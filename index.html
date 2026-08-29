@@ -168,6 +168,34 @@
 
   select#exerciseSelect { margin-bottom: 10px; }
 
+  /* Workout session mode */
+  .session-panel { text-align: center; }
+  .session-progress-track { height: 6px; border-radius: 100px; background: var(--panel-2); overflow: hidden; margin-bottom: 18px; }
+  .session-progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 100px; transition: width 0.3s; }
+  .session-step { font-size: 12px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .session-ex-name { font-size: 26px; font-weight: 800; margin-bottom: 4px; }
+  .session-ex-target { color: var(--muted); font-size: 14px; margin-bottom: 6px; }
+  .session-ex-note { color: var(--muted); font-size: 13px; margin-bottom: 18px; font-style: italic; }
+  .set-circles { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .set-circle {
+    width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--border); background: var(--panel-2);
+    color: var(--muted); font-weight: 800; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .set-circle.done { background: var(--down); border-color: var(--down); color: white; transform: scale(1.05); }
+  .session-inputs { display: flex; gap: 10px; margin-bottom: 20px; }
+  .session-inputs .field { flex: 1; }
+  .session-actions { display: flex; gap: 10px; }
+  .session-actions button { flex: 1; }
+  .btn-ghost {
+    padding: 14px 16px; border-radius: 12px; border: 1px solid var(--border); background: transparent;
+    color: var(--muted); font-size: 14px; cursor: pointer;
+  }
+  .session-complete { text-align: center; padding: 20px 0; }
+  .session-complete .big-emoji { font-size: 48px; margin-bottom: 10px; }
+  .session-complete h3 { font-size: 22px; margin: 0 0 6px; }
+  .session-complete p { color: var(--muted); margin: 0 0 20px; }
+
   .toast {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
     background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
@@ -296,7 +324,13 @@
       <h2>Today's workout</h2>
       <div id="workoutFocusRow" class="muted-note" style="margin-bottom:10px;"></div>
       <div id="workoutContent"><p class="muted-note">No workout generated yet today.</p></div>
+      <button class="btn-primary hidden" id="startWorkoutBtn" style="margin-top:10px;">Start Workout</button>
       <button class="btn-primary" id="generateWorkoutBtn" style="margin-top:10px;">Generate today's workout</button>
+    </div>
+
+    <div id="sessionCard" class="card hidden">
+      <div class="session-progress-track"><div class="session-progress-fill" id="sessionProgressFill" style="width:0%"></div></div>
+      <div id="sessionBody"></div>
     </div>
 
     <div class="card">
@@ -397,6 +431,7 @@ let ALL_EXERCISE_LOGS = [];
 let MY_PROFILE = null;
 let PARTNER_PROFILE = null;
 let TODAY_WORKOUT = null;
+let SESSION = null;
 let weightChart = null;
 let exerciseChart = null;
 
@@ -866,19 +901,186 @@ async function generateWorkout() {
   }
 }
 
+function sessionStorageKey() {
+  return `ft_session_${ME}_${todayStr()}`;
+}
+
+function loadSessionFromStorage() {
+  try {
+    const raw = localStorage.getItem(sessionStorageKey());
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveSessionToStorage() {
+  if (SESSION) localStorage.setItem(sessionStorageKey(), JSON.stringify(SESSION));
+}
+
+function clearSessionStorage() {
+  localStorage.removeItem(sessionStorageKey());
+}
+
+function todaysLoggedExerciseNames() {
+  return new Set(ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME && l.entry_date === todayStr()).map((l) => l.exercise_name.toLowerCase()));
+}
+
+function startWorkout() {
+  if (!TODAY_WORKOUT) return;
+  const loggedAlready = todaysLoggedExerciseNames();
+  SESSION = {
+    exerciseIndex: 0,
+    setsDone: TODAY_WORKOUT.exercises.map((ex) => new Array(ex.sets || 3).fill(false)),
+    weights: TODAY_WORKOUT.exercises.map((ex) => ex.targetWeight ?? ""),
+    reps: TODAY_WORKOUT.exercises.map((ex) => ex.reps ?? ""),
+    completed: TODAY_WORKOUT.exercises.map((ex) => loggedAlready.has(ex.name.toLowerCase())),
+  };
+  while (SESSION.exerciseIndex < SESSION.completed.length && SESSION.completed[SESSION.exerciseIndex]) {
+    SESSION.exerciseIndex++;
+  }
+  saveSessionToStorage();
+  $("sessionCard").classList.remove("hidden");
+  $("workoutContent").classList.add("hidden");
+  $("startWorkoutBtn").classList.add("hidden");
+  $("generateWorkoutBtn").classList.add("hidden");
+  renderSession();
+}
+
+function resumeSessionIfAny() {
+  const saved = loadSessionFromStorage();
+  if (saved && TODAY_WORKOUT) {
+    SESSION = saved;
+    $("sessionCard").classList.remove("hidden");
+    $("workoutContent").classList.add("hidden");
+    $("startWorkoutBtn").classList.add("hidden");
+    $("generateWorkoutBtn").classList.add("hidden");
+    renderSession();
+    return true;
+  }
+  return false;
+}
+
+function toggleSet(setIdx) {
+  const ei = SESSION.exerciseIndex;
+  SESSION.setsDone[ei][setIdx] = !SESSION.setsDone[ei][setIdx];
+  saveSessionToStorage();
+  renderSession();
+}
+
+async function finishExerciseAndAdvance() {
+  const ei = SESSION.exerciseIndex;
+  const ex = TODAY_WORKOUT.exercises[ei];
+  const doneCount = SESSION.setsDone[ei].filter(Boolean).length;
+  const weightVal = $("sessWeight") ? $("sessWeight").value : SESSION.weights[ei];
+  const repsVal = $("sessReps") ? $("sessReps").value : SESSION.reps[ei];
+
+  await logExerciseSilent(ex.name, weightVal, repsVal, doneCount || ex.sets);
+  SESSION.completed[ei] = true;
+  SESSION.exerciseIndex++;
+  saveSessionToStorage();
+
+  if (SESSION.exerciseIndex >= TODAY_WORKOUT.exercises.length) {
+    clearSessionStorage();
+    renderSessionComplete();
+  } else {
+    renderSession();
+  }
+}
+
+async function logExerciseSilent(name, weight, reps, sets) {
+  const { best } = personalRecords(ME);
+  const prevBest = best[name.toLowerCase()];
+  const w = weight === "" || weight == null ? null : parseFloat(weight);
+  await sb.from("exercise_logs").insert({
+    user_name: ME, entry_date: todayStr(), exercise_name: name,
+    weight: w, reps: reps === "" || reps == null ? null : parseInt(reps, 10), sets: sets || null,
+  });
+  const isPR = w != null && (prevBest === undefined || w > prevBest);
+  toast(isPR ? `New PR on ${name}! 🏆 +25 XP` : `${name} logged ✓`);
+  await loadAll();
+}
+
+function renderSession() {
+  const ei = SESSION.exerciseIndex;
+  const total = TODAY_WORKOUT.exercises.length;
+  const overallPct = Math.round((ei / total) * 100);
+  $("sessionProgressFill").style.width = overallPct + "%";
+
+  const ex = TODAY_WORKOUT.exercises[ei];
+  const setsDone = SESSION.setsDone[ei];
+  const allDone = setsDone.every(Boolean);
+
+  $("sessionBody").innerHTML = `
+    <div class="session-panel">
+      <div class="session-step">Exercise ${ei + 1} of ${total}</div>
+      <div class="session-ex-name">${escapeHtml(ex.name)}</div>
+      <div class="session-ex-target">${ex.sets} sets × ${ex.reps} reps @ ${ex.targetWeight || "bodyweight"} lb</div>
+      ${ex.note ? `<div class="session-ex-note">${escapeHtml(ex.note)}</div>` : ""}
+      <div class="set-circles">
+        ${setsDone.map((done, i) => `<button type="button" class="set-circle ${done ? "done" : ""}" data-set="${i}">${done ? "✓" : i + 1}</button>`).join("")}
+      </div>
+      <div class="session-inputs">
+        <div class="field"><label>Weight (lbs)</label><input type="number" id="sessWeight" step="0.5" value="${SESSION.weights[ei]}" /></div>
+        <div class="field"><label>Reps</label><input type="number" id="sessReps" value="${SESSION.reps[ei]}" /></div>
+      </div>
+      <div class="session-actions">
+        <button type="button" class="btn-ghost" id="skipExBtn">Skip</button>
+        <button type="button" class="btn-primary" id="nextExBtn" ${allDone ? "" : "disabled"}>${ei === total - 1 ? "Finish Workout" : "Next Exercise"}</button>
+      </div>
+    </div>`;
+
+  $("sessionBody").querySelectorAll(".set-circle").forEach((btn) => {
+    btn.onclick = () => toggleSet(parseInt(btn.dataset.set, 10));
+  });
+  $("sessWeight").oninput = (e) => { SESSION.weights[ei] = e.target.value; saveSessionToStorage(); };
+  $("sessReps").oninput = (e) => { SESSION.reps[ei] = e.target.value; saveSessionToStorage(); };
+  $("skipExBtn").onclick = () => {
+    SESSION.exerciseIndex++;
+    saveSessionToStorage();
+    if (SESSION.exerciseIndex >= total) { clearSessionStorage(); renderSessionComplete(); } else { renderSession(); }
+  };
+  $("nextExBtn").onclick = finishExerciseAndAdvance;
+}
+
+function renderSessionComplete() {
+  $("sessionProgressFill").style.width = "100%";
+  $("sessionBody").innerHTML = `
+    <div class="session-complete">
+      <div class="big-emoji">🎉</div>
+      <h3>Workout Complete!</h3>
+      <p>${TODAY_WORKOUT.exercises.length} exercises logged. Nice work, ${escapeHtml(ME)}.</p>
+      <button type="button" class="btn-primary" id="sessionDoneBtn">Done</button>
+    </div>`;
+  $("sessionDoneBtn").onclick = () => {
+    SESSION = null;
+    $("sessionCard").classList.add("hidden");
+    $("workoutContent").classList.remove("hidden");
+    $("generateWorkoutBtn").classList.remove("hidden");
+    renderWorkoutTab();
+  };
+}
+
 function renderWorkoutTab() {
   const focusRow = $("workoutFocusRow");
   const content = $("workoutContent");
   const genBtn = $("generateWorkoutBtn");
+  const startBtn = $("startWorkoutBtn");
+
+  if (resumeSessionIfAny()) return;
+  $("sessionCard").classList.add("hidden");
+  content.classList.remove("hidden");
+  genBtn.classList.remove("hidden");
 
   if (!TODAY_WORKOUT) {
     focusRow.textContent = MY_PROFILE?.focus ? `Focus: ${MY_PROFILE.focus}` : "";
     content.innerHTML = '<p class="muted-note">No workout generated yet today.</p>';
     genBtn.textContent = "Generate today's workout";
+    startBtn.classList.add("hidden");
     return;
   }
   focusRow.textContent = `Focus: ${TODAY_WORKOUT.focus}`;
   genBtn.textContent = "Regenerate today's workout";
+  startBtn.classList.remove("hidden");
+  startBtn.onclick = startWorkout;
   const { best } = personalRecords(ME);
   content.innerHTML = TODAY_WORKOUT.exercises.map((ex) => {
     const prevBest = best[ex.name.toLowerCase()];
