@@ -5,47 +5,58 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Fit Together</title>
 <link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
+  /* Palette: charcoal ink / warm off-white surfaces / cobalt (you) / ember (partner) / brass (xp) */
   :root {
-    --bg: #0b0d12;
-    --panel: #151821;
-    --panel-2: #1c202b;
-    --border: #262b38;
-    --text: #f2f3f5;
-    --muted: #8b93a7;
-    --accent: #5b8cff;
-    --accent-2: #ffb020;
-    --me: #5b8cff;
-    --partner: #ff7a5b;
-    --up: #ff5b6e;
-    --down: #34d39a;
-    --radius: 16px;
+    --bg: #0c0e13;
+    --panel: #15181f;
+    --panel-2: #1b1f28;
+    --border: #272b35;
+    --text: #eef0f4;
+    --muted: #8992a3;
+    --accent: #4d7cf2;
+    --gold: #d99a3d;
+    --me: #4d7cf2;
+    --partner: #e2653f;
+    --up: #e5495c;
+    --down: #2fb885;
+    --radius: 14px;
+    --font-display: "Space Grotesk", "Segoe UI", sans-serif;
+    --font-body: "IBM Plex Sans", -apple-system, sans-serif;
   }
   html[data-theme="light"] {
-    --bg: #f4f5f8;
+    --bg: #f6f4ef;
     --panel: #ffffff;
-    --panel-2: #f0f1f5;
-    --border: #e2e4ea;
-    --text: #14151a;
-    --muted: #6b7385;
-    --accent: #3f6bff;
-    --accent-2: #d98a00;
-    --me: #3f6bff;
-    --partner: #e35a3a;
-    --up: #d92d47;
-    --down: #17a06a;
+    --panel-2: #efece3;
+    --border: #ddd8ca;
+    --text: #17181c;
+    --muted: #6b7080;
+    --accent: #3660df;
+    --gold: #a86c1c;
+    --me: #3660df;
+    --partner: #c5502e;
+    --up: #c22c40;
+    --down: #147d5c;
   }
   * { box-sizing: border-box; }
+  ::selection { background: var(--accent); color: white; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   html, body {
     margin: 0; padding: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     transition: background 0.2s, color 0.2s;
   }
+  h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.01em; }
   #app { max-width: 480px; margin: 0 auto; min-height: 100dvh; padding: 20px 16px 90px; }
   .hidden { display: none !important; }
 
@@ -98,22 +109,26 @@
   /* Level / XP */
   .level-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
   .level-badge {
-    width: 46px; height: 46px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; color: white; flex-shrink: 0;
+    width: 46px; height: 46px; border-radius: 50%; background: var(--gold); border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; color: #1a1200; flex-shrink: 0;
+    font-family: var(--font-display);
   }
   .level-info { flex: 1; }
   .level-info .name { font-weight: 700; font-size: 15px; }
   .level-info .xp-text { font-size: 12px; color: var(--muted); }
   .xp-bar-track { height: 8px; border-radius: 100px; background: var(--panel-2); overflow: hidden; }
-  .xp-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 100px; transition: width 0.4s; }
+  .xp-bar-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.4s; }
 
-  .streak-row { display: flex; gap: 12px; }
-  .streak-box { flex: 1; background: var(--panel-2); border-radius: 12px; padding: 14px; text-align: center; border: 1px solid var(--border); }
-  .streak-box .n { font-size: 28px; font-weight: 700; line-height: 1; }
-  .streak-box .lbl { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .status-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: start; margin-bottom: 14px; }
+  .status-streaks { display: flex; flex-direction: column; gap: 8px; }
+
+  .streak-box { flex: 1; background: var(--panel-2); border-radius: 12px; padding: 10px 12px; text-align: left; border: 1px solid var(--border); display: flex; align-items: baseline; justify-content: space-between; }
+  .streak-box .n { font-size: 20px; font-weight: 700; line-height: 1; font-family: var(--font-display); display: flex; align-items: center; gap: 4px; }
+  .streak-box .lbl { font-size: 11px; color: var(--muted); }
   .streak-box.me .n { color: var(--me); }
   .streak-box.partner .n { color: var(--partner); }
 
+  .badge-caption { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 700; margin-bottom: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
   .badge-row { display: flex; gap: 8px; flex-wrap: wrap; }
   .badge-chip {
     display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 100px;
@@ -161,7 +176,7 @@
   .exercise-card .ex-name { font-weight: 700; font-size: 15px; }
   .exercise-card .ex-target { font-size: 12px; color: var(--muted); }
   .exercise-card .ex-note { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-  .exercise-card .pr-tag { background: var(--accent-2); color: #1a1200; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; margin-left: 6px; }
+  .exercise-card .pr-tag { background: var(--gold); color: #1a1200; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; margin-left: 6px; }
   .log-set-row { display: flex; gap: 8px; }
   .log-set-row input { flex: 1; }
   .log-set-row button { flex-shrink: 0; }
@@ -171,7 +186,7 @@
   /* Workout session mode */
   .session-panel { text-align: center; }
   .session-progress-track { height: 6px; border-radius: 100px; background: var(--panel-2); overflow: hidden; margin-bottom: 18px; }
-  .session-progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 100px; transition: width 0.3s; }
+  .session-progress-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.3s; }
   .session-step { font-size: 12px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
   .session-ex-name { font-size: 26px; font-weight: 800; margin-bottom: 4px; }
   .session-ex-target { color: var(--muted); font-size: 14px; margin-bottom: 6px; }
@@ -233,8 +248,8 @@
       <div class="me-tag">Logged in as <strong id="meLabel"></strong></div>
     </div>
     <div>
-      <button class="icon-btn" id="themeToggleBtn" title="Toggle theme">🌓</button>
-      <button class="icon-btn" id="switchUserBtn" title="Switch user">⇄</button>
+      <button class="icon-btn" id="themeToggleBtn" title="Toggle theme"></button>
+      <button class="icon-btn" id="switchUserBtn" title="Switch user"></button>
     </div>
   </header>
 
@@ -248,35 +263,31 @@
 
   <!-- HOME TAB -->
   <div id="tab-home" class="tab-panel">
-    <div class="card">
-      <h2>Level</h2>
-      <div class="level-row">
-        <div class="level-badge" id="levelBadge">1</div>
-        <div class="level-info">
-          <div class="name" id="levelName">Rookie</div>
-          <div class="xp-text" id="xpText">0 / 100 XP</div>
+    <div class="card status-card">
+      <div class="status-grid">
+        <div class="status-level">
+          <div class="level-row">
+            <div class="level-badge" id="levelBadge">1</div>
+            <div class="level-info">
+              <div class="name" id="levelName">Rookie</div>
+              <div class="xp-text" id="xpText">0 / 100 XP</div>
+            </div>
+          </div>
+          <div class="xp-bar-track"><div class="xp-bar-fill" id="xpBarFill" style="width:0%"></div></div>
+        </div>
+        <div class="status-streaks">
+          <div class="streak-box me">
+            <div class="n" id="myStreakIcon">0</div>
+            <div class="lbl" id="myStreakLbl">You</div>
+          </div>
+          <div class="streak-box partner">
+            <div class="n" id="partnerStreakIcon">0</div>
+            <div class="lbl" id="partnerStreakLbl">Partner</div>
+          </div>
         </div>
       </div>
-      <div class="xp-bar-track"><div class="xp-bar-fill" id="xpBarFill" style="width:0%"></div></div>
-    </div>
-
-    <div class="card">
-      <h2>Badges</h2>
+      <div class="badge-caption">Badges</div>
       <div class="badge-row" id="badgeRow"></div>
-    </div>
-
-    <div class="card">
-      <h2>Streaks</h2>
-      <div class="streak-row">
-        <div class="streak-box me">
-          <div class="n">🔥 <span id="myStreak">0</span></div>
-          <div class="lbl" id="myStreakLbl">You</div>
-        </div>
-        <div class="streak-box partner">
-          <div class="n">🔥 <span id="partnerStreak">0</span></div>
-          <div class="lbl" id="partnerStreakLbl">Partner</div>
-        </div>
-      </div>
     </div>
 
     <div class="card">
@@ -437,6 +448,26 @@ let exerciseChart = null;
 
 const $ = (id) => document.getElementById(id);
 
+/* Inline SVG icons, 20x20, stroke-based — used instead of emoji throughout */
+const ICON_PATHS = {
+  flame: '<path d="M12 2c1 3-2 4-2 7a4 4 0 0 0 8 0c0-1-.5-2-1-2.5.5 2-1 3-2 3-1.5 0-2-1.2-1.5-2.5C14 6 13 4 12 2Z"/><path d="M7 13a5 5 0 0 0 10 0c0-2-1-3-2-4 .3 1.5-.5 2.5-1.5 2.5-1.2 0-1.8-1-1.3-2.2C10.5 10.5 7 11 7 13Z"/>',
+  sunMoon: '<path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/>',
+  swap: '<path d="M7 4v13M7 4 3 8M7 4l4 4M17 20V7m0 13 4-4m-4 4-4-4"/>',
+  medal: '<circle cx="12" cy="14" r="6"/><path d="m9 10-3-6M15 10l3-6M9.5 14.5 12 17l4-4"/>',
+  trophy: '<path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a2 2 0 0 0 0 4h1M16 5h3a2 2 0 0 1 0 4h-1"/><path d="M12 12v3M9 20h6M9.5 15.5h5l.5 4.5h-6l.5-4.5Z"/>',
+  star: '<path d="M12 3l2.5 5.6 6.1.6-4.6 4.1 1.3 6-5.3-3.1L6.7 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z"/>',
+  trending: '<path d="M3 17 9 11l4 4 8-8"/><path d="M17 7h4v4"/>',
+  checklist: '<path d="M4 6h2M4 12h2M4 18h2"/><rect x="9" y="4" width="11" height="4" rx="1"/><rect x="9" y="10" width="11" height="4" rx="1"/><rect x="9" y="16" width="11" height="4" rx="1"/>',
+  dumbbell: '<path d="M4 10v4M20 10v4M2 12h2M20 12h2M6 8v8M18 8v8M9 12h6"/>',
+  bolt: '<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/>',
+  run: '<circle cx="14" cy="4.5" r="1.8"/><path d="M9 20l3-4 2 2-1.5 3M6 12l3-2 3 1 2-3 4 1M8 9l-2 2 1 3"/>',
+  check: '<path d="M4 12l5 5 11-11"/>',
+  target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/>',
+};
+function icon(name, size = 18) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px">${ICON_PATHS[name] || ""}</svg>`;
+}
+
 function toast(msg) {
   const el = $("toast");
   el.textContent = msg;
@@ -474,7 +505,7 @@ function renderOnboardStep(step, data = {}) {
   if (step === "name") {
     ob.innerHTML = `
       <div class="ob-step">
-        <h1>Fit Together 💪</h1>
+        <h1>Fit Together</h1>
         <p class="sub">A shared tracker so you two can push each other.</p>
         <input id="nameInput" type="text" placeholder="What's your name?" maxlength="24" />
         <button class="btn-primary" id="nextBtn">Continue</button>
@@ -512,15 +543,15 @@ function renderOnboardStep(step, data = {}) {
     };
   } else if (step === "focus") {
     const focuses = [
-      ["Strength", "🏋️"], ["Muscle Gain", "💪"], ["Fat Loss", "🔥"],
-      ["General Fitness", "⚡"], ["Endurance", "🏃"],
+      ["Strength", "dumbbell"], ["Muscle Gain", "trending"], ["Fat Loss", "flame"],
+      ["General Fitness", "bolt"], ["Endurance", "run"],
     ];
     ob.innerHTML = `
       <div class="ob-step">
         <h1>What's your main focus?</h1>
         <p class="sub">This shapes the daily workouts we generate for you.</p>
         <div class="choice-grid">
-          ${focuses.map(([f, e]) => `<div class="choice-card" data-v="${f}"><span class="emoji">${e}</span>${f}</div>`).join("")}
+          ${focuses.map(([f, ic]) => `<div class="choice-card" data-v="${f}"><span class="emoji">${icon(ic, 26)}</span>${f}</div>`).join("")}
         </div>
         <button class="btn-primary" id="nextBtn" disabled>Continue</button>
       </div>`;
@@ -598,6 +629,8 @@ function showApp() {
   $("onboard").classList.add("hidden");
   $("app").classList.remove("hidden");
   $("meLabel").textContent = ME;
+  $("themeToggleBtn").innerHTML = icon("sunMoon");
+  $("switchUserBtn").innerHTML = icon("swap");
   $("entryDate").value = todayStr();
 
   $("switchUserBtn").onclick = () => {
@@ -672,7 +705,7 @@ async function saveEntry(e) {
   };
   const { error } = await sb.from("fit_entries").upsert(payload, { onConflict: "user_name,entry_date" });
   if (error) { toast("Save failed"); console.error(error); return; }
-  toast("Saved ✓ +10 XP");
+  toast("Saved · +10 XP");
   $("entryWeight").value = "";
   $("entryNote").value = "";
   $("entryGym").checked = false;
@@ -751,13 +784,13 @@ function badgeDefinitions(name) {
   const exerciseCount = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name).length;
   const { prCount } = personalRecords(name);
   return [
-    { key: "first_gym", emoji: "🥇", label: "First Steps", earned: gymDays >= 1 },
-    { key: "streak3", emoji: "🔥", label: "3-Day Streak", earned: best >= 3 },
-    { key: "streak7", emoji: "🔥", label: "7-Day Streak", earned: best >= 7 },
-    { key: "streak30", emoji: "🌟", label: "30-Day Streak", earned: best >= 30 },
-    { key: "first_pr", emoji: "📈", label: "First PR", earned: prCount >= 1 },
-    { key: "pr5", emoji: "🏆", label: "5 PRs", earned: prCount >= 5 },
-    { key: "logger10", emoji: "📋", label: "10 Workouts Logged", earned: exerciseCount >= 10 },
+    { key: "first_gym", icon: "medal", label: "First Steps", earned: gymDays >= 1 },
+    { key: "streak3", icon: "flame", label: "3-Day Streak", earned: best >= 3 },
+    { key: "streak7", icon: "flame", label: "7-Day Streak", earned: best >= 7 },
+    { key: "streak30", icon: "star", label: "30-Day Streak", earned: best >= 30 },
+    { key: "first_pr", icon: "trending", label: "First PR", earned: prCount >= 1 },
+    { key: "pr5", icon: "trophy", label: "5 PRs", earned: prCount >= 5 },
+    { key: "logger10", icon: "checklist", label: "10 Workouts Logged", earned: exerciseCount >= 10 },
   ];
 }
 
@@ -771,7 +804,7 @@ function renderXP() {
 
   const defs = badgeDefinitions(ME);
   $("badgeRow").innerHTML = defs.map((b) =>
-    `<div class="badge-chip ${b.earned ? "" : "locked"}"><span>${b.emoji}</span><span>${b.label}</span></div>`
+    `<div class="badge-chip ${b.earned ? "" : "locked"}">${icon(b.icon)}<span>${b.label}</span></div>`
   ).join("");
 }
 
@@ -786,14 +819,14 @@ function renderHome() {
   $("legendMe").textContent = ME;
   $("legendPartner").textContent = partner;
 
-  $("myStreak").textContent = computeStreak(ME);
-  $("partnerStreak").textContent = computeStreak(partner);
+  $("myStreakIcon").innerHTML = `${icon("flame")} ${computeStreak(ME)}`;
+  $("partnerStreakIcon").innerHTML = `${icon("flame")} ${computeStreak(partner)}`;
 
   const t = todayStr();
   const myToday = ALL_ENTRIES.find((e) => e.user_name === ME && e.entry_date === t);
   const partnerToday = ALL_ENTRIES.find((e) => e.user_name === partner && e.entry_date === t);
-  $("todayMeCheck").textContent = myToday && myToday.gym ? "✅" : "—";
-  $("todayPartnerCheck").textContent = partnerToday && partnerToday.gym ? "✅" : "—";
+  $("todayMeCheck").innerHTML = myToday && myToday.gym ? icon("check") : "—";
+  $("todayPartnerCheck").innerHTML = partnerToday && partnerToday.gym ? icon("check") : "—";
 
   renderXP();
   renderWeightChart();
@@ -841,7 +874,7 @@ function renderLog() {
   list.innerHTML = combined.map((e) => {
     const color = e.user_name === ME ? "var(--me)" : "var(--partner)";
     const w = e.weight != null ? e.weight + " lb" : "";
-    const gym = e.gym ? '<span class="gym-yes">🏋️</span>' : "";
+    const gym = e.gym ? `<span class="gym-yes">${icon("dumbbell", 14)}</span>` : "";
     const note = e.note ? escapeHtml(e.note) : "";
     return `<div class="log-item"><span class="dot" style="background:${color}"></span><span class="date">${e.entry_date.slice(5)}</span><span class="w">${w}</span>${gym}<span class="note">${note}</span></div>`;
   }).join("");
@@ -891,7 +924,7 @@ async function generateWorkout() {
 
     await loadTodayWorkout();
     renderWorkoutTab();
-    toast("Workout ready 💪");
+    toast("Workout ready");
   } catch (err) {
     console.error(err);
     toast("Couldn't generate workout — check the coach connection");
@@ -995,7 +1028,7 @@ async function logExerciseSilent(name, weight, reps, sets) {
     weight: w, reps: reps === "" || reps == null ? null : parseInt(reps, 10), sets: sets || null,
   });
   const isPR = w != null && (prevBest === undefined || w > prevBest);
-  toast(isPR ? `New PR on ${name}! 🏆 +25 XP` : `${name} logged ✓`);
+  toast(isPR ? `New PR on ${name} · +25 XP` : `${name} logged`);
   await loadAll();
 }
 
@@ -1045,7 +1078,7 @@ function renderSessionComplete() {
   $("sessionProgressFill").style.width = "100%";
   $("sessionBody").innerHTML = `
     <div class="session-complete">
-      <div class="big-emoji">🎉</div>
+      <div class="big-emoji">${icon("star", 40)}</div>
       <h3>Workout Complete!</h3>
       <p>${TODAY_WORKOUT.exercises.length} exercises logged. Nice work, ${escapeHtml(ME)}.</p>
       <button type="button" class="btn-primary" id="sessionDoneBtn">Done</button>
@@ -1121,7 +1154,7 @@ async function logExercise(name, weight, reps, sets) {
   });
   if (error) { toast("Log failed"); console.error(error); return; }
   const isPR = w != null && (prevBest === undefined || w > prevBest);
-  toast(isPR ? `New PR on ${name}! 🏆 +25 XP` : "Logged ✓ +5 XP");
+  toast(isPR ? `New PR on ${name} · +25 XP` : "Logged · +5 XP");
   await loadAll();
   renderWorkoutTab();
 }
@@ -1207,7 +1240,7 @@ function renderCoupleTab() {
   const combined = myDays + partnerDays;
   const combinedTarget = target * 2;
   $("challengeSummary").textContent = combined >= combinedTarget
-    ? "You two crushed this week's shared goal! 🎉"
+    ? "You two crushed this week's shared goal."
     : `${combined}/${combinedTarget} combined gym days this week. Keep pushing each other.`;
 
   const myXP = computeXP(ME);
@@ -1243,7 +1276,7 @@ async function saveSetup() {
   };
   const { error } = await sb.from("profiles").upsert(payload);
   if (error) { toast("Save failed"); console.error(error); return; }
-  toast("Preferences saved ✓");
+  toast("Preferences saved");
   const { data } = await sb.from("profiles").select("*").eq("user_name", ME).maybeSingle();
   MY_PROFILE = data;
 }
