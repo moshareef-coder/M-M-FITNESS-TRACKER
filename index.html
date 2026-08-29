@@ -7,7 +7,7 @@
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
@@ -26,7 +26,6 @@
     --up: #e5495c;
     --down: #2fb885;
     --radius: 14px;
-    --font-display: "Space Grotesk", "Segoe UI", sans-serif;
     --font-body: "IBM Plex Sans", -apple-system, sans-serif;
   }
   html[data-theme="light"] {
@@ -56,8 +55,7 @@
     -webkit-font-smoothing: antialiased;
     transition: background 0.2s, color 0.2s;
   }
-  h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.01em; }
-  #app { max-width: 480px; margin: 0 auto; min-height: 100dvh; padding: 20px 16px 90px; }
+  #app { max-width: 480px; margin: 0 auto; min-height: 100dvh; padding: 20px 16px calc(76px + env(safe-area-inset-bottom, 0px)); }
   .hidden { display: none !important; }
 
   /* Onboarding */
@@ -88,17 +86,27 @@
   .choice-card .emoji { font-size: 24px; display: block; margin-bottom: 6px; }
   .choice-card.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--panel)); }
 
+  .greeting { margin-bottom: 14px; }
+  .greeting .hi { font-size: 21px; font-weight: 700; }
+  .greeting .sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
   header.top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   header.top h1 { font-size: 20px; margin: 0; }
   header.top .me-tag { font-size: 12px; color: var(--muted); }
   .icon-btn { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 4px 6px; }
 
-  .tabs { display: flex; gap: 6px; margin-bottom: 16px; overflow-x: auto; }
-  .tab-btn {
-    flex-shrink: 0; padding: 8px 14px; border-radius: 100px; border: 1px solid var(--border);
-    background: var(--panel); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer;
+  .tabs {
+    position: fixed; bottom: 0; left: 0; right: 0; max-width: 480px; margin: 0 auto;
+    display: flex; background: var(--panel); border-top: 1px solid var(--border);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+    z-index: 10;
   }
-  .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .tab-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 6px 2px; border: none; background: transparent; color: var(--muted);
+    font-size: 10.5px; font-weight: 600; cursor: pointer; min-height: 44px;
+  }
+  .tab-btn.active { color: var(--accent); }
 
   .card {
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
@@ -111,7 +119,6 @@
   .level-badge {
     width: 46px; height: 46px; border-radius: 50%; background: var(--gold); border: 2px solid var(--border);
     display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; color: #1a1200; flex-shrink: 0;
-    font-family: var(--font-display);
   }
   .level-info { flex: 1; }
   .level-info .name { font-weight: 700; font-size: 15px; }
@@ -120,10 +127,10 @@
   .xp-bar-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.4s; }
 
   .status-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: start; margin-bottom: 14px; }
-  .status-streaks { display: flex; flex-direction: column; gap: 8px; }
+  .status-streaks { display: flex; flex-direction: column; gap: 10px; padding-left: 16px; border-left: 1px solid var(--border); }
 
-  .streak-box { flex: 1; background: var(--panel-2); border-radius: 12px; padding: 10px 12px; text-align: left; border: 1px solid var(--border); display: flex; align-items: baseline; justify-content: space-between; }
-  .streak-box .n { font-size: 20px; font-weight: 700; line-height: 1; font-family: var(--font-display); display: flex; align-items: center; gap: 4px; }
+  .streak-box { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .streak-box .n { font-size: 18px; font-weight: 700; line-height: 1; display: flex; align-items: center; gap: 4px; }
   .streak-box .lbl { font-size: 11px; color: var(--muted); }
   .streak-box.me .n { color: var(--me); }
   .streak-box.partner .n { color: var(--partner); }
@@ -141,9 +148,10 @@
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
-  .today-status { display: flex; gap: 10px; }
-  .status-pill { flex: 1; border-radius: 12px; padding: 10px 12px; border: 1px solid var(--border); background: var(--panel-2); font-size: 13px; display: flex; align-items: center; justify-content: space-between; }
-  .status-pill .who { color: var(--muted); }
+  .today-status { display: flex; flex-direction: column; }
+  .status-pill { padding: 8px 0; font-size: 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .status-pill:last-child { border-bottom: none; padding-bottom: 0; }
+  .status-pill .who { color: var(--text); font-weight: 500; }
 
   form.form-grid { display: flex; flex-direction: column; gap: 10px; }
   .row2 { display: flex; gap: 10px; }
@@ -171,12 +179,18 @@
   .muted-note { color: var(--muted); font-size: 13px; }
 
   /* Workout tab */
-  .exercise-card { border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; background: var(--panel-2); }
-  .exercise-card .ex-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-  .exercise-card .ex-name { font-weight: 700; font-size: 15px; }
-  .exercise-card .ex-target { font-size: 12px; color: var(--muted); }
-  .exercise-card .ex-note { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-  .exercise-card .pr-tag { background: var(--gold); color: #1a1200; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; margin-left: 6px; }
+  .workout-progress-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+  .workout-progress-count { color: var(--accent); font-weight: 700; }
+  .workout-progress-track { height: 5px; border-radius: 100px; background: var(--panel-2); overflow: hidden; margin-bottom: 4px; }
+  .workout-progress-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.3s; }
+  .exercise-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .exercise-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .exercise-row .ex-icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; background: var(--panel-2); display: flex; align-items: center; justify-content: center; color: var(--muted); }
+  .exercise-row .ex-body { flex: 1; min-width: 0; }
+  .exercise-row .ex-name { font-weight: 600; font-size: 15px; }
+  .exercise-row .ex-target { font-size: 12px; color: var(--muted); }
+  .exercise-row .ex-note { font-size: 12px; color: var(--muted); margin-top: 2px; font-style: italic; }
+  .exercise-row .pr-tag { background: var(--gold); color: #1a1200; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; margin-left: 6px; }
   .log-set-row { display: flex; gap: 8px; }
   .log-set-row input { flex: 1; }
   .log-set-row button { flex-shrink: 0; }
@@ -198,6 +212,20 @@
     transition: all 0.15s;
   }
   .set-circle.done { background: var(--down); border-color: var(--down); color: white; transform: scale(1.05); }
+  .stepper-row { display: flex; justify-content: center; gap: 28px; margin-bottom: 20px; }
+  .stepper-row.compact { gap: 6px; justify-content: space-between; }
+  .stepper { text-align: center; }
+  .stepper-controls { display: flex; align-items: center; gap: 14px; }
+  .stepper-row.compact .stepper-controls { gap: 6px; flex-direction: column; }
+  .stepper-btn {
+    width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--panel-2);
+    color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;
+  }
+  .stepper-row.compact .stepper-btn { width: 30px; height: 30px; }
+  .stepper-btn:active { background: var(--border); }
+  .stepper-value { font-size: 30px; font-weight: 700; min-width: 64px; }
+  .stepper-row.compact .stepper-value { font-size: 20px; min-width: auto; }
+  .stepper-unit { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
   .session-inputs { display: flex; gap: 10px; margin-bottom: 20px; }
   .session-inputs .field { flex: 1; }
   .session-actions { display: flex; gap: 10px; }
@@ -253,16 +281,9 @@
     </div>
   </header>
 
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="home">Home</button>
-    <button class="tab-btn" data-tab="workout">Workout</button>
-    <button class="tab-btn" data-tab="progress">Progress</button>
-    <button class="tab-btn" data-tab="couple">Couple</button>
-    <button class="tab-btn" data-tab="setup">Setup</button>
-  </div>
-
   <!-- HOME TAB -->
   <div id="tab-home" class="tab-panel">
+    <div class="greeting" id="greeting"></div>
     <div class="card status-card">
       <div class="status-grid">
         <div class="status-level">
@@ -345,14 +366,10 @@
     </div>
 
     <div class="card">
-      <h2>Log a set (any exercise)</h2>
+      <h2>Log an exercise off-plan</h2>
       <form class="form-grid" id="quickLogForm">
         <div class="field"><label>Exercise</label><input type="text" id="qlName" placeholder="e.g. Bench Press" required /></div>
-        <div class="row2">
-          <div class="field"><label>Weight (lbs)</label><input type="number" id="qlWeight" step="0.5" /></div>
-          <div class="field"><label>Reps</label><input type="number" id="qlReps" /></div>
-          <div class="field"><label>Sets</label><input type="number" id="qlSets" /></div>
-        </div>
+        <div class="stepper-row" id="qlStepperRow"></div>
         <button type="submit" class="btn-primary">Log it</button>
       </form>
     </div>
@@ -424,6 +441,14 @@
     </div>
     <button class="btn-primary" id="saveSetupBtn">Save preferences</button>
   </div>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="home" data-icon="home">Home</button>
+    <button class="tab-btn" data-tab="workout" data-icon="dumbbell">Workout</button>
+    <button class="tab-btn" data-tab="progress" data-icon="trending">Progress</button>
+    <button class="tab-btn" data-tab="couple" data-icon="heart">Couple</button>
+    <button class="tab-btn" data-tab="setup" data-icon="gear">Setup</button>
+  </nav>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -462,6 +487,11 @@ const ICON_PATHS = {
   bolt: '<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/>',
   run: '<circle cx="14" cy="4.5" r="1.8"/><path d="M9 20l3-4 2 2-1.5 3M6 12l3-2 3 1 2-3 4 1M8 9l-2 2 1 3"/>',
   check: '<path d="M4 12l5 5 11-11"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
+  home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/>',
+  heart: '<path d="M12 20s-7-4.4-9.3-9C1.2 7.8 3 4.5 6.3 4.5c2 0 3.4 1.2 5.7 3.4 2.3-2.2 3.7-3.4 5.7-3.4 3.3 0 5.1 3.3 3.6 6.5C19 15.6 12 20 12 20Z"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.9 2.9l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V19a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.9-2.9l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H4a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.9-2.9l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.6V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.9 2.9l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.6 1H20a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.6 1Z"/>',
   target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/>',
 };
 function icon(name, size = 18) {
@@ -649,10 +679,13 @@ function showApp() {
   };
   $("logForm").addEventListener("submit", saveEntry);
   $("quickLogForm").addEventListener("submit", saveQuickLog);
+  renderQuickLogSteppers();
   $("generateWorkoutBtn").addEventListener("click", generateWorkout);
   $("saveSetupBtn").addEventListener("click", saveSetup);
 
   document.querySelectorAll(".tab-btn").forEach((btn) => {
+    const label = btn.textContent;
+    btn.innerHTML = `${icon(btn.dataset.icon, 20)}<span>${label}</span>`;
     btn.onclick = () => switchTab(btn.dataset.tab);
   });
 
@@ -810,7 +843,27 @@ function renderXP() {
 
 /* ---------- Render home ---------- */
 
+function greetingWord() {
+  const h = new Date().getHours();
+  if (h < 5) return "Still up";
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function renderGreeting() {
+  const t = todayStr();
+  const myToday = ALL_ENTRIES.find((e) => e.user_name === ME && e.entry_date === t);
+  const streak = computeStreak(ME);
+  let sub;
+  if (myToday && myToday.gym) sub = "You already logged the gym today. Nice.";
+  else if (streak > 0) sub = `${streak} day streak going. Don't break it today.`;
+  else sub = "No entry yet today.";
+  $("greeting").innerHTML = `<div class="hi">${greetingWord()}, ${escapeHtml(ME)}</div><div class="sub">${sub}</div>`;
+}
+
 function renderHome() {
+  renderGreeting();
   const partner = partnerName();
   $("myStreakLbl").textContent = ME;
   $("partnerStreakLbl").textContent = partner;
@@ -1003,10 +1056,7 @@ async function finishExerciseAndAdvance() {
   const ei = SESSION.exerciseIndex;
   const ex = TODAY_WORKOUT.exercises[ei];
   const doneCount = SESSION.setsDone[ei].filter(Boolean).length;
-  const weightVal = $("sessWeight") ? $("sessWeight").value : SESSION.weights[ei];
-  const repsVal = $("sessReps") ? $("sessReps").value : SESSION.reps[ei];
-
-  await logExerciseSilent(ex.name, weightVal, repsVal, doneCount || ex.sets);
+  await logExerciseSilent(ex.name, SESSION.weights[ei], SESSION.reps[ei], doneCount || ex.sets);
   SESSION.completed[ei] = true;
   SESSION.exerciseIndex++;
   saveSessionToStorage();
@@ -1049,23 +1099,47 @@ function renderSession() {
       <div class="session-ex-target">${ex.sets} sets × ${ex.reps} reps @ ${ex.targetWeight || "bodyweight"} lb</div>
       ${ex.note ? `<div class="session-ex-note">${escapeHtml(ex.note)}</div>` : ""}
       <div class="set-circles">
-        ${setsDone.map((done, i) => `<button type="button" class="set-circle ${done ? "done" : ""}" data-set="${i}">${done ? "✓" : i + 1}</button>`).join("")}
+        ${setsDone.map((done, i) => `<button type="button" class="set-circle ${done ? "done" : ""}" data-set="${i}">${done ? icon("check", 16) : i + 1}</button>`).join("")}
       </div>
-      <div class="session-inputs">
-        <div class="field"><label>Weight (lbs)</label><input type="number" id="sessWeight" step="0.5" value="${SESSION.weights[ei]}" /></div>
-        <div class="field"><label>Reps</label><input type="number" id="sessReps" value="${SESSION.reps[ei]}" /></div>
+      <div class="stepper-row">
+        <div class="stepper">
+          <div class="stepper-controls">
+            <button type="button" class="stepper-btn" id="sessWeightMinus">${icon("minus", 16)}</button>
+            <div><div class="stepper-value" id="sessWeightVal">${SESSION.weights[ei] || 0}</div><div class="stepper-unit">lbs</div></div>
+            <button type="button" class="stepper-btn" id="sessWeightPlus">${icon("plus", 16)}</button>
+          </div>
+        </div>
+        <div class="stepper">
+          <div class="stepper-controls">
+            <button type="button" class="stepper-btn" id="sessRepsMinus">${icon("minus", 16)}</button>
+            <div><div class="stepper-value" id="sessRepsVal">${SESSION.reps[ei] || 0}</div><div class="stepper-unit">reps</div></div>
+            <button type="button" class="stepper-btn" id="sessRepsPlus">${icon("plus", 16)}</button>
+          </div>
+        </div>
       </div>
       <div class="session-actions">
         <button type="button" class="btn-ghost" id="skipExBtn">Skip</button>
-        <button type="button" class="btn-primary" id="nextExBtn" ${allDone ? "" : "disabled"}>${ei === total - 1 ? "Finish Workout" : "Next Exercise"}</button>
+        <button type="button" class="btn-primary" id="nextExBtn" ${allDone ? "" : "disabled"}>${icon("check", 16)} ${ei === total - 1 ? "Finish Workout" : "Save & Next"}</button>
       </div>
     </div>`;
 
   $("sessionBody").querySelectorAll(".set-circle").forEach((btn) => {
     btn.onclick = () => toggleSet(parseInt(btn.dataset.set, 10));
   });
-  $("sessWeight").oninput = (e) => { SESSION.weights[ei] = e.target.value; saveSessionToStorage(); };
-  $("sessReps").oninput = (e) => { SESSION.reps[ei] = e.target.value; saveSessionToStorage(); };
+  const stepWeight = (delta) => {
+    SESSION.weights[ei] = Math.max(0, (parseFloat(SESSION.weights[ei]) || 0) + delta);
+    $("sessWeightVal").textContent = SESSION.weights[ei];
+    saveSessionToStorage();
+  };
+  const stepReps = (delta) => {
+    SESSION.reps[ei] = Math.max(0, (parseInt(SESSION.reps[ei], 10) || 0) + delta);
+    $("sessRepsVal").textContent = SESSION.reps[ei];
+    saveSessionToStorage();
+  };
+  $("sessWeightMinus").onclick = () => stepWeight(-2.5);
+  $("sessWeightPlus").onclick = () => stepWeight(2.5);
+  $("sessRepsMinus").onclick = () => stepReps(-1);
+  $("sessRepsPlus").onclick = () => stepReps(1);
   $("skipExBtn").onclick = () => {
     SESSION.exerciseIndex++;
     saveSessionToStorage();
@@ -1115,29 +1189,31 @@ function renderWorkoutTab() {
   startBtn.classList.remove("hidden");
   startBtn.onclick = startWorkout;
   const { best } = personalRecords(ME);
-  content.innerHTML = TODAY_WORKOUT.exercises.map((ex) => {
+  const loggedNow = todaysLoggedExerciseNames();
+  const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
+  const total = TODAY_WORKOUT.exercises.length;
+
+  const rows = TODAY_WORKOUT.exercises.map((ex) => {
     const prevBest = best[ex.name.toLowerCase()];
-    const prTag = prevBest && ex.targetWeight > prevBest ? '<span class="pr-tag">NEW PR TARGET</span>' : "";
-    return `<div class="exercise-card">
-      <div class="ex-head"><span class="ex-name">${escapeHtml(ex.name)}${prTag}</span><span class="ex-target">${ex.sets}×${ex.reps} @ ${ex.targetWeight || "BW"} lb</span></div>
-      ${ex.note ? `<div class="ex-note">${escapeHtml(ex.note)}</div>` : ""}
-      <div class="log-set-row">
-        <input type="number" step="0.5" placeholder="weight" data-ex="${escapeHtml(ex.name)}" data-field="weight" value="${ex.targetWeight || ""}" />
-        <input type="number" placeholder="reps" data-ex="${escapeHtml(ex.name)}" data-field="reps" value="${ex.reps || ""}" style="max-width:70px;" />
-        <button type="button" class="btn-secondary" style="width:auto;margin-top:0;" data-log="${escapeHtml(ex.name)}">Log</button>
+    const prTag = prevBest && ex.targetWeight > prevBest ? '<span class="pr-tag">NEW PR</span>' : "";
+    const doneMark = loggedNow.has(ex.name.toLowerCase()) ? icon("check") : icon("dumbbell");
+    return `<div class="exercise-row">
+      <div class="ex-icon">${doneMark}</div>
+      <div class="ex-body">
+        <div class="ex-name">${escapeHtml(ex.name)}${prTag}</div>
+        <div class="ex-target">${ex.sets} sets · ${ex.reps} reps @ ${ex.targetWeight || "bodyweight"} lb</div>
+        ${ex.note ? `<div class="ex-note">${escapeHtml(ex.note)}</div>` : ""}
       </div>
     </div>`;
   }).join("");
 
-  content.querySelectorAll("button[data-log]").forEach((btn) => {
-    btn.onclick = async () => {
-      const exName = btn.dataset.log;
-      const weightInput = content.querySelector(`input[data-ex="${CSS.escape(exName)}"][data-field="weight"]`);
-      const repsInput = content.querySelector(`input[data-ex="${CSS.escape(exName)}"][data-field="reps"]`);
-      const exDef = TODAY_WORKOUT.exercises.find((e) => e.name === exName);
-      await logExercise(exName, weightInput.value, repsInput.value, exDef?.sets);
-    };
-  });
+  content.innerHTML = `
+    <div class="workout-progress-row">
+      <span>Progress</span>
+      <span class="workout-progress-count">${doneCount}/${total}</span>
+    </div>
+    <div class="workout-progress-track"><div class="workout-progress-fill" style="width:${total ? (doneCount / total) * 100 : 0}%"></div></div>
+    ${rows}`;
 }
 
 async function logExercise(name, weight, reps, sets) {
@@ -1159,12 +1235,44 @@ async function logExercise(name, weight, reps, sets) {
   renderWorkoutTab();
 }
 
+const QL_STATE = { weight: 0, reps: 0, sets: 1 };
+
+function renderQuickLogSteppers() {
+  const specs = [
+    { key: "weight", unit: "lbs", step: 2.5, min: 0 },
+    { key: "reps", unit: "reps", step: 1, min: 0 },
+    { key: "sets", unit: "sets", step: 1, min: 1 },
+  ];
+  $("qlStepperRow").innerHTML = specs.map((s) => `
+    <div class="stepper">
+      <div class="stepper-controls">
+        <button type="button" class="stepper-btn" data-ql-minus="${s.key}">${icon("minus", 14)}</button>
+        <div><div class="stepper-value" id="ql_${s.key}_val">${QL_STATE[s.key]}</div><div class="stepper-unit">${s.unit}</div></div>
+        <button type="button" class="stepper-btn" data-ql-plus="${s.key}">${icon("plus", 14)}</button>
+      </div>
+    </div>`).join("");
+  $("qlStepperRow").classList.add("compact");
+
+  specs.forEach((s) => {
+    $(`qlStepperRow`).querySelector(`[data-ql-minus="${s.key}"]`).onclick = () => {
+      QL_STATE[s.key] = Math.max(s.min, QL_STATE[s.key] - s.step);
+      $(`ql_${s.key}_val`).textContent = QL_STATE[s.key];
+    };
+    $(`qlStepperRow`).querySelector(`[data-ql-plus="${s.key}"]`).onclick = () => {
+      QL_STATE[s.key] = QL_STATE[s.key] + s.step;
+      $(`ql_${s.key}_val`).textContent = QL_STATE[s.key];
+    };
+  });
+}
+
 async function saveQuickLog(e) {
   e.preventDefault();
   const name = $("qlName").value.trim();
   if (!name) return;
-  await logExercise(name, $("qlWeight").value, $("qlReps").value, $("qlSets").value ? parseInt($("qlSets").value, 10) : null);
-  $("qlName").value = ""; $("qlWeight").value = ""; $("qlReps").value = ""; $("qlSets").value = "";
+  await logExercise(name, QL_STATE.weight, QL_STATE.reps, QL_STATE.sets);
+  $("qlName").value = "";
+  QL_STATE.weight = 0; QL_STATE.reps = 0; QL_STATE.sets = 1;
+  renderQuickLogSteppers();
 }
 
 /* ---------- Progress tab ---------- */
