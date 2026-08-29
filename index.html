@@ -16,11 +16,26 @@
     --text: #f2f3f5;
     --muted: #8b93a7;
     --accent: #5b8cff;
+    --accent-2: #ffb020;
     --me: #5b8cff;
     --partner: #ff7a5b;
     --up: #ff5b6e;
     --down: #34d39a;
     --radius: 16px;
+  }
+  html[data-theme="light"] {
+    --bg: #f4f5f8;
+    --panel: #ffffff;
+    --panel-2: #f0f1f5;
+    --border: #e2e4ea;
+    --text: #14151a;
+    --muted: #6b7385;
+    --accent: #3f6bff;
+    --accent-2: #d98a00;
+    --me: #3f6bff;
+    --partner: #e35a3a;
+    --up: #d92d47;
+    --down: #17a06a;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -29,46 +44,84 @@
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
+    transition: background 0.2s, color 0.2s;
   }
-  #app { max-width: 480px; margin: 0 auto; min-height: 100dvh; padding: 20px 16px 100px; }
-
+  #app { max-width: 480px; margin: 0 auto; min-height: 100dvh; padding: 20px 16px 90px; }
   .hidden { display: none !important; }
 
   /* Onboarding */
   #onboard { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; }
-  #onboard h1 { font-size: 28px; margin: 0 0 6px; }
-  #onboard p { color: var(--muted); margin: 0 0 28px; font-size: 15px; }
-  #onboard input {
-    width: 100%; max-width: 320px; padding: 14px 16px; border-radius: 12px;
+  .ob-step { width: 100%; max-width: 340px; display: flex; flex-direction: column; align-items: center; }
+  #onboard h1 { font-size: 26px; margin: 0 0 6px; }
+  #onboard p.sub { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
+  #onboard input, #onboard textarea {
+    width: 100%; padding: 14px 16px; border-radius: 12px;
     border: 1px solid var(--border); background: var(--panel); color: var(--text);
-    font-size: 16px; margin-bottom: 14px; text-align: center;
+    font-size: 16px; margin-bottom: 12px; text-align: center; font-family: inherit;
   }
-  #onboard button, .btn-primary {
-    width: 100%; max-width: 320px; padding: 14px 16px; border-radius: 12px; border: none;
+  .btn-primary {
+    width: 100%; padding: 14px 16px; border-radius: 12px; border: none;
     background: var(--accent); color: white; font-size: 16px; font-weight: 600; cursor: pointer;
   }
-  #onboard button:active, .btn-primary:active { opacity: 0.85; }
+  .btn-primary:active { opacity: 0.85; }
+  .btn-secondary {
+    width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border);
+    background: transparent; color: var(--text); font-size: 14px; cursor: pointer; margin-top: 8px;
+  }
+  .choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-bottom: 14px; }
+  .choice-grid.single { grid-template-columns: 1fr; }
+  .choice-card {
+    padding: 16px 10px; border-radius: 14px; border: 1.5px solid var(--border); background: var(--panel);
+    cursor: pointer; font-size: 14px; font-weight: 600; text-align: center;
+  }
+  .choice-card .emoji { font-size: 24px; display: block; margin-bottom: 6px; }
+  .choice-card.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--panel)); }
 
-  header.top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  header.top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   header.top h1 { font-size: 20px; margin: 0; }
-  header.top .me-tag { font-size: 13px; color: var(--muted); }
-  .switch-user { background: none; border: none; color: var(--muted); font-size: 13px; text-decoration: underline; cursor: pointer; padding: 4px; }
+  header.top .me-tag { font-size: 12px; color: var(--muted); }
+  .icon-btn { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 4px 6px; }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 16px; overflow-x: auto; }
+  .tab-btn {
+    flex-shrink: 0; padding: 8px 14px; border-radius: 100px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
 
   .card {
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 16px; margin-bottom: 14px;
   }
-  .card h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 12px; font-weight: 700; }
+
+  /* Level / XP */
+  .level-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .level-badge {
+    width: 46px; height: 46px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; color: white; flex-shrink: 0;
+  }
+  .level-info { flex: 1; }
+  .level-info .name { font-weight: 700; font-size: 15px; }
+  .level-info .xp-text { font-size: 12px; color: var(--muted); }
+  .xp-bar-track { height: 8px; border-radius: 100px; background: var(--panel-2); overflow: hidden; }
+  .xp-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 100px; transition: width 0.4s; }
 
   .streak-row { display: flex; gap: 12px; }
   .streak-box { flex: 1; background: var(--panel-2); border-radius: 12px; padding: 14px; text-align: center; border: 1px solid var(--border); }
-  .streak-box .n { font-size: 30px; font-weight: 700; line-height: 1; }
+  .streak-box .n { font-size: 28px; font-weight: 700; line-height: 1; }
   .streak-box .lbl { font-size: 12px; color: var(--muted); margin-top: 6px; }
   .streak-box.me .n { color: var(--me); }
   .streak-box.partner .n { color: var(--partner); }
-  .streak-box .flame { font-size: 15px; margin-right: 2px; }
 
-  .chart-wrap { position: relative; height: 220px; }
+  .badge-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge-chip {
+    display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 100px;
+    background: var(--panel-2); border: 1px solid var(--border); font-size: 12px; font-weight: 600;
+  }
+  .badge-chip.locked { opacity: 0.35; }
+
+  .chart-wrap { position: relative; height: 200px; }
   .legend { display: flex; gap: 16px; margin-top: 10px; font-size: 12px; color: var(--muted); justify-content: center; }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
@@ -76,13 +129,12 @@
   .today-status { display: flex; gap: 10px; }
   .status-pill { flex: 1; border-radius: 12px; padding: 10px 12px; border: 1px solid var(--border); background: var(--panel-2); font-size: 13px; display: flex; align-items: center; justify-content: space-between; }
   .status-pill .who { color: var(--muted); }
-  .status-pill .check { font-size: 16px; }
 
-  form#logForm { display: flex; flex-direction: column; gap: 10px; }
+  form.form-grid { display: flex; flex-direction: column; gap: 10px; }
   .row2 { display: flex; gap: 10px; }
   .field { flex: 1; }
   label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
-  input[type="number"], input[type="date"], textarea {
+  input[type="number"], input[type="date"], input[type="text"], textarea, select {
     width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
     background: var(--panel-2); color: var(--text); font-size: 15px; font-family: inherit;
   }
@@ -92,16 +144,29 @@
     border-radius: 10px; border: 1px solid var(--border); background: var(--panel-2); cursor: pointer;
   }
   .gym-toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
-  .gym-toggle.checked { border-color: var(--accent); background: rgba(91,140,255,0.12); }
+  .gym-toggle.checked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
 
   .log-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
   .log-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
   .log-item:last-child { border-bottom: none; }
-  .log-item .dot { flex-shrink: 0; }
-  .log-item .date { color: var(--muted); width: 70px; flex-shrink: 0; }
+  .log-item .date { color: var(--muted); width: 60px; flex-shrink: 0; }
   .log-item .w { font-weight: 600; width: 56px; flex-shrink: 0; }
   .log-item .note { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .log-item .gym-yes { color: var(--down); }
+  .muted-note { color: var(--muted); font-size: 13px; }
+
+  /* Workout tab */
+  .exercise-card { border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; background: var(--panel-2); }
+  .exercise-card .ex-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .exercise-card .ex-name { font-weight: 700; font-size: 15px; }
+  .exercise-card .ex-target { font-size: 12px; color: var(--muted); }
+  .exercise-card .ex-note { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .exercise-card .pr-tag { background: var(--accent-2); color: #1a1200; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; margin-left: 6px; }
+  .log-set-row { display: flex; gap: 8px; }
+  .log-set-row input { flex: 1; }
+  .log-set-row button { flex-shrink: 0; }
+
+  select#exerciseSelect { margin-bottom: 10px; }
 
   .toast {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -110,15 +175,27 @@
     opacity: 0; pointer-events: none; transition: opacity 0.25s;
   }
   .toast.show { opacity: 1; }
+
+  .challenge-bar-wrap { margin-bottom: 14px; }
+  .challenge-bar-track { height: 14px; border-radius: 100px; background: var(--panel-2); overflow: hidden; display: flex; }
+  .challenge-bar-fill.me { background: var(--me); }
+  .challenge-bar-fill.partner { background: var(--partner); }
+  .challenge-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+  .vs-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .vs-col { flex: 1; text-align: center; }
+  .vs-col .vs-name { font-size: 13px; font-weight: 700; }
+  .vs-col .vs-xp { font-size: 22px; font-weight: 800; margin-top: 2px; }
+  .vs-mid { font-size: 12px; color: var(--muted); font-weight: 700; }
+
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--muted); border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
 
 <div id="onboard">
-  <h1>Fit Together 💪</h1>
-  <p>A shared tracker so you two can push each other.</p>
-  <input id="nameInput" type="text" placeholder="What's your name?" maxlength="24" />
-  <button id="nameSubmit" class="btn-primary">Let's go</button>
+  <!-- steps injected by JS -->
 </div>
 
 <div id="app" class="hidden">
@@ -127,68 +204,180 @@
       <h1>Fit Together</h1>
       <div class="me-tag">Logged in as <strong id="meLabel"></strong></div>
     </div>
-    <button class="switch-user" id="switchUserBtn">switch</button>
+    <div>
+      <button class="icon-btn" id="themeToggleBtn" title="Toggle theme">🌓</button>
+      <button class="icon-btn" id="switchUserBtn" title="Switch user">⇄</button>
+    </div>
   </header>
 
-  <div class="card">
-    <h2>Streaks</h2>
-    <div class="streak-row">
-      <div class="streak-box me">
-        <div class="n"><span class="flame">🔥</span><span id="myStreak">0</span></div>
-        <div class="lbl" id="myStreakLbl">You</div>
-      </div>
-      <div class="streak-box partner">
-        <div class="n"><span class="flame">🔥</span><span id="partnerStreak">0</span></div>
-        <div class="lbl" id="partnerStreakLbl">Partner</div>
-      </div>
-    </div>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="home">Home</button>
+    <button class="tab-btn" data-tab="workout">Workout</button>
+    <button class="tab-btn" data-tab="progress">Progress</button>
+    <button class="tab-btn" data-tab="couple">Couple</button>
+    <button class="tab-btn" data-tab="setup">Setup</button>
   </div>
 
-  <div class="card">
-    <h2>Today</h2>
-    <div class="today-status">
-      <div class="status-pill"><span class="who" id="todayMeLbl">You</span><span class="check" id="todayMeCheck">—</span></div>
-      <div class="status-pill"><span class="who" id="todayPartnerLbl">Partner</span><span class="check" id="todayPartnerCheck">—</span></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Weight trend</h2>
-    <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
-    <div class="legend">
-      <span><span class="dot" style="background:var(--me)"></span><span id="legendMe">You</span></span>
-      <span><span class="dot" style="background:var(--partner)"></span><span id="legendPartner">Partner</span></span>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Log today</h2>
-    <form id="logForm">
-      <div class="row2">
-        <div class="field">
-          <label>Date</label>
-          <input type="date" id="entryDate" required />
-        </div>
-        <div class="field">
-          <label>Weight (lbs)</label>
-          <input type="number" id="entryWeight" step="0.1" placeholder="—" />
+  <!-- HOME TAB -->
+  <div id="tab-home" class="tab-panel">
+    <div class="card">
+      <h2>Level</h2>
+      <div class="level-row">
+        <div class="level-badge" id="levelBadge">1</div>
+        <div class="level-info">
+          <div class="name" id="levelName">Rookie</div>
+          <div class="xp-text" id="xpText">0 / 100 XP</div>
         </div>
       </div>
-      <label class="gym-toggle" id="gymToggleWrap">
-        <span>Went to the gym today</span>
-        <input type="checkbox" id="entryGym" />
-      </label>
-      <div class="field">
-        <label>Note (optional — what you hit, weights lifted, etc.)</label>
-        <textarea id="entryNote" placeholder="e.g. bench 135x5, felt strong"></textarea>
+      <div class="xp-bar-track"><div class="xp-bar-fill" id="xpBarFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="card">
+      <h2>Badges</h2>
+      <div class="badge-row" id="badgeRow"></div>
+    </div>
+
+    <div class="card">
+      <h2>Streaks</h2>
+      <div class="streak-row">
+        <div class="streak-box me">
+          <div class="n">🔥 <span id="myStreak">0</span></div>
+          <div class="lbl" id="myStreakLbl">You</div>
+        </div>
+        <div class="streak-box partner">
+          <div class="n">🔥 <span id="partnerStreak">0</span></div>
+          <div class="lbl" id="partnerStreakLbl">Partner</div>
+        </div>
       </div>
-      <button type="submit" class="btn-primary">Save entry</button>
-    </form>
+    </div>
+
+    <div class="card">
+      <h2>Today</h2>
+      <div class="today-status">
+        <div class="status-pill"><span class="who" id="todayMeLbl">You</span><span id="todayMeCheck">—</span></div>
+        <div class="status-pill"><span class="who" id="todayPartnerLbl">Partner</span><span id="todayPartnerCheck">—</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Weight trend</h2>
+      <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--me)"></span><span id="legendMe">You</span></span>
+        <span><span class="dot" style="background:var(--partner)"></span><span id="legendPartner">Partner</span></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Log today</h2>
+      <form class="form-grid" id="logForm">
+        <div class="row2">
+          <div class="field"><label>Date</label><input type="date" id="entryDate" required /></div>
+          <div class="field"><label>Weight (lbs)</label><input type="number" id="entryWeight" step="0.1" placeholder="—" /></div>
+        </div>
+        <label class="gym-toggle" id="gymToggleWrap">
+          <span>Went to the gym today</span>
+          <input type="checkbox" id="entryGym" />
+        </label>
+        <div class="field"><label>Note (optional)</label><textarea id="entryNote" placeholder="how it felt, anything notable"></textarea></div>
+        <button type="submit" class="btn-primary">Save entry</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Recent activity</h2>
+      <div class="log-list" id="logList"></div>
+    </div>
   </div>
 
-  <div class="card">
-    <h2>Recent activity</h2>
-    <div class="log-list" id="logList"><div style="color:var(--muted); font-size:13px;">No entries yet.</div></div>
+  <!-- WORKOUT TAB -->
+  <div id="tab-workout" class="tab-panel hidden">
+    <div class="card">
+      <h2>Today's workout</h2>
+      <div id="workoutFocusRow" class="muted-note" style="margin-bottom:10px;"></div>
+      <div id="workoutContent"><p class="muted-note">No workout generated yet today.</p></div>
+      <button class="btn-primary" id="generateWorkoutBtn" style="margin-top:10px;">Generate today's workout</button>
+    </div>
+
+    <div class="card">
+      <h2>Log a set (any exercise)</h2>
+      <form class="form-grid" id="quickLogForm">
+        <div class="field"><label>Exercise</label><input type="text" id="qlName" placeholder="e.g. Bench Press" required /></div>
+        <div class="row2">
+          <div class="field"><label>Weight (lbs)</label><input type="number" id="qlWeight" step="0.5" /></div>
+          <div class="field"><label>Reps</label><input type="number" id="qlReps" /></div>
+          <div class="field"><label>Sets</label><input type="number" id="qlSets" /></div>
+        </div>
+        <button type="submit" class="btn-primary">Log it</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- PROGRESS TAB -->
+  <div id="tab-progress" class="tab-panel hidden">
+    <div class="card">
+      <h2>Exercise progress</h2>
+      <select id="exerciseSelect"></select>
+      <div class="chart-wrap"><canvas id="exerciseChart"></canvas></div>
+      <p class="muted-note" id="exercisePrNote"></p>
+    </div>
+  </div>
+
+  <!-- COUPLE TAB -->
+  <div id="tab-couple" class="tab-panel hidden">
+    <div class="card">
+      <h2>This week's challenge</h2>
+      <div class="challenge-bar-wrap">
+        <div class="challenge-bar-track">
+          <div class="challenge-bar-fill me" id="challengeMeBar" style="width:0%"></div>
+          <div class="challenge-bar-fill partner" id="challengePartnerBar" style="width:0%"></div>
+        </div>
+        <div class="challenge-label"><span id="challengeMeLbl">You: 0/4</span><span id="challengePartnerLbl">Partner: 0/4</span></div>
+      </div>
+      <p class="muted-note" id="challengeSummary"></p>
+    </div>
+
+    <div class="card">
+      <h2>Head to head</h2>
+      <div class="vs-row">
+        <div class="vs-col"><div class="vs-name" id="vsMeName">You</div><div class="vs-xp" id="vsMeXp">0</div></div>
+        <div class="vs-mid">XP</div>
+        <div class="vs-col"><div class="vs-name" id="vsPartnerName">Partner</div><div class="vs-xp" id="vsPartnerXp">0</div></div>
+      </div>
+      <p class="muted-note" id="vsSummary"></p>
+    </div>
+  </div>
+
+  <!-- SETUP TAB -->
+  <div id="tab-setup" class="tab-panel hidden">
+    <div class="card">
+      <h2>Main focus</h2>
+      <select id="setupFocus">
+        <option value="Strength">Strength</option>
+        <option value="Muscle Gain">Muscle Gain</option>
+        <option value="Fat Loss">Fat Loss</option>
+        <option value="General Fitness">General Fitness</option>
+        <option value="Endurance">Endurance</option>
+      </select>
+    </div>
+    <div class="card">
+      <h2>Body goal</h2>
+      <select id="setupGoal">
+        <option value="Lose weight">Lose weight</option>
+        <option value="Build muscle">Build muscle</option>
+        <option value="Recomp (lose fat, gain muscle)">Recomp (lose fat, gain muscle)</option>
+        <option value="Get stronger">Get stronger</option>
+        <option value="Maintain">Maintain</option>
+      </select>
+      <label style="margin-top:10px;">More detail (optional)</label>
+      <textarea id="setupGoalDetail" placeholder="e.g. training for a wedding in June, prefer 4 days/week"></textarea>
+    </div>
+    <div class="card">
+      <h2>Weekly challenge target</h2>
+      <label>Gym days per week (each of you)</label>
+      <input type="number" id="setupChallengeTarget" min="1" max="7" value="4" />
+    </div>
+    <button class="btn-primary" id="saveSetupBtn">Save preferences</button>
   </div>
 </div>
 
@@ -198,11 +387,18 @@
 const SUPABASE_URL = "https://stcpiovpjismhltklfdw.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_890hsPHDiiz4-fQi7Jqd9g_a_aoHyz2";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const FUNCTION_URL = SUPABASE_URL + "/functions/v1/generate-workout";
 
-const STORAGE_KEY = "ft_user_name";
-let ME = localStorage.getItem(STORAGE_KEY) || "";
+const NAME_KEY = "ft_user_name";
+const THEME_KEY = "ft_theme";
+let ME = localStorage.getItem(NAME_KEY) || "";
 let ALL_ENTRIES = [];
-let chart = null;
+let ALL_EXERCISE_LOGS = [];
+let MY_PROFILE = null;
+let PARTNER_PROFILE = null;
+let TODAY_WORKOUT = null;
+let weightChart = null;
+let exerciseChart = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -210,7 +406,7 @@ function toast(msg) {
   const el = $("toast");
   el.textContent = msg;
   el.classList.add("show");
-  setTimeout(() => el.classList.remove("show"), 2200);
+  setTimeout(() => el.classList.remove("show"), 2400);
 }
 
 function todayStr() {
@@ -219,54 +415,214 @@ function todayStr() {
   return new Date(d - tz).toISOString().slice(0, 10);
 }
 
-function initOnboard() {
-  if (ME) return showApp();
-  $("onboard").classList.remove("hidden");
-  $("app").classList.add("hidden");
-  $("nameSubmit").addEventListener("click", submitName);
-  $("nameInput").addEventListener("keydown", (e) => { if (e.key === "Enter") submitName(); });
+function isoDate(d) {
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
-function submitName() {
-  const v = $("nameInput").value.trim();
-  if (!v) return;
-  ME = v;
-  localStorage.setItem(STORAGE_KEY, v);
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme === "light" ? "light" : "dark");
+}
+
+/* ---------- Onboarding ---------- */
+
+function initOnboard() {
+  const theme = localStorage.getItem(THEME_KEY) ||
+    (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  applyTheme(theme);
+
+  if (ME) return checkProfileThenStart();
+  renderOnboardStep("name");
+}
+
+function renderOnboardStep(step, data = {}) {
+  const ob = $("onboard");
+  if (step === "name") {
+    ob.innerHTML = `
+      <div class="ob-step">
+        <h1>Fit Together 💪</h1>
+        <p class="sub">A shared tracker so you two can push each other.</p>
+        <input id="nameInput" type="text" placeholder="What's your name?" maxlength="24" />
+        <button class="btn-primary" id="nextBtn">Continue</button>
+      </div>`;
+    $("nextBtn").onclick = () => {
+      const v = $("nameInput").value.trim();
+      if (!v) return;
+      data.name = v;
+      renderOnboardStep("theme", data);
+    };
+  } else if (step === "theme") {
+    ob.innerHTML = `
+      <div class="ob-step">
+        <h1>Pick a look</h1>
+        <p class="sub">You can switch this anytime from the top bar.</p>
+        <div class="choice-grid">
+          <div class="choice-card" data-v="dark"><span class="emoji">🌙</span>Dark</div>
+          <div class="choice-card" data-v="light"><span class="emoji">☀️</span>Light</div>
+        </div>
+        <button class="btn-primary" id="nextBtn" disabled>Continue</button>
+      </div>`;
+    let chosen = null;
+    ob.querySelectorAll(".choice-card").forEach((c) => {
+      c.onclick = () => {
+        ob.querySelectorAll(".choice-card").forEach((x) => x.classList.remove("selected"));
+        c.classList.add("selected");
+        chosen = c.dataset.v;
+        applyTheme(chosen);
+        $("nextBtn").disabled = false;
+      };
+    });
+    $("nextBtn").onclick = () => {
+      data.theme = chosen;
+      renderOnboardStep("focus", data);
+    };
+  } else if (step === "focus") {
+    const focuses = [
+      ["Strength", "🏋️"], ["Muscle Gain", "💪"], ["Fat Loss", "🔥"],
+      ["General Fitness", "⚡"], ["Endurance", "🏃"],
+    ];
+    ob.innerHTML = `
+      <div class="ob-step">
+        <h1>What's your main focus?</h1>
+        <p class="sub">This shapes the daily workouts we generate for you.</p>
+        <div class="choice-grid">
+          ${focuses.map(([f, e]) => `<div class="choice-card" data-v="${f}"><span class="emoji">${e}</span>${f}</div>`).join("")}
+        </div>
+        <button class="btn-primary" id="nextBtn" disabled>Continue</button>
+      </div>`;
+    let chosen = null;
+    ob.querySelectorAll(".choice-card").forEach((c) => {
+      c.onclick = () => {
+        ob.querySelectorAll(".choice-card").forEach((x) => x.classList.remove("selected"));
+        c.classList.add("selected");
+        chosen = c.dataset.v;
+        $("nextBtn").disabled = false;
+      };
+    });
+    $("nextBtn").onclick = () => {
+      data.focus = chosen;
+      renderOnboardStep("goal", data);
+    };
+  } else if (step === "goal") {
+    const goals = ["Lose weight", "Build muscle", "Recomp (lose fat, gain muscle)", "Get stronger", "Maintain"];
+    ob.innerHTML = `
+      <div class="ob-step">
+        <h1>What's your body goal?</h1>
+        <div class="choice-grid single">
+          ${goals.map((g) => `<div class="choice-card" data-v="${g}">${g}</div>`).join("")}
+        </div>
+        <textarea id="goalDetail" placeholder="Any more detail? (optional)"></textarea>
+        <button class="btn-primary" id="nextBtn" disabled>Finish setup</button>
+      </div>`;
+    let chosen = null;
+    ob.querySelectorAll(".choice-card").forEach((c) => {
+      c.onclick = () => {
+        ob.querySelectorAll(".choice-card").forEach((x) => x.classList.remove("selected"));
+        c.classList.add("selected");
+        chosen = c.dataset.v;
+        $("nextBtn").disabled = false;
+      };
+    });
+    $("nextBtn").onclick = async () => {
+      data.goal = chosen;
+      data.goalDetail = $("goalDetail").value.trim();
+      await finishOnboarding(data);
+    };
+  }
+}
+
+async function finishOnboarding(data) {
+  ME = data.name;
+  localStorage.setItem(NAME_KEY, ME);
+  localStorage.setItem(THEME_KEY, data.theme);
+  applyTheme(data.theme);
+  await sb.from("profiles").upsert({
+    user_name: ME,
+    theme: data.theme,
+    focus: data.focus,
+    goal: data.goal,
+    goal_detail: data.goalDetail || null,
+    updated_at: new Date().toISOString(),
+  });
   showApp();
 }
+
+async function checkProfileThenStart() {
+  const { data } = await sb.from("profiles").select("*").eq("user_name", ME).maybeSingle();
+  if (data) {
+    MY_PROFILE = data;
+    applyTheme(data.theme || localStorage.getItem(THEME_KEY) || "dark");
+    showApp();
+  } else {
+    renderOnboardStep("theme", { name: ME });
+  }
+}
+
+/* ---------- Main app ---------- */
 
 function showApp() {
   $("onboard").classList.add("hidden");
   $("app").classList.remove("hidden");
   $("meLabel").textContent = ME;
   $("entryDate").value = todayStr();
-  $("switchUserBtn").addEventListener("click", () => {
-    localStorage.removeItem(STORAGE_KEY);
-    ME = "";
+
+  $("switchUserBtn").onclick = () => {
+    localStorage.removeItem(NAME_KEY);
     location.reload();
-  });
-  $("gymToggleWrap").addEventListener("click", () => {
-    setTimeout(() => {
-      $("gymToggleWrap").classList.toggle("checked", $("entryGym").checked);
-    }, 0);
-  });
+  };
+  $("themeToggleBtn").onclick = () => {
+    const cur = document.documentElement.getAttribute("data-theme") || "dark";
+    const next = cur === "dark" ? "light" : "dark";
+    applyTheme(next);
+    localStorage.setItem(THEME_KEY, next);
+    sb.from("profiles").update({ theme: next, updated_at: new Date().toISOString() }).eq("user_name", ME).then(() => {});
+  };
+  $("gymToggleWrap").onclick = () => {
+    setTimeout(() => $("gymToggleWrap").classList.toggle("checked", $("entryGym").checked), 0);
+  };
   $("logForm").addEventListener("submit", saveEntry);
-  loadEntries();
+  $("quickLogForm").addEventListener("submit", saveQuickLog);
+  $("generateWorkoutBtn").addEventListener("click", generateWorkout);
+  $("saveSetupBtn").addEventListener("click", saveSetup);
+
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.onclick = () => switchTab(btn.dataset.tab);
+  });
+
+  loadAll();
 }
 
-async function loadEntries() {
-  const { data, error } = await sb
-    .from("fit_entries")
-    .select("*")
-    .order("entry_date", { ascending: true });
-  if (error) {
-    toast("Couldn't load data");
-    console.error(error);
-    return;
-  }
-  ALL_ENTRIES = data || [];
-  render();
+function switchTab(tab) {
+  document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== "tab-" + tab));
+  if (tab === "progress") renderProgressTab();
+  if (tab === "workout") renderWorkoutTab();
+  if (tab === "couple") renderCoupleTab();
+  if (tab === "setup") renderSetupTab();
 }
+
+async function loadAll() {
+  const [entriesRes, exLogRes, profilesRes] = await Promise.all([
+    sb.from("fit_entries").select("*").order("entry_date", { ascending: true }),
+    sb.from("exercise_logs").select("*").order("entry_date", { ascending: true }),
+    sb.from("profiles").select("*"),
+  ]);
+  ALL_ENTRIES = entriesRes.data || [];
+  ALL_EXERCISE_LOGS = exLogRes.data || [];
+  const profiles = profilesRes.data || [];
+  MY_PROFILE = profiles.find((p) => p.user_name === ME) || MY_PROFILE;
+  PARTNER_PROFILE = profiles.find((p) => p.user_name === partnerName()) || null;
+
+  await loadTodayWorkout();
+  renderHome();
+}
+
+function partnerName() {
+  const names = new Set([...ALL_ENTRIES.map((e) => e.user_name), ...ALL_EXERCISE_LOGS.map((e) => e.user_name)]);
+  names.delete(ME);
+  return [...names][0] || "Partner";
+}
+
+/* ---------- Home tab: entries, streaks, chart ---------- */
 
 async function saveEntry(e) {
   e.preventDefault();
@@ -279,30 +635,32 @@ async function saveEntry(e) {
     gym: $("entryGym").checked,
     note: $("entryNote").value.trim() || null,
   };
-  const { error } = await sb
-    .from("fit_entries")
-    .upsert(payload, { onConflict: "user_name,entry_date" });
-  if (error) {
-    toast("Save failed");
-    console.error(error);
-    return;
-  }
-  toast("Saved ✓");
+  const { error } = await sb.from("fit_entries").upsert(payload, { onConflict: "user_name,entry_date" });
+  if (error) { toast("Save failed"); console.error(error); return; }
+  toast("Saved ✓ +10 XP");
   $("entryWeight").value = "";
   $("entryNote").value = "";
   $("entryGym").checked = false;
   $("gymToggleWrap").classList.remove("checked");
-  loadEntries();
-}
-
-function partnerName() {
-  const names = new Set(ALL_ENTRIES.map((e) => e.user_name));
-  names.delete(ME);
-  return [...names][0] || "Partner";
+  await loadAll();
 }
 
 function entriesFor(name) {
   return ALL_ENTRIES.filter((e) => e.user_name === name).sort((a, b) => a.entry_date.localeCompare(b.entry_date));
+}
+
+function longestStreak(name) {
+  const gymDays = [...new Set(entriesFor(name).filter((e) => e.gym).map((e) => e.entry_date))].sort();
+  if (gymDays.length === 0) return 0;
+  let best = 1, cur = 1;
+  for (let i = 1; i < gymDays.length; i++) {
+    const prev = new Date(gymDays[i - 1] + "T00:00:00");
+    const next = new Date(gymDays[i] + "T00:00:00");
+    const diffDays = Math.round((next - prev) / 86400000);
+    cur = diffDays === 1 ? cur + 1 : 1;
+    best = Math.max(best, cur);
+  }
+  return best;
 }
 
 function computeStreak(name) {
@@ -310,21 +668,81 @@ function computeStreak(name) {
   if (gymDays.size === 0) return 0;
   let streak = 0;
   let cursor = new Date(todayStr() + "T00:00:00");
-  // if today has no check-in yet, start counting from yesterday
-  if (!gymDays.has(todayStr())) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
+  if (!gymDays.has(todayStr())) cursor.setDate(cursor.getDate() - 1);
   while (true) {
-    const key = new Date(cursor.getTime() - cursor.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-    if (gymDays.has(key)) {
-      streak++;
-      cursor.setDate(cursor.getDate() - 1);
-    } else break;
+    const key = isoDate(cursor);
+    if (gymDays.has(key)) { streak++; cursor.setDate(cursor.getDate() - 1); } else break;
   }
   return streak;
 }
 
-function render() {
+/* ---------- Gamification: XP, levels, badges ---------- */
+
+function personalRecords(name) {
+  const logs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && l.weight != null)
+    .sort((a, b) => a.entry_date.localeCompare(b.entry_date) || a.created_at.localeCompare(b.created_at));
+  const best = {};
+  let prCount = 0;
+  const prLogIds = new Set();
+  for (const log of logs) {
+    const key = log.exercise_name.toLowerCase();
+    if (!(key in best) || log.weight > best[key]) {
+      best[key] = log.weight;
+      prCount++;
+      prLogIds.add(log.id);
+    }
+  }
+  return { best, prCount, prLogIds };
+}
+
+function computeXP(name) {
+  const gymDays = entriesFor(name).filter((e) => e.gym).length;
+  const exerciseCount = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name).length;
+  const { prCount } = personalRecords(name);
+  return gymDays * 10 + exerciseCount * 5 + prCount * 25;
+}
+
+function levelForXP(xp) {
+  const level = 1 + Math.floor(xp / 100);
+  const names = ["Rookie", "Getting Started", "Consistent", "Grinder", "Iron Will", "Machine", "Beast Mode", "Legend"];
+  const name = names[Math.min(level - 1, names.length - 1)];
+  const inLevel = xp % 100;
+  return { level, name, inLevel, next: 100 };
+}
+
+function badgeDefinitions(name) {
+  const gymDays = entriesFor(name).filter((e) => e.gym).length;
+  const best = longestStreak(name);
+  const exerciseCount = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name).length;
+  const { prCount } = personalRecords(name);
+  return [
+    { key: "first_gym", emoji: "🥇", label: "First Steps", earned: gymDays >= 1 },
+    { key: "streak3", emoji: "🔥", label: "3-Day Streak", earned: best >= 3 },
+    { key: "streak7", emoji: "🔥", label: "7-Day Streak", earned: best >= 7 },
+    { key: "streak30", emoji: "🌟", label: "30-Day Streak", earned: best >= 30 },
+    { key: "first_pr", emoji: "📈", label: "First PR", earned: prCount >= 1 },
+    { key: "pr5", emoji: "🏆", label: "5 PRs", earned: prCount >= 5 },
+    { key: "logger10", emoji: "📋", label: "10 Workouts Logged", earned: exerciseCount >= 10 },
+  ];
+}
+
+function renderXP() {
+  const xp = computeXP(ME);
+  const { level, name, inLevel } = levelForXP(xp);
+  $("levelBadge").textContent = level;
+  $("levelName").textContent = name;
+  $("xpText").textContent = `${inLevel} / 100 XP to next level (${xp} total)`;
+  $("xpBarFill").style.width = inLevel + "%";
+
+  const defs = badgeDefinitions(ME);
+  $("badgeRow").innerHTML = defs.map((b) =>
+    `<div class="badge-chip ${b.earned ? "" : "locked"}"><span>${b.emoji}</span><span>${b.label}</span></div>`
+  ).join("");
+}
+
+/* ---------- Render home ---------- */
+
+function renderHome() {
   const partner = partnerName();
   $("myStreakLbl").textContent = ME;
   $("partnerStreakLbl").textContent = partner;
@@ -342,89 +760,290 @@ function render() {
   $("todayMeCheck").textContent = myToday && myToday.gym ? "✅" : "—";
   $("todayPartnerCheck").textContent = partnerToday && partnerToday.gym ? "✅" : "—";
 
-  renderChart();
+  renderXP();
+  renderWeightChart();
   renderLog();
 }
 
-function renderChart() {
+function renderWeightChart() {
   const partner = partnerName();
   const myEntries = entriesFor(ME).filter((e) => e.weight != null);
   const partnerEntries = entriesFor(partner).filter((e) => e.weight != null);
   const allDates = [...new Set([...myEntries, ...partnerEntries].map((e) => e.entry_date))].sort();
-
   const myMap = Object.fromEntries(myEntries.map((e) => [e.entry_date, e.weight]));
   const partnerMap = Object.fromEntries(partnerEntries.map((e) => [e.entry_date, e.weight]));
 
-  const myData = allDates.map((d) => (d in myMap ? myMap[d] : null));
-  const partnerData = allDates.map((d) => (d in partnerMap ? partnerMap[d] : null));
-
   const ctx = $("weightChart").getContext("2d");
-  if (chart) chart.destroy();
-  chart = new Chart(ctx, {
+  if (weightChart) weightChart.destroy();
+  weightChart = new Chart(ctx, {
     type: "line",
     data: {
       labels: allDates.map((d) => d.slice(5)),
       datasets: [
-        {
-          label: ME,
-          data: myData,
-          borderColor: "#5b8cff",
-          backgroundColor: "rgba(91,140,255,0.15)",
-          spanGaps: true,
-          tension: 0.3,
-          pointRadius: 3,
-        },
-        {
-          label: partner,
-          data: partnerData,
-          borderColor: "#ff7a5b",
-          backgroundColor: "rgba(255,122,91,0.15)",
-          spanGaps: true,
-          tension: 0.3,
-          pointRadius: 3,
-        },
+        { label: ME, data: allDates.map((d) => myMap[d] ?? null), borderColor: cssVar("--me"), backgroundColor: "transparent", spanGaps: true, tension: 0.3, pointRadius: 3 },
+        { label: partner, data: allDates.map((d) => partnerMap[d] ?? null), borderColor: cssVar("--partner"), backgroundColor: "transparent", spanGaps: true, tension: 0.3, pointRadius: 3 },
       ],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { grid: { color: "#262b38" }, ticks: { color: "#8b93a7", maxTicksLimit: 6 } },
-        y: { grid: { color: "#262b38" }, ticks: { color: "#8b93a7" } },
+        x: { grid: { color: cssVar("--border") }, ticks: { color: cssVar("--muted"), maxTicksLimit: 6 } },
+        y: { grid: { color: cssVar("--border") }, ticks: { color: cssVar("--muted") } },
       },
     },
   });
 }
 
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
 function renderLog() {
   const combined = [...ALL_ENTRIES].sort((a, b) => b.entry_date.localeCompare(a.entry_date)).slice(0, 20);
   const list = $("logList");
-  if (combined.length === 0) {
-    list.innerHTML = '<div style="color:var(--muted); font-size:13px;">No entries yet.</div>';
-    return;
-  }
-  list.innerHTML = combined
-    .map((e) => {
-      const color = e.user_name === ME ? "var(--me)" : "var(--partner)";
-      const w = e.weight != null ? e.weight + " lb" : "";
-      const gym = e.gym ? '<span class="gym-yes">🏋️</span>' : "";
-      const note = e.note ? escapeHtml(e.note) : "";
-      return `<div class="log-item">
-        <span class="dot" style="background:${color}"></span>
-        <span class="date">${e.entry_date.slice(5)}</span>
-        <span class="w">${w}</span>
-        ${gym}
-        <span class="note">${note}</span>
-      </div>`;
-    })
-    .join("");
+  if (combined.length === 0) { list.innerHTML = '<p class="muted-note">No entries yet.</p>'; return; }
+  list.innerHTML = combined.map((e) => {
+    const color = e.user_name === ME ? "var(--me)" : "var(--partner)";
+    const w = e.weight != null ? e.weight + " lb" : "";
+    const gym = e.gym ? '<span class="gym-yes">🏋️</span>' : "";
+    const note = e.note ? escapeHtml(e.note) : "";
+    return `<div class="log-item"><span class="dot" style="background:${color}"></span><span class="date">${e.entry_date.slice(5)}</span><span class="w">${w}</span>${gym}<span class="note">${note}</span></div>`;
+  }).join("");
 }
 
 function escapeHtml(s) {
   const d = document.createElement("div");
   d.textContent = s;
   return d.innerHTML;
+}
+
+/* ---------- Workout tab ---------- */
+
+async function loadTodayWorkout() {
+  const { data } = await sb.from("ai_workouts").select("*").eq("user_name", ME).eq("entry_date", todayStr()).maybeSingle();
+  TODAY_WORKOUT = data || null;
+}
+
+async function generateWorkout() {
+  const btn = $("generateWorkoutBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating…';
+
+  const history = Object.entries(personalRecords(ME).best).map(([exercise_name, weight]) => ({ exercise_name, weight }));
+
+  try {
+    const resp = await fetch(FUNCTION_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SUPABASE_ANON_KEY },
+      body: JSON.stringify({
+        user_name: ME,
+        focus: MY_PROFILE?.focus,
+        goal: MY_PROFILE?.goal,
+        goal_detail: MY_PROFILE?.goal_detail,
+        history,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || "unknown error");
+
+    await sb.from("ai_workouts").upsert({
+      user_name: ME,
+      entry_date: todayStr(),
+      focus: data.workout.focus,
+      exercises: data.workout.exercises,
+    }, { onConflict: "user_name,entry_date" });
+
+    await loadTodayWorkout();
+    renderWorkoutTab();
+    toast("Workout ready 💪");
+  } catch (err) {
+    console.error(err);
+    toast("Couldn't generate workout — check the coach connection");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Regenerate today's workout";
+  }
+}
+
+function renderWorkoutTab() {
+  const focusRow = $("workoutFocusRow");
+  const content = $("workoutContent");
+  const genBtn = $("generateWorkoutBtn");
+
+  if (!TODAY_WORKOUT) {
+    focusRow.textContent = MY_PROFILE?.focus ? `Focus: ${MY_PROFILE.focus}` : "";
+    content.innerHTML = '<p class="muted-note">No workout generated yet today.</p>';
+    genBtn.textContent = "Generate today's workout";
+    return;
+  }
+  focusRow.textContent = `Focus: ${TODAY_WORKOUT.focus}`;
+  genBtn.textContent = "Regenerate today's workout";
+  const { best } = personalRecords(ME);
+  content.innerHTML = TODAY_WORKOUT.exercises.map((ex) => {
+    const prevBest = best[ex.name.toLowerCase()];
+    const prTag = prevBest && ex.targetWeight > prevBest ? '<span class="pr-tag">NEW PR TARGET</span>' : "";
+    return `<div class="exercise-card">
+      <div class="ex-head"><span class="ex-name">${escapeHtml(ex.name)}${prTag}</span><span class="ex-target">${ex.sets}×${ex.reps} @ ${ex.targetWeight || "BW"} lb</span></div>
+      ${ex.note ? `<div class="ex-note">${escapeHtml(ex.note)}</div>` : ""}
+      <div class="log-set-row">
+        <input type="number" step="0.5" placeholder="weight" data-ex="${escapeHtml(ex.name)}" data-field="weight" value="${ex.targetWeight || ""}" />
+        <input type="number" placeholder="reps" data-ex="${escapeHtml(ex.name)}" data-field="reps" value="${ex.reps || ""}" style="max-width:70px;" />
+        <button type="button" class="btn-secondary" style="width:auto;margin-top:0;" data-log="${escapeHtml(ex.name)}">Log</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  content.querySelectorAll("button[data-log]").forEach((btn) => {
+    btn.onclick = async () => {
+      const exName = btn.dataset.log;
+      const weightInput = content.querySelector(`input[data-ex="${CSS.escape(exName)}"][data-field="weight"]`);
+      const repsInput = content.querySelector(`input[data-ex="${CSS.escape(exName)}"][data-field="reps"]`);
+      const exDef = TODAY_WORKOUT.exercises.find((e) => e.name === exName);
+      await logExercise(exName, weightInput.value, repsInput.value, exDef?.sets);
+    };
+  });
+}
+
+async function logExercise(name, weight, reps, sets) {
+  const { best } = personalRecords(ME);
+  const prevBest = best[name.toLowerCase()];
+  const w = weight === "" ? null : parseFloat(weight);
+  const { error } = await sb.from("exercise_logs").insert({
+    user_name: ME,
+    entry_date: todayStr(),
+    exercise_name: name,
+    weight: w,
+    reps: reps === "" ? null : parseInt(reps, 10),
+    sets: sets || null,
+  });
+  if (error) { toast("Log failed"); console.error(error); return; }
+  const isPR = w != null && (prevBest === undefined || w > prevBest);
+  toast(isPR ? `New PR on ${name}! 🏆 +25 XP` : "Logged ✓ +5 XP");
+  await loadAll();
+  renderWorkoutTab();
+}
+
+async function saveQuickLog(e) {
+  e.preventDefault();
+  const name = $("qlName").value.trim();
+  if (!name) return;
+  await logExercise(name, $("qlWeight").value, $("qlReps").value, $("qlSets").value ? parseInt($("qlSets").value, 10) : null);
+  $("qlName").value = ""; $("qlWeight").value = ""; $("qlReps").value = ""; $("qlSets").value = "";
+}
+
+/* ---------- Progress tab ---------- */
+
+function renderProgressTab() {
+  const names = [...new Set(ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME).map((l) => l.exercise_name))].sort();
+  const sel = $("exerciseSelect");
+  const prevVal = sel.value;
+  sel.innerHTML = names.length
+    ? names.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("")
+    : '<option value="">Log an exercise to see progress</option>';
+  if (names.includes(prevVal)) sel.value = prevVal;
+  sel.onchange = renderExerciseChart;
+  renderExerciseChart();
+}
+
+function renderExerciseChart() {
+  const name = $("exerciseSelect").value;
+  const ctx = $("exerciseChart").getContext("2d");
+  if (exerciseChart) exerciseChart.destroy();
+  if (!name) { $("exercisePrNote").textContent = ""; return; }
+
+  const logs = ALL_EXERCISE_LOGS
+    .filter((l) => l.user_name === ME && l.exercise_name === name && l.weight != null)
+    .sort((a, b) => a.entry_date.localeCompare(b.entry_date));
+
+  exerciseChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: logs.map((l) => l.entry_date.slice(5)),
+      datasets: [{ label: name, data: logs.map((l) => l.weight), borderColor: cssVar("--accent"), backgroundColor: "transparent", tension: 0.3, pointRadius: 3 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: cssVar("--border") }, ticks: { color: cssVar("--muted"), maxTicksLimit: 6 } },
+        y: { grid: { color: cssVar("--border") }, ticks: { color: cssVar("--muted") } },
+      },
+    },
+  });
+
+  const best = logs.length ? Math.max(...logs.map((l) => l.weight)) : null;
+  $("exercisePrNote").textContent = best != null ? `Your best: ${best} lb — logged ${logs.length} time(s)` : "";
+}
+
+/* ---------- Couple tab ---------- */
+
+function weekStartStr() {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  d.setDate(d.getDate() + diff);
+  return isoDate(d);
+}
+
+function gymDaysThisWeek(name) {
+  const start = weekStartStr();
+  return entriesFor(name).filter((e) => e.gym && e.entry_date >= start).length;
+}
+
+function renderCoupleTab() {
+  const partner = partnerName();
+  const target = 4;
+  const myDays = gymDaysThisWeek(ME);
+  const partnerDays = gymDaysThisWeek(partner);
+
+  $("challengeMeLbl").textContent = `${ME}: ${myDays}/${target}`;
+  $("challengePartnerLbl").textContent = `${partner}: ${partnerDays}/${target}`;
+  $("challengeMeBar").style.width = Math.min(100, (myDays / target) * 50) + "%";
+  $("challengePartnerBar").style.width = Math.min(100, (partnerDays / target) * 50) + "%";
+
+  const combined = myDays + partnerDays;
+  const combinedTarget = target * 2;
+  $("challengeSummary").textContent = combined >= combinedTarget
+    ? "You two crushed this week's shared goal! 🎉"
+    : `${combined}/${combinedTarget} combined gym days this week. Keep pushing each other.`;
+
+  const myXP = computeXP(ME);
+  const partnerXP = computeXP(partner);
+  $("vsMeName").textContent = ME;
+  $("vsPartnerName").textContent = partner;
+  $("vsMeXp").textContent = myXP;
+  $("vsPartnerXp").textContent = partnerXP;
+  $("vsSummary").textContent = myXP === partnerXP
+    ? "Dead even right now."
+    : myXP > partnerXP
+      ? `${ME} is ahead by ${myXP - partnerXP} XP.`
+      : `${partner} is ahead by ${partnerXP - myXP} XP.`;
+}
+
+/* ---------- Setup tab ---------- */
+
+function renderSetupTab() {
+  if (MY_PROFILE) {
+    if (MY_PROFILE.focus) $("setupFocus").value = MY_PROFILE.focus;
+    if (MY_PROFILE.goal) $("setupGoal").value = MY_PROFILE.goal;
+    $("setupGoalDetail").value = MY_PROFILE.goal_detail || "";
+  }
+}
+
+async function saveSetup() {
+  const payload = {
+    user_name: ME,
+    focus: $("setupFocus").value,
+    goal: $("setupGoal").value,
+    goal_detail: $("setupGoalDetail").value.trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await sb.from("profiles").upsert(payload);
+  if (error) { toast("Save failed"); console.error(error); return; }
+  toast("Preferences saved ✓");
+  const { data } = await sb.from("profiles").select("*").eq("user_name", ME).maybeSingle();
+  MY_PROFILE = data;
 }
 
 initOnboard();
