@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Fit Together</title>
+<link rel="icon" href="data:,">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #151821;
+    --panel-2: #1c202b;
+    --border: #262b38;
+    --text: #f2f3f5;
+    --muted: #8b93a7;
+    --accent: #5b8cff;
+    --me: #5b8cff;
+    --partner: #ff7a5b;
+    --up: #ff5b6e;
+    --down: #34d39a;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #app { max-width: 480px; margin: 0 auto; min-height: 100dvh; padding: 20px 16px 100px; }
+
+  .hidden { display: none !important; }
+
+  /* Onboarding */
+  #onboard { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+  #onboard h1 { font-size: 28px; margin: 0 0 6px; }
+  #onboard p { color: var(--muted); margin: 0 0 28px; font-size: 15px; }
+  #onboard input {
+    width: 100%; max-width: 320px; padding: 14px 16px; border-radius: 12px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    font-size: 16px; margin-bottom: 14px; text-align: center;
+  }
+  #onboard button, .btn-primary {
+    width: 100%; max-width: 320px; padding: 14px 16px; border-radius: 12px; border: none;
+    background: var(--accent); color: white; font-size: 16px; font-weight: 600; cursor: pointer;
+  }
+  #onboard button:active, .btn-primary:active { opacity: 0.85; }
+
+  header.top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  header.top h1 { font-size: 20px; margin: 0; }
+  header.top .me-tag { font-size: 13px; color: var(--muted); }
+  .switch-user { background: none; border: none; color: var(--muted); font-size: 13px; text-decoration: underline; cursor: pointer; padding: 4px; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; margin-bottom: 14px;
+  }
+  .card h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+
+  .streak-row { display: flex; gap: 12px; }
+  .streak-box { flex: 1; background: var(--panel-2); border-radius: 12px; padding: 14px; text-align: center; border: 1px solid var(--border); }
+  .streak-box .n { font-size: 30px; font-weight: 700; line-height: 1; }
+  .streak-box .lbl { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .streak-box.me .n { color: var(--me); }
+  .streak-box.partner .n { color: var(--partner); }
+  .streak-box .flame { font-size: 15px; margin-right: 2px; }
+
+  .chart-wrap { position: relative; height: 220px; }
+  .legend { display: flex; gap: 16px; margin-top: 10px; font-size: 12px; color: var(--muted); justify-content: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+  .today-status { display: flex; gap: 10px; }
+  .status-pill { flex: 1; border-radius: 12px; padding: 10px 12px; border: 1px solid var(--border); background: var(--panel-2); font-size: 13px; display: flex; align-items: center; justify-content: space-between; }
+  .status-pill .who { color: var(--muted); }
+  .status-pill .check { font-size: 16px; }
+
+  form#logForm { display: flex; flex-direction: column; gap: 10px; }
+  .row2 { display: flex; gap: 10px; }
+  .field { flex: 1; }
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+  input[type="number"], input[type="date"], textarea {
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-size: 15px; font-family: inherit;
+  }
+  textarea { resize: vertical; min-height: 44px; }
+  .gym-toggle {
+    display: flex; align-items: center; justify-content: space-between; padding: 10px 12px;
+    border-radius: 10px; border: 1px solid var(--border); background: var(--panel-2); cursor: pointer;
+  }
+  .gym-toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+  .gym-toggle.checked { border-color: var(--accent); background: rgba(91,140,255,0.12); }
+
+  .log-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
+  .log-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .log-item:last-child { border-bottom: none; }
+  .log-item .dot { flex-shrink: 0; }
+  .log-item .date { color: var(--muted); width: 70px; flex-shrink: 0; }
+  .log-item .w { font-weight: 600; width: 56px; flex-shrink: 0; }
+  .log-item .note { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log-item .gym-yes { color: var(--down); }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 18px; border-radius: 100px; font-size: 14px; z-index: 50;
+    opacity: 0; pointer-events: none; transition: opacity 0.25s;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="onboard">
+  <h1>Fit Together 💪</h1>
+  <p>A shared tracker so you two can push each other.</p>
+  <input id="nameInput" type="text" placeholder="What's your name?" maxlength="24" />
+  <button id="nameSubmit" class="btn-primary">Let's go</button>
+</div>
+
+<div id="app" class="hidden">
+  <header class="top">
+    <div>
+      <h1>Fit Together</h1>
+      <div class="me-tag">Logged in as <strong id="meLabel"></strong></div>
+    </div>
+    <button class="switch-user" id="switchUserBtn">switch</button>
+  </header>
+
+  <div class="card">
+    <h2>Streaks</h2>
+    <div class="streak-row">
+      <div class="streak-box me">
+        <div class="n"><span class="flame">🔥</span><span id="myStreak">0</span></div>
+        <div class="lbl" id="myStreakLbl">You</div>
+      </div>
+      <div class="streak-box partner">
+        <div class="n"><span class="flame">🔥</span><span id="partnerStreak">0</span></div>
+        <div class="lbl" id="partnerStreakLbl">Partner</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Today</h2>
+    <div class="today-status">
+      <div class="status-pill"><span class="who" id="todayMeLbl">You</span><span class="check" id="todayMeCheck">—</span></div>
+      <div class="status-pill"><span class="who" id="todayPartnerLbl">Partner</span><span class="check" id="todayPartnerCheck">—</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Weight trend</h2>
+    <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--me)"></span><span id="legendMe">You</span></span>
+      <span><span class="dot" style="background:var(--partner)"></span><span id="legendPartner">Partner</span></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Log today</h2>
+    <form id="logForm">
+      <div class="row2">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="entryDate" required />
+        </div>
+        <div class="field">
+          <label>Weight (lbs)</label>
+          <input type="number" id="entryWeight" step="0.1" placeholder="—" />
+        </div>
+      </div>
+      <label class="gym-toggle" id="gymToggleWrap">
+        <span>Went to the gym today</span>
+        <input type="checkbox" id="entryGym" />
+      </label>
+      <div class="field">
+        <label>Note (optional — what you hit, weights lifted, etc.)</label>
+        <textarea id="entryNote" placeholder="e.g. bench 135x5, felt strong"></textarea>
+      </div>
+      <button type="submit" class="btn-primary">Save entry</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Recent activity</h2>
+    <div class="log-list" id="logList"><div style="color:var(--muted); font-size:13px;">No entries yet.</div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = "https://qpfinnnapvziupzvjglk.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_NRea1pFcwmvNp9rV52Sryw_fQEJOO6v";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const STORAGE_KEY = "ft_user_name";
+let ME = localStorage.getItem(STORAGE_KEY) || "";
+let ALL_ENTRIES = [];
+let chart = null;
+
+const $ = (id) => document.getElementById(id);
+
+function toast(msg) {
+  const el = $("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 2200);
+}
+
+function todayStr() {
+  const d = new Date();
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d - tz).toISOString().slice(0, 10);
+}
+
+function initOnboard() {
+  if (ME) return showApp();
+  $("onboard").classList.remove("hidden");
+  $("app").classList.add("hidden");
+  $("nameSubmit").addEventListener("click", submitName);
+  $("nameInput").addEventListener("keydown", (e) => { if (e.key === "Enter") submitName(); });
+}
+
+function submitName() {
+  const v = $("nameInput").value.trim();
+  if (!v) return;
+  ME = v;
+  localStorage.setItem(STORAGE_KEY, v);
+  showApp();
+}
+
+function showApp() {
+  $("onboard").classList.add("hidden");
+  $("app").classList.remove("hidden");
+  $("meLabel").textContent = ME;
+  $("entryDate").value = todayStr();
+  $("switchUserBtn").addEventListener("click", () => {
+    localStorage.removeItem(STORAGE_KEY);
+    ME = "";
+    location.reload();
+  });
+  $("gymToggleWrap").addEventListener("click", () => {
+    setTimeout(() => {
+      $("gymToggleWrap").classList.toggle("checked", $("entryGym").checked);
+    }, 0);
+  });
+  $("logForm").addEventListener("submit", saveEntry);
+  loadEntries();
+}
+
+async function loadEntries() {
+  const { data, error } = await sb
+    .from("fit_entries")
+    .select("*")
+    .order("entry_date", { ascending: true });
+  if (error) {
+    toast("Couldn't load data");
+    console.error(error);
+    return;
+  }
+  ALL_ENTRIES = data || [];
+  render();
+}
+
+async function saveEntry(e) {
+  e.preventDefault();
+  const entry_date = $("entryDate").value;
+  const weightVal = $("entryWeight").value;
+  const payload = {
+    user_name: ME,
+    entry_date,
+    weight: weightVal === "" ? null : parseFloat(weightVal),
+    gym: $("entryGym").checked,
+    note: $("entryNote").value.trim() || null,
+  };
+  const { error } = await sb
+    .from("fit_entries")
+    .upsert(payload, { onConflict: "user_name,entry_date" });
+  if (error) {
+    toast("Save failed");
+    console.error(error);
+    return;
+  }
+  toast("Saved ✓");
+  $("entryWeight").value = "";
+  $("entryNote").value = "";
+  $("entryGym").checked = false;
+  $("gymToggleWrap").classList.remove("checked");
+  loadEntries();
+}
+
+function partnerName() {
+  const names = new Set(ALL_ENTRIES.map((e) => e.user_name));
+  names.delete(ME);
+  return [...names][0] || "Partner";
+}
+
+function entriesFor(name) {
+  return ALL_ENTRIES.filter((e) => e.user_name === name).sort((a, b) => a.entry_date.localeCompare(b.entry_date));
+}
+
+function computeStreak(name) {
+  const gymDays = new Set(entriesFor(name).filter((e) => e.gym).map((e) => e.entry_date));
+  if (gymDays.size === 0) return 0;
+  let streak = 0;
+  let cursor = new Date(todayStr() + "T00:00:00");
+  // if today has no check-in yet, start counting from yesterday
+  if (!gymDays.has(todayStr())) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  while (true) {
+    const key = new Date(cursor.getTime() - cursor.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    if (gymDays.has(key)) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    } else break;
+  }
+  return streak;
+}
+
+function render() {
+  const partner = partnerName();
+  $("myStreakLbl").textContent = ME;
+  $("partnerStreakLbl").textContent = partner;
+  $("todayMeLbl").textContent = ME;
+  $("todayPartnerLbl").textContent = partner;
+  $("legendMe").textContent = ME;
+  $("legendPartner").textContent = partner;
+
+  $("myStreak").textContent = computeStreak(ME);
+  $("partnerStreak").textContent = computeStreak(partner);
+
+  const t = todayStr();
+  const myToday = ALL_ENTRIES.find((e) => e.user_name === ME && e.entry_date === t);
+  const partnerToday = ALL_ENTRIES.find((e) => e.user_name === partner && e.entry_date === t);
+  $("todayMeCheck").textContent = myToday && myToday.gym ? "✅" : "—";
+  $("todayPartnerCheck").textContent = partnerToday && partnerToday.gym ? "✅" : "—";
+
+  renderChart();
+  renderLog();
+}
+
+function renderChart() {
+  const partner = partnerName();
+  const myEntries = entriesFor(ME).filter((e) => e.weight != null);
+  const partnerEntries = entriesFor(partner).filter((e) => e.weight != null);
+  const allDates = [...new Set([...myEntries, ...partnerEntries].map((e) => e.entry_date))].sort();
+
+  const myMap = Object.fromEntries(myEntries.map((e) => [e.entry_date, e.weight]));
+  const partnerMap = Object.fromEntries(partnerEntries.map((e) => [e.entry_date, e.weight]));
+
+  const myData = allDates.map((d) => (d in myMap ? myMap[d] : null));
+  const partnerData = allDates.map((d) => (d in partnerMap ? partnerMap[d] : null));
+
+  const ctx = $("weightChart").getContext("2d");
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: allDates.map((d) => d.slice(5)),
+      datasets: [
+        {
+          label: ME,
+          data: myData,
+          borderColor: "#5b8cff",
+          backgroundColor: "rgba(91,140,255,0.15)",
+          spanGaps: true,
+          tension: 0.3,
+          pointRadius: 3,
+        },
+        {
+          label: partner,
+          data: partnerData,
+          borderColor: "#ff7a5b",
+          backgroundColor: "rgba(255,122,91,0.15)",
+          spanGaps: true,
+          tension: 0.3,
+          pointRadius: 3,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: "#262b38" }, ticks: { color: "#8b93a7", maxTicksLimit: 6 } },
+        y: { grid: { color: "#262b38" }, ticks: { color: "#8b93a7" } },
+      },
+    },
+  });
+}
+
+function renderLog() {
+  const combined = [...ALL_ENTRIES].sort((a, b) => b.entry_date.localeCompare(a.entry_date)).slice(0, 20);
+  const list = $("logList");
+  if (combined.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted); font-size:13px;">No entries yet.</div>';
+    return;
+  }
+  list.innerHTML = combined
+    .map((e) => {
+      const color = e.user_name === ME ? "var(--me)" : "var(--partner)";
+      const w = e.weight != null ? e.weight + " lb" : "";
+      const gym = e.gym ? '<span class="gym-yes">🏋️</span>' : "";
+      const note = e.note ? escapeHtml(e.note) : "";
+      return `<div class="log-item">
+        <span class="dot" style="background:${color}"></span>
+        <span class="date">${e.entry_date.slice(5)}</span>
+        <span class="w">${w}</span>
+        ${gym}
+        <span class="note">${note}</span>
+      </div>`;
+    })
+    .join("");
+}
+
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+initOnboard();
+</script>
+</body>
+</html>
