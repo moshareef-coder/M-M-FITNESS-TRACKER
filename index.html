@@ -165,6 +165,12 @@
   .gym-toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
   .gym-toggle.checked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
 
+  .pr-list { display: flex; flex-direction: column; }
+  .pr-list .pr-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .pr-list .pr-row:last-child { border-bottom: none; }
+  .pr-list .pr-weight { font-weight: 700; }
+  .pr-lookup { font-size: 12px; color: var(--muted); margin-top: -6px; margin-bottom: 8px; min-height: 16px; }
+
   .workout-cards { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 0 16px 4px; }
   .workout-card {
     flex-shrink: 0; width: 148px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px;
@@ -209,6 +215,7 @@
   .session-step { font-size: 12px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
   .session-ex-name { font-size: 26px; font-weight: 800; margin-bottom: 4px; }
   .session-ex-target { color: var(--muted); font-size: 14px; margin-bottom: 6px; }
+  .session-pr-note { color: var(--gold); font-size: 13px; font-weight: 600; margin-bottom: 6px; }
   .session-ex-note { color: var(--muted); font-size: 13px; margin-bottom: 18px; font-style: italic; }
   .set-circles { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
   .set-circle {
@@ -379,6 +386,7 @@
       <h2>Log an exercise off-plan</h2>
       <form class="form-grid" id="quickLogForm">
         <div class="field"><label>Exercise</label><input type="text" id="qlName" placeholder="e.g. Bench Press" required /></div>
+        <div class="pr-lookup" id="qlPrLookup"></div>
         <div class="stepper-row" id="qlStepperRow"></div>
         <button type="submit" class="btn-primary">Log it</button>
       </form>
@@ -450,6 +458,22 @@
       <input type="number" id="setupChallengeTarget" min="1" max="7" value="4" />
     </div>
     <button class="btn-primary" id="saveSetupBtn">Save preferences</button>
+
+    <div class="card" style="margin-top:14px;">
+      <h2>Your PRs</h2>
+      <div class="pr-list" id="currentPRsList"></div>
+
+      <label style="margin-top:14px;">Add one</label>
+      <div class="row2">
+        <div class="field"><input type="text" id="prName" placeholder="Exercise, e.g. Bench Press" /></div>
+      </div>
+      <div class="stepper-row compact" id="prStepperRow"></div>
+      <button type="button" class="btn-secondary" id="savePRBtn">Save PR</button>
+
+      <label style="margin-top:16px;">Or paste a list</label>
+      <textarea id="prBulkText" placeholder="One per line, e.g.&#10;Bench Press 225 x 5&#10;Squat 315 x 3&#10;Deadlift 405 x 1"></textarea>
+      <button type="button" class="btn-secondary" id="importPRBtn">Import list</button>
+    </div>
   </div>
 
   <nav class="tabs">
@@ -705,9 +729,13 @@ function showApp() {
   };
   $("logForm").addEventListener("submit", saveEntry);
   $("quickLogForm").addEventListener("submit", saveQuickLog);
+  $("qlName").addEventListener("input", updateQlPrLookup);
   renderQuickLogSteppers();
   $("generateWorkoutBtn").addEventListener("click", generateWorkout);
   $("saveSetupBtn").addEventListener("click", saveSetup);
+  $("savePRBtn").addEventListener("click", savePR);
+  $("importPRBtn").addEventListener("click", importPRBulk);
+  renderPRSteppers();
 
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     const label = btn.textContent;
@@ -1139,12 +1167,15 @@ function renderSession() {
   const ex = TODAY_WORKOUT.exercises[ei];
   const setsDone = SESSION.setsDone[ei];
   const allDone = setsDone.every(Boolean);
+  const { best } = personalRecords(ME);
+  const prevBest = best[ex.name.toLowerCase()];
 
   $("sessionBody").innerHTML = `
     <div class="session-panel">
       <div class="session-step">Exercise ${ei + 1} of ${total}</div>
       <div class="session-ex-name">${escapeHtml(ex.name)}</div>
       <div class="session-ex-target">${ex.sets} sets × ${ex.reps} reps @ ${ex.targetWeight || "bodyweight"} lb</div>
+      <div class="session-pr-note">${prevBest != null ? `Last PR: ${prevBest} lb` : "No PR on file yet"}</div>
       ${ex.note ? `<div class="session-ex-note">${escapeHtml(ex.note)}</div>` : ""}
       <div class="set-circles">
         ${setsDone.map((done, i) => `<button type="button" class="set-circle ${done ? "done" : ""}" data-set="${i}">${done ? icon("check", 16) : i + 1}</button>`).join("")}
@@ -1313,12 +1344,22 @@ function renderQuickLogSteppers() {
   });
 }
 
+function updateQlPrLookup() {
+  const name = $("qlName").value.trim().toLowerCase();
+  const el = $("qlPrLookup");
+  if (!name) { el.textContent = ""; return; }
+  const { best } = personalRecords(ME);
+  const match = best[name];
+  el.textContent = match != null ? `Last PR: ${match} lb` : "No PR on file for this yet";
+}
+
 async function saveQuickLog(e) {
   e.preventDefault();
   const name = $("qlName").value.trim();
   if (!name) return;
   await logExercise(name, QL_STATE.weight, QL_STATE.reps, QL_STATE.sets);
   $("qlName").value = "";
+  $("qlPrLookup").textContent = "";
   QL_STATE.weight = 0; QL_STATE.reps = 0; QL_STATE.sets = 1;
   renderQuickLogSteppers();
 }
@@ -1420,6 +1461,93 @@ function renderSetupTab() {
     if (MY_PROFILE.goal) $("setupGoal").value = MY_PROFILE.goal;
     $("setupGoalDetail").value = MY_PROFILE.goal_detail || "";
   }
+  renderCurrentPRs();
+}
+
+function renderCurrentPRs() {
+  const { best } = personalRecords(ME);
+  const entries = Object.entries(best).sort((a, b) => a[0].localeCompare(b[0]));
+  const list = $("currentPRsList");
+  list.innerHTML = entries.length
+    ? entries.map(([name, w]) => `<div class="pr-row"><span>${escapeHtml(name)}</span><span class="pr-weight">${w} lb</span></div>`).join("")
+    : '<p class="muted-note">No PRs on file yet — add one below.</p>';
+}
+
+const PR_STATE = { weight: 0, reps: 0 };
+
+function renderPRSteppers() {
+  const specs = [
+    { key: "weight", unit: "lbs", step: 2.5, min: 0 },
+    { key: "reps", unit: "reps", step: 1, min: 0 },
+  ];
+  $("prStepperRow").innerHTML = specs.map((s) => `
+    <div class="stepper">
+      <div class="stepper-controls">
+        <button type="button" class="stepper-btn" data-pr-minus="${s.key}">${icon("minus", 14)}</button>
+        <div><div class="stepper-value" id="pr_${s.key}_val">${PR_STATE[s.key]}</div><div class="stepper-unit">${s.unit}</div></div>
+        <button type="button" class="stepper-btn" data-pr-plus="${s.key}">${icon("plus", 14)}</button>
+      </div>
+    </div>`).join("");
+  specs.forEach((s) => {
+    $("prStepperRow").querySelector(`[data-pr-minus="${s.key}"]`).onclick = () => {
+      PR_STATE[s.key] = Math.max(s.min, PR_STATE[s.key] - s.step);
+      $(`pr_${s.key}_val`).textContent = PR_STATE[s.key];
+    };
+    $("prStepperRow").querySelector(`[data-pr-plus="${s.key}"]`).onclick = () => {
+      PR_STATE[s.key] = PR_STATE[s.key] + s.step;
+      $(`pr_${s.key}_val`).textContent = PR_STATE[s.key];
+    };
+  });
+}
+
+async function savePR() {
+  const name = $("prName").value.trim();
+  if (!name) { toast("Enter an exercise name"); return; }
+  if (!PR_STATE.weight) { toast("Set a weight"); return; }
+  const { error } = await sb.from("exercise_logs").insert({
+    user_name: ME, entry_date: todayStr(), exercise_name: name,
+    weight: PR_STATE.weight, reps: PR_STATE.reps || null, sets: null,
+  });
+  if (error) { toast("Save failed"); console.error(error); return; }
+  toast(`${name} saved`);
+  $("prName").value = "";
+  PR_STATE.weight = 0; PR_STATE.reps = 0;
+  renderPRSteppers();
+  await loadAll();
+  renderCurrentPRs();
+}
+
+function parsePRLine(line) {
+  const m = line.match(/^(.+?)[\s,:\-]*?(\d+(?:\.\d+)?)\s*(?:lbs?|kg)?\s*(?:[x×]\s*(\d+))?\s*(?:reps?)?\s*$/i);
+  if (!m) return null;
+  const name = m[1].trim().replace(/[:\-,]+$/, "").trim();
+  if (!name) return null;
+  return { name, weight: parseFloat(m[2]), reps: m[3] ? parseInt(m[3], 10) : null };
+}
+
+async function importPRBulk() {
+  const lines = $("prBulkText").value.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) { toast("Paste at least one line"); return; }
+  const rows = [];
+  const failed = [];
+  for (const line of lines) {
+    const parsed = parsePRLine(line);
+    if (parsed) {
+      rows.push({
+        user_name: ME, entry_date: todayStr(), exercise_name: parsed.name,
+        weight: parsed.weight, reps: parsed.reps, sets: null,
+      });
+    } else {
+      failed.push(line);
+    }
+  }
+  if (rows.length === 0) { toast("Couldn't read any of those lines"); return; }
+  const { error } = await sb.from("exercise_logs").insert(rows);
+  if (error) { toast("Import failed"); console.error(error); return; }
+  toast(failed.length ? `Imported ${rows.length}, skipped ${failed.length}` : `Imported ${rows.length} PRs`);
+  $("prBulkText").value = failed.join("\n");
+  await loadAll();
+  renderCurrentPRs();
 }
 
 async function saveSetup() {
