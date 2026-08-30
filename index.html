@@ -289,7 +289,7 @@
     </div>
     <div>
       <button class="icon-btn" id="themeToggleBtn" title="Toggle theme"></button>
-      <button class="icon-btn" id="switchUserBtn" title="Switch user"></button>
+      <button class="icon-btn" id="switchUserBtn" title="Sign out"></button>
     </div>
   </header>
 
@@ -493,11 +493,12 @@ const SUPABASE_ANON_KEY = "sb_publishable_890hsPHDiiz4-fQi7Jqd9g_a_aoHyz2";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const FUNCTION_URL = SUPABASE_URL + "/functions/v1/generate-workout";
 
-const NAME_KEY = "ft_user_name";
 const THEME_KEY = "ft_theme";
-let ME = localStorage.getItem(NAME_KEY) || "";
+let ME = "";
+let MY_EMAIL = "";
 let ALL_ENTRIES = [];
 let ALL_EXERCISE_LOGS = [];
+let ALL_PROFILES = [];
 let MY_PROFILE = null;
 let PARTNER_PROFILE = null;
 let TODAY_WORKOUT = null;
@@ -512,6 +513,8 @@ const ICON_PATHS = {
   flame: '<path d="M12 2c1 3-2 4-2 7a4 4 0 0 0 8 0c0-1-.5-2-1-2.5.5 2-1 3-2 3-1.5 0-2-1.2-1.5-2.5C14 6 13 4 12 2Z"/><path d="M7 13a5 5 0 0 0 10 0c0-2-1-3-2-4 .3 1.5-.5 2.5-1.5 2.5-1.2 0-1.8-1-1.3-2.2C10.5 10.5 7 11 7 13Z"/>',
   sunMoon: '<path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/>',
   swap: '<path d="M7 4v13M7 4 3 8M7 4l4 4M17 20V7m0 13 4-4m-4 4-4-4"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
+  google: '<path fill="#4285F4" stroke="none" d="M21.6 12.23c0-.7-.06-1.38-.18-2.03H12v3.84h5.4a4.62 4.62 0 0 1-2 3.03v2.5h3.24c1.9-1.75 3-4.32 3-7.34Z"/><path fill="#34A853" stroke="none" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.5c-.9.6-2.05.96-3.4.96-2.6 0-4.8-1.76-5.6-4.12H3.05v2.58A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" stroke="none" d="M6.4 13.9a5.98 5.98 0 0 1 0-3.8V7.52H3.05a10 10 0 0 0 0 8.96l3.36-2.58Z"/><path fill="#EA4335" stroke="none" d="M12 6.06c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.96 9.96 0 0 0 12 2a10 10 0 0 0-8.95 5.52L6.4 10.1C7.2 7.74 9.4 6.06 12 6.06Z"/>',
   medal: '<circle cx="12" cy="14" r="6"/><path d="m9 10-3-6M15 10l3-6M9.5 14.5 12 17l4-4"/>',
   trophy: '<path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a2 2 0 0 0 0 4h1M16 5h3a2 2 0 0 1 0 4h-1"/><path d="M12 12v3M9 20h6M9.5 15.5h5l.5 4.5h-6l.5-4.5Z"/>',
   star: '<path d="M12 3l2.5 5.6 6.1.6-4.6 4.1 1.3 6-5.3-3.1L6.7 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z"/>',
@@ -569,15 +572,71 @@ function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme === "light" ? "light" : "dark");
 }
 
-/* ---------- Onboarding ---------- */
+/* ---------- Auth ---------- */
 
 function initOnboard() {
   const theme = localStorage.getItem(THEME_KEY) ||
     (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
   applyTheme(theme);
 
-  if (ME) return checkProfileThenStart();
-  renderOnboardStep("name");
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_IN" && session) handleSignedIn(session);
+    if (event === "SIGNED_OUT") location.reload();
+  });
+  sb.auth.getSession().then(({ data }) => {
+    if (data.session) handleSignedIn(data.session);
+    else renderSignInScreen();
+  });
+}
+
+function renderSignInScreen() {
+  const ob = $("onboard");
+  ob.innerHTML = `
+    <div class="ob-step">
+      <h1>Fit Together</h1>
+      <p class="sub">A shared tracker so you two can push each other.</p>
+      <button class="btn-primary" id="googleSignInBtn" style="display:flex; align-items:center; justify-content:center; gap:10px; background:white; color:#1f1f1f; border:1px solid var(--border);">${icon("google", 20)}Sign in with Google</button>
+    </div>`;
+  $("googleSignInBtn").onclick = () => {
+    sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
+  };
+}
+
+function renderNotAllowedScreen(email) {
+  const ob = $("onboard");
+  ob.innerHTML = `
+    <div class="ob-step">
+      <h1>Not on the list</h1>
+      <p class="sub">Signed in as ${escapeHtml(email)}, but this app is locked to two accounts. Ask your partner to add you.</p>
+      <button class="btn-secondary" id="signOutBtn">Sign out</button>
+    </div>`;
+  $("signOutBtn").onclick = () => sb.auth.signOut();
+}
+
+let SIGN_IN_HANDLED = false;
+
+async function handleSignedIn(session) {
+  if (SIGN_IN_HANDLED) return;
+  SIGN_IN_HANDLED = true;
+  MY_EMAIL = session.user.email.toLowerCase();
+
+  const { data: allowed } = await sb.from("allowed_emails").select("email").eq("email", MY_EMAIL).maybeSingle();
+  if (!allowed) {
+    SIGN_IN_HANDLED = false;
+    renderNotAllowedScreen(MY_EMAIL);
+    return;
+  }
+
+  const { data: profile } = await sb.from("profiles").select("*").eq("email", MY_EMAIL).maybeSingle();
+  if (profile) {
+    ME = profile.user_name;
+    MY_PROFILE = profile;
+    applyTheme(profile.theme || localStorage.getItem(THEME_KEY) || "dark");
+    showApp();
+  } else {
+    const suggested = session.user.user_metadata?.full_name?.split(" ")[0] || session.user.email.split("@")[0];
+    renderOnboardStep("name", { name: suggested });
+  }
 }
 
 function renderOnboardStep(step, data = {}) {
@@ -585,9 +644,9 @@ function renderOnboardStep(step, data = {}) {
   if (step === "name") {
     ob.innerHTML = `
       <div class="ob-step">
-        <h1>Fit Together</h1>
-        <p class="sub">A shared tracker so you two can push each other.</p>
-        <input id="nameInput" type="text" placeholder="What's your name?" maxlength="24" />
+        <h1>What should we call you?</h1>
+        <p class="sub">Shown to your partner throughout the app.</p>
+        <input id="nameInput" type="text" placeholder="Your name" maxlength="24" value="${escapeHtml(data.name || "")}" />
         <button class="btn-primary" id="nextBtn">Continue</button>
       </div>`;
     $("nextBtn").onclick = () => {
@@ -678,29 +737,20 @@ function renderOnboardStep(step, data = {}) {
 
 async function finishOnboarding(data) {
   ME = data.name;
-  localStorage.setItem(NAME_KEY, ME);
   localStorage.setItem(THEME_KEY, data.theme);
   applyTheme(data.theme);
-  await sb.from("profiles").upsert({
+  const { data: saved, error } = await sb.from("profiles").upsert({
+    email: MY_EMAIL,
     user_name: ME,
     theme: data.theme,
     focus: data.focus,
     goal: data.goal,
     goal_detail: data.goalDetail || null,
     updated_at: new Date().toISOString(),
-  });
+  }).select().maybeSingle();
+  if (error) { toast("Setup failed — try again"); console.error(error); return; }
+  MY_PROFILE = saved;
   showApp();
-}
-
-async function checkProfileThenStart() {
-  const { data } = await sb.from("profiles").select("*").eq("user_name", ME).maybeSingle();
-  if (data) {
-    MY_PROFILE = data;
-    applyTheme(data.theme || localStorage.getItem(THEME_KEY) || "dark");
-    showApp();
-  } else {
-    renderOnboardStep("theme", { name: ME });
-  }
 }
 
 /* ---------- Main app ---------- */
@@ -710,19 +760,17 @@ function showApp() {
   $("app").classList.remove("hidden");
   $("meLabel").textContent = ME;
   $("themeToggleBtn").innerHTML = icon("sunMoon");
-  $("switchUserBtn").innerHTML = icon("swap");
+  $("switchUserBtn").innerHTML = icon("logout");
+  $("switchUserBtn").title = "Sign out";
   $("entryDate").value = todayStr();
 
-  $("switchUserBtn").onclick = () => {
-    localStorage.removeItem(NAME_KEY);
-    location.reload();
-  };
+  $("switchUserBtn").onclick = () => sb.auth.signOut();
   $("themeToggleBtn").onclick = () => {
     const cur = document.documentElement.getAttribute("data-theme") || "dark";
     const next = cur === "dark" ? "light" : "dark";
     applyTheme(next);
     localStorage.setItem(THEME_KEY, next);
-    sb.from("profiles").update({ theme: next, updated_at: new Date().toISOString() }).eq("user_name", ME).then(() => {});
+    sb.from("profiles").update({ theme: next, updated_at: new Date().toISOString() }).eq("email", MY_EMAIL).then(() => {});
   };
   $("gymToggleWrap").onclick = () => {
     setTimeout(() => $("gymToggleWrap").classList.toggle("checked", $("entryGym").checked), 0);
@@ -763,15 +811,16 @@ async function loadAll() {
   ]);
   ALL_ENTRIES = entriesRes.data || [];
   ALL_EXERCISE_LOGS = exLogRes.data || [];
-  const profiles = profilesRes.data || [];
-  MY_PROFILE = profiles.find((p) => p.user_name === ME) || MY_PROFILE;
-  PARTNER_PROFILE = profiles.find((p) => p.user_name === partnerName()) || null;
+  ALL_PROFILES = profilesRes.data || [];
+  MY_PROFILE = ALL_PROFILES.find((p) => p.email === MY_EMAIL) || MY_PROFILE;
+  PARTNER_PROFILE = ALL_PROFILES.find((p) => p.email !== MY_EMAIL) || null;
 
   await loadTodayWorkout();
   renderHome();
 }
 
 function partnerName() {
+  if (PARTNER_PROFILE) return PARTNER_PROFILE.user_name;
   const names = new Set([...ALL_ENTRIES.map((e) => e.user_name), ...ALL_EXERCISE_LOGS.map((e) => e.user_name)]);
   names.delete(ME);
   return [...names][0] || "Partner";
@@ -785,12 +834,13 @@ async function saveEntry(e) {
   const weightVal = $("entryWeight").value;
   const payload = {
     user_name: ME,
+    email: MY_EMAIL,
     entry_date,
     weight: weightVal === "" ? null : parseFloat(weightVal),
     gym: $("entryGym").checked,
     note: $("entryNote").value.trim() || null,
   };
-  const { error } = await sb.from("fit_entries").upsert(payload, { onConflict: "user_name,entry_date" });
+  const { error } = await sb.from("fit_entries").upsert(payload, { onConflict: "email,entry_date" });
   if (error) { toast("Save failed"); console.error(error); return; }
   toast("Saved · +10 XP");
   $("entryWeight").value = "";
@@ -1018,7 +1068,7 @@ function escapeHtml(s) {
 /* ---------- Workout tab ---------- */
 
 async function loadTodayWorkout() {
-  const { data } = await sb.from("ai_workouts").select("*").eq("user_name", ME).eq("entry_date", todayStr()).maybeSingle();
+  const { data } = await sb.from("ai_workouts").select("*").eq("email", MY_EMAIL).eq("entry_date", todayStr()).maybeSingle();
   TODAY_WORKOUT = data || null;
 }
 
@@ -1030,9 +1080,10 @@ async function generateWorkout() {
   const history = Object.entries(personalRecords(ME).best).map(([exercise_name, weight]) => ({ exercise_name, weight }));
 
   try {
+    const { data: { session } } = await sb.auth.getSession();
     const resp = await fetch(FUNCTION_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SUPABASE_ANON_KEY },
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token },
       body: JSON.stringify({
         user_name: ME,
         focus: MY_PROFILE?.focus,
@@ -1046,10 +1097,11 @@ async function generateWorkout() {
 
     await sb.from("ai_workouts").upsert({
       user_name: ME,
+      email: MY_EMAIL,
       entry_date: todayStr(),
       focus: data.workout.focus,
       exercises: data.workout.exercises,
-    }, { onConflict: "user_name,entry_date" });
+    }, { onConflict: "email,entry_date" });
 
     await loadTodayWorkout();
     renderWorkoutTab();
@@ -1150,7 +1202,7 @@ async function logExerciseSilent(name, weight, reps, sets) {
   const prevBest = best[name.toLowerCase()];
   const w = weight === "" || weight == null ? null : parseFloat(weight);
   await sb.from("exercise_logs").insert({
-    user_name: ME, entry_date: todayStr(), exercise_name: name,
+    user_name: ME, email: MY_EMAIL, entry_date: todayStr(), exercise_name: name,
     weight: w, reps: reps === "" || reps == null ? null : parseInt(reps, 10), sets: sets || null,
   });
   const isPR = w != null && (prevBest === undefined || w > prevBest);
@@ -1301,6 +1353,7 @@ async function logExercise(name, weight, reps, sets) {
   const w = weight === "" ? null : parseFloat(weight);
   const { error } = await sb.from("exercise_logs").insert({
     user_name: ME,
+    email: MY_EMAIL,
     entry_date: todayStr(),
     exercise_name: name,
     weight: w,
@@ -1505,7 +1558,7 @@ async function savePR() {
   if (!name) { toast("Enter an exercise name"); return; }
   if (!PR_STATE.weight) { toast("Set a weight"); return; }
   const { error } = await sb.from("exercise_logs").insert({
-    user_name: ME, entry_date: todayStr(), exercise_name: name,
+    user_name: ME, email: MY_EMAIL, entry_date: todayStr(), exercise_name: name,
     weight: PR_STATE.weight, reps: PR_STATE.reps || null, sets: null,
   });
   if (error) { toast("Save failed"); console.error(error); return; }
@@ -1534,7 +1587,7 @@ async function importPRBulk() {
     const parsed = parsePRLine(line);
     if (parsed) {
       rows.push({
-        user_name: ME, entry_date: todayStr(), exercise_name: parsed.name,
+        user_name: ME, email: MY_EMAIL, entry_date: todayStr(), exercise_name: parsed.name,
         weight: parsed.weight, reps: parsed.reps, sets: null,
       });
     } else {
@@ -1552,6 +1605,7 @@ async function importPRBulk() {
 
 async function saveSetup() {
   const payload = {
+    email: MY_EMAIL,
     user_name: ME,
     focus: $("setupFocus").value,
     goal: $("setupGoal").value,
@@ -1561,7 +1615,7 @@ async function saveSetup() {
   const { error } = await sb.from("profiles").upsert(payload);
   if (error) { toast("Save failed"); console.error(error); return; }
   toast("Preferences saved");
-  const { data } = await sb.from("profiles").select("*").eq("user_name", ME).maybeSingle();
+  const { data } = await sb.from("profiles").select("*").eq("email", MY_EMAIL).maybeSingle();
   MY_PROFILE = data;
 }
 

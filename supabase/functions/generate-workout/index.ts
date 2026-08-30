@@ -42,6 +42,36 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    let callerEmail = "";
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+      callerEmail = (payload.email || "").toLowerCase();
+    } catch {
+      // fall through to the empty-email rejection below
+    }
+    if (!callerEmail) {
+      return new Response(JSON.stringify({ error: "Not signed in" }), {
+        status: 401,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+    const allowResp = await fetch(
+      `${SUPABASE_URL}/rest/v1/allowed_emails?select=email&email=eq.${encodeURIComponent(callerEmail)}`,
+      { headers: { apikey: SUPABASE_ANON_KEY!, Authorization: `Bearer ${token}` } },
+    );
+    const allowRows = await allowResp.json();
+    if (!Array.isArray(allowRows) || allowRows.length === 0) {
+      return new Response(JSON.stringify({ error: "Not authorized" }), {
+        status: 403,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+
     const body = await req.json();
     const { user_name, focus, goal, goal_detail, history } = body;
 
