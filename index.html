@@ -167,6 +167,16 @@
   .badge-chip.locked { opacity: 0.35; }
 
   .chart-wrap { position: relative; height: 200px; }
+
+  .body-toggle { display: flex; gap: 8px; margin-bottom: 10px; }
+  .tab-pill {
+    padding: 6px 14px; border-radius: 100px; border: 1px solid var(--border); background: var(--panel-2);
+    color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .tab-pill.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .body-diagram-wrap { display: flex; justify-content: center; }
+  #bodyDiagram { width: 160px; height: auto; }
+  .bd-part, .bd-part-neutral { stroke: var(--border); stroke-width: 2; fill: var(--panel-2); transition: fill 0.3s; }
   .legend { display: flex; gap: 16px; margin-top: 10px; font-size: 12px; color: var(--muted); justify-content: center; }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
@@ -230,6 +240,9 @@
   .exercise-row .ex-target { font-size: 12px; color: var(--muted); }
   .exercise-row .ex-note { font-size: 12px; color: var(--muted); margin-top: 2px; font-style: italic; }
   .exercise-row .pr-tag { background: var(--gold); color: #1a1200; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; margin-left: 6px; }
+  .exercise-row .stepper-btn { width: 30px; height: 30px; }
+  .add-ex-form { margin: 12px 0; padding: 12px; background: var(--panel-2); border-radius: 10px; }
+  .add-ex-form input { margin-bottom: 10px; }
   .log-set-row { display: flex; gap: 8px; }
   .log-set-row input { flex: 1; }
   .log-set-row button { flex-shrink: 0; }
@@ -368,9 +381,7 @@
     <div class="card">
       <h2>Today's workout</h2>
       <div id="workoutFocusRow" class="muted-note" style="margin-bottom:10px;"></div>
-      <div id="workoutContent"><p class="muted-note">No workout generated yet today.</p></div>
-      <button class="btn-primary hidden" id="startWorkoutBtn" style="margin-top:10px;">Start Workout</button>
-      <button class="btn-primary" id="generateWorkoutBtn" style="margin-top:10px;">Generate today's workout</button>
+      <div id="workoutContent"></div>
     </div>
 
     <div id="sessionCard" class="card hidden">
@@ -390,14 +401,14 @@
 
     <div class="card">
       <h2>Quick check-in</h2>
-      <p class="muted-note" style="margin-top:-6px;">No structured workout today? Log your weight or mark the gym day here.</p>
+      <p class="muted-note" style="margin-top:-6px;">No structured workout today? Log your weight or mark today as a workout day here.</p>
       <form class="form-grid" id="logForm">
         <div class="row2">
           <div class="field"><label>Date</label><input type="date" id="entryDate" required /></div>
           <div class="field"><label>Weight (lbs)</label><input type="number" id="entryWeight" step="0.1" placeholder="-" /></div>
         </div>
         <label class="gym-toggle" id="gymToggleWrap">
-          <span>Went to the gym today</span>
+          <span>Worked out today</span>
           <input type="checkbox" id="entryGym" />
         </label>
         <div class="field"><label>Note (optional)</label><textarea id="entryNote" placeholder="how it felt, anything notable"></textarea></div>
@@ -415,6 +426,36 @@
         <span><span class="dot" style="background:var(--me)"></span><span id="legendMe">You</span></span>
         <span><span class="dot" style="background:var(--partner)"></span><span id="legendPartner">Partner</span></span>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>Trained areas</h2>
+      <div class="body-toggle">
+        <button type="button" class="tab-pill active" id="bodyThisWeekBtn">This week</button>
+        <button type="button" class="tab-pill" id="bodyLastWeekBtn">Last week</button>
+      </div>
+      <div class="body-diagram-wrap">
+        <svg id="bodyDiagram" viewBox="0 0 200 380" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="100" cy="26" r="20" class="bd-part-neutral" />
+          <rect x="90" y="44" width="20" height="14" rx="4" class="bd-part-neutral" />
+          <ellipse cx="60" cy="72" rx="18" ry="16" class="bd-part" data-group="shoulders" />
+          <ellipse cx="140" cy="72" rx="18" ry="16" class="bd-part" data-group="shoulders" />
+          <path d="M74 62 Q100 56 126 62 L128 108 Q100 118 72 108 Z" class="bd-part" data-group="chest" />
+          <rect x="80" y="110" width="40" height="58" rx="12" class="bd-part" data-group="core" />
+          <ellipse cx="46" cy="102" rx="13" ry="30" class="bd-part" data-group="arms" />
+          <ellipse cx="154" cy="102" rx="13" ry="30" class="bd-part" data-group="arms" />
+          <ellipse cx="40" cy="156" rx="10" ry="28" class="bd-part" data-group="arms" />
+          <ellipse cx="160" cy="156" rx="10" ry="28" class="bd-part" data-group="arms" />
+          <rect x="76" y="168" width="48" height="16" rx="6" class="bd-part-neutral" />
+          <rect x="70" y="186" width="26" height="82" rx="13" class="bd-part" data-group="legs" />
+          <rect x="104" y="186" width="26" height="82" rx="13" class="bd-part" data-group="legs" />
+          <rect x="72" y="270" width="22" height="70" rx="11" class="bd-part" data-group="legs" />
+          <rect x="106" y="270" width="22" height="70" rx="11" class="bd-part" data-group="legs" />
+          <ellipse cx="83" cy="352" rx="15" ry="8" class="bd-part-neutral" />
+          <ellipse cx="117" cy="352" rx="15" ry="8" class="bd-part-neutral" />
+        </svg>
+      </div>
+      <p class="muted-note">Front view, based on primary muscles worked. Darker means more sets logged this period.</p>
     </div>
 
     <div class="card">
@@ -517,7 +558,7 @@
     </div>
     <div class="card">
       <h2>Weekly challenge target</h2>
-      <label>Gym days per week (each of you)</label>
+      <label>Workout days per week (each of you)</label>
       <input type="number" id="setupChallengeTarget" min="1" max="7" value="4" />
     </div>
     <button class="btn-primary" id="saveSetupBtn">Save preferences</button>
@@ -540,9 +581,31 @@
 
     <div class="card hidden" id="adminCard">
       <h2>Admin</h2>
-      <label>Give yourself XP</label>
+      <label>Editing</label>
+      <div class="choice-grid" id="adminTargetChoices" style="margin-bottom:14px;">
+        <div class="choice-card" data-v="me">Myself</div>
+        <div class="choice-card" data-v="partner">Partner</div>
+      </div>
+
+      <label>Give XP</label>
       <div class="stepper-row compact" id="adminXpStepperRow"></div>
       <button type="button" class="btn-secondary" id="adminGiveXpBtn">Add XP</button>
+
+      <label style="margin-top:16px;">Add a weigh-in / workout day</label>
+      <div class="row2">
+        <input type="date" id="adminEntryDate" />
+      </div>
+      <div class="stepper-row compact" id="adminWeightStepperRow" style="margin-top:10px;"></div>
+      <label class="gym-toggle" id="adminGymToggleWrap" style="margin-top:10px;">
+        <span>Worked out that day</span>
+        <input type="checkbox" id="adminEntryGym" />
+      </label>
+      <button type="button" class="btn-secondary" id="adminAddEntryBtn" style="margin-top:10px;">Add entry</button>
+
+      <label style="margin-top:16px;">Add an exercise log</label>
+      <input type="text" id="adminExName" placeholder="Exercise name" style="margin-bottom:10px;" />
+      <div class="stepper-row compact" id="adminExStepperRow"></div>
+      <button type="button" class="btn-secondary" id="adminAddExBtn" style="margin-top:10px;">Add exercise log</button>
 
       <label style="margin-top:16px;">Full badge catalog</label>
       <div class="pr-list" id="adminBadgeCatalog"></div>
@@ -1026,10 +1089,16 @@ function showApp() {
   $("quickLogForm").addEventListener("submit", saveQuickLog);
   $("qlName").addEventListener("input", updateQlPrLookup);
   renderQuickLogSteppers();
-  $("generateWorkoutBtn").addEventListener("click", generateWorkout);
   $("saveSetupBtn").addEventListener("click", saveSetup);
   $("savePRBtn").addEventListener("click", savePR);
   $("adminGiveXpBtn").addEventListener("click", adminGiveXp);
+  $("adminAddEntryBtn").addEventListener("click", adminAddEntry);
+  $("adminAddExBtn").addEventListener("click", adminAddExercise);
+  $("bodyThisWeekBtn").addEventListener("click", () => { BODY_WEEK_OFFSET = 0; renderBodyDiagram(); });
+  $("bodyLastWeekBtn").addEventListener("click", () => { BODY_WEEK_OFFSET = 1; renderBodyDiagram(); });
+  $("adminGymToggleWrap").onclick = () => {
+    setTimeout(() => $("adminGymToggleWrap").classList.toggle("checked", $("adminEntryGym").checked), 0);
+  };
   $("importPRBtn").addEventListener("click", importPRBulk);
   renderPRSteppers();
 
@@ -1207,7 +1276,7 @@ function renderGreeting() {
   const myToday = ALL_ENTRIES.find((e) => e.user_name === ME && e.entry_date === t);
   const streak = computeStreak(ME);
   let sub;
-  if (myToday && myToday.gym) sub = "You already logged the gym today. Nice.";
+  if (myToday && myToday.gym) sub = "You already logged a workout today. Nice.";
   else if (streak > 0) sub = `${streak} day streak going. Don't break it today.`;
   else sub = "No entry yet today.";
   $("greeting").innerHTML = `<div class="hi">${greetingWord()}, ${escapeHtml(ME)}</div><div class="sub">${sub}</div>`;
@@ -1241,9 +1310,9 @@ function renderHomeWorkoutCta() {
   if (!TODAY_WORKOUT) {
     el.innerHTML = `
       <h2>Ready to train?</h2>
-      <p class="muted-note">No workout generated yet today.</p>
-      <button class="btn-primary" id="homeGenerateBtn">Generate today's workout</button>`;
-    $("homeGenerateBtn").onclick = () => { switchTab("workout"); generateWorkout(); };
+      <p class="muted-note">No workout started yet today.</p>
+      <button class="btn-primary" id="homeGenerateBtn">Begin Workout</button>`;
+    $("homeGenerateBtn").onclick = () => { WORKOUT_MODE = "choose"; switchTab("workout"); };
   } else {
     const loggedNow = todaysLoggedExerciseNames();
     const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
@@ -1370,9 +1439,8 @@ async function loadTodayWorkout() {
 }
 
 async function generateWorkout() {
-  const btn = $("generateWorkoutBtn");
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Generating…';
+  WORKOUT_MODE = null;
+  $("workoutContent").innerHTML = '<p class="muted-note"><span class="spinner"></span> Generating your workout…</p>';
 
   const history = Object.entries(personalRecords(ME).best).map(([exercise_name, weight]) => ({ exercise_name, weight }));
   const recentWeight = entriesFor(ME).filter((e) => e.weight != null).slice(-1)[0]?.weight ?? null;
@@ -1414,9 +1482,7 @@ async function generateWorkout() {
   } catch (err) {
     console.error(err);
     toast("Couldn't generate workout, check the coach connection");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Regenerate today's workout";
+    renderWorkoutTab();
   }
 }
 
@@ -1459,8 +1525,6 @@ function startWorkout() {
   saveSessionToStorage();
   $("sessionCard").classList.remove("hidden");
   $("workoutContent").classList.add("hidden");
-  $("startWorkoutBtn").classList.add("hidden");
-  $("generateWorkoutBtn").classList.add("hidden");
   renderSession();
 }
 
@@ -1470,8 +1534,6 @@ function resumeSessionIfAny() {
     SESSION = saved;
     $("sessionCard").classList.remove("hidden");
     $("workoutContent").classList.add("hidden");
-    $("startWorkoutBtn").classList.add("hidden");
-    $("generateWorkoutBtn").classList.add("hidden");
     renderSession();
     return true;
   }
@@ -1606,39 +1668,112 @@ async function renderSessionComplete() {
     SESSION = null;
     $("sessionCard").classList.add("hidden");
     $("workoutContent").classList.remove("hidden");
-    $("generateWorkoutBtn").classList.remove("hidden");
     renderWorkoutTab();
   };
 }
 
-function renderWorkoutTab() {
-  const focusRow = $("workoutFocusRow");
-  const content = $("workoutContent");
-  const genBtn = $("generateWorkoutBtn");
-  const startBtn = $("startWorkoutBtn");
+let WORKOUT_MODE = null; // null | "choose" | "manual"
+let MANUAL_DRAFT = [];
+let PLAN_EDIT_ADDING = false;
+const ADD_EX_STATE = { sets: 3, reps: 8, weight: 0 };
 
+function renderWorkoutTab() {
   if (resumeSessionIfAny()) return;
   $("sessionCard").classList.add("hidden");
-  content.classList.remove("hidden");
-  genBtn.classList.remove("hidden");
+  $("workoutContent").classList.remove("hidden");
 
-  if (!TODAY_WORKOUT) {
-    focusRow.textContent = MY_PROFILE?.focus ? `Focus: ${MY_PROFILE.focus}` : "";
-    content.innerHTML = '<p class="muted-note">No workout generated yet today.</p>';
-    genBtn.textContent = "Generate today's workout";
-    startBtn.classList.add("hidden");
+  if (TODAY_WORKOUT) {
+    WORKOUT_MODE = null;
+    renderPlanPreview();
     return;
   }
-  focusRow.textContent = `Focus: ${TODAY_WORKOUT.focus}`;
-  genBtn.textContent = "Regenerate today's workout";
-  startBtn.classList.remove("hidden");
-  startBtn.onclick = startWorkout;
+
+  $("workoutFocusRow").textContent = MY_PROFILE?.focus ? `Focus: ${MY_PROFILE.focus}` : "";
+
+  if (WORKOUT_MODE === "choose") {
+    renderChooseScreen();
+  } else if (WORKOUT_MODE === "manual") {
+    renderManualBuildScreen();
+  } else {
+    $("workoutContent").innerHTML = `
+      <p class="muted-note">No workout started yet today.</p>
+      <button class="btn-primary" id="beginWorkoutBtn" style="margin-top:10px;">Begin Workout</button>`;
+    $("beginWorkoutBtn").onclick = () => { WORKOUT_MODE = "choose"; renderWorkoutTab(); };
+  }
+}
+
+function renderChooseScreen() {
+  $("workoutContent").innerHTML = `
+    <p class="muted-note">How do you want to build today's workout?</p>
+    <button class="btn-primary" id="chooseGenerateBtn" style="margin-top:10px;">Generate for me</button>
+    <button class="btn-secondary" id="choosePlanBtn">I'll plan my own</button>`;
+  $("chooseGenerateBtn").onclick = generateWorkout;
+  $("choosePlanBtn").onclick = () => { WORKOUT_MODE = "manual"; MANUAL_DRAFT = []; renderWorkoutTab(); };
+}
+
+function renderManualBuildScreen() {
+  const rows = MANUAL_DRAFT.map((ex, i) => `
+    <div class="exercise-row">
+      <div class="ex-icon">${icon("dumbbell")}</div>
+      <div class="ex-body">
+        <div class="ex-name">${escapeHtml(ex.name)}</div>
+        <div class="ex-target">${ex.sets} sets · ${ex.reps} reps @ ${ex.targetWeight || "bodyweight"} lb</div>
+      </div>
+      <button type="button" class="stepper-btn" data-remove-draft="${i}" title="Remove">${icon("close", 14)}</button>
+    </div>`).join("");
+
+  $("workoutContent").innerHTML = `
+    ${rows}
+    <div class="add-ex-form">
+      <input type="text" id="manualExName" placeholder="Exercise name" />
+      <div class="stepper-row compact" id="manualExStepperRow"></div>
+      <button type="button" class="btn-secondary" id="manualAddExBtn">Add to plan</button>
+    </div>
+    <button type="button" class="btn-primary" id="manualStartBtn" style="margin-top:10px;" ${MANUAL_DRAFT.length === 0 ? "disabled" : ""}>Start Workout</button>
+    <button type="button" class="btn-ghost" id="manualCancelBtn">Cancel</button>`;
+
+  buildStepperRow("manualExStepperRow", [
+    { key: "sets", unit: "sets", step: 1, min: 1 },
+    { key: "reps", unit: "reps", step: 1, min: 1 },
+    { key: "weight", unit: "lbs", step: 2.5, min: 0 },
+  ], ADD_EX_STATE);
+
+  $("workoutContent").querySelectorAll("[data-remove-draft]").forEach((btn) => {
+    btn.onclick = () => { MANUAL_DRAFT.splice(parseInt(btn.dataset.removeDraft, 10), 1); renderWorkoutTab(); };
+  });
+  $("manualAddExBtn").onclick = () => {
+    const name = $("manualExName").value.trim();
+    if (!name) return;
+    MANUAL_DRAFT.push({ name, sets: ADD_EX_STATE.sets, reps: ADD_EX_STATE.reps, targetWeight: ADD_EX_STATE.weight || 0 });
+    ADD_EX_STATE.sets = 3; ADD_EX_STATE.reps = 8; ADD_EX_STATE.weight = 0;
+    renderWorkoutTab();
+  };
+  $("manualStartBtn").onclick = saveManualWorkout;
+  $("manualCancelBtn").onclick = () => { WORKOUT_MODE = null; MANUAL_DRAFT = []; renderWorkoutTab(); };
+}
+
+async function saveManualWorkout() {
+  if (MANUAL_DRAFT.length === 0) return;
+  await sb.from("ai_workouts").upsert({
+    user_name: ME, email: MY_EMAIL, entry_date: todayStr(),
+    focus: "Custom Workout", exercises: MANUAL_DRAFT,
+  }, { onConflict: "email,entry_date" });
+  WORKOUT_MODE = null;
+  MANUAL_DRAFT = [];
+  await loadTodayWorkout();
+  renderWorkoutTab();
+  toast("Workout plan saved");
+}
+
+function renderPlanPreview() {
+  $("workoutFocusRow").textContent = `Focus: ${TODAY_WORKOUT.focus}`;
+
   const { best } = personalRecords(ME);
   const loggedNow = todaysLoggedExerciseNames();
   const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
   const total = TODAY_WORKOUT.exercises.length;
 
-  const rows = TODAY_WORKOUT.exercises.map((ex) => {
+  const rows = TODAY_WORKOUT.exercises.map((ex, i) => {
     const prevBest = best[ex.name.toLowerCase()];
     const prTag = prevBest && ex.targetWeight > prevBest ? '<span class="pr-tag">NEW PR</span>' : "";
     const doneMark = loggedNow.has(ex.name.toLowerCase()) ? icon("check") : icon("dumbbell");
@@ -1649,16 +1784,56 @@ function renderWorkoutTab() {
         <div class="ex-target">${ex.sets} sets · ${ex.reps} reps @ ${ex.targetWeight || "bodyweight"} lb</div>
         ${ex.note ? `<div class="ex-note">${escapeHtml(ex.note)}</div>` : ""}
       </div>
+      <button type="button" class="stepper-btn" data-remove-plan="${i}" title="Remove">${icon("close", 14)}</button>
     </div>`;
   }).join("");
 
-  content.innerHTML = `
+  $("workoutContent").innerHTML = `
     <div class="workout-progress-row">
       <span>Progress</span>
       <span class="workout-progress-count">${doneCount}/${total}</span>
     </div>
     <div class="workout-progress-track"><div class="workout-progress-fill" style="width:${total ? (doneCount / total) * 100 : 0}%"></div></div>
-    ${rows}`;
+    ${rows}
+    ${PLAN_EDIT_ADDING ? `
+      <div class="add-ex-form">
+        <input type="text" id="planAddExName" placeholder="Exercise name" />
+        <div class="stepper-row compact" id="planAddExStepperRow"></div>
+        <button type="button" class="btn-secondary" id="planAddExConfirmBtn">Add</button>
+      </div>` : `<button type="button" class="btn-ghost" id="planAddExToggleBtn">+ Add exercise</button>`}
+    <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">Start Workout</button>
+    <button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`;
+
+  $("workoutContent").querySelectorAll("[data-remove-plan]").forEach((btn) => {
+    btn.onclick = async () => {
+      const idx = parseInt(btn.dataset.removePlan, 10);
+      TODAY_WORKOUT.exercises.splice(idx, 1);
+      await sb.from("ai_workouts").update({ exercises: TODAY_WORKOUT.exercises }).eq("email", MY_EMAIL).eq("entry_date", todayStr());
+      renderPlanPreview();
+    };
+  });
+
+  if (PLAN_EDIT_ADDING) {
+    buildStepperRow("planAddExStepperRow", [
+      { key: "sets", unit: "sets", step: 1, min: 1 },
+      { key: "reps", unit: "reps", step: 1, min: 1 },
+      { key: "weight", unit: "lbs", step: 2.5, min: 0 },
+    ], ADD_EX_STATE);
+    $("planAddExConfirmBtn").onclick = async () => {
+      const name = $("planAddExName").value.trim();
+      if (!name) return;
+      TODAY_WORKOUT.exercises.push({ name, sets: ADD_EX_STATE.sets, reps: ADD_EX_STATE.reps, targetWeight: ADD_EX_STATE.weight || 0 });
+      await sb.from("ai_workouts").update({ exercises: TODAY_WORKOUT.exercises }).eq("email", MY_EMAIL).eq("entry_date", todayStr());
+      ADD_EX_STATE.sets = 3; ADD_EX_STATE.reps = 8; ADD_EX_STATE.weight = 0;
+      PLAN_EDIT_ADDING = false;
+      renderPlanPreview();
+    };
+  } else {
+    $("planAddExToggleBtn").onclick = () => { PLAN_EDIT_ADDING = true; renderPlanPreview(); };
+  }
+
+  $("planStartBtn").onclick = startWorkout;
+  $("planRegenBtn").onclick = generateWorkout;
 }
 
 async function logExercise(name, weight, reps, sets) {
@@ -1733,9 +1908,57 @@ async function saveQuickLog(e) {
 
 /* ---------- Progress tab ---------- */
 
+const MUSCLE_KEYWORDS = {
+  chest: ["bench", "chest", "fly", "flye", "push-up", "pushup", "dip", "pec"],
+  shoulders: ["shoulder", "overhead press", "ohp", "lateral raise", "arnold", "delt", "military press"],
+  arms: ["curl", "tricep", "bicep", "pushdown", "forearm", "row", "pulldown", "pull-up", "pullup", "lat "],
+  core: ["ab ", "abs", "crunch", "plank", "sit-up", "situp", "core", "oblique"],
+  legs: ["squat", "leg", "lunge", "deadlift", "calf", "quad", "hamstring", "glute", "hip thrust", "rdl"],
+};
+
+function classifyMuscleGroup(exerciseName) {
+  const n = exerciseName.toLowerCase();
+  for (const [group, keywords] of Object.entries(MUSCLE_KEYWORDS)) {
+    if (keywords.some((k) => n.includes(k))) return group;
+  }
+  return null;
+}
+
+function computeMuscleVolume(name, weekOffset) {
+  const start = new Date(weekStartStr() + "T00:00:00");
+  start.setDate(start.getDate() - weekOffset * 7);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  const startStr = isoDate(start);
+  const endStr = isoDate(end);
+  const volumes = { chest: 0, shoulders: 0, arms: 0, core: 0, legs: 0 };
+  ALL_EXERCISE_LOGS
+    .filter((l) => l.user_name === name && l.entry_date >= startStr && l.entry_date < endStr)
+    .forEach((l) => {
+      const g = classifyMuscleGroup(l.exercise_name);
+      if (g) volumes[g] += l.sets || 1;
+    });
+  return volumes;
+}
+
+let BODY_WEEK_OFFSET = 0;
+
+function renderBodyDiagram() {
+  const volumes = computeMuscleVolume(ME, BODY_WEEK_OFFSET);
+  const max = Math.max(4, ...Object.values(volumes));
+  document.querySelectorAll("#bodyDiagram [data-group]").forEach((el) => {
+    const v = volumes[el.dataset.group] || 0;
+    const intensity = Math.min(1, v / max);
+    el.style.fill = v > 0 ? `color-mix(in srgb, var(--accent) ${Math.round(25 + intensity * 65)}%, var(--panel-2))` : "";
+  });
+  $("bodyThisWeekBtn").classList.toggle("active", BODY_WEEK_OFFSET === 0);
+  $("bodyLastWeekBtn").classList.toggle("active", BODY_WEEK_OFFSET === 1);
+}
+
 function renderProgressTab() {
   renderWeightChart();
   renderLog();
+  renderBodyDiagram();
 
   const names = [...new Set(ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME).map((l) => l.exercise_name))].sort();
   const sel = $("exerciseSelect");
@@ -1809,7 +2032,7 @@ function renderCoupleTab() {
   const combinedTarget = myTarget + partnerTarget;
   $("challengeSummary").textContent = combined >= combinedTarget
     ? "You two crushed this week's shared goal."
-    : `${combined}/${combinedTarget} combined gym days this week. Keep pushing each other.`;
+    : `${combined}/${combinedTarget} combined workout days this week. Keep pushing each other.`;
 
   const myXP = computeXP(ME);
   const partnerXP = computeXP(partner);
@@ -1894,46 +2117,109 @@ function renderCurrentPRs() {
 }
 
 const ADMIN_BADGE_CATALOG = [
-  { icon: "medal", label: "First Steps", criteria: "Log 1 gym day" },
-  { icon: "flame", label: "3-Day Streak", criteria: "Hit a 3-day gym streak" },
-  { icon: "flame", label: "7-Day Streak", criteria: "Hit a 7-day gym streak" },
-  { icon: "star", label: "30-Day Streak", criteria: "Hit a 30-day gym streak" },
+  { icon: "medal", label: "First Steps", criteria: "Log 1 workout day" },
+  { icon: "flame", label: "3-Day Streak", criteria: "Hit a 3-day workout streak" },
+  { icon: "flame", label: "7-Day Streak", criteria: "Hit a 7-day workout streak" },
+  { icon: "star", label: "30-Day Streak", criteria: "Hit a 30-day workout streak" },
   { icon: "trending", label: "First PR", criteria: "Log a new personal record" },
   { icon: "trophy", label: "5 PRs", criteria: "Log 5 personal records" },
   { icon: "checklist", label: "10 Workouts Logged", criteria: "Log 10 exercises total" },
 ];
 
 const ADMIN_XP_STATE = { amount: 50 };
+const ADMIN_ENTRY_STATE = { weight: 0 };
+const ADMIN_EX_STATE = { weight: 0, reps: 0, sets: 1 };
+let ADMIN_TARGET = "me";
+
+function adminTargetInfo() {
+  if (ADMIN_TARGET === "partner") return { email: PARTNER_EMAIL, name: partnerName(), profile: PARTNER_PROFILE };
+  return { email: MY_EMAIL, name: ME, profile: MY_PROFILE };
+}
+
+function buildStepperRow(containerId, specs, state, onChange) {
+  $(containerId).innerHTML = specs.map((s) => `
+    <div class="stepper">
+      <div class="stepper-controls">
+        <button type="button" class="stepper-btn" data-adm-minus="${s.key}">${icon("minus", 14)}</button>
+        <div><div class="stepper-value" id="${containerId}_${s.key}_val">${state[s.key]}</div><div class="stepper-unit">${s.unit}</div></div>
+        <button type="button" class="stepper-btn" data-adm-plus="${s.key}">${icon("plus", 14)}</button>
+      </div>
+    </div>`).join("");
+  specs.forEach((s) => {
+    $(containerId).querySelector(`[data-adm-minus="${s.key}"]`).onclick = () => {
+      state[s.key] = Math.max(s.min, state[s.key] - s.step);
+      $(`${containerId}_${s.key}_val`).textContent = state[s.key];
+      if (onChange) onChange();
+    };
+    $(containerId).querySelector(`[data-adm-plus="${s.key}"]`).onclick = () => {
+      state[s.key] += s.step;
+      $(`${containerId}_${s.key}_val`).textContent = state[s.key];
+      if (onChange) onChange();
+    };
+  });
+}
 
 function renderAdminPanel() {
-  const earnedSet = new Set(badgeDefinitions(ME).filter((b) => b.earned).map((b) => b.label));
+  if (!PARTNER_PROFILE) $("adminTargetChoices").querySelector('[data-v="partner"]').classList.add("hidden");
+  $("adminTargetChoices").querySelectorAll(".choice-card").forEach((c) => {
+    c.classList.toggle("selected", c.dataset.v === ADMIN_TARGET);
+    c.onclick = () => { ADMIN_TARGET = c.dataset.v; renderAdminPanel(); };
+  });
+
+  const target = adminTargetInfo();
+  const earnedSet = new Set(badgeDefinitions(target.name).filter((b) => b.earned).map((b) => b.label));
   $("adminBadgeCatalog").innerHTML = ADMIN_BADGE_CATALOG.map((b) =>
     `<div class="pr-row"><span>${icon(b.icon, 16)} ${escapeHtml(b.label)}, ${escapeHtml(b.criteria)}</span><span>${earnedSet.has(b.label) ? icon("check", 14) : "-"}</span></div>`
   ).join("");
 
-  $("adminXpStepperRow").innerHTML = `
-    <div class="stepper">
-      <div class="stepper-controls">
-        <button type="button" class="stepper-btn" id="adminXpMinus">${icon("minus", 14)}</button>
-        <div><div class="stepper-value" id="adminXpVal">${ADMIN_XP_STATE.amount}</div><div class="stepper-unit">xp</div></div>
-        <button type="button" class="stepper-btn" id="adminXpPlus">${icon("plus", 14)}</button>
-      </div>
-    </div>`;
-  $("adminXpMinus").onclick = () => {
-    ADMIN_XP_STATE.amount = Math.max(10, ADMIN_XP_STATE.amount - 10);
-    $("adminXpVal").textContent = ADMIN_XP_STATE.amount;
-  };
-  $("adminXpPlus").onclick = () => {
-    ADMIN_XP_STATE.amount += 10;
-    $("adminXpVal").textContent = ADMIN_XP_STATE.amount;
-  };
+  buildStepperRow("adminXpStepperRow", [{ key: "amount", unit: "xp", step: 10, min: 10 }], ADMIN_XP_STATE);
+  $("adminEntryDate").value = todayStr();
+  buildStepperRow("adminWeightStepperRow", [{ key: "weight", unit: "lbs", step: 2.5, min: 0 }], ADMIN_ENTRY_STATE);
+  buildStepperRow("adminExStepperRow", [
+    { key: "weight", unit: "lbs", step: 2.5, min: 0 },
+    { key: "reps", unit: "reps", step: 1, min: 0 },
+    { key: "sets", unit: "sets", step: 1, min: 1 },
+  ], ADMIN_EX_STATE);
 }
 
 async function adminGiveXp() {
-  const current = MY_PROFILE?.bonus_xp || 0;
-  const { error } = await sb.from("profiles").update({ bonus_xp: current + ADMIN_XP_STATE.amount }).eq("email", MY_EMAIL);
+  const target = adminTargetInfo();
+  if (!target.email || !target.profile) { toast("No target profile"); return; }
+  const current = target.profile.bonus_xp || 0;
+  const { error } = await sb.from("profiles").update({ bonus_xp: current + ADMIN_XP_STATE.amount }).eq("email", target.email);
   if (error) { toast("Failed to add XP"); console.error(error); return; }
-  toast(`+${ADMIN_XP_STATE.amount} XP added`);
+  toast(`+${ADMIN_XP_STATE.amount} XP added to ${target.name}`);
+  await loadAll();
+  renderAdminPanel();
+}
+
+async function adminAddEntry() {
+  const target = adminTargetInfo();
+  if (!target.email) { toast("No target profile"); return; }
+  const { error } = await sb.from("fit_entries").upsert({
+    user_name: target.name, email: target.email, entry_date: $("adminEntryDate").value,
+    weight: ADMIN_ENTRY_STATE.weight || null, gym: $("adminEntryGym").checked,
+  }, { onConflict: "email,entry_date" });
+  if (error) { toast("Failed to add entry"); console.error(error); return; }
+  toast(`Entry added for ${target.name}`);
+  ADMIN_ENTRY_STATE.weight = 0;
+  $("adminEntryGym").checked = false;
+  await loadAll();
+  renderAdminPanel();
+}
+
+async function adminAddExercise() {
+  const target = adminTargetInfo();
+  const name = $("adminExName").value.trim();
+  if (!target.email || !name) { toast("Enter an exercise name"); return; }
+  const { error } = await sb.from("exercise_logs").insert({
+    user_name: target.name, email: target.email, entry_date: todayStr(), exercise_name: name,
+    weight: ADMIN_EX_STATE.weight || null, reps: ADMIN_EX_STATE.reps || null, sets: ADMIN_EX_STATE.sets,
+  });
+  if (error) { toast("Failed to add exercise"); console.error(error); return; }
+  toast(`${name} added for ${target.name}`);
+  $("adminExName").value = "";
+  ADMIN_EX_STATE.weight = 0; ADMIN_EX_STATE.reps = 0; ADMIN_EX_STATE.sets = 1;
   await loadAll();
   renderAdminPanel();
 }
