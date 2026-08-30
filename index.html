@@ -119,6 +119,15 @@
   .greeting .hi { font-size: 18px; font-weight: 700; }
   .greeting .sub { font-size: 13px; color: var(--muted); margin-top: 1px; }
 
+  .reminder-banner {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 14px;
+    border-radius: 10px; background: color-mix(in srgb, var(--gold) 15%, var(--panel)); border: 1px solid var(--gold);
+    font-size: 13px; color: var(--text);
+  }
+  .reminder-banner .rb-icon { color: var(--gold); flex-shrink: 0; }
+  .reminder-banner .rb-text { flex: 1; }
+  .reminder-banner .rb-dismiss { background: none; border: none; color: var(--muted); cursor: pointer; padding: 2px; flex-shrink: 0; }
+
   .gauge-wrap { position: relative; width: 72px; height: 72px; flex-shrink: 0; }
   .gauge-wrap.small { width: 48px; height: 48px; }
   .gauge-wrap svg { display: block; }
@@ -304,6 +313,8 @@
       <div class="greeting" id="greeting"></div>
     </div>
 
+    <div class="reminder-banner hidden" id="weightReminder"></div>
+
     <div class="card start-workout-card" id="homeWorkoutCta"></div>
 
     <div class="card">
@@ -432,6 +443,29 @@
   <!-- SETUP TAB -->
   <div id="tab-setup" class="tab-panel hidden">
     <div class="card">
+      <h2>Your stats</h2>
+      <div class="row2">
+        <select id="setupSex">
+          <option value="">Sex</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Rather not say">Rather not say</option>
+        </select>
+        <input type="number" id="setupAge" placeholder="Age" min="13" max="100" />
+      </div>
+      <div class="row2" style="margin-top:10px;">
+        <input type="number" id="setupHeightFt" placeholder="Height: feet" min="3" max="8" />
+        <input type="number" id="setupHeightIn" placeholder="Inches" min="0" max="11" />
+      </div>
+      <label style="margin-top:10px;">Activity level</label>
+      <select id="setupActivity">
+        <option value="">Not set</option>
+        <option value="Sedentary">Sedentary</option>
+        <option value="Moderate">Moderate</option>
+        <option value="Active">Active</option>
+      </select>
+    </div>
+    <div class="card">
       <h2>Main focus</h2>
       <select id="setupFocus">
         <option value="Strength">Strength</option>
@@ -525,6 +559,8 @@ const ICON_PATHS = {
   bolt: '<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/>',
   run: '<circle cx="14" cy="4.5" r="1.8"/><path d="M9 20l3-4 2 2-1.5 3M6 12l3-2 3 1 2-3 4 1M8 9l-2 2 1 3"/>',
   check: '<path d="M4 12l5 5 11-11"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   minus: '<path d="M5 12h14"/>',
   home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/>',
@@ -679,6 +715,56 @@ function renderOnboardStep(step, data = {}) {
     });
     $("nextBtn").onclick = () => {
       data.theme = chosen;
+      renderOnboardStep("biometrics", data);
+    };
+  } else if (step === "biometrics") {
+    ob.innerHTML = `
+      <div class="ob-step">
+        <h1>A bit about you</h1>
+        <p class="sub">Used to tailor your workouts — never shown to anyone but you.</p>
+        <div class="choice-grid" id="sexChoices">
+          <div class="choice-card" data-v="Male">Male</div>
+          <div class="choice-card" data-v="Female">Female</div>
+          <div class="choice-card" data-v="Rather not say">Rather not say</div>
+        </div>
+        <div class="row2">
+          <input id="bioAge" type="number" placeholder="Age" min="13" max="100" />
+          <input id="bioWeight" type="number" placeholder="Weight (lbs)" step="0.1" />
+        </div>
+        <div class="row2">
+          <input id="bioFeet" type="number" placeholder="Height: feet" min="3" max="8" />
+          <input id="bioInches" type="number" placeholder="Inches" min="0" max="11" />
+        </div>
+        <div class="choice-grid single" id="activityChoices">
+          <div class="choice-card" data-v="Sedentary">Sedentary (little to no exercise)</div>
+          <div class="choice-card" data-v="Moderate">Moderate (some activity a few days/week)</div>
+          <div class="choice-card" data-v="Active">Active (exercise most days)</div>
+        </div>
+        <button class="btn-primary" id="nextBtn">Continue</button>
+      </div>`;
+    let sex = null, activity = null;
+    ob.querySelector("#sexChoices").querySelectorAll(".choice-card").forEach((c) => {
+      c.onclick = () => {
+        ob.querySelector("#sexChoices").querySelectorAll(".choice-card").forEach((x) => x.classList.remove("selected"));
+        c.classList.add("selected");
+        sex = c.dataset.v;
+      };
+    });
+    ob.querySelector("#activityChoices").querySelectorAll(".choice-card").forEach((c) => {
+      c.onclick = () => {
+        ob.querySelector("#activityChoices").querySelectorAll(".choice-card").forEach((x) => x.classList.remove("selected"));
+        c.classList.add("selected");
+        activity = c.dataset.v;
+      };
+    });
+    $("nextBtn").onclick = () => {
+      data.sex = sex;
+      data.age = $("bioAge").value ? parseInt($("bioAge").value, 10) : null;
+      data.weight = $("bioWeight").value ? parseFloat($("bioWeight").value) : null;
+      const feet = parseInt($("bioFeet").value, 10) || 0;
+      const inches = parseInt($("bioInches").value, 10) || 0;
+      data.heightIn = (feet || inches) ? feet * 12 + inches : null;
+      data.activityLevel = activity;
       renderOnboardStep("focus", data);
     };
   } else if (step === "focus") {
@@ -747,10 +833,20 @@ async function finishOnboarding(data) {
     focus: data.focus,
     goal: data.goal,
     goal_detail: data.goalDetail || null,
+    sex: data.sex || null,
+    age: data.age || null,
+    height_in: data.heightIn || null,
+    activity_level: data.activityLevel || null,
     updated_at: new Date().toISOString(),
   }).select().maybeSingle();
-  if (error) { toast("Setup failed — try again"); console.error(error); return; }
+  if (error) { toast("Setup failed, try again"); console.error(error); return; }
   MY_PROFILE = saved;
+  if (data.weight) {
+    await sb.from("fit_entries").upsert(
+      { user_name: ME, email: MY_EMAIL, entry_date: todayStr(), weight: data.weight },
+      { onConflict: "email,entry_date" }
+    );
+  }
   showApp();
 }
 
@@ -798,6 +894,7 @@ function showApp() {
 function switchTab(tab) {
   document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== "tab-" + tab));
+  if (tab === "home") renderHome();
   if (tab === "progress") renderProgressTab();
   if (tab === "workout") renderWorkoutTab();
   if (tab === "couple") renderCoupleTab();
@@ -1030,9 +1127,30 @@ function renderPartnerCard() {
   $("partnerWeekDots").innerHTML = weekDotsHTML(partner);
 }
 
+function renderWeightReminder() {
+  const el = $("weightReminder");
+  const goal = MY_PROFILE?.goal || "";
+  const goalRelevant = /weight|recomp|muscle/i.test(goal);
+  const today = todayStr();
+  const loggedToday = ALL_ENTRIES.some((e) => e.user_name === ME && e.entry_date === today && e.weight != null);
+  const dismissedKey = `ft_dismiss_weight_${today}`;
+
+  if (!goalRelevant || loggedToday || localStorage.getItem(dismissedKey)) {
+    el.classList.add("hidden");
+    return;
+  }
+  el.classList.remove("hidden");
+  el.innerHTML = `<span class="rb-icon">${icon("bell", 18)}</span><span class="rb-text">Log today's weight to keep your "${escapeHtml(goal)}" progress accurate.</span><button type="button" class="rb-dismiss" id="dismissReminderBtn">${icon("close", 16)}</button>`;
+  $("dismissReminderBtn").onclick = () => {
+    localStorage.setItem(dismissedKey, "1");
+    el.classList.add("hidden");
+  };
+}
+
 function renderHome() {
   $("avatarInitial").textContent = initials(ME);
   renderGreeting();
+  renderWeightReminder();
   renderHomeWorkoutCta();
   renderMyWeekCard();
   renderPartnerCard();
@@ -1107,6 +1225,8 @@ async function generateWorkout() {
   btn.innerHTML = '<span class="spinner"></span> Generating…';
 
   const history = Object.entries(personalRecords(ME).best).map(([exercise_name, weight]) => ({ exercise_name, weight }));
+  const recentWeight = entriesFor(ME).filter((e) => e.weight != null).slice(-1)[0]?.weight ?? null;
+  const recentGymDays = gymDaysThisWeek(ME);
 
   try {
     const { data: { session } } = await sb.auth.getSession();
@@ -1118,6 +1238,12 @@ async function generateWorkout() {
         focus: MY_PROFILE?.focus,
         goal: MY_PROFILE?.goal,
         goal_detail: MY_PROFILE?.goal_detail,
+        sex: MY_PROFILE?.sex,
+        age: MY_PROFILE?.age,
+        height_in: MY_PROFILE?.height_in,
+        activity_level: MY_PROFILE?.activity_level,
+        current_weight: recentWeight,
+        gym_days_this_week: recentGymDays,
         history,
       }),
     });
@@ -1556,6 +1682,13 @@ function renderSetupTab() {
     if (MY_PROFILE.goal) $("setupGoal").value = MY_PROFILE.goal;
     $("setupGoalDetail").value = MY_PROFILE.goal_detail || "";
     $("setupChallengeTarget").value = MY_PROFILE.challenge_target || 4;
+    $("setupSex").value = MY_PROFILE.sex || "";
+    $("setupAge").value = MY_PROFILE.age || "";
+    $("setupActivity").value = MY_PROFILE.activity_level || "";
+    if (MY_PROFILE.height_in) {
+      $("setupHeightFt").value = Math.floor(MY_PROFILE.height_in / 12);
+      $("setupHeightIn").value = MY_PROFILE.height_in % 12;
+    }
   }
   renderCurrentPRs();
 }
@@ -1647,6 +1780,8 @@ async function importPRBulk() {
 }
 
 async function saveSetup() {
+  const feet = parseInt($("setupHeightFt").value, 10) || 0;
+  const inches = parseInt($("setupHeightIn").value, 10) || 0;
   const payload = {
     email: MY_EMAIL,
     user_name: ME,
@@ -1654,6 +1789,10 @@ async function saveSetup() {
     goal: $("setupGoal").value,
     goal_detail: $("setupGoalDetail").value.trim() || null,
     challenge_target: Math.min(7, Math.max(1, parseInt($("setupChallengeTarget").value, 10) || 4)),
+    sex: $("setupSex").value || null,
+    age: $("setupAge").value ? parseInt($("setupAge").value, 10) : null,
+    height_in: (feet || inches) ? feet * 12 + inches : null,
+    activity_level: $("setupActivity").value || null,
     updated_at: new Date().toISOString(),
   };
   const { error } = await sb.from("profiles").upsert(payload);
@@ -1661,6 +1800,7 @@ async function saveSetup() {
   toast("Preferences saved");
   const { data } = await sb.from("profiles").select("*").eq("email", MY_EMAIL).maybeSingle();
   MY_PROFILE = data;
+  renderHome();
 }
 
 initOnboard();

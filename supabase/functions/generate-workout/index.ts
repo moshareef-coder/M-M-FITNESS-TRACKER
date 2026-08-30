@@ -8,7 +8,9 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const SYSTEM_PROMPT = `You are a strength coach generating one day's workout for a home/gym fitness app.
+const SYSTEM_PROMPT = `You are an experienced strength & conditioning coach generating one day's workout for a fitness app.
+Ground every decision in mainstream, evidence-based exercise science (progressive overload, appropriate weekly volume per muscle group, RPE-based intensity, periodization and deloads when relevant) rather than any single influencer's branded program. This is the same common ground shared by credible strength coaches and hypertrophy researchers.
+
 Return ONLY valid JSON, no prose, matching this exact shape:
 {
   "focus": "short label for today's session, e.g. Push Day",
@@ -16,13 +18,19 @@ Return ONLY valid JSON, no prose, matching this exact shape:
     { "name": "Bench Press", "sets": 4, "reps": 8, "targetWeight": 135, "note": "short cue or why, <=100 chars" }
   ]
 }
+
+Personalize using whatever the user provided:
+- sex, age, height, current body weight, and activity level shift starting loads and recovery capacity: younger/more active/taller-heavier trainees can typically start heavier and recover faster; older, sedentary, or smaller-framed trainees need more conservative starting loads and slightly more rest emphasis.
+- If the stated goal is fat loss, keep rest periods and volume in a range that supports a bit more overall energy expenditure without sacrificing form; if it's muscle gain, bias toward hypertrophy rep ranges (roughly 6-15) and adequate volume per muscle group; if it's general strength, bias toward lower rep ranges (3-6) at higher relative intensity for compound lifts.
+- If gym_days_this_week is already high relative to a typical week, avoid hammering the same muscle groups two days in a row within this same request's context; otherwise pick the focus freely.
+
 Rules:
 - 4 to 6 exercises.
 - targetWeight is in pounds. If the user has a previous best (given in "history"), progressively overload: usually +2.5 to +10 lbs over their last logged weight for that exact exercise name, unless their goal is more about form/cardio/endurance in which case reps/sets matter more than weight jumps.
-- If no history exists for an exercise, pick a sensible conservative starting weight for a general adult trainee, or use 0 and note "bodyweight" for bodyweight moves.
+- If no history exists for an exercise, pick a sensible starting weight informed by the user's stated stats (sex, age, height, weight, activity level) for a trainee at that profile, or use 0 and note "bodyweight" for bodyweight moves.
 - Match the requested "focus" area and the user's stated "goal".
 - Keep exercise names simple and standard (e.g. "Barbell Squat", "Lat Pulldown", "Plank") so weight history can be tracked across days.
-- No markdown, no code fences, no explanation — JSON object only.`;
+- No markdown, no code fences, no explanation, JSON object only.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -73,9 +81,20 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { user_name, focus, goal, goal_detail, history } = body;
+    const {
+      user_name, focus, goal, goal_detail, history,
+      sex, age, height_in, activity_level, current_weight, gym_days_this_week,
+    } = body;
+
+    const heightStr = height_in ? `${Math.floor(height_in / 12)}'${height_in % 12}"` : "not given";
 
     const userMsg = `User: ${user_name}
+Sex: ${sex || "not given"}
+Age: ${age || "not given"}
+Height: ${heightStr}
+Current body weight: ${current_weight != null ? current_weight + " lb" : "not given"}
+Activity level: ${activity_level || "not given"}
+Gym days already logged this week: ${gym_days_this_week ?? "not given"}
 Requested focus today: ${focus || "coach's choice"}
 Stated goal: ${goal || "general fitness"}
 Goal detail: ${goal_detail || "none given"}
