@@ -173,7 +173,8 @@
 
   form.form-grid { display: flex; flex-direction: column; gap: 10px; }
   .row2 { display: flex; gap: 10px; }
-  .field { flex: 1; }
+  .field { flex: 1; min-width: 0; }
+  .field input, .field select, .field textarea { width: 100%; min-width: 0; box-sizing: border-box; }
   label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
   input[type="number"], input[type="date"], input[type="text"], textarea, select {
     width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
@@ -329,7 +330,7 @@
         <div class="avatar" id="partnerAvatar" style="background:var(--partner)">?</div>
         <div>
           <div class="gauge-value" id="partnerNameLbl">Partner</div>
-          <div class="gauge-sub" id="partnerStatusLbl">—</div>
+          <div class="gauge-sub" id="partnerStatusLbl">-</div>
         </div>
       </div>
       <div class="week-dots" id="partnerWeekDots"></div>
@@ -379,7 +380,7 @@
       <form class="form-grid" id="logForm">
         <div class="row2">
           <div class="field"><label>Date</label><input type="date" id="entryDate" required /></div>
-          <div class="field"><label>Weight (lbs)</label><input type="number" id="entryWeight" step="0.1" placeholder="—" /></div>
+          <div class="field"><label>Weight (lbs)</label><input type="number" id="entryWeight" step="0.1" placeholder="-" /></div>
         </div>
         <label class="gym-toggle" id="gymToggleWrap">
           <span>Went to the gym today</span>
@@ -543,7 +544,7 @@ let exerciseChart = null;
 
 const $ = (id) => document.getElementById(id);
 
-/* Inline SVG icons, 20x20, stroke-based — used instead of emoji throughout */
+/* Inline SVG icons, 20x20, stroke-based, used instead of emoji throughout */
 const ICON_PATHS = {
   flame: '<path d="M12 2c1 3-2 4-2 7a4 4 0 0 0 8 0c0-1-.5-2-1-2.5.5 2-1 3-2 3-1.5 0-2-1.2-1.5-2.5C14 6 13 4 12 2Z"/><path d="M7 13a5 5 0 0 0 10 0c0-2-1-3-2-4 .3 1.5-.5 2.5-1.5 2.5-1.2 0-1.8-1-1.3-2.2C10.5 10.5 7 11 7 13Z"/>',
   sunMoon: '<path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/>',
@@ -721,7 +722,7 @@ function renderOnboardStep(step, data = {}) {
     ob.innerHTML = `
       <div class="ob-step">
         <h1>A bit about you</h1>
-        <p class="sub">Used to tailor your workouts — never shown to anyone but you.</p>
+        <p class="sub">Used to tailor your workouts. Never shown to anyone but you.</p>
         <div class="choice-grid" id="sexChoices">
           <div class="choice-card" data-v="Male">Male</div>
           <div class="choice-card" data-v="Female">Female</div>
@@ -1263,7 +1264,7 @@ async function generateWorkout() {
     toast("Workout ready");
   } catch (err) {
     console.error(err);
-    toast("Couldn't generate workout — check the coach connection");
+    toast("Couldn't generate workout, check the coach connection");
   } finally {
     btn.disabled = false;
     btn.textContent = "Regenerate today's workout";
@@ -1625,7 +1626,7 @@ function renderExerciseChart() {
   });
 
   const best = logs.length ? Math.max(...logs.map((l) => l.weight)) : null;
-  $("exercisePrNote").textContent = best != null ? `Your best: ${best} lb — logged ${logs.length} time(s)` : "";
+  $("exercisePrNote").textContent = best != null ? `Your best: ${best} lb, logged ${logs.length} time(s)` : "";
 }
 
 /* ---------- Couple tab ---------- */
@@ -1699,7 +1700,7 @@ function renderCurrentPRs() {
   const list = $("currentPRsList");
   list.innerHTML = entries.length
     ? entries.map(([name, w]) => `<div class="pr-row"><span>${escapeHtml(name)}</span><span class="pr-weight">${w} lb</span></div>`).join("")
-    : '<p class="muted-note">No PRs on file yet — add one below.</p>';
+    : '<p class="muted-note">No PRs on file yet. Add one below.</p>';
 }
 
 const PR_STATE = { weight: 0, reps: 0 };
