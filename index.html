@@ -341,9 +341,20 @@
       <div class="greeting" id="greeting"></div>
     </div>
 
-    <div class="reminder-banner hidden" id="weightReminder"></div>
+    <div class="reminder-banner hidden" id="encouragementBanner"></div>
 
     <div class="card start-workout-card" id="homeWorkoutCta"></div>
+
+    <div class="card hidden" id="scaleCheckCard">
+      <h2>Check the scale</h2>
+      <p class="muted-note" id="scaleGoalNote"></p>
+      <div class="stepper-row compact" id="scaleWeightStepperRow"></div>
+      <label class="gym-toggle" id="scaleGymToggleWrap" style="margin-top:10px;">
+        <span>Worked out today</span>
+        <input type="checkbox" id="entryGym" />
+      </label>
+      <button type="button" class="btn-primary" id="scaleSaveBtn" style="margin-top:10px;">Save</button>
+    </div>
 
     <div class="card">
       <h2>Your week</h2>
@@ -358,9 +369,11 @@
         <div>
           <div class="gauge-value" id="partnerNameLbl">Partner</div>
           <div class="gauge-sub" id="partnerStatusLbl">-</div>
+          <div class="gauge-sub" id="partnerGoalLbl"></div>
         </div>
       </div>
       <div class="week-dots" id="partnerWeekDots"></div>
+      <button type="button" class="btn-secondary" id="encourageBtn" style="margin-top:12px;">Send encouragement</button>
     </div>
 
     <div class="card">
@@ -389,32 +402,6 @@
       <div id="sessionBody"></div>
     </div>
 
-    <div class="card">
-      <h2>Log an exercise off-plan</h2>
-      <form class="form-grid" id="quickLogForm">
-        <div class="field"><label>Exercise</label><input type="text" id="qlName" placeholder="e.g. Bench Press" required /></div>
-        <div class="pr-lookup" id="qlPrLookup"></div>
-        <div class="stepper-row" id="qlStepperRow"></div>
-        <button type="submit" class="btn-primary">Log it</button>
-      </form>
-    </div>
-
-    <div class="card">
-      <h2>Quick check-in</h2>
-      <p class="muted-note" style="margin-top:-6px;">No structured workout today? Log your weight or mark today as a workout day here.</p>
-      <form class="form-grid" id="logForm">
-        <div class="row2">
-          <div class="field"><label>Date</label><input type="date" id="entryDate" required /></div>
-          <div class="field"><label>Weight (lbs)</label><input type="number" id="entryWeight" step="0.1" placeholder="-" /></div>
-        </div>
-        <label class="gym-toggle" id="gymToggleWrap">
-          <span>Worked out today</span>
-          <input type="checkbox" id="entryGym" />
-        </label>
-        <div class="field"><label>Note (optional)</label><textarea id="entryNote" placeholder="how it felt, anything notable"></textarea></div>
-        <button type="submit" class="btn-primary">Save entry</button>
-      </form>
-    </div>
   </div>
 
   <!-- PROGRESS TAB -->
@@ -1072,7 +1059,6 @@ function showApp() {
   $("themeToggleBtn").innerHTML = icon("sunMoon");
   $("switchUserBtn").innerHTML = icon("logout");
   $("switchUserBtn").title = "Sign out";
-  $("entryDate").value = todayStr();
 
   $("switchUserBtn").onclick = () => sb.auth.signOut();
   $("themeToggleBtn").onclick = () => {
@@ -1082,13 +1068,11 @@ function showApp() {
     localStorage.setItem(THEME_KEY, next);
     sb.from("profiles").update({ theme: next, updated_at: new Date().toISOString() }).eq("email", MY_EMAIL).then(() => {});
   };
-  $("gymToggleWrap").onclick = () => {
-    setTimeout(() => $("gymToggleWrap").classList.toggle("checked", $("entryGym").checked), 0);
+  $("scaleGymToggleWrap").onclick = () => {
+    setTimeout(() => $("scaleGymToggleWrap").classList.toggle("checked", $("entryGym").checked), 0);
   };
-  $("logForm").addEventListener("submit", saveEntry);
-  $("quickLogForm").addEventListener("submit", saveQuickLog);
-  $("qlName").addEventListener("input", updateQlPrLookup);
-  renderQuickLogSteppers();
+  $("scaleSaveBtn").addEventListener("click", saveScaleEntry);
+  $("encourageBtn").addEventListener("click", sendEncouragement);
   $("saveSetupBtn").addEventListener("click", saveSetup);
   $("savePRBtn").addEventListener("click", savePR);
   $("adminGiveXpBtn").addEventListener("click", adminGiveXp);
@@ -1144,25 +1128,22 @@ function partnerName() {
 
 /* ---------- Home tab: entries, streaks, chart ---------- */
 
-async function saveEntry(e) {
-  e.preventDefault();
-  const entry_date = $("entryDate").value;
-  const weightVal = $("entryWeight").value;
+const SCALE_STATE = { weight: 0 };
+
+async function saveScaleEntry() {
   const payload = {
     user_name: ME,
     email: MY_EMAIL,
-    entry_date,
-    weight: weightVal === "" ? null : parseFloat(weightVal),
+    entry_date: todayStr(),
+    weight: SCALE_STATE.weight || null,
     gym: $("entryGym").checked,
-    note: $("entryNote").value.trim() || null,
   };
   const { error } = await sb.from("fit_entries").upsert(payload, { onConflict: "email,entry_date" });
   if (error) { toast("Save failed"); console.error(error); return; }
   toast("Saved · +10 XP");
-  $("entryWeight").value = "";
-  $("entryNote").value = "";
+  SCALE_STATE.weight = 0;
   $("entryGym").checked = false;
-  $("gymToggleWrap").classList.remove("checked");
+  $("scaleGymToggleWrap").classList.remove("checked");
   await loadAll();
 }
 
@@ -1343,33 +1324,66 @@ function renderPartnerCard() {
   const days = gymDaysThisWeek(partner);
   const target = PARTNER_PROFILE?.challenge_target || 4;
   $("partnerStatusLbl").textContent = `${days}/${target} days this week · ${computeStreak(partner)} day streak`;
+  $("partnerGoalLbl").textContent = PARTNER_PROFILE?.goal ? `Goal: ${PARTNER_PROFILE.goal}` : "";
   $("partnerWeekDots").innerHTML = weekDotsHTML(partner);
 }
 
-function renderWeightReminder() {
-  const el = $("weightReminder");
+function renderScaleCheck() {
+  const card = $("scaleCheckCard");
   const goal = MY_PROFILE?.goal || "";
   const goalRelevant = /weight|recomp|muscle/i.test(goal);
   const today = todayStr();
   const loggedToday = ALL_ENTRIES.some((e) => e.user_name === ME && e.entry_date === today && e.weight != null);
-  const dismissedKey = `ft_dismiss_weight_${today}`;
 
-  if (!goalRelevant || loggedToday || localStorage.getItem(dismissedKey)) {
-    el.classList.add("hidden");
+  if (!goalRelevant || loggedToday) {
+    card.classList.add("hidden");
     return;
   }
+  card.classList.remove("hidden");
+  $("scaleGoalNote").textContent = `How much do you weigh today? Your goal: ${goal}`;
+  buildStepperRow("scaleWeightStepperRow", [{ key: "weight", unit: "lbs", step: 0.5, min: 0 }], SCALE_STATE);
+}
+
+async function renderEncouragementBanner() {
+  const el = $("encouragementBanner");
+  if (!PARTNER_EMAIL) { el.classList.add("hidden"); return; }
+  const { data } = await sb.from("encouragements")
+    .select("*")
+    .eq("to_email", MY_EMAIL)
+    .is("read_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data) { el.classList.add("hidden"); return; }
   el.classList.remove("hidden");
-  el.innerHTML = `<span class="rb-icon">${icon("bell", 18)}</span><span class="rb-text">Log today's weight to keep your "${escapeHtml(goal)}" progress accurate.</span><button type="button" class="rb-dismiss" id="dismissReminderBtn">${icon("close", 16)}</button>`;
-  $("dismissReminderBtn").onclick = () => {
-    localStorage.setItem(dismissedKey, "1");
+  el.innerHTML = `<span class="rb-icon">${icon("heart", 18)}</span><span class="rb-text">${escapeHtml(partnerName())} says, "${escapeHtml(data.message)}"</span><button type="button" class="rb-dismiss" id="dismissEncouragementBtn">${icon("close", 16)}</button>`;
+  $("dismissEncouragementBtn").onclick = async () => {
+    await sb.from("encouragements").update({ read_at: new Date().toISOString() }).eq("id", data.id);
     el.classList.add("hidden");
   };
+}
+
+const ENCOURAGEMENT_PRESETS = [
+  "You've got this! 💪",
+  "So proud of you, keep going.",
+  "Don't skip today, let's go!",
+  "Beast mode, let's push.",
+];
+
+async function sendEncouragement() {
+  if (!PARTNER_EMAIL) { toast("No partner to encourage yet"); return; }
+  const message = prompt(`Send ${partnerName()} some encouragement:`, ENCOURAGEMENT_PRESETS[Math.floor(Math.random() * ENCOURAGEMENT_PRESETS.length)]);
+  if (!message || !message.trim()) return;
+  const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: message.trim() });
+  if (error) { toast("Couldn't send"); console.error(error); return; }
+  toast(`Sent to ${partnerName()}`);
 }
 
 function renderHome() {
   $("avatarInitial").textContent = initials(ME);
   renderGreeting();
-  renderWeightReminder();
+  renderEncouragementBanner();
+  renderScaleCheck();
   renderHomeWorkoutCta();
   renderMyWeekCard();
   renderPartnerCard();
@@ -1619,6 +1633,7 @@ function renderSession() {
         <button type="button" class="btn-ghost" id="skipExBtn">Skip</button>
         <button type="button" class="btn-primary" id="nextExBtn" ${allDone ? "" : "disabled"}>${icon("check", 16)} ${ei === total - 1 ? "Finish Workout" : "Save & Next"}</button>
       </div>
+      <button type="button" class="btn-ghost" id="endWorkoutBtn" style="margin-top:8px;">End workout here</button>
     </div>`;
 
   $("sessionBody").querySelectorAll(".set-circle").forEach((btn) => {
@@ -1644,6 +1659,10 @@ function renderSession() {
     if (SESSION.exerciseIndex >= total) { clearSessionStorage(); renderSessionComplete(); } else { renderSession(); }
   };
   $("nextExBtn").onclick = finishExerciseAndAdvance;
+  $("endWorkoutBtn").onclick = () => {
+    clearSessionStorage();
+    renderSessionComplete();
+  };
 }
 
 async function markGymDayDone() {
@@ -1656,12 +1675,16 @@ async function markGymDayDone() {
 async function renderSessionComplete() {
   await markGymDayDone();
   await loadAll();
+  const loggedNow = todaysLoggedExerciseNames();
+  const total = TODAY_WORKOUT.exercises.length;
+  const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
+  const full = doneCount >= total;
   $("sessionProgressFill").style.width = "100%";
   $("sessionBody").innerHTML = `
     <div class="session-complete">
       <div class="big-emoji">${icon("star", 40)}</div>
-      <h3>Workout Complete!</h3>
-      <p>${TODAY_WORKOUT.exercises.length} exercises logged. Nice work, ${escapeHtml(ME)}.</p>
+      <h3>${full ? "Workout Complete!" : "Workout Ended"}</h3>
+      <p>${doneCount} of ${total} exercises completed. ${full ? "Nice work" : "Good effort"}, ${escapeHtml(ME)}.</p>
       <button type="button" class="btn-primary" id="sessionDoneBtn">Done</button>
     </div>`;
   $("sessionDoneBtn").onclick = () => {
@@ -1836,75 +1859,6 @@ function renderPlanPreview() {
   $("planRegenBtn").onclick = generateWorkout;
 }
 
-async function logExercise(name, weight, reps, sets) {
-  const { best } = personalRecords(ME);
-  const prevBest = best[name.toLowerCase()];
-  const w = weight === "" ? null : parseFloat(weight);
-  const { error } = await sb.from("exercise_logs").insert({
-    user_name: ME,
-    email: MY_EMAIL,
-    entry_date: todayStr(),
-    exercise_name: name,
-    weight: w,
-    reps: reps === "" ? null : parseInt(reps, 10),
-    sets: sets || null,
-  });
-  if (error) { toast("Log failed"); console.error(error); return; }
-  const isPR = w != null && (prevBest === undefined || w > prevBest);
-  toast(isPR ? `New PR on ${name} · +25 XP` : "Logged · +5 XP");
-  await loadAll();
-  renderWorkoutTab();
-}
-
-const QL_STATE = { weight: 0, reps: 0, sets: 1 };
-
-function renderQuickLogSteppers() {
-  const specs = [
-    { key: "weight", unit: "lbs", step: 2.5, min: 0 },
-    { key: "reps", unit: "reps", step: 1, min: 0 },
-    { key: "sets", unit: "sets", step: 1, min: 1 },
-  ];
-  $("qlStepperRow").innerHTML = specs.map((s) => `
-    <div class="stepper">
-      <div class="stepper-controls">
-        <button type="button" class="stepper-btn" data-ql-minus="${s.key}">${icon("minus", 14)}</button>
-        <div><div class="stepper-value" id="ql_${s.key}_val">${QL_STATE[s.key]}</div><div class="stepper-unit">${s.unit}</div></div>
-        <button type="button" class="stepper-btn" data-ql-plus="${s.key}">${icon("plus", 14)}</button>
-      </div>
-    </div>`).join("");
-  $("qlStepperRow").classList.add("compact");
-
-  specs.forEach((s) => {
-    $(`qlStepperRow`).querySelector(`[data-ql-minus="${s.key}"]`).onclick = () => {
-      QL_STATE[s.key] = Math.max(s.min, QL_STATE[s.key] - s.step);
-      $(`ql_${s.key}_val`).textContent = QL_STATE[s.key];
-    };
-    $(`qlStepperRow`).querySelector(`[data-ql-plus="${s.key}"]`).onclick = () => {
-      QL_STATE[s.key] = QL_STATE[s.key] + s.step;
-      $(`ql_${s.key}_val`).textContent = QL_STATE[s.key];
-    };
-  });
-}
-
-function updateQlPrLookup() {
-  const name = $("qlName").value.trim().toLowerCase();
-  const el = $("qlPrLookup");
-  if (!name) { el.textContent = ""; return; }
-  const { best } = personalRecords(ME);
-  const match = best[name];
-  el.textContent = match != null ? `Last PR: ${match} lb` : "No PR on file for this yet";
-}
-
-async function saveQuickLog(e) {
-  e.preventDefault();
-  const name = $("qlName").value.trim();
-  if (!name) return;
-  await logExercise(name, QL_STATE.weight, QL_STATE.reps, QL_STATE.sets);
-  $("qlName").value = "";
-  $("qlPrLookup").textContent = "";
-  QL_STATE.weight = 0; QL_STATE.reps = 0; QL_STATE.sets = 1;
-  renderQuickLogSteppers();
-}
 
 /* ---------- Progress tab ---------- */
 
