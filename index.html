@@ -195,6 +195,13 @@
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
   .swatch.selected { border-color: var(--text); }
+  .color-wheel-input {
+    width: 40px; height: 40px; border-radius: 50%; border: 2px dashed var(--border); padding: 0;
+    background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red); cursor: pointer; flex-shrink: 0;
+  }
+  .color-wheel-input::-webkit-color-swatch-wrapper { padding: 3px; border-radius: 50%; }
+  .color-wheel-input::-webkit-color-swatch { border-radius: 50%; border: none; }
+  .color-wheel-input::-moz-color-swatch { border-radius: 50%; border: none; }
 
   .pr-list .pr-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
   .pr-list .pr-row:last-child { border-bottom: none; }
@@ -458,7 +465,10 @@
         <div class="choice-card" data-v="light">Light</div>
       </div>
       <label>Your color</label>
-      <div class="swatch-row" id="setupColorSwatches"></div>
+      <div class="swatch-row" id="setupColorSwatches">
+        <input type="color" id="setupColorWheel" class="color-wheel-input" title="Custom color" />
+      </div>
+      <p class="pr-lookup" id="colorContrastNote" style="margin-top:8px;"></p>
     </div>
     <div class="card">
       <h2>Your stats</h2>
@@ -526,6 +536,16 @@
       <label style="margin-top:16px;">Or paste a list</label>
       <textarea id="prBulkText" placeholder="One per line, e.g.&#10;Bench Press 225 x 5&#10;Squat 315 x 3&#10;Deadlift 405 x 1"></textarea>
       <button type="button" class="btn-secondary" id="importPRBtn">Import list</button>
+    </div>
+
+    <div class="card hidden" id="adminCard">
+      <h2>Admin</h2>
+      <label>Give yourself XP</label>
+      <div class="stepper-row compact" id="adminXpStepperRow"></div>
+      <button type="button" class="btn-secondary" id="adminGiveXpBtn">Add XP</button>
+
+      <label style="margin-top:16px;">Full badge catalog</label>
+      <div class="pr-list" id="adminBadgeCatalog"></div>
     </div>
   </div>
 
@@ -649,6 +669,14 @@ function applyAccentColors() {
   }
 }
 
+function contrastVsWhite(hex) {
+  hex = hex.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const f = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const lum = 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  return (1.05) / (lum + 0.05);
+}
+
 /* ---------- Auth ---------- */
 
 function initOnboard() {
@@ -710,11 +738,91 @@ async function handleSignedIn(session) {
     MY_PROFILE = profile;
     applyTheme(profile.theme || localStorage.getItem(THEME_KEY) || "dark");
     applyAccentColors();
-    showApp();
+    await checkPartnershipThenEnter();
   } else {
     const suggested = session.user.user_metadata?.full_name?.split(" ")[0] || session.user.email.split("@")[0];
     renderOnboardStep("name", { name: suggested });
   }
+}
+
+const ADMIN_EMAIL = "mo.shareef@creativelab1.com";
+let PARTNER_EMAIL = null;
+
+async function checkPartnershipThenEnter() {
+  const { data: rows } = await sb.from("partnerships")
+    .select("*")
+    .or(`inviter_email.eq.${MY_EMAIL},invitee_email.eq.${MY_EMAIL}`)
+    .order("created_at", { ascending: false });
+  const active = (rows || []).find((r) => r.status === "pending" || r.status === "accepted");
+
+  if (active && active.status === "accepted") {
+    PARTNER_EMAIL = active.inviter_email.toLowerCase() === MY_EMAIL ? active.invitee_email.toLowerCase() : active.inviter_email.toLowerCase();
+    showApp();
+  } else if (active && active.invitee_email.toLowerCase() === MY_EMAIL) {
+    renderInvitePendingScreen(active);
+  } else if (active && active.inviter_email.toLowerCase() === MY_EMAIL) {
+    renderWaitingScreen(active);
+  } else {
+    renderInvitePartnerScreen();
+  }
+}
+
+function renderInvitePartnerScreen() {
+  const ob = $("onboard");
+  ob.innerHTML = `
+    <div class="ob-step">
+      <h1>Invite your partner</h1>
+      <p class="sub">Fit Together works as a pair. Invite them by email to unlock the full app.</p>
+      <input id="inviteEmailInput" type="email" placeholder="Partner's email" />
+      <button class="btn-primary" id="sendInviteBtn">Send invite</button>
+      <button class="btn-secondary" id="inviteSignOutBtn">Sign out</button>
+    </div>`;
+  $("sendInviteBtn").onclick = async () => {
+    const email = $("inviteEmailInput").value.trim().toLowerCase();
+    if (!email) return;
+    const { data: allowedCheck } = await sb.from("allowed_emails").select("email").eq("email", email).maybeSingle();
+    if (!allowedCheck) { toast("That email isn't approved to use this app yet"); return; }
+    if (email === MY_EMAIL) { toast("You can't invite yourself"); return; }
+    const { error } = await sb.from("partnerships").insert({ inviter_email: MY_EMAIL, invitee_email: email });
+    if (error) { toast("Couldn't send invite"); console.error(error); return; }
+    checkPartnershipThenEnter();
+  };
+  $("inviteSignOutBtn").onclick = () => sb.auth.signOut();
+}
+
+function renderWaitingScreen(partnership) {
+  const ob = $("onboard");
+  ob.innerHTML = `
+    <div class="ob-step">
+      <h1>Invite sent</h1>
+      <p class="sub">Waiting for ${escapeHtml(partnership.invitee_email)} to accept.</p>
+      <button class="btn-primary" id="checkAgainBtn">Check again</button>
+      <button class="btn-secondary" id="cancelInviteBtn">Cancel invite</button>
+    </div>`;
+  $("checkAgainBtn").onclick = checkPartnershipThenEnter;
+  $("cancelInviteBtn").onclick = async () => {
+    await sb.from("partnerships").update({ status: "declined", responded_at: new Date().toISOString() }).eq("id", partnership.id);
+    checkPartnershipThenEnter();
+  };
+}
+
+function renderInvitePendingScreen(partnership) {
+  const ob = $("onboard");
+  ob.innerHTML = `
+    <div class="ob-step">
+      <h1>Partner invite</h1>
+      <p class="sub">${escapeHtml(partnership.inviter_email)} invited you to train together on Fit Together.</p>
+      <button class="btn-primary" id="acceptInviteBtn">Accept</button>
+      <button class="btn-secondary" id="declineInviteBtn">Decline</button>
+    </div>`;
+  $("acceptInviteBtn").onclick = async () => {
+    await sb.from("partnerships").update({ status: "accepted", responded_at: new Date().toISOString() }).eq("id", partnership.id);
+    checkPartnershipThenEnter();
+  };
+  $("declineInviteBtn").onclick = async () => {
+    await sb.from("partnerships").update({ status: "declined", responded_at: new Date().toISOString() }).eq("id", partnership.id);
+    checkPartnershipThenEnter();
+  };
 }
 
 function renderOnboardStep(step, data = {}) {
@@ -888,7 +996,8 @@ async function finishOnboarding(data) {
       { onConflict: "email,entry_date" }
     );
   }
-  showApp();
+  applyAccentColors();
+  await checkPartnershipThenEnter();
 }
 
 /* ---------- Main app ---------- */
@@ -920,6 +1029,7 @@ function showApp() {
   $("generateWorkoutBtn").addEventListener("click", generateWorkout);
   $("saveSetupBtn").addEventListener("click", saveSetup);
   $("savePRBtn").addEventListener("click", savePR);
+  $("adminGiveXpBtn").addEventListener("click", adminGiveXp);
   $("importPRBtn").addEventListener("click", importPRBulk);
   renderPRSteppers();
 
@@ -952,7 +1062,7 @@ async function loadAll() {
   ALL_EXERCISE_LOGS = exLogRes.data || [];
   ALL_PROFILES = profilesRes.data || [];
   MY_PROFILE = ALL_PROFILES.find((p) => p.email === MY_EMAIL) || MY_PROFILE;
-  PARTNER_PROFILE = ALL_PROFILES.find((p) => p.email !== MY_EMAIL) || null;
+  PARTNER_PROFILE = ALL_PROFILES.find((p) => p.email === PARTNER_EMAIL) || null;
   applyAccentColors();
 
   await loadTodayWorkout();
@@ -960,10 +1070,7 @@ async function loadAll() {
 }
 
 function partnerName() {
-  if (PARTNER_PROFILE) return PARTNER_PROFILE.user_name;
-  const names = new Set([...ALL_ENTRIES.map((e) => e.user_name), ...ALL_EXERCISE_LOGS.map((e) => e.user_name)]);
-  names.delete(ME);
-  return [...names][0] || "Partner";
+  return PARTNER_PROFILE?.user_name || "Partner";
 }
 
 /* ---------- Home tab: entries, streaks, chart ---------- */
@@ -1044,7 +1151,8 @@ function computeXP(name) {
   const gymDays = entriesFor(name).filter((e) => e.gym).length;
   const exerciseCount = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name).length;
   const { prCount } = personalRecords(name);
-  return gymDays * 10 + exerciseCount * 5 + prCount * 25;
+  const bonus = ALL_PROFILES.find((p) => p.user_name === name)?.bonus_xp || 0;
+  return gymDays * 10 + exerciseCount * 5 + prCount * 25 + bonus;
 }
 
 function levelForXP(xp) {
@@ -1744,8 +1852,21 @@ function renderSetupTab() {
       document.documentElement.style.setProperty("--accent", SETUP_COLOR);
       document.documentElement.style.setProperty("--me", SETUP_COLOR);
       $("setupColorSwatches").querySelectorAll(".swatch").forEach((x) => x.classList.toggle("selected", x === s));
+      $("colorContrastNote").textContent = "";
     };
   });
+  $("setupColorWheel").value = SETUP_COLOR;
+  $("setupColorWheel").oninput = (e) => {
+    SETUP_COLOR = e.target.value;
+    document.documentElement.style.setProperty("--accent", SETUP_COLOR);
+    document.documentElement.style.setProperty("--me", SETUP_COLOR);
+    $("setupColorSwatches").querySelectorAll(".swatch").forEach((x) => x.classList.remove("selected"));
+    const c = contrastVsWhite(SETUP_COLOR);
+    $("colorContrastNote").textContent = c < 4.5 ? "Heads up, this color may be hard to read behind white button text." : "";
+  };
+
+  $("adminCard").classList.toggle("hidden", MY_EMAIL !== ADMIN_EMAIL);
+  if (MY_EMAIL === ADMIN_EMAIL) renderAdminPanel();
 
   if (MY_PROFILE) {
     if (MY_PROFILE.focus) $("setupFocus").value = MY_PROFILE.focus;
@@ -1770,6 +1891,51 @@ function renderCurrentPRs() {
   list.innerHTML = entries.length
     ? entries.map(([name, w]) => `<div class="pr-row"><span>${escapeHtml(name)}</span><span class="pr-weight">${w} lb</span></div>`).join("")
     : '<p class="muted-note">No PRs on file yet. Add one below.</p>';
+}
+
+const ADMIN_BADGE_CATALOG = [
+  { icon: "medal", label: "First Steps", criteria: "Log 1 gym day" },
+  { icon: "flame", label: "3-Day Streak", criteria: "Hit a 3-day gym streak" },
+  { icon: "flame", label: "7-Day Streak", criteria: "Hit a 7-day gym streak" },
+  { icon: "star", label: "30-Day Streak", criteria: "Hit a 30-day gym streak" },
+  { icon: "trending", label: "First PR", criteria: "Log a new personal record" },
+  { icon: "trophy", label: "5 PRs", criteria: "Log 5 personal records" },
+  { icon: "checklist", label: "10 Workouts Logged", criteria: "Log 10 exercises total" },
+];
+
+const ADMIN_XP_STATE = { amount: 50 };
+
+function renderAdminPanel() {
+  const earnedSet = new Set(badgeDefinitions(ME).filter((b) => b.earned).map((b) => b.label));
+  $("adminBadgeCatalog").innerHTML = ADMIN_BADGE_CATALOG.map((b) =>
+    `<div class="pr-row"><span>${icon(b.icon, 16)} ${escapeHtml(b.label)}, ${escapeHtml(b.criteria)}</span><span>${earnedSet.has(b.label) ? icon("check", 14) : "-"}</span></div>`
+  ).join("");
+
+  $("adminXpStepperRow").innerHTML = `
+    <div class="stepper">
+      <div class="stepper-controls">
+        <button type="button" class="stepper-btn" id="adminXpMinus">${icon("minus", 14)}</button>
+        <div><div class="stepper-value" id="adminXpVal">${ADMIN_XP_STATE.amount}</div><div class="stepper-unit">xp</div></div>
+        <button type="button" class="stepper-btn" id="adminXpPlus">${icon("plus", 14)}</button>
+      </div>
+    </div>`;
+  $("adminXpMinus").onclick = () => {
+    ADMIN_XP_STATE.amount = Math.max(10, ADMIN_XP_STATE.amount - 10);
+    $("adminXpVal").textContent = ADMIN_XP_STATE.amount;
+  };
+  $("adminXpPlus").onclick = () => {
+    ADMIN_XP_STATE.amount += 10;
+    $("adminXpVal").textContent = ADMIN_XP_STATE.amount;
+  };
+}
+
+async function adminGiveXp() {
+  const current = MY_PROFILE?.bonus_xp || 0;
+  const { error } = await sb.from("profiles").update({ bonus_xp: current + ADMIN_XP_STATE.amount }).eq("email", MY_EMAIL);
+  if (error) { toast("Failed to add XP"); console.error(error); return; }
+  toast(`+${ADMIN_XP_STATE.amount} XP added`);
+  await loadAll();
+  renderAdminPanel();
 }
 
 const PR_STATE = { weight: 0, reps: 0 };
