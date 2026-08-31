@@ -86,6 +86,10 @@
     background: var(--accent); color: white; font-size: 16px; font-weight: 600; cursor: pointer;
   }
   .btn-primary:active { opacity: 0.85; }
+  .btn-primary:disabled, .btn-secondary:disabled {
+    opacity: 0.4; cursor: not-allowed; background: var(--panel-2);
+    color: var(--muted); border: 1px solid var(--border);
+  }
   .btn-secondary {
     width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border);
     background: transparent; color: var(--text); font-size: 15.5px; cursor: pointer; margin-top: 8px;
@@ -319,6 +323,9 @@
   }
 
   /* Muscle coverage: an Apple-rings style close-the-loop for the week. */
+  .set-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .set-weight { font-size: 10.5px; font-weight: 700; color: var(--gold); min-height: 13px; }
+
   .cov-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
   .cov-sub { font-size: 12.5px; color: var(--muted); margin: 3px 0 0; }
   .cov-count { font-size: 28px; font-weight: 800; line-height: 1; color: var(--accent); white-space: nowrap; }
@@ -3045,6 +3052,8 @@ function startWorkout() {
     pausedAt: null,
     exerciseIndex: 0,
     setsDone: TODAY_WORKOUT.exercises.map((ex) => new Array(ex.sets || 3).fill(false)),
+    // Weight is recorded per set, because it commonly climbs across an exercise.
+    setWeights: TODAY_WORKOUT.exercises.map((ex) => new Array(ex.sets || 3).fill(null)),
     weights: TODAY_WORKOUT.exercises.map((ex) => ex.targetWeight ?? ""),
     reps: TODAY_WORKOUT.exercises.map((ex) => ex.reps ?? ""),
     completed: TODAY_WORKOUT.exercises.map((ex) => loggedAlready.has(ex.name.toLowerCase())),
@@ -3099,7 +3108,18 @@ function resumeSessionIfAny() {
 
 function toggleSet(setIdx) {
   const ei = SESSION.exerciseIndex;
-  SESSION.setsDone[ei][setIdx] = !SESSION.setsDone[ei][setIdx];
+  const nowDone = !SESSION.setsDone[ei][setIdx];
+  SESSION.setsDone[ei][setIdx] = nowDone;
+
+  if (!SESSION.setWeights) SESSION.setWeights = TODAY_WORKOUT.exercises.map((ex) => new Array(ex.sets || 3).fill(null));
+  if (nowDone) {
+    // Stamp the set with the weight showing right now, so changing the field
+    // for the next set does not rewrite the one already done.
+    const w = parseFloat(SESSION.weights[ei]);
+    SESSION.setWeights[ei][setIdx] = isNaN(w) ? null : w;
+  } else {
+    SESSION.setWeights[ei][setIdx] = null;
+  }
   saveSessionToStorage();
   renderSession();
 }
@@ -3108,7 +3128,26 @@ async function finishExerciseAndAdvance() {
   const ei = SESSION.exerciseIndex;
   const ex = TODAY_WORKOUT.exercises[ei];
   const doneCount = SESSION.setsDone[ei].filter(Boolean).length;
-  await logExerciseSilent(ex.name, SESSION.weights[ei], SESSION.reps[ei], doneCount || ex.sets);
+
+  // Group the completed sets by the weight they were done at. Equal weights
+  // collapse into one row; a climbing ladder logs each rung separately, which
+  // keeps PRs honest without inflating the log for a straight-weight exercise.
+  const done = (SESSION.setWeights?.[ei] || [])
+    .map((w, i) => ({ w, done: SESSION.setsDone[ei][i] }))
+    .filter((s) => s.done);
+
+  if (done.length) {
+    const byWeight = new Map();
+    for (const s of done) {
+      const key = s.w == null ? "" : String(s.w);
+      byWeight.set(key, (byWeight.get(key) || 0) + 1);
+    }
+    for (const [key, count] of byWeight) {
+      await logExerciseSilent(ex.name, key === "" ? "" : parseFloat(key), SESSION.reps[ei], count);
+    }
+  } else {
+    await logExerciseSilent(ex.name, SESSION.weights[ei], SESSION.reps[ei], doneCount || ex.sets);
+  }
   SESSION.completed[ei] = true;
   SESSION.exerciseIndex++;
   saveSessionToStorage();
@@ -3172,13 +3211,19 @@ function renderSession() {
       <div class="session-pr-note">${prevBest != null ? `Last PR: ${prevBest} lb` : "No PR on file yet"}</div>
       ${ex.note ? `<div class="session-ex-note">${escapeHtml(ex.note)}</div>` : ""}
       <div class="set-circles">
-        ${setsDone.map((done, i) => `<button type="button" class="set-circle ${done ? "done" : ""}" data-set="${i}">${done ? icon("check", 16) : i + 1}</button>`).join("")}
+        ${setsDone.map((done, i) => {
+          const w = SESSION.setWeights?.[ei]?.[i];
+          return `<div class="set-col">
+            <button type="button" class="set-circle ${done ? "done" : ""}" data-set="${i}">${done ? icon("check", 16) : i + 1}</button>
+            <div class="set-weight">${done && w != null ? w : "&nbsp;"}</div>
+          </div>`;
+        }).join("")}
       </div>
       <div class="stepper-row">
         <div class="stepper">
           <div class="stepper-controls">
             <button type="button" class="stepper-btn" id="sessWeightMinus">${icon("minus", 16)}</button>
-            <div><input class="stepper-value" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" value="${SESSION.weights[ei] || 0}" /><div class="stepper-unit">lbs</div></div>
+            <div><input class="stepper-value" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" value="${SESSION.weights[ei] || 0}" /><div class="stepper-unit">lbs now</div></div>
             <button type="button" class="stepper-btn" id="sessWeightPlus">${icon("plus", 16)}</button>
           </div>
         </div>
@@ -3511,7 +3556,7 @@ function renderManualBuildScreen() {
       <div class="ex-icon">${icon("dumbbell")}</div>
       <div class="ex-body">
         <div class="ex-name">${escapeHtml(ex.name)}</div>
-        <div class="ex-target">${ex.sets} sets · ${ex.reps} reps @ ${ex.targetWeight || "bodyweight"} lb</div>
+        <div class="ex-target">${ex.sets} sets · ${ex.reps} reps</div>
       </div>
       <button type="button" class="stepper-btn" data-remove-draft="${i}" title="Remove">${icon("close", 14)}</button>
     </div>`).join("");
@@ -3523,13 +3568,12 @@ function renderManualBuildScreen() {
       <div class="stepper-row compact" id="manualExStepperRow"></div>
       <button type="button" class="btn-secondary" id="manualAddExBtn">Add to plan</button>
     </div>
-    <button type="button" class="btn-primary" id="manualStartBtn" style="margin-top:10px;" ${MANUAL_DRAFT.length === 0 ? "disabled" : ""}>Start Workout</button>
+    <button type="button" class="btn-primary" id="manualStartBtn" style="margin-top:10px;">Start Workout</button>
     <button type="button" class="btn-ghost" id="manualCancelBtn">Cancel</button>`;
 
   buildStepperRow("manualExStepperRow", [
     { key: "sets", unit: "sets", step: 1, min: 1 },
     { key: "reps", unit: "reps", step: 1, min: 1 },
-    { key: "weight", unit: "lbs", step: 2.5, min: 0 },
   ], ADD_EX_STATE);
 
   $("workoutContent").querySelectorAll("[data-remove-draft]").forEach((btn) => {
@@ -3538,11 +3582,21 @@ function renderManualBuildScreen() {
   $("manualAddExBtn").onclick = () => {
     const name = $("manualExName").value.trim();
     if (!name) return;
-    MANUAL_DRAFT.push({ name, sets: ADD_EX_STATE.sets, reps: ADD_EX_STATE.reps, targetWeight: ADD_EX_STATE.weight || 0 });
-    ADD_EX_STATE.sets = 3; ADD_EX_STATE.reps = 8; ADD_EX_STATE.weight = 0;
+    MANUAL_DRAFT.push({ name, sets: ADD_EX_STATE.sets, reps: ADD_EX_STATE.reps, targetWeight: 0 });
+    ADD_EX_STATE.sets = 3; ADD_EX_STATE.reps = 8;
     renderWorkoutTab();
   };
-  $("manualStartBtn").onclick = saveManualWorkout;
+  $("manualStartBtn").onclick = () => {
+    // Typing an exercise and hitting Start without tapping "Add to plan" is the
+    // obvious thing to do, so treat it as adding it rather than doing nothing.
+    const pending = $("manualExName").value.trim();
+    if (pending) {
+      MANUAL_DRAFT.push({ name: pending, sets: ADD_EX_STATE.sets, reps: ADD_EX_STATE.reps, targetWeight: 0 });
+      ADD_EX_STATE.sets = 3; ADD_EX_STATE.reps = 8;
+    }
+    if (!MANUAL_DRAFT.length) { toast("Add an exercise first"); return; }
+    saveManualWorkout();
+  };
   $("manualCancelBtn").onclick = () => { WORKOUT_MODE = null; MANUAL_DRAFT = []; renderWorkoutTab(); };
 }
 
