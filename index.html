@@ -335,6 +335,27 @@
     background: var(--accent); color: #fff; font-size: 13.5px; font-weight: 700; font-family: inherit;
   }
 
+  /* Compact stat tiles, two up */
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .stat-tile {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 15px;
+  }
+  .stat-top { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .stat-ico { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; }
+  .stat-ico.week { color: var(--accent); }
+  .stat-ico.streak { color: var(--gold); }
+  .stat-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .stat-value { font-size: 28px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+  .stat-unit { font-size: 13px; font-weight: 600; color: var(--muted); margin-left: 5px; letter-spacing: 0; }
+  .stat-bar {
+    height: 5px; border-radius: 100px; background: var(--panel-2);
+    overflow: hidden; margin-top: 12px; border: 1px solid var(--border);
+  }
+  .stat-fill { height: 100%; border-radius: 100px; background: var(--accent); transition: width 0.4s; min-width: 3px; }
+  .stat-fill.streak { background: var(--gold); }
+  .stat-sub { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+
   /* Weekly muscle coverage, a loop to close */
   .coverage { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
   .coverage-ring { width: 92px; height: 92px; flex-shrink: 0; position: relative; }
@@ -730,6 +751,21 @@
         <input type="checkbox" id="entryGym" />
       </label>
       <button type="button" class="btn-primary" id="scaleSaveBtn" style="margin-top:10px;">Save</button>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-tile">
+        <div class="stat-top"><span class="stat-ico week" id="statWeekIco"></span><span class="stat-label">This week</span></div>
+        <div class="stat-value" id="statWeekValue">0<span class="stat-unit">/0</span></div>
+        <div class="stat-bar"><div class="stat-fill" id="statWeekFill"></div></div>
+        <div class="stat-sub" id="statWeekSub"></div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-top"><span class="stat-ico streak" id="statStreakIco"></span><span class="stat-label">Streak</span></div>
+        <div class="stat-value" id="statStreakValue">0<span class="stat-unit">days</span></div>
+        <div class="stat-bar"><div class="stat-fill streak" id="statStreakFill"></div></div>
+        <div class="stat-sub" id="statStreakSub"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -2252,6 +2288,7 @@ function renderMyWeekCard() {
   const days = gymDaysThisWeek(ME);
   const target = weeklyGoalFor(MY_EMAIL);
   $("myWeekCaption").textContent = `${days}/${target} days this week · ${computeStreak(ME)} day streak`;
+  renderStatTiles(days, target);
 }
 
 function renderPartnerCard() {
@@ -2866,6 +2903,27 @@ function renderTodayTally() {
 }
 
 /* The FAB reflects state: start, resume, or go again. */
+function renderStatTiles(days, target) {
+  $("statWeekIco").innerHTML = icon("checklist", 20);
+  $("statStreakIco").innerHTML = icon("flame", 20);
+
+  const pct = target > 0 ? Math.min(1, days / target) : 0;
+  $("statWeekValue").innerHTML = `${days}<span class="stat-unit">/${target}</span>`;
+  $("statWeekFill").style.width = Math.round(pct * 100) + "%";
+  $("statWeekSub").textContent = days >= target
+    ? "Goal hit"
+    : `${target - days} to go`;
+
+  const streak = computeStreak(ME);
+  const rest = restDaysLeft(ME);
+  $("statStreakValue").innerHTML = `${streak}<span class="stat-unit">${streak === 1 ? "day" : "days"}</span>`;
+  // Show progress toward the next weekly milestone rather than an arbitrary cap.
+  $("statStreakFill").style.width = Math.round(Math.min(1, (streak % 7) / 7) * 100) + "%";
+  $("statStreakSub").textContent = rest > 0
+    ? `${rest} rest day${rest === 1 ? "" : "s"} left`
+    : "No rest days left";
+}
+
 function renderFab() {
   const fab = $("fabStart");
   if (!fab) return;

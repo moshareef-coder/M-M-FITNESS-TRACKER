@@ -37,6 +37,21 @@ const body = `
     <button class="btn-primary" style="margin-top:14px;">Save weigh-in</button>
   </div>
 
+  <div class="stat-grid">
+    <div class="stat-tile">
+      <div class="stat-top"><span class="stat-ico week"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m4 6 1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg></span><span class="stat-label">This week</span></div>
+      <div class="stat-value">4<span class="stat-unit">/5</span></div>
+      <div class="stat-bar"><div class="stat-fill" style="width:80%"></div></div>
+      <div class="stat-sub">1 to go</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-top"><span class="stat-ico streak"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 2c1 3-2 4-2 7a4 4 0 0 0 8 0c0-1-.5-2-1-2.5.5 2-1 3-2 3-1.5 0-2-1.2-1.5-2.5C14 6 13 4 12 2Z"/></svg></span><span class="stat-label">Streak</span></div>
+      <div class="stat-value">6<span class="stat-unit">days</span></div>
+      <div class="stat-bar"><div class="stat-fill streak" style="width:85%"></div></div>
+      <div class="stat-sub">2 rest days left</div>
+    </div>
+  </div>
+
   <div class="card">
     <h2>Your week</h2>
     <div class="week-dots">
