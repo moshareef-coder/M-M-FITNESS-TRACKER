@@ -75,7 +75,41 @@ globalThis.window.supabase = {
   }),
 };
 
+/* Static check: an element whose id lives inside a container that later gets
+   its innerHTML reassigned is destroyed at runtime. Looking it up afterwards
+   returns null and throws. The fake DOM cannot see this, so check the source.
+   (This is the exact bug that broke the Setup tab's colour wheel.) */
+function checkClobberedIds() {
+  const wiped = new Set([...src.matchAll(/\$\("([a-zA-Z0-9_]+)"\)\s*\.innerHTML\s*=/g)].map((m) => m[1]));
+  const problems = [];
+  for (const parent of wiped) {
+    // grab the parent element's markup block and any ids nested inside it
+    const open = new RegExp(`<([a-z]+)[^>]*id="${parent}"[^>]*>`, "i").exec(html);
+    if (!open) continue;
+    const tag = open[1];
+    const start = open.index + open[0].length;
+    const close = html.indexOf(`</${tag}>`, start);
+    if (close === -1) continue;
+    const inner = html.slice(start, close);
+    for (const m of inner.matchAll(/id="([a-zA-Z0-9_]+)"/g)) {
+      const child = m[1];
+      if (new RegExp(`\\$\\("${child}"\\)`).test(src)) {
+        problems.push(`${child} (inside #${parent}, whose innerHTML is reassigned)`);
+      }
+    }
+  }
+  return problems;
+}
+
 let failed = 0;
+const clobbered = checkClobberedIds();
+if (clobbered.length) {
+  failed++;
+  console.log("  ids destroyed by an innerHTML wipe but still looked up:");
+  clobbered.forEach((p) => console.log("    " + p));
+  console.log("");
+}
+
 try {
   new Function(src + ";globalThis.__t={showApp,loadAll,renderHome,renderWorkoutTab,renderProgressTab,renderSetupTab,switchTab,renderFab,renderStatTiles,renderTodayTally,renderXP,renderScaleCheck,renderBodyTab,renderAdminPanel,renderPRSteppers};")();
 } catch (e) {

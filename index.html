@@ -649,13 +649,6 @@
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
   .swatch.selected { border-color: var(--text); }
-  .color-wheel-input {
-    width: 40px; height: 40px; border-radius: 50%; border: 2px dashed var(--border); padding: 0;
-    background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red); cursor: pointer; flex-shrink: 0;
-  }
-  .color-wheel-input::-webkit-color-swatch-wrapper { padding: 3px; border-radius: 50%; }
-  .color-wheel-input::-webkit-color-swatch { border-radius: 50%; border: none; }
-  .color-wheel-input::-moz-color-swatch { border-radius: 50%; border: none; }
 
   .pr-list .pr-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 15.5px; }
   .pr-list .pr-row:last-child { border-bottom: none; }
@@ -1094,10 +1087,7 @@
         <div class="choice-card" data-v="light">Light</div>
       </div>
       <label>Your color</label>
-      <div class="swatch-row" id="setupColorSwatches">
-        <input type="color" id="setupColorWheel" class="color-wheel-input" title="Custom color" />
-      </div>
-      <p class="pr-lookup" id="colorContrastNote" style="margin-top:8px;"></p>
+      <div class="swatch-row" id="setupColorSwatches"></div>
     </div>
     <div class="card">
       <h2>Your stats</h2>
@@ -1422,13 +1412,6 @@ function applyAccentColors() {
   }
 }
 
-function contrastVsWhite(hex) {
-  hex = hex.replace("#", "");
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  const f = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
-  const lum = 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-  return (1.05) / (lum + 0.05);
-}
 
 /* ---------- Auth ---------- */
 
@@ -3978,19 +3961,8 @@ function renderSetupTab() {
       document.documentElement.style.setProperty("--accent", SETUP_COLOR);
       document.documentElement.style.setProperty("--me", SETUP_COLOR);
       $("setupColorSwatches").querySelectorAll(".swatch").forEach((x) => x.classList.toggle("selected", x === s));
-      $("colorContrastNote").textContent = "";
     };
   });
-  $("setupColorWheel").value = SETUP_COLOR;
-  $("setupColorWheel").oninput = (e) => {
-    SETUP_COLOR = e.target.value;
-    document.documentElement.style.setProperty("--accent", SETUP_COLOR);
-    document.documentElement.style.setProperty("--me", SETUP_COLOR);
-    $("setupColorSwatches").querySelectorAll(".swatch").forEach((x) => x.classList.remove("selected"));
-    const c = contrastVsWhite(SETUP_COLOR);
-    $("colorContrastNote").textContent = c < 4.5 ? "Heads up, this color may be hard to read behind white button text." : "";
-  };
-
   $("adminCard").classList.toggle("hidden", MY_EMAIL !== ADMIN_EMAIL);
   if (MY_EMAIL === ADMIN_EMAIL) renderAdminPanel();
 
