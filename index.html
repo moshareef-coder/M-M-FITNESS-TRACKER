@@ -274,6 +274,21 @@
   .conn-banner svg { flex-shrink: 0; color: var(--gold); }
   .conn-banner.pending svg { color: var(--accent); }
 
+  .danger-card { border-color: color-mix(in srgb, var(--up) 45%, var(--border)); }
+  .danger-card h2 { color: var(--up); }
+  .btn-danger {
+    width: 100%; padding: 13px 18px; border-radius: 12px; border: none; cursor: pointer;
+    background: var(--up); color: #fff; font-size: 14.5px; font-weight: 700;
+  }
+  .btn-danger:disabled { opacity: 0.45; cursor: not-allowed; }
+  .link-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 13px 2px; border-bottom: 1px solid var(--border);
+    color: var(--text); text-decoration: none; font-size: 14px; font-weight: 600;
+  }
+  .link-row:last-child { border-bottom: none; }
+  .link-arrow { color: var(--muted); font-size: 20px; line-height: 1; }
+
   /* Progress controls */
   .person-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
   .person-toggle .tab-pill { flex: 1; padding: 9px 14px; font-size: 13px; }
@@ -958,6 +973,34 @@
       <label style="margin-top:16px;">Full badge catalog</label>
       <div class="pr-list" id="adminBadgeCatalog"></div>
     </div>
+
+    <div class="card">
+      <h2>Privacy &amp; support</h2>
+      <p class="muted-note" style="margin-top:-6px;">How your data is handled, and how to reach us.</p>
+      <a class="link-row" href="/privacy.html" target="_blank" rel="noopener">
+        <span>Privacy policy</span><span class="link-arrow">&rsaquo;</span>
+      </a>
+      <a class="link-row" href="/support.html" target="_blank" rel="noopener">
+        <span>Support</span><span class="link-arrow">&rsaquo;</span>
+      </a>
+    </div>
+
+    <div class="card danger-card">
+      <h2>Delete account</h2>
+      <p class="muted-note" style="margin-top:-6px;">
+        This permanently erases your profile, workouts, weigh-ins, photos and rank.
+        It cannot be undone, and it unpairs your partner.
+      </p>
+      <div id="deleteStep1">
+        <button type="button" class="btn-danger" id="deleteAccountBtn">Delete my account</button>
+      </div>
+      <div id="deleteStep2" class="hidden">
+        <label style="margin-top:4px;">Type <strong>DELETE</strong> to confirm</label>
+        <input type="text" id="deleteConfirmInput" placeholder="DELETE" autocomplete="off" />
+        <button type="button" class="btn-danger" id="deleteConfirmBtn" disabled style="margin-top:10px;">Permanently delete</button>
+        <button type="button" class="btn-ghost" id="deleteCancelBtn">Cancel</button>
+      </div>
+    </div>
   </div>
 
   <nav class="tabs">
@@ -1456,6 +1499,23 @@ function showApp() {
   renderConnBanner();
   flushQueue({ quiet: true });
 
+  // Account deletion. Two steps plus a typed confirmation, because it is final.
+  $("deleteAccountBtn").addEventListener("click", () => {
+    $("deleteStep1").classList.add("hidden");
+    $("deleteStep2").classList.remove("hidden");
+    $("deleteConfirmInput").focus();
+  });
+  $("deleteCancelBtn").addEventListener("click", () => {
+    $("deleteStep2").classList.add("hidden");
+    $("deleteStep1").classList.remove("hidden");
+    $("deleteConfirmInput").value = "";
+    $("deleteConfirmBtn").disabled = true;
+  });
+  $("deleteConfirmInput").addEventListener("input", (e) => {
+    $("deleteConfirmBtn").disabled = e.target.value.trim().toUpperCase() !== "DELETE";
+  });
+  $("deleteConfirmBtn").addEventListener("click", deleteMyAccount);
+
   $("progMeBtn").addEventListener("click", () => { PROGRESS_VIEW = "me"; renderProgressTab(); });
   $("progPartnerBtn").addEventListener("click", () => {
     if (!PARTNER_EMAIL) return;
@@ -1588,6 +1648,40 @@ function applyLocally(table, payload) {
     const i = ALL_ENTRIES.findIndex((e) => e.email === payload.email && e.entry_date === payload.entry_date);
     if (i >= 0) ALL_ENTRIES[i] = { ...ALL_ENTRIES[i], ...payload };
     else ALL_ENTRIES.push({ ...payload, id: `local-${Date.now()}` });
+  }
+}
+
+async function deleteMyAccount() {
+  const btn = $("deleteConfirmBtn");
+  btn.disabled = true;
+  btn.textContent = "Deleting…";
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) throw new Error("not signed in");
+
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok || !out.ok) throw new Error(out.error || "delete failed");
+
+    // Clear anything held on this device before signing out for good.
+    try {
+      localStorage.removeItem(WRITE_QUEUE_KEY);
+      clearSessionStorage();
+    } catch {}
+    await sb.auth.signOut();
+    location.reload();
+  } catch (err) {
+    console.error(err);
+    toast("Could not delete account");
+    btn.disabled = false;
+    btn.textContent = "Permanently delete";
   }
 }
 
