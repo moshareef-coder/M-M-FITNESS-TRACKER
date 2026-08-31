@@ -66,15 +66,16 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Must have a profile in this app. RLS means this only returns the caller's own row.
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
-    const allowResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/allowed_emails?select=email&email=eq.${encodeURIComponent(callerEmail)}`,
+    const profileResp = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?select=email&email=eq.${encodeURIComponent(callerEmail)}`,
       { headers: { apikey: SUPABASE_ANON_KEY!, Authorization: `Bearer ${token}` } },
     );
-    const allowRows = await allowResp.json();
-    if (!Array.isArray(allowRows) || allowRows.length === 0) {
-      return new Response(JSON.stringify({ error: "Not authorized" }), {
+    const profileRows = await profileResp.json();
+    if (!Array.isArray(profileRows) || profileRows.length === 0) {
+      return new Response(JSON.stringify({ error: "No profile for this account" }), {
         status: 403,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       });

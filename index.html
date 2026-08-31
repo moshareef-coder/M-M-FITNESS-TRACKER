@@ -86,6 +86,21 @@
   .choice-card .emoji { font-size: 24px; display: block; margin-bottom: 6px; }
   .choice-card.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--panel)); }
 
+  .code-display {
+    width: 100%; padding: 18px; border-radius: 14px; border: 1px solid var(--border);
+    background: var(--panel); margin-bottom: 16px;
+  }
+  .code-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; }
+  .code-value {
+    font-size: 34px; font-weight: 800; letter-spacing: 0.16em; margin-top: 6px; color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .code-divider { display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 16px; color: var(--muted); font-size: 12px; }
+  .code-divider::before, .code-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .code-input {
+    text-transform: uppercase; letter-spacing: 0.16em; font-weight: 700; font-size: 20px !important;
+  }
+
   header.top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   header.top h1 { font-size: 20px; margin: 0; }
   header.top .me-tag { font-size: 12px; color: var(--muted); }
@@ -563,6 +578,14 @@
   <!-- SETUP TAB -->
   <div id="tab-setup" class="tab-panel hidden">
     <div class="card">
+      <h2>Partner</h2>
+      <div class="pr-list">
+        <div class="pr-row"><span>Paired with</span><span class="pr-weight" id="setupPartnerName">-</span></div>
+        <div class="pr-row"><span>Your pairing code</span><span class="pr-weight" id="setupInviteCode">-</span></div>
+      </div>
+      <button type="button" class="btn-secondary" id="setupShareCodeBtn">Share my code</button>
+    </div>
+    <div class="card">
       <h2>Appearance</h2>
       <label>Theme</label>
       <div class="choice-grid" id="setupThemeChoices" style="margin-bottom:14px;">
@@ -834,30 +857,12 @@ function renderSignInScreen() {
   };
 }
 
-function renderNotAllowedScreen(email) {
-  const ob = $("onboard");
-  ob.innerHTML = `
-    <div class="ob-step">
-      <h1>Not on the list</h1>
-      <p class="sub">Signed in as ${escapeHtml(email)}, but this app is locked to two accounts. Ask your partner to add you.</p>
-      <button class="btn-secondary" id="signOutBtn">Sign out</button>
-    </div>`;
-  $("signOutBtn").onclick = () => sb.auth.signOut();
-}
-
 let SIGN_IN_HANDLED = false;
 
 async function handleSignedIn(session) {
   if (SIGN_IN_HANDLED) return;
   SIGN_IN_HANDLED = true;
   MY_EMAIL = session.user.email.toLowerCase();
-
-  const { data: allowed } = await sb.from("allowed_emails").select("email").eq("email", MY_EMAIL).maybeSingle();
-  if (!allowed) {
-    SIGN_IN_HANDLED = false;
-    renderNotAllowedScreen(MY_EMAIL);
-    return;
-  }
 
   const { data: profile } = await sb.from("profiles").select("*").eq("email", MY_EMAIL).maybeSingle();
   if (profile) {
@@ -878,78 +883,74 @@ let PARTNER_EMAIL = null;
 async function checkPartnershipThenEnter() {
   const { data: rows } = await sb.from("partnerships")
     .select("*")
-    .or(`inviter_email.eq.${MY_EMAIL},invitee_email.eq.${MY_EMAIL}`)
     .order("created_at", { ascending: false });
-  const active = (rows || []).find((r) => r.status === "pending" || r.status === "accepted");
+  const accepted = (rows || []).find((r) => r.status === "accepted");
 
-  if (active && active.status === "accepted") {
-    PARTNER_EMAIL = active.inviter_email.toLowerCase() === MY_EMAIL ? active.invitee_email.toLowerCase() : active.inviter_email.toLowerCase();
+  if (accepted) {
+    PARTNER_EMAIL = accepted.inviter_email.toLowerCase() === MY_EMAIL
+      ? accepted.invitee_email.toLowerCase()
+      : accepted.inviter_email.toLowerCase();
     showApp();
-  } else if (active && active.invitee_email.toLowerCase() === MY_EMAIL) {
-    renderInvitePendingScreen(active);
-  } else if (active && active.inviter_email.toLowerCase() === MY_EMAIL) {
-    renderWaitingScreen(active);
   } else {
-    renderInvitePartnerScreen();
+    renderPairingScreen();
   }
 }
 
-function renderInvitePartnerScreen() {
+function renderPairingScreen() {
   const ob = $("onboard");
+  const myCode = MY_PROFILE?.invite_code || "······";
   ob.innerHTML = `
     <div class="ob-step">
-      <h1>Invite your partner</h1>
-      <p class="sub">Fit Together works as a pair. Invite them by email to unlock the full app.</p>
-      <input id="inviteEmailInput" type="email" placeholder="Partner's email" />
-      <button class="btn-primary" id="sendInviteBtn">Send invite</button>
-      <button class="btn-secondary" id="inviteSignOutBtn">Sign out</button>
-    </div>`;
-  $("sendInviteBtn").onclick = async () => {
-    const email = $("inviteEmailInput").value.trim().toLowerCase();
-    if (!email) return;
-    const { data: allowedCheck } = await sb.from("allowed_emails").select("email").eq("email", email).maybeSingle();
-    if (!allowedCheck) { toast("That email isn't approved to use this app yet"); return; }
-    if (email === MY_EMAIL) { toast("You can't invite yourself"); return; }
-    const { error } = await sb.from("partnerships").insert({ inviter_email: MY_EMAIL, invitee_email: email });
-    if (error) { toast("Couldn't send invite"); console.error(error); return; }
-    checkPartnershipThenEnter();
-  };
-  $("inviteSignOutBtn").onclick = () => sb.auth.signOut();
-}
+      <h1>Pair with your partner</h1>
+      <p class="sub">Fit Together works as a pair. Share your code, or enter theirs.</p>
 
-function renderWaitingScreen(partnership) {
-  const ob = $("onboard");
-  ob.innerHTML = `
-    <div class="ob-step">
-      <h1>Invite sent</h1>
-      <p class="sub">Waiting for ${escapeHtml(partnership.invitee_email)} to accept.</p>
-      <button class="btn-primary" id="checkAgainBtn">Check again</button>
-      <button class="btn-secondary" id="cancelInviteBtn">Cancel invite</button>
-    </div>`;
-  $("checkAgainBtn").onclick = checkPartnershipThenEnter;
-  $("cancelInviteBtn").onclick = async () => {
-    await sb.from("partnerships").update({ status: "declined", responded_at: new Date().toISOString() }).eq("id", partnership.id);
-    checkPartnershipThenEnter();
-  };
-}
+      <div class="code-display">
+        <div class="code-label">Your code</div>
+        <div class="code-value" id="myInviteCode">${escapeHtml(myCode)}</div>
+        <button type="button" class="btn-secondary" id="shareCodeBtn" style="margin-top:10px;">Share my code</button>
+      </div>
 
-function renderInvitePendingScreen(partnership) {
-  const ob = $("onboard");
-  ob.innerHTML = `
-    <div class="ob-step">
-      <h1>Partner invite</h1>
-      <p class="sub">${escapeHtml(partnership.inviter_email)} invited you to train together on Fit Together.</p>
-      <button class="btn-primary" id="acceptInviteBtn">Accept</button>
-      <button class="btn-secondary" id="declineInviteBtn">Decline</button>
+      <div class="code-divider"><span>or</span></div>
+
+      <input id="partnerCodeInput" type="text" placeholder="Enter partner's code" maxlength="6"
+             autocapitalize="characters" autocomplete="off" spellcheck="false" class="code-input" />
+      <button class="btn-primary" id="redeemCodeBtn">Pair up</button>
+      <button class="btn-secondary" id="pairSignOutBtn">Sign out</button>
     </div>`;
-  $("acceptInviteBtn").onclick = async () => {
-    await sb.from("partnerships").update({ status: "accepted", responded_at: new Date().toISOString() }).eq("id", partnership.id);
+
+  $("shareCodeBtn").onclick = async () => {
+    const text = `Join me on Fit Together. My pairing code is ${myCode}: ${window.location.origin}`;
+    if (navigator.share) {
+      try { await navigator.share({ text }); return; } catch { /* user dismissed, fall through to copy */ }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("Invite copied");
+    } catch {
+      toast(`Your code is ${myCode}`);
+    }
+  };
+
+  $("partnerCodeInput").addEventListener("input", (e) => {
+    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  });
+
+  $("redeemCodeBtn").onclick = async () => {
+    const code = $("partnerCodeInput").value.trim().toUpperCase();
+    if (code.length < 6) { toast("Enter their 6-character code"); return; }
+    const btn = $("redeemCodeBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Pairing…';
+    const { data, error } = await sb.rpc("redeem_invite_code", { code });
+    btn.disabled = false;
+    btn.textContent = "Pair up";
+    if (error) { toast("Couldn't pair, try again"); console.error(error); return; }
+    if (!data?.ok) { toast(data?.error || "Couldn't pair"); return; }
+    toast(`Paired with ${data.partner_name}`);
     checkPartnershipThenEnter();
   };
-  $("declineInviteBtn").onclick = async () => {
-    await sb.from("partnerships").update({ status: "declined", responded_at: new Date().toISOString() }).eq("id", partnership.id);
-    checkPartnershipThenEnter();
-  };
+
+  $("pairSignOutBtn").onclick = () => sb.auth.signOut();
 }
 
 function renderOnboardStep(step, data = {}) {
@@ -1150,6 +1151,16 @@ function showApp() {
   };
   $("scaleSaveBtn").addEventListener("click", saveScaleEntry);
   $("encourageBtn").addEventListener("click", sendEncouragement);
+  $("setupShareCodeBtn").addEventListener("click", async () => {
+    const code = MY_PROFILE?.invite_code;
+    if (!code) return;
+    const text = `Join me on Fit Together. My pairing code is ${code}: ${window.location.origin}`;
+    if (navigator.share) {
+      try { await navigator.share({ text }); return; } catch { /* dismissed, fall through */ }
+    }
+    try { await navigator.clipboard.writeText(text); toast("Invite copied"); }
+    catch { toast(`Your code is ${code}`); }
+  });
   $("saveSetupBtn").addEventListener("click", saveSetup);
   $("savePRBtn").addEventListener("click", savePR);
   $("adminGiveXpBtn").addEventListener("click", adminGiveXp);
@@ -2138,6 +2149,9 @@ let SETUP_THEME = null;
 let SETUP_COLOR = null;
 
 function renderSetupTab() {
+  $("setupPartnerName").textContent = PARTNER_PROFILE?.user_name || "Not paired";
+  $("setupInviteCode").textContent = MY_PROFILE?.invite_code || "-";
+
   SETUP_THEME = document.documentElement.getAttribute("data-theme") || "dark";
   SETUP_COLOR = MY_PROFILE?.accent_color || "#356bf0";
 
