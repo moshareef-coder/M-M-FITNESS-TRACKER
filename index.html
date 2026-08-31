@@ -369,6 +369,24 @@
   .session-paused-sheet { text-align: center; padding: 28px 6px 8px; }
   .session-paused-sheet h3 { font-size: 20px; margin: 0 0 6px; }
 
+  .photo-item { position: relative; }
+  .photo-del {
+    position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%;
+    border: none; cursor: pointer; background: rgba(0,0,0,0.62); color: #fff;
+    font-size: 16px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  }
+
+  .log-del {
+    margin-left: auto; flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    border: 1px solid transparent; background: transparent; color: var(--muted);
+  }
+  .log-del:hover, .log-del:active { color: var(--up); border-color: color-mix(in srgb, var(--up) 40%, transparent); }
+  .log-rest {
+    font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 100px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+  }
+
   /* Weigh-in: type it, or nudge it */
   .weigh-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
   #scaleWeightInput {
@@ -1204,6 +1222,23 @@
     </div>
 
     <div class="card danger-card">
+      <h2>Reset my data</h2>
+      <p class="muted-note" style="margin-top:-6px;">
+        Wipes every workout, weigh-in, exercise log and photo, and sets your XP back to zero.
+        Your account, your partner and your settings stay.
+      </p>
+      <div id="resetStep1">
+        <button type="button" class="btn-danger" id="resetDataBtn">Reset my data</button>
+      </div>
+      <div id="resetStep2" class="hidden">
+        <label style="margin-top:4px;">Type <strong>RESET</strong> to confirm</label>
+        <input type="text" id="resetConfirmInput" placeholder="RESET" autocomplete="off" />
+        <button type="button" class="btn-danger" id="resetConfirmBtn" disabled style="margin-top:10px;">Wipe everything</button>
+        <button type="button" class="btn-ghost" id="resetCancelBtn">Cancel</button>
+      </div>
+    </div>
+
+    <div class="card danger-card">
       <h2>Delete account</h2>
       <p class="muted-note" style="margin-top:-6px;">
         This permanently erases your profile, workouts, weigh-ins, photos and rank.
@@ -1262,6 +1297,7 @@ const ICON_PATHS = {
   google: '<path fill="#4285F4" stroke="none" d="M21.6 12.23c0-.7-.06-1.38-.18-2.03H12v3.84h5.4a4.62 4.62 0 0 1-2 3.03v2.5h3.24c1.9-1.75 3-4.32 3-7.34Z"/><path fill="#34A853" stroke="none" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.5c-.9.6-2.05.96-3.4.96-2.6 0-4.8-1.76-5.6-4.12H3.05v2.58A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" stroke="none" d="M6.4 13.9a5.98 5.98 0 0 1 0-3.8V7.52H3.05a10 10 0 0 0 0 8.96l3.36-2.58Z"/><path fill="#EA4335" stroke="none" d="M12 6.06c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.96 9.96 0 0 0 12 2a10 10 0 0 0-8.95 5.52L6.4 10.1C7.2 7.74 9.4 6.06 12 6.06Z"/>',
   medal: '<circle cx="12" cy="14" r="6"/><path d="m9 10-3-6M15 10l3-6M9.5 14.5 12 17l4-4"/>',
   pause: '<path d="M9 5v14M15 5v14"/>',
+  trash: '<path d="M4 7h16M10 4h4M9 7v12M15 7v12M6 7l1 13h10l1-13"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
   body: '<circle cx="12" cy="4.5" r="2.2"/><path d="M8.5 8h7l1.5 5-2 .6V20h-3v-4h-1v4h-3v-6.4l-2-.6z"/>',
   play: '<path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none"/>',
@@ -1758,6 +1794,22 @@ function showApp() {
   flushQueue({ quiet: true });
 
   // Account deletion. Two steps plus a typed confirmation, because it is final.
+  $("resetDataBtn").addEventListener("click", () => {
+    $("resetStep1").classList.add("hidden");
+    $("resetStep2").classList.remove("hidden");
+    $("resetConfirmInput").focus();
+  });
+  $("resetCancelBtn").addEventListener("click", () => {
+    $("resetStep2").classList.add("hidden");
+    $("resetStep1").classList.remove("hidden");
+    $("resetConfirmInput").value = "";
+    $("resetConfirmBtn").disabled = true;
+  });
+  $("resetConfirmInput").addEventListener("input", (e) => {
+    $("resetConfirmBtn").disabled = e.target.value.trim().toUpperCase() !== "RESET";
+  });
+  $("resetConfirmBtn").addEventListener("click", resetMyData);
+
   $("deleteAccountBtn").addEventListener("click", () => {
     $("deleteStep1").classList.add("hidden");
     $("deleteStep2").classList.remove("hidden");
@@ -1922,6 +1974,46 @@ function applyLocally(table, payload) {
     const i = ALL_ENTRIES.findIndex((e) => e.email === payload.email && e.entry_date === payload.entry_date);
     if (i >= 0) ALL_ENTRIES[i] = { ...ALL_ENTRIES[i], ...payload };
     else ALL_ENTRIES.push({ ...payload, id: `local-${Date.now()}` });
+  }
+}
+
+/* Wipe the user's own training data but keep the account and pairing. */
+async function resetMyData() {
+  const btn = $("resetConfirmBtn");
+  btn.disabled = true;
+  btn.textContent = "Wiping…";
+  try {
+    // Remove stored images first, so no orphaned files are left behind.
+    const paths = [
+      ...BODY_PHOTOS.filter((p) => p.email === MY_EMAIL).map((p) => p.path),
+      ...ALL_ENTRIES.filter((e) => e.email === MY_EMAIL && e.proof_path).map((e) => e.proof_path),
+    ];
+    if (paths.length) {
+      await sb.storage.from("workout-proof").remove(paths);
+      paths.forEach((p) => delete PROOF_URL_CACHE[p]);
+    }
+
+    for (const t of ["exercise_logs", "body_photos", "ai_workouts", "fit_entries", "challenge_completions"]) {
+      await sb.from(t).delete().eq("email", MY_EMAIL);
+    }
+    await sb.from("profiles").update({ bonus_xp: 0 }).eq("email", MY_EMAIL);
+
+    SESSION = null;
+    TODAY_WORKOUT = null;
+    clearSessionStorage();
+    try { localStorage.removeItem(WRITE_QUEUE_KEY); } catch {}
+
+    toast("Everything reset");
+    await loadAll();
+    $("resetStep2").classList.add("hidden");
+    $("resetStep1").classList.remove("hidden");
+    $("resetConfirmInput").value = "";
+    switchTab("home");
+  } catch (err) {
+    console.error(err);
+    toast("Reset failed");
+  } finally {
+    btn.textContent = "Wipe everything";
   }
 }
 
@@ -2675,12 +2767,60 @@ function renderLog() {
     return;
   }
   list.innerHTML = combined.map((e) => {
+    const mine = e.email === MY_EMAIL;
     const color = e.user_name === ME ? "var(--me)" : "var(--partner)";
     const w = e.weight != null ? e.weight + " lb" : "";
     const gym = e.gym ? `<span class="gym-yes">${icon("dumbbell", 14)}</span>` : "";
-    const note = e.note ? escapeHtml(e.note) : "";
-    return `<div class="log-item"><span class="dot" style="background:${color}"></span><span class="date">${e.entry_date.slice(5)}</span><span class="w">${w}</span>${gym}<span class="note">${note}</span></div>`;
+    const rest = e.rest_day ? `<span class="log-rest">rest</span>` : "";
+    const sets = e.sessions > 1 ? `<span class="log-rest">${e.sessions}x</span>` : "";
+    // You can always remove your own entries. Never a partner's.
+    const del = mine
+      ? `<button type="button" class="log-del" data-del="${escapeHtml(e.entry_date)}" aria-label="Delete ${escapeHtml(e.entry_date)}">${icon("trash", 15)}</button>`
+      : "";
+    return `<div class="log-item">
+      <span class="dot" style="background:${color}"></span>
+      <span class="date">${e.entry_date.slice(5)}</span>
+      <span class="w">${w}</span>${gym}${sets}${rest}
+      <span class="note"></span>${del}
+    </div>`;
   }).join("");
+
+  list.querySelectorAll("[data-del]").forEach((b) => {
+    b.onclick = () => confirmDeleteDay(b.dataset.del);
+  });
+}
+
+/* Remove everything logged on one day: the entry, its exercises, its plan and
+   its proof photo. Two taps, because it cannot be undone. */
+async function confirmDeleteDay(date) {
+  const entry = ALL_ENTRIES.find((e) => e.email === MY_EMAIL && e.entry_date === date);
+  if (!entry) return;
+  const logs = ALL_EXERCISE_LOGS.filter((l) => l.email === MY_EMAIL && l.entry_date === date);
+
+  const bits = [];
+  if (entry.weight != null) bits.push("the weigh-in");
+  if (entry.gym) bits.push(`${entry.sessions || 1} workout${(entry.sessions || 1) === 1 ? "" : "s"}`);
+  if (logs.length) bits.push(`${logs.length} exercise log${logs.length === 1 ? "" : "s"}`);
+  if (entry.proof_path) bits.push("the proof photo");
+
+  if (!confirm(`Delete ${date}?\n\nThis removes ${bits.join(", ") || "this entry"}. It cannot be undone.`)) return;
+
+  try {
+    if (entry.proof_path) {
+      await sb.storage.from("workout-proof").remove([entry.proof_path]);
+      delete PROOF_URL_CACHE[entry.proof_path];
+    }
+    await sb.from("exercise_logs").delete().eq("email", MY_EMAIL).eq("entry_date", date);
+    await sb.from("ai_workouts").delete().eq("email", MY_EMAIL).eq("entry_date", date);
+    await sb.from("fit_entries").delete().eq("email", MY_EMAIL).eq("entry_date", date);
+    if (date === todayStr()) { SESSION = null; clearSessionStorage(); TODAY_WORKOUT = null; }
+    toast("Deleted");
+    await loadAll();
+    renderProgressTab();
+  } catch (err) {
+    console.error(err);
+    toast("Could not delete");
+  }
 }
 
 function escapeHtml(s) {
@@ -3612,9 +3752,31 @@ async function renderBodyPhotos() {
   strip.innerHTML = shots.map((s, i) => urls[i]
     ? `<div class="photo-item">
          <img src="${urls[i]}" alt="Progress photo ${escapeHtml(s.taken_on)}" loading="lazy" />
+         ${mine ? `<button type="button" class="photo-del" data-photo="${escapeHtml(s.id)}" aria-label="Delete photo">&times;</button>` : ""}
          <div class="photo-date">${escapeHtml(s.taken_on.slice(5))}</div>
        </div>`
     : "").join("");
+
+  strip.querySelectorAll("[data-photo]").forEach((b) => {
+    b.onclick = () => deleteBodyPhoto(b.dataset.photo);
+  });
+}
+
+async function deleteBodyPhoto(id) {
+  const shot = BODY_PHOTOS.find((p) => p.id === id && p.email === MY_EMAIL);
+  if (!shot) return;
+  if (!confirm(`Delete the photo from ${shot.taken_on}? This cannot be undone.`)) return;
+  try {
+    await sb.storage.from("workout-proof").remove([shot.path]);
+    delete PROOF_URL_CACHE[shot.path];
+    await sb.from("body_photos").delete().eq("id", id);
+    toast("Photo deleted");
+    await loadBodyPhotos();
+    renderBodyPhotos();
+  } catch (err) {
+    console.error(err);
+    toast("Could not delete");
+  }
 }
 
 async function uploadBodyPhoto(file) {
