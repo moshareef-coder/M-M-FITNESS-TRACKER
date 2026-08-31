@@ -156,6 +156,56 @@
   .gauge-value { font-size: 15px; font-weight: 700; margin-top: 2px; }
   .gauge-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
 
+  /* Rank / tier system */
+  .rank-card { position: relative; overflow: hidden; }
+  .rank-card::before {
+    content: ""; position: absolute; top: -70px; right: -70px; width: 190px; height: 190px;
+    border-radius: 50%; background: var(--rank-glow, transparent);
+    filter: blur(46px); opacity: 0.65; pointer-events: none;
+  }
+  .rank-head { display: flex; align-items: center; gap: 14px; position: relative; }
+  .rank-crest { width: 62px; height: 62px; flex-shrink: 0; }
+  .rank-meta { flex: 1; min-width: 0; }
+  .rank-tier-name {
+    font-size: 21px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.1;
+    color: var(--rank-color, var(--text));
+  }
+  .rank-level { font-size: 13px; font-weight: 600; margin-top: 2px; }
+  .rank-progress-track {
+    height: 9px; border-radius: 100px; background: var(--panel-2);
+    overflow: hidden; margin-top: 14px; border: 1px solid var(--border);
+  }
+  .rank-progress-fill {
+    height: 100%; border-radius: 100px; transition: width 0.5s ease-out;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--rank-color, #888) 55%, transparent), var(--rank-color, #888));
+  }
+  .rank-progress-label { font-size: 12px; color: var(--muted); margin-top: 7px; }
+
+  .vs-crest { width: 46px; height: 46px; margin: 0 auto 6px; }
+
+  /* Weekly stake */
+  .stake-active { text-align: center; padding: 4px 0 2px; }
+  .stake-icon { color: var(--gold); margin-bottom: 8px; }
+  .stake-text { font-size: 17px; font-weight: 700; line-height: 1.35; margin-bottom: 6px; }
+  .stake-meta { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  .stake-standings { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .stake-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 12px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .stake-row.safe { border-color: var(--down); }
+  .stake-row.at-risk { border-color: var(--up); }
+  .stake-status { font-size: 12px; font-weight: 700; }
+  .stake-status.safe { color: var(--down); }
+  .stake-status.at-risk { color: var(--up); }
+  .stake-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 12px; }
+  .stake-chip {
+    padding: 7px 12px; border-radius: 100px; border: 1px solid var(--border);
+    background: var(--panel-2); font-size: 13px; cursor: pointer;
+  }
+  .stake-chip:hover { border-color: var(--accent); }
+
   .level-row-compact { display: flex; align-items: center; gap: 12px; }
 
   .start-workout-card h2 { font-size: 16px; text-transform: none; letter-spacing: normal; color: var(--text); margin-bottom: 4px; }
@@ -418,14 +468,18 @@
       <button type="button" class="btn-secondary" id="encourageBtn" style="margin-top:12px;">Send encouragement</button>
     </div>
 
-    <div class="card">
-      <div class="level-row-compact">
-        <div class="gauge-wrap small" id="levelGaugeWrap"></div>
-        <div class="gauge-info">
-          <div class="gauge-value" id="levelName">Rookie</div>
+    <div class="card rank-card" id="rankCard">
+      <div class="rank-head">
+        <div class="rank-crest" id="rankCrest"></div>
+        <div class="rank-meta">
+          <div class="rank-tier-name" id="rankTierName">Wood</div>
+          <div class="rank-level" id="levelName">Rookie</div>
           <div class="gauge-sub" id="xpText">0 / 100 XP</div>
         </div>
       </div>
+      <div class="rank-progress-track"><div class="rank-progress-fill" id="rankProgressFill"></div></div>
+      <div class="rank-progress-label" id="rankProgressLabel"></div>
+
       <div class="badge-caption">Badges</div>
       <div class="badge-row" id="badgeRow"></div>
     </div>
@@ -583,11 +637,24 @@
     </div>
 
     <div class="card">
+      <h2>This week's stake</h2>
+      <div id="stakeBody"></div>
+    </div>
+
+    <div class="card">
       <h2>Head to head</h2>
       <div class="vs-row">
-        <div class="vs-col"><div class="vs-name" id="vsMeName">You</div><div class="vs-xp" id="vsMeXp">0</div></div>
+        <div class="vs-col">
+          <div class="vs-crest" id="vsMeCrest"></div>
+          <div class="vs-name" id="vsMeName">You</div>
+          <div class="vs-xp" id="vsMeXp">0</div>
+        </div>
         <div class="vs-mid">XP</div>
-        <div class="vs-col"><div class="vs-name" id="vsPartnerName">Partner</div><div class="vs-xp" id="vsPartnerXp">0</div></div>
+        <div class="vs-col">
+          <div class="vs-crest" id="vsPartnerCrest"></div>
+          <div class="vs-name" id="vsPartnerName">Partner</div>
+          <div class="vs-xp" id="vsPartnerXp">0</div>
+        </div>
       </div>
       <p class="muted-note" id="vsSummary"></p>
     </div>
@@ -1325,6 +1392,36 @@ function levelForXP(xp) {
   return { level, name, inLevel, next: 100 };
 }
 
+/* Rank tiers. Thresholds widen as you climb so the early ones come fast
+   and the top ones stay meaningful. */
+const RANK_TIERS = [
+  { key: "wood",     name: "Wood",     min: 0,    color: "#8a6240", glow: "rgba(138,98,64,0.55)" },
+  { key: "bronze",   name: "Bronze",   min: 250,  color: "#c87b3a", glow: "rgba(200,123,58,0.55)" },
+  { key: "silver",   name: "Silver",   min: 750,  color: "#9aa6b5", glow: "rgba(154,166,181,0.55)" },
+  { key: "gold",     name: "Gold",     min: 1750, color: "#e0a92a", glow: "rgba(224,169,42,0.6)" },
+  { key: "platinum", name: "Platinum", min: 3500, color: "#4fc9c0", glow: "rgba(79,201,192,0.6)" },
+  { key: "diamond",  name: "Diamond",  min: 7000, color: "#5b9dff", glow: "rgba(91,157,255,0.65)" },
+];
+
+function rankForXP(xp) {
+  let idx = 0;
+  for (let i = 0; i < RANK_TIERS.length; i++) {
+    if (xp >= RANK_TIERS[i].min) idx = i;
+  }
+  const tier = RANK_TIERS[idx];
+  const next = RANK_TIERS[idx + 1] || null;
+  const spanStart = tier.min;
+  const spanEnd = next ? next.min : tier.min;
+  const progress = next ? (xp - spanStart) / (spanEnd - spanStart) : 1;
+  return {
+    tier,
+    next,
+    index: idx,
+    progress: Math.max(0, Math.min(1, progress)),
+    toNext: next ? Math.max(0, next.min - xp) : 0,
+  };
+}
+
 function badgeDefinitions(name) {
   const gymDays = entriesFor(name).filter((e) => e.gym).length;
   const best = longestStreak(name);
@@ -1341,12 +1438,41 @@ function badgeDefinitions(name) {
   ];
 }
 
+/* Hex crest with the tier colour, a soft inner bevel and the level number. */
+function crestSVG(tier, level, size = 62) {
+  const id = `crest-${tier.key}-${size}`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true">
+    <defs>
+      <linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${tier.color}" stop-opacity="1"/>
+        <stop offset="100%" stop-color="${tier.color}" stop-opacity="0.55"/>
+      </linearGradient>
+    </defs>
+    <path d="M50 4 L88 26 V74 L50 96 L12 74 V26 Z" fill="url(#${id})" stroke="${tier.color}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M50 15 L79 32 V68 L50 85 L21 68 V32 Z" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="2" stroke-linejoin="round"/>
+    <text x="50" y="50" text-anchor="middle" dominant-baseline="central"
+          font-size="30" font-weight="800" fill="#fff" style="paint-order:stroke; stroke:rgba(0,0,0,0.25); stroke-width:3px;">${level}</text>
+  </svg>`;
+}
+
 function renderXP() {
   const xp = computeXP(ME);
   const { level, name, inLevel } = levelForXP(xp);
-  $("levelGaugeWrap").innerHTML = ringSVG(inLevel / 100, "var(--gold)", 48) + `<div class="gauge-center">${level}</div>`;
-  $("levelName").textContent = name;
-  $("xpText").textContent = `${inLevel}/100 XP`;
+  const rank = rankForXP(xp);
+
+  const card = $("rankCard");
+  card.style.setProperty("--rank-color", rank.tier.color);
+  card.style.setProperty("--rank-glow", rank.tier.glow);
+
+  $("rankCrest").innerHTML = crestSVG(rank.tier, level);
+  $("rankTierName").textContent = rank.tier.name;
+  $("levelName").textContent = `Level ${level} · ${name}`;
+  $("xpText").textContent = `${xp.toLocaleString()} XP total · ${inLevel}/100 to next level`;
+
+  $("rankProgressFill").style.width = Math.round(rank.progress * 100) + "%";
+  $("rankProgressLabel").textContent = rank.next
+    ? `${rank.toNext.toLocaleString()} XP to ${rank.next.name}`
+    : "Top rank reached";
 
   const defs = badgeDefinitions(ME);
   $("badgeRow").innerHTML = defs.map((b) =>
@@ -2293,15 +2419,139 @@ function renderCoupleTab() {
 
   const myXP = computeXP(ME);
   const partnerXP = computeXP(partner);
-  $("vsMeName").textContent = ME;
-  $("vsPartnerName").textContent = partner;
-  $("vsMeXp").textContent = myXP;
-  $("vsPartnerXp").textContent = partnerXP;
+  const myRank = rankForXP(myXP);
+  const partnerRank = rankForXP(partnerXP);
+
+  $("vsMeCrest").innerHTML = crestSVG(myRank.tier, levelForXP(myXP).level, 46);
+  $("vsPartnerCrest").innerHTML = crestSVG(partnerRank.tier, levelForXP(partnerXP).level, 46);
+  $("vsMeName").textContent = `${ME} · ${myRank.tier.name}`;
+  $("vsPartnerName").textContent = `${partner} · ${partnerRank.tier.name}`;
+  $("vsMeXp").textContent = myXP.toLocaleString();
+  $("vsPartnerXp").textContent = partnerXP.toLocaleString();
   $("vsSummary").textContent = myXP === partnerXP
     ? "Dead even right now."
     : myXP > partnerXP
-      ? `${ME} is ahead by ${myXP - partnerXP} XP.`
-      : `${partner} is ahead by ${partnerXP - myXP} XP.`;
+      ? `${ME} is ahead by ${(myXP - partnerXP).toLocaleString()} XP.`
+      : `${partner} is ahead by ${(partnerXP - myXP).toLocaleString()} XP.`;
+
+  renderStakeCard();
+}
+
+/* ---------- Weekly stake ---------- */
+
+const STAKE_PRESETS = [
+  "Loser buys dinner",
+  "Loser does the dishes all week",
+  "Loser plans date night",
+  "Loser buys coffee for a week",
+  "Loser handles laundry",
+];
+
+let CURRENT_STAKE = null;
+
+async function loadCurrentStake() {
+  const { data } = await sb.from("weekly_stakes")
+    .select("*")
+    .eq("week_start", weekStartStr())
+    .maybeSingle();
+  CURRENT_STAKE = data || null;
+  return CURRENT_STAKE;
+}
+
+function stakeStandings() {
+  const partner = partnerName();
+  const myTarget = MY_PROFILE?.challenge_target || 4;
+  const partnerTarget = PARTNER_PROFILE?.challenge_target || 4;
+  return [
+    { name: ME, days: gymDaysThisWeek(ME), target: myTarget },
+    { name: partner, days: gymDaysThisWeek(partner), target: partnerTarget },
+  ];
+}
+
+async function renderStakeCard() {
+  const body = $("stakeBody");
+  if (!PARTNER_EMAIL) {
+    body.innerHTML = '<p class="muted-note">Pair with a partner to set a stake.</p>';
+    return;
+  }
+
+  await loadCurrentStake();
+
+  if (!CURRENT_STAKE) {
+    body.innerHTML = `
+      <p class="muted-note">Put something on the line this week. Whoever misses their goal owes it.</p>
+      <div class="stake-chips" id="stakeChips">
+        ${STAKE_PRESETS.map((p) => `<button type="button" class="stake-chip" data-preset="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join("")}
+      </div>
+      <input type="text" id="stakeInput" placeholder="Or write your own stake" maxlength="80" />
+      <button type="button" class="btn-primary" id="setStakeBtn" style="margin-top:10px;">Set this week's stake</button>`;
+
+    body.querySelectorAll("[data-preset]").forEach((chip) => {
+      chip.onclick = () => { $("stakeInput").value = chip.dataset.preset; };
+    });
+    $("setStakeBtn").onclick = createStake;
+    return;
+  }
+
+  const standings = stakeStandings();
+  const settled = CURRENT_STAKE.status === "settled";
+  const rows = standings.map((s) => {
+    const safe = s.days >= s.target;
+    return `<div class="stake-row ${safe ? "safe" : "at-risk"}">
+      <span>${escapeHtml(s.name)}</span>
+      <span>${s.days}/${s.target} days
+        <span class="stake-status ${safe ? "safe" : "at-risk"}">${safe ? "SAFE" : "AT RISK"}</span>
+      </span>
+    </div>`;
+  }).join("");
+
+  const owing = standings.filter((s) => s.days < s.target);
+  let verdict;
+  if (owing.length === 0) verdict = "You both hit your goals. Nobody owes anything.";
+  else if (owing.length === standings.length) verdict = "You both owe it. Call it even, or double down.";
+  else verdict = `${owing[0].name} is on the hook right now.`;
+
+  body.innerHTML = `
+    <div class="stake-active">
+      <div class="stake-icon">${icon("trophy", 26)}</div>
+      <div class="stake-text">${escapeHtml(CURRENT_STAKE.stake_text)}</div>
+      <div class="stake-meta">${settled ? "Settled" : "Active this week"}</div>
+    </div>
+    <div class="stake-standings">${rows}</div>
+    <p class="muted-note">${escapeHtml(verdict)}</p>
+    ${settled ? "" : `<button type="button" class="btn-secondary" id="settleStakeBtn">Mark as settled</button>`}
+    <button type="button" class="btn-ghost" id="clearStakeBtn">${settled ? "Set a new stake" : "Cancel stake"}</button>`;
+
+  if (!settled) {
+    $("settleStakeBtn").onclick = async () => {
+      await sb.from("weekly_stakes").update({ status: "settled", settled_at: new Date().toISOString() }).eq("id", CURRENT_STAKE.id);
+      toast("Stake settled");
+      renderStakeCard();
+    };
+  }
+  $("clearStakeBtn").onclick = async () => {
+    await sb.from("weekly_stakes").delete().eq("id", CURRENT_STAKE.id);
+    CURRENT_STAKE = null;
+    renderStakeCard();
+  };
+}
+
+async function createStake() {
+  const text = $("stakeInput").value.trim();
+  if (!text) { toast("Pick or write a stake first"); return; }
+
+  const { data: partnership } = await sb.from("partnerships").select("id").eq("status", "accepted").maybeSingle();
+  if (!partnership) { toast("No active partnership"); return; }
+
+  const { error } = await sb.from("weekly_stakes").insert({
+    partnership_id: partnership.id,
+    week_start: weekStartStr(),
+    stake_text: text,
+    created_by: MY_EMAIL,
+  });
+  if (error) { toast("Couldn't set stake"); console.error(error); return; }
+  toast("Stake set for this week");
+  renderStakeCard();
 }
 
 /* ---------- Setup tab ---------- */
