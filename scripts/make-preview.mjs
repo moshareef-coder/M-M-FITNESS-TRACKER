@@ -31,12 +31,6 @@ const body = `
     <div class="rank-sync waiting">${'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>'}<span>You've earned <strong>Bronze I</strong>, but you rank up together. Mel needs 90 XP to join you.</span></div>
   </div>
 
-  <div class="card">
-    <h2>Today</h2>
-    <div class="scale-row"><div class="stepper-value" style="font-size:34px;font-weight:800;">182.5</div><div class="stepper-unit">lbs</div></div>
-    <button class="btn-primary" style="margin-top:14px;">Save weigh-in</button>
-  </div>
-
   <div class="stat-grid">
     <div class="stat-tile">
       <div class="stat-top"><span class="stat-ico week"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m4 6 1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg></span><span class="stat-label">This week</span></div>
