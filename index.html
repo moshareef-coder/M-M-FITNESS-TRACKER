@@ -289,6 +289,40 @@
   .link-row:last-child { border-bottom: none; }
   .link-arrow { color: var(--muted); font-size: 20px; line-height: 1; }
 
+  .customise-toggle {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    background: none; border: none; padding: 2px 0; cursor: pointer;
+    font-size: 14px; font-weight: 700; color: var(--text); font-family: inherit;
+  }
+  .customise-toggle .link-arrow { transition: transform 0.2s; }
+  .customise-toggle.open .link-arrow { transform: rotate(90deg); }
+
+  /* Today's workout tally */
+  .tally-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .tally-count { font-size: 40px; font-weight: 800; line-height: 1; color: var(--accent); }
+  .tally-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-top: 5px; }
+  .tally-sets { font-size: 13px; color: var(--muted); margin-top: 14px; }
+  .tally-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  .tally-chip {
+    font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 100px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+  }
+  .tally-proof { position: relative; flex-shrink: 0; }
+  .tally-proof-img {
+    width: 62px; height: 62px; object-fit: cover; border-radius: 12px; display: block;
+    border: 1px solid var(--border);
+  }
+  .tally-proof-x {
+    position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%;
+    border: none; cursor: pointer; background: var(--up); color: #fff; font-size: 15px; line-height: 1;
+  }
+  .tally-proof-add {
+    display: flex; align-items: center; gap: 6px; padding: 9px 13px; border-radius: 100px;
+    border: 1px dashed var(--border); background: transparent; color: var(--muted);
+    font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .tally-proof-add:hover { border-color: var(--accent); color: var(--accent); }
+
   /* Progress controls */
   .person-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
   .person-toggle .tab-pill { flex: 1; padding: 9px 14px; font-size: 13px; }
@@ -673,18 +707,23 @@
 
   <!-- WORKOUT TAB -->
   <div id="tab-workout" class="tab-panel hidden">
-    <div class="card">
-      <h2>Today's workout</h2>
-      <div id="workoutFocusRow" class="muted-note" style="margin-bottom:10px;"></div>
-      <div id="workoutContent"></div>
+    <div class="card hidden" id="todayTallyCard">
+      <div class="tally-head">
+        <div>
+          <div class="tally-count" id="tallyCount">0</div>
+          <div class="tally-label" id="tallyLabel">workouts today</div>
+        </div>
+        <div class="tally-proof" id="tallyProof"></div>
+      </div>
+      <div class="tally-list" id="tallyList"></div>
     </div>
 
-    <div class="card" id="proofCard">
-      <h2>Finish with proof</h2>
-      <p class="muted-note" id="proofNote">Snap a photo to close out today's workout.</p>
-      <div id="proofPreviewWrap"></div>
-      <input type="file" id="proofInput" accept="image/*" capture="environment" hidden />
-      <button type="button" class="btn-primary" id="proofAddBtn">Take photo</button>
+    <input type="file" id="proofInput" accept="image/*" capture="environment" hidden />
+
+    <div class="card" id="workoutCard">
+      <h2 id="workoutCardTitle">Today's workout</h2>
+      <div id="workoutFocusRow" class="muted-note" style="margin-bottom:10px;"></div>
+      <div id="workoutContent"></div>
     </div>
 
     <div id="sessionCard" class="card hidden">
@@ -701,11 +740,6 @@
       <button type="button" class="tab-pill" id="progPartnerBtn">Partner</button>
     </div>
 
-    <div class="card">
-      <h2>What to track</h2>
-      <p class="muted-note" style="margin-top:-6px;">Pick what shows up here. Change it any time.</p>
-      <div class="metric-picker" id="metricPicker"></div>
-    </div>
     <div class="card">
       <h2>Rank progress</h2>
       <p class="muted-note" id="rankLadderNote"></p>
@@ -838,6 +872,17 @@
       <h2>Recent activity</h2>
       <div class="log-list" id="logList"></div>
     </div>
+
+    <div class="card" id="customiseCard">
+      <button type="button" class="customise-toggle" id="customiseToggle">
+        <span>Customise this tab</span><span class="link-arrow" id="customiseChevron">&rsaquo;</span>
+      </button>
+      <div id="customiseBody" class="hidden">
+        <p class="muted-note">Turn cards on or off. Nothing is deleted.</p>
+        <div class="metric-picker" id="metricPicker"></div>
+      </div>
+    </div>
+
   </div>
 
   <!-- SETUP TAB -->
@@ -1025,10 +1070,6 @@ let MY_EMAIL = "";
 let ALL_ENTRIES = [];
 let ALL_EXERCISE_LOGS = [];
 let ALL_PROFILES = [];
-let ALL_COMPLETIONS = [];
-let CURRENT_ARC = null;
-let CURRENT_SEASON = null;
-let SEASON_RESULTS = [];
 let MY_PROFILE = null;
 let PARTNER_PROFILE = null;
 let TODAY_WORKOUT = null;
@@ -1046,6 +1087,7 @@ const ICON_PATHS = {
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
   google: '<path fill="#4285F4" stroke="none" d="M21.6 12.23c0-.7-.06-1.38-.18-2.03H12v3.84h5.4a4.62 4.62 0 0 1-2 3.03v2.5h3.24c1.9-1.75 3-4.32 3-7.34Z"/><path fill="#34A853" stroke="none" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.5c-.9.6-2.05.96-3.4.96-2.6 0-4.8-1.76-5.6-4.12H3.05v2.58A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" stroke="none" d="M6.4 13.9a5.98 5.98 0 0 1 0-3.8V7.52H3.05a10 10 0 0 0 0 8.96l3.36-2.58Z"/><path fill="#EA4335" stroke="none" d="M12 6.06c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.96 9.96 0 0 0 12 2a10 10 0 0 0-8.95 5.52L6.4 10.1C7.2 7.74 9.4 6.06 12 6.06Z"/>',
   medal: '<circle cx="12" cy="14" r="6"/><path d="m9 10-3-6M15 10l3-6M9.5 14.5 12 17l4-4"/>',
+  camera: '<path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4z"/><circle cx="12" cy="13" r="3.5"/>',
   trophy: '<path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a2 2 0 0 0 0 4h1M16 5h3a2 2 0 0 1 0 4h-1"/><path d="M12 12v3M9 20h6M9.5 15.5h5l.5 4.5h-6l.5-4.5Z"/>',
   star: '<path d="M12 3l2.5 5.6 6.1.6-4.6 4.1 1.3 6-5.3-3.1L6.7 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z"/>',
   trending: '<path d="M3 17 9 11l4 4 8-8"/><path d="M17 7h4v4"/>',
@@ -1516,6 +1558,12 @@ function showApp() {
   });
   $("deleteConfirmBtn").addEventListener("click", deleteMyAccount);
 
+  $("customiseToggle").addEventListener("click", () => {
+    const body = $("customiseBody");
+    const open = body.classList.toggle("hidden") === false;
+    $("customiseToggle").classList.toggle("open", open);
+  });
+
   $("progMeBtn").addEventListener("click", () => { PROGRESS_VIEW = "me"; renderProgressTab(); });
   $("progPartnerBtn").addEventListener("click", () => {
     if (!PARTNER_EMAIL) return;
@@ -1686,24 +1734,14 @@ async function deleteMyAccount() {
 }
 
 async function loadAll() {
-  const [entriesRes, exLogRes, profilesRes, completionsRes, arcRes, seasonRes, resultsRes] = await Promise.all([
+  const [entriesRes, exLogRes, profilesRes] = await Promise.all([
     sb.from("fit_entries").select("*").order("entry_date", { ascending: true }),
     sb.from("exercise_logs").select("*").order("entry_date", { ascending: true }),
     sb.from("profiles").select("*"),
-    sb.from("challenge_completions").select("*"),
-    sb.from("arcs").select("*").order("created_at", { ascending: false }).limit(1),
-    sb.from("seasons").select("*").order("starts_on", { ascending: false }),
-    sb.from("season_results").select("*").order("archived_at", { ascending: false }),
   ]);
-  const seasons = seasonRes.data || [];
-  const today = todayStr();
-  CURRENT_SEASON = seasons.find((s) => s.starts_on <= today && s.ends_on >= today) || seasons[0] || null;
-  SEASON_RESULTS = resultsRes.data || [];
   ALL_ENTRIES = entriesRes.data || [];
   ALL_EXERCISE_LOGS = exLogRes.data || [];
   ALL_PROFILES = profilesRes.data || [];
-  ALL_COMPLETIONS = completionsRes.data || [];
-  CURRENT_ARC = (arcRes.data || [])[0] || null;
   MY_PROFILE = ALL_PROFILES.find((p) => p.email === MY_EMAIL) || MY_PROFILE;
   PARTNER_PROFILE = ALL_PROFILES.find((p) => p.email === PARTNER_EMAIL) || null;
   applyAccentColors();
@@ -1818,23 +1856,13 @@ function computeXPBetween(name, from, to) {
     }
   }
 
-  const challengeXP = email
-    ? ALL_COMPLETIONS.filter((x) => x.email === email && inRange(x.challenge_date))
-        .reduce((s, x) => s + (x.xp_awarded || 0), 0)
-    : 0;
-
   // Admin-granted bonus is not season scoped; it always applies.
   const bonus = profile?.bonus_xp || 0;
-  return gymDays * 10 + exerciseCount * 5 + prCount * 25 + challengeXP + bonus;
+  return gymDays * 10 + exerciseCount * 5 + prCount * 25 + bonus;
 }
 
-/* Rank-facing XP: this season only. */
+/* Rank-facing XP. Seasons are parked for MVP, so this is lifetime. */
 function computeXP(name) {
-  return computeXPBetween(name, CURRENT_SEASON?.starts_on, CURRENT_SEASON?.ends_on);
-}
-
-/* Career total across every season, for the lifetime stat. */
-function computeLifetimeXP(name) {
   return computeXPBetween(name, null, null);
 }
 
@@ -2117,10 +2145,7 @@ function todayEntryFor(email) {
 }
 
 async function uploadProof(file) {
-  const wrap = $("proofPreviewWrap");
-  wrap.innerHTML = `<div class="proof-uploading"><span class="spinner"></span> Uploading…</div>`;
-  $("proofAddBtn").disabled = true;
-
+  toast("Uploading photo…");
   try {
     const blob = await compressImage(file);
     const path = `${MY_EMAIL}/${todayStr()}-${Date.now()}.jpg`;
@@ -2145,14 +2170,12 @@ async function uploadProof(file) {
       delete PROOF_URL_CACHE[existing.proof_path];
     }
 
-    toast("Proof saved, marked as worked out");
+    toast("Proof saved");
     await loadAll();
+    renderWorkoutTab();
   } catch (err) {
     console.error(err);
     toast("Upload failed, try again");
-    renderProofCard();
-  } finally {
-    $("proofAddBtn").disabled = false;
   }
 }
 
@@ -2164,36 +2187,25 @@ async function removeProof() {
   await sb.from("fit_entries").update({ proof_path: null }).eq("email", MY_EMAIL).eq("entry_date", todayStr());
   toast("Photo removed");
   await loadAll();
+  renderWorkoutTab();
 }
 
-async function renderProofCard() {
-  const wrap = $("proofPreviewWrap");
-  const btn = $("proofAddBtn");
+async function renderProofChip() {
+  const el = $("tallyProof");
+  if (!el) return;
   const entry = todayEntryFor(MY_EMAIL);
 
   if (entry?.proof_path) {
     const url = await signedProofUrl(entry.proof_path);
-    wrap.innerHTML = url
-      ? `<img class="proof-photo" src="${url}" alt="Today's workout proof" />`
-      : `<p class="muted-note">Photo saved but could not be loaded.</p>`;
-    $("proofNote").textContent = "Proof saved. Your partner can see this.";
-    btn.textContent = "Replace photo";
-    let removeBtn = $("proofRemoveBtn");
-    if (!removeBtn) {
-      removeBtn = document.createElement("button");
-      removeBtn.type = "button";
-      removeBtn.className = "btn-ghost";
-      removeBtn.id = "proofRemoveBtn";
-      removeBtn.textContent = "Remove";
-      removeBtn.onclick = removeProof;
-      btn.parentElement.appendChild(removeBtn);
-    }
-    removeBtn.classList.remove("hidden");
+    el.innerHTML = url
+      ? `<img class="tally-proof-img" src="${url}" alt="Today's proof" />
+         <button type="button" class="tally-proof-x" id="proofRemoveBtn" title="Remove photo">&times;</button>`
+      : `<span class="muted-note">Photo saved</span>`;
+    const rm = $("proofRemoveBtn");
+    if (rm) rm.onclick = removeProof;
   } else {
-    wrap.innerHTML = "";
-    $("proofNote").textContent = "Snap a photo to close out today's workout.";
-    btn.textContent = "Take photo";
-    $("proofRemoveBtn")?.classList.add("hidden");
+    el.innerHTML = `<button type="button" class="tally-proof-add" id="proofAddBtn">${icon("camera", 16)} Add proof</button>`;
+    $("proofAddBtn").onclick = () => $("proofInput").click();
   }
 }
 
@@ -2331,8 +2343,10 @@ function escapeHtml(s) {
 /* ---------- Workout tab ---------- */
 
 async function loadTodayWorkout() {
-  const { data } = await sb.from("ai_workouts").select("*").eq("email", MY_EMAIL).eq("entry_date", todayStr()).maybeSingle();
-  TODAY_WORKOUT = data || null;
+  const { data } = await sb.from("ai_workouts").select("*")
+    .eq("email", MY_EMAIL).eq("entry_date", todayStr()).eq("archived", false)
+    .order("created_at", { ascending: false }).limit(1);
+  TODAY_WORKOUT = (data || [])[0] || null;
 }
 
 async function generateWorkout() {
@@ -2563,7 +2577,13 @@ function renderSession() {
 }
 
 async function markGymDayDone() {
-  const payload = { user_name: ME, email: MY_EMAIL, entry_date: todayStr(), gym: true };
+  const existing = todayEntryFor(MY_EMAIL);
+  const payload = {
+    user_name: ME, email: MY_EMAIL, entry_date: todayStr(), gym: true,
+    sessions: (existing?.sessions || 0) + 1,
+    weight: existing?.weight ?? null,
+    proof_path: existing?.proof_path ?? null,
+  };
   const landed = await safeWrite("fit_entries", "upsert", payload, { onConflict: "email,entry_date" });
   if (!landed) applyLocally("fit_entries", payload);
 }
@@ -2592,10 +2612,18 @@ async function renderSessionComplete() {
   if (!hasProof) {
     $("sessionProofBtn").onclick = () => $("proofInput").click();
   }
-  $("sessionDoneBtn").onclick = () => {
+  $("sessionDoneBtn").onclick = async () => {
     SESSION = null;
+    // Clear today's plan so the next workout starts fresh rather than
+    // reopening the one that was just finished.
+    if (TODAY_WORKOUT?.id) {
+      await sb.from("ai_workouts").update({ archived: true }).eq("id", TODAY_WORKOUT.id);
+    }
+    TODAY_WORKOUT = null;
+    WORKOUT_MODE = null;
     $("sessionCard").classList.add("hidden");
     $("workoutContent").classList.remove("hidden");
+    await loadAll();
     renderWorkoutTab();
   };
 }
@@ -2605,8 +2633,34 @@ let MANUAL_DRAFT = [];
 let PLAN_EDIT_ADDING = false;
 const ADD_EX_STATE = { sets: 3, reps: 8, weight: 0 };
 
+/* How many workouts have been finished today, and what was in them. */
+function sessionsToday() {
+  return todayEntryFor(MY_EMAIL)?.sessions || 0;
+}
+
+function renderTodayTally() {
+  const n = sessionsToday();
+  const card = $("todayTallyCard");
+  if (!n) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+
+  $("tallyCount").textContent = n;
+  $("tallyLabel").textContent = n === 1 ? "workout today" : "workouts today";
+
+  const logs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME && l.entry_date === todayStr());
+  const totalSets = logs.reduce((s, l) => s + (l.sets || 1), 0);
+  const names = [...new Set(logs.map((l) => l.exercise_name))];
+
+  $("tallyList").innerHTML = names.length
+    ? `<div class="tally-sets">${totalSets} sets across ${names.length} exercise${names.length === 1 ? "" : "s"}</div>
+       <div class="tally-chips">${names.map((x) => `<span class="tally-chip">${escapeHtml(x)}</span>`).join("")}</div>`
+    : `<div class="tally-sets">Logged as a workout day.</div>`;
+
+  renderProofChip();
+}
+
 function renderWorkoutTab() {
-  renderProofCard();
+  renderTodayTally();
   if (resumeSessionIfAny()) return;
   $("sessionCard").classList.add("hidden");
   $("workoutContent").classList.remove("hidden");
@@ -2624,9 +2678,14 @@ function renderWorkoutTab() {
   } else if (WORKOUT_MODE === "manual") {
     renderManualBuildScreen();
   } else {
-    $("workoutContent").innerHTML = `
-      <p class="muted-note">No workout started yet today.</p>
-      <button class="btn-primary" id="beginWorkoutBtn" style="margin-top:10px;">Begin Workout</button>`;
+    // Nothing running. Either the first workout of the day, or another one.
+    const n = sessionsToday();
+    $("workoutCardTitle").textContent = n ? "Go again" : "Today's workout";
+    $("workoutContent").innerHTML = n
+      ? `<p class="muted-note">${n === 1 ? "One down" : `${n} down`}. Training twice in a day counts twice.</p>
+         <button class="btn-primary" id="beginWorkoutBtn" style="margin-top:10px;">Start workout ${n + 1}</button>`
+      : `<p class="muted-note">No workout started yet today.</p>
+         <button class="btn-primary" id="beginWorkoutBtn" style="margin-top:10px;">Begin Workout</button>`;
     $("beginWorkoutBtn").onclick = () => { WORKOUT_MODE = "choose"; renderWorkoutTab(); };
   }
 }
