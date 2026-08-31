@@ -308,6 +308,34 @@
   .chart-empty .chart-wrap { display: none; }
   .chart-empty .legend { display: none; }
 
+  .rest-banner {
+    display: flex; align-items: center; gap: 12px; justify-content: space-between;
+    margin-bottom: 12px; padding: 14px 16px; border-radius: var(--radius);
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  .rest-copy { display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; line-height: 1.4; }
+  .rest-copy span { color: var(--muted); font-size: 12.5px; }
+  .rest-btn {
+    flex-shrink: 0; padding: 9px 16px; border-radius: 100px; border: none; cursor: pointer;
+    background: var(--accent); color: #fff; font-size: 13.5px; font-weight: 700; font-family: inherit;
+  }
+
+  /* Weekly muscle coverage, a loop to close */
+  .coverage { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+  .coverage-ring { width: 92px; height: 92px; flex-shrink: 0; position: relative; }
+  .coverage-body { flex: 1; min-width: 0; }
+  .coverage-count { font-size: 26px; font-weight: 800; line-height: 1; }
+  .coverage-title { font-size: 14.5px; font-weight: 700; margin-top: 4px; }
+  .coverage-hint { font-size: 12.5px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
+  .coverage-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .cov-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 100px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+  }
+  .cov-chip.on { color: var(--down); border-color: color-mix(in srgb, var(--down) 45%, transparent); }
+
   /* Today's workout tally */
   .tally-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
   .tally-count { font-size: 40px; font-weight: 800; line-height: 1; color: var(--accent); }
@@ -660,6 +688,7 @@
     </div>
 
     <div class="reminder-banner hidden" id="encouragementBanner"></div>
+    <div class="rest-banner hidden" id="restDayBanner"></div>
 
     <div class="card rank-card" id="rankCard">
       <div class="rank-head">
@@ -768,6 +797,16 @@
         <button type="button" class="tab-pill active" id="bodyThisWeekBtn">This week</button>
         <button type="button" class="tab-pill" id="bodyLastWeekBtn">Last week</button>
       </div>
+      <div class="coverage">
+        <div class="coverage-ring" id="coverageRing"></div>
+        <div class="coverage-body">
+          <div class="coverage-count" id="coverageCount">0/6</div>
+          <div class="coverage-title" id="coverageTitle"></div>
+          <div class="coverage-hint" id="coverageHint"></div>
+        </div>
+      </div>
+      <div class="coverage-chips" id="coverageChips"></div>
+
       <div class="body-diagram-wrap">
         <svg id="bodyDiagram" viewBox="0 0 240 350" xmlns="http://www.w3.org/2000/svg">
           <!-- ============ FRONT VIEW (center x=60) ============ -->
@@ -1829,17 +1868,69 @@ function longestStreak(name) {
   return best;
 }
 
+/* Rest days protect a streak without breaking it. A streak you cannot pause
+   stops being motivation and becomes obligation, so this is deliberate:
+   up to REST_ALLOWANCE per rolling week, chosen by the user. */
+const REST_ALLOWANCE = 2;
+
+function restDaysUsed(name, days = 7) {
+  const cutoff = new Date(todayStr() + "T00:00:00");
+  cutoff.setDate(cutoff.getDate() - (days - 1));
+  const from = isoDate(cutoff);
+  return entriesFor(name).filter((e) => e.rest_day && e.entry_date >= from).length;
+}
+
+function restDaysLeft(name) {
+  return Math.max(0, REST_ALLOWANCE - restDaysUsed(name));
+}
+
 function computeStreak(name) {
-  const gymDays = new Set(entriesFor(name).filter((e) => e.gym).map((e) => e.entry_date));
+  const entries = entriesFor(name);
+  const gymDays = new Set(entries.filter((e) => e.gym).map((e) => e.entry_date));
+  const restDays = new Set(entries.filter((e) => e.rest_day).map((e) => e.entry_date));
   if (gymDays.size === 0) return 0;
+
   let streak = 0;
   let cursor = new Date(todayStr() + "T00:00:00");
-  if (!gymDays.has(todayStr())) cursor.setDate(cursor.getDate() - 1);
+  if (!gymDays.has(todayStr()) && !restDays.has(todayStr())) cursor.setDate(cursor.getDate() - 1);
   while (true) {
     const key = isoDate(cursor);
-    if (gymDays.has(key)) { streak++; cursor.setDate(cursor.getDate() - 1); } else break;
+    if (gymDays.has(key)) { streak++; cursor.setDate(cursor.getDate() - 1); }
+    else if (restDays.has(key)) { cursor.setDate(cursor.getDate() - 1); }  // held, not counted
+    else break;
   }
   return streak;
+}
+
+/* The most recent day that would break the streak and can still be protected. */
+function protectableDay(name) {
+  const entries = entriesFor(name);
+  const gymDays = new Set(entries.filter((e) => e.gym).map((e) => e.entry_date));
+  const restDays = new Set(entries.filter((e) => e.rest_day).map((e) => e.entry_date));
+  if (!gymDays.size || restDaysLeft(name) <= 0) return null;
+
+  const cursor = new Date(todayStr() + "T00:00:00");
+  cursor.setDate(cursor.getDate() - 1);           // yesterday
+  const key = isoDate(cursor);
+  if (gymDays.has(key) || restDays.has(key)) return null;
+
+  // Only worth offering if there is a streak behind it to save.
+  const before = new Date(cursor);
+  before.setDate(before.getDate() - 1);
+  return gymDays.has(isoDate(before)) ? key : null;
+}
+
+async function markRestDay(date) {
+  const existing = ALL_ENTRIES.find((e) => e.email === MY_EMAIL && e.entry_date === date);
+  const payload = {
+    user_name: ME, email: MY_EMAIL, entry_date: date, rest_day: true,
+    gym: existing?.gym ?? false,
+    weight: existing?.weight ?? null,
+  };
+  const landed = await safeWrite("fit_entries", "upsert", payload, { onConflict: "email,entry_date" });
+  if (!landed) applyLocally("fit_entries", payload);
+  toast("Rest day logged. Streak kept.");
+  await loadAll();
 }
 
 /* ---------- Gamification: XP, levels, badges ---------- */
@@ -2021,7 +2112,10 @@ function renderXP() {
   $("levelName").textContent = `Level ${level} · ${name}`;
   $("xpText").textContent = `${s.myXP.toLocaleString()} XP total · ${inLevel}/100 to next level`;
 
-  $("rankProgressFill").style.width = Math.round(rank.progress * 100) + "%";
+  // Goal-gradient: a bar that reads 0% signals "you have done nothing".
+  // Signing up and pairing is real progress, so the bar never starts empty.
+  const shown = Math.max(rank.progress, 0.06);
+  $("rankProgressFill").style.width = Math.round(shown * 100) + "%";
   $("rankProgressLabel").textContent = rank.next
     ? `${rank.toNext.toLocaleString()} combined XP to ${rank.next.name}`
     : "Top rank reached";
@@ -2060,10 +2154,25 @@ function renderGreeting() {
   const myToday = ALL_ENTRIES.find((e) => e.user_name === ME && e.entry_date === t);
   const streak = computeStreak(ME);
   let sub;
-  if (myToday && myToday.gym) sub = "You already logged a workout today. Nice.";
-  else if (streak > 0) sub = `${streak} day streak going. Don't break it today.`;
-  else sub = "No entry yet today.";
+  if (myToday && myToday.gym) sub = "Workout logged today. Nice.";
+  else if (myToday?.rest_day) sub = "Rest day. Your streak is safe.";
+  else if (streak > 0) sub = `${streak} day streak.`;
+  else sub = "Nothing logged yet today.";
   $("greeting").innerHTML = `<div class="hi">${greetingWord()}, ${escapeHtml(ME)}</div><div class="sub">${sub}</div>`;
+
+  // Offer to protect a streak that a missed day is about to end.
+  const save = protectableDay(ME);
+  const banner = $("restDayBanner");
+  if (!banner) return;
+  if (!save) { banner.classList.add("hidden"); return; }
+  banner.classList.remove("hidden");
+  banner.innerHTML = `
+    <div class="rest-copy">
+      <strong>Missed yesterday?</strong>
+      <span>Call it a rest day and keep your ${streak > 0 ? streak + " day " : ""}streak. ${restDaysLeft(ME)} left this week.</span>
+    </div>
+    <button type="button" class="rest-btn" id="restDayBtn">Rest day</button>`;
+  $("restDayBtn").onclick = () => markRestDay(save);
 }
 
 function currentWeekDates() {
@@ -2975,6 +3084,46 @@ function renderBodyDiagram() {
   $("bodyDiagramNote").textContent = totalSets > 0
     ? `Based on ${Math.round(totalSets)} weighted sets logged ${label}.`
     : `No exercises logged ${label} yet.`;
+
+  renderCoverageLoop(volumes, label);
+}
+
+/* Completion drive: an incomplete pattern reads as an open loop worth closing.
+   Apple's activity rings moved real behaviour with nothing but this, so the
+   muscle map is framed as coverage to close rather than a passive stat. */
+const COVERAGE_TARGETS = [
+  { key: "chest",     label: "Chest" },
+  { key: "back",      label: "Back",  members: ["lats", "traps"] },
+  { key: "shoulders", label: "Shoulders" },
+  { key: "arms",      label: "Arms",  members: ["biceps", "triceps", "forearms"] },
+  { key: "legs",      label: "Legs",  members: ["quads", "hamstrings", "glutes", "calves"] },
+  { key: "core",      label: "Core",  members: ["abs", "obliques", "lowerback"] },
+];
+
+function renderCoverageLoop(volumes, label) {
+  const hit = COVERAGE_TARGETS.filter((t) => {
+    const keys = t.members || [t.key];
+    return keys.some((k) => (volumes[k] || 0) > 0);
+  });
+  const done = hit.length;
+  const total = COVERAGE_TARGETS.length;
+  const pct = done / total;
+
+  $("coverageRing").innerHTML = ringSVG(pct, done === total ? "var(--down)" : "var(--accent)", 92);
+  $("coverageCount").textContent = `${done}/${total}`;
+
+  const missing = COVERAGE_TARGETS.filter((t) => !hit.includes(t));
+  $("coverageTitle").textContent = done === total
+    ? "Full coverage"
+    : `${total - done} muscle group${total - done === 1 ? "" : "s"} to go`;
+  $("coverageHint").textContent = done === total
+    ? `You hit every muscle group ${label}. That is a complete week.`
+    : `Still untouched ${label}: ${missing.map((m) => m.label).join(", ")}.`;
+
+  $("coverageChips").innerHTML = COVERAGE_TARGETS.map((t) => {
+    const on = hit.includes(t);
+    return `<span class="cov-chip ${on ? "on" : ""}">${on ? icon("check", 13) : ""}${escapeHtml(t.label)}</span>`;
+  }).join("");
 }
 
 function hexPath(cx, cy, r) {
