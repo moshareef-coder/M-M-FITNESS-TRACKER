@@ -123,7 +123,8 @@
   .tab-btn {
     flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
     padding: 6px 2px; border: none; background: transparent; color: var(--muted);
-    font-size: 10.5px; font-weight: 600; cursor: pointer; min-height: 44px;
+    font-size: 9.5px; font-weight: 600; cursor: pointer; min-height: 44px;
+    letter-spacing: -0.01em; white-space: nowrap;
   }
   .tab-btn.active { color: var(--accent); }
 
@@ -259,6 +260,49 @@
   .ladder-connector { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-left: 20px; }
   .ladder-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--border); }
   .ladder-rung.dim { opacity: 0.5; }
+
+  /* Challenges */
+  .quest {
+    position: relative; overflow: hidden;
+    padding: 14px; border-radius: 14px; margin-bottom: 10px;
+    background: var(--panel-2); border: 1px solid var(--border);
+  }
+  .quest.done { border-color: var(--down); }
+  .quest.claimed { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 10%, var(--panel-2)); }
+  .quest-head { display: flex; align-items: flex-start; gap: 11px; }
+  .quest-icon {
+    width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--panel); border: 1px solid var(--border); color: var(--accent);
+  }
+  .quest.claimed .quest-icon { color: var(--gold); border-color: var(--gold); }
+  .quest-body { flex: 1; min-width: 0; }
+  .quest-title { font-size: 15px; font-weight: 700; }
+  .quest-desc { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+  .quest-xp { font-size: 12px; font-weight: 800; color: var(--gold); flex-shrink: 0; }
+  .quest-track { height: 6px; border-radius: 100px; background: var(--panel); overflow: hidden; margin-top: 11px; border: 1px solid var(--border); }
+  .quest-fill { height: 100%; border-radius: 100px; background: var(--accent); transition: width 0.4s; }
+  .quest.done .quest-fill, .quest.claimed .quest-fill { background: var(--down); }
+  .quest-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+  .quest-count { font-size: 12px; color: var(--muted); }
+  .quest-claim {
+    padding: 7px 16px; border-radius: 100px; border: none; cursor: pointer;
+    background: var(--down); color: white; font-size: 12.5px; font-weight: 700;
+  }
+  .quest-claim:disabled { background: var(--panel); color: var(--muted); cursor: default; }
+  .quest-partner { font-size: 11.5px; color: var(--muted); margin-top: 8px; display: flex; align-items: center; gap: 6px; }
+  .quest-partner.synced { color: var(--gold); font-weight: 600; }
+
+  /* Arc */
+  .arc-live { position: relative; }
+  .arc-title { font-size: 21px; font-weight: 800; }
+  .arc-countdown { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: 0.06em; }
+  .arc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .arc-stats { display: flex; gap: 18px; margin-bottom: 12px; }
+  .arc-stat-val { font-size: 24px; font-weight: 800; line-height: 1; }
+  .arc-stat-lbl { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 4px; }
+  .arc-track { height: 10px; border-radius: 100px; background: var(--panel-2); overflow: hidden; border: 1px solid var(--border); }
+  .arc-fill { height: 100%; border-radius: 100px; background: var(--accent); transition: width 0.5s; }
 
   .level-row-compact { display: flex; align-items: center; gap: 12px; }
 
@@ -553,6 +597,16 @@
       <div id="sessionBody"></div>
     </div>
 
+  </div>
+
+  <!-- CHALLENGES TAB -->
+  <div id="tab-challenges" class="tab-panel hidden">
+    <div class="card" id="arcCard"></div>
+    <div class="card">
+      <h2>Daily challenges</h2>
+      <p class="muted-note" id="dailyDateNote"></p>
+      <div id="dailyChallengeList"></div>
+    </div>
   </div>
 
   <!-- PROGRESS TAB -->
@@ -865,6 +919,7 @@
   <nav class="tabs">
     <button class="tab-btn active" data-tab="home" data-icon="home">Home</button>
     <button class="tab-btn" data-tab="workout" data-icon="dumbbell">Workout</button>
+    <button class="tab-btn" data-tab="challenges" data-icon="star">Quests</button>
     <button class="tab-btn" data-tab="progress" data-icon="trending">Progress</button>
     <button class="tab-btn" data-tab="couple" data-icon="heart">Partner</button>
     <button class="tab-btn" data-tab="setup" data-icon="gear">Setup</button>
@@ -885,6 +940,8 @@ let MY_EMAIL = "";
 let ALL_ENTRIES = [];
 let ALL_EXERCISE_LOGS = [];
 let ALL_PROFILES = [];
+let ALL_COMPLETIONS = [];
+let CURRENT_ARC = null;
 let MY_PROFILE = null;
 let PARTNER_PROFILE = null;
 let TODAY_WORKOUT = null;
@@ -1368,20 +1425,25 @@ function switchTab(tab) {
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== "tab-" + tab));
   if (tab === "home") renderHome();
   if (tab === "progress") renderProgressTab();
+  if (tab === "challenges") renderChallengesTab();
   if (tab === "workout") renderWorkoutTab();
   if (tab === "couple") renderCoupleTab();
   if (tab === "setup") renderSetupTab();
 }
 
 async function loadAll() {
-  const [entriesRes, exLogRes, profilesRes] = await Promise.all([
+  const [entriesRes, exLogRes, profilesRes, completionsRes, arcRes] = await Promise.all([
     sb.from("fit_entries").select("*").order("entry_date", { ascending: true }),
     sb.from("exercise_logs").select("*").order("entry_date", { ascending: true }),
     sb.from("profiles").select("*"),
+    sb.from("challenge_completions").select("*"),
+    sb.from("arcs").select("*").order("created_at", { ascending: false }).limit(1),
   ]);
   ALL_ENTRIES = entriesRes.data || [];
   ALL_EXERCISE_LOGS = exLogRes.data || [];
   ALL_PROFILES = profilesRes.data || [];
+  ALL_COMPLETIONS = completionsRes.data || [];
+  CURRENT_ARC = (arcRes.data || [])[0] || null;
   MY_PROFILE = ALL_PROFILES.find((p) => p.email === MY_EMAIL) || MY_PROFILE;
   PARTNER_PROFILE = ALL_PROFILES.find((p) => p.email === PARTNER_EMAIL) || null;
   applyAccentColors();
@@ -1469,8 +1531,13 @@ function computeXP(name) {
   const gymDays = entriesFor(name).filter((e) => e.gym).length;
   const exerciseCount = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name).length;
   const { prCount } = personalRecords(name);
-  const bonus = ALL_PROFILES.find((p) => p.user_name === name)?.bonus_xp || 0;
-  return gymDays * 10 + exerciseCount * 5 + prCount * 25 + bonus;
+  const profile = ALL_PROFILES.find((p) => p.user_name === name);
+  const bonus = profile?.bonus_xp || 0;
+  const email = profile?.email;
+  const challengeXP = email
+    ? ALL_COMPLETIONS.filter((c) => c.email === email).reduce((s, c) => s + (c.xp_awarded || 0), 0)
+    : 0;
+  return gymDays * 10 + exerciseCount * 5 + prCount * 25 + bonus + challengeXP;
 }
 
 function levelForXP(xp) {
@@ -2672,6 +2739,181 @@ function renderRankLadder() {
   }).join("");
 }
 
+/* ---------- Challenges tab ---------- */
+
+const ARC_METRICS = {
+  workouts: { label: "workouts", unit: "workouts", compute: (name, from, to) =>
+    entriesFor(name).filter((e) => e.gym && e.entry_date >= from && e.entry_date <= to).length },
+  sets: { label: "sets", unit: "sets", compute: (name, from, to) =>
+    ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && l.entry_date >= from && l.entry_date <= to)
+      .reduce((s, l) => s + (l.sets || 1), 0) },
+  volume: { label: "volume", unit: "lb", compute: (name, from, to) =>
+    ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && l.entry_date >= from && l.entry_date <= to)
+      .reduce((s, l) => s + (l.weight || 0) * (l.reps || 0) * (l.sets || 1), 0) },
+};
+
+const ARC_PRESETS = [
+  { title: "Winter Arc", metric: "workouts", target: 40, days: 60 },
+  { title: "30 Day Push", metric: "workouts", target: 20, days: 30 },
+  { title: "Volume Blitz", metric: "volume", target: 250000, days: 30 },
+  { title: "Set Marathon", metric: "sets", target: 600, days: 45 },
+];
+
+function daysBetween(a, b) {
+  return Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
+}
+
+function renderArcCard() {
+  const card = $("arcCard");
+
+  if (!CURRENT_ARC) {
+    card.innerHTML = `
+      <h2>Start an arc</h2>
+      <p class="muted-note">A long shared push. Progress counts both of you together.</p>
+      <div class="stake-chips" id="arcPresets">
+        ${ARC_PRESETS.map((p, i) => `<button type="button" class="stake-chip" data-arc="${i}">${escapeHtml(p.title)}</button>`).join("")}
+      </div>
+      <button type="button" class="btn-primary" id="startArcBtn" disabled>Pick an arc to start</button>`;
+
+    let chosen = null;
+    card.querySelectorAll("[data-arc]").forEach((chip) => {
+      chip.onclick = () => {
+        chosen = ARC_PRESETS[parseInt(chip.dataset.arc, 10)];
+        card.querySelectorAll("[data-arc]").forEach((c) => c.style.borderColor = "");
+        chip.style.borderColor = "var(--accent)";
+        const btn = $("startArcBtn");
+        btn.disabled = false;
+        btn.textContent = `Start ${chosen.title}`;
+      };
+    });
+    $("startArcBtn").onclick = () => chosen && createArc(chosen);
+    return;
+  }
+
+  const m = ARC_METRICS[CURRENT_ARC.metric] || ARC_METRICS.workouts;
+  const from = CURRENT_ARC.starts_on;
+  const to = CURRENT_ARC.ends_on;
+  const mine = m.compute(ME, from, to);
+  const theirs = PARTNER_EMAIL ? m.compute(partnerName(), from, to) : 0;
+  const combined = mine + theirs;
+  const target = Number(CURRENT_ARC.target);
+  const pct = Math.min(1, combined / target);
+  const daysLeft = Math.max(0, daysBetween(todayStr(), to));
+  const fmt = (n) => Math.round(n).toLocaleString();
+
+  card.innerHTML = `
+    <div class="arc-live">
+      <div class="arc-head">
+        <div class="arc-title">${escapeHtml(CURRENT_ARC.title)}</div>
+        <div class="arc-countdown">${daysLeft}D LEFT</div>
+      </div>
+      <div class="arc-stats">
+        <div>
+          <div class="arc-stat-val">${fmt(combined)}</div>
+          <div class="arc-stat-lbl">${escapeHtml(m.unit)} together</div>
+        </div>
+        <div>
+          <div class="arc-stat-val">${fmt(mine)}</div>
+          <div class="arc-stat-lbl">you</div>
+        </div>
+        <div>
+          <div class="arc-stat-val">${fmt(theirs)}</div>
+          <div class="arc-stat-lbl">${escapeHtml(partnerName())}</div>
+        </div>
+      </div>
+      <div class="arc-track"><div class="arc-fill" style="width:${pct * 100}%"></div></div>
+      <p class="muted-note" style="margin-top:8px;">
+        ${combined >= target
+          ? "Arc complete. You did it together."
+          : `${fmt(target - combined)} ${escapeHtml(m.unit)} to go, out of ${fmt(target)}.`}
+      </p>
+      <button type="button" class="btn-ghost" id="endArcBtn">End arc</button>
+    </div>`;
+
+  $("endArcBtn").onclick = async () => {
+    await sb.from("arcs").delete().eq("id", CURRENT_ARC.id);
+    CURRENT_ARC = null;
+    renderArcCard();
+  };
+}
+
+async function createArc(preset) {
+  if (!MY_PARTNERSHIP) { toast("Pair with a partner first"); return; }
+  const start = todayStr();
+  const end = new Date(start + "T00:00:00");
+  end.setDate(end.getDate() + preset.days);
+
+  const { error } = await sb.from("arcs").insert({
+    partnership_id: MY_PARTNERSHIP.id,
+    title: preset.title,
+    metric: preset.metric,
+    target: preset.target,
+    starts_on: start,
+    ends_on: isoDate(end),
+    created_by: MY_EMAIL,
+  });
+  if (error) { toast("Couldn't start arc"); console.error(error); return; }
+  toast(`${preset.title} started`);
+  await loadAll();
+  renderChallengesTab();
+}
+
+function renderDailyChallenges() {
+  const list = dailyChallenges();
+  const partner = partnerName();
+  const fmt = (n) => Math.round(n).toLocaleString();
+
+  $("dailyDateNote").textContent = new Date(todayStr() + "T00:00:00")
+    .toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+
+  $("dailyChallengeList").innerHTML = list.map((c) => {
+    const prog = challengeProgress(c, ME);
+    const claimed = isClaimed(MY_EMAIL, c.key);
+    const partnerDone = PARTNER_EMAIL ? challengeProgress(c, partner).done : false;
+    const state = claimed ? "claimed" : prog.done ? "done" : "";
+
+    let partnerLine = "";
+    if (PARTNER_EMAIL) {
+      partnerLine = partnerDone
+        ? `<div class="quest-partner synced">${icon("check", 13)} ${escapeHtml(partner)} cleared this, +50% synced bonus</div>`
+        : `<div class="quest-partner">${icon("lock", 13)} ${escapeHtml(partner)} hasn't cleared this yet</div>`;
+    }
+
+    return `
+      <div class="quest ${state}">
+        <div class="quest-head">
+          <div class="quest-icon">${icon(c.icon, 18)}</div>
+          <div class="quest-body">
+            <div class="quest-title">${escapeHtml(c.title)}</div>
+            <div class="quest-desc">${escapeHtml(c.desc)}</div>
+          </div>
+          <div class="quest-xp">+${c.xp} XP</div>
+        </div>
+        <div class="quest-track"><div class="quest-fill" style="width:${prog.pct * 100}%"></div></div>
+        <div class="quest-foot">
+          <span class="quest-count">${fmt(prog.value)} / ${fmt(c.target)}</span>
+          <button type="button" class="quest-claim" data-claim="${c.key}"
+            ${claimed || !prog.done ? "disabled" : ""}>
+            ${claimed ? "Claimed" : prog.done ? "Claim" : "In progress"}
+          </button>
+        </div>
+        ${partnerLine}
+      </div>`;
+  }).join("");
+
+  $("dailyChallengeList").querySelectorAll("[data-claim]").forEach((btn) => {
+    btn.onclick = () => {
+      const c = list.find((x) => x.key === btn.dataset.claim);
+      if (c) claimChallenge(c);
+    };
+  });
+}
+
+function renderChallengesTab() {
+  renderArcCard();
+  renderDailyChallenges();
+}
+
 function renderProgressTab() {
   renderOvrRadar();
   renderRankLadder();
@@ -2728,6 +2970,123 @@ function weekStartStr() {
   const diff = (day === 0 ? -6 : 1) - day;
   d.setDate(d.getDate() + diff);
   return isoDate(d);
+}
+
+/* ---------- Challenges ----------
+   Daily challenges are derived deterministically from the date, so both
+   partners always see the same three without needing to store definitions. */
+
+function logsOn(name, date) {
+  return ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && l.entry_date === date);
+}
+
+const CHALLENGE_METRICS = {
+  sets: (name, date) => logsOn(name, date).reduce((s, l) => s + (l.sets || 1), 0),
+  exercises: (name, date) => new Set(logsOn(name, date).map((l) => l.exercise_name.toLowerCase())).size,
+  muscleGroups: (name, date) => {
+    const groups = new Set();
+    logsOn(name, date).forEach((l) => {
+      const rule = classifyMuscles(l.exercise_name);
+      if (rule) rule.primary.forEach((g) => groups.add(g));
+    });
+    return groups.size;
+  },
+  volume: (name, date) => logsOn(name, date)
+    .reduce((s, l) => s + (l.weight || 0) * (l.reps || 0) * (l.sets || 1), 0),
+  prs: (name, date) => {
+    // A PR is a log that beat every prior log of that exercise.
+    const all = ALL_EXERCISE_LOGS
+      .filter((l) => l.user_name === name && l.weight != null)
+      .sort((a, b) => a.entry_date.localeCompare(b.entry_date) || String(a.created_at).localeCompare(String(b.created_at)));
+    const best = {};
+    let count = 0;
+    for (const l of all) {
+      const k = l.exercise_name.toLowerCase();
+      if (!(k in best) || l.weight > best[k]) {
+        best[k] = l.weight;
+        if (l.entry_date === date) count++;
+      }
+    }
+    return count;
+  },
+  weighIn: (name, date) => {
+    const e = entriesFor(name).find((x) => x.entry_date === date);
+    return e && e.weight != null ? 1 : 0;
+  },
+  workedOut: (name, date) => {
+    const e = entriesFor(name).find((x) => x.entry_date === date);
+    return e && e.gym ? 1 : 0;
+  },
+  proof: (name, date) => {
+    const e = entriesFor(name).find((x) => x.entry_date === date);
+    return e && e.proof_path ? 1 : 0;
+  },
+};
+
+const CHALLENGE_POOL = [
+  { key: "sets12",     title: "Volume Day",     desc: "Log 12 sets",                 metric: "sets",         target: 12,   xp: 30, icon: "checklist" },
+  { key: "sets20",     title: "The Grind",      desc: "Log 20 sets",                 metric: "sets",         target: 20,   xp: 50, icon: "flame" },
+  { key: "ex4",        title: "Mix It Up",      desc: "Log 4 different exercises",   metric: "exercises",    target: 4,    xp: 25, icon: "dumbbell" },
+  { key: "groups3",    title: "Full Spread",    desc: "Hit 3 muscle groups",         metric: "muscleGroups", target: 3,    xp: 30, icon: "target" },
+  { key: "groups4",    title: "The Architect",  desc: "Hit 4 muscle groups",         metric: "muscleGroups", target: 4,    xp: 45, icon: "target" },
+  { key: "vol5k",      title: "Heavy Lifter",   desc: "Move 5,000 lb of volume",     metric: "volume",       target: 5000, xp: 40, icon: "trending" },
+  { key: "vol10k",     title: "Iron Mountain",  desc: "Move 10,000 lb of volume",    metric: "volume",       target: 10000, xp: 65, icon: "trophy" },
+  { key: "pr1",        title: "New Ground",     desc: "Set a new personal record",   metric: "prs",          target: 1,    xp: 50, icon: "star" },
+  { key: "weigh",      title: "The Stoic",      desc: "Step on the scale",           metric: "weighIn",      target: 1,    xp: 15, icon: "medal" },
+  { key: "showup",     title: "Show Up",        desc: "Log a workout today",         metric: "workedOut",    target: 1,    xp: 20, icon: "bolt" },
+  { key: "proof",      title: "Receipts",       desc: "Add photo proof",             metric: "proof",        target: 1,    xp: 25, icon: "check" },
+];
+
+/* Stable hash so the same date always yields the same three challenges. */
+function hashString(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function dailyChallenges(date = todayStr()) {
+  const pool = [...CHALLENGE_POOL];
+  const picked = [];
+  let seed = hashString(date);
+  for (let i = 0; i < 3 && pool.length; i++) {
+    seed = (seed * 1103515245 + 12345) >>> 0;
+    picked.push(pool.splice(seed % pool.length, 1)[0]);
+  }
+  return picked;
+}
+
+function challengeProgress(challenge, name, date = todayStr()) {
+  const fn = CHALLENGE_METRICS[challenge.metric];
+  const value = fn ? fn(name, date) : 0;
+  return { value, done: value >= challenge.target, pct: Math.min(1, value / challenge.target) };
+}
+
+function isClaimed(email, key, date = todayStr()) {
+  return ALL_COMPLETIONS.some((c) => c.email === email && c.challenge_key === key && c.challenge_date === date);
+}
+
+async function claimChallenge(challenge) {
+  const prog = challengeProgress(challenge, ME);
+  if (!prog.done) { toast("Not finished yet"); return; }
+  if (isClaimed(MY_EMAIL, challenge.key)) return;
+
+  // Bonus when your partner already cleared the same challenge today.
+  const partnerDone = PARTNER_EMAIL && challengeProgress(challenge, partnerName()).done;
+  const xp = challenge.xp + (partnerDone ? Math.round(challenge.xp * 0.5) : 0);
+
+  const { error } = await sb.from("challenge_completions").insert({
+    email: MY_EMAIL,
+    challenge_key: challenge.key,
+    challenge_date: todayStr(),
+    xp_awarded: xp,
+  });
+  if (error) { toast("Couldn't claim"); console.error(error); return; }
+  toast(partnerDone ? `+${xp} XP, synced bonus with ${partnerName()}` : `+${xp} XP claimed`);
+  await loadAll();
+  renderChallengesTab();
 }
 
 function gymDaysThisWeek(name) {
