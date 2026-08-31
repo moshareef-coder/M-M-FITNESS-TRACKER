@@ -132,6 +132,20 @@
   }
   .tab-btn.active { color: var(--accent); }
 
+  /* Raised primary action, the one thing the app wants you to do. */
+  .fab {
+    flex: 0 0 auto; width: 58px; height: 58px; margin: -22px 6px 0;
+    border-radius: 50%; border: none; cursor: pointer;
+    background: linear-gradient(160deg, var(--gold), color-mix(in srgb, var(--gold) 72%, #000));
+    color: #1a1206; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 22px color-mix(in srgb, var(--gold) 45%, transparent);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .fab:active { transform: scale(0.93); box-shadow: 0 4px 12px color-mix(in srgb, var(--gold) 40%, transparent); }
+  .fab svg { stroke-width: 2.4; }
+  .fab.in-progress { background: linear-gradient(160deg, var(--down), color-mix(in srgb, var(--down) 70%, #000)); color: #fff;
+    box-shadow: 0 8px 22px color-mix(in srgb, var(--down) 45%, transparent); }
+
   .card {
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 20px 18px; margin-bottom: 12px;
@@ -1097,6 +1111,7 @@
   <nav class="tabs">
     <button class="tab-btn active" data-tab="home" data-icon="home">Home</button>
     <button class="tab-btn" data-tab="workout" data-icon="dumbbell">Workout</button>
+    <button type="button" class="fab" id="fabStart" aria-label="Start a workout"></button>
     <button class="tab-btn" data-tab="progress" data-icon="trending">Progress</button>
     <button class="tab-btn" data-tab="setup" data-icon="gear">Setup</button>
   </nav>
@@ -1133,6 +1148,7 @@ const ICON_PATHS = {
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
   google: '<path fill="#4285F4" stroke="none" d="M21.6 12.23c0-.7-.06-1.38-.18-2.03H12v3.84h5.4a4.62 4.62 0 0 1-2 3.03v2.5h3.24c1.9-1.75 3-4.32 3-7.34Z"/><path fill="#34A853" stroke="none" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.5c-.9.6-2.05.96-3.4.96-2.6 0-4.8-1.76-5.6-4.12H3.05v2.58A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" stroke="none" d="M6.4 13.9a5.98 5.98 0 0 1 0-3.8V7.52H3.05a10 10 0 0 0 0 8.96l3.36-2.58Z"/><path fill="#EA4335" stroke="none" d="M12 6.06c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.96 9.96 0 0 0 12 2a10 10 0 0 0-8.95 5.52L6.4 10.1C7.2 7.74 9.4 6.06 12 6.06Z"/>',
   medal: '<circle cx="12" cy="14" r="6"/><path d="m9 10-3-6M15 10l3-6M9.5 14.5 12 17l4-4"/>',
+  play: '<path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none"/>',
   camera: '<path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4z"/><circle cx="12" cy="13" r="3.5"/>',
   trophy: '<path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a2 2 0 0 0 0 4h1M16 5h3a2 2 0 0 1 0 4h-1"/><path d="M12 12v3M9 20h6M9.5 15.5h5l.5 4.5h-6l.5-4.5Z"/>',
   star: '<path d="M12 3l2.5 5.6 6.1.6-4.6 4.1 1.3 6-5.3-3.1L6.7 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z"/>',
@@ -1657,6 +1673,15 @@ function showApp() {
     btn.innerHTML = `${icon(btn.dataset.icon, 20)}<span>${label}</span>`;
     btn.onclick = () => switchTab(btn.dataset.tab);
   });
+
+  $("fabStart").onclick = () => {
+    switchTab("workout");
+    // Mid-session, the button just takes you back to it.
+    if (SESSION) return;
+    if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
+    else startWorkout();
+  };
+  renderFab();
 
   loadAll();
 }
@@ -2587,6 +2612,7 @@ function startWorkout() {
   if (!TODAY_WORKOUT) return;
   const loggedAlready = todaysLoggedExerciseNames();
   SESSION = {
+    workoutId: TODAY_WORKOUT.id,
     exerciseIndex: 0,
     setsDone: TODAY_WORKOUT.exercises.map((ex) => new Array(ex.sets || 3).fill(false)),
     weights: TODAY_WORKOUT.exercises.map((ex) => ex.targetWeight ?? ""),
@@ -2602,16 +2628,29 @@ function startWorkout() {
   renderSession();
 }
 
+function sessionMatchesPlan(saved) {
+  if (!saved || !TODAY_WORKOUT?.exercises?.length) return false;
+  if (saved.workoutId && saved.workoutId !== TODAY_WORKOUT.id) return false;
+  const n = TODAY_WORKOUT.exercises.length;
+  return Array.isArray(saved.setsDone)
+    && saved.setsDone.length === n
+    && saved.setsDone.every(Array.isArray)
+    && Number.isInteger(saved.exerciseIndex)
+    && saved.exerciseIndex >= 0
+    && saved.exerciseIndex < n;
+}
+
 function resumeSessionIfAny() {
   const saved = loadSessionFromStorage();
-  if (saved && TODAY_WORKOUT) {
-    SESSION = saved;
-    $("sessionCard").classList.remove("hidden");
-    $("workoutContent").classList.add("hidden");
-    renderSession();
-    return true;
+  if (!sessionMatchesPlan(saved)) {
+    if (saved) clearSessionStorage();   // stale, belongs to a finished plan
+    return false;
   }
-  return false;
+  SESSION = saved;
+  $("sessionCard").classList.remove("hidden");
+  $("workoutContent").classList.add("hidden");
+  renderSession();
+  return true;
 }
 
 function toggleSet(setIdx) {
@@ -2668,6 +2707,15 @@ function renderSession() {
 
   const ex = TODAY_WORKOUT.exercises[ei];
   const setsDone = SESSION.setsDone[ei];
+  if (!ex || !Array.isArray(setsDone)) {
+    // Session and plan drifted apart; drop it rather than crash the tab.
+    SESSION = null;
+    clearSessionStorage();
+    $("sessionCard").classList.add("hidden");
+    $("workoutContent").classList.remove("hidden");
+    renderWorkoutTab();
+    return;
+  }
   const allDone = setsDone.every(Boolean);
   const { best } = personalRecords(ME);
   const prevBest = best[ex.name.toLowerCase()];
@@ -2817,7 +2865,18 @@ function renderTodayTally() {
   renderProofChip();
 }
 
+/* The FAB reflects state: start, resume, or go again. */
+function renderFab() {
+  const fab = $("fabStart");
+  if (!fab) return;
+  const running = !!SESSION;
+  fab.classList.toggle("in-progress", running);
+  fab.innerHTML = icon(running ? "play" : "plus", 26);
+  fab.setAttribute("aria-label", running ? "Resume your workout" : "Start a workout");
+}
+
 function renderWorkoutTab() {
+  renderFab();
   renderTodayTally();
   if (resumeSessionIfAny()) return;
   $("sessionCard").classList.add("hidden");

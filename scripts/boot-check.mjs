@@ -25,6 +25,8 @@ const mk = (id) => ({
   querySelectorAll() { return []; },
   querySelector() { return mk("child"); },   // must not be null: real DOM finds these
   appendChild() {}, focus() {}, click() {}, getContext() { return null; },
+  setAttribute() {}, getAttribute() { return null; }, removeAttribute() {}, remove() {},
+  insertAdjacentHTML() {}, scrollIntoView() {}, closest() { return null; },
   parentElement: { appendChild() {} },
   set onclick(v) {}, set onchange(v) {}, set oninput(v) {},
 });
