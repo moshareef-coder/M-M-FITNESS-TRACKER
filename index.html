@@ -764,6 +764,14 @@
   .exercise-row.ex-done .ex-name { color: var(--muted); }
   .exercise-row.ex-done .ex-icon { color: var(--down); }
 
+  .activity-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .activity-chip {
+    padding: 9px 14px; border-radius: 100px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--muted);
+    font-size: 13px; font-weight: 600; font-family: inherit;
+  }
+  .activity-chip.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
+
   .done-card { border-color: color-mix(in srgb, var(--down) 35%, var(--border)); }
   .done-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
   .done-title { font-size: 16px; font-weight: 800; }
@@ -3507,11 +3515,22 @@ function renderTodayTally() {
   $("tallyLabel").textContent = n === 1 ? "workout today" : "workouts today";
 
   const logs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME && l.entry_date === todayStr());
-  const totalSets = logs.reduce((s, l) => s + (l.sets || 1), 0);
+  const lifts = logs.filter((l) => !l.duration_min);
+  const timed = logs.filter((l) => l.duration_min);
+  const totalSets = lifts.reduce((s, l) => s + (l.sets || 1), 0);
+  const totalMin = timed.reduce((s, l) => s + l.duration_min, 0);
   const names = [...new Set(logs.map((l) => l.exercise_name))];
 
+  // A timed class has no sets, so summarise whichever kinds are present.
+  const parts = [];
+  if (totalSets) parts.push(`${totalSets} set${totalSets === 1 ? "" : "s"}`);
+  if (totalMin) parts.push(`${totalMin} min`);
+  const summary = parts.length
+    ? `${parts.join(" · ")} across ${names.length} ${names.length === 1 ? "activity" : "activities"}`
+    : "Logged as a workout day.";
+
   $("tallyList").innerHTML = names.length
-    ? `<div class="tally-sets">${totalSets} sets across ${names.length} exercise${names.length === 1 ? "" : "s"}</div>
+    ? `<div class="tally-sets">${escapeHtml(summary)}</div>
        <div class="tally-chips">${names.map((x) => `<span class="tally-chip">${escapeHtml(x)}</span>`).join("")}</div>`
     : `<div class="tally-sets">Logged as a workout day.</div>`;
 
@@ -3683,7 +3702,9 @@ function renderDoneWorkouts() {
       const forEx = logs.filter((l) => l.exercise_name.toLowerCase() === n.toLowerCase());
       if (!forEx.length) return "";
       const detail = forEx
-        .map((l) => `${l.sets || 1}×${l.reps ?? "?"}${l.weight ? ` @ ${l.weight} lb` : ""}`)
+        .map((l) => l.duration_min
+          ? `${l.duration_min} min`
+          : `${l.sets || 1}×${l.reps ?? "?"}${l.weight ? ` @ ${l.weight} lb` : ""}`)
         .join(", ");
       return `<div class="done-row">
         <span class="done-ex">${escapeHtml(n)}</span>
@@ -3750,6 +3771,8 @@ function renderWorkoutTab() {
     renderChooseScreen();
   } else if (WORKOUT_MODE === "manual") {
     renderManualBuildScreen();
+  } else if (WORKOUT_MODE === "activity") {
+    renderActivityScreen();
   } else {
     // Nothing running. Either the first workout of the day, or another one.
     const n = sessionsToday();
@@ -3767,9 +3790,88 @@ function renderChooseScreen() {
   $("workoutContent").innerHTML = `
     <p class="muted-note">How do you want to build today's workout?</p>
     <button class="btn-primary" id="chooseGenerateBtn" style="margin-top:10px;">Generate for me</button>
-    <button class="btn-secondary" id="choosePlanBtn">I'll plan my own</button>`;
+    <button class="btn-secondary" id="choosePlanBtn">I'll plan my own</button>
+    <button class="btn-secondary" id="chooseActivityBtn">Log a class or cardio</button>`;
   $("chooseGenerateBtn").onclick = generateWorkout;
   $("choosePlanBtn").onclick = () => { WORKOUT_MODE = "manual"; MANUAL_DRAFT = []; renderWorkoutTab(); };
+  $("chooseActivityBtn").onclick = () => { WORKOUT_MODE = "activity"; renderWorkoutTab(); };
+}
+
+/* Not everything is sets and reps. Pilates, yoga, a run and a swim are measured
+   in minutes, so they get their own path rather than being forced into a
+   lifting shape with fake 1x1 sets. */
+const ACTIVITY_PRESETS = [
+  "Pilates", "Yoga", "Barre", "Running", "Walking",
+  "Cycling", "Swimming", "Boxing", "HIIT", "Stair climber",
+];
+const ACTIVITY_STATE = { name: "", minutes: 45 };
+
+function renderActivityScreen() {
+  $("workoutCardTitle").textContent = "Log a class or cardio";
+  $("workoutContent").innerHTML = `
+    <p class="muted-note">Tracked by time, not sets. It still counts as a workout.</p>
+    <div class="activity-chips" id="activityChips">
+      ${ACTIVITY_PRESETS.map((a) => `<button type="button" class="activity-chip ${ACTIVITY_STATE.name === a ? "on" : ""}" data-act="${escapeHtml(a)}">${escapeHtml(a)}</button>`).join("")}
+    </div>
+    <input type="text" id="activityName" placeholder="Or type something else" value="${escapeHtml(ACTIVITY_PRESETS.includes(ACTIVITY_STATE.name) ? "" : ACTIVITY_STATE.name)}" style="margin-top:12px;" />
+    <div class="field-stack" style="margin-top:12px;">
+      <div class="field-row">
+        <label class="field-label">Minutes</label>
+        <div class="field-controls">
+          <button type="button" class="stepper-btn" id="actMinusBtn">${icon("minus", 16)}</button>
+          <input class="field-input" id="actMinutes" type="number" inputmode="numeric" step="5" min="1" value="${ACTIVITY_STATE.minutes}" />
+          <button type="button" class="stepper-btn" id="actPlusBtn">${icon("plus", 16)}</button>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="btn-primary" id="saveActivityBtn">Log it</button>
+    <button type="button" class="btn-ghost" id="cancelActivityBtn">Cancel</button>`;
+
+  $("activityChips").querySelectorAll("[data-act]").forEach((b) => {
+    b.onclick = () => {
+      ACTIVITY_STATE.name = b.dataset.act;
+      $("activityName").value = "";
+      renderActivityScreen();
+    };
+  });
+  $("activityName").oninput = (e) => { ACTIVITY_STATE.name = e.target.value; };
+  const setMin = (v) => {
+    ACTIVITY_STATE.minutes = Math.max(1, v);
+    $("actMinutes").value = ACTIVITY_STATE.minutes;
+  };
+  $("actMinusBtn").onclick = () => setMin(ACTIVITY_STATE.minutes - 5);
+  $("actPlusBtn").onclick = () => setMin(ACTIVITY_STATE.minutes + 5);
+  $("actMinutes").oninput = (e) => {
+    const v = parseInt(e.target.value, 10);
+    ACTIVITY_STATE.minutes = isNaN(v) ? 1 : Math.max(1, v);
+  };
+  $("saveActivityBtn").onclick = saveActivity;
+  $("cancelActivityBtn").onclick = () => { WORKOUT_MODE = null; renderWorkoutTab(); };
+}
+
+async function saveActivity() {
+  const typed = $("activityName").value.trim();
+  const name = typed || ACTIVITY_STATE.name;
+  if (!name) { toast("Pick or type an activity"); return; }
+
+  const btn = $("saveActivityBtn");
+  btn.disabled = true;
+
+  const payload = {
+    user_name: ME, email: MY_EMAIL, entry_date: todayStr(),
+    exercise_name: name, weight: null, reps: null, sets: 1,
+    duration_min: ACTIVITY_STATE.minutes,
+  };
+  const landed = await safeWrite("exercise_logs", "insert", payload);
+  if (!landed) applyLocally("exercise_logs", payload);
+
+  await markGymDayDone();
+  ACTIVITY_STATE.name = "";
+  ACTIVITY_STATE.minutes = 45;
+  WORKOUT_MODE = null;
+  toast(`${name} logged, ${payload.duration_min} min`);
+  await loadAll();
+  renderWorkoutTab();
 }
 
 function renderManualBuildScreen() {
@@ -3920,6 +4022,17 @@ function renderPlanPreview() {
    and the ones assisting (secondary, half credit). First match wins, so put
    more specific phrases above broader ones. */
 const MUSCLE_RULES = [
+  // Class and cardio activities. These come first so "Pilates core work" is
+  // read as Pilates rather than falling through to an abs-isolation rule.
+  { match: ["pilates", "reformer"], primary: ["abs", "obliques", "glutes"], secondary: ["lowerback", "quads", "hamstrings", "shoulders"] },
+  { match: ["yoga", "vinyasa", "flow "], primary: ["abs", "shoulders"], secondary: ["obliques", "lowerback", "hamstrings", "quads", "glutes"] },
+  { match: ["barre"], primary: ["glutes", "quads"], secondary: ["abs", "calves", "hamstrings"] },
+  { match: ["swim", "freestyle", "breaststroke"], primary: ["lats", "shoulders"], secondary: ["triceps", "abs", "traps"] },
+  { match: ["cycl", "spin class", "peloton", "bike", "biking"], primary: ["quads", "glutes"], secondary: ["hamstrings", "calves"] },
+  { match: ["elliptical", "stair", "stepper", "incline walk"], primary: ["quads", "glutes"], secondary: ["calves", "hamstrings"] },
+  { match: ["hike", "hiking", "walk", "treadmill walk"], primary: ["calves", "quads"], secondary: ["glutes", "hamstrings"] },
+  { match: ["boxing", "kickbox", "muay thai", "martial"], primary: ["shoulders", "abs"], secondary: ["obliques", "triceps", "calves"] },
+  { match: ["dance", "zumba", "hiit", "bootcamp", "circuit"], primary: ["quads", "abs"], secondary: ["glutes", "shoulders", "calves"] },
   { match: ["hip thrust", "glute bridge"], primary: ["glutes"], secondary: ["hamstrings"] },
   { match: ["romanian deadlift", "rdl", "stiff leg"], primary: ["hamstrings"], secondary: ["glutes", "lowerback"] },
   { match: ["deadlift"], primary: ["hamstrings", "glutes", "lowerback"], secondary: ["traps", "forearms", "lats"] },
@@ -3969,7 +4082,12 @@ function computeMuscleVolume(name, weekOffset) {
     .forEach((l) => {
       const rule = classifyMuscles(l.exercise_name);
       if (!rule) return;
-      const sets = l.sets || 1;
+      // A timed class has no sets. Count roughly ten minutes as one set of
+      // volume so a 45-minute Pilates class registers like real work rather
+      // than a single set.
+      const sets = l.duration_min
+        ? Math.max(1, Math.round(l.duration_min / 10))
+        : (l.sets || 1);
       rule.primary.forEach((g) => { if (g in volumes) volumes[g] += sets; });
       rule.secondary.forEach((g) => { if (g in volumes) volumes[g] += sets * 0.5; });
     });
