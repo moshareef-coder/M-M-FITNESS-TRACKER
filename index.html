@@ -740,7 +740,51 @@
     color: var(--muted); font-weight: 800; font-size: 15.5px; cursor: pointer; display: flex; align-items: center; justify-content: center;
     transition: all 0.15s;
   }
-  .set-circle.done { background: var(--down); border-color: var(--down); color: white; transform: scale(1.05); }
+  .set-circle.done { background: var(--down); border-color: var(--down); color: white; }
+  /* The set you are on, so there is never a question which one is live. */
+  .set-circle.current {
+    border-color: var(--gold); color: var(--gold); background: color-mix(in srgb, var(--gold) 16%, var(--panel-2));
+    transform: scale(1.1); box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 18%, transparent);
+  }
+  .set-circle:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .exercise-row.ex-done .ex-name { color: var(--muted); }
+  .exercise-row.ex-done .ex-icon { color: var(--down); }
+
+  .rest-timer {
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    margin: 0 0 18px; padding: 9px 14px; border-radius: 100px;
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel-2));
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  .rest-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .rest-clock { font-size: 19px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+  /* Stacked, thumb-sized controls instead of a cramped side-by-side row. */
+  .field-stack { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+  .field-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 14px; border-radius: 14px; background: var(--panel-2); border: 1px solid var(--border);
+  }
+  .field-label { font-size: 13.5px; font-weight: 700; color: var(--muted); }
+  .field-controls { display: flex; align-items: center; gap: 12px; }
+  .field-input {
+    width: 84px; background: transparent; border: none; color: var(--text);
+    font-size: 26px; font-weight: 800; text-align: center; font-family: inherit;
+    -moz-appearance: textfield; appearance: textfield; padding: 2px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .field-input::-webkit-outer-spin-button,
+  .field-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .field-input:focus { outline: none; border-bottom-color: var(--accent); }
+
+  .btn-big {
+    width: 100%; padding: 16px; border-radius: 14px; border: none; cursor: pointer;
+    font-size: 16px; font-weight: 700; font-family: inherit; margin-bottom: 9px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-set { background: var(--gold); color: #16181d; }
+  .btn-set:active { opacity: 0.85; }
   .stepper-row { display: flex; justify-content: center; gap: 28px; margin-bottom: 20px; }
   .stepper-row.compact { gap: 6px; justify-content: space-between; }
   .stepper { text-align: center; }
@@ -3106,10 +3150,48 @@ function resumeSessionIfAny() {
   return true;
 }
 
+let REST_TICKER = null;
+
+function formatRest(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function startRestTicker() {
+  stopRestTicker();
+  REST_TICKER = setInterval(() => {
+    const el = document.getElementById("restClock");
+    if (!el || !SESSION?.restStartedAt) { stopRestTicker(); return; }
+    el.textContent = formatRest(Date.now() - SESSION.restStartedAt);
+  }, 1000);
+}
+
+function stopRestTicker() {
+  if (REST_TICKER) { clearInterval(REST_TICKER); REST_TICKER = null; }
+}
+
+/* Rest between sets is recorded, not just displayed: it is the honest signal
+   that a workout took real time, which is what makes a partner's log credible. */
+function recordRest(ei, setIdx) {
+  if (!SESSION.restLog) SESSION.restLog = {};
+  if (SESSION.restStartedAt) {
+    SESSION.restLog[`${ei}-${setIdx}`] = Math.round((Date.now() - SESSION.restStartedAt) / 1000);
+  }
+}
+
 function toggleSet(setIdx) {
   const ei = SESSION.exerciseIndex;
-  const nowDone = !SESSION.setsDone[ei][setIdx];
-  SESSION.setsDone[ei][setIdx] = nowDone;
+  const sets = SESSION.setsDone[ei];
+  const currentSet = sets.findIndex((d) => !d);
+
+  // Sets must be logged in order: you can only complete the one you are on, or
+  // undo the last one you completed.
+  const lastDone = sets.lastIndexOf(true);
+  const allowed = setIdx === currentSet || (sets[setIdx] && setIdx === lastDone);
+  if (!allowed) return;
+
+  const nowDone = !sets[setIdx];
+  sets[setIdx] = nowDone;
 
   if (!SESSION.setWeights) SESSION.setWeights = TODAY_WORKOUT.exercises.map((ex) => new Array(ex.sets || 3).fill(null));
   if (nowDone) {
@@ -3117,8 +3199,11 @@ function toggleSet(setIdx) {
     // for the next set does not rewrite the one already done.
     const w = parseFloat(SESSION.weights[ei]);
     SESSION.setWeights[ei][setIdx] = isNaN(w) ? null : w;
+    recordRest(ei, setIdx);
+    SESSION.restStartedAt = Date.now();   // rest begins the moment a set lands
   } else {
     SESSION.setWeights[ei][setIdx] = null;
+    SESSION.restStartedAt = null;
   }
   saveSessionToStorage();
   renderSession();
@@ -3149,6 +3234,8 @@ async function finishExerciseAndAdvance() {
     await logExerciseSilent(ex.name, SESSION.weights[ei], SESSION.reps[ei], doneCount || ex.sets);
   }
   SESSION.completed[ei] = true;
+  SESSION.restStartedAt = null;
+  stopRestTicker();
   SESSION.exerciseIndex++;
   saveSessionToStorage();
 
@@ -3203,44 +3290,71 @@ function renderSession() {
   const { best } = personalRecords(ME);
   const prevBest = best[ex.name.toLowerCase()];
 
+  // The set you are on is the first one not yet done. Only that one is tappable,
+  // so sets cannot be ticked out of order or ahead of where you actually are.
+  const currentSet = setsDone.findIndex((d) => !d);
+  const restMs = SESSION.restStartedAt ? Date.now() - SESSION.restStartedAt : 0;
+
   $("sessionBody").innerHTML = `
     <div class="session-panel">
       <div class="session-step">Exercise ${ei + 1} of ${total}</div>
       <div class="session-ex-name">${escapeHtml(ex.name)}</div>
-      <div class="session-ex-target">${ex.sets} sets × ${ex.reps} reps @ ${ex.targetWeight || "bodyweight"} lb</div>
+      <div class="session-ex-target">${ex.sets} sets × ${ex.reps} reps</div>
       <div class="session-pr-note">${prevBest != null ? `Last PR: ${prevBest} lb` : "No PR on file yet"}</div>
       ${ex.note ? `<div class="session-ex-note">${escapeHtml(ex.note)}</div>` : ""}
+
       <div class="set-circles">
         ${setsDone.map((done, i) => {
           const w = SESSION.setWeights?.[ei]?.[i];
+          const isCurrent = i === currentSet;
           return `<div class="set-col">
-            <button type="button" class="set-circle ${done ? "done" : ""}" data-set="${i}">${done ? icon("check", 16) : i + 1}</button>
+            <button type="button" class="set-circle ${done ? "done" : ""} ${isCurrent ? "current" : ""}"
+              data-set="${i}" ${done || isCurrent ? "" : "disabled"}>${done ? icon("check", 16) : i + 1}</button>
             <div class="set-weight">${done && w != null ? w : "&nbsp;"}</div>
           </div>`;
         }).join("")}
       </div>
-      <div class="stepper-row">
-        <div class="stepper">
-          <div class="stepper-controls">
+
+      ${SESSION.restStartedAt && !allDone ? `
+        <div class="rest-timer" id="restTimer">
+          <span class="rest-label">Resting</span>
+          <span class="rest-clock" id="restClock">${formatRest(restMs)}</span>
+        </div>` : ""}
+
+      <div class="field-stack">
+        <div class="field-row">
+          <label class="field-label">Weight</label>
+          <div class="field-controls">
             <button type="button" class="stepper-btn" id="sessWeightMinus">${icon("minus", 16)}</button>
-            <div><input class="stepper-value" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" value="${SESSION.weights[ei] || 0}" /><div class="stepper-unit">lbs now</div></div>
+            <input class="field-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" value="${SESSION.weights[ei] || 0}" />
             <button type="button" class="stepper-btn" id="sessWeightPlus">${icon("plus", 16)}</button>
           </div>
         </div>
-        <div class="stepper">
-          <div class="stepper-controls">
+        <div class="field-row">
+          <label class="field-label">Reps</label>
+          <div class="field-controls">
             <button type="button" class="stepper-btn" id="sessRepsMinus">${icon("minus", 16)}</button>
-            <div><input class="stepper-value" id="sessRepsVal" type="number" inputmode="numeric" step="1" min="0" value="${SESSION.reps[ei] || 0}" /><div class="stepper-unit">reps</div></div>
+            <input class="field-input" id="sessRepsVal" type="number" inputmode="numeric" step="1" min="0" value="${SESSION.reps[ei] || 0}" />
             <button type="button" class="stepper-btn" id="sessRepsPlus">${icon("plus", 16)}</button>
           </div>
         </div>
       </div>
-      <div class="session-actions">
-        <button type="button" class="btn-ghost" id="skipExBtn">Skip</button>
-        <button type="button" class="btn-primary" id="nextExBtn" ${allDone ? "" : "disabled"}>${icon("check", 16)} ${ei === total - 1 ? "Finish Workout" : "Save & Next"}</button>
-      </div>
-      <button type="button" class="btn-ghost" id="endWorkoutBtn" style="margin-top:8px;">End workout here</button>
+
+      <button type="button" class="btn-big btn-set ${allDone ? "hidden" : ""}" id="logSetBtn">
+        ${icon("check", 18)} Log set ${currentSet + 1} of ${setsDone.length}
+      </button>
+      <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">
+        ${icon("check", 18)} ${ei === total - 1 ? "Finish Workout" : "Next exercise"}
+      </button>
+      <button type="button" class="btn-big btn-ghost" id="skipExBtn">Skip exercise</button>
+      <button type="button" class="btn-ghost" id="endWorkoutBtn" style="margin-top:6px;">End workout here</button>
     </div>`;
+
+  if (SESSION.restStartedAt && !allDone) startRestTicker();
+  else stopRestTicker();
+
+  const logBtn = $("logSetBtn");
+  if (logBtn) logBtn.onclick = () => { if (currentSet >= 0) toggleSet(currentSet); };
 
   $("sessionBody").querySelectorAll(".set-circle").forEach((btn) => {
     btn.onclick = () => toggleSet(parseInt(btn.dataset.set, 10));
@@ -3621,18 +3735,20 @@ function renderPlanPreview() {
   const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
   const total = TODAY_WORKOUT.exercises.length;
 
+  const started = doneCount > 0;
+  const finished = doneCount >= total && total > 0;
+
   const rows = TODAY_WORKOUT.exercises.map((ex, i) => {
-    const prevBest = best[ex.name.toLowerCase()];
-    const prTag = prevBest && ex.targetWeight > prevBest ? '<span class="pr-tag">NEW PR</span>' : "";
-    const doneMark = loggedNow.has(ex.name.toLowerCase()) ? icon("check") : icon("dumbbell");
-    return `<div class="exercise-row">
+    const isDone = loggedNow.has(ex.name.toLowerCase());
+    const doneMark = isDone ? icon("check") : icon("dumbbell");
+    return `<div class="exercise-row ${isDone ? "ex-done" : ""}">
       <div class="ex-icon">${doneMark}</div>
       <div class="ex-body">
-        <div class="ex-name">${escapeHtml(ex.name)}${prTag}</div>
-        <div class="ex-target">${ex.sets} sets · ${ex.reps} reps @ ${ex.targetWeight || "bodyweight"} lb</div>
+        <div class="ex-name">${escapeHtml(ex.name)}</div>
+        <div class="ex-target">${ex.sets} sets · ${ex.reps} reps</div>
         ${ex.note ? `<div class="ex-note">${escapeHtml(ex.note)}</div>` : ""}
       </div>
-      <button type="button" class="stepper-btn" data-remove-plan="${i}" title="Remove">${icon("close", 14)}</button>
+      ${started ? "" : `<button type="button" class="stepper-btn" data-remove-plan="${i}" title="Remove">${icon("close", 14)}</button>`}
     </div>`;
   }).join("");
 
@@ -3643,14 +3759,17 @@ function renderPlanPreview() {
     </div>
     <div class="workout-progress-track"><div class="workout-progress-fill" style="width:${total ? (doneCount / total) * 100 : 0}%"></div></div>
     ${rows}
-    ${PLAN_EDIT_ADDING ? `
+    ${finished ? "" : PLAN_EDIT_ADDING ? `
       <div class="add-ex-form">
         <input type="text" id="planAddExName" placeholder="Exercise name" />
         <div class="stepper-row compact" id="planAddExStepperRow"></div>
         <button type="button" class="btn-secondary" id="planAddExConfirmBtn">Add</button>
       </div>` : `<button type="button" class="btn-ghost" id="planAddExToggleBtn">+ Add exercise</button>`}
-    <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">Start Workout</button>
-    <button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`;
+    ${finished
+      ? `<p class="muted-note" style="text-align:center;margin:14px 0 10px;">${icon("check", 14)} Workout complete.</p>
+         <button type="button" class="btn-primary" id="planNewBtn">Start new workout</button>`
+      : `<button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume Workout" : "Start Workout"}</button>
+         ${started ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`}`;
 
   $("workoutContent").querySelectorAll("[data-remove-plan]").forEach((btn) => {
     btn.onclick = async () => {
@@ -3676,12 +3795,23 @@ function renderPlanPreview() {
       PLAN_EDIT_ADDING = false;
       renderPlanPreview();
     };
-  } else {
+  } else if ($("planAddExToggleBtn")) {
     $("planAddExToggleBtn").onclick = () => { PLAN_EDIT_ADDING = true; renderPlanPreview(); };
   }
 
-  $("planStartBtn").onclick = startWorkout;
-  $("planRegenBtn").onclick = generateWorkout;
+  // These three are mutually exclusive depending on how far the workout got.
+  if ($("planStartBtn")) $("planStartBtn").onclick = startWorkout;
+  if ($("planRegenBtn")) $("planRegenBtn").onclick = generateWorkout;
+  if ($("planNewBtn")) $("planNewBtn").onclick = async () => {
+    // Archive the finished plan so a fresh one can be built for the next session.
+    if (TODAY_WORKOUT?.id) {
+      await sb.from("ai_workouts").update({ archived: true }).eq("id", TODAY_WORKOUT.id);
+    }
+    TODAY_WORKOUT = null;
+    WORKOUT_MODE = "choose";
+    await loadAll();
+    renderWorkoutTab();
+  };
 }
 
 
