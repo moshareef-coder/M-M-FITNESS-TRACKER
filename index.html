@@ -181,6 +181,19 @@
   }
   .rank-progress-label { font-size: 12px; color: var(--muted); margin-top: 7px; }
 
+  .rank-sync {
+    display: flex; align-items: flex-start; gap: 9px; margin-top: 12px;
+    padding: 10px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.45;
+    border: 1px solid var(--border); background: var(--panel-2);
+  }
+  .rank-sync.waiting { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--panel-2)); }
+  .rank-sync.waiting svg { color: var(--gold); }
+  .rank-sync.behind { border-color: var(--up); background: color-mix(in srgb, var(--up) 12%, var(--panel-2)); }
+  .rank-sync.behind svg { color: var(--up); }
+  .rank-sync.synced { border-color: var(--down); background: color-mix(in srgb, var(--down) 12%, var(--panel-2)); }
+  .rank-sync.synced svg { color: var(--down); }
+  .rank-sync svg { flex-shrink: 0; margin-top: 1px; }
+
   .vs-crest { width: 46px; height: 46px; margin: 0 auto 6px; }
 
   /* Weekly stake */
@@ -512,6 +525,7 @@
       </div>
       <div class="rank-progress-track"><div class="rank-progress-fill" id="rankProgressFill"></div></div>
       <div class="rank-progress-label" id="rankProgressLabel"></div>
+      <div class="rank-sync hidden" id="rankSync"></div>
 
       <div class="badge-caption">Badges</div>
       <div class="badge-row" id="badgeRow"></div>
@@ -1603,24 +1617,72 @@ function crestSVG(tier, level, size = 62) {
   </svg>`;
 }
 
+/* ---------- Linked progression ----------
+   You are only as strong as your weakest link. Each person earns XP
+   individually, but the rank you actually HOLD is the one you have both
+   reached. Pull ahead and you bank the progress but wait at the gate. */
+function coupleRankState() {
+  const myXP = computeXP(ME);
+  const hasPartner = !!PARTNER_EMAIL;
+  const partnerXP = hasPartner ? computeXP(partnerName()) : myXP;
+
+  const lockedXP = Math.min(myXP, partnerXP);
+  const coupleRank = rankForXP(lockedXP);
+  const myEarned = rankForXP(myXP);
+  const partnerEarned = rankForXP(partnerXP);
+
+  return {
+    hasPartner,
+    myXP,
+    partnerXP,
+    lockedXP,
+    coupleRank,
+    myEarned,
+    partnerEarned,
+    // I have out-earned the shared rank and am waiting at the gate.
+    waiting: hasPartner && myEarned.index > coupleRank.index,
+    // I am the one holding us back.
+    holdingBack: hasPartner && partnerEarned.index > myEarned.index,
+  };
+}
+
 function renderXP() {
-  const xp = computeXP(ME);
-  const { level, name, inLevel } = levelForXP(xp);
-  const rank = rankForXP(xp);
+  const s = coupleRankState();
+  const rank = s.coupleRank;
+  const { level, name, inLevel } = levelForXP(s.myXP);
+  const partner = partnerName();
 
   const card = $("rankCard");
   card.style.setProperty("--rank-color", rank.tier.color);
   card.style.setProperty("--rank-glow", rank.tier.glow);
 
   $("rankCrest").innerHTML = crestSVG(rank.tier, level);
-  $("rankTierName").textContent = rank.tier.name;
+  $("rankTierName").textContent = rank.name;
   $("levelName").textContent = `Level ${level} · ${name}`;
-  $("xpText").textContent = `${xp.toLocaleString()} XP total · ${inLevel}/100 to next level`;
+  $("xpText").textContent = `${s.myXP.toLocaleString()} XP total · ${inLevel}/100 to next level`;
 
   $("rankProgressFill").style.width = Math.round(rank.progress * 100) + "%";
   $("rankProgressLabel").textContent = rank.next
-    ? `${rank.toNext.toLocaleString()} XP to ${rank.next.name}`
+    ? `${rank.toNext.toLocaleString()} combined XP to ${rank.next.name}`
     : "Top rank reached";
+
+  // Sync banner: who is at the gate and who needs to catch up.
+  const sync = $("rankSync");
+  if (!s.hasPartner) {
+    sync.className = "rank-sync hidden";
+    sync.innerHTML = "";
+  } else if (s.waiting) {
+    const gap = Math.max(0, s.myXP - s.partnerXP);
+    sync.className = "rank-sync waiting";
+    sync.innerHTML = `${icon("lock", 16)}<span>You've earned <strong>${escapeHtml(s.myEarned.name)}</strong>, but you rank up together. ${escapeHtml(partner)} needs ${gap.toLocaleString()} XP to join you.</span>`;
+  } else if (s.holdingBack) {
+    const gap = Math.max(0, s.partnerXP - s.myXP);
+    sync.className = "rank-sync behind";
+    sync.innerHTML = `${icon("flame", 16)}<span>${escapeHtml(partner)} is ready for <strong>${escapeHtml(s.partnerEarned.name)}</strong>. You're ${gap.toLocaleString()} XP from unlocking it for you both.</span>`;
+  } else {
+    sync.className = "rank-sync synced";
+    sync.innerHTML = `${icon("check", 16)}<span>In sync with ${escapeHtml(partner)}. Climb together.</span>`;
+  }
 
   const defs = badgeDefinitions(ME);
   $("badgeRow").innerHTML = defs.map((b) =>
@@ -2544,35 +2606,49 @@ function renderOvrRadar() {
 }
 
 function renderRankLadder() {
-  const xp = computeXP(ME);
-  const current = rankForXP(xp);
+  const s = coupleRankState();
+  const current = s.coupleRank;
+  const partner = partnerName();
   const wrap = $("rankLadder");
 
-  $("rankLadderNote").textContent = current.next
-    ? `${current.toNext.toLocaleString()} XP until ${current.next.name}`
-    : "You have reached the highest rank.";
+  if (!s.hasPartner) {
+    $("rankLadderNote").textContent = current.next
+      ? `${current.toNext.toLocaleString()} XP until ${current.next.name}`
+      : "You have reached the highest rank.";
+  } else if (s.waiting) {
+    $("rankLadderNote").textContent = `You've personally reached ${s.myEarned.name}. Ranks unlock when ${partner} gets there too.`;
+  } else if (s.holdingBack) {
+    $("rankLadderNote").textContent = `${partner} is waiting at ${s.partnerEarned.name}. Catch up to unlock it for you both.`;
+  } else {
+    $("rankLadderNote").textContent = current.next
+      ? `You both need ${current.toNext.toLocaleString()} more XP to reach ${current.next.name}.`
+      : "You have both reached the highest rank.";
+  }
 
-  // Show a window around the current rung so the ladder stays readable.
+  // Show a window around the shared rung so the ladder stays readable.
   const start = Math.max(0, current.index - 2);
   const end = Math.min(RANK_LADDER.length, current.index + 3);
 
   wrap.innerHTML = RANK_LADDER.slice(start, end).map((rung, i) => {
     const absIdx = start + i;
-    const achieved = xp >= rung.min;
+    const achieved = s.lockedXP >= rung.min;
     const isCurrent = absIdx === current.index;
+    // Banked = I personally earned it but we have not unlocked it together yet.
+    const banked = !achieved && s.myXP >= rung.min;
     const level = levelForXP(Math.max(rung.min, 0)).level;
     const connector = i < end - start - 1
       ? `<div class="ladder-connector"><div class="ladder-dot"></div><div class="ladder-dot"></div><div class="ladder-dot"></div></div>`
       : "";
 
-    let tag = "";
+    let tag;
     if (isCurrent) tag = `<div class="ladder-tag" style="color:${rung.tier.color}">Current rank</div>`;
-    else if (achieved) tag = `<div class="ladder-tag" style="color:var(--muted)">Achieved</div>`;
-    else tag = `<div class="ladder-tag" style="color:var(--muted)">${icon("lock", 10)} Unlocks at ${rung.min.toLocaleString()} XP</div>`;
+    else if (achieved) tag = `<div class="ladder-tag" style="color:var(--muted)">Achieved together</div>`;
+    else if (banked) tag = `<div class="ladder-tag" style="color:var(--gold)">${icon("lock", 10)} You're ready, waiting on ${escapeHtml(partner)}</div>`;
+    else tag = `<div class="ladder-tag" style="color:var(--muted)">${icon("lock", 10)} Unlocks at ${rung.min.toLocaleString()} XP each</div>`;
 
     return `
-      <div class="ladder-rung ${achieved ? "" : "dim"}">
-        <div class="ladder-crest ${achieved ? "" : "locked"}">${crestSVG(rung.tier, level, 42)}</div>
+      <div class="ladder-rung ${achieved || banked ? "" : "dim"}">
+        <div class="ladder-crest ${achieved ? "" : "locked"}" ${banked ? 'style="opacity:0.75;filter:none;"' : ""}>${crestSVG(rung.tier, level, 42)}</div>
         <div class="ladder-meta">
           ${tag}
           <div class="ladder-name ${isCurrent ? "current" : ""}" style="${isCurrent ? `color:${rung.tier.color}` : ""}">${escapeHtml(rung.name)}</div>
@@ -2678,15 +2754,22 @@ function renderCoupleTab() {
 
   $("vsMeCrest").innerHTML = crestSVG(myRank.tier, levelForXP(myXP).level, 46);
   $("vsPartnerCrest").innerHTML = crestSVG(partnerRank.tier, levelForXP(partnerXP).level, 46);
-  $("vsMeName").textContent = `${ME} · ${myRank.tier.name}`;
-  $("vsPartnerName").textContent = `${partner} · ${partnerRank.tier.name}`;
+  $("vsMeName").textContent = `${ME} · ${myRank.name}`;
+  $("vsPartnerName").textContent = `${partner} · ${partnerRank.name}`;
   $("vsMeXp").textContent = myXP.toLocaleString();
   $("vsPartnerXp").textContent = partnerXP.toLocaleString();
-  $("vsSummary").textContent = myXP === partnerXP
-    ? "Dead even right now."
-    : myXP > partnerXP
-      ? `${ME} is ahead by ${(myXP - partnerXP).toLocaleString()} XP.`
-      : `${partner} is ahead by ${(partnerXP - myXP).toLocaleString()} XP.`;
+
+  const s = coupleRankState();
+  const gap = Math.abs(myXP - partnerXP);
+  if (myXP === partnerXP) {
+    $("vsSummary").textContent = `Dead even. You both hold ${s.coupleRank.name}.`;
+  } else {
+    const ahead = myXP > partnerXP ? ME : partner;
+    const behind = myXP > partnerXP ? partner : ME;
+    $("vsSummary").textContent =
+      `${ahead} is ahead by ${gap.toLocaleString()} XP, but you rank up together. ` +
+      `${behind} needs ${gap.toLocaleString()} XP to pull you both to the next rank.`;
+  }
 
   renderStakeCard();
 }
