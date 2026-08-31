@@ -63,7 +63,12 @@
     -webkit-font-smoothing: antialiased;
     transition: background 0.2s, color 0.2s;
   }
-  #app { max-width: 480px; margin: 0 auto; min-height: 100dvh; padding: 22px 18px calc(104px + env(safe-area-inset-bottom, 0px)); }
+  /* viewport-fit=cover + black-translucent puts content under the status bar,
+     so the top padding must clear the notch / Dynamic Island. */
+  #app {
+    max-width: 480px; margin: 0 auto; min-height: 100dvh;
+    padding: calc(22px + env(safe-area-inset-top, 0px)) 18px calc(104px + env(safe-area-inset-bottom, 0px));
+  }
   .hidden { display: none !important; }
 
   /* Onboarding */
@@ -312,6 +317,33 @@
     padding: 7px 15px; border-radius: 100px; border: none; cursor: pointer;
     background: var(--up); color: #fff; font-size: 14px; font-weight: 700; font-family: inherit;
   }
+
+  /* Muscle coverage: an Apple-rings style close-the-loop for the week. */
+  .cov-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .cov-sub { font-size: 12.5px; color: var(--muted); margin: 3px 0 0; }
+  .cov-count { font-size: 28px; font-weight: 800; line-height: 1; color: var(--accent); white-space: nowrap; }
+  .cov-total { font-size: 15px; color: var(--muted); font-weight: 700; }
+  .cov-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+  .cov-cell {
+    padding: 10px 8px; border-radius: 11px; text-align: center;
+    background: var(--panel-2); border: 1px solid var(--border);
+  }
+  .cov-cell.hit { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--panel-2)); }
+  .cov-name { font-size: 11.5px; font-weight: 700; text-transform: capitalize; }
+  .cov-cell.hit .cov-name { color: var(--accent); }
+  .cov-sets { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+
+  .pr-total { font-size: 12.5px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .pr-total span { font-size: 20px; font-weight: 800; color: var(--gold); }
+  .pr-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 11px 0; border-bottom: 1px solid var(--border);
+  }
+  .pr-item:last-child { border-bottom: none; }
+  .pr-ex { font-size: 14px; font-weight: 600; }
+  .pr-when { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+  .pr-load { font-size: 17px; font-weight: 800; color: var(--gold); white-space: nowrap; }
+  .pr-load span { font-size: 11px; font-weight: 600; color: var(--muted); margin-left: 2px; }
 
   .empty-state { text-align: center; padding: 26px 14px 22px; }
   .empty-icon {
@@ -713,7 +745,17 @@
   }
   .stepper-row.compact .stepper-btn { width: 30px; height: 30px; }
   .stepper-btn:active { background: var(--border); }
-  .stepper-value { font-size: 30px; font-weight: 700; min-width: 64px; }
+  /* An input styled to read as plain text, so it looks like a value but can be typed into. */
+  .stepper-value {
+    font-size: 30px; font-weight: 700; min-width: 64px; width: 74px;
+    background: transparent; border: none; color: var(--text);
+    text-align: center; font-family: inherit; padding: 2px 0;
+    border-bottom: 1px dashed var(--border);
+    -moz-appearance: textfield; appearance: textfield;
+  }
+  .stepper-value::-webkit-outer-spin-button,
+  .stepper-value::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .stepper-value:focus { outline: none; border-bottom-color: var(--accent); }
   .stepper-row.compact .stepper-value { font-size: 20px; min-width: auto; }
   .stepper-unit { font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
   .session-inputs { display: flex; gap: 10px; margin-bottom: 20px; }
@@ -814,6 +856,25 @@
         <div class="stat-bar"><div class="stat-fill streak" id="statStreakFill"></div></div>
         <div class="stat-sub" id="statStreakSub"></div>
       </div>
+    </div>
+
+    <div class="card" id="coverageCard">
+      <div class="cov-head">
+        <div>
+          <h2 style="margin:0;">Muscle coverage</h2>
+          <p class="cov-sub" id="coverageSub"></p>
+        </div>
+        <div class="cov-count"><span id="coverageDone">0</span><span class="cov-total" id="coverageTotal">/6</span></div>
+      </div>
+      <div class="cov-grid" id="coverageGrid"></div>
+    </div>
+
+    <div class="card" id="prCard">
+      <div class="cov-head">
+        <h2 style="margin:0;">Personal records</h2>
+        <div class="pr-total"><span id="prTotalCount">0</span> set</div>
+      </div>
+      <div id="prHomeList"></div>
     </div>
 
     <div class="card">
@@ -2677,7 +2738,84 @@ async function sendEncouragement() {
   toast(`Sent to ${partnerName()}`);
 }
 
+/* The six groups worth closing in a week. Fourteen individual muscles is too
+   granular to feel closable; these roll up to something a week can actually
+   cover, which is what makes the loop work. */
+const COVERAGE_GROUPS = [
+  { key: "chest",     label: "chest",     parts: ["chest"] },
+  { key: "back",      label: "back",      parts: ["lats", "traps", "lowerback"] },
+  { key: "shoulders", label: "shoulders", parts: ["shoulders"] },
+  { key: "arms",      label: "arms",      parts: ["biceps", "triceps", "forearms"] },
+  { key: "legs",      label: "legs",      parts: ["quads", "hamstrings", "glutes", "calves"] },
+  { key: "core",      label: "core",      parts: ["abs", "obliques"] },
+];
+
+function weeklyCoverage(name) {
+  const vol = computeMuscleVolume(name, 0);
+  return COVERAGE_GROUPS.map((g) => {
+    const sets = g.parts.reduce((s, part) => s + (vol[part] || 0), 0);
+    return { ...g, sets, hit: sets > 0 };
+  });
+}
+
+function renderCoverage() {
+  const groups = weeklyCoverage(ME);
+  const done = groups.filter((g) => g.hit).length;
+  $("coverageDone").textContent = done;
+  $("coverageTotal").textContent = `/${groups.length}`;
+
+  const missing = groups.filter((g) => !g.hit).map((g) => g.label);
+  $("coverageSub").textContent = done === groups.length
+    ? "Every group hit this week. Nice."
+    : `Still to hit: ${missing.join(", ")}`;
+
+  $("coverageGrid").innerHTML = groups.map((g) => `
+    <div class="cov-cell ${g.hit ? "hit" : ""}">
+      <div class="cov-name">${escapeHtml(g.label)}</div>
+      <div class="cov-sets">${g.hit ? `${Math.round(g.sets)} sets` : "not yet"}</div>
+    </div>`).join("");
+}
+
+/* Most recent PRs. A PR means you actually got stronger, which is the one
+   number in here that represents real progress rather than app usage. */
+function recentPRs(name, limit = 3) {
+  const { prLogIds } = personalRecords(name);
+  return ALL_EXERCISE_LOGS
+    .filter((l) => l.user_name === name && prLogIds.has(l.id))
+    .sort((a, b) => b.entry_date.localeCompare(a.entry_date) || String(b.created_at).localeCompare(String(a.created_at)))
+    .slice(0, limit);
+}
+
+function relativeDay(dateStr) {
+  const days = Math.round((new Date(todayStr() + "T00:00:00") - new Date(dateStr + "T00:00:00")) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return "last week";
+  return new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function renderHomePRs() {
+  const { prCount } = personalRecords(ME);
+  $("prTotalCount").textContent = prCount;
+
+  const prs = recentPRs(ME);
+  $("prHomeList").innerHTML = prs.length
+    ? prs.map((p) => `
+        <div class="pr-item">
+          <div>
+            <div class="pr-ex">${escapeHtml(p.exercise_name)}</div>
+            <div class="pr-when">${escapeHtml(relativeDay(p.entry_date))}</div>
+          </div>
+          <div class="pr-load">${p.weight}<span>lbs</span></div>
+        </div>`).join("")
+    : emptyState("trophy", "No records yet",
+        "Log a lift with a weight and your first PR lands here.");
+}
+
 function renderHome() {
+  renderCoverage();
+  renderHomePRs();
   $("avatarInitial").textContent = initials(ME);
   renderGreeting();
   renderEncouragementBanner();
@@ -3040,14 +3178,14 @@ function renderSession() {
         <div class="stepper">
           <div class="stepper-controls">
             <button type="button" class="stepper-btn" id="sessWeightMinus">${icon("minus", 16)}</button>
-            <div><div class="stepper-value" id="sessWeightVal">${SESSION.weights[ei] || 0}</div><div class="stepper-unit">lbs</div></div>
+            <div><input class="stepper-value" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" value="${SESSION.weights[ei] || 0}" /><div class="stepper-unit">lbs</div></div>
             <button type="button" class="stepper-btn" id="sessWeightPlus">${icon("plus", 16)}</button>
           </div>
         </div>
         <div class="stepper">
           <div class="stepper-controls">
             <button type="button" class="stepper-btn" id="sessRepsMinus">${icon("minus", 16)}</button>
-            <div><div class="stepper-value" id="sessRepsVal">${SESSION.reps[ei] || 0}</div><div class="stepper-unit">reps</div></div>
+            <div><input class="stepper-value" id="sessRepsVal" type="number" inputmode="numeric" step="1" min="0" value="${SESSION.reps[ei] || 0}" /><div class="stepper-unit">reps</div></div>
             <button type="button" class="stepper-btn" id="sessRepsPlus">${icon("plus", 16)}</button>
           </div>
         </div>
@@ -3064,18 +3202,29 @@ function renderSession() {
   });
   const stepWeight = (delta) => {
     SESSION.weights[ei] = Math.max(0, (parseFloat(SESSION.weights[ei]) || 0) + delta);
-    $("sessWeightVal").textContent = SESSION.weights[ei];
+    $("sessWeightVal").value = SESSION.weights[ei];
     saveSessionToStorage();
   };
   const stepReps = (delta) => {
     SESSION.reps[ei] = Math.max(0, (parseInt(SESSION.reps[ei], 10) || 0) + delta);
-    $("sessRepsVal").textContent = SESSION.reps[ei];
+    $("sessRepsVal").value = SESSION.reps[ei];
     saveSessionToStorage();
   };
   $("sessWeightMinus").onclick = () => stepWeight(-2.5);
   $("sessWeightPlus").onclick = () => stepWeight(2.5);
   $("sessRepsMinus").onclick = () => stepReps(-1);
   $("sessRepsPlus").onclick = () => stepReps(1);
+  // Typing straight into the field beats tapping + fifteen times.
+  $("sessWeightVal").oninput = (e) => {
+    const v = parseFloat(e.target.value);
+    SESSION.weights[ei] = isNaN(v) ? 0 : Math.max(0, v);
+    saveSessionToStorage();
+  };
+  $("sessRepsVal").oninput = (e) => {
+    const v = parseInt(e.target.value, 10);
+    SESSION.reps[ei] = isNaN(v) ? 0 : Math.max(0, v);
+    saveSessionToStorage();
+  };
   $("skipExBtn").onclick = () => {
     SESSION.exerciseIndex++;
     saveSessionToStorage();
@@ -4013,21 +4162,28 @@ function buildStepperRow(containerId, specs, state, onChange) {
     <div class="stepper">
       <div class="stepper-controls">
         <button type="button" class="stepper-btn" data-adm-minus="${s.key}">${icon("minus", 14)}</button>
-        <div><div class="stepper-value" id="${containerId}_${s.key}_val">${state[s.key]}</div><div class="stepper-unit">${s.unit}</div></div>
+        <div><input class="stepper-value" id="${containerId}_${s.key}_val" type="number" inputmode="decimal" step="${s.step}" min="${s.min}" value="${state[s.key]}" /><div class="stepper-unit">${s.unit}</div></div>
         <button type="button" class="stepper-btn" data-adm-plus="${s.key}">${icon("plus", 14)}</button>
       </div>
     </div>`).join("");
   specs.forEach((s) => {
+    const field = $(`${containerId}_${s.key}_val`);
     $(containerId).querySelector(`[data-adm-minus="${s.key}"]`).onclick = () => {
       state[s.key] = Math.max(s.min, state[s.key] - s.step);
-      $(`${containerId}_${s.key}_val`).textContent = state[s.key];
+      field.value = state[s.key];
       if (onChange) onChange();
     };
     $(containerId).querySelector(`[data-adm-plus="${s.key}"]`).onclick = () => {
       state[s.key] += s.step;
-      $(`${containerId}_${s.key}_val`).textContent = state[s.key];
+      field.value = state[s.key];
       if (onChange) onChange();
     };
+    field.oninput = () => {
+      const v = parseFloat(field.value);
+      state[s.key] = isNaN(v) ? s.min : Math.max(s.min, v);
+      if (onChange) onChange();
+    };
+    field.onblur = () => { field.value = state[s.key]; };
   });
 }
 
@@ -4109,18 +4265,18 @@ function renderPRSteppers() {
     <div class="stepper">
       <div class="stepper-controls">
         <button type="button" class="stepper-btn" data-pr-minus="${s.key}">${icon("minus", 14)}</button>
-        <div><div class="stepper-value" id="pr_${s.key}_val">${PR_STATE[s.key]}</div><div class="stepper-unit">${s.unit}</div></div>
+        <div><input class="stepper-value" id="pr_${s.key}_val" type="number" inputmode="decimal" step="${s.step}" min="${s.min}" value="${PR_STATE[s.key]}" /><div class="stepper-unit">${s.unit}</div></div>
         <button type="button" class="stepper-btn" data-pr-plus="${s.key}">${icon("plus", 14)}</button>
       </div>
     </div>`).join("");
   specs.forEach((s) => {
     $("prStepperRow").querySelector(`[data-pr-minus="${s.key}"]`).onclick = () => {
       PR_STATE[s.key] = Math.max(s.min, PR_STATE[s.key] - s.step);
-      $(`pr_${s.key}_val`).textContent = PR_STATE[s.key];
+      $(`pr_${s.key}_val`).value = PR_STATE[s.key];
     };
     $("prStepperRow").querySelector(`[data-pr-plus="${s.key}"]`).onclick = () => {
       PR_STATE[s.key] = PR_STATE[s.key] + s.step;
-      $(`pr_${s.key}_val`).textContent = PR_STATE[s.key];
+      $(`pr_${s.key}_val`).value = PR_STATE[s.key];
     };
   });
 }

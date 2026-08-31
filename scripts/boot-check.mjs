@@ -17,6 +17,10 @@ const MISSES = new Set();
 /* Ids created at runtime via createElement, so absence from markup is expected.
    Every one of these MUST be null-checked at its lookup site. */
 const DYNAMIC = new Set(["weightEmpty", "proofRemoveBtn"]);
+/* Ids built from template literals inside an innerHTML the same code just
+   wrote, e.g. `${containerId}_${s.key}_val`. They exist by lookup time. */
+const DYNAMIC_PATTERNS = [/_val$/];
+const isDynamic = (id) => DYNAMIC.has(id) || DYNAMIC_PATTERNS.some((r) => r.test(id));
 const mk = (id) => ({
   id, textContent: "", innerHTML: "", value: "", checked: false, disabled: false, title: "",
   dataset: {}, files: [], style: { setProperty() {}, width: "" },
@@ -33,7 +37,14 @@ const mk = (id) => ({
 ids.forEach((i) => (nodes[i] = mk(i)));
 
 globalThis.document = {
-  getElementById: (id) => { if (!nodes[id]) { if (!DYNAMIC.has(id)) MISSES.add(id); return null; } return nodes[id]; },
+  getElementById: (id) => {
+    if (nodes[id]) return nodes[id];
+    // Ids created at runtime exist by the time they are looked up, so hand
+    // back a node rather than null; only genuinely absent ids are reported.
+    if (isDynamic(id)) return (nodes[id] = mk(id));
+    MISSES.add(id);
+    return null;
+  },
   querySelectorAll: () => [], querySelector: () => null,
   createElement: () => mk("tmp"), addEventListener() {}, hidden: false,
   documentElement: { getAttribute: () => "dark", setAttribute() {}, style: { setProperty() {} } },
