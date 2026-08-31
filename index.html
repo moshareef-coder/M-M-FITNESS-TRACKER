@@ -220,28 +220,6 @@
 
   .vs-crest { width: 46px; height: 46px; margin: 0 auto 6px; }
 
-  /* Weekly stake */
-  .stake-active { text-align: center; padding: 4px 0 2px; }
-  .stake-icon { color: var(--gold); margin-bottom: 8px; }
-  .stake-text { font-size: 17px; font-weight: 700; line-height: 1.35; margin-bottom: 6px; }
-  .stake-meta { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
-  .stake-standings { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
-  .stake-row {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    padding: 10px 12px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--border);
-    font-size: 14px;
-  }
-  .stake-row.safe { border-color: var(--down); }
-  .stake-row.at-risk { border-color: var(--up); }
-  .stake-status { font-size: 12px; font-weight: 700; }
-  .stake-status.safe { color: var(--down); }
-  .stake-status.at-risk { color: var(--up); }
-  .stake-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 12px; }
-  .stake-chip {
-    padding: 7px 12px; border-radius: 100px; border: 1px solid var(--border);
-    background: var(--panel-2); font-size: 13px; cursor: pointer;
-  }
-  .stake-chip:hover { border-color: var(--accent); }
 
 
   /* Rank ladder */
@@ -711,11 +689,6 @@
       <div class="week-dots" id="partnerWeekDots"></div>
       <div id="partnerProofWrap"></div>
       <button type="button" class="btn-secondary" id="encourageBtn" style="margin-top:12px;">Send encouragement</button>
-    </div>
-
-    <div class="card">
-      <h2>This week's stake</h2>
-      <div id="stakeBody"></div>
     </div>
 
   </div>
@@ -2302,7 +2275,6 @@ async function sendEncouragement() {
 
 function renderHome() {
   $("avatarInitial").textContent = initials(ME);
-  renderStakeCard();
   renderGreeting();
   renderEncouragementBanner();
   renderScaleCheck();
@@ -3240,127 +3212,7 @@ function weeklyGoalFor(email) {
 }
 
 
-/* ---------- Weekly stake ---------- */
 
-const STAKE_PRESETS = [
-  "Loser buys dinner",
-  "Loser does the dishes all week",
-  "Loser plans date night",
-  "Loser buys coffee for a week",
-  "Loser handles laundry",
-];
-
-let CURRENT_STAKE = null;
-
-async function loadCurrentStake() {
-  const { data } = await sb.from("weekly_stakes")
-    .select("*")
-    .eq("week_start", weekStartStr())
-    .maybeSingle();
-  CURRENT_STAKE = data || null;
-  return CURRENT_STAKE;
-}
-
-function stakeStandings() {
-  const partner = partnerName();
-  const myTarget = weeklyGoalFor(MY_EMAIL);
-  const partnerTarget = weeklyGoalFor(PARTNER_EMAIL);
-  return [
-    { name: ME, days: gymDaysThisWeek(ME), target: myTarget },
-    { name: partner, days: gymDaysThisWeek(partner), target: partnerTarget },
-  ];
-}
-
-async function renderStakeCard() {
-  const body = $("stakeBody");
-  if (!PARTNER_EMAIL) {
-    body.innerHTML = '<p class="muted-note">Pair with a partner to set a stake.</p>';
-    return;
-  }
-
-  await loadCurrentStake();
-
-  if (!CURRENT_STAKE) {
-    body.innerHTML = `
-      <p class="muted-note">Put something on the line this week. Whoever misses their goal owes it.</p>
-      <div class="stake-chips" id="stakeChips">
-        ${STAKE_PRESETS.map((p) => `<button type="button" class="stake-chip" data-preset="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join("")}
-      </div>
-      <input type="text" id="stakeInput" placeholder="Or write your own stake" maxlength="80" />
-      <button type="button" class="btn-primary" id="setStakeBtn" style="margin-top:10px;">Set this week's stake</button>`;
-
-    body.querySelectorAll("[data-preset]").forEach((chip) => {
-      chip.onclick = () => { $("stakeInput").value = chip.dataset.preset; };
-    });
-    $("setStakeBtn").onclick = createStake;
-    return;
-  }
-
-  const standings = stakeStandings();
-  const settled = CURRENT_STAKE.status === "settled";
-  const rows = standings.map((s) => {
-    const safe = s.days >= s.target;
-    return `<div class="stake-row ${safe ? "safe" : "at-risk"}">
-      <span>${escapeHtml(s.name)}</span>
-      <span>${s.days}/${s.target} days
-        <span class="stake-status ${safe ? "safe" : "at-risk"}">${safe ? "SAFE" : "AT RISK"}</span>
-      </span>
-    </div>`;
-  }).join("");
-
-  const owing = standings.filter((s) => s.days < s.target);
-  let verdict;
-  if (owing.length === 0) verdict = "You both hit your goals. Nobody owes anything.";
-  else if (owing.length === standings.length) verdict = "You both owe it. Call it even, or double down.";
-  else verdict = `${owing[0].name} is on the hook right now.`;
-
-  body.innerHTML = `
-    <div class="stake-active">
-      <div class="stake-icon">${icon("trophy", 26)}</div>
-      <div class="stake-text">${escapeHtml(CURRENT_STAKE.stake_text)}</div>
-      <div class="stake-meta">${settled ? "Settled" : "Active this week"}</div>
-    </div>
-    <div class="stake-standings">${rows}</div>
-    <p class="muted-note">${escapeHtml(verdict)}</p>
-    ${settled ? "" : `<button type="button" class="btn-secondary" id="settleStakeBtn">Mark as settled</button>`}
-    <button type="button" class="btn-ghost" id="clearStakeBtn">${settled ? "Set a new stake" : "Cancel stake"}</button>`;
-
-  if (!settled) {
-    $("settleStakeBtn").onclick = async () => {
-      await sb.from("weekly_stakes").update({ status: "settled", settled_at: new Date().toISOString() }).eq("id", CURRENT_STAKE.id);
-      toast("Stake settled");
-      renderStakeCard();
-    };
-  }
-  $("clearStakeBtn").onclick = async () => {
-    await sb.from("weekly_stakes").delete().eq("id", CURRENT_STAKE.id);
-    CURRENT_STAKE = null;
-    renderStakeCard();
-  };
-}
-
-async function createStake() {
-  const text = $("stakeInput").value.trim();
-  if (!text) { toast("Pick or write a stake first"); return; }
-
-  const { data: partnership } = await sb.from("partnerships").select("id").eq("status", "accepted").maybeSingle();
-  if (!partnership) { toast("No active partnership"); return; }
-
-  const { error } = await sb.from("weekly_stakes").insert({
-    partnership_id: partnership.id,
-    week_start: weekStartStr(),
-    stake_text: text,
-    created_by: MY_EMAIL,
-  });
-  if (error) { toast("Couldn't set stake"); console.error(error); return; }
-  toast("Stake set for this week");
-  renderStakeCard();
-}
-
-/* ---------- Setup tab ---------- */
-
-let SETUP_THEME = null;
-let SETUP_COLOR = null;
 
 function renderSetupTab() {
   $("setupPartnerName").textContent = PARTNER_PROFILE?.user_name || "Not paired";
