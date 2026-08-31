@@ -56,15 +56,15 @@ const chain = (rows = []) => {
   return p;
 };
 const DATA = {
-  profiles: [{ email: "mo@x.com", user_name: "Mo", tracked_metrics: ["weight", "prs", "trained"], bonus_xp: 0, challenge_target: 4 }],
-  fit_entries: [{ email: "mo@x.com", user_name: "Mo", entry_date: "2026-08-30", gym: true, weight: 180, sessions: 1 }],
-  exercise_logs: [{ email: "mo@x.com", user_name: "Mo", entry_date: "2026-08-30", exercise_name: "Bench", weight: 135, reps: 8, sets: 3 }],
-  ai_workouts: [{ id: "w1", email: "mo@x.com", user_name: "Mo", entry_date: "2026-08-30", archived: false,
+  profiles: [{ email: "mo.shareef@creativelab1.com", user_name: "Mo", tracked_metrics: ["weight", "prs", "trained"], bonus_xp: 0, challenge_target: 4 }],
+  fit_entries: [{ email: "mo.shareef@creativelab1.com", user_name: "Mo", entry_date: "2026-08-30", gym: true, weight: 180, sessions: 1 }],
+  exercise_logs: [{ email: "mo.shareef@creativelab1.com", user_name: "Mo", entry_date: "2026-08-30", exercise_name: "Bench", weight: 135, reps: 8, sets: 3 }],
+  ai_workouts: [{ id: "w1", email: "mo.shareef@creativelab1.com", user_name: "Mo", entry_date: "2026-08-30", archived: false,
     focus: "Strength", exercises: [
       { name: "Bench", sets: 3, reps: 8, targetWeight: 135 },
       { name: "Row", sets: 3, reps: 10, targetWeight: 95 },
     ] }],
-  partnerships: [{ id: "p1", inviter_email: "mo@x.com", invitee_email: "mel@x.com", status: "accepted" }],
+  partnerships: [{ id: "p1", inviter_email: "mo.shareef@creativelab1.com", invitee_email: "mel@x.com", status: "accepted" }],
 };
 globalThis.window.supabase = {
   createClient: () => ({
@@ -77,14 +77,14 @@ globalThis.window.supabase = {
 
 let failed = 0;
 try {
-  new Function(src + ";globalThis.__t={showApp,loadAll,renderHome,renderWorkoutTab,renderProgressTab,renderSetupTab,switchTab,renderFab,renderStatTiles,renderTodayTally,renderXP,renderScaleCheck,renderBodyTab};")();
+  new Function(src + ";globalThis.__t={showApp,loadAll,renderHome,renderWorkoutTab,renderProgressTab,renderSetupTab,switchTab,renderFab,renderStatTiles,renderTodayTally,renderXP,renderScaleCheck,renderBodyTab,renderAdminPanel,renderPRSteppers};")();
 } catch (e) {
   console.log("TOP-LEVEL ERROR:", e.message);
   process.exit(1);
 }
 
 globalThis.ME = "Mo";
-globalThis.MY_EMAIL = "mo@x.com";
+globalThis.MY_EMAIL = "mo.shareef@creativelab1.com";
 const t = globalThis.__t;
 for (const [name, run] of [
   ["showApp", () => t.showApp()],
@@ -97,6 +97,8 @@ for (const [name, run] of [
   ["switchTab workout", () => t.switchTab("workout")],
   ["switchTab body", () => t.switchTab("body")],
   ["renderBodyTab", () => t.renderBodyTab()],
+  ["renderAdminPanel", () => t.renderAdminPanel()],
+  ["renderPRSteppers", () => t.renderPRSteppers()],
   ["switchTab progress", () => t.switchTab("progress")],
   ["switchTab setup", () => t.switchTab("setup")],
   ["renderXP", () => t.renderXP()],

@@ -369,6 +369,26 @@
   .session-paused-sheet { text-align: center; padding: 28px 6px 8px; }
   .session-paused-sheet h3 { font-size: 20px; margin: 0 0 6px; }
 
+  /* Weigh-in: type it, or nudge it */
+  .weigh-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  #scaleWeightInput {
+    flex: 1; min-width: 0; padding: 12px 14px; border-radius: 12px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    font-size: 30px; font-weight: 800; font-family: inherit; letter-spacing: -0.02em;
+    -moz-appearance: textfield;
+  }
+  #scaleWeightInput::-webkit-outer-spin-button,
+  #scaleWeightInput::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  #scaleWeightInput:focus { outline: none; border-color: var(--accent); }
+  .weigh-unit { font-size: 14px; font-weight: 600; color: var(--muted); }
+  .weigh-nudge { display: flex; flex-direction: column; gap: 5px; }
+  .weigh-btn {
+    width: 38px; height: 30px; border-radius: 9px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+    font-size: 17px; font-weight: 700; line-height: 1; font-family: inherit;
+  }
+  .weigh-btn:active { border-color: var(--accent); color: var(--accent); }
+
   /* Compact stat tiles, two up */
   .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   .stat-tile {
@@ -776,17 +796,6 @@
 
     <div class="card start-workout-card" id="homeWorkoutCta"></div>
 
-    <div class="card hidden" id="scaleCheckCard">
-      <h2>Check the scale</h2>
-      <p class="muted-note" id="scaleGoalNote"></p>
-      <div class="stepper-row compact" id="scaleWeightStepperRow"></div>
-      <label class="gym-toggle" id="scaleGymToggleWrap" style="margin-top:10px;">
-        <span>Worked out today</span>
-        <input type="checkbox" id="entryGym" />
-      </label>
-      <button type="button" class="btn-primary" id="scaleSaveBtn" style="margin-top:10px;">Save</button>
-    </div>
-
     <div class="stat-grid">
       <div class="stat-tile">
         <div class="stat-top"><span class="stat-ico week" id="statWeekIco"></span><span class="stat-label">This week</span></div>
@@ -993,6 +1002,25 @@
       <h2>Rank progress</h2>
       <p class="muted-note" id="rankLadderNote"></p>
       <div class="rank-ladder" id="rankLadder"></div>
+    </div>
+
+    <div class="card" id="scaleCheckCard">
+      <h2>Log your weight</h2>
+      <p class="muted-note" id="scaleGoalNote" style="margin-top:-6px;"></p>
+      <div class="weigh-row">
+        <input type="number" id="scaleWeightInput" inputmode="decimal" step="0.1" min="0"
+               placeholder="0.0" autocomplete="off" aria-label="Weight" />
+        <span class="weigh-unit">lbs</span>
+        <div class="weigh-nudge">
+          <button type="button" class="weigh-btn" id="scaleMinus" aria-label="Down 0.5">&minus;</button>
+          <button type="button" class="weigh-btn" id="scalePlus" aria-label="Up 0.5">+</button>
+        </div>
+      </div>
+      <label class="gym-toggle" id="scaleGymToggleWrap" style="margin-top:12px;">
+        <span>Worked out today</span>
+        <input type="checkbox" id="entryGym" />
+      </label>
+      <button type="button" class="btn-primary" id="scaleSaveBtn" style="margin-top:12px;">Save weigh-in</button>
     </div>
 
     <div class="card metric-card" id="cardWeight">
@@ -1964,26 +1992,33 @@ function partnerName() {
 const SCALE_STATE = { weight: 0 };
 
 async function saveScaleEntry() {
+  const typed = parseFloat($("scaleWeightInput").value);
+  const weight = Number.isFinite(typed) && typed > 0 ? typed : null;
+  if (weight === null) { toast("Enter a weight first"); return; }
+
+  // An upsert replaces the whole row, so carry today's other fields through
+  // rather than blanking proof, session count and rest-day state.
+  const existing = todayEntryFor(MY_EMAIL);
   const payload = {
     user_name: ME,
     email: MY_EMAIL,
     entry_date: todayStr(),
-    weight: SCALE_STATE.weight || null,
+    weight,
     gym: $("entryGym").checked,
+    sessions: existing?.sessions ?? 0,
+    proof_path: existing?.proof_path ?? null,
+    rest_day: existing?.rest_day ?? false,
   };
   const landed = await safeWrite("fit_entries", "upsert", payload, { onConflict: "email,entry_date" });
-  SCALE_STATE.weight = 0;
-  $("entryGym").checked = false;
-  $("scaleGymToggleWrap").classList.remove("checked");
 
   if (landed) {
-    toast("Saved · +10 XP");
+    toast("Weigh-in saved");
     await loadAll();
   } else {
     applyLocally("fit_entries", payload);
     toast("Saved offline");
-    renderHome();
   }
+  renderProgressTab();
 }
 
 function entriesFor(name) {
@@ -2062,6 +2097,8 @@ async function markRestDay(date) {
     user_name: ME, email: MY_EMAIL, entry_date: date, rest_day: true,
     gym: existing?.gym ?? false,
     weight: existing?.weight ?? null,
+    sessions: existing?.sessions ?? 0,
+    proof_path: existing?.proof_path ?? null,
   };
   const landed = await safeWrite("fit_entries", "upsert", payload, { onConflict: "email,entry_date" });
   if (!landed) applyLocally("fit_entries", payload);
@@ -2436,6 +2473,8 @@ async function uploadProof(file) {
       proof_path: path,
       gym: true,
       weight: existing?.weight ?? null,
+      sessions: existing?.sessions ?? 0,
+      rest_day: existing?.rest_day ?? false,
     }, { onConflict: "email,entry_date" });
     if (dbErr) throw dbErr;
 
@@ -2470,6 +2509,8 @@ async function renderProofChip() {
   if (!el) return;
   const entry = todayEntryFor(MY_EMAIL);
 
+  // Only ever show a photo that already exists. Asking for one belongs at the
+  // end of a workout, not as a standing prompt on the tab.
   if (entry?.proof_path) {
     const url = await signedProofUrl(entry.proof_path);
     el.innerHTML = url
@@ -2479,8 +2520,7 @@ async function renderProofChip() {
     const rm = $("proofRemoveBtn");
     if (rm) rm.onclick = removeProof;
   } else {
-    el.innerHTML = `<button type="button" class="tally-proof-add" id="proofAddBtn">${icon("camera", 16)} Add proof</button>`;
-    $("proofAddBtn").onclick = () => $("proofInput").click();
+    el.innerHTML = "";
   }
 }
 
@@ -2498,18 +2538,39 @@ async function renderPartnerProof() {
 
 function renderScaleCheck() {
   const card = $("scaleCheckCard");
-  const goal = MY_PROFILE?.goal || "";
-  const goalRelevant = /weight|recomp|muscle/i.test(goal);
-  const today = todayStr();
-  const loggedToday = ALL_ENTRIES.some((e) => e.user_name === ME && e.entry_date === today && e.weight != null);
-
-  if (!goalRelevant || loggedToday) {
-    card.classList.add("hidden");
-    return;
-  }
+  // Always available on Progress now, rather than a prompt that appears and vanishes.
   card.classList.remove("hidden");
-  $("scaleGoalNote").textContent = `How much do you weigh today? Your goal: ${goal}`;
-  buildStepperRow("scaleWeightStepperRow", [{ key: "weight", unit: "lbs", step: 0.5, min: 0 }], SCALE_STATE);
+
+  const today = todayStr();
+  const todayEntry = ALL_ENTRIES.find((e) => e.user_name === ME && e.entry_date === today);
+  const lastWeight = entriesFor(ME).filter((e) => e.weight != null).slice(-1)[0]?.weight;
+
+  const input = $("scaleWeightInput");
+  if (document.activeElement !== input) {
+    // Prefill with today's entry, else the last known weight, so it is a
+    // correction rather than a blank field.
+    const val = todayEntry?.weight ?? lastWeight ?? "";
+    input.value = val === "" ? "" : String(val);
+    SCALE_STATE.weight = parseFloat(input.value) || 0;
+  }
+
+  $("scaleGoalNote").textContent = todayEntry?.weight != null
+    ? "Logged today. Change it if you need to."
+    : lastWeight != null
+      ? `Last logged ${lastWeight} lbs.`
+      : "First weigh-in. Type it in.";
+
+  input.oninput = () => { SCALE_STATE.weight = parseFloat(input.value) || 0; };
+  const nudge = (delta) => {
+    const next = Math.max(0, Math.round(((parseFloat(input.value) || 0) + delta) * 10) / 10);
+    input.value = String(next);
+    SCALE_STATE.weight = next;
+  };
+  $("scaleMinus").onclick = () => nudge(-0.5);
+  $("scalePlus").onclick = () => nudge(0.5);
+
+  $("entryGym").checked = !!todayEntry?.gym;
+  $("scaleGymToggleWrap").classList.toggle("checked", !!todayEntry?.gym);
 }
 
 async function renderEncouragementBanner() {
@@ -2551,7 +2612,6 @@ function renderHome() {
   $("avatarInitial").textContent = initials(ME);
   renderGreeting();
   renderEncouragementBanner();
-  renderScaleCheck();
   renderHomeWorkoutCta();
   renderMyWeekCard();
   renderPartnerCard();
@@ -2737,6 +2797,17 @@ function startWorkout() {
   while (SESSION.exerciseIndex < SESSION.completed.length && SESSION.completed[SESSION.exerciseIndex]) {
     SESSION.exerciseIndex++;
   }
+
+  // Everything in this plan is already logged. Opening a session would land on
+  // an exercise that does not exist, so go straight to the wrap-up instead.
+  if (SESSION.exerciseIndex >= SESSION.completed.length) {
+    saveSessionToStorage();
+    openSessionUI();
+    $("workoutContent").classList.add("hidden");
+    renderSessionComplete();
+    return;
+  }
+
   saveSessionToStorage();
   openSessionUI();
   $("workoutContent").classList.add("hidden");
@@ -2907,6 +2978,7 @@ async function markGymDayDone() {
     sessions: (existing?.sessions || 0) + 1,
     weight: existing?.weight ?? null,
     proof_path: existing?.proof_path ?? null,
+    rest_day: existing?.rest_day ?? false,
   };
   const landed = await safeWrite("fit_entries", "upsert", payload, { onConflict: "email,entry_date" });
   if (!landed) applyLocally("fit_entries", payload);
@@ -3620,6 +3692,7 @@ function renderMetricPicker() {
 }
 
 function renderProgressTab() {
+  renderScaleCheck();
   const isPartner = PROGRESS_VIEW === "partner";
   $("progMeBtn").classList.toggle("active", !isPartner);
   $("progPartnerBtn").classList.toggle("active", isPartner);
