@@ -4,7 +4,15 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Fit Together</title>
-<link rel="icon" href="data:,">
+<meta name="description" content="Train with your partner. Rank up together." />
+<meta name="theme-color" content="#0c0e13" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" href="/icon-192.png" />
+<link rel="apple-touch-icon" href="/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Fit Together" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -2065,6 +2073,11 @@ async function generateWorkout() {
       }),
     });
     const data = await resp.json();
+    if (resp.status === 429) {
+      toast(data.error || "Daily workout limit reached");
+      renderWorkoutTab();
+      return;
+    }
     if (!resp.ok || data.error) throw new Error(data.error || "unknown error");
 
     await sb.from("ai_workouts").upsert({
@@ -3193,6 +3206,12 @@ async function saveSetup() {
   MY_PROFILE = data;
   applyAccentColors();
   renderHome();
+}
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((err) => console.warn("SW registration failed", err));
+  });
 }
 
 initOnboard();

@@ -69,6 +69,7 @@ Deno.serve(async (req) => {
     // Must have a profile in this app. RLS means this only returns the caller's own row.
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const profileResp = await fetch(
       `${SUPABASE_URL}/rest/v1/profiles?select=email&email=eq.${encodeURIComponent(callerEmail)}`,
       { headers: { apikey: SUPABASE_ANON_KEY!, Authorization: `Bearer ${token}` } },
@@ -80,6 +81,36 @@ Deno.serve(async (req) => {
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       });
     }
+
+    /* Rate limit. Counted and written with the service role so a client
+       cannot read, forge or clear its own quota. */
+    const DAILY_LIMIT = 15;
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const svcHeaders = {
+      apikey: SERVICE_KEY!,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      "Content-Type": "application/json",
+    };
+
+    const usageResp = await fetch(
+      `${SUPABASE_URL}/rest/v1/ai_usage_log?select=id&email=eq.${encodeURIComponent(callerEmail)}&created_at=gte.${encodeURIComponent(since)}`,
+      { headers: { ...svcHeaders, Prefer: "count=exact" } },
+    );
+    const usedRows = await usageResp.json();
+    const used = Array.isArray(usedRows) ? usedRows.length : 0;
+
+    if (used >= DAILY_LIMIT) {
+      return new Response(
+        JSON.stringify({ error: `Daily limit reached (${DAILY_LIMIT} workouts). Try again tomorrow.` }),
+        { status: 429, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
+      );
+    }
+
+    await fetch(`${SUPABASE_URL}/rest/v1/ai_usage_log`, {
+      method: "POST",
+      headers: svcHeaders,
+      body: JSON.stringify({ email: callerEmail }),
+    });
 
     const body = await req.json();
     const {
