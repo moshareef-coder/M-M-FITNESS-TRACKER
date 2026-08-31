@@ -289,6 +289,18 @@
     background: var(--up); color: #fff; font-size: 12.5px; font-weight: 700; font-family: inherit;
   }
 
+  .empty-state { text-align: center; padding: 26px 14px 22px; }
+  .empty-icon {
+    width: 52px; height: 52px; margin: 0 auto 12px; border-radius: 15px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+  }
+  .empty-title { font-size: 14.5px; font-weight: 700; margin-bottom: 4px; }
+  .empty-hint { font-size: 12.5px; color: var(--muted); line-height: 1.5; max-width: 260px; margin: 0 auto; }
+  .chart-empty { position: relative; }
+  .chart-empty .chart-wrap { display: none; }
+  .chart-empty .legend { display: none; }
+
   /* Today's workout tally */
   .tally-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
   .tally-count { font-size: 40px; font-weight: 800; line-height: 1; color: var(--accent); }
@@ -1127,6 +1139,15 @@ function showFatal(what) {
 
 window.addEventListener("error", (e) => showFatal(e.message));
 window.addEventListener("unhandledrejection", (e) => showFatal(e.reason?.message || e.reason));
+
+/* Empty states. A blank card reads as broken; say what goes here and how. */
+function emptyState(iconName, title, hint) {
+  return `<div class="empty-state">
+    <div class="empty-icon">${icon(iconName, 26)}</div>
+    <div class="empty-title">${escapeHtml(title)}</div>
+    <div class="empty-hint">${escapeHtml(hint)}</div>
+  </div>`;
+}
 
 function toast(msg) {
   const el = $("toast");
@@ -2295,6 +2316,23 @@ function renderWeightChart() {
   const myMap = Object.fromEntries(myEntries.map((e) => [e.entry_date, e.weight]));
   const partnerMap = Object.fromEntries(partnerEntries.map((e) => [e.entry_date, e.weight]));
 
+  const card = $("cardWeight");
+  if (!myEntries.length && !partnerEntries.length) {
+    card.classList.add("chart-empty");
+    let ph = $("weightEmpty");
+    if (!ph) {
+      ph = document.createElement("div");
+      ph.id = "weightEmpty";
+      card.appendChild(ph);
+    }
+    ph.innerHTML = emptyState("trending", "No weigh-ins yet",
+      "Log your weight on the Home tab and your trend line starts here.");
+    if (weightChart) { weightChart.destroy(); weightChart = null; }
+    return;
+  }
+  card.classList.remove("chart-empty");
+  $("weightEmpty")?.remove();
+
   const ctx = $("weightChart").getContext("2d");
   if (weightChart) weightChart.destroy();
   weightChart = new Chart(ctx, {
@@ -2324,7 +2362,11 @@ function cssVar(name) {
 function renderLog() {
   const combined = [...ALL_ENTRIES].sort((a, b) => b.entry_date.localeCompare(a.entry_date)).slice(0, 20);
   const list = $("logList");
-  if (combined.length === 0) { list.innerHTML = '<p class="muted-note">No entries yet.</p>'; return; }
+  if (combined.length === 0) {
+    list.innerHTML = emptyState("checklist", "Nothing logged yet",
+      "Weigh-ins and workouts show up here as you go.");
+    return;
+  }
   list.innerHTML = combined.map((e) => {
     const color = e.user_name === ME ? "var(--me)" : "var(--partner)";
     const w = e.weight != null ? e.weight + " lb" : "";
@@ -3029,7 +3071,9 @@ async function renderBodyPhotos() {
 
   const strip = $("bodyPhotoStrip");
   if (!shots.length) {
-    strip.innerHTML = `<p class="muted-note">${mine ? "No photos yet." : "Nothing shared yet."}</p>`;
+    strip.innerHTML = mine
+      ? emptyState("camera", "No progress photos yet", "One a day. In a month you'll see the difference.")
+      : emptyState("camera", "Nothing shared yet", `${partnerName()} hasn't added progress photos.`);
     return;
   }
   const urls = await Promise.all(shots.map((s) => signedProofUrl(s.path)));
@@ -3284,7 +3328,7 @@ function renderCurrentPRs() {
   const list = $("currentPRsList");
   list.innerHTML = entries.length
     ? entries.map(([name, w]) => `<div class="pr-row"><span>${escapeHtml(name)}</span><span class="pr-weight">${w} lb</span></div>`).join("")
-    : '<p class="muted-note">No PRs on file yet. Add one below.</p>';
+    : emptyState("trophy", "No personal records yet", "Log a lift with a weight and your first PR lands here.");
 }
 
 

@@ -14,6 +14,9 @@ const src = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const ids = [...html.matchAll(/id="([a-zA-Z0-9_]+)"/g)].map((m) => m[1]);
 const nodes = {};
 const MISSES = new Set();
+/* Ids created at runtime via createElement, so absence from markup is expected.
+   Every one of these MUST be null-checked at its lookup site. */
+const DYNAMIC = new Set(["weightEmpty", "proofRemoveBtn"]);
 const mk = (id) => ({
   id, textContent: "", innerHTML: "", value: "", checked: false, disabled: false, title: "",
   dataset: {}, files: [], style: { setProperty() {}, width: "" },
@@ -28,7 +31,7 @@ const mk = (id) => ({
 ids.forEach((i) => (nodes[i] = mk(i)));
 
 globalThis.document = {
-  getElementById: (id) => { if (!nodes[id]) { MISSES.add(id); return null; } return nodes[id]; },
+  getElementById: (id) => { if (!nodes[id]) { if (!DYNAMIC.has(id)) MISSES.add(id); return null; } return nodes[id]; },
   querySelectorAll: () => [], querySelector: () => null,
   createElement: () => mk("tmp"), addEventListener() {}, hidden: false,
   documentElement: { getAttribute: () => "dark", setAttribute() {}, style: { setProperty() {} } },
