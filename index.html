@@ -258,6 +258,22 @@
   .ladder-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--border); }
   .ladder-rung.dim { opacity: 0.5; }
 
+  .conn-banner {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; align-items: center; gap: 9px;
+    margin: 0 0 12px; padding: 10px 13px; border-radius: 11px;
+    font-size: 12.5px; font-weight: 600; line-height: 1.4;
+    background: color-mix(in srgb, var(--gold) 16%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent);
+    color: var(--text);
+  }
+  .conn-banner.pending {
+    background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  .conn-banner svg { flex-shrink: 0; color: var(--gold); }
+  .conn-banner.pending svg { color: var(--accent); }
+
   /* Progress controls */
   .person-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
   .person-toggle .tab-pill { flex: 1; padding: 9px 14px; font-size: 13px; }
@@ -572,6 +588,8 @@
       <button class="icon-btn" id="switchUserBtn" title="Sign out"></button>
     </div>
   </header>
+
+  <div id="connBanner" class="conn-banner hidden"></div>
 
   <!-- HOME TAB -->
   <div id="tab-home" class="tab-panel">
@@ -1429,6 +1447,15 @@ function showApp() {
   $("adminGiveXpBtn").addEventListener("click", adminGiveXp);
   $("adminAddEntryBtn").addEventListener("click", adminAddEntry);
   $("adminAddExBtn").addEventListener("click", adminAddExercise);
+  // Recover queued writes the moment the connection comes back.
+  window.addEventListener("online", () => { renderConnBanner(); flushQueue(); });
+  window.addEventListener("offline", renderConnBanner);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) flushQueue({ quiet: true });
+  });
+  renderConnBanner();
+  flushQueue({ quiet: true });
+
   $("progMeBtn").addEventListener("click", () => { PROGRESS_VIEW = "me"; renderProgressTab(); });
   $("progPartnerBtn").addEventListener("click", () => {
     if (!PARTNER_EMAIL) return;
@@ -1465,6 +1492,103 @@ function switchTab(tab) {
   if (tab === "progress") renderProgressTab();
   if (tab === "workout") renderWorkoutTab();
   if (tab === "setup") renderSetupTab();
+}
+
+/* ---------- Offline write queue ----------
+   Gyms have poor signal. Any write that fails is kept locally and retried,
+   so a dropped connection never silently loses a logged set. Only insert and
+   upsert are queued: they carry the data worth protecting, and unlike update
+   or delete they need no serialised row filter to replay. */
+
+const WRITE_QUEUE_KEY = "ft_write_queue_v1";
+let FLUSHING = false;
+
+function readQueue() {
+  try { return JSON.parse(localStorage.getItem(WRITE_QUEUE_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveQueue(q) {
+  try { localStorage.setItem(WRITE_QUEUE_KEY, JSON.stringify(q)); }
+  catch (e) { console.error("queue save failed", e); }
+}
+
+function queuedCount() { return readQueue().length; }
+
+async function runWrite(job) {
+  const b = sb.from(job.table);
+  const { error } = job.op === "insert"
+    ? await b.insert(job.payload)
+    : await b.upsert(job.payload, job.opts || {});
+  if (error) throw error;
+}
+
+/* Attempt a write. If it cannot land, keep it and report failure so the
+   caller can still update the UI optimistically. */
+async function safeWrite(table, op, payload, opts) {
+  if (navigator.onLine) {
+    try {
+      await runWrite({ table, op, payload, opts });
+      return true;
+    } catch (e) {
+      console.error("write failed, queued:", table, e);
+    }
+  }
+  const q = readQueue();
+  q.push({ table, op, payload, opts, at: Date.now() });
+  saveQueue(q);
+  renderConnBanner();
+  return false;
+}
+
+async function flushQueue({ quiet = false } = {}) {
+  if (FLUSHING || !navigator.onLine) return;
+  const q = readQueue();
+  if (!q.length) return;
+
+  FLUSHING = true;
+  const stuck = [];
+  for (const job of q) {
+    try { await runWrite(job); }
+    catch { stuck.push(job); }
+  }
+  saveQueue(stuck);
+  FLUSHING = false;
+  renderConnBanner();
+
+  const sent = q.length - stuck.length;
+  if (sent > 0) {
+    await loadAll();
+    if (!quiet) toast(`Synced ${sent} saved ${sent === 1 ? "entry" : "entries"}`);
+  }
+}
+
+function renderConnBanner() {
+  const el = $("connBanner");
+  if (!el) return;
+  const pending = queuedCount();
+  const offline = !navigator.onLine;
+
+  if (!offline && !pending) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  el.classList.toggle("pending", !offline && pending > 0);
+
+  if (offline) {
+    el.innerHTML = `${icon("lock", 14)} <span>Offline${pending ? `, ${pending} change${pending === 1 ? "" : "s"} saved here` : ""}. Keep going, nothing is lost.</span>`;
+  } else {
+    el.innerHTML = `<span class="spinner"></span> <span>Syncing ${pending} saved change${pending === 1 ? "" : "s"}…</span>`;
+  }
+}
+
+/* Mirror a queued write into memory so the UI reflects it immediately. */
+function applyLocally(table, payload) {
+  if (table === "exercise_logs") {
+    ALL_EXERCISE_LOGS.push({ ...payload, id: `local-${Date.now()}`, created_at: new Date().toISOString() });
+  } else if (table === "fit_entries") {
+    const i = ALL_ENTRIES.findIndex((e) => e.email === payload.email && e.entry_date === payload.entry_date);
+    if (i >= 0) ALL_ENTRIES[i] = { ...ALL_ENTRIES[i], ...payload };
+    else ALL_ENTRIES.push({ ...payload, id: `local-${Date.now()}` });
+  }
 }
 
 async function loadAll() {
@@ -1511,13 +1635,19 @@ async function saveScaleEntry() {
     weight: SCALE_STATE.weight || null,
     gym: $("entryGym").checked,
   };
-  const { error } = await sb.from("fit_entries").upsert(payload, { onConflict: "email,entry_date" });
-  if (error) { toast("Save failed"); console.error(error); return; }
-  toast("Saved · +10 XP");
+  const landed = await safeWrite("fit_entries", "upsert", payload, { onConflict: "email,entry_date" });
   SCALE_STATE.weight = 0;
   $("entryGym").checked = false;
   $("scaleGymToggleWrap").classList.remove("checked");
-  await loadAll();
+
+  if (landed) {
+    toast("Saved · +10 XP");
+    await loadAll();
+  } else {
+    applyLocally("fit_entries", payload);
+    toast("Saved offline");
+    renderHome();
+  }
 }
 
 function entriesFor(name) {
@@ -2246,13 +2376,22 @@ async function logExerciseSilent(name, weight, reps, sets) {
   const { best } = personalRecords(ME);
   const prevBest = best[name.toLowerCase()];
   const w = weight === "" || weight == null ? null : parseFloat(weight);
-  await sb.from("exercise_logs").insert({
+  const payload = {
     user_name: ME, email: MY_EMAIL, entry_date: todayStr(), exercise_name: name,
     weight: w, reps: reps === "" || reps == null ? null : parseInt(reps, 10), sets: sets || null,
-  });
+  };
   const isPR = w != null && (prevBest === undefined || w > prevBest);
-  toast(isPR ? `New PR on ${name} · +25 XP` : `${name} logged`);
-  await loadAll();
+
+  const landed = await safeWrite("exercise_logs", "insert", payload);
+  if (landed) {
+    toast(isPR ? `New PR on ${name} · +25 XP` : `${name} logged`);
+    await loadAll();
+  } else {
+    // Offline: keep the set on screen and sync it when the signal returns.
+    applyLocally("exercise_logs", payload);
+    toast(`${name} saved offline`);
+    renderHome();
+  }
 }
 
 function renderSession() {
@@ -2330,10 +2469,9 @@ function renderSession() {
 }
 
 async function markGymDayDone() {
-  await sb.from("fit_entries").upsert(
-    { user_name: ME, email: MY_EMAIL, entry_date: todayStr(), gym: true },
-    { onConflict: "email,entry_date" }
-  );
+  const payload = { user_name: ME, email: MY_EMAIL, entry_date: todayStr(), gym: true };
+  const landed = await safeWrite("fit_entries", "upsert", payload, { onConflict: "email,entry_date" });
+  if (!landed) applyLocally("fit_entries", payload);
 }
 
 async function renderSessionComplete() {
