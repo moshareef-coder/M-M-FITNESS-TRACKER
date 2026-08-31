@@ -174,6 +174,8 @@
   }
   .rank-head { display: flex; align-items: center; gap: 14px; position: relative; }
   .rank-crest { width: 62px; height: 62px; flex-shrink: 0; }
+  .crest-img { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .rank-crest .crest-img { filter: drop-shadow(0 0 10px var(--rank-glow, transparent)); }
   .rank-meta { flex: 1; min-width: 0; }
   .rank-tier-name {
     font-size: 21px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.1;
@@ -1675,21 +1677,15 @@ function badgeDefinitions(name) {
   ];
 }
 
-/* Hex crest with the tier colour, a soft inner bevel and the level number. */
-function crestSVG(tier, level, size = 62) {
-  const id = `crest-${tier.key}-${size}`;
-  return `<svg width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true">
-    <defs>
-      <linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${tier.color}" stop-opacity="1"/>
-        <stop offset="100%" stop-color="${tier.color}" stop-opacity="0.55"/>
-      </linearGradient>
-    </defs>
-    <path d="M50 4 L88 26 V74 L50 96 L12 74 V26 Z" fill="url(#${id})" stroke="${tier.color}" stroke-width="3" stroke-linejoin="round"/>
-    <path d="M50 15 L79 32 V68 L50 85 L21 68 V32 Z" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="2" stroke-linejoin="round"/>
-    <text x="50" y="50" text-anchor="middle" dominant-baseline="central"
-          font-size="30" font-weight="800" fill="#fff" style="paint-order:stroke; stroke:rgba(0,0,0,0.25); stroke-width:3px;">${level}</text>
-  </svg>`;
+/* Illustrated rank badge. Falls back to a simple coloured hex if the
+   artwork ever fails to load, so a missing file never leaves a blank slot. */
+function crestImg(rung, size = 62) {
+  const src = `/badges/${rung.tier.key}-${rung.division.toLowerCase()}.webp`;
+  const fallback = `this.onerror=null;this.outerHTML='${
+    `<svg width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true">` +
+    `<path d="M50 4 L88 26 V74 L50 96 L12 74 V26 Z" fill="${rung.tier.color}" opacity="0.8"/></svg>`
+  }'`;
+  return `<img class="crest-img" src="${src}" width="${size}" height="${size}" loading="lazy" decoding="async" alt="${escapeHtml(rung.name)} badge" onerror="${escapeHtml(fallback)}" />`;
 }
 
 /* ---------- Linked progression ----------
@@ -1731,7 +1727,7 @@ function renderXP() {
   card.style.setProperty("--rank-color", rank.tier.color);
   card.style.setProperty("--rank-glow", rank.tier.glow);
 
-  $("rankCrest").innerHTML = crestSVG(rank.tier, level);
+  $("rankCrest").innerHTML = crestImg(rank.rung);
   $("rankTierName").textContent = rank.name;
   $("levelName").textContent = `Level ${level} · ${name}`;
   $("xpText").textContent = `${s.myXP.toLocaleString()} XP total · ${inLevel}/100 to next level`;
@@ -2715,7 +2711,6 @@ function renderRankLadder() {
     const isCurrent = absIdx === current.index;
     // Banked = I personally earned it but we have not unlocked it together yet.
     const banked = !achieved && s.myXP >= rung.min;
-    const level = levelForXP(Math.max(rung.min, 0)).level;
     const connector = i < end - start - 1
       ? `<div class="ladder-connector"><div class="ladder-dot"></div><div class="ladder-dot"></div><div class="ladder-dot"></div></div>`
       : "";
@@ -2728,7 +2723,7 @@ function renderRankLadder() {
 
     return `
       <div class="ladder-rung ${achieved || banked ? "" : "dim"}">
-        <div class="ladder-crest ${achieved ? "" : "locked"}" ${banked ? 'style="opacity:0.75;filter:none;"' : ""}>${crestSVG(rung.tier, level, 42)}</div>
+        <div class="ladder-crest ${achieved ? "" : "locked"}" ${banked ? 'style="opacity:0.75;filter:none;"' : ""}>${crestImg(rung, 42)}</div>
         <div class="ladder-meta">
           ${tag}
           <div class="ladder-name ${isCurrent ? "current" : ""}" style="${isCurrent ? `color:${rung.tier.color}` : ""}">${escapeHtml(rung.name)}</div>
@@ -3124,8 +3119,8 @@ function renderCoupleTab() {
   const myRank = rankForXP(myXP);
   const partnerRank = rankForXP(partnerXP);
 
-  $("vsMeCrest").innerHTML = crestSVG(myRank.tier, levelForXP(myXP).level, 46);
-  $("vsPartnerCrest").innerHTML = crestSVG(partnerRank.tier, levelForXP(partnerXP).level, 46);
+  $("vsMeCrest").innerHTML = crestImg(myRank.rung, 46);
+  $("vsPartnerCrest").innerHTML = crestImg(partnerRank.rung, 46);
   $("vsMeName").textContent = `${ME} · ${myRank.name}`;
   $("vsPartnerName").textContent = `${partner} · ${partnerRank.name}`;
   $("vsMeXp").textContent = myXP.toLocaleString();
