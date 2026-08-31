@@ -37,6 +37,7 @@ globalThis.document = {
   querySelectorAll: () => [], querySelector: () => null,
   createElement: () => mk("tmp"), addEventListener() {}, hidden: false,
   documentElement: { getAttribute: () => "dark", setAttribute() {}, style: { setProperty() {} } },
+  body: mk("body"),
 };
 globalThis.window = { addEventListener() {}, matchMedia: () => ({ matches: false, addEventListener() {} }) };
 globalThis.location = { reload() {} };
@@ -58,6 +59,12 @@ const DATA = {
   profiles: [{ email: "mo@x.com", user_name: "Mo", tracked_metrics: ["weight", "prs", "trained"], bonus_xp: 0, challenge_target: 4 }],
   fit_entries: [{ email: "mo@x.com", user_name: "Mo", entry_date: "2026-08-30", gym: true, weight: 180, sessions: 1 }],
   exercise_logs: [{ email: "mo@x.com", user_name: "Mo", entry_date: "2026-08-30", exercise_name: "Bench", weight: 135, reps: 8, sets: 3 }],
+  ai_workouts: [{ id: "w1", email: "mo@x.com", user_name: "Mo", entry_date: "2026-08-30", archived: false,
+    focus: "Strength", exercises: [
+      { name: "Bench", sets: 3, reps: 8, targetWeight: 135 },
+      { name: "Row", sets: 3, reps: 10, targetWeight: 95 },
+    ] }],
+  partnerships: [{ id: "p1", inviter_email: "mo@x.com", invitee_email: "mel@x.com", status: "accepted" }],
 };
 globalThis.window.supabase = {
   createClient: () => ({
@@ -70,7 +77,7 @@ globalThis.window.supabase = {
 
 let failed = 0;
 try {
-  new Function(src + ";globalThis.__t={showApp,loadAll,renderHome,renderWorkoutTab,renderProgressTab,renderSetupTab};")();
+  new Function(src + ";globalThis.__t={showApp,loadAll,renderHome,renderWorkoutTab,renderProgressTab,renderSetupTab,switchTab,renderFab,renderStatTiles,renderTodayTally,renderXP,renderScaleCheck,renderBodyTab};")();
 } catch (e) {
   console.log("TOP-LEVEL ERROR:", e.message);
   process.exit(1);
@@ -86,9 +93,18 @@ for (const [name, run] of [
   ["renderWorkoutTab", () => t.renderWorkoutTab()],
   ["renderProgressTab", () => t.renderProgressTab()],
   ["renderSetupTab", () => t.renderSetupTab()],
+  ["switchTab home", () => t.switchTab("home")],
+  ["switchTab workout", () => t.switchTab("workout")],
+  ["switchTab body", () => t.switchTab("body")],
+  ["renderBodyTab", () => t.renderBodyTab()],
+  ["switchTab progress", () => t.switchTab("progress")],
+  ["switchTab setup", () => t.switchTab("setup")],
+  ["renderXP", () => t.renderXP()],
+  ["renderScaleCheck", () => t.renderScaleCheck()],
+  ["renderFab", () => t.renderFab()],
 ]) {
-  try { await run(); console.log(`  ${name.padEnd(18)} ok`); }
-  catch (e) { failed++; console.log(`  ${name.padEnd(18)} THREW: ${e.message}`); console.log("    " + (e.stack || "").split("\n")[1]?.trim()); }
+  try { await run(); console.log(`  ${name.padEnd(20)} ok`); }
+  catch (e) { failed++; console.log(`  ${name.padEnd(20)} THREW: ${e.message}`); console.log("    " + (e.stack || "").split("\n")[1]?.trim()); }
 }
 if (MISSES.size) { failed++; console.log("\n  ids used in JS but MISSING from markup:", [...MISSES].join(", ")); }
 console.log(failed ? "\nBOOT CHECK FAILED" : "\nBOOT CHECK PASSED");

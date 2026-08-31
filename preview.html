@@ -48,7 +48,7 @@
     -webkit-font-smoothing: antialiased;
     transition: background 0.2s, color 0.2s;
   }
-  #app { max-width: 480px; margin: 0 auto; min-height: 100dvh; padding: 22px 18px calc(84px + env(safe-area-inset-bottom, 0px)); }
+  #app { max-width: 480px; margin: 0 auto; min-height: 100dvh; padding: 22px 18px calc(104px + env(safe-area-inset-bottom, 0px)); }
   .hidden { display: none !important; }
 
   /* Onboarding */
@@ -100,12 +100,15 @@
   .icon-btn { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 4px 6px; }
 
   .tabs {
-    position: fixed; bottom: 0; left: 0; right: 0; max-width: 480px; margin: 0 auto;
-    display: flex; background: color-mix(in srgb, var(--panel) 88%, transparent);
-    backdrop-filter: saturate(180%) blur(18px);
-    -webkit-backdrop-filter: saturate(180%) blur(18px);
-    border-top: 1px solid var(--border);
-    padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0px));
+    position: fixed; left: 14px; right: 14px; max-width: 452px; margin: 0 auto;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    display: flex; align-items: center;
+    background: color-mix(in srgb, var(--panel) 92%, transparent);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border: 1px solid var(--border); border-radius: 26px;
+    padding: 8px 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.34);
     z-index: 10;
   }
   .tab-btn {
@@ -119,7 +122,7 @@
 
   /* Raised primary action, the one thing the app wants you to do. */
   .fab {
-    flex: 0 0 auto; width: 58px; height: 58px; margin: -22px 6px 0;
+    flex: 0 0 auto; width: 54px; height: 54px; margin: -18px 4px 0;
     border-radius: 50%; border: none; cursor: pointer;
     background: linear-gradient(160deg, var(--gold), color-mix(in srgb, var(--gold) 72%, #000));
     color: #1a1206; display: flex; align-items: center; justify-content: center;
@@ -319,6 +322,37 @@
     flex-shrink: 0; padding: 9px 16px; border-radius: 100px; border: none; cursor: pointer;
     background: var(--accent); color: #fff; font-size: 13.5px; font-weight: 700; font-family: inherit;
   }
+
+  /* Focused workout session: covers the app so the only job is the set in front of you. */
+  .session-overlay {
+    position: fixed; inset: 0; z-index: 60; overflow-y: auto;
+    background: var(--bg);
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 18px calc(28px + env(safe-area-inset-bottom, 0px));
+    animation: sessionIn 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes sessionIn {
+    from { transform: translateY(16px) scale(0.985); opacity: 0; }
+    to   { transform: none; opacity: 1; }
+  }
+  .session-overlay.leaving { animation: sessionOut 0.22s ease-in forwards; }
+  @keyframes sessionOut {
+    to { transform: translateY(14px) scale(0.99); opacity: 0; }
+  }
+  body.session-open .tabs { display: none; }
+
+  .session-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .session-timer {
+    font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .session-timer.paused { color: var(--muted); }
+  .session-pause {
+    width: 42px; height: 42px; border-radius: 50%; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .session-paused-sheet { text-align: center; padding: 28px 6px 8px; }
+  .session-paused-sheet h3 { font-size: 20px; margin: 0 0 6px; }
 
   /* Compact stat tiles, two up */
   .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
