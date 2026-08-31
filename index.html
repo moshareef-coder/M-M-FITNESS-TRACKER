@@ -206,6 +206,39 @@
   }
   .stake-chip:hover { border-color: var(--accent); }
 
+  /* OVR radar */
+  .ovr-card { position: relative; overflow: hidden; }
+  .radar-wrap { display: flex; justify-content: center; }
+  #ovrRadar { width: 100%; max-width: 300px; height: auto; }
+  .radar-grid { fill: none; stroke: var(--border); stroke-width: 1; }
+  .radar-shape { fill: color-mix(in srgb, var(--accent) 22%, transparent); stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
+  .radar-axis-label { font-size: 10px; font-weight: 700; }
+  .radar-ovr { font-size: 44px; font-weight: 800; fill: var(--text); }
+  .radar-ovr-sub { font-size: 9px; font-weight: 700; fill: var(--muted); letter-spacing: 0.14em; }
+
+  .attr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .attr-tile {
+    display: flex; align-items: center; gap: 10px; padding: 11px 12px;
+    border-radius: 12px; background: var(--panel-2); border: 1px solid var(--border);
+  }
+  .attr-hex { width: 26px; height: 26px; flex-shrink: 0; }
+  .attr-val { font-size: 21px; font-weight: 800; line-height: 1; }
+  .attr-name { font-size: 11px; margin-top: 2px; }
+
+  /* Rank ladder */
+  .rank-ladder { display: flex; flex-direction: column; }
+  .ladder-rung { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+  .ladder-crest { width: 42px; height: 42px; flex-shrink: 0; }
+  .ladder-crest.locked { opacity: 0.3; filter: grayscale(1); }
+  .ladder-meta { flex: 1; min-width: 0; }
+  .ladder-name { font-size: 15px; font-weight: 700; }
+  .ladder-name.current { font-size: 19px; }
+  .ladder-sub { font-size: 11px; color: var(--muted); letter-spacing: 0.05em; }
+  .ladder-tag { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+  .ladder-connector { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-left: 20px; }
+  .ladder-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--border); }
+  .ladder-rung.dim { opacity: 0.5; }
+
   .level-row-compact { display: flex; align-items: center; gap: 12px; }
 
   .start-workout-card h2 { font-size: 16px; text-transform: none; letter-spacing: normal; color: var(--text); margin-bottom: 4px; }
@@ -502,6 +535,18 @@
 
   <!-- PROGRESS TAB -->
   <div id="tab-progress" class="tab-panel hidden">
+    <div class="card ovr-card">
+      <h2>Overall rating</h2>
+      <div class="radar-wrap"><svg id="ovrRadar" viewBox="0 0 260 240" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      <div class="attr-grid" id="attrGrid"></div>
+    </div>
+
+    <div class="card">
+      <h2>Rank progress</h2>
+      <p class="muted-note" id="rankLadderNote"></p>
+      <div class="rank-ladder" id="rankLadder"></div>
+    </div>
+
     <div class="card">
       <h2>Weight trend</h2>
       <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
@@ -729,9 +774,20 @@
       <textarea id="setupGoalDetail" placeholder="e.g. training for a wedding in June, prefer 4 days/week"></textarea>
     </div>
     <div class="card">
-      <h2>Weekly challenge target</h2>
-      <label>Workout days per week (each of you)</label>
-      <input type="number" id="setupChallengeTarget" min="1" max="7" value="4" />
+      <h2>Weekly goal</h2>
+      <label class="gym-toggle" id="sharedGoalToggleWrap">
+        <span>Use one shared goal for both of us</span>
+        <input type="checkbox" id="sharedGoalToggle" />
+      </label>
+      <div id="sharedGoalFields" class="hidden" style="margin-top:12px;">
+        <label>Workout days per week (both of you)</label>
+        <input type="number" id="setupSharedGoal" min="1" max="7" value="4" />
+        <p class="muted-note">Either of you can change this. It applies to you both.</p>
+      </div>
+      <div id="ownGoalFields" style="margin-top:12px;">
+        <label>Workout days per week (just you)</label>
+        <input type="number" id="setupChallengeTarget" min="1" max="7" value="4" />
+      </div>
     </div>
     <button class="btn-primary" id="saveSetupBtn">Save preferences</button>
 
@@ -833,6 +889,7 @@ const ICON_PATHS = {
   run: '<circle cx="14" cy="4.5" r="1.8"/><path d="M9 20l3-4 2 2-1.5 3M6 12l3-2 3 1 2-3 4 1M8 9l-2 2 1 3"/>',
   check: '<path d="M4 12l5 5 11-11"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   minus: '<path d="M5 12h14"/>',
@@ -964,6 +1021,7 @@ async function handleSignedIn(session) {
 
 const ADMIN_EMAIL = "mo.shareef@creativelab1.com";
 let PARTNER_EMAIL = null;
+let MY_PARTNERSHIP = null;
 
 async function checkPartnershipThenEnter() {
   const { data: rows } = await sb.from("partnerships")
@@ -972,6 +1030,7 @@ async function checkPartnershipThenEnter() {
   const accepted = (rows || []).find((r) => r.status === "accepted");
 
   if (accepted) {
+    MY_PARTNERSHIP = accepted;
     PARTNER_EMAIL = accepted.inviter_email.toLowerCase() === MY_EMAIL
       ? accepted.invitee_email.toLowerCase()
       : accepted.inviter_email.toLowerCase();
@@ -1236,6 +1295,14 @@ function showApp() {
   };
   $("scaleSaveBtn").addEventListener("click", saveScaleEntry);
   $("encourageBtn").addEventListener("click", sendEncouragement);
+  $("sharedGoalToggleWrap").onclick = () => {
+    setTimeout(() => {
+      const on = $("sharedGoalToggle").checked;
+      $("sharedGoalToggleWrap").classList.toggle("checked", on);
+      $("sharedGoalFields").classList.toggle("hidden", !on);
+      $("ownGoalFields").classList.toggle("hidden", on);
+    }, 0);
+  };
   $("proofAddBtn").addEventListener("click", () => $("proofInput").click());
   $("proofInput").addEventListener("change", (e) => {
     const file = e.target.files?.[0];
@@ -1403,23 +1470,104 @@ const RANK_TIERS = [
   { key: "diamond",  name: "Diamond",  min: 7000, color: "#5b9dff", glow: "rgba(91,157,255,0.65)" },
 ];
 
+/* Each tier splits into three divisions, III lowest to I highest,
+   so there are 18 rungs on the ladder instead of 6. */
+const DIVISION_OFFSETS = [
+  { label: "III", mult: 0 },
+  { label: "II",  mult: 0.34 },
+  { label: "I",   mult: 0.66 },
+];
+
+const RANK_LADDER = (() => {
+  const rungs = [];
+  RANK_TIERS.forEach((tier, ti) => {
+    const nextTierMin = RANK_TIERS[ti + 1]?.min ?? Math.round(tier.min * 1.65 + 4500);
+    const span = nextTierMin - tier.min;
+    DIVISION_OFFSETS.forEach((div) => {
+      rungs.push({
+        tier,
+        division: div.label,
+        name: `${tier.name} ${div.label}`,
+        min: Math.round(tier.min + span * div.mult),
+      });
+    });
+  });
+  return rungs;
+})();
+
 function rankForXP(xp) {
   let idx = 0;
-  for (let i = 0; i < RANK_TIERS.length; i++) {
-    if (xp >= RANK_TIERS[i].min) idx = i;
+  for (let i = 0; i < RANK_LADDER.length; i++) {
+    if (xp >= RANK_LADDER[i].min) idx = i;
   }
-  const tier = RANK_TIERS[idx];
-  const next = RANK_TIERS[idx + 1] || null;
-  const spanStart = tier.min;
-  const spanEnd = next ? next.min : tier.min;
-  const progress = next ? (xp - spanStart) / (spanEnd - spanStart) : 1;
+  const rung = RANK_LADDER[idx];
+  const next = RANK_LADDER[idx + 1] || null;
+  const spanEnd = next ? next.min : rung.min;
+  const progress = next ? (xp - rung.min) / (spanEnd - rung.min) : 1;
   return {
-    tier,
+    tier: rung.tier,
+    rung,
+    name: rung.name,
     next,
     index: idx,
     progress: Math.max(0, Math.min(1, progress)),
     toNext: next ? Math.max(0, next.min - xp) : 0,
   };
+}
+
+/* ---------- OVR attribute ratings ----------
+   Six 0-99 attributes derived from real logged data, averaged into an
+   overall. Each uses a soft cap so early progress feels fast and the
+   top of the range stays hard to reach. */
+function ratingCurve(value, target) {
+  if (target <= 0 || value <= 0) return 12;
+  const t = Math.min(1, value / target);
+  return Math.round(35 + Math.pow(t, 0.75) * 64);
+}
+
+function attributeRatings(name, email) {
+  const entries = entriesFor(name);
+  const logs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name);
+  const target = weeklyGoalFor(email);
+
+  // Strength: number of distinct PRs set
+  const { prCount, best } = personalRecords(name);
+  const strength = ratingCurve(prCount, 25);
+
+  // Consistency: workout days this week against the goal
+  const consistency = ratingCurve(gymDaysThisWeek(name), target);
+
+  // Volume: total sets logged in the last 7 days
+  const weekAgo = isoDate(new Date(Date.now() - 7 * 86400000));
+  const recentSets = logs.filter((l) => l.entry_date >= weekAgo)
+    .reduce((sum, l) => sum + (l.sets || 1), 0);
+  const volume = ratingCurve(recentSets, 60);
+
+  // Balance: how many of the 14 muscle groups got worked this week
+  const vols = computeMuscleVolume(name, 0);
+  const covered = Object.values(vols).filter((v) => v > 0).length;
+  const balance = ratingCurve(covered, 10);
+
+  // Discipline: best streak achieved
+  const discipline = ratingCurve(longestStreak(name), 21);
+
+  // Teamwork: days this week where BOTH partners worked out
+  const partner = name === ME ? partnerName() : ME;
+  const mine = new Set(entries.filter((e) => e.gym && e.entry_date >= weekStartStr()).map((e) => e.entry_date));
+  const theirs = new Set(entriesFor(partner).filter((e) => e.gym && e.entry_date >= weekStartStr()).map((e) => e.entry_date));
+  const together = [...mine].filter((d) => theirs.has(d)).length;
+  const teamwork = ratingCurve(together, Math.max(2, Math.round(target * 0.6)));
+
+  const attrs = [
+    { key: "strength",    label: "Strength",    value: strength,    color: "#e0514f" },
+    { key: "consistency", label: "Consistency", value: consistency, color: "#3fbf7f" },
+    { key: "volume",      label: "Volume",      value: volume,      color: "#4d8ef2" },
+    { key: "balance",     label: "Balance",     value: balance,     color: "#e0a92a" },
+    { key: "discipline",  label: "Discipline",  value: discipline,  color: "#e2713f" },
+    { key: "teamwork",    label: "Teamwork",    value: teamwork,    color: "#8b6ff0" },
+  ];
+  const ovr = Math.round(attrs.reduce((s, a) => s + a.value, 0) / attrs.length);
+  return { attrs, ovr };
 }
 
 function badgeDefinitions(name) {
@@ -1551,7 +1699,7 @@ function renderHomeWorkoutCta() {
 function renderMyWeekCard() {
   $("myWeekDots").innerHTML = weekDotsHTML(ME);
   const days = gymDaysThisWeek(ME);
-  const target = MY_PROFILE?.challenge_target || 4;
+  const target = weeklyGoalFor(MY_EMAIL);
   $("myWeekCaption").textContent = `${days}/${target} days this week · ${computeStreak(ME)} day streak`;
 }
 
@@ -1560,7 +1708,7 @@ function renderPartnerCard() {
   $("partnerNameLbl").textContent = partner;
   $("partnerAvatar").textContent = initials(partner);
   const days = gymDaysThisWeek(partner);
-  const target = PARTNER_PROFILE?.challenge_target || 4;
+  const target = weeklyGoalFor(PARTNER_EMAIL);
   $("partnerStatusLbl").textContent = `${days}/${target} days this week · ${computeStreak(partner)} day streak`;
   $("partnerGoalLbl").textContent = PARTNER_PROFILE?.goal ? `Goal: ${PARTNER_PROFILE.goal}` : "";
   $("partnerWeekDots").innerHTML = weekDotsHTML(partner);
@@ -2338,7 +2486,106 @@ function renderBodyDiagram() {
     : `No exercises logged ${label} yet.`;
 }
 
+function hexPath(cx, cy, r) {
+  const pts = [];
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i - Math.PI / 2;
+    pts.push(`${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`);
+  }
+  return `M${pts.join("L")}Z`;
+}
+
+function renderOvrRadar() {
+  const { attrs, ovr } = attributeRatings(ME, MY_EMAIL);
+  const cx = 130, cy = 118, maxR = 82;
+
+  const rings = [0.25, 0.5, 0.75, 1]
+    .map((f) => `<path class="radar-grid" d="${hexPath(cx, cy, maxR * f)}" />`).join("");
+
+  const spokes = attrs.map((_, i) => {
+    const a = (Math.PI / 3) * i - Math.PI / 2;
+    return `<line class="radar-grid" x1="${cx}" y1="${cy}" x2="${(cx + maxR * Math.cos(a)).toFixed(1)}" y2="${(cy + maxR * Math.sin(a)).toFixed(1)}" />`;
+  }).join("");
+
+  const pts = attrs.map((attr, i) => {
+    const a = (Math.PI / 3) * i - Math.PI / 2;
+    const r = maxR * Math.max(0.08, attr.value / 99);
+    return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`;
+  }).join("L");
+
+  const labels = attrs.map((attr, i) => {
+    const a = (Math.PI / 3) * i - Math.PI / 2;
+    const lr = maxR + 22;
+    const x = cx + lr * Math.cos(a);
+    const y = cy + lr * Math.sin(a);
+    let anchor = "middle";
+    if (Math.cos(a) > 0.3) anchor = "start";
+    else if (Math.cos(a) < -0.3) anchor = "end";
+    return `<text class="radar-axis-label" x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="${anchor}" fill="${attr.color}">${attr.label}</text>`;
+  }).join("");
+
+  $("ovrRadar").innerHTML = `
+    ${rings}${spokes}
+    <path class="radar-shape" d="M${pts}Z" />
+    <text class="radar-ovr" x="${cx}" y="${cy - 2}" text-anchor="middle" dominant-baseline="central">${ovr}</text>
+    <text class="radar-ovr-sub" x="${cx}" y="${cy + 26}" text-anchor="middle">OVR RATING</text>
+    ${labels}`;
+
+  $("attrGrid").innerHTML = attrs.map((attr) => `
+    <div class="attr-tile" style="box-shadow: inset 0 0 0 1px color-mix(in srgb, ${attr.color} 35%, transparent);">
+      <svg class="attr-hex" viewBox="0 0 100 100" aria-hidden="true">
+        <path d="${hexPath(50, 50, 44)}" fill="color-mix(in srgb, ${attr.color} 30%, transparent)" stroke="${attr.color}" stroke-width="7" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <div class="attr-val">${attr.value}</div>
+        <div class="attr-name" style="color:${attr.color}">${attr.label}</div>
+      </div>
+    </div>`).join("");
+}
+
+function renderRankLadder() {
+  const xp = computeXP(ME);
+  const current = rankForXP(xp);
+  const wrap = $("rankLadder");
+
+  $("rankLadderNote").textContent = current.next
+    ? `${current.toNext.toLocaleString()} XP until ${current.next.name}`
+    : "You have reached the highest rank.";
+
+  // Show a window around the current rung so the ladder stays readable.
+  const start = Math.max(0, current.index - 2);
+  const end = Math.min(RANK_LADDER.length, current.index + 3);
+
+  wrap.innerHTML = RANK_LADDER.slice(start, end).map((rung, i) => {
+    const absIdx = start + i;
+    const achieved = xp >= rung.min;
+    const isCurrent = absIdx === current.index;
+    const level = levelForXP(Math.max(rung.min, 0)).level;
+    const connector = i < end - start - 1
+      ? `<div class="ladder-connector"><div class="ladder-dot"></div><div class="ladder-dot"></div><div class="ladder-dot"></div></div>`
+      : "";
+
+    let tag = "";
+    if (isCurrent) tag = `<div class="ladder-tag" style="color:${rung.tier.color}">Current rank</div>`;
+    else if (achieved) tag = `<div class="ladder-tag" style="color:var(--muted)">Achieved</div>`;
+    else tag = `<div class="ladder-tag" style="color:var(--muted)">${icon("lock", 10)} Unlocks at ${rung.min.toLocaleString()} XP</div>`;
+
+    return `
+      <div class="ladder-rung ${achieved ? "" : "dim"}">
+        <div class="ladder-crest ${achieved ? "" : "locked"}">${crestSVG(rung.tier, level, 42)}</div>
+        <div class="ladder-meta">
+          ${tag}
+          <div class="ladder-name ${isCurrent ? "current" : ""}" style="${isCurrent ? `color:${rung.tier.color}` : ""}">${escapeHtml(rung.name)}</div>
+          <div class="ladder-sub">${rung.min.toLocaleString()} XP</div>
+        </div>
+      </div>
+      ${connector}`;
+  }).join("");
+}
+
 function renderProgressTab() {
+  renderOvrRadar();
+  renderRankLadder();
   renderWeightChart();
   renderLog();
   renderBodyDiagram();
@@ -2399,10 +2646,17 @@ function gymDaysThisWeek(name) {
   return entriesFor(name).filter((e) => e.gym && e.entry_date >= start).length;
 }
 
+/* A shared couple goal overrides each person's individual target when set. */
+function weeklyGoalFor(email) {
+  if (MY_PARTNERSHIP?.shared_weekly_goal) return MY_PARTNERSHIP.shared_weekly_goal;
+  const profile = email === MY_EMAIL ? MY_PROFILE : PARTNER_PROFILE;
+  return profile?.challenge_target || 4;
+}
+
 function renderCoupleTab() {
   const partner = partnerName();
-  const myTarget = MY_PROFILE?.challenge_target || 4;
-  const partnerTarget = PARTNER_PROFILE?.challenge_target || 4;
+  const myTarget = weeklyGoalFor(MY_EMAIL);
+  const partnerTarget = weeklyGoalFor(PARTNER_EMAIL);
   const myDays = gymDaysThisWeek(ME);
   const partnerDays = gymDaysThisWeek(partner);
 
@@ -2460,8 +2714,8 @@ async function loadCurrentStake() {
 
 function stakeStandings() {
   const partner = partnerName();
-  const myTarget = MY_PROFILE?.challenge_target || 4;
-  const partnerTarget = PARTNER_PROFILE?.challenge_target || 4;
+  const myTarget = weeklyGoalFor(MY_EMAIL);
+  const partnerTarget = weeklyGoalFor(PARTNER_EMAIL);
   return [
     { name: ME, days: gymDaysThisWeek(ME), target: myTarget },
     { name: partner, days: gymDaysThisWeek(partner), target: partnerTarget },
@@ -2606,6 +2860,12 @@ function renderSetupTab() {
     if (MY_PROFILE.goal) $("setupGoal").value = MY_PROFILE.goal;
     $("setupGoalDetail").value = MY_PROFILE.goal_detail || "";
     $("setupChallengeTarget").value = MY_PROFILE.challenge_target || 4;
+    const shared = MY_PARTNERSHIP?.shared_weekly_goal;
+    $("sharedGoalToggle").checked = !!shared;
+    $("setupSharedGoal").value = shared || 4;
+    $("sharedGoalToggleWrap").classList.toggle("checked", !!shared);
+    $("sharedGoalFields").classList.toggle("hidden", !shared);
+    $("ownGoalFields").classList.toggle("hidden", !!shared);
     $("setupSex").value = MY_PROFILE.sex || "";
     $("setupAge").value = MY_PROFILE.age || "";
     $("setupActivity").value = MY_PROFILE.activity_level || "";
@@ -2831,6 +3091,19 @@ async function saveSetup() {
   };
   const { error } = await sb.from("profiles").upsert(payload);
   if (error) { toast("Save failed"); console.error(error); return; }
+
+  if (MY_PARTNERSHIP) {
+    const sharedOn = $("sharedGoalToggle").checked;
+    const sharedVal = sharedOn
+      ? Math.min(7, Math.max(1, parseInt($("setupSharedGoal").value, 10) || 4))
+      : null;
+    const { error: pErr } = await sb.from("partnerships")
+      .update({ shared_weekly_goal: sharedVal })
+      .eq("id", MY_PARTNERSHIP.id);
+    if (pErr) { toast("Shared goal didn't save"); console.error(pErr); }
+    else MY_PARTNERSHIP.shared_weekly_goal = sharedVal;
+  }
+
   toast("Preferences saved");
   localStorage.setItem(THEME_KEY, payload.theme);
   const { data } = await sb.from("profiles").select("*").eq("email", MY_EMAIL).maybeSingle();
