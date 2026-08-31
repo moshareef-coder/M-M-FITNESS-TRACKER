@@ -2317,8 +2317,29 @@ async function markRestDay(date) {
 
 /* ---------- Gamification: XP, levels, badges ---------- */
 
+/* Timed activities have no weight, so their record is duration: the longest
+   session you have done of that activity. Same competence signal, different
+   unit. */
+function durationRecords(name) {
+  const logs = ALL_EXERCISE_LOGS
+    .filter((l) => l.user_name === name && l.duration_min)
+    .sort((a, b) => a.entry_date.localeCompare(b.entry_date) || String(a.created_at).localeCompare(String(b.created_at)));
+  const best = {};
+  const prLogIds = new Set();
+  let prCount = 0;
+  for (const l of logs) {
+    const key = l.exercise_name.toLowerCase();
+    if (!(key in best) || l.duration_min > best[key]) {
+      best[key] = l.duration_min;
+      prCount++;
+      prLogIds.add(l.id);
+    }
+  }
+  return { best, prCount, prLogIds };
+}
+
 function personalRecords(name) {
-  const logs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && l.weight != null)
+  const logs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && l.weight != null && !l.duration_min)
     .sort((a, b) => a.entry_date.localeCompare(b.entry_date) || a.created_at.localeCompare(b.created_at));
   const best = {};
   let prCount = 0;
@@ -2858,9 +2879,10 @@ function renderCoverage() {
 /* Most recent PRs. A PR means you actually got stronger, which is the one
    number in here that represents real progress rather than app usage. */
 function recentPRs(name, limit = 3) {
-  const { prLogIds } = personalRecords(name);
+  const lift = personalRecords(name).prLogIds;
+  const timed = durationRecords(name).prLogIds;
   return ALL_EXERCISE_LOGS
-    .filter((l) => l.user_name === name && prLogIds.has(l.id))
+    .filter((l) => l.user_name === name && (lift.has(l.id) || timed.has(l.id)))
     .sort((a, b) => b.entry_date.localeCompare(a.entry_date) || String(b.created_at).localeCompare(String(a.created_at)))
     .slice(0, limit);
 }
@@ -2875,7 +2897,7 @@ function relativeDay(dateStr) {
 }
 
 function renderHomePRs() {
-  const { prCount } = personalRecords(ME);
+  const prCount = personalRecords(ME).prCount + durationRecords(ME).prCount;
   $("prTotalCount").textContent = prCount;
 
   const prs = recentPRs(ME);
@@ -2886,10 +2908,10 @@ function renderHomePRs() {
             <div class="pr-ex">${escapeHtml(p.exercise_name)}</div>
             <div class="pr-when">${escapeHtml(relativeDay(p.entry_date))}</div>
           </div>
-          <div class="pr-load">${p.weight}<span>lbs</span></div>
+          <div class="pr-load">${p.duration_min ? `${p.duration_min}<span>min</span>` : `${p.weight}<span>lbs</span>`}</div>
         </div>`).join("")
     : emptyState("trophy", "No records yet",
-        "Log a lift with a weight and your first PR lands here.");
+        "Your heaviest lifts and longest sessions land here.");
 }
 
 function renderHome() {
@@ -3801,8 +3823,10 @@ function renderChooseScreen() {
    in minutes, so they get their own path rather than being forced into a
    lifting shape with fake 1x1 sets. */
 const ACTIVITY_PRESETS = [
-  "Pilates", "Yoga", "Barre", "Running", "Walking",
-  "Cycling", "Swimming", "Boxing", "HIIT", "Stair climber",
+  "Pilates", "Yoga", "Barre", "Running", "Walking", "Hiking",
+  "Cycling", "Spin class", "Swimming", "Rowing machine", "Elliptical", "Stair climber",
+  "Boxing", "Kickboxing", "HIIT", "CrossFit", "Jump rope", "Dance",
+  "Basketball", "Soccer", "Tennis", "Climbing", "Skiing", "Stretching",
 ];
 const ACTIVITY_STATE = { name: "", minutes: 45 };
 
@@ -4032,7 +4056,24 @@ const MUSCLE_RULES = [
   { match: ["elliptical", "stair", "stepper", "incline walk"], primary: ["quads", "glutes"], secondary: ["calves", "hamstrings"] },
   { match: ["hike", "hiking", "walk", "treadmill walk"], primary: ["calves", "quads"], secondary: ["glutes", "hamstrings"] },
   { match: ["boxing", "kickbox", "muay thai", "martial"], primary: ["shoulders", "abs"], secondary: ["obliques", "triceps", "calves"] },
-  { match: ["dance", "zumba", "hiit", "bootcamp", "circuit"], primary: ["quads", "abs"], secondary: ["glutes", "shoulders", "calves"] },
+  { match: ["dance", "zumba", "hiit", "bootcamp", "circuit", "aerobic"], primary: ["quads", "abs"], secondary: ["glutes", "shoulders", "calves"] },
+  { match: ["run", "jog", "sprint", "5k", "10k", "marathon", "treadmill"], primary: ["quads", "hamstrings", "calves"], secondary: ["glutes", "abs"] },
+  // Specific terms only: a bare "row" is a barbell row, handled further down.
+  { match: ["rowing machine", "rower", "row erg", "erg ", "concept2", "concept 2"], primary: ["lats", "quads"], secondary: ["biceps", "traps", "abs", "hamstrings"] },
+  { match: ["assault bike", "air bike", "ski erg", "skierg"], primary: ["quads", "shoulders"], secondary: ["lats", "abs", "calves"] },
+  { match: ["climb", "boulder", "rock climb"], primary: ["lats", "forearms"], secondary: ["biceps", "abs", "shoulders"] },
+  { match: ["jump rope", "skipping", "jump-rope"], primary: ["calves"], secondary: ["quads", "shoulders", "abs"] },
+  { match: ["crossfit", "wod", "murph", "metcon"], primary: ["quads", "shoulders", "abs"], secondary: ["glutes", "lats", "triceps"] },
+  { match: ["calisthenic", "bodyweight circuit"], primary: ["chest", "abs"], secondary: ["triceps", "shoulders", "lats"] },
+  { match: ["sled", "prowler", "farmer carry", "farmers carry"], primary: ["quads", "glutes"], secondary: ["forearms", "traps", "calves"] },
+  { match: ["stretch", "mobility", "foam roll", "recovery"], primary: ["hamstrings"], secondary: ["lowerback", "quads", "shoulders"] },
+  { match: ["basketball", "soccer", "football", "rugby", "hockey", "lacrosse"], primary: ["quads", "calves"], secondary: ["glutes", "hamstrings", "abs"] },
+  { match: ["tennis", "padel", "squash", "badminton", "pickleball"], primary: ["quads", "shoulders"], secondary: ["calves", "obliques", "forearms"] },
+  { match: ["golf"], primary: ["obliques"], secondary: ["forearms", "shoulders", "lowerback"] },
+  { match: ["volleyball"], primary: ["quads", "shoulders"], secondary: ["calves", "abs"] },
+  { match: ["ski", "snowboard"], primary: ["quads", "glutes"], secondary: ["abs", "calves", "hamstrings"] },
+  { match: ["surf", "paddleboard", "paddle board", "kayak", "canoe"], primary: ["lats", "shoulders"], secondary: ["abs", "obliques", "triceps"] },
+  { match: ["skate", "rollerblad"], primary: ["quads", "glutes"], secondary: ["calves", "abs"] },
   { match: ["hip thrust", "glute bridge"], primary: ["glutes"], secondary: ["hamstrings"] },
   { match: ["romanian deadlift", "rdl", "stiff leg"], primary: ["hamstrings"], secondary: ["glutes", "lowerback"] },
   { match: ["deadlift"], primary: ["hamstrings", "glutes", "lowerback"], secondary: ["traps", "forearms", "lats"] },
