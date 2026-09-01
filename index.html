@@ -3260,6 +3260,18 @@ function stopRestTicker() {
 
 /* Rest between sets is recorded, not just displayed: it is the honest signal
    that a workout took real time, which is what makes a partner's log credible. */
+/* Ends the rest period and starts the next set. The rest length is banked
+   here, so it reflects time actually spent resting. */
+function startNextSet(setIdx) {
+  if (!SESSION || !SESSION.restStartedAt) return;
+  const ei = SESSION.exerciseIndex;
+  recordRest(ei, Math.max(0, setIdx - 1));
+  SESSION.restStartedAt = null;
+  stopRestTicker();
+  saveSessionToStorage();
+  renderSession();
+}
+
 function recordRest(ei, setIdx) {
   if (!SESSION.restLog) SESSION.restLog = {};
   if (SESSION.restStartedAt) {
@@ -3287,7 +3299,6 @@ function toggleSet(setIdx) {
     // for the next set does not rewrite the one already done.
     const w = parseFloat(SESSION.weights[ei]);
     SESSION.setWeights[ei][setIdx] = isNaN(w) ? null : w;
-    recordRest(ei, setIdx);
     SESSION.restStartedAt = Date.now();   // rest begins the moment a set lands
   } else {
     SESSION.setWeights[ei][setIdx] = null;
@@ -3395,6 +3406,10 @@ function renderSession() {
   // The set you are on is the first one not yet done. Only that one is tappable,
   // so sets cannot be ticked out of order or ahead of where you actually are.
   const currentSet = setsDone.findIndex((d) => !d);
+  // Resting is its own state. It runs from logging a set until you say you are
+  // starting the next one, so the clock measures actual rest rather than
+  // rest plus the set you were busy doing.
+  const resting = !!SESSION.restStartedAt && !allDone;
   const restMs = SESSION.restStartedAt ? Date.now() - SESSION.restStartedAt : 0;
 
   $("sessionBody").innerHTML = `
@@ -3417,7 +3432,7 @@ function renderSession() {
         }).join("")}
       </div>
 
-      ${SESSION.restStartedAt && !allDone ? `
+      ${resting ? `
         <div class="rest-timer" id="restTimer">
           <span class="rest-label">Resting</span>
           <span class="rest-clock" id="restClock">${formatRest(restMs)}</span>
@@ -3442,9 +3457,13 @@ function renderSession() {
         </div>
       </div>
 
-      <button type="button" class="btn-big btn-set ${allDone ? "hidden" : ""}" id="logSetBtn">
-        ${icon("check", 18)} Log set ${currentSet + 1} of ${setsDone.length}
-      </button>
+      ${resting ? `
+        <button type="button" class="btn-big btn-primary" id="startSetBtn">
+          ${icon("play", 18)} Start set ${currentSet + 1}
+        </button>` : `
+        <button type="button" class="btn-big btn-set ${allDone ? "hidden" : ""}" id="logSetBtn">
+          ${icon("check", 18)} Log set ${currentSet + 1} of ${setsDone.length}
+        </button>`}
       <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">
         ${icon("check", 18)} ${ei === total - 1 ? "Finish Workout" : "Next exercise"}
       </button>
@@ -3452,11 +3471,14 @@ function renderSession() {
       <button type="button" class="btn-ghost" id="endWorkoutBtn" style="margin-top:6px;">End workout here</button>
     </div>`;
 
-  if (SESSION.restStartedAt && !allDone) startRestTicker();
+  if (resting) startRestTicker();
   else stopRestTicker();
 
   const logBtn = $("logSetBtn");
   if (logBtn) logBtn.onclick = () => { if (currentSet >= 0) toggleSet(currentSet); };
+
+  const startBtn = $("startSetBtn");
+  if (startBtn) startBtn.onclick = () => startNextSet(currentSet);
 
   $("sessionBody").querySelectorAll(".set-circle").forEach((btn) => {
     btn.onclick = () => toggleSet(parseInt(btn.dataset.set, 10));
