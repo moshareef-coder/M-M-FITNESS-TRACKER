@@ -1228,6 +1228,7 @@
       <input type="text" id="setupDisplayName" placeholder="Your name" maxlength="24" autocomplete="off" />
       <button type="button" class="btn-secondary" id="saveNameBtn" style="margin-top:10px;">Save name</button>
       <p class="muted-note" id="nameNote" style="margin-top:8px;">This is what your partner sees.</p>
+      <p class="muted-note" style="margin-top:10px;opacity:0.65;">Version <span id="appVersion"></span></p>
     </div>
     <div class="card">
       <h2>Partner</h2>
@@ -1419,6 +1420,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_890hsPHDiiz4-fQi7Jqd9g_a_aoHyz2";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const FUNCTION_URL = SUPABASE_URL + "/functions/v1/generate-workout";
 
+const APP_VERSION = "2026.09.01.1";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -3852,6 +3854,9 @@ function renderWorkoutTab() {
       renderPlanPreview();
     } catch (err) {
       console.error("plan preview failed", err);
+    }
+    // Whatever happened above, never leave an empty card with no way out.
+    if (!$("workoutContent").innerHTML.trim()) {
       $("workoutCardTitle").textContent = "Today's workout";
       $("workoutContent").innerHTML = `
         <p class="muted-note">Couldn't display this plan.</p>
@@ -4654,6 +4659,7 @@ async function saveDisplayName() {
 
 function renderSetupTab() {
   $("setupDisplayName").value = ME || "";
+  $("appVersion").textContent = APP_VERSION;
   $("saveNameBtn").onclick = saveDisplayName;
   $("setupPartnerName").textContent = PARTNER_PROFILE?.user_name || "Not paired";
   $("setupInviteCode").textContent = MY_PROFILE?.invite_code || "-";
@@ -4928,9 +4934,36 @@ async function saveSetup() {
   renderHome();
 }
 
+/* An installed PWA can sit on old JS for days, which is how a fixed bug appears
+   to come back. Check for a new version whenever the app is opened or focused,
+   and reload once when one takes over. */
 if ("serviceWorker" in navigator) {
+  let reloading = false;
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloading) return;         // a single reload, never a loop
+    reloading = true;
+    location.reload();
+  });
+
+  const checkForUpdate = async () => {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) await reg.update();
+    } catch (err) {
+      console.warn("update check failed", err);
+    }
+  };
+
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch((err) => console.warn("SW registration failed", err));
+    navigator.serviceWorker
+      .register("/sw.js", { updateViaCache: "none" })
+      .then(checkForUpdate)
+      .catch((err) => console.warn("SW registration failed", err));
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) checkForUpdate();
   });
 }
 
