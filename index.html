@@ -2033,13 +2033,35 @@ async function runWrite(job) {
 
 /* Attempt a write. If it cannot land, keep it and report failure so the
    caller can still update the UI optimistically. */
+/* A dropped connection is worth retrying. A permission or validation error is
+   not: retrying it forever leaves the user staring at "saved offline" while
+   nothing ever lands. Classify the failure and only queue what can succeed. */
+function isRetryable(err) {
+  if (!err) return true;
+  const code = String(err.code || "");
+  const msg = String(err.message || "").toLowerCase();
+
+  // Postgres/PostgREST classes that will never succeed on retry.
+  if (code === "42501") return false;                 // RLS violation
+  if (code.startsWith("22") || code.startsWith("23")) return false; // bad data, constraint
+  if (code === "PGRST204" || code === "PGRST301") return false;     // unknown column, no auth
+  if (/permission|policy|violates|invalid input|column .* does not exist|jwt/.test(msg)) return false;
+  return true;                                        // network, timeout, 5xx
+}
+
 async function safeWrite(table, op, payload, opts) {
   if (navigator.onLine) {
     try {
       await runWrite({ table, op, payload, opts });
       return true;
     } catch (e) {
-      console.error("write failed, queued:", table, e);
+      if (!isRetryable(e)) {
+        // Surface it instead of pretending it saved.
+        console.error("write rejected (not retryable):", table, e);
+        toast(`Couldn't save. ${e?.message ? String(e.message).slice(0, 80) : "Please try again."}`);
+        return false;
+      }
+      console.error("write failed, queued for retry:", table, e);
     }
   }
   const q = readQueue();
@@ -2056,10 +2078,17 @@ async function flushQueue({ quiet = false } = {}) {
 
   FLUSHING = true;
   const stuck = [];
+  let dropped = 0;
   for (const job of q) {
     try { await runWrite(job); }
-    catch { stuck.push(job); }
+    catch (e) {
+      // Keep retrying transient failures; discard ones that can never land so
+      // the queue cannot jam forever.
+      if (isRetryable(e)) stuck.push(job);
+      else { dropped++; console.error("dropping unsendable queued write:", job.table, e); }
+    }
   }
+  if (dropped) toast(`${dropped} change${dropped === 1 ? "" : "s"} could not be saved`);
   saveQueue(stuck);
   FLUSHING = false;
   renderConnBanner();
@@ -3268,7 +3297,21 @@ function toggleSet(setIdx) {
   renderSession();
 }
 
+let ADVANCING = false;
+
 async function finishExerciseAndAdvance() {
+  if (ADVANCING) return;          // a second tap must not log the set again
+  ADVANCING = true;
+  const btn = $("nextExBtn");
+  if (btn) btn.disabled = true;
+  try {
+    await doFinishExerciseAndAdvance();
+  } finally {
+    ADVANCING = false;
+  }
+}
+
+async function doFinishExerciseAndAdvance() {
   const ei = SESSION.exerciseIndex;
   const ex = TODAY_WORKOUT.exercises[ei];
   const doneCount = SESSION.setsDone[ei].filter(Boolean).length;
@@ -3455,11 +3498,20 @@ function renderSession() {
   };
 }
 
+let MARKING_DAY = false;
+
 async function markGymDayDone() {
+  if (MARKING_DAY) return;        // one completion must not count several times
+  MARKING_DAY = true;
+  try { await doMarkGymDayDone(); } finally { MARKING_DAY = false; }
+}
+
+async function doMarkGymDayDone() {
   const existing = todayEntryFor(MY_EMAIL);
   const payload = {
     user_name: ME, email: MY_EMAIL, entry_date: todayStr(), gym: true,
-    sessions: (existing?.sessions || 0) + 1,
+    // Capped: a runaway re-render should not be able to claim 16 workouts.
+    sessions: Math.min((existing?.sessions || 0) + 1, 12),
     weight: existing?.weight ?? null,
     proof_path: existing?.proof_path ?? null,
     rest_day: existing?.rest_day ?? false,
