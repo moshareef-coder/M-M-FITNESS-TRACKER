@@ -4,7 +4,13 @@ Two layers, built in phases, both feeding `supabase/functions/generate-workout`:
 
 1. **`formulas/`** (done) -- deterministic math: calorie burn, TDEE/BMR, 1RM, tonnage. Computed
    in code, not guessed by the AI, because LLMs are unreliable at arithmetic. See `sources.md`
-   for where each formula comes from.
+   for where each formula comes from. `calorie-math.mjs` covers all 24 `ACTIVITY_PRESETS`
+   (running, basketball, soccer, cycling, etc.), and the ones where effort actually swings the
+   burn a lot -- a pickup game vs. a competitive one, a jog vs. a tempo run -- carry
+   light/moderate/vigorous MET tiers rather than one flat number, via `estimateActivityCalories(
+   name, minutes, weightLb, intensity)`. This is the "algorithm" for sports/cardio: no separate
+   exercise-level library for them (see point 3), just properly tiered math on top of the
+   duration logging the app already does.
 2. **`principles/`** (done) -- our own written distillation of mainstream, evidence-based
    training science, folded into `generate-workout`'s system prompt as condensed rules. Not
    transcripts or paraphrases of any specific creator's content -- see the note in `sources.md`.
