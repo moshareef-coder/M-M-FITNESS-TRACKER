@@ -120,6 +120,37 @@ function checkClobberedIds() {
   return problems;
 }
 
+/* Structural check. A single unclosed <div> nests every panel inside the first
+   one, so hiding one tab hides the whole app. This shipped once; never again. */
+{
+  let markup = html.replace(/<script>[\s\S]*?<\/script>/g, "")
+                   .replace(/<style>[\s\S]*?<\/style>/g, "")
+                   .replace(/<!--[\s\S]*?-->/g, "");
+  const opens = (markup.match(/<div\b/g) || []).length;
+  const closes = (markup.match(/<\/div>/g) || []).length;
+  if (opens !== closes) {
+    console.log(`  STRUCTURE           div balance ${opens - closes} (unclosed tags)`);
+    process.exit(1);
+  }
+  let depth = 0;
+  const depths = {};
+  for (const m of markup.matchAll(/<div\b[^>]*>|<\/div>|<nav\b/g)) {
+    const t = m[0];
+    if (t.startsWith("<div")) {
+      depth++;
+      const id = /id="(tab-[a-z]+)"/.exec(t);
+      if (id) depths[id[1]] = depth;
+    } else if (t === "</div>") depth--;
+    else if (t === "<nav") depths.__nav = depth;
+  }
+  const levels = new Set(Object.entries(depths).filter(([k]) => k.startsWith("tab-")).map(([, v]) => v));
+  if (levels.size > 1) {
+    console.log("  STRUCTURE           tab panels are nested inside each other:", JSON.stringify(depths));
+    process.exit(1);
+  }
+  console.log("  structure            ok (panels are siblings, nav outside)");
+}
+
 let failed = 0;
 const clobbered = checkClobberedIds();
 if (clobbered.length) {
