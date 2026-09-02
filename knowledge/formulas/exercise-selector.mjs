@@ -197,6 +197,43 @@ export function buildWeightTrainingPlan({
 }
 
 // ---------------------------------------------------------------------------
+// How much time available maps to how many exercises fit. ~7 min per exercise covers warm-up
+// sets, working sets, and rest -- rough, but good enough to keep a 30-min session from getting
+// an 8-exercise plan.
+// ---------------------------------------------------------------------------
+export function sessionCapacity(minutesAvailable) {
+  const totalExercises = Math.max(2, Math.min(10, Math.round((minutesAvailable || 45) / 7)));
+  const focusCategoryCount = totalExercises <= 4 ? 1 : totalExercises <= 7 ? 2 : 3;
+  const exercisesPerCategory = Math.max(1, Math.round(totalExercises / focusCategoryCount));
+  return { focusCategoryCount, exercisesPerCategory };
+}
+
+// ---------------------------------------------------------------------------
+// A week at a time: each day folds into the running weekly volume/variety totals before the
+// next day is generated, so day 4 already "knows" what days 1-3 did -- the same mechanic that
+// makes today's plan depend on yesterday's real logged history once this is wired into the app.
+// ---------------------------------------------------------------------------
+export function buildWeekPlan({ level, goal, daysPerWeek = 4, equipmentAvailable = null, bodyWeightLb = null, focusCategoryCount = 2, exercisesPerCategory = 2 }) {
+  const days = [];
+  let weeklyVolumeByCategory = {};
+  let recentExerciseNames = [];
+
+  for (let day = 0; day < daysPerWeek; day++) {
+    const plan = buildWeightTrainingPlan({
+      level, goal, weeklyVolumeByCategory, recentExerciseNames, equipmentAvailable, bodyWeightLb,
+      focusCategoryCount, exercisesPerCategory,
+    });
+    days.push(plan);
+
+    plan.exercises.forEach((ex) => {
+      (ex.primary || []).forEach((m) => { weeklyVolumeByCategory[m] = (weeklyVolumeByCategory[m] || 0) + ex.sets; });
+    });
+    recentExerciseNames = [...new Set([...recentExerciseNames, ...plan.exercises.map((e) => e.name)])].slice(-12);
+  }
+  return days;
+}
+
+// ---------------------------------------------------------------------------
 // Calisthenics: rotate push/pull/legs/core, pick each move's progression rung at the
 // trainee's level (a calisthenics "level" IS the progression rung, not a separate concept).
 // ---------------------------------------------------------------------------

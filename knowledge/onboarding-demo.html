@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fit Together — Onboarding Demo</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f5f2; --card: #ffffff; --border: #e3e0da; --text: #1a1a1a;
+    --muted: #6b6660; --accent: #16181d; --chip: #f0eee9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #101318; --card: #171b21; --border: #262b33; --text: #eceef0; --muted: #8b93a1; --accent: #d6dbe4; --chip: #1f242c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 40px 20px 80px; }
+  .progress { display: flex; gap: 5px; margin-bottom: 28px; }
+  .progress .dot { flex: 1; height: 4px; border-radius: 2px; background: var(--border); }
+  .progress .dot.done { background: var(--accent); }
+  .step { display: none; }
+  .step.active { display: block; }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  .step-sub { color: var(--muted); font-size: 14px; margin-bottom: 22px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 5px; }
+  label:first-of-type { margin-top: 0; }
+  input[type=text], input[type=number], textarea { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 15px; }
+  textarea { min-height: 70px; resize: vertical; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .choice-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .choice { padding: 10px 16px; border-radius: 100px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; font-size: 14px; }
+  .choice.selected { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .nav { display: flex; justify-content: space-between; margin-top: 30px; gap: 10px; }
+  button { border: none; border-radius: 10px; padding: 12px 20px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn-primary { background: var(--accent); color: var(--bg); flex: 1; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+  .card h2 { font-size: 16px; margin: 0 0 10px; }
+  .stat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; border-bottom: 1px solid var(--border); }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row b { font-weight: 600; }
+  .focus-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .focus-chip { font-size: 12px; background: var(--chip); border-radius: 100px; padding: 4px 10px; text-transform: capitalize; }
+  .ex-row { padding: 9px 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .ex-row:last-child { border-bottom: none; }
+  .ex-sub { font-size: 11px; color: var(--muted); }
+  .day-block { margin-bottom: 16px; }
+  .day-block h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); margin: 0 0 6px; }
+  .muted-note { color: var(--muted); font-size: 13px; }
+  .continuity-banner { background: var(--chip); border-radius: 12px; padding: 12px 14px; font-size: 13px; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="progress" id="progress"></div>
+
+  <div class="step active" data-step="0">
+    <h1>Hi! Let's build your plan.</h1>
+    <div class="step-sub">First, the basics.</div>
+    <div class="row3">
+      <div><label>Height (ft)</label><input type="number" id="heightFt" value="5" min="3" max="7" /></div>
+      <div><label>Height (in)</label><input type="number" id="heightIn" value="9" min="0" max="11" /></div>
+      <div><label>Weight (lb)</label><input type="number" id="weight" value="180" min="70" /></div>
+    </div>
+    <div class="row2">
+      <div><label>Age</label><input type="number" id="age" value="30" min="13" max="90" /></div>
+      <div>
+        <label>Sex</label>
+        <div class="choice-grid" id="sexChoices">
+          <span class="choice" data-v="Male">Male</span>
+          <span class="choice" data-v="Female">Female</span>
+          <span class="choice" data-v="Rather not say">Rather not say</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" data-step="1">
+    <h1>How often do you work out?</h1>
+    <div class="step-sub">This shapes how much we push you.</div>
+    <div class="choice-grid" id="freqChoices">
+      <span class="choice" data-v="0">Not really, starting fresh</span>
+      <span class="choice" data-v="2">1-2x a week</span>
+      <span class="choice" data-v="4">3-4x a week</span>
+      <span class="choice" data-v="6">5+ a week</span>
+    </div>
+    <label>How long have you been training overall?</label>
+    <div class="choice-grid" id="expChoices">
+      <span class="choice" data-v="beginner">New to this</span>
+      <span class="choice" data-v="intermediate">A few months in</span>
+      <span class="choice" data-v="advanced">A year or more</span>
+    </div>
+  </div>
+
+  <div class="step" data-step="2">
+    <h1>Any specific goals?</h1>
+    <div class="step-sub">Numbers welcome — "lose 20 lbs" is exactly what we want.</div>
+    <div class="choice-grid" id="goalChoices">
+      <span class="choice" data-v="lose">Lose weight</span>
+      <span class="choice" data-v="gain">Gain weight / bulk</span>
+      <span class="choice" data-v="hypertrophy">Build muscle, weight steady</span>
+      <span class="choice" data-v="general">General fitness / look better</span>
+      <span class="choice" data-v="strength">Get stronger</span>
+    </div>
+    <label id="goalAmountLabel" style="display:none;">How much? (lbs)</label>
+    <input type="number" id="goalAmount" style="display:none;" min="1" placeholder="e.g. 20" />
+  </div>
+
+  <div class="step" data-step="3">
+    <h1>How long can you train?</h1>
+    <div class="step-sub">Per session — we'll size the plan to fit.</div>
+    <div class="choice-grid" id="timeChoices">
+      <span class="choice" data-v="30">~30 min</span>
+      <span class="choice" data-v="60">~1 hour</span>
+      <span class="choice" data-v="90">~1.5 hours</span>
+      <span class="choice" data-v="120">2 hours+</span>
+    </div>
+    <label>Do you play any sports? (optional)</label>
+    <div class="choice-grid" id="sportsChoices"></div>
+  </div>
+
+  <div class="step" data-step="4">
+    <h1>What do you have access to?</h1>
+    <div class="step-sub">No gym is a completely valid answer.</div>
+    <div class="choice-grid" id="equipChoices">
+      <span class="choice" data-v="home-none">Home, no equipment</span>
+      <span class="choice" data-v="home-dumbbell">Home, some dumbbells</span>
+      <span class="choice" data-v="full-gym">Full gym access</span>
+    </div>
+    <label>Anything else we should know?</label>
+    <textarea id="notes" placeholder="Bad knee, prefer mornings, hate burpees, whatever..."></textarea>
+  </div>
+
+  <div class="step" data-step="5" id="resultsStep"></div>
+
+  <div class="nav" id="nav">
+    <button class="btn-ghost" id="backBtn">Back</button>
+    <button class="btn-primary" id="nextBtn">Next</button>
+  </div>
+</div>
+
+<script type="module">
+  import { calculateTDEE } from "./formulas/tdee.mjs";
+  import { estimateGoalTimeline } from "./formulas/goal-timeline.mjs";
+  import { estimateActivityCalories } from "./formulas/calorie-math.mjs";
+  import {
+    buildWeightTrainingPlan, buildWeekPlan, sessionCapacity,
+  } from "./formulas/exercise-selector.mjs";
+
+  const SPORTS = ["Basketball", "Soccer", "Tennis", "Climbing", "Skiing", "Boxing", "Running", "Cycling", "Swimming"];
+  document.getElementById("sportsChoices").innerHTML = SPORTS.map((s) => `<span class="choice" data-v="${s}">${s}</span>`).join("");
+
+  const STORAGE_KEY = "ft_onboarding_demo_v1";
+  const state = {
+    heightFt: 5, heightIn: 9, weight: 180, age: 30, sex: null,
+    freq: null, experience: null, goalType: null, goalAmount: null,
+    time: null, sports: [], equip: null, notes: "",
+  };
+
+  let step = 0;
+  const totalSteps = 6;
+
+  function renderProgress() {
+    document.getElementById("progress").innerHTML = Array.from({ length: totalSteps })
+      .map((_, i) => `<div class="dot ${i <= step ? "done" : ""}"></div>`).join("");
+  }
+
+  function wireSingleChoice(containerId, key, onPick) {
+    const el = document.getElementById(containerId);
+    el.querySelectorAll(".choice").forEach((c) => {
+      c.classList.toggle("selected", state[key] === c.dataset.v);
+      c.onclick = () => {
+        state[key] = c.dataset.v;
+        el.querySelectorAll(".choice").forEach((x) => x.classList.toggle("selected", x === c));
+        if (onPick) onPick(c.dataset.v);
+      };
+    });
+  }
+
+  function wireMultiChoice(containerId, key) {
+    const el = document.getElementById(containerId);
+    el.querySelectorAll(".choice").forEach((c) => {
+      c.classList.toggle("selected", state[key].includes(c.dataset.v));
+      c.onclick = () => {
+        const i = state[key].indexOf(c.dataset.v);
+        if (i === -1) state[key].push(c.dataset.v); else state[key].splice(i, 1);
+        c.classList.toggle("selected");
+      };
+    });
+  }
+
+  function wireStepInputs() {
+    wireSingleChoice("sexChoices", "sex");
+    wireSingleChoice("freqChoices", "freq");
+    wireSingleChoice("expChoices", "experience");
+    wireSingleChoice("goalChoices", "goalType", (v) => {
+      const needsAmount = v === "lose" || v === "gain";
+      document.getElementById("goalAmountLabel").style.display = needsAmount ? "block" : "none";
+      document.getElementById("goalAmount").style.display = needsAmount ? "block" : "none";
+    });
+    wireSingleChoice("timeChoices", "time");
+    wireMultiChoice("sportsChoices", "sports");
+    wireSingleChoice("equipChoices", "equip");
+  }
+  wireStepInputs();
+
+  function pullInputs() {
+    state.heightFt = parseInt(document.getElementById("heightFt").value, 10) || 5;
+    state.heightIn = parseInt(document.getElementById("heightIn").value, 10) || 0;
+    state.weight = parseInt(document.getElementById("weight").value, 10) || 180;
+    state.age = parseInt(document.getElementById("age").value, 10) || 30;
+    state.goalAmount = parseInt(document.getElementById("goalAmount").value, 10) || null;
+    state.notes = document.getElementById("notes").value;
+  }
+
+  function equipmentList() {
+    return { "home-none": ["bodyweight"], "home-dumbbell": ["bodyweight", "dumbbell"], "full-gym": ["bodyweight", "dumbbell", "barbell", "cable", "machine"] }[state.equip] || ["bodyweight"];
+  }
+
+  function goalToPlanGoal() {
+    return { lose: "general fitness", gain: "muscle gain", hypertrophy: "muscle gain", general: "general fitness", strength: "strength" }[state.goalType] || "general fitness";
+  }
+
+  function activityLevelFromFreq() {
+    const n = parseInt(state.freq, 10) || 0;
+    return n === 0 ? "Sedentary" : n <= 2 ? "Sedentary" : n <= 4 ? "Moderate" : "Active";
+  }
+
+  function loadYesterday() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null; } catch { return null; }
+  }
+  function saveToday(plan) {
+    const recentExerciseNames = plan.exercises.map((e) => e.name);
+    const weeklyVolumeByCategory = {};
+    plan.exercises.forEach((ex) => (ex.primary || []).forEach((m) => { weeklyVolumeByCategory[m] = (weeklyVolumeByCategory[m] || 0) + ex.sets; }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ recentExerciseNames, weeklyVolumeByCategory, focusCategories: plan.focusCategories, savedAt: Date.now() }));
+  }
+
+  function renderResults() {
+    pullInputs();
+    const heightIn = state.heightFt * 12 + state.heightIn;
+    const tdee = calculateTDEE({ sex: state.sex, age: state.age, height_in: heightIn, activity_level: activityLevelFromFreq(), weightLb: state.weight });
+
+    let goalCard = "";
+    if ((state.goalType === "lose" || state.goalType === "gain") && state.goalAmount && tdee) {
+      const timeline = estimateGoalTimeline({ currentWeightLb: state.weight, targetChangeLb: state.goalAmount, direction: state.goalType, tdee });
+      goalCard = `<div class="card">
+        <h2>Your goal, as a formula</h2>
+        <div class="stat-row"><span>Maintenance calories (TDEE)</span><b>${tdee} kcal/day</b></div>
+        <div class="stat-row"><span>Target calories</span><b>${timeline.dailyCalorieTarget} kcal/day</b></div>
+        <div class="stat-row"><span>Sustainable pace</span><b>${timeline.weeklyRateLb} lb/week</b></div>
+        <div class="stat-row"><span>Estimated timeline</span><b>~${timeline.weeks} weeks</b></div>
+        <div class="muted-note" style="margin-top:8px;">Based on the ~3500 kcal-per-pound rule — a widely used approximation, not an exact science (water weight and metabolic adaptation mean real progress won't be a straight line).</div>
+      </div>`;
+    } else if (tdee) {
+      goalCard = `<div class="card"><h2>Your numbers</h2><div class="stat-row"><span>Maintenance calories (TDEE)</span><b>${tdee} kcal/day</b></div></div>`;
+    }
+
+    const yesterday = loadYesterday();
+    const capacity = sessionCapacity(parseInt(state.time, 10) || 45);
+    const plan = buildWeightTrainingPlan({
+      level: state.experience || "beginner",
+      goal: goalToPlanGoal(),
+      bodyWeightLb: state.weight,
+      equipmentAvailable: equipmentList(),
+      weeklyVolumeByCategory: yesterday?.weeklyVolumeByCategory || {},
+      recentExerciseNames: yesterday?.recentExerciseNames || [],
+      ...capacity,
+    });
+
+    const continuityNote = yesterday
+      ? `<div class="continuity-banner">Picking up from last time you generated a plan here — today avoids ${yesterday.focusCategories.join(" & ")} since that's what got trained then, and skips repeating the same exercises.</div>`
+      : `<div class="continuity-banner">First plan for this browser. Hit "Mark today done" below, then reload this page — tomorrow's plan will visibly build on today's.</div>`;
+
+    const focusChips = plan.focusCategories.map((c) => `<span class="focus-chip">${c}</span>`).join("");
+    const exRows = plan.exercises.map((ex) => `
+      <div class="ex-row">
+        <div>
+          <div>${ex.name}</div>
+          <div class="ex-sub">${(ex.primary || []).join(", ")} · ${ex.level}</div>
+        </div>
+        <div>${ex.sets} × ${ex.reps}${ex.targetWeight != null ? ` @ ${ex.targetWeight === 0 ? "bodyweight" : ex.targetWeight + " lb"}` : " (start light)"}</div>
+      </div>`).join("");
+
+    const sportsNote = state.sports.length
+      ? `<div class="card"><h2>Your sports</h2>${state.sports.map((s) => {
+          const kcal = estimateActivityCalories(s, 60, state.weight, "moderate");
+          return `<div class="stat-row"><span>${s}, 1 hour, moderate effort</span><b>~${kcal} kcal</b></div>`;
+        }).join("")}</div>`
+      : "";
+
+    document.getElementById("resultsStep").innerHTML = `
+      <h1>Your plan</h1>
+      <div class="step-sub">Generated by the actual algorithm, not a canned example.</div>
+      ${goalCard}
+      ${sportsNote}
+      <div class="card">
+        <h2>Today's session (~${state.time} min)</h2>
+        ${continuityNote}
+        <div class="focus-chips">${focusChips}</div>
+        ${exRows}
+      </div>
+      <button class="btn-primary" id="markDoneBtn" style="width:100%; margin-bottom:10px;">Mark today done → set up tomorrow</button>
+      <button class="btn-ghost" id="weekBtn" style="width:100%;">Generate a 7-day plan instead</button>
+      <div id="weekOut"></div>
+    `;
+
+    document.getElementById("markDoneBtn").onclick = () => {
+      saveToday(plan);
+      renderResults();
+    };
+    document.getElementById("weekBtn").onclick = () => {
+      const days = buildWeekPlan({
+        level: state.experience || "beginner", goal: goalToPlanGoal(), daysPerWeek: 5,
+        equipmentAvailable: equipmentList(), bodyWeightLb: state.weight, ...capacity,
+      });
+      document.getElementById("weekOut").innerHTML = days.map((d, i) => `
+        <div class="day-block">
+          <h3>Day ${i + 1} — ${d.focusCategories.join(" & ")}</h3>
+          ${d.exercises.map((ex) => `<div class="ex-row"><div>${ex.name}</div><div>${ex.sets} × ${ex.reps}</div></div>`).join("")}
+        </div>`).join("");
+    };
+  }
+
+  function showStep() {
+    document.querySelectorAll(".step").forEach((s) => s.classList.toggle("active", parseInt(s.dataset.step, 10) === step));
+    document.getElementById("nav").style.display = step === totalSteps - 1 ? "none" : "flex";
+    document.getElementById("backBtn").disabled = step === 0;
+    renderProgress();
+    if (step === totalSteps - 1) renderResults();
+  }
+
+  document.getElementById("nextBtn").onclick = () => {
+    pullInputs();
+    if (step < totalSteps - 1) step++;
+    showStep();
+  };
+  document.getElementById("backBtn").onclick = () => {
+    if (step > 0) step--;
+    showStep();
+  };
+
+  showStep();
+</script>
+</body>
+</html>
