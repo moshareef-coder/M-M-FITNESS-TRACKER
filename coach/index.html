@@ -364,13 +364,61 @@ function openClient(email) {
       <div class="kv"><span>Volume, 7 days</span><b>${Math.round(volumeOf(email)).toLocaleString()} lb</b></div>
       <div class="kv"><span>Last trained</span><b>${esc(lastTrained(email) || "Never")}</b></div>
     </div>
+    <h2 style="margin-top:26px;">Assign a workout</h2>
+    <label>Focus</label>
+    <input type="text" id="asFocus" placeholder="Push day, Legs, Conditioning" />
+    <label style="margin-top:12px;">Exercises</label>
+    <textarea id="asList" rows="6" placeholder="One per line, for example&#10;Bench Press 4x8 @135&#10;Incline Press 3x10 @55&#10;Dips 3x12"></textarea>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:10px;">
+      <input type="date" id="asDate" value="${todayStr()}" style="flex:1;" />
+      <button class="btn-primary" id="asSave" style="width:auto;">Assign</button>
+    </div>
+    <p class="muted-note" id="asNote"></p>
+
     <h2 style="margin-top:26px;">Recent sessions</h2>
     ${recent.length ? recent.map((r) => `<div class="kv"><span>${esc(r.entry_date)}</span><b>${r.sessions > 1 ? r.sessions + " sessions" : "1 session"}</b></div>`).join("")
       : `<p class="muted-note">Nothing logged yet.</p>`}`;
+  $("asSave").onclick = () => assignWorkout(email);
   $("closeDrawer").onclick = closeDrawer;
   $("drawerScrim").classList.remove("hidden");
   $("drawerScrim").onclick = (ev) => { if (ev.target === $("drawerScrim")) closeDrawer(); };
 }
+/* Parse the coach's shorthand. "Bench Press 4x8 @135" is faster to type than a
+   form, and anything it cannot read still becomes a named exercise. */
+function parseExercises(text) {
+  return text.split("\n").map((raw) => {
+    const line = raw.trim();
+    if (!line) return null;
+    let sets = null, reps = null, weight = null;
+    const sr = line.match(/(\d+)\s*[x×]\s*(\d+)/i);
+    if (sr) { sets = +sr[1]; reps = +sr[2]; }
+    const w = line.match(/@\s*(\d+(?:\.\d+)?)/);
+    if (w) weight = parseFloat(w[1]);
+    const name = line.replace(/\d+\s*[x×]\s*\d+/i, "").replace(/@\s*\d+(?:\.\d+)?/, "").replace(/\s{2,}/g, " ").trim();
+    if (!name) return null;
+    return { name, sets: sets || 3, reps: reps || 10, targetWeight: weight };
+  }).filter(Boolean);
+}
+
+async function assignWorkout(email) {
+  const focus = $("asFocus").value.trim();
+  const exercises = parseExercises($("asList").value);
+  const date = $("asDate").value;
+  if (!exercises.length) { $("asNote").textContent = "Add at least one exercise."; return; }
+  if (!date) { $("asNote").textContent = "Pick a date."; return; }
+
+  $("asSave").disabled = true;
+  const { error } = await sb.rpc("assign_workout", {
+    p_group_id: GROUP.id, p_email: email, p_date: date,
+    p_focus: focus || "Assigned", p_exercises: exercises,
+  });
+  $("asSave").disabled = false;
+  if (error) { $("asNote").textContent = error.message || "Could not assign that."; return; }
+  $("asNote").textContent = `Assigned ${exercises.length} exercise${exercises.length === 1 ? "" : "s"} for ${date}.`;
+  $("asList").value = "";
+  toast("Workout assigned");
+}
+
 function closeDrawer() { $("drawerScrim").classList.add("hidden"); }
 
 async function toggleCommunity() {

@@ -78,9 +78,9 @@
 
   /* Onboarding */
   #onboard { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; }
-  .ob-step { width: 100%; max-width: 340px; display: flex; flex-direction: column; align-items: center; }
-  #onboard h1 { font-size: 26px; margin: 0 0 6px; }
-  #onboard p.sub { color: var(--muted); margin: 0 0 24px; font-size: 15.5px; }
+  .ob-step { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: stretch; text-align: left; }
+  #onboard h1 { font-size: 30px; letter-spacing: -.025em; line-height: 1.15; margin: 0 0 8px; }
+  #onboard p.sub { color: var(--muted); margin: 0 0 4px; font-size: 15.5px; line-height: 1.5; }
   #onboard input, #onboard textarea {
     width: 100%; padding: 14px 16px; border-radius: 12px;
     border: 1px solid var(--border); background: var(--panel); color: var(--text);
@@ -581,6 +581,40 @@
 
   .coach-line { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); margin-top: 8px; }
   .coach-line svg { color: var(--down); }
+
+  /* Onboarding */
+  .ob-kicker { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--accent); margin-bottom: 8px; }
+  .ob-chips { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+  .ob-chip {
+    width: 100%; text-align: left; padding: 17px 18px; border-radius: 14px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    font-family: inherit; font-size: 16.5px; font-weight: 700; letter-spacing: -.01em;
+    transition: border-color .15s, background .15s;
+  }
+  .ob-chip:hover, .ob-chip:active { border-color: var(--accent); }
+  .ob-chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+
+  .ob-paces { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+  .ob-pace {
+    width: 100%; text-align: left; padding: 16px 18px; border-radius: 14px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text); font-family: inherit;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .ob-pace.rec { border-color: var(--accent); }
+  .ob-pace:hover { border-color: var(--accent); }
+  .ob-pace-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .ob-pace-top strong { font-size: 16.5px; letter-spacing: -.01em; }
+  .ob-pace-top span { font-size: 13px; color: var(--muted); }
+  .ob-pace-note { font-size: 13px; color: var(--muted); line-height: 1.4; }
+
+  .ob-summary {
+    margin: 22px 0 4px; padding: 4px 18px; border-radius: 14px;
+    background: var(--panel); border: 1px solid var(--border);
+  }
+  .ob-row { display: flex; justify-content: space-between; gap: 14px; padding: 13px 0;
+            border-bottom: 1px solid var(--border); font-size: 14.5px; text-align: left; }
+  .ob-row:last-child { border-bottom: none; }
+  .ob-row b { font-weight: 700; }
 
   /* Hero: this week's standing */
   .hero-kicker { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: var(--muted); }
@@ -1666,7 +1700,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.02.2";
+const APP_VERSION = "2026.09.02.3";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -1993,177 +2027,161 @@ function renderPairingScreen() {
   $("pairSignOutBtn").onclick = () => sb.auth.signOut();
 }
 
+/* Onboarding, rebuilt to one rule: ask the goal, then TELL them the plan.
+   Every extra question is a chance to lose someone. The plan is authoritative
+   and safety-led; preferences can be changed afterwards, never before. */
+
+const GOALS = [
+  { key: "lose",     label: "Lose weight",   goal: "Lose weight",   days: 4, focus: "Fat Loss" },
+  { key: "muscle",   label: "Build muscle",  goal: "Build muscle",  days: 4, focus: "Muscle Gain" },
+  { key: "stronger", label: "Get stronger",  goal: "Get stronger",  days: 4, focus: "Strength" },
+  { key: "recomp",   label: "Lose fat and build muscle", goal: "Recomp (lose fat, gain muscle)", days: 5, focus: "Recomp" },
+  { key: "consistent", label: "Just be consistent", goal: "Stay consistent", days: 3, focus: "General Fitness" },
+];
+
+/* The second layer, only where it changes the plan. Never a text field. */
+const GOAL_DETAIL = {
+  lose:     ["A few pounds", "10 to 20 pounds", "More than 20 pounds"],
+  muscle:   ["Fill out a bit", "Put on real size", "As much as I can"],
+  stronger: ["Lift heavier", "Chase a specific number", "Get generally strong"],
+  recomp:   ["Mostly lose fat", "An even split", "Mostly build muscle"],
+  consistent: ["Get moving again", "Keep a habit going", "Train around a busy week"],
+};
+
+const PACE = [
+  { key: "steady", label: "Steady", weeks: 12, note: "The healthy pace. Most people stick with this one." },
+  { key: "quick",  label: "Quicker", weeks: 8,  note: "Harder weeks, less room to miss." },
+  { key: "easy",   label: "Gentle",  weeks: 16, note: "Fits around a full life." },
+];
+
+function obChips(items, selected, attr) {
+  return `<div class="ob-chips">${items.map((t) => {
+    const val = typeof t === "string" ? t : t.label;
+    const key = typeof t === "string" ? t : t.key;
+    return `<button type="button" class="ob-chip ${selected === key ? "on" : ""}" data-${attr}="${escapeHtml(key)}">${escapeHtml(val)}</button>`;
+  }).join("")}</div>`;
+}
+
 function renderOnboardStep(step, data = {}) {
   const ob = $("onboard");
+  ob.classList.remove("hidden");
+  $("app").classList.add("hidden");
+
   if (step === "name") {
     ob.innerHTML = `
       <div class="ob-step">
         <h1>What should we call you?</h1>
-        <p class="sub">Shown to your partner throughout the app.</p>
-        <input id="nameInput" type="text" placeholder="Your name" maxlength="24" value="${escapeHtml(data.name || "")}" />
+        <p class="sub">This is what the people training with you will see.</p>
+        <input id="nameInput" type="text" placeholder="Your name" value="${escapeHtml(data.name || "")}"
+               autocomplete="given-name" />
         <button class="btn-primary" id="nextBtn">Continue</button>
       </div>`;
-    $("nextBtn").onclick = () => {
-      const v = $("nameInput").value.trim();
-      if (!v) return;
-      data.name = v;
-      renderOnboardStep("theme", data);
+    const go = () => {
+      const name = $("nameInput").value.trim();
+      if (!name) { toast("Enter a name"); return; }
+      renderOnboardStep("goal", { ...data, name });
     };
-  } else if (step === "theme") {
+    $("nextBtn").onclick = go;
+    $("nameInput").onkeydown = (e) => { if (e.key === "Enter") go(); };
+    $("nameInput").focus();
+    return;
+  }
+
+  if (step === "goal") {
     ob.innerHTML = `
       <div class="ob-step">
-        <h1>Pick a look</h1>
-        <p class="sub">You can switch this anytime from the top bar.</p>
-        <div class="choice-grid">
-          <div class="choice-card" data-v="dark"><span class="emoji">🌙</span>Dark</div>
-          <div class="choice-card" data-v="light"><span class="emoji">☀️</span>Light</div>
-        </div>
-        <button class="btn-primary" id="nextBtn" disabled>Continue</button>
+        <h1>What do you want?</h1>
+        <p class="sub">Pick one. We will work out the rest.</p>
+        ${obChips(GOALS, data.goalKey, "goal")}
       </div>`;
-    let chosen = null;
-    ob.querySelectorAll(".choice-card").forEach((c) => {
-      c.onclick = () => {
-        ob.querySelectorAll(".choice-card").forEach((x) => x.classList.remove("selected"));
-        c.classList.add("selected");
-        chosen = c.dataset.v;
-        applyTheme(chosen);
-        $("nextBtn").disabled = false;
-      };
+    ob.querySelectorAll("[data-goal]").forEach((b) => {
+      b.onclick = () => renderOnboardStep("detail", { ...data, goalKey: b.dataset.goal });
     });
-    $("nextBtn").onclick = () => {
-      data.theme = chosen;
-      renderOnboardStep("biometrics", data);
-    };
-  } else if (step === "biometrics") {
+    return;
+  }
+
+  if (step === "detail") {
+    const g = GOALS.find((x) => x.key === data.goalKey);
+    const opts = GOAL_DETAIL[data.goalKey] || [];
     ob.innerHTML = `
       <div class="ob-step">
-        <h1>A bit about you</h1>
-        <p class="sub">Used to tailor your workouts. Never shown to anyone but you.</p>
-        <div class="choice-grid" id="sexChoices">
-          <div class="choice-card" data-v="Male">Male</div>
-          <div class="choice-card" data-v="Female">Female</div>
-          <div class="choice-card" data-v="Rather not say">Rather not say</div>
-        </div>
-        <div class="row2">
-          <input id="bioAge" type="number" placeholder="Age" min="13" max="100" />
-          <input id="bioWeight" type="number" placeholder="Weight (lbs)" step="0.1" />
-        </div>
-        <div class="row2">
-          <input id="bioFeet" type="number" placeholder="Height: feet" min="3" max="8" />
-          <input id="bioInches" type="number" placeholder="Inches" min="0" max="11" />
-        </div>
-        <div class="choice-grid single" id="activityChoices">
-          <div class="choice-card" data-v="Sedentary">Sedentary (little to no exercise)</div>
-          <div class="choice-card" data-v="Moderate">Moderate (some activity a few days/week)</div>
-          <div class="choice-card" data-v="Active">Active (exercise most days)</div>
-        </div>
-        <button class="btn-primary" id="nextBtn">Continue</button>
+        <h1>${escapeHtml(g.label)}</h1>
+        <p class="sub">Closest one. You can change your mind later.</p>
+        ${obChips(opts, data.detail, "detail")}
+        <button class="btn-ghost" id="skipDetail">Skip this</button>
       </div>`;
-    let sex = null, activity = null;
-    ob.querySelector("#sexChoices").querySelectorAll(".choice-card").forEach((c) => {
-      c.onclick = () => {
-        ob.querySelector("#sexChoices").querySelectorAll(".choice-card").forEach((x) => x.classList.remove("selected"));
-        c.classList.add("selected");
-        sex = c.dataset.v;
-      };
+    ob.querySelectorAll("[data-detail]").forEach((b) => {
+      b.onclick = () => renderOnboardStep("pace", { ...data, detail: b.dataset.detail });
     });
-    ob.querySelector("#activityChoices").querySelectorAll(".choice-card").forEach((c) => {
-      c.onclick = () => {
-        ob.querySelector("#activityChoices").querySelectorAll(".choice-card").forEach((x) => x.classList.remove("selected"));
-        c.classList.add("selected");
-        activity = c.dataset.v;
-      };
-    });
-    $("nextBtn").onclick = () => {
-      data.sex = sex;
-      data.age = $("bioAge").value ? parseInt($("bioAge").value, 10) : null;
-      data.weight = $("bioWeight").value ? parseFloat($("bioWeight").value) : null;
-      const feet = parseInt($("bioFeet").value, 10) || 0;
-      const inches = parseInt($("bioInches").value, 10) || 0;
-      data.heightIn = (feet || inches) ? feet * 12 + inches : null;
-      data.activityLevel = activity;
-      renderOnboardStep("focus", data);
-    };
-  } else if (step === "focus") {
-    const focuses = [
-      ["Strength", "dumbbell"], ["Muscle Gain", "trending"], ["Fat Loss", "flame"],
-      ["General Fitness", "bolt"], ["Endurance", "run"],
-    ];
+    $("skipDetail").onclick = () => renderOnboardStep("pace", { ...data, detail: null });
+    return;
+  }
+
+  if (step === "pace") {
     ob.innerHTML = `
       <div class="ob-step">
-        <h1>What's your main focus?</h1>
-        <p class="sub">This shapes the daily workouts we generate for you.</p>
-        <div class="choice-grid">
-          ${focuses.map(([f, ic]) => `<div class="choice-card" data-v="${f}"><span class="emoji">${icon(ic, 26)}</span>${f}</div>`).join("")}
+        <h1>How fast?</h1>
+        <p class="sub">Steady is the one we would pick. Nothing here is a crash plan.</p>
+        <div class="ob-paces">
+          ${PACE.map((p) => `
+            <button type="button" class="ob-pace ${p.key === "steady" ? "rec" : ""}" data-pace="${p.key}">
+              <span class="ob-pace-top"><strong>${escapeHtml(p.label)}</strong><span>${p.weeks} weeks</span></span>
+              <span class="ob-pace-note">${escapeHtml(p.note)}</span>
+            </button>`).join("")}
         </div>
-        <button class="btn-primary" id="nextBtn" disabled>Continue</button>
       </div>`;
-    let chosen = null;
-    ob.querySelectorAll(".choice-card").forEach((c) => {
-      c.onclick = () => {
-        ob.querySelectorAll(".choice-card").forEach((x) => x.classList.remove("selected"));
-        c.classList.add("selected");
-        chosen = c.dataset.v;
-        $("nextBtn").disabled = false;
-      };
+    ob.querySelectorAll("[data-pace]").forEach((b) => {
+      b.onclick = () => renderOnboardStep("plan", { ...data, pace: b.dataset.pace });
     });
-    $("nextBtn").onclick = () => {
-      data.focus = chosen;
-      renderOnboardStep("goal", data);
-    };
-  } else if (step === "goal") {
-    const goals = ["Lose weight", "Build muscle", "Recomp (lose fat, gain muscle)", "Get stronger", "Maintain"];
+    return;
+  }
+
+  if (step === "plan") {
+    const g = GOALS.find((x) => x.key === data.goalKey);
+    const p = PACE.find((x) => x.key === data.pace) || PACE[0];
+    const days = g.days;
     ob.innerHTML = `
       <div class="ob-step">
-        <h1>What's your body goal?</h1>
-        <div class="choice-grid single">
-          ${goals.map((g) => `<div class="choice-card" data-v="${g}">${g}</div>`).join("")}
+        <div class="ob-kicker">YOUR PLAN</div>
+        <h1>${days} days a week, for ${p.weeks} weeks</h1>
+        <p class="sub">Built for <strong>${escapeHtml(g.label.toLowerCase())}</strong>${data.detail ? `, ${escapeHtml(data.detail.toLowerCase())}` : ""}.
+          We will pick each session for you. Change any of it later in Setup.</p>
+        <div class="ob-summary">
+          <div class="ob-row"><span>Goal</span><b>${escapeHtml(g.goal)}</b></div>
+          <div class="ob-row"><span>Training days</span><b>${days} per week</b></div>
+          <div class="ob-row"><span>Focus</span><b>${escapeHtml(g.focus)}</b></div>
+          <div class="ob-row"><span>Pace</span><b>${escapeHtml(p.label)}, ${p.weeks} weeks</b></div>
         </div>
-        <textarea id="goalDetail" placeholder="Any more detail? (optional)"></textarea>
-        <button class="btn-primary" id="nextBtn" disabled>Finish setup</button>
+        <button class="btn-primary" id="startBtn">Start</button>
+        <button class="btn-ghost" id="backBtn">Change something</button>
       </div>`;
-    let chosen = null;
-    ob.querySelectorAll(".choice-card").forEach((c) => {
-      c.onclick = () => {
-        ob.querySelectorAll(".choice-card").forEach((x) => x.classList.remove("selected"));
-        c.classList.add("selected");
-        chosen = c.dataset.v;
-        $("nextBtn").disabled = false;
-      };
+    $("startBtn").onclick = () => finishOnboarding({
+      name: data.name,
+      goal: g.goal,
+      goal_detail: data.detail || null,
+      focus: g.focus,
+      challenge_target: days,
     });
-    $("nextBtn").onclick = async () => {
-      data.goal = chosen;
-      data.goalDetail = $("goalDetail").value.trim();
-      await finishOnboarding(data);
-    };
+    $("backBtn").onclick = () => renderOnboardStep("goal", data);
+    return;
   }
 }
 
 async function finishOnboarding(data) {
   ME = data.name;
-  localStorage.setItem(THEME_KEY, data.theme);
-  applyTheme(data.theme);
+  // Biometrics are no longer asked for up front. They are optional refinements
+  // in Setup, because every question before the plan is a chance to lose someone.
   const { data: saved, error } = await sb.from("profiles").upsert({
     email: MY_EMAIL,
     user_name: ME,
-    theme: data.theme,
     focus: data.focus,
     goal: data.goal,
-    goal_detail: data.goalDetail || null,
-    sex: data.sex || null,
-    age: data.age || null,
-    height_in: data.heightIn || null,
-    activity_level: data.activityLevel || null,
+    goal_detail: data.goal_detail || null,
+    challenge_target: data.challenge_target || 4,
     updated_at: new Date().toISOString(),
   }).select().maybeSingle();
   if (error) { toast("Setup failed, try again"); console.error(error); return; }
   MY_PROFILE = saved;
-  if (data.weight) {
-    await sb.from("fit_entries").upsert(
-      { user_name: ME, email: MY_EMAIL, entry_date: todayStr(), weight: data.weight },
-      { onConflict: "email,entry_date" }
-    );
-  }
   applyAccentColors();
   await checkPartnershipThenEnter();
 }
