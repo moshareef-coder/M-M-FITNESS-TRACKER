@@ -559,6 +559,27 @@
   }
   .qchip:active { border-color: var(--accent); color: var(--text); }
 
+  .ds-weight { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .ds-weight label { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .09em;
+                     text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .ds-weight #dsWeight {
+    flex: 1; min-width: 0; padding: 12px 14px; border-radius: 12px; background: var(--panel-2);
+    border: 1px solid var(--border); color: var(--text); font-family: inherit;
+    font-size: 26px; font-weight: 800; letter-spacing: -.02em; -moz-appearance: textfield;
+  }
+  .ds-weight #dsWeight::-webkit-outer-spin-button,
+  .ds-weight #dsWeight::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .ds-weight #dsWeight:focus { outline: none; border-color: var(--accent); }
+  .ds-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .ds-actions button { margin: 0; }
+  .rep-del {
+    margin-left: 10px; flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid transparent; background: transparent; color: var(--muted);
+  }
+  .rep-del:active { color: var(--up); border-color: color-mix(in srgb, var(--up) 40%, transparent); }
+  .rep-row b { margin-left: auto; }
+
   /* Day report sheet */
   .sheet-scrim {
     position: fixed; inset: 0; z-index: 65; display: flex; align-items: flex-end;
@@ -1538,7 +1559,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.01.6";
+const APP_VERSION = "2026.09.01.7";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -2950,7 +2971,23 @@ async function openDaySheet(email, date) {
   if (e.sessions > 1) rows.push(["Sessions", e.sessions]);
   const sets = logs.reduce((s, l) => s + (l.sets || 1), 0);
   if (sets) rows.push(["Sets", sets]);
-  if (e.weight != null) rows.push(["Weight", `${e.weight} lb`]);
+
+  // Your own days are editable in place. A mistyped weight should not force you
+  // to delete the whole day and lose the workout with it.
+  const weightBlock = isMine
+    ? `<div class="ds-weight">
+         <label>Weight</label>
+         <div class="weigh-row">
+           <input type="number" id="dsWeight" inputmode="decimal" step="0.1" min="0"
+                  value="${e.weight != null ? e.weight : ""}" placeholder="Not logged" />
+           <span class="weigh-unit">lbs</span>
+         </div>
+         <div class="ds-actions">
+           <button type="button" class="btn-secondary" id="dsSaveWeight">Save weight</button>
+           ${e.weight != null ? `<button type="button" class="btn-ghost" id="dsClearWeight">Remove weight</button>` : ""}
+         </div>
+       </div>`
+    : (e.weight != null ? `<div class="rep-row"><span>Weight</span><b>${escapeHtml(String(e.weight))} lb</b></div>` : "");
 
   $("daySheet").innerHTML = `
     <div class="ds-grip"></div>
@@ -2964,13 +3001,64 @@ async function openDaySheet(email, date) {
     ${url ? `<div class="ds-hero"><img src="${url}" alt="" /></div>` : ""}
     ${e.rest_day && !e.gym ? `<p class="muted-note">Rest day. Streak kept.</p>` : ""}
     ${rows.map(([k, v]) => `<div class="rep-row"><span>${escapeHtml(k)}</span><b>${escapeHtml(String(v))}</b></div>`).join("")}
-    ${logs.map((l) => `<div class="rep-row"><span>${escapeHtml(l.exercise_name)}</span><b>${escapeHtml(exerciseSummary(l))}</b></div>`).join("")}
+    ${logs.map((l) => `<div class="rep-row">
+        <span>${escapeHtml(l.exercise_name)}</span>
+        <b>${escapeHtml(exerciseSummary(l))}</b>
+        ${isMine ? `<button type="button" class="rep-del" data-exdel="${escapeHtml(l.id)}" aria-label="Remove ${escapeHtml(l.exercise_name)}">${icon("trash", 14)}</button>` : ""}
+      </div>`).join("")}
     ${!logs.length && e.gym ? `<p class="muted-note">Logged as a workout, no exercises recorded.</p>` : ""}
-    ${e.note ? `<p class="quote">${escapeHtml(e.note)}</p>` : ""}`;
+    ${weightBlock}
+    ${e.note ? `<p class="quote">${escapeHtml(e.note)}</p>` : ""}
+    ${isMine ? `<button type="button" class="btn-ghost" id="dsDeleteDay">Delete this day</button>` : ""}`;
 
   $("dsClose").onclick = closeDaySheet;
   $("daySheetScrim").classList.remove("hidden");
   $("daySheetScrim").onclick = (ev) => { if (ev.target === $("daySheetScrim")) closeDaySheet(); };
+
+  if (!isMine) return;
+  $("dsSaveWeight").onclick = () => saveDayWeight(date, $("dsWeight").value);
+  $("dsClearWeight") && ($("dsClearWeight").onclick = () => saveDayWeight(date, ""));
+  $("dsDeleteDay").onclick = () => { closeDaySheet(); confirmDeleteDay(date); };
+  $("daySheet").querySelectorAll("[data-exdel]").forEach((b) => {
+    b.onclick = () => deleteExerciseLog(b.dataset.exdel, date);
+  });
+}
+
+/* Correct a weight on any day, or clear it, without touching the workout. */
+async function saveDayWeight(date, raw) {
+  const txt = String(raw).trim();
+  const parsed = parseFloat(txt);
+  if (txt !== "" && (!Number.isFinite(parsed) || parsed <= 0)) { toast("Enter a valid weight"); return; }
+  const weight = txt === "" ? null : parsed;
+
+  const existing = ALL_ENTRIES.find((x) => x.email === MY_EMAIL && x.entry_date === date);
+  const payload = {
+    user_name: ME, email: MY_EMAIL, entry_date: date, weight,
+    gym: existing?.gym ?? false,
+    sessions: existing?.sessions ?? 0,
+    proof_path: existing?.proof_path ?? null,
+    rest_day: existing?.rest_day ?? false,
+    note: existing?.note ?? null,
+    workout_at: existing?.workout_at ?? null,
+  };
+  const landed = await safeWrite("fit_entries", "upsert", payload, { onConflict: "email,entry_date" });
+  if (!landed) applyLocally("fit_entries", payload);
+  toast(weight === null ? "Weight removed" : "Weight updated");
+  await loadAll();
+  closeDaySheet();
+  renderHome();
+}
+
+/* Remove one mis-logged exercise, leaving the rest of the day alone. */
+async function deleteExerciseLog(id, date) {
+  const log = ALL_EXERCISE_LOGS.find((l) => l.id === id && l.email === MY_EMAIL);
+  if (!log) return;
+  if (!confirm(`Remove ${log.exercise_name} from this day? This cannot be undone.`)) return;
+  const { error } = await sb.from("exercise_logs").delete().eq("id", id);
+  if (error) { toast("Could not remove"); console.error(error); return; }
+  toast("Removed");
+  await loadAll();
+  openDaySheet(MY_EMAIL, date);
 }
 
 function closeDaySheet() { $("daySheetScrim").classList.add("hidden"); }
