@@ -12,6 +12,14 @@ Two layers, built in phases, both feeding `supabase/functions/generate-workout`:
    muscle group), `rpe-autoregulation.md` (effort targets by goal), `periodization-deloads.md`
    (when and how to back off). Each is short and meant to be read directly, not just consumed
    by the AI -- add to or edit these like any other doc when the training philosophy changes.
+3. **`exercise-library/`** (draft, awaiting review) -- an actual enumerated Training → Category →
+   Exercise list (weight training's 14 categories keyed to `MUSCLE_GROUPS`, yoga poses, Pilates
+   moves; 121 entries so far), meant to replace letting the AI invent exercise names freely.
+   Sports/cardio-machine activities (basketball, running, cycling, etc.) stay simple timed logs,
+   matching how the app already treats them -- they don't decompose into discrete "exercises."
+   Review page: `exercise-library/library.html`. **Not yet wired into `generate-workout` or the
+   app** -- the selection formula (which exercises get picked for a given goal/level/equipment)
+   is deliberately not built until the library itself is reviewed and approved.
 
 ## Using the formulas
 
