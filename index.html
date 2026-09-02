@@ -1559,7 +1559,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.01.7";
+const APP_VERSION = "2026.09.01.8";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -3657,9 +3657,11 @@ function startWorkout() {
     SESSION.exerciseIndex++;
   }
 
-  // Everything in this plan is already logged. Opening a session would land on
-  // an exercise that does not exist, so go straight to the wrap-up instead.
+  // Everything in this plan is already logged. Show the wrap-up, but mark the
+  // session finished FIRST so re-opening a completed plan cannot bank another
+  // workout. This screen is a summary, not a completion event.
   if (SESSION.exerciseIndex >= SESSION.completed.length) {
+    SESSION.finished = true;
     saveSessionToStorage();
     openSessionUI();
     $("workoutContent").classList.add("hidden");
@@ -4024,10 +4026,18 @@ async function doMarkGymDayDone() {
   if (!landed) applyLocally("fit_entries", payload);
 }
 
-async function renderSessionComplete() {
+/* Finishing a workout is an ACTION and must happen exactly once. Showing the
+   completion screen is a RENDER and may happen any number of times: reopening
+   a finished plan, ending from the pause sheet, a re-render. Keeping the write
+   inside the render is what let the session count climb on its own. */
+async function finishWorkout() {
+  if (!SESSION || SESSION.finished) return;   // already banked
+  SESSION.finished = true;
+  saveSessionToStorage();
+
   // Persist how long it took and how long the rests were. Without this the
   // workout leaves no record beyond the exercise rows.
-  if (TODAY_WORKOUT?.id && SESSION) {
+  if (TODAY_WORKOUT?.id) {
     await sb.from("ai_workouts").update({
       duration_sec: Math.round(sessionElapsed() / 1000),
       completed_at: new Date().toISOString(),
@@ -4036,6 +4046,10 @@ async function renderSessionComplete() {
   }
   await markGymDayDone();
   await loadAll();
+}
+
+async function renderSessionComplete() {
+  await finishWorkout();
   const loggedNow = todaysLoggedExerciseNames();
   const total = TODAY_WORKOUT.exercises.length;
   const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
