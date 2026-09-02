@@ -441,6 +441,13 @@
     font-size: 16px; line-height: 1; display: flex; align-items: center; justify-content: center;
   }
 
+  .log-edit {
+    margin-left: auto; flex-shrink: 0; padding: 5px 12px; border-radius: 100px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--muted);
+    font-size: 12.5px; font-weight: 600; font-family: inherit;
+  }
+  .log-edit:active { border-color: var(--accent); color: var(--text); }
+
   .log-del {
     margin-left: auto; flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px;
     display: flex; align-items: center; justify-content: center; cursor: pointer;
@@ -509,6 +516,8 @@
     font-size: 9.5px; font-weight: 800; color: rgba(255,255,255,.96); text-shadow: 0 1px 3px rgba(0,0,0,.55);
   }
   .sd.empty .sd-day { color: var(--muted); text-shadow: none; }
+  .sd-wt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+           font-size: 11px; font-weight: 700; color: var(--muted); }
   .sd-rest { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
              font-size: 9.5px; font-weight: 700; color: var(--muted); }
 
@@ -1559,7 +1568,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.01.8";
+const APP_VERSION = "2026.09.01.9";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -2148,6 +2157,18 @@ function closeAllOverlays() {
     sess.classList.remove("leaving");
     sess.classList.add("hidden");
   }
+}
+
+/* Re-render whatever the user is currently looking at. Edits can be made from
+   Home or from Progress, and each should refresh in place. */
+function refreshCurrentTab() {
+  const active = document.querySelector(".tab-btn.active");
+  const tab = active?.dataset.tab || "home";
+  if (tab === "home") renderHome();
+  else if (tab === "progress") renderProgressTab();
+  else if (tab === "body") renderBodyTab();
+  else if (tab === "workout") renderWorkoutTab();
+  else if (tab === "setup") renderSetupTab();
 }
 
 function switchTab(tab) {
@@ -2756,6 +2777,11 @@ async function stripCellHTML(name, email, date, isToday) {
     return `<button type="button" class="${cls} empty" data-day="${date}" data-who="${escapeHtml(email || "")}">
       <span class="sd-day">${letter}</span><span class="sd-rest">rest</span></button>`;
   }
+  // A weigh-in with no workout is still a day you can open and correct.
+  if (e?.weight != null) {
+    return `<button type="button" class="${cls} empty" data-day="${date}" data-who="${escapeHtml(email || "")}">
+      <span class="sd-day">${letter}</span><span class="sd-wt">${escapeHtml(String(e.weight))}</span></button>`;
+  }
   return `<div class="${cls} empty"><span class="sd-day">${letter}</span></div>`;
 }
 
@@ -3046,7 +3072,7 @@ async function saveDayWeight(date, raw) {
   toast(weight === null ? "Weight removed" : "Weight updated");
   await loadAll();
   closeDaySheet();
-  renderHome();
+  refreshCurrentTab();
 }
 
 /* Remove one mis-logged exercise, leaving the rest of the day alone. */
@@ -3487,20 +3513,20 @@ function renderLog() {
     const gym = e.gym ? `<span class="gym-yes">${icon("dumbbell", 14)}</span>` : "";
     const rest = e.rest_day ? `<span class="log-rest">rest</span>` : "";
     const sets = e.sessions > 1 ? `<span class="log-rest">${e.sessions}x</span>` : "";
-    // You can always remove your own entries. Never a partner's.
-    const del = mine
-      ? `<button type="button" class="log-del" data-del="${escapeHtml(e.entry_date)}" aria-label="Delete ${escapeHtml(e.entry_date)}">${icon("trash", 15)}</button>`
+    // Your own rows open for editing. A partner's are read-only.
+    const edit = mine
+      ? `<button type="button" class="log-edit" data-edit="${escapeHtml(e.entry_date)}">Edit</button>`
       : "";
     return `<div class="log-item">
       <span class="dot" style="background:${color}"></span>
       <span class="date">${e.entry_date.slice(5)}</span>
       <span class="w">${w}</span>${gym}${sets}${rest}
-      <span class="note"></span>${del}
+      <span class="note"></span>${edit}
     </div>`;
   }).join("");
 
-  list.querySelectorAll("[data-del]").forEach((b) => {
-    b.onclick = () => confirmDeleteDay(b.dataset.del);
+  list.querySelectorAll("[data-edit]").forEach((b) => {
+    b.onclick = () => openDaySheet(MY_EMAIL, b.dataset.edit);
   });
 }
 
@@ -3530,7 +3556,7 @@ async function confirmDeleteDay(date) {
     if (date === todayStr()) { SESSION = null; clearSessionStorage(); TODAY_WORKOUT = null; }
     toast("Deleted");
     await loadAll();
-    renderProgressTab();
+    refreshCurrentTab();
   } catch (err) {
     console.error(err);
     toast("Could not delete");
