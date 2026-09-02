@@ -1663,7 +1663,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.01.20";
+const APP_VERSION = "2026.09.02.1";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -3059,6 +3059,7 @@ function renderHero() {
   }
   if ($("heroClearBtn")) {
     $("heroClearBtn").onclick = async () => {
+      if (!confirm(`Clear tomorrow's ${planned.focus || "workout"}? You can plan another.`)) return;
       await sb.from("ai_workouts").delete().eq("id", planned.id);
       await loadAll();
       renderHero();
@@ -3494,6 +3495,7 @@ async function uploadProof(file) {
 async function removeProof() {
   const entry = todayEntryFor(MY_EMAIL);
   if (!entry?.proof_path) return;
+  if (!confirm("Delete today's proof photo? This cannot be undone.")) return;
   await sb.storage.from("workout-proof").remove([entry.proof_path]);
   delete PROOF_URL_CACHE[entry.proof_path];
   await sb.from("fit_entries").update({ proof_path: null }).eq("email", MY_EMAIL).eq("entry_date", todayStr());
