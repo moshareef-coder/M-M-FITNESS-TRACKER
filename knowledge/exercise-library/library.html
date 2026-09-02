@@ -111,7 +111,7 @@
     const styles = t.styles
       ? `<div class="styles">${t.styles.map((s) => `<span class="style-chip"><b>${s.label}</b> — ${s.note}</span>`).join("")}</div>`
       : "";
-    return `<section class="training">
+    return `<section class="training" data-training="${t.id}">
       <div class="training-head">
         <h2>${t.label}</h2>
         <span class="mode">${t.trackingMode === "sets" ? "sets × reps × weight" : "logged by duration"}</span>
@@ -139,18 +139,41 @@
     <div class="stat"><b>${SIMPLE_TIMED_ACTIVITIES.length}</b><span>Simple timed activities</span></div>
   `;
 
-  document.getElementById("filters").addEventListener("click", (e) => {
-    const btn = e.target.closest(".filter-btn");
-    if (!btn) return;
-    document.querySelectorAll(".filter-btn").forEach((b) => b.classList.toggle("active", b === btn));
-    const level = btn.dataset.level;
+  const trainingFilters = document.getElementById("trainingFilters");
+  trainingFilters.innerHTML = [`<button type="button" class="filter-btn active" data-training="all">All trainings</button>`]
+    .concat(TRAININGS.map((t) => `<button type="button" class="filter-btn" data-training="${t.id}">${t.label}</button>`))
+    .join("");
+
+  let activeTraining = "all";
+  let activeLevel = "all";
+
+  function applyFilters() {
+    document.querySelectorAll(".training").forEach((section) => {
+      section.hidden = activeTraining !== "all" && section.dataset.training !== activeTraining;
+    });
     document.querySelectorAll(".ex-row").forEach((row) => {
-      row.hidden = level !== "all" && row.dataset.level !== level;
+      row.hidden = activeLevel !== "all" && row.dataset.level !== activeLevel;
     });
     document.querySelectorAll(".category").forEach((cat) => {
       const visible = [...cat.querySelectorAll(".ex-row")].some((row) => !row.hidden);
       cat.dataset.empty = String(!visible);
     });
+  }
+
+  trainingFilters.addEventListener("click", (e) => {
+    const btn = e.target.closest(".filter-btn");
+    if (!btn) return;
+    trainingFilters.querySelectorAll(".filter-btn").forEach((b) => b.classList.toggle("active", b === btn));
+    activeTraining = btn.dataset.training;
+    applyFilters();
+  });
+
+  document.getElementById("filters").addEventListener("click", (e) => {
+    const btn = e.target.closest(".filter-btn");
+    if (!btn) return;
+    document.querySelectorAll("#filters .filter-btn").forEach((b) => b.classList.toggle("active", b === btn));
+    activeLevel = btn.dataset.level;
+    applyFilters();
   });
 </script>
 </body>
