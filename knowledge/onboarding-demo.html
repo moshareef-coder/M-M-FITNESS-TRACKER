@@ -434,9 +434,12 @@
       });
       currentTrackingMode = "sets";
       currentContext = { level, equipmentAvailable, recentExerciseNames: yesterday?.recentExerciseNames || [] };
-      continuityEl.innerHTML = yesterday
-        ? `<div class="continuity-banner">Today avoids ${yesterday.focusCategories.join(" & ")} since that is what got trained last time, and skips repeating the same exercises.</div>`
-        : `<div class="continuity-banner">First plan for this browser. Hit "Mark today done," then reload — tomorrow's weight-training day will visibly build on today's.</div>`;
+      const styleNote = currentPlan.sessionStyle === "circuit"
+        ? `Circuit style for this goal: ${currentPlan.restSeconds}s rest between exercises, keep moving. `
+        : `Traditional straight sets: ${currentPlan.restSeconds}s rest between exercises, full recovery. `;
+      continuityEl.innerHTML = (yesterday
+        ? `<div class="continuity-banner">${styleNote}Today avoids ${yesterday.focusCategories.join(" & ")} since that is what got trained last time, and skips repeating the same exercises.</div>`
+        : `<div class="continuity-banner">${styleNote}First plan for this browser. Hit "Mark today done," then reload — tomorrow's weight-training day will visibly build on today's.</div>`);
       body.innerHTML = `<div class="focus-chips" id="focusChips"></div><div id="exRows"></div>`;
       renderPlanRows();
     } else if (type === "flow") {

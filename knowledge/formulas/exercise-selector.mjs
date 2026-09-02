@@ -262,7 +262,10 @@ export function buildWeightTrainingPlan({
     })
   );
 
-  return { trainingId: "weight-training", focusCategories: categories, exercises };
+  return {
+    trainingId: "weight-training", focusCategories: categories, exercises,
+    sessionStyle: sessionStyleForGoal(goal), restSeconds: restSecondsForGoal(goal),
+  };
 }
 
 // ---------------------------------------------------------------------------
