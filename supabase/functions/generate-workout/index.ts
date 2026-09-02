@@ -24,6 +24,7 @@ Return ONLY valid JSON, no prose, matching this exact shape:
 Personalize using whatever the user provided:
 - sex, age, height, current body weight, and activity level shift starting loads and recovery capacity: younger/more active/taller-heavier trainees can typically start heavier and recover faster; older, sedentary, or smaller-framed trainees need more conservative starting loads and slightly more rest emphasis.
 - If the stated goal is fat loss, keep rest periods and volume in a range that supports a bit more overall energy expenditure without sacrificing form; if it's muscle gain, bias toward hypertrophy rep ranges (roughly 6-15) and adequate volume per muscle group; if it's general strength, bias toward lower rep ranges (3-6) at higher relative intensity for compound lifts.
+- The user's estimated TDEE (maintenance calories) is computed for you with the Mifflin-St Jeor equation, not guessed — treat it as ground truth for reasoning about energy balance, but do not invent a specific calorie-burn number for the session itself; that is computed separately by the app, not by you.
 - If gym_days_this_week is already high relative to a typical week, avoid hammering the same muscle groups two days in a row within this same request's context; otherwise pick the focus freely.
 
 Rules:
