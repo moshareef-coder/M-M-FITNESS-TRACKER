@@ -481,12 +481,31 @@
 
   .ver-stamp { opacity: .4; font-weight: 600; letter-spacing: .04em; }
 
-  /* Today cards */
-  .today-kicker { font-size: 10.5px; font-weight: 800; letter-spacing: .11em; color: var(--muted); }
-  .today-head { font-size: 20px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2; margin-top: 5px; }
-  .today-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-  .today-photo { margin-top: 14px; border-radius: 13px; overflow: hidden; aspect-ratio: 4/3; }
-  .today-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  /* Hero: both of you, at a glance */
+  .hero-kicker { font-size: 10.5px; font-weight: 800; letter-spacing: .11em; color: var(--muted); }
+  .hero-bars { display: flex; flex-direction: column; gap: 14px; margin: 14px 0 0; }
+  .pbar-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
+  .pbar-name { font-size: 15px; font-weight: 700; }
+  .pbar-count { font-size: 15px; font-weight: 800; letter-spacing: -.01em; }
+  .pbar-count span { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+  .pbar-count.hit { color: var(--down); }
+  .pbar-track {
+    height: 10px; border-radius: 100px; background: var(--panel-2);
+    border: 1px solid var(--border); overflow: hidden;
+  }
+  .pbar-track i { display: block; height: 100%; border-radius: 100px; transition: width .5s cubic-bezier(.22,1,.36,1); }
+  .pbar-track i.me { background: var(--me); }
+  .pbar-track i.them { background: var(--partner); }
+  .hero-streak {
+    display: flex; align-items: center; gap: 9px; margin-top: 16px; padding: 11px 13px;
+    border-radius: 12px; background: var(--panel-2); border: 1px solid var(--border);
+    font-size: 13.5px; line-height: 1.4;
+  }
+  .hero-streak svg { color: var(--gold); flex-shrink: 0; }
+  .hero-planned { font-size: 13.5px; color: var(--muted); margin: 16px 0 0; display: flex; align-items: center; gap: 7px; }
+  .hero-planned svg { color: var(--down); }
+  #heroCard .btn-primary, #heroCard .btn-secondary { margin-top: 16px; }
 
   /* Headline stats: wide rows, label left, number right */
   #statsRow { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
@@ -1134,9 +1153,7 @@
 
     <div class="notice hidden" id="partnerNotice"></div>
 
-    <div class="card" id="youTodayCard"></div>
-
-    <div id="statsRow"></div>
+    <div class="card" id="heroCard"></div>
 
     <div class="card">
       <div class="strip-head">
@@ -1156,7 +1173,7 @@
       <div class="strip" id="theirStrip"></div>
     </div>
 
-    <div class="card" id="tomorrowCard"></div>
+    <div id="statsRow"></div>
   </div>
 
   <div id="tab-workout" class="tab-panel hidden">
@@ -1600,7 +1617,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.01.12";
+const APP_VERSION = "2026.09.01.13";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -2794,81 +2811,9 @@ function workoutSummary(name, date) {
   return { logs, sets, mins, names };
 }
 
-async function renderYouToday() {
-  const el = $("youTodayCard");
-  const e = todayEntryFor(MY_EMAIL);
-  const partner = partnerName();
-  const theirs = PARTNER_EMAIL ? todayEntryFor(PARTNER_EMAIL) : null;
-
-  if (!e?.gym) {
-    const nudge = e?.rest_day
-      ? "Rest day. Your streak is safe."
-      : theirs?.gym
-        ? `${escapeHtml(partner)} went at ${theirs.workout_at ? new Date(theirs.workout_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "some point"} today.`
-        : "Nothing logged yet.";
-    el.innerHTML = `
-      <div class="today-kicker">YOU</div>
-      <div class="today-head">${e?.rest_day ? "Resting today" : "You haven't trained today"}</div>
-      <p class="muted-note">${nudge}</p>
-      <button type="button" class="btn-primary" id="todayGoBtn">Begin workout</button>`;
-    $("todayGoBtn").onclick = () => {
-      switchTab("workout");
-      if (SESSION) { reopenSession(); return; }
-      if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
-      else startWorkout();
-    };
-    return;
-  }
-
-  const s = workoutSummary(ME, todayStr());
-  const plan = (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === todayStr());
-  const bits = [plan?.focus, s.mins ? `${s.mins} min` : null, s.sets ? `${s.sets} sets` : null]
-    .filter(Boolean).join(" · ");
-  const url = e.proof_path ? await signedProofUrl(e.proof_path) : null;
-
-  el.innerHTML = `
-    <div class="today-kicker">YOU${e.sessions > 1 ? ` · ${e.sessions} SESSIONS` : ""}</div>
-    <div class="today-head">${escapeHtml(bits || "Workout logged")}</div>
-    ${s.names.length ? `<div class="today-chips">${s.names.slice(0, 6).map((n) => `<span class="tally-chip">${escapeHtml(n)}</span>`).join("")}</div>` : ""}
-    ${url ? `<div class="today-photo"><img src="${url}" alt="Your workout today" /></div>` : ""}
-    ${e.note ? `<p class="quote">${escapeHtml(e.note)}</p>` : ""}
-    ${PARTNER_EMAIL ? `<button type="button" class="btn-secondary" id="todayNoteBtn">${e.note ? "Change your note" : `Say something to ${escapeHtml(partner)}`}</button>` : ""}`;
-  if (PARTNER_EMAIL) $("todayNoteBtn").onclick = () => openNoteComposer("workout");
-}
 
 
 
-/* Getting ahead: plan tomorrow before tomorrow arrives. */
-function renderTomorrow() {
-  const el = $("tomorrowCard");
-  const d = new Date(todayStr() + "T00:00:00");
-  d.setDate(d.getDate() + 1);
-  const date = isoDate(d);
-  const planned = (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === date && !w.archived);
-  const label = d.toLocaleDateString(undefined, { weekday: "long" });
-
-  if (planned) {
-    const names = (planned.exercises || []).map((x) => x.name);
-    el.innerHTML = `
-      <div class="today-kicker">TOMORROW · ${escapeHtml(label.toUpperCase())}</div>
-      <div class="today-head">${escapeHtml(planned.focus || "Planned")}</div>
-      <div class="today-chips">${names.slice(0, 6).map((n) => `<span class="tally-chip">${escapeHtml(n)}</span>`).join("")}</div>
-      <button type="button" class="btn-ghost" id="clearTomorrowBtn">Clear it</button>`;
-    $("clearTomorrowBtn").onclick = async () => {
-      await sb.from("ai_workouts").delete().eq("id", planned.id);
-      await loadAll();
-      renderTomorrow();
-    };
-    return;
-  }
-
-  el.innerHTML = `
-    <div class="today-kicker">TOMORROW · ${escapeHtml(label.toUpperCase())}</div>
-    <div class="today-head">Nothing planned yet</div>
-    <p class="muted-note">Get ahead. Have it waiting when you walk in.</p>
-    <button type="button" class="btn-secondary" id="planTomorrowBtn">Plan tomorrow's workout</button>`;
-  $("planTomorrowBtn").onclick = () => generateWorkout(date);
-}
 
 /* ---------- Headline stats ----------
    Show the number that matches what this person actually does, rather than the
@@ -2935,6 +2880,116 @@ function headlineStats(name, email) {
   return out.slice(0, 3);
 }
 
+
+/* ---------- Hero: how the two of you are doing, and the one thing to do ---------- */
+
+function weekStartOf(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  const back = (d.getDay() + 6) % 7;          // weeks run Monday to Sunday
+  d.setDate(d.getDate() - back);
+  return isoDate(d);
+}
+
+function gymDaysInWeek(name, weekStart) {
+  const end = new Date(weekStart + "T00:00:00");
+  end.setDate(end.getDate() + 6);
+  const endStr = isoDate(end);
+  return new Set(entriesFor(name)
+    .filter((e) => e.gym && e.entry_date >= weekStart && e.entry_date <= endStr)
+    .map((e) => e.entry_date)).size;
+}
+
+/* Consecutive COMPLETED weeks where both of you hit your own goal. The current
+   week is excluded because it is not finished yet. */
+function sharedWeekStreak() {
+  if (!PARTNER_EMAIL) return 0;
+  const partner = partnerName();
+  const myTarget = weeklyGoalFor(MY_EMAIL);
+  const theirTarget = weeklyGoalFor(PARTNER_EMAIL);
+  if (!myTarget || !theirTarget) return 0;
+
+  let streak = 0;
+  const cursor = new Date(weekStartOf(todayStr()) + "T00:00:00");
+  for (let i = 0; i < 52; i++) {
+    cursor.setDate(cursor.getDate() - 7);     // step back one full week
+    const ws = isoDate(cursor);
+    const mine = gymDaysInWeek(ME, ws);
+    const theirs = gymDaysInWeek(partner, ws);
+    if (mine === 0 && theirs === 0) break;    // before either of you started
+    if (mine >= myTarget && theirs >= theirTarget) streak++;
+    else break;
+  }
+  return streak;
+}
+
+function personBar(name, done, target, cls) {
+  const pct = target > 0 ? Math.min(1, done / target) : 0;
+  const hit = done >= target && target > 0;
+  return `<div class="pbar">
+    <div class="pbar-top">
+      <span class="pbar-name">${escapeHtml(name)}</span>
+      <span class="pbar-count ${hit ? "hit" : ""}">${done}<span>/${target}</span></span>
+    </div>
+    <div class="pbar-track"><i class="${cls}" style="width:${pct * 100}%"></i></div>
+  </div>`;
+}
+
+function renderHero() {
+  const el = $("heroCard");
+  const myDays = gymDaysThisWeek(ME);
+  const myTarget = weeklyGoalFor(MY_EMAIL);
+  const trainedToday = !!todayEntryFor(MY_EMAIL)?.gym;
+
+  let bars = personBar("You", myDays, myTarget, "me");
+  if (PARTNER_EMAIL) {
+    const partner = partnerName();
+    bars += personBar(partner, gymDaysThisWeek(partner), weeklyGoalFor(PARTNER_EMAIL), "them");
+  }
+
+  const streak = sharedWeekStreak();
+  const streakLine = streak > 0
+    ? `<div class="hero-streak">${icon("flame", 16)} <span><strong>${streak} week${streak === 1 ? "" : "s"}</strong> in a row you both hit your goal</span></div>`
+    : "";
+
+  // Tomorrow, only once today is handled.
+  const d = new Date(todayStr() + "T00:00:00");
+  d.setDate(d.getDate() + 1);
+  const tomorrow = isoDate(d);
+  const planned = (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === tomorrow && !w.archived);
+
+  let cta;
+  if (!trainedToday) {
+    cta = `<button type="button" class="btn-primary" id="heroBtn">Begin workout</button>`;
+  } else if (planned) {
+    cta = `<p class="hero-planned">${icon("check", 14)} Tomorrow: ${escapeHtml(planned.focus || "planned")}</p>
+           <button type="button" class="btn-ghost" id="heroClearBtn">Clear tomorrow</button>`;
+  } else {
+    cta = `<button type="button" class="btn-secondary" id="heroBtn">Plan tomorrow's workout</button>`;
+  }
+
+  el.innerHTML = `
+    <div class="hero-kicker">THIS WEEK</div>
+    <div class="hero-bars">${bars}</div>
+    ${streakLine}
+    ${cta}`;
+
+  if ($("heroBtn")) {
+    $("heroBtn").onclick = () => {
+      if (trainedToday) { generateWorkout(tomorrow); return; }
+      switchTab("workout");
+      if (SESSION) { reopenSession(); return; }
+      if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
+      else startWorkout();
+    };
+  }
+  if ($("heroClearBtn")) {
+    $("heroClearBtn").onclick = async () => {
+      await sb.from("ai_workouts").delete().eq("id", planned.id);
+      await loadAll();
+      renderHero();
+    };
+  }
+}
 
 /* Your partner turning up is news, not furniture. It shows once, you either
    congratulate them or dismiss it, and then it is gone for the day. */
@@ -3577,11 +3632,10 @@ function relativeDay(dateStr) {
 
 
 function renderHome() {
-  renderYouToday();
+  renderHero();
   renderPartnerNotice();
   renderHeadlineStats();
   renderWeekStrips();
-  renderTomorrow();
   renderRestDayPrompt();
   renderEncouragementBanner();
   maybeShowPartnerPopup();
