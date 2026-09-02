@@ -123,6 +123,52 @@ export function selectExercisesForCategory({ trainingId, categoryKey, level, equ
     .slice(0, count);
 }
 
+/** Finds the exercise + its category/training by name, since a plan only carries the name. */
+function locateExercise(exerciseName, trainingId = null) {
+  const searchSpace = trainingId ? [byId[trainingId]].filter(Boolean) : TRAININGS;
+  for (const training of searchSpace) {
+    for (const category of training.categories) {
+      const ex = category.exercises.find((e) => e.name === exerciseName);
+      if (ex) return { training, category, exercise: ex };
+    }
+  }
+  return null;
+}
+
+/**
+ * Swap suggestions for one exercise: other moves in the SAME category (same primary target
+ * muscle, guaranteed by the library's structure) ranked by how similar the stimulus is --
+ * secondary-muscle overlap first, then how close the difficulty level is to the original. The
+ * top result is the recommendation; the rest are viable alternatives, not padding.
+ */
+export function findAlternatives({ exerciseName, trainingId = null, level = null, equipmentAvailable = null, count = 4 }) {
+  const located = locateExercise(exerciseName, trainingId);
+  if (!located) return [];
+  const { training, category, exercise: original } = located;
+  const maxRank = LEVEL_RANK[level ?? original.level] ?? 1;
+
+  const candidates = category.exercises.filter((ex) => {
+    if (ex.name === original.name) return false;
+    const okLevel = LEVEL_RANK[ex.level] <= maxRank;
+    const okEquip = !equipmentAvailable || !ex.equipment || equipmentAvailable.includes(ex.equipment);
+    return okLevel && okEquip;
+  });
+
+  const originalSecondary = new Set(original.secondary || []);
+  const scored = candidates.map((ex) => {
+    const overlap = (ex.secondary || []).filter((m) => originalSecondary.has(m)).length;
+    const levelDistance = Math.abs(LEVEL_RANK[ex.level] - LEVEL_RANK[original.level]);
+    const sameEquipment = ex.equipment === original.equipment ? 1 : 0;
+    return { ex, score: overlap * 3 + sameEquipment - levelDistance };
+  });
+
+  const ranked = scored.sort((a, b) => b.score - a.score).slice(0, count).map((s) => s.ex);
+  return ranked.map((ex, i) => ({
+    name: ex.name, primary: ex.primary, secondary: ex.secondary,
+    equipment: ex.equipment, level: ex.level, recommended: i === 0,
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Progressive overload as a formula, not a prompt instruction (see
 // ../principles/progressive-overload.md). Isolation/small-joint moves get a smaller jump than

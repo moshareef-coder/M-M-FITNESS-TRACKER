@@ -39,6 +39,15 @@
   .ex-prescription { text-align: right; font-size: 13px; }
   .estimate-note { font-size: 11px; color: var(--muted); }
   .empty { color: var(--muted); font-size: 14px; padding: 20px 0; text-align: center; }
+  .ex-block { border-bottom: 1px solid var(--border); }
+  .ex-block:last-child { border-bottom: none; }
+  .ex-block .ex-row { border-bottom: none; padding-bottom: 4px; }
+  .swap-btn { font-size: 12px; background: none; border: none; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 0 0 10px; }
+  .alt-panel { background: var(--chip); border-radius: 10px; padding: 8px 12px; margin: 0 0 12px; }
+  .alt-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .alt-row:last-child { border-bottom: none; }
+  .rec-badge { font-size: 10px; background: var(--accent); color: var(--bg); border-radius: 100px; padding: 2px 7px; margin-left: 6px; vertical-align: middle; }
+  .use-btn { font-size: 12px; padding: 6px 12px; border-radius: 100px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -100,6 +109,7 @@
 <script type="module">
   import {
     deriveTraineeLevel, buildWeightTrainingPlan, buildCalisthenicsPlan, buildFlowPlan,
+    findAlternatives, coldStartWeight,
   } from "./formulas/exercise-selector.mjs";
 
   const equipChips = document.getElementById("equipChips");
@@ -112,30 +122,87 @@
     return [...equipChips.querySelectorAll(".equip-chip.on")].map((c) => c.dataset.e);
   }
 
-  function renderPlan(plan, trackingMode) {
+  // Live state so a swap can mutate the plan in place and re-render, rather than regenerating
+  // (regenerating would re-run the whole selection algorithm and pick different exercises).
+  let currentPlan = null;
+  let currentTrackingMode = null;
+  let currentContext = null; // { level, equipmentAvailable, bodyWeightLb }
+  let lastAltsByIndex = {};
+
+  function weightFor(ex) {
+    if (ex.equipment === "bodyweight") return 0;
+    return coldStartWeight(ex.name, currentContext.level, currentContext.bodyWeightLb) ?? null;
+  }
+
+  function renderPlan() {
     const result = document.getElementById("result");
-    if (!plan.exercises.length) {
+    if (!currentPlan.exercises.length) {
       result.innerHTML = `<div class="empty">No eligible exercises for this combination (try adding more equipment).</div>`;
       return;
     }
-    const focusChips = plan.focusCategories.map((c) => `<span class="focus-chip">${c}</span>`).join("");
-    const rows = plan.exercises.map((ex) => {
-      const prescription = trackingMode === "sets"
-        ? `${ex.sets} × ${ex.reps}${ex.targetWeight != null ? ` @ ${ex.targetWeight === 0 ? "bodyweight" : ex.targetWeight + " lb"}` : ""}`
+    const focusChips = currentPlan.focusCategories.map((c) => `<span class="focus-chip">${c}</span>`).join("");
+    const rows = currentPlan.exercises.map((ex, i) => {
+      const prescription = currentTrackingMode === "sets"
+        ? `${ex.sets} × ${ex.reps}${ex.targetWeight != null ? ` @ ${ex.targetWeight === 0 ? "bodyweight" : ex.targetWeight + " lb"}` : " (start light)"}`
         : "~2-3 min hold";
       const note = ex.isEstimate ? `<div class="estimate-note">cold-start estimate, no history yet</div>` : "";
-      return `<div class="ex-row">
-        <div>
-          <div class="ex-name">${ex.name}</div>
-          <div class="ex-sub">${(ex.primary || []).join(", ")}${ex.level ? " · " + ex.level : ""}</div>
+      return `<div class="ex-block" data-index="${i}">
+        <div class="ex-row">
+          <div>
+            <div class="ex-name">${ex.name}</div>
+            <div class="ex-sub">${(ex.primary || []).join(", ")}${ex.level ? " · " + ex.level : ""}</div>
+          </div>
+          <div class="ex-prescription">${prescription}${note}</div>
         </div>
-        <div class="ex-prescription">${prescription}${note}</div>
+        <button type="button" class="swap-btn" data-index="${i}">Swap this exercise</button>
+        <div class="alt-panel" id="alt-${i}" hidden></div>
       </div>`;
     }).join("");
     result.innerHTML = `
       <div class="result-head"><h2>Today's plan</h2></div>
       <div class="focus-chips">${focusChips}</div>
       ${rows}`;
+
+    result.querySelectorAll(".swap-btn").forEach((btn) => {
+      btn.onclick = () => toggleAlternatives(parseInt(btn.dataset.index, 10));
+    });
+  }
+
+  function toggleAlternatives(i) {
+    const panel = document.getElementById(`alt-${i}`);
+    if (!panel.hidden) { panel.hidden = true; return; }
+
+    const ex = currentPlan.exercises[i];
+    const alts = findAlternatives({
+      exerciseName: ex.name, trainingId: currentPlan.trainingId,
+      level: currentContext.level, equipmentAvailable: currentContext.equipmentAvailable,
+    });
+    lastAltsByIndex[i] = alts;
+
+    panel.innerHTML = alts.length
+      ? alts.map((a, ai) => `<div class="alt-row">
+          <div>
+            <span class="ex-name">${a.name}</span>${a.recommended ? '<span class="rec-badge">Recommended</span>' : ""}
+            <div class="ex-sub">${(a.secondary || []).join(", ") || "no secondary muscles"} · ${a.level}</div>
+          </div>
+          <button type="button" class="use-btn" data-i="${i}" data-ai="${ai}">Use this</button>
+        </div>`).join("")
+      : `<div class="empty">No alternatives available with your current equipment.</div>`;
+
+    panel.querySelectorAll(".use-btn").forEach((btn) => {
+      btn.onclick = () => applySwap(parseInt(btn.dataset.i, 10), parseInt(btn.dataset.ai, 10));
+    });
+    panel.hidden = false;
+  }
+
+  function applySwap(i, altIndex) {
+    const chosen = lastAltsByIndex[i][altIndex];
+    const slot = currentPlan.exercises[i];
+    const merged = { ...slot, name: chosen.name, primary: chosen.primary, equipment: chosen.equipment, level: chosen.level };
+    merged.targetWeight = weightFor(merged);
+    merged.isEstimate = merged.equipment !== "bodyweight" && merged.targetWeight != null;
+    currentPlan.exercises[i] = merged;
+    renderPlan();
   }
 
   document.getElementById("training").addEventListener("change", (e) => {
@@ -151,17 +218,23 @@
     const bodyWeightLb = parseInt(document.getElementById("weight").value, 10) || null;
     const minutes = parseInt(document.getElementById("minutes").value, 10) || 30;
     const level = deriveTraineeLevel(sessions);
+    const equipmentAvailable = selectedEquipment();
+    lastAltsByIndex = {};
 
     if (trainingId === "weight-training") {
-      const plan = buildWeightTrainingPlan({ level, goal, bodyWeightLb, equipmentAvailable: selectedEquipment() });
-      renderPlan(plan, "sets");
+      currentPlan = buildWeightTrainingPlan({ level, goal, bodyWeightLb, equipmentAvailable });
+      currentTrackingMode = "sets";
+      currentContext = { level, equipmentAvailable, bodyWeightLb };
     } else if (trainingId === "calisthenics") {
-      const plan = buildCalisthenicsPlan({ level });
-      renderPlan(plan, "sets");
+      currentPlan = buildCalisthenicsPlan({ level });
+      currentTrackingMode = "sets";
+      currentContext = { level, equipmentAvailable: null, bodyWeightLb };
     } else {
-      const plan = buildFlowPlan({ trainingId, level, targetMinutes: minutes });
-      renderPlan(plan, "duration");
+      currentPlan = buildFlowPlan({ trainingId, level, targetMinutes: minutes });
+      currentTrackingMode = "duration";
+      currentContext = { level, equipmentAvailable: null, bodyWeightLb };
     }
+    renderPlan();
   });
 </script>
 </body>

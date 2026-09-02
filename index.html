@@ -481,6 +481,30 @@
 
   .ver-stamp { opacity: .4; font-weight: 600; letter-spacing: .04em; }
 
+  /* Today cards */
+  .today-kicker { font-size: 10.5px; font-weight: 800; letter-spacing: .11em; color: var(--muted); }
+  .today-head { font-size: 20px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2; margin-top: 5px; }
+  .today-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .today-photo { margin-top: 14px; border-radius: 13px; overflow: hidden; aspect-ratio: 4/3; }
+  .today-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  /* Headline stats */
+  .stats-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .hstat {
+    flex: 1; min-width: 0; padding: 14px 13px; border-radius: var(--radius);
+    background: var(--panel); border: 1px solid var(--border);
+  }
+  .hstat-val { font-size: 22px; font-weight: 800; letter-spacing: -.025em; line-height: 1; }
+  .hstat-val.good { color: var(--down); }
+  .hstat-val.warn { color: var(--up); }
+  .hstat-unit { font-size: 11.5px; font-weight: 600; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
+  .hstat-lbl { font-size: 11px; color: var(--muted); margin-top: 7px; line-height: 1.3; }
+
+  .together-line {
+    text-align: center; font-size: 14px; font-weight: 600; color: var(--muted);
+    margin: 2px 0 14px; line-height: 1.4;
+  }
+
   /* Week strips, the dashboard */
   .strip-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
   .strip-name { font-size: 14.5px; font-weight: 700; }
@@ -1077,11 +1101,17 @@
   <div id="tab-home" class="tab-panel">
     <header class="day-head">
       <div class="day-date"><span id="dayDate"></span> <span class="ver-stamp" id="verStamp"></span></div>
-      <h1 class="day-title">This week</h1>
+      <h1 class="day-title">Today</h1>
     </header>
 
     <div class="reminder-banner hidden" id="encouragementBanner"></div>
     <div class="rest-banner hidden" id="restDayBanner"></div>
+
+    <div class="card" id="youTodayCard"></div>
+
+    <div class="card hidden" id="themTodayCard"></div>
+
+    <div class="stats-row hidden" id="statsRow"></div>
 
     <div class="card">
       <div class="strip-head">
@@ -1098,29 +1128,12 @@
         <span class="strip-count" id="theirCount"></span>
       </div>
       <div class="goalbar"><i class="them" id="theirGoalBar"></i></div>
-      <div class="strip them-strip" id="theirStrip"></div>
+      <div class="strip" id="theirStrip"></div>
     </div>
 
-    <div class="next-up" id="nextUp"></div>
+    <p class="together-line hidden" id="togetherLine"></p>
 
-    <div class="card" id="coverageCard">
-      <div class="cov-head">
-        <div>
-          <h2 style="margin:0;">Muscle coverage</h2>
-          <p class="cov-sub" id="coverageSub"></p>
-        </div>
-        <div class="cov-count"><span id="coverageDone">0</span><span class="cov-total" id="coverageTotal">/6</span></div>
-      </div>
-      <div class="cov-grid" id="coverageGrid"></div>
-    </div>
-
-    <div class="card" id="prCard">
-      <div class="cov-head">
-        <h2 style="margin:0;">Personal records</h2>
-        <div class="pr-total"><span id="prTotalCount">0</span> set</div>
-      </div>
-      <div id="prHomeList"></div>
-    </div>
+    <div class="card" id="tomorrowCard"></div>
   </div>
 
   <div id="tab-workout" class="tab-panel hidden">
@@ -1564,13 +1577,14 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.01.10";
+const APP_VERSION = "2026.09.01.11";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
 let ALL_ENTRIES = [];
 let ALL_EXERCISE_LOGS = [];
 let ALL_PROFILES = [];
+let ALL_PLANS = [];
 let MY_PROFILE = null;
 let PARTNER_PROFILE = null;
 let TODAY_WORKOUT = null;
@@ -2378,11 +2392,13 @@ async function deleteMyAccount() {
 }
 
 async function loadAll() {
-  const [entriesRes, exLogRes, profilesRes] = await Promise.all([
+  const [entriesRes, exLogRes, profilesRes, plansRes] = await Promise.all([
     sb.from("fit_entries").select("*").order("entry_date", { ascending: true }),
     sb.from("exercise_logs").select("*").order("entry_date", { ascending: true }),
     sb.from("profiles").select("*"),
+    sb.from("ai_workouts").select("*").order("entry_date", { ascending: false }).limit(60),
   ]);
+  ALL_PLANS = plansRes.data || [];
   ALL_ENTRIES = entriesRes.data || [];
   ALL_EXERCISE_LOGS = exLogRes.data || [];
   ALL_PROFILES = profilesRes.data || [];
@@ -2745,6 +2761,210 @@ function currentWeekDates() {
 
 
 
+/* ---------- Today ---------- */
+
+function workoutSummary(name, date) {
+  const logs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && l.entry_date === date);
+  const sets = logs.reduce((s, l) => s + (l.sets || 1), 0);
+  const mins = logs.reduce((s, l) => s + (l.duration_min || 0), 0);
+  const names = [...new Set(logs.map((l) => l.exercise_name))];
+  return { logs, sets, mins, names };
+}
+
+async function renderYouToday() {
+  const el = $("youTodayCard");
+  const e = todayEntryFor(MY_EMAIL);
+  const partner = partnerName();
+  const theirs = PARTNER_EMAIL ? todayEntryFor(PARTNER_EMAIL) : null;
+
+  if (!e?.gym) {
+    const nudge = e?.rest_day
+      ? "Rest day. Your streak is safe."
+      : theirs?.gym
+        ? `${escapeHtml(partner)} went at ${theirs.workout_at ? new Date(theirs.workout_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "some point"} today.`
+        : "Nothing logged yet.";
+    el.innerHTML = `
+      <div class="today-kicker">YOU</div>
+      <div class="today-head">${e?.rest_day ? "Resting today" : "You haven't trained today"}</div>
+      <p class="muted-note">${nudge}</p>
+      <button type="button" class="btn-primary" id="todayGoBtn">Begin workout</button>`;
+    $("todayGoBtn").onclick = () => {
+      switchTab("workout");
+      if (SESSION) { reopenSession(); return; }
+      if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
+      else startWorkout();
+    };
+    return;
+  }
+
+  const s = workoutSummary(ME, todayStr());
+  const plan = (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === todayStr());
+  const bits = [plan?.focus, s.mins ? `${s.mins} min` : null, s.sets ? `${s.sets} sets` : null]
+    .filter(Boolean).join(" · ");
+  const url = e.proof_path ? await signedProofUrl(e.proof_path) : null;
+
+  el.innerHTML = `
+    <div class="today-kicker">YOU${e.sessions > 1 ? ` · ${e.sessions} SESSIONS` : ""}</div>
+    <div class="today-head">${escapeHtml(bits || "Workout logged")}</div>
+    ${s.names.length ? `<div class="today-chips">${s.names.slice(0, 6).map((n) => `<span class="tally-chip">${escapeHtml(n)}</span>`).join("")}</div>` : ""}
+    ${url ? `<div class="today-photo"><img src="${url}" alt="Your workout today" /></div>` : ""}
+    ${e.note ? `<p class="quote">${escapeHtml(e.note)}</p>` : ""}
+    ${PARTNER_EMAIL ? `<button type="button" class="btn-secondary" id="todayNoteBtn">${e.note ? "Change your note" : `Say something to ${escapeHtml(partner)}`}</button>` : ""}`;
+  if (PARTNER_EMAIL) $("todayNoteBtn").onclick = () => openNoteComposer("workout");
+}
+
+async function renderThemToday() {
+  const el = $("themTodayCard");
+  if (!PARTNER_EMAIL) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+
+  const partner = partnerName();
+  const e = todayEntryFor(PARTNER_EMAIL);
+  const mine = todayEntryFor(MY_EMAIL);
+
+  if (!e?.gym) {
+    el.innerHTML = `
+      <div class="today-kicker">${escapeHtml(partner.toUpperCase())}</div>
+      <div class="today-head">${e?.rest_day ? "Resting today" : "Hasn't trained yet"}</div>
+      <p class="muted-note">${mine?.gym ? "You're ahead." : "Neither of you has been yet."}</p>`;
+    return;
+  }
+
+  const s = workoutSummary(partner, todayStr());
+  const when = e.workout_at ? new Date(e.workout_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+  const bits = [s.mins ? `${s.mins} min` : null, s.sets ? `${s.sets} sets` : null].filter(Boolean).join(" · ");
+  const url = e.proof_path ? await signedProofUrl(e.proof_path) : null;
+
+  el.innerHTML = `
+    <div class="today-kicker">${escapeHtml(partner.toUpperCase())}${when ? ` · ${escapeHtml(when)}` : ""}</div>
+    <div class="today-head">${escapeHtml(partner)} trained today</div>
+    ${bits ? `<p class="muted-note">${escapeHtml(bits)}</p>` : ""}
+    ${url ? `<div class="today-photo"><img src="${url}" alt="${escapeHtml(partner)}'s workout" /></div>` : ""}
+    ${e.note ? `<p class="quote">${escapeHtml(e.note)}</p>` : ""}
+    <button type="button" class="btn-secondary" id="cheerBtn">Cheer ${escapeHtml(partner)} on</button>`;
+  $("cheerBtn").onclick = () => openNoteComposer("congratulate");
+}
+
+/* One shared number. Two counts is a scoreboard; one is a team. */
+function renderTogether() {
+  const el = $("togetherLine");
+  if (!PARTNER_EMAIL) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  const mine = gymDaysThisWeek(ME);
+  const theirs = gymDaysThisWeek(partnerName());
+  const both = mine + theirs;
+  el.textContent = both === 0
+    ? "Nothing between you two this week yet."
+    : `You two have trained ${both} time${both === 1 ? "" : "s"} this week.`;
+}
+
+/* Getting ahead: plan tomorrow before tomorrow arrives. */
+function renderTomorrow() {
+  const el = $("tomorrowCard");
+  const d = new Date(todayStr() + "T00:00:00");
+  d.setDate(d.getDate() + 1);
+  const date = isoDate(d);
+  const planned = (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === date && !w.archived);
+  const label = d.toLocaleDateString(undefined, { weekday: "long" });
+
+  if (planned) {
+    const names = (planned.exercises || []).map((x) => x.name);
+    el.innerHTML = `
+      <div class="today-kicker">TOMORROW · ${escapeHtml(label.toUpperCase())}</div>
+      <div class="today-head">${escapeHtml(planned.focus || "Planned")}</div>
+      <div class="today-chips">${names.slice(0, 6).map((n) => `<span class="tally-chip">${escapeHtml(n)}</span>`).join("")}</div>
+      <button type="button" class="btn-ghost" id="clearTomorrowBtn">Clear it</button>`;
+    $("clearTomorrowBtn").onclick = async () => {
+      await sb.from("ai_workouts").delete().eq("id", planned.id);
+      await loadAll();
+      renderTomorrow();
+    };
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="today-kicker">TOMORROW · ${escapeHtml(label.toUpperCase())}</div>
+    <div class="today-head">Nothing planned yet</div>
+    <p class="muted-note">Get ahead. Have it waiting when you walk in.</p>
+    <button type="button" class="btn-secondary" id="planTomorrowBtn">Plan tomorrow's workout</button>`;
+  $("planTomorrowBtn").onclick = () => generateWorkout(date);
+}
+
+/* ---------- Headline stats ----------
+   Show the number that matches what this person actually does, rather than the
+   same tile for everyone. A lifter sees volume, someone doing classes sees
+   time, and anyone with a weight goal sees the trend. */
+
+function statsWindow(name, days = 7) {
+  const from = new Date(todayStr() + "T00:00:00");
+  from.setDate(from.getDate() - (days - 1));
+  const fromStr = isoDate(from);
+  const logs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && l.entry_date >= fromStr);
+
+  let volume = 0, minutes = 0, sets = 0;
+  for (const l of logs) {
+    if (l.duration_min) minutes += l.duration_min;
+    if (l.weight != null && l.reps) volume += l.weight * l.reps * (l.sets || 1);
+    sets += l.sets || 0;
+  }
+  const workouts = entriesFor(name).filter((e) => e.gym && e.entry_date >= fromStr).length;
+  return { volume, minutes, sets, workouts, fromStr };
+}
+
+function weightTrend(name, days = 30) {
+  const from = new Date(todayStr() + "T00:00:00");
+  from.setDate(from.getDate() - (days - 1));
+  const fromStr = isoDate(from);
+  const w = entriesFor(name).filter((e) => e.weight != null && e.entry_date >= fromStr);
+  if (w.length < 2) return null;
+  return { change: +(w[w.length - 1].weight - w[0].weight).toFixed(1), latest: w[w.length - 1].weight, n: w.length };
+}
+
+function fmtVolume(lb) {
+  if (lb >= 1000000) return (lb / 1000000).toFixed(1) + "M";
+  if (lb >= 1000) return Math.round(lb / 1000) + "k";
+  return String(Math.round(lb));
+}
+
+/* Up to three tiles, only the ones that mean something for this person. */
+function headlineStats(name, email) {
+  const s = statsWindow(name, 7);
+  const goal = (email === MY_EMAIL ? MY_PROFILE : PARTNER_PROFILE)?.goal || "";
+  const out = [];
+
+  if (s.volume > 0) {
+    out.push({ label: "Volume, 7 days", value: fmtVolume(s.volume), unit: "lb" });
+  }
+  if (s.minutes > 0) {
+    out.push({ label: "Active, 7 days", value: String(s.minutes), unit: "min" });
+  }
+  // Weight matters when it is the stated goal, or when nothing else qualifies.
+  const wantsWeight = /lose|gain|recomp|weight/i.test(goal);
+  const t = weightTrend(name, 30);
+  if (t && (wantsWeight || out.length < 2)) {
+    const sign = t.change > 0 ? "+" : "";
+    out.push({ label: "Weight, 30 days", value: `${sign}${t.change}`, unit: "lb",
+               tone: t.change === 0 ? "" : (/lose|recomp|fat/i.test(goal) ? (t.change < 0 ? "good" : "warn")
+                                                                          : (t.change > 0 ? "good" : "warn")) });
+  }
+  if (!out.length && s.workouts > 0) {
+    out.push({ label: "Workouts, 7 days", value: String(s.workouts), unit: s.workouts === 1 ? "session" : "sessions" });
+  }
+  return out.slice(0, 3);
+}
+
+function renderHeadlineStats() {
+  const el = $("statsRow");
+  const stats = headlineStats(ME, MY_EMAIL);
+  if (!stats.length) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  el.innerHTML = stats.map((s) => `
+    <div class="hstat">
+      <div class="hstat-val ${s.tone || ""}">${escapeHtml(s.value)}<span class="hstat-unit">${escapeHtml(s.unit)}</span></div>
+      <div class="hstat-lbl">${escapeHtml(s.label)}</div>
+    </div>`).join("");
+}
+
 /* ---------- Home: the week, in pictures ---------- */
 
 const DAY_LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -2817,40 +3037,6 @@ async function renderWeekStrips() {
   await renderStrip("theirStrip", partner, PARTNER_EMAIL);
 }
 
-/* The one thing to do next. A dashboard that only reports is a dead end. */
-function renderNextUp() {
-  const el = $("nextUp");
-  const days = gymDaysThisWeek(ME);
-  const target = weeklyGoalFor(MY_EMAIL);
-  const entry = todayEntryFor(MY_EMAIL);
-  const trainedToday = !!entry?.gym;
-  const left = Math.max(0, target - days);
-  const partnerWent = PARTNER_EMAIL && !!todayEntryFor(PARTNER_EMAIL)?.gym;
-
-  let line, cta, action;
-  if (!trainedToday) {
-    line = partnerWent ? `${partnerName()} already went today.`
-         : left > 0 ? `${left} more to hit your goal this week.`
-         : "Goal already hit. Another one is a bonus.";
-    cta = "Begin workout"; action = "workout";
-  } else if (entry?.weight == null) {
-    line = `Trained today. ${left > 0 ? `${left} to go this week.` : "Week complete."}`;
-    cta = "Log your weight"; action = "weigh";
-  } else {
-    line = left > 0 ? `Done for today. ${left} more this week.` : "Goal hit. Anything else is a bonus.";
-    cta = "Train again"; action = "workout";
-  }
-
-  el.innerHTML = `<p class="next-line">${escapeHtml(line)}</p>
-    <button type="button" class="${left > 0 || !trainedToday ? "btn-primary" : "btn-secondary"}" id="nextUpBtn">${escapeHtml(cta)}</button>`;
-  $("nextUpBtn").onclick = () => {
-    if (action === "weigh") { switchTab("progress"); $("scaleWeightInput")?.focus(); return; }
-    switchTab("workout");
-    if (SESSION) { reopenSession(); return; }
-    if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
-    else startWorkout();
-  };
-}
 
 /* ---------- The partner popup ----------
    Shown once per workout, not once per app open, so dismissing it sticks.
@@ -3128,45 +3314,6 @@ function currentWeekDates() {
 
 
 
-/* The one thing to do next. A dashboard that only reports is a dead end. */
-function renderNextUp() {
-  const el = $("nextUp");
-  const days = gymDaysThisWeek(ME);
-  const target = weeklyGoalFor(MY_EMAIL);
-  const entry = todayEntryFor(MY_EMAIL);
-  const trainedToday = !!entry?.gym;
-  const left = Math.max(0, target - days);
-
-  let line, cta, action;
-  if (!trainedToday) {
-    line = left > 0
-      ? `${left} more to hit your goal this week.`
-      : "Goal already hit. Another one is a bonus.";
-    cta = "Begin workout";
-    action = "workout";
-  } else if (entry?.weight == null) {
-    line = `Trained today. ${left > 0 ? `${left} to go this week.` : "Week complete."}`;
-    cta = "Log your weight";
-    action = "weigh";
-  } else {
-    line = left > 0
-      ? `Done for today. ${left} more this week.`
-      : "Week complete. Nice work.";
-    cta = "Train again";
-    action = "workout";
-  }
-
-  el.innerHTML = `
-    <p class="next-line">${escapeHtml(line)}</p>
-    <button type="button" class="btn-primary" id="nextUpBtn">${escapeHtml(cta)}</button>`;
-  $("nextUpBtn").onclick = () => {
-    if (action === "weigh") { switchTab("progress"); $("scaleWeightInput")?.focus(); return; }
-    switchTab("workout");
-    if (SESSION) { reopenSession(); return; }
-    if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
-    else startWorkout();
-  };
-}
 
 
 
@@ -3376,23 +3523,6 @@ function weeklyCoverage(name) {
   });
 }
 
-function renderCoverage() {
-  const groups = weeklyCoverage(ME);
-  const done = groups.filter((g) => g.hit).length;
-  $("coverageDone").textContent = done;
-  $("coverageTotal").textContent = `/${groups.length}`;
-
-  const missing = groups.filter((g) => !g.hit).map((g) => g.label);
-  $("coverageSub").textContent = done === groups.length
-    ? "Every group hit this week. Nice."
-    : `Still to hit: ${missing.join(", ")}`;
-
-  $("coverageGrid").innerHTML = groups.map((g) => `
-    <div class="cov-cell ${g.hit ? "hit" : ""}">
-      <div class="cov-name">${escapeHtml(g.label)}</div>
-      <div class="cov-sets">${g.hit ? `${Math.round(g.sets)} sets` : "not yet"}</div>
-    </div>`).join("");
-}
 
 /* Most recent PRs. A PR means you actually got stronger, which is the one
    number in here that represents real progress rather than app usage. */
@@ -3414,29 +3544,14 @@ function relativeDay(dateStr) {
   return new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function renderHomePRs() {
-  const prCount = personalRecords(ME).prCount + durationRecords(ME).prCount;
-  $("prTotalCount").textContent = prCount;
-
-  const prs = recentPRs(ME);
-  $("prHomeList").innerHTML = prs.length
-    ? prs.map((p) => `
-        <div class="pr-item">
-          <div>
-            <div class="pr-ex">${escapeHtml(p.exercise_name)}</div>
-            <div class="pr-when">${escapeHtml(relativeDay(p.entry_date))}</div>
-          </div>
-          <div class="pr-load">${p.duration_min ? `${p.duration_min}<span>min</span>` : `${p.weight}<span>lbs</span>`}</div>
-        </div>`).join("")
-    : emptyState("trophy", "No records yet",
-        "Your heaviest lifts and longest sessions land here.");
-}
 
 function renderHome() {
+  renderYouToday();
+  renderThemToday();
+  renderHeadlineStats();
   renderWeekStrips();
-  renderNextUp();
-  renderCoverage();
-  renderHomePRs();
+  renderTogether();
+  renderTomorrow();
   renderRestDayPrompt();
   renderEncouragementBanner();
   maybeShowPartnerPopup();
@@ -3584,9 +3699,16 @@ async function loadTodayWorkout() {
   TODAY_WORKOUT = (data || [])[0] || null;
 }
 
-async function generateWorkout() {
+/* Generates for today by default, or any date, so tomorrow can be planned ahead. */
+async function generateWorkout(forDate) {
+  const target = forDate || todayStr();
+  const isToday = target === todayStr();
   WORKOUT_MODE = null;
-  $("workoutContent").innerHTML = '<p class="muted-note"><span class="spinner"></span> Generating your workout…</p>';
+  if (isToday) {
+    $("workoutContent").innerHTML = '<p class="muted-note"><span class="spinner"></span> Generating your workout…</p>';
+  } else {
+    $("tomorrowCard").innerHTML = '<p class="muted-note"><span class="spinner"></span> Planning tomorrow…</p>';
+  }
 
   const history = Object.entries(personalRecords(ME).best).map(([exercise_name, weight]) => ({ exercise_name, weight }));
   const recentWeight = entriesFor(ME).filter((e) => e.weight != null).slice(-1)[0]?.weight ?? null;
@@ -3614,7 +3736,7 @@ async function generateWorkout() {
     const data = await resp.json();
     if (resp.status === 429) {
       toast(data.error || "Daily workout limit reached");
-      renderWorkoutTab();
+      isToday ? renderWorkoutTab() : renderTomorrow();
       return;
     }
     if (!resp.ok || data.error) throw new Error(data.error || "unknown error");
@@ -3622,18 +3744,25 @@ async function generateWorkout() {
     await sb.from("ai_workouts").upsert({
       user_name: ME,
       email: MY_EMAIL,
-      entry_date: todayStr(),
+      entry_date: target,
       focus: data.workout.focus,
       exercises: data.workout.exercises,
+      archived: false,
     }, { onConflict: "email,entry_date" });
 
-    await loadTodayWorkout();
-    renderWorkoutTab();
-    toast("Workout ready");
+    await loadAll();
+    if (isToday) {
+      await loadTodayWorkout();
+      renderWorkoutTab();
+      toast("Workout ready");
+    } else {
+      renderTomorrow();
+      toast("Tomorrow is planned");
+    }
   } catch (err) {
     console.error(err);
     toast("Couldn't generate workout, check the coach connection");
-    renderWorkoutTab();
+    isToday ? renderWorkoutTab() : renderTomorrow();
   }
 }
 
