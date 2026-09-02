@@ -119,8 +119,8 @@
       <span class="choice" data-v="strength">Get stronger</span>
       <span class="choice" data-v="unsure">Not sure yet</span>
     </div>
-    <label id="goalAmountLabel" style="display:none;">How much? (lbs)</label>
-    <input type="number" id="goalAmount" style="display:none;" min="1" placeholder="e.g. 20" />
+    <label id="goalAmountLabel" style="display:none;">How much? (lbs) — optional, skip if you're not sure</label>
+    <input type="number" id="goalAmount" style="display:none;" min="1" placeholder="e.g. 20, or leave blank" />
   </div>
 
   <div class="step" data-step="3">
@@ -136,13 +136,11 @@
     <label>Do you play any sports? (optional)</label>
     <div class="choice-grid" id="sportsChoices"></div>
 
-    <label>What kind of training actually appeals to you? (pick any)</label>
-    <div class="choice-grid" id="styleChoices">
-      <span class="choice" data-v="weight-training">Weight training</span>
-      <span class="choice" data-v="cardio">Cardio / running</span>
-      <span class="choice" data-v="sports">Sports-focused</span>
-      <span class="choice" data-v="flow">Yoga or Pilates</span>
-      <span class="choice" data-v="unsure">Not sure, surprise me</span>
+    <label>Would you like to include weight training?</label>
+    <div class="choice-grid" id="weightTrainingChoices">
+      <span class="choice" data-v="yes">Yes</span>
+      <span class="choice" data-v="no">No, not for me</span>
+      <span class="choice" data-v="unsure">Not sure, you decide</span>
     </div>
   </div>
 
@@ -188,10 +186,11 @@
   let currentSchedule = null;
   let currentDaysAvailable = 4;
   const CARDIO_DEFAULT = "Running";
+  const MODALITY_LABELS = [["weightTraining", "weight training"], ["cardio", "cardio"], ["sports", "sports"], ["flow", "yoga/Pilates"]];
   const state = {
     heightFt: 5, heightIn: 9, weight: 180, age: 30, sex: null,
     freq: null, experience: null, goalType: null, goalAmount: null,
-    time: null, sports: [], preferredModalities: [], equip: null, notes: "",
+    time: null, sports: [], wantsWeightTraining: null, equip: null, notes: "",
   };
 
   let step = 0;
@@ -245,7 +244,7 @@
     });
     wireSingleChoice("timeChoices", "time");
     wireMultiChoice("sportsChoices", "sports");
-    wireMultiChoice("styleChoices", "preferredModalities", "unsure");
+    wireSingleChoice("weightTrainingChoices", "wantsWeightTraining");
     wireSingleChoice("equipChoices", "equip");
   }
   wireStepInputs();
@@ -302,6 +301,7 @@
     if (state.time === "unsure" || !state.time) assumed.push("assuming ~45 min sessions");
     if (state.equip === "unsure" || !state.equip) assumed.push("assuming bodyweight-only until you tell us more");
     if (state.goalType === "unsure" || !state.goalType) assumed.push("defaulting to general fitness");
+    if (state.wantsWeightTraining === "unsure" || !state.wantsWeightTraining) assumed.push(`recommending some weight training (at least ${MIN_STRENGTH_SESSIONS_PER_WEEK}x/week helps preserve muscle no matter the goal) — say no on the previous step if you'd rather skip it entirely`);
     return assumed.length ? `<div class="muted-note" style="margin-bottom:14px;">Since a few answers were "not sure yet": ${assumed.join(", ")}. Easy to change once you know.</div>` : "";
   }
 
@@ -354,11 +354,16 @@
     currentDaysAvailable = weeklyDaysAvailable();
     currentMix = computeWeeklyMix({
       goal: mixGoalKey(),
-      preferredModalities: state.preferredModalities.filter((m) => m !== "unsure"),
+      preferredModalities: state.wantsWeightTraining === "yes" ? ["weight-training"] : [],
+      excludedModalities: state.wantsWeightTraining === "no" ? ["weight-training"] : [],
       sportsCount: state.sports.length,
       daysAvailable: currentDaysAvailable,
     });
     currentSchedule = assignWeekSchedule(currentMix);
+
+    const mixSummary = MODALITY_LABELS
+      .map(([key, label]) => (currentMix[key] ? `${currentMix[key]} ${label}` : null))
+      .filter(Boolean).join(", ");
 
     document.getElementById("resultsStep").innerHTML = `
       <h1>Your plan</h1>
@@ -367,13 +372,8 @@
       ${goalCard}
       ${sportsNote}
       <div class="card">
-        <h2>Your weekly training mix</h2>
-        <div class="muted-note" style="margin-bottom:10px;">This is the actual decision layer, not a canned split — adjust any number and today's session updates to match. Weight training never goes below ${MIN_STRENGTH_SESSIONS_PER_WEEK} unless your total days are lower than that (muscle preservation during any goal, not a preference).</div>
-        <div class="mix-row"><span>Weight training</span><input type="number" id="mixWeightTraining" min="0" max="7" /></div>
-        <div class="mix-row"><span>Cardio</span><input type="number" id="mixCardio" min="0" max="7" /></div>
-        <div class="mix-row"><span>Sports</span><input type="number" id="mixSports" min="0" max="7" /></div>
-        <div class="mix-row"><span>Yoga / Pilates</span><input type="number" id="mixFlow" min="0" max="7" /></div>
-        <button type="button" class="btn-ghost" id="applyMixBtn" style="width:100%; margin-top:10px;">Update plan with these numbers</button>
+        <h2>Your week</h2>
+        <div class="muted-note">${mixSummary || "No sessions this week — go back and pick at least one day available."}</div>
       </div>
       <div class="card">
         <h2 id="todayLabel"></h2>
@@ -385,32 +385,13 @@
       <div id="weekOut"></div>
     `;
 
-    fillMixInputs();
     renderTodaySection();
 
-    document.getElementById("applyMixBtn").onclick = () => {
-      currentMix = {
-        weightTraining: parseInt(document.getElementById("mixWeightTraining").value, 10) || 0,
-        cardio: parseInt(document.getElementById("mixCardio").value, 10) || 0,
-        sports: parseInt(document.getElementById("mixSports").value, 10) || 0,
-        flow: parseInt(document.getElementById("mixFlow").value, 10) || 0,
-      };
-      currentSchedule = assignWeekSchedule(currentMix);
-      renderTodaySection();
-      document.getElementById("weekOut").innerHTML = "";
-    };
     document.getElementById("markDoneBtn").onclick = () => {
       if (currentPlan) saveToday(currentPlan);
       renderResults();
     };
     document.getElementById("weekBtn").onclick = () => renderWeekOutput();
-  }
-
-  function fillMixInputs() {
-    document.getElementById("mixWeightTraining").value = currentMix.weightTraining;
-    document.getElementById("mixCardio").value = currentMix.cardio;
-    document.getElementById("mixSports").value = currentMix.sports;
-    document.getElementById("mixFlow").value = currentMix.flow;
   }
 
   function renderTodaySection() {

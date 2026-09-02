@@ -24,39 +24,51 @@ export const GOAL_MIX_WEIGHTS = {
 // "flow" = yoga/Pilates/calisthenics-as-recovery, not a fourth hard-training category.
 const MODALITY_KEYS = ["weightTraining", "cardio", "sports", "flow"];
 
+const PREF_KEY_MAP = { "weight-training": "weightTraining", cardio: "cardio", sports: "sports", flow: "flow" };
+
 /**
  * preferredModalities: array from {"weight-training","cardio","sports","flow"}, or empty/null
  * for "no preference." Explicit preference reweights the goal defaults toward what the person
- * actually wants to do, WITHOUT ever dropping resistance training below the floor -- someone
- * who says "just cardio" for a weight-loss goal still gets 2 strength days, because that is the
- * one non-negotiable rule here, not a preference.
+ * actually wants to do, without dropping resistance training below the floor on its own --
+ * someone who just says "I like cardio" still gets the floor, since liking one thing is not the
+ * same as refusing another.
+ *
+ * excludedModalities: array in the same vocabulary, for an explicit "no." This is different
+ * from simply not preferring something -- it OVERRIDES the floor. Someone who says "I don't
+ * want to weight train" gets zero weight-training days even though the floor would otherwise
+ * add them back; that is a real choice this app has to respect, not a default to protect them
+ * from. The floor is a recommendation for people with no strong opinion, not a mandate.
  */
-export function computeWeeklyMix({ goal = "general", preferredModalities = [], sportsCount = 0, daysAvailable = 4 }) {
+export function computeWeeklyMix({ goal = "general", preferredModalities = [], excludedModalities = [], sportsCount = 0, daysAvailable = 4 }) {
   const weights = { ...(GOAL_MIX_WEIGHTS[goal] || GOAL_MIX_WEIGHTS.general) };
 
   // Preference reweighting: double the weight of anything explicitly chosen, halve what was not
   // chosen (when a preference was stated at all) -- a nudge, not an override of the floor.
   if (preferredModalities?.length) {
-    const prefKeyMap = { "weight-training": "weightTraining", cardio: "cardio", sports: "sports", flow: "flow" };
     for (const key of MODALITY_KEYS) {
-      const chosen = preferredModalities.some((p) => prefKeyMap[p] === key);
+      const chosen = preferredModalities.some((p) => PREF_KEY_MAP[p] === key);
       weights[key] = Math.max(0.5, weights[key] * (chosen ? 2 : 0.5));
     }
   }
   // No point recommending sports days if the person didn't say they play any.
   if (!sportsCount) weights.sports = 0;
+  // A hard "no" zeroes the weight outright, which also makes it invisible to the leftover-day
+  // allocation below (weight <= 0 is already skipped there).
+  for (const p of excludedModalities) if (PREF_KEY_MAP[p]) weights[PREF_KEY_MAP[p]] = 0;
 
-  // Reserve fixed floors up front -- strength always, and one sports day whenever the person
-  // said they play one and there is room, since a stated preference losing every tiebreak to a
-  // higher-weighted goal category (which is what plain proportional allocation does at low day
-  // counts) makes the "do you play a sport" question pointless. Whatever is left after both
-  // floors is allocated by weight using the largest-remainder method (standard proportional
-  // apportionment, not a proprietary system): take the integer part of each modality's fair
-  // share of the remainder, then hand out leftover days one at a time to the biggest fraction.
+  // Reserve fixed floors up front -- strength always (unless explicitly declined), and one
+  // sports day whenever the person said they play one and there is room, since a stated
+  // preference losing every tiebreak to a higher-weighted goal category (which is what plain
+  // proportional allocation does at low day counts) makes the "do you play a sport" question
+  // pointless. Whatever is left after both floors is allocated by weight using the
+  // largest-remainder method (standard proportional apportionment, not a proprietary system):
+  // take the integer part of each modality's fair share of the remainder, then hand out
+  // leftover days one at a time to the biggest fraction.
   let remainingDays = daysAvailable;
-  const floorWeightTraining = Math.min(MIN_STRENGTH_SESSIONS_PER_WEEK, remainingDays);
+  const floorWeightTraining = excludedModalities.includes("weight-training")
+    ? 0 : Math.min(MIN_STRENGTH_SESSIONS_PER_WEEK, remainingDays);
   remainingDays -= floorWeightTraining;
-  const floorSports = sportsCount > 0 && remainingDays > 0 ? 1 : 0;
+  const floorSports = !excludedModalities.includes("sports") && sportsCount > 0 && remainingDays > 0 ? 1 : 0;
   remainingDays -= floorSports;
 
   const totalWeight = MODALITY_KEYS.reduce((s, k) => s + weights[k], 0) || 1;
