@@ -10,79 +10,73 @@ const html = readFileSync(join(root, "index.html"), "utf8");
 const style = html.match(/<style>([\s\S]*?)<\/style>/)[1];
 const head = html.match(/<link[^>]*fonts[^>]*>/g)?.join("\n") || "";
 
+function ring(done, target, color, size = 148) {
+  const stroke = 9, r = 50 - stroke / 2 - 1, circ = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(1, done / target));
+  return `<svg width="${size}" height="${size}" viewBox="0 0 100 100" class="goal-ring">
+    <circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--ring-track)" stroke-width="${stroke}"/>
+    <circle cx="50" cy="50" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
+      stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - pct)}" transform="rotate(-90 50 50)"/>
+    <text x="50" y="47" text-anchor="middle" class="ring-num">${done}</text>
+    <text x="50" y="64" text-anchor="middle" class="ring-of">of ${target}</text>
+  </svg>`;
+}
+
 const body = `
 <div id="app">
-  <div class="greeting-row">
-    <div class="avatar">M</div>
-    <div class="greeting"><strong>Evening, Mo</strong><br><span class="muted-note">Thursday, 30 August</span></div>
+  <header class="day-head">
+    <div class="day-date">WEDNESDAY, SEP 2</div>
+    <h1 class="day-title">This week</h1>
+  </header>
+
+  <div class="rings">
+    <div class="ring-col">
+      <div class="ring-wrap">${ring(3,4,"var(--me)")}</div>
+      <div class="ring-name">Mo</div><div class="ring-role">YOU</div>
+      <div class="ring-streak">6 day streak</div>
+    </div>
+    <div class="ring-col">
+      <div class="ring-wrap">${ring(2,5,"var(--partner)")}</div>
+      <div class="ring-name">Mel</div><div class="ring-role">PARTNER</div>
+      <div class="ring-streak">4 day streak</div>
+    </div>
   </div>
 
-  <div class="card rank-card" style="--rank-color:#c87b3a; --rank-glow:rgba(200,123,58,0.55);">
-    <div class="rank-head">
-      <div class="rank-crest"><img class="crest-img" src="/badges/bronze-ii.webp" width="78" height="78" alt="" /></div>
-      <div class="rank-meta">
-        <div class="rank-tier-name">Bronze II</div>
-        <div class="rank-level">Level 7 · Consistent</div>
-        <div class="gauge-sub">1,240 XP total · 160 to next</div>
-      </div>
-    </div>
-    <div class="rank-progress-track"><div class="rank-progress-fill" style="width:62%"></div></div>
-    <div class="rank-progress-label">160 combined XP to Bronze I</div>
-    <div class="rank-sync waiting">${'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>'}<span>You've earned <strong>Bronze I</strong>, but you rank up together. Mel needs 90 XP to join you.</span></div>
-  </div>
-
-  <div class="stat-grid">
-    <div class="stat-tile">
-      <div class="stat-top"><span class="stat-ico week"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m4 6 1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg></span><span class="stat-label">This week</span></div>
-      <div class="stat-value">4<span class="stat-unit">/5</span></div>
-      <div class="stat-bar"><div class="stat-fill" style="width:80%"></div></div>
-      <div class="stat-sub">1 to go</div>
-    </div>
-    <div class="stat-tile">
-      <div class="stat-top"><span class="stat-ico streak"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 2c1 3-2 4-2 7a4 4 0 0 0 8 0c0-1-.5-2-1-2.5.5 2-1 3-2 3-1.5 0-2-1.2-1.5-2.5C14 6 13 4 12 2Z"/></svg></span><span class="stat-label">Streak</span></div>
-      <div class="stat-value">6<span class="stat-unit">days</span></div>
-      <div class="stat-bar"><div class="stat-fill streak" style="width:85%"></div></div>
-      <div class="stat-sub">2 rest days left</div>
-    </div>
+  <div class="next-up">
+    <p class="next-line">1 more to hit your goal this week.</p>
+    <button class="btn-primary">Begin workout</button>
   </div>
 
   <div class="card">
-    <h2>Your week</h2>
-    <div class="week-dots">
-      ${["M","T","W","T","F","S","S"].map((d,i)=>`<div class="week-dot ${i<4?"done":""}"><span>${d}</span></div>`).join("")}
-    </div>
-    <p class="muted-note">4 of 5 days this week. One more to hit your goal.</p>
+    <div class="pp-head"><div class="pp-title">Mel trained today</div><div class="pp-time">2 sessions</div></div>
+    <div style="height:190px;border-radius:12px;background:var(--panel-2);border:1px solid var(--border)"></div>
+    <button class="btn-secondary" style="margin-top:12px">Cheer Mel on</button>
   </div>
 
   <div class="card">
-    <h2>Partner</h2>
-    <div class="partner-row">
-      <div class="avatar partner">M</div>
-      <div><div class="partner-name">Mel</div><div class="muted-note">3 of 5 days · trained today</div></div>
+    <h2>The week</h2>
+    <div class="wk-grid">
+      <div class="wk-labels">${"MTWTFSS".split("").map(l=>`<span>${l}</span>`).join("")}</div>
+      <div class="wk-row">${[1,1,1,0,0,0,0].map((v,i)=>`<span class="wk-cell me ${v?"done":""} ${i===2?"today":""}"></span>`).join("")}</div>
+      <div class="wk-row">${[1,0,1,0,0,0,0].map((v,i)=>`<span class="wk-cell partner ${v?"done":""} ${i===2?"today":""}"></span>`).join("")}</div>
     </div>
-    <button class="btn-secondary" style="margin-top:12px;">Send encouragement</button>
-  </div>
-
-  <div class="card">
-    <h2>Personal records</h2>
-    <div class="pr-list">
-      <div class="pr-row"><span>Bench Press</span><span class="pr-weight">185 lb</span></div>
-      <div class="pr-row"><span>Squat</span><span class="pr-weight">245 lb</span></div>
-      <div class="pr-row"><span>Deadlift</span><span class="pr-weight">315 lb</span></div>
+    <div class="wk-legend">
+      <span class="wk-key"><span class="wk-swatch me"></span>Mo</span>
+      <span class="wk-key"><span class="wk-swatch partner"></span>Mel</span>
     </div>
   </div>
 
   <nav class="tabs">
     <button class="tab-btn active"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 10v10h14V10"/></svg><span>Home</span></button>
-    <button class="tab-btn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 8v8M18 8v8M4 10v4M20 10v4M6 12h12"/></svg><span>Workout</span></button>
-    <button class="fab"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="tab-btn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="4.5" r="2.2"/><path d="M8.5 8h7l1.5 5-2 .6V20h-3v-4h-1v4h-3v-6.4l-2-.6z"/></svg><span>Body</span></button>
+    <button class="fab"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 8v8M18 8v8M4 10v4M20 10v4M6 12h12"/></svg></button>
     <button class="tab-btn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="m3 17 6-6 4 4 8-8"/></svg><span>Progress</span></button>
     <button class="tab-btn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span>Setup</span></button>
   </nav>
 </div>`;
 
 writeFileSync(join(root, "preview.html"),
-`<!doctype html><html lang="en" data-theme="dark"><head>
+`<!doctype html><html lang="en" data-theme="light"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fit Together · UI preview</title>${head}
 <style>${style}</style></head><body>${body}</body></html>`);

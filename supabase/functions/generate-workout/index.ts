@@ -1,6 +1,8 @@
 // Deno Deploy (Supabase Edge Functions) — generates a daily workout via the Claude API.
 // Expects env var ANTHROPIC_API_KEY set as a function secret.
 
+import { calculateTDEE } from "../../../knowledge/formulas/tdee.mjs";
+
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -119,6 +121,7 @@ Deno.serve(async (req) => {
     } = body;
 
     const heightStr = height_in ? `${Math.floor(height_in / 12)}'${height_in % 12}"` : "not given";
+    const tdee = calculateTDEE({ sex, age, height_in, activity_level, weightLb: current_weight });
 
     const userMsg = `User: ${user_name}
 Sex: ${sex || "not given"}
@@ -126,6 +129,7 @@ Age: ${age || "not given"}
 Height: ${heightStr}
 Current body weight: ${current_weight != null ? current_weight + " lb" : "not given"}
 Activity level: ${activity_level || "not given"}
+Estimated maintenance calories (TDEE, Mifflin-St Jeor): ${tdee != null ? tdee + " kcal/day" : "not enough data to estimate"}
 Gym days already logged this week: ${gym_days_this_week ?? "not given"}
 Requested focus today: ${focus || "coach's choice"}
 Stated goal: ${goal || "general fitness"}
