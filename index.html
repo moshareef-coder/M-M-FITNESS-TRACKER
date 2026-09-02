@@ -579,6 +579,9 @@
     color: var(--accent); font-size: 14px; font-weight: 700; padding: 0;
   }
 
+  .coach-line { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  .coach-line svg { color: var(--down); }
+
   /* Hero: this week's standing */
   .hero-kicker { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: var(--muted); }
   .stand { display: flex; align-items: center; gap: 18px; margin: 18px 0 4px; }
@@ -1663,7 +1666,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.02.1";
+const APP_VERSION = "2026.09.02.2";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -1851,8 +1854,44 @@ async function handleSignedIn(session) {
 const ADMIN_EMAIL = "mo.shareef@creativelab1.com";
 let PARTNER_EMAIL = null;
 let MY_PARTNERSHIP = null;
+/* Coaching context. A client under a coach has no partner and cannot generate
+   their own workouts; that is the coach's job and the reason they pay. */
+let MY_GROUP = null;
+let MY_ROLE = null;
+let MY_COACH = null;
+
+const isCoachedClient = () => MY_GROUP?.kind === "coach" && MY_ROLE === "client";
+
+async function loadMyGroups() {
+  const { data } = await sb.from("group_members").select("*").is("left_at", null);
+  const mine = (data || []).filter((m) => m.email.toLowerCase() === MY_EMAIL);
+  if (!mine.length) return { pending: null, active: null };
+  const ids = mine.map((m) => m.group_id);
+  const { data: gs } = await sb.from("groups").select("*").in("id", ids);
+  const groups = gs || [];
+  const withGroup = mine.map((m) => ({ ...m, group: groups.find((g) => g.id === m.group_id) })).filter((m) => m.group);
+  return {
+    pending: withGroup.find((m) => !m.accepted_at) || null,
+    active: withGroup.find((m) => m.accepted_at && m.group.kind === "coach") || null,
+  };
+}
 
 async function checkPartnershipThenEnter() {
+  const { pending, active } = await loadMyGroups();
+
+  // An unanswered invitation takes priority over everything else.
+  if (pending) { renderInviteScreen(pending); return; }
+
+  if (active) {
+    MY_GROUP = active.group;
+    MY_ROLE = active.role;
+    const { data: roster } = await sb.from("group_members")
+      .select("email, role").eq("group_id", active.group_id).is("left_at", null);
+    MY_COACH = (roster || []).find((r) => r.role === "coach" || r.role === "owner")?.email || null;
+    showApp();
+    return;
+  }
+
   const { data: rows } = await sb.from("partnerships")
     .select("*")
     .order("created_at", { ascending: false });
@@ -1867,6 +1906,34 @@ async function checkPartnershipThenEnter() {
   } else {
     renderPairingScreen();
   }
+}
+
+/* Someone added you to their group. You decide, they do not decide for you. */
+function renderInviteScreen(invite) {
+  const g = invite.group;
+  const coachName = g.owner_email.split("@")[0];
+  $("onboard").innerHTML = `
+    <div class="ob-step">
+      <h1>${escapeHtml(coachName)} added you</h1>
+      <p class="sub">You have been invited to <strong>${escapeHtml(g.name)}</strong>.
+        Your coach will see your workouts and set your training. You can leave at any time.</p>
+      <button class="btn-primary" id="acceptInviteBtn">Join ${escapeHtml(g.name)}</button>
+      <button class="btn-ghost" id="declineInviteBtn">No thanks</button>
+    </div>`;
+  $("onboard").classList.remove("hidden");
+  $("app").classList.add("hidden");
+
+  $("acceptInviteBtn").onclick = async () => {
+    $("acceptInviteBtn").disabled = true;
+    const { error } = await sb.rpc("respond_to_group_invite", { p_group_id: g.id, p_accept: true });
+    if (error) { toast("Could not join"); $("acceptInviteBtn").disabled = false; return; }
+    await checkPartnershipThenEnter();
+  };
+  $("declineInviteBtn").onclick = async () => {
+    if (!confirm(`Decline the invitation to ${g.name}?`)) return;
+    await sb.rpc("respond_to_group_invite", { p_group_id: g.id, p_accept: false });
+    await checkPartnershipThenEnter();
+  };
 }
 
 function renderPairingScreen() {
@@ -3005,6 +3072,8 @@ function standRow(name, done, target, cls) {
 
 function renderHero() {
   const el = $("heroCard");
+  const coachLine = isCoachedClient() && MY_COACH
+    ? `<div class="coach-line">${icon("check", 13)} Coached by ${escapeHtml(MY_COACH.split("@")[0])}</div>` : "";
   const myDays = gymDaysThisWeek(ME);
   const myTarget = weeklyGoalFor(MY_EMAIL);
   const trainedToday = !!todayEntryFor(MY_EMAIL)?.gym;
@@ -3044,6 +3113,7 @@ function renderHero() {
 
   el.innerHTML = `
     <div class="hero-kicker">THIS WEEK'S STANDING</div>
+    ${coachLine}
     ${stand}
     ${streak > 0 ? `<p class="hero-sub">Weeks in a row you both hit your goal.</p>` : `<p class="hero-sub">Both hit your goal this week to start a streak.</p>`}
     ${cta}`;
@@ -3792,6 +3862,7 @@ async function loadTodayWorkout() {
 
 /* Generates for today by default, or any date, so tomorrow can be planned ahead. */
 async function generateWorkout(forDate) {
+  if (isCoachedClient()) { toast("Your coach sets your workouts"); return; }
   const target = forDate || todayStr();
   const isToday = target === todayStr();
   WORKOUT_MODE = null;
@@ -4639,12 +4710,18 @@ function renderWorkoutTab() {
 }
 
 function renderChooseScreen() {
+  // A coached client does not generate their own plan. That is what the coach
+  // is paid for, so the option is not offered rather than offered and refused.
+  const coached = isCoachedClient();
+  const coachName = MY_COACH ? MY_COACH.split("@")[0] : "your coach";
   $("workoutContent").innerHTML = `
-    <p class="muted-note">How do you want to build today's workout?</p>
-    <button class="btn-primary" id="chooseGenerateBtn" style="margin-top:10px;">Generate for me</button>
-    <button class="btn-secondary" id="choosePlanBtn">I'll plan my own</button>
+    <p class="muted-note">${coached
+      ? `${escapeHtml(coachName)} sets your training. Log what you did, or add something extra.`
+      : "How do you want to build today's workout?"}</p>
+    ${coached ? "" : `<button class="btn-primary" id="chooseGenerateBtn" style="margin-top:10px;">Generate for me</button>`}
+    <button class="${coached ? "btn-primary" : "btn-secondary"}" id="choosePlanBtn" ${coached ? 'style="margin-top:10px;"' : ""}>${coached ? "Log a workout" : "I'll plan my own"}</button>
     <button class="btn-secondary" id="chooseActivityBtn">Log a class or cardio</button>`;
-  $("chooseGenerateBtn").onclick = generateWorkout;
+  if (!coached) $("chooseGenerateBtn").onclick = generateWorkout;
   $("choosePlanBtn").onclick = () => { WORKOUT_MODE = "manual"; MANUAL_DRAFT = []; renderWorkoutTab(); };
   $("chooseActivityBtn").onclick = () => { WORKOUT_MODE = "activity"; renderWorkoutTab(); };
 }
