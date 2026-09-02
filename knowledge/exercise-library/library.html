@@ -54,8 +54,14 @@
   .ex-meta { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   .badge { font-size: 11px; padding: 3px 8px; border-radius: 100px; background: var(--chip); color: var(--muted); white-space: nowrap; }
   .badge.primary { background: var(--accent); color: var(--bg); }
-  .level-beginner { opacity: .7; }
-  .level-advanced { font-weight: 600; }
+  .badge.level-beginner { background: #4a7c59; color: #fff; }
+  .badge.level-intermediate { background: #b8860b; color: #fff; }
+  .badge.level-advanced { background: #a83232; color: #fff; }
+  .filters { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .filter-btn { font-size: 13px; padding: 6px 14px; border-radius: 100px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; }
+  .filter-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .ex-row[hidden] { display: none; }
+  .category[data-empty="true"] { display: none; }
   .simple-note { margin-top: 32px; background: var(--card); border: 1px dashed var(--border); border-radius: 14px; padding: 16px; color: var(--muted); font-size: 13px; }
   .simple-note b { color: var(--text); }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
@@ -67,6 +73,12 @@
   <h1>Exercise Library — draft for review</h1>
   <div class="sub">Training → Workout Category → Exercise. Muscle keys match the app's existing heat map, so this can plug in directly once approved.</div>
   <div class="summary" id="summary"></div>
+  <div class="filters" id="filters">
+    <button type="button" class="filter-btn active" data-level="all">All levels</button>
+    <button type="button" class="filter-btn" data-level="beginner">Beginner</button>
+    <button type="button" class="filter-btn" data-level="intermediate">Intermediate</button>
+    <button type="button" class="filter-btn" data-level="advanced">Advanced</button>
+  </div>
 </header>
 <main id="main"></main>
 
@@ -80,7 +92,7 @@
     const secondary = (ex.secondary || []).map((m) => badge(m)).join("");
     const equip = ex.equipment ? badge(ex.equipment) : "";
     const level = ex.level ? `<span class="badge level-${ex.level}">${ex.level}</span>` : "";
-    return `<div class="ex-row">
+    return `<div class="ex-row" data-level="${ex.level || ""}">
       <div class="ex-name">${ex.name}</div>
       <div class="ex-meta">${primary}${secondary}${equip}${level}</div>
     </div>`;
@@ -124,6 +136,20 @@
     <div class="stat"><b>${totalExercises}</b><span>Exercises / poses / moves</span></div>
     <div class="stat"><b>${SIMPLE_TIMED_ACTIVITIES.length}</b><span>Simple timed activities</span></div>
   `;
+
+  document.getElementById("filters").addEventListener("click", (e) => {
+    const btn = e.target.closest(".filter-btn");
+    if (!btn) return;
+    document.querySelectorAll(".filter-btn").forEach((b) => b.classList.toggle("active", b === btn));
+    const level = btn.dataset.level;
+    document.querySelectorAll(".ex-row").forEach((row) => {
+      row.hidden = level !== "all" && row.dataset.level !== level;
+    });
+    document.querySelectorAll(".category").forEach((cat) => {
+      const visible = [...cat.querySelectorAll(".ex-row")].some((row) => !row.hidden);
+      cat.dataset.empty = String(!visible);
+    });
+  });
 </script>
 </body>
 </html>

@@ -4,12 +4,13 @@
 import { WEIGHT_TRAINING } from "./weight-training.mjs";
 import { YOGA } from "./yoga.mjs";
 import { PILATES } from "./pilates.mjs";
+import { CALISTHENICS } from "./calisthenics.mjs";
 
-export const TRAININGS = [WEIGHT_TRAINING, YOGA, PILATES];
+export const TRAININGS = [WEIGHT_TRAINING, YOGA, PILATES, CALISTHENICS];
 
 // Activities tracked by duration with no exercise-level breakdown -- logging "exercises within
 // basketball" doesn't map to a discrete move list the way lifting or yoga does. Mirrors
-// ACTIVITY_PRESETS in index.html minus the three trainings above, which do have real libraries.
+// ACTIVITY_PRESETS in index.html minus the trainings above, which do have real libraries.
 export const SIMPLE_TIMED_ACTIVITIES = [
   "Barre", "Running", "Walking", "Hiking", "Cycling", "Spin class", "Swimming",
   "Rowing machine", "Elliptical", "Stair climber", "Boxing", "Kickboxing", "HIIT", "CrossFit",
