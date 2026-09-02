@@ -1217,7 +1217,22 @@
       <div class="strip hidden them-strip" id="theirStrip"></div>
     </div>
 
-    <div class="card" id="volumeCard"></div>
+    <div class="card">
+      <h2>Your PRs</h2>
+      <div class="pr-list" id="currentPRsList"></div>
+
+      <label>Add one</label>
+      <div class="row2">
+        <div class="field"><input type="text" id="prName" placeholder="Exercise, e.g. Bench Press" /></div>
+      </div>
+      <div class="stepper-row compact" id="prStepperRow"></div>
+      <button type="button" class="btn-secondary" id="savePRBtn">Save PR</button>
+
+      <label style="margin-top:16px;">Or paste a list</label>
+      <textarea id="prBulkText" placeholder="One per line, e.g.&#10;Bench Press 225 x 5&#10;Squat 315 x 3&#10;Deadlift 405 x 1"></textarea>
+      <button type="button" class="btn-secondary" id="importPRBtn">Import list</button>
+    </div>
+
   </div>
 
   <div id="tab-workout" class="tab-panel hidden">
@@ -1377,6 +1392,8 @@
       <p class="muted-note" id="bodyDiagramNote"></p>
     </div>
 
+    <div class="card" id="volumeCard"></div>
+
   </div>
 
   <!-- PROGRESS TAB -->
@@ -1530,21 +1547,6 @@
     </div>
     <button class="btn-primary" id="saveSetupBtn">Save preferences</button>
 
-    <div class="card" style="margin-top:14px;">
-      <h2>Your PRs</h2>
-      <div class="pr-list" id="currentPRsList"></div>
-
-      <label style="margin-top:14px;">Add one</label>
-      <div class="row2">
-        <div class="field"><input type="text" id="prName" placeholder="Exercise, e.g. Bench Press" /></div>
-      </div>
-      <div class="stepper-row compact" id="prStepperRow"></div>
-      <button type="button" class="btn-secondary" id="savePRBtn">Save PR</button>
-
-      <label style="margin-top:16px;">Or paste a list</label>
-      <textarea id="prBulkText" placeholder="One per line, e.g.&#10;Bench Press 225 x 5&#10;Squat 315 x 3&#10;Deadlift 405 x 1"></textarea>
-      <button type="button" class="btn-secondary" id="importPRBtn">Import list</button>
-    </div>
 
     <div class="card hidden" id="adminCard">
       <h2>Admin</h2>
@@ -1661,7 +1663,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.01.19";
+const APP_VERSION = "2026.09.01.20";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -3638,8 +3640,8 @@ function relativeDay(dateStr) {
 function renderHome() {
   renderHero();
   renderPartnerNotice();
-  renderVolumeCard();
   renderWeekStrips();
+  renderCurrentPRs();
   renderRestDayPrompt();
   renderEncouragementBanner();
 }
@@ -4372,6 +4374,7 @@ function renderTodayTally() {
 
 /* Body tab: what is recovered, what still needs work. */
 function renderBodyTab() {
+  renderVolumeCard();
   $("bodyRestIco").innerHTML = icon("clock", 20);
   $("bodyFreshIco").innerHTML = icon("check", 20);
 
@@ -5390,7 +5393,6 @@ function renderSetupTab() {
       $("setupHeightIn").value = MY_PROFILE.height_in % 12;
     }
   }
-  renderCurrentPRs();
 }
 
 function renderCurrentPRs() {
