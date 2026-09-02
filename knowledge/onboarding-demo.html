@@ -50,6 +50,9 @@
   .day-block h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); margin: 0 0 6px; }
   .muted-note { color: var(--muted); font-size: 13px; }
   .continuity-banner { background: var(--chip); border-radius: 12px; padding: 12px 14px; font-size: 13px; margin-bottom: 14px; }
+  .mix-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; font-size: 14px; border-bottom: 1px solid var(--border); }
+  .mix-row:last-of-type { border-bottom: none; }
+  .mix-row input[type=number] { width: 60px; text-align: center; padding: 6px; }
   .ex-block { border-bottom: 1px solid var(--border); }
   .ex-block:last-child { border-bottom: none; }
   .swap-btn { font-size: 12px; background: none; border: none; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 0 0 10px; }
@@ -132,6 +135,15 @@
     </div>
     <label>Do you play any sports? (optional)</label>
     <div class="choice-grid" id="sportsChoices"></div>
+
+    <label>What kind of training actually appeals to you? (pick any)</label>
+    <div class="choice-grid" id="styleChoices">
+      <span class="choice" data-v="weight-training">Weight training</span>
+      <span class="choice" data-v="cardio">Cardio / running</span>
+      <span class="choice" data-v="sports">Sports-focused</span>
+      <span class="choice" data-v="flow">Yoga or Pilates</span>
+      <span class="choice" data-v="unsure">Not sure, surprise me</span>
+    </div>
   </div>
 
   <div class="step" data-step="4">
@@ -160,20 +172,26 @@
   import { estimateGoalTimeline } from "./formulas/goal-timeline.mjs";
   import { estimateActivityCalories } from "./formulas/calorie-math.mjs";
   import {
-    buildWeightTrainingPlan, buildWeekPlan, sessionCapacity, findAlternatives, coldStartWeight,
+    buildWeightTrainingPlan, buildFlowPlan, sessionCapacity, findAlternatives, coldStartWeight,
   } from "./formulas/exercise-selector.mjs";
+  import { computeWeeklyMix, assignWeekSchedule, MIN_STRENGTH_SESSIONS_PER_WEEK } from "./formulas/training-mix.mjs";
 
   const SPORTS = ["Basketball", "Soccer", "Tennis", "Climbing", "Skiing", "Boxing", "Running", "Cycling", "Swimming"];
   document.getElementById("sportsChoices").innerHTML = SPORTS.map((s) => `<span class="choice" data-v="${s}">${s}</span>`).join("");
 
   const STORAGE_KEY = "ft_onboarding_demo_v1";
   let currentPlan = null;
+  let currentTrackingMode = "sets";
   let currentContext = null; // { level, equipmentAvailable, recentExerciseNames }
   let lastAltsByIndex = {};
+  let currentMix = null;
+  let currentSchedule = null;
+  let currentDaysAvailable = 4;
+  const CARDIO_DEFAULT = "Running";
   const state = {
     heightFt: 5, heightIn: 9, weight: 180, age: 30, sex: null,
     freq: null, experience: null, goalType: null, goalAmount: null,
-    time: null, sports: [], equip: null, notes: "",
+    time: null, sports: [], preferredModalities: [], equip: null, notes: "",
   };
 
   let step = 0;
@@ -196,14 +214,22 @@
     });
   }
 
-  function wireMultiChoice(containerId, key) {
+  function wireMultiChoice(containerId, key, exclusiveValue = null) {
     const el = document.getElementById(containerId);
     el.querySelectorAll(".choice").forEach((c) => {
       c.classList.toggle("selected", state[key].includes(c.dataset.v));
       c.onclick = () => {
-        const i = state[key].indexOf(c.dataset.v);
-        if (i === -1) state[key].push(c.dataset.v); else state[key].splice(i, 1);
-        c.classList.toggle("selected");
+        const v = c.dataset.v;
+        if (v === exclusiveValue) {
+          // "Not sure / surprise me" clears everything else -- it means no preference, not
+          // "no preference plus whatever else was clicked."
+          state[key] = state[key].includes(v) ? [] : [v];
+        } else {
+          state[key] = state[key].filter((x) => x !== exclusiveValue);
+          const i = state[key].indexOf(v);
+          if (i === -1) state[key].push(v); else state[key].splice(i, 1);
+        }
+        el.querySelectorAll(".choice").forEach((x) => x.classList.toggle("selected", state[key].includes(x.dataset.v)));
       };
     });
   }
@@ -219,6 +245,7 @@
     });
     wireSingleChoice("timeChoices", "time");
     wireMultiChoice("sportsChoices", "sports");
+    wireMultiChoice("styleChoices", "preferredModalities", "unsure");
     wireSingleChoice("equipChoices", "equip");
   }
   wireStepInputs();
@@ -251,6 +278,16 @@
 
   function planMinutes() {
     return state.time === "unsure" || !state.time ? 45 : parseInt(state.time, 10);
+  }
+
+  function weeklyDaysAvailable() {
+    if (state.freq === "unsure" || state.freq == null) return 3; // conservative default
+    const n = parseInt(state.freq, 10);
+    return n === 0 ? 2 : n; // "starting fresh" still gets a modest 2-day recommendation, not 0
+  }
+
+  function mixGoalKey() {
+    return state.goalType === "unsure" || !state.goalType ? "general" : state.goalType;
   }
 
   function activityLevelFromFreq() {
@@ -298,32 +335,21 @@
       goalCard = `<div class="card"><h2>Your numbers</h2><div class="stat-row"><span>Maintenance calories (TDEE)</span><b>${tdee} kcal/day</b></div></div>`;
     }
 
-    const yesterday = loadYesterday();
-    const level = planLevel();
-    const equipmentAvailable = equipmentList();
-    const capacity = sessionCapacity(planMinutes());
-    currentPlan = buildWeightTrainingPlan({
-      level,
-      goal: goalToPlanGoal(),
-      bodyWeightLb: state.weight,
-      equipmentAvailable,
-      weeklyVolumeByCategory: yesterday?.weeklyVolumeByCategory || {},
-      recentExerciseNames: yesterday?.recentExerciseNames || [],
-      ...capacity,
-    });
-    currentContext = { level, equipmentAvailable, recentExerciseNames: yesterday?.recentExerciseNames || [] };
-    lastAltsByIndex = {};
-
-    const continuityNote = yesterday
-      ? `<div class="continuity-banner">Picking up from last time you generated a plan here — today avoids ${yesterday.focusCategories.join(" & ")} since that's what got trained then, and skips repeating the same exercises.</div>`
-      : `<div class="continuity-banner">First plan for this browser. Hit "Mark today done" below, then reload this page — tomorrow's plan will visibly build on today's.</div>`;
-
     const sportsNote = state.sports.length
       ? `<div class="card"><h2>Your sports</h2>${state.sports.map((s) => {
           const kcal = estimateActivityCalories(s, 60, state.weight, "moderate");
           return `<div class="stat-row"><span>${s}, 1 hour, moderate effort</span><b>~${kcal} kcal</b></div>`;
         }).join("")}</div>`
       : "";
+
+    currentDaysAvailable = weeklyDaysAvailable();
+    currentMix = computeWeeklyMix({
+      goal: mixGoalKey(),
+      preferredModalities: state.preferredModalities.filter((m) => m !== "unsure"),
+      sportsCount: state.sports.length,
+      daysAvailable: currentDaysAvailable,
+    });
+    currentSchedule = assignWeekSchedule(currentMix);
 
     document.getElementById("resultsStep").innerHTML = `
       <h1>Your plan</h1>
@@ -332,33 +358,117 @@
       ${goalCard}
       ${sportsNote}
       <div class="card">
-        <h2>Today's session (~${planMinutes()} min)</h2>
-        ${continuityNote}
-        <div class="focus-chips" id="focusChips"></div>
-        <div id="exRows"></div>
+        <h2>Your weekly training mix</h2>
+        <div class="muted-note" style="margin-bottom:10px;">This is the actual decision layer, not a canned split — adjust any number and today's session updates to match. Weight training never goes below ${MIN_STRENGTH_SESSIONS_PER_WEEK} unless your total days are lower than that (muscle preservation during any goal, not a preference).</div>
+        <div class="mix-row"><span>Weight training</span><input type="number" id="mixWeightTraining" min="0" max="7" /></div>
+        <div class="mix-row"><span>Cardio</span><input type="number" id="mixCardio" min="0" max="7" /></div>
+        <div class="mix-row"><span>Sports</span><input type="number" id="mixSports" min="0" max="7" /></div>
+        <div class="mix-row"><span>Yoga / Pilates</span><input type="number" id="mixFlow" min="0" max="7" /></div>
+        <button type="button" class="btn-ghost" id="applyMixBtn" style="width:100%; margin-top:10px;">Update plan with these numbers</button>
+      </div>
+      <div class="card">
+        <h2 id="todayLabel"></h2>
+        <div id="continuityNote"></div>
+        <div id="todayBody"></div>
       </div>
       <button class="btn-primary" id="markDoneBtn" style="width:100%; margin-bottom:10px;">Mark today done → set up tomorrow</button>
-      <button class="btn-ghost" id="weekBtn" style="width:100%;">Generate a 7-day plan instead</button>
+      <button class="btn-ghost" id="weekBtn" style="width:100%;">Show the full week</button>
       <div id="weekOut"></div>
     `;
 
-    renderPlanRows();
+    fillMixInputs();
+    renderTodaySection();
 
+    document.getElementById("applyMixBtn").onclick = () => {
+      currentMix = {
+        weightTraining: parseInt(document.getElementById("mixWeightTraining").value, 10) || 0,
+        cardio: parseInt(document.getElementById("mixCardio").value, 10) || 0,
+        sports: parseInt(document.getElementById("mixSports").value, 10) || 0,
+        flow: parseInt(document.getElementById("mixFlow").value, 10) || 0,
+      };
+      currentSchedule = assignWeekSchedule(currentMix);
+      renderTodaySection();
+      document.getElementById("weekOut").innerHTML = "";
+    };
     document.getElementById("markDoneBtn").onclick = () => {
-      saveToday(currentPlan);
+      if (currentPlan) saveToday(currentPlan);
       renderResults();
     };
-    document.getElementById("weekBtn").onclick = () => {
-      const days = buildWeekPlan({
-        level, goal: goalToPlanGoal(), daysPerWeek: 5, equipmentAvailable,
-        bodyWeightLb: state.weight, ...capacity,
+    document.getElementById("weekBtn").onclick = () => renderWeekOutput();
+  }
+
+  function fillMixInputs() {
+    document.getElementById("mixWeightTraining").value = currentMix.weightTraining;
+    document.getElementById("mixCardio").value = currentMix.cardio;
+    document.getElementById("mixSports").value = currentMix.sports;
+    document.getElementById("mixFlow").value = currentMix.flow;
+  }
+
+  function renderTodaySection() {
+    const type = currentSchedule[0];
+    const level = planLevel();
+    const equipmentAvailable = equipmentList();
+    const yesterday = loadYesterday();
+    const label = { weightTraining: "Weight training", cardio: "Cardio", sports: "Sports", flow: "Flow (yoga)" }[type];
+    document.getElementById("todayLabel").textContent = `Today: ${label} (~${planMinutes()} min)`;
+
+    const continuityEl = document.getElementById("continuityNote");
+    const body = document.getElementById("todayBody");
+
+    if (type === "weightTraining") {
+      const capacity = sessionCapacity(planMinutes());
+      currentPlan = buildWeightTrainingPlan({
+        level, goal: goalToPlanGoal(), bodyWeightLb: state.weight, equipmentAvailable,
+        weeklyVolumeByCategory: yesterday?.weeklyVolumeByCategory || {},
+        recentExerciseNames: yesterday?.recentExerciseNames || [],
+        ...capacity,
       });
-      document.getElementById("weekOut").innerHTML = days.map((d, i) => `
-        <div class="day-block">
-          <h3>Day ${i + 1} — ${d.focusCategories.join(" & ")}</h3>
-          ${d.exercises.map((ex) => `<div class="ex-row"><div>${ex.name}</div><div>${ex.sets} × ${ex.reps}</div></div>`).join("")}
-        </div>`).join("");
-    };
+      currentTrackingMode = "sets";
+      currentContext = { level, equipmentAvailable, recentExerciseNames: yesterday?.recentExerciseNames || [] };
+      continuityEl.innerHTML = yesterday
+        ? `<div class="continuity-banner">Today avoids ${yesterday.focusCategories.join(" & ")} since that is what got trained last time, and skips repeating the same exercises.</div>`
+        : `<div class="continuity-banner">First plan for this browser. Hit "Mark today done," then reload — tomorrow's weight-training day will visibly build on today's.</div>`;
+      body.innerHTML = `<div class="focus-chips" id="focusChips"></div><div id="exRows"></div>`;
+      renderPlanRows();
+    } else if (type === "flow") {
+      currentPlan = buildFlowPlan({ trainingId: "yoga", level, targetMinutes: planMinutes() });
+      currentTrackingMode = "duration";
+      currentContext = { level, equipmentAvailable: null, recentExerciseNames: [] };
+      continuityEl.innerHTML = `<div class="continuity-banner">Defaulting to yoga — say the word if you'd rather this be Pilates.</div>`;
+      body.innerHTML = `<div class="focus-chips" id="focusChips"></div><div id="exRows"></div>`;
+      renderPlanRows();
+    } else {
+      currentPlan = null;
+      continuityEl.innerHTML = "";
+      const activity = type === "sports" && state.sports.length ? state.sports[0] : CARDIO_DEFAULT;
+      const kcal = estimateActivityCalories(activity, planMinutes(), state.weight, "moderate");
+      body.innerHTML = `<div class="ex-row"><div><div>${activity}</div><div class="ex-sub">moderate effort, ~${planMinutes()} min</div></div><div>~${kcal} kcal</div></div>`;
+    }
+  }
+
+  function renderWeekOutput() {
+    const level = planLevel();
+    const equipmentAvailable = equipmentList();
+    const capacity = sessionCapacity(planMinutes());
+    let weeklyVolumeByCategory = {};
+    let recentExerciseNames = [];
+
+    const blocks = currentSchedule.map((type, i) => {
+      if (type === "weightTraining") {
+        const d = buildWeightTrainingPlan({ level, goal: goalToPlanGoal(), bodyWeightLb: state.weight, equipmentAvailable, weeklyVolumeByCategory, recentExerciseNames, ...capacity });
+        d.exercises.forEach((ex) => (ex.primary || []).forEach((m) => { weeklyVolumeByCategory[m] = (weeklyVolumeByCategory[m] || 0) + ex.sets; }));
+        recentExerciseNames = [...new Set([...recentExerciseNames, ...d.exercises.map((e) => e.name)])].slice(-12);
+        return `<div class="day-block"><h3>Day ${i + 1} — Weight training (${d.focusCategories.join(" & ")})</h3>${d.exercises.map((ex) => `<div class="ex-row"><div>${ex.name}</div><div>${ex.sets} × ${ex.reps}</div></div>`).join("")}</div>`;
+      }
+      if (type === "flow") {
+        const d = buildFlowPlan({ trainingId: "yoga", level, targetMinutes: planMinutes() });
+        return `<div class="day-block"><h3>Day ${i + 1} — Yoga</h3>${d.exercises.map((ex) => `<div class="ex-row"><div>${ex.name}</div></div>`).join("")}</div>`;
+      }
+      const activity = type === "sports" && state.sports.length ? state.sports[0] : CARDIO_DEFAULT;
+      const kcal = estimateActivityCalories(activity, planMinutes(), state.weight, "moderate");
+      return `<div class="day-block"><h3>Day ${i + 1} — ${type === "sports" ? "Sports" : "Cardio"}</h3><div class="ex-row"><div>${activity}</div><div>~${kcal} kcal</div></div></div>`;
+    });
+    document.getElementById("weekOut").innerHTML = blocks.join("");
   }
 
   // ---------------------------------------------------------------------------
@@ -369,18 +479,22 @@
   // ---------------------------------------------------------------------------
   function renderPlanRows() {
     document.getElementById("focusChips").innerHTML = currentPlan.focusCategories.map((c) => `<span class="focus-chip">${c}</span>`).join("");
-    document.getElementById("exRows").innerHTML = currentPlan.exercises.map((ex, i) => `
-      <div class="ex-block" data-index="${i}">
+    document.getElementById("exRows").innerHTML = currentPlan.exercises.map((ex, i) => {
+      const prescription = currentTrackingMode === "sets"
+        ? `${ex.sets} × ${ex.reps}${ex.targetWeight != null ? ` @ ${ex.targetWeight === 0 ? "bodyweight" : ex.targetWeight + " lb"}` : " (start light)"}`
+        : "~2-3 min hold";
+      return `<div class="ex-block" data-index="${i}">
         <div class="ex-row" style="border-bottom:none; padding-bottom:4px;">
           <div>
             <div>${ex.name}</div>
             <div class="ex-sub">${(ex.primary || []).join(", ")} · ${ex.level}</div>
           </div>
-          <div>${ex.sets} × ${ex.reps}${ex.targetWeight != null ? ` @ ${ex.targetWeight === 0 ? "bodyweight" : ex.targetWeight + " lb"}` : " (start light)"}</div>
+          <div>${prescription}</div>
         </div>
         <button type="button" class="swap-btn" data-index="${i}">Swap this exercise</button>
         <div class="alt-panel" id="alt-${i}" hidden></div>
-      </div>`).join("");
+      </div>`;
+    }).join("");
 
     document.querySelectorAll(".swap-btn").forEach((btn) => {
       btn.onclick = () => toggleAlternatives(parseInt(btn.dataset.index, 10));
