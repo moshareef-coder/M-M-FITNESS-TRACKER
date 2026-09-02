@@ -488,22 +488,47 @@
   .today-photo { margin-top: 14px; border-radius: 13px; overflow: hidden; aspect-ratio: 4/3; }
   .today-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-  /* Headline stats */
-  .stats-row { display: flex; gap: 10px; margin-bottom: 12px; }
-  .hstat {
-    flex: 1; min-width: 0; padding: 14px 13px; border-radius: var(--radius);
+  /* Headline stats: wide rows, label left, number right */
+  #statsRow { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+  .srow {
+    display: flex; align-items: stretch;
     background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
   }
-  .hstat-val { font-size: 22px; font-weight: 800; letter-spacing: -.025em; line-height: 1; }
-  .hstat-val.good { color: var(--down); }
-  .hstat-val.warn { color: var(--up); }
-  .hstat-unit { font-size: 11.5px; font-weight: 600; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
-  .hstat-lbl { font-size: 11px; color: var(--muted); margin-top: 7px; line-height: 1.3; }
+  .srow-l { flex: 1; min-width: 0; padding: 16px; }
+  .srow-label { font-size: 16px; font-weight: 800; letter-spacing: -.015em; line-height: 1.2; }
+  .srow-sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .srow-r {
+    flex-shrink: 0; display: flex; align-items: center; gap: 12px;
+    padding: 16px 16px 16px 18px; border-left: 1px solid var(--border);
+  }
+  .srow-val { font-size: 26px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+  .srow-val.good { color: var(--down); }
+  .srow-val.warn { color: var(--up); }
+  .srow-unit { font-size: 12.5px; font-weight: 600; color: var(--muted); margin-left: 5px; letter-spacing: 0; }
+  .srow-ico { color: var(--muted); display: flex; }
 
-  .together-line {
-    text-align: center; font-size: 14px; font-weight: 600; color: var(--muted);
-    margin: 2px 0 14px; line-height: 1.4;
+  /* Partner notice: news, dismissible, then gone */
+  .notice {
+    position: relative; margin-bottom: 12px; padding: 16px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
   }
+  .notice-x {
+    position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%;
+    border: none; cursor: pointer; background: var(--panel-2); color: var(--muted);
+    font-size: 17px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  }
+  .notice-body { display: flex; align-items: center; gap: 13px; padding-right: 30px; }
+  .notice-img { width: 52px; height: 52px; border-radius: 12px; object-fit: cover; flex-shrink: 0; }
+  .notice-av {
+    width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--partner); color: #fff; font-size: 19px; font-weight: 800;
+  }
+  .notice-text { min-width: 0; }
+  .notice-head { font-size: 16px; font-weight: 800; letter-spacing: -.015em; }
+  .notice-sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+  .notice .btn-secondary { margin-top: 14px; }
 
   /* Week strips, the dashboard */
   .strip-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -1107,11 +1132,11 @@
     <div class="reminder-banner hidden" id="encouragementBanner"></div>
     <div class="rest-banner hidden" id="restDayBanner"></div>
 
+    <div class="notice hidden" id="partnerNotice"></div>
+
     <div class="card" id="youTodayCard"></div>
 
-    <div class="card hidden" id="themTodayCard"></div>
-
-    <div class="stats-row hidden" id="statsRow"></div>
+    <div id="statsRow"></div>
 
     <div class="card">
       <div class="strip-head">
@@ -1130,8 +1155,6 @@
       <div class="goalbar"><i class="them" id="theirGoalBar"></i></div>
       <div class="strip" id="theirStrip"></div>
     </div>
-
-    <p class="together-line hidden" id="togetherLine"></p>
 
     <div class="card" id="tomorrowCard"></div>
   </div>
@@ -1577,7 +1600,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.01.11";
+const APP_VERSION = "2026.09.01.12";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -2813,50 +2836,7 @@ async function renderYouToday() {
   if (PARTNER_EMAIL) $("todayNoteBtn").onclick = () => openNoteComposer("workout");
 }
 
-async function renderThemToday() {
-  const el = $("themTodayCard");
-  if (!PARTNER_EMAIL) { el.classList.add("hidden"); return; }
-  el.classList.remove("hidden");
 
-  const partner = partnerName();
-  const e = todayEntryFor(PARTNER_EMAIL);
-  const mine = todayEntryFor(MY_EMAIL);
-
-  if (!e?.gym) {
-    el.innerHTML = `
-      <div class="today-kicker">${escapeHtml(partner.toUpperCase())}</div>
-      <div class="today-head">${e?.rest_day ? "Resting today" : "Hasn't trained yet"}</div>
-      <p class="muted-note">${mine?.gym ? "You're ahead." : "Neither of you has been yet."}</p>`;
-    return;
-  }
-
-  const s = workoutSummary(partner, todayStr());
-  const when = e.workout_at ? new Date(e.workout_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
-  const bits = [s.mins ? `${s.mins} min` : null, s.sets ? `${s.sets} sets` : null].filter(Boolean).join(" · ");
-  const url = e.proof_path ? await signedProofUrl(e.proof_path) : null;
-
-  el.innerHTML = `
-    <div class="today-kicker">${escapeHtml(partner.toUpperCase())}${when ? ` · ${escapeHtml(when)}` : ""}</div>
-    <div class="today-head">${escapeHtml(partner)} trained today</div>
-    ${bits ? `<p class="muted-note">${escapeHtml(bits)}</p>` : ""}
-    ${url ? `<div class="today-photo"><img src="${url}" alt="${escapeHtml(partner)}'s workout" /></div>` : ""}
-    ${e.note ? `<p class="quote">${escapeHtml(e.note)}</p>` : ""}
-    <button type="button" class="btn-secondary" id="cheerBtn">Cheer ${escapeHtml(partner)} on</button>`;
-  $("cheerBtn").onclick = () => openNoteComposer("congratulate");
-}
-
-/* One shared number. Two counts is a scoreboard; one is a team. */
-function renderTogether() {
-  const el = $("togetherLine");
-  if (!PARTNER_EMAIL) { el.classList.add("hidden"); return; }
-  el.classList.remove("hidden");
-  const mine = gymDaysThisWeek(ME);
-  const theirs = gymDaysThisWeek(partnerName());
-  const both = mine + theirs;
-  el.textContent = both === 0
-    ? "Nothing between you two this week yet."
-    : `You two have trained ${both} time${both === 1 ? "" : "s"} this week.`;
-}
 
 /* Getting ahead: plan tomorrow before tomorrow arrives. */
 function renderTomorrow() {
@@ -2921,9 +2901,11 @@ function weightTrend(name, days = 30) {
 }
 
 function fmtVolume(lb) {
-  if (lb >= 1000000) return (lb / 1000000).toFixed(1) + "M";
-  if (lb >= 1000) return Math.round(lb / 1000) + "k";
-  return String(Math.round(lb));
+  // Show the real number, as in "12,450 lbs". Only abbreviate once it stops
+  // fitting, which for a week of lifting is rare.
+  const n = Math.round(lb);
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+  return n.toLocaleString();
 }
 
 /* Up to three tiles, only the ones that mean something for this person. */
@@ -2933,17 +2915,17 @@ function headlineStats(name, email) {
   const out = [];
 
   if (s.volume > 0) {
-    out.push({ label: "Volume, 7 days", value: fmtVolume(s.volume), unit: "lb" });
+    out.push({ label: "Volume lifted, 7 days", value: fmtVolume(s.volume), unit: "lb" });
   }
   if (s.minutes > 0) {
-    out.push({ label: "Active, 7 days", value: String(s.minutes), unit: "min" });
+    out.push({ label: "Active time, 7 days", value: String(s.minutes), unit: "min" });
   }
   // Weight matters when it is the stated goal, or when nothing else qualifies.
   const wantsWeight = /lose|gain|recomp|weight/i.test(goal);
   const t = weightTrend(name, 30);
   if (t && (wantsWeight || out.length < 2)) {
     const sign = t.change > 0 ? "+" : "";
-    out.push({ label: "Weight, 30 days", value: `${sign}${t.change}`, unit: "lb",
+    out.push({ label: "Body weight, 30 days", value: `${sign}${t.change}`, unit: "lb",
                tone: t.change === 0 ? "" : (/lose|recomp|fat/i.test(goal) ? (t.change < 0 ? "good" : "warn")
                                                                           : (t.change > 0 ? "good" : "warn")) });
   }
@@ -2953,16 +2935,90 @@ function headlineStats(name, email) {
   return out.slice(0, 3);
 }
 
+
+/* Your partner turning up is news, not furniture. It shows once, you either
+   congratulate them or dismiss it, and then it is gone for the day. */
+async function renderPartnerNotice() {
+  const el = $("partnerNotice");
+  if (!PARTNER_EMAIL) { el.classList.add("hidden"); return; }
+
+  const e = todayEntryFor(PARTNER_EMAIL);
+  if (!e?.gym || e.seen_by_partner_at) { el.classList.add("hidden"); return; }
+
+  const partner = partnerName();
+  const when = e.workout_at
+    ? new Date(e.workout_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : "today";
+  const url = e.proof_path ? await signedProofUrl(e.proof_path) : null;
+
+  el.classList.remove("hidden");
+  el.innerHTML = `
+    <button type="button" class="notice-x" id="noticeX" aria-label="Dismiss">&times;</button>
+    <div class="notice-body">
+      ${url ? `<img class="notice-img" src="${url}" alt="" />` : `<span class="notice-av">${escapeHtml(initials(partner))}</span>`}
+      <div class="notice-text">
+        <div class="notice-head">${escapeHtml(partner)} worked out</div>
+        <div class="notice-sub">${escapeHtml(when)}${e.note ? ` · "${escapeHtml(e.note)}"` : ""}</div>
+      </div>
+    </div>
+    <button type="button" class="btn-secondary" id="noticeCheer">Congratulate ${escapeHtml(partner)}</button>`;
+
+  const dismiss = async () => {
+    el.classList.add("hidden");
+    try { await sb.rpc("mark_partner_entry_seen", { p_entry_date: todayStr() }); }
+    catch (err) { console.warn("could not mark seen", err); }
+    await loadAll();
+  };
+  $("noticeX").onclick = dismiss;
+  $("noticeCheer").onclick = async () => { await dismiss(); openNoteComposer("congratulate"); };
+}
+
+/* Wide rows: label on the left, the number on the right. One per person for
+   the headline metric, so both are visible without a second dashboard. */
+function statRow(label, sub, value, unit, iconName, tone) {
+  return `<div class="srow">
+    <div class="srow-l">
+      <div class="srow-label">${escapeHtml(label)}</div>
+      <div class="srow-sub">${escapeHtml(sub)}</div>
+    </div>
+    <div class="srow-r">
+      <div class="srow-val ${tone || ""}">${escapeHtml(value)}<span class="srow-unit">${escapeHtml(unit)}</span></div>
+      <span class="srow-ico">${icon(iconName, 18)}</span>
+    </div>
+  </div>`;
+}
+
 function renderHeadlineStats() {
   const el = $("statsRow");
-  const stats = headlineStats(ME, MY_EMAIL);
-  if (!stats.length) { el.classList.add("hidden"); return; }
+  const rows = [];
+  const strip = (s) => s.replace(/, \d+ days?$/, "");
+
+  const mine = headlineStats(ME, MY_EMAIL);
+  const primary = mine[0];
+  if (primary) {
+    rows.push(statRow(strip(primary.label), "You · last 7 days", primary.value, primary.unit, "trending", primary.tone));
+  }
+
+  if (PARTNER_EMAIL && primary) {
+    const partner = partnerName();
+    const theirs = headlineStats(partner, PARTNER_EMAIL);
+    // Prefer the same metric so the two rows actually compare.
+    const match = theirs.find((t) => t.label === primary.label) || theirs[0];
+    if (match) {
+      rows.push(statRow(strip(match.label), `${partner} · last 7 days`, match.value, match.unit, "trending", match.tone));
+    }
+  }
+
+  // Anything else worth knowing about you, underneath the pair.
+  mine.slice(1).forEach((s) => {
+    const window = s.label.includes("30") ? "You · last 30 days" : "You · last 7 days";
+    rows.push(statRow(strip(s.label), window, s.value, s.unit,
+                      s.label.includes("Body weight") ? "trending" : "clock", s.tone));
+  });
+
+  if (!rows.length) { el.classList.add("hidden"); return; }
   el.classList.remove("hidden");
-  el.innerHTML = stats.map((s) => `
-    <div class="hstat">
-      <div class="hstat-val ${s.tone || ""}">${escapeHtml(s.value)}<span class="hstat-unit">${escapeHtml(s.unit)}</span></div>
-      <div class="hstat-lbl">${escapeHtml(s.label)}</div>
-    </div>`).join("");
+  el.innerHTML = rows.join("");
 }
 
 /* ---------- Home: the week, in pictures ---------- */
@@ -3281,32 +3337,7 @@ function exerciseSummary(l) {
   return l.weight != null ? `${sr} · ${l.weight} lb` : sr || "logged";
 }
 
-function renderRestDayPrompt() {
-  const banner = $("restDayBanner");
-  if (!banner) return;
-  const save = protectableDay(ME);
-  if (!save) { banner.classList.add("hidden"); return; }
-  const streak = computeStreak(ME);
-  banner.classList.remove("hidden");
-  banner.innerHTML = `
-    <div class="rest-copy">
-      <strong>Missed yesterday?</strong>
-      <span>Call it a rest day and keep your ${streak > 0 ? streak + " day " : ""}streak. ${restDaysLeft(ME)} left this week.</span>
-    </div>
-    <button type="button" class="rest-btn" id="restDayBtn">Rest day</button>`;
-  $("restDayBtn").onclick = () => markRestDay(save);
-}
 
-function currentWeekDates() {
-  const start = weekStartStr();
-  const dates = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(start + "T00:00:00");
-    d.setDate(d.getDate() + i);
-    dates.push(isoDate(d));
-  }
-  return dates;
-}
 
 
 
@@ -3547,10 +3578,9 @@ function relativeDay(dateStr) {
 
 function renderHome() {
   renderYouToday();
-  renderThemToday();
+  renderPartnerNotice();
   renderHeadlineStats();
   renderWeekStrips();
-  renderTogether();
   renderTomorrow();
   renderRestDayPrompt();
   renderEncouragementBanner();

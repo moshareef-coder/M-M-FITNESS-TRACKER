@@ -85,12 +85,14 @@
       <span class="choice" data-v="2">1-2x a week</span>
       <span class="choice" data-v="4">3-4x a week</span>
       <span class="choice" data-v="6">5+ a week</span>
+      <span class="choice" data-v="unsure">Not sure yet</span>
     </div>
     <label>How long have you been training overall?</label>
     <div class="choice-grid" id="expChoices">
       <span class="choice" data-v="beginner">New to this</span>
       <span class="choice" data-v="intermediate">A few months in</span>
       <span class="choice" data-v="advanced">A year or more</span>
+      <span class="choice" data-v="unsure">Not sure yet</span>
     </div>
   </div>
 
@@ -103,6 +105,7 @@
       <span class="choice" data-v="hypertrophy">Build muscle, weight steady</span>
       <span class="choice" data-v="general">General fitness / look better</span>
       <span class="choice" data-v="strength">Get stronger</span>
+      <span class="choice" data-v="unsure">Not sure yet</span>
     </div>
     <label id="goalAmountLabel" style="display:none;">How much? (lbs)</label>
     <input type="number" id="goalAmount" style="display:none;" min="1" placeholder="e.g. 20" />
@@ -116,6 +119,7 @@
       <span class="choice" data-v="60">~1 hour</span>
       <span class="choice" data-v="90">~1.5 hours</span>
       <span class="choice" data-v="120">2 hours+</span>
+      <span class="choice" data-v="unsure">Not sure yet</span>
     </div>
     <label>Do you play any sports? (optional)</label>
     <div class="choice-grid" id="sportsChoices"></div>
@@ -128,6 +132,7 @@
       <span class="choice" data-v="home-none">Home, no equipment</span>
       <span class="choice" data-v="home-dumbbell">Home, some dumbbells</span>
       <span class="choice" data-v="full-gym">Full gym access</span>
+      <span class="choice" data-v="unsure">Not sure yet</span>
     </div>
     <label>Anything else we should know?</label>
     <textarea id="notes" placeholder="Bad knee, prefer mornings, hate burpees, whatever..."></textarea>
@@ -215,17 +220,40 @@
     state.notes = document.getElementById("notes").value;
   }
 
+  // "Not sure yet" always falls back to the most conservative, safest assumption for that
+  // question, never to a guess that could be wrong in a risky direction (e.g. overestimating
+  // equipment or experience). The results screen says outright which answers were assumed.
   function equipmentList() {
+    if (state.equip === "unsure") return ["bodyweight"]; // works everywhere, never fails to find exercises
     return { "home-none": ["bodyweight"], "home-dumbbell": ["bodyweight", "dumbbell"], "full-gym": ["bodyweight", "dumbbell", "barbell", "cable", "machine"] }[state.equip] || ["bodyweight"];
   }
 
   function goalToPlanGoal() {
+    if (state.goalType === "unsure") return "general fitness";
     return { lose: "general fitness", gain: "muscle gain", hypertrophy: "muscle gain", general: "general fitness", strength: "strength" }[state.goalType] || "general fitness";
   }
 
+  function planLevel() {
+    return state.experience === "unsure" || !state.experience ? "beginner" : state.experience;
+  }
+
+  function planMinutes() {
+    return state.time === "unsure" || !state.time ? 45 : parseInt(state.time, 10);
+  }
+
   function activityLevelFromFreq() {
+    if (state.freq === "unsure" || state.freq == null) return "Sedentary";
     const n = parseInt(state.freq, 10) || 0;
     return n === 0 ? "Sedentary" : n <= 2 ? "Sedentary" : n <= 4 ? "Moderate" : "Active";
+  }
+
+  function assumptionsNote() {
+    const assumed = [];
+    if (state.experience === "unsure" || !state.experience) assumed.push("starting you as a beginner");
+    if (state.time === "unsure" || !state.time) assumed.push("assuming ~45 min sessions");
+    if (state.equip === "unsure" || !state.equip) assumed.push("assuming bodyweight-only until you tell us more");
+    if (state.goalType === "unsure" || !state.goalType) assumed.push("defaulting to general fitness");
+    return assumed.length ? `<div class="muted-note" style="margin-bottom:14px;">Since a few answers were "not sure yet": ${assumed.join(", ")}. Easy to change once you know.</div>` : "";
   }
 
   function loadYesterday() {
@@ -259,30 +287,24 @@
     }
 
     const yesterday = loadYesterday();
-    const capacity = sessionCapacity(parseInt(state.time, 10) || 45);
-    const plan = buildWeightTrainingPlan({
-      level: state.experience || "beginner",
+    const level = planLevel();
+    const equipmentAvailable = equipmentList();
+    const capacity = sessionCapacity(planMinutes());
+    currentPlan = buildWeightTrainingPlan({
+      level,
       goal: goalToPlanGoal(),
       bodyWeightLb: state.weight,
-      equipmentAvailable: equipmentList(),
+      equipmentAvailable,
       weeklyVolumeByCategory: yesterday?.weeklyVolumeByCategory || {},
       recentExerciseNames: yesterday?.recentExerciseNames || [],
       ...capacity,
     });
+    currentContext = { level, equipmentAvailable, recentExerciseNames: yesterday?.recentExerciseNames || [] };
+    lastAltsByIndex = {};
 
     const continuityNote = yesterday
       ? `<div class="continuity-banner">Picking up from last time you generated a plan here — today avoids ${yesterday.focusCategories.join(" & ")} since that's what got trained then, and skips repeating the same exercises.</div>`
       : `<div class="continuity-banner">First plan for this browser. Hit "Mark today done" below, then reload this page — tomorrow's plan will visibly build on today's.</div>`;
-
-    const focusChips = plan.focusCategories.map((c) => `<span class="focus-chip">${c}</span>`).join("");
-    const exRows = plan.exercises.map((ex) => `
-      <div class="ex-row">
-        <div>
-          <div>${ex.name}</div>
-          <div class="ex-sub">${(ex.primary || []).join(", ")} · ${ex.level}</div>
-        </div>
-        <div>${ex.sets} × ${ex.reps}${ex.targetWeight != null ? ` @ ${ex.targetWeight === 0 ? "bodyweight" : ex.targetWeight + " lb"}` : " (start light)"}</div>
-      </div>`).join("");
 
     const sportsNote = state.sports.length
       ? `<div class="card"><h2>Your sports</h2>${state.sports.map((s) => {
@@ -294,27 +316,30 @@
     document.getElementById("resultsStep").innerHTML = `
       <h1>Your plan</h1>
       <div class="step-sub">Generated by the actual algorithm, not a canned example.</div>
+      ${assumptionsNote()}
       ${goalCard}
       ${sportsNote}
       <div class="card">
-        <h2>Today's session (~${state.time} min)</h2>
+        <h2>Today's session (~${planMinutes()} min)</h2>
         ${continuityNote}
-        <div class="focus-chips">${focusChips}</div>
-        ${exRows}
+        <div class="focus-chips" id="focusChips"></div>
+        <div id="exRows"></div>
       </div>
       <button class="btn-primary" id="markDoneBtn" style="width:100%; margin-bottom:10px;">Mark today done → set up tomorrow</button>
       <button class="btn-ghost" id="weekBtn" style="width:100%;">Generate a 7-day plan instead</button>
       <div id="weekOut"></div>
     `;
 
+    renderPlanRows();
+
     document.getElementById("markDoneBtn").onclick = () => {
-      saveToday(plan);
+      saveToday(currentPlan);
       renderResults();
     };
     document.getElementById("weekBtn").onclick = () => {
       const days = buildWeekPlan({
-        level: state.experience || "beginner", goal: goalToPlanGoal(), daysPerWeek: 5,
-        equipmentAvailable: equipmentList(), bodyWeightLb: state.weight, ...capacity,
+        level, goal: goalToPlanGoal(), daysPerWeek: 5, equipmentAvailable,
+        bodyWeightLb: state.weight, ...capacity,
       });
       document.getElementById("weekOut").innerHTML = days.map((d, i) => `
         <div class="day-block">
@@ -322,6 +347,73 @@
           ${d.exercises.map((ex) => `<div class="ex-row"><div>${ex.name}</div><div>${ex.sets} × ${ex.reps}</div></div>`).join("")}
         </div>`).join("");
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Swap: same pattern as algorithm-demo.html, adapted to this page's plan state. Hard-excludes
+  // every exercise already in today's plan so a swap can never create a duplicate, and soft-
+  // avoids anything logged this week (falls back to allowing a repeat only if that is the only
+  // option left).
+  // ---------------------------------------------------------------------------
+  function renderPlanRows() {
+    document.getElementById("focusChips").innerHTML = currentPlan.focusCategories.map((c) => `<span class="focus-chip">${c}</span>`).join("");
+    document.getElementById("exRows").innerHTML = currentPlan.exercises.map((ex, i) => `
+      <div class="ex-block" data-index="${i}">
+        <div class="ex-row" style="border-bottom:none; padding-bottom:4px;">
+          <div>
+            <div>${ex.name}</div>
+            <div class="ex-sub">${(ex.primary || []).join(", ")} · ${ex.level}</div>
+          </div>
+          <div>${ex.sets} × ${ex.reps}${ex.targetWeight != null ? ` @ ${ex.targetWeight === 0 ? "bodyweight" : ex.targetWeight + " lb"}` : " (start light)"}</div>
+        </div>
+        <button type="button" class="swap-btn" data-index="${i}">Swap this exercise</button>
+        <div class="alt-panel" id="alt-${i}" hidden></div>
+      </div>`).join("");
+
+    document.querySelectorAll(".swap-btn").forEach((btn) => {
+      btn.onclick = () => toggleAlternatives(parseInt(btn.dataset.index, 10));
+    });
+  }
+
+  function toggleAlternatives(i) {
+    const panel = document.getElementById(`alt-${i}`);
+    if (!panel.hidden) { panel.hidden = true; return; }
+
+    const ex = currentPlan.exercises[i];
+    const excludeNames = currentPlan.exercises.map((e) => e.name);
+    const alts = findAlternatives({
+      exerciseName: ex.name, trainingId: currentPlan.trainingId,
+      level: currentContext.level, equipmentAvailable: currentContext.equipmentAvailable,
+      excludeNames, recentExerciseNames: currentContext.recentExerciseNames,
+    });
+    lastAltsByIndex[i] = alts;
+
+    panel.innerHTML = alts.length
+      ? alts.map((a, ai) => `<div class="alt-row">
+          <div>
+            <span>${a.name}</span>${a.recommended ? '<span class="rec-badge">Recommended</span>' : ""}
+            <div class="ex-sub">${(a.secondary || []).join(", ") || "no secondary muscles"} · ${a.level}</div>
+          </div>
+          <button type="button" class="use-btn" data-i="${i}" data-ai="${ai}">Use this</button>
+        </div>`).join("")
+      : `<div class="empty">No alternatives available with your current equipment.</div>`;
+
+    panel.querySelectorAll(".use-btn").forEach((btn) => {
+      btn.onclick = () => applySwap(parseInt(btn.dataset.i, 10), parseInt(btn.dataset.ai, 10));
+    });
+    panel.hidden = false;
+  }
+
+  function applySwap(i, altIndex) {
+    const chosen = lastAltsByIndex[i][altIndex];
+    const slot = currentPlan.exercises[i];
+    const isBodyweight = chosen.equipment === "bodyweight";
+    const weight = isBodyweight ? 0 : coldStartWeight(chosen.name, currentContext.level, state.weight) ?? null;
+    currentPlan.exercises[i] = {
+      ...slot, name: chosen.name, primary: chosen.primary, equipment: chosen.equipment, level: chosen.level,
+      targetWeight: weight, isEstimate: !isBodyweight && weight != null,
+    };
+    renderPlanRows();
   }
 
   function showStep() {

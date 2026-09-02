@@ -151,6 +151,21 @@ function checkClobberedIds() {
   console.log("  structure            ok (panels are siblings, nav outside)");
 }
 
+/* A duplicated function silently shadows the earlier one, so an edit can appear
+   to do nothing. This has happened; catch it. */
+{
+  const js = src;
+  const names = [...js.matchAll(/^(?:async )?function (\w+)\(/gm)].map((m) => m[1]);
+  const counts = {};
+  names.forEach((n) => (counts[n] = (counts[n] || 0) + 1));
+  const dupes = Object.entries(counts).filter(([, k]) => k > 1).map(([n, k]) => `${n} x${k}`);
+  if (dupes.length) {
+    console.log("  DUPLICATES          " + dupes.join(", "));
+    process.exit(1);
+  }
+  console.log("  no duplicate fns     ok");
+}
+
 let failed = 0;
 const clobbered = checkClobberedIds();
 if (clobbered.length) {
