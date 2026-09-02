@@ -695,22 +695,6 @@
     animation: popIn .3s cubic-bezier(.22,1,.36,1);
   }
   @keyframes popIn { from { transform: translateY(14px) scale(.97); opacity: 0 } to { transform: none; opacity: 1 } }
-  .pop-media { position: relative; aspect-ratio: 4/5; }
-  .pop-media.noimg { aspect-ratio: 16/10; }
-  .pop-img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .pop-blank { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-               background: var(--partner); color: #fff; }
-  .pop-x {
-    position: absolute; top: 12px; right: 12px; z-index: 2; width: 32px; height: 32px; border-radius: 50%;
-    border: none; cursor: pointer; background: rgba(0,0,0,.45); color: #fff; font-size: 18px; line-height: 1;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .pop-veil { position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(to top, rgba(0,0,0,.78) 0%, rgba(0,0,0,.3) 46%, rgba(0,0,0,0) 72%); }
-  .pop-over { position: absolute; left: 0; right: 0; bottom: 0; padding: 17px; color: #fff; }
-  .pop-who { font-size: 11px; font-weight: 800; letter-spacing: .1em; opacity: .86; }
-  .pop-head { font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin-top: 4px; line-height: 1.18; }
-  .pop-meta { font-size: 13px; opacity: .84; margin-top: 4px; }
   .pop-body { padding: 17px; }
   .pop-body.compose { padding: 16px; }
   .quote { font-size: 15.5px; line-height: 1.5; font-style: italic; margin: 0 0 14px; }
@@ -1677,7 +1661,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.01.18";
+const APP_VERSION = "2026.09.01.19";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -3229,64 +3213,8 @@ async function renderWeekStrips() {
    Shown once per workout, not once per app open, so dismissing it sticks.
    The action depends on whether you have trained yet: go, or congratulate. */
 
-let POPUP_SHOWN_FOR = null;
 
-async function maybeShowPartnerPopup() {
-  if (!PARTNER_EMAIL) return;
-  const partner = partnerName();
-  const theirs = todayEntryFor(PARTNER_EMAIL);
-  if (!theirs?.gym) return;                       // nothing to show
-  if (theirs.seen_by_partner_at) return;          // already seen on some device
-  if (POPUP_SHOWN_FOR === theirs.entry_date) return;
-  POPUP_SHOWN_FOR = theirs.entry_date;
 
-  const iTrained = !!todayEntryFor(MY_EMAIL)?.gym;
-  const url = theirs.proof_path ? await signedProofUrl(theirs.proof_path) : null;
-  const when = theirs.workout_at
-    ? new Date(theirs.workout_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-    : "today";
-  const logs = ALL_EXERCISE_LOGS.filter((l) => l.email === PARTNER_EMAIL && l.entry_date === theirs.entry_date);
-  const sets = logs.reduce((s, l) => s + (l.sets || 1), 0);
-  const meta = [theirs.sessions > 1 ? `${theirs.sessions} sessions` : null,
-                sets ? `${sets} sets` : null].filter(Boolean).join(" · ");
-
-  $("popCard").innerHTML = `
-    <div class="pop-media ${url ? "" : "noimg"}">
-      <button type="button" class="pop-x" id="popX" aria-label="Close">&times;</button>
-      ${url ? `<img class="pop-img" src="${url}" alt="" />` : `<div class="pop-blank">${icon("check", 44)}</div>`}
-      <div class="pop-veil"></div>
-      <div class="pop-over">
-        <div class="pop-who">${escapeHtml(partner.toUpperCase())} · ${escapeHtml(when)}</div>
-        <div class="pop-head">${iTrained ? "You both went today." : `${escapeHtml(partner)} already went.`}</div>
-        ${meta ? `<div class="pop-meta">${escapeHtml(meta)}</div>` : ""}
-      </div>
-    </div>
-    <div class="pop-body">
-      ${theirs.note ? `<p class="quote">${escapeHtml(theirs.note)}</p>` : ""}
-      <button type="button" class="btn-primary" id="popAction">${iTrained ? `Congratulate ${escapeHtml(partner)}` : "Begin workout"}</button>
-    </div>`;
-
-  $("popScrim").classList.remove("hidden");
-  $("popX").onclick = dismissPopup;
-  $("popScrim").onclick = (ev) => { if (ev.target === $("popScrim")) dismissPopup(); };
-  $("popAction").onclick = async () => {
-    await dismissPopup();
-    if (iTrained) openNoteComposer("congratulate");
-    else {
-      switchTab("workout");
-      if (SESSION) { reopenSession(); return; }
-      if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
-      else startWorkout();
-    }
-  };
-}
-
-async function dismissPopup() {
-  $("popScrim").classList.add("hidden");
-  // Mark it seen so it does not reappear on the next open, on any device.
-  try { await sb.rpc("mark_partner_entry_seen", { p_entry_date: todayStr() }); }
-  catch (err) { console.warn("could not mark seen", err); }
-}
 
 /* ---------- Saying something ----------
    After your own workout, or when congratulating theirs. Chips mean most
@@ -3714,7 +3642,6 @@ function renderHome() {
   renderWeekStrips();
   renderRestDayPrompt();
   renderEncouragementBanner();
-  maybeShowPartnerPopup();
 }
 
 function renderWeightChart() {

@@ -323,13 +323,22 @@
     let goalCard = "";
     if ((state.goalType === "lose" || state.goalType === "gain") && state.goalAmount && tdee) {
       const timeline = estimateGoalTimeline({ currentWeightLb: state.weight, targetChangeLb: state.goalAmount, direction: state.goalType, tdee });
+      const timelineRow = timeline.weeks != null
+        ? `<div class="stat-row"><span>Estimated timeline</span><b>~${timeline.weeks} weeks</b></div>`
+        : `<div class="stat-row"><span>Estimated timeline</span><b>not yet — see note below</b></div>`;
+      const cappedNote = timeline.wasCapped && timeline.weeklyRateLb > 0
+        ? `Capped at a 20% deficit below maintenance (the widely-cited sustainable range trainers and dietitians recommend is 15-20%) rather than a faster but harder-to-sustain cut. `
+        : "";
+      const floorNote = timeline.weeklyRateLb === 0
+        ? `Your maintenance calories are already close to a safe daily minimum, so there is no deficit here we would responsibly recommend — losing weight safely from here is about activity level and time, not eating less. `
+        : "";
       goalCard = `<div class="card">
         <h2>Your goal, as a formula</h2>
         <div class="stat-row"><span>Maintenance calories (TDEE)</span><b>${tdee} kcal/day</b></div>
         <div class="stat-row"><span>Target calories</span><b>${timeline.dailyCalorieTarget} kcal/day</b></div>
         <div class="stat-row"><span>Sustainable pace</span><b>${timeline.weeklyRateLb} lb/week</b></div>
-        <div class="stat-row"><span>Estimated timeline</span><b>~${timeline.weeks} weeks</b></div>
-        <div class="muted-note" style="margin-top:8px;">Based on the ~3500 kcal-per-pound rule — a widely used approximation, not an exact science (water weight and metabolic adaptation mean real progress won't be a straight line).</div>
+        ${timelineRow}
+        <div class="muted-note" style="margin-top:8px;">${cappedNote}${floorNote}Based on the ~3500 kcal-per-pound rule — a widely used approximation, not an exact science (water weight and metabolic adaptation mean real progress won't be a straight line).</div>
       </div>`;
     } else if (tdee) {
       goalCard = `<div class="card"><h2>Your numbers</h2><div class="stat-row"><span>Maintenance calories (TDEE)</span><b>${tdee} kcal/day</b></div></div>`;

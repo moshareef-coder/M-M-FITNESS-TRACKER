@@ -166,6 +166,21 @@ function checkClobberedIds() {
   console.log("  no duplicate fns     ok");
 }
 
+/* Nothing that covers the whole screen may start visible, and only one thing
+   may claim the screen at a time. A stray overlay makes the page look dead. */
+{
+  const overlays = ["popScrim", "daySheetScrim", "sessionCard"];
+  const bad = overlays.filter((id) => {
+    const tag = new RegExp(`<div[^>]*id="${id}"[^>]*>`).exec(html)?.[0] || "";
+    return !tag.includes("hidden");
+  });
+  if (bad.length) {
+    console.log("  OVERLAYS            these start visible and will block clicks:", bad.join(", "));
+    process.exit(1);
+  }
+  console.log("  overlays start hidden ok");
+}
+
 let failed = 0;
 const clobbered = checkClobberedIds();
 if (clobbered.length) {

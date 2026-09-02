@@ -97,6 +97,18 @@ export function repsForGoal(goal) {
   return Math.round((lo + hi) / 2);
 }
 
+// Circuit-style structure (short rest, elevated heart rate throughout) is a distinct session
+// shape from traditional straight-sets training, not just "the same session but rushed" -- see
+// ../principles/weight-loss-training.md. General-fitness/fat-loss sessions use it; strength and
+// hypertrophy sessions need full recovery between sets to actually move load or add reps.
+export function sessionStyleForGoal(goal) {
+  return normalizeGoal(goal) === "general" ? "circuit" : "traditional";
+}
+
+export function restSecondsForGoal(goal) {
+  return sessionStyleForGoal(goal) === "circuit" ? 30 : 90;
+}
+
 // ---------------------------------------------------------------------------
 // Exercise selection within a category: filter by level and available equipment, prefer
 // exercises not done in the last few sessions for variety, prefer more-compound movements
