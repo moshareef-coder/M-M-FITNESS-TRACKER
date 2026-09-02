@@ -502,16 +502,24 @@
 
   /* Hero: this week's standing */
   .hero-kicker { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: var(--muted); }
-  .rings { display: flex; gap: 14px; justify-content: center; margin: 18px 0 4px; }
-  .ring-col { flex: 1; min-width: 0; text-align: center; }
-  .pring { display: block; margin: 0 auto; max-width: 128px; height: auto; }
-  .pring.me { color: var(--me); }
-  .pring.them { color: var(--partner); }
-  .pring-num { font-size: 21px; font-weight: 800; fill: var(--text); letter-spacing: -.02em; }
-  .pring-sub { font-size: 9.5px; font-weight: 600; fill: var(--muted); }
-  .ring-name { font-size: 15px; font-weight: 800; margin-top: 12px; }
-  .ring-name.me { color: var(--me); }
-  .ring-name.them { color: var(--partner); }
+  .stand { display: flex; align-items: center; gap: 18px; margin: 18px 0 4px; }
+  .stand-dial { flex-shrink: 0; }
+  .dring { display: block; }
+  .stand-list { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+  .strow-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+  .strow-name { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+  .strow-val { font-size: 17px; font-weight: 800; letter-spacing: -.015em; }
+  .strow-val.me { color: var(--me); }
+  .strow-val.them { color: var(--partner); }
+  .strow-track { height: 5px; border-radius: 100px; background: var(--panel-2); overflow: hidden; }
+  .strow-track i { display: block; height: 100%; border-radius: 100px; transition: width .5s cubic-bezier(.22,1,.36,1); }
+  .strow-track i.me { background: var(--me); }
+  .strow-track i.them { background: var(--partner); }
+
+  @media (max-width: 360px) {
+    .stand { gap: 14px; }
+    .dring { width: 112px; height: 112px; }
+  }
   .hero-streak {
     display: flex; align-items: center; gap: 9px; margin-top: 16px; padding: 11px 13px;
     border-radius: 12px; background: var(--panel-2); border: 1px solid var(--border);
@@ -2928,20 +2936,35 @@ function sharedWeekStreak() {
 
 
 
-/* A progress ring with the count inside, per the design. */
-function personRing(done, target, cls, size = 116) {
-  const stroke = 11;
-  const r = 50 - stroke / 2 - 1;
-  const circ = 2 * Math.PI * r;
-  const pct = target > 0 ? Math.max(0, Math.min(1, done / target)) : 0;
-  return `<svg class="pring ${cls}" viewBox="0 0 100 100" width="${size}" height="${size}">
-    <circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--panel-2)" stroke-width="${stroke}"/>
-    <circle cx="50" cy="50" r="${r}" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round"
-      stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - pct)}" transform="rotate(-90 50 50)"
-      style="transition:stroke-dashoffset .6s cubic-bezier(.22,1,.36,1)"/>
-    <text x="50" y="46" text-anchor="middle" class="pring-num">${done}/${target}</text>
-    <text x="50" y="62" text-anchor="middle" class="pring-sub">done</text>
+
+/* One dial, two arcs. Yours on the outside, your partner's inside, so the
+   pair reads as a single object rather than two competing charts. */
+function dualRing(mine, theirs, size = 138) {
+  const arc = (r, stroke, pct, color) => {
+    const circ = 2 * Math.PI * r;
+    return `<circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--panel-2)" stroke-width="${stroke}"/>
+      <circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
+        stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - Math.max(0, Math.min(1, pct)))}"
+        transform="rotate(-90 60 60)"
+        style="transition:stroke-dashoffset .6s cubic-bezier(.22,1,.36,1)"/>`;
+  };
+  return `<svg class="dring" viewBox="0 0 120 120" width="${size}" height="${size}" aria-hidden="true">
+    ${arc(50, 12, mine, "var(--me)")}
+    ${theirs !== null ? arc(33, 12, theirs, "var(--partner)") : ""}
+    <g transform="translate(46 46) scale(0.58)" fill="none" stroke="var(--muted)" stroke-width="2.4"
+       stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS.medal}</g>
   </svg>`;
+}
+
+function standRow(name, done, target, cls) {
+  const pct = target > 0 ? Math.min(1, done / target) : 0;
+  return `<div class="strow">
+    <div class="strow-top">
+      <span class="strow-name">${escapeHtml(name)}</span>
+      <span class="strow-val ${cls}">${done}/${target}</span>
+    </div>
+    <div class="strow-track"><i class="${cls}" style="width:${pct * 100}%"></i></div>
+  </div>`;
 }
 
 function renderHero() {
@@ -2950,17 +2973,20 @@ function renderHero() {
   const myTarget = weeklyGoalFor(MY_EMAIL);
   const trainedToday = !!todayEntryFor(MY_EMAIL)?.gym;
 
-  let rings = `<div class="ring-col">
-      ${personRing(myDays, myTarget, "me")}
-      <div class="ring-name me">You (${escapeHtml(ME)})</div>
-    </div>`;
-  if (PARTNER_EMAIL) {
-    const partner = partnerName();
-    rings += `<div class="ring-col">
-      ${personRing(gymDaysThisWeek(partner), weeklyGoalFor(PARTNER_EMAIL), "them")}
-      <div class="ring-name them">${escapeHtml(partner)}</div>
-    </div>`;
-  }
+  const partner = PARTNER_EMAIL ? partnerName() : null;
+  const theirDays = partner ? gymDaysThisWeek(partner) : 0;
+  const theirTarget = partner ? weeklyGoalFor(PARTNER_EMAIL) : 0;
+
+  const stand = `<div class="stand">
+    <div class="stand-dial">${dualRing(
+      myTarget > 0 ? myDays / myTarget : 0,
+      partner ? (theirTarget > 0 ? theirDays / theirTarget : 0) : null,
+    )}</div>
+    <div class="stand-list">
+      ${standRow(`You (${ME})`, myDays, myTarget, "me")}
+      ${partner ? standRow(partner, theirDays, theirTarget, "them") : ""}
+    </div>
+  </div>`;
 
   const streak = sharedWeekStreak();
   const streakLine = streak > 0
@@ -2984,7 +3010,7 @@ function renderHero() {
 
   el.innerHTML = `
     <div class="hero-kicker">THIS WEEK'S STANDING</div>
-    <div class="rings">${rings}</div>
+    ${stand}
     ${streakLine}
     ${cta}`;
 
