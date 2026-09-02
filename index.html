@@ -1535,7 +1535,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.01.3";
+const APP_VERSION = "2026.09.01.4";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -2108,7 +2108,28 @@ function showApp() {
   loadAll();
 }
 
+/* One place that guarantees the nav is reachable. */
+function closeAllOverlays() {
+  document.body.classList.remove("session-open");
+  ["popScrim", "daySheetScrim"].forEach((id) => $(id)?.classList.add("hidden"));
+  const sess = $("sessionCard");
+  if (sess && !sess.classList.contains("hidden")) {
+    // Bank the time rather than losing it, then stand the session down.
+    if (SESSION && !SESSION.pausedAt) {
+      SESSION.elapsedMs = sessionElapsed();
+      SESSION.pausedAt = Date.now();
+      saveSessionToStorage();
+    }
+    stopSessionTimer();
+    sess.classList.remove("leaving");
+    sess.classList.add("hidden");
+  }
+}
+
 function switchTab(tab) {
+  // Nothing may survive a tab change and cover the app. Getting stranded with
+  // no navigation is worse than losing an overlay's state.
+  closeAllOverlays();
   document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== "tab-" + tab));
   if (tab === "home") renderHome();
