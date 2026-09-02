@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fit Together — Workout Generator Algorithm</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f5f2; --card: #ffffff; --border: #e3e0da; --text: #1a1a1a;
+    --muted: #6b6660; --accent: #16181d; --chip: #f0eee9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #101318; --card: #171b21; --border: #262b33; --text: #eceef0; --muted: #8b93a1; --accent: #d6dbe4; --chip: #1f242c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  header, main { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+  header { padding-top: 28px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+  label:first-child { margin-top: 0; }
+  select, input[type=number] { width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 14px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .equip-chip { font-size: 13px; padding: 6px 12px; border-radius: 100px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; }
+  .equip-chip.on { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  button.generate { width: 100%; margin-top: 16px; padding: 12px; border-radius: 10px; border: none; background: var(--accent); color: var(--bg); font-weight: 600; font-size: 15px; cursor: pointer; }
+  .result-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .result-head h2 { font-size: 17px; margin: 0; }
+  .focus-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .focus-chip { font-size: 12px; background: var(--chip); border-radius: 100px; padding: 4px 10px; text-transform: capitalize; }
+  .ex-row { padding: 10px 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
+  .ex-row:last-child { border-bottom: none; }
+  .ex-name { font-weight: 500; }
+  .ex-sub { font-size: 12px; color: var(--muted); }
+  .ex-prescription { text-align: right; font-size: 13px; }
+  .estimate-note { font-size: 11px; color: var(--muted); }
+  .empty { color: var(--muted); font-size: 14px; padding: 20px 0; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Workout Generator — algorithm demo</h1>
+  <div class="sub">Runs the real selection code (knowledge/formulas/exercise-selector.mjs) against the real library. No AI call — this is what the app should hand Claude as a starting point, or use outright.</div>
+</header>
+<main>
+  <div class="card">
+    <label>Training</label>
+    <select id="training">
+      <option value="weight-training">Weight Training</option>
+      <option value="calisthenics">Calisthenics</option>
+      <option value="yoga">Yoga</option>
+      <option value="pilates">Pilates</option>
+    </select>
+
+    <div class="row2">
+      <div>
+        <label>Goal</label>
+        <select id="goal">
+          <option value="muscle gain">Muscle gain</option>
+          <option value="strength">Strength</option>
+          <option value="general fitness">General fitness / fat loss</option>
+        </select>
+      </div>
+      <div>
+        <label>Sessions logged so far</label>
+        <input type="number" id="sessions" value="0" min="0" />
+      </div>
+    </div>
+
+    <div class="row2">
+      <div>
+        <label>Body weight (lb)</label>
+        <input type="number" id="weight" value="180" min="60" />
+      </div>
+      <div id="minutesField">
+        <label>Target minutes (yoga/Pilates)</label>
+        <input type="number" id="minutes" value="30" min="10" />
+      </div>
+    </div>
+
+    <label>Equipment available (weight training only)</label>
+    <div class="chips" id="equipChips">
+      <span class="equip-chip on" data-e="bodyweight">Bodyweight</span>
+      <span class="equip-chip on" data-e="dumbbell">Dumbbell</span>
+      <span class="equip-chip on" data-e="barbell">Barbell</span>
+      <span class="equip-chip on" data-e="cable">Cable</span>
+      <span class="equip-chip on" data-e="machine">Machine</span>
+    </div>
+
+    <button type="button" class="generate" id="generateBtn">Generate plan</button>
+  </div>
+
+  <div class="card" id="result"><div class="empty">Click Generate to run the algorithm.</div></div>
+</main>
+
+<script type="module">
+  import {
+    deriveTraineeLevel, buildWeightTrainingPlan, buildCalisthenicsPlan, buildFlowPlan,
+  } from "./formulas/exercise-selector.mjs";
+
+  const equipChips = document.getElementById("equipChips");
+  equipChips.addEventListener("click", (e) => {
+    const chip = e.target.closest(".equip-chip");
+    if (chip) chip.classList.toggle("on");
+  });
+
+  function selectedEquipment() {
+    return [...equipChips.querySelectorAll(".equip-chip.on")].map((c) => c.dataset.e);
+  }
+
+  function renderPlan(plan, trackingMode) {
+    const result = document.getElementById("result");
+    if (!plan.exercises.length) {
+      result.innerHTML = `<div class="empty">No eligible exercises for this combination (try adding more equipment).</div>`;
+      return;
+    }
+    const focusChips = plan.focusCategories.map((c) => `<span class="focus-chip">${c}</span>`).join("");
+    const rows = plan.exercises.map((ex) => {
+      const prescription = trackingMode === "sets"
+        ? `${ex.sets} × ${ex.reps}${ex.targetWeight != null ? ` @ ${ex.targetWeight === 0 ? "bodyweight" : ex.targetWeight + " lb"}` : ""}`
+        : "~2-3 min hold";
+      const note = ex.isEstimate ? `<div class="estimate-note">cold-start estimate, no history yet</div>` : "";
+      return `<div class="ex-row">
+        <div>
+          <div class="ex-name">${ex.name}</div>
+          <div class="ex-sub">${(ex.primary || []).join(", ")}${ex.level ? " · " + ex.level : ""}</div>
+        </div>
+        <div class="ex-prescription">${prescription}${note}</div>
+      </div>`;
+    }).join("");
+    result.innerHTML = `
+      <div class="result-head"><h2>Today's plan</h2></div>
+      <div class="focus-chips">${focusChips}</div>
+      ${rows}`;
+  }
+
+  document.getElementById("training").addEventListener("change", (e) => {
+    const isFlow = e.target.value === "yoga" || e.target.value === "pilates";
+    document.getElementById("minutesField").style.opacity = isFlow ? 1 : 0.4;
+    equipChips.parentElement.style.opacity = e.target.value === "weight-training" ? 1 : 0.4;
+  });
+
+  document.getElementById("generateBtn").addEventListener("click", () => {
+    const trainingId = document.getElementById("training").value;
+    const goal = document.getElementById("goal").value;
+    const sessions = parseInt(document.getElementById("sessions").value, 10) || 0;
+    const bodyWeightLb = parseInt(document.getElementById("weight").value, 10) || null;
+    const minutes = parseInt(document.getElementById("minutes").value, 10) || 30;
+    const level = deriveTraineeLevel(sessions);
+
+    if (trainingId === "weight-training") {
+      const plan = buildWeightTrainingPlan({ level, goal, bodyWeightLb, equipmentAvailable: selectedEquipment() });
+      renderPlan(plan, "sets");
+    } else if (trainingId === "calisthenics") {
+      const plan = buildCalisthenicsPlan({ level });
+      renderPlan(plan, "sets");
+    } else {
+      const plan = buildFlowPlan({ trainingId, level, targetMinutes: minutes });
+      renderPlan(plan, "duration");
+    }
+  });
+</script>
+</body>
+</html>
