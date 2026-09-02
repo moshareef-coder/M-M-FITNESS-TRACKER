@@ -1301,10 +1301,6 @@
           <button type="button" class="weigh-btn" id="scalePlus" aria-label="Up 0.5">+</button>
         </div>
       </div>
-      <label class="gym-toggle" id="scaleGymToggleWrap" style="margin-top:12px;">
-        <span>Worked out today</span>
-        <input type="checkbox" id="entryGym" />
-      </label>
       <button type="button" class="btn-primary" id="scaleSaveBtn" style="margin-top:12px;">Save weigh-in</button>
     </div>
 
@@ -1568,7 +1564,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.01.9";
+const APP_VERSION = "2026.09.01.10";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -2023,9 +2019,6 @@ function showApp() {
     localStorage.setItem(THEME_KEY, next);
     sb.from("profiles").update({ theme: next, updated_at: new Date().toISOString() }).eq("email", MY_EMAIL).then(() => {});
   };
-  $("scaleGymToggleWrap").onclick = () => {
-    setTimeout(() => $("scaleGymToggleWrap").classList.toggle("checked", $("entryGym").checked), 0);
-  };
   $("scaleSaveBtn").addEventListener("click", saveScaleEntry);
   $("sharedGoalToggleWrap").onclick = () => {
     setTimeout(() => {
@@ -2424,10 +2417,12 @@ async function saveScaleEntry() {
     email: MY_EMAIL,
     entry_date: todayStr(),
     weight,
-    gym: $("entryGym").checked,
+    gym: existing?.gym ?? false,          // a weigh-in is not a workout
     sessions: existing?.sessions ?? 0,
     proof_path: existing?.proof_path ?? null,
     rest_day: existing?.rest_day ?? false,
+    note: existing?.note ?? null,
+    workout_at: existing?.workout_at ?? null,
   };
   const landed = await safeWrite("fit_entries", "upsert", payload, { onConflict: "email,entry_date" });
 
@@ -2963,11 +2958,13 @@ function openNoteComposer(mode) {
       toast("Sent");
     } else {
       const e = todayEntryFor(MY_EMAIL);
+      // Saving a note must never invent a workout. Only finishWorkout() may
+      // touch gym or sessions; everything else copies what is already there.
       const payload = {
         user_name: ME, email: MY_EMAIL, entry_date: todayStr(), note: text,
-        gym: e?.gym ?? true, weight: e?.weight ?? null, sessions: e?.sessions ?? 1,
+        gym: e?.gym ?? false, weight: e?.weight ?? null, sessions: e?.sessions ?? 0,
         proof_path: e?.proof_path ?? null, rest_day: e?.rest_day ?? false,
-        workout_at: e?.workout_at ?? new Date().toISOString(),
+        workout_at: e?.workout_at ?? null,
       };
       const landed = await safeWrite("fit_entries", "upsert", payload, { onConflict: "email,entry_date" });
       if (!landed) applyLocally("fit_entries", payload);
@@ -3231,10 +3228,12 @@ async function uploadProof(file) {
       email: MY_EMAIL,
       entry_date: todayStr(),
       proof_path: path,
-      gym: true,
+      gym: existing?.gym ?? false,
       weight: existing?.weight ?? null,
       sessions: existing?.sessions ?? 0,
       rest_day: existing?.rest_day ?? false,
+      note: existing?.note ?? null,
+      workout_at: existing?.workout_at ?? null,
     }, { onConflict: "email,entry_date" });
     if (dbErr) throw dbErr;
 
@@ -3320,8 +3319,6 @@ function renderScaleCheck() {
   $("scaleMinus").onclick = () => nudge(-0.5);
   $("scalePlus").onclick = () => nudge(0.5);
 
-  $("entryGym").checked = !!todayEntry?.gym;
-  $("scaleGymToggleWrap").classList.toggle("checked", !!todayEntry?.gym);
 }
 
 async function renderEncouragementBanner() {
@@ -4030,6 +4027,10 @@ function renderSession() {
 
 let MARKING_DAY = false;
 
+/* THE ONLY FUNCTION ALLOWED TO CHANGE `gym` OR `sessions`.
+   A session means one finished workout. Not a weigh-in, not a photo, not a
+   note, not a re-render, not opening a finished plan. Every other write to
+   fit_entries must copy the existing values through untouched. */
 async function markGymDayDone() {
   if (MARKING_DAY) return;        // one completion must not count several times
   MARKING_DAY = true;
