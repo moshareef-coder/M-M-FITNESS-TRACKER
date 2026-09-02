@@ -140,19 +140,30 @@ function locateExercise(exerciseName, trainingId = null) {
  * muscle, guaranteed by the library's structure) ranked by how similar the stimulus is --
  * secondary-muscle overlap first, then how close the difficulty level is to the original. The
  * top result is the recommendation; the rest are viable alternatives, not padding.
+ *
+ * excludeNames: a HARD exclusion, no fallback -- pass every exercise already sitting in
+ * today's plan (including the one being swapped out) so a swap can never create a duplicate
+ * within the same session.
+ * recentExerciseNames: a SOFT exclusion (this week's history) -- avoided when possible, but
+ * falls back to allowing a repeat rather than returning nothing if that is the only option,
+ * same "fresh vs. pool" pattern selectExercisesForCategory uses.
  */
-export function findAlternatives({ exerciseName, trainingId = null, level = null, equipmentAvailable = null, count = 4 }) {
+export function findAlternatives({ exerciseName, trainingId = null, level = null, equipmentAvailable = null, excludeNames = [], recentExerciseNames = [], count = 4 }) {
   const located = locateExercise(exerciseName, trainingId);
   if (!located) return [];
-  const { training, category, exercise: original } = located;
+  const { category, exercise: original } = located;
   const maxRank = LEVEL_RANK[level ?? original.level] ?? 1;
+  const hardExcluded = new Set([original.name, ...excludeNames]);
 
-  const candidates = category.exercises.filter((ex) => {
-    if (ex.name === original.name) return false;
+  const eligible = category.exercises.filter((ex) => {
+    if (hardExcluded.has(ex.name)) return false;
     const okLevel = LEVEL_RANK[ex.level] <= maxRank;
     const okEquip = !equipmentAvailable || !ex.equipment || equipmentAvailable.includes(ex.equipment);
     return okLevel && okEquip;
   });
+
+  const fresh = eligible.filter((ex) => !recentExerciseNames.includes(ex.name));
+  const candidates = fresh.length ? fresh : eligible; // weekly-repeat avoidance is best-effort only
 
   const originalSecondary = new Set(original.secondary || []);
   const scored = candidates.map((ex) => {

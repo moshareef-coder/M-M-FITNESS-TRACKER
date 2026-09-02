@@ -173,9 +173,13 @@
     if (!panel.hidden) { panel.hidden = true; return; }
 
     const ex = currentPlan.exercises[i];
+    // Hard-exclude every exercise already sitting in today's plan (not just this slot) so a
+    // swap can never introduce a duplicate elsewhere in the same session.
+    const excludeNames = currentPlan.exercises.map((e) => e.name);
     const alts = findAlternatives({
       exerciseName: ex.name, trainingId: currentPlan.trainingId,
       level: currentContext.level, equipmentAvailable: currentContext.equipmentAvailable,
+      excludeNames,
     });
     lastAltsByIndex[i] = alts;
 
