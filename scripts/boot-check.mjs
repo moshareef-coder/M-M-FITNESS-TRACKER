@@ -67,8 +67,14 @@ const chain = (rows = []) => {
   return p;
 };
 const DATA = {
-  profiles: [{ email: "mo.shareef@creativelab1.com", user_name: "Mo", tracked_metrics: ["weight", "prs", "trained"], bonus_xp: 0, challenge_target: 4 }],
-  fit_entries: [{ email: "mo.shareef@creativelab1.com", user_name: "Mo", entry_date: "2026-08-30", gym: true, weight: 180, sessions: 1 }],
+  profiles: [
+    { email: "mo.shareef@creativelab1.com", user_name: "Mo", tracked_metrics: ["weight", "prs"], challenge_target: 4 },
+    { email: "mel@x.com", user_name: "Mel", tracked_metrics: ["weight"], challenge_target: 5 },
+  ],
+  fit_entries: [
+    { email: "mo.shareef@creativelab1.com", user_name: "Mo", entry_date: "2026-09-01", gym: true, weight: 180, sessions: 1, proof_path: "x/p.jpg" },
+    { email: "mel@x.com", user_name: "Mel", entry_date: "2026-09-01", gym: true, weight: 140, sessions: 2, proof_path: "x/q.jpg" },
+  ],
   exercise_logs: [{ email: "mo.shareef@creativelab1.com", user_name: "Mo", entry_date: "2026-08-30", exercise_name: "Bench", weight: 135, reps: 8, sets: 3 }],
   ai_workouts: [{ id: "w1", email: "mo.shareef@creativelab1.com", user_name: "Mo", entry_date: "2026-08-30", archived: false,
     focus: "Strength", exercises: [
@@ -76,6 +82,8 @@ const DATA = {
       { name: "Row", sets: 3, reps: 10, targetWeight: 95 },
     ] }],
   partnerships: [{ id: "p1", inviter_email: "mo.shareef@creativelab1.com", invitee_email: "mel@x.com", status: "accepted" }],
+  body_photos: [{ id: "b1", email: "mo.shareef@creativelab1.com", taken_on: "2026-09-01", path: "x/body/a.jpg" }],
+  encouragements: [],
 };
 globalThis.window.supabase = {
   createClient: () => ({

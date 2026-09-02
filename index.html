@@ -424,6 +424,13 @@
     border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
     display: flex; align-items: center; justify-content: center;
   }
+  .session-min {
+    width: 42px; height: 42px; border-radius: 50%; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .session-bar { gap: 12px; }
+  .session-bar .session-timer { flex: 1; text-align: center; }
   .session-paused-sheet { text-align: center; padding: 28px 6px 8px; }
   .session-paused-sheet h3 { font-size: 20px; margin: 0 0 6px; }
 
@@ -1034,6 +1041,7 @@
 
     <div id="sessionCard" class="session-overlay hidden">
       <div class="session-bar">
+        <button type="button" class="session-min" id="sessionMinBtn" aria-label="Back, without ending the workout"></button>
         <div class="session-timer" id="sessionTimer">0:00</div>
         <button type="button" class="session-pause" id="sessionPauseBtn" aria-label="Pause workout"></button>
       </div>
@@ -1434,7 +1442,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_890hsPHDiiz4-fQi7Jqd9g_a_aoHyz2";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const FUNCTION_URL = SUPABASE_URL + "/functions/v1/generate-workout";
 
-const APP_VERSION = "2026.09.01.1";
+const APP_VERSION = "2026.09.01.2";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -1460,6 +1468,7 @@ const ICON_PATHS = {
   medal: '<circle cx="12" cy="14" r="6"/><path d="m9 10-3-6M15 10l3-6M9.5 14.5 12 17l4-4"/>',
   pause: '<path d="M9 5v14M15 5v14"/>',
   trash: '<path d="M4 7h16M10 4h4M9 7v12M15 7v12M6 7l1 13h10l1-13"/>',
+  chevronDown: '<path d="m6 9 6 6 6-6"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
   body: '<circle cx="12" cy="4.5" r="2.2"/><path d="M8.5 8h7l1.5 5-2 .6V20h-3v-4h-1v4h-3v-6.4l-2-.6z"/>',
   play: '<path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none"/>',
@@ -1998,7 +2007,7 @@ function showApp() {
   $("fabStart").onclick = () => {
     switchTab("workout");
     // Mid-session, the button just takes you back to it.
-    if (SESSION) return;
+    if (SESSION) { reopenSession(); return; }
     if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
     else startWorkout();
   };
@@ -2655,7 +2664,7 @@ function renderNextUp() {
   $("nextUpBtn").onclick = () => {
     if (action === "weigh") { switchTab("progress"); $("scaleWeightInput")?.focus(); return; }
     switchTab("workout");
-    if (SESSION) return;
+    if (SESSION) { reopenSession(); return; }
     if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
     else startWorkout();
   };
@@ -3244,20 +3253,37 @@ function sessionMatchesPlan(saved) {
     && saved.exerciseIndex < n;
 }
 
+/* Load a saved session into memory, but do NOT take over the screen. Opening a
+   full-screen overlay just because a tab was visited traps the user, since the
+   overlay hides the nav. Offer it instead. */
 function resumeSessionIfAny() {
+  if (SESSION) return false;
   const saved = loadSessionFromStorage();
   if (!sessionMatchesPlan(saved)) {
     if (saved) clearSessionStorage();   // stale, belongs to a finished plan
     return false;
   }
   SESSION = saved;
-  // A session resumed later should not count the time the app was closed.
+  // Time while the app was closed should not count toward the workout.
   if (!saved.pausedAt) { SESSION.pausedAt = Date.now(); SESSION.elapsedMs = saved.elapsedMs || 0; }
+  saveSessionToStorage();
+  return false;
+}
+
+/* Reopen a session the user already started, on purpose. */
+function reopenSession() {
+  if (!SESSION) return;
   openSessionUI();
   $("workoutContent").classList.add("hidden");
-  if (SESSION.pausedAt) { $("sessionPauseBtn").innerHTML = icon("play", 18); $("sessionTimer").classList.add("paused"); stopSessionTimer(); tickTimer(); renderPausedSheet(); }
-  else renderSession();
-  return true;
+  if (SESSION.pausedAt) {
+    $("sessionPauseBtn").innerHTML = icon("play", 18);
+    $("sessionTimer").classList.add("paused");
+    stopSessionTimer();
+    tickTimer();
+    renderPausedSheet();
+  } else {
+    renderSession();
+  }
 }
 
 let REST_TICKER = null;
@@ -3721,7 +3747,22 @@ function openSessionUI() {
   $("sessionCard").classList.remove("hidden");
   $("sessionPauseBtn").innerHTML = icon("pause", 18);
   $("sessionPauseBtn").onclick = togglePause;
+  $("sessionMinBtn").innerHTML = icon("chevronDown", 20);
+  $("sessionMinBtn").onclick = minimiseSession;
   startSessionTimer();
+}
+
+/* Leave the session on screen-level, keeping it running underneath. */
+function minimiseSession() {
+  if (SESSION && !SESSION.pausedAt) {
+    SESSION.elapsedMs = sessionElapsed();
+    SESSION.pausedAt = Date.now();
+    saveSessionToStorage();
+  }
+  stopSessionTimer();
+  closeSessionUI();
+  $("workoutContent").classList.remove("hidden");
+  renderWorkoutTab();
 }
 
 function closeSessionUI() {
@@ -3843,9 +3884,27 @@ function renderWorkoutTab() {
   renderFab();
   renderDoneWorkouts();
   renderTodayTally();
-  if (resumeSessionIfAny()) return;
-  closeSessionUI();
+  resumeSessionIfAny();          // loads a saved session, does not take over
   $("workoutContent").classList.remove("hidden");
+
+  // A workout already underway: offer it rather than hijacking the screen.
+  if (SESSION && TODAY_WORKOUT) {
+    const total = TODAY_WORKOUT.exercises.length;
+    const at = Math.min(SESSION.exerciseIndex + 1, total);
+    $("workoutCardTitle").textContent = "Workout in progress";
+    $("workoutContent").innerHTML = `
+      <p class="muted-note">Exercise ${at} of ${total} · ${fmtElapsed(sessionElapsed())} so far.</p>
+      <button class="btn-primary" id="resumeOpenBtn" style="margin-top:10px;">Resume workout</button>
+      <button class="btn-ghost" id="discardSessionBtn">Discard it</button>`;
+    $("resumeOpenBtn").onclick = reopenSession;
+    $("discardSessionBtn").onclick = () => {
+      if (!confirm("Discard this workout? Sets you already logged are kept.")) return;
+      SESSION = null;
+      clearSessionStorage();
+      renderWorkoutTab();
+    };
+    return;
+  }
 
   if (TODAY_WORKOUT) {
     WORKOUT_MODE = null;
