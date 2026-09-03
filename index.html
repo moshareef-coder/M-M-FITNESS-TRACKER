@@ -130,8 +130,7 @@
     text-transform: uppercase; letter-spacing: 0.16em; font-weight: 700; font-size: 20px !important;
   }
 
-  header.top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-  header.top h1 { font-size: 20px; margin: 0; }
+  header.top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; min-height: 56px; }
   header.top .me-tag { font-size: 13.5px; color: var(--muted); }
   .icon-btn { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 4px 6px; }
 
@@ -571,15 +570,15 @@
      the rings and the chart already use, so the header needs no legend. */
   .avatar-pair { display: flex; align-items: center; margin-left: 2px; }
   .av {
-    width: 38px; height: 38px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+    width: 56px; height: 56px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center; padding: 0;
-    background: var(--panel-2); font-size: 13.5px; font-weight: 800;
-    border: 2.5px solid var(--border); cursor: pointer; transition: transform .12s ease;
+    background: var(--panel-2); font-size: 18px; font-weight: 800;
+    border: 3px solid var(--border); cursor: pointer; transition: transform .12s ease;
   }
   .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .av:active { transform: scale(.93); }
   .av.me { border-color: var(--me); color: var(--me); }
-  .av.them { border-color: var(--partner); color: var(--partner); margin-left: -11px; z-index: 1; }
+  .av.them { border-color: var(--partner); color: var(--partner); margin-left: -14px; z-index: 1; }
   .setup-photo { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
   .setup-photo .av { width: 56px; height: 56px; font-size: 19px; cursor: default; }
 
@@ -1325,13 +1324,8 @@
 
 <div id="app" class="hidden">
   <header class="top">
-    <div>
-      <h1>Fit Together</h1>
-      <div class="me-tag" id="topDate"></div>
-    </div>
+    <div class="me-tag" id="topDate"></div>
     <div class="top-right">
-      <button class="icon-btn" id="themeToggleBtn" title="Toggle theme"></button>
-      <button class="icon-btn" id="switchUserBtn" title="Sign out"></button>
       <div class="avatar-pair" id="avatarPair"></div>
     </div>
   </header>
@@ -1733,10 +1727,18 @@
       </a>
     </div>
 
+    <div class="card">
+      <h2>Account</h2>
+      <p class="muted-note" style="margin-top:-6px;margin-bottom:12px;">
+        Signed in as <span id="setupEmail"></span>.
+      </p>
+      <button type="button" class="btn-secondary" id="setupSignOutBtn">Sign out</button>
+    </div>
+
     <div class="card danger-card">
       <h2>Reset my data</h2>
       <p class="muted-note" style="margin-top:-6px;">
-        Wipes every workout, weigh-in, exercise log and photo, and sets your XP back to zero.
+        Wipes every workout, weigh-in, exercise log and photo.
         Your account, your partner and your settings stay.
       </p>
       <div id="resetStep1">
@@ -1832,7 +1834,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.03.7";
+const APP_VERSION = "2026.09.03.8";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -2444,18 +2446,6 @@ function showApp() {
   $("onboard").classList.add("hidden");
   $("app").classList.remove("hidden");
   renderAvatarPair();
-  $("themeToggleBtn").innerHTML = icon("sunMoon");
-  $("switchUserBtn").innerHTML = icon("logout");
-  $("switchUserBtn").title = "Sign out";
-
-  $("switchUserBtn").onclick = () => sb.auth.signOut();
-  $("themeToggleBtn").onclick = () => {
-    const cur = document.documentElement.getAttribute("data-theme") || "dark";
-    const next = cur === "dark" ? "light" : "dark";
-    applyTheme(next);
-    localStorage.setItem(THEME_KEY, next);
-    sb.from("profiles").update({ theme: next, updated_at: new Date().toISOString() }).eq("email", MY_EMAIL).then(() => {});
-  };
   $("scaleSaveBtn").addEventListener("click", saveScaleEntry);
   $("sharedGoalToggleWrap").onclick = () => {
     setTimeout(() => {
@@ -3742,8 +3732,7 @@ async function renderStrip(elId, name, email) {
 
 async function renderWeekStrips() {
   const d = new Date(todayStr() + "T00:00:00");
-  $("topDate").textContent = d.toLocaleDateString(undefined,
-    { weekday: "long", month: "short", day: "numeric" }).toUpperCase() + " · v" + APP_VERSION;
+  $("topDate").textContent = "v" + APP_VERSION;
 
   const myDays = gymDaysThisWeek(ME);
   const myTarget = weeklyGoalFor(MY_EMAIL);
@@ -6278,6 +6267,8 @@ function renderSetupTab() {
   $("setupInviteCode").textContent = MY_PROFILE?.invite_code || "-";
   renderPushToggle();
   renderSetupPhoto();
+  $("setupEmail").textContent = MY_EMAIL || "";
+  $("setupSignOutBtn").onclick = () => sb.auth.signOut();
   $("avatarFile").onchange = (e) => {
     const f = e.target.files?.[0];
     e.target.value = "";               // so picking the same file twice still fires
