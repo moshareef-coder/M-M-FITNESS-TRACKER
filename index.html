@@ -1107,6 +1107,8 @@
   .exercise-row.ex-done .ex-name { color: var(--muted); }
   .exercise-row.ex-done .ex-icon { color: var(--down); }
 
+  .draft-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
   .activity-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .activity-chip {
     padding: 9px 14px; border-radius: 100px; cursor: pointer;
@@ -4420,8 +4422,33 @@ async function renderSessionComplete() {
   };
 }
 
-let WORKOUT_MODE = null; // null | "choose" | "manual"
+let WORKOUT_MODE = null; // null | "choose" | "manual" | "activity"
 let MANUAL_DRAFT = [];
+
+/* A half-built plan is real work. Keep it on the device so leaving the tab,
+   tapping the workout button, or the app reloading does not throw it away.
+   Keyed by day, so yesterday's abandoned draft never resurfaces. */
+function draftKey() { return `ft_draft_${MY_EMAIL}_${todayStr()}`; }
+
+function saveDraft() {
+  try {
+    if (MANUAL_DRAFT.length) localStorage.setItem(draftKey(), JSON.stringify(MANUAL_DRAFT));
+    else localStorage.removeItem(draftKey());
+  } catch (e) { console.warn("draft save failed", e); }
+}
+
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem(draftKey());
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((x) => x && x.name) : [];
+  } catch { return []; }
+}
+
+function clearDraft() {
+  MANUAL_DRAFT = [];
+  try { localStorage.removeItem(draftKey()); } catch { /* nothing to clear */ }
+}
 let PLAN_EDIT_ADDING = false;
 const ADD_EX_STATE = { sets: 3, reps: 8, weight: 0 };
 
@@ -4717,7 +4744,29 @@ function renderWorkoutTab() {
   } else {
     // Nothing running. Either the first workout of the day, or another one.
     const n = sessionsToday();
+    const draft = MANUAL_DRAFT.length ? MANUAL_DRAFT : loadDraft();
     $("workoutCardTitle").textContent = n ? "Go again" : "Today's workout";
+
+    if (draft.length) {
+      // An unfinished plan is the most likely thing you came back for.
+      $("workoutContent").innerHTML = `
+        <p class="muted-note">You have a plan in progress with ${draft.length} exercise${draft.length === 1 ? "" : "s"}.</p>
+        <div class="draft-chips">${draft.map((e) => `<span class="tally-chip">${escapeHtml(e.name)}</span>`).join("")}</div>
+        <button class="btn-primary" id="resumeDraftBtn" style="margin-top:12px;">Keep planning</button>
+        <button class="btn-ghost" id="discardDraftBtn">Discard it</button>`;
+      $("resumeDraftBtn").onclick = () => {
+        MANUAL_DRAFT = draft;
+        WORKOUT_MODE = "manual";
+        renderWorkoutTab();
+      };
+      $("discardDraftBtn").onclick = () => {
+        if (!confirm(`Discard ${draft.length} exercise${draft.length === 1 ? "" : "s"}?`)) return;
+        clearDraft();
+        renderWorkoutTab();
+      };
+      return;
+    }
+
     $("workoutContent").innerHTML = n
       ? `<p class="muted-note">${n === 1 ? "One down" : `${n} down`}. Training twice in a day counts twice.</p>
          <button class="btn-primary" id="beginWorkoutBtn" style="margin-top:10px;">Start workout ${n + 1}</button>`
@@ -4740,7 +4789,11 @@ function renderChooseScreen() {
     <button class="${coached ? "btn-primary" : "btn-secondary"}" id="choosePlanBtn" ${coached ? 'style="margin-top:10px;"' : ""}>${coached ? "Log a workout" : "I'll plan my own"}</button>
     <button class="btn-secondary" id="chooseActivityBtn">Log a class or cardio</button>`;
   if (!coached) $("chooseGenerateBtn").onclick = generateWorkout;
-  $("choosePlanBtn").onclick = () => { WORKOUT_MODE = "manual"; MANUAL_DRAFT = []; renderWorkoutTab(); };
+  $("choosePlanBtn").onclick = () => {
+    WORKOUT_MODE = "manual";
+    if (!MANUAL_DRAFT.length) MANUAL_DRAFT = loadDraft();   // pick up where you left off
+    renderWorkoutTab();
+  };
   $("chooseActivityBtn").onclick = () => { WORKOUT_MODE = "activity"; renderWorkoutTab(); };
 }
 
@@ -4850,13 +4903,18 @@ function renderManualBuildScreen() {
   ], ADD_EX_STATE);
 
   $("workoutContent").querySelectorAll("[data-remove-draft]").forEach((btn) => {
-    btn.onclick = () => { MANUAL_DRAFT.splice(parseInt(btn.dataset.removeDraft, 10), 1); renderWorkoutTab(); };
+    btn.onclick = () => {
+      MANUAL_DRAFT.splice(parseInt(btn.dataset.removeDraft, 10), 1);
+      saveDraft();
+      renderWorkoutTab();
+    };
   });
   $("manualAddExBtn").onclick = () => {
     const name = $("manualExName").value.trim();
     if (!name) return;
     MANUAL_DRAFT.push({ name, sets: ADD_EX_STATE.sets, reps: ADD_EX_STATE.reps, targetWeight: 0 });
     ADD_EX_STATE.sets = 3; ADD_EX_STATE.reps = 8;
+    saveDraft();
     renderWorkoutTab();
   };
   $("manualStartBtn").onclick = () => {
@@ -4866,11 +4924,17 @@ function renderManualBuildScreen() {
     if (pending) {
       MANUAL_DRAFT.push({ name: pending, sets: ADD_EX_STATE.sets, reps: ADD_EX_STATE.reps, targetWeight: 0 });
       ADD_EX_STATE.sets = 3; ADD_EX_STATE.reps = 8;
+      saveDraft();
     }
     if (!MANUAL_DRAFT.length) { toast("Add an exercise first"); return; }
     saveManualWorkout();
   };
-  $("manualCancelBtn").onclick = () => { WORKOUT_MODE = null; MANUAL_DRAFT = []; renderWorkoutTab(); };
+  $("manualCancelBtn").onclick = () => {
+    if (MANUAL_DRAFT.length && !confirm(`Discard ${MANUAL_DRAFT.length} exercise${MANUAL_DRAFT.length === 1 ? "" : "s"} you added?`)) return;
+    WORKOUT_MODE = null;
+    clearDraft();
+    renderWorkoutTab();
+  };
 }
 
 async function saveManualWorkout() {
@@ -4880,7 +4944,7 @@ async function saveManualWorkout() {
     focus: "Custom Workout", exercises: MANUAL_DRAFT,
   }, { onConflict: "email,entry_date" });
   WORKOUT_MODE = null;
-  MANUAL_DRAFT = [];
+  clearDraft();
   await loadTodayWorkout();
   renderWorkoutTab();
   toast("Workout plan saved");
