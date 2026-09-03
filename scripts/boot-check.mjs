@@ -191,7 +191,7 @@ if (clobbered.length) {
 }
 
 try {
-  new Function(src + ";globalThis.__t={showApp,loadAll,renderHome,renderWorkoutTab,renderProgressTab,renderSetupTab,switchTab,renderFab,renderTodayTally,renderScaleCheck,renderBodyTab,renderAdminPanel,renderPRSteppers};")();
+  new Function(src + ";globalThis.__t={showApp,loadAll,renderHome,renderWorkoutTab,renderProgressTab,renderSetupTab,switchTab,renderFab,renderTodayTally,renderScaleCheck,renderBodyTab,renderAdminPanel};")();
 } catch (e) {
   console.log("TOP-LEVEL ERROR:", e.message);
   process.exit(1);
@@ -212,7 +212,6 @@ for (const [name, run] of [
   ["switchTab body", () => t.switchTab("body")],
   ["renderBodyTab", () => t.renderBodyTab()],
   ["renderAdminPanel", () => t.renderAdminPanel()],
-  ["renderPRSteppers", () => t.renderPRSteppers()],
   ["switchTab progress", () => t.switchTab("progress")],
   ["switchTab setup", () => t.switchTab("setup")],
   ["renderScaleCheck", () => t.renderScaleCheck()],
