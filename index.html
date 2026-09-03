@@ -77,6 +77,10 @@
   .hidden { display: none !important; }
 
   /* Onboarding */
+  .setup-chip { display: flex; flex-direction: column; gap: 5px; }
+  .setup-title { font-size: 16.5px; font-weight: 700; letter-spacing: -.01em; }
+  .setup-sub { font-size: 13px; font-weight: 400; color: var(--muted); line-height: 1.4; }
+
   #onboard { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; }
   .ob-step { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: stretch; text-align: left; }
   #onboard h1 { font-size: 30px; letter-spacing: -.025em; line-height: 1.15; margin: 0 0 8px; }
@@ -1759,7 +1763,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.03.1";
+const APP_VERSION = "2026.09.03.2";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -2036,13 +2040,97 @@ function renderInviteScreen(invite) {
   };
 }
 
+/* Who are you training with? Asked once, changeable later, and "just me" is a
+   real answer rather than a dead end. The sizes match the plans, but nothing
+   here mentions money yet. */
+const SETUPS = [
+  { key: "solo",  title: "Just me",            sub: "Train alone. You can add someone whenever you like.", seats: 1 },
+  { key: "pair",  title: "Me and one other",   sub: "A partner you keep each other honest with.",          seats: 2 },
+  { key: "group", title: "A small group",      sub: "Up to 5 of you, including yourself.",                 seats: 5 },
+  { key: "coach", title: "I coach people",     sub: "Up to 20, including you. Managed from the web.",      seats: 20 },
+];
+
 function renderPairingScreen() {
+  const ob = $("onboard");
+  ob.classList.remove("hidden");
+  $("app").classList.add("hidden");
+  ob.innerHTML = `
+    <div class="ob-step">
+      <h1>Who is training with you?</h1>
+      <p class="sub">You can change this later. Nothing is locked in.</p>
+      <div class="ob-chips">
+        ${SETUPS.map((s) => `
+          <button type="button" class="ob-chip setup-chip" data-setup="${s.key}">
+            <span class="setup-title">${escapeHtml(s.title)}</span>
+            <span class="setup-sub">${escapeHtml(s.sub)}</span>
+          </button>`).join("")}
+      </div>
+      <button class="btn-ghost" id="pairSignOutBtn">Sign out</button>
+    </div>`;
+  ob.querySelectorAll("[data-setup]").forEach((b) => {
+    b.onclick = () => chooseSetup(b.dataset.setup);
+  });
+  $("pairSignOutBtn").onclick = () => sb.auth.signOut();
+}
+
+async function chooseSetup(key) {
+  if (key === "solo") {
+    localStorage.setItem(SOLO_KEY, "1");
+    showApp();
+    return;
+  }
+  if (key === "pair") { renderCodeScreen(); return; }
+
+  // A group or a coaching roster: create it, then send them where they manage it.
+  const spec = SETUPS.find((s) => s.key === key);
+  const { data, error } = await sb.from("groups").insert({
+    name: key === "coach" ? `${ME}'s clients` : `${ME}'s group`,
+    kind: key === "coach" ? "coach" : "pair",
+    owner_email: MY_EMAIL,
+    seat_limit: spec.seats,
+  }).select().single();
+  if (error) { toast("Could not set that up"); console.error(error); return; }
+  await sb.from("group_members").insert({
+    group_id: data.id, email: MY_EMAIL,
+    role: key === "coach" ? "coach" : "owner",
+    accepted_at: new Date().toISOString(),
+  });
+  localStorage.setItem(SOLO_KEY, "1");        // no partner wall while the group fills up
+  if (key === "coach") { renderCoachHandoff(); return; }
+  toast("Group created");
+  await checkPartnershipThenEnter();
+}
+
+/* Coaches work from a desk, so point them there rather than pretending the
+   phone is the right place to manage twenty people. */
+function renderCoachHandoff() {
+  $("onboard").innerHTML = `
+    <div class="ob-step">
+      <h1>Your group is ready</h1>
+      <p class="sub">Add and manage your clients from the coach dashboard on a computer.
+        Keep using this app for your own training.</p>
+      <div class="ob-summary">
+        <div class="ob-row"><span>Dashboard</span><b>m-m-fitness-tracker.vercel.app/coach</b></div>
+        <div class="ob-row"><span>Seats</span><b>20, including you</b></div>
+      </div>
+      <button class="btn-primary" id="copyCoachLink">Copy the link</button>
+      <button class="btn-ghost" id="coachContinue">Continue to the app</button>
+    </div>`;
+  $("copyCoachLink").onclick = async () => {
+    try { await navigator.clipboard.writeText(location.origin + "/coach/"); toast("Link copied"); }
+    catch { toast(location.origin + "/coach/"); }
+  };
+  $("coachContinue").onclick = () => checkPartnershipThenEnter();
+}
+
+/* The invite-code exchange, now only reached by people who chose a partner. */
+function renderCodeScreen() {
   const ob = $("onboard");
   const myCode = MY_PROFILE?.invite_code || "······";
   ob.innerHTML = `
     <div class="ob-step">
       <h1>Pair with your partner</h1>
-      <p class="sub">Fit Together works as a pair. Share your code, or enter theirs.</p>
+      <p class="sub">Share your code, or enter theirs.</p>
 
       <div class="code-display">
         <div class="code-label">Your code</div>
@@ -2055,48 +2143,30 @@ function renderPairingScreen() {
       <input id="partnerCodeInput" type="text" placeholder="Enter partner's code" maxlength="6"
              autocapitalize="characters" autocomplete="off" spellcheck="false" class="code-input" />
       <button class="btn-primary" id="redeemCodeBtn">Pair up</button>
-      <button class="btn-ghost" id="soloBtn">Start on my own</button>
-      <button class="btn-secondary" id="pairSignOutBtn">Sign out</button>
+      <button class="btn-ghost" id="backToSetup">Back</button>
     </div>`;
 
   $("shareCodeBtn").onclick = async () => {
-    const text = `Join me on Fit Together. My pairing code is ${myCode}: ${window.location.origin}`;
-    if (navigator.share) {
-      try { await navigator.share({ text }); return; } catch { /* user dismissed, fall through to copy */ }
-    }
+    const text = `Train with me on Fit Together. My code is ${MY_PROFILE?.invite_code}. ${location.origin}`;
     try {
-      await navigator.clipboard.writeText(text);
-      toast("Invite copied");
-    } catch {
-      toast(`Your code is ${myCode}`);
-    }
+      if (navigator.share) await navigator.share({ text });
+      else { await navigator.clipboard.writeText(text); toast("Copied"); }
+    } catch {}
   };
-
-  $("partnerCodeInput").addEventListener("input", (e) => {
+  $("partnerCodeInput").oninput = (e) => {
     e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  });
-
+  };
   $("redeemCodeBtn").onclick = async () => {
     const code = $("partnerCodeInput").value.trim().toUpperCase();
-    if (code.length < 6) { toast("Enter their 6-character code"); return; }
-    const btn = $("redeemCodeBtn");
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Pairing…';
-    const { data, error } = await sb.rpc("redeem_invite_code", { code });
-    btn.disabled = false;
-    btn.textContent = "Pair up";
-    if (error) { toast("Couldn't pair, try again"); console.error(error); return; }
-    if (!data?.ok) { toast(data?.error || "Couldn't pair"); return; }
-    toast(`Paired with ${data.partner_name}`);
-    checkPartnershipThenEnter();
+    if (code.length !== 6) { toast("Codes are 6 characters"); return; }
+    $("redeemCodeBtn").disabled = true;
+    const { error } = await sb.rpc("redeem_invite_code", { code });
+    $("redeemCodeBtn").disabled = false;
+    if (error) { toast(error.message || "That code did not work"); return; }
+    localStorage.removeItem(SOLO_KEY);
+    await checkPartnershipThenEnter();
   };
-
-  $("soloBtn").onclick = () => {
-    // An empty chair, not a closed door. Pairing stays available in Setup.
-    localStorage.setItem(SOLO_KEY, "1");
-    showApp();
-  };
-  $("pairSignOutBtn").onclick = () => sb.auth.signOut();
+  $("backToSetup").onclick = () => renderPairingScreen();
 }
 
 /* Onboarding, rebuilt to one rule: ask the goal, then TELL them the plan.
