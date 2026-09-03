@@ -12,9 +12,13 @@ exercise library. This is a proposal and a shared reference, not a change to the
 `MUSCLE_GROUPS` keys or to Jawa's exercise-library data -- those stay exactly as they are
 unless a deliberate follow-up decides to expand them.
 
-**Scope note**: this covers muscles actually relevant to training (what a lift, pose, or
-stretch can meaningfully target), not the full ~600-muscle medical count -- no facial muscles,
-no tiny intrinsic hand/foot muscles, nothing that never shows up in a workout context.
+**Scope note**: medically there are ~639 skeletal muscles total, but that count includes facial
+expression muscles, eye muscles, inner-ear muscles, and other things no workout app would ever
+show. The figure that actually matters here -- confirmed by how fitness sources themselves
+describe it -- is that programs group training into roughly 12 major muscle groups OR **around
+100 individual muscles people actively train**. This list targets that same practical range: 75
+entries, every one independently referenced in strength/mobility/fitness contexts, none of the
+purely medical filler.
 
 ---
 
@@ -24,6 +28,7 @@ no tiny intrinsic hand/foot muscles, nothing that never shows up in a workout co
 - Upper trapezius
 - Middle trapezius
 - Lower trapezius
+- Levator scapulae
 
 ## Shoulders → `shoulders`
 
@@ -51,7 +56,9 @@ no tiny intrinsic hand/foot muscles, nothing that never shows up in a workout co
 
 ## Lower back → `lowerback`
 
-- Erector spinae (iliocostalis, longissimus, spinalis -- usually trained and referenced as one group)
+- Iliocostalis *(erector spinae)*
+- Longissimus *(erector spinae)*
+- Spinalis *(erector spinae)*
 - Multifidus *(deep spinal stabilizer)*
 - Quadratus lumborum
 
@@ -60,18 +67,24 @@ no tiny intrinsic hand/foot muscles, nothing that never shows up in a workout co
 - Biceps brachii, long head
 - Biceps brachii, short head
 - Brachialis
+- Coracobrachialis
 
 ## Triceps → `triceps`
 
 - Triceps brachii, long head
 - Triceps brachii, lateral head
 - Triceps brachii, medial head
+- Anconeus
 
 ## Forearms → `forearms`
 
 - Brachioradialis
-- Wrist flexors (flexor carpi radialis, flexor carpi ulnaris, palmaris longus -- grouped)
-- Wrist extensors (extensor carpi radialis, extensor carpi ulnaris -- grouped)
+- Flexor carpi radialis
+- Flexor carpi ulnaris
+- Palmaris longus
+- Extensor carpi radialis longus
+- Extensor carpi radialis brevis
+- Extensor carpi ulnaris
 - Pronator teres
 - Supinator
 
@@ -96,6 +109,7 @@ no tiny intrinsic hand/foot muscles, nothing that never shows up in a workout co
 ## Hip flexors → `quads` *(closest current rollup; not a perfect fit)*
 
 - Iliopsoas (psoas major + iliacus)
+- Sartorius *(crosses hip and knee; also a hip-flexor synergist)*
 - Rectus femoris *(also a quad head, listed again below -- it crosses both the hip and knee)*
 
 ## Quads → `quads`
@@ -110,6 +124,7 @@ no tiny intrinsic hand/foot muscles, nothing that never shows up in a workout co
 - Biceps femoris
 - Semitendinosus
 - Semimembranosus
+- Popliteus *(deep knee stabilizer, hamstring-adjacent)*
 
 ## Adductors (inner thigh) → `quads` *(closest current rollup; not a perfect fit)*
 
@@ -124,19 +139,23 @@ no tiny intrinsic hand/foot muscles, nothing that never shows up in a workout co
 - Gastrocnemius, medial head
 - Gastrocnemius, lateral head
 - Soleus
+- Plantaris
 - Tibialis anterior
 - Tibialis posterior
-- Peroneus longus / brevis (fibularis)
+- Peroneus longus *(fibularis longus)*
+- Peroneus brevis *(fibularis brevis)*
 
 ---
 
 ## Count
 
-**62 entries** across 14 regions (some are grouped, e.g. "wrist flexors" stands in for three
-individual muscles that are never trained or discussed separately in a fitness context). Two rollups (hip flexors, adductors) don't map
-cleanly onto an existing broad group -- worth deciding, if the taxonomy ever actually expands,
-whether they become their own `MUSCLE_GROUPS` entries or stay folded into `quads` as they are
-today. Flagging now rather than guessing silently.
+**75 entries** across 14 regions, every muscle listed individually rather than bundled (biceps
+and triceps broken out by head, wrist flexors/extensors named individually, erector spinae
+split into its three components, etc.) -- lands right in the ~100-muscle range fitness sources
+themselves use as "what people actually train," not the full 639-muscle medical count. Two
+rollups (hip flexors, adductors) don't map cleanly onto an existing broad group -- worth
+deciding, if the taxonomy ever actually expands, whether they become their own `MUSCLE_GROUPS`
+entries or stay folded into `quads` as they are today. Flagging now rather than guessing silently.
 
 ## Next step
 
