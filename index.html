@@ -1772,7 +1772,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.03.4";
+const APP_VERSION = "2026.09.03.5";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -3610,6 +3610,13 @@ async function openDaySheet(email, date) {
   if (e.sessions > 1) rows.push(["Sessions", e.sessions]);
   const sets = logs.reduce((s, l) => s + (l.sets || 1), 0);
   if (sets) rows.push(["Sets", sets]);
+  /* How long it took lives on the plan rather than the day, and more than one
+     workout a day is allowed, so add them up. ai_workouts is readable by a
+     partner and a coach already, so this needed no new permission. */
+  const trainedSec = ALL_PLANS
+    .filter((w) => w.email === email && w.entry_date === date && w.duration_sec > 0)
+    .reduce((s, w) => s + w.duration_sec, 0);
+  if (trainedSec) rows.push(["Time", fmtDuration(trainedSec)]);
 
   // Your own days are editable in place. A mistyped weight should not force you
   // to delete the whole day and lose the workout with it.
@@ -4793,6 +4800,15 @@ function renderBodyTab() {
 /* ---------- Session timer + pause ---------- */
 
 let SESSION_TIMER = null;
+
+/* "47 min" reads better than "47:12" in a report, where the seconds are noise.
+   fmtElapsed stays as it is for the live timer, where they are not. */
+function fmtDuration(sec) {
+  const m = Math.round((sec || 0) / 60);
+  if (m < 1) return "under a minute";
+  if (m < 60) return `${m} min`;
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
+}
 
 function fmtElapsed(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
