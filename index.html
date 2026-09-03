@@ -870,6 +870,49 @@
   .ps-empty { padding: 26px 18px; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.5; }
   .strow-tap { cursor: pointer; border-radius: 10px; margin: -4px; padding: 4px; }
   .strow-tap:active { background: var(--panel-2); }
+  /* Build-next-workout screen */
+  .plan-preview {
+    border: 1px solid var(--border); border-radius: var(--radius); padding: 16px;
+    background: var(--card-fill); box-shadow: var(--shadow-card); margin-bottom: 18px;
+    display: flex; gap: 16px; align-items: center;
+  }
+  .pp-rows { flex: 1; min-width: 0; }
+  .pp-row { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; font-size: 13.5px; }
+  .pp-row span { color: var(--muted); }
+  .pp-row b { font-family: var(--font-display); font-weight: 700; letter-spacing: -.01em; text-align: right; }
+  .pp-ring { width: 84px; height: 84px; flex-shrink: 0; position: relative; }
+  .pp-ring-num {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-family: var(--font-display);
+  }
+  .pp-ring-num b { font-size: 21px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+  .pp-ring-num i { font-style: normal; font-size: 8.5px; letter-spacing: .1em; color: var(--muted); font-weight: 700; margin-top: 3px; }
+  .opt-card {
+    width: 100%; display: flex; align-items: center; gap: 14px; text-align: left;
+    border: 1px solid var(--border); border-radius: 14px; padding: 15px 16px; margin-bottom: 10px;
+    background: var(--card-fill); box-shadow: var(--shadow-card); cursor: pointer; color: var(--text);
+    transition: transform .12s ease, border-color .15s ease;
+  }
+  .opt-card:active { transform: scale(.988); }
+  .opt-card.primary { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+  .opt-card.primary .opt-ico { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  .opt-ico {
+    width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0; display: flex;
+    align-items: center; justify-content: center; background: var(--panel-2); color: var(--muted);
+  }
+  .opt-txt { flex: 1; min-width: 0; }
+  .opt-title { font-size: 15.5px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.01em; }
+  .opt-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+  .opt-go { color: var(--muted); flex-shrink: 0; transform: rotate(180deg); }
+  .opt-card.primary .opt-go { color: var(--accent); }
+  .recent-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+  .recent-chip {
+    flex: 0 0 auto; min-width: 132px; border: 1px solid var(--border); border-radius: 13px;
+    padding: 12px 14px; background: var(--card-fill); box-shadow: var(--shadow-card);
+  }
+  .recent-name { font-size: 13.5px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.01em; }
+  .recent-when { font-size: 12px; color: var(--muted); margin-top: 3px; display: flex; align-items: center; gap: 5px; }
+  .recent-when .done { color: var(--accent); }
   .ds-grip { width: 38px; height: 4px; border-radius: 100px; background: var(--border); margin: 0 auto 14px; }
   .ds-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
   .ds-date { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: var(--muted); }
@@ -1865,7 +1908,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.03.9";
+const APP_VERSION = "2026.09.03.10";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -5418,19 +5461,91 @@ function backBar(label, onBack) {
   return `<button type="button" class="back-bar" id="screenBackBtn">${icon("chevronLeft", 16)} ${escapeHtml(label)}</button>`;
 }
 
+/* What we can honestly say about the next workout before it exists.
+   Deliberately no "% match" score: that implies an algorithm we do not have
+   yet, and a made-up number is worse than an absent one. Everything here is
+   measured from the user's own logs. */
+function planPreview() {
+  const vols = computeMuscleVolume(ME, 0);
+  const hit = MUSCLE_GROUPS.filter((m) => (vols[m] || 0) > 0);
+  const cold = MUSCLE_GROUPS.filter((m) => !(vols[m] > 0));
+  return {
+    focus: MY_PROFILE?.focus || "General Fitness",
+    goal: MY_PROFILE?.goal || "Stay consistent",
+    done: gymDaysThisWeek(ME),
+    target: weeklyGoalFor(MY_EMAIL) || 4,
+    coverage: Math.round((hit.length / MUSCLE_GROUPS.length) * 100),
+    untrained: cold.slice(0, 3),
+  };
+}
+
+function optionCard(id, ico, title, sub, primary) {
+  return `<button type="button" class="opt-card ${primary ? "primary" : ""}" id="${id}">
+    <span class="opt-ico">${icon(ico, 19)}</span>
+    <span class="opt-txt">
+      <span class="opt-title">${escapeHtml(title)}</span>
+      <span class="opt-sub">${escapeHtml(sub)}</span>
+    </span>
+    <span class="opt-go">${icon("chevronLeft", 18)}</span>
+  </button>`;
+}
+
+function recentWorkoutsStrip() {
+  const mine = (ALL_PLANS || [])
+    .filter((w) => w.email === MY_EMAIL && !w.archived)
+    .sort((a, b) => String(b.entry_date).localeCompare(String(a.entry_date)))
+    .slice(0, 6);
+  if (!mine.length) return "";
+  return `<div class="ps-label" style="margin-top:22px;">RECENT WORKOUTS</div>
+    <div class="recent-strip">
+      ${mine.map((w) => `<div class="recent-chip">
+        <div class="recent-name">${escapeHtml(w.focus || "Workout")}</div>
+        <div class="recent-when">
+          ${escapeHtml(relDayLabel(w.entry_date))}
+          ${w.completed_at ? `<span class="done">${icon("check", 13)}</span>` : ""}
+        </div>
+      </div>`).join("")}
+    </div>`;
+}
+
 function renderChooseScreen() {
   // A coached client does not generate their own plan. That is what the coach
   // is paid for, so the option is not offered rather than offered and refused.
   const coached = isCoachedClient();
   const coachName = MY_COACH ? MY_COACH.split("@")[0] : "your coach";
+  const p = planPreview();
+
+  const preview = coached ? "" : `
+    <div class="plan-preview">
+      <div class="pp-rows">
+        <div class="pp-row"><span>Focus</span><b>${escapeHtml(p.focus)}</b></div>
+        <div class="pp-row"><span>This week</span><b>${p.done} of ${p.target}</b></div>
+        <div class="pp-row"><span>Not trained yet</span><b>${
+          p.untrained.length ? escapeHtml(p.untrained.join(", ")) : "All covered"
+        }</b></div>
+      </div>
+      <div class="pp-ring">
+        ${ringSVG(p.coverage / 100, "var(--accent)", 84)}
+        <div class="pp-ring-num"><b>${p.coverage}%</b><i>COVERED</i></div>
+      </div>
+    </div>`;
+
   $("workoutContent").innerHTML = `
     ${backBar("Back", () => { WORKOUT_MODE = null; renderWorkoutTab(); })}
+    ${preview}
     <p class="muted-note">${coached
       ? `${escapeHtml(coachName)} sets your training. Log what you did, or add something extra.`
-      : "How do you want to build today's workout?"}</p>
-    ${coached ? "" : `<button class="btn-primary" id="chooseGenerateBtn" style="margin-top:10px;">Generate for me</button>`}
-    <button class="${coached ? "btn-primary" : "btn-secondary"}" id="choosePlanBtn" ${coached ? 'style="margin-top:10px;"' : ""}>${coached ? "Log a workout" : "I'll plan my own"}</button>
-    <button class="btn-secondary" id="chooseActivityBtn">Log a class or cardio</button>`;
+      : "How do you want to build this one?"}</p>
+    ${coached ? "" : optionCard("chooseGenerateBtn", "bolt", "Generate for me",
+        "Built around your goal and what you have lifted lately.", true)}
+    ${optionCard("choosePlanBtn", "checklist",
+        coached ? "Log a workout" : "I'll plan my own",
+        coached ? "Record the session your coach set." : "Start from scratch and add your own exercises.",
+        coached)}
+    ${optionCard("chooseActivityBtn", "heart", "Log a class or cardio",
+        "Track a class, a sport or a run.", false)}
+    ${recentWorkoutsStrip()}`;
+
   if (!coached) $("chooseGenerateBtn").onclick = generateWorkout;
   $("choosePlanBtn").onclick = () => {
     WORKOUT_MODE = "manual";
