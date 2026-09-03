@@ -98,6 +98,6 @@ couple of different goals and levels, so it can be judged by reading rather than
 
 ## Try the app first
 
-**https://m-m-fitness-tracker.vercel.app** — sign in with Google, choose **"Just me"** when it
+**https://m-m-fitness-tracker.vercel.app**. Sign in with Google, choose **"Just me"** when it
 asks who is training with you. Set a goal, generate a workout, run a session, log some sets.
 An hour of that is worth more than any amount of reading this file.

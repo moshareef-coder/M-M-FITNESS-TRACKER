@@ -8,7 +8,7 @@ Fit Together is a workout tracker for people training together: a pair, or a coa
 19 clients. When someone opens it they either follow a plan their coach set, or the app
 generates one for them. **This brief is about that generation.**
 
-Try it first, as a user: **https://m-m-fitness-tracker.vercel.app** — sign in with Google,
+Try it first, as a user: **https://m-m-fitness-tracker.vercel.app**. Sign in with Google,
 choose "Start on my own" when it asks about a partner. Set a goal, generate a workout, run
 through a session, log some sets. An hour of that will tell you more than this document.
 
@@ -26,15 +26,15 @@ for.
 
 Everything is plain ES modules in `knowledge/`, no build step, runnable with `node`.
 
-- **`exercise-library/`** — 219 exercises across weight training (120, keyed to the app's 14
+- **`exercise-library/`**: 219 exercises across weight training (120, keyed to the app's 14
   muscle groups), yoga (37), pilates (23) and calisthenics (39). Each has `primary` and
   `secondary` muscles, `equipment`, and a `level`. Review page: `exercise-library/library.html`.
-- **`formulas/`** — TDEE and BMR, calorie burn per activity with MET tiers, 1RM and tonnage,
+- **`formulas/`**: TDEE and BMR, calorie burn per activity with MET tiers, 1RM and tonnage,
   goal timelines, and the training mix (how many strength vs cardio sessions for a goal).
-- **`formulas/exercise-selector.mjs`** — the selection algorithm. **This is the file you own.**
+- **`formulas/exercise-selector.mjs`**: the selection algorithm. **This is the file you own.**
   It already has `buildWeekPlan`, `selectExercisesForCategory`, `findAlternatives`,
   `progressiveOverload`, `coldStartWeight`, volume landmarks and rep ranges per goal.
-- **`principles/`** — our written distillation of the training science the algorithm is meant to
+- **`principles/`**: our written distillation of the training science the algorithm is meant to
   follow: progressive overload, volume landmarks (MEV/MAV/MRV), RPE, periodization and deloads.
 
 **The algorithm runs today.** `buildWeekPlan({ level: "beginner", goal: "Lose weight",
@@ -46,7 +46,7 @@ blank page. Your job is to make what it produces actually good.
 Run it and look at the output. Real problems visible in the first two days it generated:
 
 1. **Poor exercise pairing.** One day came back as `Dumbbell Shrug, Barbell Shrug, Machine
-   Shoulder Press, Seated Dumbbell Press` — two shrugs in a row, and traps hit twice while other
+   Shoulder Press, Seated Dumbbell Press`, two shrugs in a row, and traps hit twice while other
    groups got nothing.
 2. **Every exercise is 3x10**, whatever the goal. Rep ranges exist in the file but are not
    reaching the output.
@@ -71,7 +71,29 @@ how it changes for a beginner versus someone with a year behind them. Add what y
      something sensible for the same muscle and available equipment. This is a hard product
      requirement, not a nice-to-have.
 
-**3. Keep it testable.** Pure functions, no network, no database. Given the same inputs it
+**3. Find out what people actually ask for.** Our onboarding offers five broad goals, but
+nobody in real life says "recomp". They say "lose 20 pounds before my sister's wedding", "run a
+five minute mile", "get my first pull-up", "get back to what I lifted in college", "fit my old
+jeans". Go and find the real ones: fitness subreddits, app store reviews for MyFitnessPal,
+Strava, Ladder, Fitbod, Hevy, coaching forums, wherever people write down what they want in
+their own words.
+
+Then work out, for each recurring one:
+   - What it actually means in numbers. "Lose 20 pounds" is a rate and a deficit. "Five minute
+     mile" is a pace, a current baseline, and an interval progression. "First pull-up" is
+     a specific assistance ladder.
+   - Whether it maps onto one of our five goals or needs its own handling
+   - What a realistic timeline is, and how we say so honestly when someone's target is not
+     realistic. We suggest the healthy rate, we never sell the fastest one.
+   - Whether the plan changes at all. A strength goal aimed at a five minute mile should not
+     return the same week as one aimed at a bigger bench.
+
+Write this up as `principles/real-goals.md`: the goals people actually state, grouped, with
+what each one implies for the plan. This is research work as much as code work, and it may well
+be the most valuable thing in the whole project, because it decides what the app asks people on
+their very first screen.
+
+**4. Keep it testable.** Pure functions, no network, no database. Given the same inputs it
 returns the same plan. Add a small script that prints a week for several goal and level
 combinations so we can read the output and judge it.
 
