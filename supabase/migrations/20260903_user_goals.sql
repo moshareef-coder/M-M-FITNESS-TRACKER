@@ -59,3 +59,9 @@ create policy "self updates goals" on user_goals
   for update using (is_me(email)) with check (is_me(email));
 create policy "self deletes goals" on user_goals
   for delete using (is_me(email));
+
+-- Prints a visible confirmation instead of "Success. No rows returned", so a
+-- stale clipboard cannot look like a successful run.
+select 'user_goals ready' as result,
+       (select count(*) from information_schema.columns where table_name = 'user_goals') as columns,
+       (select count(*) from pg_policies where tablename = 'user_goals') as policies;
