@@ -1763,7 +1763,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.03.2";
+const APP_VERSION = "2026.09.03.3";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -1961,6 +1961,9 @@ let MY_PARTNERSHIP = null;
 let MY_GROUP = null;
 let MY_ROLE = null;
 let MY_COACH = null;
+/* The active goal: what they asked for and the date they agreed to. */
+let MY_GOAL = null;
+let ALL_GOALS = [];
 
 const isCoachedClient = () => MY_GROUP?.kind === "coach" && MY_ROLE === "client";
 
@@ -2303,6 +2306,12 @@ function renderOnboardStep(step, data = {}) {
       goal_detail: data.detail || null,
       focus: g.focus,
       challenge_target: days,
+      /* The pace was being shown on this screen and then dropped. It is the
+         only deadline the user ever agrees to, so it has to survive. */
+      goal_key: g.key,
+      pace: p.key,
+      weeks: p.weeks,
+      days_per_week: days,
     });
     $("backBtn").onclick = () => renderOnboardStep("goal", data);
     return;
@@ -2324,8 +2333,41 @@ async function finishOnboarding(data) {
   }).select().maybeSingle();
   if (error) { toast("Setup failed, try again"); console.error(error); return; }
   MY_PROFILE = saved;
+  if (data.goal_key) await setActiveGoal(data);
   applyAccentColors();
   await checkPartnershipThenEnter();
+}
+
+/* One active goal per person. Setting a new one retires the old rather than
+   deleting it, so we keep a record of what someone has actually chased.
+   `metric`, `start_value` and `target_value` stay null for now. We deliberately
+   do not ask for weight before showing the plan, so there is nothing honest to
+   snapshot yet, and inventing a number would be worse than leaving it empty. */
+async function setActiveGoal(data) {
+  const target = new Date();
+  target.setDate(target.getDate() + (data.weeks || 12) * 7);
+
+  /* Retire the previous goal rather than deleting it, so we keep a record of
+     what someone has actually chased. A partial unique index enforces one
+     active goal, so this has to happen before the insert. safeWrite is no help
+     here: it only knows insert and upsert, and this is a filtered update. */
+  const retired = await sb.from("user_goals")
+    .update({ status: "replaced" })
+    .eq("email", MY_EMAIL).eq("status", "active");
+  if (retired.error) { console.error("could not retire the old goal", retired.error); return; }
+
+  const row = {
+    email: MY_EMAIL,
+    goal_key: data.goal_key,
+    detail: data.goal_detail || null,
+    pace: data.pace || "steady",
+    target_date: target.toISOString().slice(0, 10),
+    days_per_week: data.days_per_week || 4,
+    status: "active",
+  };
+  const { error } = await sb.from("user_goals").insert(row);
+  if (error) console.error("goal not saved", error);
+  else MY_GOAL = row;
 }
 
 /* ---------- Main app ---------- */
@@ -2716,12 +2758,16 @@ async function deleteMyAccount() {
 }
 
 async function loadAll() {
-  const [entriesRes, exLogRes, profilesRes, plansRes] = await Promise.all([
+  const [entriesRes, exLogRes, profilesRes, plansRes, goalsRes] = await Promise.all([
     sb.from("fit_entries").select("*").order("entry_date", { ascending: true }),
     sb.from("exercise_logs").select("*").order("entry_date", { ascending: true }),
     sb.from("profiles").select("*"),
     sb.from("ai_workouts").select("*").order("entry_date", { ascending: false }).limit(60),
+    /* Goals are readable by partner and coach, so this returns theirs too. */
+    sb.from("user_goals").select("*").eq("status", "active"),
   ]);
+  ALL_GOALS = goalsRes.data || [];
+  MY_GOAL = ALL_GOALS.find((g) => (g.email || "").toLowerCase() === MY_EMAIL) || null;
   ALL_PLANS = plansRes.data || [];
   ALL_ENTRIES = entriesRes.data || [];
   ALL_EXERCISE_LOGS = exLogRes.data || [];
