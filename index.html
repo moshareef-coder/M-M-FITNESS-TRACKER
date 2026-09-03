@@ -567,12 +567,21 @@
 
   /* App header */
   .top-right { display: flex; align-items: center; gap: 8px; }
-  .top-avatar {
-    width: 42px; height: 42px; border-radius: 50%; margin-left: 4px;
-    display: flex; align-items: center; justify-content: center;
-    background: color-mix(in srgb, var(--accent) 16%, var(--panel));
-    color: var(--accent); font-size: 15px; font-weight: 800;
+  /* The pair, top right. Blue is you and coral is them, the same two colours
+     the rings and the chart already use, so the header needs no legend. */
+  .avatar-pair { display: flex; align-items: center; margin-left: 2px; }
+  .av {
+    width: 38px; height: 38px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+    background: var(--panel-2); font-size: 13.5px; font-weight: 800;
+    border: 2.5px solid var(--border); cursor: pointer; transition: transform .12s ease;
   }
+  .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .av:active { transform: scale(.93); }
+  .av.me { border-color: var(--me); color: var(--me); }
+  .av.them { border-color: var(--partner); color: var(--partner); margin-left: -11px; z-index: 1; }
+  .setup-photo { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+  .setup-photo .av { width: 56px; height: 56px; font-size: 19px; cursor: default; }
 
   /* Card heads with a side link */
   .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
@@ -801,6 +810,7 @@
     border: 3px solid var(--partner);
     box-shadow: 0 0 0 6px color-mix(in srgb, var(--partner) 14%, transparent);
   }
+  .ps-face { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
   .ps-initials { font-size: 34px; font-weight: 800; letter-spacing: -.02em; color: var(--partner); }
   .ps-streak {
     position: absolute; right: -14px; bottom: 2px; display: flex; align-items: center; gap: 4px;
@@ -1322,7 +1332,7 @@
     <div class="top-right">
       <button class="icon-btn" id="themeToggleBtn" title="Toggle theme"></button>
       <button class="icon-btn" id="switchUserBtn" title="Sign out"></button>
-      <span class="top-avatar" id="meLabel"></span>
+      <div class="avatar-pair" id="avatarPair"></div>
     </div>
   </header>
 
@@ -1581,6 +1591,8 @@
       <input type="text" id="setupDisplayName" placeholder="Your name" maxlength="24" autocomplete="off" />
       <button type="button" class="btn-secondary" id="saveNameBtn" style="margin-top:10px;">Save name</button>
       <p class="muted-note" id="nameNote" style="margin-top:8px;">This is what your partner sees.</p>
+      <div class="setup-photo" id="setupPhoto"></div>
+      <input type="file" id="avatarFile" accept="image/*" class="hidden" />
       <p class="muted-note" style="margin-top:10px;opacity:0.65;">Version <span id="appVersion"></span></p>
     </div>
     <div class="card">
@@ -1820,7 +1832,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.03.6";
+const APP_VERSION = "2026.09.03.7";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -2431,7 +2443,7 @@ async function setActiveGoal(data) {
 function showApp() {
   $("onboard").classList.add("hidden");
   $("app").classList.remove("hidden");
-  $("meLabel").textContent = initials(ME);
+  renderAvatarPair();
   $("themeToggleBtn").innerHTML = icon("sunMoon");
   $("switchUserBtn").innerHTML = icon("logout");
   $("switchUserBtn").title = "Sign out";
@@ -2829,6 +2841,7 @@ async function loadAll() {
   applyAccentColors();
 
   await captureTimezone();
+  renderAvatarPair();
   await loadBodyPhotos();
   await loadTodayWorkout();
   await loadDoneWorkouts();
@@ -3317,6 +3330,91 @@ function standRow(name, done, target, cls) {
   </div>`;
 }
 
+/* ---------- Profile photos ---------- */
+
+function profileFor(email) {
+  return (ALL_PROFILES || []).find((p) => (p.email || "").toLowerCase() === (email || "").toLowerCase());
+}
+
+/* Signed URLs expire, so this leans on the same cache the proof photos use
+   rather than minting a fresh one on every render. */
+async function avatarUrlFor(email) {
+  const path = profileFor(email)?.avatar_path;
+  if (!path) return null;
+  try { return await signedProofUrl(path); } catch { return null; }
+}
+
+async function avatarHTML(email, name, cls, tag = "button") {
+  const url = await avatarUrlFor(email);
+  const inner = url
+    ? `<img src="${url}" alt="" />`
+    : escapeHtml(initials(name || "?"));
+  const type = tag === "button" ? ' type="button"' : "";
+  return `<${tag}${type} class="av ${cls}" aria-label="${escapeHtml(name || "")}">${inner}</${tag}>`;
+}
+
+/* Both faces, top right. Tapping theirs is the way into their profile, which is
+   far more obvious than tapping a name in a progress row. */
+async function renderAvatarPair() {
+  const wrap = $("avatarPair");
+  if (!wrap) return;
+  const partner = PARTNER_EMAIL ? partnerName() : null;
+  const mine = await avatarHTML(MY_EMAIL, ME, "me");
+  const theirs = partner ? await avatarHTML(PARTNER_EMAIL, partner, "them") : "";
+  wrap.innerHTML = mine + theirs;
+
+  const [meBtn, themBtn] = wrap.querySelectorAll(".av");
+  if (meBtn) meBtn.onclick = () => switchTab("setup");
+  if (themBtn) themBtn.onclick = openPartnerSheet;
+}
+
+async function uploadAvatar(file) {
+  const btn = $("avatarPickBtn");
+  if (btn) { btn.disabled = true; btn.textContent = "Uploading…"; }
+  try {
+    const blob = await compressImage(file, 400, 0.85);
+    const path = `${MY_EMAIL}/avatar/${Date.now()}.jpg`;
+    const { error: upErr } = await sb.storage.from("workout-proof")
+      .upload(path, blob, { contentType: "image/jpeg", upsert: true });
+    if (upErr) throw upErr;
+
+    const old = MY_PROFILE?.avatar_path;
+    const { error: dbErr } = await sb.from("profiles")
+      .update({ avatar_path: path }).eq("email", MY_EMAIL);
+    if (dbErr) throw dbErr;
+
+    if (MY_PROFILE) MY_PROFILE.avatar_path = path;
+    const cached = profileFor(MY_EMAIL);
+    if (cached) cached.avatar_path = path;
+
+    // Replace, do not accumulate. Old avatars are dead weight in the bucket.
+    if (old && old !== path) {
+      await sb.storage.from("workout-proof").remove([old]);
+      delete PROOF_URL_CACHE[old];
+    }
+    toast("Photo saved");
+  } catch (e) {
+    console.error("avatar upload failed", e);
+    toast("Could not save that photo");
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "Change photo"; }
+    await renderAvatarPair();
+    await renderSetupPhoto();
+  }
+}
+
+async function renderSetupPhoto() {
+  const box = $("setupPhoto");
+  if (!box) return;
+  box.innerHTML = await avatarHTML(MY_EMAIL, ME, "me", "span");
+  box.insertAdjacentHTML("beforeend",
+    `<div>
+       <button type="button" class="btn-secondary" id="avatarPickBtn">${MY_PROFILE?.avatar_path ? "Change photo" : "Add a photo"}</button>
+       <p class="muted-note" style="margin-top:6px;">Your partner sees this.</p>
+     </div>`);
+  $("avatarPickBtn").onclick = () => $("avatarFile").click();
+}
+
 /* ---------- Partner sheet ---------- */
 
 /* Consecutive days ending today or yesterday. Yesterday still counts, because
@@ -3413,6 +3511,7 @@ async function openPartnerSheet() {
   const streak = currentDayStreak(name);
   const hi = partnerHighlight(PARTNER_EMAIL, name);
   const acts = recentActivity(PARTNER_EMAIL, name);
+  const face = await avatarUrlFor(PARTNER_EMAIL);
 
   $("partnerSheet").innerHTML = `
     <div class="ds-grip"></div>
@@ -3421,7 +3520,7 @@ async function openPartnerSheet() {
     </div>
     <div class="ps-hero">
       <div class="ps-ring">
-        <span class="ps-initials">${escapeHtml(initials(name))}</span>
+        ${face ? `<img class="ps-face" src="${face}" alt="" />` : `<span class="ps-initials">${escapeHtml(initials(name))}</span>`}
         ${streak > 0 ? `<span class="ps-streak">${icon("flame", 13)} ${streak}</span>` : ""}
       </div>
       <div class="ps-name">${escapeHtml(name)}</div>
@@ -4286,9 +4385,10 @@ async function generateWorkout(forDate) {
       isToday ? renderWorkoutTab() : renderHero();
       return;
     }
-    if (!resp.ok || data.error) throw new Error(data.error || "unknown error");
+    if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
+    if (!data.workout?.exercises?.length) throw new Error("Coach returned an empty workout");
 
-    await sb.from("ai_workouts").upsert({
+    const { error: saveErr } = await sb.from("ai_workouts").upsert({
       user_name: ME,
       email: MY_EMAIL,
       entry_date: target,
@@ -4296,6 +4396,10 @@ async function generateWorkout(forDate) {
       exercises: data.workout.exercises,
       archived: false,
     }, { onConflict: "email,entry_date" });
+    // Supabase upsert does not throw on its own -- it was failing silently here, which
+    // would show "Workout ready" even though nothing was actually saved. Checking .error
+    // explicitly is what turns that into a real, visible failure instead.
+    if (saveErr) throw new Error(`Save failed: ${saveErr.message}`);
 
     await loadAll();
     if (isToday) {
@@ -4307,8 +4411,10 @@ async function generateWorkout(forDate) {
       toast("Tomorrow is planned");
     }
   } catch (err) {
-    console.error(err);
-    toast("Couldn't generate workout, check the coach connection");
+    console.error("generateWorkout failed:", err);
+    // Showing the real reason (not a generic line) is what makes the NEXT failure
+    // self-diagnosing instead of another silent "try again and hope" report.
+    toast(`Couldn't generate: ${err.message || err}`);
     isToday ? renderWorkoutTab() : renderHero();
   }
 }
@@ -6171,6 +6277,12 @@ function renderSetupTab() {
   $("setupPairWrap").classList.toggle("hidden", !!PARTNER_EMAIL || isCoachedClient());
   $("setupInviteCode").textContent = MY_PROFILE?.invite_code || "-";
   renderPushToggle();
+  renderSetupPhoto();
+  $("avatarFile").onchange = (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";               // so picking the same file twice still fires
+    if (f) uploadAvatar(f);
+  };
 
   SETUP_THEME = document.documentElement.getAttribute("data-theme") || "dark";
 
