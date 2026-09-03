@@ -62,6 +62,7 @@
   .rec-badge { font-size: 10px; background: var(--accent); color: var(--bg); border-radius: 100px; padding: 2px 7px; margin-left: 6px; vertical-align: middle; }
   .use-btn { font-size: 12px; padding: 6px 12px; border-radius: 100px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; white-space: nowrap; }
   .empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+  .search-input { width: 100%; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 13px; margin-bottom: 8px; }
 </style>
 </head>
 <body>
@@ -173,6 +174,7 @@
     buildWeightTrainingPlan, buildFlowPlan, sessionCapacity, findAlternatives, coldStartWeight,
   } from "./formulas/exercise-selector.mjs";
   import { computeWeeklyMix, assignWeekSchedule, MIN_STRENGTH_SESSIONS_PER_WEEK } from "./formulas/training-mix.mjs";
+  import { TRAININGS } from "./exercise-library/index.mjs";
 
   const SPORTS = ["Basketball", "Soccer", "Tennis", "Climbing", "Skiing", "Boxing", "Running", "Cycling", "Swimming"];
   document.getElementById("sportsChoices").innerHTML = SPORTS.map((s) => `<span class="choice" data-v="${s}">${s}</span>`).join("");
@@ -494,6 +496,58 @@
     });
   }
 
+  // Every exercise in the current plan's training, flattened once. Search reads this directly
+  // rather than importing exercise-selector.mjs's search-adjacent internals -- that file is
+  // Jawa's now (CODEOWNERS), this is a UI-only feature reading the shared library data, not
+  // touching her code.
+  function allExercisesFor(trainingId) {
+    const training = TRAININGS.find((t) => t.id === trainingId);
+    if (!training) return [];
+    return training.categories.flatMap((c) => c.exercises);
+  }
+
+  // Exercise names use hyphens ("Push-Up"); people type spaces ("push up"). Normalizing both
+  // sides to bare alphanumerics before matching is what makes the obvious query actually work --
+  // caught by testing the exact example given ("push up" against "Push-Up" returned nothing).
+  function normalizeSearch(s) {
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  }
+
+  function searchExercises(query, { trainingId, excludeNames = [], equipmentAvailable = null }) {
+    const q = normalizeSearch(query);
+    if (!q) return [];
+    const excluded = new Set(excludeNames);
+    return allExercisesFor(trainingId)
+      .filter((ex) => !excluded.has(ex.name))
+      .filter((ex) => normalizeSearch(ex.name).includes(q))
+      .filter((ex) => !equipmentAvailable || !ex.equipment || equipmentAvailable.includes(ex.equipment))
+      .sort((a, b) => {
+        const aStarts = normalizeSearch(a.name).startsWith(q) ? 0 : 1;
+        const bStarts = normalizeSearch(b.name).startsWith(q) ? 0 : 1;
+        return aStarts - bStarts || a.name.localeCompare(b.name);
+      })
+      .slice(0, 8)
+      .map((ex) => ({ name: ex.name, primary: ex.primary, secondary: ex.secondary, equipment: ex.equipment, level: ex.level, recommended: false }));
+  }
+
+  function renderAltRows(i, items, emptyMessage) {
+    const panel = document.getElementById(`alt-${i}`);
+    const list = panel.querySelector(".alt-list");
+    lastAltsByIndex[i] = items;
+    list.innerHTML = items.length
+      ? items.map((a, ai) => `<div class="alt-row">
+          <div>
+            <span>${a.name}</span>${a.recommended ? '<span class="rec-badge">Recommended</span>' : ""}
+            <div class="ex-sub">${(a.secondary || []).join(", ") || "no secondary muscles"} · ${a.level}${a.equipment ? " · " + a.equipment : ""}</div>
+          </div>
+          <button type="button" class="use-btn" data-i="${i}" data-ai="${ai}">Use this</button>
+        </div>`).join("")
+      : `<div class="empty">${emptyMessage}</div>`;
+    list.querySelectorAll(".use-btn").forEach((btn) => {
+      btn.onclick = () => applySwap(parseInt(btn.dataset.i, 10), parseInt(btn.dataset.ai, 10));
+    });
+  }
+
   function toggleAlternatives(i) {
     const panel = document.getElementById(`alt-${i}`);
     if (!panel.hidden) { panel.hidden = true; return; }
@@ -505,21 +559,26 @@
       level: currentContext.level, equipmentAvailable: currentContext.equipmentAvailable,
       excludeNames, recentExerciseNames: currentContext.recentExerciseNames,
     });
-    lastAltsByIndex[i] = alts;
 
-    panel.innerHTML = alts.length
-      ? alts.map((a, ai) => `<div class="alt-row">
-          <div>
-            <span>${a.name}</span>${a.recommended ? '<span class="rec-badge">Recommended</span>' : ""}
-            <div class="ex-sub">${(a.secondary || []).join(", ") || "no secondary muscles"} · ${a.level}</div>
-          </div>
-          <button type="button" class="use-btn" data-i="${i}" data-ai="${ai}">Use this</button>
-        </div>`).join("")
-      : `<div class="empty">No alternatives available with your current equipment.</div>`;
+    panel.innerHTML = `
+      <input type="text" class="search-input" id="search-${i}" placeholder="Or search the full catalog, e.g. push up" />
+      <div class="alt-list"></div>
+    `;
+    renderAltRows(i, alts, "No alternatives available with your current equipment.");
 
-    panel.querySelectorAll(".use-btn").forEach((btn) => {
-      btn.onclick = () => applySwap(parseInt(btn.dataset.i, 10), parseInt(btn.dataset.ai, 10));
-    });
+    const searchInput = document.getElementById(`search-${i}`);
+    searchInput.oninput = () => {
+      const q = searchInput.value.trim();
+      if (!q) {
+        renderAltRows(i, alts, "No alternatives available with your current equipment.");
+        return;
+      }
+      const results = searchExercises(q, {
+        trainingId: currentPlan.trainingId, excludeNames, equipmentAvailable: currentContext.equipmentAvailable,
+      });
+      renderAltRows(i, results, `No "${q}" in the catalog for ${currentPlan.trainingId} with your equipment.`);
+    };
+
     panel.hidden = false;
   }
 
