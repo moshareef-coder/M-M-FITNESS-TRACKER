@@ -3265,40 +3265,20 @@ function sharedWeekStreak() {
 
 
 
-/* Two full rings, interlocked like a chain link rather than nested inside
-   each other — yours and your partner's cross in the middle, each stays a
-   complete circle at every fill level, and the shared streak sits in the
-   lens where they cross. Glossy stroke + glow filter, on-palette (no
-   borrowed hues) so it stays correct in both themes. */
+/* One dial, two arcs. Yours on the outside, your partner's inside, so the
+   pair reads as a single object rather than two competing charts. */
 function dualRing(mine, theirs, streak, size = 138) {
-  const ring = (cx, pct, colorVar, gradId) => {
-    const r = 32, stroke = 15;
+  const arc = (r, stroke, pct, color) => {
     const circ = 2 * Math.PI * r;
-    const off = circ * (1 - Math.max(0, Math.min(1, pct)));
-    const dash = `transition:stroke-dashoffset .6s cubic-bezier(.22,1,.36,1)`;
-    return `<circle cx="${cx}" cy="60" r="${r}" fill="none" stroke="var(--panel-2)" stroke-width="${stroke}"/>
-      <circle cx="${cx}" cy="60" r="${r}" fill="none" stroke="url(#${gradId})" stroke-width="${stroke}" stroke-linecap="round"
-        stroke-dasharray="${circ}" stroke-dashoffset="${off}"
-        transform="rotate(-90 ${cx} 60)" filter="url(#dringGlow)" style="${dash}"/>`;
+    return `<circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--panel-2)" stroke-width="${stroke}"/>
+      <circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
+        stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - Math.max(0, Math.min(1, pct)))}"
+        transform="rotate(-90 60 60)"
+        style="transition:stroke-dashoffset .6s cubic-bezier(.22,1,.36,1)"/>`;
   };
-  const grad = (id, colorVar) => `<linearGradient id="${id}" x1="0.2" y1="0" x2="0.8" y2="1">
-      <stop offset="0" stop-color="color-mix(in srgb, ${colorVar} 78%, white)"/>
-      <stop offset="35%" stop-color="${colorVar}"/>
-      <stop offset="100%" stop-color="color-mix(in srgb, ${colorVar} 80%, black)"/>
-    </linearGradient>`;
   return `<svg class="dring" viewBox="0 0 120 120" width="${size}" height="${size}" aria-hidden="true">
-    <defs>
-      ${grad("dringMe", "var(--me)")}
-      ${grad("dringPartner", "var(--partner)")}
-      <filter id="dringGlow" x="-70%" y="-70%" width="240%" height="240%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="tight"/>
-        <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="wide"/>
-        <feComponentTransfer in="wide" result="wideDim"><feFuncA type="linear" slope="0.55"/></feComponentTransfer>
-        <feMerge><feMergeNode in="wideDim"/><feMergeNode in="tight"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-    </defs>
-    ${ring(42, mine, "var(--me)", "dringMe")}
-    ${theirs !== null ? ring(78, theirs, "var(--partner)", "dringPartner") : ""}
+    ${arc(50, 12, mine, "var(--me)")}
+    ${theirs !== null ? arc(33, 12, theirs, "var(--partner)") : ""}
     <text x="60" y="${streak > 0 ? 58 : 62}" text-anchor="middle" class="dring-num">${streak}</text>
     <text x="60" y="72" text-anchor="middle" class="dring-lbl">${streak === 1 ? "WEEK" : "WEEKS"}</text>
   </svg>`;
