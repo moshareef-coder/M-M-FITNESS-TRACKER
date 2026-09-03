@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-title" content="Fit Together" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
@@ -38,10 +38,13 @@
     --down: #a8ff00;
     --on-accent: #0b0d11;
     --radius: 16px;
-    --font-body: "IBM Plex Sans", -apple-system, sans-serif;
-    /* Sora carries the numbers. A fitness app is mostly numbers, and Plex sets
-       them politely rather than confidently. */
-    --font-display: "Sora", "IBM Plex Sans", -apple-system, sans-serif;
+    /* One family, not two — DM Sans reads warmer and more human than IBM Plex
+       (which leans technical/enterprise) and is strong enough at large sizes
+       to also carry the numbers, so display doesn't need a second typeface.
+       (Note: a prior --font-display referenced "Sora" without ever loading
+       it via a stylesheet link, so it was silently falling back anyway.) */
+    --font-body: "DM Sans", -apple-system, sans-serif;
+    --font-display: "DM Sans", -apple-system, sans-serif;
     /* Depth is three layers, not one: a hairline of light along the top edge,
        a gradient down the fill, and a shadow underneath. */
     --card-fill: linear-gradient(180deg, #171b22 0%, #12151a 100%);
@@ -870,6 +873,54 @@
   .ps-empty { padding: 26px 18px; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.5; }
   .strow-tap { cursor: pointer; border-radius: 10px; margin: -4px; padding: 4px; }
   .strow-tap:active { background: var(--panel-2); }
+  /* Past workouts, and the recap they open */
+  .wk-row {
+    width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; color: var(--text);
+    border: 1px solid var(--border); border-radius: 13px; padding: 13px 14px; margin-bottom: 8px;
+    background: var(--card-fill); box-shadow: var(--shadow-card); cursor: pointer;
+    transition: transform .12s ease;
+  }
+  .wk-row:active { transform: scale(.988); }
+  .wk-ico {
+    width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; display: flex;
+    align-items: center; justify-content: center; background: var(--panel-2); color: var(--accent);
+  }
+  .wk-txt { flex: 1; min-width: 0; }
+  .wk-name { font-size: 14.5px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.01em; }
+  .wk-meta { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .wk-go { color: var(--muted); transform: rotate(180deg); flex-shrink: 0; }
+  .rc-head { display: flex; align-items: center; gap: 13px; margin-bottom: 16px; }
+  .rc-tick {
+    width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0; display: flex;
+    align-items: center; justify-content: center; color: var(--accent);
+    border: 2.5px solid var(--accent); box-shadow: var(--glow-accent);
+  }
+  .rc-kicker { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: var(--accent); }
+  .rc-title { font-size: 23px; font-weight: 800; font-family: var(--font-display); letter-spacing: -.03em; margin-top: 2px; }
+  .rc-when { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .rc-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-bottom: 16px;
+    background: var(--border); border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+  }
+  .rc-stat { background: var(--panel); padding: 14px 10px; text-align: center; }
+  .rc-stat b { display: block; font-size: 21px; font-weight: 800; font-family: var(--font-display); letter-spacing: -.03em; }
+  .rc-stat span { display: block; font-size: 10.5px; color: var(--muted); margin-top: 4px; letter-spacing: .04em; }
+  .rc-stat.time b { color: var(--accent); }
+  .rc-ex { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .rc-ex:last-child { border-bottom: none; }
+  .rc-n {
+    width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: flex;
+    align-items: center; justify-content: center; background: var(--panel-2);
+    font-size: 11.5px; font-weight: 800; color: var(--muted);
+  }
+  .rc-ex-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
+  .rc-ex-num { font-size: 13px; font-weight: 700; font-family: var(--font-display); text-align: right; white-space: nowrap; }
+  .rc-pr {
+    font-size: 9.5px; font-weight: 800; letter-spacing: .06em; padding: 2px 6px; border-radius: 5px;
+    background: color-mix(in srgb, var(--me) 22%, transparent); color: var(--me); margin-left: 6px;
+  }
+  .rc-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .rc-actions button { flex: 1; margin: 0; }
   /* Build-next-workout screen */
   .plan-preview {
     border: 1px solid var(--border); border-radius: var(--radius); padding: 16px;
@@ -1444,6 +1495,7 @@
         </div>
         <div class="tally-proof" id="tallyProof"></div>
       </div>
+      <div class="ps-label" style="margin-top:16px;">PREVIOUS WORKOUTS</div>
       <div class="tally-list" id="tallyList"></div>
     </div>
 
@@ -1848,6 +1900,9 @@
     <div class="pop" id="popCard"></div>
   </div>
 
+  <div class="sheet-scrim hidden" id="recapScrim">
+    <div class="partner-sheet" id="recapSheet"></div>
+  </div>
   <div class="sheet-scrim hidden" id="partnerSheetScrim">
     <div class="partner-sheet" id="partnerSheet"></div>
   </div>
@@ -1908,7 +1963,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.03.10";
+const APP_VERSION = "2026.09.03.11";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -2645,7 +2700,7 @@ function showApp() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim"].forEach((id) => $(id)?.classList.add("hidden"));
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim"].forEach((id) => $(id)?.classList.add("hidden"));
   const sess = $("sessionCard");
   if (sess && !sess.classList.contains("hidden")) {
     // Bank the time rather than losing it, then stand the session down.
@@ -3483,6 +3538,171 @@ async function renderSetupPhoto() {
        <p class="muted-note" style="margin-top:6px;">Your partner sees this.</p>
      </div>`);
   $("avatarPickBtn").onclick = () => $("avatarFile").click();
+}
+
+/* ---------- Workout recap ---------- */
+
+/* One finished session, reconstructed from what was actually logged. Keyed by
+   date because that is how exercise_logs are keyed; a day with two workouts
+   reads as one recap, which matches how the day sheet already counts. */
+function recapFor(email, name, date) {
+  const logs = ALL_EXERCISE_LOGS
+    .filter((l) => l.email === email && l.entry_date === date)
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  const plans = (ALL_PLANS || []).filter((w) => w.email === email && w.entry_date === date);
+  const entry = ALL_ENTRIES.find((e) => e.user_name === name && e.entry_date === date);
+
+  const sets = logs.reduce((s, l) => s + (l.sets || 1), 0);
+  const volume = logs.reduce((s, l) => s + (l.sets || 1) * (l.reps || 0) * (l.weight || 0), 0);
+  const minutes = logs.reduce((s, l) => s + (l.duration_min || 0), 0);
+  const seconds = plans.reduce((s, w) => s + (w.duration_sec || 0), 0);
+
+  const best = personalRecords(name).best || {};
+  return {
+    date,
+    title: plans.find((w) => w.focus)?.focus || deriveFocus(logs.map((l) => l.exercise_name)),
+    logs, sets, volume, minutes, seconds,
+    exercises: logs.length,
+    note: entry?.note || null,
+    /* A PR badge means this was the heaviest that exercise has ever gone. Ties
+       count, because matching your best on a bad day is worth seeing. */
+    isPR: (l) => l.weight != null && best[l.exercise_name] != null && l.weight >= best[l.exercise_name],
+  };
+}
+
+function recapStat(value, label, cls = "") {
+  return `<div class="rc-stat ${cls}"><b>${escapeHtml(String(value))}</b><span>${escapeHtml(label)}</span></div>`;
+}
+
+function openRecap(email, name, date) {
+  const r = recapFor(email, name, date);
+  const mine = email === MY_EMAIL;
+
+  const stats = [
+    recapStat(r.sets || "-", "TOTAL SETS"),
+    recapStat(r.exercises || "-", "EXERCISES"),
+    recapStat(r.seconds ? fmtDuration(r.seconds) : (r.minutes ? `${r.minutes} min` : "-"), "TIME", "time"),
+  ].join("");
+
+  const volumeRow = r.volume > 0
+    ? `<div class="rc-stats" style="grid-template-columns:1fr;">
+         ${recapStat(`${Math.round(r.volume).toLocaleString()} lb`, "TOTAL VOLUME")}
+       </div>`
+    : "";
+
+  $("recapSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="ps-head"><button type="button" class="ds-x" id="rcClose" aria-label="Close">&times;</button></div>
+    <div class="rc-head">
+      <div class="rc-tick">${icon("check", 22)}</div>
+      <div>
+        <div class="rc-kicker">WORKOUT COMPLETED</div>
+        <div class="rc-title">${escapeHtml(r.title)}</div>
+        <div class="rc-when">${escapeHtml(relDayLabel(r.date))}</div>
+      </div>
+    </div>
+    <div class="rc-stats">${stats}</div>
+    ${volumeRow}
+    ${r.logs.length ? `
+      <div class="ps-label">EXERCISES</div>
+      <div style="margin-bottom:4px;">
+        ${r.logs.map((l, i) => `<div class="rc-ex">
+          <span class="rc-n">${i + 1}</span>
+          <span class="rc-ex-name">${escapeHtml(l.exercise_name)}${r.isPR(l) ? `<span class="rc-pr">PR</span>` : ""}</span>
+          <span class="rc-ex-num">${escapeHtml(exerciseSummary(l))}</span>
+        </div>`).join("")}
+      </div>` : `<div class="ps-empty">No exercises were logged for this one.</div>`}
+    ${r.note ? `<p class="quote">${escapeHtml(r.note)}</p>` : ""}
+    ${mine ? `<div class="rc-actions">
+        <button type="button" class="btn-secondary" id="rcShare">Share</button>
+        ${PARTNER_EMAIL ? `<button type="button" class="btn-primary" id="rcTell">Tell ${escapeHtml(partnerName())}</button>` : ""}
+      </div>` : ""}`;
+
+  $("rcClose").onclick = closeRecap;
+  if ($("rcTell")) $("rcTell").onclick = () => { closeRecap(); openNoteComposer("congratulate"); };
+  if ($("rcShare")) $("rcShare").onclick = () => shareRecap(r);
+  $("recapScrim").classList.remove("hidden");
+  $("recapScrim").onclick = (ev) => { if (ev.target === $("recapScrim")) closeRecap(); };
+}
+
+function closeRecap() { $("recapScrim").classList.add("hidden"); }
+
+/* Sharing: an image, with the link carried in the share text.
+   A bare link dies where fitness actually gets shared, Stories and WhatsApp,
+   because nobody taps an unfurled card. A bare image brings nobody back. So we
+   send both: the picture people will actually look at, and the URL alongside it
+   for anywhere that accepts one. */
+const SHARE_URL = "https://m-m-fitness-tracker.vercel.app";
+
+function drawRecapCard(r) {
+  const W = 1080, H = 1350;
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const x = cv.getContext("2d");
+
+  const g = x.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#161b25");
+  g.addColorStop(1, "#0b0d11");
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+
+  x.fillStyle = "#a8ff00";
+  x.font = "800 34px Sora, sans-serif";
+  x.fillText("FIT TOGETHER", 80, 130);
+
+  x.fillStyle = "#8b94a3";
+  x.font = "700 30px Sora, sans-serif";
+  x.fillText("WORKOUT COMPLETED", 80, 260);
+
+  x.fillStyle = "#f4f6f8";
+  x.font = "800 84px Sora, sans-serif";
+  x.fillText(r.title.slice(0, 22), 80, 360);
+
+  const stats = [
+    [String(r.sets || 0), "SETS"],
+    [String(r.exercises || 0), "EXERCISES"],
+    [r.seconds ? fmtDuration(r.seconds) : `${r.minutes} min`, "TIME"],
+  ];
+  if (r.volume > 0) stats.push([`${Math.round(r.volume / 1000)}k lb`, "VOLUME"]);
+
+  let y = 520;
+  for (const [val, label] of stats) {
+    x.fillStyle = "#a8ff00";
+    x.font = "800 76px Sora, sans-serif";
+    x.fillText(val, 80, y);
+    x.fillStyle = "#8b94a3";
+    x.font = "700 28px Sora, sans-serif";
+    x.fillText(label, 80, y + 46);
+    y += 170;
+  }
+
+  x.fillStyle = "#8b94a3";
+  x.font = "500 30px Sora, sans-serif";
+  x.fillText(SHARE_URL.replace("https://", ""), 80, H - 90);
+
+  return new Promise((res) => cv.toBlob(res, "image/png"));
+}
+
+async function shareRecap(r) {
+  const text = `${r.title}: ${r.sets} sets in ${r.seconds ? fmtDuration(r.seconds) : r.minutes + " min"}.`;
+  try {
+    const blob = await drawRecapCard(r);
+    const file = new File([blob], "workout.png", { type: "image/png" });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], text: `${text} ${SHARE_URL}` });
+      return;
+    }
+    if (navigator.share) {
+      await navigator.share({ title: "Fit Together", text, url: SHARE_URL });
+      return;
+    }
+    await navigator.clipboard.writeText(`${text} ${SHARE_URL}`);
+    toast("Copied to your clipboard");
+  } catch (e) {
+    // AbortError just means they closed the share sheet, which is not a failure.
+    if (e?.name === "AbortError") return;
+    console.error("share failed", e);
+    toast("Could not share that");
+  }
 }
 
 /* ---------- Partner sheet ---------- */
@@ -5048,25 +5268,33 @@ function renderTodayTally() {
   $("tallyCount").textContent = n;
   $("tallyLabel").textContent = n === 1 ? "workout today" : "workouts today";
 
-  const logs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME && l.entry_date === todayStr());
-  const lifts = logs.filter((l) => !l.duration_min);
-  const timed = logs.filter((l) => l.duration_min);
-  const totalSets = lifts.reduce((s, l) => s + (l.sets || 1), 0);
-  const totalMin = timed.reduce((s, l) => s + l.duration_min, 0);
-  const names = [...new Set(logs.map((l) => l.exercise_name))];
+  /* A one-line tally told you a number you could not act on. These are the
+     sessions themselves, and each opens its own recap. */
+  const days = [...new Set(
+    ALL_ENTRIES.filter((e) => e.user_name === ME && (e.gym || e.rest_day)).map((e) => e.entry_date),
+  )].sort().reverse().slice(0, 5);
 
-  // A timed class has no sets, so summarise whichever kinds are present.
-  const parts = [];
-  if (totalSets) parts.push(`${totalSets} set${totalSets === 1 ? "" : "s"}`);
-  if (totalMin) parts.push(`${totalMin} min`);
-  const summary = parts.length
-    ? `${parts.join(" · ")} across ${names.length} ${names.length === 1 ? "activity" : "activities"}`
-    : "Logged as a workout day.";
+  $("tallyList").innerHTML = days.length
+    ? days.map((d) => {
+        const r = recapFor(MY_EMAIL, ME, d);
+        const bits = [];
+        if (r.sets) bits.push(`${r.sets} set${r.sets === 1 ? "" : "s"}`);
+        if (r.seconds) bits.push(fmtDuration(r.seconds));
+        else if (r.minutes) bits.push(`${r.minutes} min`);
+        return `<button type="button" class="wk-row" data-recap="${escapeHtml(d)}">
+          <span class="wk-ico">${icon("dumbbell", 17)}</span>
+          <span class="wk-txt">
+            <span class="wk-name">${escapeHtml(r.title)}</span>
+            <span class="wk-meta">${escapeHtml([relDayLabel(d)].concat(bits).join(" · "))}</span>
+          </span>
+          <span class="wk-go">${icon("chevronLeft", 17)}</span>
+        </button>`;
+      }).join("")
+    : `<div class="tally-sets">Nothing logged yet. Your sessions will show up here.</div>`;
 
-  $("tallyList").innerHTML = names.length
-    ? `<div class="tally-sets">${escapeHtml(summary)}</div>
-       <div class="tally-chips">${names.map((x) => `<span class="tally-chip">${escapeHtml(x)}</span>`).join("")}</div>`
-    : `<div class="tally-sets">Logged as a workout day.</div>`;
+  $("tallyList").querySelectorAll("[data-recap]").forEach((b) => {
+    b.onclick = () => openRecap(MY_EMAIL, ME, b.dataset.recap);
+  });
 
   renderProofChip();
 }
@@ -5752,11 +5980,47 @@ function wireManualExSearch() {
   });
 }
 
+/* Name a workout after what is actually in it. "Custom Workout" tells the user
+   nothing they did not already know, and reads like a database default. The
+   exercises already say what the session was, so ask them. */
+const MUSCLE_REGIONS = {
+  chest: "Chest", shoulders: "Shoulders", traps: "Back", lats: "Back", lowerback: "Back",
+  biceps: "Arms", triceps: "Arms", forearms: "Arms", abs: "Core", obliques: "Core",
+  glutes: "Legs", quads: "Legs", hamstrings: "Legs", calves: "Legs",
+};
+
+function deriveFocus(exercises) {
+  const names = (exercises || []).map((e) => (typeof e === "string" ? e : e?.name)).filter(Boolean);
+  if (!names.length) return "Workout";
+  /* One thing means the thing itself. A run is a run, not "Legs", and a session
+     that was only bench presses is best described as bench presses. */
+  if (names.length === 1) return names[0];
+
+  const weight = {};
+  for (const n of names) {
+    const rule = classifyMuscles(n);
+    if (!rule) continue;
+    // A primary muscle says what the session was about; a secondary one is
+    // along for the ride, so it counts for less.
+    for (const m of rule.primary || []) weight[MUSCLE_REGIONS[m]] = (weight[MUSCLE_REGIONS[m]] || 0) + 1;
+    for (const m of rule.secondary || []) weight[MUSCLE_REGIONS[m]] = (weight[MUSCLE_REGIONS[m]] || 0) + 0.25;
+  }
+
+  const ranked = Object.entries(weight).filter(([k]) => k).sort((a, b) => b[1] - a[1]);
+  if (!ranked.length) return "Workout";
+  if (ranked.length === 1) return ranked[0][0];
+
+  // Only call it a pairing when the second region genuinely earned its place.
+  const [first, second] = ranked;
+  if (second[1] >= first[1] * 0.5) return `${first[0]} & ${second[0]}`;
+  return first[0];
+}
+
 async function saveManualWorkout() {
   if (MANUAL_DRAFT.length === 0) return;
   await sb.from("ai_workouts").upsert({
     user_name: ME, email: MY_EMAIL, entry_date: todayStr(),
-    focus: "Custom Workout", exercises: MANUAL_DRAFT,
+    focus: deriveFocus(MANUAL_DRAFT), exercises: MANUAL_DRAFT,
   }, { onConflict: "email,entry_date" });
   WORKOUT_MODE = null;
   clearDraft();
