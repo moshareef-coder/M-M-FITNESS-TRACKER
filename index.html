@@ -3265,20 +3265,37 @@ function sharedWeekStreak() {
 
 
 
-/* One dial, two arcs. Yours on the outside, your partner's inside, so the
-   pair reads as a single object rather than two competing charts. */
+/* Two full rings, interlocked like a chain link rather than nested inside
+   each other — yours and your partner's cross in the middle, each stays a
+   complete circle at every fill level, and the shared streak sits in the
+   lens where they cross. Glossy stroke + glow filter, on-palette (no
+   borrowed hues) so it stays correct in both themes. */
 function dualRing(mine, theirs, streak, size = 138) {
-  const arc = (r, stroke, pct, color) => {
+  const ring = (cx, pct, colorVar, gradId) => {
+    const r = 32, stroke = 15;
     const circ = 2 * Math.PI * r;
-    return `<circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--panel-2)" stroke-width="${stroke}"/>
-      <circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
+    return `<circle cx="${cx}" cy="60" r="${r}" fill="none" stroke="var(--panel-2)" stroke-width="${stroke}"/>
+      <circle cx="${cx}" cy="60" r="${r}" fill="none" stroke="url(#${gradId})" stroke-width="${stroke}" stroke-linecap="round"
         stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - Math.max(0, Math.min(1, pct)))}"
-        transform="rotate(-90 60 60)"
+        transform="rotate(-90 ${cx} 60)" filter="url(#dringGlow)"
         style="transition:stroke-dashoffset .6s cubic-bezier(.22,1,.36,1)"/>`;
   };
+  const grad = (id, colorVar) => `<linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="color-mix(in srgb, ${colorVar} 60%, white)"/>
+      <stop offset="55%" stop-color="${colorVar}"/>
+      <stop offset="100%" stop-color="color-mix(in srgb, ${colorVar} 78%, black)"/>
+    </linearGradient>`;
   return `<svg class="dring" viewBox="0 0 120 120" width="${size}" height="${size}" aria-hidden="true">
-    ${arc(50, 12, mine, "var(--me)")}
-    ${theirs !== null ? arc(33, 12, theirs, "var(--partner)") : ""}
+    <defs>
+      ${grad("dringMe", "var(--me)")}
+      ${grad("dringPartner", "var(--partner)")}
+      <filter id="dringGlow" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="2.6" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    ${ring(42, mine, "var(--me)", "dringMe")}
+    ${theirs !== null ? ring(78, theirs, "var(--partner)", "dringPartner") : ""}
     <text x="60" y="${streak > 0 ? 58 : 62}" text-anchor="middle" class="dring-num">${streak}</text>
     <text x="60" y="72" text-anchor="middle" class="dring-lbl">${streak === 1 ? "WEEK" : "WEEKS"}</text>
   </svg>`;
@@ -4237,8 +4254,25 @@ function resumeSessionIfAny() {
     return false;
   }
   SESSION = saved;
-  // Time while the app was closed should not count toward the workout.
-  if (!saved.pausedAt) { SESSION.pausedAt = Date.now(); SESSION.elapsedMs = saved.elapsedMs || 0; }
+  /* Locking your phone between sets is ordinary, so the clock keeps running
+     across a short absence rather than resetting. A long one means they walked
+     away: keep every second they actually did, and leave it paused so they
+     resume on purpose.
+
+     The old code set elapsedMs to the last banked value, which silently threw
+     away everything since the last save, and if the tab was killed before any
+     save it threw away the whole workout. */
+  if (!saved.pausedAt) {
+    const away = Date.now() - (saved.bankedAt || saved.startedAt || Date.now());
+    if (away > RESUME_GRACE_MS) {
+      SESSION.elapsedMs = saved.elapsedMs || 0;
+      SESSION.pausedAt = Date.now();
+    } else {
+      SESSION.elapsedMs = (saved.elapsedMs || 0) + Math.max(0, away);
+      SESSION.startedAt = Date.now();
+      SESSION.bankedAt = Date.now();
+    }
+  }
   saveSessionToStorage();
   return false;
 }
@@ -4764,6 +4798,21 @@ function fmtElapsed(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
   const m = Math.floor(s / 60);
   return `${m}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/* Anything longer than this and we assume they walked away rather than locked
+   their phone between sets. */
+const RESUME_GRACE_MS = 30 * 60 * 1000;
+
+/* Move the running segment into the accumulated total and restart the segment.
+   Idempotent, so it is safe on every lifecycle event, and it is what stops the
+   clock losing time when the OS kills the tab mid-workout. */
+function bankSessionTime() {
+  if (!SESSION || SESSION.finished || SESSION.pausedAt) return;
+  SESSION.elapsedMs = sessionElapsed();
+  SESSION.startedAt = Date.now();
+  SESSION.bankedAt = Date.now();
+  saveSessionToStorage();
 }
 
 function sessionElapsed() {
@@ -6268,8 +6317,12 @@ if ("serviceWorker" in navigator) {
   });
 
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) checkForUpdate();
+    if (document.hidden) bankSessionTime();
+    else checkForUpdate();
   });
+  /* pagehide is the one that fires when iOS freezes or discards the tab, which
+     is exactly the case the timer used to lose. */
+  window.addEventListener("pagehide", bankSessionTime);
 }
 
 initOnboard();
