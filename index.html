@@ -1117,6 +1117,23 @@
   }
   .switch-chip:active { border-color: var(--accent); color: var(--accent); }
 
+  .grip {
+    flex-shrink: 0; width: 30px; height: 34px; padding: 0; cursor: grab;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none; color: var(--muted);
+    touch-action: none;            /* the drag must not scroll the page */
+    -webkit-user-select: none; user-select: none;
+  }
+  .grip:active { cursor: grabbing; color: var(--accent); }
+  .reorder-list { position: relative; }
+  .draggable { transition: transform 0.16s ease; }
+  .reordering .draggable { transition: none; }
+  .draggable.dragging {
+    position: relative; z-index: 5; opacity: 0.95;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+    border-color: var(--accent);
+  }
+
   .ex-order {
     width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
@@ -1736,7 +1753,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.03.3";
+const APP_VERSION = "2026.09.03.4";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -1760,6 +1777,7 @@ const ICON_PATHS = {
   swap: '<path d="M7 4v13M7 4 3 8M7 4l4 4M17 20V7m0 13 4-4m-4 4-4-4"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
   google: '<path fill="#4285F4" stroke="none" d="M21.6 12.23c0-.7-.06-1.38-.18-2.03H12v3.84h5.4a4.62 4.62 0 0 1-2 3.03v2.5h3.24c1.9-1.75 3-4.32 3-7.34Z"/><path fill="#34A853" stroke="none" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.5c-.9.6-2.05.96-3.4.96-2.6 0-4.8-1.76-5.6-4.12H3.05v2.58A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" stroke="none" d="M6.4 13.9a5.98 5.98 0 0 1 0-3.8V7.52H3.05a10 10 0 0 0 0 8.96l3.36-2.58Z"/><path fill="#EA4335" stroke="none" d="M12 6.06c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.96 9.96 0 0 0 12 2a10 10 0 0 0-8.95 5.52L6.4 10.1C7.2 7.74 9.4 6.06 12 6.06Z"/>',
+  grip: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
   chevronLeft: '<path d="M15 18l-6-6 6-6"/>',
   arrowUp: '<path d="M12 19V5M5 12l7-7 7 7"/>',
   arrowDown: '<path d="M12 5v14M19 12l-7 7-7-7"/>',
@@ -4846,6 +4864,75 @@ function renderWorkoutTab() {
 
 /* Sub-screens are easy to enter by accident. Each gets a way back that does
    not destroy anything already entered. */
+/* Touch-friendly drag reordering.
+   HTML5 drag-and-drop does not fire on touch, so this uses Pointer Events.
+   The dragged row follows the finger; when it passes a neighbour's midpoint the
+   two swap in the DOM immediately and the drag baseline resets, so the list
+   reorders under your finger rather than only on release. */
+function makeReorderable(container, onDrop) {
+  if (!container) return;
+  let drag = null;
+
+  const rowsIn = () => [...container.querySelectorAll(".draggable")];
+
+  const finish = () => {
+    if (!drag) return;
+    drag.row.classList.remove("dragging");
+    drag.row.style.transform = "";
+    container.classList.remove("reordering");
+    const order = rowsIn().map((r) => parseInt(r.dataset.idx, 10));
+    const moved = order.some((v, i) => v !== i);
+    drag = null;
+    if (moved) onDrop(order);
+  };
+
+  container.querySelectorAll("[data-grip]").forEach((grip) => {
+    grip.addEventListener("pointerdown", (e) => {
+      const row = grip.closest(".draggable");
+      if (!row) return;
+      e.preventDefault();
+      try { grip.setPointerCapture(e.pointerId); } catch { /* older browsers */ }
+      drag = { row, grip, startY: e.clientY, id: e.pointerId };
+      row.classList.add("dragging");
+      container.classList.add("reordering");
+    });
+
+    grip.addEventListener("pointermove", (e) => {
+      if (!drag || drag.id !== e.pointerId) return;
+      e.preventDefault();
+      drag.row.style.transform = `translateY(${e.clientY - drag.startY}px)`;
+
+      const rows = rowsIn();
+      const idx = rows.indexOf(drag.row);
+      const box = drag.row.getBoundingClientRect();
+      const mid = box.top + box.height / 2;
+
+      const prev = rows[idx - 1];
+      if (prev) {
+        const p = prev.getBoundingClientRect();
+        if (mid < p.top + p.height / 2) {
+          container.insertBefore(drag.row, prev);
+          drag.startY = e.clientY;
+          drag.row.style.transform = "";
+          return;
+        }
+      }
+      const next = rows[idx + 1];
+      if (next) {
+        const n = next.getBoundingClientRect();
+        if (mid > n.top + n.height / 2) {
+          container.insertBefore(next, drag.row);
+          drag.startY = e.clientY;
+          drag.row.style.transform = "";
+        }
+      }
+    });
+
+    grip.addEventListener("pointerup", finish);
+    grip.addEventListener("pointercancel", finish);
+  });
+}
+
 function backBar(label, onBack) {
   setTimeout(() => {
     const b = document.getElementById("screenBackBtn");
@@ -4957,19 +5044,16 @@ async function saveActivity() {
 }
 
 function renderManualBuildScreen() {
-  const rows = MANUAL_DRAFT.map((ex, i) => `
-    <div class="exercise-row">
+  const rows = `<div class="reorder-list" id="draftRows">${MANUAL_DRAFT.map((ex, i) => `
+    <div class="exercise-row draggable" data-idx="${i}">
+      <button type="button" class="grip" data-grip aria-label="Drag to reorder">${icon("grip", 16)}</button>
       <div class="ex-order">${i + 1}</div>
       <div class="ex-body">
         <div class="ex-name">${escapeHtml(ex.name)}</div>
         <div class="ex-target">${ex.sets} sets · ${ex.reps} reps</div>
       </div>
-      <div class="row-actions">
-        <button type="button" class="row-btn" data-move-draft="${i}" data-dir="-1" ${i === 0 ? "disabled" : ""} title="Move up">${icon("arrowUp", 13)}</button>
-        <button type="button" class="row-btn" data-move-draft="${i}" data-dir="1" ${i === MANUAL_DRAFT.length - 1 ? "disabled" : ""} title="Move down">${icon("arrowDown", 13)}</button>
-        <button type="button" class="row-btn" data-remove-draft="${i}" title="Remove">${icon("close", 13)}</button>
-      </div>
-    </div>`).join("");
+      <button type="button" class="row-btn" data-remove-draft="${i}" title="Remove">${icon("close", 13)}</button>
+    </div>`).join("")}</div>`;
 
   $("workoutContent").innerHTML = `
     ${backBar("Back", () => { saveDraft(); WORKOUT_MODE = "choose"; renderWorkoutTab(); })}
@@ -4987,15 +5071,10 @@ function renderManualBuildScreen() {
     { key: "reps", unit: "reps", step: 1, min: 1 },
   ], ADD_EX_STATE);
 
-  $("workoutContent").querySelectorAll("[data-move-draft]").forEach((btn) => {
-    btn.onclick = () => {
-      const from = parseInt(btn.dataset.moveDraft, 10);
-      const to = from + parseInt(btn.dataset.dir, 10);
-      if (to < 0 || to >= MANUAL_DRAFT.length) return;
-      [MANUAL_DRAFT[from], MANUAL_DRAFT[to]] = [MANUAL_DRAFT[to], MANUAL_DRAFT[from]];
-      saveDraft();
-      renderWorkoutTab();
-    };
+  makeReorderable($("draftRows"), (order) => {
+    MANUAL_DRAFT = order.map((i) => MANUAL_DRAFT[i]);
+    saveDraft();
+    renderWorkoutTab();
   });
 
   $("workoutContent").querySelectorAll("[data-remove-draft]").forEach((btn) => {
@@ -5060,19 +5139,15 @@ function renderPlanPreview() {
   const rows = TODAY_WORKOUT.exercises.map((ex, i) => {
     const isDone = loggedNow.has(ex.name.toLowerCase());
     const doneMark = isDone ? icon("check") : icon("dumbbell");
-    return `<div class="exercise-row ${isDone ? "ex-done" : ""}">
+    return `<div class="exercise-row ${isDone ? "ex-done" : ""} ${started ? "" : "draggable"}" data-idx="${i}">
+      ${started ? "" : `<button type="button" class="grip" data-grip aria-label="Drag to reorder">${icon("grip", 16)}</button>`}
       <div class="ex-icon">${doneMark}</div>
       <div class="ex-body">
         <div class="ex-name">${escapeHtml(ex.name)}</div>
         <div class="ex-target">${ex.sets} sets · ${ex.reps} reps</div>
         ${ex.note ? `<div class="ex-note">${escapeHtml(ex.note)}</div>` : ""}
       </div>
-      ${started ? "" : `
-        <div class="row-actions">
-          <button type="button" class="row-btn" data-move-plan="${i}" data-dir="-1" ${i === 0 ? "disabled" : ""} title="Move up">${icon("arrowUp", 13)}</button>
-          <button type="button" class="row-btn" data-move-plan="${i}" data-dir="1" ${i === TODAY_WORKOUT.exercises.length - 1 ? "disabled" : ""} title="Move down">${icon("arrowDown", 13)}</button>
-          <button type="button" class="row-btn" data-remove-plan="${i}" title="Remove">${icon("close", 13)}</button>
-        </div>`}
+      ${started ? "" : `<button type="button" class="row-btn" data-remove-plan="${i}" title="Remove">${icon("close", 13)}</button>`}
     </div>`;
   }).join("");
 
@@ -5082,7 +5157,7 @@ function renderPlanPreview() {
       <span class="workout-progress-count">${doneCount}/${total}</span>
     </div>
     <div class="workout-progress-track"><div class="workout-progress-fill" style="width:${total ? (doneCount / total) * 100 : 0}%"></div></div>
-    ${rows}
+    <div class="reorder-list" id="planRows">${rows}</div>
     ${finished ? "" : PLAN_EDIT_ADDING ? `
       <div class="add-ex-form">
         <input type="text" id="planAddExName" placeholder="Exercise name" />
@@ -5095,16 +5170,10 @@ function renderPlanPreview() {
       : `<button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume Workout" : "Start Workout"}</button>
          ${started ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`}`;
 
-  $("workoutContent").querySelectorAll("[data-move-plan]").forEach((btn) => {
-    btn.onclick = async () => {
-      const from = parseInt(btn.dataset.movePlan, 10);
-      const to = from + parseInt(btn.dataset.dir, 10);
-      const list = TODAY_WORKOUT.exercises;
-      if (to < 0 || to >= list.length) return;
-      [list[from], list[to]] = [list[to], list[from]];
-      await sb.from("ai_workouts").update({ exercises: list }).eq("id", TODAY_WORKOUT.id);
-      renderPlanPreview();
-    };
+  makeReorderable($("planRows"), async (order) => {
+    TODAY_WORKOUT.exercises = order.map((i) => TODAY_WORKOUT.exercises[i]);
+    await sb.from("ai_workouts").update({ exercises: TODAY_WORKOUT.exercises }).eq("id", TODAY_WORKOUT.id);
+    renderPlanPreview();
   });
 
   $("workoutContent").querySelectorAll("[data-remove-plan]").forEach((btn) => {
