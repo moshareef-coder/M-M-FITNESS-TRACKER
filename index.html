@@ -1117,6 +1117,13 @@
   }
   .switch-chip:active { border-color: var(--accent); color: var(--accent); }
 
+  .ex-order {
+    width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--muted); font-size: 12.5px; font-weight: 800;
+  }
+
   .row-actions { display: flex; gap: 4px; flex-shrink: 0; }
   .row-btn {
     width: 30px; height: 30px; border-radius: 9px; cursor: pointer;
@@ -1729,7 +1736,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.03.2";
+const APP_VERSION = "2026.09.03.3";
 const THEME_KEY = "ft_theme";
 let ME = "";
 let MY_EMAIL = "";
@@ -4952,12 +4959,16 @@ async function saveActivity() {
 function renderManualBuildScreen() {
   const rows = MANUAL_DRAFT.map((ex, i) => `
     <div class="exercise-row">
-      <div class="ex-icon">${icon("dumbbell")}</div>
+      <div class="ex-order">${i + 1}</div>
       <div class="ex-body">
         <div class="ex-name">${escapeHtml(ex.name)}</div>
         <div class="ex-target">${ex.sets} sets · ${ex.reps} reps</div>
       </div>
-      <button type="button" class="stepper-btn" data-remove-draft="${i}" title="Remove">${icon("close", 14)}</button>
+      <div class="row-actions">
+        <button type="button" class="row-btn" data-move-draft="${i}" data-dir="-1" ${i === 0 ? "disabled" : ""} title="Move up">${icon("arrowUp", 13)}</button>
+        <button type="button" class="row-btn" data-move-draft="${i}" data-dir="1" ${i === MANUAL_DRAFT.length - 1 ? "disabled" : ""} title="Move down">${icon("arrowDown", 13)}</button>
+        <button type="button" class="row-btn" data-remove-draft="${i}" title="Remove">${icon("close", 13)}</button>
+      </div>
     </div>`).join("");
 
   $("workoutContent").innerHTML = `
@@ -4975,6 +4986,17 @@ function renderManualBuildScreen() {
     { key: "sets", unit: "sets", step: 1, min: 1 },
     { key: "reps", unit: "reps", step: 1, min: 1 },
   ], ADD_EX_STATE);
+
+  $("workoutContent").querySelectorAll("[data-move-draft]").forEach((btn) => {
+    btn.onclick = () => {
+      const from = parseInt(btn.dataset.moveDraft, 10);
+      const to = from + parseInt(btn.dataset.dir, 10);
+      if (to < 0 || to >= MANUAL_DRAFT.length) return;
+      [MANUAL_DRAFT[from], MANUAL_DRAFT[to]] = [MANUAL_DRAFT[to], MANUAL_DRAFT[from]];
+      saveDraft();
+      renderWorkoutTab();
+    };
+  });
 
   $("workoutContent").querySelectorAll("[data-remove-draft]").forEach((btn) => {
     btn.onclick = () => {
