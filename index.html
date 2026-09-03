@@ -1823,7 +1823,7 @@ let FIT_MATH = {};
   FIT_MATH = { ...tdee, ...cal, ...strength };
 })();
 
-const APP_VERSION = "2026.09.03.5";
+const APP_VERSION = "2026.09.03.6";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -2577,7 +2577,7 @@ function showApp() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim"].forEach((id) => $(id)?.classList.add("hidden"));
+  ["popScrim", "daySheetScrim", "partnerSheetScrim"].forEach((id) => $(id)?.classList.add("hidden"));
   const sess = $("sessionCard");
   if (sess && !sess.classList.contains("hidden")) {
     // Bank the time rather than losing it, then stand the session down.
@@ -3392,7 +3392,7 @@ function recentActivity(email, name, limit = 4) {
     const bits = [relDayLabel(d)];
     if (secs > 0) bits.push(fmtDuration(secs));
     out.push({
-      icon: "check",
+      icon: "dumbbell",
       title: focus ? `Completed ${focus}` : "Trained",
       when: bits.join(" \u00b7 "),
     });
@@ -3400,7 +3400,7 @@ function recentActivity(email, name, limit = 4) {
     const vol = dayVolumeLb(email, d);
     if (vol >= 5000) {
       out.push({
-        icon: "trend",
+        icon: "trending",
         title: `Lifted ${Math.round(vol / 1000)}k lb`,
         when: relDayLabel(d),
       });
@@ -4130,6 +4130,13 @@ function relativeDay(dateStr) {
 
 function renderHome() {
   renderHero();
+  const openBtn = $("openPartnerBtn");
+  if (openBtn) {
+    openBtn.onclick = openPartnerSheet;
+    openBtn.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPartnerSheet(); }
+    };
+  }
   renderPartnerNotice();
   renderWeekStrips();
   renderCurrentPRs();

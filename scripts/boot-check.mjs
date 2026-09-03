@@ -169,7 +169,7 @@ function checkClobberedIds() {
 /* Nothing that covers the whole screen may start visible, and only one thing
    may claim the screen at a time. A stray overlay makes the page look dead. */
 {
-  const overlays = ["popScrim", "daySheetScrim", "sessionCard"];
+  const overlays = ["popScrim", "daySheetScrim", "partnerSheetScrim", "sessionCard"];
   const bad = overlays.filter((id) => {
     const tag = new RegExp(`<div[^>]*id="${id}"[^>]*>`).exec(html)?.[0] || "";
     return !tag.includes("hidden");
