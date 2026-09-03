@@ -441,9 +441,27 @@ $("createBtn").onclick = async () => {
 $("inviteBtn").onclick = async () => {
   const email = $("inviteEmail").value.trim().toLowerCase();
   if (!email) { toast("Enter an email"); return; }
-  if (MEMBERS.length + 1 >= GROUP.seat_limit) { toast("Your group is full"); return; }
-  const { error } = await sb.from("group_members").insert({ group_id: GROUP.id, email, role: "client" });
-  if (error) { toast(error.code === "23505" ? "Already in the group" : "Could not add them"); return; }
+  /* The database allows seat_limit members including the coach, so the guard is
+     `>=`, not `+ 1 >=`, which was quietly costing every group one seat. */
+  if (MEMBERS.length >= GROUP.seat_limit) { toast("Your group is full"); return; }
+  let { error } = await sb.from("group_members").insert({ group_id: GROUP.id, email, role: "client" });
+  if (error?.code === "23505") {
+    /* Removing someone sets left_at and keeps the row, because of the unique
+       index on (group_id, email). Re-adding a former client therefore collides,
+       and the old code told the coach they were "already in the group" when they
+       were not, with no way to get them back. Drop the dead row and insert again
+       rather than reviving it, so the seat limit trigger still runs. */
+    const { data: existing } = await sb.from("group_members")
+      .select("id, left_at").eq("group_id", GROUP.id).eq("email", email).maybeSingle();
+    if (!existing?.left_at) { toast("Already in the group"); return; }
+    const dead = await sb.from("group_members").delete().eq("id", existing.id);
+    if (dead.error) { toast("Could not add them"); console.error(dead.error); return; }
+    ({ error } = await sb.from("group_members").insert({ group_id: GROUP.id, email, role: "client" }));
+  }
+  if (error) {
+    toast(error.code === "23514" ? "Your group is full" : "Could not add them");
+    console.error(error); return;
+  }
   $("inviteEmail").value = "";
   toast("Added. They will see you once they sign in.");
   await load();
