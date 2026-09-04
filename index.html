@@ -1975,6 +1975,9 @@
     <div class="pop" id="popCard"></div>
   </div>
 
+  <div class="sheet-scrim hidden" id="allWorkoutsScrim">
+    <div class="partner-sheet" id="allWorkoutsSheet"></div>
+  </div>
   <div class="sheet-scrim hidden" id="recapScrim">
     <div class="partner-sheet" id="recapSheet"></div>
   </div>
@@ -2038,7 +2041,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.03.17";
+const APP_VERSION = "2026.09.03.18";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -2776,7 +2779,8 @@ function showApp() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim"].forEach((id) => $(id)?.classList.add("hidden"));
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim"]
+    .forEach((id) => $(id)?.classList.add("hidden"));
   const sess = $("sessionCard");
   if (sess && !sess.classList.contains("hidden")) {
     // Bank the time rather than losing it, then stand the session down.
@@ -5605,45 +5609,48 @@ async function startFreshWorkout() {
    properly rather than "Today / Yesterday": a list you scan for one particular
    session needs dates, and relative labels stop meaning anything past the
    second row. */
-let PREV_ALL = false;
+/* The three most recent days, each opening its own recap. Three is the whole
+   list here on purpose: this is a glance, and anything longer belongs in the
+   full list behind View All. */
+function prevWorkoutDays() {
+  return [...new Set(
+    ALL_ENTRIES.filter((e) => e.user_name === ME && e.gym).map((e) => e.entry_date),
+  )].sort().reverse();
+}
 
-/* Days you trained, most recent first, each opening its own recap. Same card
-   shape as Recent Workouts, laid out left to right, and dated properly rather
-   than "Today / Yesterday": relative labels stop meaning anything past the
-   second row when you are scanning for one particular session. */
+function datedLabel(d) {
+  return new Date(d + "T00:00:00")
+    .toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+function workoutMeta(r) {
+  const bits = [];
+  if (r.sets) bits.push(`${r.sets} set${r.sets === 1 ? "" : "s"}`);
+  if (r.seconds) bits.push(fmtDuration(r.seconds));
+  else if (r.minutes) bits.push(`${r.minutes} min`);
+  return bits.join(" \u00b7 ") || "Logged";
+}
+
 function renderPreviousWorkouts() {
   const card = $("prevWorkoutsCard");
   const list = $("prevWorkoutsList");
   const head = $("prevWorkoutsAll");
   if (!card || !list) return;
 
-  const days = [...new Set(
-    ALL_ENTRIES.filter((e) => e.user_name === ME && e.gym).map((e) => e.entry_date),
-  )].sort().reverse();
-
+  const days = prevWorkoutDays();
   card.classList.toggle("hidden", days.length === 0);
   if (head) {
     head.classList.toggle("hidden", days.length <= 3);
-    head.textContent = PREV_ALL ? "Show less" : "View All";
-    head.onclick = () => { PREV_ALL = !PREV_ALL; renderPreviousWorkouts(); };
+    head.onclick = openAllWorkouts;
   }
   if (!days.length) { list.innerHTML = ""; return; }
 
-  const shown = PREV_ALL ? days.slice(0, 30) : days.slice(0, 10);
-
-  list.className = PREV_ALL ? "recent-stack" : "recent-strip";
-  list.innerHTML = shown.map((d) => {
+  list.innerHTML = days.slice(0, 3).map((d) => {
     const r = recapFor(MY_EMAIL, ME, d);
-    const bits = [];
-    if (r.sets) bits.push(`${r.sets} set${r.sets === 1 ? "" : "s"}`);
-    if (r.seconds) bits.push(fmtDuration(r.seconds));
-    else if (r.minutes) bits.push(`${r.minutes} min`);
-    const dated = new Date(d + "T00:00:00")
-      .toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
     return `<div class="recent-chip" data-prev="${escapeHtml(d)}" role="button" tabindex="0">
       <div class="recent-name">${escapeHtml(r.title)}</div>
-      <div class="recent-when">${escapeHtml(dated)}</div>
-      <div class="recent-when">${escapeHtml(bits.join(" \u00b7 ") || "Logged")}</div>
+      <div class="recent-when">${escapeHtml(datedLabel(d))}</div>
+      <div class="recent-when">${escapeHtml(workoutMeta(r))}</div>
       <div class="recent-foot"><span class="recent-mark">${icon("check", 15)}</span></div>
     </div>`;
   }).join("");
@@ -5652,6 +5659,43 @@ function renderPreviousWorkouts() {
     b.onclick = () => openRecap(MY_EMAIL, ME, b.dataset.prev);
   });
 }
+
+/* Every workout you have logged, as a list. Opens over the tab rather than
+   pushing the page down, so closing it puts you back exactly where you were. */
+function openAllWorkouts() {
+  const days = prevWorkoutDays();
+
+  $("allWorkoutsSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="awClose" aria-label="Back">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">All workouts</div>
+      <div class="spacer"></div>
+    </div>
+    <p class="muted-note" style="margin:-6px 0 14px;">${days.length} logged.</p>
+    ${days.map((d) => {
+      const r = recapFor(MY_EMAIL, ME, d);
+      return `<button type="button" class="wk-row" data-all="${escapeHtml(d)}">
+        <span class="wk-ico">${icon("dumbbell", 17)}</span>
+        <span class="wk-txt">
+          <span class="wk-name">${escapeHtml(r.title)}</span>
+          <span class="wk-meta">${escapeHtml(datedLabel(d))} \u00b7 ${escapeHtml(workoutMeta(r))}</span>
+        </span>
+        <span class="wk-go">${icon("chevronLeft", 17)}</span>
+      </button>`;
+    }).join("")}`;
+
+  $("awClose").onclick = closeAllWorkouts;
+  $("allWorkoutsSheet").querySelectorAll("[data-all]").forEach((b) => {
+    b.onclick = () => { closeAllWorkouts(); openRecap(MY_EMAIL, ME, b.dataset.all); };
+  });
+  $("allWorkoutsScrim").classList.remove("hidden");
+  $("allWorkoutsScrim").onclick = (ev) => {
+    if (ev.target === $("allWorkoutsScrim")) closeAllWorkouts();
+  };
+}
+
+function closeAllWorkouts() { $("allWorkoutsScrim").classList.add("hidden"); }
 
 function renderWorkoutTab() {
   renderFab();
