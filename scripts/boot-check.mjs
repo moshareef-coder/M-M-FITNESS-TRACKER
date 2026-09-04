@@ -11,7 +11,8 @@ const html = readFileSync(join(root, "index.html"), "utf8");
 const src = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 
 // Fake DOM built from the real markup's ids, so a missing element shows up.
-const ids = [...html.matchAll(/id="([a-zA-Z0-9_]+)"/g)].map((m) => m[1]);
+// Hyphens are valid in ids and the app uses them (page-profile, setRow-admin).
+const ids = [...html.matchAll(/id="([a-zA-Z0-9_-]+)"/g)].map((m) => m[1]);
 const nodes = {};
 const MISSES = new Set();
 /* Ids created at runtime via createElement, so absence from markup is expected.
