@@ -13,10 +13,10 @@
 const P = 1, S = 0.5;
 
 // Plain gym language, not Latin: this is what shows on the piece list and the figure
-// callouts. Two pieces sharing a label (the four forearm muscles, both hamstrings) is
-// fine -- the "where" line underneath tells them apart, same as segments in an anatomy
-// chart's legend. "try" is one exercise that targets the piece, shown when it has not
-// been hit in the period.
+// callouts. Every label in a group is distinct (Outer Quad, Inner Quad, Front Quad)
+// because four rows all reading "Forearm" is no more useful than four reading "Flexor
+// Carpi Ulnaris". The "where" line underneath places each one on the body. "try" is one
+// exercise that targets the piece, shown when it has not been hit in the period.
 export const MUSCLE_PIECES = {
   deltoids:             { label: "Shoulder",       group: "shoulders",  where: "front and side of the shoulder",     heads: ["anteriorDeltoid", "lateralDeltoid"], try: "Lateral raise" },
   posteriorDeltoid:     { label: "Rear Shoulder",  group: "shoulders",  where: "back of the shoulder",               try: "Face pull" },
@@ -24,36 +24,36 @@ export const MUSCLE_PIECES = {
   trapezius:            { label: "Upper Back",     group: "traps",      where: "neck down to mid back",              heads: ["upperTraps", "midTraps", "lowerTraps"], try: "Shrug" },
   sternocleidomastoid:  { label: "Neck",           group: "traps",      where: "front of the neck",                  try: "Neck flexion" },
   latissimusDorsi:      { label: "Middle Back",    group: "lats",       where: "the wide back muscle",               try: "Lat pulldown" },
-  teresMajor:           { label: "Middle Back",    group: "lats",       where: "just behind the armpit",             try: "Row" },
+  teresMajor:           { label: "Back of Armpit", group: "lats",       where: "just behind the armpit",             try: "Row" },
   erectorSpinae:        { label: "Lower Back",     group: "lowerback",  where: "either side of the spine",           try: "Back extension" },
   biceps:               { label: "Bicep",          group: "biceps",     where: "front of the upper arm",             heads: ["bicepsLong", "bicepsShort"], try: "Curl" },
-  brachialis:           { label: "Bicep",          group: "biceps",     where: "under the biceps",                   try: "Hammer curl" },
+  brachialis:           { label: "Deep Bicep",     group: "biceps",     where: "under the biceps",                   try: "Hammer curl" },
   tricepsBrachii:       { label: "Tricep",         group: "triceps",    where: "back of the upper arm",              heads: ["tricepsLong", "tricepsLateral", "tricepsMedial"], try: "Pushdown" },
-  brachioradialis:      { label: "Forearm",        group: "forearms",   where: "thumb side of the forearm",          try: "Hammer curl" },
-  flexorCarpiRadialis:  { label: "Forearm",        group: "forearms",   where: "inner forearm",                      try: "Wrist curl" },
-  flexorCarpiUlnaris:   { label: "Forearm",        group: "forearms",   where: "inner forearm, little finger side",  try: "Wrist curl" },
-  extensorCarpiUlnaris: { label: "Forearm",        group: "forearms",   where: "outer forearm",                      try: "Reverse wrist curl" },
+  brachioradialis:      { label: "Outer Forearm",  group: "forearms",   where: "thumb side of the forearm",          try: "Hammer curl" },
+  flexorCarpiRadialis:  { label: "Inner Forearm",  group: "forearms",   where: "inner forearm",                      try: "Wrist curl" },
+  flexorCarpiUlnaris:   { label: "Lower Forearm",  group: "forearms",   where: "inner forearm, little finger side",  try: "Wrist curl" },
+  extensorCarpiUlnaris: { label: "Back Forearm",   group: "forearms",   where: "outer forearm",                      try: "Reverse wrist curl" },
   rectusAbdominis:      { label: "Abs",            group: "abs",        where: "the six pack",                       heads: ["upperAbs", "lowerAbs"], try: "Crunch" },
   externalObliques:     { label: "Obliques",       group: "obliques",   where: "sides of the waist",                 try: "Russian twist" },
   gluteusMaximus:       { label: "Glutes",         group: "glutes",     where: "the main glute",                     try: "Hip thrust" },
   gluteusMedius:        { label: "Hip",            group: "glutes",     where: "upper outer hip",                    try: "Hip abduction" },
-  rectusFemoris:        { label: "Quad",           group: "quads",      where: "centre of the thigh",                try: "Leg extension" },
-  vastusLateralis:      { label: "Quad",           group: "quads",      where: "outer thigh",                        try: "Squat" },
-  vastusMedialis:       { label: "Quad",           group: "quads",      where: "inner thigh, above the knee",        try: "Leg extension" },
+  rectusFemoris:        { label: "Front Quad",     group: "quads",      where: "centre of the thigh",                try: "Leg extension" },
+  vastusLateralis:      { label: "Outer Quad",     group: "quads",      where: "outer thigh",                        try: "Squat" },
+  vastusMedialis:       { label: "Inner Quad",     group: "quads",      where: "inner thigh, above the knee",        try: "Leg extension" },
   sartorius:            { label: "Thigh",          group: "quads",      where: "runs diagonally across the thigh",   try: "Lunge" },
   adductorMagnus:       { label: "Inner Thigh",    group: "quads",      where: "inner thigh",                        try: "Squat" },
-  bicepsFemoris:        { label: "Hamstring",      group: "hamstrings", where: "outer hamstring",                    try: "Leg curl" },
-  semitendinosus:       { label: "Hamstring",      group: "hamstrings", where: "inner hamstring",                    try: "Romanian deadlift" },
+  bicepsFemoris:        { label: "Outer Hamstring", group: "hamstrings", where: "outer hamstring",                   try: "Leg curl" },
+  semitendinosus:       { label: "Inner Hamstring", group: "hamstrings", where: "inner hamstring",                   try: "Romanian deadlift" },
   gastrocnemius:        { label: "Calf",           group: "calves",     where: "the visible calf",                   try: "Standing calf raise" },
-  soleus:               { label: "Calf",           group: "calves",     where: "deep under the calf",                try: "Seated calf raise" },
+  soleus:               { label: "Deep Calf",      group: "calves",     where: "deep under the calf",                try: "Seated calf raise" },
   tibialisAnterior:     { label: "Shin",           group: "calves",     where: "front of the shin",                  try: "Tibialis raise" },
 };
 
 export const MUSCLE_HEADS = {
   anteriorDeltoid: { of: "deltoids",        label: "Front" },
   lateralDeltoid:  { of: "deltoids",        label: "Side" },
-  pecClavicular:   { of: "pectoralisMajor", label: "Upper chest" },
-  pecSternal:      { of: "pectoralisMajor", label: "Mid and lower chest" },
+  pecClavicular:   { of: "pectoralisMajor", label: "Upper" },
+  pecSternal:      { of: "pectoralisMajor", label: "Mid and lower" },
   upperTraps:      { of: "trapezius",       label: "Upper" },
   midTraps:        { of: "trapezius",       label: "Middle" },
   lowerTraps:      { of: "trapezius",       label: "Lower" },
@@ -62,8 +62,8 @@ export const MUSCLE_HEADS = {
   tricepsLong:     { of: "tricepsBrachii",  label: "Back" },
   tricepsLateral:  { of: "tricepsBrachii",  label: "Outer" },
   tricepsMedial:   { of: "tricepsBrachii",  label: "Inner" },
-  upperAbs:        { of: "rectusAbdominis", label: "Upper abs" },
-  lowerAbs:        { of: "rectusAbdominis", label: "Lower abs" },
+  upperAbs:        { of: "rectusAbdominis", label: "Upper" },
+  lowerAbs:        { of: "rectusAbdominis", label: "Lower" },
 };
 
 export const PIECES_BY_GROUP = {};

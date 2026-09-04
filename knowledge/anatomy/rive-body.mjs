@@ -58,6 +58,7 @@ const PALETTE_VM = "palette";
 // many times it. The .riv is vector, so 4x stays crisp; beyond that a single muscle
 // fills the canvas and loses its neighbours for context.
 const MAX_ZOOM = 4;
+const MAX_RECT_PX = 2400;
 const FOCUS_MS = 520;
 
 /**
@@ -87,11 +88,11 @@ export function createBodyHeatmap({ canvas, artboardName, palette, intensities, 
     autoBind: true,
     layout: new window.rive.Layout({ fit: window.rive.Fit.Contain, alignment: window.rive.Alignment.Center }),
     onLoad: () => {
-      r.resizeDrawingSurfaceToCanvas();
+      if (canvasSize().W) r.resizeDrawingSurfaceToCanvas();
       applyIntensities(r, intensities || {});
       applyPalette(r, palette);
       loaded = true;
-      frame = frameFor(focusBox);
+      frame = frameFor(focusBox) || frame;
       applyFrame(frame);
       onLoad?.(r);
     },
@@ -99,25 +100,45 @@ export function createBodyHeatmap({ canvas, artboardName, palette, intensities, 
   });
 
   // --- render frame (zoom) -------------------------------------------------------
-  // Rive's Layout can draw the artboard into any rectangle of the drawing buffer, even
-  // one much larger than the canvas; the canvas simply clips it. That is our zoom: a
+  // Rive's Layout can draw the artboard into any rectangle of the canvas, even one much
+  // larger than the canvas itself; the canvas simply clips it. That is our zoom: a
   // contain-fit into a frame scaled around the muscle we want centred. Frames are kept
   // as fractions of the canvas so a resize mid-tween only needs a re-multiply.
+  //
+  // Layout bounds go to the renderer in drawing-buffer pixels (canvas.width/height), so
+  // applyFrame scales by those; CSS pixels would draw the figure at 1/DPR size, tiny on a
+  // phone. Frames themselves are fractions, which come out the same either way since both
+  // axes carry the same device pixel ratio.
   let loaded = false;
   let focusBox = null;        // normalized artboard box we are zoomed on, or null
   let frame = null;           // current frame, fractions of canvas {x0, y0, x1, y1}
   let tween = null;
-  let lastTap = null;         // last pointerdown in drawing-buffer pixels
+  let lastTap = null;         // last pointerdown in CSS pixels inside the canvas
 
   function artboardAspect() {
     const b = r.bounds;
     return b ? (b.maxX - b.minX) / (b.maxY - b.minY) : 178 / 490;
   }
 
+  // Near zero while the tab is hidden or a figure is folded away. Every Rive instance on
+  // the page shares one WebGL2 context, and building a degenerate drawing surface (a
+  // canvas caught mid-fold at one or two pixels wide) breaks that context for every
+  // figure, not just this one -- the other canvas goes blank and stays blank. So anything
+  // smaller than this is treated as "no size yet" and skipped.
+  const MIN_PX = 8;
+  function canvasSize() {
+    const W = canvas.clientWidth || 0, H = canvas.clientHeight || 0;
+    return W < MIN_PX || H < MIN_PX ? { W: 0, H: 0 } : { W, H };
+  }
+
+  // Null when the canvas has no usable size yet. Callers keep whatever frame they have
+  // rather than treating that as a target, otherwise zooming back out while the column is
+  // mid-relayout resolves to "stay where you are" and the figure never unzooms.
   function frameFor(box) {
-    const W = canvas.width || 1, H = canvas.height || 1;
+    const { W, H } = canvasSize();
+    if (!W || !H) return null;
     const a = artboardAspect();
-    const base = Math.min(H, W / a);          // contain-fit height in px
+    const base = Math.min(H, W / a);          // contain-fit height in CSS px
     let fh = base;
     let cx = 0.5, cy = 0.5;
     if (box) {
@@ -126,6 +147,12 @@ export function createBodyHeatmap({ canvas, artboardName, palette, intensities, 
       // whichever hits first, then clamp to the allowed zoom range.
       fh = Math.min((0.6 * H) / bh, (0.7 * W) / (bw * a));
       fh = Math.max(base, Math.min(base * MAX_ZOOM, fh));
+      // Also cap the rectangle in device pixels. A phone at DPR 3 turns a modest looking
+      // zoom into a render rect thousands of pixels tall, and GPUs differ in how large a
+      // rect they will still draw; staying under this keeps every device on the same path.
+      const dpr = canvas.width / (W || 1) || 1;
+      fh = Math.min(fh, MAX_RECT_PX / dpr);
+      fh = Math.max(base, fh);
       cx = (box[0] + box[2]) / 2;
       cy = (box[1] + box[3]) / 2;
     }
@@ -137,6 +164,7 @@ export function createBodyHeatmap({ canvas, artboardName, palette, intensities, 
   function applyFrame(f) {
     if (!loaded || !f) return;
     const W = canvas.width, H = canvas.height;
+    if (!W || !H) return;
     r.layout = r.layout.copyWith({
       fit: window.rive.Fit.Contain,
       alignment: window.rive.Alignment.Center,
@@ -150,7 +178,8 @@ export function createBodyHeatmap({ canvas, artboardName, palette, intensities, 
     if (!loaded) return;
     if (tween) { cancelAnimationFrame(tween); tween = null; }
     const to = frameFor(focusBox);
-    const from = frame || frameFor(null);
+    if (!to) return;            // canvas not laid out yet; the resize observer follows up
+    const from = frame || to;
     const reduce = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!animate || reduce) { frame = to; applyFrame(frame); return; }
     const t0 = performance.now();
@@ -161,8 +190,10 @@ export function createBodyHeatmap({ canvas, artboardName, palette, intensities, 
         x0: from.x0 + (to.x0 - from.x0) * e, y0: from.y0 + (to.y0 - from.y0) * e,
         x1: from.x1 + (to.x1 - from.x1) * e, y1: from.y1 + (to.y1 - from.y1) * e,
       };
+      if (t < 1) { applyFrame(frame); tween = requestAnimationFrame(step); return; }
+      tween = null;
+      frame = frameFor(focusBox) || frame;   // the canvas may have resized under the tween
       applyFrame(frame);
-      tween = t < 1 ? requestAnimationFrame(step) : null;
     };
     tween = requestAnimationFrame(step);
   }
@@ -170,23 +201,22 @@ export function createBodyHeatmap({ canvas, artboardName, palette, intensities, 
   // Artboard fraction -> CSS pixel inside the canvas, for positioning overlays.
   function project(ax, ay) {
     const f = frame || frameFor(focusBox);
-    const cw = canvas.clientWidth || 1, ch = canvas.clientHeight || 1;
-    return { x: (f.x0 + ax * (f.x1 - f.x0)) * cw, y: (f.y0 + ay * (f.y1 - f.y0)) * ch };
+    const { W, H } = canvasSize();
+    if (!f) return { x: 0, y: 0 };
+    return { x: (f.x0 + ax * (f.x1 - f.x0)) * W, y: (f.y0 + ay * (f.y1 - f.y0)) * H };
   }
 
-  // Drawing-buffer pixel -> artboard fraction (may fall outside 0..1 when zoomed).
+  // CSS pixel inside the canvas -> artboard fraction (outside 0..1 when zoomed in).
   function unproject(px, py) {
     const f = frame || frameFor(focusBox);
-    const W = canvas.width || 1, H = canvas.height || 1;
+    const { W, H } = canvasSize();
+    if (!f || !W || !H) return null;
     return { x: (px / W - f.x0) / (f.x1 - f.x0), y: (py / H - f.y0) / (f.y1 - f.y0) };
   }
 
   canvas.addEventListener("pointerdown", (e) => {
     const rect = canvas.getBoundingClientRect();
-    lastTap = {
-      x: ((e.clientX - rect.left) / (rect.width || 1)) * canvas.width,
-      y: ((e.clientY - rect.top) / (rect.height || 1)) * canvas.height,
-    };
+    lastTap = { x: e.clientX - rect.left, y: e.clientY - rect.top };
   });
 
   if (onMuscleClick) {
@@ -200,14 +230,22 @@ export function createBodyHeatmap({ canvas, artboardName, palette, intensities, 
   // rotate. Rive only sizes its drawing surface on load, so without this the figure
   // renders blurry or stretched the first time the tab becomes visible. Resizing also
   // resets Rive's layout to the full canvas, so the zoom frame is put back afterwards.
+  function resize() {
+    const { W, H } = canvasSize();
+    if (!W || !H) return;   // folded away or hidden; the next real size does the work
+    try { r.resizeDrawingSurfaceToCanvas(); } catch { return; /* not loaded yet */ }
+    if (!loaded) return;
+    // Any frame mid-flight was computed for the old size, so drop it and snap to where
+    // this muscle belongs at the new one. Leaving it running strands the figure on a
+    // frame that no longer matches its canvas, which reads as a stuck zoom.
+    if (tween) { cancelAnimationFrame(tween); tween = null; }
+    frame = frameFor(focusBox) || frame;
+    applyFrame(frame);
+  }
+
   let ro = null;
   if (typeof ResizeObserver !== "undefined") {
-    ro = new ResizeObserver(() => {
-      try { r.resizeDrawingSurfaceToCanvas(); } catch { return; /* not loaded yet */ }
-      if (!loaded) return;
-      if (!tween) frame = frameFor(focusBox);
-      applyFrame(frame);
-    });
+    ro = new ResizeObserver(resize);
     ro.observe(canvas);
   }
 
@@ -217,10 +255,7 @@ export function createBodyHeatmap({ canvas, artboardName, palette, intensities, 
     focus,
     project,
     get zoomed() { return !!focusBox; },
-    resize: () => {
-      r.resizeDrawingSurfaceToCanvas();
-      if (loaded) { frame = frameFor(focusBox); applyFrame(frame); }
-    },
+    resize,
     destroy: () => { if (tween) cancelAnimationFrame(tween); ro?.disconnect(); r.cleanup(); },
   };
   return api;
