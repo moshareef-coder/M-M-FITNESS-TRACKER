@@ -55,6 +55,9 @@ globalThis.window = { addEventListener() {}, matchMedia: () => ({ matches: false
 globalThis.location = { reload() {} };
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 globalThis.getComputedStyle = () => ({ getPropertyValue: () => "#3b82f6" });
+// The Body tab animates its rings on the next frame; here there is no frame, so run it now.
+globalThis.requestAnimationFrame = (fn) => { fn(0); return 0; };
+globalThis.cancelAnimationFrame = () => {};
 Object.defineProperty(globalThis, "navigator", { value: { onLine: true }, configurable: true });
 globalThis.Chart = function () { return { destroy() {} }; };
 
