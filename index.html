@@ -778,25 +778,29 @@
   .wk-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
   .wk-legend i.me { background: var(--me); }
   .wk-legend i.them { background: var(--partner); }
-  .wk { display: grid; grid-template-columns: repeat(7, 1fr); margin: 4px -6px 0; }
-  .wk-col { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px 0 8px; border-radius: 12px; border: 2px solid transparent; }
+  .wk { display: grid; grid-template-columns: repeat(7, 1fr); margin: 4px -4px 0; }
+  .wk-col { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 6px 4px 8px; border-radius: 12px; border: 2px solid transparent; }
   .wk-col + .wk-col::before { content: ""; position: absolute; left: -1px; top: 14px; bottom: 14px; width: 1px; background: var(--border); }
   .wk-col.today { border-color: color-mix(in srgb, var(--me) 55%, var(--panel)); }
   .wk-col.today::before, .wk-col.today + .wk-col::before { display: none; }
-  .wk-d { font-size: 14px; font-weight: 600; color: var(--muted); line-height: 1; margin-bottom: 4px; }
+  .wk-d { font-size: 14px; font-weight: 600; color: var(--muted); line-height: 1; margin-bottom: 2px; text-align: center; }
   .wk-col.today .wk-d { color: var(--text); }
   .wk-today { position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; text-align: center; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--me); }
   .wk:has(.wk-today) { margin-bottom: 18px; }
+  /* The day tile. A proof photo when there is one, because seeing the two of
+     you actually there is the point; a solid tick when there is not. */
   .dot {
-    width: 34px; height: 34px; border-radius: 50%; padding: 0; border: 2px solid var(--border); background: transparent;
-    display: flex; align-items: center; justify-content: center; cursor: default; color: #fff; font-family: inherit;
+    position: relative; width: 100%; aspect-ratio: 3 / 4; border-radius: 10px; overflow: hidden; padding: 0;
+    border: 1.5px dashed var(--border); background: transparent; display: flex; align-items: center;
+    justify-content: center; cursor: default; color: #fff; font-family: inherit;
   }
-  .dot.on { border-color: transparent; cursor: pointer; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 22%, transparent); }
+  .dot.on { border: none; cursor: pointer; }
   .dot.on.me { background: var(--me); }
   .dot.on.them { background: var(--partner); }
-  .dot.rest { cursor: pointer; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .04em; }
-  .dot.wt { cursor: pointer; color: var(--muted); font-size: 10px; font-weight: 700; }
-  @media (max-width: 380px) { .dot { width: 30px; height: 30px; } }
+  .dot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .dot.rest, .dot.wt { cursor: pointer; border-style: solid; background: var(--panel-2); }
+  .dot.rest { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .04em; }
+  .dot.wt { color: var(--muted); font-size: 10.5px; font-weight: 700; }
 
   /* Together timeline: one card per session, the latest word on it below. */
   .card-link.ink { color: var(--text); display: inline-flex; align-items: center; gap: 2px; font-weight: 600; }
@@ -2357,7 +2361,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.2";
+const APP_VERSION = "2026.09.04.3";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -4556,17 +4560,21 @@ function entryOn(name, date) {
 
 /* One person's dot for one day. A filled dot with a tick means they trained;
    rest days and weigh-ins still open, because they are days you can correct. */
-function dotHTML(name, email, date, cls) {
+async function dotHTML(name, email, date, cls) {
   const e = entryOn(name, date);
   const who = `data-day="${date}" data-who="${escapeHtml(email || "")}"`;
   const label = `aria-label="${escapeHtml(name)}, ${relDayLabel(date)}"`;
-  if (e?.gym) return `<button type="button" class="dot on ${cls}" ${who} ${label}>${icon("check", 16)}</button>`;
+  if (e?.gym) {
+    const url = e.proof_path ? await signedProofUrl(e.proof_path) : null;
+    const inner = url ? `<img src="${url}" alt="" loading="lazy" />` : icon("check", 16);
+    return `<button type="button" class="dot on ${cls}" ${who} ${label}>${inner}</button>`;
+  }
   if (e?.rest_day) return `<button type="button" class="dot rest" ${who} ${label}>rest</button>`;
   if (e?.weight != null) return `<button type="button" class="dot wt" ${who} ${label}>${escapeHtml(String(e.weight))}</button>`;
   return `<span class="dot"></span>`;
 }
 
-function renderWeekStrips() {
+async function renderWeekStrips() {
   $("topDate").textContent = "v" + APP_VERSION;
   const today = todayStr();
   const partner = PARTNER_EMAIL ? partnerName() : null;
@@ -4575,15 +4583,18 @@ function renderWeekStrips() {
     + (partner ? `<span><i class="them"></i>${escapeHtml(partner)}</span>` : "");
 
   const grid = $("weekGrid");
-  grid.innerHTML = currentWeekDates().map((date, i) => {
+  const cols = await Promise.all(currentWeekDates().map(async (date, i) => {
     const isToday = date === today;
+    const mine = await dotHTML(ME, MY_EMAIL, date, "me");
+    const theirs = partner ? await dotHTML(partner, PARTNER_EMAIL, date, "them") : "";
     return `<div class="wk-col${isToday ? " today" : ""}">
       <span class="wk-d">${DAY_LETTERS[i]}</span>
-      ${dotHTML(ME, MY_EMAIL, date, "me")}
-      ${partner ? dotHTML(partner, PARTNER_EMAIL, date, "them") : ""}
+      ${mine}
+      ${theirs}
       ${isToday ? `<span class="wk-today">Today</span>` : ""}
     </div>`;
-  }).join("");
+  }));
+  grid.innerHTML = cols.join("");
   grid.querySelectorAll("[data-day]").forEach((b) => {
     b.onclick = () => openDaySheet(b.dataset.who, b.dataset.day);
   });
