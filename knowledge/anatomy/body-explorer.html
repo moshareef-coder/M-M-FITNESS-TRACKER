@@ -1,0 +1,426 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Body Explorer</title>
+<style>
+  :root {
+    --bg: #0a0a0a; --panel: #14161a; --border: #262b33; --text: #eceef0; --muted: #8b93a1;
+    --skin-cool: #d7dbe0; --skin-warm: #e8a58c; --skin-base: #2a2c30; --accent: #d5a35f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
+  header { max-width: 900px; margin: 0 auto; padding: 24px 20px 8px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13.5px; }
+  main { max-width: 900px; margin: 0 auto; padding: 12px 20px 60px; }
+
+  .overview-row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+  .body-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 16px; width: 280px; }
+  .body-panel svg { width: 100%; height: auto; display: block; }
+  .body-panel .cap { text-align: center; color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .glow { filter: drop-shadow(0 0 3px rgba(255,255,255,0.45)) drop-shadow(0 0 7px rgba(255,255,255,0.2)); }
+  .skin-cool { fill: var(--skin-cool); } .skin-warm { fill: var(--skin-warm); } .skin-base { fill: var(--skin-base); }
+  .region { cursor: pointer; transition: opacity 0.15s; }
+  .region:hover, .region.active { opacity: 0.7; }
+
+  .detail-wrap { display: none; }
+  .detail-wrap.open { display: block; }
+  .overview-wrap.hidden-when-detail { display: block; }
+  .overview-wrap.hidden-when-detail.hidden { display: none; }
+
+  .detail-card { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 20px; max-width: 640px; margin: 0 auto; }
+  .back-btn { background: none; border: 1px solid var(--border); color: var(--text); border-radius: 100px; padding: 8px 16px; font-size: 13.5px; cursor: pointer; margin-bottom: 14px; }
+  .detail-title { font-size: 19px; margin: 0 0 2px; }
+  .detail-note { color: var(--muted); font-size: 12.5px; margin-bottom: 16px; }
+  .detail-svg-wrap { display: flex; justify-content: center; margin-bottom: 16px; }
+  .detail-svg-wrap svg { width: 260px; height: auto; }
+  .muscle-seg { stroke: var(--bg); stroke-width: 1.5; cursor: pointer; transition: filter 0.15s; }
+  .muscle-seg:hover, .muscle-seg.hi { filter: brightness(1.35); }
+  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
+  .legend-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; cursor: default; }
+  .legend-swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+  .legend-row.hi { color: var(--accent); }
+  .fidelity-tag { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border: 1px solid var(--border); border-radius: 100px; padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Body Explorer — draft</h1>
+  <div class="sub">Click any region on the body below to see every individual muscle inside it.</div>
+</header>
+<main>
+  <div class="overview-wrap hidden-when-detail" id="overviewWrap">
+    <div class="overview-row">
+      <div class="body-panel">
+        <svg id="frontSvg" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="cap">Front</div>
+      </div>
+      <div class="body-panel">
+        <svg id="backSvg" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="cap">Back</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-wrap" id="detailWrap">
+    <div class="detail-card">
+      <button class="back-btn" id="backBtn">&larr; Back to body</button>
+      <h2 class="detail-title" id="detailTitle"></h2>
+      <div class="detail-note" id="detailNote"></div>
+      <div class="detail-svg-wrap" id="detailSvgWrap"></div>
+      <div class="legend" id="detailLegend"></div>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { MUSCLE_REGIONS } from "./muscle-data.mjs";
+
+const FRONT_BODY = `
+  <path class="skin-base" d="M80 42 C80 28 88 18 100 18 C 112 18 120 28 120 42 C 120 50 117 56 112 60 L 88 60 C 83 56 80 50 80 42 Z" />
+  <path class="skin-warm" d="M88 60 L112 60 L 114 72 Q 100 78 86 72 Z" />
+  <g class="region" data-broad="traps"><path class="skin-cool" d="M68 68 Q 100 62 132 68 L 126 84 Q 100 76 74 84 Z" /></g>
+  <g class="region" data-broad="shoulders">
+    <path class="skin-cool" d="M66 70 C 50 72 38 82 34 100 C 32 112 34 122 42 126 C 50 128 56 120 58 108 C 60 96 62 82 68 74 Z" />
+    <path class="skin-cool" d="M134 70 C 150 72 162 82 166 100 C 168 112 166 122 158 126 C 150 128 144 120 142 108 C 140 96 138 82 132 74 Z" />
+  </g>
+  <g class="region" data-broad="chest">
+    <path class="skin-warm" d="M72 78 C 84 74 94 76 99 82 L 99 122 C 88 130 74 128 66 116 C 62 104 64 90 72 78 Z" />
+    <path class="skin-warm" d="M128 78 C 116 74 106 76 101 82 L 101 122 C 112 130 126 128 134 116 C 138 104 136 90 128 78 Z" />
+  </g>
+  <g class="region" data-broad="biceps">
+    <path class="skin-cool" d="M40 128 C 34 142 32 158 35 172 C 38 180 46 182 51 176 C 55 168 55 152 52 136 C 50 130 46 127 40 128 Z" />
+    <path class="skin-cool" d="M160 128 C 166 142 168 158 165 172 C 162 180 154 182 149 176 C 145 168 145 152 148 136 C 150 130 154 127 160 128 Z" />
+  </g>
+  <g class="region" data-broad="forearms">
+    <path class="skin-warm" d="M34 176 C 28 192 25 208 26 224 C 28 232 36 234 40 228 C 43 216 44 198 42 180 Z" />
+    <path class="skin-warm" d="M166 176 C 172 192 175 208 174 224 C 172 232 164 234 160 228 C 157 216 156 198 158 180 Z" />
+    <ellipse class="skin-base" cx="30" cy="232" rx="7" ry="9" /><ellipse class="skin-base" cx="170" cy="232" rx="7" ry="9" />
+  </g>
+  <g class="region" data-broad="abs">
+    <path class="skin-warm" d="M78 124 C 88 130 112 130 122 124 L 122 150 Q 100 156 78 150 Z" />
+    <path class="skin-warm" d="M80 154 C 90 158 110 158 120 154 L 119 178 Q 100 184 81 178 Z" />
+    <path class="skin-warm" d="M83 182 Q 100 188 117 182 C 116 196 108 208 100 214 C 92 208 84 196 83 182 Z" />
+    <line x1="100" y1="126" x2="100" y2="212" stroke="#0a0a0a" stroke-width="1.2" />
+  </g>
+  <g class="region" data-broad="obliques">
+    <path class="skin-cool" d="M68 118 C 65 134 66 152 72 170 C 76 178 80 176 80 168 C 78 150 78 132 78 120 Z" />
+    <path class="skin-cool" d="M132 118 C 135 134 134 152 128 170 C 124 178 120 176 120 168 C 122 150 122 132 122 120 Z" />
+  </g>
+  <path class="skin-base" d="M78 214 Q 100 222 122 214 L 118 232 Q 100 238 82 232 Z" />
+  <g class="region" data-broad="quads">
+    <path class="skin-warm" d="M74 236 C 66 264 64 296 68 326 C 71 338 78 340 84 334 C 90 316 92 288 90 258 C 89 248 86 240 82 236 Z" />
+    <path class="skin-warm" d="M126 236 C 134 264 136 296 132 326 C 129 338 122 340 116 334 C 110 316 108 288 110 258 C 111 248 114 240 118 236 Z" />
+    <path class="skin-cool" d="M82 300 C 80 314 81 326 86 334 C 90 330 92 320 91 306 C 90 300 87 297 82 300 Z" />
+    <path class="skin-cool" d="M118 300 C 120 314 119 326 114 334 C 110 330 108 320 109 306 C 110 300 113 297 118 300 Z" />
+  </g>
+  <ellipse class="skin-base" cx="83" cy="340" rx="10" ry="8" /><ellipse class="skin-base" cx="117" cy="340" rx="10" ry="8" />
+  <g class="region" data-broad="calves">
+    <path class="skin-warm" d="M76 350 C 71 364 70 378 74 388 C 78 394 86 393 88 386 C 90 374 89 360 86 350 Z" />
+    <path class="skin-warm" d="M124 350 C 129 364 130 378 126 388 C 122 394 114 393 112 386 C 110 374 111 360 114 350 Z" />
+  </g>
+  <ellipse class="skin-base" cx="81" cy="392" rx="9" ry="6" /><ellipse class="skin-base" cx="119" cy="392" rx="9" ry="6" />
+`;
+
+const BACK_BODY = `
+  <path class="skin-base" d="M80 42 C80 28 88 18 100 18 C 112 18 120 28 120 42 C 120 50 117 56 112 60 L 88 60 C 83 56 80 50 80 42 Z" />
+  <path class="skin-warm" d="M88 60 L112 60 L 114 71 Q 100 76 86 71 Z" />
+  <g class="region" data-broad="traps">
+    <path class="skin-cool" d="M100 64 L 122 72 C 118 90 110 102 100 108 C 90 102 82 90 78 72 Z" />
+    <line x1="100" y1="68" x2="100" y2="102" stroke="#0a0a0a" stroke-width="1" opacity="0.5" />
+  </g>
+  <g class="region" data-broad="shoulders">
+    <path class="skin-cool" d="M76 70 C 60 72 48 82 44 100 C 42 112 44 122 52 126 C 60 128 66 120 68 108 C 70 96 72 82 78 74 Z" />
+    <path class="skin-cool" d="M124 70 C 140 72 152 82 156 100 C 158 112 156 122 148 126 C 140 128 134 120 132 108 C 130 96 128 82 122 74 Z" />
+  </g>
+  <g class="region" data-broad="lats">
+    <path class="skin-warm" d="M76 78 C 66 96 63 118 68 140 C 74 150 84 154 94 148 L 96 84 Z" />
+    <path class="skin-warm" d="M124 78 C 134 96 137 118 132 140 C 126 150 116 154 106 148 L 104 84 Z" />
+    <path class="skin-cool" d="M80 84 Q 90 108 88 138" fill="none" stroke="#0a0a0a" stroke-width="0.9" opacity="0.6" />
+    <path class="skin-cool" d="M120 84 Q 110 108 112 138" fill="none" stroke="#0a0a0a" stroke-width="0.9" opacity="0.6" />
+  </g>
+  <g class="region" data-broad="triceps">
+    <path class="skin-cool" d="M40 128 C 34 142 32 158 35 172 C 38 180 46 182 51 176 C 55 168 55 152 52 136 C 50 130 46 127 40 128 Z" />
+    <path class="skin-cool" d="M160 128 C 166 142 168 158 165 172 C 162 180 154 182 149 176 C 145 168 145 152 148 136 C 150 130 154 127 160 128 Z" />
+  </g>
+  <g class="region" data-broad="forearms">
+    <path class="skin-warm" d="M34 176 C 28 192 25 208 26 224 C 28 232 36 234 40 228 C 43 216 44 198 42 180 Z" />
+    <path class="skin-warm" d="M166 176 C 172 192 175 208 174 224 C 172 232 164 234 160 228 C 157 216 156 198 158 180 Z" />
+    <ellipse class="skin-base" cx="30" cy="232" rx="7" ry="9" /><ellipse class="skin-base" cx="170" cy="232" rx="7" ry="9" />
+  </g>
+  <g class="region" data-broad="lowerback">
+    <path class="skin-warm" d="M84 150 Q 100 146 116 150 L 114 176 Q 100 182 86 176 Z" />
+    <line x1="100" y1="148" x2="100" y2="180" stroke="#0a0a0a" stroke-width="1" opacity="0.5" />
+  </g>
+  <g class="region" data-broad="glutes">
+    <path class="skin-cool" d="M78 180 C 68 184 62 196 64 210 C 66 224 78 232 92 228 C 98 220 98 194 94 182 Z" />
+    <path class="skin-cool" d="M122 180 C 132 184 138 196 136 210 C 134 224 122 232 108 228 C 102 220 102 194 106 182 Z" />
+  </g>
+  <ellipse class="skin-base" cx="83" cy="238" rx="10" ry="7" /><ellipse class="skin-base" cx="117" cy="238" rx="10" ry="7" />
+  <g class="region" data-broad="hamstrings">
+    <path class="skin-warm" d="M72 246 C 65 270 64 298 70 322 C 74 332 82 332 86 322 C 90 300 90 272 86 250 C 84 246 76 244 72 246 Z" />
+    <path class="skin-warm" d="M128 246 C 135 270 136 298 130 322 C 126 332 118 332 114 322 C 110 300 110 272 114 250 C 116 246 124 244 128 246 Z" />
+    <path class="skin-cool" d="M78 250 Q 76 280 80 310" fill="none" stroke="#0a0a0a" stroke-width="0.9" opacity="0.5" />
+    <path class="skin-cool" d="M122 250 Q 124 280 120 310" fill="none" stroke="#0a0a0a" stroke-width="0.9" opacity="0.5" />
+  </g>
+  <ellipse class="skin-base" cx="81" cy="330" rx="9" ry="7" /><ellipse class="skin-base" cx="119" cy="330" rx="9" ry="7" />
+  <g class="region" data-broad="calves">
+    <path class="skin-warm" d="M74 338 C 68 354 67 372 72 386 C 76 394 86 393 88 384 C 91 368 90 350 86 338 Z" />
+    <path class="skin-warm" d="M126 338 C 132 354 133 372 128 386 C 124 394 114 393 112 384 C 109 368 110 350 114 338 Z" />
+  </g>
+  <ellipse class="skin-base" cx="81" cy="392" rx="9" ry="6" /><ellipse class="skin-base" cx="119" cy="392" rx="9" ry="6" />
+`;
+
+document.getElementById("frontSvg").innerHTML = `<g class="glow">${FRONT_BODY}</g>`;
+document.getElementById("backSvg").innerHTML = `<g class="glow">${BACK_BODY}</g>`;
+
+// Which muscle-data regions live inside each visually-distinct broad body-part shape.
+// Some broad shapes (quads) combine several muscle-data entries -- see the note in the
+// commit/README on why this grouping is anatomically the right call for a click target.
+const BROAD_TO_DATA_KEYS = {
+  traps: ["neckTraps"], shoulders: ["shoulders"], chest: ["chest"], lats: ["back"],
+  lowerback: ["lowerBack"], biceps: ["biceps"], triceps: ["triceps"], forearms: ["forearms"],
+  abs: ["abs"], obliques: ["obliques"], glutes: ["glutes"],
+  quads: ["hipFlexors", "quads", "adductors"], hamstrings: ["hamstrings"], calves: ["calves"],
+};
+
+const PALETTE = ["#d5a35f","#7ec2ee","#4c9b72","#e2566c","#b98ce0","#5fc9c9","#e0a85f","#8ea3e8","#e07eb0","#9bc45f","#c9917e","#7ea8c4"];
+
+document.querySelectorAll(".region").forEach((g) => {
+  g.addEventListener("click", () => openDetail(g.dataset.broad));
+});
+document.getElementById("backBtn").addEventListener("click", closeDetail);
+
+function musclesFor(broad) {
+  const keys = BROAD_TO_DATA_KEYS[broad] || [];
+  return keys.map((k) => ({ key: k, ...MUSCLE_REGIONS[k] }));
+}
+
+function openDetail(broad) {
+  const clusters = musclesFor(broad);
+  if (!clusters.length) return;
+  const title = clusters.length === 1 ? clusters[0].label : clusters.map((c) => c.label).join(" / ");
+  document.getElementById("detailTitle").textContent = title;
+
+  // Flatten to one indexed list across clusters, each gets a stable color from PALETTE.
+  const flat = [];
+  clusters.forEach((c) => c.muscles.forEach((m) => flat.push({ ...m, cluster: c.label })));
+
+  const renderer = DETAIL_RENDERERS[broad] || renderGenericDetail;
+  const { svg, fidelity } = renderer(flat);
+  document.getElementById("detailSvgWrap").innerHTML = svg;
+  document.getElementById("detailNote").innerHTML = `${flat.length} muscles in this region.${fidelity === "sketch" ? ' <span class="fidelity-tag">early pass</span>' : ""}`;
+
+  document.getElementById("detailLegend").innerHTML = flat.map((m, i) => `
+    <div class="legend-row" data-i="${i}">
+      <span class="legend-swatch" style="background:${PALETTE[i % PALETTE.length]}"></span>
+      <span>${m.name}</span>
+    </div>`).join("");
+
+  wireHighlight(flat.length);
+
+  document.getElementById("overviewWrap").classList.add("hidden");
+  document.getElementById("detailWrap").classList.add("open");
+  window.scrollTo(0, 0);
+}
+
+function closeDetail() {
+  document.getElementById("detailWrap").classList.remove("open");
+  document.getElementById("overviewWrap").classList.remove("hidden");
+}
+
+function wireHighlight(n) {
+  for (let i = 0; i < n; i++) {
+    const seg = document.querySelector(`.muscle-seg[data-i="${i}"]`);
+    const row = document.querySelector(`.legend-row[data-i="${i}"]`);
+    if (!seg || !row) continue;
+    const on = () => { seg.classList.add("hi"); row.classList.add("hi"); };
+    const off = () => { seg.classList.remove("hi"); row.classList.remove("hi"); };
+    seg.addEventListener("mouseenter", on); seg.addEventListener("mouseleave", off);
+    row.addEventListener("mouseenter", on); row.addEventListener("mouseleave", off);
+  }
+}
+
+function seg(i, d, extra = "") {
+  return `<path class="muscle-seg" data-i="${i}" d="${d}" fill="${PALETTE[i % PALETTE.length]}" ${extra} />`;
+}
+function svgWrap(viewBox, inner) {
+  return { svg: `<svg viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>` };
+}
+
+// ---------------------------------------------------------------------------
+// Hand-authored detail illustrations. Each takes the flattened muscle list (same order as the
+// legend) and returns real, anatomically-reasoned sub-shapes -- not generic stripes.
+// ---------------------------------------------------------------------------
+const DETAIL_RENDERERS = {};
+
+// Chest needs a real diagonal clav/sternal split plus pec minor + serratus fingers -- built
+// directly (not via the generic seg() helper above, which was a first pass) for real accuracy.
+DETAIL_RENDERERS.chest = (m) => svgWrap("0 0 240 220",
+  seg(0, "M52 42 C70 24 108 18 120 26 L120 112 C96 120 66 110 54 84 C46 68 45 54 52 42 Z") + // clavicular head
+  seg(1, "M120 26 C132 18 170 24 188 42 C195 54 194 68 186 84 C174 110 144 120 120 112 Z") + // sternal head
+  seg(2, "M108 66 C114 62 128 62 134 66 L132 92 C124 96 116 96 110 92 Z") + // pec minor (inset, slightly deeper tone)
+  seg(3, "M40 96 C34 100 30 108 30 118 L44 116 C42 108 42 102 46 96 Z") + // serratus finger 1
+  `<path class="muscle-seg" data-i="3" d="M46 118 C40 122 37 130 38 140 L52 137 C49 129 48 123 52 118 Z" fill="${PALETTE[3 % PALETTE.length]}" />` + // serratus finger 2
+  `<path class="muscle-seg" data-i="3" d="M54 140 C49 144 47 152 48 161 L61 157 C58 150 57 145 60 140 Z" fill="${PALETTE[3 % PALETTE.length]}" />` // serratus finger 3
+);
+
+DETAIL_RENDERERS.shoulders = (m) => svgWrap("0 0 240 220",
+  // deltoid cap as a 3-way pie (front/lateral/rear), then a small deep cluster for the rotator cuff
+  seg(0, "M120 20 C90 22 66 38 56 66 L120 78 Z") + // anterior
+  seg(1, "M56 66 C48 90 50 116 62 136 L120 78 Z") + // lateral
+  seg(2, "M62 136 C78 158 100 168 120 168 L120 78 Z") + // posterior
+  seg(3, "M164 60 C176 58 188 64 192 76 C194 84 190 90 182 90 C172 90 164 82 162 72 Z") + // supraspinatus
+  `<path class="muscle-seg" data-i="4" d="M168 92 C180 90 192 96 195 108 C197 116 191 122 182 121 C172 120 165 111 164 100 Z" fill="${PALETTE[4]}" />` + // infraspinatus
+  `<path class="muscle-seg" data-i="5" d="M162 124 C172 121 182 125 186 134 C188 140 183 145 176 144 C168 143 163 137 162 130 Z" fill="${PALETTE[5]}" />` + // teres minor
+  `<path class="muscle-seg" data-i="6" d="M168 148 C178 146 188 150 190 158 C191 163 187 167 180 166 C172 165 168 160 167 154 Z" fill="${PALETTE[6]}" />` // subscapularis
+);
+
+DETAIL_RENDERERS.lats = (m) => svgWrap("0 0 240 220",
+  seg(0, "M100 20 C70 40 55 80 62 130 C68 160 88 175 112 168 L118 24 Z") + // latissimus dorsi (the wing)
+  seg(1, "M96 24 C86 30 80 42 82 56 C84 66 92 70 100 66 C104 56 104 38 100 24 Z") + // teres major (top of the wing, near armpit)
+  seg(2, "M126 22 C136 20 148 24 152 34 L136 38 C132 32 129 27 126 22 Z") + // rhomboid major
+  `<path class="muscle-seg" data-i="3" d="M132 44 C142 40 154 44 158 54 L142 58 C138 52 135 47 132 44 Z" fill="${PALETTE[3]}" />` // rhomboid minor
+);
+
+DETAIL_RENDERERS.biceps = (m) => svgWrap("0 0 200 260",
+  seg(0, "M70 20 C56 40 50 80 52 130 C53 155 62 170 74 168 C82 166 86 150 84 120 C82 80 78 44 82 22 Z") + // long head
+  seg(1, "M100 26 C112 46 116 82 112 122 C110 148 100 164 90 162 C86 148 88 118 92 84 C94 54 96 32 100 26 Z") + // short head
+  seg(2, "M120 60 C130 70 132 100 126 130 C122 150 112 158 106 150 C110 122 114 90 116 68 Z") + // brachialis (peeking outer)
+  `<path class="muscle-seg" data-i="3" d="M84 18 C92 12 104 12 108 20 C104 26 96 28 88 26 Z" fill="${PALETTE[3]}" />` // coracobrachialis (top, near armpit)
+);
+
+DETAIL_RENDERERS.triceps = (m) => svgWrap("0 0 200 260",
+  seg(0, "M90 22 C78 50 74 100 78 148 C80 164 90 170 96 164 C92 130 90 80 92 40 C93 32 92 26 90 22 Z") + // long head (middle, biggest)
+  seg(1, "M50 30 C40 60 38 100 44 140 C48 158 58 166 66 160 C60 130 58 90 60 50 C60 40 56 34 50 30 Z") + // lateral head (outer)
+  seg(2, "M112 60 C120 80 122 110 118 138 C115 152 106 156 102 148 C106 122 108 96 108 74 Z") + // medial head (inner, thin sliver)
+  `<path class="muscle-seg" data-i="3" d="M60 158 C68 156 78 158 80 166 C76 172 66 173 60 168 Z" fill="${PALETTE[3]}" />` // anconeus (near elbow)
+);
+
+DETAIL_RENDERERS.quads = (m) => {
+  // 11 muscles: hip flexors (2), quads (4), adductors (5) -- three anatomical zones left to
+  // right across the front of the thigh: hip-crease straps, the quad group down the middle,
+  // the adductor strands on the inner thigh.
+  const parts = [
+    seg(0, "M40 20 C60 16 90 24 108 44 L96 58 C78 42 56 34 40 30 Z"), // iliopsoas (diagonal hip strap)
+    `<path class="muscle-seg" data-i="1" d="M52 22 C76 30 100 60 108 100 L96 106 C86 70 66 44 46 32 Z" fill="${PALETTE[1]}" />`, // sartorius (long diagonal strap)
+    `<path class="muscle-seg" data-i="2" d="M96 46 C106 70 108 110 104 150 C102 168 92 176 84 172 C86 140 88 100 90 66 C91 56 93 50 96 46 Z" fill="${PALETTE[2]}" />`, // rectus femoris
+    `<path class="muscle-seg" data-i="3" d="M108 56 C120 72 124 108 120 146 C118 164 108 172 100 166 C104 136 106 100 108 70 Z" fill="${PALETTE[3]}" />`, // vastus lateralis (outer)
+    `<path class="muscle-seg" data-i="4" d="M78 90 C74 116 76 148 84 172 C88 182 96 182 98 174 C92 150 88 122 88 96 C86 90 82 88 78 90 Z" fill="${PALETTE[4]}" />`, // vastus medialis (inner, teardrop to knee)
+    `<path class="muscle-seg" data-i="5" d="M96 66 C102 88 102 118 98 144 L88 142 C90 116 90 90 88 70 Z" fill="${PALETTE[5]}" />`, // vastus intermedius (deep, thin sliver visible between)
+    `<path class="muscle-seg" data-i="6" d="M46 60 C40 84 40 114 48 140 C52 150 60 150 60 140 C54 116 52 90 54 64 Z" fill="${PALETTE[6]}" />`, // adductor longus
+    `<path class="muscle-seg" data-i="7" d="M32 66 C26 92 27 124 36 152 C40 162 48 160 48 150 C42 124 40 96 40 70 Z" fill="${PALETTE[7]}" />`, // adductor magnus
+    `<path class="muscle-seg" data-i="8" d="M56 60 C52 78 52 98 56 114 C58 120 64 118 63 110 C61 94 60 78 62 64 Z" fill="${PALETTE[8]}" />`, // adductor brevis
+    `<path class="muscle-seg" data-i="9" d="M22 70 C18 96 20 128 30 154 C34 162 40 160 39 150 C32 126 30 98 30 74 Z" fill="${PALETTE[9]}" />`, // gracilis
+    `<path class="muscle-seg" data-i="10" d="M48 52 C42 62 40 74 42 86 C44 92 50 90 50 82 C48 72 48 62 52 54 Z" fill="${PALETTE[10]}" />`, // pectineus (top, near groin)
+  ];
+  return svgWrap("0 0 200 260", parts.join(""));
+};
+
+DETAIL_RENDERERS.glutes = (m) => svgWrap("0 0 220 220",
+  seg(0, "M40 60 C30 80 30 120 46 148 C60 172 96 176 116 158 C122 130 118 90 100 66 C82 46 54 44 40 60 Z") + // gluteus maximus
+  seg(1, "M90 30 C108 28 122 40 126 58 C128 70 120 78 108 76 C98 64 92 48 90 30 Z") + // gluteus medius (upper-outer)
+  seg(2, "M108 44 C118 42 126 48 128 58 C129 64 124 68 118 66 C112 60 108 52 108 44 Z") + // gluteus minimus (deep, small)
+  `<path class="muscle-seg" data-i="3" d="M118 26 C130 22 142 28 144 40 C145 46 139 50 133 48 C126 42 120 34 118 26 Z" fill="${PALETTE[3]}" />` + // TFL
+  `<path class="muscle-seg" data-i="4" d="M70 90 C82 88 92 96 94 108 C95 114 89 118 82 115 C74 108 70 98 70 90 Z" fill="${PALETTE[4]}" />` // piriformis (deep, central)
+);
+
+DETAIL_RENDERERS.calves = (m) => svgWrap("0 0 200 260",
+  seg(0, "M62 20 C48 34 42 56 46 80 C50 96 62 102 72 92 C74 70 72 42 66 22 Z") + // gastroc medial head
+  seg(1, "M98 22 C92 42 90 70 92 92 C102 102 114 96 118 80 C122 56 116 34 102 20 Z") + // gastroc lateral head
+  seg(2, "M50 82 C44 106 44 140 52 168 C56 182 66 188 70 178 C64 148 60 112 60 86 Z") + // soleus (visible outer/lower)
+  seg(3, "M78 90 C76 104 76 118 78 130 L84 128 C82 116 82 102 84 92 Z") + // plantaris (tiny sliver between heads)
+  `<path class="muscle-seg" data-i="4" d="M96 20 C90 44 88 76 90 100 L98 98 C96 72 96 44 100 22 Z" fill="${PALETTE[4]}" />` + // tibialis anterior (shin, front-facing)
+  `<path class="muscle-seg" data-i="5" d="M100 100 C98 116 98 132 102 144 C106 150 112 146 111 136 C108 122 106 110 106 100 Z" fill="${PALETTE[5]}" />` + // tibialis posterior (deep)
+  `<path class="muscle-seg" data-i="6" d="M112 92 C118 112 120 138 116 162 C114 174 106 178 104 168 C108 144 108 116 106 96 Z" fill="${PALETTE[6]}" />` + // peroneus longus
+  `<path class="muscle-seg" data-i="7" d="M118 110 C122 128 122 148 118 164 C116 172 110 174 109 166 C112 148 112 128 110 112 Z" fill="${PALETTE[7]}" />` // peroneus brevis
+);
+
+DETAIL_RENDERERS.traps = (m) => svgWrap("0 0 220 240",
+  // trap diamond in 3 horizontal bands (upper/mid/lower), SCM as a neck strap, levator
+  // scapulae tucked at the upper-side junction where it actually runs.
+  seg(0, "M50 20 C58 40 66 62 72 78 L84 74 C76 54 68 34 62 16 Z") + // sternocleidomastoid (neck strap)
+  seg(1, "M110 16 L150 40 C144 54 130 62 110 64 C90 62 76 54 70 40 Z") + // upper trapezius
+  seg(2, "M78 44 C86 52 98 56 110 56 C122 56 134 52 142 44 L138 90 C126 96 94 96 82 90 Z") + // middle trapezius
+  seg(3, "M84 94 C94 100 126 100 136 94 C132 130 122 156 110 164 C98 156 88 130 84 94 Z") + // lower trapezius
+  `<path class="muscle-seg" data-i="4" d="M60 30 C68 34 74 42 76 52 C77 58 71 60 66 55 C60 48 57 38 56 30 Z" fill="${PALETTE[4]}" />` // levator scapulae
+);
+
+DETAIL_RENDERERS.forearms = (m) => {
+  // 9 muscles, genuinely two different anatomical sides -- flexors on the palm-up side,
+  // extensors on the palm-down side. Shown as two labeled forearm shapes side by side rather
+  // than forcing them into one silhouette, since that is how they actually separate.
+  // Index order MUST match muscle-data.mjs's forearms list exactly (brachioradialis, FCR, FCU,
+  // palmaris longus, ECRL, ECRB, ECU, pronator teres, supinator) even though the VISUAL layout
+  // groups pronator teres with the flexor side, since that is where it actually sits.
+  return svgWrap("0 0 260 260",
+    `<text x="60" y="14" fill="#8b9aa3" font-size="10" text-anchor="middle">FLEXOR SIDE</text>` +
+    seg(0, "M46 24 C36 50 32 90 36 130 C38 148 48 152 54 142 C56 108 54 66 56 30 Z") + // brachioradialis
+    seg(1, "M62 30 C58 60 58 96 62 128 C64 140 72 142 74 132 C74 100 72 66 72 34 Z") + // FCR
+    seg(2, "M78 32 C76 62 76 96 80 126 C82 136 90 138 90 128 C88 98 86 66 86 36 Z") + // FCU
+    seg(3, "M92 34 C92 60 94 90 98 116 C100 124 106 124 105 116 C102 90 100 62 98 38 Z") + // palmaris longus
+    `<path class="muscle-seg" data-i="7" d="M40 20 C48 22 56 26 60 32 L50 40 C44 34 40 28 36 24 Z" fill="${PALETTE[7]}" />` + // pronator teres
+    `<text x="200" y="14" fill="#8b9aa3" font-size="10" text-anchor="middle">EXTENSOR SIDE</text>` +
+    `<path class="muscle-seg" data-i="4" d="M166 30 C160 58 160 92 166 124 C169 136 177 136 178 124 C176 92 174 60 176 32 Z" fill="${PALETTE[4]}" />` + // ECRL
+    `<path class="muscle-seg" data-i="5" d="M180 32 C178 60 179 92 184 122 C186 132 194 132 193 122 C190 92 188 62 188 34 Z" fill="${PALETTE[5]}" />` + // ECRB
+    `<path class="muscle-seg" data-i="6" d="M195 34 C195 60 197 90 202 116 C204 124 210 124 209 116 C206 90 204 62 202 36 Z" fill="${PALETTE[6]}" />` + // ECU
+    `<path class="muscle-seg" data-i="8" d="M208 40 C210 54 213 70 218 84 C220 90 226 88 224 80 C219 66 215 52 213 40 Z" fill="${PALETTE[8]}" />` // supinator (deep, near elbow)
+  );
+};
+
+DETAIL_RENDERERS.abs = (m) => svgWrap("0 0 200 260",
+  // the visible 6-pack (rectus abdominis, tendinous intersections included as gaps) with
+  // transverse abdominis shown as the deep halo wrapping around it -- anatomically it is the
+  // deepest ab layer, wrapping the torso like a corset, so a border reads better than a band.
+  `<path fill="none" stroke="${PALETTE[1]}" stroke-width="14" d="M60 20 C40 20 30 50 30 100 C30 160 40 210 60 240 L140 240 C160 210 170 160 170 100 C170 50 160 20 140 20 Z" data-i="1" class="muscle-seg" />` +
+  seg(0, "M62 26 h76 v46 h-76 Z") + seg(0, "M62 82 h76 v46 h-76 Z") + `<path class="muscle-seg" data-i="0" d="M66 138 C66 170 78 200 100 220 C122 200 134 170 134 138 C120 146 80 146 66 138 Z" fill="${PALETTE[0]}" />` +
+  `<line x1="100" y1="28" x2="100" y2="220" stroke="#0a0a0a" stroke-width="1.4" />`
+);
+
+DETAIL_RENDERERS.obliques = (m) => svgWrap("0 0 200 260",
+  seg(0, "M50 20 C36 60 34 120 48 180 C54 200 66 210 74 200 C64 170 58 130 60 90 C61 60 58 36 62 18 Z") + // external oblique (broad, surface)
+  `<path class="muscle-seg" data-i="1" d="M56 40 C48 72 47 116 56 156 C60 172 70 178 74 168 C67 144 64 112 66 84 C67 64 65 50 68 36 Z" fill="${PALETTE[1]}" />` // internal oblique (inset, deep)
+);
+
+DETAIL_RENDERERS.lowerback = (m) => svgWrap("0 0 200 240",
+  seg(0, "M64 20 C56 60 55 120 62 180 C64 196 72 200 74 186 C70 140 68 90 70 40 C70 32 68 24 64 20 Z") + // iliocostalis (outer column)
+  seg(1, "M84 16 C80 60 79 124 84 184 C86 200 94 202 96 186 C92 138 90 84 92 32 C92 26 88 20 84 16 Z") + // longissimus (middle column)
+  seg(2, "M104 18 C102 58 102 120 106 180 C108 196 114 198 115 184 C112 138 111 86 112 34 C112 28 108 22 104 18 Z") + // spinalis (inner column)
+  `<path class="muscle-seg" data-i="3" d="M88 186 C92 196 100 202 106 200 C104 190 98 182 92 178 Z" fill="${PALETTE[3]}" />` + // multifidus (base of spine)
+  `<path class="muscle-seg" data-i="4" d="M120 40 C130 44 138 54 140 66 C141 72 135 74 130 68 C124 60 120 50 118 42 Z" fill="${PALETTE[4]}" />` // quadratus lumborum (side)
+);
+
+DETAIL_RENDERERS.hamstrings = (m) => svgWrap("0 0 200 260",
+  seg(0, "M50 20 C40 50 38 100 46 150 C50 172 62 178 68 164 C64 128 60 80 62 34 C62 26 56 22 50 20 Z") + // biceps femoris (outer)
+  seg(1, "M76 18 C70 50 70 100 76 148 C79 168 90 172 94 156 C90 122 88 74 88 30 C88 24 82 20 76 18 Z") + // semitendinosus (inner, longer/thinner)
+  seg(2, "M96 22 C92 52 92 98 98 144 C101 162 110 164 112 150 C108 118 106 74 106 34 C106 28 100 24 96 22 Z") + // semimembranosus (inner, deeper)
+  `<path class="muscle-seg" data-i="3" d="M78 150 C86 148 94 152 96 160 C97 166 91 168 85 164 C80 160 78 155 78 150 Z" fill="${PALETTE[3]}" />` // popliteus (behind the knee)
+);
+
+// ---------------------------------------------------------------------------
+// Generic fallback for regions not yet hand-illustrated: real anatomical ORDER (superficial to
+// deep, proximal to distal, matching muscle-data.mjs), but laid out as clipped bands within the
+// region's actual silhouette rather than a bespoke shape per muscle. Correctly labeled and
+// correctly counted -- just less visually bespoke than the hand-drawn ones above.
+// ---------------------------------------------------------------------------
+function renderGenericDetail(m) {
+  const w = 200, h = 240;
+  const n = m.length;
+  const bandW = w / n;
+  const bodyPath = "M100 10 C60 10 40 40 40 90 C40 150 50 200 60 230 L140 230 C150 200 160 150 160 90 C160 40 140 10 100 10 Z";
+  const clipId = "clip" + Math.random().toString(36).slice(2, 8);
+  const bands = m.map((_, i) => seg(i, `M${(i * bandW).toFixed(1)} 0 h${bandW.toFixed(1)} v${h} h-${bandW.toFixed(1)} Z`, `clip-path="url(#${clipId})"`)).join("");
+  return {
+    fidelity: "sketch",
+    svg: `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+      <defs><clipPath id="${clipId}"><path d="${bodyPath}" /></clipPath></defs>
+      <path d="${bodyPath}" fill="#2a2c30" />
+      <g>${bands}</g>
+    </svg>`,
+  };
+}
+</script>
+</body>
+</html>
