@@ -1,7 +1,34 @@
 // Deno Deploy (Supabase Edge Functions) — generates a daily workout via the Claude API.
 // Expects env var ANTHROPIC_API_KEY set as a function secret.
+//
+// calculateTDEE below is inlined from knowledge/formulas/tdee.mjs (Mifflin-St Jeor,
+// see knowledge/sources.md) rather than imported, because this function is deployed
+// via the Management API with only this file's contents — a relative import here
+// would resolve against a bundle that was never actually uploaded. Keep this copy in
+// sync if the source in knowledge/formulas/tdee.mjs changes.
 
-import { calculateTDEE } from "../../../knowledge/formulas/tdee.mjs";
+const LB_TO_KG = 0.453592;
+const IN_TO_CM = 2.54;
+const ACTIVITY_MULTIPLIERS: Record<string, number> = {
+  "Sedentary": 1.2,
+  "Moderate": 1.55,
+  "Active": 1.725,
+};
+function calculateBMR({ sex, age, height_in, weightLb }: { sex?: string; age?: number; height_in?: number; weightLb?: number }) {
+  if (!age || !height_in || !weightLb) return null;
+  const kg = weightLb * LB_TO_KG;
+  const cm = height_in * IN_TO_CM;
+  const base = 10 * kg + 6.25 * cm - 5 * age;
+  if (sex === "Male") return Math.round(base + 5);
+  if (sex === "Female") return Math.round(base - 161);
+  return Math.round(base - 78); // midpoint of +5 / -161
+}
+function calculateTDEE(profile: { sex?: string; age?: number; height_in?: number; weightLb?: number; activity_level?: string }) {
+  const bmr = calculateBMR(profile);
+  if (bmr == null) return null;
+  const multiplier = ACTIVITY_MULTIPLIERS[profile.activity_level ?? ""] ?? ACTIVITY_MULTIPLIERS["Moderate"];
+  return Math.round(bmr * multiplier);
+}
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const CORS_HEADERS = {
@@ -155,7 +182,7 @@ Generate today's workout JSON now.`;
       },
       body: JSON.stringify({
         model: "claude-sonnet-5",
-        max_tokens: 1024,
+        max_tokens: 2048,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userMsg }],
       }),
@@ -171,8 +198,31 @@ Generate today's workout JSON now.`;
 
     const data = await resp.json();
     const text = data.content?.[0]?.text?.trim() || "";
-    const jsonText = text.replace(/^```json\s*/i, "").replace(/```\s*$/, "");
-    const workout = JSON.parse(jsonText);
+    // The model is asked for pure JSON, but strip fences and any stray
+    // leading/trailing prose defensively rather than trusting that exactly —
+    // a truncated response or an extra sentence around the JSON is a real
+    // failure mode, not a hypothetical one.
+    let jsonText = text.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```\s*$/, "").trim();
+    const first = jsonText.indexOf("{");
+    const last = jsonText.lastIndexOf("}");
+    if (first !== -1 && last !== -1 && last > first) jsonText = jsonText.slice(first, last + 1);
+
+    let workout;
+    try {
+      workout = JSON.parse(jsonText);
+    } catch (parseErr) {
+      // Keep a snippet of the raw text so a future failure is diagnosable
+      // from the client error instead of a bare "Unexpected token" message.
+      return new Response(JSON.stringify({
+        error: "Coach's response wasn't valid JSON — try again",
+        detail: String(parseErr),
+        raw: text.slice(0, 400),
+        stopReason: data.stop_reason,
+      }), {
+        status: 502,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
 
     return new Response(JSON.stringify({ workout }), {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },

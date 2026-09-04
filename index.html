@@ -1526,6 +1526,16 @@
   </div>
 
   <div id="tab-workout" class="tab-panel hidden">
+    <input type="file" id="proofInput" accept="image/*" capture="environment" hidden />
+
+    <div id="doneWorkouts"></div>
+
+    <div class="card" id="workoutCard">
+      <h2 id="workoutCardTitle">Today's workout</h2>
+      <div id="workoutFocusRow" class="muted-note" style="margin-bottom:10px;"></div>
+      <div id="workoutContent"></div>
+    </div>
+
     <div class="card hidden" id="todayTallyCard">
       <div class="tally-head">
         <div>
@@ -1538,15 +1548,6 @@
       <div class="tally-list" id="tallyList"></div>
     </div>
 
-    <input type="file" id="proofInput" accept="image/*" capture="environment" hidden />
-
-    <div id="doneWorkouts"></div>
-
-    <div class="card" id="workoutCard">
-      <h2 id="workoutCardTitle">Today's workout</h2>
-      <div id="workoutFocusRow" class="muted-note" style="margin-bottom:10px;"></div>
-      <div id="workoutContent"></div>
-    </div>
 
     <div id="sessionCard" class="session-overlay hidden">
       <div class="session-bar">
@@ -2002,7 +2003,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.03.12";
+const APP_VERSION = "2026.09.03.13";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -3600,7 +3601,7 @@ function recapFor(email, name, date) {
   const best = personalRecords(name).best || {};
   return {
     date,
-    title: plans.find((w) => w.focus)?.focus || deriveFocus(logs.map((l) => l.exercise_name)),
+    title: displayFocus(plans.find((w) => w.focus)?.focus, logs.map((l) => l.exercise_name)),
     logs, sets, volume, minutes, seconds,
     exercises: logs.length,
     note: entry?.note || null,
@@ -3787,7 +3788,7 @@ function recentActivity(email, name, limit = 4) {
   for (const d of days) {
     const plans = ALL_PLANS.filter((w) => w.email === email && w.entry_date === d && w.completed_at);
     const secs = plans.reduce((s, w) => s + (w.duration_sec || 0), 0);
-    const focus = plans.find((w) => w.focus)?.focus;
+    const focus = plans.length ? displayFocus(plans.find((w) => w.focus)?.focus, plans[0].exercises) : null;
     const bits = [relDayLabel(d)];
     if (secs > 0) bits.push(fmtDuration(secs));
     out.push({
@@ -5543,7 +5544,7 @@ function renderDoneWorkouts() {
     return `<div class="card done-card">
       <div class="done-head">
         <div>
-          <div class="done-title">${escapeHtml(w.focus || "Workout")} ${TODAY_DONE_WORKOUTS.length > 1 ? `#${TODAY_DONE_WORKOUTS.length - wi}` : ""}</div>
+          <div class="done-title">${escapeHtml(displayFocus(w.focus, w.exercises))} ${TODAY_DONE_WORKOUTS.length > 1 ? `#${TODAY_DONE_WORKOUTS.length - wi}` : ""}</div>
           <div class="done-meta">${[when, dur, avgRest ? `${avgRest}s avg rest` : null].filter(Boolean).join(" · ") || "Completed"}</div>
         </div>
         <div class="done-check">${icon("check", 18)}</div>
@@ -5834,7 +5835,7 @@ function recentWorkoutsStrip() {
     </div>
     <div class="recent-strip">
       ${mine.map((w) => `<button type="button" class="recent-chip" data-recap="${escapeHtml(w.entry_date)}">
-        <div class="recent-name">${escapeHtml(w.focus || "Workout")}</div>
+        <div class="recent-name">${escapeHtml(displayFocus(w.focus, w.exercises))}</div>
         <div class="recent-when">
           ${escapeHtml(relDayLabel(w.entry_date))}
           ${w.completed_at ? `<span class="done">${icon("check", 13)}</span>` : ""}
@@ -6128,6 +6129,18 @@ const MUSCLE_REGIONS = {
   glutes: "Legs", quads: "Legs", hamstrings: "Legs", calves: "Legs",
 };
 
+/* Rows written before workouts named themselves still carry "Custom Workout"
+   in the database, and a stored placeholder is not a name. Rather than a
+   migration that would still leave older clients showing it, treat the
+   placeholders as absent and derive from the exercises every time. */
+const PLACEHOLDER_FOCUS = new Set(["", "custom", "custom workout", "workout", "manual", "manual workout"]);
+
+function displayFocus(stored, exercises) {
+  const s = String(stored || "").trim();
+  if (s && !PLACEHOLDER_FOCUS.has(s.toLowerCase())) return s;
+  return deriveFocus(exercises || []);
+}
+
 function deriveFocus(exercises) {
   const names = (exercises || []).map((e) => (typeof e === "string" ? e : e?.name)).filter(Boolean);
   if (!names.length) return "Workout";
@@ -6169,7 +6182,7 @@ async function saveManualWorkout() {
 }
 
 function renderPlanPreview() {
-  $("workoutFocusRow").textContent = `Focus: ${TODAY_WORKOUT.focus}`;
+  $("workoutFocusRow").textContent = `Focus: ${displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises)}`;
 
   const loggedNow = todaysLoggedExerciseNames();
   const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
