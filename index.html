@@ -691,27 +691,6 @@
   #heroCard .btn-primary, #heroCard .btn-ghost { margin-top: 18px; }
 
   /* Volume this week */
-  .vtotal {
-    font-size: 28px; font-weight: 800; letter-spacing: -.02em; margin-top: 10px;
-    font-family: var(--font-display, inherit);
-  }
-  .vtotal span { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0; margin-left: 4px; }
-  .vnudge {
-    display: block; width: 100%; margin-top: 14px; padding: 11px 14px;
-    border-radius: 10px; border: 1px dashed var(--border); background: transparent;
-    color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; text-align: center;
-  }
-  .vnudge:active { background: var(--panel-2); }
-  .vrows { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
-  .vrow-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-  .vrow-name { font-size: 15px; font-weight: 700; }
-  .vrow-val { font-size: 16px; font-weight: 800; letter-spacing: -.015em; }
-  .vrow-val.me { color: var(--me); }
-  .vrow-val.them { color: var(--partner); }
-  .vrow-track { height: 8px; border-radius: 100px; background: var(--panel-2); overflow: hidden; }
-  .vrow-track i { display: block; height: 100%; border-radius: 100px; transition: width .5s cubic-bezier(.22,1,.36,1); }
-  .vrow-track i.me { background: var(--me); }
-  .vrow-track i.them { background: var(--partner); }
 
   /* Partner notice: news, dismissible, then gone */
   .notice {
@@ -1138,20 +1117,6 @@
   .stat-fill.streak { background: var(--accent); }
   .stat-sub { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
 
-  /* Weekly muscle coverage, a loop to close */
-  .coverage { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
-  .coverage-ring { width: 92px; height: 92px; flex-shrink: 0; position: relative; }
-  .coverage-body { flex: 1; min-width: 0; }
-  .coverage-count { font-size: 26px; font-weight: 800; line-height: 1; }
-  .coverage-title { font-size: 14.5px; font-weight: 700; margin-top: 4px; }
-  .coverage-hint { font-size: 12.5px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
-  .coverage-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
-  .cov-chip {
-    display: inline-flex; align-items: center; gap: 5px;
-    font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 100px;
-    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
-  }
-  .cov-chip.on { color: var(--down); border-color: color-mix(in srgb, var(--down) 45%, transparent); }
 
   /* Today's workout tally */
   .tally-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
@@ -1313,21 +1278,109 @@
 
   .chart-wrap { position: relative; height: 200px; }
 
-  .body-toggle { display: flex; gap: 8px; margin-bottom: 10px; }
   .tab-pill {
     padding: 6px 14px; border-radius: 100px; border: 1px solid var(--border); background: var(--panel-2);
     color: var(--muted); font-size: 13.5px; font-weight: 600; cursor: pointer;
   }
   .tab-pill.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-  .body-diagram-wrap { display: flex; justify-content: center; gap: 8px; }
-  .rive-body-canvas { width: 50%; max-width: 160px; height: 230px; }
-
-  .heat-legend { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px 0 4px; }
-  .heat-legend-label { font-size: 12.5px; color: var(--muted); }
-  .heat-legend-bar {
-    width: 120px; height: 8px; border-radius: 100px;
-    background: linear-gradient(90deg, #f2d024, #f59b1f, #e0521f, #8f1010);
+  /* ---------- Body tab: "Body Impact" ----------
+     Four stacked blocks: muscles hit (list + figures), impact rings, insights,
+     shared-with-partner. Each animates in once per visit (.bi-anim), not on
+     every data refresh, so a background sync never makes the screen twitch. */
+  .bi-title {
+    font-size: 17px; font-weight: 700; letter-spacing: -.01em; text-align: center;
+    margin: 0 0 14px; min-height: 24px;
   }
+  .bi-anim { animation: popIn .5s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms); }
+  .bi-period { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 3px; border-radius: 100px; background: var(--panel-2); border: 1px solid var(--border); margin-bottom: 14px; }
+  .bi-period button {
+    border: none; background: none; color: var(--muted); font-family: inherit; font-size: 13px; font-weight: 600;
+    padding: 6px 4px; border-radius: 100px; cursor: pointer; transition: background .2s, color .2s, transform .12s;
+  }
+  .bi-period button:active { transform: scale(.96); }
+  .bi-period button.active { background: var(--accent); color: var(--on-accent); }
+
+  .bi-grid { display: grid; grid-template-columns: minmax(0, 1fr) 56%; gap: 8px; align-items: start; }
+  .bi-head { font-size: 19px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; margin: 0 0 16px; }
+  /* Runs past its column on purpose: the figure next to it has clear space at
+     shoulder height, and a wrapped two-line title pushes the list down. */
+  .bi-grid .bi-head { white-space: nowrap; position: relative; z-index: 1; }
+  .bi-list { display: flex; flex-direction: column; gap: 13px; }
+  .bi-row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 12.5px; }
+  .bi-row-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bi-row-level { color: var(--muted); font-weight: 500; flex-shrink: 0; }
+  .bi-segs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; margin-top: 6px; }
+  .bi-seg { height: 7px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--border); position: relative; overflow: hidden; }
+  .bi-seg i {
+    position: absolute; inset: 0; background: var(--accent); border-radius: 4px;
+    transform-origin: left center; transform: scaleX(var(--fill, 0));
+    transition: transform .55s cubic-bezier(.22,1,.36,1); transition-delay: var(--d, 0ms);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  .bi-list.no-anim .bi-seg i { transition: none; }
+  .bi-empty { font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .bi-figures { display: flex; gap: 2px; margin-top: -10px; }
+  .bi-canvas { flex: 1; min-width: 0; height: 250px; display: block; }
+
+  .bi-section { display: flex; align-items: center; gap: 7px; font-size: 19px; font-weight: 700; letter-spacing: -.02em; margin: 18px 0 14px; }
+  .bi-info {
+    width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--muted); color: var(--muted);
+    font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+    background: none; cursor: pointer; padding: 0; font-family: inherit; line-height: 1;
+  }
+  .bi-info:active { color: var(--text); border-color: var(--text); }
+  .bi-rings { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+  .bi-ring { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+  .bi-ring-svg { width: 64px; height: 64px; position: relative; }
+  .bi-ring-svg svg { width: 100%; height: 100%; display: block; }
+  .bi-ring-svg .track { stroke: var(--panel-2); }
+  .bi-ring-svg .fill {
+    stroke: var(--accent); stroke-linecap: round;
+    transition: stroke-dashoffset 1s cubic-bezier(.22,1,.36,1); transition-delay: var(--d, 0ms);
+  }
+  .bi-rings.no-anim .bi-ring-svg .fill { transition: none; }
+  .bi-ring.top .bi-ring-svg { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--accent) 55%, transparent)); }
+  .bi-ring-val { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; letter-spacing: -.02em; }
+  .bi-ring-label { font-size: 12px; color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .bi-ring.dim .bi-ring-svg .fill { stroke: var(--border); }
+  .bi-ring.dim .bi-ring-val, .bi-ring.dim .bi-ring-label { color: var(--muted); }
+
+  .bi-insights { display: flex; flex-direction: column; gap: 8px; }
+  .bi-ins { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px; }
+  .bi-ins-ico { border-radius: 12px; background: var(--panel-2); display: flex; align-items: center; justify-content: center; color: var(--accent); }
+  .bi-ins-ico.blue { color: var(--me); }
+  .bi-ins-body { background: var(--panel-2); border-radius: 12px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .bi-ins-title { font-size: 14.5px; font-weight: 700; }
+  .bi-ins-sub { font-size: 12.5px; color: var(--muted); line-height: 1.4; margin-top: 2px; }
+  .bi-ins-val { font-size: 19px; font-weight: 700; color: var(--accent); white-space: nowrap; letter-spacing: -.02em; flex-shrink: 0; }
+  .bi-ins-val.small { font-size: 12.5px; padding-top: 2px; text-align: right; white-space: normal; max-width: 45%; }
+  .bi-ins-val.muted { color: var(--muted); }
+
+  .bi-share { display: flex; align-items: center; gap: 12px; }
+  .bi-share .av { width: 44px; height: 44px; font-size: 15px; border-width: 2px; cursor: default; }
+  .bi-share-text { flex: 1; min-width: 0; }
+  .bi-share-title { font-size: 14.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bi-share-sub { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+  .bi-share-check {
+    width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid var(--border); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; color: var(--muted); background: none;
+    transition: border-color .3s, color .3s, transform .3s cubic-bezier(.22,1,.36,1);
+  }
+  .bi-share-check.on { border-color: var(--text); color: var(--text); }
+  .bi-share-check.pop { animation: biPop .5s cubic-bezier(.22,1,.36,1) both .35s; }
+  @keyframes biPop { 0% { transform: scale(.6); opacity: 0 } 60% { transform: scale(1.12); opacity: 1 } 100% { transform: scale(1) } }
+
+  @media (max-width: 380px) {
+    .bi-grid { grid-template-columns: minmax(0, 1fr) 52%; }
+    .bi-canvas { height: 220px; }
+    .bi-ring-svg { width: 56px; height: 56px; }
+    .bi-ring-val { font-size: 12.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bi-anim, .bi-share-check.pop { animation: none; }
+    .bi-seg i, .bi-ring-svg .fill { transition: none; }
+  }
+
   .legend { display: flex; gap: 16px; margin-top: 10px; font-size: 13.5px; color: var(--muted); justify-content: center; }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
@@ -1635,48 +1688,37 @@
 
   <!-- BODY TAB -->
   <div id="tab-body" class="tab-panel hidden">
-    <div class="stat-grid">
-      <div class="stat-tile">
-        <div class="stat-top"><span class="stat-ico week" id="bodyRestIco"></span><span class="stat-label">Since last workout</span></div>
-        <div class="stat-value" id="bodyRestValue">0<span class="stat-unit">days</span></div>
-        <div class="stat-sub" id="bodyRestSub"></div>
-      </div>
-      <div class="stat-tile">
-        <div class="stat-top"><span class="stat-ico streak" id="bodyFreshIco"></span><span class="stat-label">Fresh groups</span></div>
-        <div class="stat-value" id="bodyFreshValue">0<span class="stat-unit">/6</span></div>
-        <div class="stat-sub" id="bodyFreshSub"></div>
-      </div>
-    </div>
+    <div class="bi-title">Body Impact</div>
 
-    <div class="card" id="cardTrained">
-      <h2>Trained areas</h2>
-      <div class="body-toggle">
-        <button type="button" class="tab-pill active" id="bodyThisWeekBtn">This week</button>
-        <button type="button" class="tab-pill" id="bodyLastWeekBtn">Last week</button>
+    <div class="card bi-anim" style="--d:0ms">
+      <div class="bi-period" id="biPeriod">
+        <button type="button" data-period="today">Today</button>
+        <button type="button" data-period="week">This week</button>
+        <button type="button" data-period="lastweek">Last week</button>
       </div>
-      <div class="coverage">
-        <div class="coverage-ring" id="coverageRing"></div>
-        <div class="coverage-body">
-          <div class="coverage-count" id="coverageCount">0/6</div>
-          <div class="coverage-title" id="coverageTitle"></div>
-          <div class="coverage-hint" id="coverageHint"></div>
+      <div class="bi-grid">
+        <div>
+          <h3 class="bi-head" id="biHead">Muscles Hit Today</h3>
+          <div class="bi-list" id="biList"></div>
+        </div>
+        <div class="bi-figures">
+          <canvas id="bodyDiagramFront" class="bi-canvas"></canvas>
+          <canvas id="bodyDiagramBack" class="bi-canvas"></canvas>
         </div>
       </div>
-      <div class="coverage-chips" id="coverageChips"></div>
-
-      <div class="body-diagram-wrap">
-        <canvas id="bodyDiagramFront" class="rive-body-canvas"></canvas>
-        <canvas id="bodyDiagramBack" class="rive-body-canvas"></canvas>
-      </div>
-      <div class="heat-legend">
-        <span class="heat-legend-label">Light</span>
-        <span class="heat-legend-bar"></span>
-        <span class="heat-legend-label">Heavy</span>
-      </div>
-      <p class="muted-note" id="bodyDiagramNote"></p>
+      <div class="bi-section">Training Impact <button type="button" class="bi-info" id="biInfoBtn" aria-label="What is training impact">i</button></div>
+      <div class="bi-rings" id="biRings"></div>
     </div>
 
-    <div class="card" id="volumeCard"></div>
+    <div class="card bi-anim" style="--d:80ms">
+      <h3 class="bi-head" style="margin-bottom:12px">Insights</h3>
+      <div class="bi-insights" id="biInsights"></div>
+    </div>
+
+    <div class="card bi-anim hidden" id="biShareCard" style="--d:160ms">
+      <div class="bi-section" style="margin-top:0">Shared with Partner <button type="button" class="bi-info" id="biShareInfo" aria-label="About sharing">i</button></div>
+      <div class="bi-share" id="biShare"></div>
+    </div>
 
   </div>
 
@@ -2145,6 +2187,7 @@ const ICON_PATHS = {
   trophy: '<path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a2 2 0 0 0 0 4h1M16 5h3a2 2 0 0 1 0 4h-1"/><path d="M12 12v3M9 20h6M9.5 15.5h5l.5 4.5h-6l.5-4.5Z"/>',
   star: '<path d="M12 3l2.5 5.6 6.1.6-4.6 4.1 1.3 6-5.3-3.1L6.7 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z"/>',
   trending: '<path d="M3 17 9 11l4 4 8-8"/><path d="M17 7h4v4"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16"/><path d="M3 21v-5h5"/>',
   pencil: `<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>`,
   checklist: '<path d="M4 6h2M4 12h2M4 18h2"/><rect x="9" y="4" width="11" height="4" rx="1"/><rect x="9" y="10" width="11" height="4" rx="1"/><rect x="9" y="16" width="11" height="4" rx="1"/>',
   dumbbell: '<path d="M4 10v4M20 10v4M2 12h2M20 12h2M6 8v8M18 8v8M9 12h6"/>',
@@ -2819,8 +2862,11 @@ function showApp() {
     e.target.value = "";
     if (f) uploadBodyPhoto(f);
   });
-  $("bodyThisWeekBtn").addEventListener("click", () => { BODY_WEEK_OFFSET = 0; renderBodyDiagram(); });
-  $("bodyLastWeekBtn").addEventListener("click", () => { BODY_WEEK_OFFSET = 1; renderBodyDiagram(); });
+  document.querySelectorAll("#biPeriod button").forEach((b) => {
+    b.addEventListener("click", () => { BODY_PERIOD = b.dataset.period; renderBodyTab(true); });
+  });
+  $("biInfoBtn").addEventListener("click", () => toast("Impact is how much of a full training dose each muscle got. 100% is about 8 hard sets in a day or 14 in a week."));
+  $("biShareInfo").addEventListener("click", () => toast(`${partnerName()} sees every workout you log. This shows when they have seen today's.`));
   $("adminGymToggleWrap").onclick = () => {
     setTimeout(() => $("adminGymToggleWrap").classList.toggle("checked", $("adminEntryGym").checked), 0);
   };
@@ -2881,7 +2927,7 @@ function switchTab(tab) {
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== "tab-" + tab));
   if (tab === "home") renderHome();
   if (tab === "progress") renderProgressTab();
-  if (tab === "body") renderBodyTab();
+  if (tab === "body") renderBodyTab(true);
   if (tab === "workout") renderWorkoutTab();
   if (tab === "setup") renderSetupTab();
 }
@@ -4192,61 +4238,6 @@ function renderHero() {
 }
 
 /* Volume this week, both of you, scaled against the higher of the two. */
-function renderVolumeCard() {
-  const el = $("volumeCard");
-  const mine = statsWindow(ME, 7);
-  const theirs = PARTNER_EMAIL ? statsWindow(partnerName(), 7) : null;
-
-  const useVolume = mine.volume > 0 || (theirs && theirs.volume > 0);
-  const val = (s) => (useVolume ? s.volume : s.minutes);
-  const unit = useVolume ? "lb" : "min";
-  const title = useVolume ? "VOLUME THIS WEEK" : "ACTIVE TIME THIS WEEK";
-
-  const mv = val(mine);
-  const tv = theirs ? val(theirs) : 0;
-  if (!mv && !tv) { el.classList.add("hidden"); return; }
-  el.classList.remove("hidden");
-  const peak = Math.max(mv, tv, 1);
-
-  const row = (name, v, cls) => `
-    <div class="vrow">
-      <div class="vrow-top">
-        <span class="vrow-name">${escapeHtml(name)}</span>
-        <span class="vrow-val ${cls}">${useVolume ? fmtVolume(v) : v.toLocaleString()} ${unit}</span>
-      </div>
-      <div class="vrow-track"><i class="${cls}" style="width:${Math.round((v / peak) * 100)}%"></i></div>
-    </div>`;
-
-  // Two bars next to each other is still a comparison, not a shared result.
-  // The combined total is the one number that only exists because there are
-  // two of you — it can't be read off either row alone.
-  const combined = theirs ? mv + tv : null;
-
-  // A supportive nudge, not a taunt: only shows when you're clearly ahead
-  // (not a rounding difference) and there's someone to check on.
-  const gap = theirs ? mv - tv : 0;
-  const showNudge = theirs && mv > 0 && gap > peak * 0.25;
-
-  el.innerHTML = `
-    <div class="hero-kicker">${title}</div>
-    ${combined != null ? `<div class="vtotal">${useVolume ? fmtVolume(combined) : combined.toLocaleString()} <span>${unit} between you</span></div>` : ""}
-    <div class="vrows">
-      ${row(`You (${ME})`, mv, "me")}
-      ${theirs ? row(partnerName(), tv, "them") : ""}
-    </div>
-    ${showNudge ? `<button type="button" class="vnudge" id="vNudgeBtn">You're ahead this week — check on ${escapeHtml(partnerName())}?</button>` : ""}`;
-
-  if (showNudge) {
-    $("vNudgeBtn").onclick = async () => {
-      const btn = $("vNudgeBtn");
-      btn.disabled = true;
-      const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "Thinking of you — let's get a session in today 💪" });
-      if (error) { toast("Couldn't send"); btn.disabled = false; return; }
-      btn.textContent = "Sent";
-    };
-  }
-}
-
 /* Your partner turning up is news, not furniture. It shows once, you either
    congratulate them or dismiss it, and then it is gone for the day. */
 async function renderPartnerNotice() {
@@ -5555,35 +5546,6 @@ let PLAN_EDIT_ADDING = false;
 const ADD_EX_STATE = { sets: 3, reps: 8, weight: 0 };
 
 /* Body tab: what is recovered, what still needs work. */
-function renderBodyTab() {
-  renderVolumeCard();
-  $("bodyRestIco").innerHTML = icon("clock", 20);
-  $("bodyFreshIco").innerHTML = icon("check", 20);
-
-  const trained = entriesFor(ME).filter((e) => e.gym).map((e) => e.entry_date).sort();
-  const last = trained[trained.length - 1];
-  const days = last
-    ? Math.round((new Date(todayStr() + "T00:00:00") - new Date(last + "T00:00:00")) / 86400000)
-    : null;
-
-  $("bodyRestValue").innerHTML = days === null
-    ? `-<span class="stat-unit">days</span>`
-    : `${days}<span class="stat-unit">${days === 1 ? "day" : "days"}</span>`;
-  $("bodyRestSub").textContent = days === null ? "No workouts yet"
-    : days === 0 ? "Trained today" : days === 1 ? "Yesterday" : "Time to move";
-
-  // Fresh = not trained this week, so it is available to hit.
-  const volumes = computeMuscleVolume(ME, 0);
-  const worked = COVERAGE_TARGETS.filter((t) => (t.members || [t.key]).some((k) => (volumes[k] || 0) > 0));
-  const fresh = COVERAGE_TARGETS.length - worked.length;
-  $("bodyFreshValue").innerHTML = `${fresh}<span class="stat-unit">/${COVERAGE_TARGETS.length}</span>`;
-  $("bodyFreshSub").textContent = fresh === 0
-    ? "Everything hit this week"
-    : COVERAGE_TARGETS.filter((t) => !worked.includes(t)).map((t) => t.label).join(", ");
-
-  renderBodyDiagram();
-}
-
 /* ---------- Session timer + pause ---------- */
 
 let SESSION_TIMER = null;
@@ -6590,9 +6552,11 @@ function computeMuscleVolume(name, weekOffset) {
   start.setDate(start.getDate() - weekOffset * 7);
   const end = new Date(start);
   end.setDate(end.getDate() + 7);
-  const startStr = isoDate(start);
-  const endStr = isoDate(end);
+  return computeMuscleVolumeBetween(name, isoDate(start), isoDate(end));
+}
 
+// Weighted sets per muscle group for [startStr, endStr) -- a day, a week, whatever the caller needs.
+function computeMuscleVolumeBetween(name, startStr, endStr) {
   const volumes = {};
   MUSCLE_GROUPS.forEach((g) => { volumes[g] = 0; });
 
@@ -6613,88 +6577,6 @@ function computeMuscleVolume(name, weekOffset) {
   return volumes;
 }
 
-// Formerly HEAT_STOPS/heatColor, hand-painting the old SVG's [data-group] fills. The
-// gradient now lives as APP_HEAT_PALETTE in knowledge/anatomy/rive-body.mjs (same RGB
-// stops) and is pushed into the Rive diagram instead. The legend bar's gradient below is
-// static CSS (.heat-legend-bar), independent of either.
-
-let BODY_WEEK_OFFSET = 0;
-
-/* Rive-backed body diagram (knowledge/anatomy/rive-body.mjs). Loaded lazily on first call
-   rather than at page load -- most sessions don't visit the Body tab every load, and the
-   .riv asset plus the Rive WASM runtime are real weight not worth paying upfront. Two
-   canvases (front/back) stay alive across re-renders; only destroyed and rebuilt when the
-   viewed person's sex actually changes artboards, since Rive can't swap an artboard on a
-   live instance (see rive-body.mjs). */
-let riveBodyModule = null;
-let riveBodyPromise = null;
-let riveFrontCtrl = null;
-let riveBackCtrl = null;
-let riveLoadedSex = null;
-
-function ensureRiveBodyModule() {
-  if (!riveBodyPromise) {
-    riveBodyPromise = import("./knowledge/anatomy/rive-body.mjs").then((m) => { riveBodyModule = m; return m; });
-  }
-  return riveBodyPromise;
-}
-
-// The app tracks relative weekly volume per broad group (v/max, continuous); the Rive file
-// wants a discrete 0-4 level per individual muscle. Any logged work at all shows as at least
-// level 1 -- a single light set shouldn't look identical to "never trained" (level 0).
-function riveIntensityFromVolume(v, max) {
-  if (v <= 0 || max <= 0) return 0;
-  return Math.max(1, Math.round((v / max) * 4));
-}
-
-function labelizeMuscle(key) {
-  return key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
-}
-
-async function renderBodyDiagram() {
-  const volumes = computeMuscleVolume(viewedName(), BODY_WEEK_OFFSET);
-  const values = Object.values(volumes);
-  const max = Math.max(...values);
-  const totalSets = values.reduce((a, b) => a + b, 0);
-
-  const mod = await ensureRiveBodyModule();
-  const intensities = {};
-  for (const muscle of mod.ALL_MUSCLES) {
-    const group = mod.RIVE_TO_APP_GROUP[muscle];
-    intensities[muscle] = riveIntensityFromVolume(volumes[group] || 0, max);
-  }
-
-  const sex = profileFor(viewedEmail())?.sex === "Female" ? "Female" : "Male";
-  const onMuscleClick = (muscle, group) => toast(`${labelizeMuscle(muscle)} — ${group}`);
-
-  if (!riveFrontCtrl || riveLoadedSex !== sex) {
-    riveFrontCtrl?.destroy();
-    riveBackCtrl?.destroy();
-    riveFrontCtrl = mod.createBodyHeatmap({
-      canvas: $("bodyDiagramFront"), artboardName: `${sex}-Front`,
-      palette: mod.APP_HEAT_PALETTE, intensities, onMuscleClick,
-    });
-    riveBackCtrl = mod.createBodyHeatmap({
-      canvas: $("bodyDiagramBack"), artboardName: `${sex}-Back`,
-      palette: mod.APP_HEAT_PALETTE, intensities, onMuscleClick,
-    });
-    riveLoadedSex = sex;
-  } else {
-    riveFrontCtrl.setIntensities(intensities);
-    riveBackCtrl.setIntensities(intensities);
-  }
-
-  $("bodyThisWeekBtn").classList.toggle("active", BODY_WEEK_OFFSET === 0);
-  $("bodyLastWeekBtn").classList.toggle("active", BODY_WEEK_OFFSET === 1);
-
-  const label = BODY_WEEK_OFFSET === 0 ? "this week" : "last week";
-  $("bodyDiagramNote").textContent = totalSets > 0
-    ? `Based on ${Math.round(totalSets)} weighted sets logged ${label}.`
-    : `No exercises logged ${label} yet.`;
-
-  renderCoverageLoop(volumes, label);
-}
-
 /* Completion drive: an incomplete pattern reads as an open loop worth closing.
    Apple's activity rings moved real behaviour with nothing but this, so the
    muscle map is framed as coverage to close rather than a passive stat. */
@@ -6707,31 +6589,319 @@ const COVERAGE_TARGETS = [
   { key: "core",      label: "Core",  members: ["abs", "obliques", "lowerback"] },
 ];
 
-function renderCoverageLoop(volumes, label) {
-  const hit = COVERAGE_TARGETS.filter((t) => {
-    const keys = t.members || [t.key];
-    return keys.some((k) => (volumes[k] || 0) > 0);
-  });
-  const done = hit.length;
-  const total = COVERAGE_TARGETS.length;
-  const pct = done / total;
+/* ---------- Body tab: Body Impact ----------
+   One period at a time (today / this week / last week). Everything on the tab
+   reads from the same per-group volume dict, so the list, the figures and the
+   rings can never disagree with each other. */
 
-  $("coverageRing").innerHTML = ringSVG(pct, done === total ? "var(--down)" : "var(--accent)", 92);
-  $("coverageCount").textContent = `${done}/${total}`;
+const BODY_GROUP_LABELS = {
+  chest: "Chest", shoulders: "Shoulders", traps: "Traps", lats: "Lats", lowerback: "Lower Back",
+  biceps: "Biceps", triceps: "Triceps", forearms: "Forearms", abs: "Core", obliques: "Obliques",
+  glutes: "Glutes", quads: "Quads", hamstrings: "Hamstrings", calves: "Calves",
+};
 
-  const missing = COVERAGE_TARGETS.filter((t) => !hit.includes(t));
-  $("coverageTitle").textContent = done === total
-    ? "Full coverage"
-    : `${total - done} muscle group${total - done === 1 ? "" : "s"} to go`;
-  $("coverageHint").textContent = done === total
-    ? `You hit every muscle group ${label}. That is a complete week.`
-    : `Still untouched ${label}: ${missing.map((m) => m.label).join(", ")}.`;
+// "Impact" is how much of a full training dose a group got. Roughly 8 hard sets
+// is a solid session for one muscle and 14 a solid week (10-20 is the usual
+// hypertrophy range); anything past that is capped at 100% rather than shown
+// as 140%, which would read as a mistake.
+const BODY_IMPACT_TARGET = { today: 8, week: 14, lastweek: 14 };
+const BODY_RECOVERY_HOURS = 48;
 
-  $("coverageChips").innerHTML = COVERAGE_TARGETS.map((t) => {
-    const on = hit.includes(t);
-    return `<span class="cov-chip ${on ? "on" : ""}">${on ? icon("check", 13) : ""}${escapeHtml(t.label)}</span>`;
-  }).join("");
+// Untrained groups fill the ring row so it is always five wide. Big movers
+// first: an empty chest ring is a more useful nudge than an empty forearms one.
+const BODY_RING_FILLERS = ["chest", "lats", "quads", "shoulders", "abs", "hamstrings", "glutes", "biceps", "triceps", "calves", "traps", "lowerback", "obliques", "forearms"];
+
+let BODY_PERIOD = null;        // null until first render, then "today" | "week" | "lastweek"
+let BODY_LAST_KEY = null;      // what was last drawn, so a silent refresh does not replay animations
+let BODY_RAMP_TIMERS = [];
+
+function bodyPeriodRange(period) {
+  if (period === "today") {
+    const s = todayStr();
+    const e = new Date(s + "T00:00:00");
+    e.setDate(e.getDate() + 1);
+    return [s, isoDate(e)];
+  }
+  const start = new Date(weekStartStr() + "T00:00:00");
+  if (period === "lastweek") start.setDate(start.getDate() - 7);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  return [isoDate(start), isoDate(end)];
 }
+
+function bodyPeriodWord(period) {
+  return period === "today" ? "today" : period === "week" ? "this week" : "last week";
+}
+
+function bodyImpactRank(volumes, period) {
+  const target = BODY_IMPACT_TARGET[period];
+  return MUSCLE_GROUPS
+    .map((g) => ({ key: g, label: BODY_GROUP_LABELS[g], sets: volumes[g] || 0, pct: Math.min(1, (volumes[g] || 0) / target) }))
+    .filter((m) => m.sets > 0)
+    .sort((a, b) => b.sets - a.sets);
+}
+
+function bodyImpactLevel(pct) {
+  return pct >= 0.75 ? "High" : pct >= 0.4 ? "Medium" : "Low";
+}
+
+function bodyRiveLevel(pct) {
+  return pct <= 0 ? 0 : Math.max(1, Math.round(pct * 4));
+}
+
+function labelizeMuscle(key) {
+  return key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+}
+
+/* animate=true replays the fills and ramps the figures; a background data
+   refresh passes nothing and only animates if the numbers actually changed. */
+function renderBodyTab(animate = false) {
+  if (!BODY_PERIOD) {
+    const [s, e] = bodyPeriodRange("today");
+    const today = computeMuscleVolumeBetween(ME, s, e);
+    BODY_PERIOD = Object.values(today).some((v) => v > 0) ? "today" : "week";
+  }
+  const [start, end] = bodyPeriodRange(BODY_PERIOD);
+  const volumes = computeMuscleVolumeBetween(ME, start, end);
+  const ranked = bodyImpactRank(volumes, BODY_PERIOD);
+  const key = `${ME}|${BODY_PERIOD}|${JSON.stringify(volumes)}`;
+  if (key !== BODY_LAST_KEY) animate = true;
+  BODY_LAST_KEY = key;
+
+  document.querySelectorAll("#biPeriod button").forEach((b) => b.classList.toggle("active", b.dataset.period === BODY_PERIOD));
+  $("biHead").textContent = BODY_PERIOD === "today" ? "Muscles Hit Today"
+    : BODY_PERIOD === "week" ? "Muscles Hit This Week" : "Muscles Hit Last Week";
+
+  renderBodyList(ranked, animate);
+  renderBodyRings(ranked, animate);
+  renderBodyDiagram(ranked, animate);
+  renderBodyInsights(animate);
+  renderBodyShare();
+}
+
+function renderBodyList(ranked, animate) {
+  const el = $("biList");
+  el.classList.toggle("no-anim", !animate);
+  const top = ranked.slice(0, 5);
+  if (!top.length) {
+    el.innerHTML = `<div class="bi-empty">Nothing logged ${bodyPeriodWord(BODY_PERIOD)} yet. Finish a session and the muscles you hit light up here.</div>`;
+    return;
+  }
+  el.innerHTML = top.map((m, i) => {
+    const fill = m.pct * 6;
+    const segs = Array.from({ length: 6 }, (_, s) => {
+      const f = Math.max(0, Math.min(1, fill - s));
+      return `<span class="bi-seg"><i style="--fill:${animate ? 0 : f.toFixed(2)};--d:${i * 70 + s * 45}ms" data-fill="${f.toFixed(2)}"></i></span>`;
+    }).join("");
+    return `<div class="bi-row">
+      <div class="bi-row-top"><span class="bi-row-name">${escapeHtml(m.label)}</span><span class="bi-row-level">${bodyImpactLevel(m.pct)}</span></div>
+      <div class="bi-segs">${segs}</div>
+    </div>`;
+  }).join("");
+  if (animate) {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.querySelectorAll(".bi-seg i").forEach((i) => i.style.setProperty("--fill", i.dataset.fill));
+    }));
+  }
+}
+
+function renderBodyRings(ranked, animate) {
+  const el = $("biRings");
+  el.classList.toggle("no-anim", !animate);
+  const shown = ranked.slice(0, 5);
+  for (const g of BODY_RING_FILLERS) {
+    if (shown.length >= 5) break;
+    if (!shown.some((m) => m.key === g)) shown.push({ key: g, label: BODY_GROUP_LABELS[g], sets: 0, pct: 0 });
+  }
+  const r = 42, c = 2 * Math.PI * r;
+  el.innerHTML = shown.map((m, i) => {
+    const pct = Math.round(m.pct * 100);
+    const off = c * (1 - m.pct);
+    return `<div class="bi-ring ${i === 0 && m.sets > 0 ? "top" : ""} ${m.sets > 0 ? "" : "dim"}">
+      <div class="bi-ring-svg">
+        <svg viewBox="0 0 100 100">
+          <circle class="track" cx="50" cy="50" r="${r}" fill="none" stroke-width="9"/>
+          <circle class="fill" cx="50" cy="50" r="${r}" fill="none" stroke-width="9" transform="rotate(-90 50 50)"
+            stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${(animate ? c : off).toFixed(2)}" data-off="${off.toFixed(2)}" style="--d:${i * 90}ms"/>
+        </svg>
+        <div class="bi-ring-val" data-target="${pct}">${animate ? 0 : pct}%</div>
+      </div>
+      <div class="bi-ring-label">${escapeHtml(m.label)}</div>
+    </div>`;
+  }).join("");
+  if (!animate) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    el.querySelectorAll(".fill").forEach((f) => { f.style.strokeDashoffset = f.dataset.off; });
+    el.querySelectorAll(".bi-ring-val").forEach((v, i) => bodyCountUp(v, Number(v.dataset.target), 1000, i * 90));
+  }));
+}
+
+function bodyCountUp(el, target, ms, delay) {
+  const t0 = performance.now() + delay;
+  const tick = (now) => {
+    const t = Math.max(0, Math.min(1, (now - t0) / ms));
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = `${Math.round(target * eased)}%`;
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+/* Rive-backed figures (knowledge/anatomy/rive-body.mjs), loaded lazily on the
+   first Body visit: the .riv plus the WASM runtime are real weight most sessions
+   never need. Front and back stay alive across re-renders and are only rebuilt
+   when the artboard has to change, since Rive cannot swap one on a live instance. */
+let riveBodyPromise = null;
+let riveFrontCtrl = null;
+let riveBackCtrl = null;
+let riveLoadedSex = null;
+
+function ensureRiveBodyModule() {
+  if (!riveBodyPromise) riveBodyPromise = import("./knowledge/anatomy/rive-body.mjs");
+  return riveBodyPromise;
+}
+
+async function renderBodyDiagram(ranked, animate) {
+  const mod = await ensureRiveBodyModule();
+  const byGroup = Object.fromEntries(ranked.map((m) => [m.key, m]));
+  const target = {};
+  for (const muscle of mod.ALL_MUSCLES) {
+    target[muscle] = bodyRiveLevel(byGroup[mod.RIVE_TO_APP_GROUP[muscle]]?.pct || 0);
+  }
+
+  const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
+  const onMuscleClick = (muscle, group) => {
+    const m = byGroup[group];
+    const label = BODY_GROUP_LABELS[group] || group;
+    toast(m ? `${labelizeMuscle(muscle)} · ${label} · ${bodyImpactLevel(m.pct)}`
+            : `${labelizeMuscle(muscle)} · ${label} · not trained ${bodyPeriodWord(BODY_PERIOD)}`);
+  };
+
+  if (!riveFrontCtrl || riveLoadedSex !== sex) {
+    riveFrontCtrl?.destroy();
+    riveBackCtrl?.destroy();
+    const make = (id, view) => mod.createBodyHeatmap({
+      canvas: $(id), artboardName: `${sex}-${view}`, palette: mod.LIME_PALETTE,
+      intensities: {}, onMuscleClick, onLoad: () => bodyRampFigures(target, animate),
+    });
+    riveFrontCtrl = make("bodyDiagramFront", "Front");
+    riveBackCtrl = make("bodyDiagramBack", "Back");
+    riveLoadedSex = sex;
+  } else {
+    bodyRampFigures(target, animate);
+  }
+}
+
+/* Muscles light up one level at a time instead of snapping to their final
+   colour, so a heavy chest day visibly "builds" on the figure. */
+function bodyRampFigures(target, animate) {
+  BODY_RAMP_TIMERS.forEach(clearTimeout);
+  BODY_RAMP_TIMERS = [];
+  const apply = (lvl) => {
+    const step = {};
+    for (const k in target) step[k] = Math.min(lvl, target[k]);
+    riveFrontCtrl?.setIntensities(step);
+    riveBackCtrl?.setIntensities(step);
+  };
+  if (!animate) { apply(4); return; }
+  apply(0);
+  for (let lvl = 1; lvl <= 4; lvl++) BODY_RAMP_TIMERS.push(setTimeout(() => apply(lvl), 120 + lvl * 160));
+}
+
+function bodyGroupsPhrase(groups) {
+  const labels = groups.map((g) => (BODY_GROUP_LABELS[g] || g).toLowerCase());
+  const text = labels.length > 1 ? `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}` : labels[0] || "";
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function renderBodyInsights(animate) {
+  const rows = [];
+
+  // Recovery: hours until the groups from the last session have had 48h.
+  const mine = ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME);
+  const lastDate = mine.reduce((m, l) => (l.entry_date > m ? l.entry_date : m), "");
+  if (lastDate) {
+    const next = new Date(lastDate + "T00:00:00");
+    next.setDate(next.getDate() + 1);
+    const day = bodyImpactRank(computeMuscleVolumeBetween(ME, lastDate, isoDate(next)), "today");
+    const groups = day.slice(0, 2).map((m) => m.key);
+    const entry = entriesFor(ME).find((e) => e.entry_date === lastDate);
+    const at = entry?.workout_at ? new Date(entry.workout_at) : new Date(lastDate + "T18:00:00");
+    const remaining = BODY_RECOVERY_HOURS - (Date.now() - at.getTime()) / 3600000;
+    const who = groups.length ? bodyGroupsPhrase(groups) : "Those muscles";
+    rows.push(remaining > 0
+      ? { ico: "refresh", title: "Recovery", value: `${Math.ceil(remaining)}h`, sub: `${who} worked hard. We recommend rest before training this area again.` }
+      : { ico: "refresh", title: "Recovery", value: "Ready", sub: `${who} ${groups.length > 1 ? "have" : "has"} had ${BODY_RECOVERY_HOURS}h. Good to train again.` });
+  } else {
+    rows.push({ ico: "refresh", title: "Recovery", value: "-", cls: "muted", sub: "Log a session to get recovery guidance here." });
+  }
+
+  // Volume trend: this week so far against the same stretch of last week, so
+  // a Tuesday is never compared with a full seven days.
+  const weekStart = weekStartStr();
+  const [, tomorrow] = bodyPeriodRange("today");
+  const elapsed = Math.round((new Date(todayStr() + "T00:00:00") - new Date(weekStart + "T00:00:00")) / 86400000) + 1;
+  const lastStart = new Date(weekStart + "T00:00:00"); lastStart.setDate(lastStart.getDate() - 7);
+  const lastCut = new Date(lastStart); lastCut.setDate(lastCut.getDate() + elapsed);
+  const sum = (v) => Object.values(v).reduce((a, b) => a + b, 0);
+  const thisWk = sum(computeMuscleVolumeBetween(ME, weekStart, tomorrow));
+  const lastWk = sum(computeMuscleVolumeBetween(ME, isoDate(lastStart), isoDate(lastCut)));
+  if (thisWk === 0 && lastWk === 0) {
+    rows.push({ ico: "trending", title: "Volume Trend", value: "-", cls: "muted", sub: "Nothing logged yet. Your first week sets the baseline." });
+  } else if (lastWk === 0) {
+    rows.push({ ico: "trending", title: "Volume Trend", value: "New", sub: "First week with logged volume. Next week has something to beat." });
+  } else {
+    const pct = Math.round(((thisWk - lastWk) / lastWk) * 100);
+    rows.push(pct >= 0
+      ? { ico: "trending", title: "Volume Trend", value: `+${pct}%`, sub: "Great job pushing volume up from this point last week." }
+      : { ico: "trending", title: "Volume Trend", value: `${pct}%`, cls: "muted", sub: "Below this point last week. Fine if it is a planned lighter week." });
+  }
+
+  // Suggestion: whatever this week has not touched yet.
+  const weekVol = computeMuscleVolumeBetween(ME, weekStart, tomorrow);
+  const missing = COVERAGE_TARGETS.filter((t) => !(t.members || [t.key]).some((k) => (weekVol[k] || 0) > 0));
+  if (thisWk === 0) {
+    rows.push({ ico: "bolt", blue: true, title: "Suggestion", value: "Any session today", small: true, sub: "Nothing logged this week yet. Start anywhere and we build from there." });
+  } else if (missing.length) {
+    rows.push({ ico: "bolt", blue: true, title: "Suggestion", value: `${missing.slice(0, 2).map((t) => t.label).join(" or ")} tomorrow`, small: true, sub: "Keep the momentum going with a balanced next session." });
+  } else {
+    rows.push({ ico: "bolt", blue: true, title: "Suggestion", value: "Rest or cardio tomorrow", small: true, sub: "Every group is covered this week. Recover, then go again." });
+  }
+
+  $("biInsights").innerHTML = rows.map((r, i) => `
+    <div class="bi-ins ${animate ? "bi-anim" : ""}" style="--d:${120 + i * 70}ms">
+      <div class="bi-ins-ico ${r.blue ? "blue" : ""}">${icon(r.ico, 22)}</div>
+      <div class="bi-ins-body">
+        <div><div class="bi-ins-title">${escapeHtml(r.title)}</div><div class="bi-ins-sub">${escapeHtml(r.sub)}</div></div>
+        <div class="bi-ins-val ${r.small ? "small" : ""} ${r.cls || ""}">${escapeHtml(r.value)}</div>
+      </div>
+    </div>`).join("");
+}
+
+/* Whether your partner has seen today's workout. Their seeing it is the
+   whole point of logging with someone, so it gets its own card. */
+async function renderBodyShare() {
+  const card = $("biShareCard");
+  if (!PARTNER_EMAIL) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  const partner = partnerName();
+  const mine = todayEntryFor(MY_EMAIL);
+  const seenAt = mine?.gym && mine.seen_by_partner_at ? new Date(mine.seen_by_partner_at) : null;
+  const fmt = (d) => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+  let title, sub, state;
+  if (seenAt) { title = `${partner} saw your workout`; sub = fmt(seenAt); state = "on"; }
+  else if (mine?.gym) { title = `Shared with ${partner}`; sub = "Not seen yet"; state = "wait"; }
+  else { title = "No workout shared today"; sub = `Log a session and ${partner} will see it.`; state = "off"; }
+
+  const av = await avatarHTML(PARTNER_EMAIL, partner, "them", "span");
+  const prev = $("biShare").dataset.state;
+  $("biShare").dataset.state = state;
+  $("biShare").innerHTML = `${av}
+    <div class="bi-share-text"><div class="bi-share-title">${escapeHtml(title)}</div><div class="bi-share-sub">${escapeHtml(sub)}</div></div>
+    <span class="bi-share-check ${state === "on" ? "on" : ""} ${state === "on" && prev !== "on" ? "pop" : ""}">${icon(state === "wait" ? "clock" : "check", 18)}</span>`;
+}
+
 
 function hexPath(cx, cy, r) {
   const pts = [];
@@ -6908,7 +7078,6 @@ function renderProgressTab() {
 
   if (on.has("weight")) renderWeightChart();
   if (on.has("activity")) renderLog();
-  if (on.has("trained")) renderBodyDiagram();
   if (on.has("photos")) renderBodyPhotos();
 
 }
