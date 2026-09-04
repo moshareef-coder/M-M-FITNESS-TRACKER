@@ -1312,15 +1312,91 @@
   .bi-segs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; margin-top: 6px; }
   .bi-seg { height: 7px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--border); position: relative; overflow: hidden; }
   .bi-seg i {
-    position: absolute; inset: 0; background: var(--accent); border-radius: 4px;
+    position: absolute; inset: 0; background: var(--heat, var(--accent)); border-radius: 4px;
     transform-origin: left center; transform: scaleX(var(--fill, 0));
     transition: transform .55s cubic-bezier(.22,1,.36,1); transition-delay: var(--d, 0ms);
-    box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--heat, var(--accent)) 45%, transparent);
   }
   .bi-list.no-anim .bi-seg i { transition: none; }
   .bi-empty { font-size: 13px; color: var(--muted); line-height: 1.45; }
   .bi-figures { display: flex; gap: 2px; margin-top: -10px; }
-  .bi-canvas { flex: 1; min-width: 0; height: 250px; display: block; }
+  .bi-fig {
+    flex: 1 1 0; min-width: 0; position: relative; overflow: hidden;
+    transition: flex-grow .45s cubic-bezier(.22,1,.36,1), opacity .3s;
+  }
+  .bi-canvas { width: 100%; height: 250px; display: block; transition: height .45s cubic-bezier(.22,1,.36,1); touch-action: manipulation; }
+  .bi-hint { font-size: 11.5px; color: var(--muted); text-align: right; margin-top: 2px; }
+
+  /* Focus mode: one muscle tapped. The other figure folds away, the tapped one
+     grows and zooms, the ranked list gives way to that muscle's own detail. */
+  .bi-grid.focus .bi-col-list { display: none; }
+  .bi-detail { display: none; min-width: 0; }
+  .bi-grid.focus .bi-detail { display: block; animation: popIn .4s cubic-bezier(.22,1,.36,1) both; }
+  .bi-grid.focus .bi-fig.collapsed { flex-grow: 0; opacity: 0; pointer-events: none; }
+  .bi-grid.focus .bi-canvas { height: 300px; }
+  .bi-back {
+    display: inline-flex; align-items: center; gap: 4px; border: none; background: var(--panel-2); color: var(--muted);
+    font-family: inherit; font-size: 12px; font-weight: 600; padding: 5px 10px 5px 8px; border-radius: 100px; cursor: pointer; margin-bottom: 12px;
+  }
+  .bi-back:active { transform: scale(.96); }
+  .bi-detail-name { font-size: 18px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+  .bi-detail-sub { font-size: 12.5px; color: var(--muted); line-height: 1.4; margin-top: 3px; }
+  .bi-detail-impact { margin-top: 12px; }
+  .bi-detail-pct { font-size: 30px; font-weight: 800; letter-spacing: -.03em; color: var(--heat, var(--accent)); line-height: 1; }
+  .bi-detail-pct.none { color: var(--muted); font-size: 18px; font-weight: 700; }
+  .bi-detail-lvl { font-size: 12.5px; color: var(--muted); font-weight: 500; margin-top: 3px; }
+  .bi-detail-bar { height: 6px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--border); margin-top: 8px; overflow: hidden; }
+  .bi-detail-bar i { display: block; height: 100%; background: var(--heat, var(--accent)); border-radius: 4px; transform-origin: left; transform: scaleX(var(--fill, 0)); transition: transform .6s cubic-bezier(.22,1,.36,1); }
+  .bi-detail-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 14px 0 6px; }
+  .bi-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .bi-chip {
+    font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 100px; border: 1px solid var(--border);
+    color: var(--muted); background: var(--panel-2); white-space: nowrap;
+  }
+  .bi-chip.hit { color: var(--text); border-color: color-mix(in srgb, var(--heat, var(--accent)) 60%, transparent); background: color-mix(in srgb, var(--heat, var(--accent)) 18%, var(--panel-2)); }
+  .bi-hit { display: flex; justify-content: space-between; gap: 6px; font-size: 12.5px; padding: 4px 0; border-top: 1px solid var(--border); }
+  .bi-hit:first-of-type { border-top: none; }
+  .bi-hit-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bi-hit-sets { color: var(--muted); flex-shrink: 0; }
+  .bi-hit-sets.assist::after { content: " assist"; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
+  .bi-try { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+  .bi-try b { color: var(--text); font-weight: 600; }
+
+  .bi-pieces { display: none; flex-direction: column; gap: 6px; }
+  .bi-pieces.show { display: flex; animation: popIn .4s cubic-bezier(.22,1,.36,1) both; }
+  .bi-rings.hide { display: none; }
+  .bi-piece {
+    display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 10px; text-align: left;
+    width: 100%; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel-2);
+    color: var(--text); font-family: inherit; cursor: pointer; transition: border-color .2s, background .2s, transform .12s;
+  }
+  .bi-piece:active { transform: scale(.985); }
+  .bi-piece.on { border-color: color-mix(in srgb, var(--heat, var(--accent)) 70%, transparent); background: color-mix(in srgb, var(--heat, var(--accent)) 12%, var(--panel-2)); }
+  .bi-piece-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--heat, var(--accent)); box-shadow: 0 0 8px color-mix(in srgb, var(--heat, var(--accent)) 60%, transparent); }
+  .bi-piece.off .bi-piece-dot { background: none; border: 1.5px solid var(--muted); box-shadow: none; }
+  .bi-piece-name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bi-piece-where { font-size: 11.5px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bi-piece-val { text-align: right; }
+  .bi-piece-pct { font-size: 15px; font-weight: 700; letter-spacing: -.02em; color: var(--heat, var(--accent)); }
+  .bi-piece.off .bi-piece-pct { color: var(--muted); font-size: 12.5px; font-weight: 600; }
+  .bi-piece-bar { width: 64px; height: 4px; border-radius: 3px; background: var(--panel); margin-top: 4px; margin-left: auto; overflow: hidden; }
+  .bi-piece-bar i { display: block; height: 100%; width: calc(var(--fill, 0) * 100%); background: var(--heat, var(--accent)); border-radius: 3px; }
+
+  /* Labels pinned to the zoomed figure, one per piece. Zero-size anchor at the
+     muscle centre; the dot and pill hang off it so positioning is one transform. */
+  .bi-callouts { position: absolute; inset: 0; pointer-events: none; }
+  .bi-callout { position: absolute; width: 0; height: 0; padding: 0; border: 0; background: none; pointer-events: auto; cursor: pointer; font-family: inherit; }
+  .bi-callout i { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--heat, var(--accent)); box-shadow: 0 0 0 2px rgba(0,0,0,.55); }
+  .bi-callout.off i { background: #3a434c; }
+  .bi-callout span {
+    position: absolute; left: var(--dx, 9px); top: calc(var(--dy, 0px) - 10px); height: 20px; line-height: 18px; padding: 0 7px;
+    font-size: 10.5px; font-weight: 600; white-space: nowrap; border-radius: 6px; color: var(--text);
+    background: rgba(18, 22, 26, .88); border: 1px solid var(--border); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  }
+  .bi-callout.off span { color: var(--muted); }
+  .bi-callout.on span { background: var(--heat, var(--accent)); color: #fff; border-color: transparent; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+  .bi-callout.on.off span { color: var(--bg); }
+  .bi-callout.on i { box-shadow: 0 0 0 2px rgba(0,0,0,.55), 0 0 10px var(--heat, var(--accent)); }
 
   .bi-section { display: flex; align-items: center; gap: 7px; font-size: 19px; font-weight: 700; letter-spacing: -.02em; margin: 18px 0 14px; }
   .bi-info {
@@ -1335,11 +1411,11 @@
   .bi-ring-svg svg { width: 100%; height: 100%; display: block; }
   .bi-ring-svg .track { stroke: var(--panel-2); }
   .bi-ring-svg .fill {
-    stroke: var(--accent); stroke-linecap: round;
+    stroke: var(--heat, var(--accent)); stroke-linecap: round;
     transition: stroke-dashoffset 1s cubic-bezier(.22,1,.36,1); transition-delay: var(--d, 0ms);
   }
   .bi-rings.no-anim .bi-ring-svg .fill { transition: none; }
-  .bi-ring.top .bi-ring-svg { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--accent) 55%, transparent)); }
+  .bi-ring.top .bi-ring-svg { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--heat, var(--accent)) 55%, transparent)); }
   .bi-ring-val { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; letter-spacing: -.02em; }
   .bi-ring-label { font-size: 12px; color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .bi-ring.dim .bi-ring-svg .fill { stroke: var(--border); }
@@ -1377,8 +1453,8 @@
     .bi-ring-val { font-size: 12.5px; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .bi-anim, .bi-share-check.pop { animation: none; }
-    .bi-seg i, .bi-ring-svg .fill { transition: none; }
+    .bi-anim, .bi-share-check.pop, .bi-grid.focus .bi-detail, .bi-pieces.show { animation: none; }
+    .bi-seg i, .bi-ring-svg .fill, .bi-fig, .bi-canvas, .bi-detail-bar i { transition: none; }
   }
 
   .legend { display: flex; gap: 16px; margin-top: 10px; font-size: 13.5px; color: var(--muted); justify-content: center; }
@@ -1696,18 +1772,21 @@
         <button type="button" data-period="week">This week</button>
         <button type="button" data-period="lastweek">Last week</button>
       </div>
-      <div class="bi-grid">
-        <div>
+      <div class="bi-grid" id="biGrid">
+        <div class="bi-col-list">
           <h3 class="bi-head" id="biHead">Muscles Hit Today</h3>
           <div class="bi-list" id="biList"></div>
         </div>
-        <div class="bi-figures">
-          <canvas id="bodyDiagramFront" class="bi-canvas"></canvas>
-          <canvas id="bodyDiagramBack" class="bi-canvas"></canvas>
+        <div class="bi-detail" id="biDetail"></div>
+        <div class="bi-figures" id="biFigures">
+          <div class="bi-fig" data-view="Front"><canvas id="bodyDiagramFront" class="bi-canvas"></canvas><div class="bi-callouts"></div></div>
+          <div class="bi-fig" data-view="Back"><canvas id="bodyDiagramBack" class="bi-canvas"></canvas><div class="bi-callouts"></div></div>
         </div>
       </div>
-      <div class="bi-section">Training Impact <button type="button" class="bi-info" id="biInfoBtn" aria-label="What is training impact">i</button></div>
+      <div class="bi-hint" id="biHint">Tap a muscle on the figure to zoom in</div>
+      <div class="bi-section"><span id="biSectionTitle">Training Impact</span> <button type="button" class="bi-info" id="biInfoBtn" aria-label="What is training impact">i</button></div>
       <div class="bi-rings" id="biRings"></div>
+      <div class="bi-pieces" id="biPieces"></div>
     </div>
 
     <div class="card bi-anim" style="--d:80ms">
@@ -2865,7 +2944,18 @@ function showApp() {
   document.querySelectorAll("#biPeriod button").forEach((b) => {
     b.addEventListener("click", () => { BODY_PERIOD = b.dataset.period; renderBodyTab(true); });
   });
-  $("biInfoBtn").addEventListener("click", () => toast("Impact is how much of a full training dose each muscle got. 100% is about 8 hard sets in a day or 14 in a week."));
+  $("biInfoBtn").addEventListener("click", () => toast(BODY_FOCUS
+    ? "Each piece is one muscle the figure can draw. Credit comes from the exercises you logged: a squat loads every quad, a leg extension does not touch the adductors."
+    : "Impact is how much of a full training dose each muscle got. 100% is about 8 hard sets in a day or 14 in a week."));
+  $("biDetail").addEventListener("click", (e) => { if (e.target.closest("#biBack")) bodyUnfocus(); });
+  $("biPieces").addEventListener("click", (e) => {
+    const b = e.target.closest(".bi-piece");
+    if (b && BODY_FOCUS) bodyFocusMuscle(b.dataset.muscle, BODY_FOCUS.view, BODY_FOCUS.side);
+  });
+  $("biFigures").addEventListener("click", (e) => {
+    const b = e.target.closest(".bi-callout");
+    if (b && BODY_FOCUS) bodyFocusMuscle(b.dataset.muscle, BODY_FOCUS.view, BODY_FOCUS.side);
+  });
   $("biShareInfo").addEventListener("click", () => toast(`${partnerName()} sees every workout you log. This shows when they have seen today's.`));
   $("adminGymToggleWrap").onclick = () => {
     setTimeout(() => $("adminGymToggleWrap").classList.toggle("checked", $("adminEntryGym").checked), 0);
@@ -6515,26 +6605,34 @@ const MUSCLE_RULES = [
   { match: ["surf", "paddleboard", "paddle board", "kayak", "canoe"], primary: ["lats", "shoulders"], secondary: ["abs", "obliques", "triceps"] },
   { match: ["skate", "rollerblad"], primary: ["quads", "glutes"], secondary: ["calves", "abs"] },
   { match: ["hip thrust", "glute bridge"], primary: ["glutes"], secondary: ["hamstrings"] },
+  { match: ["abduction", "abductor", "clamshell", "band walk", "monster walk", "fire hydrant"], primary: ["glutes"], secondary: [] },
+  { match: ["adduction", "adductor", "copenhagen"], primary: ["quads"], secondary: [] },
+  { match: ["neck"], primary: ["traps"], secondary: [] },
   { match: ["romanian deadlift", "rdl", "stiff leg"], primary: ["hamstrings"], secondary: ["glutes", "lowerback"] },
   { match: ["deadlift"], primary: ["hamstrings", "glutes", "lowerback"], secondary: ["traps", "forearms", "lats"] },
   { match: ["back extension", "hyperextension", "good morning"], primary: ["lowerback"], secondary: ["hamstrings", "glutes"] },
-  { match: ["squat", "leg press", "lunge", "step up", "bulgarian"], primary: ["quads"], secondary: ["glutes", "hamstrings"] },
+  { match: ["squat", "leg press", "lunge", "step up", "step-up", "bulgarian"], primary: ["quads"], secondary: ["glutes", "hamstrings"] },
   { match: ["leg extension"], primary: ["quads"], secondary: [] },
-  { match: ["leg curl", "hamstring curl"], primary: ["hamstrings"], secondary: [] },
-  { match: ["calf"], primary: ["calves"], secondary: [] },
+  { match: ["leg curl", "hamstring curl", "nordic"], primary: ["hamstrings"], secondary: [] },
+  { match: ["calf", "tibialis", "toe raise"], primary: ["calves"], secondary: [] },
   { match: ["lat pulldown", "pulldown", "pull-up", "pullup", "chin-up", "chinup"], primary: ["lats"], secondary: ["biceps", "forearms"] },
+  { match: ["upright row"], primary: ["shoulders", "traps"], secondary: ["biceps"] },
   { match: ["row"], primary: ["lats"], secondary: ["biceps", "traps", "shoulders"] },
   { match: ["shrug"], primary: ["traps"], secondary: ["forearms"] },
-  { match: ["face pull", "rear delt"], primary: ["shoulders"], secondary: ["traps"] },
-  { match: ["lateral raise", "front raise", "arnold", "overhead press", "military press", "ohp", "shoulder press"], primary: ["shoulders"], secondary: ["triceps", "traps"] },
+  { match: ["face pull", "rear delt", "reverse fly", "reverse flye"], primary: ["shoulders"], secondary: ["traps"] },
+  { match: ["lateral raise", "front raise", "arnold", "overhead press", "military press", "ohp", "shoulder press", "push press"], primary: ["shoulders"], secondary: ["triceps", "traps"] },
+  // Before the chest rules: a close grip bench is a triceps lift, an incline curl a
+  // biceps one, and "grip" alone must not catch a wide grip bench press.
+  { match: ["close grip", "close-grip"], primary: ["triceps"], secondary: ["chest", "shoulders"] },
+  { match: ["wrist"], primary: ["forearms"], secondary: [] },
+  { match: ["hammer curl", "bicep", "curl", "preacher", "concentration"], primary: ["biceps"], secondary: ["forearms"] },
   { match: ["incline"], primary: ["chest", "shoulders"], secondary: ["triceps"] },
-  { match: ["bench", "chest press", "push-up", "pushup", "dip", "fly", "flye", "pec deck"], primary: ["chest"], secondary: ["triceps", "shoulders"] },
-  { match: ["tricep", "pushdown", "skull crusher", "overhead extension", "kickback"], primary: ["triceps"], secondary: [] },
-  { match: ["wrist", "forearm", "farmer", "grip"], primary: ["forearms"], secondary: [] },
-  { match: ["hammer curl", "bicep", "curl", "preacher"], primary: ["biceps"], secondary: ["forearms"] },
+  { match: ["bench", "chest press", "push-up", "pushup", "dip", "fly", "flye", "pec deck", "crossover"], primary: ["chest"], secondary: ["triceps", "shoulders"] },
+  { match: ["tricep", "pushdown", "skull crusher", "overhead extension", "kickback", "french press"], primary: ["triceps"], secondary: [] },
+  { match: ["forearm", "farmer", "grip"], primary: ["forearms"], secondary: [] },
   { match: ["swing", "clean", "snatch", "thruster"], primary: ["glutes", "hamstrings"], secondary: ["shoulders", "lowerback", "traps"] },
-  { match: ["russian twist", "side bend", "oblique", "woodchop"], primary: ["obliques"], secondary: ["abs"] },
-  { match: ["plank", "crunch", "sit-up", "situp", "leg raise", "ab ", "abs", "core", "hollow"], primary: ["abs"], secondary: ["obliques"] },
+  { match: ["russian twist", "side bend", "oblique", "woodchop", "wood chop", "side plank"], primary: ["obliques"], secondary: ["abs"] },
+  { match: ["plank", "crunch", "sit-up", "situp", "leg raise", "knee raise", "hanging", "toes to bar", "dead bug", "ab wheel", "rollout", "ab ", "abs", "core", "hollow"], primary: ["abs"], secondary: ["obliques"] },
 ];
 
 const MUSCLE_GROUPS = ["chest", "shoulders", "traps", "lats", "lowerback", "biceps", "triceps", "forearms", "abs", "obliques", "glutes", "quads", "hamstrings", "calves"];
@@ -6649,8 +6747,25 @@ function bodyRiveLevel(pct) {
   return pct <= 0 ? 0 : Math.max(1, Math.round(pct * 4));
 }
 
-function labelizeMuscle(key) {
-  return key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+// Same yellow-to-red ramp as the figures (APP_HEAT_PALETTE in rive-body.mjs), so
+// the bars, the rings and the muscles themselves always agree on what "hot" looks
+// like. Interpolated rather than 4 flat buckets so a 51% row and a 74% row read
+// as visibly different, not identical "Medium" orange.
+const BODY_HEAT_STOPS = [
+  [0, 242, 208, 36], [0.34, 245, 155, 31], [0.67, 224, 82, 31], [1, 168, 20, 20],
+];
+function bodyHeatColor(pct) {
+  const p = Math.max(0, Math.min(1, pct));
+  for (let i = 1; i < BODY_HEAT_STOPS.length; i++) {
+    const [p0, r0, g0, b0] = BODY_HEAT_STOPS[i - 1];
+    const [p1, r1, g1, b1] = BODY_HEAT_STOPS[i];
+    if (p <= p1) {
+      const t = p1 === p0 ? 0 : (p - p0) / (p1 - p0);
+      return `rgb(${Math.round(r0 + (r1 - r0) * t)}, ${Math.round(g0 + (g1 - g0) * t)}, ${Math.round(b0 + (b1 - b0) * t)})`;
+    }
+  }
+  const [, r, g, b] = BODY_HEAT_STOPS[BODY_HEAT_STOPS.length - 1];
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 /* animate=true replays the fills and ramps the figures; a background data
@@ -6674,7 +6789,8 @@ function renderBodyTab(animate = false) {
 
   renderBodyList(ranked, animate);
   renderBodyRings(ranked, animate);
-  renderBodyDiagram(ranked, animate);
+  renderBodyDiagram(animate);
+  if (BODY_FOCUS) renderBodyDetail();
   renderBodyInsights(animate);
   renderBodyShare();
 }
@@ -6693,7 +6809,7 @@ function renderBodyList(ranked, animate) {
       const f = Math.max(0, Math.min(1, fill - s));
       return `<span class="bi-seg"><i style="--fill:${animate ? 0 : f.toFixed(2)};--d:${i * 70 + s * 45}ms" data-fill="${f.toFixed(2)}"></i></span>`;
     }).join("");
-    return `<div class="bi-row">
+    return `<div class="bi-row" style="--heat:${bodyHeatColor(m.pct)}">
       <div class="bi-row-top"><span class="bi-row-name">${escapeHtml(m.label)}</span><span class="bi-row-level">${bodyImpactLevel(m.pct)}</span></div>
       <div class="bi-segs">${segs}</div>
     </div>`;
@@ -6717,7 +6833,7 @@ function renderBodyRings(ranked, animate) {
   el.innerHTML = shown.map((m, i) => {
     const pct = Math.round(m.pct * 100);
     const off = c * (1 - m.pct);
-    return `<div class="bi-ring ${i === 0 && m.sets > 0 ? "top" : ""} ${m.sets > 0 ? "" : "dim"}">
+    return `<div class="bi-ring ${i === 0 && m.sets > 0 ? "top" : ""} ${m.sets > 0 ? "" : "dim"}" style="--heat:${bodyHeatColor(m.pct)}">
       <div class="bi-ring-svg">
         <svg viewBox="0 0 100 100">
           <circle class="track" cx="50" cy="50" r="${r}" fill="none" stroke-width="9"/>
@@ -6761,34 +6877,231 @@ function ensureRiveBodyModule() {
   return riveBodyPromise;
 }
 
-async function renderBodyDiagram(ranked, animate) {
-  const mod = await ensureRiveBodyModule();
-  const byGroup = Object.fromEntries(ranked.map((m) => [m.key, m]));
+async function renderBodyDiagram(animate) {
+  const [mod] = await Promise.all([ensureRiveBodyModule(), ensureBodyDetailModules()]);
+  // Each muscle lights up on its own credit, not its group's: a day of bench
+  // and flyes reddens the pecs and front delts but leaves the rear delts cool.
+  // Exercises without a per-piece rule fall back to their group's credit.
+  const [start, end] = bodyPeriodRange(BODY_PERIOD);
+  const { volumes } = computeMuscleDetailBetween(ME, start, end);
+  const dose = BODY_IMPACT_TARGET[BODY_PERIOD];
   const target = {};
   for (const muscle of mod.ALL_MUSCLES) {
-    target[muscle] = bodyRiveLevel(byGroup[mod.RIVE_TO_APP_GROUP[muscle]]?.pct || 0);
+    target[muscle] = bodyRiveLevel(Math.min(1, (volumes[muscle] || 0) / dose));
   }
 
   const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
-  const onMuscleClick = (muscle, group) => {
-    const m = byGroup[group];
-    const label = BODY_GROUP_LABELS[group] || group;
-    toast(m ? `${labelizeMuscle(muscle)} · ${label} · ${bodyImpactLevel(m.pct)}`
-            : `${labelizeMuscle(muscle)} · ${label} · not trained ${bodyPeriodWord(BODY_PERIOD)}`);
-  };
 
   if (!riveFrontCtrl || riveLoadedSex !== sex) {
+    if (BODY_FOCUS) bodyClearFocusUI();
     riveFrontCtrl?.destroy();
     riveBackCtrl?.destroy();
     const make = (id, view) => mod.createBodyHeatmap({
-      canvas: $(id), artboardName: `${sex}-${view}`, palette: mod.LIME_PALETTE,
-      intensities: {}, onMuscleClick, onLoad: () => bodyRampFigures(target, animate),
+      canvas: $(id), artboardName: `${sex}-${view}`, palette: mod.APP_HEAT_PALETTE,
+      intensities: {},
+      onMuscleClick: (muscle, group, tap) => bodyFocusMuscle(muscle, view, tap ? (tap.x < 0.5 ? "left" : "right") : null),
+      onLoad: () => bodyRampFigures(target, animate),
+      onFrame: () => { if (BODY_FOCUS?.view === view) bodyPositionCallouts(); },
     });
     riveFrontCtrl = make("bodyDiagramFront", "Front");
     riveBackCtrl = make("bodyDiagramBack", "Back");
     riveLoadedSex = sex;
   } else {
     bodyRampFigures(target, animate);
+  }
+}
+
+/* ---- Focus mode: tap a muscle, zoom in, see it piece by piece ----
+   The figure cannot recolour one muscle on its own (the .riv shares one palette
+   across all of them), so the emphasis is the zoom itself plus HTML callouts
+   pinned over the canvas. Per-piece credit comes from knowledge/anatomy/
+   muscle-detail.mjs; where to zoom from muscle-bounds.mjs. */
+let BODY_FOCUS = null;      // null | { muscle, view: "Front"|"Back", side: "left"|"right"|null }
+let BODY_DETAIL = null;     // { detail, bounds } modules once loaded
+let bodyDetailPromise = null;
+
+function ensureBodyDetailModules() {
+  if (!bodyDetailPromise) {
+    bodyDetailPromise = Promise.all([
+      import("./knowledge/anatomy/muscle-detail.mjs"),
+      import("./knowledge/anatomy/muscle-bounds.mjs"),
+    ]).then(([detail, bounds]) => { BODY_DETAIL = { detail, bounds }; return BODY_DETAIL; });
+  }
+  return bodyDetailPromise;
+}
+
+// Weighted sets per piece and head for [startStr, endStr), plus which exercises
+// put them there. Same set counting as computeMuscleVolumeBetween so a piece can
+// never show more work than its group.
+function computeMuscleDetailBetween(name, startStr, endStr) {
+  const volumes = {}, hitBy = {};
+  ALL_EXERCISE_LOGS
+    .filter((l) => l.user_name === name && l.entry_date >= startStr && l.entry_date < endStr)
+    .forEach((l) => {
+      const res = BODY_DETAIL.detail.hitsForExercise(l.exercise_name, classifyMuscles(l.exercise_name));
+      if (!res) return;
+      const sets = l.duration_min ? Math.max(1, Math.round(l.duration_min / 10)) : (l.sets || 1);
+      for (const [k, w] of Object.entries(res.hits)) {
+        volumes[k] = (volumes[k] || 0) + sets * w;
+        const list = (hitBy[k] ??= new Map());
+        const id = l.exercise_name.trim().toLowerCase();
+        const cur = list.get(id) || { name: l.exercise_name.trim(), sets: 0, weight: w };
+        cur.sets += sets;
+        list.set(id, cur);
+      }
+    });
+  return { volumes, hitBy };
+}
+
+async function bodyFocusMuscle(muscle, view, side) {
+  const { detail, bounds } = await ensureBodyDetailModules();
+  if (!detail.MUSCLE_PIECES[muscle] || !riveFrontCtrl) return;
+  const sex = riveLoadedSex || "Male";
+  // A piece picked from the list may only be drawn on the other side of the body.
+  const views = bounds.viewsFor(muscle, sex);
+  if (!views.length) return;
+  if (!views.includes(view)) view = views[0];
+  const artboard = `${sex}-${view}`;
+  const bilateral = !!bounds.MUSCLE_BOUNDS[artboard].muscles[muscle].left;
+  side = bilateral ? (side || BODY_FOCUS?.side || "left") : null;
+
+  const first = !BODY_FOCUS;
+  BODY_FOCUS = { muscle, view, side };
+  $("biGrid").classList.add("focus");
+  $("biHint").classList.add("hidden");
+  document.querySelectorAll("#biFigures .bi-fig").forEach((f) => f.classList.toggle("collapsed", f.dataset.view !== view));
+  $("biRings").classList.add("hide");
+  $("biPieces").classList.add("show");
+
+  const ctrl = view === "Front" ? riveFrontCtrl : riveBackCtrl;
+  const other = view === "Front" ? riveBackCtrl : riveFrontCtrl;
+  other?.focus(null, false);
+  // On the first tap the canvas is still growing; zoom after the layout settles
+  // so the tween lands on the final size instead of chasing it.
+  const go = () => ctrl?.focus(bounds.boundsFor(artboard, muscle, side), true);
+  if (first) setTimeout(go, 60); else go();
+  renderBodyDetail();
+}
+
+function bodyClearFocusUI() {
+  BODY_FOCUS = null;
+  $("biGrid").classList.remove("focus");
+  $("biHint").classList.remove("hidden");
+  document.querySelectorAll("#biFigures .bi-fig").forEach((f) => f.classList.remove("collapsed"));
+  document.querySelectorAll("#biFigures .bi-callouts").forEach((c) => { c.innerHTML = ""; });
+  $("biRings").classList.remove("hide");
+  $("biPieces").classList.remove("show");
+  $("biSectionTitle").textContent = "Training Impact";
+}
+
+function bodyUnfocus() {
+  bodyClearFocusUI();
+  riveFrontCtrl?.focus(null, true);
+  riveBackCtrl?.focus(null, true);
+}
+
+function bodyFmtSets(v) {
+  const n = Math.round(v * 10) / 10;
+  return `${n} ${n === 1 ? "set" : "sets"}`;
+}
+
+function renderBodyDetail() {
+  const f = BODY_FOCUS;
+  if (!f || !BODY_DETAIL) return;
+  const { detail, bounds } = BODY_DETAIL;
+  const [start, end] = bodyPeriodRange(BODY_PERIOD);
+  const { volumes, hitBy } = computeMuscleDetailBetween(ME, start, end);
+  const target = BODY_IMPACT_TARGET[BODY_PERIOD];
+  const pctOf = (k) => Math.min(1, (volumes[k] || 0) / target);
+  // Untouched pieces stay neutral rather than showing the level-1 yellow for 0%.
+  const heatOf = (k) => ((volumes[k] || 0) > 0 ? bodyHeatColor(pctOf(k)) : "var(--muted)");
+  const word = bodyPeriodWord(BODY_PERIOD);
+  const piece = detail.MUSCLE_PIECES[f.muscle];
+  const groupLabel = BODY_GROUP_LABELS[piece.group] || piece.group;
+  const pct = pctOf(f.muscle);
+  const sets = volumes[f.muscle] || 0;
+
+  // Left column: the tapped muscle itself.
+  const heads = (piece.heads || []).map((h) => {
+    const hp = pctOf(h);
+    return `<span class="bi-chip ${hp > 0 ? "hit" : ""}" style="--heat:${heatOf(h)}">${escapeHtml(detail.MUSCLE_HEADS[h].label)}${hp > 0 ? ` · ${Math.round(hp * 100)}%` : ""}</span>`;
+  }).join("");
+  const hits = [...(hitBy[f.muscle]?.values() || [])].sort((a, b) => b.sets * b.weight - a.sets * a.weight).slice(0, 4);
+  $("biDetail").innerHTML = `
+    <button type="button" class="bi-back" id="biBack">${icon("chevronLeft", 14)} All muscles</button>
+    <div class="bi-detail-name">${escapeHtml(piece.label)}</div>
+    <div class="bi-detail-sub">${escapeHtml(groupLabel)} · ${escapeHtml(piece.where)}</div>
+    <div class="bi-detail-impact" style="--heat:${heatOf(f.muscle)}">
+      ${sets > 0
+        ? `<div class="bi-detail-pct">${Math.round(pct * 100)}%</div><div class="bi-detail-lvl">${bodyImpactLevel(pct)} · ${bodyFmtSets(sets)}</div>`
+        : `<div class="bi-detail-pct none">Not hit ${escapeHtml(word)}</div>`}
+    </div>
+    <div class="bi-detail-bar" style="--heat:${heatOf(f.muscle)}"><i style="--fill:${pct.toFixed(3)}"></i></div>
+    ${heads ? `<div class="bi-detail-label">Parts</div><div class="bi-chips">${heads}</div>` : ""}
+    <div class="bi-detail-label">${sets > 0 ? "Hit by" : "Try"}</div>
+    ${sets > 0
+      ? hits.map((h) => `<div class="bi-hit"><span class="bi-hit-name">${escapeHtml(h.name)}</span><span class="bi-hit-sets ${h.weight < 1 ? "assist" : ""}">${bodyFmtSets(h.sets)}</span></div>`).join("")
+      : `<div class="bi-try"><b>${escapeHtml(piece.try)}</b> targets it directly.</div>`}`;
+
+  // Below: every piece of the same group, hit or not.
+  const pieces = detail.PIECES_BY_GROUP[piece.group] || [];
+  $("biSectionTitle").textContent = `${groupLabel}, piece by piece`;
+  $("biPieces").innerHTML = pieces.map((k) => {
+    const p = detail.MUSCLE_PIECES[k];
+    const pp = pctOf(k);
+    const hit = (volumes[k] || 0) > 0;
+    return `<button type="button" class="bi-piece ${k === f.muscle ? "on" : ""} ${hit ? "" : "off"}" data-muscle="${k}" style="--heat:${heatOf(k)}">
+      <span class="bi-piece-dot"></span>
+      <span class="bi-piece-text"><div class="bi-piece-name">${escapeHtml(p.label)}</div><div class="bi-piece-where">${escapeHtml(p.where)}</div></span>
+      <span class="bi-piece-val"><div class="bi-piece-pct">${hit ? `${Math.round(pp * 100)}%` : "Not hit"}</div><div class="bi-piece-bar"><i style="--fill:${pp.toFixed(3)}"></i></div></span>
+    </button>`;
+  }).join("");
+
+  // Callouts on the zoomed figure, for the pieces that view actually draws.
+  const artboard = `${riveLoadedSex || "Male"}-${f.view}`;
+  document.querySelectorAll("#biFigures .bi-fig").forEach((fig) => {
+    const wrap = fig.querySelector(".bi-callouts");
+    if (fig.dataset.view !== f.view) { wrap.innerHTML = ""; return; }
+    wrap.innerHTML = pieces.map((k) => {
+      const box = bounds.boundsFor(artboard, k, f.side);
+      if (!box) return "";
+      return `<button type="button" class="bi-callout ${k === f.muscle ? "on" : ""} ${(volumes[k] || 0) > 0 ? "" : "off"}" data-muscle="${k}"
+        data-ax="${((box[0] + box[2]) / 2).toFixed(4)}" data-ay="${((box[1] + box[3]) / 2).toFixed(4)}" style="--heat:${heatOf(k)}"
+        aria-label="${escapeHtml(detail.MUSCLE_PIECES[k].label)}"><i></i><span>${escapeHtml(detail.MUSCLE_PIECES[k].label)}</span></button>`;
+    }).join("");
+  });
+  bodyPositionCallouts();
+}
+
+// Runs every frame of the zoom tween and after resizes, so it only moves what is
+// already there. Pills sit to the right of their dot unless that would clip, and
+// close neighbours are nudged apart vertically (the dot stays put, the pill slides).
+function bodyPositionCallouts() {
+  const f = BODY_FOCUS;
+  if (!f) return;
+  const ctrl = f.view === "Front" ? riveFrontCtrl : riveBackCtrl;
+  const fig = document.querySelector(`#biFigures .bi-fig[data-view="${f.view}"]`);
+  if (!ctrl || !fig) return;
+  const canvas = fig.querySelector("canvas");
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  const items = [...fig.querySelectorAll(".bi-callout")].map((el) => ({ el, ...ctrl.project(+el.dataset.ax, +el.dataset.ay) }));
+  items.sort((a, b) => a.y - b.y);
+  let lastY = -Infinity;
+  for (const it of items) {
+    const inside = it.x >= 6 && it.x <= W - 6 && it.y >= 6 && it.y <= H - 6;
+    it.el.classList.toggle("hidden", !inside);
+    if (!inside) continue;
+    const y = Math.max(lastY + 24, it.y);
+    lastY = y;
+    it.el.style.left = `${it.x}px`;
+    it.el.style.top = `${it.y}px`;
+    it.el.style.setProperty("--dy", `${y - it.y}px`);
+    // Pill to the right of the dot; to the left if that clips; slid along if
+    // neither side fits (a wide label on a narrow phone canvas).
+    const w = it.el.lastElementChild.offsetWidth || 80;
+    let dx = 9;
+    if (it.x + 9 + w > W - 4) dx = it.x - 9 - w >= 4 ? -9 - w : Math.max(4 - it.x, W - 4 - w - it.x);
+    it.el.style.setProperty("--dx", `${dx}px`);
   }
 }
 
