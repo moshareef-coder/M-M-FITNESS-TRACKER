@@ -690,6 +690,17 @@
   #heroCard .btn-primary, #heroCard .btn-ghost { margin-top: 18px; }
 
   /* Volume this week */
+  .vtotal {
+    font-size: 28px; font-weight: 800; letter-spacing: -.02em; margin-top: 10px;
+    font-family: var(--font-display, inherit);
+  }
+  .vtotal span { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0; margin-left: 4px; }
+  .vnudge {
+    display: block; width: 100%; margin-top: 14px; padding: 11px 14px;
+    border-radius: 10px; border: 1px dashed var(--border); background: transparent;
+    color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; text-align: center;
+  }
+  .vnudge:active { background: var(--panel-2); }
   .vrows { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
   .vrow-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
   .vrow-name { font-size: 15px; font-weight: 700; }
@@ -721,7 +732,16 @@
   .notice-text { min-width: 0; }
   .notice-head { font-size: 16px; font-weight: 800; letter-spacing: -.015em; }
   .notice-sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
-  .notice .btn-secondary { margin-top: 14px; }
+  .notice-actions { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .notice-actions .btn-secondary { flex: 1; margin-top: 0; }
+  .react-btn {
+    flex-shrink: 0; width: 46px; height: 46px; border-radius: 12px;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--partner);
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: transform .15s ease, background .15s ease;
+  }
+  .react-btn:active { transform: scale(0.92); }
+  .react-btn.sent { background: color-mix(in srgb, var(--partner) 20%, var(--panel-2)); transform: scale(1.1); }
 
   /* Week strips, the dashboard */
   .strip-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -3624,6 +3644,28 @@ function sharedWeekStreak() {
   return streak;
 }
 
+/* Consecutive days, right up to today, where you BOTH actually trained —
+   the daily counterpart to sharedWeekStreak's weekly gate. This is the one
+   that resets fast and is felt immediately, on purpose: the weekly streak
+   forgives an off day, this one doesn't, so it's the number that makes
+   "did we both show up today" feel like it matters in the moment. */
+function sharedDayStreak() {
+  if (!PARTNER_EMAIL) return 0;
+  const partner = partnerName();
+  let streak = 0;
+  const cursor = new Date(todayStr() + "T00:00:00");
+  for (let i = 0; i < 365; i++) {
+    const ds = isoDate(cursor);
+    const mine = !!entryOn(ME, ds)?.gym;
+    const theirs = !!entryOn(partner, ds)?.gym;
+    if (!mine && !theirs && i > 0) break; // neither trained -- streak is over (today gets a pass while the day is still open)
+    if (mine && theirs) streak++;
+    else if (i === 0) { /* today not logged yet by one or both -- don't break on today itself */ }
+    else break;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
 
 
 
@@ -4171,6 +4213,7 @@ function renderHero() {
   const theirTarget = partner ? weeklyGoalFor(PARTNER_EMAIL) : 0;
 
   const streak = sharedWeekStreak();
+  const dayStreak = sharedDayStreak();
 
   const stand = `<div class="stand">
     <div class="stand-dial">${dualRing(
@@ -4204,7 +4247,11 @@ function renderHero() {
     <div class="hero-kicker">THIS WEEK'S STANDING</div>
     ${coachLine}
     ${stand}
-    ${streak > 0 ? `<p class="hero-sub">Weeks in a row you both hit your goal.</p>` : `<p class="hero-sub">Both hit your goal this week to start a streak.</p>`}
+    ${dayStreak > 0
+      ? `<p class="hero-sub">${icon("flame", 13)} ${dayStreak} day${dayStreak === 1 ? "" : "s"} running, both of you.</p>`
+      : streak > 0
+        ? `<p class="hero-sub">Weeks in a row you both hit your goal.</p>`
+        : `<p class="hero-sub">Both hit your goal this week to start a streak.</p>`}
     ${cta}`;
 
   if ($("heroBtn")) {
@@ -4252,12 +4299,34 @@ function renderVolumeCard() {
       <div class="vrow-track"><i class="${cls}" style="width:${Math.round((v / peak) * 100)}%"></i></div>
     </div>`;
 
+  // Two bars next to each other is still a comparison, not a shared result.
+  // The combined total is the one number that only exists because there are
+  // two of you — it can't be read off either row alone.
+  const combined = theirs ? mv + tv : null;
+
+  // A supportive nudge, not a taunt: only shows when you're clearly ahead
+  // (not a rounding difference) and there's someone to check on.
+  const gap = theirs ? mv - tv : 0;
+  const showNudge = theirs && mv > 0 && gap > peak * 0.25;
+
   el.innerHTML = `
     <div class="hero-kicker">${title}</div>
+    ${combined != null ? `<div class="vtotal">${useVolume ? fmtVolume(combined) : combined.toLocaleString()} <span>${unit} between you</span></div>` : ""}
     <div class="vrows">
       ${row(`You (${ME})`, mv, "me")}
       ${theirs ? row(partnerName(), tv, "them") : ""}
-    </div>`;
+    </div>
+    ${showNudge ? `<button type="button" class="vnudge" id="vNudgeBtn">You're ahead this week — check on ${escapeHtml(partnerName())}?</button>` : ""}`;
+
+  if (showNudge) {
+    $("vNudgeBtn").onclick = async () => {
+      const btn = $("vNudgeBtn");
+      btn.disabled = true;
+      const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "Thinking of you — let's get a session in today 💪" });
+      if (error) { toast("Couldn't send"); btn.disabled = false; return; }
+      btn.textContent = "Sent";
+    };
+  }
 }
 
 /* Your partner turning up is news, not furniture. It shows once, you either
@@ -4285,7 +4354,10 @@ async function renderPartnerNotice() {
         <div class="notice-sub">${escapeHtml(when)}${e.note ? ` · "${escapeHtml(e.note)}"` : ""}</div>
       </div>
     </div>
-    <button type="button" class="btn-secondary" id="noticeCheer">Congratulate ${escapeHtml(partner)}</button>`;
+    <div class="notice-actions">
+      <button type="button" class="react-btn" id="noticeReact" aria-label="React">${icon("flame", 20)}</button>
+      <button type="button" class="btn-secondary" id="noticeCheer">Congratulate ${escapeHtml(partner)}</button>
+    </div>`;
 
   const dismiss = async () => {
     el.classList.add("hidden");
@@ -4295,6 +4367,15 @@ async function renderPartnerNotice() {
   };
   $("noticeX").onclick = dismiss;
   $("noticeCheer").onclick = async () => { await dismiss(); openNoteComposer("congratulate"); };
+  // A tap-to-react is the low-friction path — most days you want to acknowledge
+  // them, not compose a message. Full congratulate flow stays one tap away.
+  $("noticeReact").onclick = async () => {
+    $("noticeReact").disabled = true;
+    const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "🔥" });
+    if (error) { toast("Couldn't send"); console.error(error); $("noticeReact").disabled = false; return; }
+    $("noticeReact").classList.add("sent");
+    setTimeout(dismiss, 500);
+  };
 }
 
 /* Wide rows: label on the left, the number on the right. One per person for
