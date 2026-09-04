@@ -1577,8 +1577,11 @@
     </div>
 
     <div class="card hidden" id="prevWorkoutsCard">
-      <h2>Previous workouts</h2>
-      <div id="prevWorkoutsList"></div>
+      <div class="recent-head" style="margin-top:0;">
+        <h3>Previous workouts</h3>
+        <button type="button" class="recent-all hidden" id="prevWorkoutsAll">View All</button>
+      </div>
+      <div class="recent-strip" id="prevWorkoutsList"></div>
     </div>
 
     <div id="sessionCard" class="session-overlay hidden">
@@ -2035,7 +2038,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.03.16";
+const APP_VERSION = "2026.09.03.17";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -5602,19 +5605,34 @@ async function startFreshWorkout() {
    properly rather than "Today / Yesterday": a list you scan for one particular
    session needs dates, and relative labels stop meaning anything past the
    second row. */
+let PREV_ALL = false;
+
+/* Days you trained, most recent first, each opening its own recap. Same card
+   shape as Recent Workouts, laid out left to right, and dated properly rather
+   than "Today / Yesterday": relative labels stop meaning anything past the
+   second row when you are scanning for one particular session. */
 function renderPreviousWorkouts() {
   const card = $("prevWorkoutsCard");
   const list = $("prevWorkoutsList");
+  const head = $("prevWorkoutsAll");
   if (!card || !list) return;
 
   const days = [...new Set(
     ALL_ENTRIES.filter((e) => e.user_name === ME && e.gym).map((e) => e.entry_date),
-  )].sort().reverse().slice(0, 20);
+  )].sort().reverse();
 
   card.classList.toggle("hidden", days.length === 0);
+  if (head) {
+    head.classList.toggle("hidden", days.length <= 3);
+    head.textContent = PREV_ALL ? "Show less" : "View All";
+    head.onclick = () => { PREV_ALL = !PREV_ALL; renderPreviousWorkouts(); };
+  }
   if (!days.length) { list.innerHTML = ""; return; }
 
-  list.innerHTML = days.map((d) => {
+  const shown = PREV_ALL ? days.slice(0, 30) : days.slice(0, 10);
+
+  list.className = PREV_ALL ? "recent-stack" : "recent-strip";
+  list.innerHTML = shown.map((d) => {
     const r = recapFor(MY_EMAIL, ME, d);
     const bits = [];
     if (r.sets) bits.push(`${r.sets} set${r.sets === 1 ? "" : "s"}`);
@@ -5622,14 +5640,12 @@ function renderPreviousWorkouts() {
     else if (r.minutes) bits.push(`${r.minutes} min`);
     const dated = new Date(d + "T00:00:00")
       .toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-    return `<button type="button" class="wk-row" data-prev="${escapeHtml(d)}">
-      <span class="wk-ico">${icon("dumbbell", 17)}</span>
-      <span class="wk-txt">
-        <span class="wk-name">${escapeHtml(r.title)}</span>
-        <span class="wk-meta">${escapeHtml([dated].concat(bits).join(" \u00b7 "))}</span>
-      </span>
-      <span class="wk-go">${icon("chevronLeft", 17)}</span>
-    </button>`;
+    return `<div class="recent-chip" data-prev="${escapeHtml(d)}" role="button" tabindex="0">
+      <div class="recent-name">${escapeHtml(r.title)}</div>
+      <div class="recent-when">${escapeHtml(dated)}</div>
+      <div class="recent-when">${escapeHtml(bits.join(" \u00b7 ") || "Logged")}</div>
+      <div class="recent-foot"><span class="recent-mark">${icon("check", 15)}</span></div>
+    </div>`;
   }).join("");
 
   list.querySelectorAll("[data-prev]").forEach((b) => {
