@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<script src="https://cdn.jsdelivr.net/npm/@rive-app/canvas@2.42.0/rive.min.js"></script>
+<style>body{background:#111;color:#eee;font:12px monospace} canvas{border:1px solid #444}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<pre id="out"></pre>
+<pre id="log"></pre>
+<script type="module">
+import { ALL_MUSCLES, ARTBOARDS, RIVE_SRC, STATE_MACHINE } from "./rive-body.mjs";
+const log = (m) => { document.getElementById("log").textContent += m + "\n"; };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const canvas = document.getElementById("c");
+const MAG = { r: 255, g: 0, b: 255 };
+const NEUTRAL = { r: 40, g: 40, b: 40 };
+
+// The palette VM is shared by every muscle, so isolate by intensity: palette is
+// magenta at every level, and only the muscle under test is switched on.
+function paletteAll(vmi, muscle) {
+  const set = (name, col) => { const p = vmi.color(`${muscle}/palette/${name}`); if (p) p.rgb(col.r, col.g, col.b); };
+  set("baseColor", NEUTRAL); set("colorLevel1", MAG); set("colorLevel2", MAG); set("colorLevel3", MAG); set("colorLevel4", MAG);
+}
+function setOn(vmi, muscle, on) { const n = vmi.number(`${muscle}/intensity`); if (n) n.value = on ? 4 : 0; }
+
+function loadArtboard(name) {
+  return new Promise((resolve, reject) => {
+    const r = new rive.Rive({
+      src: RIVE_SRC, canvas, artboard: name, stateMachine: STATE_MACHINE, autoplay: true, autoBind: true,
+      layout: new rive.Layout({ fit: rive.Fit.Contain, alignment: rive.Alignment.Center }),
+      onLoad: () => resolve(r), onLoadError: reject,
+    });
+  });
+}
+
+function bbox(img, W, H, pred) {
+  let x0 = W, y0 = H, x1 = -1, y1 = -1, n = 0;
+  const d = img.data;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    if (pred(x, d[i], d[i + 1], d[i + 2], d[i + 3])) { n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  return n ? { x0, y0, x1: x1 + 1, y1: y1 + 1, n } : null;
+}
+const isMag = (r, g, b, a) => a > 40 && r > 120 && b > 120 && g < 110 && Math.abs(r - b) < 90;
+
+const result = {};
+for (const ab of ARTBOARDS) {
+  const r = await loadArtboard(ab);
+  const b = r.bounds;
+  const artW = b.maxX - b.minX, artH = b.maxY - b.minY;
+  const H = 900, W = Math.round(H * artW / artH);
+  canvas.width = W; canvas.height = H; canvas.style.width = W + "px"; canvas.style.height = H + "px";
+  r.resizeToCanvas();
+  const vmi = r.viewModelInstance;
+  paletteAll(vmi, ALL_MUSCLES[0]);
+  for (const m of ALL_MUSCLES) setOn(vmi, m, false);
+  await sleep(600);
+  const ctx = canvas.getContext("2d");
+  // body silhouette extents: everything non-transparent
+  const body = bbox(ctx.getImageData(0, 0, W, H), W, H, (x, rr, gg, bb, a) => a > 40);
+  log(`${ab}: artboard ${artW}x${artH}, canvas ${W}x${H}, body ${JSON.stringify(body)}`);
+  result[ab] = { artboard: [artW, artH], body: body ? [body.x0 / W, body.y0 / H, body.x1 / W, body.y1 / H] : null, muscles: {} };
+  for (const m of ALL_MUSCLES) {
+    setOn(vmi, m, true);
+    // Intensity tweens inside the state machine; wait until two reads agree.
+    let img, all, prev = "x";
+    for (let tries = 0; tries < 12; tries++) {
+      await sleep(400);
+      img = ctx.getImageData(0, 0, W, H);
+      all = bbox(img, W, H, (x, rr, gg, bb, a) => isMag(rr, gg, bb, a));
+      const sig = JSON.stringify(all);
+      if (sig === prev && tries >= 2) break;
+      prev = sig;
+    }
+    if (all) {
+      const left = bbox(img, W, H, (x, rr, gg, bb, a) => x < W / 2 && isMag(rr, gg, bb, a));
+      const right = bbox(img, W, H, (x, rr, gg, bb, a) => x >= W / 2 && isMag(rr, gg, bb, a));
+      const bilateral = !!(left && right && right.x0 - left.x1 > W * 0.02);
+      const norm = (q) => q ? [+(q.x0 / W).toFixed(4), +(q.y0 / H).toFixed(4), +(q.x1 / W).toFixed(4), +(q.y1 / H).toFixed(4)] : null;
+      result[ab].muscles[m] = { all: norm(all), left: bilateral ? norm(left) : null, right: bilateral ? norm(right) : null, px: all.n };
+      log(`  ${m}: ${JSON.stringify(result[ab].muscles[m])}`);
+    } else {
+      log(`  ${m}: not visible`);
+    }
+    setOn(vmi, m, false);
+    for (let tries = 0; tries < 12; tries++) {
+      await sleep(400);
+      if (!bbox(ctx.getImageData(0, 0, W, H), W, H, (x, rr, gg, bb, a) => isMag(rr, gg, bb, a))) break;
+    }
+  }
+  r.cleanup();
+}
+document.getElementById("out").textContent = "BOUNDS_JSON=" + JSON.stringify(result);
+document.title = "DONE";
+</script>
+</body>
+</html>

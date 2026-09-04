@@ -54,12 +54,23 @@ for (const [muscle, group] of Object.entries(RIVE_TO_APP_GROUP)) {
 
 const PALETTE_VM = "palette";
 
+// Zoom limits for focus(): never smaller than the plain contain-fit, never more than this
+// many times it. The .riv is vector, so 4x stays crisp; beyond that a single muscle
+// fills the canvas and loses its neighbours for context.
+const MAX_ZOOM = 4;
+const FOCUS_MS = 520;
+
 /**
  * Load one artboard onto a canvas and wire it up to intensities/palette/click callback.
- * Returns a controller: { setIntensities, setPalette, destroy }. Caller owns the canvas
- * element's sizing; this only draws into it.
+ * Returns a controller: { setIntensities, setPalette, focus, project, resize, destroy }.
+ * Caller owns the canvas element's sizing; this only draws into it.
+ *
+ * onMuscleClick(muscle, group, tap) also gets the tap position as artboard fractions
+ * ({ x, y } in 0..1) so the caller can tell the viewer-left limb from the viewer-right.
+ * onFrame(controller) fires whenever the render frame moves (zoom tween, resize), so
+ * HTML overlays positioned with project() can follow.
  */
-export function createBodyHeatmap({ canvas, artboardName, palette, intensities, onMuscleClick, onLoad }) {
+export function createBodyHeatmap({ canvas, artboardName, palette, intensities, onMuscleClick, onLoad, onFrame }) {
   if (!ARTBOARDS.includes(artboardName)) {
     throw new Error(`Unknown artboard "${artboardName}", expected one of ${ARTBOARDS.join(", ")}`);
   }
@@ -79,35 +90,140 @@ export function createBodyHeatmap({ canvas, artboardName, palette, intensities, 
       r.resizeDrawingSurfaceToCanvas();
       applyIntensities(r, intensities || {});
       applyPalette(r, palette);
+      loaded = true;
+      frame = frameFor(focusBox);
+      applyFrame(frame);
       onLoad?.(r);
     },
     onLoadError: (e) => console.error("Rive body heatmap failed to load:", e),
   });
 
+  // --- render frame (zoom) -------------------------------------------------------
+  // Rive's Layout can draw the artboard into any rectangle of the drawing buffer, even
+  // one much larger than the canvas; the canvas simply clips it. That is our zoom: a
+  // contain-fit into a frame scaled around the muscle we want centred. Frames are kept
+  // as fractions of the canvas so a resize mid-tween only needs a re-multiply.
+  let loaded = false;
+  let focusBox = null;        // normalized artboard box we are zoomed on, or null
+  let frame = null;           // current frame, fractions of canvas {x0, y0, x1, y1}
+  let tween = null;
+  let lastTap = null;         // last pointerdown in drawing-buffer pixels
+
+  function artboardAspect() {
+    const b = r.bounds;
+    return b ? (b.maxX - b.minX) / (b.maxY - b.minY) : 178 / 490;
+  }
+
+  function frameFor(box) {
+    const W = canvas.width || 1, H = canvas.height || 1;
+    const a = artboardAspect();
+    const base = Math.min(H, W / a);          // contain-fit height in px
+    let fh = base;
+    let cx = 0.5, cy = 0.5;
+    if (box) {
+      const bw = Math.max(box[2] - box[0], 0.02), bh = Math.max(box[3] - box[1], 0.02);
+      // Fill about 60% of the canvas height or 70% of its width with the muscle,
+      // whichever hits first, then clamp to the allowed zoom range.
+      fh = Math.min((0.6 * H) / bh, (0.7 * W) / (bw * a));
+      fh = Math.max(base, Math.min(base * MAX_ZOOM, fh));
+      cx = (box[0] + box[2]) / 2;
+      cy = (box[1] + box[3]) / 2;
+    }
+    const fw = fh * a;
+    const x0 = W / 2 - cx * fw, y0 = H / 2 - cy * fh;
+    return { x0: x0 / W, y0: y0 / H, x1: (x0 + fw) / W, y1: (y0 + fh) / H };
+  }
+
+  function applyFrame(f) {
+    if (!loaded || !f) return;
+    const W = canvas.width, H = canvas.height;
+    r.layout = r.layout.copyWith({
+      fit: window.rive.Fit.Contain,
+      alignment: window.rive.Alignment.Center,
+      minX: f.x0 * W, minY: f.y0 * H, maxX: f.x1 * W, maxY: f.y1 * H,
+    });
+    onFrame?.(api);
+  }
+
+  function focus(box, animate = true) {
+    focusBox = box ? box.slice() : null;
+    if (!loaded) return;
+    if (tween) { cancelAnimationFrame(tween); tween = null; }
+    const to = frameFor(focusBox);
+    const from = frame || frameFor(null);
+    const reduce = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!animate || reduce) { frame = to; applyFrame(frame); return; }
+    const t0 = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, (now - t0) / FOCUS_MS);
+      const e = 1 - Math.pow(1 - t, 3);
+      frame = {
+        x0: from.x0 + (to.x0 - from.x0) * e, y0: from.y0 + (to.y0 - from.y0) * e,
+        x1: from.x1 + (to.x1 - from.x1) * e, y1: from.y1 + (to.y1 - from.y1) * e,
+      };
+      applyFrame(frame);
+      tween = t < 1 ? requestAnimationFrame(step) : null;
+    };
+    tween = requestAnimationFrame(step);
+  }
+
+  // Artboard fraction -> CSS pixel inside the canvas, for positioning overlays.
+  function project(ax, ay) {
+    const f = frame || frameFor(focusBox);
+    const cw = canvas.clientWidth || 1, ch = canvas.clientHeight || 1;
+    return { x: (f.x0 + ax * (f.x1 - f.x0)) * cw, y: (f.y0 + ay * (f.y1 - f.y0)) * ch };
+  }
+
+  // Drawing-buffer pixel -> artboard fraction (may fall outside 0..1 when zoomed).
+  function unproject(px, py) {
+    const f = frame || frameFor(focusBox);
+    const W = canvas.width || 1, H = canvas.height || 1;
+    return { x: (px / W - f.x0) / (f.x1 - f.x0), y: (py / H - f.y0) / (f.y1 - f.y0) };
+  }
+
+  canvas.addEventListener("pointerdown", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    lastTap = {
+      x: ((e.clientX - rect.left) / (rect.width || 1)) * canvas.width,
+      y: ((e.clientY - rect.top) / (rect.height || 1)) * canvas.height,
+    };
+  });
+
   if (onMuscleClick) {
     r.on(window.rive.EventType.RiveEvent, (event) => {
       const muscle = extractMuscleName(event?.data);
-      if (muscle) onMuscleClick(muscle, RIVE_TO_APP_GROUP[muscle]);
+      if (muscle) onMuscleClick(muscle, RIVE_TO_APP_GROUP[muscle], lastTap ? unproject(lastTap.x, lastTap.y) : null);
     });
   }
 
   // The canvas is often created while its tab is display:none (zero size), and phones
   // rotate. Rive only sizes its drawing surface on load, so without this the figure
-  // renders blurry or stretched the first time the tab becomes visible.
+  // renders blurry or stretched the first time the tab becomes visible. Resizing also
+  // resets Rive's layout to the full canvas, so the zoom frame is put back afterwards.
   let ro = null;
   if (typeof ResizeObserver !== "undefined") {
     ro = new ResizeObserver(() => {
-      try { r.resizeDrawingSurfaceToCanvas(); } catch { /* not loaded yet */ }
+      try { r.resizeDrawingSurfaceToCanvas(); } catch { return; /* not loaded yet */ }
+      if (!loaded) return;
+      if (!tween) frame = frameFor(focusBox);
+      applyFrame(frame);
     });
     ro.observe(canvas);
   }
 
-  return {
+  const api = {
     setIntensities: (next) => applyIntensities(r, next),
     setPalette: (next) => applyPalette(r, next),
-    resize: () => r.resizeDrawingSurfaceToCanvas(),
-    destroy: () => { ro?.disconnect(); r.cleanup(); },
+    focus,
+    project,
+    get zoomed() { return !!focusBox; },
+    resize: () => {
+      r.resizeDrawingSurfaceToCanvas();
+      if (loaded) { frame = frameFor(focusBox); applyFrame(frame); }
+    },
+    destroy: () => { if (tween) cancelAnimationFrame(tween); ro?.disconnect(); r.cleanup(); },
   };
+  return api;
 }
 
 function applyIntensities(r, intensities) {
