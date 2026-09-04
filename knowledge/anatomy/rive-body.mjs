@@ -7,7 +7,10 @@
 // Muscle keys and grouping are the vendor's, not ours (see ALL_MUSCLES below) -- they map
 // closely but not 1:1 onto this app's MUSCLE_GROUPS. See RIVE_TO_APP_GROUP.
 
-export const RIVE_SRC = "./assets/human_anatomy_advanced_v3.0.riv";
+// Resolved against this module's own location (not the importing page's), so it loads
+// correctly whether imported from knowledge/anatomy/body-explorer.html or from index.html
+// at the repo root. A plain "./assets/..." relative path would only work from the former.
+export const RIVE_SRC = new URL("./assets/human_anatomy_advanced_v3.0.riv", import.meta.url).href;
 export const STATE_MACHINE = "State Machine 1";
 
 export const ARTBOARDS = ["Male-Front", "Male-Back", "Female-Front", "Female-Back"];
@@ -40,6 +43,14 @@ export const RIVE_TO_APP_GROUP = {
   sartorius: "quads", rectusFemoris: "quads", vastusMedialis: "quads", vastusLateralis: "quads",
   gluteusMedius: "glutes", tibialisAnterior: "calves", soleus: "calves", gastrocnemius: "calves",
 };
+
+// The reverse of RIVE_TO_APP_GROUP: for each of this app's 14 broad groups, every Rive
+// muscle key that rolls up into it. Built once from RIVE_TO_APP_GROUP rather than hand
+// duplicated, so the two can't drift apart.
+export const APP_GROUP_TO_RIVE_MUSCLES = {};
+for (const [muscle, group] of Object.entries(RIVE_TO_APP_GROUP)) {
+  (APP_GROUP_TO_RIVE_MUSCLES[group] ??= []).push(muscle);
+}
 
 const PALETTE_VM = "palette";
 

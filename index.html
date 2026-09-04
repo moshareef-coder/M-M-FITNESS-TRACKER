@@ -18,6 +18,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@rive-app/webgl2@2.42.0/rive.min.js"></script>
 <style>
   /* Palette: graphite/charcoal ink / cobalt blue (you) / coral orange (partner) / electric lime (action) */
   :root {
@@ -1318,11 +1319,8 @@
     color: var(--muted); font-size: 13.5px; font-weight: 600; cursor: pointer;
   }
   .tab-pill.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-  .body-diagram-wrap { display: flex; justify-content: center; }
-  #bodyDiagram { width: 100%; max-width: 320px; height: auto; }
-  .bd-part { stroke: var(--border); stroke-width: 0.8; fill: var(--panel-2); transition: fill 0.3s; }
-  .bd-neutral { stroke: var(--border); stroke-width: 0.8; fill: var(--panel-2); opacity: 0.45; }
-  .bd-label { fill: var(--muted); font-size: 12.5px; font-weight: 600; text-anchor: middle; }
+  .body-diagram-wrap { display: flex; justify-content: center; gap: 8px; }
+  .rive-body-canvas { width: 50%; max-width: 160px; height: 230px; }
 
   .heat-legend { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px 0 4px; }
   .heat-legend-label { font-size: 12.5px; color: var(--muted); }
@@ -1667,88 +1665,8 @@
       <div class="coverage-chips" id="coverageChips"></div>
 
       <div class="body-diagram-wrap">
-        <svg id="bodyDiagram" viewBox="0 0 240 350" xmlns="http://www.w3.org/2000/svg">
-          <!-- ============ FRONT VIEW (center x=60) ============ -->
-          <circle cx="60" cy="20" r="13" class="bd-neutral" />
-          <path d="M54 31 h12 v8 h-12 z" class="bd-neutral" />
-          <!-- upper traps -->
-          <path d="M47 39 Q60 34 73 39 L70 47 Q60 44 50 47 Z" class="bd-part" data-group="traps" />
-          <!-- deltoids -->
-          <path d="M45 44 Q33 46 31 60 Q30 70 36 72 Q42 66 44 54 Z" class="bd-part" data-group="shoulders" />
-          <path d="M75 44 Q87 46 89 60 Q90 70 84 72 Q78 66 76 54 Z" class="bd-part" data-group="shoulders" />
-          <!-- pectorals -->
-          <path d="M47 48 Q57 46 59 50 L59 72 Q49 76 44 66 Q43 55 47 48 Z" class="bd-part" data-group="chest" />
-          <path d="M73 48 Q63 46 61 50 L61 72 Q71 76 76 66 Q77 55 73 48 Z" class="bd-part" data-group="chest" />
-          <!-- biceps -->
-          <path d="M33 72 Q28 84 29 98 Q34 102 38 98 Q39 84 38 73 Z" class="bd-part" data-group="biceps" />
-          <path d="M87 72 Q92 84 91 98 Q86 102 82 98 Q81 84 82 73 Z" class="bd-part" data-group="biceps" />
-          <!-- forearms -->
-          <path d="M29 100 Q25 116 26 132 Q31 136 35 132 Q37 116 37 100 Z" class="bd-part" data-group="forearms" />
-          <path d="M91 100 Q95 116 94 132 Q89 136 85 132 Q83 116 83 100 Z" class="bd-part" data-group="forearms" />
-          <ellipse cx="30" cy="141" rx="5" ry="7" class="bd-neutral" />
-          <ellipse cx="90" cy="141" rx="5" ry="7" class="bd-neutral" />
-          <!-- abs -->
-          <rect x="53" y="75" width="6.5" height="8" rx="2" class="bd-part" data-group="abs" />
-          <rect x="60.5" y="75" width="6.5" height="8" rx="2" class="bd-part" data-group="abs" />
-          <rect x="53" y="85" width="6.5" height="8" rx="2" class="bd-part" data-group="abs" />
-          <rect x="60.5" y="85" width="6.5" height="8" rx="2" class="bd-part" data-group="abs" />
-          <rect x="53" y="95" width="6.5" height="8" rx="2" class="bd-part" data-group="abs" />
-          <rect x="60.5" y="95" width="6.5" height="8" rx="2" class="bd-part" data-group="abs" />
-          <path d="M53 105 h14 v8 q-7 5 -14 0 z" class="bd-part" data-group="abs" />
-          <!-- obliques -->
-          <path d="M46 74 Q43 90 48 110 L52 110 L52 76 Z" class="bd-part" data-group="obliques" />
-          <path d="M74 74 Q77 90 72 110 L68 110 L68 76 Z" class="bd-part" data-group="obliques" />
-          <!-- hips -->
-          <path d="M46 113 Q60 118 74 113 L72 126 Q60 130 48 126 Z" class="bd-neutral" />
-          <!-- quads -->
-          <path d="M47 128 Q42 158 46 196 L57 196 Q59 158 58 128 Z" class="bd-part" data-group="quads" />
-          <path d="M73 128 Q78 158 74 196 L63 196 Q61 158 62 128 Z" class="bd-part" data-group="quads" />
-          <!-- knees -->
-          <ellipse cx="51" cy="203" rx="7" ry="6" class="bd-neutral" />
-          <ellipse cx="69" cy="203" rx="7" ry="6" class="bd-neutral" />
-          <!-- calves (front, tibialis) -->
-          <path d="M46 210 Q43 240 47 270 L56 270 Q57 240 55 210 Z" class="bd-part" data-group="calves" />
-          <path d="M74 210 Q77 240 73 270 L64 270 Q63 240 65 210 Z" class="bd-part" data-group="calves" />
-          <ellipse cx="51" cy="278" rx="8" ry="6" class="bd-neutral" />
-          <ellipse cx="69" cy="278" rx="8" ry="6" class="bd-neutral" />
-          <text x="60" y="300" class="bd-label">Front</text>
-
-          <!-- ============ BACK VIEW (center x=180) ============ -->
-          <circle cx="180" cy="20" r="13" class="bd-neutral" />
-          <path d="M174 31 h12 v8 h-12 z" class="bd-neutral" />
-          <!-- traps (large diamond) -->
-          <path d="M180 36 L196 44 Q190 62 180 68 Q170 62 164 44 Z" class="bd-part" data-group="traps" />
-          <!-- rear delts -->
-          <path d="M165 44 Q153 46 151 60 Q150 70 156 72 Q162 66 164 54 Z" class="bd-part" data-group="shoulders" />
-          <path d="M195 44 Q207 46 209 60 Q210 70 204 72 Q198 66 196 54 Z" class="bd-part" data-group="shoulders" />
-          <!-- lats -->
-          <path d="M166 60 Q158 76 163 100 L178 106 L178 68 Z" class="bd-part" data-group="lats" />
-          <path d="M194 60 Q202 76 197 100 L182 106 L182 68 Z" class="bd-part" data-group="lats" />
-          <!-- triceps -->
-          <path d="M153 72 Q148 84 149 98 Q154 102 158 98 Q159 84 158 73 Z" class="bd-part" data-group="triceps" />
-          <path d="M207 72 Q212 84 211 98 Q206 102 202 98 Q201 84 202 73 Z" class="bd-part" data-group="triceps" />
-          <!-- forearms -->
-          <path d="M149 100 Q145 116 146 132 Q151 136 155 132 Q157 116 157 100 Z" class="bd-part" data-group="forearms" />
-          <path d="M211 100 Q215 116 214 132 Q209 136 205 132 Q203 116 203 100 Z" class="bd-part" data-group="forearms" />
-          <ellipse cx="150" cy="141" rx="5" ry="7" class="bd-neutral" />
-          <ellipse cx="210" cy="141" rx="5" ry="7" class="bd-neutral" />
-          <!-- lower back / erectors -->
-          <path d="M172 100 Q180 98 188 100 L186 118 Q180 121 174 118 Z" class="bd-part" data-group="lowerback" />
-          <!-- glutes -->
-          <path d="M165 120 Q172 116 179 120 L179 138 Q170 141 166 134 Z" class="bd-part" data-group="glutes" />
-          <path d="M195 120 Q188 116 181 120 L181 138 Q190 141 194 134 Z" class="bd-part" data-group="glutes" />
-          <!-- hamstrings -->
-          <path d="M167 140 Q162 168 166 196 L177 196 Q179 168 178 140 Z" class="bd-part" data-group="hamstrings" />
-          <path d="M193 140 Q198 168 194 196 L183 196 Q181 168 182 140 Z" class="bd-part" data-group="hamstrings" />
-          <ellipse cx="171" cy="203" rx="7" ry="6" class="bd-neutral" />
-          <ellipse cx="189" cy="203" rx="7" ry="6" class="bd-neutral" />
-          <!-- calves (back, gastroc) -->
-          <path d="M165 210 Q161 236 166 270 L176 270 Q177 236 174 210 Z" class="bd-part" data-group="calves" />
-          <path d="M195 210 Q199 236 194 270 L184 270 Q183 236 186 210 Z" class="bd-part" data-group="calves" />
-          <ellipse cx="171" cy="278" rx="8" ry="6" class="bd-neutral" />
-          <ellipse cx="189" cy="278" rx="8" ry="6" class="bd-neutral" />
-          <text x="180" y="300" class="bd-label">Back</text>
-        </svg>
+        <canvas id="bodyDiagramFront" class="rive-body-canvas"></canvas>
+        <canvas id="bodyDiagramBack" class="rive-body-canvas"></canvas>
       </div>
       <div class="heat-legend">
         <span class="heat-legend-label">Light</span>
@@ -6695,37 +6613,76 @@ function computeMuscleVolume(name, weekOffset) {
   return volumes;
 }
 
-/* Yellow (light work) through orange and red to dark red (hammered). */
-const HEAT_STOPS = [
-  [242, 208, 36],
-  [245, 155, 31],
-  [224, 82, 31],
-  [143, 16, 16],
-];
-
-function heatColor(t) {
-  const clamped = Math.max(0, Math.min(1, t));
-  const scaled = clamped * (HEAT_STOPS.length - 1);
-  const i = Math.min(HEAT_STOPS.length - 2, Math.floor(scaled));
-  const f = scaled - i;
-  const [r1, g1, b1] = HEAT_STOPS[i];
-  const [r2, g2, b2] = HEAT_STOPS[i + 1];
-  const mix = (a, b) => Math.round(a + (b - a) * f);
-  return `rgb(${mix(r1, r2)}, ${mix(g1, g2)}, ${mix(b1, b2)})`;
-}
+// Formerly HEAT_STOPS/heatColor, hand-painting the old SVG's [data-group] fills. The
+// gradient now lives as APP_HEAT_PALETTE in knowledge/anatomy/rive-body.mjs (same RGB
+// stops) and is pushed into the Rive diagram instead. The legend bar's gradient below is
+// static CSS (.heat-legend-bar), independent of either.
 
 let BODY_WEEK_OFFSET = 0;
 
-function renderBodyDiagram() {
+/* Rive-backed body diagram (knowledge/anatomy/rive-body.mjs). Loaded lazily on first call
+   rather than at page load -- most sessions don't visit the Body tab every load, and the
+   .riv asset plus the Rive WASM runtime are real weight not worth paying upfront. Two
+   canvases (front/back) stay alive across re-renders; only destroyed and rebuilt when the
+   viewed person's sex actually changes artboards, since Rive can't swap an artboard on a
+   live instance (see rive-body.mjs). */
+let riveBodyModule = null;
+let riveBodyPromise = null;
+let riveFrontCtrl = null;
+let riveBackCtrl = null;
+let riveLoadedSex = null;
+
+function ensureRiveBodyModule() {
+  if (!riveBodyPromise) {
+    riveBodyPromise = import("./knowledge/anatomy/rive-body.mjs").then((m) => { riveBodyModule = m; return m; });
+  }
+  return riveBodyPromise;
+}
+
+// The app tracks relative weekly volume per broad group (v/max, continuous); the Rive file
+// wants a discrete 0-4 level per individual muscle. Any logged work at all shows as at least
+// level 1 -- a single light set shouldn't look identical to "never trained" (level 0).
+function riveIntensityFromVolume(v, max) {
+  if (v <= 0 || max <= 0) return 0;
+  return Math.max(1, Math.round((v / max) * 4));
+}
+
+function labelizeMuscle(key) {
+  return key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+}
+
+async function renderBodyDiagram() {
   const volumes = computeMuscleVolume(viewedName(), BODY_WEEK_OFFSET);
   const values = Object.values(volumes);
   const max = Math.max(...values);
   const totalSets = values.reduce((a, b) => a + b, 0);
 
-  document.querySelectorAll("#bodyDiagram [data-group]").forEach((el) => {
-    const v = volumes[el.dataset.group] || 0;
-    el.style.fill = v > 0 && max > 0 ? heatColor(v / max) : "";
-  });
+  const mod = await ensureRiveBodyModule();
+  const intensities = {};
+  for (const muscle of mod.ALL_MUSCLES) {
+    const group = mod.RIVE_TO_APP_GROUP[muscle];
+    intensities[muscle] = riveIntensityFromVolume(volumes[group] || 0, max);
+  }
+
+  const sex = profileFor(viewedEmail())?.sex === "Female" ? "Female" : "Male";
+  const onMuscleClick = (muscle, group) => toast(`${labelizeMuscle(muscle)} — ${group}`);
+
+  if (!riveFrontCtrl || riveLoadedSex !== sex) {
+    riveFrontCtrl?.destroy();
+    riveBackCtrl?.destroy();
+    riveFrontCtrl = mod.createBodyHeatmap({
+      canvas: $("bodyDiagramFront"), artboardName: `${sex}-Front`,
+      palette: mod.APP_HEAT_PALETTE, intensities, onMuscleClick,
+    });
+    riveBackCtrl = mod.createBodyHeatmap({
+      canvas: $("bodyDiagramBack"), artboardName: `${sex}-Back`,
+      palette: mod.APP_HEAT_PALETTE, intensities, onMuscleClick,
+    });
+    riveLoadedSex = sex;
+  } else {
+    riveFrontCtrl.setIntensities(intensities);
+    riveBackCtrl.setIntensities(intensities);
+  }
 
   $("bodyThisWeekBtn").classList.toggle("active", BODY_WEEK_OFFSET === 0);
   $("bodyLastWeekBtn").classList.toggle("active", BODY_WEEK_OFFSET === 1);
