@@ -161,14 +161,3 @@ export const APP_HEAT_PALETTE = {
   level3: { r: 224, g: 82, b: 31 },
   level4: { r: 143, g: 16, b: 16 },
 };
-
-// Single-hue ramp on the app's electric lime accent (#a8ff00): dim for a light touch,
-// full accent for a heavily worked muscle. Used by the live Body tab, where one colour
-// getting brighter reads cleaner than a yellow-to-red heat scale next to lime UI.
-export const LIME_PALETTE = {
-  base: { r: 0x2a, g: 0x30, b: 0x38 },
-  level1: { r: 84, g: 128, b: 0 },
-  level2: { r: 118, g: 180, b: 0 },
-  level3: { r: 150, g: 228, b: 0 },
-  level4: { r: 168, g: 255, b: 0 },
-};

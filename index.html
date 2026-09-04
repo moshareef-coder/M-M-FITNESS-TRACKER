@@ -1312,10 +1312,10 @@
   .bi-segs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; margin-top: 6px; }
   .bi-seg { height: 7px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--border); position: relative; overflow: hidden; }
   .bi-seg i {
-    position: absolute; inset: 0; background: var(--accent); border-radius: 4px;
+    position: absolute; inset: 0; background: var(--heat, var(--accent)); border-radius: 4px;
     transform-origin: left center; transform: scaleX(var(--fill, 0));
     transition: transform .55s cubic-bezier(.22,1,.36,1); transition-delay: var(--d, 0ms);
-    box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--heat, var(--accent)) 45%, transparent);
   }
   .bi-list.no-anim .bi-seg i { transition: none; }
   .bi-empty { font-size: 13px; color: var(--muted); line-height: 1.45; }
@@ -1335,11 +1335,11 @@
   .bi-ring-svg svg { width: 100%; height: 100%; display: block; }
   .bi-ring-svg .track { stroke: var(--panel-2); }
   .bi-ring-svg .fill {
-    stroke: var(--accent); stroke-linecap: round;
+    stroke: var(--heat, var(--accent)); stroke-linecap: round;
     transition: stroke-dashoffset 1s cubic-bezier(.22,1,.36,1); transition-delay: var(--d, 0ms);
   }
   .bi-rings.no-anim .bi-ring-svg .fill { transition: none; }
-  .bi-ring.top .bi-ring-svg { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--accent) 55%, transparent)); }
+  .bi-ring.top .bi-ring-svg { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--heat, var(--accent)) 55%, transparent)); }
   .bi-ring-val { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; letter-spacing: -.02em; }
   .bi-ring-label { font-size: 12px; color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .bi-ring.dim .bi-ring-svg .fill { stroke: var(--border); }
@@ -6649,6 +6649,27 @@ function bodyRiveLevel(pct) {
   return pct <= 0 ? 0 : Math.max(1, Math.round(pct * 4));
 }
 
+// Same yellow-to-red ramp as the figures (APP_HEAT_PALETTE in rive-body.mjs), so
+// the bars, the rings and the muscles themselves always agree on what "hot" looks
+// like. Interpolated rather than 4 flat buckets so a 51% row and a 74% row read
+// as visibly different, not identical "Medium" orange.
+const BODY_HEAT_STOPS = [
+  [0, 242, 208, 36], [0.34, 245, 155, 31], [0.67, 224, 82, 31], [1, 168, 20, 20],
+];
+function bodyHeatColor(pct) {
+  const p = Math.max(0, Math.min(1, pct));
+  for (let i = 1; i < BODY_HEAT_STOPS.length; i++) {
+    const [p0, r0, g0, b0] = BODY_HEAT_STOPS[i - 1];
+    const [p1, r1, g1, b1] = BODY_HEAT_STOPS[i];
+    if (p <= p1) {
+      const t = p1 === p0 ? 0 : (p - p0) / (p1 - p0);
+      return `rgb(${Math.round(r0 + (r1 - r0) * t)}, ${Math.round(g0 + (g1 - g0) * t)}, ${Math.round(b0 + (b1 - b0) * t)})`;
+    }
+  }
+  const [, r, g, b] = BODY_HEAT_STOPS[BODY_HEAT_STOPS.length - 1];
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 function labelizeMuscle(key) {
   return key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }
@@ -6693,7 +6714,7 @@ function renderBodyList(ranked, animate) {
       const f = Math.max(0, Math.min(1, fill - s));
       return `<span class="bi-seg"><i style="--fill:${animate ? 0 : f.toFixed(2)};--d:${i * 70 + s * 45}ms" data-fill="${f.toFixed(2)}"></i></span>`;
     }).join("");
-    return `<div class="bi-row">
+    return `<div class="bi-row" style="--heat:${bodyHeatColor(m.pct)}">
       <div class="bi-row-top"><span class="bi-row-name">${escapeHtml(m.label)}</span><span class="bi-row-level">${bodyImpactLevel(m.pct)}</span></div>
       <div class="bi-segs">${segs}</div>
     </div>`;
@@ -6717,7 +6738,7 @@ function renderBodyRings(ranked, animate) {
   el.innerHTML = shown.map((m, i) => {
     const pct = Math.round(m.pct * 100);
     const off = c * (1 - m.pct);
-    return `<div class="bi-ring ${i === 0 && m.sets > 0 ? "top" : ""} ${m.sets > 0 ? "" : "dim"}">
+    return `<div class="bi-ring ${i === 0 && m.sets > 0 ? "top" : ""} ${m.sets > 0 ? "" : "dim"}" style="--heat:${bodyHeatColor(m.pct)}">
       <div class="bi-ring-svg">
         <svg viewBox="0 0 100 100">
           <circle class="track" cx="50" cy="50" r="${r}" fill="none" stroke-width="9"/>
@@ -6781,7 +6802,7 @@ async function renderBodyDiagram(ranked, animate) {
     riveFrontCtrl?.destroy();
     riveBackCtrl?.destroy();
     const make = (id, view) => mod.createBodyHeatmap({
-      canvas: $(id), artboardName: `${sex}-${view}`, palette: mod.LIME_PALETTE,
+      canvas: $(id), artboardName: `${sex}-${view}`, palette: mod.APP_HEAT_PALETTE,
       intensities: {}, onMuscleClick, onLoad: () => bodyRampFigures(target, animate),
     });
     riveFrontCtrl = make("bodyDiagramFront", "Front");
