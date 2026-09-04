@@ -923,6 +923,8 @@
   .rc-actions button { flex: 1; margin: 0; }
   /* Screen header for full-tab sub-screens */
   .scr-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  #workoutCardTitle:empty { display: none; }
+  #workoutFocusRow:empty { display: none; margin: 0; }
   .scr-back {
     width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
     border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
@@ -995,6 +997,8 @@
   .opt-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
   .opt-go { color: var(--muted); flex-shrink: 0; transform: rotate(180deg); }
   .opt-card.primary .opt-go { color: var(--accent); }
+  .recent-stack { display: flex; flex-direction: column; gap: 8px; }
+  .recent-stack .recent-chip { min-width: 0; width: 100%; text-align: left; }
   .recent-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
   .recent-chip {
     flex: 0 0 auto; min-width: 132px; border: 1px solid var(--border); border-radius: 13px;
@@ -1528,24 +1532,10 @@
   <div id="tab-workout" class="tab-panel hidden">
     <input type="file" id="proofInput" accept="image/*" capture="environment" hidden />
 
-    <div id="doneWorkouts"></div>
-
     <div class="card" id="workoutCard">
       <h2 id="workoutCardTitle">Today's workout</h2>
       <div id="workoutFocusRow" class="muted-note" style="margin-bottom:10px;"></div>
       <div id="workoutContent"></div>
-    </div>
-
-    <div class="card hidden" id="todayTallyCard">
-      <div class="tally-head">
-        <div>
-          <div class="tally-count" id="tallyCount">0</div>
-          <div class="tally-label" id="tallyLabel">workouts today</div>
-        </div>
-        <div class="tally-proof" id="tallyProof"></div>
-      </div>
-      <div class="ps-label" style="margin-top:16px;">PREVIOUS WORKOUTS</div>
-      <div class="tally-list" id="tallyList"></div>
     </div>
 
 
@@ -2003,7 +1993,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.03.13";
+const APP_VERSION = "2026.09.03.14";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -4225,9 +4215,15 @@ async function openDaySheet(email, date) {
     ${!logs.length && e.gym ? `<p class="muted-note">Logged as a workout, no exercises recorded.</p>` : ""}
     ${weightBlock}
     ${e.note ? `<p class="quote">${escapeHtml(e.note)}</p>` : ""}
+    ${isMine && e.proof_path ? `<button type="button" class="btn-ghost" id="dsRemoveProof">Remove photo</button>` : ""}
     ${isMine ? `<button type="button" class="btn-ghost" id="dsDeleteDay">Delete this day</button>` : ""}`;
 
   $("dsClose").onclick = closeDaySheet;
+  /* Removing just the photo used to live on the workout tab. It moved here so
+     the only way to undo a proof shot is not to delete the whole day. */
+  if ($("dsRemoveProof")) {
+    $("dsRemoveProof").onclick = async () => { await removeProof(); closeDaySheet(); };
+  }
   $("daySheetScrim").classList.remove("hidden");
   $("daySheetScrim").onclick = (ev) => { if (ev.target === $("daySheetScrim")) closeDaySheet(); };
 
@@ -4393,28 +4389,6 @@ async function removeProof() {
   renderWorkoutTab();
 }
 
-async function renderProofChip() {
-  const el = $("tallyProof");
-  if (!el) return;
-  const entry = todayEntryFor(MY_EMAIL);
-
-  // Only ever show a photo that already exists. Asking for one belongs at the
-  // end of a workout, not as a standing prompt on the tab.
-  if (entry?.proof_path) {
-    const url = await signedProofUrl(entry.proof_path);
-    el.innerHTML = url
-      ? `<img class="tally-proof-img" src="${url}" alt="Today's proof" />
-         <button type="button" class="tally-proof-x" id="proofRemoveBtn" title="Remove photo">&times;</button>`
-      : `<span class="muted-note">Photo saved</span>`;
-    const rm = $("proofRemoveBtn");
-    if (rm) rm.onclick = removeProof;
-  } else {
-    el.innerHTML = "";
-  }
-}
-
-/* Your partner's proof from today. This is the thing that actually gets
-   someone off the sofa, so it gets its own card rather than a footnote. */
 
 function renderScaleCheck() {
   const card = $("scaleCheckCard");
@@ -5295,52 +5269,6 @@ function clearDraft() {
 let PLAN_EDIT_ADDING = false;
 const ADD_EX_STATE = { sets: 3, reps: 8, weight: 0 };
 
-/* How many workouts have been finished today, and what was in them. */
-function sessionsToday() {
-  return todayEntryFor(MY_EMAIL)?.sessions || 0;
-}
-
-function renderTodayTally() {
-  const n = sessionsToday();
-  const card = $("todayTallyCard");
-  if (!n) { card.classList.add("hidden"); return; }
-  card.classList.remove("hidden");
-
-  $("tallyCount").textContent = n;
-  $("tallyLabel").textContent = n === 1 ? "workout today" : "workouts today";
-
-  /* A one-line tally told you a number you could not act on. These are the
-     sessions themselves, and each opens its own recap. */
-  const days = [...new Set(
-    ALL_ENTRIES.filter((e) => e.user_name === ME && (e.gym || e.rest_day)).map((e) => e.entry_date),
-  )].sort().reverse().slice(0, 5);
-
-  $("tallyList").innerHTML = days.length
-    ? days.map((d) => {
-        const r = recapFor(MY_EMAIL, ME, d);
-        const bits = [];
-        if (r.sets) bits.push(`${r.sets} set${r.sets === 1 ? "" : "s"}`);
-        if (r.seconds) bits.push(fmtDuration(r.seconds));
-        else if (r.minutes) bits.push(`${r.minutes} min`);
-        return `<button type="button" class="wk-row" data-recap="${escapeHtml(d)}">
-          <span class="wk-ico">${icon("dumbbell", 17)}</span>
-          <span class="wk-txt">
-            <span class="wk-name">${escapeHtml(r.title)}</span>
-            <span class="wk-meta">${escapeHtml([relDayLabel(d)].concat(bits).join(" · "))}</span>
-          </span>
-          <span class="wk-go">${icon("chevronLeft", 17)}</span>
-        </button>`;
-      }).join("")
-    : `<div class="tally-sets">Nothing logged yet. Your sessions will show up here.</div>`;
-
-  $("tallyList").querySelectorAll("[data-recap]").forEach((b) => {
-    b.onclick = () => openRecap(MY_EMAIL, ME, b.dataset.recap);
-  });
-
-  renderProofChip();
-}
-
-
 /* Body tab: what is recovered, what still needs work. */
 function renderBodyTab() {
   renderVolumeCard();
@@ -5509,51 +5437,6 @@ function formatDuration(sec) {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-/* A finished workout should leave a record you can look back at, with what you
-   actually lifted and how long it took, rather than vanishing. */
-function renderDoneWorkouts() {
-  const wrap = $("doneWorkouts");
-  if (!wrap) return;
-  if (!TODAY_DONE_WORKOUTS.length) { wrap.innerHTML = ""; return; }
-
-  const logs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME && l.entry_date === todayStr());
-
-  wrap.innerHTML = TODAY_DONE_WORKOUTS.map((w, wi) => {
-    const names = (w.exercises || []).map((e) => e.name);
-    const rows = names.map((n) => {
-      const forEx = logs.filter((l) => l.exercise_name.toLowerCase() === n.toLowerCase());
-      if (!forEx.length) return "";
-      const detail = forEx
-        .map((l) => l.duration_min
-          ? `${l.duration_min} min`
-          : `${l.sets || 1}×${l.reps ?? "?"}${l.weight ? ` @ ${l.weight} lb` : ""}`)
-        .join(", ");
-      return `<div class="done-row">
-        <span class="done-ex">${escapeHtml(n)}</span>
-        <span class="done-detail">${escapeHtml(detail)}</span>
-      </div>`;
-    }).join("");
-
-    const dur = formatDuration(w.duration_sec);
-    const rests = Object.values(w.rest_log || {}).filter((v) => typeof v === "number" && v > 0);
-    const avgRest = rests.length ? Math.round(rests.reduce((a, b) => a + b, 0) / rests.length) : null;
-    const when = w.completed_at
-      ? new Date(w.completed_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
-      : null;
-
-    return `<div class="card done-card">
-      <div class="done-head">
-        <div>
-          <div class="done-title">${escapeHtml(displayFocus(w.focus, w.exercises))} ${TODAY_DONE_WORKOUTS.length > 1 ? `#${TODAY_DONE_WORKOUTS.length - wi}` : ""}</div>
-          <div class="done-meta">${[when, dur, avgRest ? `${avgRest}s avg rest` : null].filter(Boolean).join(" · ") || "Completed"}</div>
-        </div>
-        <div class="done-check">${icon("check", 18)}</div>
-      </div>
-      ${rows || '<p class="muted-note">No exercises logged.</p>'}
-    </div>`;
-  }).join("");
-}
-
 async function startFreshWorkout() {
   if (TODAY_WORKOUT?.id) {
     await sb.from("ai_workouts").update({ archived: true }).eq("id", TODAY_WORKOUT.id);
@@ -5566,8 +5449,6 @@ async function startFreshWorkout() {
 
 function renderWorkoutTab() {
   renderFab();
-  renderDoneWorkouts();
-  renderTodayTally();
   resumeSessionIfAny();          // loads a saved session, does not take over
   $("workoutContent").classList.remove("hidden");
 
@@ -5617,37 +5498,10 @@ function renderWorkoutTab() {
   } else if (WORKOUT_MODE === "activity") {
     renderActivityScreen();
   } else {
-    // Nothing running. Either the first workout of the day, or another one.
-    const n = sessionsToday();
-    const draft = MANUAL_DRAFT.length ? MANUAL_DRAFT : loadDraft();
-    $("workoutCardTitle").textContent = n ? "Go again" : "Today's workout";
-
-    if (draft.length) {
-      // An unfinished plan is the most likely thing you came back for.
-      $("workoutContent").innerHTML = `
-        <p class="muted-note">You have a plan in progress with ${draft.length} exercise${draft.length === 1 ? "" : "s"}.</p>
-        <div class="draft-chips">${draft.map((e) => `<span class="tally-chip">${escapeHtml(e.name)}</span>`).join("")}</div>
-        <button class="btn-primary" id="resumeDraftBtn" style="margin-top:12px;">Keep planning</button>
-        <button class="btn-ghost" id="discardDraftBtn">Discard it</button>`;
-      $("resumeDraftBtn").onclick = () => {
-        MANUAL_DRAFT = draft;
-        WORKOUT_MODE = "manual";
-        renderWorkoutTab();
-      };
-      $("discardDraftBtn").onclick = () => {
-        if (!confirm(`Discard ${draft.length} exercise${draft.length === 1 ? "" : "s"}?`)) return;
-        clearDraft();
-        renderWorkoutTab();
-      };
-      return;
-    }
-
-    $("workoutContent").innerHTML = n
-      ? `<p class="muted-note">${n === 1 ? "One down" : `${n} down`}. Training twice in a day counts twice.</p>
-         <button class="btn-primary" id="beginWorkoutBtn" style="margin-top:10px;">Start workout ${n + 1}</button>`
-      : `<p class="muted-note">No workout started yet today.</p>
-         <button class="btn-primary" id="beginWorkoutBtn" style="margin-top:10px;">Begin Workout</button>`;
-    $("beginWorkoutBtn").onclick = () => { WORKOUT_MODE = "choose"; renderWorkoutTab(); };
+    /* Build Next Workout is the tab, not a screen behind a button. The old
+       "Go again / Begin Workout" step was a waiting room: it asked you to
+       press a button to reach the screen that asks you what you want. */
+    renderChooseScreen();
   }
 }
 
@@ -5823,25 +5677,32 @@ function optionCard(id, ico, title, sub, primary) {
   </button>`;
 }
 
+let RECENT_ALL = false;
+
 function recentWorkoutsStrip() {
-  const mine = (ALL_PLANS || [])
+  const all = (ALL_PLANS || [])
     .filter((w) => w.email === MY_EMAIL && !w.archived)
-    .sort((a, b) => String(b.entry_date).localeCompare(String(a.entry_date)))
-    .slice(0, 8);
-  if (!mine.length) return "";
+    .sort((a, b) => String(b.entry_date).localeCompare(String(a.entry_date)));
+  if (!all.length) return "";
+  const mine = RECENT_ALL ? all.slice(0, 40) : all.slice(0, 8);
+
+  const chip = (w) => `<button type="button" class="recent-chip" data-recap="${escapeHtml(w.entry_date)}">
+      <div class="recent-name">${escapeHtml(displayFocus(w.focus, w.exercises))}</div>
+      <div class="recent-when">
+        ${escapeHtml(relDayLabel(w.entry_date))}
+        ${w.completed_at ? `<span class="done">${icon("check", 13)}</span>` : ""}
+      </div>
+    </button>`;
+
   return `<div class="recent-head">
       <h3>Recent Workouts</h3>
-      <button type="button" class="recent-all" id="recentAllBtn">View All</button>
+      ${all.length > 8 ? `<button type="button" class="recent-all" id="recentAllBtn">${RECENT_ALL ? "Show less" : "View All"}</button>` : ""}
     </div>
-    <div class="recent-strip">
-      ${mine.map((w) => `<button type="button" class="recent-chip" data-recap="${escapeHtml(w.entry_date)}">
-        <div class="recent-name">${escapeHtml(displayFocus(w.focus, w.exercises))}</div>
-        <div class="recent-when">
-          ${escapeHtml(relDayLabel(w.entry_date))}
-          ${w.completed_at ? `<span class="done">${icon("check", 13)}</span>` : ""}
-        </div>
-      </button>`).join("")}
-    </div>`;
+    ${RECENT_ALL
+      /* Expanded, they stack: a sideways scroll is fine for a glance at the
+         last few, useless for finding one from three weeks ago. */
+      ? `<div class="recent-stack">${mine.map(chip).join("")}</div>`
+      : `<div class="recent-strip">${mine.map(chip).join("")}</div>`}`;
 }
 
 function renderChooseScreen() {
@@ -5850,6 +5711,11 @@ function renderChooseScreen() {
   const coached = isCoachedClient();
   const coachName = MY_COACH ? MY_COACH.split("@")[0] : "your coach";
   const p = planPreview();
+
+  // The card's own heading and focus line would just repeat the screen title
+  // and the preview, so this screen owns the top of the card outright.
+  $("workoutCardTitle").textContent = "";
+  $("workoutFocusRow").textContent = "";
 
   const preview = coached ? "" : `
     <div class="spp">
@@ -5880,9 +5746,7 @@ function renderChooseScreen() {
 
   $("workoutContent").innerHTML = `
     <div class="scr-head">
-      <button type="button" class="scr-back" id="sppBack" aria-label="Back">${icon("chevronLeft", 18)}</button>
       <div class="scr-title">Build Next Workout</div>
-      <div class="spacer"></div>
     </div>
     ${preview}
     <p class="build-q">${coached
@@ -5904,7 +5768,6 @@ function renderChooseScreen() {
     renderWorkoutTab();
   };
 
-  $("sppBack").onclick = () => { WORKOUT_MODE = null; renderWorkoutTab(); };
   if ($("sppCustomise")) $("sppCustomise").onclick = toManual;
   if (!coached) $("chooseGenerateBtn").onclick = generateWorkout;
   $("choosePlanBtn").onclick = toManual;
@@ -5915,11 +5778,7 @@ function renderChooseScreen() {
     b.onclick = () => openRecap(MY_EMAIL, ME, b.dataset.recap);
   });
   if ($("recentAllBtn")) {
-    $("recentAllBtn").onclick = () => {
-      WORKOUT_MODE = null;
-      renderWorkoutTab();
-      $("todayTallyCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    };
+    $("recentAllBtn").onclick = () => { RECENT_ALL = !RECENT_ALL; renderChooseScreen(); };
   }
 }
 

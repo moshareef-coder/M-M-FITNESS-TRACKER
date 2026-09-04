@@ -191,7 +191,7 @@ if (clobbered.length) {
 }
 
 try {
-  new Function(src + ";globalThis.__t={showApp,loadAll,renderHome,renderWorkoutTab,renderProgressTab,renderSetupTab,switchTab,renderFab,renderTodayTally,renderScaleCheck,renderBodyTab,renderAdminPanel};")();
+  new Function(src + ";globalThis.__t={showApp,loadAll,renderHome,renderWorkoutTab,renderProgressTab,renderSetupTab,switchTab,renderFab,renderScaleCheck,renderBodyTab,renderAdminPanel};")();
 } catch (e) {
   console.log("TOP-LEVEL ERROR:", e.message);
   process.exit(1);
