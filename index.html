@@ -889,6 +889,22 @@
   .wk-name { font-size: 14.5px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.01em; }
   .wk-meta { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
   .wk-go { color: var(--muted); transform: rotate(180deg); flex-shrink: 0; }
+  .rc-bar-card { border: 1px solid var(--border); border-radius: 14px; padding: 15px 16px; margin-bottom: 18px; background: var(--panel); }
+  .rc-bar-card h4 { margin: 0 0 13px; font-size: 15px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.01em; }
+  .rc-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 11px 16px; }
+  .rc-bar-name { font-size: 12.5px; font-weight: 600; margin-bottom: 4px; }
+  .rc-bar-line { display: flex; align-items: center; gap: 8px; }
+  .rc-bar-track { flex: 1; height: 7px; border-radius: 100px; background: var(--panel-2); overflow: hidden; }
+  .rc-bar-fill { height: 100%; border-radius: 100px; background: var(--accent); box-shadow: var(--glow-accent); }
+  .rc-bar-band { font-size: 11px; color: var(--muted); flex-shrink: 0; min-width: 46px; text-align: right; }
+  .rc-ex-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+  .rc-ex-head h4 { margin: 0; font-size: 16px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.02em; }
+  .rc-list { border: 1px solid var(--border); border-radius: 14px; padding: 2px 14px; background: var(--panel); }
+  .rc-ex-num2 { font-size: 13px; font-weight: 700; font-family: var(--font-display); text-align: right; line-height: 1.35; white-space: nowrap; }
+  .rc-ex-num2 i { font-style: normal; display: block; color: var(--muted); font-weight: 600; font-size: 12px; }
+  .rc-share { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+              border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+              display: flex; align-items: center; justify-content: center; }
   .rc-head { display: flex; align-items: center; gap: 13px; margin-bottom: 16px; }
   .rc-tick {
     width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0; display: flex;
@@ -903,15 +919,17 @@
     background: var(--border); border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
   }
   .rc-stat { background: var(--panel); padding: 14px 10px; text-align: center; }
-  .rc-stat b { display: block; font-size: 21px; font-weight: 800; font-family: var(--font-display); letter-spacing: -.03em; }
+  .rc-stat b { display: block; font-size: 23px; font-weight: 800; font-family: var(--font-display); letter-spacing: -.03em; color: var(--accent); }
+  .rc-stat b small { font-size: 12px; font-weight: 700; margin-left: 2px; }
   .rc-stat span { display: block; font-size: 10.5px; color: var(--muted); margin-top: 4px; letter-spacing: .04em; }
-  .rc-stat.time b { color: var(--accent); }
   .rc-ex { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
   .rc-ex:last-child { border-bottom: none; }
   .rc-n {
-    width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: flex;
-    align-items: center; justify-content: center; background: var(--panel-2);
-    font-size: 11.5px; font-weight: 800; color: var(--muted);
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; display: flex;
+    align-items: center; justify-content: center; background: transparent;
+    border: 1.5px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    font-size: 11.5px; font-weight: 800; color: var(--accent);
+    font-family: var(--font-display);
   }
   .rc-ex-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
   .rc-ex-num { font-size: 13px; font-weight: 700; font-family: var(--font-display); text-align: right; white-space: nowrap; }
@@ -1538,6 +1556,10 @@
       <div id="workoutContent"></div>
     </div>
 
+    <div class="card hidden" id="prevWorkoutsCard">
+      <h2>Previous workouts</h2>
+      <div id="prevWorkoutsList"></div>
+    </div>
 
     <div id="sessionCard" class="session-overlay hidden">
       <div class="session-bar">
@@ -1993,7 +2015,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.03.14";
+const APP_VERSION = "2026.09.03.15";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -3601,6 +3623,46 @@ function recapFor(email, name, date) {
   };
 }
 
+/* Muscle load for a single day, ranked against the hardest-hit muscle that
+   day. High/Medium/Low is relative on purpose: an absolute scale would call an
+   honest 20-minute session "Low" across the board, which tells nobody
+   anything. */
+function dayMuscleLoad(email, date) {
+  const load = {};
+  ALL_EXERCISE_LOGS
+    .filter((l) => l.email === email && l.entry_date === date)
+    .forEach((l) => {
+      const rule = classifyMuscles(l.exercise_name);
+      if (!rule) return;
+      const sets = l.duration_min ? Math.max(1, Math.round(l.duration_min / 10)) : (l.sets || 1);
+      (rule.primary || []).forEach((g) => { load[g] = (load[g] || 0) + sets; });
+      (rule.secondary || []).forEach((g) => { load[g] = (load[g] || 0) + sets * 0.5; });
+    });
+
+  const max = Math.max(...Object.values(load), 0);
+  if (!max) return [];
+  const pretty = { lowerback: "Lower back", abs: "Core", obliques: "Obliques", lats: "Lats" };
+  return Object.entries(load)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([g, v]) => ({
+      name: pretty[g] || g.charAt(0).toUpperCase() + g.slice(1),
+      pct: Math.round((v / max) * 100),
+      band: v / max >= 0.66 ? "High" : v / max >= 0.33 ? "Medium" : "Low",
+    }));
+}
+
+/* A MET estimate, which is the standard way to do this without a heart rate
+   monitor: kcal = MET x bodyweight(kg) x hours. 5.0 is the compendium value
+   for vigorous resistance training. Returns null with no logged bodyweight,
+   because a calorie figure invented from an assumed weight is just a number. */
+function estCalories(name, seconds, minutes) {
+  const lb = currentWeightLb(name);
+  const hours = ((seconds || 0) / 3600) + ((minutes || 0) / 60);
+  if (!lb || hours <= 0) return null;
+  return Math.round(5.0 * (lb / 2.205) * hours);
+}
+
 function recapStat(value, label, cls = "") {
   return `<div class="rc-stat ${cls}"><b>${escapeHtml(String(value))}</b><span>${escapeHtml(label)}</span></div>`;
 }
@@ -3608,52 +3670,121 @@ function recapStat(value, label, cls = "") {
 function openRecap(email, name, date) {
   const r = recapFor(email, name, date);
   const mine = email === MY_EMAIL;
+  const bars = dayMuscleLoad(email, date);
+  const kcal = estCalories(name, r.seconds, r.minutes);
 
-  const stats = [
-    recapStat(r.sets || "-", "TOTAL SETS"),
-    recapStat(r.exercises || "-", "EXERCISES"),
-    recapStat(r.seconds ? fmtDuration(r.seconds) : (r.minutes ? `${r.minutes} min` : "-"), "TIME", "time"),
-  ].join("");
+  const at = (ALL_PLANS || [])
+    .filter((w) => w.email === email && w.entry_date === date && w.completed_at)
+    .map((w) => new Date(w.completed_at))[0];
+  const when = [relDayLabel(r.date), at ? at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : null]
+    .filter(Boolean).join(" · ");
 
-  const volumeRow = r.volume > 0
-    ? `<div class="rc-stats" style="grid-template-columns:1fr;">
-         ${recapStat(`${Math.round(r.volume).toLocaleString()} lb`, "TOTAL VOLUME")}
-       </div>`
-    : "";
+  const timeText = r.seconds ? fmtElapsed(r.seconds * 1000) : (r.minutes ? `${r.minutes}:00` : "-");
+
+  /* Volume and calories only appear when they are real: a bodyweight session
+     has no tonnage, and calories need a logged bodyweight to mean anything. */
+  const secondRow = [
+    r.volume > 0 ? recapStat(`${Math.round(r.volume).toLocaleString()}<small>lb</small>`, "TOTAL VOLUME") : null,
+    kcal ? recapStat(String(kcal), "EST. CALORIES") : null,
+  ].filter(Boolean);
+
+  const exRow = (l, i) => {
+    const reps = l.duration_min
+      ? `${l.duration_min} min`
+      : `${l.sets || 1}\u00d7${l.reps ?? "-"}`;
+    const load = l.weight != null ? `@ ${l.weight} lb` : "";
+    return `<div class="rc-ex">
+      <span class="rc-n">${i + 1}</span>
+      <span class="rc-ex-name">${escapeHtml(l.exercise_name)}${r.isPR(l) ? `<span class="rc-pr">PR</span>` : ""}</span>
+      <span class="rc-ex-num2">${escapeHtml(reps)}${load ? `<i>${escapeHtml(load)}</i>` : ""}</span>
+    </div>`;
+  };
 
   $("recapSheet").innerHTML = `
     <div class="ds-grip"></div>
-    <div class="ps-head"><button type="button" class="ds-x" id="rcClose" aria-label="Close">&times;</button></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="rcClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">Workout Recap</div>
+      ${mine ? `<button type="button" class="rc-share" id="rcShare" aria-label="Share">${icon("swap", 17)}</button>`
+             : `<div class="spacer"></div>`}
+    </div>
+
     <div class="rc-head">
       <div class="rc-tick">${icon("check", 22)}</div>
       <div>
         <div class="rc-kicker">WORKOUT COMPLETED</div>
         <div class="rc-title">${escapeHtml(r.title)}</div>
-        <div class="rc-when">${escapeHtml(relDayLabel(r.date))}</div>
+        <div class="rc-when">${escapeHtml(when)}</div>
       </div>
     </div>
-    <div class="rc-stats">${stats}</div>
-    ${volumeRow}
+
+    <div class="rc-stats">
+      ${recapStat(r.sets || "-", "TOTAL SETS")}
+      ${recapStat(r.exercises || "-", "EXERCISES")}
+      ${recapStat(timeText, "TIME")}
+    </div>
+    ${secondRow.length
+      ? `<div class="rc-stats" style="grid-template-columns:repeat(${secondRow.length},1fr);">${secondRow.join("")}</div>`
+      : ""}
+
+    ${bars.length ? `
+      <div class="rc-bar-card">
+        <h4>Muscles Hit</h4>
+        <div class="rc-bars">
+          ${bars.map((m) => `<div>
+            <div class="rc-bar-name">${escapeHtml(m.name)}</div>
+            <div class="rc-bar-line">
+              <span class="rc-bar-track"><span class="rc-bar-fill" style="width:${m.pct}%"></span></span>
+              <span class="rc-bar-band">${m.band}</span>
+            </div>
+          </div>`).join("")}
+        </div>
+      </div>` : ""}
+
     ${r.logs.length ? `
-      <div class="ps-label">EXERCISES</div>
-      <div style="margin-bottom:4px;">
-        ${r.logs.map((l, i) => `<div class="rc-ex">
-          <span class="rc-n">${i + 1}</span>
-          <span class="rc-ex-name">${escapeHtml(l.exercise_name)}${r.isPR(l) ? `<span class="rc-pr">PR</span>` : ""}</span>
-          <span class="rc-ex-num">${escapeHtml(exerciseSummary(l))}</span>
-        </div>`).join("")}
-      </div>` : `<div class="ps-empty">No exercises were logged for this one.</div>`}
+      <div class="rc-ex-head"><h4>Exercises</h4></div>
+      <div class="rc-list">${r.logs.map(exRow).join("")}</div>`
+      : `<div class="ps-empty">No exercises were logged for this one.</div>`}
+
     ${r.note ? `<p class="quote">${escapeHtml(r.note)}</p>` : ""}
+
     ${mine ? `<div class="rc-actions">
-        <button type="button" class="btn-secondary" id="rcShare">Share</button>
-        ${PARTNER_EMAIL ? `<button type="button" class="btn-primary" id="rcTell">Tell ${escapeHtml(partnerName())}</button>` : ""}
+        <button type="button" class="btn-secondary" id="rcSave">Save Workout</button>
+        ${PARTNER_EMAIL ? `<button type="button" class="btn-primary" id="rcTell">Share to ${escapeHtml(partnerName())}</button>` : ""}
       </div>` : ""}`;
 
   $("rcClose").onclick = closeRecap;
   if ($("rcTell")) $("rcTell").onclick = () => { closeRecap(); openNoteComposer("congratulate"); };
   if ($("rcShare")) $("rcShare").onclick = () => shareRecap(r);
+  if ($("rcSave")) $("rcSave").onclick = () => saveRecapAsPlan(r);
   $("recapScrim").classList.remove("hidden");
   $("recapScrim").onclick = (ev) => { if (ev.target === $("recapScrim")) closeRecap(); };
+}
+
+/* "Save Workout" means keep it to do again, so it becomes tomorrow's plan
+   rather than a bookmark that sits somewhere doing nothing. */
+async function saveRecapAsPlan(r) {
+  const exercises = r.logs.map((l) => ({
+    name: l.exercise_name,
+    sets: l.sets || 3,
+    reps: l.reps || 10,
+    targetWeight: l.weight ?? null,
+  }));
+  if (!exercises.length) { toast("Nothing to save"); return; }
+
+  const d = new Date(todayStr() + "T00:00:00");
+  d.setDate(d.getDate() + 1);
+  const tomorrow = isoDate(d);
+
+  const { error } = await sb.from("ai_workouts").upsert({
+    user_name: ME, email: MY_EMAIL, entry_date: tomorrow,
+    focus: r.title, exercises,
+  }, { onConflict: "email,entry_date" });
+
+  if (error) { console.error("could not save workout", error); toast("Could not save that"); return; }
+  await loadAll();
+  closeRecap();
+  toast(`Saved. ${r.title} is set for tomorrow.`);
 }
 
 function closeRecap() { $("recapScrim").classList.add("hidden"); }
@@ -5447,8 +5578,48 @@ async function startFreshWorkout() {
   renderWorkoutTab();
 }
 
+/* Days you trained, most recent first, each opening its own recap. Dated
+   properly rather than "Today / Yesterday": a list you scan for one particular
+   session needs dates, and relative labels stop meaning anything past the
+   second row. */
+function renderPreviousWorkouts() {
+  const card = $("prevWorkoutsCard");
+  const list = $("prevWorkoutsList");
+  if (!card || !list) return;
+
+  const days = [...new Set(
+    ALL_ENTRIES.filter((e) => e.user_name === ME && e.gym).map((e) => e.entry_date),
+  )].sort().reverse().slice(0, 20);
+
+  card.classList.toggle("hidden", days.length === 0);
+  if (!days.length) { list.innerHTML = ""; return; }
+
+  list.innerHTML = days.map((d) => {
+    const r = recapFor(MY_EMAIL, ME, d);
+    const bits = [];
+    if (r.sets) bits.push(`${r.sets} set${r.sets === 1 ? "" : "s"}`);
+    if (r.seconds) bits.push(fmtDuration(r.seconds));
+    else if (r.minutes) bits.push(`${r.minutes} min`);
+    const dated = new Date(d + "T00:00:00")
+      .toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    return `<button type="button" class="wk-row" data-prev="${escapeHtml(d)}">
+      <span class="wk-ico">${icon("dumbbell", 17)}</span>
+      <span class="wk-txt">
+        <span class="wk-name">${escapeHtml(r.title)}</span>
+        <span class="wk-meta">${escapeHtml([dated].concat(bits).join(" \u00b7 "))}</span>
+      </span>
+      <span class="wk-go">${icon("chevronLeft", 17)}</span>
+    </button>`;
+  }).join("");
+
+  list.querySelectorAll("[data-prev]").forEach((b) => {
+    b.onclick = () => openRecap(MY_EMAIL, ME, b.dataset.prev);
+  });
+}
+
 function renderWorkoutTab() {
   renderFab();
+  renderPreviousWorkouts();
   resumeSessionIfAny();          // loads a saved session, does not take over
   $("workoutContent").classList.remove("hidden");
 
