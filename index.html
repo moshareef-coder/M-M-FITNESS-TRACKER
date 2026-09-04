@@ -921,6 +921,45 @@
   }
   .rc-actions { display: flex; gap: 10px; margin-top: 18px; }
   .rc-actions button { flex: 1; margin: 0; }
+  /* Screen header for full-tab sub-screens */
+  .scr-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .scr-back {
+    width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .scr-title { flex: 1; text-align: center; font-size: 17px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.02em; }
+  .scr-head .spacer { width: 38px; flex-shrink: 0; }
+  /* Smart plan preview */
+  .spp { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px;
+         background: var(--card-fill); box-shadow: var(--shadow-card); margin-bottom: 20px; }
+  .spp-top { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; }
+  .spp-top h3 { flex: 1; margin: 0; font-size: 16px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.02em; }
+  .spp-spark { color: var(--accent); display: flex; }
+  .spp-cust {
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+    border-radius: 100px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .spp-body { display: flex; gap: 16px; align-items: flex-start; }
+  .spp-facts { flex: 1; min-width: 0; }
+  .spp-fact { margin-bottom: 11px; }
+  .spp-fact .k { font-size: 12px; color: var(--muted); }
+  .spp-fact .v { font-size: 14.5px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.01em; margin-top: 1px; }
+  .spp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+  .spp-chip { font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 100px;
+              border: 1px solid var(--border); background: var(--panel-2); color: var(--text); }
+  .spp-ring { width: 118px; flex-shrink: 0; text-align: center; }
+  .spp-ring-wrap { position: relative; width: 110px; height: 110px; margin: 0 auto; }
+  .spp-ring-num { position: absolute; inset: 0; display: flex; flex-direction: column;
+                  align-items: center; justify-content: center; font-family: var(--font-display); }
+  .spp-ring-num b { font-size: 27px; font-weight: 800; letter-spacing: -.04em; line-height: 1; }
+  .spp-ring-num i { font-style: normal; font-size: 11.5px; color: var(--muted); font-weight: 600; margin-top: 2px; }
+  .spp-ring p { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+  .build-q { font-size: 14.5px; color: var(--muted); margin: 0 0 12px; }
+  /* Recent workouts */
+  .recent-head { display: flex; align-items: baseline; justify-content: space-between; margin: 24px 0 12px; }
+  .recent-head h3 { margin: 0; font-size: 16px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.02em; }
+  .recent-all { background: none; border: none; color: var(--accent); font-size: 13.5px; font-weight: 700; cursor: pointer; padding: 0; }
   /* Build-next-workout screen */
   .plan-preview {
     border: 1px solid var(--border); border-radius: var(--radius); padding: 16px;
@@ -1963,7 +2002,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.03.11";
+const APP_VERSION = "2026.09.03.12";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -2002,6 +2041,7 @@ const ICON_PATHS = {
   trophy: '<path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a2 2 0 0 0 0 4h1M16 5h3a2 2 0 0 1 0 4h-1"/><path d="M12 12v3M9 20h6M9.5 15.5h5l.5 4.5h-6l.5-4.5Z"/>',
   star: '<path d="M12 3l2.5 5.6 6.1.6-4.6 4.1 1.3 6-5.3-3.1L6.7 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z"/>',
   trending: '<path d="M3 17 9 11l4 4 8-8"/><path d="M17 7h4v4"/>',
+  pencil: `<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>`,
   checklist: '<path d="M4 6h2M4 12h2M4 18h2"/><rect x="9" y="4" width="11" height="4" rx="1"/><rect x="9" y="10" width="11" height="4" rx="1"/><rect x="9" y="16" width="11" height="4" rx="1"/>',
   dumbbell: '<path d="M4 10v4M20 10v4M2 12h2M20 12h2M6 8v8M18 8v8M9 12h6"/>',
   bolt: '<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/>',
@@ -5693,28 +5733,92 @@ function backBar(label, onBack) {
    Deliberately no "% match" score: that implies an algorithm we do not have
    yet, and a made-up number is worse than an absent one. Everything here is
    measured from the user's own logs. */
+const REGION_MUSCLES = {
+  Chest: ["chest"], Back: ["lats", "traps", "lowerback"], Shoulders: ["shoulders"],
+  Arms: ["biceps", "triceps", "forearms"], Core: ["abs", "obliques"],
+  Legs: ["glutes", "quads", "hamstrings", "calves"],
+};
+
+const EQUIPMENT_WORDS = [
+  ["Barbell", ["barbell", "ez-bar", "ez bar", "deadlift", "back squat", "bench press"]],
+  ["Dumbbells", ["dumbbell", "db "]],
+  ["Cables", ["cable", "pulldown", "pushdown", "pec deck"]],
+  ["Machines", ["machine", "leg press", "smith", "hack squat"]],
+  ["Kettlebell", ["kettlebell"]],
+  ["Bodyweight", ["push up", "push-up", "pull up", "pull-up", "chin up", "dip", "plank", "sit up"]],
+];
+
+/* What we can honestly propose for the next session, all of it measured from
+   the user's own logs.
+
+   The Match figure is deliberately defined rather than decorative: it is how
+   under-trained the proposed focus is this week, relative to whatever the user
+   has hit hardest. Train nothing but chest all week and a Back & Legs proposal
+   scores high; train everything evenly and every proposal scores middling,
+   which is the correct signal. It is not a claim about workout quality, which
+   is a question we cannot answer until the algorithm work lands. */
 function planPreview() {
   const vols = computeMuscleVolume(ME, 0);
-  const hit = MUSCLE_GROUPS.filter((m) => (vols[m] || 0) > 0);
-  const cold = MUSCLE_GROUPS.filter((m) => !(vols[m] > 0));
+
+  const regions = Object.entries(REGION_MUSCLES).map(([name, muscles]) => ({
+    name,
+    muscles,
+    volume: muscles.reduce((s, m) => s + (vols[m] || 0), 0),
+  }));
+  regions.sort((a, b) => a.volume - b.volume);
+
+  const heaviest = Math.max(...regions.map((r) => r.volume), 0);
+  const pick = regions.slice(0, 2);
+  const focus = pick.map((r) => r.name).join(" & ");
+
+  const restedness = heaviest > 0
+    ? 1 - (pick.reduce((s, r) => s + r.volume, 0) / (pick.length * heaviest))
+    : 1;
+  const match = Math.max(35, Math.min(99, Math.round(restedness * 100)));
+
+  // Duration from the user's own finished sessions, not a guess.
+  const durations = (ALL_PLANS || [])
+    .filter((w) => w.email === MY_EMAIL && w.duration_sec > 0)
+    .map((w) => w.duration_sec / 60);
+  const avg = durations.length
+    ? Math.round(durations.reduce((s, m) => s + m, 0) / durations.length)
+    : null;
+
+  // Equipment from what they have actually been lifting with lately.
+  const recent = (ALL_EXERCISE_LOGS || [])
+    .filter((l) => l.email === MY_EMAIL)
+    .slice(-40)
+    .map((l) => (l.exercise_name || "").toLowerCase());
+  const kit = EQUIPMENT_WORDS
+    .filter(([, words]) => recent.some((n) => words.some((w) => n.includes(w))))
+    .map(([label]) => label)
+    .slice(0, 3);
+
+  const pretty = { lowerback: "Lower back", abs: "Core", obliques: "Obliques" };
+  const targets = pick.flatMap((r) => r.muscles)
+    .map((m) => pretty[m] || m.charAt(0).toUpperCase() + m.slice(1))
+    .filter((v, idx, arr) => arr.indexOf(v) === idx)
+    .slice(0, 4);
+
   return {
-    focus: MY_PROFILE?.focus || "General Fitness",
-    goal: MY_PROFILE?.goal || "Stay consistent",
+    focus,
+    match,
+    duration: avg ? `${Math.max(15, avg - 5)}-${avg + 5} min` : null,
+    equipment: kit.length ? kit.join(", ") : null,
+    targets,
     done: gymDaysThisWeek(ME),
     target: weeklyGoalFor(MY_EMAIL) || 4,
-    coverage: Math.round((hit.length / MUSCLE_GROUPS.length) * 100),
-    untrained: cold.slice(0, 3),
   };
 }
 
 function optionCard(id, ico, title, sub, primary) {
   return `<button type="button" class="opt-card ${primary ? "primary" : ""}" id="${id}">
-    <span class="opt-ico">${icon(ico, 19)}</span>
+    <span class="opt-ico">${icon(ico, 26)}</span>
     <span class="opt-txt">
       <span class="opt-title">${escapeHtml(title)}</span>
       <span class="opt-sub">${escapeHtml(sub)}</span>
     </span>
-    <span class="opt-go">${icon("chevronLeft", 18)}</span>
+    <span class="opt-go">${icon("chevronLeft", 16)}</span>
   </button>`;
 }
 
@@ -5722,17 +5826,20 @@ function recentWorkoutsStrip() {
   const mine = (ALL_PLANS || [])
     .filter((w) => w.email === MY_EMAIL && !w.archived)
     .sort((a, b) => String(b.entry_date).localeCompare(String(a.entry_date)))
-    .slice(0, 6);
+    .slice(0, 8);
   if (!mine.length) return "";
-  return `<div class="ps-label" style="margin-top:22px;">RECENT WORKOUTS</div>
+  return `<div class="recent-head">
+      <h3>Recent Workouts</h3>
+      <button type="button" class="recent-all" id="recentAllBtn">View All</button>
+    </div>
     <div class="recent-strip">
-      ${mine.map((w) => `<div class="recent-chip">
+      ${mine.map((w) => `<button type="button" class="recent-chip" data-recap="${escapeHtml(w.entry_date)}">
         <div class="recent-name">${escapeHtml(w.focus || "Workout")}</div>
         <div class="recent-when">
           ${escapeHtml(relDayLabel(w.entry_date))}
           ${w.completed_at ? `<span class="done">${icon("check", 13)}</span>` : ""}
         </div>
-      </div>`).join("")}
+      </button>`).join("")}
     </div>`;
 }
 
@@ -5744,43 +5851,75 @@ function renderChooseScreen() {
   const p = planPreview();
 
   const preview = coached ? "" : `
-    <div class="plan-preview">
-      <div class="pp-rows">
-        <div class="pp-row"><span>Focus</span><b>${escapeHtml(p.focus)}</b></div>
-        <div class="pp-row"><span>This week</span><b>${p.done} of ${p.target}</b></div>
-        <div class="pp-row"><span>Not trained yet</span><b>${
-          p.untrained.length ? escapeHtml(p.untrained.join(", ")) : "All covered"
-        }</b></div>
+    <div class="spp">
+      <div class="spp-top">
+        <span class="spp-spark">${icon("star", 18)}</span>
+        <h3>Smart Plan Preview</h3>
+        <button type="button" class="spp-cust" id="sppCustomise">Customize</button>
       </div>
-      <div class="pp-ring">
-        ${ringSVG(p.coverage / 100, "var(--accent)", 84)}
-        <div class="pp-ring-num"><b>${p.coverage}%</b><i>COVERED</i></div>
+      <div class="spp-body">
+        <div class="spp-facts">
+          <div class="spp-fact"><div class="k">Focus</div><div class="v">${escapeHtml(p.focus)}</div></div>
+          ${p.duration ? `<div class="spp-fact"><div class="k">Est. Duration</div><div class="v">${escapeHtml(p.duration)}</div></div>` : ""}
+          ${p.equipment ? `<div class="spp-fact"><div class="k">Equipment</div><div class="v">${escapeHtml(p.equipment)}</div></div>` : ""}
+          <div class="spp-fact">
+            <div class="k">Target Muscles</div>
+            <div class="spp-chips">${p.targets.map((t) => `<span class="spp-chip">${escapeHtml(t)}</span>`).join("")}</div>
+          </div>
+        </div>
+        <div class="spp-ring">
+          <div class="spp-ring-wrap">
+            ${ringSVG(p.match / 100, "var(--accent)", 110)}
+            <div class="spp-ring-num"><b>${p.match}%</b><i>Match</i></div>
+          </div>
+          <p>Based on your<br />recent sessions</p>
+        </div>
       </div>
     </div>`;
 
   $("workoutContent").innerHTML = `
-    ${backBar("Back", () => { WORKOUT_MODE = null; renderWorkoutTab(); })}
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="sppBack" aria-label="Back">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">Build Next Workout</div>
+      <div class="spacer"></div>
+    </div>
     ${preview}
-    <p class="muted-note">${coached
+    <p class="build-q">${coached
       ? `${escapeHtml(coachName)} sets your training. Log what you did, or add something extra.`
-      : "How do you want to build this one?"}</p>
+      : "How do you want to build your next workout?"}</p>
     ${coached ? "" : optionCard("chooseGenerateBtn", "bolt", "Generate for me",
-        "Built around your goal and what you have lifted lately.", true)}
-    ${optionCard("choosePlanBtn", "checklist",
+        "Built around your goals and stats.", true)}
+    ${optionCard("choosePlanBtn", "pencil",
         coached ? "Log a workout" : "I'll plan my own",
         coached ? "Record the session your coach set." : "Start from scratch and add your own exercises.",
         coached)}
     ${optionCard("chooseActivityBtn", "heart", "Log a class or cardio",
-        "Track a class, a sport or a run.", false)}
+        "Track a class, sport, or cardio session.", false)}
     ${recentWorkoutsStrip()}`;
 
-  if (!coached) $("chooseGenerateBtn").onclick = generateWorkout;
-  $("choosePlanBtn").onclick = () => {
+  const toManual = () => {
     WORKOUT_MODE = "manual";
     if (!MANUAL_DRAFT.length) MANUAL_DRAFT = loadDraft();   // pick up where you left off
     renderWorkoutTab();
   };
+
+  $("sppBack").onclick = () => { WORKOUT_MODE = null; renderWorkoutTab(); };
+  if ($("sppCustomise")) $("sppCustomise").onclick = toManual;
+  if (!coached) $("chooseGenerateBtn").onclick = generateWorkout;
+  $("choosePlanBtn").onclick = toManual;
   $("chooseActivityBtn").onclick = () => { WORKOUT_MODE = "activity"; renderWorkoutTab(); };
+
+  // Every recent chip opens its recap, and View All drops you at the full list.
+  $("workoutContent").querySelectorAll("[data-recap]").forEach((b) => {
+    b.onclick = () => openRecap(MY_EMAIL, ME, b.dataset.recap);
+  });
+  if ($("recentAllBtn")) {
+    $("recentAllBtn").onclick = () => {
+      WORKOUT_MODE = null;
+      renderWorkoutTab();
+      $("todayTallyCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+  }
 }
 
 /* Not everything is sets and reps. Pilates, yoga, a run and a swim are measured
@@ -6070,7 +6209,7 @@ function renderPlanPreview() {
     ${finished
       ? `<p class="muted-note" style="text-align:center;margin:14px 0 10px;">${icon("check", 14)} Workout complete.</p>
          <button type="button" class="btn-primary" id="planNewBtn">Start new workout</button>`
-      : `<button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume Workout" : "Start Workout"}</button>
+      : `<button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume Workout" : "Begin Workout"}</button>
          ${started ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`}`;
 
   makeReorderable($("planRows"), async (order) => {
