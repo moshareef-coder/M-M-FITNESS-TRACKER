@@ -95,6 +95,10 @@ globalThis.window.supabase = {
     auth: { onAuthStateChange() {}, getSession: async () => ({ data: { session: null } }), signOut() {} },
     storage: { from: () => ({ createSignedUrl: async () => ({ data: null }), upload: async () => ({ error: null }), remove: async () => ({}) }) },
     rpc: () => chain([]),
+    // Realtime: the live-session watcher opens a channel during loadAll, so a
+    // missing stub here would hide a throw that kills startup.
+    channel: () => ({ on() { return this; }, subscribe() { return this; } }),
+    removeChannel: () => {},
   }),
 };
 
@@ -173,7 +177,7 @@ function checkClobberedIds() {
 /* Nothing that covers the whole screen may start visible, and only one thing
    may claim the screen at a time. A stray overlay makes the page look dead. */
 {
-  const overlays = ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "sessionCard"];
+  const overlays = ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "sessionCard"];
   const bad = overlays.filter((id) => {
     const tag = new RegExp(`<div[^>]*id="${id}"[^>]*>`).exec(html)?.[0] || "";
     return !tag.includes("hidden");
@@ -224,6 +228,16 @@ for (const [name, run] of [
   try { await run(); console.log(`  ${name.padEnd(20)} ok`); }
   catch (e) { failed++; console.log(`  ${name.padEnd(20)} THREW: ${e.message}`); console.log("    " + (e.stack || "").split("\n")[1]?.trim()); }
 }
+/* The live card and watcher only run when a partner exists, which the plain
+   loadAll pass may not reach. Force it, because a throw here kills startup. */
+try {
+  globalThis.PARTNER_EMAIL = "mel@x.com";
+  await globalThis.__t.loadAll();
+  console.log("  loadAll (paired)     ok");
+} catch (e) {
+  failed++; console.log(`  loadAll (paired)     THREW: ${e.message}`);
+}
+
 if (MISSES.size) { failed++; console.log("\n  ids used in JS but MISSING from markup:", [...MISSES].join(", ")); }
 console.log(failed ? "\nBOOT CHECK FAILED" : "\nBOOT CHECK PASSED");
 process.exit(failed ? 1 : 0);

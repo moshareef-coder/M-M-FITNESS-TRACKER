@@ -640,6 +640,56 @@
   .setup-photo { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
   .setup-photo .av { width: 56px; height: 56px; font-size: 17px; border-width: 3px; cursor: default; }
 
+  /* Someone training right now. A red dot is the one place in this app that
+     earns pure attention-grabbing, because it is true for twenty minutes a
+     day and false the rest of the time. */
+  .live-card {
+    width: 100%; display: flex; align-items: center; gap: 11px; text-align: left; cursor: pointer;
+    background: var(--card-fill); border: 1px solid color-mix(in srgb, var(--partner) 45%, var(--border));
+    border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; font-family: inherit;
+    color: var(--text); box-shadow: var(--shadow-card); transition: transform .12s ease;
+  }
+  .live-card:active { transform: scale(.99); }
+  .live-av {
+    width: 44px; height: 44px; border-radius: 50%; overflow: hidden; flex-shrink: 0; position: relative;
+    border: 2px solid var(--partner); background: var(--panel-2); color: var(--partner);
+    display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 800;
+  }
+  .live-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .live-body { flex: 1; min-width: 0; }
+  .live-head { display: flex; align-items: center; gap: 7px; }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--up); flex-shrink: 0; animation: livePulse 1.6s ease-in-out infinite; }
+  @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+  .live-label { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--up); }
+  .live-name { font-size: 15.5px; font-weight: 700; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .live-what { font-size: 12.5px; color: var(--muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .live-go { color: var(--muted); flex-shrink: 0; display: flex; }
+  @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+
+  /* The watch screen */
+  .lw-hero { text-align: center; padding: 4px 0 14px; }
+  .lw-av {
+    width: 84px; height: 84px; border-radius: 50%; overflow: hidden; margin: 0 auto 10px;
+    border: 3px solid var(--partner); background: var(--panel-2); color: var(--partner);
+    display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800;
+  }
+  .lw-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .lw-name { font-size: 21px; font-weight: 800; letter-spacing: -.03em; }
+  .lw-focus { font-size: 14px; color: var(--muted); margin-top: 2px; }
+  .lw-now {
+    background: var(--panel-2); border-radius: 14px; padding: 14px; text-align: center; margin-bottom: 10px;
+  }
+  .lw-now-label { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .lw-ex { font-size: 21px; font-weight: 800; letter-spacing: -.02em; margin-top: 4px; }
+  .lw-sets { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+  .lw-set { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border); }
+  .lw-set.on { background: var(--partner); border-color: transparent; }
+  .lw-meta { display: flex; justify-content: center; gap: 16px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+  .lw-meta span { display: inline-flex; align-items: center; gap: 5px; }
+  .lw-next { font-size: 14px; color: var(--muted); text-align: center; margin: 0 0 12px; }
+  .lw-next b { color: var(--text); font-weight: 700; }
+  .lw-stale { font-size: 12.5px; color: var(--muted); text-align: center; margin: 0 0 12px; }
+
   /* Card heads with a side link */
   .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
   .card-head h2 { margin: 0; }
@@ -1841,6 +1891,7 @@
   <div id="tab-home" class="tab-panel">
     <div class="reminder-banner hidden" id="encouragementBanner"></div>
     <div class="rest-banner hidden" id="restDayBanner"></div>
+    <button type="button" class="live-card hidden" id="liveCard"></button>
     <div class="notice hidden" id="partnerNotice"></div>
 
     <div class="card" id="heroCard"></div>
@@ -2304,6 +2355,9 @@
     <div class="pop" id="popCard"></div>
   </div>
 
+  <div class="sheet-scrim hidden" id="liveScrim">
+    <div class="partner-sheet" id="liveSheet"></div>
+  </div>
   <div class="sheet-scrim hidden" id="allWorkoutsScrim">
     <div class="partner-sheet" id="allWorkoutsSheet"></div>
   </div>
@@ -2373,7 +2427,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.5";
+const APP_VERSION = "2026.09.04.6";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -3138,7 +3192,7 @@ function showApp() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim"]
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
   const sess = $("sessionCard");
   if (sess && !sess.classList.contains("hidden")) {
@@ -3389,6 +3443,9 @@ async function loadAll() {
     sb.from("user_goals").select("*").eq("status", "active"),
     sb.from("session_reactions").select("*").order("created_at", { ascending: false }),
   ]);
+  await loadLiveSessions();
+  watchLiveSessions();
+  startLiveTick();
   ALL_REACTIONS = reactRes.data || [];
   ALL_GOALS = goalsRes.data || [];
   MY_GOAL = ALL_GOALS.find((g) => (g.email || "").toLowerCase() === MY_EMAIL) || null;
@@ -4614,6 +4671,145 @@ async function renderWeekStrips() {
 }
 
 
+/* ---------- Watching someone train ----------
+   The live row is presence, so it is read with a clock, not just a query: a
+   phone that locks stops beating, and pretending that is still "in the gym
+   right now" is how a live feature starts lying. */
+
+let LIVE_PARTNER = null;
+let LIVE_CHANNEL = null;
+let LIVE_TICK = null;
+
+const LIVE_QUIET_MS = 3 * 60 * 1000;    // beats stop when the screen sleeps
+const LIVE_GONE_MS = 25 * 60 * 1000;    // long enough that they have left
+
+function liveAgeMs(row) {
+  return Date.now() - new Date(row.last_beat_at).getTime();
+}
+
+async function loadLiveSessions() {
+  if (!PARTNER_EMAIL) { LIVE_PARTNER = null; return; }
+  const { data, error } = await sb.from("live_sessions").select("*");
+  if (error) { console.warn("could not read live sessions", error); return; }
+  const row = (data || []).find((r) => (r.email || "").toLowerCase() === PARTNER_EMAIL.toLowerCase());
+  LIVE_PARTNER = row && liveAgeMs(row) < LIVE_GONE_MS ? row : null;
+}
+
+/* Postgres Changes rather than polling, so a set landing in the gym shows up
+   here in about a second. RLS applies per subscriber, so this only ever
+   delivers rows the watcher was already allowed to read. */
+function watchLiveSessions() {
+  if (LIVE_CHANNEL || !PARTNER_EMAIL) return;
+  LIVE_CHANNEL = sb.channel("live-sessions")
+    .on("postgres_changes", { event: "*", schema: "public", table: "live_sessions" }, (payload) => {
+      const row = payload.new && Object.keys(payload.new).length ? payload.new : null;
+      const gone = payload.eventType === "DELETE";
+      const who = (row?.email || payload.old?.email || "").toLowerCase();
+      if (who !== PARTNER_EMAIL.toLowerCase()) return;
+      LIVE_PARTNER = gone ? null : row;
+      renderLiveCard();
+      if (!$("liveScrim").classList.contains("hidden")) renderLiveSheet();
+    })
+    .subscribe();
+}
+
+/* The card ages on its own, so "5 min ago" does not sit there saying 5 min
+   twenty minutes later. */
+function startLiveTick() {
+  if (LIVE_TICK) return;
+  LIVE_TICK = setInterval(() => {
+    if (!LIVE_PARTNER) return;
+    if (liveAgeMs(LIVE_PARTNER) > LIVE_GONE_MS) LIVE_PARTNER = null;
+    renderLiveCard();
+    if (!$("liveScrim").classList.contains("hidden")) renderLiveSheet();
+  }, 20000);
+}
+
+function liveStateLabel(row) {
+  if (liveAgeMs(row) > LIVE_QUIET_MS) return "Screen off, still in it";
+  if (row.state === "paused") return "Paused";
+  if (row.state === "resting") return "Resting";
+  return "Working";
+}
+
+async function renderLiveCard() {
+  const el = $("liveCard");
+  if (!el) return;
+  if (!LIVE_PARTNER) { el.classList.add("hidden"); return; }
+  const row = LIVE_PARTNER;
+  const name = row.user_name || partnerName();
+  const mins = Math.max(1, Math.round((row.elapsed_sec || 0) / 60));
+  const what = [row.exercise_name, `${mins} min in`, liveStateLabel(row)].filter(Boolean).join(" · ");
+
+  el.innerHTML = `
+    <span class="live-av" data-av-email="${escapeHtml(row.email)}">${escapeHtml(initials(name))}</span>
+    <span class="live-body">
+      <span class="live-head"><span class="live-dot"></span><span class="live-label">Training now</span></span>
+      <span class="live-name">${escapeHtml(name)} is on ${escapeHtml(row.focus || "a workout")}</span>
+      <span class="live-what">${escapeHtml(what)}</span>
+    </span>
+    <span class="live-go">${icon("chevronRight", 20)}</span>`;
+  el.classList.remove("hidden");
+  el.onclick = openLiveSheet;
+  hydrateAvatars(el);
+}
+
+async function openLiveSheet() {
+  if (!LIVE_PARTNER) return;
+  await renderLiveSheet();
+  $("liveScrim").classList.remove("hidden");
+  $("liveScrim").onclick = (ev) => { if (ev.target === $("liveScrim")) closeLiveSheet(); };
+}
+
+function closeLiveSheet() { $("liveScrim").classList.add("hidden"); }
+
+async function renderLiveSheet() {
+  const row = LIVE_PARTNER;
+  const sheet = $("liveSheet");
+  if (!row) {
+    sheet.innerHTML = `<div class="ds-grip"></div>
+      <div class="ps-head"><button type="button" class="ds-x" id="lwClose" aria-label="Close">&times;</button></div>
+      <div class="ps-empty">That session just ended.</div>`;
+    $("lwClose").onclick = closeLiveSheet;
+    return;
+  }
+  const name = row.user_name || partnerName();
+  const face = await avatarUrlFor(row.email);
+  const mins = Math.round((row.elapsed_sec || 0) / 60);
+  const setTotal = row.set_total || 0;
+  const sets = Array.from({ length: setTotal }, (_, i) =>
+    `<span class="lw-set${i < (row.set_done || 0) ? " on" : ""}"></span>`).join("");
+
+  /* Their plan is already on the server, so "what's next" needs nothing live. */
+  const plan = (ALL_PLANS || []).find((w) => w.id === row.workout_id);
+  const nextEx = plan?.exercises?.[(row.exercise_index || 0) + 1];
+  const stale = liveAgeMs(row) > LIVE_QUIET_MS;
+
+  sheet.innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="ps-head"><button type="button" class="ds-x" id="lwClose" aria-label="Close">&times;</button></div>
+    <div class="lw-hero">
+      <div class="lw-av">${face ? `<img src="${face}" alt="" />` : escapeHtml(initials(name))}</div>
+      <div class="lw-name">${escapeHtml(name)}</div>
+      <div class="lw-focus">${escapeHtml(row.focus || "Workout")} · exercise ${(row.exercise_index || 0) + 1} of ${row.exercise_count || 1}</div>
+    </div>
+    <div class="lw-now">
+      <div class="lw-now-label">${escapeHtml(liveStateLabel(row))}</div>
+      <div class="lw-ex">${escapeHtml(row.exercise_name || "Warming up")}</div>
+      ${setTotal ? `<div class="lw-sets">${sets}</div>` : ""}
+      <div class="lw-meta">
+        <span>${icon("clock", 15)} ${mins} min</span>
+        ${setTotal ? `<span>${icon("check", 15)} ${row.set_done || 0} of ${setTotal} sets</span>` : ""}
+      </div>
+    </div>
+    ${nextEx ? `<p class="lw-next">Up next: <b>${escapeHtml(nextEx.name || "")}</b>${nextEx.sets ? ` · ${nextEx.sets} × ${escapeHtml(String(nextEx.reps || ""))}` : ""}</p>` : ""}
+    ${stale ? `<p class="lw-stale">Their screen is off, so this is where they were a few minutes ago.</p>` : ""}
+    <button type="button" class="btn-primary" id="lwCheer">Send encouragement</button>`;
+
+  $("lwClose").onclick = closeLiveSheet;
+  $("lwCheer").onclick = () => { closeLiveSheet(); openNoteComposer("congratulate"); };
+}
+
 /* ---------- Together timeline ----------
    Every session either of you logged, newest first, with what it was and how
    big it was. Hearts and comments live in session_reactions, one row each. */
@@ -5208,6 +5404,7 @@ function relativeDay(dateStr) {
 function renderHome() {
   renderHero();
   renderTopStreak();
+  renderLiveCard();
   const openBtn = $("openPartnerBtn");
   if (openBtn) {
     openBtn.onclick = openPartnerSheet;
@@ -5450,6 +5647,59 @@ function loadSessionFromStorage() {
   } catch { return null; }
 }
 
+/* ---------- Live session ----------
+   A workout has only ever existed on the phone doing it. These few lines are
+   what let the other person watch it happen: one row, overwritten as you move
+   through the plan, deleted when you stop. It is presence, not history, so it
+   never queues offline; a stale beat is worse than no beat. */
+
+let LIVE_TIMER = null;
+
+function liveStateNow() {
+  if (!SESSION || !TODAY_WORKOUT?.exercises?.length) return null;
+  const ei = Math.min(SESSION.exerciseIndex, TODAY_WORKOUT.exercises.length - 1);
+  const ex = TODAY_WORKOUT.exercises[ei];
+  const sets = SESSION.setsDone?.[ei] || [];
+  return {
+    email: MY_EMAIL,
+    user_name: ME,
+    workout_id: TODAY_WORKOUT.id || null,
+    focus: displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises),
+    exercise_name: ex?.name || null,
+    exercise_index: ei,
+    exercise_count: TODAY_WORKOUT.exercises.length,
+    set_done: sets.filter(Boolean).length,
+    set_total: sets.length,
+    state: SESSION.pausedAt ? "paused" : SESSION.restStartedAt ? "resting" : "working",
+    elapsed_sec: Math.round(sessionElapsed() / 1000),
+    last_beat_at: new Date().toISOString(),
+  };
+}
+
+async function beatLive() {
+  const row = liveStateNow();
+  if (!row || SESSION.finished) return;
+  try { await sb.from("live_sessions").upsert(row, { onConflict: "email" }); }
+  catch (e) { console.warn("live beat failed", e); }
+}
+
+function startLive() {
+  beatLive();
+  if (LIVE_TIMER) return;
+  /* A watcher decides "live" from last_beat_at, so the beat has to keep coming
+     while the screen is open even when nothing changes. */
+  LIVE_TIMER = setInterval(() => {
+    if (!SESSION || SESSION.finished) { endLive(); return; }
+    beatLive();
+  }, 30000);
+}
+
+async function endLive() {
+  if (LIVE_TIMER) { clearInterval(LIVE_TIMER); LIVE_TIMER = null; }
+  try { await sb.from("live_sessions").delete().eq("email", MY_EMAIL); }
+  catch (e) { console.warn("could not end live session", e); }
+}
+
 function saveSessionToStorage() {
   if (SESSION) localStorage.setItem(sessionStorageKey(), JSON.stringify(SESSION));
 }
@@ -5495,6 +5745,7 @@ function startWorkout() {
   }
 
   saveSessionToStorage();
+  startLive();
   openSessionUI();
   $("workoutContent").classList.add("hidden");
   renderSession();
@@ -5549,6 +5800,7 @@ function resumeSessionIfAny() {
 /* Reopen a session the user already started, on purpose. */
 function reopenSession() {
   if (!SESSION) return;
+  startLive();
   openSessionUI();
   $("workoutContent").classList.add("hidden");
   if (SESSION.pausedAt) {
@@ -5719,6 +5971,7 @@ async function logExerciseSilent(name, weight, reps, sets) {
 }
 
 function renderSession() {
+  beatLive();
   const ei = SESSION.exerciseIndex;
   const total = TODAY_WORKOUT.exercises.length;
   const overallPct = Math.round((ei / total) * 100);
@@ -5911,6 +6164,7 @@ async function finishWorkout() {
     }).eq("id", TODAY_WORKOUT.id);
   }
   await markGymDayDone();
+  await endLive();
   await loadAll();
 }
 
