@@ -41,11 +41,16 @@ const FUNCS = [
   "classifyMuscles", "profileFor", "renderClipPill",
   "clipRecorderHTML", "clipViewerHTML", "clipGoneHTML",
   "formatRest", "renderSession", "openEffortInfo",
+  "openWorkoutPrivacy", "workoutPrivacy", "defaultWorkoutPrivacy", "privacySummary", "workoutPrivacyLocked",
+  "liveDetailsShared",
 ].map(fn).join("\n");
 
 /* The working-muscles block is more than a function: caches, colour helpers
    and the snapshot queue. It comes over whole. */
 const WORKING_MUSCLES = section("/* ---------- Working muscles ----------", "/* ---------- Watching someone train ----------");
+
+/* The three switches are data, and a hand-copied copy of them would drift. */
+const PRIVACY_ROWS = grab(/\nconst PRIVACY_ROWS = \[.*?\n\];\n/s, "PRIVACY_ROWS");
 
 /* Data the extracted functions close over. Lifted whole rather than retyped,
    because a hand-copied muscle table would drift from the app's within a week. */
@@ -197,6 +202,10 @@ let MY_DAYS = 4, MY_TARGET = 5, THEIR_DAYS = 4, THEIR_TARGET = 5;
 let DAY_STREAK = 4, WEEK_STREAK = 0, TRAINED_TODAY = false, PLANNED_TOMORROW = null;
 let ENTRIES = {}, ALL_PLANS = [], ALL_EXERCISE_LOGS = [], ALL_REACTIONS = [], LIVE_PARTNER = null;
 let PARTNER_PROFILE = null;
+let PENDING_PRIVACY = null, MY_PROFILE = null;
+const saveSessionToStorage2 = () => {};
+const applyWorkoutPrivacy = () => {};
+const renderPlanPreview = () => {};
 
 /* Effort points stand in for real data here: what matters for the gallery is
    the shape (a number, a lead) not the exact math, which lives in index.html. */
@@ -262,6 +271,7 @@ const ensureBodyDetailModules = () => Promise.resolve(BODY_DETAIL);
 let BODY_DETAIL = { detail: { hitsForExercise: (name) => HITS[String(name).toLowerCase()] || null } };
 const HITS = ${JSON.stringify(HITS)};
 
+${PRIVACY_ROWS}
 ${FUNCS}
 ${WORKING_MUSCLES}
 
@@ -436,6 +446,15 @@ const STATES = [
   { group: "Home", name: "How effort is scored",
     note: "Tapping the effort line opens this. Three lines, the real numbers from the formula, and why two people can be compared when one of them shares nothing.",
     pop: () => openEffortInfo(), setup: () => {} },
+
+  { group: "Home", name: "Advanced settings for one workout",
+    note: "Opened from the plan screen before you press Begin, or the small chip on the session card once you have. Defaults come from Settings, changes here last one workout.",
+    pop: () => openWorkoutPrivacy(),
+    setup: () => { SESSION = null; PENDING_PRIVACY = { live: true, details: false, cheers: true }; } },
+
+  { group: "Watching them train", name: "They turned messages off",
+    note: "Cheer buttons are gone rather than greyed. The database refuses the clip too, so it is not a UI-only promise.",
+    setup: () => { LIVE_PARTNER = liveRow({ allow_cheers: false }); }, sheet: true },
 
   { group: "What they see while training", name: "Mid set, bench press",
     note: "The exerciser's own screen. Their body, lit in their colour, sits between the target and the set dots so they see what they are hitting before they log.",

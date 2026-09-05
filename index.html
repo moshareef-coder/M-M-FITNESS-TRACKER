@@ -834,6 +834,32 @@
     color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 15%, transparent);
   }
   .ef-note { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0 0 14px; }
+
+  /* Per workout privacy: the way in from the plan screen, the three switches,
+     and the small chip that reopens them mid workout. */
+  .wp-open {
+    width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer;
+    margin-top: 12px; padding: 12px 13px; border-radius: 14px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text); font: inherit;
+  }
+  .wp-open:active { opacity: .75; }
+  .wp-open-ico { display: flex; color: var(--muted); flex-shrink: 0; }
+  .wp-open-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .wp-open-txt b { font-size: 14px; font-weight: 700; }
+  .wp-open-txt i { font-size: 12.5px; font-style: normal; color: var(--muted); }
+  .wp-open-go { display: flex; color: var(--muted); flex-shrink: 0; }
+  .wp-list { display: flex; flex-direction: column; gap: 9px; margin: 2px 0 12px; }
+  .wp-row span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .wp-row b { font-size: 14px; font-weight: 700; }
+  .wp-row i { font-size: 12.5px; font-style: normal; color: var(--muted); line-height: 1.4; }
+  .sess-step-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .wp-chip {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+  }
+  .wp-chip.on { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .wp-chip:active { opacity: .7; }
   .lw-effort .lw-why {
     display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; padding: 0;
     background: none; border: none; color: var(--muted); cursor: pointer; font: inherit; font-size: 11px;
@@ -2613,7 +2639,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.11";
+const APP_VERSION = "2026.09.04.12";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -5478,6 +5504,16 @@ function startLiveTick() {
   }, 20000);
 }
 
+/* The row decides, not the profile: a live session carries the choice made
+   when that workout started, which defaulted from the profile but may have
+   been opened up or shut down for this one. Rows written before per workout
+   privacy existed have no flag, and those fall back to the standing setting. */
+function liveDetailsShared(row) {
+  if (row?.details_shared === false) return false;
+  if (row?.details_shared === true) return true;
+  return PARTNER_PROFILE?.share_workout_details !== false;
+}
+
 function liveStateLabel(row) {
   if (liveAgeMs(row) > LIVE_QUIET_MS) return "Screen off, still in it";
   if (row.state === "paused") return "Paused";
@@ -5494,7 +5530,7 @@ async function renderLiveCard() {
   const mins = Math.max(1, Math.round((row.elapsed_sec || 0) / 60));
   // A person can keep the exercise private and still show up as working hard:
   // the effort score stands in for it, never the other way around.
-  const sharing = PARTNER_PROFILE?.share_workout_details !== false;
+  const sharing = liveDetailsShared(row);
   const nameLine = sharing
     ? `${escapeHtml(name)} is on ${escapeHtml(row.focus || "a workout")}`
     : `${escapeHtml(name)} is training`;
@@ -5539,7 +5575,8 @@ async function renderLiveSheet() {
   const mins = Math.round((row.elapsed_sec || 0) / 60);
   // Off means: still show they're live, how long, and how hard, just not
   // what. Nothing here about the actual exercise gets built when it's off.
-  const sharing = PARTNER_PROFILE?.share_workout_details !== false;
+  const sharing = liveDetailsShared(row);
+  const canCheer = row.allow_cheers !== false;
   const setTotal = sharing ? (row.set_total || 0) : 0;
   const sets = Array.from({ length: setTotal }, (_, i) =>
     `<span class="lw-set${i < (row.set_done || 0) ? " on" : ""}"></span>`).join("");
@@ -5580,7 +5617,7 @@ async function renderLiveSheet() {
     ${!sharing ? `<p class="lw-private-note">${escapeHtml(name)} keeps workout details private. Their effort score is always shared.</p>` : ""}
     ${sharing && nextEx ? `<p class="lw-next">Up next: <b>${escapeHtml(nextEx.name || "")}</b>${nextEx.sets ? ` · ${nextEx.sets} × ${escapeHtml(String(nextEx.reps || ""))}` : ""}</p>` : ""}
     ${stale ? `<p class="lw-stale">Their screen is off, so this is where they were a few minutes ago.</p>` : ""}
-    <div class="lw-card">
+    ${canCheer ? `<div class="lw-card">
       <div class="lw-card-label">Cheer them on</div>
       <div class="lw-send">
         <button type="button" class="btn-secondary" id="lwClip" style="margin-top:0">
@@ -5590,12 +5627,12 @@ async function renderLiveSheet() {
           ${icon("bolt", 22)} Send a message
         </button>
       </div>
-    </div>`;
+    </div>` : `<p class="lw-private-note">${escapeHtml(name)} has messages off for this workout.</p>`}`;
 
   $("lwClose").onclick = closeLiveSheet;
   if ($("lwWhy")) $("lwWhy").onclick = () => { closeLiveSheet(); openEffortInfo(); };
-  $("lwMsg").onclick = () => { closeLiveSheet(); openNoteComposer("congratulate"); };
-  $("lwClip").onclick = () => { closeLiveSheet(); openClipRecorder(row.email); };
+  if ($("lwMsg")) $("lwMsg").onclick = () => { closeLiveSheet(); openNoteComposer("congratulate"); };
+  if ($("lwClip")) $("lwClip").onclick = () => { closeLiveSheet(); openClipRecorder(row.email); };
 }
 
 /* ---------- Together timeline ----------
@@ -6475,21 +6512,119 @@ function loadSessionFromStorage() {
 
 let LIVE_TIMER = null;
 
+/* ---------- Per workout privacy ----------
+   The Settings toggle is the standing answer; this is the one for today.
+   Defaults come from the profile, so someone who never opens this gets
+   exactly the behaviour they already chose, and a change here is scoped to
+   the session it was made in. */
+
+let PENDING_PRIVACY = null;   // chosen before Begin, moved onto SESSION at start
+
+function defaultWorkoutPrivacy() {
+  return { live: true, details: MY_PROFILE?.share_workout_details !== false, cheers: true };
+}
+
+function workoutPrivacy() {
+  if (SESSION) {
+    if (!SESSION.privacy) SESSION.privacy = defaultWorkoutPrivacy();
+    return SESSION.privacy;
+  }
+  if (!PENDING_PRIVACY) PENDING_PRIVACY = defaultWorkoutPrivacy();
+  return PENDING_PRIVACY;
+}
+
+/* One line for the plan screen and the session card, so the state is legible
+   without opening anything. */
+function privacySummary(p = workoutPrivacy()) {
+  if (!PARTNER_EMAIL) return "";
+  const who = partnerName();
+  if (!p.live) return `${who} cannot see this workout`;
+  if (!p.details && !p.cheers) return `${who} sees effort only, and cannot send anything`;
+  if (!p.details) return `${who} sees you are training, not what`;
+  if (!p.cheers) return `${who} can watch, but cannot send anything`;
+  return `${who} can watch and cheer`;
+}
+
+function workoutPrivacyLocked(p = workoutPrivacy()) {
+  return !p.live || !p.details || !p.cheers;
+}
+
+const PRIVACY_ROWS = [
+  { key: "live", title: "Let them see me training", sub: "Turn this off and nothing is published at all. No live card, no watching." },
+  { key: "details", title: "Let them see what I'm doing", sub: "The exercise, the muscles worked and your sets. Off, they still see your effort score." },
+  { key: "cheers", title: "Let them send me things", sub: "Videos and messages that appear while you train." },
+];
+
+function openWorkoutPrivacy() {
+  const p = workoutPrivacy();
+  $("popCard").innerHTML = `
+    <div class="pop-body">
+      <div class="ds-top">
+        <div class="pop-who" style="color:var(--muted)">THIS WORKOUT</div>
+        <button type="button" class="ds-x" id="wpX" aria-label="Close">&times;</button>
+      </div>
+      <div class="wp-list">
+        ${PRIVACY_ROWS.map((r) => `
+          <label class="gym-toggle wp-row${p[r.key] ? " checked" : ""}" data-wp="${r.key}">
+            <span><b>${escapeHtml(r.title)}</b><i>${escapeHtml(r.sub)}</i></span>
+            <input type="checkbox" data-wp-input="${r.key}"${p[r.key] ? " checked" : ""} />
+          </label>`).join("")}
+      </div>
+      <p class="ef-note">Just for this workout. Your standing choice in Settings is not changed.</p>
+      <button type="button" class="btn-primary" id="wpDone">Done</button>
+    </div>`;
+  $("popScrim").classList.remove("hidden");
+
+  $("popCard").querySelectorAll("[data-wp-input]").forEach((input) => {
+    input.onchange = () => {
+      p[input.dataset.wpInput] = input.checked;
+      input.closest(".wp-row").classList.toggle("checked", input.checked);
+      applyWorkoutPrivacy();
+    };
+  });
+  const close = () => {
+    $("popScrim").classList.add("hidden");
+    if (SESSION) renderSession(); else if (TODAY_WORKOUT) renderPlanPreview();
+  };
+  $("wpX").onclick = close;
+  $("wpDone").onclick = close;
+}
+
+/* A change mid-workout has to take effect now, not at the next beat: turning
+   watching off while someone is watching should empty their screen. */
+async function applyWorkoutPrivacy() {
+  if (!SESSION) return;
+  saveSessionToStorage();
+  if (!workoutPrivacy().live) {
+    try { await sb.from("live_sessions").delete().eq("email", MY_EMAIL); }
+    catch (e) { console.warn("could not withdraw the live session", e); }
+    return;
+  }
+  await beatLive();
+}
+
 function liveStateNow() {
   if (!SESSION || !TODAY_WORKOUT?.exercises?.length) return null;
+  const priv = workoutPrivacy();
+  if (!priv.live) return null;   // nothing published means nothing to read
   const ei = Math.min(SESSION.exerciseIndex, TODAY_WORKOUT.exercises.length - 1);
   const ex = TODAY_WORKOUT.exercises[ei];
   const sets = SESSION.setsDone?.[ei] || [];
+  /* When details are off the identifying fields are not written at all,
+     rather than written and hidden by the watcher's UI. The server should not
+     be holding something the person asked nobody to see. */
   return {
     email: MY_EMAIL,
     user_name: ME,
-    workout_id: TODAY_WORKOUT.id || null,
-    focus: displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises),
-    exercise_name: ex?.name || null,
-    exercise_index: ei,
-    exercise_count: TODAY_WORKOUT.exercises.length,
-    set_done: sets.filter(Boolean).length,
-    set_total: sets.length,
+    workout_id: priv.details ? (TODAY_WORKOUT.id || null) : null,
+    focus: priv.details ? displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises) : null,
+    exercise_name: priv.details ? (ex?.name || null) : null,
+    exercise_index: priv.details ? ei : 0,
+    exercise_count: priv.details ? TODAY_WORKOUT.exercises.length : 0,
+    set_done: priv.details ? sets.filter(Boolean).length : 0,
+    set_total: priv.details ? sets.length : 0,
+    details_shared: !!priv.details,
+    allow_cheers: !!priv.cheers,
     state: SESSION.pausedAt ? "paused" : SESSION.restStartedAt ? "resting" : "working",
     elapsed_sec: Math.round(sessionElapsed() / 1000),
     last_beat_at: new Date().toISOString(),
@@ -6539,8 +6674,11 @@ function todaysLoggedExerciseNames() {
 function startWorkout() {
   if (!TODAY_WORKOUT) return;
   SESSION_LAST_EX = null;   // a new session always slides its first exercise in
+  const chosenPrivacy = PENDING_PRIVACY || defaultWorkoutPrivacy();
+  PENDING_PRIVACY = null;
   const loggedAlready = todaysLoggedExerciseNames();
   SESSION = {
+    privacy: chosenPrivacy,
     workoutId: TODAY_WORKOUT.id,
     startedAt: Date.now(),
     elapsedMs: 0,
@@ -6837,7 +6975,11 @@ function renderSession() {
 
   $("sessionBody").innerHTML = `
     <div class="sess-card${exChanged ? " ex-in" : ""}">
-      <div class="sess-step">EXERCISE ${ei + 1} OF ${total}</div>
+      <div class="sess-step-row">
+        <div class="sess-step">EXERCISE ${ei + 1} OF ${total}</div>
+        ${PARTNER_EMAIL ? `<button type="button" class="wp-chip${workoutPrivacyLocked() ? " on" : ""}" id="sessPrivacyBtn"
+          aria-label="Who can see this workout">${icon(workoutPrivacyLocked() ? "lock" : "people", 14)}</button>` : ""}
+      </div>
       <h2 class="sess-name">${escapeHtml(ex.name)}</h2>
       <div class="sess-meta">
         <span class="sess-target">${ex.sets} sets × ${ex.reps} reps</span>
@@ -6903,6 +7045,8 @@ function renderSession() {
 
   if (resting) startRestTicker();
   else stopRestTicker();
+
+  if ($("sessPrivacyBtn")) $("sessPrivacyBtn").onclick = openWorkoutPrivacy;
 
   const logBtn = $("logSetBtn");
   if (logBtn) logBtn.onclick = () => { if (currentSet >= 0) toggleSet(currentSet); };
@@ -7968,7 +8112,12 @@ function renderPlanPreview() {
     ${finished
       ? `<p class="muted-note" style="text-align:center;margin:14px 0 10px;">${icon("check", 14)} Workout complete.</p>
          <button type="button" class="btn-primary" id="planNewBtn">Start new workout</button>`
-      : `<button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume Workout" : "Begin Workout"}</button>
+      : `${PARTNER_EMAIL ? `<button type="button" class="wp-open" id="planPrivacyBtn">
+             <span class="wp-open-ico">${icon(workoutPrivacyLocked() ? "lock" : "people", 16)}</span>
+             <span class="wp-open-txt"><b>Advanced</b><i>${escapeHtml(privacySummary())}</i></span>
+             <span class="wp-open-go">${icon("chevronRight", 16)}</span>
+           </button>` : ""}
+         <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume Workout" : "Begin Workout"}</button>
          ${started ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`}`;
 
   makeReorderable($("planRows"), async (order) => {
@@ -8006,6 +8155,7 @@ function renderPlanPreview() {
   }
 
   // These three are mutually exclusive depending on how far the workout got.
+  if ($("planPrivacyBtn")) $("planPrivacyBtn").onclick = openWorkoutPrivacy;
   if ($("planStartBtn")) $("planStartBtn").onclick = startWorkout;
   if ($("planRegenBtn")) $("planRegenBtn").onclick = generateWorkout;
   if ($("planNewBtn")) $("planNewBtn").onclick = startFreshWorkout;

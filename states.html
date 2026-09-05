@@ -824,6 +824,32 @@
     color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 15%, transparent);
   }
   .ef-note { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0 0 14px; }
+
+  /* Per workout privacy: the way in from the plan screen, the three switches,
+     and the small chip that reopens them mid workout. */
+  .wp-open {
+    width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer;
+    margin-top: 12px; padding: 12px 13px; border-radius: 14px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text); font: inherit;
+  }
+  .wp-open:active { opacity: .75; }
+  .wp-open-ico { display: flex; color: var(--muted); flex-shrink: 0; }
+  .wp-open-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .wp-open-txt b { font-size: 14px; font-weight: 700; }
+  .wp-open-txt i { font-size: 12.5px; font-style: normal; color: var(--muted); }
+  .wp-open-go { display: flex; color: var(--muted); flex-shrink: 0; }
+  .wp-list { display: flex; flex-direction: column; gap: 9px; margin: 2px 0 12px; }
+  .wp-row span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .wp-row b { font-size: 14px; font-weight: 700; }
+  .wp-row i { font-size: 12.5px; font-style: normal; color: var(--muted); line-height: 1.4; }
+  .sess-step-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .wp-chip {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+  }
+  .wp-chip.on { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .wp-chip:active { opacity: .7; }
   .lw-effort .lw-why {
     display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; padding: 0;
     background: none; border: none; color: var(--muted); cursor: pointer; font: inherit; font-size: 11px;
@@ -2316,6 +2342,10 @@ let MY_DAYS = 4, MY_TARGET = 5, THEIR_DAYS = 4, THEIR_TARGET = 5;
 let DAY_STREAK = 4, WEEK_STREAK = 0, TRAINED_TODAY = false, PLANNED_TOMORROW = null;
 let ENTRIES = {}, ALL_PLANS = [], ALL_EXERCISE_LOGS = [], ALL_REACTIONS = [], LIVE_PARTNER = null;
 let PARTNER_PROFILE = null;
+let PENDING_PRIVACY = null, MY_PROFILE = null;
+const saveSessionToStorage2 = () => {};
+const applyWorkoutPrivacy = () => {};
+const renderPlanPreview = () => {};
 
 /* Effort points stand in for real data here: what matters for the gallery is
    the shape (a number, a lead) not the exact math, which lives in index.html. */
@@ -2380,6 +2410,13 @@ const ensureRiveBodyModule = () => Promise.resolve(RIVE_BODY);
 const ensureBodyDetailModules = () => Promise.resolve(BODY_DETAIL);
 let BODY_DETAIL = { detail: { hitsForExercise: (name) => HITS[String(name).toLowerCase()] || null } };
 const HITS = {"barbell squat":{"hits":{"rectusFemoris":1,"vastusLateralis":1,"vastusMedialis":1,"adductorMagnus":1,"gluteusMaximus":0.5,"bicepsFemoris":0.5,"semitendinosus":0.5},"general":false},"barbell row":{"hits":{"latissimusDorsi":1,"teresMajor":1,"biceps":0.5,"brachialis":0.5,"trapezius":0.5,"midTraps":0.5,"posteriorDeltoid":0.5,"bicepsLong":0.5,"bicepsShort":0.5},"general":false},"calf raise":{"hits":{"gastrocnemius":1,"soleus":1},"general":false},"bench press":{"hits":{"pectoralisMajor":1,"pecSternal":1,"pecClavicular":0.5,"tricepsBrachii":0.5,"tricepsLong":0.5,"tricepsLateral":0.5,"tricepsMedial":0.5,"deltoids":0.5,"anteriorDeltoid":0.5},"general":false},"romanian deadlift":{"hits":{"bicepsFemoris":1,"semitendinosus":1,"gluteusMaximus":0.5,"erectorSpinae":0.5},"general":false},"turkish get-up":null};
+
+
+const PRIVACY_ROWS = [
+  { key: "live", title: "Let them see me training", sub: "Turn this off and nothing is published at all. No live card, no watching." },
+  { key: "details", title: "Let them see what I'm doing", sub: "The exercise, the muscles worked and your sets. Off, they still see your effort score." },
+  { key: "cheers", title: "Let them send me things", sub: "Videos and messages that appear while you train." },
+];
 
 
 function icon(name, size = 18) {
@@ -2734,7 +2771,7 @@ async function renderLiveCard() {
   const mins = Math.max(1, Math.round((row.elapsed_sec || 0) / 60));
   // A person can keep the exercise private and still show up as working hard:
   // the effort score stands in for it, never the other way around.
-  const sharing = PARTNER_PROFILE?.share_workout_details !== false;
+  const sharing = liveDetailsShared(row);
   const nameLine = sharing
     ? `${escapeHtml(name)} is on ${escapeHtml(row.focus || "a workout")}`
     : `${escapeHtml(name)} is training`;
@@ -2771,7 +2808,8 @@ async function renderLiveSheet() {
   const mins = Math.round((row.elapsed_sec || 0) / 60);
   // Off means: still show they're live, how long, and how hard, just not
   // what. Nothing here about the actual exercise gets built when it's off.
-  const sharing = PARTNER_PROFILE?.share_workout_details !== false;
+  const sharing = liveDetailsShared(row);
+  const canCheer = row.allow_cheers !== false;
   const setTotal = sharing ? (row.set_total || 0) : 0;
   const sets = Array.from({ length: setTotal }, (_, i) =>
     `<span class="lw-set${i < (row.set_done || 0) ? " on" : ""}"></span>`).join("");
@@ -2812,7 +2850,7 @@ async function renderLiveSheet() {
     ${!sharing ? `<p class="lw-private-note">${escapeHtml(name)} keeps workout details private. Their effort score is always shared.</p>` : ""}
     ${sharing && nextEx ? `<p class="lw-next">Up next: <b>${escapeHtml(nextEx.name || "")}</b>${nextEx.sets ? ` · ${nextEx.sets} × ${escapeHtml(String(nextEx.reps || ""))}` : ""}</p>` : ""}
     ${stale ? `<p class="lw-stale">Their screen is off, so this is where they were a few minutes ago.</p>` : ""}
-    <div class="lw-card">
+    ${canCheer ? `<div class="lw-card">
       <div class="lw-card-label">Cheer them on</div>
       <div class="lw-send">
         <button type="button" class="btn-secondary" id="lwClip" style="margin-top:0">
@@ -2822,12 +2860,12 @@ async function renderLiveSheet() {
           ${icon("bolt", 22)} Send a message
         </button>
       </div>
-    </div>`;
+    </div>` : `<p class="lw-private-note">${escapeHtml(name)} has messages off for this workout.</p>`}`;
 
   $("lwClose").onclick = closeLiveSheet;
   if ($("lwWhy")) $("lwWhy").onclick = () => { closeLiveSheet(); openEffortInfo(); };
-  $("lwMsg").onclick = () => { closeLiveSheet(); openNoteComposer("congratulate"); };
-  $("lwClip").onclick = () => { closeLiveSheet(); openClipRecorder(row.email); };
+  if ($("lwMsg")) $("lwMsg").onclick = () => { closeLiveSheet(); openNoteComposer("congratulate"); };
+  if ($("lwClip")) $("lwClip").onclick = () => { closeLiveSheet(); openClipRecorder(row.email); };
 }
 
 
@@ -2934,7 +2972,11 @@ function renderSession() {
 
   $("sessionBody").innerHTML = `
     <div class="sess-card${exChanged ? " ex-in" : ""}">
-      <div class="sess-step">EXERCISE ${ei + 1} OF ${total}</div>
+      <div class="sess-step-row">
+        <div class="sess-step">EXERCISE ${ei + 1} OF ${total}</div>
+        ${PARTNER_EMAIL ? `<button type="button" class="wp-chip${workoutPrivacyLocked() ? " on" : ""}" id="sessPrivacyBtn"
+          aria-label="Who can see this workout">${icon(workoutPrivacyLocked() ? "lock" : "people", 14)}</button>` : ""}
+      </div>
       <h2 class="sess-name">${escapeHtml(ex.name)}</h2>
       <div class="sess-meta">
         <span class="sess-target">${ex.sets} sets × ${ex.reps} reps</span>
@@ -3000,6 +3042,8 @@ function renderSession() {
 
   if (resting) startRestTicker();
   else stopRestTicker();
+
+  if ($("sessPrivacyBtn")) $("sessPrivacyBtn").onclick = openWorkoutPrivacy;
 
   const logBtn = $("logSetBtn");
   if (logBtn) logBtn.onclick = () => { if (currentSet >= 0) toggleSet(currentSet); };
@@ -3074,6 +3118,80 @@ function openEffortInfo() {
   const close = () => $("popScrim").classList.add("hidden");
   $("effortX").onclick = close;
   $("effortOk").onclick = close;
+}
+
+
+function openWorkoutPrivacy() {
+  const p = workoutPrivacy();
+  $("popCard").innerHTML = `
+    <div class="pop-body">
+      <div class="ds-top">
+        <div class="pop-who" style="color:var(--muted)">THIS WORKOUT</div>
+        <button type="button" class="ds-x" id="wpX" aria-label="Close">&times;</button>
+      </div>
+      <div class="wp-list">
+        ${PRIVACY_ROWS.map((r) => `
+          <label class="gym-toggle wp-row${p[r.key] ? " checked" : ""}" data-wp="${r.key}">
+            <span><b>${escapeHtml(r.title)}</b><i>${escapeHtml(r.sub)}</i></span>
+            <input type="checkbox" data-wp-input="${r.key}"${p[r.key] ? " checked" : ""} />
+          </label>`).join("")}
+      </div>
+      <p class="ef-note">Just for this workout. Your standing choice in Settings is not changed.</p>
+      <button type="button" class="btn-primary" id="wpDone">Done</button>
+    </div>`;
+  $("popScrim").classList.remove("hidden");
+
+  $("popCard").querySelectorAll("[data-wp-input]").forEach((input) => {
+    input.onchange = () => {
+      p[input.dataset.wpInput] = input.checked;
+      input.closest(".wp-row").classList.toggle("checked", input.checked);
+      applyWorkoutPrivacy();
+    };
+  });
+  const close = () => {
+    $("popScrim").classList.add("hidden");
+    if (SESSION) renderSession(); else if (TODAY_WORKOUT) renderPlanPreview();
+  };
+  $("wpX").onclick = close;
+  $("wpDone").onclick = close;
+}
+
+
+function workoutPrivacy() {
+  if (SESSION) {
+    if (!SESSION.privacy) SESSION.privacy = defaultWorkoutPrivacy();
+    return SESSION.privacy;
+  }
+  if (!PENDING_PRIVACY) PENDING_PRIVACY = defaultWorkoutPrivacy();
+  return PENDING_PRIVACY;
+}
+
+
+function defaultWorkoutPrivacy() {
+  return { live: true, details: MY_PROFILE?.share_workout_details !== false, cheers: true };
+}
+
+
+function privacySummary(p = workoutPrivacy()) {
+  if (!PARTNER_EMAIL) return "";
+  const who = partnerName();
+  if (!p.live) return `${who} cannot see this workout`;
+  if (!p.details && !p.cheers) return `${who} sees effort only, and cannot send anything`;
+  if (!p.details) return `${who} sees you are training, not what`;
+  if (!p.cheers) return `${who} can watch, but cannot send anything`;
+  return `${who} can watch and cheer`;
+}
+
+
+function workoutPrivacyLocked(p = workoutPrivacy()) {
+  return !p.live || !p.details || !p.cheers;
+}
+
+
+function liveDetailsShared(row) {
+  if (row?.details_shared === false) return false;
+  if (row?.details_shared === true) return true;
+  return PARTNER_PROFILE?.share_workout_details !== false;
 }
 
 /* ---------- Working muscles ----------
@@ -3460,6 +3578,15 @@ const STATES = [
   { group: "Home", name: "How effort is scored",
     note: "Tapping the effort line opens this. Three lines, the real numbers from the formula, and why two people can be compared when one of them shares nothing.",
     pop: () => openEffortInfo(), setup: () => {} },
+
+  { group: "Home", name: "Advanced settings for one workout",
+    note: "Opened from the plan screen before you press Begin, or the small chip on the session card once you have. Defaults come from Settings, changes here last one workout.",
+    pop: () => openWorkoutPrivacy(),
+    setup: () => { SESSION = null; PENDING_PRIVACY = { live: true, details: false, cheers: true }; } },
+
+  { group: "Watching them train", name: "They turned messages off",
+    note: "Cheer buttons are gone rather than greyed. The database refuses the clip too, so it is not a UI-only promise.",
+    setup: () => { LIVE_PARTNER = liveRow({ allow_cheers: false }); }, sheet: true },
 
   { group: "What they see while training", name: "Mid set, bench press",
     note: "The exerciser's own screen. Their body, lit in their colour, sits between the target and the set dots so they see what they are hitting before they log.",
