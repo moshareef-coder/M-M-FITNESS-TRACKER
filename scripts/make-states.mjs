@@ -238,6 +238,9 @@ const closeLiveSheet = () => {};
 const openNoteComposer = () => {};
 const openNextClip = () => {};
 let SESSION = null, CLIP_INBOX = [], TODAY_WORKOUT = null;
+/* Animation bookkeeping renderSession reads. The gallery is a still life, so
+   these stay null and nothing animates in a captured frame. */
+let SESSION_JUST_SET = null, SESSION_LAST_EX = 0;
 const beatLive = () => {};
 const startRestTicker = () => {};
 const stopRestTicker = () => {};

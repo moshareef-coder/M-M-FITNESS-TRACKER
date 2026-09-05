@@ -1036,6 +1036,38 @@
     animation: popIn .3s cubic-bezier(.22,1,.36,1);
   }
   @keyframes popIn { from { transform: translateY(14px) scale(.97); opacity: 0 } to { transform: none; opacity: 1 } }
+
+  /* ---- Entry motion, shared by Home and the session screen ----
+     The Body tab already moves this way: a card rises, a ring fills, a number
+     counts up, each a beat after the last. These are the same easing and the
+     same stagger custom property so the whole app moves one way rather than
+     three. Every one of them is opt in per render (JS adds the class), so a
+     background refresh after a logged set never replays the show. */
+  .h-rise { animation: hRise .5s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms); }
+  @keyframes hRise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .h-pop { animation: hPop .44s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms); }
+  @keyframes hPop {
+    0% { opacity: 0; transform: scale(.7); }
+    62% { opacity: 1; transform: scale(1.07); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  /* The ring fill is a transition, not an animation, because the value it
+     lands on is data: JS paints it empty, then flips it to the real offset. */
+  .pring .pring-fill { transition: stroke-dashoffset .95s cubic-bezier(.22,1,.36,1); transition-delay: var(--d, 0ms); }
+  .tl-item.h-rise { animation-duration: .42s; }
+
+  /* The session screen: a new exercise slides in from the right, a logged set
+     pops. Both are one-shot, both are keyed to something the user just did. */
+  .sess-card.ex-in { animation: exIn .44s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes exIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+  .set-circle.just-done { animation: setPop .52s cubic-bezier(.22,1,.36,1); }
+  @keyframes setPop { 0% { transform: scale(1); } 34% { transform: scale(1.24); } 100% { transform: scale(1); } }
+  .rest-bar { animation: hRise .38s cubic-bezier(.22,1,.36,1) both; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .h-rise, .h-pop, .sess-card.ex-in, .set-circle.just-done, .rest-bar { animation: none; }
+    .pring .pring-fill { transition: none; }
+  }
   .pop-body { padding: 17px; }
   .pop-body.compose { padding: 16px; }
   .quote { font-size: 15.5px; line-height: 1.5; font-style: italic; margin: 0 0 14px; }
@@ -1800,7 +1832,7 @@
 
   /* Workout session mode */
   .session-progress-track { height: 6px; border-radius: 100px; background: var(--panel-2); overflow: hidden; margin-bottom: 18px; }
-  .session-progress-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.3s; }
+  .session-progress-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width .6s cubic-bezier(.22,1,.36,1); }
   .set-circles { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
   .set-circle {
     width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--border); background: var(--panel-2);
@@ -2301,6 +2333,9 @@ const closeLiveSheet = () => {};
 const openNoteComposer = () => {};
 const openNextClip = () => {};
 let SESSION = null, CLIP_INBOX = [], TODAY_WORKOUT = null;
+/* Animation bookkeeping renderSession reads. The gallery is a still life, so
+   these stay null and nothing animates in a captured frame. */
+let SESSION_JUST_SET = null, SESSION_LAST_EX = 0;
 const beatLive = () => {};
 const startRestTicker = () => {};
 const stopRestTicker = () => {};
@@ -2326,24 +2361,26 @@ function icon(name, size = 18) {
 }
 
 
-function personRing(done, target, cls, email, name) {
+function personRing(done, target, cls, email, name, animate = false) {
   const pct = target > 0 ? Math.max(0, Math.min(1, done / target)) : 0;
   const r = 52, stroke = 9, circ = 2 * Math.PI * r;
+  const off = circ * (1 - pct);
   const color = cls === "me" ? "var(--me)" : "var(--partner)";
+  const whole = Math.round(pct * 100);
   return `<div class="pcol ${cls}">
     <div class="pring-wrap">
       <svg class="pring" viewBox="0 0 120 120" aria-hidden="true">
         <circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--panel-2)" stroke-width="${stroke}"/>
-        <circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
-          stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - pct)}" transform="rotate(-90 60 60)"
-          style="transition:stroke-dashoffset .6s cubic-bezier(.22,1,.36,1)"/>
+        <circle class="pring-fill" cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
+          stroke-dasharray="${circ}" stroke-dashoffset="${(animate ? circ : off).toFixed(2)}" data-off="${off.toFixed(2)}"
+          transform="rotate(-90 60 60)" style="--d:${cls === "me" ? 0 : 150}ms"/>
       </svg>
       <span class="pring-av ${cls}" data-av-email="${escapeHtml(email || "")}">${escapeHtml(initials(name || "?"))}</span>
     </div>
     <div class="pcol-meta">
       <div class="pcol-name">${escapeHtml(name)}</div>
       <div class="pcol-val">${done} / ${target}</div>
-      <div class="pcol-pct">${Math.round(pct * 100)}%</div>
+      <div class="pcol-pct" data-pct="${whole}" data-delay="${cls === "me" ? 0 : 150}">${animate ? 0 : whole}%</div>
     </div>
   </div>`;
 }
@@ -2358,7 +2395,7 @@ async function hydrateAvatars(root) {
 }
 
 
-function renderHero() {
+function renderHero(animate = false) {
   const el = $("heroCard");
   const coachLine = isCoachedClient() && MY_COACH
     ? `<div class="coach-line">${icon("check", 13)} Coached by ${escapeHtml(MY_COACH.split("@")[0])}</div>` : "";
@@ -2387,17 +2424,18 @@ function renderHero() {
 
   /* One streak, one place. Days running beats weeks when both exist, because
      it changes more often and so has more to say. */
+  const streakNum = dayStreak > 0 ? dayStreak : streak;
   const badge = dayStreak > 0
-    ? `<div class="streak-badge"><div class="sb-top">${icon("flame", 22)}<b>${dayStreak}</b></div><span>Day streak</span></div>`
+    ? `<div class="streak-badge${animate ? " h-pop" : ""}" style="--d:340ms"><div class="sb-top">${icon("flame", 22)}<b data-streak="${dayStreak}">${animate ? 0 : dayStreak}</b></div><span>Day streak</span></div>`
     : streak > 0
-      ? `<div class="streak-badge"><div class="sb-top">${icon("flame", 22)}<b>${streak}</b></div><span>Week streak</span></div>`
+      ? `<div class="streak-badge${animate ? " h-pop" : ""}" style="--d:340ms"><div class="sb-top">${icon("flame", 22)}<b data-streak="${streak}">${animate ? 0 : streak}</b></div><span>Week streak</span></div>`
       : "";
 
   const stand = `<div class="stand${partner ? "" : " solo"}">
-    ${personRing(myDays, myTarget, "me", MY_EMAIL, ME)}
+    ${personRing(myDays, myTarget, "me", MY_EMAIL, ME, animate)}
     ${partner ? `<div class="stand-div"></div>
     <div class="strow-tap" id="openPartnerBtn" role="button" tabindex="0"
-      aria-label="Open ${escapeHtml(partner)}">${personRing(theirDays, theirTarget, "them", PARTNER_EMAIL, partner)}</div>` : ""}
+      aria-label="Open ${escapeHtml(partner)}">${personRing(theirDays, theirTarget, "them", PARTNER_EMAIL, partner, animate)}</div>` : ""}
   </div>`;
 
   const d = new Date(todayStr() + "T00:00:00");
@@ -2426,8 +2464,8 @@ function renderHero() {
         ${coachLine}
         ${partner ? `<div class="hero-effort">
           <span class="he-label">${icon("bolt", 13)} Effort this week</span>
-          <span class="he-you${myWeekXP >= theirWeekXP ? " lead" : ""}">You <b>${myWeekXP}</b></span>
-          <span class="he-them${theirWeekXP > myWeekXP ? " lead" : ""}">${escapeHtml(partner)} <b>${theirWeekXP}</b></span>
+          <span class="he-you${myWeekXP >= theirWeekXP ? " lead" : ""}">You <b data-xp="${myWeekXP}" data-delay="380">${animate ? 0 : myWeekXP}</b></span>
+          <span class="he-them${theirWeekXP > myWeekXP ? " lead" : ""}">${escapeHtml(partner)} <b data-xp="${theirWeekXP}" data-delay="480">${animate ? 0 : theirWeekXP}</b></span>
         </div>` : ""}
       </div>
       ${badge}
@@ -2435,6 +2473,20 @@ function renderHero() {
     ${stand}
     ${cta}`;
   hydrateAvatars(el);
+
+  /* Two frames, not one: the browser has to have painted the empty ring
+     before the real offset counts as a change worth transitioning. */
+  if (animate) {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.querySelectorAll(".pring-fill").forEach((c) => { c.style.strokeDashoffset = c.dataset.off; });
+      el.querySelectorAll(".pcol-pct").forEach((p) =>
+        countUp(p, Number(p.dataset.pct), { ms: 950, delay: Number(p.dataset.delay) || 0, suffix: "%" }));
+      el.querySelectorAll("[data-xp]").forEach((b) =>
+        countUp(b, Number(b.dataset.xp), { ms: 800, delay: Number(b.dataset.delay) || 0 }));
+      const flame = el.querySelector("[data-streak]");
+      if (flame) countUp(flame, Number(flame.dataset.streak), { ms: 700, delay: 380 });
+    }));
+  }
 
   if ($("heroBtn")) {
     $("heroBtn").onclick = () => {
@@ -2487,7 +2539,7 @@ async function dotHTML(name, email, date, cls) {
 }
 
 
-async function renderWeekStrips() {
+async function renderWeekStrips(animate = false) {
   $("topDate").textContent = "v" + APP_VERSION;
   const today = todayStr();
   const partner = PARTNER_EMAIL ? partnerName() : null;
@@ -2500,7 +2552,7 @@ async function renderWeekStrips() {
     const isToday = date === today;
     const mine = await dotHTML(ME, MY_EMAIL, date, "me");
     const theirs = partner ? await dotHTML(partner, PARTNER_EMAIL, date, "them") : "";
-    return `<div class="wk-col${isToday ? " today" : ""}">
+    return `<div class="wk-col${isToday ? " today" : ""}${animate ? " h-rise" : ""}" style="--d:${140 + i * 45}ms">
       <span class="wk-d">${DAY_LETTERS[i]}</span>
       ${mine}
       ${theirs}
@@ -2613,7 +2665,7 @@ function wireTimeline(root) {
 }
 
 
-async function renderTimeline() {
+async function renderTimeline(animate = false) {
   const el = $("timelineList");
   if (!el) return;
   const items = timelineSessions(3);
@@ -2622,6 +2674,12 @@ async function renderTimeline() {
     return;
   }
   el.innerHTML = (await Promise.all(items.map(timelineItemHTML))).join("");
+  if (animate) {
+    el.querySelectorAll(".tl-item").forEach((it, i) => {
+      it.style.setProperty("--d", `${320 + i * 70}ms`);
+      it.classList.add("h-rise");
+    });
+  }
   wireTimeline(el);
 }
 
@@ -2839,8 +2897,13 @@ function renderSession() {
   const resting = !!SESSION.restStartedAt && !allDone;
   const restMs = SESSION.restStartedAt ? Date.now() - SESSION.restStartedAt : 0;
 
+  const exChanged = SESSION_LAST_EX !== ei;
+  SESSION_LAST_EX = ei;
+  const justSet = SESSION_JUST_SET;
+  SESSION_JUST_SET = null;
+
   $("sessionBody").innerHTML = `
-    <div class="sess-card">
+    <div class="sess-card${exChanged ? " ex-in" : ""}">
       <div class="sess-step">EXERCISE ${ei + 1} OF ${total}</div>
       <h2 class="sess-name">${escapeHtml(ex.name)}</h2>
       <div class="sess-meta">
@@ -2853,8 +2916,8 @@ function renderSession() {
         ${setsDone.map((done, i) => {
           const w = SESSION.setWeights?.[ei]?.[i];
           const isCurrent = i === currentSet;
-          return `<div class="set-col">
-            <button type="button" class="set-circle ${done ? "done" : ""} ${isCurrent ? "current" : ""}"
+          return `<div class="set-col${exChanged ? " h-pop" : ""}" style="--d:${140 + i * 55}ms">
+            <button type="button" class="set-circle ${done ? "done" : ""} ${isCurrent ? "current" : ""}${justSet === i ? " just-done" : ""}"
               data-set="${i}" ${done || isCurrent ? "" : "disabled"}>${done ? icon("check", 18) : i + 1}</button>
             <div class="set-weight">${done ? (w != null ? `${w} lb` : "done") : isCurrent ? "pending" : "&nbsp;"}</div>
           </div>`;
