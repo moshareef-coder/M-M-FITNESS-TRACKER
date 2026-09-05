@@ -1064,6 +1064,49 @@
   .sv-head { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
   .sv-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 6px; margin-bottom: 12px; }
   /* The week planner: days down the page, what is on them, and a way in. */
+  /* The month. Days carry their state in a dot rather than a colour wash, so a
+     trained day, a planned one and a rest day are told apart at a glance
+     without the grid turning into a paint chart. */
+  .cal { margin-top: 22px; }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .cal-title { font-size: 15.5px; font-weight: 800; letter-spacing: -.02em; }
+  .cal-dows {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px;
+    font-size: 10.5px; font-weight: 800; letter-spacing: .06em; color: var(--muted); text-align: center;
+  }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-day {
+    position: relative; aspect-ratio: 1; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    border-radius: 11px; background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    animation: calIn .3s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
+  }
+  @keyframes calIn { from { opacity: 0; transform: scale(.86); } to { opacity: 1; transform: none; } }
+  .cal-day:active { transform: scale(.94); }
+  .cal-day.out { opacity: .3; }
+  .cal-day.today { border-color: var(--me); font-weight: 800; }
+  .cal-day::after {
+    content: ""; position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%);
+    width: 5px; height: 5px; border-radius: 50%; background: transparent;
+  }
+  .cal-day.done { background: color-mix(in srgb, var(--accent) 16%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+  .cal-day.done::after { background: var(--accent); }
+  .cal-day.planned::after { background: var(--me); }
+  .cal-day.rest::after { background: var(--muted); }
+  .cal-key { display: flex; gap: 14px; margin-top: 12px; font-size: 11.5px; color: var(--muted); }
+  .cal-key span { display: inline-flex; align-items: center; gap: 5px; }
+  .cal-key i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .cal-key .k-done { background: var(--accent); }
+  .cal-key .k-plan { background: var(--me); }
+  .cal-key .k-rest { background: var(--muted); }
+
+  /* The tab had no arrival of its own while Home and Body both did. */
+  .opt-card, .spp, .sv-saved, .cal { animation: hRise .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms); }
+  @media (prefers-reduced-motion: reduce) {
+    .cal-day, .opt-card, .spp, .sv-saved, .cal { animation: none; }
+    .cal-day:active { transform: none; }
+  }
+
   .wk-nav {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     margin: 4px 0 14px; padding: 6px; border-radius: 14px; background: var(--panel-2); border: 1px solid var(--border);
@@ -1705,7 +1748,9 @@
     width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0; display: flex;
     align-items: center; justify-content: center; background: var(--panel-2); color: var(--muted);
   }
-  .opt-txt { flex: 1; min-width: 0; }
+  /* These are spans, so without this they run onto one line and the margin
+     below is ignored, which is what made the option cards read as a wall. */
+  .opt-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .opt-title { font-size: 15.5px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.01em; }
   .opt-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
   .opt-go { color: var(--muted); flex-shrink: 0; transform: rotate(180deg); }
@@ -2995,7 +3040,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.27";
+const APP_VERSION = "2026.09.04.28";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -3019,6 +3064,7 @@ const ICON_PATHS = {
   swap: '<path d="M7 4v13M7 4 3 8M7 4l4 4M17 20V7m0 13 4-4m-4 4-4-4"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
   google: '<path fill="#4285F4" stroke="none" d="M21.6 12.23c0-.7-.06-1.38-.18-2.03H12v3.84h5.4a4.62 4.62 0 0 1-2 3.03v2.5h3.24c1.9-1.75 3-4.32 3-7.34Z"/><path fill="#34A853" stroke="none" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.5c-.9.6-2.05.96-3.4.96-2.6 0-4.8-1.76-5.6-4.12H3.05v2.58A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" stroke="none" d="M6.4 13.9a5.98 5.98 0 0 1 0-3.8V7.52H3.05a10 10 0 0 0 0 8.96l3.36-2.58Z"/><path fill="#EA4335" stroke="none" d="M12 6.06c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.96 9.96 0 0 0 12 2a10 10 0 0 0-8.95 5.52L6.4 10.1C7.2 7.74 9.4 6.06 12 6.06Z"/>',
+  wand: '<path d="M15 4.5 4.5 15l4.5 4.5L19.5 9z"/><path d="m13 6.5 4.5 4.5"/><path d="M18 3v3M20.5 4.5h-3"/><path d="M6 3.5v2M7 4.5H5"/><path d="M20 15v2.5M21.25 16.25h-2.5"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.6v.6"/>',
   grip: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
   chevronLeft: '<path d="M15 18l-6-6 6-6"/>',
@@ -8307,6 +8353,17 @@ function planPreview() {
   };
 }
 
+/* The pieces of the Build screen come in one after another, same easing and
+   stagger as Home, so the tab arrives rather than appearing. */
+function staggerWorkoutCards() {
+  const parts = [...$("workoutContent").querySelectorAll(".spp, .opt-card, .sv-saved, .cal")];
+  parts.forEach((el, i) => {
+    el.classList.remove("h-rise");
+    void el.offsetWidth;
+    el.style.setProperty("--d", `${i * 60}ms`);
+  });
+}
+
 function optionCard(id, ico, title, sub, primary) {
   return `<button type="button" class="opt-card ${primary ? "primary" : ""}" id="${id}">
     <span class="opt-ico">${icon(ico, 26)}</span>
@@ -8318,37 +8375,86 @@ function optionCard(id, ico, title, sub, primary) {
   </button>`;
 }
 
-let RECENT_ALL = false;
+/* ---- History as a calendar ----
+   A sideways strip of chips is fine for a glance at the last three and useless
+   for "what did I do a fortnight ago". A month reads at once: what you did,
+   what is planned, and the gaps, which are the interesting part. */
+let HISTORY_MONTH = 0;   // 0 is this month, negative goes back
 
-function recentWorkoutsStrip() {
-  const all = (ALL_PLANS || [])
-    .filter((w) => w.email === MY_EMAIL && !w.archived)
-    .sort((a, b) => String(b.entry_date).localeCompare(String(a.entry_date)));
-  if (!all.length) return "";
-  const mine = RECENT_ALL ? all.slice(0, 40) : all.slice(0, 8);
+function historyMonthDays(offset = HISTORY_MONTH) {
+  const today = new Date(todayStr() + "T00:00:00");
+  const first = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+  const start = new Date(first);
+  const lead = (first.getDay() + 6) % 7;          // Monday-first grid
+  start.setDate(start.getDate() - lead);
 
-  /* Completed ones carry a tick. A plan you never ran carries a bin, because
-     the only thing you want to do with a workout you skipped is clear it. */
-  const chip = (w) => `<div class="recent-chip" data-recap="${escapeHtml(w.entry_date)}" role="button" tabindex="0">
-      <div class="recent-name">${escapeHtml(displayFocus(w.focus, w.exercises))}</div>
-      <div class="recent-when">${escapeHtml(relDayLabel(w.entry_date))}</div>
-      <div class="recent-foot">
-        ${w.completed_at
-          ? `<span class="recent-mark">${icon("check", 15)}</span>`
-          : `<button type="button" class="recent-mark drop" data-drop="${escapeHtml(w.id)}"
-               aria-label="Remove this plan">${icon("trash", 14)}</button>`}
-      </div>
-    </div>`;
+  const out = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    const date = isoDate(d);
+    const plan = (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === date && !w.archived);
+    const entry = (ALL_ENTRIES || []).find((e) => e.email === MY_EMAIL && e.entry_date === date);
+    out.push({
+      date,
+      day: d.getDate(),
+      thisMonth: d.getMonth() === first.getMonth(),
+      isToday: date === todayStr(),
+      future: date > todayStr(),
+      done: !!plan?.completed_at || !!entry?.gym,
+      planned: !!plan && !plan.completed_at,
+      rest: !!entry?.rest_day,
+      title: plan ? displayFocus(plan.focus, plan.exercises) : null,
+    });
+  }
+  // A trailing week made entirely of the next month is padding nobody needs.
+  return out.slice(0, out.slice(35).every((d) => !d.thisMonth) ? 35 : 42);
+}
 
-  return `<div class="recent-head">
-      <h3>Recent Workouts</h3>
-      ${all.length > 3 ? `<button type="button" class="recent-all" id="recentAllBtn">${RECENT_ALL ? "Show less" : "View All"}</button>` : ""}
+function historyMonthLabel(offset = HISTORY_MONTH) {
+  const today = new Date(todayStr() + "T00:00:00");
+  const m = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+  return m.toLocaleDateString([], { month: "long", year: m.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+}
+
+function workoutCalendarHTML() {
+  const days = historyMonthDays();
+  const dows = ["M", "T", "W", "T", "F", "S", "S"];
+  return `<div class="cal">
+    <div class="cal-head">
+      <button type="button" class="wk-nav-btn" id="calPrev" aria-label="Previous month">${icon("chevronLeft", 16)}</button>
+      <div class="cal-title">${escapeHtml(historyMonthLabel())}</div>
+      <button type="button" class="wk-nav-btn" id="calNext" ${HISTORY_MONTH >= 0 ? "disabled" : ""} aria-label="Next month">${icon("chevronRight", 16)}</button>
     </div>
-    ${RECENT_ALL
-      /* Expanded, they stack: a sideways scroll is fine for a glance at the
-         last few, useless for finding one from three weeks ago. */
-      ? `<div class="recent-stack">${mine.map(chip).join("")}</div>`
-      : `<div class="recent-strip">${mine.map(chip).join("")}</div>`}`;
+    <div class="cal-dows">${dows.map((d) => `<span>${d}</span>`).join("")}</div>
+    <div class="cal-grid">
+      ${days.map((d, i) => `
+        <button type="button" class="cal-day${d.thisMonth ? "" : " out"}${d.done ? " done" : ""}${d.planned ? " planned" : ""}${d.rest ? " rest" : ""}${d.isToday ? " today" : ""}"
+          data-cal="${d.date}" style="--d:${Math.min(i, 24) * 12}ms"
+          ${d.title ? `title="${escapeHtml(d.title)}"` : ""}>${d.day}</button>`).join("")}
+    </div>
+    <div class="cal-key">
+      <span><i class="k-done"></i>Trained</span>
+      <span><i class="k-plan"></i>Planned</span>
+      <span><i class="k-rest"></i>Rest</span>
+    </div>
+  </div>`;
+}
+
+function wireWorkoutCalendar(root) {
+  if ($("calPrev")) $("calPrev").onclick = () => { HISTORY_MONTH--; renderWorkoutTab(); };
+  if ($("calNext")) $("calNext").onclick = () => { if (HISTORY_MONTH < 0) { HISTORY_MONTH++; renderWorkoutTab(); } };
+  root.querySelectorAll("[data-cal]").forEach((b) => {
+    b.onclick = () => {
+      const date = b.dataset.cal;
+      const day = historyMonthDays().find((d) => d.date === date);
+      if (!day) return;
+      // A day you trained opens what you did; a day ahead opens what you could.
+      if (day.done) openRecap(MY_EMAIL, ME, date);
+      else if (day.future || day.isToday) openDayPlanner(date);
+      else toast("Nothing logged that day");
+    };
+  });
 }
 
 function renderChooseScreen() {
@@ -8398,7 +8504,7 @@ function renderChooseScreen() {
     <p class="build-q">${coached
       ? `${escapeHtml(coachName)} sets your training. Log what you did, or add something extra.`
       : "How do you want to build your next workout?"}</p>
-    ${coached ? "" : optionCard("chooseGenerateBtn", "bolt", "Generate for me",
+    ${coached ? "" : optionCard("chooseGenerateBtn", "wand", "Generate for me",
         "Built around your goals and stats.", true)}
     ${optionCard("choosePlanBtn", "pencil",
         coached ? "Log a workout" : "I'll plan my own",
@@ -8407,8 +8513,10 @@ function renderChooseScreen() {
     ${optionCard("chooseWeekBtn", "checklist", "Plan your week",
         "Put saved workouts on the days you will do them.", false)}
     ${savedWorkoutsHTML()}
-    ${recentWorkoutsStrip()}`;
+    ${workoutCalendarHTML()}`;
   wireSavedWorkouts($("workoutContent"));
+  wireWorkoutCalendar($("workoutContent"));
+  staggerWorkoutCards();
 
   const toManual = () => {
     WORKOUT_MODE = "manual";
@@ -8425,19 +8533,6 @@ function renderChooseScreen() {
   $("workoutContent").querySelectorAll("[data-recap]").forEach((b) => {
     b.onclick = () => openRecap(MY_EMAIL, ME, b.dataset.recap);
   });
-  $("workoutContent").querySelectorAll("[data-drop]").forEach((b) => {
-    b.onclick = async (ev) => {
-      ev.stopPropagation();          // the card underneath opens the recap
-      if (!confirm("Remove this planned workout? Nothing you logged is deleted.")) return;
-      const { error } = await sb.from("ai_workouts").delete().eq("id", b.dataset.drop);
-      if (error) { console.error(error); toast("Could not remove it"); return; }
-      await loadAll();
-      renderChooseScreen();
-    };
-  });
-  if ($("recentAllBtn")) {
-    $("recentAllBtn").onclick = () => { RECENT_ALL = !RECENT_ALL; renderChooseScreen(); };
-  }
 }
 
 /* Not everything is sets and reps. Pilates, yoga, a run and a swim are measured
@@ -8695,7 +8790,7 @@ function openDayPlanner(date) {
       ${existing?.completed_at ? `<p class="ef-note">This one is already done. Putting something else here does not change what you logged.</p>` : ""}
       <div class="dp-ways">
         ${isCoachedClient() ? "" : `<button type="button" class="dp-way" id="dpGen">
-          <span class="dp-way-ico">${icon("bolt", 18)}</span>
+          <span class="dp-way-ico">${icon("wand", 18)}</span>
           <span class="dp-way-txt"><b>Generate one</b><i>Built around your goals and history.</i></span>
         </button>`}
         <button type="button" class="dp-way" id="dpOwn">

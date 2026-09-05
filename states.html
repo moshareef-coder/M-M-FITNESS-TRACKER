@@ -1054,6 +1054,49 @@
   .sv-head { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
   .sv-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 6px; margin-bottom: 12px; }
   /* The week planner: days down the page, what is on them, and a way in. */
+  /* The month. Days carry their state in a dot rather than a colour wash, so a
+     trained day, a planned one and a rest day are told apart at a glance
+     without the grid turning into a paint chart. */
+  .cal { margin-top: 22px; }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .cal-title { font-size: 15.5px; font-weight: 800; letter-spacing: -.02em; }
+  .cal-dows {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px;
+    font-size: 10.5px; font-weight: 800; letter-spacing: .06em; color: var(--muted); text-align: center;
+  }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-day {
+    position: relative; aspect-ratio: 1; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    border-radius: 11px; background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    animation: calIn .3s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
+  }
+  @keyframes calIn { from { opacity: 0; transform: scale(.86); } to { opacity: 1; transform: none; } }
+  .cal-day:active { transform: scale(.94); }
+  .cal-day.out { opacity: .3; }
+  .cal-day.today { border-color: var(--me); font-weight: 800; }
+  .cal-day::after {
+    content: ""; position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%);
+    width: 5px; height: 5px; border-radius: 50%; background: transparent;
+  }
+  .cal-day.done { background: color-mix(in srgb, var(--accent) 16%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+  .cal-day.done::after { background: var(--accent); }
+  .cal-day.planned::after { background: var(--me); }
+  .cal-day.rest::after { background: var(--muted); }
+  .cal-key { display: flex; gap: 14px; margin-top: 12px; font-size: 11.5px; color: var(--muted); }
+  .cal-key span { display: inline-flex; align-items: center; gap: 5px; }
+  .cal-key i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .cal-key .k-done { background: var(--accent); }
+  .cal-key .k-plan { background: var(--me); }
+  .cal-key .k-rest { background: var(--muted); }
+
+  /* The tab had no arrival of its own while Home and Body both did. */
+  .opt-card, .spp, .sv-saved, .cal { animation: hRise .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms); }
+  @media (prefers-reduced-motion: reduce) {
+    .cal-day, .opt-card, .spp, .sv-saved, .cal { animation: none; }
+    .cal-day:active { transform: none; }
+  }
+
   .wk-nav {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     margin: 4px 0 14px; padding: 6px; border-radius: 14px; background: var(--panel-2); border: 1px solid var(--border);
@@ -1695,7 +1738,9 @@
     width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0; display: flex;
     align-items: center; justify-content: center; background: var(--panel-2); color: var(--muted);
   }
-  .opt-txt { flex: 1; min-width: 0; }
+  /* These are spans, so without this they run onto one line and the margin
+     below is ignored, which is what made the option cards read as a wall. */
+  .opt-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .opt-title { font-size: 15.5px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.01em; }
   .opt-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
   .opt-go { color: var(--muted); flex-shrink: 0; transform: rotate(180deg); }
@@ -2556,6 +2601,7 @@ const ICON_PATHS = {
   swap: '<path d="M7 4v13M7 4 3 8M7 4l4 4M17 20V7m0 13 4-4m-4 4-4-4"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
   google: '<path fill="#4285F4" stroke="none" d="M21.6 12.23c0-.7-.06-1.38-.18-2.03H12v3.84h5.4a4.62 4.62 0 0 1-2 3.03v2.5h3.24c1.9-1.75 3-4.32 3-7.34Z"/><path fill="#34A853" stroke="none" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.5c-.9.6-2.05.96-3.4.96-2.6 0-4.8-1.76-5.6-4.12H3.05v2.58A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" stroke="none" d="M6.4 13.9a5.98 5.98 0 0 1 0-3.8V7.52H3.05a10 10 0 0 0 0 8.96l3.36-2.58Z"/><path fill="#EA4335" stroke="none" d="M12 6.06c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.96 9.96 0 0 0 12 2a10 10 0 0 0-8.95 5.52L6.4 10.1C7.2 7.74 9.4 6.06 12 6.06Z"/>',
+  wand: '<path d="M15 4.5 4.5 15l4.5 4.5L19.5 9z"/><path d="m13 6.5 4.5 4.5"/><path d="M18 3v3M20.5 4.5h-3"/><path d="M6 3.5v2M7 4.5H5"/><path d="M20 15v2.5M21.25 16.25h-2.5"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.6v.6"/>',
   grip: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
   chevronLeft: '<path d="M15 18l-6-6 6-6"/>',
