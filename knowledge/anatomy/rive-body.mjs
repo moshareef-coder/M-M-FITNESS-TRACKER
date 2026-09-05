@@ -53,6 +53,7 @@ for (const [muscle, group] of Object.entries(RIVE_TO_APP_GROUP)) {
 }
 
 const PALETTE_VM = "palette";
+const PALETTE_VM_NAME = "PaletteViewModel"; // the view model that property is an instance of
 
 // Zoom limits for focus(): never smaller than the plain contain-fit, never more than this
 // many times it. The .riv is vector, so 4x stays crisp; beyond that a single muscle
@@ -294,11 +295,41 @@ function applyPalette(r, palette) {
   for (const muscle of ALL_MUSCLES) paintMuscle(vmi, muscle, palette);
 }
 
+// In the shipped .riv every muscle's "palette" property points at ONE shared
+// PaletteViewModel instance, so writing rectusFemoris/palette/colorLevel4 recolours
+// every muscle at level 4. A per-muscle colour therefore needs the muscle detached
+// onto its own instance first. Done lazily and once per muscle per Rive instance;
+// muscles never asked for their own colour keep sharing the file's instance.
+const OWN_PALETTES = new WeakMap();
+function paletteViewModel(r) {
+  const direct = r.viewModelByName?.(PALETTE_VM_NAME);
+  if (direct) return direct;
+  const n = r.viewModelCount || 0;
+  for (let i = 0; i < n; i++) {
+    const vm = r.viewModelByIndex(i);
+    if (vm && /palette/i.test(vm.name || "")) return vm;
+  }
+  return null;
+}
+function detachPalette(r, muscle) {
+  let own = OWN_PALETTES.get(r);
+  if (!own) { own = new Set(); OWN_PALETTES.set(r, own); }
+  if (own.has(muscle)) return true;
+  const vmi = r.viewModelInstance;
+  const inst = paletteViewModel(r)?.instance();
+  if (!vmi || !inst || !vmi.replaceViewModel(`${muscle}/${PALETTE_VM}`, inst)) return false;
+  own.add(muscle);
+  return true;
+}
+
 function applyMusclePalette(r, muscle, palette) {
   if (!palette || !MUSCLE_SET.has(muscle)) return;
   const vmi = r.viewModelInstance;
   if (!vmi) return;
-  paintMuscle(vmi, muscle, palette);
+  detachPalette(r, muscle);
+  // A fresh instance starts on the file's own colours, so every level is written,
+  // base included, rather than trusting whatever the caller happened to pass.
+  paintMuscle(vmi, muscle, { ...APP_HEAT_PALETTE, ...palette });
 }
 
 // Rive event payload shape: { name, properties? }. Validated against ALL_MUSCLES so an
