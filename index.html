@@ -16,9 +16,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+<!-- Only Supabase blocks: nothing can be shown until we know who is signed in.
+     Chart.js is the progress chart and the Rive runtime is the body figure;
+     both are fetched when the screen that needs them is opened, which keeps
+     125 KB off the path between opening the app and seeing it. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<script src="https://cdn.jsdelivr.net/npm/@rive-app/webgl2@2.42.0/rive.min.js"></script>
 <style>
   /* Palette: graphite/charcoal ink / cobalt blue (you) / coral orange (partner) / electric lime (action) */
   :root {
@@ -3156,7 +3158,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.35";
+const APP_VERSION = "2026.09.04.36";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -4239,6 +4241,11 @@ async function deleteMyAccount() {
   }
 }
 
+/* Everything the app needs to draw itself, in ONE round trip's worth of time.
+   It used to be a parallel batch followed by six awaits in a row: live
+   sessions, clips, timezone, photos, today's workout, finished workouts, saved
+   workouts. Seven waits stacked end to end, and since loadAll runs after
+   almost every write, that latency was on every action, not just startup. */
 async function loadAll() {
   const [entriesRes, exLogRes, profilesRes, plansRes, goalsRes, reactRes] = await Promise.all([
     sb.from("fit_entries").select("*").order("entry_date", { ascending: true }),
@@ -4248,12 +4255,17 @@ async function loadAll() {
     /* Goals are readable by partner and coach, so this returns theirs too. */
     sb.from("user_goals").select("*").eq("status", "active"),
     sb.from("session_reactions").select("*").order("created_at", { ascending: false }),
+    /* These five need nothing from the batch above, so they ride along with
+       it rather than queueing behind it. */
+    loadLiveSessions(),
+    loadClipInbox(),
+    loadBodyPhotos(),
+    loadTodayWorkout(),
+    loadDoneWorkouts(),
+    loadSavedWorkouts(),
   ]);
-  await loadLiveSessions();
-  await loadClipInbox();
   watchLiveSessions();
   startLiveTick();
-  ensureWorkingMuscleModules().catch((e) => console.warn("muscle modules", e));
   ALL_REACTIONS = reactRes.data || [];
   ALL_GOALS = goalsRes.data || [];
   MY_GOAL = ALL_GOALS.find((g) => (g.email || "").toLowerCase() === MY_EMAIL) || null;
@@ -4265,14 +4277,26 @@ async function loadAll() {
   PARTNER_PROFILE = ALL_PROFILES.find((p) => p.email === PARTNER_EMAIL) || null;
   applyAccentColors();
 
-  await captureTimezone();
   renderAvatarPair();
-  await loadBodyPhotos();
-  await loadTodayWorkout();
-  await loadDoneWorkouts();
-  await loadSavedWorkouts();
   renderHome(!HOME_PAINTED);
   HOME_PAINTED = true;
+  /* A write nobody is waiting on. It used to sit between the data and the
+     first paint, holding the whole screen for a round trip. */
+  captureTimezone().catch(() => {});
+  warmBodyModules();
+}
+
+/* The body figure is heavy and most of it is cached forever once fetched, so
+   fetch it while the phone is doing nothing rather than when a screen is
+   waiting on it. Never on the critical path: startup used to pull the Rive
+   runtime and its wasm before Home had finished painting. */
+let bodyWarmed = false;
+function warmBodyModules() {
+  if (bodyWarmed) return;
+  bodyWarmed = true;
+  const go = () => ensureWorkingMuscleModules().catch((e) => console.warn("muscle modules", e));
+  if (typeof requestIdleCallback === "function") requestIdleCallback(go, { timeout: 6000 });
+  else setTimeout(go, 2500);
 }
 
 function partnerName() {
@@ -6862,6 +6886,9 @@ function staggerHomeCards() {
 }
 
 function renderWeightChart() {
+  /* Chart.js is 70 KB and only this card uses it, so it arrives with the card
+     rather than with the app. */
+  if (!window.Chart) { loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderWeightChart); return; }
   const partner = partnerName();
   $("legendMe").textContent = ME;
   $("legendPartner").textContent = partner;
@@ -10170,8 +10197,42 @@ let riveFrontCtrl = null;
 let riveBackCtrl = null;
 let riveLoadedSex = null;
 
+/* One script tag per URL, however many callers ask for it. */
+const SCRIPTS = new Map();
+function loadScriptOnce(src) {
+  if (!SCRIPTS.has(src)) {
+    SCRIPTS.set(src, new Promise((resolve, reject) => {
+      const el = document.createElement("script");
+      el.src = src;
+      el.onload = resolve;
+      el.onerror = () => reject(new Error(`could not load ${src}`));
+      document.head.appendChild(el);
+    }));
+  }
+  return SCRIPTS.get(src);
+}
+
+/* The Rive runtime and its 2 MB wasm are the most expensive things the app can
+   fetch, and most sessions never open a screen with a body on it. So they load
+   on first use, and the wasm comes from our own origin: the runtime's default
+   is unpkg, which measured 2.4 to 2.9 seconds on the first figure. Ours is
+   cached by the service worker after that, being version named and immutable. */
+let riveRuntimePromise = null;
+function ensureRiveRuntime() {
+  if (!riveRuntimePromise) {
+    riveRuntimePromise = loadScriptOnce("https://cdn.jsdelivr.net/npm/@rive-app/webgl2@2.42.0/rive.min.js")
+      .then(() => {
+        try { window.rive?.RuntimeLoader?.setWasmUrl("/vendor/rive-2.42.0.wasm"); }
+        catch (e) { console.warn("rive wasm url", e); }
+      });
+  }
+  return riveRuntimePromise;
+}
+
 function ensureRiveBodyModule() {
-  if (!riveBodyPromise) riveBodyPromise = import("./knowledge/anatomy/rive-body.mjs");
+  if (!riveBodyPromise) {
+    riveBodyPromise = ensureRiveRuntime().then(() => import("./knowledge/anatomy/rive-body.mjs"));
+  }
   return riveBodyPromise;
 }
 
