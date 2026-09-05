@@ -45,7 +45,7 @@ const FUNCS = [
   "openWorkoutPrivacy", "workoutPrivacy", "defaultWorkoutPrivacy", "privacySummary", "workoutPrivacyLocked",
   "liveDetailsShared", "openGenOverlay", "paintGen", "stopGenTicker", "revealGeneratedPlan",
   "setGenWord", "startGenWordCycle", "stopGenWordCycle", "mountGenBody", "unmountGenBody",
-  "startGenRaf", "stopGenRaf",
+  "startGenRaf", "stopGenRaf", "writeRev",
 ].map(fn).join("\n");
 
 /* The working-muscles block is more than a function: caches, colour helpers
@@ -283,7 +283,7 @@ ${PRIVACY_ROWS}
 ${GEN_STEPS}
 ${GEN_WORDS}
 let genTimer = null, genPct = 0, genStepAt = 0, genWordTimer = null, genWordAt = 0, genBodyCtrl = null;
-let genRaf = null, genRevShown = 0;
+let genRaf = null, genRevShown = 0, genFrameAt = 0, genCancelled = false;
 ${FUNCS}
 ${WORKING_MUSCLES}
 

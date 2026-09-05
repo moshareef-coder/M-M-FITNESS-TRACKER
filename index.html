@@ -689,6 +689,13 @@
   @keyframes genDown { to { transform: translateY(100%); } }
   /* The chamber. A faint grid across the whole screen that drifts upward, so
      the figure reads as standing in something rather than floating on black. */
+  .gen-x {
+    position: absolute; z-index: 3; top: calc(10px + env(safe-area-inset-top, 0px)); right: 14px;
+    width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-size: 22px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); color: #f4f6f8;
+  }
+  .gen-x:active { opacity: .6; }
   .gen-grid {
     position: absolute; inset: -40px 0;
     background-image:
@@ -741,8 +748,10 @@
   .gen-word-wrap { position: relative; display: inline-block; }
   .gen-word {
     font-size: clamp(30px, 10vw, 42px); font-weight: 800; letter-spacing: -.03em; line-height: 1.05;
-    font-family: var(--font-display, inherit);
+    font-family: var(--font-display, inherit); text-wrap: balance;
   }
+  .gen-word.mid { font-size: clamp(24px, 7.4vw, 32px); }
+  .gen-word.long { font-size: clamp(20px, 6vw, 26px); letter-spacing: -.02em; line-height: 1.15; }
   .gen-step { margin-top: 10px; font-size: 14px; color: rgba(255,255,255,.62); min-height: 20px; transition: opacity .25s; }
   .gen-scrim .gen-pct {
     margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .14em;
@@ -2689,6 +2698,7 @@
          Body tab materialising from the feet up as the plan comes together,
          and a bright line at the height it has reached. The figure is the same
          Rive artboard the rest of the app uses, tinted for the hologram. -->
+    <button type="button" class="gen-x" id="genX" aria-label="Close">&times;</button>
     <div class="gen-grid" aria-hidden="true"></div>
     <div class="gen-holo" id="genHolo" aria-hidden="true">
       <div class="gen-body-mask" id="genBodyMask">
@@ -2780,7 +2790,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.16";
+const APP_VERSION = "2026.09.04.17";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -6568,13 +6578,30 @@ async function loadTodayWorkout() {
    it eases toward 90 while waiting and only reaches 100 when the plan is
    actually in hand, so it never claims to be finished before it is. */
 
-/* The big word changes every half second while it thinks. Short enough to
-   hold the display size on a narrow phone, and daft enough to be worth
-   watching. The first is the honest one; the rest are the joke. */
+/* The line changes every two seconds while it thinks. Some are honest, most
+   are not. Long ones get a smaller size rather than being cut, which is what
+   the length check in setGenWord is for. */
 const GEN_WORDS = [
-  "Generating", "Cooking", "Scheming", "Plotting", "Percolating", "Marinating",
-  "Noodling", "Brewing", "Concocting", "Summoning", "Manifesting", "Calibrating",
-  "Pondering", "Simmering", "Conspiring", "Deliberating", "Ruminating", "Whisking",
+  "Fitmaxxing",
+  "Crafting the perfect workout",
+  "Locking in",
+  "Cooking",
+  "Consulting the iron",
+  "Gymmaxxing",
+  "Manifesting PRs",
+  "Doing the math",
+  "Building different",
+  "Chasing the pump",
+  "Summoning gains",
+  "Respectfully cooking",
+  "Simulating soreness",
+  "Percolating",
+  "Understood the assignment",
+  "Marinating",
+  "Peak performance loading",
+  "Negotiating with your hamstrings",
+  "No days off energy",
+  "Scheming",
 ];
 
 const GEN_STEPS = [
@@ -6585,7 +6612,7 @@ const GEN_STEPS = [
   "Almost there",
 ];
 let genTimer = null, genPct = 0, genStepAt = 0, genWordTimer = null, genWordAt = 0;
-let genRaf = null, genRevShown = 0;
+let genRaf = null, genRevShown = 0, genFrameAt = 0, genCancelled = false;
 
 function openGenOverlay(title) {
   const scrim = $("genScrim");
@@ -6601,6 +6628,8 @@ function openGenOverlay(title) {
     </div>
     <div class="gen-pct" id="genPct">0%</div>`;
   scrim.classList.remove("hidden", "leaving");
+  genCancelled = false;
+  $("genX").onclick = () => { genCancelled = true; closeGenOverlay(); };
   genRevShown = 0;
   $("genHolo")?.style.setProperty("--rev", "0%");
   paintGen(0);
@@ -6610,6 +6639,10 @@ function openGenOverlay(title) {
   /* Eases in, slows as it approaches 90, and never crosses it on its own. */
   genTimer = setInterval(() => {
     genPct = Math.min(90, genPct + Math.max(0.6, (90 - genPct) * 0.06));
+    /* If the frame loop has gone quiet, and it can for reasons outside this
+       screen, do not sit there frozen at whatever it last painted. Write the
+       value out and start it again. */
+    if (genRaf && Date.now() - genFrameAt > 500) { stopGenRaf(); genRevShown = genPct; writeRev(); }
     paintGen(genPct);
     const step = Math.min(GEN_STEPS.length - 1, Math.floor(genPct / 19));
     if (step !== genStepAt) {
@@ -6657,7 +6690,13 @@ function setGenWord(word) {
   if (!wrap) return;
   wrap.classList.add("swap");
   setTimeout(() => {
-    wrap.querySelectorAll(".gen-word").forEach((el) => { el.textContent = word; });
+    wrap.querySelectorAll(".gen-word").forEach((el) => {
+      el.textContent = word;
+      // Two steps down rather than one: "Fitmaxxing" and "Negotiating with
+      // your hamstrings" cannot share a size on a 393px screen.
+      el.classList.toggle("mid", word.length > 13 && word.length <= 20);
+      el.classList.toggle("long", word.length > 20);
+    });
     wrap.classList.remove("swap");
   }, 90);
 }
@@ -6670,7 +6709,7 @@ function startGenWordCycle(first) {
     genWordAt++;
     const list = GEN_WORDS.filter((w) => w !== first);
     setGenWord(list[genWordAt % list.length]);
-  }, 550);
+  }, 2000);
 }
 
 function stopGenWordCycle() {
@@ -6685,21 +6724,33 @@ function stopGenWordCycle() {
    but mask-image is a discrete property and cannot be interpolated, so the
    mask jumped to each new value while the line glided toward it half a second
    behind. The body ran ahead of its own scan line the whole way up. */
+/* One write, so the mask, the line and the number are always the same value.
+   Nothing else is allowed to set them. */
+function writeRev() {
+  $("genHolo")?.style.setProperty("--rev", `${genRevShown.toFixed(2)}%`);
+  const label = $("genPct");
+  if (label) label.textContent = `${Math.round(genRevShown)}%`;
+}
+
+/* paintGen moves the target. The frame loop eases toward it, but the display
+   must never DEPEND on that loop: if it is not running, this writes the value
+   straight out. A stalled loop should cost smoothness, never progress. */
 function paintGen(pct) {
   genPct = Math.max(0, Math.min(100, pct));
+  if (!genRaf) { genRevShown = genPct; writeRev(); }
   startGenRaf();
 }
 
 function startGenRaf() {
   if (genRaf) return;
+  genFrameAt = Date.now();
   const step = () => {
     const scrim = $("genScrim");
     if (!scrim || scrim.classList.contains("hidden")) { genRaf = null; return; }
+    genFrameAt = Date.now();
     const gap = genPct - genRevShown;
     genRevShown += Math.abs(gap) < 0.15 ? gap : gap * 0.12;
-    $("genHolo")?.style.setProperty("--rev", `${genRevShown.toFixed(2)}%`);
-    const label = $("genPct");
-    if (label) label.textContent = `${Math.round(genRevShown)}%`;
+    writeRev();
     genRaf = requestAnimationFrame(step);
   };
   genRaf = requestAnimationFrame(step);
@@ -6727,6 +6778,7 @@ function closeGenOverlay() {
 /* The payoff: the plan lands a row at a time. Quick, 70ms apart, so five
    exercises are all in within half a second. */
 function revealGeneratedPlan(workout, onGo) {
+  if (genCancelled) return;   // they left; the workout is saved either way
   stopGenTicker();
   paintGen(100);
   const list = (workout.exercises || []).slice(0, 8);
@@ -6751,6 +6803,7 @@ function revealGeneratedPlan(workout, onGo) {
 }
 
 function failGenOverlay(message) {
+  if (genCancelled) { toast(`Couldn't generate: ${message}`); return; }
   stopGenTicker();
   $("genFill").style.height = "0%";
   $("genStage").innerHTML = `
