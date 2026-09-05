@@ -1063,6 +1063,20 @@
   .sv-ex b { color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
   .sv-head { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
   .sv-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 6px; margin-bottom: 12px; }
+  /* The week planner: days down the page, what is on them, and a way in. */
+  .wk-plan { display: flex; flex-direction: column; gap: 7px; margin-top: 12px; }
+  .wk-plan-day {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font: inherit; cursor: pointer;
+    padding: 12px 13px; border-radius: 14px; background: var(--panel); border: 1px solid var(--border); color: var(--text);
+  }
+  .wk-plan-day:active { opacity: .75; }
+  .wk-plan-day.has { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .wk-plan-when { flex-shrink: 0; width: 74px; display: flex; flex-direction: column; }
+  .wk-plan-when b { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .wk-plan-when i { font-size: 19px; font-weight: 800; font-style: normal; letter-spacing: -.02em; }
+  .wk-plan-what { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wk-plan-day:not(.has) .wk-plan-what { color: var(--muted); font-weight: 500; }
+  .wk-plan-go { flex-shrink: 0; color: var(--muted); display: flex; }
   .sv-day {
     font: inherit; cursor: pointer; padding: 9px 6px; border-radius: 12px; text-align: center;
     background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
@@ -2953,7 +2967,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.25";
+const APP_VERSION = "2026.09.04.26";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -4806,7 +4820,7 @@ function openRecap(email, name, date) {
     ${r.note ? `<p class="quote">${escapeHtml(r.note)}</p>` : ""}
 
     ${mine ? `<div class="rc-actions">
-        <button type="button" class="btn-secondary" id="rcSave">Save &amp; plan</button>
+        <button type="button" class="btn-secondary" id="rcSave">Save this workout</button>
         ${PARTNER_EMAIL ? `<button type="button" class="btn-primary" id="rcTell">Share to ${escapeHtml(partnerName())}</button>` : ""}
       </div>` : ""}`;
 
@@ -4818,10 +4832,9 @@ function openRecap(email, name, date) {
   $("recapScrim").onclick = (ev) => { if (ev.target === $("recapScrim")) closeRecap(); };
 }
 
-/* A workout worth repeating is worth keeping. This used to drop it straight
-   onto tomorrow, which was the only thing it could do with it; now it goes to
-   the saved list and opens the planner, so tomorrow is one of the answers
-   rather than the only one. */
+/* A workout worth repeating is worth keeping. It goes to the saved list and
+   stops there: what to do with it later is a separate decision, made on the
+   week planner when you are actually thinking about days. */
 async function saveRecapAsPlan(r) {
   const exercises = r.logs.map((l) => ({
     name: l.exercise_name,
@@ -4833,7 +4846,7 @@ async function saveRecapAsPlan(r) {
   const saved = await saveWorkoutAs(exercises, r.title);
   if (!saved) return;
   closeRecap();
-  openSavedWorkout(saved.id);
+  renderWorkoutTab();
 }
 
 function closeRecap() { $("recapScrim").classList.add("hidden"); }
@@ -8092,8 +8105,8 @@ function renderWorkoutTab() {
     renderChooseScreen();
   } else if (WORKOUT_MODE === "manual") {
     renderManualBuildScreen();
-  } else if (WORKOUT_MODE === "activity") {
-    renderActivityScreen();
+  } else if (WORKOUT_MODE === "week") {
+    renderWeekPlanner();
   } else {
     /* Build Next Workout is the tab, not a screen behind a button. The old
        "Go again / Begin Workout" step was a waiting room: it asked you to
@@ -8360,8 +8373,8 @@ function renderChooseScreen() {
         coached ? "Log a workout" : "I'll plan my own",
         coached ? "Record the session your coach set." : "Start from scratch and add your own exercises.",
         coached)}
-    ${optionCard("chooseActivityBtn", "heart", "Log a class or cardio",
-        "Track a class, sport, or cardio session.", false)}
+    ${optionCard("chooseWeekBtn", "checklist", "Plan your week",
+        "Put saved workouts on the days you will do them.", false)}
     ${savedWorkoutsHTML()}
     ${recentWorkoutsStrip()}`;
   wireSavedWorkouts($("workoutContent"));
@@ -8375,7 +8388,7 @@ function renderChooseScreen() {
   if ($("sppCustomise")) $("sppCustomise").onclick = toManual;
   if (!coached) $("chooseGenerateBtn").onclick = () => generateWorkout();
   $("choosePlanBtn").onclick = toManual;
-  $("chooseActivityBtn").onclick = () => { WORKOUT_MODE = "activity"; renderWorkoutTab(); };
+  $("chooseWeekBtn").onclick = () => { WORKOUT_MODE = "week"; renderWorkoutTab(); };
 
   // Every recent chip opens its recap.
   $("workoutContent").querySelectorAll("[data-recap]").forEach((b) => {
@@ -8536,72 +8549,117 @@ function savedPlanDays() {
   return out;
 }
 
+/* Tapping a saved workout asks what you want to do with it, not which days.
+   Days are a separate screen, because "keep this" and "do this on Tuesday" are
+   different thoughts and making one require the other is a tax on saving. */
 function openSavedWorkout(id) {
   const w = SAVED_WORKOUTS.find((x) => x.id === id);
   if (!w) return;
-  const picked = new Set();
-
-  const draw = () => {
-    const days = savedPlanDays();
-    $("popCard").innerHTML = `
-      <div class="pop-body">
-        <div class="ds-top">
-          <div><div class="pop-who" style="color:var(--muted)">SAVED WORKOUT</div>
-            <div class="sv-name">${escapeHtml(w.name)}</div></div>
-          <button type="button" class="ds-x" id="svX" aria-label="Close">&times;</button>
-        </div>
-        <div class="sv-list">
-          ${(w.exercises || []).map((ex) => `<div class="sv-ex"><span>${escapeHtml(ex.name)}</span><b>${ex.sets} × ${ex.reps}</b></div>`).join("")}
-        </div>
-        <div class="sv-head">Put it on a day</div>
-        <div class="sv-days">
-          ${days.map((d) => `
-            <button type="button" class="sv-day${picked.has(d.date) ? " on" : ""}${d.taken ? " taken" : ""}" data-day="${d.date}">
-              <span class="sv-day-l">${escapeHtml(d.label)}</span>
-              <span class="sv-day-n">${d.day}</span>
-              ${d.taken ? `<span class="sv-day-x">${escapeHtml(d.taken)}</span>` : ""}
-            </button>`).join("")}
-        </div>
-        <p class="ef-note">Picking a day that already has a plan replaces it. Days you have finished are left alone.</p>
-        <button type="button" class="btn-primary" id="svApply">${picked.size ? `Schedule ${picked.size} day${picked.size === 1 ? "" : "s"}` : "Pick a day"}</button>
-        <button type="button" class="btn-ghost" id="svDelete">Delete this workout</button>
-      </div>`;
-
-    $("svX").onclick = () => $("popScrim").classList.add("hidden");
-    $("popCard").querySelectorAll("[data-day]").forEach((b) => {
-      b.onclick = () => {
-        const date = b.dataset.day;
-        picked.has(date) ? picked.delete(date) : picked.add(date);
-        draw();
-      };
-    });
-    $("svApply").onclick = () => scheduleSavedWorkout(w, [...picked]);
-    $("svDelete").onclick = async () => {
-      if (!confirm(`Delete "${w.name}"? This does not touch any workout you have already done.`)) return;
-      await deleteSavedWorkout(w.id);
-      $("popScrim").classList.add("hidden");
-      renderWorkoutTab();
-    };
-  };
-
-  draw();
+  $("popCard").innerHTML = `
+    <div class="pop-body">
+      <div class="ds-top">
+        <div><div class="pop-who" style="color:var(--muted)">SAVED WORKOUT</div>
+          <div class="sv-name">${escapeHtml(w.name)}</div></div>
+        <button type="button" class="ds-x" id="svX" aria-label="Close">&times;</button>
+      </div>
+      <div class="sv-list">
+        ${(w.exercises || []).map((ex) => `<div class="sv-ex"><span>${escapeHtml(ex.name)}</span><b>${ex.sets} × ${ex.reps}</b></div>`).join("")}
+      </div>
+      <button type="button" class="btn-primary" id="svToday" style="margin-top:14px">Do this today</button>
+      <button type="button" class="btn-secondary" id="svEdit">Edit a copy</button>
+      <button type="button" class="btn-ghost" id="svDelete">Delete</button>
+    </div>`;
   $("popScrim").classList.remove("hidden");
+  $("popScrim").onclick = (e) => { if (e.target === $("popScrim")) $("popScrim").classList.add("hidden"); };
+
+  const close = () => $("popScrim").classList.add("hidden");
+  $("svX").onclick = close;
+  $("svToday").onclick = () => scheduleSavedWorkout(w, [todayStr()]);
+  $("svEdit").onclick = () => {
+    /* A copy, not the original: editing one to use it once should not quietly
+       rewrite the thing you saved. */
+    MANUAL_DRAFT = (w.exercises || []).map((ex) => ({ ...ex }));
+    saveDraft();
+    close();
+    WORKOUT_MODE = "manual";
+    renderWorkoutTab();
+  };
+  $("svDelete").onclick = async () => {
+    if (!confirm(`Delete "${w.name}"? Workouts you already did are not affected.`)) return;
+    await deleteSavedWorkout(w.id);
+    close();
+    renderWorkoutTab();
+  };
 }
 
-async function scheduleSavedWorkout(w, dates) {
-  if (!dates.length) { toast("Pick at least one day"); return; }
-  const rows = dates.map((date) => ({
-    user_name: ME, email: MY_EMAIL, entry_date: date,
-    focus: w.focus || w.name, exercises: w.exercises, archived: false,
-  }));
-  const { error } = await sb.from("ai_workouts").upsert(rows, { onConflict: "email,entry_date" });
-  if (error) { toast("Couldn't schedule it"); console.error(error); return; }
-  await sb.from("saved_workouts").update({ last_used_at: new Date().toISOString() }).eq("id", w.id);
-  $("popScrim").classList.add("hidden");
-  await loadAll();
-  await loadTodayWorkout();
-  renderWorkoutTab();
-  toast(dates.length === 1 ? "Added to that day" : `Added to ${dates.length} days`);
+/* ---- Planning the week ----
+   Day first: here are your days, put something on them. Workout first meant
+   saving and scheduling were the same act, so you could not just keep a
+   workout for later without deciding when to do it. */
+function renderWeekPlanner() {
+  $("workoutCardTitle").textContent = "Plan your week";
+  $("workoutFocusRow").textContent = "";
+  const days = savedPlanDays();
+
+  $("workoutContent").innerHTML = `
+    ${backBar("Back", () => { WORKOUT_MODE = "choose"; renderWorkoutTab(); })}
+    ${SAVED_WORKOUTS.length
+      ? `<p class="muted-note">Tap a day to put one of your saved workouts on it.</p>`
+      : `<p class="muted-note">No saved workouts yet. Build one and hit "Save for later", then it can go on any day here.</p>`}
+    <div class="wk-plan">
+      ${days.slice(0, 14).map((d) => `
+        <button type="button" class="wk-plan-day${d.taken ? " has" : ""}" data-plan-day="${d.date}">
+          <span class="wk-plan-when"><b>${escapeHtml(d.label)}</b><i>${d.day}</i></span>
+          <span class="wk-plan-what">${d.taken ? escapeHtml(d.taken) : "Nothing planned"}</span>
+          <span class="wk-plan-go">${d.done ? icon("check", 16) : icon("chevronRight", 16)}</span>
+        </button>`).join("")}
+    </div>`;
+
+  $("workoutContent").querySelectorAll("[data-plan-day]").forEach((b) => {
+    b.onclick = () => openDayPlanner(b.dataset.planDay);
+  });
+}
+
+function openDayPlanner(date) {
+  const existing = (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === date && !w.archived);
+  const label = relDayLabel(date);
+  $("popCard").innerHTML = `
+    <div class="pop-body">
+      <div class="ds-top">
+        <div><div class="pop-who" style="color:var(--muted)">${escapeHtml(String(label).toUpperCase())}</div>
+          <div class="sv-name">${existing ? escapeHtml(displayFocus(existing.focus, existing.exercises)) : "Nothing planned"}</div></div>
+        <button type="button" class="ds-x" id="dpX" aria-label="Close">&times;</button>
+      </div>
+      ${existing?.completed_at ? `<p class="ef-note">This one is already done. Putting something else here does not change what you logged.</p>` : ""}
+      ${SAVED_WORKOUTS.length ? `
+        <div class="sv-head">Put one of these on it</div>
+        <div class="sv-cards">
+          ${SAVED_WORKOUTS.map((w) => `
+            <button type="button" class="sv-card" data-put="${escapeHtml(w.id)}">
+              <span class="sv-card-name">${escapeHtml(w.name)}</span>
+              <span class="sv-card-meta">${(w.exercises || []).length} exercises</span>
+            </button>`).join("")}
+        </div>` : `<p class="ef-note">Nothing saved yet. Build a workout and keep it, then it shows up here.</p>`}
+      ${existing ? `<button type="button" class="btn-ghost" id="dpClear" style="margin-top:14px">Clear this day</button>` : ""}
+    </div>`;
+  $("popScrim").classList.remove("hidden");
+  $("popScrim").onclick = (e) => { if (e.target === $("popScrim")) $("popScrim").classList.add("hidden"); };
+  $("dpX").onclick = () => $("popScrim").classList.add("hidden");
+  $("popCard").querySelectorAll("[data-put]").forEach((b) => {
+    const w = SAVED_WORKOUTS.find((x) => x.id === b.dataset.put);
+    b.onclick = () => scheduleSavedWorkout(w, [date]);
+  });
+  if ($("dpClear")) {
+    $("dpClear").onclick = async () => {
+      const { error } = await sb.from("ai_workouts").delete().eq("id", existing.id);
+      if (error) { toast("Couldn't clear it"); console.error(error); return; }
+      $("popScrim").classList.add("hidden");
+      await loadAll();
+      await loadTodayWorkout();
+      renderWorkoutTab();
+      toast("Day cleared");
+    };
+  }
 }
 
 function savedWorkoutsHTML() {
@@ -8697,8 +8755,9 @@ function renderManualBuildScreen() {
     saveManualWorkout();
   };
   $("cbSaveBtn").onclick = async () => {
-    const saved = await saveWorkoutAs(MANUAL_DRAFT);
-    if (saved) openSavedWorkout(saved.id);   // straight into "which days?"
+    // Saving is just saving. Scheduling lives on its own screen, because
+    // being made to pick days every time you keep something is a tax.
+    if (await saveWorkoutAs(MANUAL_DRAFT)) renderWorkoutTab();
   };
   $("manualCancelBtn").onclick = () => {
     if (MANUAL_DRAFT.length && !confirm(`Discard ${MANUAL_DRAFT.length} exercise${MANUAL_DRAFT.length === 1 ? "" : "s"} you added?`)) return;
