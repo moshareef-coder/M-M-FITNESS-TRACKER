@@ -30,6 +30,7 @@ const HEADER = grab(/ {2}<header class="top">.*?<\/header>\n/s, "the app header"
 const HOME = src.match(/<!-- HOME TAB -->([\s\S]*?)<div id="tab-workout"/)[1];
 const LIVE_SHEET = grab(/ {2}<div class="sheet-scrim hidden" id="liveScrim">[\s\S]*?<\/div>\n {2}<\/div>\n/, "the live sheet");
 const CLIP_PILL = grab(/ {2}<button type="button" class="clip-pill hidden" id="clipPill"><\/button>\n/, "the clip pill");
+const POP = grab(/ {2}<div class="pop-scrim hidden" id="popScrim">[\s\S]*?<\/div>\n {2}<\/div>\n/, "the popup shell");
 const SESSION_CARD = grab(/ {4}<div id="sessionCard" class="session-overlay hidden">[\s\S]*?<div id="sessionBody"><\/div>\n {4}<\/div>\n/, "the session card");
 
 const FUNCS = [
@@ -39,7 +40,7 @@ const FUNCS = [
   "liveAgeMs", "liveStateLabel", "renderLiveCard", "renderLiveSheet",
   "classifyMuscles", "profileFor", "renderClipPill",
   "clipRecorderHTML", "clipViewerHTML", "clipGoneHTML",
-  "formatRest", "renderSession",
+  "formatRest", "renderSession", "openEffortInfo",
 ].map(fn).join("\n");
 
 /* The working-muscles block is more than a function: caches, colour helpers
@@ -160,6 +161,7 @@ ${HOME}
 ${LIVE_SHEET}
 ${CLIP_PILL}
 ${SESSION_CARD}
+${POP}
 </div>
 
 <script>
@@ -431,6 +433,10 @@ const STATES = [
     note: "Up to twenty seconds. Tap the shutter again to stop early; the ring shows time used. The camera fills the screen in the app.",
     raw: () => clipRecorderHTML("Mell"), setup: () => {} },
 
+  { group: "Home", name: "How effort is scored",
+    note: "Tapping the effort line opens this. Three lines, the real numbers from the formula, and why two people can be compared when one of them shares nothing.",
+    pop: () => openEffortInfo(), setup: () => {} },
+
   { group: "What they see while training", name: "Mid set, bench press",
     note: "The exerciser's own screen. Their body, lit in their colour, sits between the target and the set dots so they see what they are hitting before they log.",
     session: true, setup: () => { sessionFixture(); } },
@@ -492,6 +498,12 @@ async function renderSheetState() {
   return deId($("liveSheet").outerHTML);
 }
 
+async function renderPopState(st) {
+  st.pop();
+  await settle();
+  return deId($("popCard").outerHTML);
+}
+
 async function renderSessionState() {
   const card = $("sessionCard");
   card.classList.remove("hidden");
@@ -531,6 +543,7 @@ const setTheme = (t) => {
       html = st.raw ? await renderRawState(st)
            : st.pill ? await renderPillState()
            : st.sheet ? await renderSheetState()
+           : st.pop ? await renderPopState(st)
            : st.session ? await renderSessionState()
            : await renderHomeState();
     } catch (e) {

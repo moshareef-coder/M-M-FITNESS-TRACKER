@@ -817,6 +817,27 @@
   .hero-effort svg { vertical-align: -2px; color: var(--accent); }
   .hero-effort b { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--text); }
   .hero-effort .he-you.lead b, .hero-effort .he-them.lead b { color: var(--accent-ink); }
+  /* The label is the way in: tapping it says where the number came from. */
+  .he-label {
+    display: inline-flex; align-items: center; gap: 5px; font: inherit; color: var(--muted);
+    background: none; border: none; padding: 0; cursor: pointer;
+  }
+  .he-label .i-glyph { opacity: .75; }
+  .he-label:active { opacity: .6; }
+
+  /* How effort is scored, three lines and the reason it is comparable. */
+  .ef-list { display: flex; flex-direction: column; gap: 11px; margin: 2px 0 14px; }
+  .ef-row { display: flex; align-items: baseline; gap: 12px; font-size: 14px; line-height: 1.4; }
+  .ef-pts {
+    flex-shrink: 0; min-width: 44px; text-align: center; padding: 4px 8px; border-radius: 100px;
+    font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums;
+    color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 15%, transparent);
+  }
+  .ef-note { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0 0 14px; }
+  .lw-effort .lw-why {
+    display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; padding: 0;
+    background: none; border: none; color: var(--muted); cursor: pointer; font: inherit; font-size: 11px;
+  }
 
   /* Onboarding */
   .ob-kicker { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--accent-ink); margin-bottom: 8px; }
@@ -2592,7 +2613,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.10";
+const APP_VERSION = "2026.09.04.11";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -2616,6 +2637,7 @@ const ICON_PATHS = {
   swap: '<path d="M7 4v13M7 4 3 8M7 4l4 4M17 20V7m0 13 4-4m-4 4-4-4"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
   google: '<path fill="#4285F4" stroke="none" d="M21.6 12.23c0-.7-.06-1.38-.18-2.03H12v3.84h5.4a4.62 4.62 0 0 1-2 3.03v2.5h3.24c1.9-1.75 3-4.32 3-7.34Z"/><path fill="#34A853" stroke="none" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.5c-.9.6-2.05.96-3.4.96-2.6 0-4.8-1.76-5.6-4.12H3.05v2.58A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" stroke="none" d="M6.4 13.9a5.98 5.98 0 0 1 0-3.8V7.52H3.05a10 10 0 0 0 0 8.96l3.36-2.58Z"/><path fill="#EA4335" stroke="none" d="M12 6.06c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.96 9.96 0 0 0 12 2a10 10 0 0 0-8.95 5.52L6.4 10.1C7.2 7.74 9.4 6.06 12 6.06Z"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.6v.6"/>',
   grip: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
   chevronLeft: '<path d="M15 18l-6-6 6-6"/>',
   chevronRight: '<path d="M9 18l6-6-6-6"/>',
@@ -3833,6 +3855,34 @@ function effortXPBetween(name, from, to) {
 function todaysEffortXP(name) { return effortXPBetween(name, todayStr(), todayStr()); }
 function weekEffortXP(name) { return effortXPBetween(name, weekStartStr(), todayStr()); }
 
+/* A number people compete on has to be explainable, or it feels arbitrary and
+   they stop trusting it. Three lines, the real weights from effortXPBetween
+   above, and the reason two people can be compared at all. Keep these numbers
+   in step with that function; they are the same three terms. */
+function openEffortInfo() {
+  const partner = PARTNER_EMAIL ? partnerName() : null;
+  $("popCard").innerHTML = `
+    <div class="pop-body">
+      <div class="ds-top">
+        <div class="pop-who" style="color:var(--muted)">HOW EFFORT IS SCORED</div>
+        <button type="button" class="ds-x" id="effortX" aria-label="Close">&times;</button>
+      </div>
+      <div class="ef-list">
+        <div class="ef-row"><span class="ef-pts">+10</span><span>A day you trained. Turning up is the hard part.</span></div>
+        <div class="ef-row"><span class="ef-pts">+5</span><span>Every exercise you finish in a session.</span></div>
+        <div class="ef-row"><span class="ef-pts">+25</span><span>A personal best on any lift.</span></div>
+      </div>
+      <p class="ef-note">That is the whole sum. It counts what you did, never how heavy it was, so
+        ${partner ? `you and ${escapeHtml(partner)} are scored the same way` : "everyone is scored the same way"}
+        even when one of you keeps the workout itself private.</p>
+      <button type="button" class="btn-primary" id="effortOk">Got it</button>
+    </div>`;
+  $("popScrim").classList.remove("hidden");
+  const close = () => $("popScrim").classList.add("hidden");
+  $("effortX").onclick = close;
+  $("effortOk").onclick = close;
+}
+
 function levelForXP(xp) {
   const level = 1 + Math.floor(xp / 100);
   const names = ["Rookie", "Getting Started", "Consistent", "Grinder", "Iron Will", "Machine", "Beast Mode", "Legend"];
@@ -4727,7 +4777,7 @@ function renderHero(animate = false) {
         <p class="hero-sub">${sub}</p>
         ${coachLine}
         ${partner ? `<div class="hero-effort">
-          <span class="he-label">${icon("bolt", 13)} Effort this week</span>
+          <button type="button" class="he-label" id="effortInfoBtn" aria-label="How effort is scored">${icon("bolt", 13)} Effort this week <span class="i-glyph">${icon("info", 13)}</span></button>
           <span class="he-you${myWeekXP >= theirWeekXP ? " lead" : ""}">You <b data-xp="${myWeekXP}" data-delay="380">${animate ? 0 : myWeekXP}</b></span>
           <span class="he-them${theirWeekXP > myWeekXP ? " lead" : ""}">${escapeHtml(partner)} <b data-xp="${theirWeekXP}" data-delay="480">${animate ? 0 : theirWeekXP}</b></span>
         </div>` : ""}
@@ -4751,6 +4801,8 @@ function renderHero(animate = false) {
       if (flame) countUp(flame, Number(flame.dataset.streak), { ms: 700, delay: 380 });
     }));
   }
+
+  if ($("effortInfoBtn")) $("effortInfoBtn").onclick = openEffortInfo;
 
   if ($("heroBtn")) {
     $("heroBtn").onclick = () => {
@@ -5517,7 +5569,8 @@ async function renderLiveSheet() {
       ${sharing
         ? `<div class="lw-ex">${escapeHtml(row.exercise_name || "Warming up")}</div>
            ${setTotal ? `<div class="lw-sets">${sets}</div>` : ""}`
-        : `<div class="lw-effort"><b>${xp}</b><span>XP today</span></div>`}
+        : `<div class="lw-effort"><b>${xp}</b><span>XP today</span>
+             <button type="button" class="lw-why" id="lwWhy" aria-label="How effort is scored">${icon("info", 13)}</button></div>`}
       <div class="lw-meta">
         <span>${icon("clock", 15)} <span class="lw-elapsed">${mins} min</span></span>
         ${sharing && setTotal ? `<span>${icon("check", 15)} ${row.set_done || 0} of ${setTotal} sets</span>` : ""}
@@ -5540,6 +5593,7 @@ async function renderLiveSheet() {
     </div>`;
 
   $("lwClose").onclick = closeLiveSheet;
+  if ($("lwWhy")) $("lwWhy").onclick = () => { closeLiveSheet(); openEffortInfo(); };
   $("lwMsg").onclick = () => { closeLiveSheet(); openNoteComposer("congratulate"); };
   $("lwClip").onclick = () => { closeLiveSheet(); openClipRecorder(row.email); };
 }
