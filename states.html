@@ -783,6 +783,13 @@
   .lw-send svg { display: block; }
   .lw-next b { color: var(--text); font-weight: 700; }
   .lw-stale { font-size: 12.5px; color: var(--muted); text-align: center; margin: 0 0 12px; }
+  /* What a watcher gets when the exercise itself is kept private: an effort
+     number standing in for the name, weight and muscle map. */
+  .lw-now-private { padding: 18px 14px; }
+  .lw-effort { display: flex; align-items: baseline; justify-content: center; gap: 7px; margin-top: 6px; }
+  .lw-effort b { font-size: 30px; font-weight: 800; letter-spacing: -.02em; color: var(--partner); font-variant-numeric: tabular-nums; }
+  .lw-effort span { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .lw-private-note { font-size: 12.5px; color: var(--muted); text-align: center; margin: 0 0 12px; line-height: 1.4; }
 
   /* Card heads with a side link */
   .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
@@ -794,6 +801,12 @@
 
   .coach-line { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); margin-top: 8px; }
   .coach-line svg { color: var(--down); }
+  /* Effort head to head: a number either of you gets to see even when the
+     workout behind it stays private. */
+  .hero-effort { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 12px; margin-top: 9px; font-size: 12.5px; color: var(--muted); }
+  .hero-effort svg { vertical-align: -2px; color: var(--accent); }
+  .hero-effort b { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--text); }
+  .hero-effort .he-you.lead b, .hero-effort .he-them.lead b { color: var(--accent-ink); }
 
   /* Onboarding */
   .ob-kicker { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--accent-ink); margin-bottom: 8px; }
@@ -2244,6 +2257,14 @@ let ME = "Mo", MY_EMAIL = "mo@x", PARTNER_EMAIL = "mell@x";
 let MY_DAYS = 4, MY_TARGET = 5, THEIR_DAYS = 4, THEIR_TARGET = 5;
 let DAY_STREAK = 4, WEEK_STREAK = 0, TRAINED_TODAY = false, PLANNED_TOMORROW = null;
 let ENTRIES = {}, ALL_PLANS = [], ALL_EXERCISE_LOGS = [], ALL_REACTIONS = [], LIVE_PARTNER = null;
+let PARTNER_PROFILE = null;
+
+/* Effort points stand in for real data here: what matters for the gallery is
+   the shape (a number, a lead) not the exact math, which lives in index.html. */
+const MY_WEEK_XP = 85, THEIR_WEEK_XP = 60, TODAY_XP = 45, ENTRY_XP = 60;
+const weekEffortXP = (name) => (name === ME ? MY_WEEK_XP : THEIR_WEEK_XP);
+const todaysEffortXP = () => TODAY_XP;
+const effortXPBetween = () => ENTRY_XP;
 
 const partnerName = () => "Mell";
 const currentWeekDates = () => WEEK;
@@ -2352,6 +2373,11 @@ function renderHero() {
   const streak = sharedWeekStreak();
   const dayStreak = sharedDayStreak();
 
+  // Head to head on effort, not on what was done: this reads the same whether
+  // or not either of you shares the specifics of a workout.
+  const myWeekXP = weekEffortXP(ME);
+  const theirWeekXP = partner ? weekEffortXP(partner) : 0;
+
   /* Under the title: one line that says where the pair stands. When you are
      level it reads as one sentence; otherwise each of you gets your number. */
   let sub;
@@ -2398,6 +2424,11 @@ function renderHero() {
         <h1 class="hero-title">Stronger Together</h1>
         <p class="hero-sub">${sub}</p>
         ${coachLine}
+        ${partner ? `<div class="hero-effort">
+          <span class="he-label">${icon("bolt", 13)} Effort this week</span>
+          <span class="he-you${myWeekXP >= theirWeekXP ? " lead" : ""}">You <b>${myWeekXP}</b></span>
+          <span class="he-them${theirWeekXP > myWeekXP ? " lead" : ""}">${escapeHtml(partner)} <b>${theirWeekXP}</b></span>
+        </div>` : ""}
       </div>
       ${badge}
     </div>
@@ -2520,11 +2551,14 @@ function nameFor(email) {
 async function timelineItemHTML(item) {
   const { email, name, cls, entry } = item;
   const date = entry.entry_date;
-  const plan = (ALL_PLANS || []).find((w) => w.email === email && w.entry_date === date && w.completed_at);
+  // Your own rows are always full detail; a partner's row respects their
+  // toggle, same rule as the live sheet.
+  const sharing = email === MY_EMAIL || PARTNER_PROFILE?.share_workout_details !== false;
+  const plan = sharing ? (ALL_PLANS || []).find((w) => w.email === email && w.entry_date === date && w.completed_at) : null;
   const sum = workoutSummary(name, date);
-  const focus = plan ? displayFocus(plan.focus, plan.exercises) : (sum.names.length ? deriveFocus(sum.names) : "Workout");
+  const focus = !sharing ? "Workout" : plan ? displayFocus(plan.focus, plan.exercises) : (sum.names.length ? deriveFocus(sum.names) : "Workout");
   const mins = plan?.duration_sec ? Math.round(plan.duration_sec / 60) : sum.mins;
-  const lb = dayVolumeLb(email, date);
+  const lb = sharing ? dayVolumeLb(email, date) : 0;
   const when = relDayLabel(date) + (entry.workout_at
     ? ", " + new Date(entry.workout_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "");
   const url = entry.proof_path ? await signedProofUrl(entry.proof_path) : null;
@@ -2534,7 +2568,8 @@ async function timelineItemHTML(item) {
   const stats = [];
   if (mins) stats.push(`<span>${icon("clock", 15)} ${mins} min</span>`);
   if (lb) stats.push(`<span>${icon("dumbbell", 15)} ${fmtVolume(lb)} lbs</span>`);
-  if (!stats.length && sum.sets) stats.push(`<span>${icon("check", 15)} ${sum.sets} sets</span>`);
+  if (!stats.length && sharing && sum.sets) stats.push(`<span>${icon("check", 15)} ${sum.sets} sets</span>`);
+  if (!sharing) stats.push(`<span>${icon("bolt", 15)} ${effortXPBetween(name, date, date)} XP</span>`);
 
   const foot = rx.comment
     ? `<div class="tl-cmt"><span class="tl-av sm ${(rx.comment.from_email || "").toLowerCase() === MY_EMAIL ? "me" : "them"}"
@@ -2611,13 +2646,21 @@ async function renderLiveCard() {
   const row = LIVE_PARTNER;
   const name = row.user_name || partnerName();
   const mins = Math.max(1, Math.round((row.elapsed_sec || 0) / 60));
-  const what = [row.exercise_name, `${mins} min in`, liveStateLabel(row)].filter(Boolean).join(" · ");
+  // A person can keep the exercise private and still show up as working hard:
+  // the effort score stands in for it, never the other way around.
+  const sharing = PARTNER_PROFILE?.share_workout_details !== false;
+  const nameLine = sharing
+    ? `${escapeHtml(name)} is on ${escapeHtml(row.focus || "a workout")}`
+    : `${escapeHtml(name)} is training`;
+  const what = sharing
+    ? [row.exercise_name, `${mins} min in`, liveStateLabel(row)].filter(Boolean).join(" · ")
+    : [`${mins} min in`, liveStateLabel(row), `${todaysEffortXP(name)} XP today`].join(" · ");
 
   el.innerHTML = `
     <span class="live-av" data-av-email="${escapeHtml(row.email)}">${escapeHtml(initials(name))}</span>
     <span class="live-body">
       <span class="live-head"><span class="live-dot"></span><span class="live-label">Training now</span></span>
-      <span class="live-name">${escapeHtml(name)} is on ${escapeHtml(row.focus || "a workout")}</span>
+      <span class="live-name">${nameLine}</span>
       <span class="live-what">${escapeHtml(what)}</span>
     </span>
     <span class="live-go">${icon("chevronRight", 20)}</span>`;
@@ -2640,15 +2683,19 @@ async function renderLiveSheet() {
   const name = row.user_name || partnerName();
   const face = await avatarUrlFor(row.email);
   const mins = Math.round((row.elapsed_sec || 0) / 60);
-  const setTotal = row.set_total || 0;
+  // Off means: still show they're live, how long, and how hard, just not
+  // what. Nothing here about the actual exercise gets built when it's off.
+  const sharing = PARTNER_PROFILE?.share_workout_details !== false;
+  const setTotal = sharing ? (row.set_total || 0) : 0;
   const sets = Array.from({ length: setTotal }, (_, i) =>
     `<span class="lw-set${i < (row.set_done || 0) ? " on" : ""}"></span>`).join("");
 
   /* Their plan is already on the server, so "what's next" needs nothing live. */
-  const plan = (ALL_PLANS || []).find((w) => w.id === row.workout_id);
+  const plan = sharing ? (ALL_PLANS || []).find((w) => w.id === row.workout_id) : null;
   const nextEx = plan?.exercises?.[(row.exercise_index || 0) + 1];
   const stale = liveAgeMs(row) > LIVE_QUIET_MS;
-  const map = workingMusclesHTML(row.exercise_name, { who: "them", size: "lg", email: row.email });
+  const map = sharing ? workingMusclesHTML(row.exercise_name, { who: "them", size: "lg", email: row.email }) : "";
+  const xp = todaysEffortXP(name);
 
   sheet.innerHTML = `
     <div class="ds-grip"></div>
@@ -2659,19 +2706,24 @@ async function renderLiveSheet() {
     <div class="lw-hero">
       <div class="lw-av">${face ? `<img src="${face}" alt="" />` : escapeHtml(initials(name))}</div>
       <div class="lw-name">${escapeHtml(name)}</div>
-      <div class="lw-focus">${escapeHtml(row.focus || "Workout")} · exercise ${(row.exercise_index || 0) + 1} of ${row.exercise_count || 1}</div>
+      <div class="lw-focus">${sharing
+        ? `${escapeHtml(row.focus || "Workout")} · exercise ${(row.exercise_index || 0) + 1} of ${row.exercise_count || 1}`
+        : "Keeping today's workout private"}</div>
     </div>
-    <div class="lw-now">
+    <div class="lw-now${sharing ? "" : " lw-now-private"}">
       <div class="lw-now-label">${escapeHtml(liveStateLabel(row))}</div>
-      <div class="lw-ex">${escapeHtml(row.exercise_name || "Warming up")}</div>
-      ${setTotal ? `<div class="lw-sets">${sets}</div>` : ""}
+      ${sharing
+        ? `<div class="lw-ex">${escapeHtml(row.exercise_name || "Warming up")}</div>
+           ${setTotal ? `<div class="lw-sets">${sets}</div>` : ""}`
+        : `<div class="lw-effort"><b>${xp}</b><span>XP today</span></div>`}
       <div class="lw-meta">
         <span>${icon("clock", 15)} <span class="lw-elapsed">${mins} min</span></span>
-        ${setTotal ? `<span>${icon("check", 15)} ${row.set_done || 0} of ${setTotal} sets</span>` : ""}
+        ${sharing && setTotal ? `<span>${icon("check", 15)} ${row.set_done || 0} of ${setTotal} sets</span>` : ""}
       </div>
     </div>
-    ${map ? `<div class="lw-card" data-wm-wrap><div class="lw-card-label">Muscles working right now</div>${map}</div>` : ""}
-    ${nextEx ? `<p class="lw-next">Up next: <b>${escapeHtml(nextEx.name || "")}</b>${nextEx.sets ? ` · ${nextEx.sets} × ${escapeHtml(String(nextEx.reps || ""))}` : ""}</p>` : ""}
+    ${sharing && map ? `<div class="lw-card" data-wm-wrap><div class="lw-card-label">Muscles working right now</div>${map}</div>` : ""}
+    ${!sharing ? `<p class="lw-private-note">${escapeHtml(name)} keeps workout details private. Their effort score is always shared.</p>` : ""}
+    ${sharing && nextEx ? `<p class="lw-next">Up next: <b>${escapeHtml(nextEx.name || "")}</b>${nextEx.sets ? ` · ${nextEx.sets} × ${escapeHtml(String(nextEx.reps || ""))}` : ""}</p>` : ""}
     ${stale ? `<p class="lw-stale">Their screen is off, so this is where they were a few minutes ago.</p>` : ""}
     <div class="lw-card">
       <div class="lw-card-label">Cheer them on</div>
@@ -3132,6 +3184,7 @@ function resetFixtures() {
   MY_DAYS = 4; MY_TARGET = 5; THEIR_DAYS = 4; THEIR_TARGET = 5;
   DAY_STREAK = 4; WEEK_STREAK = 0; TRAINED_TODAY = false; PLANNED_TOMORROW = null;
   LIVE_PARTNER = null;
+  PARTNER_PROFILE = null;
   ENTRIES = {
     Mo: [
       { entry_date: "2026-08-31", gym: true, proof_path: "p", workout_at: "2026-08-31T07:10:00" },
@@ -3227,6 +3280,10 @@ const STATES = [
     note: "Days beat weeks when both exist; this is what weeks look like.",
     setup: () => { DAY_STREAK = 0; WEEK_STREAK = 3; } },
 
+  { group: "Home", name: "Partner keeps workouts private",
+    note: "The effort line still says who trained harder this week. Her live card and yesterday's timeline row lose the specifics; the number stays.",
+    setup: () => { LIVE_PARTNER = liveRow(); PARTNER_PROFILE = { share_workout_details: false }; } },
+
   { group: "Watching them train", name: "Working, mid set",
     note: "Set dots fill as they log. Up next comes from their plan.",
     sheet: true, setup: () => { LIVE_PARTNER = liveRow(); } },
@@ -3255,6 +3312,10 @@ const STATES = [
   { group: "Watching them train", name: "An exercise the classifier does not know",
     note: "No figure rather than a body with nothing lit.",
     setup: () => { LIVE_PARTNER = liveRow({ exercise_name: "Turkish Get-Up" }); }, sheet: true },
+
+  { group: "Watching them train", name: "This one keeps it private",
+    note: "Name, sets and the muscle figure are gone. Live status, elapsed time and today's effort score stay, so how hard never needs to reveal at what.",
+    setup: () => { LIVE_PARTNER = liveRow(); PARTNER_PROFILE = { share_workout_details: false }; }, sheet: true },
 
   { group: "Getting a clip mid-workout", name: "A clip is waiting",
     note: "Sits above the session screen. Only ever exists during a workout.",

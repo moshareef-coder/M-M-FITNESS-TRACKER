@@ -194,6 +194,14 @@ let ME = "Mo", MY_EMAIL = "mo@x", PARTNER_EMAIL = "mell@x";
 let MY_DAYS = 4, MY_TARGET = 5, THEIR_DAYS = 4, THEIR_TARGET = 5;
 let DAY_STREAK = 4, WEEK_STREAK = 0, TRAINED_TODAY = false, PLANNED_TOMORROW = null;
 let ENTRIES = {}, ALL_PLANS = [], ALL_EXERCISE_LOGS = [], ALL_REACTIONS = [], LIVE_PARTNER = null;
+let PARTNER_PROFILE = null;
+
+/* Effort points stand in for real data here: what matters for the gallery is
+   the shape (a number, a lead) not the exact math, which lives in index.html. */
+const MY_WEEK_XP = 85, THEIR_WEEK_XP = 60, TODAY_XP = 45, ENTRY_XP = 60;
+const weekEffortXP = (name) => (name === ME ? MY_WEEK_XP : THEIR_WEEK_XP);
+const todaysEffortXP = () => TODAY_XP;
+const effortXPBetween = () => ENTRY_XP;
 
 const partnerName = () => "Mell";
 const currentWeekDates = () => WEEK;
@@ -265,6 +273,7 @@ function resetFixtures() {
   MY_DAYS = 4; MY_TARGET = 5; THEIR_DAYS = 4; THEIR_TARGET = 5;
   DAY_STREAK = 4; WEEK_STREAK = 0; TRAINED_TODAY = false; PLANNED_TOMORROW = null;
   LIVE_PARTNER = null;
+  PARTNER_PROFILE = null;
   ENTRIES = {
     Mo: [
       { entry_date: "2026-08-31", gym: true, proof_path: "p", workout_at: "2026-08-31T07:10:00" },
@@ -360,6 +369,10 @@ const STATES = [
     note: "Days beat weeks when both exist; this is what weeks look like.",
     setup: () => { DAY_STREAK = 0; WEEK_STREAK = 3; } },
 
+  { group: "Home", name: "Partner keeps workouts private",
+    note: "The effort line still says who trained harder this week. Her live card and yesterday's timeline row lose the specifics; the number stays.",
+    setup: () => { LIVE_PARTNER = liveRow(); PARTNER_PROFILE = { share_workout_details: false }; } },
+
   { group: "Watching them train", name: "Working, mid set",
     note: "Set dots fill as they log. Up next comes from their plan.",
     sheet: true, setup: () => { LIVE_PARTNER = liveRow(); } },
@@ -388,6 +401,10 @@ const STATES = [
   { group: "Watching them train", name: "An exercise the classifier does not know",
     note: "No figure rather than a body with nothing lit.",
     setup: () => { LIVE_PARTNER = liveRow({ exercise_name: "Turkish Get-Up" }); }, sheet: true },
+
+  { group: "Watching them train", name: "This one keeps it private",
+    note: "Name, sets and the muscle figure are gone. Live status, elapsed time and today's effort score stay, so how hard never needs to reveal at what.",
+    setup: () => { LIVE_PARTNER = liveRow(); PARTNER_PROFILE = { share_workout_details: false }; }, sheet: true },
 
   { group: "Getting a clip mid-workout", name: "A clip is waiting",
     note: "Sits above the session screen. Only ever exists during a workout.",
