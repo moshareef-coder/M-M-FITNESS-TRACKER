@@ -687,35 +687,63 @@
   @keyframes genUp { from { transform: translateY(100%); } to { transform: none; } }
   .gen-scrim.leaving { animation: genDown .3s ease-in forwards; }
   @keyframes genDown { to { transform: translateY(100%); } }
-  .gen-fill {
-    position: absolute; left: 0; right: 0; bottom: 0; height: 0;
-    background: linear-gradient(to top, var(--accent), color-mix(in srgb, var(--accent) 88%, transparent));
-    transition: height .9s cubic-bezier(.33,.7,.4,1);
+  /* The chamber. A faint grid across the whole screen that drifts upward, so
+     the figure reads as standing in something rather than floating on black. */
+  .gen-grid {
+    position: absolute; inset: -40px 0;
+    background-image:
+      linear-gradient(to right, color-mix(in srgb, var(--accent) 24%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--accent) 24%, transparent) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: radial-gradient(ellipse 78% 62% at 50% 52%, #000 35%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 78% 62% at 50% 52%, #000 35%, transparent 100%);
+    animation: genGrid 5.5s linear infinite;
   }
-  /* The crest sits above the body of the water, so troughs show the ground
-     through and peaks push past the line. Each is twice as wide as the screen
-     and slides exactly half its width, which is why the loop never seams. */
-  .gen-wave {
-    position: absolute; left: 0; bottom: 100%; width: 200%; height: 34px;
-    display: block; will-change: transform;
+  @keyframes genGrid { to { transform: translateY(-28px); } }
+
+  /* The figure keeps the artboard's proportions (178:490) so it is never
+     stretched, and --rev is the height the build has reached. */
+  .gen-holo {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    height: min(76vh, 560px); aspect-ratio: 178 / 490; --rev: 0%;
   }
-  .gen-wave path { fill: var(--accent); }
-  .gen-wave.back { opacity: .45; animation: genWave 5.4s linear infinite; }
-  .gen-wave.front { animation: genWave 3.1s linear infinite reverse; }
-  @keyframes genWave { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-  /* A slow rise and fall on the whole body of water, so the surface breathes
-     rather than sitting at a dead level between steps. */
-  .gen-fill { animation: genSwell 4.6s ease-in-out infinite; }
-  @keyframes genSwell { 0%, 100% { margin-bottom: 0; } 50% { margin-bottom: 5px; } }
-  .gen-stage { position: relative; width: 100%; max-width: 420px; text-align: center; }
+  .gen-body-mask {
+    position: absolute; inset: 0;
+    /* Solid below the line, a faint ghost above it: you can see where the rest
+       of the body is going to be before it is there. */
+    mask-image: linear-gradient(to top, #000 0 var(--rev), rgba(0,0,0,.14) var(--rev));
+    -webkit-mask-image: linear-gradient(to top, #000 0 var(--rev), rgba(0,0,0,.14) var(--rev));
+    transition: mask-image .5s linear, -webkit-mask-image .5s linear;
+  }
+  #genBodyCanvas { width: 100%; height: 100%; display: block; }
+  /* The build line, with its own glow and a soft wash just under it. */
+  .gen-scan {
+    position: absolute; left: -14%; right: -14%; bottom: var(--rev); height: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 18px 3px color-mix(in srgb, var(--accent) 65%, transparent);
+    transition: bottom .5s linear;
+  }
+  .gen-scan::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 46px;
+    background: linear-gradient(to top, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
+  }
+  /* Something for it to stand on. */
+  .gen-floor {
+    position: absolute; left: -30%; right: -30%; bottom: -6px; height: 1px;
+    background: color-mix(in srgb, var(--accent) 50%, transparent);
+    box-shadow: 0 0 22px 5px color-mix(in srgb, var(--accent) 28%, transparent);
+  }
+
+  .gen-stage {
+    position: relative; width: 100%; max-width: 420px; text-align: center;
+    display: flex; flex-direction: column; justify-content: space-between; height: 100%;
+  }
+  .gen-scrim.done .gen-stage { justify-content: center; }
+  .gen-head { padding-top: 6px; }
   .gen-word-wrap { position: relative; display: inline-block; }
   .gen-word {
     font-size: clamp(30px, 10vw, 42px); font-weight: 800; letter-spacing: -.03em; line-height: 1.05;
     font-family: var(--font-display, inherit);
-  }
-  .gen-word.over {
-    position: absolute; inset: 0; color: #0c0f14;
-    clip-path: inset(var(--cut, 100%) 0 0 0); transition: clip-path .55s cubic-bezier(.22,1,.36,1);
   }
   .gen-step { margin-top: 10px; font-size: 14px; color: rgba(255,255,255,.62); min-height: 20px; transition: opacity .25s; }
   .gen-scrim .gen-pct {
@@ -728,33 +756,37 @@
   .gen-rows { display: flex; flex-direction: column; gap: 8px; text-align: left; }
   .gen-row {
     display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px;
-    background: #ffffff; border: none; box-shadow: 0 6px 18px rgba(0,0,0,.12);
+    background: rgba(255,255,255,.06); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
     animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
   }
   @keyframes genRow { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
   .gen-row-n {
     flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    font-size: 12px; font-weight: 800; background: #eef1f5; color: #686d7c;
+    font-size: 12px; font-weight: 800; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent);
   }
   .gen-row-b { min-width: 0; display: flex; flex-direction: column; }
-  .gen-row-name { font-size: 15px; font-weight: 700; color: #111318; }
-  .gen-row-t { font-size: 12.5px; color: #686d7c; }
+  .gen-row-name { font-size: 15px; font-weight: 700; color: #f4f6f8; }
+  .gen-row-t { font-size: 12.5px; color: rgba(255,255,255,.55); }
   .gen-go {
     margin-top: 18px; animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
   }
   /* Standing on the accent: the primary button would be green on green, and
      muted grey type disappears, so the whole stage inverts. */
-  .gen-scrim.done .gen-done-head { color: rgba(12,15,20,.62); }
-  .gen-scrim.done .gen-focus { color: #0c0f14; }
+  /* The reveal is the plan, not the chamber, so the figure and grid fade back
+     and the rows sit on the dark ground rather than on top of a body. */
+  .gen-scrim.done .gen-holo { opacity: .12; transition: opacity .5s ease; }
+  .gen-scrim.done .gen-grid { opacity: .35; transition: opacity .5s ease; }
+  .gen-scrim.done .gen-done-head { color: rgba(255,255,255,.6); }
+  .gen-scrim.done .gen-focus { color: #f4f6f8; }
   .gen-scrim.done .gen-go {
-    background: #0c0f14; color: #ffffff; border: none;
-    box-shadow: 0 10px 26px rgba(0,0,0,.22);
+    background: var(--accent); color: var(--accent-ink); border: none;
+    box-shadow: 0 10px 26px rgba(0,0,0,.35);
   }
   .gen-err { font-size: 14px; color: rgba(255,255,255,.66); line-height: 1.5; margin: 12px 0 18px; }
   .gen-scrim:not(.done) .gen-focus { color: #f4f6f8; }
   @media (prefers-reduced-motion: reduce) {
-    .gen-scrim, .gen-scrim.leaving, .gen-row, .gen-go, .gen-fill, .gen-wave { animation: none; }
-    .gen-fill, .gen-word.over { transition: none; }
+    .gen-scrim, .gen-scrim.leaving, .gen-row, .gen-go, .gen-grid { animation: none; }
+    .gen-body-mask, .gen-scan { transition: none; }
     /* The word cycle is stopped in JS too: fast swapping text is exactly what
        this preference is asking us not to do. */
   }
@@ -2656,15 +2688,17 @@
        spinner on a card, the whole screen comes up from the floor and fills
        with green while it thinks, then hands back the plan a row at a time. -->
   <div class="gen-scrim hidden" id="genScrim" role="status" aria-live="polite">
-    <div class="gen-fill" id="genFill">
-      <!-- Two crests at different speeds and directions. One wave reads as a
-           shape sliding past; two reads as water. -->
-      <svg class="gen-wave back" viewBox="0 0 1200 80" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M0 44 C 100 14, 200 74, 300 44 S 500 14, 600 44 S 800 74, 900 44 S 1100 14, 1200 44 L1200 80 L0 80 Z" />
-      </svg>
-      <svg class="gen-wave front" viewBox="0 0 1200 80" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M0 46 C 150 76, 250 16, 400 46 S 650 76, 800 46 S 1050 16, 1200 46 L1200 80 L0 80 Z" />
-      </svg>
+    <!-- A scanning chamber: a grid that drifts, the anatomical figure from the
+         Body tab materialising from the feet up as the plan comes together,
+         and a bright line at the height it has reached. The figure is the same
+         Rive artboard the rest of the app uses, tinted for the hologram. -->
+    <div class="gen-grid" aria-hidden="true"></div>
+    <div class="gen-holo" id="genHolo" aria-hidden="true">
+      <div class="gen-body-mask" id="genBodyMask">
+        <canvas id="genBodyCanvas"></canvas>
+      </div>
+      <div class="gen-scan" id="genScan"></div>
+      <div class="gen-floor"></div>
     </div>
     <div class="gen-stage" id="genStage"></div>
   </div>
@@ -2749,7 +2783,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.14";
+const APP_VERSION = "2026.09.04.15";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -6561,15 +6595,17 @@ function openGenOverlay(title) {
   genPct = 0;
   genStepAt = 0;
   $("genStage").innerHTML = `
-    <div class="gen-word-wrap">
-      <div class="gen-word base">${escapeHtml(title)}</div>
-      <div class="gen-word over" id="genWordOver" style="--cut:100%" aria-hidden="true">${escapeHtml(title)}</div>
+    <div class="gen-head">
+      <div class="gen-word-wrap">
+        <div class="gen-word base">${escapeHtml(title)}</div>
+      </div>
+      <div class="gen-step" id="genStep">${escapeHtml(GEN_STEPS[0])}</div>
     </div>
-    <div class="gen-step" id="genStep">${escapeHtml(GEN_STEPS[0])}</div>
     <div class="gen-pct" id="genPct">0%</div>`;
-  $("genFill").style.height = "0%";
   scrim.classList.remove("hidden", "leaving");
+  paintGen(0);
   startGenWordCycle(title);
+  mountGenBody();
 
   /* Eases in, slows as it approaches 90, and never crosses it on its own. */
   genTimer = setInterval(() => {
@@ -6582,6 +6618,38 @@ function openGenOverlay(title) {
       if (el) { el.style.opacity = "0"; setTimeout(() => { el.textContent = GEN_STEPS[step]; el.style.opacity = "1"; }, 200); }
     }
   }, 180);
+}
+
+let genBodyCtrl = null;
+
+/* The same artboard the Body tab and the session card use, tinted flat so it
+   reads as a hologram rather than a heat map. It is lazy: the runtime and the
+   .riv are a real download, so a failure here must cost nothing. The grid and
+   the scan line carry the screen on their own if the figure never arrives. */
+async function mountGenBody() {
+  try {
+    const mod = await ensureRiveBodyModule();
+    const canvas = $("genBodyCanvas");
+    if (!canvas || !$("genScrim") || $("genScrim").classList.contains("hidden")) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.round(canvas.clientWidth * dpr);
+    canvas.height = Math.round(canvas.clientHeight * dpr);
+    const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
+    const holo = { r: 59, g: 231, b: 107 };
+    genBodyCtrl = mod.createBodyHeatmap({
+      canvas,
+      artboardName: `${sex}-Front`,
+      palette: { base: holo, level1: holo, level2: holo, level3: holo, level4: holo },
+      intensities: {},
+    });
+  } catch (e) {
+    console.warn("hologram figure unavailable", e);
+  }
+}
+
+function unmountGenBody() {
+  try { genBodyCtrl?.destroy(); } catch {}
+  genBodyCtrl = null;
 }
 
 function setGenWord(word) {
@@ -6612,17 +6680,9 @@ function stopGenWordCycle() {
 
 function paintGen(pct) {
   const p = Math.max(0, Math.min(100, pct));
-  $("genFill").style.height = `${p}%`;
-  /* The overlaid copy is clipped at the waterline, and the waterline is a
-     fraction of the SCREEN, not of the word. Measuring the word each time is
-     what makes the letters turn over exactly as the green passes them. */
-  const over = $("genWordOver");
-  if (over) {
-    const r = over.getBoundingClientRect();
-    const waterY = window.innerHeight * (1 - p / 100);
-    const cut = r.height ? ((waterY - r.top) / r.height) * 100 : 100;
-    over.style.setProperty("--cut", `${Math.max(0, Math.min(100, cut))}%`);
-  }
+  /* One number drives everything: how much of the body has been built, and
+     where the scan line sits. Both read --rev off the same element. */
+  $("genHolo")?.style.setProperty("--rev", `${p}%`);
   const label = $("genPct");
   if (label) label.textContent = `${Math.round(p)}%`;
 }
@@ -6634,6 +6694,7 @@ function stopGenTicker() {
 
 function closeGenOverlay() {
   stopGenTicker();
+  unmountGenBody();
   const scrim = $("genScrim");
   if (!scrim || scrim.classList.contains("hidden")) return;
   scrim.classList.add("leaving");

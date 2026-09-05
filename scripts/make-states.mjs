@@ -44,7 +44,7 @@ const FUNCS = [
   "formatRest", "renderSession", "openEffortInfo",
   "openWorkoutPrivacy", "workoutPrivacy", "defaultWorkoutPrivacy", "privacySummary", "workoutPrivacyLocked",
   "liveDetailsShared", "openGenOverlay", "paintGen", "stopGenTicker", "revealGeneratedPlan",
-  "setGenWord", "startGenWordCycle", "stopGenWordCycle",
+  "setGenWord", "startGenWordCycle", "stopGenWordCycle", "mountGenBody", "unmountGenBody",
 ].map(fn).join("\n");
 
 /* The working-muscles block is more than a function: caches, colour helpers
@@ -281,7 +281,7 @@ const HITS = ${JSON.stringify(HITS)};
 ${PRIVACY_ROWS}
 ${GEN_STEPS}
 ${GEN_WORDS}
-let genTimer = null, genPct = 0, genStepAt = 0, genWordTimer = null, genWordAt = 0;
+let genTimer = null, genPct = 0, genStepAt = 0, genWordTimer = null, genWordAt = 0, genBodyCtrl = null;
 ${FUNCS}
 ${WORKING_MUSCLES}
 
@@ -432,11 +432,11 @@ const STATES = [
     setup: () => { LIVE_PARTNER = liveRow(); PARTNER_PROFILE = { share_workout_details: false }; }, sheet: true },
 
   { group: "Generating a workout", name: "Working on it",
-    note: "Comes up from the bottom when you press generate. The surface is two waves at different speeds, the word changes every half second, and the letters turn over as the water passes them.",
+    note: "Comes up from the bottom when you press generate. The body builds from the feet up as it works, with a scan line at the height it has reached. The figure itself is live WebGL, so this still frame shows the chamber without it.",
     gen: () => { openGenOverlay("Generating"); paintGen(62); }, setup: () => {} },
 
   { group: "Generating a workout", name: "The plan lands",
-    note: "Each exercise fades up in turn, about 70ms apart, so five are in within half a second.",
+    note: "Each exercise fades up in turn, about 70ms apart, so five are in within half a second. The figure fades back behind them rather than leaving.",
     gen: () => {
       openGenOverlay("Generating");
       paintGen(100);
