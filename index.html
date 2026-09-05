@@ -2790,7 +2790,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.21";
+const APP_VERSION = "2026.09.04.22";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -3509,7 +3509,15 @@ function showApp() {
     if (f) uploadBodyPhoto(f);
   });
   document.querySelectorAll("#biPeriod button").forEach((b) => {
-    b.addEventListener("click", () => { BODY_PERIOD = b.dataset.period; renderBodyTab(true); });
+    /* Changing the window changes the answer, so it has to change the view
+       back too. Left zoomed, the redraw repainted the whole heat map behind a
+       muscle that was still isolated and still pulsing, which is neither one
+       state nor the other. */
+    b.addEventListener("click", () => {
+      BODY_PERIOD = b.dataset.period;
+      bodyResetFocus();
+      renderBodyTab(true);
+    });
   });
   $("biInfoBtn").addEventListener("click", () => toast(BODY_FOCUS
     ? "Each piece is one muscle the figure can draw. Credit comes from the exercises you logged: a squat loads every quad, a leg extension does not touch the adductors."
@@ -9269,6 +9277,12 @@ function bodyRampFigures(target, animate) {
     riveFrontCtrl?.setIntensities(map);
     riveBackCtrl?.setIntensities(map);
   };
+  /* A refresh while a muscle is being examined must not repaint the whole map
+     behind it. The period buttons drop the zoom before they redraw, but a
+     background data refresh does not, and that left the figure showing every
+     muscle lit with one of them still pulsing on top. Hold the isolation; the
+     new numbers appear when the zoom is dropped. */
+  if (BODY_FOCUS) { bodyIsolateMuscle(BODY_FOCUS.muscle); return; }
   if (!animate) { apply(target); return; }
 
   const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
