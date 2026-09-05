@@ -3284,7 +3284,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.41";
+const APP_VERSION = "2026.09.04.42";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -11856,7 +11856,14 @@ async function saveSetup() {
 
 /* An installed PWA can sit on old JS for days, which is how a fixed bug appears
    to come back. Check for a new version whenever the app is opened or focused,
-   and reload once when one takes over. */
+   and reload once when one takes over.
+
+   The worker alone is not enough. Since the shell is served from cache first,
+   a phone that resumes the app rather than launching it can keep drawing the
+   old build while the new worker waits its turn, and the person sees a fix
+   they were told had shipped simply not be there. So the page also asks the
+   deployed sw.js what version is live, and if it disagrees with the one
+   running, it has the worker drop the cached shell and reloads once. */
 if ("serviceWorker" in navigator) {
   let reloading = false;
 
@@ -11866,6 +11873,36 @@ if ("serviceWorker" in navigator) {
     location.reload();
   });
 
+  const RELOAD_KEY = "ft-reloaded-for";
+  let lastVersionCheck = 0;
+  const ensureLatestBuild = async () => {
+    if (reloading || Date.now() - lastVersionCheck < 45000) return;
+    lastVersionCheck = Date.now();
+    let live = "";
+    try {
+      const text = await (await fetch("/sw.js", { cache: "no-store" })).text();
+      live = (text.match(/fit-together-([0-9.]+)/) || [])[1] || "";
+    } catch { return; }            // offline is not a reason to do anything
+    if (!live || live === APP_VERSION) return;
+    /* One reload per version, so a mismatch we cannot fix can never loop. */
+    let already = "";
+    try { already = sessionStorage.getItem(RELOAD_KEY) || ""; } catch {}
+    if (already === live) { console.warn("still on", APP_VERSION, "with", live, "deployed"); return; }
+    try { sessionStorage.setItem(RELOAD_KEY, live); } catch {}
+    toast("Updating…");
+    const sw = navigator.serviceWorker.controller;
+    if (sw) {
+      await new Promise((done) => {
+        const ch = new MessageChannel();
+        ch.port1.onmessage = done;
+        sw.postMessage({ type: "flush-shell" }, [ch.port2]);
+        setTimeout(done, 1200);    // never hang on a worker that does not answer
+      });
+    }
+    reloading = true;
+    location.reload();
+  };
+
   const checkForUpdate = async () => {
     try {
       const reg = await navigator.serviceWorker.getRegistration();
@@ -11873,6 +11910,7 @@ if ("serviceWorker" in navigator) {
     } catch (err) {
       console.warn("update check failed", err);
     }
+    ensureLatestBuild();
   };
 
   window.addEventListener("load", () => {

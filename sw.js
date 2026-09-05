@@ -11,7 +11,7 @@
    A deploy is still never masked: it ships a new sw.js with a new cache name,
    which drops this cache on activate, and the page reloads itself when the new
    worker takes over. */
-const CACHE = "fit-together-2026.09.04.41";
+const CACHE = "fit-together-2026.09.04.42";
 /* Version named or content named files live outside the versioned cache, so a
    deploy does not throw away the 2 MB Rive wasm and the .riv and make the next
    launch download them all over again. */
@@ -85,6 +85,16 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(fetch(req).catch(() => caches.match(req)));
+});
+
+/* The page found a newer version deployed than the one it is running. Drop
+   the cached shell and code so the reload it is about to do lands on the new
+   build rather than on this cache again. */
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "flush-shell") return;
+  event.waitUntil(caches.delete(CACHE).then(() => {
+    event.ports?.[0]?.postMessage({ ok: true });
+  }));
 });
 
 /* Push groundwork. Wired now so the native/push step later only needs
