@@ -142,11 +142,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    await fetch(`${SUPABASE_URL}/rest/v1/ai_usage_log`, {
+    /* The usage row used to be written here, before the model was even
+       called. That meant every failure still cost a slot: a bad response, a
+       Claude outage, or a client that could not save what came back all
+       burned quota and produced nothing. One real case of that emptied an
+       account's whole daily allowance in half an hour. It is written at the
+       end now, once there is a workout to hand back. */
+    const logUsage = () => fetch(`${SUPABASE_URL}/rest/v1/ai_usage_log`, {
       method: "POST",
       headers: svcHeaders,
       body: JSON.stringify({ email: callerEmail }),
-    });
+    }).catch((e) => console.error("could not log usage", e));
 
     const body = await req.json();
     const {
@@ -224,6 +230,7 @@ Generate today's workout JSON now.`;
       });
     }
 
+    await logUsage();
     return new Response(JSON.stringify({ workout }), {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     });
