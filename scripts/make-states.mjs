@@ -31,6 +31,7 @@ const HOME = src.match(/<!-- HOME TAB -->([\s\S]*?)<div id="tab-workout"/)[1];
 const LIVE_SHEET = grab(/ {2}<div class="sheet-scrim hidden" id="liveScrim">[\s\S]*?<\/div>\n {2}<\/div>\n/, "the live sheet");
 const CLIP_PILL = grab(/ {2}<button type="button" class="clip-pill hidden" id="clipPill"><\/button>\n/, "the clip pill");
 const POP = grab(/ {2}<div class="pop-scrim hidden" id="popScrim">[\s\S]*?<\/div>\n {2}<\/div>\n/, "the popup shell");
+const GEN = grab(/ {2}<div class="gen-scrim hidden" id="genScrim"[\s\S]*?<div class="gen-stage" id="genStage"><\/div>\n {2}<\/div>\n/, "the generating screen");
 const SESSION_CARD = grab(/ {4}<div id="sessionCard" class="session-overlay hidden">[\s\S]*?<div id="sessionBody"><\/div>\n {4}<\/div>\n/, "the session card");
 
 const FUNCS = [
@@ -42,7 +43,7 @@ const FUNCS = [
   "clipRecorderHTML", "clipViewerHTML", "clipGoneHTML",
   "formatRest", "renderSession", "openEffortInfo",
   "openWorkoutPrivacy", "workoutPrivacy", "defaultWorkoutPrivacy", "privacySummary", "workoutPrivacyLocked",
-  "liveDetailsShared",
+  "liveDetailsShared", "openGenOverlay", "paintGen", "stopGenTicker", "revealGeneratedPlan",
 ].map(fn).join("\n");
 
 /* The working-muscles block is more than a function: caches, colour helpers
@@ -51,6 +52,7 @@ const WORKING_MUSCLES = section("/* ---------- Working muscles ----------", "/* 
 
 /* The three switches are data, and a hand-copied copy of them would drift. */
 const PRIVACY_ROWS = grab(/\nconst PRIVACY_ROWS = \[.*?\n\];\n/s, "PRIVACY_ROWS");
+const GEN_STEPS = grab(/\nconst GEN_STEPS = \[.*?\n\];\n/s, "GEN_STEPS");
 
 /* Data the extracted functions close over. Lifted whole rather than retyped,
    because a hand-copied muscle table would drift from the app's within a week. */
@@ -134,6 +136,8 @@ const GALLERY_CSS = `
   .gal-pillbox .clip-pill { position: absolute; top: 26px; animation: none; }
   /* The session screen covers the viewport in the app; here it is a card. */
   .gal-phone .session-overlay { position: static; animation: none; padding: 14px 18px 24px; }
+  /* Same for the generating screen, which is fixed and full bleed in the app. */
+  .gal-phone .gen-scrim { position: relative; height: 560px; animation: none; }
 `;
 
 const BODY = `<title>Fit Together Screen States</title>
@@ -167,6 +171,7 @@ ${LIVE_SHEET}
 ${CLIP_PILL}
 ${SESSION_CARD}
 ${POP}
+${GEN}
 </div>
 
 <script>
@@ -272,6 +277,8 @@ let BODY_DETAIL = { detail: { hitsForExercise: (name) => HITS[String(name).toLow
 const HITS = ${JSON.stringify(HITS)};
 
 ${PRIVACY_ROWS}
+${GEN_STEPS}
+let genTimer = null, genPct = 0, genStepAt = 0;
 ${FUNCS}
 ${WORKING_MUSCLES}
 
@@ -421,6 +428,29 @@ const STATES = [
     note: "Name, sets and the muscle figure are gone. Live status, elapsed time and today's effort score stay, so how hard never needs to reveal at what.",
     setup: () => { LIVE_PARTNER = liveRow(); PARTNER_PROFILE = { share_workout_details: false }; }, sheet: true },
 
+  { group: "Generating a workout", name: "Working on it",
+    note: "Comes up from the bottom of the screen when you press generate. Green fills as it goes and the word turns over as it passes.",
+    gen: () => { openGenOverlay("Generating"); paintGen(62); }, setup: () => {} },
+
+  { group: "Generating a workout", name: "The plan lands",
+    note: "Each exercise fades up in turn, about 70ms apart, so five are in within half a second.",
+    gen: () => {
+      openGenOverlay("Generating");
+      paintGen(100);
+      $("genScrim").classList.add("done");
+      const plan = [["Bench Press", 4, 8], ["Overhead Press", 3, 10], ["Incline Dumbbell Press", 3, 10],
+        ["Triceps Pushdown", 3, 12], ["Lateral Raise", 3, 15]];
+      const rows = plan.map((ex, i) =>
+        '<div class="gen-row" style="--d:' + (i * 70) + 'ms"><span class="gen-row-n">' + (i + 1) + '</span>' +
+        '<span class="gen-row-b"><span class="gen-row-name">' + ex[0] + '</span>' +
+        '<span class="gen-row-t">' + ex[1] + ' sets \u00b7 ' + ex[2] + ' reps</span></span></div>').join("");
+      $("genStage").innerHTML =
+        '<div class="gen-done-head">Your workout</div>' +
+        '<div class="gen-focus">Push Day</div>' +
+        '<div class="gen-rows">' + rows + '</div>' +
+        '<button type="button" class="btn-primary gen-go">Let\u2019s go</button>';
+    }, setup: () => {} },
+
   { group: "Getting a clip mid-workout", name: "A clip is waiting",
     note: "Sits above the session screen. Only ever exists during a workout.",
     pill: true,
@@ -517,6 +547,15 @@ async function renderSheetState() {
   return deId($("liveSheet").outerHTML);
 }
 
+async function renderGenState(st) {
+  const scrim = $("genScrim");
+  scrim.classList.remove("hidden");
+  st.gen();
+  stopGenTicker();           // a still frame, so no ticker is left running
+  await settle();
+  return deId(scrim.outerHTML);
+}
+
 async function renderPopState(st) {
   st.pop();
   await settle();
@@ -562,6 +601,7 @@ const setTheme = (t) => {
       html = st.raw ? await renderRawState(st)
            : st.pill ? await renderPillState()
            : st.sheet ? await renderSheetState()
+           : st.gen ? await renderGenState(st)
            : st.pop ? await renderPopState(st)
            : st.session ? await renderSessionState()
            : await renderHomeState();
@@ -580,13 +620,13 @@ const setTheme = (t) => {
   }
 
   $("galBody").innerHTML = [...groups.entries()].map(([g, frames]) =>
-    '<section class="gal-group" id="g-' + g.replace(/\W+/g, "-").toLowerCase() + '"><h2>' + escapeHtml(g) +
+    '<section class="gal-group" id="g-' + g.replace(/\\W+/g, "-").toLowerCase() + '"><h2>' + escapeHtml(g) +
       '</h2><div class="gal-grid">' + frames.join("") + "</div></section>"
   ).join("");
   stage.remove();
 
   $("galToc").innerHTML = [...groups.keys()].map((g) =>
-    '<a href="#g-' + g.replace(/\W+/g, "-").toLowerCase() + '">' + escapeHtml(g) + "</a>").join("");
+    '<a href="#g-' + g.replace(/\\W+/g, "-").toLowerCase() + '">' + escapeHtml(g) + "</a>").join("");
 
   $("galLight").onclick = () => setTheme("light");
   $("galDark").onclick = () => setTheme("dark");

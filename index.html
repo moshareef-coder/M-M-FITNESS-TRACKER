@@ -668,6 +668,84 @@
 
   /* Clips: recording one, and watching one. Both are full-screen and black,
      because a few seconds of someone shouting at you deserves the screen. */
+  /* ---- Generating ----
+     Rises from the bottom, fills with green as it works, then the plan lands
+     a row at a time. The word is drawn twice, once on the ground colour and
+     once in the on-accent colour clipped to the fill line, so the letters
+     turn over as the green passes them. */
+  /* Deliberately theme-independent, like the clip viewer: a near-black ground
+     is what makes the green read as light filling a room, and it is the only
+     way the word visibly turns over, since on a white ground both the text and
+     the on-accent colour are near-black and nothing appears to happen. */
+  .gen-scrim {
+    position: fixed; inset: 0; z-index: 95; overflow: hidden;
+    background: #0c0f14; color: #f4f6f8;
+    display: flex; align-items: center; justify-content: center;
+    padding: calc(24px + env(safe-area-inset-top, 0px)) 22px calc(24px + env(safe-area-inset-bottom, 0px));
+    animation: genUp .46s cubic-bezier(.22,1,.36,1);
+  }
+  @keyframes genUp { from { transform: translateY(100%); } to { transform: none; } }
+  .gen-scrim.leaving { animation: genDown .3s ease-in forwards; }
+  @keyframes genDown { to { transform: translateY(100%); } }
+  .gen-fill {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 0;
+    background: linear-gradient(to top, var(--accent), color-mix(in srgb, var(--accent) 82%, transparent));
+    transition: height .55s cubic-bezier(.22,1,.36,1);
+  }
+  .gen-fill::after {
+    content: ""; position: absolute; left: 0; right: 0; top: -12px; height: 12px;
+    background: linear-gradient(to top, color-mix(in srgb, var(--accent) 55%, transparent), transparent);
+  }
+  .gen-stage { position: relative; width: 100%; max-width: 420px; text-align: center; }
+  .gen-word-wrap { position: relative; display: inline-block; }
+  .gen-word {
+    font-size: clamp(30px, 10vw, 42px); font-weight: 800; letter-spacing: -.03em; line-height: 1.05;
+    font-family: var(--font-display, inherit);
+  }
+  .gen-word.over {
+    position: absolute; inset: 0; color: #0c0f14;
+    clip-path: inset(var(--cut, 100%) 0 0 0); transition: clip-path .55s cubic-bezier(.22,1,.36,1);
+  }
+  .gen-step { margin-top: 10px; font-size: 14px; color: rgba(255,255,255,.62); min-height: 20px; transition: opacity .25s; }
+  .gen-scrim .gen-pct {
+    margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .14em;
+    color: rgba(255,255,255,.45); font-variant-numeric: tabular-nums;
+  }
+  /* The reveal: the plan arrives one row at a time. */
+  .gen-done-head { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .gen-focus { font-size: 26px; font-weight: 800; letter-spacing: -.03em; margin: 4px 0 16px; }
+  .gen-rows { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+  .gen-row {
+    display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px;
+    background: #ffffff; border: none; box-shadow: 0 6px 18px rgba(0,0,0,.12);
+    animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
+  }
+  @keyframes genRow { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+  .gen-row-n {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; background: #eef1f5; color: #686d7c;
+  }
+  .gen-row-b { min-width: 0; display: flex; flex-direction: column; }
+  .gen-row-name { font-size: 15px; font-weight: 700; color: #111318; }
+  .gen-row-t { font-size: 12.5px; color: #686d7c; }
+  .gen-go {
+    margin-top: 18px; animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
+  }
+  /* Standing on the accent: the primary button would be green on green, and
+     muted grey type disappears, so the whole stage inverts. */
+  .gen-scrim.done .gen-done-head { color: rgba(12,15,20,.62); }
+  .gen-scrim.done .gen-focus { color: #0c0f14; }
+  .gen-scrim.done .gen-go {
+    background: #0c0f14; color: #ffffff; border: none;
+    box-shadow: 0 10px 26px rgba(0,0,0,.22);
+  }
+  .gen-err { font-size: 14px; color: rgba(255,255,255,.66); line-height: 1.5; margin: 12px 0 18px; }
+  .gen-scrim:not(.done) .gen-focus { color: #f4f6f8; }
+  @media (prefers-reduced-motion: reduce) {
+    .gen-scrim, .gen-scrim.leaving, .gen-row, .gen-go { animation: none; }
+    .gen-fill, .gen-word.over { transition: none; }
+  }
+
   .clip-scrim {
     position: fixed; inset: 0; z-index: 90; background: #000;
     display: flex; align-items: center; justify-content: center;
@@ -2559,6 +2637,14 @@
     <div class="pop" id="popCard"></div>
   </div>
 
+  <!-- Generation takes a few seconds of real network time. Rather than a
+       spinner on a card, the whole screen comes up from the floor and fills
+       with green while it thinks, then hands back the plan a row at a time. -->
+  <div class="gen-scrim hidden" id="genScrim" role="status" aria-live="polite">
+    <div class="gen-fill" id="genFill"></div>
+    <div class="gen-stage" id="genStage"></div>
+  </div>
+
   <div class="clip-scrim hidden" id="clipRecScrim">
     <div class="clip-stage" id="clipRecStage"></div>
   </div>
@@ -2639,7 +2725,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.12";
+const APP_VERSION = "2026.09.04.13";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -3407,6 +3493,8 @@ function closeAllOverlays() {
   document.body.classList.remove("session-open");
   ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
+  stopGenTicker();
+  $("genScrim")?.classList.add("hidden");
   const sess = $("sessionCard");
   if (sess && !sess.classList.contains("hidden")) {
     // Bank the time rather than losing it, then stand the session down.
@@ -6419,16 +6507,120 @@ async function loadTodayWorkout() {
 }
 
 /* Generates for today by default, or any date, so tomorrow can be planned ahead. */
+/* ---------- The generating screen ----------
+   The wait is real (an edge function call), so it gets a real screen rather
+   than a spinner on a card. Progress is honest about what it does not know:
+   it eases toward 90 while waiting and only reaches 100 when the plan is
+   actually in hand, so it never claims to be finished before it is. */
+
+const GEN_STEPS = [
+  "Reading your last few weeks",
+  "Picking lifts that fit",
+  "Balancing what you hit recently",
+  "Setting your weights",
+  "Almost there",
+];
+let genTimer = null, genPct = 0, genStepAt = 0;
+
+function openGenOverlay(title) {
+  const scrim = $("genScrim");
+  scrim.classList.remove("done");
+  genPct = 0;
+  genStepAt = 0;
+  $("genStage").innerHTML = `
+    <div class="gen-word-wrap">
+      <div class="gen-word base">${escapeHtml(title)}</div>
+      <div class="gen-word over" id="genWordOver" style="--cut:100%" aria-hidden="true">${escapeHtml(title)}</div>
+    </div>
+    <div class="gen-step" id="genStep">${escapeHtml(GEN_STEPS[0])}</div>
+    <div class="gen-pct" id="genPct">0%</div>`;
+  $("genFill").style.height = "0%";
+  scrim.classList.remove("hidden", "leaving");
+
+  /* Eases in, slows as it approaches 90, and never crosses it on its own. */
+  genTimer = setInterval(() => {
+    genPct = Math.min(90, genPct + Math.max(0.6, (90 - genPct) * 0.06));
+    paintGen(genPct);
+    const step = Math.min(GEN_STEPS.length - 1, Math.floor(genPct / 19));
+    if (step !== genStepAt) {
+      genStepAt = step;
+      const el = $("genStep");
+      if (el) { el.style.opacity = "0"; setTimeout(() => { el.textContent = GEN_STEPS[step]; el.style.opacity = "1"; }, 200); }
+    }
+  }, 180);
+}
+
+function paintGen(pct) {
+  const p = Math.max(0, Math.min(100, pct));
+  $("genFill").style.height = `${p}%`;
+  /* The overlaid copy is clipped at the waterline, and the waterline is a
+     fraction of the SCREEN, not of the word. Measuring the word each time is
+     what makes the letters turn over exactly as the green passes them. */
+  const over = $("genWordOver");
+  if (over) {
+    const r = over.getBoundingClientRect();
+    const waterY = window.innerHeight * (1 - p / 100);
+    const cut = r.height ? ((waterY - r.top) / r.height) * 100 : 100;
+    over.style.setProperty("--cut", `${Math.max(0, Math.min(100, cut))}%`);
+  }
+  const label = $("genPct");
+  if (label) label.textContent = `${Math.round(p)}%`;
+}
+
+function stopGenTicker() {
+  if (genTimer) { clearInterval(genTimer); genTimer = null; }
+}
+
+function closeGenOverlay() {
+  stopGenTicker();
+  const scrim = $("genScrim");
+  if (!scrim || scrim.classList.contains("hidden")) return;
+  scrim.classList.add("leaving");
+  setTimeout(() => { scrim.classList.add("hidden"); scrim.classList.remove("leaving"); }, 300);
+}
+
+/* The payoff: the plan lands a row at a time. Quick, 70ms apart, so five
+   exercises are all in within half a second. */
+function revealGeneratedPlan(workout, onGo) {
+  stopGenTicker();
+  paintGen(100);
+  const list = (workout.exercises || []).slice(0, 8);
+  setTimeout(() => {
+    $("genScrim").classList.add("done");
+    $("genStage").innerHTML = `
+      <div class="gen-done-head">Your workout</div>
+      <div class="gen-focus">${escapeHtml(displayFocus(workout.focus, workout.exercises) || "Ready")}</div>
+      <div class="gen-rows">
+        ${list.map((ex, i) => `
+          <div class="gen-row" style="--d:${i * 70}ms">
+            <span class="gen-row-n">${i + 1}</span>
+            <span class="gen-row-b">
+              <span class="gen-row-name">${escapeHtml(ex.name || "")}</span>
+              <span class="gen-row-t">${ex.sets || 3} sets · ${ex.reps || 10} reps</span>
+            </span>
+          </div>`).join("")}
+      </div>
+      <button type="button" class="btn-primary gen-go" id="genGoBtn" style="--d:${list.length * 70 + 120}ms">Let's go</button>`;
+    $("genGoBtn").onclick = () => { closeGenOverlay(); onGo?.(); };
+  }, 420);
+}
+
+function failGenOverlay(message) {
+  stopGenTicker();
+  $("genFill").style.height = "0%";
+  $("genStage").innerHTML = `
+    <div class="gen-focus">That didn't work</div>
+    <p class="gen-err">${escapeHtml(message)}</p>
+    <button type="button" class="btn-primary" id="genCloseBtn">Close</button>`;
+  $("genCloseBtn").onclick = closeGenOverlay;
+}
+
 async function generateWorkout(forDate) {
   if (isCoachedClient()) { toast("Your coach sets your workouts"); return; }
   const target = forDate || todayStr();
   const isToday = target === todayStr();
   WORKOUT_MODE = null;
-  if (isToday) {
-    $("workoutContent").innerHTML = '<p class="muted-note"><span class="spinner"></span> Generating your workout…</p>';
-  } else {
-    $("heroCard").innerHTML = '<p class="muted-note"><span class="spinner"></span> Planning tomorrow…</p>';
-  }
+  openGenOverlay(isToday ? "Generating" : "Planning");
 
   const history = Object.entries(personalRecords(ME).best).map(([exercise_name, weight]) => ({ exercise_name, weight }));
   const recentWeight = entriesFor(ME).filter((e) => e.weight != null).slice(-1)[0]?.weight ?? null;
@@ -6455,7 +6647,7 @@ async function generateWorkout(forDate) {
     });
     const data = await resp.json();
     if (resp.status === 429) {
-      toast(data.error || "Daily workout limit reached");
+      failGenOverlay(data.error || "You have hit today's limit on new workouts. Try again tomorrow.");
       isToday ? renderWorkoutTab() : renderHero();
       return;
     }
@@ -6479,16 +6671,16 @@ async function generateWorkout(forDate) {
     if (isToday) {
       await loadTodayWorkout();
       renderWorkoutTab();
-      toast("Workout ready");
+      revealGeneratedPlan(data.workout, () => switchTab("workout"));
     } else {
       renderHero();
-      toast("Tomorrow is planned");
+      revealGeneratedPlan(data.workout, () => toast("Tomorrow is planned"));
     }
   } catch (err) {
     console.error("generateWorkout failed:", err);
     // Showing the real reason (not a generic line) is what makes the NEXT failure
     // self-diagnosing instead of another silent "try again and hope" report.
-    toast(`Couldn't generate: ${err.message || err}`);
+    failGenOverlay(err.message || String(err));
     isToday ? renderWorkoutTab() : renderHero();
   }
 }

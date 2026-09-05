@@ -652,6 +652,84 @@
 
   /* Clips: recording one, and watching one. Both are full-screen and black,
      because a few seconds of someone shouting at you deserves the screen. */
+  /* ---- Generating ----
+     Rises from the bottom, fills with green as it works, then the plan lands
+     a row at a time. The word is drawn twice, once on the ground colour and
+     once in the on-accent colour clipped to the fill line, so the letters
+     turn over as the green passes them. */
+  /* Deliberately theme-independent, like the clip viewer: a near-black ground
+     is what makes the green read as light filling a room, and it is the only
+     way the word visibly turns over, since on a white ground both the text and
+     the on-accent colour are near-black and nothing appears to happen. */
+  .gen-scrim {
+    position: fixed; inset: 0; z-index: 95; overflow: hidden;
+    background: #0c0f14; color: #f4f6f8;
+    display: flex; align-items: center; justify-content: center;
+    padding: calc(24px + env(safe-area-inset-top, 0px)) 22px calc(24px + env(safe-area-inset-bottom, 0px));
+    animation: genUp .46s cubic-bezier(.22,1,.36,1);
+  }
+  @keyframes genUp { from { transform: translateY(100%); } to { transform: none; } }
+  .gen-scrim.leaving { animation: genDown .3s ease-in forwards; }
+  @keyframes genDown { to { transform: translateY(100%); } }
+  .gen-fill {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 0;
+    background: linear-gradient(to top, var(--accent), color-mix(in srgb, var(--accent) 82%, transparent));
+    transition: height .55s cubic-bezier(.22,1,.36,1);
+  }
+  .gen-fill::after {
+    content: ""; position: absolute; left: 0; right: 0; top: -12px; height: 12px;
+    background: linear-gradient(to top, color-mix(in srgb, var(--accent) 55%, transparent), transparent);
+  }
+  .gen-stage { position: relative; width: 100%; max-width: 420px; text-align: center; }
+  .gen-word-wrap { position: relative; display: inline-block; }
+  .gen-word {
+    font-size: clamp(30px, 10vw, 42px); font-weight: 800; letter-spacing: -.03em; line-height: 1.05;
+    font-family: var(--font-display, inherit);
+  }
+  .gen-word.over {
+    position: absolute; inset: 0; color: #0c0f14;
+    clip-path: inset(var(--cut, 100%) 0 0 0); transition: clip-path .55s cubic-bezier(.22,1,.36,1);
+  }
+  .gen-step { margin-top: 10px; font-size: 14px; color: rgba(255,255,255,.62); min-height: 20px; transition: opacity .25s; }
+  .gen-scrim .gen-pct {
+    margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .14em;
+    color: rgba(255,255,255,.45); font-variant-numeric: tabular-nums;
+  }
+  /* The reveal: the plan arrives one row at a time. */
+  .gen-done-head { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .gen-focus { font-size: 26px; font-weight: 800; letter-spacing: -.03em; margin: 4px 0 16px; }
+  .gen-rows { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+  .gen-row {
+    display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px;
+    background: #ffffff; border: none; box-shadow: 0 6px 18px rgba(0,0,0,.12);
+    animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
+  }
+  @keyframes genRow { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+  .gen-row-n {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; background: #eef1f5; color: #686d7c;
+  }
+  .gen-row-b { min-width: 0; display: flex; flex-direction: column; }
+  .gen-row-name { font-size: 15px; font-weight: 700; color: #111318; }
+  .gen-row-t { font-size: 12.5px; color: #686d7c; }
+  .gen-go {
+    margin-top: 18px; animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
+  }
+  /* Standing on the accent: the primary button would be green on green, and
+     muted grey type disappears, so the whole stage inverts. */
+  .gen-scrim.done .gen-done-head { color: rgba(12,15,20,.62); }
+  .gen-scrim.done .gen-focus { color: #0c0f14; }
+  .gen-scrim.done .gen-go {
+    background: #0c0f14; color: #ffffff; border: none;
+    box-shadow: 0 10px 26px rgba(0,0,0,.22);
+  }
+  .gen-err { font-size: 14px; color: rgba(255,255,255,.66); line-height: 1.5; margin: 12px 0 18px; }
+  .gen-scrim:not(.done) .gen-focus { color: #f4f6f8; }
+  @media (prefers-reduced-motion: reduce) {
+    .gen-scrim, .gen-scrim.leaving, .gen-row, .gen-go { animation: none; }
+    .gen-fill, .gen-word.over { transition: none; }
+  }
+
   .clip-scrim {
     position: fixed; inset: 0; z-index: 90; background: #000;
     display: flex; align-items: center; justify-content: center;
