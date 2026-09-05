@@ -851,6 +851,25 @@
   .clip-actions .btn-secondary { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); color: #fff; }
   .clip-note { color: rgba(255,255,255,.65); font-size: 12.5px; text-align: center; }
   .clip-gone { color: #fff; text-align: center; padding: 0 30px; }
+  /* The answer to "did that send", and to "is it really still there". */
+  .clip-tick {
+    width: 62px; height: 62px; margin: 0 auto 14px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.5); color: #fff;
+    animation: clipPop .4s cubic-bezier(.22,1.4,.36,1) both;
+  }
+  .clip-tick.sent { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+  @keyframes clipPop { from { transform: scale(.6); opacity: 0 } to { transform: none; opacity: 1 } }
+  .clip-spin {
+    width: 34px; height: 34px; margin: 0 auto 16px; border-radius: 50%;
+    border: 3px solid rgba(255,255,255,.25); border-top-color: #fff;
+    animation: clipSpin .8s linear infinite;
+  }
+  @keyframes clipSpin { to { transform: rotate(360deg) } }
+  @media (prefers-reduced-motion: reduce) {
+    .clip-tick { animation: none; }
+    .clip-spin { animation-duration: 2s; }
+  }
   .clip-gone b { display: block; font-size: 21px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 6px; }
   .clip-gone span { color: rgba(255,255,255,.7); font-size: 14px; line-height: 1.45; }
   /* Waiting for them, on top of the session screen they are already inside. */
@@ -3160,7 +3179,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.37";
+const APP_VERSION = "2026.09.04.38";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -5623,23 +5642,70 @@ function clipRecorderHTML(name) {
       <button type="button" class="clip-shutter" id="clipShutter" aria-label="Record">
         <svg class="clip-ring" viewBox="0 0 96 96"><circle id="clipRing" cx="48" cy="48" r="46" stroke-dasharray="289" stroke-dashoffset="289"/></svg>
       </button>
-      <div class="clip-note">Not saved anywhere. They watch it once and it is gone.</div>
+      <div class="clip-note">Not saved anywhere. They get two watches and it is gone.</div>
     </div>`;
 }
 
-function clipViewerHTML(fromName, src) {
+function clipViewerHTML(fromName, src, last) {
   return `
-    <video class="clip-media" id="clipPlayer" playsinline autoplay src="${src}"></video>
+    <video class="clip-media" id="clipPlayer" playsinline autoplay loop src="${src}"></video>
     <div class="clip-bar"><i id="clipBar"></i></div>
     <div class="clip-top">
       <button type="button" class="clip-x" id="clipViewX" aria-label="Close">&times;</button>
       <span class="clip-who">${escapeHtml(fromName)}</span>
+    </div>
+    <div class="clip-bottom">
+      <div class="clip-note">${last
+        ? "Last watch. Closing this ends it."
+        : "It loops while you are here. Close it and you have one more watch."}</div>
     </div>`;
 }
 
 function clipGoneHTML() {
   return `<div class="clip-stage" style="align-items:center;justify-content:center">
       <div class="clip-gone"><b>Gone.</b><span>Clips are not saved. Get back to it.</span></div>
+    </div>`;
+}
+
+/* Watched once, closed, and still there: say so plainly, because "it is still
+   waiting for you" is the whole point of the second watch. */
+function clipSavedForLaterHTML(fromName) {
+  return `<div class="clip-stage" style="align-items:center;justify-content:center">
+      <div class="clip-gone">
+        <div class="clip-tick">${icon("check", 30)}</div>
+        <b>One more watch left</b>
+        <span>${escapeHtml(fromName)}'s clip is on the pill up top until you use it.</span>
+      </div>
+    </div>`;
+}
+
+function clipSendingHTML(toName) {
+  return `<div class="clip-stage" style="align-items:center;justify-content:center">
+      <div class="clip-gone">
+        <div class="clip-spin" aria-hidden="true"></div>
+        <b>Sending</b>
+        <span>To ${escapeHtml(toName)}</span>
+      </div>
+    </div>`;
+}
+
+function clipSentHTML(toName) {
+  return `<div class="clip-stage" style="align-items:center;justify-content:center">
+      <div class="clip-gone">
+        <div class="clip-tick sent">${icon("check", 30)}</div>
+        <b>Sent to ${escapeHtml(toName)}</b>
+        <span>It waits on their screen. Two watches, then it is gone.</span>
+      </div>
+    </div>`;
+}
+
+function clipSendFailedHTML() {
+  return `<div class="clip-stage" style="align-items:center;justify-content:center">
+      <div class="clip-gone">
+        <b>That did not send</b>
+        <span>The clip is gone with it. Signal in here is the usual reason.</span>
+        <button type="button" class="btn-secondary" id="clipFailClose" style="margin-top:16px">Close</button>
+      </div>
     </div>`;
 }
 
@@ -5739,7 +5805,7 @@ function showClipReview(toEmail, mime) {
         <button type="button" class="btn-secondary" id="clipRetake">Again</button>
         <button type="button" class="btn-primary" id="clipSend">Send it</button>
       </div>
-      <div class="clip-note">They see it once, during this workout.</div>
+      <div class="clip-note">Two watches, during this workout, then gone.</div>
     </div>`;
   $("clipCancel").onclick = () => { URL.revokeObjectURL(url); closeClipRecorder(); };
   $("clipRetake").onclick = () => { URL.revokeObjectURL(url); closeClipRecorder(); openClipRecorder(toEmail); };
@@ -5750,28 +5816,36 @@ function showClipReview(toEmail, mime) {
   };
 }
 
+/* Sending is an upload and an insert, either of which can fail, and you are
+   holding a phone in a gym. So the overlay stays up and answers: sending,
+   then sent and who to, or what went wrong with the take still in hand. */
 async function sendClip(toEmail, mime) {
   const ext = mime.includes("webm") ? "webm" : mime.includes("quicktime") ? "mov" : "mp4";
   const path = `${toEmail.toLowerCase()}/${crypto.randomUUID()}.${ext}`;
+  $("clipRecStage").innerHTML = clipSendingHTML(nameFor(toEmail));
+
   const { error: upErr } = await sb.storage.from("live-clips").upload(path, clipBlob, { contentType: mime });
-  if (upErr) { console.error(upErr); toast("Could not send that"); closeClipRecorder(); return; }
-  const { error } = await sb.from("live_clips").insert({ from_email: MY_EMAIL, to_email: toEmail, path });
+  const { error } = upErr ? { error: upErr }
+    : await sb.from("live_clips").insert({ from_email: MY_EMAIL, to_email: toEmail, path });
   if (error) {
     console.error(error);
-    await sb.storage.from("live-clips").remove([path]);
-    toast("Could not send that");
-  } else {
-    toast("Sent");
+    if (!upErr) await sb.storage.from("live-clips").remove([path]);
+    $("clipRecStage").innerHTML = clipSendFailedHTML();
+    $("clipFailClose").onclick = closeClipRecorder;
+    return;
   }
-  closeClipRecorder();
+  $("clipRecStage").innerHTML = clipSentHTML(nameFor(toEmail));
+  setTimeout(closeClipRecorder, 1800);
 }
 
 /* ---- the receiving end ---- */
 
 async function loadClipInbox() {
   if (!MY_EMAIL) return;
+  /* Watched once is not finished with, so the inbox counts watches rather
+     than asking whether it has been seen at all. */
   const { data, error } = await sb.from("live_clips").select("*")
-    .eq("to_email", MY_EMAIL).is("viewed_at", null).order("created_at", { ascending: true });
+    .eq("to_email", MY_EMAIL).lt("views", CLIP_WATCHES).order("created_at", { ascending: true });
   if (error) { console.warn("could not read clips", error); return; }
   CLIP_INBOX = data || [];
   renderClipPill();
@@ -5783,12 +5857,20 @@ function renderClipPill() {
   const el = $("clipPill");
   if (!el) return;
   if (!SESSION || SESSION.finished || !CLIP_INBOX.length) { el.classList.add("hidden"); return; }
-  const from = nameFor(CLIP_INBOX[0].from_email);
+  const next = CLIP_INBOX[0];
+  const from = nameFor(next.from_email);
   const more = CLIP_INBOX.length > 1 ? ` (${CLIP_INBOX.length})` : "";
-  el.innerHTML = `${icon("camera", 18)} ${escapeHtml(from)} sent you a clip${more}`;
+  const label = next.views ? `Watch ${escapeHtml(from)}'s clip once more` : `${escapeHtml(from)} sent you a clip`;
+  el.innerHTML = `${icon("camera", 18)} ${label}${more}`;
   el.classList.remove("hidden");
   el.onclick = openNextClip;
 }
+
+/* Two watches, not two plays. Inside one sitting it loops for as long as you
+   stay, because a clip you glanced away from should not be spent; what costs
+   you a watch is closing it. Close the first, one is left. Close the second
+   and the row and the file both go. */
+const CLIP_WATCHES = 2;
 
 async function openNextClip() {
   const clip = CLIP_INBOX[0];
@@ -5796,29 +5878,53 @@ async function openNextClip() {
   const { data, error } = await sb.storage.from("live-clips").createSignedUrl(clip.path, 300);
   if (error || !data?.signedUrl) { console.error(error); toast("That clip has gone"); await destroyClip(clip); return; }
 
+  const spent = clip.views || 0;
+  const last = spent >= CLIP_WATCHES - 1;
   $("clipViewScrim").classList.remove("hidden");
-  $("clipViewStage").innerHTML = clipViewerHTML(nameFor(clip.from_email), data.signedUrl);
+  $("clipViewStage").innerHTML = clipViewerHTML(nameFor(clip.from_email), data.signedUrl, last);
 
-  const done = async () => {
-    await destroyClip(clip);
-    $("clipViewStage").innerHTML = clipGoneHTML();
+  let closing = false;
+  const close = (stageHTML) => {
+    $("clipViewStage").innerHTML = stageHTML;
     setTimeout(() => {
       $("clipViewScrim").classList.add("hidden");
       $("clipViewStage").innerHTML = "";
-      if (CLIP_INBOX.length) renderClipPill();
+      renderClipPill();
     }, 1400);
+  };
+  const done = async () => {
+    if (closing) return;      // the X and an error can both fire
+    closing = true;
+    if (last) {
+      await destroyClip(clip);
+      close(clipGoneHTML());
+    } else {
+      await spendClipWatch(clip);
+      close(clipSavedForLaterHTML(nameFor(clip.from_email)));
+    }
   };
   $("clipViewX").onclick = done;
   const player = $("clipPlayer");
-  player.onended = done;
   player.ontimeupdate = () => {
     const bar = $("clipBar");
     if (bar && player.duration) bar.style.width = `${Math.min(100, (player.currentTime / player.duration) * 100)}%`;
   };
   /* A file that will not play is not worth a second attempt; it is gone the
      same as one that did. */
-  player.onerror = () => { toast("That clip would not play"); done(); };
+  player.onerror = () => { toast("That clip would not play"); closing = true; destroyClip(clip).then(() => close(clipGoneHTML())); };
   renderClipPill();
+}
+
+/* One watch used up. The row stays, so the clip survives the app being closed
+   and reopened, and viewed_at becomes what it says it is: when they first saw
+   it, which the sender can read on their own row. */
+async function spendClipWatch(clip) {
+  clip.views = (clip.views || 0) + 1;
+  const patch = { views: clip.views };
+  if (!clip.viewed_at) { clip.viewed_at = new Date().toISOString(); patch.viewed_at = clip.viewed_at; }
+  try {
+    await sb.from("live_clips").update(patch).eq("id", clip.id);
+  } catch (e) { console.warn("could not record the watch", e); }
 }
 
 /* Watched, dismissed, or the workout ended: same outcome, the file goes too. */

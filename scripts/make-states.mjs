@@ -39,7 +39,7 @@ const FUNCS = [
   "timelineSessions", "reactionsFor", "nameFor", "timelineItemHTML", "wireTimeline", "renderTimeline",
   "liveAgeMs", "liveStateLabel", "renderLiveCard", "renderLiveSheet",
   "classifyMuscles", "profileFor", "renderClipPill",
-  "clipRecorderHTML", "clipViewerHTML", "clipGoneHTML",
+  "clipRecorderHTML", "clipViewerHTML", "clipGoneHTML", "clipSavedForLaterHTML", "clipSentHTML", "clipSendFailedHTML",
   "formatRest", "renderSession", "openEffortInfo",
   "openWorkoutPrivacy", "workoutPrivacy", "defaultWorkoutPrivacy", "privacySummary", "workoutPrivacyLocked",
   "liveDetailsShared", "openGenOverlay", "paintGen", "stopGenTicker", "revealGeneratedPlan",
@@ -455,13 +455,34 @@ const STATES = [
     setup: () => { SESSION = { finished: false }; CLIP_INBOX = [
       { id: "c1", from_email: "mell@x", path: "x" }, { id: "c2", from_email: "mell@x", path: "y" }]; } },
 
-  { group: "Getting a clip mid-workout", name: "Opening it",
-    note: "Plays once, full screen. The video area is black here because there is no file.",
-    raw: () => clipViewerHTML("Mell", ""), setup: () => {} },
+  { group: "Getting a clip mid-workout", name: "The second one is a replay",
+    note: "A clip already watched once says so on the pill, so it does not read as something new arriving.",
+    pill: true,
+    setup: () => { SESSION = { finished: false }; CLIP_INBOX = [{ id: "c1", from_email: "mell@x", path: "x", views: 1 }]; } },
 
-  { group: "Getting a clip mid-workout", name: "After it plays",
+  { group: "Getting a clip mid-workout", name: "Watching it",
+    note: "It loops for as long as you stay. The video area is black here because there is no file.",
+    raw: () => clipViewerHTML("Mell", "", false), setup: () => {} },
+
+  { group: "Getting a clip mid-workout", name: "Closing the first watch",
+    note: "One watch is spent by closing, not by the video reaching the end. The clip is still there.",
+    raw: () => clipSavedForLaterHTML("Mell"), setup: () => {} },
+
+  { group: "Getting a clip mid-workout", name: "The last watch",
+    note: "Opened for the second time, the line under it stops promising another.",
+    raw: () => clipViewerHTML("Mell", "", true), setup: () => {} },
+
+  { group: "Getting a clip mid-workout", name: "After the last one",
     note: "Then it is deleted, file and row, and this closes itself.",
     raw: () => clipGoneHTML(), setup: () => {} },
+
+  { group: "Sending a clip", name: "Sent",
+    note: "The overlay stays up and answers. A toast behind a closing camera is not an answer when you are holding a phone in a gym.",
+    raw: () => clipSentHTML("Mell"), setup: () => {} },
+
+  { group: "Sending a clip", name: "It did not send",
+    note: "Signal in a gym being what it is. The clip is gone with it, which the copy says rather than implying a retry that does not exist.",
+    raw: () => clipSendFailedHTML(), setup: () => {} },
 
   { group: "Sending a clip", name: "The recorder",
     note: "Up to twenty seconds. Tap the shutter again to stop early; the ring shows time used. The camera fills the screen in the app.",

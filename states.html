@@ -839,6 +839,25 @@
   .clip-actions .btn-secondary { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); color: #fff; }
   .clip-note { color: rgba(255,255,255,.65); font-size: 12.5px; text-align: center; }
   .clip-gone { color: #fff; text-align: center; padding: 0 30px; }
+  /* The answer to "did that send", and to "is it really still there". */
+  .clip-tick {
+    width: 62px; height: 62px; margin: 0 auto 14px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.5); color: #fff;
+    animation: clipPop .4s cubic-bezier(.22,1.4,.36,1) both;
+  }
+  .clip-tick.sent { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+  @keyframes clipPop { from { transform: scale(.6); opacity: 0 } to { transform: none; opacity: 1 } }
+  .clip-spin {
+    width: 34px; height: 34px; margin: 0 auto 16px; border-radius: 50%;
+    border: 3px solid rgba(255,255,255,.25); border-top-color: #fff;
+    animation: clipSpin .8s linear infinite;
+  }
+  @keyframes clipSpin { to { transform: rotate(360deg) } }
+  @media (prefers-reduced-motion: reduce) {
+    .clip-tick { animation: none; }
+    .clip-spin { animation-duration: 2s; }
+  }
   .clip-gone b { display: block; font-size: 21px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 6px; }
   .clip-gone span { color: rgba(255,255,255,.7); font-size: 14px; line-height: 1.45; }
   /* Waiting for them, on top of the session screen they are already inside. */
@@ -3454,9 +3473,11 @@ function renderClipPill() {
   const el = $("clipPill");
   if (!el) return;
   if (!SESSION || SESSION.finished || !CLIP_INBOX.length) { el.classList.add("hidden"); return; }
-  const from = nameFor(CLIP_INBOX[0].from_email);
+  const next = CLIP_INBOX[0];
+  const from = nameFor(next.from_email);
   const more = CLIP_INBOX.length > 1 ? ` (${CLIP_INBOX.length})` : "";
-  el.innerHTML = `${icon("camera", 18)} ${escapeHtml(from)} sent you a clip${more}`;
+  const label = next.views ? `Watch ${escapeHtml(from)}'s clip once more` : `${escapeHtml(from)} sent you a clip`;
+  el.innerHTML = `${icon("camera", 18)} ${label}${more}`;
   el.classList.remove("hidden");
   el.onclick = openNextClip;
 }
@@ -3474,18 +3495,23 @@ function clipRecorderHTML(name) {
       <button type="button" class="clip-shutter" id="clipShutter" aria-label="Record">
         <svg class="clip-ring" viewBox="0 0 96 96"><circle id="clipRing" cx="48" cy="48" r="46" stroke-dasharray="289" stroke-dashoffset="289"/></svg>
       </button>
-      <div class="clip-note">Not saved anywhere. They watch it once and it is gone.</div>
+      <div class="clip-note">Not saved anywhere. They get two watches and it is gone.</div>
     </div>`;
 }
 
 
-function clipViewerHTML(fromName, src) {
+function clipViewerHTML(fromName, src, last) {
   return `
-    <video class="clip-media" id="clipPlayer" playsinline autoplay src="${src}"></video>
+    <video class="clip-media" id="clipPlayer" playsinline autoplay loop src="${src}"></video>
     <div class="clip-bar"><i id="clipBar"></i></div>
     <div class="clip-top">
       <button type="button" class="clip-x" id="clipViewX" aria-label="Close">&times;</button>
       <span class="clip-who">${escapeHtml(fromName)}</span>
+    </div>
+    <div class="clip-bottom">
+      <div class="clip-note">${last
+        ? "Last watch. Closing this ends it."
+        : "It loops while you are here. Close it and you have one more watch."}</div>
     </div>`;
 }
 
@@ -3493,6 +3519,39 @@ function clipViewerHTML(fromName, src) {
 function clipGoneHTML() {
   return `<div class="clip-stage" style="align-items:center;justify-content:center">
       <div class="clip-gone"><b>Gone.</b><span>Clips are not saved. Get back to it.</span></div>
+    </div>`;
+}
+
+
+function clipSavedForLaterHTML(fromName) {
+  return `<div class="clip-stage" style="align-items:center;justify-content:center">
+      <div class="clip-gone">
+        <div class="clip-tick">${icon("check", 30)}</div>
+        <b>One more watch left</b>
+        <span>${escapeHtml(fromName)}'s clip is on the pill up top until you use it.</span>
+      </div>
+    </div>`;
+}
+
+
+function clipSentHTML(toName) {
+  return `<div class="clip-stage" style="align-items:center;justify-content:center">
+      <div class="clip-gone">
+        <div class="clip-tick sent">${icon("check", 30)}</div>
+        <b>Sent to ${escapeHtml(toName)}</b>
+        <span>It waits on their screen. Two watches, then it is gone.</span>
+      </div>
+    </div>`;
+}
+
+
+function clipSendFailedHTML() {
+  return `<div class="clip-stage" style="align-items:center;justify-content:center">
+      <div class="clip-gone">
+        <b>That did not send</b>
+        <span>The clip is gone with it. Signal in here is the usual reason.</span>
+        <button type="button" class="btn-secondary" id="clipFailClose" style="margin-top:16px">Close</button>
+      </div>
     </div>`;
 }
 
@@ -4194,13 +4253,34 @@ const STATES = [
     setup: () => { SESSION = { finished: false }; CLIP_INBOX = [
       { id: "c1", from_email: "mell@x", path: "x" }, { id: "c2", from_email: "mell@x", path: "y" }]; } },
 
-  { group: "Getting a clip mid-workout", name: "Opening it",
-    note: "Plays once, full screen. The video area is black here because there is no file.",
-    raw: () => clipViewerHTML("Mell", ""), setup: () => {} },
+  { group: "Getting a clip mid-workout", name: "The second one is a replay",
+    note: "A clip already watched once says so on the pill, so it does not read as something new arriving.",
+    pill: true,
+    setup: () => { SESSION = { finished: false }; CLIP_INBOX = [{ id: "c1", from_email: "mell@x", path: "x", views: 1 }]; } },
 
-  { group: "Getting a clip mid-workout", name: "After it plays",
+  { group: "Getting a clip mid-workout", name: "Watching it",
+    note: "It loops for as long as you stay. The video area is black here because there is no file.",
+    raw: () => clipViewerHTML("Mell", "", false), setup: () => {} },
+
+  { group: "Getting a clip mid-workout", name: "Closing the first watch",
+    note: "One watch is spent by closing, not by the video reaching the end. The clip is still there.",
+    raw: () => clipSavedForLaterHTML("Mell"), setup: () => {} },
+
+  { group: "Getting a clip mid-workout", name: "The last watch",
+    note: "Opened for the second time, the line under it stops promising another.",
+    raw: () => clipViewerHTML("Mell", "", true), setup: () => {} },
+
+  { group: "Getting a clip mid-workout", name: "After the last one",
     note: "Then it is deleted, file and row, and this closes itself.",
     raw: () => clipGoneHTML(), setup: () => {} },
+
+  { group: "Sending a clip", name: "Sent",
+    note: "The overlay stays up and answers. A toast behind a closing camera is not an answer when you are holding a phone in a gym.",
+    raw: () => clipSentHTML("Mell"), setup: () => {} },
+
+  { group: "Sending a clip", name: "It did not send",
+    note: "Signal in a gym being what it is. The clip is gone with it, which the copy says rather than implying a retry that does not exist.",
+    raw: () => clipSendFailedHTML(), setup: () => {} },
 
   { group: "Sending a clip", name: "The recorder",
     note: "Up to twenty seconds. Tap the shutter again to stop early; the ring shows time used. The camera fills the screen in the app.",
