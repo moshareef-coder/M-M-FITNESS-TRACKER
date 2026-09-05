@@ -1,7 +1,7 @@
 /* Fit Together service worker.
    Deliberately network-first for the app shell so a deploy is never masked by
    a stale cached page, and cache-first only for static icons. */
-const CACHE = "fit-together-2026.09.04.31";
+const CACHE = "fit-together-2026.09.04.32";
 const STATIC_ASSETS = [
   "/icon-192.png",
   "/icon-512.png",

@@ -2162,7 +2162,6 @@
     transition: stroke-dashoffset 1s cubic-bezier(.22,1,.36,1); transition-delay: var(--d, 0ms);
   }
   .bi-rings.no-anim .bi-ring-svg .fill { transition: none; }
-  .bi-ring.top .bi-ring-svg { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--heat, var(--accent)) 55%, transparent)); }
   .bi-ring-val { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; letter-spacing: -.02em; }
   /* Label carries its ring's heat, lifted towards white so the deep reds at the top of
      the scale stay readable at 12px on the dark card. */
@@ -3041,7 +3040,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.31";
+const APP_VERSION = "2026.09.04.32";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -9750,15 +9749,36 @@ function ensureRiveBodyModule() {
 
 async function renderBodyDiagram(animate) {
   const [mod] = await Promise.all([ensureRiveBodyModule(), ensureBodyDetailModules()]);
-  // Each muscle lights up on its own credit, not its group's: a day of bench
-  // and flyes reddens the pecs and front delts but leaves the rear delts cool.
-  // Exercises without a per-piece rule fall back to their group's credit.
+  /* The figure and the rings have to agree, and they used to not: the rings
+     measure a GROUP against the dose, while this measured each MUSCLE against
+     that same dose. A group's sets are split across its muscles, so quads at
+     100% lit each quad at a third of that and the figure came out orange while
+     its ring was deep red.
+
+     So the group's number sets the ceiling, and each muscle is placed against
+     the hardest worked muscle in its own group. The hottest muscle in a group
+     matches its ring exactly, and the rest sit proportionally below, which is
+     what keeps a bench day reddening the front delts and leaving the rear ones
+     cool rather than flattening everything to one colour. */
   const [start, end] = bodyPeriodRange(BODY_PERIOD);
   const { volumes } = computeMuscleDetailBetween(ME, start, end);
+  const groupVolumes = computeMuscleVolumeBetween(ME, start, end);
   const dose = BODY_IMPACT_TARGET[BODY_PERIOD];
+
+  const peak = {};
+  for (const muscle of mod.ALL_MUSCLES) {
+    const g = mod.RIVE_TO_APP_GROUP[muscle];
+    if (g) peak[g] = Math.max(peak[g] || 0, volumes[muscle] || 0);
+  }
+
   const target = {};
   for (const muscle of mod.ALL_MUSCLES) {
-    target[muscle] = bodyRiveLevel(Math.min(1, (volumes[muscle] || 0) / dose));
+    const g = mod.RIVE_TO_APP_GROUP[muscle];
+    const groupPct = g ? Math.min(1, (groupVolumes[g] || 0) / dose) : 0;
+    // No per-piece detail for this group's work: colour the whole group alike
+    // rather than leaving it dark while its ring says otherwise.
+    const share = !g ? 0 : peak[g] > 0 ? (volumes[muscle] || 0) / peak[g] : 1;
+    target[muscle] = bodyRiveLevel(groupPct * share);
   }
 
   const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
