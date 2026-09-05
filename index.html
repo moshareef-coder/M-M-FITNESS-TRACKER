@@ -2790,7 +2790,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.18";
+const APP_VERSION = "2026.09.04.19";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -9141,18 +9141,48 @@ function bodyPositionCallouts() {
 
 /* Muscles light up one level at a time instead of snapping to their final
    colour, so a heavy chest day visibly "builds" on the figure. */
+/* Feet first, head last, using the real bounding boxes rather than a
+   hand-written order, so it stays right if the asset changes. A muscle drawn
+   on both views is placed by whichever view has it lowest. One the asset does
+   not draw at all has no box, sorts to the end, and is never seen anyway
+   (sternocleidomastoid is on the female front artboard only). */
+function bodyBuildOrder(muscles, sex) {
+  const boxes = BODY_DETAIL?.bounds?.MUSCLE_BOUNDS || {};
+  const front = boxes[`${sex}-Front`]?.muscles || {};
+  const back = boxes[`${sex}-Back`]?.muscles || {};
+  const lowest = (m) => Math.max(front[m]?.all?.[3] ?? 0, back[m]?.all?.[3] ?? 0);
+  return [...muscles].sort((a, b) => lowest(b) - lowest(a));
+}
+
+/* The figure builds itself a muscle at a time, bottom to top, in about two
+   thirds of a second. Same idea as the generating screen, told in muscles
+   instead of a scan line.
+
+   applyIntensities walks every muscle and zeroes anything the map does not
+   mention, so each step has to carry the whole picture so far, not just the
+   muscle that changed. */
 function bodyRampFigures(target, animate) {
   BODY_RAMP_TIMERS.forEach(clearTimeout);
   BODY_RAMP_TIMERS = [];
-  const apply = (lvl) => {
-    const step = {};
-    for (const k in target) step[k] = Math.min(lvl, target[k]);
-    riveFrontCtrl?.setIntensities(step);
-    riveBackCtrl?.setIntensities(step);
+  const apply = (map) => {
+    riveFrontCtrl?.setIntensities(map);
+    riveBackCtrl?.setIntensities(map);
   };
-  if (!animate) { apply(4); return; }
-  apply(0);
-  for (let lvl = 1; lvl <= 4; lvl++) BODY_RAMP_TIMERS.push(setTimeout(() => apply(lvl), 120 + lvl * 160));
+  if (!animate) { apply(target); return; }
+
+  const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
+  const order = bodyBuildOrder(Object.keys(target), sex);
+  const shown = {};
+  for (const k in target) shown[k] = 0;
+  apply(shown);
+
+  const STEP = 20;
+  order.forEach((muscle, i) => {
+    BODY_RAMP_TIMERS.push(setTimeout(() => {
+      shown[muscle] = target[muscle];
+      apply(shown);
+    }, 90 + i * STEP));
+  });
 }
 
 function bodyGroupsPhrase(groups) {
