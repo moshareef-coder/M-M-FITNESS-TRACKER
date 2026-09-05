@@ -698,6 +698,9 @@
   .clip-ring { position: absolute; inset: -11px; transform: rotate(-90deg); pointer-events: none; }
   .clip-ring circle { fill: none; stroke: var(--up); stroke-width: 4; stroke-linecap: round; }
   .clip-count { color: #fff; font-size: 15.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  /* How much of it is left, for the one time it plays. */
+  .clip-bar { position: absolute; left: 14px; right: 14px; top: calc(6px + env(safe-area-inset-top, 0px)); height: 3px; border-radius: 2px; background: rgba(255,255,255,.25); z-index: 2; }
+  .clip-bar i { display: block; height: 100%; width: 0; border-radius: 2px; background: #fff; transition: width .25s linear; }
   .clip-actions { display: flex; gap: 10px; width: 100%; max-width: 340px; }
   .clip-actions button { flex: 1; margin-top: 0; }
   .clip-actions .btn-secondary { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); color: #fff; }
@@ -718,23 +721,40 @@
   .clip-pill svg { display: block; }
   @media (prefers-reduced-motion: reduce) { .clip-pill { animation: none; } }
 
-  /* The body map. Muscles the exercise hits, lit on a plain figure. */
-  .bm { display: flex; align-items: center; gap: 14px; }
-  .bm-figs { display: flex; gap: 6px; flex-shrink: 0; }
-  .bm-view { text-align: center; }
-  .bm-view span { display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
-  .bm-fig { width: 62px; height: 121px; display: block; }
-  .bm-body { fill: color-mix(in srgb, var(--muted) 26%, transparent); }
-  .bm-part { fill: color-mix(in srgb, var(--muted) 34%, transparent); transition: fill .35s ease; }
-  .bm-part.sec { fill: color-mix(in srgb, var(--partner) 42%, transparent); }
-  .bm-part.on { fill: var(--partner); }
-  .bm-legend { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-  .bm-row { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.35; }
-  .bm-row i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; margin-top: 4px; }
-  .bm-row i.on { background: var(--partner); }
-  .bm-row i.sec { background: color-mix(in srgb, var(--partner) 42%, transparent); }
-  .bm-row span { text-transform: capitalize; }
-  .bm-row:nth-child(2) span { color: var(--muted); }
+  /* Working muscles: the Body tab's anatomical figure, lit for one exercise.
+     Front and back side by side, the names beside them. Two sizes: the watch
+     sheet gets the large one, the session card the small one, and the colour
+     says whose body it is (coral for them, blue for you). */
+  .wm { display: flex; align-items: center; gap: 14px; --wm-ink: var(--partner); }
+  .wm-me { --wm-ink: var(--me); }
+  .wm-figs { display: flex; gap: 8px; flex-shrink: 0; }
+  .wm-view { margin: 0; text-align: center; }
+  .wm-view figcaption { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
+  /* The picture arrives a moment after the markup, so the slot holds its size
+     and the figure fades into it rather than the card jumping. */
+  .wm-fig {
+    display: block; width: 88px; height: 242px; object-fit: contain; border-radius: 10px;
+    background: color-mix(in srgb, var(--muted) 9%, transparent);
+    opacity: 0; transition: opacity .35s ease, background-color .35s ease;
+  }
+  .wm-fig.in { opacity: 1; background: transparent; }
+  .wm-sm .wm-fig { width: 64px; height: 176px; }
+  .wm-sm .wm-figs { gap: 4px; }
+  .wm-legend { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .wm-label { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--wm-ink); }
+  .wm-main { font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2; }
+  .wm-sm .wm-main { font-size: 15.5px; }
+  .wm-also { font-size: 13px; color: var(--muted); line-height: 1.35; }
+  .wm-keys { display: flex; align-items: center; gap: 12px; margin-top: 6px; font-size: 11px; color: var(--muted); }
+  .wm-keys span { display: inline-flex; align-items: center; gap: 5px; }
+  .wm-keys i { width: 9px; height: 9px; border-radius: 50%; background: var(--wm-ink); }
+  .wm-keys i.sec { background: color-mix(in srgb, var(--wm-ink) 45%, color-mix(in srgb, var(--muted) 35%, var(--panel-2))); }
+  /* On the session card it sits between the exercise and the set circles. */
+  .sess-card .wm { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  /* Where the pictures are drawn: on screen (Rive will not draw off it) but
+     invisible and untouchable. */
+  #bodySnapHost { position: fixed; left: 0; top: 0; z-index: -1; opacity: 0; pointer-events: none; }
+  #bodySnapHost canvas { display: block; }
 
   /* The watch screen */
   .lw-hero { text-align: center; padding: 4px 0 14px; }
@@ -2519,7 +2539,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.7";
+const APP_VERSION = "2026.09.04.8";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -3539,6 +3559,7 @@ async function loadAll() {
   await loadClipInbox();
   watchLiveSessions();
   startLiveTick();
+  ensureWorkingMuscleModules().catch((e) => console.warn("muscle modules", e));
   ALL_REACTIONS = reactRes.data || [];
   ALL_GOALS = goalsRes.data || [];
   MY_GOAL = ALL_GOALS.find((g) => (g.email || "").toLowerCase() === MY_EMAIL) || null;
@@ -4765,11 +4786,12 @@ async function renderWeekStrips() {
 
 
 /* ---------- Live clips ----------
-   Five seconds, sent to someone mid-workout, watched once, deleted. Nothing
-   here is kept: no history, no timeline entry, no second viewing. The row and
-   the file go when the workout ends, whichever way it ends. */
+   Up to twenty seconds, sent to someone mid-workout, watched once, deleted.
+   Nothing here is kept: no history, no timeline entry, no second viewing. The
+   row and the file go when the workout ends, whichever way it ends. */
 
-const CLIP_SECONDS = 5;
+const CLIP_SECONDS = 20;
+const CLIP_MAX_BYTES = 64 * 1024 * 1024;   // matches the bucket's file_size_limit
 let CLIP_INBOX = [];
 let clipRec = null;      // MediaRecorder
 let clipStream = null;
@@ -4807,7 +4829,7 @@ function clipRecorderHTML(name) {
       <span class="clip-who">To ${escapeHtml(name)}, training now</span>
     </div>
     <div class="clip-bottom" id="clipControls">
-      <div class="clip-hint" id="clipHint">Hold up. ${CLIP_SECONDS} seconds, then it sends.</div>
+      <div class="clip-hint" id="clipHint">Up to ${CLIP_SECONDS} seconds. Tap again to stop early.</div>
       <button type="button" class="clip-shutter" id="clipShutter" aria-label="Record">
         <svg class="clip-ring" viewBox="0 0 96 96"><circle id="clipRing" cx="48" cy="48" r="46" stroke-dasharray="289" stroke-dashoffset="289"/></svg>
       </button>
@@ -4818,6 +4840,7 @@ function clipRecorderHTML(name) {
 function clipViewerHTML(fromName, src) {
   return `
     <video class="clip-media" id="clipPlayer" playsinline autoplay src="${src}"></video>
+    <div class="clip-bar"><i id="clipBar"></i></div>
     <div class="clip-top">
       <button type="button" class="clip-x" id="clipViewX" aria-label="Close">&times;</button>
       <span class="clip-who">${escapeHtml(fromName)}</span>
@@ -4865,7 +4888,7 @@ function clipFallbackCapture(toEmail) {
   input.onchange = async () => {
     const file = input.files?.[0];
     if (!file) { closeClipRecorder(); return; }
-    if (file.size > 12 * 1024 * 1024) { toast("That clip is too long"); closeClipRecorder(); return; }
+    if (file.size > CLIP_MAX_BYTES) { toast("That clip is too long"); closeClipRecorder(); return; }
     clipBlob = file;
     await sendClip(toEmail, file.type || "video/mp4");
   };
@@ -4877,7 +4900,11 @@ function startClipRecording(toEmail) {
   const ring = $("clipRing");
   const chunks = [];
   const mime = clipMimeType();
-  try { clipRec = new MediaRecorder(clipStream, mime ? { mimeType: mime } : undefined); }
+  /* Twenty seconds at this rate is a few megabytes: fine over gym wifi, and
+     the phone's default would be several times larger for no visible gain. */
+  const opts = { videoBitsPerSecond: 2_500_000, audioBitsPerSecond: 96_000 };
+  if (mime) opts.mimeType = mime;
+  try { clipRec = new MediaRecorder(clipStream, opts); }
   catch (e) { console.error(e); toast("Cannot record here"); closeClipRecorder(); return; }
 
   clipRec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
@@ -4891,15 +4918,21 @@ function startClipRecording(toEmail) {
 
   clipRec.start();
   shutter.classList.add("recording");
-  shutter.disabled = true;
-  $("clipHint").textContent = "Recording";
+  shutter.setAttribute("aria-label", "Stop");
+  /* The shutter is now the stop button. Snap-style: the ring runs down, and
+     you can cut it short whenever you have said what you wanted to say. */
+  const stop = () => { try { clipRec?.state === "recording" && clipRec.stop(); } catch {} };
+  shutter.onclick = stop;
 
   const started = Date.now();
   const CIRC = 289;
+  const hint = $("clipHint");
   clipTimer = setInterval(() => {
-    const p = Math.min(1, (Date.now() - started) / (CLIP_SECONDS * 1000));
+    const ms = Date.now() - started;
+    const p = Math.min(1, ms / (CLIP_SECONDS * 1000));
     if (ring) ring.setAttribute("stroke-dashoffset", String(CIRC * (1 - p)));
-    if (p >= 1) { try { clipRec.stop(); } catch {} }
+    if (hint) hint.innerHTML = `<span class="clip-count">${Math.min(CLIP_SECONDS, Math.floor(ms / 1000))}s</span> · tap to stop`;
+    if (p >= 1) stop();
   }, 60);
 }
 
@@ -4986,7 +5019,15 @@ async function openNextClip() {
     }, 1400);
   };
   $("clipViewX").onclick = done;
-  $("clipPlayer").onended = done;
+  const player = $("clipPlayer");
+  player.onended = done;
+  player.ontimeupdate = () => {
+    const bar = $("clipBar");
+    if (bar && player.duration) bar.style.width = `${Math.min(100, (player.currentTime / player.duration) * 100)}%`;
+  };
+  /* A file that will not play is not worth a second attempt; it is gone the
+     same as one that did. */
+  player.onerror = () => { toast("That clip would not play"); done(); };
   renderClipPill();
 }
 
@@ -5011,99 +5052,215 @@ async function purgeMyClips() {
   } catch (e) { console.warn("could not purge clips", e); }
 }
 
-/* ---------- The body map ----------
-   The Body tab's figure is a Rive artboard plus a WASM runtime, loaded lazily
-   because it is real weight. Watching someone train needs the opposite: a
-   figure that is already there the instant the sheet opens, and that survives
-   in a static page with no network. So this is plain inline SVG, stylised
-   rather than anatomical, one shape per muscle group the app already
-   classifies. Front and back, because a row and a bench press should not
-   light the same half of the body. */
+/* ---------- Working muscles ----------
+   The same anatomical figure as the Body tab, lit for one exercise, shown to
+   the person training and to whoever is watching them. The Body tab keeps two
+   live Rive instances; here each figure is drawn once into a hidden canvas and
+   kept as a picture. A picture survives renderSession redrawing on every set,
+   cannot break another canvas's WebGL context, and can be handed to the state
+   gallery ready-made. The Rive runtime script is already on the page; the .riv
+   and the WASM are fetched on the first exercise that needs them and then live
+   in the browser cache. */
 
-const BODY_SHAPES = {
-  front: {
-    silhouette: [
-      `<ellipse cx="50" cy="13" rx="8.5" ry="10.5"/>`,
-      `<rect x="46" y="21" width="8" height="7" rx="2.5"/>`,
-      `<path d="M31,33 Q50,26 69,33 L70,58 Q66,76 63,93 L37,93 Q34,76 30,58 Z"/>`,
-      `<ellipse cx="25.5" cy="54" rx="6" ry="15"/>`, `<ellipse cx="74.5" cy="54" rx="6" ry="15"/>`,
-      `<ellipse cx="21" cy="81" rx="5" ry="14"/>`, `<ellipse cx="79" cy="81" rx="5" ry="14"/>`,
-      `<ellipse cx="18.5" cy="98" rx="4" ry="6"/>`, `<ellipse cx="81.5" cy="98" rx="4" ry="6"/>`,
-      `<ellipse cx="43" cy="117" rx="8" ry="24"/>`, `<ellipse cx="57" cy="117" rx="8" ry="24"/>`,
-      `<ellipse cx="43.5" cy="158" rx="6" ry="18"/>`, `<ellipse cx="56.5" cy="158" rx="6" ry="18"/>`,
-      `<ellipse cx="43.5" cy="182" rx="5" ry="5"/>`, `<ellipse cx="56.5" cy="182" rx="5" ry="5"/>`,
-    ],
-    parts: {
-      traps: `<path d="M39,30 L50,27 L61,30 L57,36 L43,36 Z"/>`,
-      shoulders: `<ellipse cx="31" cy="39" rx="8" ry="7"/><ellipse cx="69" cy="39" rx="8" ry="7"/>`,
-      chest: `<path d="M40,37 Q48,35 49,39 L49,52 Q41,52 38,45 Z"/><path d="M60,37 Q52,35 51,39 L51,52 Q59,52 62,45 Z"/>`,
-      biceps: `<ellipse cx="26" cy="53" rx="5" ry="11"/><ellipse cx="74" cy="53" rx="5" ry="11"/>`,
-      forearms: `<ellipse cx="21" cy="81" rx="4.4" ry="12.5"/><ellipse cx="79" cy="81" rx="4.4" ry="12.5"/>`,
-      abs: `<rect x="44" y="55" width="12" height="30" rx="4"/>`,
-      obliques: `<path d="M38,56 L43,56 L43,84 L39,77 Z"/><path d="M62,56 L57,56 L57,84 L61,77 Z"/>`,
-      quads: `<ellipse cx="43" cy="115" rx="7" ry="21"/><ellipse cx="57" cy="115" rx="7" ry="21"/>`,
-      calves: `<ellipse cx="43.5" cy="158" rx="5.2" ry="16"/><ellipse cx="56.5" cy="158" rx="5.2" ry="16"/>`,
-    },
-  },
-  back: {
-    silhouette: [
-      `<ellipse cx="50" cy="13" rx="8.5" ry="10.5"/>`,
-      `<rect x="46" y="21" width="8" height="7" rx="2.5"/>`,
-      `<path d="M31,33 Q50,26 69,33 L70,58 Q66,76 63,93 L37,93 Q34,76 30,58 Z"/>`,
-      `<ellipse cx="25.5" cy="54" rx="6" ry="15"/>`, `<ellipse cx="74.5" cy="54" rx="6" ry="15"/>`,
-      `<ellipse cx="21" cy="81" rx="5" ry="14"/>`, `<ellipse cx="79" cy="81" rx="5" ry="14"/>`,
-      `<ellipse cx="18.5" cy="98" rx="4" ry="6"/>`, `<ellipse cx="81.5" cy="98" rx="4" ry="6"/>`,
-      `<ellipse cx="43" cy="117" rx="8" ry="24"/>`, `<ellipse cx="57" cy="117" rx="8" ry="24"/>`,
-      `<ellipse cx="43.5" cy="158" rx="6" ry="18"/>`, `<ellipse cx="56.5" cy="158" rx="6" ry="18"/>`,
-      `<ellipse cx="43.5" cy="182" rx="5" ry="5"/>`, `<ellipse cx="56.5" cy="182" rx="5" ry="5"/>`,
-    ],
-    parts: {
-      traps: `<path d="M38,30 L50,27 L62,30 L58,50 L50,54 L42,50 Z"/>`,
-      shoulders: `<ellipse cx="31" cy="39" rx="8" ry="7"/><ellipse cx="69" cy="39" rx="8" ry="7"/>`,
-      lats: `<path d="M40,44 L48,50 L48,72 L36,64 Q34,53 40,44 Z"/><path d="M60,44 L52,50 L52,72 L64,64 Q66,53 60,44 Z"/>`,
-      triceps: `<ellipse cx="26" cy="53" rx="5" ry="11"/><ellipse cx="74" cy="53" rx="5" ry="11"/>`,
-      forearms: `<ellipse cx="21" cy="81" rx="4.4" ry="12.5"/><ellipse cx="79" cy="81" rx="4.4" ry="12.5"/>`,
-      lowerback: `<rect x="43" y="72" width="14" height="16" rx="4"/>`,
-      glutes: `<path d="M37,92 Q43,88 49,92 L49,108 Q41,110 37,103 Z"/><path d="M63,92 Q57,88 51,92 L51,108 Q59,110 63,103 Z"/>`,
-      hamstrings: `<ellipse cx="43" cy="122" rx="7" ry="18"/><ellipse cx="57" cy="122" rx="7" ry="18"/>`,
-      calves: `<ellipse cx="43.5" cy="158" rx="5.2" ry="16"/><ellipse cx="56.5" cy="158" rx="5.2" ry="16"/>`,
-    },
-  },
-};
+const BODY_SNAP_W = 120, BODY_SNAP_H = 330;   // CSS px, artboard is 178:490
+const BODY_SNAP_CACHE = new Map();            // key -> data URL, or null when it failed
+const BODY_SNAP_PENDING = new Map();          // key -> promise
+let bodySnapQueue = Promise.resolve();
+let RIVE_BODY = null;                         // rive-body.mjs once loaded
+let workingMuscleModules = null;
 
-/* A muscle group with no shape in a view simply is not drawn there, which is
-   how "lats" stays off the front without a special case. */
-function bodyFigureSVG(view, primary = [], secondary = []) {
-  const def = BODY_SHAPES[view];
-  const parts = Object.entries(def.parts).map(([group, shape]) => {
-    const cls = primary.includes(group) ? "bm-part on" : secondary.includes(group) ? "bm-part sec" : "bm-part";
-    return `<g class="${cls}">${shape}</g>`;
-  }).join("");
-  return `<svg class="bm-fig" viewBox="0 0 100 195" aria-hidden="true">
-    <g class="bm-body">${def.silhouette.join("")}</g>
-    ${parts}
-  </svg>`;
+function ensureWorkingMuscleModules() {
+  if (!workingMuscleModules) {
+    workingMuscleModules = Promise.all([ensureRiveBodyModule(), ensureBodyDetailModules()])
+      .then(([rive]) => { RIVE_BODY = rive; });
+  }
+  return workingMuscleModules;
 }
 
-/* Both views plus the names, because a highlight says where and a word says
-   what. Falls back to nothing when the exercise is unknown to the classifier,
-   rather than drawing a body with nothing lit. */
-function muscleMapHTML(exerciseName) {
-  const rule = exerciseName ? classifyMuscles(exerciseName) : null;
-  if (!rule) return "";
-  const primary = rule.primary || [];
-  const secondary = (rule.secondary || []).filter((m) => !primary.includes(m));
-  const nice = (m) => ({ lowerback: "lower back" }[m] || m);
-  return `<div class="bm">
-    <div class="bm-figs">
-      <div class="bm-view">${bodyFigureSVG("front", primary, secondary)}<span>Front</span></div>
-      <div class="bm-view">${bodyFigureSVG("back", primary, secondary)}<span>Back</span></div>
-    </div>
-    <div class="bm-legend">
-      <div class="bm-row"><i class="on"></i><span>${primary.map(nice).map(escapeHtml).join(", ")}</span></div>
-      ${secondary.length ? `<div class="bm-row"><i class="sec"></i><span>${secondary.map(nice).map(escapeHtml).join(", ")}</span></div>` : ""}
+const hexRGB = (hex) => {
+  const h = String(hex).trim().replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+};
+const mixRGB = (a, b, t) => ({
+  r: Math.round(a.r + (b.r - a.r) * t), g: Math.round(a.g + (b.g - a.g) * t), b: Math.round(a.b + (b.b - a.b) * t),
+});
+const rgbHex = (c) => "#" + [c.r, c.g, c.b].map((v) => v.toString(16).padStart(2, "0")).join("");
+
+/* Colours come from the theme tokens at render time, so the figure follows
+   light and dark mode. Base is the colour of a muscle the exercise does not
+   touch: a grey with the accent's tint, sitting quietly on the card. */
+function bodySnapInk(who) {
+  const css = getComputedStyle(document.documentElement);
+  const tok = (n) => hexRGB(css.getPropertyValue(n) || "#888");
+  const primary = tok(who === "me" ? "--me" : "--partner");
+  const base = mixRGB(tok("--panel-2"), tok("--muted"), 0.35);
+  return { primary, base, secondary: mixRGB(base, primary, 0.45) };
+}
+
+/* Which muscles, and how hard. Detail rules give a per-muscle answer; an
+   exercise with only a group rule lights every muscle in the group. Weight 1
+   is the muscle doing the work, anything less is helping. */
+function workingMusclesFor(exerciseName) {
+  if (!exerciseName || !BODY_DETAIL || !RIVE_BODY) return null;
+  const res = BODY_DETAIL.detail.hitsForExercise(exerciseName, classifyMuscles(exerciseName));
+  if (!res) return null;
+  const intensities = {}, primaryGroups = new Set(), secondaryGroups = new Set();
+  for (const [key, w] of Object.entries(res.hits)) {
+    const group = RIVE_BODY.RIVE_TO_APP_GROUP[key];
+    if (!group) continue;
+    intensities[key] = w >= 1 ? 4 : 2;
+    (w >= 1 ? primaryGroups : secondaryGroups).add(group);
+  }
+  if (!Object.keys(intensities).length) return null;
+  const order = Object.keys(BODY_GROUP_LABELS);
+  const sorted = (set) => [...set].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  const primary = sorted(primaryGroups);
+  const secondary = sorted(secondaryGroups).filter((g) => !primaryGroups.has(g));
+  return { intensities, primary, secondary };
+}
+
+function bodySnapKey(sex, view, who, theme, exerciseName) {
+  return `${sex}|${view}|${who}|${theme}|${exerciseName.trim().toLowerCase()}`;
+}
+
+/* Draws one figure and resolves to a PNG data URL, or null if Rive could not.
+   Two things make this a poll rather than a callback: the view model is not
+   always there yet when onLoad fires, so the colours have to be pushed again
+   once it is; and the first frame lands a beat after that, so the snapshot
+   waits until the lit colour is actually in the pixels. Rive owns the canvas
+   with a WebGL2 context, so the pixels are read back through that context
+   (a 2D context can no longer be had on it). */
+async function renderBodySnap({ sex, view, intensities, ink }) {
+  const mod = await ensureRiveBodyModule();
+  let host = $("bodySnapHost");
+  if (!host) { host = document.createElement("div"); host.id = "bodySnapHost"; document.body.appendChild(host); }
+  const canvas = document.createElement("canvas");
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  canvas.style.width = `${BODY_SNAP_W}px`; canvas.style.height = `${BODY_SNAP_H}px`;
+  canvas.width = Math.round(BODY_SNAP_W * dpr); canvas.height = Math.round(BODY_SNAP_H * dpr);
+  host.appendChild(canvas);
+
+  const palette = { base: ink.base, level1: ink.secondary, level2: ink.secondary, level3: ink.primary, level4: ink.primary };
+  /* The palette has landed once the resting muscles wear the base colour. That
+     is the signal, not the lit colour: a view can have nothing lit on it (the
+     front of a row, the back of a bench press) and still needs its figure. */
+  const hasColour = (d, { r, g, b }) => {
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4 * 97) {
+      if (d[i + 3] > 200 && Math.abs(d[i] - r) < 20 && Math.abs(d[i + 1] - g) < 20 && Math.abs(d[i + 2] - b) < 20 && ++n >= 3) return true;
+    }
+    return false;
+  };
+  const readPixels = () => {
+    const gl = canvas.getContext("webgl2");
+    if (!gl) return canvas.getContext("2d")?.getImageData(0, 0, canvas.width, canvas.height).data || null;
+    const out = new Uint8Array(canvas.width * canvas.height * 4);
+    gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, out);
+    return out;
+  };
+
+  return new Promise((resolve) => {
+    let ctrl = null, rive = null, applied = false, timer = null, done = false, settleAt = 0;
+    const finish = (url) => {
+      if (done) return;
+      done = true;
+      clearInterval(timer);
+      try { ctrl?.destroy(); } catch {}
+      canvas.remove();
+      resolve(url);
+    };
+    const deadline = Date.now() + 12000;
+    timer = setInterval(() => {
+      if (Date.now() > deadline) { console.warn("body snapshot timed out", sex, view); finish(null); return; }
+      if (!rive?.viewModelInstance) return;
+      if (!applied) { ctrl.setPalette(palette); ctrl.setIntensities(intensities); applied = true; return; }
+      if (settleAt) { if (Date.now() >= settleAt) finish(canvas.toDataURL("image/png")); return; }
+      let data;
+      try { data = readPixels(); } catch { return; }
+      /* One more beat after the base colour shows, so the lit muscles in the
+         same update have certainly been drawn too. */
+      if (data && hasColour(data, ink.base)) settleAt = Date.now() + 300;
+    }, 120);
+    try {
+      ctrl = mod.createBodyHeatmap({
+        canvas, artboardName: `${sex}-${view}`, palette, intensities,
+        onLoad: (r) => { rive = r; },
+      });
+    } catch (e) { console.warn("body snapshot failed", e); finish(null); }
+  });
+}
+
+/* One at a time. Two figures drawing into the shared WebGL context at once is
+   supported, but a queue is easier to reason about and the wait is short. */
+function ensureBodySnap(key, spec) {
+  if (BODY_SNAP_CACHE.has(key) || BODY_SNAP_PENDING.has(key)) return;
+  const p = bodySnapQueue.then(() => renderBodySnap(spec)).catch((e) => { console.warn(e); return null; })
+    .then((url) => {
+      BODY_SNAP_CACHE.set(key, url);
+      BODY_SNAP_PENDING.delete(key);
+      document.querySelectorAll(`img.wm-fig[data-snap="${key}"]`).forEach((img) => fillBodySnap(img, url));
+    });
+  BODY_SNAP_PENDING.set(key, p);
+  bodySnapQueue = p;
+}
+
+function fillBodySnap(img, url) {
+  if (!url) { img.classList.add("in"); return; }   // the slot fades to nothing rather than sitting grey forever
+  img.onload = () => img.classList.add("in");
+  img.src = url;
+}
+
+/* Sync, so renderSession can call it on every redraw. The pictures come from
+   the cache when they are there and drop into place when they are not. While
+   the modules are still loading it leaves a placeholder and finishes the job
+   itself once they arrive. */
+function workingMusclesHTML(exerciseName, { who = "them", size = "lg", email = null } = {}) {
+  if (!exerciseName) return "";
+  if (!BODY_DETAIL || !RIVE_BODY) {
+    ensureWorkingMuscleModules().then(fillPendingWorkingMuscles);
+    const spec = escapeHtml(JSON.stringify({ exerciseName, who, size, email }));
+    return `<div class="wm-pending" data-wm="${spec}"></div>`;
+  }
+  const hit = workingMusclesFor(exerciseName);
+  if (!hit) return "";
+  const sex = profileFor(email)?.sex === "Female" ? "Female" : "Male";
+  const theme = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  const ink = bodySnapInk(who);
+  const fig = (view) => {
+    const key = bodySnapKey(sex, view, who, theme, exerciseName);
+    ensureBodySnap(key, { sex, view, intensities: hit.intensities, ink });
+    const url = BODY_SNAP_CACHE.get(key);
+    const src = url ? ` src="${url}"` : "";
+    const cls = url ? "wm-fig in" : BODY_SNAP_CACHE.has(key) ? "wm-fig in" : "wm-fig";
+    return `<figure class="wm-view"><img class="${cls}" data-snap="${escapeHtml(key)}"${src} alt="" /><figcaption>${view}</figcaption></figure>`;
+  };
+  const label = (g) => BODY_GROUP_LABELS[g] || g;
+  const main = hit.primary.length ? hit.primary.map(label) : hit.secondary.map(label);
+  const also = hit.primary.length ? hit.secondary.map((g) => label(g).toLowerCase()) : [];
+  return `<div class="wm wm-${size} wm-${who}">
+    <div class="wm-figs">${fig("Front")}${fig("Back")}</div>
+    <div class="wm-legend">
+      <div class="wm-label">${who === "me" ? "You are working" : "Working"}</div>
+      <div class="wm-main">${main.map(escapeHtml).join(", ")}</div>
+      ${also.length ? `<div class="wm-also">with ${also.map(escapeHtml).join(", ")}</div>` : ""}
+      <div class="wm-keys"><span><i></i>Main</span>${also.length ? `<span><i class="sec"></i>Helping</span>` : ""}</div>
     </div>
   </div>`;
+}
+
+/* The modules arrived after a screen asked for a figure: draw it in now. A
+   wrapper marked data-wm-wrap goes away with it when the exercise turns out
+   to be one nobody has classified. */
+function fillPendingWorkingMuscles() {
+  document.querySelectorAll(".wm-pending").forEach((el) => {
+    let spec;
+    try { spec = JSON.parse(el.dataset.wm); } catch { el.remove(); return; }
+    const html = workingMusclesHTML(spec.exerciseName, spec);
+    const wrap = el.closest("[data-wm-wrap]");
+    if (!html && wrap) { wrap.remove(); return; }
+    el.outerHTML = html;
+  });
 }
 
 /* ---------- Watching someone train ----------
@@ -5226,7 +5383,7 @@ async function renderLiveSheet() {
   const plan = (ALL_PLANS || []).find((w) => w.id === row.workout_id);
   const nextEx = plan?.exercises?.[(row.exercise_index || 0) + 1];
   const stale = liveAgeMs(row) > LIVE_QUIET_MS;
-  const map = muscleMapHTML(row.exercise_name);
+  const map = workingMusclesHTML(row.exercise_name, { who: "them", size: "lg", email: row.email });
 
   sheet.innerHTML = `
     <div class="ds-grip"></div>
@@ -5248,7 +5405,7 @@ async function renderLiveSheet() {
         ${setTotal ? `<span>${icon("check", 15)} ${row.set_done || 0} of ${setTotal} sets</span>` : ""}
       </div>
     </div>
-    ${map ? `<div class="lw-card"><div class="lw-card-label">Muscles working right now</div>${map}</div>` : ""}
+    ${map ? `<div class="lw-card" data-wm-wrap><div class="lw-card-label">Muscles working right now</div>${map}</div>` : ""}
     ${nextEx ? `<p class="lw-next">Up next: <b>${escapeHtml(nextEx.name || "")}</b>${nextEx.sets ? ` · ${nextEx.sets} × ${escapeHtml(String(nextEx.reps || ""))}` : ""}</p>` : ""}
     ${stale ? `<p class="lw-stale">Their screen is off, so this is where they were a few minutes ago.</p>` : ""}
     <div class="lw-card">
@@ -6469,6 +6626,7 @@ function renderSession() {
         <span class="sess-target">${ex.sets} sets × ${ex.reps} reps</span>
       </div>
       ${ex.note ? `<div class="sess-note">${escapeHtml(ex.note)}</div>` : ""}
+      ${workingMusclesHTML(ex.name, { who: "me", size: "sm", email: MY_EMAIL })}
 
       <div class="set-circles">
         ${setsDone.map((done, i) => {

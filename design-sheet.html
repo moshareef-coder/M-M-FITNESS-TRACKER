@@ -682,6 +682,9 @@
   .clip-ring { position: absolute; inset: -11px; transform: rotate(-90deg); pointer-events: none; }
   .clip-ring circle { fill: none; stroke: var(--up); stroke-width: 4; stroke-linecap: round; }
   .clip-count { color: #fff; font-size: 15.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  /* How much of it is left, for the one time it plays. */
+  .clip-bar { position: absolute; left: 14px; right: 14px; top: calc(6px + env(safe-area-inset-top, 0px)); height: 3px; border-radius: 2px; background: rgba(255,255,255,.25); z-index: 2; }
+  .clip-bar i { display: block; height: 100%; width: 0; border-radius: 2px; background: #fff; transition: width .25s linear; }
   .clip-actions { display: flex; gap: 10px; width: 100%; max-width: 340px; }
   .clip-actions button { flex: 1; margin-top: 0; }
   .clip-actions .btn-secondary { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); color: #fff; }
@@ -702,23 +705,40 @@
   .clip-pill svg { display: block; }
   @media (prefers-reduced-motion: reduce) { .clip-pill { animation: none; } }
 
-  /* The body map. Muscles the exercise hits, lit on a plain figure. */
-  .bm { display: flex; align-items: center; gap: 14px; }
-  .bm-figs { display: flex; gap: 6px; flex-shrink: 0; }
-  .bm-view { text-align: center; }
-  .bm-view span { display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
-  .bm-fig { width: 62px; height: 121px; display: block; }
-  .bm-body { fill: color-mix(in srgb, var(--muted) 26%, transparent); }
-  .bm-part { fill: color-mix(in srgb, var(--muted) 34%, transparent); transition: fill .35s ease; }
-  .bm-part.sec { fill: color-mix(in srgb, var(--partner) 42%, transparent); }
-  .bm-part.on { fill: var(--partner); }
-  .bm-legend { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-  .bm-row { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.35; }
-  .bm-row i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; margin-top: 4px; }
-  .bm-row i.on { background: var(--partner); }
-  .bm-row i.sec { background: color-mix(in srgb, var(--partner) 42%, transparent); }
-  .bm-row span { text-transform: capitalize; }
-  .bm-row:nth-child(2) span { color: var(--muted); }
+  /* Working muscles: the Body tab's anatomical figure, lit for one exercise.
+     Front and back side by side, the names beside them. Two sizes: the watch
+     sheet gets the large one, the session card the small one, and the colour
+     says whose body it is (coral for them, blue for you). */
+  .wm { display: flex; align-items: center; gap: 14px; --wm-ink: var(--partner); }
+  .wm-me { --wm-ink: var(--me); }
+  .wm-figs { display: flex; gap: 8px; flex-shrink: 0; }
+  .wm-view { margin: 0; text-align: center; }
+  .wm-view figcaption { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
+  /* The picture arrives a moment after the markup, so the slot holds its size
+     and the figure fades into it rather than the card jumping. */
+  .wm-fig {
+    display: block; width: 88px; height: 242px; object-fit: contain; border-radius: 10px;
+    background: color-mix(in srgb, var(--muted) 9%, transparent);
+    opacity: 0; transition: opacity .35s ease, background-color .35s ease;
+  }
+  .wm-fig.in { opacity: 1; background: transparent; }
+  .wm-sm .wm-fig { width: 64px; height: 176px; }
+  .wm-sm .wm-figs { gap: 4px; }
+  .wm-legend { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .wm-label { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--wm-ink); }
+  .wm-main { font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2; }
+  .wm-sm .wm-main { font-size: 15.5px; }
+  .wm-also { font-size: 13px; color: var(--muted); line-height: 1.35; }
+  .wm-keys { display: flex; align-items: center; gap: 12px; margin-top: 6px; font-size: 11px; color: var(--muted); }
+  .wm-keys span { display: inline-flex; align-items: center; gap: 5px; }
+  .wm-keys i { width: 9px; height: 9px; border-radius: 50%; background: var(--wm-ink); }
+  .wm-keys i.sec { background: color-mix(in srgb, var(--wm-ink) 45%, color-mix(in srgb, var(--muted) 35%, var(--panel-2))); }
+  /* On the session card it sits between the exercise and the set circles. */
+  .sess-card .wm { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  /* Where the pictures are drawn: on screen (Rive will not draw off it) but
+     invisible and untouchable. */
+  #bodySnapHost { position: fixed; left: 0; top: 0; z-index: -1; opacity: 0; pointer-events: none; }
+  #bodySnapHost canvas { display: block; }
 
   /* The watch screen */
   .lw-hero { text-align: center; padding: 4px 0 14px; }

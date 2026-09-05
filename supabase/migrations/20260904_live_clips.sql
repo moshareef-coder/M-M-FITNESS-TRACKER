@@ -1,7 +1,7 @@
 -- Live clips, 2026-09-04.
 --
--- A few seconds of video sent to someone who is training RIGHT NOW, watched
--- once, then gone. Deliberately not a feature that accumulates: there is no
+-- Up to twenty seconds of video sent to someone who is training RIGHT NOW,
+-- watched once, then gone. Deliberately not a feature that accumulates: there is no
 -- history, no gallery, no thumbnail in the timeline. The row and the file both
 -- die when the workout ends, and a sweeper catches anything a closed app left
 -- behind.
@@ -54,10 +54,12 @@ begin
   end if;
 end $$;
 
--- The bucket. Small cap on purpose: five seconds of phone video is a couple of
--- megabytes, and anything much larger is not the feature.
+-- The bucket. Capped on purpose: twenty seconds of phone video at the rate the
+-- app records is a few megabytes; the limit leaves room for the camera-roll
+-- fallback, which records at whatever rate the phone likes. Raised from 12MB
+-- when clips went from five seconds to twenty (2026-09-04).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('live-clips', 'live-clips', false, 12582912,
+values ('live-clips', 'live-clips', false, 67108864,
         array['video/mp4', 'video/quicktime', 'video/webm'])
 on conflict (id) do update
   set file_size_limit = excluded.file_size_limit,

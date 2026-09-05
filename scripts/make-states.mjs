@@ -17,51 +17,58 @@
    of frames never has duplicate ids. Handlers are dropped in the capture; this
    is a gallery to look at, not an app to use. */
 
-import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const src = readFileSync(join(root, "index.html"), "utf8");
-
-const style = src.match(/<style>([\s\S]*?)<\/style>/)[1];
-const fonts = src.match(/<link[^>]*fonts[^>]*>/g)?.join("\n") || "";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { root, src, style, fonts, grab, fn, section, SNAP_SPECS, SNAP_PROFILES, SNAP_FILE } from "./lift.mjs";
+import { hitsForExercise } from "../knowledge/anatomy/muscle-detail.mjs";
+import { RIVE_TO_APP_GROUP } from "../knowledge/anatomy/rive-body.mjs";
 
 /* ---- lift the real thing out of the app ---- */
-
-function grab(re, what) {
-  const m = src.match(re);
-  if (!m) throw new Error(`make-states: could not find ${what} in index.html`);
-  return m[0];
-}
-
-function fn(name) {
-  const m = src.match(new RegExp(`\\n(async )?function ${name}\\(.*?\\n}\\n`, "s"));
-  if (!m) throw new Error(`make-states: function ${name}() is gone or was renamed. Fix this script.`);
-  return m[0];
-}
 
 const ICONS = grab(/\nconst ICON_PATHS = \{.*?\n\};\n/s, "ICON_PATHS");
 const HEADER = grab(/ {2}<header class="top">.*?<\/header>\n/s, "the app header");
 const HOME = src.match(/<!-- HOME TAB -->([\s\S]*?)<div id="tab-workout"/)[1];
 const LIVE_SHEET = grab(/ {2}<div class="sheet-scrim hidden" id="liveScrim">[\s\S]*?<\/div>\n {2}<\/div>\n/, "the live sheet");
 const CLIP_PILL = grab(/ {2}<button type="button" class="clip-pill hidden" id="clipPill"><\/button>\n/, "the clip pill");
+const SESSION_CARD = grab(/ {4}<div id="sessionCard" class="session-overlay hidden">[\s\S]*?<div id="sessionBody"><\/div>\n {4}<\/div>\n/, "the session card");
 
 const FUNCS = [
   "icon", "personRing", "hydrateAvatars", "renderHero", "renderTopStreak",
   "entryOn", "dotHTML", "renderWeekStrips",
   "timelineSessions", "reactionsFor", "nameFor", "timelineItemHTML", "wireTimeline", "renderTimeline",
   "liveAgeMs", "liveStateLabel", "renderLiveCard", "renderLiveSheet",
-  "bodyFigureSVG", "muscleMapHTML", "classifyMuscles", "renderClipPill",
+  "classifyMuscles", "profileFor", "renderClipPill",
   "clipRecorderHTML", "clipViewerHTML", "clipGoneHTML",
+  "formatRest", "renderSession",
 ].map(fn).join("\n");
+
+/* The working-muscles block is more than a function: caches, colour helpers
+   and the snapshot queue. It comes over whole. */
+const WORKING_MUSCLES = section("/* ---------- Working muscles ----------", "/* ---------- Watching someone train ----------");
 
 /* Data the extracted functions close over. Lifted whole rather than retyped,
    because a hand-copied muscle table would drift from the app's within a week. */
 const DATA = [
-  grab(/\nconst BODY_SHAPES = \{.*?\n\};\n/s, "BODY_SHAPES"),
   grab(/\nconst MUSCLE_RULES = \[.*?\n\];\n/s, "MUSCLE_RULES"),
+  grab(/\nconst BODY_GROUP_LABELS = \{.*?\n\};\n/s, "BODY_GROUP_LABELS"),
 ].join("\n");
+
+/* ---- the figures ----
+   The muscle detail modules are ES modules the app imports at runtime. A
+   standalone page cannot, so the answers for the gallery's exercises are
+   worked out here in Node, with the app's own classifier, and embedded. */
+const classifyMuscles = new Function(`${DATA}\n${fn("classifyMuscles")}\nreturn classifyMuscles;`)();
+const GALLERY_EXERCISES = [...new Set([...SNAP_SPECS.map((s) => s.exerciseName), "Turkish Get-Up"])];
+const HITS = Object.fromEntries(GALLERY_EXERCISES.map((name) =>
+  [name.toLowerCase(), hitsForExercise(name, classifyMuscles(name))]));
+
+/* The pictures themselves are WebGL, which Node does not have. snap-body.mjs
+   draws them in a headless Chrome; without that file the slots stay empty and
+   the build says so, loudly, because a gallery with blank bodies reads as a
+   bug in the app. */
+let SNAPS = {};
+if (existsSync(SNAP_FILE)) SNAPS = JSON.parse(readFileSync(SNAP_FILE, "utf8"));
+else console.warn("make-states: no scripts/.body-snaps.json, the figures will be blank. Run: node scripts/snap-body.mjs");
 
 /* ---- the gallery page ---- */
 
@@ -119,6 +126,8 @@ const GALLERY_CSS = `
   .gal-dark .clip-top, .gal-dark .clip-bottom { position: absolute; }
   .gal-dark .clip-media { flex: 1; min-height: 0; }
   .gal-pillbox .clip-pill { position: absolute; top: 26px; animation: none; }
+  /* The session screen covers the viewport in the app; here it is a card. */
+  .gal-phone .session-overlay { position: static; animation: none; padding: 14px 18px 24px; }
 `;
 
 const BODY = `<title>Fit Together Screen States</title>
@@ -150,6 +159,7 @@ ${HOME}
   </div>
 ${LIVE_SHEET}
 ${CLIP_PILL}
+${SESSION_CARD}
 </div>
 
 <script>
@@ -170,7 +180,8 @@ const DAY_LETTERS = ["M","T","W","T","F","S","S"];
 const APP_VERSION = "states";
 const LIVE_QUIET_MS = 3 * 60 * 1000;
 const LIVE_GONE_MS = 25 * 60 * 1000;
-const CLIP_SECONDS = 5;
+const CLIP_SECONDS = 20;
+let ALL_PROFILES = ${JSON.stringify(SNAP_PROFILES)};
 
 const FACE = (c) => "data:image/svg+xml," + encodeURIComponent(
   "<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><rect width='120' height='120' fill='" + c + "'/>" +
@@ -218,9 +229,34 @@ const openLiveSheet = () => {};
 const closeLiveSheet = () => {};
 const openNoteComposer = () => {};
 const openNextClip = () => {};
-let SESSION = null, CLIP_INBOX = [];
+let SESSION = null, CLIP_INBOX = [], TODAY_WORKOUT = null;
+const beatLive = () => {};
+const startRestTicker = () => {};
+const stopRestTicker = () => {};
+const saveSessionToStorage = () => {};
+const clearSessionStorage = () => {};
+const closeSessionUI = () => {};
+const renderWorkoutTab = () => {};
+const renderSessionComplete = () => {};
+const toggleSet = () => {};
+const startNextSet = () => {};
+const jumpToExercise = () => {};
+const finishExerciseAndAdvance = () => {};
+/* The app loads these as ES modules. Here the answers are baked in. */
+let riveBodyPromise = null, bodyDetailPromise = null;
+const ensureRiveBodyModule = () => Promise.resolve(RIVE_BODY);
+const ensureBodyDetailModules = () => Promise.resolve(BODY_DETAIL);
+let BODY_DETAIL = { detail: { hitsForExercise: (name) => HITS[String(name).toLowerCase()] || null } };
+const HITS = ${JSON.stringify(HITS)};
 
 ${FUNCS}
+${WORKING_MUSCLES}
+
+RIVE_BODY = { RIVE_TO_APP_GROUP: ${JSON.stringify(RIVE_TO_APP_GROUP)} };
+/* Pre-drawn by snap-body.mjs, both themes, so nothing here touches WebGL. */
+const SNAPS = ${JSON.stringify(SNAPS)};
+for (const [k, v] of Object.entries(SNAPS)) BODY_SNAP_CACHE.set(k, v);
+ensureBodySnap = (key) => { if (!BODY_SNAP_CACHE.has(key)) console.warn("no snapshot for " + key + ", run node scripts/snap-body.mjs"); };
 
 /* ---- the fixtures each state starts from ---- */
 
@@ -270,6 +306,17 @@ const liveRow = (over = {}) => ({
   set_done: 2, set_total: 4, state: "working", elapsed_sec: 1140,
   last_beat_at: new Date().toISOString(), ...over,
 });
+
+/* The exerciser's side. Mo, three exercises into a push day. */
+const sessionFixture = (over = {}) => {
+  TODAY_WORKOUT = { focus: "Push day", exercises: [
+    { name: "Bench Press", sets: 4, reps: 8, note: "Pause a beat on the chest. Elbows about 45 degrees." },
+    { name: "Overhead Press", sets: 3, reps: 10 }, { name: "Incline Dumbbell Press", sets: 3, reps: 10 },
+    { name: "Romanian Deadlift", sets: 3, reps: 10 }, { name: "Triceps Pushdown", sets: 3, reps: 12 }] };
+  SESSION = { exerciseIndex: 0, setsDone: [[true, true, false, false], [false, false, false], [false, false, false], [false, false, false], [false, false, false]],
+    setWeights: [[185, 185]], weights: [185, 95, 60, 225, 50], reps: [8, 10, 10, 10, 12], completed: [false, false, false, false, false],
+    restStartedAt: null, ...over };
+};
 
 /* ---- what to show ---- */
 
@@ -335,11 +382,11 @@ const STATES = [
     setup: () => { LIVE_PARTNER = null; }, sheet: true },
 
   { group: "Watching them train", name: "A pull exercise, back lit up",
-    note: "The map is per exercise, so the front and back figures change as they move through the plan.",
+    note: "The figure is per exercise, so front and back change as they move through the plan. Same anatomy as the Body tab, her body since she is a woman.",
     setup: () => { LIVE_PARTNER = liveRow({ exercise_name: "Barbell Row", exercise_index: 1, set_done: 1, set_total: 3 }); }, sheet: true },
 
   { group: "Watching them train", name: "An exercise the classifier does not know",
-    note: "No map rather than a body with nothing lit.",
+    note: "No figure rather than a body with nothing lit.",
     setup: () => { LIVE_PARTNER = liveRow({ exercise_name: "Turkish Get-Up" }); }, sheet: true },
 
   { group: "Getting a clip mid-workout", name: "A clip is waiting",
@@ -361,8 +408,22 @@ const STATES = [
     raw: () => clipGoneHTML(), setup: () => {} },
 
   { group: "Sending a clip", name: "The recorder",
-    note: "Five seconds, auto-stop. The camera fills the screen in the app.",
+    note: "Up to twenty seconds. Tap the shutter again to stop early; the ring shows time used. The camera fills the screen in the app.",
     raw: () => clipRecorderHTML("Mell"), setup: () => {} },
+
+  { group: "What they see while training", name: "Mid set, bench press",
+    note: "The exerciser's own screen. Their body, lit in their colour, sits between the target and the set dots so they see what they are hitting before they log.",
+    session: true, setup: () => { sessionFixture(); } },
+
+  { group: "What they see while training", name: "Resting, a hip hinge",
+    note: "Hamstrings and glutes are on the back, so the back figure carries the colour and the front stays quiet.",
+    session: true, setup: () => { sessionFixture({ exerciseIndex: 3, restStartedAt: Date.now() - 48000,
+      setsDone: [[true, true, true, true], [true, true, true], [true, true, true], [true, false, false], [false, false, false]],
+      setWeights: [[185, 185, 185, 185], [95, 95, 95], [60, 60, 60], [225]], completed: [true, true, true, false, false] }); } },
+
+  { group: "What they see while training", name: "An exercise the classifier does not know",
+    note: "The card simply has no figure. Nothing else moves.",
+    session: true, setup: () => { sessionFixture(); TODAY_WORKOUT.exercises[0] = { name: "Turkish Get-Up", sets: 3, reps: 5 }; } },
 ];
 
 /* ---- render each state into the stage, then capture it ---- */
@@ -411,7 +472,35 @@ async function renderSheetState() {
   return deId($("liveSheet").outerHTML);
 }
 
+async function renderSessionState() {
+  const card = $("sessionCard");
+  card.classList.remove("hidden");
+  renderSession();
+  await settle();
+  return deId(card.outerHTML);
+}
+
+/* The figures are drawn per theme (their greys come from the tokens), so
+   the toggle swaps every figure to its sibling in the other theme. */
+const setTheme = (t) => {
+  document.documentElement.setAttribute("data-theme", t);
+  $("galLight").classList.toggle("on", t === "light");
+  $("galDark").classList.toggle("on", t === "dark");
+  document.querySelectorAll("img.wm-fig[data-snap]").forEach((img) => {
+    const key = img.dataset.snap.replace(/\|(light|dark)\|/, "|" + t + "|");
+    img.dataset.snap = key;
+    const url = BODY_SNAP_CACHE.get(key);
+    if (url) img.src = url; else img.removeAttribute("src");
+  });
+};
+
 (async () => {
+  /* The app's light palette lives behind html[data-theme="light"], so an
+     un-stamped host would render this dark. Light is the app's default, so
+     state it before anything is drawn: the figures pick their theme at
+     render time. */
+  setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light");
+
   const groups = new Map();
   for (let i = 0; i < STATES.length; i++) {
     const st = STATES[i];
@@ -422,6 +511,7 @@ async function renderSheetState() {
       html = st.raw ? await renderRawState(st)
            : st.pill ? await renderPillState()
            : st.sheet ? await renderSheetState()
+           : st.session ? await renderSessionState()
            : await renderHomeState();
     } catch (e) {
       html = '<div class="gal-empty">This state threw: ' + escapeHtml(e.message) + "</div>";
@@ -446,17 +536,8 @@ async function renderSheetState() {
   $("galToc").innerHTML = [...groups.keys()].map((g) =>
     '<a href="#g-' + g.replace(/\W+/g, "-").toLowerCase() + '">' + escapeHtml(g) + "</a>").join("");
 
-  const setTheme = (t) => {
-    document.documentElement.setAttribute("data-theme", t);
-    $("galLight").classList.toggle("on", t === "light");
-    $("galDark").classList.toggle("on", t === "dark");
-  };
   $("galLight").onclick = () => setTheme("light");
   $("galDark").onclick = () => setTheme("dark");
-  /* The app's light palette lives behind html[data-theme="light"], so an
-     un-stamped host would render this dark. Light is the app's default, so
-     state it rather than inheriting whatever the page is embedded in. */
-  setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light");
 })();
 </script>`;
 

@@ -198,8 +198,11 @@ if (clobbered.length) {
   console.log("");
 }
 
+/* The app's dynamic imports are written relative to index.html at the repo
+   root; inside new Function they resolve relative to this script instead. */
+const bootSrc = src.replace(/import\("\.\/knowledge\//g, 'import("../knowledge/');
 try {
-  new Function(src + ";globalThis.__t={showApp,loadAll,renderHome,renderWorkoutTab,renderProgressTab,renderSetupTab,switchTab,renderFab,renderScaleCheck,renderBodyTab,renderAdminPanel};")();
+  new Function(bootSrc + ";globalThis.__t={showApp,loadAll,renderHome,renderWorkoutTab,renderProgressTab,renderSetupTab,switchTab,renderFab,renderScaleCheck,renderBodyTab,renderAdminPanel};")();
 } catch (e) {
   console.log("TOP-LEVEL ERROR:", e.message);
   process.exit(1);
