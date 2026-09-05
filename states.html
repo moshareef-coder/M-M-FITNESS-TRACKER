@@ -2626,39 +2626,92 @@
     backdrop-filter: saturate(180%) blur(14px); -webkit-backdrop-filter: saturate(180%) blur(14px);
     border-bottom: 1px solid var(--border);
   }
-  .gal-title { font-size: 21px; font-weight: 800; letter-spacing: -.03em; }
+  .gal-title { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
   .gal-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-  .gal-toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 4px; }
-  .gal-toc a {
-    font-size: 12.5px; font-weight: 600; text-decoration: none; color: var(--muted);
-    border: 1px solid var(--border); border-radius: 100px; padding: 5px 11px; background: var(--panel);
-  }
-  .gal-toc a:hover { color: var(--text); }
-  .gal-sub { color: var(--muted); font-size: 14px; max-width: 62ch; line-height: 1.5; margin: 0 0 22px; }
+  .gal-sub { color: var(--muted); font-size: 12.5px; max-width: 66ch; line-height: 1.55; margin: 0; }
   .gal-controls { display: flex; gap: 8px; }
   .gal-btn {
-    font: inherit; font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 100px; cursor: pointer;
+    font: inherit; font-size: 12.5px; font-weight: 600; padding: 7px 13px; border-radius: 100px; cursor: pointer;
     background: var(--panel); border: 1px solid var(--border); color: var(--text);
   }
   .gal-btn.on { background: var(--accent); color: var(--on-accent); border-color: transparent; }
-  .gal-group { margin-top: 34px; scroll-margin-top: 70px; }
-  /* Direct child only. As a descendant selector this also hit the app's own
-     h2 inside every frame, so the session card's title rendered as a tiny
-     uppercase label and the gallery lied about the screen. */
-  .gal-group > h2 {
-    font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted);
-    font-weight: 800; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+
+  /* ---- the file shell: a tree on the left, the canvas on the right ---- */
+  .fig { display: grid; grid-template-columns: 272px minmax(0, 1fr); min-height: 100vh; }
+  .fig-side {
+    position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+    background: var(--panel); border-right: 1px solid var(--border); padding: 18px 12px 40px;
   }
-  .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(393px, 1fr)); gap: 26px 20px; }
+  .fig-file { padding: 0 8px 14px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+  .fig-file b { display: block; font-size: 14px; font-weight: 800; letter-spacing: -.01em; }
+  .fig-file span { display: block; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
+  .fig-tree { display: flex; flex-direction: column; gap: 2px; }
+  .fig-page-btn {
+    display: flex; align-items: center; gap: 7px; width: 100%; text-align: left; cursor: pointer;
+    font: inherit; font-size: 13px; font-weight: 700; color: var(--text);
+    background: none; border: none; border-radius: 8px; padding: 7px 8px;
+  }
+  .fig-page-btn:hover { background: var(--panel-2); }
+  .fig-page-btn .caret { width: 10px; color: var(--muted); transition: transform .18s; display: inline-block; }
+  .fig-page-btn.shut .caret { transform: rotate(-90deg); }
+  .fig-page-btn .count { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .fig-kids { display: flex; flex-direction: column; gap: 1px; margin: 0 0 6px 9px; padding-left: 9px; border-left: 1px solid var(--border); }
+  .fig-page-btn.shut + .fig-kids { display: none; }
+  .fig-sec-label {
+    display: flex; align-items: center; gap: 8px; text-decoration: none;
+    font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); padding: 9px 8px 4px; border-radius: 7px;
+  }
+  .fig-sec-label span { margin-left: auto; letter-spacing: 0; font-size: 10.5px; opacity: .8; }
+  .fig-sec-label:hover { color: var(--text); }
+  .fig-link {
+    display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left; cursor: pointer;
+    font: inherit; font-size: 12.5px; color: var(--muted); background: none; border: none;
+    border-radius: 7px; padding: 5px 8px; text-decoration: none;
+  }
+  .fig-link:hover { background: var(--panel-2); color: var(--text); }
+  .fig-link.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink); font-weight: 700; }
+  .fig-link i { font-style: normal; font-size: 10.5px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 15px; }
+  .fig-link.on i { color: var(--accent-ink); }
+  .fig-canvas { padding: 0 26px 90px; min-width: 0; background: var(--bg); }
+  .gal-bar {
+    position: sticky; top: 0; z-index: 6; display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; padding: 16px 0 12px; margin-bottom: 6px;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+  }
+  .gal-crumb { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+
+  /* ---- pages, sections, frames ---- */
+  .fig-page { padding-top: 30px; scroll-margin-top: 74px; }
+  .fig-page-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .fig-page-n {
+    font-size: 11px; font-weight: 800; color: var(--muted); border: 1px solid var(--border);
+    border-radius: 6px; padding: 2px 7px; font-variant-numeric: tabular-nums;
+  }
+  .fig-page-name { font-size: 21px; font-weight: 800; letter-spacing: -.03em; }
+  .fig-page-note { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; line-height: 1.5; max-width: 68ch; }
+  .fig-section { border: 1px dashed var(--border); border-radius: 16px; padding: 14px; margin-top: 14px; scroll-margin-top: 84px; }
+  .fig-section-head { display: flex; align-items: center; gap: 8px; margin: -2px 0 12px; }
+  .fig-section-name { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .fig-section-rule { flex: 1; height: 1px; background: var(--border); }
+  .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(393px, 1fr)); gap: 24px 20px; }
   @media (max-width: 460px) { .gal-grid { grid-template-columns: 1fr; } }
-  .gal-frame { margin: 0; }
-  .gal-cap { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+  .gal-frame { margin: 0; scroll-margin-top: 90px; }
+  .gal-frame.flash .gal-phone { box-shadow: 0 0 0 3px var(--accent); }
+  .gal-cap { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
   .gal-num {
-    font-size: 11px; font-weight: 800; color: var(--on-accent); background: var(--accent);
+    font-size: 11px; font-weight: 800; color: var(--accent-ink);
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
     border-radius: 100px; padding: 2px 8px; flex-shrink: 0; font-variant-numeric: tabular-nums;
   }
-  .gal-name { font-size: 15.5px; font-weight: 700; }
-  .gal-note { font-size: 12.5px; color: var(--muted); margin: 2px 0 8px; line-height: 1.4; }
+  .fig-section-n { font-size: 10.5px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .gal-name { font-size: 14px; font-weight: 700; }
+  .gal-note { font-size: 12.5px; color: var(--muted); margin: 0 0 8px; line-height: 1.45; }
+  @media (max-width: 900px) {
+    .fig { grid-template-columns: 1fr; }
+    .fig-side { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    .fig-canvas { padding: 0 16px 80px; }
+  }
   .gal-phone {
     width: 100%; max-width: 393px; border: 1px solid var(--border); border-radius: 20px; overflow: hidden;
     background: var(--bg); background-image: var(--page-wash);
@@ -2679,20 +2732,28 @@
   /* Same for the generating screen, which is fixed and full bleed in the app. */
   .gal-phone .gen-scrim { position: relative; height: 560px; animation: none; }
 </style>
-<div class="gal-wrap">
-  <div class="gal-bar">
-    <div>
-      <div class="gal-eyebrow">Fit Together</div>
-      <div class="gal-title">Every screen state</div>
+<div class="fig">
+  <aside class="fig-side">
+    <div class="fig-file">
+      <b>Fit Together</b>
+      <span>Screen states</span>
     </div>
-    <div class="gal-controls">
-      <button type="button" class="gal-btn on" id="galLight">Light</button>
-      <button type="button" class="gal-btn" id="galDark">Dark</button>
+    <nav class="fig-tree" id="galTree"></nav>
+  </aside>
+  <main class="fig-canvas">
+    <div class="gal-bar">
+      <div>
+        <div class="gal-crumb" id="galCrumb">Fit Together / Screen states</div>
+        <div class="gal-title">Every screen, in the order you meet it</div>
+        <p class="gal-sub">Real stylesheet, real render functions, fake data. Pages follow the journey: opening the app, planning the workout, doing it, watching them, sending and getting a clip. Every frame has a number, so "change 7" is enough to say which one.</p>
+      </div>
+      <div class="gal-controls">
+        <button type="button" class="gal-btn on" id="galLight">Light</button>
+        <button type="button" class="gal-btn" id="galDark">Dark</button>
+      </div>
     </div>
-  </div>
-  <p class="gal-sub">Drawn with the app's real stylesheet and its real render functions, fed fake data. Nothing here needs a logged workout, so we can go through it together and change what you don't like. Each state has a number: say "change 7" and I will know which one.</p>
-  <nav class="gal-toc" id="galToc"></nav>
-  <div id="galBody"></div>
+    <div id="galBody"></div>
+  </main>
 </div>
 
 <!-- The hidden stage. Real ids, real markup, one state at a time. -->
@@ -4200,87 +4261,87 @@ const sessionFixture = (over = {}) => {
 /* ---- what to show ---- */
 
 const STATES = [
-  { group: "Home", name: "Everyday, both of you going",
+  { page: "Opening the app", section: "The everyday state", name: "Everyday, both of you going",
     note: "The one you see most: partner paired, both mid-week, nobody live.",
     setup: () => {} },
 
-  { group: "Home", name: "Partner is training right now",
+  { page: "Opening the app", section: "When they are training", name: "Partner is training right now",
     note: "The live card takes the top of the screen. Red dot pulses.",
     setup: () => { LIVE_PARTNER = liveRow(); } },
 
-  { group: "Home", name: "Partner live, but their phone locked",
+  { page: "Opening the app", section: "When they are training", name: "Partner live, but their phone locked",
     note: "Beat older than 3 minutes. It says so instead of pretending.",
     setup: () => { LIVE_PARTNER = liveRow({ last_beat_at: new Date(Date.now() - 7 * 60000).toISOString(), state: "resting" }); } },
 
-  { group: "Home", name: "You have already trained today",
+  { page: "Opening the app", section: "The everyday state", name: "You have already trained today",
     note: "The green button turns into planning tomorrow.",
     setup: () => { TRAINED_TODAY = true; } },
 
-  { group: "Home", name: "Tomorrow is already planned",
+  { page: "Opening the app", section: "The everyday state", name: "Tomorrow is already planned",
     note: "No button at all, just the line and a way to clear it.",
     setup: () => { TRAINED_TODAY = true; PLANNED_TOMORROW = { id: "p1", focus: "Pull day" }; } },
 
-  { group: "Home", name: "Brand new, nothing logged",
+  { page: "Opening the app", section: "Other shapes of the same screen", name: "Brand new, nothing logged",
     note: "First run. Empty rings, no streak, empty week, empty timeline.",
     setup: () => {
       MY_DAYS = 0; THEIR_DAYS = 0; DAY_STREAK = 0; WEEK_STREAK = 0;
       ENTRIES = { Mo: [], Mell: [] }; ALL_PLANS = []; ALL_EXERCISE_LOGS = []; ALL_REACTIONS = [];
     } },
 
-  { group: "Home", name: "Training on your own",
+  { page: "Opening the app", section: "Other shapes of the same screen", name: "Training on your own",
     note: "No partner: one ring, centred, no legend, no timeline from them.",
     setup: () => { PARTNER_EMAIL = null; ENTRIES.Mell = []; ALL_REACTIONS = []; } },
 
-  { group: "Home", name: "One of you is behind",
+  { page: "Opening the app", section: "The everyday state", name: "One of you is behind",
     note: "Different counts, so the line names both instead of saying 'each'.",
     setup: () => { MY_DAYS = 4; THEIR_DAYS = 1; DAY_STREAK = 0; WEEK_STREAK = 2; } },
 
-  { group: "Home", name: "Week streak instead of day streak",
+  { page: "Opening the app", section: "The everyday state", name: "Week streak instead of day streak",
     note: "Days beat weeks when both exist; this is what weeks look like.",
     setup: () => { DAY_STREAK = 0; WEEK_STREAK = 3; } },
 
-  { group: "Home", name: "Partner keeps workouts private",
+  { page: "Opening the app", section: "Other shapes of the same screen", name: "Partner keeps workouts private",
     note: "The effort line still says who trained harder this week. Her live card and yesterday's timeline row lose the specifics; the number stays.",
     setup: () => { LIVE_PARTNER = liveRow(); PARTNER_PROFILE = { share_workout_details: false }; } },
 
-  { group: "Watching them train", name: "Working, mid set",
+  { page: "Watching them train", section: "Where they are up to", name: "Working, mid set",
     note: "Set dots fill as they log. Up next comes from their plan.",
     sheet: true, setup: () => { LIVE_PARTNER = liveRow(); } },
 
-  { group: "Watching them train", name: "Resting between sets",
+  { page: "Watching them train", section: "Where they are up to", name: "Resting between sets",
     setup: () => { LIVE_PARTNER = liveRow({ state: "resting", set_done: 3 }); }, sheet: true },
 
-  { group: "Watching them train", name: "Paused",
+  { page: "Watching them train", section: "Where they are up to", name: "Paused",
     setup: () => { LIVE_PARTNER = liveRow({ state: "paused", elapsed_sec: 2100 }); }, sheet: true },
 
-  { group: "Watching them train", name: "Screen off, still in it",
+  { page: "Watching them train", section: "Where they are up to", name: "Screen off, still in it",
     note: "What a watcher sees once the beats stop coming.",
     setup: () => { LIVE_PARTNER = liveRow({ last_beat_at: new Date(Date.now() - 9 * 60000).toISOString() }); }, sheet: true },
 
-  { group: "Watching them train", name: "Last exercise, nothing next",
+  { page: "Watching them train", section: "Where they are up to", name: "Last exercise, nothing next",
     setup: () => { LIVE_PARTNER = liveRow({ exercise_index: 4, exercise_name: "Calf Raise", set_done: 1, set_total: 3 }); }, sheet: true },
 
-  { group: "Watching them train", name: "They just finished while you were looking",
+  { page: "Watching them train", section: "Where they are up to", name: "They just finished while you were looking",
     note: "The row goes away mid-watch. This is the fallback.",
     setup: () => { LIVE_PARTNER = null; }, sheet: true },
 
-  { group: "Watching them train", name: "A pull exercise, back lit up",
+  { page: "Watching them train", section: "What the muscle line says", name: "A pull exercise, back lit up",
     note: "The muscle line is per exercise, so it changes as they move through the plan. The tile beside it is where the exercise demo will go.",
     setup: () => { LIVE_PARTNER = liveRow({ exercise_name: "Barbell Row", exercise_index: 1, set_done: 1, set_total: 3 }); }, sheet: true },
 
-  { group: "Watching them train", name: "An exercise the classifier does not know",
+  { page: "Watching them train", section: "What the muscle line says", name: "An exercise nobody has classified",
     note: "Nothing at all rather than a line naming no muscles.",
     setup: () => { LIVE_PARTNER = liveRow({ exercise_name: "Turkish Get-Up" }); }, sheet: true },
 
-  { group: "Watching them train", name: "This one keeps it private",
+  { page: "Watching them train", section: "When they hold something back", name: "This one keeps it private",
     note: "Name, sets and the muscle line are gone. Live status, elapsed time and today's effort score stay, so how hard never needs to reveal at what.",
     setup: () => { LIVE_PARTNER = liveRow(); PARTNER_PROFILE = { share_workout_details: false }; }, sheet: true },
 
-  { group: "Generating a workout", name: "Working on it",
+  { page: "Planning the workout", section: "While it thinks", name: "Working on it",
     note: "Comes up from the bottom when you press generate. The body builds from the feet up as it works, with a scan line at the height it has reached. The figure itself is live WebGL, so this still frame shows the chamber without it.",
     gen: () => { openGenOverlay("Generating"); paintGen(62); }, setup: () => {} },
 
-  { group: "Generating a workout", name: "The plan lands",
+  { page: "Planning the workout", section: "While it thinks", name: "The plan lands",
     note: "Each exercise fades up in turn, about 70ms apart, so five are in within half a second. The figure fades back behind them rather than leaving.",
     gen: () => {
       openGenOverlay("Generating");
@@ -4299,73 +4360,73 @@ const STATES = [
         '<button type="button" class="btn-primary gen-go">Let’s go</button>';
     }, setup: () => {} },
 
-  { group: "Getting a clip mid-workout", name: "A clip is waiting",
+  { page: "Getting a clip", section: "The pill on your session", name: "A clip is waiting",
     note: "Sits above the session screen. Only ever exists during a workout.",
     pill: true,
     setup: () => { SESSION = { finished: false }; CLIP_INBOX = [{ id: "c1", from_email: "mell@x", path: "x" }]; } },
 
-  { group: "Getting a clip mid-workout", name: "More than one waiting",
+  { page: "Getting a clip", section: "The pill on your session", name: "More than one waiting",
     pill: true,
     setup: () => { SESSION = { finished: false }; CLIP_INBOX = [
       { id: "c1", from_email: "mell@x", path: "x" }, { id: "c2", from_email: "mell@x", path: "y" }]; } },
 
-  { group: "Getting a clip mid-workout", name: "The second one is a replay",
+  { page: "Getting a clip", section: "The pill on your session", name: "The second one is a replay",
     note: "A clip already watched once says so on the pill, so it does not read as something new arriving.",
     pill: true,
     setup: () => { SESSION = { finished: false }; CLIP_INBOX = [{ id: "c1", from_email: "mell@x", path: "x", views: 1 }]; } },
 
-  { group: "Getting a clip mid-workout", name: "Watching it",
+  { page: "Getting a clip", section: "Two watches, then gone", name: "Watching it",
     note: "It loops for as long as you stay. The video area is black here because there is no file.",
     raw: () => clipViewerHTML("Mell", "", false), setup: () => {} },
 
-  { group: "Getting a clip mid-workout", name: "Closing the first watch",
+  { page: "Getting a clip", section: "Two watches, then gone", name: "Closing the first watch",
     note: "One watch is spent by closing, not by the video reaching the end. The clip is still there.",
     raw: () => clipSavedForLaterHTML("Mell"), setup: () => {} },
 
-  { group: "Getting a clip mid-workout", name: "The last watch",
+  { page: "Getting a clip", section: "Two watches, then gone", name: "The last watch",
     note: "Opened for the second time, the line under it stops promising another.",
     raw: () => clipViewerHTML("Mell", "", true), setup: () => {} },
 
-  { group: "Getting a clip mid-workout", name: "After the last one",
+  { page: "Getting a clip", section: "Two watches, then gone", name: "After the last one",
     note: "Then it is deleted, file and row, and this closes itself.",
     raw: () => clipGoneHTML(), setup: () => {} },
 
-  { group: "Sending a clip", name: "Sent",
+  { page: "Sending a clip", section: "After you press send", name: "Sent",
     note: "The overlay stays up and answers. A toast behind a closing camera is not an answer when you are holding a phone in a gym.",
     raw: () => clipSentHTML("Mell"), setup: () => {} },
 
-  { group: "Sending a clip", name: "It did not send",
+  { page: "Sending a clip", section: "After you press send", name: "It did not send",
     note: "Signal in a gym being what it is. The clip is gone with it, which the copy says rather than implying a retry that does not exist.",
     raw: () => clipSendFailedHTML(), setup: () => {} },
 
-  { group: "Sending a clip", name: "The recorder",
+  { page: "Sending a clip", section: "Filming it", name: "The recorder",
     note: "Up to twenty seconds. Tap the shutter again to stop early; the ring shows time used. The camera fills the screen in the app.",
     raw: () => clipRecorderHTML("Mell"), setup: () => {} },
 
-  { group: "Home", name: "How effort is scored",
+  { page: "Opening the app", section: "Explaining a number", name: "How effort is scored",
     note: "Tapping the effort line opens this. Three lines, the real numbers from the formula, and why two people can be compared when one of them shares nothing.",
     pop: () => openEffortInfo(), setup: () => {} },
 
-  { group: "Home", name: "Advanced settings for one workout",
+  { page: "Planning the workout", section: "Before you press begin", name: "Advanced settings for one workout",
     note: "Opened from the plan screen before you press Begin, or the small chip on the session card once you have. Defaults come from Settings, changes here last one workout.",
     pop: () => openWorkoutPrivacy(),
     setup: () => { SESSION = null; PENDING_PRIVACY = { live: true, details: false, cheers: true }; } },
 
-  { group: "Watching them train", name: "They turned messages off",
+  { page: "Watching them train", section: "When they hold something back", name: "They turned messages off",
     note: "Cheer buttons are gone rather than greyed. The database refuses the clip too, so it is not a UI-only promise.",
     setup: () => { LIVE_PARTNER = liveRow({ allow_cheers: false }); }, sheet: true },
 
-  { group: "What they see while training", name: "Mid set, bench press",
+  { page: "Doing the workout", section: "The session screen", name: "Mid set, bench press",
     note: "The exerciser's own screen. What they are working reads as a line between the target and the set dots, in their colour, with the demo tile beside it.",
     session: true, setup: () => { sessionFixture(); } },
 
-  { group: "What they see while training", name: "Resting, a hip hinge",
+  { page: "Doing the workout", section: "The session screen", name: "Resting, a hip hinge",
     note: "A hip hinge names the hamstrings and glutes, with the quads and lower back listed as helping.",
     session: true, setup: () => { sessionFixture({ exerciseIndex: 3, restStartedAt: Date.now() - 48000,
       setsDone: [[true, true, true, true], [true, true, true], [true, true, true], [true, false, false], [false, false, false]],
       setWeights: [[185, 185, 185, 185], [95, 95, 95], [60, 60, 60], [225]], completed: [true, true, true, false, false] }); } },
 
-  { group: "What they see while training", name: "An exercise the classifier does not know",
+  { page: "Doing the workout", section: "The session screen", name: "An exercise the classifier does not know",
     note: "The card simply has no muscle line. Nothing else moves.",
     session: true, setup: () => { sessionFixture(); TODAY_WORKOUT.exercises[0] = { name: "Turkish Get-Up", sets: 3, reps: 5 }; } },
 ];
@@ -4452,9 +4513,31 @@ const setTheme = (t) => {
      render time. */
   setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light");
 
-  const groups = new Map();
-  for (let i = 0; i < STATES.length; i++) {
-    const st = STATES[i];
+  /* Pages hold sections hold frames. The order is the journey, stated here
+     rather than left to whatever order the states happen to be declared in,
+     and the frame numbers follow it so they ascend as you scroll. */
+  const PAGE_ORDER = [
+    "Opening the app", "Planning the workout", "Doing the workout",
+    "Watching them train", "Sending a clip", "Getting a clip",
+  ];
+  const SECTION_ORDER = {
+    "Opening the app": ["The everyday state", "Other shapes of the same screen", "When they are training", "Explaining a number"],
+    "Planning the workout": ["While it thinks", "Before you press begin"],
+    "Doing the workout": ["The session screen"],
+    "Watching them train": ["Where they are up to", "What the muscle line says", "When they hold something back"],
+    "Sending a clip": ["Filming it", "After you press send"],
+    "Getting a clip": ["The pill on your session", "Two watches, then gone"],
+  };
+  const rank = (list, v) => { const i = list.indexOf(v); return i < 0 ? 999 : i; };
+  const ORDERED = STATES.slice().sort((a, b) =>
+    rank(PAGE_ORDER, a.page) - rank(PAGE_ORDER, b.page) ||
+    rank(SECTION_ORDER[a.page] || [], a.section) - rank(SECTION_ORDER[b.page] || [], b.section) ||
+    STATES.indexOf(a) - STATES.indexOf(b));
+
+  const slug = (t) => t.replace(/\W+/g, "-").toLowerCase();
+  const pages = new Map();
+  for (let i = 0; i < ORDERED.length; i++) {
+    const st = ORDERED[i];
     resetFixtures();
     st.setup();
     let html;
@@ -4470,24 +4553,113 @@ const setTheme = (t) => {
       html = '<div class="gal-empty">This state threw: ' + escapeHtml(e.message) + "</div>";
       console.error(st.name, e);
     }
-    if (!groups.has(st.group)) groups.set(st.group, []);
-    groups.get(st.group).push(
-      '<figure class="gal-frame">' +
-        '<figcaption class="gal-cap"><span class="gal-num">' + (i + 1) + '</span>' +
-          '<span class="gal-name">' + escapeHtml(st.name) + "</span></figcaption>" +
-        (st.note ? '<p class="gal-note">' + escapeHtml(st.note) + "</p>" : "") +
-        '<div class="gal-phone">' + html + "</div>" +
-      "</figure>");
+    const frameId = "f-" + (i + 1) + "-" + slug(st.name);
+    if (!pages.has(st.page)) pages.set(st.page, new Map());
+    const sections = pages.get(st.page);
+    if (!sections.has(st.section)) sections.set(st.section, []);
+    sections.get(st.section).push({
+      n: i + 1, name: st.name, id: frameId,
+      html:
+        '<figure class="gal-frame" id="' + frameId + '">' +
+          '<figcaption class="gal-cap"><span class="gal-num">' + (i + 1) + '</span>' +
+            '<span class="gal-name">' + escapeHtml(st.name) + "</span></figcaption>" +
+          (st.note ? '<p class="gal-note">' + escapeHtml(st.note) + "</p>" : "") +
+          '<div class="gal-phone">' + html + "</div>" +
+        "</figure>",
+    });
   }
 
-  $("galBody").innerHTML = [...groups.entries()].map(([g, frames]) =>
-    '<section class="gal-group" id="g-' + g.replace(/\W+/g, "-").toLowerCase() + '"><h2>' + escapeHtml(g) +
-      '</h2><div class="gal-grid">' + frames.join("") + "</div></section>"
-  ).join("");
+  const PAGE_NOTES = {
+    "Opening the app": "The first thing you see, in the states it is actually in: both of you going, one of you behind, nobody paired yet, and the moment they start training.",
+    "Planning the workout": "From pressing generate to standing over the plan with your thumb on begin.",
+    "Doing the workout": "Your own screen, mid session. This is the one you look at with a barbell in front of you.",
+    "Watching them train": "Their session as it reaches you: how far in, what they are on, and the parts they can keep to themselves.",
+    "Sending a clip": "Twenty seconds, one take, and a straight answer about whether it left your phone.",
+    "Getting a clip": "It waits on the pill, loops while you watch, and gives you exactly one more before it is gone.",
+  };
+
+  let pageNo = 0;
+  const canvas = [], tree = [];
+  for (const [pageName, sections] of pages) {
+    pageNo++;
+    const pageId = "p-" + slug(pageName);
+    const total = [...sections.values()].reduce((n, f) => n + f.length, 0);
+    canvas.push(
+      '<section class="fig-page" id="' + pageId + '">' +
+        '<div class="fig-page-head"><span class="fig-page-n">' + pageNo + '</span>' +
+          '<h2 class="fig-page-name">' + escapeHtml(pageName) + "</h2></div>" +
+        (PAGE_NOTES[pageName] ? '<p class="fig-page-note">' + escapeHtml(PAGE_NOTES[pageName]) + "</p>" : "") +
+        [...sections.entries()].map(([secName, frames]) =>
+          '<div class="fig-section" id="s-' + slug(pageName + "-" + secName) + '">' +
+            '<div class="fig-section-head"><span class="fig-section-name">' + escapeHtml(secName) +
+              '</span><span class="fig-section-rule"></span>' +
+              '<span class="fig-section-n">' + frames.length + " frame" + (frames.length === 1 ? "" : "s") + "</span></div>" +
+            '<div class="gal-grid">' + frames.map((f) => f.html).join("") + "</div>" +
+          "</div>").join("") +
+      "</section>");
+
+    tree.push(
+      '<button type="button" class="fig-page-btn" data-page="' + pageId + '">' +
+        '<span class="caret">&#9662;</span>' + escapeHtml(pageName) +
+        '<span class="count">' + total + "</span></button>" +
+      '<div class="fig-kids">' +
+        [...sections.entries()].map(([secName, frames]) =>
+          '<a class="fig-sec-label" href="#s-' + slug(pageName + "-" + secName) + '">' + escapeHtml(secName) +
+            '<span>' + frames.length + "</span></a>" +
+          frames.map((f) =>
+            '<a class="fig-link" href="#' + f.id + '" data-frame="' + f.id + '"><i>' + f.n + "</i>" +
+              escapeHtml(f.name) + "</a>").join("")).join("") +
+      "</div>");
+  }
+  $("galBody").innerHTML = canvas.join("");
+  $("galTree").innerHTML = tree.join("");
   stage.remove();
 
-  $("galToc").innerHTML = [...groups.keys()].map((g) =>
-    '<a href="#g-' + g.replace(/\W+/g, "-").toLowerCase() + '">' + escapeHtml(g) + "</a>").join("");
+  /* Clicking a frame in the tree highlights it, the way selecting a layer
+     does. Collapsing a page folds its frames away. */
+  $("galTree").querySelectorAll("[data-page]").forEach((b) => {
+    b.onclick = (e) => {
+      if (e.target.classList.contains("caret")) { b.classList.toggle("shut"); return; }
+      document.getElementById(b.dataset.page)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+  });
+  const links = [...$("galTree").querySelectorAll("[data-frame]")];
+  links.forEach((a) => {
+    a.onclick = () => {
+      const el = document.getElementById(a.dataset.frame);
+      el?.classList.add("flash");
+      setTimeout(() => el?.classList.remove("flash"), 900);
+    };
+  });
+
+  /* The tree follows the canvas, so you always know where you are. */
+  const crumb = $("galCrumb");
+  const seen = new Map();
+  const spy = new IntersectionObserver((entries) => {
+    for (const en of entries) seen.set(en.target, en.isIntersecting ? en.intersectionRatio : 0);
+    let best = null, bestR = 0;
+    for (const [el, r] of seen) if (r > bestR) { best = el; bestR = r; }
+    if (!best) return;
+    let active = null;
+    links.forEach((a) => {
+      const on = a.dataset.frame === best.id;
+      a.classList.toggle("on", on);
+      if (on) active = a;
+    });
+    /* The tree follows the canvas the way a layers panel follows selection. */
+    if (active) {
+      const side = active.closest(".fig-side");
+      const r = active.getBoundingClientRect(), sr = side.getBoundingClientRect();
+      if (r.top < sr.top + 12 || r.bottom > sr.bottom - 12) active.scrollIntoView({ block: "center" });
+    }
+    const page = best.closest(".fig-page");
+    const section = best.closest(".fig-section");
+    if (page && crumb) {
+      crumb.textContent = "Fit Together / " + page.querySelector(".fig-page-name").textContent +
+        (section ? " / " + section.querySelector(".fig-section-name").textContent : "");
+    }
+  }, { rootMargin: "-15% 0px -60% 0px", threshold: [0, 0.25, 0.6] });
+  document.querySelectorAll(".gal-frame").forEach((f) => spy.observe(f));
 
   $("galLight").onclick = () => setTheme("light");
   $("galDark").onclick = () => setTheme("dark");
