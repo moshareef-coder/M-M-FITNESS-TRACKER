@@ -971,7 +971,20 @@
   .cb-groups { font-size: 13px; color: var(--muted); line-height: 1.4; }
   .cb-empty { font-size: 13px; color: var(--muted); line-height: 1.45; }
 
-  .cb-chips { display: flex; gap: 7px; overflow-x: auto; padding: 2px 0 10px; scrollbar-width: none; }
+  /* The search field and the category chips stay put while the results scroll
+     under them, so typing never scrolls away the thing you are typing in. */
+  /* top is -10px, not 0: the sheet has 10px of top padding and content scrolls
+     through it, so a header pinned at 0 lets cards show in the band above it. */
+  .cb-pick-top {
+    position: sticky; top: -10px; z-index: 3; background: var(--panel);
+    padding: 18px 0 2px; margin-bottom: 2px;
+  }
+  .cb-pick-top input { margin-bottom: 0; }
+  /* Close travels with the search field, so it is still there once the title
+     has scrolled away behind the keyboard. */
+  .cb-search-row { display: flex; align-items: center; gap: 10px; }
+  .cb-search-row .ex-search-wrap { flex: 1; min-width: 0; }
+  .cb-chips { display: flex; gap: 7px; overflow-x: auto; padding: 12px 0 10px; scrollbar-width: none; }
   .cb-chips::-webkit-scrollbar { display: none; }
   .cb-chip {
     flex-shrink: 0; font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
@@ -1630,6 +1643,13 @@
   .sheet-scrim {
     position: fixed; inset: 0; z-index: 65; display: flex; align-items: flex-end;
     background: rgba(12,14,19,.5); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  }
+  /* Keyboard up: pinSheets() has sized the scrim to what is actually visible,
+     so the sheet fills that and keeps its own scroll instead of running on
+     underneath the keys. */
+  .sheet-scrim.kb > * {
+    max-height: 100%; animation: none;
+    padding-bottom: 16px;
   }
   .day-sheet {
     width: 100%; max-height: 86dvh; overflow-y: auto; background: var(--panel);

@@ -981,7 +981,20 @@
   .cb-groups { font-size: 13px; color: var(--muted); line-height: 1.4; }
   .cb-empty { font-size: 13px; color: var(--muted); line-height: 1.45; }
 
-  .cb-chips { display: flex; gap: 7px; overflow-x: auto; padding: 2px 0 10px; scrollbar-width: none; }
+  /* The search field and the category chips stay put while the results scroll
+     under them, so typing never scrolls away the thing you are typing in. */
+  /* top is -10px, not 0: the sheet has 10px of top padding and content scrolls
+     through it, so a header pinned at 0 lets cards show in the band above it. */
+  .cb-pick-top {
+    position: sticky; top: -10px; z-index: 3; background: var(--panel);
+    padding: 18px 0 2px; margin-bottom: 2px;
+  }
+  .cb-pick-top input { margin-bottom: 0; }
+  /* Close travels with the search field, so it is still there once the title
+     has scrolled away behind the keyboard. */
+  .cb-search-row { display: flex; align-items: center; gap: 10px; }
+  .cb-search-row .ex-search-wrap { flex: 1; min-width: 0; }
+  .cb-chips { display: flex; gap: 7px; overflow-x: auto; padding: 12px 0 10px; scrollbar-width: none; }
   .cb-chips::-webkit-scrollbar { display: none; }
   .cb-chip {
     flex-shrink: 0; font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
@@ -1640,6 +1653,13 @@
   .sheet-scrim {
     position: fixed; inset: 0; z-index: 65; display: flex; align-items: flex-end;
     background: rgba(12,14,19,.5); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  }
+  /* Keyboard up: pinSheets() has sized the scrim to what is actually visible,
+     so the sheet fills that and keeps its own scroll instead of running on
+     underneath the keys. */
+  .sheet-scrim.kb > * {
+    max-height: 100%; animation: none;
+    padding-bottom: 16px;
   }
   .day-sheet {
     width: 100%; max-height: 86dvh; overflow-y: auto; background: var(--panel);
@@ -3136,7 +3156,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.34";
+const APP_VERSION = "2026.09.04.35";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -3973,12 +3993,37 @@ function pinTabBar() {
     // one that carries on below it (the case in the screenshot: content visible
     // under the bar).
     bar.style.transform = !typing && Math.abs(gap) > 2 ? `translateY(${-gap}px)` : "";
+    pinSheets();
   };
   const schedule = () => { if (!raf) raf = requestAnimationFrame(apply); };
   vv.addEventListener("resize", schedule);
   vv.addEventListener("scroll", schedule);
   window.addEventListener("focusout", schedule);
+  window.addEventListener("focusin", schedule);
   window.addEventListener("orientationchange", schedule);
+}
+
+/* A bottom sheet is fixed to the layout viewport, and iOS does not shrink the
+   layout viewport for the keyboard. So the sheet stays anchored to the bottom
+   of the page, which is now behind the keyboard, and everything below the
+   search field disappears under it. Sizing the scrim to the VISUAL viewport
+   puts the sheet's bottom edge on top of the keyboard instead: the sheet
+   moves up, the space the keyboard took is simply gone rather than covered. */
+function pinSheets() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const hidden = Math.round(window.innerHeight - vv.height);
+  const kb = hidden > 90;   // small deltas are the URL bar, not a keyboard
+  for (const scrim of document.querySelectorAll(".sheet-scrim")) {
+    if (scrim.classList.contains("hidden")) {
+      scrim.style.top = scrim.style.height = "";
+      scrim.classList.remove("kb");
+      continue;
+    }
+    scrim.classList.toggle("kb", kb);
+    scrim.style.top = kb ? `${Math.round(vv.offsetTop)}px` : "";
+    scrim.style.height = kb ? `${Math.round(vv.height)}px` : "";
+  }
 }
 
 function switchTab(tab) {
@@ -9322,6 +9367,7 @@ function cbOpenPicker() {
 function cbClosePicker() {
   CB_PENDING = null;
   $("cbPickScrim").classList.add("hidden");
+  pinSheets();
 }
 
 function cbRenderPicker() {
@@ -9334,14 +9380,18 @@ function cbRenderPicker() {
         <div class="cb-sheet-title">Add an exercise</div>
         <div class="cb-sheet-count">${n ? `${n} in your workout so far` : "Nothing added yet"}</div>
       </div>
-      <button type="button" class="ds-x" id="cbPickX" aria-label="Done">&times;</button>
     </div>
-    <div class="ex-search-wrap">
-      <input type="text" id="cbSearch" placeholder="Search exercises" autocomplete="off" />
-    </div>
-    <div class="cb-chips" id="cbChips">
-      ${CB_GROUPS.map((g) => `<button type="button" class="cb-chip${g.key === CB_GROUP ? " on" : ""}" data-group="${g.key}">${escapeHtml(g.label)}</button>`).join("")}
-      <button type="button" class="cb-chip${CB_GROUP === "own" ? " on" : ""}" data-group="own">Other</button>
+    <div class="cb-pick-top">
+      <div class="cb-search-row">
+        <div class="ex-search-wrap">
+          <input type="text" id="cbSearch" placeholder="Search exercises" autocomplete="off" />
+        </div>
+        <button type="button" class="ds-x" id="cbPickX" aria-label="Done">&times;</button>
+      </div>
+      <div class="cb-chips" id="cbChips">
+        ${CB_GROUPS.map((g) => `<button type="button" class="cb-chip${g.key === CB_GROUP ? " on" : ""}" data-group="${g.key}">${escapeHtml(g.label)}</button>`).join("")}
+        <button type="button" class="cb-chip${CB_GROUP === "own" ? " on" : ""}" data-group="own">Other</button>
+      </div>
     </div>
     <div class="cb-grid" id="cbGrid"></div>`;
 
@@ -9354,6 +9404,13 @@ function cbRenderPicker() {
     };
   });
   $("cbSearch").oninput = () => cbRenderGrid();
+  /* Focus means the keyboard is coming and the room is about to halve. Scroll
+     the title away so what is left is the field, the categories and results. */
+  $("cbSearch").onfocus = () => {
+    const sheet = $("cbPickSheet"), top = sheet?.querySelector(".cb-pick-top");
+    if (!top) return;
+    setTimeout(() => { sheet.scrollTop = top.offsetTop; pinSheets(); }, 120);
+  };
   cbRenderGrid();
 }
 
