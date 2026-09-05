@@ -44,6 +44,7 @@ const FUNCS = [
   "formatRest", "renderSession", "openEffortInfo",
   "openWorkoutPrivacy", "workoutPrivacy", "defaultWorkoutPrivacy", "privacySummary", "workoutPrivacyLocked",
   "liveDetailsShared", "openGenOverlay", "paintGen", "stopGenTicker", "revealGeneratedPlan",
+  "setGenWord", "startGenWordCycle", "stopGenWordCycle",
 ].map(fn).join("\n");
 
 /* The working-muscles block is more than a function: caches, colour helpers
@@ -53,6 +54,7 @@ const WORKING_MUSCLES = section("/* ---------- Working muscles ----------", "/* 
 /* The three switches are data, and a hand-copied copy of them would drift. */
 const PRIVACY_ROWS = grab(/\nconst PRIVACY_ROWS = \[.*?\n\];\n/s, "PRIVACY_ROWS");
 const GEN_STEPS = grab(/\nconst GEN_STEPS = \[.*?\n\];\n/s, "GEN_STEPS");
+const GEN_WORDS = grab(/\nconst GEN_WORDS = \[.*?\n\];\n/s, "GEN_WORDS");
 
 /* Data the extracted functions close over. Lifted whole rather than retyped,
    because a hand-copied muscle table would drift from the app's within a week. */
@@ -278,7 +280,8 @@ const HITS = ${JSON.stringify(HITS)};
 
 ${PRIVACY_ROWS}
 ${GEN_STEPS}
-let genTimer = null, genPct = 0, genStepAt = 0;
+${GEN_WORDS}
+let genTimer = null, genPct = 0, genStepAt = 0, genWordTimer = null, genWordAt = 0;
 ${FUNCS}
 ${WORKING_MUSCLES}
 
@@ -429,7 +432,7 @@ const STATES = [
     setup: () => { LIVE_PARTNER = liveRow(); PARTNER_PROFILE = { share_workout_details: false }; }, sheet: true },
 
   { group: "Generating a workout", name: "Working on it",
-    note: "Comes up from the bottom of the screen when you press generate. Green fills as it goes and the word turns over as it passes.",
+    note: "Comes up from the bottom when you press generate. The surface is two waves at different speeds, the word changes every half second, and the letters turn over as the water passes them.",
     gen: () => { openGenOverlay("Generating"); paintGen(62); }, setup: () => {} },
 
   { group: "Generating a workout", name: "The plan lands",

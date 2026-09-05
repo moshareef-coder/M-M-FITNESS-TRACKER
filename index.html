@@ -689,13 +689,24 @@
   @keyframes genDown { to { transform: translateY(100%); } }
   .gen-fill {
     position: absolute; left: 0; right: 0; bottom: 0; height: 0;
-    background: linear-gradient(to top, var(--accent), color-mix(in srgb, var(--accent) 82%, transparent));
-    transition: height .55s cubic-bezier(.22,1,.36,1);
+    background: linear-gradient(to top, var(--accent), color-mix(in srgb, var(--accent) 88%, transparent));
+    transition: height .9s cubic-bezier(.33,.7,.4,1);
   }
-  .gen-fill::after {
-    content: ""; position: absolute; left: 0; right: 0; top: -12px; height: 12px;
-    background: linear-gradient(to top, color-mix(in srgb, var(--accent) 55%, transparent), transparent);
+  /* The crest sits above the body of the water, so troughs show the ground
+     through and peaks push past the line. Each is twice as wide as the screen
+     and slides exactly half its width, which is why the loop never seams. */
+  .gen-wave {
+    position: absolute; left: 0; bottom: 100%; width: 200%; height: 34px;
+    display: block; will-change: transform;
   }
+  .gen-wave path { fill: var(--accent); }
+  .gen-wave.back { opacity: .45; animation: genWave 5.4s linear infinite; }
+  .gen-wave.front { animation: genWave 3.1s linear infinite reverse; }
+  @keyframes genWave { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* A slow rise and fall on the whole body of water, so the surface breathes
+     rather than sitting at a dead level between steps. */
+  .gen-fill { animation: genSwell 4.6s ease-in-out infinite; }
+  @keyframes genSwell { 0%, 100% { margin-bottom: 0; } 50% { margin-bottom: 5px; } }
   .gen-stage { position: relative; width: 100%; max-width: 420px; text-align: center; }
   .gen-word-wrap { position: relative; display: inline-block; }
   .gen-word {
@@ -742,9 +753,13 @@
   .gen-err { font-size: 14px; color: rgba(255,255,255,.66); line-height: 1.5; margin: 12px 0 18px; }
   .gen-scrim:not(.done) .gen-focus { color: #f4f6f8; }
   @media (prefers-reduced-motion: reduce) {
-    .gen-scrim, .gen-scrim.leaving, .gen-row, .gen-go { animation: none; }
+    .gen-scrim, .gen-scrim.leaving, .gen-row, .gen-go, .gen-fill, .gen-wave { animation: none; }
     .gen-fill, .gen-word.over { transition: none; }
+    /* The word cycle is stopped in JS too: fast swapping text is exactly what
+       this preference is asking us not to do. */
   }
+  .gen-word-wrap { transition: opacity .09s ease, transform .09s ease; }
+  .gen-word-wrap.swap { opacity: .28; transform: translateY(-4px); }
 
   .clip-scrim {
     position: fixed; inset: 0; z-index: 90; background: #000;
@@ -2641,7 +2656,16 @@
        spinner on a card, the whole screen comes up from the floor and fills
        with green while it thinks, then hands back the plan a row at a time. -->
   <div class="gen-scrim hidden" id="genScrim" role="status" aria-live="polite">
-    <div class="gen-fill" id="genFill"></div>
+    <div class="gen-fill" id="genFill">
+      <!-- Two crests at different speeds and directions. One wave reads as a
+           shape sliding past; two reads as water. -->
+      <svg class="gen-wave back" viewBox="0 0 1200 80" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 44 C 100 14, 200 74, 300 44 S 500 14, 600 44 S 800 74, 900 44 S 1100 14, 1200 44 L1200 80 L0 80 Z" />
+      </svg>
+      <svg class="gen-wave front" viewBox="0 0 1200 80" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 46 C 150 76, 250 16, 400 46 S 650 76, 800 46 S 1050 16, 1200 46 L1200 80 L0 80 Z" />
+      </svg>
+    </div>
     <div class="gen-stage" id="genStage"></div>
   </div>
 
@@ -2725,7 +2749,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.13";
+const APP_VERSION = "2026.09.04.14";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -6513,6 +6537,15 @@ async function loadTodayWorkout() {
    it eases toward 90 while waiting and only reaches 100 when the plan is
    actually in hand, so it never claims to be finished before it is. */
 
+/* The big word changes every half second while it thinks. Short enough to
+   hold the display size on a narrow phone, and daft enough to be worth
+   watching. The first is the honest one; the rest are the joke. */
+const GEN_WORDS = [
+  "Generating", "Cooking", "Scheming", "Plotting", "Percolating", "Marinating",
+  "Noodling", "Brewing", "Concocting", "Summoning", "Manifesting", "Calibrating",
+  "Pondering", "Simmering", "Conspiring", "Deliberating", "Ruminating", "Whisking",
+];
+
 const GEN_STEPS = [
   "Reading your last few weeks",
   "Picking lifts that fit",
@@ -6520,7 +6553,7 @@ const GEN_STEPS = [
   "Setting your weights",
   "Almost there",
 ];
-let genTimer = null, genPct = 0, genStepAt = 0;
+let genTimer = null, genPct = 0, genStepAt = 0, genWordTimer = null, genWordAt = 0;
 
 function openGenOverlay(title) {
   const scrim = $("genScrim");
@@ -6536,6 +6569,7 @@ function openGenOverlay(title) {
     <div class="gen-pct" id="genPct">0%</div>`;
   $("genFill").style.height = "0%";
   scrim.classList.remove("hidden", "leaving");
+  startGenWordCycle(title);
 
   /* Eases in, slows as it approaches 90, and never crosses it on its own. */
   genTimer = setInterval(() => {
@@ -6548,6 +6582,32 @@ function openGenOverlay(title) {
       if (el) { el.style.opacity = "0"; setTimeout(() => { el.textContent = GEN_STEPS[step]; el.style.opacity = "1"; }, 200); }
     }
   }, 180);
+}
+
+function setGenWord(word) {
+  const wrap = $("genStage")?.querySelector(".gen-word-wrap");
+  if (!wrap) return;
+  wrap.classList.add("swap");
+  setTimeout(() => {
+    wrap.querySelectorAll(".gen-word").forEach((el) => { el.textContent = word; });
+    wrap.classList.remove("swap");
+    paintGen(genPct);   // the new word is a new box, so the waterline is re-measured
+  }, 90);
+}
+
+function startGenWordCycle(first) {
+  stopGenWordCycle();
+  genWordAt = 0;
+  if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  genWordTimer = setInterval(() => {
+    genWordAt++;
+    const list = GEN_WORDS.filter((w) => w !== first);
+    setGenWord(list[genWordAt % list.length]);
+  }, 550);
+}
+
+function stopGenWordCycle() {
+  if (genWordTimer) { clearInterval(genWordTimer); genWordTimer = null; }
 }
 
 function paintGen(pct) {
@@ -6569,6 +6629,7 @@ function paintGen(pct) {
 
 function stopGenTicker() {
   if (genTimer) { clearInterval(genTimer); genTimer = null; }
+  stopGenWordCycle();
 }
 
 function closeGenOverlay() {

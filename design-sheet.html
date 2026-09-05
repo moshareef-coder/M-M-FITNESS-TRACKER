@@ -673,13 +673,24 @@
   @keyframes genDown { to { transform: translateY(100%); } }
   .gen-fill {
     position: absolute; left: 0; right: 0; bottom: 0; height: 0;
-    background: linear-gradient(to top, var(--accent), color-mix(in srgb, var(--accent) 82%, transparent));
-    transition: height .55s cubic-bezier(.22,1,.36,1);
+    background: linear-gradient(to top, var(--accent), color-mix(in srgb, var(--accent) 88%, transparent));
+    transition: height .9s cubic-bezier(.33,.7,.4,1);
   }
-  .gen-fill::after {
-    content: ""; position: absolute; left: 0; right: 0; top: -12px; height: 12px;
-    background: linear-gradient(to top, color-mix(in srgb, var(--accent) 55%, transparent), transparent);
+  /* The crest sits above the body of the water, so troughs show the ground
+     through and peaks push past the line. Each is twice as wide as the screen
+     and slides exactly half its width, which is why the loop never seams. */
+  .gen-wave {
+    position: absolute; left: 0; bottom: 100%; width: 200%; height: 34px;
+    display: block; will-change: transform;
   }
+  .gen-wave path { fill: var(--accent); }
+  .gen-wave.back { opacity: .45; animation: genWave 5.4s linear infinite; }
+  .gen-wave.front { animation: genWave 3.1s linear infinite reverse; }
+  @keyframes genWave { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* A slow rise and fall on the whole body of water, so the surface breathes
+     rather than sitting at a dead level between steps. */
+  .gen-fill { animation: genSwell 4.6s ease-in-out infinite; }
+  @keyframes genSwell { 0%, 100% { margin-bottom: 0; } 50% { margin-bottom: 5px; } }
   .gen-stage { position: relative; width: 100%; max-width: 420px; text-align: center; }
   .gen-word-wrap { position: relative; display: inline-block; }
   .gen-word {
@@ -726,9 +737,13 @@
   .gen-err { font-size: 14px; color: rgba(255,255,255,.66); line-height: 1.5; margin: 12px 0 18px; }
   .gen-scrim:not(.done) .gen-focus { color: #f4f6f8; }
   @media (prefers-reduced-motion: reduce) {
-    .gen-scrim, .gen-scrim.leaving, .gen-row, .gen-go { animation: none; }
+    .gen-scrim, .gen-scrim.leaving, .gen-row, .gen-go, .gen-fill, .gen-wave { animation: none; }
     .gen-fill, .gen-word.over { transition: none; }
+    /* The word cycle is stopped in JS too: fast swapping text is exactly what
+       this preference is asking us not to do. */
   }
+  .gen-word-wrap { transition: opacity .09s ease, transform .09s ease; }
+  .gen-word-wrap.swap { opacity: .28; transform: translateY(-4px); }
 
   .clip-scrim {
     position: fixed; inset: 0; z-index: 90; background: #000;
