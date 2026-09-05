@@ -966,6 +966,95 @@
   }
   .ef-note { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0 0 14px; }
 
+  /* ---- Building a workout: pick from cards, watch the body fill in ----
+     The old screen was a text field and a list that rebuilt itself on every
+     add, so nothing could move. This one keeps its shell and changes only what
+     changed, which is what lets any of it animate. */
+  .cb-hero {
+    display: flex; gap: 14px; align-items: center; padding: 14px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 16px; margin-bottom: 12px;
+  }
+  .cb-fig { width: 78px; height: 214px; flex-shrink: 0; display: block; }
+  .cb-facts { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .cb-count { font-size: 22px; font-weight: 800; letter-spacing: -.03em; }
+  .cb-count span { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+  .cb-groups { font-size: 13px; color: var(--muted); line-height: 1.4; }
+  .cb-empty { font-size: 13px; color: var(--muted); line-height: 1.45; }
+
+  .cb-chips { display: flex; gap: 7px; overflow-x: auto; padding: 2px 0 10px; scrollbar-width: none; }
+  .cb-chips::-webkit-scrollbar { display: none; }
+  .cb-chip {
+    flex-shrink: 0; font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
+    padding: 8px 14px; border-radius: 100px; white-space: nowrap;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+    transition: background-color .18s, color .18s, border-color .18s;
+  }
+  .cb-chip.on { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+
+  .cb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .cb-card {
+    position: relative; overflow: hidden; text-align: left; cursor: pointer; font: inherit;
+    padding: 12px 12px 11px; border-radius: 14px; min-height: 74px;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    display: flex; flex-direction: column; justify-content: space-between; gap: 6px;
+    animation: cbIn .3s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
+    transition: transform .16s cubic-bezier(.22,1,.36,1), border-color .16s;
+  }
+  @keyframes cbIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .cb-card:active { transform: scale(.96); }
+  .cb-card-name { font-size: 14px; font-weight: 700; line-height: 1.25; }
+  .cb-card-meta { font-size: 11.5px; color: var(--muted); text-transform: capitalize; }
+  .cb-card.picked { border-color: var(--accent); }
+  .cb-card .cb-tick {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: var(--accent); color: var(--on-accent); opacity: 0;
+  }
+  .cb-card.flash .cb-tick { animation: cbFlash .55s ease both; }
+  @keyframes cbFlash { 0% { opacity: 0; } 22% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
+  .cb-none { color: var(--muted); font-size: 13.5px; padding: 12px 2px 18px; }
+
+  .cb-line-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 2px 0 8px;
+  }
+  .cb-line-head h3 { margin: 0; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .cb-row {
+    display: flex; align-items: center; gap: 10px; padding: 10px 11px; border-radius: 13px; margin-bottom: 7px;
+    background: var(--panel); border: 1px solid var(--border);
+    animation: cbRow .34s cubic-bezier(.22,1,.36,1) both;
+  }
+  @keyframes cbRow { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+  .cb-row.going { animation: cbOut .24s ease-in forwards; }
+  @keyframes cbOut { to { opacity: 0; transform: translateX(22px); height: 0; margin: 0; padding-top: 0; padding-bottom: 0; } }
+  .cb-n {
+    width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; background: var(--panel-2); color: var(--muted);
+  }
+  .cb-row-body { flex: 1; min-width: 0; }
+  .cb-row-name { font-size: 14.5px; font-weight: 700; }
+  .cb-row-sets { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cb-step { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+  .cb-step button {
+    width: 27px; height: 27px; border-radius: 50%; font: inherit; font-size: 15px; line-height: 1; cursor: pointer;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cb-step button:active { opacity: .6; }
+  .cb-x {
+    width: 27px; height: 27px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+    background: none; border: none; color: var(--muted); display: flex; align-items: center; justify-content: center;
+  }
+  .cb-go {
+    position: sticky; bottom: 0; z-index: 4; padding: 10px 0 calc(10px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(to top, var(--bg) 62%, transparent);
+    animation: cbRise .3s cubic-bezier(.22,1,.36,1) both;
+  }
+  .cb-go button { margin: 0; }
+  @keyframes cbRise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .cb-card, .cb-row, .cb-row.going, .cb-card.flash .cb-tick, .cb-go { animation: none; }
+    .cb-card:active { transform: none; }
+  }
+
   /* Per workout privacy: the way in from the plan screen, the three switches,
      and the small chip that reopens them mid workout. */
   .wp-open {
@@ -2790,7 +2879,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.22";
+const APP_VERSION = "2026.09.04.23";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -8318,122 +8407,277 @@ async function saveActivity() {
   renderWorkoutTab();
 }
 
+/* ---- Building a workout ----
+   Pick exercises off cards and watch the body you are about to train fill in.
+   The shell is rendered once and then only the parts that change are touched,
+   because the old version called renderWorkoutTab() after every add, which
+   rebuilt the whole tab and made any transition impossible. */
+
+const CB_GROUPS = [
+  { key: "all", label: "All", cats: null },
+  { key: "chest", label: "Chest", cats: ["chest"] },
+  { key: "back", label: "Back", cats: ["lats", "traps", "lowerback"] },
+  { key: "shoulders", label: "Shoulders", cats: ["shoulders"] },
+  { key: "arms", label: "Arms", cats: ["biceps", "triceps", "forearms"] },
+  { key: "legs", label: "Legs", cats: ["quads", "hamstrings", "glutes", "calves"] },
+  { key: "core", label: "Core", cats: ["abs", "obliques"] },
+];
+let CB_GROUP = "all";
+let cbBodyCtrl = null;
+
+function cbExercisesFor(groupKey, query) {
+  const group = CB_GROUPS.find((g) => g.key === groupKey) || CB_GROUPS[0];
+  const cats = EXERCISE_TRAININGS.flatMap((t) => t.categories);
+  const picked = group.cats ? cats.filter((c) => group.cats.includes(c.key)) : cats;
+  const q = normalizeSearch(query || "");
+  const out = [];
+  const seen = new Set();
+  for (const c of picked) {
+    for (const ex of c.exercises) {
+      if (seen.has(ex.name)) continue;
+      if (q && !normalizeSearch(ex.name).includes(q)) continue;
+      seen.add(ex.name);
+      out.push(ex);
+    }
+  }
+  return out;
+}
+
 function renderManualBuildScreen() {
-  const rows = `<div class="reorder-list" id="draftRows">${MANUAL_DRAFT.map((ex, i) => `
-    <div class="exercise-row draggable" data-idx="${i}">
-      <button type="button" class="grip" data-grip aria-label="Drag to reorder">${icon("grip", 16)}</button>
-      <div class="ex-order">${i + 1}</div>
-      <div class="ex-body">
-        <div class="ex-name">${escapeHtml(ex.name)}</div>
-        <div class="ex-target">${ex.sets} sets · ${ex.reps} reps</div>
-      </div>
-      <button type="button" class="row-btn" data-remove-draft="${i}" title="Remove">${icon("close", 13)}</button>
-    </div>`).join("")}</div>`;
-
   $("workoutContent").innerHTML = `
-    ${backBar("Back", () => { saveDraft(); WORKOUT_MODE = "choose"; renderWorkoutTab(); })}
-    ${rows}
-    <div class="add-ex-form">
-      <div class="ex-search-wrap">
-        <input type="text" id="manualExName" placeholder="Exercise name" autocomplete="off" />
-        <div class="ex-suggest hidden" id="manualExSuggest"></div>
-      </div>
-      <div class="stepper-row compact" id="manualExStepperRow"></div>
-      <button type="button" class="btn-secondary" id="manualAddExBtn">Add to plan</button>
+    ${backBar("Back", () => { saveDraft(); cbTeardown(); WORKOUT_MODE = "choose"; renderWorkoutTab(); })}
+    <div class="cb-hero">
+      <canvas class="cb-fig" id="cbFigure"></canvas>
+      <div class="cb-facts" id="cbFacts"></div>
     </div>
-    <button type="button" class="btn-primary" id="manualStartBtn" style="margin-top:10px;">Start Workout</button>
-    <button type="button" class="btn-ghost" id="manualCancelBtn">Cancel</button>`;
+    <!-- The list sits above the picker deliberately: the grid runs to dozens of
+         cards, and a lineup underneath it would mean never seeing the thing you
+         just added. -->
+    <div id="cbLineWrap" class="hidden">
+      <div class="cb-line-head"><h3>Your workout</h3><span class="cb-row-sets" id="cbTotal"></span></div>
+      <div class="reorder-list" id="draftRows"></div>
+    </div>
+    <div class="ex-search-wrap">
+      <input type="text" id="cbSearch" placeholder="Search exercises" autocomplete="off" />
+    </div>
+    <div class="cb-chips" id="cbChips">
+      ${CB_GROUPS.map((g) => `<button type="button" class="cb-chip${g.key === CB_GROUP ? " on" : ""}" data-group="${g.key}">${escapeHtml(g.label)}</button>`).join("")}
+    </div>
+    <div class="cb-grid" id="cbGrid"></div>
+    <button type="button" class="btn-ghost" id="manualCancelBtn">Cancel</button>
+    <!-- Follows you down the grid, so Start is never a scroll away. -->
+    <div class="cb-go hidden" id="cbGo">
+      <button type="button" class="btn-primary" id="manualStartBtn">Start Workout</button>
+    </div>`;
 
-  buildStepperRow("manualExStepperRow", [
-    { key: "sets", unit: "sets", step: 1, min: 1 },
-    { key: "reps", unit: "reps", step: 1, min: 1 },
-  ], ADD_EX_STATE);
-
-  makeReorderable($("draftRows"), (order) => {
-    MANUAL_DRAFT = order.map((i) => MANUAL_DRAFT[i]);
-    saveDraft();
-    renderWorkoutTab();
-  });
-
-  $("workoutContent").querySelectorAll("[data-remove-draft]").forEach((btn) => {
-    btn.onclick = () => {
-      MANUAL_DRAFT.splice(parseInt(btn.dataset.removeDraft, 10), 1);
-      saveDraft();
-      renderWorkoutTab();
+  $("cbChips").querySelectorAll("[data-group]").forEach((b) => {
+    b.onclick = () => {
+      CB_GROUP = b.dataset.group;
+      $("cbChips").querySelectorAll(".cb-chip").forEach((c) => c.classList.toggle("on", c === b));
+      cbRenderGrid();
     };
   });
-  $("manualAddExBtn").onclick = () => {
-    const name = $("manualExName").value.trim();
-    if (!name) return;
-    MANUAL_DRAFT.push({ name, sets: ADD_EX_STATE.sets, reps: ADD_EX_STATE.reps, targetWeight: 0 });
-    ADD_EX_STATE.sets = 3; ADD_EX_STATE.reps = 8;
-    saveDraft();
-    renderWorkoutTab();
-  };
-  wireManualExSearch();
+  $("cbSearch").oninput = () => cbRenderGrid();
+
+  cbRenderGrid();
+  cbRenderLineup();
+  cbUpdateCharacter();
+  cbMountFigure();
+
   $("manualStartBtn").onclick = () => {
-    // Typing an exercise and hitting Start without tapping "Add to plan" is the
-    // obvious thing to do, so treat it as adding it rather than doing nothing.
-    const pending = $("manualExName").value.trim();
-    if (pending) {
-      MANUAL_DRAFT.push({ name: pending, sets: ADD_EX_STATE.sets, reps: ADD_EX_STATE.reps, targetWeight: 0 });
-      ADD_EX_STATE.sets = 3; ADD_EX_STATE.reps = 8;
-      saveDraft();
-    }
-    if (!MANUAL_DRAFT.length) { toast("Add an exercise first"); return; }
+    if (!MANUAL_DRAFT.length) { toast("Pick at least one exercise"); return; }
+    cbTeardown();
     saveManualWorkout();
   };
   $("manualCancelBtn").onclick = () => {
     if (MANUAL_DRAFT.length && !confirm(`Discard ${MANUAL_DRAFT.length} exercise${MANUAL_DRAFT.length === 1 ? "" : "s"} you added?`)) return;
+    cbTeardown();
     WORKOUT_MODE = null;
     clearDraft();
     renderWorkoutTab();
   };
 }
 
-/* Live search-as-you-type against the exercise catalog for the manual "Add exercise" field.
-   EXERCISE_TRAININGS loads asynchronously (see the dynamic import near the top of this file),
-   so this is a no-op until it lands rather than throwing on an empty array. */
-function wireManualExSearch() {
-  const input = $("manualExName");
-  const box = $("manualExSuggest");
-  let activeIndex = -1;
-
-  function hide() { box.classList.add("hidden"); box.innerHTML = ""; activeIndex = -1; }
-
-  function renderSuggestions(results) {
-    if (!results.length) { hide(); return; }
-    box.innerHTML = results.map((ex, i) => `
-      <div class="ex-suggest-row" data-i="${i}">
-        <div class="ex-suggest-name">${escapeHtml(ex.name)}</div>
-        <div class="ex-suggest-sub">${(ex.primary || []).join(", ")}${ex.equipment ? " · " + ex.equipment : ""}</div>
-      </div>`).join("");
-    box.classList.remove("hidden");
-    box.querySelectorAll(".ex-suggest-row").forEach((row) => {
-      row.onmousedown = (e) => {
-        // mousedown (not click) so this fires before the input's blur handler hides the box
-        e.preventDefault();
-        input.value = results[parseInt(row.dataset.i, 10)].name;
-        hide();
-      };
-    });
-  }
-
-  input.addEventListener("input", () => {
-    if (!EXERCISE_TRAININGS.length) return; // library still loading
-    renderSuggestions(searchExerciseCatalog(input.value));
-  });
-  input.addEventListener("blur", () => setTimeout(hide, 120));
-  input.addEventListener("keydown", (e) => {
-    const rows = [...box.querySelectorAll(".ex-suggest-row")];
-    if (!rows.length) return;
-    if (e.key === "ArrowDown") { e.preventDefault(); activeIndex = Math.min(activeIndex + 1, rows.length - 1); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); activeIndex = Math.max(activeIndex - 1, 0); }
-    else if (e.key === "Enter" && activeIndex >= 0) { e.preventDefault(); rows[activeIndex].dispatchEvent(new Event("mousedown")); return; }
-    else return;
-    rows.forEach((r, i) => r.classList.toggle("active", i === activeIndex));
+function cbRenderGrid() {
+  const grid = $("cbGrid");
+  if (!grid) return;
+  if (!EXERCISE_TRAININGS.length) { grid.innerHTML = `<div class="cb-none">Loading the exercise library…</div>`; return; }
+  const list = cbExercisesFor(CB_GROUP, $("cbSearch")?.value || "").slice(0, 60);
+  if (!list.length) { grid.innerHTML = `<div class="cb-none">Nothing matches that. Try another word, or a different group.</div>`; return; }
+  const chosen = new Set(MANUAL_DRAFT.map((e) => e.name));
+  grid.innerHTML = list.map((ex, i) => `
+    <button type="button" class="cb-card${chosen.has(ex.name) ? " picked" : ""}" data-add="${escapeHtml(ex.name)}" style="--d:${Math.min(i, 12) * 22}ms">
+      <span class="cb-card-name">${escapeHtml(ex.name)}</span>
+      <span class="cb-card-meta">${escapeHtml(ex.equipment || "")}${ex.level ? ` · ${escapeHtml(ex.level)}` : ""}</span>
+      <span class="cb-tick">${icon("check", 26)}</span>
+    </button>`).join("");
+  grid.querySelectorAll("[data-add]").forEach((b) => {
+    b.onclick = () => cbAdd(b.dataset.add, b);
   });
 }
+
+/* Adding never re-renders the grid or the list: the new row is appended and
+   animates itself in, and the card flashes where the finger already is. */
+function cbAdd(name, card) {
+  MANUAL_DRAFT.push({ name, sets: 3, reps: 10, targetWeight: 0 });
+  saveDraft();
+  card?.classList.add("picked", "flash");
+  setTimeout(() => card?.classList.remove("flash"), 600);
+  const rows = $("draftRows");
+  if (rows) {
+    const el = document.createElement("div");
+    el.innerHTML = cbRowHTML(MANUAL_DRAFT[MANUAL_DRAFT.length - 1], MANUAL_DRAFT.length - 1);
+    const row = el.firstElementChild;
+    rows.appendChild(row);
+    cbWireRow(row);
+  }
+  cbUpdateCharacter();
+}
+
+function cbRowHTML(ex, i) {
+  return `<div class="cb-row exercise-row draggable" data-idx="${i}">
+    <span class="cb-n">${i + 1}</span>
+    <span class="cb-row-body">
+      <span class="cb-row-name">${escapeHtml(ex.name)}</span>
+      <span class="cb-row-sets" data-sets>${ex.sets} × ${ex.reps}</span>
+    </span>
+    <span class="cb-step">
+      <button type="button" data-less aria-label="Fewer sets">&minus;</button>
+      <button type="button" data-more aria-label="More sets">+</button>
+    </span>
+    <button type="button" class="cb-x" data-drop aria-label="Remove">${icon("close", 14)}</button>
+  </div>`;
+}
+
+function cbWireRow(row) {
+  const idxOf = () => [...$("draftRows").children].indexOf(row);
+  const redraw = () => {
+    const ex = MANUAL_DRAFT[idxOf()];
+    if (ex) row.querySelector("[data-sets]").textContent = `${ex.sets} × ${ex.reps}`;
+    cbUpdateCharacter();
+  };
+  row.querySelector("[data-less]").onclick = () => {
+    const ex = MANUAL_DRAFT[idxOf()];
+    if (ex && ex.sets > 1) { ex.sets--; saveDraft(); redraw(); }
+  };
+  row.querySelector("[data-more]").onclick = () => {
+    const ex = MANUAL_DRAFT[idxOf()];
+    if (ex && ex.sets < 10) { ex.sets++; saveDraft(); redraw(); }
+  };
+  row.querySelector("[data-drop]").onclick = () => {
+    const i = idxOf();
+    if (i < 0) return;
+    const gone = MANUAL_DRAFT[i].name;
+    MANUAL_DRAFT.splice(i, 1);
+    saveDraft();
+    row.classList.add("going");
+    setTimeout(() => {
+      row.remove();
+      cbRenumber();
+      cbUpdateCharacter();
+      if (!MANUAL_DRAFT.some((e) => e.name === gone)) {
+        $("cbGrid")?.querySelector(`[data-add="${CSS.escape(gone)}"]`)?.classList.remove("picked");
+      }
+    }, 240);
+  };
+}
+
+function cbRenumber() {
+  [...($("draftRows")?.children || [])].forEach((row, i) => {
+    row.dataset.idx = i;
+    const n = row.querySelector(".cb-n");
+    if (n) n.textContent = i + 1;
+  });
+}
+
+function cbRenderLineup() {
+  const rows = $("draftRows");
+  if (!rows) return;
+  rows.innerHTML = MANUAL_DRAFT.map((ex, i) => cbRowHTML(ex, i)).join("");
+  [...rows.children].forEach(cbWireRow);
+  makeReorderable(rows, (order) => {
+    MANUAL_DRAFT = order.map((i) => MANUAL_DRAFT[i]);
+    saveDraft();
+    cbRenumber();
+  });
+}
+
+/* The character sheet: how many, how much, and which muscles it adds up to. */
+function cbUpdateCharacter() {
+  const facts = $("cbFacts");
+  const total = MANUAL_DRAFT.reduce((n, e) => n + (e.sets || 0), 0);
+  if ($("cbTotal")) $("cbTotal").textContent = MANUAL_DRAFT.length ? `${total} sets` : "";
+  $("cbLineWrap")?.classList.toggle("hidden", !MANUAL_DRAFT.length);
+  $("cbGo")?.classList.toggle("hidden", !MANUAL_DRAFT.length);
+  if (facts) {
+    if (!MANUAL_DRAFT.length) {
+      facts.innerHTML = `<div class="cb-count">Build it<span></span></div>
+        <div class="cb-empty">Tap an exercise below. The body fills in as you go, so you can see what you are actually training.</div>`;
+    } else {
+      const groups = cbGroupsHit();
+      facts.innerHTML = `<div class="cb-count">${MANUAL_DRAFT.length} <span>exercise${MANUAL_DRAFT.length === 1 ? "" : "s"} · ${total} sets</span></div>
+        <div class="cb-groups">${groups.length ? escapeHtml(bodyGroupsPhrase(groups)) : "Nothing recognised yet"}</div>`;
+    }
+  }
+  cbPaintFigure();
+}
+
+function cbGroupsHit() {
+  const out = [];
+  for (const ex of MANUAL_DRAFT) {
+    const rule = classifyMuscles(ex.name);
+    for (const g of [...(rule?.primary || []), ...(rule?.secondary || [])]) {
+      if (!out.includes(g)) out.push(g);
+    }
+  }
+  const order = Object.keys(BODY_GROUP_LABELS);
+  return out.sort((a, b) => order.indexOf(a) - order.indexOf(b)).slice(0, 6);
+}
+
+/* Muscles accumulate: one exercise warms a muscle, several light it right up,
+   which is what makes adding to the list feel like it is building something. */
+function cbIntensities() {
+  const score = {};
+  for (const ex of MANUAL_DRAFT) {
+    const hit = BODY_DETAIL?.detail?.hitsForExercise(ex.name, classifyMuscles(ex.name));
+    if (!hit) continue;
+    for (const [key, w] of Object.entries(hit.hits)) score[key] = (score[key] || 0) + w;
+  }
+  const out = {};
+  for (const [key, v] of Object.entries(score)) {
+    out[key] = v >= 2 ? 4 : v >= 1.5 ? 3 : v >= 1 ? 2 : 1;
+  }
+  return out;
+}
+
+async function cbMountFigure() {
+  cbTeardown();   // re-entering the screen must not stack a second live instance
+  try {
+    const [mod] = await Promise.all([ensureRiveBodyModule(), ensureBodyDetailModules()]);
+    const canvas = $("cbFigure");
+    if (!canvas || !canvas.isConnected) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.round(canvas.clientWidth * dpr);
+    canvas.height = Math.round(canvas.clientHeight * dpr);
+    const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
+    cbBodyCtrl = mod.createBodyHeatmap({
+      canvas, artboardName: `${sex}-Front`, palette: mod.APP_HEAT_PALETTE,
+      intensities: cbIntensities(),
+    });
+  } catch (e) {
+    console.warn("build figure unavailable", e);
+  }
+}
+
+function cbPaintFigure() {
+  cbBodyCtrl?.setIntensities(cbIntensities());
+}
+
+function cbTeardown() {
+  try { cbBodyCtrl?.destroy(); } catch {}
+  cbBodyCtrl = null;
+}
+
 
 /* Name a workout after what is actually in it. "Custom Workout" tells the user
    nothing they did not already know, and reads like a database default. The
