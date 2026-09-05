@@ -3284,7 +3284,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.43";
+const APP_VERSION = "2026.09.04.44";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -4403,8 +4403,17 @@ async function loadAll() {
   applyAccentColors();
 
   renderAvatarPair();
-  renderHome(!HOME_PAINTED);
-  HOME_PAINTED = true;
+  /* loadAll runs after nearly every write anywhere in the app, logging a set
+     mid-session included, and Home is not on screen for most of those. It
+     used to repaint anyway: a full re-render of a tab nobody is looking at,
+     every single time. switchTab("home") already forces its own repaint on
+     the way in, so skipping this one costs nothing when you actually open
+     the tab, only when you would not have seen it. */
+  const homeShown = !$("tab-home")?.classList.contains("hidden");
+  if (homeShown || !HOME_PAINTED) {
+    renderHome(!HOME_PAINTED);
+    HOME_PAINTED = true;
+  }
   /* A write nobody is waiting on. It used to sit between the data and the
      first paint, holding the whole screen for a round trip. */
   captureTimezone().catch(() => {});
