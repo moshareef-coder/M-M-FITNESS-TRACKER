@@ -703,7 +703,6 @@
        of the body is going to be before it is there. */
     mask-image: linear-gradient(to top, #000 0 var(--rev), rgba(0,0,0,.14) var(--rev));
     -webkit-mask-image: linear-gradient(to top, #000 0 var(--rev), rgba(0,0,0,.14) var(--rev));
-    transition: mask-image .5s linear, -webkit-mask-image .5s linear;
   }
   #genBodyCanvas { width: 100%; height: 100%; display: block; }
   /* The build line, with its own glow and a soft wash just under it. */
@@ -711,7 +710,6 @@
     position: absolute; left: -14%; right: -14%; bottom: var(--rev); height: 2px;
     background: var(--accent);
     box-shadow: 0 0 18px 3px color-mix(in srgb, var(--accent) 65%, transparent);
-    transition: bottom .5s linear;
   }
   .gen-scan::after {
     content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 46px;
@@ -776,7 +774,6 @@
   .gen-scrim:not(.done) .gen-focus { color: #f4f6f8; }
   @media (prefers-reduced-motion: reduce) {
     .gen-scrim, .gen-scrim.leaving, .gen-row, .gen-go, .gen-grid { animation: none; }
-    .gen-body-mask, .gen-scan { transition: none; }
     /* The word cycle is stopped in JS too: fast swapping text is exactly what
        this preference is asking us not to do. */
   }
@@ -2578,6 +2575,7 @@ const GEN_WORDS = [
 ];
 
 let genTimer = null, genPct = 0, genStepAt = 0, genWordTimer = null, genWordAt = 0, genBodyCtrl = null;
+let genRaf = null, genRevShown = 0;
 
 function icon(name, size = 18) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px">${ICON_PATHS[name] || ""}</svg>`;
@@ -3369,6 +3367,8 @@ function openGenOverlay(title) {
     </div>
     <div class="gen-pct" id="genPct">0%</div>`;
   scrim.classList.remove("hidden", "leaving");
+  genRevShown = 0;
+  $("genHolo")?.style.setProperty("--rev", "0%");
   paintGen(0);
   startGenWordCycle(title);
   mountGenBody();
@@ -3388,12 +3388,8 @@ function openGenOverlay(title) {
 
 
 function paintGen(pct) {
-  const p = Math.max(0, Math.min(100, pct));
-  /* One number drives everything: how much of the body has been built, and
-     where the scan line sits. Both read --rev off the same element. */
-  $("genHolo")?.style.setProperty("--rev", `${p}%`);
-  const label = $("genPct");
-  if (label) label.textContent = `${Math.round(p)}%`;
+  genPct = Math.max(0, Math.min(100, pct));
+  startGenRaf();
 }
 
 
@@ -3435,7 +3431,6 @@ function setGenWord(word) {
   setTimeout(() => {
     wrap.querySelectorAll(".gen-word").forEach((el) => { el.textContent = word; });
     wrap.classList.remove("swap");
-    paintGen(genPct);   // the new word is a new box, so the waterline is re-measured
   }, 90);
 }
 
@@ -3482,6 +3477,27 @@ async function mountGenBody() {
 function unmountGenBody() {
   try { genBodyCtrl?.destroy(); } catch {}
   genBodyCtrl = null;
+}
+
+
+function startGenRaf() {
+  if (genRaf) return;
+  const step = () => {
+    const scrim = $("genScrim");
+    if (!scrim || scrim.classList.contains("hidden")) { genRaf = null; return; }
+    const gap = genPct - genRevShown;
+    genRevShown += Math.abs(gap) < 0.15 ? gap : gap * 0.12;
+    $("genHolo")?.style.setProperty("--rev", `${genRevShown.toFixed(2)}%`);
+    const label = $("genPct");
+    if (label) label.textContent = `${Math.round(genRevShown)}%`;
+    genRaf = requestAnimationFrame(step);
+  };
+  genRaf = requestAnimationFrame(step);
+}
+
+
+function stopGenRaf() {
+  if (genRaf) { cancelAnimationFrame(genRaf); genRaf = null; }
 }
 
 /* ---------- Working muscles ----------
