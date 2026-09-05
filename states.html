@@ -1422,9 +1422,11 @@
   .hero-sub { font-size: 14px; color: var(--muted); margin: 4px 0 0; line-height: 1.4; }
   /* The streak badge: one number, one label, a soft green pill. */
   .streak-badge {
+    font: inherit; border: none; cursor: pointer; text-align: center;
     flex-shrink: 0; display: flex; flex-direction: column; align-items: center; padding: 7px 12px 6px; border-radius: 100px;
     background: color-mix(in srgb, var(--accent) 12%, var(--panel)); color: var(--text);
   }
+  .streak-badge:active { transform: scale(.97); }
   .streak-badge .sb-top { display: flex; align-items: center; gap: 4px; }
   .streak-badge .sb-top svg { color: var(--accent); }
   .streak-badge b { font-size: 21px; font-weight: 800; letter-spacing: -.04em; line-height: 1; font-family: var(--font-display); }
@@ -2295,16 +2297,16 @@
 
   .bi-section { display: flex; align-items: center; gap: 7px; font-size: 21px; font-weight: 700; letter-spacing: -.02em; margin: 18px 0 14px; }
   /* The ring stays 18px. The box around it is 32, which is what a thumb needs. */
-  .bi-info {
+  .info-dot, .bi-info {
     width: 32px; height: 32px; margin: -7px; border-radius: 50%; color: var(--muted);
     font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
     background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; line-height: 1;
   }
-  .bi-info::before {
+  .info-dot::before, .bi-info::before {
     content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid currentColor;
   }
-  .bi-info { position: relative; }
-  .bi-info:active { color: var(--text); border-color: var(--text); }
+  .info-dot, .bi-info { position: relative; }
+  .info-dot:active, .bi-info:active { color: var(--text); }
   .bi-rings { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
   .bi-ring {
     display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0;
@@ -2345,6 +2347,29 @@
   .bi-ins-val { font-size: 21px; font-weight: 700; color: var(--accent-ink); white-space: nowrap; letter-spacing: -.02em; flex-shrink: 0; }
   .bi-ins-val.small { font-size: 12.5px; padding-top: 2px; text-align: right; white-space: normal; max-width: 45%; }
   .bi-ins-val.muted { color: var(--muted); }
+
+  /* What to train next: the answer first, the working underneath. */
+  .nx-answer { padding: 2px 0 14px; }
+  .nx-head { font-size: 24px; font-weight: 800; letter-spacing: -.03em; line-height: 1.15; }
+  .nx-why { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 6px 0 0; }
+  .nx-rows { display: flex; flex-direction: column; gap: 1px; border-top: 1px solid var(--border); }
+  .nx-row {
+    display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: baseline;
+    padding: 11px 0; border-bottom: 1px solid var(--border);
+  }
+  .nx-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .nx-k { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .nx-v { display: flex; flex-wrap: wrap; gap: 5px; }
+  .nx-text { font-size: 12.5px; color: var(--text); line-height: 1.45; }
+  .nx-chip {
+    font-size: 12.5px; font-weight: 700; padding: 3px 9px; border-radius: 100px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  }
+  .nx-chip i { font-style: normal; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .nx-chip.go { background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: transparent; color: var(--accent-ink); }
+  .nx-chip.rest { background: color-mix(in srgb, var(--partner) 12%, transparent); border-color: transparent; color: var(--partner); }
+  .nx-chip.rest i { color: inherit; opacity: .75; }
+  .nx-none { font-size: 12.5px; color: var(--muted); }
 
   .bi-share { display: flex; align-items: center; gap: 12px; }
   .bi-share .av { width: 44px; height: 44px; font-size: 15.5px; border-width: 2px; cursor: default; }
@@ -2782,7 +2807,7 @@
 
     <div class="card">
       <div class="card-head">
-        <h2>This week</h2>
+        <h2>This week <button type="button" class="info-dot" data-info="weekStrip" aria-label="What the day tiles mean">i</button></h2>
         <div class="wk-legend" id="weekLegend"></div>
       </div>
       <!-- Seven columns, one dot per person per day, so a day reads down its
@@ -3070,12 +3095,112 @@ const finishExerciseAndAdvance = () => {};
 let riveBodyPromise = null, bodyDetailPromise = null;
 const ensureRiveBodyModule = () => Promise.resolve(null);
 const ensureBodyDetailModules = () => Promise.resolve(BODY_DETAIL);
+const BODY_RECOVERY_HOURS = 48;
 let BODY_DETAIL = { detail: {
   hitsForExercise: (name) => HITS[String(name).toLowerCase()] || null,
   MUSCLE_PIECES: {"deltoids":{"label":"Shoulder","group":"shoulders","where":"front and side of the shoulder","heads":["anteriorDeltoid","lateralDeltoid"],"try":"Lateral raise"},"posteriorDeltoid":{"label":"Rear Shoulder","group":"shoulders","where":"back of the shoulder","try":"Face pull"},"pectoralisMajor":{"label":"Chest","group":"chest","where":"the chest","heads":["pecClavicular","pecSternal"],"try":"Bench press"},"trapezius":{"label":"Upper Back","group":"traps","where":"neck down to mid back","heads":["upperTraps","midTraps","lowerTraps"],"try":"Shrug"},"sternocleidomastoid":{"label":"Neck","group":"traps","where":"front of the neck","try":"Neck flexion"},"latissimusDorsi":{"label":"Middle Back","group":"lats","where":"the wide back muscle","try":"Lat pulldown"},"teresMajor":{"label":"Back of Armpit","group":"lats","where":"just behind the armpit","try":"Row"},"erectorSpinae":{"label":"Lower Back","group":"lowerback","where":"either side of the spine","try":"Back extension"},"biceps":{"label":"Bicep","group":"biceps","where":"front of the upper arm","heads":["bicepsLong","bicepsShort"],"try":"Curl"},"brachialis":{"label":"Deep Bicep","group":"biceps","where":"under the biceps","try":"Hammer curl"},"tricepsBrachii":{"label":"Tricep","group":"triceps","where":"back of the upper arm","heads":["tricepsLong","tricepsLateral","tricepsMedial"],"try":"Pushdown"},"brachioradialis":{"label":"Outer Forearm","group":"forearms","where":"thumb side of the forearm","try":"Hammer curl"},"flexorCarpiRadialis":{"label":"Inner Forearm","group":"forearms","where":"inner forearm","try":"Wrist curl"},"flexorCarpiUlnaris":{"label":"Lower Forearm","group":"forearms","where":"inner forearm, little finger side","try":"Wrist curl"},"extensorCarpiUlnaris":{"label":"Back Forearm","group":"forearms","where":"outer forearm","try":"Reverse wrist curl"},"rectusAbdominis":{"label":"Abs","group":"abs","where":"the six pack","heads":["upperAbs","lowerAbs"],"try":"Crunch"},"externalObliques":{"label":"Obliques","group":"obliques","where":"sides of the waist","try":"Russian twist"},"gluteusMaximus":{"label":"Glutes","group":"glutes","where":"the main glute","try":"Hip thrust"},"gluteusMedius":{"label":"Hip","group":"glutes","where":"upper outer hip","try":"Hip abduction"},"rectusFemoris":{"label":"Front Quad","group":"quads","where":"centre of the thigh","try":"Leg extension"},"vastusLateralis":{"label":"Outer Quad","group":"quads","where":"outer thigh","try":"Squat"},"vastusMedialis":{"label":"Inner Quad","group":"quads","where":"inner thigh, above the knee","try":"Leg extension"},"sartorius":{"label":"Thigh","group":"quads","where":"runs diagonally across the thigh","try":"Lunge"},"adductorMagnus":{"label":"Inner Thigh","group":"quads","where":"inner thigh","try":"Squat"},"bicepsFemoris":{"label":"Outer Hamstring","group":"hamstrings","where":"outer hamstring","try":"Leg curl"},"semitendinosus":{"label":"Inner Hamstring","group":"hamstrings","where":"inner hamstring","try":"Romanian deadlift"},"gastrocnemius":{"label":"Calf","group":"calves","where":"the visible calf","try":"Standing calf raise"},"soleus":{"label":"Deep Calf","group":"calves","where":"deep under the calf","try":"Seated calf raise"},"tibialisAnterior":{"label":"Shin","group":"calves","where":"front of the shin","try":"Tibialis raise"}},
   MUSCLE_HEADS: {"anteriorDeltoid":{"of":"deltoids","label":"Front"},"lateralDeltoid":{"of":"deltoids","label":"Side"},"pecClavicular":{"of":"pectoralisMajor","label":"Upper"},"pecSternal":{"of":"pectoralisMajor","label":"Mid and lower"},"upperTraps":{"of":"trapezius","label":"Upper"},"midTraps":{"of":"trapezius","label":"Middle"},"lowerTraps":{"of":"trapezius","label":"Lower"},"bicepsLong":{"of":"biceps","label":"Outer"},"bicepsShort":{"of":"biceps","label":"Inner"},"tricepsLong":{"of":"tricepsBrachii","label":"Back"},"tricepsLateral":{"of":"tricepsBrachii","label":"Outer"},"tricepsMedial":{"of":"tricepsBrachii","label":"Inner"},"upperAbs":{"of":"rectusAbdominis","label":"Upper"},"lowerAbs":{"of":"rectusAbdominis","label":"Lower"}},
 } };
 const HITS = {"barbell squat":{"hits":{"rectusFemoris":1,"vastusLateralis":1,"vastusMedialis":1,"adductorMagnus":1,"gluteusMaximus":0.5,"bicepsFemoris":0.5,"semitendinosus":0.5},"general":false},"barbell row":{"hits":{"latissimusDorsi":1,"teresMajor":1,"biceps":0.5,"brachialis":0.5,"trapezius":0.5,"midTraps":0.5,"posteriorDeltoid":0.5,"bicepsLong":0.5,"bicepsShort":0.5},"general":false},"calf raise":{"hits":{"gastrocnemius":1,"soleus":1},"general":false},"bench press":{"hits":{"pectoralisMajor":1,"pecSternal":1,"pecClavicular":0.5,"tricepsBrachii":0.5,"tricepsLong":0.5,"tricepsLateral":0.5,"tricepsMedial":0.5,"deltoids":0.5,"anteriorDeltoid":0.5},"general":false},"romanian deadlift":{"hits":{"bicepsFemoris":1,"semitendinosus":1,"gluteusMaximus":0.5,"erectorSpinae":0.5},"general":false},"turkish get-up":null};
+
+
+const INFO_TOPICS = {
+  effort: () => ({
+    eyebrow: "How effort is scored",
+    rows: [
+      ["+10", "A day you trained. Turning up is the hard part."],
+      ["+5", "Every exercise you finish in a session."],
+      ["+25", "A personal best on any lift."],
+    ],
+    paras: [`That is the whole sum. It counts what you did, never how heavy it was, so ${
+      PARTNER_EMAIL ? `you and ${partnerName()} are scored the same way` : "everyone is scored the same way"
+    } even when one of you keeps the workout itself private.`],
+  }),
+  streak: () => ({
+    eyebrow: "The streak",
+    paras: [
+      "A day streak counts days in a row where you logged a workout. A rest day you marked as a rest day does not break it; a day you simply skipped does.",
+      "Once you have trained at least four days a week for two weeks, it switches to a week streak, because by then the honest unit is the week rather than the day.",
+    ],
+  }),
+  weekTarget: () => ({
+    eyebrow: "The weekly target",
+    paras: [
+      "The ring fills with the days you trained this week against the days you said you would. Change the target in Setup, under Training.",
+      "The percentage underneath is the same thing in numbers. It resets every Monday.",
+    ],
+  }),
+  weekStrip: () => ({
+    eyebrow: "This week, day by day",
+    rows: [
+      ["Photo", "A workout with a proof photo attached. Tap it to see the day."],
+      ["Tick", "A workout logged with no photo."],
+      ["Rest", "A day you marked as rest. It keeps the streak alive."],
+      ["141", "A weigh-in with no workout that day."],
+    ],
+    paras: ["Your row is on top in blue, theirs underneath in coral. An empty dashed square is a day nobody logged."],
+  }),
+  muscleLevels: () => ({
+    eyebrow: "Low, medium, high",
+    paras: [
+      "The bar behind each muscle is how much work it got against a full dose: six blocks, filling as the sets add up.",
+      "Low is one or two hard sets, medium is around half a dose, high is a full one. A dose is about eight hard sets in a day, or fourteen across a week.",
+      "Helping muscles count for half. A row trains your lats and helps your biceps, so the biceps bar moves at half speed.",
+    ],
+  }),
+  impact: () => ({
+    eyebrow: "Training impact",
+    paras: [
+      "Each ring is one muscle group against a full training dose for the period you are looking at: about eight hard sets in a day, fourteen in a week.",
+      "100% does not mean stop. It means that group has had a full week's work, which is the point at which more sets stop paying you back.",
+    ],
+  }),
+  pieces: () => ({
+    eyebrow: "Inside a muscle group",
+    paras: [
+      "Each piece is one muscle the figure can actually draw, and the credit comes from the exercises you logged rather than from the group name.",
+      "A squat loads every quad. A leg extension does not touch the adductors. That is why two leg days can leave different pieces cold.",
+    ],
+  }),
+  trainNext: () => ({
+    eyebrow: "What to train next",
+    paras: [
+      `A group counts as recovering for ${BODY_RECOVERY_HOURS} hours after the session that worked it. That is the usual window for the muscle to repair, not a rule about how you feel.`,
+      "Ready means either it has had those hours, or you have not trained it at all this week.",
+      "The suggestion picks whatever this week has missed. When everything is covered and nothing is ready, it says rest, because that is the honest answer.",
+    ],
+  }),
+  planMatch: () => ({
+    eyebrow: "The match figure",
+    paras: [
+      "How well the plan we drafted lines up with what you have actually been doing: the muscles you have trained recently, the equipment your logged exercises use, and the days you train.",
+      "It is a fit score, not a grade. A low number usually means we do not know you well enough yet, which fixes itself after a few logged sessions.",
+    ],
+  }),
+  calendarKey: () => ({
+    eyebrow: "The calendar",
+    rows: [
+      ["Trained", "A workout you logged that day."],
+      ["Planned", "A workout waiting on that day. Tap it to see or change it."],
+      ["Rest", "A day you marked as rest."],
+    ],
+    paras: ["Tap the month to jump to another month or year. Days before your first logged workout are not selectable."],
+  }),
+  savedWorkouts: () => ({
+    eyebrow: "Saved workouts",
+    paras: [
+      "A saved workout is a template, not a booking. It carries no date, so keeping one costs you nothing and commits you to nothing.",
+      "Opening one shows the body it works and the exercises in it. From there you can do it today, edit a copy without touching the original, or delete it.",
+    ],
+  }),
+  share: () => ({
+    eyebrow: "What your partner sees",
+    paras: [
+      `${PARTNER_EMAIL ? partnerName() : "Your partner"} sees every workout you log, in the timeline and on their week strip. This card shows whether they have seen today's yet.`,
+      "It is not a read receipt for messages. It only ever refers to the workout itself.",
+    ],
+  }),
+};
 
 
 const PRIVACY_ROWS = [
@@ -3190,9 +3315,9 @@ function renderHero(animate = false) {
      it changes more often and so has more to say. */
   const streakNum = dayStreak > 0 ? dayStreak : streak;
   const badge = dayStreak > 0
-    ? `<div class="streak-badge${animate ? " h-pop" : ""}" style="--d:340ms"><div class="sb-top">${icon("flame", 22)}<b data-streak="${dayStreak}">${animate ? 0 : dayStreak}</b></div><span>Day streak</span></div>`
+    ? `<button type="button" class="streak-badge${animate ? " h-pop" : ""}" style="--d:340ms" data-info="streak" aria-label="What keeps the streak alive"><div class="sb-top">${icon("flame", 22)}<b data-streak="${dayStreak}">${animate ? 0 : dayStreak}</b></div><span>Day streak</span></button>`
     : streak > 0
-      ? `<div class="streak-badge${animate ? " h-pop" : ""}" style="--d:340ms"><div class="sb-top">${icon("flame", 22)}<b data-streak="${streak}">${animate ? 0 : streak}</b></div><span>Week streak</span></div>`
+      ? `<button type="button" class="streak-badge${animate ? " h-pop" : ""}" style="--d:340ms" data-info="streak" aria-label="What keeps the streak alive"><div class="sb-top">${icon("flame", 22)}<b data-streak="${streak}">${animate ? 0 : streak}</b></div><span>Week streak</span></button>`
       : "";
 
   const stand = `<div class="stand${partner ? "" : " solo"}">
@@ -3224,7 +3349,7 @@ function renderHero(animate = false) {
       <div>
         <div class="hero-kicker">This week together</div>
         <h1 class="hero-title">Stronger Together</h1>
-        <p class="hero-sub">${sub}</p>
+        <p class="hero-sub">${sub} ${infoDot("weekTarget", "How the weekly target works")}</p>
         ${coachLine}
         ${partner ? `<div class="hero-effort">
           <button type="button" class="he-label" id="effortInfoBtn" aria-label="How effort is scored">${icon("bolt", 13)} Effort this week <span class="i-glyph">${icon("info", 13)}</span></button>
@@ -3839,28 +3964,42 @@ function renderSession() {
 }
 
 
-function openEffortInfo() {
-  const partner = PARTNER_EMAIL ? partnerName() : null;
+function openEffortInfo() { openInfo("effort"); }
+
+function levelForXP(xp) {
+  const level = 1 + Math.floor(xp / 100);
+  const names = ["Rookie", "Getting Started", "Consistent", "Grinder", "Iron Will", "Machine", "Beast Mode", "Legend"];
+  const name = names[Math.min(level - 1, names.length - 1)];
+  const inLevel = xp % 100;
+  return { level, name, inLevel, next: 100 };
+}
+
+
+function openInfo(key) {
+  const build = INFO_TOPICS[key];
+  if (!build) return;
+  const t = build();
   $("popCard").innerHTML = `
     <div class="pop-body">
       <div class="ds-top">
-        <div class="pop-who" style="color:var(--muted)">HOW EFFORT IS SCORED</div>
-        <button type="button" class="ds-x" id="effortX" aria-label="Close">&times;</button>
+        <div class="pop-who" style="color:var(--muted)">${escapeHtml(t.eyebrow).toUpperCase()}</div>
+        <button type="button" class="ds-x" id="infoX" aria-label="Close">&times;</button>
       </div>
-      <div class="ef-list">
-        <div class="ef-row"><span class="ef-pts">+10</span><span>A day you trained. Turning up is the hard part.</span></div>
-        <div class="ef-row"><span class="ef-pts">+5</span><span>Every exercise you finish in a session.</span></div>
-        <div class="ef-row"><span class="ef-pts">+25</span><span>A personal best on any lift.</span></div>
-      </div>
-      <p class="ef-note">That is the whole sum. It counts what you did, never how heavy it was, so
-        ${partner ? `you and ${escapeHtml(partner)} are scored the same way` : "everyone is scored the same way"}
-        even when one of you keeps the workout itself private.</p>
-      <button type="button" class="btn-primary" id="effortOk">Got it</button>
+      ${t.rows ? `<div class="ef-list">${t.rows.map(([pill, text]) =>
+        `<div class="ef-row"><span class="ef-pts">${escapeHtml(pill)}</span><span>${escapeHtml(text)}</span></div>`).join("")}</div>` : ""}
+      ${(t.paras || []).map((p) => `<p class="ef-note">${escapeHtml(p)}</p>`).join("")}
+      <button type="button" class="btn-primary" id="infoOk">Got it</button>
     </div>`;
   $("popScrim").classList.remove("hidden");
   const close = () => $("popScrim").classList.add("hidden");
-  $("effortX").onclick = close;
-  $("effortOk").onclick = close;
+  $("infoX").onclick = close;
+  $("infoOk").onclick = close;
+  $("popScrim").onclick = (e) => { if (e.target === $("popScrim")) close(); };
+}
+
+
+function infoDot(key, label) {
+  return `<button type="button" class="info-dot" data-info="${key}" aria-label="${escapeHtml(label || "What this means")}">i</button>`;
 }
 
 
@@ -4304,6 +4443,19 @@ const STATES = [
     note: "The effort line still says who trained harder this week. Her live card and yesterday's timeline row lose the specifics; the number stays.",
     setup: () => { LIVE_PARTNER = liveRow(); PARTNER_PROFILE = { share_workout_details: false }; } },
 
+  { page: "Reading your body", section: "The explainers behind it", name: "What to train next",
+    note: "The card on the Body tab answers one question and shows its working. This is the note behind it.",
+    pop: () => openInfo("trainNext"), setup: () => {} },
+
+  { page: "Reading your body", section: "The explainers behind it", name: "Low, medium and high",
+    pop: () => openInfo("muscleLevels"), setup: () => {} },
+
+  { page: "Reading your body", section: "The explainers behind it", name: "Training impact",
+    pop: () => openInfo("impact"), setup: () => {} },
+
+  { page: "Reading your body", section: "The explainers behind it", name: "What your partner sees",
+    pop: () => openInfo("share"), setup: () => {} },
+
   { page: "Watching them train", section: "Where they are up to", name: "Working, mid set",
     note: "Set dots fill as they log. Up next comes from their plan.",
     sheet: true, setup: () => { LIVE_PARTNER = liveRow(); } },
@@ -4403,9 +4555,24 @@ const STATES = [
     note: "Up to twenty seconds. Tap the shutter again to stop early; the ring shows time used. The camera fills the screen in the app.",
     raw: () => clipRecorderHTML("Mell"), setup: () => {} },
 
+  { page: "Opening the app", section: "Explaining a number", name: "What keeps the streak alive",
+    note: "The badge is the button. Tapping it says what breaks a streak and what does not.",
+    pop: () => openInfo("streak"), setup: () => {} },
+
+  { page: "Opening the app", section: "Explaining a number", name: "What the day tiles mean",
+    note: "The week strip is dense on purpose, so the key lives one tap away rather than under it.",
+    pop: () => openInfo("weekStrip"), setup: () => {} },
+
+  { page: "Opening the app", section: "Explaining a number", name: "The weekly target",
+    pop: () => openInfo("weekTarget"), setup: () => {} },
+
   { page: "Opening the app", section: "Explaining a number", name: "How effort is scored",
     note: "Tapping the effort line opens this. Three lines, the real numbers from the formula, and why two people can be compared when one of them shares nothing.",
     pop: () => openEffortInfo(), setup: () => {} },
+
+  { page: "Planning the workout", section: "Before you press begin", name: "What the match figure means",
+    note: "86% has to mean something or it is decoration.",
+    pop: () => openInfo("planMatch"), setup: () => {} },
 
   { page: "Planning the workout", section: "Before you press begin", name: "Advanced settings for one workout",
     note: "Opened from the plan screen before you press Begin, or the small chip on the session card once you have. Defaults come from Settings, changes here last one workout.",
@@ -4517,13 +4684,14 @@ const setTheme = (t) => {
      rather than left to whatever order the states happen to be declared in,
      and the frame numbers follow it so they ascend as you scroll. */
   const PAGE_ORDER = [
-    "Opening the app", "Planning the workout", "Doing the workout",
+    "Opening the app", "Planning the workout", "Doing the workout", "Reading your body",
     "Watching them train", "Sending a clip", "Getting a clip",
   ];
   const SECTION_ORDER = {
     "Opening the app": ["The everyday state", "Other shapes of the same screen", "When they are training", "Explaining a number"],
     "Planning the workout": ["While it thinks", "Before you press begin"],
     "Doing the workout": ["The session screen"],
+    "Reading your body": ["The explainers behind it"],
     "Watching them train": ["Where they are up to", "What the muscle line says", "When they hold something back"],
     "Sending a clip": ["Filming it", "After you press send"],
     "Getting a clip": ["The pill on your session", "Two watches, then gone"],
@@ -4573,6 +4741,7 @@ const setTheme = (t) => {
     "Opening the app": "The first thing you see, in the states it is actually in: both of you going, one of you behind, nobody paired yet, and the moment they start training.",
     "Planning the workout": "From pressing generate to standing over the plan with your thumb on begin.",
     "Doing the workout": "Your own screen, mid session. This is the one you look at with a barbell in front of you.",
+    "Reading your body": "The Body tab turns logged sets into a picture. These are the cards that say where each number came from, reachable from the small i beside it.",
     "Watching them train": "Their session as it reaches you: how far in, what they are on, and the parts they can keep to themselves.",
     "Sending a clip": "Twenty seconds, one take, and a straight answer about whether it left your phone.",
     "Getting a clip": "It waits on the pill, loops while you watch, and gives you exactly one more before it is gone.",

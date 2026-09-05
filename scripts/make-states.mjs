@@ -40,7 +40,7 @@ const FUNCS = [
   "liveAgeMs", "liveStateLabel", "renderLiveCard", "renderLiveSheet",
   "classifyMuscles", "profileFor", "renderClipPill",
   "clipRecorderHTML", "clipViewerHTML", "clipGoneHTML", "clipSavedForLaterHTML", "clipSentHTML", "clipSendFailedHTML",
-  "formatRest", "renderSession", "openEffortInfo",
+  "formatRest", "renderSession", "openEffortInfo", "openInfo", "infoDot",
   "openWorkoutPrivacy", "workoutPrivacy", "defaultWorkoutPrivacy", "privacySummary", "workoutPrivacyLocked",
   "liveDetailsShared", "openGenOverlay", "paintGen", "stopGenTicker", "revealGeneratedPlan",
   "setGenWord", "startGenWordCycle", "stopGenWordCycle", "mountGenBody", "unmountGenBody",
@@ -50,6 +50,9 @@ const FUNCS = [
 /* The working-muscles block is more than a function: caches, colour helpers
    and the snapshot queue. It comes over whole. */
 const WORKING_MUSCLES = section("/* ---------- Working muscles ----------", "/* ---------- Watching someone train ----------");
+
+/* The info topics are data too: every explainer in the app comes from here. */
+const INFO = grab(/\nconst INFO_TOPICS = \{.*?\n\};\n/s, "INFO_TOPICS");
 
 /* The three switches are data, and a hand-copied copy of them would drift. */
 const PRIVACY_ROWS = grab(/\nconst PRIVACY_ROWS = \[.*?\n\];\n/s, "PRIVACY_ROWS");
@@ -331,6 +334,7 @@ const finishExerciseAndAdvance = () => {};
 let riveBodyPromise = null, bodyDetailPromise = null;
 const ensureRiveBodyModule = () => Promise.resolve(null);
 const ensureBodyDetailModules = () => Promise.resolve(BODY_DETAIL);
+const BODY_RECOVERY_HOURS = 48;
 let BODY_DETAIL = { detail: {
   hitsForExercise: (name) => HITS[String(name).toLowerCase()] || null,
   MUSCLE_PIECES: ${JSON.stringify(MUSCLE_PIECES)},
@@ -338,6 +342,7 @@ let BODY_DETAIL = { detail: {
 } };
 const HITS = ${JSON.stringify(HITS)};
 
+${INFO}
 ${PRIVACY_ROWS}
 ${GEN_STEPS}
 ${GEN_WORDS}
@@ -453,6 +458,19 @@ const STATES = [
     note: "The effort line still says who trained harder this week. Her live card and yesterday's timeline row lose the specifics; the number stays.",
     setup: () => { LIVE_PARTNER = liveRow(); PARTNER_PROFILE = { share_workout_details: false }; } },
 
+  { page: "Reading your body", section: "The explainers behind it", name: "What to train next",
+    note: "The card on the Body tab answers one question and shows its working. This is the note behind it.",
+    pop: () => openInfo("trainNext"), setup: () => {} },
+
+  { page: "Reading your body", section: "The explainers behind it", name: "Low, medium and high",
+    pop: () => openInfo("muscleLevels"), setup: () => {} },
+
+  { page: "Reading your body", section: "The explainers behind it", name: "Training impact",
+    pop: () => openInfo("impact"), setup: () => {} },
+
+  { page: "Reading your body", section: "The explainers behind it", name: "What your partner sees",
+    pop: () => openInfo("share"), setup: () => {} },
+
   { page: "Watching them train", section: "Where they are up to", name: "Working, mid set",
     note: "Set dots fill as they log. Up next comes from their plan.",
     sheet: true, setup: () => { LIVE_PARTNER = liveRow(); } },
@@ -552,9 +570,24 @@ const STATES = [
     note: "Up to twenty seconds. Tap the shutter again to stop early; the ring shows time used. The camera fills the screen in the app.",
     raw: () => clipRecorderHTML("Mell"), setup: () => {} },
 
+  { page: "Opening the app", section: "Explaining a number", name: "What keeps the streak alive",
+    note: "The badge is the button. Tapping it says what breaks a streak and what does not.",
+    pop: () => openInfo("streak"), setup: () => {} },
+
+  { page: "Opening the app", section: "Explaining a number", name: "What the day tiles mean",
+    note: "The week strip is dense on purpose, so the key lives one tap away rather than under it.",
+    pop: () => openInfo("weekStrip"), setup: () => {} },
+
+  { page: "Opening the app", section: "Explaining a number", name: "The weekly target",
+    pop: () => openInfo("weekTarget"), setup: () => {} },
+
   { page: "Opening the app", section: "Explaining a number", name: "How effort is scored",
     note: "Tapping the effort line opens this. Three lines, the real numbers from the formula, and why two people can be compared when one of them shares nothing.",
     pop: () => openEffortInfo(), setup: () => {} },
+
+  { page: "Planning the workout", section: "Before you press begin", name: "What the match figure means",
+    note: "86% has to mean something or it is decoration.",
+    pop: () => openInfo("planMatch"), setup: () => {} },
 
   { page: "Planning the workout", section: "Before you press begin", name: "Advanced settings for one workout",
     note: "Opened from the plan screen before you press Begin, or the small chip on the session card once you have. Defaults come from Settings, changes here last one workout.",
@@ -666,13 +699,14 @@ const setTheme = (t) => {
      rather than left to whatever order the states happen to be declared in,
      and the frame numbers follow it so they ascend as you scroll. */
   const PAGE_ORDER = [
-    "Opening the app", "Planning the workout", "Doing the workout",
+    "Opening the app", "Planning the workout", "Doing the workout", "Reading your body",
     "Watching them train", "Sending a clip", "Getting a clip",
   ];
   const SECTION_ORDER = {
     "Opening the app": ["The everyday state", "Other shapes of the same screen", "When they are training", "Explaining a number"],
     "Planning the workout": ["While it thinks", "Before you press begin"],
     "Doing the workout": ["The session screen"],
+    "Reading your body": ["The explainers behind it"],
     "Watching them train": ["Where they are up to", "What the muscle line says", "When they hold something back"],
     "Sending a clip": ["Filming it", "After you press send"],
     "Getting a clip": ["The pill on your session", "Two watches, then gone"],
@@ -722,6 +756,7 @@ const setTheme = (t) => {
     "Opening the app": "The first thing you see, in the states it is actually in: both of you going, one of you behind, nobody paired yet, and the moment they start training.",
     "Planning the workout": "From pressing generate to standing over the plan with your thumb on begin.",
     "Doing the workout": "Your own screen, mid session. This is the one you look at with a barbell in front of you.",
+    "Reading your body": "The Body tab turns logged sets into a picture. These are the cards that say where each number came from, reachable from the small i beside it.",
     "Watching them train": "Their session as it reaches you: how far in, what they are on, and the parts they can keep to themselves.",
     "Sending a clip": "Twenty seconds, one take, and a straight answer about whether it left your phone.",
     "Getting a clip": "It waits on the pill, loops while you watch, and gives you exactly one more before it is gone.",

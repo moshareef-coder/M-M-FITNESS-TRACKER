@@ -1434,9 +1434,11 @@
   .hero-sub { font-size: 14px; color: var(--muted); margin: 4px 0 0; line-height: 1.4; }
   /* The streak badge: one number, one label, a soft green pill. */
   .streak-badge {
+    font: inherit; border: none; cursor: pointer; text-align: center;
     flex-shrink: 0; display: flex; flex-direction: column; align-items: center; padding: 7px 12px 6px; border-radius: 100px;
     background: color-mix(in srgb, var(--accent) 12%, var(--panel)); color: var(--text);
   }
+  .streak-badge:active { transform: scale(.97); }
   .streak-badge .sb-top { display: flex; align-items: center; gap: 4px; }
   .streak-badge .sb-top svg { color: var(--accent); }
   .streak-badge b { font-size: 21px; font-weight: 800; letter-spacing: -.04em; line-height: 1; font-family: var(--font-display); }
@@ -2307,16 +2309,16 @@
 
   .bi-section { display: flex; align-items: center; gap: 7px; font-size: 21px; font-weight: 700; letter-spacing: -.02em; margin: 18px 0 14px; }
   /* The ring stays 18px. The box around it is 32, which is what a thumb needs. */
-  .bi-info {
+  .info-dot, .bi-info {
     width: 32px; height: 32px; margin: -7px; border-radius: 50%; color: var(--muted);
     font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
     background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; line-height: 1;
   }
-  .bi-info::before {
+  .info-dot::before, .bi-info::before {
     content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid currentColor;
   }
-  .bi-info { position: relative; }
-  .bi-info:active { color: var(--text); border-color: var(--text); }
+  .info-dot, .bi-info { position: relative; }
+  .info-dot:active, .bi-info:active { color: var(--text); }
   .bi-rings { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
   .bi-ring {
     display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0;
@@ -2357,6 +2359,29 @@
   .bi-ins-val { font-size: 21px; font-weight: 700; color: var(--accent-ink); white-space: nowrap; letter-spacing: -.02em; flex-shrink: 0; }
   .bi-ins-val.small { font-size: 12.5px; padding-top: 2px; text-align: right; white-space: normal; max-width: 45%; }
   .bi-ins-val.muted { color: var(--muted); }
+
+  /* What to train next: the answer first, the working underneath. */
+  .nx-answer { padding: 2px 0 14px; }
+  .nx-head { font-size: 24px; font-weight: 800; letter-spacing: -.03em; line-height: 1.15; }
+  .nx-why { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 6px 0 0; }
+  .nx-rows { display: flex; flex-direction: column; gap: 1px; border-top: 1px solid var(--border); }
+  .nx-row {
+    display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: baseline;
+    padding: 11px 0; border-bottom: 1px solid var(--border);
+  }
+  .nx-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .nx-k { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .nx-v { display: flex; flex-wrap: wrap; gap: 5px; }
+  .nx-text { font-size: 12.5px; color: var(--text); line-height: 1.45; }
+  .nx-chip {
+    font-size: 12.5px; font-weight: 700; padding: 3px 9px; border-radius: 100px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  }
+  .nx-chip i { font-style: normal; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .nx-chip.go { background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: transparent; color: var(--accent-ink); }
+  .nx-chip.rest { background: color-mix(in srgb, var(--partner) 12%, transparent); border-color: transparent; color: var(--partner); }
+  .nx-chip.rest i { color: inherit; opacity: .75; }
+  .nx-none { font-size: 12.5px; color: var(--muted); }
 
   .bi-share { display: flex; align-items: center; gap: 12px; }
   .bi-share .av { width: 44px; height: 44px; font-size: 15.5px; border-width: 2px; cursor: default; }
@@ -2663,7 +2688,7 @@
 
     <div class="card">
       <div class="card-head">
-        <h2>This week</h2>
+        <h2>This week <button type="button" class="info-dot" data-info="weekStrip" aria-label="What the day tiles mean">i</button></h2>
         <div class="wk-legend" id="weekLegend"></div>
       </div>
       <!-- Seven columns, one dot per person per day, so a day reads down its
@@ -2723,7 +2748,7 @@
       </div>
       <div class="bi-grid" id="biGrid">
         <div class="bi-col-list">
-          <h3 class="bi-head" id="biHead">Muscles Hit</h3>
+          <h3 class="bi-head" id="biHead">Muscles Hit <span id="biLevelsInfo"></span></h3>
           <div class="bi-list" id="biList"></div>
         </div>
         <div class="bi-detail" id="biDetail"></div>
@@ -2735,18 +2760,18 @@
       <div class="bi-hint" id="biHint"><span>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M12 11V9.5a1.5 1.5 0 0 1 3 0V11"/><path d="M15 11.5v-1a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1a6 6 0 0 1-5.2-3l-2-3.4a1.5 1.5 0 0 1 2.5-1.6L9 15"/></svg>
         Tap any muscle</span></div>
-      <div class="bi-section"><span id="biSectionTitle">Training Impact</span> <button type="button" class="bi-info" id="biInfoBtn" aria-label="What is training impact">i</button></div>
+      <div class="bi-section"><span id="biSectionTitle">Training Impact</span> <span id="biInfoSlot"></span></div>
       <div class="bi-rings" id="biRings"></div>
       <div class="bi-pieces" id="biPieces"></div>
     </div>
 
     <div class="card bi-anim" style="--d:80ms">
-      <h3 class="bi-head" style="margin-bottom:12px">Insights</h3>
-      <div class="bi-insights" id="biInsights"></div>
+      <div class="bi-section" style="margin-top:0"><span>What to train next</span> <span id="biNextInfoSlot"></span></div>
+      <div id="biNext"></div>
     </div>
 
     <div class="card bi-anim hidden" id="biShareCard" style="--d:160ms">
-      <div class="bi-section" style="margin-top:0">Shared with Partner <button type="button" class="bi-info" id="biShareInfo" aria-label="About sharing">i</button></div>
+      <div class="bi-section" style="margin-top:0">Shared with Partner <span id="biShareInfoSlot"></span></div>
       <div class="bi-share" id="biShare"></div>
     </div>
 
@@ -3230,7 +3255,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.39";
+const APP_VERSION = "2026.09.04.40";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -3971,9 +3996,9 @@ function showApp() {
       renderBodyTab(true);
     });
   });
-  $("biInfoBtn").addEventListener("click", () => toast(BODY_FOCUS
-    ? "Each piece is one muscle the figure can draw. Credit comes from the exercises you logged: a squat loads every quad, a leg extension does not touch the adductors."
-    : "Impact is how much of a full training dose each muscle got. 100% is about 8 hard sets in a day or 14 in a week."));
+  $("biInfoSlot").innerHTML = infoDot("impact", "What training impact means");
+  $("biLevelsInfo").innerHTML = infoDot("muscleLevels", "What low, medium and high mean");
+  $("biShareInfoSlot").innerHTML = infoDot("share", "What your partner sees");
   $("biDetail").addEventListener("click", (e) => { if (e.target.closest("#biBack")) bodyUnfocus(); });
   $("biPieces").addEventListener("click", (e) => {
     const b = e.target.closest(".bi-piece");
@@ -3991,7 +4016,6 @@ function showApp() {
     const b = e.target.closest(".bi-callout");
     if (b && BODY_FOCUS) bodyFocusMuscle(b.dataset.muscle, BODY_FOCUS.view, BODY_FOCUS.side);
   });
-  $("biShareInfo").addEventListener("click", () => toast(`${partnerName()} sees every workout you log. This shows when they have seen today's.`));
   $("adminGymToggleWrap").onclick = () => {
     setTimeout(() => $("adminGymToggleWrap").classList.toggle("checked", $("adminEntryGym").checked), 0);
   };
@@ -4574,29 +4598,147 @@ function weekEffortXP(name) { return effortXPBetween(name, weekStartStr(), today
    they stop trusting it. Three lines, the real weights from effortXPBetween
    above, and the reason two people can be compared at all. Keep these numbers
    in step with that function; they are the same three terms. */
-function openEffortInfo() {
-  const partner = PARTNER_EMAIL ? partnerName() : null;
+/* ---------- Info popovers ----------
+   One component, one place to add a topic. Anything on any screen that could
+   read as a number we made up gets a small "i" beside it; tapping it opens
+   the same card and says where the number comes from. Wired by delegation, so
+   a screen only has to print infoDot("key") and nothing else. */
+const INFO_TOPICS = {
+  effort: () => ({
+    eyebrow: "How effort is scored",
+    rows: [
+      ["+10", "A day you trained. Turning up is the hard part."],
+      ["+5", "Every exercise you finish in a session."],
+      ["+25", "A personal best on any lift."],
+    ],
+    paras: [`That is the whole sum. It counts what you did, never how heavy it was, so ${
+      PARTNER_EMAIL ? `you and ${partnerName()} are scored the same way` : "everyone is scored the same way"
+    } even when one of you keeps the workout itself private.`],
+  }),
+  streak: () => ({
+    eyebrow: "The streak",
+    paras: [
+      "A day streak counts days in a row where you logged a workout. A rest day you marked as a rest day does not break it; a day you simply skipped does.",
+      "Once you have trained at least four days a week for two weeks, it switches to a week streak, because by then the honest unit is the week rather than the day.",
+    ],
+  }),
+  weekTarget: () => ({
+    eyebrow: "The weekly target",
+    paras: [
+      "The ring fills with the days you trained this week against the days you said you would. Change the target in Setup, under Training.",
+      "The percentage underneath is the same thing in numbers. It resets every Monday.",
+    ],
+  }),
+  weekStrip: () => ({
+    eyebrow: "This week, day by day",
+    rows: [
+      ["Photo", "A workout with a proof photo attached. Tap it to see the day."],
+      ["Tick", "A workout logged with no photo."],
+      ["Rest", "A day you marked as rest. It keeps the streak alive."],
+      ["141", "A weigh-in with no workout that day."],
+    ],
+    paras: ["Your row is on top in blue, theirs underneath in coral. An empty dashed square is a day nobody logged."],
+  }),
+  muscleLevels: () => ({
+    eyebrow: "Low, medium, high",
+    paras: [
+      "The bar behind each muscle is how much work it got against a full dose: six blocks, filling as the sets add up.",
+      "Low is one or two hard sets, medium is around half a dose, high is a full one. A dose is about eight hard sets in a day, or fourteen across a week.",
+      "Helping muscles count for half. A row trains your lats and helps your biceps, so the biceps bar moves at half speed.",
+    ],
+  }),
+  impact: () => ({
+    eyebrow: "Training impact",
+    paras: [
+      "Each ring is one muscle group against a full training dose for the period you are looking at: about eight hard sets in a day, fourteen in a week.",
+      "100% does not mean stop. It means that group has had a full week's work, which is the point at which more sets stop paying you back.",
+    ],
+  }),
+  pieces: () => ({
+    eyebrow: "Inside a muscle group",
+    paras: [
+      "Each piece is one muscle the figure can actually draw, and the credit comes from the exercises you logged rather than from the group name.",
+      "A squat loads every quad. A leg extension does not touch the adductors. That is why two leg days can leave different pieces cold.",
+    ],
+  }),
+  trainNext: () => ({
+    eyebrow: "What to train next",
+    paras: [
+      `A group counts as recovering for ${BODY_RECOVERY_HOURS} hours after the session that worked it. That is the usual window for the muscle to repair, not a rule about how you feel.`,
+      "Ready means either it has had those hours, or you have not trained it at all this week.",
+      "The suggestion picks whatever this week has missed. When everything is covered and nothing is ready, it says rest, because that is the honest answer.",
+    ],
+  }),
+  planMatch: () => ({
+    eyebrow: "The match figure",
+    paras: [
+      "How well the plan we drafted lines up with what you have actually been doing: the muscles you have trained recently, the equipment your logged exercises use, and the days you train.",
+      "It is a fit score, not a grade. A low number usually means we do not know you well enough yet, which fixes itself after a few logged sessions.",
+    ],
+  }),
+  calendarKey: () => ({
+    eyebrow: "The calendar",
+    rows: [
+      ["Trained", "A workout you logged that day."],
+      ["Planned", "A workout waiting on that day. Tap it to see or change it."],
+      ["Rest", "A day you marked as rest."],
+    ],
+    paras: ["Tap the month to jump to another month or year. Days before your first logged workout are not selectable."],
+  }),
+  savedWorkouts: () => ({
+    eyebrow: "Saved workouts",
+    paras: [
+      "A saved workout is a template, not a booking. It carries no date, so keeping one costs you nothing and commits you to nothing.",
+      "Opening one shows the body it works and the exercises in it. From there you can do it today, edit a copy without touching the original, or delete it.",
+    ],
+  }),
+  share: () => ({
+    eyebrow: "What your partner sees",
+    paras: [
+      `${PARTNER_EMAIL ? partnerName() : "Your partner"} sees every workout you log, in the timeline and on their week strip. This card shows whether they have seen today's yet.`,
+      "It is not a read receipt for messages. It only ever refers to the workout itself.",
+    ],
+  }),
+};
+
+function infoDot(key, label) {
+  return `<button type="button" class="info-dot" data-info="${key}" aria-label="${escapeHtml(label || "What this means")}">i</button>`;
+}
+
+function openInfo(key) {
+  const build = INFO_TOPICS[key];
+  if (!build) return;
+  const t = build();
   $("popCard").innerHTML = `
     <div class="pop-body">
       <div class="ds-top">
-        <div class="pop-who" style="color:var(--muted)">HOW EFFORT IS SCORED</div>
-        <button type="button" class="ds-x" id="effortX" aria-label="Close">&times;</button>
+        <div class="pop-who" style="color:var(--muted)">${escapeHtml(t.eyebrow).toUpperCase()}</div>
+        <button type="button" class="ds-x" id="infoX" aria-label="Close">&times;</button>
       </div>
-      <div class="ef-list">
-        <div class="ef-row"><span class="ef-pts">+10</span><span>A day you trained. Turning up is the hard part.</span></div>
-        <div class="ef-row"><span class="ef-pts">+5</span><span>Every exercise you finish in a session.</span></div>
-        <div class="ef-row"><span class="ef-pts">+25</span><span>A personal best on any lift.</span></div>
-      </div>
-      <p class="ef-note">That is the whole sum. It counts what you did, never how heavy it was, so
-        ${partner ? `you and ${escapeHtml(partner)} are scored the same way` : "everyone is scored the same way"}
-        even when one of you keeps the workout itself private.</p>
-      <button type="button" class="btn-primary" id="effortOk">Got it</button>
+      ${t.rows ? `<div class="ef-list">${t.rows.map(([pill, text]) =>
+        `<div class="ef-row"><span class="ef-pts">${escapeHtml(pill)}</span><span>${escapeHtml(text)}</span></div>`).join("")}</div>` : ""}
+      ${(t.paras || []).map((p) => `<p class="ef-note">${escapeHtml(p)}</p>`).join("")}
+      <button type="button" class="btn-primary" id="infoOk">Got it</button>
     </div>`;
   $("popScrim").classList.remove("hidden");
   const close = () => $("popScrim").classList.add("hidden");
-  $("effortX").onclick = close;
-  $("effortOk").onclick = close;
+  $("infoX").onclick = close;
+  $("infoOk").onclick = close;
+  $("popScrim").onclick = (e) => { if (e.target === $("popScrim")) close(); };
 }
+
+/* Any screen, any time: the button only has to carry data-info. */
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-info]");
+  if (!btn) return;
+  e.preventDefault();
+  const sheet = btn.closest(".sheet-scrim");
+  if (sheet && sheet.id === "liveScrim") closeLiveSheet();
+  openInfo(btn.dataset.info);
+});
+
+/* Kept as a name because two screens and the state gallery call it. */
+function openEffortInfo() { openInfo("effort"); }
 
 function levelForXP(xp) {
   const level = 1 + Math.floor(xp / 100);
@@ -5446,9 +5588,9 @@ function renderHero(animate = false) {
      it changes more often and so has more to say. */
   const streakNum = dayStreak > 0 ? dayStreak : streak;
   const badge = dayStreak > 0
-    ? `<div class="streak-badge${animate ? " h-pop" : ""}" style="--d:340ms"><div class="sb-top">${icon("flame", 22)}<b data-streak="${dayStreak}">${animate ? 0 : dayStreak}</b></div><span>Day streak</span></div>`
+    ? `<button type="button" class="streak-badge${animate ? " h-pop" : ""}" style="--d:340ms" data-info="streak" aria-label="What keeps the streak alive"><div class="sb-top">${icon("flame", 22)}<b data-streak="${dayStreak}">${animate ? 0 : dayStreak}</b></div><span>Day streak</span></button>`
     : streak > 0
-      ? `<div class="streak-badge${animate ? " h-pop" : ""}" style="--d:340ms"><div class="sb-top">${icon("flame", 22)}<b data-streak="${streak}">${animate ? 0 : streak}</b></div><span>Week streak</span></div>`
+      ? `<button type="button" class="streak-badge${animate ? " h-pop" : ""}" style="--d:340ms" data-info="streak" aria-label="What keeps the streak alive"><div class="sb-top">${icon("flame", 22)}<b data-streak="${streak}">${animate ? 0 : streak}</b></div><span>Week streak</span></button>`
       : "";
 
   const stand = `<div class="stand${partner ? "" : " solo"}">
@@ -5480,7 +5622,7 @@ function renderHero(animate = false) {
       <div>
         <div class="hero-kicker">This week together</div>
         <h1 class="hero-title">Stronger Together</h1>
-        <p class="hero-sub">${sub}</p>
+        <p class="hero-sub">${sub} ${infoDot("weekTarget", "How the weekly target works")}</p>
         ${coachLine}
         ${partner ? `<div class="hero-effort">
           <button type="button" class="he-label" id="effortInfoBtn" aria-label="How effort is scored">${icon("bolt", 13)} Effort this week <span class="i-glyph">${icon("info", 13)}</span></button>
@@ -8685,6 +8827,7 @@ function calendarInnerHTML() {
       <span><i class="k-done"></i>Trained</span>
       <span><i class="k-plan"></i>Planned</span>
       <span><i class="k-rest"></i>Rest</span>
+      ${infoDot("calendarKey", "What the calendar shows")}
     </div>`;
 }
 
@@ -8813,7 +8956,7 @@ function renderChooseScreen() {
         <div class="spp-ring">
           <div class="spp-ring-wrap">
             ${ringSVG(p.match / 100, "var(--accent)", 110)}
-            <div class="spp-ring-num"><b>${p.match}%</b><i>Match</i></div>
+            <div class="spp-ring-num"><b>${p.match}%</b><i>Match ${infoDot("planMatch", "What the match figure means")}</i></div>
           </div>
           <p>Based on your<br />recent sessions</p>
         </div>
@@ -10149,7 +10292,7 @@ function renderBodyTab(animate = false) {
   renderBodyRings(ranked, animate);
   renderBodyDiagram(animate);
   if (BODY_FOCUS) renderBodyDetail();
-  renderBodyInsights(animate);
+  renderBodyNext(animate);
   renderBodyShare();
 }
 
@@ -10728,68 +10871,105 @@ function bodyGroupsPhrase(groups) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function renderBodyInsights(animate) {
-  const rows = [];
+/* ---------- What to train next ----------
+   This card used to be three unrelated rows called Recovery, Volume Trend and
+   Suggestion, each with a number on the right: "37h", "New", "Rest or cardio
+   tomorrow". Nobody opens the Body tab wanting a dashboard. They want an
+   answer to one question, so the card answers that question first and shows
+   its working underneath. */
 
-  // Recovery: hours until the groups from the last session have had 48h.
+/* Per training area: what it got this week, when it was last worked, and
+   whether it has had its recovery window. */
+function bodyAreaStates() {
+  const [weekStart, weekEnd] = [weekStartStr(), bodyPeriodRange("today")[1]];
+  const weekVol = computeMuscleVolumeBetween(ME, weekStart, weekEnd);
   const mine = ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME);
-  const lastDate = mine.reduce((m, l) => (l.entry_date > m ? l.entry_date : m), "");
-  if (lastDate) {
-    const next = new Date(lastDate + "T00:00:00");
-    next.setDate(next.getDate() + 1);
-    const day = bodyImpactRank(computeMuscleVolumeBetween(ME, lastDate, isoDate(next)), "today");
-    const groups = day.slice(0, 2).map((m) => m.key);
-    const entry = entriesFor(ME).find((e) => e.entry_date === lastDate);
-    const at = entry?.workout_at ? new Date(entry.workout_at) : new Date(lastDate + "T18:00:00");
-    const remaining = BODY_RECOVERY_HOURS - (Date.now() - at.getTime()) / 3600000;
-    const who = groups.length ? bodyGroupsPhrase(groups) : "Those muscles";
-    rows.push(remaining > 0
-      ? { ico: "refresh", title: "Recovery", value: `${Math.ceil(remaining)}h`, sub: `${who} worked hard. We recommend rest before training this area again.` }
-      : { ico: "refresh", title: "Recovery", value: "Ready", sub: `${who} ${groups.length > 1 ? "have" : "has"} had ${BODY_RECOVERY_HOURS}h. Good to train again.` });
+  const entryTime = (date) => {
+    const e = entriesFor(ME).find((x) => x.entry_date === date);
+    return e?.workout_at ? new Date(e.workout_at).getTime() : new Date(date + "T18:00:00").getTime();
+  };
+  return COVERAGE_TARGETS.map((t) => {
+    const members = t.members || [t.key];
+    const weekSets = members.reduce((n, k) => n + (weekVol[k] || 0), 0);
+    let lastDate = "";
+    for (const log of mine) {
+      const rule = classifyMuscles(log.exercise_name);
+      if (!rule) continue;
+      const hit = [...rule.primary, ...rule.secondary].some((g) => members.includes(g));
+      if (hit && log.entry_date > lastDate) lastDate = log.entry_date;
+    }
+    const hoursLeft = lastDate
+      ? BODY_RECOVERY_HOURS - (Date.now() - entryTime(lastDate)) / 3600000
+      : -1;
+    return { ...t, members, weekSets, lastDate, hoursLeft, ready: hoursLeft <= 0 };
+  });
+}
+
+function renderBodyNext(animate) {
+  const areas = bodyAreaStates();
+  const trained = areas.filter((a) => a.lastDate);
+  const ready = areas.filter((a) => a.ready);
+  const resting = areas.filter((a) => !a.ready).sort((a, b) => a.hoursLeft - b.hoursLeft);
+  const untouched = areas.filter((a) => a.weekSets === 0);
+  const list = (xs) => xs.map((a) => a.label);
+  const phrase = (names) => names.length <= 1 ? (names[0] || "")
+    : names.slice(0, -1).join(", ") + " or " + names[names.length - 1];
+
+  let headline, why;
+  if (!trained.length) {
+    headline = "Anything at all";
+    why = "Nothing logged yet, so there is nothing to balance against. The first session sets the baseline.";
   } else {
-    rows.push({ ico: "refresh", title: "Recovery", value: "-", cls: "muted", sub: "Log a session to get recovery guidance here." });
+    const pick = untouched.filter((a) => a.ready);
+    if (pick.length) {
+      headline = phrase(list(pick.slice(0, 2)));
+      why = `Nothing this week has touched your ${phrase(list(pick.slice(0, 2))).toLowerCase()}.` +
+        (resting.length ? ` ${phrase(list(resting.slice(0, 2)))} ${resting.length > 1 ? "are" : "is"} still inside the ${BODY_RECOVERY_HOURS} hour window.` : "");
+    } else if (ready.length) {
+      const leanest = ready.slice().sort((a, b) => a.weekSets - b.weekSets).slice(0, 2);
+      headline = phrase(list(leanest));
+      why = `Every area has had something this week, so this is the ${leanest.length > 1 ? "pair" : "one"} with the least so far: ${
+        leanest.map((a) => `${a.label.toLowerCase()} ${Math.round(a.weekSets)} set${Math.round(a.weekSets) === 1 ? "" : "s"}`).join(", ")}.`;
+    } else {
+      headline = "Rest, or something light";
+      why = `Everything you train is still inside its ${BODY_RECOVERY_HOURS} hour window. A walk or an easy ride does not set that back.`;
+    }
   }
 
-  // Volume trend: this week so far against the same stretch of last week, so
-  // a Tuesday is never compared with a full seven days.
+  // This week against the same point last week, so a Tuesday is never
+  // compared with a full seven days.
   const weekStart = weekStartStr();
   const [, tomorrow] = bodyPeriodRange("today");
   const elapsed = Math.round((new Date(todayStr() + "T00:00:00") - new Date(weekStart + "T00:00:00")) / 86400000) + 1;
   const lastStart = new Date(weekStart + "T00:00:00"); lastStart.setDate(lastStart.getDate() - 7);
   const lastCut = new Date(lastStart); lastCut.setDate(lastCut.getDate() + elapsed);
   const sum = (v) => Object.values(v).reduce((a, b) => a + b, 0);
-  const thisWk = sum(computeMuscleVolumeBetween(ME, weekStart, tomorrow));
-  const lastWk = sum(computeMuscleVolumeBetween(ME, isoDate(lastStart), isoDate(lastCut)));
-  if (thisWk === 0 && lastWk === 0) {
-    rows.push({ ico: "trending", title: "Volume Trend", value: "-", cls: "muted", sub: "Nothing logged yet. Your first week sets the baseline." });
-  } else if (lastWk === 0) {
-    rows.push({ ico: "trending", title: "Volume Trend", value: "New", sub: "First week with logged volume. Next week has something to beat." });
-  } else {
+  const thisWk = Math.round(sum(computeMuscleVolumeBetween(ME, weekStart, tomorrow)));
+  const lastWk = Math.round(sum(computeMuscleVolumeBetween(ME, isoDate(lastStart), isoDate(lastCut))));
+  let weekLine;
+  if (!thisWk && !lastWk) weekLine = "Nothing logged yet this week.";
+  else if (!lastWk) weekLine = `${thisWk} sets so far. Nothing to compare it with yet, so this week is the baseline.`;
+  else {
     const pct = Math.round(((thisWk - lastWk) / lastWk) * 100);
-    rows.push(pct >= 0
-      ? { ico: "trending", title: "Volume Trend", value: `+${pct}%`, sub: "Great job pushing volume up from this point last week." }
-      : { ico: "trending", title: "Volume Trend", value: `${pct}%`, cls: "muted", sub: "Below this point last week. Fine if it is a planned lighter week." });
+    weekLine = `${thisWk} sets so far, ${pct >= 0 ? "up" : "down"} ${Math.abs(pct)}% on the same point last week.`;
   }
 
-  // Suggestion: whatever this week has not touched yet.
-  const weekVol = computeMuscleVolumeBetween(ME, weekStart, tomorrow);
-  const missing = COVERAGE_TARGETS.filter((t) => !(t.members || [t.key]).some((k) => (weekVol[k] || 0) > 0));
-  if (thisWk === 0) {
-    rows.push({ ico: "bolt", blue: true, title: "Suggestion", value: "Any session today", small: true, sub: "Nothing logged this week yet. Start anywhere and we build from there." });
-  } else if (missing.length) {
-    rows.push({ ico: "bolt", blue: true, title: "Suggestion", value: `${missing.slice(0, 2).map((t) => t.label).join(" or ")} tomorrow`, small: true, sub: "Keep the momentum going with a balanced next session." });
-  } else {
-    rows.push({ ico: "bolt", blue: true, title: "Suggestion", value: "Rest or cardio tomorrow", small: true, sub: "Every group is covered this week. Recover, then go again." });
-  }
+  const chips = (xs, kind) => xs.length
+    ? xs.map((a) => `<span class="nx-chip ${kind}">${escapeHtml(a.label)}${
+        kind === "rest" ? ` <i>${Math.ceil(a.hoursLeft)}h</i>` : ""}</span>`).join("")
+    : `<span class="nx-none">None</span>`;
 
-  $("biInsights").innerHTML = rows.map((r, i) => `
-    <div class="bi-ins ${animate ? "bi-anim" : ""}" style="--d:${120 + i * 70}ms">
-      <div class="bi-ins-ico ${r.blue ? "blue" : ""}">${icon(r.ico, 22)}</div>
-      <div class="bi-ins-body">
-        <div><div class="bi-ins-title">${escapeHtml(r.title)}</div><div class="bi-ins-sub">${escapeHtml(r.sub)}</div></div>
-        <div class="bi-ins-val ${r.small ? "small" : ""} ${r.cls || ""}">${escapeHtml(r.value)}</div>
-      </div>
-    </div>`).join("");
+  $("biNext").innerHTML = `
+    <div class="nx-answer${animate ? " bi-anim" : ""}" style="--d:120ms">
+      <div class="nx-head">${escapeHtml(headline)}</div>
+      <p class="nx-why">${escapeHtml(why)}</p>
+    </div>
+    <div class="nx-rows">
+      <div class="nx-row"><span class="nx-k">Ready now</span><span class="nx-v">${chips(ready, "go")}</span></div>
+      <div class="nx-row"><span class="nx-k">Recovering</span><span class="nx-v">${chips(resting, "rest")}</span></div>
+      <div class="nx-row"><span class="nx-k">This week</span><span class="nx-v nx-text">${escapeHtml(weekLine)}</span></div>
+    </div>`;
+  $("biNextInfoSlot").innerHTML = infoDot("trainNext", "How this is worked out");
 }
 
 /* Whether your partner has seen today's workout. Their seeing it is the
