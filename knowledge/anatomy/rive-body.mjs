@@ -252,6 +252,11 @@ export function createBodyHeatmap({ canvas, artboardName, palette, intensities, 
   const api = {
     setIntensities: (next) => applyIntensities(r, next),
     setPalette: (next) => applyPalette(r, next),
+    /* One muscle's colours, without touching the others. The palette
+       properties are per muscle in the view model; setPalette just happens to
+       write the same values to all of them. Used to pick a single muscle out
+       of the heat map in a colour the heat map does not use. */
+    setMusclePalette: (muscle, next) => applyMusclePalette(r, muscle, next),
     focus,
     project,
     get zoomed() { return !!focusBox; },
@@ -270,21 +275,30 @@ function applyIntensities(r, intensities) {
   }
 }
 
+function paintMuscle(vmi, muscle, palette) {
+  const set = (name, c) => {
+    const prop = vmi.color(`${muscle}/${PALETTE_VM}/${name}`);
+    if (prop && c) prop.rgb(c.r, c.g, c.b);
+  };
+  set("baseColor", palette.base);
+  set("colorLevel1", palette.level1);
+  set("colorLevel2", palette.level2);
+  set("colorLevel3", palette.level3);
+  set("colorLevel4", palette.level4);
+}
+
 function applyPalette(r, palette) {
   if (!palette) return;
   const vmi = r.viewModelInstance;
   if (!vmi) return;
-  for (const muscle of ALL_MUSCLES) {
-    const set = (name, c) => {
-      const prop = vmi.color(`${muscle}/${PALETTE_VM}/${name}`);
-      if (prop && c) prop.rgb(c.r, c.g, c.b);
-    };
-    set("baseColor", palette.base);
-    set("colorLevel1", palette.level1);
-    set("colorLevel2", palette.level2);
-    set("colorLevel3", palette.level3);
-    set("colorLevel4", palette.level4);
-  }
+  for (const muscle of ALL_MUSCLES) paintMuscle(vmi, muscle, palette);
+}
+
+function applyMusclePalette(r, muscle, palette) {
+  if (!palette || !MUSCLE_SET.has(muscle)) return;
+  const vmi = r.viewModelInstance;
+  if (!vmi) return;
+  paintMuscle(vmi, muscle, palette);
 }
 
 // Rive event payload shape: { name, properties? }. Validated against ALL_MUSCLES so an

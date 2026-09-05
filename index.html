@@ -2790,7 +2790,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.19";
+const APP_VERSION = "2026.09.04.20";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -8721,6 +8721,10 @@ const BODY_RING_FILLERS = ["chest", "lats", "quads", "shoulders", "abs", "hamstr
 let BODY_PERIOD = null;        // null until first render, then "today" | "week" | "lastweek"
 let BODY_LAST_KEY = null;      // what was last drawn, so a silent refresh does not replay animations
 let BODY_RAMP_TIMERS = [];
+let BODY_LAST_TARGET = {};      // the full heat map, so focus can isolate and restore
+let BODY_BLINK_TIMERS = [];
+let BODY_GREENED = null;        // a muscle recoloured green, to put back on unfocus
+let BODY_HEAT_PALETTE = null;   // the module's own ramp, kept so it can be restored
 
 function bodyPeriodRange(period) {
   if (period === "today") {
@@ -8909,6 +8913,7 @@ async function renderBodyDiagram(animate) {
   }
 
   const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
+  BODY_HEAT_PALETTE = mod.APP_HEAT_PALETTE;
 
   if (!riveFrontCtrl || riveLoadedSex !== sex) {
     if (BODY_FOCUS) bodyClearFocusUI();
@@ -8998,7 +9003,76 @@ async function bodyFocusMuscle(muscle, view, side) {
   // so the tween lands on the final size instead of chasing it.
   const go = () => ctrl?.focus(bounds.boundsFor(artboard, muscle, side), true);
   if (first) setTimeout(go, 60); else go();
+  bodyIsolateMuscle(muscle);
   renderBodyDetail();
+}
+
+/* Zoomed in on one muscle, the heat map around it is noise: everything else
+   goes dark so the thing being read is the only thing lit. A muscle with no
+   work done on it would be dark too, and a zoom onto nothing says nothing, so
+   that case is lit in the app's green, which the heat scale never uses, and
+   is unmistakably "none" rather than "a little".
+
+   Then it blinks, so a second tap on a second muscle is visibly a new answer
+   and not the same screen. Three blinks, then it holds. */
+const BODY_NONE_GREEN = { r: 0x3b, g: 0xe7, b: 0x6b };   // the app's accent, absent from the heat ramp
+
+/* Built at call time, not at parse time: the base colour comes from the
+   module's own palette so a change there cannot leave this one behind. */
+function bodyGreenPalette() {
+  return {
+    base: BODY_HEAT_PALETTE?.base || { r: 0x23, g: 0x2a, b: 0x31 },
+    level1: BODY_NONE_GREEN, level2: BODY_NONE_GREEN,
+    level3: BODY_NONE_GREEN, level4: BODY_NONE_GREEN,
+  };
+}
+
+function bodyIsolateMuscle(muscle) {
+  BODY_BLINK_TIMERS.forEach(clearTimeout);
+  BODY_BLINK_TIMERS = [];
+  bodyRestoreGreen();
+
+  const real = BODY_LAST_TARGET[muscle] || 0;
+  const unused = real === 0;
+  if (unused) {
+    const green = bodyGreenPalette();
+    riveFrontCtrl?.setMusclePalette(muscle, green);
+    riveBackCtrl?.setMusclePalette(muscle, green);
+    BODY_GREENED = muscle;
+  }
+  const lit = unused ? 4 : real;
+
+  const only = (level) => {
+    const map = {};
+    for (const k in BODY_LAST_TARGET) map[k] = 0;
+    map[muscle] = level;
+    riveFrontCtrl?.setIntensities(map);
+    riveBackCtrl?.setIntensities(map);
+  };
+
+  const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduced) { only(lit); return; }
+
+  only(0);
+  [140, 300, 440, 600, 740].forEach((at, i) => {
+    BODY_BLINK_TIMERS.push(setTimeout(() => only(i % 2 === 0 ? lit : 0), at));
+  });
+}
+
+function bodyRestoreGreen() {
+  if (!BODY_GREENED || !BODY_HEAT_PALETTE) { BODY_GREENED = null; return; }
+  riveFrontCtrl?.setMusclePalette(BODY_GREENED, BODY_HEAT_PALETTE);
+  riveBackCtrl?.setMusclePalette(BODY_GREENED, BODY_HEAT_PALETTE);
+  BODY_GREENED = null;
+}
+
+/* Everything lit again, exactly as it was before the zoom. */
+function bodyRestoreHeat() {
+  BODY_BLINK_TIMERS.forEach(clearTimeout);
+  BODY_BLINK_TIMERS = [];
+  bodyRestoreGreen();
+  riveFrontCtrl?.setIntensities(BODY_LAST_TARGET);
+  riveBackCtrl?.setIntensities(BODY_LAST_TARGET);
 }
 
 function bodyClearFocusUI() {
@@ -9014,6 +9088,7 @@ function bodyClearFocusUI() {
 
 function bodyUnfocus() {
   bodyClearFocusUI();
+  bodyRestoreHeat();
   riveFrontCtrl?.focus(null, true);
   riveBackCtrl?.focus(null, true);
   // The folded figure sat at zero width, so its drawing surface was left alone. Size it
@@ -9164,6 +9239,7 @@ function bodyBuildOrder(muscles, sex) {
 function bodyRampFigures(target, animate) {
   BODY_RAMP_TIMERS.forEach(clearTimeout);
   BODY_RAMP_TIMERS = [];
+  BODY_LAST_TARGET = { ...target };
   const apply = (map) => {
     riveFrontCtrl?.setIntensities(map);
     riveBackCtrl?.setIntensities(map);
