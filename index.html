@@ -2790,7 +2790,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.20";
+const APP_VERSION = "2026.09.04.21";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -3594,7 +3594,7 @@ function switchTab(tab) {
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== "tab-" + tab));
   if (tab === "home") renderHome(true);
   if (tab === "progress") renderProgressTab();
-  if (tab === "body") renderBodyTab(true);
+  if (tab === "body") { bodyResetFocus(); renderBodyTab(true); }
   if (tab === "workout") renderWorkoutTab();
   if (tab === "setup") renderSetupTab();
 }
@@ -8722,7 +8722,7 @@ let BODY_PERIOD = null;        // null until first render, then "today" | "week"
 let BODY_LAST_KEY = null;      // what was last drawn, so a silent refresh does not replay animations
 let BODY_RAMP_TIMERS = [];
 let BODY_LAST_TARGET = {};      // the full heat map, so focus can isolate and restore
-let BODY_BLINK_TIMERS = [];
+let BODY_PULSE_RAF = null;      // the selected muscle's slow breath
 let BODY_GREENED = null;        // a muscle recoloured green, to put back on unfocus
 let BODY_HEAT_PALETTE = null;   // the module's own ramp, kept so it can be restored
 
@@ -9028,35 +9028,50 @@ function bodyGreenPalette() {
 }
 
 function bodyIsolateMuscle(muscle) {
-  BODY_BLINK_TIMERS.forEach(clearTimeout);
-  BODY_BLINK_TIMERS = [];
+  bodyStopPulse();
   bodyRestoreGreen();
 
   const real = BODY_LAST_TARGET[muscle] || 0;
   const unused = real === 0;
-  if (unused) {
-    const green = bodyGreenPalette();
-    riveFrontCtrl?.setMusclePalette(muscle, green);
-    riveBackCtrl?.setMusclePalette(muscle, green);
-    BODY_GREENED = muscle;
-  }
-  const lit = unused ? 4 : real;
+  const heat = BODY_HEAT_PALETTE || {};
+  const lit = unused ? BODY_NONE_GREEN : (heat[`level${real}`] || BODY_NONE_GREEN);
+  const base = heat.base || { r: 0x23, g: 0x2a, b: 0x31 };
+  BODY_GREENED = muscle;   // its palette is ours now either way, so put it back on exit
 
-  const only = (level) => {
-    const map = {};
-    for (const k in BODY_LAST_TARGET) map[k] = 0;
-    map[muscle] = level;
-    riveFrontCtrl?.setIntensities(map);
-    riveBackCtrl?.setIntensities(map);
+  // Everything else dark; the selected one carries the only light on the figure.
+  const only = {};
+  for (const k in BODY_LAST_TARGET) only[k] = 0;
+  only[muscle] = 4;
+  riveFrontCtrl?.setIntensities(only);
+  riveBackCtrl?.setIntensities(only);
+
+  const paint = (t) => {
+    const mix = (a, b) => Math.round(a + (b - a) * t);
+    const c = { r: mix(base.r, lit.r), g: mix(base.g, lit.g), b: mix(base.b, lit.b) };
+    const pal = { base, level1: c, level2: c, level3: c, level4: c };
+    riveFrontCtrl?.setMusclePalette(muscle, pal);
+    riveBackCtrl?.setMusclePalette(muscle, pal);
   };
 
   const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (reduced) { only(lit); return; }
+  if (reduced) { paint(1); return; }
 
-  only(0);
-  [140, 300, 440, 600, 740].forEach((at, i) => {
-    BODY_BLINK_TIMERS.push(setTimeout(() => only(i % 2 === 0 ? lit : 0), at));
-  });
+  /* A slow breath rather than a strobe, and it never goes all the way out, so
+     the muscle you picked is always readable while it pulses. Runs for as long
+     as it stays selected. */
+  const PERIOD = 1700, FLOOR = 0.22;
+  const t0 = performance.now();
+  const step = (now) => {
+    if (!BODY_FOCUS || BODY_FOCUS.muscle !== muscle) { BODY_PULSE_RAF = null; return; }
+    const phase = (Math.sin(((now - t0) / PERIOD) * Math.PI * 2 - Math.PI / 2) + 1) / 2;
+    paint(FLOOR + (1 - FLOOR) * phase);
+    BODY_PULSE_RAF = requestAnimationFrame(step);
+  };
+  BODY_PULSE_RAF = requestAnimationFrame(step);
+}
+
+function bodyStopPulse() {
+  if (BODY_PULSE_RAF) { cancelAnimationFrame(BODY_PULSE_RAF); BODY_PULSE_RAF = null; }
 }
 
 function bodyRestoreGreen() {
@@ -9068,8 +9083,7 @@ function bodyRestoreGreen() {
 
 /* Everything lit again, exactly as it was before the zoom. */
 function bodyRestoreHeat() {
-  BODY_BLINK_TIMERS.forEach(clearTimeout);
-  BODY_BLINK_TIMERS = [];
+  bodyStopPulse();
   bodyRestoreGreen();
   riveFrontCtrl?.setIntensities(BODY_LAST_TARGET);
   riveBackCtrl?.setIntensities(BODY_LAST_TARGET);
@@ -9084,6 +9098,17 @@ function bodyClearFocusUI() {
   $("biRings").classList.remove("hide");
   $("biPieces").classList.remove("show");
   $("biSectionTitle").textContent = "Training Impact";
+}
+
+/* Leaving the tab and returning is an arrival: the zoom, the isolated muscle
+   and its pulse all go, without the zoom-out tween, since there is nothing on
+   screen yet to animate away from. */
+function bodyResetFocus() {
+  if (!BODY_FOCUS) return;
+  bodyClearFocusUI();
+  bodyRestoreHeat();
+  riveFrontCtrl?.focus(null, false);
+  riveBackCtrl?.focus(null, false);
 }
 
 function bodyUnfocus() {
