@@ -2790,7 +2790,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.17";
+const APP_VERSION = "2026.09.04.18";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -6802,20 +6802,37 @@ function revealGeneratedPlan(workout, onGo) {
   }, 420);
 }
 
+/* The screen that says what went wrong. It has to be the most robust thing
+   here: if this throws, the user is left staring at a frozen overlay with no
+   idea what happened, which is exactly what it did when it still referenced
+   the old water element after that was removed. Hence the belt and braces. */
 function failGenOverlay(message) {
-  if (genCancelled) { toast(`Couldn't generate: ${message}`); return; }
-  stopGenTicker();
-  $("genFill").style.height = "0%";
-  $("genStage").innerHTML = `
-    <div class="gen-focus">That didn't work</div>
-    <p class="gen-err">${escapeHtml(message)}</p>
-    <button type="button" class="btn-primary" id="genCloseBtn">Close</button>`;
-  $("genCloseBtn").onclick = closeGenOverlay;
+  const text = String(message || "Something went wrong");
+  if (genCancelled) { toast(`Couldn't generate: ${text}`); return; }
+  try {
+    stopGenTicker();
+    stopGenRaf();
+    $("genHolo")?.style.setProperty("--rev", "0%");
+    $("genStage").innerHTML = `
+      <div class="gen-focus">That didn't work</div>
+      <p class="gen-err">${escapeHtml(text)}</p>
+      <button type="button" class="btn-primary" id="genCloseBtn">Close</button>`;
+    $("genCloseBtn").onclick = closeGenOverlay;
+  } catch (e) {
+    console.error("could not show the failure screen", e);
+    closeGenOverlay();
+    toast(`Couldn't generate: ${text}`);
+  }
 }
 
 async function generateWorkout(forDate) {
   if (isCoachedClient()) { toast("Your coach sets your workouts"); return; }
-  const target = forDate || todayStr();
+  /* This used to be wired straight to onclick, which handed it a PointerEvent
+     as forDate. That went all the way into entry_date and came back as
+     "invalid input syntax for type date" from Postgres. Only a real date is
+     allowed through now, so a future mis-wiring cannot poison the write. */
+  const wanted = typeof forDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(forDate) ? forDate : null;
+  const target = wanted || todayStr();
   const isToday = target === todayStr();
   WORKOUT_MODE = null;
   openGenOverlay(isToday ? "Generating" : "Planning");
@@ -6843,7 +6860,17 @@ async function generateWorkout(forDate) {
         history,
       }),
     });
-    const data = await resp.json();
+    /* Read as text first. When the function errors it can answer with an HTML
+       page or a truncated body, and resp.json() then throws a bare syntax
+       error that says nothing about what came back. */
+    const raw = await resp.text();
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      const snippet = raw.trim().slice(0, 140) || "(empty response)";
+      throw new Error(`The coach sent back something unreadable (HTTP ${resp.status}): ${snippet}`);
+    }
     if (resp.status === 429) {
       failGenOverlay(data.error || "You have hit today's limit on new workouts. Try again tomorrow.");
       isToday ? renderWorkoutTab() : renderHero();
@@ -8180,7 +8207,7 @@ function renderChooseScreen() {
   };
 
   if ($("sppCustomise")) $("sppCustomise").onclick = toManual;
-  if (!coached) $("chooseGenerateBtn").onclick = generateWorkout;
+  if (!coached) $("chooseGenerateBtn").onclick = () => generateWorkout();
   $("choosePlanBtn").onclick = toManual;
   $("chooseActivityBtn").onclick = () => { WORKOUT_MODE = "activity"; renderWorkoutTab(); };
 
@@ -8547,7 +8574,7 @@ function renderPlanPreview() {
   // These three are mutually exclusive depending on how far the workout got.
   if ($("planPrivacyBtn")) $("planPrivacyBtn").onclick = openWorkoutPrivacy;
   if ($("planStartBtn")) $("planStartBtn").onclick = startWorkout;
-  if ($("planRegenBtn")) $("planRegenBtn").onclick = generateWorkout;
+  if ($("planRegenBtn")) $("planRegenBtn").onclick = () => generateWorkout();
   if ($("planNewBtn")) $("planNewBtn").onclick = startFreshWorkout;
 }
 
