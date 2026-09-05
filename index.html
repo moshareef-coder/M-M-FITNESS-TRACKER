@@ -3284,7 +3284,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.42";
+const APP_VERSION = "2026.09.04.43";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -5141,14 +5141,11 @@ async function renderAvatarPair() {
 /* ---------- The photo editor ----------
    A picture straight off a phone is never square, and a face is never in the
    middle of it. Dropping the file in as it comes crops whatever the middle
-   happens to be, which is how you end up with a shoulder. So: drag to move,
-   pinch or drag the slider to zoom, and the circle is exactly what gets
-   saved.
-
-   Two files are kept. The crop is what everyone sees; the original sits
-   beside it so "Edit photo" can reopen the real picture rather than making
-   you crop a crop, the way a phone's photo editor is non destructive. */
-const AVATAR_ORIGINAL = () => `${MY_EMAIL}/avatar/original.jpg`;
+   happens to be, which is how you end up with a shoulder. So: every photo you
+   pick opens straight into this, drag to move, pinch or drag the slider to
+   zoom, and the circle is exactly what gets saved. There is no separate
+   re-edit step; picking a new photo is the only way in, which is also the
+   only time there is a fresh picture worth lining up. */
 const CROP_OUT = 512;
 let CROP = null;
 
@@ -5256,7 +5253,7 @@ async function openAvatarEditor(source) {
     btn.disabled = true; btn.textContent = "Saving…";
     const blob = await cropToBlob();
     close();
-    if (blob) await saveAvatar(blob, source);
+    if (blob) await saveAvatar(blob);
     else toast("Could not save that photo");
   };
 }
@@ -5284,9 +5281,7 @@ function loadImageFromBlob(blob) {
   });
 }
 
-/* Upload the crop, and the original beside it so the next edit starts from
-   the real picture. */
-async function saveAvatar(cropBlob, originalBlob) {
+async function saveAvatar(cropBlob) {
   const btn = $("avatarPickBtn");
   if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
   try {
@@ -5294,14 +5289,6 @@ async function saveAvatar(cropBlob, originalBlob) {
     const { error: upErr } = await sb.storage.from("workout-proof")
       .upload(path, cropBlob, { contentType: "image/jpeg", upsert: true });
     if (upErr) throw upErr;
-
-    if (originalBlob instanceof Blob) {
-      const keep = await compressImage(originalBlob, 1600, 0.86);
-      await sb.storage.from("workout-proof")
-        .upload(AVATAR_ORIGINAL(), keep, { contentType: "image/jpeg", upsert: true })
-        .catch(() => {});
-      delete PROOF_URL_CACHE[AVATAR_ORIGINAL()];
-    }
 
     const old = MY_PROFILE?.avatar_path;
     const { error: dbErr } = await sb.from("profiles")
@@ -5312,8 +5299,8 @@ async function saveAvatar(cropBlob, originalBlob) {
     const cached = profileFor(MY_EMAIL);
     if (cached) cached.avatar_path = path;
 
-    // Replace, do not accumulate. Old crops are dead weight in the bucket.
-    if (old && old !== path && !old.endsWith("original.jpg")) {
+    // Replace, do not accumulate. The old crop is dead weight in the bucket.
+    if (old && old !== path) {
       await sb.storage.from("workout-proof").remove([old]);
       delete PROOF_URL_CACHE[old];
     }
@@ -5328,20 +5315,6 @@ async function saveAvatar(cropBlob, originalBlob) {
   }
 }
 
-/* Editing again starts from the original if there is one, so a crop is never
-   cropped twice. */
-async function editExistingAvatar() {
-  const tryPath = async (path) => {
-    if (!path) return null;
-    const url = await signedProofUrl(path);
-    if (!url) return null;
-    try { const r = await fetch(url); return r.ok ? await r.blob() : null; } catch { return null; }
-  };
-  const blob = await tryPath(AVATAR_ORIGINAL()) || await tryPath(MY_PROFILE?.avatar_path);
-  if (!blob) { toast("Pick a photo to start from"); $("avatarFile").click(); return; }
-  await openAvatarEditor(blob);
-}
-
 async function removeAvatar() {
   if (!confirm("Remove your photo? Your initials go back in its place.")) return;
   const old = MY_PROFILE?.avatar_path;
@@ -5350,9 +5323,10 @@ async function removeAvatar() {
     if (MY_PROFILE) MY_PROFILE.avatar_path = null;
     const cached = profileFor(MY_EMAIL);
     if (cached) cached.avatar_path = null;
-    const gone = [old, AVATAR_ORIGINAL()].filter(Boolean);
-    await sb.storage.from("workout-proof").remove(gone);
-    gone.forEach((p) => delete PROOF_URL_CACHE[p]);
+    if (old) {
+      await sb.storage.from("workout-proof").remove([old]);
+      delete PROOF_URL_CACHE[old];
+    }
     toast("Photo removed");
   } catch (e) {
     console.error("avatar remove failed", e);
@@ -5370,14 +5344,15 @@ async function renderSetupPhoto() {
   box.insertAdjacentHTML("beforeend",
     `<div class="setup-photo-acts">
        <button type="button" class="btn-secondary" id="avatarPickBtn">${has ? "Change photo" : "Add a photo"}</button>
-       ${has ? `<button type="button" class="btn-ghost" id="avatarEditBtn">Move and scale</button>
-                <button type="button" class="btn-ghost" id="avatarRemoveBtn">Remove photo</button>` : ""}
+       ${has ? `<button type="button" class="btn-ghost" id="avatarRemoveBtn">Remove photo</button>` : ""}
        <p class="muted-note" style="margin-top:2px;">Your partner sees this. Tap the circle to change it.</p>
      </div>`);
+  // The circle and the button do the same thing: picking a photo is the only
+  // way in, and every photo you pick opens straight into moving and scaling
+  // it, so there is nothing else here to offer.
   const pick = () => $("avatarFile").click();
   $("avatarPickBtn").onclick = pick;
-  box.querySelector(".av").onclick = has ? editExistingAvatar : pick;
-  if ($("avatarEditBtn")) $("avatarEditBtn").onclick = editExistingAvatar;
+  box.querySelector(".av").onclick = pick;
   if ($("avatarRemoveBtn")) $("avatarRemoveBtn").onclick = removeAvatar;
 }
 
