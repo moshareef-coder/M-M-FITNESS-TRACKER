@@ -1068,7 +1068,16 @@
      trained day, a planned one and a rest day are told apart at a glance
      without the grid turning into a paint chart. */
   .cal { margin-top: 22px; }
-  .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 12px; }
+  .cal-title { flex: 1; text-align: center; }
+  .wk-nav-btn.wide { width: 42px; gap: -4px; }
+  .wk-nav-btn.wide svg:last-child { margin-left: -9px; }
+  .cal-today {
+    display: block; width: 100%; margin: 0 0 12px; padding: 8px; border-radius: 10px; cursor: pointer;
+    font: inherit; font-size: 12.5px; font-weight: 600;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+  }
+  .cal-today:active { opacity: .7; }
   .cal-title { font-size: 15.5px; font-weight: 800; letter-spacing: -.02em; }
   .cal-dows {
     display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px;
@@ -2504,14 +2513,6 @@
       <div id="workoutContent"></div>
     </div>
 
-    <div class="card hidden" id="prevWorkoutsCard">
-      <div class="recent-head" style="margin-top:0;">
-        <h3>Previous workouts</h3>
-        <button type="button" class="recent-all hidden" id="prevWorkoutsAll">View All</button>
-      </div>
-      <div class="recent-strip" id="prevWorkoutsList"></div>
-    </div>
-
     <div id="sessionCard" class="session-overlay hidden">
       <div class="session-bar">
         <button type="button" class="session-min" id="sessionMinBtn" aria-label="Back, without ending the workout"></button>
@@ -3040,7 +3041,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.30";
+const APP_VERSION = "2026.09.04.31";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -8078,34 +8079,6 @@ function workoutMeta(r) {
   return bits.join(" \u00b7 ") || "Logged";
 }
 
-function renderPreviousWorkouts() {
-  const card = $("prevWorkoutsCard");
-  const list = $("prevWorkoutsList");
-  const head = $("prevWorkoutsAll");
-  if (!card || !list) return;
-
-  const days = prevWorkoutDays();
-  card.classList.toggle("hidden", days.length === 0);
-  if (head) {
-    head.classList.toggle("hidden", days.length <= 3);
-    head.onclick = openAllWorkouts;
-  }
-  if (!days.length) { list.innerHTML = ""; return; }
-
-  list.innerHTML = days.slice(0, 3).map((d) => {
-    const r = recapFor(MY_EMAIL, ME, d);
-    return `<div class="recent-chip" data-prev="${escapeHtml(d)}" role="button" tabindex="0">
-      <div class="recent-name">${escapeHtml(r.title)}</div>
-      <div class="recent-when">${escapeHtml(datedLabel(d))}</div>
-      <div class="recent-when">${escapeHtml(workoutMeta(r))}</div>
-      <div class="recent-foot"><span class="recent-mark">${icon("check", 15)}</span></div>
-    </div>`;
-  }).join("");
-
-  list.querySelectorAll("[data-prev]").forEach((b) => {
-    b.onclick = () => openRecap(MY_EMAIL, ME, b.dataset.prev);
-  });
-}
 
 /* Every workout you have logged, as a list. Opens over the tab rather than
    pushing the page down, so closing it puts you back exactly where you were. */
@@ -8146,7 +8119,6 @@ function closeAllWorkouts() { $("allWorkoutsScrim").classList.add("hidden"); }
 
 function renderWorkoutTab() {
   renderFab();
-  renderPreviousWorkouts();
   resumeSessionIfAny();          // loads a saved session, does not take over
   $("workoutContent").classList.remove("hidden");
 
@@ -8425,18 +8397,37 @@ function historyMonthDays(offset = HISTORY_MONTH) {
 function historyMonthLabel(offset = HISTORY_MONTH) {
   const today = new Date(todayStr() + "T00:00:00");
   const m = new Date(today.getFullYear(), today.getMonth() + offset, 1);
-  return m.toLocaleDateString([], { month: "long", year: m.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+  // The year is always shown. Hiding it for the current one is the sort of
+  // tidiness that leaves you unsure which year you are looking at.
+  return m.toLocaleDateString([], { month: "long", year: "numeric" });
+}
+
+/* How far back there is anything to look at, so the controls can stop at the
+   end of your history rather than letting you scroll into empty years. */
+function historyOldestOffset() {
+  const dates = [
+    ...(ALL_PLANS || []).filter((w) => w.email === MY_EMAIL).map((w) => w.entry_date),
+    ...(ALL_ENTRIES || []).filter((e) => e.email === MY_EMAIL && (e.gym || e.rest_day)).map((e) => e.entry_date),
+  ].filter(Boolean).sort();
+  if (!dates.length) return 0;
+  const today = new Date(todayStr() + "T00:00:00");
+  const first = new Date(dates[0] + "T00:00:00");
+  return (first.getFullYear() - today.getFullYear()) * 12 + (first.getMonth() - today.getMonth());
 }
 
 function workoutCalendarHTML() {
   const days = historyMonthDays();
+  const oldest = Math.min(0, historyOldestOffset());
   const dows = ["M", "T", "W", "T", "F", "S", "S"];
   return `<div class="cal">
     <div class="cal-head">
-      <button type="button" class="wk-nav-btn" id="calPrev" aria-label="Previous month">${icon("chevronLeft", 16)}</button>
+      <button type="button" class="wk-nav-btn wide" id="calPrevYear" ${HISTORY_MONTH <= oldest ? "disabled" : ""} aria-label="Back a year">${icon("chevronLeft", 14)}${icon("chevronLeft", 14)}</button>
+      <button type="button" class="wk-nav-btn" id="calPrev" ${HISTORY_MONTH <= oldest ? "disabled" : ""} aria-label="Previous month">${icon("chevronLeft", 16)}</button>
       <div class="cal-title">${escapeHtml(historyMonthLabel())}</div>
       <button type="button" class="wk-nav-btn" id="calNext" ${HISTORY_MONTH >= 0 ? "disabled" : ""} aria-label="Next month">${icon("chevronRight", 16)}</button>
+      <button type="button" class="wk-nav-btn wide" id="calNextYear" ${HISTORY_MONTH + 12 > 0 ? "disabled" : ""} aria-label="Forward a year">${icon("chevronRight", 14)}${icon("chevronRight", 14)}</button>
     </div>
+    ${HISTORY_MONTH !== 0 ? `<button type="button" class="cal-today" id="calToday">Back to this month</button>` : ""}
     <div class="cal-dows">${dows.map((d) => `<span>${d}</span>`).join("")}</div>
     <div class="cal-grid">
       ${days.map((d, i) => `
@@ -8453,8 +8444,13 @@ function workoutCalendarHTML() {
 }
 
 function wireWorkoutCalendar(root) {
-  if ($("calPrev")) $("calPrev").onclick = () => { HISTORY_MONTH--; renderWorkoutTab(); };
-  if ($("calNext")) $("calNext").onclick = () => { if (HISTORY_MONTH < 0) { HISTORY_MONTH++; renderWorkoutTab(); } };
+  const oldest = Math.min(0, historyOldestOffset());
+  const go = (to) => { HISTORY_MONTH = Math.max(oldest, Math.min(0, to)); renderWorkoutTab(); };
+  if ($("calPrev")) $("calPrev").onclick = () => go(HISTORY_MONTH - 1);
+  if ($("calNext")) $("calNext").onclick = () => go(HISTORY_MONTH + 1);
+  if ($("calPrevYear")) $("calPrevYear").onclick = () => go(HISTORY_MONTH - 12);
+  if ($("calNextYear")) $("calNextYear").onclick = () => go(HISTORY_MONTH + 12);
+  if ($("calToday")) $("calToday").onclick = () => go(0);
   root.querySelectorAll("[data-cal]").forEach((b) => {
     b.onclick = () => {
       const date = b.dataset.cal;
