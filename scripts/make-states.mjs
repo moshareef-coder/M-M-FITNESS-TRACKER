@@ -99,7 +99,10 @@ const GALLERY_CSS = `
   }
   .gal-btn.on { background: var(--accent); color: var(--on-accent); border-color: transparent; }
   .gal-group { margin-top: 34px; scroll-margin-top: 70px; }
-  .gal-group h2 {
+  /* Direct child only. As a descendant selector this also hit the app's own
+     h2 inside every frame, so the session card's title rendered as a tiny
+     uppercase label and the gallery lied about the screen. */
+  .gal-group > h2 {
     font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted);
     font-weight: 800; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
   }
