@@ -17,11 +17,10 @@
    of frames never has duplicate ids. Handlers are dropped in the capture; this
    is a gallery to look at, not an app to use. */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { root, src, style, fonts, grab, fn, section, SNAP_SPECS, SNAP_PROFILES, SNAP_FILE } from "./lift.mjs";
-import { hitsForExercise } from "../knowledge/anatomy/muscle-detail.mjs";
-import { RIVE_TO_APP_GROUP } from "../knowledge/anatomy/rive-body.mjs";
+import { root, src, style, fonts, grab, fn, section, SNAP_SPECS, SNAP_PROFILES } from "./lift.mjs";
+import { hitsForExercise, MUSCLE_PIECES, MUSCLE_HEADS } from "../knowledge/anatomy/muscle-detail.mjs";
 
 /* ---- lift the real thing out of the app ---- */
 
@@ -64,7 +63,7 @@ const DATA = [
   grab(/\nconst BODY_GROUP_LABELS = \{.*?\n\};\n/s, "BODY_GROUP_LABELS"),
 ].join("\n");
 
-/* ---- the figures ----
+/* ---- the working muscles ----
    The muscle detail modules are ES modules the app imports at runtime. A
    standalone page cannot, so the answers for the gallery's exercises are
    worked out here in Node, with the app's own classifier, and embedded. */
@@ -72,14 +71,6 @@ const classifyMuscles = new Function(`${DATA}\n${fn("classifyMuscles")}\nreturn 
 const GALLERY_EXERCISES = [...new Set([...SNAP_SPECS.map((s) => s.exerciseName), "Turkish Get-Up"])];
 const HITS = Object.fromEntries(GALLERY_EXERCISES.map((name) =>
   [name.toLowerCase(), hitsForExercise(name, classifyMuscles(name))]));
-
-/* The pictures themselves are WebGL, which Node does not have. snap-body.mjs
-   draws them in a headless Chrome; without that file the slots stay empty and
-   the build says so, loudly, because a gallery with blank bodies reads as a
-   bug in the app. */
-let SNAPS = {};
-if (existsSync(SNAP_FILE)) SNAPS = JSON.parse(readFileSync(SNAP_FILE, "utf8"));
-else console.warn("make-states: no scripts/.body-snaps.json, the figures will be blank. Run: node scripts/snap-body.mjs");
 
 /* ---- the gallery page ---- */
 
@@ -274,9 +265,13 @@ const jumpToExercise = () => {};
 const finishExerciseAndAdvance = () => {};
 /* The app loads these as ES modules. Here the answers are baked in. */
 let riveBodyPromise = null, bodyDetailPromise = null;
-const ensureRiveBodyModule = () => Promise.resolve(RIVE_BODY);
+const ensureRiveBodyModule = () => Promise.resolve(null);
 const ensureBodyDetailModules = () => Promise.resolve(BODY_DETAIL);
-let BODY_DETAIL = { detail: { hitsForExercise: (name) => HITS[String(name).toLowerCase()] || null } };
+let BODY_DETAIL = { detail: {
+  hitsForExercise: (name) => HITS[String(name).toLowerCase()] || null,
+  MUSCLE_PIECES: ${JSON.stringify(MUSCLE_PIECES)},
+  MUSCLE_HEADS: ${JSON.stringify(MUSCLE_HEADS)},
+} };
 const HITS = ${JSON.stringify(HITS)};
 
 ${PRIVACY_ROWS}
@@ -286,12 +281,6 @@ let genTimer = null, genPct = 0, genStepAt = 0, genWordTimer = null, genWordAt =
 let genRaf = null, genRevShown = 0, genFrameAt = 0, genCancelled = false;
 ${FUNCS}
 ${WORKING_MUSCLES}
-
-RIVE_BODY = { RIVE_TO_APP_GROUP: ${JSON.stringify(RIVE_TO_APP_GROUP)} };
-/* Pre-drawn by snap-body.mjs, both themes, so nothing here touches WebGL. */
-const SNAPS = ${JSON.stringify(SNAPS)};
-for (const [k, v] of Object.entries(SNAPS)) BODY_SNAP_CACHE.set(k, v);
-ensureBodySnap = (key) => { if (!BODY_SNAP_CACHE.has(key)) console.warn("no snapshot for " + key + ", run node scripts/snap-body.mjs"); };
 
 /* ---- the fixtures each state starts from ---- */
 
@@ -422,15 +411,15 @@ const STATES = [
     setup: () => { LIVE_PARTNER = null; }, sheet: true },
 
   { group: "Watching them train", name: "A pull exercise, back lit up",
-    note: "The figure is per exercise, so front and back change as they move through the plan. Same anatomy as the Body tab, her body since she is a woman.",
+    note: "The muscle line is per exercise, so it changes as they move through the plan. The tile beside it is where the exercise demo will go.",
     setup: () => { LIVE_PARTNER = liveRow({ exercise_name: "Barbell Row", exercise_index: 1, set_done: 1, set_total: 3 }); }, sheet: true },
 
   { group: "Watching them train", name: "An exercise the classifier does not know",
-    note: "No figure rather than a body with nothing lit.",
+    note: "Nothing at all rather than a line naming no muscles.",
     setup: () => { LIVE_PARTNER = liveRow({ exercise_name: "Turkish Get-Up" }); }, sheet: true },
 
   { group: "Watching them train", name: "This one keeps it private",
-    note: "Name, sets and the muscle figure are gone. Live status, elapsed time and today's effort score stay, so how hard never needs to reveal at what.",
+    note: "Name, sets and the muscle line are gone. Live status, elapsed time and today's effort score stay, so how hard never needs to reveal at what.",
     setup: () => { LIVE_PARTNER = liveRow(); PARTNER_PROFILE = { share_workout_details: false }; }, sheet: true },
 
   { group: "Generating a workout", name: "Working on it",
@@ -492,17 +481,17 @@ const STATES = [
     setup: () => { LIVE_PARTNER = liveRow({ allow_cheers: false }); }, sheet: true },
 
   { group: "What they see while training", name: "Mid set, bench press",
-    note: "The exerciser's own screen. Their body, lit in their colour, sits between the target and the set dots so they see what they are hitting before they log.",
+    note: "The exerciser's own screen. What they are working reads as a line between the target and the set dots, in their colour, with the demo tile beside it.",
     session: true, setup: () => { sessionFixture(); } },
 
   { group: "What they see while training", name: "Resting, a hip hinge",
-    note: "Hamstrings and glutes are on the back, so the back figure carries the colour and the front stays quiet.",
+    note: "A hip hinge names the hamstrings and glutes, with the quads and lower back listed as helping.",
     session: true, setup: () => { sessionFixture({ exerciseIndex: 3, restStartedAt: Date.now() - 48000,
       setsDone: [[true, true, true, true], [true, true, true], [true, true, true], [true, false, false], [false, false, false]],
       setWeights: [[185, 185, 185, 185], [95, 95, 95], [60, 60, 60], [225]], completed: [true, true, true, false, false] }); } },
 
   { group: "What they see while training", name: "An exercise the classifier does not know",
-    note: "The card simply has no figure. Nothing else moves.",
+    note: "The card simply has no muscle line. Nothing else moves.",
     session: true, setup: () => { sessionFixture(); TODAY_WORKOUT.exercises[0] = { name: "Turkish Get-Up", sets: 3, reps: 5 }; } },
 ];
 
@@ -575,18 +564,10 @@ async function renderSessionState() {
   return deId(card.outerHTML);
 }
 
-/* The figures are drawn per theme (their greys come from the tokens), so
-   the toggle swaps every figure to its sibling in the other theme. */
 const setTheme = (t) => {
   document.documentElement.setAttribute("data-theme", t);
   $("galLight").classList.toggle("on", t === "light");
   $("galDark").classList.toggle("on", t === "dark");
-  document.querySelectorAll("img.wm-fig[data-snap]").forEach((img) => {
-    const key = img.dataset.snap.replace(/\|(light|dark)\|/, "|" + t + "|");
-    img.dataset.snap = key;
-    const url = BODY_SNAP_CACHE.get(key);
-    if (url) img.src = url; else img.removeAttribute("src");
-  });
 };
 
 (async () => {

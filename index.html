@@ -515,12 +515,19 @@
   .rest-label { font-size: 12.5px; font-weight: 800; letter-spacing: .11em; color: var(--muted); }
   .rest-clock { font-size: 24px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 
+  /* Grid, not space-between: "Weight (lb)" is a wider label than "Reps", so
+     with flex the two control groups started at different places and the minus
+     buttons did not line up down the screen. */
   .sess-field {
-    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px;
     background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
     padding: 14px 16px; margin-bottom: 12px;
   }
   .sess-field-label { font-size: 17px; font-weight: 700; color: var(--text); }
+  /* The unit rides with the label instead of parenthesised after it, which
+     wrapped to a second line on a narrow phone and shoved the row out of line
+     with the one below. */
+  .sess-field-unit { font-size: 12.5px; font-weight: 700; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
   .sess-field-ctl { display: flex; align-items: center; gap: 12px; }
   .round-btn {
     width: 44px; height: 44px; border-radius: 50%; cursor: pointer; flex-shrink: 0;
@@ -529,10 +536,15 @@
     display: flex; align-items: center; justify-content: center;
   }
   .round-btn:active { border-color: var(--accent); color: var(--accent-ink); }
-  .sess-input {
-    width: 74px; text-align: center; border: none; background: transparent; color: var(--text);
+  /* Two classes, so this beats the generic input[type="number"] rule further
+     down the sheet. That rule was winning on specificity and stretching the
+     field to fill whatever space the label left over, which is the other half
+     of why the two rows disagreed. */
+  .sess-field .sess-input {
+    width: 104px; flex: none; box-sizing: border-box; text-align: center; color: var(--text);
+    border: 1px solid var(--border); background: var(--panel-2); border-radius: 12px;
     font-family: inherit; font-size: 24px; font-weight: 800; letter-spacing: -.02em;
-    -moz-appearance: textfield; padding: 0;
+    font-variant-numeric: tabular-nums; -moz-appearance: textfield; padding: 8px 4px;
   }
   .sess-input::-webkit-outer-spin-button, .sess-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .sess-input:focus { outline: none; }
@@ -860,34 +872,24 @@
      says whose body it is (coral for them, blue for you). */
   .wm { display: flex; align-items: center; gap: 14px; --wm-ink: var(--partner); }
   .wm-me { --wm-ink: var(--me); }
-  .wm-figs { display: flex; gap: 8px; flex-shrink: 0; }
-  .wm-view { margin: 0; text-align: center; }
-  .wm-view figcaption { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
-  /* The picture arrives a moment after the markup, so the slot holds its size
-     and the figure fades into it rather than the card jumping. */
-  .wm-fig {
-    display: block; width: 88px; height: 242px; object-fit: contain; border-radius: 10px;
-    background: color-mix(in srgb, var(--muted) 9%, transparent);
-    opacity: 0; transition: opacity .35s ease, background-color .35s ease;
+  /* Where the exercise demo will live. Until then it is a quiet tile rather
+     than a hole, so the row keeps its shape. */
+  .wm-ico {
+    width: 52px; height: 52px; border-radius: 15px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: color-mix(in srgb, var(--wm-ink) 80%, var(--text));
   }
-  .wm-fig.in { opacity: 1; background: transparent; }
-  .wm-sm .wm-fig { width: 64px; height: 176px; }
-  .wm-sm .wm-figs { gap: 4px; }
+  .wm-sm .wm-ico { width: 44px; height: 44px; border-radius: 13px; }
   .wm-legend { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
   .wm-label { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--wm-ink); }
   .wm-main { font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2; }
   .wm-sm .wm-main { font-size: 15.5px; }
   .wm-also { font-size: 13px; color: var(--muted); line-height: 1.35; }
-  .wm-keys { display: flex; align-items: center; gap: 12px; margin-top: 6px; font-size: 11px; color: var(--muted); }
-  .wm-keys span { display: inline-flex; align-items: center; gap: 5px; }
-  .wm-keys i { width: 9px; height: 9px; border-radius: 50%; background: var(--wm-ink); }
-  .wm-keys i.sec { background: color-mix(in srgb, var(--wm-ink) 45%, color-mix(in srgb, var(--muted) 35%, var(--panel-2))); }
   /* On the session card it sits between the exercise and the set circles. */
   .sess-card .wm { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
   /* Where the pictures are drawn: on screen (Rive will not draw off it) but
      invisible and untouchable. */
-  #bodySnapHost { position: fixed; left: 0; top: 0; z-index: -1; opacity: 0; pointer-events: none; }
-  #bodySnapHost canvas { display: block; }
 
   /* The watch screen */
   .lw-hero { text-align: center; padding: 4px 0 14px; }
@@ -3158,7 +3160,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.36";
+const APP_VERSION = "2026.09.04.37";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -4286,10 +4288,9 @@ async function loadAll() {
   warmBodyModules();
 }
 
-/* The body figure is heavy and most of it is cached forever once fetched, so
-   fetch it while the phone is doing nothing rather than when a screen is
-   waiting on it. Never on the critical path: startup used to pull the Rive
-   runtime and its wasm before Home had finished painting. */
+/* The muscle tables, so a session screen has the words ready before it is
+   opened. Small now that this no longer drags in the Rive runtime, but still
+   off the critical path: startup used to await these before Home painted. */
 let bodyWarmed = false;
 function warmBodyModules() {
   if (bodyWarmed) return;
@@ -5842,205 +5843,83 @@ async function purgeMyClips() {
 }
 
 /* ---------- Working muscles ----------
-   The same anatomical figure as the Body tab, lit for one exercise, shown to
-   the person training and to whoever is watching them. The Body tab keeps two
-   live Rive instances; here each figure is drawn once into a hidden canvas and
-   kept as a picture. A picture survives renderSession redrawing on every set,
-   cannot break another canvas's WebGL context, and can be handed to the state
-   gallery ready-made. The Rive runtime script is already on the page; the .riv
-   and the WASM are fetched on the first exercise that needs them and then live
-   in the browser cache. */
+   Which muscles an exercise trains, in words. There used to be two lit
+   anatomical figures here, drawn through Rive into a hidden canvas and kept as
+   pictures. They were the slowest thing on the session screen: the runtime,
+   its 2 MB wasm and a 338 KB .riv had to arrive before the first one appeared,
+   and mid workout that is a long time to look at two empty boxes. The words
+   were always the useful part, so the figures are gone and the tile beside
+   them is where the exercise demo will go. */
 
-const BODY_SNAP_W = 120, BODY_SNAP_H = 330;   // CSS px, artboard is 178:490
-const BODY_SNAP_CACHE = new Map();            // key -> data URL, or null when it failed
-const BODY_SNAP_PENDING = new Map();          // key -> promise
-let bodySnapQueue = Promise.resolve();
-let RIVE_BODY = null;                         // rive-body.mjs once loaded
 let workingMuscleModules = null;
 
 function ensureWorkingMuscleModules() {
-  if (!workingMuscleModules) {
-    workingMuscleModules = Promise.all([ensureRiveBodyModule(), ensureBodyDetailModules()])
-      .then(([rive]) => { RIVE_BODY = rive; });
-  }
+  if (!workingMuscleModules) workingMuscleModules = ensureBodyDetailModules();
   return workingMuscleModules;
 }
 
-const hexRGB = (hex) => {
-  const h = String(hex).trim().replace("#", "");
-  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
-  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
-};
-const mixRGB = (a, b, t) => ({
-  r: Math.round(a.r + (b.r - a.r) * t), g: Math.round(a.g + (b.g - a.g) * t), b: Math.round(a.b + (b.b - a.b) * t),
-});
-const rgbHex = (c) => "#" + [c.r, c.g, c.b].map((v) => v.toString(16).padStart(2, "0")).join("");
-
-/* Colours come from the theme tokens at render time, so the figure follows
-   light and dark mode. Base is the colour of a muscle the exercise does not
-   touch: a grey with the accent's tint, sitting quietly on the card. */
-function bodySnapInk(who) {
-  const css = getComputedStyle(document.documentElement);
-  const tok = (n) => hexRGB(css.getPropertyValue(n) || "#888");
-  const primary = tok(who === "me" ? "--me" : "--partner");
-  const base = mixRGB(tok("--panel-2"), tok("--muted"), 0.35);
-  return { primary, base, secondary: mixRGB(base, primary, 0.45) };
+/* Muscle keys come back from the detail rules as pieces (rectusFemoris) or as
+   heads of a piece (upperTraps), so a head is resolved through the piece it
+   belongs to. This used to read the map out of rive-body.mjs, which meant a
+   line of text about your quads pulled in the whole 3D runtime. */
+function groupForMuscleKey(key) {
+  const d = BODY_DETAIL?.detail;
+  if (!d) return null;
+  const piece = d.MUSCLE_PIECES?.[key] || d.MUSCLE_PIECES?.[d.MUSCLE_HEADS?.[key]?.of];
+  return piece?.group || null;
 }
 
 /* Which muscles, and how hard. Detail rules give a per-muscle answer; an
    exercise with only a group rule lights every muscle in the group. Weight 1
    is the muscle doing the work, anything less is helping. */
 function workingMusclesFor(exerciseName) {
-  if (!exerciseName || !BODY_DETAIL || !RIVE_BODY) return null;
+  if (!exerciseName || !BODY_DETAIL) return null;
   const res = BODY_DETAIL.detail.hitsForExercise(exerciseName, classifyMuscles(exerciseName));
   if (!res) return null;
-  const intensities = {}, primaryGroups = new Set(), secondaryGroups = new Set();
+  const primaryGroups = new Set(), secondaryGroups = new Set();
+  let any = false;
   for (const [key, w] of Object.entries(res.hits)) {
-    const group = RIVE_BODY.RIVE_TO_APP_GROUP[key];
+    const group = groupForMuscleKey(key);
     if (!group) continue;
-    intensities[key] = w >= 1 ? 4 : 2;
+    any = true;
     (w >= 1 ? primaryGroups : secondaryGroups).add(group);
   }
-  if (!Object.keys(intensities).length) return null;
+  if (!any) return null;
   const order = Object.keys(BODY_GROUP_LABELS);
   const sorted = (set) => [...set].sort((a, b) => order.indexOf(a) - order.indexOf(b));
   const primary = sorted(primaryGroups);
   const secondary = sorted(secondaryGroups).filter((g) => !primaryGroups.has(g));
-  return { intensities, primary, secondary };
+  return { primary, secondary };
 }
 
-function bodySnapKey(sex, view, who, theme, exerciseName) {
-  return `${sex}|${view}|${who}|${theme}|${exerciseName.trim().toLowerCase()}`;
-}
-
-/* Draws one figure and resolves to a PNG data URL, or null if Rive could not.
-   Two things make this a poll rather than a callback: the view model is not
-   always there yet when onLoad fires, so the colours have to be pushed again
-   once it is; and the first frame lands a beat after that, so the snapshot
-   waits until the lit colour is actually in the pixels. Rive owns the canvas
-   with a WebGL2 context, so the pixels are read back through that context
-   (a 2D context can no longer be had on it). */
-async function renderBodySnap({ sex, view, intensities, ink }) {
-  const mod = await ensureRiveBodyModule();
-  let host = $("bodySnapHost");
-  if (!host) { host = document.createElement("div"); host.id = "bodySnapHost"; document.body.appendChild(host); }
-  const canvas = document.createElement("canvas");
-  const dpr = Math.min(3, window.devicePixelRatio || 1);
-  canvas.style.width = `${BODY_SNAP_W}px`; canvas.style.height = `${BODY_SNAP_H}px`;
-  canvas.width = Math.round(BODY_SNAP_W * dpr); canvas.height = Math.round(BODY_SNAP_H * dpr);
-  host.appendChild(canvas);
-
-  const palette = { base: ink.base, level1: ink.secondary, level2: ink.secondary, level3: ink.primary, level4: ink.primary };
-  /* The palette has landed once the resting muscles wear the base colour. That
-     is the signal, not the lit colour: a view can have nothing lit on it (the
-     front of a row, the back of a bench press) and still needs its figure. */
-  const hasColour = (d, { r, g, b }) => {
-    let n = 0;
-    for (let i = 0; i < d.length; i += 4 * 97) {
-      if (d[i + 3] > 200 && Math.abs(d[i] - r) < 20 && Math.abs(d[i + 1] - g) < 20 && Math.abs(d[i + 2] - b) < 20 && ++n >= 3) return true;
-    }
-    return false;
-  };
-  const readPixels = () => {
-    const gl = canvas.getContext("webgl2");
-    if (!gl) return canvas.getContext("2d")?.getImageData(0, 0, canvas.width, canvas.height).data || null;
-    const out = new Uint8Array(canvas.width * canvas.height * 4);
-    gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, out);
-    return out;
-  };
-
-  return new Promise((resolve) => {
-    let ctrl = null, rive = null, applied = false, timer = null, done = false, settleAt = 0;
-    const finish = (url) => {
-      if (done) return;
-      done = true;
-      clearInterval(timer);
-      try { ctrl?.destroy(); } catch {}
-      canvas.remove();
-      resolve(url);
-    };
-    const deadline = Date.now() + 12000;
-    timer = setInterval(() => {
-      if (Date.now() > deadline) { console.warn("body snapshot timed out", sex, view); finish(null); return; }
-      if (!rive?.viewModelInstance) return;
-      if (!applied) { ctrl.setPalette(palette); ctrl.setIntensities(intensities); applied = true; return; }
-      if (settleAt) { if (Date.now() >= settleAt) finish(canvas.toDataURL("image/png")); return; }
-      let data;
-      try { data = readPixels(); } catch { return; }
-      /* One more beat after the base colour shows, so the lit muscles in the
-         same update have certainly been drawn too. */
-      if (data && hasColour(data, ink.base)) settleAt = Date.now() + 300;
-    }, 120);
-    try {
-      ctrl = mod.createBodyHeatmap({
-        canvas, artboardName: `${sex}-${view}`, palette, intensities,
-        onLoad: (r) => { rive = r; },
-      });
-    } catch (e) { console.warn("body snapshot failed", e); finish(null); }
-  });
-}
-
-/* One at a time. Two figures drawing into the shared WebGL context at once is
-   supported, but a queue is easier to reason about and the wait is short. */
-function ensureBodySnap(key, spec) {
-  if (BODY_SNAP_CACHE.has(key) || BODY_SNAP_PENDING.has(key)) return;
-  const p = bodySnapQueue.then(() => renderBodySnap(spec)).catch((e) => { console.warn(e); return null; })
-    .then((url) => {
-      BODY_SNAP_CACHE.set(key, url);
-      BODY_SNAP_PENDING.delete(key);
-      document.querySelectorAll(`img.wm-fig[data-snap="${key}"]`).forEach((img) => fillBodySnap(img, url));
-    });
-  BODY_SNAP_PENDING.set(key, p);
-  bodySnapQueue = p;
-}
-
-function fillBodySnap(img, url) {
-  if (!url) { img.classList.add("in"); return; }   // the slot fades to nothing rather than sitting grey forever
-  img.onload = () => img.classList.add("in");
-  img.src = url;
-}
-
-/* Sync, so renderSession can call it on every redraw. The pictures come from
-   the cache when they are there and drop into place when they are not. While
-   the modules are still loading it leaves a placeholder and finishes the job
-   itself once they arrive. */
+/* Sync, so renderSession can call it on every redraw. While the (small) detail
+   module is still loading it leaves a placeholder and finishes the job itself
+   once it arrives. */
 function workingMusclesHTML(exerciseName, { who = "them", size = "lg", email = null } = {}) {
   if (!exerciseName) return "";
-  if (!BODY_DETAIL || !RIVE_BODY) {
+  if (!BODY_DETAIL) {
     ensureWorkingMuscleModules().then(fillPendingWorkingMuscles);
     const spec = escapeHtml(JSON.stringify({ exerciseName, who, size, email }));
     return `<div class="wm-pending" data-wm="${spec}"></div>`;
   }
   const hit = workingMusclesFor(exerciseName);
   if (!hit) return "";
-  const sex = profileFor(email)?.sex === "Female" ? "Female" : "Male";
-  const theme = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
-  const ink = bodySnapInk(who);
-  const fig = (view) => {
-    const key = bodySnapKey(sex, view, who, theme, exerciseName);
-    ensureBodySnap(key, { sex, view, intensities: hit.intensities, ink });
-    const url = BODY_SNAP_CACHE.get(key);
-    const src = url ? ` src="${url}"` : "";
-    const cls = url ? "wm-fig in" : BODY_SNAP_CACHE.has(key) ? "wm-fig in" : "wm-fig";
-    return `<figure class="wm-view"><img class="${cls}" data-snap="${escapeHtml(key)}"${src} alt="" /><figcaption>${view}</figcaption></figure>`;
-  };
   const label = (g) => BODY_GROUP_LABELS[g] || g;
   const main = hit.primary.length ? hit.primary.map(label) : hit.secondary.map(label);
   const also = hit.primary.length ? hit.secondary.map((g) => label(g).toLowerCase()) : [];
   return `<div class="wm wm-${size} wm-${who}">
-    <div class="wm-figs">${fig("Front")}${fig("Back")}</div>
+    <div class="wm-ico" aria-hidden="true">${icon("dumbbell", size === "sm" ? 22 : 26)}</div>
     <div class="wm-legend">
       <div class="wm-label">${who === "me" ? "You are working" : "Working"}</div>
       <div class="wm-main">${main.map(escapeHtml).join(", ")}</div>
       ${also.length ? `<div class="wm-also">with ${also.map(escapeHtml).join(", ")}</div>` : ""}
-      <div class="wm-keys"><span><i></i>Main</span>${also.length ? `<span><i class="sec"></i>Helping</span>` : ""}</div>
     </div>
   </div>`;
 }
 
-/* The modules arrived after a screen asked for a figure: draw it in now. A
-   wrapper marked data-wm-wrap goes away with it when the exercise turns out
-   to be one nobody has classified. */
+/* The module arrived after a screen asked for this: draw it in now. A wrapper
+   marked data-wm-wrap goes away with it when the exercise turns out to be one
+   nobody has classified. */
 function fillPendingWorkingMuscles() {
   document.querySelectorAll(".wm-pending").forEach((el) => {
     let spec;
@@ -7883,7 +7762,7 @@ function renderSession() {
       </div>` : ""}
 
     <div class="sess-field">
-      <label class="sess-field-label">Weight (lb)</label>
+      <label class="sess-field-label">Weight <span class="sess-field-unit">lb</span></label>
       <div class="sess-field-ctl">
         <button type="button" class="round-btn" id="sessWeightMinus" aria-label="Less weight">&minus;</button>
         <input class="sess-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" value="${SESSION.weights[ei] || 0}" />

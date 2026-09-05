@@ -33,9 +33,9 @@ export function section(fromBanner, toBanner) {
   return src.slice(a, b);
 }
 
-/* The figures the gallery shows, one per (exercise, whose body). The
-   pre-render draws exactly these, in both themes, so the gallery's keys and
-   the snapshot file agree by construction. Emails match the gallery fixtures. */
+/* The exercises the gallery shows a working-muscle line for. Emails match the
+   gallery fixtures. This used to feed a pre-render of Rive figures; the app
+   shows words and an icon now, so it is just the list of exercises to cover. */
 export const SNAP_SPECS = [
   { exerciseName: "Barbell Squat", who: "them", size: "lg", email: "mell@x" },
   { exerciseName: "Barbell Row", who: "them", size: "lg", email: "mell@x" },
@@ -44,7 +44,5 @@ export const SNAP_SPECS = [
   { exerciseName: "Romanian Deadlift", who: "me", size: "sm", email: "mo@x" },
 ];
 
-/* Who is which sex in the fixtures, so Male and Female figures both appear. */
+/* Who is which sex in the fixtures. */
 export const SNAP_PROFILES = [{ email: "mo@x", sex: "Male" }, { email: "mell@x", sex: "Female" }];
-
-export const SNAP_FILE = join(root, "scripts", ".body-snaps.json");
