@@ -656,6 +656,76 @@
   .live-go { color: var(--muted); flex-shrink: 0; display: flex; }
   @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
 
+  /* Clips: recording one, and watching one. Both are full-screen and black,
+     because a few seconds of someone shouting at you deserves the screen. */
+  .clip-scrim {
+    position: fixed; inset: 0; z-index: 90; background: #000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .clip-stage { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
+  .clip-media { flex: 1; width: 100%; height: 100%; object-fit: cover; background: #000; }
+  .clip-media.mirror { transform: scaleX(-1); }
+  .clip-top {
+    position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 14px; right: 14px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; z-index: 2;
+  }
+  .clip-x {
+    width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(0,0,0,.45); color: #fff; font-size: 21px; line-height: 1; backdrop-filter: blur(8px);
+  }
+  .clip-who { color: #fff; font-size: 14px; font-weight: 700; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  .clip-bottom {
+    position: absolute; left: 0; right: 0; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column; align-items: center; gap: 14px; z-index: 2; padding: 0 20px;
+  }
+  .clip-hint { color: rgba(255,255,255,.8); font-size: 14px; text-align: center; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  .clip-shutter {
+    width: 74px; height: 74px; border-radius: 50%; border: 4px solid rgba(255,255,255,.85);
+    background: var(--up); cursor: pointer; padding: 0; position: relative;
+  }
+  .clip-shutter[disabled] { opacity: .5; }
+  .clip-shutter.recording { background: #fff; }
+  .clip-ring { position: absolute; inset: -11px; transform: rotate(-90deg); pointer-events: none; }
+  .clip-ring circle { fill: none; stroke: var(--up); stroke-width: 4; stroke-linecap: round; }
+  .clip-count { color: #fff; font-size: 15.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .clip-actions { display: flex; gap: 10px; width: 100%; max-width: 340px; }
+  .clip-actions button { flex: 1; margin-top: 0; }
+  .clip-actions .btn-secondary { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); color: #fff; }
+  .clip-note { color: rgba(255,255,255,.65); font-size: 12.5px; text-align: center; }
+  .clip-gone { color: #fff; text-align: center; padding: 0 30px; }
+  .clip-gone b { display: block; font-size: 21px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 6px; }
+  .clip-gone span { color: rgba(255,255,255,.7); font-size: 14px; line-height: 1.45; }
+  /* Waiting for them, on top of the session screen they are already inside. */
+  .clip-pill {
+    position: fixed; left: 50%; transform: translateX(-50%); z-index: 80; cursor: pointer;
+    top: calc(14px + env(safe-area-inset-top, 0px));
+    display: flex; align-items: center; gap: 9px; padding: 10px 16px 10px 12px; border-radius: 100px;
+    background: var(--partner); color: #fff; border: none; font-family: inherit;
+    font-size: 14px; font-weight: 700; white-space: nowrap; box-shadow: 0 10px 26px -8px rgba(0,0,0,.55);
+    animation: clipIn .32s cubic-bezier(.22,1,.36,1);
+  }
+  @keyframes clipIn { from { opacity: 0; transform: translate(-50%, -14px); } }
+  .clip-pill svg { display: block; }
+  @media (prefers-reduced-motion: reduce) { .clip-pill { animation: none; } }
+
+  /* The body map. Muscles the exercise hits, lit on a plain figure. */
+  .bm { display: flex; align-items: center; gap: 14px; }
+  .bm-figs { display: flex; gap: 6px; flex-shrink: 0; }
+  .bm-view { text-align: center; }
+  .bm-view span { display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+  .bm-fig { width: 62px; height: 121px; display: block; }
+  .bm-body { fill: color-mix(in srgb, var(--muted) 26%, transparent); }
+  .bm-part { fill: color-mix(in srgb, var(--muted) 34%, transparent); transition: fill .35s ease; }
+  .bm-part.sec { fill: color-mix(in srgb, var(--partner) 42%, transparent); }
+  .bm-part.on { fill: var(--partner); }
+  .bm-legend { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .bm-row { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.35; }
+  .bm-row i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; margin-top: 4px; }
+  .bm-row i.on { background: var(--partner); }
+  .bm-row i.sec { background: color-mix(in srgb, var(--partner) 42%, transparent); }
+  .bm-row span { text-transform: capitalize; }
+  .bm-row:nth-child(2) span { color: var(--muted); }
+
   /* The watch screen */
   .lw-hero { text-align: center; padding: 4px 0 14px; }
   .lw-av {
@@ -677,6 +747,20 @@
   .lw-meta { display: flex; justify-content: center; gap: 16px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
   .lw-meta span { display: inline-flex; align-items: center; gap: 5px; }
   .lw-next { font-size: 14px; color: var(--muted); text-align: center; margin: 0 0 12px; }
+  /* LIVE, said properly: a red dot that breathes, at the top, above the name. */
+  .lw-live {
+    display: flex; align-items: center; justify-content: center; gap: 7px; margin-bottom: 10px;
+  }
+  .lw-live .live-dot { width: 8px; height: 8px; }
+  .lw-live b { font-size: 12.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--up); }
+  .lw-live.off .live-dot { background: var(--muted); animation: none; }
+  .lw-live.off b { color: var(--muted); }
+  .lw-elapsed { font-variant-numeric: tabular-nums; }
+  .lw-card { background: var(--panel-2); border-radius: 14px; padding: 13px; margin-bottom: 10px; }
+  .lw-card-label { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 9px; }
+  .lw-send { display: flex; gap: 8px; }
+  .lw-send button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 13px 8px; }
+  .lw-send svg { display: block; }
   .lw-next b { color: var(--text); font-weight: 700; }
   .lw-stale { font-size: 12.5px; color: var(--muted); text-align: center; margin: 0 0 12px; }
 
@@ -1901,6 +1985,13 @@
   /* The sheet states are shown as the panel itself, not the dimmed overlay. */
   .gal-phone .partner-sheet { position: static; transform: none; max-height: none; border-radius: 0; }
   .gal-empty { color: var(--muted); font-size: 14px; padding: 20px; }
+  /* The pill is fixed to the viewport in the app; here it sits in a box. */
+  .gal-pillbox { position: relative; height: 92px; background: var(--panel-2); }
+  /* Full-screen black surfaces, shown at phone proportions rather than fixed. */
+  .gal-dark { position: relative; height: 560px; background: #000; display: flex; flex-direction: column; }
+  .gal-dark .clip-top, .gal-dark .clip-bottom { position: absolute; }
+  .gal-dark .clip-media { flex: 1; min-height: 0; }
+  .gal-pillbox .clip-pill { position: absolute; top: 26px; animation: none; }
 </style>
 <div class="gal-wrap">
   <div class="gal-bar">
@@ -1977,6 +2068,8 @@
     <div class="partner-sheet" id="liveSheet"></div>
   </div>
 
+  <button type="button" class="clip-pill hidden" id="clipPill"></button>
+
 </div>
 
 <script>
@@ -2023,6 +2116,119 @@ const ICON_PATHS = {
 };
 
 
+const BODY_SHAPES = {
+  front: {
+    silhouette: [
+      `<ellipse cx="50" cy="13" rx="8.5" ry="10.5"/>`,
+      `<rect x="46" y="21" width="8" height="7" rx="2.5"/>`,
+      `<path d="M31,33 Q50,26 69,33 L70,58 Q66,76 63,93 L37,93 Q34,76 30,58 Z"/>`,
+      `<ellipse cx="25.5" cy="54" rx="6" ry="15"/>`, `<ellipse cx="74.5" cy="54" rx="6" ry="15"/>`,
+      `<ellipse cx="21" cy="81" rx="5" ry="14"/>`, `<ellipse cx="79" cy="81" rx="5" ry="14"/>`,
+      `<ellipse cx="18.5" cy="98" rx="4" ry="6"/>`, `<ellipse cx="81.5" cy="98" rx="4" ry="6"/>`,
+      `<ellipse cx="43" cy="117" rx="8" ry="24"/>`, `<ellipse cx="57" cy="117" rx="8" ry="24"/>`,
+      `<ellipse cx="43.5" cy="158" rx="6" ry="18"/>`, `<ellipse cx="56.5" cy="158" rx="6" ry="18"/>`,
+      `<ellipse cx="43.5" cy="182" rx="5" ry="5"/>`, `<ellipse cx="56.5" cy="182" rx="5" ry="5"/>`,
+    ],
+    parts: {
+      traps: `<path d="M39,30 L50,27 L61,30 L57,36 L43,36 Z"/>`,
+      shoulders: `<ellipse cx="31" cy="39" rx="8" ry="7"/><ellipse cx="69" cy="39" rx="8" ry="7"/>`,
+      chest: `<path d="M40,37 Q48,35 49,39 L49,52 Q41,52 38,45 Z"/><path d="M60,37 Q52,35 51,39 L51,52 Q59,52 62,45 Z"/>`,
+      biceps: `<ellipse cx="26" cy="53" rx="5" ry="11"/><ellipse cx="74" cy="53" rx="5" ry="11"/>`,
+      forearms: `<ellipse cx="21" cy="81" rx="4.4" ry="12.5"/><ellipse cx="79" cy="81" rx="4.4" ry="12.5"/>`,
+      abs: `<rect x="44" y="55" width="12" height="30" rx="4"/>`,
+      obliques: `<path d="M38,56 L43,56 L43,84 L39,77 Z"/><path d="M62,56 L57,56 L57,84 L61,77 Z"/>`,
+      quads: `<ellipse cx="43" cy="115" rx="7" ry="21"/><ellipse cx="57" cy="115" rx="7" ry="21"/>`,
+      calves: `<ellipse cx="43.5" cy="158" rx="5.2" ry="16"/><ellipse cx="56.5" cy="158" rx="5.2" ry="16"/>`,
+    },
+  },
+  back: {
+    silhouette: [
+      `<ellipse cx="50" cy="13" rx="8.5" ry="10.5"/>`,
+      `<rect x="46" y="21" width="8" height="7" rx="2.5"/>`,
+      `<path d="M31,33 Q50,26 69,33 L70,58 Q66,76 63,93 L37,93 Q34,76 30,58 Z"/>`,
+      `<ellipse cx="25.5" cy="54" rx="6" ry="15"/>`, `<ellipse cx="74.5" cy="54" rx="6" ry="15"/>`,
+      `<ellipse cx="21" cy="81" rx="5" ry="14"/>`, `<ellipse cx="79" cy="81" rx="5" ry="14"/>`,
+      `<ellipse cx="18.5" cy="98" rx="4" ry="6"/>`, `<ellipse cx="81.5" cy="98" rx="4" ry="6"/>`,
+      `<ellipse cx="43" cy="117" rx="8" ry="24"/>`, `<ellipse cx="57" cy="117" rx="8" ry="24"/>`,
+      `<ellipse cx="43.5" cy="158" rx="6" ry="18"/>`, `<ellipse cx="56.5" cy="158" rx="6" ry="18"/>`,
+      `<ellipse cx="43.5" cy="182" rx="5" ry="5"/>`, `<ellipse cx="56.5" cy="182" rx="5" ry="5"/>`,
+    ],
+    parts: {
+      traps: `<path d="M38,30 L50,27 L62,30 L58,50 L50,54 L42,50 Z"/>`,
+      shoulders: `<ellipse cx="31" cy="39" rx="8" ry="7"/><ellipse cx="69" cy="39" rx="8" ry="7"/>`,
+      lats: `<path d="M40,44 L48,50 L48,72 L36,64 Q34,53 40,44 Z"/><path d="M60,44 L52,50 L52,72 L64,64 Q66,53 60,44 Z"/>`,
+      triceps: `<ellipse cx="26" cy="53" rx="5" ry="11"/><ellipse cx="74" cy="53" rx="5" ry="11"/>`,
+      forearms: `<ellipse cx="21" cy="81" rx="4.4" ry="12.5"/><ellipse cx="79" cy="81" rx="4.4" ry="12.5"/>`,
+      lowerback: `<rect x="43" y="72" width="14" height="16" rx="4"/>`,
+      glutes: `<path d="M37,92 Q43,88 49,92 L49,108 Q41,110 37,103 Z"/><path d="M63,92 Q57,88 51,92 L51,108 Q59,110 63,103 Z"/>`,
+      hamstrings: `<ellipse cx="43" cy="122" rx="7" ry="18"/><ellipse cx="57" cy="122" rx="7" ry="18"/>`,
+      calves: `<ellipse cx="43.5" cy="158" rx="5.2" ry="16"/><ellipse cx="56.5" cy="158" rx="5.2" ry="16"/>`,
+    },
+  },
+};
+
+
+const MUSCLE_RULES = [
+  // Class and cardio activities. These come first so "Pilates core work" is
+  // read as Pilates rather than falling through to an abs-isolation rule.
+  { match: ["pilates", "reformer"], primary: ["abs", "obliques", "glutes"], secondary: ["lowerback", "quads", "hamstrings", "shoulders"] },
+  { match: ["yoga", "vinyasa", "flow "], primary: ["abs", "shoulders"], secondary: ["obliques", "lowerback", "hamstrings", "quads", "glutes"] },
+  { match: ["barre"], primary: ["glutes", "quads"], secondary: ["abs", "calves", "hamstrings"] },
+  { match: ["swim", "freestyle", "breaststroke"], primary: ["lats", "shoulders"], secondary: ["triceps", "abs", "traps"] },
+  { match: ["cycl", "spin class", "peloton", "bike", "biking"], primary: ["quads", "glutes"], secondary: ["hamstrings", "calves"] },
+  { match: ["elliptical", "stair", "stepper", "incline walk"], primary: ["quads", "glutes"], secondary: ["calves", "hamstrings"] },
+  { match: ["hike", "hiking", "walk", "treadmill walk"], primary: ["calves", "quads"], secondary: ["glutes", "hamstrings"] },
+  { match: ["boxing", "kickbox", "muay thai", "martial"], primary: ["shoulders", "abs"], secondary: ["obliques", "triceps", "calves"] },
+  { match: ["dance", "zumba", "hiit", "bootcamp", "circuit", "aerobic"], primary: ["quads", "abs"], secondary: ["glutes", "shoulders", "calves"] },
+  { match: ["run", "jog", "sprint", "5k", "10k", "marathon", "treadmill"], primary: ["quads", "hamstrings", "calves"], secondary: ["glutes", "abs"] },
+  // Specific terms only: a bare "row" is a barbell row, handled further down.
+  { match: ["rowing machine", "rower", "row erg", "erg ", "concept2", "concept 2"], primary: ["lats", "quads"], secondary: ["biceps", "traps", "abs", "hamstrings"] },
+  { match: ["assault bike", "air bike", "ski erg", "skierg"], primary: ["quads", "shoulders"], secondary: ["lats", "abs", "calves"] },
+  { match: ["climb", "boulder", "rock climb"], primary: ["lats", "forearms"], secondary: ["biceps", "abs", "shoulders"] },
+  { match: ["jump rope", "skipping", "jump-rope"], primary: ["calves"], secondary: ["quads", "shoulders", "abs"] },
+  { match: ["crossfit", "wod", "murph", "metcon"], primary: ["quads", "shoulders", "abs"], secondary: ["glutes", "lats", "triceps"] },
+  { match: ["calisthenic", "bodyweight circuit"], primary: ["chest", "abs"], secondary: ["triceps", "shoulders", "lats"] },
+  { match: ["sled", "prowler", "farmer carry", "farmers carry"], primary: ["quads", "glutes"], secondary: ["forearms", "traps", "calves"] },
+  { match: ["stretch", "mobility", "foam roll", "recovery"], primary: ["hamstrings"], secondary: ["lowerback", "quads", "shoulders"] },
+  { match: ["basketball", "soccer", "football", "rugby", "hockey", "lacrosse"], primary: ["quads", "calves"], secondary: ["glutes", "hamstrings", "abs"] },
+  { match: ["tennis", "padel", "squash", "badminton", "pickleball"], primary: ["quads", "shoulders"], secondary: ["calves", "obliques", "forearms"] },
+  { match: ["golf"], primary: ["obliques"], secondary: ["forearms", "shoulders", "lowerback"] },
+  { match: ["volleyball"], primary: ["quads", "shoulders"], secondary: ["calves", "abs"] },
+  { match: ["ski", "snowboard"], primary: ["quads", "glutes"], secondary: ["abs", "calves", "hamstrings"] },
+  { match: ["surf", "paddleboard", "paddle board", "kayak", "canoe"], primary: ["lats", "shoulders"], secondary: ["abs", "obliques", "triceps"] },
+  { match: ["skate", "rollerblad"], primary: ["quads", "glutes"], secondary: ["calves", "abs"] },
+  { match: ["hip thrust", "glute bridge"], primary: ["glutes"], secondary: ["hamstrings"] },
+  { match: ["abduction", "abductor", "clamshell", "band walk", "monster walk", "fire hydrant"], primary: ["glutes"], secondary: [] },
+  { match: ["adduction", "adductor", "copenhagen"], primary: ["quads"], secondary: [] },
+  { match: ["neck"], primary: ["traps"], secondary: [] },
+  { match: ["romanian deadlift", "rdl", "stiff leg"], primary: ["hamstrings"], secondary: ["glutes", "lowerback"] },
+  { match: ["deadlift"], primary: ["hamstrings", "glutes", "lowerback"], secondary: ["traps", "forearms", "lats"] },
+  { match: ["back extension", "hyperextension", "good morning"], primary: ["lowerback"], secondary: ["hamstrings", "glutes"] },
+  { match: ["squat", "leg press", "lunge", "step up", "step-up", "bulgarian"], primary: ["quads"], secondary: ["glutes", "hamstrings"] },
+  { match: ["leg extension"], primary: ["quads"], secondary: [] },
+  { match: ["leg curl", "hamstring curl", "nordic"], primary: ["hamstrings"], secondary: [] },
+  { match: ["calf", "tibialis", "toe raise"], primary: ["calves"], secondary: [] },
+  { match: ["lat pulldown", "pulldown", "pull-up", "pullup", "chin-up", "chinup"], primary: ["lats"], secondary: ["biceps", "forearms"] },
+  { match: ["upright row"], primary: ["shoulders", "traps"], secondary: ["biceps"] },
+  { match: ["row"], primary: ["lats"], secondary: ["biceps", "traps", "shoulders"] },
+  { match: ["shrug"], primary: ["traps"], secondary: ["forearms"] },
+  { match: ["face pull", "rear delt", "reverse fly", "reverse flye"], primary: ["shoulders"], secondary: ["traps"] },
+  { match: ["lateral raise", "front raise", "arnold", "overhead press", "military press", "ohp", "shoulder press", "push press"], primary: ["shoulders"], secondary: ["triceps", "traps"] },
+  // Before the chest rules: a close grip bench is a triceps lift, an incline curl a
+  // biceps one, and "grip" alone must not catch a wide grip bench press.
+  { match: ["close grip", "close-grip"], primary: ["triceps"], secondary: ["chest", "shoulders"] },
+  { match: ["wrist"], primary: ["forearms"], secondary: [] },
+  { match: ["hammer curl", "bicep", "curl", "preacher", "concentration"], primary: ["biceps"], secondary: ["forearms"] },
+  { match: ["incline"], primary: ["chest", "shoulders"], secondary: ["triceps"] },
+  { match: ["bench", "chest press", "push-up", "pushup", "dip", "fly", "flye", "pec deck", "crossover"], primary: ["chest"], secondary: ["triceps", "shoulders"] },
+  { match: ["tricep", "pushdown", "skull crusher", "overhead extension", "kickback", "french press"], primary: ["triceps"], secondary: [] },
+  { match: ["forearm", "farmer", "grip"], primary: ["forearms"], secondary: [] },
+  { match: ["swing", "clean", "snatch", "thruster"], primary: ["glutes", "hamstrings"], secondary: ["shoulders", "lowerback", "traps"] },
+  { match: ["russian twist", "side bend", "oblique", "woodchop", "wood chop", "side plank"], primary: ["obliques"], secondary: ["abs"] },
+  { match: ["plank", "crunch", "sit-up", "situp", "leg raise", "knee raise", "hanging", "toes to bar", "dead bug", "ab wheel", "rollout", "ab ", "abs", "core", "hollow"], primary: ["abs"], secondary: ["obliques"] },
+];
+
+
 const $ = (id) => document.getElementById(id);
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const initials = (n) => String(n).split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -2037,6 +2243,7 @@ const DAY_LETTERS = ["M","T","W","T","F","S","S"];
 const APP_VERSION = "states";
 const LIVE_QUIET_MS = 3 * 60 * 1000;
 const LIVE_GONE_MS = 25 * 60 * 1000;
+const CLIP_SECONDS = 5;
 
 const FACE = (c) => "data:image/svg+xml," + encodeURIComponent(
   "<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><rect width='120' height='120' fill='" + c + "'/>" +
@@ -2083,6 +2290,8 @@ const toggleReaction = () => {};
 const openLiveSheet = () => {};
 const closeLiveSheet = () => {};
 const openNoteComposer = () => {};
+const openNextClip = () => {};
+let SESSION = null, CLIP_INBOX = [];
 
 
 function icon(name, size = 18) {
@@ -2433,10 +2642,14 @@ async function renderLiveSheet() {
   const plan = (ALL_PLANS || []).find((w) => w.id === row.workout_id);
   const nextEx = plan?.exercises?.[(row.exercise_index || 0) + 1];
   const stale = liveAgeMs(row) > LIVE_QUIET_MS;
+  const map = muscleMapHTML(row.exercise_name);
 
   sheet.innerHTML = `
     <div class="ds-grip"></div>
     <div class="ps-head"><button type="button" class="ds-x" id="lwClose" aria-label="Close">&times;</button></div>
+    <div class="lw-live${stale ? " off" : ""}">
+      <span class="live-dot"></span><b>${stale ? "Live, screen off" : "Live"}</b>
+    </div>
     <div class="lw-hero">
       <div class="lw-av">${face ? `<img src="${face}" alt="" />` : escapeHtml(initials(name))}</div>
       <div class="lw-name">${escapeHtml(name)}</div>
@@ -2447,16 +2660,115 @@ async function renderLiveSheet() {
       <div class="lw-ex">${escapeHtml(row.exercise_name || "Warming up")}</div>
       ${setTotal ? `<div class="lw-sets">${sets}</div>` : ""}
       <div class="lw-meta">
-        <span>${icon("clock", 15)} ${mins} min</span>
+        <span>${icon("clock", 15)} <span class="lw-elapsed">${mins} min</span></span>
         ${setTotal ? `<span>${icon("check", 15)} ${row.set_done || 0} of ${setTotal} sets</span>` : ""}
       </div>
     </div>
+    ${map ? `<div class="lw-card"><div class="lw-card-label">Muscles working right now</div>${map}</div>` : ""}
     ${nextEx ? `<p class="lw-next">Up next: <b>${escapeHtml(nextEx.name || "")}</b>${nextEx.sets ? ` · ${nextEx.sets} × ${escapeHtml(String(nextEx.reps || ""))}` : ""}</p>` : ""}
     ${stale ? `<p class="lw-stale">Their screen is off, so this is where they were a few minutes ago.</p>` : ""}
-    <button type="button" class="btn-primary" id="lwCheer">Send encouragement</button>`;
+    <div class="lw-card">
+      <div class="lw-card-label">Cheer them on</div>
+      <div class="lw-send">
+        <button type="button" class="btn-secondary" id="lwClip" style="margin-top:0">
+          ${icon("camera", 22)} Send a quick video
+        </button>
+        <button type="button" class="btn-secondary" id="lwMsg" style="margin-top:0">
+          ${icon("bolt", 22)} Send a message
+        </button>
+      </div>
+    </div>`;
 
   $("lwClose").onclick = closeLiveSheet;
-  $("lwCheer").onclick = () => { closeLiveSheet(); openNoteComposer("congratulate"); };
+  $("lwMsg").onclick = () => { closeLiveSheet(); openNoteComposer("congratulate"); };
+  $("lwClip").onclick = () => { closeLiveSheet(); openClipRecorder(row.email); };
+}
+
+
+function bodyFigureSVG(view, primary = [], secondary = []) {
+  const def = BODY_SHAPES[view];
+  const parts = Object.entries(def.parts).map(([group, shape]) => {
+    const cls = primary.includes(group) ? "bm-part on" : secondary.includes(group) ? "bm-part sec" : "bm-part";
+    return `<g class="${cls}">${shape}</g>`;
+  }).join("");
+  return `<svg class="bm-fig" viewBox="0 0 100 195" aria-hidden="true">
+    <g class="bm-body">${def.silhouette.join("")}</g>
+    ${parts}
+  </svg>`;
+}
+
+
+function muscleMapHTML(exerciseName) {
+  const rule = exerciseName ? classifyMuscles(exerciseName) : null;
+  if (!rule) return "";
+  const primary = rule.primary || [];
+  const secondary = (rule.secondary || []).filter((m) => !primary.includes(m));
+  const nice = (m) => ({ lowerback: "lower back" }[m] || m);
+  return `<div class="bm">
+    <div class="bm-figs">
+      <div class="bm-view">${bodyFigureSVG("front", primary, secondary)}<span>Front</span></div>
+      <div class="bm-view">${bodyFigureSVG("back", primary, secondary)}<span>Back</span></div>
+    </div>
+    <div class="bm-legend">
+      <div class="bm-row"><i class="on"></i><span>${primary.map(nice).map(escapeHtml).join(", ")}</span></div>
+      ${secondary.length ? `<div class="bm-row"><i class="sec"></i><span>${secondary.map(nice).map(escapeHtml).join(", ")}</span></div>` : ""}
+    </div>
+  </div>`;
+}
+
+
+function classifyMuscles(exerciseName) {
+  const n = exerciseName.toLowerCase();
+  for (const rule of MUSCLE_RULES) {
+    if (rule.match.some((k) => n.includes(k))) return rule;
+  }
+  return null;
+}
+
+
+function renderClipPill() {
+  const el = $("clipPill");
+  if (!el) return;
+  if (!SESSION || SESSION.finished || !CLIP_INBOX.length) { el.classList.add("hidden"); return; }
+  const from = nameFor(CLIP_INBOX[0].from_email);
+  const more = CLIP_INBOX.length > 1 ? ` (${CLIP_INBOX.length})` : "";
+  el.innerHTML = `${icon("camera", 18)} ${escapeHtml(from)} sent you a clip${more}`;
+  el.classList.remove("hidden");
+  el.onclick = openNextClip;
+}
+
+
+function clipRecorderHTML(name) {
+  return `
+    <video class="clip-media mirror" id="clipPreview" playsinline muted autoplay></video>
+    <div class="clip-top">
+      <button type="button" class="clip-x" id="clipCancel" aria-label="Close">&times;</button>
+      <span class="clip-who">To ${escapeHtml(name)}, training now</span>
+    </div>
+    <div class="clip-bottom" id="clipControls">
+      <div class="clip-hint" id="clipHint">Hold up. ${CLIP_SECONDS} seconds, then it sends.</div>
+      <button type="button" class="clip-shutter" id="clipShutter" aria-label="Record">
+        <svg class="clip-ring" viewBox="0 0 96 96"><circle id="clipRing" cx="48" cy="48" r="46" stroke-dasharray="289" stroke-dashoffset="289"/></svg>
+      </button>
+      <div class="clip-note">Not saved anywhere. They watch it once and it is gone.</div>
+    </div>`;
+}
+
+
+function clipViewerHTML(fromName, src) {
+  return `
+    <video class="clip-media" id="clipPlayer" playsinline autoplay src="${src}"></video>
+    <div class="clip-top">
+      <button type="button" class="clip-x" id="clipViewX" aria-label="Close">&times;</button>
+      <span class="clip-who">${escapeHtml(fromName)}</span>
+    </div>`;
+}
+
+
+function clipGoneHTML() {
+  return `<div class="clip-stage" style="align-items:center;justify-content:center">
+      <div class="clip-gone"><b>Gone.</b><span>Clips are not saved. Get back to it.</span></div>
+    </div>`;
 }
 
 
@@ -2571,6 +2883,36 @@ const STATES = [
   { group: "Watching them train", name: "They just finished while you were looking",
     note: "The row goes away mid-watch. This is the fallback.",
     setup: () => { LIVE_PARTNER = null; }, sheet: true },
+
+  { group: "Watching them train", name: "A pull exercise, back lit up",
+    note: "The map is per exercise, so the front and back figures change as they move through the plan.",
+    setup: () => { LIVE_PARTNER = liveRow({ exercise_name: "Barbell Row", exercise_index: 1, set_done: 1, set_total: 3 }); }, sheet: true },
+
+  { group: "Watching them train", name: "An exercise the classifier does not know",
+    note: "No map rather than a body with nothing lit.",
+    setup: () => { LIVE_PARTNER = liveRow({ exercise_name: "Turkish Get-Up" }); }, sheet: true },
+
+  { group: "Getting a clip mid-workout", name: "A clip is waiting",
+    note: "Sits above the session screen. Only ever exists during a workout.",
+    pill: true,
+    setup: () => { SESSION = { finished: false }; CLIP_INBOX = [{ id: "c1", from_email: "mell@x", path: "x" }]; } },
+
+  { group: "Getting a clip mid-workout", name: "More than one waiting",
+    pill: true,
+    setup: () => { SESSION = { finished: false }; CLIP_INBOX = [
+      { id: "c1", from_email: "mell@x", path: "x" }, { id: "c2", from_email: "mell@x", path: "y" }]; } },
+
+  { group: "Getting a clip mid-workout", name: "Opening it",
+    note: "Plays once, full screen. The video area is black here because there is no file.",
+    raw: () => clipViewerHTML("Mell", ""), setup: () => {} },
+
+  { group: "Getting a clip mid-workout", name: "After it plays",
+    note: "Then it is deleted, file and row, and this closes itself.",
+    raw: () => clipGoneHTML(), setup: () => {} },
+
+  { group: "Sending a clip", name: "The recorder",
+    note: "Five seconds, auto-stop. The camera fills the screen in the app.",
+    raw: () => clipRecorderHTML("Mell"), setup: () => {} },
 ];
 
 /* ---- render each state into the stage, then capture it ---- */
@@ -2601,6 +2943,18 @@ async function renderHomeState() {
   return '<div class="gal-inner">' + deId(header.outerHTML + home.innerHTML) + "</div>";
 }
 
+/* Some states are just markup, with no data behind them. */
+async function renderRawState(st) {
+  return '<div class="gal-dark">' + deId(st.raw()) + "</div>";
+}
+
+async function renderPillState() {
+  renderClipPill();
+  await settle();
+  const pill = $("clipPill");
+  return '<div class="gal-pillbox">' + deId(pill.outerHTML) + "</div>";
+}
+
 async function renderSheetState() {
   await renderLiveSheet();
   await settle();
@@ -2615,7 +2969,10 @@ async function renderSheetState() {
     st.setup();
     let html;
     try {
-      html = st.sheet ? await renderSheetState() : await renderHomeState();
+      html = st.raw ? await renderRawState(st)
+           : st.pill ? await renderPillState()
+           : st.sheet ? await renderSheetState()
+           : await renderHomeState();
     } catch (e) {
       html = '<div class="gal-empty">This state threw: ' + escapeHtml(e.message) + "</div>";
       console.error(st.name, e);

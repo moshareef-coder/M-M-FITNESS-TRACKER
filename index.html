@@ -666,6 +666,76 @@
   .live-go { color: var(--muted); flex-shrink: 0; display: flex; }
   @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
 
+  /* Clips: recording one, and watching one. Both are full-screen and black,
+     because a few seconds of someone shouting at you deserves the screen. */
+  .clip-scrim {
+    position: fixed; inset: 0; z-index: 90; background: #000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .clip-stage { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
+  .clip-media { flex: 1; width: 100%; height: 100%; object-fit: cover; background: #000; }
+  .clip-media.mirror { transform: scaleX(-1); }
+  .clip-top {
+    position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 14px; right: 14px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; z-index: 2;
+  }
+  .clip-x {
+    width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(0,0,0,.45); color: #fff; font-size: 21px; line-height: 1; backdrop-filter: blur(8px);
+  }
+  .clip-who { color: #fff; font-size: 14px; font-weight: 700; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  .clip-bottom {
+    position: absolute; left: 0; right: 0; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column; align-items: center; gap: 14px; z-index: 2; padding: 0 20px;
+  }
+  .clip-hint { color: rgba(255,255,255,.8); font-size: 14px; text-align: center; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  .clip-shutter {
+    width: 74px; height: 74px; border-radius: 50%; border: 4px solid rgba(255,255,255,.85);
+    background: var(--up); cursor: pointer; padding: 0; position: relative;
+  }
+  .clip-shutter[disabled] { opacity: .5; }
+  .clip-shutter.recording { background: #fff; }
+  .clip-ring { position: absolute; inset: -11px; transform: rotate(-90deg); pointer-events: none; }
+  .clip-ring circle { fill: none; stroke: var(--up); stroke-width: 4; stroke-linecap: round; }
+  .clip-count { color: #fff; font-size: 15.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .clip-actions { display: flex; gap: 10px; width: 100%; max-width: 340px; }
+  .clip-actions button { flex: 1; margin-top: 0; }
+  .clip-actions .btn-secondary { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); color: #fff; }
+  .clip-note { color: rgba(255,255,255,.65); font-size: 12.5px; text-align: center; }
+  .clip-gone { color: #fff; text-align: center; padding: 0 30px; }
+  .clip-gone b { display: block; font-size: 21px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 6px; }
+  .clip-gone span { color: rgba(255,255,255,.7); font-size: 14px; line-height: 1.45; }
+  /* Waiting for them, on top of the session screen they are already inside. */
+  .clip-pill {
+    position: fixed; left: 50%; transform: translateX(-50%); z-index: 80; cursor: pointer;
+    top: calc(14px + env(safe-area-inset-top, 0px));
+    display: flex; align-items: center; gap: 9px; padding: 10px 16px 10px 12px; border-radius: 100px;
+    background: var(--partner); color: #fff; border: none; font-family: inherit;
+    font-size: 14px; font-weight: 700; white-space: nowrap; box-shadow: 0 10px 26px -8px rgba(0,0,0,.55);
+    animation: clipIn .32s cubic-bezier(.22,1,.36,1);
+  }
+  @keyframes clipIn { from { opacity: 0; transform: translate(-50%, -14px); } }
+  .clip-pill svg { display: block; }
+  @media (prefers-reduced-motion: reduce) { .clip-pill { animation: none; } }
+
+  /* The body map. Muscles the exercise hits, lit on a plain figure. */
+  .bm { display: flex; align-items: center; gap: 14px; }
+  .bm-figs { display: flex; gap: 6px; flex-shrink: 0; }
+  .bm-view { text-align: center; }
+  .bm-view span { display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+  .bm-fig { width: 62px; height: 121px; display: block; }
+  .bm-body { fill: color-mix(in srgb, var(--muted) 26%, transparent); }
+  .bm-part { fill: color-mix(in srgb, var(--muted) 34%, transparent); transition: fill .35s ease; }
+  .bm-part.sec { fill: color-mix(in srgb, var(--partner) 42%, transparent); }
+  .bm-part.on { fill: var(--partner); }
+  .bm-legend { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .bm-row { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.35; }
+  .bm-row i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; margin-top: 4px; }
+  .bm-row i.on { background: var(--partner); }
+  .bm-row i.sec { background: color-mix(in srgb, var(--partner) 42%, transparent); }
+  .bm-row span { text-transform: capitalize; }
+  .bm-row:nth-child(2) span { color: var(--muted); }
+
   /* The watch screen */
   .lw-hero { text-align: center; padding: 4px 0 14px; }
   .lw-av {
@@ -687,6 +757,20 @@
   .lw-meta { display: flex; justify-content: center; gap: 16px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
   .lw-meta span { display: inline-flex; align-items: center; gap: 5px; }
   .lw-next { font-size: 14px; color: var(--muted); text-align: center; margin: 0 0 12px; }
+  /* LIVE, said properly: a red dot that breathes, at the top, above the name. */
+  .lw-live {
+    display: flex; align-items: center; justify-content: center; gap: 7px; margin-bottom: 10px;
+  }
+  .lw-live .live-dot { width: 8px; height: 8px; }
+  .lw-live b { font-size: 12.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--up); }
+  .lw-live.off .live-dot { background: var(--muted); animation: none; }
+  .lw-live.off b { color: var(--muted); }
+  .lw-elapsed { font-variant-numeric: tabular-nums; }
+  .lw-card { background: var(--panel-2); border-radius: 14px; padding: 13px; margin-bottom: 10px; }
+  .lw-card-label { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 9px; }
+  .lw-send { display: flex; gap: 8px; }
+  .lw-send button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 13px 8px; }
+  .lw-send svg { display: block; }
   .lw-next b { color: var(--text); font-weight: 700; }
   .lw-stale { font-size: 12.5px; color: var(--muted); text-align: center; margin: 0 0 12px; }
 
@@ -2355,6 +2439,14 @@
     <div class="pop" id="popCard"></div>
   </div>
 
+  <div class="clip-scrim hidden" id="clipRecScrim">
+    <div class="clip-stage" id="clipRecStage"></div>
+  </div>
+  <div class="clip-scrim hidden" id="clipViewScrim">
+    <div class="clip-stage" id="clipViewStage"></div>
+  </div>
+  <button type="button" class="clip-pill hidden" id="clipPill"></button>
+
   <div class="sheet-scrim hidden" id="liveScrim">
     <div class="partner-sheet" id="liveSheet"></div>
   </div>
@@ -2427,7 +2519,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.6";
+const APP_VERSION = "2026.09.04.7";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -3192,7 +3284,7 @@ function showApp() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim"]
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
   const sess = $("sessionCard");
   if (sess && !sess.classList.contains("hidden")) {
@@ -3444,6 +3536,7 @@ async function loadAll() {
     sb.from("session_reactions").select("*").order("created_at", { ascending: false }),
   ]);
   await loadLiveSessions();
+  await loadClipInbox();
   watchLiveSessions();
   startLiveTick();
   ALL_REACTIONS = reactRes.data || [];
@@ -4671,6 +4764,348 @@ async function renderWeekStrips() {
 }
 
 
+/* ---------- Live clips ----------
+   Five seconds, sent to someone mid-workout, watched once, deleted. Nothing
+   here is kept: no history, no timeline entry, no second viewing. The row and
+   the file go when the workout ends, whichever way it ends. */
+
+const CLIP_SECONDS = 5;
+let CLIP_INBOX = [];
+let clipRec = null;      // MediaRecorder
+let clipStream = null;
+let clipBlob = null;
+let clipTimer = null;
+
+function stopClipStream() {
+  if (clipTimer) { clearInterval(clipTimer); clipTimer = null; }
+  try { clipRec?.state === "recording" && clipRec.stop(); } catch {}
+  clipRec = null;
+  clipStream?.getTracks().forEach((t) => t.stop());
+  clipStream = null;
+}
+
+function closeClipRecorder() {
+  stopClipStream();
+  clipBlob = null;
+  $("clipRecScrim").classList.add("hidden");
+  $("clipRecStage").innerHTML = "";
+}
+
+/* Safari gives MediaRecorder mp4; Chrome gives webm. Ask for what the browser
+   actually supports rather than guessing, and fall back to the camera roll
+   input if MediaRecorder is missing entirely. */
+function clipMimeType() {
+  const types = ["video/mp4", "video/webm;codecs=vp9", "video/webm"];
+  return types.find((t) => window.MediaRecorder?.isTypeSupported?.(t)) || "";
+}
+
+function clipRecorderHTML(name) {
+  return `
+    <video class="clip-media mirror" id="clipPreview" playsinline muted autoplay></video>
+    <div class="clip-top">
+      <button type="button" class="clip-x" id="clipCancel" aria-label="Close">&times;</button>
+      <span class="clip-who">To ${escapeHtml(name)}, training now</span>
+    </div>
+    <div class="clip-bottom" id="clipControls">
+      <div class="clip-hint" id="clipHint">Hold up. ${CLIP_SECONDS} seconds, then it sends.</div>
+      <button type="button" class="clip-shutter" id="clipShutter" aria-label="Record">
+        <svg class="clip-ring" viewBox="0 0 96 96"><circle id="clipRing" cx="48" cy="48" r="46" stroke-dasharray="289" stroke-dashoffset="289"/></svg>
+      </button>
+      <div class="clip-note">Not saved anywhere. They watch it once and it is gone.</div>
+    </div>`;
+}
+
+function clipViewerHTML(fromName, src) {
+  return `
+    <video class="clip-media" id="clipPlayer" playsinline autoplay src="${src}"></video>
+    <div class="clip-top">
+      <button type="button" class="clip-x" id="clipViewX" aria-label="Close">&times;</button>
+      <span class="clip-who">${escapeHtml(fromName)}</span>
+    </div>`;
+}
+
+function clipGoneHTML() {
+  return `<div class="clip-stage" style="align-items:center;justify-content:center">
+      <div class="clip-gone"><b>Gone.</b><span>Clips are not saved. Get back to it.</span></div>
+    </div>`;
+}
+
+async function openClipRecorder(toEmail) {
+  const name = nameFor(toEmail);
+  $("clipRecScrim").classList.remove("hidden");
+  $("clipRecStage").innerHTML = clipRecorderHTML(name);
+  $("clipCancel").onclick = closeClipRecorder;
+
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { clipFallbackCapture(toEmail); return; }
+
+  try {
+    clipStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: { ideal: 720 } },
+      audio: true,
+    });
+  } catch (e) {
+    console.warn("camera unavailable", e);
+    clipFallbackCapture(toEmail);
+    return;
+  }
+  const vid = $("clipPreview");
+  if (!vid) { stopClipStream(); return; }
+  vid.srcObject = clipStream;
+
+  $("clipShutter").onclick = () => startClipRecording(toEmail);
+}
+
+/* No MediaRecorder, or the camera said no: use the OS recorder instead. The
+   length cannot be enforced there, so the size cap does that job. */
+function clipFallbackCapture(toEmail) {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "video/*";
+  input.setAttribute("capture", "user");
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) { closeClipRecorder(); return; }
+    if (file.size > 12 * 1024 * 1024) { toast("That clip is too long"); closeClipRecorder(); return; }
+    clipBlob = file;
+    await sendClip(toEmail, file.type || "video/mp4");
+  };
+  input.click();
+}
+
+function startClipRecording(toEmail) {
+  const shutter = $("clipShutter");
+  const ring = $("clipRing");
+  const chunks = [];
+  const mime = clipMimeType();
+  try { clipRec = new MediaRecorder(clipStream, mime ? { mimeType: mime } : undefined); }
+  catch (e) { console.error(e); toast("Cannot record here"); closeClipRecorder(); return; }
+
+  clipRec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  clipRec.onstop = async () => {
+    if (clipTimer) { clearInterval(clipTimer); clipTimer = null; }
+    clipBlob = new Blob(chunks, { type: mime || "video/mp4" });
+    clipStream?.getTracks().forEach((t) => t.stop());
+    clipStream = null;
+    showClipReview(toEmail, mime || "video/mp4");
+  };
+
+  clipRec.start();
+  shutter.classList.add("recording");
+  shutter.disabled = true;
+  $("clipHint").textContent = "Recording";
+
+  const started = Date.now();
+  const CIRC = 289;
+  clipTimer = setInterval(() => {
+    const p = Math.min(1, (Date.now() - started) / (CLIP_SECONDS * 1000));
+    if (ring) ring.setAttribute("stroke-dashoffset", String(CIRC * (1 - p)));
+    if (p >= 1) { try { clipRec.stop(); } catch {} }
+  }, 60);
+}
+
+function showClipReview(toEmail, mime) {
+  const url = URL.createObjectURL(clipBlob);
+  $("clipRecStage").innerHTML = `
+    <video class="clip-media" id="clipPreview" playsinline autoplay loop src="${url}"></video>
+    <div class="clip-top">
+      <button type="button" class="clip-x" id="clipCancel" aria-label="Close">&times;</button>
+      <span class="clip-who">To ${escapeHtml(nameFor(toEmail))}</span>
+    </div>
+    <div class="clip-bottom">
+      <div class="clip-actions">
+        <button type="button" class="btn-secondary" id="clipRetake">Again</button>
+        <button type="button" class="btn-primary" id="clipSend">Send it</button>
+      </div>
+      <div class="clip-note">They see it once, during this workout.</div>
+    </div>`;
+  $("clipCancel").onclick = () => { URL.revokeObjectURL(url); closeClipRecorder(); };
+  $("clipRetake").onclick = () => { URL.revokeObjectURL(url); closeClipRecorder(); openClipRecorder(toEmail); };
+  $("clipSend").onclick = async () => {
+    $("clipSend").disabled = true;
+    await sendClip(toEmail, mime);
+    URL.revokeObjectURL(url);
+  };
+}
+
+async function sendClip(toEmail, mime) {
+  const ext = mime.includes("webm") ? "webm" : mime.includes("quicktime") ? "mov" : "mp4";
+  const path = `${toEmail.toLowerCase()}/${crypto.randomUUID()}.${ext}`;
+  const { error: upErr } = await sb.storage.from("live-clips").upload(path, clipBlob, { contentType: mime });
+  if (upErr) { console.error(upErr); toast("Could not send that"); closeClipRecorder(); return; }
+  const { error } = await sb.from("live_clips").insert({ from_email: MY_EMAIL, to_email: toEmail, path });
+  if (error) {
+    console.error(error);
+    await sb.storage.from("live-clips").remove([path]);
+    toast("Could not send that");
+  } else {
+    toast("Sent");
+  }
+  closeClipRecorder();
+}
+
+/* ---- the receiving end ---- */
+
+async function loadClipInbox() {
+  if (!MY_EMAIL) return;
+  const { data, error } = await sb.from("live_clips").select("*")
+    .eq("to_email", MY_EMAIL).is("viewed_at", null).order("created_at", { ascending: true });
+  if (error) { console.warn("could not read clips", error); return; }
+  CLIP_INBOX = data || [];
+  renderClipPill();
+}
+
+/* Only while the workout is on. Outside a session there is nothing to interrupt
+   and nothing to react to, so the pill simply does not exist. */
+function renderClipPill() {
+  const el = $("clipPill");
+  if (!el) return;
+  if (!SESSION || SESSION.finished || !CLIP_INBOX.length) { el.classList.add("hidden"); return; }
+  const from = nameFor(CLIP_INBOX[0].from_email);
+  const more = CLIP_INBOX.length > 1 ? ` (${CLIP_INBOX.length})` : "";
+  el.innerHTML = `${icon("camera", 18)} ${escapeHtml(from)} sent you a clip${more}`;
+  el.classList.remove("hidden");
+  el.onclick = openNextClip;
+}
+
+async function openNextClip() {
+  const clip = CLIP_INBOX[0];
+  if (!clip) return;
+  const { data, error } = await sb.storage.from("live-clips").createSignedUrl(clip.path, 300);
+  if (error || !data?.signedUrl) { console.error(error); toast("That clip has gone"); await destroyClip(clip); return; }
+
+  $("clipViewScrim").classList.remove("hidden");
+  $("clipViewStage").innerHTML = clipViewerHTML(nameFor(clip.from_email), data.signedUrl);
+
+  const done = async () => {
+    await destroyClip(clip);
+    $("clipViewStage").innerHTML = clipGoneHTML();
+    setTimeout(() => {
+      $("clipViewScrim").classList.add("hidden");
+      $("clipViewStage").innerHTML = "";
+      if (CLIP_INBOX.length) renderClipPill();
+    }, 1400);
+  };
+  $("clipViewX").onclick = done;
+  $("clipPlayer").onended = done;
+  renderClipPill();
+}
+
+/* Watched, dismissed, or the workout ended: same outcome, the file goes too. */
+async function destroyClip(clip) {
+  CLIP_INBOX = CLIP_INBOX.filter((c) => c.id !== clip.id);
+  renderClipPill();
+  try {
+    await sb.storage.from("live-clips").remove([clip.path]);
+    await sb.from("live_clips").delete().eq("id", clip.id);
+  } catch (e) { console.warn("could not destroy clip", e); }
+}
+
+async function purgeMyClips() {
+  const clips = CLIP_INBOX.slice();
+  CLIP_INBOX = [];
+  renderClipPill();
+  if (!clips.length) return;
+  try {
+    await sb.storage.from("live-clips").remove(clips.map((c) => c.path));
+    await sb.from("live_clips").delete().in("id", clips.map((c) => c.id));
+  } catch (e) { console.warn("could not purge clips", e); }
+}
+
+/* ---------- The body map ----------
+   The Body tab's figure is a Rive artboard plus a WASM runtime, loaded lazily
+   because it is real weight. Watching someone train needs the opposite: a
+   figure that is already there the instant the sheet opens, and that survives
+   in a static page with no network. So this is plain inline SVG, stylised
+   rather than anatomical, one shape per muscle group the app already
+   classifies. Front and back, because a row and a bench press should not
+   light the same half of the body. */
+
+const BODY_SHAPES = {
+  front: {
+    silhouette: [
+      `<ellipse cx="50" cy="13" rx="8.5" ry="10.5"/>`,
+      `<rect x="46" y="21" width="8" height="7" rx="2.5"/>`,
+      `<path d="M31,33 Q50,26 69,33 L70,58 Q66,76 63,93 L37,93 Q34,76 30,58 Z"/>`,
+      `<ellipse cx="25.5" cy="54" rx="6" ry="15"/>`, `<ellipse cx="74.5" cy="54" rx="6" ry="15"/>`,
+      `<ellipse cx="21" cy="81" rx="5" ry="14"/>`, `<ellipse cx="79" cy="81" rx="5" ry="14"/>`,
+      `<ellipse cx="18.5" cy="98" rx="4" ry="6"/>`, `<ellipse cx="81.5" cy="98" rx="4" ry="6"/>`,
+      `<ellipse cx="43" cy="117" rx="8" ry="24"/>`, `<ellipse cx="57" cy="117" rx="8" ry="24"/>`,
+      `<ellipse cx="43.5" cy="158" rx="6" ry="18"/>`, `<ellipse cx="56.5" cy="158" rx="6" ry="18"/>`,
+      `<ellipse cx="43.5" cy="182" rx="5" ry="5"/>`, `<ellipse cx="56.5" cy="182" rx="5" ry="5"/>`,
+    ],
+    parts: {
+      traps: `<path d="M39,30 L50,27 L61,30 L57,36 L43,36 Z"/>`,
+      shoulders: `<ellipse cx="31" cy="39" rx="8" ry="7"/><ellipse cx="69" cy="39" rx="8" ry="7"/>`,
+      chest: `<path d="M40,37 Q48,35 49,39 L49,52 Q41,52 38,45 Z"/><path d="M60,37 Q52,35 51,39 L51,52 Q59,52 62,45 Z"/>`,
+      biceps: `<ellipse cx="26" cy="53" rx="5" ry="11"/><ellipse cx="74" cy="53" rx="5" ry="11"/>`,
+      forearms: `<ellipse cx="21" cy="81" rx="4.4" ry="12.5"/><ellipse cx="79" cy="81" rx="4.4" ry="12.5"/>`,
+      abs: `<rect x="44" y="55" width="12" height="30" rx="4"/>`,
+      obliques: `<path d="M38,56 L43,56 L43,84 L39,77 Z"/><path d="M62,56 L57,56 L57,84 L61,77 Z"/>`,
+      quads: `<ellipse cx="43" cy="115" rx="7" ry="21"/><ellipse cx="57" cy="115" rx="7" ry="21"/>`,
+      calves: `<ellipse cx="43.5" cy="158" rx="5.2" ry="16"/><ellipse cx="56.5" cy="158" rx="5.2" ry="16"/>`,
+    },
+  },
+  back: {
+    silhouette: [
+      `<ellipse cx="50" cy="13" rx="8.5" ry="10.5"/>`,
+      `<rect x="46" y="21" width="8" height="7" rx="2.5"/>`,
+      `<path d="M31,33 Q50,26 69,33 L70,58 Q66,76 63,93 L37,93 Q34,76 30,58 Z"/>`,
+      `<ellipse cx="25.5" cy="54" rx="6" ry="15"/>`, `<ellipse cx="74.5" cy="54" rx="6" ry="15"/>`,
+      `<ellipse cx="21" cy="81" rx="5" ry="14"/>`, `<ellipse cx="79" cy="81" rx="5" ry="14"/>`,
+      `<ellipse cx="18.5" cy="98" rx="4" ry="6"/>`, `<ellipse cx="81.5" cy="98" rx="4" ry="6"/>`,
+      `<ellipse cx="43" cy="117" rx="8" ry="24"/>`, `<ellipse cx="57" cy="117" rx="8" ry="24"/>`,
+      `<ellipse cx="43.5" cy="158" rx="6" ry="18"/>`, `<ellipse cx="56.5" cy="158" rx="6" ry="18"/>`,
+      `<ellipse cx="43.5" cy="182" rx="5" ry="5"/>`, `<ellipse cx="56.5" cy="182" rx="5" ry="5"/>`,
+    ],
+    parts: {
+      traps: `<path d="M38,30 L50,27 L62,30 L58,50 L50,54 L42,50 Z"/>`,
+      shoulders: `<ellipse cx="31" cy="39" rx="8" ry="7"/><ellipse cx="69" cy="39" rx="8" ry="7"/>`,
+      lats: `<path d="M40,44 L48,50 L48,72 L36,64 Q34,53 40,44 Z"/><path d="M60,44 L52,50 L52,72 L64,64 Q66,53 60,44 Z"/>`,
+      triceps: `<ellipse cx="26" cy="53" rx="5" ry="11"/><ellipse cx="74" cy="53" rx="5" ry="11"/>`,
+      forearms: `<ellipse cx="21" cy="81" rx="4.4" ry="12.5"/><ellipse cx="79" cy="81" rx="4.4" ry="12.5"/>`,
+      lowerback: `<rect x="43" y="72" width="14" height="16" rx="4"/>`,
+      glutes: `<path d="M37,92 Q43,88 49,92 L49,108 Q41,110 37,103 Z"/><path d="M63,92 Q57,88 51,92 L51,108 Q59,110 63,103 Z"/>`,
+      hamstrings: `<ellipse cx="43" cy="122" rx="7" ry="18"/><ellipse cx="57" cy="122" rx="7" ry="18"/>`,
+      calves: `<ellipse cx="43.5" cy="158" rx="5.2" ry="16"/><ellipse cx="56.5" cy="158" rx="5.2" ry="16"/>`,
+    },
+  },
+};
+
+/* A muscle group with no shape in a view simply is not drawn there, which is
+   how "lats" stays off the front without a special case. */
+function bodyFigureSVG(view, primary = [], secondary = []) {
+  const def = BODY_SHAPES[view];
+  const parts = Object.entries(def.parts).map(([group, shape]) => {
+    const cls = primary.includes(group) ? "bm-part on" : secondary.includes(group) ? "bm-part sec" : "bm-part";
+    return `<g class="${cls}">${shape}</g>`;
+  }).join("");
+  return `<svg class="bm-fig" viewBox="0 0 100 195" aria-hidden="true">
+    <g class="bm-body">${def.silhouette.join("")}</g>
+    ${parts}
+  </svg>`;
+}
+
+/* Both views plus the names, because a highlight says where and a word says
+   what. Falls back to nothing when the exercise is unknown to the classifier,
+   rather than drawing a body with nothing lit. */
+function muscleMapHTML(exerciseName) {
+  const rule = exerciseName ? classifyMuscles(exerciseName) : null;
+  if (!rule) return "";
+  const primary = rule.primary || [];
+  const secondary = (rule.secondary || []).filter((m) => !primary.includes(m));
+  const nice = (m) => ({ lowerback: "lower back" }[m] || m);
+  return `<div class="bm">
+    <div class="bm-figs">
+      <div class="bm-view">${bodyFigureSVG("front", primary, secondary)}<span>Front</span></div>
+      <div class="bm-view">${bodyFigureSVG("back", primary, secondary)}<span>Back</span></div>
+    </div>
+    <div class="bm-legend">
+      <div class="bm-row"><i class="on"></i><span>${primary.map(nice).map(escapeHtml).join(", ")}</span></div>
+      ${secondary.length ? `<div class="bm-row"><i class="sec"></i><span>${secondary.map(nice).map(escapeHtml).join(", ")}</span></div>` : ""}
+    </div>
+  </div>`;
+}
+
 /* ---------- Watching someone train ----------
    The live row is presence, so it is read with a clock, not just a query: a
    phone that locks stops beating, and pretending that is still "in the gym
@@ -4701,6 +5136,13 @@ async function loadLiveSessions() {
 function watchLiveSessions() {
   if (LIVE_CHANNEL || !PARTNER_EMAIL) return;
   LIVE_CHANNEL = sb.channel("live-sessions")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "live_clips" }, (payload) => {
+      const clip = payload.new;
+      if (!clip || (clip.to_email || "").toLowerCase() !== MY_EMAIL) return;
+      if (CLIP_INBOX.some((c) => c.id === clip.id)) return;
+      CLIP_INBOX.push(clip);
+      renderClipPill();
+    })
     .on("postgres_changes", { event: "*", schema: "public", table: "live_sessions" }, (payload) => {
       const row = payload.new && Object.keys(payload.new).length ? payload.new : null;
       const gone = payload.eventType === "DELETE";
@@ -4784,10 +5226,14 @@ async function renderLiveSheet() {
   const plan = (ALL_PLANS || []).find((w) => w.id === row.workout_id);
   const nextEx = plan?.exercises?.[(row.exercise_index || 0) + 1];
   const stale = liveAgeMs(row) > LIVE_QUIET_MS;
+  const map = muscleMapHTML(row.exercise_name);
 
   sheet.innerHTML = `
     <div class="ds-grip"></div>
     <div class="ps-head"><button type="button" class="ds-x" id="lwClose" aria-label="Close">&times;</button></div>
+    <div class="lw-live${stale ? " off" : ""}">
+      <span class="live-dot"></span><b>${stale ? "Live, screen off" : "Live"}</b>
+    </div>
     <div class="lw-hero">
       <div class="lw-av">${face ? `<img src="${face}" alt="" />` : escapeHtml(initials(name))}</div>
       <div class="lw-name">${escapeHtml(name)}</div>
@@ -4798,16 +5244,28 @@ async function renderLiveSheet() {
       <div class="lw-ex">${escapeHtml(row.exercise_name || "Warming up")}</div>
       ${setTotal ? `<div class="lw-sets">${sets}</div>` : ""}
       <div class="lw-meta">
-        <span>${icon("clock", 15)} ${mins} min</span>
+        <span>${icon("clock", 15)} <span class="lw-elapsed">${mins} min</span></span>
         ${setTotal ? `<span>${icon("check", 15)} ${row.set_done || 0} of ${setTotal} sets</span>` : ""}
       </div>
     </div>
+    ${map ? `<div class="lw-card"><div class="lw-card-label">Muscles working right now</div>${map}</div>` : ""}
     ${nextEx ? `<p class="lw-next">Up next: <b>${escapeHtml(nextEx.name || "")}</b>${nextEx.sets ? ` · ${nextEx.sets} × ${escapeHtml(String(nextEx.reps || ""))}` : ""}</p>` : ""}
     ${stale ? `<p class="lw-stale">Their screen is off, so this is where they were a few minutes ago.</p>` : ""}
-    <button type="button" class="btn-primary" id="lwCheer">Send encouragement</button>`;
+    <div class="lw-card">
+      <div class="lw-card-label">Cheer them on</div>
+      <div class="lw-send">
+        <button type="button" class="btn-secondary" id="lwClip" style="margin-top:0">
+          ${icon("camera", 22)} Send a quick video
+        </button>
+        <button type="button" class="btn-secondary" id="lwMsg" style="margin-top:0">
+          ${icon("bolt", 22)} Send a message
+        </button>
+      </div>
+    </div>`;
 
   $("lwClose").onclick = closeLiveSheet;
-  $("lwCheer").onclick = () => { closeLiveSheet(); openNoteComposer("congratulate"); };
+  $("lwMsg").onclick = () => { closeLiveSheet(); openNoteComposer("congratulate"); };
+  $("lwClip").onclick = () => { closeLiveSheet(); openClipRecorder(row.email); };
 }
 
 /* ---------- Together timeline ----------
@@ -5685,6 +6143,7 @@ async function beatLive() {
 
 function startLive() {
   beatLive();
+  renderClipPill();
   if (LIVE_TIMER) return;
   /* A watcher decides "live" from last_beat_at, so the beat has to keep coming
      while the screen is open even when nothing changes. */
@@ -5696,6 +6155,9 @@ function startLive() {
 
 async function endLive() {
   if (LIVE_TIMER) { clearInterval(LIVE_TIMER); LIVE_TIMER = null; }
+  /* The clips existed for this workout only. It is over, so they are gone,
+     whether or not they were ever watched. */
+  await purgeMyClips();
   try { await sb.from("live_sessions").delete().eq("email", MY_EMAIL); }
   catch (e) { console.warn("could not end live session", e); }
 }
@@ -6320,6 +6782,7 @@ function minimiseSession() {
 
 function closeSessionUI() {
   stopSessionTimer();
+  renderClipPill();
   document.body.classList.remove("session-open");
   const card = $("sessionCard");
   card.classList.add("leaving");

@@ -650,6 +650,76 @@
   .live-go { color: var(--muted); flex-shrink: 0; display: flex; }
   @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
 
+  /* Clips: recording one, and watching one. Both are full-screen and black,
+     because a few seconds of someone shouting at you deserves the screen. */
+  .clip-scrim {
+    position: fixed; inset: 0; z-index: 90; background: #000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .clip-stage { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
+  .clip-media { flex: 1; width: 100%; height: 100%; object-fit: cover; background: #000; }
+  .clip-media.mirror { transform: scaleX(-1); }
+  .clip-top {
+    position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 14px; right: 14px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; z-index: 2;
+  }
+  .clip-x {
+    width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(0,0,0,.45); color: #fff; font-size: 21px; line-height: 1; backdrop-filter: blur(8px);
+  }
+  .clip-who { color: #fff; font-size: 14px; font-weight: 700; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  .clip-bottom {
+    position: absolute; left: 0; right: 0; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column; align-items: center; gap: 14px; z-index: 2; padding: 0 20px;
+  }
+  .clip-hint { color: rgba(255,255,255,.8); font-size: 14px; text-align: center; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  .clip-shutter {
+    width: 74px; height: 74px; border-radius: 50%; border: 4px solid rgba(255,255,255,.85);
+    background: var(--up); cursor: pointer; padding: 0; position: relative;
+  }
+  .clip-shutter[disabled] { opacity: .5; }
+  .clip-shutter.recording { background: #fff; }
+  .clip-ring { position: absolute; inset: -11px; transform: rotate(-90deg); pointer-events: none; }
+  .clip-ring circle { fill: none; stroke: var(--up); stroke-width: 4; stroke-linecap: round; }
+  .clip-count { color: #fff; font-size: 15.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .clip-actions { display: flex; gap: 10px; width: 100%; max-width: 340px; }
+  .clip-actions button { flex: 1; margin-top: 0; }
+  .clip-actions .btn-secondary { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); color: #fff; }
+  .clip-note { color: rgba(255,255,255,.65); font-size: 12.5px; text-align: center; }
+  .clip-gone { color: #fff; text-align: center; padding: 0 30px; }
+  .clip-gone b { display: block; font-size: 21px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 6px; }
+  .clip-gone span { color: rgba(255,255,255,.7); font-size: 14px; line-height: 1.45; }
+  /* Waiting for them, on top of the session screen they are already inside. */
+  .clip-pill {
+    position: fixed; left: 50%; transform: translateX(-50%); z-index: 80; cursor: pointer;
+    top: calc(14px + env(safe-area-inset-top, 0px));
+    display: flex; align-items: center; gap: 9px; padding: 10px 16px 10px 12px; border-radius: 100px;
+    background: var(--partner); color: #fff; border: none; font-family: inherit;
+    font-size: 14px; font-weight: 700; white-space: nowrap; box-shadow: 0 10px 26px -8px rgba(0,0,0,.55);
+    animation: clipIn .32s cubic-bezier(.22,1,.36,1);
+  }
+  @keyframes clipIn { from { opacity: 0; transform: translate(-50%, -14px); } }
+  .clip-pill svg { display: block; }
+  @media (prefers-reduced-motion: reduce) { .clip-pill { animation: none; } }
+
+  /* The body map. Muscles the exercise hits, lit on a plain figure. */
+  .bm { display: flex; align-items: center; gap: 14px; }
+  .bm-figs { display: flex; gap: 6px; flex-shrink: 0; }
+  .bm-view { text-align: center; }
+  .bm-view span { display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+  .bm-fig { width: 62px; height: 121px; display: block; }
+  .bm-body { fill: color-mix(in srgb, var(--muted) 26%, transparent); }
+  .bm-part { fill: color-mix(in srgb, var(--muted) 34%, transparent); transition: fill .35s ease; }
+  .bm-part.sec { fill: color-mix(in srgb, var(--partner) 42%, transparent); }
+  .bm-part.on { fill: var(--partner); }
+  .bm-legend { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .bm-row { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.35; }
+  .bm-row i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; margin-top: 4px; }
+  .bm-row i.on { background: var(--partner); }
+  .bm-row i.sec { background: color-mix(in srgb, var(--partner) 42%, transparent); }
+  .bm-row span { text-transform: capitalize; }
+  .bm-row:nth-child(2) span { color: var(--muted); }
+
   /* The watch screen */
   .lw-hero { text-align: center; padding: 4px 0 14px; }
   .lw-av {
@@ -671,6 +741,20 @@
   .lw-meta { display: flex; justify-content: center; gap: 16px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
   .lw-meta span { display: inline-flex; align-items: center; gap: 5px; }
   .lw-next { font-size: 14px; color: var(--muted); text-align: center; margin: 0 0 12px; }
+  /* LIVE, said properly: a red dot that breathes, at the top, above the name. */
+  .lw-live {
+    display: flex; align-items: center; justify-content: center; gap: 7px; margin-bottom: 10px;
+  }
+  .lw-live .live-dot { width: 8px; height: 8px; }
+  .lw-live b { font-size: 12.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--up); }
+  .lw-live.off .live-dot { background: var(--muted); animation: none; }
+  .lw-live.off b { color: var(--muted); }
+  .lw-elapsed { font-variant-numeric: tabular-nums; }
+  .lw-card { background: var(--panel-2); border-radius: 14px; padding: 13px; margin-bottom: 10px; }
+  .lw-card-label { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 9px; }
+  .lw-send { display: flex; gap: 8px; }
+  .lw-send button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 13px 8px; }
+  .lw-send svg { display: block; }
   .lw-next b { color: var(--text); font-weight: 700; }
   .lw-stale { font-size: 12.5px; color: var(--muted); text-align: center; margin: 0 0 12px; }
 

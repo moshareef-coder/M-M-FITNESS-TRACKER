@@ -45,13 +45,23 @@ const ICONS = grab(/\nconst ICON_PATHS = \{.*?\n\};\n/s, "ICON_PATHS");
 const HEADER = grab(/ {2}<header class="top">.*?<\/header>\n/s, "the app header");
 const HOME = src.match(/<!-- HOME TAB -->([\s\S]*?)<div id="tab-workout"/)[1];
 const LIVE_SHEET = grab(/ {2}<div class="sheet-scrim hidden" id="liveScrim">[\s\S]*?<\/div>\n {2}<\/div>\n/, "the live sheet");
+const CLIP_PILL = grab(/ {2}<button type="button" class="clip-pill hidden" id="clipPill"><\/button>\n/, "the clip pill");
 
 const FUNCS = [
   "icon", "personRing", "hydrateAvatars", "renderHero", "renderTopStreak",
   "entryOn", "dotHTML", "renderWeekStrips",
   "timelineSessions", "reactionsFor", "nameFor", "timelineItemHTML", "wireTimeline", "renderTimeline",
   "liveAgeMs", "liveStateLabel", "renderLiveCard", "renderLiveSheet",
+  "bodyFigureSVG", "muscleMapHTML", "classifyMuscles", "renderClipPill",
+  "clipRecorderHTML", "clipViewerHTML", "clipGoneHTML",
 ].map(fn).join("\n");
+
+/* Data the extracted functions close over. Lifted whole rather than retyped,
+   because a hand-copied muscle table would drift from the app's within a week. */
+const DATA = [
+  grab(/\nconst BODY_SHAPES = \{.*?\n\};\n/s, "BODY_SHAPES"),
+  grab(/\nconst MUSCLE_RULES = \[.*?\n\];\n/s, "MUSCLE_RULES"),
+].join("\n");
 
 /* ---- the gallery page ---- */
 
@@ -102,6 +112,13 @@ const GALLERY_CSS = `
   /* The sheet states are shown as the panel itself, not the dimmed overlay. */
   .gal-phone .partner-sheet { position: static; transform: none; max-height: none; border-radius: 0; }
   .gal-empty { color: var(--muted); font-size: 14px; padding: 20px; }
+  /* The pill is fixed to the viewport in the app; here it sits in a box. */
+  .gal-pillbox { position: relative; height: 92px; background: var(--panel-2); }
+  /* Full-screen black surfaces, shown at phone proportions rather than fixed. */
+  .gal-dark { position: relative; height: 560px; background: #000; display: flex; flex-direction: column; }
+  .gal-dark .clip-top, .gal-dark .clip-bottom { position: absolute; }
+  .gal-dark .clip-media { flex: 1; min-height: 0; }
+  .gal-pillbox .clip-pill { position: absolute; top: 26px; animation: none; }
 `;
 
 const BODY = `<title>Fit Together Screen States</title>
@@ -132,10 +149,12 @@ ${HEADER}
 ${HOME}
   </div>
 ${LIVE_SHEET}
+${CLIP_PILL}
 </div>
 
 <script>
 ${ICONS}
+${DATA}
 
 const $ = (id) => document.getElementById(id);
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -151,6 +170,7 @@ const DAY_LETTERS = ["M","T","W","T","F","S","S"];
 const APP_VERSION = "states";
 const LIVE_QUIET_MS = 3 * 60 * 1000;
 const LIVE_GONE_MS = 25 * 60 * 1000;
+const CLIP_SECONDS = 5;
 
 const FACE = (c) => "data:image/svg+xml," + encodeURIComponent(
   "<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><rect width='120' height='120' fill='" + c + "'/>" +
@@ -197,6 +217,8 @@ const toggleReaction = () => {};
 const openLiveSheet = () => {};
 const closeLiveSheet = () => {};
 const openNoteComposer = () => {};
+const openNextClip = () => {};
+let SESSION = null, CLIP_INBOX = [];
 
 ${FUNCS}
 
@@ -311,6 +333,36 @@ const STATES = [
   { group: "Watching them train", name: "They just finished while you were looking",
     note: "The row goes away mid-watch. This is the fallback.",
     setup: () => { LIVE_PARTNER = null; }, sheet: true },
+
+  { group: "Watching them train", name: "A pull exercise, back lit up",
+    note: "The map is per exercise, so the front and back figures change as they move through the plan.",
+    setup: () => { LIVE_PARTNER = liveRow({ exercise_name: "Barbell Row", exercise_index: 1, set_done: 1, set_total: 3 }); }, sheet: true },
+
+  { group: "Watching them train", name: "An exercise the classifier does not know",
+    note: "No map rather than a body with nothing lit.",
+    setup: () => { LIVE_PARTNER = liveRow({ exercise_name: "Turkish Get-Up" }); }, sheet: true },
+
+  { group: "Getting a clip mid-workout", name: "A clip is waiting",
+    note: "Sits above the session screen. Only ever exists during a workout.",
+    pill: true,
+    setup: () => { SESSION = { finished: false }; CLIP_INBOX = [{ id: "c1", from_email: "mell@x", path: "x" }]; } },
+
+  { group: "Getting a clip mid-workout", name: "More than one waiting",
+    pill: true,
+    setup: () => { SESSION = { finished: false }; CLIP_INBOX = [
+      { id: "c1", from_email: "mell@x", path: "x" }, { id: "c2", from_email: "mell@x", path: "y" }]; } },
+
+  { group: "Getting a clip mid-workout", name: "Opening it",
+    note: "Plays once, full screen. The video area is black here because there is no file.",
+    raw: () => clipViewerHTML("Mell", ""), setup: () => {} },
+
+  { group: "Getting a clip mid-workout", name: "After it plays",
+    note: "Then it is deleted, file and row, and this closes itself.",
+    raw: () => clipGoneHTML(), setup: () => {} },
+
+  { group: "Sending a clip", name: "The recorder",
+    note: "Five seconds, auto-stop. The camera fills the screen in the app.",
+    raw: () => clipRecorderHTML("Mell"), setup: () => {} },
 ];
 
 /* ---- render each state into the stage, then capture it ---- */
@@ -341,6 +393,18 @@ async function renderHomeState() {
   return '<div class="gal-inner">' + deId(header.outerHTML + home.innerHTML) + "</div>";
 }
 
+/* Some states are just markup, with no data behind them. */
+async function renderRawState(st) {
+  return '<div class="gal-dark">' + deId(st.raw()) + "</div>";
+}
+
+async function renderPillState() {
+  renderClipPill();
+  await settle();
+  const pill = $("clipPill");
+  return '<div class="gal-pillbox">' + deId(pill.outerHTML) + "</div>";
+}
+
 async function renderSheetState() {
   await renderLiveSheet();
   await settle();
@@ -355,7 +419,10 @@ async function renderSheetState() {
     st.setup();
     let html;
     try {
-      html = st.sheet ? await renderSheetState() : await renderHomeState();
+      html = st.raw ? await renderRawState(st)
+           : st.pill ? await renderPillState()
+           : st.sheet ? await renderSheetState()
+           : await renderHomeState();
     } catch (e) {
       html = '<div class="gal-empty">This state threw: ' + escapeHtml(e.message) + "</div>";
       console.error(st.name, e);
@@ -404,6 +471,15 @@ const page = `<!doctype html>
 ${BODY}
 </body>
 </html>`;
+
+/* A syntax error here produces a page that renders NOTHING, which looks like a
+   slow load rather than a fault. Catch it at build time instead. The commonest
+   cause is a stub colliding with a function lifted out of the app. */
+{
+  const js = BODY.slice(BODY.indexOf("<script>") + 8, BODY.lastIndexOf("</script>"));
+  try { new Function(js); }
+  catch (e) { throw new Error(`make-states: the generated script does not parse: ${e.message}`); }
+}
 
 writeFileSync(join(root, "states.html"), page);
 
