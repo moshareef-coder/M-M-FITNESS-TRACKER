@@ -645,8 +645,34 @@
   .av:active { transform: scale(.93); }
   .av.me { border-color: var(--me); color: var(--me); box-shadow: var(--glow-me); }
   .av.them { border-color: var(--partner); color: var(--partner); margin-left: -10px; z-index: 1; box-shadow: var(--glow-partner); }
-  .setup-photo { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
-  .setup-photo .av { width: 56px; height: 56px; font-size: 17px; border-width: 3px; cursor: default; }
+  .setup-photo { display: flex; align-items: flex-start; gap: 14px; margin-top: 14px; }
+  .setup-photo .av { width: 64px; height: 64px; font-size: 17px; border-width: 3px; cursor: pointer; flex-shrink: 0; }
+  .setup-photo .av:active { transform: scale(.97); }
+  .setup-photo-acts { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .setup-photo-acts .btn-ghost, .setup-photo-acts .btn-secondary { margin: 0; }
+
+  /* The photo editor. The circle is the crop, so what you line up is exactly
+     what gets saved. */
+  /* The stage hugs the canvas, so the mask's circle is a circle rather than
+     an ellipse stretched across whatever width the sheet happens to be. */
+  .crop-stage {
+    position: relative; display: flex; align-items: center; justify-content: center;
+    width: fit-content; margin: 4px auto 14px; background: var(--panel-2);
+    border-radius: 16px; padding: 16px; overflow: hidden;
+  }
+  .crop-canvas { display: block; border-radius: 4px; cursor: grab; background: var(--panel); }
+  .crop-canvas:active { cursor: grabbing; }
+  .crop-mask {
+    position: absolute; inset: 16px; border-radius: 4px; pointer-events: none;
+    background: color-mix(in srgb, var(--bg) 62%, transparent);
+    -webkit-mask-image: radial-gradient(circle at center, transparent 0 49.5%, #000 50%);
+    mask-image: radial-gradient(circle at center, transparent 0 49.5%, #000 50%);
+  }
+  .crop-zoom { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
+  .crop-zoom-ico { color: var(--muted); display: flex; flex-shrink: 0; }
+  .crop-zoom input[type="range"] {
+    flex: 1; min-width: 0; accent-color: var(--accent); height: 32px; padding: 0; background: none; border: none;
+  }
 
   /* Someone training right now. A red dot is the one place in this app that
      earns pure attention-grabbing, because it is true for twenty minutes a
@@ -3198,6 +3224,9 @@
   <div class="sheet-scrim hidden" id="timelineScrim">
     <div class="partner-sheet" id="timelineSheet"></div>
   </div>
+  <div class="sheet-scrim hidden" id="cropScrim">
+    <div class="partner-sheet" id="cropSheet"></div>
+  </div>
   <div class="sheet-scrim hidden" id="savedScrim">
     <div class="partner-sheet" id="savedSheet"></div>
   </div>
@@ -3255,7 +3284,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.40";
+const APP_VERSION = "2026.09.04.41";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -5109,15 +5138,170 @@ async function renderAvatarPair() {
   if (themBtn) themBtn.onclick = openPartnerSheet;
 }
 
-async function uploadAvatar(file) {
+/* ---------- The photo editor ----------
+   A picture straight off a phone is never square, and a face is never in the
+   middle of it. Dropping the file in as it comes crops whatever the middle
+   happens to be, which is how you end up with a shoulder. So: drag to move,
+   pinch or drag the slider to zoom, and the circle is exactly what gets
+   saved.
+
+   Two files are kept. The crop is what everyone sees; the original sits
+   beside it so "Edit photo" can reopen the real picture rather than making
+   you crop a crop, the way a phone's photo editor is non destructive. */
+const AVATAR_ORIGINAL = () => `${MY_EMAIL}/avatar/original.jpg`;
+const CROP_OUT = 512;
+let CROP = null;
+
+async function openAvatarEditor(source) {
+  const img = await loadImageFromBlob(source);
+  if (!img) { toast("Could not read that photo"); return; }
+  $("cropSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="cropCancel" aria-label="Cancel">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">Move and scale</div>
+      <div class="spacer"></div>
+    </div>
+    <div class="crop-stage">
+      <canvas id="cropCanvas" class="crop-canvas"></canvas>
+      <div class="crop-mask"></div>
+    </div>
+    <div class="crop-zoom">
+      <span class="crop-zoom-ico" aria-hidden="true">${icon("body", 14)}</span>
+      <input type="range" id="cropZoom" min="1" max="4" step="0.01" value="1" aria-label="Zoom" />
+      <span class="crop-zoom-ico big" aria-hidden="true">${icon("body", 20)}</span>
+    </div>
+    <p class="muted-note" style="text-align:center;margin:2px 0 14px;">Drag to move, pinch or use the slider to zoom.</p>
+    <button type="button" class="btn-primary" id="cropSave">Use this photo</button>
+    <button type="button" class="btn-ghost" id="cropBack">Cancel</button>`;
+  $("cropScrim").classList.remove("hidden");
+  pinSheets();
+
+  const canvas = $("cropCanvas");
+  const box = canvas.parentElement.getBoundingClientRect();
+  const side = Math.round(Math.min(box.width, 320));
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.style.width = canvas.style.height = `${side}px`;
+  canvas.width = canvas.height = Math.round(side * dpr);
+  const ctx = canvas.getContext("2d");
+
+  const cover = side / Math.min(img.width, img.height);   // the image always fills the circle
+  /* A tall photo opens on its upper third rather than dead centre, because
+     that is where a face is in almost every phone portrait. They can drag it
+     anywhere from there. */
+  const tall = img.height > img.width * 1.2;
+  CROP = { img, side, dpr, base: cover, zoom: 1, x: 0, y: tall ? img.height * cover * 0.15 : 0, source };
+
+  const clamp = () => {
+    const w = img.width * CROP.base * CROP.zoom, h = img.height * CROP.base * CROP.zoom;
+    const mx = Math.max(0, (w - side) / 2), my = Math.max(0, (h - side) / 2);
+    CROP.x = Math.min(mx, Math.max(-mx, CROP.x));
+    CROP.y = Math.min(my, Math.max(-my, CROP.y));
+  };
+  const paint = () => {
+    clamp();
+    const w = img.width * CROP.base * CROP.zoom, h = img.height * CROP.base * CROP.zoom;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, side, side);
+    ctx.drawImage(img, side / 2 - w / 2 + CROP.x, side / 2 - h / 2 + CROP.y, w, h);
+  };
+  paint();
+
+  /* One finger moves it, two pinch it. The same maths as the slider, so the
+     three controls can never disagree about where the picture is. */
+  const pts = new Map();
+  let startDist = 0, startZoom = 1, last = null;
+  canvas.style.touchAction = "none";
+  canvas.onpointerdown = (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      startDist = Math.hypot(a.x - b.x, a.y - b.y);
+      startZoom = CROP.zoom;
+    }
+    last = { x: e.clientX, y: e.clientY };
+  };
+  canvas.onpointermove = (e) => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2 && startDist) {
+      const [a, b] = [...pts.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      CROP.zoom = Math.min(4, Math.max(1, startZoom * (d / startDist)));
+      $("cropZoom").value = String(CROP.zoom);
+    } else if (last) {
+      CROP.x += e.clientX - last.x;
+      CROP.y += e.clientY - last.y;
+      last = { x: e.clientX, y: e.clientY };
+    }
+    paint();
+  };
+  const up = (e) => { pts.delete(e.pointerId); startDist = 0; last = null; };
+  canvas.onpointerup = up;
+  canvas.onpointercancel = up;
+  canvas.onwheel = (e) => {
+    e.preventDefault();
+    CROP.zoom = Math.min(4, Math.max(1, CROP.zoom * (e.deltaY < 0 ? 1.08 : 0.93)));
+    $("cropZoom").value = String(CROP.zoom);
+    paint();
+  };
+  $("cropZoom").oninput = (e) => { CROP.zoom = parseFloat(e.target.value) || 1; paint(); };
+
+  const close = () => { $("cropScrim").classList.add("hidden"); CROP = null; };
+  $("cropCancel").onclick = close;
+  $("cropBack").onclick = close;
+  $("cropSave").onclick = async () => {
+    const btn = $("cropSave");
+    btn.disabled = true; btn.textContent = "Saving…";
+    const blob = await cropToBlob();
+    close();
+    if (blob) await saveAvatar(blob, source);
+    else toast("Could not save that photo");
+  };
+}
+
+/* The circle, at the size everyone else will see it. */
+function cropToBlob() {
+  if (!CROP) return Promise.resolve(null);
+  const { img, side, base, zoom, x, y } = CROP;
+  const out = document.createElement("canvas");
+  out.width = out.height = CROP_OUT;
+  const k = CROP_OUT / side;
+  const w = img.width * base * zoom * k, h = img.height * base * zoom * k;
+  const ctx = out.getContext("2d");
+  ctx.drawImage(img, CROP_OUT / 2 - w / 2 + x * k, CROP_OUT / 2 - h / 2 + y * k, w, h);
+  return new Promise((res) => out.toBlob((b) => res(b), "image/jpeg", 0.9));
+}
+
+function loadImageFromBlob(blob) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
+/* Upload the crop, and the original beside it so the next edit starts from
+   the real picture. */
+async function saveAvatar(cropBlob, originalBlob) {
   const btn = $("avatarPickBtn");
-  if (btn) { btn.disabled = true; btn.textContent = "Uploading…"; }
+  if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
   try {
-    const blob = await compressImage(file, 400, 0.85);
     const path = `${MY_EMAIL}/avatar/${Date.now()}.jpg`;
     const { error: upErr } = await sb.storage.from("workout-proof")
-      .upload(path, blob, { contentType: "image/jpeg", upsert: true });
+      .upload(path, cropBlob, { contentType: "image/jpeg", upsert: true });
     if (upErr) throw upErr;
+
+    if (originalBlob instanceof Blob) {
+      const keep = await compressImage(originalBlob, 1600, 0.86);
+      await sb.storage.from("workout-proof")
+        .upload(AVATAR_ORIGINAL(), keep, { contentType: "image/jpeg", upsert: true })
+        .catch(() => {});
+      delete PROOF_URL_CACHE[AVATAR_ORIGINAL()];
+    }
 
     const old = MY_PROFILE?.avatar_path;
     const { error: dbErr } = await sb.from("profiles")
@@ -5128,14 +5312,14 @@ async function uploadAvatar(file) {
     const cached = profileFor(MY_EMAIL);
     if (cached) cached.avatar_path = path;
 
-    // Replace, do not accumulate. Old avatars are dead weight in the bucket.
-    if (old && old !== path) {
+    // Replace, do not accumulate. Old crops are dead weight in the bucket.
+    if (old && old !== path && !old.endsWith("original.jpg")) {
       await sb.storage.from("workout-proof").remove([old]);
       delete PROOF_URL_CACHE[old];
     }
     toast("Photo saved");
   } catch (e) {
-    console.error("avatar upload failed", e);
+    console.error("avatar save failed", e);
     toast("Could not save that photo");
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = "Change photo"; }
@@ -5144,16 +5328,57 @@ async function uploadAvatar(file) {
   }
 }
 
+/* Editing again starts from the original if there is one, so a crop is never
+   cropped twice. */
+async function editExistingAvatar() {
+  const tryPath = async (path) => {
+    if (!path) return null;
+    const url = await signedProofUrl(path);
+    if (!url) return null;
+    try { const r = await fetch(url); return r.ok ? await r.blob() : null; } catch { return null; }
+  };
+  const blob = await tryPath(AVATAR_ORIGINAL()) || await tryPath(MY_PROFILE?.avatar_path);
+  if (!blob) { toast("Pick a photo to start from"); $("avatarFile").click(); return; }
+  await openAvatarEditor(blob);
+}
+
+async function removeAvatar() {
+  if (!confirm("Remove your photo? Your initials go back in its place.")) return;
+  const old = MY_PROFILE?.avatar_path;
+  try {
+    await sb.from("profiles").update({ avatar_path: null }).eq("email", MY_EMAIL);
+    if (MY_PROFILE) MY_PROFILE.avatar_path = null;
+    const cached = profileFor(MY_EMAIL);
+    if (cached) cached.avatar_path = null;
+    const gone = [old, AVATAR_ORIGINAL()].filter(Boolean);
+    await sb.storage.from("workout-proof").remove(gone);
+    gone.forEach((p) => delete PROOF_URL_CACHE[p]);
+    toast("Photo removed");
+  } catch (e) {
+    console.error("avatar remove failed", e);
+    toast("Could not remove it");
+  }
+  await renderAvatarPair();
+  await renderSetupPhoto();
+}
+
 async function renderSetupPhoto() {
   const box = $("setupPhoto");
   if (!box) return;
-  box.innerHTML = await avatarHTML(MY_EMAIL, ME, "me", "span");
+  const has = !!MY_PROFILE?.avatar_path;
+  box.innerHTML = await avatarHTML(MY_EMAIL, ME, "me", "button");
   box.insertAdjacentHTML("beforeend",
-    `<div>
-       <button type="button" class="btn-secondary" id="avatarPickBtn">${MY_PROFILE?.avatar_path ? "Change photo" : "Add a photo"}</button>
-       <p class="muted-note" style="margin-top:6px;">Your partner sees this.</p>
+    `<div class="setup-photo-acts">
+       <button type="button" class="btn-secondary" id="avatarPickBtn">${has ? "Change photo" : "Add a photo"}</button>
+       ${has ? `<button type="button" class="btn-ghost" id="avatarEditBtn">Move and scale</button>
+                <button type="button" class="btn-ghost" id="avatarRemoveBtn">Remove photo</button>` : ""}
+       <p class="muted-note" style="margin-top:2px;">Your partner sees this. Tap the circle to change it.</p>
      </div>`);
-  $("avatarPickBtn").onclick = () => $("avatarFile").click();
+  const pick = () => $("avatarFile").click();
+  $("avatarPickBtn").onclick = pick;
+  box.querySelector(".av").onclick = has ? editExistingAvatar : pick;
+  if ($("avatarEditBtn")) $("avatarEditBtn").onclick = editExistingAvatar;
+  if ($("avatarRemoveBtn")) $("avatarRemoveBtn").onclick = removeAvatar;
 }
 
 /* ---------- Workout recap ---------- */
@@ -6859,12 +7084,17 @@ function compressImage(file, maxDim = 1280, quality = 0.82) {
   });
 }
 
+/* Signed links last an hour. The cache used to keep them forever, so an app
+   left open past that point started showing broken photos and empty avatars,
+   which reads as "my picture disappeared". Entries now expire first. */
+const PROOF_URL_TTL = 50 * 60 * 1000;
 async function signedProofUrl(path) {
   if (!path) return null;
-  if (PROOF_URL_CACHE[path]) return PROOF_URL_CACHE[path];
+  const hit = PROOF_URL_CACHE[path];
+  if (hit && typeof hit === "object" && hit.at + PROOF_URL_TTL > Date.now()) return hit.url;
   const { data, error } = await sb.storage.from("workout-proof").createSignedUrl(path, 3600);
   if (error || !data) return null;
-  PROOF_URL_CACHE[path] = data.signedUrl;
+  PROOF_URL_CACHE[path] = { url: data.signedUrl, at: Date.now() };
   return data.signedUrl;
 }
 
@@ -11438,7 +11668,7 @@ function renderSetupTab() {
   $("avatarFile").onchange = (e) => {
     const f = e.target.files?.[0];
     e.target.value = "";               // so picking the same file twice still fires
-    if (f) uploadAvatar(f);
+    if (f) openAvatarEditor(f);
   };
 
   SETUP_THEME = document.documentElement.getAttribute("data-theme") || "dark";
