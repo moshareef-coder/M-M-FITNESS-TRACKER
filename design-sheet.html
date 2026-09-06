@@ -644,11 +644,18 @@
   }
   .crop-canvas { display: block; border-radius: 4px; cursor: grab; background: var(--panel); }
   .crop-canvas:active { cursor: grabbing; }
+  /* closest-side, not the bare "circle" keyword: with no size keyword a CSS
+     radial-gradient defaults to farthest-corner, so the 49.5%/50% stops were
+     resolving against the diagonal rather than the side. That made the clear
+     circle about 70% of the canvas width instead of the full width, so the
+     hole you lined the photo up in was smaller than the square that actually
+     got saved -- what looked centred and safely inside the circle was really
+     cropped from well outside it. */
   .crop-mask {
     position: absolute; inset: 16px; border-radius: 4px; pointer-events: none;
     background: color-mix(in srgb, var(--bg) 62%, transparent);
-    -webkit-mask-image: radial-gradient(circle at center, transparent 0 49.5%, #000 50%);
-    mask-image: radial-gradient(circle at center, transparent 0 49.5%, #000 50%);
+    -webkit-mask-image: radial-gradient(circle closest-side at center, transparent 0 49.5%, #000 50%);
+    mask-image: radial-gradient(circle closest-side at center, transparent 0 49.5%, #000 50%);
   }
   .crop-zoom { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
   .crop-zoom-ico { color: var(--muted); display: flex; flex-shrink: 0; }

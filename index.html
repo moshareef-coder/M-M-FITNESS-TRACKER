@@ -662,11 +662,18 @@
   }
   .crop-canvas { display: block; border-radius: 4px; cursor: grab; background: var(--panel); }
   .crop-canvas:active { cursor: grabbing; }
+  /* closest-side, not the bare "circle" keyword: with no size keyword a CSS
+     radial-gradient defaults to farthest-corner, so the 49.5%/50% stops were
+     resolving against the diagonal rather than the side. That made the clear
+     circle about 70% of the canvas width instead of the full width, so the
+     hole you lined the photo up in was smaller than the square that actually
+     got saved -- what looked centred and safely inside the circle was really
+     cropped from well outside it. */
   .crop-mask {
     position: absolute; inset: 16px; border-radius: 4px; pointer-events: none;
     background: color-mix(in srgb, var(--bg) 62%, transparent);
-    -webkit-mask-image: radial-gradient(circle at center, transparent 0 49.5%, #000 50%);
-    mask-image: radial-gradient(circle at center, transparent 0 49.5%, #000 50%);
+    -webkit-mask-image: radial-gradient(circle closest-side at center, transparent 0 49.5%, #000 50%);
+    mask-image: radial-gradient(circle closest-side at center, transparent 0 49.5%, #000 50%);
   }
   .crop-zoom { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
   .crop-zoom-ico { color: var(--muted); display: flex; flex-shrink: 0; }
@@ -3284,7 +3291,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.44";
+const APP_VERSION = "2026.09.04.45";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -5156,6 +5163,7 @@ async function renderAvatarPair() {
    re-edit step; picking a new photo is the only way in, which is also the
    only time there is a fresh picture worth lining up. */
 const CROP_OUT = 512;
+const MIN_ZOOM = 1.15;   // never open at exactly cover fit: see the note by CROP.zoom below
 let CROP = null;
 
 async function openAvatarEditor(source) {
@@ -5174,7 +5182,7 @@ async function openAvatarEditor(source) {
     </div>
     <div class="crop-zoom">
       <span class="crop-zoom-ico" aria-hidden="true">${icon("body", 14)}</span>
-      <input type="range" id="cropZoom" min="1" max="4" step="0.01" value="1" aria-label="Zoom" />
+      <input type="range" id="cropZoom" min="${MIN_ZOOM}" max="4" step="0.01" value="${MIN_ZOOM}" aria-label="Zoom" />
       <span class="crop-zoom-ico big" aria-hidden="true">${icon("body", 20)}</span>
     </div>
     <p class="muted-note" style="text-align:center;margin:2px 0 14px;">Drag to move, pinch or use the slider to zoom.</p>
@@ -5196,7 +5204,12 @@ async function openAvatarEditor(source) {
      that is where a face is in almost every phone portrait. They can drag it
      anywhere from there. */
   const tall = img.height > img.width * 1.2;
-  CROP = { img, side, dpr, base: cover, zoom: 1, x: 0, y: tall ? img.height * cover * 0.15 : 0, source };
+  /* Starting at exactly cover fit leaves zero room to drag in whichever axis
+     the photo's own shape constrains -- a portrait photo cannot move left or
+     right at all until you zoom in first, which reads as the editor being
+     broken rather than as a photo that happens to need a touch of zoom. A
+     small default overzoom means there is always real drag room on open. */
+  CROP = { img, side, dpr, base: cover, zoom: MIN_ZOOM, x: 0, y: tall ? img.height * cover * 0.15 : 0, source };
 
   const clamp = () => {
     const w = img.width * CROP.base * CROP.zoom, h = img.height * CROP.base * CROP.zoom;
@@ -5216,7 +5229,7 @@ async function openAvatarEditor(source) {
   /* One finger moves it, two pinch it. The same maths as the slider, so the
      three controls can never disagree about where the picture is. */
   const pts = new Map();
-  let startDist = 0, startZoom = 1, last = null;
+  let startDist = 0, startZoom = MIN_ZOOM, last = null;
   canvas.style.touchAction = "none";
   canvas.onpointerdown = (e) => {
     canvas.setPointerCapture(e.pointerId);
@@ -5234,7 +5247,7 @@ async function openAvatarEditor(source) {
     if (pts.size === 2 && startDist) {
       const [a, b] = [...pts.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
-      CROP.zoom = Math.min(4, Math.max(1, startZoom * (d / startDist)));
+      CROP.zoom = Math.min(4, Math.max(MIN_ZOOM, startZoom * (d / startDist)));
       $("cropZoom").value = String(CROP.zoom);
     } else if (last) {
       CROP.x += e.clientX - last.x;
@@ -5248,11 +5261,11 @@ async function openAvatarEditor(source) {
   canvas.onpointercancel = up;
   canvas.onwheel = (e) => {
     e.preventDefault();
-    CROP.zoom = Math.min(4, Math.max(1, CROP.zoom * (e.deltaY < 0 ? 1.08 : 0.93)));
+    CROP.zoom = Math.min(4, Math.max(MIN_ZOOM, CROP.zoom * (e.deltaY < 0 ? 1.08 : 0.93)));
     $("cropZoom").value = String(CROP.zoom);
     paint();
   };
-  $("cropZoom").oninput = (e) => { CROP.zoom = parseFloat(e.target.value) || 1; paint(); };
+  $("cropZoom").oninput = (e) => { CROP.zoom = parseFloat(e.target.value) || MIN_ZOOM; paint(); };
 
   const close = () => { $("cropScrim").classList.add("hidden"); CROP = null; };
   $("cropCancel").onclick = close;
