@@ -2770,6 +2770,72 @@
     .fig-side { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
     .fig-canvas { padding: 0 16px 80px; }
   }
+  /* ---- prototype mode ----
+     A gallery answers "what does it look like". A flow answers "what happens
+     next", which is the actual question about a feature like sending a clip.
+     Every section is already an ordered flow, so clicking any frame plays its
+     section from that point rather than opening a bigger picture of one. */
+  .fig-play {
+    font: inherit; font-size: 10.5px; font-weight: 800; letter-spacing: .04em;
+    display: inline-flex; align-items: center; gap: 5px; cursor: pointer; flex-shrink: 0;
+    background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent-ink);
+    border: none; border-radius: 100px; padding: 5px 11px; min-height: 32px;
+  }
+  .fig-play:active { transform: scale(.97); }
+  .fig-play-page { font-size: 11px; padding: 7px 14px; }
+  .gal-frame .gal-phone { cursor: pointer; position: relative; transition: box-shadow .15s, transform .15s; }
+  .gal-frame .gal-phone:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
+  .gal-frame .gal-phone:active { transform: scale(.995); }
+
+  .proto-scrim {
+    position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column;
+    background: color-mix(in srgb, var(--bg) 82%, #000);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .proto-scrim.on { display: flex; }
+  .proto-top {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    padding: 14px 18px; border-bottom: 1px solid var(--border); background: var(--panel);
+  }
+  .proto-where { min-width: 0; }
+  .proto-flow { font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .proto-name { font-size: 15.5px; font-weight: 800; letter-spacing: -.01em; margin-top: 2px; }
+  .proto-x {
+    font: inherit; font-size: 21px; line-height: 1; cursor: pointer; flex-shrink: 0;
+    width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--text); display: flex; align-items: center; justify-content: center;
+  }
+  .proto-stage { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; padding: 18px; }
+  .proto-phone {
+    width: 393px; flex-shrink: 0; border: 1px solid var(--border); border-radius: 22px; overflow: hidden;
+    background: var(--bg); background-image: var(--page-wash); transform-origin: center center;
+    box-shadow: 0 24px 60px -20px rgba(0,0,0,.45);
+  }
+  .proto-zone { position: absolute; top: 0; bottom: 0; width: 34%; cursor: pointer; z-index: 2; }
+  .proto-zone.prev { left: 0; }
+  .proto-zone.next { right: 0; }
+  .proto-note {
+    font-size: 12.5px; color: var(--muted); line-height: 1.5; text-align: center;
+    max-width: 62ch; margin: 0 auto; padding: 0 18px 10px;
+  }
+  .proto-foot {
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    padding: 12px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--border); background: var(--panel);
+  }
+  .proto-btn {
+    font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; min-height: 40px;
+    padding: 9px 18px; border-radius: 100px; border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--text);
+  }
+  .proto-btn.go { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+  .proto-btn:disabled { opacity: .4; cursor: default; }
+  .proto-dots { display: flex; align-items: center; gap: 6px; }
+  .proto-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); cursor: pointer; padding: 0; border: none; }
+  .proto-dot.on { background: var(--accent); transform: scale(1.25); }
+  .proto-step { font-size: 12.5px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+  @media (max-width: 460px) { .proto-zone { width: 40%; } }
+
   .gal-phone {
     width: 100%; max-width: 393px; border: 1px solid var(--border); border-radius: 20px; overflow: hidden;
     background: var(--bg); background-image: var(--page-wash);
@@ -2812,6 +2878,28 @@
     </div>
     <div id="galBody"></div>
   </main>
+</div>
+
+<div class="proto-scrim" id="protoScrim" role="dialog" aria-label="Flow">
+  <div class="proto-top">
+    <div class="proto-where">
+      <div class="proto-flow" id="protoFlow"></div>
+      <div class="proto-name" id="protoName"></div>
+    </div>
+    <button type="button" class="proto-x" id="protoX" aria-label="Close">&times;</button>
+  </div>
+  <div class="proto-stage" id="protoStage">
+    <div class="proto-zone prev" id="protoPrevZone" aria-hidden="true"></div>
+    <div class="proto-phone" id="protoPhone"></div>
+    <div class="proto-zone next" id="protoNextZone" aria-hidden="true"></div>
+  </div>
+  <p class="proto-note" id="protoNote"></p>
+  <div class="proto-foot">
+    <button type="button" class="proto-btn" id="protoPrev">Back</button>
+    <div class="proto-dots" id="protoDots"></div>
+    <span class="proto-step" id="protoStep"></span>
+    <button type="button" class="proto-btn go" id="protoNext">Next</button>
+  </div>
 </div>
 
 <!-- The hidden stage. Real ids, real markup, one state at a time. -->
@@ -4759,13 +4847,13 @@ const setTheme = (t) => {
     const sections = pages.get(st.page);
     if (!sections.has(st.section)) sections.set(st.section, []);
     sections.get(st.section).push({
-      n: i + 1, name: st.name, id: frameId,
+      n: i + 1, name: st.name, id: frameId, note: st.note || "", screen: html,
       html:
         '<figure class="gal-frame" id="' + frameId + '">' +
           '<figcaption class="gal-cap"><span class="gal-num">' + (i + 1) + '</span>' +
             '<span class="gal-name">' + escapeHtml(st.name) + "</span></figcaption>" +
           (st.note ? '<p class="gal-note">' + escapeHtml(st.note) + "</p>" : "") +
-          '<div class="gal-phone">' + html + "</div>" +
+          '<div class="gal-phone" data-frame-play="' + frameId + '">' + html + "</div>" +
         "</figure>",
     });
   }
@@ -4780,22 +4868,43 @@ const setTheme = (t) => {
     "Getting a clip": "It waits on the pill, loops while you watch, and gives you exactly one more before it is gone.",
   };
 
+  /* Every section is a flow, and every page is all of its flows end to end.
+     The player reads from here, so the thing you click through is the same
+     markup the gallery drew, not a second copy that can drift from it. */
+  const FLOWS = {};
+  const frameFlow = {};
+  const byNumber = {};
+
   let pageNo = 0;
   const canvas = [], tree = [];
   for (const [pageName, sections] of pages) {
     pageNo++;
     const pageId = "p-" + slug(pageName);
     const total = [...sections.values()].reduce((n, f) => n + f.length, 0);
+
+    const pageFrames = [];
+    for (const [secName, frames] of sections) {
+      const flowId = "s-" + slug(pageName + "-" + secName);
+      FLOWS[flowId] = { title: pageName + " / " + secName, frames };
+      frames.forEach((f, i) => { frameFlow[f.id] = { flow: flowId, at: i }; byNumber[f.n] = { flow: flowId, at: i }; });
+      pageFrames.push(...frames);
+    }
+    FLOWS[pageId] = { title: pageName, frames: pageFrames };
+
     canvas.push(
       '<section class="fig-page" id="' + pageId + '">' +
         '<div class="fig-page-head"><span class="fig-page-n">' + pageNo + '</span>' +
-          '<h2 class="fig-page-name">' + escapeHtml(pageName) + "</h2></div>" +
+          '<h2 class="fig-page-name">' + escapeHtml(pageName) + "</h2>" +
+          '<button type="button" class="fig-play fig-play-page" data-play="' + pageId + '">' +
+            "&#9654; Play all " + total + "</button></div>" +
         (PAGE_NOTES[pageName] ? '<p class="fig-page-note">' + escapeHtml(PAGE_NOTES[pageName]) + "</p>" : "") +
         [...sections.entries()].map(([secName, frames]) =>
           '<div class="fig-section" id="s-' + slug(pageName + "-" + secName) + '">' +
             '<div class="fig-section-head"><span class="fig-section-name">' + escapeHtml(secName) +
               '</span><span class="fig-section-rule"></span>' +
-              '<span class="fig-section-n">' + frames.length + " frame" + (frames.length === 1 ? "" : "s") + "</span></div>" +
+              '<span class="fig-section-n">' + frames.length + " frame" + (frames.length === 1 ? "" : "s") + "</span>" +
+              '<button type="button" class="fig-play" data-play="s-' + slug(pageName + "-" + secName) + '">' +
+                "&#9654; Play</button></div>" +
             '<div class="gal-grid">' + frames.map((f) => f.html).join("") + "</div>" +
           "</div>").join("") +
       "</section>");
@@ -4816,6 +4925,94 @@ const setTheme = (t) => {
   $("galBody").innerHTML = canvas.join("");
   $("galTree").innerHTML = tree.join("");
   stage.remove();
+
+  /* ---- the flow player ----
+     Click a frame and it plays its section from there: the screens in order,
+     one at a time, at phone size, with the note under each. Arrow keys, the
+     buttons, or tapping the left and right thirds of the screen, which is how
+     a prototype behaves everywhere else. */
+  let PLAY = null;
+  const fit = () => {
+    if (!PLAY) return;
+    const stage = $("protoStage"), phone = $("protoPhone");
+    phone.style.transform = "scale(1)";
+    const box = stage.getBoundingClientRect(), card = phone.getBoundingClientRect();
+    if (!card.height) return;
+    const s = Math.min(1.35, (box.height - 24) / card.height, (box.width - 24) / card.width);
+    phone.style.transform = "scale(" + Math.max(0.4, s) + ")";
+  };
+  const paintFlow = () => {
+    const f = PLAY.frames[PLAY.at];
+    $("protoFlow").textContent = PLAY.title;
+    $("protoName").textContent = f.n + ". " + f.name;
+    $("protoPhone").innerHTML = f.screen;
+    $("protoNote").textContent = f.note || "";
+    $("protoStep").textContent = (PLAY.at + 1) + " / " + PLAY.frames.length;
+    $("protoPrev").disabled = PLAY.at === 0;
+    /* At the end of a section, carry on into whatever comes next in the
+       journey instead of dead-ending: sending a clip and receiving one are
+       the same story told from two phones. */
+    const last = PLAY.at === PLAY.frames.length - 1;
+    const after = last ? byNumber[f.n + 1] : null;
+    PLAY.handoff = after && after.flow !== PLAY.id ? after : null;
+    $("protoNext").disabled = last && !PLAY.handoff;
+    $("protoNext").textContent = PLAY.handoff
+      ? "Next: " + FLOWS[PLAY.handoff.flow].title.split(" / ").pop()
+      : "Next";
+    $("protoDots").innerHTML = PLAY.frames.map((x, i) =>
+      '<button type="button" class="proto-dot' + (i === PLAY.at ? " on" : "") + '" data-dot="' + i +
+        '" aria-label="' + escapeHtml(x.name) + '"></button>').join("");
+    fit();
+  };
+  const step = (d) => {
+    if (!PLAY) return;
+    const next = PLAY.at + d;
+    if (d > 0 && next >= PLAY.frames.length) {
+      if (PLAY.handoff) openFlow(PLAY.handoff.flow, PLAY.handoff.at);
+      return;
+    }
+    if (next < 0 || next >= PLAY.frames.length) return;
+    PLAY.at = next;
+    paintFlow();
+  };
+  function openFlow(flowId, at) {
+    const flow = FLOWS[flowId];
+    if (!flow || !flow.frames.length) return;
+    PLAY = { id: flowId, title: flow.title, frames: flow.frames, at: Math.max(0, Math.min(at || 0, flow.frames.length - 1)) };
+    $("protoScrim").classList.add("on");
+    paintFlow();
+  }
+  const closeFlow = () => { PLAY = null; $("protoScrim").classList.remove("on"); $("protoPhone").innerHTML = ""; };
+
+  $("protoX").onclick = closeFlow;
+  $("protoPrev").onclick = () => step(-1);
+  $("protoNext").onclick = () => step(1);
+  $("protoPrevZone").onclick = () => step(-1);
+  $("protoNextZone").onclick = () => step(1);
+  $("protoDots").onclick = (e) => {
+    const d = e.target.closest("[data-dot]");
+    if (d && PLAY) { PLAY.at = Number(d.dataset.dot); paintFlow(); }
+  };
+  $("protoScrim").onclick = (e) => { if (e.target === $("protoScrim")) closeFlow(); };
+  window.addEventListener("resize", fit);
+  document.addEventListener("keydown", (e) => {
+    if (!PLAY) return;
+    if (e.key === "Escape") closeFlow();
+    if (e.key === "ArrowRight") step(1);
+    if (e.key === "ArrowLeft") step(-1);
+  });
+
+  /* Play a whole page or one section from its header. */
+  $("galBody").addEventListener("click", (e) => {
+    const play = e.target.closest("[data-play]");
+    if (play) { openFlow(play.dataset.play, 0); return; }
+    /* Or click the screen itself and start there, inside its own section. */
+    const frame = e.target.closest("[data-frame-play]");
+    if (frame) {
+      const where = frameFlow[frame.dataset.framePlay];
+      if (where) openFlow(where.flow, where.at);
+    }
+  });
 
   /* Clicking a frame in the tree highlights it, the way selecting a layer
      does. Collapsing a page folds its frames away. */
