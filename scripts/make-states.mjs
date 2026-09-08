@@ -353,7 +353,7 @@ const SHOT = (c) => "data:image/svg+xml," + encodeURIComponent(
 
 let ME = "Mo", MY_EMAIL = "mo@x", PARTNER_EMAIL = "mell@x";
 let MY_DAYS = 4, MY_TARGET = 5, THEIR_DAYS = 4, THEIR_TARGET = 5;
-let DAY_STREAK = 4, WEEK_STREAK = 0, TRAINED_TODAY = false, PLANNED_TOMORROW = null;
+let DAY_STREAK = 4, WEEK_STREAK = 0, TRAINED_TODAY = false;
 let ENTRIES = {}, ALL_PLANS = [], ALL_EXERCISE_LOGS = [], ALL_REACTIONS = [], LIVE_PARTNER = null;
 let PARTNER_PROFILE = null;
 let PENDING_PRIVACY = null, MY_PROFILE = null;
@@ -444,7 +444,7 @@ ${WORKING_MUSCLES}
 function resetFixtures() {
   ME = "Mo"; MY_EMAIL = "mo@x"; PARTNER_EMAIL = "mell@x";
   MY_DAYS = 4; MY_TARGET = 5; THEIR_DAYS = 4; THEIR_TARGET = 5;
-  DAY_STREAK = 4; WEEK_STREAK = 0; TRAINED_TODAY = false; PLANNED_TOMORROW = null;
+  DAY_STREAK = 4; WEEK_STREAK = 0; TRAINED_TODAY = false;
   LIVE_PARTNER = null;
   PARTNER_PROFILE = null;
   ENTRIES = {
@@ -520,8 +520,19 @@ const STATES = [
     setup: () => { TRAINED_TODAY = true; } },
 
   { page: "Opening the app", section: "The everyday state", name: "Tomorrow is already planned",
-    note: "No button at all, just the line and a way to clear it.",
-    setup: () => { TRAINED_TODAY = true; PLANNED_TOMORROW = { id: "p1", focus: "Pull day" }; } },
+    note: "Review Next Workout opens the plan; the line above it names the focus.",
+    /* renderHero finds this by looking up ALL_PLANS for tomorrow's date itself,
+       it does not read a separate flag. PLANNED_TOMORROW never fed anything: a
+       leftover from before that lookup existed, and the reason this state used
+       to render with nothing queued at all. */
+    setup: () => {
+      TRAINED_TODAY = true;
+      ALL_PLANS.push({ id: "p1", email: MY_EMAIL, entry_date: "2026-09-05", focus: "Pull day", exercises: [
+        { name: "Deadlift", sets: 3, reps: 5, targetWeight: 315 },
+        { name: "Pull-Up", sets: 4, reps: 8, targetWeight: null },
+        { name: "Barbell Row", sets: 3, reps: 10, targetWeight: 155 },
+      ] });
+    } },
 
   { page: "Opening the app", section: "Other shapes of the same screen", name: "Brand new, nothing logged",
     note: "First run. Empty rings, no streak, empty week, empty timeline.",
