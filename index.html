@@ -1426,6 +1426,40 @@
   }
 
   /* Onboarding */
+  /* The sign-in screen. It is the only screen a stranger sees, so it carries
+     the mark, the one line that says what this is, and the legal links. */
+  .si { text-align: center; align-items: center; }
+  .si-mark {
+    width: 56px; height: 56px; border-radius: 17px; margin: 0 auto 16px;
+    display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink);
+  }
+  .si h1, .si p.sub { text-align: center; }
+  .si p.sub { margin-bottom: 22px; max-width: 34ch; }
+  .btn-google {
+    width: 100%; padding: 14px 16px; border-radius: 12px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    font-family: var(--font-display); font-size: 15.5px; font-weight: 700; letter-spacing: -.01em;
+  }
+  .btn-google:active { transform: scale(.99); }
+  .btn-google:disabled, .si .btn-primary:disabled { opacity: .6; cursor: default; }
+  .si-or {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    margin: 18px 0 14px; color: var(--muted); font-size: 12.5px; font-weight: 700;
+  }
+  .si-or::before, .si-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .si-label {
+    align-self: flex-start; font-size: 11px; font-weight: 800; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+  }
+  #onboard .si input { text-align: left; margin-bottom: 10px; }
+  .si-msg { font-size: 12.5px; line-height: 1.45; margin: 12px 0 0; min-height: 18px; color: var(--muted); }
+  .si-msg.bad { color: var(--partner); }
+  .si-msg.good { color: var(--accent-ink); font-weight: 700; }
+  .si-legal { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 20px 0 0; max-width: 34ch; }
+  .si-legal a { color: var(--muted); text-underline-offset: 2px; }
+
   .ob-kicker { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--accent-ink); margin-bottom: 8px; }
   .ob-chips { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
   .ob-chip {
@@ -3294,7 +3328,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.46";
+const APP_VERSION = "2026.09.04.47";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -3467,17 +3501,89 @@ function initOnboard() {
   });
 }
 
-function renderSignInScreen() {
+/* The first screen anyone ever sees, and until now it was a heading and one
+   button with its styling inline. It has to do four things a sign-in screen
+   always has to do: say what the app is for, offer a way in that does not
+   assume a Google account, say what happens when it goes wrong, and put the
+   legal terms in front of someone BEFORE they hand over an account. */
+function renderSignInScreen(state = {}) {
   const ob = $("onboard");
   ob.innerHTML = `
-    <div class="ob-step">
+    <div class="ob-step si">
+      <div class="si-mark">${icon("dumbbell", 26)}</div>
       <h1>Fit Together</h1>
-      <p class="sub">A shared tracker so you two can push each other.</p>
-      <button class="btn-primary" id="googleSignInBtn" style="display:flex; align-items:center; justify-content:center; gap:10px; background:white; color:#1f1f1f; border:1px solid var(--border);">${icon("google", 20)}Sign in with Google</button>
+      <p class="sub">A shared tracker for two people who keep each other honest. See their workout as it happens, cheer them through it.</p>
+
+      <button type="button" class="btn-google" id="googleSignInBtn">${icon("google", 20)} Continue with Google</button>
+
+      <div class="si-or"><span>or</span></div>
+
+      <label class="si-label" for="siEmail">Email</label>
+      <input type="email" id="siEmail" inputmode="email" autocomplete="email" autocapitalize="off"
+             spellcheck="false" placeholder="you@example.com" value="${escapeHtml(state.email || "")}" />
+      <button type="button" class="btn-primary" id="emailSignInBtn">Email me a sign-in link</button>
+
+      <p class="si-msg ${state.tone || ""}" id="siMsg">${escapeHtml(state.msg || "")}</p>
+
+      <p class="si-legal">By continuing you agree to the
+        <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>. Questions go to
+        <a href="/support.html" target="_blank" rel="noopener">support</a>.</p>
     </div>`;
-  $("googleSignInBtn").onclick = () => {
-    sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
+
+  const msg = (text, tone) => {
+    const el = $("siMsg");
+    el.textContent = text;
+    el.className = "si-msg " + (tone || "");
   };
+
+  $("googleSignInBtn").onclick = async () => {
+    const btn = $("googleSignInBtn");
+    btn.disabled = true;
+    msg("Opening Google…", "");
+    const { error } = await sb.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+    /* A failure here used to be silent: the button did nothing and the person
+       had no idea whether it was them or us. */
+    if (error) {
+      console.error("google sign-in failed", error);
+      btn.disabled = false;
+      msg("Could not reach Google. Check your connection and try again.", "bad");
+    }
+  };
+
+  $("emailSignInBtn").onclick = async () => {
+    const email = ($("siEmail").value || "").trim();
+    /* Deliberately not a regex that tries to be clever about addresses: the
+       only real test of an email is whether the link arrives. */
+    if (!email || !email.includes("@") || email.length < 5) {
+      msg("Enter the email you want the link sent to.", "bad");
+      $("siEmail").focus();
+      return;
+    }
+    const btn = $("emailSignInBtn");
+    btn.disabled = true;
+    msg("Sending…", "");
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    btn.disabled = false;
+    if (error) {
+      console.error("magic link failed", error);
+      /* The rate limit is the one failure worth naming exactly, because it is
+         ours rather than theirs and it looks like a broken app otherwise. */
+      const limited = /rate|limit|too many/i.test(error.message || "");
+      msg(limited
+        ? "Too many links requested just now. Wait a minute and try again."
+        : "Could not send that link. Check the address and try again.", "bad");
+      return;
+    }
+    msg(`Link sent to ${email}. Open it on this phone and you are in.`, "good");
+  };
+
+  $("siEmail").onkeydown = (e) => { if (e.key === "Enter") $("emailSignInBtn").click(); };
 }
 
 let SIGN_IN_HANDLED = false;
@@ -6844,6 +6950,34 @@ async function toggleReaction(email, date, btn) {
   if (!$("timelineScrim").classList.contains("hidden")) openTimelineSheet();
 }
 
+/* One line of text, asked for properly. A browser prompt cannot be styled,
+   looks like a security warning on iOS, and in a wrapped native build looks
+   like the web showing through. Resolves to the trimmed string, or null if
+   they backed out. */
+function askForName(heading, preset = "") {
+  return new Promise((resolve) => {
+    $("popCard").innerHTML = `
+      <div class="pop-body compose">
+        <div class="ds-top">
+          <div><div class="pop-who" style="color:var(--muted)">${escapeHtml(heading.toUpperCase())}</div></div>
+          <button type="button" class="ds-x" id="askX" aria-label="Close">&times;</button>
+        </div>
+        <input type="text" id="askInput" maxlength="40" autocomplete="off"
+               placeholder="${escapeHtml(preset || "Name it")}" value="${escapeHtml(preset)}" />
+        <button type="button" class="btn-primary" id="askOk">Save</button>
+        <button type="button" class="btn-ghost" id="askCancel">Cancel</button>
+      </div>`;
+    $("popScrim").classList.remove("hidden");
+    const input = $("askInput");
+    const done = (value) => { $("popScrim").classList.add("hidden"); resolve(value); };
+    $("askX").onclick = () => done(null);
+    $("askCancel").onclick = () => done(null);
+    $("askOk").onclick = () => done((input.value || "").trim() || null);
+    input.onkeydown = (e) => { if (e.key === "Enter") $("askOk").click(); };
+    setTimeout(() => { input.focus(); input.select(); }, 60);
+  });
+}
+
 /* A short comment on one session. Same composer as the notes, one row. */
 function openSessionComment(email, date) {
   const owner = nameFor(email);
@@ -7280,12 +7414,39 @@ const ENCOURAGEMENT_PRESETS = [
 
 async function sendEncouragement() {
   if (!PARTNER_EMAIL) { toast("No partner to encourage yet"); return; }
-  const message = prompt(`Send ${partnerName()} some encouragement:`, ENCOURAGEMENT_PRESETS[Math.floor(Math.random() * ENCOURAGEMENT_PRESETS.length)]);
-  if (!message || !message.trim()) return;
-  const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: message.trim() });
-  if (error) { toast("Couldn't send"); console.error(error); return; }
-  toast(`Sent to ${partnerName()}`);
+  const preset = ENCOURAGEMENT_PRESETS[Math.floor(Math.random() * ENCOURAGEMENT_PRESETS.length)];
+  $("popCard").innerHTML = `
+    <div class="pop-body compose">
+      <div class="ds-top">
+        <div><div class="pop-who" style="color:var(--muted)">SEND ${escapeHtml(partnerName().toUpperCase())} SOMETHING</div></div>
+        <button type="button" class="ds-x" id="encX" aria-label="Close">&times;</button>
+      </div>
+      <textarea class="note-in" id="encInput" rows="2" maxlength="140" placeholder="${escapeHtml(preset)}">${escapeHtml(preset)}</textarea>
+      <div class="chip-row">${ENCOURAGEMENT_PRESETS.slice(0, 4).map((t) =>
+        `<button type="button" class="qchip" data-chip="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}</div>
+      <button type="button" class="btn-primary" id="encSend">Send</button>
+      <button type="button" class="btn-ghost" id="encSkip">Cancel</button>
+    </div>`;
+  $("popScrim").classList.remove("hidden");
+  const input = $("encInput");
+  $("popCard").querySelectorAll("[data-chip]").forEach((b) => {
+    b.onclick = () => { input.value = b.dataset.chip; input.focus(); };
+  });
+  const close = () => $("popScrim").classList.add("hidden");
+  $("encX").onclick = close;
+  $("encSkip").onclick = close;
+  $("encSend").onclick = async () => {
+    const message = (input.value || "").trim();
+    if (!message) { close(); return; }
+    $("encSend").disabled = true;
+    const { error } = await sb.from("encouragements")
+      .insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message });
+    if (error) { toast("Couldn't send"); console.error(error); $("encSend").disabled = false; return; }
+    close();
+    toast(`Sent to ${partnerName()}`);
+  };
 }
+
 
 /* The six groups worth closing in a week. Fourteen individual muscles is too
    granular to feel closable; these roll up to something a week can actually
@@ -9390,7 +9551,7 @@ async function saveWorkoutAs(exercises, suggestedName) {
     name: e.name, sets: e.sets || 3, reps: e.reps || 10, targetWeight: e.targetWeight || 0,
   }));
   if (!clean.length) { toast("Nothing to save"); return false; }
-  const name = (prompt("Name this workout", suggestedName || deriveFocus(clean)) || "").trim();
+  const name = await askForName("Name this workout", suggestedName || deriveFocus(clean));
   if (!name) return false;
   const { data, error } = await sb.from("saved_workouts").insert({
     email: MY_EMAIL, name, focus: deriveFocus(clean), exercises: clean,
