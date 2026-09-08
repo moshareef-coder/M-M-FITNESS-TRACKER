@@ -1455,6 +1455,27 @@
     letter-spacing: -.03em; margin: 18px 0 0;
   }
   .si-tag { font-size: 15px; color: var(--muted); margin: 8px 0 0; max-width: 26ch; line-height: 1.45; }
+
+  /* The three-screen "what this is about" intro, before the name/goal wizard */
+  .intro-top {
+    flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+    padding: calc(16px + env(safe-area-inset-top)) 16px 0;
+  }
+  .intro-back {
+    width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer;
+    background: var(--panel-2); color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .intro-skip {
+    margin-left: auto; background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 14px; font-weight: 600; padding: 8px 4px;
+  }
+  .intro-hero { padding-top: 12px; min-height: 32dvh; }
+  .intro-h { font-size: 27px; line-height: 1.2; max-width: 20ch; }
+  .intro-sheet { align-items: stretch; gap: 4px; }
+  .intro-dots { display: flex; justify-content: center; gap: 7px; margin-bottom: 20px; }
+  .intro-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--border); transition: background .2s, width .2s; }
+  .intro-dots span.on { background: var(--accent); width: 20px; border-radius: 4px; }
   .si-sheet {
     flex: 0 0 auto; display: flex; flex-direction: column;
     padding: 24px 24px calc(28px + env(safe-area-inset-bottom));
@@ -3651,7 +3672,7 @@ async function handleSignedIn(session) {
     await checkPartnershipThenEnter();
   } else {
     const suggested = session.user.user_metadata?.full_name?.split(" ")[0] || session.user.email.split("@")[0];
-    renderOnboardStep("name", { name: suggested });
+    renderOnboardIntro(0, { name: suggested });
   }
 }
 
@@ -3907,6 +3928,71 @@ function obChips(items, selected, attr) {
     const key = typeof t === "string" ? t : t.key;
     return `<button type="button" class="ob-chip ${selected === key ? "on" : ""}" data-${attr}="${escapeHtml(key)}">${escapeHtml(val)}</button>`;
   }).join("")}</div>`;
+}
+
+/* The three-screen "what this is" intro, run once for brand-new sign-ups
+   only, before a single question is asked. Modeled on how Klima and Mercury
+   pace their intro carousels — one statement per screen, a skip that always
+   works, dots that show there are exactly three of these and no more.
+   The point of writing this at all: the 5-step wizard right after it (name,
+   goal, detail, pace, plan) never once mentions a partner, on an app called
+   Fit Together. This is where that gets said, first, before anything else. */
+const ONBOARD_INTRO = [
+  {
+    ring: "both",
+    h: "You're not doing this alone.",
+    sub: "The moment they log a workout, you'll know — a photo, a note, right on your home screen.",
+  },
+  {
+    ring: "me",
+    h: "The week isn't done until you both are.",
+    sub: "Hit your goal solo and the app doesn't celebrate — it nudges you to go check on them instead.",
+  },
+  {
+    ring: "partner",
+    h: "Show up for them. They'll show up for you.",
+    sub: "That's the whole app. Everything else is just the tools to make it easy.",
+  },
+];
+
+function renderOnboardIntro(i, data) {
+  const ob = $("onboard");
+  ob.classList.remove("hidden");
+  $("app").classList.add("hidden");
+  const step = ONBOARD_INTRO[i];
+  const strokeMe = step.ring === "partner" ? "var(--border)" : "var(--me)";
+  const strokePartner = step.ring === "me" ? "var(--border)" : "var(--partner)";
+
+  ob.innerHTML = `
+    <div class="si-screen intro-screen">
+      <div class="intro-top">
+        ${i > 0 ? `<button type="button" class="intro-back" id="introBack" aria-label="Back">${icon("chevronLeft", 20)}</button>` : "<span></span>"}
+        <button type="button" class="intro-skip" id="introSkip">Skip</button>
+      </div>
+      <div class="si-hero intro-hero">
+        <svg class="si-rings" viewBox="0 0 200 120" aria-hidden="true">
+          <defs><filter id="siGlow2" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter></defs>
+          <circle cx="78" cy="60" r="38" fill="none" stroke="${strokeMe}" stroke-width="9" filter="url(#siGlow2)"/>
+          <circle cx="122" cy="60" r="38" fill="none" stroke="${strokePartner}" stroke-width="9" filter="url(#siGlow2)"/>
+        </svg>
+        <h1 class="si-word intro-h">${escapeHtml(step.h)}</h1>
+        <p class="si-tag">${escapeHtml(step.sub)}</p>
+      </div>
+      <div class="si-sheet intro-sheet">
+        <div class="intro-dots">${ONBOARD_INTRO.map((_, di) => `<span class="${di === i ? "on" : ""}"></span>`).join("")}</div>
+        <button type="button" class="btn-primary" id="introNext">${i === ONBOARD_INTRO.length - 1 ? "Let's set you up" : "Continue"}</button>
+      </div>
+    </div>`;
+
+  $("introSkip").onclick = () => renderOnboardStep("name", data);
+  if (i > 0) $("introBack").onclick = () => renderOnboardIntro(i - 1, data);
+  $("introNext").onclick = () => {
+    if (i === ONBOARD_INTRO.length - 1) renderOnboardStep("name", data);
+    else renderOnboardIntro(i + 1, data);
+  };
 }
 
 function renderOnboardStep(step, data = {}) {
