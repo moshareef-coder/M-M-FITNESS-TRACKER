@@ -1,0 +1,390 @@
+/* The sandbox shell: journey on the left, the real app in the middle, the
+   world it wakes up in on the right.
+ *
+ * Every step drives the iframe by calling the app's OWN functions, not by
+ * faking screens. Same origin, so switchTab, goWorkoutScreen, openLiveSheet
+ * and the rest are all reachable. If a step stops working, the app changed,
+ * which is exactly what we want a walkthrough to tell us.
+ */
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const frame = $("app");
+  const device = $("device");
+
+  /* ---------- the journey ----------
+     Grouped the way a person meets the app, not the way the code is laid out.
+     `scenario` says which world the step needs; the phone only reloads when
+     the step actually asks for a different one. */
+  const JOURNEY = [
+    { group: "Getting in", note: "Everything before there is an account.", steps: [
+      { t: "Sign in", scenario: "signedout",
+        s: "Google, or a link by email",
+        note: "The first screen anyone ever sees. Two rings for the hero, both ways in below where the thumb is, and the legal links in front of you before you hand over an account. The buttons are live: pressing one shows the real loading and error states.",
+        run: () => {} },
+
+      { t: "Welcome tour", scenario: "fresh",
+        s: "Three screens explaining the app",
+        note: "Three statements between signing in and being asked anything: what the app is for, what a partner is, what the two rings mean. One idea per screen, dots to show where you are, and a skip that is always there. New sign-ups only, so nobody who already has an account sees it again.",
+        run: (w) => w.renderOnboardIntro(0, {}) },
+
+      { t: "Tell us about you", scenario: "fresh",
+        s: "Name, goal, pace, plan",
+        note: "The five-step wizard the intro hands you to. A real account with no profile row, so it runs for real: type a name and press through, and every answer is written to the fake database and read back by the next screen.",
+        run: () => {} },
+
+      { t: "First look at an empty app", scenario: "fresh",
+        s: "No workouts, no partner, no history",
+        note: "What a stranger sees on day one. Skip past onboarding first if it is still on screen. This is the state that has never been walked properly end to end, so look hard at the empty cards.",
+        run: (w) => w.switchTab("home") },
+    ]},
+
+    { group: "A normal day", note: "The loop the app exists for.", steps: [
+      { t: "Home", scenario: "paired",
+        s: "The week, both of you",
+        note: "Paired with Mell, a pull session already logged this morning and a push day queued. The week strip carries both people, the hero card carries today. Tap a day tile to open that day.",
+        run: (w) => w.switchTab("home") },
+
+      { t: "Pick how to train", scenario: "paired",
+        s: "Generate, build, or plan the week",
+        note: "The fork at the top of the workout tab. All three routes below are reachable from here, so try it by tapping rather than by the rail.",
+        run: (w) => { w.switchTab("workout"); w.goWorkoutScreen("choose"); } },
+
+      { t: "Build one yourself", scenario: "paired",
+        s: "Search, categories, sets and reps",
+        note: "The screen with the keyboard bug we fixed: type in the search box and the sheet should stay put rather than sliding under the keyboard. Categories should clear the search field.",
+        run: (w) => { w.switchTab("workout"); w.goWorkoutScreen("manual"); } },
+
+      { t: "Plan the week", scenario: "paired",
+        s: "Assign workouts to days",
+        note: "Tap any day to plan it. Planned days feed the week strip on home and the auto-schedule.",
+        run: (w) => { w.switchTab("workout"); w.goWorkoutScreen("week"); } },
+
+      { t: "Saved workouts", scenario: "paired",
+        s: "Two saved, openable",
+        note: "The list that used to be called a loadout. Tap one to see its exercises, tap an exercise for the detail. Nothing here says loadout any more.",
+        run: (w) => { w.switchTab("workout"); w.openSavedList(); } },
+
+      { t: "Do the workout", scenario: "paired",
+        s: "Five exercises, live timer",
+        note: "The real session screen on today's push day. Log sets, change weights, tap through exercises. Weight and reps should sit on the same baseline in every row. Finish it and the completion screen banks the workout into the fake database.",
+        run: (w) => { w.switchTab("workout"); w.startWorkout(); } },
+    ]},
+
+    { group: "The other person", note: "Everything that only matters because someone else is there.", steps: [
+      { t: "They are training now", scenario: "live",
+        s: "Live card on home",
+        note: "Mell is nineteen minutes into leg day. The live card is on home; tap it for the sheet with what she is on and the cheer buttons. This is the state that fires the push notification we added.",
+        run: (w) => { w.switchTab("home"); setTimeout(() => w.openLiveSheet(), 260); } },
+
+      { t: "They keep it private", scenario: "livePrivate",
+        s: "Same card, no detail",
+        note: "Same live session with sharing turned off. You can see that she is training and cheer for her. You cannot see what she is lifting. The card has to still feel worth having.",
+        run: (w) => { w.switchTab("home"); setTimeout(() => w.openLiveSheet(), 260); } },
+
+      { t: "A clip is waiting", scenario: "clip",
+        s: "Watch, then it is gone",
+        note: "A clip only reaches you while you are training, so this starts your workout first and the pill appears above the set list. It loops for as long as you stay on it, you get exactly one more watch after you close it, then it is gone for good. The video is drawn by the sandbox, so it is a real playable file rather than a placeholder.",
+        run: (w) => { w.switchTab("workout"); w.startWorkout(); setTimeout(() => w.openNextClip?.(), 500); } },
+
+      { t: "Send a clip", scenario: "live", flag: "needs a camera",
+        s: "Record twenty seconds",
+        note: "The recorder asks for the camera, so in this frame you get the permission-denied state rather than a viewfinder. That path is worth reading on its own: it should explain itself, not just fail.",
+        run: (w) => { w.switchTab("home"); setTimeout(() => w.openClipRecorder?.("mell@sandbox"), 260); } },
+
+      { t: "Training alone", scenario: "solo",
+        s: "No partner at all",
+        note: "Every partner surface has to hold up with nobody there: no live card, no comparison, no second ring. Setup should offer pairing rather than showing an empty slot.",
+        run: (w) => w.switchTab("home") },
+
+      { t: "You are behind", scenario: "behind",
+        s: "They trained, you did not",
+        note: "She trained, you did not, and there is no plan queued to make it easy. This is the one that decides whether the app feels like a training partner or like a scold, so read the wording closely.",
+        run: (w) => w.switchTab("home") },
+
+      { t: "Rest day", scenario: "restday",
+        s: "Deliberately not training",
+        note: "A rest day is a choice, not a miss, so nothing is logged and no plan is waiting. The banner and the streak both have to treat it as deliberate rather than as a gap.",
+        run: (w) => w.switchTab("home") },
+    ]},
+
+    { group: "Looking back", note: "The two tabs that answer how it is going.", steps: [
+      { t: "Progress", scenario: "paired",
+        s: "Weight, PRs, days trained",
+        note: "Both people on the same chart. The metric picker at the top decides what the chart shows.",
+        run: (w) => w.switchTab("progress") },
+
+      { t: "Choose what to track", scenario: "paired",
+        s: "The metric picker",
+        note: "Not everyone cares about scale weight. Turning one off should remove it from the chart and the summary, not just grey it out.",
+        run: (w) => { w.switchTab("progress"); setTimeout(() => w.document.getElementById("metricPicker")?.scrollIntoView({ behavior: "smooth", block: "center" }), 220); } },
+
+      { t: "Progress photos", scenario: "paired",
+        s: "Private by default",
+        note: "Photos live on progress, not on home, because they are the most private thing in the app. Adding one opens the file picker for real.",
+        run: (w) => { w.switchTab("progress"); setTimeout(() => w.document.getElementById("cardPhotos")?.scrollIntoView({ behavior: "smooth", block: "start" }), 220); } },
+
+      { t: "Body", scenario: "paired",
+        s: "What you have hit, what is next",
+        note: "The tab we just rewrote. It answers one question, which muscle group to train next, and everything else is supporting detail. The information dots explain the levels and the rings.",
+        run: (w) => w.switchTab("body") },
+    ]},
+
+    { group: "Settings", note: "Everything under the last tab.", steps: [
+      { t: "Setup", scenario: "paired",
+        s: "The settings index",
+        note: "Every row here opens its own page. Check the rows line up and the icons match the line height of their labels.",
+        run: (w) => w.switchTab("setup") },
+
+      { t: "Profile and photo", scenario: "paired",
+        s: "Upload, crop, zoom",
+        note: "Uploading a photo opens the crop editor for real: pick a file and you get the circle, the zoom and the pan. The visible circle now matches exactly what gets saved, which it did not before.",
+        run: (w) => { w.switchTab("setup"); w.openSettingsPage("profile"); } },
+
+      { t: "Your partner", scenario: "paired",
+        s: "Pairing, invite code, privacy",
+        note: "Where sharing workout detail is turned off, which is what the private live card above is obeying.",
+        run: (w) => { w.switchTab("setup"); w.openSettingsPage("partner"); } },
+
+      { t: "Notifications", scenario: "paired", flag: "needs a home screen",
+        s: "Push, nudges, partner started",
+        note: "Web push only exists in an installed app on iOS, so inside this frame the toggle will report that it cannot subscribe. The list of what we would send is still the point: read it as copy.",
+        run: (w) => { w.switchTab("setup"); w.openSettingsPage("notify"); } },
+
+      { t: "Training preferences", scenario: "paired",
+        s: "Goal, pace, equipment",
+        note: "What the generator reads before it writes a plan.",
+        run: (w) => { w.switchTab("setup"); w.openSettingsPage("training"); } },
+
+      { t: "Theme", scenario: "paired",
+        s: "Light, dark, system",
+        note: "Dark mode is not the light one inverted. Card surfaces lift rather than drop shadows, and the two ring colours have separate dark values.",
+        run: (w) => { w.switchTab("setup"); w.openSettingsPage("theme"); } },
+
+      { t: "Account and legal", scenario: "paired",
+        s: "Sign out, delete, privacy",
+        note: "The delete path has to actually delete, and the privacy policy has to describe clips, photos and live sessions. Right now it predates all three, which is on the issues list.",
+        run: (w) => { w.switchTab("setup"); w.openSettingsPage("account"); } },
+    ]},
+  ];
+
+  /* Flat list, so previous and next are one line each. */
+  const STEPS = [];
+  JOURNEY.forEach((g) => g.steps.forEach((s) => STEPS.push({ ...s, group: g.group })));
+
+  const SCENARIO_COPY = {
+    signedout:   "Nobody is signed in. The app is on its very first screen.",
+    fresh:       "A real account with no profile row yet, so onboarding runs.",
+    paired:      "Paired with Mell. You pulled this morning; push day is queued.",
+    solo:        "No partner. Every shared surface has to hold up empty.",
+    live:        "Mell is nineteen minutes into leg day, sharing the detail.",
+    livePrivate: "Mell is training with sharing switched off.",
+    clip:        "Mell is live and a clip from an hour ago is unwatched.",
+    behind:      "She trained today and yesterday. You did not.",
+    restday:     "You marked today a rest day on purpose.",
+  };
+  const SCENARIO_ORDER = ["paired", "signedout", "fresh", "solo", "live", "livePrivate", "clip", "behind", "restday"];
+  const SCENARIO_LABEL = {
+    signedout: "Signed out", fresh: "Brand new account", paired: "Paired, mid-week",
+    solo: "Training alone", live: "Partner training now", livePrivate: "Partner keeps it private",
+    clip: "A clip is waiting", behind: "You are behind", restday: "Rest day",
+  };
+
+  /* ---------- driving the phone ---------- */
+  let current = 0;
+  let loaded = "signedout";   // matches the src in sandbox.html, so step one does not reload
+
+  /* The app boots asynchronously. Wait for it to have put something on screen
+     rather than guessing at a delay, or half the steps fire into an empty DOM. */
+  function ready(win) {
+    return new Promise((resolve) => {
+      const t0 = Date.now();
+      const poll = () => {
+        try {
+          const d = win.document;
+          const app = d.getElementById("app");
+          const ob = d.getElementById("onboard");
+          const painted = (app && !app.classList.contains("hidden")) ||
+                          (ob && ob.innerHTML.length > 300);
+          if (painted && typeof win.switchTab === "function") return resolve(win);
+        } catch { /* still navigating */ }
+        if (Date.now() - t0 > 15000) return resolve(null);
+        setTimeout(poll, 80);
+      };
+      poll();
+    });
+  }
+
+  function load(scenario) {
+    device.classList.add("loading");
+    return new Promise((resolve) => {
+      frame.onload = () => { frame.onload = null; ready(frame.contentWindow).then(resolve); };
+      frame.src = `/sandbox-app.html?scenario=${encodeURIComponent(scenario)}`;
+      loaded = scenario;
+    });
+  }
+
+  async function go(i, { force = false } = {}) {
+    current = Math.max(0, Math.min(STEPS.length - 1, i));
+    const step = STEPS[current];
+    paintHead(step);
+    paintRail();
+    paintScenarios(step.scenario);
+
+    let win;
+    if (force || step.scenario !== loaded) {
+      win = await load(step.scenario);
+    } else {
+      win = frame.contentWindow;
+      /* Same world, so do not reload: just stand down whatever the last step
+         left open, which is faster and keeps anything you typed. */
+      try { win.closeAllOverlays?.(); win.closeSettingsPage?.(); win.closeSavedSheet?.(); } catch {}
+    }
+    device.classList.remove("loading");
+    if (!win) return;
+    try { step.run(win); } catch (err) { console.warn("step failed:", step.t, err); }
+  }
+
+  /* ---------- painting ---------- */
+  function paintHead(step) {
+    $("crumb").textContent = step.group;
+    $("stepTitle").textContent = step.t;
+    $("stepNote").textContent = step.note;
+    $("prevBtn").disabled = current === 0;
+    $("nextBtn").disabled = current === STEPS.length - 1;
+  }
+
+  function paintRail() {
+    const pane = $("paneJourney");
+    if (!pane.dataset.built) {
+      let n = 0, html = "";
+      JOURNEY.forEach((g) => {
+        html += `<div class="grp"><b>${esc(g.group)}</b><i>${g.steps.length}</i></div>`;
+        g.steps.forEach((s) => {
+          const idx = n++;
+          html += `<button class="step" data-i="${idx}">
+            <span class="n">${String(idx + 1).padStart(2, "0")}</span>
+            <span>
+              <span class="t">${esc(s.t)}${s.flag ? `<span class="flag">${esc(s.flag)}</span>` : ""}</span>
+              <span class="s">${esc(s.s)}</span>
+            </span>
+          </button>`;
+        });
+      });
+      pane.innerHTML = html;
+      pane.dataset.built = "1";
+      pane.addEventListener("click", (e) => {
+        const b = e.target.closest(".step");
+        if (b) go(Number(b.dataset.i));
+      });
+    }
+    pane.querySelectorAll(".step").forEach((b) => {
+      b.setAttribute("aria-current", Number(b.dataset.i) === current ? "true" : "false");
+    });
+  }
+
+  function paintScenarios(active) {
+    const box = $("scenarios");
+    if (!box.dataset.built) {
+      box.innerHTML = SCENARIO_ORDER.map((k) => `
+        <button class="scn${k.startsWith("live") || k === "clip" ? " live" : ""}" data-k="${k}" aria-pressed="false">
+          <span><span class="t">${esc(SCENARIO_LABEL[k])}</span><span class="d">${esc(SCENARIO_COPY[k])}</span></span>
+          <span class="dot"></span>
+        </button>`).join("");
+      box.dataset.built = "1";
+      box.addEventListener("click", async (e) => {
+        const b = e.target.closest(".scn");
+        if (!b) return;
+        const k = b.dataset.k;
+        paintScenarios(k);
+        $("scenarioNote").innerHTML = `<b>Now showing</b>${esc(SCENARIO_COPY[k])}`;
+        device.classList.add("loading");
+        await load(k);
+        device.classList.remove("loading");
+      });
+    }
+    box.querySelectorAll(".scn").forEach((b) => {
+      b.setAttribute("aria-pressed", b.dataset.k === active ? "true" : "false");
+    });
+    $("scenarioNote").innerHTML = `<b>Now showing</b>${esc(SCENARIO_COPY[active] || "")}`;
+  }
+
+  /* ---------- issues ---------- */
+  const DONE_KEY = "ft_sandbox_done";
+  const doneSet = new Set(JSON.parse(localStorage.getItem(DONE_KEY) || "[]"));
+  const LEVEL_LABEL = {
+    blocker: "Blocker", todo: "To do", waiting: "Waiting on you",
+    native: "Needs native", debt: "Debt", closed: "Closed",
+  };
+
+  fetch("/issues.json")
+    .then((r) => r.json())
+    .then((groups) => {
+      const open = groups.reduce((n, g) => n + g.items.filter((i) => i.level !== "closed").length, 0);
+      $("issueCount").textContent = String(open);
+      $("paneIssues").innerHTML = groups.map((g) => `
+        <div class="isec"><b>${esc(g.group)}</b><p>${esc(g.note)}</p></div>
+        ${g.items.map((it) => {
+          const id = slug(it.title);
+          return `<button class="issue${doneSet.has(id) ? " done" : ""}" data-id="${id}">
+            <span class="lv lv-${it.level}">${esc(LEVEL_LABEL[it.level] || it.level)}</span>
+            <span class="h">${esc(it.title)}</span>
+            <span class="d">${esc(it.detail)}</span>
+            <span class="w">${esc(it.where)}</span>
+          </button>`;
+        }).join("")}`).join("");
+      $("paneIssues").addEventListener("click", (e) => {
+        const b = e.target.closest(".issue");
+        if (!b) return;
+        /* Alt-click ticks one off. It only lives in this browser, which is the
+           honest scope: the file on disk stays the source of truth. */
+        if (e.altKey) {
+          b.classList.toggle("done");
+          b.classList.contains("done") ? doneSet.add(b.dataset.id) : doneSet.delete(b.dataset.id);
+          localStorage.setItem(DONE_KEY, JSON.stringify([...doneSet]));
+          return;
+        }
+        b.classList.toggle("open");
+      });
+    })
+    .catch(() => { $("paneIssues").innerHTML = `<div class="isec"><p>issues.json did not load.</p></div>`; });
+
+  /* ---------- chrome ---------- */
+  $("tabJourney").onclick = () => showPane("Journey");
+  $("tabIssues").onclick = () => showPane("Issues");
+  function showPane(which) {
+    ["Journey", "Issues"].forEach((k) => {
+      $("tab" + k).setAttribute("aria-selected", String(k === which));
+      $("pane" + k).hidden = k !== which;
+    });
+  }
+
+  $("prevBtn").onclick = () => go(current - 1);
+  $("nextBtn").onclick = () => go(current + 1);
+  $("reloadBtn").onclick = () => go(current, { force: true });
+  $("openBtn").onclick = () => window.open(frame.src, "_blank", "noopener");
+  $("darkBtn").onclick = () => {
+    const w = frame.contentWindow;
+    try {
+      const next = w.document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      w.applyTheme?.(next);
+      $("darkBtn").textContent = next === "dark" ? "Flip the app to light" : "Flip the app to dark";
+    } catch { /* frame still loading */ }
+  };
+
+  addEventListener("keydown", (e) => {
+    if (e.target.closest("input, textarea")) return;
+    if (e.key === "ArrowRight") { e.preventDefault(); go(current + 1); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); go(current - 1); }
+  });
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+  function slug(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
+
+  /* The phone already has ?scenario=paired in its src, so step one only has to
+     wait for it rather than reload it. */
+  device.classList.add("loading");
+  ready(frame.contentWindow).then(() => { device.classList.remove("loading"); go(0); });
+})();

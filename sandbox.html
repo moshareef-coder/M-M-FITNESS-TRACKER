@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fit Together Sandbox</title>
+<link rel="icon" href="/icon-192.png">
+<style>
+/* A workbench, not a second app. Everything here is deliberately quieter than
+   the phone in the middle, so the only saturated colour on screen is the
+   product's own. Tokens borrowed from index.html so the two never disagree. */
+:root {
+  --ground: #eceef1;
+  --panel: #ffffff;
+  --sunk: #f4f6f8;
+  --line: #dce0e6;
+  --line-soft: #e8ebef;
+  --ink: #151a21;
+  --ink-2: #49515d;
+  --mut: #79828f;
+  --me: #2d6bff;
+  --partner: #ff6b4a;
+  --warn: #b8860b;
+  --ok: #1c9c52;
+  --rail: 268px;
+  --side: 296px;
+  --r: 10px;
+  /* The phone has to fit the laptop it is being reviewed on, so cap it at an
+     iPhone 15 and shrink from there rather than pushing the stage into scroll. */
+  --screen: min(844px, calc(100dvh - 240px));
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; font-family: var(--sans); color: var(--ink);
+  background: var(--ground); font-size: 14px; line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; }
+
+/* ---------- frame ---------- */
+.wrap { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr) var(--side); height: 100dvh; }
+.rail, .side {
+  background: var(--panel); display: flex; flex-direction: column;
+  min-height: 0; overflow: hidden;
+}
+.rail { border-right: 1px solid var(--line); }
+.side { border-left: 1px solid var(--line); }
+.stage {
+  min-width: 0; display: flex; flex-direction: column; align-items: center;
+  gap: 16px; padding: 20px; overflow: auto;
+}
+
+/* ---------- rail head ---------- */
+.brand { padding: 16px 16px 12px; border-bottom: 1px solid var(--line-soft); }
+.brand h1 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+.brand p { margin: 3px 0 0; font-size: 12px; color: var(--mut); }
+
+.tabs { display: flex; gap: 2px; padding: 8px; border-bottom: 1px solid var(--line-soft); }
+.tabs button {
+  flex: 1; border: 0; background: transparent; padding: 7px 8px; border-radius: 7px;
+  font-size: 12.5px; font-weight: 550; color: var(--ink-2); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: background .12s ease, color .12s ease;
+}
+.tabs button:hover { background: var(--sunk); }
+.tabs button[aria-selected="true"] { background: var(--ink); color: #fff; }
+.tabs .count {
+  font-size: 10.5px; font-weight: 650; padding: 1px 5px; border-radius: 999px;
+  background: rgba(0,0,0,.09); font-variant-numeric: tabular-nums;
+}
+.tabs button[aria-selected="true"] .count { background: rgba(255,255,255,.2); }
+
+.railbody { flex: 1; min-height: 0; overflow: auto; padding: 10px 8px 24px; }
+
+/* ---------- journey ---------- */
+.grp { margin: 10px 0 4px; padding: 0 8px; display: flex; align-items: baseline; gap: 8px; }
+.grp b { font-size: 11px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; color: var(--mut); }
+.grp i { font-style: normal; font-size: 11px; color: #b3bac4; font-variant-numeric: tabular-nums; }
+
+.step {
+  width: 100%; display: grid; grid-template-columns: 22px 1fr; gap: 9px; align-items: start;
+  border: 0; background: transparent; text-align: left; padding: 7px 8px;
+  border-radius: 8px; cursor: pointer; color: var(--ink);
+  transition: background .12s ease;
+}
+.step:hover { background: var(--sunk); }
+.step:focus-visible { outline: 2px solid var(--me); outline-offset: -2px; }
+.step .n {
+  font-family: var(--mono); font-size: 10.5px; color: var(--mut); padding-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.step > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.step .t { display: block; font-size: 13px; font-weight: 500; letter-spacing: -0.005em; }
+.step .s { display: block; font-size: 11.5px; color: var(--mut); margin-top: 1px; }
+.step[aria-current="true"] { background: #e6edff; }
+.step[aria-current="true"] .n { color: var(--me); font-weight: 700; }
+.step[aria-current="true"] .t { font-weight: 650; color: #123; }
+.step .flag {
+  display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 650;
+  letter-spacing: .04em; text-transform: uppercase; padding: 1px 5px; border-radius: 4px;
+  background: #fdf0e9; color: #b1481f; vertical-align: 1px;
+}
+
+/* ---------- issues ---------- */
+.isec { margin: 12px 0 2px; padding: 0 8px; }
+.isec b { font-size: 11px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; color: var(--mut); }
+.isec p { margin: 2px 0 6px; font-size: 11.5px; color: #97a0ac; line-height: 1.4; }
+.issue {
+  width: 100%; text-align: left; border: 0; background: transparent; cursor: pointer;
+  padding: 8px; border-radius: 8px; display: block; color: var(--ink);
+}
+.issue:hover { background: var(--sunk); }
+.issue:focus-visible { outline: 2px solid var(--me); outline-offset: -2px; }
+.issue .lv {
+  display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; padding: 1.5px 6px; border-radius: 4px; margin-bottom: 4px;
+}
+.lv-blocker { background: #fdeaea; color: #b3261e; }
+.lv-todo    { background: #e9eefb; color: #2a4fb8; }
+.lv-waiting { background: #fdf3e0; color: #8a6100; }
+.lv-native  { background: #efe9fb; color: #5b3ab8; }
+.lv-debt    { background: #eef0f2; color: #5a626c; }
+.lv-closed  { background: #eaf5ee; color: #2b6f45; }
+.issue .h { font-size: 12.5px; font-weight: 550; line-height: 1.35; }
+.issue .d { font-size: 11.5px; color: var(--ink-2); margin-top: 3px; line-height: 1.45; display: none; }
+.issue .w { font-family: var(--mono); font-size: 10.5px; color: var(--mut); margin-top: 5px; display: none; }
+.issue.open .d, .issue.open .w { display: block; }
+.issue.done .h { text-decoration: line-through; color: var(--mut); }
+
+/* ---------- stage ---------- */
+.stagehead {
+  width: 100%; max-width: 940px; display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 16px;
+}
+.stagehead h2 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.015em; }
+.stagehead p { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-2); max-width: 62ch; line-height: 1.5; }
+.stagehead .crumb {
+  font-family: var(--mono); font-size: 11px; color: var(--mut); text-transform: uppercase;
+  letter-spacing: .06em; margin-bottom: 5px;
+}
+.arrows { display: flex; gap: 6px; flex: none; }
+.arrows button {
+  border: 1px solid var(--line); background: var(--panel); width: 30px; height: 30px;
+  border-radius: 8px; cursor: pointer; color: var(--ink-2); font-size: 14px; line-height: 1;
+  display: grid; place-items: center;
+}
+.arrows button:hover:not(:disabled) { background: var(--sunk); border-color: #cfd5dd; }
+.arrows button:active:not(:disabled) { transform: translateY(1px); }
+.arrows button:disabled { opacity: .35; cursor: default; }
+
+/* The device. 390x844 is an iPhone 15, which is the screen this was designed on. */
+.device {
+  position: relative; width: 390px; flex: none;
+  border-radius: 42px; padding: 10px; background: #101318;
+  box-shadow: 0 1px 2px rgba(16,20,26,.18), 0 18px 46px -14px rgba(16,20,26,.42);
+}
+.device iframe {
+  display: block; width: 100%; height: var(--screen); border: 0; border-radius: 32px;
+  background: #fff;
+}
+.device.loading::before {
+  content: "loading"; position: absolute; inset: 10px; border-radius: 32px; z-index: 3;
+  background: rgba(255,255,255,.86); display: grid; place-items: center;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--mut);
+}
+
+.stagefoot { width: 100%; max-width: 940px; padding-bottom: 8px; }
+.hint {
+  font-size: 12px; color: var(--mut); display: flex; gap: 8px; align-items: baseline;
+}
+.hint kbd {
+  font-family: var(--mono); font-size: 10.5px; border: 1px solid var(--line);
+  border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; background: var(--panel);
+}
+
+/* ---------- side ---------- */
+.sidehead { padding: 16px 16px 12px; border-bottom: 1px solid var(--line-soft); }
+.sidehead h2 { margin: 0; font-size: 13px; font-weight: 650; }
+.sidehead p { margin: 3px 0 0; font-size: 11.5px; color: var(--mut); line-height: 1.45; }
+.sidebody { flex: 1; min-height: 0; overflow: auto; padding: 10px 10px 24px; }
+
+.scn {
+  width: 100%; text-align: left; border: 1px solid var(--line); background: var(--panel);
+  border-radius: var(--r); padding: 9px 11px; cursor: pointer; margin-bottom: 6px;
+  display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;
+  transition: border-color .12s ease, background .12s ease;
+}
+.scn:hover { background: var(--sunk); }
+.scn:focus-visible { outline: 2px solid var(--me); outline-offset: 1px; }
+.scn > span:first-child { display: flex; flex-direction: column; min-width: 0; }
+.scn .t { display: block; font-size: 12.5px; font-weight: 550; }
+.scn .d { display: block; font-size: 11.5px; color: var(--mut); margin-top: 2px; line-height: 1.4; }
+.scn .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--line); flex: none; }
+.scn[aria-pressed="true"] { border-color: var(--me); background: #f2f6ff; }
+.scn[aria-pressed="true"] .dot { background: var(--me); box-shadow: 0 0 0 3px rgba(45,107,255,.16); }
+.scn.live[aria-pressed="true"] { border-color: var(--partner); background: #fff4f1; }
+.scn.live[aria-pressed="true"] .dot { background: var(--partner); box-shadow: 0 0 0 3px rgba(255,107,74,.18); }
+
+.tool {
+  width: 100%; text-align: left; border: 1px solid var(--line); background: var(--panel);
+  border-radius: 8px; padding: 8px 11px; cursor: pointer; margin-bottom: 6px; font-size: 12.5px;
+}
+.tool:hover { background: var(--sunk); }
+.tool:active { transform: translateY(1px); }
+.note {
+  background: var(--sunk); border: 1px solid var(--line-soft); border-radius: var(--r);
+  padding: 10px 12px; font-size: 12px; color: var(--ink-2); line-height: 1.5;
+}
+.note b { display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); margin-bottom: 4px; }
+
+.sep { height: 1px; background: var(--line-soft); margin: 14px 2px; }
+
+@media (max-width: 1180px) {
+  :root { --screen: min(736px, calc(100dvh - 240px)); }
+  .wrap { grid-template-columns: 232px minmax(0, 1fr) 250px; }
+  .device { width: 340px; }
+}
+@media (max-width: 900px) {
+  .wrap { grid-template-columns: 1fr; grid-template-rows: auto auto auto; height: auto; }
+  .rail, .side { border: 0; border-bottom: 1px solid var(--line); }
+  .railbody, .sidebody { max-height: 300px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="rail">
+    <div class="brand">
+      <h1>Fit Together sandbox</h1>
+      <p>The real app on fake data. Click anything.</p>
+    </div>
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tabJourney" aria-selected="true" aria-controls="paneJourney">Journey</button>
+      <button role="tab" id="tabIssues" aria-selected="false" aria-controls="paneIssues">
+        Issues <span class="count" id="issueCount">0</span>
+      </button>
+    </div>
+    <div class="railbody">
+      <div id="paneJourney" role="tabpanel" aria-labelledby="tabJourney"></div>
+      <div id="paneIssues" role="tabpanel" aria-labelledby="tabIssues" hidden></div>
+    </div>
+  </nav>
+
+  <main class="stage">
+    <div class="stagehead">
+      <div>
+        <div class="crumb" id="crumb">&nbsp;</div>
+        <h2 id="stepTitle">Loading</h2>
+        <p id="stepNote"></p>
+      </div>
+      <div class="arrows">
+        <button id="prevBtn" title="Previous step" aria-label="Previous step">&#8592;</button>
+        <button id="nextBtn" title="Next step" aria-label="Next step">&#8594;</button>
+      </div>
+    </div>
+
+    <div class="device" id="device">
+      <iframe id="app" title="Fit Together, sandbox build" src="/sandbox-app.html?scenario=signedout"></iframe>
+    </div>
+
+    <div class="stagefoot">
+      <div class="hint">
+        <span><kbd>&#8592;</kbd> <kbd>&#8594;</kbd> step through</span>
+        <span>&middot;</span>
+        <span>Everything you tap is the shipping code. Writes stick until you reload.</span>
+      </div>
+    </div>
+  </main>
+
+  <aside class="side">
+    <div class="sidehead">
+      <h2>Scenarios</h2>
+      <p>Who you are when the app opens. Picking one reloads the phone.</p>
+    </div>
+    <div class="sidebody">
+      <div id="scenarios"></div>
+      <div class="sep"></div>
+      <div class="sidehead" style="padding:0 0 8px;border:0">
+        <h2>Handy</h2>
+      </div>
+      <button class="tool" id="reloadBtn">Reload the phone</button>
+      <button class="tool" id="darkBtn">Flip the app to dark</button>
+      <button class="tool" id="openBtn">Open the phone in its own tab</button>
+      <div class="sep"></div>
+      <div class="note" id="scenarioNote"></div>
+    </div>
+  </aside>
+</div>
+
+<script src="/sandbox-steps.js"></script>
+</body>
+</html>
