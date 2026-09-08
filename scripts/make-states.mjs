@@ -96,6 +96,9 @@ const GALLERY_CSS = `
   }
   .gal-btn.on { background: var(--accent); color: var(--on-accent); border-color: transparent; }
 
+  :root { --gal-bar: 150px; }
+  @media (max-width: 900px) { :root { --gal-bar: 218px; } }
+
   /* ---- the file shell: a tree on the left, the canvas on the right ---- */
   .fig { display: grid; grid-template-columns: 272px minmax(0, 1fr); min-height: 100vh; }
   .fig-side {
@@ -142,7 +145,11 @@ const GALLERY_CSS = `
   .gal-crumb { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
 
   /* ---- pages, sections, frames ---- */
-  .fig-page { padding-top: 30px; scroll-margin-top: 74px; }
+  /* The sticky header is 133px tall, 203px once it wraps on a narrow window,
+     and every anchor offset here was a guess well under that: jumping to a
+     page or a frame from the tree landed it underneath the bar. One number,
+     measured, used by all three. */
+  .fig-page { padding-top: 30px; scroll-margin-top: var(--gal-bar); }
   .fig-page-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
   .fig-page-n {
     font-size: 11px; font-weight: 800; color: var(--muted); border: 1px solid var(--border);
@@ -150,13 +157,13 @@ const GALLERY_CSS = `
   }
   .fig-page-name { font-size: 21px; font-weight: 800; letter-spacing: -.03em; }
   .fig-page-note { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; line-height: 1.5; max-width: 68ch; }
-  .fig-section { border: 1px dashed var(--border); border-radius: 16px; padding: 14px; margin-top: 14px; scroll-margin-top: 84px; }
+  .fig-section { border: 1px dashed var(--border); border-radius: 16px; padding: 14px; margin-top: 14px; scroll-margin-top: calc(var(--gal-bar) + 10px); }
   .fig-section-head { display: flex; align-items: center; gap: 8px; margin: -2px 0 12px; }
   .fig-section-name { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
   .fig-section-rule { flex: 1; height: 1px; background: var(--border); }
   .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(393px, 1fr)); gap: 24px 20px; }
   @media (max-width: 460px) { .gal-grid { grid-template-columns: 1fr; } }
-  .gal-frame { margin: 0; scroll-margin-top: 90px; }
+  .gal-frame { margin: 0; scroll-margin-top: calc(var(--gal-bar) + 16px); }
   .gal-frame.flash .gal-phone { box-shadow: 0 0 0 3px var(--accent); }
   .gal-cap { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
   .gal-num {
@@ -188,6 +195,32 @@ const GALLERY_CSS = `
   .gal-frame .gal-phone { cursor: pointer; position: relative; transition: box-shadow .15s, transform .15s; }
   .gal-frame .gal-phone:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
   .gal-frame .gal-phone:active { transform: scale(.995); }
+
+  /* The master sheet. Not a screen, so not a phone frame: a list you read. */
+  .iss-note { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: -4px 0 14px; max-width: 68ch; }
+  .iss-list { display: flex; flex-direction: column; gap: 10px; }
+  .iss {
+    border: 1px solid var(--border); border-left: 3px solid var(--border);
+    border-radius: 14px; padding: 14px 16px; background: var(--panel);
+  }
+  .iss-blocker { border-left-color: var(--partner); }
+  .iss-waiting, .iss-native { border-left-color: color-mix(in srgb, var(--accent) 60%, var(--border)); }
+  .iss-closed { opacity: .62; }
+  .iss-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .iss-tag {
+    font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 100px; flex-shrink: 0;
+    background: var(--panel-2); color: var(--muted);
+  }
+  .iss-tag.blocker { background: color-mix(in srgb, var(--partner) 16%, transparent); color: var(--partner); }
+  .iss-tag.waiting, .iss-tag.native { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink); }
+  .iss-title { font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
+  .iss-detail { font-size: 12.5px; color: var(--muted); line-height: 1.55; margin: 8px 0 0; max-width: 74ch; }
+  .iss-where {
+    font-size: 11px; font-weight: 700; color: var(--muted); margin-top: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; opacity: .8;
+  }
+  #p-open-issues .fig-page-n { color: var(--partner); border-color: color-mix(in srgb, var(--partner) 45%, var(--border)); }
 
   .proto-scrim {
     position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column;
@@ -259,6 +292,143 @@ const GALLERY_CSS = `
   .gal-phone .gen-scrim { position: relative; height: 560px; animation: none; }
 `;
 
+/* Node-side escaping: the client-side escapeHtml lives inside the generated
+   script, and this block is built out here. */
+const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* ---- the master sheet ----
+   Everything flagged and not yet done, kept where we actually look rather than
+   in a chat scrollback nobody scrolls. Each entry is real and checked against
+   the code or the live config on the day it was written; when one is fixed it
+   moves to "closed" rather than quietly disappearing, so we can see what was
+   decided as well as what was done. */
+const ISSUES = [
+  {
+    group: "Before real users",
+    note: "These are the ones that bite the first stranger who signs up.",
+    items: [
+      { level: "blocker", title: "Email sign-in is capped at 2 messages an hour",
+        detail: "Supabase's built-in mailer is development only, and the app now offers email as a way in. The third person to request a link in an hour gets nothing. Needs Resend or Postmark wired in: a config change, no code.",
+        where: "Supabase auth settings" },
+      { level: "blocker", title: "Errors are shown but never recorded",
+        detail: "A crash raises the fatal banner and names the function, so the user sees it. Nothing is sent anywhere, so we never learn it happened. Needs a table plus a hook on the existing error listeners; no new vendor.",
+        where: "index.html, showFatal" },
+      { level: "blocker", title: "Legal pages predate half the app",
+        detail: "privacy.html and support.html were written before clips, live sessions, push notifications and photos existed, and use a different design language from the app. Apple requires the privacy policy to match what is actually collected.",
+        where: "privacy.html, support.html" },
+      { level: "todo", title: "Onboarding has never been walked as a genuinely new account",
+        detail: "Name, goal, detail, pace, plan, then pairing. Every path exists but has only ever been used by accounts that already had data. Empty states for a truly fresh account need the same pass the rest of the app got.",
+        where: "index.html, renderOnboardStep" },
+    ],
+  },
+  {
+    group: "Waiting on you",
+    note: "Nothing here can move without an account, a click, or a decision only you can make.",
+    items: [
+      { level: "waiting", title: "Sign in with Apple needs the Developer account",
+        detail: "Apple requires it once any social login is offered, so it blocks App Store submission. The keys cannot be generated without the paid account. The sign-in screen already has room for the button.",
+        where: "$99/yr Apple Developer Program" },
+      { level: "waiting", title: "Jawa is still not a collaborator on the repo",
+        detail: "Her CODEOWNERS entries point at @jawaabdulal now, but a CODEOWNERS line does nothing until she has repo access. The deploy token cannot add her: it is fine-grained with no Administration permission.",
+        where: "GitHub, Settings, Collaborators" },
+      { level: "waiting", title: "meridian-web-studio has push access and I do not know who that is",
+        detail: "A second collaborator with write access to the repo, account created 2026-08-01, no activity on it. Worth confirming who it is or removing it before real users exist.",
+        where: "GitHub, Settings, Collaborators" },
+      { level: "waiting", title: "Photo retention was never decided",
+        detail: "Raised in the strategy meeting and left open. Proof photos expire after 30 days. Progress photos tied to a goal have no policy at all, and storage cost was explicitly called a real constraint.",
+        where: "Supabase storage" },
+    ],
+  },
+  {
+    group: "Waiting on the native build",
+    note: "Real features that a PWA genuinely cannot do. They all arrive with the same Capacitor step.",
+    items: [
+      { level: "native", title: "The timer stops when the app is backgrounded",
+        detail: "Deliberate today, so time asleep is not counted, but the ask was for it to keep running like a navigation app. Needs genuine background execution, which the web cannot give.",
+        where: "Capacitor" },
+      { level: "native", title: "Hands-free voice logging",
+        detail: "Costed 2026-09-06. Safari has never shipped the speech recognition API, so this cannot be built as a PWA at all. Native gives Apple's on-device Speech framework, but foreground only: push to talk, never always listening. Camera hand gestures are the one option that works in the web app today.",
+        where: "Capacitor, or MediaPipe in the web app" },
+    ],
+  },
+  {
+    group: "Deliberate debt",
+    note: "Known, chosen on purpose, and written down so the reasoning is not lost.",
+    items: [
+      { level: "debt", title: "Every write still refetches every table",
+        detail: "loadAll() runs after almost every write. It is one parallel batch now, and it no longer repaints Home when Home is not on screen, but it still refetches everything rather than updating what changed. Fine at current volume.",
+        where: "index.html, loadAll" },
+      { level: "debt", title: "Two tables are fetched in full, unbounded",
+        detail: "fit_entries and exercise_logs are read whole. Deliberately not windowed: personal records need a true all-time max per exercise and the calendar needs the true first entry ever, so a rolling window would make both silently wrong. Indexed on (email, entry_date) in the meantime.",
+        where: "index.html, loadAll" },
+      { level: "debt", title: "The cron secret is inlined in the database",
+        detail: "Vault is unavailable on this project, so the shared secret sits in the cron job commands and inside the live-start trigger function body. Anyone with database access can read it. Accepted for now; it is not a user credential.",
+        where: "Postgres, cron.job and notify_live_session_start" },
+      { level: "debt", title: "The gallery does not cover four tabs",
+        detail: "Workout, Body, Progress and Setup are not in here. They are covered instead by the app harness, which runs the real app against fixture data and screenshots every tab.",
+        where: "scripts/make-states.mjs" },
+      { level: "debt", title: "Two new sheets are unverified visually",
+        detail: "The encouragement composer and the askForName sheet that replaced the browser prompts passed the boot check and reuse the app's existing composer pattern, but have not been screenshotted. The browser harness kept getting killed the day they shipped.",
+        where: "index.html, sendEncouragement and askForName" },
+    ],
+  },
+  {
+    group: "Decided, closed",
+    note: "Kept so they do not come back around as fresh ideas.",
+    items: [
+      { level: "closed", title: "No music integration",
+        detail: "Showing what your partner is listening to via Spotify was overruled in the strategy meeting: music apps already play in the background, people use different services, and it is not core. Do not build it.",
+        where: "Decided 2026-09-01" },
+      { level: "closed", title: "Live streaming is not the cheering feature",
+        detail: "Deliberately not FaceTime or a live stream, which was agreed to be too expensive. A short clip that loops on their session screen and then disappears was the chosen shape, and it shipped.",
+        where: "Decided 2026-09-01" },
+    ],
+  },
+];
+
+const LEVEL_LABEL = {
+  blocker: "Blocker", todo: "To do", waiting: "Waiting on you",
+  native: "Needs native", debt: "Debt", closed: "Closed",
+};
+
+const issueCount = ISSUES.reduce((n, g) => n + g.items.filter((i) => i.level !== "closed").length, 0);
+
+const ISSUES_HTML =
+  '<section class="fig-page" id="p-open-issues">' +
+    '<div class="fig-page-head"><span class="fig-page-n">!</span>' +
+      '<h2 class="fig-page-name">Open issues</h2></div>' +
+    '<p class="fig-page-note">The master sheet: everything flagged and not yet done, checked against the code or the live config rather than remembered. ' +
+      issueCount + ' open right now.</p>' +
+    ISSUES.map((g) =>
+      '<div class="fig-section" id="i-' + g.group.replace(/\W+/g, "-").toLowerCase() + '">' +
+        '<div class="fig-section-head"><span class="fig-section-name">' + esc(g.group) + '</span>' +
+          '<span class="fig-section-rule"></span>' +
+          '<span class="fig-section-n">' + g.items.length + '</span></div>' +
+        '<p class="iss-note">' + esc(g.note) + '</p>' +
+        '<div class="iss-list">' +
+          g.items.map((i) =>
+            '<div class="iss iss-' + i.level + '">' +
+              '<div class="iss-top">' +
+                '<span class="iss-tag ' + i.level + '">' + esc(LEVEL_LABEL[i.level] || i.level) + '</span>' +
+                '<span class="iss-title">' + esc(i.title) + '</span>' +
+              '</div>' +
+              '<p class="iss-detail">' + esc(i.detail) + '</p>' +
+              '<div class="iss-where">' + esc(i.where) + '</div>' +
+            '</div>').join("") +
+        '</div>' +
+      '</div>').join("") +
+  '</section>';
+
+const ISSUES_TREE =
+  '<button type="button" class="fig-page-btn" data-page="p-open-issues">' +
+    '<span class="caret">&#9662;</span>Open issues' +
+    '<span class="count">' + issueCount + '</span></button>' +
+  '<div class="fig-kids">' +
+    ISSUES.map((g) =>
+      '<a class="fig-sec-label" href="#i-' + g.group.replace(/\W+/g, "-").toLowerCase() + '">' + esc(g.group) +
+        '<span>' + g.items.length + '</span></a>').join("") +
+  '</div>';
+
 const BODY = `<title>Fit Together Screen States</title>
 ${fonts}
 <style>${style}</style>
@@ -326,6 +496,9 @@ ${GEN}
 <script>
 ${ICONS}
 ${DATA}
+
+const ISSUES_HTML = ${JSON.stringify(ISSUES_HTML)};
+const ISSUES_TREE = ${JSON.stringify(ISSUES_TREE)};
 
 const $ = (id) => document.getElementById(id);
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -915,6 +1088,10 @@ const setTheme = (t) => {
               escapeHtml(f.name) + "</a>").join("")).join("") +
       "</div>");
   }
+  /* The master sheet goes last: it is the one page that is not a screen. */
+  canvas.push(ISSUES_HTML);
+  tree.push(ISSUES_TREE);
+
   $("galBody").innerHTML = canvas.join("");
   $("galTree").innerHTML = tree.join("");
   stage.remove();

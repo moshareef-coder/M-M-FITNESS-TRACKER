@@ -1424,6 +1424,37 @@
   }
   .si h1, .si p.sub { text-align: center; }
   .si p.sub { margin-bottom: 22px; max-width: 34ch; }
+
+  /* Hero over sheet: the brand gets the top of the screen, the controls sit
+     at the bottom in thumb reach. */
+  /* The sign-in screen is the one onboarding step that goes edge to edge, so
+     it opts the shared #onboard padding off rather than fighting it. */
+  #onboard:has(.si-screen) { padding: 0; justify-content: stretch; }
+  .si-screen { display: flex; flex-direction: column; flex: 1; width: 100%; align-self: stretch; }
+  .si-hero {
+    flex: 1 1 auto; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    padding: 40px 24px 24px; min-height: 38dvh;
+    background: radial-gradient(120% 80% at 50% 25%, color-mix(in srgb, var(--me) 16%, transparent) 0%, transparent 70%);
+  }
+  .si-rings { width: min(70vw, 260px); height: auto; display: block; }
+  .si-word {
+    font-family: var(--font-display); font-size: 34px; font-weight: 800;
+    letter-spacing: -.03em; margin: 18px 0 0;
+  }
+  .si-tag { font-size: 15px; color: var(--muted); margin: 8px 0 0; max-width: 26ch; line-height: 1.45; }
+  .si-sheet {
+    flex: 0 0 auto; display: flex; flex-direction: column;
+    padding: 24px 24px calc(28px + env(safe-area-inset-bottom));
+    background: var(--panel); border-top: 1px solid var(--border);
+    border-radius: 24px 24px 0 0;
+  }
+  .si-sheet .si-legal, .si-sheet .si-msg { text-align: center; max-width: none; }
+  @media (max-height: 700px) {
+    .si-rings { width: min(52vw, 190px); }
+    .si-word { font-size: 28px; }
+    .si-hero { min-height: 30dvh; padding-top: 28px; }
+  }
   .btn-google {
     width: 100%; padding: 14px 16px; border-radius: 12px; cursor: pointer;
     display: flex; align-items: center; justify-content: center; gap: 10px;
@@ -2728,6 +2759,9 @@
   }
   .gal-btn.on { background: var(--accent); color: var(--on-accent); border-color: transparent; }
 
+  :root { --gal-bar: 150px; }
+  @media (max-width: 900px) { :root { --gal-bar: 218px; } }
+
   /* ---- the file shell: a tree on the left, the canvas on the right ---- */
   .fig { display: grid; grid-template-columns: 272px minmax(0, 1fr); min-height: 100vh; }
   .fig-side {
@@ -2774,7 +2808,11 @@
   .gal-crumb { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
 
   /* ---- pages, sections, frames ---- */
-  .fig-page { padding-top: 30px; scroll-margin-top: 74px; }
+  /* The sticky header is 133px tall, 203px once it wraps on a narrow window,
+     and every anchor offset here was a guess well under that: jumping to a
+     page or a frame from the tree landed it underneath the bar. One number,
+     measured, used by all three. */
+  .fig-page { padding-top: 30px; scroll-margin-top: var(--gal-bar); }
   .fig-page-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
   .fig-page-n {
     font-size: 11px; font-weight: 800; color: var(--muted); border: 1px solid var(--border);
@@ -2782,13 +2820,13 @@
   }
   .fig-page-name { font-size: 21px; font-weight: 800; letter-spacing: -.03em; }
   .fig-page-note { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; line-height: 1.5; max-width: 68ch; }
-  .fig-section { border: 1px dashed var(--border); border-radius: 16px; padding: 14px; margin-top: 14px; scroll-margin-top: 84px; }
+  .fig-section { border: 1px dashed var(--border); border-radius: 16px; padding: 14px; margin-top: 14px; scroll-margin-top: calc(var(--gal-bar) + 10px); }
   .fig-section-head { display: flex; align-items: center; gap: 8px; margin: -2px 0 12px; }
   .fig-section-name { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
   .fig-section-rule { flex: 1; height: 1px; background: var(--border); }
   .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(393px, 1fr)); gap: 24px 20px; }
   @media (max-width: 460px) { .gal-grid { grid-template-columns: 1fr; } }
-  .gal-frame { margin: 0; scroll-margin-top: 90px; }
+  .gal-frame { margin: 0; scroll-margin-top: calc(var(--gal-bar) + 16px); }
   .gal-frame.flash .gal-phone { box-shadow: 0 0 0 3px var(--accent); }
   .gal-cap { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
   .gal-num {
@@ -2820,6 +2858,32 @@
   .gal-frame .gal-phone { cursor: pointer; position: relative; transition: box-shadow .15s, transform .15s; }
   .gal-frame .gal-phone:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
   .gal-frame .gal-phone:active { transform: scale(.995); }
+
+  /* The master sheet. Not a screen, so not a phone frame: a list you read. */
+  .iss-note { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: -4px 0 14px; max-width: 68ch; }
+  .iss-list { display: flex; flex-direction: column; gap: 10px; }
+  .iss {
+    border: 1px solid var(--border); border-left: 3px solid var(--border);
+    border-radius: 14px; padding: 14px 16px; background: var(--panel);
+  }
+  .iss-blocker { border-left-color: var(--partner); }
+  .iss-waiting, .iss-native { border-left-color: color-mix(in srgb, var(--accent) 60%, var(--border)); }
+  .iss-closed { opacity: .62; }
+  .iss-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .iss-tag {
+    font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 100px; flex-shrink: 0;
+    background: var(--panel-2); color: var(--muted);
+  }
+  .iss-tag.blocker { background: color-mix(in srgb, var(--partner) 16%, transparent); color: var(--partner); }
+  .iss-tag.waiting, .iss-tag.native { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink); }
+  .iss-title { font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
+  .iss-detail { font-size: 12.5px; color: var(--muted); line-height: 1.55; margin: 8px 0 0; max-width: 74ch; }
+  .iss-where {
+    font-size: 11px; font-weight: 700; color: var(--muted); margin-top: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; opacity: .8;
+  }
+  #p-open-issues .fig-page-n { color: var(--partner); border-color: color-mix(in srgb, var(--partner) 45%, var(--border)); }
 
   .proto-scrim {
     position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column;
@@ -3154,6 +3218,9 @@ const BODY_GROUP_LABELS = {
   glutes: "Glutes", quads: "Quads", hamstrings: "Hamstrings", calves: "Calves",
 };
 
+
+const ISSUES_HTML = "<section class=\"fig-page\" id=\"p-open-issues\"><div class=\"fig-page-head\"><span class=\"fig-page-n\">!</span><h2 class=\"fig-page-name\">Open issues</h2></div><p class=\"fig-page-note\">The master sheet: everything flagged and not yet done, checked against the code or the live config rather than remembered. 15 open right now.</p><div class=\"fig-section\" id=\"i-before-real-users\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Before real users</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">4</span></div><p class=\"iss-note\">These are the ones that bite the first stranger who signs up.</p><div class=\"iss-list\"><div class=\"iss iss-blocker\"><div class=\"iss-top\"><span class=\"iss-tag blocker\">Blocker</span><span class=\"iss-title\">Email sign-in is capped at 2 messages an hour</span></div><p class=\"iss-detail\">Supabase's built-in mailer is development only, and the app now offers email as a way in. The third person to request a link in an hour gets nothing. Needs Resend or Postmark wired in: a config change, no code.</p><div class=\"iss-where\">Supabase auth settings</div></div><div class=\"iss iss-blocker\"><div class=\"iss-top\"><span class=\"iss-tag blocker\">Blocker</span><span class=\"iss-title\">Errors are shown but never recorded</span></div><p class=\"iss-detail\">A crash raises the fatal banner and names the function, so the user sees it. Nothing is sent anywhere, so we never learn it happened. Needs a table plus a hook on the existing error listeners; no new vendor.</p><div class=\"iss-where\">index.html, showFatal</div></div><div class=\"iss iss-blocker\"><div class=\"iss-top\"><span class=\"iss-tag blocker\">Blocker</span><span class=\"iss-title\">Legal pages predate half the app</span></div><p class=\"iss-detail\">privacy.html and support.html were written before clips, live sessions, push notifications and photos existed, and use a different design language from the app. Apple requires the privacy policy to match what is actually collected.</p><div class=\"iss-where\">privacy.html, support.html</div></div><div class=\"iss iss-todo\"><div class=\"iss-top\"><span class=\"iss-tag todo\">To do</span><span class=\"iss-title\">Onboarding has never been walked as a genuinely new account</span></div><p class=\"iss-detail\">Name, goal, detail, pace, plan, then pairing. Every path exists but has only ever been used by accounts that already had data. Empty states for a truly fresh account need the same pass the rest of the app got.</p><div class=\"iss-where\">index.html, renderOnboardStep</div></div></div></div><div class=\"fig-section\" id=\"i-waiting-on-you\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Waiting on you</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">4</span></div><p class=\"iss-note\">Nothing here can move without an account, a click, or a decision only you can make.</p><div class=\"iss-list\"><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">Sign in with Apple needs the Developer account</span></div><p class=\"iss-detail\">Apple requires it once any social login is offered, so it blocks App Store submission. The keys cannot be generated without the paid account. The sign-in screen already has room for the button.</p><div class=\"iss-where\">$99/yr Apple Developer Program</div></div><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">Jawa is still not a collaborator on the repo</span></div><p class=\"iss-detail\">Her CODEOWNERS entries point at @jawaabdulal now, but a CODEOWNERS line does nothing until she has repo access. The deploy token cannot add her: it is fine-grained with no Administration permission.</p><div class=\"iss-where\">GitHub, Settings, Collaborators</div></div><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">meridian-web-studio has push access and I do not know who that is</span></div><p class=\"iss-detail\">A second collaborator with write access to the repo, account created 2026-08-01, no activity on it. Worth confirming who it is or removing it before real users exist.</p><div class=\"iss-where\">GitHub, Settings, Collaborators</div></div><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">Photo retention was never decided</span></div><p class=\"iss-detail\">Raised in the strategy meeting and left open. Proof photos expire after 30 days. Progress photos tied to a goal have no policy at all, and storage cost was explicitly called a real constraint.</p><div class=\"iss-where\">Supabase storage</div></div></div></div><div class=\"fig-section\" id=\"i-waiting-on-the-native-build\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Waiting on the native build</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">2</span></div><p class=\"iss-note\">Real features that a PWA genuinely cannot do. They all arrive with the same Capacitor step.</p><div class=\"iss-list\"><div class=\"iss iss-native\"><div class=\"iss-top\"><span class=\"iss-tag native\">Needs native</span><span class=\"iss-title\">The timer stops when the app is backgrounded</span></div><p class=\"iss-detail\">Deliberate today, so time asleep is not counted, but the ask was for it to keep running like a navigation app. Needs genuine background execution, which the web cannot give.</p><div class=\"iss-where\">Capacitor</div></div><div class=\"iss iss-native\"><div class=\"iss-top\"><span class=\"iss-tag native\">Needs native</span><span class=\"iss-title\">Hands-free voice logging</span></div><p class=\"iss-detail\">Costed 2026-09-06. Safari has never shipped the speech recognition API, so this cannot be built as a PWA at all. Native gives Apple's on-device Speech framework, but foreground only: push to talk, never always listening. Camera hand gestures are the one option that works in the web app today.</p><div class=\"iss-where\">Capacitor, or MediaPipe in the web app</div></div></div></div><div class=\"fig-section\" id=\"i-deliberate-debt\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Deliberate debt</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">5</span></div><p class=\"iss-note\">Known, chosen on purpose, and written down so the reasoning is not lost.</p><div class=\"iss-list\"><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">Every write still refetches every table</span></div><p class=\"iss-detail\">loadAll() runs after almost every write. It is one parallel batch now, and it no longer repaints Home when Home is not on screen, but it still refetches everything rather than updating what changed. Fine at current volume.</p><div class=\"iss-where\">index.html, loadAll</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">Two tables are fetched in full, unbounded</span></div><p class=\"iss-detail\">fit_entries and exercise_logs are read whole. Deliberately not windowed: personal records need a true all-time max per exercise and the calendar needs the true first entry ever, so a rolling window would make both silently wrong. Indexed on (email, entry_date) in the meantime.</p><div class=\"iss-where\">index.html, loadAll</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">The cron secret is inlined in the database</span></div><p class=\"iss-detail\">Vault is unavailable on this project, so the shared secret sits in the cron job commands and inside the live-start trigger function body. Anyone with database access can read it. Accepted for now; it is not a user credential.</p><div class=\"iss-where\">Postgres, cron.job and notify_live_session_start</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">The gallery does not cover four tabs</span></div><p class=\"iss-detail\">Workout, Body, Progress and Setup are not in here. They are covered instead by the app harness, which runs the real app against fixture data and screenshots every tab.</p><div class=\"iss-where\">scripts/make-states.mjs</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">Two new sheets are unverified visually</span></div><p class=\"iss-detail\">The encouragement composer and the askForName sheet that replaced the browser prompts passed the boot check and reuse the app's existing composer pattern, but have not been screenshotted. The browser harness kept getting killed the day they shipped.</p><div class=\"iss-where\">index.html, sendEncouragement and askForName</div></div></div></div><div class=\"fig-section\" id=\"i-decided-closed\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Decided, closed</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">2</span></div><p class=\"iss-note\">Kept so they do not come back around as fresh ideas.</p><div class=\"iss-list\"><div class=\"iss iss-closed\"><div class=\"iss-top\"><span class=\"iss-tag closed\">Closed</span><span class=\"iss-title\">No music integration</span></div><p class=\"iss-detail\">Showing what your partner is listening to via Spotify was overruled in the strategy meeting: music apps already play in the background, people use different services, and it is not core. Do not build it.</p><div class=\"iss-where\">Decided 2026-09-01</div></div><div class=\"iss iss-closed\"><div class=\"iss-top\"><span class=\"iss-tag closed\">Closed</span><span class=\"iss-title\">Live streaming is not the cheering feature</span></div><p class=\"iss-detail\">Deliberately not FaceTime or a live stream, which was agreed to be too expensive. A short clip that loops on their session screen and then disappears was the chosen shape, and it shipped.</p><div class=\"iss-where\">Decided 2026-09-01</div></div></div></div></section>";
+const ISSUES_TREE = "<button type=\"button\" class=\"fig-page-btn\" data-page=\"p-open-issues\"><span class=\"caret\">&#9662;</span>Open issues<span class=\"count\">15</span></button><div class=\"fig-kids\"><a class=\"fig-sec-label\" href=\"#i-before-real-users\">Before real users<span>4</span></a><a class=\"fig-sec-label\" href=\"#i-waiting-on-you\">Waiting on you<span>4</span></a><a class=\"fig-sec-label\" href=\"#i-waiting-on-the-native-build\">Waiting on the native build<span>2</span></a><a class=\"fig-sec-label\" href=\"#i-deliberate-debt\">Deliberate debt<span>5</span></a><a class=\"fig-sec-label\" href=\"#i-decided-closed\">Decided, closed<span>2</span></a></div>";
 
 const $ = (id) => document.getElementById(id);
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -4967,6 +5034,10 @@ const setTheme = (t) => {
               escapeHtml(f.name) + "</a>").join("")).join("") +
       "</div>");
   }
+  /* The master sheet goes last: it is the one page that is not a screen. */
+  canvas.push(ISSUES_HTML);
+  tree.push(ISSUES_TREE);
+
   $("galBody").innerHTML = canvas.join("");
   $("galTree").innerHTML = tree.join("");
   stage.remove();
