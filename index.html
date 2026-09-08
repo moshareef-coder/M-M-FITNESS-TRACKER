@@ -1436,6 +1436,37 @@
   }
   .si h1, .si p.sub { text-align: center; }
   .si p.sub { margin-bottom: 22px; max-width: 34ch; }
+
+  /* Hero over sheet: the brand gets the top of the screen, the controls sit
+     at the bottom in thumb reach. */
+  /* The sign-in screen is the one onboarding step that goes edge to edge, so
+     it opts the shared #onboard padding off rather than fighting it. */
+  #onboard:has(.si-screen) { padding: 0; justify-content: stretch; }
+  .si-screen { display: flex; flex-direction: column; flex: 1; width: 100%; align-self: stretch; }
+  .si-hero {
+    flex: 1 1 auto; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    padding: 40px 24px 24px; min-height: 38dvh;
+    background: radial-gradient(120% 80% at 50% 25%, color-mix(in srgb, var(--me) 16%, transparent) 0%, transparent 70%);
+  }
+  .si-rings { width: min(70vw, 260px); height: auto; display: block; }
+  .si-word {
+    font-family: var(--font-display); font-size: 34px; font-weight: 800;
+    letter-spacing: -.03em; margin: 18px 0 0;
+  }
+  .si-tag { font-size: 15px; color: var(--muted); margin: 8px 0 0; max-width: 26ch; line-height: 1.45; }
+  .si-sheet {
+    flex: 0 0 auto; display: flex; flex-direction: column;
+    padding: 24px 24px calc(28px + env(safe-area-inset-bottom));
+    background: var(--panel); border-top: 1px solid var(--border);
+    border-radius: 24px 24px 0 0;
+  }
+  .si-sheet .si-legal, .si-sheet .si-msg { text-align: center; max-width: none; }
+  @media (max-height: 700px) {
+    .si-rings { width: min(52vw, 190px); }
+    .si-word { font-size: 28px; }
+    .si-hero { min-height: 30dvh; padding-top: 28px; }
+  }
   .btn-google {
     width: 100%; padding: 14px 16px; border-radius: 12px; cursor: pointer;
     display: flex; align-items: center; justify-content: center; gap: 10px;
@@ -3508,26 +3539,44 @@ function initOnboard() {
    legal terms in front of someone BEFORE they hand over an account. */
 function renderSignInScreen(state = {}) {
   const ob = $("onboard");
+  /* Every fitness app worth copying (Peloton, Hevy, Gymshark, Ladder) builds
+     this same screen: a full-bleed hero carrying the brand, then the auth
+     controls anchored at the bottom where the thumb is. The hero here is the
+     product's own two-ring motif rather than stock gym photography, because
+     the rings are the thing this app is actually about: two people, linked. */
   ob.innerHTML = `
-    <div class="ob-step si">
-      <div class="si-mark">${icon("dumbbell", 26)}</div>
-      <h1>Fit Together</h1>
-      <p class="sub">A shared tracker for two people who keep each other honest. See their workout as it happens, cheer them through it.</p>
+    <div class="si-screen">
+      <div class="si-hero">
+        <svg class="si-rings" viewBox="0 0 200 120" aria-hidden="true">
+          <defs>
+            <filter id="siGlow" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <circle cx="78" cy="60" r="38" fill="none" stroke="var(--me)" stroke-width="9" filter="url(#siGlow)"/>
+          <circle cx="122" cy="60" r="38" fill="none" stroke="var(--partner)" stroke-width="9" filter="url(#siGlow)"/>
+        </svg>
+        <h1 class="si-word">Fit Together</h1>
+        <p class="si-tag">Neither of you gets to quit quietly.</p>
+      </div>
 
-      <button type="button" class="btn-google" id="googleSignInBtn">${icon("google", 20)} Continue with Google</button>
+      <div class="si-sheet">
+        <button type="button" class="btn-google" id="googleSignInBtn">${icon("google", 20)} Continue with Google</button>
 
-      <div class="si-or"><span>or</span></div>
+        <div class="si-or"><span>or</span></div>
 
-      <label class="si-label" for="siEmail">Email</label>
-      <input type="email" id="siEmail" inputmode="email" autocomplete="email" autocapitalize="off"
-             spellcheck="false" placeholder="you@example.com" value="${escapeHtml(state.email || "")}" />
-      <button type="button" class="btn-primary" id="emailSignInBtn">Email me a sign-in link</button>
+        <label class="si-label" for="siEmail">Email</label>
+        <input type="email" id="siEmail" inputmode="email" autocomplete="email" autocapitalize="off"
+               spellcheck="false" placeholder="you@example.com" value="${escapeHtml(state.email || "")}" />
+        <button type="button" class="btn-primary" id="emailSignInBtn">Email me a sign-in link</button>
 
-      <p class="si-msg ${state.tone || ""}" id="siMsg">${escapeHtml(state.msg || "")}</p>
+        <p class="si-msg ${state.tone || ""}" id="siMsg">${escapeHtml(state.msg || "")}</p>
 
-      <p class="si-legal">By continuing you agree to the
-        <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>. Questions go to
-        <a href="/support.html" target="_blank" rel="noopener">support</a>.</p>
+        <p class="si-legal">By continuing you agree to the
+          <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>. Questions go to
+          <a href="/support.html" target="_blank" rel="noopener">support</a>.</p>
+      </div>
     </div>`;
 
   const msg = (text, tone) => {
