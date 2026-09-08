@@ -3222,6 +3222,9 @@
   <div class="sheet-scrim hidden" id="recapScrim">
     <div class="partner-sheet" id="recapSheet"></div>
   </div>
+  <div class="sheet-scrim hidden" id="nextWorkoutScrim">
+    <div class="partner-sheet" id="nextWorkoutSheet"></div>
+  </div>
   <div class="sheet-scrim hidden" id="partnerSheetScrim">
     <div class="partner-sheet" id="partnerSheet"></div>
   </div>
@@ -4077,7 +4080,7 @@ function showApp() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim"]
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
   stopGenTicker();
   $("genScrim")?.classList.add("hidden");
@@ -5452,6 +5455,66 @@ function recapStat(value, label, cls = "") {
   return `<div class="rc-stat ${cls}"><b>${escapeHtml(String(value))}</b><span>${escapeHtml(label)}</span></div>`;
 }
 
+/* A plan for a day that has not happened yet: no logs, no time, no PRs, just
+   what is queued. Recap and this deliberately look alike, so opening either
+   feels like the same gesture, but this one never claims something is done
+   that is not. */
+function openNextWorkoutReview(plan) {
+  if (!plan) return;
+  const title = displayFocus(plan.focus, plan.exercises);
+  const exercises = plan.exercises || [];
+  const dated = new Date(plan.entry_date + "T00:00:00")
+    .toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+
+  const exRow = (ex, i) => {
+    const load = ex.targetWeight != null && ex.targetWeight !== "" ? `@ ${ex.targetWeight} lb` : "";
+    return `<div class="rc-ex">
+      <span class="rc-n">${i + 1}</span>
+      <span class="rc-ex-name">${escapeHtml(ex.name)}</span>
+      <span class="rc-ex-num2">${escapeHtml(String(ex.sets ?? "-"))}\u00d7${escapeHtml(String(ex.reps ?? "-"))}${load ? `<i>${escapeHtml(load)}</i>` : ""}</span>
+    </div>`;
+  };
+
+  $("nextWorkoutSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="nwClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">Next Workout</div>
+      <div class="spacer"></div>
+    </div>
+
+    <div class="rc-head">
+      <div class="rc-tick" style="border-color:var(--border);color:var(--muted);box-shadow:none;">${icon("dumbbell", 20)}</div>
+      <div>
+        <div class="rc-kicker">QUEUED FOR TOMORROW</div>
+        <div class="rc-title">${escapeHtml(title)}</div>
+        <div class="rc-when">${escapeHtml(dated)}</div>
+      </div>
+    </div>
+
+    ${exercises.length
+      ? `<div class="rc-ex-head"><h4>Exercises</h4></div>
+         <div class="rc-list">${exercises.map(exRow).join("")}</div>`
+      : `<div class="ps-empty">Nothing planned yet for this one.</div>`}
+
+    <div class="rc-actions">
+      <button type="button" class="btn-ghost" id="nwClear">Clear this workout</button>
+    </div>`;
+
+  $("nwClose").onclick = closeNextWorkoutReview;
+  $("nwClear").onclick = async () => {
+    if (!confirm(`Clear tomorrow's ${title}? You can plan another.`)) return;
+    await sb.from("ai_workouts").delete().eq("id", plan.id);
+    closeNextWorkoutReview();
+    await loadAll();
+    renderHero();
+  };
+  $("nextWorkoutScrim").classList.remove("hidden");
+  $("nextWorkoutScrim").onclick = (ev) => { if (ev.target === $("nextWorkoutScrim")) closeNextWorkoutReview(); };
+}
+
+function closeNextWorkoutReview() { $("nextWorkoutScrim").classList.add("hidden"); }
+
 function openRecap(email, name, date) {
   const r = recapFor(email, name, date);
   const mine = email === MY_EMAIL;
@@ -5833,8 +5896,13 @@ function renderHero(animate = false) {
   if (!trainedToday) {
     cta = ctaBtn("Start Today's Workout");
   } else if (planned) {
-    cta = `<p class="hero-planned">${icon("check", 14)} Tomorrow: ${escapeHtml(planned.focus || "planned")}</p>
-           <button type="button" class="btn-ghost" id="heroClearBtn">Clear tomorrow</button>`;
+    /* Trained today and something is already queued: the line used to be the
+       only thing here, with a ghost "Clear tomorrow" doing all the work.
+       There was no way to see what was actually planned without starting it
+       tomorrow. Review opens that; Clear moved inside the review sheet. */
+    cta = `<p class="hero-planned">${icon("check", 14)} Tomorrow: ${escapeHtml(displayFocus(planned.focus, planned.exercises))}</p>
+           <button type="button" class="btn-cta" id="heroReviewBtn">${icon("dumbbell", 22)} Review Next Workout
+             <span class="go">${icon("chevronRight", 22)}</span></button>`;
   } else {
     cta = ctaBtn("Plan Tomorrow's Workout");
   }
@@ -5885,13 +5953,8 @@ function renderHero(animate = false) {
       else startWorkout();
     };
   }
-  if ($("heroClearBtn")) {
-    $("heroClearBtn").onclick = async () => {
-      if (!confirm(`Clear tomorrow's ${planned.focus || "workout"}? You can plan another.`)) return;
-      await sb.from("ai_workouts").delete().eq("id", planned.id);
-      await loadAll();
-      renderHero();
-    };
+  if ($("heroReviewBtn")) {
+    $("heroReviewBtn").onclick = () => openNextWorkoutReview(planned);
   }
 }
 
