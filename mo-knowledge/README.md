@@ -18,16 +18,28 @@ with a year behind them" and stops.
 That gap is the whole reason this folder exists. Our question is not *what is the right
 program*. It is **what about this specific person moves it, and by how much**.
 
-## The claim we are testing
+## The two claims we are testing
 
-> Weight, age and sex are load and recovery modifiers. They barely touch program
-> structure. The variables that actually decide the shape of a plan are how many days
-> a week someone will really show up, and how much training they have behind them,
-> and we can measure the second one instead of asking.
+**One, about individualisation.** Weight, age and sex are load and recovery modifiers.
+They barely touch program structure. What actually decides the shape of a plan is how
+many days a week someone will really show up, and how much training they have behind
+them, and we can measure the second instead of asking. Files `01` to `05`.
 
-If that is right, a lot of what consumer fitness apps ask for on their first screen is
-theatre, and our onboarding is already closer to correct than theirs by accident. If it
-is wrong, we will find out here rather than after shipping.
+**Two, and this is the one that matters.** Every training algorithm ever written builds a
+plan for one person in isolation, and bolts the social layer on afterwards. We have two
+people as the premise of the product and we still wrote a single player algorithm. Files
+`06` to `09`.
+
+> **The pair is not a social feature on top of the algorithm. The pair should be the
+> algorithm.**
+
+The first claim is us getting better at a game everyone else is playing. The second is a
+game nobody is playing. If we only have time for one, it is the second.
+
+Underneath both sits a third that the first ten files kept circling without saying:
+**the outcome is not hypertrophy, it is whether they are still here in twelve weeks.**
+That reframes the algorithm's job from "produce the best plan" to "produce the best plan
+they will actually do", which is a different problem and sometimes has a different answer.
 
 ## What is in here
 
@@ -40,15 +52,31 @@ research/
                                     people assume and in different places
   03-sex.md                         what sex actually changes, and where the
                                     evidence does not support prescribing anything
-  04-training-history.md            the dominant variable, and the one we can measure
+  04-training-history.md            the dominant single-person variable, and the
+                                    one we can measure rather than ask
   05-putting-it-together.md         the synthesis: the modifier stack, in order, and
                                     what to do when half the inputs are missing
+
+  06-the-pair-is-the-algorithm.md   the central claim. The Köhler effect, its
+                                    conditions, and five mechanisms built on data
+                                    we already hold
+  07-inference-over-interrogation.md  asking nothing is an advantage, not a
+                                    constraint. What we can learn and when, plus
+                                    the three signals we currently throw away
+  08-fair-comparison.md             how two mismatched people compare without one
+                                    of them closing the app. Bridges 01 into 06
+  09-adherence-is-the-outcome.md    the variable we should have been optimising
+                                    the whole time
+  10-what-this-feels-like.md        the translation: five moments a user would
+                                    actually notice, and what we would build first
 sources.md                          every claim above, with a confidence rating and
                                     a note on what still needs verifying
 open-questions.md                   what we cannot answer yet and what would settle it
 ```
 
-Read `00` first. It is short and it constrains everything after it.
+Read `00` first, it is short and it constrains everything after it. Then `06`, which is
+where the folder stops being a literature review and starts being a position. If you only
+read one, read `10`, which is the whole argument in the form of things a person notices.
 
 ## How the bake-off gets judged
 

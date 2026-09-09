@@ -88,6 +88,46 @@ basis for `03-sex.md` declining to build cycle periodization.
 *Confidence: high on the existence and the conclusion. This is currently the mainstream
 reading.*
 
+## Pair, group and adherence effects
+
+This section is newer than the rest and carries the weight of `06` to `09`, so the
+confidence notes matter more here than anywhere else in the file.
+
+**The Köhler effect in exercise settings** (Feltz, Kerr, Irwin, and colleagues, roughly
+2011 onward). A body of experimental work, not one paper, showing that the weaker member
+of a pair persists substantially longer at an exercise task than when working alone,
+and that the effect is strongest with a moderate ability gap and a conjunctive task
+where the joint outcome depends on the weaker member. Several studies used
+software-generated partners, which is directly relevant to an app.
+
+This is the evidential foundation of `06` and therefore of the folder's main claim.
+*Confidence: high that the effect is real, replicated, and demonstrated specifically in
+exercise contexts. Medium on the boundaries of the productive ability gap.*
+**VERIFY** before any design depends on a specific gap threshold, which `08` currently
+does implicitly.
+
+**Gollwitzer, implementation intentions.** Specifying when and where a behaviour will
+happen markedly improves follow-through. One of the better replicated findings in
+behaviour change, supported by later meta-analysis. The basis for `09`'s argument that
+the app should schedule sessions to specific days rather than issue weekly quotas.
+*Confidence: high.*
+
+**Christakis and Fowler**, spread of behaviour through social networks. Cited in `09`
+with an explicit caveat: the causal identification is genuinely contested, because
+homophily is very hard to separate from contagion in observational network data. Treat
+as suggestive, never quote an effect size.
+*Confidence: medium on the effect, high that the methodological criticism is substantive.*
+
+**Group and partnered exercise adherence.** A broad literature rather than a single
+citation. Training with others improves adherence. Well accepted, and `06` gives one
+mechanism for part of it.
+*Confidence: high on the general finding, low on any specific number.* **VERIFY** if a
+figure is ever quoted at a user.
+
+**Early dropout and the first weeks.** `09` claims the first two weeks disproportionately
+decide retention. Widely believed, and I do not have a source I trust for it.
+*Confidence: medium. Treated as a design assumption rather than a finding.* **VERIFY**
+
 ## Bodyweight scaling
 
 **Allometric scaling of strength to bodyweight**, roughly to the two-thirds power. Not a
@@ -119,3 +159,6 @@ In priority order, if this folder ever justifies the time:
    and gives no number, because I do not have one I trust.
 4. Whether the two-thirds exponent holds for untrained people. Probably not exactly, and
    nobody has much reason to have studied it.
+5. The productive ability gap for the Köhler effect. `06` and `08` both depend on there
+   being a band, and neither can currently say where it is. This is now the highest value
+   unknown in the folder, because the main claim rests on it.

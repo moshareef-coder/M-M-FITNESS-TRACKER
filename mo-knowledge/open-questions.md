@@ -75,7 +75,48 @@ most of the mechanism.
 
 **What would settle it:** a product decision, then a small amount of schema.
 
-## 7. Are we researching the right thing at all?
+## 7. Where is the productive ability gap?
+
+New, and now the most important unknown here. `06` rests on the Köhler effect, which
+only works when the ability gap between two people is moderate. Too small, nothing
+happens. Too large, the weaker person disengages and a conjunctive target becomes
+humiliating rather than motivating.
+
+Neither `06` nor `08` can say where that band is. So the folder's main claim currently
+has a hole in the middle of it.
+
+**What would settle it:** a proper read of the Feltz and Kerr experimental work, which
+manipulated the gap deliberately and should have the numbers. This is the single highest
+value hour of reading available to this project.
+
+**What we can do meanwhile:** design `08`'s comparison ladder so the *perceived* gap is
+always presented at its narrowest defensible framing. That is the right design whatever
+the number turns out to be.
+
+## 8. Does the pair effect show up in our own data?
+
+`09` states it as a testable prediction: sessions within a partnership should cluster in
+time more than chance, and more than two matched people training alone would.
+
+**What would settle it:** more users. With two, we cannot distinguish a real effect from
+Mo and Mell living in the same house.
+
+**Worth doing now:** write the query anyway, so it runs the day there is enough data
+rather than being remembered as a good idea nobody had time for.
+
+## 9. Should we ever give someone fewer days than they asked for?
+
+From `09`. If the honest read of someone's behaviour says three days and they asked for
+five, handing them five schedules four failures a week.
+
+But overriding a stated preference is exactly the paternalism the product rule exists to
+prevent, and being quietly downgraded by an app is its own insult.
+
+**What would settle it:** probably a middle path rather than an answer. Give the days
+they asked for, make some of them small enough to be unmissable, and let the plan
+converge on what they actually do without ever announcing that it did.
+
+## 10. Are we researching the right thing at all?
 
 The brief's section 3 argues the most valuable work is finding out what people actually
 say they want, in their own words, rather than our five abstract goals. That may well be
@@ -89,6 +130,19 @@ there are different bets:
 - **The brief bets** the goal is wrong for the person and fixing it needs better
   understanding of what they actually asked for.
 
-Both could be right. If only one is, the second one is probably more valuable, because a
-technically excellent plan for the wrong goal is still the wrong plan. That is worth
-saying out loud even though it argues against our own folder.
+Both could be right. If only one is, the brief's is probably more valuable, because a
+technically excellent plan for the wrong goal is still the wrong plan. That was worth
+saying out loud even though it argued against our own folder.
+
+**What changed with `06` to `09`.** That paragraph was written when this folder was only
+about individualisation, and it was fair then. It is now a third bet, and the third bet
+is the one worth having:
+
+- The brief bets **the goal is wrong for the person.**
+- Files `01` to `05` bet **the plan is wrong for the person.**
+- Files `06` to `09` bet **the plan is built for the wrong unit entirely**, because it is
+  built for one person when the product is two.
+
+The third is the only one of the three that nobody else in the market can copy quickly,
+because they would have to change what their product is first. That is the argument for
+spending the next block of effort there rather than on either of the others.
