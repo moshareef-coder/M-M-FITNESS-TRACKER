@@ -13,10 +13,13 @@ export const src = readFileSync(join(root, "index.html"), "utf8");
 export const style = src.match(/<style>([\s\S]*?)<\/style>/)[1];
 export const fonts = src.match(/<link[^>]*fonts[^>]*>/g)?.join("\n") || "";
 
-export function grab(re, what) {
+/* `group` picks a capture instead of the whole match, for the times the only
+   reliable anchors are markers that should not come along (a tab panel sits
+   between two HTML comments belonging to other tabs). */
+export function grab(re, what, group = 0) {
   const m = src.match(re);
   if (!m) throw new Error(`could not find ${what} in index.html`);
-  return m[0];
+  return m[group];
 }
 
 export function fn(name) {

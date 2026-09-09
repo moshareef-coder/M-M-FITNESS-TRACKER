@@ -3080,6 +3080,15 @@
     width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border);
     background: var(--panel-2); color: var(--text); display: flex; align-items: center; justify-content: center;
   }
+  /* Stands in for the two things a still capture genuinely cannot draw: the
+     Rive figure and the Chart.js weight line. Labelled, so a blank rectangle
+     is never mistaken for a broken screen. */
+  .gal-nofig {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    min-height: 150px; border: 1px dashed var(--border); border-radius: 12px;
+    color: var(--muted); font-size: 12px; font-weight: 700; text-align: center; padding: 12px;
+  }
+  .gal-nofig span { display: block; font-size: 10.5px; font-weight: 500; opacity: .75; }
   .proto-stage { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; padding: 18px; }
   .proto-phone {
     width: 393px; flex-shrink: 0; border: 1px solid var(--border); border-radius: 22px; overflow: hidden;
@@ -3231,6 +3240,101 @@
   </div>
 
   
+  <div id="tab-body" class="tab-panel hidden">
+    <div class="bi-title">Body Impact</div>
+
+    <div class="card bi-anim" style="--d:0ms">
+      <div class="bi-period" id="biPeriod">
+        <button type="button" data-period="today">Today</button>
+        <button type="button" data-period="week">This week</button>
+        <button type="button" data-period="lastweek">Last week</button>
+      </div>
+      <div class="bi-grid" id="biGrid">
+        <div class="bi-col-list">
+          <h3 class="bi-head" id="biHead">Muscles Hit <span id="biLevelsInfo"></span></h3>
+          <div class="bi-list" id="biList"></div>
+        </div>
+        <div class="bi-detail" id="biDetail"></div>
+        <div class="bi-figures" id="biFigures">
+          <div class="bi-fig" data-view="Front"><canvas id="bodyDiagramFront" class="bi-canvas"></canvas><div class="bi-callouts"></div></div>
+          <div class="bi-fig" data-view="Back"><canvas id="bodyDiagramBack" class="bi-canvas"></canvas><div class="bi-callouts"></div></div>
+        </div>
+      </div>
+      <div class="bi-hint" id="biHint"><span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M12 11V9.5a1.5 1.5 0 0 1 3 0V11"/><path d="M15 11.5v-1a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1a6 6 0 0 1-5.2-3l-2-3.4a1.5 1.5 0 0 1 2.5-1.6L9 15"/></svg>
+        Tap any muscle</span></div>
+      <div class="bi-section"><span id="biSectionTitle">Training Impact</span> <span id="biInfoSlot"></span></div>
+      <div class="bi-rings" id="biRings"></div>
+      <div class="bi-pieces" id="biPieces"></div>
+    </div>
+
+    <div class="card bi-anim" style="--d:80ms">
+      <div class="bi-section" style="margin-top:0"><span>What to train next</span> <span id="biNextInfoSlot"></span></div>
+      <div id="biNext"></div>
+    </div>
+
+    <div class="card bi-anim hidden" id="biShareCard" style="--d:160ms">
+      <div class="bi-section" style="margin-top:0">Shared with Partner <span id="biShareInfoSlot"></span></div>
+      <div class="bi-share" id="biShare"></div>
+    </div>
+
+  </div>
+
+  <div id="tab-progress" class="tab-panel hidden">
+    <div class="person-toggle">
+      <button type="button" class="tab-pill active" id="progMeBtn">You</button>
+      <button type="button" class="tab-pill" id="progPartnerBtn">Partner</button>
+    </div>
+
+    <div class="card" id="scaleCheckCard">
+      <h2>Log your weight</h2>
+      <p class="muted-note" id="scaleGoalNote" style="margin-top:-6px;"></p>
+      <div class="weigh-row">
+        <button type="button" class="round-btn" id="scaleMinus" aria-label="Down 0.5">&minus;</button>
+        <div class="weigh-field">
+          <input type="number" id="scaleWeightInput" inputmode="decimal" step="0.1" min="0"
+                 placeholder="0.0" autocomplete="off" aria-label="Weight" />
+          <span class="weigh-unit">lbs</span>
+        </div>
+        <button type="button" class="round-btn" id="scalePlus" aria-label="Up 0.5">+</button>
+      </div>
+      <button type="button" class="btn-primary" id="scaleSaveBtn" style="margin-top:12px;">Save weigh-in</button>
+    </div>
+
+    <div class="card metric-card" id="cardWeight">
+      <h2>Weight trend</h2>
+      <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--me)"></span><span id="legendMe">You</span></span>
+        <span><span class="dot" style="background:var(--partner)"></span><span id="legendPartner">Partner</span></span>
+      </div>
+    </div>
+
+    <div class="card metric-card" id="cardPhotos">
+      <h2>Body photos</h2>
+      <p class="muted-note" style="margin-top:-6px;" id="photoHint">One photo a day. Swipe back to see how far you've come.</p>
+      <div class="photo-strip" id="bodyPhotoStrip"></div>
+      <input type="file" id="bodyPhotoInput" accept="image/*" capture="environment" hidden />
+      <button type="button" class="btn-secondary" id="addBodyPhotoBtn">Add today's photo</button>
+    </div>
+
+    <div class="card metric-card" id="cardActivity">
+      <h2>Recent activity</h2>
+      <div class="log-list" id="logList"></div>
+    </div>
+
+    <div class="card" id="customiseCard">
+      <button type="button" class="customise-toggle" id="customiseToggle">
+        <span>Customise this tab</span><span class="link-arrow" id="customiseChevron">&rsaquo;</span>
+      </button>
+      <div id="customiseBody" class="hidden">
+        <p class="muted-note">Turn cards on or off. Nothing is deleted.</p>
+        <div class="metric-picker" id="metricPicker"></div>
+      </div>
+    </div>
+
+  </div>
+
   </div>
   <div class="sheet-scrim hidden" id="liveScrim">
     <div class="partner-sheet" id="liveSheet"></div>
@@ -3396,6 +3500,38 @@ const BODY_GROUP_LABELS = {
 };
 
 
+const MUSCLE_GROUPS = ["chest", "shoulders", "traps", "lats", "lowerback", "biceps", "triceps", "forearms", "abs", "obliques", "glutes", "quads", "hamstrings", "calves"];
+
+
+const BODY_IMPACT_TARGET = { today: 8, week: 14, lastweek: 14 };
+
+
+const BODY_RING_FILLERS = ["chest", "lats", "quads", "shoulders", "abs", "hamstrings", "glutes", "biceps", "triceps", "calves", "traps", "lowerback", "obliques", "forearms"];
+
+
+const BODY_HEAT_STOPS = [
+  [0, 242, 208, 36], [0.34, 245, 155, 31], [0.67, 224, 82, 31], [1, 168, 20, 20],
+];
+
+
+const COVERAGE_TARGETS = [
+  { key: "chest",     label: "Chest" },
+  { key: "back",      label: "Back",  members: ["lats", "traps"] },
+  { key: "shoulders", label: "Shoulders" },
+  { key: "arms",      label: "Arms",  members: ["biceps", "triceps", "forearms"] },
+  { key: "legs",      label: "Legs",  members: ["quads", "hamstrings", "glutes", "calves"] },
+  { key: "core",      label: "Core",  members: ["abs", "obliques", "lowerback"] },
+];
+
+
+const TRACK_OPTIONS = [
+  { key: "weight",   label: "Body weight",   icon: "trending",  card: "cardWeight" },
+  { key: "photos",   label: "Body photos",   icon: "medal",     card: "cardPhotos" },
+  { key: "activity", label: "Activity log",  icon: "checklist", card: "cardActivity" },
+  { key: "steps",    label: "Steps",         icon: "run",       card: null, needsApp: true },
+];
+
+
 const ISSUES_HTML = "<section class=\"fig-page\" id=\"p-open-issues\"><div class=\"fig-page-head\"><span class=\"fig-page-n\">!</span><h2 class=\"fig-page-name\">Open issues</h2></div><p class=\"fig-page-note\">The master sheet: everything flagged and not yet done, checked against the code or the live config rather than remembered. 16 open right now.</p><div class=\"fig-section\" id=\"i-before-real-users\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Before real users</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">4</span></div><p class=\"iss-note\">These are the ones that bite the first stranger who signs up.</p><div class=\"iss-list\"><div class=\"iss iss-blocker\"><div class=\"iss-top\"><span class=\"iss-tag blocker\">Blocker</span><span class=\"iss-title\">Email sign-in is capped at 2 messages an hour</span></div><p class=\"iss-detail\">Supabase's built-in mailer is development only, and the app now offers email as a way in. The third person to request a link in an hour gets nothing. Needs Resend or Postmark wired in: a config change, no code.</p><div class=\"iss-where\">Supabase auth settings</div></div><div class=\"iss iss-blocker\"><div class=\"iss-top\"><span class=\"iss-tag blocker\">Blocker</span><span class=\"iss-title\">Errors are shown but never recorded</span></div><p class=\"iss-detail\">A crash raises the fatal banner and names the function, so the user sees it. Nothing is sent anywhere, so we never learn it happened. Needs a table plus a hook on the existing error listeners; no new vendor.</p><div class=\"iss-where\">index.html, showFatal</div></div><div class=\"iss iss-blocker\"><div class=\"iss-top\"><span class=\"iss-tag blocker\">Blocker</span><span class=\"iss-title\">Legal pages predate half the app</span></div><p class=\"iss-detail\">privacy.html and support.html were written before clips, live sessions, push notifications and photos existed, and use a different design language from the app. Apple requires the privacy policy to match what is actually collected.</p><div class=\"iss-where\">privacy.html, support.html</div></div><div class=\"iss iss-todo\"><div class=\"iss-top\"><span class=\"iss-tag todo\">To do</span><span class=\"iss-title\">Onboarding has never been walked as a genuinely new account</span></div><p class=\"iss-detail\">Name, goal, detail, pace, plan, then pairing. Every path exists but has only ever been used by accounts that already had data. Empty states for a truly fresh account need the same pass the rest of the app got.</p><div class=\"iss-where\">index.html, renderOnboardStep</div></div></div></div><div class=\"fig-section\" id=\"i-waiting-on-you\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Waiting on you</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">4</span></div><p class=\"iss-note\">Nothing here can move without an account, a click, or a decision only you can make.</p><div class=\"iss-list\"><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">Sign in with Apple needs the Developer account</span></div><p class=\"iss-detail\">Apple requires it once any social login is offered, so it blocks App Store submission. The keys cannot be generated without the paid account. The sign-in screen already has room for the button.</p><div class=\"iss-where\">$99/yr Apple Developer Program</div></div><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">Jawa is still not a collaborator on the repo</span></div><p class=\"iss-detail\">Her CODEOWNERS entries point at @jawaabdulal now, but a CODEOWNERS line does nothing until she has repo access. The deploy token cannot add her: it is fine-grained with no Administration permission.</p><div class=\"iss-where\">GitHub, Settings, Collaborators</div></div><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">meridian-web-studio has push access and I do not know who that is</span></div><p class=\"iss-detail\">A second collaborator with write access to the repo, account created 2026-08-01, no activity on it. Worth confirming who it is or removing it before real users exist.</p><div class=\"iss-where\">GitHub, Settings, Collaborators</div></div><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">Photo retention was never decided</span></div><p class=\"iss-detail\">Raised in the strategy meeting and left open. Proof photos expire after 30 days. Progress photos tied to a goal have no policy at all, and storage cost was explicitly called a real constraint.</p><div class=\"iss-where\">Supabase storage</div></div></div></div><div class=\"fig-section\" id=\"i-designed-not-built\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Designed, not built</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">1</span></div><p class=\"iss-note\">Full mockups exist and the reasoning behind every choice is written down. Someone just needs to wire it into the real app.</p><div class=\"iss-list\"><div class=\"iss iss-todo\"><div class=\"iss-top\"><span class=\"iss-tag todo\">To do</span><span class=\"iss-title\">Milestone badges: 11 designed with real icons, 15 more written up as concepts</span></div><p class=\"iss-detail\">Four categories (Getting started, Consistency together, Strength, Keeping the record) plus three unlock celebrations. Everything routes through each person's own weekly target rather than a raw day count, on purpose: an earlier pass named two badges after a perfect 7-day week and a no-miss streak, which quietly punished using a rest day, and that got corrected before anything else was built on top of it. Locked badges hide the icon and the name from the user (a plain question mark, not a preview of what is coming) so the surprise stays a surprise. Real SVGs, category colors and the celebration copy are all in the gallery's Badges section now. Needs a badges table (who has earned what), the unlock check itself, and the celebration overlay wired into index.html.</p><div class=\"iss-where\">gallery, Badges section</div></div></div></div><div class=\"fig-section\" id=\"i-waiting-on-the-native-build\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Waiting on the native build</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">2</span></div><p class=\"iss-note\">Real features that a PWA genuinely cannot do. They all arrive with the same Capacitor step.</p><div class=\"iss-list\"><div class=\"iss iss-native\"><div class=\"iss-top\"><span class=\"iss-tag native\">Needs native</span><span class=\"iss-title\">The timer stops when the app is backgrounded</span></div><p class=\"iss-detail\">Deliberate today, so time asleep is not counted, but the ask was for it to keep running like a navigation app. Needs genuine background execution, which the web cannot give.</p><div class=\"iss-where\">Capacitor</div></div><div class=\"iss iss-native\"><div class=\"iss-top\"><span class=\"iss-tag native\">Needs native</span><span class=\"iss-title\">Hands-free voice logging</span></div><p class=\"iss-detail\">Costed 2026-09-06. Safari has never shipped the speech recognition API, so this cannot be built as a PWA at all. Native gives Apple's on-device Speech framework, but foreground only: push to talk, never always listening. Camera hand gestures are the one option that works in the web app today.</p><div class=\"iss-where\">Capacitor, or MediaPipe in the web app</div></div></div></div><div class=\"fig-section\" id=\"i-deliberate-debt\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Deliberate debt</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">5</span></div><p class=\"iss-note\">Known, chosen on purpose, and written down so the reasoning is not lost.</p><div class=\"iss-list\"><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">Every write still refetches every table</span></div><p class=\"iss-detail\">loadAll() runs after almost every write. It is one parallel batch now, and it no longer repaints Home when Home is not on screen, but it still refetches everything rather than updating what changed. Fine at current volume.</p><div class=\"iss-where\">index.html, loadAll</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">Two tables are fetched in full, unbounded</span></div><p class=\"iss-detail\">fit_entries and exercise_logs are read whole. Deliberately not windowed: personal records need a true all-time max per exercise and the calendar needs the true first entry ever, so a rolling window would make both silently wrong. Indexed on (email, entry_date) in the meantime.</p><div class=\"iss-where\">index.html, loadAll</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">The cron secret is inlined in the database</span></div><p class=\"iss-detail\">Vault is unavailable on this project, so the shared secret sits in the cron job commands and inside the live-start trigger function body. Anyone with database access can read it. Accepted for now; it is not a user credential.</p><div class=\"iss-where\">Postgres, cron.job and notify_live_session_start</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">The gallery does not cover four tabs</span></div><p class=\"iss-detail\">Workout, Body, Progress and Setup are not in here. They are covered instead by the app harness, which runs the real app against fixture data and screenshots every tab.</p><div class=\"iss-where\">scripts/make-states.mjs</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">Two new sheets are unverified visually</span></div><p class=\"iss-detail\">The encouragement composer and the askForName sheet that replaced the browser prompts passed the boot check and reuse the app's existing composer pattern, but have not been screenshotted. The browser harness kept getting killed the day they shipped.</p><div class=\"iss-where\">index.html, sendEncouragement and askForName</div></div></div></div><div class=\"fig-section\" id=\"i-decided-closed\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Decided, closed</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">2</span></div><p class=\"iss-note\">Kept so they do not come back around as fresh ideas.</p><div class=\"iss-list\"><div class=\"iss iss-closed\"><div class=\"iss-top\"><span class=\"iss-tag closed\">Closed</span><span class=\"iss-title\">No music integration</span></div><p class=\"iss-detail\">Showing what your partner is listening to via Spotify was overruled in the strategy meeting: music apps already play in the background, people use different services, and it is not core. Do not build it.</p><div class=\"iss-where\">Decided 2026-09-01</div></div><div class=\"iss iss-closed\"><div class=\"iss-top\"><span class=\"iss-tag closed\">Closed</span><span class=\"iss-title\">Live streaming is not the cheering feature</span></div><p class=\"iss-detail\">Deliberately not FaceTime or a live stream, which was agreed to be too expensive. A short clip that loops on their session screen and then disappears was the chosen shape, and it shipped.</p><div class=\"iss-where\">Decided 2026-09-01</div></div></div></div></section>";
 const ISSUES_TREE = "<button type=\"button\" class=\"fig-page-btn\" data-page=\"p-open-issues\"><span class=\"caret\">&#9662;</span>Open issues<span class=\"count\">16</span></button><div class=\"fig-kids\"><a class=\"fig-sec-label\" href=\"#i-before-real-users\">Before real users<span>4</span></a><a class=\"fig-sec-label\" href=\"#i-waiting-on-you\">Waiting on you<span>4</span></a><a class=\"fig-sec-label\" href=\"#i-designed-not-built\">Designed, not built<span>1</span></a><a class=\"fig-sec-label\" href=\"#i-waiting-on-the-native-build\">Waiting on the native build<span>2</span></a><a class=\"fig-sec-label\" href=\"#i-deliberate-debt\">Deliberate debt<span>5</span></a><a class=\"fig-sec-label\" href=\"#i-decided-closed\">Decided, closed<span>2</span></a></div>";
 const BADGES_HTML = "<section class=\"fig-page\" id=\"p-badges\"><div class=\"fig-page-head\"><span class=\"fig-page-n\">B</span><h2 class=\"fig-page-name\">Badges</h2></div><p class=\"fig-page-note\">Not wired into the app yet: a design handoff, so whoever builds this has the real icons and the real rule rather than a description of them. Every badge routes through their own weekly target, never a raw day count, so nobody is penalized for a rest day. Locked badges hide the icon and the name in the shipped app, shown here as a plain question mark, with the real name kept in a caption for whoever is building it, not for the end user.</p><div class=\"fig-section\" id=\"bdg-getting-started\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Getting started</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">3</span></div><div class=\"bdg-grid\"><div class=\"bdg bdg-earned\"><div class=\"bdg-ring\" style=\"background:color-mix(in srgb, #2d6bff 16%, var(--panel-2));box-shadow:0 0 0 1.5px #2d6bff, 0 8px 20px -8px color-mix(in srgb, #2d6bff 40%, transparent)\"><svg viewBox=\"0 0 24 24\" width=\"34\" height=\"34\"><g fill=\"none\" stroke=\"#2d6bff\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 21V3\"/><path d=\"M6 4h11l-3 4 3 4H6\"/></g></svg></div><div class=\"bdg-label\">First Workout</div><div class=\"bdg-sub\">Logged</div></div><div class=\"bdg bdg-earned\"><div class=\"bdg-ring\" style=\"background:color-mix(in srgb, #2fa968 16%, var(--panel-2));box-shadow:0 0 0 1.5px #2fa968, 0 8px 20px -8px color-mix(in srgb, #2fa968 40%, transparent)\"><svg viewBox=\"0 0 24 24\" width=\"34\" height=\"34\"><g fill=\"none\" stroke=\"#2fa968\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"5\" r=\"2.3\"/><path d=\"M12 8v6M12 8l-5 2M12 8l5 2M12 14l-4 7M12 14l4 7\"/></g></svg></div><div class=\"bdg-label\">Full Body</div><div class=\"bdg-sub\">One session, every group</div></div><div class=\"bdg bdg-locked\"><div class=\"bdg-ring bdg-mystery\">?</div><div class=\"bdg-label\">Locked</div><div class=\"bdg-cap\">Goal Week, Hit your own weekly number</div></div></div></div><div class=\"fig-section\" id=\"bdg-consistency-together\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Consistency, together</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">3</span></div><div class=\"bdg-grid\"><div class=\"bdg bdg-earned\"><div class=\"bdg-ring\" style=\"background:color-mix(in srgb, #ff6b4a 16%, var(--panel-2));box-shadow:0 0 0 1.5px #ff6b4a, 0 8px 20px -8px color-mix(in srgb, #ff6b4a 40%, transparent)\"><svg viewBox=\"0 0 24 24\" width=\"34\" height=\"34\"><g fill=\"none\" stroke=\"#ff6b4a\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2.3,1.5) scale(0.62)\"><path d=\"M12 2C12 6 8 8 8 12a4 4 0 1 0 8 0c0-1-.3-1.8-.8-2.5.3 1.8-.9 2.5-1.8 2.5-1.3 0-1.9-1-1.4-2.3C13 8 12.7 5 12 2Z\"/></g><g transform=\"translate(7.3,1.5) scale(0.62)\"><path d=\"M12 2C12 6 8 8 8 12a4 4 0 1 0 8 0c0-1-.3-1.8-.8-2.5.3 1.8-.9 2.5-1.8 2.5-1.3 0-1.9-1-1.4-2.3C13 8 12.7 5 12 2Z\"/></g></g></svg></div><div class=\"bdg-label\">Two Weeks Running</div><div class=\"bdg-sub\">Two weeks in a row, both of you</div></div><div class=\"bdg bdg-earned\"><div class=\"bdg-ring\" style=\"background:color-mix(in srgb, #a8ff00 16%, var(--panel-2));box-shadow:0 0 0 1.5px #a8ff00, 0 8px 20px -8px color-mix(in srgb, #a8ff00 40%, transparent)\"><svg viewBox=\"0 0 24 24\" width=\"34\" height=\"34\"><text x=\"12\" y=\"16.2\" text-anchor=\"middle\" font-family=\"DM Sans\" font-weight=\"800\" font-size=\"9.5\" fill=\"#a8ff00\">100</text></svg></div><div class=\"bdg-label\">100 Together</div><div class=\"bdg-sub\">Combined workouts</div></div><div class=\"bdg bdg-locked\"><div class=\"bdg-ring bdg-mystery\">?</div><div class=\"bdg-label\">Locked</div><div class=\"bdg-cap\">Full Coverage, Every muscle, one week</div></div></div></div><div class=\"fig-section\" id=\"bdg-strength\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Strength</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">3</span></div><div class=\"bdg-grid\"><div class=\"bdg bdg-earned\"><div class=\"bdg-ring\" style=\"background:color-mix(in srgb, #ff6b4a 16%, var(--panel-2));box-shadow:0 0 0 1.5px #ff6b4a, 0 8px 20px -8px color-mix(in srgb, #ff6b4a 40%, transparent)\"><svg viewBox=\"0 0 24 24\" width=\"34\" height=\"34\"><g fill=\"none\" stroke=\"#ff6b4a\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 17h16M8 12l4-5 4 5M12 7v10\"/></g></svg></div><div class=\"bdg-label\">New PR</div><div class=\"bdg-sub\">Beat your own best</div></div><div class=\"bdg bdg-locked\"><div class=\"bdg-ring bdg-mystery\">?</div><div class=\"bdg-label\">Locked</div><div class=\"bdg-cap\">Double PR Week, You both hit one</div></div><div class=\"bdg bdg-locked\"><div class=\"bdg-ring bdg-mystery\">?</div><div class=\"bdg-label\">Locked</div><div class=\"bdg-cap\">Bodyweight Bench, The first real ladder rung</div></div></div></div><div class=\"fig-section\" id=\"bdg-keeping-the-record\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Keeping the record</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">2</span></div><div class=\"bdg-grid\"><div class=\"bdg bdg-locked\"><div class=\"bdg-ring bdg-mystery\">?</div><div class=\"bdg-label\">Locked</div><div class=\"bdg-cap\">First Photo, Day one of the record</div></div><div class=\"bdg bdg-locked\"><div class=\"bdg-ring bdg-mystery\">?</div><div class=\"bdg-label\">Locked</div><div class=\"bdg-cap\">1 Year, Together, on the app</div></div></div></div><div class=\"fig-section\" id=\"bdg-unlock-moments\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Unlock moments</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">3</span></div><p class=\"iss-note\">The full-screen celebration when a badge unlocks. Shown static here; the real version stages the ring in with an overshoot bounce, then the headline and button fade up a beat after.</p><div class=\"bdg-cel-row\"><div class=\"bdg-cel\"><div class=\"bdg-cel-ring\" style=\"box-shadow:0 0 0 2px #2d6bff, 0 0 60px -10px #2d6bff\"><svg viewBox=\"0 0 24 24\" width=\"46\" height=\"46\"><g fill=\"none\" stroke=\"#2d6bff\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 21V3\"/><path d=\"M6 4h11l-3 4 3 4H6\"/></g></svg></div><h3 class=\"bdg-cel-h\">First one down.</h3><p class=\"bdg-cel-sub\">Every streak starts here. Welcome to the log.</p><div class=\"bdg-cel-cta\" style=\"background:#2d6bff\">Keep going</div></div><div class=\"bdg-cel\"><div class=\"bdg-cel-ring\" style=\"box-shadow:0 0 0 2px #a8ff00, 0 0 60px -10px #a8ff00\"><svg viewBox=\"0 0 24 24\" width=\"46\" height=\"46\"><text x=\"12\" y=\"16.2\" text-anchor=\"middle\" font-family=\"DM Sans\" font-weight=\"800\" font-size=\"9.5\" fill=\"#a8ff00\">100</text></svg></div><h3 class=\"bdg-cel-h\">100 together.</h3><p class=\"bdg-cel-sub\">Not 100 each: 100 total. That is every session, both of you, added up.</p><div class=\"bdg-cel-cta\" style=\"background:#a8ff00\">Keep going</div></div><div class=\"bdg-cel\"><div class=\"bdg-cel-ring\" style=\"box-shadow:0 0 0 2px #ff6b4a, 0 0 60px -10px #ff6b4a\"><svg viewBox=\"0 0 24 24\" width=\"46\" height=\"46\"><g fill=\"none\" stroke=\"#ff6b4a\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2.3,1.5) scale(0.62)\"><path d=\"M12 2C12 6 8 8 8 12a4 4 0 1 0 8 0c0-1-.3-1.8-.8-2.5.3 1.8-.9 2.5-1.8 2.5-1.3 0-1.9-1-1.4-2.3C13 8 12.7 5 12 2Z\"/></g><g transform=\"translate(7.3,1.5) scale(0.62)\"><path d=\"M12 2C12 6 8 8 8 12a4 4 0 1 0 8 0c0-1-.3-1.8-.8-2.5.3 1.8-.9 2.5-1.8 2.5-1.3 0-1.9-1-1.4-2.3C13 8 12.7 5 12 2Z\"/></g></g></svg></div><h3 class=\"bdg-cel-h\">Two weeks running.</h3><p class=\"bdg-cel-sub\">Two weeks in a row you both hit your own goal. That is the actual hard part.</p><div class=\"bdg-cel-cta\" style=\"background:#ff6b4a\">Keep going</div></div></div></div><div class=\"fig-section\" id=\"bdg-concepts\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Written, not designed</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">15</span></div><p class=\"iss-note\">Named and reasoned through, no icon or medallion built yet. Same rule as above: everything here is rest-day safe by construction, nothing rewards never resting.</p><div class=\"bdg-concept-group\"><div class=\"bdg-concept-name\">Consistency, goal-based and rest-day safe</div><ul class=\"bdg-concept-list\"><li>First time you hit your weekly goal</li><li>A full month: four weeks running, both of you</li><li>Two months running</li><li>Used a rest day: tapped rest day instead of quietly skipping, before the streak broke</li><li>Back at it: first session after a week or more away, framed as welcome back, never a scolding</li></ul></div><div class=\"bdg-concept-group\"><div class=\"bdg-concept-name\">Strength</div><ul class=\"bdg-concept-list\"><li>5 total PRs</li><li>10 total PRs</li><li>The comeback PR: a new best on a lift not touched in 30 or more days</li></ul></div><div class=\"bdg-concept-group\"><div class=\"bdg-concept-name\">Variety</div><ul class=\"bdg-concept-list\"><li>Tried 3 different training types in a month</li><li>First time logging yoga, pilates or calisthenics, whichever is new for you</li></ul></div><div class=\"bdg-concept-group\"><div class=\"bdg-concept-name\">Partner, lean hardest here since it is the differentiator</div><ul class=\"bdg-concept-list\"><li>Evenly matched: a week where you both logged the exact same number of sessions</li><li>Cheered your partner 10 times</li><li>Cheered your partner 25 times</li><li>Reset together: you both came back from a break in the same week</li><li>Both hit your own goal, same week, for the first time</li></ul></div></div></section>";
@@ -3447,6 +3583,10 @@ const currentWeekDates = () => WEEK;
 const todayStr = () => TODAY;
 const isoDate = (d) => d.toISOString().slice(0, 10);
 const entriesFor = (n) => ENTRIES[n] || [];
+/* The app keeps one flat table and filters it; the gallery keeps a map by
+   name. Progress reads the flat one directly, so it is flattened from the map
+   at render time rather than kept as a second fixture that could disagree. */
+let ALL_ENTRIES = [];
 const gymDaysThisWeek = (n) => (n === ME ? MY_DAYS : THEIR_DAYS);
 const weeklyGoalFor = (e) => (e === MY_EMAIL ? MY_TARGET : THEIR_TARGET);
 const todayEntryFor = () => (TRAINED_TODAY ? { gym: true } : null);
@@ -3476,7 +3616,7 @@ const openLiveSheet = () => {};
 const closeLiveSheet = () => {};
 const openNoteComposer = () => {};
 const openNextClip = () => {};
-let SESSION = null, CLIP_INBOX = [], TODAY_WORKOUT = null;
+let SESSION = null, CLIP_INBOX = [], TODAY_WORKOUT = null, WORKOUT_MODE = null;
 /* Animation bookkeeping renderSession reads. The gallery is a still life, so
    these stay null and nothing animates in a captured frame. */
 let SESSION_JUST_SET = null, SESSION_LAST_EX = 0;
@@ -3505,6 +3645,46 @@ const toggleSet = () => {};
 const startNextSet = () => {};
 const jumpToExercise = () => {};
 const finishExerciseAndAdvance = () => {};
+/* The Body tab's figure is Rive on a WebGL canvas. It cannot run in a static
+   capture, so everything that touches it is a no-op and the canvas is labelled
+   in the frame instead of pretending. The rings, the ranked list, the detail
+   panel and What to train next are all the app's real code. */
+let BODY_PERIOD = null, BODY_LAST_KEY = null, BODY_LAST_TARGET = {}, BODY_PULSE_RAF = null;
+let BODY_GREENED = null, BODY_HEAT_PALETTE = null, BODY_MUSCLE_COLOR = {}, BODY_ALL_MUSCLES = [];
+let riveFrontCtrl = null, riveBackCtrl = null, riveLoadedSex = "Male";
+/* The app's weekStartStr reads the real clock, which would put the fixture
+   week out of range and leave every "this week" panel empty. Same rule,
+   anchored to the fixture day instead. */
+const weekStartStr = () => {
+  const d = new Date(TODAY + "T00:00:00");
+  const day = d.getDay();
+  d.setDate(d.getDate() + ((day === 0 ? -6 : 1) - day));
+  return isoDate(d);
+};
+const renderBodyDiagram = async () => {};
+const bodyRampFigures = () => {};
+const bodyBuildOrder = () => [];
+const bodyPaintPalettes = () => ({});
+const bodyHeatRGB = () => ({ r: 0, g: 0, b: 0 });
+const bodyIsolateMuscle = () => {};
+const bodyRestoreGreen = () => {};
+const bodyStopPulse = () => {};
+const bodyClearFocusUI = () => {};
+const bodyPositionCallouts = () => {};
+const bodyFocusMuscle = async () => {};
+
+/* Progress: the chart needs Chart.js off a CDN and the photos need signed
+   storage URLs, so those two panels are stubbed and the rest is real. */
+let PROGRESS_VIEW = "me";
+const SCALE_STATE = { weight: 0 };
+const renderWeightChart = () => {};
+const renderBodyPhotos = async () => {};
+const loadBodyPhotos = async () => [];
+const deleteBodyPhoto = () => {};
+const toggleMetric = () => {};
+const cssVar = () => "#888";
+const loadScriptOnce = () => Promise.resolve();
+
 /* The app loads these as ES modules. Here the answers are baked in. */
 let riveBodyPromise = null, bodyDetailPromise = null;
 const ensureRiveBodyModule = () => Promise.resolve(null);
@@ -4799,6 +4979,527 @@ function writeRev() {
   if (label) label.textContent = `${Math.round(genRevShown)}%`;
 }
 
+
+function bodyPeriodRange(period) {
+  if (period === "today") {
+    const s = todayStr();
+    const e = new Date(s + "T00:00:00");
+    e.setDate(e.getDate() + 1);
+    return [s, isoDate(e)];
+  }
+  const start = new Date(weekStartStr() + "T00:00:00");
+  if (period === "lastweek") start.setDate(start.getDate() - 7);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  return [isoDate(start), isoDate(end)];
+}
+
+
+function bodyPeriodWord(period) {
+  return period === "today" ? "today" : period === "week" ? "this week" : "last week";
+}
+
+
+function bodyHeatColor(pct) {
+  const p = Math.max(0, Math.min(1, pct));
+  for (let i = 1; i < BODY_HEAT_STOPS.length; i++) {
+    const [p0, r0, g0, b0] = BODY_HEAT_STOPS[i - 1];
+    const [p1, r1, g1, b1] = BODY_HEAT_STOPS[i];
+    if (p <= p1) {
+      const t = p1 === p0 ? 0 : (p - p0) / (p1 - p0);
+      return `rgb(${Math.round(r0 + (r1 - r0) * t)}, ${Math.round(g0 + (g1 - g0) * t)}, ${Math.round(b0 + (b1 - b0) * t)})`;
+    }
+  }
+  const [, r, g, b] = BODY_HEAT_STOPS[BODY_HEAT_STOPS.length - 1];
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+
+function bodyImpactLevel(pct) {
+  return pct >= 0.75 ? "High" : pct >= 0.4 ? "Medium" : "Low";
+}
+
+
+function bodyImpactRank(volumes, period) {
+  const target = BODY_IMPACT_TARGET[period];
+  return MUSCLE_GROUPS
+    .map((g) => ({ key: g, label: BODY_GROUP_LABELS[g], sets: volumes[g] || 0, pct: Math.min(1, (volumes[g] || 0) / target) }))
+    .filter((m) => m.sets > 0)
+    .sort((a, b) => b.sets - a.sets);
+}
+
+
+function bodyFmtSets(v) {
+  const n = Math.round(v * 10) / 10;
+  return `${n} ${n === 1 ? "set" : "sets"}`;
+}
+
+
+function computeMuscleVolumeBetween(name, startStr, endStr) {
+  const volumes = {};
+  MUSCLE_GROUPS.forEach((g) => { volumes[g] = 0; });
+
+  ALL_EXERCISE_LOGS
+    .filter((l) => l.user_name === name && l.entry_date >= startStr && l.entry_date < endStr)
+    .forEach((l) => {
+      const rule = classifyMuscles(l.exercise_name);
+      if (!rule) return;
+      // A timed class has no sets. Count roughly ten minutes as one set of
+      // volume so a 45-minute Pilates class registers like real work rather
+      // than a single set.
+      const sets = l.duration_min
+        ? Math.max(1, Math.round(l.duration_min / 10))
+        : (l.sets || 1);
+      rule.primary.forEach((g) => { if (g in volumes) volumes[g] += sets; });
+      rule.secondary.forEach((g) => { if (g in volumes) volumes[g] += sets * 0.5; });
+    });
+  return volumes;
+}
+
+
+function computeMuscleDetailBetween(name, startStr, endStr) {
+  const volumes = {}, hitBy = {};
+  ALL_EXERCISE_LOGS
+    .filter((l) => l.user_name === name && l.entry_date >= startStr && l.entry_date < endStr)
+    .forEach((l) => {
+      const res = BODY_DETAIL.detail.hitsForExercise(l.exercise_name, classifyMuscles(l.exercise_name));
+      if (!res) return;
+      const sets = l.duration_min ? Math.max(1, Math.round(l.duration_min / 10)) : (l.sets || 1);
+      for (const [k, w] of Object.entries(res.hits)) {
+        volumes[k] = (volumes[k] || 0) + sets * w;
+        const list = (hitBy[k] ??= new Map());
+        const id = l.exercise_name.trim().toLowerCase();
+        const cur = list.get(id) || { name: l.exercise_name.trim(), sets: 0, weight: w };
+        cur.sets += sets;
+        list.set(id, cur);
+      }
+    });
+  return { volumes, hitBy };
+}
+
+
+function countUp(el, target, { ms = 900, delay = 0, prefix = "", suffix = "" } = {}) {
+  const done = () => { el.textContent = `${prefix}${Math.round(target)}${suffix}`; };
+  if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) { done(); return; }
+  const t0 = performance.now() + delay;
+  const tick = (now) => {
+    if (!el.isConnected) return;
+    const t = Math.max(0, Math.min(1, (now - t0) / ms));
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = `${prefix}${Math.round(target * eased)}${suffix}`;
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+
+function bodyCountUp(el, target, ms, delay) {
+  countUp(el, target, { ms, delay, suffix: "%" });
+}
+
+
+function bodyAreaStates() {
+  const [weekStart, weekEnd] = [weekStartStr(), bodyPeriodRange("today")[1]];
+  const weekVol = computeMuscleVolumeBetween(ME, weekStart, weekEnd);
+  const mine = ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME);
+  const entryTime = (date) => {
+    const e = entriesFor(ME).find((x) => x.entry_date === date);
+    return e?.workout_at ? new Date(e.workout_at).getTime() : new Date(date + "T18:00:00").getTime();
+  };
+  return COVERAGE_TARGETS.map((t) => {
+    const members = t.members || [t.key];
+    const weekSets = members.reduce((n, k) => n + (weekVol[k] || 0), 0);
+    let lastDate = "";
+    for (const log of mine) {
+      const rule = classifyMuscles(log.exercise_name);
+      if (!rule) continue;
+      const hit = [...rule.primary, ...rule.secondary].some((g) => members.includes(g));
+      if (hit && log.entry_date > lastDate) lastDate = log.entry_date;
+    }
+    const hoursLeft = lastDate
+      ? BODY_RECOVERY_HOURS - (Date.now() - entryTime(lastDate)) / 3600000
+      : -1;
+    return { ...t, members, weekSets, lastDate, hoursLeft, ready: hoursLeft <= 0 };
+  });
+}
+
+
+async function avatarHTML(email, name, cls, tag = "button") {
+  const url = await avatarUrlFor(email);
+  const inner = url
+    ? `<img src="${url}" alt="" />`
+    : escapeHtml(initials(name || "?"));
+  const type = tag === "button" ? ' type="button"' : "";
+  return `<${tag}${type} class="av ${cls}" aria-label="${escapeHtml(name || "")}">${inner}</${tag}>`;
+}
+
+
+function renderBodyTab(animate = false) {
+  if (!BODY_PERIOD) {
+    const [s, e] = bodyPeriodRange("today");
+    const today = computeMuscleVolumeBetween(ME, s, e);
+    BODY_PERIOD = Object.values(today).some((v) => v > 0) ? "today" : "week";
+  }
+  const [start, end] = bodyPeriodRange(BODY_PERIOD);
+  const volumes = computeMuscleVolumeBetween(ME, start, end);
+  const ranked = bodyImpactRank(volumes, BODY_PERIOD);
+  const key = `${ME}|${BODY_PERIOD}|${JSON.stringify(volumes)}`;
+  if (key !== BODY_LAST_KEY) animate = true;
+  BODY_LAST_KEY = key;
+
+  document.querySelectorAll("#biPeriod button").forEach((b) => b.classList.toggle("active", b.dataset.period === BODY_PERIOD));
+  $("biHead").textContent = "Muscles Hit";
+
+  renderBodyList(ranked, animate);
+  renderBodyRings(ranked, animate);
+  renderBodyDiagram(animate);
+  if (BODY_FOCUS) renderBodyDetail();
+  renderBodyNext(animate);
+  renderBodyShare();
+}
+
+
+function renderBodyList(ranked, animate) {
+  const el = $("biList");
+  el.classList.toggle("no-anim", !animate);
+  const top = ranked.slice(0, 5);
+  if (!top.length) {
+    el.innerHTML = `<div class="bi-empty">Nothing logged ${bodyPeriodWord(BODY_PERIOD)} yet. Finish a session and the muscles you hit light up here.</div>`;
+    return;
+  }
+  el.innerHTML = top.map((m, i) => {
+    const fill = m.pct * 6;
+    const segs = Array.from({ length: 6 }, (_, s) => {
+      const f = Math.max(0, Math.min(1, fill - s));
+      return `<span class="bi-seg"><i style="--fill:${animate ? 0 : f.toFixed(2)};--d:${i * 70 + s * 45}ms" data-fill="${f.toFixed(2)}"></i></span>`;
+    }).join("");
+    return `<button type="button" class="bi-row" data-group="${m.key}" style="--heat:${bodyHeatColor(m.pct)}">
+      <div class="bi-row-top"><span class="bi-row-name">${escapeHtml(m.label)}</span><span class="bi-row-level">${bodyImpactLevel(m.pct)}${icon("chevronRight", 13)}</span></div>
+      <div class="bi-segs">${segs}</div>
+    </button>`;
+  }).join("");
+  if (animate) {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.querySelectorAll(".bi-seg i").forEach((i) => i.style.setProperty("--fill", i.dataset.fill));
+    }));
+  }
+}
+
+
+function renderBodyRings(ranked, animate) {
+  const el = $("biRings");
+  el.classList.toggle("no-anim", !animate);
+  const shown = ranked.slice(0, 5);
+  for (const g of BODY_RING_FILLERS) {
+    if (shown.length >= 5) break;
+    if (!shown.some((m) => m.key === g)) shown.push({ key: g, label: BODY_GROUP_LABELS[g], sets: 0, pct: 0 });
+  }
+  const r = 42, c = 2 * Math.PI * r;
+  el.innerHTML = shown.map((m, i) => {
+    const pct = Math.round(m.pct * 100);
+    const off = c * (1 - m.pct);
+    return `<button type="button" class="bi-ring ${i === 0 && m.sets > 0 ? "top" : ""} ${m.sets > 0 ? "" : "dim"}" data-group="${m.key}" style="--heat:${bodyHeatColor(m.pct)}">
+      <div class="bi-ring-svg">
+        <svg viewBox="0 0 100 100">
+          <circle class="track" cx="50" cy="50" r="${r}" fill="none" stroke-width="9"/>
+          <circle class="fill" cx="50" cy="50" r="${r}" fill="none" stroke-width="9" transform="rotate(-90 50 50)"
+            stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${(animate ? c : off).toFixed(2)}" data-off="${off.toFixed(2)}" style="--d:${i * 90}ms"/>
+        </svg>
+        <div class="bi-ring-val" data-target="${pct}">${animate ? 0 : pct}%</div>
+      </div>
+      <div class="bi-ring-label">${escapeHtml(m.label)}</div>
+    </button>`;
+  }).join("");
+  if (!animate) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    el.querySelectorAll(".fill").forEach((f) => { f.style.strokeDashoffset = f.dataset.off; });
+    el.querySelectorAll(".bi-ring-val").forEach((v, i) => bodyCountUp(v, Number(v.dataset.target), 1000, i * 90));
+  }));
+}
+
+
+function renderBodyDetail() {
+  const f = BODY_FOCUS;
+  if (!f || !BODY_DETAIL) return;
+  const { detail, bounds } = BODY_DETAIL;
+  const [start, end] = bodyPeriodRange(BODY_PERIOD);
+  const { volumes, hitBy } = computeMuscleDetailBetween(ME, start, end);
+  const target = BODY_IMPACT_TARGET[BODY_PERIOD];
+  const pctOf = (k) => Math.min(1, (volumes[k] || 0) / target);
+  // Untouched pieces stay neutral rather than showing the level-1 yellow for 0%.
+  const heatOf = (k) => ((volumes[k] || 0) > 0 ? bodyHeatColor(pctOf(k)) : "var(--muted)");
+  const word = bodyPeriodWord(BODY_PERIOD);
+  const piece = detail.MUSCLE_PIECES[f.muscle];
+  const groupLabel = BODY_GROUP_LABELS[piece.group] || piece.group;
+  const pct = pctOf(f.muscle);
+  const sets = volumes[f.muscle] || 0;
+
+  // Left column: the tapped muscle itself.
+  const heads = (piece.heads || []).map((h) => {
+    const hp = pctOf(h);
+    return `<span class="bi-chip ${hp > 0 ? "hit" : ""}" style="--heat:${heatOf(h)}">${escapeHtml(detail.MUSCLE_HEADS[h].label)}${hp > 0 ? ` · ${Math.round(hp * 100)}%` : ""}</span>`;
+  }).join("");
+  const hits = [...(hitBy[f.muscle]?.values() || [])].sort((a, b) => b.sets * b.weight - a.sets * a.weight).slice(0, 4);
+  $("biDetail").innerHTML = `
+    <button type="button" class="bi-back" id="biBack">${icon("chevronLeft", 14)} All muscles</button>
+    <div class="bi-detail-name">${escapeHtml(piece.label)}</div>
+    <div class="bi-detail-sub">${escapeHtml(groupLabel)} · ${escapeHtml(piece.where)}</div>
+    <div class="bi-detail-impact" style="--heat:${heatOf(f.muscle)}">
+      ${sets > 0
+        ? `<div class="bi-detail-pct">${Math.round(pct * 100)}%</div><div class="bi-detail-lvl">${bodyImpactLevel(pct)} · ${bodyFmtSets(sets)} ${escapeHtml(word)}</div>`
+        : `<div class="bi-detail-pct none">Not hit ${escapeHtml(word)}</div>`}
+    </div>
+    <div class="bi-detail-bar" style="--heat:${heatOf(f.muscle)}"><i style="--fill:${pct.toFixed(3)}"></i></div>
+    ${heads ? `<div class="bi-detail-label">Parts</div><div class="bi-chips">${heads}</div>` : ""}
+    <div class="bi-detail-label">${sets > 0 ? "Hit by" : "Try"}</div>
+    ${sets > 0
+      ? hits.map((h) => `<div class="bi-hit"><span class="bi-hit-name">${escapeHtml(h.name)}</span><span class="bi-hit-sets ${h.weight < 1 ? "assist" : ""}">${bodyFmtSets(h.sets)}</span></div>`).join("")
+      : `<div class="bi-try"><b>${escapeHtml(piece.try)}</b> targets it directly.</div>`}`;
+
+  // Below: every piece of the same group, hit or not.
+  const pieces = detail.PIECES_BY_GROUP[piece.group] || [];
+  $("biSectionTitle").textContent = `${groupLabel}, piece by piece`;
+  $("biPieces").innerHTML = pieces.map((k) => {
+    const p = detail.MUSCLE_PIECES[k];
+    const pp = pctOf(k);
+    const hit = (volumes[k] || 0) > 0;
+    return `<button type="button" class="bi-piece ${k === f.muscle ? "on" : ""} ${hit ? "" : "off"}" data-muscle="${k}" style="--heat:${heatOf(k)}">
+      <span class="bi-piece-dot"></span>
+      <span class="bi-piece-text"><div class="bi-piece-name">${escapeHtml(p.label)}</div><div class="bi-piece-where">${escapeHtml(p.where)}</div></span>
+      <span class="bi-piece-val"><div class="bi-piece-pct">${hit ? `${Math.round(pp * 100)}%` : "Not hit"}</div><div class="bi-piece-bar"><i style="--fill:${pp.toFixed(3)}"></i></div></span>
+    </button>`;
+  }).join("");
+
+  // Callouts on the zoomed figure, for the pieces that view actually draws.
+  const artboard = `${riveLoadedSex || "Male"}-${f.view}`;
+  document.querySelectorAll("#biFigures .bi-fig").forEach((fig) => {
+    const wrap = fig.querySelector(".bi-callouts");
+    if (fig.dataset.view !== f.view) { wrap.innerHTML = ""; return; }
+    wrap.innerHTML = pieces.map((k) => {
+      const box = bounds.boundsFor(artboard, k, f.side);
+      if (!box) return "";
+      return `<button type="button" class="bi-callout ${k === f.muscle ? "on" : ""} ${(volumes[k] || 0) > 0 ? "" : "off"}" data-muscle="${k}"
+        data-ax="${((box[0] + box[2]) / 2).toFixed(4)}" data-ay="${((box[1] + box[3]) / 2).toFixed(4)}" style="--heat:${heatOf(k)}"
+        aria-label="${escapeHtml(detail.MUSCLE_PIECES[k].label)}"><i></i><span>${escapeHtml(detail.MUSCLE_PIECES[k].label)}</span></button>`;
+    }).join("");
+  });
+  bodyPositionCallouts();
+}
+
+
+function renderBodyNext(animate) {
+  const areas = bodyAreaStates();
+  const trained = areas.filter((a) => a.lastDate);
+  const ready = areas.filter((a) => a.ready);
+  const resting = areas.filter((a) => !a.ready).sort((a, b) => a.hoursLeft - b.hoursLeft);
+  const untouched = areas.filter((a) => a.weekSets === 0);
+  const list = (xs) => xs.map((a) => a.label);
+  const phrase = (names) => names.length <= 1 ? (names[0] || "")
+    : names.slice(0, -1).join(", ") + " or " + names[names.length - 1];
+
+  let headline, why;
+  if (!trained.length) {
+    headline = "Anything at all";
+    why = "Nothing logged yet, so there is nothing to balance against. The first session sets the baseline.";
+  } else {
+    const pick = untouched.filter((a) => a.ready);
+    if (pick.length) {
+      headline = phrase(list(pick.slice(0, 2)));
+      why = `Nothing this week has touched your ${phrase(list(pick.slice(0, 2))).toLowerCase()}.` +
+        (resting.length ? ` ${phrase(list(resting.slice(0, 2)))} ${resting.length > 1 ? "are" : "is"} still inside the ${BODY_RECOVERY_HOURS} hour window.` : "");
+    } else if (ready.length) {
+      const leanest = ready.slice().sort((a, b) => a.weekSets - b.weekSets).slice(0, 2);
+      headline = phrase(list(leanest));
+      why = `Every area has had something this week, so this is the ${leanest.length > 1 ? "pair" : "one"} with the least so far: ${
+        leanest.map((a) => `${a.label.toLowerCase()} ${Math.round(a.weekSets)} set${Math.round(a.weekSets) === 1 ? "" : "s"}`).join(", ")}.`;
+    } else {
+      headline = "Rest, or something light";
+      why = `Everything you train is still inside its ${BODY_RECOVERY_HOURS} hour window. A walk or an easy ride does not set that back.`;
+    }
+  }
+
+  // This week against the same point last week, so a Tuesday is never
+  // compared with a full seven days.
+  const weekStart = weekStartStr();
+  const [, tomorrow] = bodyPeriodRange("today");
+  const elapsed = Math.round((new Date(todayStr() + "T00:00:00") - new Date(weekStart + "T00:00:00")) / 86400000) + 1;
+  const lastStart = new Date(weekStart + "T00:00:00"); lastStart.setDate(lastStart.getDate() - 7);
+  const lastCut = new Date(lastStart); lastCut.setDate(lastCut.getDate() + elapsed);
+  const sum = (v) => Object.values(v).reduce((a, b) => a + b, 0);
+  const thisWk = Math.round(sum(computeMuscleVolumeBetween(ME, weekStart, tomorrow)));
+  const lastWk = Math.round(sum(computeMuscleVolumeBetween(ME, isoDate(lastStart), isoDate(lastCut))));
+  let weekLine;
+  if (!thisWk && !lastWk) weekLine = "Nothing logged yet this week.";
+  else if (!lastWk) weekLine = `${thisWk} sets so far. Nothing to compare it with yet, so this week is the baseline.`;
+  else {
+    const pct = Math.round(((thisWk - lastWk) / lastWk) * 100);
+    weekLine = `${thisWk} sets so far, ${pct >= 0 ? "up" : "down"} ${Math.abs(pct)}% on the same point last week.`;
+  }
+
+  const chips = (xs, kind) => xs.length
+    ? xs.map((a) => `<span class="nx-chip ${kind}">${escapeHtml(a.label)}${
+        kind === "rest" ? ` <i>${Math.ceil(a.hoursLeft)}h</i>` : ""}</span>`).join("")
+    : `<span class="nx-none">None</span>`;
+
+  $("biNext").innerHTML = `
+    <div class="nx-answer${animate ? " bi-anim" : ""}" style="--d:120ms">
+      <div class="nx-head">${escapeHtml(headline)}</div>
+      <p class="nx-why">${escapeHtml(why)}</p>
+    </div>
+    <div class="nx-rows">
+      <div class="nx-row"><span class="nx-k">Ready now</span><span class="nx-v">${chips(ready, "go")}</span></div>
+      <div class="nx-row"><span class="nx-k">Recovering</span><span class="nx-v">${chips(resting, "rest")}</span></div>
+      <div class="nx-row"><span class="nx-k">This week</span><span class="nx-v nx-text">${escapeHtml(weekLine)}</span></div>
+    </div>`;
+  $("biNextInfoSlot").innerHTML = infoDot("trainNext", "How this is worked out");
+}
+
+
+async function renderBodyShare() {
+  const card = $("biShareCard");
+  if (!PARTNER_EMAIL) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  const partner = partnerName();
+  const mine = todayEntryFor(MY_EMAIL);
+  const seenAt = mine?.gym && mine.seen_by_partner_at ? new Date(mine.seen_by_partner_at) : null;
+  const fmt = (d) => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+  let title, sub, state;
+  if (seenAt) { title = `${partner} saw your workout`; sub = fmt(seenAt); state = "on"; }
+  else if (mine?.gym) { title = `Shared with ${partner}`; sub = "Not seen yet"; state = "wait"; }
+  else { title = "No workout shared today"; sub = `Log a session and ${partner} will see it.`; state = "off"; }
+
+  const av = await avatarHTML(PARTNER_EMAIL, partner, "them", "span");
+  const prev = $("biShare").dataset.state;
+  $("biShare").dataset.state = state;
+  $("biShare").innerHTML = `${av}
+    <div class="bi-share-text"><div class="bi-share-title">${escapeHtml(title)}</div><div class="bi-share-sub">${escapeHtml(sub)}</div></div>
+    <span class="bi-share-check ${state === "on" ? "on" : ""} ${state === "on" && prev !== "on" ? "pop" : ""}">${icon(state === "wait" ? "clock" : "check", 18)}</span>`;
+}
+
+
+function emptyState(iconName, title, hint) {
+  return `<div class="empty-state">
+    <div class="empty-icon">${icon(iconName, 26)}</div>
+    <div class="empty-title">${escapeHtml(title)}</div>
+    <div class="empty-hint">${escapeHtml(hint)}</div>
+  </div>`;
+}
+
+
+function myTrackedMetrics() {
+  return MY_PROFILE?.tracked_metrics || ["weight", "trained"];
+}
+
+
+function renderScaleCheck() {
+  const card = $("scaleCheckCard");
+  // Always available on Progress now, rather than a prompt that appears and vanishes.
+  card.classList.remove("hidden");
+
+  const today = todayStr();
+  const todayEntry = ALL_ENTRIES.find((e) => e.user_name === ME && e.entry_date === today);
+  const lastWeight = entriesFor(ME).filter((e) => e.weight != null).slice(-1)[0]?.weight;
+
+  const input = $("scaleWeightInput");
+  if (document.activeElement !== input) {
+    // Prefill with today's entry, else the last known weight, so it is a
+    // correction rather than a blank field.
+    const val = todayEntry?.weight ?? lastWeight ?? "";
+    input.value = val === "" ? "" : String(val);
+    SCALE_STATE.weight = parseFloat(input.value) || 0;
+  }
+
+  $("scaleGoalNote").textContent = todayEntry?.weight != null
+    ? "Logged today. Change it if you need to."
+    : lastWeight != null
+      ? `Last logged ${lastWeight} lbs.`
+      : "First weigh-in. Type it in.";
+
+  input.oninput = () => { SCALE_STATE.weight = parseFloat(input.value) || 0; };
+  const nudge = (delta) => {
+    const next = Math.max(0, Math.round(((parseFloat(input.value) || 0) + delta) * 10) / 10);
+    input.value = String(next);
+    SCALE_STATE.weight = next;
+  };
+  $("scaleMinus").onclick = () => nudge(-0.5);
+  $("scalePlus").onclick = () => nudge(0.5);
+
+}
+
+
+function renderMetricPicker() {
+  const on = new Set(myTrackedMetrics());
+  $("metricPicker").innerHTML = TRACK_OPTIONS.map((o) => `
+    <button type="button" class="metric-chip ${on.has(o.key) ? "on" : ""}" data-metric="${o.key}" ${o.needsApp ? "disabled" : ""}>
+      ${icon(o.icon, 15)}<span>${escapeHtml(o.label)}${o.needsApp ? " (app only)" : ""}</span>
+    </button>`).join("");
+  $("metricPicker").querySelectorAll("[data-metric]").forEach((b) => {
+    if (!b.disabled) b.onclick = () => toggleMetric(b.dataset.metric);
+  });
+}
+
+
+function renderLog() {
+  const combined = [...ALL_ENTRIES].sort((a, b) => b.entry_date.localeCompare(a.entry_date)).slice(0, 20);
+  const list = $("logList");
+  if (combined.length === 0) {
+    list.innerHTML = emptyState("checklist", "Nothing logged yet",
+      "Weigh-ins and workouts show up here as you go.");
+    return;
+  }
+  list.innerHTML = combined.map((e) => {
+    const mine = e.email === MY_EMAIL;
+    const color = e.user_name === ME ? "var(--me)" : "var(--partner)";
+    const w = e.weight != null ? e.weight + " lb" : "";
+    const gym = e.gym ? `<span class="gym-yes">${icon("dumbbell", 14)}</span>` : "";
+    const rest = e.rest_day ? `<span class="log-rest">rest</span>` : "";
+    const sets = e.sessions > 1 ? `<span class="log-rest">${e.sessions}x</span>` : "";
+    // Your own rows open for editing. A partner's are read-only.
+    const edit = mine
+      ? `<button type="button" class="log-edit" data-edit="${escapeHtml(e.entry_date)}">Edit</button>`
+      : "";
+    return `<div class="log-item">
+      <span class="dot" style="background:${color}"></span>
+      <span class="date">${e.entry_date.slice(5)}</span>
+      <span class="w">${w}</span>${gym}${sets}${rest}
+      <span class="note"></span>${edit}
+    </div>`;
+  }).join("");
+
+  list.querySelectorAll("[data-edit]").forEach((b) => {
+    b.onclick = () => openDaySheet(MY_EMAIL, b.dataset.edit);
+  });
+}
+
+
+function renderProgressTab() {
+  const isPartner = PROGRESS_VIEW === "partner";
+  // Logging weight only makes sense for yourself, hide it entirely on your
+  // partner's view instead of showing a control that would log to your own
+  // entry while you're looking at their stats.
+  if (isPartner) $("scaleCheckCard").classList.add("hidden");
+  else renderScaleCheck();
+  $("progMeBtn").classList.toggle("active", !isPartner);
+  $("progPartnerBtn").classList.toggle("active", isPartner);
+  $("progPartnerBtn").textContent = PARTNER_EMAIL ? partnerName() : "Partner";
+  $("progPartnerBtn").disabled = !PARTNER_EMAIL;
+
+  renderMetricPicker();
+
+  const on = new Set(myTrackedMetrics());
+  TRACK_OPTIONS.forEach((o) => {
+    if (!o.card) return;
+    const el = $(o.card);
+    if (el) el.classList.toggle("hidden", !on.has(o.key));
+  });
+
+  if (on.has("weight")) renderWeightChart();
+  if (on.has("activity")) renderLog();
+  if (on.has("photos")) renderBodyPhotos();
+
+}
+
 /* ---------- Working muscles ----------
    Which muscles an exercise trains, in words. There used to be two lit
    anatomical figures here, drawn through Rive into a hidden canvas and kept as
@@ -4953,6 +5654,30 @@ const sessionFixture = (over = {}) => {
 
 /* The screen after the last rep. "done" is how many of the five exercises
    actually got logged, which is what separates finishing from stopping. */
+/* The Body tab reads exercise_logs and nothing else, so the fixture is just a
+   day's training. Names go through the app's own classifier, so what lights up
+   is whatever the app would light up. */
+const bodyFixture = ({ period = "today", logs = null } = {}) => {
+  BODY_PERIOD = period;
+  BODY_LAST_KEY = null;
+  BODY_FOCUS = null;
+  const day = (d, rows) => rows.map((r) => ({ email: "mo@x", user_name: "Mo", entry_date: d, ...r }));
+  ALL_EXERCISE_LOGS = logs !== null ? logs : [
+    ...day(TODAY, [
+      { exercise_name: "Bench Press", sets: 4, reps: 8, weight: 185 },
+      { exercise_name: "Incline Dumbbell Press", sets: 3, reps: 10, weight: 60 },
+      { exercise_name: "Triceps Pushdown", sets: 3, reps: 12, weight: 50 },
+      { exercise_name: "Overhead Press", sets: 3, reps: 10, weight: 95 },
+    ]),
+    ...day("2026-09-02", [
+      { exercise_name: "Barbell Row", sets: 4, reps: 8, weight: 155 },
+      { exercise_name: "Lat Pulldown", sets: 3, reps: 10, weight: 120 },
+      { exercise_name: "Barbell Squat", sets: 4, reps: 6, weight: 225 },
+      { exercise_name: "Calf Raise", sets: 3, reps: 15, weight: 90 },
+    ]),
+  ];
+};
+
 const completeFixture = ({ done = null, elapsedMs = 47 * 60 * 1000, prs = 1 } = {}) => {
   sessionFixture();
   const names = TODAY_WORKOUT.exercises.map((e) => e.name.toLowerCase());
@@ -5017,6 +5742,25 @@ const STATES = [
   { page: "Opening the app", section: "Other shapes of the same screen", name: "Partner keeps workouts private",
     note: "The effort line still says who trained harder this week. Her live card and yesterday's timeline row lose the specifics; the number stays.",
     setup: () => { LIVE_PARTNER = liveRow(); PARTNER_PROFILE = { share_workout_details: false }; } },
+
+  /* The Body tab itself. It had no state at all before this: the page held
+     only its four explainer popups, so the screen everyone actually looks at
+     was never in review. */
+  { page: "Reading your body", section: "The screen itself", name: "A push day, chest and triceps lit",
+    note: "The real rings, the ranked list and What to train next, off the same logs the app reads. The two figures are Rive on WebGL and only draw in the live app.",
+    body: true, setup: () => { bodyFixture(); } },
+
+  { page: "Reading your body", section: "The screen itself", name: "A week of everything",
+    note: "The week period rather than today, so more groups are lit and the ranking spreads out.",
+    body: true, setup: () => { bodyFixture({ period: "week" }); } },
+
+  { page: "Reading your body", section: "The screen itself", name: "Nothing logged yet",
+    note: "The empty state: no bars, no rings, and the line that says what would fill them.",
+    body: true, setup: () => { bodyFixture({ logs: [] }); } },
+
+  { page: "Looking back", section: "The Progress tab", name: "Weight, activity and personal bests",
+    note: "The Progress tab, which had no state here before. The weight chart is Chart.js and the body photos need signed storage URLs, so both are live only; everything else is the app's own render.",
+    progress: true, setup: () => { bodyFixture(); } },
 
   { page: "Reading your body", section: "The explainers behind it", name: "What to train next",
     note: "The card on the Body tab answers one question and shows its working. This is the note behind it.",
@@ -5209,6 +5953,37 @@ async function renderHomeState() {
   return '<div class="gal-inner">' + deId(header.outerHTML + home.innerHTML) + "</div>";
 }
 
+/* The Body tab. Its rings and bars open empty and animate to the real number
+   on the next frame, which a still capture would freeze at zero, so the
+   resting values are applied straight after the render, the same way the
+   finish screen's ring is handled. */
+async function renderBodyState() {
+  const panel = stage.querySelector("#tab-body");
+  panel.classList.remove("hidden");
+  renderBodyTab(true);
+  await settle();
+  panel.querySelectorAll(".bi-ring .fill").forEach((f) => { f.style.strokeDashoffset = f.dataset.off; });
+  panel.querySelectorAll(".bi-ring-val").forEach((v) => { v.textContent = v.dataset.target + "%"; });
+  panel.querySelectorAll(".bi-seg i").forEach((i) => { i.style.setProperty("--fill", i.dataset.fill); });
+  // The figure is Rive on WebGL and cannot draw here. Say so rather than
+  // leaving two blank rectangles that read as a broken screen.
+  panel.querySelectorAll(".bi-fig").forEach((f) => {
+    f.innerHTML = '<div class="gal-nofig">' + f.dataset.view + ' figure<span>live only, Rive/WebGL</span></div>';
+  });
+  return '<div class="gal-inner">' + deId(header.outerHTML + panel.outerHTML) + "</div>";
+}
+
+async function renderProgressState() {
+  const panel = stage.querySelector("#tab-progress");
+  panel.classList.remove("hidden");
+  ALL_ENTRIES = Object.values(ENTRIES).flat();
+  renderProgressTab();
+  await settle();
+  const chart = panel.querySelector(".chart-wrap");
+  if (chart) chart.innerHTML = '<div class="gal-nofig">Weight chart<span>live only, Chart.js</span></div>';
+  return '<div class="gal-inner">' + deId(header.outerHTML + panel.outerHTML) + "</div>";
+}
+
 /* Some states are just markup, with no data behind them. */
 async function renderRawState(st) {
   return '<div class="gal-dark">' + deId(st.raw()) + "</div>";
@@ -5281,13 +6056,14 @@ const setTheme = (t) => {
      and the frame numbers follow it so they ascend as you scroll. */
   const PAGE_ORDER = [
     "Opening the app", "Planning the workout", "Doing the workout", "Reading your body",
-    "Watching them train", "Sending a clip", "Getting a clip",
+    "Looking back", "Watching them train", "Sending a clip", "Getting a clip",
   ];
   const SECTION_ORDER = {
     "Opening the app": ["The everyday state", "Other shapes of the same screen", "When they are training", "Explaining a number"],
     "Planning the workout": ["While it thinks", "Before you press begin"],
     "Doing the workout": ["The session screen", "Finishing"],
-    "Reading your body": ["The explainers behind it"],
+    "Reading your body": ["The screen itself", "The explainers behind it"],
+    "Looking back": ["The Progress tab"],
     "Watching them train": ["Where they are up to", "What the muscle line says", "When they hold something back"],
     "Sending a clip": ["Filming it", "After you press send"],
     "Getting a clip": ["The pill on your session", "Two watches, then gone"],
@@ -5311,6 +6087,8 @@ const setTheme = (t) => {
            : st.sheet ? await renderSheetState()
            : st.gen ? await renderGenState(st)
            : st.pop ? await renderPopState(st)
+           : st.body ? await renderBodyState()
+           : st.progress ? await renderProgressState()
            : st.complete ? await renderCompleteState()
            : st.session ? await renderSessionState()
            : await renderHomeState();

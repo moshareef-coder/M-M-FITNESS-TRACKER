@@ -32,6 +32,11 @@ const CLIP_PILL = grab(/ {2}<button type="button" class="clip-pill hidden" id="c
 const POP = grab(/ {2}<div class="pop-scrim hidden" id="popScrim">[\s\S]*?<\/div>\n {2}<\/div>\n/, "the popup shell");
 const GEN = grab(/ {2}<div class="gen-scrim hidden" id="genScrim"[\s\S]*?<div class="gen-stage" id="genStage"><\/div>\n {2}<\/div>\n/, "the generating screen");
 const SESSION_CARD = grab(/ {4}<div id="sessionCard" class="session-overlay hidden">[\s\S]*?<div id="sessionBody"><\/div>\n {4}<\/div>\n/, "the session card");
+/* Whole tabs, lifted the same way Home is. Without these the gallery only ever
+   showed Home and the session, which is how the Body tab drifted out of review
+   entirely: it was not stale, it simply was not in here. */
+const BODY_TAB = grab(/ {2}<!-- BODY TAB -->\n([\s\S]*?)\n {2}<!-- PROGRESS TAB -->/, "the body tab", 1);
+const PROGRESS_TAB = grab(/ {2}<!-- PROGRESS TAB -->\n([\s\S]*?)\n {2}<!-- SETUP TAB -->/, "the progress tab", 1);
 
 const FUNCS = [
   "icon", "personRing", "hydrateAvatars", "renderHero", "renderTopStreak",
@@ -46,6 +51,17 @@ const FUNCS = [
   "liveDetailsShared", "openGenOverlay", "paintGen", "stopGenTicker", "revealGeneratedPlan",
   "setGenWord", "startGenWordCycle", "stopGenWordCycle", "mountGenBody", "unmountGenBody",
   "startGenRaf", "stopGenRaf", "writeRev",
+  /* The Body tab. Everything that computes or draws HTML comes over; the Rive
+     figure cannot run here and is stubbed below, so these render the rings,
+     the ranked list and the detail panel exactly as the app does. */
+  "bodyPeriodRange", "bodyPeriodWord", "bodyHeatColor", "bodyImpactLevel",
+  "bodyImpactRank", "bodyFmtSets", "computeMuscleVolumeBetween", "computeMuscleDetailBetween",
+  "countUp", "bodyCountUp", "bodyAreaStates", "avatarHTML",
+  "renderBodyTab", "renderBodyList", "renderBodyRings", "renderBodyDetail",
+  "renderBodyNext", "renderBodyShare",
+  /* Progress. */
+  "emptyState", "myTrackedMetrics", "renderScaleCheck", "renderMetricPicker", "renderLog",
+  "renderProgressTab",
 ].map(fn).join("\n");
 
 /* The working-muscles block is more than a function: caches, colour helpers
@@ -65,6 +81,12 @@ const GEN_WORDS = grab(/\nconst GEN_WORDS = \[.*?\n\];\n/s, "GEN_WORDS");
 const DATA = [
   grab(/\nconst MUSCLE_RULES = \[.*?\n\];\n/s, "MUSCLE_RULES"),
   grab(/\nconst BODY_GROUP_LABELS = \{.*?\n\};\n/s, "BODY_GROUP_LABELS"),
+  grab(/\nconst MUSCLE_GROUPS = \[.*?\];\n/s, "MUSCLE_GROUPS"),
+  grab(/\nconst BODY_IMPACT_TARGET = \{.*?\};\n/s, "BODY_IMPACT_TARGET"),
+  grab(/\nconst BODY_RING_FILLERS = \[.*?\];\n/s, "BODY_RING_FILLERS"),
+  grab(/\nconst BODY_HEAT_STOPS = \[.*?\n\];\n/s, "BODY_HEAT_STOPS"),
+  grab(/\nconst COVERAGE_TARGETS = \[.*?\n\];\n/s, "COVERAGE_TARGETS"),
+  grab(/\nconst TRACK_OPTIONS = \[.*?\n\];\n/s, "TRACK_OPTIONS"),
 ].join("\n");
 
 /* ---- the working muscles ----
@@ -277,6 +299,15 @@ const GALLERY_CSS = `
     width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border);
     background: var(--panel-2); color: var(--text); display: flex; align-items: center; justify-content: center;
   }
+  /* Stands in for the two things a still capture genuinely cannot draw: the
+     Rive figure and the Chart.js weight line. Labelled, so a blank rectangle
+     is never mistaken for a broken screen. */
+  .gal-nofig {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    min-height: 150px; border: 1px dashed var(--border); border-radius: 12px;
+    color: var(--muted); font-size: 12px; font-weight: 700; text-align: center; padding: 12px;
+  }
+  .gal-nofig span { display: block; font-size: 10.5px; font-weight: 500; opacity: .75; }
   .proto-stage { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; padding: 18px; }
   .proto-phone {
     width: 393px; flex-shrink: 0; border: 1px solid var(--border); border-radius: 22px; overflow: hidden;
@@ -588,6 +619,8 @@ ${fonts}
 ${HEADER}
     <span id="topDate" class="hidden"></span>
 ${HOME}
+${BODY_TAB}
+${PROGRESS_TAB}
   </div>
 ${LIVE_SHEET}
 ${CLIP_PILL}
@@ -651,6 +684,10 @@ const currentWeekDates = () => WEEK;
 const todayStr = () => TODAY;
 const isoDate = (d) => d.toISOString().slice(0, 10);
 const entriesFor = (n) => ENTRIES[n] || [];
+/* The app keeps one flat table and filters it; the gallery keeps a map by
+   name. Progress reads the flat one directly, so it is flattened from the map
+   at render time rather than kept as a second fixture that could disagree. */
+let ALL_ENTRIES = [];
 const gymDaysThisWeek = (n) => (n === ME ? MY_DAYS : THEIR_DAYS);
 const weeklyGoalFor = (e) => (e === MY_EMAIL ? MY_TARGET : THEIR_TARGET);
 const todayEntryFor = () => (TRAINED_TODAY ? { gym: true } : null);
@@ -680,7 +717,7 @@ const openLiveSheet = () => {};
 const closeLiveSheet = () => {};
 const openNoteComposer = () => {};
 const openNextClip = () => {};
-let SESSION = null, CLIP_INBOX = [], TODAY_WORKOUT = null;
+let SESSION = null, CLIP_INBOX = [], TODAY_WORKOUT = null, WORKOUT_MODE = null;
 /* Animation bookkeeping renderSession reads. The gallery is a still life, so
    these stay null and nothing animates in a captured frame. */
 let SESSION_JUST_SET = null, SESSION_LAST_EX = 0;
@@ -709,6 +746,46 @@ const toggleSet = () => {};
 const startNextSet = () => {};
 const jumpToExercise = () => {};
 const finishExerciseAndAdvance = () => {};
+/* The Body tab's figure is Rive on a WebGL canvas. It cannot run in a static
+   capture, so everything that touches it is a no-op and the canvas is labelled
+   in the frame instead of pretending. The rings, the ranked list, the detail
+   panel and What to train next are all the app's real code. */
+let BODY_PERIOD = null, BODY_LAST_KEY = null, BODY_LAST_TARGET = {}, BODY_PULSE_RAF = null;
+let BODY_GREENED = null, BODY_HEAT_PALETTE = null, BODY_MUSCLE_COLOR = {}, BODY_ALL_MUSCLES = [];
+let riveFrontCtrl = null, riveBackCtrl = null, riveLoadedSex = "Male";
+/* The app's weekStartStr reads the real clock, which would put the fixture
+   week out of range and leave every "this week" panel empty. Same rule,
+   anchored to the fixture day instead. */
+const weekStartStr = () => {
+  const d = new Date(TODAY + "T00:00:00");
+  const day = d.getDay();
+  d.setDate(d.getDate() + ((day === 0 ? -6 : 1) - day));
+  return isoDate(d);
+};
+const renderBodyDiagram = async () => {};
+const bodyRampFigures = () => {};
+const bodyBuildOrder = () => [];
+const bodyPaintPalettes = () => ({});
+const bodyHeatRGB = () => ({ r: 0, g: 0, b: 0 });
+const bodyIsolateMuscle = () => {};
+const bodyRestoreGreen = () => {};
+const bodyStopPulse = () => {};
+const bodyClearFocusUI = () => {};
+const bodyPositionCallouts = () => {};
+const bodyFocusMuscle = async () => {};
+
+/* Progress: the chart needs Chart.js off a CDN and the photos need signed
+   storage URLs, so those two panels are stubbed and the rest is real. */
+let PROGRESS_VIEW = "me";
+const SCALE_STATE = { weight: 0 };
+const renderWeightChart = () => {};
+const renderBodyPhotos = async () => {};
+const loadBodyPhotos = async () => [];
+const deleteBodyPhoto = () => {};
+const toggleMetric = () => {};
+const cssVar = () => "#888";
+const loadScriptOnce = () => Promise.resolve();
+
 /* The app loads these as ES modules. Here the answers are baked in. */
 let riveBodyPromise = null, bodyDetailPromise = null;
 const ensureRiveBodyModule = () => Promise.resolve(null);
@@ -793,6 +870,30 @@ const sessionFixture = (over = {}) => {
 
 /* The screen after the last rep. "done" is how many of the five exercises
    actually got logged, which is what separates finishing from stopping. */
+/* The Body tab reads exercise_logs and nothing else, so the fixture is just a
+   day's training. Names go through the app's own classifier, so what lights up
+   is whatever the app would light up. */
+const bodyFixture = ({ period = "today", logs = null } = {}) => {
+  BODY_PERIOD = period;
+  BODY_LAST_KEY = null;
+  BODY_FOCUS = null;
+  const day = (d, rows) => rows.map((r) => ({ email: "mo@x", user_name: "Mo", entry_date: d, ...r }));
+  ALL_EXERCISE_LOGS = logs !== null ? logs : [
+    ...day(TODAY, [
+      { exercise_name: "Bench Press", sets: 4, reps: 8, weight: 185 },
+      { exercise_name: "Incline Dumbbell Press", sets: 3, reps: 10, weight: 60 },
+      { exercise_name: "Triceps Pushdown", sets: 3, reps: 12, weight: 50 },
+      { exercise_name: "Overhead Press", sets: 3, reps: 10, weight: 95 },
+    ]),
+    ...day("2026-09-02", [
+      { exercise_name: "Barbell Row", sets: 4, reps: 8, weight: 155 },
+      { exercise_name: "Lat Pulldown", sets: 3, reps: 10, weight: 120 },
+      { exercise_name: "Barbell Squat", sets: 4, reps: 6, weight: 225 },
+      { exercise_name: "Calf Raise", sets: 3, reps: 15, weight: 90 },
+    ]),
+  ];
+};
+
 const completeFixture = ({ done = null, elapsedMs = 47 * 60 * 1000, prs = 1 } = {}) => {
   sessionFixture();
   const names = TODAY_WORKOUT.exercises.map((e) => e.name.toLowerCase());
@@ -857,6 +958,25 @@ const STATES = [
   { page: "Opening the app", section: "Other shapes of the same screen", name: "Partner keeps workouts private",
     note: "The effort line still says who trained harder this week. Her live card and yesterday's timeline row lose the specifics; the number stays.",
     setup: () => { LIVE_PARTNER = liveRow(); PARTNER_PROFILE = { share_workout_details: false }; } },
+
+  /* The Body tab itself. It had no state at all before this: the page held
+     only its four explainer popups, so the screen everyone actually looks at
+     was never in review. */
+  { page: "Reading your body", section: "The screen itself", name: "A push day, chest and triceps lit",
+    note: "The real rings, the ranked list and What to train next, off the same logs the app reads. The two figures are Rive on WebGL and only draw in the live app.",
+    body: true, setup: () => { bodyFixture(); } },
+
+  { page: "Reading your body", section: "The screen itself", name: "A week of everything",
+    note: "The week period rather than today, so more groups are lit and the ranking spreads out.",
+    body: true, setup: () => { bodyFixture({ period: "week" }); } },
+
+  { page: "Reading your body", section: "The screen itself", name: "Nothing logged yet",
+    note: "The empty state: no bars, no rings, and the line that says what would fill them.",
+    body: true, setup: () => { bodyFixture({ logs: [] }); } },
+
+  { page: "Looking back", section: "The Progress tab", name: "Weight, activity and personal bests",
+    note: "The Progress tab, which had no state here before. The weight chart is Chart.js and the body photos need signed storage URLs, so both are live only; everything else is the app's own render.",
+    progress: true, setup: () => { bodyFixture(); } },
 
   { page: "Reading your body", section: "The explainers behind it", name: "What to train next",
     note: "The card on the Body tab answers one question and shows its working. This is the note behind it.",
@@ -1049,6 +1169,37 @@ async function renderHomeState() {
   return '<div class="gal-inner">' + deId(header.outerHTML + home.innerHTML) + "</div>";
 }
 
+/* The Body tab. Its rings and bars open empty and animate to the real number
+   on the next frame, which a still capture would freeze at zero, so the
+   resting values are applied straight after the render, the same way the
+   finish screen's ring is handled. */
+async function renderBodyState() {
+  const panel = stage.querySelector("#tab-body");
+  panel.classList.remove("hidden");
+  renderBodyTab(true);
+  await settle();
+  panel.querySelectorAll(".bi-ring .fill").forEach((f) => { f.style.strokeDashoffset = f.dataset.off; });
+  panel.querySelectorAll(".bi-ring-val").forEach((v) => { v.textContent = v.dataset.target + "%"; });
+  panel.querySelectorAll(".bi-seg i").forEach((i) => { i.style.setProperty("--fill", i.dataset.fill); });
+  // The figure is Rive on WebGL and cannot draw here. Say so rather than
+  // leaving two blank rectangles that read as a broken screen.
+  panel.querySelectorAll(".bi-fig").forEach((f) => {
+    f.innerHTML = '<div class="gal-nofig">' + f.dataset.view + ' figure<span>live only, Rive/WebGL</span></div>';
+  });
+  return '<div class="gal-inner">' + deId(header.outerHTML + panel.outerHTML) + "</div>";
+}
+
+async function renderProgressState() {
+  const panel = stage.querySelector("#tab-progress");
+  panel.classList.remove("hidden");
+  ALL_ENTRIES = Object.values(ENTRIES).flat();
+  renderProgressTab();
+  await settle();
+  const chart = panel.querySelector(".chart-wrap");
+  if (chart) chart.innerHTML = '<div class="gal-nofig">Weight chart<span>live only, Chart.js</span></div>';
+  return '<div class="gal-inner">' + deId(header.outerHTML + panel.outerHTML) + "</div>";
+}
+
 /* Some states are just markup, with no data behind them. */
 async function renderRawState(st) {
   return '<div class="gal-dark">' + deId(st.raw()) + "</div>";
@@ -1121,13 +1272,14 @@ const setTheme = (t) => {
      and the frame numbers follow it so they ascend as you scroll. */
   const PAGE_ORDER = [
     "Opening the app", "Planning the workout", "Doing the workout", "Reading your body",
-    "Watching them train", "Sending a clip", "Getting a clip",
+    "Looking back", "Watching them train", "Sending a clip", "Getting a clip",
   ];
   const SECTION_ORDER = {
     "Opening the app": ["The everyday state", "Other shapes of the same screen", "When they are training", "Explaining a number"],
     "Planning the workout": ["While it thinks", "Before you press begin"],
     "Doing the workout": ["The session screen", "Finishing"],
-    "Reading your body": ["The explainers behind it"],
+    "Reading your body": ["The screen itself", "The explainers behind it"],
+    "Looking back": ["The Progress tab"],
     "Watching them train": ["Where they are up to", "What the muscle line says", "When they hold something back"],
     "Sending a clip": ["Filming it", "After you press send"],
     "Getting a clip": ["The pill on your session", "Two watches, then gone"],
@@ -1151,6 +1303,8 @@ const setTheme = (t) => {
            : st.sheet ? await renderSheetState()
            : st.gen ? await renderGenState(st)
            : st.pop ? await renderPopState(st)
+           : st.body ? await renderBodyState()
+           : st.progress ? await renderProgressState()
            : st.complete ? await renderCompleteState()
            : st.session ? await renderSessionState()
            : await renderHomeState();
