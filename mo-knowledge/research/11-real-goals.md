@@ -199,7 +199,7 @@ Maps to our **Recomp**, and this is the bubble that should be labelled in their 
 - **Lean, shredded, summer body.** 8 to 12 weeks for a visible change; 2 to 4 kg in eight
   weeks is realistic. Twelve weeks out is the honest start date.
 
-### 5. Do something new
+### 5. Hit a milestone
 <sub>first pull-up, first 5K</sub>
 
 **No home in our five.** "I want to be able to" autocomplete: do a pull up, touch my toes,
@@ -329,7 +329,7 @@ explaining:
 | Build muscle | get bigger |
 | Get stronger | lift heavier |
 | Tone up | get lean, see abs |
-| Do something new | first pull-up, first 5K |
+| Hit a milestone | first pull-up, first 5K |
 | Train for an event | a race, a test, a trip |
 | Feel better | energy, sleep, live longer |
 | Get back into it | after time off |
@@ -390,8 +390,9 @@ nothing records why it was used. See open questions 6 and `07` on recording swap
   two labels or it is too long.** And **if a word makes somebody stop and work it out, it
   is the wrong word**, however accurate it is. That killed "Bodyweight multiples" (gym
   jargon), "Back to my old numbers" (only means something to somebody who kept records),
-  "Murph" (CrossFit), "Hit a number", "Doctor's orders", and "Before a date", which reads
-  as a romantic one.
+  and "Murph" (CrossFit). Not every rewrite survived: "Hit a number", "Hit a milestone",
+  "Doctor's orders" and "Before a date" went back to how they started once Mo read them,
+  which is the actual test a label has to pass, not a rule applied uniformly from a desk.
 - **"Stay consistent" is two different things.** One is "I want to feel better and be
   healthy" (the biggest survey family). The other is "I keep quitting". They need different
   first screens even if the plan converges.
