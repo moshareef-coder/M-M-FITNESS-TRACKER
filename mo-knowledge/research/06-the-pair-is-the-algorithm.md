@@ -57,10 +57,29 @@ The app currently gives each person a `challenge_target` and shows two streaks s
 side. That is an **additive** design, and by the evidence above it is the weaker of the
 two options.
 
-A **conjunctive** target is a single number the pair reaches together, where falling
-short is a joint outcome. "You two owe seven sessions this week" rather than "you owe
-four and she owes three". Same total, different psychology, and the literature says
-materially different behaviour.
+**This does not mean pooling the numbers into one shared total, and an earlier draft of
+this file said it did, which was wrong.** Two people rarely share a goal. He wants
+strength, three days is plenty. She wants something else and wants four. Forcing those
+into a single number, "you two owe seven sessions", either overcounts him or undercounts
+her, and it quietly erases the fact that they were never training for the same thing.
+
+The design that survives that objection keeps the targets individual and makes only the
+**outcome of the week conjunctive**:
+
+- Each person keeps their own target, their own days, their own goal. Nothing about what
+  either of them is training for has to match.
+- The week only counts as a win for the pair if **both** people hit their own number.
+  Not summed. Not averaged. Both, independently, or the week did not land.
+
+This is what a conjunctive task actually requires: the joint outcome depends on the
+weaker contribution, not that the contributions are the same size or the same kind. His
+three and her four can both be "on track" or both be "the week slipped" without either
+number ever being compared to the other. What is shared is not the target. It is whether
+the week happened.
+
+Practically: a pair-level line that reads something like "3 of 3 sessions, waiting on
+her 4th" rather than a pooled countdown. Visible to both, decided by both, never merged
+into one figure that hides two different goals.
 
 This is a small change to a screen and a large change to what the app is.
 

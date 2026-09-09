@@ -56,13 +56,16 @@ as an algorithm one, which is the uncomfortable conclusion in `09`.
 
 ### 5. The week is a thing you owe each other
 
-Not two streaks side by side. One number the pair reaches together, where falling short
-is something that happened to both of them.
+He trains for strength, three days. She trains for something else, four. Neither number
+changes for the other. But the week only feels like a win if both of them hit their own
+number, and the app says so as one line, not two separate streaks that quietly let one
+person coast while the other carries it.
 
-> "I went because she would have been left carrying it."
+> "I went because she would have been left carrying the week if I didn't."
 
-Mechanism: `06` mechanism 1, the conjunctive target. This is the sharpest single change
-in the folder, it is one screen, and it is a genuine A/B test rather than an argument.
+Mechanism: `06` mechanism 1, the conjunctive target on individual goals. This is the
+sharpest single change in the folder, it is one screen, and it is a genuine A/B test
+rather than an argument.
 
 ## What we would build first
 
