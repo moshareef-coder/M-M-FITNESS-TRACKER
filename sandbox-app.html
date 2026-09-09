@@ -8964,6 +8964,16 @@ function clearSessionStorage() {
   localStorage.removeItem(sessionStorageKey());
 }
 
+/* Abandons an in-progress workout without banking it: the sets already
+   logged stand (they were written as they happened), only the in-memory
+   session and its resume state go away. A real top-level function, not an
+   inline handler, so it is also the one thing the sandbox walkthrough can
+   call between steps to stand down a session another step left open. */
+function discardSession() {
+  SESSION = null;
+  clearSessionStorage();
+}
+
 function todaysLoggedExerciseNames() {
   return new Set(ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME && l.entry_date === todayStr()).map((l) => l.exercise_name.toLowerCase()));
 }
@@ -9987,8 +9997,7 @@ function renderWorkoutTab({ respectMode = false } = {}) {
     $("resumeOpenBtn").onclick = reopenSession;
     $("discardSessionBtn").onclick = () => {
       if (!confirm("Discard this workout? Sets you already logged are kept.")) return;
-      SESSION = null;
-      clearSessionStorage();
+      discardSession();
       renderWorkoutTab();
     };
     return;

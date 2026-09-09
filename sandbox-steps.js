@@ -283,8 +283,15 @@
     } else {
       win = frame.contentWindow;
       /* Same world, so do not reload: just stand down whatever the last step
-         left open, which is faster and keeps anything you typed. */
-      try { win.closeAllOverlays?.(); win.closeSettingsPage?.(); win.closeSavedSheet?.(); } catch {}
+         left open, which is faster and keeps anything you typed. An open
+         workout session is part of that: it wins over everything else the
+         workout tab can show, so "Pick how to train" and "Build one
+         yourself" rendered as "workout in progress" the moment any later
+         step (or the same one, revisited) had already started one. Every
+         step that actually wants a session calls startWorkout() itself
+         right after, which makes a fresh one unconditionally, so clearing
+         here costs those steps nothing. */
+      try { win.closeAllOverlays?.(); win.closeSettingsPage?.(); win.closeSavedSheet?.(); win.discardSession?.(); } catch {}
     }
     device.classList.remove("loading");
     if (!win) return;
