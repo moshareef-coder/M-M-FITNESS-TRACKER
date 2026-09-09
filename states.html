@@ -480,13 +480,40 @@
   .sess-note { font-size: 12.5px; color: var(--muted); margin-top: 10px; line-height: 1.45; }
 
 
+  /* Rest is a ring rather than a line of text: it reads at arm's length across
+     a gym, and it says how much is LEFT instead of only how much has gone.
+     What gets recorded is unchanged (still the real elapsed rest, banked by
+     recordRest); the target only decides what the ring draws against. */
   .rest-bar {
-    display: flex; align-items: center; justify-content: center; gap: 12px;
-    background: var(--panel-2); border-radius: 14px; padding: 18px;
+    display: flex; flex-direction: column; align-items: center; gap: 13px;
+    background: var(--panel-2); border-radius: 14px; padding: 16px;
     margin-bottom: 14px;
   }
-  .rest-label { font-size: 12.5px; font-weight: 800; letter-spacing: .11em; color: var(--muted); }
-  .rest-clock { font-size: 24px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .rest-ring { position: relative; width: 132px; height: 132px; }
+  .rest-ring > svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .rest-ring circle { fill: none; stroke-width: 9; }
+  .rest-ring .rr-track { stroke: var(--panel); }
+  .rest-ring .rr-fill {
+    stroke: var(--accent); stroke-linecap: round;
+    transition: stroke-dashoffset .9s linear, stroke .35s;
+  }
+  /* The last fifth, and then past the target: the only two states worth a
+     colour change, so the ring is glanceable without being read. */
+  .rest-ring.low .rr-fill, .rest-ring.over .rr-fill { stroke: var(--up); }
+  .rest-mid {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1px;
+  }
+  .rest-label { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--muted); }
+  .rest-clock { font-size: 27px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .rest-ring.low .rest-clock, .rest-ring.over .rest-clock { color: var(--up); }
+  .rest-adjust { display: flex; gap: 8px; width: 100%; }
+  .rest-adjust button {
+    flex: 1; padding: 9px 0; border-radius: 10px; cursor: pointer;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    font-family: inherit; font-size: 13px; font-weight: 700;
+  }
+  .rest-adjust button:active { transform: scale(.96); }
 
   /* Grid, not space-between: "Weight (lb)" is a wider label than "Reps", so
      with flex the two control groups started at different places and the minus
@@ -1508,8 +1535,14 @@
     font-family: inherit; font-size: 15.5px; font-weight: 700; letter-spacing: -.01em;
     transition: border-color .15s, background .15s;
   }
-  .ob-chip:hover, .ob-chip:active { border-color: var(--accent); }
+  .ob-chip:active { border-color: var(--accent); }
   .ob-chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+  /* Hover only, never on touch: iOS Safari keeps :hover latched on the last
+     tapped element until the next tap lands elsewhere, which made whichever
+     option happened to sit under a previous tap look chosen or recommended. */
+  @media (hover: hover) and (pointer: fine) {
+    .ob-chip:hover { border-color: var(--accent); }
+  }
 
   .ob-paces { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
   .ob-pace {
@@ -1518,7 +1551,9 @@
     display: flex; flex-direction: column; gap: 5px;
   }
   .ob-pace.rec { border-color: var(--accent); }
-  .ob-pace:hover { border-color: var(--accent); }
+  @media (hover: hover) and (pointer: fine) {
+    .ob-pace:hover { border-color: var(--accent); }
+  }
   .ob-pace-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
   .ob-pace-top strong { font-size: 15.5px; letter-spacing: -.01em; }
   .ob-pace-top span { font-size: 12.5px; color: var(--muted); }
@@ -1572,6 +1607,26 @@
   .pcol-name { font-size: 14px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pcol-val { font-size: 21px; font-weight: 800; letter-spacing: -.03em; line-height: 1.1; font-family: var(--font-display); white-space: nowrap; }
   .pcol-pct { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+  .pcol-pct.pcol-live { color: var(--partner); font-weight: 700; }
+
+  /* Training RIGHT NOW, said on the ring itself. The live card above already
+     carries the detail; this puts the same fact on the thing the eye lands on
+     first, so the dial is the answer rather than a second banner. */
+  .pring-wrap.live::after {
+    content: ""; position: absolute; inset: -3px; border-radius: 50%;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--partner) 55%, transparent);
+    animation: liveBreathe 2s ease-in-out infinite; pointer-events: none;
+  }
+  @keyframes liveBreathe {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--partner) 50%, transparent); }
+    50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--partner) 0%, transparent); }
+  }
+  .pring-live-dot {
+    position: absolute; top: 0; right: 0; width: 13px; height: 13px; border-radius: 50%;
+    background: var(--up); border: 2px solid var(--panel); z-index: 2;
+    animation: liveBlink 1.6s ease-in-out infinite;
+  }
+  @keyframes liveBlink { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 
   @media (max-width: 380px) {
     .pring-wrap { width: 58px; height: 58px; }
@@ -1759,13 +1814,20 @@
      pops. Both are one-shot, both are keyed to something the user just did. */
   .sess-card.ex-in { animation: exIn .44s cubic-bezier(.22,1,.36,1) both; }
   @keyframes exIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+  /* The pop carries a ring of light out with it, so a logged set reads as
+     landing rather than as a colour swap. */
   .set-circle.just-done { animation: setPop .52s cubic-bezier(.22,1,.36,1); }
-  @keyframes setPop { 0% { transform: scale(1); } 34% { transform: scale(1.24); } 100% { transform: scale(1); } }
+  @keyframes setPop {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--down) 55%, transparent); }
+    34% { transform: scale(1.24); box-shadow: 0 0 0 11px color-mix(in srgb, var(--down) 0%, transparent); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--down) 0%, transparent); }
+  }
   .rest-bar { animation: hRise .38s cubic-bezier(.22,1,.36,1) both; }
 
   @media (prefers-reduced-motion: reduce) {
-    .h-rise, .h-pop, .sess-card.ex-in, .set-circle.just-done, .rest-bar { animation: none; }
-    .pring .pring-fill { transition: none; }
+    .h-rise, .h-pop, .sess-card.ex-in, .set-circle.just-done, .rest-bar,
+    .pring-wrap.live::after, .pring-live-dot { animation: none; }
+    .pring .pring-fill, .pr-pop, .rest-ring .rr-fill, .sc-ring .sc-fill { transition: none; }
   }
   .pop-body { padding: 17px; }
   .pop-body.compose { padding: 16px; }
@@ -2604,6 +2666,26 @@
   }
   .set-circle:disabled { opacity: 0.4; cursor: not-allowed; }
 
+  /* A personal record is the point of the session, so it is said on the set
+     that broke it rather than turning up later as a tag in Recent Activity.
+     Fixed, above the session overlay, and it retracts on its own: it must
+     never stand between you and the next set. */
+  .pr-pop {
+    position: fixed; left: 14px; right: 14px; top: calc(10px + env(safe-area-inset-top, 0px));
+    z-index: 62; display: flex; align-items: center; gap: 12px;
+    background: var(--accent); color: var(--on-accent);
+    border-radius: 14px; padding: 12px 15px;
+    box-shadow: 0 16px 34px -12px color-mix(in srgb, var(--accent) 60%, transparent);
+    transform: translateY(-160%); transition: transform .5s cubic-bezier(.2,.9,.25,1.25);
+  }
+  .pr-pop.show { transform: none; }
+  .pr-pop-ico { flex-shrink: 0; display: flex; }
+  .pr-pop-kicker { display: block; font-size: 11px; font-weight: 800; letter-spacing: .11em; opacity: .75; }
+  .pr-pop-val { display: block; font-size: 15.5px; font-weight: 800; letter-spacing: -.01em; }
+  /* Confetti pieces are positioned by JS against whichever element it bursts
+     from, so they need no layout of their own, only to sit above it. */
+  .confetti-piece { position: fixed; z-index: 63; border-radius: 2px; pointer-events: none; }
+
   .exercise-row.ex-done .ex-name { color: var(--muted); }
   .exercise-row.ex-done .ex-icon { color: var(--down); }
 
@@ -2733,10 +2815,48 @@
     transition: transform .12s ease, background .12s ease;
   }
   .btn-ghost:active { transform: scale(.985); background: var(--panel-2); }
-  .session-complete { text-align: center; padding: 20px 0; }
-  .session-complete .big-emoji { font-size: 48px; margin-bottom: 10px; }
-  .session-complete h3 { font-size: 21px; margin: 0 0 6px; }
-  .session-complete p { color: var(--muted); margin: 0 0 20px; }
+  /* The finish screen is the payoff, not a receipt. Ring fills to full, the
+     numbers land under it, and the last line is the pair, because a workout
+     here is half of a shared week rather than a solo total. */
+  .session-complete { text-align: center; padding: 12px 0 0; }
+  .session-complete h3 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; margin: 12px 0 4px; }
+  .session-complete p { color: var(--muted); margin: 0 0 4px; font-size: 14px; }
+  .sc-ring { position: relative; width: 148px; height: 148px; margin: 0 auto; }
+  /* Direct child only: the tick sitting in the middle is an svg too, and a
+     bare .sc-ring svg rule blew it up to the full dial and rotated it. */
+  .sc-ring > svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .sc-ring circle { fill: none; stroke-width: 10; }
+  .sc-ring .sc-track { stroke: var(--panel-2); }
+  .sc-ring .sc-fill {
+    stroke: var(--accent); stroke-linecap: round;
+    transition: stroke-dashoffset 1.1s cubic-bezier(.22,1,.36,1);
+  }
+  .sc-ring-mid { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--accent-ink); }
+  .sc-stats {
+    display: flex; margin: 18px 0 16px;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  }
+  .sc-stat { flex: 1; padding: 13px 4px; min-width: 0; }
+  .sc-stat + .sc-stat { border-left: 1px solid var(--border); }
+  .sc-stat b {
+    display: block; font-size: 21px; font-weight: 800; letter-spacing: -.03em;
+    font-family: var(--font-display); line-height: 1.15;
+  }
+  .sc-stat span { font-size: 11px; font-weight: 700; letter-spacing: .07em; color: var(--muted); text-transform: uppercase; }
+  .sc-stat.pr b { color: var(--accent-ink); }
+  .sc-team {
+    display: inline-flex; align-items: center; gap: 9px; margin-bottom: 18px;
+    background: var(--panel-2); border-radius: 100px; padding: 6px 15px 6px 7px;
+    font-size: 13px; font-weight: 600;
+  }
+  .sc-team-avs { display: flex; }
+  .sc-team-av {
+    width: 26px; height: 26px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10.5px; font-weight: 800; color: #fff; border: 2px solid var(--panel-2);
+  }
+  .sc-team-av + .sc-team-av { margin-left: -9px; }
+  .sc-team-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
   .toast {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -2905,6 +3025,42 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace; opacity: .8;
   }
   #p-open-issues .fig-page-n { color: var(--partner); border-color: color-mix(in srgb, var(--partner) 45%, var(--border)); }
+
+  /* Badges: a design handoff, so the grid reads more like a spec sheet than
+     a phone screen -- no phone frame, just the medallions themselves. */
+  #p-badges .fig-page-n { color: #a8ff00; border-color: color-mix(in srgb, #a8ff00 45%, var(--border)); }
+  .bdg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 18px 14px; }
+  .bdg { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 7px; }
+  .bdg-ring {
+    width: 62px; height: 62px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .bdg-mystery {
+    background: var(--panel-2); box-shadow: 0 0 0 1.5px var(--border);
+    color: var(--muted); font-size: 22px; font-weight: 800;
+  }
+  .bdg-label { font-size: 11.5px; font-weight: 700; }
+  .bdg-locked .bdg-label { color: var(--muted); }
+  .bdg-sub { font-size: 9.5px; color: var(--muted); line-height: 1.3; max-width: 104px; }
+  .bdg-cap { font-size: 9.5px; color: var(--muted); line-height: 1.3; max-width: 112px; opacity: .7; }
+  .bdg-cel-row { display: flex; gap: 18px; flex-wrap: wrap; }
+  .bdg-cel {
+    flex: 1 1 220px; max-width: 260px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 18px; padding: 22px 18px; text-align: center;
+  }
+  .bdg-cel-ring {
+    width: 74px; height: 74px; border-radius: 50%; margin: 0 auto 14px;
+    display: flex; align-items: center; justify-content: center; background: var(--panel-2);
+  }
+  .bdg-cel-h { font-size: 18px; font-weight: 800; letter-spacing: -.02em; margin: 0 0 6px; }
+  .bdg-cel-sub { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0 0 16px; }
+  .bdg-cel-cta {
+    display: inline-block; padding: 9px 20px; border-radius: 100px;
+    font-size: 12.5px; font-weight: 700; color: #0b0d11;
+  }
+  .bdg-concept-group { margin-top: 14px; }
+  .bdg-concept-name { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .bdg-concept-list { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--text); line-height: 1.7; }
 
   .proto-scrim {
     position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column;
@@ -3240,8 +3396,10 @@ const BODY_GROUP_LABELS = {
 };
 
 
-const ISSUES_HTML = "<section class=\"fig-page\" id=\"p-open-issues\"><div class=\"fig-page-head\"><span class=\"fig-page-n\">!</span><h2 class=\"fig-page-name\">Open issues</h2></div><p class=\"fig-page-note\">The master sheet: everything flagged and not yet done, checked against the code or the live config rather than remembered. 15 open right now.</p><div class=\"fig-section\" id=\"i-before-real-users\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Before real users</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">4</span></div><p class=\"iss-note\">These are the ones that bite the first stranger who signs up.</p><div class=\"iss-list\"><div class=\"iss iss-blocker\"><div class=\"iss-top\"><span class=\"iss-tag blocker\">Blocker</span><span class=\"iss-title\">Email sign-in is capped at 2 messages an hour</span></div><p class=\"iss-detail\">Supabase's built-in mailer is development only, and the app now offers email as a way in. The third person to request a link in an hour gets nothing. Needs Resend or Postmark wired in: a config change, no code.</p><div class=\"iss-where\">Supabase auth settings</div></div><div class=\"iss iss-blocker\"><div class=\"iss-top\"><span class=\"iss-tag blocker\">Blocker</span><span class=\"iss-title\">Errors are shown but never recorded</span></div><p class=\"iss-detail\">A crash raises the fatal banner and names the function, so the user sees it. Nothing is sent anywhere, so we never learn it happened. Needs a table plus a hook on the existing error listeners; no new vendor.</p><div class=\"iss-where\">index.html, showFatal</div></div><div class=\"iss iss-blocker\"><div class=\"iss-top\"><span class=\"iss-tag blocker\">Blocker</span><span class=\"iss-title\">Legal pages predate half the app</span></div><p class=\"iss-detail\">privacy.html and support.html were written before clips, live sessions, push notifications and photos existed, and use a different design language from the app. Apple requires the privacy policy to match what is actually collected.</p><div class=\"iss-where\">privacy.html, support.html</div></div><div class=\"iss iss-todo\"><div class=\"iss-top\"><span class=\"iss-tag todo\">To do</span><span class=\"iss-title\">Onboarding has never been walked as a genuinely new account</span></div><p class=\"iss-detail\">Name, goal, detail, pace, plan, then pairing. Every path exists but has only ever been used by accounts that already had data. Empty states for a truly fresh account need the same pass the rest of the app got.</p><div class=\"iss-where\">index.html, renderOnboardStep</div></div></div></div><div class=\"fig-section\" id=\"i-waiting-on-you\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Waiting on you</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">4</span></div><p class=\"iss-note\">Nothing here can move without an account, a click, or a decision only you can make.</p><div class=\"iss-list\"><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">Sign in with Apple needs the Developer account</span></div><p class=\"iss-detail\">Apple requires it once any social login is offered, so it blocks App Store submission. The keys cannot be generated without the paid account. The sign-in screen already has room for the button.</p><div class=\"iss-where\">$99/yr Apple Developer Program</div></div><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">Jawa is still not a collaborator on the repo</span></div><p class=\"iss-detail\">Her CODEOWNERS entries point at @jawaabdulal now, but a CODEOWNERS line does nothing until she has repo access. The deploy token cannot add her: it is fine-grained with no Administration permission.</p><div class=\"iss-where\">GitHub, Settings, Collaborators</div></div><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">meridian-web-studio has push access and I do not know who that is</span></div><p class=\"iss-detail\">A second collaborator with write access to the repo, account created 2026-08-01, no activity on it. Worth confirming who it is or removing it before real users exist.</p><div class=\"iss-where\">GitHub, Settings, Collaborators</div></div><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">Photo retention was never decided</span></div><p class=\"iss-detail\">Raised in the strategy meeting and left open. Proof photos expire after 30 days. Progress photos tied to a goal have no policy at all, and storage cost was explicitly called a real constraint.</p><div class=\"iss-where\">Supabase storage</div></div></div></div><div class=\"fig-section\" id=\"i-waiting-on-the-native-build\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Waiting on the native build</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">2</span></div><p class=\"iss-note\">Real features that a PWA genuinely cannot do. They all arrive with the same Capacitor step.</p><div class=\"iss-list\"><div class=\"iss iss-native\"><div class=\"iss-top\"><span class=\"iss-tag native\">Needs native</span><span class=\"iss-title\">The timer stops when the app is backgrounded</span></div><p class=\"iss-detail\">Deliberate today, so time asleep is not counted, but the ask was for it to keep running like a navigation app. Needs genuine background execution, which the web cannot give.</p><div class=\"iss-where\">Capacitor</div></div><div class=\"iss iss-native\"><div class=\"iss-top\"><span class=\"iss-tag native\">Needs native</span><span class=\"iss-title\">Hands-free voice logging</span></div><p class=\"iss-detail\">Costed 2026-09-06. Safari has never shipped the speech recognition API, so this cannot be built as a PWA at all. Native gives Apple's on-device Speech framework, but foreground only: push to talk, never always listening. Camera hand gestures are the one option that works in the web app today.</p><div class=\"iss-where\">Capacitor, or MediaPipe in the web app</div></div></div></div><div class=\"fig-section\" id=\"i-deliberate-debt\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Deliberate debt</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">5</span></div><p class=\"iss-note\">Known, chosen on purpose, and written down so the reasoning is not lost.</p><div class=\"iss-list\"><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">Every write still refetches every table</span></div><p class=\"iss-detail\">loadAll() runs after almost every write. It is one parallel batch now, and it no longer repaints Home when Home is not on screen, but it still refetches everything rather than updating what changed. Fine at current volume.</p><div class=\"iss-where\">index.html, loadAll</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">Two tables are fetched in full, unbounded</span></div><p class=\"iss-detail\">fit_entries and exercise_logs are read whole. Deliberately not windowed: personal records need a true all-time max per exercise and the calendar needs the true first entry ever, so a rolling window would make both silently wrong. Indexed on (email, entry_date) in the meantime.</p><div class=\"iss-where\">index.html, loadAll</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">The cron secret is inlined in the database</span></div><p class=\"iss-detail\">Vault is unavailable on this project, so the shared secret sits in the cron job commands and inside the live-start trigger function body. Anyone with database access can read it. Accepted for now; it is not a user credential.</p><div class=\"iss-where\">Postgres, cron.job and notify_live_session_start</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">The gallery does not cover four tabs</span></div><p class=\"iss-detail\">Workout, Body, Progress and Setup are not in here. They are covered instead by the app harness, which runs the real app against fixture data and screenshots every tab.</p><div class=\"iss-where\">scripts/make-states.mjs</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">Two new sheets are unverified visually</span></div><p class=\"iss-detail\">The encouragement composer and the askForName sheet that replaced the browser prompts passed the boot check and reuse the app's existing composer pattern, but have not been screenshotted. The browser harness kept getting killed the day they shipped.</p><div class=\"iss-where\">index.html, sendEncouragement and askForName</div></div></div></div><div class=\"fig-section\" id=\"i-decided-closed\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Decided, closed</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">2</span></div><p class=\"iss-note\">Kept so they do not come back around as fresh ideas.</p><div class=\"iss-list\"><div class=\"iss iss-closed\"><div class=\"iss-top\"><span class=\"iss-tag closed\">Closed</span><span class=\"iss-title\">No music integration</span></div><p class=\"iss-detail\">Showing what your partner is listening to via Spotify was overruled in the strategy meeting: music apps already play in the background, people use different services, and it is not core. Do not build it.</p><div class=\"iss-where\">Decided 2026-09-01</div></div><div class=\"iss iss-closed\"><div class=\"iss-top\"><span class=\"iss-tag closed\">Closed</span><span class=\"iss-title\">Live streaming is not the cheering feature</span></div><p class=\"iss-detail\">Deliberately not FaceTime or a live stream, which was agreed to be too expensive. A short clip that loops on their session screen and then disappears was the chosen shape, and it shipped.</p><div class=\"iss-where\">Decided 2026-09-01</div></div></div></div></section>";
-const ISSUES_TREE = "<button type=\"button\" class=\"fig-page-btn\" data-page=\"p-open-issues\"><span class=\"caret\">&#9662;</span>Open issues<span class=\"count\">15</span></button><div class=\"fig-kids\"><a class=\"fig-sec-label\" href=\"#i-before-real-users\">Before real users<span>4</span></a><a class=\"fig-sec-label\" href=\"#i-waiting-on-you\">Waiting on you<span>4</span></a><a class=\"fig-sec-label\" href=\"#i-waiting-on-the-native-build\">Waiting on the native build<span>2</span></a><a class=\"fig-sec-label\" href=\"#i-deliberate-debt\">Deliberate debt<span>5</span></a><a class=\"fig-sec-label\" href=\"#i-decided-closed\">Decided, closed<span>2</span></a></div>";
+const ISSUES_HTML = "<section class=\"fig-page\" id=\"p-open-issues\"><div class=\"fig-page-head\"><span class=\"fig-page-n\">!</span><h2 class=\"fig-page-name\">Open issues</h2></div><p class=\"fig-page-note\">The master sheet: everything flagged and not yet done, checked against the code or the live config rather than remembered. 16 open right now.</p><div class=\"fig-section\" id=\"i-before-real-users\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Before real users</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">4</span></div><p class=\"iss-note\">These are the ones that bite the first stranger who signs up.</p><div class=\"iss-list\"><div class=\"iss iss-blocker\"><div class=\"iss-top\"><span class=\"iss-tag blocker\">Blocker</span><span class=\"iss-title\">Email sign-in is capped at 2 messages an hour</span></div><p class=\"iss-detail\">Supabase's built-in mailer is development only, and the app now offers email as a way in. The third person to request a link in an hour gets nothing. Needs Resend or Postmark wired in: a config change, no code.</p><div class=\"iss-where\">Supabase auth settings</div></div><div class=\"iss iss-blocker\"><div class=\"iss-top\"><span class=\"iss-tag blocker\">Blocker</span><span class=\"iss-title\">Errors are shown but never recorded</span></div><p class=\"iss-detail\">A crash raises the fatal banner and names the function, so the user sees it. Nothing is sent anywhere, so we never learn it happened. Needs a table plus a hook on the existing error listeners; no new vendor.</p><div class=\"iss-where\">index.html, showFatal</div></div><div class=\"iss iss-blocker\"><div class=\"iss-top\"><span class=\"iss-tag blocker\">Blocker</span><span class=\"iss-title\">Legal pages predate half the app</span></div><p class=\"iss-detail\">privacy.html and support.html were written before clips, live sessions, push notifications and photos existed, and use a different design language from the app. Apple requires the privacy policy to match what is actually collected.</p><div class=\"iss-where\">privacy.html, support.html</div></div><div class=\"iss iss-todo\"><div class=\"iss-top\"><span class=\"iss-tag todo\">To do</span><span class=\"iss-title\">Onboarding has never been walked as a genuinely new account</span></div><p class=\"iss-detail\">Name, goal, detail, pace, plan, then pairing. Every path exists but has only ever been used by accounts that already had data. Empty states for a truly fresh account need the same pass the rest of the app got.</p><div class=\"iss-where\">index.html, renderOnboardStep</div></div></div></div><div class=\"fig-section\" id=\"i-waiting-on-you\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Waiting on you</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">4</span></div><p class=\"iss-note\">Nothing here can move without an account, a click, or a decision only you can make.</p><div class=\"iss-list\"><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">Sign in with Apple needs the Developer account</span></div><p class=\"iss-detail\">Apple requires it once any social login is offered, so it blocks App Store submission. The keys cannot be generated without the paid account. The sign-in screen already has room for the button.</p><div class=\"iss-where\">$99/yr Apple Developer Program</div></div><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">Jawa is still not a collaborator on the repo</span></div><p class=\"iss-detail\">Her CODEOWNERS entries point at @jawaabdulal now, but a CODEOWNERS line does nothing until she has repo access. The deploy token cannot add her: it is fine-grained with no Administration permission.</p><div class=\"iss-where\">GitHub, Settings, Collaborators</div></div><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">meridian-web-studio has push access and I do not know who that is</span></div><p class=\"iss-detail\">A second collaborator with write access to the repo, account created 2026-08-01, no activity on it. Worth confirming who it is or removing it before real users exist.</p><div class=\"iss-where\">GitHub, Settings, Collaborators</div></div><div class=\"iss iss-waiting\"><div class=\"iss-top\"><span class=\"iss-tag waiting\">Waiting on you</span><span class=\"iss-title\">Photo retention was never decided</span></div><p class=\"iss-detail\">Raised in the strategy meeting and left open. Proof photos expire after 30 days. Progress photos tied to a goal have no policy at all, and storage cost was explicitly called a real constraint.</p><div class=\"iss-where\">Supabase storage</div></div></div></div><div class=\"fig-section\" id=\"i-designed-not-built\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Designed, not built</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">1</span></div><p class=\"iss-note\">Full mockups exist and the reasoning behind every choice is written down. Someone just needs to wire it into the real app.</p><div class=\"iss-list\"><div class=\"iss iss-todo\"><div class=\"iss-top\"><span class=\"iss-tag todo\">To do</span><span class=\"iss-title\">Milestone badges: 11 designed with real icons, 15 more written up as concepts</span></div><p class=\"iss-detail\">Four categories (Getting started, Consistency together, Strength, Keeping the record) plus three unlock celebrations. Everything routes through each person's own weekly target rather than a raw day count, on purpose: an earlier pass named two badges after a perfect 7-day week and a no-miss streak, which quietly punished using a rest day, and that got corrected before anything else was built on top of it. Locked badges hide the icon and the name from the user (a plain question mark, not a preview of what is coming) so the surprise stays a surprise. Real SVGs, category colors and the celebration copy are all in the gallery's Badges section now. Needs a badges table (who has earned what), the unlock check itself, and the celebration overlay wired into index.html.</p><div class=\"iss-where\">gallery, Badges section</div></div></div></div><div class=\"fig-section\" id=\"i-waiting-on-the-native-build\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Waiting on the native build</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">2</span></div><p class=\"iss-note\">Real features that a PWA genuinely cannot do. They all arrive with the same Capacitor step.</p><div class=\"iss-list\"><div class=\"iss iss-native\"><div class=\"iss-top\"><span class=\"iss-tag native\">Needs native</span><span class=\"iss-title\">The timer stops when the app is backgrounded</span></div><p class=\"iss-detail\">Deliberate today, so time asleep is not counted, but the ask was for it to keep running like a navigation app. Needs genuine background execution, which the web cannot give.</p><div class=\"iss-where\">Capacitor</div></div><div class=\"iss iss-native\"><div class=\"iss-top\"><span class=\"iss-tag native\">Needs native</span><span class=\"iss-title\">Hands-free voice logging</span></div><p class=\"iss-detail\">Costed 2026-09-06. Safari has never shipped the speech recognition API, so this cannot be built as a PWA at all. Native gives Apple's on-device Speech framework, but foreground only: push to talk, never always listening. Camera hand gestures are the one option that works in the web app today.</p><div class=\"iss-where\">Capacitor, or MediaPipe in the web app</div></div></div></div><div class=\"fig-section\" id=\"i-deliberate-debt\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Deliberate debt</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">5</span></div><p class=\"iss-note\">Known, chosen on purpose, and written down so the reasoning is not lost.</p><div class=\"iss-list\"><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">Every write still refetches every table</span></div><p class=\"iss-detail\">loadAll() runs after almost every write. It is one parallel batch now, and it no longer repaints Home when Home is not on screen, but it still refetches everything rather than updating what changed. Fine at current volume.</p><div class=\"iss-where\">index.html, loadAll</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">Two tables are fetched in full, unbounded</span></div><p class=\"iss-detail\">fit_entries and exercise_logs are read whole. Deliberately not windowed: personal records need a true all-time max per exercise and the calendar needs the true first entry ever, so a rolling window would make both silently wrong. Indexed on (email, entry_date) in the meantime.</p><div class=\"iss-where\">index.html, loadAll</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">The cron secret is inlined in the database</span></div><p class=\"iss-detail\">Vault is unavailable on this project, so the shared secret sits in the cron job commands and inside the live-start trigger function body. Anyone with database access can read it. Accepted for now; it is not a user credential.</p><div class=\"iss-where\">Postgres, cron.job and notify_live_session_start</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">The gallery does not cover four tabs</span></div><p class=\"iss-detail\">Workout, Body, Progress and Setup are not in here. They are covered instead by the app harness, which runs the real app against fixture data and screenshots every tab.</p><div class=\"iss-where\">scripts/make-states.mjs</div></div><div class=\"iss iss-debt\"><div class=\"iss-top\"><span class=\"iss-tag debt\">Debt</span><span class=\"iss-title\">Two new sheets are unverified visually</span></div><p class=\"iss-detail\">The encouragement composer and the askForName sheet that replaced the browser prompts passed the boot check and reuse the app's existing composer pattern, but have not been screenshotted. The browser harness kept getting killed the day they shipped.</p><div class=\"iss-where\">index.html, sendEncouragement and askForName</div></div></div></div><div class=\"fig-section\" id=\"i-decided-closed\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Decided, closed</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">2</span></div><p class=\"iss-note\">Kept so they do not come back around as fresh ideas.</p><div class=\"iss-list\"><div class=\"iss iss-closed\"><div class=\"iss-top\"><span class=\"iss-tag closed\">Closed</span><span class=\"iss-title\">No music integration</span></div><p class=\"iss-detail\">Showing what your partner is listening to via Spotify was overruled in the strategy meeting: music apps already play in the background, people use different services, and it is not core. Do not build it.</p><div class=\"iss-where\">Decided 2026-09-01</div></div><div class=\"iss iss-closed\"><div class=\"iss-top\"><span class=\"iss-tag closed\">Closed</span><span class=\"iss-title\">Live streaming is not the cheering feature</span></div><p class=\"iss-detail\">Deliberately not FaceTime or a live stream, which was agreed to be too expensive. A short clip that loops on their session screen and then disappears was the chosen shape, and it shipped.</p><div class=\"iss-where\">Decided 2026-09-01</div></div></div></div></section>";
+const ISSUES_TREE = "<button type=\"button\" class=\"fig-page-btn\" data-page=\"p-open-issues\"><span class=\"caret\">&#9662;</span>Open issues<span class=\"count\">16</span></button><div class=\"fig-kids\"><a class=\"fig-sec-label\" href=\"#i-before-real-users\">Before real users<span>4</span></a><a class=\"fig-sec-label\" href=\"#i-waiting-on-you\">Waiting on you<span>4</span></a><a class=\"fig-sec-label\" href=\"#i-designed-not-built\">Designed, not built<span>1</span></a><a class=\"fig-sec-label\" href=\"#i-waiting-on-the-native-build\">Waiting on the native build<span>2</span></a><a class=\"fig-sec-label\" href=\"#i-deliberate-debt\">Deliberate debt<span>5</span></a><a class=\"fig-sec-label\" href=\"#i-decided-closed\">Decided, closed<span>2</span></a></div>";
+const BADGES_HTML = "<section class=\"fig-page\" id=\"p-badges\"><div class=\"fig-page-head\"><span class=\"fig-page-n\">B</span><h2 class=\"fig-page-name\">Badges</h2></div><p class=\"fig-page-note\">Not wired into the app yet: a design handoff, so whoever builds this has the real icons and the real rule rather than a description of them. Every badge routes through their own weekly target, never a raw day count, so nobody is penalized for a rest day. Locked badges hide the icon and the name in the shipped app, shown here as a plain question mark, with the real name kept in a caption for whoever is building it, not for the end user.</p><div class=\"fig-section\" id=\"bdg-getting-started\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Getting started</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">3</span></div><div class=\"bdg-grid\"><div class=\"bdg bdg-earned\"><div class=\"bdg-ring\" style=\"background:color-mix(in srgb, #2d6bff 16%, var(--panel-2));box-shadow:0 0 0 1.5px #2d6bff, 0 8px 20px -8px color-mix(in srgb, #2d6bff 40%, transparent)\"><svg viewBox=\"0 0 24 24\" width=\"34\" height=\"34\"><g fill=\"none\" stroke=\"#2d6bff\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 21V3\"/><path d=\"M6 4h11l-3 4 3 4H6\"/></g></svg></div><div class=\"bdg-label\">First Workout</div><div class=\"bdg-sub\">Logged</div></div><div class=\"bdg bdg-earned\"><div class=\"bdg-ring\" style=\"background:color-mix(in srgb, #2fa968 16%, var(--panel-2));box-shadow:0 0 0 1.5px #2fa968, 0 8px 20px -8px color-mix(in srgb, #2fa968 40%, transparent)\"><svg viewBox=\"0 0 24 24\" width=\"34\" height=\"34\"><g fill=\"none\" stroke=\"#2fa968\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"5\" r=\"2.3\"/><path d=\"M12 8v6M12 8l-5 2M12 8l5 2M12 14l-4 7M12 14l4 7\"/></g></svg></div><div class=\"bdg-label\">Full Body</div><div class=\"bdg-sub\">One session, every group</div></div><div class=\"bdg bdg-locked\"><div class=\"bdg-ring bdg-mystery\">?</div><div class=\"bdg-label\">Locked</div><div class=\"bdg-cap\">Goal Week, Hit your own weekly number</div></div></div></div><div class=\"fig-section\" id=\"bdg-consistency-together\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Consistency, together</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">3</span></div><div class=\"bdg-grid\"><div class=\"bdg bdg-earned\"><div class=\"bdg-ring\" style=\"background:color-mix(in srgb, #ff6b4a 16%, var(--panel-2));box-shadow:0 0 0 1.5px #ff6b4a, 0 8px 20px -8px color-mix(in srgb, #ff6b4a 40%, transparent)\"><svg viewBox=\"0 0 24 24\" width=\"34\" height=\"34\"><g fill=\"none\" stroke=\"#ff6b4a\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2.3,1.5) scale(0.62)\"><path d=\"M12 2C12 6 8 8 8 12a4 4 0 1 0 8 0c0-1-.3-1.8-.8-2.5.3 1.8-.9 2.5-1.8 2.5-1.3 0-1.9-1-1.4-2.3C13 8 12.7 5 12 2Z\"/></g><g transform=\"translate(7.3,1.5) scale(0.62)\"><path d=\"M12 2C12 6 8 8 8 12a4 4 0 1 0 8 0c0-1-.3-1.8-.8-2.5.3 1.8-.9 2.5-1.8 2.5-1.3 0-1.9-1-1.4-2.3C13 8 12.7 5 12 2Z\"/></g></g></svg></div><div class=\"bdg-label\">Two Weeks Running</div><div class=\"bdg-sub\">Two weeks in a row, both of you</div></div><div class=\"bdg bdg-earned\"><div class=\"bdg-ring\" style=\"background:color-mix(in srgb, #a8ff00 16%, var(--panel-2));box-shadow:0 0 0 1.5px #a8ff00, 0 8px 20px -8px color-mix(in srgb, #a8ff00 40%, transparent)\"><svg viewBox=\"0 0 24 24\" width=\"34\" height=\"34\"><text x=\"12\" y=\"16.2\" text-anchor=\"middle\" font-family=\"DM Sans\" font-weight=\"800\" font-size=\"9.5\" fill=\"#a8ff00\">100</text></svg></div><div class=\"bdg-label\">100 Together</div><div class=\"bdg-sub\">Combined workouts</div></div><div class=\"bdg bdg-locked\"><div class=\"bdg-ring bdg-mystery\">?</div><div class=\"bdg-label\">Locked</div><div class=\"bdg-cap\">Full Coverage, Every muscle, one week</div></div></div></div><div class=\"fig-section\" id=\"bdg-strength\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Strength</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">3</span></div><div class=\"bdg-grid\"><div class=\"bdg bdg-earned\"><div class=\"bdg-ring\" style=\"background:color-mix(in srgb, #ff6b4a 16%, var(--panel-2));box-shadow:0 0 0 1.5px #ff6b4a, 0 8px 20px -8px color-mix(in srgb, #ff6b4a 40%, transparent)\"><svg viewBox=\"0 0 24 24\" width=\"34\" height=\"34\"><g fill=\"none\" stroke=\"#ff6b4a\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 17h16M8 12l4-5 4 5M12 7v10\"/></g></svg></div><div class=\"bdg-label\">New PR</div><div class=\"bdg-sub\">Beat your own best</div></div><div class=\"bdg bdg-locked\"><div class=\"bdg-ring bdg-mystery\">?</div><div class=\"bdg-label\">Locked</div><div class=\"bdg-cap\">Double PR Week, You both hit one</div></div><div class=\"bdg bdg-locked\"><div class=\"bdg-ring bdg-mystery\">?</div><div class=\"bdg-label\">Locked</div><div class=\"bdg-cap\">Bodyweight Bench, The first real ladder rung</div></div></div></div><div class=\"fig-section\" id=\"bdg-keeping-the-record\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Keeping the record</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">2</span></div><div class=\"bdg-grid\"><div class=\"bdg bdg-locked\"><div class=\"bdg-ring bdg-mystery\">?</div><div class=\"bdg-label\">Locked</div><div class=\"bdg-cap\">First Photo, Day one of the record</div></div><div class=\"bdg bdg-locked\"><div class=\"bdg-ring bdg-mystery\">?</div><div class=\"bdg-label\">Locked</div><div class=\"bdg-cap\">1 Year, Together, on the app</div></div></div></div><div class=\"fig-section\" id=\"bdg-unlock-moments\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Unlock moments</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">3</span></div><p class=\"iss-note\">The full-screen celebration when a badge unlocks. Shown static here; the real version stages the ring in with an overshoot bounce, then the headline and button fade up a beat after.</p><div class=\"bdg-cel-row\"><div class=\"bdg-cel\"><div class=\"bdg-cel-ring\" style=\"box-shadow:0 0 0 2px #2d6bff, 0 0 60px -10px #2d6bff\"><svg viewBox=\"0 0 24 24\" width=\"46\" height=\"46\"><g fill=\"none\" stroke=\"#2d6bff\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 21V3\"/><path d=\"M6 4h11l-3 4 3 4H6\"/></g></svg></div><h3 class=\"bdg-cel-h\">First one down.</h3><p class=\"bdg-cel-sub\">Every streak starts here. Welcome to the log.</p><div class=\"bdg-cel-cta\" style=\"background:#2d6bff\">Keep going</div></div><div class=\"bdg-cel\"><div class=\"bdg-cel-ring\" style=\"box-shadow:0 0 0 2px #a8ff00, 0 0 60px -10px #a8ff00\"><svg viewBox=\"0 0 24 24\" width=\"46\" height=\"46\"><text x=\"12\" y=\"16.2\" text-anchor=\"middle\" font-family=\"DM Sans\" font-weight=\"800\" font-size=\"9.5\" fill=\"#a8ff00\">100</text></svg></div><h3 class=\"bdg-cel-h\">100 together.</h3><p class=\"bdg-cel-sub\">Not 100 each: 100 total. That is every session, both of you, added up.</p><div class=\"bdg-cel-cta\" style=\"background:#a8ff00\">Keep going</div></div><div class=\"bdg-cel\"><div class=\"bdg-cel-ring\" style=\"box-shadow:0 0 0 2px #ff6b4a, 0 0 60px -10px #ff6b4a\"><svg viewBox=\"0 0 24 24\" width=\"46\" height=\"46\"><g fill=\"none\" stroke=\"#ff6b4a\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2.3,1.5) scale(0.62)\"><path d=\"M12 2C12 6 8 8 8 12a4 4 0 1 0 8 0c0-1-.3-1.8-.8-2.5.3 1.8-.9 2.5-1.8 2.5-1.3 0-1.9-1-1.4-2.3C13 8 12.7 5 12 2Z\"/></g><g transform=\"translate(7.3,1.5) scale(0.62)\"><path d=\"M12 2C12 6 8 8 8 12a4 4 0 1 0 8 0c0-1-.3-1.8-.8-2.5.3 1.8-.9 2.5-1.8 2.5-1.3 0-1.9-1-1.4-2.3C13 8 12.7 5 12 2Z\"/></g></g></svg></div><h3 class=\"bdg-cel-h\">Two weeks running.</h3><p class=\"bdg-cel-sub\">Two weeks in a row you both hit your own goal. That is the actual hard part.</p><div class=\"bdg-cel-cta\" style=\"background:#ff6b4a\">Keep going</div></div></div></div><div class=\"fig-section\" id=\"bdg-concepts\"><div class=\"fig-section-head\"><span class=\"fig-section-name\">Written, not designed</span><span class=\"fig-section-rule\"></span><span class=\"fig-section-n\">15</span></div><p class=\"iss-note\">Named and reasoned through, no icon or medallion built yet. Same rule as above: everything here is rest-day safe by construction, nothing rewards never resting.</p><div class=\"bdg-concept-group\"><div class=\"bdg-concept-name\">Consistency, goal-based and rest-day safe</div><ul class=\"bdg-concept-list\"><li>First time you hit your weekly goal</li><li>A full month: four weeks running, both of you</li><li>Two months running</li><li>Used a rest day: tapped rest day instead of quietly skipping, before the streak broke</li><li>Back at it: first session after a week or more away, framed as welcome back, never a scolding</li></ul></div><div class=\"bdg-concept-group\"><div class=\"bdg-concept-name\">Strength</div><ul class=\"bdg-concept-list\"><li>5 total PRs</li><li>10 total PRs</li><li>The comeback PR: a new best on a lift not touched in 30 or more days</li></ul></div><div class=\"bdg-concept-group\"><div class=\"bdg-concept-name\">Variety</div><ul class=\"bdg-concept-list\"><li>Tried 3 different training types in a month</li><li>First time logging yoga, pilates or calisthenics, whichever is new for you</li></ul></div><div class=\"bdg-concept-group\"><div class=\"bdg-concept-name\">Partner, lean hardest here since it is the differentiator</div><ul class=\"bdg-concept-list\"><li>Evenly matched: a week where you both logged the exact same number of sessions</li><li>Cheered your partner 10 times</li><li>Cheered your partner 25 times</li><li>Reset together: you both came back from a break in the same week</li><li>Both hit your own goal, same week, for the first time</li></ul></div></div></section>";
+const BADGES_TREE = "<button type=\"button\" class=\"fig-page-btn\" data-page=\"p-badges\"><span class=\"caret\">&#9662;</span>Badges<span class=\"count\">29</span></button><div class=\"fig-kids\"><a class=\"fig-sec-label\" href=\"#bdg-getting-started\">Getting started<span>3</span></a><a class=\"fig-sec-label\" href=\"#bdg-consistency-together\">Consistency, together<span>3</span></a><a class=\"fig-sec-label\" href=\"#bdg-strength\">Strength<span>3</span></a><a class=\"fig-sec-label\" href=\"#bdg-keeping-the-record\">Keeping the record<span>2</span></a><a class=\"fig-sec-label\" href=\"#bdg-unlock-moments\">Unlock moments<span>3</span></a><a class=\"fig-sec-label\" href=\"#bdg-concepts\">Written, not designed<span>15</span></a></div>";
 
 const $ = (id) => document.getElementById(id);
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -3323,13 +3481,26 @@ let SESSION = null, CLIP_INBOX = [], TODAY_WORKOUT = null;
    these stay null and nothing animates in a captured frame. */
 let SESSION_JUST_SET = null, SESSION_LAST_EX = 0;
 const beatLive = () => {};
+/* The rest ring's own constants. restRingHTML is lifted, so these have to come
+   with it or the ring draws against nothing. */
+const DEFAULT_REST_SEC = 90;
+const REST_RING_R = 56;
+const REST_RING_CIRC = 2 * Math.PI * REST_RING_R;
 const startRestTicker = () => {};
 const stopRestTicker = () => {};
 const saveSessionToStorage = () => {};
 const clearSessionStorage = () => {};
 const closeSessionUI = () => {};
 const renderWorkoutTab = () => {};
-const renderSessionComplete = () => {};
+/* The finish screen is lifted whole, so only its write half and its noises are
+   stubbed out. Everything it reports is a number the fixtures decide. */
+let SESSION_ELAPSED_MS = 47 * 60 * 1000, TODAY_PRS = 1, LOGGED_NAMES = [];
+const finishWorkout = async () => {};
+const sessionElapsed = () => SESSION_ELAPSED_MS;
+const todaysLoggedExerciseNames = () => new Set(LOGGED_NAMES);
+const todaysPRCount = () => TODAY_PRS;
+const buzz = () => {};
+const confettiBurst = () => {};
 const toggleSet = () => {};
 const startNextSet = () => {};
 const jumpToExercise = () => {};
@@ -3493,14 +3664,14 @@ function icon(name, size = 18) {
 }
 
 
-function personRing(done, target, cls, email, name, animate = false) {
+function personRing(done, target, cls, email, name, animate = false, live = false) {
   const pct = target > 0 ? Math.max(0, Math.min(1, done / target)) : 0;
   const r = 52, stroke = 9, circ = 2 * Math.PI * r;
   const off = circ * (1 - pct);
   const color = cls === "me" ? "var(--me)" : "var(--partner)";
   const whole = Math.round(pct * 100);
   return `<div class="pcol ${cls}">
-    <div class="pring-wrap">
+    <div class="pring-wrap${live ? " live" : ""}">
       <svg class="pring" viewBox="0 0 120 120" aria-hidden="true">
         <circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--panel-2)" stroke-width="${stroke}"/>
         <circle class="pring-fill" cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
@@ -3508,11 +3679,14 @@ function personRing(done, target, cls, email, name, animate = false) {
           transform="rotate(-90 60 60)" style="--d:${cls === "me" ? 0 : 150}ms"/>
       </svg>
       <span class="pring-av ${cls}" data-av-email="${escapeHtml(email || "")}">${escapeHtml(initials(name || "?"))}</span>
+      ${live ? `<span class="pring-live-dot" aria-hidden="true"></span>` : ""}
     </div>
     <div class="pcol-meta">
       <div class="pcol-name">${escapeHtml(name)}</div>
       <div class="pcol-val">${done} / ${target}</div>
-      <div class="pcol-pct" data-pct="${whole}" data-delay="${cls === "me" ? 0 : 150}">${animate ? 0 : whole}%</div>
+      ${live
+        ? `<div class="pcol-pct pcol-live">Training now</div>`
+        : `<div class="pcol-pct" data-pct="${whole}" data-delay="${cls === "me" ? 0 : 150}">${animate ? 0 : whole}%</div>`}
     </div>
   </div>`;
 }
@@ -3567,7 +3741,7 @@ function renderHero(animate = false) {
     ${personRing(myDays, myTarget, "me", MY_EMAIL, ME, animate)}
     ${partner ? `<div class="stand-div"></div>
     <div class="strow-tap" id="openPartnerBtn" role="button" tabindex="0"
-      aria-label="Open ${escapeHtml(partner)}">${personRing(theirDays, theirTarget, "them", PARTNER_EMAIL, partner, animate)}</div>` : ""}
+      aria-label="Open ${escapeHtml(partner)}">${personRing(theirDays, theirTarget, "them", PARTNER_EMAIL, partner, animate, !!LIVE_PARTNER)}</div>` : ""}
   </div>`;
 
   const d = new Date(todayStr() + "T00:00:00");
@@ -3618,7 +3792,7 @@ function renderHero(animate = false) {
   if (animate) {
     requestAnimationFrame(() => requestAnimationFrame(() => {
       el.querySelectorAll(".pring-fill").forEach((c) => { c.style.strokeDashoffset = c.dataset.off; });
-      el.querySelectorAll(".pcol-pct").forEach((p) =>
+      el.querySelectorAll(".pcol-pct[data-pct]").forEach((p) =>
         countUp(p, Number(p.dataset.pct), { ms: 950, delay: Number(p.dataset.delay) || 0, suffix: "%" }));
       el.querySelectorAll("[data-xp]").forEach((b) =>
         countUp(b, Number(b.dataset.xp), { ms: 800, delay: Number(b.dataset.delay) || 0 }));
@@ -4047,6 +4221,47 @@ function formatRest(ms) {
 }
 
 
+function restTargetSec() {
+  const v = Number(SESSION?.restTargetSec);
+  return Number.isFinite(v) && v > 0 ? v : DEFAULT_REST_SEC;
+}
+
+
+function restRingState(ms) {
+  const target = restTargetSec();
+  const left = target - Math.max(0, ms) / 1000;
+  const over = left < 0;
+  return {
+    over,
+    low: !over && left <= target * 0.2,
+    text: over ? `+${formatRest(-left * 1000)}` : formatRest(left * 1000),
+    pct: over ? 0 : Math.max(0, Math.min(1, left / target)),
+  };
+}
+
+
+function restRingHTML(ms) {
+  const s = restRingState(ms);
+  return `<div class="rest-bar">
+    <div class="rest-ring${s.over ? " over" : s.low ? " low" : ""}" id="restRing">
+      <svg viewBox="0 0 128 128" aria-hidden="true">
+        <circle class="rr-track" cx="64" cy="64" r="${REST_RING_R}"/>
+        <circle class="rr-fill" id="restFill" cx="64" cy="64" r="${REST_RING_R}"
+          stroke-dasharray="${REST_RING_CIRC.toFixed(2)}" stroke-dashoffset="${(REST_RING_CIRC * (1 - s.pct)).toFixed(2)}"/>
+      </svg>
+      <div class="rest-mid">
+        <span class="rest-label">RESTING</span>
+        <span class="rest-clock" id="restClock">${s.text}</span>
+      </div>
+    </div>
+    <div class="rest-adjust">
+      <button type="button" id="restMinus">&minus;10s</button>
+      <button type="button" id="restPlus">+10s</button>
+    </div>
+  </div>`;
+}
+
+
 function renderSession() {
   beatLive();
   const ei = SESSION.exerciseIndex;
@@ -4108,11 +4323,7 @@ function renderSession() {
       </div>
     </div>
 
-    ${resting ? `
-      <div class="rest-bar" id="restTimer">
-        <span class="rest-label">RESTING</span>
-        <span class="rest-clock" id="restClock">${formatRest(restMs)}</span>
-      </div>` : ""}
+    ${resting ? restRingHTML(restMs) : ""}
 
     <div class="sess-field">
       <label class="sess-field-label">Weight <span class="sess-field-unit">lb</span></label>
@@ -4153,6 +4364,9 @@ function renderSession() {
 
   if (resting) startRestTicker();
   else stopRestTicker();
+
+  if ($("restMinus")) $("restMinus").onclick = () => adjustRestTarget(-10);
+  if ($("restPlus")) $("restPlus").onclick = () => adjustRestTarget(10);
 
   if ($("sessPrivacyBtn")) $("sessPrivacyBtn").onclick = openWorkoutPrivacy;
 
@@ -4203,6 +4417,103 @@ function renderSession() {
   $("endWorkoutBtn").onclick = () => {
     clearSessionStorage();
     renderSessionComplete();
+  };
+}
+
+
+async function renderSessionComplete() {
+  await finishWorkout();
+  const loggedNow = todaysLoggedExerciseNames();
+  const total = TODAY_WORKOUT.exercises.length;
+  const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
+  const full = doneCount >= total;
+  $("sessionProgressFill").style.width = "100%";
+  const hasProof = !!todayEntryFor(MY_EMAIL)?.proof_path;
+  /* The numbers that make this feel like it counted. Volume is the lifter's
+     figure; on a class or cardio day there is none, so the exercise count
+     takes that tile rather than printing a proud zero. */
+  const durSec = Math.round(sessionElapsed() / 1000);
+  const durLabel = durSec < 60 ? "<1m" : `${Math.round(durSec / 60)}m`;
+  const volume = dayVolumeLb(MY_EMAIL, todayStr());
+  const prs = todaysPRCount();
+  const ringPct = total > 0 ? Math.min(1, doneCount / total) : 1;
+  const scR = 58, scCirc = 2 * Math.PI * scR;
+
+  const partner = PARTNER_EMAIL ? partnerName() : null;
+  const myDays = gymDaysThisWeek(ME);
+  const myTarget = weeklyGoalFor(MY_EMAIL);
+  const theirDays = partner ? gymDaysThisWeek(partner) : 0;
+  const theirTarget = partner ? weeklyGoalFor(PARTNER_EMAIL) : 0;
+
+  $("sessionBody").innerHTML = `
+    <div class="session-complete">
+      <div class="sc-ring">
+        <svg viewBox="0 0 128 128" aria-hidden="true">
+          <circle class="sc-track" cx="64" cy="64" r="${scR}"/>
+          <circle class="sc-fill" id="scFill" cx="64" cy="64" r="${scR}"
+            stroke-dasharray="${scCirc.toFixed(2)}" stroke-dashoffset="${scCirc.toFixed(2)}"
+            data-off="${(scCirc * (1 - ringPct)).toFixed(2)}"/>
+        </svg>
+        <div class="sc-ring-mid">${icon("check", 38)}</div>
+      </div>
+      <h3>${full ? "Workout Complete" : "Workout Ended"}</h3>
+      <p>${escapeHtml(displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises))} · ${doneCount} of ${total} exercises</p>
+      <div class="sc-stats">
+        <div class="sc-stat"><b>${durLabel}</b><span>Time</span></div>
+        ${volume > 0
+          ? `<div class="sc-stat"><b>${fmtVolume(volume)}</b><span>Volume lb</span></div>`
+          : `<div class="sc-stat"><b>${doneCount}/${total}</b><span>Exercises</span></div>`}
+        ${prs > 0 ? `<div class="sc-stat pr"><b>${prs}</b><span>${prs === 1 ? "New PR" : "New PRs"}</span></div>` : ""}
+      </div>
+      ${partner ? `<div class="sc-team">
+        <span class="sc-team-avs">
+          <span class="sc-team-av" style="background:var(--me);" data-av-email="${escapeHtml(MY_EMAIL)}">${escapeHtml(initials(ME))}</span>
+          <span class="sc-team-av" style="background:var(--partner);" data-av-email="${escapeHtml(PARTNER_EMAIL)}">${escapeHtml(initials(partner))}</span>
+        </span>
+        You + ${escapeHtml(partner)}: ${myDays + theirDays} of ${myTarget + theirTarget} this week
+      </div>` : `<div class="sc-team">${myDays} of ${myTarget} workouts this week</div>`}
+      ${hasProof
+        ? `<p class="muted-note">${icon("check", 14)} Proof saved. ${escapeHtml(partnerName())} can see it.</p>`
+        : `<p class="muted-note">One last thing: snap a photo to lock this in.</p>
+           <button type="button" class="btn-primary" id="sessionProofBtn">Take proof photo</button>`}
+      ${PARTNER_EMAIL ? `<button type="button" class="btn-secondary" id="sessionNoteBtn">Say something to ${escapeHtml(partnerName())}</button>` : ""}
+      <button type="button" class="${hasProof ? "btn-primary" : "btn-ghost"}" id="sessionDoneBtn">Done</button>
+    </div>`;
+
+  hydrateAvatars($("sessionBody"));
+  /* Two frames, so the browser has painted the empty ring before the real
+     offset counts as a change worth transitioning. Same reason as the hero. */
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const fill = document.getElementById("scFill");
+    if (fill) fill.style.strokeDashoffset = fill.dataset.off;
+  }));
+  // Confetti only for a workout actually finished. Ending early is a real and
+  // fine outcome, but it is not the same event and should not be dressed as one.
+  if (full) {
+    buzz([20, 50, 20]);
+    setTimeout(() => {
+      const ring = $("sessionBody").querySelector(".sc-ring");
+      if (ring) confettiBurst(ring, 26);
+    }, 420);
+  }
+
+  if (!hasProof) {
+    $("sessionProofBtn").onclick = () => $("proofInput").click();
+  }
+  if (PARTNER_EMAIL) $("sessionNoteBtn").onclick = () => openNoteComposer("workout");
+  $("sessionDoneBtn").onclick = async () => {
+    SESSION = null;
+    // Clear today's plan so the next workout starts fresh rather than
+    // reopening the one that was just finished.
+    if (TODAY_WORKOUT?.id) {
+      await sb.from("ai_workouts").update({ archived: true }).eq("id", TODAY_WORKOUT.id);
+    }
+    TODAY_WORKOUT = null;
+    WORKOUT_MODE = null;
+    closeSessionUI();
+    $("workoutContent").classList.remove("hidden");
+    await loadAll();
+    renderWorkoutTab();
   };
 }
 
@@ -4640,6 +4951,16 @@ const sessionFixture = (over = {}) => {
     restStartedAt: null, ...over };
 };
 
+/* The screen after the last rep. "done" is how many of the five exercises
+   actually got logged, which is what separates finishing from stopping. */
+const completeFixture = ({ done = null, elapsedMs = 47 * 60 * 1000, prs = 1 } = {}) => {
+  sessionFixture();
+  const names = TODAY_WORKOUT.exercises.map((e) => e.name.toLowerCase());
+  LOGGED_NAMES = done == null ? names : names.slice(0, done);
+  SESSION_ELAPSED_MS = elapsedMs;
+  TODAY_PRS = prs;
+};
+
 /* ---- what to show ---- */
 
 const STATES = [
@@ -4850,6 +5171,14 @@ const STATES = [
   { page: "Doing the workout", section: "The session screen", name: "An exercise the classifier does not know",
     note: "The card simply has no muscle line. Nothing else moves.",
     session: true, setup: () => { sessionFixture(); TODAY_WORKOUT.exercises[0] = { name: "Turkish Get-Up", sets: 3, reps: 5 }; } },
+
+  { page: "Doing the workout", section: "Finishing", name: "All five done, one of them a record",
+    note: "The ring fills, the numbers land, and the last line is the pair rather than a solo total. A PR earns its own tile; without one that tile is not there.",
+    complete: true, setup: () => { completeFixture(); } },
+
+  { page: "Doing the workout", section: "Finishing", name: "Stopped after two",
+    note: "Ending early is a real outcome and reads as one: Workout Ended, no PR tile, no confetti. Same layout, no false celebration.",
+    complete: true, setup: () => { completeFixture({ done: 2, elapsedMs: 18 * 60 * 1000, prs: 0 }); } },
 ];
 
 /* ---- render each state into the stage, then capture it ---- */
@@ -4921,6 +5250,19 @@ async function renderSessionState() {
   return deId(card.outerHTML);
 }
 
+/* The finish screen fills its ring across two animation frames. A still life
+   wants the value it settles ON, and waiting for rAF here hangs the build in
+   headless, so the resting offset is applied straight after the render. */
+async function renderCompleteState() {
+  const card = $("sessionCard");
+  card.classList.remove("hidden");
+  await renderSessionComplete();
+  await settle();
+  const fill = $("scFill");
+  if (fill) fill.style.strokeDashoffset = fill.dataset.off;
+  return deId(card.outerHTML);
+}
+
 const setTheme = (t) => {
   document.documentElement.setAttribute("data-theme", t);
   $("galLight").classList.toggle("on", t === "light");
@@ -4944,7 +5286,7 @@ const setTheme = (t) => {
   const SECTION_ORDER = {
     "Opening the app": ["The everyday state", "Other shapes of the same screen", "When they are training", "Explaining a number"],
     "Planning the workout": ["While it thinks", "Before you press begin"],
-    "Doing the workout": ["The session screen"],
+    "Doing the workout": ["The session screen", "Finishing"],
     "Reading your body": ["The explainers behind it"],
     "Watching them train": ["Where they are up to", "What the muscle line says", "When they hold something back"],
     "Sending a clip": ["Filming it", "After you press send"],
@@ -4969,6 +5311,7 @@ const setTheme = (t) => {
            : st.sheet ? await renderSheetState()
            : st.gen ? await renderGenState(st)
            : st.pop ? await renderPopState(st)
+           : st.complete ? await renderCompleteState()
            : st.session ? await renderSessionState()
            : await renderHomeState();
     } catch (e) {
@@ -5055,7 +5398,10 @@ const setTheme = (t) => {
               escapeHtml(f.name) + "</a>").join("")).join("") +
       "</div>");
   }
-  /* The master sheet goes last: it is the one page that is not a screen. */
+  /* Design handoffs come after the real screens, and the master sheet goes
+     last of all: neither one is a screen pulled from index.html. */
+  canvas.push(BADGES_HTML);
+  tree.push(BADGES_TREE);
   canvas.push(ISSUES_HTML);
   tree.push(ISSUES_TREE);
 

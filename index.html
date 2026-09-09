@@ -492,13 +492,40 @@
   .sess-note { font-size: 12.5px; color: var(--muted); margin-top: 10px; line-height: 1.45; }
 
 
+  /* Rest is a ring rather than a line of text: it reads at arm's length across
+     a gym, and it says how much is LEFT instead of only how much has gone.
+     What gets recorded is unchanged (still the real elapsed rest, banked by
+     recordRest); the target only decides what the ring draws against. */
   .rest-bar {
-    display: flex; align-items: center; justify-content: center; gap: 12px;
-    background: var(--panel-2); border-radius: 14px; padding: 18px;
+    display: flex; flex-direction: column; align-items: center; gap: 13px;
+    background: var(--panel-2); border-radius: 14px; padding: 16px;
     margin-bottom: 14px;
   }
-  .rest-label { font-size: 12.5px; font-weight: 800; letter-spacing: .11em; color: var(--muted); }
-  .rest-clock { font-size: 24px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .rest-ring { position: relative; width: 132px; height: 132px; }
+  .rest-ring > svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .rest-ring circle { fill: none; stroke-width: 9; }
+  .rest-ring .rr-track { stroke: var(--panel); }
+  .rest-ring .rr-fill {
+    stroke: var(--accent); stroke-linecap: round;
+    transition: stroke-dashoffset .9s linear, stroke .35s;
+  }
+  /* The last fifth, and then past the target: the only two states worth a
+     colour change, so the ring is glanceable without being read. */
+  .rest-ring.low .rr-fill, .rest-ring.over .rr-fill { stroke: var(--up); }
+  .rest-mid {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1px;
+  }
+  .rest-label { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--muted); }
+  .rest-clock { font-size: 27px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .rest-ring.low .rest-clock, .rest-ring.over .rest-clock { color: var(--up); }
+  .rest-adjust { display: flex; gap: 8px; width: 100%; }
+  .rest-adjust button {
+    flex: 1; padding: 9px 0; border-radius: 10px; cursor: pointer;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    font-family: inherit; font-size: 13px; font-weight: 700;
+  }
+  .rest-adjust button:active { transform: scale(.96); }
 
   /* Grid, not space-between: "Weight (lb)" is a wider label than "Reps", so
      with flex the two control groups started at different places and the minus
@@ -1520,8 +1547,14 @@
     font-family: inherit; font-size: 15.5px; font-weight: 700; letter-spacing: -.01em;
     transition: border-color .15s, background .15s;
   }
-  .ob-chip:hover, .ob-chip:active { border-color: var(--accent); }
+  .ob-chip:active { border-color: var(--accent); }
   .ob-chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+  /* Hover only, never on touch: iOS Safari keeps :hover latched on the last
+     tapped element until the next tap lands elsewhere, which made whichever
+     option happened to sit under a previous tap look chosen or recommended. */
+  @media (hover: hover) and (pointer: fine) {
+    .ob-chip:hover { border-color: var(--accent); }
+  }
 
   .ob-paces { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
   .ob-pace {
@@ -1530,7 +1563,9 @@
     display: flex; flex-direction: column; gap: 5px;
   }
   .ob-pace.rec { border-color: var(--accent); }
-  .ob-pace:hover { border-color: var(--accent); }
+  @media (hover: hover) and (pointer: fine) {
+    .ob-pace:hover { border-color: var(--accent); }
+  }
   .ob-pace-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
   .ob-pace-top strong { font-size: 15.5px; letter-spacing: -.01em; }
   .ob-pace-top span { font-size: 12.5px; color: var(--muted); }
@@ -1584,6 +1619,26 @@
   .pcol-name { font-size: 14px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pcol-val { font-size: 21px; font-weight: 800; letter-spacing: -.03em; line-height: 1.1; font-family: var(--font-display); white-space: nowrap; }
   .pcol-pct { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+  .pcol-pct.pcol-live { color: var(--partner); font-weight: 700; }
+
+  /* Training RIGHT NOW, said on the ring itself. The live card above already
+     carries the detail; this puts the same fact on the thing the eye lands on
+     first, so the dial is the answer rather than a second banner. */
+  .pring-wrap.live::after {
+    content: ""; position: absolute; inset: -3px; border-radius: 50%;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--partner) 55%, transparent);
+    animation: liveBreathe 2s ease-in-out infinite; pointer-events: none;
+  }
+  @keyframes liveBreathe {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--partner) 50%, transparent); }
+    50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--partner) 0%, transparent); }
+  }
+  .pring-live-dot {
+    position: absolute; top: 0; right: 0; width: 13px; height: 13px; border-radius: 50%;
+    background: var(--up); border: 2px solid var(--panel); z-index: 2;
+    animation: liveBlink 1.6s ease-in-out infinite;
+  }
+  @keyframes liveBlink { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 
   @media (max-width: 380px) {
     .pring-wrap { width: 58px; height: 58px; }
@@ -1771,13 +1826,20 @@
      pops. Both are one-shot, both are keyed to something the user just did. */
   .sess-card.ex-in { animation: exIn .44s cubic-bezier(.22,1,.36,1) both; }
   @keyframes exIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+  /* The pop carries a ring of light out with it, so a logged set reads as
+     landing rather than as a colour swap. */
   .set-circle.just-done { animation: setPop .52s cubic-bezier(.22,1,.36,1); }
-  @keyframes setPop { 0% { transform: scale(1); } 34% { transform: scale(1.24); } 100% { transform: scale(1); } }
+  @keyframes setPop {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--down) 55%, transparent); }
+    34% { transform: scale(1.24); box-shadow: 0 0 0 11px color-mix(in srgb, var(--down) 0%, transparent); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--down) 0%, transparent); }
+  }
   .rest-bar { animation: hRise .38s cubic-bezier(.22,1,.36,1) both; }
 
   @media (prefers-reduced-motion: reduce) {
-    .h-rise, .h-pop, .sess-card.ex-in, .set-circle.just-done, .rest-bar { animation: none; }
-    .pring .pring-fill { transition: none; }
+    .h-rise, .h-pop, .sess-card.ex-in, .set-circle.just-done, .rest-bar,
+    .pring-wrap.live::after, .pring-live-dot { animation: none; }
+    .pring .pring-fill, .pr-pop, .rest-ring .rr-fill, .sc-ring .sc-fill { transition: none; }
   }
   .pop-body { padding: 17px; }
   .pop-body.compose { padding: 16px; }
@@ -2616,6 +2678,26 @@
   }
   .set-circle:disabled { opacity: 0.4; cursor: not-allowed; }
 
+  /* A personal record is the point of the session, so it is said on the set
+     that broke it rather than turning up later as a tag in Recent Activity.
+     Fixed, above the session overlay, and it retracts on its own: it must
+     never stand between you and the next set. */
+  .pr-pop {
+    position: fixed; left: 14px; right: 14px; top: calc(10px + env(safe-area-inset-top, 0px));
+    z-index: 62; display: flex; align-items: center; gap: 12px;
+    background: var(--accent); color: var(--on-accent);
+    border-radius: 14px; padding: 12px 15px;
+    box-shadow: 0 16px 34px -12px color-mix(in srgb, var(--accent) 60%, transparent);
+    transform: translateY(-160%); transition: transform .5s cubic-bezier(.2,.9,.25,1.25);
+  }
+  .pr-pop.show { transform: none; }
+  .pr-pop-ico { flex-shrink: 0; display: flex; }
+  .pr-pop-kicker { display: block; font-size: 11px; font-weight: 800; letter-spacing: .11em; opacity: .75; }
+  .pr-pop-val { display: block; font-size: 15.5px; font-weight: 800; letter-spacing: -.01em; }
+  /* Confetti pieces are positioned by JS against whichever element it bursts
+     from, so they need no layout of their own, only to sit above it. */
+  .confetti-piece { position: fixed; z-index: 63; border-radius: 2px; pointer-events: none; }
+
   .exercise-row.ex-done .ex-name { color: var(--muted); }
   .exercise-row.ex-done .ex-icon { color: var(--down); }
 
@@ -2745,10 +2827,48 @@
     transition: transform .12s ease, background .12s ease;
   }
   .btn-ghost:active { transform: scale(.985); background: var(--panel-2); }
-  .session-complete { text-align: center; padding: 20px 0; }
-  .session-complete .big-emoji { font-size: 48px; margin-bottom: 10px; }
-  .session-complete h3 { font-size: 21px; margin: 0 0 6px; }
-  .session-complete p { color: var(--muted); margin: 0 0 20px; }
+  /* The finish screen is the payoff, not a receipt. Ring fills to full, the
+     numbers land under it, and the last line is the pair, because a workout
+     here is half of a shared week rather than a solo total. */
+  .session-complete { text-align: center; padding: 12px 0 0; }
+  .session-complete h3 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; margin: 12px 0 4px; }
+  .session-complete p { color: var(--muted); margin: 0 0 4px; font-size: 14px; }
+  .sc-ring { position: relative; width: 148px; height: 148px; margin: 0 auto; }
+  /* Direct child only: the tick sitting in the middle is an svg too, and a
+     bare .sc-ring svg rule blew it up to the full dial and rotated it. */
+  .sc-ring > svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .sc-ring circle { fill: none; stroke-width: 10; }
+  .sc-ring .sc-track { stroke: var(--panel-2); }
+  .sc-ring .sc-fill {
+    stroke: var(--accent); stroke-linecap: round;
+    transition: stroke-dashoffset 1.1s cubic-bezier(.22,1,.36,1);
+  }
+  .sc-ring-mid { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--accent-ink); }
+  .sc-stats {
+    display: flex; margin: 18px 0 16px;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  }
+  .sc-stat { flex: 1; padding: 13px 4px; min-width: 0; }
+  .sc-stat + .sc-stat { border-left: 1px solid var(--border); }
+  .sc-stat b {
+    display: block; font-size: 21px; font-weight: 800; letter-spacing: -.03em;
+    font-family: var(--font-display); line-height: 1.15;
+  }
+  .sc-stat span { font-size: 11px; font-weight: 700; letter-spacing: .07em; color: var(--muted); text-transform: uppercase; }
+  .sc-stat.pr b { color: var(--accent-ink); }
+  .sc-team {
+    display: inline-flex; align-items: center; gap: 9px; margin-bottom: 18px;
+    background: var(--panel-2); border-radius: 100px; padding: 6px 15px 6px 7px;
+    font-size: 13px; font-weight: 600;
+  }
+  .sc-team-avs { display: flex; }
+  .sc-team-av {
+    width: 26px; height: 26px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10.5px; font-weight: 800; color: #fff; border: 2px solid var(--panel-2);
+  }
+  .sc-team-av + .sc-team-av { margin-left: -9px; }
+  .sc-team-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
   .toast {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -3380,7 +3500,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.04.47";
+const APP_VERSION = "2026.09.08.1";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -5326,14 +5446,14 @@ function sharedDayStreak() {
    real values on the element for renderHero to flip to on the next frame.
    Yours moves first, your partner's a beat later, so two rings read as a
    sequence rather than a twitch. */
-function personRing(done, target, cls, email, name, animate = false) {
+function personRing(done, target, cls, email, name, animate = false, live = false) {
   const pct = target > 0 ? Math.max(0, Math.min(1, done / target)) : 0;
   const r = 52, stroke = 9, circ = 2 * Math.PI * r;
   const off = circ * (1 - pct);
   const color = cls === "me" ? "var(--me)" : "var(--partner)";
   const whole = Math.round(pct * 100);
   return `<div class="pcol ${cls}">
-    <div class="pring-wrap">
+    <div class="pring-wrap${live ? " live" : ""}">
       <svg class="pring" viewBox="0 0 120 120" aria-hidden="true">
         <circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--panel-2)" stroke-width="${stroke}"/>
         <circle class="pring-fill" cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
@@ -5341,11 +5461,14 @@ function personRing(done, target, cls, email, name, animate = false) {
           transform="rotate(-90 60 60)" style="--d:${cls === "me" ? 0 : 150}ms"/>
       </svg>
       <span class="pring-av ${cls}" data-av-email="${escapeHtml(email || "")}">${escapeHtml(initials(name || "?"))}</span>
+      ${live ? `<span class="pring-live-dot" aria-hidden="true"></span>` : ""}
     </div>
     <div class="pcol-meta">
       <div class="pcol-name">${escapeHtml(name)}</div>
       <div class="pcol-val">${done} / ${target}</div>
-      <div class="pcol-pct" data-pct="${whole}" data-delay="${cls === "me" ? 0 : 150}">${animate ? 0 : whole}%</div>
+      ${live
+        ? `<div class="pcol-pct pcol-live">Training now</div>`
+        : `<div class="pcol-pct" data-pct="${whole}" data-delay="${cls === "me" ? 0 : 150}">${animate ? 0 : whole}%</div>`}
     </div>
   </div>`;
 }
@@ -6123,7 +6246,7 @@ function renderHero(animate = false) {
     ${personRing(myDays, myTarget, "me", MY_EMAIL, ME, animate)}
     ${partner ? `<div class="stand-div"></div>
     <div class="strow-tap" id="openPartnerBtn" role="button" tabindex="0"
-      aria-label="Open ${escapeHtml(partner)}">${personRing(theirDays, theirTarget, "them", PARTNER_EMAIL, partner, animate)}</div>` : ""}
+      aria-label="Open ${escapeHtml(partner)}">${personRing(theirDays, theirTarget, "them", PARTNER_EMAIL, partner, animate, !!LIVE_PARTNER)}</div>` : ""}
   </div>`;
 
   const d = new Date(todayStr() + "T00:00:00");
@@ -6174,7 +6297,7 @@ function renderHero(animate = false) {
   if (animate) {
     requestAnimationFrame(() => requestAnimationFrame(() => {
       el.querySelectorAll(".pring-fill").forEach((c) => { c.style.strokeDashoffset = c.dataset.off; });
-      el.querySelectorAll(".pcol-pct").forEach((p) =>
+      el.querySelectorAll(".pcol-pct[data-pct]").forEach((p) =>
         countUp(p, Number(p.dataset.pct), { ms: 950, delay: Number(p.dataset.delay) || 0, suffix: "%" }));
       el.querySelectorAll("[data-xp]").forEach((b) =>
         countUp(b, Number(b.dataset.xp), { ms: 800, delay: Number(b.dataset.delay) || 0 }));
@@ -8423,23 +8546,92 @@ function reopenSession() {
 }
 
 let REST_TICKER = null;
+let REST_BUZZED_AT = null;     // the rest whose target has already buzzed once
 
 function formatRest(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+/* How long the ring draws against. Adjustable in 10s steps from the session
+   screen and stored with the session, so it survives a reload mid-workout.
+   It changes nothing about what gets RECORDED: recordRest still banks the
+   real elapsed time, target or no target. */
+const DEFAULT_REST_SEC = 90;
+const REST_RING_R = 56;
+const REST_RING_CIRC = 2 * Math.PI * REST_RING_R;
+
+function restTargetSec() {
+  const v = Number(SESSION?.restTargetSec);
+  return Number.isFinite(v) && v > 0 ? v : DEFAULT_REST_SEC;
+}
+
+/* One place decides what the ring says, so the first paint and the ticker can
+   never disagree. Past the target it counts up with a + rather than sitting at
+   zero, because standing there for four minutes is worth knowing. */
+function restRingState(ms) {
+  const target = restTargetSec();
+  const left = target - Math.max(0, ms) / 1000;
+  const over = left < 0;
+  return {
+    over,
+    low: !over && left <= target * 0.2,
+    text: over ? `+${formatRest(-left * 1000)}` : formatRest(left * 1000),
+    pct: over ? 0 : Math.max(0, Math.min(1, left / target)),
+  };
+}
+
+function restRingHTML(ms) {
+  const s = restRingState(ms);
+  return `<div class="rest-bar">
+    <div class="rest-ring${s.over ? " over" : s.low ? " low" : ""}" id="restRing">
+      <svg viewBox="0 0 128 128" aria-hidden="true">
+        <circle class="rr-track" cx="64" cy="64" r="${REST_RING_R}"/>
+        <circle class="rr-fill" id="restFill" cx="64" cy="64" r="${REST_RING_R}"
+          stroke-dasharray="${REST_RING_CIRC.toFixed(2)}" stroke-dashoffset="${(REST_RING_CIRC * (1 - s.pct)).toFixed(2)}"/>
+      </svg>
+      <div class="rest-mid">
+        <span class="rest-label">RESTING</span>
+        <span class="rest-clock" id="restClock">${s.text}</span>
+      </div>
+    </div>
+    <div class="rest-adjust">
+      <button type="button" id="restMinus">&minus;10s</button>
+      <button type="button" id="restPlus">+10s</button>
+    </div>
+  </div>`;
+}
+
+function paintRestRing() {
+  const clock = document.getElementById("restClock");
+  if (!clock || !SESSION?.restStartedAt) { stopRestTicker(); return; }
+  const s = restRingState(Date.now() - SESSION.restStartedAt);
+  clock.textContent = s.text;
+  const ring = document.getElementById("restRing");
+  if (ring) { ring.classList.toggle("low", s.low); ring.classList.toggle("over", s.over); }
+  const fill = document.getElementById("restFill");
+  if (fill) fill.style.strokeDashoffset = (REST_RING_CIRC * (1 - s.pct)).toFixed(2);
+  // One buzz as the target lands, and only one per rest however long you stand there.
+  if (s.over && REST_BUZZED_AT !== SESSION.restStartedAt) {
+    REST_BUZZED_AT = SESSION.restStartedAt;
+    buzz([18, 60, 18]);
+  }
+}
+
 function startRestTicker() {
   stopRestTicker();
-  REST_TICKER = setInterval(() => {
-    const el = document.getElementById("restClock");
-    if (!el || !SESSION?.restStartedAt) { stopRestTicker(); return; }
-    el.textContent = formatRest(Date.now() - SESSION.restStartedAt);
-  }, 1000);
+  REST_TICKER = setInterval(paintRestRing, 1000);
 }
 
 function stopRestTicker() {
   if (REST_TICKER) { clearInterval(REST_TICKER); REST_TICKER = null; }
+}
+
+/* Haptics where the browser allows them. Android Chrome honours this; iOS
+   Safari ignores it entirely, and the real fix there is the Capacitor Haptics
+   plugin once the app is wrapped, not this call. Silent no-op either way. */
+function buzz(pattern) {
+  try { navigator.vibrate?.(pattern); } catch { /* unsupported, nothing to do */ }
 }
 
 /* Rest between sets is recorded, not just displayed: it is the honest signal
@@ -8478,6 +8670,103 @@ function recordRest(ei, setIdx) {
   }
 }
 
+function adjustRestTarget(delta) {
+  if (!SESSION) return;
+  SESSION.restTargetSec = Math.max(10, restTargetSec() + delta);
+  saveSessionToStorage();
+  paintRestRing();
+}
+
+/* The half second after a set lands: a buzz, and a line naming exactly what
+   was recorded, so "did that go in?" never has to be asked mid-workout. */
+function celebrateSet(ei, setIdx) {
+  const ex = TODAY_WORKOUT.exercises[ei];
+  const w = SESSION.setWeights?.[ei]?.[setIdx];
+  const reps = parseInt(SESSION.reps[ei], 10) || ex.reps || 0;
+  buzz(15);
+  toast(w > 0
+    ? `Set ${setIdx + 1} logged — ${w} lb × ${reps}`
+    : `Set ${setIdx + 1} logged — ${reps} reps`);
+  maybeAnnouncePR(ex.name, w);
+}
+
+/* The heaviest this exercise has ever been logged at, from the same rows
+   personalRecords() reads: real weights only, no duration-based entries. */
+function bestEverFor(name) {
+  const key = (name || "").trim().toLowerCase();
+  if (!key) return null;
+  let best = null;
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== ME || l.weight == null || l.duration_min) continue;
+    if ((l.exercise_name || "").trim().toLowerCase() !== key) continue;
+    if (best == null || l.weight > best) best = l.weight;
+  }
+  return best;
+}
+
+/* A record means heavier than this exercise has EVER gone, so the first time
+   you ever do a lift is not a PR: there was nothing to beat. The set is not in
+   exercise_logs yet (those are written when the exercise ends), so the check
+   is against the history plus whatever this session already announced, which
+   is what stops three sets at the same new weight firing three times. */
+function maybeAnnouncePR(name, weight) {
+  if (!(weight > 0)) return;
+  const prev = bestEverFor(name);
+  if (prev == null) return;
+  const key = (name || "").trim().toLowerCase();
+  SESSION.prShown = SESSION.prShown || {};
+  if (weight <= prev || weight <= (SESSION.prShown[key] || 0)) return;
+  SESSION.prShown[key] = weight;
+  saveSessionToStorage();
+  showPRPop(name, weight);
+}
+
+/* Drops in over the session, bursts once, retracts on its own. Fixed and
+   short-lived on purpose: nothing about a record should stand between you and
+   the next set. */
+let PR_POP_TIMER = null;
+function showPRPop(name, weight) {
+  let el = document.getElementById("prPop");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "prPop";
+    el.className = "pr-pop";
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `<span class="pr-pop-ico">${icon("star", 22)}</span>
+    <span><span class="pr-pop-kicker">NEW PR</span><span class="pr-pop-val">${weight} lb · ${escapeHtml(name)}</span></span>`;
+  clearTimeout(PR_POP_TIMER);
+  requestAnimationFrame(() => el.classList.add("show"));
+  buzz([20, 40, 20, 40, 70]);
+  confettiBurst(el);
+  PR_POP_TIMER = setTimeout(() => el.classList.remove("show"), 2600);
+}
+
+/* Confetti thrown from an element's own box, in the app's own three hues.
+   Pieces are fixed-position and delete themselves when the animation ends, so
+   nothing is left behind if the screen changes underneath them. */
+function confettiBurst(fromEl, count = 20) {
+  if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const box = fromEl.getBoundingClientRect();
+  const colors = ["var(--accent)", "var(--me)", "var(--partner)", "var(--text)"];
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement("div");
+    p.className = "confetti-piece";
+    const size = 5 + Math.random() * 5;
+    p.style.width = `${size.toFixed(1)}px`;
+    p.style.height = `${(size * 0.42).toFixed(1)}px`;
+    p.style.background = colors[i % colors.length];
+    p.style.left = `${box.left + box.width / 2 + (Math.random() - 0.5) * box.width * 0.6}px`;
+    p.style.top = `${box.top + box.height / 2}px`;
+    document.body.appendChild(p);
+    const anim = p.animate([
+      { transform: "translate(0,0) rotate(0deg)", opacity: 1 },
+      { transform: `translate(${((Math.random() - 0.5) * 240).toFixed(0)}px, ${(70 + Math.random() * 190).toFixed(0)}px) rotate(${(Math.random() * 620).toFixed(0)}deg)`, opacity: 0 },
+    ], { duration: 700 + Math.random() * 520, easing: "cubic-bezier(.2,.6,.4,1)" });
+    anim.onfinish = () => p.remove();
+  }
+}
+
 function toggleSet(setIdx) {
   const ei = SESSION.exerciseIndex;
   const sets = SESSION.setsDone[ei];
@@ -8508,6 +8797,9 @@ function toggleSet(setIdx) {
   }
   saveSessionToStorage();
   renderSession();
+  // After the redraw: the pop is fixed to the page, not inside the markup that
+  // was just replaced, and the toast reads off what the render just banked.
+  if (nowDone) celebrateSet(ei, setIdx);
 }
 
 let ADVANCING = false;
@@ -8645,11 +8937,7 @@ function renderSession() {
       </div>
     </div>
 
-    ${resting ? `
-      <div class="rest-bar" id="restTimer">
-        <span class="rest-label">RESTING</span>
-        <span class="rest-clock" id="restClock">${formatRest(restMs)}</span>
-      </div>` : ""}
+    ${resting ? restRingHTML(restMs) : ""}
 
     <div class="sess-field">
       <label class="sess-field-label">Weight <span class="sess-field-unit">lb</span></label>
@@ -8690,6 +8978,9 @@ function renderSession() {
 
   if (resting) startRestTicker();
   else stopRestTicker();
+
+  if ($("restMinus")) $("restMinus").onclick = () => adjustRestTarget(-10);
+  if ($("restPlus")) $("restPlus").onclick = () => adjustRestTarget(10);
 
   if ($("sessPrivacyBtn")) $("sessPrivacyBtn").onclick = openWorkoutPrivacy;
 
@@ -8794,6 +9085,17 @@ async function finishWorkout() {
   await loadAll();
 }
 
+/* Records set TODAY. personalRecords walks the whole history in order and
+   flags the log that set each best, so this is the ones that happen to be
+   today's rather than a second definition of what a record is. */
+function todaysPRCount() {
+  const { prLogIds } = personalRecords(ME);
+  const today = todayStr();
+  return ALL_EXERCISE_LOGS
+    .filter((l) => l.user_name === ME && l.entry_date === today && prLogIds.has(l.id))
+    .length;
+}
+
 async function renderSessionComplete() {
   await finishWorkout();
   const loggedNow = todaysLoggedExerciseNames();
@@ -8802,11 +9104,49 @@ async function renderSessionComplete() {
   const full = doneCount >= total;
   $("sessionProgressFill").style.width = "100%";
   const hasProof = !!todayEntryFor(MY_EMAIL)?.proof_path;
+  /* The numbers that make this feel like it counted. Volume is the lifter's
+     figure; on a class or cardio day there is none, so the exercise count
+     takes that tile rather than printing a proud zero. */
+  const durSec = Math.round(sessionElapsed() / 1000);
+  const durLabel = durSec < 60 ? "<1m" : `${Math.round(durSec / 60)}m`;
+  const volume = dayVolumeLb(MY_EMAIL, todayStr());
+  const prs = todaysPRCount();
+  const ringPct = total > 0 ? Math.min(1, doneCount / total) : 1;
+  const scR = 58, scCirc = 2 * Math.PI * scR;
+
+  const partner = PARTNER_EMAIL ? partnerName() : null;
+  const myDays = gymDaysThisWeek(ME);
+  const myTarget = weeklyGoalFor(MY_EMAIL);
+  const theirDays = partner ? gymDaysThisWeek(partner) : 0;
+  const theirTarget = partner ? weeklyGoalFor(PARTNER_EMAIL) : 0;
+
   $("sessionBody").innerHTML = `
     <div class="session-complete">
-      <div class="big-emoji">${icon("star", 40)}</div>
-      <h3>${full ? "Workout Complete!" : "Workout Ended"}</h3>
-      <p>${doneCount} of ${total} exercises completed. ${full ? "Nice work" : "Good effort"}, ${escapeHtml(ME)}.</p>
+      <div class="sc-ring">
+        <svg viewBox="0 0 128 128" aria-hidden="true">
+          <circle class="sc-track" cx="64" cy="64" r="${scR}"/>
+          <circle class="sc-fill" id="scFill" cx="64" cy="64" r="${scR}"
+            stroke-dasharray="${scCirc.toFixed(2)}" stroke-dashoffset="${scCirc.toFixed(2)}"
+            data-off="${(scCirc * (1 - ringPct)).toFixed(2)}"/>
+        </svg>
+        <div class="sc-ring-mid">${icon("check", 38)}</div>
+      </div>
+      <h3>${full ? "Workout Complete" : "Workout Ended"}</h3>
+      <p>${escapeHtml(displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises))} · ${doneCount} of ${total} exercises</p>
+      <div class="sc-stats">
+        <div class="sc-stat"><b>${durLabel}</b><span>Time</span></div>
+        ${volume > 0
+          ? `<div class="sc-stat"><b>${fmtVolume(volume)}</b><span>Volume lb</span></div>`
+          : `<div class="sc-stat"><b>${doneCount}/${total}</b><span>Exercises</span></div>`}
+        ${prs > 0 ? `<div class="sc-stat pr"><b>${prs}</b><span>${prs === 1 ? "New PR" : "New PRs"}</span></div>` : ""}
+      </div>
+      ${partner ? `<div class="sc-team">
+        <span class="sc-team-avs">
+          <span class="sc-team-av" style="background:var(--me);" data-av-email="${escapeHtml(MY_EMAIL)}">${escapeHtml(initials(ME))}</span>
+          <span class="sc-team-av" style="background:var(--partner);" data-av-email="${escapeHtml(PARTNER_EMAIL)}">${escapeHtml(initials(partner))}</span>
+        </span>
+        You + ${escapeHtml(partner)}: ${myDays + theirDays} of ${myTarget + theirTarget} this week
+      </div>` : `<div class="sc-team">${myDays} of ${myTarget} workouts this week</div>`}
       ${hasProof
         ? `<p class="muted-note">${icon("check", 14)} Proof saved. ${escapeHtml(partnerName())} can see it.</p>`
         : `<p class="muted-note">One last thing: snap a photo to lock this in.</p>
@@ -8814,6 +9154,23 @@ async function renderSessionComplete() {
       ${PARTNER_EMAIL ? `<button type="button" class="btn-secondary" id="sessionNoteBtn">Say something to ${escapeHtml(partnerName())}</button>` : ""}
       <button type="button" class="${hasProof ? "btn-primary" : "btn-ghost"}" id="sessionDoneBtn">Done</button>
     </div>`;
+
+  hydrateAvatars($("sessionBody"));
+  /* Two frames, so the browser has painted the empty ring before the real
+     offset counts as a change worth transitioning. Same reason as the hero. */
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const fill = document.getElementById("scFill");
+    if (fill) fill.style.strokeDashoffset = fill.dataset.off;
+  }));
+  // Confetti only for a workout actually finished. Ending early is a real and
+  // fine outcome, but it is not the same event and should not be dressed as one.
+  if (full) {
+    buzz([20, 50, 20]);
+    setTimeout(() => {
+      const ring = $("sessionBody").querySelector(".sc-ring");
+      if (ring) confettiBurst(ring, 26);
+    }, 420);
+  }
 
   if (!hasProof) {
     $("sessionProofBtn").onclick = () => $("proofInput").click();
@@ -9082,7 +9439,7 @@ function openAllWorkouts() {
 
 function closeAllWorkouts() { $("allWorkoutsScrim").classList.add("hidden"); }
 
-function renderWorkoutTab() {
+function renderWorkoutTab({ respectMode = false } = {}) {
   renderFab();
   resumeSessionIfAny();          // loads a saved session, does not take over
   $("workoutContent").classList.remove("hidden");
@@ -9106,7 +9463,9 @@ function renderWorkoutTab() {
     return;
   }
 
-  if (TODAY_WORKOUT) {
+  // An explicit request to see choose/manual/week (from goWorkoutScreen) wins
+  // over the default "show today's plan" behaviour; a plain tab switch does not.
+  if (TODAY_WORKOUT && !(respectMode && WORKOUT_MODE)) {
     WORKOUT_MODE = null;
     try {
       renderPlanPreview();
@@ -9491,7 +9850,7 @@ function goWorkoutScreen(mode, { back = false, before } = {}) {
     before?.();
     WORKOUT_MODE = mode;
     window.scrollTo({ top: 0, behavior: "instant" });
-    renderWorkoutTab();
+    renderWorkoutTab({ respectMode: true });
     el.classList.remove("scr-out");
     if (!reduced) {
       el.classList.toggle("back", back);
@@ -10197,6 +10556,7 @@ function cbRenderPicker() {
     b.onclick = () => {
       CB_GROUP = b.dataset.group;
       $("cbChips").querySelectorAll(".cb-chip").forEach((c) => c.classList.toggle("on", c === b));
+      $("cbSearch").value = "";
       cbRenderGrid();
     };
   });
@@ -10548,6 +10908,9 @@ async function saveManualWorkout() {
 }
 
 function renderPlanPreview() {
+  // Reachable straight from choose/manual/week now, each of which stamps its
+  // own heading here — clear it or their title outlives them on this screen.
+  $("workoutCardTitle").textContent = "";
   $("workoutFocusRow").textContent = `Focus: ${displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises)}`;
 
   const loggedNow = todaysLoggedExerciseNames();
@@ -11326,7 +11689,7 @@ function renderBodyDetail() {
     <div class="bi-detail-sub">${escapeHtml(groupLabel)} · ${escapeHtml(piece.where)}</div>
     <div class="bi-detail-impact" style="--heat:${heatOf(f.muscle)}">
       ${sets > 0
-        ? `<div class="bi-detail-pct">${Math.round(pct * 100)}%</div><div class="bi-detail-lvl">${bodyImpactLevel(pct)} · ${bodyFmtSets(sets)}</div>`
+        ? `<div class="bi-detail-pct">${Math.round(pct * 100)}%</div><div class="bi-detail-lvl">${bodyImpactLevel(pct)} · ${bodyFmtSets(sets)} ${escapeHtml(word)}</div>`
         : `<div class="bi-detail-pct none">Not hit ${escapeHtml(word)}</div>`}
     </div>
     <div class="bi-detail-bar" style="--heat:${heatOf(f.muscle)}"><i style="--fill:${pct.toFixed(3)}"></i></div>

@@ -40,7 +40,8 @@ const FUNCS = [
   "liveAgeMs", "liveStateLabel", "renderLiveCard", "renderLiveSheet",
   "classifyMuscles", "profileFor", "renderClipPill",
   "clipRecorderHTML", "clipViewerHTML", "clipGoneHTML", "clipSavedForLaterHTML", "clipSentHTML", "clipSendFailedHTML",
-  "formatRest", "renderSession", "openEffortInfo", "openInfo", "infoDot",
+  "formatRest", "restTargetSec", "restRingState", "restRingHTML",
+  "renderSession", "renderSessionComplete", "openEffortInfo", "openInfo", "infoDot",
   "openWorkoutPrivacy", "workoutPrivacy", "defaultWorkoutPrivacy", "privacySummary", "workoutPrivacyLocked",
   "liveDetailsShared", "openGenOverlay", "paintGen", "stopGenTicker", "revealGeneratedPlan",
   "setGenWord", "startGenWordCycle", "stopGenWordCycle", "mountGenBody", "unmountGenBody",
@@ -222,6 +223,42 @@ const GALLERY_CSS = `
   }
   #p-open-issues .fig-page-n { color: var(--partner); border-color: color-mix(in srgb, var(--partner) 45%, var(--border)); }
 
+  /* Badges: a design handoff, so the grid reads more like a spec sheet than
+     a phone screen -- no phone frame, just the medallions themselves. */
+  #p-badges .fig-page-n { color: #a8ff00; border-color: color-mix(in srgb, #a8ff00 45%, var(--border)); }
+  .bdg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 18px 14px; }
+  .bdg { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 7px; }
+  .bdg-ring {
+    width: 62px; height: 62px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .bdg-mystery {
+    background: var(--panel-2); box-shadow: 0 0 0 1.5px var(--border);
+    color: var(--muted); font-size: 22px; font-weight: 800;
+  }
+  .bdg-label { font-size: 11.5px; font-weight: 700; }
+  .bdg-locked .bdg-label { color: var(--muted); }
+  .bdg-sub { font-size: 9.5px; color: var(--muted); line-height: 1.3; max-width: 104px; }
+  .bdg-cap { font-size: 9.5px; color: var(--muted); line-height: 1.3; max-width: 112px; opacity: .7; }
+  .bdg-cel-row { display: flex; gap: 18px; flex-wrap: wrap; }
+  .bdg-cel {
+    flex: 1 1 220px; max-width: 260px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 18px; padding: 22px 18px; text-align: center;
+  }
+  .bdg-cel-ring {
+    width: 74px; height: 74px; border-radius: 50%; margin: 0 auto 14px;
+    display: flex; align-items: center; justify-content: center; background: var(--panel-2);
+  }
+  .bdg-cel-h { font-size: 18px; font-weight: 800; letter-spacing: -.02em; margin: 0 0 6px; }
+  .bdg-cel-sub { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0 0 16px; }
+  .bdg-cel-cta {
+    display: inline-block; padding: 9px 20px; border-radius: 100px;
+    font-size: 12.5px; font-weight: 700; color: #0b0d11;
+  }
+  .bdg-concept-group { margin-top: 14px; }
+  .bdg-concept-name { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .bdg-concept-list { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--text); line-height: 1.7; }
+
   .proto-scrim {
     position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column;
     background: color-mix(in srgb, var(--bg) 82%, #000);
@@ -348,6 +385,153 @@ const ISSUES_TREE =
         '<span>' + g.items.length + '</span></a>').join("") +
   '</div>';
 
+/* ---- the badge system ----
+   Design handoff, not a real screen: nothing here is wired into index.html.
+   Kept in one place so whoever builds it has the real icons, the real copy
+   and the rest-day rule rather than re-deriving them from a chat. Every
+   badge routes through each person's own weekly target, never a raw day
+   count, on purpose: see the "before real users" onboarding note and the
+   REST_ALLOWANCE mechanic this has to keep agreeing with. */
+const BADGE_CATS = [
+  { name: "Getting started", items: [
+    { earned: true, color: "#2d6bff", label: "First Workout", sub: "Logged",
+      svg: '<path d="M6 21V3"/><path d="M6 4h11l-3 4 3 4H6"/>' },
+    { earned: true, color: "#2fa968", label: "Full Body", sub: "One session, every group",
+      svg: '<circle cx="12" cy="5" r="2.3"/><path d="M12 8v6M12 8l-5 2M12 8l5 2M12 14l-4 7M12 14l4 7"/>' },
+    { earned: false, color: "#4a5160", label: "Goal Week", sub: "Hit your own weekly number",
+      svg: '<circle cx="12" cy="4.2" r="1.6"/><circle cx="17.7" cy="6.3" r="1.6"/><circle cx="19.8" cy="12" r="1.6"/><circle cx="17.7" cy="17.7" r="1.6"/><circle cx="12" cy="19.8" r="1.6"/><circle cx="6.3" cy="17.7" r="1.6"/><circle cx="4.2" cy="6.3" r="1.6"/>' },
+  ]},
+  { name: "Consistency, together", items: [
+    { earned: true, color: "#ff6b4a", label: "Two Weeks Running", sub: "Two weeks in a row, both of you",
+      svg: '<g transform="translate(-2.3,1.5) scale(0.62)"><path d="M12 2C12 6 8 8 8 12a4 4 0 1 0 8 0c0-1-.3-1.8-.8-2.5.3 1.8-.9 2.5-1.8 2.5-1.3 0-1.9-1-1.4-2.3C13 8 12.7 5 12 2Z"/></g><g transform="translate(7.3,1.5) scale(0.62)"><path d="M12 2C12 6 8 8 8 12a4 4 0 1 0 8 0c0-1-.3-1.8-.8-2.5.3 1.8-.9 2.5-1.8 2.5-1.3 0-1.9-1-1.4-2.3C13 8 12.7 5 12 2Z"/></g>' },
+    { earned: true, color: "#a8ff00", label: "100 Together", sub: "Combined workouts", text: "100" },
+    { earned: false, color: "#4a5160", label: "Full Coverage", sub: "Every muscle, one week",
+      svg: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M6.3 6.3l11.4 11.4M17.7 6.3 6.3 17.7"/>' },
+  ]},
+  { name: "Strength", items: [
+    { earned: true, color: "#ff6b4a", label: "New PR", sub: "Beat your own best",
+      svg: '<path d="M4 17h16M8 12l4-5 4 5M12 7v10"/>' },
+    { earned: false, color: "#4a5160", label: "Double PR Week", sub: "You both hit one",
+      svg: '<g transform="translate(-3.5,2)"><path d="M9 15.5V6.5M5.2 10l3.8-4 3.8 4" transform="scale(0.62)"/></g><g transform="translate(6.5,2)"><path d="M9 15.5V6.5M5.2 10l3.8-4 3.8 4" transform="scale(0.62)"/></g>' },
+    { earned: false, color: "#4a5160", label: "Bodyweight Bench", sub: "The first real ladder rung",
+      svg: '<path d="M4 10v4M20 10v4M2 12h2M20 12h2M6 8v8M18 8v8M9 12h6"/>' },
+  ]},
+  { name: "Keeping the record", items: [
+    { earned: false, color: "#4a5160", label: "First Photo", sub: "Day one of the record",
+      svg: '<rect x="3" y="6" width="18" height="14" rx="2"/><circle cx="12" cy="13" r="3.5"/><path d="M8 6l1.5-2h5L16 6"/>' },
+    { earned: false, color: "#4a5160", label: "1 Year", sub: "Together, on the app", text: "365" },
+  ]},
+];
+
+const BADGE_CELEBRATIONS = [
+  { color: "#2d6bff", headline: "First one down.", sub: "Every streak starts here. Welcome to the log.",
+    svg: '<path d="M6 21V3"/><path d="M6 4h11l-3 4 3 4H6"/>' },
+  { color: "#a8ff00", headline: "100 together.", sub: "Not 100 each: 100 total. That is every session, both of you, added up.",
+    text: "100" },
+  { color: "#ff6b4a", headline: "Two weeks running.", sub: "Two weeks in a row you both hit your own goal. That is the actual hard part.",
+    svg: '<g transform="translate(-2.3,1.5) scale(0.62)"><path d="M12 2C12 6 8 8 8 12a4 4 0 1 0 8 0c0-1-.3-1.8-.8-2.5.3 1.8-.9 2.5-1.8 2.5-1.3 0-1.9-1-1.4-2.3C13 8 12.7 5 12 2Z"/></g><g transform="translate(7.3,1.5) scale(0.62)"><path d="M12 2C12 6 8 8 8 12a4 4 0 1 0 8 0c0-1-.3-1.8-.8-2.5.3 1.8-.9 2.5-1.8 2.5-1.3 0-1.9-1-1.4-2.3C13 8 12.7 5 12 2Z"/></g>' },
+];
+
+const BADGE_CONCEPTS = [
+  { group: "Consistency, goal-based and rest-day safe", items: [
+    "First time you hit your weekly goal",
+    "A full month: four weeks running, both of you",
+    "Two months running",
+    "Used a rest day: tapped rest day instead of quietly skipping, before the streak broke",
+    "Back at it: first session after a week or more away, framed as welcome back, never a scolding",
+  ]},
+  { group: "Strength", items: [
+    "5 total PRs",
+    "10 total PRs",
+    "The comeback PR: a new best on a lift not touched in 30 or more days",
+  ]},
+  { group: "Variety", items: [
+    "Tried 3 different training types in a month",
+    "First time logging yoga, pilates or calisthenics, whichever is new for you",
+  ]},
+  { group: "Partner, lean hardest here since it is the differentiator", items: [
+    "Evenly matched: a week where you both logged the exact same number of sessions",
+    "Cheered your partner 10 times",
+    "Cheered your partner 25 times",
+    "Reset together: you both came back from a break in the same week",
+    "Both hit your own goal, same week, for the first time",
+  ]},
+];
+
+const badgeIcon = (b) => b.text
+  ? '<text x="12" y="16.2" text-anchor="middle" font-family="DM Sans" font-weight="800" font-size="9.5" fill="' + b.color + '">' + b.text + '</text>'
+  : '<g fill="none" stroke="' + b.color + '" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + b.svg + '</g>';
+
+const badgeConceptCount = BADGE_CONCEPTS.reduce((n, g) => n + g.items.length, 0);
+
+const BADGES_HTML =
+  '<section class="fig-page" id="p-badges">' +
+    '<div class="fig-page-head"><span class="fig-page-n">B</span>' +
+      '<h2 class="fig-page-name">Badges</h2></div>' +
+    '<p class="fig-page-note">Not wired into the app yet: a design handoff, so whoever builds this has the real icons and the real rule rather than a description of them. Every badge routes through their own weekly target, never a raw day count, so nobody is penalized for a rest day. Locked badges hide the icon and the name in the shipped app, shown here as a plain question mark, with the real name kept in a caption for whoever is building it, not for the end user.</p>' +
+    BADGE_CATS.map((cat) =>
+      '<div class="fig-section" id="bdg-' + cat.name.replace(/\W+/g, "-").toLowerCase() + '">' +
+        '<div class="fig-section-head"><span class="fig-section-name">' + esc(cat.name) + '</span>' +
+          '<span class="fig-section-rule"></span>' +
+          '<span class="fig-section-n">' + cat.items.length + '</span></div>' +
+        '<div class="bdg-grid">' +
+          cat.items.map((b) => b.earned
+            ? '<div class="bdg bdg-earned">' +
+                '<div class="bdg-ring" style="background:color-mix(in srgb, ' + b.color + ' 16%, var(--panel-2));box-shadow:0 0 0 1.5px ' + b.color + ', 0 8px 20px -8px color-mix(in srgb, ' + b.color + ' 40%, transparent)">' +
+                  '<svg viewBox="0 0 24 24" width="34" height="34">' + badgeIcon(b) + '</svg>' +
+                '</div>' +
+                '<div class="bdg-label">' + esc(b.label) + '</div>' +
+                '<div class="bdg-sub">' + esc(b.sub) + '</div>' +
+              '</div>'
+            : '<div class="bdg bdg-locked">' +
+                '<div class="bdg-ring bdg-mystery">?</div>' +
+                '<div class="bdg-label">Locked</div>' +
+                '<div class="bdg-cap">' + esc(b.label) + ', ' + esc(b.sub) + '</div>' +
+              '</div>').join("") +
+        '</div>' +
+      '</div>').join("") +
+    '<div class="fig-section" id="bdg-unlock-moments">' +
+      '<div class="fig-section-head"><span class="fig-section-name">Unlock moments</span>' +
+        '<span class="fig-section-rule"></span>' +
+        '<span class="fig-section-n">' + BADGE_CELEBRATIONS.length + '</span></div>' +
+      '<p class="iss-note">The full-screen celebration when a badge unlocks. Shown static here; the real version stages the ring in with an overshoot bounce, then the headline and button fade up a beat after.</p>' +
+      '<div class="bdg-cel-row">' +
+        BADGE_CELEBRATIONS.map((c) =>
+          '<div class="bdg-cel">' +
+            '<div class="bdg-cel-ring" style="box-shadow:0 0 0 2px ' + c.color + ', 0 0 60px -10px ' + c.color + '">' +
+              '<svg viewBox="0 0 24 24" width="46" height="46">' + badgeIcon(c) + '</svg>' +
+            '</div>' +
+            '<h3 class="bdg-cel-h">' + esc(c.headline) + '</h3>' +
+            '<p class="bdg-cel-sub">' + esc(c.sub) + '</p>' +
+            '<div class="bdg-cel-cta" style="background:' + c.color + '">Keep going</div>' +
+          '</div>').join("") +
+      '</div>' +
+    '</div>' +
+    '<div class="fig-section" id="bdg-concepts">' +
+      '<div class="fig-section-head"><span class="fig-section-name">Written, not designed</span>' +
+        '<span class="fig-section-rule"></span>' +
+        '<span class="fig-section-n">' + badgeConceptCount + '</span></div>' +
+      '<p class="iss-note">Named and reasoned through, no icon or medallion built yet. Same rule as above: everything here is rest-day safe by construction, nothing rewards never resting.</p>' +
+      BADGE_CONCEPTS.map((g) =>
+        '<div class="bdg-concept-group">' +
+          '<div class="bdg-concept-name">' + esc(g.group) + '</div>' +
+          '<ul class="bdg-concept-list">' + g.items.map((t) => '<li>' + esc(t) + '</li>').join("") + '</ul>' +
+        '</div>').join("") +
+    '</div>' +
+  '</section>';
+
+const BADGES_TREE =
+  '<button type="button" class="fig-page-btn" data-page="p-badges">' +
+    '<span class="caret">&#9662;</span>Badges' +
+    '<span class="count">' + (BADGE_CATS.reduce((n, c) => n + c.items.length, 0) + BADGE_CELEBRATIONS.length + badgeConceptCount) + '</span></button>' +
+  '<div class="fig-kids">' +
+    BADGE_CATS.map((cat) =>
+      '<a class="fig-sec-label" href="#bdg-' + cat.name.replace(/\W+/g, "-").toLowerCase() + '">' + esc(cat.name) +
+        '<span>' + cat.items.length + '</span></a>').join("") +
+    '<a class="fig-sec-label" href="#bdg-unlock-moments">Unlock moments<span>' + BADGE_CELEBRATIONS.length + '</span></a>' +
+    '<a class="fig-sec-label" href="#bdg-concepts">Written, not designed<span>' + badgeConceptCount + '</span></a>' +
+  '</div>';
+
 const BODY = `<title>Fit Together Screen States</title>
 ${fonts}
 <style>${style}</style>
@@ -418,6 +602,8 @@ ${DATA}
 
 const ISSUES_HTML = ${JSON.stringify(ISSUES_HTML)};
 const ISSUES_TREE = ${JSON.stringify(ISSUES_TREE)};
+const BADGES_HTML = ${JSON.stringify(BADGES_HTML)};
+const BADGES_TREE = ${JSON.stringify(BADGES_TREE)};
 
 const $ = (id) => document.getElementById(id);
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -499,13 +685,26 @@ let SESSION = null, CLIP_INBOX = [], TODAY_WORKOUT = null;
    these stay null and nothing animates in a captured frame. */
 let SESSION_JUST_SET = null, SESSION_LAST_EX = 0;
 const beatLive = () => {};
+/* The rest ring's own constants. restRingHTML is lifted, so these have to come
+   with it or the ring draws against nothing. */
+const DEFAULT_REST_SEC = 90;
+const REST_RING_R = 56;
+const REST_RING_CIRC = 2 * Math.PI * REST_RING_R;
 const startRestTicker = () => {};
 const stopRestTicker = () => {};
 const saveSessionToStorage = () => {};
 const clearSessionStorage = () => {};
 const closeSessionUI = () => {};
 const renderWorkoutTab = () => {};
-const renderSessionComplete = () => {};
+/* The finish screen is lifted whole, so only its write half and its noises are
+   stubbed out. Everything it reports is a number the fixtures decide. */
+let SESSION_ELAPSED_MS = 47 * 60 * 1000, TODAY_PRS = 1, LOGGED_NAMES = [];
+const finishWorkout = async () => {};
+const sessionElapsed = () => SESSION_ELAPSED_MS;
+const todaysLoggedExerciseNames = () => new Set(LOGGED_NAMES);
+const todaysPRCount = () => TODAY_PRS;
+const buzz = () => {};
+const confettiBurst = () => {};
 const toggleSet = () => {};
 const startNextSet = () => {};
 const jumpToExercise = () => {};
@@ -590,6 +789,16 @@ const sessionFixture = (over = {}) => {
   SESSION = { exerciseIndex: 0, setsDone: [[true, true, false, false], [false, false, false], [false, false, false], [false, false, false], [false, false, false]],
     setWeights: [[185, 185]], weights: [185, 95, 60, 225, 50], reps: [8, 10, 10, 10, 12], completed: [false, false, false, false, false],
     restStartedAt: null, ...over };
+};
+
+/* The screen after the last rep. "done" is how many of the five exercises
+   actually got logged, which is what separates finishing from stopping. */
+const completeFixture = ({ done = null, elapsedMs = 47 * 60 * 1000, prs = 1 } = {}) => {
+  sessionFixture();
+  const names = TODAY_WORKOUT.exercises.map((e) => e.name.toLowerCase());
+  LOGGED_NAMES = done == null ? names : names.slice(0, done);
+  SESSION_ELAPSED_MS = elapsedMs;
+  TODAY_PRS = prs;
 };
 
 /* ---- what to show ---- */
@@ -802,6 +1011,14 @@ const STATES = [
   { page: "Doing the workout", section: "The session screen", name: "An exercise the classifier does not know",
     note: "The card simply has no muscle line. Nothing else moves.",
     session: true, setup: () => { sessionFixture(); TODAY_WORKOUT.exercises[0] = { name: "Turkish Get-Up", sets: 3, reps: 5 }; } },
+
+  { page: "Doing the workout", section: "Finishing", name: "All five done, one of them a record",
+    note: "The ring fills, the numbers land, and the last line is the pair rather than a solo total. A PR earns its own tile; without one that tile is not there.",
+    complete: true, setup: () => { completeFixture(); } },
+
+  { page: "Doing the workout", section: "Finishing", name: "Stopped after two",
+    note: "Ending early is a real outcome and reads as one: Workout Ended, no PR tile, no confetti. Same layout, no false celebration.",
+    complete: true, setup: () => { completeFixture({ done: 2, elapsedMs: 18 * 60 * 1000, prs: 0 }); } },
 ];
 
 /* ---- render each state into the stage, then capture it ---- */
@@ -873,6 +1090,19 @@ async function renderSessionState() {
   return deId(card.outerHTML);
 }
 
+/* The finish screen fills its ring across two animation frames. A still life
+   wants the value it settles ON, and waiting for rAF here hangs the build in
+   headless, so the resting offset is applied straight after the render. */
+async function renderCompleteState() {
+  const card = $("sessionCard");
+  card.classList.remove("hidden");
+  await renderSessionComplete();
+  await settle();
+  const fill = $("scFill");
+  if (fill) fill.style.strokeDashoffset = fill.dataset.off;
+  return deId(card.outerHTML);
+}
+
 const setTheme = (t) => {
   document.documentElement.setAttribute("data-theme", t);
   $("galLight").classList.toggle("on", t === "light");
@@ -896,7 +1126,7 @@ const setTheme = (t) => {
   const SECTION_ORDER = {
     "Opening the app": ["The everyday state", "Other shapes of the same screen", "When they are training", "Explaining a number"],
     "Planning the workout": ["While it thinks", "Before you press begin"],
-    "Doing the workout": ["The session screen"],
+    "Doing the workout": ["The session screen", "Finishing"],
     "Reading your body": ["The explainers behind it"],
     "Watching them train": ["Where they are up to", "What the muscle line says", "When they hold something back"],
     "Sending a clip": ["Filming it", "After you press send"],
@@ -921,6 +1151,7 @@ const setTheme = (t) => {
            : st.sheet ? await renderSheetState()
            : st.gen ? await renderGenState(st)
            : st.pop ? await renderPopState(st)
+           : st.complete ? await renderCompleteState()
            : st.session ? await renderSessionState()
            : await renderHomeState();
     } catch (e) {
@@ -1007,7 +1238,10 @@ const setTheme = (t) => {
               escapeHtml(f.name) + "</a>").join("")).join("") +
       "</div>");
   }
-  /* The master sheet goes last: it is the one page that is not a screen. */
+  /* Design handoffs come after the real screens, and the master sheet goes
+     last of all: neither one is a screen pulled from index.html. */
+  canvas.push(BADGES_HTML);
+  tree.push(BADGES_TREE);
   canvas.push(ISSUES_HTML);
   tree.push(ISSUES_TREE);
 
