@@ -75,10 +75,23 @@ research/
 goals/
   goal-tree.json                    the bubble system as data: 9 bubbles, 46 children,
                                     each with numbers, timeline, plan and sources
+engine/
+  README.md                         the four passes, what makes it different, the
+                                    bugs the first run had, and the known limits
+  goal-engine.mjs                   goal in, honest timeline and parameters out
+  training-age.mjs                  logs in, experience out, with an audit trail
+  load.mjs                          allometric cold start, overruled by history
+  plan.mjs                          the orchestrator
+  pair.mjs                          shared rhythm, conjunctive week, fair comparison
+  demo.mjs                          prints weeks so they can be judged by reading
 sources.md                          every claim above, with a confidence rating and
                                     a note on what still needs verifying
 open-questions.md                   what we cannot answer yet and what would settle it
 ```
+
+The research is only worth as much as the thing it produces, so it produces
+something. `node mo-knowledge/engine/demo.mjs` prints six people's weeks and one
+pair. Nothing in `engine/` is wired into the app.
 
 Read `00` first, it is short and it constrains everything after it. Then `06`, which is
 where the folder stops being a literature review and starts being a position. If you only
