@@ -166,7 +166,6 @@ Maps to our **Build muscle**. Surveys' #1 stated goal.
   least four months.
 - **Without getting bulky.** Women gain about a pound of muscle a month as beginners.
   Bulky does not happen by accident. The plan is identical.
-- **After 40, 50, 60.** In every autocomplete. Same program, slower ramp (see `02`).
 
 ### 3. Get stronger
 <sub>lift heavier</sub>
@@ -183,7 +182,7 @@ Maps to our **Get stronger**. 42.3% name it their primary 2026 goal.
   maintenance calories.
 - **Strong for life.** "Strengthen knees" is the #1 autocomplete for "exercises to". Grip
   and leg strength predict mortality. Overlaps feel-better.
-- **Back to what I used to lift.** Muscle memory: roughly a tenth of the original time.
+- **Get back to where I was.** Muscle memory: roughly a tenth of the original time.
   Route to get-back.
 
 ### 4. Tone up
@@ -200,7 +199,7 @@ Maps to our **Recomp**, and this is the bubble that should be labelled in their 
 - **Lean, shredded, summer body.** 8 to 12 weeks for a visible change; 2 to 4 kg in eight
   weeks is realistic. Twelve weeks out is the honest start date.
 
-### 5. Hit a milestone
+### 5. Do something new
 <sub>first pull-up, first 5K</sub>
 
 **No home in our five.** "I want to be able to" autocomplete: do a pull up, touch my toes,
@@ -235,7 +234,7 @@ hyrox, ironman, 10k, triathlon, pull ups, spartan race.
   Baseline: 3 miles, 20 push-ups, one pull-up.
 - **A fitness test.** 12 weeks. Run, push-ups, sit-ups. "Get in shape for the military" is
   an autocomplete.
-- **Murph, benchmarks.** Scaled beginner 50 to 70 minutes.
+- **A workout challenge.** Scaled beginner 50 to 70 minutes.
 - **A season or a trip.** "Get in shape for hiking / soccer / basketball" are all
   autocompletes.
 
@@ -269,7 +268,6 @@ and the thinnest in every fitness app.
 
 - **After years off.** Regain in a tenth of the time. Start at half the old loads. Six to
   twelve weeks to most of it back.
-- **After an injury.** Their clinician's timeline. Avoid, swap, remember.
 - **After a baby.** "Start working out postpartum" is an autocomplete. Core and pelvic floor
   first, 6 to 12 weeks, function before appearance. Do not sell the pre-baby body.
 - **Never really started.** "Beginner workout for" autocomplete is women, women over 50,
@@ -331,7 +329,7 @@ explaining:
 | Build muscle | get bigger |
 | Get stronger | lift heavier |
 | Tone up | get lean, see abs |
-| Hit a milestone | first pull-up, first 5K |
+| Do something new | first pull-up, first 5K |
 | Train for an event | a race, a test, a trip |
 | Feel better | energy, sleep, live longer |
 | Get back into it | after time off |
@@ -359,13 +357,41 @@ plan.
 field, deterministic ladders and a re-entry ramp respectively. None needs the AI. All
 three are underserved by every competitor found.
 
+## Part 4b: what is not a goal
+
+Three children were pulled out of the bubbles on 2026-09-09: "With a health condition"
+(was under Lose weight), "After an injury" (was under Get back into it) and "Over 40"
+(was under Build muscle).
+
+None of them is a goal. They are **limits on how a goal gets trained for**, and mixing
+them into "what do you want?" asks somebody to describe a problem at the exact moment they
+came to state an ambition. Different question, different screen.
+
+The screen they belong on, flagged as later work and now on the master sheet:
+
+> **Anything we should know?** Optional, with an obvious skip. Injuries, conditions, things
+> that hurt, equipment you do not have. Shown **after** the plan exists, never before, so
+> it can only ever make an existing plan safer and can never stand between somebody and
+> their first plan. Answerable later from Setup.
+
+This still obeys the product rule. Ask the goal, tell them the plan, and only then offer
+to make it safer.
+
+Most of it is probably solved more cheaply anyway. A per-exercise "this hurts, give me
+something else" that gets remembered turns a safety input into a feature people would use
+regardless, and it needs no questionnaire at all. `findAlternatives` already exists;
+nothing records why it was used. See open questions 6 and `07` on recording swaps.
+
 ## Part 5: where this disagrees with our current five
 
 - **"Recomp" should be labelled "Tone up".** Two words, and the two words most people
   already use. The goal is right and popular; the word on the button was one nobody says.
-  Same rule everywhere else: "Be able to do something" became **Hit a milestone**, "Feel
-  better, be healthy, live longer" became **Feel better**. If a label needs a comma, it is
-  two labels or it is too long.
+  Two rules came out of this pass and both generalise. **If a label needs a comma, it is
+  two labels or it is too long.** And **if a word makes somebody stop and work it out, it
+  is the wrong word**, however accurate it is. That killed "Bodyweight multiples" (gym
+  jargon), "Back to my old numbers" (only means something to somebody who kept records),
+  "Murph" (CrossFit), "Hit a number", "Doctor's orders", and "Before a date", which reads
+  as a romantic one.
 - **"Stay consistent" is two different things.** One is "I want to feel better and be
   healthy" (the biggest survey family). The other is "I keep quitting". They need different
   first screens even if the plan converges.
