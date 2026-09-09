@@ -177,6 +177,32 @@
       apply: (db) => { db.live_sessions = [liveRow()]; },
     },
 
+    /* Today's push day already logged, every exercise. startWorkout sees a plan
+       with nothing left in it and goes straight to the wrap-up, which is the
+       app's own route to that screen rather than a screen posed for the photo.
+       The bench set is 190 against a best of 180, so the day carries a real PR
+       and the finish screen has something to put in its third tile. */
+    finished: {
+      label: "Workout just finished",
+      apply: (db) => {
+        const plan = db.ai_workouts.find((w) => w.email === ME && !w.archived);
+        const at = (i) => day(0) + "T0" + (8 + i) + ":00:00Z";
+        db.exercise_logs = db.exercise_logs.filter((e) => e.email !== ME || e.entry_date !== day(0));
+        (plan?.exercises || []).forEach((ex, i) => {
+          db.exercise_logs.push({
+            id: "fin" + i, email: ME, user_name: "Mo", entry_date: day(0),
+            exercise_name: ex.name, sets: ex.sets, reps: ex.reps,
+            weight: ex.name === "Bench Press" ? 190 : ex.targetWeight ?? null,
+            created_at: at(i),
+          });
+        });
+        if (plan) { plan.duration_sec = 47 * 60; plan.completed_at = day(0) + "T08:47:00Z"; }
+        db.fit_entries = db.fit_entries.filter((e) => e.email !== ME || e.entry_date !== day(0));
+        db.fit_entries.push({ id: "efin", email: ME, user_name: "Mo", entry_date: day(0),
+          weight: 189.1, gym: true, sessions: 1, workout_at: day(0) + "T08:47:00Z" });
+      },
+    },
+
     livePrivate: {
       label: "Partner keeps it private",
       apply: (db) => {

@@ -11,6 +11,16 @@
   const frame = $("app");
   const device = $("device");
 
+  /* Types into the session's weight field the way a thumb would, so the app's
+     own oninput banks it. Setting SESSION directly is not possible from here:
+     it is a top-level `let`, which never lands on window. */
+  function setSessionWeight(w, lb) {
+    const el = w.document.getElementById("sessWeightVal");
+    if (!el) return;
+    el.value = String(lb);
+    el.dispatchEvent(new w.Event("input", { bubbles: true }));
+  }
+
   /* ---------- the journey ----------
      Grouped the way a person meets the app, not the way the code is laid out.
      `scenario` says which world the step needs; the phone only reloads when
@@ -31,6 +41,11 @@
         s: "Name, goal, pace, plan",
         note: "The five-step wizard the intro hands you to. A real account with no profile row, so it runs for real: type a name and press through, and every answer is written to the fake database and read back by the next screen.",
         run: () => {} },
+
+      { t: "Goal bubbles (prototype)", scenario: "fresh", flag: "not live",
+        s: "The bubble picker, for real",
+        note: "Not the real goal step, which is the one before this. This is the direction Mo picked after three rounds of review, running for real rather than as a picture: tap a goal to open it, tap another and the first stays open, pick as many specific goals as apply. Nothing here writes to the fake database and Continue does not go anywhere, on purpose. Tracked in Open issues under Designed, not built.",
+        run: (w) => w.renderGoalBubblesPrototype?.() },
 
       { t: "First look at an empty app", scenario: "fresh",
         s: "No workouts, no partner, no history",
@@ -67,6 +82,31 @@
       { t: "Do the workout", scenario: "paired",
         s: "Five exercises, live timer",
         note: "The real session screen on today's push day. Log sets, change weights, tap through exercises. Weight and reps should sit on the same baseline in every row. Finish it and the completion screen banks the workout into the fake database.",
+        run: (w) => { w.switchTab("workout"); w.startWorkout(); } },
+
+      { t: "Resting between sets", scenario: "paired",
+        s: "A ring, not a line of text",
+        note: "One set logged, so rest has started. The ring counts down against a 90 second target, the two chips move that target by ten seconds, and it turns red for the last fifth. Past the target it counts up with a plus rather than sitting on zero. The weight is dropped under the bench best first, so this step shows rest on its own without a record firing over it.",
+        run: (w) => {
+          w.switchTab("workout");
+          w.startWorkout();
+          setSessionWeight(w, 175);
+          w.toggleSet(0);
+        } },
+
+      { t: "A record, as it happens", scenario: "paired",
+        s: "The banner on the set that broke it",
+        note: "Bench Press has been logged at 180 before, so a set at 190 is a real record and says so on the spot instead of turning up later as a tag in Recent Activity. The banner drops in, bursts once and retracts on its own. Log two more sets at the same weight: it should stay quiet, because the record was already announced.",
+        run: (w) => {
+          w.switchTab("workout");
+          w.startWorkout();
+          setSessionWeight(w, 190);
+          w.toggleSet(0);
+        } },
+
+      { t: "Finishing", scenario: "finished",
+        s: "The screen after the last rep",
+        note: "Every exercise on today's plan already logged, so the app's own route lands here: the ring fills, time, volume and the record land under it, and the last line is the pair rather than a solo total. End a workout early instead and the same layout drops the PR tile and the confetti, because that is not the same event.",
         run: (w) => { w.switchTab("workout"); w.startWorkout(); } },
     ]},
 
@@ -181,12 +221,14 @@
     clip:        "Mell is live and a clip from an hour ago is unwatched.",
     behind:      "She trained today and yesterday. You did not.",
     restday:     "You marked today a rest day on purpose.",
+    finished:    "Today's push day is done, every exercise logged, one of them a record.",
   };
-  const SCENARIO_ORDER = ["paired", "signedout", "fresh", "solo", "live", "livePrivate", "clip", "behind", "restday"];
+  const SCENARIO_ORDER = ["paired", "signedout", "fresh", "solo", "live", "livePrivate", "clip", "behind", "restday", "finished"];
   const SCENARIO_LABEL = {
     signedout: "Signed out", fresh: "Brand new account", paired: "Paired, mid-week",
     solo: "Training alone", live: "Partner training now", livePrivate: "Partner keeps it private",
     clip: "A clip is waiting", behind: "You are behind", restday: "Rest day",
+    finished: "Workout just finished",
   };
 
   /* ---------- driving the phone ---------- */

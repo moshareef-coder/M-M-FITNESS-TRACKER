@@ -1540,6 +1540,47 @@
   .si-legal { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 20px 0 0; max-width: 34ch; }
   .si-legal a { color: var(--muted); text-underline-offset: 2px; }
 
+  /* PROTOTYPE, NOT LIVE: renderGoalBubblesPrototype, reachable only from the
+     sandbox walkthrough. See the comment above that function. Sizes stay on
+     the app's eight-step scale (11 / 12.5 / 14 / 15.5 / 17 / 21 / 24 / 28),
+     same as everywhere else. */
+  .proto-bubble-flag {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--partner);
+    background: color-mix(in srgb, var(--partner) 14%, transparent);
+    border-radius: 100px; padding: 5px 11px; margin-bottom: 14px;
+  }
+  .proto-bubble-field { position: relative; height: 56vh; min-height: 380px; margin-top: 6px; touch-action: none; }
+  .proto-bub {
+    position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    text-align: center; font: inherit; cursor: pointer; padding: 6px; user-select: none;
+    color: var(--text); background: var(--panel-2); border: 1.5px solid var(--border);
+    transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
+    will-change: left, top, transform, opacity;
+  }
+  .proto-bub:active { filter: brightness(.97); }
+  .proto-bub-inner { display: flex; flex-direction: column; align-items: center; gap: 4px; line-height: 1.15; pointer-events: none; }
+  .proto-bub-label { font-weight: 700; letter-spacing: -.01em; }
+  .proto-bub.parent { background: var(--panel); border-color: color-mix(in srgb, var(--accent) 38%, var(--border)); z-index: 2; }
+  .proto-bub.parent .proto-bub-ico { color: var(--accent-ink); }
+  .proto-bub.parent .proto-bub-label { font-size: 14px; }
+  .proto-bub.parent.active {
+    background: var(--accent); border-color: transparent; color: var(--on-accent);
+    box-shadow: var(--glow-accent); z-index: 3;
+  }
+  .proto-bub.parent.active .proto-bub-ico { color: var(--on-accent); }
+  .proto-bub.child { background: var(--panel-2); border-color: var(--border); z-index: 1; }
+  .proto-bub.child .proto-bub-label { font-size: 12.5px; font-weight: 600; }
+  .proto-bub.child.picked {
+    background: var(--panel); border-color: var(--accent-ink); color: var(--text);
+    box-shadow: inset 0 0 0 1.5px var(--accent-ink);
+  }
+  .proto-bubble-cta {
+    margin-top: 16px; transform: translateY(14px); opacity: 0; pointer-events: none;
+    transition: transform .28s cubic-bezier(.22,1,.36,1), opacity .28s;
+  }
+  .proto-bubble-cta.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
+
   .ob-kicker { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--accent-ink); margin-bottom: 8px; }
   .ob-chips { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
   .ob-chip {
@@ -3501,7 +3542,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.08.1";
+const APP_VERSION = "2026.09.08.2";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -4114,6 +4155,217 @@ function renderOnboardIntro(i, data) {
     if (i === ONBOARD_INTRO.length - 1) renderOnboardStep("name", data);
     else renderOnboardIntro(i + 1, data);
   };
+}
+
+/* PROTOTYPE, NOT LIVE. Mo picked this direction after three rounds of review
+   (a published artifact, then the gallery's static "Choosing a goal" page),
+   and asked to try it for real inside the sandbox rather than as a picture.
+
+   This function is real and fully interactive, the actual spring simulation,
+   not a hand-placed frame. It is also completely inert for a real user: real
+   onboarding never calls it. renderOnboardStep still runs the shipping goal
+   step exactly as it does today. The only caller is the sandbox's own
+   walkthrough (sandbox-steps.js), which reaches app functions directly by
+   name, the same way it reaches switchTab and startWorkout. Tracked in
+   issues.json under "Designed, not built" until it replaces the real step. */
+function renderGoalBubblesPrototype() {
+  const ob = $("onboard");
+  ob.classList.remove("hidden");
+  $("app").classList.add("hidden");
+
+  ob.innerHTML = `
+    <div class="ob-step">
+      <span class="proto-bubble-flag">${icon("bell", 12)} Prototype, not live</span>
+      <div class="ob-kicker">STEP 2 OF 5</div>
+      <h1 class="ob-h1">What's the goal?</h1>
+      <p class="ob-sub">Tap one to open it. Tap a specific goal, then continue.</p>
+      <div class="proto-bubble-field" id="protoBubbleField"></div>
+      <div class="proto-bubble-cta" id="protoBubbleCta">
+        <button type="button" class="btn-cta" id="protoBubbleCtaBtn">${icon("dumbbell", 22)} Continue
+          <span class="go">${icon("chevronRight", 22)}</span></button>
+      </div>
+    </div>`;
+
+  initGoalBubbles($("protoBubbleField"), $("protoBubbleCta"), $("protoBubbleCtaBtn"));
+  /* A real tap needs a real response, and the honest one here is that this
+     does not go anywhere yet, nothing else in onboarding calls this screen. */
+  $("protoBubbleCtaBtn").onclick = () => toast("Prototype only, not wired into onboarding yet");
+}
+
+/* The five broad goals and their specific ones. Placeholder content: Jawa's
+   real-goals research replaces this before the step ever goes live. */
+const PROTO_BUBBLE_GOALS = [
+  { key: "lose", ico: "arrowDown", title: "Lose weight",
+    kids: ["Lose 10 to 15 lb", "Lose 20+ lb", "Fit old clothes again", "Slim down for an event", "Lose weight, keep muscle"] },
+  { key: "muscle", ico: "dumbbell", title: "Build muscle",
+    kids: ["Fill out my arms", "Add visible size", "Bulk up on purpose", "A bigger back", "Broader shoulders"] },
+  { key: "strong", ico: "bolt", title: "Get stronger",
+    kids: ["Bench my bodyweight", "Get a first pull-up", "Deadlift 2x bodyweight", "Squat 1.5x bodyweight", "Lift heavier, generally"] },
+  { key: "recomp", ico: "refresh", title: "Lose fat, build muscle",
+    kids: ["Look leaner, not smaller", "Drop fat, keep strength", "Get visibly toned", "An even split, no rush"] },
+  { key: "consistent", ico: "clock", title: "Stay consistent",
+    kids: ["Get back into a routine", "Show up 3x a week", "Rebuild after a break", "Train around a busy week"] },
+];
+
+/* The same spring simulation as the published artifact: soft repulsion routed
+   through velocity rather than position (so it damps instead of snapping),
+   and a bubble grows into its own collision footprint over its first third of
+   a second rather than arriving at full size, which is what makes several
+   spawning at once flow apart instead of exploding. Every category can stay
+   open at once, and picking a specific goal never clears another, in the
+   same category or a different one. */
+function initGoalBubbles(field, ctaBar, ctaBtn) {
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+  const GROW_MS = 380, LEAVE_MS = 200;
+
+  let W, H, bubbles = [], activeKeys = new Set(), pickedKeys = new Set(), raf = null;
+
+  function makeParentHomes() {
+    const cx = W / 2, cy = H * 0.24, spread = W * 0.36;
+    return PROTO_BUBBLE_GOALS.map((g, i) => {
+      const a = (i / PROTO_BUBBLE_GOALS.length) * Math.PI * 2 + 0.4;
+      const rad = spread * (0.55 + 0.35 * Math.sin(i * 2.1));
+      return { x: cx + Math.cos(a) * rad, y: cy + Math.sin(a) * rad * 0.9 };
+    });
+  }
+
+  function build() {
+    field.innerHTML = "";
+    W = field.clientWidth; H = field.clientHeight;
+    const homes = makeParentHomes();
+    const now = performance.now();
+    bubbles = PROTO_BUBBLE_GOALS.map((g, i) => ({
+      kind: "parent", key: g.key, label: g.title, iconKey: g.ico, r: 58,
+      x: homes[i].x + (Math.random() - 0.5) * 20, y: homes[i].y + (Math.random() - 0.5) * 20,
+      homeX: homes[i].x, homeY: homes[i].y, vx: 0, vy: 0, el: null,
+      phase: Math.random() * Math.PI * 2, bornAt: now, leaving: false,
+    }));
+    bubbles.forEach(mount);
+    activeKeys = new Set(); pickedKeys = new Set();
+    updateCta();
+    if (!raf) tick();
+  }
+
+  function mount(b) {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "proto-bub " + (b.kind === "parent" ? "parent" : "child");
+    el.style.width = b.r * 2 + "px";
+    el.style.height = b.r * 2 + "px";
+    const label = b.kind === "parent"
+      ? `<span class="proto-bub-ico">${icon(b.iconKey, 20)}</span><span class="proto-bub-label">${escapeHtml(b.label)}</span>`
+      : `<span class="proto-bub-label">${escapeHtml(b.label)}</span>`;
+    el.innerHTML = `<span class="proto-bub-inner">${label}</span>`;
+    el.onclick = () => b.kind === "parent" ? tapParent(b) : tapChild(b);
+    field.appendChild(el);
+    b.el = el;
+    paint(b, 0);
+  }
+
+  function tapParent(b) {
+    if (activeKeys.has(b.key)) { closeParent(b.key); return; }
+    activeKeys.add(b.key);
+    b.el.classList.add("active");
+    const g = PROTO_BUBBLE_GOALS.find((x) => x.key === b.key);
+    const n = g.kids.length, now = performance.now();
+    g.kids.forEach((label, i) => {
+      const a = (i / n) * Math.PI * 2 - Math.PI / 2 + b.phase;
+      const dist = b.r + 44;
+      const child = {
+        kind: "child", key: b.key + "|" + i, label, r: 38,
+        x: b.x + Math.cos(a) * (b.r * 0.35), y: b.y + Math.sin(a) * (b.r * 0.35),
+        homeX: b.x + Math.cos(a) * dist, homeY: b.y + Math.sin(a) * dist * 0.85,
+        vx: 0, vy: 0, el: null, phase: Math.random() * Math.PI * 2, bornAt: now, leaving: false,
+      };
+      bubbles.push(child);
+      mount(child);
+    });
+  }
+
+  function closeParent(key) {
+    activeKeys.delete(key);
+    const p = bubbles.find((x) => x.kind === "parent" && x.key === key);
+    if (p) p.el.classList.remove("active");
+    bubbles.filter((x) => x.kind === "child" && x.key.startsWith(key + "|") && !x.leaving)
+      .forEach((x) => { x.leaving = true; x.leaveAt = performance.now(); });
+    [...pickedKeys].forEach((k) => { if (k.startsWith(key + "|")) pickedKeys.delete(k); });
+    updateCta();
+  }
+
+  function tapChild(b) {
+    if (pickedKeys.has(b.key)) pickedKeys.delete(b.key);
+    else pickedKeys.add(b.key);
+    bubbles.filter((x) => x.kind === "child").forEach((x) => x.el.classList.toggle("picked", pickedKeys.has(x.key)));
+    updateCta();
+  }
+
+  function updateCta() {
+    const n = pickedKeys.size;
+    if (n === 0) { ctaBar.classList.remove("show"); return; }
+    ctaBar.classList.add("show");
+    const label = n === 1
+      ? (bubbles.find((x) => pickedKeys.has(x.key))?.label || "")
+      : n + " goals";
+    ctaBtn.innerHTML = icon("dumbbell", 22) + " Continue with " + escapeHtml(label.length > 26 ? label.slice(0, 24) + "..." : label)
+      + '<span class="go">' + icon("chevronRight", 22) + "</span>";
+  }
+
+  function paint(b, grow) {
+    b.el.style.left = (b.x - b.r) + "px";
+    b.el.style.top = (b.y - b.r) + "px";
+    b.el.style.opacity = grow;
+    b.el.style.transform = `scale(${(0.4 + 0.6 * grow).toFixed(3)})`;
+  }
+
+  function tick(t) {
+    raf = requestAnimationFrame(tick);
+    const eff = bubbles.map((b) => {
+      const growT = Math.min(1, (t - b.bornAt) / GROW_MS);
+      return b.r * (0.3 + 0.7 * easeOutCubic(growT));
+    });
+    for (let i = 0; i < bubbles.length; i++) {
+      const a = bubbles[i];
+      if (a.leaving) continue;
+      for (let j = i + 1; j < bubbles.length; j++) {
+        const b = bubbles[j];
+        if (b.leaving) continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const dist = Math.hypot(dx, dy) || 0.01;
+        const min = eff[i] + eff[j] + 4;
+        if (dist < min) {
+          const push = (min - dist) / dist * 0.16;
+          a.vx -= dx * push; a.vy -= dy * push; b.vx += dx * push; b.vy += dy * push;
+        }
+      }
+    }
+    const damp = 0.9, gone = [];
+    bubbles.forEach((b) => {
+      b.vx += (b.homeX - b.x) * 0.006;
+      b.vy += (b.homeY - b.y) * 0.006;
+      if (!reduceMotion) {
+        b.phase += 0.01;
+        b.vx += Math.cos(b.phase) * 0.014;
+        b.vy += Math.sin(b.phase * 0.8) * 0.014;
+      }
+      b.vx *= damp; b.vy *= damp;
+      b.x += b.vx; b.y += b.vy;
+      b.x = Math.max(b.r, Math.min(W - b.r, b.x));
+      b.y = Math.max(b.r, Math.min(H - b.r, b.y));
+      if (b.leaving) {
+        const lt = Math.min(1, (t - b.leaveAt) / LEAVE_MS);
+        paint(b, 1 - lt);
+        if (lt >= 1) gone.push(b);
+      } else {
+        const growT = Math.min(1, (t - b.bornAt) / GROW_MS);
+        paint(b, reduceMotion ? 1 : easeOutCubic(growT));
+      }
+    });
+    if (gone.length) { gone.forEach((b) => b.el.remove()); bubbles = bubbles.filter((b) => !gone.includes(b)); }
+  }
+
+  requestAnimationFrame(build);
+  window.addEventListener("resize", () => { if (bubbles.length) build(); });
 }
 
 function renderOnboardStep(step, data = {}) {
@@ -9086,15 +9338,25 @@ async function finishWorkout() {
   await loadAll();
 }
 
-/* Records set TODAY. personalRecords walks the whole history in order and
-   flags the log that set each best, so this is the ones that happen to be
-   today's rather than a second definition of what a record is. */
+/* Records set TODAY, counted the same way the in-session banner decides to
+   fire: a lift that BEAT a previous best. personalRecords() also flags the
+   first time an exercise is ever logged, which is right for its own purposes
+   but would have this screen call an ordinary push day five new records. */
 function todaysPRCount() {
-  const { prLogIds } = personalRecords(ME);
   const today = todayStr();
-  return ALL_EXERCISE_LOGS
-    .filter((l) => l.user_name === ME && l.entry_date === today && prLogIds.has(l.id))
-    .length;
+  const logs = ALL_EXERCISE_LOGS
+    .filter((l) => l.user_name === ME && l.weight != null && !l.duration_min)
+    .sort((a, b) => a.entry_date.localeCompare(b.entry_date) || String(a.created_at || "").localeCompare(String(b.created_at || "")));
+
+  const best = {};
+  let n = 0;
+  for (const l of logs) {
+    const key = (l.exercise_name || "").trim().toLowerCase();
+    const prev = best[key];
+    if (prev != null && l.weight > prev && l.entry_date === today) n++;
+    if (prev == null || l.weight > prev) best[key] = l.weight;
+  }
+  return n;
 }
 
 async function renderSessionComplete() {
@@ -9108,7 +9370,10 @@ async function renderSessionComplete() {
   /* The numbers that make this feel like it counted. Volume is the lifter's
      figure; on a class or cardio day there is none, so the exercise count
      takes that tile rather than printing a proud zero. */
-  const durSec = Math.round(sessionElapsed() / 1000);
+  /* Reopening a finished plan starts a fresh clock, so the live timer reads
+     seconds. The plan banked how long it actually took, so take whichever is
+     larger: on a real finish they agree, on a reopen the stored one wins. */
+  const durSec = Math.max(Math.round(sessionElapsed() / 1000), TODAY_WORKOUT?.duration_sec || 0);
   const durLabel = durSec < 60 ? "<1m" : `${Math.round(durSec / 60)}m`;
   const volume = dayVolumeLb(MY_EMAIL, todayStr());
   const prs = todaysPRCount();
