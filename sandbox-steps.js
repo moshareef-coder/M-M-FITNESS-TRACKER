@@ -195,6 +195,11 @@
         note: "What the generator reads before it writes a plan.",
         run: (w) => { w.switchTab("setup"); w.openSettingsPage("training"); } },
 
+      { t: "Milestones", scenario: "paired",
+        s: "Badges earned, doing the real thing",
+        note: "Earned from real data on load, not clicked into being: this fixture set already has a logged workout, so First Workout should already show unlocked. Everything still locked shows only a question mark, on purpose, so it never spoils what is coming.",
+        run: (w) => { w.switchTab("setup"); w.openSettingsPage("milestones"); } },
+
       { t: "Theme", scenario: "paired",
         s: "Light, dark, system",
         note: "Dark mode is not the light one inverted. Card surfaces lift rather than drop shadows, and the two ring colours have separate dark values.",
