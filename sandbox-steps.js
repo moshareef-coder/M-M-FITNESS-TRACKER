@@ -32,6 +32,11 @@
         note: "The five-step wizard the intro hands you to. A real account with no profile row, so it runs for real: type a name and press through, and every answer is written to the fake database and read back by the next screen.",
         run: () => {} },
 
+      { t: "Goal bubbles (prototype)", scenario: "fresh", flag: "not live",
+        s: "The bubble picker, for real",
+        note: "Not the real goal step, which is the one before this. This is the direction Mo picked after three rounds of review, running for real rather than as a picture: tap a goal to open it, tap another and the first stays open, pick as many specific goals as apply. Nothing here writes to the fake database and Continue does not go anywhere, on purpose. Tracked in Open issues under Designed, not built.",
+        run: (w) => w.renderGoalBubblesPrototype?.() },
+
       { t: "First look at an empty app", scenario: "fresh",
         s: "No workouts, no partner, no history",
         note: "What a stranger sees on day one. Skip past onboarding first if it is still on screen. This is the state that has never been walked properly end to end, so look hard at the empty cards.",
