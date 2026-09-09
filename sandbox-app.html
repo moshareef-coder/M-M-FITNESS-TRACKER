@@ -3589,7 +3589,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.08.2";
+const APP_VERSION = "2026.09.09.1";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -5240,6 +5240,17 @@ async function markRestDay(date) {
 
 /* ---------- Gamification: XP, levels, badges ---------- */
 
+/* THE definition of a personal record, and the only one the app is allowed to
+   have: a weight that BEAT one you had already lifted for that exercise.
+
+   The first time you ever log a movement is NOT a record. It used to be, which
+   meant a brand new person set a PR on every exercise of their first workout,
+   and anyone trying a new machine got one for turning up. A word that fires
+   every time stops meaning anything, and the whole point of this one is that it
+   is rare. A tie is not a record either: you have to go higher.
+
+   `best` still takes the first log, because "the heaviest this has ever been"
+   is a different question from "was this a record", and other screens need it. */
 function personalRecords(name) {
   const logs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && l.weight != null && !l.duration_min)
     .sort((a, b) => a.entry_date.localeCompare(b.entry_date) || String(a.created_at || "").localeCompare(String(b.created_at || "")));
@@ -5247,12 +5258,10 @@ function personalRecords(name) {
   let prCount = 0;
   const prLogIds = new Set();
   for (const log of logs) {
-    const key = log.exercise_name.toLowerCase();
-    if (!(key in best) || log.weight > best[key]) {
-      best[key] = log.weight;
-      prCount++;
-      prLogIds.add(log.id);
-    }
+    const key = (log.exercise_name || "").trim().toLowerCase();
+    const prev = best[key];
+    if (prev != null && log.weight > prev) { prCount++; prLogIds.add(log.id); }
+    if (prev == null || log.weight > prev) best[key] = log.weight;
   }
   return { best, prCount, prLogIds };
 }
@@ -5486,19 +5495,13 @@ function computeXPBetween(name, from, to) {
   const profile = ALL_PROFILES.find((p) => p.user_name === name);
   const email = profile?.email;
 
-  // PRs only count if they were set inside the window.
-  const all = ALL_EXERCISE_LOGS
-    .filter((l) => l.user_name === name && l.weight != null)
-    .sort((a, b) => a.entry_date.localeCompare(b.entry_date) || String(a.created_at).localeCompare(String(b.created_at)));
-  const best = {};
-  let prCount = 0;
-  for (const l of all) {
-    const k = l.exercise_name.toLowerCase();
-    if (!(k in best) || l.weight > best[k]) {
-      best[k] = l.weight;
-      if (inRange(l.entry_date)) prCount++;
-    }
-  }
+  /* PRs only count if they were set inside the window, and a PR is whatever
+     personalRecords says it is. This used to walk the logs again with its own
+     slightly different rule, which is how the app ended up with three answers
+     to "was that a record". */
+  const { prLogIds } = personalRecords(name);
+  const prCount = ALL_EXERCISE_LOGS
+    .filter((l) => l.user_name === name && inRange(l.entry_date) && prLogIds.has(l.id)).length;
 
   // Admin-granted bonus is not season scoped; it always applies.
   const bonus = profile?.bonus_xp || 0;
@@ -6286,16 +6289,18 @@ function recapFor(email, name, date) {
   const minutes = logs.reduce((s, l) => s + (l.duration_min || 0), 0);
   const seconds = plans.reduce((s, w) => s + (w.duration_sec || 0), 0);
 
-  const best = personalRecords(name).best || {};
+  const { prLogIds } = personalRecords(name);
   return {
     date,
     title: displayFocus(plans.find((w) => w.focus)?.focus, logs.map((l) => l.exercise_name)),
     logs, sets, volume, minutes, seconds,
     exercises: logs.length,
     note: entry?.note || null,
-    /* A PR badge means this was the heaviest that exercise has ever gone. Ties
-       count, because matching your best on a bad day is worth seeing. */
-    isPR: (l) => l.weight != null && best[l.exercise_name] != null && l.weight >= best[l.exercise_name],
+    /* The same record personalRecords means, so the tag here and the banner
+       mid-workout can never disagree. This used to look the name up in a
+       lowercase-keyed map without lowercasing it, so for any normally cased
+       exercise the tag never appeared at all. */
+    isPR: (l) => prLogIds.has(l.id),
   };
 }
 
@@ -9609,25 +9614,14 @@ async function finishWorkout() {
   await loadAll();
 }
 
-/* Records set TODAY, counted the same way the in-session banner decides to
-   fire: a lift that BEAT a previous best. personalRecords() also flags the
-   first time an exercise is ever logged, which is right for its own purposes
-   but would have this screen call an ordinary push day five new records. */
+/* Records set TODAY. personalRecords is now the one place that decides what a
+   record is, so this just asks which of them landed today. */
 function todaysPRCount() {
+  const { prLogIds } = personalRecords(ME);
   const today = todayStr();
-  const logs = ALL_EXERCISE_LOGS
-    .filter((l) => l.user_name === ME && l.weight != null && !l.duration_min)
-    .sort((a, b) => a.entry_date.localeCompare(b.entry_date) || String(a.created_at || "").localeCompare(String(b.created_at || "")));
-
-  const best = {};
-  let n = 0;
-  for (const l of logs) {
-    const key = (l.exercise_name || "").trim().toLowerCase();
-    const prev = best[key];
-    if (prev != null && l.weight > prev && l.entry_date === today) n++;
-    if (prev == null || l.weight > prev) best[key] = l.weight;
-  }
-  return n;
+  return ALL_EXERCISE_LOGS
+    .filter((l) => l.user_name === ME && l.entry_date === today && prLogIds.has(l.id))
+    .length;
 }
 
 async function renderSessionComplete() {
