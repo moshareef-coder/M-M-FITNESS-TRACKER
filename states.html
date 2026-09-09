@@ -27,6 +27,10 @@
     --partner: #ff6b4a;
     --up: #e2566c;
     --down: #a8ff00;
+    /* The one semantic amber. Green/blue/coral are identity colours (action,
+       you, them); this is the only hue that means "caution" and nothing else,
+       so it can sit next to any of them without being read as a person. */
+    --warn: #f0b429;
     --on-accent: #0b0d11;
     /* Text and icons in the accent hue. Same as the fill on dark; on white the
        fill green is too pale to read, so this deepens. */
@@ -68,6 +72,9 @@
     --partner: #f37c62;
     --up: #c2452f;
     --down: #22b954;
+    /* Deepened for white, the same way --accent-ink is: the dark amber is a
+       highlighter on this ground and fails as chip text. */
+    --warn: #9a6400;
     --on-accent: #052a17;
     --accent-ink: #1cb955;
     /* On white, glow reads as smudge. Depth here comes from shadow alone. */
@@ -2619,8 +2626,13 @@
   }
   .nx-chip i { font-style: normal; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
   .nx-chip.go { background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: transparent; color: var(--accent-ink); }
-  .nx-chip.rest { background: color-mix(in srgb, var(--partner) 12%, transparent); border-color: transparent; color: var(--partner); }
-  .nx-chip.rest i { color: inherit; opacity: .75; }
+  /* Three answers, three colours, and nothing else in the app uses this amber:
+     green go, amber your call, red leave it. The hours stay on the two that
+     are counting down, because "8h" is the difference between waiting and
+     changing your plan. */
+  .nx-chip.easy { background: color-mix(in srgb, var(--warn) 15%, transparent); border-color: transparent; color: var(--warn); }
+  .nx-chip.rest { background: color-mix(in srgb, var(--up) 13%, transparent); border-color: transparent; color: var(--up); }
+  .nx-chip.easy i, .nx-chip.rest i { color: inherit; opacity: .75; }
   .nx-none { font-size: 12.5px; color: var(--muted); }
 
   .bi-share { display: flex; align-items: center; gap: 12px; }
@@ -3795,6 +3807,7 @@ let riveBodyPromise = null, bodyDetailPromise = null;
 const ensureRiveBodyModule = () => Promise.resolve(null);
 const ensureBodyDetailModules = () => Promise.resolve(BODY_DETAIL);
 const BODY_RECOVERY_HOURS = 48;
+const BODY_FRESH_HOURS = 24;
 let BODY_DETAIL = { detail: {
   hitsForExercise: (name) => HITS[String(name).toLowerCase()] || null,
   MUSCLE_PIECES: {"deltoids":{"label":"Shoulder","group":"shoulders","where":"front and side of the shoulder","heads":["anteriorDeltoid","lateralDeltoid"],"try":"Lateral raise"},"posteriorDeltoid":{"label":"Rear Shoulder","group":"shoulders","where":"back of the shoulder","try":"Face pull"},"pectoralisMajor":{"label":"Chest","group":"chest","where":"the chest","heads":["pecClavicular","pecSternal"],"try":"Bench press"},"trapezius":{"label":"Upper Back","group":"traps","where":"neck down to mid back","heads":["upperTraps","midTraps","lowerTraps"],"try":"Shrug"},"sternocleidomastoid":{"label":"Neck","group":"traps","where":"front of the neck","try":"Neck flexion"},"latissimusDorsi":{"label":"Middle Back","group":"lats","where":"the wide back muscle","try":"Lat pulldown"},"teresMajor":{"label":"Back of Armpit","group":"lats","where":"just behind the armpit","try":"Row"},"erectorSpinae":{"label":"Lower Back","group":"lowerback","where":"either side of the spine","try":"Back extension"},"biceps":{"label":"Bicep","group":"biceps","where":"front of the upper arm","heads":["bicepsLong","bicepsShort"],"try":"Curl"},"brachialis":{"label":"Deep Bicep","group":"biceps","where":"under the biceps","try":"Hammer curl"},"tricepsBrachii":{"label":"Tricep","group":"triceps","where":"back of the upper arm","heads":["tricepsLong","tricepsLateral","tricepsMedial"],"try":"Pushdown"},"brachioradialis":{"label":"Outer Forearm","group":"forearms","where":"thumb side of the forearm","try":"Hammer curl"},"flexorCarpiRadialis":{"label":"Inner Forearm","group":"forearms","where":"inner forearm","try":"Wrist curl"},"flexorCarpiUlnaris":{"label":"Lower Forearm","group":"forearms","where":"inner forearm, little finger side","try":"Wrist curl"},"extensorCarpiUlnaris":{"label":"Back Forearm","group":"forearms","where":"outer forearm","try":"Reverse wrist curl"},"rectusAbdominis":{"label":"Abs","group":"abs","where":"the six pack","heads":["upperAbs","lowerAbs"],"try":"Crunch"},"externalObliques":{"label":"Obliques","group":"obliques","where":"sides of the waist","try":"Russian twist"},"gluteusMaximus":{"label":"Glutes","group":"glutes","where":"the main glute","try":"Hip thrust"},"gluteusMedius":{"label":"Hip","group":"glutes","where":"upper outer hip","try":"Hip abduction"},"rectusFemoris":{"label":"Front Quad","group":"quads","where":"centre of the thigh","try":"Leg extension"},"vastusLateralis":{"label":"Outer Quad","group":"quads","where":"outer thigh","try":"Squat"},"vastusMedialis":{"label":"Inner Quad","group":"quads","where":"inner thigh, above the knee","try":"Leg extension"},"sartorius":{"label":"Thigh","group":"quads","where":"runs diagonally across the thigh","try":"Lunge"},"adductorMagnus":{"label":"Inner Thigh","group":"quads","where":"inner thigh","try":"Squat"},"bicepsFemoris":{"label":"Outer Hamstring","group":"hamstrings","where":"outer hamstring","try":"Leg curl"},"semitendinosus":{"label":"Inner Hamstring","group":"hamstrings","where":"inner hamstring","try":"Romanian deadlift"},"gastrocnemius":{"label":"Calf","group":"calves","where":"the visible calf","try":"Standing calf raise"},"soleus":{"label":"Deep Calf","group":"calves","where":"deep under the calf","try":"Seated calf raise"},"tibialisAnterior":{"label":"Shin","group":"calves","where":"front of the shin","try":"Tibialis raise"}},
@@ -3864,9 +3877,12 @@ const INFO_TOPICS = {
   trainNext: () => ({
     eyebrow: "What to train next",
     paras: [
-      `A group counts as recovering for ${BODY_RECOVERY_HOURS} hours after the session that worked it. That is the usual window for the muscle to repair, not a rule about how you feel.`,
-      "Ready means either it has had those hours, or you have not trained it at all this week.",
-      "The suggestion picks whatever this week has missed. When everything is covered and nothing is ready, it says rest, because that is the honest answer.",
+      `A muscle takes about ${BODY_RECOVERY_HOURS} hours to repair after the session that worked it. That is the usual window, not a rule about how you feel.`,
+      `Green, ready now: it has had the full ${BODY_RECOVERY_HOURS} hours, or you have not trained it at all this week.`,
+      `Amber, fine to train: worked between ${BODY_FRESH_HOURS} and ${BODY_RECOVERY_HOURS} hours ago. Not fully repaired, but training it again is a normal thing to do and the app is not going to argue. Expect less than your best.`,
+      `Red, give it a day: worked in the last ${BODY_FRESH_HOURS} hours. This is the one worth leaving alone if you have a choice.`,
+      "The number on an amber or red chip is the hours until that area is fully recovered, so a red one turns amber well before it runs out.",
+      "The suggestion above picks whatever this week has missed first, then whatever has had the least work. It only tells you to rest when every area is red.",
     ],
   }),
   planMatch: () => ({
@@ -5224,10 +5240,14 @@ function bodyAreaStates() {
       const hit = [...rule.primary, ...rule.secondary].some((g) => members.includes(g));
       if (hit && log.entry_date > lastDate) lastDate = log.entry_date;
     }
-    const hoursLeft = lastDate
-      ? BODY_RECOVERY_HOURS - (Date.now() - entryTime(lastDate)) / 3600000
-      : -1;
-    return { ...t, members, weekSets, lastDate, hoursLeft, ready: hoursLeft <= 0 };
+    const hoursSince = lastDate ? (Date.now() - entryTime(lastDate)) / 3600000 : Infinity;
+    const hoursLeft = lastDate ? BODY_RECOVERY_HOURS - hoursSince : -1;
+    /* Three answers, not two. "hold" is the first day, "ok" is the rest of the
+       window and is a yes, "ready" is recovered or never trained. */
+    const state = hoursSince < BODY_FRESH_HOURS ? "hold"
+      : hoursSince < BODY_RECOVERY_HOURS ? "ok"
+      : "ready";
+    return { ...t, members, weekSets, lastDate, hoursSince, hoursLeft, state, ready: state === "ready" };
   });
 }
 
@@ -5398,8 +5418,9 @@ function renderBodyDetail() {
 function renderBodyNext(animate) {
   const areas = bodyAreaStates();
   const trained = areas.filter((a) => a.lastDate);
-  const ready = areas.filter((a) => a.ready);
-  const resting = areas.filter((a) => !a.ready).sort((a, b) => a.hoursLeft - b.hoursLeft);
+  const ready = areas.filter((a) => a.state === "ready");
+  const okToTrain = areas.filter((a) => a.state === "ok").sort((a, b) => a.hoursLeft - b.hoursLeft);
+  const holding = areas.filter((a) => a.state === "hold").sort((a, b) => a.hoursLeft - b.hoursLeft);
   const untouched = areas.filter((a) => a.weekSets === 0);
   const list = (xs) => xs.map((a) => a.label);
   const phrase = (names) => names.length <= 1 ? (names[0] || "")
@@ -5413,16 +5434,26 @@ function renderBodyNext(animate) {
     const pick = untouched.filter((a) => a.ready);
     if (pick.length) {
       headline = phrase(list(pick.slice(0, 2)));
+      /* Only the red ones are worth mentioning as a caveat. Naming an amber
+         group here read as a warning about something the app is happy for you
+         to train. */
       why = `Nothing this week has touched your ${phrase(list(pick.slice(0, 2))).toLowerCase()}.` +
-        (resting.length ? ` ${phrase(list(resting.slice(0, 2)))} ${resting.length > 1 ? "are" : "is"} still inside the ${BODY_RECOVERY_HOURS} hour window.` : "");
+        (holding.length ? ` ${phrase(list(holding.slice(0, 2)))} ${holding.length > 1 ? "were" : "was"} worked in the last ${BODY_FRESH_HOURS} hours.` : "");
     } else if (ready.length) {
       const leanest = ready.slice().sort((a, b) => a.weekSets - b.weekSets).slice(0, 2);
       headline = phrase(list(leanest));
       why = `Every area has had something this week, so this is the ${leanest.length > 1 ? "pair" : "one"} with the least so far: ${
         leanest.map((a) => `${a.label.toLowerCase()} ${Math.round(a.weekSets)} set${Math.round(a.weekSets) === 1 ? "" : "s"}`).join(", ")}.`;
+    } else if (okToTrain.length) {
+      /* Nothing is fully recovered, but wanting to train anyway is normal and
+         the honest answer is yes. Naming the one furthest from its session
+         beats telling someone to go home. */
+      const leanest = okToTrain.slice().sort((a, b) => a.weekSets - b.weekSets).slice(0, 2);
+      headline = phrase(list(leanest));
+      why = `Nothing is fully recovered, but ${phrase(list(leanest)).toLowerCase()} ${leanest.length > 1 ? "are" : "is"} past the first day, so ${leanest.length > 1 ? "they are" : "it is"} fine to train if you want ${leanest.length > 1 ? "them" : "it"}.`;
     } else {
       headline = "Rest, or something light";
-      why = `Everything you train is still inside its ${BODY_RECOVERY_HOURS} hour window. A walk or an easy ride does not set that back.`;
+      why = `Everything you train was worked in the last ${BODY_FRESH_HOURS} hours. A walk or an easy ride does not set that back.`;
     }
   }
 
@@ -5446,7 +5477,7 @@ function renderBodyNext(animate) {
 
   const chips = (xs, kind) => xs.length
     ? xs.map((a) => `<span class="nx-chip ${kind}">${escapeHtml(a.label)}${
-        kind === "rest" ? ` <i>${Math.ceil(a.hoursLeft)}h</i>` : ""}</span>`).join("")
+        kind === "go" ? "" : ` <i>${Math.ceil(a.hoursLeft)}h</i>`}</span>`).join("")
     : `<span class="nx-none">None</span>`;
 
   $("biNext").innerHTML = `
@@ -5456,7 +5487,8 @@ function renderBodyNext(animate) {
     </div>
     <div class="nx-rows">
       <div class="nx-row"><span class="nx-k">Ready now</span><span class="nx-v">${chips(ready, "go")}</span></div>
-      <div class="nx-row"><span class="nx-k">Recovering</span><span class="nx-v">${chips(resting, "rest")}</span></div>
+      <div class="nx-row"><span class="nx-k">Fine to train</span><span class="nx-v">${chips(okToTrain, "easy")}</span></div>
+      <div class="nx-row"><span class="nx-k">Give it a day</span><span class="nx-v">${chips(holding, "rest")}</span></div>
       <div class="nx-row"><span class="nx-k">This week</span><span class="nx-v nx-text">${escapeHtml(weekLine)}</span></div>
     </div>`;
   $("biNextInfoSlot").innerHTML = infoDot("trainNext", "How this is worked out");

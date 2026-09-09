@@ -825,6 +825,7 @@ let riveBodyPromise = null, bodyDetailPromise = null;
 const ensureRiveBodyModule = () => Promise.resolve(null);
 const ensureBodyDetailModules = () => Promise.resolve(BODY_DETAIL);
 const BODY_RECOVERY_HOURS = 48;
+const BODY_FRESH_HOURS = 24;
 let BODY_DETAIL = { detail: {
   hitsForExercise: (name) => HITS[String(name).toLowerCase()] || null,
   MUSCLE_PIECES: ${JSON.stringify(MUSCLE_PIECES)},
