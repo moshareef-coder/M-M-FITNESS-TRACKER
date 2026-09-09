@@ -69,6 +69,12 @@ research/
                                     the whole time
   10-what-this-feels-like.md        the translation: five moments a user would
                                     actually notice, and what we would build first
+  11-real-goals.md                  what people actually say they want, from surveys,
+                                    search data, autocomplete and forums. Nine bubbles,
+                                    three of which our five goals do not cover
+goals/
+  goal-tree.json                    the bubble system as data: 9 bubbles, 46 children,
+                                    each with numbers, timeline, plan and sources
 sources.md                          every claim above, with a confidence rating and
                                     a note on what still needs verifying
 open-questions.md                   what we cannot answer yet and what would settle it

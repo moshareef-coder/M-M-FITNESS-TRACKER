@@ -162,3 +162,141 @@ In priority order, if this folder ever justifies the time:
 5. The productive ability gap for the Köhler effect. `06` and `08` both depend on there
    being a band, and neither can currently say where it is. This is now the highest value
    unknown in the folder, because the main claim rests on it.
+
+## Real goals research (research/11 and goals/goal-tree.json)
+
+**These are different from everything above.** They were actually fetched on 2026-09-08,
+so the URLs are real and the numbers were read from the page, not remembered. Confidence
+notes here are about the source's quality, not about whether it exists. Keys match the
+`sources` arrays in `goal-tree.json`.
+
+### Surveys with a sample size
+
+- `hfa-2026` Health & Fitness Association / Kantar, Dec 5 to 16 2025, n=2,000 US adults.
+  Build muscle or strength 50%, mobility/flexibility/posture 48%, mental health 46%; 55%
+  fully achieved 2025 resolutions. https://www.healthandfitness.org/americans-treat-exercise-as-essential-spending-heading-into-2026/
+  *High. Professional polling, representative sample.*
+- `hfa-2025` Same series, Dec 19 to 27 2024, n=2,000. Muscle/strength 50%, regular routine
+  44%, mental health 42%. https://www.healthandfitness.org/about/media-center/press-releases/health-exercise-and-fitness-dominate-americans-new-years-resolutions/
+  *High.*
+- `lifetime-2026` Life Time, Dec 1 to 22 2025, n=750 consumers and members. Get stronger
+  42.3% primary goal; lift more 46.5%; longevity 33.2%; solo 50.5% vs group 33.6%.
+  https://news.lifetime.life/2025-12-30-2026-Life-Time-Wellness-Survey-Results-Are-In-Strength-Training-and-Longevity-Lead-New-Year-Priorities-with-82-Focused-More-on-Wellbeing
+  *Medium-high. Smaller sample, skews to a gym chain's members.*
+- `mindbody-2019` Mindbody Wellness Index: Fitness in America, survey Oct to Nov 2018,
+  n≈17,000, ages 18 to 65, top 50 US metros. Reasons for exercising by age and sex (PDF
+  extracted locally). https://www.mindbodyonline.com/sites/default/files/public/education/learning-assets/2019_Fitness_in_America-Report.pdf
+  *High on sample, dated (2018).*
+- `mindbody-2024` Mindbody 2024 Wellness Index via trade press: 61% primary motivation is a
+  healthier longer life; 30% mobility; 85% say activity helps mental health.
+  https://www.mindbodyonline.com/business/education/blog/6-wellness-trends-watch-2024
+  *Medium. Read through secondary reporting.*
+- `strava-2025` Strava Year in Sport 2025 press release and mid-year data. Weekly goals 10x
+  more likely to be hit 10 weeks running; Gen Z 75% more likely to cite an event; 61% more
+  lift for aesthetics; clubs nearly 4x. https://press.strava.com/articles/strava-releases-12th-annual-year-in-sport-trend-report-2025
+  *Medium-high. Huge n, self-selected active users.*
+- `cornell-wedding` Cornell, engaged women: 70%+ intend to lose, average desired 23 lb.
+  https://news.cornell.edu/stories/2008/01/wedding-day-weight-wishes-lose-more-20-pounds
+  and `sciencedirect-wedding` follow-up on actual outcomes (half lose ~7 lb, a third gain).
+  https://www.sciencedirect.com/science/article/abs/pii/S1740144513001496 *High, dated.*
+- `fitbod-cohort` Frontiers in Sports and Active Living 2026, 389,481 Fitbod users,
+  100,709 beginners. 10.1% adherent at 12 months; median dropout 19 weeks; first-28-day
+  frequency strongest predictor (HR 0.73 per SD at week 11). Goals not in dataset.
+  https://pmc.ncbi.nlm.nih.gov/articles/PMC13500638/
+  *High. The most important single source in this folder. Industry-funded cohort, read
+  the conflicts section before quoting it externally.*
+- `pn-clients` Precision Nutrition: 81% of clients rate looking and feeling better 9+/10;
+  ~60% of clients are low-compliance. https://www.precisionnutrition.com/how-to-coach
+  *Medium. Proprietary client data, no methodology.*
+
+### Search volume and autocomplete
+
+- `villagegym` https://www.villagegym.co.uk/blog/the-most-googled-fitness-questions/
+  Annual UK volumes: lose weight fast 486k, six pack 145k, gain weight 79k, build muscle
+  52.8k, bigger arms 22.8k. *Medium. Single keyword tool, UK.*
+- `insure4sport` https://www.insure4sport.co.uk/blog/most-googled-fitness-questions/
+  Monthly: best way to lose weight 13k, belly fat exercise 6.4k, six-pack 3.6k. *Medium.*
+- `google-suggest` Google autocomplete endpoint, 25 prefixes, queried 2026-09-08 from a US
+  location. Reflects current popular completions, not volumes. *High as a signal of
+  phrasing, none as a count.* Prefixes used: best workout for, how to lose, how to lose
+  weight, how to lose belly fat, i want to lose, workout plan to, workout to lose,
+  exercises to, beginner workout for, how to get toned, how to gain, how to build muscle,
+  how to get bigger, how to get stronger, how to get abs, how to do a pull up, how to
+  train for, how to get in shape, how to start working out, getting back into, how to stay
+  consistent, how to improve my, how to fix my, i want to be able to, workout for women,
+  workout for men.
+
+### Rates, standards and timelines
+
+- `cdc-rate`, `harvard-rate` 1 to 2 lb/week, 0.5 to 1% bodyweight.
+  https://www.health.harvard.edu/weight-loss/what-does-a-healthy-realistic-rate-of-weight-loss-look-like-and-why-does-it-matter
+- `medicalnewstoday-20lb` https://www.medicalnewstoday.com/articles/how-to-lose-20-pounds
+- `look-ahead`, `obesity-action` 5 to 10% clinically meaningful.
+  https://pubmed.ncbi.nlm.nih.gov/21593294/ and https://www.obesityaction.org/resources/benefits-of-5-10-percent-weight-loss/
+- `harvard-prediabetes` https://www.health.harvard.edu/diseases-and-conditions/exercising-150-minutes-per-week-could-help-reverse-prediabetes
+- `mcdonald-aragon` beginner 1 to 1.5% BW/month etc. https://www.syattfitness.com/fat-loss/a-realistic-look-at-progress-fat-loss-and-mass-gain/ and https://leanffmi.com/natural-muscle-gain-rate/ *Medium. Coaching models, widely used, not trials.*
+- `bonytobeastly-20lb` https://bonytobeastly.com/how-long-to-gain-20-pounds/ *Low-medium. Vendor blog, no citations.*
+- `legion-newbie` https://legionathletics.com/newbie-gains/
+- `inbody-month`, `bonytobombshell` women ~1 lb/month. https://inbodyusa.com/blogs/inbodyblog/how-much-muscle-can-you-gain-in-a-month/
+- `strengthlog-arms`, `biologyinsights-arms` https://www.strengthlog.com/how-to-get-big-arms/ https://biologyinsights.com/how-long-does-it-take-to-add-an-inch-to-your-arms/
+- `glute-timeline`, `scienceinsights-glutes` https://www.gxmmat.us/blogs/daily-news/the-real-timeline-for-glute-growth-what-to-expect-in-30-days-vs-6-months https://scienceinsights.org/how-fast-can-you-build-glutes-a-realistic-timeline/ *Low-medium.*
+- `fitbod-skinnyfat`, `nutrola-skinnyfat` https://fitbod.me/blog/skinny-fat-cut-or-bulk/ https://nutrola.app/en/blog/im-skinny-fat-should-i-bulk-or-cut
+- `bulk-or-cut`, `rippedbody` men ~15%, women ~25% thresholds. https://legionathletics.com/cut-or-bulk/ https://rippedbody.com/cut-or-bulk/
+- `macrofactor-recomp` who can recomp; Barakat 2020, Murphy & Koehler 2021.
+  https://macrofactor.com/recomposition/ *Medium-high, cites primary literature.*
+- `inbody-abs`, `bodyspec-abs` https://inbodyusa.com/blogs/inbodyblog/what-body-fat-percentage-do-you-need-to-see-abs/ https://www.bodyspec.com/blog/post/what_body_fat_percentage_is_really_needed_to_see_abs
+- `outlift-225` 17% of men, n=585. https://outlift.com/is-225-a-good-bench-press/ *Medium. Self-selected newsletter sample.*
+- `legion-225`, `fitnessvolt-225` https://legionathletics.com/how-long-will-it-take-to-hit-225-bench/ https://fitnessvolt.com/strength-standards/research/how-long-to-bench-225/
+- `strengthlevel-bench` 48.7M lifts, level definitions. https://strengthlevel.com/strength-standards/bench-press/lb *High on n, self-reported lifts.*
+- `anandtech-year1`, `anandtech-skinny` verbatim forum threads. https://forums.anandtech.com/threads/beginner-to-1-year-weight-lifting-goals.2331796/ https://forums.anandtech.com/threads/how-can-a-skinny-guy-gain-some-weight.234214/
+- `blind-goals` https://www.teamblind.com/post/how-long-to-realistically-reach-my-goals-a31tlz31
+- `weddingbee` https://boards.weddingbee.com/topic/did-your-weight-change-in-the-2-4-weeks-before-your-wedding/
+- `mfp-snippets`, `mfp-recomp-threads` MyFitnessPal community, titles and search snippets
+  only (pages render client side). https://community.myfitnesspal.com/en/discussion/10189358/whats-your-goal
+- `results-timeline` feel 2 weeks, see 4 to 8, others 12. https://www.polar.com/blog/how-long-to-see-results-from-working-out/ *Medium. Folk wisdom with a basis.*
+- `summer-8-12wk` https://sussexperformancecentre.co.uk/how-to-get-in-better-shape-for-your-summer-holiday-without-doing-anything-stupid/
+- `hers-last10`, `medicinenet-last10` https://www.forhers.com/guides/how-to-lose-the-last-10-pounds https://www.medicinenet.com/how_do_i_lose_stubborn_last_few_pounds/article.htm
+- `nhs-c25k` 9 weeks, 3 runs. https://www.nhs.uk/better-health/get-active/get-running-with-couch-to-5k/ *High.*
+- `pacepercentile` 5K times by age and sex (RunRepeat / Running USA data). https://pacepercentile.com/guides/what-is-a-good-5k-time/
+- `whatwerunning-sub30`, `runnersblueprint` https://whatwerunning.com/how-to-run-a-sub-30-minute-5k/ https://www.runnersblueprint.com/what-is-a-good-5k-time-for-a-beginner/
+- `lauranorris-mile`, `marathonhandbook-mile` https://lauranorrisrunning.com/how-to-run-mile-8-minutes/ https://marathonhandbook.com/how-to-run-an-8-minute-mile/
+- `marathonhandbook-half`, `outside-half` https://marathonhandbook.com/couch-to-half-marathon/ https://run.outsideonline.com/training/training-plans/half-marathon/couch-to-half-marathon-training-plan-2/
+- `pullup-12wk`, `toolatesmart` https://fitnosophy.gumroad.com/l/learn-your-first-pull-up-in-12-weeks https://toolatesmart.substack.com/p/status-update-pull-ups
+- `pushup-age`, `pushup-8wk` https://marathonhandbook.com/average-push-ups-by-age/ https://www.bigbeefit.com/blog/push-ups-for-beginners
+- `darebee-toes` https://darebee.com/fitness/how-to-touch-your-toes.html
+- `calisthenics-handstand` https://calisthenicsassociation.org/blog/handstand-training-complete-guide
+- `hyrox-stats`, `sportspro-hyrox` https://www.gym-flooring.com/blogs/stats-hub/hyrox-stats https://www.sportspro.com/features/finance-investment/hyrox-business-model-mass-participation-private-equity-investment/
+- `spartan-training`, `veloforte-ocr` https://www.spartan.com/en/blog/spartan-tough-mudder-obstacle-race-training-plan https://veloforte.com/blogs/fuel-better/tough-mudder-training
+- `military-police` https://www.military.com/military-fitness/law-enforcement-training/police-academy-training
+- `crossfit-murph` https://www.crossfit.com/murph-workout-training-plan
+- `singh-2023` Singh et al., BJSM 2023 umbrella review: depression d ≈ -0.43, anxiety
+  d ≈ -0.42. https://pmc.ncbi.nlm.nih.gov/articles/PMC10579187/ *High.* Noetel 2024 BMJ
+  network meta-analysis was NOT fetched (403); not cited.
+- `attia-longevity` popular summaries of the four-pillar framework; grip and VO2max as
+  predictors. https://peterattiamd.com/how-does-vo2-max-correlate-with-longevity/ *Medium. Practitioner framework, primary literature behind it is strong.*
+- `northwestern-stairs` https://www.nm.org/healthbeat/healthy-tips/why-am-i-out-of-breath-walking-up-stairs
+- `desk-hips` https://dailyburn.com/life/fitness/tight-hips-the-best-hip-flexor-stretches-for-people-who-sit-all-day/
+- `puregym-backpain`, `puregym-toning`, `puregym-return` https://www.puregym.com/blog/strength-training-lower-back-pain/ https://www.puregym.com/us/blog/the-best-full-body-toning-workout-plan-for-women https://www.puregym.com/blog/getting-back-into-weight-training/
+- `barbend-return` 50% loads after 4+ weeks off. https://barbend.com/how-to-return-to-strength-training-after-time-off/
+- `muscle-memory` Staron retraining data; myonuclear permanence (Cumming 2024, J Physiol). https://blog.nasm.org/muscle-memory https://physoc.onlinelibrary.wiley.com/doi/10.1113/JP285675 *High on the primary paper.*
+- `postpartum-realistic`, `thrive-pelvic` https://runnersedge.physio/new-year-new-mom-realistic-fitness-goals-after-baby/ https://thrivepelvichealth.com/postpartum/5-realistic-fitness-goals-for-new-moms-that-dont-require-a-gym-membership/
+- `nsca-older` see the position stands section above.
+- `dailyburn-beginner` https://dailyburn.com/life/health/how-long-should-a-beginner-workout-be-a-science-backed-guide/
+- `mayo-belly` https://www.mayoclinic.org/healthy-lifestyle/womens-health/in-depth/belly-fat/art-20045809
+
+### What competitors ask
+
+- Fitbod six goals: General Fitness, Strength Training, Muscle Tone, Bodybuilding,
+  Powerlifting, Olympic Weightlifting. https://fitbod.me/blog/fitbods-fitness-goals/
+- Freeletics journeys: bodyweight (get started, lose weight, get fit, gain strength),
+  running (lose weight, endurance and speed), weights (gain strength, get toned, build
+  muscle). Help centre page 403'd; read via search snippets.
+- Nike Training Club: strength, athletic performance, lose fat, flexibility. Via reviews.
+- Lifesum: stay healthy, lose weight, gain weight. Via a UX writeup.
+
+### Not reached
+
+Reddit (crawler blocked), Quora (403), bodybuilding.com forums (403), HealthUnlocked
+(403), T-Nation and Nerd Fitness Discourse JSON (403), Apple App Store review pages
+(403), BMJ (403), PubMed (cookie wall). The forum layer is therefore thinner than it
+should be; see research/11 open questions.
