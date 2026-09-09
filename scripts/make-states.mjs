@@ -327,6 +327,40 @@ const GALLERY_CSS = `
   .gal-phone .session-overlay { position: static; animation: none; padding: 14px 18px 24px; }
   /* Same for the generating screen, which is fixed and full bleed in the app. */
   .gal-phone .gen-scrim { position: relative; height: 560px; animation: none; }
+
+  /* Prototype: the goal bubble picker. Not lifted from index.html, because it
+     is not in index.html; this is the only page in the gallery showing work
+     that has never shipped. Positions are hand placed per state rather than
+     driven by the live spring simulation, the same way every other frame here
+     is a still frame, not a running loop. */
+  .proto-flag {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--partner);
+    background: color-mix(in srgb, var(--partner) 14%, transparent);
+    border-radius: 100px; padding: 5px 11px; margin-bottom: 12px;
+  }
+  .proto-field { position: relative; }
+  .proto-bub {
+    position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 6px; color: var(--text); background: var(--panel-2);
+    border: 1.5px solid var(--border);
+  }
+  .proto-bub-inner { display: flex; flex-direction: column; align-items: center; gap: 4px; line-height: 1.15; }
+  .proto-bub-label { font-weight: 700; letter-spacing: -.01em; }
+  .proto-bub.parent { background: var(--panel); border-color: color-mix(in srgb, var(--accent) 38%, var(--border)); }
+  .proto-bub.parent .proto-bub-ico { color: var(--accent-ink); }
+  .proto-bub.parent .proto-bub-label { font-size: 14px; }
+  .proto-bub.parent.active {
+    background: var(--accent); border-color: transparent; color: var(--on-accent);
+    box-shadow: var(--glow-accent);
+  }
+  .proto-bub.parent.active .proto-bub-ico { color: var(--on-accent); }
+  .proto-bub.child { background: var(--panel-2); border-color: var(--border); }
+  .proto-bub.child .proto-bub-label { font-size: 12.5px; font-weight: 600; }
+  .proto-bub.child.picked {
+    background: var(--panel); border-color: var(--accent-ink); color: var(--text);
+    box-shadow: inset 0 0 0 1.5px var(--accent-ink);
+  }
 `;
 
 /* Node-side escaping: the client-side escapeHtml lives inside the generated
@@ -804,6 +838,21 @@ const completeFixture = ({ done = null, elapsedMs = 47 * 60 * 1000, prs = 1 } = 
 /* ---- what to show ---- */
 
 const STATES = [
+  { page: "Choosing a goal", section: "Bubble picker prototype", name: "Resting cluster, nothing open",
+    note: "PROTOTYPE, NOT LIVE. Five broad goals, each a bubble. Tapping one opens it without closing any other.",
+    subline: "Tap one to open it up.",
+    bubbles: "resting", setup: () => {} },
+
+  { page: "Choosing a goal", section: "Bubble picker prototype", name: "One goal open",
+    note: "PROTOTYPE, NOT LIVE. The tapped goal fills solid and its specific goals bloom out around it.",
+    subline: "Tap a specific goal, then continue.",
+    bubbles: "oneOpen", setup: () => {} },
+
+  { page: "Choosing a goal", section: "Bubble picker prototype", name: "Two goals open, three specifics picked",
+    note: "PROTOTYPE, NOT LIVE. Every open goal stays open, and picking a specific goal never clears another, in the same category or a different one.",
+    subline: "Tap a specific goal, then continue.",
+    bubbles: "twoOpenPicked", setup: () => {} },
+
   { page: "Opening the app", section: "The everyday state", name: "Everyday, both of you going",
     note: "The one you see most: partner paired, both mid-week, nobody live.",
     setup: () => {} },
@@ -1054,6 +1103,80 @@ async function renderRawState(st) {
   return '<div class="gal-dark">' + deId(st.raw()) + "</div>";
 }
 
+/* Prototype: the goal bubble picker. Every other state in this file renders
+   real app code against fake data; this one does not, because the picker has
+   never been built into index.html at all. Positions are hand placed and
+   checked for overlap once, offline, rather than produced by the live spring
+   simulation the actual prototype runs, the same way every other "frame" in
+   this gallery is a still image rather than a running loop. See the flag on
+   the page itself, and "Choosing a goal, bubble picker" in Open issues. */
+function protoBub(kind, icoKey, b, active, picked) {
+  const cls = "proto-bub " + kind + (active ? " active" : "") + (picked ? " picked" : "");
+  const inner = kind === "parent"
+    ? '<span class="proto-bub-ico">' + icon(icoKey, 20) + '</span><span class="proto-bub-label">' + escapeHtml(b.label) + "</span>"
+    : '<span class="proto-bub-label">' + escapeHtml(b.label) + "</span>";
+  return '<div class="' + cls + '" style="width:' + (b.r * 2) + "px;height:" + (b.r * 2) + "px;left:" + (b.x - b.r) + "px;top:" + (b.y - b.r) + 'px">'
+    + '<span class="proto-bub-inner">' + inner + "</span></div>";
+}
+
+const PROTO_STATES = {
+  resting: {
+    w: 357, h: 380,
+    bubbles: [
+      { kind: "parent", ico: "arrowDown", b: { label: "Lose weight", r: 58, x: 95, y: 90 } },
+      { kind: "parent", ico: "dumbbell", b: { label: "Build muscle", r: 56, x: 255, y: 70 } },
+      { kind: "parent", ico: "bolt", b: { label: "Get stronger", r: 52, x: 60, y: 230 } },
+      { kind: "parent", ico: "refresh", b: { label: "Lose fat, build muscle", r: 60, x: 270, y: 220 } },
+      { kind: "parent", ico: "clock", b: { label: "Stay consistent", r: 54, x: 175, y: 310 } },
+    ],
+  },
+  oneOpen: {
+    w: 357, h: 470,
+    bubbles: [
+      { kind: "parent", ico: "bolt", active: true, b: { label: "Get stronger", r: 58, x: 178, y: 195 } },
+      { kind: "child", b: { label: "Bench my bodyweight", r: 34, x: 178, y: 71 } },
+      { kind: "child", b: { label: "Get a first pull-up", r: 34, x: 296, y: 157 } },
+      { kind: "child", b: { label: "Deadlift 2x bodyweight", r: 34, x: 251, y: 295 } },
+      { kind: "child", b: { label: "Squat 1.5x bodyweight", r: 34, x: 105, y: 295 } },
+      { kind: "child", b: { label: "Lift heavier, generally", r: 34, x: 60, y: 157 } },
+    ],
+  },
+  twoOpenPicked: {
+    w: 357, h: 560,
+    bubbles: [
+      { kind: "parent", ico: "arrowDown", active: true, b: { label: "Lose weight", r: 50, x: 140, y: 180 } },
+      { kind: "child", picked: true, b: { label: "Lose 10 to 15 lb", r: 30, x: 140, y: 80 } },
+      { kind: "child", b: { label: "Lose 20+ lb", r: 30, x: 227, y: 230 } },
+      { kind: "child", picked: true, b: { label: "Fit old clothes again", r: 30, x: 53, y: 230 } },
+      { kind: "parent", ico: "clock", active: true, b: { label: "Stay consistent", r: 50, x: 235, y: 400 } },
+      { kind: "child", picked: true, b: { label: "Get back into a routine", r: 30, x: 235, y: 300 } },
+      { kind: "child", b: { label: "Show up 3x a week", r: 30, x: 235, y: 500 } },
+    ],
+  },
+};
+
+function protoHeader(kicker, h1, sub) {
+  return '<div class="ob-kicker">' + escapeHtml(kicker) + '</div>'
+    + '<h1 class="ob-h1">' + escapeHtml(h1) + "</h1>"
+    + '<p class="ob-sub">' + escapeHtml(sub) + "</p>";
+}
+
+async function renderBubblesState(st) {
+  const s = PROTO_STATES[st.bubbles];
+  const field = '<div class="proto-field" style="width:' + s.w + "px;height:" + s.h + 'px">'
+    + s.bubbles.map((x) => protoBub(x.kind, x.ico, x.b, x.active, x.picked)).join("")
+    + "</div>";
+  const ctaCount = s.bubbles.filter((x) => x.kind === "child" && x.picked).length;
+  const cta = ctaCount === 0 ? "" : '<button type="button" class="btn-cta" style="margin-top:16px" disabled>'
+    + icon("dumbbell", 22) + " Continue with " + ctaCount + (ctaCount === 1 ? " goal" : " goals")
+    + '<span class="go">' + icon("chevronRight", 22) + "</span></button>";
+  return '<div class="gal-inner">'
+    + '<span class="proto-flag">' + icon("bell", 12) + " Prototype, not live</span>"
+    + protoHeader("STEP 2 OF 5", "What's the goal?", st.subline)
+    + field + cta
+    + "</div>";
+}
+
 async function renderPillState() {
   renderClipPill();
   await settle();
@@ -1153,6 +1276,7 @@ const setTheme = (t) => {
            : st.pop ? await renderPopState(st)
            : st.complete ? await renderCompleteState()
            : st.session ? await renderSessionState()
+           : st.bubbles ? await renderBubblesState(st)
            : await renderHomeState();
     } catch (e) {
       html = '<div class="gal-empty">This state threw: ' + escapeHtml(e.message) + "</div>";
@@ -1175,6 +1299,7 @@ const setTheme = (t) => {
   }
 
   const PAGE_NOTES = {
+    "Choosing a goal": "Not built yet. A prototype for the onboarding goal step: tap a broad goal, it opens into specific ones, and everything you open or pick stays open until you say otherwise. Tracked in Open issues.",
     "Opening the app": "The first thing you see, in the states it is actually in: both of you going, one of you behind, nobody paired yet, and the moment they start training.",
     "Planning the workout": "From pressing generate to standing over the plan with your thumb on begin.",
     "Doing the workout": "Your own screen, mid session. This is the one you look at with a barbell in front of you.",
