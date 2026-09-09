@@ -126,6 +126,7 @@ Nine top-level bubbles, ordered roughly by how often they come up, each with its
 `goal-tree.json`. This is the readable pass.
 
 ### 1. Lose weight
+<sub>and keep it off</sub>
 
 Maps to our **Lose weight**. The largest search intent by a wide margin.
 
@@ -148,7 +149,8 @@ Maps to our **Lose weight**. The largest search intent by a wide margin.
 The honest line for this whole bubble: training is perhaps a fifth of the outcome and we
 do not do nutrition. The plan should say so rather than imply the workouts will do it.
 
-### 2. Build muscle, get bigger
+### 2. Build muscle
+<sub>get bigger</sub>
 
 Maps to our **Build muscle**. Surveys' #1 stated goal.
 
@@ -167,6 +169,7 @@ Maps to our **Build muscle**. Surveys' #1 stated goal.
 - **After 40, 50, 60.** In every autocomplete. Same program, slower ramp (see `02`).
 
 ### 3. Get stronger
+<sub>lift heavier</sub>
 
 Maps to our **Get stronger**. 42.3% name it their primary 2026 goal.
 
@@ -183,7 +186,8 @@ Maps to our **Get stronger**. 42.3% name it their primary 2026 goal.
 - **Back to what I used to lift.** Muscle memory: roughly a tenth of the original time.
   Route to get-back.
 
-### 4. Tone up, get lean, get abs
+### 4. Tone up
+<sub>get lean, see abs</sub>
 
 Maps to our **Recomp**, and this is the bubble that should be labelled in their words.
 
@@ -196,7 +200,8 @@ Maps to our **Recomp**, and this is the bubble that should be labelled in their 
 - **Lean, shredded, summer body.** 8 to 12 weeks for a visible change; 2 to 4 kg in eight
   weeks is realistic. Twelve weeks out is the honest start date.
 
-### 5. Be able to do something
+### 5. Hit a milestone
+<sub>first pull-up, first 5K</sub>
 
 **No home in our five.** "I want to be able to" autocomplete: do a pull up, touch my toes,
 run 5 miles, do a handstand, lift my girlfriend, do the splits.
@@ -216,6 +221,7 @@ run 5 miles, do a handstand, lift my girlfriend, do the splits.
 Every one of these is deterministic. No generator, no AI, a ladder and a schedule.
 
 ### 6. Train for an event
+<sub>a race, a test, a trip</sub>
 
 **No home in our five.** "How to train for" autocomplete: half marathon, 5k, marathon,
 hyrox, ironman, 10k, triathlon, pull ups, spartan race.
@@ -235,7 +241,8 @@ hyrox, ironman, 10k, triathlon, pull ups, spartan race.
 
 The date drives everything and the generator does not know what a date is.
 
-### 7. Feel better, be healthy, live longer
+### 7. Feel better
+<sub>energy, sleep, live longer</sub>
 
 Maps to our **Stay consistent**, and gives it content. The biggest family in every survey
 and the thinnest in every fitness app.
@@ -255,7 +262,8 @@ and the thinnest in every fitness app.
 - **Pain.** Top two autocompletes for "exercises to". We hold no injury data. The answer is
   a per-exercise "this hurts" that swaps and remembers, not a questionnaire.
 
-### 8. Get back into it, or start for real
+### 8. Get back into it
+<sub>after time off</sub>
 
 **No home in our five.** And it is most of our users, because most beginners quit.
 
@@ -269,7 +277,8 @@ and the thinnest in every fitness app.
   predictor of still training at a year. Three short full-body days. Nothing else matters
   if week five does not happen.
 
-### 9. Just be consistent
+### 9. Stay consistent
+<sub>actually stick to it</sub>
 
 Maps to our **Stay consistent**. 44% want a regular routine. "How to stay consistent with
 working out / in the gym / with weight loss / with adhd" are all autocompletes.
@@ -312,10 +321,26 @@ the outside.
 The product rule is ask the goal, then tell them the plan. Two taps is still that. This
 is the shape the research supports:
 
-**Tap one: nine bubbles, in their words.** Lose weight. Build muscle. Get stronger. Tone up
-and get lean. Be able to do something. Train for an event. Feel better and live longer. Get
-back into it. Just be consistent. Not five abstract categories; nine things people actually
-say, with weight loss present and unjudged but not the headline.
+**Tap one: nine bubbles, two or three words each.** A long label is a label nobody reads,
+so the button carries the shortest true phrase and a quiet line under it does the
+explaining:
+
+| Button | Under it |
+|---|---|
+| Lose weight | and keep it off |
+| Build muscle | get bigger |
+| Get stronger | lift heavier |
+| Tone up | get lean, see abs |
+| Hit a milestone | first pull-up, first 5K |
+| Train for an event | a race, a test, a trip |
+| Feel better | energy, sleep, live longer |
+| Get back into it | after time off |
+| Stay consistent | actually stick to it |
+
+Not five abstract categories; nine things people actually say, with weight loss present and
+unjudged but not the headline. Every longer phrasing people really type ("lose 20 pounds
+before my sister's wedding", "I want to be able to do a pull up") stays in the data as an
+alias, so it can be matched and shown later. It just never goes on a button.
 
 **Tap two: "what specifically?"** The children above. Two to seven per bubble, one tap,
 optional. A number, a date, a body part, an event. Each one changes the numbers the plan
@@ -336,8 +361,11 @@ three are underserved by every competitor found.
 
 ## Part 5: where this disagrees with our current five
 
-- **"Recomp" should be labelled "Tone up, get lean" or "Lose fat and build muscle".** The
-  goal is right and popular. The word is one nobody uses.
+- **"Recomp" should be labelled "Tone up".** Two words, and the two words most people
+  already use. The goal is right and popular; the word on the button was one nobody says.
+  Same rule everywhere else: "Be able to do something" became **Hit a milestone**, "Feel
+  better, be healthy, live longer" became **Feel better**. If a label needs a comma, it is
+  two labels or it is too long.
 - **"Stay consistent" is two different things.** One is "I want to feel better and be
   healthy" (the biggest survey family). The other is "I keep quitting". They need different
   first screens even if the plan converges.
