@@ -483,6 +483,10 @@
     to { transform: translateY(14px) scale(0.99); opacity: 0; }
   }
   body.session-open .tabs { display: none; }
+  /* Nothing is running any more, so the clock and the pause button stop
+     claiming otherwise. The way back out is the Done button below. */
+  .session-overlay.finished .session-clock,
+  .session-overlay.finished .session-pause { display: none; }
 
   /* Guided session, matching the design */
   .sess-card {
@@ -659,7 +663,7 @@
   .av {
     width: 40px; height: 40px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center; padding: 0;
-    background: var(--panel-2); font-size: 12.5px; font-weight: 800;
+    background: var(--panel-2); font-size: 11.5px; letter-spacing: -.02em; font-weight: 800;
     border: 2px solid var(--border); cursor: pointer; transition: transform .12s ease;
   }
   .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -1741,7 +1745,7 @@
   .pring-av {
     position: absolute; inset: 15%; border-radius: 50%; overflow: hidden;
     display: flex; align-items: center; justify-content: center;
-    background: var(--panel-2); font-size: 15.5px; font-weight: 800;
+    background: var(--panel-2); font-size: 14px; letter-spacing: -.02em; font-weight: 800;
   }
   .pring-av.me { color: var(--me); }
   .pring-av.them { color: var(--partner); }
@@ -2751,7 +2755,10 @@
     background: var(--panel-2); border: 1px solid transparent; color: var(--muted);
     font-size: 12.5px; font-weight: 700;
   }
-  .wt-pill.on { background: var(--text); color: var(--bg); }
+  /* Selected reads the same here as it does on the Body tab: the accent,
+     not the ink. Two controls doing the same job should not use two
+     different languages to say "this one". */
+  .wt-pill.on { background: var(--accent); color: var(--on-accent); }
   .wt-pill:active { transform: scale(.97); }
 
   .wt-history { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 4px; }
@@ -2772,6 +2779,15 @@
   }
   .wt-row-x.down { color: var(--accent-ink); }
   .wt-row-x.up { color: var(--warn); }
+  .chart-down {
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    min-height: 120px; margin: 0; padding: 0 20px;
+    font-size: 13px; line-height: 1.5; color: var(--muted);
+  }
+  .sc-pr-name {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    margin: 10px 0 0; font-size: 13.5px; font-weight: 600; color: var(--accent-ink);
+  }
   .cst-caption { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
 
   /* The strength card's lift list: tap a row and the chart above switches to
@@ -3099,7 +3115,7 @@
   .sc-team-av {
     width: 26px; height: 26px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 10.5px; font-weight: 800; color: #fff; border: 2px solid var(--panel-2);
+    font-size: 9.5px; letter-spacing: -.02em; font-weight: 800; color: #fff; border: 2px solid var(--panel-2);
   }
   .sc-team-av + .sc-team-av { margin-left: -9px; }
   .sc-team-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -3257,6 +3273,16 @@
       <button type="button" class="tab-pill" id="progPartnerBtn">Partner</button>
     </div>
 
+
+    <div class="card metric-card" id="cardWeight">
+      <h2>Weight trend</h2>
+      <div class="wt-stats" id="weightStats"></div>
+      <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
+      <div class="wt-range" id="weightRange"></div>
+      <div class="legend" id="weightLegend"></div>
+      <div class="wt-history" id="weightHistory"></div>
+    </div>
+
     <div class="card" id="scaleCheckCard">
       <h2>Log your weight</h2>
       <p class="muted-note" id="scaleGoalNote" style="margin-top:-6px;"></p>
@@ -3270,15 +3296,6 @@
         <button type="button" class="round-btn" id="scalePlus" aria-label="Up 0.5">+</button>
       </div>
       <button type="button" class="btn-primary" id="scaleSaveBtn" style="margin-top:12px;">Save weigh-in</button>
-    </div>
-
-    <div class="card metric-card" id="cardWeight">
-      <h2>Weight trend</h2>
-      <div class="wt-stats" id="weightStats"></div>
-      <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
-      <div class="wt-range" id="weightRange"></div>
-      <div class="legend" id="weightLegend"></div>
-      <div class="wt-history" id="weightHistory"></div>
     </div>
 
     <div class="card metric-card" id="cardConsistency">
@@ -3921,8 +3938,15 @@ function ringSVG(pct, color, size = 72) {
   </svg>`;
 }
 
+/* Two letters, not one. Couples share a first initial often enough that a
+   pair of identical "M" discs is a real reading of this screen, and the
+   ring colour is the only thing telling them apart. */
 function initials(name) {
-  return (name || "?").trim().slice(0, 1).toUpperCase();
+  const clean = (name || "?").trim();
+  if (!clean) return "?";
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length > 1) return (words[0][0] + words[1][0]).toUpperCase();
+  return clean.slice(0, 2).toUpperCase();
 }
 
 /* A single missing element used to kill the whole boot silently, leaving the
@@ -4386,7 +4410,7 @@ function obChips(items, selected, attr) {
 
 /* The three-screen "what this is" intro, run once for brand-new sign-ups
    only, before a single question is asked. Modeled on how Klima and Mercury
-   pace their intro carousels — one statement per screen, a skip that always
+   pace their intro carousels: one statement per screen, a skip that always
    works, dots that show there are exactly three of these and no more.
    The point of writing this at all: the 5-step wizard right after it (name,
    goal, detail, pace, plan) never once mentions a partner, on an app called
@@ -4395,12 +4419,12 @@ const ONBOARD_INTRO = [
   {
     ring: "both",
     h: "You're not doing this alone.",
-    sub: "The moment they log a workout, you'll know — a photo, a note, right on your home screen.",
+    sub: "The moment they log a workout, you'll know: a photo, a note, right on your home screen.",
   },
   {
     ring: "me",
     h: "The week isn't done until you both are.",
-    sub: "Hit your goal solo and the app doesn't celebrate — it nudges you to go check on them instead.",
+    sub: "Hit your goal solo and the app doesn't celebrate. It nudges you to go check on them instead.",
   },
   {
     ring: "partner",
@@ -9253,7 +9277,10 @@ function renderConsistencyStats() {
 let consistencyChart = null;
 
 function renderConsistencyChart() {
-  if (!window.Chart) { loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderConsistencyChart); return; }
+  if (!window.Chart) {
+    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderConsistencyChart).catch(() => chartUnavailable("consistencyChart"));
+    return;
+  }
   const viewingPartner = PROGRESS_VIEW === "partner";
   const name = viewingPartner ? partnerName() : ME;
   const hex = cssVar(viewingPartner ? "--partner" : "--me");
@@ -9390,7 +9417,10 @@ function renderStrengthStats() {
 let strengthChart = null;
 
 function renderStrengthChart() {
-  if (!window.Chart) { loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderStrengthChart); return; }
+  if (!window.Chart) {
+    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderStrengthChart).catch(() => chartUnavailable("strengthChart"));
+    return;
+  }
   const viewingPartner = PROGRESS_VIEW === "partner";
   const name = viewingPartner ? partnerName() : ME;
   const hex = cssVar(viewingPartner ? "--partner" : "--me");
@@ -9504,7 +9534,10 @@ function renderVolumeStats() {
 let volumeChart = null;
 
 function renderVolumeChart() {
-  if (!window.Chart) { loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderVolumeChart); return; }
+  if (!window.Chart) {
+    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderVolumeChart).catch(() => chartUnavailable("volumeChart"));
+    return;
+  }
   const viewingPartner = PROGRESS_VIEW === "partner";
   const name = viewingPartner ? partnerName() : ME;
   const hex = cssVar(viewingPartner ? "--partner" : "--me");
@@ -9552,7 +9585,10 @@ function renderVolumeChart() {
 function renderWeightChart() {
   /* Chart.js is 70 KB and only this card uses it, so it arrives with the card
      rather than with the app. */
-  if (!window.Chart) { loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderWeightChart); return; }
+  if (!window.Chart) {
+    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderWeightChart).catch(() => chartUnavailable("weightChart"));
+    return;
+  }
   /* ONE person per chart. Both lines shared a y axis, and with forty five
      pounds between them the axis spanned 140 to 200, which flattened both
      trends into straight lines. The You / partner toggle above already picks
@@ -10730,8 +10766,8 @@ function celebrateSet(ei, setIdx) {
   const reps = parseInt(SESSION.reps[ei], 10) || ex.reps || 0;
   buzz(15);
   toast(w > 0
-    ? `Set ${setIdx + 1} logged — ${w} lb × ${reps}`
-    : `Set ${setIdx + 1} logged — ${reps} reps`);
+    ? `Set ${setIdx + 1} logged: ${w} lb × ${reps}`
+    : `Set ${setIdx + 1} logged: ${reps} reps`);
   maybeAnnouncePR(ex.name, w);
 }
 
@@ -11153,12 +11189,25 @@ async function finishWorkout() {
 
 /* Records set TODAY. personalRecords is now the one place that decides what a
    record is, so this just asks which of them landed today. */
-function todaysPRCount() {
+function todaysPRLogs() {
   const { prLogIds } = personalRecords(ME);
   const today = todayStr();
   return ALL_EXERCISE_LOGS
-    .filter((l) => l.user_name === ME && l.entry_date === today && prLogIds.has(l.id))
-    .length;
+    .filter((l) => l.user_name === ME && l.entry_date === today && prLogIds.has(l.id));
+}
+
+function todaysPRCount() {
+  return todaysPRLogs().length;
+}
+
+/* "1 New PR" is the best number on the finish screen and the least useful
+   one, because it does not say on what. One record names the lift; several
+   name the first and count the rest. */
+function todaysPRLabel() {
+  const names = [...new Set(todaysPRLogs().map((l) => (l.exercise_name || "").trim()).filter(Boolean))];
+  if (!names.length) return "";
+  if (names.length === 1) return names[0];
+  return `${names[0]} +${names.length - 1} more`;
 }
 
 async function renderSessionComplete() {
@@ -11168,6 +11217,8 @@ async function renderSessionComplete() {
   const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
   const full = doneCount >= total;
   $("sessionProgressFill").style.width = "100%";
+  $("sessionCard").classList.add("finished");
+  stopSessionTimer();
   const hasProof = !!todayEntryFor(MY_EMAIL)?.proof_path;
   /* The numbers that make this feel like it counted. Volume is the lifter's
      figure; on a class or cardio day there is none, so the exercise count
@@ -11208,6 +11259,7 @@ async function renderSessionComplete() {
           : `<div class="sc-stat"><b>${doneCount}/${total}</b><span>Exercises</span></div>`}
         ${prs > 0 ? `<div class="sc-stat pr"><b>${prs}</b><span>${prs === 1 ? "New PR" : "New PRs"}</span></div>` : ""}
       </div>
+      ${prs > 0 ? `<p class="sc-pr-name">${icon("trophy", 14)} ${escapeHtml(todaysPRLabel())}</p>` : ""}
       ${partner ? `<div class="sc-team">
         <span class="sc-team-avs">
           <span class="sc-team-av" style="background:var(--me);" data-av-email="${escapeHtml(MY_EMAIL)}">${escapeHtml(initials(ME))}</span>
@@ -12977,7 +13029,7 @@ async function saveManualWorkout() {
 
 function renderPlanPreview() {
   // Reachable straight from choose/manual/week now, each of which stamps its
-  // own heading here — clear it or their title outlives them on this screen.
+  // own heading here, clear it or their title outlives them on this screen.
   $("workoutCardTitle").textContent = "";
   $("workoutFocusRow").textContent = `Focus: ${displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises)}`;
 
@@ -13441,6 +13493,18 @@ let riveLoadedSex = null;
 
 /* One script tag per URL, however many callers ask for it. */
 const SCRIPTS = new Map();
+/* A chart that never arrives used to leave an empty grid sitting there for
+   good, with the real numbers listed directly underneath it. Say what
+   happened instead: the figures are not lost, only the drawing of them. */
+function chartUnavailable(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  const wrap = canvas?.closest(".chart-wrap");
+  if (!wrap || wrap.querySelector(".chart-down")) return;
+  canvas.classList.add("hidden");
+  wrap.insertAdjacentHTML("beforeend",
+    '<p class="chart-down">The chart could not load. Your numbers are all still here.</p>');
+}
+
 function loadScriptOnce(src) {
   if (!SCRIPTS.has(src)) {
     SCRIPTS.set(src, new Promise((resolve, reject) => {
