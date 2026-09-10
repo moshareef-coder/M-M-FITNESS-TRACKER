@@ -5486,7 +5486,11 @@ function showApp() {
     // Mid-session, the button just takes you back to it.
     if (SESSION) { reopenSession(); return; }
     if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
-    else startWorkout();
+    // A plan already exists: switchTab above already rendered its overview,
+    // with its own Begin Workout button. Starting it from here instead would
+    // skip the one screen where you can look it over, rearrange it, or swap
+    // something before you have done a single rep, which used to happen
+    // silently and read as the app deciding for you.
   };
   renderFab();
 
@@ -7637,7 +7641,8 @@ function renderHero(animate = false) {
       switchTab("workout");
       if (SESSION) { reopenSession(); return; }
       if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
-      else startWorkout();
+      // Same reasoning as the FAB above: a plan already showing its own
+      // overview does not also need this button to start it a second way.
     };
   }
   if ($("heroReviewBtn")) {
@@ -12995,6 +13000,7 @@ function renderPlanPreview() {
         <div class="ex-target">${ex.sets} sets · ${ex.reps} reps</div>
         ${ex.note ? `<div class="ex-note">${escapeHtml(ex.note)}</div>` : ""}
       </div>
+      ${isDone ? "" : `<button type="button" class="wp-chip" data-plan-swap="${i}" aria-label="Swap ${escapeHtml(ex.name)}">${icon("swap", 15)}</button>`}
       ${started ? "" : `<button type="button" class="row-btn" data-remove-plan="${i}" title="Remove">${icon("close", 13)}</button>`}
     </div>`;
   }).join("");
@@ -13027,6 +13033,23 @@ function renderPlanPreview() {
     TODAY_WORKOUT.exercises = order.map((i) => TODAY_WORKOUT.exercises[i]);
     await sb.from("ai_workouts").update({ exercises: TODAY_WORKOUT.exercises }).eq("id", TODAY_WORKOUT.id);
     renderPlanPreview();
+  });
+
+  /* The overview is where "I generated this, now let me actually look at it"
+     happens, and until now the only way to change an exercise here was to
+     delete it outright and type a replacement from scratch, or start the
+     workout and discover the swap sheet already exists one screen later.
+     Same sheet the reveal and the session use, same three ranked
+     alternatives with a reason, same search. A logged exercise has no swap:
+     there is nothing left to replace. */
+  $("workoutContent").querySelectorAll("[data-plan-swap]").forEach((btn) => {
+    btn.onclick = () => openSwapSheet({
+      list: () => TODAY_WORKOUT.exercises,
+      index: Number(btn.dataset.planSwap),
+      date: TODAY_WORKOUT.entry_date || todayStr(),
+      focus: TODAY_WORKOUT.focus,
+      after: () => renderPlanPreview(),
+    });
   });
 
   $("workoutContent").querySelectorAll("[data-remove-plan]").forEach((btn) => {
