@@ -1635,15 +1635,24 @@
   .proto-cta.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
 
   /* PROTOTYPE, NOT LIVE: renderBodyFocusPrototype. See the comment above that
-     function. The figures themselves are .bi-figures / .bi-fig / .bi-canvas /
-     .bi-back, the exact classes Body Impact's own body diagram already uses
-     (defined further down, near #biFigures) -- this is the same component,
-     not a lookalike. .proto-body-wrap only owns the zoom-to-one-side fold,
-     which Body Impact scopes to .bi-grid.focus, a wrapper this screen does
-     not have (it has no list/detail columns to make room for). */
-  .proto-body-wrap.focus .bi-figures { grid-template-columns: 1fr; }
-  .proto-body-wrap.focus .bi-fig { grid-area: 1 / 1; }
-  .proto-body-wrap.focus .bi-fig.collapsed { opacity: 0; pointer-events: none; }
+     function. The figures themselves are .bi-figures / .bi-fig / .bi-canvas,
+     the exact classes Body Impact's own body diagram already uses (defined
+     further down, near #biFigures), not a lookalike. Everything below is
+     this screen's own: the pinch/pan gesture layer and its rezoom pill, and
+     the full-body / clear-all row. */
+  .proto-body-canvas { touch-action: none; }
+  .proto-body-rezoom {
+    position: absolute; top: 8px; right: 8px; z-index: 2; width: 26px; height: 26px;
+    border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--border); color: var(--text);
+  }
+  .proto-body-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .proto-body-action {
+    flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font: inherit; font-size: 12.5px; font-weight: 700; color: var(--text); cursor: pointer;
+    padding: 10px 12px; border-radius: 100px; background: var(--panel-2); border: 1px solid var(--border);
+  }
+  .proto-body-action:active { transform: scale(.97); }
   .proto-body-summary { margin-top: 12px; min-height: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
   .proto-body-summary b { color: var(--accent-ink); font-weight: 700; }
 
@@ -4519,21 +4528,17 @@ function initGoalTiles(grid, ctaBar, ctaBtn) {
   render();
 }
 
-/* PROTOTYPE, NOT LIVE. The first version of this drew its own stand-in body
-   from scratch. Wrong call: this app already has the purchased body figure
-   (knowledge/anatomy/rive-body.mjs, the Rive asset Body Impact and the
-   workout builder both already render), and it already solves tap-to-zoom
-   and per-muscle colour for real, in production. This version uses that
-   figure directly, reusing Body Impact's own established mechanics
-   (bodyFocusMuscle / bodyIsolateMuscle) rather than reinventing them:
-
-   Tapping any muscle zooms to it (the same ctrl.focus() + muscle-bounds.mjs
-   path Body Impact's own muscle drill-down uses) and toggles the whole
-   14-group it belongs to (RIVE_TO_APP_GROUP) into the app's accent green,
-   painted onto every Rive muscle that rolls up to that group, on both
-   artboards, using the exact green Body Impact already uses for "isolated,
-   no data". Front delts and rear delts both light from either tap, same
-   bilateral handling.
+/* PROTOTYPE, NOT LIVE. Tapping used to also zoom the figure in, on the
+   assumption that was the fix for a small muscle being a tight target. Mo
+   corrected that: the zoom he wants is his own fingers, a real pinch, so he
+   can zoom in exactly where and how much he wants and THEN tap precisely,
+   with tapping staying a plain mark/unmark. So a tap now only ever toggles a
+   group; it never moves the camera. Pinch and a one-finger pan (once already
+   zoomed) drive the camera instead, built on ctrl.focus()/unproject() the
+   same way Body Impact's own zoom does, just driven by a live gesture
+   instead of a fixed target box. Full body and Clear all sit next to the
+   summary as the two ways to change everything at once instead of one
+   muscle at a time.
 
    Real onboarding never calls this. The only caller is the sandbox's own
    walkthrough. Tracked in issues.json under "Designed, not built". */
@@ -4547,13 +4552,20 @@ function renderBodyFocusPrototype() {
       <span class="proto-flag">${icon("bell", 12)} Prototype, not live</span>
       <div class="ob-kicker">FOCUS AREAS</div>
       <h1 class="ob-h1">Which muscles do you want to focus on?</h1>
-      <p class="ob-sub">Tap any muscle to mark it. Pick as many as you want.</p>
-      <div class="proto-body-wrap" id="protoBodyWrap">
-        <button type="button" class="bi-back hidden" id="protoBodyBackBtn">${icon("chevronLeft", 14)} Both sides</button>
-        <div class="bi-figures" id="protoBodyFigures">
-          <div class="bi-fig" data-view="Front"><canvas id="protoBodyFront" class="bi-canvas"></canvas></div>
-          <div class="bi-fig" data-view="Back"><canvas id="protoBodyBack" class="bi-canvas"></canvas></div>
+      <p class="ob-sub">Tap a muscle to mark it. Pinch to zoom in on one for an easier tap.</p>
+      <div class="bi-figures" id="protoBodyFigures">
+        <div class="bi-fig" data-view="Front">
+          <canvas id="protoBodyFront" class="bi-canvas proto-body-canvas"></canvas>
+          <button type="button" class="proto-body-rezoom hidden" data-view="Front">${icon("refresh", 13)}</button>
         </div>
+        <div class="bi-fig" data-view="Back">
+          <canvas id="protoBodyBack" class="bi-canvas proto-body-canvas"></canvas>
+          <button type="button" class="proto-body-rezoom hidden" data-view="Back">${icon("refresh", 13)}</button>
+        </div>
+      </div>
+      <div class="proto-body-actions">
+        <button type="button" class="proto-body-action" id="protoBodyAll">${icon("check", 13)} Full body</button>
+        <button type="button" class="proto-body-action" id="protoBodyClear">${icon("close", 13)} Clear all</button>
       </div>
       <p class="proto-body-summary" id="protoBodySummary">Loading the figure...</p>
       <div class="proto-cta" id="protoBodyCta">
@@ -4572,6 +4584,90 @@ const PROTO_BODY_GREEN = { r: 0x3b, g: 0xe7, b: 0x6b };   // same accent Body Im
 let PROTO_BODY_FRONT_CTRL = null, PROTO_BODY_BACK_CTRL = null, PROTO_BODY_GEN = 0;
 const PROTO_BODY_PICKED = new Set();
 
+/* A live pinch/pan camera on one canvas, independent of the other. Box is
+   {cx, cy, w, h} in artboard-fraction units (the same [x0,y0,x1,y1] shape
+   ctrl.focus() already takes elsewhere, just tracked as a live, continuously
+   updated center+size instead of a one-shot target). null box means the
+   natural, not-zoomed contain-fit.
+
+   Deliberately NOT chasing exact parity with the module's own internal
+   contain-fit math for what box=null "really" measures out to -- the first
+   frame of a pinch treats "not zoomed yet" as the full unit square, which is
+   close enough that it does not read as a jump, and the eventual on-screen
+   scale is bounded by the module's own MAX_ZOOM regardless of the box this
+   sends it, so there is no case where an approximate box here compounds
+   into someplace genuinely wrong. */
+function attachPinchZoom(canvas, rezoomBtn, getCtrl) {
+  const MIN_BOX = 0.15;
+  const pointers = new Map();
+  let box = null, pinch = null, pan = null;
+
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const toArr = (b) => b ? [b.cx - b.w / 2, b.cy - b.h / 2, b.cx + b.w / 2, b.cy + b.h / 2] : null;
+  const baseBox = () => box || { cx: 0.5, cy: 0.5, w: 1, h: 1 };
+  const localPoint = (e) => {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+  function apply() {
+    getCtrl()?.focus(toArr(box), false);
+    rezoomBtn.classList.toggle("hidden", !box);
+  }
+
+  canvas.addEventListener("pointerdown", (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, localPoint(e));
+    if (pointers.size === 2) {
+      const pts = [...pointers.values()];
+      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
+      const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+      const anchor = getCtrl()?.unproject(mid.x, mid.y);
+      pinch = { dist, startBox: baseBox(), anchor: anchor || { x: baseBox().cx, y: baseBox().cy } };
+      pan = null;
+    } else if (pointers.size === 1) {
+      const rect = canvas.getBoundingClientRect();
+      pan = { start: localPoint(e), startBox: baseBox(), w: rect.width || 1, h: rect.height || 1 };
+    }
+  });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, localPoint(e));
+    if (pointers.size === 2 && pinch) {
+      const pts = [...pointers.values()];
+      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
+      const ratio = dist / pinch.dist;
+      const w = clamp(pinch.startBox.w / ratio, MIN_BOX, 1);
+      const h = clamp(pinch.startBox.h / ratio, MIN_BOX, 1);
+      box = { cx: pinch.anchor.x, cy: pinch.anchor.y, w, h };
+      apply();
+    } else if (pointers.size === 1 && pan && pan.startBox.w < 0.999) {
+      // Panning only once already zoomed in, so a plain touch at rest never
+      // fights the page's own vertical scroll.
+      const p = localPoint(e);
+      const dxFrac = -(p.x - pan.start.x) * (pan.startBox.w / pan.w);
+      const dyFrac = -(p.y - pan.start.y) * (pan.startBox.h / pan.h);
+      box = {
+        cx: clamp(pan.startBox.cx + dxFrac, pan.startBox.w / 2, 1 - pan.startBox.w / 2),
+        cy: clamp(pan.startBox.cy + dyFrac, pan.startBox.h / 2, 1 - pan.startBox.h / 2),
+        w: pan.startBox.w, h: pan.startBox.h,
+      };
+      apply();
+    }
+  });
+
+  function end(e) {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinch = null;
+    if (pointers.size < 1) pan = null;
+  }
+  canvas.addEventListener("pointerup", end);
+  canvas.addEventListener("pointercancel", end);
+
+  rezoomBtn.onclick = () => { box = null; getCtrl()?.focus(null, true); rezoomBtn.classList.add("hidden"); };
+  return { reset: () => { box = null; rezoomBtn.classList.add("hidden"); } };
+}
+
 /* Own generation counter, same shape as ADVANCING elsewhere in this file: the
    canvases are new DOM nodes every time this screen is (re)rendered (unlike
    Body Impact's, which are a permanent part of #app's shell), so any
@@ -4585,35 +4681,22 @@ async function initBodyFocusRive() {
   PROTO_BODY_BACK_CTRL?.destroy(); PROTO_BODY_BACK_CTRL = null;
   PROTO_BODY_PICKED.clear();
 
-  let mod, boundsMod;
+  let mod;
   try {
-    [mod, boundsMod] = await Promise.all([ensureRiveBodyModule(), import("./knowledge/anatomy/muscle-bounds.mjs")]);
+    mod = await ensureRiveBodyModule();
   } catch (e) {
     console.error("proto body focus: figure failed to load", e);
     if (gen === PROTO_BODY_GEN) $("protoBodySummary") && ($("protoBodySummary").textContent = "Could not load the body figure.");
     return;
   }
   if (gen !== PROTO_BODY_GEN) return;         // a newer visit already took over
-  const wrap = $("protoBodyWrap");
-  if (!wrap) return;                          // navigated away entirely while this loaded
+  const figuresEl = $("protoBodyFigures");
+  if (!figuresEl) return;                     // navigated away entirely while this loaded
 
-  const backBtn = $("protoBodyBackBtn");
   const summaryEl = $("protoBodySummary");
   const ctaBar = $("protoBodyCta"), ctaBtn = $("protoBodyCtaBtn");
+  const allBtn = $("protoBodyAll"), clearBtn = $("protoBodyClear");
   const sex = "Male";   // prototype default; real onboarding has no profile sex to read yet
-  let firstFocus = true;
-
-  function unionBoundsForGroup(artboardName, group, side) {
-    let box = null;
-    for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[group] || []) {
-      const b = boundsMod.boundsFor(artboardName, m, side);
-      if (!b) continue;
-      box = box
-        ? [Math.min(box[0], b[0]), Math.min(box[1], b[1]), Math.max(box[2], b[2]), Math.max(box[3], b[3])]
-        : b.slice();
-    }
-    return box;
-  }
 
   function repaintIntensities() {
     const on = {};
@@ -4636,47 +4719,24 @@ async function initBodyFocusRive() {
   function sync() {
     const n = PROTO_BODY_PICKED.size;
     if (!n) summaryEl.textContent = "Nothing marked yet.";
+    else if (n === PROTO_BODY_ORDER.length) summaryEl.innerHTML = "<b>Full body</b> marked.";
     else {
       const names = PROTO_BODY_ORDER.filter((k) => PROTO_BODY_PICKED.has(k)).map((k) => BODY_GROUP_LABELS[k]);
       summaryEl.innerHTML = "Marked: <b>" + escapeHtml(names.join(", ")) + "</b>";
     }
     if (!n) { ctaBar.classList.remove("show"); return; }
     ctaBar.classList.add("show");
-    ctaBtn.innerHTML = icon("dumbbell", 22) + " Continue with " + n + " area" + (n === 1 ? "" : "s")
+    const label = n === PROTO_BODY_ORDER.length ? "the full body" : n + " area" + (n === 1 ? "" : "s");
+    ctaBtn.innerHTML = icon("dumbbell", 22) + " Continue with " + label
       + '<span class="go">' + icon("chevronRight", 22) + "</span>";
   }
 
-  function focusView(view, group, side) {
-    wrap.classList.add("focus");
-    document.querySelectorAll("#protoBodyFigures .bi-fig").forEach((f) => f.classList.toggle("collapsed", f.dataset.view !== view));
-    backBtn.classList.remove("hidden");
-    const ctrl = view === "Front" ? PROTO_BODY_FRONT_CTRL : PROTO_BODY_BACK_CTRL;
-    const other = view === "Front" ? PROTO_BODY_BACK_CTRL : PROTO_BODY_FRONT_CTRL;
-    other?.focus(null, false);
-    const box = unionBoundsForGroup(`${sex}-${view}`, group, side);
-    // On the very first tap the canvas is still growing into its layout; zoom
-    // after that settles so the tween lands on the final size, same guard
-    // Body Impact's own bodyFocusMuscle uses for the same reason.
-    const go = () => box && ctrl?.focus(box, true);
-    if (firstFocus) { firstFocus = false; setTimeout(go, 60); } else go();
-  }
-
-  backBtn.onclick = () => {
-    wrap.classList.remove("focus");
-    document.querySelectorAll("#protoBodyFigures .bi-fig").forEach((f) => f.classList.remove("collapsed"));
-    backBtn.classList.add("hidden");
-    PROTO_BODY_FRONT_CTRL?.focus(null, true);
-    PROTO_BODY_BACK_CTRL?.focus(null, true);
-  };
-
-  function onTap(muscle, group, view, tap) {
+  function onTap(muscle, group) {
     if (!group) return;
     const wasPicked = PROTO_BODY_PICKED.has(group);
     if (wasPicked) PROTO_BODY_PICKED.delete(group); else PROTO_BODY_PICKED.add(group);
     if (!wasPicked) paintGreen(group);
     repaintIntensities();
-    const side = tap ? (tap.x < 0.5 ? "left" : "right") : null;
-    focusView(view, group, side);
     sync();
   }
 
@@ -4685,12 +4745,27 @@ async function initBodyFocusRive() {
       canvas: $(id),
       artboardName: `${sex}-${view}`,
       intensities: {},
-      onMuscleClick: (muscle, group, tap) => onTap(muscle, group, view, tap),
+      onMuscleClick: (muscle, group) => onTap(muscle, group),
     });
   }
 
   PROTO_BODY_FRONT_CTRL = make("protoBodyFront", "Front");
   PROTO_BODY_BACK_CTRL = make("protoBodyBack", "Back");
+
+  attachPinchZoom($("protoBodyFront"), document.querySelector('.proto-body-rezoom[data-view="Front"]'), () => PROTO_BODY_FRONT_CTRL);
+  attachPinchZoom($("protoBodyBack"), document.querySelector('.proto-body-rezoom[data-view="Back"]'), () => PROTO_BODY_BACK_CTRL);
+
+  allBtn.onclick = () => {
+    for (const g of PROTO_BODY_ORDER) { if (!PROTO_BODY_PICKED.has(g)) paintGreen(g); PROTO_BODY_PICKED.add(g); }
+    repaintIntensities();
+    sync();
+  };
+  clearBtn.onclick = () => {
+    PROTO_BODY_PICKED.clear();
+    repaintIntensities();
+    sync();
+  };
+
   sync();
 }
 

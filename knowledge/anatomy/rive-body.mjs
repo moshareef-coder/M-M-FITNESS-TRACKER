@@ -64,13 +64,15 @@ const FOCUS_MS = 520;
 
 /**
  * Load one artboard onto a canvas and wire it up to intensities/palette/click callback.
- * Returns a controller: { setIntensities, setPalette, focus, project, resize, destroy }.
+ * Returns a controller: { setIntensities, setPalette, focus, project, unproject, resize, destroy }.
  * Caller owns the canvas element's sizing; this only draws into it.
  *
  * onMuscleClick(muscle, group, tap) also gets the tap position as artboard fractions
  * ({ x, y } in 0..1) so the caller can tell the viewer-left limb from the viewer-right.
  * onFrame(controller) fires whenever the render frame moves (zoom tween, resize), so
- * HTML overlays positioned with project() can follow.
+ * HTML overlays positioned with project() can follow. unproject() is the inverse of
+ * project() (CSS pixel -> artboard fraction), for a caller driving its own live zoom
+ * gesture (a pinch, say) that needs to anchor on wherever the fingers are.
  */
 export function createBodyHeatmap({ canvas, artboardName, palette, intensities, onMuscleClick, onLoad, onFrame }) {
   if (!ARTBOARDS.includes(artboardName)) {
@@ -260,6 +262,7 @@ export function createBodyHeatmap({ canvas, artboardName, palette, intensities, 
     setMusclePalette: (muscle, next) => applyMusclePalette(r, muscle, next),
     focus,
     project,
+    unproject,
     get zoomed() { return !!focusBox; },
     resize,
     destroy: () => { if (tween) cancelAnimationFrame(tween); ro?.disconnect(); r.cleanup(); },
