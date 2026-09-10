@@ -38,14 +38,9 @@
         run: (w) => w.renderOnboardIntro(0, {}) },
 
       { t: "Tell us about you", scenario: "fresh",
-        s: "Name, goal, pace, plan",
-        note: "The five-step wizard the intro hands you to. A real account with no profile row, so it runs for real: type a name and press through, and every answer is written to the fake database and read back by the next screen.",
+        s: "Name, goal tiles, pace, plan",
+        note: "The wizard the intro hands you to, on a real account with no profile row. The goal step is the nine tiles from the research: tap one, then what you mean by it, two taps and through. Lose weight, build muscle, get stronger and tone up still ask how much on the next screen; the other five are specific enough already and skip straight to pace. Every answer is written to the fake database, goal_bubble and goal_child included.",
         run: () => {} },
-
-      { t: "Goal tiles (prototype)", scenario: "fresh", flag: "not live",
-        s: "Tiles + bottom sheet, for real",
-        note: "Not the real goal step, which is the one before this. The bubble version that used to live here got opened all the way (all nine categories, 52 bubbles) and stopped being readable, no spacing fix was going to save 52 items on one screen. A follow-up compared three structurally different pickers and Mo picked this one: nine categories always visible as a grid, tap one for its full checklist in a bottom sheet. Multi-select persists across categories. Nothing here writes to the fake database and Continue does not go anywhere, on purpose. Tracked in Open issues under Designed, not built.",
-        run: (w) => w.renderGoalTilesPrototype?.() },
 
       { t: "First look at an empty app", scenario: "fresh",
         s: "No workouts, no partner, no history",
@@ -266,6 +261,11 @@
         s: "Tap the body, front and back",
         note: "The body picker, now a real settings page rather than the prototype it started as. This is the actual purchased body figure, the same one Body Impact and the workout builder already render, not a stand-in. A tap marks or unmarks a muscle, plain and simple, no zoom: went through a tap-to-zoom pass and then a pinch-to-zoom pass, and neither turned out to be needed, so both are gone. Marking any muscle lights the whole group it belongs to (front delts and rear delts both from either one), the same keys Body Impact already tracks. Four is the cap, because the engine gives a picked group 1.4x its weekly sets out of a fixed weekly volume, so a fifth tap is refused out loud. Save writes profiles.focus_groups and focus_chosen_at to the fake database for real, and the next generated workout reads them.",
         run: (w) => { w.switchTab("setup"); w.openSettingsPage("focus"); } },
+
+      { t: "Change your goal", scenario: "paired",
+        s: "The same tiles, from Setup",
+        note: "The onboarding tiles again, pre-selected from the profile. Picking writes goal, goal_bubble and goal_child in one go, and the next generated plan is built for it. The old Training page select still works as a legacy editor; choosing a different string there clears the tile pick so a stale tile can never quietly win.",
+        run: (w) => { w.switchTab("setup"); w.openSettingsPage("goal"); } },
 
       { t: "Limits and injuries", scenario: "paired",
         s: "What hurts, and what you don't own",

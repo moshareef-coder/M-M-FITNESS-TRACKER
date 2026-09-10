@@ -262,7 +262,11 @@
   window.__SANDBOX = { scenario: SCENARIO, scenarios: SCENARIOS, db: DB, me: ME, them: THEM };
 
   /* ---- the stand-in client ---- */
-  const clone = (rows) => rows.map((r) => ({ ...r }));
+  /* Clones carry their index into the table, so an update() can land on the
+     real row. Before this, update wrote into the clone and vanished, which
+     hid a missing write behind a passing walk. __i never leaves the builder. */
+  const clone = (rows) => rows.map((r, i) => ({ ...r, __i: i }));
+  const strip = (rows) => rows.map(({ __i, ...r }) => r);
   const low = (v) => String(v == null ? "" : v).toLowerCase();
   const col = (row, c) => (c.startsWith("lower(") ? low(row[c.slice(6, -1)]) : row[c]);
 
@@ -279,9 +283,13 @@
       },
       upsert(payload, opts) {
         const list = Array.isArray(payload) ? payload : [payload];
-        const on = (opts && opts.onConflict ? opts.onConflict : "id").split(",")[0].trim();
+        /* Supabase resolves an upsert on the primary key. profiles is keyed by
+           email and its fixture rows carry no id, so the old "id" default
+           matched undefined to undefined and always hit row zero: right by
+           accident for one user, wrong the moment there are two. */
+        const on = (opts && opts.onConflict ? opts.onConflict : (list[0]?.id != null ? "id" : table === "profiles" ? "email" : "id")).split(",")[0].trim();
         rows = list.map((p) => {
-          const hit = (DB[table] ??= []).find((r) => low(r[on]) === low(p[on]));
+          const hit = p[on] == null ? null : (DB[table] ??= []).find((r) => low(r[on]) === low(p[on]));
           if (hit) { Object.assign(hit, p); return hit; }
           const row = { id: "s-" + Math.random().toString(36).slice(2, 9), ...p };
           DB[table].push(row);
@@ -312,14 +320,17 @@
     };
     function settle() {
       if (pending && pending.kind === "update") {
-        for (const r of rows) Object.assign(r, pending.patch);
+        for (const r of rows) {
+          Object.assign(r, pending.patch);
+          if (r.__i != null && DB[table]?.[r.__i]) Object.assign(DB[table][r.__i], pending.patch);
+        }
       }
       if (pending && pending.kind === "delete") {
         const ids = new Set(rows.map((r) => r.id));
         DB[table] = (DB[table] || []).filter((r) => !ids.has(r.id));
       }
       pending = null;
-      return Promise.resolve({ data: rows, error: null });
+      return Promise.resolve({ data: strip(rows), error: null });
     }
     return api;
   }

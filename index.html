@@ -1564,39 +1564,33 @@
   .si-legal { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 20px 0 0; max-width: 34ch; }
   .si-legal a { color: var(--muted); text-underline-offset: 2px; }
 
-  /* PROTOTYPE, NOT LIVE: renderGoalTilesPrototype, reachable only from the
-     sandbox walkthrough. See the comment above that function. Sizes stay on
-     the app's eight-step scale (11 / 12.5 / 14 / 15.5 / 17 / 21 / 24 / 28),
-     same as everywhere else. */
-  .proto-flag {
-    display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800;
-    letter-spacing: .08em; text-transform: uppercase; color: var(--partner);
-    background: color-mix(in srgb, var(--partner) 14%, transparent);
-    border-radius: 100px; padding: 5px 11px; margin-bottom: 14px;
-  }
   /* Nine categories, all on screen at once: a tile only has to hold an icon
      and a word, so this is the one place in the whole flow where nothing
      scrolls and nothing is hidden by default. */
-  .proto-tile-grid {
+  .goal-tile-grid {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 6px;
     transition: transform .28s cubic-bezier(.22,1,.36,1), filter .28s ease;
   }
-  .proto-tile-grid.dim { transform: scale(.97); filter: brightness(.9); }
-  .proto-tile {
+  .goal-tile-grid.dim { transform: scale(.97); filter: brightness(.9); }
+  .goal-tile {
     aspect-ratio: 1; border-radius: 16px; background: var(--panel); border: 1.5px solid var(--border);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
     font-family: inherit; color: var(--text); cursor: pointer; padding: 8px; position: relative;
     transition: border-color .18s ease, background .18s ease;
   }
-  .proto-tile:active { transform: scale(.985); }
-  .proto-tile.has-picks { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
-  .proto-tile-ico {
+  .goal-tile:active { transform: scale(.985); }
+  .goal-tile.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+  .goal-tile-ico {
     width: 36px; height: 36px; border-radius: 11px; background: var(--panel-2);
     display: flex; align-items: center; justify-content: center; color: var(--accent-ink);
   }
-  .proto-tile.has-picks .proto-tile-ico { background: var(--accent); color: var(--on-accent); }
-  .proto-tile-label { font-size: 12.5px; font-weight: 700; letter-spacing: -.01em; text-align: center; line-height: 1.2; }
-  .proto-tile-badge {
+  .goal-tile.on .goal-tile-ico { background: var(--accent); color: var(--on-accent); }
+  .goal-tile-label { font-size: 12.5px; font-weight: 700; letter-spacing: -.01em; text-align: center; line-height: 1.2; }
+  .goal-tile-sub { font-size: 10.5px; color: var(--muted); text-align: center; line-height: 1.25; margin-top: 2px; }
+  .pgs-text { flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: left; }
+  .pgs-sub { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .pgs-go { color: var(--muted); display: flex; }
+  .goal-tile-badge {
     position: absolute; top: 8px; right: 8px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 100px;
     background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 800;
     display: flex; align-items: center; justify-content: center;
@@ -1604,7 +1598,7 @@
   /* The category sheet reuses .sheet-scrim, the same fixed dark overlay every
      other sheet in the app opens on, so this reads as the app's own bottom
      sheet rather than a prototype-only one. */
-  .proto-goal-sheet {
+  .goal-sheet {
     width: 100%; max-height: 78dvh; overflow-y: auto; background: var(--panel);
     border-radius: 22px 22px 0 0; border: 1px solid var(--border); border-bottom: none;
     padding: 10px 18px calc(20px + env(safe-area-inset-bottom, 0px));
@@ -1629,11 +1623,6 @@
     display: flex; align-items: center; justify-content: center; color: transparent; background: var(--panel);
   }
   .pgs-row.on .pgs-box { background: var(--accent); border-color: transparent; color: var(--on-accent); }
-  .proto-cta {
-    margin-top: 16px; transform: translateY(14px); opacity: 0; pointer-events: none;
-    transition: transform .28s cubic-bezier(.22,1,.36,1), opacity .28s;
-  }
-  .proto-cta.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
 
   /* renderBodyFocusPage, the Focus areas settings page. The figures themselves
      are .bi-figures / .bi-fig / .bi-canvas, the exact classes Body Impact's own
@@ -3355,6 +3344,11 @@
           <span class="set-txt"><span class="set-title">Partner</span><span class="set-sub">Who you train with</span></span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
+        <button type="button" class="set-row" id="setRow-goal" data-page="goal">
+          <span class="set-ico" data-ico="medal"></span>
+          <span class="set-txt"><span class="set-title">Goal</span><span class="set-sub" id="setGoalSub">Not set</span></span>
+          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+        </button>
         <button type="button" class="set-row" id="setRow-training" data-page="training">
           <span class="set-ico" data-ico="target"></span>
           <span class="set-txt"><span class="set-title">Training</span><span class="set-sub">Focus, goal and weekly target</span></span>
@@ -3451,6 +3445,17 @@
       </label>
       <p class="muted-note">Off hides the exercise name, muscle figure, sets and up-next from their live view and timeline. They still see that you're training, for how long, and your effort score, so who worked hardest never depends on showing what you did.</p>
     </div>
+    </div>
+    <div class="settings-page hidden" id="page-goal">
+      <div class="scr-head">
+        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+        <div class="scr-title">Goal</div>
+        <div class="spacer"></div>
+      </div>
+      <div class="card">
+        <p class="muted-note" id="goalPageNote"></p>
+        <div class="goal-tile-grid" id="goalPageGrid"></div>
+      </div>
     </div>
     <div class="settings-page hidden" id="page-training">
       <div class="scr-head">
@@ -4444,197 +4449,166 @@ function renderOnboardIntro(i, data) {
   };
 }
 
-/* PROTOTYPE, NOT LIVE. Four rounds of review got here: a published artifact,
-   the gallery's static "Choosing a goal" page, a live spring-physics bubble
-   field in the sandbox, and then Mo opening every bubble at once and finding
-   52 items cannot share one screen at any spacing. The follow-up laid out
-   three structurally different pickers (research-grounded: 2-5 choices is
-   the accepted range per onboarding screen, so the fix was never going to be
-   a better bubble). Mo picked tiles-plus-sheet: nine categories always
-   visible as a 3x3 grid, tap one for its full checklist in a bottom sheet,
-   same pattern Fitbod and JustFit converge on and the one this app's own
-   mobile-ui-patterns skill already calls out as the answer for "not enough
-   room, but a whole new page would lose context".
+/* The goal step. Four rounds of review got here: a published artifact, the
+   gallery's static page, a live bubble field in the sandbox, and then Mo
+   opening every bubble at once and finding 52 items cannot share one screen
+   at any spacing. He picked tiles plus sheet: nine categories always visible,
+   tap one for its specifics in the app's own bottom sheet, tap a specific and
+   you are through. Two taps, never a third, which is research/11's rule for
+   the first screen.
 
-   This function is real and fully interactive. It is also completely inert
-   for a real user: real onboarding never calls it. renderOnboardStep still
-   runs the shipping goal step exactly as it does today. The only caller is
-   the sandbox's own walkthrough (sandbox-steps.js), which reaches app
-   functions directly by name, the same way it reaches switchTab and
-   startWorkout. Tracked in issues.json under "Designed, not built" until it
-   replaces the real step. */
-function renderGoalTilesPrototype() {
+   Single select, on purpose. The prototype let you pick several; the engine's
+   contract is one goal (goal_bubble and goal_child, see
+   mo-knowledge/engine/CONTRACT.md), and a plan built for two goals is a plan
+   built for neither. The four families with no legacy string still write a
+   valid `goal` ("Stay consistent"), so every existing reader keeps working.
+
+   Labels, sub lines and ids come from mo-knowledge/goals/goal-tree.json and
+   are used verbatim; the longer phrasings people actually type live there as
+   aliases and never go on a button. */
+const GOAL_TILES = [
+  { id: "lose-weight", legacy: "lose", askDetail: true, ico: "arrowDown", title: "Lose weight", sub: "and keep it off",
+    kids: [{ id: "lose-a-number", label: "A number of pounds" }, { id: "lose-belly", label: "Belly fat" }, { id: "lose-by-date", label: "Before a date" }, { id: "lose-for-health", label: "For my health" }, { id: "lose-last-10", label: "The last 10 pounds" }, { id: "lose-and-build", label: "Lose fat and build muscle" }] },
+  { id: "build-muscle", legacy: "muscle", askDetail: true, ico: "dumbbell", title: "Build muscle", sub: "get bigger",
+    kids: [{ id: "build-overall", label: "Gain weight" }, { id: "build-a-part", label: "Arms, chest, shoulders" }, { id: "build-glutes", label: "Glutes" }, { id: "build-skinny-fat", label: "Skinny fat" }, { id: "build-women", label: "Without getting bulky" }] },
+  { id: "get-stronger", legacy: "stronger", askDetail: true, ico: "bolt", title: "Get stronger", sub: "lift heavier",
+    kids: [{ id: "strong-a-lift", label: "Hit a number" }, { id: "strong-multiples", label: "Lift my bodyweight" }, { id: "strong-not-bigger", label: "Stronger, not bigger" }, { id: "strong-for-life", label: "For everyday life" }, { id: "strong-again", label: "Get back to where I was" }] },
+  { id: "tone-lean-abs", legacy: "recomp", askDetail: true, ico: "refresh", title: "Tone up", sub: "get lean, see abs",
+    kids: [{ id: "tone-part", label: "Arms, legs, stomach" }, { id: "abs", label: "Abs" }, { id: "lean-shredded", label: "Get lean" }] },
+  { id: "do-a-thing", legacy: "consistent", askDetail: false, ico: "target", title: "Hit a milestone", sub: "first pull-up, first 5K",
+    kids: [{ id: "first-pullup", label: "First pull-up" }, { id: "first-pushup", label: "Push-ups" }, { id: "run-5k", label: "Run a 5K" }, { id: "faster-mile", label: "Run faster" }, { id: "flexibility", label: "Touch my toes" }, { id: "skills", label: "Handstand" }] },
+  { id: "event", legacy: "consistent", askDetail: false, ico: "medal", title: "Train for an event", sub: "a race, a test, a trip",
+    kids: [{ id: "event-run", label: "A race" }, { id: "event-hyrox", label: "Hyrox" }, { id: "event-ocr", label: "Obstacle race" }, { id: "event-test", label: "A fitness test" }, { id: "event-benchmark", label: "A workout challenge" }, { id: "event-sport", label: "A sport or a trip" }] },
+  { id: "feel-better", legacy: "consistent", askDetail: false, ico: "heart", title: "Feel better", sub: "energy, sleep, live longer",
+    kids: [{ id: "mental", label: "Mood, stress, sleep" }, { id: "longevity", label: "Live longer" }, { id: "energy", label: "More energy" }, { id: "prevent", label: "Doctor's orders" }, { id: "mobility", label: "Loosen up" }, { id: "pain", label: "Aches and pains" }] },
+  { id: "get-back", legacy: "consistent", askDetail: false, ico: "run", title: "Get back into it", sub: "after time off",
+    kids: [{ id: "back-after-years", label: "After years off" }, { id: "back-postpartum", label: "After a baby" }, { id: "start-fresh", label: "Total beginner" }] },
+  { id: "consistent", legacy: "consistent", askDetail: false, ico: "clock", title: "Stay consistent", sub: "actually stick to it",
+    kids: [{ id: "keep-quitting", label: "I keep quitting" }, { id: "dont-know", label: "Don't know where to start" }, { id: "no-time", label: "No time" }] },
+];
+
+function goalTileFor(bubble) { return GOAL_TILES.find((t) => t.id === bubble) || null; }
+
+/* "Tone up, get lean" for a Setup subtitle, or the legacy string for a profile
+   that predates the tiles. */
+function goalTileLabel(profile) {
+  const t = goalTileFor(profile?.goal_bubble);
+  if (!t) return profile?.goal || "Not set";
+  const kid = t.kids.find((k) => k.id === profile?.goal_child);
+  return kid ? `${t.title}, ${kid.label.toLowerCase()}` : t.title;
+}
+
+/* Onboarding's goal step. Picking advances on its own. The four legacy
+   families still get the amount chips on the detail step, because "a number
+   of pounds" needs a number; the five newer families are already as specific
+   as the app can use and go straight to pace. */
+function renderGoalTilesStep(data = {}) {
   const ob = $("onboard");
   ob.classList.remove("hidden");
   $("app").classList.add("hidden");
-
   ob.innerHTML = `
     <div class="ob-step">
-      <span class="proto-flag">${icon("bell", 12)} Prototype, not live</span>
-      <div class="ob-kicker">STEP 2 OF 5</div>
-      <h1 class="ob-h1">What's the goal?</h1>
-      <p class="ob-sub">Tap a category for its full list. Pick as many as you want.</p>
-      <div class="proto-tile-grid" id="protoTileGrid"></div>
-      <div class="proto-cta" id="protoGoalCta">
-        <button type="button" class="btn-cta" id="protoGoalCtaBtn">${icon("dumbbell", 22)} Continue
-          <span class="go">${icon("chevronRight", 22)}</span></button>
-      </div>
+      <h1>What do you want?</h1>
+      <p class="sub">Tap one, then tell us what you mean by it.</p>
+      <div class="goal-tile-grid" id="goalTileGrid"></div>
     </div>`;
-
-  initGoalTiles($("protoTileGrid"), $("protoGoalCta"), $("protoGoalCtaBtn"));
-  /* A real tap needs a real response, and the honest one here is that this
-     does not go anywhere yet, nothing else in onboarding calls this screen. */
-  $("protoGoalCtaBtn").onclick = () => toast("Prototype only, not wired into onboarding yet");
+  initGoalTiles($("goalTileGrid"), {
+    selected: { bubble: data.goal_bubble || null, child: data.goal_child || null },
+    onPick: ({ bubble, child, label }) => {
+      const tile = goalTileFor(bubble);
+      const next = { ...data, goalKey: tile.legacy, goal_bubble: bubble, goal_child: child, goalLabel: label };
+      if (tile.askDetail) renderOnboardStep("detail", next);
+      else renderOnboardStep("pace", { ...next, detail: child ? label : null });
+    },
+  });
 }
 
-/* The nine broad goals and their specific ones, from the real-goals research
-   (mo-knowledge, built 2026-09-08 from surveys, search volume, autocomplete
-   and open forums, every number sourced in mo-knowledge/sources.md). Category
-   and checklist labels are used verbatim; the longer phrasings people
-   actually type live in the research as aliases and never appear on a
-   button, same rule the research itself states. Four of these, milestone,
-   event, get back into it, and tone up, map onto none of the app's original
-   five goals, which is real signal, not a gap to paper over: see
-   mo-knowledge for what each implies about pace, plan, and what "done"
-   means. Constraints like an injury or an age bracket are deliberately not
-   here; the research defers those to a later, optional screen so this one
-   stays "what do you want", never "what is wrong with you". */
-const PROTO_GOAL_CATEGORIES = [
-  { key: "lose", ico: "arrowDown", title: "Lose weight",
-    kids: ["A number of pounds", "Belly fat", "Before a date", "For my health", "The last 10 pounds", "Lose fat and build muscle"] },
-  { key: "muscle", ico: "dumbbell", title: "Build muscle",
-    kids: ["Gain weight", "Arms, chest, shoulders", "Glutes", "Skinny fat", "Without getting bulky"] },
-  { key: "strong", ico: "bolt", title: "Get stronger",
-    kids: ["Hit a number", "Lift my bodyweight", "Stronger, not bigger", "For everyday life", "Get back to where I was"] },
-  { key: "tone", ico: "refresh", title: "Tone up",
-    kids: ["Arms, legs, stomach", "Abs", "Get lean"] },
-  { key: "milestone", ico: "target", title: "Hit a milestone",
-    kids: ["First pull-up", "Push-ups", "Run a 5K", "Run faster", "Touch my toes", "Handstand"] },
-  { key: "event", ico: "medal", title: "Train for an event",
-    kids: ["A race", "Hyrox", "Obstacle race", "A fitness test", "A workout challenge", "A sport or a trip"] },
-  { key: "feel", ico: "heart", title: "Feel better",
-    kids: ["Mood, stress, sleep", "Live longer", "More energy", "Doctor's orders", "Loosen up", "Aches and pains"] },
-  { key: "getback", ico: "run", title: "Get back into it",
-    kids: ["After years off", "After a baby", "Total beginner"] },
-  { key: "consistent", ico: "clock", title: "Stay consistent",
-    kids: ["I keep quitting", "Don't know where to start", "No time"] },
-];
+/* Nine tiles, always visible, no scrolling to find them. Tapping one opens the
+   SAME .sheet-scrim overlay every other sheet in the app uses. The first row
+   in the sheet is the plain category ("Just lose weight"), for people who do
+   not want to be more specific than that. */
+function initGoalTiles(grid, { selected = {}, onPick } = {}) {
+  let openId = null;
+  const scrimId = "goalSheetScrim";
 
-/* Nine tiles, always visible, no scrolling to find them. Tapping one opens a
-   bottom sheet built from the SAME .sheet-scrim overlay every other sheet in
-   the app uses, so this is not a prototype-only component wearing the app's
-   colors, it is the app's own sheet pattern. Multi-select persists across
-   categories: closing a sheet and opening another never clears what was
-   picked, and a tile's badge shows its count without reopening it. */
-function initGoalTiles(grid, ctaBar, ctaBtn) {
-  let openKey = null;
-  const pickedKeys = new Set();
-
-  function pickCountFor(g) {
-    return g.kids.reduce((n, _, i) => n + (pickedKeys.has(g.key + "|" + i) ? 1 : 0), 0);
-  }
-
-  function render() {
-    grid.classList.toggle("dim", !!openKey);
-    grid.innerHTML = PROTO_GOAL_CATEGORIES.map((g) => {
-      const n = pickCountFor(g);
-      return `<button type="button" class="proto-tile${n ? " has-picks" : ""}" data-tile-key="${g.key}">
-        ${n ? `<span class="proto-tile-badge">${n}</span>` : ""}
-        <span class="proto-tile-ico">${icon(g.ico, 18)}</span>
-        <span class="proto-tile-label">${escapeHtml(g.title)}</span>
-      </button>`;
-    }).join("");
-    grid.querySelectorAll("[data-tile-key]").forEach((btn) => {
-      btn.onclick = () => { openKey = btn.dataset.tileKey; openSheet(); };
+  function paint() {
+    grid.classList.toggle("dim", !!openId);
+    grid.innerHTML = GOAL_TILES.map((t) => `
+      <button type="button" class="goal-tile${selected.bubble === t.id ? " on" : ""}" data-tile="${t.id}">
+        <span class="goal-tile-ico">${icon(t.ico, 18)}</span>
+        <span class="goal-tile-label">${escapeHtml(t.title)}</span>
+        <span class="goal-tile-sub">${escapeHtml(t.sub)}</span>
+      </button>`).join("");
+    grid.querySelectorAll("[data-tile]").forEach((b) => {
+      b.onclick = () => { openId = b.dataset.tile; paint(); };
     });
-    renderSheet();
-    updateCta();
-  }
 
-  function openSheet() {
-    let scrim = document.getElementById("protoGoalSheetScrim");
+    let scrim = document.getElementById(scrimId);
+    const t = GOAL_TILES.find((x) => x.id === openId);
+    if (!t) { if (scrim) scrim.classList.add("hidden"); return; }
     if (!scrim) {
       scrim = document.createElement("div");
-      scrim.id = "protoGoalSheetScrim";
+      scrim.id = scrimId;
       scrim.className = "sheet-scrim hidden";
       grid.parentElement.appendChild(scrim);
-      scrim.onclick = (e) => { if (e.target === scrim) closeSheet(); };
     }
-    scrim.classList.remove("hidden");
-    renderSheet();
-  }
-
-  function closeSheet() {
-    openKey = null;
-    const scrim = document.getElementById("protoGoalSheetScrim");
-    if (scrim) scrim.classList.add("hidden");
-    render();
-  }
-
-  function renderSheet() {
-    const scrim = document.getElementById("protoGoalSheetScrim");
-    if (!scrim) return;
-    const g = PROTO_GOAL_CATEGORIES.find((x) => x.key === openKey);
-    if (!g) { scrim.classList.add("hidden"); return; }
-    scrim.classList.remove("hidden");
-    const rows = g.kids.map((label, i) => {
-      const key = g.key + "|" + i;
-      const on = pickedKeys.has(key);
-      return `<button type="button" class="pgs-row${on ? " on" : ""}" data-pick-key="${key}">
-        <span class="pgs-box">${on ? icon("check", 13) : ""}</span>
-        <span>${escapeHtml(label)}</span>
+    const row = (id, label, sub) => {
+      const on = selected.bubble === t.id && (selected.child || null) === id;
+      return `<button type="button" class="pgs-row${on ? " on" : ""}" data-pick="${id || ""}">
+        <span class="pgs-text"><span>${escapeHtml(label)}</span>${sub ? `<span class="pgs-sub">${escapeHtml(sub)}</span>` : ""}</span>
+        <span class="pgs-go">${icon("chevronRight", 16)}</span>
       </button>`;
-    }).join("");
+    };
+    scrim.classList.remove("hidden");
     scrim.innerHTML = `
-      <div class="proto-goal-sheet">
+      <div class="goal-sheet">
         <div class="pgs-head">
-          <span class="pgs-ico">${icon(g.ico, 16)}</span>
-          <span class="pgs-title">${escapeHtml(g.title)}</span>
-          <button type="button" class="ds-x" id="protoGoalSheetClose" aria-label="Close">&times;</button>
+          <span class="pgs-ico">${icon(t.ico, 16)}</span>
+          <span class="pgs-title">${escapeHtml(t.title)}</span>
+          <button type="button" class="ds-x" id="goalSheetClose" aria-label="Close">&times;</button>
         </div>
-        <div class="pgs-rows">${rows}</div>
+        <div class="pgs-rows">
+          ${row(null, "Just " + t.title.toLowerCase(), t.sub)}
+          ${t.kids.map((k) => row(k.id, k.label)).join("")}
+        </div>
       </div>`;
-    scrim.onclick = (e) => { if (e.target === scrim) closeSheet(); };
-    scrim.querySelector("#protoGoalSheetClose").onclick = closeSheet;
-    scrim.querySelectorAll("[data-pick-key]").forEach((btn) => {
-      btn.onclick = () => {
-        const key = btn.dataset.pickKey;
-        if (pickedKeys.has(key)) pickedKeys.delete(key); else pickedKeys.add(key);
-        renderSheet();
-        updateCta();
+    const close = () => { openId = null; paint(); };
+    scrim.onclick = (e) => { if (e.target === scrim) close(); };
+    scrim.querySelector("#goalSheetClose").onclick = close;
+    scrim.querySelectorAll("[data-pick]").forEach((b) => {
+      b.onclick = () => {
+        const child = b.dataset.pick || null;
+        const kid = t.kids.find((k) => k.id === child);
+        openId = null;
+        scrim.classList.add("hidden");
+        onPick?.({ bubble: t.id, child, label: kid ? kid.label : t.title });
       };
     });
   }
+  paint();
+}
 
-  function updateCta() {
-    const n = pickedKeys.size;
-    if (n === 0) { ctaBar.classList.remove("show"); return; }
-    ctaBar.classList.add("show");
-    let label = "";
-    if (n === 1) {
-      for (const g of PROTO_GOAL_CATEGORIES) {
-        const i = g.kids.findIndex((_, idx) => pickedKeys.has(g.key + "|" + idx));
-        if (i >= 0) { label = g.kids[i]; break; }
-      }
-    } else label = n + " goals";
-    ctaBtn.innerHTML = icon("dumbbell", 22) + " Continue with " + escapeHtml(label.length > 26 ? label.slice(0, 24) + "..." : label)
-      + '<span class="go">' + icon("chevronRight", 22) + "</span>";
-    // Tile badges need to reflect picks made inside the open sheet too.
-    grid.querySelectorAll("[data-tile-key]").forEach((btn) => {
-      const g = PROTO_GOAL_CATEGORIES.find((x) => x.key === btn.dataset.tileKey);
-      const n2 = pickCountFor(g);
-      btn.classList.toggle("has-picks", !!n2);
-      let badge = btn.querySelector(".proto-tile-badge");
-      if (n2 && !badge) {
-        badge = document.createElement("span");
-        badge.className = "proto-tile-badge";
-        btn.prepend(badge);
-      }
-      if (badge) { if (n2) badge.textContent = n2; else badge.remove(); }
-    });
-  }
-
-  render();
+/* The same tiles from Setup, writing straight to the profile. A specific from
+   the sheet becomes the goal detail; "Just X" leaves whatever detail was there. */
+function renderGoalPage() {
+  $("goalPageNote").textContent = "Tap one, then what you mean by it. The next plan you generate is built for it.";
+  initGoalTiles($("goalPageGrid"), {
+    selected: { bubble: MY_PROFILE?.goal_bubble || null, child: MY_PROFILE?.goal_child || null },
+    onPick: async ({ bubble, child, label }) => {
+      const tile = goalTileFor(bubble);
+      const legacy = GOALS.find((g) => g.key === tile.legacy);
+      /* Upsert on the email key, the way every other profile write here is
+         done (saveSetup, saveFocusGroups), rather than update().eq(): one
+         write path, and it is the one the sandbox's fake client persists. */
+      const patch = { email: MY_EMAIL, user_name: ME, goal: legacy.goal, goal_bubble: bubble, goal_child: child, updated_at: new Date().toISOString() };
+      if (child) patch.goal_detail = label;
+      const { error } = await sb.from("profiles").upsert(patch);
+      if (error) { toast("Could not save the goal"); console.error(error); return; }
+      await loadAll();
+      toast("Goal updated");
+      closeSettingsPage();
+    },
+  });
 }
 
 /* The Focus areas page, opened from Setup. Went through a zoom-on-tap pass,
@@ -5221,15 +5195,7 @@ function renderOnboardStep(step, data = {}) {
   }
 
   if (step === "goal") {
-    ob.innerHTML = `
-      <div class="ob-step">
-        <h1>What do you want?</h1>
-        <p class="sub">Pick one. We will work out the rest.</p>
-        ${obChips(GOALS, data.goalKey, "goal")}
-      </div>`;
-    ob.querySelectorAll("[data-goal]").forEach((b) => {
-      b.onclick = () => renderOnboardStep("detail", { ...data, goalKey: b.dataset.goal });
-    });
+    renderGoalTilesStep(data);   // advances to detail or pace on its own
     return;
   }
 
@@ -5238,7 +5204,7 @@ function renderOnboardStep(step, data = {}) {
     const opts = GOAL_DETAIL[data.goalKey] || [];
     ob.innerHTML = `
       <div class="ob-step">
-        <h1>${escapeHtml(g.label)}</h1>
+        <h1>${escapeHtml(data.goalLabel || g.label)}</h1>
         <p class="sub">Closest one. You can change your mind later.</p>
         ${obChips(opts, data.detail, "detail")}
         <button class="btn-ghost" id="skipDetail">Skip this</button>
@@ -5280,7 +5246,7 @@ function renderOnboardStep(step, data = {}) {
         <p class="sub">Built for <strong>${escapeHtml(g.label.toLowerCase())}</strong>${data.detail ? `, ${escapeHtml(data.detail.toLowerCase())}` : ""}.
           We will pick each session for you. Change any of it later in Setup.</p>
         <div class="ob-summary">
-          <div class="ob-row"><span>Goal</span><b>${escapeHtml(g.goal)}</b></div>
+          <div class="ob-row"><span>Goal</span><b>${escapeHtml(data.goalLabel || g.goal)}</b></div>
           <div class="ob-row"><span>Training days</span><b>${days} per week</b></div>
           <div class="ob-row"><span>Focus</span><b>${escapeHtml(g.focus)}</b></div>
           <div class="ob-row"><span>Pace</span><b>${escapeHtml(p.label)}, ${p.weeks} weeks</b></div>
@@ -5291,6 +5257,8 @@ function renderOnboardStep(step, data = {}) {
     $("startBtn").onclick = () => finishOnboarding({
       name: data.name,
       goal: g.goal,
+      goal_bubble: data.goal_bubble || null,
+      goal_child: data.goal_child || null,
       goal_detail: data.detail || null,
       focus: g.focus,
       challenge_target: days,
@@ -5315,6 +5283,8 @@ async function finishOnboarding(data) {
     user_name: ME,
     focus: data.focus,
     goal: data.goal,
+    goal_bubble: data.goal_bubble || null,
+    goal_child: data.goal_child || null,
     goal_detail: data.goal_detail || null,
     challenge_target: data.challenge_target || 4,
     updated_at: new Date().toISOString(),
@@ -14508,6 +14478,7 @@ function openSettingsPage(key) {
   });
   // The only two pages whose contents are built rather than sitting in the
   // markup: both carry a Rive canvas that has to be created and destroyed.
+  if (key === "goal") renderGoalPage();
   if (key === "focus") renderBodyFocusPage();
   if (key === "limits") renderLimitsPage();
   window.scrollTo({ top: 0 });
@@ -14518,6 +14489,7 @@ function closeSettingsPage() {
   closeBodyFocusPage();
   closeLimitsPage();
   $("setupRoot").classList.remove("hidden");
+  $("setGoalSub").textContent = goalTileLabel(MY_PROFILE);
   $("setFocusSub").textContent = focusGroupsSubtitle();
   paintLimitsSubtitle();
   window.scrollTo({ top: 0 });
@@ -14722,6 +14694,7 @@ async function saveSetup() {
     user_name: ME,
     focus: $("setupFocus").value,
     goal: $("setupGoal").value,
+    ...($("setupGoal").value !== MY_PROFILE?.goal ? { goal_bubble: null, goal_child: null } : {}),
     goal_detail: $("setupGoalDetail").value.trim() || null,
     challenge_target: Math.min(7, Math.max(1, parseInt($("setupChallengeTarget").value, 10) || 4)),
     sex: $("setupSex").value || null,
