@@ -64,7 +64,8 @@ globalThis.Chart = function () { return { destroy() {} }; };
 const chain = (rows = []) => {
   const p = Promise.resolve({ data: rows, error: null });
   Object.assign(p, {
-    select: () => chain(rows), eq: () => chain(rows), order: () => chain(rows),
+    // gte is here because loadAll windows exercise_swaps to the last 90 days.
+    select: () => chain(rows), eq: () => chain(rows), order: () => chain(rows), gte: () => chain(rows),
     limit: () => chain(rows), maybeSingle: () => Promise.resolve({ data: rows[0] || null, error: null }),
     insert: () => chain([]), upsert: () => chain([]), update: () => chain([]), delete: () => chain([]),
   });

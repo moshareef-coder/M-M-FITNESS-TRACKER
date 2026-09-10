@@ -94,6 +94,9 @@
       session_reactions: [{ id: "r1", from_email: THEM, to_email: ME, entry_date: day(-1), kind: "comment", message: "Beast mode!", created_at: day(-1) + "T09:00:00Z" }],
       encouragements: [], live_sessions: [], live_clips: [], body_photos: [],
       group_members: [], groups: [], push_subscriptions: [], nudge_log: [],
+      /* Empty on purpose: a swap is something you do in the walkthrough, and
+         the point of the step is watching the row land in here. */
+      exercise_swaps: [],
     };
   }
 

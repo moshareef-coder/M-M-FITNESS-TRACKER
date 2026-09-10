@@ -834,9 +834,19 @@
     flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     font-size: 12.5px; font-weight: 800; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent);
   }
-  .gen-row-b { min-width: 0; display: flex; flex-direction: column; }
+  .gen-row-b { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .gen-row-name { font-size: 15.5px; font-weight: 700; color: #f4f6f8; }
   .gen-row-t { font-size: 12.5px; color: rgba(255,255,255,.55); }
+  /* The swap control on a plan row is the same chip as the one in the session
+     header, but the reveal stage is dark whatever the theme is, so the panel
+     and border tokens would come back light on top of it. */
+  .gen-row .wp-chip { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18); color: rgba(255,255,255,.6); }
+  /* Sheets sit at 65 and the reveal at 95, and this is the only sheet that
+     ever opens over the reveal. */
+  #swapScrim { z-index: 96; }
+  /* An alternative's reason is a sentence, not a stat line, so it wraps
+     rather than being cut off at the first ellipsis. */
+  #swapSheet .sv-row-meta { white-space: normal; overflow: visible; line-height: 1.35; }
   .gen-go {
     margin-top: 18px; animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
   }
@@ -1452,6 +1462,7 @@
   .wp-row b { font-size: 14px; font-weight: 700; }
   .wp-row i { font-size: 12.5px; font-style: normal; color: var(--muted); line-height: 1.4; }
   .sess-step-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .sess-step-acts { display: flex; align-items: center; gap: 8px; }
   .wp-chip {
     display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
     width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
@@ -3755,6 +3766,12 @@
   <div class="sheet-scrim hidden" id="savedScrim">
     <div class="partner-sheet" id="savedSheet"></div>
   </div>
+  <!-- Swapping an exercise. Its own scrim rather than the picker's, because
+       this is the one sheet that has to open over the reveal overlay, and the
+       reveal sits above every other sheet in the app. -->
+  <div class="sheet-scrim hidden" id="swapScrim">
+    <div class="partner-sheet" id="swapSheet"></div>
+  </div>
 
   <nav class="tabs">
     <button class="tab-btn active" data-tab="home" data-icon="home">Home</button>
@@ -3818,6 +3835,10 @@ let ALL_ENTRIES = [];
 let ALL_EXERCISE_LOGS = [];
 let ALL_PROFILES = [];
 let ALL_PLANS = [];
+/* What the plan said against what they actually did instead, 90 days back.
+   engine/preferences.mjs stops prescribing a lift once it has been swapped
+   away from three times, and it can only read what generate is sent. */
+let ALL_SWAPS = [];
 let MY_PROFILE = null;
 let PARTNER_PROFILE = null;
 let TODAY_WORKOUT = null;
@@ -5505,7 +5526,7 @@ function showApp() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim"]
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
   stopGenTicker();
   $("genScrim")?.classList.add("hidden");
@@ -5807,7 +5828,7 @@ async function deleteMyAccount() {
    workouts. Seven waits stacked end to end, and since loadAll runs after
    almost every write, that latency was on every action, not just startup. */
 async function loadAll() {
-  const [entriesRes, exLogRes, profilesRes, plansRes, goalsRes, reactRes, badgesRes] = await Promise.all([
+  const [entriesRes, exLogRes, profilesRes, plansRes, goalsRes, reactRes, badgesRes, swapsRes] = await Promise.all([
     sb.from("fit_entries").select("*").order("entry_date", { ascending: true }),
     sb.from("exercise_logs").select("*").order("entry_date", { ascending: true }),
     sb.from("profiles").select("*"),
@@ -5816,6 +5837,10 @@ async function loadAll() {
     sb.from("user_goals").select("*").eq("status", "active"),
     sb.from("session_reactions").select("*").order("created_at", { ascending: false }),
     sb.from("milestone_badges").select("*"),
+    /* What has been swapped away from, over the same 90 days the generator is
+       sent logs for. Self only under RLS, so this is always just my rows. */
+    sb.from("exercise_swaps").select("*").eq("email", MY_EMAIL)
+      .gte("created_at", new Date(Date.now() - 90 * 86400000).toISOString()),
     /* These five need nothing from the batch above, so they ride along with
        it rather than queueing behind it. */
     loadLiveSessions(),
@@ -5835,6 +5860,7 @@ async function loadAll() {
   ALL_EXERCISE_LOGS = exLogRes.data || [];
   ALL_PROFILES = profilesRes.data || [];
   ALL_MILESTONE_BADGES = badgesRes.data || [];
+  ALL_SWAPS = swapsRes.data || [];
   MY_PROFILE = ALL_PROFILES.find((p) => p.email === MY_EMAIL) || MY_PROFILE;
   PARTNER_PROFILE = ALL_PROFILES.find((p) => p.email === PARTNER_EMAIL) || null;
   applyAccentColors();
@@ -9931,7 +9957,7 @@ function closeGenOverlay() {
    here rather than in a toast: it is the caveat on the plan you are reading,
    so it sits above the rows in the sheet's own muted line and stays on screen
    for as long as they do. */
-function revealGeneratedPlan(workout, honest, onGo) {
+function revealGeneratedPlan(workout, honest, onGo, planDate) {
   if (genCancelled) return;   // they left; the workout is saved either way
   stopGenTicker();
   paintGen(100);
@@ -9944,20 +9970,23 @@ function revealGeneratedPlan(workout, honest, onGo) {
      is written whether they take the offer or dismiss it, and this line is
      therefore shown exactly once in the life of an account. */
   const askLimits = MY_PROFILE?.limits == null;
+  // A swap is recorded against the day the plan is for, not the day it was read.
+  const swapDate = planDate || todayStr();
   setTimeout(() => {
     $("genScrim").classList.add("done");
     $("genStage").innerHTML = `
       <div class="gen-done-head">Your workout</div>
       <div class="gen-focus">${escapeHtml(displayFocus(workout.focus, workout.exercises) || "Ready")}</div>
       ${honest ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(honest)}</p>` : ""}
-      <div class="gen-rows">
+      <div class="gen-rows" id="genRows">
         ${list.map((ex, i) => `
-          <div class="gen-row" style="--d:${i * 70}ms">
+          <div class="gen-row" data-ex="${i}" style="--d:${i * 70}ms">
             <span class="gen-row-n">${i + 1}</span>
             <span class="gen-row-b">
               <span class="gen-row-name">${escapeHtml(ex.name || "")}</span>
               <span class="gen-row-t">${ex.sets || 3} sets · ${ex.reps || 10} reps</span>
             </span>
+            <button type="button" class="wp-chip" data-swap="${i}" aria-label="Swap ${escapeHtml(ex.name || "")}">${icon("swap", 15)}</button>
           </div>`).join("")}
       </div>
       ${askLimits ? `
@@ -9966,6 +9995,24 @@ function revealGeneratedPlan(workout, honest, onGo) {
         <button type="button" id="genLimitsBtn">Tell us</button>
       </div>` : ""}
       <button type="button" class="btn-primary gen-go" id="genGoBtn" style="--d:${list.length * 70 + 120}ms">Let's go</button>`;
+    /* Only the row that changed is repainted afterwards, so swapping one
+       exercise does not make the other four replay their arrival. */
+    $("genStage").querySelectorAll("[data-swap]").forEach((b) => {
+      b.onclick = () => openSwapSheet({
+        list: () => workout.exercises || [],
+        index: Number(b.dataset.swap),
+        date: swapDate,
+        focus: workout.focus,
+        reload: true,
+        after: (i, ex) => {
+          const row = $("genRows")?.querySelector(`[data-ex="${i}"]`);
+          if (!row) return;
+          row.querySelector(".gen-row-name").textContent = ex.name;
+          row.querySelector(".gen-row-t").textContent = `${ex.sets || 3} sets · ${ex.reps || 10} reps`;
+          row.querySelector("[data-swap]")?.setAttribute("aria-label", `Swap ${ex.name}`);
+        },
+      });
+    });
     $("genGoBtn").onclick = () => {
       // Dismissing the offer is itself an answer, and recording it is what keeps
       // "offered once" true rather than "offered after every single plan".
@@ -9984,6 +10031,210 @@ function revealGeneratedPlan(workout, honest, onGo) {
       };
     }
   }, 420);
+}
+
+/* ---------- Swapping an exercise ----------
+   Every exercise the engine returns already carries `swap` and up to three
+   ranked `alternatives` with a reason each (mo-knowledge/engine/CONTRACT.md),
+   and the app read none of them. The other half of the same gap: nothing
+   recorded what somebody actually replaced, so engine/preferences.mjs, which
+   stops prescribing a lift once it has been swapped away from three times,
+   opens on an empty table.
+
+   One sheet serves both places a swap can happen, the reveal and the session,
+   so the alternatives, the search and the recording exist once. The caller
+   says what to change and what to redraw afterwards. */
+let SWAP_CTX = null;      // { list, index, date, focus, after, reload }
+let SWAP_SEARCHING = false;
+
+function swapTarget() {
+  const list = SWAP_CTX?.list?.();
+  return Array.isArray(list) ? list[SWAP_CTX.index] || null : null;
+}
+
+function openSwapSheet(ctx) {
+  SWAP_CTX = ctx;
+  SWAP_SEARCHING = false;
+  if (!swapTarget()) { SWAP_CTX = null; return; }
+  $("swapScrim").classList.remove("hidden");
+  $("swapScrim").onclick = (e) => { if (e.target === $("swapScrim")) closeSwapSheet(); };
+  renderSwapSheet();
+}
+
+function closeSwapSheet() {
+  SWAP_CTX = null;
+  SWAP_SEARCHING = false;
+  $("swapScrim").classList.add("hidden");
+  pinSheets();
+}
+
+function renderSwapSheet() {
+  const ex = swapTarget();
+  if (!ex) { closeSwapSheet(); return; }
+  const alts = (ex.alternatives || []).filter((a) => a && a.name && a.name !== ex.name).slice(0, 3);
+  $("swapSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="swClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">Swap ${escapeHtml(ex.name || "")}</div>
+      <div class="spacer"></div>
+    </div>
+    <p class="muted-note" style="margin:-6px 0 14px;">${alts.length
+      ? "Same job, a different movement. Sets and reps stay where they are."
+      : "Nothing close enough to suggest for this one. Search the library instead."}</p>
+    <div class="sv-rows">
+      ${alts.map((a, i) => `<button type="button" class="sv-row" data-alt="${i}">
+        <span class="sv-row-ico">${icon("swap", 18)}</span>
+        <span class="sv-row-txt">
+          <span class="sv-row-name">${escapeHtml(a.name)}</span>
+          <span class="sv-row-meta">${escapeHtml(a.why || "")}</span>
+        </span>
+        <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
+      </button>`).join("")}
+      ${SWAP_SEARCHING ? "" : `<button type="button" class="sv-row" id="swSearchRow">
+        <span class="sv-row-ico">${icon("plus", 18)}</span>
+        <span class="sv-row-txt">
+          <span class="sv-row-name">Search all exercises</span>
+          <span class="sv-row-meta">Anything in the library, not just these</span>
+        </span>
+        <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
+      </button>`}
+    </div>
+    ${SWAP_SEARCHING ? `
+    <div class="ex-search-wrap" style="margin-top:12px">
+      <input type="text" id="swSearch" placeholder="Search exercises" autocomplete="off" />
+    </div>
+    <div class="sv-rows" id="swResults" style="margin-top:8px"></div>` : ""}`;
+
+  $("swClose").onclick = closeSwapSheet;
+  $("swapSheet").querySelectorAll("[data-alt]").forEach((b) => {
+    const a = alts[Number(b.dataset.alt)];
+    b.onclick = () => applySwap(a.name, "suggested");
+  });
+  if ($("swSearchRow")) $("swSearchRow").onclick = () => { SWAP_SEARCHING = true; renderSwapSheet(); };
+  if ($("swSearch")) {
+    // The same catalog and the same normaliser the manual builder searches, so
+    // "push up" finds "Push-Up" here for the same reason it does there.
+    $("swSearch").oninput = renderSwapResults;
+    $("swSearch").focus();
+    renderSwapResults();
+  }
+  $("swapSheet").scrollTop = 0;
+}
+
+function renderSwapResults() {
+  const wrap = $("swResults");
+  if (!wrap) return;
+  const query = $("swSearch")?.value.trim() || "";
+  if (!query) { wrap.innerHTML = `<div class="cb-none">Type a name to search the library.</div>`; return; }
+  const seen = new Set();
+  const found = searchExerciseCatalog(query, 12).filter((ex) => {
+    const key = (ex.name || "").toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 8);
+  if (!found.length) { wrap.innerHTML = `<div class="cb-none">Nothing matches "${escapeHtml(query)}".</div>`; return; }
+  wrap.innerHTML = found.map((ex) => `<button type="button" class="sv-row" data-found="${escapeHtml(ex.name)}">
+    <span class="sv-row-ico">${icon("dumbbell", 18)}</span>
+    <span class="sv-row-txt">
+      <span class="sv-row-name">${escapeHtml(ex.name)}</span>
+      <span class="sv-row-meta">${escapeHtml([ex.equipment, ex.level].filter(Boolean).join(" · "))}</span>
+    </span>
+    <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
+  </button>`).join("");
+  wrap.querySelectorAll("[data-found]").forEach((b) => {
+    b.onclick = () => applySwap(b.dataset.found, "searched");
+  });
+}
+
+/* The last weight actually put on a movement. previousBest() answers a
+   different question, the heaviest ever, because it feeds the record line. A
+   starting load wants the most recent one instead. */
+function lastLoggedWeight(name) {
+  const key = (name || "").trim().toLowerCase();
+  if (!key) return null;
+  let latest = null;
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== ME || l.weight == null || l.duration_min) continue;
+    if ((l.exercise_name || "").trim().toLowerCase() !== key) continue;
+    const newer = !latest
+      || (l.entry_date || "") > (latest.entry_date || "")
+      || ((l.entry_date || "") === (latest.entry_date || "") && (l.created_at || "") > (latest.created_at || ""));
+    if (newer) latest = l;
+  }
+  return latest ? latest.weight : null;
+}
+
+async function applySwap(chosen, source) {
+  const ctx = SWAP_CTX;
+  const ex = swapTarget();
+  if (!ctx || !ex || !chosen) return;
+  const planned = ex.name;
+  if (chosen === planned) { closeSwapSheet(); return; }
+
+  /* Sets and reps are the dose the engine chose for the slot, so they stay.
+     The load cannot: it was worked out for a different movement. What they
+     last actually lifted on the new one is the only honest number available,
+     and with no history at all a target weight would be a guess, so it says
+     so instead of printing one. */
+  const last = lastLoggedWeight(chosen);
+  ex.name = chosen;
+  ex.targetWeight = last ?? 0;
+  ex.note = last == null ? "Pick a weight with two reps left in you" : `Last time you did ${last} lb`;
+
+  const idx = ctx.index;
+  const exercises = ctx.list?.() || [];
+  const date = ctx.date;
+  const focus = ctx.focus;
+  const reload = ctx.reload;
+  closeSwapSheet();
+  ctx.after?.(idx, ex);
+  toast(`Swapped to ${chosen}`);
+
+  /* Nothing announces the record itself, the row redrawing above is the
+     feedback. Mirrored into ALL_SWAPS as well as written, so the next
+     generate carries it without waiting for the next loadAll. */
+  const row = { email: MY_EMAIL, entry_date: date, planned_exercise: planned, chosen_exercise: chosen, source };
+  await safeWrite("exercise_swaps", "insert", row);
+  ALL_SWAPS.push({ ...row, created_at: new Date().toISOString() });
+
+  /* The saved plan has to move with the screen: loadTodayWorkout re-reads
+     ai_workouts on the next loadAll, and a stale row would put the movement
+     they just replaced straight back in front of them. Same upsert key the
+     generate flow writes with. */
+  await safeWrite("ai_workouts", "upsert", {
+    user_name: ME, email: MY_EMAIL, entry_date: date, focus, exercises,
+  }, { onConflict: "email,entry_date" });
+  if (reload && date === todayStr()) await loadTodayWorkout();
+}
+
+/* The current movement, swapped from inside the session. Same sheet. */
+function swapCurrentExercise() {
+  if (!SESSION || !TODAY_WORKOUT?.exercises?.length) return;
+  openSwapSheet({
+    list: () => TODAY_WORKOUT.exercises,
+    index: SESSION.exerciseIndex,
+    date: TODAY_WORKOUT.entry_date || todayStr(),
+    focus: TODAY_WORKOUT.focus,
+    after: (i, ex) => {
+      /* A movement you have just picked has had nothing done on it, and the
+         weight and reps carried over would be the old lift's. Re-seeded from
+         the new one, and every array keeps its length so sessionMatchesPlan
+         still recognises the saved session on the way back in. */
+      const sets = ex.sets || 3;
+      SESSION.setsDone[i] = new Array(sets).fill(false);
+      SESSION.setWeights[i] = new Array(sets).fill(null);
+      SESSION.weights[i] = ex.targetWeight ?? "";
+      SESSION.reps[i] = ex.reps ?? "";
+      SESSION.completed[i] = false;
+      SESSION.restStartedAt = null;   // a different exercise is not a rest period
+      stopRestTicker();
+      SESSION_LAST_EX = null;         // the new movement slides in like any other
+      saveSessionToStorage();
+      renderSession();
+    },
+  });
 }
 
 /* The screen that says what went wrong. It has to be the most robust thing
@@ -10039,6 +10290,17 @@ async function generateWorkout(forDate) {
       reps: l.reps,
       weight: l.weight,
     }));
+  /* Revealed preference, and the only thing in this payload that is measured
+     rather than stated: what the plan said against what they went and did.
+     Same 90 day window as the logs, which is what preferences.mjs reads. */
+  const recentSwaps = (ALL_SWAPS || [])
+    .filter((s) => (s.entry_date || "") >= logsFrom)
+    .map((s) => ({
+      entry_date: s.entry_date,
+      planned_exercise: s.planned_exercise,
+      chosen_exercise: s.chosen_exercise,
+      source: s.source,
+    }));
   const recentPlans = (ALL_PLANS || [])
     .filter((p) => p.email === MY_EMAIL && p.entry_date >= plansFrom)
     .map((p) => ({
@@ -10073,6 +10335,7 @@ async function generateWorkout(forDate) {
         history,
         logs: recentLogs,
         plans: recentPlans,
+        swaps: recentSwaps,
       }),
     });
     /* Read as text first. When the function errors it can answer with an HTML
@@ -10114,10 +10377,10 @@ async function generateWorkout(forDate) {
     if (isToday) {
       await loadTodayWorkout();
       renderWorkoutTab();
-      revealGeneratedPlan(data.workout, data.honest, () => switchTab("workout"));
+      revealGeneratedPlan(data.workout, data.honest, () => switchTab("workout"), target);
     } else {
       renderHero();
-      revealGeneratedPlan(data.workout, data.honest, () => toast("Tomorrow is planned"));
+      revealGeneratedPlan(data.workout, data.honest, () => toast("Tomorrow is planned"), target);
     }
   } catch (err) {
     console.error("generateWorkout failed:", err);
@@ -10738,8 +11001,11 @@ function renderSession() {
     <div class="sess-card${exChanged ? " ex-in" : ""}">
       <div class="sess-step-row">
         <div class="sess-step">EXERCISE ${ei + 1} OF ${total}</div>
-        ${PARTNER_EMAIL ? `<button type="button" class="wp-chip${workoutPrivacyLocked() ? " on" : ""}" id="sessPrivacyBtn"
-          aria-label="Who can see this workout">${icon(workoutPrivacyLocked() ? "lock" : "people", 14)}</button>` : ""}
+        <div class="sess-step-acts">
+          <button type="button" class="wp-chip" id="sessSwapBtn" aria-label="Swap this exercise">${icon("swap", 14)}</button>
+          ${PARTNER_EMAIL ? `<button type="button" class="wp-chip${workoutPrivacyLocked() ? " on" : ""}" id="sessPrivacyBtn"
+            aria-label="Who can see this workout">${icon(workoutPrivacyLocked() ? "lock" : "people", 14)}</button>` : ""}
+        </div>
       </div>
       <h2 class="sess-name">${escapeHtml(ex.name)}</h2>
       <div class="sess-meta">
@@ -10810,6 +11076,7 @@ function renderSession() {
   else stopRestTicker();
 
   if ($("sessPrivacyBtn")) $("sessPrivacyBtn").onclick = openWorkoutPrivacy;
+  if ($("sessSwapBtn")) $("sessSwapBtn").onclick = swapCurrentExercise;
 
   const logBtn = $("logSetBtn");
   if (logBtn) logBtn.onclick = () => { if (currentSet >= 0) toggleSet(currentSet); };

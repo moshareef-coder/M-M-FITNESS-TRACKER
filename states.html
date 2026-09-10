@@ -821,9 +821,19 @@
     flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     font-size: 12.5px; font-weight: 800; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent);
   }
-  .gen-row-b { min-width: 0; display: flex; flex-direction: column; }
+  .gen-row-b { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .gen-row-name { font-size: 15.5px; font-weight: 700; color: #f4f6f8; }
   .gen-row-t { font-size: 12.5px; color: rgba(255,255,255,.55); }
+  /* The swap control on a plan row is the same chip as the one in the session
+     header, but the reveal stage is dark whatever the theme is, so the panel
+     and border tokens would come back light on top of it. */
+  .gen-row .wp-chip { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18); color: rgba(255,255,255,.6); }
+  /* Sheets sit at 65 and the reveal at 95, and this is the only sheet that
+     ever opens over the reveal. */
+  #swapScrim { z-index: 96; }
+  /* An alternative's reason is a sentence, not a stat line, so it wraps
+     rather than being cut off at the first ellipsis. */
+  #swapSheet .sv-row-meta { white-space: normal; overflow: visible; line-height: 1.35; }
   .gen-go {
     margin-top: 18px; animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
   }
@@ -1439,6 +1449,7 @@
   .wp-row b { font-size: 14px; font-weight: 700; }
   .wp-row i { font-size: 12.5px; font-style: normal; color: var(--muted); line-height: 1.4; }
   .sess-step-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .sess-step-acts { display: flex; align-items: center; gap: 8px; }
   .wp-chip {
     display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
     width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
@@ -4739,8 +4750,11 @@ function renderSession() {
     <div class="sess-card${exChanged ? " ex-in" : ""}">
       <div class="sess-step-row">
         <div class="sess-step">EXERCISE ${ei + 1} OF ${total}</div>
-        ${PARTNER_EMAIL ? `<button type="button" class="wp-chip${workoutPrivacyLocked() ? " on" : ""}" id="sessPrivacyBtn"
-          aria-label="Who can see this workout">${icon(workoutPrivacyLocked() ? "lock" : "people", 14)}</button>` : ""}
+        <div class="sess-step-acts">
+          <button type="button" class="wp-chip" id="sessSwapBtn" aria-label="Swap this exercise">${icon("swap", 14)}</button>
+          ${PARTNER_EMAIL ? `<button type="button" class="wp-chip${workoutPrivacyLocked() ? " on" : ""}" id="sessPrivacyBtn"
+            aria-label="Who can see this workout">${icon(workoutPrivacyLocked() ? "lock" : "people", 14)}</button>` : ""}
+        </div>
       </div>
       <h2 class="sess-name">${escapeHtml(ex.name)}</h2>
       <div class="sess-meta">
@@ -4811,6 +4825,7 @@ function renderSession() {
   else stopRestTicker();
 
   if ($("sessPrivacyBtn")) $("sessPrivacyBtn").onclick = openWorkoutPrivacy;
+  if ($("sessSwapBtn")) $("sessSwapBtn").onclick = swapCurrentExercise;
 
   const logBtn = $("logSetBtn");
   if (logBtn) logBtn.onclick = () => { if (currentSet >= 0) toggleSet(currentSet); };
@@ -5124,7 +5139,7 @@ function stopGenTicker() {
 }
 
 
-function revealGeneratedPlan(workout, honest, onGo) {
+function revealGeneratedPlan(workout, honest, onGo, planDate) {
   if (genCancelled) return;   // they left; the workout is saved either way
   stopGenTicker();
   paintGen(100);
@@ -5137,20 +5152,23 @@ function revealGeneratedPlan(workout, honest, onGo) {
      is written whether they take the offer or dismiss it, and this line is
      therefore shown exactly once in the life of an account. */
   const askLimits = MY_PROFILE?.limits == null;
+  // A swap is recorded against the day the plan is for, not the day it was read.
+  const swapDate = planDate || todayStr();
   setTimeout(() => {
     $("genScrim").classList.add("done");
     $("genStage").innerHTML = `
       <div class="gen-done-head">Your workout</div>
       <div class="gen-focus">${escapeHtml(displayFocus(workout.focus, workout.exercises) || "Ready")}</div>
       ${honest ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(honest)}</p>` : ""}
-      <div class="gen-rows">
+      <div class="gen-rows" id="genRows">
         ${list.map((ex, i) => `
-          <div class="gen-row" style="--d:${i * 70}ms">
+          <div class="gen-row" data-ex="${i}" style="--d:${i * 70}ms">
             <span class="gen-row-n">${i + 1}</span>
             <span class="gen-row-b">
               <span class="gen-row-name">${escapeHtml(ex.name || "")}</span>
               <span class="gen-row-t">${ex.sets || 3} sets · ${ex.reps || 10} reps</span>
             </span>
+            <button type="button" class="wp-chip" data-swap="${i}" aria-label="Swap ${escapeHtml(ex.name || "")}">${icon("swap", 15)}</button>
           </div>`).join("")}
       </div>
       ${askLimits ? `
@@ -5159,6 +5177,24 @@ function revealGeneratedPlan(workout, honest, onGo) {
         <button type="button" id="genLimitsBtn">Tell us</button>
       </div>` : ""}
       <button type="button" class="btn-primary gen-go" id="genGoBtn" style="--d:${list.length * 70 + 120}ms">Let's go</button>`;
+    /* Only the row that changed is repainted afterwards, so swapping one
+       exercise does not make the other four replay their arrival. */
+    $("genStage").querySelectorAll("[data-swap]").forEach((b) => {
+      b.onclick = () => openSwapSheet({
+        list: () => workout.exercises || [],
+        index: Number(b.dataset.swap),
+        date: swapDate,
+        focus: workout.focus,
+        reload: true,
+        after: (i, ex) => {
+          const row = $("genRows")?.querySelector(`[data-ex="${i}"]`);
+          if (!row) return;
+          row.querySelector(".gen-row-name").textContent = ex.name;
+          row.querySelector(".gen-row-t").textContent = `${ex.sets || 3} sets · ${ex.reps || 10} reps`;
+          row.querySelector("[data-swap]")?.setAttribute("aria-label", `Swap ${ex.name}`);
+        },
+      });
+    });
     $("genGoBtn").onclick = () => {
       // Dismissing the offer is itself an answer, and recording it is what keeps
       // "offered once" true rather than "offered after every single plan".

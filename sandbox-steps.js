@@ -77,6 +77,18 @@
           setTimeout(() => { w.document.getElementById("chooseGenerateBtn")?.click(); }, 400);
         } },
 
+      { t: "Swap an exercise", scenario: "paired",
+        s: "Three alternatives, or search",
+        note: "The same reveal, with the swap control on every row tapped for you. The engine already ranks up to three alternatives per exercise and says why each one is close; picking one records the swap against that day, and there is a search over the whole library underneath for when none of the three is the answer. Three swaps away from the same lift and preferences.mjs stops prescribing it, which is the whole reason this is written down rather than just done.",
+        run: (w) => {
+          w.switchTab("workout");
+          w.goWorkoutScreen("choose");
+          setTimeout(() => { w.document.getElementById("chooseGenerateBtn")?.click(); }, 400);
+          // The reveal lands 420ms after the engine answers, and the rows are
+          // only in the DOM from that point on.
+          setTimeout(() => { w.document.querySelector("#genRows [data-swap]")?.click(); }, 2600);
+        } },
+
       { t: "Generate for a beginner", scenario: "fresh",
         s: "Day one, no history",
         note: "Same button, same engine, a person the app knows nothing about yet: no profile, no logged sets, no goal on file. This is where the honest line does the most work, the plan comes back deliberately cautious and says so rather than guessing a load it has no basis for.",
