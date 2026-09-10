@@ -62,6 +62,12 @@
         "title": "The honest pace line renders, but nothing currently feeds it a number",
         "detail": "revealGeneratedPlan already shows honest text above the exercise list when non-null (the gen-step paragraph, index.html) — that half is built and live. But generateWorkout()'s payload never sends goal_bubble, goal_child, or any amount/date, and the engine's resolveGoal() (mo-knowledge/engine/goal-engine.mjs) can only build a timeline from exactly those (amountLb, byDate) or from the legacy goal string with no numbers at all. Verified against the live sandbox on Mo's own fixture account, which has an ACTIVE dated goal (user_goals: lose weight, target 182 lb by day+60) — the real generate call still came back meta.goalSource: \"legacy\" and honest: null. The number the honest line needs already exists in user_goals (target_value/target_date) for anyone who set one the old way, and will exist properly once the goal tiles picker below is wired and starts asking amount/deadline per bubble; either source would work, but the payload currently forwards neither.",
         "where": "index.html, generateWorkout (the fetch body never includes user_goals fields, goal_bubble, or goal_child); mo-knowledge/engine/goal-engine.mjs, resolveGoal"
+      },
+      {
+        "level": "closed",
+        "title": "The FAB and the Home hero card skipped the plan overview and started the workout directly",
+        "detail": "Both called switchTab(\"workout\"), which already renders the overview correctly, and then called startWorkout() one line later regardless, throwing that screen away and opening the live session before anyone had looked at the plan. Reported directly by Mo on 2026-09-10 after generating a workout and after opening a day he had planned ahead; same bug, two entry points. Fixed by deleting the direct call; switchTab already did the right thing on its own. Separately, the overview had a remove button and no swap button, added while in there: same sheet and same alternatives the reveal sheet and the session already use.",
+        "where": "index.html, the fabStart and heroBtn click handlers, and renderPlanPreview"
       }
     ]
   },
