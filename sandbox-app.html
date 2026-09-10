@@ -2737,6 +2737,7 @@
   }
   .wt-row-x.down { color: var(--accent-ink); }
   .wt-row-x.up { color: var(--warn); }
+  .cst-caption { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
 
   .bi-share { display: flex; align-items: center; gap: 12px; }
   .bi-share .av { width: 44px; height: 44px; font-size: 15.5px; border-width: 2px; cursor: default; }
@@ -3221,6 +3222,13 @@
       <div class="wt-history" id="weightHistory"></div>
     </div>
 
+    <div class="card metric-card" id="cardConsistency">
+      <h2>Consistency</h2>
+      <div class="wt-stats" id="consistencyStats"></div>
+      <div class="chart-wrap"><canvas id="consistencyChart"></canvas></div>
+      <div class="cst-caption" id="consistencyCaption"></div>
+    </div>
+
     <div class="card metric-card" id="cardPhotos">
       <h2>Body photos</h2>
       <p class="muted-note" style="margin-top:-6px;" id="photoHint">One photo a day. Swipe back to see how far you've come.</p>
@@ -3691,7 +3699,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.09.4";
+const APP_VERSION = "2026.09.09.5";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -8514,6 +8522,120 @@ function renderWeightHistory() {
   el.querySelectorAll("[data-day]").forEach((b) => { b.onclick = () => openDaySheet(MY_EMAIL, b.dataset.day); });
 }
 
+/* ---------- Consistency card ----------
+   For "Stay consistent": the number that matters is not a trend line, it is
+   whether the last several weeks actually happened. Everything here is ONE
+   person's own record (sharedDayStreak/sharedWeekStreak answer "did you BOTH
+   show up", which is the wrong question when looking at just your own tab). */
+
+/* Consecutive days up to today where THIS person trained. Same shape as
+   sharedDayStreak but for one person, since Progress has a You/Partner toggle
+   and the couple-streak would show identically on both sides. */
+function personalDayStreak(name) {
+  let streak = 0;
+  const cursor = new Date(todayStr() + "T00:00:00");
+  for (let i = 0; i < 365; i++) {
+    const trained = !!entryOn(name, isoDate(cursor))?.gym;
+    if (!trained && i > 0) break;          // today gets a pass while the day is still open
+    if (trained) streak++;
+    else if (i !== 0) break;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+/* The last N calendar weeks (oldest first), each with days trained against
+   today's target. The target is applied retroactively to past weeks, the same
+   simplification sharedWeekStreak already makes: we do not keep a history of
+   what the target used to be, only what it is now. */
+function consistencyWeeks(name, weeks = 8) {
+  const target = weeklyGoalFor(name === ME ? MY_EMAIL : PARTNER_EMAIL);
+  const out = [];
+  const cursor = new Date(weekStartStr() + "T00:00:00");
+  for (let i = 0; i < weeks; i++) {
+    const ws = isoDate(cursor);
+    out.unshift({ weekStart: ws, days: gymDaysInWeek(name, ws), target });
+    cursor.setDate(cursor.getDate() - 7);
+  }
+  return out;
+}
+
+function renderConsistencyStats() {
+  const viewingPartner = PROGRESS_VIEW === "partner";
+  const name = viewingPartner ? partnerName() : ME;
+  const target = weeklyGoalFor(viewingPartner ? PARTNER_EMAIL : MY_EMAIL);
+  const thisWeek = gymDaysThisWeek(name);
+  const streak = personalDayStreak(name);
+  const weeks = consistencyWeeks(name, 8);
+  // The current week is still open, so counting it toward "weeks hit" would
+  // punish a Tuesday for not yet being a Sunday. Only finished weeks count.
+  const finished = weeks.slice(0, -1);
+  const hit = finished.filter((w) => w.days >= w.target).length;
+  const tone = thisWeek >= target ? " good" : "";
+  $("consistencyStats").innerHTML = `
+    <div class="wt-stat${tone}"><b>${thisWeek}/${target}</b><span>This week</span></div>
+    <div class="wt-stat"><b>${streak}</b><span>Day streak</span></div>
+    <div class="wt-stat"><b>${hit}/${finished.length}</b><span>Weeks hit</span></div>`;
+}
+
+let consistencyChart = null;
+
+function renderConsistencyChart() {
+  if (!window.Chart) { loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderConsistencyChart); return; }
+  const viewingPartner = PROGRESS_VIEW === "partner";
+  const name = viewingPartner ? partnerName() : ME;
+  const hex = cssVar(viewingPartner ? "--partner" : "--me");
+  const weeks = consistencyWeeks(name, 8);
+  const target = weeks[0]?.target || 0;
+
+  const card = $("cardConsistency");
+  if (!weeks.some((w) => w.days > 0)) {
+    card.classList.add("chart-empty");
+    let ph = $("consistencyEmpty");
+    if (!ph) { ph = document.createElement("div"); ph.id = "consistencyEmpty"; card.appendChild(ph); }
+    ph.innerHTML = emptyState("checklist", "No weeks logged yet",
+      "Train a day and the last eight weeks start filling in here.");
+    if (consistencyChart) { consistencyChart.destroy(); consistencyChart = null; }
+    $("consistencyCaption").textContent = "";
+    return;
+  }
+  card.classList.remove("chart-empty");
+  $("consistencyEmpty")?.remove();
+
+  const ctx = $("consistencyChart").getContext("2d");
+  if (consistencyChart) consistencyChart.destroy();
+  const labels = weeks.map((w) => w.weekStart.slice(5));
+  consistencyChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Days trained", data: weeks.map((w) => w.days),
+          backgroundColor: weeks.map((w) => w.days >= w.target ? hex : cssVar("--panel-2")),
+          borderRadius: 4, maxBarThickness: 26,
+        },
+        {
+          label: "Target", data: weeks.map((w) => w.target), type: "line",
+          borderColor: cssVar("--muted"), borderWidth: 1.5, borderDash: [5, 4],
+          pointRadius: 0, fill: false, tension: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { border: { display: false }, grid: { display: false }, ticks: { color: cssVar("--muted"), font: { size: 10 } } },
+        y: { border: { display: false }, beginAtZero: true, max: 7,
+             grid: { color: cssVar("--border"), drawTicks: false },
+             ticks: { color: cssVar("--muted"), stepSize: 1, font: { size: 10 }, padding: 6 } },
+      },
+    },
+  });
+  $("consistencyCaption").textContent = `Target: ${target} day${target === 1 ? "" : "s"} a week`;
+}
+
 function renderWeightChart() {
   /* Chart.js is 70 KB and only this card uses it, so it arrives with the card
      rather than with the app. */
@@ -12947,14 +13069,29 @@ function viewedName() { return PROGRESS_VIEW === "partner" ? partnerName() : ME;
 function viewedEmail() { return PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY_EMAIL; }
 
 const TRACK_OPTIONS = [
-  { key: "weight",   label: "Body weight",   icon: "trending",  card: "cardWeight" },
-  { key: "photos",   label: "Body photos",   icon: "medal",     card: "cardPhotos" },
-  { key: "activity", label: "Activity log",  icon: "checklist", card: "cardActivity" },
-  { key: "steps",    label: "Steps",         icon: "run",       card: null, needsApp: true },
+  { key: "weight",      label: "Body weight",  icon: "trending",  card: "cardWeight" },
+  { key: "consistency", label: "Consistency",  icon: "flame",     card: "cardConsistency" },
+  { key: "photos",      label: "Body photos",  icon: "medal",     card: "cardPhotos" },
+  { key: "activity",    label: "Activity log", icon: "checklist", card: "cardActivity" },
+  { key: "steps",       label: "Steps",        icon: "run",       card: null, needsApp: true },
 ];
 
+/* The starting point before anyone has touched "Customise this tab", chosen by
+   what they actually said they wanted at onboarding rather than one default
+   for everyone. Someone who picked "Stay consistent" was landing on a weight
+   chart, because the old default was a flat ["weight", "trained"] regardless
+   of goal, and "trained" was not even a real card key. Only "Stay consistent"
+   branches for now: Build muscle and Get stronger still fall through to
+   weight until their own cards exist, an empty Progress tab would be worse
+   than a not-quite-right one. */
+function defaultTrackedMetrics() {
+  const goal = (MY_PROFILE?.goal || "").toLowerCase();
+  if (/consistent/.test(goal)) return ["consistency", "activity"];
+  return ["weight", "photos"];
+}
+
 function myTrackedMetrics() {
-  return MY_PROFILE?.tracked_metrics || ["weight", "trained"];
+  return MY_PROFILE?.tracked_metrics || defaultTrackedMetrics();
 }
 
 async function toggleMetric(key) {
@@ -13000,6 +13137,7 @@ function renderProgressTab() {
   });
 
   if (on.has("weight")) { renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); }
+  if (on.has("consistency")) { renderConsistencyChart(); renderConsistencyStats(); }
   if (on.has("activity")) renderLog();
   if (on.has("photos")) renderBodyPhotos();
 

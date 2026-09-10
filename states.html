@@ -2724,6 +2724,7 @@
   }
   .wt-row-x.down { color: var(--accent-ink); }
   .wt-row-x.up { color: var(--warn); }
+  .cst-caption { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
 
   .bi-share { display: flex; align-items: center; gap: 12px; }
   .bi-share .av { width: 44px; height: 44px; font-size: 15.5px; border-width: 2px; cursor: default; }
@@ -3517,6 +3518,13 @@
       <div class="wt-history" id="weightHistory"></div>
     </div>
 
+    <div class="card metric-card" id="cardConsistency">
+      <h2>Consistency</h2>
+      <div class="wt-stats" id="consistencyStats"></div>
+      <div class="chart-wrap"><canvas id="consistencyChart"></canvas></div>
+      <div class="cst-caption" id="consistencyCaption"></div>
+    </div>
+
     <div class="card metric-card" id="cardPhotos">
       <h2>Body photos</h2>
       <p class="muted-note" style="margin-top:-6px;" id="photoHint">One photo a day. Swipe back to see how far you've come.</p>
@@ -3732,10 +3740,11 @@ const COVERAGE_TARGETS = [
 
 
 const TRACK_OPTIONS = [
-  { key: "weight",   label: "Body weight",   icon: "trending",  card: "cardWeight" },
-  { key: "photos",   label: "Body photos",   icon: "medal",     card: "cardPhotos" },
-  { key: "activity", label: "Activity log",  icon: "checklist", card: "cardActivity" },
-  { key: "steps",    label: "Steps",         icon: "run",       card: null, needsApp: true },
+  { key: "weight",      label: "Body weight",  icon: "trending",  card: "cardWeight" },
+  { key: "consistency", label: "Consistency",  icon: "flame",     card: "cardConsistency" },
+  { key: "photos",      label: "Body photos",  icon: "medal",     card: "cardPhotos" },
+  { key: "activity",    label: "Activity log", icon: "checklist", card: "cardActivity" },
+  { key: "steps",       label: "Steps",        icon: "run",       card: null, needsApp: true },
 ];
 
 
@@ -5630,7 +5639,7 @@ function emptyState(iconName, title, hint) {
 
 
 function myTrackedMetrics() {
-  return MY_PROFILE?.tracked_metrics || ["weight", "trained"];
+  return MY_PROFILE?.tracked_metrics || defaultTrackedMetrics();
 }
 
 
@@ -5737,6 +5746,7 @@ function renderProgressTab() {
   });
 
   if (on.has("weight")) { renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); }
+  if (on.has("consistency")) { renderConsistencyChart(); renderConsistencyStats(); }
   if (on.has("activity")) renderLog();
   if (on.has("photos")) renderBodyPhotos();
 

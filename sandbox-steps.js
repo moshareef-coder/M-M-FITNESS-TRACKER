@@ -175,6 +175,17 @@
         note: "One person per chart, whoever the You / Mell toggle is on: both lines shared an axis before, and forty five pounds between them flattened each into a straight line. Start, now, change and the goal read across the top, the dashes are the target, the pills change the window, and every weigh-in below opens the day it belongs to so a mistyped number is fixable here.",
         run: (w) => w.switchTab("progress") },
 
+      { t: "A goal-shaped default", scenario: "paired",
+        s: "Same tab, a different goal",
+        note: "Mo's fixture goal is Lose weight, so the step above defaults to the weight chart. This one flips his goal to Stay consistent and reloads Progress: the default becomes days-trained-vs-target instead, because the old default was a flat [weight, trained] for every goal, and \"trained\" was not even a real card. Build muscle and Get stronger still fall back to weight for now, an empty tab would be worse than a not-quite-right one, until their own cards exist.",
+        run: (w) => {
+          const db = w.__SANDBOX.db;
+          const me = db.profiles.find((p) => p.email === w.__SANDBOX.me);
+          me.goal = "Stay consistent";
+          delete me.tracked_metrics;
+          w.loadAll().then(() => w.switchTab("progress"));
+        } },
+
       { t: "Choose what to track", scenario: "paired",
         s: "The metric picker",
         note: "Not everyone cares about scale weight. Turning one off should remove it from the chart and the summary, not just grey it out.",
