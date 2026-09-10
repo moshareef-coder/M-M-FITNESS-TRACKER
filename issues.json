@@ -68,6 +68,12 @@
         "title": "The FAB and the Home hero card skipped the plan overview and started the workout directly",
         "detail": "Both called switchTab(\"workout\"), which already renders the overview correctly, and then called startWorkout() one line later regardless, throwing that screen away and opening the live session before anyone had looked at the plan. Reported directly by Mo on 2026-09-10 after generating a workout and after opening a day he had planned ahead; same bug, two entry points. Fixed by deleting the direct call; switchTab already did the right thing on its own. Separately, the overview had a remove button and no swap button, added while in there: same sheet and same alternatives the reveal sheet and the session already use.",
         "where": "index.html, the fabStart and heroBtn click handlers, and renderPlanPreview"
+      },
+      {
+        "level": "closed",
+        "title": "Regenerating could hand back a split trained the day before, and the plan overview had no way back",
+        "detail": "Reported directly by Mo on 2026-09-10: he generated a plan, it repeated shoulders/arms/back from the day before, and there was no way to return to the choose/build screen once a plan existed. Two separate causes. First, nextDayIndex's rotation only knew the calendar position, not the log, so a regenerate after a Leg day could wrap straight to Push even with real Push logs from yesterday still in the table. Fixed with a new module, recovery.mjs, that reads FRESH_HOURS/RECOVERY_HOURS off the actual logs (mirroring bodyAreaStates' own thresholds) and skips a still-fresh split forward to a rested one, never blocking generation outright. Second, renderPlanPreview had no exit; it now carries the same backBar() every other workout-tab screen already has, routing to goWorkoutScreen(\"choose\"). A third complaint in the same message, that Shoulders/Arms/Back read red (hold) after only a light touch, turned out to be bodyAreaStates crediting an aggregate's lastDate from any member hit at all, primary or secondary, any magnitude; a lightly-touched secondary could paint a whole region red while its dominant muscle sat at 0% for the week. Fixed with a per-day credited-set floor (BODY_MIN_CREDIT_SETS, matching recovery.mjs's own floor) before a date counts as trained.",
+        "where": "mo-knowledge/engine/recovery.mjs, adapter.mjs's nextDayIndex, plan.mjs's mainGroups; index.html, renderPlanPreview and bodyAreaStates"
       }
     ]
   },
