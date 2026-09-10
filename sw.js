@@ -23,9 +23,16 @@ const STATIC_ASSETS = [
   "/icon-maskable-512.png",
   "/manifest.webmanifest",
 ];
-/* Named by version or by content, so a hit is always the right file. */
-const IMMUTABLE = [/^\/vendor\//, /\.riv$/, /\.wasm$/, /^\/badges\//, /\.png$/];
+/* Named by version or by content, so a hit is always the right file. Only the
+   launch icons are bare .png, so this matches them by name: a blanket \.png$
+   swallowed every same-origin image into a bucket that is never dropped. */
+const IMMUTABLE = [/^\/vendor\//, /\.riv$/, /\.wasm$/, /^\/icon-.*\.png$/];
 const CODE = [/^\/knowledge\//, /^\/mo-knowledge\//];   // the engine and its chip lists load in the browser too
+/* These can change under the same filename: a redesigned badge, an updated
+   policy. They revalidate like the shell rather than living in ASSETS, which
+   activate never clears, so a change reaches an installed user on the next
+   launch instead of never. */
+const REVALIDATE = [...CODE, /^\/badges\//, /^\/(privacy|support|states)\.html$/];
 const isShell = (url) => url.pathname === "/" || url.pathname === "/index.html";
 const matches = (list, url) => list.some((re) => re.test(url.pathname));
 
@@ -79,7 +86,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (isShell(url) || matches(CODE, url)) {
+  if (isShell(url) || matches(REVALIDATE, url)) {
     event.respondWith(staleWhileRevalidate(req));
     return;
   }
