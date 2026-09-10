@@ -12,6 +12,7 @@
 set -euo pipefail
 slug="${1:?function slug}"
 source ~/.cl1-deploy.env
+SB_REF="${FT_SB_REF:-$SB_REF}"
 
 # SB_REF in ~/.cl1-deploy.env has pointed at a DIFFERENT project (OneLab/Flow)
 # while this repo talks to another one. Deploying blind would have shipped this
