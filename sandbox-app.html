@@ -1639,14 +1639,7 @@
      function. The figures themselves are .bi-figures / .bi-fig / .bi-canvas,
      the exact classes Body Impact's own body diagram already uses (defined
      further down, near #biFigures), not a lookalike. Everything below is
-     this screen's own: the pinch/pan gesture layer and its rezoom pill, and
-     the full-body / clear-all row. */
-  .proto-body-canvas { touch-action: none; }
-  .proto-body-rezoom {
-    position: absolute; top: 8px; right: 8px; z-index: 2; width: 26px; height: 26px;
-    border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
-    background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--border); color: var(--text);
-  }
+     this screen's own: just the full-body / clear-all row and the summary. */
   .proto-body-actions { display: flex; gap: 8px; margin-top: 10px; }
   .proto-body-action {
     flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -4529,17 +4522,12 @@ function initGoalTiles(grid, ctaBar, ctaBtn) {
   render();
 }
 
-/* PROTOTYPE, NOT LIVE. Tapping used to also zoom the figure in, on the
-   assumption that was the fix for a small muscle being a tight target. Mo
-   corrected that: the zoom he wants is his own fingers, a real pinch, so he
-   can zoom in exactly where and how much he wants and THEN tap precisely,
-   with tapping staying a plain mark/unmark. So a tap now only ever toggles a
-   group; it never moves the camera. Pinch and a one-finger pan (once already
-   zoomed) drive the camera instead, built on ctrl.focus()/unproject() the
-   same way Body Impact's own zoom does, just driven by a live gesture
-   instead of a fixed target box. Full body and Clear all sit next to the
-   summary as the two ways to change everything at once instead of one
-   muscle at a time.
+/* PROTOTYPE, NOT LIVE. Went through a zoom-on-tap pass, then a pinch/pan
+   gesture layer to replace it; Mo decided the picker does not need zoom at
+   all, so both are gone. A tap only ever marks or unmarks the group it
+   belongs to now, full stop. Full body and Clear all sit under the figures
+   as the two ways to change everything at once instead of one muscle at a
+   time.
 
    Real onboarding never calls this. The only caller is the sandbox's own
    walkthrough. Tracked in issues.json under "Designed, not built". */
@@ -4553,16 +4541,10 @@ function renderBodyFocusPrototype() {
       <span class="proto-flag">${icon("bell", 12)} Prototype, not live</span>
       <div class="ob-kicker">FOCUS AREAS</div>
       <h1 class="ob-h1">Which muscles do you want to focus on?</h1>
-      <p class="ob-sub">Tap a muscle to mark it. Pinch to zoom in on one for an easier tap.</p>
+      <p class="ob-sub">Tap any muscle to mark it. Pick as many as you want.</p>
       <div class="bi-figures" id="protoBodyFigures">
-        <div class="bi-fig" data-view="Front">
-          <canvas id="protoBodyFront" class="bi-canvas proto-body-canvas"></canvas>
-          <button type="button" class="proto-body-rezoom hidden" data-view="Front">${icon("refresh", 13)}</button>
-        </div>
-        <div class="bi-fig" data-view="Back">
-          <canvas id="protoBodyBack" class="bi-canvas proto-body-canvas"></canvas>
-          <button type="button" class="proto-body-rezoom hidden" data-view="Back">${icon("refresh", 13)}</button>
-        </div>
+        <div class="bi-fig" data-view="Front"><canvas id="protoBodyFront" class="bi-canvas"></canvas></div>
+        <div class="bi-fig" data-view="Back"><canvas id="protoBodyBack" class="bi-canvas"></canvas></div>
       </div>
       <div class="proto-body-actions">
         <button type="button" class="proto-body-action" id="protoBodyAll">${icon("check", 13)} Full body</button>
@@ -4584,90 +4566,6 @@ const PROTO_BODY_GREEN = { r: 0x3b, g: 0xe7, b: 0x6b };   // same accent Body Im
 
 let PROTO_BODY_FRONT_CTRL = null, PROTO_BODY_BACK_CTRL = null, PROTO_BODY_GEN = 0;
 const PROTO_BODY_PICKED = new Set();
-
-/* A live pinch/pan camera on one canvas, independent of the other. Box is
-   {cx, cy, w, h} in artboard-fraction units (the same [x0,y0,x1,y1] shape
-   ctrl.focus() already takes elsewhere, just tracked as a live, continuously
-   updated center+size instead of a one-shot target). null box means the
-   natural, not-zoomed contain-fit.
-
-   Deliberately NOT chasing exact parity with the module's own internal
-   contain-fit math for what box=null "really" measures out to -- the first
-   frame of a pinch treats "not zoomed yet" as the full unit square, which is
-   close enough that it does not read as a jump, and the eventual on-screen
-   scale is bounded by the module's own MAX_ZOOM regardless of the box this
-   sends it, so there is no case where an approximate box here compounds
-   into someplace genuinely wrong. */
-function attachPinchZoom(canvas, rezoomBtn, getCtrl) {
-  const MIN_BOX = 0.15;
-  const pointers = new Map();
-  let box = null, pinch = null, pan = null;
-
-  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-  const toArr = (b) => b ? [b.cx - b.w / 2, b.cy - b.h / 2, b.cx + b.w / 2, b.cy + b.h / 2] : null;
-  const baseBox = () => box || { cx: 0.5, cy: 0.5, w: 1, h: 1 };
-  const localPoint = (e) => {
-    const r = canvas.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
-  };
-  function apply() {
-    getCtrl()?.focus(toArr(box), false);
-    rezoomBtn.classList.toggle("hidden", !box);
-  }
-
-  canvas.addEventListener("pointerdown", (e) => {
-    canvas.setPointerCapture(e.pointerId);
-    pointers.set(e.pointerId, localPoint(e));
-    if (pointers.size === 2) {
-      const pts = [...pointers.values()];
-      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
-      const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
-      const anchor = getCtrl()?.unproject(mid.x, mid.y);
-      pinch = { dist, startBox: baseBox(), anchor: anchor || { x: baseBox().cx, y: baseBox().cy } };
-      pan = null;
-    } else if (pointers.size === 1) {
-      const rect = canvas.getBoundingClientRect();
-      pan = { start: localPoint(e), startBox: baseBox(), w: rect.width || 1, h: rect.height || 1 };
-    }
-  });
-
-  canvas.addEventListener("pointermove", (e) => {
-    if (!pointers.has(e.pointerId)) return;
-    pointers.set(e.pointerId, localPoint(e));
-    if (pointers.size === 2 && pinch) {
-      const pts = [...pointers.values()];
-      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
-      const ratio = dist / pinch.dist;
-      const w = clamp(pinch.startBox.w / ratio, MIN_BOX, 1);
-      const h = clamp(pinch.startBox.h / ratio, MIN_BOX, 1);
-      box = { cx: pinch.anchor.x, cy: pinch.anchor.y, w, h };
-      apply();
-    } else if (pointers.size === 1 && pan && pan.startBox.w < 0.999) {
-      // Panning only once already zoomed in, so a plain touch at rest never
-      // fights the page's own vertical scroll.
-      const p = localPoint(e);
-      const dxFrac = -(p.x - pan.start.x) * (pan.startBox.w / pan.w);
-      const dyFrac = -(p.y - pan.start.y) * (pan.startBox.h / pan.h);
-      box = {
-        cx: clamp(pan.startBox.cx + dxFrac, pan.startBox.w / 2, 1 - pan.startBox.w / 2),
-        cy: clamp(pan.startBox.cy + dyFrac, pan.startBox.h / 2, 1 - pan.startBox.h / 2),
-        w: pan.startBox.w, h: pan.startBox.h,
-      };
-      apply();
-    }
-  });
-
-  function end(e) {
-    pointers.delete(e.pointerId);
-    if (pointers.size < 2) pinch = null;
-    if (pointers.size < 1) pan = null;
-  }
-  canvas.addEventListener("pointerup", end);
-  canvas.addEventListener("pointercancel", end);
-
-  rezoomBtn.onclick = () => { box = null; getCtrl()?.focus(null, true); rezoomBtn.classList.add("hidden"); };
-  return { reset: () => { box = null; rezoomBtn.classList.add("hidden"); } };
-}
 
 /* Own generation counter, same shape as ADVANCING elsewhere in this file: the
    canvases are new DOM nodes every time this screen is (re)rendered (unlike
@@ -4752,9 +4650,6 @@ async function initBodyFocusRive() {
 
   PROTO_BODY_FRONT_CTRL = make("protoBodyFront", "Front");
   PROTO_BODY_BACK_CTRL = make("protoBodyBack", "Back");
-
-  attachPinchZoom($("protoBodyFront"), document.querySelector('.proto-body-rezoom[data-view="Front"]'), () => PROTO_BODY_FRONT_CTRL);
-  attachPinchZoom($("protoBodyBack"), document.querySelector('.proto-body-rezoom[data-view="Back"]'), () => PROTO_BODY_BACK_CTRL);
 
   allBtn.onclick = () => {
     for (const g of PROTO_BODY_ORDER) { if (!PROTO_BODY_PICKED.has(g)) paintGreen(g); PROTO_BODY_PICKED.add(g); }
