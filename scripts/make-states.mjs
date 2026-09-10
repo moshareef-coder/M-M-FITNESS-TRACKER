@@ -45,7 +45,7 @@ const FUNCS = [
   "liveAgeMs", "liveStateLabel", "renderLiveCard", "renderLiveSheet",
   "classifyMuscles", "profileFor", "renderClipPill",
   "clipRecorderHTML", "clipViewerHTML", "clipGoneHTML", "clipSavedForLaterHTML", "clipSentHTML", "clipSendFailedHTML",
-  "formatRest", "restTargetSec", "restRingState", "restRingHTML",
+  "formatRest",
   "renderSession", "renderSessionComplete", "openEffortInfo", "openInfo", "infoDot",
   "openWorkoutPrivacy", "workoutPrivacy", "defaultWorkoutPrivacy", "privacySummary", "workoutPrivacyLocked",
   "liveDetailsShared", "openGenOverlay", "paintGen", "stopGenTicker", "revealGeneratedPlan",
@@ -756,11 +756,6 @@ let SESSION = null, CLIP_INBOX = [], TODAY_WORKOUT = null, WORKOUT_MODE = null;
    these stay null and nothing animates in a captured frame. */
 let SESSION_JUST_SET = null, SESSION_LAST_EX = 0;
 const beatLive = () => {};
-/* The rest ring's own constants. restRingHTML is lifted, so these have to come
-   with it or the ring draws against nothing. */
-const DEFAULT_REST_SEC = 90;
-const REST_RING_R = 56;
-const REST_RING_CIRC = 2 * Math.PI * REST_RING_R;
 const startRestTicker = () => {};
 const stopRestTicker = () => {};
 const saveSessionToStorage = () => {};

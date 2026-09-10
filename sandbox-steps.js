@@ -112,8 +112,8 @@
         run: (w) => { w.switchTab("workout"); w.startWorkout(); } },
 
       { t: "Resting between sets", scenario: "paired",
-        s: "A ring, not a line of text",
-        note: "One set logged, so rest has started. The ring counts down against a 90 second target, the two chips move that target by ten seconds, and it turns red for the last fifth. Past the target it counts up with a plus rather than sitting on zero. The weight is dropped under the bench best first, so this step shows rest on its own without a record firing over it.",
+        s: "A plain clock, counting up",
+        note: "One set logged, so rest has started: RESTING and a clock counting up from zero, nothing to read or adjust mid-set. The weight is dropped under the bench best first, so this step shows rest on its own without a record firing over it.",
         run: (w) => {
           w.switchTab("workout");
           w.startWorkout();

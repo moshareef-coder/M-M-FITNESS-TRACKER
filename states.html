@@ -501,40 +501,13 @@
   .sess-note { font-size: 12.5px; color: var(--muted); margin-top: 10px; line-height: 1.45; }
 
 
-  /* Rest is a ring rather than a line of text: it reads at arm's length across
-     a gym, and it says how much is LEFT instead of only how much has gone.
-     What gets recorded is unchanged (still the real elapsed rest, banked by
-     recordRest); the target only decides what the ring draws against. */
   .rest-bar {
-    display: flex; flex-direction: column; align-items: center; gap: 13px;
-    background: var(--panel-2); border-radius: 14px; padding: 16px;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    background: var(--panel-2); border-radius: 14px; padding: 18px;
     margin-bottom: 14px;
   }
-  .rest-ring { position: relative; width: 132px; height: 132px; }
-  .rest-ring > svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
-  .rest-ring circle { fill: none; stroke-width: 9; }
-  .rest-ring .rr-track { stroke: var(--panel); }
-  .rest-ring .rr-fill {
-    stroke: var(--accent); stroke-linecap: round;
-    transition: stroke-dashoffset .9s linear, stroke .35s;
-  }
-  /* The last fifth, and then past the target: the only two states worth a
-     colour change, so the ring is glanceable without being read. */
-  .rest-ring.low .rr-fill, .rest-ring.over .rr-fill { stroke: var(--up); }
-  .rest-mid {
-    position: absolute; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 1px;
-  }
-  .rest-label { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--muted); }
-  .rest-clock { font-size: 27px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-  .rest-ring.low .rest-clock, .rest-ring.over .rest-clock { color: var(--up); }
-  .rest-adjust { display: flex; gap: 8px; width: 100%; }
-  .rest-adjust button {
-    flex: 1; padding: 9px 0; border-radius: 10px; cursor: pointer;
-    background: var(--panel); border: 1px solid var(--border); color: var(--text);
-    font-family: inherit; font-size: 13px; font-weight: 700;
-  }
-  .rest-adjust button:active { transform: scale(.96); }
+  .rest-label { font-size: 12.5px; font-weight: 800; letter-spacing: .11em; color: var(--muted); }
+  .rest-clock { font-size: 24px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 
   /* Grid, not space-between: "Weight (lb)" is a wider label than "Reps", so
      with flex the two control groups started at different places and the minus
@@ -1986,7 +1959,7 @@
   @media (prefers-reduced-motion: reduce) {
     .h-rise, .h-pop, .sess-card.ex-in, .set-circle.just-done, .rest-bar,
     .pring-wrap.live::after, .pring-live-dot { animation: none; }
-    .pring .pring-fill, .pr-pop, .rest-ring .rr-fill, .sc-ring .sc-fill { transition: none; }
+    .pring .pring-fill, .pr-pop, .sc-ring .sc-fill { transition: none; }
   }
   .pop-body { padding: 17px; }
   .pop-body.compose { padding: 16px; }
@@ -3871,11 +3844,6 @@ let SESSION = null, CLIP_INBOX = [], TODAY_WORKOUT = null, WORKOUT_MODE = null;
    these stay null and nothing animates in a captured frame. */
 let SESSION_JUST_SET = null, SESSION_LAST_EX = 0;
 const beatLive = () => {};
-/* The rest ring's own constants. restRingHTML is lifted, so these have to come
-   with it or the ring draws against nothing. */
-const DEFAULT_REST_SEC = 90;
-const REST_RING_R = 56;
-const REST_RING_CIRC = 2 * Math.PI * REST_RING_R;
 const startRestTicker = () => {};
 const stopRestTicker = () => {};
 const saveSessionToStorage = () => {};
@@ -4655,47 +4623,6 @@ function formatRest(ms) {
 }
 
 
-function restTargetSec() {
-  const v = Number(SESSION?.restTargetSec);
-  return Number.isFinite(v) && v > 0 ? v : DEFAULT_REST_SEC;
-}
-
-
-function restRingState(ms) {
-  const target = restTargetSec();
-  const left = target - Math.max(0, ms) / 1000;
-  const over = left < 0;
-  return {
-    over,
-    low: !over && left <= target * 0.2,
-    text: over ? `+${formatRest(-left * 1000)}` : formatRest(left * 1000),
-    pct: over ? 0 : Math.max(0, Math.min(1, left / target)),
-  };
-}
-
-
-function restRingHTML(ms) {
-  const s = restRingState(ms);
-  return `<div class="rest-bar">
-    <div class="rest-ring${s.over ? " over" : s.low ? " low" : ""}" id="restRing">
-      <svg viewBox="0 0 128 128" aria-hidden="true">
-        <circle class="rr-track" cx="64" cy="64" r="${REST_RING_R}"/>
-        <circle class="rr-fill" id="restFill" cx="64" cy="64" r="${REST_RING_R}"
-          stroke-dasharray="${REST_RING_CIRC.toFixed(2)}" stroke-dashoffset="${(REST_RING_CIRC * (1 - s.pct)).toFixed(2)}"/>
-      </svg>
-      <div class="rest-mid">
-        <span class="rest-label">RESTING</span>
-        <span class="rest-clock" id="restClock">${s.text}</span>
-      </div>
-    </div>
-    <div class="rest-adjust">
-      <button type="button" id="restMinus">&minus;10s</button>
-      <button type="button" id="restPlus">+10s</button>
-    </div>
-  </div>`;
-}
-
-
 function renderSession() {
   beatLive();
   const ei = SESSION.exerciseIndex;
@@ -4766,7 +4693,11 @@ function renderSession() {
       </div>
     </div>
 
-    ${resting ? restRingHTML(restMs) : ""}
+    ${resting ? `
+      <div class="rest-bar" id="restTimer">
+        <span class="rest-label">RESTING</span>
+        <span class="rest-clock" id="restClock">${formatRest(restMs)}</span>
+      </div>` : ""}
 
     <div class="sess-field">
       <label class="sess-field-label">Weight <span class="sess-field-unit">lb</span></label>
@@ -4802,14 +4733,10 @@ function renderSession() {
         </div>
       </div>`;
     })()}
-    <button type="button" class="btn-big btn-outline" id="skipExBtn">Skip exercise</button>
     <button type="button" class="link-danger" id="endWorkoutBtn">End workout here</button>`;
 
   if (resting) startRestTicker();
   else stopRestTicker();
-
-  if ($("restMinus")) $("restMinus").onclick = () => adjustRestTarget(-10);
-  if ($("restPlus")) $("restPlus").onclick = () => adjustRestTarget(10);
 
   if ($("sessPrivacyBtn")) $("sessPrivacyBtn").onclick = openWorkoutPrivacy;
 
@@ -4850,11 +4777,6 @@ function renderSession() {
     const v = parseInt(e.target.value, 10);
     SESSION.reps[ei] = isNaN(v) ? 0 : Math.max(0, v);
     saveSessionToStorage();
-  };
-  $("skipExBtn").onclick = () => {
-    SESSION.exerciseIndex++;
-    saveSessionToStorage();
-    if (SESSION.exerciseIndex >= total) { clearSessionStorage(); renderSessionComplete(); } else { renderSession(); }
   };
   $("nextExBtn").onclick = finishExerciseAndAdvance;
   $("endWorkoutBtn").onclick = () => {
