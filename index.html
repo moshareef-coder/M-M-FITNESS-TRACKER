@@ -1769,7 +1769,27 @@
   /* Two faces, two rings, side by side, with the numbers beside each. Same
      size, same baseline, so a glance says who is ahead. */
   .stand { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 16px 0; }
-  .stand.solo { justify-content: center; }
+  .stand.solo { justify-content: space-between; }
+  /* The seat nobody is in yet. Drawn as the partner's ring would be drawn, so
+     the shape of what is missing is obvious without a sentence explaining it,
+     and tapping it goes straight to pairing. An empty slot asks every day
+     without ever nagging. */
+  .invite-slot {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+    background: none; border: 0; padding: 0; cursor: pointer;
+    font-family: inherit; color: inherit; text-align: left;
+  }
+  .invite-ring {
+    position: relative; width: 66px; height: 66px; flex-shrink: 0;
+    border-radius: 50%; border: 2px dashed var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--partner); transition: border-color .18s, transform .12s;
+  }
+  .invite-slot:active .invite-ring { transform: scale(.95); }
+  .invite-slot:hover .invite-ring { border-color: var(--partner); }
+  .invite-meta { min-width: 0; }
+  .invite-meta b { display: block; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+  .invite-meta span { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.35; margin-top: 2px; }
   .stand-div { width: 1px; align-self: stretch; background: var(--border); flex-shrink: 0; }
   .pcol { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
   .strow-tap { flex: 1; min-width: 0; display: flex; }
@@ -3220,7 +3240,7 @@
 
     <div class="card" id="timelineCard">
       <div class="card-head">
-        <h2>Together timeline</h2>
+        <h2 id="timelineTitle">Together timeline</h2>
         <button type="button" class="card-link ink" id="timelineAllBtn">See all <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
       </div>
       <div id="timelineList"></div>
@@ -3229,8 +3249,8 @@
     <button type="button" class="card momentum" id="momentumCard">
       <span class="momentum-ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a2 2 0 0 0 0 4h1M16 5h3a2 2 0 0 1 0 4h-1"/><path d="M12 12v3M9 20h6M9.5 15.5h5l.5 4.5h-6l.5-4.5Z"/></svg></span>
       <span class="momentum-text">
-        <b>Momentum is real.</b>
-        <span>Keep showing up for each other. You got this! 💪</span>
+        <b id="momentumTitle">Momentum is real.</b>
+        <span id="momentumBody">Keep showing up for each other.</span>
       </span>
       <svg class="momentum-go" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
     </button>
@@ -5472,7 +5492,14 @@ function showApp() {
   $("deleteConfirmBtn").addEventListener("click", deleteMyAccount);
 
   $("timelineAllBtn").addEventListener("click", openTimelineSheet);
-  $("momentumCard").addEventListener("click", () => switchTab("progress"));
+  /* With nobody on the other side, the encouragement card IS the invite. It
+     is the one piece of furniture on Home that exists purely to say "keep
+     going together", so with no together it should offer to make one. */
+  $("momentumCard").addEventListener("click", () => {
+    if (PARTNER_EMAIL) { switchTab("progress"); return; }
+    switchTab("setup");
+    openSettingsPage("partner");
+  });
 
   $("customiseToggle").addEventListener("click", () => {
     const body = $("customiseBody");
@@ -7627,9 +7654,13 @@ function renderHero(animate = false) {
 
   const stand = `<div class="stand${partner ? "" : " solo"}">
     ${personRing(myDays, myTarget, "me", MY_EMAIL, ME, animate)}
-    ${partner ? `<div class="stand-div"></div>
-    <div class="strow-tap" id="openPartnerBtn" role="button" tabindex="0"
-      aria-label="Open ${escapeHtml(partner)}">${personRing(theirDays, theirTarget, "them", PARTNER_EMAIL, partner, animate, !!LIVE_PARTNER)}</div>` : ""}
+    <div class="stand-div"></div>
+    ${partner ? `<div class="strow-tap" id="openPartnerBtn" role="button" tabindex="0"
+      aria-label="Open ${escapeHtml(partner)}">${personRing(theirDays, theirTarget, "them", PARTNER_EMAIL, partner, animate, !!LIVE_PARTNER)}</div>`
+    : `<button type="button" class="invite-slot" id="invitePartnerBtn" aria-label="Invite your partner">
+        <span class="invite-ring">${icon("plus", 26)}</span>
+        <span class="invite-meta"><b>Invite</b><span>Better with two.</span></span>
+      </button>`}
   </div>`;
 
   const d = new Date(todayStr() + "T00:00:00");
@@ -7657,8 +7688,8 @@ function renderHero(animate = false) {
   el.innerHTML = `
     <div class="hero-top">
       <div>
-        <div class="hero-kicker">This week together</div>
-        <h1 class="hero-title">Stronger Together</h1>
+        <div class="hero-kicker">${partner ? "This week together" : "This week"}</div>
+        <h1 class="hero-title">${partner ? "Stronger Together" : "Your week"}</h1>
         <p class="hero-sub">${sub} ${infoDot("weekTarget", "How the weekly target works")}</p>
         ${coachLine}
         ${partner ? `<div class="hero-effort">
@@ -7703,6 +7734,32 @@ function renderHero(animate = false) {
   }
   if ($("heroReviewBtn")) {
     $("heroReviewBtn").onclick = () => openNextWorkoutReview(planned);
+  }
+  if ($("invitePartnerBtn")) {
+    $("invitePartnerBtn").onclick = () => { switchTab("setup"); openSettingsPage("partner"); };
+  }
+}
+
+/* Everything on Home that is written for two people, in one place. Training
+   alone is a supported way to use this app, not a broken version of it, and
+   the words have to say so: "Stronger Together" over a single ring, above a
+   "Together timeline" of your own workouts, reads as a bug rather than as an
+   invitation. */
+function renderPairCopy() {
+  const paired = !!PARTNER_EMAIL;
+  const title = $("timelineTitle");
+  if (title) title.textContent = paired ? "Together timeline" : "Your timeline";
+
+  const mTitle = $("momentumTitle");
+  const mBody = $("momentumBody");
+  if (mTitle && mBody) {
+    if (paired) {
+      mTitle.textContent = "Momentum is real.";
+      mBody.textContent = "Keep showing up for each other.";
+    } else {
+      mTitle.textContent = "One is a start.";
+      mBody.textContent = "Everything here works better with someone on the other side of it.";
+    }
   }
 }
 
@@ -9129,6 +9186,7 @@ let HOME_PAINTED = false;   // the first paint of a session is an arrival, the r
 
 function renderHome(animate = false) {
   renderHero(animate);
+  renderPairCopy();
   renderTopStreak();
   renderLiveCard();
   const openBtn = $("openPartnerBtn");
