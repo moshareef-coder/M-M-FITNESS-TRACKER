@@ -1415,9 +1415,12 @@
   }
   .cb-dial-ctl button:active { opacity: .6; }
   .cb-own { width: 100%; margin-bottom: 12px; }
+  /* Sits at the end of the list, in the flow. It used to be sticky at bottom:0,
+     which parked it underneath the floating tab bar and cut the label in half.
+     #app already reserves 104px plus the safe area down there, so the buttons
+     clear the bar on their own once they scroll into view. */
   .cb-go {
-    position: sticky; bottom: 0; z-index: 4; padding: 10px 0 calc(10px + env(safe-area-inset-bottom, 0px));
-    background: linear-gradient(to top, var(--bg) 62%, transparent);
+    display: flex; flex-direction: column; gap: 10px; margin-top: 8px;
     animation: cbRise .3s cubic-bezier(.22,1,.36,1) both;
   }
   .cb-go button { margin: 0; }
@@ -11051,12 +11054,13 @@ function renderManualBuildScreen() {
       <div class="reorder-list" id="draftRows"></div>
     </div>
     <button type="button" class="cb-add" id="cbAddBtn">${icon("plus", 18)} Add an exercise</button>
-    <button type="button" class="btn-ghost" id="manualCancelBtn">Cancel</button>
-    <!-- Follows you down the grid, so Start is never a scroll away. -->
+    <!-- Start comes before Cancel now that the bar is in the flow, so the thing
+         you actually want is the first one you reach at the end of the list. -->
     <div class="cb-go hidden" id="cbGo">
       <button type="button" class="btn-primary" id="manualStartBtn">${PLAN_FOR_DATE && PLAN_FOR_DATE !== todayStr() ? "Put it on that day" : "Start Workout"}</button>
       <button type="button" class="btn-ghost" id="cbSaveBtn">Save workout</button>
-    </div>`;
+    </div>
+    <button type="button" class="btn-ghost" id="manualCancelBtn">Cancel</button>`;
 
   $("cbAddBtn").onclick = () => cbOpenPicker();
 
