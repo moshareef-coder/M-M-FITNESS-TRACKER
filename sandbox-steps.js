@@ -49,7 +49,7 @@
 
       { t: "Body focus (prototype)", scenario: "fresh", flag: "not live",
         s: "Tap the body, front and back",
-        note: "The follow-up to the goal tiles: show the body and let a person mark which muscles they want to focus on, instead of describing goals in words. Front and back side by side, tap any of the 14 areas to mark it green, the same keys Body Impact already tracks. Double-tap or pinch to zoom in on one, small areas like forearms and obliques are otherwise a tight target on a phone. A reset-zoom pill shows once zoomed. Nothing here writes to the fake database and Continue does not go anywhere, on purpose. Tracked in Open issues under Designed, not built.",
+        note: "The follow-up to the goal tiles: show the body and let a person mark which muscles they want to focus on, instead of describing goals in words. This is the actual purchased body figure, the same one Body Impact and the workout builder already render, not a stand-in: tap any muscle and it zooms to that area and marks the whole group green (front delts and rear delts both light from either one), the same keys Body Impact already tracks. Tap Both sides to zoom back out. Nothing here writes to the fake database and Continue does not go anywhere, on purpose. Tracked in Open issues under Designed, not built.",
         run: (w) => w.renderBodyFocusPrototype?.() },
 
       { t: "First look at an empty app", scenario: "fresh",
