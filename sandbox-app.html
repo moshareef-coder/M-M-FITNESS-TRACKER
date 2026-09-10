@@ -1671,6 +1671,15 @@
     border-color: var(--accent); color: var(--text); font-weight: 700;
   }
   .proto-lim-foot { font-size: 12.5px; color: var(--muted); text-align: center; margin: 14px 0 0; }
+  /* The content caveat, on the screen itself: without it the obvious read of
+     this page is that the chips ARE the proposal, and they are not. */
+  .proto-lim-warn {
+    display: flex; align-items: flex-start; gap: 7px; font-size: 12.5px; line-height: 1.45;
+    color: var(--partner); background: color-mix(in srgb, var(--partner) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--partner) 30%, transparent);
+    border-radius: 12px; padding: 10px 12px; margin: 14px 0 0;
+  }
+  .proto-lim-warn svg { flex-shrink: 0; margin-top: 2px; }
 
   .ob-kicker { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--accent-ink); margin-bottom: 8px; }
   .ob-chips { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
@@ -4709,6 +4718,31 @@ async function initBodyFocusRive() {
 
    Real onboarding never calls this. The only caller is the sandbox's own
    walkthrough. Tracked in issues.json under "Designed, not built". */
+/* PLACEHOLDER CONTENT, NOT AGREED, NEEDS THE ENGINE. Both lists below were
+   written to have something real to tap in the prototype. Neither is derived
+   from anything, and checking them against the engine says they are wrong in
+   two different ways. The engine has to define this content, not this file,
+   because an answer is only worth collecting if something downstream can act
+   on it; offering a limit nothing can honour is a promise the plan quietly
+   breaks.
+
+   Equipment: the exercise library records exactly five values it can filter
+   on (bodyweight, dumbbell, barbell, cable, machine) and 60 of its exercises
+   record no equipment at all. So of the six offered below, three (Pull-up
+   bar, Squat rack, Bench) do not exist in the engine in any form: somebody
+   can say they have no squat rack and nothing can honour it. Meanwhile
+   "machine", which the engine CAN honour, is not offered.
+
+   Injuries: worse, there is no joint or pain concept in the library at all.
+   An exercise records name, primary, secondary, equipment, level, and that
+   is the lot. The only way to act on "my shoulder hurts" today is by proxy,
+   dropping anything listing shoulders in primary or secondary, which is
+   wrong in both directions at once: it would drop most chest pressing (where
+   shoulders is a secondary) while keeping plenty that genuinely loads a bad
+   shoulder. A body area is only worth offering once the engine can tell the
+   difference.
+
+   Flagged in issues.json. Do not treat these two arrays as the spec. */
 const PROTO_LIMIT_HURTS = ["Shoulder", "Lower back", "Knee", "Wrist", "Elbow", "Neck", "Hip", "Ankle"];
 const PROTO_LIMIT_MISSING = ["Barbell", "Pull-up bar", "Squat rack", "Bench", "Cable machine", "Dumbbells"];
 
@@ -4726,6 +4760,7 @@ function renderLimitsPrototype() {
       <div class="ob-kicker">OPTIONAL</div>
       <h1 class="ob-h1">Anything we should know?</h1>
       <p class="ob-sub">Your plan is already made. This only makes it safer, and skipping it costs you nothing.</p>
+      <p class="proto-lim-warn">${icon("bell", 12)} Judge the shape, not the options. The chips below are placeholder: the engine has to say what can actually be honoured.</p>
 
       <div class="proto-lim-head">Does anything hurt?</div>
       <div class="proto-lim-chips">${chips(PROTO_LIMIT_HURTS, "hurt")}</div>
