@@ -43,7 +43,11 @@
      into seven different apps. */
   function baseWorld() {
     return {
-      profiles: [profile(ME, "Mo"), profile(THEM, "Mell")],
+      /* Mo's goal matches his user_goals row below (lose weight, a real weight
+         target) rather than the shared default, so the two do not contradict
+         each other the moment Progress starts reading profiles.goal to decide
+         which card leads. */
+      profiles: [profile(ME, "Mo", { goal: "Lose weight" }), profile(THEM, "Mell")],
       partnerships: [{ id: "p1", inviter_email: ME, invitee_email: THEM, status: "accepted",
         created_at: day(-30) + "T00:00:00Z", responded_at: day(-30) + "T00:00:00Z" }],
       fit_entries: [
@@ -81,7 +85,12 @@
           exercises: [{ name: "Dumbbell Bench Press", sets: 4, reps: 8 }, { name: "Lat Pulldown", sets: 4, reps: 10 },
             { name: "Seated Dumbbell Press", sets: 3, reps: 10 }, { name: "Dumbbell Row", sets: 3, reps: 10 }] },
       ],
-      user_goals: [{ id: "g1", email: ME, status: "active", goal: "Get stronger", target_weight: 182, target_date: day(60), start_weight: 195 }],
+      /* Matches the real 20260903_user_goals migration columns exactly
+         (goal_key, metric, metric_ref, start_value, target_value) rather than
+         inventing target_weight/start_weight, which are not real columns and
+         once let a whole feature ship reading fields that do not exist. */
+      user_goals: [{ id: "g1", email: ME, status: "active", goal_key: "lose", detail: "10 to 20 pounds",
+        metric: "weight_lb", start_value: 195, target_value: 182, target_date: day(60), pace: "steady", days_per_week: 5 }],
       session_reactions: [{ id: "r1", from_email: THEM, to_email: ME, entry_date: day(-1), kind: "comment", message: "Beast mode!", created_at: day(-1) + "T09:00:00Z" }],
       encouragements: [], live_sessions: [], live_clips: [], body_photos: [],
       group_members: [], groups: [], push_subscriptions: [], nudge_log: [],

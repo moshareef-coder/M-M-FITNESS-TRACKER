@@ -3690,7 +3690,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.09.3";
+const APP_VERSION = "2026.09.09.4";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -5596,7 +5596,12 @@ function renderMilestoneBadges() {
 function computeXPBetween(name, from, to) {
   const inRange = (d) => (!from || d >= from) && (!to || d <= to);
   const gymDays = entriesFor(name).filter((e) => e.gym && inRange(e.entry_date)).length;
-  const exerciseCount = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && inRange(l.entry_date)).length;
+  // Same gate Body Impact reads off: a set logged before Finish is tapped on
+  // your own in-progress workout has not been decided yet, so it does not
+  // count toward rank XP until it does (or the session is abandoned).
+  const hidden = bodyHiddenToday(name);
+  const countedLogs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && inRange(l.entry_date) && !isBodyHidden(l, hidden));
+  const exerciseCount = countedLogs.length;
 
   const profile = ALL_PROFILES.find((p) => p.user_name === name);
   const email = profile?.email;
@@ -5606,8 +5611,7 @@ function computeXPBetween(name, from, to) {
      slightly different rule, which is how the app ended up with three answers
      to "was that a record". */
   const { prLogIds } = personalRecords(name);
-  const prCount = ALL_EXERCISE_LOGS
-    .filter((l) => l.user_name === name && inRange(l.entry_date) && prLogIds.has(l.id)).length;
+  const prCount = countedLogs.filter((l) => prLogIds.has(l.id)).length;
 
   // Admin-granted bonus is not season scoped; it always applies.
   const bonus = profile?.bonus_xp || 0;
@@ -5628,9 +5632,13 @@ function computeXP(name) {
 function effortXPBetween(name, from, to) {
   const inRange = (d) => (!from || d >= from) && (!to || d <= to);
   const gymDays = entriesFor(name).filter((e) => e.gym && inRange(e.entry_date)).length;
-  const exerciseCount = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && inRange(l.entry_date)).length;
+  // Same in-progress-session gate Body Impact uses, so "who worked harder"
+  // cannot count a set that has not been decided yet either.
+  const hidden = bodyHiddenToday(name);
+  const countedLogs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && inRange(l.entry_date) && !isBodyHidden(l, hidden));
+  const exerciseCount = countedLogs.length;
   const { prLogIds } = personalRecords(name);
-  const prCount = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && inRange(l.entry_date) && prLogIds.has(l.id)).length;
+  const prCount = countedLogs.filter((l) => prLogIds.has(l.id)).length;
   return gymDays * 10 + exerciseCount * 5 + prCount * 25;
 }
 function todaysEffortXP(name) { return effortXPBetween(name, todayStr(), todayStr()); }
@@ -8429,12 +8437,17 @@ function weightRangeStart() {
   return isoDate(d);
 }
 
-/* The active goal for whoever is being looked at, when it carries a weight
-   target. Goals without one (a workout-count goal, say) are not a weight
-   target and must not draw a line on this chart. */
+/* The active goal for whoever is being looked at, when it carries a WEIGHT
+   target specifically. user_goals is a generic container (see the
+   20260903_user_goals migration: metric can be weight_lb, lift_1rm_lb,
+   mile_time_sec, reps or sessions_per_week) so this checks metric, not just
+   that a target exists. Real rows have no metric set yet at all today, since
+   nothing writes one, which is the actual gap: this correctly returns null
+   for every user until that changes, rather than reading fields
+   (target_weight/start_weight) that were never real columns. */
 function weightGoalFor(email) {
   const g = (ALL_GOALS || []).find((x) => (x.email || "").toLowerCase() === (email || "").toLowerCase());
-  return g && g.target_weight != null ? g : null;
+  return g && g.metric === "weight_lb" && g.target_value != null ? g : null;
 }
 
 /* Weigh-ins for one person inside the chosen window, oldest first. */
@@ -8458,7 +8471,7 @@ function renderWeightStats() {
      a deliberate cut as a warning. A target either sits above where you
      started or below it, and that settles it. */
   const goal = weightGoalFor(PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY_EMAIL);
-  const wantsUp = goal ? goal.target_weight > (goal.start_weight ?? start) : null;
+  const wantsUp = goal ? goal.target_value > (goal.start_value ?? start) : null;
   const tone = Math.abs(delta) < 0.05 || wantsUp == null ? ""
     : (delta > 0) === wantsUp ? " good" : " warn";
   const fmt = (n) => `${n.toFixed(1)}`;
@@ -8466,7 +8479,7 @@ function renderWeightStats() {
     <div class="wt-stat"><b>${fmt(start)}</b><span>Start</span></div>
     <div class="wt-stat"><b>${fmt(current)}</b><span>Now</span></div>
     <div class="wt-stat${tone}"><b>${delta > 0 ? "+" : ""}${fmt(delta)}</b><span>Change</span></div>
-    ${goal ? `<div class="wt-stat"><b>${fmt(goal.target_weight)}</b><span>Goal</span></div>` : ""}`;
+    ${goal ? `<div class="wt-stat"><b>${fmt(goal.target_value)}</b><span>Goal</span></div>` : ""}`;
 }
 
 function renderWeightRange() {
@@ -8518,7 +8531,7 @@ function renderWeightChart() {
   const allDates = rows.map((e) => e.entry_date);
   $("weightLegend").innerHTML =
     `<span><span class="dot" style="background:${hex}"></span>${escapeHtml(viewingPartner ? partner : "You")}</span>` +
-    (goal ? `<span><span class="dash"></span>Goal ${goal.target_weight.toFixed(1)}</span>` : "");
+    (goal ? `<span><span class="dash"></span>Goal ${goal.target_value.toFixed(1)}</span>` : "");
   const card = $("cardWeight");
   if (!rows.length) {
     card.classList.add("chart-empty");
@@ -8571,7 +8584,7 @@ function renderWeightChart() {
      a shape; with it you can see the gap you are actually closing. */
   if (goal) {
     datasets.push({
-      label: "Goal", data: values.map(() => goal.target_weight),
+      label: "Goal", data: values.map(() => goal.target_value),
       borderColor: cssVar("--muted"), borderWidth: 1.5, borderDash: [5, 4],
       pointRadius: 0, fill: false, tension: 0,
     });
@@ -9902,7 +9915,10 @@ async function finishWorkout() {
       rest_log: SESSION.restLog || {},
     }).eq("id", TODAY_WORKOUT.id);
   }
-  await markGymDayDone();
+  // A gym day is a real training day, not an open-then-close. Pausing right
+  // after Start and tapping End without logging a single set must not bank a
+  // full day, a streak tick, or a Together Timeline entry.
+  if (SESSION.loggedExNames?.length) await markGymDayDone();
   await endLive();
   await loadAll();
 }
