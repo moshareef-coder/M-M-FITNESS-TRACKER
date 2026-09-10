@@ -25,6 +25,7 @@ import { calibrate } from "./calibrate.mjs";
 import { learnPreferences, applyPreferences, avoidNote } from "./preferences.mjs";
 import { scoreAlternatives } from "./alternatives.mjs";
 import { planPlateauResponse, applyRotateFallback } from "./plateau-response.mjs";
+import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary, softenedNote } from "./limits.mjs";
 
 const WEIGHTS = TRAININGS.find((t) => t.id === "weight-training");
 const CALIS = TRAININGS.find((t) => t.id === "calisthenics");
@@ -43,6 +44,29 @@ const PRIORITY_MULTIPLIER = 1.4;
 const SHORT_DAY_MIN = 4;
 const SHORT_DAY_SETS = 2;
 
+/* How far a group's weekly total is allowed to drift from its target before the
+   plan does something about it. Two sets, because the target is itself a round
+   number off a landmark range and pretending it is exact would have the week
+   twitching over a rounding. */
+const VOLUME_SLACK = 2;
+
+/* The time budget. `P.sessionMin` has existed since the first version and only
+   the display ever read it, so a strength day of six lifts at six sets and three
+   minutes of rest printed "~60 min" over something closer to two hours. A set is
+   about 30 seconds of actual work, the rest interval is already prescribed per
+   exercise, and 5 minutes covers getting warm. 15% over is the tolerance,
+   because the estimate is an estimate and trimming a session for one minute is
+   worse than the minute. Nothing goes below four exercises (PLAN.md's contract
+   with the app) and a main movement is never the thing that goes. */
+const REP_SECONDS = 30;
+const WARMUP_MIN = 5;
+const TIME_TOLERANCE = 1.15;
+
+function estimateMinutes(exercises) {
+  const seconds = exercises.reduce((t, e) => t + e.sets * (REP_SECONDS + e.restSec), 0);
+  return Math.round(WARMUP_MIN + seconds / 60);
+}
+
 /* The sets clamp used to be Math.max(2, Math.min(5, ...)) applied straight to
    the rounded target, and it quietly ate the three things that were supposed to
    move it. A beginner's 8 weekly sets over one hit already rounds past the top,
@@ -55,14 +79,53 @@ const SHORT_DAY_SETS = 2;
    against what the count would have been without it, then clamp to [2, 6].
    Where a back-off and a priority meet on the same lift the priority wins by
    one set, because a group the goal named should never come out below its
-   neighbours in the same session. */
+   neighbours in the same session.
+
+   Round three moved two things, both for the same reason: the guarantee has to
+   survive the clamp, and the round two version ran it before the clamp.
+   1. The priority guarantee is taken after the divide, on the per-session
+      number, so a group the goal named earns a set in the session rather than
+      only in the weekly total. Multiplying the week and then dividing is the
+      same arithmetic either way, but +1 is not: on the week it can vanish into
+      a rounding, on the session it cannot. `enforcePriorityFloor` below then
+      finishes the job across a whole day, which is the half of it no single
+      exercise can see.
+   2. A back-off is subtracted from the CLAMPED number rather than folded into
+      the target before it. The old order was the [2, 6] clamp swallowing the
+      cut it was meant to protect: 14 weekly sets over one hit is 14, times 0.85
+      is 12, and both come out of the clamp at 6, so the plan said "this week is
+      lighter" and handed back the same six sets. Measured on a three lift
+      stall: the cut moved 2 slots out of 11. Now a main lift always gives up a
+      set to a back-off, floor 2, and the only thing that can swallow it is the
+      floor itself, which is a real limit rather than an accident of ordering. */
 function setsFor({ base, hitCount, priority, backOff, isMain }) {
   const per = (weekly) => Math.round(weekly / Math.max(1, hitCount));
-  const target = base * (priority ? PRIORITY_MULTIPLIER : 1) * (backOff ? 0.85 : 1);
-  let sets = per(target);
-  if (backOff && isMain) sets = Math.min(sets, per(base * (priority ? PRIORITY_MULTIPLIER : 1)) - 1);
-  if (priority) sets = Math.max(sets, per(base * (backOff ? 0.85 : 1)) + 1);
-  return Math.max(2, Math.min(6, sets));
+  const plain = per(base);
+  const wanted = priority ? Math.max(per(base * PRIORITY_MULTIPLIER), plain + 1) : plain;
+  const sets = Math.max(2, Math.min(6, wanted));
+  if (!backOff) return sets;
+  /* The accessories take the 0.85 they always took. A main lift takes whichever
+     is smaller, so the cut is never less than one set: that is the whole promise
+     the note in dayNotes makes on the user's behalf. */
+  const eased = Math.round(sets * 0.85);
+  return Math.max(2, isMain ? Math.min(eased, sets - 1) : eased);
+}
+
+/* Priority has to hold inside one session and not only across the week, because
+   a session is what somebody reads. `setsFor` divides a weekly target by how
+   often the group is hit, and two groups on the same card can arrive there by
+   very different divisors: on the toned-arms person a Russian Twist for a group
+   trained once a week came out at 6 sets next to a priority Step-Up at 4, so the
+   card said "arms and glutes are the focus" and then gave the most sets to abs.
+   The extra volume a priority earns has to come out of a fixed weekly budget
+   (see engine/README.md, Focus), so this takes it from the neighbours rather
+   than adding it on top: on any day that has a priority exercise, nothing
+   without the flag carries more sets than the lowest priority lift there. */
+function enforcePriorityFloor(exercises) {
+  const priority = exercises.filter((e) => e.priority);
+  if (!priority.length) return;
+  const ceiling = Math.min(...priority.map((e) => e.sets));
+  for (const e of exercises) if (!e.priority) e.sets = Math.max(2, Math.min(e.sets, ceiling));
 }
 
 /* A day is a list of slots. Each slot names a movement pattern and the muscle
@@ -150,12 +213,28 @@ function slotsForDay(key, isShort) {
 
 const LEVEL_RANK = { beginner: 0, novice: 1, intermediate: 2, advanced: 3 };
 
+/* How far a movement can be loaded, as a ranking penalty rather than a filter.
+   Only a strength emphasis reads it, and only on a main slot. A beginner who
+   picks "Get stronger" and has logged nothing was handed Push-Up at 3 reps as
+   the main horizontal push, because the level term below prefers the level
+   closest to the user and a push-up is tagged beginner while a bench press is
+   intermediate. Three reps of a push-up is not a strength prescription and no
+   amount of progression turns it into a 225 bench: there is nothing to add.
+   Barbell and machine load in small steps and keep going, so they cost nothing.
+   Dumbbells and cables load in coarser steps and run out at whatever the rack
+   holds, so they cost a little. Bodyweight cannot be loaded at all, so it costs
+   3, which is enough to lose to a lift two levels away (2 plus the 0.5 for
+   being above the user) and never enough to outrank the -100 for something they
+   already lift. Every other emphasis keeps the conservative tie break it had. */
+const LOAD_PENALTY = { barbell: 0, machine: 0, bodyweight: 3 };
+const loadPenalty = (ex) => LOAD_PENALTY[ex.equipment] ?? 1;
+
 /* A main slot is a movement pattern somebody needs, so it reaches one level
    higher than an accessory would. Without that a beginner gets no hinge at all:
    every deadlift, Romanian deadlift and hip thrust in the library is tagged
    intermediate or above, which is defensible on technique and leaves a beginner
    with no posterior chain work, which is worse. See engine/README.md. */
-function candidates({ groups, pattern, level, equipment, role = "accessory", historyNames = [], preferences = null, exclude = null }) {
+function candidates({ groups, pattern, level, equipment, role = "accessory", historyNames = [], preferences = null, exclude = null, emphasis = null }) {
   const ceiling = (LEVEL_RANK[level] ?? 0) + (role === "main" ? 2 : 1);
   const match = (needPattern) => {
     const pool = [];
@@ -177,13 +256,23 @@ function candidates({ groups, pattern, level, equipment, role = "accessory", his
             it is the only way the load can come from history rather than a guess.
          2. Level as close to his as possible without going over, so a beginner
             gets the safe version and an intermediate does not get the baby one.
-         3. research/05, the conservative tie break: lower level wins a draw. */
+         3. On a main slot for a strength goal, how far the thing can be loaded,
+            because a main lift you cannot add weight to is not a strength plan.
+            See LOAD_PENALTY. It is a term and not a filter on purpose: where the
+            library has nothing loadable at this level the bodyweight movement
+            still wins its slot rather than the slot going empty.
+         4. research/05, the conservative tie break: lower level wins a draw. */
     const known = new Set(historyNames);
     const rank = LEVEL_RANK[level] ?? 0;
+    const wantsLoad = emphasis === "strength" && role === "main";
     return pool
       .map((e) => {
         const lv = LEVEL_RANK[e.level] ?? 0;
-        return { e, score: (known.has(e.name.toLowerCase()) ? -100 : 0) + Math.abs(rank - lv) + (lv > rank ? 0.5 : 0) };
+        return {
+          e,
+          score: (known.has(e.name.toLowerCase()) ? -100 : 0) + Math.abs(rank - lv) + (lv > rank ? 0.5 : 0)
+            + (wantsLoad ? loadPenalty(e) : 0),
+        };
       })
       .sort((x, y) => x.score - y.score || (LEVEL_RANK[x.e.level] ?? 0) - (LEVEL_RANK[y.e.level] ?? 0))
       .map((x) => x.e);
@@ -210,6 +299,7 @@ function candidates({ groups, pattern, level, equipment, role = "accessory", his
 
 export function buildPlan({
   goal, person = {}, logs = [], plans = [], swaps = [], equipment = null, today = new Date(), priorityOverride = null,
+  limits = null,
 } = {}) {
   const { bodyWeightLb = null, sex = null, daysAsked = null } = person;
 
@@ -282,6 +372,49 @@ export function buildPlan({
   /* Rotations the library could not afford. Filled during selection. */
   const rotateBlocked = new Set();
 
+  /* ---- what hurts and what they do not own (engine/limits.mjs) ----
+     Two answers from one optional onboarding screen, and they are not the same
+     kind of answer, so they do not travel the same way.
+
+     A painful joint is a judgement, so it goes down the `exclude` path the
+     plateau rotation already uses: it filters the ranked pool and it never
+     empties a slot, because a hole in the week is worse than one movement that
+     is not ideal. Where it could not be honoured the exercise is still in the
+     week, which is how the note below knows to say so out loud instead of
+     claiming a limit was kept that was not.
+
+     Missing equipment is a fact, so it narrows the `equipment` allow list this
+     function has always taken, which is a hard filter with no fallback. That
+     difference is deliberate. A bad shoulder can be worked around with a
+     lighter version of something; a barbell somebody does not own cannot, and a
+     plan that prescribes one is a plan they cannot do. Where that leaves a slot
+     with nothing, the slot is dropped rather than filled with a lie: the
+     library has no bodyweight biceps-primary movement at all, so a bodyweight
+     only week honestly has no curl in it.
+
+     The joint exclusion is computed once, over the same two libraries
+     `candidates` draws from, because whether a movement loads a bad shoulder is
+     a property of the movement and not of the slot it is being considered for.
+     applyLimits' own softening cannot fire at that scale and is not meant to:
+     it is there for a caller filtering one slot's pool, and it is what the per
+     slot fallback inside `candidates` is doing in a rougher way here. */
+  const limitsUsed = normalizeLimits(limits);
+  const libraryPool = [];
+  for (const lib of [WEIGHTS, CALIS]) for (const cat of lib.categories) for (const ex of cat.exercises) libraryPool.push(ex);
+  const limitsRun = applyLimits({ pool: libraryPool, limits: limitsUsed });
+  const limitExcluded = limitsRun.excluded.filter((e) => e.excluded !== false);
+  const limitOut = new Set(limitExcluded.map((e) => e.name.toLowerCase()));
+  const limitNotes = limitsSummary(limitsUsed);
+  for (const say of limitNotes) dayNotes.push(say);
+
+  const kitAllowed = allowedEquipment(limitsUsed);
+  const kit = kitAllowed
+    ? (equipment ? equipment.filter((e) => kitAllowed.includes(e)) : kitAllowed)
+    : equipment;
+  /* One set into the one `exclude` parameter, so there is still exactly one
+     path into selection and the rotation and the limits cannot fight. */
+  const excludeOut = limitOut.size ? new Set([...rotateOut, ...limitOut]) : rotateOut;
+
   const split = splitFor(days, level).slice(0, days);
   /* One lever, pulled once. A systemic volume cut is the same 0.85 that
      calibration's back-off already runs through `setsFor`, so it reuses that
@@ -311,7 +444,7 @@ export function buildPlan({
     const slots = slotsForDay(key, isShort);
 
     const picks = slots.map((slot) => {
-      const pool = candidates({ ...slot, level, equipment, role: slot.role, historyNames, preferences, exclude: rotateOut });
+      const pool = candidates({ ...slot, level, equipment: kit, role: slot.role, historyNames, preferences, exclude: excludeOut, emphasis: P.emphasis });
       if (!pool.length) return null;
       /* Prefer something not already used this week, so a week of five days does
          not become the same four lifts five times. */
@@ -333,7 +466,7 @@ export function buildPlan({
          how a swap could be materially easier or harder than the lift it stood
          in for. Now ranked by nearest stimulus, in alternatives.mjs. */
       const ranked = scoreAlternatives({
-        exercise: pick, pool, level, equipment, exclude: [...usedToday], count: 4,
+        exercise: pick, pool, level, equipment: kit, exclude: [...usedToday], count: 4,
       });
       const swap = ranked.find((a) => !swapsThisWeek.has(a.name)) || ranked[0] || null;
       if (swap) swapsThisWeek.add(swap.name);
@@ -358,6 +491,13 @@ export function buildPlan({
   }
 
   /* ---- pass 3: sets, reps and load, now that the week is known ---- */
+  /* Which slot an exercise came out of is needed twice after the week is built,
+     by the weekly ledger and by the time budget, and both need to know a main
+     from an accessory. It is not part of the shape the app consumes, so it is
+     kept beside the week in a map keyed by the exercise object rather than
+     added to it as a field nothing outside this file would read. */
+  const roleOf = new Map();
+  const isPriority = (group) => (priorityOverride ?? P.priority).includes(group);
   const week = selected.map(({ name, key, isShort, picks }) => {
     const exercises = picks.map(({ slot, pick, swap, alternatives, offPattern }) => {
       const group = (pick.primary || [])[0];
@@ -366,7 +506,7 @@ export function buildPlan({
          that merged list arrives as priorityOverride and stands in for the
          goal's. Null means nobody merged anything and the goal decides, which
          is every call that existed before this line. */
-      const priority = (priorityOverride ?? P.priority).includes(group);
+      const priority = isPriority(group);
       const isMain = slot.role === "main";
       const full = setsFor({ base: baseSets, hitCount: hits[group] || 1, priority, backOff, isMain });
       /* A short day is the session they were least likely to make, so it stays
@@ -379,7 +519,7 @@ export function buildPlan({
         calibration: calibration.byExercise,
       });
 
-      return {
+      const exercise = {
         name: pick.name, group, equipment: pick.equipment, sets, reps,
         restSec: isMain ? P.restSec : Math.round(P.restSec * 0.7),
         weight: load.weight, loadBasis: load.basis, loadNote: load.note,
@@ -393,10 +533,118 @@ export function buildPlan({
            the library could not supply at this level. */
         note: offPattern ? `Standing in for a ${slot.pattern} movement; the library has none at this level.` : null,
       };
+      roleOf.set(exercise, slot.role);
+      return exercise;
     });
 
-    return { name, focus: key, short: isShort, minutes: isShort ? Math.round(P.sessionMin * 0.6) : P.sessionMin, exercises };
+    return {
+      name, focus: key, short: isShort,
+      minutes: isShort ? Math.round(P.sessionMin * 0.6) : P.sessionMin,
+      /* Filled in below, once the sets have stopped moving. Declared here so the
+         key is on every day whatever the trimming does. */
+      estimatedMinutes: null,
+      exercises,
+    };
   });
+
+  /* ---- the week's own ledger, read after the week exists ----
+     Wave 1 finding 1, from the bake-off: Jawa's `buildWeekPlan` carries a
+     running `weeklyVolumeByCategory` from day to day, so day four knows what
+     days one to three actually spent. Ours divided a weekly target by how often
+     a group is hit and then never looked again, which is an assumption rather
+     than a ledger: the [2, 6] clamp, the priority multiplier and the rounding
+     all move the real total away from the target and nothing noticed.
+     Hers threads the ledger forward while choosing; ours cannot, because pass 2
+     has to finish before pass 3 knows a divisor at all (see `hits` above). So
+     the ledger is read at the end instead, and the correction lands on the LATER
+     days, which is the same direction her loop corrects in: the days furthest
+     from being decided are the ones that give the sets back.
+     Accessories only. A main movement is the reason the day exists. */
+  const weeklyTargetFor = (group) => baseSets * (isPriority(group) ? PRIORITY_MULTIPLIER : 1);
+  const plannedByGroup = () => {
+    const totals = {};
+    for (const d of week) for (const e of d.exercises) totals[e.group] = (totals[e.group] || 0) + e.sets;
+    return totals;
+  };
+  const volumeTrimmed = [];
+  for (const [group, planned] of Object.entries(plannedByGroup())) {
+    /* Whole sets only, so the loops stop at `>= 1` rather than at `> 0`. The
+       target is fractional (a base of 6.4 times a 1.4 priority is 8.96) and
+       chasing the last 0.04 of a set takes a whole one, which is how a
+       correction of one set became a correction of two on the first run of
+       this. A fraction of a set over is not over. */
+    let excess = planned - weeklyTargetFor(group) - VOLUME_SLACK;
+    if (excess < 1) continue;
+    const before = planned;
+    for (let i = week.length - 1; i >= 0 && excess >= 1; i--) {
+      for (const e of week[i].exercises) {
+        if (excess < 1) break;
+        if (e.group !== group || roleOf.get(e) !== "accessory") continue;
+        while (e.sets > 2 && excess >= 1) { e.sets -= 1; excess -= 1; }
+      }
+    }
+    const after = plannedByGroup()[group];
+    if (after < before) {
+      volumeTrimmed.push({
+        group, target: +weeklyTargetFor(group).toFixed(1), from: before, to: after,
+        why: `${group} was ${+(before - weeklyTargetFor(group)).toFixed(1)} sets over its weekly target, so the later days give some back.`,
+      });
+    }
+  }
+
+  /* Priority is settled after the ledger, not before it, because a trim can take
+     a set off a priority accessory and put a day back the wrong way round. */
+  for (const d of week) enforcePriorityFloor(d.exercises);
+
+  /* ---- the time budget, which is the last thing that can change a day ----
+     Wave 1 finding 3: Jawa's `sessionCapacity` turns minutes into an exercise
+     count before anything is chosen. Ours fixes the count in the slot table and
+     then reported the minutes afterwards, which is the same arithmetic run
+     backwards, and it was not even run: `P.sessionMin` reached the display and
+     nothing else, so a strength day of six lifts at six sets and three minutes
+     of rest was printed as "~60 min" over something closer to two hours.
+     Backwards is the right way round for this engine, because the slots are the
+     argument and a movement pattern is not negotiable for a rounding of time.
+     So the count is still decided by the split, the minutes are estimated from
+     what was really prescribed, and only the tail accessories go when it will
+     not fit. Four exercises is the floor and a main lift never goes. */
+  const timeTrimmed = [];
+  for (const d of week) {
+    let estimate = estimateMinutes(d.exercises);
+    while (estimate > d.minutes * TIME_TOLERANCE && d.exercises.length > SHORT_DAY_MIN) {
+      let last = -1;
+      for (let i = d.exercises.length - 1; i >= 0; i--) {
+        if (roleOf.get(d.exercises[i]) === "accessory") { last = i; break; }
+      }
+      if (last < 0) break;
+      timeTrimmed.push({ day: d.name, dropped: d.exercises[last].name });
+      d.exercises.splice(last, 1);
+      estimate = estimateMinutes(d.exercises);
+    }
+    d.estimatedMinutes = estimate;
+  }
+
+  /* The ledger, said out loud. The over side already acted; the under side only
+     reports, because the honest answer to "this group is short" is another
+     movement and inventing one would break the slot table that keeps two lifts
+     off the same muscle. "Room to add" means the group already appears as an
+     accessory somewhere with fewer than the 6 sets the clamp allows, so the gap
+     could be closed without a new exercise. Nothing downstream reads this yet
+     and that is deliberate: measured first, acted on when there is a caller. */
+  const finalTotals = plannedByGroup();
+  const volumeTargets = {};
+  for (const group of Object.keys(finalTotals)) volumeTargets[group] = +weeklyTargetFor(group).toFixed(1);
+  const volumeUnder = [];
+  for (const [group, planned] of Object.entries(finalTotals)) {
+    const target = weeklyTargetFor(group);
+    if (planned >= target - VOLUME_SLACK) continue;
+    const room = week.some((d) => d.exercises.some((e) => e.group === group && roleOf.get(e) === "accessory" && e.sets < 6));
+    if (!room) continue;
+    volumeUnder.push({
+      group, target: +target.toFixed(1), planned,
+      why: `${group} is ${+(target - planned).toFixed(1)} sets under its weekly target and an accessory slot has room for them.`,
+    });
+  }
 
   /* A hard avoid is the only thing in here that removes a movement somebody
      never asked to have removed, so it is said out loud. Checked against the
@@ -408,6 +656,15 @@ export function buildPlan({
   for (const a of preferences.avoid) {
     if (a.strength === "hard" && !inWeek.has(a.name.toLowerCase())) dayNotes.push(avoidNote(a));
   }
+
+  /* Same argument, for the limits. A slot the library could fill no other way
+     kept a movement that still loads a joint they named, and the person has to
+     be told rather than left to find out under a bar. */
+  const limitBlocked = [...new Set(
+    week.flatMap((d) => d.exercises.map((e) => e.name)).filter((n) => limitOut.has(n.toLowerCase())),
+  )];
+  const blockedSay = softenedNote(limitBlocked);
+  if (blockedSay) dayNotes.push(blockedSay);
 
   /* ---- pass 4: progression ---- */
   /* The plateau answer, spoken. A rotation the library could not afford becomes
@@ -438,7 +695,17 @@ export function buildPlan({
     },
     days, dayNotes, restDays: 7 - days,
     week, progression, deload,
+    /* What the week really spends per muscle group against what it was aiming
+       for, plus every correction that was made and every gap that was not. The
+       first version of this engine could not have printed this table, which is
+       precisely why it did not notice it was wrong. */
+    weeklyVolume: { byGroup: finalTotals, targetByGroup: volumeTargets, trimmed: volumeTrimmed, under: volumeUnder, timeTrimmed },
     cardio: P.cardio,
+    /* What was asked for, what it cost, and what it could not buy. `excluded`
+       is every movement the joint table ruled out across both libraries, not
+       only the ones a slot wanted, because "how much of the library is left"
+       is the question support gets. `blocked` is the honest remainder. */
+    limits: { applied: limitsUsed, excluded: limitExcluded.map((e) => e.name), notes: limitNotes, blocked: limitBlocked },
     calibration: { summary: calibration.summary, overall: calibration.overall },
     /* A stall now leaves with an answer attached rather than a diagnosis. The
        full reasoning stays in plateauPlan.why for an audit; the plan carries

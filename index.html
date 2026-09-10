@@ -1607,20 +1607,20 @@
   }
   .proto-cta.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
 
-  /* PROTOTYPE, NOT LIVE: renderBodyFocusPrototype. See the comment above that
-     function. The figures themselves are .bi-figures / .bi-fig / .bi-canvas,
-     the exact classes Body Impact's own body diagram already uses (defined
-     further down, near #biFigures), not a lookalike. Everything below is
-     this screen's own: just the full-body / clear-all row and the summary. */
-  .proto-body-actions { display: flex; gap: 8px; margin-top: 10px; }
-  .proto-body-action {
+  /* renderBodyFocusPage, the Focus areas settings page. The figures themselves
+     are .bi-figures / .bi-fig / .bi-canvas, the exact classes Body Impact's own
+     body diagram already uses (defined further down, near #biFigures), not a
+     lookalike. Everything below is this screen's own: the clear-all row and
+     the summary. */
+  .focus-pick-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .focus-pick-action {
     flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     font: inherit; font-size: 12.5px; font-weight: 700; color: var(--text); cursor: pointer;
     padding: 10px 12px; border-radius: 100px; background: var(--panel-2); border: 1px solid var(--border);
   }
-  .proto-body-action:active { transform: scale(.97); }
-  .proto-body-summary { margin-top: 12px; min-height: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
-  .proto-body-summary b { color: var(--accent-ink); font-weight: 700; }
+  .focus-pick-action:active { transform: scale(.97); }
+  .focus-pick-summary { margin-top: 12px; min-height: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .focus-pick-summary b { color: var(--accent-ink); font-weight: 700; }
 
   /* PROTOTYPE, NOT LIVE: renderLimitsPrototype. See the comment above that
      function. Chips wrap rather than stack: eight body areas as full-width
@@ -3342,6 +3342,11 @@
           <span class="set-txt"><span class="set-title">Your body</span><span class="set-sub">Height, age and activity level</span></span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
+        <button type="button" class="set-row" id="setRow-focus" data-page="focus">
+          <span class="set-ico" data-ico="dumbbell"></span>
+          <span class="set-txt"><span class="set-title">Focus areas</span><span class="set-sub" id="setFocusSub">Not set</span></span>
+          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+        </button>
         <button type="button" class="set-row" id="setRow-notify" data-page="notify">
           <span class="set-ico" data-ico="bell"></span>
           <span class="set-txt"><span class="set-title">Notifications</span><span class="set-sub">Reminders and nudges</span></span>
@@ -3502,6 +3507,17 @@
       </select>
     </div>
     <button class="btn-primary" id="saveBodyBtn">Save</button>
+    </div>
+    <div class="settings-page hidden" id="page-focus">
+      <div class="scr-head">
+        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+        <div class="scr-title">Focus areas</div>
+        <div class="spacer"></div>
+      </div>
+      <!-- Empty on purpose: the figure is a Rive canvas with a render loop, so
+           renderBodyFocusPage builds it when the page opens and the back arrow
+           tears it down, rather than leaving it drawing behind a hidden div. -->
+      <div id="focusPickRoot"></div>
     </div>
     <div class="settings-page hidden" id="page-notify">
       <div class="scr-head">
@@ -4566,50 +4582,96 @@ function initGoalTiles(grid, ctaBar, ctaBtn) {
   render();
 }
 
-/* PROTOTYPE, NOT LIVE. Went through a zoom-on-tap pass, then a pinch/pan
-   gesture layer to replace it; Mo decided the picker does not need zoom at
-   all, so both are gone. A tap only ever marks or unmarks the group it
-   belongs to now, full stop. Full body and Clear all sit under the figures
-   as the two ways to change everything at once instead of one muscle at a
-   time.
+/* The Focus areas page, opened from Setup. Went through a zoom-on-tap pass,
+   then a pinch/pan gesture layer to replace it; Mo decided the picker does not
+   need zoom at all, so both are gone. A tap only ever marks or unmarks the
+   group it belongs to, full stop.
 
-   Real onboarding never calls this. The only caller is the sandbox's own
-   walkthrough. Tracked in issues.json under "Designed, not built". */
-function renderBodyFocusPrototype() {
-  const ob = $("onboard");
-  ob.classList.remove("hidden");
-  $("app").classList.add("hidden");
-
-  ob.innerHTML = `
-    <div class="ob-step">
-      <span class="proto-flag">${icon("bell", 12)} Prototype, not live</span>
-      <div class="ob-kicker">FOCUS AREAS</div>
-      <h1 class="ob-h1">Which muscles do you want to focus on?</h1>
-      <p class="ob-sub">Tap any muscle to mark it. Pick as many as you want.</p>
-      <div class="bi-figures" id="protoBodyFigures">
-        <div class="bi-fig" data-view="Front"><canvas id="protoBodyFront" class="bi-canvas"></canvas></div>
-        <div class="bi-fig" data-view="Back"><canvas id="protoBodyBack" class="bi-canvas"></canvas></div>
+   Four is the cap, because the engine gives a picked group 1.4x its weekly
+   sets out of a fixed weekly volume: past four the plan is the same plan with
+   a longer explanation. That is why there is no Full body button any more,
+   only Clear all. */
+function renderBodyFocusPage() {
+  $("focusPickRoot").innerHTML = `
+    <div class="card">
+      <h2>Which muscles do you want to focus on?</h2>
+      <p class="muted-note">Tap up to ${MAX_FOCUS_GROUPS}. Each one earns extra sets in the workouts you generate.</p>
+      <div class="bi-figures" id="focusPickFigures">
+        <div class="bi-fig" data-view="Front"><canvas id="focusPickFront" class="bi-canvas"></canvas></div>
+        <div class="bi-fig" data-view="Back"><canvas id="focusPickBack" class="bi-canvas"></canvas></div>
       </div>
-      <div class="proto-body-actions">
-        <button type="button" class="proto-body-action" id="protoBodyAll">${icon("check", 13)} Full body</button>
-        <button type="button" class="proto-body-action" id="protoBodyClear">${icon("close", 13)} Clear all</button>
+      <div class="focus-pick-actions">
+        <button type="button" class="focus-pick-action" id="focusPickClear">${icon("close", 13)} Clear all</button>
       </div>
-      <p class="proto-body-summary" id="protoBodySummary">Loading the figure...</p>
-      <div class="proto-cta" id="protoBodyCta">
-        <button type="button" class="btn-cta" id="protoBodyCtaBtn">${icon("dumbbell", 22)} Continue
-          <span class="go">${icon("chevronRight", 22)}</span></button>
-      </div>
-    </div>`;
+      <p class="focus-pick-summary" id="focusPickSummary">Loading the figure...</p>
+    </div>
+    <button type="button" class="btn-primary" id="focusPickSaveBtn">Save focus</button>`;
 
   initBodyFocusRive();
-  $("protoBodyCtaBtn").onclick = () => toast("Prototype only, not wired into onboarding yet");
+  $("focusPickSaveBtn").onclick = saveBodyFocus;
 }
 
-const PROTO_BODY_ORDER = ["chest", "shoulders", "traps", "lats", "lowerback", "biceps", "triceps", "forearms", "abs", "obliques", "glutes", "quads", "hamstrings", "calves"];
-const PROTO_BODY_GREEN = { r: 0x3b, g: 0xe7, b: 0x6b };   // same accent Body Impact isolates a muscle in
+/* Torn down rather than hidden: two Rive instances share the page's one WebGL2
+   context with Body Impact's own figures, so leaving these drawing behind a
+   closed page costs frames on every other tab. */
+function closeBodyFocusPage() {
+  if (!FOCUS_PICK_FRONT_CTRL && !FOCUS_PICK_BACK_CTRL) return;
+  FOCUS_PICK_GEN++;
+  FOCUS_PICK_FRONT_CTRL?.destroy(); FOCUS_PICK_FRONT_CTRL = null;
+  FOCUS_PICK_BACK_CTRL?.destroy(); FOCUS_PICK_BACK_CTRL = null;
+  $("focusPickRoot").innerHTML = "";
+}
 
-let PROTO_BODY_FRONT_CTRL = null, PROTO_BODY_BACK_CTRL = null, PROTO_BODY_GEN = 0;
-const PROTO_BODY_PICKED = new Set();
+async function saveBodyFocus() {
+  const groups = FOCUS_GROUP_ORDER.filter((g) => FOCUS_PICKED.has(g));
+  const btn = $("focusPickSaveBtn");
+  btn.disabled = true;
+  const ok = await saveFocusGroups(groups);
+  btn.disabled = false;
+  if (!ok) return;
+  toast(groups.length
+    ? "Focus saved: " + groups.map((g) => BODY_GROUP_LABELS[g]).join(", ")
+    : "Focus cleared");
+  closeSettingsPage();
+}
+
+/* The one writer for profiles.focus_groups, because two screens offer it now:
+   this page, and the shortcut on a muscle in Body impact. Same upsert shape as
+   saveSetup, and focus_chosen_at goes with every write because the engine
+   reports a choice older than 60 days as stale rather than trusting it forever.
+   Callers do their own toast: what they just did is not the same sentence. */
+async function saveFocusGroups(groups) {
+  const { error } = await sb.from("profiles").upsert({
+    email: MY_EMAIL,
+    user_name: ME,
+    focus_groups: groups.slice(0, MAX_FOCUS_GROUPS),
+    focus_chosen_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+  if (error) { toast("Focus didn't save"); console.error(error); return false; }
+  await loadAll();
+  return true;
+}
+
+/* "Glutes, hamstrings", not a list of proper nouns: this reads as a sentence
+   fragment under a row title, the way every other set-sub does. */
+function focusGroupsSubtitle() {
+  const names = FOCUS_GROUP_ORDER
+    .filter((g) => (MY_PROFILE?.focus_groups || []).includes(g))
+    .map((g) => BODY_GROUP_LABELS[g]);
+  if (!names.length) return "Not set";
+  return names.map((n, i) => (i ? n.toLowerCase() : n)).join(", ");
+}
+
+const FOCUS_GROUP_ORDER = ["chest", "shoulders", "traps", "lats", "lowerback", "biceps", "triceps", "forearms", "abs", "obliques", "glutes", "quads", "hamstrings", "calves"];
+const FOCUS_PICK_GREEN = { r: 0x3b, g: 0xe7, b: 0x6b };   // same accent Body Impact isolates a muscle in
+/* Must stay in step with MAX_FOCUS in mo-knowledge/engine/focus.mjs: anything
+   past the fourth is dropped there anyway, and a saved fifth group that never
+   changes the plan is worse than not offering it. */
+const MAX_FOCUS_GROUPS = 4;
+
+let FOCUS_PICK_FRONT_CTRL = null, FOCUS_PICK_BACK_CTRL = null, FOCUS_PICK_GEN = 0;
+const FOCUS_PICKED = new Set();
 
 /* Own generation counter, same shape as ADVANCING elsewhere in this file: the
    canvases are new DOM nodes every time this screen is (re)rendered (unlike
@@ -4619,65 +4681,62 @@ const PROTO_BODY_PICKED = new Set();
    check is what keeps a second, faster visit from racing a first one still
    loading the (cached, but still async) Rive module. */
 async function initBodyFocusRive() {
-  const gen = ++PROTO_BODY_GEN;
-  PROTO_BODY_FRONT_CTRL?.destroy(); PROTO_BODY_FRONT_CTRL = null;
-  PROTO_BODY_BACK_CTRL?.destroy(); PROTO_BODY_BACK_CTRL = null;
-  PROTO_BODY_PICKED.clear();
+  const gen = ++FOCUS_PICK_GEN;
+  FOCUS_PICK_FRONT_CTRL?.destroy(); FOCUS_PICK_FRONT_CTRL = null;
+  FOCUS_PICK_BACK_CTRL?.destroy(); FOCUS_PICK_BACK_CTRL = null;
+  // Whatever is on file is what the page opens on, so this reads as editing a
+  // saved answer rather than starting over every visit.
+  FOCUS_PICKED.clear();
+  for (const g of MY_PROFILE?.focus_groups || []) if (BODY_GROUP_LABELS[g]) FOCUS_PICKED.add(g);
 
   let mod;
   try {
     mod = await ensureRiveBodyModule();
   } catch (e) {
-    console.error("proto body focus: figure failed to load", e);
-    if (gen === PROTO_BODY_GEN) $("protoBodySummary") && ($("protoBodySummary").textContent = "Could not load the body figure.");
+    console.error("body focus: figure failed to load", e);
+    if (gen === FOCUS_PICK_GEN) $("focusPickSummary") && ($("focusPickSummary").textContent = "Could not load the body figure.");
     return;
   }
-  if (gen !== PROTO_BODY_GEN) return;         // a newer visit already took over
-  const figuresEl = $("protoBodyFigures");
+  if (gen !== FOCUS_PICK_GEN) return;         // a newer visit already took over
+  const figuresEl = $("focusPickFigures");
   if (!figuresEl) return;                     // navigated away entirely while this loaded
 
-  const summaryEl = $("protoBodySummary");
-  const ctaBar = $("protoBodyCta"), ctaBtn = $("protoBodyCtaBtn");
-  const allBtn = $("protoBodyAll"), clearBtn = $("protoBodyClear");
-  const sex = "Male";   // prototype default; real onboarding has no profile sex to read yet
+  const summaryEl = $("focusPickSummary");
+  const clearBtn = $("focusPickClear");
+  const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
 
   function repaintIntensities() {
     const on = {};
     for (const m of mod.ALL_MUSCLES) on[m] = 0;
-    for (const group of PROTO_BODY_PICKED) {
+    for (const group of FOCUS_PICKED) {
       for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[group] || []) on[m] = 4;
     }
-    PROTO_BODY_FRONT_CTRL?.setIntensities(on);
-    PROTO_BODY_BACK_CTRL?.setIntensities(on);
+    FOCUS_PICK_FRONT_CTRL?.setIntensities(on);
+    FOCUS_PICK_BACK_CTRL?.setIntensities(on);
   }
 
   function paintGreen(group) {
-    const pal = { base: mod.APP_HEAT_PALETTE.base, level1: PROTO_BODY_GREEN, level2: PROTO_BODY_GREEN, level3: PROTO_BODY_GREEN, level4: PROTO_BODY_GREEN };
+    const pal = { base: mod.APP_HEAT_PALETTE.base, level1: FOCUS_PICK_GREEN, level2: FOCUS_PICK_GREEN, level3: FOCUS_PICK_GREEN, level4: FOCUS_PICK_GREEN };
     for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[group] || []) {
-      PROTO_BODY_FRONT_CTRL?.setMusclePalette(m, pal);
-      PROTO_BODY_BACK_CTRL?.setMusclePalette(m, pal);
+      FOCUS_PICK_FRONT_CTRL?.setMusclePalette(m, pal);
+      FOCUS_PICK_BACK_CTRL?.setMusclePalette(m, pal);
     }
   }
 
   function sync() {
-    const n = PROTO_BODY_PICKED.size;
-    if (!n) summaryEl.textContent = "Nothing marked yet.";
-    else if (n === PROTO_BODY_ORDER.length) summaryEl.innerHTML = "<b>Full body</b> marked.";
-    else {
-      const names = PROTO_BODY_ORDER.filter((k) => PROTO_BODY_PICKED.has(k)).map((k) => BODY_GROUP_LABELS[k]);
-      summaryEl.innerHTML = "Marked: <b>" + escapeHtml(names.join(", ")) + "</b>";
-    }
-    if (!n) { ctaBar.classList.remove("show"); return; }
-    ctaBar.classList.add("show");
-    const label = n === PROTO_BODY_ORDER.length ? "the full body" : n + " area" + (n === 1 ? "" : "s");
-    ctaBtn.innerHTML = icon("dumbbell", 22) + " Continue with " + label
-      + '<span class="go">' + icon("chevronRight", 22) + "</span>";
+    const names = FOCUS_GROUP_ORDER.filter((k) => FOCUS_PICKED.has(k)).map((k) => BODY_GROUP_LABELS[k]);
+    summaryEl.innerHTML = names.length
+      ? "Marked: <b>" + escapeHtml(names.join(", ")) + "</b>"
+      : "Nothing marked. Saving now clears whatever is on file.";
   }
 
   function onTap(muscle, group) {
     if (!group) return;
-    const wasPicked = PROTO_BODY_PICKED.has(group);
-    if (wasPicked) PROTO_BODY_PICKED.delete(group); else PROTO_BODY_PICKED.add(group);
+    const wasPicked = FOCUS_PICKED.has(group);
+    // The cap is refused out loud rather than silently: a tap that does nothing
+    // and says nothing reads as the figure being broken.
+    if (!wasPicked && FOCUS_PICKED.size >= MAX_FOCUS_GROUPS) { toast("Four is plenty, drop one first"); return; }
+    if (wasPicked) FOCUS_PICKED.delete(group); else FOCUS_PICKED.add(group);
     if (!wasPicked) paintGreen(group);
     repaintIntensities();
     sync();
@@ -4688,20 +4747,19 @@ async function initBodyFocusRive() {
       canvas: $(id),
       artboardName: `${sex}-${view}`,
       intensities: {},
+      /* A per muscle palette needs the view model, which does not exist until
+         the figure has loaded, so what is already on file is painted from here
+         rather than straight after this call. */
+      onLoad: () => { for (const g of FOCUS_PICKED) paintGreen(g); repaintIntensities(); },
       onMuscleClick: (muscle, group) => onTap(muscle, group),
     });
   }
 
-  PROTO_BODY_FRONT_CTRL = make("protoBodyFront", "Front");
-  PROTO_BODY_BACK_CTRL = make("protoBodyBack", "Back");
+  FOCUS_PICK_FRONT_CTRL = make("focusPickFront", "Front");
+  FOCUS_PICK_BACK_CTRL = make("focusPickBack", "Back");
 
-  allBtn.onclick = () => {
-    for (const g of PROTO_BODY_ORDER) { if (!PROTO_BODY_PICKED.has(g)) paintGreen(g); PROTO_BODY_PICKED.add(g); }
-    repaintIntensities();
-    sync();
-  };
   clearBtn.onclick = () => {
-    PROTO_BODY_PICKED.clear();
+    FOCUS_PICKED.clear();
     repaintIntensities();
     sync();
   };
@@ -5108,7 +5166,11 @@ function showApp() {
   $("biInfoSlot").innerHTML = infoDot("impact", "What training impact means");
   $("biLevelsInfo").innerHTML = infoDot("muscleLevels", "What low, medium and high mean");
   $("biShareInfoSlot").innerHTML = infoDot("share", "What your partner sees");
-  $("biDetail").addEventListener("click", (e) => { if (e.target.closest("#biBack")) bodyUnfocus(); });
+  $("biDetail").addEventListener("click", (e) => {
+    if (e.target.closest("#biBack")) { bodyUnfocus(); return; }
+    const add = e.target.closest("#biFocusAdd");
+    if (add) addFocusGroup(add.dataset.group);
+  });
   $("biPieces").addEventListener("click", (e) => {
     const b = e.target.closest(".bi-piece");
     if (b && BODY_FOCUS) bodyFocusMuscle(b.dataset.muscle, BODY_FOCUS.view, BODY_FOCUS.side);
@@ -9570,8 +9632,13 @@ function closeGenOverlay() {
 }
 
 /* The payoff: the plan lands a row at a time. Quick, 70ms apart, so five
-   exercises are all in within half a second. */
-function revealGeneratedPlan(workout, onGo) {
+   exercises are all in within half a second.
+
+   `honest` is the generator's one plain sentence about pace, and it belongs
+   here rather than in a toast: it is the caveat on the plan you are reading,
+   so it sits above the rows in the sheet's own muted line and stays on screen
+   for as long as they do. */
+function revealGeneratedPlan(workout, honest, onGo) {
   if (genCancelled) return;   // they left; the workout is saved either way
   stopGenTicker();
   paintGen(100);
@@ -9581,6 +9648,7 @@ function revealGeneratedPlan(workout, onGo) {
     $("genStage").innerHTML = `
       <div class="gen-done-head">Your workout</div>
       <div class="gen-focus">${escapeHtml(displayFocus(workout.focus, workout.exercises) || "Ready")}</div>
+      ${honest ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(honest)}</p>` : ""}
       <div class="gen-rows">
         ${list.map((ex, i) => `
           <div class="gen-row" style="--d:${i * 70}ms">
@@ -9677,6 +9745,9 @@ async function generateWorkout(forDate) {
         challenge_target: MY_PROFILE?.challenge_target ?? null,
         focus_groups: MY_PROFILE?.focus_groups ?? null,
         focus_chosen_at: MY_PROFILE?.focus_chosen_at ?? null,
+        limits: MY_PROFILE?.limits ?? null,
+        goal_bubble: MY_PROFILE?.goal_bubble ?? null,
+        goal_child: MY_PROFILE?.goal_child ?? null,
         history,
         logs: recentLogs,
         plans: recentPlans,
@@ -9701,6 +9772,9 @@ async function generateWorkout(forDate) {
     if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
     if (!data.workout?.exercises?.length) throw new Error("Coach returned an empty workout");
 
+    /* data.honest is not written here: ai_workouts has no column for it, and
+       migrations are owned elsewhere. It lives as long as the reveal sheet
+       does, which is where the sentence is worth reading anyway. */
     const { error: saveErr } = await sb.from("ai_workouts").upsert({
       user_name: ME,
       email: MY_EMAIL,
@@ -9718,10 +9792,10 @@ async function generateWorkout(forDate) {
     if (isToday) {
       await loadTodayWorkout();
       renderWorkoutTab();
-      revealGeneratedPlan(data.workout, () => switchTab("workout"));
+      revealGeneratedPlan(data.workout, data.honest, () => switchTab("workout"));
     } else {
       renderHero();
-      revealGeneratedPlan(data.workout, () => toast("Tomorrow is planned"));
+      revealGeneratedPlan(data.workout, data.honest, () => toast("Tomorrow is planned"));
     }
   } catch (err) {
     console.error("generateWorkout failed:", err);
@@ -13109,6 +13183,20 @@ async function bodyFocusGroup(group) {
   bodyFocusMuscle(best, BODY_FOCUS?.view || "Front", BODY_FOCUS?.side || null);
 }
 
+/* Body impact is a viewer, and this is its one way out to a real preference:
+   you tapped a muscle to read it, and if that turns out to be the thing you
+   care about, saying so here means the next generated week acts on it. The
+   picker in Setup is still where a focus is built or dropped. */
+async function addFocusGroup(group) {
+  const current = (MY_PROFILE?.focus_groups || []).filter((g) => BODY_GROUP_LABELS[g]);
+  if (!group || current.includes(group)) return;
+  if (current.length >= MAX_FOCUS_GROUPS) { toast("Four is plenty, drop one first"); return; }
+  const next = [...current, group];
+  if (!await saveFocusGroups(next)) return;
+  toast("Focus saved: " + next.map((g) => BODY_GROUP_LABELS[g]).join(", "));
+  renderBodyDetail();
+}
+
 function bodyFmtSets(v) {
   const n = Math.round(v * 10) / 10;
   return `${n} ${n === 1 ? "set" : "sets"}`;
@@ -13146,6 +13234,9 @@ function renderBodyDetail() {
         : `<div class="bi-detail-pct none">Not hit ${escapeHtml(word)}</div>`}
     </div>
     <div class="bi-detail-bar" style="--heat:${heatOf(f.muscle)}"><i style="--fill:${pct.toFixed(3)}"></i></div>
+    ${(MY_PROFILE?.focus_groups || []).includes(piece.group)
+      ? `<div class="bi-detail-sub" style="margin-top:12px;">${icon("check", 13)} ${escapeHtml(groupLabel)} is one of your focus areas.</div>`
+      : `<button type="button" class="bi-back" id="biFocusAdd" data-group="${piece.group}" style="margin:12px 0 0;">${icon("dumbbell", 13)} Focus on this</button>`}
     ${heads ? `<div class="bi-detail-label">Parts</div><div class="bi-chips">${heads}</div>` : ""}
     <div class="bi-detail-label">${sets > 0 ? "Hit by" : "Try"}</div>
     ${sets > 0
@@ -13827,12 +13918,16 @@ function openSettingsPage(key) {
   document.querySelectorAll(".settings-page").forEach((el) => {
     el.classList.toggle("hidden", el.id !== `page-${key}`);
   });
+  // The only page whose contents are built rather than sitting in the markup.
+  if (key === "focus") renderBodyFocusPage();
   window.scrollTo({ top: 0 });
 }
 
 function closeSettingsPage() {
   document.querySelectorAll(".settings-page").forEach((el) => el.classList.add("hidden"));
+  closeBodyFocusPage();
   $("setupRoot").classList.remove("hidden");
+  $("setFocusSub").textContent = focusGroupsSubtitle();
   window.scrollTo({ top: 0 });
 }
 
@@ -13845,6 +13940,7 @@ function renderSetupTab() {
   // Training alone is a choice, not a dead end: offer pairing whenever there is none.
   $("setupPairWrap").classList.toggle("hidden", !!PARTNER_EMAIL || isCoachedClient());
   $("setupInviteCode").textContent = MY_PROFILE?.invite_code || "-";
+  $("setFocusSub").textContent = focusGroupsSubtitle();
 
   // Only meaningful once there is someone to hide details from.
   $("sharePrivacyCard").classList.toggle("hidden", !PARTNER_EMAIL);

@@ -368,13 +368,6 @@
       const { generateFromPayload } = await import("/mo-knowledge/engine/adapter.mjs");
       const { workout, honest, meta } = generateFromPayload(payload);
       window.__SANDBOX.lastGenerated = { payload, workout, honest, meta };
-      /* The reveal sheet only ever shows data.workout, so the honest line about
-         pace has nowhere to land unless the sandbox puts it somewhere. A toast
-         is the closest thing the app already has, and this stays sandbox only:
-         production never loads this file, so it never gets an opinion about
-         where the honest line should show up for real. 600ms lands it after
-         revealGeneratedPlan's own 420ms reveal animation, not on top of it. */
-      if (honest) setTimeout(() => { try { window.toast?.(honest); } catch {} }, 600);
       return new Response(JSON.stringify({ workout, honest, meta }), {
         status: 200,
         headers: { "Content-Type": "application/json" },

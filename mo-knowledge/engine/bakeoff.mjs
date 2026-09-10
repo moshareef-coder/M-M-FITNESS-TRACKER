@@ -115,12 +115,17 @@ const jawaGoalFor = (bubble) => JAWA_GOAL[bubble] || "Stay consistent";
 function normaliseOurs(plan) {
   return plan.week.map((d) => ({
     name: d.name,
+    /* The time budget and what the prescription really costs. Hers carries
+       neither, so the metric below reports ours and prints a dash for hers
+       rather than inventing a number to compare against. */
+    budgetMin: d.minutes, estimateMin: d.estimatedMinutes,
     exercises: d.exercises.map((e) => ({ name: e.name, sets: e.sets, reps: e.reps, load: e.weight, equipment: e.equipment, primary: e.group ? [e.group] : [] })),
   }));
 }
 function normaliseJawa(days) {
   return days.map((d) => ({
     name: null, // her day objects carry no name field at all
+    budgetMin: null, estimateMin: null,
     exercises: (d.exercises || []).map((e) => ({ name: e.name, sets: e.sets, reps: e.reps, load: e.targetWeight, equipment: e.equipment, primary: e.primary || [] })),
   }));
 }
@@ -141,8 +146,9 @@ function isLowerDay(d) {
 
 function scorecard(days) {
   const perDay = days.map((d) => d.exercises.length);
-  let repeatedInstances = 0, lowerDays = 0, noHingeDays = 0, noLoadCount = 0;
+  let repeatedInstances = 0, lowerDays = 0, noHingeDays = 0, noLoadCount = 0, overBudgetDays = 0;
   for (const d of days) {
+    if (d.budgetMin && d.estimateMin && d.estimateMin > d.budgetMin * 1.15) overBudgetDays++;
     const names = d.exercises.map((e) => e.name);
     repeatedInstances += names.length - new Set(names).size;
     if (isLowerDay(d)) {
@@ -158,7 +164,7 @@ function scorecard(days) {
     days: days.length,
     exMin: perDay.length ? Math.min(...perDay) : 0,
     exMax: perDay.length ? Math.max(...perDay) : 0,
-    repeatedInstances, lowerDays, noHingeDays, noLoadCount,
+    repeatedInstances, lowerDays, noHingeDays, noLoadCount, overBudgetDays,
     namesPresent: days.length > 0 && days.every((d) => d.name),
   };
 }
@@ -192,8 +198,8 @@ function printBlock(label, days, sc, error) {
 // whether a starting weight shows up for someone with no history at all.
 // ---------------------------------------------------------------------------
 const totals = {
-  OURS: { days: 0, exMin: Infinity, exMax: 0, repeatedInstances: 0, lowerDays: 0, noHingeDays: 0, noLoadCount: 0, namesAlways: true, errors: 0 },
-  JAWA: { days: 0, exMin: Infinity, exMax: 0, repeatedInstances: 0, lowerDays: 0, noHingeDays: 0, noLoadCount: 0, namesAlways: true, errors: 0 },
+  OURS: { days: 0, exMin: Infinity, exMax: 0, repeatedInstances: 0, lowerDays: 0, noHingeDays: 0, noLoadCount: 0, overBudgetDays: 0, namesAlways: true, errors: 0 },
+  JAWA: { days: 0, exMin: Infinity, exMax: 0, repeatedInstances: 0, lowerDays: 0, noHingeDays: 0, noLoadCount: 0, overBudgetDays: 0, namesAlways: true, errors: 0 },
 };
 function addTotals(bucket, sc) {
   bucket.days += sc.days;
@@ -203,6 +209,7 @@ function addTotals(bucket, sc) {
   bucket.lowerDays += sc.lowerDays;
   bucket.noHingeDays += sc.noHingeDays;
   bucket.noLoadCount += sc.noLoadCount;
+  bucket.overBudgetDays += sc.overBudgetDays;
   bucket.namesAlways = bucket.namesAlways && sc.namesPresent;
 }
 
@@ -249,7 +256,7 @@ PEOPLE.forEach((c, idx) => {
   console.log("");
   printBlock("OURS", ourDays, ourSc, null);
   console.log("");
-  printBlock("JAWA", jawaDays, jawaSc || { days: 0, exMin: 0, exMax: 0, repeatedInstances: 0, lowerDays: 0, noHingeDays: 0, noLoadCount: 0, namesPresent: false }, jawaError);
+  printBlock("JAWA", jawaDays, jawaSc || { days: 0, exMin: 0, exMax: 0, repeatedInstances: 0, lowerDays: 0, noHingeDays: 0, noLoadCount: 0, overBudgetDays: 0, namesPresent: false }, jawaError);
 
   // Rep-range-vs-goal sample: person 0 is lose-weight, person 2 is get-stronger.
   if (idx === 0 || idx === 2) {
@@ -280,6 +287,7 @@ row("repeated exercise in a day (count)", totals.OURS.repeatedInstances, totals.
 row("lower days (ours by name, hers content)", totals.OURS.lowerDays, totals.JAWA.lowerDays);
 row("of those, days with no hinge", totals.OURS.noHingeDays, totals.JAWA.noHingeDays);
 row("exercise with no load, non-bw (count)", totals.OURS.noLoadCount, totals.JAWA.noLoadCount);
+row("days over their time budget by 15%", totals.OURS.overBudgetDays, "no budget to be over");
 row("days have names, every time", totals.OURS.namesAlways ? "yes" : "no", totals.JAWA.namesAlways ? "yes" : "no");
 row("people Jawa's call errored on", "-", totals.JAWA.errors);
 row("main-lift reps, lose-weight", repRangeSample.ours["lose-weight"], repRangeSample.jawa["lose-weight"]);

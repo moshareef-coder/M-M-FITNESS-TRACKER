@@ -110,7 +110,10 @@ function printPlan(p) {
   for (const n of p.dayNotes) console.log(`\n  ${n}`);
   if (p.missing.length) console.log(`\n  Working without: ${p.missing.join("; ")}.`);
   for (const d of p.week) {
-    console.log(`\n  ${d.name}${d.short ? "  (kept short)" : ""}  ~${d.minutes} min`);
+    /* Two numbers, because they used to be one and it was the wrong one.
+       `minutes` is the budget the goal asked for; `estimatedMinutes` is what the
+       sets, reps and rest intervals below actually add up to. */
+    console.log(`\n  ${d.name}${d.short ? "  (kept short)" : ""}  ~${d.estimatedMinutes} min against a ${d.minutes} min budget`);
     for (const e of d.exercises) {
       const load = e.weight != null ? `${e.weight} lb` : e.loadBasis === "bodyweight" ? "bodyweight" : "your call";
       console.log(`    ${e.name.padEnd(28)} ${String(e.sets + "x" + e.reps).padEnd(6)} ${load.padStart(11)}`
@@ -118,6 +121,17 @@ function printPlan(p) {
       if (e.note) console.log(`      ${e.note}`);
     }
   }
+  /* The week's own ledger. Printed because a total nobody can see is a total
+     nobody checks, and every volume bug in this folder was found by adding one
+     column to a printout. */
+  const v = p.weeklyVolume;
+  const line = Object.keys(v.byGroup).sort()
+    .map((g) => `${g} ${v.byGroup[g]}/${v.targetByGroup[g]}`).join("  ");
+  console.log(`\n  Weekly sets per group, against target: ${line}`);
+  for (const t of v.trimmed) console.log(`    Trimmed: ${t.why}`);
+  for (const u of v.under) console.log(`    Short: ${u.why}`);
+  for (const t of v.timeTrimmed) console.log(`    Dropped for time: ${t.dropped} from ${t.day}.`);
+
   const first = p.week[0]?.exercises[0];
   if (first) console.log(`\n  Where the first weight came from: ${first.loadNote}`);
   console.log(`  Cardio: ${p.cardio.sessions} x ${p.cardio.minutes} min ${p.cardio.zone}.`);

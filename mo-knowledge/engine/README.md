@@ -138,17 +138,55 @@ author had just written, plus one the edge function agent hit wiring it up.
   into an 890 lb leg press. The engine was right to believe the log. The log was
   the lie. Weights are per lift now, in demo.mjs and bakeoff.mjs both.
 
+## Round three, fixed
+
+Five that were found, written down and then left sitting. Same rule as the two
+lists above: the fix is only worth as much as the sentence saying what was wrong.
+
+- **Push-ups for a beginner who wants to get stronger, again.** The level term
+  prefers the level closest to the user, a push-up is tagged beginner and a bench
+  press intermediate, so "Get stronger" opened with 3 reps of a push-up. A main
+  slot on a strength goal now ranks by how far a movement can be loaded, because
+  no amount of progression turns a push-up into a 225 bench. A term, not a
+  filter, and every other emphasis keeps the conservative tie break it had.
+- **A non-priority group out-setting a priority one on the same card.** The 1.4x
+  went on the weekly target and was then divided by how often the group is hit,
+  so a group trained once a week beat a priority group trained three times:
+  Russian Twist 6 against a priority Step-Up 4. The guarantee is taken per
+  session now, and no lift without the flag carries more sets than the lowest
+  priority lift on its day.
+- **The [2, 6] clamp still swallowing a back-off.** Round two moved the clamp and
+  left the order alone, so a group hit once or twice at intermediate rounded past
+  the ceiling both with and without the cut and 2 of 11 slots moved on a three
+  lift stall. The cut is subtracted after the clamp now, so a back-off or a
+  volume cut always costs every main lift it touches a set, floor 2.
+- **Weekly volume threaded across the days, Wave 1 finding 1.** The week now
+  totals its own hard sets per muscle group, trims accessories on the LATER days
+  where a group is more than 2 sets over its target, and names the groups that
+  are more than 2 sets under it with room to hold more. `weeklyVolume` on the
+  plan is the ledger, and demo.mjs prints it, because a total nobody can see is
+  a total nobody checks.
+- **`P.sessionMin` reached the display and nothing else, Wave 1 finding 3.** A
+  strength day of six lifts at six sets and three minutes of rest printed
+  "~60 min" over something closer to two hours. Every day carries
+  `estimatedMinutes` now, computed from the sets, a 30 second set and the rest
+  intervals already prescribed, and a day more than 15% over its budget drops
+  tail accessories until it fits. It stops at four exercises and never takes a
+  main lift, so a day of four mains at long rests can still run over and now says
+  so out loud instead of quietly lying about it.
+
 ## Wave 1 findings: three things Jawa's selector does that ours does not
 
-From reading `bakeoff.mjs` output side by side. None of these is done here yet.
-They are listed as **next**, not as shipped.
+From reading `bakeoff.mjs` output side by side. All three are done now, 2 in the
+second run and 1 and 3 in the third; the descriptions stay because what her
+selector does better is worth keeping on the record after it has been copied.
 
 1. **Weekly volume threaded across the days inside one call.** `buildWeekPlan`
    carries a running `weeklyVolumeByCategory` from day to day and re-ranks the
    most under-trained groups before choosing the next day's work. Ours divides a
    fixed weekly target by how often a group is hit and never looks at what the
    earlier days actually spent. Hers is the better shape: the ledger is real
-   rather than assumed.
+   rather than assumed. **Done**, see Round three below.
 2. **A scored swap, ranked by muscle overlap.** Her `suggestSwaps` ranks
    candidates by secondary-muscle overlap first and then by how close the level
    is to the original, so a swap is the nearest stimulus rather than the next row
@@ -158,7 +196,9 @@ They are listed as **next**, not as shipped.
    minutes an exercise, and the session length sets how many categories and how
    many movements per category fit. Ours fixes the count in the slot table and
    reports the minutes afterwards, which is the same arithmetic run backwards and
-   is why a short day needed a special case at all.
+   is why a short day needed a special case at all. **Done**, see Round three
+   below, though ours still runs it backwards on purpose: the slot table is the
+   argument, so the minutes trim the tail rather than choosing the movements.
 
 ## A stall gets an answer (`plateau-response.mjs`)
 
@@ -452,3 +492,121 @@ which is the second signal and the stronger one. research/07 calls this the
 revealed preference the app throws away. Nothing reads the table yet; W3
 (`preferences.mjs`) is the reader, and recording now means it opens with history
 instead of an empty table.
+
+## Goal storage
+
+`profiles.goal` still holds one of the five legacy strings ("Lose weight", etc). `profiles.goal_bubble` and `profiles.goal_child` hold ids from `mo-knowledge/goals/goal-tree.json` instead, once the tile picker writes them. When `goal_bubble` is a valid bubble id, `mo-knowledge/engine/adapter.mjs`'s `mapGoal` uses it over the legacy string, and a valid `goal_child` under it wins over anything parsed from `goal_detail`; an invalid or absent value falls back to the legacy parsing silently.
+
+## Limits: what hurts, and what they do not own
+
+The optional onboarding sheet in `index.html` asks two questions and, until
+this round, the engine could honour neither. The sheet's own comment says so
+better than a summary would:
+
+> there is no joint or pain concept in the library at all. An exercise records
+> name, primary, secondary, equipment, level, and that is the lot. The only way
+> to act on "my shoulder hurts" today is by proxy, dropping anything listing
+> shoulders in primary or secondary, which is wrong in both directions at once:
+> it would drop most chest pressing (where shoulders is a secondary) while
+> keeping plenty that genuinely loads a bad shoulder.
+
+Both directions are the point. A Dumbbell Bench Press lists shoulders. So does
+a Dip. They are not the same question, and no amount of reading `secondary`
+will tell them apart.
+
+### `joint-load.mjs`, which is the actual work
+
+A table from exercise name to the joints that movement loads **heavily**, where
+heavily means "a person with pain there should not be handed this", not "this
+joint is involved". Eight keys: shoulder, elbow, wrist, neck, lowerback, hip,
+knee, ankle.
+
+All 159 weight-training and calisthenics rows are tagged explicitly, one at a
+time, across 146 distinct names (thirteen names live in both libraries and
+share one entry, which is correct: a Push-Up is a Push-Up). Nothing falls
+through to the default. Yoga and pilates are deliberately untagged: they are
+low load by nature, no pose in either file carries an external weight, and a
+pose by pose pass belongs with somebody who knows the contraindications.
+
+It is coaching judgement, written from scratch, and its header says so. A
+physio should review it before any of it is described to a user as medical
+advice. It is not medical advice.
+
+The line it draws, in the cases the brief named and a few it did not:
+
+```
+Overhead Press        shoulder, lowerback, wrist     Dumbbell Bench Press   none
+Weighted Dip          shoulder, elbow                Machine Chest Press    none
+Upright Row           shoulder, wrist, neck          Chest-Supported Row    none
+Barbell Bench Press   shoulder                       Landmine Press         none
+Pec Deck              shoulder                       Face Pull              none
+Deadlift              lowerback, hip                 Leg Press              knee, hip
+Good Morning          lowerback, hip                 Goblet Squat           knee, hip
+Barbell Back Squat    knee, hip, lowerback           Glute Bridge           none
+Leg Extension         knee                           Hip Thrust             hip
+Sissy Squat           knee, ankle                    Leg Curl               none
+Crunch                neck, lowerback                Plank                  none
+Skull Crusher         elbow                          Hammer Curl            none
+```
+
+Thirty one of the 146 are tagged with nothing at all, and that is the number
+that makes the file worth having. A proxy filter has no way to produce it.
+
+`defaultJointLoad` covers anything not in the table, conservatively, from
+`patternFor` and the primary groups: a vertical push is a shoulder, a hinge is
+a lower back and a hip, a squat or a lunge is a knee and a hip. Nothing
+untagged slips through unprotected. Today nothing in the two libraries reaches
+it, which is the intended state and is asserted by counting.
+
+### `limits.mjs`, which is the interface
+
+Two exported lists, `BODY_AREAS` and `EQUIPMENT_OPTIONS`, and the screen must
+import them rather than write its own. That is the lesson from the prototype:
+it offered "Pull-up bar", "Squat rack" and "Bench", and the library records
+exactly five equipment values and cannot see any of those three, while
+"machine", which the engine can honour, was not offered at all. `CONTRACT.md`
+is the document the screens are built from and carries both lists in full.
+
+`normalizeLimits` takes an object, the JSON string a jsonb column round trips
+as, or null, and drops unknown keys in silence. `applyLimits` is the pure
+filter. `limitsSummary` turns the answers into the sentences the plan says out
+loud.
+
+The free text note is stored and never parsed. Turning "left knee since the
+ACL" into a filter is how an app ends up guessing at a medical history.
+
+### The two halves are not the same kind of answer
+
+A painful joint is a judgement, so it travels down the `exclude` path the
+plateau rotation already uses: it filters the ranked pool and never empties a
+slot, because a hole in the week is worse than one movement that is not ideal.
+
+Missing equipment is a fact, so it narrows the `equipment` allow list
+`buildPlan` has always taken, which is a hard filter with no fallback. A bad
+shoulder can be worked around with a lighter version of something. A barbell
+somebody does not own cannot. Where that leaves a slot with nothing the slot is
+dropped rather than filled with a lie: the library has no bodyweight
+biceps-primary movement at all, so a bodyweight only pull day honestly has no
+curl in it and comes back with three exercises instead of five.
+
+### Where it is still imperfect, said out loud
+
+Every overhead press in the library loads the shoulder, because that is what
+overhead pressing is. So a shoulder limit empties the vertical push slot, the
+existing never-empty fallback keeps the best ranked candidate, and the week
+comes back with a Machine Shoulder Press in it. That is not a bug being hidden:
+`plan.limits.blocked` names it and `dayNotes` carries the sentence.
+
+> Machine Shoulder Press and Dumbbell Shoulder Press are still in this week.
+> The library has nothing else that fills that slot, so go light, stop if it
+> hurts, and swap it out if it does not settle.
+
+The alternative is dropping the slot, which is a product decision rather than
+an engine one. The same shape happens for a bad ankle and the calf slot, where
+there is no calf exercise that spares the ankle, and `applyLimits` softens to
+the single least loaded one when it is called on a pool directly.
+
+`supabase/migrations/20260909_limits.sql` is the other half and is written, not
+applied. One jsonb column on `profiles`, because unlike `focus_groups` these
+three fields are one answer given at one moment and are read together or not at
+all. No policy change: self writes its own row and `can_see` reads.

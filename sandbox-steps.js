@@ -47,11 +47,6 @@
         note: "Not the real goal step, which is the one before this. The bubble version that used to live here got opened all the way (all nine categories, 52 bubbles) and stopped being readable, no spacing fix was going to save 52 items on one screen. A follow-up compared three structurally different pickers and Mo picked this one: nine categories always visible as a grid, tap one for its full checklist in a bottom sheet. Multi-select persists across categories. Nothing here writes to the fake database and Continue does not go anywhere, on purpose. Tracked in Open issues under Designed, not built.",
         run: (w) => w.renderGoalTilesPrototype?.() },
 
-      { t: "Body focus (prototype)", scenario: "fresh", flag: "not live",
-        s: "Tap the body, front and back",
-        note: "The follow-up to the goal tiles: show the body and let a person mark which muscles they want to focus on, instead of describing goals in words. This is the actual purchased body figure, the same one Body Impact and the workout builder already render, not a stand-in. A tap marks or unmarks a muscle, plain and simple, no zoom: went through a tap-to-zoom pass and then a pinch-to-zoom pass, and neither turned out to be needed, so both are gone. Marking any muscle lights the whole group it belongs to (front delts and rear delts both from either one), the same keys Body Impact already tracks. Full body and Clear all sit under the figures for marking or clearing everything at once. Nothing here writes to the fake database and Continue does not go anywhere, on purpose. Tracked in Open issues under Designed, not built.",
-        run: (w) => w.renderBodyFocusPrototype?.() },
-
       { t: "Limits and injuries (prototype)", scenario: "fresh", flag: "not live",
         s: "Shape is right, content is not",
         note: "READ THIS BEFORE JUDGING THE CHIPS: the eight body areas and six pieces of equipment are placeholder. They were written to have something real to tap, and they are wrong. The exercise library can only filter on five equipment values (bodyweight, dumbbell, barbell, cable, machine), so Pull-up bar, Squat rack and Bench do not exist in the engine at all, somebody could say they have no squat rack and nothing could honour it. Injuries are worse: there is no joint or pain concept in the library whatsoever, so 'my shoulder hurts' can only be acted on by proxy, which would drop most chest pressing while keeping plenty that genuinely loads a bad shoulder. The engine has to define this content. What IS worth judging here is the shape. The app holds nothing about injuries today, so it can prescribe overhead pressing to somebody with a bad shoulder and never find out; this is the screen for that, and where it sits is the point: AFTER the plan exists, never before. A limit is not a goal, it is a constraint on how the goal gets trained for, and asking up front turns 'what do you want' into 'what is wrong with you'. The plan is already made by here, so this only ever makes it safer, which is why Skip for now is a real button and not small print. Only the stated half of the problem: the measured half, an exercise somebody quietly swaps away from every week, is being built engine-side separately and is the better signal. Nothing writes to the fake database, on purpose. Tracked in Open issues under Designed, not built.",
@@ -76,7 +71,7 @@
 
       { t: "Generate a workout", scenario: "paired",
         s: "The engine, live",
-        note: "This is the deterministic engine that replaces the model call, running right here in your browser against the fake data, not a screenshot of it. The honest line about pace pops as a toast a beat after the plan lands, because the reveal sheet itself only ever shows the exercises. Tap Generate and read the plan it built for Mo: a pull session yesterday and a push day already queued, so this is the engine picking the next thing in the rotation.",
+        note: "This is the deterministic engine that replaces the model call, running right here in your browser against the fake data, not a screenshot of it. The honest line about pace sits above the exercises in the reveal sheet, in the sheet's own muted line. Tap Generate and read the plan it built for Mo: a pull session yesterday and a push day already queued, so this is the engine picking the next thing in the rotation.",
         run: (w) => {
           w.switchTab("workout");
           w.goWorkoutScreen("choose");
@@ -259,6 +254,11 @@
         s: "Goal, pace, equipment",
         note: "What the generator reads before it writes a plan.",
         run: (w) => { w.switchTab("setup"); w.openSettingsPage("training"); } },
+
+      { t: "Focus areas", scenario: "paired",
+        s: "Tap the body, front and back",
+        note: "The body picker, now a real settings page rather than the prototype it started as. This is the actual purchased body figure, the same one Body Impact and the workout builder already render, not a stand-in. A tap marks or unmarks a muscle, plain and simple, no zoom: went through a tap-to-zoom pass and then a pinch-to-zoom pass, and neither turned out to be needed, so both are gone. Marking any muscle lights the whole group it belongs to (front delts and rear delts both from either one), the same keys Body Impact already tracks. Four is the cap, because the engine gives a picked group 1.4x its weekly sets out of a fixed weekly volume, so a fifth tap is refused out loud. Save writes profiles.focus_groups and focus_chosen_at to the fake database for real, and the next generated workout reads them.",
+        run: (w) => { w.switchTab("setup"); w.openSettingsPage("focus"); } },
 
       { t: "Milestones", scenario: "paired",
         s: "Badges earned, doing the real thing",

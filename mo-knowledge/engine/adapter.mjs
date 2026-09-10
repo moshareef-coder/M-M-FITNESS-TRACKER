@@ -8,7 +8,10 @@
  *
  * This file is the only place those two vocabularies meet. Nothing upstream of
  * it knows the app exists, and nothing in the app has to change for the engine
- * to ship. When the bubble picker replaces the five strings, `mapGoal` is the
+ * to ship. `mapGoal` also takes goal_bubble and goal_child now, which is the
+ * tile picker's exact tap once profiles.goal_bubble/goal_child give it
+ * somewhere to be stored; a valid one wins over the five strings and the free
+ * text they come with. As more of onboarding moves to tiles, `mapGoal` is the
  * one function that gets smaller, and the rest of this file does not move.
  *
  * Deno safe: no node: imports, no dependencies, no file reads. Which is why the
@@ -16,6 +19,7 @@
  */
 import { buildPlan } from "./plan.mjs";
 import { normalizeFocus, mergePriority, focusFreshness } from "./focus.mjs";
+import { normalizeLimits } from "./limits.mjs";
 /* Read only, for one field. See the focus block in generateFromPayload. */
 import { resolveGoal } from "./goal-engine.mjs";
 
@@ -46,6 +50,33 @@ const BUBBLE_FOR_GOAL = {
    five bubbles are reachable by button, so the button is at least as good a
    witness as our substring match and we do not overrule it. */
 const OVERRIDE_BUBBLES = new Set(["do-a-thing", "event", "get-back", "feel-better"]);
+
+/* The nine bubble ids and, per bubble, the child ids under it. Hand written
+   from mo-knowledge/goals/goal-tree.json, same convention as ALIASES below
+   and for the same reason: this file has to stay Deno safe, so it cannot
+   read the JSON at runtime and mirrors it here instead. Used only to
+   validate goal_bubble/goal_child from the tile picker (see mapGoal) before
+   trusting them; the same drift-check follow up noted at ALIASES covers
+   this table too, and is not written yet. */
+const TREE_CHILDREN = {
+  "lose-weight": ["lose-a-number", "lose-belly", "lose-by-date", "lose-for-health", "lose-last-10", "lose-and-build"],
+  "build-muscle": ["build-overall", "build-a-part", "build-glutes", "build-skinny-fat", "build-women"],
+  "get-stronger": ["strong-a-lift", "strong-multiples", "strong-not-bigger", "strong-for-life", "strong-again"],
+  "tone-lean-abs": ["tone-part", "abs", "lean-shredded"],
+  "do-a-thing": ["first-pullup", "first-pushup", "run-5k", "faster-mile", "flexibility", "skills"],
+  "event": ["event-run", "event-hyrox", "event-ocr", "event-test", "event-benchmark", "event-sport"],
+  "feel-better": ["mental", "longevity", "energy", "prevent", "mobility", "pain"],
+  "get-back": ["back-after-years", "back-postpartum", "start-fresh"],
+  "consistent": ["keep-quitting", "dont-know", "no-time"],
+};
+
+function isValidBubble(bubble) {
+  return typeof bubble === "string" && Object.prototype.hasOwnProperty.call(TREE_CHILDREN, bubble);
+}
+
+function isValidChild(bubble, child) {
+  return typeof child === "string" && (TREE_CHILDREN[bubble] || []).includes(child);
+}
 
 /* Hand written from the `aliases` arrays in ../goals/goal-tree.json, plus a
    short tail of bare keywords ("abs", "glutes", "belly") because people type
@@ -445,30 +476,53 @@ function bestAlias(detail) {
 
 /**
  * The five strings the app stores, plus whatever they typed, turned into the
- * tree's language.
+ * tree's language. Now also takes goal_bubble and goal_child, which is what
+ * the tile picker in index.html (renderGoalTilesPrototype) produces once a
+ * person taps a category and one of its rows: the exact bubble and child,
+ * with nothing to parse. A valid goal_bubble wins over the legacy goal
+ * string outright, and a valid goal_child under that bubble wins over
+ * whatever goal_detail would have matched. goal_detail is still parsed for
+ * amountLb and byDate either way, because a number of pounds and a date are
+ * not in the tree and the tile picker cannot supply them; it is parsed for a
+ * child only when goal_child was absent or did not validate, same as before
+ * this existed. An invalid goal_bubble or goal_child is treated as if it
+ * were never sent, silently, so a bad value degrades to the old behaviour
+ * rather than throwing.
  *
- * @param {{ goal?: string, goal_detail?: string, today?: Date }} input
+ * @param {{ goal?: string, goal_detail?: string, goal_bubble?: string, goal_child?: string, today?: Date }} input
  * @returns {{ bubble: string, child: string|undefined, amountLb?: number, byDate?: Date }}
  */
-export function mapGoal({ goal, goal_detail, today = new Date() } = {}) {
-  const stated = BUBBLE_FOR_GOAL[norm(goal)];
-  /* No goal at all is the habit plan, which is the one that asks least of
-     somebody we know nothing about. */
-  let bubble = stated || "consistent";
-  let child;
+export function mapGoal({ goal, goal_detail, goal_bubble, goal_child, today = new Date() } = {}) {
+  const tileBubble = isValidBubble(goal_bubble) ? goal_bubble : null;
+  const tileChild = tileBubble && isValidChild(tileBubble, goal_child) ? goal_child : null;
 
-  const hit = bestAlias(goal_detail);
-  if (hit) {
-    if (!stated && hit.bubble) {
-      bubble = hit.bubble;
-      child = hit.child || undefined;
-    } else if (hit.bubble === bubble) {
-      child = hit.child || undefined;
-    } else if (OVERRIDE_BUBBLES.has(hit.bubble)) {
-      bubble = hit.bubble;
-      child = hit.child || undefined;
-    } else if (hit.theme) {
-      child = THEME_CHILD[hit.theme]?.[bubble];
+  /* No goal at all is the habit plan, which is the one that asks least of
+     somebody we know nothing about. A valid tile bubble stands in for the
+     legacy lookup rather than beside it, so `stated` below is exactly what
+     it always was when there is no tile pick. */
+  const stated = tileBubble || BUBBLE_FOR_GOAL[norm(goal)];
+  let bubble = stated || "consistent";
+  let child = tileChild || undefined;
+
+  /* Skipped entirely once the tile picker already named a child: that tap is
+     a better witness than a phrase match, and running the alias search on
+     top of it risks overruling a person's explicit second tap with a guess. */
+  if (!child) {
+    const hit = bestAlias(goal_detail);
+    if (hit) {
+      if (!stated && hit.bubble) {
+        bubble = hit.bubble;
+        child = hit.child || undefined;
+      } else if (hit.bubble === bubble) {
+        child = hit.child || undefined;
+      } else if (OVERRIDE_BUBBLES.has(hit.bubble) && !tileBubble) {
+        /* A tile bubble already won the argument the legacy override exists
+           to settle, so it does not get re-litigated by a phrase match. */
+        bubble = hit.bubble;
+        child = hit.child || undefined;
+      } else if (hit.theme) {
+        child = THEME_CHILD[hit.theme]?.[bubble];
+      }
     }
   }
 
@@ -715,7 +769,17 @@ export function generateFromPayload(payload = {}, { today = new Date() } = {}) {
   let step = "start";
   try {
     step = "mapGoal";
-    const goal = mapGoal({ goal: payload.goal, goal_detail: payload.goal_detail, today });
+    const goal = mapGoal({
+      goal: payload.goal,
+      goal_detail: payload.goal_detail,
+      goal_bubble: payload.goal_bubble,
+      goal_child: payload.goal_child,
+      today,
+    });
+    /* Same validity check mapGoal uses internally to decide whether the tile
+       pick wins. Recomputed rather than threaded back out of mapGoal, so its
+       return shape stays exactly what it was before goal_bubble existed. */
+    const goalSource = isValidBubble(payload.goal_bubble) ? "tiles" : "legacy";
 
     step = "logs";
     const given = Array.isArray(payload.logs) ? payload.logs : null;
@@ -755,6 +819,17 @@ export function generateFromPayload(payload = {}, { today = new Date() } = {}) {
        that changes. */
     const merged = mergePriority({ goalPriority, userFocus: requestedFocus, revealed: null });
 
+    step = "limits";
+    /* What hurts and what they do not own, from the optional onboarding sheet.
+       It arrives as a jsonb object, or as the string a jsonb column round trips
+       as through some clients, or as null for everybody who skipped the screen
+       and everybody whose client predates it. All three come back as two empty
+       lists and the plan below is exactly the plan it was before this existed.
+       The free text note is normalised and stored and nothing reads it: see
+       engine/limits.mjs on why parsing it would be guessing at a medical
+       history. */
+    const limits = normalizeLimits(payload.limits);
+
     step = "buildPlan";
     const plan = buildPlan({
       goal,
@@ -766,6 +841,7 @@ export function generateFromPayload(payload = {}, { today = new Date() } = {}) {
       logs,
       today,
       priorityOverride: merged.priority,
+      limits,
     });
 
     step = "nextDayIndex";
@@ -816,7 +892,20 @@ export function generateFromPayload(payload = {}, { today = new Date() } = {}) {
           why: merged.why,
           stale: freshness.stale,
         },
+        /* What was said and what it cost, in three numbers. The excluded list
+           itself is on the plan and can run to fifty names on a bodyweight
+           only week, which is not something a meta block should carry, so the
+           count is here and the names stay where the reasons are. */
+        limits: {
+          hurts: limits.hurts,
+          missing: limits.missing,
+          excludedCount: (plan.limits?.excluded || []).length,
+        },
         source: "engine",
+        /* Whether the bubble came from an explicit tile tap or from parsing
+           the five legacy strings and free text. Support cannot tell the two
+           apart from the workout alone, same reason childUsed exists above. */
+        goalSource,
         logsSource,
         missing,
       },
