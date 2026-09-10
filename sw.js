@@ -25,7 +25,7 @@ const STATIC_ASSETS = [
 ];
 /* Named by version or by content, so a hit is always the right file. */
 const IMMUTABLE = [/^\/vendor\//, /\.riv$/, /\.wasm$/, /^\/badges\//, /\.png$/];
-const CODE = [/^\/knowledge\//];
+const CODE = [/^\/knowledge\//, /^\/mo-knowledge\//];   // the engine and its chip lists load in the browser too
 const isShell = (url) => url.pathname === "/" || url.pathname === "/index.html";
 const matches = (list, url) => list.some((re) => re.test(url.pathname));
 

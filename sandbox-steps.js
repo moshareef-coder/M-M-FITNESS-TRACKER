@@ -47,11 +47,6 @@
         note: "Not the real goal step, which is the one before this. The bubble version that used to live here got opened all the way (all nine categories, 52 bubbles) and stopped being readable, no spacing fix was going to save 52 items on one screen. A follow-up compared three structurally different pickers and Mo picked this one: nine categories always visible as a grid, tap one for its full checklist in a bottom sheet. Multi-select persists across categories. Nothing here writes to the fake database and Continue does not go anywhere, on purpose. Tracked in Open issues under Designed, not built.",
         run: (w) => w.renderGoalTilesPrototype?.() },
 
-      { t: "Limits and injuries (prototype)", scenario: "fresh", flag: "not live",
-        s: "Shape is right, content is not",
-        note: "READ THIS BEFORE JUDGING THE CHIPS: the eight body areas and six pieces of equipment are placeholder. They were written to have something real to tap, and they are wrong. The exercise library can only filter on five equipment values (bodyweight, dumbbell, barbell, cable, machine), so Pull-up bar, Squat rack and Bench do not exist in the engine at all, somebody could say they have no squat rack and nothing could honour it. Injuries are worse: there is no joint or pain concept in the library whatsoever, so 'my shoulder hurts' can only be acted on by proxy, which would drop most chest pressing while keeping plenty that genuinely loads a bad shoulder. The engine has to define this content. What IS worth judging here is the shape. The app holds nothing about injuries today, so it can prescribe overhead pressing to somebody with a bad shoulder and never find out; this is the screen for that, and where it sits is the point: AFTER the plan exists, never before. A limit is not a goal, it is a constraint on how the goal gets trained for, and asking up front turns 'what do you want' into 'what is wrong with you'. The plan is already made by here, so this only ever makes it safer, which is why Skip for now is a real button and not small print. Only the stated half of the problem: the measured half, an exercise somebody quietly swaps away from every week, is being built engine-side separately and is the better signal. Nothing writes to the fake database, on purpose. Tracked in Open issues under Designed, not built.",
-        run: (w) => w.renderLimitsPrototype?.() },
-
       { t: "First look at an empty app", scenario: "fresh",
         s: "No workouts, no partner, no history",
         note: "What a stranger sees on day one. Skip past onboarding first if it is still on screen. This is the state that has never been walked properly end to end, so look hard at the empty cards.",
@@ -259,6 +254,11 @@
         s: "Tap the body, front and back",
         note: "The body picker, now a real settings page rather than the prototype it started as. This is the actual purchased body figure, the same one Body Impact and the workout builder already render, not a stand-in. A tap marks or unmarks a muscle, plain and simple, no zoom: went through a tap-to-zoom pass and then a pinch-to-zoom pass, and neither turned out to be needed, so both are gone. Marking any muscle lights the whole group it belongs to (front delts and rear delts both from either one), the same keys Body Impact already tracks. Four is the cap, because the engine gives a picked group 1.4x its weekly sets out of a fixed weekly volume, so a fifth tap is refused out loud. Save writes profiles.focus_groups and focus_chosen_at to the fake database for real, and the next generated workout reads them.",
         run: (w) => { w.switchTab("setup"); w.openSettingsPage("focus"); } },
+
+      { t: "Limits and injuries", scenario: "paired",
+        s: "What hurts, and what you don't own",
+        note: "Real now, not the prototype it started as: both chip lists are imported live from mo-knowledge/engine/limits.mjs at runtime, so nothing on this screen can be offered unless the plan can honour it (that is why there is no Pull-up bar, Squat rack or Bench any more, and why No machines is finally there). The body is the same purchased figure Focus areas uses; a tap maps the muscle to the nearest joint or joints, so tapping a quad marks Hip and Knee and the chips below light up to match, and either half of the pair can be tapped instead. Save writes profiles.limits to the fake database for real and the next generated workout is filtered by it, so mark Shoulder here and then run Generate and the plan comes back with no overhead pressing and no dips in it.",
+        run: (w) => { w.switchTab("setup"); w.openSettingsPage("limits"); } },
 
       { t: "Milestones", scenario: "paired",
         s: "Badges earned, doing the real thing",

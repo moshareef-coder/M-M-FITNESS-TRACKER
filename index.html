@@ -839,6 +839,23 @@
   .gen-go {
     margin-top: 18px; animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
   }
+  /* The only place limits are ever offered unprompted, and it arrives after the
+     plan rather than before it. Deliberately quieter than everything above it:
+     it is an aside on a finished plan, not a step in the way of one. The stage
+     is always dark, hence the fixed whites rather than the theme tokens. */
+  .gen-nudge {
+    display: flex; align-items: center; gap: 12px; text-align: left;
+    margin-top: 14px; padding: 12px 14px; border-radius: 14px;
+    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.14);
+    animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
+  }
+  .gen-nudge p { margin: 0; flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.45; color: rgba(255,255,255,.62); }
+  .gen-nudge button {
+    flex-shrink: 0; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+    padding: 9px 14px; border-radius: 100px; min-height: 38px;
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); color: #f4f6f8;
+  }
+  .gen-nudge button:active { transform: scale(.97); }
   /* Standing on the accent: the primary button would be green on green, and
      muted grey type disappears, so the whole stage inverts. */
   /* The reveal is the plan, not the chamber, so the figure and grid fade back
@@ -854,7 +871,7 @@
   .gen-err { font-size: 14px; color: rgba(255,255,255,.66); line-height: 1.5; margin: 12px 0 18px; }
   .gen-scrim:not(.done) .gen-focus { color: #f4f6f8; }
   @media (prefers-reduced-motion: reduce) {
-    .gen-scrim, .gen-scrim.leaving, .gen-row, .gen-go, .gen-grid { animation: none; }
+    .gen-scrim, .gen-scrim.leaving, .gen-row, .gen-go, .gen-grid, .gen-nudge { animation: none; }
     /* The word cycle is stopped in JS too: fast swapping text is exactly what
        this preference is asking us not to do. */
   }
@@ -1613,45 +1630,45 @@
      lookalike. Everything below is this screen's own: the clear-all row and
      the summary. */
   .focus-pick-actions { display: flex; gap: 8px; margin-top: 10px; }
-  .focus-pick-action {
+  .focus-pick-action, .limit-clear {
     flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     font: inherit; font-size: 12.5px; font-weight: 700; color: var(--text); cursor: pointer;
     padding: 10px 12px; border-radius: 100px; background: var(--panel-2); border: 1px solid var(--border);
   }
-  .focus-pick-action:active { transform: scale(.97); }
+  .focus-pick-action:active, .limit-clear:active { transform: scale(.97); }
   .focus-pick-summary { margin-top: 12px; min-height: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
   .focus-pick-summary b { color: var(--accent-ink); font-weight: 700; }
 
-  /* PROTOTYPE, NOT LIVE: renderLimitsPrototype. See the comment above that
-     function. Chips wrap rather than stack: eight body areas as full-width
-     .ob-chip rows would be a page of scrolling for a screen whose whole
-     argument is that it is quick and skippable. */
-  .proto-lim-head {
-    font-size: 12.5px; font-weight: 800; letter-spacing: .04em; color: var(--muted);
-    margin: 20px 0 10px;
+  /* renderLimitsPage, the Limits and injuries settings page. Same figure as
+     Focus areas above (.bi-figures / .bi-fig / .bi-canvas, Body Impact's own
+     classes) and the same pill geometry as .focus-pick-action; the only thing
+     that differs is the colour, because a limit is a caution and not a choice.
+     var(--partner) is the app's existing warning tint, no new colour. */
+  .limit-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .limit-chip {
+    flex: 1 1 calc(50% - 8px); min-width: 146px; text-align: left; cursor: pointer;
+    display: flex; flex-direction: column; gap: 2px;
+    font: inherit; padding: 10px 14px; border-radius: 14px; min-height: 44px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    transition: border-color .15s, background .15s;
   }
-  .proto-lim-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .proto-lim-chip {
-    font: inherit; font-size: 14px; font-weight: 600; letter-spacing: -.01em; cursor: pointer;
-    padding: 11px 15px; border-radius: 100px; min-height: 44px;
-    background: var(--panel); border: 1px solid var(--border); color: var(--text);
-    transition: border-color .15s, background .15s, color .15s;
+  .limit-chip:active { transform: scale(.97); }
+  .limit-chip b { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
+  .limit-chip i { font-style: normal; font-size: 11.5px; line-height: 1.35; color: var(--muted); }
+  .limit-chip.on {
+    background: color-mix(in srgb, var(--partner) 12%, var(--panel));
+    border-color: var(--partner);
   }
-  .proto-lim-chip:active { transform: scale(.97); }
-  .proto-lim-chip.on {
-    background: color-mix(in srgb, var(--accent) 14%, var(--panel));
-    border-color: var(--accent); color: var(--text); font-weight: 700;
+  .limit-chip.on b { color: var(--partner); }
+  @media (hover: hover) and (pointer: fine) {
+    .limit-chip:hover { border-color: var(--partner); }
   }
-  .proto-lim-foot { font-size: 12.5px; color: var(--muted); text-align: center; margin: 14px 0 0; }
-  /* The content caveat, on the screen itself: without it the obvious read of
-     this page is that the chips ARE the proposal, and they are not. */
-  .proto-lim-warn {
-    display: flex; align-items: flex-start; gap: 7px; font-size: 12.5px; line-height: 1.45;
-    color: var(--partner); background: color-mix(in srgb, var(--partner) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--partner) 30%, transparent);
-    border-radius: 12px; padding: 10px 12px; margin: 14px 0 0;
-  }
-  .proto-lim-warn svg { flex-shrink: 0; margin-top: 2px; }
+  .limit-summary { margin-top: 12px; min-height: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .limit-summary b { color: var(--partner); font-weight: 700; }
+  .limit-foot { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 10px 0 0; }
+  /* One geometry, not a second one: the clear button is the focus picker's own
+     pill rule, widened, rather than a lookalike written out again. */
+  .limit-clear { width: 100%; margin-top: 10px; }
 
   .ob-kicker { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--accent-ink); margin-bottom: 8px; }
   .ob-chips { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
@@ -3347,6 +3364,11 @@
           <span class="set-txt"><span class="set-title">Focus areas</span><span class="set-sub" id="setFocusSub">Not set</span></span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
+        <button type="button" class="set-row" id="setRow-limits" data-page="limits">
+          <span class="set-ico" data-ico="info"></span>
+          <span class="set-txt"><span class="set-title">Limits and injuries</span><span class="set-sub" id="setLimitsSub">Not set</span></span>
+          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+        </button>
         <button type="button" class="set-row" id="setRow-notify" data-page="notify">
           <span class="set-ico" data-ico="bell"></span>
           <span class="set-txt"><span class="set-title">Notifications</span><span class="set-sub">Reminders and nudges</span></span>
@@ -3518,6 +3540,18 @@
            renderBodyFocusPage builds it when the page opens and the back arrow
            tears it down, rather than leaving it drawing behind a hidden div. -->
       <div id="focusPickRoot"></div>
+    </div>
+    <div class="settings-page hidden" id="page-limits">
+      <div class="scr-head">
+        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+        <div class="scr-title">Limits and injuries</div>
+        <div class="spacer"></div>
+      </div>
+      <!-- Empty for the same reason page-focus is: this page carries two Rive
+           canvases with a render loop, so renderLimitsPage builds it on open and
+           the back arrow tears it down rather than leaving it drawing behind a
+           hidden div. The chips are built here too, from the engine's lists. -->
+      <div id="limitsRoot"></div>
     </div>
     <div class="settings-page hidden" id="page-notify">
       <div class="scr-head">
@@ -4767,119 +4801,377 @@ async function initBodyFocusRive() {
   sync();
 }
 
-/* PROTOTYPE, NOT LIVE. The app currently holds nothing about injuries, so it
-   can prescribe overhead pressing to somebody with a bad shoulder and never
-   find out. This is the screen for that, built to the shape issues.json
-   already argued for:
+/* Limits and injuries, the Setup page and the one thing the app is offered
+   after a plan. The app used to hold nothing about injuries at all, so it could
+   prescribe overhead pressing to somebody with a bad shoulder and never find
+   out. Both halves are real now: mo-knowledge/engine/joint-load.mjs says which
+   of eight joints each of 159 movements loads heavily, limits.mjs filters the
+   week with it, and profiles.limits is a live jsonb column.
 
-   It comes AFTER the plan exists, never before. A limit is not a goal, it is
-   a constraint on how the goal gets trained for, and asking about it up front
-   turns "what do you want" into "what is wrong with you" and can block
-   somebody from ever getting a plan. Here the plan is already made and this
-   only ever makes it safer, which is why the skip is a real, always-visible
-   button rather than small print, and why the copy leads with that.
+   WHERE IT SITS is the point. A limit is not a goal, it is a constraint on how
+   the goal gets trained for, so asking about it up front turns "what do you
+   want" into "what is wrong with you" and can block somebody from ever getting
+   a plan. It lives in Setup, and it is offered exactly once elsewhere: under a
+   plan that already exists, where it can only ever make that plan safer. That
+   is why Skip for now is a real button and not small print.
 
-   Deliberately only the STATED half of this problem. The measured half, an
-   exercise somebody quietly swaps away from every week, is a separate and
-   frankly better signal, and it is already being built engine-side
-   (exercise_swaps, engine/alternatives.mjs, engine/preferences.mjs). This
+   Deliberately only the STATED half of the problem. The measured half, an
+   exercise somebody quietly swaps away from every week, is a better signal and
+   is being built separately (exercise_swaps, engine/preferences.mjs). This
    screen catches what measurement cannot: the shoulder you are protecting by
-   never going near the movement in the first place, and the rack you do not
-   own. Nothing here is a medical question and none of it is phrased as one.
+   never going near the movement, and the barbell you do not own. Nothing here
+   is a medical question and none of it is phrased as one. */
+/* The two chip lists are the engine's, imported at runtime rather than written
+   here, so a limit is only ever offered if a plan can actually honour it. */
+let limitsListsPromise = null;
 
-   Real onboarding never calls this. The only caller is the sandbox's own
-   walkthrough. Tracked in issues.json under "Designed, not built". */
-/* PLACEHOLDER CONTENT, NOT AGREED, NEEDS THE ENGINE. Both lists below were
-   written to have something real to tap in the prototype. Neither is derived
-   from anything, and checking them against the engine says they are wrong in
-   two different ways. The engine has to define this content, not this file,
-   because an answer is only worth collecting if something downstream can act
-   on it; offering a limit nothing can honour is a promise the plan quietly
-   breaks.
-
-   Equipment: the exercise library records exactly five values it can filter
-   on (bodyweight, dumbbell, barbell, cable, machine) and 60 of its exercises
-   record no equipment at all. So of the six offered below, three (Pull-up
-   bar, Squat rack, Bench) do not exist in the engine in any form: somebody
-   can say they have no squat rack and nothing can honour it. Meanwhile
-   "machine", which the engine CAN honour, is not offered.
-
-   Injuries: worse, there is no joint or pain concept in the library at all.
-   An exercise records name, primary, secondary, equipment, level, and that
-   is the lot. The only way to act on "my shoulder hurts" today is by proxy,
-   dropping anything listing shoulders in primary or secondary, which is
-   wrong in both directions at once: it would drop most chest pressing (where
-   shoulders is a secondary) while keeping plenty that genuinely loads a bad
-   shoulder. A body area is only worth offering once the engine can tell the
-   difference.
-
-   Flagged in issues.json. Do not treat these two arrays as the spec. */
-const PROTO_LIMIT_HURTS = ["Shoulder", "Lower back", "Knee", "Wrist", "Elbow", "Neck", "Hip", "Ankle"];
-const PROTO_LIMIT_MISSING = ["Barbell", "Pull-up bar", "Squat rack", "Bench", "Cable machine", "Dumbbells"];
-
-function renderLimitsPrototype() {
-  const ob = $("onboard");
-  ob.classList.remove("hidden");
-  $("app").classList.add("hidden");
-
-  const chips = (list, kind) => list.map((label, i) =>
-    `<button type="button" class="proto-lim-chip" data-kind="${kind}" data-i="${i}">${escapeHtml(label)}</button>`).join("");
-
-  ob.innerHTML = `
-    <div class="ob-step">
-      <span class="proto-flag">${icon("bell", 12)} Prototype, not live</span>
-      <div class="ob-kicker">OPTIONAL</div>
-      <h1 class="ob-h1">Anything we should know?</h1>
-      <p class="ob-sub">Your plan is already made. This only makes it safer, and skipping it costs you nothing.</p>
-      <p class="proto-lim-warn">${icon("bell", 12)} Judge the shape, not the options. The chips below are placeholder: the engine has to say what can actually be honoured.</p>
-
-      <div class="proto-lim-head">Does anything hurt?</div>
-      <div class="proto-lim-chips">${chips(PROTO_LIMIT_HURTS, "hurt")}</div>
-
-      <div class="proto-lim-head">Anything you don't have?</div>
-      <div class="proto-lim-chips">${chips(PROTO_LIMIT_MISSING, "missing")}</div>
-
-      <div class="proto-lim-head">Anything else?</div>
-      <input id="protoLimNote" type="text" maxlength="120" placeholder="A condition, a recent surgery, anything" />
-
-      <div class="proto-cta" id="protoLimCta">
-        <button type="button" class="btn-cta" id="protoLimSaveBtn">${icon("check", 22)} Save
-          <span class="go">${icon("chevronRight", 22)}</span></button>
-      </div>
-      <button type="button" class="btn-ghost" id="protoLimSkipBtn">Skip for now</button>
-      <p class="proto-lim-foot">You can change this any time in Setup.</p>
-    </div>`;
-
-  initLimitsPrototype();
+function ensureLimitsLists() {
+  if (!limitsListsPromise) {
+    limitsListsPromise = import("/mo-knowledge/engine/limits.mjs")
+      .then(({ BODY_AREAS, EQUIPMENT_OPTIONS }) => ({ BODY_AREAS, EQUIPMENT_OPTIONS }));
+  }
+  return limitsListsPromise;
 }
 
-function initLimitsPrototype() {
-  const picked = { hurt: new Set(), missing: new Set() };
-  const ctaBar = $("protoLimCta"), saveBtn = $("protoLimSaveBtn"), noteEl = $("protoLimNote");
+/* Which joint a tap on the figure means. The body is drawn in muscles and the
+   engine thinks in joints, so this is the join between the two: the joint or
+   joints each of the app's fourteen groups actually moves. Coaching judgement,
+   exactly like joint-load.mjs itself, and it wants the same physio read before
+   any of it is described as medical.
 
-  function sync() {
-    const n = picked.hurt.size + picked.missing.size + (noteEl.value.trim() ? 1 : 0);
-    ctaBar.classList.toggle("show", n > 0);
-    if (!n) return;
-    // Counting the free-text note as one more thing said, so the button never
-    // reads "Save 0" for somebody who only typed.
-    saveBtn.innerHTML = icon("check", 22) + " Save " + n + " thing" + (n === 1 ? "" : "s")
-      + '<span class="go">' + icon("chevronRight", 22) + "</span>";
+   Two calls worth knowing about. The neck lives under `traps` because that is
+   where the figure puts it: the .riv's sternocleidomastoid maps to traps in
+   RIVE_TO_APP_GROUP, and "no heavy shrugs" is a traps sentence anyway. And the
+   wrist hangs off `forearms` alone rather than off every arm muscle, because
+   the forearm is what moves it; tapping a bicep and having the wrist light up
+   would read as the figure guessing. */
+const LIMIT_GROUP_JOINTS = {
+  chest: ["shoulder"], shoulders: ["shoulder"], traps: ["neck", "shoulder"], lats: ["shoulder"],
+  biceps: ["elbow"], triceps: ["elbow"], forearms: ["elbow", "wrist"],
+  abs: ["lowerback"], obliques: ["lowerback"], lowerback: ["lowerback"],
+  glutes: ["hip"], hamstrings: ["hip", "knee"], quads: ["hip", "knee"], calves: ["ankle"],
+};
+
+/* The reverse, built from the table above rather than typed out again, so a
+   change to one cannot leave the other behind. Every one of the eight joints
+   has at least one group, which is what makes a chip tap paintable. */
+const LIMIT_JOINT_GROUPS = {};
+for (const [group, joints] of Object.entries(LIMIT_GROUP_JOINTS)) {
+  for (const j of joints) (LIMIT_JOINT_GROUPS[j] ??= []).push(group);
+}
+
+let LIMITS_FRONT_CTRL = null, LIMITS_BACK_CTRL = null, LIMITS_GEN = 0;
+const LIMIT_HURTS = new Set();      // BODY_AREAS keys
+const LIMIT_MISSING = new Set();    // EQUIPMENT_OPTIONS keys
+/* Set only when the page was reached from the after-plan offer, so Skip can
+   tell "I came here from Setup and changed my mind" (write nothing) from
+   "you asked me and I said no" (write the empty answer, so null keeps meaning
+   never asked and the offer is not made twice). */
+let LIMITS_ASKED_AFTER_PLAN = false;
+
+const emptyLimits = () => ({ hurts: [], missing: [], note: null, updated_at: new Date().toISOString() });
+
+/* The figure has to be exactly the colour the chips are, and --partner has a
+   separate value per theme, so it is read off the stylesheet rather than
+   duplicated here. Same argument as FOCUS_PICK_GREEN matching the ring. */
+function limitWarnRgb() {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(cssVar("--partner"));
+  return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : { r: 0xff, g: 0x6b, b: 0x4a };
+}
+
+function renderLimitsPage() {
+  $("limitsRoot").innerHTML = `
+    <div class="card">
+      <h2>Does anything hurt?</h2>
+      <p class="muted-note">Tap the body, or tap a chip: they are the same answer. Anything marked is left
+        out of every workout we generate from here on, and each chip says what that costs you.</p>
+      <div class="bi-figures" id="limitsFigures">
+        <div class="bi-fig" data-view="Front"><canvas id="limitsFront" class="bi-canvas"></canvas></div>
+        <div class="bi-fig" data-view="Back"><canvas id="limitsBack" class="bi-canvas"></canvas></div>
+      </div>
+      <div class="limit-chips" id="limitsHurtChips"></div>
+      <p class="limit-summary" id="limitsHurtSummary">Loading the figure...</p>
+    </div>
+    <div class="card">
+      <h2>Anything you don't have?</h2>
+      <p class="muted-note">A painful joint can be trained around with a lighter version of something.
+        Kit you do not own cannot, so the plan simply stops prescribing it.</p>
+      <div class="limit-chips" id="limitsGearChips"></div>
+      <p class="limit-foot" id="limitsGearFoot"></p>
+    </div>
+    <div class="card">
+      <h2>Anything else?</h2>
+      <p class="muted-note">One line, kept as you wrote it and read back to you here. Nothing reads it
+        but a person.</p>
+      <input id="limitsNote" type="text" maxlength="120" placeholder="A condition, a recent surgery, anything" />
+    </div>
+    <button type="button" class="btn-primary" id="limitsSaveBtn">Save</button>
+    <button type="button" class="btn-ghost" id="limitsSkipBtn">Skip for now</button>
+    <button type="button" class="limit-clear" id="limitsClearBtn">${icon("close", 13)} Clear all</button>`;
+
+  $("limitsSaveBtn").onclick = saveLimitsPage;
+  $("limitsSkipBtn").onclick = skipLimitsPage;
+  $("limitsClearBtn").onclick = clearLimitsPage;
+  initLimitsPage();
+}
+
+/* Own generation counter and own controller variables, for the same reason the
+   focus picker has its own: these canvases are new DOM nodes every visit, and
+   the focus page's controllers are destroyed on close, so nothing here can be
+   shared with it or reused from a previous visit. */
+async function initLimitsPage() {
+  const gen = ++LIMITS_GEN;
+  LIMITS_FRONT_CTRL?.destroy(); LIMITS_FRONT_CTRL = null;
+  LIMITS_BACK_CTRL?.destroy(); LIMITS_BACK_CTRL = null;
+
+  let lists;
+  try {
+    lists = await ensureLimitsLists();
+  } catch (e) {
+    console.error("limits: the engine's lists failed to load", e);
+    if (gen === LIMITS_GEN && $("limitsHurtSummary")) $("limitsHurtSummary").textContent = "Could not load the options.";
+    return;
+  }
+  if (gen !== LIMITS_GEN || !$("limitsFigures")) return;   // a newer visit, or navigated away
+  const { BODY_AREAS, EQUIPMENT_OPTIONS } = lists;
+
+  /* Whatever is on file is what the page opens on, so this reads as editing a
+     saved answer rather than starting over. Unknown keys are dropped here for
+     the same reason normalizeLimits drops them engine-side: an older client's
+     stale value should cost a chip, never the screen. */
+  const saved = MY_PROFILE?.limits && typeof MY_PROFILE.limits === "object" ? MY_PROFILE.limits : {};
+  const okHurt = new Set(BODY_AREAS.map((a) => a.key));
+  const okGear = new Set(EQUIPMENT_OPTIONS.map((o) => o.key));
+  LIMIT_HURTS.clear(); LIMIT_MISSING.clear();
+  for (const k of Array.isArray(saved.hurts) ? saved.hurts : []) if (okHurt.has(k)) LIMIT_HURTS.add(k);
+  for (const k of Array.isArray(saved.missing) ? saved.missing : []) if (okGear.has(k)) LIMIT_MISSING.add(k);
+  $("limitsNote").value = typeof saved.note === "string" ? saved.note : "";
+
+  const chip = (kind, o) => `<button type="button" class="limit-chip" data-kind="${kind}" data-key="${escapeHtml(o.key)}">
+      <b>${escapeHtml(o.label)}</b><i>${escapeHtml(o.hint)}</i></button>`;
+  $("limitsHurtChips").innerHTML = BODY_AREAS.map((a) => chip("hurt", a)).join("");
+  $("limitsGearChips").innerHTML = EQUIPMENT_OPTIONS.map((o) => chip("gear", o)).join("");
+  const noneOpt = EQUIPMENT_OPTIONS.find((o) => o.key === "none");
+  $("limitsGearFoot").textContent = noneOpt
+    ? `"${noneOpt.label}" clears the other four and vice versa: the whole week becomes bodyweight.`
+    : "";
+
+  const label = (k) => BODY_AREAS.find((a) => a.key === k)?.label || k;
+  let mod = null;                                    // the Rive module, once it loads
+
+  function syncChips() {
+    document.querySelectorAll("#limitsHurtChips .limit-chip").forEach((b) => {
+      b.classList.toggle("on", LIMIT_HURTS.has(b.dataset.key));
+      b.setAttribute("aria-pressed", String(LIMIT_HURTS.has(b.dataset.key)));
+    });
+    document.querySelectorAll("#limitsGearChips .limit-chip").forEach((b) => {
+      b.classList.toggle("on", LIMIT_MISSING.has(b.dataset.key));
+      b.setAttribute("aria-pressed", String(LIMIT_MISSING.has(b.dataset.key)));
+    });
+    const names = BODY_AREAS.filter((a) => LIMIT_HURTS.has(a.key)).map((a) => a.label);
+    $("limitsHurtSummary").innerHTML = names.length
+      ? "Marked: <b>" + escapeHtml(names.join(", ")) + "</b>. Nothing that loads "
+        + (names.length === 1 ? "it" : "them") + " heavily goes in a plan again."
+      : "Nothing marked. Saving now clears whatever is on file.";
   }
 
-  document.querySelectorAll(".proto-lim-chip").forEach((btn) => {
-    btn.onclick = () => {
-      const kind = btn.dataset.kind, i = Number(btn.dataset.i);
-      if (picked[kind].has(i)) picked[kind].delete(i); else picked[kind].add(i);
-      btn.classList.toggle("on", picked[kind].has(i));
-      sync();
-    };
-  });
-  noteEl.oninput = sync;
+  /* The figure paints per muscle, so a marked joint lights every group that
+     joint moves. Intensity 4 is what the palette below is bound to; 0 is the
+     figure's own resting fill, which is why unmarking never has to repaint. */
+  function repaint() {
+    if (!mod) return;
+    const on = {};
+    for (const m of mod.ALL_MUSCLES) on[m] = 0;
+    for (const j of LIMIT_HURTS) {
+      for (const g of LIMIT_JOINT_GROUPS[j] || []) {
+        for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) on[m] = 4;
+      }
+    }
+    LIMITS_FRONT_CTRL?.setIntensities(on);
+    LIMITS_BACK_CTRL?.setIntensities(on);
+  }
 
-  saveBtn.onclick = () => toast("Prototype only, nothing saved yet");
-  $("protoLimSkipBtn").onclick = () => toast("Prototype only, this is where the plan would open");
-  sync();
+  function paintWarn(group) {
+    if (!mod) return;
+    const warn = limitWarnRgb();
+    const pal = { base: mod.APP_HEAT_PALETTE.base, level1: warn, level2: warn, level3: warn, level4: warn };
+    for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[group] || []) {
+      LIMITS_FRONT_CTRL?.setMusclePalette(m, pal);
+      LIMITS_BACK_CTRL?.setMusclePalette(m, pal);
+    }
+  }
+
+  function markJoint(key) {
+    LIMIT_HURTS.add(key);
+    for (const g of LIMIT_JOINT_GROUPS[key] || []) paintWarn(g);
+  }
+
+  function toggleHurt(key) {
+    if (LIMIT_HURTS.has(key)) LIMIT_HURTS.delete(key); else markJoint(key);
+    repaint(); syncChips();
+  }
+
+  function toggleGear(key) {
+    /* "No equipment at all" is not a fifth implement, it is the honest nothing
+       case, so it cannot coexist with the other four. The engine already makes
+       it win if both somehow arrive; refusing the combination here means the
+       screen never shows a state the plan would quietly rewrite. */
+    if (LIMIT_MISSING.has(key)) LIMIT_MISSING.delete(key);
+    else if (key === "none") { LIMIT_MISSING.clear(); LIMIT_MISSING.add("none"); }
+    else { LIMIT_MISSING.delete("none"); LIMIT_MISSING.add(key); }
+    syncChips();
+  }
+
+  /* A muscle can sit between two joints (the quad moves the hip and the knee),
+     so a tap marks or clears the whole set rather than half of it, and says out
+     loud which joints it just meant: the chips explain the jump, but they are
+     below the fold on a small phone. */
+  function onTap(muscle, group) {
+    const joints = LIMIT_GROUP_JOINTS[group] || [];
+    if (!joints.length) return;
+    const allOn = joints.every((j) => LIMIT_HURTS.has(j));
+    for (const j of joints) { if (allOn) LIMIT_HURTS.delete(j); else markJoint(j); }
+    repaint(); syncChips();
+    if (!allOn) toast(joints.map(label).join(" and ") + " marked");
+  }
+
+  $("limitsHurtChips").onclick = (e) => {
+    const b = e.target.closest(".limit-chip");
+    if (b) toggleHurt(b.dataset.key);
+  };
+  $("limitsGearChips").onclick = (e) => {
+    const b = e.target.closest(".limit-chip");
+    if (b) toggleGear(b.dataset.key);
+  };
+  syncChips();
+
+  /* The figure is the nicer half of this screen but it must never be the only
+     way in: the chips above are already live by here, so a failed .riv or a
+     browser without WebGL2 leaves a working page rather than a dead one. */
+  try {
+    mod = await ensureRiveBodyModule();
+  } catch (e) {
+    console.error("limits: figure failed to load", e);
+    if (gen === LIMITS_GEN && $("limitsFigures")) $("limitsFigures").classList.add("hidden");
+    return;
+  }
+  if (gen !== LIMITS_GEN || !$("limitsFigures")) return;
+
+  const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
+  const make = (id, view) => mod.createBodyHeatmap({
+    canvas: $(id),
+    artboardName: `${sex}-${view}`,
+    intensities: {},
+    /* A per muscle palette needs the view model, which does not exist until the
+       figure has loaded, so what is already on file is painted from here rather
+       than straight after this call. */
+    onLoad: () => {
+      for (const j of LIMIT_HURTS) for (const g of LIMIT_JOINT_GROUPS[j] || []) paintWarn(g);
+      repaint();
+    },
+    onMuscleClick: (muscle, group) => onTap(muscle, group),
+  });
+
+  LIMITS_FRONT_CTRL = make("limitsFront", "Front");
+  LIMITS_BACK_CTRL = make("limitsBack", "Back");
+}
+
+/* Torn down rather than hidden, same as the focus picker: two Rive instances
+   share the page's one WebGL2 context with Body Impact's own figures, so
+   leaving these drawing behind a closed page costs frames on every other tab. */
+function closeLimitsPage() {
+  LIMITS_ASKED_AFTER_PLAN = false;
+  const root = $("limitsRoot");
+  if (!root || !root.innerHTML) return;
+  LIMITS_GEN++;
+  LIMITS_FRONT_CTRL?.destroy(); LIMITS_FRONT_CTRL = null;
+  LIMITS_BACK_CTRL?.destroy(); LIMITS_BACK_CTRL = null;
+  root.innerHTML = "";
+}
+
+/* The one writer for profiles.limits, same upsert shape as saveFocusGroups.
+   updated_at goes inside the jsonb because the engine does not set it: it is
+   there so a limit can be aged the way focus_chosen_at ages a body map pick. */
+async function saveLimits(limits, { quiet = false } = {}) {
+  const { error } = await sb.from("profiles").upsert({
+    email: MY_EMAIL,
+    user_name: ME,
+    limits,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) { if (!quiet) toast("That didn't save"); console.error(error); return false; }
+  await loadAll();
+  return true;
+}
+
+async function saveLimitsPage() {
+  const { BODY_AREAS, EQUIPMENT_OPTIONS } = await ensureLimitsLists();
+  // The engine's own order, not tap order, so two people who said the same
+  // thing store the same thing.
+  const hurts = BODY_AREAS.filter((a) => LIMIT_HURTS.has(a.key)).map((a) => a.key);
+  const missing = EQUIPMENT_OPTIONS.filter((o) => LIMIT_MISSING.has(o.key)).map((o) => o.key);
+  /* Free text, capped at the 120 characters the column and the engine agree on,
+     stored exactly as written and never parsed. Turning "left knee since the
+     ACL" into a filter is how an app ends up guessing at a medical history; the
+     engine ignores this field by design and so does everything here. */
+  const note = ($("limitsNote")?.value || "").trim().slice(0, 120) || null;
+
+  const btn = $("limitsSaveBtn");
+  btn.disabled = true;
+  const ok = await saveLimits({ hurts, missing, note, updated_at: new Date().toISOString() });
+  btn.disabled = false;
+  if (!ok) return;
+
+  const said = [
+    ...BODY_AREAS.filter((a) => hurts.includes(a.key)).map((a) => a.label.toLowerCase()),
+    ...EQUIPMENT_OPTIONS.filter((o) => missing.includes(o.key)).map((o) => o.label.toLowerCase()),
+  ];
+  toast(said.length ? "Noted: " + said.join(", ") : note ? "Note saved" : "Nothing noted");
+  closeSettingsPage();
+}
+
+/* From Setup this is just a way back out and writes nothing. Reached from the
+   after-plan offer it records the empty answer, so limits === null keeps
+   meaning "never asked" and that offer is never made a second time. */
+async function skipLimitsPage() {
+  if (LIMITS_ASKED_AFTER_PLAN) await saveLimits(emptyLimits(), { quiet: true });
+  closeSettingsPage();
+}
+
+async function clearLimitsPage() {
+  LIMIT_HURTS.clear(); LIMIT_MISSING.clear();
+  if ($("limitsNote")) $("limitsNote").value = "";
+  const btn = $("limitsClearBtn");
+  btn.disabled = true;
+  const ok = await saveLimits(emptyLimits());
+  btn.disabled = false;
+  if (!ok) return;
+  toast("Limits cleared");
+  closeSettingsPage();
+}
+
+/* "Shoulder, no barbell" under the Setup row, the same sentence-fragment voice
+   as focusGroupsSubtitle. Async because the labels belong to the engine and
+   nothing else on the Setup tab needs that module: somebody who has never
+   answered never pays for the import. */
+function paintLimitsSubtitle() {
+  const el = $("setLimitsSub");
+  if (!el) return;
+  const lim = MY_PROFILE?.limits;
+  // Never asked and asked-but-nothing-said are different answers, and the row
+  // is the only place that difference is visible.
+  if (!lim || typeof lim !== "object") { el.textContent = "Not set"; return; }
+  el.textContent = "Nothing noted";
+  ensureLimitsLists().then(({ BODY_AREAS, EQUIPMENT_OPTIONS }) => {
+    const names = [
+      ...BODY_AREAS.filter((a) => (lim.hurts || []).includes(a.key)).map((a) => a.label),
+      ...EQUIPMENT_OPTIONS.filter((o) => (lim.missing || []).includes(o.key)).map((o) => o.label),
+    ];
+    if (!$("setLimitsSub")) return;
+    $("setLimitsSub").textContent = names.length
+      ? names.map((n, i) => (i ? n.toLowerCase() : n)).join(", ")
+      : lim.note ? "A note, nothing ruled out" : "Nothing noted";
+  }).catch(() => { /* the row keeps its honest fallback */ });
 }
 
 function renderOnboardStep(step, data = {}) {
@@ -5790,7 +6082,7 @@ const MILESTONE_BADGES = [
       return false;
     } },
 
-  { id: "goal_week", category: "Getting started", color: "#2d6bff",
+  { id: "goal_week", category: "Getting started", color: "#4a5160",
     label: "Goal Week", sub: "Hit your own weekly number",
     svg: '<circle cx="12" cy="4.2" r="1.6"/><circle cx="17.7" cy="6.3" r="1.6"/><circle cx="19.8" cy="12" r="1.6"/><circle cx="17.7" cy="17.7" r="1.6"/><circle cx="12" cy="19.8" r="1.6"/><circle cx="6.3" cy="17.7" r="1.6"/><circle cx="4.2" cy="6.3" r="1.6"/>',
     cel: { headline: "You hit your number.", sub: "Your own target, not anyone else's." },
@@ -5816,7 +6108,7 @@ const MILESTONE_BADGES = [
       return mine + theirs >= 100;
     } },
 
-  { id: "full_coverage", category: "Consistency, together", color: "#2fa968",
+  { id: "full_coverage", category: "Consistency, together", color: "#4a5160",
     label: "Full Coverage", sub: "Every muscle, one week",
     svg: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M6.3 6.3l11.4 11.4M17.7 6.3 6.3 17.7"/>',
     cel: { headline: "Nothing skipped this week.", sub: "Every muscle group got its work in." },
@@ -5836,7 +6128,7 @@ const MILESTONE_BADGES = [
     cel: { headline: "A new best.", sub: "Heavier than you have ever gone before." },
     check: () => personalRecords(ME).prCount >= 1 },
 
-  { id: "double_pr_week", category: "Strength", color: "#a8ff00",
+  { id: "double_pr_week", category: "Strength", color: "#4a5160",
     label: "Double PR Week", sub: "You both hit one",
     svg: '<g transform="translate(-3.5,2)"><path d="M9 15.5V6.5M5.2 10l3.8-4 3.8 4" transform="scale(0.62)"/></g><g transform="translate(6.5,2)"><path d="M9 15.5V6.5M5.2 10l3.8-4 3.8 4" transform="scale(0.62)"/></g>',
     cel: { headline: "Both of you, new bests.", sub: "Same week, two records." },
@@ -5859,7 +6151,7 @@ const MILESTONE_BADGES = [
       return false;
     } },
 
-  { id: "bodyweight_bench", category: "Strength", color: "#ff6b4a",
+  { id: "bodyweight_bench", category: "Strength", color: "#4a5160",
     label: "Bodyweight Bench", sub: "The first real ladder rung",
     svg: '<path d="M4 10v4M20 10v4M2 12h2M20 12h2M6 8v8M18 8v8M9 12h6"/>',
     cel: { headline: "Bench, bodyweight.", sub: "The first real ladder rung, and you are on it." },
@@ -5870,13 +6162,13 @@ const MILESTONE_BADGES = [
         l.exercise_name.toLowerCase().includes("bench press") && l.weight >= bw);
     } },
 
-  { id: "first_photo", category: "Keeping the record", color: "#2fa968",
+  { id: "first_photo", category: "Keeping the record", color: "#4a5160",
     label: "First Photo", sub: "Day one of the record",
     svg: '<rect x="3" y="6" width="18" height="14" rx="2"/><circle cx="12" cy="13" r="3.5"/><path d="M8 6l1.5-2h5L16 6"/>',
     cel: { headline: "Day one of the record.", sub: "The first photo of many." },
     check: () => MY_EMAIL ? BODY_PHOTOS.some((p) => p.email === MY_EMAIL) : false },
 
-  { id: "one_year", category: "Keeping the record", color: "#a8ff00",
+  { id: "one_year", category: "Keeping the record", color: "#4a5160",
     label: "1 Year", sub: "Together, on the app", text: "365",
     cel: { headline: "One year together on the app.", sub: "Every week of it, logged." },
     check: () => !!(MY_PARTNERSHIP?.responded_at &&
@@ -9643,6 +9935,14 @@ function revealGeneratedPlan(workout, honest, onGo) {
   stopGenTicker();
   paintGen(100);
   const list = (workout.exercises || []).slice(0, 8);
+  /* The one unprompted offer, and it is here rather than in onboarding because
+     a limit is a constraint on how a goal gets trained for, not a goal: asking
+     up front turns "what do you want" into "what is wrong with you" and can
+     block somebody from ever getting a plan. By here the plan exists, so the
+     answer can only make it safer. null means never asked, so an empty answer
+     is written whether they take the offer or dismiss it, and this line is
+     therefore shown exactly once in the life of an account. */
+  const askLimits = MY_PROFILE?.limits == null;
   setTimeout(() => {
     $("genScrim").classList.add("done");
     $("genStage").innerHTML = `
@@ -9659,8 +9959,29 @@ function revealGeneratedPlan(workout, honest, onGo) {
             </span>
           </div>`).join("")}
       </div>
+      ${askLimits ? `
+      <div class="gen-nudge" style="--d:${list.length * 70 + 60}ms">
+        <p>Anything that hurts, or gear you don't have? Tell us once and every plan will respect it.</p>
+        <button type="button" id="genLimitsBtn">Tell us</button>
+      </div>` : ""}
       <button type="button" class="btn-primary gen-go" id="genGoBtn" style="--d:${list.length * 70 + 120}ms">Let's go</button>`;
-    $("genGoBtn").onclick = () => { closeGenOverlay(); onGo?.(); };
+    $("genGoBtn").onclick = () => {
+      // Dismissing the offer is itself an answer, and recording it is what keeps
+      // "offered once" true rather than "offered after every single plan".
+      if (askLimits) saveLimits(emptyLimits(), { quiet: true }).catch((e) => console.error(e));
+      closeGenOverlay();
+      onGo?.();
+    };
+    if ($("genLimitsBtn")) {
+      $("genLimitsBtn").onclick = () => {
+        closeGenOverlay();
+        switchTab("setup");
+        openSettingsPage("limits");
+        // After openSettingsPage, which renders the page: Skip there should now
+        // record the answer rather than leaving it null.
+        LIMITS_ASKED_AFTER_PLAN = true;
+      };
+    }
   }, 420);
 }
 
@@ -13918,16 +14239,20 @@ function openSettingsPage(key) {
   document.querySelectorAll(".settings-page").forEach((el) => {
     el.classList.toggle("hidden", el.id !== `page-${key}`);
   });
-  // The only page whose contents are built rather than sitting in the markup.
+  // The only two pages whose contents are built rather than sitting in the
+  // markup: both carry a Rive canvas that has to be created and destroyed.
   if (key === "focus") renderBodyFocusPage();
+  if (key === "limits") renderLimitsPage();
   window.scrollTo({ top: 0 });
 }
 
 function closeSettingsPage() {
   document.querySelectorAll(".settings-page").forEach((el) => el.classList.add("hidden"));
   closeBodyFocusPage();
+  closeLimitsPage();
   $("setupRoot").classList.remove("hidden");
   $("setFocusSub").textContent = focusGroupsSubtitle();
+  paintLimitsSubtitle();
   window.scrollTo({ top: 0 });
 }
 
@@ -13941,6 +14266,7 @@ function renderSetupTab() {
   $("setupPairWrap").classList.toggle("hidden", !!PARTNER_EMAIL || isCoachedClient());
   $("setupInviteCode").textContent = MY_PROFILE?.invite_code || "-";
   $("setFocusSub").textContent = focusGroupsSubtitle();
+  paintLimitsSubtitle();
 
   // Only meaningful once there is someone to hide details from.
   $("sharePrivacyCard").classList.toggle("hidden", !PARTNER_EMAIL);
