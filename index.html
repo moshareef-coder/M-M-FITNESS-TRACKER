@@ -496,6 +496,20 @@
   }
   .sess-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
   .sess-target { font-size: 15.5px; color: var(--muted); }
+  /* The mark to beat, beside the target. Quiet until it is beaten, then it
+     takes the accent, because that is the one moment it is worth looking at. */
+  .sess-best {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700;
+    letter-spacing: -.01em; padding: 5px 10px; border-radius: 100px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+    transition: background .18s ease, border-color .18s ease, color .18s ease;
+  }
+  .sess-best svg { flex-shrink: 0; }
+  .sess-best.beaten {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    color: var(--accent-ink);
+  }
   .sess-note { font-size: 12.5px; color: var(--muted); margin-top: 10px; line-height: 1.45; }
 
 
@@ -1549,49 +1563,76 @@
   .si-legal { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 20px 0 0; max-width: 34ch; }
   .si-legal a { color: var(--muted); text-underline-offset: 2px; }
 
-  /* PROTOTYPE, NOT LIVE: renderGoalBubblesPrototype, reachable only from the
+  /* PROTOTYPE, NOT LIVE: renderGoalTilesPrototype, reachable only from the
      sandbox walkthrough. See the comment above that function. Sizes stay on
      the app's eight-step scale (11 / 12.5 / 14 / 15.5 / 17 / 21 / 24 / 28),
      same as everywhere else. */
-  .proto-bubble-flag {
+  .proto-flag {
     display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800;
     letter-spacing: .08em; text-transform: uppercase; color: var(--partner);
     background: color-mix(in srgb, var(--partner) 14%, transparent);
     border-radius: 100px; padding: 5px 11px; margin-bottom: 14px;
   }
-  /* Nine categories now, up from five, so more room: the physics settles
-     cleanly either way (checked headless before this went in), but several
-     opened at once want the extra breathing room. */
-  .proto-bubble-field { position: relative; height: 64vh; min-height: 460px; margin-top: 6px; touch-action: none; }
-  .proto-bub {
-    position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    text-align: center; font: inherit; cursor: pointer; padding: 6px; user-select: none;
-    color: var(--text); background: var(--panel-2); border: 1.5px solid var(--border);
-    transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
-    will-change: left, top, transform, opacity;
+  /* Nine categories, all on screen at once: a tile only has to hold an icon
+     and a word, so this is the one place in the whole flow where nothing
+     scrolls and nothing is hidden by default. */
+  .proto-tile-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 6px;
+    transition: transform .28s cubic-bezier(.22,1,.36,1), filter .28s ease;
   }
-  .proto-bub:active { filter: brightness(.97); }
-  .proto-bub-inner { display: flex; flex-direction: column; align-items: center; gap: 4px; line-height: 1.15; pointer-events: none; }
-  .proto-bub-label { font-weight: 700; letter-spacing: -.01em; }
-  .proto-bub.parent { background: var(--panel); border-color: color-mix(in srgb, var(--accent) 38%, var(--border)); z-index: 2; }
-  .proto-bub.parent .proto-bub-ico { color: var(--accent-ink); }
-  .proto-bub.parent .proto-bub-label { font-size: 14px; }
-  .proto-bub.parent.active {
-    background: var(--accent); border-color: transparent; color: var(--on-accent);
-    box-shadow: var(--glow-accent); z-index: 3;
+  .proto-tile-grid.dim { transform: scale(.97); filter: brightness(.9); }
+  .proto-tile {
+    aspect-ratio: 1; border-radius: 16px; background: var(--panel); border: 1.5px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    font-family: inherit; color: var(--text); cursor: pointer; padding: 8px; position: relative;
+    transition: border-color .18s ease, background .18s ease;
   }
-  .proto-bub.parent.active .proto-bub-ico { color: var(--on-accent); }
-  .proto-bub.child { background: var(--panel-2); border-color: var(--border); z-index: 1; }
-  .proto-bub.child .proto-bub-label { font-size: 12.5px; font-weight: 600; }
-  .proto-bub.child.picked {
-    background: var(--panel); border-color: var(--accent-ink); color: var(--text);
-    box-shadow: inset 0 0 0 1.5px var(--accent-ink);
+  .proto-tile:active { transform: scale(.985); }
+  .proto-tile.has-picks { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+  .proto-tile-ico {
+    width: 36px; height: 36px; border-radius: 11px; background: var(--panel-2);
+    display: flex; align-items: center; justify-content: center; color: var(--accent-ink);
   }
-  .proto-bubble-cta {
+  .proto-tile.has-picks .proto-tile-ico { background: var(--accent); color: var(--on-accent); }
+  .proto-tile-label { font-size: 12.5px; font-weight: 700; letter-spacing: -.01em; text-align: center; line-height: 1.2; }
+  .proto-tile-badge {
+    position: absolute; top: 8px; right: 8px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 100px;
+    background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  /* The category sheet reuses .sheet-scrim, the same fixed dark overlay every
+     other sheet in the app opens on, so this reads as the app's own bottom
+     sheet rather than a prototype-only one. */
+  .proto-goal-sheet {
+    width: 100%; max-height: 78dvh; overflow-y: auto; background: var(--panel);
+    border-radius: 22px 22px 0 0; border: 1px solid var(--border); border-bottom: none;
+    padding: 10px 18px calc(20px + env(safe-area-inset-bottom, 0px));
+    animation: sheetUp .28s cubic-bezier(.22,1,.36,1);
+  }
+  .pgs-head { display: flex; align-items: center; gap: 10px; padding: 6px 0 16px; }
+  .pgs-ico {
+    width: 32px; height: 32px; border-radius: 10px; background: var(--accent); color: var(--on-accent);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .pgs-title { flex: 1; font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+  .pgs-rows { display: flex; flex-direction: column; gap: 9px; }
+  .pgs-row {
+    width: 100%; display: flex; align-items: center; gap: 11px; text-align: left; padding: 14px 15px;
+    border-radius: 12px; cursor: pointer; border: 1px solid var(--border); background: var(--panel-2);
+    color: var(--text); font-family: inherit; font-size: 14.5px; font-weight: 600; letter-spacing: -.005em;
+    transition: border-color .15s, background .15s;
+  }
+  .pgs-row.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+  .pgs-box {
+    flex-shrink: 0; width: 21px; height: 21px; border-radius: 6px; border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center; color: transparent; background: var(--panel);
+  }
+  .pgs-row.on .pgs-box { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+  .proto-cta {
     margin-top: 16px; transform: translateY(14px); opacity: 0; pointer-events: none;
     transition: transform .28s cubic-bezier(.22,1,.36,1), opacity .28s;
   }
-  .proto-bubble-cta.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
+  .proto-cta.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
 
   .ob-kicker { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--accent-ink); margin-bottom: 8px; }
   .ob-chips { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
@@ -4221,54 +4262,62 @@ function renderOnboardIntro(i, data) {
   };
 }
 
-/* PROTOTYPE, NOT LIVE. Mo picked this direction after three rounds of review
-   (a published artifact, then the gallery's static "Choosing a goal" page),
-   and asked to try it for real inside the sandbox rather than as a picture.
+/* PROTOTYPE, NOT LIVE. Four rounds of review got here: a published artifact,
+   the gallery's static "Choosing a goal" page, a live spring-physics bubble
+   field in the sandbox, and then Mo opening every bubble at once and finding
+   52 items cannot share one screen at any spacing. The follow-up laid out
+   three structurally different pickers (research-grounded: 2-5 choices is
+   the accepted range per onboarding screen, so the fix was never going to be
+   a better bubble). Mo picked tiles-plus-sheet: nine categories always
+   visible as a 3x3 grid, tap one for its full checklist in a bottom sheet,
+   same pattern Fitbod and JustFit converge on and the one this app's own
+   mobile-ui-patterns skill already calls out as the answer for "not enough
+   room, but a whole new page would lose context".
 
-   This function is real and fully interactive, the actual spring simulation,
-   not a hand-placed frame. It is also completely inert for a real user: real
-   onboarding never calls it. renderOnboardStep still runs the shipping goal
-   step exactly as it does today. The only caller is the sandbox's own
-   walkthrough (sandbox-steps.js), which reaches app functions directly by
-   name, the same way it reaches switchTab and startWorkout. Tracked in
-   issues.json under "Designed, not built" until it replaces the real step. */
-function renderGoalBubblesPrototype() {
+   This function is real and fully interactive. It is also completely inert
+   for a real user: real onboarding never calls it. renderOnboardStep still
+   runs the shipping goal step exactly as it does today. The only caller is
+   the sandbox's own walkthrough (sandbox-steps.js), which reaches app
+   functions directly by name, the same way it reaches switchTab and
+   startWorkout. Tracked in issues.json under "Designed, not built" until it
+   replaces the real step. */
+function renderGoalTilesPrototype() {
   const ob = $("onboard");
   ob.classList.remove("hidden");
   $("app").classList.add("hidden");
 
   ob.innerHTML = `
     <div class="ob-step">
-      <span class="proto-bubble-flag">${icon("bell", 12)} Prototype, not live</span>
+      <span class="proto-flag">${icon("bell", 12)} Prototype, not live</span>
       <div class="ob-kicker">STEP 2 OF 5</div>
       <h1 class="ob-h1">What's the goal?</h1>
-      <p class="ob-sub">Tap one to open it. Tap a specific goal, then continue.</p>
-      <div class="proto-bubble-field" id="protoBubbleField"></div>
-      <div class="proto-bubble-cta" id="protoBubbleCta">
-        <button type="button" class="btn-cta" id="protoBubbleCtaBtn">${icon("dumbbell", 22)} Continue
+      <p class="ob-sub">Tap a category for its full list. Pick as many as you want.</p>
+      <div class="proto-tile-grid" id="protoTileGrid"></div>
+      <div class="proto-cta" id="protoGoalCta">
+        <button type="button" class="btn-cta" id="protoGoalCtaBtn">${icon("dumbbell", 22)} Continue
           <span class="go">${icon("chevronRight", 22)}</span></button>
       </div>
     </div>`;
 
-  initGoalBubbles($("protoBubbleField"), $("protoBubbleCta"), $("protoBubbleCtaBtn"));
+  initGoalTiles($("protoTileGrid"), $("protoGoalCta"), $("protoGoalCtaBtn"));
   /* A real tap needs a real response, and the honest one here is that this
      does not go anywhere yet, nothing else in onboarding calls this screen. */
-  $("protoBubbleCtaBtn").onclick = () => toast("Prototype only, not wired into onboarding yet");
+  $("protoGoalCtaBtn").onclick = () => toast("Prototype only, not wired into onboarding yet");
 }
 
 /* The nine broad goals and their specific ones, from the real-goals research
    (mo-knowledge, built 2026-09-08 from surveys, search volume, autocomplete
-   and open forums, every number sourced in mo-knowledge/sources.md). Bubble
-   labels and child labels are used verbatim; the longer phrasings people
-   actually type live in the research as aliases and never appear on a button,
-   same rule the research itself states. Four of these, milestone, event, get
-   back into it, and tone up, map onto none of the app's original five goals,
-   which is real signal, not a gap to paper over: see mo-knowledge for what
-   each implies about pace, plan, and what "done" means. Constraints like an
-   injury or an age bracket are deliberately not here; the research defers
-   those to a later, optional screen so this one stays "what do you want",
-   never "what is wrong with you". */
-const PROTO_BUBBLE_GOALS = [
+   and open forums, every number sourced in mo-knowledge/sources.md). Category
+   and checklist labels are used verbatim; the longer phrasings people
+   actually type live in the research as aliases and never appear on a
+   button, same rule the research itself states. Four of these, milestone,
+   event, get back into it, and tone up, map onto none of the app's original
+   five goals, which is real signal, not a gap to paper over: see
+   mo-knowledge for what each implies about pace, plan, and what "done"
+   means. Constraints like an injury or an age bracket are deliberately not
+   here; the research defers those to a later, optional screen so this one
+   stays "what do you want", never "what is wrong with you". */
+const PROTO_GOAL_CATEGORIES = [
   { key: "lose", ico: "arrowDown", title: "Lose weight",
     kids: ["A number of pounds", "Belly fat", "Before a date", "For my health", "The last 10 pounds", "Lose fat and build muscle"] },
   { key: "muscle", ico: "dumbbell", title: "Build muscle",
@@ -4289,165 +4338,121 @@ const PROTO_BUBBLE_GOALS = [
     kids: ["I keep quitting", "Don't know where to start", "No time"] },
 ];
 
-/* The same spring simulation as the published artifact: soft repulsion routed
-   through velocity rather than position (so it damps instead of snapping),
-   and a bubble grows into its own collision footprint over its first third of
-   a second rather than arriving at full size, which is what makes several
-   spawning at once flow apart instead of exploding. Every category can stay
-   open at once, and picking a specific goal never clears another, in the
-   same category or a different one. */
-function initGoalBubbles(field, ctaBar, ctaBtn) {
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
-  const GROW_MS = 380, LEAVE_MS = 200;
+/* Nine tiles, always visible, no scrolling to find them. Tapping one opens a
+   bottom sheet built from the SAME .sheet-scrim overlay every other sheet in
+   the app uses, so this is not a prototype-only component wearing the app's
+   colors, it is the app's own sheet pattern. Multi-select persists across
+   categories: closing a sheet and opening another never clears what was
+   picked, and a tile's badge shows its count without reopening it. */
+function initGoalTiles(grid, ctaBar, ctaBtn) {
+  let openKey = null;
+  const pickedKeys = new Set();
 
-  let W, H, bubbles = [], activeKeys = new Set(), pickedKeys = new Set(), raf = null;
+  function pickCountFor(g) {
+    return g.kids.reduce((n, _, i) => n + (pickedKeys.has(g.key + "|" + i) ? 1 : 0), 0);
+  }
 
-  function makeParentHomes() {
-    const cx = W / 2, cy = H * 0.24, spread = W * 0.36;
-    return PROTO_BUBBLE_GOALS.map((g, i) => {
-      const a = (i / PROTO_BUBBLE_GOALS.length) * Math.PI * 2 + 0.4;
-      const rad = spread * (0.55 + 0.35 * Math.sin(i * 2.1));
-      return { x: cx + Math.cos(a) * rad, y: cy + Math.sin(a) * rad * 0.9 };
+  function render() {
+    grid.classList.toggle("dim", !!openKey);
+    grid.innerHTML = PROTO_GOAL_CATEGORIES.map((g) => {
+      const n = pickCountFor(g);
+      return `<button type="button" class="proto-tile${n ? " has-picks" : ""}" data-tile-key="${g.key}">
+        ${n ? `<span class="proto-tile-badge">${n}</span>` : ""}
+        <span class="proto-tile-ico">${icon(g.ico, 18)}</span>
+        <span class="proto-tile-label">${escapeHtml(g.title)}</span>
+      </button>`;
+    }).join("");
+    grid.querySelectorAll("[data-tile-key]").forEach((btn) => {
+      btn.onclick = () => { openKey = btn.dataset.tileKey; openSheet(); };
     });
-  }
-
-  function build() {
-    field.innerHTML = "";
-    W = field.clientWidth; H = field.clientHeight;
-    const homes = makeParentHomes();
-    const now = performance.now();
-    bubbles = PROTO_BUBBLE_GOALS.map((g, i) => ({
-      kind: "parent", key: g.key, label: g.title, iconKey: g.ico, r: 58,
-      x: homes[i].x + (Math.random() - 0.5) * 20, y: homes[i].y + (Math.random() - 0.5) * 20,
-      homeX: homes[i].x, homeY: homes[i].y, vx: 0, vy: 0, el: null,
-      phase: Math.random() * Math.PI * 2, bornAt: now, leaving: false,
-    }));
-    bubbles.forEach(mount);
-    activeKeys = new Set(); pickedKeys = new Set();
+    renderSheet();
     updateCta();
-    if (!raf) tick();
   }
 
-  function mount(b) {
-    const el = document.createElement("button");
-    el.type = "button";
-    el.className = "proto-bub " + (b.kind === "parent" ? "parent" : "child");
-    el.style.width = b.r * 2 + "px";
-    el.style.height = b.r * 2 + "px";
-    const label = b.kind === "parent"
-      ? `<span class="proto-bub-ico">${icon(b.iconKey, 20)}</span><span class="proto-bub-label">${escapeHtml(b.label)}</span>`
-      : `<span class="proto-bub-label">${escapeHtml(b.label)}</span>`;
-    el.innerHTML = `<span class="proto-bub-inner">${label}</span>`;
-    el.onclick = () => b.kind === "parent" ? tapParent(b) : tapChild(b);
-    field.appendChild(el);
-    b.el = el;
-    paint(b, 0);
+  function openSheet() {
+    let scrim = document.getElementById("protoGoalSheetScrim");
+    if (!scrim) {
+      scrim = document.createElement("div");
+      scrim.id = "protoGoalSheetScrim";
+      scrim.className = "sheet-scrim hidden";
+      grid.parentElement.appendChild(scrim);
+      scrim.onclick = (e) => { if (e.target === scrim) closeSheet(); };
+    }
+    scrim.classList.remove("hidden");
+    renderSheet();
   }
 
-  function tapParent(b) {
-    if (activeKeys.has(b.key)) { closeParent(b.key); return; }
-    activeKeys.add(b.key);
-    b.el.classList.add("active");
-    const g = PROTO_BUBBLE_GOALS.find((x) => x.key === b.key);
-    const n = g.kids.length, now = performance.now();
-    g.kids.forEach((label, i) => {
-      const a = (i / n) * Math.PI * 2 - Math.PI / 2 + b.phase;
-      const dist = b.r + 44;
-      const child = {
-        kind: "child", key: b.key + "|" + i, label, r: 38,
-        x: b.x + Math.cos(a) * (b.r * 0.35), y: b.y + Math.sin(a) * (b.r * 0.35),
-        homeX: b.x + Math.cos(a) * dist, homeY: b.y + Math.sin(a) * dist * 0.85,
-        vx: 0, vy: 0, el: null, phase: Math.random() * Math.PI * 2, bornAt: now, leaving: false,
+  function closeSheet() {
+    openKey = null;
+    const scrim = document.getElementById("protoGoalSheetScrim");
+    if (scrim) scrim.classList.add("hidden");
+    render();
+  }
+
+  function renderSheet() {
+    const scrim = document.getElementById("protoGoalSheetScrim");
+    if (!scrim) return;
+    const g = PROTO_GOAL_CATEGORIES.find((x) => x.key === openKey);
+    if (!g) { scrim.classList.add("hidden"); return; }
+    scrim.classList.remove("hidden");
+    const rows = g.kids.map((label, i) => {
+      const key = g.key + "|" + i;
+      const on = pickedKeys.has(key);
+      return `<button type="button" class="pgs-row${on ? " on" : ""}" data-pick-key="${key}">
+        <span class="pgs-box">${on ? icon("check", 13) : ""}</span>
+        <span>${escapeHtml(label)}</span>
+      </button>`;
+    }).join("");
+    scrim.innerHTML = `
+      <div class="proto-goal-sheet">
+        <div class="pgs-head">
+          <span class="pgs-ico">${icon(g.ico, 16)}</span>
+          <span class="pgs-title">${escapeHtml(g.title)}</span>
+          <button type="button" class="ds-x" id="protoGoalSheetClose" aria-label="Close">&times;</button>
+        </div>
+        <div class="pgs-rows">${rows}</div>
+      </div>`;
+    scrim.onclick = (e) => { if (e.target === scrim) closeSheet(); };
+    scrim.querySelector("#protoGoalSheetClose").onclick = closeSheet;
+    scrim.querySelectorAll("[data-pick-key]").forEach((btn) => {
+      btn.onclick = () => {
+        const key = btn.dataset.pickKey;
+        if (pickedKeys.has(key)) pickedKeys.delete(key); else pickedKeys.add(key);
+        renderSheet();
+        updateCta();
       };
-      bubbles.push(child);
-      mount(child);
     });
-  }
-
-  function closeParent(key) {
-    activeKeys.delete(key);
-    const p = bubbles.find((x) => x.kind === "parent" && x.key === key);
-    if (p) p.el.classList.remove("active");
-    bubbles.filter((x) => x.kind === "child" && x.key.startsWith(key + "|") && !x.leaving)
-      .forEach((x) => { x.leaving = true; x.leaveAt = performance.now(); });
-    [...pickedKeys].forEach((k) => { if (k.startsWith(key + "|")) pickedKeys.delete(k); });
-    updateCta();
-  }
-
-  function tapChild(b) {
-    if (pickedKeys.has(b.key)) pickedKeys.delete(b.key);
-    else pickedKeys.add(b.key);
-    bubbles.filter((x) => x.kind === "child").forEach((x) => x.el.classList.toggle("picked", pickedKeys.has(x.key)));
-    updateCta();
   }
 
   function updateCta() {
     const n = pickedKeys.size;
     if (n === 0) { ctaBar.classList.remove("show"); return; }
     ctaBar.classList.add("show");
-    const label = n === 1
-      ? (bubbles.find((x) => pickedKeys.has(x.key))?.label || "")
-      : n + " goals";
+    let label = "";
+    if (n === 1) {
+      for (const g of PROTO_GOAL_CATEGORIES) {
+        const i = g.kids.findIndex((_, idx) => pickedKeys.has(g.key + "|" + idx));
+        if (i >= 0) { label = g.kids[i]; break; }
+      }
+    } else label = n + " goals";
     ctaBtn.innerHTML = icon("dumbbell", 22) + " Continue with " + escapeHtml(label.length > 26 ? label.slice(0, 24) + "..." : label)
       + '<span class="go">' + icon("chevronRight", 22) + "</span>";
-  }
-
-  function paint(b, grow) {
-    b.el.style.left = (b.x - b.r) + "px";
-    b.el.style.top = (b.y - b.r) + "px";
-    b.el.style.opacity = grow;
-    b.el.style.transform = `scale(${(0.4 + 0.6 * grow).toFixed(3)})`;
-  }
-
-  function tick(t) {
-    raf = requestAnimationFrame(tick);
-    const eff = bubbles.map((b) => {
-      const growT = Math.min(1, (t - b.bornAt) / GROW_MS);
-      return b.r * (0.3 + 0.7 * easeOutCubic(growT));
+    // Tile badges need to reflect picks made inside the open sheet too.
+    grid.querySelectorAll("[data-tile-key]").forEach((btn) => {
+      const g = PROTO_GOAL_CATEGORIES.find((x) => x.key === btn.dataset.tileKey);
+      const n2 = pickCountFor(g);
+      btn.classList.toggle("has-picks", !!n2);
+      let badge = btn.querySelector(".proto-tile-badge");
+      if (n2 && !badge) {
+        badge = document.createElement("span");
+        badge.className = "proto-tile-badge";
+        btn.prepend(badge);
+      }
+      if (badge) { if (n2) badge.textContent = n2; else badge.remove(); }
     });
-    for (let i = 0; i < bubbles.length; i++) {
-      const a = bubbles[i];
-      if (a.leaving) continue;
-      for (let j = i + 1; j < bubbles.length; j++) {
-        const b = bubbles[j];
-        if (b.leaving) continue;
-        const dx = b.x - a.x, dy = b.y - a.y;
-        const dist = Math.hypot(dx, dy) || 0.01;
-        const min = eff[i] + eff[j] + 4;
-        if (dist < min) {
-          const push = (min - dist) / dist * 0.16;
-          a.vx -= dx * push; a.vy -= dy * push; b.vx += dx * push; b.vy += dy * push;
-        }
-      }
-    }
-    const damp = 0.9, gone = [];
-    bubbles.forEach((b) => {
-      b.vx += (b.homeX - b.x) * 0.006;
-      b.vy += (b.homeY - b.y) * 0.006;
-      if (!reduceMotion) {
-        b.phase += 0.01;
-        b.vx += Math.cos(b.phase) * 0.014;
-        b.vy += Math.sin(b.phase * 0.8) * 0.014;
-      }
-      b.vx *= damp; b.vy *= damp;
-      b.x += b.vx; b.y += b.vy;
-      b.x = Math.max(b.r, Math.min(W - b.r, b.x));
-      b.y = Math.max(b.r, Math.min(H - b.r, b.y));
-      if (b.leaving) {
-        const lt = Math.min(1, (t - b.leaveAt) / LEAVE_MS);
-        paint(b, 1 - lt);
-        if (lt >= 1) gone.push(b);
-      } else {
-        const growT = Math.min(1, (t - b.bornAt) / GROW_MS);
-        paint(b, reduceMotion ? 1 : easeOutCubic(growT));
-      }
-    });
-    if (gone.length) { gone.forEach((b) => b.el.remove()); bubbles = bubbles.filter((b) => !gone.includes(b)); }
   }
 
-  requestAnimationFrame(build);
-  window.addEventListener("resize", () => { if (bubbles.length) build(); });
+  render();
 }
 
 function renderOnboardStep(step, data = {}) {
@@ -5299,6 +5304,29 @@ function personalRecords(name) {
     if (prev == null || log.weight > prev) best[key] = log.weight;
   }
   return { best, prCount, prLogIds };
+}
+
+/* The heaviest you have already done on one movement, from BEFORE today, so it
+   can sit on screen while you lift. Same reading as personalRecords: real
+   weights only, no duration entries, and the first time you ever do something
+   has nothing behind it, so this returns null and the chip stays away rather
+   than showing you a zero to beat.
+
+   Before today rather than before this session on purpose. It keeps the number
+   fixed for the whole workout, so a set you just did cannot quietly move the
+   target you are still chasing. Ties break on reps: same weight for more reps
+   is the better set to be shown. */
+function previousBest(name) {
+  const key = (name || "").trim().toLowerCase();
+  const today = todayStr();
+  let top = null;
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== ME || l.weight == null || l.duration_min) continue;
+    if ((l.exercise_name || "").trim().toLowerCase() !== key) continue;
+    if (!l.entry_date || l.entry_date >= today) continue;
+    if (!top || l.weight > top.weight || (l.weight === top.weight && (l.reps || 0) > (top.reps || 0))) top = l;
+  }
+  return top;
 }
 
 /* ---------- Milestone badges ----------
@@ -9438,6 +9466,16 @@ async function logExerciseSilent(name, weight, reps, sets) {
     weight: w, reps: reps === "" || reps == null ? null : parseInt(reps, 10), sets: sets || null,
   };
 
+  // Remembered on the session itself, not derived from the log after the fact,
+  // so Body Impact knows exactly what THIS unfinished workout wrote and can
+  // keep it out of Muscles Hit / Training Impact until Finish is tapped.
+  if (SESSION) {
+    if (!SESSION.loggedExNames) SESSION.loggedExNames = [];
+    const key = (name || "").trim().toLowerCase();
+    if (!SESSION.loggedExNames.includes(key)) SESSION.loggedExNames.push(key);
+    saveSessionToStorage();
+  }
+
   const landed = await safeWrite("exercise_logs", "insert", payload);
   if (landed) {
     toast(`${name} logged`);
@@ -9473,6 +9511,12 @@ function renderSession() {
   }
   const allDone = setsDone.every(Boolean);
 
+  // The number to chase on this movement, and whether this session has already
+  // gone past it. Only weights logged against THIS exercise count toward that.
+  const pb = previousBest(ex.name);
+  const sessionTop = (SESSION.setWeights?.[ei] || []).reduce((m, w) => (w != null && w > m ? w : m), 0);
+  const beatenPB = !!pb && sessionTop > pb.weight;
+
   // The set you are on is the first one not yet done. Only that one is tappable,
   // so sets cannot be ticked out of order or ahead of where you actually are.
   const currentSet = setsDone.findIndex((d) => !d);
@@ -9497,6 +9541,9 @@ function renderSession() {
       <h2 class="sess-name">${escapeHtml(ex.name)}</h2>
       <div class="sess-meta">
         <span class="sess-target">${ex.sets} sets × ${ex.reps} reps</span>
+        ${pb ? `<span class="sess-best${beatenPB ? " beaten" : ""}">${icon("trophy", 13)}${beatenPB
+          ? `Beat it, was ${pb.weight} lb`
+          : `Best ${pb.weight} lb${pb.reps ? ` × ${pb.reps}` : ""}`}</span>` : ""}
       </div>
       ${ex.note ? `<div class="sess-note">${escapeHtml(ex.note)}</div>` : ""}
       ${workingMusclesHTML(ex.name, { who: "me", size: "sm", email: MY_EMAIL })}
@@ -11663,13 +11710,27 @@ function computeMuscleVolume(name, weekOffset) {
   return computeMuscleVolumeBetween(name, isoDate(start), isoDate(end));
 }
 
+/* Exercise names an unfinished workout has already written today, if this is
+   a read of your own logs. Sets land in exercise_logs the moment you finish
+   an exercise and move to the next one, well before you tap Finish on the
+   workout itself, so without this the Body tab would light up mid-session or
+   even while paused. Null once the session is done, or was never yours. */
+function bodyHiddenToday(name) {
+  if (name !== ME || !SESSION || SESSION.finished) return null;
+  return new Set(SESSION.loggedExNames || []);
+}
+function isBodyHidden(l, hidden) {
+  return !!hidden && l.entry_date === todayStr() && hidden.has((l.exercise_name || "").trim().toLowerCase());
+}
+
 // Weighted sets per muscle group for [startStr, endStr) -- a day, a week, whatever the caller needs.
 function computeMuscleVolumeBetween(name, startStr, endStr) {
   const volumes = {};
   MUSCLE_GROUPS.forEach((g) => { volumes[g] = 0; });
+  const hidden = bodyHiddenToday(name);
 
   ALL_EXERCISE_LOGS
-    .filter((l) => l.user_name === name && l.entry_date >= startStr && l.entry_date < endStr)
+    .filter((l) => l.user_name === name && l.entry_date >= startStr && l.entry_date < endStr && !isBodyHidden(l, hidden))
     .forEach((l) => {
       const rule = classifyMuscles(l.exercise_name);
       if (!rule) return;
@@ -12060,8 +12121,9 @@ function ensureBodyDetailModules() {
 // never show more work than its group.
 function computeMuscleDetailBetween(name, startStr, endStr) {
   const volumes = {}, hitBy = {};
+  const hidden = bodyHiddenToday(name);
   ALL_EXERCISE_LOGS
-    .filter((l) => l.user_name === name && l.entry_date >= startStr && l.entry_date < endStr)
+    .filter((l) => l.user_name === name && l.entry_date >= startStr && l.entry_date < endStr && !isBodyHidden(l, hidden))
     .forEach((l) => {
       const res = BODY_DETAIL.detail.hitsForExercise(l.exercise_name, classifyMuscles(l.exercise_name));
       if (!res) return;
@@ -12418,7 +12480,8 @@ function bodyGroupsPhrase(groups) {
 function bodyAreaStates() {
   const [weekStart, weekEnd] = [weekStartStr(), bodyPeriodRange("today")[1]];
   const weekVol = computeMuscleVolumeBetween(ME, weekStart, weekEnd);
-  const mine = ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME);
+  const hidden = bodyHiddenToday(ME);
+  const mine = ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME && !isBodyHidden(l, hidden));
   const entryTime = (date) => {
     const e = entriesFor(ME).find((x) => x.entry_date === date);
     return e?.workout_at ? new Date(e.workout_at).getTime() : new Date(date + "T18:00:00").getTime();
