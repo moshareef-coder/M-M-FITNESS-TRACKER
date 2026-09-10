@@ -52,6 +52,11 @@
         note: "The follow-up to the goal tiles: show the body and let a person mark which muscles they want to focus on, instead of describing goals in words. This is the actual purchased body figure, the same one Body Impact and the workout builder already render, not a stand-in. A tap marks or unmarks a muscle, plain and simple, no zoom: went through a tap-to-zoom pass and then a pinch-to-zoom pass, and neither turned out to be needed, so both are gone. Marking any muscle lights the whole group it belongs to (front delts and rear delts both from either one), the same keys Body Impact already tracks. Full body and Clear all sit under the figures for marking or clearing everything at once. Nothing here writes to the fake database and Continue does not go anywhere, on purpose. Tracked in Open issues under Designed, not built.",
         run: (w) => w.renderBodyFocusPrototype?.() },
 
+      { t: "Limits and injuries (prototype)", scenario: "fresh", flag: "not live",
+        s: "The one thing the app never asks",
+        note: "The app currently holds nothing about injuries, so it can prescribe overhead pressing to somebody with a bad shoulder and never find out. This is the screen for that, and where it sits is the whole point: AFTER the plan exists, never before. A limit is not a goal, it is a constraint on how the goal gets trained for, and asking up front turns 'what do you want' into 'what is wrong with you'. Here the plan is already made, so this only ever makes it safer, which is why Skip for now is a real button and not small print. Deliberately only the stated half of the problem: the measured half, an exercise somebody quietly swaps away from every week, is being built engine-side separately and is the better signal. This catches what measurement cannot, the shoulder you protect by never going near the movement, and the rack you do not own. Nothing writes to the fake database, on purpose. Tracked in Open issues under Designed, not built.",
+        run: (w) => w.renderLimitsPrototype?.() },
+
       { t: "First look at an empty app", scenario: "fresh",
         s: "No workouts, no partner, no history",
         note: "What a stranger sees on day one. Skip past onboarding first if it is still on screen. This is the state that has never been walked properly end to end, so look hard at the empty cards.",
