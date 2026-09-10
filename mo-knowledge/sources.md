@@ -300,3 +300,130 @@ Reddit (crawler blocked), Quora (403), bodybuilding.com forums (403), HealthUnlo
 (403), T-Nation and Nerd Fitness Discourse JSON (403), Apple App Store review pages
 (403), BMJ (403), PubMed (cookie wall). The forum layer is therefore thinner than it
 should be; see research/11 open questions.
+
+## From Jawa's research (merged 2026-09-09)
+
+Jawa Abdulal researched real goals independently on her own branch
+(`origin/jawaabdulal-patch-1`). Mo folded her work into ours on 2026-09-09; what came
+across and what was left is set out in `research/12-merged-with-jawa.md`. The URLs below
+are copied from her source file, unchanged, and only the ones that back a claim we
+actually merged are here. Keys match the `sources` arrays in `goals/goal-tree.json`.
+
+Confidence note before citing any of these: her cluster work leans on practitioner blogs,
+Substacks and open forums, which is the right kind of source for **what people say** and a
+weak one for **numbers**. The two peer-reviewed items are the reinjury pair, and they are
+the only ones here I would quote a figure from without pulling the paper first.
+
+### The push to pull ratio, and the pull-up ladder
+
+- `jawa-pushpull` The claim that pushing strength in typical adults runs roughly 1.5 to
+  2.7 times pulling strength, and that a failed push-up is usually core stability rather
+  than chest. This is the single best thing in her file and the one I most want a primary
+  citation for. Her supporting reading is the pull-up progression cluster below.
+  **VERIFY** before the ratio is quoted at a user or hard coded as a constant. The
+  programming consequence (extra lat, biceps, rear delt and grip volume for a first
+  pull-up; abs volume for a first push-up) is sound whatever the exact multiple.
+- `jawa-pullup-ladders` The regression ladder itself, dead hang to band assisted to
+  negative to strict, corroborating our `pullup-12wk` and `toolatesmart`.
+  https://www.community.darebee.com/threads/first-pullup-workout-program-challenge.1947/ ,
+  https://www.setforset.com/blogs/news/pull-up-progression ,
+  https://youfit.com/blog/pull-ups-for-beginners ,
+  https://bibleofcalisthenics.substack.com/p/pull-up-progression-from-beginner
+  *Low-medium. Practitioner consensus, no measurement.*
+
+### Fear of reinjury, and muscle loss after 50
+
+- `jawa-reinjury` Zarzycki et al., research synthesis on psychological barriers to
+  return to sport after ACL reconstruction. The source of "fear of reinjury is the most
+  commonly cited psychological barrier, roughly two thirds of those naming one".
+  https://pmc.ncbi.nlm.nih.gov/articles/PMC9957354
+  And Lentz et al., American Journal of Sports Medicine, comparing physical, functional
+  and psychosocial measures by fear of reinjury and return-to-sport status.
+  https://scholars.duke.edu/publication/1158670
+  *High on existence and general finding. Both are ACL populations, so generalising to
+  "somebody nervous about their back" is our extrapolation, not theirs.* **VERIFY**
+- `jawa-sarcopenia-50` Inactive adults lose roughly 1 to 2% of muscle mass per year after
+  50, and resistance training counteracts it. Her citation is a gym blog rather than the
+  sarcopenia literature.
+  https://app.gohighlevel.com/v2/preview/rax6uapNXCNHcBAff4BK
+  *Low as cited. The finding is standard and our `nsca-older` position statement covers
+  the same ground properly; use that one for anything user-facing.*
+  Verbatim older-returner phrasing that goes with it, "the days of heavy squats and
+  deadlifts are long gone":
+  https://healthunlocked.com/strengthandflex/posts/150455879/new-old-beginner-here ,
+  https://healthunlocked.com/couchto5k/posts/146593226/back-to-the-beginning-with-the-old-knees
+
+### Plateaus as a signal rather than a goal
+
+- `jawa-plateau` The verbatim stall phrasings ("stuck at the same weight for weeks", "my
+  bench hasn't gone up", "cant lose weight anymore") behind `detectPlateau` in
+  `engine/training-age.mjs`.
+  https://healthunlocked.com/weight-loss-support/posts/135084465/plateauing ,
+  https://healthunlocked.com/weight-loss-support/posts/135799387/stuck ,
+  https://forums.anandtech.com/threads/hit-a-plateau.146383/ ,
+  https://ateamfit.substack.com/p/busting-through-plateaus-in-the-gym ,
+  https://www.teamblind.com/post/cant-lose-weight-anymore-mc7wn2aa
+  *Medium as phrasing evidence, which is all it is being used for. The thresholds in
+  `detectPlateau` are ours and are coaching convention, not from these pages.*
+
+### Verbatim phrasing added to the goal tree
+
+- `jawa-strength-phrasing` "Bench my bodyweight", "deadlift double my bodyweight", "10
+  full push-ups", and the bodyweight-ratio benchmark ladder.
+  https://caylaspring.substack.com/p/redefining-fitness-goals-strength ,
+  https://mrpotato.substack.com/p/bench-225the-ultimate-guide-to-benching ,
+  https://texags.com/forums/48/topics/3346357 ,
+  https://forums.anandtech.com/threads/double-bodyweight-squat-club-check-in-here.2383873/post-36385132
+- `jawa-running` "Run a 5K without stopping", "sub-4-hour marathon", "sub-20-minute 5K",
+  and the run-walk to continuous structure behind them.
+  https://orangejuiceai.substack.com/p/ai-fitness-showdown-strava-run-dot ,
+  https://www.pressreader.com/uk/runners-world-uk/20180401/283682595132405 ,
+  https://lazygirlrunning.substack.com/p/run-a-faster-5k-without-burning-out ,
+  https://www.liberty.edu/campusrec/2018/04/17/how-to-train-for-your-first-5k ,
+  https://stories.strava.com/articles/strava-guide-how-to-break-your-5k-pr-with-a-little-help-from-strava
+- `jawa-returning` "Get back to what I lifted in college", "coming back to lifting as an
+  adult", "functional strength to avoid injuries as I age".
+  https://www.hevyapp.com/features/exercise-performance/
+- `jawa-functional` "Keep up with my kids without getting winded", the everyday-fitness
+  phrasing our `energy` and `pain` children now carry.
+  https://gymkee.com/blog/personal-training-client-intake-form/
+- `jawa-vague` "Just want to get fit", "overall health", the non-answer that should still
+  produce a plan.
+  https://www.teamblind.com/post/need-gym-workout-plan-for-absolute-beginners-def2z23k
+- `jawa-bulk-fear` "Toned not bulky", "I want to be strong but I'm petrified of gaining
+  muscle". Her point is that the plan does not change and the copy has to.
+  https://evanarbour.substack.com/p/light-weight-vs-heavy-weight-which ,
+  https://www.goodreads.com/author_blog_posts/13876345-low-volume-strength-training-program---without-the-bulk ,
+  https://www.liberty.edu/campusrec/2021/02/19/women-on-weights/
+- `jawa-hardgainer` "Hardgainer", "I eat a lot and don't gain weight", and the surplus
+  being the usual failure point.
+  https://alexanderjacortes.gumroad.com/l/Ectomorph ,
+  https://finance.yahoo.com/news/build-muscle-fast-beginners-skinny-185400617.html
+- `jawa-skinnyfat` "Normal BMI but soft", "bulk and cut advice hasn't worked for me".
+  https://alexanderjacortes.gumroad.com/l/SkinnyFatManifesto/prime
+- `jawa-toning` "Get lean and defined", "look good shirtless", plus Fitbod naming toning
+  as a first-class onboarding option, which is the outside evidence for our "Tone up"
+  label.
+  https://mixandmatchmama.com/2024/10/fit-bod-app-review/ ,
+  https://fitnessdrum.com/fitbod-review/
+- `jawa-bodypart` "Chicken legs" and the leg-avoidance phrasing.
+  https://www.garagestrength.com/blogs/news/skipping-leg-day ,
+  https://www.goodreads.com/author_blog_posts/21190913-don-t-skip-leg-day?tab=author
+- `jawa-spot-reduction` "Lose my love handles", and the useful detail that the popular
+  articles concede spot reduction is a myth while still selling a targeted workout.
+  https://www.foxnews.com/lifestyle/lose-your-love-handles-with-this-10-minute-workout ,
+  https://www.healthline.com/nutrition/get-rid-of-love-handles
+- `jawa-wedding` "45 lbs before July 4th", "fit into my dress by the date". Corroborates
+  our `cornell-wedding` and `weddingbee`.
+  https://www.weddingwire.com/wedding-forums/will-you-lose-weight-before-the-wedding-whats-your-goal/d1230a03a5585be1.html ,
+  https://healthunlocked.com/weight-loss-support/posts/130590094/help-getting-married-and-overweight-need-to-lose-45-lbs-before-july-4th ,
+  https://healthunlocked.com/couchto5k/posts/140888800/wedding-fitness
+
+### Of hers, not carried over
+
+Her three shared-foundation blocks (sex and anthropometry, experience tiers, equipment
+substitution) and the generic intake-form templates and app-review listings were left
+behind: the first three back `knowledge/principles/*`, which is her folder and not part of
+this merge, and where they cover the same ground as our `01`, `03` and `04` we already
+cite primary literature rather than strength-standard calculators; the intake-form and
+app-review URLs only corroborate phrasing we already hold from `google-suggest`.

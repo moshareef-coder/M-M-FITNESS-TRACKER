@@ -341,5 +341,42 @@
     },
   };
   window.__SANDBOX.hasProfile = hasProfile;
+
+  /* Generate for me posts to a Supabase edge function, which the sandbox has no
+     way to reach. That function is about to become a thin wrapper around
+     mo-knowledge/engine/adapter.mjs with no model call in between, so this is
+     not a mock of the generator, it is the generator: same module, same
+     output, one hop closer to the browser than production runs it. What Mo
+     sees here is what ships.
+
+     Every other request passes straight through untouched, real fetch and all. */
+  const realFetch = window.fetch.bind(window);
+  window.fetch = async function (input, init) {
+    const url = typeof input === "string" ? input : (input && input.url) || "";
+    if (!url.includes("/functions/v1/generate-workout")) return realFetch(input, init);
+    try {
+      const payload = init && init.body ? JSON.parse(init.body) : {};
+      const { generateFromPayload } = await import("/mo-knowledge/engine/adapter.mjs");
+      const { workout, honest, meta } = generateFromPayload(payload);
+      window.__SANDBOX.lastGenerated = { payload, workout, honest, meta };
+      /* The reveal sheet only ever shows data.workout, so the honest line about
+         pace has nowhere to land unless the sandbox puts it somewhere. A toast
+         is the closest thing the app already has, and this stays sandbox only:
+         production never loads this file, so it never gets an opinion about
+         where the honest line should show up for real. 600ms lands it after
+         revealGeneratedPlan's own 420ms reveal animation, not on top of it. */
+      if (honest) setTimeout(() => { try { window.toast?.(honest); } catch {} }, 600);
+      return new Response(JSON.stringify({ workout, honest, meta }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Sandbox engine failed", detail: String(err) }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  };
+
   if (SCENARIO === "clip") demoClip();   // start recording now, not when it is tapped
 })();

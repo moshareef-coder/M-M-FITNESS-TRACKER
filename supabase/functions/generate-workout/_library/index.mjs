@@ -1,0 +1,19 @@
+/* VENDORED by scripts/vendor-engine.mjs from knowledge/exercise-library/index.mjs. Do not edit here. */
+// Aggregates every training's exercise library into one list. Add a new training here once
+// its file exists (see weight-training.mjs for the shape to follow).
+
+import { WEIGHT_TRAINING } from "./weight-training.mjs";
+import { YOGA } from "./yoga.mjs";
+import { PILATES } from "./pilates.mjs";
+import { CALISTHENICS } from "./calisthenics.mjs";
+
+export const TRAININGS = [WEIGHT_TRAINING, YOGA, PILATES, CALISTHENICS];
+
+// Activities tracked by duration with no exercise-level breakdown -- logging "exercises within
+// basketball" doesn't map to a discrete move list the way lifting or yoga does. Mirrors
+// ACTIVITY_PRESETS in index.html minus the trainings above, which do have real libraries.
+export const SIMPLE_TIMED_ACTIVITIES = [
+  "Barre", "Running", "Walking", "Hiking", "Cycling", "Spin class", "Swimming",
+  "Rowing machine", "Elliptical", "Stair climber", "Boxing", "Kickboxing", "HIIT", "CrossFit",
+  "Jump rope", "Dance", "Basketball", "Soccer", "Tennis", "Climbing", "Skiing", "Stretching",
+];

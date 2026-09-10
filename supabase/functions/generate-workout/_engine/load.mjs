@@ -1,3 +1,4 @@
+/* VENDORED by scripts/vendor-engine.mjs from mo-knowledge/engine/load.mjs. Do not edit here. */
 /* Starting weights, from bodyweight and sex when there is no history, and from
  * history the moment there is any.
  *

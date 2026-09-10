@@ -37,6 +37,18 @@ const day = (n) => {
   const d = new Date(); d.setDate(d.getDate() + n);
   return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
+/* What each made up person is logging. It used to be 135 for a bench press and
+   185 for everything else, which quietly handed a 145 lb woman a 205 lb goblet
+   squat and, through the pattern fallback, an 890 lb leg press. The engine was
+   right to believe the log. The log was the lie, and made up numbers that nobody
+   could lift make the whole printout impossible to judge by reading. */
+const LOG_WEIGHT = {
+  "Bench Press": 135,
+  "Barbell Back Squat": 185,
+  "Dumbbell Bench Press": 55,
+  "Goblet Squat": 45,
+};
+
 /* A plausible log history: `n` sessions ending `endedDaysAgo` ago, roughly every
    other day, with the weight climbing if `climbing`. */
 const history = ({ n, endedDaysAgo = 1, climbing = true, lifts = ["Bench Press", "Barbell Back Squat"] }) => {
@@ -46,7 +58,7 @@ const history = ({ n, endedDaysAgo = 1, climbing = true, lifts = ["Bench Press",
     for (const name of lifts) {
       out.push({
         entry_date: day(-back), exercise_name: name, sets: 3, reps: 8,
-        weight: (name === "Bench Press" ? 135 : 185) + (climbing ? Math.round(i / 3) * 5 : 0),
+        weight: (LOG_WEIGHT[name] ?? 95) + (climbing ? Math.round(i / 3) * 5 : 0),
       });
     }
   }

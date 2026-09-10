@@ -1,3 +1,4 @@
+/* VENDORED by scripts/vendor-engine.mjs from mo-knowledge/engine/training-age.mjs. Do not edit here. */
 /* Training age, derived from what somebody did rather than asked.
  *
  * research/04 argues this is the dominant variable in a plan and the one we can

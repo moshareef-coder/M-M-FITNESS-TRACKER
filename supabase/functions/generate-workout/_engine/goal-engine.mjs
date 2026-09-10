@@ -1,3 +1,4 @@
+/* VENDORED by scripts/vendor-engine.mjs from mo-knowledge/engine/goal-engine.mjs. Do not edit here. */
 /* Goals in, an honest answer and a set of training parameters out.
  *
  * This is ../goals/goal-tree.json made executable. The tree is the research: what

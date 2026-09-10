@@ -1,11 +1,31 @@
-// Deno Deploy (Supabase Edge Functions) — generates a daily workout via the Claude API.
-// Expects env var ANTHROPIC_API_KEY set as a function secret.
+// Deno Deploy (Supabase Edge Functions) generates one day's workout.
+//
+// Two engines, chosen by the WORKOUT_ENGINE function secret:
+//
+//   local (the default, and what runs when the var is unset)
+//     mo-knowledge/engine/ builds the week and adapter.mjs returns one day of
+//     it. Deterministic, no network call, no API key needed, zero cost per
+//     workout. Answers { workout, honest, meta }.
+//
+//   llm
+//     the original path: one claude-sonnet-5 call against SYSTEM_PROMPT below,
+//     with the JSON parsed back defensively. Requires ANTHROPIC_API_KEY.
+//     Kept for one release as a fallback. Answers { workout }.
+//
+// The app reads data.workout and nothing else, so both shapes satisfy it.
 //
 // calculateTDEE below is inlined from knowledge/formulas/tdee.mjs (Mifflin-St Jeor,
-// see knowledge/sources.md) rather than imported, because this function is deployed
-// via the Management API with only this file's contents — a relative import here
-// would resolve against a bundle that was never actually uploaded. Keep this copy in
-// sync if the source in knowledge/formulas/tdee.mjs changes.
+// see knowledge/sources.md) rather than imported, because this function used to be
+// deployed via the Management API with only this file's contents, and a relative
+// import there would resolve against a bundle that was never actually uploaded.
+// Keep this copy in sync if the source in knowledge/formulas/tdee.mjs changes.
+// The engine is VENDORED into ./_engine and ./_library by
+// scripts/vendor-engine.mjs for the same reason, so this function stays self
+// contained and deploys with scripts/deploy-function.sh, which uploads every
+// file in this directory. Edit mo-knowledge/engine/, never _engine/.
+
+// @ts-ignore untyped .mjs, same as the rest of mo-knowledge/
+import { generateFromPayload } from "./_engine/adapter.mjs";
 
 const LB_TO_KG = 0.453592;
 const IN_TO_CM = 2.54;
@@ -31,6 +51,9 @@ function calculateTDEE(profile: { sex?: string; age?: number; height_in?: number
 }
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+/* Unset means local. The engine is the default so a fresh deploy needs no
+   secret at all; set WORKOUT_ENGINE=llm to go back to the model for a release. */
+const ENGINE = (Deno.env.get("WORKOUT_ENGINE") || "local").toLowerCase();
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -68,6 +91,99 @@ Rules:
 - Keep exercise names simple and standard (e.g. "Barbell Squat", "Lat Pulldown", "Plank") so weight history can be tracked across days.
 - No markdown, no code fences, no explanation, JSON object only.`;
 
+/* The model path, lifted out of the handler unchanged. It answers either
+   `{ workout }` or `{ response }`, because both of its failures are Responses
+   with wording the app already shows and a thrown error would lose them. */
+async function generateWithModel(payload: any): Promise<{ workout?: any; response?: Response }> {
+  const {
+    user_name, focus, goal, goal_detail, history,
+    sex, age, height_in, activity_level, current_weight, gym_days_this_week,
+  } = payload;
+
+  const heightStr = height_in ? `${Math.floor(height_in / 12)}'${height_in % 12}"` : "not given";
+  const tdee = calculateTDEE({ sex, age, height_in, activity_level, weightLb: current_weight });
+
+  const userMsg = `User: ${user_name}
+Sex: ${sex || "not given"}
+Age: ${age || "not given"}
+Height: ${heightStr}
+Current body weight: ${current_weight != null ? current_weight + " lb" : "not given"}
+Activity level: ${activity_level || "not given"}
+Estimated maintenance calories (TDEE, Mifflin-St Jeor): ${tdee != null ? tdee + " kcal/day" : "not enough data to estimate"}
+Gym days already logged this week: ${gym_days_this_week ?? "not given"}
+Requested focus today: ${focus || "coach's choice"}
+Stated goal: ${goal || "general fitness"}
+Goal detail: ${goal_detail || "none given"}
+Recent exercise history (most recent last logged weight per exercise, may be empty):
+${JSON.stringify(history || [], null, 2)}
+
+Generate today's workout JSON now.`;
+
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": ANTHROPIC_API_KEY!,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-5",
+      max_tokens: 2048,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userMsg }],
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    return {
+      response: new Response(JSON.stringify({ error: "Claude API error", detail: errText }), {
+        status: 502,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      }),
+    };
+  }
+
+  const data = await resp.json();
+  const text = data.content?.[0]?.text?.trim() || "";
+  // The model is asked for pure JSON, but strip fences and any stray
+  // leading/trailing prose defensively rather than trusting that exactly --
+  // a truncated response or an extra sentence around the JSON is a real
+  // failure mode, not a hypothetical one.
+  let jsonText = text.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```\s*$/, "").trim();
+  const first = jsonText.indexOf("{");
+  const last = jsonText.lastIndexOf("}");
+  if (first !== -1 && last !== -1 && last > first) jsonText = jsonText.slice(first, last + 1);
+
+  let workout;
+  try {
+    workout = JSON.parse(jsonText);
+  } catch (parseErr) {
+    // Keep a snippet of the raw text so a future failure is diagnosable
+    // from the client error instead of a bare "Unexpected token" message.
+    return {
+      response: new Response(JSON.stringify({
+        error: "Coach's response wasn't valid JSON — try again",
+        detail: String(parseErr),
+        raw: text.slice(0, 400),
+        stopReason: data.stop_reason,
+      }), {
+        status: 502,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      }),
+    };
+  }
+
+  return { workout };
+}
+
+/* The engine path. Everything it needs is in the payload, so there is no
+   network call and nothing to time out. `honest` and `meta` ride along for
+   the UI to start showing; the app reads `workout` and ignores the rest. */
+function generateLocally(payload: any): { workout: any; honest: string | null; meta: any } {
+  return generateFromPayload(payload);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: CORS_HEADERS });
@@ -78,7 +194,9 @@ Deno.serve(async (req) => {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     });
   }
-  if (!ANTHROPIC_API_KEY) {
+  /* Only the model path needs a key. The local engine must work on a project
+     where ANTHROPIC_API_KEY was never set, so this guard moved behind ENGINE. */
+  if (ENGINE === "llm" && !ANTHROPIC_API_KEY) {
     return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }), {
       status: 500,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
@@ -147,7 +265,10 @@ Deno.serve(async (req) => {
        Claude outage, or a client that could not save what came back all
        burned quota and produced nothing. One real case of that emptied an
        account's whole daily allowance in half an hour. It is written at the
-       end now, once there is a workout to hand back. */
+       end now, once there is a workout to hand back. Both engines log, so a
+       user's daily allowance keeps meaning one thing whichever one is on. The
+       row carries the caller and nothing else; if a model column is ever added
+       the local path should write "local-engine" into it. */
     const logUsage = () => fetch(`${SUPABASE_URL}/rest/v1/ai_usage_log`, {
       method: "POST",
       headers: svcHeaders,
@@ -155,80 +276,28 @@ Deno.serve(async (req) => {
     }).catch((e) => console.error("could not log usage", e));
 
     const body = await req.json();
-    const {
-      user_name, focus, goal, goal_detail, history,
-      sex, age, height_in, activity_level, current_weight, gym_days_this_week,
-    } = body;
 
-    const heightStr = height_in ? `${Math.floor(height_in / 12)}'${height_in % 12}"` : "not given";
-    const tdee = calculateTDEE({ sex, age, height_in, activity_level, weightLb: current_weight });
-
-    const userMsg = `User: ${user_name}
-Sex: ${sex || "not given"}
-Age: ${age || "not given"}
-Height: ${heightStr}
-Current body weight: ${current_weight != null ? current_weight + " lb" : "not given"}
-Activity level: ${activity_level || "not given"}
-Estimated maintenance calories (TDEE, Mifflin-St Jeor): ${tdee != null ? tdee + " kcal/day" : "not enough data to estimate"}
-Gym days already logged this week: ${gym_days_this_week ?? "not given"}
-Requested focus today: ${focus || "coach's choice"}
-Stated goal: ${goal || "general fitness"}
-Goal detail: ${goal_detail || "none given"}
-Recent exercise history (most recent last logged weight per exercise, may be empty):
-${JSON.stringify(history || [], null, 2)}
-
-Generate today's workout JSON now.`;
-
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-5",
-        max_tokens: 2048,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userMsg }],
-      }),
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      return new Response(JSON.stringify({ error: "Claude API error", detail: errText }), {
-        status: 502,
+    if (ENGINE !== "llm") {
+      let result;
+      try {
+        result = generateLocally(body);
+      } catch (engineErr) {
+        /* The app prints data.error, so the engine's own "failed at <step>"
+           string is worth more here than a stack it will never show. */
+        console.error("workout engine failed", engineErr);
+        return new Response(
+          JSON.stringify({ error: "Workout engine failed", detail: String(engineErr) }),
+          { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
+        );
+      }
+      await logUsage();
+      return new Response(JSON.stringify(result), {
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       });
     }
 
-    const data = await resp.json();
-    const text = data.content?.[0]?.text?.trim() || "";
-    // The model is asked for pure JSON, but strip fences and any stray
-    // leading/trailing prose defensively rather than trusting that exactly —
-    // a truncated response or an extra sentence around the JSON is a real
-    // failure mode, not a hypothetical one.
-    let jsonText = text.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```\s*$/, "").trim();
-    const first = jsonText.indexOf("{");
-    const last = jsonText.lastIndexOf("}");
-    if (first !== -1 && last !== -1 && last > first) jsonText = jsonText.slice(first, last + 1);
-
-    let workout;
-    try {
-      workout = JSON.parse(jsonText);
-    } catch (parseErr) {
-      // Keep a snippet of the raw text so a future failure is diagnosable
-      // from the client error instead of a bare "Unexpected token" message.
-      return new Response(JSON.stringify({
-        error: "Coach's response wasn't valid JSON — try again",
-        detail: String(parseErr),
-        raw: text.slice(0, 400),
-        stopReason: data.stop_reason,
-      }), {
-        status: 502,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-      });
-    }
+    const { workout, response } = await generateWithModel(body);
+    if (response) return response;
 
     await logUsage();
     return new Response(JSON.stringify({ workout }), {

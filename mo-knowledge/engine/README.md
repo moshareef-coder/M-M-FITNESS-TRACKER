@@ -81,6 +81,84 @@ cheaper than rediscovering them.
   so push-ups beat bench press. Now ranked by what he already lifts, then by level
   closest to his own.
 
+## Bugs the second run had, all fixed
+
+Same rule as the list above. These were found by reading the code each module's
+author had just written, plus one the edge function agent hit wiring it up.
+
+- **The sets clamp swallowed every multiplier it was there to protect.**
+  `Math.max(2, Math.min(5, ...))` pinned beginners at 2 and strength
+  intermediates at 5, so `setsFactor`, the priority list and calibration's 0.85
+  back-off were silent no-ops in 20 of 52 goal and level combinations while the
+  plan said "this week is lighter". Now the target is computed unclamped, a
+  back-off is guaranteed to cost a main lift a set and a priority to earn one,
+  and only then is it clamped to [2, 6].
+- **Weekly volume was divided by intentions rather than by exercises.** `hits`
+  counted slot groups, so a slot listing `["lats", "traps"]` bumped both and one
+  exercise came out of it. Selection is now a first pass over the whole week and
+  the divisor is counted off what was actually picked.
+- **The last logged row became the next prescription.** One deliberately light
+  day, or a set done at home with what was in the room, set the week. `weight: 0`
+  counted as history too. Now: the last three sessions, nothing at or below zero,
+  and a preference for rows done at a comparable rep count.
+- **The same swap was offered on three days running.** Swaps were chosen and
+  never registered, so they repeated and could collide with a later main pick.
+  They are tracked in their own set now, which keeps them varied without letting
+  an offer block a prescription.
+- **`missing` never mentioned absent plans.** Logs with no plans is the common
+  half-fed case: calibrate.mjs has no join to make and every verdict comes back
+  unknown. It says so now.
+- **Short days came out with two exercises.** The app contract is 4 to 6. A short
+  day now keeps every main movement and fills back up to four with accessories,
+  at two sets, in the same short minutes.
+- **2 lb a week was called "a healthy pace".** Above about 267 lb the rate is
+  pinned at the ceiling, so the people with the most to lose by going too fast
+  were the only ones being told the top of the range was the middle of it.
+- **A one day week was a two day week with a day cut off.** `splitFor(1)` sliced
+  the pair down to one and left somebody with "Full body A" and no B anywhere.
+- **`resolveGoal` could not say which parameter set ran.** It returned
+  `child: undefined` when it fell to `_default`, so nothing downstream could tell
+  a deliberate default from a typo. It returns `childUsed` now, and the adapter
+  puts it in `meta`.
+- **`daysAsked` was inferred when the person had already answered.** The widened
+  payload carries `challenge_target`, a number they set themselves, and it now
+  wins over the gym-days-so-far guess.
+- **The bake-off's no-hinge metric punished split programmes.** It counted upper
+  and push days, which correctly have no hinge. Only lower days can fail it now,
+  ours judged by day name and hers, which carry no names, by content, and the
+  rule is printed under the table.
+- **The profile's preferred focus was ignored.** The model this replaces honoured
+  `payload.focus`, and the adapter handed back whatever the rotation had queued.
+  A stated focus now picks the matching day, the rotation decides which when two
+  match, and `meta.focusHonoured` says whether it was used.
+- **The demo's own fake logs were the least believable numbers in the printout.**
+  `history()` gave 135 lb to a bench press and 185 lb to everything else, so a
+  145 lb woman logged a 205 lb goblet squat and the pattern fallback turned it
+  into an 890 lb leg press. The engine was right to believe the log. The log was
+  the lie. Weights are per lift now, in demo.mjs and bakeoff.mjs both.
+
+## Wave 1 findings: three things Jawa's selector does that ours does not
+
+From reading `bakeoff.mjs` output side by side. None of these is done here yet.
+They are listed as **next**, not as shipped.
+
+1. **Weekly volume threaded across the days inside one call.** `buildWeekPlan`
+   carries a running `weeklyVolumeByCategory` from day to day and re-ranks the
+   most under-trained groups before choosing the next day's work. Ours divides a
+   fixed weekly target by how often a group is hit and never looks at what the
+   earlier days actually spent. Hers is the better shape: the ledger is real
+   rather than assumed.
+2. **A scored swap, ranked by muscle overlap.** Her `suggestSwaps` ranks
+   candidates by secondary-muscle overlap first and then by how close the level
+   is to the original, so a swap is the nearest stimulus rather than the next row
+   in the list. Ours takes the next unused candidate in a ranked pool, which is
+   how a swap can be a materially easier or harder movement without saying so.
+3. **A time budget that decides the exercise count.** She works from about seven
+   minutes an exercise, and the session length sets how many categories and how
+   many movements per category fit. Ours fixes the count in the slot table and
+   reports the minutes afterwards, which is the same arithmetic run backwards and
+   is why a short day needed a special case at all.
+
 ## Known limits
 
 - **Cold start loads for isolation work are the weakest numbers here.** A formula
@@ -105,3 +183,55 @@ cheaper than rediscovering them.
 `plan.mjs` reads `knowledge/exercise-library/` read only, and edits nothing under
 `knowledge/`. Deliberate: if both runs at this problem use the same 219 exercises,
 the bake-off is about the algorithm rather than about who wrote a better list.
+
+## Adapter
+
+`adapter.mjs` is the only file in here that knows the app exists. The engine
+builds a week; index.html asks for one day and consumes exactly this:
+
+```
+{ focus: "Push day", exercises: [{ name, sets, reps, targetWeight, note }] }
+```
+
+Four exports, and the edge function calls the last one.
+
+| export | does |
+|---|---|
+| `mapGoal({ goal, goal_detail })` | five stored goal strings plus free text, into a bubble, a child, and any pounds or date that were really in the sentence |
+| `nextDayIndex(plan, { logs, plans, today })` | where in the rotation this person is, from the last `ai_workouts.focus` we wrote, or from log names when there is no plan row |
+| `toWorkout(plan, dayIndex)` | one day of `plan.week` in the app's shape |
+| `generateFromPayload(payload)` | the whole path: `{ workout, honest, meta }` |
+
+Four things worth knowing before editing it.
+
+**The alias table is hand written.** `ALIASES` mirrors the `aliases` arrays in
+`../goals/goal-tree.json`, because reading the JSON needs a file read and this
+module has to run in Deno. Two files describing the same thing drift, which is
+why `checkTreeCoverage` exists for `GOAL_PARAMS`; the equivalent check over
+`ALIASES` is a follow up and is marked as one in the file.
+
+**The button loses to the sentence, but only where it has to.** The five goals
+cannot express "first pull-up", "train for Hyrox", "after baby" or "more
+energy", so a confident match on one of those four bubbles overrules whichever
+button they pressed. The other five bubbles are reachable by button, so a
+cross-bubble match there keeps the bubble and uses `THEME_CHILD` to find the
+nearest thing that bubble can say. "Abs" under Lose weight is belly fat, under
+Recomp it is abs, and under Get stronger it is nothing, which is the honest
+answer rather than a forced one.
+
+**A date is only a date when there is one in the sentence.** "Before my wedding"
+sets no `byDate`. Inventing one would turn the honest timeline, which is the
+whole argument of `goal-engine.mjs`, into a fabricated promise.
+
+**The old payload cannot carry a training age and says so.** `history` is a
+flattened map of personal bests with no dates, so `generateFromPayload`
+synthesizes one row per lift dated three days back. Loads come out right;
+`meta.confidence` comes back `"none"` and `meta.missing` names what is absent.
+Pass real `logs` and that entry disappears.
+
+Two things it deliberately does not do: it does not pad a day up to six
+exercises, and it never returns the same day twice in a row when the week has
+more than one. It does hold a floor of three, because the app has no answer for
+a two exercise card, and it fills from the next day of that person's own week
+rather than inventing a movement. `plan.mjs` floors a short day at four, so the
+floor should never fire.

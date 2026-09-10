@@ -1,3 +1,4 @@
+/* VENDORED by scripts/vendor-engine.mjs from mo-knowledge/engine/plan.mjs. Do not edit here. */
 /* The plan builder. Four passes, in the order research/05 argues for, and each
  * one after the first can be skipped when its input is missing:
  *
@@ -16,7 +17,7 @@
  * Deliberate: if both runs at this problem use the same 219 exercises then the
  * comparison is about the algorithm rather than about who wrote a better list.
  */
-import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
+import { TRAININGS } from "../_library/index.mjs";
 import { resolveGoal } from "./goal-engine.mjs";
 import { deriveTrainingAge, observedCapacity } from "./training-age.mjs";
 import { prescribeLoad, patternFor } from "./load.mjs";
