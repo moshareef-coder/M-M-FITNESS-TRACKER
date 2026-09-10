@@ -140,40 +140,67 @@ author had just written, plus one the edge function agent hit wiring it up.
 
 ## Round three, fixed
 
-Five that were found, written down and then left sitting. Same rule as the two
-lists above: the fix is only worth as much as the sentence saying what was wrong.
+Seven that were found, written down and then left sitting, the last two of them
+found while checking the other five. Same rule as the two lists above: the fix is
+only worth as much as the sentence saying what was wrong.
 
 - **Push-ups for a beginner who wants to get stronger, again.** The level term
   prefers the level closest to the user, a push-up is tagged beginner and a bench
   press intermediate, so "Get stronger" opened with 3 reps of a push-up. A main
   slot on a strength goal now ranks by how far a movement can be loaded, because
   no amount of progression turns a push-up into a 225 bench. A term, not a
-  filter, and every other emphasis keeps the conservative tie break it had.
+  filter, and every other emphasis keeps the conservative tie break it had. The
+  180 lb beginner asking for four days now opens on a Machine Chest Press and no
+  main slot anywhere in his week is bodyweight.
 - **A non-priority group out-setting a priority one on the same card.** The 1.4x
   went on the weekly target and was then divided by how often the group is hit,
   so a group trained once a week beat a priority group trained three times:
   Russian Twist 6 against a priority Step-Up 4. The guarantee is taken per
   session now, and no lift without the flag carries more sets than the lowest
-  priority lift on its day.
+  priority lift on its day. Checked across 3816 days: 366 of them carry a
+  priority exercise and none of the 366 has a neighbour out-setting it.
 - **The [2, 6] clamp still swallowing a back-off.** Round two moved the clamp and
   left the order alone, so a group hit once or twice at intermediate rounded past
   the ceiling both with and without the cut and 2 of 11 slots moved on a three
   lift stall. The cut is subtracted after the clamp now, so a back-off or a
-  volume cut always costs every main lift it touches a set, floor 2.
+  volume cut always costs every main lift it touches a set, floor 2. Measured
+  again on two identical people whose only difference is a third stalled lift:
+  8 main lifts out of 8, every one of them down a set.
 - **Weekly volume threaded across the days, Wave 1 finding 1.** The week now
   totals its own hard sets per muscle group, trims accessories on the LATER days
   where a group is more than 2 sets over its target, and names the groups that
-  are more than 2 sets under it with room to hold more. `weeklyVolume` on the
-  plan is the ledger, and demo.mjs prints it, because a total nobody can see is
-  a total nobody checks.
+  are more than 2 sets under it with room to hold more. `weeklyVolume` is the
+  ledger, one `{ sets, target }` per group, and `volumeNotes` holds every
+  correction beside it rather than inside it, so a caller can iterate the ledger
+  without having to know which keys are muscles and which are bookkeeping.
+  demo.mjs prints both, because a total nobody can see is a total nobody checks.
 - **`P.sessionMin` reached the display and nothing else, Wave 1 finding 3.** A
   strength day of six lifts at six sets and three minutes of rest printed
   "~60 min" over something closer to two hours. Every day carries
   `estimatedMinutes` now, computed from the sets, a 30 second set and the rest
-  intervals already prescribed, and a day more than 15% over its budget drops
-  tail accessories until it fits. It stops at four exercises and never takes a
-  main lift, so a day of four mains at long rests can still run over and now says
-  so out loud instead of quietly lying about it.
+  intervals already prescribed, and a day more than 15% over its budget comes
+  down until it fits. Two levers, gentlest first, and a main lift is never
+  either of them.
+- **The time trim had only the blunt lever, and it ran out of road.** Dropping
+  whole accessories stops at four exercises, so the demo's intermediate Lower
+  body A sat at 73 minutes against a 60 minute budget with nothing left it was
+  allowed to drop, while carrying a Single-Leg Calf Raise at 6 sets. Taking a set
+  off a tail accessory is a smaller thing to do to a session than taking the
+  movement away, so sets now come down to the floor of two before any movement
+  goes, non-priority accessories only so the per session guarantee above cannot
+  be undone from behind. That day is 68 minutes now and no day in the six weeks
+  is over its tolerance.
+- **A group could sit over its target with nothing saying why.** The trim moves
+  accessories and never goes below two sets, so an excess made entirely of main
+  work, or of accessories already on the floor, came out of the loop untouched
+  and the ledger showed a number over target with no line anywhere explaining it.
+  Across 1040 goal, day count and history combinations, 85 plans did this: a five
+  day return-to-training week hits chest and lats four times at a 0.6 sets
+  factor, which asks for 4.8 sets and cannot buy fewer than 8. Neither wall is a
+  bug to patch here, so `volumeNotes.over` reports it and names which wall it
+  hit, the same way the under side already did. The same argument applies to the
+  clock: `volumeNotes.overBudget` names a day that is still long after both time
+  levers, and the note reaches `dayNotes`.
 
 ## Wave 1 findings: three things Jawa's selector does that ours does not
 
@@ -270,14 +297,31 @@ it is not paying attention.
   It is open question 7 and it is the biggest hole in the folder's main claim.
 - **Sex coefficients** in `pair.mjs` are derived from two reference bench
   standards. Fine as a presentation handicap, not a measurement.
-- **A volume cut can be a no-op the plan still talks about.** `setsFor` clamps to
-  [2, 6], so the 0.85 is swallowed wherever a group is hit once or twice at
-  intermediate or above, or already floors at two. Measured: on a four day
-  intermediate week the cut moved 2 slots out of 11. This is the same clamp
-  calibration's own back-off note runs into and it is not new, but the plateau
-  note is a second voice saying "the sets come down" when for some people they
-  partly do not. The honest fix is the clamp, which moves every plan, so it is
-  named here rather than patched from one caller.
+- **A volume cut can still be a no-op on a lift already at two sets.** The clamp
+  half of this is fixed: the 0.85 is subtracted after [2, 6] rather than folded
+  in before it, so a back-off costs every main lift it touches a set. What
+  remains is the floor. Two sets is the smallest thing worth calling a
+  prescription, so a lift already there gives up nothing, and the plateau note
+  saying "the sets come down" is speaking for the week rather than for that one
+  lift. That is a real limit rather than an ordering accident, which is the
+  difference between this entry and the one it replaced.
+- **A weekly target can be unreachable in both directions and the plan can only
+  say so.** The smallest prescription is two sets and the trim never touches a
+  main movement, so a split that hits a group four times cannot spend fewer than
+  8 sets on it whatever the target says, and a group with no accessory slot
+  cannot be topped up without inventing a movement the slot table exists to
+  prevent. `volumeNotes.over` and `volumeNotes.under` report both. Acting on
+  either one means changing the split, which is a larger decision than a ledger
+  should be allowed to make on its own.
+- **A day of four main lifts at long rests will not fit a short budget.** An
+  advanced lifter who picks the no-time goal gets four main movements at six
+  sets, which is about 47 minutes against the 25 they asked for, and both time
+  levers stop before touching a main. 90 days out of 3816 land here.
+  `volumeNotes.overBudget` names them and the sentence reaches `dayNotes`, so
+  the number is a statement rather than a discrepancy. Shaving a main's sets
+  would fix the clock by pulling the back-off lever, which belongs to
+  calibration and the plateau response, and two hands on one lever is the bug
+  this folder already has a section about.
 - **`detectPlateau` can rarely report a stall shorter than its own window.**
   `weeksFlat` is measured from the first day the all time best was set, and a lift
   whose best sits inside the six week window counts as climbing, so a 4 or 5 week

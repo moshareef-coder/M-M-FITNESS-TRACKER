@@ -18,14 +18,34 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-import { deriveTrainingAge, observedCapacity, THRESHOLDS } from "./training-age.mjs";
+import { deriveTrainingAge, observedCapacity, THRESHOLDS, detectPlateau } from "./training-age.mjs";
 import { resolveGoal, GOAL_PARAMS } from "./goal-engine.mjs";
 import { coldStart1RM, prescribeLoad, patternFor, variantFactor, roundLoad } from "./load.mjs";
 import { buildPlan } from "./plan.mjs";
 import { conjunctiveWeek, chooseComparison, sharedSchedule, relativeScore, PRODUCTIVE_GAP } from "./pair.mjs";
 
+import { normalizeFocus, mergePriority, focusFreshness } from "./focus.mjs";
+import { scoreAlternatives } from "./alternatives.mjs";
+import { learnPreferences, applyPreferences, avoidNote, SOFT_AT, HARD_AT } from "./preferences.mjs";
+import { planPlateauResponse, applyRotateFallback, PLATEAU_RESPONSE } from "./plateau-response.mjs";
+import { BODY_AREAS, EQUIPMENT_OPTIONS, normalizeLimits, applyLimits, limitsSummary, softenedNote } from "./limits.mjs";
+import { JOINTS, JOINT_LOAD, defaultJointLoad } from "./joint-load.mjs";
+import { joinPlanToActual, calibrateExercise, calibrate, PUSH_COMPOUND, PUSH_ISOLATION, BACK_OFF } from "./calibrate.mjs";
+import { mapGoal, generateFromPayload, toWorkout, focusDayIndex, nextDayIndex } from "./adapter.mjs";
+
+import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
+import { MUSCLE_PIECES } from "../../knowledge/anatomy/muscle-detail.mjs";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const TREE = JSON.parse(readFileSync(join(here, "../goals/goal-tree.json"), "utf8"));
+
+/* ---- shared library helpers for the new test sections below ---- */
+const WEIGHT_LIB = TRAININGS.find((t) => t.id === "weight-training");
+const CALI_LIB = TRAININGS.find((t) => t.id === "calisthenics");
+const flattenExercises = (lib) => lib.categories.flatMap((c) => c.exercises);
+const WEIGHT_EXERCISES = flattenExercises(WEIGHT_LIB);
+const CALI_EXERCISES = flattenExercises(CALI_LIB);
+const LIBRARY_POOL = [...WEIGHT_EXERCISES, ...CALI_EXERCISES];
 
 /* ---- shared helpers, matching demo.mjs ---- */
 
@@ -464,4 +484,641 @@ test("relativeScore needs a bodyweight and scores a woman higher than a man at t
   const female = relativeScore({ liftedLb: 135, bodyWeightLb: 150, sex: "Female" });
   const male = relativeScore({ liftedLb: 135, bodyWeightLb: 150, sex: "Male" });
   assert.ok(female > male, `female ${female} should exceed male ${male}`);
+});
+
+/* =========================================================================
+ * focus.mjs
+ * ========================================================================= */
+
+test("normalizeFocus accepts group keys directly", () => {
+  const r = normalizeFocus(["chest", "glutes"]);
+  assert.deepEqual(r, ["chest", "glutes"]);
+});
+
+test("normalizeFocus accepts muscle piece names and translates them to groups", () => {
+  assert.ok(MUSCLE_PIECES.deltoids, "expected deltoids in MUSCLE_PIECES");
+  assert.ok(MUSCLE_PIECES.gluteusMaximus, "expected gluteusMaximus in MUSCLE_PIECES");
+  const r = normalizeFocus(["deltoids", "gluteusMaximus"]);
+  assert.deepEqual(r, ["shoulders", "glutes"]);
+});
+
+test("normalizeFocus accepts a comma separated string", () => {
+  const r = normalizeFocus("chest, glutes");
+  assert.deepEqual(r, ["chest", "glutes"]);
+});
+
+test("normalizeFocus drops junk it does not recognise", () => {
+  const r = normalizeFocus(["chest", "banana", "123", ""]);
+  assert.deepEqual(r, ["chest"]);
+});
+
+test("normalizeFocus caps at four groups", () => {
+  const five = ["chest", "shoulders", "traps", "lats", "biceps"];
+  const r = normalizeFocus(five);
+  assert.equal(r.length, 4);
+  assert.deepEqual(r, five.slice(0, 4));
+});
+
+test("mergePriority puts the user's own focus ahead of the goal's priority", () => {
+  const r = mergePriority({ goalPriority: ["quads"], userFocus: ["chest"] });
+  assert.equal(r.priority[0], "chest");
+  assert.ok(r.priority.includes("quads"));
+});
+
+test("mergePriority caps the combined list at five", () => {
+  const r = mergePriority({ goalPriority: ["quads", "hamstrings", "calves"], userFocus: ["chest", "shoulders", "traps", "lats"] });
+  assert.ok(r.priority.length <= 5, `priority was ${r.priority.length} long`);
+});
+
+test("mergePriority drops a group present in revealed.avoid and says so in why", () => {
+  const r = mergePriority({ goalPriority: [], userFocus: ["chest", "quads"], revealed: { avoid: ["chest"] } });
+  assert.ok(!r.priority.includes("chest"));
+  assert.ok(r.priority.includes("quads"));
+  assert.ok(r.why.some((w) => w.includes("chest")), `why was: ${r.why.join(" | ")}`);
+});
+
+test("focusFreshness flags a pick older than sixty days as stale", () => {
+  const chosenAt = new Date(Date.now() - 65 * 86400000);
+  const r = focusFreshness({ chosenAt });
+  assert.equal(r.stale, true);
+  assert.equal(r.ageDays, 65);
+});
+
+/* =========================================================================
+ * alternatives.mjs
+ * ========================================================================= */
+
+const BARBELL_BENCH = WEIGHT_EXERCISES.find((e) => e.name === "Barbell Bench Press");
+
+test("scoreAlternatives for a barbell exercise returns ranked, same primary group entries", () => {
+  const results = scoreAlternatives({ exercise: BARBELL_BENCH, pool: WEIGHT_EXERCISES, level: "intermediate", count: 20 });
+  assert.ok(results.length > 1);
+  const byName = new Map(WEIGHT_EXERCISES.map((e) => [e.name, e]));
+  for (const r of results) {
+    assert.equal(typeof r.name, "string");
+    assert.equal(typeof r.why, "string");
+    assert.equal(typeof r.score, "number");
+    const ex = byName.get(r.name);
+    assert.ok(ex && ex.primary.some((g) => BARBELL_BENCH.primary.includes(g)), `${r.name} does not share a primary group with Barbell Bench Press`);
+  }
+  for (let i = 1; i < results.length; i++) {
+    assert.ok(results[i - 1].score >= results[i].score, `results were not sorted by score descending at index ${i}`);
+  }
+});
+
+test("scoreAlternatives with equipment bodyweight only returns only bodyweight entries", () => {
+  const results = scoreAlternatives({ exercise: BARBELL_BENCH, pool: WEIGHT_EXERCISES, equipment: ["bodyweight"], count: 20 });
+  assert.ok(results.length > 0);
+  for (const r of results) assert.equal(r.equipment, "bodyweight");
+});
+
+test("scoreAlternatives honours exclude", () => {
+  const results = scoreAlternatives({ exercise: BARBELL_BENCH, pool: WEIGHT_EXERCISES, exclude: ["Dumbbell Bench Press"], count: 20 });
+  assert.ok(!results.some((r) => r.name === "Dumbbell Bench Press"));
+});
+
+test("scoreAlternatives dedupes results by name when the pool has the same name twice", () => {
+  const pool = [
+    { name: "Test Duplicate", primary: ["chest"], secondary: ["triceps"], equipment: "dumbbell", level: "beginner" },
+    { name: "Test Duplicate", primary: ["chest"], secondary: ["triceps", "shoulders"], equipment: "dumbbell", level: "beginner" },
+  ];
+  const results = scoreAlternatives({ exercise: BARBELL_BENCH, pool, count: 10 });
+  assert.equal(results.filter((r) => r.name === "Test Duplicate").length, 1);
+});
+
+/* =========================================================================
+ * preferences.mjs
+ * ========================================================================= */
+
+test(`${HARD_AT} swaps away from one exercise is a hard avoid`, () => {
+  const swaps = [day(-5), day(-15), day(-25)].map((d) => ({
+    entry_date: d, planned_exercise: "Overhead Press", chosen_exercise: "Dumbbell Shoulder Press",
+  }));
+  const r = learnPreferences({ swaps });
+  const entry = r.avoid.find((a) => a.name === "Overhead Press");
+  assert.ok(entry, "expected Overhead Press in avoid");
+  assert.equal(entry.strength, "hard");
+  assert.equal(entry.count, HARD_AT);
+});
+
+test(`${SOFT_AT} swaps away from one exercise is a soft avoid`, () => {
+  const swaps = [day(-5), day(-15)].map((d) => ({
+    entry_date: d, planned_exercise: "Overhead Press", chosen_exercise: "Dumbbell Shoulder Press",
+  }));
+  const r = learnPreferences({ swaps });
+  const entry = r.avoid.find((a) => a.name === "Overhead Press");
+  assert.ok(entry, "expected Overhead Press in avoid");
+  assert.equal(entry.strength, "soft");
+  assert.equal(entry.count, SOFT_AT);
+});
+
+test("one swap away from an exercise is not enough to avoid it", () => {
+  const swaps = [{ entry_date: day(-5), planned_exercise: "Overhead Press", chosen_exercise: "Dumbbell Shoulder Press" }];
+  const r = learnPreferences({ swaps });
+  assert.ok(!r.avoid.some((a) => a.name === "Overhead Press"));
+});
+
+test("planned but never logged twice is a soft skip avoid", () => {
+  const plans = [day(-5), day(-12)].map((d) => ({
+    entry_date: d, completed_at: d, exercises: [{ name: "Face Pull", sets: 3, reps: 15, targetWeight: 0 }],
+  }));
+  const r = learnPreferences({ plans, logs: [] });
+  const entry = r.avoid.find((a) => a.name === "Face Pull");
+  assert.ok(entry, "expected Face Pull in avoid");
+  assert.equal(entry.reason, "skipped");
+  assert.equal(entry.strength, "soft");
+  assert.equal(entry.count, 2);
+});
+
+test("a swap is not double counted as a skip", () => {
+  const dates = [day(-5), day(-15)];
+  const swaps = dates.map((d) => ({ entry_date: d, planned_exercise: "Overhead Press", chosen_exercise: "Dumbbell Shoulder Press" }));
+  const plans = dates.map((d) => ({ entry_date: d, completed_at: d, exercises: [{ name: "Overhead Press", sets: 3, reps: 8, targetWeight: 95 }] }));
+  const r = learnPreferences({ swaps, plans, logs: [] });
+  const entry = r.avoid.find((a) => a.name === "Overhead Press");
+  assert.ok(entry, "expected Overhead Press in avoid");
+  assert.equal(entry.count, 2, `count was ${entry.count}, the swap row should not also be counted as a missing log`);
+  assert.equal(entry.strength, "soft");
+});
+
+test("equipmentBias detects a dumbbell skew", () => {
+  const swaps = [day(-5), day(-15), day(-25)].map((d) => ({
+    entry_date: d, planned_exercise: "Barbell Bench Press", chosen_exercise: "Dumbbell Bench Press",
+  }));
+  const r = learnPreferences({ swaps });
+  assert.ok(r.equipmentBias);
+  assert.equal(r.equipmentBias.equipment, "dumbbell");
+  assert.ok(r.equipmentBias.ratio >= 0.6, `ratio was ${r.equipmentBias.ratio}`);
+  assert.equal(r.equipmentBias.n, 3);
+});
+
+test("confidence rises with the number of revealed signals", () => {
+  const swapsN = (n) => Array.from({ length: n }, (_, i) => ({
+    entry_date: day(-(5 + i * 2)), planned_exercise: `Exercise ${i}`, chosen_exercise: `Alt ${i}`,
+  }));
+  assert.equal(learnPreferences({ swaps: [] }).confidence, "none");
+  assert.equal(learnPreferences({ swaps: swapsN(3) }).confidence, "low");
+  assert.equal(learnPreferences({ swaps: swapsN(8) }).confidence, "medium");
+  assert.equal(learnPreferences({ swaps: swapsN(20) }).confidence, "high");
+});
+
+test("applyPreferences never empties a pool of one hard avoided exercise", () => {
+  const pool = [{ name: "Overhead Press", equipment: "barbell" }];
+  const prefs = { avoid: [{ name: "Overhead Press", strength: "hard" }], prefer: [], equipmentBias: null };
+  const result = applyPreferences(pool, prefs);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].name, "Overhead Press");
+});
+
+test("applyPreferences removes a hard avoid and sinks a soft avoid to the end", () => {
+  const pool = [{ name: "A", equipment: "barbell" }, { name: "B", equipment: "barbell" }, { name: "C", equipment: "barbell" }];
+  const prefs = {
+    avoid: [{ name: "A", strength: "hard" }, { name: "B", strength: "soft" }],
+    prefer: [], equipmentBias: null,
+  };
+  const result = applyPreferences(pool, prefs).map((e) => e.name);
+  assert.deepEqual(result, ["C", "B"]);
+});
+
+/* =========================================================================
+ * plateau-response.mjs
+ * ========================================================================= */
+
+test("plateau response waits under four weeks flat", () => {
+  const plateau = { lifts: [{ name: "Bench Press", sessions: 6, weeksFlat: 2, weightLb: 135 }] };
+  const r = planPlateauResponse({ plateau, level: "intermediate" });
+  assert.equal(r.responses[0].action, "wait");
+});
+
+test("plateau response waits for a beginner under eight weeks flat", () => {
+  const plateau = { lifts: [{ name: "Bench Press", sessions: 5, weeksFlat: 6, weightLb: 95 }] };
+  const r = planPlateauResponse({ plateau, level: "beginner" });
+  assert.equal(r.responses[0].action, "wait");
+});
+
+test("plateau response deloads the lift when calibration says too heavy for it", () => {
+  const plateau = { lifts: [{ name: "Squat", sessions: 10, weeksFlat: 10, weightLb: 225 }] };
+  const calibration = { byExercise: { squat: { verdict: "too-heavy" } }, overall: null };
+  const r = planPlateauResponse({ plateau, level: "intermediate", calibration });
+  assert.equal(r.responses[0].action, "deload-lift");
+});
+
+test("plateau response uses the rep range for a strength goal with a short stall", () => {
+  const plateau = { lifts: [{ name: "Deadlift", sessions: 8, weeksFlat: PLATEAU_RESPONSE.shortStallWeeks - 1, weightLb: 275 }] };
+  const r = planPlateauResponse({ plateau, level: "intermediate", goal: { bubble: "get-stronger" } });
+  assert.equal(r.responses[0].action, "rep-range");
+});
+
+test("plateau response rotates otherwise", () => {
+  const plateau = { lifts: [{ name: "Leg Press", sessions: 10, weeksFlat: PLATEAU_RESPONSE.rotateFromWeeks, weightLb: 400 }] };
+  const r = planPlateauResponse({ plateau, level: "intermediate" });
+  assert.equal(r.responses[0].action, "rotate");
+});
+
+test("plateau response cuts volume in the summary for three or more stalls", () => {
+  const plateau = { lifts: ["Bench Press", "Squat", "Row"].map((name) => ({ name, sessions: 10, weeksFlat: 10, weightLb: 200 })) };
+  const r = planPlateauResponse({ plateau, level: "intermediate" });
+  assert.equal(r.summary.action, "volume-cut");
+  assert.ok(r.summary.say);
+});
+
+test("volume-cut is not emitted when calibration overall is back-off", () => {
+  const plateau = { lifts: ["Bench Press", "Squat", "Row"].map((name) => ({ name, sessions: 10, weeksFlat: 10, weightLb: 200 })) };
+  const calibration = { byExercise: {}, overall: "back-off" };
+  const r = planPlateauResponse({ plateau, level: "intermediate", calibration });
+  assert.notEqual(r.summary.action, "volume-cut");
+});
+
+test("every plateau response has a non empty say", () => {
+  const plateau = { lifts: [
+    { name: "Bench Press", sessions: 10, weeksFlat: PLATEAU_RESPONSE.rotateFromWeeks, weightLb: 200 },
+    { name: "Squat", sessions: 10, weeksFlat: PLATEAU_RESPONSE.shortStallWeeks - 1, weightLb: 300 },
+  ] };
+  const r = planPlateauResponse({ plateau, level: "intermediate", goal: { bubble: "get-stronger" } });
+  assert.ok(r.responses.length > 0);
+  for (const resp of r.responses) assert.ok(typeof resp.say === "string" && resp.say.length > 0);
+});
+
+/* =========================================================================
+ * limits.mjs and joint-load.mjs
+ * ========================================================================= */
+
+test("BODY_AREAS has eight entries with key, label and hint", () => {
+  assert.equal(BODY_AREAS.length, 8);
+  for (const a of BODY_AREAS) {
+    assert.equal(typeof a.key, "string");
+    assert.equal(typeof a.label, "string");
+    assert.equal(typeof a.hint, "string");
+  }
+});
+
+test("EQUIPMENT_OPTIONS has five entries including none", () => {
+  assert.equal(EQUIPMENT_OPTIONS.length, 5);
+  assert.ok(EQUIPMENT_OPTIONS.some((o) => o.key === "none"));
+});
+
+test("normalizeLimits accepts an object, drops unknown keys, and trims the note to 120", () => {
+  const r = normalizeLimits({ hurts: ["shoulder", "bogus"], missing: ["barbell", "bogus"], note: "x".repeat(200), extra: "drop me" });
+  assert.deepEqual(r.hurts, ["shoulder"]);
+  assert.deepEqual(r.missing, ["barbell"]);
+  assert.equal(r.note.length, 120);
+});
+
+test("normalizeLimits accepts the JSON string a jsonb column round trips as", () => {
+  const r = normalizeLimits(JSON.stringify({ hurts: ["knee"] }));
+  assert.deepEqual(r.hurts, ["knee"]);
+});
+
+test("normalizeLimits accepts null", () => {
+  const r = normalizeLimits(null);
+  assert.deepEqual(r, { hurts: [], missing: [], note: null });
+});
+
+test("applyLimits with hurts shoulder removes Overhead Press and Dip and keeps a safer press", () => {
+  assert.ok(WEIGHT_EXERCISES.some((e) => e.name === "Overhead Press"));
+  assert.ok(CALI_EXERCISES.some((e) => e.name === "Dip"));
+  const r = applyLimits({ pool: LIBRARY_POOL, limits: { hurts: ["shoulder"], missing: [] } });
+  const names = r.pool.map((e) => e.name);
+  assert.ok(!names.includes("Overhead Press"), "Overhead Press should have been excluded");
+  assert.ok(!names.includes("Dip"), "Dip should have been excluded");
+  assert.ok(names.includes("Dumbbell Bench Press") || names.includes("Chest-Supported Row"), "expected a shoulder-safe press or row to remain");
+});
+
+test("applyLimits with missing barbell removes every barbell exercise", () => {
+  const r = applyLimits({ pool: LIBRARY_POOL, limits: { hurts: [], missing: ["barbell"] } });
+  assert.ok(r.pool.length > 0);
+  assert.ok(r.pool.every((e) => e.equipment !== "barbell"));
+});
+
+test("applyLimits with missing none keeps only bodyweight", () => {
+  const r = applyLimits({ pool: LIBRARY_POOL, limits: { hurts: [], missing: ["none"] } });
+  assert.ok(r.pool.length > 0);
+  assert.ok(r.pool.every((e) => (e.equipment || "bodyweight") === "bodyweight"));
+});
+
+test("applyLimits returns one softened entry rather than emptying the pool", () => {
+  const pool = [{ name: "Overhead Press", primary: ["shoulders"], secondary: [], equipment: "barbell" }];
+  const r = applyLimits({ pool, limits: { hurts: ["shoulder"], missing: [] } });
+  assert.equal(r.pool.length, 1);
+  assert.equal(r.pool[0].name, "Overhead Press");
+  assert.ok(r.excluded.some((e) => e.name === "Overhead Press" && e.softened === true));
+});
+
+test("every weight-training and calisthenics exercise has an explicit JOINT_LOAD entry", () => {
+  const missNames = LIBRARY_POOL
+    .filter((ex) => !Object.prototype.hasOwnProperty.call(JOINT_LOAD, ex.name))
+    .map((ex) => ex.name);
+  assert.equal(missNames.length, 0, `missing joint-load entries for: ${missNames.join(", ")}`);
+});
+
+test("every JOINT_LOAD value is a subset of the eight joint keys", () => {
+  const validKeys = new Set(JOINTS);
+  for (const [name, joints] of Object.entries(JOINT_LOAD)) {
+    for (const j of joints) assert.ok(validKeys.has(j), `${name} lists unknown joint "${j}"`);
+  }
+});
+
+test("defaultJointLoad gives shoulder for a vertical push name and lowerback for a hinge name", () => {
+  assert.ok(!Object.prototype.hasOwnProperty.call(JOINT_LOAD, "Overhead Cable Press"));
+  const push = defaultJointLoad({ name: "Overhead Cable Press", primary: ["shoulders"] });
+  assert.ok(push.includes("shoulder"), `push load was: ${push.join(", ")}`);
+
+  assert.ok(!Object.prototype.hasOwnProperty.call(JOINT_LOAD, "Kettlebell Deadlift"));
+  const hinge = defaultJointLoad({ name: "Kettlebell Deadlift", primary: ["hamstrings"] });
+  assert.ok(hinge.includes("lowerback"), `hinge load was: ${hinge.join(", ")}`);
+});
+
+/* =========================================================================
+ * calibrate.mjs
+ * ========================================================================= */
+
+test("joinPlanToActual skips plans with no completed_at", () => {
+  const plans = [{ entry_date: day(-1), exercises: [{ name: "Bench Press", sets: 3, reps: 8, targetWeight: 135 }] }];
+  const rows = joinPlanToActual({ plans, logs: [] });
+  assert.equal(rows.length, 0);
+});
+
+test("calibrateExercise verdicts too-easy at the compound and isolation factors", () => {
+  const compoundRows = [day(-1), day(-4)].map((d) => ({
+    entry_date: d, exercise: "Bench Press",
+    planned: { sets: 3, reps: 8, targetWeight: 135 }, actual: { sets: 3, reps: 8, weight: 135 },
+  }));
+  const compound = calibrateExercise(compoundRows);
+  assert.equal(compound.verdict, "too-easy");
+  assert.equal(compound.nextLoadFactor, PUSH_COMPOUND);
+
+  const isolationRows = [day(-1), day(-4)].map((d) => ({
+    entry_date: d, exercise: "Lateral Raise",
+    planned: { sets: 3, reps: 12, targetWeight: 20 }, actual: { sets: 3, reps: 12, weight: 20 },
+  }));
+  const isolation = calibrateExercise(isolationRows);
+  assert.equal(isolation.verdict, "too-easy");
+  assert.equal(isolation.nextLoadFactor, PUSH_ISOLATION);
+});
+
+test("calibrateExercise verdicts too-heavy at the back-off factor", () => {
+  const rows = [
+    { entry_date: day(-1), exercise: "Squat", planned: { sets: 3, reps: 8, targetWeight: 225 }, actual: { sets: 2, reps: 8, weight: 225 } },
+    { entry_date: day(-4), exercise: "Squat", planned: { sets: 3, reps: 8, targetWeight: 225 }, actual: { sets: 3, reps: 8, weight: 225 } },
+  ];
+  const r = calibrateExercise(rows);
+  assert.equal(r.verdict, "too-heavy");
+  assert.equal(r.nextLoadFactor, BACK_OFF);
+});
+
+test("calibrateExercise verdicts skipped with a swap suggested after two null sessions", () => {
+  const rows = [day(-1), day(-4)].map((d) => ({ entry_date: d, exercise: "Face Pull", actual: null }));
+  const r = calibrateExercise(rows);
+  assert.equal(r.verdict, "skipped");
+  assert.equal(r.swapSuggested, true);
+});
+
+test("calibrateExercise verdicts unknown with only one row", () => {
+  const rows = [{ entry_date: day(-1), exercise: "Cable Curl", planned: { sets: 3, reps: 10, targetWeight: 30 }, actual: { sets: 3, reps: 10, weight: 30 } }];
+  const r = calibrateExercise(rows);
+  assert.equal(r.verdict, "unknown");
+});
+
+test("calibrate overall reads unknown with no data at all", () => {
+  const r = calibrate({ plans: [], logs: [] });
+  assert.equal(r.overall, "unknown");
+});
+
+test("calibrate overall reads push when enough lifts are too easy", () => {
+  const dates = [day(-1), day(-4)];
+  const plans = dates.map((d) => ({
+    entry_date: d, completed_at: d,
+    exercises: [{ name: "Squat", sets: 3, reps: 8, targetWeight: 225 }, { name: "Bench Press", sets: 3, reps: 8, targetWeight: 135 }],
+  }));
+  const logs = dates.flatMap((d) => ([
+    { entry_date: d, exercise_name: "Squat", sets: 3, reps: 8, weight: 225 },
+    { entry_date: d, exercise_name: "Bench Press", sets: 3, reps: 8, weight: 135 },
+  ]));
+  const r = calibrate({ plans, logs });
+  assert.equal(r.overall, "push");
+});
+
+test("calibrate overall reads back-off when enough lifts are too heavy", () => {
+  const dates = [day(-1), day(-4)];
+  const plans = dates.map((d) => ({
+    entry_date: d, completed_at: d,
+    exercises: [{ name: "Squat", sets: 3, reps: 8, targetWeight: 225 }, { name: "Bench Press", sets: 3, reps: 8, targetWeight: 135 }],
+  }));
+  const logs = dates.flatMap((d) => ([
+    { entry_date: d, exercise_name: "Squat", sets: 2, reps: 8, weight: 225 },
+    { entry_date: d, exercise_name: "Bench Press", sets: 2, reps: 8, weight: 135 },
+  ]));
+  const r = calibrate({ plans, logs });
+  assert.equal(r.overall, "back-off");
+});
+
+test("calibrate overall holds when there is not enough evidence either way", () => {
+  const d = day(-1);
+  const plans = [{ entry_date: d, completed_at: d, exercises: [{ name: "Row", sets: 3, reps: 8, targetWeight: 95 }] }];
+  const logs = [{ entry_date: d, exercise_name: "Row", sets: 3, reps: 8, weight: 95 }];
+  const r = calibrate({ plans, logs });
+  assert.equal(r.overall, "hold");
+});
+
+/* =========================================================================
+ * adapter.mjs
+ * ========================================================================= */
+
+test("mapGoal: a valid goal_bubble beats the legacy goal string", () => {
+  const r = mapGoal({ goal: "Lose weight", goal_bubble: "get-stronger" });
+  assert.equal(r.bubble, "get-stronger");
+});
+
+test("mapGoal: a valid goal_child beats a parsed detail", () => {
+  const r = mapGoal({ goal_bubble: "lose-weight", goal_child: "lose-belly", goal_detail: "gain weight fast" });
+  assert.equal(r.bubble, "lose-weight");
+  assert.equal(r.child, "lose-belly");
+});
+
+test("mapGoal: amountLb and byDate are still parsed alongside a tile child", () => {
+  const today = new Date();
+  const r = mapGoal({ goal_bubble: "lose-weight", goal_child: "lose-a-number", goal_detail: "lose 20 pounds in 6 weeks", today });
+  assert.equal(r.child, "lose-a-number");
+  assert.equal(r.amountLb, 20);
+  assert.ok(r.byDate instanceof Date);
+});
+
+test("mapGoal: invalid tile ids fall back to the legacy string", () => {
+  const r = mapGoal({ goal_bubble: "not-a-real-bubble", goal_child: "nope", goal: "Lose weight" });
+  assert.equal(r.bubble, "lose-weight");
+});
+
+test("toWorkout emits the full exercise shape with a numeric targetWeight, zero for bodyweight or unknown", () => {
+  const plan = buildPlan({ goal: { bubble: "get-stronger", child: "strong-a-lift" }, person: { bodyWeightLb: null, sex: "Male", daysAsked: 3 }, logs: [] });
+  const workout = toWorkout(plan, 0);
+  assert.ok(workout.exercises.length > 0);
+  for (const e of workout.exercises) {
+    assert.equal(typeof e.name, "string");
+    assert.equal(typeof e.sets, "number");
+    assert.equal(typeof e.reps, "number");
+    assert.equal(typeof e.targetWeight, "number");
+    assert.equal(typeof e.note, "string");
+    assert.ok(e.swap === null || typeof e.swap === "string");
+    assert.ok(Array.isArray(e.alternatives));
+  }
+  assert.ok(workout.exercises.some((e) => e.targetWeight === 0), "expected at least one exercise with targetWeight 0 when weight is unknown");
+});
+
+test("generateFromPayload never throws on an empty payload or a junk goal", () => {
+  const r1 = generateFromPayload({});
+  assert.ok(r1.workout.exercises.length >= 3 && r1.workout.exercises.length <= 6);
+  for (const key of ["level", "confidence", "days", "dayName", "source", "goalSource", "focus", "limits"]) {
+    assert.ok(Object.prototype.hasOwnProperty.call(r1.meta, key), `meta missing ${key}`);
+  }
+  const r2 = generateFromPayload({ goal: "some junk goal that matches nothing at all" });
+  assert.ok(r2.workout.exercises.length >= 3 && r2.workout.exercises.length <= 6);
+});
+
+test("focusDayIndex picks a push day when one exists and falls back to -1 otherwise", () => {
+  const logs = climbThenPlateau(70, 20);
+  const withPush = buildPlan({ goal: { bubble: "consistent", child: "keep-quitting" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 3 }, logs });
+  const pushIndex = focusDayIndex(withPush, "push", { from: 0 });
+  assert.ok(pushIndex >= 0);
+  assert.ok(withPush.week[pushIndex].name.toLowerCase().includes("push"));
+
+  const beginner = buildPlan({ goal: { bubble: "consistent", child: "keep-quitting" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 3 }, logs: [] });
+  const noPush = focusDayIndex(beginner, "push", { from: 1 });
+  assert.equal(noPush, -1);
+});
+
+test("a JSON string limits payload works and meta.limits.excludedCount is a number", () => {
+  const r = generateFromPayload({ limits: JSON.stringify({ hurts: ["knee"] }) });
+  assert.ok(r.meta.limits.hurts.includes("knee"));
+  assert.equal(typeof r.meta.limits.excludedCount, "number");
+});
+
+/* =========================================================================
+ * training-age.mjs: detectPlateau
+ * ========================================================================= */
+
+test("detectPlateau flags a lift flat for the window and not one still climbing", () => {
+  const flat = detectPlateau({ logs: climbThenPlateau(70, 20) });
+  assert.equal(flat.stalled, true);
+  assert.ok(flat.lifts.some((l) => l.name === "Bench Press"));
+
+  const climbing = detectPlateau({ logs: climbingEverySession(30) });
+  assert.equal(climbing.stalled, false);
+});
+
+test("deriveTrainingAge returns a plateau field", () => {
+  const r = deriveTrainingAge({ logs: history({ n: 20 }) });
+  assert.ok(r.plateau);
+  assert.equal(typeof r.plateau.stalled, "boolean");
+  assert.ok(Array.isArray(r.plateau.lifts));
+});
+
+/* =========================================================================
+ * a few more exported helpers on the same modules, still inside scope
+ * ========================================================================= */
+
+test("avoidNote names the exercise and how it was avoided, and leaves the door open", () => {
+  const swapped = avoidNote({ name: "Overhead Press", count: 3, reason: "swapped" });
+  assert.ok(swapped.includes("Overhead Press"));
+  assert.ok(swapped.includes("swapped"));
+  const skipped = avoidNote({ name: "Face Pull", count: 2, reason: "skipped" });
+  assert.ok(skipped.includes("Face Pull"));
+  assert.ok(skipped.toLowerCase().includes("logged"));
+});
+
+test("applyRotateFallback falls back to rep-range when rotation had nowhere to go", () => {
+  const plateau = { lifts: [{ name: "Leg Press", sessions: 10, weeksFlat: PLATEAU_RESPONSE.rotateFromWeeks, weightLb: 400 }] };
+  const result = planPlateauResponse({ plateau, level: "intermediate" });
+  assert.equal(result.responses[0].action, "rotate");
+  const fallenBack = applyRotateFallback(result, ["Leg Press"], { plateau });
+  assert.equal(fallenBack.responses[0].action, "rep-range");
+  assert.equal(fallenBack.responses[0].exercise, "Leg Press");
+});
+
+test("applyRotateFallback is a no-op when nothing named was actually rotating", () => {
+  const plateau = { lifts: [{ name: "Bench Press", sessions: 6, weeksFlat: 2, weightLb: 135 }] };
+  const result = planPlateauResponse({ plateau, level: "intermediate" });
+  const unchanged = applyRotateFallback(result, ["Some Other Lift"], { plateau });
+  assert.equal(unchanged.responses[0].action, result.responses[0].action);
+});
+
+test("limitsSummary explains a hurt joint and a missing equipment answer in plain sentences", () => {
+  const hurt = limitsSummary({ hurts: ["shoulder"], missing: [] });
+  assert.ok(hurt.length > 0);
+  assert.ok(hurt[0].toLowerCase().includes("shoulder"));
+
+  const bodyweightOnly = limitsSummary({ hurts: [], missing: ["none"] });
+  assert.ok(bodyweightOnly.some((s) => s.toLowerCase().includes("bodyweight")));
+});
+
+test("softenedNote is null with nothing softened and names what was kept otherwise", () => {
+  assert.equal(softenedNote([]), null);
+  const note = softenedNote(["Overhead Press"]);
+  assert.ok(note.includes("Overhead Press"));
+});
+
+test("nextDayIndex starts the week at zero with nothing to go on", () => {
+  const plan = buildPlan({ goal: { bubble: "lose-weight", child: "lose-a-number" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 4 }, logs: [] });
+  const i = nextDayIndex(plan, { logs: [], plans: [], today: new Date() });
+  assert.equal(i, 0);
+});
+
+test("nextDayIndex moves to the day after the last one recorded", () => {
+  const plan = buildPlan({ goal: { bubble: "lose-weight", child: "lose-a-number" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 4 }, logs: [] });
+  const lastFocus = plan.week[0].name;
+  const plans = [{ entry_date: day(-1), completed_at: day(-1), focus: lastFocus }];
+  const i = nextDayIndex(plan, { logs: [], plans, today: new Date() });
+  assert.equal(i, 1);
+});
+
+/* =========================================================================
+ * a small second pass, edge cases worth locking down
+ * ========================================================================= */
+
+test("normalizeFocus drops a duplicate rather than counting it twice", () => {
+  const r = normalizeFocus(["chest", "chest", "glutes"]);
+  assert.deepEqual(r, ["chest", "glutes"]);
+});
+
+test("mergePriority with nothing asked and nothing from the goal spreads volume evenly and says so", () => {
+  const r = mergePriority({});
+  assert.deepEqual(r.priority, []);
+  assert.ok(r.why.some((w) => w.toLowerCase().includes("evenly")));
+});
+
+test("scoreAlternatives respects the count limit", () => {
+  const results = scoreAlternatives({ exercise: BARBELL_BENCH, pool: WEIGHT_EXERCISES, count: 2 });
+  assert.ok(results.length <= 2);
+});
+
+test("scoreAlternatives with no exercise returns an empty list", () => {
+  assert.deepEqual(scoreAlternatives({ exercise: null, pool: WEIGHT_EXERCISES }), []);
+});
+
+test("calibrateExercise reads on-track when sets are met and reps land a little under target", () => {
+  const rows = [day(-1), day(-4)].map((d) => ({
+    entry_date: d, exercise: "Barbell Row",
+    planned: { sets: 3, reps: 8, targetWeight: 135 },
+    actual: { sets: 3, reps: 7, weight: 135 },
+  }));
+  const r = calibrateExercise(rows);
+  assert.equal(r.verdict, "on-track");
+  assert.equal(r.nextLoadFactor, 1);
+});
+
+test("applyLimits excluded entries carry a plain reason mentioning the joint", () => {
+  const r = applyLimits({ pool: LIBRARY_POOL, limits: { hurts: ["shoulder"], missing: [] } });
+  const overhead = r.excluded.find((e) => e.name === "Overhead Press");
+  assert.ok(overhead);
+  assert.ok(overhead.why.toLowerCase().includes("shoulder"));
+  assert.equal(overhead.excluded, true);
+});
+
+test("generateFromPayload honours an explicit challenge_target for the day count", () => {
+  const r = generateFromPayload({ goal_bubble: "lose-weight", challenge_target: 5 });
+  assert.equal(r.meta.days, 5);
+});
+
+test("mapGoal with a completely empty payload falls back to the consistent bubble", () => {
+  const r = mapGoal({});
+  assert.equal(r.bubble, "consistent");
 });

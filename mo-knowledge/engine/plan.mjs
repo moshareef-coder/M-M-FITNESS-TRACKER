@@ -606,15 +606,33 @@ export function buildPlan({
      argument and a movement pattern is not negotiable for a rounding of time.
      So the count is still decided by the split, the minutes are estimated from
      what was really prescribed, and only the tail accessories go when it will
-     not fit. Four exercises is the floor and a main lift never goes. */
+     not fit. Four exercises is the floor and a main lift never goes.
+
+     Two levers, gentlest first, because the round three version had only the
+     blunt one and it ran out of road: the demo's intermediate Lower body A came
+     to 73 minutes against a 60 minute budget, 22% over, with the loop stopping
+     because the day was already at four exercises. It was sitting on a
+     Single-Leg Calf Raise at 6 sets. Taking a set off a tail accessory is a
+     smaller thing to do to somebody's session than taking the movement away, so
+     sets come down to the floor of two first and only then does a movement go.
+     Only non-priority accessories are shaved, so the per session priority
+     guarantee settled above cannot be undone from here. A day that is still
+     over after both levers is a day of long-rested main lifts, and it says the
+     honest number rather than the budget it was asked for. */
   const timeTrimmed = [];
+  const lastIndex = (list, ok) => { for (let i = list.length - 1; i >= 0; i--) if (ok(list[i], i)) return i; return -1; };
   for (const d of week) {
     let estimate = estimateMinutes(d.exercises);
-    while (estimate > d.minutes * TIME_TOLERANCE && d.exercises.length > SHORT_DAY_MIN) {
-      let last = -1;
-      for (let i = d.exercises.length - 1; i >= 0; i--) {
-        if (roleOf.get(d.exercises[i]) === "accessory") { last = i; break; }
+    const overBudget = () => estimate > d.minutes * TIME_TOLERANCE;
+    while (overBudget()) {
+      const shave = lastIndex(d.exercises, (e) => roleOf.get(e) === "accessory" && !e.priority && e.sets > SHORT_DAY_SETS);
+      if (shave >= 0) {
+        d.exercises[shave].sets -= 1;
+        estimate = estimateMinutes(d.exercises);
+        continue;
       }
+      if (d.exercises.length <= SHORT_DAY_MIN) break;
+      const last = lastIndex(d.exercises, (e) => roleOf.get(e) === "accessory");
       if (last < 0) break;
       timeTrimmed.push({ day: d.name, dropped: d.exercises[last].name });
       d.exercises.splice(last, 1);
@@ -623,16 +641,41 @@ export function buildPlan({
     d.estimatedMinutes = estimate;
   }
 
-  /* The ledger, said out loud. The over side already acted; the under side only
-     reports, because the honest answer to "this group is short" is another
+  /* And when neither lever was enough, the day says so instead of leaving the
+     number to be noticed. This is a real state, not a rounding: an advanced
+     lifter on the no-time goal gets four main movements at six sets, which is
+     47 minutes against the 25 they asked for, and there is nothing here that
+     can honestly fix it. Trimming a main would take the movement pattern the
+     day exists for, and shaving a main's sets is the back-off lever, which
+     belongs to calibration and the plateau response rather than to a clock.
+     Measured across 3816 days of goal, day count and history combinations: 90
+     stay over, every one of them a day whose accessories are gone or at the
+     floor. Named, so the number is a statement rather than a discrepancy. */
+  const overBudget = week
+    .filter((d) => d.estimatedMinutes > d.minutes * TIME_TOLERANCE)
+    .map((d) => ({
+      day: d.name, estimatedMinutes: d.estimatedMinutes, budget: d.minutes,
+      why: `${d.name} comes to about ${d.estimatedMinutes} minutes against the ${d.minutes} you asked for. Everything left on it is a main lift, so the time goes to the rest between sets.`,
+    }));
+  for (const o of overBudget) dayNotes.push(o.why);
+
+  /* The ledger, said out loud. The over side acted where it could and reports
+     what it could not; the under side only reports, because the honest answer
+     to "this group is short" is another
      movement and inventing one would break the slot table that keeps two lifts
      off the same muscle. "Room to add" means the group already appears as an
      accessory somewhere with fewer than the 6 sets the clamp allows, so the gap
      could be closed without a new exercise. Nothing downstream reads this yet
      and that is deliberate: measured first, acted on when there is a caller. */
   const finalTotals = plannedByGroup();
-  const volumeTargets = {};
-  for (const group of Object.keys(finalTotals)) volumeTargets[group] = +weeklyTargetFor(group).toFixed(1);
+  /* One entry per group, `{ sets, target }`, because the two numbers are only
+     ever read together: a total means nothing without the thing it was aiming
+     at. The first shape of this was two parallel maps keyed by the same groups,
+     which is the same data with a way to get them out of step. */
+  const weeklyVolume = {};
+  for (const [group, sets] of Object.entries(finalTotals)) {
+    weeklyVolume[group] = { sets, target: +weeklyTargetFor(group).toFixed(1) };
+  }
   const volumeUnder = [];
   for (const [group, planned] of Object.entries(finalTotals)) {
     const target = weeklyTargetFor(group);
@@ -642,6 +685,32 @@ export function buildPlan({
     volumeUnder.push({
       group, target: +target.toFixed(1), planned,
       why: `${group} is ${+(target - planned).toFixed(1)} sets under its weekly target and an accessory slot has room for them.`,
+    });
+  }
+
+  /* The other half of the same honesty, and it was missing. The trim above only
+     moves accessories and never goes below two sets, so an excess made entirely
+     of main work, or of accessories already sitting on the floor of two, comes
+     out of the loop untouched and the ledger showed a group over target with no
+     line anywhere saying why. Measured on a sweep of 1040 goal, day count and
+     history combinations: 85 plans left a group more than the slack over, every
+     one of them because two sets is the smallest prescription there is. A
+     five day return-to-training week hits chest and lats four times at a 0.6
+     sets factor, which asks for 4.8 sets and cannot buy fewer than 8.
+     Neither cause is a bug to patch here. Cutting a main movement to chase a
+     weekly number would take the reason the day exists, and prescribing one set
+     is not a prescription. So it reports, in the same shape as the under side,
+     and it names which of the two walls it hit. */
+  const volumeOver = [];
+  for (const [group, planned] of Object.entries(finalTotals)) {
+    const target = weeklyTargetFor(group);
+    if (planned - target <= VOLUME_SLACK) continue;
+    const accessories = week.flatMap((d) => d.exercises.filter((e) => e.group === group && roleOf.get(e) === "accessory"));
+    volumeOver.push({
+      group, target: +target.toFixed(1), planned,
+      why: accessories.length
+        ? `${group} is ${+(planned - target).toFixed(1)} sets over its weekly target and every accessory for it is already at the floor of two sets.`
+        : `${group} is ${+(planned - target).toFixed(1)} sets over its weekly target and all of it is main work, which is not trimmed.`,
     });
   }
 
@@ -695,10 +764,14 @@ export function buildPlan({
     days, dayNotes, restDays: 7 - days,
     week, progression, deload,
     /* What the week really spends per muscle group against what it was aiming
-       for, plus every correction that was made and every gap that was not. The
-       first version of this engine could not have printed this table, which is
-       precisely why it did not notice it was wrong. */
-    weeklyVolume: { byGroup: finalTotals, targetByGroup: volumeTargets, trimmed: volumeTrimmed, under: volumeUnder, timeTrimmed },
+       for. The first version of this engine could not have printed this table,
+       which is precisely why it did not notice it was wrong. */
+    weeklyVolume,
+    /* Every correction that was made and every gap that was not, kept beside
+       the ledger rather than inside it so that `weeklyVolume` stays a plain map
+       from group to numbers and a caller can iterate it without having to know
+       which keys are muscles and which are bookkeeping. */
+    volumeNotes: { trimmed: volumeTrimmed, over: volumeOver, under: volumeUnder, timeTrimmed, overBudget },
     cardio: P.cardio,
     /* What was asked for, what it cost, and what it could not buy. `excluded`
        is every movement the joint table ruled out across both libraries, not

@@ -125,12 +125,13 @@ function printPlan(p) {
      nobody checks, and every volume bug in this folder was found by adding one
      column to a printout. */
   const v = p.weeklyVolume;
-  const line = Object.keys(v.byGroup).sort()
-    .map((g) => `${g} ${v.byGroup[g]}/${v.targetByGroup[g]}`).join("  ");
+  const line = Object.keys(v).sort()
+    .map((g) => `${g} ${v[g].sets}/${v[g].target}`).join("  ");
   console.log(`\n  Weekly sets per group, against target: ${line}`);
-  for (const t of v.trimmed) console.log(`    Trimmed: ${t.why}`);
-  for (const u of v.under) console.log(`    Short: ${u.why}`);
-  for (const t of v.timeTrimmed) console.log(`    Dropped for time: ${t.dropped} from ${t.day}.`);
+  for (const t of p.volumeNotes.trimmed) console.log(`    Trimmed: ${t.why}`);
+  for (const o of p.volumeNotes.over) console.log(`    Over, and staying over: ${o.why}`);
+  for (const u of p.volumeNotes.under) console.log(`    Short: ${u.why}`);
+  for (const t of p.volumeNotes.timeTrimmed) console.log(`    Dropped for time: ${t.dropped} from ${t.day}.`);
 
   const first = p.week[0]?.exercises[0];
   if (first) console.log(`\n  Where the first weight came from: ${first.loadNote}`);
