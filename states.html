@@ -2733,6 +2733,30 @@
   .wt-row-x.up { color: var(--warn); }
   .cst-caption { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
 
+  /* The strength card's lift list: tap a row and the chart above switches to
+     it, the same "tap to re-focus" idea the Body tab already uses. */
+  .str-list { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 4px; }
+  .str-row {
+    width: 100%; display: flex; align-items: baseline; gap: 10px; padding: 10px 0;
+    border-bottom: 1px solid var(--border); background: none; border-left: 0; border-right: 0; border-top: 0;
+    color: var(--text); font-family: inherit; text-align: left; cursor: pointer;
+  }
+  .str-row:last-child { border-bottom: none; }
+  .str-row:active { background: var(--panel-2); }
+  .str-row.on .str-row-name { color: var(--me); }
+  .str-row-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .str-row-meta { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .str-row-w { font-size: 15.5px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .str-row-w i { font-style: normal; font-size: 11px; font-weight: 600; color: var(--muted); margin-left: 3px; }
+  /* One reading, or none in the window: a real answer in place of an axis
+     with nothing on it or one dot floating in the middle. */
+  .str-single {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px; text-align: center;
+  }
+  .str-single b { font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
+  .str-single span { font-size: 12.5px; color: var(--muted); }
+
   .bi-share { display: flex; align-items: center; gap: 12px; }
   .bi-share .av { width: 44px; height: 44px; font-size: 15.5px; border-width: 2px; cursor: default; }
   .bi-share-text { flex: 1; min-width: 0; }
@@ -3532,6 +3556,23 @@
       <div class="cst-caption" id="consistencyCaption"></div>
     </div>
 
+    <div class="card metric-card" id="cardStrength">
+      <h2>Strength</h2>
+      <div class="wt-stats" id="strengthStats"></div>
+      <div class="chart-wrap">
+        <canvas id="strengthChart"></canvas>
+        <div class="str-single hidden" id="strengthSingle"></div>
+      </div>
+      <div class="str-list" id="strengthList"></div>
+    </div>
+
+    <div class="card metric-card" id="cardVolume">
+      <h2>Training volume</h2>
+      <div class="wt-stats" id="volumeStats"></div>
+      <div class="chart-wrap"><canvas id="volumeChart"></canvas></div>
+      <div class="cst-caption" id="volumeCaption"></div>
+    </div>
+
     <div class="card metric-card" id="cardPhotos">
       <h2>Body photos</h2>
       <p class="muted-note" style="margin-top:-6px;" id="photoHint">One photo a day. Swipe back to see how far you've come.</p>
@@ -3748,6 +3789,8 @@ const COVERAGE_TARGETS = [
 
 const TRACK_OPTIONS = [
   { key: "weight",      label: "Body weight",  icon: "trending",  card: "cardWeight" },
+  { key: "strength",    label: "Strength",     icon: "dumbbell",  card: "cardStrength" },
+  { key: "volume",      label: "Volume",       icon: "bolt",      card: "cardVolume" },
   { key: "consistency", label: "Consistency",  icon: "flame",     card: "cardConsistency" },
   { key: "photos",      label: "Body photos",  icon: "medal",     card: "cardPhotos" },
   { key: "activity",    label: "Activity log", icon: "checklist", card: "cardActivity" },
@@ -5703,6 +5746,8 @@ function renderProgressTab() {
 
   if (on.has("weight")) { renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); }
   if (on.has("consistency")) { renderConsistencyChart(); renderConsistencyStats(); }
+  if (on.has("strength")) { renderStrengthChart(); renderStrengthStats(); }
+  if (on.has("volume")) { renderVolumeChart(); renderVolumeStats(); }
   if (on.has("activity")) renderLog();
   if (on.has("photos")) renderBodyPhotos();
 

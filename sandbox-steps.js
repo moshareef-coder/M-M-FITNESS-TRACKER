@@ -180,13 +180,35 @@
         note: "One person per chart, whoever the You / Mell toggle is on: both lines shared an axis before, and forty five pounds between them flattened each into a straight line. Start, now, change and the goal read across the top, the dashes are the target, the pills change the window, and every weigh-in below opens the day it belongs to so a mistyped number is fixable here.",
         run: (w) => w.switchTab("progress") },
 
-      { t: "A goal-shaped default", scenario: "paired",
+      { t: "Default: Stay consistent", scenario: "paired",
         s: "Same tab, a different goal",
-        note: "Mo's fixture goal is Lose weight, so the step above defaults to the weight chart. This one flips his goal to Stay consistent and reloads Progress: the default becomes days-trained-vs-target instead, because the old default was a flat [weight, trained] for every goal, and \"trained\" was not even a real card. Build muscle and Get stronger still fall back to weight for now, an empty tab would be worse than a not-quite-right one, until their own cards exist.",
+        note: "Mo's fixture goal is Lose weight, so the step above defaults to the weight chart. This one flips his goal to Stay consistent and reloads Progress: the default becomes days-trained-vs-target instead, because the old default was a flat [weight, trained] for every goal, and \"trained\" was not even a real card.",
         run: (w) => {
           const db = w.__SANDBOX.db;
           const me = db.profiles.find((p) => p.email === w.__SANDBOX.me);
           me.goal = "Stay consistent";
+          delete me.tracked_metrics;
+          w.loadAll().then(() => w.switchTab("progress"));
+        } },
+
+      { t: "Default: Get stronger", scenario: "paired",
+        s: "Top lifts and their trend",
+        note: "Same flip, a different goal: the default becomes the Strength card, ranked by how much you actually train each lift rather than a heaviest-single leaderboard, so the lift you do every week leads over one you tried once. Tap any row below the chart to re-chart that lift instead. personalRecords() already tracked every best; this is the first screen that shows the climb rather than just the number.",
+        run: (w) => {
+          const db = w.__SANDBOX.db;
+          const me = db.profiles.find((p) => p.email === w.__SANDBOX.me);
+          me.goal = "Get stronger";
+          delete me.tracked_metrics;
+          w.loadAll().then(() => w.switchTab("progress"));
+        } },
+
+      { t: "Default: Build muscle", scenario: "paired",
+        s: "Weekly volume, not weight",
+        note: "The default becomes Training volume: weight times reps times sets, added up per week, against your own 8-week average. Unlike Strength it rewards more sets on a lift, not just a heavier top single, which is closer to what actually drives size. No target line: there is no honest number to draw one from yet.",
+        run: (w) => {
+          const db = w.__SANDBOX.db;
+          const me = db.profiles.find((p) => p.email === w.__SANDBOX.me);
+          me.goal = "Build muscle";
           delete me.tracked_metrics;
           w.loadAll().then(() => w.switchTab("progress"));
         } },

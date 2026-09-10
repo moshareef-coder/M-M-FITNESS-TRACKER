@@ -2746,6 +2746,30 @@
   .wt-row-x.up { color: var(--warn); }
   .cst-caption { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
 
+  /* The strength card's lift list: tap a row and the chart above switches to
+     it, the same "tap to re-focus" idea the Body tab already uses. */
+  .str-list { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 4px; }
+  .str-row {
+    width: 100%; display: flex; align-items: baseline; gap: 10px; padding: 10px 0;
+    border-bottom: 1px solid var(--border); background: none; border-left: 0; border-right: 0; border-top: 0;
+    color: var(--text); font-family: inherit; text-align: left; cursor: pointer;
+  }
+  .str-row:last-child { border-bottom: none; }
+  .str-row:active { background: var(--panel-2); }
+  .str-row.on .str-row-name { color: var(--me); }
+  .str-row-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .str-row-meta { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .str-row-w { font-size: 15.5px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .str-row-w i { font-style: normal; font-size: 11px; font-weight: 600; color: var(--muted); margin-left: 3px; }
+  /* One reading, or none in the window: a real answer in place of an axis
+     with nothing on it or one dot floating in the middle. */
+  .str-single {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px; text-align: center;
+  }
+  .str-single b { font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
+  .str-single span { font-size: 12.5px; color: var(--muted); }
+
   .bi-share { display: flex; align-items: center; gap: 12px; }
   .bi-share .av { width: 44px; height: 44px; font-size: 15.5px; border-width: 2px; cursor: default; }
   .bi-share-text { flex: 1; min-width: 0; }
@@ -3236,6 +3260,23 @@
       <div class="cst-caption" id="consistencyCaption"></div>
     </div>
 
+    <div class="card metric-card" id="cardStrength">
+      <h2>Strength</h2>
+      <div class="wt-stats" id="strengthStats"></div>
+      <div class="chart-wrap">
+        <canvas id="strengthChart"></canvas>
+        <div class="str-single hidden" id="strengthSingle"></div>
+      </div>
+      <div class="str-list" id="strengthList"></div>
+    </div>
+
+    <div class="card metric-card" id="cardVolume">
+      <h2>Training volume</h2>
+      <div class="wt-stats" id="volumeStats"></div>
+      <div class="chart-wrap"><canvas id="volumeChart"></canvas></div>
+      <div class="cst-caption" id="volumeCaption"></div>
+    </div>
+
     <div class="card metric-card" id="cardPhotos">
       <h2>Body photos</h2>
       <p class="muted-note" style="margin-top:-6px;" id="photoHint">One photo a day. Swipe back to see how far you've come.</p>
@@ -3706,7 +3747,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.09.5";
+const APP_VERSION = "2026.09.09.6";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -8909,6 +8950,247 @@ function renderConsistencyChart() {
   $("consistencyCaption").textContent = `Target: ${target} day${target === 1 ? "" : "s"} a week`;
 }
 
+/* Canvas does not understand color-mix, so a token is unpacked to rgba by
+   hand. Shared by every chart that fills under its line. */
+function rgbOf(hex) {
+  const h = String(hex || "").trim().replace("#", "");
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  if (!/^[0-9a-f]{6}$/i.test(full)) return null;
+  const n = parseInt(full, 16);
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+}
+
+function chartWash(ctx, hex) {
+  const rgb = rgbOf(hex);
+  if (!rgb) return "transparent";
+  const g = ctx.createLinearGradient(0, 0, 0, 190);
+  g.addColorStop(0, `rgba(${rgb}, .26)`);
+  g.addColorStop(1, `rgba(${rgb}, 0)`);
+  return g;
+}
+
+/* ---------- Strength card ----------
+   For "Get stronger": which lifts you actually do, and whether the number on
+   the bar is climbing. personalRecords() already tracks "the heaviest this
+   has ever been" for every exercise; this ranks them by how much you actually
+   train them, since a lift done once is not the one worth leading with. */
+
+/* Weight-based logs only (a duration-based class entry has no meaningful
+   "weight lifted"), grouped by exercise, ranked by total sets logged so the
+   lift you actually do most leads. */
+function topLiftsFor(name, limit = 6) {
+  const logs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && l.weight != null && !l.duration_min);
+  const by = new Map();
+  for (const l of logs) {
+    const key = (l.exercise_name || "").trim().toLowerCase();
+    if (!key) continue;
+    const row = by.get(key) || { name: l.exercise_name.trim(), sets: 0, best: 0, lastDate: "" };
+    row.sets += l.sets || 1;
+    row.best = Math.max(row.best, l.weight);
+    if (l.entry_date > row.lastDate) row.lastDate = l.entry_date;
+    by.set(key, row);
+  }
+  return [...by.values()].sort((a, b) => b.sets - a.sets).slice(0, limit);
+}
+
+/* Every logged weight for one exercise, oldest first, one point per DAY (the
+   heaviest set that day) rather than one per set, so three warm-up sets and a
+   top set on the same day do not look like four separate sessions. */
+function liftHistory(name, exerciseName, weeks = 12) {
+  const key = exerciseName.trim().toLowerCase();
+  const from = new Date(todayStr() + "T00:00:00");
+  from.setDate(from.getDate() - weeks * 7);
+  const fromStr = isoDate(from);
+  const byDate = new Map();
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== name || l.weight == null || l.duration_min) continue;
+    if ((l.exercise_name || "").trim().toLowerCase() !== key) continue;
+    if (l.entry_date < fromStr) continue;
+    byDate.set(l.entry_date, Math.max(byDate.get(l.entry_date) || 0, l.weight));
+  }
+  return [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([entry_date, weight]) => ({ entry_date, weight }));
+}
+
+/* The lift currently charted. Defaults to whoever is most trained, and resets
+   whenever the person being viewed changes so Mell's chart does not open on a
+   lift pulled from Mo's history. */
+let STRENGTH_LIFT = null;
+let STRENGTH_LIFT_FOR = null;
+
+function renderStrengthStats() {
+  const viewingPartner = PROGRESS_VIEW === "partner";
+  const name = viewingPartner ? partnerName() : ME;
+  const { prCount } = personalRecords(name);
+  const lifts = topLiftsFor(name, 100);
+  const totalSets = lifts.reduce((s, l) => s + l.sets, 0);
+  $("strengthStats").innerHTML = `
+    <div class="wt-stat"><b>${lifts.length}</b><span>Lifts tracked</span></div>
+    <div class="wt-stat"><b>${totalSets}</b><span>Sets logged</span></div>
+    <div class="wt-stat${prCount > 0 ? " good" : ""}"><b>${prCount}</b><span>Lifetime PRs</span></div>`;
+}
+
+let strengthChart = null;
+
+function renderStrengthChart() {
+  if (!window.Chart) { loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderStrengthChart); return; }
+  const viewingPartner = PROGRESS_VIEW === "partner";
+  const name = viewingPartner ? partnerName() : ME;
+  const hex = cssVar(viewingPartner ? "--partner" : "--me");
+  const lifts = topLiftsFor(name);
+
+  const card = $("cardStrength");
+  if (!lifts.length) {
+    card.classList.add("chart-empty");
+    let ph = $("strengthEmpty");
+    if (!ph) { ph = document.createElement("div"); ph.id = "strengthEmpty"; card.appendChild(ph); }
+    ph.innerHTML = emptyState("dumbbell", "No lifts logged yet",
+      "Log a weighted exercise and your top lifts start ranking here.");
+    if (strengthChart) { strengthChart.destroy(); strengthChart = null; }
+    $("strengthList").innerHTML = "";
+    return;
+  }
+  card.classList.remove("chart-empty");
+  $("strengthEmpty")?.remove();
+
+  // Reset the selection when switching between You and Partner, or the first
+  // time this card renders, to whoever's own most-trained lift.
+  if (STRENGTH_LIFT_FOR !== name || !lifts.some((l) => l.name === STRENGTH_LIFT)) {
+    STRENGTH_LIFT = lifts[0].name;
+    STRENGTH_LIFT_FOR = name;
+  }
+
+  const history = liftHistory(name, STRENGTH_LIFT);
+  const ctx = $("strengthChart").getContext("2d");
+  if (strengthChart) strengthChart.destroy();
+
+  const single = $("strengthSingle");
+  if (history.length < 2) {
+    // A single reading has nothing to draw a line between; say the number
+    // instead of leaving an axis with one dot floating in the middle of it.
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    single.classList.remove("hidden");
+    single.innerHTML = history.length
+      ? `<b>${history[0].weight} lbs</b><span>Logged once so far</span>`
+      : `<b>—</b><span>Not logged in the last 12 weeks</span>`;
+  } else {
+    single.classList.add("hidden");
+    const values = history.map((h) => h.weight);
+    const pointSizes = values.map((_, i) => (i === values.length - 1 ? 4 : 0));
+    strengthChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: history.map((h) => h.entry_date.slice(5)),
+        datasets: [{
+          label: STRENGTH_LIFT, data: values, borderColor: hex, borderWidth: 2.5, tension: 0.35,
+          pointRadius: pointSizes, pointBackgroundColor: hex, pointBorderColor: cssVar("--panel"), pointBorderWidth: 2,
+          fill: true, backgroundColor: chartWash(ctx, hex),
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { border: { display: false }, grid: { display: false }, ticks: { color: cssVar("--muted"), maxTicksLimit: 5, font: { size: 10 } } },
+          y: { border: { display: false }, grid: { color: cssVar("--border"), drawTicks: false }, ticks: { color: cssVar("--muted"), font: { size: 10 }, padding: 6 } },
+        },
+      },
+    });
+  }
+
+  $("strengthList").innerHTML = `<div class="wt-history-head">Charting ${escapeHtml(STRENGTH_LIFT)}</div>` +
+    lifts.map((l) => `<button type="button" class="str-row${l.name === STRENGTH_LIFT ? " on" : ""}" data-lift="${escapeHtml(l.name)}">
+      <span class="str-row-name">${escapeHtml(l.name)}</span>
+      <span class="str-row-meta">${bodyFmtSets(l.sets)}</span>
+      <span class="str-row-w">${l.best}<i>lbs</i></span>
+    </button>`).join("");
+  $("strengthList").querySelectorAll("[data-lift]").forEach((b) => {
+    b.onclick = () => { STRENGTH_LIFT = b.dataset.lift; renderStrengthChart(); };
+  });
+}
+
+/* ---------- Volume card ----------
+   For "Build muscle": total weight moved per week. A single number people
+   already recognise from every lifting app, and unlike Strength it rewards
+   more sets on a lift, not just a heavier top single. */
+
+function volumeWeeks(name, weeks = 8) {
+  const out = [];
+  const cursor = new Date(weekStartStr() + "T00:00:00");
+  for (let i = 0; i < weeks; i++) {
+    const ws = isoDate(cursor);
+    const we = new Date(cursor); we.setDate(we.getDate() + 7);
+    const wes = isoDate(we);
+    const volume = ALL_EXERCISE_LOGS
+      .filter((l) => l.user_name === name && l.entry_date >= ws && l.entry_date < wes && l.weight != null && l.reps)
+      .reduce((s, l) => s + l.weight * l.reps * (l.sets || 1), 0);
+    out.unshift({ weekStart: ws, volume });
+    cursor.setDate(cursor.getDate() - 7);
+  }
+  return out;
+}
+
+function renderVolumeStats() {
+  const viewingPartner = PROGRESS_VIEW === "partner";
+  const name = viewingPartner ? partnerName() : ME;
+  const weeks = volumeWeeks(name, 8);
+  const thisWeek = weeks[weeks.length - 1].volume;
+  const finished = weeks.slice(0, -1).filter((w) => w.volume > 0);
+  const avg = finished.length ? finished.reduce((s, w) => s + w.volume, 0) / finished.length : 0;
+  const vsAvg = avg > 0 ? Math.round(((thisWeek - avg) / avg) * 100) : null;
+  $("volumeStats").innerHTML = `
+    <div class="wt-stat"><b>${fmtVolume(thisWeek)}</b><span>This week, lb</span></div>
+    <div class="wt-stat"><b>${avg > 0 ? fmtVolume(avg) : "—"}</b><span>8-week avg</span></div>
+    <div class="wt-stat${vsAvg == null ? "" : vsAvg >= 0 ? " good" : ""}"><b>${vsAvg == null ? "—" : `${vsAvg > 0 ? "+" : ""}${vsAvg}%`}</b><span>Vs. average</span></div>`;
+}
+
+let volumeChart = null;
+
+function renderVolumeChart() {
+  if (!window.Chart) { loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderVolumeChart); return; }
+  const viewingPartner = PROGRESS_VIEW === "partner";
+  const name = viewingPartner ? partnerName() : ME;
+  const hex = cssVar(viewingPartner ? "--partner" : "--me");
+  const weeks = volumeWeeks(name, 8);
+
+  const card = $("cardVolume");
+  if (!weeks.some((w) => w.volume > 0)) {
+    card.classList.add("chart-empty");
+    let ph = $("volumeEmpty");
+    if (!ph) { ph = document.createElement("div"); ph.id = "volumeEmpty"; card.appendChild(ph); }
+    ph.innerHTML = emptyState("bolt", "No sets logged yet",
+      "Log a weighted set and the last eight weeks start filling in here.");
+    if (volumeChart) { volumeChart.destroy(); volumeChart = null; }
+    $("volumeCaption").textContent = "";
+    return;
+  }
+  card.classList.remove("chart-empty");
+  $("volumeEmpty")?.remove();
+
+  const ctx = $("volumeChart").getContext("2d");
+  if (volumeChart) volumeChart.destroy();
+  volumeChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: weeks.map((w) => w.weekStart.slice(5)),
+      datasets: [{
+        label: "Volume", data: weeks.map((w) => w.volume),
+        backgroundColor: hex, borderRadius: 4, maxBarThickness: 26,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { border: { display: false }, grid: { display: false }, ticks: { color: cssVar("--muted"), font: { size: 10 } } },
+        y: { border: { display: false }, beginAtZero: true,
+             grid: { color: cssVar("--border"), drawTicks: false },
+             ticks: { color: cssVar("--muted"), font: { size: 10 }, padding: 6, callback: (v) => fmtVolume(v) } },
+      },
+    },
+  });
+  $("volumeCaption").textContent = "Weight × reps × sets, every weighted exercise";
+}
+
 function renderWeightChart() {
   /* Chart.js is 70 KB and only this card uses it, so it arrives with the card
      rather than with the app. */
@@ -8948,24 +9230,6 @@ function renderWeightChart() {
   const ctx = $("weightChart").getContext("2d");
   if (weightChart) weightChart.destroy();
 
-  /* Canvas does not understand color-mix, so the token is unpacked to rgba by
-     hand. Everywhere else in the sheet color-mix is fine; here it silently
-     produces no fill at all. */
-  const rgbOf = (hex) => {
-    const h = String(hex || "").trim().replace("#", "");
-    const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
-    if (!/^[0-9a-f]{6}$/i.test(full)) return null;
-    const n = parseInt(full, 16);
-    return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
-  };
-  const wash = (hex) => {
-    const rgb = rgbOf(hex);
-    if (!rgb) return "transparent";
-    const g = ctx.createLinearGradient(0, 0, 0, 190);
-    g.addColorStop(0, `rgba(${rgb}, .26)`);
-    g.addColorStop(1, `rgba(${rgb}, 0)`);
-    return g;
-  };
   // Only the last point is drawn, because a dot on every reading is noise and
   // where you are NOW is the thing worth marking.
   const values = rows.map((e) => e.weight);
@@ -8974,7 +9238,7 @@ function renderWeightChart() {
   const datasets = [{
     label: name, data: values, borderColor: hex, borderWidth: 2.5, spanGaps: true, tension: 0.35,
     pointRadius: pointSizes, pointBackgroundColor: hex, pointBorderColor: cssVar("--panel"), pointBorderWidth: 2,
-    fill: true, backgroundColor: wash(hex),
+    fill: true, backgroundColor: chartWash(ctx, hex),
   }];
   /* The target as a dashed rule across the chart. Without it the line is just
      a shape; with it you can see the gap you are actually closing. */
@@ -13271,6 +13535,8 @@ function viewedEmail() { return PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY
 
 const TRACK_OPTIONS = [
   { key: "weight",      label: "Body weight",  icon: "trending",  card: "cardWeight" },
+  { key: "strength",    label: "Strength",     icon: "dumbbell",  card: "cardStrength" },
+  { key: "volume",      label: "Volume",       icon: "bolt",      card: "cardVolume" },
   { key: "consistency", label: "Consistency",  icon: "flame",     card: "cardConsistency" },
   { key: "photos",      label: "Body photos",  icon: "medal",     card: "cardPhotos" },
   { key: "activity",    label: "Activity log", icon: "checklist", card: "cardActivity" },
@@ -13279,15 +13545,17 @@ const TRACK_OPTIONS = [
 
 /* The starting point before anyone has touched "Customise this tab", chosen by
    what they actually said they wanted at onboarding rather than one default
-   for everyone. Someone who picked "Stay consistent" was landing on a weight
-   chart, because the old default was a flat ["weight", "trained"] regardless
-   of goal, and "trained" was not even a real card key. Only "Stay consistent"
-   branches for now: Build muscle and Get stronger still fall through to
-   weight until their own cards exist, an empty Progress tab would be worse
-   than a not-quite-right one. */
+   for everyone. The old default was a flat ["weight", "trained"] regardless
+   of goal, and "trained" was not even a real card key, so a Get-stronger user
+   and a Stay-consistent user both landed on a weight chart. "Recomp" is
+   checked before the muscle test below, since its full string is "Recomp
+   (lose fat, gain muscle)" and would otherwise match on the word "muscle". */
 function defaultTrackedMetrics() {
   const goal = (MY_PROFILE?.goal || "").toLowerCase();
   if (/consistent/.test(goal)) return ["consistency", "activity"];
+  if (/stronger/.test(goal)) return ["strength", "activity"];
+  if (/recomp/.test(goal)) return ["weight", "photos"];
+  if (/muscle/.test(goal)) return ["volume", "photos"];
   return ["weight", "photos"];
 }
 
@@ -13339,6 +13607,8 @@ function renderProgressTab() {
 
   if (on.has("weight")) { renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); }
   if (on.has("consistency")) { renderConsistencyChart(); renderConsistencyStats(); }
+  if (on.has("strength")) { renderStrengthChart(); renderStrengthStats(); }
+  if (on.has("volume")) { renderVolumeChart(); renderVolumeStats(); }
   if (on.has("activity")) renderLog();
   if (on.has("photos")) renderBodyPhotos();
 
