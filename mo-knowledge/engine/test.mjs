@@ -32,6 +32,7 @@ import { BODY_AREAS, EQUIPMENT_OPTIONS, normalizeLimits, applyLimits, limitsSumm
 import { JOINTS, JOINT_LOAD, defaultJointLoad } from "./joint-load.mjs";
 import { joinPlanToActual, calibrateExercise, calibrate, PUSH_COMPOUND, PUSH_ISOLATION, BACK_OFF } from "./calibrate.mjs";
 import { mapGoal, generateFromPayload, toWorkout, focusDayIndex, nextDayIndex } from "./adapter.mjs";
+import { buildMuscleIndex, muscleRecoveryStates, mainGroupsForDay, dayIsFresh, skipFreshDays, FRESH_HOURS, RECOVERY_HOURS, MIN_CREDIT_SETS } from "./recovery.mjs";
 
 import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
 import { MUSCLE_PIECES } from "../../knowledge/anatomy/muscle-detail.mjs";
@@ -1121,4 +1122,123 @@ test("generateFromPayload honours an explicit challenge_target for the day count
 test("mapGoal with a completely empty payload falls back to the consistent bubble", () => {
   const r = mapGoal({});
   assert.equal(r.bubble, "consistent");
+});
+
+/* ---- recovery.mjs, the fix for regenerating into yesterday's muscles ---- */
+
+const MUSCLE_INDEX = buildMuscleIndex(TRAININGS);
+
+test("muscleRecoveryStates reads a real session from yesterday as hold, not ready", () => {
+  const logs = [
+    { entry_date: day(-1), exercise_name: "Barbell Bench Press", sets: 4, reps: 8, weight: 185 },
+    { entry_date: day(-1), exercise_name: "Machine Shoulder Press", sets: 3, reps: 10, weight: 60 },
+  ];
+  const states = muscleRecoveryStates({ logs, muscleIndex: MUSCLE_INDEX, today: new Date() });
+  assert.equal(states.get("chest")?.state, "hold");
+  assert.equal(states.get("shoulders")?.state, "hold");
+});
+
+test("muscleRecoveryStates ignores a light secondary touch below the credit floor", () => {
+  // One set of an accessory triceps movement credits triceps 1 (primary) but
+  // the chest it also lightly touches as a secondary at 0.5, under
+  // MIN_CREDIT_SETS: chest should not read as trained today from this alone.
+  const logs = [{ entry_date: day(-1), exercise_name: "Triceps Pushdown", sets: 1, reps: 12, weight: 30 }];
+  const states = muscleRecoveryStates({ logs, muscleIndex: MUSCLE_INDEX, today: new Date() });
+  assert.equal(states.get("chest"), undefined);
+});
+
+test("muscleRecoveryStates moves hold to ok to ready as hours pass, at the documented thresholds", () => {
+  const logs = [{ entry_date: day(-1), exercise_name: "Barbell Bench Press", sets: 4, reps: 8, weight: 185 }];
+  const held = muscleRecoveryStates({ logs, muscleIndex: MUSCLE_INDEX, today: new Date(Date.parse(day(-1) + "T18:00:00") + (FRESH_HOURS - 1) * 3600000) });
+  assert.equal(held.get("chest").state, "hold");
+  const ok = muscleRecoveryStates({ logs, muscleIndex: MUSCLE_INDEX, today: new Date(Date.parse(day(-1) + "T18:00:00") + (FRESH_HOURS + 1) * 3600000) });
+  assert.equal(ok.get("chest").state, "ok");
+  const ready = muscleRecoveryStates({ logs, muscleIndex: MUSCLE_INDEX, today: new Date(Date.parse(day(-1) + "T18:00:00") + (RECOVERY_HOURS + 1) * 3600000) });
+  assert.equal(ready.get("chest").state, "ready");
+});
+
+test("mainGroupsForDay unions only the main-role slots, not the accessories", () => {
+  const slots = [
+    { pattern: "horizontalPush", groups: ["chest"], role: "main" },
+    { pattern: "isolation", groups: ["triceps"], role: "accessory" },
+  ];
+  const groups = mainGroupsForDay(slots);
+  assert.ok(groups.has("chest"));
+  assert.ok(!groups.has("triceps"));
+});
+
+test("dayIsFresh is true only when a main group is held, an ok group does not block the day", () => {
+  const states = new Map([["chest", { state: "hold" }], ["lats", { state: "ok" }]]);
+  assert.equal(dayIsFresh(new Set(["chest"]), states), true);
+  assert.equal(dayIsFresh(new Set(["lats"]), states), false);
+  assert.equal(dayIsFresh(new Set(["quads"]), states), false);
+});
+
+test("skipFreshDays walks forward past a held day to the first fully rested one", () => {
+  const states = new Map([["chest", { state: "hold" }], ["lats", { state: "ready" }], ["quads", { state: "ready" }]]);
+  const dayGroups = [new Set(["chest"]), new Set(["lats"]), new Set(["quads"])];
+  assert.equal(skipFreshDays(0, dayGroups, states), 1);
+});
+
+test("skipFreshDays never blocks generation: with every day fresh it returns the least-fresh one rather than nothing", () => {
+  const states = new Map([["chest", { state: "hold" }], ["lats", { state: "hold" }]]);
+  const dayGroups = [new Set(["chest"]), new Set(["chest", "lats"])];
+  const i = skipFreshDays(0, dayGroups, states);
+  assert.ok(i === 0 || i === 1);
+});
+
+test("nextDayIndex will not hand back yesterday's Push day just because the rotation wrapped there", () => {
+  const history = [];
+  for (let i = 0; i < 70; i++) {
+    const back = 2 + (69 - i) * 3;
+    history.push({ entry_date: day(-back), exercise_name: "Barbell Bench Press", sets: 3, reps: 8, weight: 135 + Math.round(i / 3) * 5 });
+    history.push({ entry_date: day(-back), exercise_name: "Barbell Back Squat", sets: 3, reps: 8, weight: 185 + Math.round(i / 3) * 5 });
+  }
+  const yesterday = [
+    { entry_date: day(-1), exercise_name: "Barbell Bench Press", sets: 4, reps: 8, weight: 225 },
+    { entry_date: day(-1), exercise_name: "Machine Shoulder Press", sets: 3, reps: 10, weight: 60 },
+  ];
+  const logs = [...history, ...yesterday];
+  const plan = buildPlan({ goal: { bubble: "get-stronger", child: "strong-a-lift" }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 3 }, logs });
+  assert.equal(plan.week.map((d) => d.name).join(","), "Push day,Pull day,Leg day");
+  // The last completed plan was Leg day, so naive rotation wraps to Push,
+  // which is exactly the muscle group a real session hit yesterday.
+  const plans = [{ entry_date: day(-1), focus: "Leg day", completed_at: day(-1) + "T18:00:00Z", exercises: [] }];
+  const idx = nextDayIndex(plan, { logs, plans, today: new Date() });
+  assert.notEqual(plan.week[idx].name, "Push day");
+});
+
+test("nextDayIndex returns to Push day once the fresh window has genuinely passed", () => {
+  const history = [];
+  for (let i = 0; i < 70; i++) {
+    const back = 2 + (69 - i) * 3;
+    history.push({ entry_date: day(-back), exercise_name: "Barbell Bench Press", sets: 3, reps: 8, weight: 135 + Math.round(i / 3) * 5 });
+    history.push({ entry_date: day(-back), exercise_name: "Barbell Back Squat", sets: 3, reps: 8, weight: 185 + Math.round(i / 3) * 5 });
+  }
+  const yesterday = [
+    { entry_date: day(-1), exercise_name: "Barbell Bench Press", sets: 4, reps: 8, weight: 225 },
+    { entry_date: day(-1), exercise_name: "Machine Shoulder Press", sets: 3, reps: 10, weight: 60 },
+  ];
+  const logs = [...history, ...yesterday];
+  const plan = buildPlan({ goal: { bubble: "get-stronger", child: "strong-a-lift" }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 3 }, logs });
+  const plans = [{ entry_date: day(-1), focus: "Leg day", completed_at: day(-1) + "T18:00:00Z", exercises: [] }];
+  const later = new Date(Date.now() + (RECOVERY_HOURS + 2) * 3600000);
+  const idx = nextDayIndex(plan, { logs, plans, today: later });
+  assert.equal(plan.week[idx].name, "Push day");
+});
+
+test("nextDayIndex with no logs at all behaves exactly as the plain rotation did, nothing to skip", () => {
+  const plan = buildPlan({ goal: { bubble: "lose-weight", child: "lose-a-number" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 3 }, logs: [] });
+  const names = plan.week.map((d) => d.name);
+  const plans = [{ entry_date: day(-1), focus: names[0], completed_at: day(-1) + "T18:00:00Z", exercises: [] }];
+  const idx = nextDayIndex(plan, { logs: [], plans, today: new Date() });
+  assert.equal(plan.week[idx].name, names[1]);
+});
+
+test("every day plan.mjs builds carries a mainGroups set the adapter can read", () => {
+  const plan = buildPlan({ goal: { bubble: "get-stronger", child: "strong-a-lift" }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 4 }, logs: [] });
+  for (const d of plan.week) {
+    assert.ok(Array.isArray(d.mainGroups));
+    assert.ok(d.mainGroups.length > 0);
+  }
 });

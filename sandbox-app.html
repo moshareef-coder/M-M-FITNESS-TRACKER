@@ -13330,6 +13330,7 @@ function renderPlanPreview() {
   }).join("");
 
   $("workoutContent").innerHTML = `
+    ${backBar("Back", () => goWorkoutScreen("choose", { back: true }))}
     <div class="workout-progress-row">
       <span>Progress</span>
       <span class="workout-progress-count">${doneCount}/${total}</span>
@@ -13567,6 +13568,13 @@ const BODY_RECOVERY_HOURS = 48;
    thing to want; this exists so the answer is "yes, and here is the cost"
    instead of a wall of red. */
 const BODY_FRESH_HOURS = 24;
+
+/* Same floor recovery.mjs uses before it will credit a muscle as actually
+   worked, kept in sync by hand since this file and the engine cannot share
+   an import. Without it, a single secondary-only touch (a shoulder press's
+   0.5 credit to Shoulders, say) could mark the whole group "hold" on a day
+   it was barely involved. */
+const BODY_MIN_CREDIT_SETS = 2;
 
 // Untrained groups fill the ring row so it is always five wide. Big movers
 // first: an empty chest ring is a more useful nudge than an empty forearms one.
@@ -14303,12 +14311,23 @@ function bodyAreaStates() {
   return COVERAGE_TARGETS.map((t) => {
     const members = t.members || [t.key];
     const weekSets = members.reduce((n, k) => n + (weekVol[k] || 0), 0);
-    let lastDate = "";
+    // Credit per day this group actually got, weighted the same way
+    // computeMuscleVolumeBetween weights it, so a date only counts toward
+    // lastDate once the credit clears BODY_MIN_CREDIT_SETS.
+    const creditByDate = {};
     for (const log of mine) {
       const rule = classifyMuscles(log.exercise_name);
       if (!rule) continue;
-      const hit = [...rule.primary, ...rule.secondary].some((g) => members.includes(g));
-      if (hit && log.entry_date > lastDate) lastDate = log.entry_date;
+      const primaryHit = rule.primary.some((g) => members.includes(g));
+      const secondaryHit = rule.secondary.some((g) => members.includes(g));
+      if (!primaryHit && !secondaryHit) continue;
+      const sets = log.duration_min ? Math.max(1, Math.round(log.duration_min / 10)) : (log.sets || 1);
+      const credit = (primaryHit ? sets : 0) + (secondaryHit ? sets * 0.5 : 0);
+      creditByDate[log.entry_date] = (creditByDate[log.entry_date] || 0) + credit;
+    }
+    let lastDate = "";
+    for (const date in creditByDate) {
+      if (creditByDate[date] >= BODY_MIN_CREDIT_SETS && date > lastDate) lastDate = date;
     }
     const hoursSince = lastDate ? (Date.now() - entryTime(lastDate)) / 3600000 : Infinity;
     const hoursLeft = lastDate ? BODY_RECOVERY_HOURS - hoursSince : -1;

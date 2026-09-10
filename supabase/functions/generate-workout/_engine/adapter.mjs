@@ -23,6 +23,12 @@ import { normalizeFocus, mergePriority, focusFreshness } from "./focus.mjs";
 import { normalizeLimits } from "./limits.mjs";
 /* Read only, for one field. See the focus block in generateFromPayload. */
 import { resolveGoal } from "./goal-engine.mjs";
+import { buildMuscleIndex, muscleRecoveryStates, skipFreshDays } from "./recovery.mjs";
+import { TRAININGS } from "../_library/index.mjs";
+
+/* Built once. Same library plan.mjs reads, so the muscle a logged exercise
+   counts toward here is the same one plan.mjs would credit it toward. */
+const MUSCLE_INDEX = buildMuscleIndex(TRAININGS);
 
 /* ------------------------------------------------------------------ *
  * 1. Five goal strings in, nine bubbles out
@@ -565,21 +571,31 @@ function rowTime(row) {
  * memory: its `focus` is the day name we wrote last time. Logs are the backup
  * for anyone whose plans predate the engine, matched on exercise names.
  *
- * Always the day after the last one, never the same day again, including when
- * the last one was earlier today. Somebody generating twice in a day wants
- * something else to do, not the same session repeated.
+ * The day after the last one, never the same day again, including when the
+ * last one was earlier today, EXCEPT when that next day's own muscles are
+ * still in the fresh window: recovery.mjs reads the same logs the Body tab
+ * reads and, if the naive next day would hand back muscle a real session
+ * only just hit, walks the rotation forward to the first day that is not
+ * still fresh, same as switchTab("body") would advise right now. The two
+ * screens read one body; they should not be free to disagree about it.
  */
 export function nextDayIndex(plan, { logs = [], plans = [], today = new Date() } = {}) {
   const week = plan?.week || [];
   if (week.length <= 1) return 0;
   const names = week.map((d) => norm(d.name));
 
+  const rested = (naive) => {
+    const states = muscleRecoveryStates({ logs, muscleIndex: MUSCLE_INDEX, today });
+    const dayGroups = week.map((d) => new Set(d.mainGroups || []));
+    return skipFreshDays(naive, dayGroups, states);
+  };
+
   const rows = (Array.isArray(plans) ? plans : [])
     .filter((p) => p && p.focus)
     .sort((a, b) => rowTime(b) - rowTime(a));
   for (const r of rows) {
     const i = names.indexOf(norm(r.focus));
-    if (i >= 0) return (i + 1) % week.length;
+    if (i >= 0) return rested((i + 1) % week.length);
   }
 
   /* No usable plan row. Ask the logs what the last session looked like: the
@@ -594,10 +610,11 @@ export function nextDayIndex(plan, { logs = [], plans = [], today = new Date() }
       const hits = d.exercises.filter((e) => did.has(norm(e.name))).length;
       if (hits > bestHits) { bestHits = hits; bestIndex = i; }
     });
-    if (bestIndex >= 0) return (bestIndex + 1) % week.length;
+    if (bestIndex >= 0) return rested((bestIndex + 1) % week.length);
   }
 
-  /* Nothing to go on, so the week starts where the week starts. */
+  /* Nothing to go on, so the week starts where the week starts. Recovery has
+     nothing to skip past either: with no logs, every group reads "ready". */
   return 0;
 }
 

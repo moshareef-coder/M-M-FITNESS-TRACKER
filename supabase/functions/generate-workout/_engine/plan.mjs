@@ -26,6 +26,7 @@ import { learnPreferences, applyPreferences, avoidNote } from "./preferences.mjs
 import { scoreAlternatives } from "./alternatives.mjs";
 import { planPlateauResponse, applyRotateFallback } from "./plateau-response.mjs";
 import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary, softenedNote } from "./limits.mjs";
+import { mainGroupsForDay } from "./recovery.mjs";
 
 const WEIGHTS = TRAININGS.find((t) => t.id === "weight-training");
 const CALIS = TRAININGS.find((t) => t.id === "calisthenics");
@@ -543,6 +544,13 @@ export function buildPlan({
       /* Filled in below, once the sets have stopped moving. Declared here so the
          key is on every day whatever the trimming does. */
       estimatedMinutes: null,
+      /* What this day is actually FOR, muscle-wise, so the adapter can tell a
+         Push day apart from a Leg day without knowing SLOTS exists. Read by
+         engine/recovery.mjs on the way to nextDayIndex, so regenerating skips
+         a day whose defining muscles were trained within the last day rather
+         than handing back the same muscles the Body tab is, right now, saying
+         to leave alone. */
+      mainGroups: [...mainGroupsForDay(SLOTS[key])],
       exercises,
     };
   });
