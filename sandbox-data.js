@@ -254,6 +254,51 @@
         db.ai_workouts = [];
       },
     },
+
+    /* ---- the three states nobody could look at ----
+       Every empty-state finding in the audit lived in a world the sandbox
+       could not build, which is exactly why they stayed unfixed: you cannot
+       design a screen you cannot open. These three make them openable. */
+
+    soloNoData: {
+      label: "Alone, nothing logged",
+      apply: (db) => {
+        db.partnerships = [];
+        db.profiles = db.profiles.filter((p) => p.email === ME);
+        db.fit_entries = []; db.exercise_logs = []; db.ai_workouts = [];
+        db.saved_workouts = []; db.session_reactions = []; db.user_goals = [];
+        db.body_photos = []; db.live_sessions = []; db.live_clips = [];
+        try { localStorage.setItem("ft_solo", "1"); } catch {}
+      },
+    },
+
+    invitePending: {
+      label: "Invite sent, not accepted",
+      apply: (db) => {
+        // A real pending row: sent by me, never answered. The app looks for an
+        // accepted partnership, does not find one, and falls through.
+        db.partnerships = [{ id: "p-pending", inviter_email: ME, invitee_email: THEM,
+          status: "pending", created_at: day(-1) + "T09:00:00Z", responded_at: null }];
+        db.profiles = db.profiles.filter((p) => p.email === ME);
+        db.fit_entries = db.fit_entries.filter((e) => e.email === ME);
+        db.exercise_logs = db.exercise_logs.filter((e) => e.email === ME);
+        db.session_reactions = [];
+        try { localStorage.removeItem("ft_solo"); } catch {}
+      },
+    },
+
+    pairedNoData: {
+      label: "Paired, day one",
+      apply: (db) => {
+        // Both people are in and neither has trained. Every shared surface has
+        // to hold up with two names and no history behind either of them.
+        db.fit_entries = []; db.exercise_logs = []; db.ai_workouts = [];
+        db.saved_workouts = []; db.session_reactions = []; db.user_goals = [];
+        db.body_photos = []; db.live_sessions = []; db.live_clips = [];
+        db.partnerships = db.partnerships.map((p) => ({ ...p,
+          created_at: day(0) + "T08:00:00Z", responded_at: day(0) + "T08:00:00Z" }));
+      },
+    },
   };
 
   const DB = baseWorld();

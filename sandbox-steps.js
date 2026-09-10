@@ -231,6 +231,23 @@
         run: (w) => w.switchTab("body") },
     ]},
 
+    { group: "Starting from nothing", note: "The three empty worlds the audit could not open. Every one of these is a screen a real new account meets before it meets any of the others.", steps: [
+      { t: "Alone, nothing logged", scenario: "soloNoData",
+        s: "One ring, an empty seat",
+        note: "Signed up, no partner, nothing trained. The second ring is drawn as a dashed outline with a plus in it, in the partner's coral, exactly where their real ring would sit, and it goes straight to pairing. Read the copy: nothing on this screen should be addressed to a couple.",
+        run: (w) => w.switchTab("home") },
+
+      { t: "Invite sent, waiting", scenario: "invitePending",
+        s: "The state with no screen of its own",
+        note: "A real pending invite: sent yesterday, never accepted. The app looks for an accepted partnership, does not find one, and falls through to the generic pairing prompt. There is no waiting room, no way to see that the invite is out there, and no way to send it again. That gap is the finding.",
+        run: () => {} },
+
+      { t: "Paired, day one", scenario: "pairedNoData",
+        s: "Two names, no history",
+        note: "Both people in, neither has trained. Every shared surface has to hold up with two names and nothing behind either of them: the rings at zero, the week strip empty both rows, the timeline with nothing in it.",
+        run: (w) => w.switchTab("home") },
+    ]},
+
     { group: "Settings", note: "Everything under the last tab.", steps: [
       { t: "Setup", scenario: "paired",
         s: "The settings index",
@@ -303,14 +320,21 @@
     clip:        "Mell is live and a clip from an hour ago is unwatched.",
     behind:      "She trained today and yesterday. You did not.",
     restday:     "You marked today a rest day on purpose.",
+    soloNoData:  "Signed up, training alone, nothing logged yet.",
+    invitePending: "You sent an invite. They have not accepted it.",
+    pairedNoData: "Both of you are in. Neither has trained yet.",
     finished:    "Today's push day is done, every exercise logged, one of them a record.",
   };
-  const SCENARIO_ORDER = ["paired", "signedout", "fresh", "solo", "live", "livePrivate", "clip", "behind", "restday", "finished"];
+  const SCENARIO_ORDER = ["paired", "signedout", "fresh", "solo", "live", "livePrivate", "clip", "behind", "restday", "finished",
+    "soloNoData", "invitePending", "pairedNoData"];
   const SCENARIO_LABEL = {
     signedout: "Signed out", fresh: "Brand new account", paired: "Paired, mid-week",
     solo: "Training alone", live: "Partner training now", livePrivate: "Partner keeps it private",
     clip: "A clip is waiting", behind: "You are behind", restday: "Rest day",
     finished: "Workout just finished",
+    soloNoData: "Alone, nothing logged",
+    invitePending: "Invite sent, not accepted",
+    pairedNoData: "Paired, day one",
   };
 
   /* ---------- driving the phone ---------- */
