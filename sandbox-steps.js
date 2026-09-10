@@ -42,10 +42,10 @@
         note: "The five-step wizard the intro hands you to. A real account with no profile row, so it runs for real: type a name and press through, and every answer is written to the fake database and read back by the next screen.",
         run: () => {} },
 
-      { t: "Goal bubbles (prototype)", scenario: "fresh", flag: "not live",
-        s: "The bubble picker, for real",
-        note: "Not the real goal step, which is the one before this. This is the direction Mo picked after three rounds of review, running for real rather than as a picture: tap a goal to open it, tap another and the first stays open, pick as many specific goals as apply. Nothing here writes to the fake database and Continue does not go anywhere, on purpose. Tracked in Open issues under Designed, not built.",
-        run: (w) => w.renderGoalBubblesPrototype?.() },
+      { t: "Goal tiles (prototype)", scenario: "fresh", flag: "not live",
+        s: "Tiles + bottom sheet, for real",
+        note: "Not the real goal step, which is the one before this. The bubble version that used to live here got opened all the way (all nine categories, 52 bubbles) and stopped being readable, no spacing fix was going to save 52 items on one screen. A follow-up compared three structurally different pickers and Mo picked this one: nine categories always visible as a grid, tap one for its full checklist in a bottom sheet. Multi-select persists across categories. Nothing here writes to the fake database and Continue does not go anywhere, on purpose. Tracked in Open issues under Designed, not built.",
+        run: (w) => w.renderGoalTilesPrototype?.() },
 
       { t: "First look at an empty app", scenario: "fresh",
         s: "No workouts, no partner, no history",
