@@ -9476,6 +9476,16 @@ async function logExerciseSilent(name, weight, reps, sets) {
     weight: w, reps: reps === "" || reps == null ? null : parseInt(reps, 10), sets: sets || null,
   };
 
+  // Remembered on the session itself, not derived from the log after the fact,
+  // so Body Impact knows exactly what THIS unfinished workout wrote and can
+  // keep it out of Muscles Hit / Training Impact until Finish is tapped.
+  if (SESSION) {
+    if (!SESSION.loggedExNames) SESSION.loggedExNames = [];
+    const key = (name || "").trim().toLowerCase();
+    if (!SESSION.loggedExNames.includes(key)) SESSION.loggedExNames.push(key);
+    saveSessionToStorage();
+  }
+
   const landed = await safeWrite("exercise_logs", "insert", payload);
   if (landed) {
     toast(`${name} logged`);
@@ -11710,13 +11720,27 @@ function computeMuscleVolume(name, weekOffset) {
   return computeMuscleVolumeBetween(name, isoDate(start), isoDate(end));
 }
 
+/* Exercise names an unfinished workout has already written today, if this is
+   a read of your own logs. Sets land in exercise_logs the moment you finish
+   an exercise and move to the next one, well before you tap Finish on the
+   workout itself, so without this the Body tab would light up mid-session or
+   even while paused. Null once the session is done, or was never yours. */
+function bodyHiddenToday(name) {
+  if (name !== ME || !SESSION || SESSION.finished) return null;
+  return new Set(SESSION.loggedExNames || []);
+}
+function isBodyHidden(l, hidden) {
+  return !!hidden && l.entry_date === todayStr() && hidden.has((l.exercise_name || "").trim().toLowerCase());
+}
+
 // Weighted sets per muscle group for [startStr, endStr) -- a day, a week, whatever the caller needs.
 function computeMuscleVolumeBetween(name, startStr, endStr) {
   const volumes = {};
   MUSCLE_GROUPS.forEach((g) => { volumes[g] = 0; });
+  const hidden = bodyHiddenToday(name);
 
   ALL_EXERCISE_LOGS
-    .filter((l) => l.user_name === name && l.entry_date >= startStr && l.entry_date < endStr)
+    .filter((l) => l.user_name === name && l.entry_date >= startStr && l.entry_date < endStr && !isBodyHidden(l, hidden))
     .forEach((l) => {
       const rule = classifyMuscles(l.exercise_name);
       if (!rule) return;
@@ -12107,8 +12131,9 @@ function ensureBodyDetailModules() {
 // never show more work than its group.
 function computeMuscleDetailBetween(name, startStr, endStr) {
   const volumes = {}, hitBy = {};
+  const hidden = bodyHiddenToday(name);
   ALL_EXERCISE_LOGS
-    .filter((l) => l.user_name === name && l.entry_date >= startStr && l.entry_date < endStr)
+    .filter((l) => l.user_name === name && l.entry_date >= startStr && l.entry_date < endStr && !isBodyHidden(l, hidden))
     .forEach((l) => {
       const res = BODY_DETAIL.detail.hitsForExercise(l.exercise_name, classifyMuscles(l.exercise_name));
       if (!res) return;
@@ -12465,7 +12490,8 @@ function bodyGroupsPhrase(groups) {
 function bodyAreaStates() {
   const [weekStart, weekEnd] = [weekStartStr(), bodyPeriodRange("today")[1]];
   const weekVol = computeMuscleVolumeBetween(ME, weekStart, weekEnd);
-  const mine = ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME);
+  const hidden = bodyHiddenToday(ME);
+  const mine = ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME && !isBodyHidden(l, hidden));
   const entryTime = (date) => {
     const e = entriesFor(ME).find((x) => x.entry_date === date);
     return e?.workout_at ? new Date(e.workout_at).getTime() : new Date(date + "T18:00:00").getTime();
