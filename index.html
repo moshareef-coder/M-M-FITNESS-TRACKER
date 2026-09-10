@@ -2652,7 +2652,9 @@
   .bi-grid { display: grid; grid-template-columns: minmax(0, 1fr) 56%; gap: 8px; align-items: start; }
   .bi-head { font-size: 21px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; margin: 0 0 16px; }
   .bi-grid .bi-head { position: relative; z-index: 1; }
-  .bi-list { display: flex; flex-direction: column; gap: 13px; }
+  /* Single-line rows now that the bars are gone, so they sit closer together
+     and read as one ranked list rather than five floating lines. */
+  .bi-list { display: flex; flex-direction: column; gap: 9px; }
   .bi-row {
     display: block; width: 100%; text-align: left; padding: 0; border: none; background: none;
     color: inherit; font: inherit; cursor: pointer; transition: transform .12s;
@@ -2664,15 +2666,6 @@
   /* No negative margin: it pushed the chevron 3px past the column edge, so
      the arrows did not line up with anything else in the card. */
   .bi-row-level svg { opacity: .55; }
-  .bi-segs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; margin-top: 6px; }
-  .bi-seg { height: 7px; border-radius: 100px; background: var(--panel-2); border: 1px solid var(--border); position: relative; overflow: hidden; }
-  .bi-seg i {
-    position: absolute; inset: 0; background: var(--heat, var(--accent)); border-radius: 100px;
-    transform-origin: left center; transform: scaleX(var(--fill, 0));
-    transition: transform .55s cubic-bezier(.22,1,.36,1); transition-delay: var(--d, 0ms);
-    box-shadow: 0 0 10px color-mix(in srgb, var(--heat, var(--accent)) 45%, transparent);
-  }
-  .bi-list.no-anim .bi-seg i { transition: none; }
   .bi-empty { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
   /* Both figures are always the same pixel size, in every mode. Every Rive instance on
      the page shares one WebGL2 renderer whose render target follows whichever canvas drew
@@ -2945,7 +2938,7 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .bi-anim, .bi-share-check.pop, .bi-grid.focus .bi-detail, .bi-pieces.show { animation: none; }
-    .bi-seg i, .bi-ring-svg .fill, .bi-fig, .bi-canvas, .bi-detail-bar i { transition: none; }
+    .bi-ring-svg .fill, .bi-fig, .bi-canvas, .bi-detail-bar i { transition: none; }
   }
 
   .legend { display: flex; gap: 16px; margin-top: 10px; font-size: 12.5px; color: var(--muted); justify-content: center; }
@@ -13692,22 +13685,10 @@ function renderBodyList(ranked, animate) {
     el.innerHTML = `<div class="bi-empty">Nothing logged ${bodyPeriodWord(BODY_PERIOD)} yet. Finish a session and the muscles you hit light up here.</div>`;
     return;
   }
-  el.innerHTML = top.map((m, i) => {
-    const fill = m.pct * 6;
-    const segs = Array.from({ length: 6 }, (_, s) => {
-      const f = Math.max(0, Math.min(1, fill - s));
-      return `<span class="bi-seg"><i style="--fill:${animate ? 0 : f.toFixed(2)};--d:${i * 70 + s * 45}ms" data-fill="${f.toFixed(2)}"></i></span>`;
-    }).join("");
-    return `<button type="button" class="bi-row" data-group="${m.key}" style="--heat:${bodyHeatColor(m.pct)}">
+  el.innerHTML = top.map((m) =>
+    `<button type="button" class="bi-row" data-group="${m.key}" style="--heat:${bodyHeatColor(m.pct)}">
       <div class="bi-row-top"><span class="bi-row-name">${escapeHtml(m.label)}</span><span class="bi-row-level">${bodyImpactLevel(m.pct)}${icon("chevronRight", 13)}</span></div>
-      <div class="bi-segs">${segs}</div>
-    </button>`;
-  }).join("");
-  if (animate) {
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      el.querySelectorAll(".bi-seg i").forEach((i) => i.style.setProperty("--fill", i.dataset.fill));
-    }));
-  }
+    </button>`).join("");
 }
 
 function renderBodyRings(ranked, animate) {

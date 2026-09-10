@@ -1225,7 +1225,6 @@ async function renderBodyState() {
   await settle();
   panel.querySelectorAll(".bi-ring .fill").forEach((f) => { f.style.strokeDashoffset = f.dataset.off; });
   panel.querySelectorAll(".bi-ring-val").forEach((v) => { v.textContent = v.dataset.target + "%"; });
-  panel.querySelectorAll(".bi-seg i").forEach((i) => { i.style.setProperty("--fill", i.dataset.fill); });
   // The figure is Rive on WebGL and cannot draw here. Say so rather than
   // leaving two blank rectangles that read as a broken screen.
   panel.querySelectorAll(".bi-fig").forEach((f) => {
