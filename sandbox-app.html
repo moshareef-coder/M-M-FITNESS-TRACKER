@@ -48,6 +48,14 @@
     /* Text and icons in the accent hue. Same as the fill on dark; on white the
        fill green is too pale to read, so this deepens. */
     --accent-ink: var(--accent);
+    /* The identity hues split the same way: --me / --partner stay the fill,
+       ring and glow colour, these carry the same identity as small text and
+       clear 4.5:1 on --bg, --panel and --panel-2. */
+    --me-ink: #5c8dff;
+    --partner-ink: #ff8262;
+    /* --up as a fill behind white text is only 3.63:1, so the solid danger
+       buttons take a deeper red than the trend and alert text colour. */
+    --up-fill: #c93c52;
     --radius: 16px;
     /* One family, not two. DM Sans reads warmer and more human than IBM Plex
        (which leans technical/enterprise) and is strong enough at large sizes
@@ -60,8 +68,12 @@
        a gradient down the fill, and a shadow underneath. */
     --card-fill: linear-gradient(180deg, #171b22 0%, #12151a 100%);
     --card-edge: inset 0 1px 0 rgba(255,255,255,.055);
-    --shadow-card: var(--card-edge), 0 10px 28px -12px rgba(0,0,0,.75);
-    --shadow-lift: var(--card-edge), 0 18px 40px -14px rgba(0,0,0,.85);
+    /* On this ground depth comes from the lighter card fill and the hairline
+       edge, not from black on black: a drop shadow here only muddies. Lift and
+       float keep a trace so overlays still read as detached. */
+    --shadow-card: var(--card-edge);
+    --shadow-lift: var(--card-edge), 0 12px 30px -18px rgba(0,0,0,.7);
+    --shadow-float: 0 10px 28px -16px rgba(0,0,0,.7);
     --glow-accent: 0 0 22px -12px color-mix(in srgb, var(--accent) 60%, transparent);
     --glow-me: 0 0 14px -8px color-mix(in srgb, var(--me) 60%, transparent);
     --glow-partner: 0 0 14px -8px color-mix(in srgb, var(--partner) 60%, transparent);
@@ -89,13 +101,17 @@
        highlighter on this ground and fails as chip text. */
     --warn: #9a6400;
     --on-accent: #052a17;
-    --accent-ink: #1cb955;
+    --accent-ink: #0f7a38;
+    --me-ink: #2c6c96;
+    --partner-ink: #b03f22;
+    --up-fill: var(--up);
     /* On white, glow reads as smudge. Depth here comes from shadow alone. */
     --card-fill: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
     --card-edge: inset 0 1px 0 rgba(255,255,255,.9);
     --shadow-card: var(--card-edge), 0 6px 18px -10px rgba(20,23,29,.28);
     --shadow-lift: var(--card-edge), 0 14px 30px -12px rgba(20,23,29,.34);
-    --glow-accent: 0 6px 16px -8px color-mix(in srgb, var(--accent) 70%, transparent);
+    --shadow-float: 0 10px 30px -10px rgba(20,23,29,.30);
+    --glow-accent: none;
     --glow-me: none;
     --glow-partner: none;
     --page-wash: radial-gradient(120% 60% at 50% -10%, #ffffff 0%, var(--bg) 60%);
@@ -184,11 +200,15 @@
 
   header.top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; min-height: 44px; }
   header.top .me-tag { font-size: 12.5px; color: var(--muted); }
-  .brand { display: flex; align-items: center; gap: 7px; font-size: 17px; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
+  /* Both sides were nowrap with no min-width, so at 320 the row refused to
+     shrink and widened the whole layout viewport. The wordmark is the half
+     that gives: the faces and the streak stay whole. */
+  .brand { display: flex; align-items: center; gap: 7px; font-size: 17px; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; min-width: 0; }
+  .brand span { overflow: hidden; text-overflow: ellipsis; }
   .brand svg { color: var(--me); flex-shrink: 0; }
   /* The streak, small, beside the faces. Tapping it goes to Progress. */
   .top-streak {
-    display: inline-flex; align-items: center; gap: 5px; padding: 6px 8px 6px 11px; border-radius: 100px;
+    display: inline-flex; align-items: center; gap: 5px; padding: 6px 8px 6px 11px; border-radius: 100px; min-height: 44px;
     background: var(--panel); border: 1px solid var(--border); color: var(--text);
     font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-card); white-space: nowrap;
   }
@@ -206,7 +226,7 @@
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     border: 1px solid var(--border); border-radius: 26px;
     padding: 8px 8px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.34);
+    box-shadow: var(--shadow-float);
     z-index: 10;
   }
   .tab-btn {
@@ -227,7 +247,7 @@
     box-shadow: 0 8px 22px rgba(0,0,0,0.35);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
-  .fab:active { transform: scale(0.93); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .fab:active { transform: scale(0.93); box-shadow: none; }
   .fab svg { stroke-width: 2.4; }
   /* Monochrome removes colour as a state signal, so an active workout is shown
      with a pulsing ring instead. */
@@ -382,9 +402,11 @@
   .danger-card { border-color: color-mix(in srgb, var(--up) 45%, var(--border)); }
   .danger-card h2 { color: var(--up); }
   .btn-danger {
-    width: 100%; padding: 13px 18px; border-radius: 12px; border: none; cursor: pointer;
-    background: var(--up); color: #fff; font-size: 15.5px; font-weight: 700;
+    width: 100%; padding: 14px 16px; border-radius: 12px; border: none; cursor: pointer;
+    background: var(--up-fill); color: #fff; font-size: 15.5px; font-weight: 700;
+    font-family: inherit; transition: transform .12s ease;
   }
+  .btn-danger:active { transform: scale(.985); }
   .btn-danger:disabled { opacity: 0.45; cursor: not-allowed; }
   .link-row {
     display: flex; align-items: center; justify-content: space-between;
@@ -413,7 +435,7 @@
   .fatal-banner span { color: var(--muted); font-size: 12.5px; word-break: break-word; }
   .fatal-banner button {
     padding: 7px 15px; border-radius: 100px; border: none; cursor: pointer;
-    background: var(--up); color: #fff; font-size: 14px; font-weight: 700; font-family: inherit;
+    background: var(--up-fill); color: #fff; font-size: 14px; font-weight: 700; font-family: inherit;
   }
 
   /* Muscle coverage: an Apple-rings style close-the-loop for the week. */
@@ -541,8 +563,8 @@
     font-size: 34px; font-weight: 800; letter-spacing: -.03em; line-height: 1;
     font-variant-numeric: tabular-nums;
   }
-  .rest-track { height: 2px; border-radius: 2px; background: var(--panel); overflow: hidden; }
-  .rest-fill { height: 100%; width: 100%; background: var(--accent); border-radius: 2px; transition: width 1s linear; }
+  .rest-track { height: 2px; border-radius: 9px; background: var(--panel); overflow: hidden; }
+  .rest-fill { height: 100%; width: 100%; background: var(--accent); border-radius: 9px; transition: width 1s linear; }
   /* Past the target, the only state worth a colour change. */
   .rest-bar.over .rest-clock { color: var(--up); }
   .rest-bar.over .rest-fill { background: var(--up); }
@@ -616,16 +638,14 @@
     font-variant-numeric: tabular-nums;
   }
   .session-timer.paused { color: var(--muted); }
-  .session-pause {
+  /* Same shape, same job, so the same fill: the pair reads as one control set. */
+  .session-pause, .session-min {
     width: 48px; height: 48px; border-radius: 50%; cursor: pointer; flex-shrink: 0;
-    border: 1px solid var(--border); background: var(--panel); color: var(--text);
-    display: flex; align-items: center; justify-content: center;
-  }
-  .session-min {
-    width: 48px; height: 48px; border-radius: 50%; cursor: pointer;
     border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
     display: flex; align-items: center; justify-content: center;
+    transition: transform .12s ease, background .12s ease;
   }
+  .session-pause:active, .session-min:active { transform: scale(.985); background: var(--panel); }
   .session-bar { gap: 12px; }
   .session-paused-sheet { text-align: center; padding: 28px 6px 8px; }
   .session-paused-sheet h3 { font-size: 21px; margin: 0 0 6px; }
@@ -645,11 +665,14 @@
   .log-edit:active { border-color: var(--accent); color: var(--text); }
 
   .log-del {
-    margin-left: auto; flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px;
+    margin-left: auto; flex-shrink: 0; width: 30px; height: 30px; border-radius: 9px;
     display: flex; align-items: center; justify-content: center; cursor: pointer;
     border: 1px solid transparent; background: transparent; color: var(--muted);
   }
-  .log-del:hover, .log-del:active { color: var(--up); border-color: color-mix(in srgb, var(--up) 40%, transparent); }
+  .log-del:active { color: var(--up); border-color: color-mix(in srgb, var(--up) 40%, transparent); transform: scale(.985); }
+  @media (hover: hover) {
+    .log-del:hover { color: var(--up); border-color: color-mix(in srgb, var(--up) 40%, transparent); }
+  }
   .log-rest {
     font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 100px;
     background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
@@ -690,20 +713,28 @@
 
 
   /* App header */
-  .top-right { display: flex; align-items: center; gap: 10px; }
+  .top-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  @media (max-width: 380px) {
+    .brand { font-size: 15.5px; gap: 6px; }
+    .brand svg { width: 22px; height: 22px; }
+    .top-right { gap: 8px; }
+    .dot { min-height: 40px; }
+    .bi-ring-svg { width: 46px; height: 46px; }
+    .bi-ring-label { font-size: 11px; }
+  }
   /* The pair, top right. Blue is you and coral is them, the same two colours
      the rings and the chart already use, so the header needs no legend. */
   .avatar-pair { display: flex; align-items: center; margin-left: 2px; }
   .av {
-    width: 40px; height: 40px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+    width: 40px; height: 40px; border-radius: 50%; overflow: visible; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center; padding: 0;
-    background: var(--panel-2); font-size: 11.5px; letter-spacing: -.02em; font-weight: 800;
+    background: var(--panel-2); font-size: 11px; letter-spacing: -.02em; font-weight: 800;
     border: 2px solid var(--border); cursor: pointer; transition: transform .12s ease;
   }
-  .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .av img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; }
   .av:active { transform: scale(.93); }
-  .av.me { border-color: var(--me); color: var(--me); box-shadow: var(--glow-me); }
-  .av.them { border-color: var(--partner); color: var(--partner); margin-left: -10px; z-index: 1; box-shadow: var(--glow-partner); }
+  .av.me { border-color: var(--me); color: var(--me-ink); box-shadow: var(--glow-me); }
+  .av.them { border-color: var(--partner); color: var(--partner-ink); margin-left: -10px; z-index: 1; box-shadow: var(--glow-partner); }
   .setup-photo { display: flex; align-items: flex-start; gap: 14px; margin-top: 14px; }
   .setup-photo .av { width: 64px; height: 64px; font-size: 17px; border-width: 3px; cursor: pointer; flex-shrink: 0; }
   .setup-photo .av:active { transform: scale(.97); }
@@ -719,7 +750,7 @@
     width: fit-content; margin: 4px auto 14px; background: var(--panel-2);
     border-radius: 16px; padding: 16px; overflow: hidden;
   }
-  .crop-canvas { display: block; border-radius: 4px; cursor: grab; background: var(--panel); }
+  .crop-canvas { display: block; border-radius: 9px; cursor: grab; background: var(--panel); }
   .crop-canvas:active { cursor: grabbing; }
   /* closest-side, not the bare "circle" keyword: with no size keyword a CSS
      radial-gradient defaults to farthest-corner, so the 49.5%/50% stops were
@@ -729,7 +760,7 @@
      got saved -- what looked centred and safely inside the circle was really
      cropped from well outside it. */
   .crop-mask {
-    position: absolute; inset: 16px; border-radius: 4px; pointer-events: none;
+    position: absolute; inset: 16px; border-radius: 9px; pointer-events: none;
     background: color-mix(in srgb, var(--bg) 62%, transparent);
     -webkit-mask-image: radial-gradient(circle closest-side at center, transparent 0 49.5%, #000 50%);
     mask-image: radial-gradient(circle closest-side at center, transparent 0 49.5%, #000 50%);
@@ -847,11 +878,11 @@
   .gen-head { padding-top: 6px; }
   .gen-word-wrap { position: relative; display: inline-block; }
   .gen-word {
-    font-size: clamp(30px, 10vw, 42px); font-weight: 800; letter-spacing: -.03em; line-height: 1.05;
+    font-size: clamp(28px, 10vw, 42px); font-weight: 800; letter-spacing: -.03em; line-height: 1.05;
     font-family: var(--font-display, inherit); text-wrap: balance;
   }
   .gen-word.mid { font-size: clamp(24px, 7.4vw, 32px); }
-  .gen-word.long { font-size: clamp(20px, 6vw, 26px); letter-spacing: -.02em; line-height: 1.15; }
+  .gen-word.long { font-size: clamp(21px, 6vw, 26px); letter-spacing: -.02em; line-height: 1.15; }
   .gen-step { margin-top: 10px; font-size: 14px; color: rgba(255,255,255,.62); min-height: 20px; transition: opacity .25s; }
   .gen-scrim .gen-pct {
     margin-top: 18px; font-size: 12.5px; font-weight: 800; letter-spacing: .14em;
@@ -957,8 +988,8 @@
   .clip-ring circle { fill: none; stroke: var(--up); stroke-width: 4; stroke-linecap: round; }
   .clip-count { color: #fff; font-size: 15.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
   /* How much of it is left, for the one time it plays. */
-  .clip-bar { position: absolute; left: 14px; right: 14px; top: calc(6px + env(safe-area-inset-top, 0px)); height: 3px; border-radius: 2px; background: rgba(255,255,255,.25); z-index: 2; }
-  .clip-bar i { display: block; height: 100%; width: 0; border-radius: 2px; background: #fff; transition: width .25s linear; }
+  .clip-bar { position: absolute; left: 14px; right: 14px; top: calc(6px + env(safe-area-inset-top, 0px)); height: 3px; border-radius: 9px; background: rgba(255,255,255,.25); z-index: 2; }
+  .clip-bar i { display: block; height: 100%; width: 0; border-radius: 9px; background: #fff; transition: width .25s linear; }
   .clip-actions { display: flex; gap: 10px; width: 100%; max-width: 340px; }
   .clip-actions button { flex: 1; margin-top: 0; }
   .clip-actions .btn-secondary { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); color: #fff; }
@@ -1015,7 +1046,7 @@
   /* Where the exercise demo will live. Until then it is a quiet tile rather
      than a hole, so the row keeps its shape. */
   .wm-ico {
-    width: 52px; height: 52px; border-radius: 15px; flex-shrink: 0;
+    width: 52px; height: 52px; border-radius: 16px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     background: var(--panel-2); border: 1px solid var(--border);
     color: color-mix(in srgb, var(--wm-ink) 80%, var(--text));
@@ -1085,7 +1116,7 @@
     border: none; background: none; cursor: pointer; font-family: inherit;
     color: var(--accent-ink); font-size: 14px; font-weight: 700;
     display: inline-flex; align-items: center; gap: 3px;
-    padding: 7px 0; margin: -7px 0; min-height: 32px;
+    padding: 13px 0; margin: -13px 0; min-height: 44px;
   }
 
   .coach-line { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); margin-top: 8px; }
@@ -1152,7 +1183,7 @@
   .cb-chips::-webkit-scrollbar { display: none; }
   .cb-chip {
     flex-shrink: 0; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
-    padding: 8px 14px; border-radius: 100px; white-space: nowrap;
+    padding: 11px 14px; border-radius: 100px; white-space: nowrap; min-height: 44px;
     background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
     transition: background-color .18s, color .18s, border-color .18s;
   }
@@ -1426,7 +1457,7 @@
   .sv-day-l { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .sv-day-n { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
   .sv-day-x {
-    font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .sv-day.taken { border-style: dashed; }
   .sv-day.on { background: var(--accent); border-color: transparent; }
@@ -1435,7 +1466,7 @@
   .cb-figs { display: flex; gap: 4px; flex-shrink: 0; }
   .cb-add {
     width: 100%; font: inherit; font-size: 15.5px; font-weight: 700; cursor: pointer;
-    padding: 15px; border-radius: 15px; margin-top: 2px;
+    padding: 15px; border-radius: 14px; margin-top: 2px;
     background: var(--panel-2); border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--border));
     color: var(--text); display: flex; align-items: center; justify-content: center; gap: 8px;
   }
@@ -1455,7 +1486,7 @@
   .cb-confirm-name { font-size: 24px; font-weight: 800; letter-spacing: -.03em; margin: 2px 0 4px; }
   .cb-confirm-meta { font-size: 12.5px; color: var(--muted); text-transform: capitalize; margin-bottom: 18px; }
   .cb-dials { display: flex; gap: 10px; margin-bottom: 16px; }
-  .cb-dial { flex: 1; background: var(--panel-2); border: 1px solid var(--border); border-radius: 15px; padding: 12px 10px; }
+  .cb-dial { flex: 1; background: var(--panel-2); border: 1px solid var(--border); border-radius: 14px; padding: 12px 10px; }
   .cb-dial-label { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
   .cb-dial-ctl { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
   .cb-dial-val { font-size: 24px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
@@ -1511,7 +1542,7 @@
      margin keeps the line it sits on exactly where it was. */
   .lw-effort .lw-why {
     display: inline-flex; align-items: center; justify-content: center; gap: 4px;
-    margin: -9px -8px -9px -6px; padding: 9px 8px 9px 8px; min-width: 32px; min-height: 32px;
+    margin: -15px -8px -15px -6px; padding: 15px 8px; min-width: 44px; min-height: 44px;
     background: none; border: none; color: var(--muted); cursor: pointer; font: inherit; font-size: 11px;
   }
 
@@ -1520,7 +1551,7 @@
      the mark, the one line that says what this is, and the legal links. */
   .si { text-align: center; align-items: center; }
   .si-mark {
-    width: 56px; height: 56px; border-radius: 17px; margin: 0 auto 16px;
+    width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 16px;
     display: flex; align-items: center; justify-content: center;
     background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink);
   }
@@ -1544,7 +1575,7 @@
     font-family: var(--font-display); font-size: 34px; font-weight: 800;
     letter-spacing: -.03em; margin: 18px 0 0;
   }
-  .si-tag { font-size: 15px; color: var(--muted); margin: 8px 0 0; max-width: 26ch; line-height: 1.45; }
+  .si-tag { font-size: 15.5px; color: var(--muted); margin: 8px 0 0; max-width: 26ch; line-height: 1.45; }
 
   /* The three-screen "what this is about" intro, before the name/goal wizard */
   .intro-top {
@@ -1561,11 +1592,11 @@
     color: var(--muted); font-size: 14px; font-weight: 600; padding: 8px 4px;
   }
   .intro-hero { padding-top: 12px; min-height: 32dvh; }
-  .intro-h { font-size: 27px; line-height: 1.2; max-width: 20ch; }
+  .intro-h { font-size: 28px; line-height: 1.2; max-width: 20ch; }
   .intro-sheet { align-items: stretch; gap: 4px; }
   .intro-dots { display: flex; justify-content: center; gap: 7px; margin-bottom: 20px; }
   .intro-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--border); transition: background .2s, width .2s; }
-  .intro-dots span.on { background: var(--accent); width: 20px; border-radius: 4px; }
+  .intro-dots span.on { background: var(--accent); width: 20px; border-radius: 9px; }
   .si-sheet {
     flex: 0 0 auto; display: flex; flex-direction: column;
     padding: 24px 24px calc(28px + env(safe-area-inset-bottom));
@@ -1597,7 +1628,7 @@
   }
   #onboard .si input { text-align: left; margin-bottom: 10px; }
   .si-msg { font-size: 12.5px; line-height: 1.45; margin: 12px 0 0; min-height: 18px; color: var(--muted); }
-  .si-msg.bad { color: var(--partner); }
+  .si-msg.bad { color: var(--partner-ink); }
   .si-msg.good { color: var(--accent-ink); font-weight: 700; }
   .si-legal { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 20px 0 0; max-width: 34ch; }
   .si-legal a { color: var(--muted); text-underline-offset: 2px; }
@@ -1652,12 +1683,13 @@
   .pgs-row {
     width: 100%; display: flex; align-items: center; gap: 11px; text-align: left; padding: 14px 15px;
     border-radius: 12px; cursor: pointer; border: 1px solid var(--border); background: var(--panel-2);
-    color: var(--text); font-family: inherit; font-size: 14.5px; font-weight: 600; letter-spacing: -.005em;
-    transition: border-color .15s, background .15s;
+    color: var(--text); font-family: inherit; font-size: 14px; font-weight: 600; letter-spacing: -.005em;
+    transition: border-color .15s, background .15s, transform .12s ease;
   }
+  .pgs-row:active { transform: scale(.985); background: var(--panel-2); }
   .pgs-row.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
   .pgs-box {
-    flex-shrink: 0; width: 21px; height: 21px; border-radius: 6px; border: 1.5px solid var(--border);
+    flex-shrink: 0; width: 21px; height: 21px; border-radius: 9px; border: 1.5px solid var(--border);
     display: flex; align-items: center; justify-content: center; color: transparent; background: var(--panel);
   }
   .pgs-row.on .pgs-box { background: var(--accent); border-color: transparent; color: var(--on-accent); }
@@ -1697,12 +1729,12 @@
     background: color-mix(in srgb, var(--partner) 12%, var(--panel));
     border-color: var(--partner);
   }
-  .limit-chip.on b { color: var(--partner); }
+  .limit-chip.on b { color: var(--partner-ink); }
   @media (hover: hover) and (pointer: fine) {
     .limit-chip:hover { border-color: var(--partner); }
   }
   .limit-summary { margin-top: 12px; min-height: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
-  .limit-summary b { color: var(--partner); font-weight: 700; }
+  .limit-summary b { color: var(--partner-ink); font-weight: 700; }
   .limit-foot { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 10px 0 0; }
   /* One geometry, not a second one: the clear button is the focus picker's own
      pill rule, widened, rather than a lookalike written out again. */
@@ -1795,8 +1827,8 @@
   .lk-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
   button.lk-av { border: 0; padding: 0; font-family: inherit; cursor: pointer; transition: transform .12s ease; }
   button.lk-av:active { transform: translate(-50%, -50%) scale(.92); }
-  .lk-av.me { left: 32.1%; color: var(--me); }
-  .lk-av.them { left: 67.9%; color: var(--partner); }
+  .lk-av.me { left: 32.1%; color: var(--me-ink); }
+  .lk-av.them { left: 67.9%; color: var(--partner-ink); }
   /* The empty seat, in the same place the partner's ring would be. */
   .lk-invite {
     position: absolute; top: 49.5%; left: 67.9%; width: 30%; aspect-ratio: 1;
@@ -1809,11 +1841,11 @@
   /* Who is who, once, under the rings, instead of a label column beside each. */
   .lk-legend {
     display: flex; align-items: baseline; justify-content: center; gap: 8px;
-    flex-wrap: wrap; font-size: 14.5px; margin-bottom: 2px;
+    flex-wrap: wrap; font-size: 14px; margin-bottom: 2px;
   }
   .lk-legend b { font-weight: 700; letter-spacing: -.01em; }
-  .lk-legend .me { color: var(--me); }
-  .lk-legend .them { color: var(--partner); }
+  .lk-legend .me { color: var(--me-ink); }
+  .lk-legend .them { color: var(--partner-ink); }
   .lk-legend .sep { color: var(--border); }
   .lk-legend .invite-link {
     background: none; border: 0; padding: 0; font: inherit; cursor: pointer;
@@ -1849,14 +1881,14 @@
     display: flex; align-items: center; justify-content: center;
     background: var(--panel-2); font-size: 14px; letter-spacing: -.02em; font-weight: 800;
   }
-  .pring-av.me { color: var(--me); }
-  .pring-av.them { color: var(--partner); }
+  .pring-av.me { color: var(--me-ink); }
+  .pring-av.them { color: var(--partner-ink); }
   .pring-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .pcol-meta { min-width: 0; }
   .pcol-name { font-size: 14px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pcol-val { font-size: 21px; font-weight: 800; letter-spacing: -.03em; line-height: 1.1; font-family: var(--font-display); white-space: nowrap; }
   .pcol-pct { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
-  .pcol-pct.pcol-live { color: var(--partner); font-weight: 700; }
+  .pcol-pct.pcol-live { color: var(--partner-ink); font-weight: 700; }
 
   /* Training RIGHT NOW, said on the ring itself. The live card above already
      carries the detail; this puts the same fact on the thing the eye lands on
@@ -1888,7 +1920,7 @@
   .btn-cta {
     width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; position: relative;
     padding: 14px 40px 14px 14px; border-radius: 14px; border: none; background: var(--accent); color: var(--on-accent);
-    font-family: var(--font-display); font-size: 16px; font-weight: 700; letter-spacing: -.01em; cursor: pointer;
+    font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -.01em; cursor: pointer;
     box-shadow: var(--glow-accent); transition: transform .12s ease;
   }
   .btn-cta:active { transform: scale(.985); box-shadow: none; }
@@ -1951,7 +1983,7 @@
   .wk-col.today { border-color: color-mix(in srgb, var(--me) 45%, var(--panel)); background: color-mix(in srgb, var(--me) 7%, transparent); }
   .wk-d { font-size: 12.5px; font-weight: 600; color: var(--muted); line-height: 1; margin-bottom: 2px; text-align: center; }
   .wk-col.today .wk-d { color: var(--text); }
-  .wk-today { position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--me); }
+  .wk-today { position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--me-ink); }
   .wk:has(.wk-today) { margin-bottom: 16px; }
   /* The day tile. A proof photo when there is one, because seeing the two of
      you actually there is the point; a solid tick when there is not. */
@@ -1977,14 +2009,14 @@
     width: 42px; height: 42px; border-radius: 50%; overflow: hidden; flex-shrink: 0; border: 2px solid var(--border);
     display: flex; align-items: center; justify-content: center; background: var(--panel-2); font-size: 17px; font-weight: 800;
   }
-  .tl-av.me { border-color: var(--me); color: var(--me); }
-  .tl-av.them { border-color: var(--partner); color: var(--partner); }
+  .tl-av.me { border-color: var(--me); color: var(--me-ink); }
+  .tl-av.them { border-color: var(--partner); color: var(--partner-ink); }
   .tl-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .tl-body { flex: 1; min-width: 0; }
   .tl-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
   .tl-name { font-weight: 700; font-size: 14px; flex-shrink: 0; }
-  .tl-name.me { color: var(--me); }
-  .tl-name.them { color: var(--partner); }
+  .tl-name.me { color: var(--me-ink); }
+  .tl-name.them { color: var(--partner-ink); }
   .tl-when { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tl-focus { font-size: 15.5px; font-weight: 700; letter-spacing: -.02em; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tl-stats { display: flex; align-items: center; gap: 12px; margin-top: 5px; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
@@ -1994,10 +2026,11 @@
   .tl-av.sm { width: 26px; height: 26px; border-width: 1.5px; font-size: 11px; }
   .tl-cmt { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 7px; font-size: 15.5px; overflow: hidden; }
   .tl-cmt b { flex-shrink: 0; font-weight: 700; }
-  .tl-cmt b.me { color: var(--me); }
-  .tl-cmt b.them { color: var(--partner); }
+  .tl-cmt b.me { color: var(--me-ink); }
+  .tl-cmt b.them { color: var(--partner-ink); }
   .tl-cmt .tl-av.sm { align-self: center; }
-  .tl-cmt .tl-cmt-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Free text a partner wrote: two lines before it clips, not one word. */
+  .tl-cmt .tl-cmt-text { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   .tl-cmt.empty { color: var(--muted); font-size: 14px; cursor: text; }
   .tl-say {
     border: none; background: none; font: inherit; color: var(--muted); cursor: pointer; text-align: left; flex: 1;
@@ -2005,7 +2038,7 @@
   }
   .tl-react {
     display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: none; background: none;
-    padding: 6px 8px; margin: -6px -8px; min-height: 32px; cursor: pointer;
+    padding: 12px 10px; margin: -12px -10px; min-height: 44px; cursor: pointer;
     color: var(--muted); font-family: inherit; font-size: 15.5px; font-weight: 700; flex-shrink: 0;
   }
   .tl-react svg { stroke-width: 2; }
@@ -2035,7 +2068,7 @@
   @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
   .pop {
     width: 100%; max-width: 400px; background: var(--panel); border-radius: 22px; overflow: hidden;
-    border: 1px solid var(--border); box-shadow: 0 24px 60px rgba(0,0,0,.34);
+    border: 1px solid var(--border); box-shadow: var(--shadow-lift);
     animation: popIn .3s cubic-bezier(.22,1,.36,1);
   }
   @keyframes popIn { from { transform: translateY(14px) scale(.97); opacity: 0 } to { transform: none; opacity: 1 } }
@@ -2052,11 +2085,11 @@
   }
   .msb-mystery {
     background: var(--panel-2); box-shadow: 0 0 0 1.5px var(--border);
-    color: var(--muted); font-size: 20px; font-weight: 800;
+    color: var(--muted); font-size: 21px; font-weight: 800;
   }
   .msb-label { font-size: 11px; font-weight: 700; line-height: 1.25; }
   .msb-locked .msb-label { color: var(--muted); }
-  .msb-sub { font-size: 9.5px; color: var(--muted); line-height: 1.25; max-width: 96px; }
+  .msb-sub { font-size: 11px; color: var(--muted); line-height: 1.25; max-width: 96px; }
 
   /* The unlock celebration reuses the pop-scrim/pop shell everything else in
      the app already pops a card into, so it is one modal system rather than
@@ -2066,8 +2099,8 @@
     width: 76px; height: 76px; border-radius: 50%; margin: 0 auto 16px;
     display: flex; align-items: center; justify-content: center; background: var(--panel-2);
   }
-  .msb-cel-h { font-size: 20px; font-weight: 800; letter-spacing: -.02em; margin: 0 0 8px; }
-  .msb-cel-sub { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0 0 20px; max-width: 30ch; }
+  .msb-cel-h { font-size: 21px; font-weight: 800; letter-spacing: -.02em; margin: 0 0 8px; }
+  .msb-cel-sub { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 0 0 20px; max-width: 30ch; }
   .msb-cel .btn-primary { width: 100%; color: #0b0d11; border-color: transparent; }
 
   /* ---- Entry motion, shared by Home and the session screen ----
@@ -2139,7 +2172,7 @@
   .ds-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
   .ds-actions button { margin: 0; }
   .rep-del {
-    margin-left: 10px; flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
+    margin-left: 10px; flex-shrink: 0; width: 28px; height: 28px; border-radius: 9px; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     border: 1px solid transparent; background: transparent; color: var(--muted);
   }
@@ -2182,7 +2215,7 @@
     box-shadow: 0 0 0 6px color-mix(in srgb, var(--partner) 14%, transparent), var(--glow-partner);
   }
   .ps-face { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
-  .ps-initials { font-size: 28px; font-weight: 800; letter-spacing: -.02em; color: var(--partner); font-family: var(--font-display); }
+  .ps-initials { font-size: 28px; font-weight: 800; letter-spacing: -.02em; color: var(--partner-ink); font-family: var(--font-display); }
   .ps-streak {
     position: absolute; right: -14px; bottom: 2px; display: flex; align-items: center; gap: 4px;
     padding: 5px 10px; border-radius: 100px; background: var(--partner); color: #0b0d11;
@@ -2242,7 +2275,7 @@
   .rc-list { border: 1px solid var(--border); border-radius: 14px; padding: 2px 14px; background: var(--panel); }
   .rc-ex-num2 { font-size: 12.5px; font-weight: 700; font-family: var(--font-display); text-align: right; line-height: 1.35; white-space: nowrap; }
   .rc-ex-num2 i { font-style: normal; display: block; color: var(--muted); font-weight: 600; font-size: 12.5px; }
-  .rc-share { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+  .rc-share { width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
               border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
               display: flex; align-items: center; justify-content: center; }
   .rc-head { display: flex; align-items: center; gap: 13px; margin-bottom: 16px; }
@@ -2274,7 +2307,7 @@
   .rc-ex-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
   .rc-ex-num { font-size: 12.5px; font-weight: 700; font-family: var(--font-display); text-align: right; white-space: nowrap; }
   .rc-pr {
-    font-size: 11px; font-weight: 800; letter-spacing: .06em; padding: 2px 6px; border-radius: 5px;
+    font-size: 11px; font-weight: 800; letter-spacing: .06em; padding: 2px 6px; border-radius: 9px;
     background: color-mix(in srgb, var(--me) 22%, transparent); color: var(--me); margin-left: 6px;
   }
   .rc-actions { display: flex; gap: 10px; margin-top: 18px; }
@@ -2303,12 +2336,15 @@
   #workoutCardTitle:empty { display: none; }
   #workoutFocusRow:empty { display: none; margin: 0; }
   .scr-back {
-    width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+    width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
     border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
     display: flex; align-items: center; justify-content: center;
   }
   .scr-title { flex: 1; text-align: center; font-size: 17px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.02em; }
-  .scr-head .spacer { width: 38px; flex-shrink: 0; }
+  .scr-head .spacer { width: 44px; flex-shrink: 0; }
+  /* Centred only when it is balancing a back button; alone it is a heading
+     over left-aligned content and should start where that content starts. */
+  .scr-head > .scr-title:only-child { text-align: left; }
   /* Smart plan preview */
   .spp { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px;
          background: var(--card-fill); box-shadow: var(--shadow-card); margin-bottom: 20px; }
@@ -2316,7 +2352,7 @@
   .spp-top h3 { flex: 1; margin: 0; font-size: 15.5px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.02em; }
   .spp-spark { color: var(--accent-ink); display: flex; }
   .spp-cust {
-    border: 1px solid var(--border); background: var(--panel-2); color: var(--text); min-height: 32px;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--text); min-height: 44px;
     border-radius: 100px; padding: 7px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
   }
   .spp-body { display: flex; gap: 16px; align-items: flex-start; }
@@ -2700,11 +2736,13 @@
   .bi-detail-name { font-size: 17px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
   .bi-detail-sub { font-size: 12.5px; color: var(--muted); line-height: 1.4; margin-top: 3px; }
   .bi-detail-impact { margin-top: 12px; }
-  .bi-detail-pct { font-size: 28px; font-weight: 800; letter-spacing: -.03em; color: var(--heat, var(--accent)); line-height: 1; }
+  /* The heat hue is the signal, but the raw stop fails as text at both ends of
+     the scale, so the number is pulled towards the page ink in both themes. */
+  .bi-detail-pct { font-size: 28px; font-weight: 800; letter-spacing: -.03em; color: color-mix(in srgb, var(--heat, var(--accent)) 60%, var(--text)); line-height: 1; }
   .bi-detail-pct.none { color: var(--muted); font-size: 17px; font-weight: 700; }
   .bi-detail-lvl { font-size: 12.5px; color: var(--muted); font-weight: 500; margin-top: 3px; }
-  .bi-detail-bar { height: 6px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--border); margin-top: 8px; overflow: hidden; }
-  .bi-detail-bar i { display: block; height: 100%; background: var(--heat, var(--accent)); border-radius: 4px; transform-origin: left; transform: scaleX(var(--fill, 0)); transition: transform .6s cubic-bezier(.22,1,.36,1); }
+  .bi-detail-bar { height: 6px; border-radius: 9px; background: var(--panel-2); border: 1px solid var(--border); margin-top: 8px; overflow: hidden; }
+  .bi-detail-bar i { display: block; height: 100%; background: var(--heat, var(--accent)); border-radius: 9px; transform-origin: left; transform: scaleX(var(--fill, 0)); transition: transform .6s cubic-bezier(.22,1,.36,1); }
   .bi-detail-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 14px 0 6px; }
   .bi-chips { display: flex; flex-wrap: wrap; gap: 4px; }
   .bi-chip {
@@ -2735,10 +2773,10 @@
   .bi-piece-name { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bi-piece-where { font-size: 11px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bi-piece-val { text-align: right; }
-  .bi-piece-pct { font-size: 15.5px; font-weight: 700; letter-spacing: -.02em; color: var(--heat, var(--accent)); }
+  .bi-piece-pct { font-size: 15.5px; font-weight: 700; letter-spacing: -.02em; color: color-mix(in srgb, var(--heat, var(--accent)) 45%, var(--text)); }
   .bi-piece.off .bi-piece-pct { color: var(--muted); font-size: 12.5px; font-weight: 600; }
-  .bi-piece-bar { width: 64px; height: 4px; border-radius: 3px; background: var(--panel); margin-top: 4px; margin-left: auto; overflow: hidden; }
-  .bi-piece-bar i { display: block; height: 100%; width: calc(var(--fill, 0) * 100%); background: var(--heat, var(--accent)); border-radius: 3px; }
+  .bi-piece-bar { width: 64px; height: 4px; border-radius: 9px; background: var(--panel); margin-top: 4px; margin-left: auto; overflow: hidden; }
+  .bi-piece-bar i { display: block; height: 100%; width: calc(var(--fill, 0) * 100%); background: var(--heat, var(--accent)); border-radius: 9px; }
 
   /* Labels pinned to the zoomed figure, one per piece. Zero-size anchor at the
      muscle centre; the dot and pill hang off it so positioning is one transform. */
@@ -2748,8 +2786,8 @@
   .bi-callout.off i { background: #3a434c; }
   .bi-callout span {
     position: absolute; left: var(--dx, 9px); top: calc(var(--dy, 0px) - 10px); height: 20px; line-height: 18px; padding: 0 7px;
-    font-size: 11px; font-weight: 600; white-space: nowrap; border-radius: 6px; color: var(--text);
-    background: #12161a; border: 1px solid var(--border);
+    font-size: 11px; font-weight: 600; white-space: nowrap; border-radius: 9px; color: var(--text);
+    background: var(--panel); border: 1px solid var(--border);
   }
   .bi-callout.off span { color: var(--muted); }
   .bi-callout.on span { background: var(--heat, var(--accent)); color: #fff; border-color: transparent; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
@@ -2783,12 +2821,12 @@
   }
   .bi-rings.no-anim .bi-ring-svg .fill { transition: none; }
   .bi-ring-val { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; letter-spacing: -.02em; }
-  /* Label carries its ring's heat, lifted towards white so the deep reds at the top of
-     the scale stay readable at 12px on the dark card. */
+  /* Label carries its ring's heat, pulled towards the page ink so it stays
+     readable at both ends of the scale in both themes. */
   .bi-ring-label {
     font-size: 12.5px; font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis; max-width: 100%;
-    color: color-mix(in srgb, var(--heat, var(--muted)) 78%, #fff);
+    color: color-mix(in srgb, var(--heat, var(--muted)) 45%, var(--text));
   }
   .bi-ring.dim .bi-ring-svg .fill { stroke: var(--border); }
   .bi-ring.dim .bi-ring-val, .bi-ring.dim .bi-ring-label { color: var(--muted); }
@@ -2854,7 +2892,7 @@
   .legend .dash { display: inline-block; width: 14px; height: 0; border-top: 1.5px dashed var(--muted); vertical-align: middle; margin-right: 5px; }
   .wt-range { display: flex; gap: 6px; margin-top: 12px; }
   .wt-pill {
-    flex: 1; padding: 7px 0; border-radius: 9px; cursor: pointer; font-family: inherit;
+    flex: 1; padding: 7px 0; border-radius: 9px; cursor: pointer; font-family: inherit; min-height: 44px;
     background: var(--panel-2); border: 1px solid transparent; color: var(--muted);
     font-size: 12.5px; font-weight: 700;
   }
@@ -2891,7 +2929,7 @@
     display: flex; align-items: center; justify-content: center; gap: 6px;
     margin: 10px 0 0; font-size: 13.5px; font-weight: 600; color: var(--accent-ink);
   }
-  .cst-caption { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .cst-caption { text-align: center; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
 
   /* The strength card's lift list: tap a row and the chart above switches to
      it, the same "tap to re-focus" idea the Body tab already uses. */
@@ -2903,9 +2941,9 @@
   }
   .str-row:last-child { border-bottom: none; }
   .str-row:active { background: var(--panel-2); }
-  .str-row.on .str-row-name { color: var(--me); }
+  .str-row.on .str-row-name { color: var(--me-ink); }
   .str-row-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .str-row-meta { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .str-row-meta { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
   .str-row-w { font-size: 15.5px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .str-row-w i { font-style: normal; font-size: 11px; font-weight: 600; color: var(--muted); margin-left: 3px; }
   /* One reading, or none in the window: a real answer in place of an axis
@@ -2970,7 +3008,7 @@
   .log-item:last-child { border-bottom: none; }
   .log-item .date { color: var(--muted); width: 60px; flex-shrink: 0; }
   .log-item .w { font-weight: 600; width: 56px; flex-shrink: 0; }
-  .log-item .note { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log-item .note { color: var(--muted); flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   .log-item .gym-yes { color: var(--down); }
   .muted-note { color: var(--muted); font-size: 14px; }
 
@@ -2995,7 +3033,11 @@
     box-shadow: 0 8px 20px rgba(0,0,0,0.25); max-height: 240px; overflow-y: auto; }
   .ex-suggest-row { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border); }
   .ex-suggest-row:last-child { border-bottom: none; }
-  .ex-suggest-row:hover, .ex-suggest-row.active { background: var(--panel-2); }
+  .ex-suggest-row.active, .ex-suggest-row:active { background: var(--panel-2); }
+  .ex-suggest-row:active { transform: scale(.985); }
+  @media (hover: hover) {
+    .ex-suggest-row:hover { background: var(--panel-2); }
+  }
   .ex-suggest-name { font-size: 14px; }
   .ex-suggest-sub { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
   .log-set-row { display: flex; gap: 8px; }
@@ -3038,6 +3080,9 @@
   .pr-pop {
     position: fixed; left: 14px; right: 14px; top: calc(10px + env(safe-area-inset-top, 0px));
     z-index: 62; display: flex; align-items: center; gap: 12px;
+    /* It spans the full width over the pause and collapse buttons, so it must
+       not eat the taps it covers for the 2.6s it is up. */
+    pointer-events: none;
     background: var(--accent); color: var(--on-accent);
     border-radius: 14px; padding: 12px 15px;
     box-shadow: 0 16px 34px -12px color-mix(in srgb, var(--accent) 60%, transparent);
@@ -3082,7 +3127,7 @@
   }
 
   .ex-order {
-    width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+    width: 26px; height: 26px; border-radius: 9px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     background: var(--panel-2); border: 1px solid var(--border);
     color: var(--muted); font-size: 12.5px; font-weight: 800;
@@ -3139,10 +3184,13 @@
   .field-input:focus { outline: none; border-bottom-color: var(--accent); }
 
   .btn-big {
-    width: 100%; padding: 16px; border-radius: 14px; border: none; cursor: pointer;
+    width: 100%; padding: 14px 16px; border-radius: 12px; border: none; cursor: pointer;
     font-size: 15.5px; font-weight: 700; font-family: inherit; margin-bottom: 9px;
+    min-height: 48px;
     display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: transform .12s ease, background .12s ease;
   }
+  .btn-big:active { transform: scale(.985); }
   .btn-set { background: var(--accent); color: var(--on-accent); }
   .btn-set:active { opacity: 0.85; }
   .stepper-row { display: flex; justify-content: center; gap: 28px; margin-bottom: 20px; }
@@ -3212,21 +3260,64 @@
   .sc-team {
     display: inline-flex; align-items: center; gap: 9px; margin-bottom: 18px;
     background: var(--panel-2); border-radius: 100px; padding: 6px 15px 6px 7px;
-    font-size: 13px; font-weight: 600;
+    font-size: 12.5px; font-weight: 600;
   }
   .sc-team-avs { display: flex; }
   .sc-team-av {
     width: 26px; height: 26px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 9.5px; letter-spacing: -.02em; font-weight: 800; color: #fff; border: 2px solid var(--panel-2);
+    font-size: 11px; letter-spacing: -.02em; font-weight: 800; color: #fff; border: 2px solid var(--panel-2);
   }
   .sc-team-av + .sc-team-av { margin-left: -9px; }
   .sc-team-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
+  /* ---- Press feedback and hit areas (one house rule, applied late) ----
+     Every tappable thing answers a press the same way: a 1.5 percent squash
+     and, where it has a surface, a --panel-2 wash. */
+  .tab-btn:active, .sv-day:active, .metric-chip:active, .tab-pill:active,
+  .activity-chip:active, .ob-pace:active, .rest-btn:active, .card-link:active,
+  .notice-x:active, .reminder-banner .rb-dismiss:active, .ds-x:active,
+  .lw-effort .lw-why:active, .intro-back:active, .intro-skip:active,
+  .icon-btn:active, .wk-nav-btn:active, .spp-cust:active, .rc-share:active,
+  .recent-all:active, .gym-toggle:active, .quest-claim:active, .cb-chip:active,
+  .cb-x:active, .ob-chip:active, .row-btn:active, .grip:active,
+  .switch-chip:active, .photo-del:active, .rep-del:active, .stepper-btn:active {
+    transform: scale(.985);
+  }
+  .sv-day:active, .metric-chip:active, .tab-pill:active, .activity-chip:active,
+  .ob-pace:active, .gym-toggle:active, .notice-x:active, .ds-x:active,
+  .intro-back:active, .wk-nav-btn:active, .spp-cust:active, .rc-share:active,
+  .row-btn:active, .switch-chip:active, .stepper-btn:active {
+    background: var(--panel-2);
+  }
+  /* The set circle already scales to mark the live set, so its press is a
+     smaller squash off whichever scale it is currently sitting at. */
+  .set-circle:active { transform: scale(.94); }
+  .set-circle.current:active { transform: scale(1.06); }
+  /* The callout itself is a zero-size anchor; its label is the visible part. */
+  .bi-callout:active span { transform: scale(.985); }
+
+  /* Controls that are small on purpose keep their glyph and grow the hit area
+     instead, so nothing has to be aimed at. */
+  .photo-del, .rep-del, .row-btn, .stepper-btn, .grip, .info-dot, .bi-info,
+  .notice-x, .ds-x, .cb-x, .cb-step button, .switch-chip, .set-circle,
+  .log-del, .av, .reminder-banner .rb-dismiss { position: relative; }
+  .photo-del::after, .rep-del::after, .row-btn::after, .stepper-btn::after,
+  .grip::after, .info-dot::after, .bi-info::after, .notice-x::after,
+  .ds-x::after, .cb-x::after, .cb-step button::after, .switch-chip::after,
+  .set-circle::after, .log-del::after, .av::after,
+  .reminder-banner .rb-dismiss::after {
+    content: ""; position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%; height: 100%; min-width: 44px; min-height: 44px;
+  }
+
   .toast {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
     background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
-    padding: 10px 18px; border-radius: 100px; font-size: 15.5px; z-index: 50;
+    /* Above every overlay layer (sheets 65, pops 70, clip 90, generate 95/96):
+       a toast is the top-most transient layer or it is invisible where it fires. */
+    padding: 10px 18px; border-radius: 100px; font-size: 15.5px; z-index: 100;
     opacity: 0; pointer-events: none; transition: opacity 0.25s;
   }
   .toast.show { opacity: 1; }
@@ -8094,7 +8185,7 @@ async function openClipRecorder(toEmail) {
     });
   } catch (e) {
     console.warn("camera unavailable", e);
-    clipFallbackCapture(toEmail);
+    showClipDenied(toEmail);
     return;
   }
   const vid = $("clipPreview");
@@ -8104,13 +8195,30 @@ async function openClipRecorder(toEmail) {
   $("clipShutter").onclick = () => startClipRecording(toEmail);
 }
 
-/* No MediaRecorder, or the camera said no: use the OS recorder instead. The
-   length cannot be enforced there, so the size cap does that job. */
-function clipFallbackCapture(toEmail) {
+/* The camera refused. Leaving the recorder up meant a black screen, "Up to 20
+   seconds" and a shutter wired to nothing, with no word about why. */
+function showClipDenied(toEmail) {
+  stopClipStream();
+  $("clipRecStage").innerHTML = `<div class="clip-stage" style="align-items:center;justify-content:center">
+      <div class="clip-gone">
+        <b>The camera is blocked</b>
+        <span>This page is not being allowed to use the camera. Send a video you already have, or allow the camera in your browser settings and try again.</span>
+        <button type="button" class="btn-secondary" id="clipRollBtn" style="margin-top:16px">Choose a video</button>
+        <button type="button" class="btn-ghost" id="clipDeniedClose">Not now</button>
+      </div>
+    </div>`;
+  $("clipRollBtn").onclick = () => clipFallbackCapture(toEmail, { camera: false });
+  $("clipDeniedClose").onclick = closeClipRecorder;
+}
+
+/* No MediaRecorder, or they asked for the camera roll instead: use the OS
+   picker. The length cannot be enforced there, so the size cap does that job. */
+function clipFallbackCapture(toEmail, { camera = true } = {}) {
   const input = document.createElement("input");
   input.type = "file";
   input.accept = "video/*";
-  input.setAttribute("capture", "user");
+  // Asking for the camera again is pointless when the camera is what refused.
+  if (camera) input.setAttribute("capture", "user");
   input.onchange = async () => {
     const file = input.files?.[0];
     if (!file) { closeClipRecorder(); return; }
@@ -8573,7 +8681,7 @@ async function renderLiveSheet() {
         : `<div class="lw-effort"><b>${xp}</b><span>XP today</span>
              <button type="button" class="lw-why" id="lwWhy" aria-label="How effort is scored">${icon("info", 13)}</button></div>`}
       <div class="lw-meta">
-        <span>${icon("clock", 15)} <span class="lw-elapsed">${mins} min</span></span>
+        <span>${icon("clock", 15)} <span class="lw-elapsed">${mins} min${stale ? " at last check" : ""}</span></span>
         ${sharing && setTotal ? `<span>${icon("check", 15)} ${row.set_done || 0} of ${setTotal} sets</span>` : ""}
       </div>
     </div>
@@ -10744,21 +10852,57 @@ async function endLive() {
 }
 
 function saveSessionToStorage() {
-  if (SESSION) localStorage.setItem(sessionStorageKey(), JSON.stringify(SESSION));
+  if (!SESSION) return;
+  // A banked workout is not something to come back to. Writing it here is what
+  // made the tab offer "Resume" for a workout that was already finished.
+  if (SESSION.finished) { clearSessionStorage(); return; }
+  localStorage.setItem(sessionStorageKey(), JSON.stringify(SESSION));
 }
 
 function clearSessionStorage() {
   localStorage.removeItem(sessionStorageKey());
 }
 
-/* Abandons an in-progress workout without banking it: the sets already
-   logged stand (they were written as they happened), only the in-memory
-   session and its resume state go away. A real top-level function, not an
-   inline handler, so it is also the one thing the sandbox walkthrough can
-   call between steps to stand down a session another step left open. */
-function discardSession() {
+/* A yes or no question asked the way askForName asks for a line of text: a
+   browser confirm cannot be styled and reads as a security warning on iOS.
+   It owns its own scrim rather than sharing popCard, because a badge unlock
+   landing mid-question would otherwise replace it. Resolves true only if they
+   chose the action. */
+function askConfirm({ heading, body, ok, cancel = "Keep going" }) {
+  return new Promise((resolve) => {
+    const scrim = document.createElement("div");
+    scrim.className = "pop-scrim";
+    scrim.innerHTML = `
+      <div class="pop">
+        <div class="pop-body">
+          <div class="ds-top">
+            <div class="pop-who" style="color:var(--muted)">${escapeHtml(heading.toUpperCase())}</div>
+            <button type="button" class="ds-x" data-confirm="0" aria-label="Close">&times;</button>
+          </div>
+          <p class="muted-note">${escapeHtml(body)}</p>
+          <button type="button" class="btn-primary" data-confirm="1" style="margin-top:16px;">${escapeHtml(ok)}</button>
+          <button type="button" class="btn-ghost" data-confirm="0">${escapeHtml(cancel)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(scrim);
+    scrim.querySelectorAll("[data-confirm]").forEach((b) => {
+      b.onclick = () => { scrim.remove(); resolve(b.dataset.confirm === "1"); };
+    });
+    scrim.onclick = (e) => { if (e.target === scrim) { scrim.remove(); resolve(false); } };
+  });
+}
+
+/* Abandons an in-progress workout without banking the day. The sets already
+   ticked are written first, including the ones on the exercise you are
+   standing on, so "I am not counting this workout" never means losing the
+   lifting you actually did. A real top-level function, not an inline handler,
+   so it is also the one thing the sandbox walkthrough can call between steps
+   to stand down a session another step left open. */
+async function discardSession() {
+  await bankCurrentExercise();
   SESSION = null;
   clearSessionStorage();
+  await endLive();
 }
 
 function todaysLoggedExerciseNames() {
@@ -10812,6 +10956,7 @@ function startWorkout() {
 
 function sessionMatchesPlan(saved) {
   if (!saved || !TODAY_WORKOUT?.exercises?.length) return false;
+  if (saved.finished) return false;   // banked, so there is nothing to resume
   if (saved.workoutId && saved.workoutId !== TODAY_WORKOUT.id) return false;
   const n = TODAY_WORKOUT.exercises.length;
   return Array.isArray(saved.setsDone)
@@ -10859,6 +11004,14 @@ function resumeSessionIfAny() {
 /* Reopen a session the user already started, on purpose. */
 function reopenSession() {
   if (!SESSION) return;
+  // A finished workout is a summary, not a session: broadcasting it would tell
+  // the partner you are training again.
+  if (SESSION.finished) {
+    openSessionUI();
+    $("workoutContent").classList.add("hidden");
+    renderSessionComplete();
+    return;
+  }
   startLive();
   openSessionUI();
   $("workoutContent").classList.add("hidden");
@@ -11146,37 +11299,93 @@ async function finishExerciseAndAdvance() {
   }
 }
 
+/* Write the sets ticked on one exercise, grouped by the weight they were done
+   at. Equal weights collapse into one row; a climbing ladder logs each rung
+   separately, which keeps PRs honest without inflating the log for a
+   straight-weight exercise. Every path that banks an exercise comes through
+   here, so ending early cannot record it differently from Next exercise. */
+async function logSetsForExercise(ei) {
+  const ex = TODAY_WORKOUT.exercises[ei];
+  const done = (SESSION.setWeights?.[ei] || [])
+    .map((w, i) => ({ w, done: SESSION.setsDone[ei][i] }))
+    .filter((s) => s.done);
+
+  if (!done.length) return 0;
+  const byWeight = new Map();
+  for (const s of done) {
+    const key = s.w == null ? "" : String(s.w);
+    byWeight.set(key, (byWeight.get(key) || 0) + 1);
+  }
+  for (const [key, count] of byWeight) {
+    await logExerciseSilent(ex.name, key === "" ? "" : parseFloat(key), SESSION.reps[ei], count);
+  }
+  return done.length;
+}
+
+/* Sets ticked on the exercise you are standing on are work that happened.
+   Ending early or discarding used to drop them on the floor, because nothing
+   wrote a row until Next exercise was tapped. */
+async function bankCurrentExercise() {
+  if (!SESSION || SESSION.finished) return false;
+  const ei = SESSION.exerciseIndex;
+  if (!TODAY_WORKOUT?.exercises?.[ei] || SESSION.completed[ei]) return false;
+  if (!(await logSetsForExercise(ei))) return false;
+  SESSION.completed[ei] = true;
+  SESSION.restStartedAt = null;
+  stopRestTicker();
+  saveSessionToStorage();
+  return true;
+}
+
+let ENDING_SESSION = false;
+
+/* Both ways out of a workout, the link under the exercise and the button on
+   the paused sheet, land here: one confirmation, one place that banks the sets
+   before the summary is drawn. */
+async function endWorkoutNow() {
+  if (ENDING_SESSION || !SESSION) return;
+  const ei = SESSION.exerciseIndex;
+  const ticked = (SESSION.setsDone?.[ei] || []).filter(Boolean).length;
+  const left = SESSION.completed.filter((c, i) => !c && i !== ei).length;
+  const ok = await askConfirm({
+    heading: "End this workout",
+    body: [
+      ticked ? `Your ${ticked} set${ticked === 1 ? "" : "s"} on this exercise are saved first.` : "Nothing is logged on this exercise yet.",
+      left ? `${left} exercise${left === 1 ? "" : "s"} in the plan stay undone.` : "Everything else in the plan is done.",
+    ].join(" "),
+    ok: "End workout",
+  });
+  if (!ok) return;
+  ENDING_SESSION = true;
+  try {
+    await bankCurrentExercise();
+    clearSessionStorage();
+    await renderSessionComplete();
+  } finally {
+    ENDING_SESSION = false;
+  }
+}
+
 async function doFinishExerciseAndAdvance() {
   const ei = SESSION.exerciseIndex;
   const ex = TODAY_WORKOUT.exercises[ei];
   const doneCount = SESSION.setsDone[ei].filter(Boolean).length;
 
-  // Group the completed sets by the weight they were done at. Equal weights
-  // collapse into one row; a climbing ladder logs each rung separately, which
-  // keeps PRs honest without inflating the log for a straight-weight exercise.
-  const done = (SESSION.setWeights?.[ei] || [])
-    .map((w, i) => ({ w, done: SESSION.setsDone[ei][i] }))
-    .filter((s) => s.done);
-
-  if (done.length) {
-    const byWeight = new Map();
-    for (const s of done) {
-      const key = s.w == null ? "" : String(s.w);
-      byWeight.set(key, (byWeight.get(key) || 0) + 1);
-    }
-    for (const [key, count] of byWeight) {
-      await logExerciseSilent(ex.name, key === "" ? "" : parseFloat(key), SESSION.reps[ei], count);
-    }
-  } else {
+  if (!(await logSetsForExercise(ei))) {
     await logExerciseSilent(ex.name, SESSION.weights[ei], SESSION.reps[ei], doneCount || ex.sets);
   }
   SESSION.completed[ei] = true;
   SESSION.restStartedAt = null;
   stopRestTicker();
-  SESSION.exerciseIndex++;
+
+  // Position in the plan is not progress through it: after a jump the exercises
+  // behind you can still be untouched, so what comes next is the first one that
+  // is not done rather than the one after this.
+  const nextIdx = SESSION.completed.findIndex((c) => !c);
+  SESSION.exerciseIndex = nextIdx === -1 ? TODAY_WORKOUT.exercises.length : nextIdx;
   saveSessionToStorage();
 
-  if (SESSION.exerciseIndex >= TODAY_WORKOUT.exercises.length) {
+  if (nextIdx === -1) {
     clearSessionStorage();
     renderSessionComplete();
   } else {
@@ -11220,7 +11429,10 @@ function renderSession() {
   beatLive();
   const ei = SESSION.exerciseIndex;
   const total = TODAY_WORKOUT.exercises.length;
-  const overallPct = Math.round((ei / total) * 100);
+  // Progress is what is finished, not where you are standing. Jumping to the
+  // last exercise with three untouched is not 80% of a workout.
+  const doneEx = SESSION.completed.filter(Boolean).length;
+  const overallPct = Math.round((doneEx / total) * 100);
   $("sessionProgressFill").style.width = overallPct + "%";
 
   const ex = TODAY_WORKOUT.exercises[ei];
@@ -11238,9 +11450,13 @@ function renderSession() {
 
   // The number to chase on this movement, and whether this session has already
   // gone past it. Only weights logged against THIS exercise count toward that.
-  const pb = previousBest(ex.name);
+  // It is the same number the PR pop compares against, so the chip cannot say
+  // "beat it" while the pop disagrees, or the other way round.
+  const pbWeight = bestEverFor(ex.name);
+  const pbLast = previousBest(ex.name);
+  const pbReps = pbLast && pbLast.weight === pbWeight ? pbLast.reps : null;
   const sessionTop = (SESSION.setWeights?.[ei] || []).reduce((m, w) => (w != null && w > m ? w : m), 0);
-  const beatenPB = !!pb && sessionTop > pb.weight;
+  const beatenPB = pbWeight != null && sessionTop > pbWeight;
 
   // The set you are on is the first one not yet done. Only that one is tappable,
   // so sets cannot be ticked out of order or ahead of where you actually are.
@@ -11267,7 +11483,7 @@ function renderSession() {
   $("sessionBody").innerHTML = `
     <div class="sess-card${exChanged ? " ex-in" : ""}">
       <div class="sess-step-row">
-        <div class="sess-step">EXERCISE ${ei + 1} OF ${total}</div>
+        <div class="sess-step">${doneEx} OF ${total} DONE</div>
         <div class="sess-step-acts">
           <button type="button" class="wp-chip" id="sessSwapBtn" aria-label="Swap this exercise">${icon("swap", 14)}</button>
           ${PARTNER_EMAIL ? `<button type="button" class="wp-chip${workoutPrivacyLocked() ? " on" : ""}" id="sessPrivacyBtn"
@@ -11277,9 +11493,9 @@ function renderSession() {
       <h2 class="sess-name">${escapeHtml(ex.name)}</h2>
       <div class="sess-meta">
         <span class="sess-target">${ex.sets} sets × ${ex.reps} reps</span>
-        ${pb ? `<span class="sess-best${beatenPB ? " beaten" : ""}">${icon("trophy", 13)}${beatenPB
-          ? `Beat it, was ${pb.weight} lb`
-          : `Best ${pb.weight} lb${pb.reps ? ` × ${pb.reps}` : ""}`}</span>` : ""}
+        ${pbWeight != null ? `<span class="sess-best${beatenPB ? " beaten" : ""}">${icon("trophy", 13)}${beatenPB
+          ? `Beat it, was ${pbWeight} lb`
+          : `Best ${pbWeight} lb${pbReps ? ` × ${pbReps}` : ""}`}</span>` : ""}
       </div>
       ${ex.note ? `<div class="sess-note">${escapeHtml(ex.note)}</div>` : ""}
       ${workingMusclesHTML(ex.name, { who: "me", size: "sm", email: MY_EMAIL })}
@@ -11333,7 +11549,7 @@ function renderSession() {
     </div>
 
     <button type="button" class="btn-big btn-primary ${allDone ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>
-    <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">${ei === total - 1 ? "Finish workout" : "Next exercise"}</button>
+    <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">${SESSION.completed.some((c, i) => !c && i !== ei) ? "Next exercise" : "Finish workout"}</button>
     ${(() => {
       const others = TODAY_WORKOUT.exercises
         .map((x, i) => ({ x, i }))
@@ -11385,21 +11601,26 @@ function renderSession() {
   $("sessRepsMinus").onclick = () => stepReps(-1);
   $("sessRepsPlus").onclick = () => stepReps(1);
   // Typing straight into the field beats tapping + fifteen times.
+  // The clamp has to reach the field as well as the value: a set logged at 0
+  // while the box still shows -40 is the app disagreeing with itself.
   $("sessWeightVal").oninput = (e) => {
     const v = parseFloat(e.target.value);
     SESSION.weights[ei] = isNaN(v) ? 0 : Math.max(0, v);
+    if (v < 0) e.target.value = SESSION.weights[ei];
     saveSessionToStorage();
   };
   $("sessRepsVal").oninput = (e) => {
     const v = parseInt(e.target.value, 10);
     SESSION.reps[ei] = isNaN(v) ? 0 : Math.max(0, v);
+    if (v < 0) e.target.value = SESSION.reps[ei];
     saveSessionToStorage();
   };
+  // An emptied field logged 0 while showing nothing, so put the real number
+  // back the moment they leave it.
+  $("sessWeightVal").onblur = (e) => { e.target.value = SESSION.weights[ei] || 0; };
+  $("sessRepsVal").onblur = (e) => { e.target.value = SESSION.reps[ei] || 0; };
   $("nextExBtn").onclick = finishExerciseAndAdvance;
-  $("endWorkoutBtn").onclick = () => {
-    clearSessionStorage();
-    renderSessionComplete();
-  };
+  $("endWorkoutBtn").onclick = endWorkoutNow;
 }
 
 let MARKING_DAY = false;
@@ -11479,6 +11700,16 @@ function todaysPRLabel() {
   return `${names[0]} +${names.length - 1} more`;
 }
 
+/* The volume of THIS workout, not of the day. dayVolumeLb counts every row
+   today, so a session logged this morning was being added to a tile sitting
+   under "1 of 5 exercises". */
+function planVolumeLb() {
+  const names = new Set((TODAY_WORKOUT?.exercises || []).map((ex) => (ex.name || "").trim().toLowerCase()));
+  return ALL_EXERCISE_LOGS
+    .filter((l) => l.email === MY_EMAIL && l.entry_date === todayStr() && names.has((l.exercise_name || "").trim().toLowerCase()))
+    .reduce((s, l) => s + (l.sets || 1) * (l.reps || 0) * (l.weight || 0), 0);
+}
+
 async function renderSessionComplete() {
   await finishWorkout();
   const loggedNow = todaysLoggedExerciseNames();
@@ -11497,7 +11728,10 @@ async function renderSessionComplete() {
      larger: on a real finish they agree, on a reopen the stored one wins. */
   const durSec = Math.max(Math.round(sessionElapsed() / 1000), TODAY_WORKOUT?.duration_sec || 0);
   const durLabel = durSec < 60 ? "<1m" : `${Math.round(durSec / 60)}m`;
-  const volume = dayVolumeLb(MY_EMAIL, todayStr());
+  // One duration on the screen: the clock is stopped here, so leave it reading
+  // the same number the Time tile does.
+  if ($("sessionTimer")) $("sessionTimer").textContent = fmtElapsed(durSec * 1000);
+  const volume = planVolumeLb();
   const prs = todaysPRCount();
   const ringPct = total > 0 ? Math.min(1, doneCount / total) : 1;
   const scR = 58, scCirc = 2 * Math.PI * scR;
@@ -11565,20 +11799,27 @@ async function renderSessionComplete() {
     $("sessionProofBtn").onclick = () => $("proofInput").click();
   }
   if (PARTNER_EMAIL) $("sessionNoteBtn").onclick = () => openNoteComposer("workout");
-  $("sessionDoneBtn").onclick = async () => {
-    SESSION = null;
-    // Clear today's plan so the next workout starts fresh rather than
-    // reopening the one that was just finished.
-    if (TODAY_WORKOUT?.id) {
-      await sb.from("ai_workouts").update({ archived: true }).eq("id", TODAY_WORKOUT.id);
-    }
-    TODAY_WORKOUT = null;
-    WORKOUT_MODE = null;
-    closeSessionUI();
-    $("workoutContent").classList.remove("hidden");
-    await loadAll();
-    renderWorkoutTab();
-  };
+  $("sessionDoneBtn").onclick = sessionDone;
+}
+
+/* Leaving the completion screen. Also what the chevron does there, so the two
+   ways off that screen cannot end in different states. */
+async function sessionDone() {
+  SESSION = null;
+  // The resume key outlives SESSION, and a finished workout offered back as
+  // "Resume" is the bug that made this its own function.
+  clearSessionStorage();
+  // Clear today's plan so the next workout starts fresh rather than
+  // reopening the one that was just finished.
+  if (TODAY_WORKOUT?.id) {
+    await sb.from("ai_workouts").update({ archived: true }).eq("id", TODAY_WORKOUT.id);
+  }
+  TODAY_WORKOUT = null;
+  WORKOUT_MODE = null;
+  closeSessionUI();
+  $("workoutContent").classList.remove("hidden");
+  await loadAll();
+  renderWorkoutTab();
 }
 
 let WORKOUT_MODE = null; // null | "choose" | "manual" | "activity"
@@ -11673,6 +11914,9 @@ function stopSessionTimer() {
 function openSessionUI() {
   document.body.classList.add("session-open");
   $("sessionCard").classList.remove("hidden");
+  // Last session's completion screen left this on, which would hide the clock
+  // and the pause button on the next workout.
+  $("sessionCard").classList.remove("finished");
   $("sessionPauseBtn").innerHTML = icon("pause", 18);
   $("sessionPauseBtn").onclick = togglePause;
   $("sessionMinBtn").innerHTML = icon("chevronDown", 20);
@@ -11682,11 +11926,13 @@ function openSessionUI() {
 
 /* Leave the session on screen-level, keeping it running underneath. */
 function minimiseSession() {
-  if (SESSION && !SESSION.pausedAt) {
-    SESSION.elapsedMs = sessionElapsed();
-    SESSION.pausedAt = Date.now();
-    saveSessionToStorage();
-  }
+  // On a finished workout the chevron is the way out, so it means the same as
+  // Done rather than re-presenting a banked workout as in progress.
+  if (SESSION?.finished) { sessionDone(); return; }
+  // The clock really does keep counting, which is what the label promises.
+  // Banking the elapsed time protects it if the tab is killed; pausing it
+  // silently is what made Resume take two taps.
+  bankSessionTime();
   stopSessionTimer();
   closeSessionUI();
   $("workoutContent").classList.remove("hidden");
@@ -11706,7 +11952,7 @@ function closeSessionUI() {
 }
 
 function togglePause() {
-  if (!SESSION) return;
+  if (!SESSION || SESSION.finished) return;   // nothing left to pause or resume
   if (SESSION.pausedAt) {
     SESSION.startedAt = Date.now();
     SESSION.pausedAt = null;
@@ -11735,7 +11981,7 @@ function renderPausedSheet() {
       <button type="button" class="btn-ghost" id="endSessionBtn">End workout</button>
     </div>`;
   $("resumeSessionBtn").onclick = togglePause;
-  $("endSessionBtn").onclick = () => renderSessionComplete();
+  $("endSessionBtn").onclick = endWorkoutNow;
 }
 
 function renderFab() {
@@ -11836,16 +12082,21 @@ function renderWorkoutTab({ respectMode = false } = {}) {
   // A workout already underway: offer it rather than hijacking the screen.
   if (SESSION && TODAY_WORKOUT) {
     const total = TODAY_WORKOUT.exercises.length;
-    const at = Math.min(SESSION.exerciseIndex + 1, total);
+    const doneEx = SESSION.completed.filter(Boolean).length;
     $("workoutCardTitle").textContent = "Workout in progress";
     $("workoutContent").innerHTML = `
-      <p class="muted-note">Exercise ${at} of ${total} · ${fmtElapsed(sessionElapsed())} so far.</p>
+      <p class="muted-note">${doneEx} of ${total} exercises done · ${fmtElapsed(sessionElapsed())} so far${SESSION.pausedAt ? " · paused" : ""}.</p>
       <button class="btn-primary" id="resumeOpenBtn" style="margin-top:10px;">Resume workout</button>
       <button class="btn-ghost" id="discardSessionBtn">Discard it</button>`;
     $("resumeOpenBtn").onclick = reopenSession;
-    $("discardSessionBtn").onclick = () => {
-      if (!confirm("Discard this workout? Sets you already logged are kept.")) return;
-      discardSession();
+    $("discardSessionBtn").onclick = async () => {
+      const ok = await askConfirm({
+        heading: "Discard this workout",
+        body: "The sets you have already ticked are kept, this exercise included. The day is not counted as a workout.",
+        ok: "Discard it",
+      });
+      if (!ok) return;
+      await discardSession();
       renderWorkoutTab();
     };
     return;
