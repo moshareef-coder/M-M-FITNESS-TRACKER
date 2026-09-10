@@ -7436,8 +7436,11 @@ function closeNextWorkoutReview() { $("nextWorkoutScrim").classList.add("hidden"
 function openRecap(email, name, date) {
   const r = recapFor(email, name, date);
   const mine = email === MY_EMAIL;
-  const bars = dayMuscleLoad(email, date);
-  const kcal = estCalories(name, r.seconds, r.minutes);
+  /* No caller passes a partner's email today, but this sheet prints every set,
+     load and muscle, so it carries the same gate as the timeline. */
+  const sharing = mine || PARTNER_PROFILE?.share_workout_details !== false;
+  const bars = sharing ? dayMuscleLoad(email, date) : [];
+  const kcal = sharing ? estCalories(name, r.seconds, r.minutes) : 0;
 
   const at = (ALL_PLANS || [])
     .filter((w) => w.email === email && w.entry_date === date && w.completed_at)
@@ -7450,7 +7453,7 @@ function openRecap(email, name, date) {
   /* Volume and calories only appear when they are real: a bodyweight session
      has no tonnage, and calories need a logged bodyweight to mean anything. */
   const secondRow = [
-    r.volume > 0 ? recapStat(`${Math.round(r.volume).toLocaleString()}<small>lb</small>`, "TOTAL VOLUME") : null,
+    sharing && r.volume > 0 ? recapStat(`${Math.round(r.volume).toLocaleString()}<small>lb</small>`, "TOTAL VOLUME") : null,
     kcal ? recapStat(String(kcal), "EST. CALORIES") : null,
   ].filter(Boolean);
 
@@ -7479,15 +7482,17 @@ function openRecap(email, name, date) {
       <div class="rc-tick">${icon("check", 22)}</div>
       <div>
         <div class="rc-kicker">WORKOUT COMPLETED</div>
-        <div class="rc-title">${escapeHtml(r.title)}</div>
+        <div class="rc-title">${escapeHtml(sharing ? r.title : "Workout")}</div>
         <div class="rc-when">${escapeHtml(when)}</div>
       </div>
     </div>
 
-    <div class="rc-stats">
-      ${recapStat(r.sets || "-", "TOTAL SETS")}
-      ${recapStat(r.exercises || "-", "EXERCISES")}
-      ${recapStat(timeText, "TIME")}
+    <div class="rc-stats"${sharing ? "" : ` style="grid-template-columns:1fr;"`}>
+      ${sharing
+        ? `${recapStat(r.sets || "-", "TOTAL SETS")}
+           ${recapStat(r.exercises || "-", "EXERCISES")}
+           ${recapStat(timeText, "TIME")}`
+        : recapStat(String(effortXPBetween(name, date, date)), "EFFORT XP")}
     </div>
     ${secondRow.length
       ? `<div class="rc-stats" style="grid-template-columns:repeat(${secondRow.length},1fr);">${secondRow.join("")}</div>`
@@ -7507,7 +7512,9 @@ function openRecap(email, name, date) {
         </div>
       </div>` : ""}
 
-    ${r.logs.length ? `
+    ${!sharing
+      ? `<p class="lw-private-note">${escapeHtml(name)} keeps workout details private. Their effort score is always shared.</p>`
+      : r.logs.length ? `
       <div class="rc-ex-head"><h4>Exercises</h4></div>
       <div class="rc-list">${r.logs.map(exRow).join("")}</div>`
       : `<div class="ps-empty">No exercises were logged for this one.</div>`}
@@ -7660,10 +7667,21 @@ function dayVolumeLb(email, date) {
    say we show the empty state rather than inventing encouragement. */
 function recentActivity(email, name, limit = 4) {
   const out = [];
+  /* The focus and the tonnage are exactly what the details toggle hides, so a
+     private partner gets the effort score instead, same as the live sheet. */
+  const sharing = email === MY_EMAIL || PARTNER_PROFILE?.share_workout_details !== false;
   const days = [...new Set(entriesFor(name).filter((e) => e.gym).map((e) => e.entry_date))]
     .sort().reverse().slice(0, 6);
 
   for (const d of days) {
+    if (!sharing) {
+      out.push({
+        icon: "bolt",
+        title: "Trained",
+        when: `${relDayLabel(d)} \u00b7 ${effortXPBetween(name, d, d)} XP`,
+      });
+      continue;
+    }
     const plans = ALL_PLANS.filter((w) => w.email === email && w.entry_date === d && w.completed_at);
     const secs = plans.reduce((s, w) => s + (w.duration_sec || 0), 0);
     const focus = plans.length ? displayFocus(plans.find((w) => w.focus)?.focus, plans[0].exercises) : null;
@@ -8756,7 +8774,7 @@ async function timelineItemHTML(item) {
   const plan = sharing ? (ALL_PLANS || []).find((w) => w.email === email && w.entry_date === date && w.completed_at) : null;
   const sum = workoutSummary(name, date);
   const focus = !sharing ? "Workout" : plan ? displayFocus(plan.focus, plan.exercises) : (sum.names.length ? deriveFocus(sum.names) : "Workout");
-  const mins = plan?.duration_sec ? Math.round(plan.duration_sec / 60) : sum.mins;
+  const mins = !sharing ? 0 : plan?.duration_sec ? Math.round(plan.duration_sec / 60) : sum.mins;
   const lb = sharing ? dayVolumeLb(email, date) : 0;
   const when = relDayLabel(date) + (entry.workout_at
     ? ", " + new Date(entry.workout_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "");
@@ -9006,10 +9024,15 @@ async function openDaySheet(email, date) {
   const name = isMine ? ME : partnerName();
   const e = entryOn(name, date);
   if (!e) return;
+  /* Same rule the timeline and the live sheet apply: your own day is always in
+     full, a partner's detail only while they share it. */
+  const sharing = isMine || PARTNER_PROFILE?.share_workout_details !== false;
 
-  const logs = ALL_EXERCISE_LOGS
-    .filter((l) => l.email === email && l.entry_date === date)
-    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  const logs = sharing
+    ? ALL_EXERCISE_LOGS
+        .filter((l) => l.email === email && l.entry_date === date)
+        .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+    : [];
   const url = e.proof_path ? await signedProofUrl(e.proof_path) : null;
   const pretty = new Date(date + "T00:00:00")
     .toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
@@ -9021,13 +9044,19 @@ async function openDaySheet(email, date) {
   /* How long it took lives on the plan rather than the day, and more than one
      workout a day is allowed, so add them up. ai_workouts is readable by a
      partner and a coach already, so this needed no new permission. */
-  const trainedSec = ALL_PLANS
-    .filter((w) => w.email === email && w.entry_date === date && w.duration_sec > 0)
-    .reduce((s, w) => s + w.duration_sec, 0);
+  const trainedSec = sharing
+    ? ALL_PLANS
+        .filter((w) => w.email === email && w.entry_date === date && w.duration_sec > 0)
+        .reduce((s, w) => s + w.duration_sec, 0)
+    : 0;
   if (trainedSec) rows.push(["Time", fmtDuration(trainedSec)]);
+  // What is left when detail is off: that they trained, and how hard.
+  if (!sharing && e.gym) rows.push(["Effort", `${effortXPBetween(name, date, date)} XP`]);
 
   // Your own days are editable in place. A mistyped weight should not force you
-  // to delete the whole day and lose the workout with it.
+  // to delete the whole day and lose the workout with it. A partner's body
+  // weight is not shown at all: it is not workout detail and nothing opts into
+  // sharing it, so the sheet is not the place to publish it.
   const weightBlock = isMine
     ? `<div class="ds-weight">
          <label>Weight</label>
@@ -9041,7 +9070,7 @@ async function openDaySheet(email, date) {
            ${e.weight != null ? `<button type="button" class="btn-ghost" id="dsClearWeight">Remove weight</button>` : ""}
          </div>
        </div>`
-    : (e.weight != null ? `<div class="rep-row"><span>Weight</span><b>${escapeHtml(String(e.weight))} lb</b></div>` : "");
+    : "";
 
   $("daySheet").innerHTML = `
     <div class="ds-grip"></div>
@@ -9060,7 +9089,8 @@ async function openDaySheet(email, date) {
         <b>${escapeHtml(exerciseSummary(l))}</b>
         ${isMine ? `<button type="button" class="rep-del" data-exdel="${escapeHtml(l.id)}" aria-label="Remove ${escapeHtml(l.exercise_name)}">${icon("trash", 14)}</button>` : ""}
       </div>`).join("")}
-    ${!logs.length && e.gym ? `<p class="muted-note">Logged as a workout, no exercises recorded.</p>` : ""}
+    ${sharing && !logs.length && e.gym ? `<p class="muted-note">Logged as a workout, no exercises recorded.</p>` : ""}
+    ${!sharing ? `<p class="muted-note">${escapeHtml(name)} keeps workout details private. Their effort score is always shared.</p>` : ""}
     ${weightBlock}
     ${e.note ? `<p class="quote">${escapeHtml(e.note)}</p>` : ""}
     ${isMine && e.proof_path ? `<button type="button" class="btn-ghost" id="dsRemoveProof">Remove photo</button>` : ""}
@@ -9955,11 +9985,18 @@ function cssVar(name) {
 }
 
 function renderLog() {
-  const combined = [...ALL_ENTRIES].sort((a, b) => b.entry_date.localeCompare(a.entry_date)).slice(0, 20);
+  // One person at a time, like every other card on this tab: the You/Partner
+  // toggle decides whose rows these are.
+  const viewedIsMe = PROGRESS_VIEW !== "partner";
+  const combined = ALL_ENTRIES
+    .filter((e) => e.user_name === (viewedIsMe ? ME : partnerName()))
+    .sort((a, b) => b.entry_date.localeCompare(a.entry_date)).slice(0, 20);
   const list = $("logList");
   if (combined.length === 0) {
     list.innerHTML = emptyState("checklist", "Nothing logged yet",
-      "Weigh-ins and workouts show up here as you go.");
+      viewedIsMe
+        ? "Weigh-ins and workouts show up here as you go."
+        : `${partnerName()} has not logged anything yet.`);
     return;
   }
   list.innerHTML = combined.map((e) => {
@@ -10673,6 +10710,7 @@ async function generateWorkout(forDate) {
     await loadAll();
     if (isToday) {
       await loadTodayWorkout();
+      FRESH_PLAN_ID = TODAY_WORKOUT?.id || null;
       renderWorkoutTab();
       revealGeneratedPlan(data.workout, data.honest, () => switchTab("workout"), target);
     } else {
@@ -10781,6 +10819,7 @@ function openWorkoutPrivacy() {
     $("popScrim").classList.add("hidden");
     if (SESSION) renderSession(); else if (TODAY_WORKOUT) renderPlanPreview();
   };
+  $("popScrim").onclick = (e) => { if (e.target === $("popScrim")) close(); };
   $("wpX").onclick = close;
   $("wpDone").onclick = close;
 }
@@ -11825,8 +11864,12 @@ async function sessionDone() {
   renderWorkoutTab();
 }
 
-let WORKOUT_MODE = null; // null | "choose" | "manual" | "activity"
+let WORKOUT_MODE = null; // null | "choose" | "manual" | "week" | "activity"
 let MANUAL_DRAFT = [];
+/* The id of a plan generated in this sitting. A new plan can legitimately
+   contain something already logged today, and without this the preview read
+   that as "half done" and withheld every way of changing it. */
+let FRESH_PLAN_ID = null;
 /* The day a build is destined for. Null means today, which is what building
    from the Workout tab has always meant. */
 let PLAN_FOR_DATE = null;
@@ -12005,12 +12048,16 @@ function formatDuration(sec) {
 
 async function startFreshWorkout() {
   if (TODAY_WORKOUT?.id) {
-    await sb.from("ai_workouts").update({ archived: true }).eq("id", TODAY_WORKOUT.id);
+    /* This is the only exit from the completion screen, so a failed archive has
+       to say so: unchecked, the tap looked like a dead button. */
+    const { error } = await sb.from("ai_workouts").update({ archived: true }).eq("id", TODAY_WORKOUT.id);
+    if (error) { console.error("could not archive today's workout", error); toast("Couldn't close off that workout. Try again."); return; }
   }
   TODAY_WORKOUT = null;
+  FRESH_PLAN_ID = null;
   WORKOUT_MODE = "choose";
   await loadAll();
-  renderWorkoutTab();
+  renderWorkoutTab({ respectMode: true });
 }
 
 /* Days you trained, most recent first, each opening its own recap. Dated
@@ -12029,6 +12076,18 @@ function prevWorkoutDays() {
 function datedLabel(d) {
   return new Date(d + "T00:00:00")
     .toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+/* The generator dates its coaching notes in ISO ("You lifted 130 on
+   2026-09-10"), which is the only place in the app a machine date reaches a
+   sentence, and it names today by its filename. */
+function humanizeNoteDates(text) {
+  const yesterday = isoDate(new Date(Date.now() - 86400000));
+  return String(text).replace(/(\bon )?(\d{4}-\d{2}-\d{2})\b/g, (whole, on, d) => {
+    if (d === todayStr()) return "today";
+    if (d === yesterday) return "yesterday";
+    return `${on || ""}${datedLabel(d)}`;
+  });
 }
 
 function workoutMeta(r) {
@@ -12080,6 +12139,7 @@ function closeAllWorkouts() { $("allWorkoutsScrim").classList.add("hidden"); }
 function renderWorkoutTab({ respectMode = false } = {}) {
   renderFab();
   resumeSessionIfAny();          // loads a saved session, does not take over
+  if (SESSION) FRESH_PLAN_ID = null;   // once it is being lifted it is not untouched any more
   $("workoutContent").classList.remove("hidden");
 
   // A workout already underway: offer it rather than hijacking the screen.
@@ -12133,6 +12193,8 @@ function renderWorkoutTab({ respectMode = false } = {}) {
     renderManualBuildScreen();
   } else if (WORKOUT_MODE === "week") {
     renderWeekPlanner();
+  } else if (WORKOUT_MODE === "activity") {
+    renderActivityScreen();
   } else {
     /* Build Next Workout is the tab, not a screen behind a button. The old
        "Go again / Begin Workout" step was a waiting room: it asked you to
@@ -12166,6 +12228,10 @@ function makeReorderable(container, onDrop) {
   };
 
   container.querySelectorAll("[data-grip]").forEach((grip) => {
+    // The builder appends rows one at a time and re-binds, so a grip that
+    // already has these handlers must not collect a second set.
+    if (grip.dataset.gripBound) return;
+    grip.dataset.gripBound = "1";
     grip.addEventListener("pointerdown", (e) => {
       const row = grip.closest(".draggable");
       if (!row) return;
@@ -12563,6 +12629,8 @@ function renderChooseScreen() {
         coached)}
     ${optionCard("chooseWeekBtn", "checklist", "Plan your week",
         "Put saved workouts on the days you will do them.", false)}
+    ${optionCard("chooseActivityBtn", "run", "Log a class or cardio",
+        "Pilates, yoga, a run: counted by minutes.", false)}
     ${savedWorkoutsHTML()}
     ${workoutCalendarHTML()}`;
   wireSavedWorkouts($("workoutContent"));
@@ -12577,6 +12645,7 @@ function renderChooseScreen() {
   if (!coached) $("chooseGenerateBtn").onclick = () => generateWorkout();
   $("choosePlanBtn").onclick = toManual;
   $("chooseWeekBtn").onclick = () => goWorkoutScreen("week");
+  $("chooseActivityBtn").onclick = () => goWorkoutScreen("activity");
 
   // Every recent chip opens its recap.
   $("workoutContent").querySelectorAll("[data-recap]").forEach((b) => {
@@ -12598,7 +12667,7 @@ const ACTIVITY_STATE = { name: "", minutes: 45 };
 function renderActivityScreen() {
   $("workoutCardTitle").textContent = "Log a class or cardio";
   $("workoutContent").innerHTML = `
-    ${backBar("Back", () => { WORKOUT_MODE = "choose"; renderWorkoutTab(); })}
+    ${backBar("Back", () => goWorkoutScreen("choose", { back: true }))}
     <p class="muted-note">Tracked by time, not sets. It still counts as a workout.</p>
     <div class="activity-chips" id="activityChips">
       ${ACTIVITY_PRESETS.map((a) => `<button type="button" class="activity-chip ${ACTIVITY_STATE.name === a ? "on" : ""}" data-act="${escapeHtml(a)}">${escapeHtml(a)}</button>`).join("")}
@@ -12636,7 +12705,7 @@ function renderActivityScreen() {
     ACTIVITY_STATE.minutes = isNaN(v) ? 1 : Math.max(1, v);
   };
   $("saveActivityBtn").onclick = saveActivity;
-  $("cancelActivityBtn").onclick = () => { WORKOUT_MODE = null; renderWorkoutTab(); };
+  $("cancelActivityBtn").onclick = () => goWorkoutScreen("choose", { back: true });
 }
 
 async function saveActivity() {
@@ -12700,6 +12769,50 @@ async function deleteSavedWorkout(id) {
   if (error) { toast("Couldn't remove it"); console.error(error); return; }
   SAVED_WORKOUTS = SAVED_WORKOUTS.filter((w) => w.id !== id);
   toast("Removed");
+}
+
+/* Putting a saved workout on a day is just writing the ai_workouts row that day
+   would have had anyway, which is what the calendar, the hero, the generator
+   and the session all already read. Same shape as generateWorkout and
+   saveManualWorkout write, archived and completed_at cleared for the same
+   reason: a day that already had a finished workout must not swallow this one. */
+async function scheduleSavedWorkout(w, dates) {
+  if (!w) return;
+  const exercises = (w.exercises || []).filter((e) => e?.name).map((e) => ({
+    name: e.name, sets: e.sets || 3, reps: e.reps || 10, targetWeight: e.targetWeight || 0,
+  }));
+  if (!exercises.length) { toast("That workout has no exercises in it yet"); return; }
+  const days = (dates || []).filter((d) => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d));
+  if (!days.length) return;
+
+  for (const date of days) {
+    const { error } = await sb.from("ai_workouts").upsert({
+      user_name: ME, email: MY_EMAIL, entry_date: date,
+      focus: w.name || w.focus || deriveFocus(exercises), exercises,
+      archived: false, completed_at: null,
+    }, { onConflict: "email,entry_date" });
+    if (error) { console.error("could not schedule the saved workout", error); toast("Couldn't put it on that day. Try again."); return; }
+  }
+
+  // Best effort: the sub-line reads last_used_at, but a failed stamp is not
+  // worth telling anyone about when the workout itself landed.
+  const { error: stampErr } = await sb.from("saved_workouts").update({ last_used_at: new Date().toISOString() }).eq("id", w.id);
+  if (stampErr) console.warn("could not stamp last_used_at", stampErr);
+
+  closeSavedSheet();
+  $("popScrim").classList.add("hidden");
+  await loadSavedWorkouts();
+  await loadAll();
+
+  const today = days.includes(todayStr());
+  if (today) await loadTodayWorkout();
+  FRESH_PLAN_ID = today ? TODAY_WORKOUT?.id || null : null;
+  WORKOUT_MODE = today ? null : "week";
+  switchTab("workout");
+  renderWorkoutTab({ respectMode: true });
+  if (today && days.length === 1) toast(`${w.name} is today's workout`);
+  else if (days.length === 1) toast(`${w.name} is on ${datedLabel(days[0])}`);
+  else toast(`${w.name} is on ${days.length} days`);
 }
 
 /* A week is Monday to Sunday, because that is what people mean by "this week".
@@ -12766,6 +12879,7 @@ function openSavedWorkout(id, { fromList = false } = {}) {
   if (!w) return;
   savedFigTeardown();
   const exs = w.exercises || [];
+  const empty = !exs.length;
   const sets = exs.reduce((n, e) => n + (parseInt(e.sets, 10) || 0), 0);
   const minutes = Math.max(10, Math.round(sets * 2.5 / 5) * 5);   // a set and its rest is about 2.5 min
   const groups = groupsHitFor(exs);
@@ -12791,12 +12905,13 @@ function openSavedWorkout(id, { fromList = false } = {}) {
       <div class="sd-facts">
         <div class="sd-stat"><b>${exs.length}</b><span>Exercise${exs.length === 1 ? "" : "s"}</span></div>
         <div class="sd-stat"><b>${sets}</b><span>Sets</span></div>
-        <div class="sd-stat"><b>~${minutes}</b><span>Minutes</span></div>
+        ${empty ? "" : `<div class="sd-stat"><b>~${minutes}</b><span>Minutes</span></div>`}
         <div class="sd-groups">${groups.map((g) => `<span class="sd-group">${escapeHtml(BODY_GROUP_LABELS[g] || g)}</span>`).join("")}</div>
       </div>
     </div>
-    <div class="cb-line-head" style="margin-bottom:8px"><h3>Exercises</h3><span class="cb-row-sets">sets × reps</span></div>
+    ${empty ? "" : `<div class="cb-line-head" style="margin-bottom:8px"><h3>Exercises</h3><span class="cb-row-sets">sets × reps</span></div>`}
     <div class="sd-list">
+      ${empty ? `<p class="muted-note">Nothing in this one yet. Open a copy and add the exercises, then it can go on a day.</p>` : ""}
       ${exs.map((ex, i) => `<div class="sd-ex">
         <span class="sd-ex-n">${i + 1}</span>
         <span class="sd-ex-txt">
@@ -12807,8 +12922,8 @@ function openSavedWorkout(id, { fromList = false } = {}) {
       </div>`).join("")}
     </div>
     <div class="sd-acts">
-      <button type="button" class="btn-primary" id="svToday">Do this today</button>
-      <button type="button" class="btn-secondary" id="svEdit">Edit a copy</button>
+      ${empty ? "" : `<button type="button" class="btn-primary" id="svToday">Do this today</button>`}
+      <button type="button" class="${empty ? "btn-primary" : "btn-secondary"}" id="svEdit">Edit a copy</button>
       <button type="button" class="btn-ghost" id="svDelete">Delete</button>
     </div>`;
   $("savedScrim").classList.remove("hidden");
@@ -12816,7 +12931,7 @@ function openSavedWorkout(id, { fromList = false } = {}) {
   $("savedSheet").scrollTop = 0;
 
   $("sdBack").onclick = () => (fromList ? openSavedList() : closeSavedSheet());
-  $("svToday").onclick = () => { closeSavedSheet(); scheduleSavedWorkout(w, [todayStr()]); };
+  if ($("svToday")) $("svToday").onclick = () => { closeSavedSheet(); scheduleSavedWorkout(w, [todayStr()]); };
   $("svEdit").onclick = () => {
     /* A copy, not the original: editing one to use it once should not quietly
        rewrite the thing you saved. */
@@ -12924,7 +13039,7 @@ function openDayPlanner(date) {
               <span class="sv-card-meta">${(w.exercises || []).length} exercises</span>
             </button>`).join("")}
         </div>` : ""}
-      ${existing ? `<button type="button" class="btn-ghost" id="dpClear">Clear this day</button>` : ""}
+      ${existing && !existing.completed_at ? `<button type="button" class="btn-ghost" id="dpClear">Clear this day</button>` : ""}
     </div>`;
   $("popScrim").classList.remove("hidden");
   $("popScrim").onclick = (e) => { if (e.target === $("popScrim")) close(); };
@@ -12946,6 +13061,12 @@ function openDayPlanner(date) {
   });
   if ($("dpClear")) {
     $("dpClear").onclick = async () => {
+      const ok = await askConfirm({
+        heading: "Clear this day",
+        body: `${displayFocus(existing.focus, existing.exercises)} is removed from ${label}. Anything you have already logged is kept.`,
+        ok: "Clear it",
+      });
+      if (!ok) return;
       const { error } = await sb.from("ai_workouts").delete().eq("id", existing.id);
       if (error) { toast("Couldn't clear it"); console.error(error); return; }
       close();
@@ -13111,6 +13232,7 @@ function renderManualBuildScreen() {
          just added. -->
     <div id="cbLineWrap" class="hidden">
       <div class="cb-line-head"><h3>Your workout</h3><span class="cb-row-sets" id="cbTotal"></span></div>
+      <p class="muted-note">Tap a row to change its sets, reps or weight. Drag the handle to reorder.</p>
       <div class="reorder-list" id="draftRows"></div>
     </div>
     <button type="button" class="cb-add" id="cbAddBtn">${icon("plus", 18)} Add an exercise</button>
@@ -13182,7 +13304,7 @@ function cbRenderPicker() {
         <div class="ex-search-wrap">
           <input type="text" id="cbSearch" placeholder="Search exercises" autocomplete="off" />
         </div>
-        <button type="button" class="ds-x" id="cbPickX" aria-label="Done">&times;</button>
+        <button type="button" class="ds-x" id="cbPickX" aria-label="Close">&times;</button>
       </div>
       <div class="cb-chips" id="cbChips">
         ${CB_GROUPS.map((g) => `<button type="button" class="cb-chip${g.key === CB_GROUP ? " on" : ""}" data-group="${g.key}">${escapeHtml(g.label)}</button>`).join("")}
@@ -13236,7 +13358,13 @@ function cbRenderGrid() {
     </button>`).join("");
   grid.querySelectorAll("[data-pick]").forEach((b) => {
     const ex = list.find((e) => e.name === b.dataset.pick);
-    b.onclick = () => cbConfirmStep(ex);
+    b.onclick = () => {
+      // The tick means it is already in there, so this tap changes that entry
+      // rather than quietly making a second identical one.
+      const at = MANUAL_DRAFT.findIndex((e) => e.name === ex.name);
+      if (at >= 0) { cbConfirmStep(MANUAL_DRAFT[at], { editIndex: at }); return; }
+      cbConfirmStep(ex);
+    };
   });
 }
 
@@ -13257,14 +13385,27 @@ function cbRenderOwn(query) {
 }
 
 /* Step two: how much of it. Defaults to 3 by 10 so confirming without
-   touching anything is still a sensible answer. */
-function cbConfirmStep(ex) {
-  CB_PENDING = { name: ex.name, sets: 3, reps: 10, meta: ex.own ? "your own" : [ex.equipment, ex.level].filter(Boolean).join(" · ") };
+   touching anything is still a sensible answer. Weight is here because the
+   plan preview's own add form has always asked for it, and an exercise added
+   through this door came out a different shape, silently weightless.
+   The same step edits a row already in the lineup, so sets, reps and weight
+   are all changeable after the fact instead of only sets. */
+function cbConfirmStep(ex, { editIndex = null } = {}) {
+  const editing = editIndex != null;
+  CB_PENDING = {
+    name: ex.name,
+    sets: parseInt(ex.sets, 10) || 3,
+    reps: parseInt(ex.reps, 10) || 10,
+    weight: Number(ex.targetWeight) || 0,
+    editIndex,
+    meta: editing ? "in your workout" : ex.own ? "your own" : [ex.equipment, ex.level].filter(Boolean).join(" · "),
+  };
   const draw = () => {
     $("cbPickSheet").innerHTML = `
       <div class="ds-grip"></div>
       <div class="cb-sheet-head">
-        <button type="button" class="cb-back" id="cbBackBtn">${icon("chevronLeft", 14)} All exercises</button>
+        ${editing ? `<button type="button" class="cb-back" id="cbBackBtn">${icon("chevronLeft", 14)} Your workout</button>`
+          : `<button type="button" class="cb-back" id="cbBackBtn">${icon("chevronLeft", 14)} All exercises</button>`}
         <button type="button" class="ds-x" id="cbPickX" aria-label="Close">&times;</button>
       </div>
       <div class="cb-confirm">
@@ -13288,21 +13429,46 @@ function cbConfirmStep(ex) {
             </div>
           </div>
         </div>
+        <div class="cb-dials">
+          <div class="cb-dial">
+            <div class="cb-dial-label">Weight (lbs)</div>
+            <div class="cb-dial-ctl">
+              <button type="button" data-d="weight:-2.5" aria-label="Less weight">&minus;</button>
+              <span class="cb-dial-val">${CB_PENDING.weight}</span>
+              <button type="button" data-d="weight:2.5" aria-label="More weight">+</button>
+            </div>
+          </div>
+        </div>
         <p class="ef-note" style="margin-bottom:12px">You can change these mid workout. Nothing here is locked in.</p>
-        <button type="button" class="btn-primary" id="cbConfirmBtn">Add to workout</button>
+        <button type="button" class="btn-primary" id="cbConfirmBtn">${editing ? "Save changes" : "Add to workout"}</button>
       </div>`;
     $("cbPickX").onclick = cbClosePicker;
-    $("cbBackBtn").onclick = cbRenderPicker;
+    $("cbBackBtn").onclick = editing ? cbClosePicker : cbRenderPicker;
     $("cbPickSheet").querySelectorAll("[data-d]").forEach((b) => {
       b.onclick = () => {
         const [field, delta] = b.dataset.d.split(":");
-        const min = field === "sets" ? 1 : 1, max = field === "sets" ? 10 : 50;
+        const max = field === "sets" ? 10 : field === "reps" ? 50 : 1000;
+        const min = field === "weight" ? 0 : 1;
         CB_PENDING[field] = Math.max(min, Math.min(max, CB_PENDING[field] + Number(delta)));
         draw();
       };
     });
     $("cbConfirmBtn").onclick = () => {
-      cbAdd(CB_PENDING.name, CB_PENDING.sets, CB_PENDING.reps);
+      // The node this handler sits on is replaced by what follows, but the
+      // handler stays live long enough for a second tap to run it against a
+      // CB_PENDING that is already null. Take the values, then stand down.
+      if (!CB_PENDING) return;
+      const { name, sets, reps, weight, editIndex: at } = CB_PENDING;
+      CB_PENDING = null;
+      if (at != null) {
+        const row = MANUAL_DRAFT[at];
+        if (row) { row.sets = sets; row.reps = reps; row.targetWeight = weight; saveDraft(); }
+        cbClosePicker();
+        cbRenderLineup();
+        cbUpdateCharacter();
+        return;
+      }
+      cbAdd(name, sets, reps, weight);
       cbRenderPicker();      // straight back to the grid, ready for the next one
     };
   };
@@ -13310,8 +13476,14 @@ function cbConfirmStep(ex) {
 }
 
 /* Adding never re-renders the list: the new row is appended and animates in. */
-function cbAdd(name, sets, reps) {
-  MANUAL_DRAFT.push({ name, sets, reps, targetWeight: 0 });
+function cbAdd(name, sets, reps, weight = 0) {
+  /* The card carries a tick once it is in the draft, and tapping it again used
+     to add a second identical row without a word. */
+  if (MANUAL_DRAFT.some((e) => e.name === name)) {
+    toast(`${name} is already in your workout`);
+    return;
+  }
+  MANUAL_DRAFT.push({ name, sets, reps, targetWeight: weight || 0 });
   saveDraft();
   const rows = $("draftRows");
   if (rows) {
@@ -13320,18 +13492,29 @@ function cbAdd(name, sets, reps) {
     const row = el.firstElementChild;
     rows.appendChild(row);
     cbWireRow(row);
+    cbBindReorder();   // the new row needs its grip bound too
   }
   cbUpdateCharacter();
   toast(`${name} added`);
 }
 
+function cbDose(ex) {
+  const bits = [`${ex.sets} sets × ${ex.reps} reps`];
+  if (Number(ex.targetWeight) > 0) bits.push(`${ex.targetWeight} lbs`);
+  return bits.join(" · ");
+}
+
 function cbRowHTML(ex, i) {
+  /* The grip is what makeReorderable binds to. Without it every row was marked
+     draggable and none of them was. The dose says which number the stepper
+     moves, and the row itself opens the dial step for the rest. */
   return `<div class="cb-row exercise-row draggable" data-idx="${i}">
+    <button type="button" class="grip" data-grip aria-label="Drag to reorder">${icon("grip", 16)}</button>
     <span class="cb-n">${i + 1}</span>
-    <span class="cb-row-body">
+    <button type="button" class="cb-row-body" data-edit aria-label="Change ${escapeHtml(ex.name)}" style="background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;">
       <span class="cb-row-name">${escapeHtml(ex.name)}</span>
-      <span class="cb-row-sets" data-sets>${ex.sets} × ${ex.reps}</span>
-    </span>
+      <span class="cb-row-sets" data-sets>${escapeHtml(cbDose(ex))}</span>
+    </button>
     <span class="cb-step">
       <button type="button" data-less aria-label="Fewer sets">&minus;</button>
       <button type="button" data-more aria-label="More sets">+</button>
@@ -13344,8 +13527,16 @@ function cbWireRow(row) {
   const idxOf = () => [...$("draftRows").children].indexOf(row);
   const redraw = () => {
     const ex = MANUAL_DRAFT[idxOf()];
-    if (ex) row.querySelector("[data-sets]").textContent = `${ex.sets} × ${ex.reps}`;
+    if (ex) row.querySelector("[data-sets]").textContent = cbDose(ex);
     cbUpdateCharacter();
+  };
+  row.querySelector("[data-edit]").onclick = () => {
+    const i = idxOf();
+    const ex = MANUAL_DRAFT[i];
+    if (!ex) return;
+    $("cbPickScrim").classList.remove("hidden");
+    $("cbPickScrim").onclick = (e) => { if (e.target === $("cbPickScrim")) cbClosePicker(); };
+    cbConfirmStep(ex, { editIndex: i });
   };
   row.querySelector("[data-less]").onclick = () => {
     const ex = MANUAL_DRAFT[idxOf()];
@@ -13386,7 +13577,11 @@ function cbRenderLineup() {
   if (!rows) return;
   rows.innerHTML = MANUAL_DRAFT.map((ex, i) => cbRowHTML(ex, i)).join("");
   [...rows.children].forEach(cbWireRow);
-  makeReorderable(rows, (order) => {
+  cbBindReorder();
+}
+
+function cbBindReorder() {
+  makeReorderable($("draftRows"), (order) => {
     MANUAL_DRAFT = order.map((i) => MANUAL_DRAFT[i]);
     saveDraft();
     cbRenumber();
@@ -13534,16 +13729,23 @@ async function saveManualWorkout() {
   if (MANUAL_DRAFT.length === 0) return;
   const target = PLAN_FOR_DATE || todayStr();
   const forToday = target === todayStr();
-  await sb.from("ai_workouts").upsert({
+  /* archived and completed_at are cleared explicitly: a workout finished
+     earlier today leaves the row archived, and an upsert that did not reset
+     them wrote the new plan onto it, where loadTodayWorkout can never see it.
+     The user got "Workout plan saved" and an empty screen. */
+  const { error } = await sb.from("ai_workouts").upsert({
     user_name: ME, email: MY_EMAIL, entry_date: target,
     focus: deriveFocus(MANUAL_DRAFT), exercises: MANUAL_DRAFT,
+    archived: false, completed_at: null,
   }, { onConflict: "email,entry_date" });
+  if (error) { console.error("could not save the manual workout", error); toast("Couldn't save that plan. Try again."); return; }
   PLAN_FOR_DATE = null;
   WORKOUT_MODE = forToday ? null : "week";
   clearDraft();
   await loadAll();
   await loadTodayWorkout();
-  renderWorkoutTab();
+  if (forToday) FRESH_PLAN_ID = TODAY_WORKOUT?.id || null;
+  renderWorkoutTab({ respectMode: true });
   toast(forToday ? "Workout plan saved" : "Added to that day");
 }
 
@@ -13557,8 +13759,12 @@ function renderPlanPreview() {
   const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
   const total = TODAY_WORKOUT.exercises.length;
 
-  const started = doneCount > 0;
-  const finished = doneCount >= total && total > 0;
+  /* A plan made moments ago is untouched even when it happens to name something
+     already logged this morning, so it keeps its grips, its remove buttons and
+     Regenerate. Without this a regenerated plan could arrive locked. */
+  const fresh = !!FRESH_PLAN_ID && FRESH_PLAN_ID === TODAY_WORKOUT.id;
+  const started = doneCount > 0 && !fresh;
+  const finished = doneCount >= total && total > 0 && !fresh;
 
   const rows = TODAY_WORKOUT.exercises.map((ex, i) => {
     const isDone = loggedNow.has(ex.name.toLowerCase());
@@ -13569,7 +13775,7 @@ function renderPlanPreview() {
       <div class="ex-body">
         <div class="ex-name">${escapeHtml(ex.name)}</div>
         <div class="ex-target">${ex.sets} sets · ${ex.reps} reps</div>
-        ${ex.note ? `<div class="ex-note">${escapeHtml(ex.note)}</div>` : ""}
+        ${ex.note ? `<div class="ex-note">${escapeHtml(humanizeNoteDates(ex.note))}</div>` : ""}
       </div>
       ${isDone ? "" : `<button type="button" class="wp-chip" data-plan-swap="${i}" aria-label="Swap ${escapeHtml(ex.name)}">${icon("swap", 15)}</button>`}
       ${started ? "" : `<button type="button" class="row-btn" data-remove-plan="${i}" title="Remove">${icon("close", 13)}</button>`}
@@ -13641,7 +13847,7 @@ function renderPlanPreview() {
     ], ADD_EX_STATE);
     $("planAddExConfirmBtn").onclick = async () => {
       const name = $("planAddExName").value.trim();
-      if (!name) return;
+      if (!name) { toast("Give it a name first"); $("planAddExName").focus(); return; }
       TODAY_WORKOUT.exercises.push({ name, sets: ADD_EX_STATE.sets, reps: ADD_EX_STATE.reps, targetWeight: ADD_EX_STATE.weight || 0 });
       await sb.from("ai_workouts").update({ exercises: TODAY_WORKOUT.exercises }).eq("email", MY_EMAIL).eq("entry_date", todayStr());
       ADD_EX_STATE.sets = 3; ADD_EX_STATE.reps = 8; ADD_EX_STATE.weight = 0;
@@ -13655,7 +13861,19 @@ function renderPlanPreview() {
   // These three are mutually exclusive depending on how far the workout got.
   if ($("planPrivacyBtn")) $("planPrivacyBtn").onclick = openWorkoutPrivacy;
   if ($("planStartBtn")) $("planStartBtn").onclick = startWorkout;
-  if ($("planRegenBtn")) $("planRegenBtn").onclick = () => generateWorkout();
+  /* Regenerate overwrites today's row outright, so it says what goes with it.
+     There is no undo once the new plan is written. */
+  if ($("planRegenBtn")) {
+    $("planRegenBtn").onclick = async () => {
+      const ok = await askConfirm({
+        heading: "Regenerate this plan",
+        body: `${displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises)} and its ${total} exercise${total === 1 ? "" : "s"} are replaced, including anything you added, swapped or reordered. There is no way back to it.`,
+        ok: "Regenerate",
+        cancel: "Keep this plan",
+      });
+      if (ok) generateWorkout();
+    };
+  }
   if ($("planNewBtn")) $("planNewBtn").onclick = startFreshWorkout;
 }
 
@@ -13666,6 +13884,16 @@ function renderPlanPreview() {
    and the ones assisting (secondary, half credit). First match wins, so put
    more specific phrases above broader ones. */
 const MUSCLE_RULES = [
+  /* Conditioning moves people type by name. Above the cardio block because the
+     broad rules would otherwise take them: "mountain climber" reads as climbing,
+     "box jump" as jumping. None of these are in the exercise library. */
+  { match: ["burpee"], primary: ["quads", "chest"], secondary: ["shoulders", "abs", "triceps"] },
+  { match: ["box jump", "jump squat", "broad jump"], primary: ["quads", "glutes"], secondary: ["calves", "hamstrings"] },
+  { match: ["battle rope"], primary: ["shoulders", "abs"], secondary: ["biceps", "forearms"] },
+  { match: ["turkish get up", "get-up"], primary: ["shoulders", "abs"], secondary: ["obliques", "glutes", "triceps"] },
+  { match: ["mountain climber"], primary: ["abs", "shoulders"], secondary: ["obliques", "quads"] },
+  // A walking lunge is a lunge. Only the word "walking" puts it near the cardio rules.
+  { match: ["walking lunge"], primary: ["quads"], secondary: ["glutes", "hamstrings"] },
   // Class and cardio activities. These come first so "Pilates core work" is
   // read as Pilates rather than falling through to an abs-isolation rule.
   { match: ["pilates", "reformer"], primary: ["abs", "obliques", "glutes"], secondary: ["lowerback", "quads", "hamstrings", "shoulders"] },
@@ -13701,15 +13929,16 @@ const MUSCLE_RULES = [
   { match: ["romanian deadlift", "rdl", "stiff leg"], primary: ["hamstrings"], secondary: ["glutes", "lowerback"] },
   { match: ["deadlift"], primary: ["hamstrings", "glutes", "lowerback"], secondary: ["traps", "forearms", "lats"] },
   { match: ["back extension", "hyperextension", "good morning"], primary: ["lowerback"], secondary: ["hamstrings", "glutes"] },
+  // Above the squat rule: a leg press calf raise is calf work done on a leg press.
+  { match: ["calf", "tibialis", "toe raise"], primary: ["calves"], secondary: [] },
   { match: ["squat", "leg press", "lunge", "step up", "step-up", "bulgarian"], primary: ["quads"], secondary: ["glutes", "hamstrings"] },
   { match: ["leg extension"], primary: ["quads"], secondary: [] },
   { match: ["leg curl", "hamstring curl", "nordic"], primary: ["hamstrings"], secondary: [] },
-  { match: ["calf", "tibialis", "toe raise"], primary: ["calves"], secondary: [] },
   { match: ["lat pulldown", "pulldown", "pull-up", "pullup", "chin-up", "chinup"], primary: ["lats"], secondary: ["biceps", "forearms"] },
   { match: ["upright row"], primary: ["shoulders", "traps"], secondary: ["biceps"] },
   { match: ["row"], primary: ["lats"], secondary: ["biceps", "traps", "shoulders"] },
   { match: ["shrug"], primary: ["traps"], secondary: ["forearms"] },
-  { match: ["face pull", "rear delt", "reverse fly", "reverse flye"], primary: ["shoulders"], secondary: ["traps"] },
+  { match: ["face pull", "rear delt", "reverse fly", "reverse flye", "reverse pec deck"], primary: ["shoulders"], secondary: ["traps"] },
   { match: ["lateral raise", "front raise", "arnold", "overhead press", "military press", "ohp", "shoulder press", "push press"], primary: ["shoulders"], secondary: ["triceps", "traps"] },
   // Before the chest rules: a close grip bench is a triceps lift, an incline curl a
   // biceps one, and "grip" alone must not catch a wide grip bench press.
@@ -13719,18 +13948,66 @@ const MUSCLE_RULES = [
   { match: ["incline"], primary: ["chest", "shoulders"], secondary: ["triceps"] },
   { match: ["bench", "chest press", "push-up", "pushup", "dip", "fly", "flye", "pec deck", "crossover"], primary: ["chest"], secondary: ["triceps", "shoulders"] },
   { match: ["tricep", "pushdown", "skull crusher", "overhead extension", "kickback", "french press"], primary: ["triceps"], secondary: [] },
-  { match: ["forearm", "farmer", "grip"], primary: ["forearms"], secondary: [] },
+  // Above the grip rule, so a snatch-grip pull is read as a pull and not as grip work.
   { match: ["swing", "clean", "snatch", "thruster"], primary: ["glutes", "hamstrings"], secondary: ["shoulders", "lowerback", "traps"] },
+  { match: ["forearm", "farmer", "grip"], primary: ["forearms"], secondary: [] },
   { match: ["russian twist", "side bend", "oblique", "woodchop", "wood chop", "side plank"], primary: ["obliques"], secondary: ["abs"] },
   { match: ["plank", "crunch", "sit-up", "situp", "leg raise", "knee raise", "hanging", "toes to bar", "dead bug", "ab wheel", "rollout", "ab ", "abs", "core", "hollow"], primary: ["abs"], secondary: ["obliques"] },
 ];
 
 const MUSCLE_GROUPS = ["chest", "shoulders", "traps", "lats", "lowerback", "biceps", "triceps", "forearms", "abs", "obliques", "glutes", "quads", "hamstrings", "calves"];
 
+/* Every library exercise already states the muscles it works, so a name the library
+   knows is answered from the library and never re-derived from the words in it. The
+   keyword rules are the fallback for free text somebody typed. Built lazily because
+   EXERCISE_TRAININGS arrives from a dynamic import after first paint. */
+let LIBRARY_MUSCLES = null;
+let LIBRARY_MUSCLES_FOR = -1;
+function libraryMuscles() {
+  if (LIBRARY_MUSCLES && LIBRARY_MUSCLES_FOR === EXERCISE_TRAININGS.length) return LIBRARY_MUSCLES;
+  LIBRARY_MUSCLES_FOR = EXERCISE_TRAININGS.length;
+  LIBRARY_MUSCLES = new Map();
+  for (const t of EXERCISE_TRAININGS) {
+    for (const c of t.categories || []) {
+      for (const ex of c.exercises || []) {
+        const key = normalizeSearch(ex.name);
+        if (key && !LIBRARY_MUSCLES.has(key)) {
+          LIBRARY_MUSCLES.set(key, { match: [], primary: ex.primary || [], secondary: ex.secondary || [] });
+        }
+      }
+    }
+  }
+  return LIBRARY_MUSCLES;
+}
+
+/* Keyword matching is word aware. A bare substring test read "crunch" as a run,
+   "Crow Pose" as a row and "Butterfly Pose" as a fly. Separators are levelled first
+   so "Pull Up", "Pull-up" and "Pullup" all match one keyword, and plural or gerund
+   endings still count ("burpees", "crunches", "walking"). */
+const MUSCLE_KEYWORD_RE = new Map();
+function muscleWords(s) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+function muscleKeywordHit(words, joined, keyword) {
+  let re = MUSCLE_KEYWORD_RE.get(keyword);
+  if (re === undefined) {
+    const k = muscleWords(keyword);
+    re = k ? new RegExp(`\\b${k.replace(/ /g, "\\s")}(?:e?s|ing|ed|er|ers)?\\b`) : null;
+    MUSCLE_KEYWORD_RE.set(keyword, re);
+  }
+  if (!re) return false;
+  // A joined spelling ("pullup") has no boundary to find the spaced keyword by.
+  return re.test(words) || joined === muscleWords(keyword).replace(/ /g, "");
+}
+
 function classifyMuscles(exerciseName) {
-  const n = exerciseName.toLowerCase();
+  const raw = String(exerciseName || "");
+  const known = libraryMuscles().get(normalizeSearch(raw));
+  if (known) return known;
+  const words = muscleWords(raw);
+  const joined = words.replace(/ /g, "");
   for (const rule of MUSCLE_RULES) {
-    if (rule.match.some((k) => n.includes(k))) return rule;
+    if (rule.match.some((k) => muscleKeywordHit(words, joined, k))) return rule;
   }
   return null;
 }
@@ -13922,7 +14199,9 @@ function renderBodyTab(animate = false) {
   BODY_LAST_KEY = key;
 
   document.querySelectorAll("#biPeriod button").forEach((b) => b.classList.toggle("active", b.dataset.period === BODY_PERIOD));
-  $("biHead").textContent = "Muscles Hit";
+  /* Rewritten whole, dot included: setting textContent here used to delete the
+     info dot the wire-up had put inside this heading, on the first render. */
+  $("biHead").innerHTML = `Muscles Hit <span id="biLevelsInfo">${infoDot("muscleLevels", "What low, medium and high mean")}</span>`;
 
   renderBodyList(ranked, animate);
   renderBodyRings(ranked, animate);
@@ -13932,18 +14211,34 @@ function renderBodyTab(animate = false) {
   renderBodyShare();
 }
 
+/* Three empty windows, not one. Last week is closed, so nothing you do now can
+   fill it and the nudge would be a lie. A day marked as rest is a decision the
+   rest of the app credits, so this one stops reading as an omission. */
+function bodyEmptyLine() {
+  if (BODY_PERIOD === "lastweek") return "Nothing was logged last week.";
+  if (BODY_PERIOD === "today" && todayEntryFor(MY_EMAIL)?.rest_day) {
+    return "Rest day. Nothing logged, and that is the point. Streak kept.";
+  }
+  return `Nothing logged ${bodyPeriodWord(BODY_PERIOD)} yet. Finish a session and the muscles you hit light up here.`;
+}
+
 function renderBodyList(ranked, animate) {
   const el = $("biList");
   el.classList.toggle("no-anim", !animate);
   const top = ranked.slice(0, 5);
   if (!top.length) {
-    el.innerHTML = `<div class="bi-empty">Nothing logged ${bodyPeriodWord(BODY_PERIOD)} yet. Finish a session and the muscles you hit light up here.</div>`;
+    el.innerHTML = `<div class="bi-empty">${escapeHtml(bodyEmptyLine())}</div>`;
     return;
   }
   el.innerHTML = top.map((m) =>
     `<button type="button" class="bi-row" data-group="${m.key}" style="--heat:${bodyHeatColor(m.pct)}">
       <div class="bi-row-top"><span class="bi-row-name">${escapeHtml(m.label)}</span><span class="bi-row-level">${bodyImpactLevel(m.pct)}${icon("chevronRight", 13)}</span></div>
-    </button>`).join("");
+    </button>`).join("")
+    // The list is a top five under a heading that reads as all of them, and ten
+    // groups can have work, so say how many are not shown.
+    + (ranked.length > top.length
+      ? `<div class="bi-empty">Top ${top.length} of ${ranked.length} groups with work ${bodyPeriodWord(BODY_PERIOD)}.</div>`
+      : "");
 }
 
 function renderBodyRings(ranked, animate) {
@@ -14308,6 +14603,7 @@ function bodyClearFocusUI() {
   $("biRings").classList.remove("hide");
   $("biPieces").classList.remove("show");
   $("biSectionTitle").textContent = "Training Impact";
+  $("biInfoSlot").innerHTML = infoDot("impact", "What training impact means");
 }
 
 /* Leaving the tab and returning is an arrival: the zoom, the isolated muscle
@@ -14382,7 +14678,7 @@ function renderBodyDetail() {
   // Left column: the tapped muscle itself.
   const heads = (piece.heads || []).map((h) => {
     const hp = pctOf(h);
-    return `<span class="bi-chip ${hp > 0 ? "hit" : ""}" style="--heat:${heatOf(h)}">${escapeHtml(detail.MUSCLE_HEADS[h].label)}${hp > 0 ? ` · ${Math.round(hp * 100)}%` : ""}</span>`;
+    return `<span class="bi-chip ${hp > 0 ? "hit" : ""}" style="--heat:${heatOf(h)}">${escapeHtml(detail.MUSCLE_HEADS[h].label)} · ${hp > 0 ? `${Math.round(hp * 100)}%` : "Not hit"}</span>`;
   }).join("");
   const hits = [...(hitBy[f.muscle]?.values() || [])].sort((a, b) => b.sets * b.weight - a.sets * a.weight).slice(0, 4);
   $("biDetail").innerHTML = `
@@ -14401,12 +14697,19 @@ function renderBodyDetail() {
     ${heads ? `<div class="bi-detail-label">Parts</div><div class="bi-chips">${heads}</div>` : ""}
     <div class="bi-detail-label">${sets > 0 ? "Hit by" : "Try"}</div>
     ${sets > 0
-      ? hits.map((h) => `<div class="bi-hit"><span class="bi-hit-name">${escapeHtml(h.name)}</span><span class="bi-hit-sets ${h.weight < 1 ? "assist" : ""}">${bodyFmtSets(h.sets)}</span></div>`).join("")
+      /* Counted, not logged. The headline is weighted (a helping muscle earns half),
+         so a row printing its raw set count made the list contradict the total above
+         it. An assisting row now shows both numbers and the rows add up again. */
+      ? hits.map((h) => `<div class="bi-hit"><span class="bi-hit-name">${escapeHtml(h.name)}</span><span class="bi-hit-sets ${h.weight < 1 ? "assist" : ""}">${
+          h.weight < 1 ? `${bodyFmtSets(h.sets * h.weight)} of ${Math.round(h.sets * 10) / 10}` : bodyFmtSets(h.sets)}</span></div>`).join("")
       : `<div class="bi-try"><b>${escapeHtml(piece.try)}</b> targets it directly.</div>`}`;
 
   // Below: every piece of the same group, hit or not.
   const pieces = detail.PIECES_BY_GROUP[piece.group] || [];
   $("biSectionTitle").textContent = `${groupLabel}, piece by piece`;
+  // The rings are off screen in focus mode, so the dot beside this heading has to
+  // explain pieces rather than rings.
+  $("biInfoSlot").innerHTML = infoDot("pieces", "What the pieces of a muscle are");
   $("biPieces").innerHTML = pieces.map((k) => {
     const p = detail.MUSCLE_PIECES[k];
     const pp = pctOf(k);
@@ -14711,26 +15014,30 @@ function hexPath(cx, cy, r) {
 
 let BODY_PHOTOS = [];
 
+/* Progress photos are the most private thing in the app and nothing opts into
+   sharing them, so only your own rows are ever fetched. The server side of this
+   is the body_photos RLS policy; this is the client half. */
 async function loadBodyPhotos() {
-  const { data } = await sb.from("body_photos").select("*").order("taken_on", { ascending: false });
+  const { data } = await sb.from("body_photos").select("*")
+    .eq("email", MY_EMAIL)
+    .order("taken_on", { ascending: false });
   BODY_PHOTOS = data || [];
 }
 
 async function renderBodyPhotos() {
-  const email = viewedEmail();
   const mine = PROGRESS_VIEW === "me";
-  const shots = BODY_PHOTOS.filter((p) => p.email === email);
+  // Photos are yours alone, so the partner view has no card at all rather than
+  // an empty one implying there is something to share.
+  $("cardPhotos").classList.toggle("hidden", !mine);
+  if (!mine) return;
+  const shots = BODY_PHOTOS.filter((p) => p.email === MY_EMAIL);
 
-  $("addBodyPhotoBtn").classList.toggle("hidden", !mine);
-  $("photoHint").textContent = mine
-    ? "One photo a day. Swipe back to see how far you've come."
-    : `${partnerName()}'s progress photos.`;
+  $("addBodyPhotoBtn").classList.remove("hidden");
+  $("photoHint").textContent = "One photo a day. Swipe back to see how far you've come.";
 
   const strip = $("bodyPhotoStrip");
   if (!shots.length) {
-    strip.innerHTML = mine
-      ? emptyState("camera", "No progress photos yet", "One a day. In a month you'll see the difference.")
-      : emptyState("camera", "Nothing shared yet", `${partnerName()} hasn't added progress photos.`);
+    strip.innerHTML = emptyState("camera", "No progress photos yet", "One a day. In a month you'll see the difference.");
     return;
   }
   const urls = await Promise.all(shots.map((s) => signedProofUrl(s.path)));
