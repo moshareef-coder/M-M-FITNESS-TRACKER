@@ -781,9 +781,15 @@ function logsFromHistory(history, today) {
  *
  * @param {object} payload  what index.html POSTs, optionally widened with
  *                          `logs` (exercise_logs rows) and `plans` (ai_workouts)
- * @returns {{ workout: object, honest: string|null, meta: object }}
+ * @param {boolean} [opts.includePlan]  also return the whole week this day was
+ *                          cut from. Off by default, because the edge function
+ *                          sends its return straight down the wire and the plan
+ *                          is twenty times the size of the day. On, it is the
+ *                          only way to see the week and the day from one call,
+ *                          which is what engine-lab.html exists to show.
+ * @returns {{ workout: object, honest: string|null, meta: object, plan?: object }}
  */
-export function generateFromPayload(payload = {}, { today = new Date() } = {}) {
+export function generateFromPayload(payload = {}, { today = new Date(), includePlan = false } = {}) {
   let step = "start";
   try {
     step = "mapGoal";
@@ -881,6 +887,9 @@ export function generateFromPayload(payload = {}, { today = new Date() } = {}) {
     return {
       workout,
       honest: plan.honest?.message || null,
+      /* Same object the day was cut from, not a second build of it, so a lab
+         showing both can never show a week the day did not come out of. */
+      ...(includePlan ? { plan } : {}),
       meta: {
         level: plan.level,
         /* Which parameter set really ran, "_default" included. A plan that came

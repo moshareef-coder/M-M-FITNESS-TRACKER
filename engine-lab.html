@@ -1,0 +1,944 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fit Together Engine Lab</title>
+<link rel="icon" href="/icon-192.png">
+<style>
+/* Sibling of sandbox.html, same workbench, different subject. The sandbox runs
+   the app on fake data; this runs the engine on a made up person. Tokens are
+   copied from there on purpose so the two tools read as one family. */
+:root {
+  --ground: #eceef1;
+  --panel: #ffffff;
+  --sunk: #f4f6f8;
+  --line: #dce0e6;
+  --line-soft: #e8ebef;
+  --ink: #151a21;
+  --ink-2: #49515d;
+  --mut: #79828f;
+  --me: #2d6bff;
+  --warn: #b8860b;
+  --ok: #1c9c52;
+  --bad: #c8442f;
+  --rail: 320px;
+  --r: 10px;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; font-family: var(--sans); color: var(--ink);
+  background: var(--ground); font-size: 14px; line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+
+.wrap { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); height: 100dvh; }
+.rail {
+  background: var(--panel); border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+}
+.stage { min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+
+/* ---------- rail ---------- */
+.brand { padding: 15px 16px 12px; border-bottom: 1px solid var(--line-soft); }
+.brand h1 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+.brand p { margin: 3px 0 0; font-size: 12px; color: var(--mut); }
+.railbody { flex: 1; min-height: 0; overflow: auto; padding: 4px 14px 28px; }
+
+.sec { padding: 14px 0 4px; border-bottom: 1px solid var(--line-soft); }
+.sec:last-child { border-bottom: 0; }
+.sec > h2 {
+  margin: 0 0 9px; font-size: 11px; font-weight: 650; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--mut);
+}
+.sec .hint { margin: -4px 0 9px; font-size: 11.5px; color: var(--mut); line-height: 1.4; }
+
+.row { display: flex; gap: 8px; margin-bottom: 9px; }
+.row > label { flex: 1; min-width: 0; }
+label > span {
+  display: block; font-size: 11.5px; color: var(--ink-2); margin-bottom: 4px; font-weight: 550;
+}
+select, input[type="number"], input[type="date"] {
+  width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); font-size: 13px;
+}
+select:focus-visible, input:focus-visible, button:focus-visible {
+  outline: 2px solid var(--me); outline-offset: 1px;
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 999px;
+  padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--ink-2);
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+.chip:hover { background: var(--sunk); }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.chip.warn[aria-pressed="true"] { background: var(--warn); border-color: var(--warn); }
+.chip.sore[aria-pressed="true"] { background: var(--bad); border-color: var(--bad); }
+
+.presets { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.presets button {
+  border: 1px solid var(--line); background: var(--sunk); border-radius: 8px;
+  padding: 7px 8px; font-size: 12px; font-weight: 550; cursor: pointer; text-align: left;
+  line-height: 1.25; transition: border-color .12s ease, background .12s ease;
+}
+.presets button:hover { background: var(--panel); border-color: var(--me); color: var(--me); }
+
+/* ---------- stage head ---------- */
+.head {
+  border-bottom: 1px solid var(--line); background: var(--panel);
+  padding: 12px 20px 0; display: flex; flex-direction: column; gap: 11px;
+}
+.summary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.summary .day {
+  font-size: 17px; font-weight: 650; letter-spacing: -0.01em; margin-right: 3px;
+}
+.tag {
+  font-size: 11.5px; font-weight: 550; padding: 2px 8px; border-radius: 999px;
+  background: var(--sunk); border: 1px solid var(--line); color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.tag b { font-weight: 650; color: var(--ink); }
+.tag.good { background: color-mix(in srgb, var(--ok) 10%, #fff); border-color: color-mix(in srgb, var(--ok) 30%, #fff); color: #14713b; }
+.tag.warn { background: color-mix(in srgb, var(--warn) 12%, #fff); border-color: color-mix(in srgb, var(--warn) 32%, #fff); color: #7a5a08; }
+.tag.bad  { background: color-mix(in srgb, var(--bad) 10%, #fff);  border-color: color-mix(in srgb, var(--bad) 30%, #fff);  color: #93301f; }
+
+.tabs { display: flex; gap: 2px; }
+.tabs button {
+  border: 0; background: transparent; padding: 8px 12px; border-radius: 8px 8px 0 0;
+  font-size: 13px; font-weight: 550; color: var(--ink-2); cursor: pointer;
+  border-bottom: 2px solid transparent; transition: color .12s ease, border-color .12s ease;
+}
+.tabs button:hover { color: var(--ink); }
+.tabs button[aria-selected="true"] { color: var(--me); border-bottom-color: var(--me); }
+
+.panelbody { flex: 1; min-height: 0; overflow: auto; padding: 18px 20px 60px; }
+.panelbody > .pane { display: none; }
+.panelbody > .pane.on { display: block; }
+
+/* ---------- cards ---------- */
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 14px 16px; margin-bottom: 14px;
+}
+.card > h3 {
+  margin: 0 0 4px; font-size: 13px; font-weight: 650;
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+}
+.card > h3 .sub { font-size: 11.5px; font-weight: 450; color: var(--mut); }
+.card > p { margin: 0 0 10px; font-size: 12.5px; color: var(--ink-2); }
+.card > p:last-child { margin-bottom: 0; }
+
+.grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+
+/* ---------- exercise rows ---------- */
+.ex { display: flex; align-items: flex-start; gap: 11px; padding: 9px 0; border-top: 1px solid var(--line-soft); }
+.ex:first-of-type { border-top: 0; }
+.ex .n { flex: 1; min-width: 0; }
+.ex .n b { font-weight: 600; font-size: 13.5px; }
+.ex .n .meta { font-size: 11.5px; color: var(--mut); margin-top: 1px; }
+.ex .n .note { font-size: 11.5px; color: var(--warn); margin-top: 2px; }
+.ex .sr {
+  text-align: right; font-variant-numeric: tabular-nums; font-size: 12.5px;
+  color: var(--ink-2); white-space: nowrap;
+}
+.ex .sr b { font-size: 14px; color: var(--ink); font-weight: 650; }
+.ex .sr .w { display: block; font-size: 11.5px; color: var(--mut); }
+.alts { margin: 2px 0 0; padding: 0; list-style: none; font-size: 11.5px; color: var(--mut); }
+.alts li { padding: 1px 0; }
+.alts li b { font-weight: 550; color: var(--ink-2); }
+
+/* ---------- volume table ---------- */
+table.vol { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.vol th {
+  text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--mut); font-weight: 650; padding: 0 8px 6px 0;
+}
+table.vol td { padding: 4px 8px 4px 0; border-top: 1px solid var(--line-soft); vertical-align: middle; }
+table.vol td.num { font-variant-numeric: tabular-nums; text-align: right; width: 46px; }
+.bar { position: relative; height: 7px; border-radius: 999px; background: var(--sunk); min-width: 90px; }
+.bar i { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--me); }
+.bar i.under { background: var(--warn); }
+.bar i.over { background: var(--bad); }
+.bar u {
+  position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink);
+  opacity: .45; border-radius: 2px;
+}
+
+/* ---------- seven days ---------- */
+.days { display: flex; flex-direction: column; gap: 8px; }
+.dayrow {
+  display: flex; align-items: center; gap: 12px; padding: 10px 13px;
+  border: 1px solid var(--line); border-radius: var(--r); background: var(--panel);
+}
+.dayrow.rest { background: var(--sunk); border-style: dashed; }
+.dayrow .when { width: 108px; flex: none; font-size: 12px; color: var(--mut); font-variant-numeric: tabular-nums; }
+.dayrow .what { flex: 1; min-width: 0; }
+.dayrow .what b { font-size: 13.5px; font-weight: 600; }
+.dayrow .what .list { font-size: 11.5px; color: var(--mut); margin-top: 1px; }
+.dayrow .why { font-size: 11.5px; color: var(--ink-2); max-width: 300px; text-align: right; }
+
+/* ---------- misc ---------- */
+ul.why { margin: 0; padding-left: 17px; font-size: 12.5px; color: var(--ink-2); }
+ul.why li { padding: 1px 0; }
+pre.json {
+  margin: 0; font-family: var(--mono); font-size: 11.5px; line-height: 1.5;
+  background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 12px 14px; overflow: auto; max-height: 60vh; color: var(--ink-2);
+}
+.empty { color: var(--mut); font-size: 12.5px; font-style: italic; }
+.err {
+  background: color-mix(in srgb, var(--bad) 8%, #fff); border: 1px solid color-mix(in srgb, var(--bad) 35%, #fff);
+  color: #93301f; border-radius: var(--r); padding: 12px 14px; font-size: 13px;
+  font-family: var(--mono); white-space: pre-wrap;
+}
+@media (max-width: 880px) {
+  .wrap { grid-template-columns: 1fr; height: auto; }
+  .rail { border-right: 0; border-bottom: 1px solid var(--line); }
+  .railbody { max-height: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside class="rail">
+    <div class="brand">
+      <h1>Engine Lab</h1>
+      <p>Dial in a person, see the week they get. Runs the real engine in this tab.</p>
+    </div>
+    <div class="railbody" id="rail"></div>
+  </aside>
+
+  <main class="stage">
+    <div class="head">
+      <div class="summary" id="summary"></div>
+      <div class="tabs" id="tabs" role="tablist"></div>
+    </div>
+    <div class="panelbody" id="panels"></div>
+  </main>
+</div>
+
+<script type="module">
+/* The lab imports the engine directly. No build step, no API call, no key:
+   the same .mjs files the edge function runs are ES modules, so a browser can
+   run them as-is. That is the whole trick, and it is why this page costs
+   nothing to use and can never drift from what ships. */
+import { generateFromPayload } from "./mo-knowledge/engine/adapter.mjs";
+import { MUSCLE_GROUPS } from "./mo-knowledge/engine/focus.mjs";
+import { EQUIPMENT_OPTIONS } from "./mo-knowledge/engine/limits.mjs";
+import { JOINTS } from "./mo-knowledge/engine/joint-load.mjs";
+import { TRAININGS } from "./knowledge/exercise-library/index.mjs";
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, html) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (html != null) n.innerHTML = html;
+  return n;
+};
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const titleCase = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1);
+
+const GROUP_LABEL = {
+  chest: "Chest", shoulders: "Shoulders", traps: "Traps", lats: "Lats", lowerback: "Lower back",
+  biceps: "Biceps", triceps: "Triceps", forearms: "Forearms", abs: "Abs", obliques: "Obliques",
+  glutes: "Glutes", quads: "Quads", hamstrings: "Hamstrings", calves: "Calves",
+};
+const label = (g) => GROUP_LABEL[g] || titleCase(g);
+
+const DAY_MS = 86400000;
+const iso = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+
+/* One real exercise per muscle group, taken from the library rather than typed
+   here, so "trained shoulders yesterday" writes a log the engine will actually
+   credit to shoulders. A name invented for this page would be classified by
+   nothing and would silently prove the opposite of what the toggle claims. */
+const PICK_FOR_GROUP = (() => {
+  const out = {};
+  for (const t of TRAININGS) {
+    for (const cat of t.categories || []) {
+      for (const ex of cat.exercises || []) {
+        for (const g of ex.primary || []) {
+          if (!out[g] && ex.equipment !== "none") out[g] = ex.name;
+        }
+      }
+    }
+  }
+  return out;
+})();
+
+/* Enough distinct names to make a history look like training rather than one
+   lift repeated for six months, which is a different person entirely. */
+const HISTORY_POOL = ["chest", "lats", "quads", "shoulders", "hamstrings", "biceps", "triceps", "glutes"]
+  .map((g) => PICK_FOR_GROUP[g]).filter(Boolean);
+
+/* ------------------------------------------------------------------ *
+ * State
+ * ------------------------------------------------------------------ */
+const S = {
+  bubble: "build-muscle",
+  child: "",
+  legacyGoal: "Build muscle",
+  weight: 195,
+  sex: "Male",
+  days: 4,
+  history: "months",
+  soreYesterday: [],
+  focus: [],
+  hurts: [],
+  missing: [],
+  today: iso(new Date()),
+  askFocus: "",
+  lastDone: "",
+};
+
+let TREE = null;
+let LAST = null;
+let TAB = "today";
+
+/* ------------------------------------------------------------------ *
+ * Scenario to payload
+ * ------------------------------------------------------------------ */
+
+/* A history the training-age module can actually read: dated sessions going
+   back, not a pile of personal bests. "none" really means none, which is the
+   day one plan and the case most likely to be wrong in a way nobody notices. */
+function makeHistory(kind, today) {
+  if (kind === "none") return [];
+  const weeks = kind === "weeks" ? 3 : kind === "months" ? 26 : 78;
+  const perWeek = 3;
+  const logs = [];
+  for (let w = weeks; w >= 1; w--) {
+    for (let s = 0; s < perWeek; s++) {
+      const date = iso(new Date(today.getTime() - (w * 7 + s * 2) * DAY_MS));
+      for (let i = 0; i < 3; i++) {
+        const name = HISTORY_POOL[(w * perWeek + s + i) % HISTORY_POOL.length];
+        logs.push({ entry_date: date, exercise_name: name, sets: 3, reps: 8, weight: 95 + ((w + i) % 6) * 10 });
+      }
+    }
+  }
+  return logs;
+}
+
+/* The toggles say "I trained this yesterday", so they have to write a session
+   big enough to count. recovery.mjs ignores anything under two credited sets,
+   deliberately, so a one set token would toggle nothing and look broken. */
+function soreLogs(groups, today) {
+  const date = iso(new Date(today.getTime() - DAY_MS));
+  return groups
+    .map((g) => PICK_FOR_GROUP[g])
+    .filter(Boolean)
+    .map((name) => ({ entry_date: date, exercise_name: name, sets: 4, reps: 10, weight: 100 }));
+}
+
+function buildPayload() {
+  const today = new Date(S.today + "T12:00:00");
+  const logs = [...makeHistory(S.history, today), ...soreLogs(S.soreYesterday, today)];
+  return {
+    payload: {
+      goal: S.legacyGoal,
+      goal_bubble: S.bubble || undefined,
+      goal_child: S.child || undefined,
+      current_weight: S.weight || null,
+      sex: S.sex || null,
+      challenge_target: S.days,
+      focus_groups: S.focus,
+      focus_chosen_at: S.focus.length ? new Date(today.getTime() - DAY_MS).toISOString() : null,
+      limits: { hurts: S.hurts, missing: S.missing, note: null },
+      logs,
+      /* The row the app writes when you finish a workout. This is what the
+         rotation actually reads: without one it falls back to guessing the
+         last day from the logs, which is the weaker of the two paths and not
+         the one most people are on. */
+      plans: S.lastDone
+        ? [{ focus: S.lastDone, entry_date: iso(new Date(today.getTime() - DAY_MS)), completed_at: new Date(today.getTime() - DAY_MS).toISOString() }]
+        : [],
+      focus: S.askFocus || undefined,
+    },
+    today,
+  };
+}
+
+function run() {
+  const { payload, today } = buildPayload();
+  try {
+    LAST = { ...generateFromPayload(payload, { today, includePlan: true }), payload, today, error: null };
+  } catch (err) {
+    LAST = { error: err.message || String(err), payload, today };
+  }
+  render();
+}
+
+/* ------------------------------------------------------------------ *
+ * The rail
+ * ------------------------------------------------------------------ */
+/* The two in the middle are a matched pair on purpose. Same person, same point
+   in the rotation, one of them trained their chest and shoulders yesterday.
+   Flipping between them is the fastest way to see recovery.mjs working, which
+   is the thing that was broken and is the thing hardest to trust from a diff. */
+const BASE = { bubble: "build-muscle", child: "", legacyGoal: "Build muscle", history: "months", days: 4, soreYesterday: [], focus: [], hurts: [], missing: [], weight: 195, sex: "Male", askFocus: "", lastDone: "" };
+const PRESETS = {
+  "First timer": { ...BASE, history: "none", days: 3, weight: 180 },
+  "Mid-week, fresh": { ...BASE, lastDone: "Lower body B" },
+  "Same day, but sore": { ...BASE, lastDone: "Lower body B", soreYesterday: ["chest", "shoulders", "triceps"] },
+  "Bad shoulder": { ...BASE, hurts: ["shoulder"] },
+  "Home, nothing": { ...BASE, bubble: "consistent", legacyGoal: "Stay consistent", history: "weeks", days: 3, missing: ["none"], weight: 170, sex: "Female" },
+  "Wants arms": { ...BASE, bubble: "tone-lean-abs", legacyGoal: "Recomp (lose fat, gain muscle)", focus: ["biceps", "triceps", "abs"], weight: 175 },
+  "Strong, 6 days": { ...BASE, bubble: "get-stronger", legacyGoal: "Get stronger", history: "years", days: 6, weight: 210 },
+  "Asked for legs": { ...BASE, bubble: "lose-weight", legacyGoal: "Lose weight", weight: 205, sex: "Female", askFocus: "Legs" },
+};
+
+function chipRow(list, selected, onToggle, cls) {
+  const box = el("div", "chips");
+  for (const item of list) {
+    const key = typeof item === "string" ? item : item.key;
+    const text = typeof item === "string" ? label(item) : item.label;
+    const b = el("button", "chip" + (cls ? " " + cls : ""), esc(text));
+    b.type = "button";
+    b.setAttribute("aria-pressed", selected.includes(key) ? "true" : "false");
+    b.onclick = () => { onToggle(key); run(); };
+    box.appendChild(b);
+  }
+  return box;
+}
+
+/* The day names change with the split, so this list is read off the week that
+   was just built rather than hard coded. A rotation control offering "Push
+   day" to somebody on a full body split would be lying about the engine. */
+function refreshLastDone() {
+  const sel = $("lastDoneSel");
+  if (!sel) return;
+  const names = (LAST?.plan?.week || []).map((d) => d.name);
+  /* Deliberately never clears the current pick, even when this week does not
+     hold that day. The rail renders against the previous result, so validating
+     against it silently threw away a preset's choice before the run that would
+     have made it valid. A focus no day matches is already handled: the
+     rotation ignores that row and reads the logs instead. */
+  const options = names.includes(S.lastDone) || !S.lastDone ? names : [S.lastDone, ...names];
+  sel.innerHTML = "";
+  const none = el("option", null, "Nothing yet");
+  none.value = "";
+  sel.appendChild(none);
+  for (const n of options) {
+    const o = el("option", null, esc(n) + (names.includes(n) ? "" : " (not in this week)"));
+    o.value = n;
+    if (n === S.lastDone) o.selected = true;
+    sel.appendChild(o);
+  }
+}
+
+function section(title, hint) {
+  const s = el("section", "sec");
+  s.appendChild(el("h2", null, esc(title)));
+  if (hint) s.appendChild(el("p", "hint", esc(hint)));
+  return s;
+}
+
+function renderRail() {
+  const rail = $("rail");
+  rail.innerHTML = "";
+
+  // Presets
+  const pre = section("Start from");
+  const grid = el("div", "presets");
+  for (const [name, patch] of Object.entries(PRESETS)) {
+    const b = el("button", null, esc(name));
+    b.type = "button";
+    b.onclick = () => { Object.assign(S, patch); renderRail(); run(); };
+    grid.appendChild(b);
+  }
+  pre.appendChild(grid);
+  rail.appendChild(pre);
+
+  // Goal
+  const goal = section("Goal", "The nine bubbles from goal-tree.json. The child is the clarifier under it.");
+  const gr = el("div", "row");
+  const bl = el("label", null, "<span>Bubble</span>");
+  const bsel = el("select");
+  for (const b of (TREE?.bubbles || [])) {
+    const o = el("option", null, esc(b.label));
+    o.value = b.id;
+    if (b.id === S.bubble) o.selected = true;
+    bsel.appendChild(o);
+  }
+  bsel.onchange = () => {
+    S.bubble = bsel.value;
+    S.child = "";
+    const b = (TREE?.bubbles || []).find((x) => x.id === S.bubble);
+    if (b?.mapsTo) S.legacyGoal = b.mapsTo;
+    renderRail(); run();
+  };
+  bl.appendChild(bsel);
+  gr.appendChild(bl);
+  goal.appendChild(gr);
+
+  const kids = (TREE?.bubbles || []).find((b) => b.id === S.bubble)?.children || [];
+  const cl = el("label", null, "<span>Child</span>");
+  const csel = el("select");
+  const none = el("option", null, "Bubble default");
+  none.value = "";
+  csel.appendChild(none);
+  for (const c of kids) {
+    const o = el("option", null, esc(c.label));
+    o.value = c.id;
+    if (c.id === S.child) o.selected = true;
+    csel.appendChild(o);
+  }
+  csel.onchange = () => { S.child = csel.value; run(); };
+  cl.appendChild(csel);
+  goal.appendChild(cl);
+  rail.appendChild(goal);
+
+  // Person
+  const person = section("Person");
+  const pr = el("div", "row");
+  const wl = el("label", null, "<span>Weight (lb)</span>");
+  const wi = el("input");
+  wi.type = "number"; wi.value = S.weight; wi.min = 80; wi.max = 500;
+  wi.onchange = () => { S.weight = Number(wi.value) || null; run(); };
+  wl.appendChild(wi);
+  const sl = el("label", null, "<span>Sex</span>");
+  const ss = el("select");
+  for (const v of ["Male", "Female", ""]) {
+    const o = el("option", null, v || "Not given");
+    o.value = v;
+    if (v === S.sex) o.selected = true;
+    ss.appendChild(o);
+  }
+  ss.onchange = () => { S.sex = ss.value; run(); };
+  sl.appendChild(ss);
+  pr.appendChild(wl); pr.appendChild(sl);
+  person.appendChild(pr);
+
+  const pr2 = el("div", "row");
+  const dl = el("label", null, "<span>Days a week</span>");
+  const ds = el("select");
+  for (let d = 2; d <= 6; d++) {
+    const o = el("option", null, String(d));
+    o.value = d;
+    if (d === S.days) o.selected = true;
+    ds.appendChild(o);
+  }
+  ds.onchange = () => { S.days = Number(ds.value); run(); };
+  dl.appendChild(ds);
+  const hl = el("label", null, "<span>Trained for</span>");
+  const hs = el("select");
+  for (const [v, t] of [["none", "Never"], ["weeks", "3 weeks"], ["months", "6 months"], ["years", "18 months"]]) {
+    const o = el("option", null, t);
+    o.value = v;
+    if (v === S.history) o.selected = true;
+    hs.appendChild(o);
+  }
+  hs.onchange = () => { S.history = hs.value; run(); };
+  hl.appendChild(hs);
+  pr2.appendChild(dl); pr2.appendChild(hl);
+  person.appendChild(pr2);
+
+  const tl = el("label", null, "<span>Today is</span>");
+  const ti = el("input");
+  ti.type = "date"; ti.value = S.today;
+  ti.onchange = () => { S.today = ti.value; run(); };
+  tl.appendChild(ti);
+  person.appendChild(tl);
+  rail.appendChild(person);
+
+  // Sore
+  const sore = section("Trained yesterday", "Writes a real four-set session, so the generator has to route around it.");
+  sore.appendChild(chipRow(MUSCLE_GROUPS, S.soreYesterday, (g) => {
+    S.soreYesterday = S.soreYesterday.includes(g) ? S.soreYesterday.filter((x) => x !== g) : [...S.soreYesterday, g];
+    renderRail();
+  }, "sore"));
+  rail.appendChild(sore);
+
+  // Focus
+  const focus = section("Wants to focus on", "The body picker's tap. Extra volume, not a different week.");
+  focus.appendChild(chipRow(MUSCLE_GROUPS, S.focus, (g) => {
+    S.focus = S.focus.includes(g) ? S.focus.filter((x) => x !== g) : [...S.focus, g];
+    renderRail();
+  }));
+  rail.appendChild(focus);
+
+  // Last completed session
+  const last = section("Last session you finished", "The row the app writes on Finish. This is what the rotation counts from.");
+  const ll = el("label");
+  const lsel = el("select");
+  lsel.id = "lastDoneSel";
+  lsel.onchange = () => { S.lastDone = lsel.value; run(); };
+  ll.appendChild(lsel);
+  last.appendChild(ll);
+  rail.appendChild(last);
+  refreshLastDone();
+
+  // Asked for a day
+  const ask = section("Asked for a specific day", "Beats the rotation when the week holds a day that answers it.");
+  const al = el("label");
+  const asel = el("select");
+  for (const v of ["", "Push", "Pull", "Legs", "Upper", "Full body"]) {
+    const o = el("option", null, v || "Let it rotate");
+    o.value = v;
+    if (v === S.askFocus) o.selected = true;
+    asel.appendChild(o);
+  }
+  asel.onchange = () => { S.askFocus = asel.value; run(); };
+  al.appendChild(asel);
+  ask.appendChild(al);
+  rail.appendChild(ask);
+
+  // Limits
+  const hurt = section("It hurts", "Joints, not muscles. Rules movements out of both libraries.");
+  hurt.appendChild(chipRow(JOINTS, S.hurts, (j) => {
+    S.hurts = S.hurts.includes(j) ? S.hurts.filter((x) => x !== j) : [...S.hurts, j];
+    renderRail();
+  }, "warn"));
+  rail.appendChild(hurt);
+
+  const gear = section("Does not have");
+  gear.appendChild(chipRow(EQUIPMENT_OPTIONS, S.missing, (k) => {
+    S.missing = S.missing.includes(k) ? S.missing.filter((x) => x !== k) : [...S.missing, k];
+    renderRail();
+  }, "warn"));
+  rail.appendChild(gear);
+}
+
+/* ------------------------------------------------------------------ *
+ * The stage
+ * ------------------------------------------------------------------ */
+const TABS = [
+  ["today", "The day"],
+  ["week", "The week"],
+  ["seven", "Seven days"],
+  ["why", "Why"],
+  ["json", "In and out"],
+];
+
+function renderTabs() {
+  const box = $("tabs");
+  box.innerHTML = "";
+  for (const [key, text] of TABS) {
+    const b = el("button", null, esc(text));
+    b.type = "button";
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", TAB === key ? "true" : "false");
+    b.onclick = () => { TAB = key; render(); };
+    box.appendChild(b);
+  }
+}
+
+function renderSummary() {
+  const box = $("summary");
+  box.innerHTML = "";
+  if (!LAST || LAST.error) { box.appendChild(el("span", "day", "Engine error")); return; }
+  const m = LAST.meta;
+  box.appendChild(el("span", "day", esc(LAST.workout.focus)));
+  box.appendChild(el("span", "tag", `<b>${esc(titleCase(m.level))}</b>`));
+  box.appendChild(el("span", "tag", `<b>${m.days}</b> days a week`));
+  box.appendChild(el("span", "tag", `${LAST.workout.exercises.length} exercises`));
+  const conf = m.confidence === "none" ? "bad" : m.confidence === "low" ? "warn" : "good";
+  box.appendChild(el("span", `tag ${conf}`, `confidence <b>${esc(m.confidence)}</b>`));
+  if (m.focusHonoured) box.appendChild(el("span", "tag good", "asked for this day"));
+  if (m.limits.excludedCount) box.appendChild(el("span", "tag warn", `<b>${m.limits.excludedCount}</b> ruled out`));
+  box.appendChild(el("span", "tag", `goal from <b>${esc(m.goalSource)}</b>`));
+}
+
+function exerciseRows(list, { alts = true } = {}) {
+  const box = el("div");
+  for (const ex of list) {
+    const row = el("div", "ex");
+    const n = el("div", "n");
+    n.appendChild(el("b", null, esc(ex.name)));
+    const bits = [];
+    if (ex.group) bits.push(label(ex.group));
+    if (ex.equipment) bits.push(ex.equipment);
+    if (ex.restSec) bits.push(`${ex.restSec}s rest`);
+    if (bits.length) n.appendChild(el("div", "meta", esc(bits.join(" · "))));
+    if (ex.note) n.appendChild(el("div", "note", esc(ex.note)));
+    if (alts && ex.alternatives?.length) {
+      const ul = el("ul", "alts");
+      for (const a of ex.alternatives) ul.appendChild(el("li", null, `<b>${esc(a.name)}</b> &mdash; ${esc(a.why)}`.replace("&mdash;", "&middot;")));
+      n.appendChild(ul);
+    }
+    const sr = el("div", "sr");
+    sr.innerHTML = `<b>${ex.sets} &times; ${ex.reps}</b>`;
+    const w = ex.targetWeight ?? ex.weight;
+    sr.appendChild(el("span", "w", w ? `${w} lb` : (ex.loadBasis === "bodyweight" ? "bodyweight" : "log it")));
+    row.appendChild(n);
+    row.appendChild(sr);
+    box.appendChild(row);
+  }
+  return box;
+}
+
+function paneToday() {
+  const p = el("div", "pane" + (TAB === "today" ? " on" : ""));
+  const c = el("div", "card");
+  c.appendChild(el("h3", null, `${esc(LAST.workout.focus)} <span class="sub">what the app receives and shows</span>`));
+  if (LAST.honest) c.appendChild(el("p", null, esc(LAST.honest)));
+  c.appendChild(exerciseRows(LAST.workout.exercises));
+  p.appendChild(c);
+
+  const day = LAST.plan.week.find((d) => d.name === LAST.workout.focus);
+  if (day) {
+    const t = el("div", "card");
+    t.appendChild(el("h3", null, `Time and shape <span class="sub">before anyone opens the app</span>`));
+    t.appendChild(el("p", null, `Budgeted ${day.minutes} minutes, estimated ${day.estimatedMinutes}. Main groups: ${day.mainGroups.map(label).join(", ") || "none"}.`));
+    p.appendChild(t);
+  }
+  return p;
+}
+
+function paneWeek() {
+  const p = el("div", "pane" + (TAB === "week" ? " on" : ""));
+  const grid = el("div", "grid2");
+  for (const d of LAST.plan.week) {
+    const c = el("div", "card");
+    const isToday = d.name === LAST.workout.focus;
+    c.appendChild(el("h3", null, `${esc(d.name)} ${isToday ? '<span class="tag good">today</span>' : ""} <span class="sub">${d.estimatedMinutes} of ${d.minutes} min</span>`));
+    c.appendChild(exerciseRows(d.exercises, { alts: false }));
+    grid.appendChild(c);
+  }
+  p.appendChild(grid);
+
+  if (LAST.plan.dayNotes?.length) {
+    const c = el("div", "card");
+    c.appendChild(el("h3", null, "Notes on the week"));
+    const ul = el("ul", "why");
+    for (const n of LAST.plan.dayNotes) ul.appendChild(el("li", null, esc(typeof n === "string" ? n : JSON.stringify(n))));
+    c.appendChild(ul);
+    p.appendChild(c);
+  }
+  return p;
+}
+
+/* Seven calendar days, generated one at a time, each one seeing the sessions
+   the ones before it wrote. This is the view that shows rotation and recovery
+   doing their job: nothing here is scripted, every row is a real call. */
+function paneSeven() {
+  const p = el("div", "pane" + (TAB === "seven" ? " on" : ""));
+  const base = LAST.today;
+  const start = { ...buildPayload().payload };
+  const logs = [...(start.logs || [])];
+  /* Starts from whatever the rail says was finished last, so day one of the
+     seven is the same answer the other tabs are showing, not a fresh start. */
+  const plans = [...(start.plans || [])];
+
+  // Spread the sessions across the week rather than stacking them at the front.
+  const trainOn = new Set();
+  for (let i = 0; i < S.days; i++) trainOn.add(Math.round((i * 7) / S.days));
+
+  const box = el("div", "days");
+  for (let i = 0; i < 7; i++) {
+    const when = new Date(base.getTime() + i * DAY_MS);
+    const row = el("div", "dayrow" + (trainOn.has(i) ? "" : " rest"));
+    const stamp = when.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    row.appendChild(el("div", "when", esc(stamp)));
+
+    let out = null;
+    try {
+      out = generateFromPayload({ ...start, logs, plans }, { today: when, includePlan: true });
+    } catch (err) {
+      row.appendChild(el("div", "what", `<b>Failed</b><div class="list">${esc(err.message)}</div>`));
+      box.appendChild(row);
+      continue;
+    }
+
+    const what = el("div", "what");
+    what.appendChild(el("b", null, esc(out.workout.focus)));
+    what.appendChild(el("div", "list", esc(out.workout.exercises.map((e) => e.name).join(", "))));
+    row.appendChild(what);
+
+    const held = out.plan.week
+      .find((d) => d.name === out.workout.focus)?.mainGroups?.map(label).join(", ") || "";
+    row.appendChild(el("div", "why", trainOn.has(i)
+      ? esc(`trains ${held}`)
+      : esc(`would offer ${out.workout.focus}, resting instead`)));
+
+    if (trainOn.has(i)) {
+      const date = iso(when);
+      for (const ex of out.workout.exercises) {
+        logs.push({ entry_date: date, exercise_name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.targetWeight ?? null });
+      }
+      plans.push({ focus: out.workout.focus, entry_date: date, completed_at: when.toISOString() });
+    }
+    box.appendChild(row);
+  }
+  p.appendChild(box);
+
+  const note = el("div", "card");
+  note.appendChild(el("h3", null, "What this is"));
+  note.appendChild(el("p", null, "Seven real generate calls, one per day, each one handed the sessions the days before it wrote. Solid rows are days this person trains; dashed rows show what they would have been offered if they opened the app anyway. If a split repeats too soon, it shows up here."));
+  p.appendChild(note);
+  return p;
+}
+
+function paneWhy() {
+  const p = el("div", "pane" + (TAB === "why" ? " on" : ""));
+  const plan = LAST.plan;
+  const m = LAST.meta;
+
+  // Goal
+  const g = el("div", "card");
+  g.appendChild(el("h3", null, `Goal <span class="sub">bubble, child, and the parameters they set</span>`));
+  const gp = plan.goal?.params || {};
+  g.appendChild(el("p", null, esc(
+    `Bubble ${plan.goal?.bubble || "?"}, child ${m.childUsed || "none"}, emphasis ${gp.emphasis || "?"}. ` +
+    `Reps ${gp.repRange ? gp.repRange.join(" to ") : "?"}, rest ${gp.restSec ?? "?"}s, sets factor ${gp.setsFactor ?? "?"}, ` +
+    `session ${gp.sessionMin ?? "?"} min, ${gp.minDays ?? "?"} to ${gp.maxDays ?? "?"} days. ` +
+    `Priority: ${(gp.priority || []).map(label).join(", ") || "even"}.`)));
+  if (gp.cardio?.sessions) {
+    g.appendChild(el("p", null, esc(`Cardio: ${gp.cardio.sessions} session a week, ${gp.cardio.minutes} minutes, ${gp.cardio.zone}.`)));
+  }
+  if (LAST.honest) g.appendChild(el("p", null, esc(LAST.honest)));
+  p.appendChild(g);
+
+  // Level
+  const lv = el("div", "card");
+  lv.appendChild(el("h3", null, `Experience <span class="sub">read from the logs, not asked for</span>`));
+  const ta = plan.trainingAge || {};
+  lv.appendChild(el("p", null, esc(
+    `${titleCase(plan.level)}, confidence ${ta.confidence || "none"}. ` +
+    `${ta.sessions ?? 0} sessions over ${ta.weeksTraining ?? 0} weeks, about ${ta.sessionsPerWeek ?? 0} a week.` +
+    (ta.daysSinceLast != null ? ` Last one ${ta.daysSinceLast} day${ta.daysSinceLast === 1 ? "" : "s"} ago.` : "") +
+    (ta.returning ? " Reads as returning after a break." : "") +
+    (ta.restarting ? " Reads as restarting." : ""))));
+  /* The module explains itself in prose and cites the research file it came
+     from. Printing that verbatim beats anything this page could paraphrase. */
+  if (ta.why?.length) {
+    const ul = el("ul", "why");
+    for (const w of ta.why) ul.appendChild(el("li", null, esc(w)));
+    lv.appendChild(ul);
+  }
+  if (m.missing?.length) {
+    lv.appendChild(el("p", null, "Working without: " + esc(m.missing.join("; ")) + "."));
+  }
+  p.appendChild(lv);
+
+  // Focus
+  const f = el("div", "card");
+  f.appendChild(el("h3", null, `Focus <span class="sub">what was asked for against what it bought</span>`));
+  f.appendChild(el("p", null, esc(
+    `Requested: ${m.focus.requested.map(label).join(", ") || "nothing"}. Applied: ${m.focus.applied.map(label).join(", ") || "nothing"}.`)));
+  if (m.focus.why?.length) {
+    const ul = el("ul", "why");
+    for (const w of m.focus.why) ul.appendChild(el("li", null, esc(w)));
+    f.appendChild(ul);
+  }
+  p.appendChild(f);
+
+  // Volume
+  const v = el("div", "card");
+  v.appendChild(el("h3", null, `Weekly volume <span class="sub">sets landed against the target for this goal</span>`));
+  const tbl = el("table", "vol");
+  tbl.innerHTML = "<thead><tr><th>Group</th><th>Sets</th><th>Target</th><th></th></tr></thead>";
+  const tb = el("tbody");
+  const entries = Object.entries(plan.weeklyVolume || {}).sort((a, b) => b[1].sets - a[1].sets);
+  for (const [group, val] of entries) {
+    const tr = el("tr");
+    tr.appendChild(el("td", null, esc(label(group))));
+    tr.appendChild(el("td", "num", String(Math.round(val.sets))));
+    tr.appendChild(el("td", "num", String(Math.round(val.target))));
+    const max = Math.max(val.sets, val.target) * 1.25 || 1;
+    const cls = val.sets < val.target * 0.8 ? "under" : val.sets > val.target * 1.25 ? "over" : "";
+    const cell = el("td");
+    cell.innerHTML = `<div class="bar"><i class="${cls}" style="width:${(val.sets / max) * 100}%"></i><u style="left:${(val.target / max) * 100}%"></u></div>`;
+    tr.appendChild(cell);
+    tb.appendChild(tr);
+  }
+  tbl.appendChild(tb);
+  v.appendChild(tbl);
+  const vn = plan.volumeNotes || {};
+  const noteBits = [];
+  if (vn.under?.length) noteBits.push(`Under target: ${vn.under.map((x) => label(x.group || x)).join(", ")}`);
+  if (vn.over?.length) noteBits.push(`Over target: ${vn.over.map((x) => label(x.group || x)).join(", ")}`);
+  if (vn.timeTrimmed) noteBits.push("Trimmed to fit the time budget");
+  if (noteBits.length) v.appendChild(el("p", null, esc(noteBits.join(". ") + ".")));
+  p.appendChild(v);
+
+  // Limits
+  const lim = el("div", "card");
+  lim.appendChild(el("h3", null, `Limits <span class="sub">what was ruled out and what it cost</span>`));
+  if (!S.hurts.length && !S.missing.length) {
+    lim.appendChild(el("p", "empty", "Nothing declared, so the whole library was available."));
+  } else {
+    lim.appendChild(el("p", null, esc(
+      `Hurts: ${S.hurts.join(", ") || "nothing"}. Missing: ${S.missing.join(", ") || "nothing"}. ` +
+      `${(plan.limits?.excluded || []).length} movements ruled out of ${countLibrary()} in the library.`)));
+    if (plan.limits?.notes?.length) {
+      const ul = el("ul", "why");
+      for (const n of plan.limits.notes) ul.appendChild(el("li", null, esc(typeof n === "string" ? n : JSON.stringify(n))));
+      lim.appendChild(ul);
+    }
+    if (plan.limits?.blocked?.length) {
+      lim.appendChild(el("p", null, "Could not fill: " + esc(plan.limits.blocked.map((b) => (typeof b === "string" ? b : b.slot || JSON.stringify(b))).join(", "))));
+    }
+  }
+  p.appendChild(lim);
+
+  // Progression, plateau, calibration
+  const pr = el("div", "card");
+  pr.appendChild(el("h3", null, `Progression <span class="sub">what happens next week</span>`));
+  pr.appendChild(el("p", null, esc(plan.progression?.detail || plan.progression?.rule || "none")));
+  if (plan.deload) pr.appendChild(el("p", null, esc(typeof plan.deload === "string" ? plan.deload : JSON.stringify(plan.deload))));
+  if (plan.plateau?.summary) pr.appendChild(el("p", null, esc(plan.plateau.summary)));
+  if (plan.calibration?.summary) pr.appendChild(el("p", null, esc(plan.calibration.summary)));
+  p.appendChild(pr);
+
+  return p;
+}
+
+let LIB_COUNT = null;
+function countLibrary() {
+  if (LIB_COUNT == null) {
+    LIB_COUNT = TRAININGS.reduce((n, t) => n + (t.categories || []).reduce((k, c) => k + (c.exercises || []).length, 0), 0);
+  }
+  return LIB_COUNT;
+}
+
+function paneJson() {
+  const p = el("div", "pane" + (TAB === "json" ? " on" : ""));
+  const a = el("div", "card");
+  a.appendChild(el("h3", null, `Payload in <span class="sub">exactly what index.html POSTs</span>`));
+  const payloadForShow = { ...LAST.payload, logs: `[${LAST.payload.logs.length} log rows]` };
+  a.appendChild(el("pre", "json", esc(JSON.stringify(payloadForShow, null, 2))));
+  p.appendChild(a);
+
+  const b = el("div", "card");
+  b.appendChild(el("h3", null, `Workout out <span class="sub">what comes back over the wire</span>`));
+  b.appendChild(el("pre", "json", esc(JSON.stringify({ workout: LAST.workout, honest: LAST.honest, meta: LAST.meta }, null, 2))));
+  p.appendChild(b);
+  return p;
+}
+
+function render() {
+  renderTabs();
+  renderSummary();
+  refreshLastDone();
+  const box = $("panels");
+  box.innerHTML = "";
+  if (!LAST) return;
+  if (LAST.error) {
+    box.appendChild(el("div", "err", esc(LAST.error)));
+    return;
+  }
+  box.appendChild(paneToday());
+  box.appendChild(paneWeek());
+  box.appendChild(paneSeven());
+  box.appendChild(paneWhy());
+  box.appendChild(paneJson());
+}
+
+/* ------------------------------------------------------------------ *
+ * Boot
+ * ------------------------------------------------------------------ */
+fetch("./mo-knowledge/goals/goal-tree.json")
+  .then((r) => r.json())
+  .then((tree) => { TREE = tree; })
+  .catch(() => { TREE = { bubbles: [] }; })
+  .finally(() => { renderRail(); run(); });
+</script>
+</body>
+</html>
