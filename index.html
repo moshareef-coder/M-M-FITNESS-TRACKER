@@ -1634,6 +1634,40 @@
   }
   .proto-cta.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
 
+  /* PROTOTYPE, NOT LIVE: renderBodyFocusPrototype. See the comment above that
+     function. Reuses .proto-flag / .proto-cta / .btn-cta from the goal tiles
+     prototype above, since neither of those is goal-specific. */
+  .proto-body-figures { display: flex; gap: 14px; justify-content: center; margin-top: 6px; }
+  .proto-fig-col { flex: 1 1 0; text-align: center; }
+  .proto-fig-label {
+    font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 6px;
+  }
+  /* Fixed pixel size, not percentage: the zoom/pan clamp math needs a known
+     viewport size, and it has to match the SVG's viewBox aspect (220:440). */
+  .proto-fig-viewport {
+    width: 158px; height: 316px; margin: 0 auto; border-radius: 14px; overflow: hidden;
+    background: var(--panel-2); border: 1px solid var(--border); position: relative;
+    touch-action: none;
+  }
+  .proto-fig-zoom { width: 158px; height: 316px; transform-origin: 0 0; will-change: transform; }
+  svg.proto-figure { width: 100%; height: 100%; display: block; }
+  .proto-mr {
+    fill: var(--panel-2); stroke: var(--border); stroke-width: 1.5; cursor: pointer;
+    transition: fill .16s ease, stroke .16s ease, filter .16s ease;
+  }
+  .proto-mr.on { fill: var(--accent); stroke: transparent; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 55%, transparent)); }
+  .proto-mr-base { fill: var(--panel-2); stroke: var(--border); stroke-width: 1.5; pointer-events: none; }
+  .proto-fig-reset {
+    position: absolute; top: 8px; right: 8px; z-index: 2; font: inherit; font-size: 11px; font-weight: 700;
+    padding: 6px 10px; border-radius: 100px; cursor: pointer; display: none;
+    background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--border); color: var(--text);
+  }
+  .proto-fig-reset.show { display: block; }
+  .proto-body-summary { margin-top: 12px; min-height: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .proto-body-summary b { color: var(--accent-ink); font-weight: 700; }
+  .proto-body-hint { font-size: 12px; color: var(--muted); margin: 0 0 14px; }
+
   .ob-kicker { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--accent-ink); margin-bottom: 8px; }
   .ob-chips { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
   .ob-chip {
@@ -4504,6 +4538,272 @@ function initGoalTiles(grid, ctaBar, ctaBtn) {
   }
 
   render();
+}
+
+/* PROTOTYPE, NOT LIVE. Mo asked for this right after the tiles picker: show
+   the body, front and back side by side, tap a muscle to mark it, and be
+   able to zoom in on one so a small region is actually easy to hit on a
+   phone. Same inert pattern as renderGoalTilesPrototype: real onboarding
+   never calls this, the only caller is the sandbox's own walkthrough. Tracked
+   in issues.json under "Designed, not built".
+
+   The 14 tappable regions carry the exact MUSCLE_GROUPS keys Body Impact
+   already reads (BODY_GROUP_LABELS above), so this is drawn to plug into
+   that data model directly rather than invent a second one. Shoulders
+   appears on both figures (front delts, rear delts); tapping either toggles
+   the same key and both light up together, same for anything bilateral. */
+function renderBodyFocusPrototype() {
+  const ob = $("onboard");
+  ob.classList.remove("hidden");
+  $("app").classList.add("hidden");
+
+  ob.innerHTML = `
+    <div class="ob-step">
+      <span class="proto-flag">${icon("bell", 12)} Prototype, not live</span>
+      <div class="ob-kicker">FOCUS AREAS</div>
+      <h1 class="ob-h1">Which muscles do you want to focus on?</h1>
+      <p class="ob-sub">Tap any area, front or back, to mark it. Pick as many as you want.</p>
+      <p class="proto-body-hint">Double-tap or pinch to zoom in on one for an easier tap. Green means marked.</p>
+      <div class="proto-body-figures" id="protoBodyFigures"></div>
+      <p class="proto-body-summary" id="protoBodySummary"></p>
+      <div class="proto-cta" id="protoBodyCta">
+        <button type="button" class="btn-cta" id="protoBodyCtaBtn">${icon("dumbbell", 22)} Continue
+          <span class="go">${icon("chevronRight", 22)}</span></button>
+      </div>
+    </div>`;
+
+  initBodyFocus($("protoBodyFigures"), $("protoBodySummary"), $("protoBodyCta"), $("protoBodyCtaBtn"));
+  $("protoBodyCtaBtn").onclick = () => toast("Prototype only, not wired into onboarding yet");
+}
+
+/* Stylized, not anatomical: simple rounded shapes over a base silhouette, the
+   same simplification the app's own Rive figure already uses (a plain body
+   with colored regions laid over it, not muscle-shaped cutouts). Coordinates
+   are in a 220x440 viewBox shared by both figures. */
+const PROTO_BODY_VIEW = { w: 220, h: 440 };
+const PROTO_BODY_BASE = [
+  { t: "ellipse", cx: 110, cy: 32, rx: 22, ry: 26 },
+  { t: "rect", x: 98, y: 54, w: 24, h: 18, rx: 6 },
+  { t: "path", d: "M64,74 L156,74 L156,150 L140,210 L80,210 L64,150 Z" },
+  { t: "path", d: "M80,208 L140,208 L148,234 L72,234 Z" },
+  { t: "rect", x: 72, y: 322, w: 28, h: 68, rx: 12 },
+  { t: "rect", x: 120, y: 322, w: 28, h: 68, rx: 12 },
+  { t: "ellipse", cx: 86, cy: 400, rx: 17, ry: 10 },
+  { t: "ellipse", cx: 134, cy: 400, rx: 17, ry: 10 },
+  { t: "ellipse", cx: 48, cy: 222, rx: 10, ry: 12 },
+  { t: "ellipse", cx: 172, cy: 222, rx: 10, ry: 12 },
+];
+const PROTO_BODY_REGIONS_FRONT = [
+  { key: "shoulders", t: "ellipse", cx: 58, cy: 92, rx: 20, ry: 22 },
+  { key: "shoulders", t: "ellipse", cx: 162, cy: 92, rx: 20, ry: 22 },
+  { key: "chest", t: "rect", x: 78, y: 82, w: 64, h: 34, rx: 14 },
+  { key: "biceps", t: "rect", x: 40, y: 108, w: 22, h: 52, rx: 11 },
+  { key: "biceps", t: "rect", x: 158, y: 108, w: 22, h: 52, rx: 11 },
+  { key: "abs", t: "rect", x: 92, y: 122, w: 36, h: 58, rx: 10 },
+  { key: "obliques", t: "rect", x: 70, y: 125, w: 18, h: 50, rx: 8 },
+  { key: "obliques", t: "rect", x: 132, y: 125, w: 18, h: 50, rx: 8 },
+  { key: "forearms", t: "rect", x: 38, y: 164, w: 20, h: 54, rx: 10 },
+  { key: "forearms", t: "rect", x: 162, y: 164, w: 20, h: 54, rx: 10 },
+  { key: "quads", t: "rect", x: 68, y: 232, w: 36, h: 88, rx: 16 },
+  { key: "quads", t: "rect", x: 116, y: 232, w: 36, h: 88, rx: 16 },
+];
+const PROTO_BODY_REGIONS_BACK = [
+  { key: "shoulders", t: "ellipse", cx: 58, cy: 92, rx: 20, ry: 22 },
+  { key: "shoulders", t: "ellipse", cx: 162, cy: 92, rx: 20, ry: 22 },
+  { key: "traps", t: "rect", x: 85, y: 76, w: 50, h: 30, rx: 12 },
+  { key: "lats", t: "rect", x: 66, y: 104, w: 34, h: 60, rx: 14 },
+  { key: "lats", t: "rect", x: 120, y: 104, w: 34, h: 60, rx: 14 },
+  { key: "triceps", t: "rect", x: 40, y: 108, w: 22, h: 52, rx: 11 },
+  { key: "triceps", t: "rect", x: 158, y: 108, w: 22, h: 52, rx: 11 },
+  { key: "lowerback", t: "rect", x: 90, y: 166, w: 40, h: 42, rx: 12 },
+  { key: "glutes", t: "rect", x: 76, y: 210, w: 68, h: 36, rx: 18 },
+  { key: "hamstrings", t: "rect", x: 68, y: 246, w: 36, h: 76, rx: 16 },
+  { key: "hamstrings", t: "rect", x: 116, y: 246, w: 36, h: 76, rx: 16 },
+  { key: "calves", t: "rect", x: 72, y: 326, w: 28, h: 68, rx: 12 },
+  { key: "calves", t: "rect", x: 120, y: 326, w: 28, h: 68, rx: 12 },
+];
+const PROTO_BODY_ORDER = ["chest", "shoulders", "traps", "lats", "lowerback", "biceps", "triceps", "forearms", "abs", "obliques", "glutes", "quads", "hamstrings", "calves"];
+
+/* Zoom is a plain CSS transform on a div wrapping the SVG, not anything
+   inside the SVG's own coordinate space, so region click handlers need zero
+   changes: the browser maps pointer coordinates through CSS transforms on
+   its own. Two independent zoom states, one per figure, so zooming into the
+   front view never disturbs the back one.
+
+   Gesture model: double-tap zooms toward the tapped point (or fully back out
+   if already zoomed), pinch zooms continuously toward the pinch midpoint,
+   and a single finger pans but ONLY once already zoomed in, so a plain touch
+   at rest never fights the page's own vertical scroll. A pan past a small
+   threshold sets suppressClick so the drag that ended the gesture cannot
+   also toggle whatever region it landed on. */
+function initBodyFocus(figuresEl, summaryEl, ctaBar, ctaBtn) {
+  const VIEW_W = 158, VIEW_H = 316;
+  const MIN_SCALE = 1, MAX_SCALE = 3, ZOOM_STEP = 2.2;
+  const picked = new Set();
+
+  function shapeAttrs(s) {
+    if (s.t === "ellipse") return `cx="${s.cx}" cy="${s.cy}" rx="${s.rx}" ry="${s.ry}"`;
+    if (s.t === "rect") return `x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="${s.rx}"`;
+    return "";
+  }
+  function shapeTag(s) { return s.t === "ellipse" ? "ellipse" : s.t === "rect" ? "rect" : "path"; }
+  function shapeEl(s, cls, key) {
+    const dk = key ? ` data-key="${key}"` : "";
+    if (s.t === "path") return `<path d="${s.d}" class="${cls}"${dk}/>`;
+    return `<${shapeTag(s)} ${shapeAttrs(s)} class="${cls}"${dk}/>`;
+  }
+  function hitPad(s) {
+    if (s.t === "ellipse") return { t: "ellipse", cx: s.cx, cy: s.cy, rx: s.rx + 4, ry: s.ry + 4 };
+    if (s.t === "rect") return { t: "rect", x: s.x - 4, y: s.y - 4, w: s.w + 8, h: s.h + 8, rx: s.rx + 4 };
+    return null;
+  }
+
+  function buildSvg(regions) {
+    const base = PROTO_BODY_BASE.map((s) => shapeEl(s, "proto-mr-base")).join("");
+    const overlay = regions.map((r) => {
+      const pad = hitPad(r);
+      const padHtml = pad ? `<${shapeTag(pad)} ${shapeAttrs(pad)} fill="transparent" stroke="none"/>` : "";
+      return `<g data-key="${r.key}">${padHtml}${shapeEl(r, "proto-mr", r.key)}</g>`;
+    }).join("");
+    return `<svg class="proto-figure" viewBox="0 0 ${PROTO_BODY_VIEW.w} ${PROTO_BODY_VIEW.h}" xmlns="http://www.w3.org/2000/svg">${base}${overlay}</svg>`;
+  }
+
+  function clampPan(st) {
+    const minTx = VIEW_W * (1 - st.scale), minTy = VIEW_H * (1 - st.scale);
+    st.tx = Math.min(0, Math.max(minTx, st.tx));
+    st.ty = Math.min(0, Math.max(minTy, st.ty));
+  }
+  function applyTransform(st) {
+    st.zoomEl.style.transform = `translate(${st.tx}px, ${st.ty}px) scale(${st.scale})`;
+    st.resetBtn.classList.toggle("show", st.scale > 1.01);
+  }
+  function zoomToward(st, anchorX, anchorY, newScale) {
+    newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, newScale));
+    const contentX = (anchorX - st.tx) / st.scale, contentY = (anchorY - st.ty) / st.scale;
+    st.scale = newScale;
+    st.tx = anchorX - contentX * newScale;
+    st.ty = anchorY - contentY * newScale;
+    if (newScale <= 1.001) { st.scale = 1; st.tx = 0; st.ty = 0; }
+    clampPan(st);
+    applyTransform(st);
+  }
+
+  function makeFigure(label, regions) {
+    const col = document.createElement("div");
+    col.className = "proto-fig-col";
+    col.innerHTML = `
+      <div class="proto-fig-label">${escapeHtml(label)}</div>
+      <div class="proto-fig-viewport">
+        <div class="proto-fig-zoom">${buildSvg(regions)}</div>
+        <button type="button" class="proto-fig-reset">Reset zoom</button>
+      </div>`;
+    figuresEl.appendChild(col);
+
+    const viewport = col.querySelector(".proto-fig-viewport");
+    const zoomEl = col.querySelector(".proto-fig-zoom");
+    const resetBtn = col.querySelector(".proto-fig-reset");
+    const st = { scale: 1, tx: 0, ty: 0, zoomEl, resetBtn, pointers: new Map(), lastTap: null, suppressClick: false };
+
+    resetBtn.onclick = () => { st.scale = 1; st.tx = 0; st.ty = 0; applyTransform(st); };
+
+    col.querySelectorAll("[data-key]").forEach((g) => {
+      g.addEventListener("click", () => {
+        if (st.suppressClick) { st.suppressClick = false; return; }
+        const key = g.getAttribute("data-key");
+        if (picked.has(key)) picked.delete(key); else picked.add(key);
+        sync();
+      });
+    });
+
+    function localPoint(e) {
+      const r = viewport.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+    function pinchState() {
+      const pts = [...st.pointers.values()];
+      const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
+      return { dist: Math.hypot(dx, dy) || 0.01, mid: { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } };
+    }
+
+    viewport.addEventListener("pointerdown", (e) => {
+      viewport.setPointerCapture(e.pointerId);
+      const p = localPoint(e);
+      st.pointers.set(e.pointerId, p);
+      if (st.pointers.size === 1) {
+        st.dragStart = { x: p.x, y: p.y, tx: st.tx, ty: st.ty };
+        st.moved = false;
+      } else if (st.pointers.size === 2) {
+        const ps = pinchState();
+        st.pinchStartDist = ps.dist;
+        st.pinchStartScale = st.scale;
+      }
+    });
+
+    viewport.addEventListener("pointermove", (e) => {
+      if (!st.pointers.has(e.pointerId)) return;
+      const p = localPoint(e);
+      st.pointers.set(e.pointerId, p);
+
+      if (st.pointers.size === 2) {
+        const ps = pinchState();
+        const newScale = st.pinchStartScale * (ps.dist / st.pinchStartDist);
+        zoomToward(st, ps.mid.x, ps.mid.y, newScale);
+        st.moved = true;
+      } else if (st.pointers.size === 1 && st.scale > 1.001 && st.dragStart) {
+        const dx = p.x - st.dragStart.x, dy = p.y - st.dragStart.y;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) st.moved = true;
+        st.tx = st.dragStart.tx + dx;
+        st.ty = st.dragStart.ty + dy;
+        clampPan(st);
+        applyTransform(st);
+      }
+    });
+
+    function endPointer(e) {
+      st.pointers.delete(e.pointerId);
+      if (st.pointers.size === 0) {
+        if (st.moved) st.suppressClick = true;
+        else handleTap(localPoint(e));
+        st.dragStart = null;
+      }
+    }
+    viewport.addEventListener("pointerup", endPointer);
+    viewport.addEventListener("pointercancel", endPointer);
+
+    function handleTap(p) {
+      const now = performance.now();
+      const last = st.lastTap;
+      st.lastTap = { x: p.x, y: p.y, t: now };
+      if (last && now - last.t < 320 && Math.hypot(p.x - last.x, p.y - last.y) < 28) {
+        st.lastTap = null;
+        if (st.scale > 1.001) zoomToward(st, p.x, p.y, 1);
+        else zoomToward(st, p.x, p.y, ZOOM_STEP);
+      }
+    }
+
+    return st;
+  }
+
+  function sync() {
+    figuresEl.querySelectorAll(".proto-mr").forEach((el) => {
+      el.classList.toggle("on", picked.has(el.getAttribute("data-key")));
+    });
+    const n = picked.size;
+    if (!n) summaryEl.textContent = "Nothing marked yet.";
+    else {
+      const names = PROTO_BODY_ORDER.filter((k) => picked.has(k)).map((k) => BODY_GROUP_LABELS[k]);
+      summaryEl.innerHTML = "Marked: <b>" + escapeHtml(names.join(", ")) + "</b>";
+    }
+    if (!n) { ctaBar.classList.remove("show"); return; }
+    ctaBar.classList.add("show");
+    ctaBtn.innerHTML = icon("dumbbell", 22) + " Continue with " + n + " area" + (n === 1 ? "" : "s")
+      + '<span class="go">' + icon("chevronRight", 22) + "</span>";
+  }
+
+  figuresEl.innerHTML = "";
+  makeFigure("Front", PROTO_BODY_REGIONS_FRONT);
+  makeFigure("Back", PROTO_BODY_REGIONS_BACK);
+  sync();
 }
 
 function renderOnboardStep(step, data = {}) {

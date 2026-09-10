@@ -47,6 +47,11 @@
         note: "Not the real goal step, which is the one before this. The bubble version that used to live here got opened all the way (all nine categories, 52 bubbles) and stopped being readable, no spacing fix was going to save 52 items on one screen. A follow-up compared three structurally different pickers and Mo picked this one: nine categories always visible as a grid, tap one for its full checklist in a bottom sheet. Multi-select persists across categories. Nothing here writes to the fake database and Continue does not go anywhere, on purpose. Tracked in Open issues under Designed, not built.",
         run: (w) => w.renderGoalTilesPrototype?.() },
 
+      { t: "Body focus (prototype)", scenario: "fresh", flag: "not live",
+        s: "Tap the body, front and back",
+        note: "The follow-up to the goal tiles: show the body and let a person mark which muscles they want to focus on, instead of describing goals in words. Front and back side by side, tap any of the 14 areas to mark it green, the same keys Body Impact already tracks. Double-tap or pinch to zoom in on one, small areas like forearms and obliques are otherwise a tight target on a phone. A reset-zoom pill shows once zoomed. Nothing here writes to the fake database and Continue does not go anywhere, on purpose. Tracked in Open issues under Designed, not built.",
+        run: (w) => w.renderBodyFocusPrototype?.() },
+
       { t: "First look at an empty app", scenario: "fresh",
         s: "No workouts, no partner, no history",
         note: "What a stranger sees on day one. Skip past onboarding first if it is still on screen. This is the state that has never been walked properly end to end, so look hard at the empty cards.",
