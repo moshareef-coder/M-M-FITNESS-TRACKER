@@ -497,6 +497,20 @@
   }
   .sess-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
   .sess-target { font-size: 15.5px; color: var(--muted); }
+  /* The mark to beat, beside the target. Quiet until it is beaten, then it
+     takes the accent, because that is the one moment it is worth looking at. */
+  .sess-best {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700;
+    letter-spacing: -.01em; padding: 5px 10px; border-radius: 100px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+    transition: background .18s ease, border-color .18s ease, color .18s ease;
+  }
+  .sess-best svg { flex-shrink: 0; }
+  .sess-best.beaten {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    color: var(--accent-ink);
+  }
   .sess-note { font-size: 12.5px; color: var(--muted); margin-top: 10px; line-height: 1.45; }
 
 
@@ -5302,6 +5316,29 @@ function personalRecords(name) {
   return { best, prCount, prLogIds };
 }
 
+/* The heaviest you have already done on one movement, from BEFORE today, so it
+   can sit on screen while you lift. Same reading as personalRecords: real
+   weights only, no duration entries, and the first time you ever do something
+   has nothing behind it, so this returns null and the chip stays away rather
+   than showing you a zero to beat.
+
+   Before today rather than before this session on purpose. It keeps the number
+   fixed for the whole workout, so a set you just did cannot quietly move the
+   target you are still chasing. Ties break on reps: same weight for more reps
+   is the better set to be shown. */
+function previousBest(name) {
+  const key = (name || "").trim().toLowerCase();
+  const today = todayStr();
+  let top = null;
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== ME || l.weight == null || l.duration_min) continue;
+    if ((l.exercise_name || "").trim().toLowerCase() !== key) continue;
+    if (!l.entry_date || l.entry_date >= today) continue;
+    if (!top || l.weight > top.weight || (l.weight === top.weight && (l.reps || 0) > (top.reps || 0))) top = l;
+  }
+  return top;
+}
+
 /* ---------- Milestone badges ----------
    Kept forever once earned, unlike the seasonal rank above. Every check below
    reads data that is already loaded rather than asking for anything new, and
@@ -9474,6 +9511,12 @@ function renderSession() {
   }
   const allDone = setsDone.every(Boolean);
 
+  // The number to chase on this movement, and whether this session has already
+  // gone past it. Only weights logged against THIS exercise count toward that.
+  const pb = previousBest(ex.name);
+  const sessionTop = (SESSION.setWeights?.[ei] || []).reduce((m, w) => (w != null && w > m ? w : m), 0);
+  const beatenPB = !!pb && sessionTop > pb.weight;
+
   // The set you are on is the first one not yet done. Only that one is tappable,
   // so sets cannot be ticked out of order or ahead of where you actually are.
   const currentSet = setsDone.findIndex((d) => !d);
@@ -9498,6 +9541,9 @@ function renderSession() {
       <h2 class="sess-name">${escapeHtml(ex.name)}</h2>
       <div class="sess-meta">
         <span class="sess-target">${ex.sets} sets × ${ex.reps} reps</span>
+        ${pb ? `<span class="sess-best${beatenPB ? " beaten" : ""}">${icon("trophy", 13)}${beatenPB
+          ? `Beat it, was ${pb.weight} lb`
+          : `Best ${pb.weight} lb${pb.reps ? ` × ${pb.reps}` : ""}`}</span>` : ""}
       </div>
       ${ex.note ? `<div class="sess-note">${escapeHtml(ex.note)}</div>` : ""}
       ${workingMusclesHTML(ex.name, { who: "me", size: "sm", email: MY_EMAIL })}
