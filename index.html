@@ -517,13 +517,41 @@
   .sess-note { font-size: 12.5px; color: var(--muted); margin-top: 10px; line-height: 1.45; }
 
 
+  /* Rest counts DOWN against a target. Counting up answers "how long have I
+     been standing here", which nobody asks; counting down answers "can I go
+     yet", which is the only question rest raises. Consistent rest is also what
+     makes progressive overload mean anything, so the target is training
+     information rather than decoration.
+     Deliberately a strip and not a ring: a ring implies precision and invites
+     tick marks, gradients and a second progress metaphor competing with the
+     number. A hairline bar cannot. */
   .rest-bar {
-    display: flex; align-items: center; justify-content: center; gap: 12px;
-    background: var(--panel-2); border-radius: 14px; padding: 18px;
+    display: flex; flex-direction: column; gap: 9px;
+    background: var(--panel-2); border-radius: 14px; padding: 14px 16px;
     margin-bottom: 14px;
   }
+  .rest-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
   .rest-label { font-size: 12.5px; font-weight: 800; letter-spacing: .11em; color: var(--muted); }
-  .rest-clock { font-size: 24px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .rest-next {
+    font-size: 12.5px; color: var(--muted); min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .rest-clock {
+    font-size: 34px; font-weight: 800; letter-spacing: -.03em; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .rest-track { height: 2px; border-radius: 2px; background: var(--panel); overflow: hidden; }
+  .rest-fill { height: 100%; width: 100%; background: var(--accent); border-radius: 2px; transition: width 1s linear; }
+  /* Past the target, the only state worth a colour change. */
+  .rest-bar.over .rest-clock { color: var(--up); }
+  .rest-bar.over .rest-fill { background: var(--up); }
+  .rest-adjust { display: flex; gap: 8px; }
+  .rest-adjust button {
+    flex: 1; min-height: 40px; padding: 9px 0; border-radius: 10px; cursor: pointer;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    font-family: inherit; font-size: 13px; font-weight: 700;
+  }
+  .rest-adjust button:active { transform: scale(.96); }
 
   /* Grid, not space-between: "Weight (lb)" is a wider label than "Reps", so
      with flex the two control groups started at different places and the minus
@@ -534,6 +562,11 @@
     padding: 14px 16px; margin-bottom: 12px;
   }
   .sess-field-label { font-size: 17px; font-weight: 700; color: var(--text); }
+  .sess-field-last {
+    display: block; font-size: 12px; font-weight: 500; color: var(--muted);
+    margin-top: 3px; letter-spacing: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   /* The unit rides with the label instead of parenthesised after it, which
      wrapped to a second line on a narrow phone and shoved the row out of line
      with the one below. */
@@ -10605,7 +10638,9 @@ function startWorkout() {
     setsDone: TODAY_WORKOUT.exercises.map((ex) => new Array(ex.sets || 3).fill(false)),
     // Weight is recorded per set, because it commonly climbs across an exercise.
     setWeights: TODAY_WORKOUT.exercises.map((ex) => new Array(ex.sets || 3).fill(null)),
-    weights: TODAY_WORKOUT.exercises.map((ex) => ex.targetWeight ?? ""),
+    // What you lifted last time beats what the plan guessed, because it is
+    // the one number that is evidence rather than a suggestion.
+    weights: TODAY_WORKOUT.exercises.map((ex) => ex.targetWeight ?? lastTimeFor(ex.name)?.weight ?? ""),
     reps: TODAY_WORKOUT.exercises.map((ex) => ex.reps ?? ""),
     completed: TODAY_WORKOUT.exercises.map((ex) => loggedAlready.has(ex.name.toLowerCase())),
   };
@@ -10696,19 +10731,63 @@ function reopenSession() {
 }
 
 let REST_TICKER = null;
+const DEFAULT_REST_SEC = 90;
 
 function formatRest(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+/* Kept with the session, so it survives a reload mid-workout. It changes
+   nothing about what is RECORDED: recordRest still banks the real elapsed
+   rest, whatever the target says. */
+function restTargetSec() {
+  const v = Number(SESSION?.restTargetSec);
+  return Number.isFinite(v) && v > 0 ? v : DEFAULT_REST_SEC;
+}
+
+/* One place decides what the strip says, so the first paint and the ticker can
+   never disagree. Past the target it counts up with a plus rather than sitting
+   on zero, because standing there for four minutes is worth knowing. */
+function restState(ms) {
+  const target = restTargetSec();
+  const left = target - Math.max(0, ms) / 1000;
+  const over = left < 0;
+  return {
+    over,
+    text: over ? `+${formatRest(-left * 1000)}` : formatRest(left * 1000),
+    pct: over ? 0 : Math.max(0, Math.min(1, left / target)),
+  };
+}
+
+function paintRest() {
+  const bar = document.getElementById("restTimer");
+  const clock = document.getElementById("restClock");
+  if (!bar || !clock || !SESSION?.restStartedAt) { stopRestTicker(); return; }
+  const s = restState(Date.now() - SESSION.restStartedAt);
+  clock.textContent = s.text;
+  bar.classList.toggle("over", s.over);
+  const fill = document.getElementById("restFill");
+  if (fill) fill.style.width = `${(s.pct * 100).toFixed(1)}%`;
+  // One buzz as the target lands, once per rest however long you stand there.
+  if (s.over && REST_BUZZED_AT !== SESSION.restStartedAt) {
+    REST_BUZZED_AT = SESSION.restStartedAt;
+    buzz([18, 60, 18]);
+  }
+}
+
+let REST_BUZZED_AT = null;
+
+function adjustRestTarget(delta) {
+  if (!SESSION) return;
+  SESSION.restTargetSec = Math.max(15, restTargetSec() + delta);
+  saveSessionToStorage();
+  paintRest();
+}
+
 function startRestTicker() {
   stopRestTicker();
-  REST_TICKER = setInterval(() => {
-    const el = document.getElementById("restClock");
-    if (!el || !SESSION?.restStartedAt) { stopRestTicker(); return; }
-    el.textContent = formatRest(Date.now() - SESSION.restStartedAt);
-  }, 1000);
+  REST_TICKER = setInterval(paintRest, 1000);
 }
 
 function stopRestTicker() {
@@ -10769,6 +10848,24 @@ function celebrateSet(ei, setIdx) {
     ? `Set ${setIdx + 1} logged: ${w} lb × ${reps}`
     : `Set ${setIdx + 1} logged: ${reps} reps`);
   maybeAnnouncePR(ex.name, w);
+}
+
+/* What you actually did last time on this lift, which is the number worth
+   defaulting to and the number worth showing. The plan's target is a
+   suggestion; this is evidence. Today is excluded, so mid-session sets do not
+   become their own "last time". */
+function lastTimeFor(name) {
+  const key = (name || "").trim().toLowerCase();
+  if (!key) return null;
+  const today = todayStr();
+  let best = null;
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== ME || l.weight == null || l.duration_min) continue;
+    if ((l.exercise_name || "").trim().toLowerCase() !== key) continue;
+    if (l.entry_date >= today) continue;
+    if (!best || l.entry_date > best.entry_date) best = l;
+  }
+  return best ? { weight: best.weight, reps: best.reps ?? null, date: best.entry_date } : null;
 }
 
 /* The heaviest this exercise has ever been logged at, from the same rows
@@ -10866,6 +10963,15 @@ function toggleSet(setIdx) {
   SESSION_JUST_SET = nowDone ? setIdx : null;
 
   if (!SESSION.setWeights) SESSION.setWeights = TODAY_WORKOUT.exercises.map((ex) => new Array(ex.sets || 3).fill(null));
+  /* Logging the next set IS the end of the rest before it, so there is no
+     separate "start set" tap to get back out of resting. Not one app in the
+     category asks you to announce that you are starting. The real elapsed rest
+     is banked here on the way past, exactly as it was before. */
+  if (nowDone && SESSION.restStartedAt) {
+    recordRest(ei, Math.max(0, setIdx - 1));
+    SESSION.restStartedAt = null;
+    stopRestTicker();
+  }
   if (nowDone) {
     // Stamp the set with the weight showing right now, so changing the field
     // for the next set does not rewrite the one already done.
@@ -11001,6 +11107,14 @@ function renderSession() {
   // rest plus the set you were busy doing.
   const resting = !!SESSION.restStartedAt && !allDone;
   const restMs = SESSION.restStartedAt ? Date.now() - SESSION.restStartedAt : 0;
+  const restNow = restState(restMs);
+  /* What is actually next, named. Rest is the one moment in a set cycle when
+     somebody is looking at the phone, and a bare clock wastes it. */
+  const nextUp = currentSet >= 0 && currentSet < setsDone.length
+    ? `set ${currentSet + 1} of ${setsDone.length}`
+    : (ei + 1 < total ? escapeHtml(TODAY_WORKOUT.exercises[ei + 1].name) : "finish");
+
+  const lastTime = lastTimeFor(ex.name);
 
   const exChanged = SESSION_LAST_EX !== ei;
   SESSION_LAST_EX = ei;
@@ -11041,13 +11155,24 @@ function renderSession() {
     </div>
 
     ${resting ? `
-      <div class="rest-bar" id="restTimer">
-        <span class="rest-label">RESTING</span>
-        <span class="rest-clock" id="restClock">${formatRest(restMs)}</span>
+      <div class="rest-bar${restNow.over ? " over" : ""}" id="restTimer">
+        <div class="rest-head">
+          <span class="rest-label">RESTING</span>
+          ${nextUp ? `<span class="rest-next">Next: ${escapeHtml(nextUp)}</span>` : ""}
+        </div>
+        <span class="rest-clock" id="restClock">${restNow.text}</span>
+        <div class="rest-track"><div class="rest-fill" id="restFill" style="width:${(restNow.pct * 100).toFixed(1)}%"></div></div>
+        <div class="rest-adjust">
+          <button type="button" id="restMinus">&minus;15s</button>
+          <button type="button" id="restPlus">+15s</button>
+          <button type="button" id="restSkip">Skip</button>
+        </div>
       </div>` : ""}
 
     <div class="sess-field">
-      <label class="sess-field-label">Weight <span class="sess-field-unit">lb</span></label>
+      <label class="sess-field-label">Weight <span class="sess-field-unit">lb</span>
+        ${lastTime ? `<span class="sess-field-last">Last time ${lastTime.weight}${lastTime.reps ? ` &times; ${lastTime.reps}` : " lb"}</span>` : ""}
+      </label>
       <div class="sess-field-ctl">
         <button type="button" class="round-btn" id="sessWeightMinus" aria-label="Less weight">&minus;</button>
         <input class="sess-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" value="${SESSION.weights[ei] || 0}" />
@@ -11064,9 +11189,7 @@ function renderSession() {
       </div>
     </div>
 
-    ${resting ? `
-      <button type="button" class="btn-big btn-primary" id="startSetBtn">Start set ${currentSet + 1}</button>`
-      : `<button type="button" class="btn-big btn-primary ${allDone ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>`}
+    <button type="button" class="btn-big btn-primary ${allDone ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>
     <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">${ei === total - 1 ? "Finish workout" : "Next exercise"}</button>
     ${(() => {
       const others = TODAY_WORKOUT.exercises
@@ -11085,14 +11208,17 @@ function renderSession() {
   if (resting) startRestTicker();
   else stopRestTicker();
 
+  if ($("restMinus")) $("restMinus").onclick = () => adjustRestTarget(-15);
+  if ($("restPlus")) $("restPlus").onclick = () => adjustRestTarget(15);
+  if ($("restSkip")) $("restSkip").onclick = () => startNextSet(currentSet);
+
   if ($("sessPrivacyBtn")) $("sessPrivacyBtn").onclick = openWorkoutPrivacy;
   if ($("sessSwapBtn")) $("sessSwapBtn").onclick = swapCurrentExercise;
 
   const logBtn = $("logSetBtn");
   if (logBtn) logBtn.onclick = () => { if (currentSet >= 0) toggleSet(currentSet); };
 
-  const startBtn = $("startSetBtn");
-  if (startBtn) startBtn.onclick = () => startNextSet(currentSet);
+
 
   $("sessionBody").querySelectorAll("[data-jump]").forEach((b) => {
     b.onclick = () => jumpToExercise(parseInt(b.dataset.jump, 10));

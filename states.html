@@ -505,13 +505,41 @@
   .sess-note { font-size: 12.5px; color: var(--muted); margin-top: 10px; line-height: 1.45; }
 
 
+  /* Rest counts DOWN against a target. Counting up answers "how long have I
+     been standing here", which nobody asks; counting down answers "can I go
+     yet", which is the only question rest raises. Consistent rest is also what
+     makes progressive overload mean anything, so the target is training
+     information rather than decoration.
+     Deliberately a strip and not a ring: a ring implies precision and invites
+     tick marks, gradients and a second progress metaphor competing with the
+     number. A hairline bar cannot. */
   .rest-bar {
-    display: flex; align-items: center; justify-content: center; gap: 12px;
-    background: var(--panel-2); border-radius: 14px; padding: 18px;
+    display: flex; flex-direction: column; gap: 9px;
+    background: var(--panel-2); border-radius: 14px; padding: 14px 16px;
     margin-bottom: 14px;
   }
+  .rest-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
   .rest-label { font-size: 12.5px; font-weight: 800; letter-spacing: .11em; color: var(--muted); }
-  .rest-clock { font-size: 24px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .rest-next {
+    font-size: 12.5px; color: var(--muted); min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .rest-clock {
+    font-size: 34px; font-weight: 800; letter-spacing: -.03em; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .rest-track { height: 2px; border-radius: 2px; background: var(--panel); overflow: hidden; }
+  .rest-fill { height: 100%; width: 100%; background: var(--accent); border-radius: 2px; transition: width 1s linear; }
+  /* Past the target, the only state worth a colour change. */
+  .rest-bar.over .rest-clock { color: var(--up); }
+  .rest-bar.over .rest-fill { background: var(--up); }
+  .rest-adjust { display: flex; gap: 8px; }
+  .rest-adjust button {
+    flex: 1; min-height: 40px; padding: 9px 0; border-radius: 10px; cursor: pointer;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    font-family: inherit; font-size: 13px; font-weight: 700;
+  }
+  .rest-adjust button:active { transform: scale(.96); }
 
   /* Grid, not space-between: "Weight (lb)" is a wider label than "Reps", so
      with flex the two control groups started at different places and the minus
@@ -522,6 +550,11 @@
     padding: 14px 16px; margin-bottom: 12px;
   }
   .sess-field-label { font-size: 17px; font-weight: 700; color: var(--text); }
+  .sess-field-last {
+    display: block; font-size: 12px; font-weight: 500; color: var(--muted);
+    margin-top: 3px; letter-spacing: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   /* The unit rides with the label instead of parenthesised after it, which
      wrapped to a second line on a narrow phone and shoved the row out of line
      with the one below. */
@@ -4747,6 +4780,14 @@ function renderSession() {
   // rest plus the set you were busy doing.
   const resting = !!SESSION.restStartedAt && !allDone;
   const restMs = SESSION.restStartedAt ? Date.now() - SESSION.restStartedAt : 0;
+  const restNow = restState(restMs);
+  /* What is actually next, named. Rest is the one moment in a set cycle when
+     somebody is looking at the phone, and a bare clock wastes it. */
+  const nextUp = currentSet >= 0 && currentSet < setsDone.length
+    ? `set ${currentSet + 1} of ${setsDone.length}`
+    : (ei + 1 < total ? escapeHtml(TODAY_WORKOUT.exercises[ei + 1].name) : "finish");
+
+  const lastTime = lastTimeFor(ex.name);
 
   const exChanged = SESSION_LAST_EX !== ei;
   SESSION_LAST_EX = ei;
@@ -4787,13 +4828,24 @@ function renderSession() {
     </div>
 
     ${resting ? `
-      <div class="rest-bar" id="restTimer">
-        <span class="rest-label">RESTING</span>
-        <span class="rest-clock" id="restClock">${formatRest(restMs)}</span>
+      <div class="rest-bar${restNow.over ? " over" : ""}" id="restTimer">
+        <div class="rest-head">
+          <span class="rest-label">RESTING</span>
+          ${nextUp ? `<span class="rest-next">Next: ${escapeHtml(nextUp)}</span>` : ""}
+        </div>
+        <span class="rest-clock" id="restClock">${restNow.text}</span>
+        <div class="rest-track"><div class="rest-fill" id="restFill" style="width:${(restNow.pct * 100).toFixed(1)}%"></div></div>
+        <div class="rest-adjust">
+          <button type="button" id="restMinus">&minus;15s</button>
+          <button type="button" id="restPlus">+15s</button>
+          <button type="button" id="restSkip">Skip</button>
+        </div>
       </div>` : ""}
 
     <div class="sess-field">
-      <label class="sess-field-label">Weight <span class="sess-field-unit">lb</span></label>
+      <label class="sess-field-label">Weight <span class="sess-field-unit">lb</span>
+        ${lastTime ? `<span class="sess-field-last">Last time ${lastTime.weight}${lastTime.reps ? ` &times; ${lastTime.reps}` : " lb"}</span>` : ""}
+      </label>
       <div class="sess-field-ctl">
         <button type="button" class="round-btn" id="sessWeightMinus" aria-label="Less weight">&minus;</button>
         <input class="sess-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" value="${SESSION.weights[ei] || 0}" />
@@ -4810,9 +4862,7 @@ function renderSession() {
       </div>
     </div>
 
-    ${resting ? `
-      <button type="button" class="btn-big btn-primary" id="startSetBtn">Start set ${currentSet + 1}</button>`
-      : `<button type="button" class="btn-big btn-primary ${allDone ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>`}
+    <button type="button" class="btn-big btn-primary ${allDone ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>
     <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">${ei === total - 1 ? "Finish workout" : "Next exercise"}</button>
     ${(() => {
       const others = TODAY_WORKOUT.exercises
@@ -4831,14 +4881,17 @@ function renderSession() {
   if (resting) startRestTicker();
   else stopRestTicker();
 
+  if ($("restMinus")) $("restMinus").onclick = () => adjustRestTarget(-15);
+  if ($("restPlus")) $("restPlus").onclick = () => adjustRestTarget(15);
+  if ($("restSkip")) $("restSkip").onclick = () => startNextSet(currentSet);
+
   if ($("sessPrivacyBtn")) $("sessPrivacyBtn").onclick = openWorkoutPrivacy;
   if ($("sessSwapBtn")) $("sessSwapBtn").onclick = swapCurrentExercise;
 
   const logBtn = $("logSetBtn");
   if (logBtn) logBtn.onclick = () => { if (currentSet >= 0) toggleSet(currentSet); };
 
-  const startBtn = $("startSetBtn");
-  if (startBtn) startBtn.onclick = () => startNextSet(currentSet);
+
 
   $("sessionBody").querySelectorAll("[data-jump]").forEach((b) => {
     b.onclick = () => jumpToExercise(parseInt(b.dataset.jump, 10));
