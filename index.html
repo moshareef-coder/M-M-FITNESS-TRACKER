@@ -2694,6 +2694,49 @@
   .nx-chip.easy i, .nx-chip.rest i { color: inherit; opacity: .75; }
   .nx-none { font-size: 12.5px; color: var(--muted); }
 
+  /* Weight trend: the answer above the chart, the window under it, the
+     readings below that. Same order every comparable app arrived at, because
+     a line on its own does not tell you whether it is going the right way. */
+  .wt-stats { display: flex; margin: 0 0 14px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .wt-stat { flex: 1; padding: 11px 4px; text-align: center; min-width: 0; }
+  .wt-stat + .wt-stat { border-left: 1px solid var(--border); }
+  .wt-stat b {
+    display: block; font-size: 21px; font-weight: 800; letter-spacing: -.03em;
+    font-family: var(--font-display); line-height: 1.15; font-variant-numeric: tabular-nums;
+  }
+  .wt-stat span { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .wt-stat.good b { color: var(--accent-ink); }
+  .wt-stat.warn b { color: var(--warn); }
+
+  .legend .dash { display: inline-block; width: 14px; height: 0; border-top: 1.5px dashed var(--muted); vertical-align: middle; margin-right: 5px; }
+  .wt-range { display: flex; gap: 6px; margin-top: 12px; }
+  .wt-pill {
+    flex: 1; padding: 7px 0; border-radius: 9px; cursor: pointer; font-family: inherit;
+    background: var(--panel-2); border: 1px solid transparent; color: var(--muted);
+    font-size: 12.5px; font-weight: 700;
+  }
+  .wt-pill.on { background: var(--text); color: var(--bg); }
+  .wt-pill:active { transform: scale(.97); }
+
+  .wt-history { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 4px; }
+  .wt-history-head { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); padding: 10px 0 4px; }
+  .wt-row {
+    width: 100%; display: flex; align-items: baseline; gap: 12px; padding: 10px 0;
+    border-bottom: 1px solid var(--border); background: none; border-left: 0; border-right: 0; border-top: 0;
+    color: var(--text); font-family: inherit; text-align: left; cursor: pointer;
+  }
+  .wt-row:last-child { border-bottom: none; }
+  .wt-row:active { background: var(--panel-2); }
+  .wt-row-d { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wt-row-w { font-size: 15.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .wt-row-w i { font-style: normal; font-size: 11px; font-weight: 600; color: var(--muted); margin-left: 3px; }
+  .wt-row-x {
+    width: 52px; text-align: right; font-size: 12.5px; font-weight: 700;
+    font-variant-numeric: tabular-nums; color: var(--muted);
+  }
+  .wt-row-x.down { color: var(--accent-ink); }
+  .wt-row-x.up { color: var(--warn); }
+
   .bi-share { display: flex; align-items: center; gap: 12px; }
   .bi-share .av { width: 44px; height: 44px; font-size: 15.5px; border-width: 2px; cursor: default; }
   .bi-share-text { flex: 1; min-width: 0; }
@@ -3170,11 +3213,11 @@
 
     <div class="card metric-card" id="cardWeight">
       <h2>Weight trend</h2>
+      <div class="wt-stats" id="weightStats"></div>
       <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
-      <div class="legend">
-        <span><span class="dot" style="background:var(--me)"></span><span id="legendMe">You</span></span>
-        <span><span class="dot" style="background:var(--partner)"></span><span id="legendPartner">Partner</span></span>
-      </div>
+      <div class="wt-range" id="weightRange"></div>
+      <div class="legend" id="weightLegend"></div>
+      <div class="wt-history" id="weightHistory"></div>
     </div>
 
     <div class="card metric-card" id="cardPhotos">
@@ -3647,7 +3690,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.09.2";
+const APP_VERSION = "2026.09.09.3";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 let ME = "";
@@ -8372,21 +8415,112 @@ function staggerHomeCards() {
   });
 }
 
+/* How far back the trend looks. A chart of every weigh-in you have ever done
+   answers a different question from "how is this month going", and without
+   this the line just kept getting flatter as the history grew. */
+const WEIGHT_RANGES = [["1W", 7], ["1M", 30], ["3M", 90], ["6M", 180], ["All", null]];
+let PROGRESS_RANGE = "1M";
+
+function weightRangeStart() {
+  const days = WEIGHT_RANGES.find(([k]) => k === PROGRESS_RANGE)?.[1];
+  if (!days) return "";
+  const d = new Date(todayStr() + "T00:00:00");
+  d.setDate(d.getDate() - days);
+  return isoDate(d);
+}
+
+/* The active goal for whoever is being looked at, when it carries a weight
+   target. Goals without one (a workout-count goal, say) are not a weight
+   target and must not draw a line on this chart. */
+function weightGoalFor(email) {
+  const g = (ALL_GOALS || []).find((x) => (x.email || "").toLowerCase() === (email || "").toLowerCase());
+  return g && g.target_weight != null ? g : null;
+}
+
+/* Weigh-ins for one person inside the chosen window, oldest first. */
+function weighInsFor(name) {
+  const from = weightRangeStart();
+  return entriesFor(name).filter((e) => e.weight != null && (!from || e.entry_date >= from));
+}
+
+/* The three numbers every weight screen worth copying opens with: where you
+   started in this window, where you are, and the difference. Reading a trend
+   off a line is work; this is the answer. */
+function renderWeightStats() {
+  const name = PROGRESS_VIEW === "partner" ? partnerName() : ME;
+  const rows = weighInsFor(name);
+  const el = $("weightStats");
+  if (rows.length < 1) { el.innerHTML = ""; return; }
+  const start = rows[0].weight, current = rows[rows.length - 1].weight;
+  const delta = current - start;
+  /* Which way is good comes from the goal's own numbers, not from reading the
+     goal's NAME. "Get stronger" was being matched as gain-weight and painting
+     a deliberate cut as a warning. A target either sits above where you
+     started or below it, and that settles it. */
+  const goal = weightGoalFor(PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY_EMAIL);
+  const wantsUp = goal ? goal.target_weight > (goal.start_weight ?? start) : null;
+  const tone = Math.abs(delta) < 0.05 || wantsUp == null ? ""
+    : (delta > 0) === wantsUp ? " good" : " warn";
+  const fmt = (n) => `${n.toFixed(1)}`;
+  el.innerHTML = `
+    <div class="wt-stat"><b>${fmt(start)}</b><span>Start</span></div>
+    <div class="wt-stat"><b>${fmt(current)}</b><span>Now</span></div>
+    <div class="wt-stat${tone}"><b>${delta > 0 ? "+" : ""}${fmt(delta)}</b><span>Change</span></div>
+    ${goal ? `<div class="wt-stat"><b>${fmt(goal.target_weight)}</b><span>Goal</span></div>` : ""}`;
+}
+
+function renderWeightRange() {
+  $("weightRange").innerHTML = WEIGHT_RANGES.map(([k]) =>
+    `<button type="button" class="wt-pill${k === PROGRESS_RANGE ? " on" : ""}" data-range="${k}">${k}</button>`).join("");
+  $("weightRange").querySelectorAll("[data-range]").forEach((b) => {
+    b.onclick = () => { PROGRESS_RANGE = b.dataset.range; renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); };
+  });
+}
+
+/* Every weigh-in in the window, newest first, each one a way back into the day
+   it belongs to. Correcting a mistyped weight used to mean finding the day on
+   Home; the number is listed here, so this is where you would go looking. */
+function renderWeightHistory() {
+  const name = PROGRESS_VIEW === "partner" ? partnerName() : ME;
+  const mine = PROGRESS_VIEW !== "partner";
+  const rows = weighInsFor(name).slice().reverse();
+  const el = $("weightHistory");
+  if (!rows.length) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="wt-history-head">${rows.length} weigh-in${rows.length === 1 ? "" : "s"}</div>` +
+    rows.slice(0, 12).map((e, i) => {
+      const prev = rows[i + 1];
+      const d = prev ? e.weight - prev.weight : null;
+      return `<${mine ? "button" : "div"} class="wt-row"${mine ? ` type="button" data-day="${e.entry_date}"` : ""}>
+        <span class="wt-row-d">${escapeHtml(relDayLabel(e.entry_date))}</span>
+        <span class="wt-row-w">${e.weight.toFixed(1)}<i>lbs</i></span>
+        <span class="wt-row-x ${d == null ? "" : d < 0 ? "down" : d > 0 ? "up" : ""}">${
+          d == null ? "" : d === 0 ? "0.0" : `${d > 0 ? "+" : ""}${d.toFixed(1)}`}</span>
+      </${mine ? "button" : "div"}>`;
+    }).join("");
+  el.querySelectorAll("[data-day]").forEach((b) => { b.onclick = () => openDaySheet(MY_EMAIL, b.dataset.day); });
+}
+
 function renderWeightChart() {
   /* Chart.js is 70 KB and only this card uses it, so it arrives with the card
      rather than with the app. */
   if (!window.Chart) { loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderWeightChart); return; }
+  /* ONE person per chart. Both lines shared a y axis, and with forty five
+     pounds between them the axis spanned 140 to 200, which flattened both
+     trends into straight lines. The You / partner toggle above already picks
+     whose screen this is, so the chart follows it and the axis fits one set
+     of numbers. */
   const partner = partnerName();
-  $("legendMe").textContent = ME;
-  $("legendPartner").textContent = partner;
-  const myEntries = entriesFor(ME).filter((e) => e.weight != null);
-  const partnerEntries = entriesFor(partner).filter((e) => e.weight != null);
-  const allDates = [...new Set([...myEntries, ...partnerEntries].map((e) => e.entry_date))].sort();
-  const myMap = Object.fromEntries(myEntries.map((e) => [e.entry_date, e.weight]));
-  const partnerMap = Object.fromEntries(partnerEntries.map((e) => [e.entry_date, e.weight]));
-
+  const viewingPartner = PROGRESS_VIEW === "partner";
+  const name = viewingPartner ? partner : ME;
+  const hex = cssVar(viewingPartner ? "--partner" : "--me");
+  const goal = weightGoalFor(viewingPartner ? PARTNER_EMAIL : MY_EMAIL);
+  const rows = weighInsFor(name);
+  const allDates = rows.map((e) => e.entry_date);
+  $("weightLegend").innerHTML =
+    `<span><span class="dot" style="background:${hex}"></span>${escapeHtml(viewingPartner ? partner : "You")}</span>` +
+    (goal ? `<span><span class="dash"></span>Goal ${goal.target_weight.toFixed(1)}</span>` : "");
   const card = $("cardWeight");
-  if (!myEntries.length && !partnerEntries.length) {
+  if (!rows.length) {
     card.classList.add("chart-empty");
     let ph = $("weightEmpty");
     if (!ph) {
@@ -8404,21 +8538,59 @@ function renderWeightChart() {
 
   const ctx = $("weightChart").getContext("2d");
   if (weightChart) weightChart.destroy();
+
+  /* Canvas does not understand color-mix, so the token is unpacked to rgba by
+     hand. Everywhere else in the sheet color-mix is fine; here it silently
+     produces no fill at all. */
+  const rgbOf = (hex) => {
+    const h = String(hex || "").trim().replace("#", "");
+    const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+    if (!/^[0-9a-f]{6}$/i.test(full)) return null;
+    const n = parseInt(full, 16);
+    return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+  };
+  const wash = (hex) => {
+    const rgb = rgbOf(hex);
+    if (!rgb) return "transparent";
+    const g = ctx.createLinearGradient(0, 0, 0, 190);
+    g.addColorStop(0, `rgba(${rgb}, .26)`);
+    g.addColorStop(1, `rgba(${rgb}, 0)`);
+    return g;
+  };
+  // Only the last point is drawn, because a dot on every reading is noise and
+  // where you are NOW is the thing worth marking.
+  const values = rows.map((e) => e.weight);
+  const pointSizes = values.map((_, i) => (i === values.length - 1 ? 4 : 0));
+
+  const datasets = [{
+    label: name, data: values, borderColor: hex, borderWidth: 2.5, spanGaps: true, tension: 0.35,
+    pointRadius: pointSizes, pointBackgroundColor: hex, pointBorderColor: cssVar("--panel"), pointBorderWidth: 2,
+    fill: true, backgroundColor: wash(hex),
+  }];
+  /* The target as a dashed rule across the chart. Without it the line is just
+     a shape; with it you can see the gap you are actually closing. */
+  if (goal) {
+    datasets.push({
+      label: "Goal", data: values.map(() => goal.target_weight),
+      borderColor: cssVar("--muted"), borderWidth: 1.5, borderDash: [5, 4],
+      pointRadius: 0, fill: false, tension: 0,
+    });
+  }
+
   weightChart = new Chart(ctx, {
     type: "line",
     data: {
       labels: allDates.map((d) => d.slice(5)),
-      datasets: [
-        { label: ME, data: allDates.map((d) => myMap[d] ?? null), borderColor: cssVar("--me"), backgroundColor: "transparent", spanGaps: true, tension: 0.3, pointRadius: 3 },
-        { label: partner, data: allDates.map((d) => partnerMap[d] ?? null), borderColor: cssVar("--partner"), backgroundColor: "transparent", spanGaps: true, tension: 0.3, pointRadius: 3 },
-      ],
+      datasets,
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
+      /* No vertical rules and no box: horizontal lines are the only ones that
+         help you read a weight off the axis. */
       scales: {
-        x: { grid: { color: cssVar("--border") }, ticks: { color: cssVar("--muted"), maxTicksLimit: 6 } },
-        y: { grid: { color: cssVar("--border") }, ticks: { color: cssVar("--muted") } },
+        x: { border: { display: false }, grid: { display: false }, ticks: { color: cssVar("--muted"), maxTicksLimit: 5, font: { size: 10 } } },
+        y: { border: { display: false }, grid: { color: cssVar("--border"), drawTicks: false }, ticks: { color: cssVar("--muted"), maxTicksLimit: 5, font: { size: 10 }, padding: 6 } },
       },
     },
   });
@@ -8786,6 +8958,29 @@ async function generateWorkout(forDate) {
   const history = Object.entries(personalRecords(ME).best).map(([exercise_name, weight]) => ({ exercise_name, weight }));
   const recentWeight = entriesFor(ME).filter((e) => e.weight != null).slice(-1)[0]?.weight ?? null;
   const recentGymDays = gymDaysThisWeek(ME);
+  /* research/07: the generator was only ever sent `history`, a flattened map of
+     personal bests with no dates, so it could not derive experience or calibrate
+     against what was actually done. Dated logs and the last few plans fix both.
+     Trimmed to the fields the engine reads, because the whole row is far bigger. */
+  const logsFrom = isoDate(new Date(Date.now() - 90 * 86400000));
+  const plansFrom = isoDate(new Date(Date.now() - 30 * 86400000));
+  const recentLogs = (ALL_EXERCISE_LOGS || [])
+    .filter((l) => l.email === MY_EMAIL && l.entry_date >= logsFrom)
+    .map((l) => ({
+      entry_date: l.entry_date,
+      exercise_name: l.exercise_name,
+      sets: l.sets,
+      reps: l.reps,
+      weight: l.weight,
+    }));
+  const recentPlans = (ALL_PLANS || [])
+    .filter((p) => p.email === MY_EMAIL && p.entry_date >= plansFrom)
+    .map((p) => ({
+      entry_date: p.entry_date,
+      focus: p.focus,
+      exercises: p.exercises,
+      completed_at: p.completed_at,
+    }));
 
   try {
     const { data: { session } } = await sb.auth.getSession();
@@ -8803,7 +8998,10 @@ async function generateWorkout(forDate) {
         activity_level: MY_PROFILE?.activity_level,
         current_weight: recentWeight,
         gym_days_this_week: recentGymDays,
+        challenge_target: MY_PROFILE?.challenge_target ?? null,
         history,
+        logs: recentLogs,
+        plans: recentPlans,
       }),
     });
     /* Read as text first. When the function errors it can answer with an HTML
@@ -12784,7 +12982,7 @@ function renderProgressTab() {
     if (el) el.classList.toggle("hidden", !on.has(o.key));
   });
 
-  if (on.has("weight")) renderWeightChart();
+  if (on.has("weight")) { renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); }
   if (on.has("activity")) renderLog();
   if (on.has("photos")) renderBodyPhotos();
 

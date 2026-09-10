@@ -64,6 +64,28 @@
         note: "The fork at the top of the workout tab. All three routes below are reachable from here, so try it by tapping rather than by the rail.",
         run: (w) => { w.switchTab("workout"); w.goWorkoutScreen("choose"); } },
 
+      { t: "Generate a workout", scenario: "paired",
+        s: "The engine, live",
+        note: "This is the deterministic engine that replaces the model call, running right here in your browser against the fake data, not a screenshot of it. The honest line about pace pops as a toast a beat after the plan lands, because the reveal sheet itself only ever shows the exercises. Tap Generate and read the plan it built for Mo: a pull session yesterday and a push day already queued, so this is the engine picking the next thing in the rotation.",
+        run: (w) => {
+          w.switchTab("workout");
+          w.goWorkoutScreen("choose");
+          // goWorkoutScreen animates the screen swap and only renders the
+          // buttons once that settles (220ms fallback if the animation event
+          // never fires, which it will not while the phone is still loading).
+          // 400ms clears that with room to spare before the click below.
+          setTimeout(() => { w.document.getElementById("chooseGenerateBtn")?.click(); }, 400);
+        } },
+
+      { t: "Generate for a beginner", scenario: "fresh",
+        s: "Day one, no history",
+        note: "Same button, same engine, a person the app knows nothing about yet: no profile, no logged sets, no goal on file. This is where the honest line does the most work, the plan comes back deliberately cautious and says so rather than guessing a load it has no basis for.",
+        run: (w) => {
+          w.switchTab("workout");
+          w.goWorkoutScreen("choose");
+          setTimeout(() => { w.document.getElementById("chooseGenerateBtn")?.click(); }, 400);
+        } },
+
       { t: "Build one yourself", scenario: "paired",
         s: "Search, categories, sets and reps",
         note: "The screen with the keyboard bug we fixed: type in the search box and the sheet should stay put rather than sliding under the keyboard. Categories should clear the search field.",
@@ -150,7 +172,7 @@
     { group: "Looking back", note: "The two tabs that answer how it is going.", steps: [
       { t: "Progress", scenario: "paired",
         s: "Weight, PRs, days trained",
-        note: "Both people on the same chart. The metric picker at the top decides what the chart shows.",
+        note: "One person per chart, whoever the You / Mell toggle is on: both lines shared an axis before, and forty five pounds between them flattened each into a straight line. Start, now, change and the goal read across the top, the dashes are the target, the pills change the window, and every weigh-in below opens the day it belongs to so a mistyped number is fixable here.",
         run: (w) => w.switchTab("progress") },
 
       { t: "Choose what to track", scenario: "paired",
