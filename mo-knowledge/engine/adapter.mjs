@@ -15,6 +15,9 @@
  * alias table below is hand written rather than loaded from goal-tree.json.
  */
 import { buildPlan } from "./plan.mjs";
+import { normalizeFocus, mergePriority, focusFreshness } from "./focus.mjs";
+/* Read only, for one field. See the focus block in generateFromPayload. */
+import { resolveGoal } from "./goal-engine.mjs";
 
 /* ------------------------------------------------------------------ *
  * 1. Five goal strings in, nine bubbles out
@@ -630,7 +633,7 @@ function cueFor(ex) {
 /**
  * @param {object} plan   a buildPlan result
  * @param {number} dayIndex
- * @returns {{ focus: string, exercises: Array<{name,sets,reps,targetWeight,note}> }}
+ * @returns {{ focus: string, exercises: Array<{name,sets,reps,targetWeight,note,swap,alternatives}> }}
  */
 export function toWorkout(plan, dayIndex = 0) {
   const week = plan?.week || [];
@@ -659,6 +662,15 @@ export function toWorkout(plan, dayIndex = 0) {
        both is 0. Never a string: the app does arithmetic on this. */
     targetWeight: e.weight ?? 0,
     note: cueFor(e),
+    /* Additive, and the five keys above are untouched. The engine has always
+       computed a swap for every exercise and this function threw it away, so
+       the suggestion existed and never reached a screen (PLAN-2, W2).
+       index.html ignores both of these fields today and that is fine: extra
+       keys cost the app nothing, and the field is here for whoever wires the
+       swap button, at which point exercise_swaps records what they chose. */
+    swap: e.swap ?? null,
+    alternatives: (Array.isArray(e.alternatives) ? e.alternatives : [])
+      .slice(0, 3).map((a) => ({ name: a.name, why: a.why })),
   }));
 
   return { focus: day.name, exercises };
@@ -723,6 +735,27 @@ export function generateFromPayload(payload = {}, { today = new Date() } = {}) {
     const daysAsked = Number.isFinite(target) && target >= 2 && target <= 6
       ? Math.round(target)
       : Number(payload.gym_days_this_week) >= 4 ? 4 : 3;
+    step = "focus";
+    /* The body picker's selection, once it has somewhere to live. It arrives as
+       the app's group keys or as the finer piece keys the zoomed view works in,
+       and focus.mjs flattens both to the fourteen groups plan.mjs prioritises.
+       Absent column, old client, null: all of them come back as an empty list
+       and every line below behaves exactly as it did before this existed.
+
+       resolveGoal is called here for one field. It is cheap, pure, and it picks
+       `params` off the bubble and the child alone: `level` only reaches the
+       timeline. So the priority list read here is the same one buildPlan will
+       resolve for itself a few lines down, and reading it is preferable to
+       building the week twice or to copying the goal table into this file. */
+    const goalPriority = resolveGoal({ ...goal, today }).params.priority;
+    const requestedFocus = normalizeFocus(payload.focus_groups);
+    const freshness = focusFreshness({ chosenAt: payload.focus_chosen_at ?? null, today });
+    /* `revealed` is W3's measured preference and does not exist yet, so this is
+       null and the tap stands unopposed. When it lands, this is the one line
+       that changes. */
+    const merged = mergePriority({ goalPriority, userFocus: requestedFocus, revealed: null });
+
+    step = "buildPlan";
     const plan = buildPlan({
       goal,
       person: {
@@ -732,6 +765,7 @@ export function generateFromPayload(payload = {}, { today = new Date() } = {}) {
       },
       logs,
       today,
+      priorityOverride: merged.priority,
     });
 
     step = "nextDayIndex";
@@ -771,6 +805,17 @@ export function generateFromPayload(payload = {}, { today = new Date() } = {}) {
            way, and the profile's focus is right there in the payload if
            somebody needs to tell the two apart. */
         focusHonoured,
+        /* Not the same `focus` as `focusHonoured` above, which is about which
+           day of the rotation came back. This is the body map: which groups
+           were asked for, which ones actually earned the extra volume, the
+           sentences saying why, and whether the choice is old enough that it is
+           worth asking again. Nothing acts on `stale` yet, on purpose. */
+        focus: {
+          requested: requestedFocus,
+          applied: merged.priority,
+          why: merged.why,
+          stale: freshness.stale,
+        },
         source: "engine",
         logsSource,
         missing,

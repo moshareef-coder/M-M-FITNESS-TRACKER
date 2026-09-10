@@ -32,6 +32,7 @@ pass simply does not run is the design.
 | `training-age.mjs` | logs in, experience level out, with an audit trail. Nothing is asked |
 | `load.mjs` | allometric cold start from bodyweight and sex, overruled by history the moment there is any |
 | `plan.mjs` | the orchestrator |
+| `plateau-response.mjs` | a stalled lift in, one answer out: rotate, change the reps, deload that lift, cut the week, or wait |
 | `pair.mjs` | shared rhythm, conjunctive week, and a comparison that does not humiliate |
 | `demo.mjs` | prints weeks so they can be judged by reading |
 
@@ -152,12 +153,67 @@ They are listed as **next**, not as shipped.
    candidates by secondary-muscle overlap first and then by how close the level
    is to the original, so a swap is the nearest stimulus rather than the next row
    in the list. Ours takes the next unused candidate in a ranked pool, which is
-   how a swap can be a materially easier or harder movement without saying so.
+   how a swap can be a materially easier or harder movement without saying so. **Done**, see Scored alternatives below.
 3. **A time budget that decides the exercise count.** She works from about seven
    minutes an exercise, and the session length sets how many categories and how
    many movements per category fit. Ours fixes the count in the slot table and
    reports the minutes afterwards, which is the same arithmetic run backwards and
    is why a short day needed a special case at all.
+
+## A stall gets an answer (`plateau-response.mjs`)
+
+`training-age.mjs` has always returned Jawa's `detectPlateau` on every plan and
+nothing read it, so the engine could name the lift that had not moved in six
+weeks and then hand back the same week regardless (PLAN-2, W4). It now has an
+answer. A plateau is where people quit, so this is the most expensive signal to
+leave unread in the folder.
+
+**It is not the same thing as `calibrate.mjs` and the two must never both fire on
+one lift.** calibrate asks "how did the last session go", per exercise, across
+three sessions, and moves a load by at most five percent. A plateau is weeks of a
+lift going nowhere while nothing goes wrong in any single session: every set
+finished, every rep landed, same 185 lb since July. Different question, different
+answer, and where they meet one of them stands down.
+
+The decision, per stalled lift, top to bottom, first match wins:
+
+| when | action | why that one |
+|---|---|---|
+| flat under 4 weeks | `wait` | a fortnight is a fortnight. research/09: a plan that reacts to noise teaches people to distrust every change it makes |
+| beginner, under 8 weeks flat or under 6 sessions of the lift | `wait` | a beginner is on linear progression by definition. Same argument this file already makes about withholding a scheduled deload from a beginner |
+| calibrate says `too-easy` | `wait` | calibrate is already adding load next session. The stall is breaking itself and a second response is the same fix twice |
+| calibrate says `too-heavy` | `deload-lift` | they are grinding. `periodization-deloads.md` names missed reps on a previously solid lift as a trigger, and one week as enough. Never also rotated: the load is already coming down |
+| strength goal, under 6 weeks flat | `rep-range` | `progressive-overload.md` counts more reps at the same weight as overload, and it is the cheapest lever that does not take away the lift they came here for |
+| anything else | `rotate` | the same file: chasing 5 lb a week runs out of road, and rotating which lever moves is what keeps a plan working |
+| 3 or more lifts acting at once | `volume-cut`, in `summary` | that is fatigue rather than three exercise problems. Systemic, so it never appears on one exercise |
+
+Four things that took a second pass to get right.
+
+**A rotation has to reach selection or it is only a sentence.** So the pass 4
+call sits above pass 2 and hands the rotated names to `candidates()` as an
+exclusion, the same shape `preferences.mjs` uses for a hard avoid, and with the
+same rule: it never empties a slot. When excluding a lift would leave a slot with
+nothing, the lift stays, `applyRotateFallback` turns that response into a
+`rep-range` instead, and the note says so. A note claiming a lift is gone while
+it is still on the card is worse than no note.
+
+**The volume cut goes down the lever that already exists.** It sets the same
+`backOff` flag calibration's back-off sets, rather than adding a second 0.85
+beside it, and `planPlateauResponse` will not return `volume-cut` at all when
+calibration has already called the week a back-off. Two cuts down one lever is a
+deload nobody prescribed.
+
+**When the cut fires, the per lift answers stand down for the week.** Rotating
+three lifts during a lighter week hands somebody a week they do not recognise and
+leaves nothing attributable afterwards. `periodization-deloads.md` describes a
+deload as the same exercises with fewer sets, and `progressive-overload.md` says
+pick one lever. The diagnosis survives in each response's `detail`; only the
+action waits, and the summary speaks for the week.
+
+**`wait` has three different sentences.** "Too soon to tell", "you are a beginner
+and this is attendance" and "you are about to add weight anyway" are different
+news, and a wait note that guesses wrong is the one place this could sound like
+it is not paying attention.
 
 ## Known limits
 
@@ -174,6 +230,20 @@ They are listed as **next**, not as shipped.
   It is open question 7 and it is the biggest hole in the folder's main claim.
 - **Sex coefficients** in `pair.mjs` are derived from two reference bench
   standards. Fine as a presentation handicap, not a measurement.
+- **A volume cut can be a no-op the plan still talks about.** `setsFor` clamps to
+  [2, 6], so the 0.85 is swallowed wherever a group is hit once or twice at
+  intermediate or above, or already floors at two. Measured: on a four day
+  intermediate week the cut moved 2 slots out of 11. This is the same clamp
+  calibration's own back-off note runs into and it is not new, but the plateau
+  note is a second voice saying "the sets come down" when for some people they
+  partly do not. The honest fix is the clamp, which moves every plan, so it is
+  named here rather than patched from one caller.
+- **`detectPlateau` can rarely report a stall shorter than its own window.**
+  `weeksFlat` is measured from the first day the all time best was set, and a lift
+  whose best sits inside the six week window counts as climbing, so a 4 or 5 week
+  stall only appears on a lift newer than the window. In practice `rotate` is the
+  common answer and `rep-range` fires mostly for recently introduced lifts.
+  `detectPlateau` is Jawa's and was not touched.
 - **No nutrition, and it matters.** For every fat loss goal the training is maybe a
   fifth of the outcome. The plan says so rather than implying the workouts will do
   it.
@@ -235,3 +305,150 @@ more than one. It does hold a floor of three, because the app has no answer for
 a two exercise card, and it fills from the next day of that person's own week
 rather than inventing a movement. `plan.mjs` floors a short day at four, so the
 floor should never fire.
+
+## Focus
+
+`focus.mjs` is the body picker's selection, translated into something the plan
+can act on. The picker works at the level of a muscle piece and a head, because
+that is what you can point at on a figure; `plan.mjs` has only ever thought in
+the app's fourteen muscle groups, and it already has the lever this needs.
+`P.priority` earns a group 1.4x its weekly sets through `setsFor`. A user chosen
+focus is that same mechanism with a different source, so nothing new was
+invented for it: `normalizeFocus` flattens pieces and heads down to groups,
+`mergePriority` decides whose list wins, and `buildPlan` takes the result as
+`priorityOverride`. Null there means nobody merged anything and the goal decides,
+which is every caller that existed before this landed.
+
+**Stated and revealed are two different signals, and only one of them is here
+yet.** Stated is the tap, the goal bubble, the number in the picker: high trust
+on the day, decaying afterwards. Revealed is what somebody actually does, which
+exercises they swap away from, which days they skip, which lifts have stopped
+moving: low trust on day one, and it rises with every session. Where the two
+disagree the measured one is right, because somebody who picked glutes in
+January and has not hip thrusted since February has told us something newer than
+the tap.
+
+Today `mergePriority` puts the tap first and the goal's own priority second, and
+caps the combination at five, because the 1.4x has to come out of a fixed weekly
+volume and once most of the body is on the list the plan is the same plan with a
+longer explanation. A single tap is capped at four for the same reason: focusing
+on everything is focusing on nothing.
+
+The `revealed` argument is where W3's output lands, shaped
+`{ avoid: [], prefer: [] }` and null until it ships. When it does, an `avoid`
+entry drops the matching group out of the user's focus and says so in `why`. It
+never touches the goal's own priority: overruling the goal from a swap count is
+a larger claim than a swap count can carry. `prefer` is deliberately read by
+nobody yet.
+
+`focusFreshness` reports rather than acts. Past 60 days the choice comes back
+`stale: true` and `meta.focus.stale` carries it to the app, which can ask again.
+Nothing in the engine discounts a stale focus, because the honest thing to do
+with an old answer is to ask for a new one, not to quietly weight the old one
+down. That decision belongs with W3, which will have the measurement to make it.
+
+`meta.focus` is `{ requested, applied, why, stale }`: what came out of the
+profile, what really ended up prioritised after the merge and the cap, the plain
+sentences explaining it, and whether the choice is old. The gap between
+`requested` and `applied` is the interesting field, and it is the first question
+support gets when somebody says their week did not change.
+
+## Scored alternatives
+
+`alternatives.mjs` ranks substitutes for an exercise, and `plan.mjs` uses it to
+choose the swap. The approach came from reading Jawa's `findAlternatives` in
+`knowledge/formulas/exercise-selector.mjs`, which was Wave 1 finding 2 above:
+she ranks by secondary muscle overlap and then by level distance, so her swap is
+the nearest stimulus. Ours took the next unused row of a pool ranked for
+choosing a MAIN lift, which is a different question, and is how a swap could
+come back materially easier or harder than the lift it replaced without ever
+saying so. Nothing under `knowledge/` was edited; it was read.
+
+The rule, in descending authority, and every term bounded by its own weight so
+that the order of the terms IS their authority:
+
+| term | weight | note |
+|---|---|---|
+| same primary muscle group | filter | not a score. An alternative that does not train the thing the slot exists for is a different exercise |
+| secondary muscle coverage | 0 to +3 | `shared / the original's secondary count` |
+| same movement pattern | +2 | via `patternFor` |
+| level distance from the USER | -1 per step | plus another -1 if it is harder than they are |
+| same equipment as the original | +0.5 | the load carries over |
+| equipment list, when given | filter | bodyweight always allowed: they still own the floor |
+
+Three choices worth defending.
+
+**Coverage rather than a raw overlap count.** A count is unbounded, and unbounded
+it beat everything else put together. Walking Lunge shares two secondary muscles
+with Barbell Back Squat and Goblet Squat shares one, so counting put a *lunge*
+above a goblet squat as the swap for a back squat, which is precisely the
+"materially different movement" failure this file exists to fix. Coverage caps
+the term at 3 and the pattern bonus then decides that case correctly. Jaccard was
+the other option and was rejected for penalising an exercise for hitting more
+muscles than the original, which is not a reason to reject a substitute.
+
+**Level distance is measured from the user, not from the original.** Jawa
+measures from the original. The original was already chosen against the user's
+level, and the failure that costs something is handing somebody a movement above
+their technique, so the distance is to the person and it is asymmetric: harder
+than you costs an extra point, which makes every tie break toward the easier
+option. research/05's conservative rule, applied to swaps.
+
+**Movement pattern is scored, which is ours rather than hers.** A barbell row
+and a lat pulldown share every muscle in the library's description of them and
+are not interchangeable. `patternFor` already existed for load ratios and it
+answers this too.
+
+Fourteen exercise names exist in more than one training (`Push-Up` and `Pull-Up`
+are in weight-training and calisthenics both, `Plank` is in three), so a pool
+built across libraries hands the same movement back twice and a list of three
+alternatives could have shown `Push-Up` twice. Deduplicated by name, keeping the
+highest scoring copy, which is the one described most fully.
+
+Sample, for an intermediate lifter with everything available:
+
+```
+Barbell Row          ->  Pendlay Row            Same movement, same supporting muscles
+                         T-Bar Row              Same movement, same supporting muscles
+                         Chest-Supported Row    Easier version of the same movement, no barbell needed
+
+Barbell Bench Press  ->  Dip                    Same movement, same supporting muscles, no equipment needed
+                         Dumbbell Bench Press   Easier version of the same movement, no barbell needed
+                         Incline Push-Up        Easier version of the same movement, no equipment needed
+
+  ...bodyweight only ->  Dip                    Same movement, same supporting muscles, no equipment needed
+                         Incline Push-Up        Easier version of the same movement, no equipment needed
+                         Push-Up                Easier version of the same movement, no equipment needed
+
+Barbell Back Squat   ->  Bulgarian Split Squat  Same movement, same supporting muscles, no barbell needed
+                         Hack Squat             Same movement, same supporting muscles, no barbell needed
+                         Leg Press              Easier version of the same movement, no barbell needed
+```
+
+### The swap now reaches the app
+
+It did not before. `plan.mjs` computed one for every exercise and `toWorkout`
+dropped it, so the suggestion existed and never got to a screen. That was PLAN-2
+W2 and it is fixed: `toWorkout` emits `swap` (a string or null) and
+`alternatives` (up to three `{ name, why }`) alongside the five keys it always
+emitted, which are unchanged. Additive, so nothing in `index.html` had to move
+and nothing in it reads them yet.
+
+`swap` stays a bare string on the plan's exercise objects too, because things
+already read it that way. `alternatives` is the same answer with its reasons
+attached and two more options behind it. The two can differ: `swapsThisWeek`
+still prefers an alternative that has not already been offered this week, so the
+swap is sometimes the second ranked rather than the first, and a swap still
+never blocks a later main pick.
+
+The one place it comes back empty is `Step-Up` on a glutes lunge slot, which is
+the only glute-primary lunge in the library. `swap: null` is the honest output
+there rather than an off-pattern substitute.
+
+`supabase/migrations/20260909_exercise_swaps.sql` is the other half and is
+written, not applied. It records what somebody actually replaced and whether
+they took one of ours (`suggested`) or went and found their own (`searched`),
+which is the second signal and the stronger one. research/07 calls this the
+revealed preference the app throws away. Nothing reads the table yet; W3
+(`preferences.mjs`) is the reader, and recording now means it opens with history
+instead of an empty table.

@@ -26,7 +26,7 @@ const LIB_OUT = join(fn, "_library");
 
 /* Only what the function runs. demo, test and bakeoff are node-only and would
    fail Deno's import of node:fs on the way in. */
-const ENGINE_FILES = ["adapter.mjs", "plan.mjs", "goal-engine.mjs", "training-age.mjs", "load.mjs", "calibrate.mjs", "pair.mjs"];
+const ENGINE_FILES = ["adapter.mjs", "plan.mjs", "goal-engine.mjs", "training-age.mjs", "load.mjs", "calibrate.mjs", "pair.mjs", "alternatives.mjs", "focus.mjs", "preferences.mjs", "plateau-response.mjs"];
 
 rmSync(ENGINE_OUT, { recursive: true, force: true });
 rmSync(LIB_OUT, { recursive: true, force: true });
@@ -47,3 +47,17 @@ for (const f of readdirSync(LIB_SRC).filter((n) => n.endsWith(".mjs"))) {
   count++;
 }
 console.log(`vendored ${count} files into ${fn.replace(root + "/", "")}/{_engine,_library}`);
+
+/* Three agents in one round each added an import to plan.mjs and each had to
+   remember to add it here. Two of them nearly shipped a bundle whose plan.mjs
+   imported a file that was never copied, which fails at boot, in production,
+   silently until somebody taps Generate. So check rather than remember. */
+for (const f of ENGINE_FILES) {
+  const src = readFileSync(join(ENGINE_OUT, f), "utf8");
+  for (const m of src.matchAll(/from\s+["']\.\/([a-zA-Z0-9_-]+\.mjs)["']/g)) {
+    if (!ENGINE_FILES.includes(m[1])) {
+      throw new Error(`${f} imports ${m[1]}, which is not in ENGINE_FILES. Add it, or the deployed function cannot boot.`);
+    }
+  }
+}
+console.log("import check: every engine import is vendored");

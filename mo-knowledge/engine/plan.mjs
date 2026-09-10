@@ -21,6 +21,9 @@ import { resolveGoal } from "./goal-engine.mjs";
 import { deriveTrainingAge, observedCapacity } from "./training-age.mjs";
 import { prescribeLoad, patternFor } from "./load.mjs";
 import { calibrate } from "./calibrate.mjs";
+import { learnPreferences, applyPreferences, avoidNote } from "./preferences.mjs";
+import { scoreAlternatives } from "./alternatives.mjs";
+import { planPlateauResponse, applyRotateFallback } from "./plateau-response.mjs";
 
 const WEIGHTS = TRAININGS.find((t) => t.id === "weight-training");
 const CALIS = TRAININGS.find((t) => t.id === "calisthenics");
@@ -151,7 +154,7 @@ const LEVEL_RANK = { beginner: 0, novice: 1, intermediate: 2, advanced: 3 };
    every deadlift, Romanian deadlift and hip thrust in the library is tagged
    intermediate or above, which is defensible on technique and leaves a beginner
    with no posterior chain work, which is worse. See engine/README.md. */
-function candidates({ groups, pattern, level, equipment, role = "accessory", historyNames = [] }) {
+function candidates({ groups, pattern, level, equipment, role = "accessory", historyNames = [], preferences = null, exclude = null }) {
   const ceiling = (LEVEL_RANK[level] ?? 0) + (role === "main" ? 2 : 1);
   const match = (needPattern) => {
     const pool = [];
@@ -185,15 +188,27 @@ function candidates({ groups, pattern, level, equipment, role = "accessory", his
       .map((x) => x.e);
   };
 
-  const exact = match(pattern !== "isolation");
-  if (exact.length) return exact;
   /* Never silently drop a slot. A missing hinge is a hole in the week, and the
      first run of this file dropped one without saying anything. */
-  return match(false);
+  const exact = match(pattern !== "isolation");
+  const ranked = exact.length ? exact : match(false);
+  /* Lifts a plateau response rotated out of this week (engine/plateau-response.mjs).
+     Same shape as a hard avoid below and the same rule: it filters the ranked
+     pool and it never empties a slot, because a hole in the week is worse than
+     a stalled lift appearing once more. When it cannot be honoured the excluded
+     lift is still in the pool, which is how buildPlan knows the rotation was
+     blocked and answers with the rep range instead. */
+  const kept = exclude ? ranked.filter((e) => !exclude.has(e.name.toLowerCase())) : ranked;
+  const pool = kept.length ? kept : ranked;
+  /* research/07: what they swap away from and what they stop logging is a
+     stronger signal than anything they could tell us. It is applied here, on
+     the ranked pool, so a preference reorders the same candidates rather than
+     reaching into the split, the sets or the load. */
+  return applyPreferences(pool, preferences);
 }
 
 export function buildPlan({
-  goal, person = {}, logs = [], plans = [], equipment = null, today = new Date(),
+  goal, person = {}, logs = [], plans = [], swaps = [], equipment = null, today = new Date(), priorityOverride = null,
 } = {}) {
   const { bodyWeightLb = null, sex = null, daysAsked = null } = person;
 
@@ -206,6 +221,13 @@ export function buildPlan({
      Empty `plans` gives an empty map and every pass below behaves as it always
      did, which is the day one plan. */
   const calibration = calibrate({ plans, logs });
+
+  /* research/07 again, the half of it nothing read until now: swaps taken and
+     exercises quietly abandoned. Learned once for the whole week, because a
+     preference is about a person and not about a Tuesday. Empty `swaps` and
+     empty `plans` give an empty result and every pass below behaves exactly as
+     it did before this existed. */
+  const preferences = learnPreferences({ swaps, plans, logs, today });
 
   const resolved = resolveGoal({ ...goal, bodyWeightLb, sex, level, today });
   const P = resolved.params;
@@ -243,8 +265,29 @@ export function buildPlan({
     dayNotes.push("Everything landed last week. Loads are up.");
   }
 
+  /* ---- pass 4's decision, taken here because it changes pass 2 ----
+     `deriveTrainingAge` has always returned Jawa's `plateau` and nothing ever
+     read it: the engine could name the lift that had not moved in six weeks and
+     then hand back the same week regardless. This is where it gets an answer.
+     It is a progression decision and it belongs to pass 4, but a rotation has to
+     reach selection or it is only a sentence, so the call sits above pass 2 and
+     the result is spoken further down with the rest of pass 4. */
+  let plateauPlan = planPlateauResponse({
+    plateau: trainingAge.plateau, level, calibration, goal: resolved,
+  });
+  const rotateOut = new Set(
+    plateauPlan.responses.filter((r) => r.action === "rotate").map((r) => r.exercise.toLowerCase()),
+  );
+  /* Rotations the library could not afford. Filled during selection. */
+  const rotateBlocked = new Set();
+
   const split = splitFor(days, level).slice(0, days);
-  const backOff = calibration.overall === "back-off";
+  /* One lever, pulled once. A systemic volume cut is the same 0.85 that
+     calibration's back-off already runs through `setsFor`, so it reuses that
+     flag rather than adding a second multiplier beside it. plateau-response.mjs
+     will not return volume-cut at all when calibration has already backed off,
+     so these two can never both be true, and the week can never be cut twice. */
+  const backOff = calibration.overall === "back-off" || plateauPlan.summary.action === "volume-cut";
   const baseSets = BASE_WEEKLY_SETS[level] * P.setsFactor;
 
   /* ---- pass 2: selection, the whole week before any set count ---- */
@@ -267,24 +310,37 @@ export function buildPlan({
     const slots = slotsForDay(key, isShort);
 
     const picks = slots.map((slot) => {
-      const pool = candidates({ ...slot, level, equipment, role: slot.role, historyNames });
+      const pool = candidates({ ...slot, level, equipment, role: slot.role, historyNames, preferences, exclude: rotateOut });
       if (!pool.length) return null;
       /* Prefer something not already used this week, so a week of five days does
          not become the same four lifts five times. */
       const pick = pool.find((e) => !usedToday.has(e.name) && (usedThisWeek.get(e.name) || 0) === 0)
         || pool.find((e) => !usedToday.has(e.name)) || pool[0];
+      /* A rotated lift that got picked anyway means excluding it would have left
+         this slot with nothing. Recorded now, answered after selection. */
+      if (rotateOut.has(pick.name.toLowerCase())) rotateBlocked.add(pick.name);
       const offPattern = patternFor(pick) !== slot.pattern && slot.pattern !== "isolation";
       usedToday.add(pick.name);
       usedThisWeek.set(pick.name, (usedThisWeek.get(pick.name) || 0) + 1);
 
       /* Every exercise needs a swap. The brief calls this a hard product
          requirement rather than a nice to have, and research/07 adds that the
-         swap somebody actually uses is a pain signal worth recording. */
-      const alternatives = pool.filter((e) => e.name !== pick.name && !usedToday.has(e.name));
-      const swap = alternatives.find((e) => !swapsThisWeek.has(e.name)) || alternatives[0] || null;
+         swap somebody actually uses is a pain signal worth recording.
+
+         This used to be `pool.filter(...)[0]`: the next unused row of a pool
+         ranked for choosing a MAIN lift, which is a different question and is
+         how a swap could be materially easier or harder than the lift it stood
+         in for. Now ranked by nearest stimulus, in alternatives.mjs. */
+      const ranked = scoreAlternatives({
+        exercise: pick, pool, level, equipment, exclude: [...usedToday], count: 4,
+      });
+      const swap = ranked.find((a) => !swapsThisWeek.has(a.name)) || ranked[0] || null;
       if (swap) swapsThisWeek.add(swap.name);
 
-      return { slot, pick, swap, offPattern };
+      return {
+        slot, pick, swap, offPattern,
+        alternatives: ranked.slice(0, 3).map((a) => ({ name: a.name, why: a.why })),
+      };
     }).filter(Boolean);
 
     return { name, key, isShort, picks };
@@ -302,9 +358,14 @@ export function buildPlan({
 
   /* ---- pass 3: sets, reps and load, now that the week is known ---- */
   const week = selected.map(({ name, key, isShort, picks }) => {
-    const exercises = picks.map(({ slot, pick, swap, offPattern }) => {
+    const exercises = picks.map(({ slot, pick, swap, alternatives, offPattern }) => {
       const group = (pick.primary || [])[0];
-      const priority = P.priority.includes(group);
+      /* The goal is not the only thing that can name a priority group. When the
+         caller has merged the user's own body-map focus in (engine/focus.mjs),
+         that merged list arrives as priorityOverride and stands in for the
+         goal's. Null means nobody merged anything and the goal decides, which
+         is every call that existed before this line. */
+      const priority = (priorityOverride ?? P.priority).includes(group);
       const isMain = slot.role === "main";
       const full = setsFor({ base: baseSets, hitCount: hits[group] || 1, priority, backOff, isMain });
       /* A short day is the session they were least likely to make, so it stays
@@ -321,7 +382,11 @@ export function buildPlan({
         name: pick.name, group, equipment: pick.equipment, sets, reps,
         restSec: isMain ? P.restSec : Math.round(P.restSec * 0.7),
         weight: load.weight, loadBasis: load.basis, loadNote: load.note,
+        /* `swap` stays a bare string, because everything already reading it
+           expects one. `alternatives` is the same answer with its reasons
+           attached and two more options behind it. */
         swap: swap ? swap.name : null,
+        alternatives,
         priority,
         /* Said out loud rather than hidden: this slot wanted a movement pattern
            the library could not supply at this level. */
@@ -332,7 +397,28 @@ export function buildPlan({
     return { name, focus: key, short: isShort, minutes: isShort ? Math.round(P.sessionMin * 0.6) : P.sessionMin, exercises };
   });
 
+  /* A hard avoid is the only thing in here that removes a movement somebody
+     never asked to have removed, so it is said out loud. Checked against the
+     week that was actually built rather than against the intent, because
+     applyPreferences keeps a disliked lift when dropping it would leave the
+     slot unfillable, and a note claiming it is gone when it is still on the
+     card would be worse than no note. */
+  const inWeek = new Set(week.flatMap((d) => d.exercises.map((e) => String(e.name).toLowerCase())));
+  for (const a of preferences.avoid) {
+    if (a.strength === "hard" && !inWeek.has(a.name.toLowerCase())) dayNotes.push(avoidNote(a));
+  }
+
   /* ---- pass 4: progression ---- */
+  /* The plateau answer, spoken. A rotation the library could not afford becomes
+     a rep range change instead, so the note and the week always agree. */
+  if (rotateBlocked.size) {
+    plateauPlan = applyRotateFallback(plateauPlan, [...rotateBlocked], { goal: resolved, plateau: trainingAge.plateau });
+  }
+  /* A response with nothing to say is a deferral, not a silence: on a volume cut
+     week the summary speaks for the whole plan and the per lift answers wait. */
+  for (const r of plateauPlan.responses) if (r.say) dayNotes.push(r.say);
+  if (plateauPlan.summary.say) dayNotes.push(plateauPlan.summary.say);
+
   const progression = level === "beginner" || level === "novice"
     ? { rule: "linear", detail: "Hit every rep on every set and the weight goes up next time. That keeps working for months and there is no reason to be cleverer than it while it does." }
     : { rule: "double", detail: "Work up to the top of the rep range on every set, then add weight and drop back to the bottom." };
@@ -345,10 +431,18 @@ export function buildPlan({
 
   return {
     goal: resolved, honest: resolved.timeline, level, trainingAge,
+    preferences: {
+      avoid: preferences.avoid, prefer: preferences.prefer,
+      equipmentBias: preferences.equipmentBias, confidence: preferences.confidence,
+    },
     days, dayNotes, restDays: 7 - days,
     week, progression, deload,
     cardio: P.cardio,
     calibration: { summary: calibration.summary, overall: calibration.overall },
+    /* A stall now leaves with an answer attached rather than a diagnosis. The
+       full reasoning stays in plateauPlan.why for an audit; the plan carries
+       what was decided and what it means for the week. */
+    plateau: { responses: plateauPlan.responses, summary: plateauPlan.summary },
     /* What we would have used and did not have, so a plan can say what would
        sharpen it rather than silently guessing. */
     missing: [
