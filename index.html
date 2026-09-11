@@ -10729,8 +10729,14 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = []) {
   const said = (Array.isArray(notes) ? notes : []).filter((n) => typeof n === "string" && n.trim()).slice(0, 3);
   const wu = workout.warmup || [];
   const cd = workout.cooldown || [];
-  const stretchLine = wu.length || cd.length
-    ? `Opens with ${wu.length ? `a ${wu.length} move warm-up` : "no warm-up"}, closes with ${cd.length ? `${cd.length} ${cd.some((m) => m.kind === "mobility") ? "mobility moves" : "stretches"}` : "no cool-down"}. Timed, and you can skip either.`
+  /* Only mention the halves that exist: the old template printed "Opens with
+     no warm-up" and "a 8 move warm-up". */
+  const coolWord = cd.some((m) => m.kind === "mobility") ? "mobility moves" : "stretches";
+  const parts = [];
+  if (wu.length) parts.push(`opens with ${wu.length === 8 || wu.length === 11 ? "an" : "a"} ${wu.length} move warm-up`);
+  if (cd.length) parts.push(`closes with ${cd.length} ${coolWord}`);
+  const stretchLine = parts.length
+    ? `${parts.join(", ")[0].toUpperCase()}${parts.join(", ").slice(1)}. Timed, and you can skip either.`
     : "";
   /* The one unprompted offer, and it is here rather than in onboarding because
      a limit is a constraint on how a goal gets trained for, not a goal: asking
@@ -11161,6 +11167,15 @@ async function generateWorkout(forDate) {
         ? { warmup: data.workout.warmup || [], cooldown: data.workout.cooldown || [], skipped: false }
         : null,
       archived: false,
+      /* The other two writers of this row clear these and the generator did
+         not, so generating a second workout on a day you had already finished
+         wrote a brand new plan carrying the old completion. Home then read
+         "no plan today" and offered to plan tomorrow, the calendar showed the
+         day as trained rather than planned, and the new workout's summary
+         reported the first one's duration. "Legs this morning, arms tonight"
+         is an ordinary Saturday. */
+      completed_at: null,
+      duration_sec: null,
     }, { onConflict: "email,entry_date" });
     // Supabase upsert does not throw on its own -- it was failing silently here, which
     // would show "Workout ready" even though nothing was actually saved. Checking .error
@@ -11413,6 +11428,11 @@ function todaysLoggedExerciseNames() {
 
 function startWorkout() {
   if (!TODAY_WORKOUT) return;
+  /* Remove every exercise and Begin Workout used to land straight on
+     "Workout Complete, 0 of 0 exercises" with confetti, because an empty plan
+     is neither started nor finished by the counts and startWorkout read
+     index 0 >= length 0 as "everything is done". */
+  if (!TODAY_WORKOUT.exercises?.length) { toast("Add an exercise first"); return; }
   SESSION_LAST_EX = null;   // a new session always slides its first exercise in
   const chosenPrivacy = PENDING_PRIVACY || defaultWorkoutPrivacy();
   PENDING_PRIVACY = null;
@@ -11453,7 +11473,7 @@ function startWorkout() {
      not been skipped for the day. Resuming a session that already logged a set
      never goes back to it: the warm-up is for cold muscles. */
   const mob = planMobility();
-  if (mob && !mob.skipped && mob.warmup.length && !SESSION.completed.some(Boolean)) {
+  if (mob && !mob.skippedWarmup && mob.warmup.length && !SESSION.completed.some(Boolean)) {
     SESSION.phase = "warmup";
     SESSION.stretchIndex = 0;
     SESSION.stretchSide = 1;
@@ -11476,7 +11496,13 @@ function sessionMatchesPlan(saved) {
     && saved.setsDone.every(Array.isArray)
     && Number.isInteger(saved.exerciseIndex)
     && saved.exerciseIndex >= 0
-    && saved.exerciseIndex < n;
+    /* A cool-down sits one past the last lift on purpose: every exercise is
+       banked and the index has run off the end. Requiring `< n` threw that
+       session away on any reload, and since finishWorkout only runs at the
+       END of the cool-down, the day was never banked at all: no gym row, no
+       streak, no summary, and a live session left broadcasting. The lifts
+       survived in exercise_logs, which is what made it easy to miss. */
+    && (saved.exerciseIndex < n || (saved.phase === "cooldown" && saved.exerciseIndex === n));
 }
 
 /* Load a saved session into memory, but do NOT take over the screen. Opening a
@@ -11526,6 +11552,7 @@ function reopenSession() {
   }
   startLive();
   openSessionUI();
+  restampStretchClock();   // coming back to a hold restarts it, see above
   $("workoutContent").classList.add("hidden");
   if (SESSION.pausedAt) {
     $("sessionPauseBtn").innerHTML = icon("play", 18);
@@ -11845,12 +11872,24 @@ async function logSetsForExercise(ei) {
 /* Sets ticked on the exercise you are standing on are work that happened.
    Ending early or discarding used to drop them on the floor, because nothing
    wrote a row until Next exercise was tapped. */
+/* Every exercise with a ticked set, not only the one you are standing on.
+   "Machine taken? Do another first" deliberately leaves your sets behind on
+   the exercise you left, and this only ever banked exerciseIndex, so ticking
+   two sets of bench, jumping to incline, and ending the workout threw the
+   bench sets away without a word. The confirm even said "nothing is logged on
+   this exercise yet", which was true of where you were standing and silent
+   about the two sets it was about to destroy. */
 async function bankCurrentExercise() {
   if (!SESSION || SESSION.finished) return false;
-  const ei = SESSION.exerciseIndex;
-  if (!TODAY_WORKOUT?.exercises?.[ei] || SESSION.completed[ei]) return false;
-  if (!(await logSetsForExercise(ei))) return false;
-  SESSION.completed[ei] = true;
+  let banked = false;
+  for (let ei = 0; ei < (TODAY_WORKOUT?.exercises?.length || 0); ei++) {
+    if (SESSION.completed[ei]) continue;
+    if (!(SESSION.setsDone?.[ei] || []).some(Boolean)) continue;
+    if (!(await logSetsForExercise(ei))) continue;
+    SESSION.completed[ei] = true;
+    banked = true;
+  }
+  if (!banked) return false;
   SESSION.restStartedAt = null;
   stopRestTicker();
   saveSessionToStorage();
@@ -11864,6 +11903,19 @@ let ENDING_SESSION = false;
    before the summary is drawn. */
 async function endWorkoutNow() {
   if (ENDING_SESSION || !SESSION) return;
+  /* From inside the cool-down every set is already banked and the index has
+     run past the last lift, so the usual "nothing is logged on this exercise
+     yet" line was both alarming and false. */
+  if (SESSION.phase === "cooldown") {
+    const ok = await askConfirm({
+      heading: "Finish here?",
+      body: "Your workout is saved. You are only skipping the rest of the cool-down.",
+      ok: "Finish",
+    });
+    if (!ok) return;
+    endStretchPhase();
+    return;
+  }
   const ei = SESSION.exerciseIndex;
   const ticked = (SESSION.setsDone?.[ei] || []).filter(Boolean).length;
   const left = SESSION.completed.filter((c, i) => !c && i !== ei).length;
@@ -11911,7 +11963,7 @@ async function doFinishExerciseAndAdvance() {
        waits until the holds are done or skipped. Ending early (endWorkoutNow)
        does not come through here, so someone leaving is never held back. */
     const mob = planMobility();
-    if (mob && !mob.skipped && mob.cooldown.length) {
+    if (mob && !mob.skippedCooldown && mob.cooldown.length) {
       SESSION.phase = "cooldown";
       SESSION.stretchIndex = 0;
       SESSION.stretchSide = 1;
@@ -12011,6 +12063,11 @@ function stretchAdvance() {
 function endStretchPhase() {
   if (!SESSION) return;
   stopStretchTicker();
+  /* Leaving the block leaves its colour behind too. Only renderSession used to
+     clear this, and the cool-down branch below never reaches it, so a workout
+     that finished through a cool-down ended on a blue summary screen while one
+     without a cool-down ended on the normal palette: same screen, two looks. */
+  $("sessionCard").classList.remove("stretching");
   const was = SESSION.phase;
   SESSION.phase = "lift";
   SESSION.stretchIndex = 0;
@@ -12059,6 +12116,20 @@ function stretchBlockSeconds(list) {
   return (list || []).reduce((t, m) => t + (Number(m.seconds) || 0) * (m.perSide ? 2 : 1), 0);
 }
 
+/* The clock for the move on screen. Re-stamped whenever a stretch phase is
+   re-entered rather than only when the move changes, because stretchStartedAt
+   is an absolute timestamp: after a pause, a reload or a minimise it is
+   already in the past, so paintStretch found the hold expired and advanced.
+   Every route back in skipped the move you were standing on, with no input
+   from you. Resuming restarts the hold, which is also the honest behaviour:
+   you stopped holding it when you put the phone down. */
+function restampStretchClock() {
+  if (!SESSION) return;
+  if (SESSION.phase !== "warmup" && SESSION.phase !== "cooldown") return;
+  SESSION.stretchStartedAt = Date.now();
+  saveSessionToStorage();
+}
+
 function renderStretchPhase() {
   const list = stretchList();
   const i = SESSION.stretchIndex || 0;
@@ -12088,7 +12159,7 @@ function renderStretchPhase() {
       <span class="stretch-banner-icon">${icon(isWarm ? "flame" : "heart", 19)}</span>
       <div class="stretch-banner-body">
         <div class="stretch-banner-title">${isWarm ? "Warming up" : "Cooling down"}</div>
-        <div class="stretch-banner-sub">${Math.round(blockSec / 60)} min in total · about ${leftMin} min left</div>
+        <div class="stretch-banner-sub">${Math.max(1, Math.round(blockSec / 60))} min in total · about ${leftMin} min left</div>
         <div class="stretch-pips">${list.map((_, n) => `<i class="${n < i ? "done" : n === i ? "now" : ""}"></i>`).join("")}</div>
       </div>
     </div>
@@ -12640,6 +12711,7 @@ function openSessionUI() {
   // Last session's completion screen left this on, which would hide the clock
   // and the pause button on the next workout.
   $("sessionCard").classList.remove("finished");
+  $("sessionCard").classList.remove("stretching");   // never leak a block's colour into the next workout
   $("sessionPauseBtn").innerHTML = icon("pause", 18);
   $("sessionPauseBtn").onclick = togglePause;
   $("sessionMinBtn").innerHTML = icon("chevronDown", 20);
@@ -12664,6 +12736,13 @@ function minimiseSession() {
 
 function closeSessionUI() {
   stopSessionTimer();
+  /* The stretch clock ticks every 250ms and advances the block on its own, so
+     leaving it running against a closed overlay finished the workout behind
+     the user's back: minimise during a cool-down, wait, and paintStretch ran
+     off the end of the block into renderSessionComplete with nothing on
+     screen. The day was banked, the live session torn down and confetti
+     thrown into a hidden node, while the workout tab still offered Resume. */
+  stopStretchTicker();
   renderClipPill();
   document.body.classList.remove("session-open");
   const card = $("sessionCard");
@@ -12681,6 +12760,7 @@ function togglePause() {
     SESSION.pausedAt = null;
     $("sessionPauseBtn").innerHTML = icon("pause", 18);
     $("sessionTimer").classList.remove("paused");
+    restampStretchClock();   // a held stretch restarts rather than skipping itself
     saveSessionToStorage();
     startSessionTimer();
     renderSession();
@@ -14444,28 +14524,44 @@ async function saveManualWorkout() {
 function planMobility() {
   const m = TODAY_WORKOUT?.mobility;
   if (!m || typeof m !== "object") return null;
-  return { warmup: Array.isArray(m.warmup) ? m.warmup : [], cooldown: Array.isArray(m.cooldown) ? m.cooldown : [], skipped: !!m.skipped };
+  /* Per block, falling back to the single old flag so rows written before
+     this split keep behaving the way they read. */
+  return {
+    warmup: Array.isArray(m.warmup) ? m.warmup : [],
+    cooldown: Array.isArray(m.cooldown) ? m.cooldown : [],
+    skipped: !!m.skipped,
+    skippedWarmup: m.skippedWarmup ?? !!m.skipped,
+    skippedCooldown: m.skippedCooldown ?? !!m.skipped,
+  };
 }
 
 function stretchBlockHTML(which, finished) {
   const m = planMobility();
   if (!m || finished) return "";
   const list = m[which];
+  const skipped = which === "warmup" ? m.skippedWarmup : m.skippedCooldown;
+  /* The skipped notice comes BEFORE the empty check on purpose. It used to sit
+     after it, so a day whose warm-up was empty (every move ruled out by a hurt
+     joint or missing kit) rendered nothing at all once skipped, and Put it back
+     was unreachable for the rest of the day. The notice is drawn by whichever
+     block actually has moves, so there is always exactly one way back. */
+  if (skipped) {
+    const firstWithMoves = m.warmup.length ? "warmup" : m.cooldown.length ? "cooldown" : null;
+    if (which !== firstWithMoves) return "";
+    return `
+      <div class="muted-note" style="margin:6px 0 10px;">Stretching skipped today.
+        <button type="button" class="link-btn" data-stretch-undo>Put it back</button></div>`;
+  }
   if (!list.length) return "";
   const title = which === "warmup" ? "Warm-up" : "Cool-down";
   const mins = Math.max(1, Math.round(stretchBlockSeconds(list) / 60));
-  if (m.skipped) {
-    return which === "warmup" ? `
-      <div class="muted-note" style="margin:6px 0 10px;">Stretching skipped today.
-        <button type="button" class="link-btn" data-stretch-undo>Put it back</button></div>` : "";
-  }
   /* The same blue that takes over the session screen, used here as a stripe
      down the block so the overview already tells you which parts of this
      workout are stretching and which are lifting. */
   return `
     <div class="workout-progress-row stretch-row" style="margin-top:${which === "warmup" ? 0 : 12}px;">
       <span>${title} · about ${mins} min</span>
-      ${which === "warmup" ? `<button type="button" class="link-btn" data-stretch-skip>Skip today</button>` : ""}
+      ${which === (m.warmup.length ? "warmup" : "cooldown") ? `<button type="button" class="link-btn" data-stretch-skip>Skip today</button>` : ""}
     </div>
     <div class="reorder-list stretch-list">
       ${list.map((s) => `<div class="exercise-row">
@@ -14481,14 +14577,38 @@ function stretchBlockHTML(which, finished) {
 
 /* One tap, one row update, and nothing about the lifts moves. The write goes
    to the same row the plan lives on, so a reload shows the same answer. */
-async function setStretchSkipped(skipped) {
+/* `which` is "warmup", "cooldown", or omitted for both (the plan overview's
+   one control, which covers the whole day's stretching). Stored per block so
+   skipping the warm-up in the gym cannot silently cancel the cool-down that
+   is still forty minutes away. `skipped` stays written for older rows and for
+   anything that only reads one flag. */
+async function setStretchSkipped(skipped, which = null) {
   const m = planMobility();
   if (!m || !TODAY_WORKOUT?.id) return;
-  const next = { ...m, skipped };
+  const next = { ...m };
+  if (which === "warmup") next.skippedWarmup = skipped;
+  else if (which === "cooldown") next.skippedCooldown = skipped;
+  else { next.skipped = skipped; next.skippedWarmup = skipped; next.skippedCooldown = skipped; }
   TODAY_WORKOUT.mobility = next;
   renderPlanPreview();
   const { error } = await sb.from("ai_workouts").update({ mobility: next }).eq("id", TODAY_WORKOUT.id);
   if (error) { console.error(error); toast("That didn't save"); }
+}
+
+/* The three plan-preview edits (reorder, add, remove) all write the same
+   column. Unchecked they left the screen showing an edit the server never
+   took; reloading on failure is what puts the two back in step. */
+async function savePlanExercises() {
+  if (!TODAY_WORKOUT?.id) return false;
+  const { error } = await sb.from("ai_workouts")
+    .update({ exercises: TODAY_WORKOUT.exercises }).eq("id", TODAY_WORKOUT.id);
+  if (error) {
+    console.error("plan edit not saved", error);
+    toast("Couldn't save that change");
+    await loadAll();
+    return false;
+  }
+  return true;
 }
 
 function renderPlanPreview() {
