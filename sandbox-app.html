@@ -141,6 +141,15 @@
   * { box-sizing: border-box; }
   ::selection { background: var(--accent); color: var(--on-accent); }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* Sheets take focus on open; the sheet itself is a focus target, not a
+     control, so it must not draw a ring of its own. */
+  .sheet-scrim > [tabindex="-1"]:focus-visible,
+  .pop-scrim > [tabindex="-1"]:focus-visible,
+  .clip-scrim > [tabindex="-1"]:focus-visible { outline: none; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
   html, body {
     margin: 0; padding: 0;
     background: var(--bg);
@@ -546,8 +555,14 @@
     --accent-ink: var(--stretch-ink);
     --on-accent: var(--on-stretch);
     --gold: var(--stretch);
+    /* Two layers, and the flat one matters: the first cut used only the
+       radial, which faded out by the middle of the screen, so a short block
+       on a tall phone left the bottom half sitting in the normal grey and the
+       effect read as a banner rather than a mode. The wash now holds all the
+       way down, strongest at the top where the eye lands. */
     background:
-      radial-gradient(120% 55% at 50% 0%, color-mix(in srgb, var(--stretch) 22%, transparent) 0%, transparent 72%),
+      radial-gradient(125% 60% at 50% 0%, color-mix(in srgb, var(--stretch) 26%, transparent) 0%, transparent 78%),
+      linear-gradient(180deg, color-mix(in srgb, var(--stretch) 13%, transparent) 0%, color-mix(in srgb, var(--stretch) 9%, transparent) 100%),
       var(--bg);
   }
   /* The panels lift toward the hue too, or a blue screen with grey cards on it
@@ -719,7 +734,9 @@
     font-variant-numeric: tabular-nums; -moz-appearance: textfield; padding: 8px 4px;
   }
   .sess-input::-webkit-outer-spin-button, .sess-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  .sess-input:focus { outline: none; }
+  /* The ring is dropped because it boxes the big number awkwardly, so the
+     border has to carry the focus signal instead of nothing carrying it. */
+  .sess-input:focus { outline: none; border-color: var(--accent); }
 
   .btn-outline {
     background: var(--panel); border: 1px solid var(--border); color: var(--text);
@@ -4362,7 +4379,9 @@ function applyAccentColors() {
 /* ---------- Auth ---------- */
 
 function initOnboard() {
-  const theme = localStorage.getItem(THEME_KEY) || "light";
+  // iOS private browsing can throw here, and this runs before first paint.
+  let theme = "light";
+  try { theme = localStorage.getItem(THEME_KEY) || "light"; } catch {}
   applyTheme(theme);
 
   sb.auth.onAuthStateChange((event, session) => {
@@ -4635,7 +4654,7 @@ function renderPairingScreen() {
   ob.querySelectorAll("[data-setup]").forEach((b) => {
     b.onclick = () => chooseSetup(b.dataset.setup);
   });
-  $("pairSignOutBtn").onclick = () => sb.auth.signOut();
+  $("pairSignOutBtn").onclick = () => { clearLocalAccountState(); sb.auth.signOut(); };
 }
 
 async function chooseSetup(key) {
@@ -4655,11 +4674,19 @@ async function chooseSetup(key) {
     seat_limit: spec.seats,
   }).select().single();
   if (error) { toast("Could not set that up"); console.error(error); return; }
-  await sb.from("group_members").insert({
+  const { error: memberErr } = await sb.from("group_members").insert({
     group_id: data.id, email: MY_EMAIL,
     role: "coach",
     accepted_at: new Date().toISOString(),
   });
+  /* Without this the user owns a group they are not a member of, which nothing
+     in the app can read, and choosing again just makes another one. */
+  if (memberErr) {
+    console.error(memberErr);
+    await sb.from("groups").delete().eq("id", data.id);
+    toast("Could not set that up");
+    return;
+  }
   localStorage.setItem(SOLO_KEY, "1");        // no partner wall while the roster fills up
   renderCoachHandoff();
 }
@@ -6035,6 +6062,7 @@ function switchTab(tab) {
 const WRITE_QUEUE_KEY = "ft_write_queue_v1";
 function writeQueueKey() { return MY_EMAIL ? `${WRITE_QUEUE_KEY}_${MY_EMAIL}` : null; }
 let FLUSHING = false;
+let LAST_QUEUED_ID = null;
 
 function readQueue() {
   const key = writeQueueKey();
@@ -6114,7 +6142,11 @@ async function safeWrite(table, op, payload, opts) {
     }
   }
   const q = readQueue();
-  q.push({ table, op, payload, opts, at: Date.now() });
+  /* The job carries the id applyLocally will mirror, so deleting a row that
+     never reached the server can drop the write that would resurrect it. A
+     random suffix because two sets can be logged in the same millisecond. */
+  LAST_QUEUED_ID = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  q.push({ id: LAST_QUEUED_ID, table, op, payload, opts, at: Date.now() });
   saveQueue(q);
   renderConnBanner();
   return false;
@@ -6138,7 +6170,10 @@ async function flushQueue({ quiet = false } = {}) {
     }
   }
   if (dropped) toast(`${dropped} change${dropped === 1 ? "" : "s"} could not be saved`);
-  saveQueue(stuck);
+  /* Anything queued WHILE this flush ran was appended after the snapshot.
+     Writing `stuck` alone would throw those away after telling the user they
+     were saved offline. */
+  saveQueue(stuck.concat(readQueue().slice(q.length)));
   FLUSHING = false;
   renderConnBanner();
 
@@ -6168,12 +6203,13 @@ function renderConnBanner() {
 
 /* Mirror a queued write into memory so the UI reflects it immediately. */
 function applyLocally(table, payload) {
+  const localId = LAST_QUEUED_ID || `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   if (table === "exercise_logs") {
-    ALL_EXERCISE_LOGS.push({ ...payload, id: `local-${Date.now()}`, created_at: new Date().toISOString() });
+    ALL_EXERCISE_LOGS.push({ ...payload, id: localId, created_at: new Date().toISOString() });
   } else if (table === "fit_entries") {
     const i = ALL_ENTRIES.findIndex((e) => e.email === payload.email && e.entry_date === payload.entry_date);
     if (i >= 0) ALL_ENTRIES[i] = { ...ALL_ENTRIES[i], ...payload };
-    else ALL_ENTRIES.push({ ...payload, id: `local-${Date.now()}` });
+    else ALL_ENTRIES.push({ ...payload, id: localId });
   }
 }
 
@@ -6196,15 +6232,20 @@ async function resetMyData() {
     /* milestone_badges is deliberately not in this list: the table has no
        DELETE policy, so a client delete would silently remove nothing. The
        card copy says badges are kept rather than promising otherwise. */
+    /* supabase-js resolves with { error } rather than throwing, so the catch
+       below never sees a rejected delete. Raise the first one instead of
+       telling the user everything was wiped when nothing was. */
     for (const t of ["exercise_logs", "body_photos", "ai_workouts", "fit_entries", "challenge_completions", "saved_workouts"]) {
-      await sb.from(t).delete().eq("email", MY_EMAIL);
+      const { error } = await sb.from(t).delete().eq("email", MY_EMAIL);
+      if (error) throw error;
     }
-    await sb.from("profiles").update({ bonus_xp: 0 }).eq("email", MY_EMAIL);
+    const { error: pErr } = await sb.from("profiles").update({ bonus_xp: 0 }).eq("email", MY_EMAIL);
+    if (pErr) throw pErr;
 
     SESSION = null;
     TODAY_WORKOUT = null;
     clearSessionStorage();
-    try { localStorage.removeItem(WRITE_QUEUE_KEY); } catch {}
+    try { const k = writeQueueKey(); if (k) localStorage.removeItem(k); } catch {}
 
     toast("Everything reset");
     await loadAll();
@@ -6216,6 +6257,7 @@ async function resetMyData() {
     console.error(err);
     toast("Could not reset your data");
   } finally {
+    btn.disabled = false;
     btn.textContent = "Wipe everything";
   }
 }
@@ -6240,10 +6282,8 @@ async function deleteMyAccount() {
     if (!res.ok || !out.ok) throw new Error(out.error || "delete failed");
 
     // Clear anything held on this device before signing out for good.
-    try {
-      localStorage.removeItem(WRITE_QUEUE_KEY);
-      clearSessionStorage();
-    } catch {}
+    clearSessionStorage();
+    clearLocalAccountState();
     await sb.auth.signOut();
     location.reload();
   } catch (err) {
@@ -6388,7 +6428,10 @@ function restDaysUsed(name, days = 7) {
   const cutoff = new Date(todayStr() + "T00:00:00");
   cutoff.setDate(cutoff.getDate() - (days - 1));
   const from = isoDate(cutoff);
-  return entriesFor(name).filter((e) => e.rest_day && e.entry_date >= from).length;
+  // Bounded at today: a rest day dated in the future was spending the
+  // allowance for a window it is not even in.
+  const to = todayStr();
+  return entriesFor(name).filter((e) => e.rest_day && e.entry_date >= from && e.entry_date <= to).length;
 }
 
 function restDaysLeft(name) {
@@ -6526,7 +6569,7 @@ const MILESTONE_BADGES = [
     check: () => {
       const days = new Set(ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME).map((l) => l.entry_date));
       for (const d of days) {
-        const next = isoDate(new Date(new Date(d + "T00:00:00").getTime() + 86400000));
+        const next = shiftDate(d, 1);
         const vol = computeMuscleVolumeBetween(ME, d, next);
         if (MUSCLE_GROUPS.every((g) => vol[g] > 0)) return true;
       }
@@ -6566,7 +6609,7 @@ const MILESTONE_BADGES = [
     check: () => {
       const weeks = new Set(entriesFor(ME).filter((e) => e.gym).map((e) => weekStartOf(e.entry_date)));
       for (const ws of weeks) {
-        const end = isoDate(new Date(new Date(ws + "T00:00:00").getTime() + 7 * 86400000));
+        const end = shiftDate(ws, 7);
         const vol = computeMuscleVolumeBetween(ME, ws, end);
         if (MUSCLE_GROUPS.every((g) => vol[g] > 0)) return true;
       }
@@ -6591,8 +6634,13 @@ const MILESTONE_BADGES = [
         const best = {};
         const weeks = new Set();
         for (const l of logs) {
-          const key = l.exercise_name.toLowerCase();
-          if (!(key in best) || l.weight > best[key]) { best[key] = l.weight; weeks.add(weekStartOf(l.entry_date)); }
+          const key = (l.exercise_name || "").trim().toLowerCase();
+          /* The same rule as personalRecords: the first time you ever do a
+             movement is not a record, it is the baseline. Counting it here
+             unlocked "Both of you, new bests" from one set each. */
+          const prev = best[key];
+          if (prev != null && l.weight > prev) weeks.add(weekStartOf(l.entry_date));
+          if (prev == null || l.weight > prev) best[key] = l.weight;
         }
         return weeks;
       };
@@ -6610,7 +6658,7 @@ const MILESTONE_BADGES = [
       const bw = currentWeightLb(ME);
       if (!bw) return false;
       return ALL_EXERCISE_LOGS.some((l) => l.user_name === ME && l.weight != null &&
-        l.exercise_name.toLowerCase().includes("bench press") && l.weight >= bw);
+        (l.exercise_name || "").toLowerCase().includes("bench press") && l.weight >= bw);
     } },
 
   { id: "first_photo", category: "Keeping the record", color: "#4a5160",
@@ -6724,6 +6772,14 @@ function renderMilestoneBadges() {
 
 /* XP earned inside a date window. Ranks run on the CURRENT SEASON only,
    which is what makes a season reset meaningful; badges are kept forever. */
+/* Exercises finished, not rows written. A weight ladder writes one row per
+   rung, so 100/110/120 on one lift used to score three exercises against a
+   rule the explainer states as "+5 every exercise you finish", and against a
+   completion screen that counts the same thing once. */
+function distinctExerciseCount(logs) {
+  return new Set(logs.map((l) => `${l.entry_date}|${(l.exercise_name || "").trim().toLowerCase()}`)).size;
+}
+
 function computeXPBetween(name, from, to) {
   const inRange = (d) => (!from || d >= from) && (!to || d <= to);
   const gymDays = entriesFor(name).filter((e) => e.gym && inRange(e.entry_date)).length;
@@ -6732,7 +6788,7 @@ function computeXPBetween(name, from, to) {
   // count toward rank XP until it does (or the session is abandoned).
   const hidden = bodyHiddenToday(name);
   const countedLogs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && inRange(l.entry_date) && !isBodyHidden(l, hidden));
-  const exerciseCount = countedLogs.length;
+  const exerciseCount = distinctExerciseCount(countedLogs);
 
   const profile = ALL_PROFILES.find((p) => p.user_name === name);
   const email = profile?.email;
@@ -6767,7 +6823,7 @@ function effortXPBetween(name, from, to) {
   // cannot count a set that has not been decided yet either.
   const hidden = bodyHiddenToday(name);
   const countedLogs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && inRange(l.entry_date) && !isBodyHidden(l, hidden));
-  const exerciseCount = countedLogs.length;
+  const exerciseCount = distinctExerciseCount(countedLogs);
   const { prLogIds } = personalRecords(name);
   const prCount = countedLogs.filter((l) => prLogIds.has(l.id)).length;
   return gymDays * 10 + exerciseCount * 5 + prCount * 25;
@@ -7057,7 +7113,7 @@ function renderRestDayPrompt() {
   banner.innerHTML = `
     <div class="rest-copy">
       <strong>Missed yesterday?</strong>
-      <span>Call it a rest day and keep your ${streak > 0 ? streak + " day " : ""}streak. ${restDaysLeft(ME)} left this week.</span>
+      <span>Call it a rest day and keep your ${streak > 0 ? streak + " day " : ""}streak. ${restDaysLeft(ME)} left of ${REST_ALLOWANCE} in any 7 days.</span>
     </div>
     <button type="button" class="rest-btn" id="restDayBtn">Rest day</button>`;
   $("restDayBtn").onclick = () => markRestDay(save);
@@ -7666,7 +7722,8 @@ function openNextWorkoutReview(plan) {
   $("nwClose").onclick = closeNextWorkoutReview;
   $("nwClear").onclick = async () => {
     if (!confirm(`Clear tomorrow's ${title}? You can plan another.`)) return;
-    await sb.from("ai_workouts").delete().eq("id", plan.id);
+    const { error } = await sb.from("ai_workouts").delete().eq("id", plan.id);
+    if (error) { console.error(error); toast("Couldn't clear that workout"); return; }
     closeNextWorkoutReview();
     await loadAll();
     renderHero();
@@ -7891,6 +7948,10 @@ function relDayLabel(date) {
   const y = new Date(today + "T00:00:00");
   y.setDate(y.getDate() - 1);
   if (date === isoDate(y)) return "Yesterday";
+  /* Past six days a bare weekday name stops identifying a day: recentActivity
+     walks the six most recent gym days, which can be weeks apart, and two
+     different Mondays read identically. */
+  if (date < shiftDate(today, -6)) return datedLabel(date);
   return new Date(date + "T00:00:00").toLocaleDateString(undefined, { weekday: "long" });
 }
 
@@ -8131,6 +8192,11 @@ function renderHero(animate = false) {
     cta = `<p class="hero-planned">${icon("check", 14)} Tomorrow: ${escapeHtml(displayFocus(planned.focus, planned.exercises))}</p>
            <button type="button" class="btn-cta" id="heroReviewBtn">${icon("dumbbell", 22)} Review Next Workout
              <span class="go">${icon("chevronRight", 22)}</span></button>`;
+  } else if (isCoachedClient()) {
+    // The choose screen and the day planner already hide generate for a
+    // coached client. Offering it here only to refuse after the tap is worse
+    // than not offering it.
+    cta = heroLine("Your coach sets your workouts.");
   } else {
     cta = ctaBtn("Plan Tomorrow's Workout");
   }
@@ -8149,8 +8215,8 @@ function renderHero(animate = false) {
     ${partner && (myWeekXP > 0 || theirWeekXP > 0) ? `<div class="hero-effort">
       <button type="button" class="he-label" id="effortInfoBtn" aria-label="How effort is scored">${icon("bolt", 13)} Effort this week <span class="i-glyph">${icon("info", 13)}</span></button>
       <span class="he-scores">
-        <span class="he-you${myWeekXP >= theirWeekXP ? " lead" : ""}">You <b data-xp="${myWeekXP}" data-delay="380">${animate ? 0 : myWeekXP}</b></span>
-        <span class="he-them${theirWeekXP > myWeekXP ? " lead" : ""}">${escapeHtml(partner)} <b data-xp="${theirWeekXP}" data-delay="480">${animate ? 0 : theirWeekXP}</b></span>
+        <span class="he-you${myWeekXP >= theirWeekXP ? " lead" : ""}">You <b data-xp="${myWeekXP}" data-delay="380">${animate ? 0 : myWeekXP}</b>${myWeekXP > theirWeekXP ? `<span class="sr-only"> effort points, ahead</span>` : `<span class="sr-only"> effort points</span>`}</span>
+        <span class="he-them${theirWeekXP > myWeekXP ? " lead" : ""}">${escapeHtml(partner)} <b data-xp="${theirWeekXP}" data-delay="480">${animate ? 0 : theirWeekXP}</b>${theirWeekXP > myWeekXP ? `<span class="sr-only"> effort points, ahead</span>` : `<span class="sr-only"> effort points</span>`}</span>
       </span>
     </div>` : ""}
     ${cta}`;
@@ -9097,7 +9163,10 @@ function nameFor(email) {
   const e = (email || "").toLowerCase();
   if (e === MY_EMAIL) return ME;
   if (e === (PARTNER_EMAIL || "").toLowerCase()) return partnerName();
-  return e.split("@")[0];
+  // In a coach group everyone else is a third person, and ALL_PROFILES already
+  // holds their real name. An email prefix is the last resort, not the rule.
+  const p = ALL_PROFILES.find((x) => (x.email || "").toLowerCase() === e);
+  return p?.user_name || e.split("@")[0];
 }
 
 async function timelineItemHTML(item) {
@@ -9521,6 +9590,16 @@ async function deleteExerciseLog(id, date) {
     cancel: "Keep it",
   });
   if (!ok) return;
+  /* A row that never reached the server has no id to delete. Dropping the
+     queued insert IS the delete: without it the set reappears on reconnect. */
+  if (String(id).startsWith("local-")) {
+    saveQueue(readQueue().filter((j) => j.id !== id));
+    ALL_EXERCISE_LOGS = ALL_EXERCISE_LOGS.filter((l) => l.id !== id);
+    renderConnBanner();
+    toast("Removed");
+    openDaySheet(MY_EMAIL, date);
+    return;
+  }
   const { error } = await sb.from("exercise_logs").delete().eq("id", id);
   if (error) { toast("Could not remove"); console.error(error); return; }
   toast("Removed");
@@ -9643,7 +9722,8 @@ async function removeProof() {
   if (!confirm("Delete today's proof photo? This cannot be undone.")) return;
   await sb.storage.from("workout-proof").remove([entry.proof_path]);
   delete PROOF_URL_CACHE[entry.proof_path];
-  await sb.from("fit_entries").update({ proof_path: null }).eq("email", MY_EMAIL).eq("entry_date", todayStr());
+  const { error } = await sb.from("fit_entries").update({ proof_path: null }).eq("email", MY_EMAIL).eq("entry_date", todayStr());
+  if (error) { console.error(error); toast("Could not remove the photo"); return; }
   toast("Photo removed");
   await loadAll();
   renderWorkoutTab();
@@ -10441,9 +10521,13 @@ async function confirmDeleteDay(date) {
       await sb.storage.from("workout-proof").remove([entry.proof_path]);
       delete PROOF_URL_CACHE[entry.proof_path];
     }
-    await sb.from("exercise_logs").delete().eq("email", MY_EMAIL).eq("entry_date", date);
-    await sb.from("ai_workouts").delete().eq("email", MY_EMAIL).eq("entry_date", date);
-    await sb.from("fit_entries").delete().eq("email", MY_EMAIL).eq("entry_date", date);
+    /* supabase-js resolves with { error } instead of throwing, so the catch
+       below never sees a failed delete and the day was reported deleted
+       whatever happened. */
+    for (const t of ["exercise_logs", "ai_workouts", "fit_entries"]) {
+      const { error } = await sb.from(t).delete().eq("email", MY_EMAIL).eq("entry_date", date);
+      if (error) throw error;
+    }
     if (date === todayStr()) { SESSION = null; clearSessionStorage(); TODAY_WORKOUT = null; }
     toast("Deleted");
     await loadAll();
@@ -10710,8 +10794,14 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = []) {
   const said = (Array.isArray(notes) ? notes : []).filter((n) => typeof n === "string" && n.trim()).slice(0, 3);
   const wu = workout.warmup || [];
   const cd = workout.cooldown || [];
-  const stretchLine = wu.length || cd.length
-    ? `Opens with ${wu.length ? `a ${wu.length} move warm-up` : "no warm-up"}, closes with ${cd.length ? `${cd.length} ${cd.some((m) => m.kind === "mobility") ? "mobility moves" : "stretches"}` : "no cool-down"}. Timed, and you can skip either.`
+  /* Only mention the halves that exist: the old template printed "Opens with
+     no warm-up" and "a 8 move warm-up". */
+  const coolWord = cd.some((m) => m.kind === "mobility") ? "mobility moves" : "stretches";
+  const parts = [];
+  if (wu.length) parts.push(`opens with ${wu.length === 8 || wu.length === 11 ? "an" : "a"} ${wu.length} move warm-up`);
+  if (cd.length) parts.push(`closes with ${cd.length} ${coolWord}`);
+  const stretchLine = parts.length
+    ? `${parts.join(", ")[0].toUpperCase()}${parts.join(", ").slice(1)}. Timed, and you can skip either.`
     : "";
   /* The one unprompted offer, and it is here rather than in onboarding because
      a limit is a constraint on how a goal gets trained for, not a goal: asking
@@ -11142,6 +11232,15 @@ async function generateWorkout(forDate) {
         ? { warmup: data.workout.warmup || [], cooldown: data.workout.cooldown || [], skipped: false }
         : null,
       archived: false,
+      /* The other two writers of this row clear these and the generator did
+         not, so generating a second workout on a day you had already finished
+         wrote a brand new plan carrying the old completion. Home then read
+         "no plan today" and offered to plan tomorrow, the calendar showed the
+         day as trained rather than planned, and the new workout's summary
+         reported the first one's duration. "Legs this morning, arms tonight"
+         is an ordinary Saturday. */
+      completed_at: null,
+      duration_sec: null,
     }, { onConflict: "email,entry_date" });
     // Supabase upsert does not throw on its own -- it was failing silently here, which
     // would show "Workout ready" even though nothing was actually saved. Checking .error
@@ -11167,15 +11266,49 @@ async function generateWorkout(forDate) {
   }
 }
 
-function sessionStorageKey() {
-  return `ft_session_${ME}_${todayStr()}`;
+/* Keyed by the day the session STARTED, not the day it happens to be read, and
+   by email rather than the display name. A workout begun at 23:40 otherwise
+   logs its early exercises to one date and the rest to the next, banks the
+   wrong day, and orphans the first day's key forever. */
+function sessionStorageKey(date) {
+  return `ft_session_${MY_EMAIL}_${date || SESSION?.date || todayStr()}`;
+}
+
+/* The one date every write in this session stamps. */
+function sessionDate() {
+  return SESSION?.date || todayStr();
+}
+
+/* Keys a session in progress could be sitting under: today, yesterday (started
+   before midnight), and the pre-email keys of both. */
+function sessionKeyCandidates() {
+  const today = todayStr();
+  const yday = shiftDate(today, -1);
+  return [
+    [`ft_session_${MY_EMAIL}_${today}`, today],
+    [`ft_session_${MY_EMAIL}_${yday}`, yday],
+    [`ft_session_${ME}_${today}`, today],
+    [`ft_session_${ME}_${yday}`, yday],
+  ];
 }
 
 function loadSessionFromStorage() {
-  try {
-    const raw = localStorage.getItem(sessionStorageKey());
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  for (const [key, date] of sessionKeyCandidates()) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const saved = JSON.parse(raw);
+      if (!saved) continue;
+      if (!saved.date) saved.date = date;
+      const want = sessionStorageKey(saved.date);
+      if (key !== want) {
+        localStorage.setItem(want, raw);
+        localStorage.removeItem(key);
+      }
+      return saved;
+    } catch { /* try the next key */ }
+  }
+  return null;
 }
 
 /* ---------- Live session ----------
@@ -11339,11 +11472,19 @@ function saveSessionToStorage() {
   // A banked workout is not something to come back to. Writing it here is what
   // made the tab offer "Resume" for a workout that was already finished.
   if (SESSION.finished) { clearSessionStorage(); return; }
-  localStorage.setItem(sessionStorageKey(), JSON.stringify(SESSION));
+  /* iOS Safari private browsing throws on setItem. An unguarded throw here
+     aborted toggleSet before it re-rendered, freezing the workout mid-set. */
+  try { localStorage.setItem(sessionStorageKey(), JSON.stringify(SESSION)); }
+  catch (e) { console.warn("could not save session locally", e); }
 }
 
 function clearSessionStorage() {
-  localStorage.removeItem(sessionStorageKey());
+  // Clear every key the session could be under, so a midnight crossing or a
+  // rename cannot leave one behind to be offered as a resume tomorrow.
+  const keys = new Set([sessionStorageKey(), ...sessionKeyCandidates().map(([k]) => k)]);
+  for (const k of keys) {
+    try { localStorage.removeItem(k); } catch { /* private browsing */ }
+  }
 }
 
 /* A yes or no question asked the way askForName asks for a line of text: a
@@ -11394,6 +11535,11 @@ function todaysLoggedExerciseNames() {
 
 function startWorkout() {
   if (!TODAY_WORKOUT) return;
+  /* Remove every exercise and Begin Workout used to land straight on
+     "Workout Complete, 0 of 0 exercises" with confetti, because an empty plan
+     is neither started nor finished by the counts and startWorkout read
+     index 0 >= length 0 as "everything is done". */
+  if (!TODAY_WORKOUT.exercises?.length) { toast("Add an exercise first"); return; }
   SESSION_LAST_EX = null;   // a new session always slides its first exercise in
   const chosenPrivacy = PENDING_PRIVACY || defaultWorkoutPrivacy();
   PENDING_PRIVACY = null;
@@ -11401,6 +11547,9 @@ function startWorkout() {
   SESSION = {
     privacy: chosenPrivacy,
     workoutId: TODAY_WORKOUT.id,
+    // Stamped once. Every write in this session uses it, so a workout that
+    // runs past midnight stays one workout on one day.
+    date: todayStr(),
     startedAt: Date.now(),
     elapsedMs: 0,
     pausedAt: null,
@@ -11434,7 +11583,7 @@ function startWorkout() {
      not been skipped for the day. Resuming a session that already logged a set
      never goes back to it: the warm-up is for cold muscles. */
   const mob = planMobility();
-  if (mob && !mob.skipped && mob.warmup.length && !SESSION.completed.some(Boolean)) {
+  if (mob && !mob.skippedWarmup && mob.warmup.length && !SESSION.completed.some(Boolean)) {
     SESSION.phase = "warmup";
     SESSION.stretchIndex = 0;
     SESSION.stretchSide = 1;
@@ -11457,7 +11606,13 @@ function sessionMatchesPlan(saved) {
     && saved.setsDone.every(Array.isArray)
     && Number.isInteger(saved.exerciseIndex)
     && saved.exerciseIndex >= 0
-    && saved.exerciseIndex < n;
+    /* A cool-down sits one past the last lift on purpose: every exercise is
+       banked and the index has run off the end. Requiring `< n` threw that
+       session away on any reload, and since finishWorkout only runs at the
+       END of the cool-down, the day was never banked at all: no gym row, no
+       streak, no summary, and a live session left broadcasting. The lifts
+       survived in exercise_logs, which is what made it easy to miss. */
+    && (saved.exerciseIndex < n || (saved.phase === "cooldown" && saved.exerciseIndex === n));
 }
 
 /* Load a saved session into memory, but do NOT take over the screen. Opening a
@@ -11507,6 +11662,7 @@ function reopenSession() {
   }
   startLive();
   openSessionUI();
+  restampStretchClock();   // coming back to a hold restarts it, see above
   $("workoutContent").classList.add("hidden");
   if (SESSION.pausedAt) {
     $("sessionPauseBtn").innerHTML = icon("play", 18);
@@ -11826,12 +11982,24 @@ async function logSetsForExercise(ei) {
 /* Sets ticked on the exercise you are standing on are work that happened.
    Ending early or discarding used to drop them on the floor, because nothing
    wrote a row until Next exercise was tapped. */
+/* Every exercise with a ticked set, not only the one you are standing on.
+   "Machine taken? Do another first" deliberately leaves your sets behind on
+   the exercise you left, and this only ever banked exerciseIndex, so ticking
+   two sets of bench, jumping to incline, and ending the workout threw the
+   bench sets away without a word. The confirm even said "nothing is logged on
+   this exercise yet", which was true of where you were standing and silent
+   about the two sets it was about to destroy. */
 async function bankCurrentExercise() {
   if (!SESSION || SESSION.finished) return false;
-  const ei = SESSION.exerciseIndex;
-  if (!TODAY_WORKOUT?.exercises?.[ei] || SESSION.completed[ei]) return false;
-  if (!(await logSetsForExercise(ei))) return false;
-  SESSION.completed[ei] = true;
+  let banked = false;
+  for (let ei = 0; ei < (TODAY_WORKOUT?.exercises?.length || 0); ei++) {
+    if (SESSION.completed[ei]) continue;
+    if (!(SESSION.setsDone?.[ei] || []).some(Boolean)) continue;
+    if (!(await logSetsForExercise(ei))) continue;
+    SESSION.completed[ei] = true;
+    banked = true;
+  }
+  if (!banked) return false;
   SESSION.restStartedAt = null;
   stopRestTicker();
   saveSessionToStorage();
@@ -11845,6 +12013,19 @@ let ENDING_SESSION = false;
    before the summary is drawn. */
 async function endWorkoutNow() {
   if (ENDING_SESSION || !SESSION) return;
+  /* From inside the cool-down every set is already banked and the index has
+     run past the last lift, so the usual "nothing is logged on this exercise
+     yet" line was both alarming and false. */
+  if (SESSION.phase === "cooldown") {
+    const ok = await askConfirm({
+      heading: "Finish here?",
+      body: "Your workout is saved. You are only skipping the rest of the cool-down.",
+      ok: "Finish",
+    });
+    if (!ok) return;
+    endStretchPhase();
+    return;
+  }
   const ei = SESSION.exerciseIndex;
   const ticked = (SESSION.setsDone?.[ei] || []).filter(Boolean).length;
   const left = SESSION.completed.filter((c, i) => !c && i !== ei).length;
@@ -11892,7 +12073,7 @@ async function doFinishExerciseAndAdvance() {
        waits until the holds are done or skipped. Ending early (endWorkoutNow)
        does not come through here, so someone leaving is never held back. */
     const mob = planMobility();
-    if (mob && !mob.skipped && mob.cooldown.length) {
+    if (mob && !mob.skippedCooldown && mob.cooldown.length) {
       SESSION.phase = "cooldown";
       SESSION.stretchIndex = 0;
       SESSION.stretchSide = 1;
@@ -11911,7 +12092,7 @@ async function doFinishExerciseAndAdvance() {
 async function logExerciseSilent(name, weight, reps, sets) {
   const w = weight === "" || weight == null ? null : parseFloat(weight);
   const payload = {
-    user_name: ME, email: MY_EMAIL, entry_date: todayStr(), exercise_name: name,
+    user_name: ME, email: MY_EMAIL, entry_date: sessionDate(), exercise_name: name,
     weight: w, reps: reps === "" || reps == null ? null : parseInt(reps, 10), sets: sets || null,
   };
 
@@ -11992,6 +12173,11 @@ function stretchAdvance() {
 function endStretchPhase() {
   if (!SESSION) return;
   stopStretchTicker();
+  /* Leaving the block leaves its colour behind too. Only renderSession used to
+     clear this, and the cool-down branch below never reaches it, so a workout
+     that finished through a cool-down ended on a blue summary screen while one
+     without a cool-down ended on the normal palette: same screen, two looks. */
+  $("sessionCard").classList.remove("stretching");
   const was = SESSION.phase;
   SESSION.phase = "lift";
   SESSION.stretchIndex = 0;
@@ -12010,7 +12196,10 @@ function endStretchPhase() {
    does not offer the same block again. The profile switch is in Setup. */
 async function skipStretchPhase() {
   const was = SESSION?.phase;
-  if (was === "warmup") await setStretchSkipped(true);
+  /* Per block. One shared `skipped` flag meant tapping Skip warm-up quietly
+     cancelled the cool-down as well, an hour before it was due, and the
+     workout ended straight at the summary with no stretching ever offered. */
+  if (was === "warmup" || was === "cooldown") await setStretchSkipped(true, was);
   endStretchPhase();
   if (was === "warmup") toast("Warm-up skipped today");
 }
@@ -12038,6 +12227,20 @@ function preparesLabel(move) {
    so the overview and the session can never quote different numbers. */
 function stretchBlockSeconds(list) {
   return (list || []).reduce((t, m) => t + (Number(m.seconds) || 0) * (m.perSide ? 2 : 1), 0);
+}
+
+/* The clock for the move on screen. Re-stamped whenever a stretch phase is
+   re-entered rather than only when the move changes, because stretchStartedAt
+   is an absolute timestamp: after a pause, a reload or a minimise it is
+   already in the past, so paintStretch found the hold expired and advanced.
+   Every route back in skipped the move you were standing on, with no input
+   from you. Resuming restarts the hold, which is also the honest behaviour:
+   you stopped holding it when you put the phone down. */
+function restampStretchClock() {
+  if (!SESSION) return;
+  if (SESSION.phase !== "warmup" && SESSION.phase !== "cooldown") return;
+  SESSION.stretchStartedAt = Date.now();
+  saveSessionToStorage();
 }
 
 function renderStretchPhase() {
@@ -12069,7 +12272,7 @@ function renderStretchPhase() {
       <span class="stretch-banner-icon">${icon(isWarm ? "flame" : "heart", 19)}</span>
       <div class="stretch-banner-body">
         <div class="stretch-banner-title">${isWarm ? "Warming up" : "Cooling down"}</div>
-        <div class="stretch-banner-sub">${Math.round(blockSec / 60)} min in total · about ${leftMin} min left</div>
+        <div class="stretch-banner-sub">${Math.max(1, Math.round(blockSec / 60))} min in total · about ${leftMin} min left</div>
         <div class="stretch-pips">${list.map((_, n) => `<i class="${n < i ? "done" : n === i ? "now" : ""}"></i>`).join("")}</div>
       </div>
     </div>
@@ -12204,7 +12407,9 @@ function renderSession() {
           const isCurrent = i === currentSet;
           return `<div class="set-col${exChanged ? " h-pop" : ""}" style="--d:${140 + i * 55}ms">
             <button type="button" class="set-circle ${done ? "done" : ""} ${isCurrent ? "current" : ""}${justSet === i ? " just-done" : ""}"
-              data-set="${i}" ${done || isCurrent ? "" : "disabled"}>${done ? icon("check", 18) : i + 1}</button>
+              data-set="${i}" ${done || isCurrent ? "" : "disabled"}
+              aria-pressed="${done ? "true" : "false"}"
+              aria-label="Set ${i + 1}, ${done ? "done" : isCurrent ? "current" : "not started"}">${done ? icon("check", 18) : i + 1}</button>
             <div class="set-weight">${done ? (w != null ? `${w} lb` : "done") : isCurrent ? "pending" : "&nbsp;"}</div>
           </div>`;
         }).join("")}
@@ -12334,9 +12539,11 @@ async function markGymDayDone() {
 }
 
 async function doMarkGymDayDone() {
-  const existing = todayEntryFor(MY_EMAIL);
+  // The day the session started, so a workout across midnight banks one day.
+  const date = sessionDate();
+  const existing = ALL_ENTRIES.find((e) => e.email === MY_EMAIL && e.entry_date === date) || null;
   const payload = {
-    user_name: ME, email: MY_EMAIL, entry_date: todayStr(), gym: true,
+    user_name: ME, email: MY_EMAIL, entry_date: date, gym: true,
     // Capped: a runaway re-render should not be able to claim 16 workouts.
     sessions: Math.min((existing?.sessions || 0) + 1, 12),
     weight: existing?.weight ?? null,
@@ -12361,11 +12568,14 @@ async function finishWorkout() {
   // Persist how long it took and how long the rests were. Without this the
   // workout leaves no record beyond the exercise rows.
   if (TODAY_WORKOUT?.id) {
-    await sb.from("ai_workouts").update({
+    const { error } = await sb.from("ai_workouts").update({
       duration_sec: Math.round(sessionElapsed() / 1000),
       completed_at: new Date().toISOString(),
       rest_log: SESSION.restLog || {},
     }).eq("id", TODAY_WORKOUT.id);
+    // The sets are already saved, so this is not worth blocking the wrap-up
+    // for. It is worth saying, because the recap's time will read as zero.
+    if (error) { console.error("workout duration not saved", error); toast("Couldn't save the workout time"); }
   }
   // A gym day is a real training day, not an open-then-close. Pausing right
   // after Start and tapping End without logging a single set must not bank a
@@ -12510,7 +12720,10 @@ async function sessionDone() {
   // Clear today's plan so the next workout starts fresh rather than
   // reopening the one that was just finished.
   if (TODAY_WORKOUT?.id) {
-    await sb.from("ai_workouts").update({ archived: true }).eq("id", TODAY_WORKOUT.id);
+    // Unchecked, a failed archive left the finished plan to reopen tomorrow
+    // with nothing said about it.
+    const { error } = await sb.from("ai_workouts").update({ archived: true }).eq("id", TODAY_WORKOUT.id);
+    if (error) { console.error("could not archive today's workout", error); toast("Couldn't close off that workout"); }
   }
   TODAY_WORKOUT = null;
   WORKOUT_MODE = null;
@@ -12619,6 +12832,7 @@ function openSessionUI() {
   // Last session's completion screen left this on, which would hide the clock
   // and the pause button on the next workout.
   $("sessionCard").classList.remove("finished");
+  $("sessionCard").classList.remove("stretching");   // never leak a block's colour into the next workout
   $("sessionPauseBtn").innerHTML = icon("pause", 18);
   $("sessionPauseBtn").onclick = togglePause;
   $("sessionMinBtn").innerHTML = icon("chevronDown", 20);
@@ -12643,6 +12857,13 @@ function minimiseSession() {
 
 function closeSessionUI() {
   stopSessionTimer();
+  /* The stretch clock ticks every 250ms and advances the block on its own, so
+     leaving it running against a closed overlay finished the workout behind
+     the user's back: minimise during a cool-down, wait, and paintStretch ran
+     off the end of the block into renderSessionComplete with nothing on
+     screen. The day was banked, the live session torn down and confetti
+     thrown into a hidden node, while the workout tab still offered Resume. */
+  stopStretchTicker();
   renderClipPill();
   document.body.classList.remove("session-open");
   const card = $("sessionCard");
@@ -12660,6 +12881,7 @@ function togglePause() {
     SESSION.pausedAt = null;
     $("sessionPauseBtn").innerHTML = icon("pause", 18);
     $("sessionTimer").classList.remove("paused");
+    restampStretchClock();   // a held stretch restarts rather than skipping itself
     saveSessionToStorage();
     startSessionTimer();
     renderSession();
@@ -14423,28 +14645,44 @@ async function saveManualWorkout() {
 function planMobility() {
   const m = TODAY_WORKOUT?.mobility;
   if (!m || typeof m !== "object") return null;
-  return { warmup: Array.isArray(m.warmup) ? m.warmup : [], cooldown: Array.isArray(m.cooldown) ? m.cooldown : [], skipped: !!m.skipped };
+  /* Per block, falling back to the single old flag so rows written before
+     this split keep behaving the way they read. */
+  return {
+    warmup: Array.isArray(m.warmup) ? m.warmup : [],
+    cooldown: Array.isArray(m.cooldown) ? m.cooldown : [],
+    skipped: !!m.skipped,
+    skippedWarmup: m.skippedWarmup ?? !!m.skipped,
+    skippedCooldown: m.skippedCooldown ?? !!m.skipped,
+  };
 }
 
 function stretchBlockHTML(which, finished) {
   const m = planMobility();
   if (!m || finished) return "";
   const list = m[which];
+  const skipped = which === "warmup" ? m.skippedWarmup : m.skippedCooldown;
+  /* The skipped notice comes BEFORE the empty check on purpose. It used to sit
+     after it, so a day whose warm-up was empty (every move ruled out by a hurt
+     joint or missing kit) rendered nothing at all once skipped, and Put it back
+     was unreachable for the rest of the day. The notice is drawn by whichever
+     block actually has moves, so there is always exactly one way back. */
+  if (skipped) {
+    const firstWithMoves = m.warmup.length ? "warmup" : m.cooldown.length ? "cooldown" : null;
+    if (which !== firstWithMoves) return "";
+    return `
+      <div class="muted-note" style="margin:6px 0 10px;">Stretching skipped today.
+        <button type="button" class="link-btn" data-stretch-undo>Put it back</button></div>`;
+  }
   if (!list.length) return "";
   const title = which === "warmup" ? "Warm-up" : "Cool-down";
   const mins = Math.max(1, Math.round(stretchBlockSeconds(list) / 60));
-  if (m.skipped) {
-    return which === "warmup" ? `
-      <div class="muted-note" style="margin:6px 0 10px;">Stretching skipped today.
-        <button type="button" class="link-btn" data-stretch-undo>Put it back</button></div>` : "";
-  }
   /* The same blue that takes over the session screen, used here as a stripe
      down the block so the overview already tells you which parts of this
      workout are stretching and which are lifting. */
   return `
     <div class="workout-progress-row stretch-row" style="margin-top:${which === "warmup" ? 0 : 12}px;">
       <span>${title} · about ${mins} min</span>
-      ${which === "warmup" ? `<button type="button" class="link-btn" data-stretch-skip>Skip today</button>` : ""}
+      ${which === (m.warmup.length ? "warmup" : "cooldown") ? `<button type="button" class="link-btn" data-stretch-skip>Skip today</button>` : ""}
     </div>
     <div class="reorder-list stretch-list">
       ${list.map((s) => `<div class="exercise-row">
@@ -14460,14 +14698,38 @@ function stretchBlockHTML(which, finished) {
 
 /* One tap, one row update, and nothing about the lifts moves. The write goes
    to the same row the plan lives on, so a reload shows the same answer. */
-async function setStretchSkipped(skipped) {
+/* `which` is "warmup", "cooldown", or omitted for both (the plan overview's
+   one control, which covers the whole day's stretching). Stored per block so
+   skipping the warm-up in the gym cannot silently cancel the cool-down that
+   is still forty minutes away. `skipped` stays written for older rows and for
+   anything that only reads one flag. */
+async function setStretchSkipped(skipped, which = null) {
   const m = planMobility();
   if (!m || !TODAY_WORKOUT?.id) return;
-  const next = { ...m, skipped };
+  const next = { ...m };
+  if (which === "warmup") next.skippedWarmup = skipped;
+  else if (which === "cooldown") next.skippedCooldown = skipped;
+  else { next.skipped = skipped; next.skippedWarmup = skipped; next.skippedCooldown = skipped; }
   TODAY_WORKOUT.mobility = next;
   renderPlanPreview();
   const { error } = await sb.from("ai_workouts").update({ mobility: next }).eq("id", TODAY_WORKOUT.id);
   if (error) { console.error(error); toast("That didn't save"); }
+}
+
+/* The three plan-preview edits (reorder, add, remove) all write the same
+   column. Unchecked they left the screen showing an edit the server never
+   took; reloading on failure is what puts the two back in step. */
+async function savePlanExercises() {
+  if (!TODAY_WORKOUT?.id) return false;
+  const { error } = await sb.from("ai_workouts")
+    .update({ exercises: TODAY_WORKOUT.exercises }).eq("id", TODAY_WORKOUT.id);
+  if (error) {
+    console.error("plan edit not saved", error);
+    toast("Couldn't save that change");
+    await loadAll();
+    return false;
+  }
+  return true;
 }
 
 function renderPlanPreview() {
@@ -14528,11 +14790,11 @@ function renderPlanPreview() {
              <span class="wp-open-go">${icon("chevronRight", 16)}</span>
            </button>` : ""}
          <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume Workout" : "Begin Workout"}</button>
-         ${started ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`}`;
+         ${started || isCoachedClient() ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`}`;
 
   makeReorderable($("planRows"), async (order) => {
     TODAY_WORKOUT.exercises = order.map((i) => TODAY_WORKOUT.exercises[i]);
-    await sb.from("ai_workouts").update({ exercises: TODAY_WORKOUT.exercises }).eq("id", TODAY_WORKOUT.id);
+    await savePlanExercises();
     renderPlanPreview();
   });
 
@@ -14562,7 +14824,7 @@ function renderPlanPreview() {
     btn.onclick = async () => {
       const idx = parseInt(btn.dataset.removePlan, 10);
       TODAY_WORKOUT.exercises.splice(idx, 1);
-      await sb.from("ai_workouts").update({ exercises: TODAY_WORKOUT.exercises }).eq("email", MY_EMAIL).eq("entry_date", todayStr());
+      await savePlanExercises();
       renderPlanPreview();
     };
   });
@@ -14577,7 +14839,7 @@ function renderPlanPreview() {
       const name = $("planAddExName").value.trim();
       if (!name) { toast("Give it a name first"); $("planAddExName").focus(); return; }
       TODAY_WORKOUT.exercises.push({ name, sets: ADD_EX_STATE.sets, reps: ADD_EX_STATE.reps, targetWeight: ADD_EX_STATE.weight || 0 });
-      await sb.from("ai_workouts").update({ exercises: TODAY_WORKOUT.exercises }).eq("email", MY_EMAIL).eq("entry_date", todayStr());
+      await savePlanExercises();
       ADD_EX_STATE.sets = 3; ADD_EX_STATE.reps = 8; ADD_EX_STATE.weight = 0;
       PLAN_EDIT_ADDING = false;
       renderPlanPreview();
@@ -15804,7 +16066,8 @@ async function deleteBodyPhoto(id) {
   try {
     await sb.storage.from("workout-proof").remove([shot.path]);
     delete PROOF_URL_CACHE[shot.path];
-    await sb.from("body_photos").delete().eq("id", id);
+    const { error } = await sb.from("body_photos").delete().eq("id", id);
+    if (error) throw error;
     toast("Photo deleted");
     await loadBodyPhotos();
     renderBodyPhotos();
@@ -15967,15 +16230,23 @@ function weekStartStr() {
 
 
 
+/* One answer to "how many gym days this week", shared with badges and the
+   week streak. Counting rows instead of distinct dates, and leaving the week
+   open at the top end, let one duplicate or future-dated row make the hero
+   ring and the badge disagree on the same screen. */
 function gymDaysThisWeek(name) {
-  const start = weekStartStr();
-  return entriesFor(name).filter((e) => e.gym && e.entry_date >= start).length;
+  return gymDaysInWeek(name, weekStartStr());
 }
 
 /* A shared couple goal overrides each person's individual target when set. */
 function weeklyGoalFor(email) {
   if (MY_PARTNERSHIP?.shared_weekly_goal) return MY_PARTNERSHIP.shared_weekly_goal;
-  const profile = email === MY_EMAIL ? MY_PROFILE : PARTNER_PROFILE;
+  /* Looked up by email rather than assuming anyone who is not me is my
+     partner: in a coach group PARTNER_PROFILE is null, so every client was
+     silently given the default 4. */
+  const e = (email || "").toLowerCase();
+  const profile = e === MY_EMAIL ? MY_PROFILE
+    : ALL_PROFILES.find((p) => (p.email || "").toLowerCase() === e) || null;
   return profile?.challenge_target || 4;
 }
 
@@ -16148,7 +16419,10 @@ async function captureTimezone() {
   try {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (!tz || !MY_PROFILE || MY_PROFILE.timezone === tz) return;
-    await sb.from("profiles").update({ timezone: tz }).eq("email", MY_EMAIL);
+    const { error } = await sb.from("profiles").update({ timezone: tz }).eq("email", MY_EMAIL);
+    // Leaving MY_PROFILE.timezone set after a failed write means the retry on
+    // the next load never happens, and reminders keep firing in the old zone.
+    if (error) { console.warn("timezone not saved", error); return; }
     MY_PROFILE.timezone = tz;
   } catch { /* never block the app for this */ }
 }
@@ -16293,7 +16567,7 @@ function renderSetupTab() {
   // The Admin row only exists for accounts that have the panel.
   $("setRow-admin").classList.toggle("hidden", $("adminCard").classList.contains("hidden"));
   $("setupEmail").textContent = MY_EMAIL || "";
-  $("setupSignOutBtn").onclick = () => sb.auth.signOut();
+  $("setupSignOutBtn").onclick = () => { clearLocalAccountState(); sb.auth.signOut(); };
   $("avatarFile").onchange = (e) => {
     const f = e.target.files?.[0];
     e.target.value = "";               // so picking the same file twice still fires
@@ -16528,8 +16802,15 @@ async function saveSetup() {
 if ("serviceWorker" in navigator) {
   let reloading = false;
 
+  /* A reload mid-workout throws the user back to Home with a resume card, and
+     visibilitychange (the update trigger below) is exactly what fires between
+     sets. The new build can wait until the session is over. */
+  const midSession = () => !!SESSION && !SESSION.finished;
+  let deferredReload = false;
+
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (reloading) return;         // a single reload, never a loop
+    if (midSession()) { deferredReload = true; return; }
     reloading = true;
     location.reload();
   });
@@ -16537,7 +16818,7 @@ if ("serviceWorker" in navigator) {
   const RELOAD_KEY = "ft-reloaded-for";
   let lastVersionCheck = 0;
   const ensureLatestBuild = async () => {
-    if (reloading || Date.now() - lastVersionCheck < 45000) return;
+    if (reloading || midSession() || Date.now() - lastVersionCheck < 45000) return;
     lastVersionCheck = Date.now();
     let live = "";
     try {
@@ -16583,6 +16864,7 @@ if ("serviceWorker" in navigator) {
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) bankSessionTime();
+    else if (deferredReload && !midSession()) { reloading = true; location.reload(); }
     else checkForUpdate();
   });
   /* pagehide is the one that fires when iOS freezes or discards the tab, which
@@ -16590,7 +16872,221 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("pagehide", bankSessionTime);
 }
 
+/* ---------- Accessibility semantics ----------
+   Selected state lives in a CSS class on a few dozen controls rendered by a
+   few dozen functions. Mirroring it into ARIA at every render site would mean
+   editing all of them and would drift the first time one is rewritten, so the
+   class is mirrored in one place instead, off the same mutations that paint
+   it. Everything below is derived from state the app already keeps; nothing
+   here decides anything. */
+
+/* selector, the ARIA attribute the pattern calls for, the class that means
+   "this one is the chosen one". aria-pressed rather than aria-selected: none
+   of these sit in a real tablist, and a lie about the pattern is worse for a
+   screen-reader user than the simpler honest answer. */
+const A11Y_STATE_MAP = [
+  [".tab-btn[data-tab]", "aria-current", "active", "page"],
+  [".bi-period button[data-period]", "aria-pressed", "active"],
+  [".tab-pill", "aria-pressed", "active"],
+  [".wt-pill[data-range]", "aria-pressed", "on"],
+  [".metric-chip[data-metric]", "aria-pressed", "on"],
+  [".cb-chip[data-group]", "aria-pressed", "on"],
+  [".ob-chip", "aria-pressed", "on"],
+  [".goal-tile[data-tile]", "aria-pressed", "on"],
+  [".pgs-row[data-pick]", "aria-pressed", "on"],
+  [".activity-chip[data-act]", "aria-pressed", "on"],
+  [".str-row[data-lift]", "aria-pressed", "on"],
+  [".cal-month[data-month]", "aria-pressed", "on"],
+  [".bi-piece[data-muscle]", "aria-pressed", "on"],
+  [".bi-callout[data-muscle]", "aria-pressed", "on"],
+  [".wp-chip", "aria-pressed", "on"],
+  [".tl-react[data-react]", "aria-pressed", "on"],
+  [".choice-card[data-v]", "aria-pressed", "selected"],
+];
+
+function syncA11yState() {
+  for (const [sel, attr, cls, onValue] of A11Y_STATE_MAP) {
+    for (const el of document.querySelectorAll(sel)) {
+      const on = el.classList.contains(cls);
+      if (onValue) {
+        if (on) el.setAttribute(attr, onValue);
+        else el.removeAttribute(attr);
+      } else {
+        el.setAttribute(attr, on ? "true" : "false");
+      }
+    }
+  }
+}
+
+/* ---------- Sheets as dialogs ----------
+   Twelve sheets open by dropping a `hidden` class on their scrim, from about
+   forty call sites. Watching the class is the one hook that covers all of
+   them, including the ones another screen opens indirectly. */
+const A11Y_SHEETS = {
+  popScrim: "Dialog",
+  clipRecScrim: "Record a clip",
+  clipViewScrim: "Clip",
+  cbPickScrim: "Add an exercise",
+  liveScrim: "Live session",
+  allWorkoutsScrim: "All workouts",
+  recapScrim: "Workout recap",
+  nextWorkoutScrim: "Next workout",
+  partnerSheetScrim: "Partner",
+  daySheetScrim: "Day",
+  timelineScrim: "Timeline",
+  cropScrim: "Move and scale",
+  savedScrim: "Saved workouts",
+  swapScrim: "Swap exercise",
+};
+const A11Y_TITLE_SEL = ".scr-title, .pop-who, .ps-label, .cb-sheet-title, .ds-date, .sv-title, h1, h2, h3";
+const A11Y_FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const A11Y_CLOSE_SEL = '[aria-label="Close"], .ds-x, .cb-x, .notice-x';
+const a11yOpenSheets = [];               // innermost last, so Escape closes the top one
+let a11yTitleSeq = 0;
+
+function a11yFocusableIn(root) {
+  return [...root.querySelectorAll(A11Y_FOCUSABLE)].filter((el) => el.offsetParent !== null || el === document.activeElement);
+}
+
+function a11yOpenSheet(scrim) {
+  const sheet = scrim.firstElementChild;
+  if (!sheet) return;
+  scrim.__a11yReturn = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  sheet.setAttribute("role", "dialog");
+  sheet.setAttribute("aria-modal", "true");
+  sheet.setAttribute("tabindex", "-1");
+  const title = sheet.querySelector(A11Y_TITLE_SEL);
+  if (title && title.textContent.trim()) {
+    if (!title.id) title.id = `a11yTitle${++a11yTitleSeq}`;
+    sheet.setAttribute("aria-labelledby", title.id);
+    sheet.removeAttribute("aria-label");
+  } else {
+    sheet.removeAttribute("aria-labelledby");
+    sheet.setAttribute("aria-label", A11Y_SHEETS[scrim.id] || "Dialog");
+  }
+  if (!a11yOpenSheets.includes(scrim)) a11yOpenSheets.push(scrim);
+  /* A frame, because several sheets fill their own body right after showing
+     the scrim, and one sheet focuses its text input 60ms later on purpose. */
+  requestAnimationFrame(() => {
+    if (scrim.classList.contains("hidden")) return;
+    if (sheet.contains(document.activeElement)) return;
+    try { sheet.focus({ preventScroll: true }); } catch { sheet.focus(); }
+  });
+}
+
+function a11yCloseSheet(scrim) {
+  const i = a11yOpenSheets.indexOf(scrim);
+  if (i >= 0) a11yOpenSheets.splice(i, 1);
+  const back = scrim.__a11yReturn;
+  scrim.__a11yReturn = null;
+  if (!back || !back.isConnected || back.offsetParent === null) return;
+  /* Only take focus back if the sheet still had it: a sheet that closed
+     because the user moved on elsewhere must not yank the caret. */
+  if (!scrim.contains(document.activeElement) && document.activeElement !== document.body) return;
+  try { back.focus({ preventScroll: true }); } catch { back.focus(); }
+}
+
+/* ---------- Larger text ----------
+   Every size in the stylesheet is a fixed px value, so raising the root font
+   size does nothing: a person with iOS Dynamic Type turned up used to get the
+   app at exactly the size everyone else gets it. Converting 470 declarations
+   to rem is a restyle, not a fix, so the whole document is scaled instead.
+   Uniform scale keeps every relationship the layout already has and simply
+   gives it less room, which is the same thing a narrower phone does and the
+   layout already handles. Capped at 1.25 because past that the 320px-wide
+   phones run out of line. */
+const TEXT_SCALE_MAX = 1.25;
+
+function preferredTextScale() {
+  const probe = document.createElement("span");
+  probe.style.cssText = "position:absolute;visibility:hidden;top:-9999px;font-size:medium";
+  document.documentElement.appendChild(probe);
+  /* `medium` is the reader's own browser default, 16px unless they raised it. */
+  const browserScale = (parseFloat(getComputedStyle(probe).fontSize) || 16) / 16;
+  /* Dynamic Type reaches a web view only through the -apple-system-body
+     metric, which is 17px at the default size and climbs from there. */
+  probe.style.font = "-apple-system-body";
+  const appleScale = probe.style.font ? (parseFloat(getComputedStyle(probe).fontSize) || 17) / 17 : 0;
+  probe.remove();
+  const scale = Math.max(browserScale, appleScale);
+  return Math.min(TEXT_SCALE_MAX, Math.max(1, Number.isFinite(scale) ? scale : 1));
+}
+
+/* Scaling the document costs width: at 1.25 a 390px phone lays out as if it
+   were 312px. 320 is the narrowest width every screen is known good at, so
+   that is the floor, which also means a 320px phone gets no scaling rather
+   than a broken layout. */
+function applyTextScale() {
+  document.documentElement.style.zoom = "";
+  const room = Math.max(1, window.innerWidth / 320);
+  const scale = Math.min(preferredTextScale(), room, TEXT_SCALE_MAX);
+  if (scale > 1.001) document.documentElement.style.zoom = String(scale);
+}
+
+function a11yInit() {
+  applyTextScale();
+  /* The setting can be changed while the app sits in the background. */
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) applyTextScale(); });
+  window.addEventListener("orientationchange", () => setTimeout(applyTextScale, 120));
+  syncA11yState();
+
+  const scrims = Object.keys(A11Y_SHEETS).map((id) => $(id)).filter(Boolean);
+  for (const scrim of scrims) {
+    if (!scrim.classList.contains("hidden")) a11yOpenSheet(scrim);
+    new MutationObserver(() => {
+      const open = !scrim.classList.contains("hidden");
+      const wasOpen = a11yOpenSheets.includes(scrim);
+      if (open && !wasOpen) a11yOpenSheet(scrim);
+      else if (!open && wasOpen) a11yCloseSheet(scrim);
+      else if (open) a11yOpenSheet(scrim);   // re-rendered in place, re-label it
+    }).observe(scrim, { attributes: true, attributeFilter: ["class"] });
+  }
+
+  let queued = false;
+  new MutationObserver(() => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => { queued = false; syncA11yState(); });
+  }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
+
+  document.addEventListener("keydown", (e) => {
+    const scrim = a11yOpenSheets[a11yOpenSheets.length - 1];
+
+    if (e.key === "Escape" && scrim) {
+      const sheet = scrim.firstElementChild;
+      const x = sheet?.querySelector(A11Y_CLOSE_SEL);
+      if (x) { e.preventDefault(); x.click(); return; }
+      /* No close control: the sheets that have none close on a scrim tap, so
+         reuse that path rather than hiding the scrim behind its own code. */
+      if (typeof scrim.onclick === "function") { e.preventDefault(); scrim.dispatchEvent(new MouseEvent("click", { bubbles: false })); }
+      return;
+    }
+
+    if (e.key === "Tab" && scrim) {
+      const sheet = scrim.firstElementChild;
+      const items = a11yFocusableIn(sheet);
+      if (!items.length) { e.preventDefault(); sheet.focus(); return; }
+      const first = items[0], last = items[items.length - 1];
+      const here = document.activeElement;
+      if (!sheet.contains(here)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); return; }
+      if (!e.shiftKey && here === last) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && here === first) { e.preventDefault(); last.focus(); }
+      return;
+    }
+
+    /* A div with role=button is only a button if the keyboard can press it. */
+    if (e.key === "Enter" || e.key === " ") {
+      const el = document.activeElement;
+      if (el && el.getAttribute?.("role") === "button" && el.tagName !== "BUTTON" && el.tagName !== "A") {
+        e.preventDefault();
+        el.click();
+      }
+    }
+  });
+}
+
 initOnboard();
+a11yInit();
 </script>
 </body>
 </html>
