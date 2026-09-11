@@ -24,6 +24,7 @@ import { normalizeLimits } from "./limits.mjs";
 /* Read only, for one field. See the focus block in generateFromPayload. */
 import { resolveGoal } from "./goal-engine.mjs";
 import { buildMuscleIndex, muscleRecoveryStates, skipFreshDays } from "./recovery.mjs";
+import { stripMobility } from "./mobility.mjs";
 import { TRAININGS } from "../_library/index.mjs";
 
 /* Built once. Same library plan.mjs reads, so the muscle a logged exercise
@@ -745,7 +746,13 @@ export function toWorkout(plan, dayIndex = 0) {
       .slice(0, 3).map((a) => ({ name: a.name, why: a.why })),
   }));
 
-  return { focus: day.name, exercises };
+  /* Additive, like swap and alternatives above: the five keys the app has
+     always read are untouched. Timed moves, not sets. The app shows them as a
+     countdown and must never write them to exercise_logs, because a stretch
+     credited as a set would light the Body tab and tell recovery.mjs a muscle
+     was worked when it was only loosened. */
+  const mob = day.mobility || { warmup: [], cooldown: [] };
+  return { focus: day.name, exercises, warmup: mob.warmup, cooldown: mob.cooldown };
 }
 
 /* ------------------------------------------------------------------ *
@@ -877,7 +884,17 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
     const dayIndex = focusHonoured ? asked : rotation;
 
     step = "toWorkout";
-    const workout = toWorkout(plan, dayIndex);
+    const rawWorkout = toWorkout(plan, dayIndex);
+
+    step = "stretching";
+    /* Mo's rule, 2026-09-10: timed, and it can be turned off. profiles.
+       skip_stretching, or a client sending stretching:false. Either strips the
+       two blocks and nothing else moves: the plan, the day, the rotation and
+       every other field of meta are byte for byte what they were. */
+    const skipStretching = payload.skip_stretching === true || payload.stretching === false;
+    const dayBuilt = plan.week[dayIndex] || plan.week[0];
+    const mob = dayBuilt?.mobility || { warmup: [], cooldown: [], warmupSeconds: 0, cooldownSeconds: 0, mobilityGoal: false, why: [] };
+    const workout = skipStretching ? stripMobility(rawWorkout) : rawWorkout;
 
     const missing = [...(plan.missing || [])];
     if (logsSource === "history") {
@@ -929,6 +946,16 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
           excludedCount: (plan.limits?.excluded || []).length,
         },
         source: "engine",
+        /* The warm-up and cool-down in three numbers and a reason, so the
+           reveal can say "plus five minutes after" without reading the arrays,
+           and so support can tell a skipped block from an empty library. */
+        stretching: {
+          included: !skipStretching,
+          warmupMinutes: skipStretching ? 0 : Math.round(mob.warmupSeconds / 60),
+          cooldownMinutes: skipStretching ? 0 : Math.round(mob.cooldownSeconds / 60),
+          mobilityGoal: !!mob.mobilityGoal,
+          why: skipStretching ? ["Skipped: stretching is turned off on this profile."] : mob.why,
+        },
         /* Whether the bubble came from an explicit tile tap or from parsing
            the five legacy strings and free text. Support cannot tell the two
            apart from the workout alone, same reason childUsed exists above. */

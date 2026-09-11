@@ -41,6 +41,7 @@ somebody on day zero who has answered nothing, and it does.
 | `history` | array | engine | the old flattened map of best lifts, `{ exercise_name, weight }`, no dates. Used for loads and never for experience level |
 | `logs` | array | engine | real sessions, `{ entry_date, exercise_name, weight, reps, sets }`. Beats `history` whenever there is any |
 | `plans` | array | engine | completed plans, `{ entry_date, focus, exercises, completed_at }`. Joined against `logs` to calibrate |
+| `skip_stretching` | bool | engine | **new.** `true` strips `workout.warmup` and `workout.cooldown` and changes nothing else. From `profiles.skip_stretching`. A client may also send `stretching: false`, same effect |
 
 `limits` is accepted three ways and all three are safe: the object, the string a
 jsonb column round trips as through some clients, and `null`. Unknown keys
@@ -68,6 +69,13 @@ inside it are dropped in silence.
           { name: "Push-Up",              why: "Same movement, same supporting muscles, no equipment needed" }
         ]
       }
+    ],
+    warmup: [                           // new. Dynamic moves before the first set. Timed, never logged as sets
+      { name: "Leg Swings", seconds: 30, perSide: true, group: "hamstrings", kind: "dynamic",
+        cue: "Swing from the hip, not the back. Let the range grow with each swing." }
+    ],
+    cooldown: [                         // new. Static holds after the last set, or a mobility block for the flexibility and mobility goals
+      { name: "Standing Calf Stretch", seconds: 30, perSide: true, group: "calves", kind: "static", cue: "..." }
     ]
   },
   honest: "Six weeks is enough for about twelve pounds, and here is the plan for twelve.",  // or null
@@ -97,6 +105,11 @@ bodyweight only pull day honestly has no curl in it).
 | `limits.hurts` | text[] | **new.** The joint keys that survived validation |
 | `limits.missing` | text[] | **new.** The equipment keys that survived validation |
 | `limits.excludedCount` | number | **new.** How many library movements those two answers ruled out. The names and the per-movement reasons stay on the plan, because on a bodyweight only week the list runs past a hundred |
+| `stretching.included` | bool | **new.** `false` when `skip_stretching` stripped the blocks |
+| `stretching.warmupMinutes` | number | **new.** Rounded minutes of the warm-up. Inside the session budget: those five minutes were always in `estimatedMinutes` and were empty until now |
+| `stretching.cooldownMinutes` | number | **new.** Rounded minutes of the cool-down. On top of the session: five by default, ten for the `flexibility` and `mobility` goal children |
+| `stretching.mobilityGoal` | bool | **new.** The goal child is one of those two, so the cool-down is the ten minute hips and upper back block the goal tree asks for |
+| `stretching.why` | text[] | **new.** Plain sentences: what was picked, for which groups, and what a joint limit left out |
 | `source` | text | `engine` or `llm` |
 | `goalSource` | text | `tiles` if `goal_bubble` was valid, `legacy` if the five strings and the free text were parsed |
 | `logsSource` | text | `logs` / `history` / `none` |

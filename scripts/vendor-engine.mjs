@@ -26,7 +26,7 @@ const LIB_OUT = join(fn, "_library");
 
 /* Only what the function runs. demo, test and bakeoff are node-only and would
    fail Deno's import of node:fs on the way in. */
-const ENGINE_FILES = ["adapter.mjs", "plan.mjs", "goal-engine.mjs", "training-age.mjs", "load.mjs", "calibrate.mjs", "pair.mjs", "alternatives.mjs", "focus.mjs", "preferences.mjs", "plateau-response.mjs", "limits.mjs", "joint-load.mjs", "recovery.mjs"];
+const ENGINE_FILES = ["adapter.mjs", "plan.mjs", "goal-engine.mjs", "training-age.mjs", "load.mjs", "calibrate.mjs", "pair.mjs", "alternatives.mjs", "focus.mjs", "preferences.mjs", "plateau-response.mjs", "limits.mjs", "joint-load.mjs", "recovery.mjs", "mobility.mjs"];
 
 rmSync(ENGINE_OUT, { recursive: true, force: true });
 rmSync(LIB_OUT, { recursive: true, force: true });

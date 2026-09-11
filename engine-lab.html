@@ -295,6 +295,7 @@ const S = {
   today: iso(new Date()),
   askFocus: "",
   lastDone: "",
+  skipStretching: false,
 };
 
 let TREE = null;
@@ -359,6 +360,7 @@ function buildPayload() {
         ? [{ focus: S.lastDone, entry_date: iso(new Date(today.getTime() - DAY_MS)), completed_at: new Date(today.getTime() - DAY_MS).toISOString() }]
         : [],
       focus: S.askFocus || undefined,
+      skip_stretching: S.skipStretching,
     },
     today,
   };
@@ -381,7 +383,7 @@ function run() {
    in the rotation, one of them trained their chest and shoulders yesterday.
    Flipping between them is the fastest way to see recovery.mjs working, which
    is the thing that was broken and is the thing hardest to trust from a diff. */
-const BASE = { bubble: "build-muscle", child: "", legacyGoal: "Build muscle", history: "months", days: 4, soreYesterday: [], focus: [], hurts: [], missing: [], weight: 195, sex: "Male", askFocus: "", lastDone: "" };
+const BASE = { bubble: "build-muscle", child: "", legacyGoal: "Build muscle", history: "months", days: 4, soreYesterday: [], focus: [], hurts: [], missing: [], weight: 195, sex: "Male", askFocus: "", lastDone: "", skipStretching: false };
 const PRESETS = {
   "First timer": { ...BASE, history: "none", days: 3, weight: 180 },
   "Mid-week, fresh": { ...BASE, lastDone: "Lower body B" },
@@ -391,6 +393,8 @@ const PRESETS = {
   "Wants arms": { ...BASE, bubble: "tone-lean-abs", legacyGoal: "Recomp (lose fat, gain muscle)", focus: ["biceps", "triceps", "abs"], weight: 175 },
   "Strong, 6 days": { ...BASE, bubble: "get-stronger", legacyGoal: "Get stronger", history: "years", days: 6, weight: 210 },
   "Asked for legs": { ...BASE, bubble: "lose-weight", legacyGoal: "Lose weight", weight: 205, sex: "Female", askFocus: "Legs" },
+  "Loosen up": { ...BASE, bubble: "feel-better", child: "mobility", legacyGoal: "Stay consistent", history: "weeks", days: 3, weight: 165, sex: "Female" },
+  "Stretching off": { ...BASE, lastDone: "Lower body B", skipStretching: true },
 };
 
 function chipRow(list, selected, onToggle, cls) {
@@ -589,6 +593,17 @@ function renderRail() {
   ask.appendChild(al);
   rail.appendChild(ask);
 
+  // Stretching
+  const str = section("Stretching", "A dynamic warm-up before and a static cool-down after, timed. Off strips both and changes nothing else.");
+  const strChip = el("button", "chip", S.skipStretching ? "Skipped" : "On");
+  strChip.type = "button";
+  strChip.setAttribute("aria-pressed", S.skipStretching ? "false" : "true");
+  strChip.onclick = () => { S.skipStretching = !S.skipStretching; renderRail(); run(); };
+  const strBox = el("div", "chips");
+  strBox.appendChild(strChip);
+  str.appendChild(strBox);
+  rail.appendChild(str);
+
   // Limits
   const hurt = section("It hurts", "Joints, not muscles. Rules movements out of both libraries.");
   hurt.appendChild(chipRow(JOINTS, S.hurts, (j) => {
@@ -642,6 +657,11 @@ function renderSummary() {
   box.appendChild(el("span", `tag ${conf}`, `confidence <b>${esc(m.confidence)}</b>`));
   if (m.focusHonoured) box.appendChild(el("span", "tag good", "asked for this day"));
   if (m.limits.excludedCount) box.appendChild(el("span", "tag warn", `<b>${m.limits.excludedCount}</b> ruled out`));
+  if (m.stretching) {
+    box.appendChild(m.stretching.included
+      ? el("span", "tag", `stretch <b>${m.stretching.warmupMinutes}</b>+<b>${m.stretching.cooldownMinutes}</b> min`)
+      : el("span", "tag warn", "stretching off"));
+  }
   box.appendChild(el("span", "tag", `goal from <b>${esc(m.goalSource)}</b>`));
 }
 
@@ -673,19 +693,71 @@ function exerciseRows(list, { alts = true } = {}) {
   return box;
 }
 
+/* Timed moves, not sets: seconds on the right, doubled when it is per side. */
+function stretchRows(list) {
+  const box = el("div");
+  for (const m of list) {
+    const row = el("div", "ex");
+    const n = el("div", "n");
+    n.appendChild(el("b", null, esc(m.name)));
+    n.appendChild(el("div", "meta", esc([m.group ? label(m.group) : null, m.perSide ? "each side" : null].filter(Boolean).join(" · "))));
+    if (m.cue) n.appendChild(el("div", "note", esc(m.cue)));
+    const sr = el("div", "sr");
+    sr.innerHTML = `<b>${m.seconds}s</b>`;
+    if (m.perSide) sr.appendChild(el("span", "w", `${m.seconds * 2}s total`));
+    row.appendChild(n);
+    row.appendChild(sr);
+    box.appendChild(row);
+  }
+  return box;
+}
+
 function paneToday() {
   const p = el("div", "pane" + (TAB === "today" ? " on" : ""));
+  const st = LAST.meta.stretching || { included: false, warmupMinutes: 0, cooldownMinutes: 0, why: [] };
+  const wu = LAST.workout.warmup || [];
+  const cd = LAST.workout.cooldown || [];
+
+  if (wu.length) {
+    const w = el("div", "card");
+    w.appendChild(el("h3", null, `Warm-up <span class="sub">${wu.length} dynamic moves, about ${st.warmupMinutes} min, inside the session budget</span>`));
+    w.appendChild(stretchRows(wu));
+    p.appendChild(w);
+  }
+
   const c = el("div", "card");
   c.appendChild(el("h3", null, `${esc(LAST.workout.focus)} <span class="sub">what the app receives and shows</span>`));
   if (LAST.honest) c.appendChild(el("p", null, esc(LAST.honest)));
   c.appendChild(exerciseRows(LAST.workout.exercises));
   p.appendChild(c);
 
+  if (cd.length) {
+    const k = el("div", "card");
+    k.appendChild(el("h3", null, `Cool-down <span class="sub">${cd.length} ${st.mobilityGoal ? "mobility moves" : "static holds"}, about ${st.cooldownMinutes} min, on top</span>`));
+    k.appendChild(stretchRows(cd));
+    p.appendChild(k);
+  }
+  if (!st.included) {
+    const s = el("div", "card");
+    s.appendChild(el("h3", null, "Stretching skipped"));
+    s.appendChild(el("p", "empty", esc((st.why || []).join(" ") || "Turned off on this profile.")));
+    p.appendChild(s);
+  }
+
   const day = LAST.plan.week.find((d) => d.name === LAST.workout.focus);
   if (day) {
     const t = el("div", "card");
     t.appendChild(el("h3", null, `Time and shape <span class="sub">before anyone opens the app</span>`));
-    t.appendChild(el("p", null, `Budgeted ${day.minutes} minutes, estimated ${day.estimatedMinutes}. Main groups: ${day.mainGroups.map(label).join(", ") || "none"}.`));
+    const cool = st.included ? st.cooldownMinutes : 0;
+    t.appendChild(el("p", null, esc(
+      `Budgeted ${day.minutes} minutes for the session, estimated ${day.estimatedMinutes} including the warm-up` +
+      (cool ? `, plus ${cool} for the cool-down: about ${day.estimatedMinutes + cool} door to door.` : ".") +
+      ` Main groups: ${day.mainGroups.map(label).join(", ") || "none"}.`)));
+    if (st.why?.length) {
+      const ul = el("ul", "why");
+      for (const w of st.why) ul.appendChild(el("li", null, esc(w)));
+      t.appendChild(ul);
+    }
     p.appendChild(t);
   }
   return p;

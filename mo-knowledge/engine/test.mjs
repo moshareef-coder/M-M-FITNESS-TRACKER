@@ -24,7 +24,8 @@ import { coldStart1RM, prescribeLoad, patternFor, variantFactor, roundLoad } fro
 import { buildPlan } from "./plan.mjs";
 import { conjunctiveWeek, chooseComparison, sharedSchedule, relativeScore, PRODUCTIVE_GAP } from "./pair.mjs";
 
-import { normalizeFocus, mergePriority, focusFreshness } from "./focus.mjs";
+import { normalizeFocus, mergePriority, focusFreshness, MUSCLE_GROUPS } from "./focus.mjs";
+import { mobilityFor, pickBlock, moveSeconds, stripMobility, WARMUP_SECONDS, COOLDOWN_SECONDS, MOBILITY_GOAL_SECONDS, MOBILITY_CHILDREN, MIN_MOVES, MAX_MOVES } from "./mobility.mjs";
 import { scoreAlternatives } from "./alternatives.mjs";
 import { learnPreferences, applyPreferences, avoidNote, SOFT_AT, HARD_AT } from "./preferences.mjs";
 import { planPlateauResponse, applyRotateFallback, PLATEAU_RESPONSE } from "./plateau-response.mjs";
@@ -1133,7 +1134,11 @@ test("muscleRecoveryStates reads a real session from yesterday as hold, not read
     { entry_date: day(-1), exercise_name: "Barbell Bench Press", sets: 4, reps: 8, weight: 185 },
     { entry_date: day(-1), exercise_name: "Machine Shoulder Press", sets: 3, reps: 10, weight: 60 },
   ];
-  const states = muscleRecoveryStates({ logs, muscleIndex: MUSCLE_INDEX, today: new Date() });
+  /* A fixed clock, twelve hours after the session. `new Date()` here passed all
+     morning and failed at 18:01, when "yesterday at six" fell out of the fresh
+     window. A test that depends on the wall clock is not a test. */
+  const noon = new Date(Date.parse(day(-1) + "T18:00:00") + 12 * 3600000);
+  const states = muscleRecoveryStates({ logs, muscleIndex: MUSCLE_INDEX, today: noon });
   assert.equal(states.get("chest")?.state, "hold");
   assert.equal(states.get("shoulders")?.state, "hold");
 });
@@ -1204,7 +1209,10 @@ test("nextDayIndex will not hand back yesterday's Push day just because the rota
   // The last completed plan was Leg day, so naive rotation wraps to Push,
   // which is exactly the muscle group a real session hit yesterday.
   const plans = [{ entry_date: day(-1), focus: "Leg day", completed_at: day(-1) + "T18:00:00Z", exercises: [] }];
-  const idx = nextDayIndex(plan, { logs, plans, today: new Date() });
+  /* Fixed clock, same reason as the recovery test above: twelve hours after
+     yesterday's session, inside the fresh window whatever time it is now. */
+  const noon = new Date(Date.parse(day(-1) + "T18:00:00") + 12 * 3600000);
+  const idx = nextDayIndex(plan, { logs, plans, today: noon });
   assert.notEqual(plan.week[idx].name, "Push day");
 });
 
@@ -1241,4 +1249,150 @@ test("every day plan.mjs builds carries a mainGroups set the adapter can read", 
     assert.ok(Array.isArray(d.mainGroups));
     assert.ok(d.mainGroups.length > 0);
   }
+});
+
+/* ---------- stretching: warm-up before, cool-down after, skippable ---------- */
+
+const STRETCH_LIB = TRAININGS.find((t) => t.id === "stretching");
+const STRETCH_ALL = STRETCH_LIB ? STRETCH_LIB.categories.flatMap((c) => c.exercises) : [];
+
+test("the stretching library is registered, and every group has a dynamic and a static move", () => {
+  assert.ok(STRETCH_LIB, "knowledge/exercise-library/stretching.mjs must be in TRAININGS");
+  const kinds = new Set(STRETCH_LIB.categories.map((c) => c.key));
+  for (const k of ["dynamic", "static", "mobility"]) assert.ok(kinds.has(k), `category ${k}`);
+  for (const kind of ["dynamic", "static"]) {
+    const covered = new Set(STRETCH_LIB.categories.find((c) => c.key === kind).exercises.flatMap((e) => e.primary));
+    for (const g of MUSCLE_GROUPS) assert.ok(covered.has(g), `${kind} never covers ${g}`);
+  }
+});
+
+test("every stretch has the fields mobility.mjs reads, and only muscle and joint keys the engine knows", () => {
+  const joints = new Set(JOINTS);
+  for (const c of STRETCH_LIB.categories) {
+    for (const e of c.exercises) {
+      assert.equal(e.kind, c.key, `${e.name} kind matches its category`);
+      assert.ok(e.seconds >= 20 && e.seconds <= 60, `${e.name} seconds`);
+      assert.equal(typeof e.perSide, "boolean", `${e.name} perSide`);
+      assert.ok(e.cue && !/[–—]/.test(e.cue), `${e.name} has a cue with no dashes`);
+      for (const g of [...e.primary, ...(e.secondary || [])]) assert.ok(MUSCLE_GROUPS.includes(g), `${e.name} group ${g}`);
+      for (const j of e.avoidIf || []) assert.ok(joints.has(j), `${e.name} joint ${j}`);
+    }
+  }
+});
+
+test("no stretch shares a name with a lift, so the app can never credit a hold as a set", () => {
+  const lifting = new Set(TRAININGS.filter((t) => t.id !== "stretching").flatMap((t) => t.categories.flatMap((c) => c.exercises.map((e) => e.name.toLowerCase()))));
+  for (const e of STRETCH_ALL) assert.ok(!lifting.has(e.name.toLowerCase()), `${e.name} collides with another library`);
+  const names = STRETCH_ALL.map((e) => e.name.toLowerCase());
+  assert.equal(new Set(names).size, names.length, "no duplicate stretch names");
+});
+
+test("MOBILITY_CHILDREN are real children in goal-tree.json", () => {
+  const ids = new Set(TREE.bubbles.flatMap((b) => (b.children || []).map((c) => c.id)));
+  for (const id of MOBILITY_CHILDREN) assert.ok(ids.has(id), id);
+});
+
+test("moveSeconds doubles a per side stretch and leaves a two sided one alone", () => {
+  assert.equal(moveSeconds({ seconds: 30, perSide: true }), 60);
+  assert.equal(moveSeconds({ seconds: 30, perSide: false }), 30);
+});
+
+test("pickBlock draws only from the kind asked for and covers the groups it was given", () => {
+  const block = pickBlock({ kind: "dynamic", groups: ["quads", "hamstrings", "glutes"], budgetSec: WARMUP_SECONDS, level: "novice" });
+  assert.ok(block.length >= MIN_MOVES && block.length <= MAX_MOVES);
+  for (const m of block) assert.equal(m.kind, "dynamic");
+  const byName = new Map(STRETCH_ALL.map((e) => [e.name, e]));
+  const covered = new Set(block.flatMap((m) => byName.get(m.name).primary));
+  for (const g of ["quads", "hamstrings", "glutes"]) assert.ok(covered.has(g), `covers ${g}`);
+});
+
+test("pickBlock respects the budget once the floor is met, and is deterministic", () => {
+  const a = pickBlock({ kind: "static", groups: ["chest", "lats", "shoulders", "biceps", "triceps"], budgetSec: COOLDOWN_SECONDS, level: "intermediate" });
+  const b = pickBlock({ kind: "static", groups: ["chest", "lats", "shoulders", "biceps", "triceps"], budgetSec: COOLDOWN_SECONDS, level: "intermediate" });
+  assert.deepEqual(a, b);
+  const spent = a.reduce((t, m) => t + moveSeconds(m), 0);
+  /* The floor may overshoot, everything past it may not. */
+  const floorSpent = a.slice(0, MIN_MOVES).reduce((t, m) => t + moveSeconds(m), 0);
+  assert.ok(spent <= Math.max(COOLDOWN_SECONDS, floorSpent), `${spent}s against ${COOLDOWN_SECONDS}s`);
+});
+
+test("a joint that hurts removes every stretch the library says to avoid for it", () => {
+  const risky = STRETCH_ALL.filter((e) => (e.avoidIf || []).includes("knee")).map((e) => e.name);
+  assert.ok(risky.length > 0, "the library marks at least one stretch as hard on a knee");
+  for (const kind of ["dynamic", "static", "mobility"]) {
+    const block = pickBlock({ kind, groups: MUSCLE_GROUPS, budgetSec: 3600, hurts: ["knee"], level: "advanced" });
+    for (const m of block) assert.ok(!risky.includes(m.name), `${m.name} should have been avoided`);
+  }
+});
+
+test("mobilityFor gives a normal day a dynamic warm-up and a static cool-down for what it worked", () => {
+  const plan = buildPlan({ goal: { bubble: "build-muscle", child: null }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 4 }, logs: [] });
+  for (const d of plan.week) {
+    assert.ok(d.mobility, `${d.name} has mobility`);
+    assert.ok(d.mobility.warmup.length >= MIN_MOVES, `${d.name} warm-up`);
+    assert.ok(d.mobility.cooldown.length >= MIN_MOVES, `${d.name} cool-down`);
+    for (const m of d.mobility.warmup) assert.equal(m.kind, "dynamic");
+    for (const m of d.mobility.cooldown) assert.equal(m.kind, "static");
+    assert.equal(d.mobility.mobilityGoal, false);
+    assert.equal(d.totalMinutes, d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60));
+    assert.ok(d.totalMinutes >= d.estimatedMinutes);
+  }
+});
+
+test("the flexibility and mobility goal children get the ten minute block, mobility moves first", () => {
+  for (const [bubble, child] of [["do-a-thing", "flexibility"], ["feel-better", "mobility"]]) {
+    const plan = buildPlan({ goal: { bubble, child }, person: { bodyWeightLb: 160, sex: "Female", daysAsked: 3 }, logs: [] });
+    assert.equal(plan.goal.childUsed, child, `${child} resolved`);
+    for (const d of plan.week) {
+      assert.equal(d.mobility.mobilityGoal, true, `${d.name} is a mobility goal day`);
+      assert.ok(d.mobility.cooldownSeconds > COOLDOWN_SECONDS, `${d.name} cool-down is longer than the default`);
+      assert.ok(d.mobility.cooldownSeconds <= MOBILITY_GOAL_SECONDS + 120, `${d.name} but not past ten minutes plus the floor`);
+      assert.equal(d.mobility.cooldown[0].kind, "mobility", `${d.name} leads with a mobility move`);
+    }
+  }
+});
+
+test("toWorkout carries the two blocks and generateFromPayload reports them in meta", () => {
+  const out = generateFromPayload({ goal: "Build muscle", current_weight: 190, sex: "Male", challenge_target: 4 }, { includePlan: true });
+  assert.ok(Array.isArray(out.workout.warmup) && out.workout.warmup.length >= MIN_MOVES);
+  assert.ok(Array.isArray(out.workout.cooldown) && out.workout.cooldown.length >= MIN_MOVES);
+  for (const m of [...out.workout.warmup, ...out.workout.cooldown]) {
+    assert.equal(typeof m.name, "string");
+    assert.ok(m.seconds > 0);
+    assert.equal(typeof m.perSide, "boolean");
+    assert.ok(MUSCLE_GROUPS.includes(m.group));
+  }
+  assert.equal(out.meta.stretching.included, true);
+  assert.ok(out.meta.stretching.warmupMinutes >= 1);
+  assert.ok(out.meta.stretching.cooldownMinutes >= 1);
+  assert.ok(out.meta.stretching.why.length >= 2);
+  /* The five keys the app has always read are untouched. */
+  for (const e of out.workout.exercises) for (const k of ["name", "sets", "reps", "targetWeight", "note"]) assert.ok(k in e);
+});
+
+test("skip_stretching strips the blocks and changes nothing else about the answer", () => {
+  const payload = { goal: "Get stronger", current_weight: 200, sex: "Male", challenge_target: 3 };
+  const today = new Date("2026-09-10T12:00:00");
+  const on = generateFromPayload(payload, { today, includePlan: true });
+  const off = generateFromPayload({ ...payload, skip_stretching: true }, { today, includePlan: true });
+  assert.deepEqual(off.workout.warmup, []);
+  assert.deepEqual(off.workout.cooldown, []);
+  assert.equal(off.meta.stretching.included, false);
+  assert.equal(off.meta.stretching.warmupMinutes, 0);
+  assert.deepEqual(off.workout.exercises, on.workout.exercises);
+  assert.equal(off.workout.focus, on.workout.focus);
+  assert.deepEqual(JSON.stringify(off.plan), JSON.stringify(on.plan), "the plan underneath is byte for byte the same");
+  const { stretching: a, ...restOn } = on.meta;
+  const { stretching: b, ...restOff } = off.meta;
+  assert.deepEqual(restOff, restOn);
+  /* The other spelling a client might send. */
+  const off2 = generateFromPayload({ ...payload, stretching: false }, { today });
+  assert.deepEqual(off2.workout.warmup, []);
+});
+
+test("stripMobility empties the two arrays and leaves every other key alone", () => {
+  const w = { focus: "Push day", exercises: [{ name: "x" }], warmup: [{ name: "a" }], cooldown: [{ name: "b" }] };
+  const s = stripMobility(w);
+  assert.deepEqual(s, { focus: "Push day", exercises: [{ name: "x" }], warmup: [], cooldown: [] });
+  assert.deepEqual(w.warmup, [{ name: "a" }], "input not mutated");
 });

@@ -26,6 +26,7 @@ import { scoreAlternatives } from "./alternatives.mjs";
 import { planPlateauResponse, applyRotateFallback } from "./plateau-response.mjs";
 import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary, softenedNote } from "./limits.mjs";
 import { mainGroupsForDay } from "./recovery.mjs";
+import { mobilityFor } from "./mobility.mjs";
 
 const WEIGHTS = TRAININGS.find((t) => t.id === "weight-training");
 const CALIS = TRAININGS.find((t) => t.id === "calisthenics");
@@ -752,6 +753,18 @@ export function buildPlan({
      week the summary speaks for the whole plan and the per lift answers wait. */
   for (const r of plateauPlan.responses) if (r.say) dayNotes.push(r.say);
   if (plateauPlan.summary.say) dayNotes.push(plateauPlan.summary.say);
+
+  /* ---- warm-up and cool-down, after the time pass so the day is final ----
+     The five warm-up minutes have been inside estimateMinutes since the first
+     run with nothing in them; the warm-up block fills them. The cool-down is
+     new and sits on top, so a day carries both numbers and totalMinutes is the
+     honest one for somebody deciding whether they have time. Nothing here
+     feeds the volume ledger or recovery: a stretch is not a set. See
+     engine/mobility.mjs for the reasoning and the research. */
+  for (const d of week) {
+    d.mobility = mobilityFor(d, { level, hurts: limitsUsed.hurts, goalChild: resolved.childUsed });
+    d.totalMinutes = d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60);
+  }
 
   const progression = level === "beginner" || level === "novice"
     ? { rule: "linear", detail: "Hit every rep on every set and the weight goes up next time. That keeps working for months and there is no reason to be cleverer than it while it does." }

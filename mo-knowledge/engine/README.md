@@ -654,3 +654,63 @@ the single least loaded one when it is called on a pool directly.
 applied. One jsonb column on `profiles`, because unlike `focus_groups` these
 three fields are one answer given at one moment and are read together or not at
 all. No policy change: self writes its own row and `can_see` reads.
+
+## Stretching (`mobility.mjs`)
+
+Built 2026-09-10, Mo's ask: "we need the stretching in there, timed, and they
+can say skip stretching." research/11: 48% of people setting a 2026 goal want
+mobility, flexibility or posture, "five to ten minutes a day of work that nobody
+offers." research/02: warm-up matters more with age.
+
+**What it is.** A dynamic warm-up before the first set and a static cool-down
+after the last one, matched to the day. `knowledge/exercise-library/
+stretching.mjs` holds 49 moves in three categories (dynamic, static, mobility),
+every one tagged with the fourteen muscle groups, `seconds`, `perSide`, a
+`cue`, and `avoidIf` joints. `mobilityFor(day)` picks greedily for coverage:
+each move is the one that covers the most target groups nobody has covered
+yet, then nearest level, then shortest, then name, so it is deterministic. The
+warm-up targets `day.mainGroups`; the cool-down targets every group the day's
+exercises touched, because the biceps you curled are the tight ones, not only
+the lats the day was named for.
+
+**Time, decided.** The warm-up lives inside the session budget, because
+`WARMUP_MIN = 5` has been inside `estimateMinutes` since the first run of this
+engine with nothing in it. The cool-down is new and sits on top: five minutes,
+and every day now carries `totalMinutes = estimatedMinutes + cooldown` beside
+the old number so nothing is hidden inside a figure that used to mean
+something else. Cutting working sets to make room would have reduced the volume
+the ledger already says is short, silently, on every plan.
+
+**The two goals that are this.** `flexibility` (under do-a-thing) and
+`mobility` (under feel-better) both say "5 to 10 min daily, hips and upper
+back" in the tree. For them the cool-down grows to ten minutes and draws from
+the mobility category first, then static holds for whatever is left. Ten is the
+top of the range the research names, and for these people the block is the
+plan.
+
+**What it is not.** Volume. Nothing here touches `weeklyVolume`, `recovery.mjs`
+never credits a stretch (a test guarantees no stretch shares a name with a
+lift, so the app's keyword classifier cannot mistake one either), and the app
+must not write these rows to `exercise_logs`. Also not a separate workout: the
+blocks ride on the day as `workout.warmup` and `workout.cooldown`, additive
+keys, and the five keys the app has always read are untouched.
+
+**Skip.** `payload.skip_stretching: true` (or `stretching: false`) strips both
+arrays in the adapter and nothing else moves: a test asserts the plan is byte
+for byte identical with and without it. `profiles.skip_stretching` is the
+column; `meta.stretching` says which happened.
+
+**Limits.** A stretch carries `avoidIf` joints and a joint that hurts removes
+it, same rule as a lift. `meta.stretching.why` names how many were left out.
+
+**Where it is still imperfect.** Biceps and triceps have no honest dynamic
+stretch; the library uses elbow circles, which is what a coach would do and is
+the one entry worth revisiting. The library index still lists "Stretching" in
+`SIMPLE_TIMED_ACTIVITIES` for logging a class by minutes; that path is
+unchanged and separate from this. And sixteen names were already duplicated
+across the lifting, calisthenics, yoga and pilates files before this work
+(Push-Up, Pull-Up, Plank and friends). Measured 2026-09-10: every pair agrees
+on the primary muscle; three (Plank, Side Plank, Incline Push-Up) differ by one
+extra secondary, shoulders, in the later file. `buildMuscleIndex` keeps the
+last copy it sees, so recovery credits those three a half set to shoulders the
+lifting file would not. Harmless today, worth one cleanup pass.
