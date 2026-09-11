@@ -125,15 +125,16 @@ function sanitizeWorkout(raw: any): { focus: string; exercises: any[] } | null {
    with wording the app already shows and a thrown error would lose them. */
 async function generateWithModel(payload: any): Promise<{ workout?: any; response?: Response }> {
   const {
-    user_name, focus, goal, goal_detail, history,
+    focus, goal, goal_detail, history,
     sex, age, height_in, activity_level, current_weight, gym_days_this_week,
   } = payload;
 
   const heightStr = height_in ? `${Math.floor(height_in / 12)}'${height_in % 12}"` : "not given";
   const tdee = calculateTDEE({ sex, age, height_in, activity_level, weightLb: current_weight });
 
-  const userMsg = `User: ${user_name}
-Sex: ${sex || "not given"}
+  /* Deliberately anonymous. Nothing here names the person: the model gets
+     body metrics, goals and training history, never a name or an email. */
+  const userMsg = `Sex: ${sex || "not given"}
 Age: ${age || "not given"}
 Height: ${heightStr}
 Current body weight: ${current_weight != null ? current_weight + " lb" : "not given"}
@@ -235,9 +236,14 @@ const MAX_BODY_BYTES = 512 * 1024;
 const MAX_ROWS = 2000;
 const MAX_TEXT = 200;
 const TEXT_FIELDS = [
-  "user_name", "focus", "goal", "goal_detail", "goal_bubble", "goal_child",
+  "focus", "goal", "goal_detail", "goal_bubble", "goal_child",
   "activity_level", "sex", "focus_chosen_at",
 ];
+/* Dropped before anything reads the payload. The client no longer sends
+   these, but a phone running a service-worker-cached older build still
+   will for as long as that copy lives, and the published policy says no
+   identifier reaches the model. Strip rather than trust the caller. */
+const IDENTIFYING_FIELDS = ["user_name", "name", "email", "user_email", "partner_name"];
 const ROW_FIELDS = ["history", "logs", "plans", "swaps", "focus_groups"];
 /* [min, max] for the numbers that reach a formula. Out of range is dropped
    rather than clamped: a height of 900 inches is not a tall person, it is
@@ -253,6 +259,7 @@ const NUMBER_FIELDS: Record<string, [number, number]> = {
 function boundPayload(raw: unknown): Record<string, unknown> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   const out: Record<string, any> = { ...(raw as Record<string, any>) };
+  for (const k of IDENTIFYING_FIELDS) delete out[k];
   for (const k of TEXT_FIELDS) {
     if (out[k] != null) out[k] = String(out[k]).slice(0, MAX_TEXT);
   }
