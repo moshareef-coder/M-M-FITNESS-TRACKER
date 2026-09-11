@@ -43,6 +43,14 @@
        you, them); this is the only hue that means "caution" and nothing else,
        so it can sit next to any of them without being read as a person. */
     --warn: #f0b429;
+    /* Stretching is a MODE, not an identity, so it gets its own hue rather
+       than borrowing --me (you) or --partner (them), which would read as a
+       person. Cyan-leaning blue: far enough from the lime that a glance at
+       the phone across the gym says "this is not the lifting part", and far
+       enough from cobalt that it is never mistaken for your own colour. */
+    --stretch: #2ea8ff;
+    --stretch-ink: #6cc4ff;
+    --on-stretch: #04121f;
     --on-accent: #0b0d11;
     /* Text and icons in the accent hue. Same as the fill on dark; on white the
        fill green is too pale to read, so this deepens. */
@@ -99,6 +107,11 @@
     /* Deepened for white, the same way --accent-ink is: the dark amber is a
        highlighter on this ground and fails as chip text. */
     --warn: #9a6400;
+    /* Same job on white: deep enough to carry as text and as a fill behind
+       white, since the dark mode cyan is a highlighter on this ground. */
+    --stretch: #0b7fc7;
+    --stretch-ink: #0a6ba8;
+    --on-stretch: #ffffff;
     --on-accent: #052a17;
     --accent-ink: #0f7a38;
     --me-ink: #2c6c96;
@@ -505,6 +518,90 @@
     to { transform: translateY(14px) scale(0.99); opacity: 0; }
   }
   body.session-open .tabs { display: none; }
+
+  /* ---------- Stretching mode ----------
+     Mo's brief: "the whole thing can light up blue while we're doing the
+     workout, so it's like, oh, it's stretching." The point is that you should
+     know which part of the session you are in from across the room, without
+     reading a word.
+
+     Done by re-pointing the accent tokens inside this one scope rather than
+     restyling elements one at a time. Every child already paints itself from
+     --accent (the progress bar, the timer fill, the step label, the primary
+     buttons), so they all turn together and nothing can be missed or drift
+     later. The ground takes a wash of the same hue so the change reads as the
+     screen changing mode rather than one control changing colour. */
+  .session-overlay.stretching {
+    --accent: var(--stretch);
+    --accent-ink: var(--stretch-ink);
+    --on-accent: var(--on-stretch);
+    --gold: var(--stretch);
+    background:
+      radial-gradient(120% 55% at 50% 0%, color-mix(in srgb, var(--stretch) 22%, transparent) 0%, transparent 72%),
+      var(--bg);
+  }
+  /* The panels lift toward the hue too, or a blue screen with grey cards on it
+     reads as a bug rather than a mode. */
+  .session-overlay.stretching .sess-card {
+    background: color-mix(in srgb, var(--stretch) 9%, var(--panel));
+    border-color: color-mix(in srgb, var(--stretch) 28%, var(--border));
+  }
+  .session-overlay.stretching .rest-bar {
+    background: color-mix(in srgb, var(--stretch) 12%, var(--panel-2));
+  }
+  .session-overlay.stretching .rest-adjust button {
+    background: color-mix(in srgb, var(--stretch) 7%, var(--panel));
+    border-color: color-mix(in srgb, var(--stretch) 30%, var(--border));
+  }
+
+  /* The banner that names the mode and says how long it runs. Mo asked for the
+     length to be on screen, because "a few stretches" and "ten minutes of
+     stretching" are different commitments and you decide which one you are
+     doing before you start, not three moves in. */
+  .stretch-banner {
+    display: flex; align-items: center; gap: 12px;
+    background: color-mix(in srgb, var(--stretch) 16%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--stretch) 38%, transparent);
+    border-radius: 16px; padding: 13px 15px; margin-bottom: 12px;
+    animation: hRise .38s cubic-bezier(.22,1,.36,1) both;
+  }
+  .stretch-banner-icon {
+    width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--stretch); color: var(--on-stretch);
+  }
+  .stretch-banner-body { min-width: 0; flex: 1; }
+  .stretch-banner-title {
+    font-size: 13px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase;
+    color: var(--stretch-ink); line-height: 1.2;
+  }
+  .stretch-banner-sub {
+    font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.35;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Where you are in the block, as dashes rather than a second progress bar:
+     the session already has one at the top and two bars competing is the
+     mistake the rest strip comment warns about. */
+  .stretch-pips { display: flex; gap: 4px; margin-top: 8px; }
+  .stretch-pips i {
+    flex: 1; height: 3px; border-radius: 9px; background: color-mix(in srgb, var(--stretch) 22%, transparent);
+    transition: background .25s ease;
+  }
+  .stretch-pips i.done { background: color-mix(in srgb, var(--stretch) 55%, transparent); }
+  .stretch-pips i.now { background: var(--stretch); }
+
+  /* The same hue on the plan overview, so the shape of the session is legible
+     before it starts: blue at the top, lifting in the middle, blue at the end. */
+  .workout-progress-row.stretch-row { color: var(--stretch-ink); font-weight: 700; }
+  .workout-progress-row.stretch-row .link-btn { color: var(--stretch-ink); }
+  .reorder-list.stretch-list {
+    border-left: 2px solid color-mix(in srgb, var(--stretch) 45%, transparent);
+    padding-left: 11px; margin-left: 1px;
+  }
+  .reorder-list.stretch-list .ex-icon {
+    background: color-mix(in srgb, var(--stretch) 16%, transparent);
+    color: var(--stretch-ink); border-color: color-mix(in srgb, var(--stretch) 32%, transparent);
+  }
   /* Nothing is running any more, so the clock and the pause button stop
      claiming otherwise. The way back out is the Done button below. */
   .session-overlay.finished .session-clock,
@@ -3366,7 +3463,6 @@
       <div class="avatar-pair" id="avatarPair"></div>
     </div>
   </header>
-  <span id="topDate" class="hidden"></span>
 
   <div id="fatalBanner" class="fatal-banner hidden"></div>
   <div id="connBanner" class="conn-banner hidden"></div>
@@ -3667,6 +3763,22 @@
       </label>
       <p class="muted-note">Off hides the exercise name, muscle figure, sets and up-next from their live view and timeline. They still see that you're training, for how long, and your effort score, so who worked hardest never depends on showing what you did.</p>
     </div>
+    <div class="card danger-card hidden" id="leavePartnerCard">
+      <h2>Leave this partnership</h2>
+      <p class="muted-note" style="margin-top:-6px;">
+        You both go back to training alone, and neither of you can see the
+        other's workouts, weigh-ins or photos any more. Nothing you have logged
+        is deleted, and either of you can pair again with a new code.
+      </p>
+      <div id="leavePartnerStep1">
+        <button type="button" class="btn-danger" id="leavePartnerBtn">Leave partnership</button>
+      </div>
+      <div id="leavePartnerStep2" class="hidden">
+        <p class="muted-note" style="margin-top:-2px;">This also ends it for <span id="leavePartnerName">your partner</span>.</p>
+        <button type="button" class="btn-danger" id="leavePartnerConfirmBtn">Yes, leave</button>
+        <button type="button" class="btn-ghost" id="leavePartnerCancelBtn">Cancel</button>
+      </div>
+    </div>
     </div>
     <div class="settings-page hidden" id="page-goal">
       <div class="scr-head">
@@ -3864,8 +3976,9 @@
     <div class="card danger-card">
       <h2>Reset my data</h2>
       <p class="muted-note" style="margin-top:-6px;">
-        Wipes every workout, weigh-in, exercise log and photo.
-        Your account, your partner and your settings stay.
+        Wipes every workout, weigh-in, exercise log, saved plan and photo.
+        Your account, your partner, your settings and the milestones you have
+        already earned stay.
       </p>
       <div id="resetStep1">
         <button type="button" class="btn-danger" id="resetDataBtn">Reset my data</button>
@@ -4311,7 +4424,17 @@ function renderSignInScreen(state = {}) {
       console.error("google sign-in failed", error);
       btn.disabled = false;
       msg("Could not reach Google. Check your connection and try again.", "bad");
+      return;
     }
+    /* A resolved call with no error means the page is about to navigate away.
+       If the redirect stalls or is blocked, the button used to stay disabled
+       forever with no recovery but a manual reload. Real navigation destroys
+       this page before the timeout fires, so it only ever bites when nothing
+       actually happened. */
+    setTimeout(() => {
+      btn.disabled = false;
+      msg("Still here? The redirect may be blocked. Try again, or use email below.", "bad");
+    }, 6000);
   };
 
   $("emailSignInBtn").onclick = async () => {
@@ -4360,8 +4483,11 @@ async function handleSignedIn(session) {
     MY_PROFILE = profile;
     applyTheme(profile.theme || localStorage.getItem(THEME_KEY) || "light");
     applyAccentColors();
+    clearObDraft();   // a profile already exists, so any leftover draft is stale
     await checkPartnershipThenEnter();
   } else {
+    const draft = loadObDraft();
+    if (draft) { renderOnboardStep(draft.step, draft.data); return; }
     const suggested = session.user.user_metadata?.full_name?.split(" ")[0] || session.user.email.split("@")[0];
     renderOnboardIntro(0, { name: suggested });
   }
@@ -4460,10 +4586,14 @@ function renderInviteScreen(invite) {
 /* Who are you training with? Asked once, changeable later, and "just me" is a
    real answer rather than a dead end. The sizes match the plans, but nothing
    here mentions money yet. */
+/* "A small group" used to live here too, but it wrote a `groups` row nothing
+   in the app ever read back (no `kind` for it, no management surface), so the
+   group and its member row just sat orphaned forever. Pulled until a small
+   group is actually recognised somewhere, rather than shipping a choice that
+   quietly does nothing. */
 const SETUPS = [
   { key: "solo",  title: "Just me",            sub: "Train alone. You can add someone whenever you like.", seats: 1 },
   { key: "pair",  title: "Me and one other",   sub: "A partner you keep each other honest with.",          seats: 2 },
-  { key: "group", title: "A small group",      sub: "Up to 5 of you, including yourself.",                 seats: 5 },
   { key: "coach", title: "I coach people",     sub: "Up to 20, including you. Managed from the web.",      seats: 20 },
 ];
 
@@ -4498,24 +4628,22 @@ async function chooseSetup(key) {
   }
   if (key === "pair") { renderCodeScreen(); return; }
 
-  // A group or a coaching roster: create it, then send them where they manage it.
+  // A coaching roster: create it, then send them where they manage it.
   const spec = SETUPS.find((s) => s.key === key);
   const { data, error } = await sb.from("groups").insert({
-    name: key === "coach" ? `${ME}'s clients` : `${ME}'s group`,
-    kind: key === "coach" ? "coach" : "pair",
+    name: `${ME}'s clients`,
+    kind: "coach",
     owner_email: MY_EMAIL,
     seat_limit: spec.seats,
   }).select().single();
   if (error) { toast("Could not set that up"); console.error(error); return; }
   await sb.from("group_members").insert({
     group_id: data.id, email: MY_EMAIL,
-    role: key === "coach" ? "coach" : "owner",
+    role: "coach",
     accepted_at: new Date().toISOString(),
   });
-  localStorage.setItem(SOLO_KEY, "1");        // no partner wall while the group fills up
-  if (key === "coach") { renderCoachHandoff(); return; }
-  toast("Group created");
-  await checkPartnershipThenEnter();
+  localStorage.setItem(SOLO_KEY, "1");        // no partner wall while the roster fills up
+  renderCoachHandoff();
 }
 
 /* Coaches work from a desk, so point them there rather than pretending the
@@ -4564,7 +4692,12 @@ function renderCodeScreen() {
     </div>`;
 
   $("shareCodeBtn").onclick = async () => {
-    const text = `Train with me on Fit Together. My code is ${MY_PROFILE?.invite_code}. ${location.origin}`;
+    /* No profile gets a real invite_code from the client; it has to come from
+       a server-side default/trigger on insert (see owner note). Guard rather
+       than let "My code is undefined" go out over a real share sheet. */
+    const code = MY_PROFILE?.invite_code;
+    if (!code) { toast("Your code isn't ready yet"); return; }
+    const text = `Train with me on Fit Together. My code is ${code}. ${location.origin}`;
     try {
       if (navigator.share) await navigator.share({ text });
       else { await navigator.clipboard.writeText(text); toast("Copied"); }
@@ -4645,6 +4778,29 @@ const ONBOARD_INTRO = [
     sub: "That's the whole app. Everything else is just the tools to make it easy.",
   },
 ];
+
+/* Nothing is written to the DB until Start, same as the workout builder's
+   draft: a reload before then used to drop the whole wizard back to the
+   welcome tour with the name and goal already picked gone. Keyed by email so
+   a shared device never resumes the wrong person's half-finished answers. */
+function obDraftKey() { return `ft_ob_draft_${MY_EMAIL}`; }
+
+function saveObDraft(step, data) {
+  try { localStorage.setItem(obDraftKey(), JSON.stringify({ step, data })); }
+  catch (e) { console.warn("onboarding draft save failed", e); }
+}
+
+function loadObDraft() {
+  try {
+    const raw = localStorage.getItem(obDraftKey());
+    const draft = raw ? JSON.parse(raw) : null;
+    return draft && draft.step ? draft : null;
+  } catch { return null; }
+}
+
+function clearObDraft() {
+  try { localStorage.removeItem(obDraftKey()); } catch { /* nothing to clear */ }
+}
 
 function renderOnboardIntro(i, data) {
   const ob = $("onboard");
@@ -4748,6 +4904,7 @@ function renderGoalTilesStep(data = {}) {
       <h1>What do you want?</h1>
       <p class="sub">Tap one, then tell us what you mean by it.</p>
       <div class="goal-tile-grid" id="goalTileGrid"></div>
+      <button type="button" class="btn-ghost" id="goalBackBtn">Back</button>
     </div>`;
   initGoalTiles($("goalTileGrid"), {
     selected: { bubble: data.goal_bubble || null, child: data.goal_child || null },
@@ -4758,6 +4915,7 @@ function renderGoalTilesStep(data = {}) {
       else renderOnboardStep("pace", { ...next, detail: child ? label : null });
     },
   });
+  $("goalBackBtn").onclick = () => renderOnboardStep("name", data);
 }
 
 /* Nine tiles, always visible, no scrolling to find them. Tapping one opens the
@@ -5410,6 +5568,7 @@ function renderOnboardStep(step, data = {}) {
   const ob = $("onboard");
   ob.classList.remove("hidden");
   $("app").classList.add("hidden");
+  saveObDraft(step, data);   // so a reload resumes here instead of the welcome tour
 
   if (step === "name") {
     ob.innerHTML = `
@@ -5417,7 +5576,7 @@ function renderOnboardStep(step, data = {}) {
         <h1>What should we call you?</h1>
         <p class="sub">This is what the people training with you will see.</p>
         <input id="nameInput" type="text" placeholder="Your name" value="${escapeHtml(data.name || "")}"
-               autocomplete="given-name" />
+               autocomplete="given-name" maxlength="24" />
         <button class="btn-primary" id="nextBtn">Continue</button>
       </div>`;
     const go = () => {
@@ -5445,11 +5604,13 @@ function renderOnboardStep(step, data = {}) {
         <p class="sub">Closest one. You can change your mind later.</p>
         ${obChips(opts, data.detail, "detail")}
         <button class="btn-ghost" id="skipDetail">Skip this</button>
+        <button class="btn-ghost" id="detailBackBtn">Back</button>
       </div>`;
     ob.querySelectorAll("[data-detail]").forEach((b) => {
       b.onclick = () => renderOnboardStep("pace", { ...data, detail: b.dataset.detail });
     });
     $("skipDetail").onclick = () => renderOnboardStep("pace", { ...data, detail: null });
+    $("detailBackBtn").onclick = () => renderOnboardStep("goal", data);
     return;
   }
 
@@ -5465,10 +5626,15 @@ function renderOnboardStep(step, data = {}) {
               <span class="ob-pace-note">${escapeHtml(p.note)}</span>
             </button>`).join("")}
         </div>
+        <button class="btn-ghost" id="paceBackBtn">Back</button>
       </div>`;
     ob.querySelectorAll("[data-pace]").forEach((b) => {
       b.onclick = () => renderOnboardStep("plan", { ...data, pace: b.dataset.pace });
     });
+    /* The detail step is skipped for tiles that don't ask it, so back has to
+       land wherever this step was actually reached from. */
+    const tile = goalTileFor(data.goal_bubble);
+    $("paceBackBtn").onclick = () => renderOnboardStep(tile?.askDetail ? "detail" : "goal", data);
     return;
   }
 
@@ -5506,7 +5672,7 @@ function renderOnboardStep(step, data = {}) {
       weeks: p.weeks,
       days_per_week: days,
     });
-    $("backBtn").onclick = () => renderOnboardStep("goal", data);
+    $("backBtn").onclick = () => renderOnboardStep("pace", data);   // one step back, not all the way to goal
     return;
   }
 }
@@ -5528,6 +5694,7 @@ async function finishOnboarding(data) {
   }).select().maybeSingle();
   if (error) { toast("Setup failed, try again"); console.error(error); return; }
   MY_PROFILE = saved;
+  clearObDraft();
   if (data.goal_key) await setActiveGoal(data);
   applyAccentColors();
   await checkPartnershipThenEnter();
@@ -5981,7 +6148,10 @@ async function resetMyData() {
       paths.forEach((p) => delete PROOF_URL_CACHE[p]);
     }
 
-    for (const t of ["exercise_logs", "body_photos", "ai_workouts", "fit_entries", "challenge_completions"]) {
+    /* milestone_badges is deliberately not in this list: the table has no
+       DELETE policy, so a client delete would silently remove nothing. The
+       card copy says badges are kept rather than promising otherwise. */
+    for (const t of ["exercise_logs", "body_photos", "ai_workouts", "fit_entries", "challenge_completions", "saved_workouts"]) {
       await sb.from(t).delete().eq("email", MY_EMAIL);
     }
     await sb.from("profiles").update({ bonus_xp: 0 }).eq("email", MY_EMAIL);
@@ -5999,7 +6169,7 @@ async function resetMyData() {
     switchTab("home");
   } catch (err) {
     console.error(err);
-    toast("Reset failed");
+    toast("Could not reset your data");
   } finally {
     btn.textContent = "Wipe everything";
   }
@@ -6164,20 +6334,6 @@ function currentWeightLb(name) {
   return entriesFor(name).filter((e) => e.weight != null).slice(-1)[0]?.weight ?? null;
 }
 
-function longestStreak(name) {
-  const gymDays = [...new Set(entriesFor(name).filter((e) => e.gym).map((e) => e.entry_date))].sort();
-  if (gymDays.length === 0) return 0;
-  let best = 1, cur = 1;
-  for (let i = 1; i < gymDays.length; i++) {
-    const prev = new Date(gymDays[i - 1] + "T00:00:00");
-    const next = new Date(gymDays[i] + "T00:00:00");
-    const diffDays = Math.round((next - prev) / 86400000);
-    cur = diffDays === 1 ? cur + 1 : 1;
-    best = Math.max(best, cur);
-  }
-  return best;
-}
-
 /* Rest days protect a streak without breaking it. A streak you cannot pause
    stops being motivation and becomes obligation, so this is deliberate:
    up to REST_ALLOWANCE per rolling week, chosen by the user. */
@@ -6194,10 +6350,16 @@ function restDaysLeft(name) {
   return Math.max(0, REST_ALLOWANCE - restDaysUsed(name));
 }
 
-function computeStreak(name) {
+/* THE personal streak: days in a row you trained, with rest days holding the
+   chain rather than counting as links in it. `asIfRested` answers "what would
+   this be if I marked that day as rest", which is the number the rest-day
+   offer has to quote: without it the banner reports the streak left AFTER the
+   gap it is offering to close. */
+function computeStreak(name, asIfRested = null) {
   const entries = entriesFor(name);
   const gymDays = new Set(entries.filter((e) => e.gym).map((e) => e.entry_date));
   const restDays = new Set(entries.filter((e) => e.rest_day).map((e) => e.entry_date));
+  if (asIfRested) restDays.add(asIfRested);
   if (gymDays.size === 0) return 0;
 
   let streak = 0;
@@ -6591,9 +6753,15 @@ const INFO_TOPICS = {
   }),
   streak: () => ({
     eyebrow: "The streak",
+    rows: [
+      ["Together", "Days in a row you both logged a workout. Both of you, every day: a rest day does not save this one."],
+      ["Together weeks", "Completed weeks where you each hit your own weekly target. Shown when the day streak is at zero."],
+      ["Your streak", "Days in a row you trained. A day you marked as a rest day holds it; a day you skipped ends it."],
+    ],
     paras: [
-      "A day streak counts days in a row where you logged a workout. A rest day you marked as a rest day does not break it; a day you simply skipped does.",
-      "Once you have trained at least four days a week for two weeks, it switches to a week streak, because by then the honest unit is the week rather than the day.",
+      PARTNER_EMAIL
+        ? "Home shows the together streak while you have one, then the week streak, and your own streak when neither is running. The badge always says which one you are looking at."
+        : "Training alone, this is your own streak: days in a row you trained, with rest days holding it rather than breaking it.",
     ],
   }),
   weekTarget: () => ({
@@ -6838,7 +7006,8 @@ function renderRestDayPrompt() {
   if (!banner) return;
   const save = protectableDay(ME);
   if (!save) { banner.classList.add("hidden"); return; }
-  const streak = computeStreak(ME);
+  // The streak as it would be once the day is saved, not the one left behind it.
+  const streak = computeStreak(ME, save);
   banner.classList.remove("hidden");
   banner.innerHTML = `
     <div class="rest-copy">
@@ -7006,6 +7175,20 @@ function sharedDayStreak() {
   return streak;
 }
 
+/* The one streak Home is allowed to print, so the header pill, the hero badge
+   and the explainer can never quote three different numbers at each other.
+   Order is how much each has to say: the days you both trained first, then the
+   pair's completed weeks, then your own days, which is what anybody training
+   alone sees instead of nothing at all. */
+function homeStreak() {
+  const together = sharedDayStreak();
+  if (together > 0) return { n: together, unit: "day", label: "Together", full: "Together streak" };
+  const weeks = sharedWeekStreak();
+  if (weeks > 0) return { n: weeks, unit: "week", label: "Together weeks", full: "Together week streak" };
+  const mine = computeStreak(ME);
+  if (mine > 0) return { n: mine, unit: "day", label: "Your streak", full: "Your streak" };
+  return null;
+}
 
 
 /* One person, one ring, their face in the middle. Two of these side by side
@@ -7649,19 +7832,12 @@ async function shareRecap(r) {
 
 /* ---------- Partner sheet ---------- */
 
-/* Consecutive days ending today or yesterday. Yesterday still counts, because
-   opening the app at 7am should not tell you the streak you are about to keep
-   is already gone. Rest days count: that is the whole point of a rest day. */
+/* One person's streak, and it is the same number Home shows for you. It used
+   to count rest days as streak days of their own, which meant eight rest days
+   after a single workout read "9 day streak, going now": a rest day protects a
+   streak, it cannot build one. */
 function currentDayStreak(name) {
-  const kept = new Set(entriesFor(name).filter((e) => e.gym || e.rest_day).map((e) => e.entry_date));
-  const cursor = new Date(todayStr() + "T00:00:00");
-  if (!kept.has(isoDate(cursor))) cursor.setDate(cursor.getDate() - 1);
-  let streak = 0;
-  while (kept.has(isoDate(cursor)) && streak < 400) {
-    streak++;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  return streak;
+  return computeStreak(name);
 }
 
 function relDayLabel(date) {
@@ -7764,7 +7940,7 @@ async function openPartnerSheet() {
     <div class="ps-hero">
       <div class="ps-ring">
         ${face ? `<img class="ps-face" src="${face}" alt="" />` : `<span class="ps-initials">${escapeHtml(initials(name))}</span>`}
-        ${streak > 0 ? `<span class="ps-streak">${icon("flame", 13)} ${streak}</span>` : ""}
+        ${streak > 0 ? `<span class="ps-streak" aria-label="${escapeHtml(name)}'s streak: ${streak} day${streak === 1 ? "" : "s"}">${icon("flame", 13)} ${streak}</span>` : ""}
       </div>
       <div class="ps-name">${escapeHtml(name)}</div>
       <div class="ps-sub">IN IT WITH YOU</div>
@@ -7852,29 +8028,18 @@ function renderHero(animate = false) {
   const theirDays = partner ? gymDaysThisWeek(partner) : 0;
   const theirTarget = partner ? weeklyGoalFor(PARTNER_EMAIL) : 0;
 
-  const streak = sharedWeekStreak();
-  const dayStreak = sharedDayStreak();
+  const hs = homeStreak();
 
   // Head to head on effort, not on what was done: this reads the same whether
   // or not either of you shares the specifics of a workout.
   const myWeekXP = weekEffortXP(ME);
   const theirWeekXP = partner ? weekEffortXP(partner) : 0;
 
-  /* Under the title: one line that says where the pair stands. When you are
-     level it reads as one sentence; otherwise each of you gets your number. */
-  let sub;
-  if (!partner) sub = `${myDays} of ${myTarget} workouts this week`;
-  else if (myDays === theirDays && myTarget === theirTarget) sub = `${myDays} of ${myTarget} workouts each this week`;
-  else sub = `You ${myDays} of ${myTarget}, ${escapeHtml(partner)} ${theirDays} of ${theirTarget} this week`;
-
-  /* One streak, one place. Days running beats weeks when both exist, because
-     it changes more often and so has more to say. */
-  const streakNum = dayStreak > 0 ? dayStreak : streak;
-  const badge = dayStreak > 0
-    ? `<button type="button" class="streak-badge${animate ? " h-pop" : ""}" style="--d:340ms" data-info="streak" aria-label="What keeps the streak alive"><div class="sb-top">${icon("flame", 22)}<b data-streak="${dayStreak}">${animate ? 0 : dayStreak}</b></div><span>Day streak</span></button>`
-    : streak > 0
-      ? `<button type="button" class="streak-badge${animate ? " h-pop" : ""}" style="--d:340ms" data-info="streak" aria-label="What keeps the streak alive"><div class="sb-top">${icon("flame", 22)}<b data-streak="${streak}">${animate ? 0 : streak}</b></div><span>Week streak</span></button>`
-      : "";
+  /* One streak, one place, and it says which streak it is: the badge, the
+     header pill and the explainer all read homeStreak(). */
+  const badge = hs
+    ? `<button type="button" class="streak-badge${animate ? " h-pop" : ""}" style="--d:340ms" data-info="streak" aria-label="${escapeHtml(hs.full)}: ${hs.n} ${hs.unit}${hs.n === 1 ? "" : "s"}. What keeps it alive"><div class="sb-top">${icon("flame", 22)}<b data-streak="${hs.n}">${animate ? 0 : hs.n}</b></div><span>${escapeHtml(hs.label)}</span></button>`
+    : "";
 
   const stand = ringLockup(myDays, myTarget, theirDays, theirTarget, partner, animate);
 
@@ -7885,9 +8050,34 @@ function renderHero(animate = false) {
 
   const ctaBtn = (label) => `<button type="button" class="btn-cta" id="heroBtn">${icon("dumbbell", 22)} ${label}
     <span class="go">${icon("chevronRight", 22)}</span></button>`;
+  const heroLine = (text, ico = "check") => `<p class="hero-planned">${icon(ico, 14)} ${escapeHtml(text)}</p>`;
+
+  /* A plan queued for today that nobody has opened yet. The FAB has always
+     started this; the hero used to say "Plan Tomorrow's Workout" on the same
+     screen, so the two controls contradicted each other about today. */
+  const todayPlan = TODAY_WORKOUT && !TODAY_WORKOUT.archived && !TODAY_WORKOUT.completed_at ? TODAY_WORKOUT : null;
+  const todayEntry = todayEntryFor(MY_EMAIL);
+  const restToday = !!todayEntry?.rest_day && !trainedToday;
+
+  // Where the week stands when it is not going well. Said once, plainly, and
+  // never as a telling-off: this app is a training partner, not a nag.
+  const dayIdx = currentWeekDates().indexOf(todayStr());
+  const daysLeft = dayIdx < 0 ? 0 : 7 - dayIdx;
+  const gap = partner ? theirDays - myDays : 0;
+  let behindLine = "";
+  if (!trainedToday && !restToday && myDays < myTarget && daysLeft > 0) {
+    if (gap >= 2) behindLine = heroLine(`${partner} is ${gap} ahead this week. ${daysLeft} day${daysLeft === 1 ? "" : "s"} left.`, "clock");
+    else if (myDays === 0) behindLine = heroLine(`Nothing logged this week yet. ${daysLeft} day${daysLeft === 1 ? "" : "s"} left.`, "clock");
+  }
+
   let cta;
-  if (!trainedToday) {
-    cta = ctaBtn("Start Today's Workout");
+  if (todayPlan) {
+    cta = heroLine(`Today: ${displayFocus(todayPlan.focus, todayPlan.exercises)}, ready when you are`)
+      + ctaBtn(trainedToday ? "Start Today's Plan" : "Start Today's Workout");
+  } else if (restToday) {
+    cta = heroLine("Rest day. Back at it tomorrow.") + ctaBtn("Train Anyway");
+  } else if (!trainedToday) {
+    cta = behindLine + ctaBtn("Start Today's Workout");
   } else if (planned) {
     /* Trained today and something is already queued: the line used to be the
        only thing here, with a ghost "Clear tomorrow" doing all the work.
@@ -7937,7 +8127,7 @@ function renderHero(animate = false) {
 
   if ($("heroBtn")) {
     $("heroBtn").onclick = () => {
-      if (trainedToday) { generateWorkout(tomorrow); return; }
+      if (trainedToday && !todayPlan) { generateWorkout(tomorrow); return; }
       switchTab("workout");
       if (SESSION) { reopenSession(); return; }
       if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
@@ -7966,23 +8156,52 @@ function renderPairCopy() {
   const mTitle = $("momentumTitle");
   const mBody = $("momentumBody");
   if (mTitle && mBody) {
-    if (paired) {
-      mTitle.textContent = "Momentum is real.";
-      mBody.textContent = "Keep showing up for each other.";
-    } else {
-      mTitle.textContent = "One is a start.";
-      mBody.textContent = "Everything here works better with someone on the other side of it.";
-    }
+    const m = momentumCopy(paired);
+    mTitle.textContent = m.title;
+    mBody.textContent = m.body;
   }
 }
 
-/* The header pill: the pair's running streak, tap for the Progress tab. */
+/* The card used to say "Momentum is real. Keep showing up for each other."
+   forever, including in a week where neither of you had trained at all. A card
+   that says the same thing in every state stops being read, so it now says the
+   one true thing about the week it is sitting on. */
+function momentumCopy(paired) {
+  const mine = gymDaysThisWeek(ME);
+  const target = weeklyGoalFor(MY_EMAIL);
+  if (!paired) {
+    if (mine === 0) return { title: "Nothing logged this week.", body: "Everything here works better with someone on the other side of it." };
+    return { title: `${mine} workout${mine === 1 ? "" : "s"} this week.`, body: "Everything here works better with someone on the other side of it." };
+  }
+  const partner = partnerName();
+  const theirs = gymDaysThisWeek(partner);
+  const theirTarget = weeklyGoalFor(PARTNER_EMAIL);
+  if (mine >= target && theirs >= theirTarget) {
+    return { title: "Week done, both of you.", body: `${mine} and ${theirs} against your targets.` };
+  }
+  if (mine === 0 && theirs === 0) {
+    return { title: "Fresh week.", body: "Neither of you has logged one yet." };
+  }
+  if (mine === 0) {
+    return { title: `${partner} has ${theirs} this week.`, body: "The first one back is the hard one." };
+  }
+  if (theirs === 0) {
+    return { title: `You are ${mine} in this week.`, body: `${partner} has not logged one yet.` };
+  }
+  return { title: `${mine + theirs} workouts between you this week.`, body: "Momentum is real. Keep it going." };
+}
+
+/* The header pill: the same streak the hero badge shows, never a second one,
+   with the concept in the label since the pill has no room to spell it out.
+   Tap for the Progress tab. */
 function renderTopStreak() {
   const el = $("topStreak");
   if (!el) return;
-  const days = sharedDayStreak();
-  if (!(days > 0)) { el.classList.add("hidden"); return; }
-  el.innerHTML = `<span class="fl">${icon("flame", 18)}</span> ${days} day${days === 1 ? "" : "s"} <span class="go">${icon("chevronRight", 16)}</span>`;
+  const hs = homeStreak();
+  if (!hs) { el.classList.add("hidden"); return; }
+  const unit = `${hs.n} ${hs.unit}${hs.n === 1 ? "" : "s"}`;
+  el.setAttribute("aria-label", `${hs.full}: ${unit}`);
+  el.innerHTML = `<span class="fl">${icon("flame", 18)}</span> ${unit} <span class="go">${icon("chevronRight", 16)}</span>`;
   el.classList.remove("hidden");
   el.onclick = () => switchTab("progress");
 }
@@ -7990,16 +8209,25 @@ function renderTopStreak() {
 /* Volume this week, both of you, scaled against the higher of the two. */
 /* Your partner turning up is news, not furniture. It shows once, you either
    congratulate them or dismiss it, and then it is gone for the day. */
+/* Dismissed on this device, whatever the server thinks. The write used to be
+   the only record of it, so a failed RPC brought the card back in its
+   un-reacted state and the flame got sent twice. */
+const NOTICE_DISMISSED = new Set();
+
 async function renderPartnerNotice() {
   const el = $("partnerNotice");
   if (!PARTNER_EMAIL) { el.classList.add("hidden"); return; }
 
   const e = todayEntryFor(PARTNER_EMAIL);
   if (!e?.gym || e.seen_by_partner_at) { el.classList.add("hidden"); return; }
+  if (NOTICE_DISMISSED.has(todayStr())) { el.classList.add("hidden"); return; }
 
   const partner = partnerName();
-  const when = e.workout_at
-    ? new Date(e.workout_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+  // Same rule as the timeline: a clock time only when it falls on the day the
+  // entry is filed under, otherwise it reads as a time that has not happened.
+  const at = e.workout_at ? new Date(e.workout_at) : null;
+  const when = at && isoDate(at) === e.entry_date
+    ? at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : "today";
   const url = e.proof_path ? await signedProofUrl(e.proof_path) : null;
 
@@ -8019,9 +8247,17 @@ async function renderPartnerNotice() {
     </div>`;
 
   const dismiss = async () => {
+    NOTICE_DISMISSED.add(todayStr());
     el.classList.add("hidden");
-    try { await sb.rpc("mark_partner_entry_seen", { p_entry_date: todayStr() }); }
-    catch (err) { console.warn("could not mark seen", err); }
+    let failed = false;
+    try {
+      const { error } = (await sb.rpc("mark_partner_entry_seen", { p_entry_date: todayStr() })) || {};
+      if (error) throw error;
+    } catch (err) {
+      failed = true;
+      console.error("could not mark seen", err);
+    }
+    if (failed) toast("Saved here, not synced");
     await loadAll();
   };
   $("noticeX").onclick = dismiss;
@@ -8062,11 +8298,16 @@ async function dotHTML(name, email, date, cls) {
   }
   if (e?.rest_day) return `<button type="button" class="dot rest" ${who} ${label}>rest</button>`;
   if (e?.weight != null) return `<button type="button" class="dot wt" ${who} ${label}>${escapeHtml(String(e.weight))}</button>`;
-  return `<span class="dot"></span>`;
+  /* An empty day used to be the one tile you could not tap, which is exactly
+     the day you want to open: to call it a rest day, or to add a weigh-in you
+     forgot. Your own past days open; a day that has not happened cannot be
+     corrected, so it stays inert but still announces itself. */
+  const mineAndPast = (email || "").toLowerCase() === MY_EMAIL && date <= todayStr();
+  if (mineAndPast) return `<button type="button" class="dot" style="cursor:pointer" ${who} aria-label="${escapeHtml(name)}, ${relDayLabel(date)}, nothing logged"></button>`;
+  return `<span class="dot" role="img" aria-label="${escapeHtml(name)}, ${relDayLabel(date)}, nothing logged"></span>`;
 }
 
 async function renderWeekStrips(animate = false) {
-  $("topDate").textContent = "v" + APP_VERSION;
   const today = todayStr();
   const partner = PARTNER_EMAIL ? partnerName() : null;
 
@@ -8371,6 +8612,7 @@ async function loadClipInbox() {
 function renderClipPill() {
   const el = $("clipPill");
   if (!el) return;
+  renderClipHomeCard();
   if (!SESSION || SESSION.finished || !CLIP_INBOX.length) { el.classList.add("hidden"); return; }
   const next = CLIP_INBOX[0];
   const from = nameFor(next.from_email);
@@ -8379,6 +8621,36 @@ function renderClipPill() {
   el.innerHTML = `${icon("camera", 18)} ${label}${more}`;
   el.classList.remove("hidden");
   el.onclick = openNextClip;
+}
+
+/* Outside a session the pill does not exist, and a clip dies when the sender's
+   workout ends, so one that arrived while you were not training used to expire
+   without the app ever saying it was there. On Home it gets a card. */
+function renderClipHomeCard() {
+  const home = $("tab-home");
+  if (!home) return;
+  let card = $("clipHomeCard");
+  const next = (!SESSION || SESSION.finished) ? CLIP_INBOX[0] : null;
+  if (!next) { card && card.classList.add("hidden"); return; }
+  if (!card) {
+    card = document.createElement("button");
+    card.type = "button";
+    card.id = "clipHomeCard";
+    card.className = "live-card";
+    home.insertBefore(card, $("liveCard") || home.firstChild);
+  }
+  const from = nameFor(next.from_email);
+  const more = CLIP_INBOX.length > 1 ? ` (${CLIP_INBOX.length})` : "";
+  card.innerHTML = `
+    <span class="live-av">${escapeHtml(initials(from))}</span>
+    <span class="live-body">
+      <span class="live-head"><span class="live-dot"></span><span class="live-label">Clip waiting</span></span>
+      <span class="live-name">${escapeHtml(from)} sent you a clip${more}</span>
+      <span class="live-what">${next.views ? "One watch left, then it is gone." : "Two watches, then it is gone."}</span>
+    </span>
+    <span class="live-go">${icon("chevronRight", 20)}</span>`;
+  card.classList.remove("hidden");
+  card.onclick = openNextClip;
 }
 
 /* Two watches, not two plays. Inside one sitting it loops for as long as you
@@ -8766,10 +9038,12 @@ function timelineSessions(limit) {
 
 function reactionsFor(email, date) {
   const rows = ALL_REACTIONS.filter((r) => (r.to_email || "").toLowerCase() === (email || "").toLowerCase() && r.entry_date === date);
-  const hearts = rows.filter((r) => r.kind === "heart");
+  /* One thing, one word: it is a cheer. "heart" is only the stored kind, kept
+     because rows already exist with it. */
+  const cheers = rows.filter((r) => r.kind === "heart");
   return {
-    hearts: hearts.length,
-    mine: hearts.find((r) => (r.from_email || "").toLowerCase() === MY_EMAIL) || null,
+    cheers: cheers.length,
+    mine: cheers.find((r) => (r.from_email || "").toLowerCase() === MY_EMAIL) || null,
     comment: rows.find((r) => r.kind === "comment") || null,
   };
 }
@@ -8792,17 +9066,25 @@ async function timelineItemHTML(item) {
   const focus = !sharing ? "Workout" : plan ? displayFocus(plan.focus, plan.exercises) : (sum.names.length ? deriveFocus(sum.names) : "Workout");
   const mins = !sharing ? 0 : plan?.duration_sec ? Math.round(plan.duration_sec / 60) : sum.mins;
   const lb = sharing ? dayVolumeLb(email, date) : 0;
-  const when = relDayLabel(date) + (entry.workout_at
-    ? ", " + new Date(entry.workout_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "");
+  /* The day word comes from entry_date and the clock from workout_at, so a row
+     written in another timezone produced "Today, 11:40 PM" at one in the
+     morning. If the two do not agree, the day wins and the time is dropped. */
+  const at = entry.workout_at ? new Date(entry.workout_at) : null;
+  const when = relDayLabel(date) + (at && isoDate(at) === date
+    ? ", " + at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "");
   const url = entry.proof_path ? await signedProofUrl(entry.proof_path) : null;
+  const isMineRow = (email || "").toLowerCase() === MY_EMAIL;
   const rx = reactionsFor(email, date);
-  const heartLabel = rx.hearts ? ` ${rx.hearts}` : "";
+  const cheerLabel = rx.cheers ? ` ${rx.cheers}` : "";
 
   const stats = [];
   if (mins) stats.push(`<span>${icon("clock", 15)} ${mins} min</span>`);
   if (lb) stats.push(`<span>${icon("dumbbell", 15)} ${fmtVolume(lb)} lbs</span>`);
   if (!stats.length && sharing && sum.sets) stats.push(`<span>${icon("check", 15)} ${sum.sets} sets</span>`);
   if (!sharing) stats.push(`<span>${icon("bolt", 15)} ${effortXPBetween(name, date, date)} XP</span>`);
+  // A day banked with nothing recorded on it still says what it is, the way
+  // the day sheet does, rather than rendering as a name and a weekday.
+  if (!stats.length) stats.push(`<span>${icon("check", 15)} Trained, nothing recorded</span>`);
 
   const foot = rx.comment
     ? `<div class="tl-cmt"><span class="tl-av sm ${(rx.comment.from_email || "").toLowerCase() === MY_EMAIL ? "me" : "them"}"
@@ -8823,7 +9105,11 @@ async function timelineItemHTML(item) {
     </button>
     <div class="tl-foot">
       ${foot}
-      <button type="button" class="tl-react${rx.mine ? " on" : ""}" data-react="${escapeHtml(email)}|${date}" aria-label="Cheer">${icon("star", 18)}${heartLabel}</button>
+      ${isMineRow
+        /* You cannot cheer yourself: it used to insert a reaction from you to
+           you and then count it. Cheers you were sent still show. */
+        ? (rx.cheers ? `<span class="tl-react on" aria-label="${rx.cheers} cheer${rx.cheers === 1 ? "" : "s"}">${icon("star", 18)}${cheerLabel}</span>` : "")
+        : `<button type="button" class="tl-react${rx.mine ? " on" : ""}" data-react="${escapeHtml(email)}|${date}" aria-label="Cheer">${icon("star", 18)}${cheerLabel}</button>`}
     </div>
   </div>`;
 }
@@ -8863,6 +9149,7 @@ async function renderTimeline(animate = false) {
 }
 
 async function toggleReaction(email, date, btn) {
+  if ((email || "").toLowerCase() === MY_EMAIL) return;   // a cheer from you to you is not a cheer
   const rx = reactionsFor(email, date);
   btn.disabled = true;
   if (rx.mine) {
@@ -8932,7 +9219,7 @@ function openSessionComment(email, date) {
   $("noteSkip").onclick = close;
   $("noteSend").onclick = async () => {
     const text = input.value.trim();
-    if (!text) { close(); return; }
+    if (!text) { toast("Write something first"); input.focus(); return; }
     $("noteSend").disabled = true;
     const { data, error } = await sb.from("session_reactions")
       .insert({ from_email: MY_EMAIL, to_email: email, entry_date: date, kind: "comment", message: text }).select();
@@ -8984,8 +9271,9 @@ const NOTE_CHIPS = {
 
 function openNoteComposer(mode) {
   const partner = partnerName();
-  const heading = mode === "congratulate" ? `Say something to ${partner}` : `Say something to ${partner}`;
-  const hint = mode === "congratulate" ? "They'll see it next time they open the app." : "They'll see it when they open the app.";
+  const heading = `Say something to ${partner}`;
+  // The answer to "did that actually go anywhere", so it belongs on screen.
+  const hint = "They'll see it next time they open the app.";
 
   $("popCard").innerHTML = `
     <div class="pop-body compose">
@@ -8994,6 +9282,7 @@ function openNoteComposer(mode) {
         <button type="button" class="ds-x" id="noteX" aria-label="Close">&times;</button>
       </div>
       <textarea class="note-in" id="noteInput" rows="2" maxlength="140" placeholder="Optional"></textarea>
+      <p class="muted-note">${escapeHtml(hint)}</p>
       <div class="chip-row">${NOTE_CHIPS[mode].map((t) => `<button type="button" class="qchip" data-chip="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}</div>
       <button type="button" class="btn-primary" id="noteSend">Send it</button>
       <button type="button" class="btn-ghost" id="noteSkip">Skip</button>
@@ -9009,10 +9298,13 @@ function openNoteComposer(mode) {
   $("noteSkip").onclick = close;
   $("noteSend").onclick = async () => {
     const text = input.value.trim();
-    if (!text) { close(); return; }
+    // Closing the sheet on an empty box is indistinguishable from a send, and
+    // Skip is right there for anyone who meant to leave.
+    if (!text) { toast("Write something first"); input.focus(); return; }
     $("noteSend").disabled = true;
     if (mode === "congratulate") {
-      await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: text });
+      const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: text });
+      if (error) { toast("Couldn't send"); console.error(error); $("noteSend").disabled = false; return; }
       toast("Sent");
     } else {
       const e = todayEntryFor(MY_EMAIL);
@@ -9038,7 +9330,14 @@ function openNoteComposer(mode) {
 async function openDaySheet(email, date) {
   const isMine = email === MY_EMAIL;
   const name = isMine ? ME : partnerName();
-  const e = entryOn(name, date);
+  const logged = entryOn(name, date);
+  /* A day of your own with nothing on it still opens: it is the day you want
+     to mark as rest, or add a weigh-in you forgot. Nothing is written until
+     you do one of those, so this stands in for the row that is not there. */
+  const blank = !logged;
+  const e = logged || (isMine && date <= todayStr()
+    ? { entry_date: date, gym: false, rest_day: false, weight: null, sessions: 0, proof_path: null, note: null }
+    : null);
   if (!e) return;
   /* Same rule the timeline and the live sheet apply: your own day is always in
      full, a partner's detail only while they share it. */
@@ -9106,11 +9405,13 @@ async function openDaySheet(email, date) {
         ${isMine ? `<button type="button" class="rep-del" data-exdel="${escapeHtml(l.id)}" aria-label="Remove ${escapeHtml(l.exercise_name)}">${icon("trash", 14)}</button>` : ""}
       </div>`).join("")}
     ${sharing && !logs.length && e.gym ? `<p class="muted-note">Logged as a workout, no exercises recorded.</p>` : ""}
+    ${blank ? `<p class="muted-note">Nothing logged on this day.</p>
+       <button type="button" class="btn-secondary" id="dsRestDay">Mark as a rest day</button>` : ""}
     ${!sharing ? `<p class="muted-note">${escapeHtml(name)} keeps workout details private. Their effort score is always shared.</p>` : ""}
     ${weightBlock}
     ${e.note ? `<p class="quote">${escapeHtml(e.note)}</p>` : ""}
     ${isMine && e.proof_path ? `<button type="button" class="btn-ghost" id="dsRemoveProof">Remove photo</button>` : ""}
-    ${isMine ? `<button type="button" class="btn-ghost" id="dsDeleteDay">Delete this day</button>` : ""}`;
+    ${isMine && !blank ? `<button type="button" class="btn-ghost" id="dsDeleteDay">Delete this day</button>` : ""}`;
 
   $("dsClose").onclick = closeDaySheet;
   /* Removing just the photo used to live on the workout tab. It moved here so
@@ -9123,19 +9424,28 @@ async function openDaySheet(email, date) {
 
   if (!isMine) return;
   $("dsSaveWeight").onclick = () => saveDayWeight(date, $("dsWeight").value);
-  $("dsClearWeight") && ($("dsClearWeight").onclick = () => saveDayWeight(date, ""));
-  $("dsDeleteDay").onclick = () => { closeDaySheet(); confirmDeleteDay(date); };
+  $("dsClearWeight") && ($("dsClearWeight").onclick = () => saveDayWeight(date, "", { remove: true }));
+  $("dsRestDay") && ($("dsRestDay").onclick = async () => { closeDaySheet(); await markRestDay(date); });
+  // Confirm first, close after: saying no used to leave you back on Home with
+  // the day you were looking at shut.
+  $("dsDeleteDay") && ($("dsDeleteDay").onclick = async () => {
+    if (await confirmDeleteDay(date)) closeDaySheet();
+  });
   $("daySheet").querySelectorAll("[data-exdel]").forEach((b) => {
     b.onclick = () => deleteExerciseLog(b.dataset.exdel, date);
   });
 }
 
 /* Correct a weight on any day, or clear it, without touching the workout. */
-async function saveDayWeight(date, raw) {
+async function saveDayWeight(date, raw, { remove = false } = {}) {
   const txt = String(raw).trim();
   const parsed = parseFloat(txt);
   if (txt !== "" && (!Number.isFinite(parsed) || parsed <= 0)) { toast("Enter a valid weight"); return; }
-  const weight = txt === "" ? null : parsed;
+  /* Save on an empty field used to write null and toast "Weight removed": a
+     button labelled Save destroying data, with Remove weight sitting one row
+     over doing it on purpose. Only that button may delete. */
+  if (txt === "" && !remove) { toast("Enter a weight"); return; }
+  const weight = remove ? null : parsed;
 
   const existing = ALL_ENTRIES.find((x) => x.email === MY_EMAIL && x.entry_date === date);
   const payload = {
@@ -9159,7 +9469,13 @@ async function saveDayWeight(date, raw) {
 async function deleteExerciseLog(id, date) {
   const log = ALL_EXERCISE_LOGS.find((l) => l.id === id && l.email === MY_EMAIL);
   if (!log) return;
-  if (!confirm(`Remove ${log.exercise_name} from this day? This cannot be undone.`)) return;
+  const ok = await askConfirm({
+    heading: "Remove this exercise",
+    body: `${log.exercise_name} comes off this day. It cannot be undone.`,
+    ok: "Remove it",
+    cancel: "Keep it",
+  });
+  if (!ok) return;
   const { error } = await sb.from("exercise_logs").delete().eq("id", id);
   if (error) { toast("Could not remove"); console.error(error); return; }
   toast("Removed");
@@ -9310,7 +9626,7 @@ function renderScaleCheck() {
   $("scaleGoalNote").textContent = todayEntry?.weight != null
     ? "Logged today. Change it if you need to."
     : lastWeight != null
-      ? `Last logged ${lastWeight} lbs.`
+      ? `Last logged ${lastWeight.toFixed(1)} lbs.`
       : "First weigh-in. Type it in.";
 
   input.oninput = () => { SCALE_STATE.weight = parseFloat(input.value) || 0; };
@@ -9324,6 +9640,10 @@ function renderScaleCheck() {
 
 }
 
+/* Dismissed on this device. Hiding the element was the only record of it, so
+   the next render of Home brought the same message back. */
+const ENCOURAGEMENT_DISMISSED = new Set();
+
 async function renderEncouragementBanner() {
   const el = $("encouragementBanner");
   if (!PARTNER_EMAIL) { el.classList.add("hidden"); return; }
@@ -9332,17 +9652,20 @@ async function renderEncouragementBanner() {
     .eq("to_email", MY_EMAIL)
     .is("read_at", null)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(5);
   /* An empty message is not a message. Without this the banner reads
      `Mell says, ""`, which looks like the app lost something. */
-  const said = String(data?.message || "").trim();
-  if (!data || !said) { el.classList.add("hidden"); return; }
+  const row = (data || []).find((r) => !ENCOURAGEMENT_DISMISSED.has(r.id) && String(r.message || "").trim());
+  if (!row) { el.classList.add("hidden"); return; }
+  const said = String(row.message).trim();
   el.classList.remove("hidden");
   el.innerHTML = `<span class="rb-icon">${icon("star", 18)}</span><span class="rb-text">${escapeHtml(partnerName())} says, "${escapeHtml(said)}"</span><button type="button" class="rb-dismiss" id="dismissEncouragementBtn">${icon("close", 16)}</button>`;
   $("dismissEncouragementBtn").onclick = async () => {
-    await sb.from("encouragements").update({ read_at: new Date().toISOString() }).eq("id", data.id);
+    ENCOURAGEMENT_DISMISSED.add(row.id);
     el.classList.add("hidden");
+    const { error } = await sb.from("encouragements").update({ read_at: new Date().toISOString() }).eq("id", row.id);
+    if (error) { toast("Saved here, not synced"); console.error(error); }
+    renderEncouragementBanner();
   };
 }
 
@@ -9439,6 +9762,7 @@ function renderHome(animate = false) {
     };
   }
   renderPartnerNotice();
+  renderClipPill();
   renderWeekStrips(animate);
   renderTimeline(animate);
   renderRestDayPrompt();
@@ -10018,7 +10342,7 @@ function renderLog() {
   list.innerHTML = combined.map((e) => {
     const mine = e.email === MY_EMAIL;
     const color = e.user_name === ME ? "var(--me)" : "var(--partner)";
-    const w = e.weight != null ? e.weight + " lb" : "";
+    const w = e.weight != null ? e.weight.toFixed(1) + " lbs" : "";
     const gym = e.gym ? `<span class="gym-yes">${icon("dumbbell", 14)}</span>` : "";
     const rest = e.rest_day ? `<span class="log-rest">rest</span>` : "";
     const sets = e.sessions > 1 ? `<span class="log-rest">${e.sessions}x</span>` : "";
@@ -10026,8 +10350,11 @@ function renderLog() {
     const edit = mine
       ? `<button type="button" class="log-edit" data-edit="${escapeHtml(e.entry_date)}">Edit</button>`
       : "";
+    /* `.dot` alone is Home's week-strip tile (full width, dashed, square). The
+       small round version only exists as `.legend .dot`, and this row is not a
+       legend, so the size travels with the markup. */
     return `<div class="log-item">
-      <span class="dot" style="background:${color}"></span>
+      <span class="dot" style="background:${color};width:8px;height:8px;flex:none;border:none;border-radius:50%"></span>
       <span class="date">${e.entry_date.slice(5)}</span>
       <span class="w">${w}</span>${gym}${sets}${rest}
       <span class="note"></span>${edit}
@@ -10040,10 +10367,11 @@ function renderLog() {
 }
 
 /* Remove everything logged on one day: the entry, its exercises, its plan and
-   its proof photo. Two taps, because it cannot be undone. */
+   its proof photo. Two taps, because it cannot be undone. Resolves true only
+   if the day actually went, so the caller knows whether to close the sheet. */
 async function confirmDeleteDay(date) {
   const entry = ALL_ENTRIES.find((e) => e.email === MY_EMAIL && e.entry_date === date);
-  if (!entry) return;
+  if (!entry) return false;
   const logs = ALL_EXERCISE_LOGS.filter((l) => l.email === MY_EMAIL && l.entry_date === date);
 
   const bits = [];
@@ -10052,7 +10380,16 @@ async function confirmDeleteDay(date) {
   if (logs.length) bits.push(`${logs.length} exercise log${logs.length === 1 ? "" : "s"}`);
   if (entry.proof_path) bits.push("the proof photo");
 
-  if (!confirm(`Delete ${date}?\n\nThis removes ${bits.join(", ") || "this entry"}. It cannot be undone.`)) return;
+  // The same words the sheet above it uses, not the raw ISO date.
+  const pretty = new Date(date + "T00:00:00")
+    .toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+  const ok = await askConfirm({
+    heading: "Delete this day",
+    body: `${pretty}: this removes ${bits.join(", ") || "this entry"}. It cannot be undone.`,
+    ok: "Delete it",
+    cancel: "Keep it",
+  });
+  if (!ok) return false;
 
   try {
     if (entry.proof_path) {
@@ -10066,9 +10403,11 @@ async function confirmDeleteDay(date) {
     toast("Deleted");
     await loadAll();
     refreshCurrentTab();
+    return true;
   } catch (err) {
     console.error(err);
     toast("Could not delete");
+    return false;
   }
 }
 
@@ -10336,9 +10675,21 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = []) {
   const swapDate = planDate || todayStr();
   setTimeout(() => {
     $("genScrim").classList.add("done");
+    /* "Your workout" and "Let's go" over a plan for tomorrow read as starting
+       now. Say which day it is for, the way the Review Next Workout sheet
+       does, and label the button for what it actually does. */
+    const forToday = !planDate || planDate === todayStr();
+    const target = new Date((planDate || todayStr()) + "T00:00:00");
+    const forDate = target.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+    const dayAfter = new Date(todayStr() + "T00:00:00");
+    dayAfter.setDate(dayAfter.getDate() + 1);
+    const head = forToday
+      ? "Your workout"
+      : `Queued for ${planDate === isoDate(dayAfter) ? "tomorrow" : target.toLocaleDateString(undefined, { weekday: "long" })}`;
     $("genStage").innerHTML = `
-      <div class="gen-done-head">Your workout</div>
+      <div class="gen-done-head">${escapeHtml(head)}</div>
       <div class="gen-focus">${escapeHtml(displayFocus(workout.focus, workout.exercises) || "Ready")}</div>
+      ${forToday ? "" : `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(forDate)}</p>`}
       ${honest ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(honest)}</p>` : ""}
       ${said.map((n) => `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(n)}</p>`).join("")}
       ${stretchLine ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(stretchLine)}</p>` : ""}
@@ -10358,7 +10709,7 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = []) {
         <p>Anything that hurts, or gear you don't have? Tell us once and every plan will respect it.</p>
         <button type="button" id="genLimitsBtn">Tell us</button>
       </div>` : ""}
-      <button type="button" class="btn-primary gen-go" id="genGoBtn" style="--d:${list.length * 70 + 120}ms">Let's go</button>`;
+      <button type="button" class="btn-primary gen-go" id="genGoBtn" style="--d:${list.length * 70 + 120}ms">${forToday ? "Let's go" : "Save it"}</button>`;
     /* Only the row that changed is repainted afterwards, so swapping one
        exercise does not make the other four replay their arrival. */
     $("genStage").querySelectorAll("[data-swap]").forEach((b) => {
@@ -11614,6 +11965,13 @@ async function skipStretchPhase() {
   if (was === "warmup") toast("Warm-up skipped today");
 }
 
+/* A block's real length: per side runs twice, so a 40 second hold done both
+   sides is 80. The same arithmetic the plan overview uses, kept in one place
+   so the overview and the session can never quote different numbers. */
+function stretchBlockSeconds(list) {
+  return (list || []).reduce((t, m) => t + (Number(m.seconds) || 0) * (m.perSide ? 2 : 1), 0);
+}
+
 function renderStretchPhase() {
   const list = stretchList();
   const i = SESSION.stretchIndex || 0;
@@ -11626,8 +11984,28 @@ function renderStretchPhase() {
   const nextUp = move.perSide && SESSION.stretchSide === 1 ? "other side" : next ? next.name : (isWarm ? "first lift" : "finish");
   SESSION_LAST_EX = null;   // the first lift after the warm-up slides in like a new exercise
   $("sessionProgressFill").style.width = isWarm ? "0%" : "100%";
+  /* The whole screen changes colour for the duration of the block. See the
+     .session-overlay.stretching rules: one class, every accent follows. */
+  $("sessionCard").classList.add("stretching");
+
+  /* How long the block runs, and how much of it is left, both said out loud.
+     Counted from the moves themselves rather than a constant, so it can never
+     promise eight minutes and deliver three. */
+  const blockSec = stretchBlockSeconds(list);
+  const doneSec = stretchBlockSeconds(list.slice(0, i))
+    + (move.perSide && SESSION.stretchSide === 2 ? Math.max(1, Number(move.seconds) || 30) : 0);
+  const leftMin = Math.max(1, Math.round((blockSec - doneSec) / 60));
 
   $("sessionBody").innerHTML = `
+    <div class="stretch-banner">
+      <span class="stretch-banner-icon">${icon(isWarm ? "flame" : "heart", 19)}</span>
+      <div class="stretch-banner-body">
+        <div class="stretch-banner-title">${isWarm ? "Warming up" : "Cooling down"}</div>
+        <div class="stretch-banner-sub">${Math.round(blockSec / 60)} min in total · about ${leftMin} min left</div>
+        <div class="stretch-pips">${list.map((_, n) => `<i class="${n < i ? "done" : n === i ? "now" : ""}"></i>`).join("")}</div>
+      </div>
+    </div>
+
     <div class="sess-card ex-in">
       <div class="sess-step-row">
         <div class="sess-step">${isWarm ? "WARM-UP" : "COOL-DOWN"} · ${i + 1} OF ${list.length}</div>
@@ -11668,6 +12046,10 @@ function renderSession() {
      the lift, and none of it can see a stretch. */
   if (SESSION.phase === "warmup" || SESSION.phase === "cooldown") { renderStretchPhase(); return; }
   stopStretchTicker();
+  /* Back to lifting, so the screen goes back to lime. Removed here rather than
+     in endStretchPhase because every route into the lift screen comes through
+     renderSession, including a resume from storage mid-session. */
+  $("sessionCard").classList.remove("stretching");
   const ei = SESSION.exerciseIndex;
   const total = TODAY_WORKOUT.exercises.length;
   // Progress is what is finished, not where you are standing. Jumping to the
@@ -13975,19 +14357,21 @@ function stretchBlockHTML(which, finished) {
   const list = m[which];
   if (!list.length) return "";
   const title = which === "warmup" ? "Warm-up" : "Cool-down";
-  const secs = list.reduce((t, s) => t + (Number(s.seconds) || 0) * (s.perSide ? 2 : 1), 0);
-  const mins = Math.max(1, Math.round(secs / 60));
+  const mins = Math.max(1, Math.round(stretchBlockSeconds(list) / 60));
   if (m.skipped) {
     return which === "warmup" ? `
       <div class="muted-note" style="margin:6px 0 10px;">Stretching skipped today.
         <button type="button" class="link-btn" data-stretch-undo>Put it back</button></div>` : "";
   }
+  /* The same blue that takes over the session screen, used here as a stripe
+     down the block so the overview already tells you which parts of this
+     workout are stretching and which are lifting. */
   return `
-    <div class="workout-progress-row" style="margin-top:${which === "warmup" ? 0 : 12}px;">
+    <div class="workout-progress-row stretch-row" style="margin-top:${which === "warmup" ? 0 : 12}px;">
       <span>${title} · about ${mins} min</span>
       ${which === "warmup" ? `<button type="button" class="link-btn" data-stretch-skip>Skip today</button>` : ""}
     </div>
-    <div class="reorder-list">
+    <div class="reorder-list stretch-list">
       ${list.map((s) => `<div class="exercise-row">
         <div class="ex-icon" style="font-size:11px;font-weight:650;">${Number(s.seconds) || 0}s</div>
         <div class="ex-body">
@@ -15378,7 +15762,7 @@ async function uploadBodyPhoto(file) {
     renderBodyPhotos();
   } catch (err) {
     console.error(err);
-    toast("Upload failed");
+    toast("Could not upload that photo");
     renderBodyPhotos();
   }
 }
@@ -15395,7 +15779,7 @@ const TRACK_OPTIONS = [
   { key: "strength",    label: "Strength",     icon: "dumbbell",  card: "cardStrength" },
   { key: "volume",      label: "Volume",       icon: "bolt",      card: "cardVolume" },
   { key: "consistency", label: "Consistency",  icon: "flame",     card: "cardConsistency" },
-  { key: "photos",      label: "Body photos",  icon: "medal",     card: "cardPhotos" },
+  { key: "photos",      label: "Body photos",  icon: "camera",    card: "cardPhotos" },
   { key: "activity",    label: "Activity log", icon: "checklist", card: "cardActivity" },
   { key: "steps",       label: "Steps",        icon: "run",       card: null, needsApp: true },
 ];
@@ -15416,8 +15800,16 @@ function defaultTrackedMetrics() {
   return ["weight", "photos"];
 }
 
+/* Profiles saved under older defaults carry keys that match no card ("prs",
+   "trained"), and an unknown key is indistinguishable from "off": it hid every
+   card but Weight with nothing on screen to explain why. Keep only real keys,
+   and treat a list with nothing real left in it as never having been set. */
 function myTrackedMetrics() {
-  return MY_PROFILE?.tracked_metrics || defaultTrackedMetrics();
+  const known = new Set(TRACK_OPTIONS.map((o) => o.key));
+  const stored = Array.isArray(MY_PROFILE?.tracked_metrics)
+    ? MY_PROFILE.tracked_metrics.filter((k) => known.has(k))
+    : [];
+  return stored.length ? stored : defaultTrackedMetrics();
 }
 
 async function toggleMetric(key) {
@@ -15425,7 +15817,7 @@ async function toggleMetric(key) {
   set.has(key) ? set.delete(key) : set.add(key);
   const next = [...set];
   const { error } = await sb.from("profiles").update({ tracked_metrics: next }).eq("email", MY_EMAIL);
-  if (error) { toast("Couldn't save"); console.error(error); return; }
+  if (error) { toast("Could not save"); console.error(error); return; }
   MY_PROFILE.tracked_metrics = next;
   renderProgressTab();
 }
@@ -15451,7 +15843,14 @@ function renderProgressTab() {
   $("progMeBtn").classList.toggle("active", !isPartner);
   $("progPartnerBtn").classList.toggle("active", isPartner);
   $("progPartnerBtn").textContent = PARTNER_EMAIL ? partnerName() : "Partner";
-  $("progPartnerBtn").disabled = !PARTNER_EMAIL;
+  /* Same dimming the disabled metric chip gets from `.metric-chip:disabled`,
+     which `.tab-pill` has no equivalent of: without it the pill looks tappable
+     and simply does nothing when you are training alone. */
+  const soloed = !PARTNER_EMAIL;
+  $("progPartnerBtn").disabled = soloed;
+  $("progPartnerBtn").style.opacity = soloed ? "0.45" : "";
+  $("progPartnerBtn").style.cursor = soloed ? "not-allowed" : "";
+  $("progPartnerBtn").title = soloed ? "Pair up to see their progress here" : "";
 
   renderMetricPicker();
 
@@ -15554,7 +15953,7 @@ async function saveDisplayName() {
     toast("Name updated");
   } catch (err) {
     console.error(err);
-    note.textContent = "Couldn't save that name.";
+    note.textContent = "Could not save that name.";
   } finally {
     btn.disabled = false;
   }
@@ -15613,7 +16012,12 @@ async function renderPushToggle() {
 
 async function enablePush() {
   const btn = $("pushToggleBtn");
+  const note = $("pushNote");
+  /* The permission prompt can sit there unanswered indefinitely, and the whole
+     function is waiting on it. Say so, otherwise the tap reads as dead. */
   btn.disabled = true;
+  btn.textContent = "Turning on…";
+  note.textContent = "Waiting for your answer to the permission prompt.";
   try {
     /* Must be inside the click. Asking on page load is how you get denied
        permanently, and iOS requires a gesture regardless. */
@@ -15676,7 +16080,41 @@ async function captureTimezone() {
 
 /* Settings pages live inside the tab rather than in an overlay, so the tab bar
    stays reachable and the back arrow is the only way out that matters. */
+/* Ending a partnership is one column on one shared row, which is what makes it
+   safe to do from the client: the UPDATE policy lets either party write the
+   row, the lock_partnership_parties trigger stops the emails being rewritten,
+   and my_partner_email() only ever looks at status = 'accepted', so the moment
+   this lands neither side can see the other server-side either. Nothing is
+   deleted, and redeem_invite_code only refuses when an 'accepted' row exists,
+   so both people can pair again afterwards. */
+async function leavePartnership() {
+  const btn = $("leavePartnerConfirmBtn");
+  if (!MY_PARTNERSHIP) return;
+  btn.disabled = true;
+  btn.textContent = "Leaving…";
+  const { error } = await sb.from("partnerships")
+    .update({ status: "ended" }).eq("id", MY_PARTNERSHIP.id);
+  btn.disabled = false;
+  btn.textContent = "Yes, leave";
+  if (error) { console.error(error); toast("Could not leave the partnership"); return; }
+
+  MY_PARTNERSHIP = null;
+  PARTNER_EMAIL = null;
+  PARTNER_PROFILE = null;
+  // Training alone is a real state here, not an unfinished pairing.
+  try { localStorage.setItem(SOLO_KEY, "1"); } catch {}
+  toast("Partnership ended");
+  await loadAll();
+  closeSettingsPage();
+  switchTab("home");
+}
+
+/* Where the Setup index was when you left it, so back puts you where you were
+   rather than at the top of a long list you just scrolled through. */
+let SETUP_SCROLL = 0;
+
 function openSettingsPage(key) {
+  SETUP_SCROLL = window.scrollY;
   $("setupRoot").classList.add("hidden");
   document.querySelectorAll(".settings-page").forEach((el) => {
     el.classList.toggle("hidden", el.id !== `page-${key}`);
@@ -15697,7 +16135,7 @@ function closeSettingsPage() {
   $("setGoalSub").textContent = goalTileLabel(MY_PROFILE);
   $("setFocusSub").textContent = focusGroupsSubtitle();
   paintLimitsSubtitle();
-  window.scrollTo({ top: 0 });
+  window.scrollTo({ top: SETUP_SCROLL });
 }
 
 function renderSetupTab() {
@@ -15712,6 +16150,24 @@ function renderSetupTab() {
   $("setFocusSub").textContent = focusGroupsSubtitle();
   paintLimitsSubtitle();
 
+  /* Coached clients leave through their group, not through this card. */
+  const canLeave = !!MY_PARTNERSHIP && !!PARTNER_EMAIL && !isCoachedClient();
+  $("leavePartnerCard").classList.toggle("hidden", !canLeave);
+  if (canLeave) {
+    $("leavePartnerName").textContent = partnerName();
+    $("leavePartnerStep1").classList.remove("hidden");
+    $("leavePartnerStep2").classList.add("hidden");
+    $("leavePartnerBtn").onclick = () => {
+      $("leavePartnerStep1").classList.add("hidden");
+      $("leavePartnerStep2").classList.remove("hidden");
+    };
+    $("leavePartnerCancelBtn").onclick = () => {
+      $("leavePartnerStep2").classList.add("hidden");
+      $("leavePartnerStep1").classList.remove("hidden");
+    };
+    $("leavePartnerConfirmBtn").onclick = leavePartnership;
+  }
+
   // Only meaningful once there is someone to hide details from.
   $("sharePrivacyCard").classList.toggle("hidden", !PARTNER_EMAIL);
   if (PARTNER_EMAIL) {
@@ -15719,9 +16175,29 @@ function renderSetupTab() {
     const sharing = MY_PROFILE?.share_workout_details !== false;
     $("shareDetailsToggle").checked = sharing;
     $("shareDetailsToggleWrap").classList.toggle("checked", sharing);
+    /* This is a privacy control and it has no Save button of its own, so it
+       writes on the flip. It used to be picked up only by saveSetup(), bound to
+       the Training and Your Body pages, which meant leaving this page quietly
+       put it back and the toggle lied about what your partner could see. */
     $("shareDetailsToggleWrap").onclick = () => {
-      setTimeout(() => {
-        $("shareDetailsToggleWrap").classList.toggle("checked", $("shareDetailsToggle").checked);
+      setTimeout(async () => {
+        const on = $("shareDetailsToggle").checked;
+        $("shareDetailsToggleWrap").classList.toggle("checked", on);
+        // A label wrapping its own checkbox sees the click twice; one flip is
+        // one write, not two.
+        if (on === (MY_PROFILE?.share_workout_details !== false)) return;
+        const { error } = await sb.from("profiles")
+          .update({ share_workout_details: on }).eq("email", MY_EMAIL);
+        if (error) {
+          console.error(error);
+          toast("Could not save");
+          const back = MY_PROFILE?.share_workout_details !== false;
+          $("shareDetailsToggle").checked = back;
+          $("shareDetailsToggleWrap").classList.toggle("checked", back);
+          return;
+        }
+        if (MY_PROFILE) MY_PROFILE.share_workout_details = on;
+        toast(on ? `${partnerName()} sees your details` : `Details hidden from ${partnerName()}`);
       }, 0);
     };
   }
@@ -15753,10 +16229,16 @@ function renderSetupTab() {
 
   $("setupThemeChoices").querySelectorAll(".choice-card").forEach((c) => {
     c.classList.toggle("selected", c.dataset.v === SETUP_THEME);
-    c.onclick = () => {
+    /* The picker has no Save button either, so applying the theme and storing
+       it are the same action. Without the write it looked saved until reload. */
+    c.onclick = async () => {
       SETUP_THEME = c.dataset.v;
       applyTheme(SETUP_THEME);
       $("setupThemeChoices").querySelectorAll(".choice-card").forEach((x) => x.classList.toggle("selected", x === c));
+      try { localStorage.setItem(THEME_KEY, SETUP_THEME); } catch {}
+      const { error } = await sb.from("profiles").update({ theme: SETUP_THEME }).eq("email", MY_EMAIL);
+      if (error) { console.error(error); toast("Could not save the theme"); return; }
+      if (MY_PROFILE) MY_PROFILE.theme = SETUP_THEME;
     };
   });
 
@@ -15852,25 +16334,35 @@ function renderAdminPanel() {
   ], ADMIN_EX_STATE);
 }
 
+/* Hiding the panel is not a lock. These three write other people's rows, and
+   every one of them is a callable global for anyone with a console open. This
+   closes the client half only: the boundary that actually holds is the RLS
+   policy on profiles, fit_entries and exercise_logs. */
+function isAdmin() {
+  return !!MY_EMAIL && MY_EMAIL === ADMIN_EMAIL;
+}
+
 async function adminGiveXp() {
+  if (!isAdmin()) return;
   const target = adminTargetInfo();
   if (!target.email || !target.profile) { toast("No target profile"); return; }
   const current = target.profile.bonus_xp || 0;
   const { error } = await sb.from("profiles").update({ bonus_xp: current + ADMIN_XP_STATE.amount }).eq("email", target.email);
-  if (error) { toast("Failed to add XP"); console.error(error); return; }
+  if (error) { toast("Could not add XP"); console.error(error); return; }
   toast(`+${ADMIN_XP_STATE.amount} XP added to ${target.name}`);
   await loadAll();
   renderAdminPanel();
 }
 
 async function adminAddEntry() {
+  if (!isAdmin()) return;
   const target = adminTargetInfo();
   if (!target.email) { toast("No target profile"); return; }
   const { error } = await sb.from("fit_entries").upsert({
     user_name: target.name, email: target.email, entry_date: $("adminEntryDate").value,
     weight: ADMIN_ENTRY_STATE.weight || null, gym: $("adminEntryGym").checked,
   }, { onConflict: "email,entry_date" });
-  if (error) { toast("Failed to add entry"); console.error(error); return; }
+  if (error) { toast("Could not add the entry"); console.error(error); return; }
   toast(`Entry added for ${target.name}`);
   ADMIN_ENTRY_STATE.weight = 0;
   $("adminEntryGym").checked = false;
@@ -15879,6 +16371,7 @@ async function adminAddEntry() {
 }
 
 async function adminAddExercise() {
+  if (!isAdmin()) return;
   const target = adminTargetInfo();
   const name = $("adminExName").value.trim();
   if (!target.email || !name) { toast("Enter an exercise name"); return; }
@@ -15886,7 +16379,7 @@ async function adminAddExercise() {
     user_name: target.name, email: target.email, entry_date: todayStr(), exercise_name: name,
     weight: ADMIN_EX_STATE.weight || null, reps: ADMIN_EX_STATE.reps || null, sets: ADMIN_EX_STATE.sets,
   });
-  if (error) { toast("Failed to add exercise"); console.error(error); return; }
+  if (error) { toast("Could not add the exercise"); console.error(error); return; }
   toast(`${name} added for ${target.name}`);
   $("adminExName").value = "";
   ADMIN_EX_STATE.weight = 0; ADMIN_EX_STATE.reps = 0; ADMIN_EX_STATE.sets = 1;
@@ -15894,9 +16387,21 @@ async function adminAddExercise() {
   renderAdminPanel();
 }
 
+/* `min`/`max` on a number input only bound the spinner arrows, and a typed 0
+   never reaches the clamp because `0 || fallback` resolves to the fallback
+   first. Every one of these numbers is sent to the workout generator, so the
+   clamp has to happen here, on the way out. */
+function clampNum(raw, lo, hi, fallback = null) {
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(hi, Math.max(lo, n));
+}
+
 async function saveSetup() {
-  const feet = parseInt($("setupHeightFt").value, 10) || 0;
-  const inches = parseInt($("setupHeightIn").value, 10) || 0;
+  const feetRaw = parseInt($("setupHeightFt").value, 10);
+  // A blank or zero feet field is "not set", not "three feet tall".
+  const feet = Number.isFinite(feetRaw) && feetRaw > 0 ? Math.min(8, Math.max(3, feetRaw)) : 0;
+  const inches = clampNum($("setupHeightIn").value, 0, 11, 0);
   const payload = {
     email: MY_EMAIL,
     user_name: ME,
@@ -15904,9 +16409,9 @@ async function saveSetup() {
     goal: $("setupGoal").value,
     ...($("setupGoal").value !== MY_PROFILE?.goal ? { goal_bubble: null, goal_child: null } : {}),
     goal_detail: $("setupGoalDetail").value.trim() || null,
-    challenge_target: Math.min(7, Math.max(1, parseInt($("setupChallengeTarget").value, 10) || 4)),
+    challenge_target: clampNum($("setupChallengeTarget").value, 1, 7, 4),
     sex: $("setupSex").value || null,
-    age: $("setupAge").value ? parseInt($("setupAge").value, 10) : null,
+    age: clampNum($("setupAge").value, 13, 100),
     height_in: (feet || inches) ? feet * 12 + inches : null,
     activity_level: $("setupActivity").value || null,
     theme: SETUP_THEME || "dark",
@@ -15915,17 +16420,15 @@ async function saveSetup() {
     updated_at: new Date().toISOString(),
   };
   const { error } = await sb.from("profiles").upsert(payload);
-  if (error) { toast("Save failed"); console.error(error); return; }
+  if (error) { toast("Could not save"); console.error(error); return; }
 
   if (MY_PARTNERSHIP) {
     const sharedOn = $("sharedGoalToggle").checked;
-    const sharedVal = sharedOn
-      ? Math.min(7, Math.max(1, parseInt($("setupSharedGoal").value, 10) || 4))
-      : null;
+    const sharedVal = sharedOn ? clampNum($("setupSharedGoal").value, 1, 7, 4) : null;
     const { error: pErr } = await sb.from("partnerships")
       .update({ shared_weekly_goal: sharedVal })
       .eq("id", MY_PARTNERSHIP.id);
-    if (pErr) { toast("Shared goal didn't save"); console.error(pErr); }
+    if (pErr) { toast("Could not save the shared goal"); console.error(pErr); }
     else MY_PARTNERSHIP.shared_weekly_goal = sharedVal;
   }
 
