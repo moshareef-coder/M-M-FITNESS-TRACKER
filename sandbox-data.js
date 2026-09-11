@@ -81,8 +81,8 @@
              reaches the first lift in under a minute. */
           mobility: {
             warmup: [
-              { name: "Arm Circles", seconds: 20, perSide: false, group: "shoulders", kind: "dynamic", cue: "Start with small circles and let them grow. Keep the ribs down so the movement happens at the shoulder." },
-              { name: "Cross-Body Arm Swings", seconds: 20, perSide: false, group: "chest", kind: "dynamic", cue: "Swing the arms wide open, then cross them in front. Stay relaxed, this is not a stretch you force." },
+              { name: "Arm Circles", seconds: 20, perSide: false, group: "shoulders", kind: "dynamic", prepares: ["horizontalPush", "verticalPush"], cue: "Start with small circles and let them grow. Keep the ribs down so the movement happens at the shoulder." },
+              { name: "Cross-Body Arm Swings", seconds: 20, perSide: false, group: "chest", kind: "dynamic", prepares: ["horizontalPush", "horizontalPull"], cue: "Swing the arms wide open, then cross them in front. Stay relaxed, this is not a stretch you force." },
             ],
             cooldown: [
               { name: "Doorway Chest Stretch", seconds: 20, perSide: false, group: "chest", kind: "static", cue: "Forearms on the frame, step through until the chest opens. Breathe out into it." },
