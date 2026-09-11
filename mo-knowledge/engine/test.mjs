@@ -1390,6 +1390,23 @@ test("skip_stretching strips the blocks and changes nothing else about the answe
   assert.deepEqual(off2.workout.warmup, []);
 });
 
+test("no equipment means no roller, band or bench in either block, and the plan says so", () => {
+  const kit = new Set(STRETCH_ALL.filter((e) => !["none", "wall", "doorway", undefined, null, ""].includes(e.equipment)).map((e) => e.name));
+  assert.ok(kit.size > 0, "the library has at least one stretch that needs kit");
+  for (const [bubble, child] of [["consistent", null], ["feel-better", "mobility"]]) {
+    const plan = buildPlan({ goal: { bubble, child }, person: { bodyWeightLb: 170, sex: "Female", daysAsked: 3 }, logs: [], limits: { hurts: [], missing: ["none"] } });
+    for (const d of plan.week) {
+      for (const m of [...d.mobility.warmup, ...d.mobility.cooldown]) assert.ok(!kit.has(m.name), `${d.name}: ${m.name} needs kit`);
+      assert.ok(d.mobility.warmup.length >= MIN_MOVES && d.mobility.cooldown.length >= MIN_MOVES, `${d.name} still has both blocks`);
+      assert.ok(d.mobility.why.some((w) => /no equipment/.test(w)), `${d.name} says why`);
+    }
+  }
+  /* And with equipment, at least one block somewhere in a mobility week uses it,
+     or the filter above is testing nothing. */
+  const withKit = buildPlan({ goal: { bubble: "feel-better", child: "mobility" }, person: { bodyWeightLb: 170, sex: "Female", daysAsked: 3 }, logs: [] });
+  assert.ok(withKit.week.some((d) => d.mobility.cooldown.some((m) => kit.has(m.name))), "a mobility week with equipment uses some");
+});
+
 test("stripMobility empties the two arrays and leaves every other key alone", () => {
   const w = { focus: "Push day", exercises: [{ name: "x" }], warmup: [{ name: "a" }], cooldown: [{ name: "b" }] };
   const s = stripMobility(w);

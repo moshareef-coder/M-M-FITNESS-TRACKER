@@ -763,7 +763,7 @@ export function buildPlan({
      feeds the volume ledger or recovery: a stretch is not a set. See
      engine/mobility.mjs for the reasoning and the research. */
   for (const d of week) {
-    d.mobility = mobilityFor(d, { level, hurts: limitsUsed.hurts, goalChild: resolved.childUsed });
+    d.mobility = mobilityFor(d, { level, hurts: limitsUsed.hurts, missing: limitsUsed.missing, goalChild: resolved.childUsed });
     d.totalMinutes = d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60);
   }
 

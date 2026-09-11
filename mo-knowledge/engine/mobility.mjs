@@ -72,11 +72,18 @@ export function moveSeconds(entry) {
   return entry?.perSide ? s * 2 : s;
 }
 
-function eligible(entry, { hurts, level }) {
+/* What a stretch can need that a person might not own. The lifting vocabulary
+   (barbell, dumbbell, cable, machine) does not describe a stretch, so this is
+   the one bridge: "none" on limits.missing means bodyweight only, and a wall
+   or a doorway is not equipment. A roller, a band and a bench are. */
+const FREE_KIT = new Set(["none", "wall", "doorway", undefined, null, ""]);
+
+function eligible(entry, { hurts, level, bodyweightOnly }) {
   if (!entry || !entry.name) return false;
   /* A stretch that loads a joint they said hurts is the same mistake as a lift
      that does, only slower. avoidIf is the library's own word on that. */
   for (const j of entry.avoidIf || []) if (hurts.includes(j)) return false;
+  if (bodyweightOnly && !FREE_KIT.has(entry.equipment)) return false;
   /* One level above theirs is fine on a stretch: nothing here is loaded. Two
      above is a movement that needs a floor teacher, not a cue. */
   const rank = LEVEL_RANK[level] ?? 0;
@@ -109,8 +116,9 @@ const toMove = (e) => ({
  * nothing for the target groups still yields a block: a warm-up for a day the
  * library does not describe well is better than no warm-up.
  */
-export function pickBlock({ kind, groups = [], budgetSec, hurts = [], level = "beginner", exclude = null, pools = null, maxMoves = MAX_MOVES }) {
+export function pickBlock({ kind, groups = [], budgetSec, hurts = [], missing = [], level = "beginner", exclude = null, pools = null, maxMoves = MAX_MOVES }) {
   const want = new Set((groups || []).filter((g) => GROUPS.has(g)));
+  const bodyweightOnly = (missing || []).includes("none");
   const source = pools || [poolFor(kind)];
   const seen = new Set();
   const candidates = [];
@@ -118,7 +126,7 @@ export function pickBlock({ kind, groups = [], budgetSec, hurts = [], level = "b
     for (const e of pool) {
       const key = String(e.name).toLowerCase();
       if (seen.has(key) || (exclude && exclude.has(key))) continue;
-      if (!eligible(e, { hurts, level })) continue;
+      if (!eligible(e, { hurts, level, bodyweightOnly })) continue;
       seen.add(key);
       candidates.push(e);
     }
@@ -179,7 +187,7 @@ const total = (moves) => moves.reduce((t, m) => t + moveSeconds(m), 0);
  * @param hurts      limits.hurts, validated joint keys
  * @param goalChild  plan.goal.childUsed, so the two mobility children get their block
  */
-export function mobilityFor(day, { level = "beginner", hurts = [], goalChild = null } = {}) {
+export function mobilityFor(day, { level = "beginner", hurts = [], missing = [], goalChild = null } = {}) {
   const lib = library();
   if (!lib) {
     return { warmup: [], cooldown: [], warmupSeconds: 0, cooldownSeconds: 0, mobilityGoal: false,
@@ -192,18 +200,23 @@ export function mobilityFor(day, { level = "beginner", hurts = [], goalChild = n
   const worked = [...new Set([...(day?.exercises || []).map((e) => e.group).filter(Boolean), ...mainGroups])];
   const mobilityGoal = MOBILITY_CHILDREN.includes(goalChild);
 
-  const warmup = pickBlock({ kind: "dynamic", groups: mainGroups, budgetSec: WARMUP_SECONDS, hurts, level });
+  const warmup = pickBlock({ kind: "dynamic", groups: mainGroups, budgetSec: WARMUP_SECONDS, hurts, missing, level });
   const cooldown = mobilityGoal
     ? pickBlock({
-        kind: "mobility", groups: worked, budgetSec: MOBILITY_GOAL_SECONDS, hurts, level,
+        kind: "mobility", groups: worked, budgetSec: MOBILITY_GOAL_SECONDS, hurts, missing, level,
         /* Mobility moves first, then static holds for whatever those left out.
            The order of the pools is the preference; coverage still decides. */
         pools: [poolFor("mobility"), poolFor("static")],
         maxMoves: MAX_MOBILITY_MOVES,
       })
-    : pickBlock({ kind: "static", groups: worked, budgetSec: COOLDOWN_SECONDS, hurts, level });
+    : pickBlock({ kind: "static", groups: worked, budgetSec: COOLDOWN_SECONDS, hurts, missing, level });
 
   const why = [];
+  if ((missing || []).includes("none")) {
+    const kitOnly = [...poolFor("dynamic"), ...poolFor("static"), ...poolFor("mobility")]
+      .filter((e) => !FREE_KIT.has(e.equipment)).length;
+    if (kitOnly) why.push(`${kitOnly} stretches that need a roller, a band or a bench left out, since there is no equipment.`);
+  }
   if (warmup.length) why.push(`${warmup.length} dynamic moves for ${mainGroups.length ? mainGroups.join(", ") : "the whole body"} before the first set, inside the five minutes the session already budgets.`);
   if (cooldown.length) {
     why.push(mobilityGoal
