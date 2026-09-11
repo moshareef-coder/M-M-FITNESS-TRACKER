@@ -207,9 +207,15 @@ export function splitFor(days, level) {
 function slotsForDay(key, isShort) {
   const all = SLOTS[key];
   if (!isShort) return all;
+  /* Mains first, then every accessory in order, and the cap is applied by the
+     caller on PICKS rather than here on slots. Slicing the slots to four meant
+     a slot the equipment filter could not fill counted against the floor, and
+     the sweep of 2026-09-10 found 100 bodyweight only short days handed back
+     with two exercises: the comment in adapter.mjs saying the floor there
+     "should never fire" was carrying the whole week. */
   const mains = all.filter((s) => s.role === "main");
   const rest = all.filter((s) => s.role !== "main");
-  return mains.concat(rest.slice(0, Math.max(0, SHORT_DAY_MIN - mains.length)));
+  return mains.concat(rest);
 }
 
 const LEVEL_RANK = { beginner: 0, novice: 1, intermediate: 2, advanced: 3 };
@@ -329,6 +335,18 @@ export function buildPlan({
   const asked = daysAsked ?? P.minDays;
   let days = Math.min(P.maxDays, Math.max(P.minDays, asked));
   const dayNotes = [];
+  /* The one input they can see being ignored. The weekly picker offers 2 to 6,
+     no goal in the tree allows more than 5, and the sweep of 2026-09-10 found
+     every six day ask silently answered with 5, 4 or 3 and no sentence about
+     it, unlike the capacity shortening below which explains itself. Same
+     voice, same place, so the number is a statement rather than a discrepancy.
+     Whether a goal should allow six is a product question; saying what
+     happened is not. */
+  if (Number.isFinite(asked) && asked !== days) {
+    dayNotes.push(asked > days
+      ? `You asked for ${asked} days. This goal tops out at ${days}: more sessions than that and the recovery between them is what gives, so the week is ${days}.`
+      : `You asked for ${asked} days. This goal needs at least ${days} to work, so the week is ${days}, with the extra kept short.`);
+  }
 
   /* research/09 and open question 9: honour the number they asked for, because
      overriding a stated preference is the paternalism the product rule exists to
@@ -444,7 +462,13 @@ export function buildPlan({
     const usedToday = new Set();
     const slots = slotsForDay(key, isShort);
 
+    /* The short day floor, counted on what was actually filled. Every main
+       slot still runs; accessories are taken in order until the day has
+       SHORT_DAY_MIN exercises, and a slot the library cannot fill does not
+       spend one of those places. See slotsForDay. */
+    let taken = 0;
     const picks = slots.map((slot) => {
+      if (isShort && slot.role !== "main" && taken >= SHORT_DAY_MIN) return null;
       const pool = candidates({ ...slot, level, equipment: kit, role: slot.role, historyNames, preferences, exclude: excludeOut, emphasis: P.emphasis });
       if (!pool.length) return null;
       /* Prefer something not already used this week, so a week of five days does
@@ -456,6 +480,7 @@ export function buildPlan({
       if (rotateOut.has(pick.name.toLowerCase())) rotateBlocked.add(pick.name);
       const offPattern = patternFor(pick) !== slot.pattern && slot.pattern !== "isolation";
       usedToday.add(pick.name);
+      taken++;
       usedThisWeek.set(pick.name, (usedThisWeek.get(pick.name) || 0) + 1);
 
       /* Every exercise needs a swap. The brief calls this a hard product
@@ -483,10 +508,18 @@ export function buildPlan({
 
   /* How often each group really gets hit, from what was picked, so weekly volume
      can be split across sessions rather than guessed per session. */
+  /* The group an exercise counts toward is the slot's group it was chosen FOR,
+     not whatever its library row lists first. An incline press qualifies for
+     the shoulders isolation slot because shoulders is among its primaries, and
+     recording primary[0] credited it to chest instead, so the slot's own
+     group got nothing, the neighbour was over-counted, and a day could read as
+     chest three times. The sweep of 2026-09-10 found that on 307 of 726 clean
+     days. Same rule below in the week map, same helper, one answer. */
+  const groupFor = (slot, pick) => (slot.groups || []).find((g) => (pick.primary || []).includes(g)) || (pick.primary || [])[0];
   const hits = {};
   for (const day of selected) {
-    for (const { pick } of day.picks) {
-      const g = (pick.primary || [])[0];
+    for (const { slot, pick } of day.picks) {
+      const g = groupFor(slot, pick);
       if (g) hits[g] = (hits[g] || 0) + 1;
     }
   }
@@ -501,7 +534,7 @@ export function buildPlan({
   const isPriority = (group) => (priorityOverride ?? P.priority).includes(group);
   const week = selected.map(({ name, key, isShort, picks }) => {
     const exercises = picks.map(({ slot, pick, swap, alternatives, offPattern }) => {
-      const group = (pick.primary || [])[0];
+      const group = groupFor(slot, pick);
       /* The goal is not the only thing that can name a priority group. When the
          caller has merged the user's own body-map focus in (engine/focus.mjs),
          that merged list arrives as priorityOverride and stands in for the
@@ -641,7 +674,15 @@ export function buildPlan({
         continue;
       }
       if (d.exercises.length <= SHORT_DAY_MIN) break;
-      const last = lastIndex(d.exercises, (e) => roleOf.get(e) === "accessory");
+      /* The sweep of 2026-09-10 caught this lever undoing the one above it:
+         "Only non-priority accessories are shaved" was true of the sets lever
+         and false of the drop lever four lines below it, so asking for arms on
+         a tight strength day pushed both arm lifts to five sets, crossed the
+         budget, and this line deleted the triceps work from the week. Weekly
+         triceps went 8 sets to 0 because somebody asked for more of it. A
+         priority accessory is never the thing that goes; a day with nothing
+         else to drop says its honest number instead. */
+      const last = lastIndex(d.exercises, (e) => roleOf.get(e) === "accessory" && !e.priority);
       if (last < 0) break;
       timeTrimmed.push({ day: d.name, dropped: d.exercises[last].name });
       d.exercises.splice(last, 1);

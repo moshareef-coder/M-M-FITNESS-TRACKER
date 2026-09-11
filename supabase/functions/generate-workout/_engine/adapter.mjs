@@ -744,6 +744,13 @@ export function toWorkout(plan, dayIndex = 0) {
     swap: e.swap ?? null,
     alternatives: (Array.isArray(e.alternatives) ? e.alternatives : [])
       .slice(0, 3).map((a) => ({ name: a.name, why: a.why })),
+    /* The rest the engine budgeted this lift at, the same number
+       estimateMinutes costed the session with. Audit of 2026-09-10: this was
+       the only figure in the time budget the app could not see, so a strength
+       trainee budgeted at 180 seconds got the app's 90 second default and a 66
+       minute plan delivered in 45. Additive; the app's own timer stays the
+       fallback when the field is absent. */
+    restSec: e.restSec ?? null,
   }));
 
   /* Additive, like swap and alternatives above: the five keys the app has
@@ -904,6 +911,15 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
     return {
       workout,
       honest: plan.honest?.message || null,
+      /* Every sentence the plan said about itself: the limits summary, the
+         softened warning when a slot kept a movement that loads a bad joint,
+         the over-budget number, the capacity note, the day-count clamp, the
+         plateau answers. Audit of 2026-09-10: all of it was computed and none
+         of it left this function, so the engine's defence for prescribing a
+         movement someone said hurts ("the plan says so out loud") held inside
+         the engine and was false end to end. Additive, next to honest, which
+         the reveal already has one slot for. */
+      notes: Array.isArray(plan.dayNotes) ? plan.dayNotes : [],
       /* Same object the day was cut from, not a second build of it, so a lab
          showing both can never show a week the day did not come out of. */
       ...(includePlan ? { plan } : {}),

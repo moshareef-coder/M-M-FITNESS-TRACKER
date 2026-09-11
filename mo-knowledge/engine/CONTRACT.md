@@ -67,7 +67,8 @@ inside it are dropped in silence.
           { name: "Dumbbell Bench Press", why: "Same movement, same supporting muscles, dumbbell instead" },
           { name: "Incline Push-Up",      why: "Same movement, same supporting muscles, no equipment needed" },
           { name: "Push-Up",              why: "Same movement, same supporting muscles, no equipment needed" }
-        ]
+        ],
+        restSec: 180                    // new. The rest this lift was budgeted at, the number the session estimate was costed with. Seed the rest timer from it; the app's own default stays the fallback when absent
       }
     ],
     warmup: [                           // new. Dynamic moves before the first set. Timed, never logged as sets
@@ -79,9 +80,20 @@ inside it are dropped in silence.
     ]
   },
   honest: "Six weeks is enough for about twelve pounds, and here is the plan for twelve.",  // or null
+  notes: [                              // new. Every sentence the plan said about itself, in the order it said them; [] when it said nothing
+    "You asked for 6 days. This goal tops out at 5: more sessions than that and the recovery between them is what gives, so the week is 5.",
+    "Machine Shoulder Press is still in this week. The library has nothing else that fills that slot, so go light, stop if it hurts, and swap it out if it does not settle."
+  ],
   meta: { ... }
 }
 ```
+
+`notes` is the plan's own `dayNotes`, unfiltered: the limits summary, the
+softened warning when a slot kept a movement that loads a joint they said
+hurts, the over-budget number, the day-count clamp, the capacity shortening,
+the plateau answers. Until 2026-09-10 all of it was computed and none of it
+left the engine. Render it under `honest` in the reveal; nothing needs storing,
+`ai_workouts` does not store `honest` either.
 
 Three to six exercises. Three is the floor and it is only reached when the
 library genuinely cannot fill the day, which today means a bodyweight only week

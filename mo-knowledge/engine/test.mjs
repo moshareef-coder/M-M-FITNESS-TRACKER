@@ -1407,6 +1407,119 @@ test("no equipment means no roller, band or bench in either block, and the plan 
   assert.ok(withKit.week.some((d) => d.mobility.cooldown.some((m) => kit.has(m.name))), "a mobility week with equipment uses some");
 });
 
+/* ---------- audit of 2026-09-10: the sweep's findings, pinned ---------- */
+
+test("asking for a focus never deletes that group's work from the week (time trim keeps priority accessories)", () => {
+  /* The sweep's reproduction: get-stronger, 5 days, arms focus. Before the fix
+     both arm lifts went to five sets, the day crossed the time tolerance, and
+     the drop lever removed the triceps isolation on both upper days. */
+  const base = { goal_bubble: "get-stronger", challenge_target: 5, current_weight: 180, sex: "Male" };
+  const today = new Date("2026-09-10T12:00:00");
+  const without = generateFromPayload(base, { today, includePlan: true });
+  const withArms = generateFromPayload({ ...base, focus_groups: ["biceps", "triceps"] }, { today, includePlan: true });
+  for (const g of ["biceps", "triceps"]) {
+    const before = without.plan.weeklyVolume[g]?.sets ?? 0;
+    const after = withArms.plan.weeklyVolume[g]?.sets ?? 0;
+    assert.ok(after >= before, `${g}: ${before} sets without focus, ${after} with`);
+    assert.ok(after > 0, `${g} still has work in the week`);
+  }
+  for (const d of withArms.plan.week) {
+    for (const e of d.exercises) if (e.priority) assert.ok(e.sets >= 2, `${e.name} on ${d.name} kept its sets`);
+  }
+});
+
+test("an exercise is credited to the slot's group it was chosen for, not its library row's first primary", () => {
+  /* The sweep's reproduction: lose-weight, 2 days, glutes focus, 6 months of
+     history gave a Push day reading chest three times because an incline press
+     picked for the shoulders slot was recorded as chest. */
+  const today = new Date("2026-09-10T12:00:00");
+  const logs = [];
+  for (let w = 26; w >= 1; w--) for (const n of ["Barbell Bench Press", "Lat Pulldown", "Barbell Back Squat"]) logs.push({ entry_date: day(-w * 7), exercise_name: n, sets: 3, reps: 8, weight: 135 });
+  const out = generateFromPayload({ goal_bubble: "lose-weight", challenge_target: 2, sex: "Female", current_weight: 150, focus_groups: ["glutes"], logs }, { today, includePlan: true });
+  for (const d of out.plan.week) {
+    const counts = {};
+    for (const e of d.exercises) counts[e.group] = (counts[e.group] || 0) + 1;
+    for (const [g, n] of Object.entries(counts)) assert.ok(n <= 2, `${d.name} credits ${g} ${n} times: ${d.exercises.map((e) => e.name + "[" + e.group + "]").join(", ")}`);
+  }
+  /* And across every day the engine builds for a plain week, no group is
+     credited three times on one day. */
+  const plain = buildPlan({ goal: { bubble: "build-muscle", child: null }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 4 }, logs: [] });
+  for (const d of plain.week) {
+    const counts = {};
+    for (const e of d.exercises) counts[e.group] = (counts[e.group] || 0) + 1;
+    assert.ok(Math.max(...Object.values(counts)) <= 2, `${d.name}: ${JSON.stringify(counts)}`);
+  }
+});
+
+test("a short bodyweight-only day still reaches the four exercise floor when the library allows it", () => {
+  /* The sweep's reproduction: lose-weight, 5 days asked, 3 weeks of logs (so
+     capacity shortens the tail days), no equipment. Before the fix the short
+     leg day came back with two exercises because unfillable slots counted
+     against the floor. */
+  const today = new Date("2026-09-10T12:00:00");
+  /* Three sessions a week for four weeks, on distinct dates: observedCapacity
+     needs eight effective sessions before it will say anything, and then it
+     says "about 3", which against five asked shortens the last two days. */
+  const logs = [];
+  for (let w = 4; w >= 1; w--) for (const s of [0, 2, 4]) {
+    const date = day(-(w * 7 + s));
+    for (const n of ["Bodyweight Squat", "Push-Up", "Inverted Row"]) logs.push({ entry_date: date, exercise_name: n, sets: 3, reps: 10, weight: 0 });
+  }
+  const out = generateFromPayload({ goal_bubble: "lose-weight", challenge_target: 5, sex: "Female", current_weight: 150, logs, limits: { hurts: [], missing: ["none"] } }, { today, includePlan: true });
+  const shortDays = out.plan.week.filter((d) => d.short);
+  assert.ok(shortDays.length > 0, "the scenario produces at least one short day");
+  for (const d of out.plan.week) assert.ok(d.exercises.length >= 3, `${d.name} has ${d.exercises.length}`);
+  /* "When the library allows it": a short day gets min(floor, what the full
+     day could fill). A bodyweight leg day has fewer fillable slots than four,
+     and that is the library's honest limit, not the floor failing. The same
+     person with no shortening is the reference. */
+  const full = generateFromPayload({ goal_bubble: "lose-weight", challenge_target: 5, sex: "Female", current_weight: 150, logs: [], limits: { hurts: [], missing: ["none"] } }, { today, includePlan: true });
+  for (const d of shortDays) {
+    const ref = full.plan.week.find((x) => x.focus === d.focus);
+    const want = Math.min(4, ref.exercises.length);
+    assert.equal(d.exercises.length, want, `${d.name} short day has ${d.exercises.length}, the full day fills ${ref.exercises.length}`);
+  }
+});
+
+test("a day count the goal will not honour is said out loud in the notes", () => {
+  const out = generateFromPayload({ goal_bubble: "build-muscle", challenge_target: 6, current_weight: 190, sex: "Male" }, { includePlan: true });
+  assert.ok(out.meta.days < 6, "no goal allows six today, so this asks for the clamp");
+  assert.ok(Array.isArray(out.notes));
+  assert.ok(out.notes.some((n) => /asked for 6 days/.test(n)), out.notes.join(" | "));
+  assert.deepEqual(out.notes, out.plan.dayNotes, "notes are the plan's own dayNotes, nothing filtered");
+  const fine = generateFromPayload({ goal_bubble: "build-muscle", challenge_target: 4, current_weight: 190, sex: "Male" });
+  assert.ok(!fine.notes.some((n) => /asked for/.test(n)), "an honoured count says nothing about it");
+});
+
+test("the rest the engine budgeted reaches the app on every exercise", () => {
+  const out = generateFromPayload({ goal_bubble: "get-stronger", challenge_target: 3, current_weight: 200, sex: "Male" }, { includePlan: true });
+  const day = out.plan.week.find((d) => d.name === out.workout.focus);
+  for (const e of out.workout.exercises) {
+    assert.ok(Number.isInteger(e.restSec) && e.restSec > 0, `${e.name} restSec ${e.restSec}`);
+    const built = day.exercises.find((x) => x.name === e.name);
+    if (built) assert.equal(e.restSec, built.restSec);
+  }
+  /* Strength rests are long, which is the whole point of sending the number. */
+  assert.ok(out.workout.exercises.some((e) => e.restSec >= 120), "a strength day carries at least one long rest");
+});
+
+test("recovery reads the real end of a session when the rows carry a clock", () => {
+  /* Same session, two clocks. Logged at 07:00 it is ready by 07:00 the next
+     day plus 24h; logged at 22:00 it is still held at the same moment. The
+     18:00 assumption only applies to rows with no timestamp at all. */
+  const at = (h) => [
+    { entry_date: day(-1), exercise_name: "Barbell Bench Press", sets: 4, reps: 8, weight: 185, created_at: day(-1) + `T${h}:00:00` },
+    { entry_date: day(-1), exercise_name: "Machine Shoulder Press", sets: 3, reps: 10, weight: 60, created_at: day(-1) + `T${h}:30:00` },
+  ];
+  const probe = new Date(Date.parse(day(0) + "T09:00:00"));
+  const morning = muscleRecoveryStates({ logs: at("07"), muscleIndex: MUSCLE_INDEX, today: probe });
+  const night = muscleRecoveryStates({ logs: at("22"), muscleIndex: MUSCLE_INDEX, today: probe });
+  assert.equal(morning.get("chest").state, "ok", "07:30 yesterday to 09:00 today is 25.5h");
+  assert.equal(night.get("chest").state, "hold", "22:30 yesterday to 09:00 today is 10.5h");
+  const bare = muscleRecoveryStates({ logs: at("07").map(({ created_at, ...l }) => l), muscleIndex: MUSCLE_INDEX, today: probe });
+  assert.equal(bare.get("chest").state, "hold", "no clock: assumed 18:00, 15h ago");
+});
+
 test("stripMobility empties the two arrays and leaves every other key alone", () => {
   const w = { focus: "Push day", exercises: [{ name: "x" }], warmup: [{ name: "a" }], cooldown: [{ name: "b" }] };
   const s = stripMobility(w);

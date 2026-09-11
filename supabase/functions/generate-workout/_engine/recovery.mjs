@@ -88,6 +88,14 @@ export function muscleRecoveryStates({ logs = [], muscleIndex, today = new Date(
   }
 
   const lastRealHit = new Map(); // group -> entry_date string, most recent date clearing MIN_CREDIT_SETS
+  /* When the rows carry a real clock (exercise_logs.created_at is written the
+     moment a set is logged, fit_entries.workout_at when the day is), the last
+     one on the day is the session's end, and that is when recovery starts.
+     The 18:00 assumption below is for rows that have neither, which is the
+     sandbox fixture and nothing the app writes today. Audit of 2026-09-10:
+     with the assumption alone, "yesterday" stopped reading as fresh at 18:00
+     today whatever time the session really ended. */
+  const endOfDay = new Map();
   for (const [date, dayLogs] of byDate) {
     const credit = creditForDay(dayLogs, muscleIndex);
     for (const [group, sets] of Object.entries(credit)) {
@@ -95,11 +103,19 @@ export function muscleRecoveryStates({ logs = [], muscleIndex, today = new Date(
       const prev = lastRealHit.get(group);
       if (!prev || date > prev) lastRealHit.set(group, date);
     }
+    let latest = NaN;
+    for (const log of dayLogs) {
+      const t = Date.parse(log.created_at || log.workout_at || "");
+      if (Number.isFinite(t) && !(t < latest)) latest = t;
+    }
+    if (Number.isFinite(latest)) endOfDay.set(date, latest);
   }
 
   const states = new Map();
   for (const [group, lastDate] of lastRealHit) {
-    const hitAt = new Date(lastDate + "T18:00:00");   // same assumed time-of-day as the app when no timestamp exists
+    const hitAt = endOfDay.has(lastDate)
+      ? new Date(endOfDay.get(lastDate))
+      : new Date(lastDate + "T18:00:00");   // same assumed time-of-day as the app when no timestamp exists
     const hoursSince = (today - hitAt) / 3600000;
     const state = hoursSince < FRESH_HOURS ? "hold" : hoursSince < RECOVERY_HOURS ? "ok" : "ready";
     states.set(group, { hoursSince, state, lastDate });

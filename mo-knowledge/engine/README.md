@@ -714,3 +714,74 @@ on the primary muscle; three (Plank, Side Plank, Incline Push-Up) differ by one
 extra secondary, shoulders, in the later file. `buildMuscleIndex` keeps the
 last copy it sees, so recovery credits those three a half set to shoulders the
 lifting file would not. Harmless today, worth one cleanup pass.
+
+## The sweep (`sweep.mjs`), and the audit of 2026-09-10
+
+`node mo-knowledge/engine/sweep.mjs` runs every goal selection (52: nine
+bubbles, every child plus every bubble default) across 2 to 6 days, four
+history lengths, six limits cases, with sex, bodyweight and focus cycled
+through, 7,872 generate calls in about fourteen seconds, and checks twenty
+odd invariants on each. It exits 1 on any FAIL and is part of the gate now.
+WARNs are counted, not failed, and the counts are the point: a number that
+moves between commits is a change somebody should be able to explain.
+
+**Fixed from the first run, all pinned by tests:**
+
+- *Asking for a focus deleted that group's work.* The time trim's drop lever
+  removed the last accessory without checking `priority`, so arms focus on a
+  tight strength day pushed both arm lifts to five sets, crossed the budget,
+  and dropped the triceps isolation from the week: 8 weekly sets to 0 because
+  somebody asked for more. A priority accessory is never the thing that goes.
+- *A short bodyweight day came back with two exercises.* `slotsForDay` sliced
+  the slots to four, an unfillable slot spent one of the places, and nothing
+  re-floored. 100 days in the sweep. The floor is counted on picks now.
+- *The ledger credited an exercise to its library row's first primary, not the
+  slot it was chosen for.* An incline press in the shoulders slot was booked as
+  chest, so the slot's group got nothing and the day could read chest three
+  times (307 of 726 clean days). `groupFor(slot, pick)` is the one answer.
+- *Rest never reached the app.* `restSec` was the only number in the time
+  budget the app could not see; a 180 second strength rest ran on the app's 90
+  second default. It rides on every exercise now (CONTRACT.md).
+- *Every dayNote was thrown away.* The limits summary, the softened warning
+  when a slot kept a movement that loads a bad joint, the over-budget number,
+  the plateau answers: computed, never returned. `notes` comes back next to
+  `honest` now. The app has to render it; see the stretching wiring list.
+- *A six day ask was silently answered with five, four or three.* No goal in
+  the tree allows six. The clamp says so in the notes now, in the same voice
+  as the capacity shortening; whether a goal should allow six is a product
+  question, still open.
+- *Recovery assumed 18:00.* It reads `created_at` (or `workout_at`) when the
+  rows carry one, so a session logged at 07:00 is ready 24 hours after 07:00.
+  Two tests that compared "yesterday at six" against `new Date()` only passed
+  before six in the evening; fixed clocks now.
+
+**Measured and left open, in the order a user would notice:**
+
+1. **Volume above beginner is mostly under target, by design of the clamp.**
+   Three quarters of every group in every intermediate and advanced plan lands
+   under 0.8 of its weekly target (83% intermediate at 3 days, 88% advanced at
+   5). Cause: `setsFor` clamps to `[2, 6]` per session and a group hit once a
+   week wants 14 or 16. Nothing overshoots above beginner. Two honest fixes:
+   scale the target to the frequency the split can deliver, or give the split
+   a second weekly touch per group (the 4 day upper/lower already does, which
+   is why it is the least bad). Product call.
+2. **There is no calendar.** `restDays: 7 - days` is read by the demo only; the
+   app's rest day is a separate 2-a-week streak token; nothing places a day on
+   a weekday and the week never says "today is a rest day". Spacing between
+   sessions is emergent from `nextDayIndex` at generate time.
+3. **`deload` is a sentence.** Level decides it, nothing counts weeks, and
+   week six is identical to week five. The `backOff` lever exists; it needs a
+   week number to fire on.
+4. **`plan.cardio` is never placed on a day or sent to the app.** For the
+   endurance goals it is three sessions a week the user is never told about.
+5. **Announced fallbacks are common.** With `hurts: ["shoulder"]` about 1.3
+   ruled out movements per plan are still prescribed because the slot had
+   nothing else, every one named in `plan.limits.blocked` with a note. The
+   note reaches the app now (above). Dropping the slot instead is a product
+   decision.
+
+Also counted: the 4 day split repeats `Step-Up` on both leg days in 94 of 208
+clean plans; the novice band (weeks 7 to 20) is never swept because the four
+history lengths land either side of it; `over-time-budget` rose from 704 to
+1,268 days when the drop lever stopped removing priority work, which is the
+honest number replacing a quiet deletion.
