@@ -207,49 +207,6 @@
     text-transform: uppercase; letter-spacing: 0.16em; font-weight: 700; font-size: 21px !important;
   }
 
-  /* The pairing step. Both roles live on one surface, colour coded, because a
-     person arriving here does not know whether they are the one inviting or
-     the one who was invited: you are --me, they are --partner, the same two
-     hues the rings use everywhere else. */
-  .pair-panel {
-    width: 100%; padding: 16px; border-radius: 16px; border: 1.5px solid var(--border);
-    background: var(--panel); margin-bottom: 12px; text-align: left;
-  }
-  .pair-panel.mine { border-color: color-mix(in srgb, var(--me) 42%, var(--border)); background: color-mix(in srgb, var(--me) 7%, var(--panel)); }
-  .pair-panel.theirs { border-color: color-mix(in srgb, var(--partner) 42%, var(--border)); background: color-mix(in srgb, var(--partner) 7%, var(--panel)); }
-  .pair-panel h3 { font-size: 15px; font-weight: 800; letter-spacing: -.01em; margin: 0 0 2px; }
-  .pair-panel .pair-hint { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; line-height: 1.4; }
-  .pair-panel.mine h3 { color: var(--me-ink, var(--me)); }
-  .pair-panel.theirs h3 { color: var(--partner-ink, var(--partner)); }
-  .pair-code {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px;
-    padding: 12px 14px; margin-bottom: 10px;
-  }
-  .pair-code b { font-size: 24px; font-weight: 800; letter-spacing: .18em; font-variant-numeric: tabular-nums; }
-  .pair-code .pair-copy {
-    font-size: 12px; font-weight: 700; color: var(--muted); background: none; border: 0;
-    font-family: inherit; cursor: pointer; padding: 8px; margin: -8px;
-  }
-  .pair-code .pair-copy:active { opacity: .6; }
-  .pair-wait { font-size: 13px; color: var(--muted); font-weight: 600; letter-spacing: 0; }
-  .pair-or {
-    display: flex; align-items: center; gap: 10px; width: 100%;
-    margin: 4px 0 12px; color: var(--muted); font-size: 12px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .08em;
-  }
-  .pair-or::before, .pair-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
-  .pair-skip {
-    display: block; width: 100%; margin-top: 4px; padding: 12px;
-    background: none; border: 0; font: inherit; font-size: 14.5px; font-weight: 600;
-    color: var(--muted); cursor: pointer; text-align: center;
-  }
-  .pair-skip:active { opacity: .6; }
-  .pair-alt { font-size: 13px; color: var(--dim, var(--muted)); text-align: center; margin: 14px 0 0; }
-  .pair-alt button {
-    background: none; border: 0; font: inherit; color: var(--muted); font-weight: 700;
-    text-decoration: underline; text-underline-offset: 2px; cursor: pointer; padding: 6px;
-  }
 
   header.top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; min-height: 44px; }
   header.top .me-tag { font-size: 12.5px; color: var(--muted); }
@@ -672,6 +629,17 @@
 
   /* Advice, not an exercise: no row chrome, no drag handle, nothing that
      invites a tap expecting sets and reps. */
+  /* The row body is a button now, because tapping it opens the sets and reps.
+     Everything here is undoing button chrome so it still reads as the row it
+     has always been, plus the one affordance that says it is tappable. */
+  .ex-body.ex-tap {
+    display: block; width: 100%; text-align: left; background: none; border: 0;
+    padding: 0; font: inherit; color: inherit; cursor: pointer; min-width: 0;
+  }
+  .ex-body.ex-tap:disabled { cursor: default; opacity: 1; }
+  .ex-body.ex-tap:not(:disabled):active { opacity: .6; }
+  .ex-body.ex-tap .ex-target svg { opacity: .5; vertical-align: -1px; margin-left: 2px; }
+
   .cardio-note {
     display: flex; gap: 11px; align-items: flex-start; margin: 10px 0 2px;
     padding: 11px 13px; border-radius: 14px;
@@ -3134,6 +3102,22 @@
   }
   .cst-caption { text-align: center; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
 
+  /* The little square Mo asked for: proof the photo landed, still on screen
+     after the toast that said the same thing has faded. */
+  .sc-proof {
+    display: flex; align-items: center; gap: 12px; text-align: left;
+    margin: 14px 0 0; padding: 10px 12px; border-radius: 14px;
+    background: var(--panel-2); border: 1px solid var(--border);
+  }
+  .sc-proof-thumb {
+    width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0; overflow: hidden;
+    background: var(--panel); display: flex; align-items: center; justify-content: center; color: var(--muted);
+  }
+  .sc-proof-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .sc-proof-body { min-width: 0; }
+  .sc-proof-body .muted-note { margin: 0; }
+  .sc-proof-body .link-btn { margin-top: 3px; }
+
   /* The strength card's lift list: tap a row and the chart above switches to
      it, the same "tap to re-focus" idea the Body tab already uses. */
   .str-list { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 4px; }
@@ -3283,6 +3267,12 @@
     transform: scale(1.1); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
   }
   .set-circle:disabled { opacity: 0.4; cursor: not-allowed; }
+  /* Dashed rather than solid, so it reads as "start something new" next to a
+     row of circles that are all either done or waiting on a number. */
+  .set-circle.set-add {
+    background: none; border-style: dashed; border-color: var(--muted); color: var(--muted);
+  }
+  .set-circle.set-add:active { border-color: var(--accent); color: var(--accent-ink); }
 
   /* A personal record is the point of the session, so it is said on the set
      that broke it rather than turning up later as a tag in Recent Activity.
@@ -3297,9 +3287,20 @@
     background: var(--accent); color: var(--on-accent);
     border-radius: 14px; padding: 12px 15px;
     box-shadow: 0 16px 34px -12px color-mix(in srgb, var(--accent) 60%, transparent);
-    transform: translateY(-160%); transition: transform .5s cubic-bezier(.2,.9,.25,1.25);
+    /* The retract has to clear the top of the SCREEN, not 160% of the banner.
+       A percentage translate is relative to the element's own height, so with
+       a Dynamic Island the banner starts 59px down, slides up ~90px, and
+       parks with its bottom still 35px on screen: a green sliver stuck under
+       the status bar for the rest of the workout, which is exactly what it
+       did on Mo's phone. On a simulator the inset is 0, it cleared, and no
+       headless test ever saw it. This distance is its own height plus however
+       far down it started, so it is gone at any inset and any height, and the
+       fade is belt and braces in case the geometry ever moves again. */
+    transform: translateY(calc(-100% - 24px - env(safe-area-inset-top, 0px)));
+    opacity: 0;
+    transition: transform .5s cubic-bezier(.2,.9,.25,1.25), opacity .3s ease;
   }
-  .pr-pop.show { transform: none; }
+  .pr-pop.show { transform: none; opacity: 1; }
   .pr-pop-ico { flex-shrink: 0; display: flex; }
   .pr-pop-kicker { display: block; font-size: 11px; font-weight: 800; letter-spacing: .11em; opacity: .75; }
   .pr-pop-val { display: block; font-size: 15.5px; font-weight: 800; letter-spacing: -.01em; }
@@ -5487,6 +5488,10 @@ function renderSession() {
             <div class="set-weight">${done ? (w != null ? `${w} lb` : "done") : isCurrent ? "pending" : "&nbsp;"}</div>
           </div>`;
         }).join("")}
+        ${allDone ? `<div class="set-col">
+          <button type="button" class="set-circle set-add" id="addSetBtn" aria-label="Add another set">${icon("plus", 20)}</button>
+          <div class="set-weight">extra</div>
+        </div>` : ""}
       </div>
     </div>
 
@@ -5556,9 +5561,10 @@ function renderSession() {
     b.onclick = () => jumpToExercise(parseInt(b.dataset.jump, 10));
   });
 
-  $("sessionBody").querySelectorAll(".set-circle").forEach((btn) => {
+  $("sessionBody").querySelectorAll(".set-circle[data-set]").forEach((btn) => {
     btn.onclick = () => toggleSet(parseInt(btn.dataset.set, 10));
   });
+  if ($("addSetBtn")) $("addSetBtn").onclick = addSet;
   const stepWeight = (delta) => {
     SESSION.weights[ei] = Math.max(0, (parseFloat(SESSION.weights[ei]) || 0) + delta);
     $("sessWeightVal").value = SESSION.weights[ei];
@@ -5606,7 +5612,12 @@ async function renderSessionComplete() {
   $("sessionProgressFill").style.width = "100%";
   $("sessionCard").classList.add("finished");
   stopSessionTimer();
-  const hasProof = !!todayEntryFor(MY_EMAIL)?.proof_path;
+  const proofEntry = todayEntryFor(MY_EMAIL);
+  const hasProof = !!proofEntry?.proof_path;
+  /* Fetched here rather than left for an <img> to resolve on its own, so the
+     square either shows the real photo or the fallback icon and never a
+     broken-image glyph while a signed URL is still in flight. */
+  const proofUrl = hasProof ? await signedProofUrl(proofEntry.proof_path) : null;
   /* The numbers that make this feel like it counted. Volume is the lifter's
      figure; on a class or cardio day there is none, so the exercise count
      takes that tile rather than printing a proud zero. */
@@ -5658,7 +5669,19 @@ async function renderSessionComplete() {
         You + ${escapeHtml(partner)}: ${myDays + theirDays} of ${myTarget + theirTarget} this week
       </div>` : `<div class="sc-team">${myDays} of ${myTarget} workouts this week</div>`}
       ${hasProof
-        ? `<p class="muted-note">${icon("check", 14)} Proof saved. ${escapeHtml(partnerName())} can see it.</p>`
+        /* Mo, 2026-09-12: "there's no way of telling if I've submitted a
+           photo... I need to be able to tell." The checkmark line was the
+           only signal, and it sat right where the toast that said the same
+           thing a moment earlier had already faded. A square thumbnail is
+           still there after the toast is gone, and it is the actual photo,
+           not a promise that one exists. */
+        ? `<div class="sc-proof">
+             <div class="sc-proof-thumb">${proofUrl ? `<img src="${proofUrl}" alt="Your proof photo" />` : icon("camera", 22)}</div>
+             <div class="sc-proof-body">
+               <p class="muted-note">${icon("check", 14)} Proof saved. ${escapeHtml(partnerName())} can see it.</p>
+               <button type="button" class="link-btn" id="sessionProofChangeBtn">Change photo</button>
+             </div>
+           </div>`
         : `<p class="muted-note">One last thing: snap a photo to lock this in.</p>
            <button type="button" class="btn-primary" id="sessionProofBtn">Take proof photo</button>`}
       ${PARTNER_EMAIL ? `<button type="button" class="btn-secondary" id="sessionNoteBtn">Say something to ${escapeHtml(partnerName())}</button>` : ""}
@@ -5684,6 +5707,8 @@ async function renderSessionComplete() {
 
   if (!hasProof) {
     $("sessionProofBtn").onclick = () => $("proofInput").click();
+  } else {
+    $("sessionProofChangeBtn").onclick = () => $("proofInput").click();
   }
   if (PARTNER_EMAIL) $("sessionNoteBtn").onclick = () => openNoteComposer("workout");
   $("sessionDoneBtn").onclick = sessionDone;
