@@ -20,7 +20,16 @@
      Chart.js is the progress chart and the Rive runtime is the body figure;
      both are fetched when the screen that needs them is opened, which keeps
      125 KB off the path between opening the app and seeing it. -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Pinned exactly, with an integrity hash. On a floating @2 the script that
+     holds the session and signs every request is whatever npm published most
+     recently, chosen by the resolver rather than by this repo: one bad publish
+     reaches every installed user on their next launch with no deploy here.
+     If you bump this, recompute the hash:
+     curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A
+     and update CDN in scripts/make-sandbox.mjs to match. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0"
+        integrity="sha384-JBR+x8blGwjDRO63aHCGiZMD4VNiTR4ZUGA+N6ZKLf3zNt1fK8IBpcgPaMrxqWBp"
+        crossorigin="anonymous"></script>
 <style>
   /* Palette: graphite/charcoal ink / cobalt blue (you) / coral orange (partner) / electric lime (action) */
   :root {
@@ -131,6 +140,15 @@
   * { box-sizing: border-box; }
   ::selection { background: var(--accent); color: var(--on-accent); }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* Sheets take focus on open; the sheet itself is a focus target, not a
+     control, so it must not draw a ring of its own. */
+  .sheet-scrim > [tabindex="-1"]:focus-visible,
+  .pop-scrim > [tabindex="-1"]:focus-visible,
+  .clip-scrim > [tabindex="-1"]:focus-visible { outline: none; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
   html, body {
     margin: 0; padding: 0;
     background: var(--bg);
@@ -709,7 +727,9 @@
     font-variant-numeric: tabular-nums; -moz-appearance: textfield; padding: 8px 4px;
   }
   .sess-input::-webkit-outer-spin-button, .sess-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  .sess-input:focus { outline: none; }
+  /* The ring is dropped because it boxes the big number awkwardly, so the
+     border has to carry the focus signal instead of nothing carrying it. */
+  .sess-input:focus { outline: none; border-color: var(--accent); }
 
   .btn-outline {
     background: var(--panel); border: 1px solid var(--border); color: var(--text);
@@ -3937,8 +3957,8 @@
       <h2>Appearance</h2>
       <label>Theme</label>
       <div class="choice-grid" id="setupThemeChoices" style="margin-bottom:14px;">
-        <div class="choice-card" data-v="dark">Dark</div>
-        <div class="choice-card" data-v="light">Light</div>
+        <div class="choice-card" role="button" tabindex="0" data-v="dark">Dark</div>
+        <div class="choice-card" role="button" tabindex="0" data-v="light">Light</div>
       </div>
     </div>
     </div>
@@ -4017,8 +4037,8 @@
       <h2>Admin</h2>
       <label>Editing</label>
       <div class="choice-grid" id="adminTargetChoices" style="margin-bottom:14px;">
-        <div class="choice-card" data-v="me">Myself</div>
-        <div class="choice-card" data-v="partner">Partner</div>
+        <div class="choice-card" role="button" tabindex="0" data-v="me">Myself</div>
+        <div class="choice-card" role="button" tabindex="0" data-v="partner">Partner</div>
       </div>
 
       <label>Give XP</label>
@@ -4121,7 +4141,7 @@
   </div>
 
   <nav class="tabs">
-    <button class="tab-btn active" data-tab="home" data-icon="home">Home</button>
+    <button class="tab-btn active" data-tab="home" data-icon="home" aria-current="page">Home</button>
     <button class="tab-btn" data-tab="body" data-icon="body">Body</button>
     <button type="button" class="fab" id="fabStart" aria-label="Start a workout"></button>
     <button class="tab-btn" data-tab="progress" data-icon="trending">Progress</button>
@@ -4129,7 +4149,7 @@
   </nav>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 const SUPABASE_URL = "https://stcpiovpjismhltklfdw.supabase.co";
@@ -4329,6 +4349,14 @@ function todayStr() {
 
 function isoDate(d) {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+/* Calendar arithmetic, not 86,400,000 ms: on the day clocks go back, local
+   midnight plus a fixed day lands at 23:00 of the same date. */
+function shiftDate(dateStr, days) {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return isoDate(d);
 }
 
 function applyTheme(theme) {
@@ -5723,13 +5751,13 @@ async function setActiveGoal(data) {
     goal_key: data.goal_key,
     detail: data.goal_detail || null,
     pace: data.pace || "steady",
-    target_date: target.toISOString().slice(0, 10),
+    target_date: isoDate(target),
     days_per_week: data.days_per_week || 4,
     status: "active",
   };
-  const { error } = await sb.from("user_goals").insert(row);
-  if (error) console.error("goal not saved", error);
-  else MY_GOAL = row;
+  const { data: saved, error } = await sb.from("user_goals").insert(row).select().maybeSingle();
+  if (error) { console.error("goal not saved", error); toast("Goal not saved, try again"); return; }
+  MY_GOAL = saved || row;
 }
 
 /* ---------- Main app ---------- */
@@ -6012,17 +6040,44 @@ function switchTab(tab) {
    upsert are queued: they carry the data worth protecting, and unlike update
    or delete they need no serialised row filter to replay. */
 
+/* Keyed per account: a global key let one person's pending writes replay under
+   the next person to sign in on the same device. */
 const WRITE_QUEUE_KEY = "ft_write_queue_v1";
+function writeQueueKey() { return MY_EMAIL ? `${WRITE_QUEUE_KEY}_${MY_EMAIL}` : null; }
 let FLUSHING = false;
 
 function readQueue() {
-  try { return JSON.parse(localStorage.getItem(WRITE_QUEUE_KEY)) || []; }
+  const key = writeQueueKey();
+  if (!key) return [];
+  try {
+    // One-time move of the pre-per-user queue, so an upgrade mid-flight does
+    // not strand writes that were already made offline.
+    const legacy = localStorage.getItem(WRITE_QUEUE_KEY);
+    if (legacy !== null) {
+      if (localStorage.getItem(key) === null) localStorage.setItem(key, legacy);
+      localStorage.removeItem(WRITE_QUEUE_KEY);
+    }
+    return JSON.parse(localStorage.getItem(key)) || [];
+  }
   catch { return []; }
 }
 
 function saveQueue(q) {
-  try { localStorage.setItem(WRITE_QUEUE_KEY, JSON.stringify(q)); }
+  const key = writeQueueKey();
+  if (!key) return;
+  try { localStorage.setItem(key, JSON.stringify(q)); }
   catch (e) { console.error("queue save failed", e); }
+}
+
+/* Everything this device holds for the account that is leaving. The theme is
+   deliberately kept: it is a device preference, not account data. */
+function clearLocalAccountState() {
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k === THEME_KEY) continue;
+      if (k.startsWith("ft_")) localStorage.removeItem(k);
+    }
+  } catch (e) { console.warn("could not clear local state", e); }
 }
 
 function queuedCount() { return readQueue().length; }
@@ -6093,7 +6148,10 @@ async function flushQueue({ quiet = false } = {}) {
     }
   }
   if (dropped) toast(`${dropped} change${dropped === 1 ? "" : "s"} could not be saved`);
-  saveQueue(stuck);
+  /* Anything queued WHILE this flush ran was appended after the snapshot.
+     Writing `stuck` alone would throw those away after telling the user they
+     were saved offline. */
+  saveQueue(stuck.concat(readQueue().slice(q.length)));
   FLUSHING = false;
   renderConnBanner();
 
@@ -9935,7 +9993,7 @@ let consistencyChart = null;
 
 function renderConsistencyChart() {
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderConsistencyChart).catch(() => chartUnavailable("consistencyChart"));
+    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderConsistencyChart).catch(() => chartUnavailable("consistencyChart"));
     return;
   }
   const viewingPartner = PROGRESS_VIEW === "partner";
@@ -10075,7 +10133,7 @@ let strengthChart = null;
 
 function renderStrengthChart() {
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderStrengthChart).catch(() => chartUnavailable("strengthChart"));
+    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderStrengthChart).catch(() => chartUnavailable("strengthChart"));
     return;
   }
   const viewingPartner = PROGRESS_VIEW === "partner";
@@ -10192,7 +10250,7 @@ let volumeChart = null;
 
 function renderVolumeChart() {
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderVolumeChart).catch(() => chartUnavailable("volumeChart"));
+    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderVolumeChart).catch(() => chartUnavailable("volumeChart"));
     return;
   }
   const viewingPartner = PROGRESS_VIEW === "partner";
@@ -10243,7 +10301,7 @@ function renderWeightChart() {
   /* Chart.js is 70 KB and only this card uses it, so it arrives with the card
      rather than with the app. */
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4").then(renderWeightChart).catch(() => chartUnavailable("weightChart"));
+    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderWeightChart).catch(() => chartUnavailable("weightChart"));
     return;
   }
   /* ONE person per chart. Both lines shared a y axis, and with forty five
@@ -12036,7 +12094,14 @@ function renderStretchPhase() {
       <h2 class="sess-name">${escapeHtml(move.name || "")}</h2>
       <div class="sess-meta">
         <span class="sess-target">${total}s${move.perSide ? ` · ${SESSION.stretchSide === 1 ? "left" : "right"} side` : ""}</span>
-        ${move.group ? `<span class="sess-target">${escapeHtml(BODY_GROUP_LABELS?.[move.group] || move.group)}</span>` : ""}
+        ${(() => {
+          /* What it is for beats what it works: "for your squats" is a reason
+             to do it, "Quads" is a label. Falls back to the muscle for the
+             static holds, which carry no patterns. */
+          const why = preparesLabel(move);
+          const text = why || (move.group ? (BODY_GROUP_LABELS?.[move.group] || move.group) : "");
+          return text ? `<span class="sess-target">${escapeHtml(text)}</span>` : "";
+        })()}
       </div>
       ${move.cue ? `<div class="sess-note">${escapeHtml(move.cue)}</div>` : ""}
     </div>
@@ -12152,7 +12217,9 @@ function renderSession() {
           const isCurrent = i === currentSet;
           return `<div class="set-col${exChanged ? " h-pop" : ""}" style="--d:${140 + i * 55}ms">
             <button type="button" class="set-circle ${done ? "done" : ""} ${isCurrent ? "current" : ""}${justSet === i ? " just-done" : ""}"
-              data-set="${i}" ${done || isCurrent ? "" : "disabled"}>${done ? icon("check", 18) : i + 1}</button>
+              data-set="${i}" ${done || isCurrent ? "" : "disabled"}
+              aria-pressed="${done ? "true" : "false"}"
+              aria-label="Set ${i + 1}, ${done ? "done" : isCurrent ? "current" : "not started"}">${done ? icon("check", 18) : i + 1}</button>
             <div class="set-weight">${done ? (w != null ? `${w} lb` : "done") : isCurrent ? "pending" : "&nbsp;"}</div>
           </div>`;
         }).join("")}

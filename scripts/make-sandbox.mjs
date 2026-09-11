@@ -18,10 +18,12 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = readFileSync(join(root, "index.html"), "utf8");
 
-const CDN = '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>';
-if (!src.includes(CDN)) throw new Error("make-sandbox: could not find the Supabase script tag to inject after");
+/* Matched by its closing tag rather than the whole thing, so pinning the
+   version or changing the integrity hash in index.html does not break this. */
+const CDN = /<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@[^"]*"[\s\S]*?<\/script>/;
+if (!CDN.test(src)) throw new Error("make-sandbox: could not find the Supabase script tag to inject after");
 
-let out = src.replace(CDN, CDN + '\n<script src="/sandbox-data.js"></script>');
+let out = src.replace(CDN, (tag) => tag + '\n<script src="/sandbox-data.js"></script>');
 
 /* Registering the production worker from the sandbox would poison the cache
    for the real app, since they share an origin. */
