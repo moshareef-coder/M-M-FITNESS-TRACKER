@@ -228,6 +228,50 @@
     text-transform: uppercase; letter-spacing: 0.16em; font-weight: 700; font-size: 21px !important;
   }
 
+  /* The pairing step. Both roles live on one surface, colour coded, because a
+     person arriving here does not know whether they are the one inviting or
+     the one who was invited: you are --me, they are --partner, the same two
+     hues the rings use everywhere else. */
+  .pair-panel {
+    width: 100%; padding: 16px; border-radius: 16px; border: 1.5px solid var(--border);
+    background: var(--panel); margin-bottom: 12px; text-align: left;
+  }
+  .pair-panel.mine { border-color: color-mix(in srgb, var(--me) 42%, var(--border)); background: color-mix(in srgb, var(--me) 7%, var(--panel)); }
+  .pair-panel.theirs { border-color: color-mix(in srgb, var(--partner) 42%, var(--border)); background: color-mix(in srgb, var(--partner) 7%, var(--panel)); }
+  .pair-panel h3 { font-size: 15px; font-weight: 800; letter-spacing: -.01em; margin: 0 0 2px; }
+  .pair-panel .pair-hint { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; line-height: 1.4; }
+  .pair-panel.mine h3 { color: var(--me-ink, var(--me)); }
+  .pair-panel.theirs h3 { color: var(--partner-ink, var(--partner)); }
+  .pair-code {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 10px;
+  }
+  .pair-code b { font-size: 24px; font-weight: 800; letter-spacing: .18em; font-variant-numeric: tabular-nums; }
+  .pair-code .pair-copy {
+    font-size: 12px; font-weight: 700; color: var(--muted); background: none; border: 0;
+    font-family: inherit; cursor: pointer; padding: 8px; margin: -8px;
+  }
+  .pair-code .pair-copy:active { opacity: .6; }
+  .pair-wait { font-size: 13px; color: var(--muted); font-weight: 600; letter-spacing: 0; }
+  .pair-or {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    margin: 4px 0 12px; color: var(--muted); font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .08em;
+  }
+  .pair-or::before, .pair-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .pair-skip {
+    display: block; width: 100%; margin-top: 4px; padding: 12px;
+    background: none; border: 0; font: inherit; font-size: 14.5px; font-weight: 600;
+    color: var(--muted); cursor: pointer; text-align: center;
+  }
+  .pair-skip:active { opacity: .6; }
+  .pair-alt { font-size: 13px; color: var(--dim, var(--muted)); text-align: center; margin: 14px 0 0; }
+  .pair-alt button {
+    background: none; border: 0; font: inherit; color: var(--muted); font-weight: 700;
+    text-decoration: underline; text-underline-offset: 2px; cursor: pointer; padding: 6px;
+  }
+
   header.top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; min-height: 44px; }
   header.top .me-tag { font-size: 12.5px; color: var(--muted); }
   /* Both sides were nowrap with no min-width, so at 320 the row refused to
@@ -4260,9 +4304,73 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.10.1";
+const APP_VERSION = "2026.09.11.1";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
+
+/* An invite link carries the code so person B never has to be told to go and
+   find a code entry screen and retype six characters. Read once at load and
+   kept across the sign-in round trip, which sends the tab away and back. */
+const PENDING_INVITE_KEY = "ft_pending_invite";
+let PENDING_INVITE = (() => {
+  let code = null;
+  try {
+    const q = new URLSearchParams(location.search).get("invite");
+    if (q && /^[A-Z0-9]{6}$/i.test(q.trim())) {
+      code = q.trim().toUpperCase();
+      sessionStorage.setItem(PENDING_INVITE_KEY, code);
+      // Take it out of the address bar so a reload or a shared URL is clean.
+      history.replaceState(null, "", location.pathname);
+    } else {
+      code = sessionStorage.getItem(PENDING_INVITE_KEY);
+    }
+  } catch { /* private mode, or no history API */ }
+  return code;
+})();
+function clearPendingInvite() {
+  PENDING_INVITE = null;
+  try { sessionStorage.removeItem(PENDING_INVITE_KEY); } catch { /* nothing to clear */ }
+}
+
+/* Declining a partner used to be permanent: one tap wrote ft_solo=1 and the
+   app never asked again, on a product whose whole mechanic needs two people.
+   The refusal now decays. "coach" is the one answer that stays, because a
+   coach genuinely has no partner, and a plain "1" is the legacy value from
+   before this changed and is left alone so existing users are not re-asked
+   out of nowhere. */
+const SOLO_SNOOZE_DAYS = 7;
+
+function snoozeSolo() {
+  try { localStorage.setItem(SOLO_KEY, `snooze:${Date.now()}`); } catch { /* private mode */ }
+}
+function setSoloCoach() {
+  try { localStorage.setItem(SOLO_KEY, "coach"); } catch { /* private mode */ }
+}
+function clearSolo() {
+  try { localStorage.removeItem(SOLO_KEY); } catch { /* nothing to clear */ }
+}
+/* redeem_invite_code is a plpgsql function that RETURNS a json verdict rather
+   than raising, so a wrong code arrives as data {ok:false, error:"..."} with
+   error null. Every caller here used to test only `error`, which made a bad
+   code look like success: the app cleared the solo flag, re-entered, found no
+   partnership and bounced back to the pairing screen with nothing said. This
+   reads the verdict and surfaces the server's own wording. */
+function redeemOk(res, error) {
+  if (error) { toast(error.message || "That code did not work"); return false; }
+  if (!res || res.ok !== true) { toast(res?.error || "That code did not work"); return false; }
+  return true;
+}
+
+/* True while we should NOT put the pairing wall in front of someone. */
+function soloHeld() {
+  let v = null;
+  try { v = localStorage.getItem(SOLO_KEY); } catch { return false; }
+  if (!v) return false;
+  if (v === "coach" || v === "1") return true;
+  const at = Number(v.startsWith("snooze:") ? v.slice(7) : NaN);
+  if (!Number.isFinite(at)) return false;
+  return Date.now() - at < SOLO_SNOOZE_DAYS * 864e5;
+}
 let ME = "";
 let MY_EMAIL = "";
 let ALL_ENTRIES = [];
@@ -4574,13 +4682,31 @@ async function handleSignedIn(session) {
   SIGN_IN_HANDLED = true;
   MY_EMAIL = session.user.email.toLowerCase();
 
-  const { data: profile } = await sb.from("profiles").select("*").eq("email", MY_EMAIL).maybeSingle();
+  const { data: profile, error: profileErr } = await sb.from("profiles")
+    .select("*").eq("email", MY_EMAIL).maybeSingle();
+
+  /* A failed read is not the same as "no profile". Treating it as one used to
+     send a fully set-up account back through onboarding, and finishing would
+     then upsert over their real name, goal and targets. When the lookup itself
+     fails, say so and stop rather than guessing the destructive way. */
+  if (profileErr) {
+    console.error(profileErr);
+    SIGN_IN_HANDLED = false;
+    renderSignInScreen({ email: MY_EMAIL, tone: "bad",
+      msg: "Could not reach your profile. Check your connection and try again." });
+    return;
+  }
+
   if (profile) {
     ME = profile.user_name;
     MY_PROFILE = profile;
     applyTheme(profile.theme || localStorage.getItem(THEME_KEY) || "light");
     applyAccentColors();
-    clearObDraft();   // a profile already exists, so any leftover draft is stale
+    /* A profile row no longer means onboarding finished: the pairing step
+       creates one early so there is an invite code to share. A draft is the
+       thing that says they are still mid-wizard, so it wins. */
+    const draft = loadObDraft();
+    if (draft) { renderOnboardStep(draft.step, draft.data); return; }
     await checkPartnershipThenEnter();
   } else {
     const draft = loadObDraft();
@@ -4645,8 +4771,8 @@ async function checkPartnershipThenEnter() {
       ? accepted.invitee_email.toLowerCase()
       : accepted.inviter_email.toLowerCase();
     showApp();
-  } else if (localStorage.getItem(SOLO_KEY) === "1") {
-    showApp();                       // chose to train alone; the seat stays open
+  } else if (soloHeld()) {
+    showApp();                       // training alone for now; the seat stays open
   } else {
     renderPairingScreen();
   }
@@ -4698,28 +4824,32 @@ function renderPairingScreen() {
   const ob = $("onboard");
   ob.classList.remove("hidden");
   $("app").classList.add("hidden");
+  /* Asked as an action with a quiet way past it, not as a three-way menu with
+     "Just me" sitting first and softened. Every two-sided app that survives
+     this moment (Paired, Feeld, Flo) assumes the second person and makes the
+     escape small. Training alone and coaching are still reachable, one line
+     down, because both are real answers: they are just not the default one. */
   ob.innerHTML = `
     <div class="ob-step">
-      <h1>Who is training with you?</h1>
-      <p class="sub">You can change this later. Nothing is locked in.</p>
-      <div class="ob-chips">
-        ${SETUPS.map((s) => `
-          <button type="button" class="ob-chip setup-chip" data-setup="${s.key}">
-            <span class="setup-title">${escapeHtml(s.title)}</span>
-            <span class="setup-sub">${escapeHtml(s.sub)}</span>
-          </button>`).join("")}
-      </div>
-      <button class="btn-ghost" id="pairSignOutBtn">Sign out</button>
+      <h1>Bring in your partner</h1>
+      <p class="sub">Neither of you gets to quit quietly. That only works with someone
+        on the other side of it.</p>
+      <button type="button" class="btn-primary" id="pairInviteBtn">Invite your partner</button>
+      <button type="button" class="btn-secondary" id="pairHaveCodeBtn" style="margin-top:10px;">I have their code</button>
+      <button type="button" class="pair-skip" id="pairSoloBtn">Train alone for now</button>
+      <p class="pair-alt">Training people instead? <button type="button" id="pairCoachBtn">Set up a coaching group</button></p>
+      <button class="btn-ghost" id="pairSignOutBtn" style="margin-top:18px;">Sign out</button>
     </div>`;
-  ob.querySelectorAll("[data-setup]").forEach((b) => {
-    b.onclick = () => chooseSetup(b.dataset.setup);
-  });
+  $("pairInviteBtn").onclick = () => renderCodeScreen();
+  $("pairHaveCodeBtn").onclick = () => renderCodeScreen({ focusCode: true });
+  $("pairSoloBtn").onclick = () => chooseSetup("solo");
+  $("pairCoachBtn").onclick = () => chooseSetup("coach");
   $("pairSignOutBtn").onclick = () => { clearLocalAccountState(); sb.auth.signOut(); };
 }
 
 async function chooseSetup(key) {
   if (key === "solo") {
-    localStorage.setItem(SOLO_KEY, "1");
+    snoozeSolo();
     showApp();
     return;
   }
@@ -4747,7 +4877,7 @@ async function chooseSetup(key) {
     toast("Could not set that up");
     return;
   }
-  localStorage.setItem(SOLO_KEY, "1");        // no partner wall while the roster fills up
+  setSoloCoach();                 // a coach has no partner by design, so this one does not decay
   renderCoachHandoff();
 }
 
@@ -4774,27 +4904,41 @@ function renderCoachHandoff() {
 }
 
 /* The invite-code exchange, now only reached by people who chose a partner. */
-function renderCodeScreen() {
+function renderCodeScreen({ focusCode = false } = {}) {
   const ob = $("onboard");
-  const myCode = MY_PROFILE?.invite_code || "······";
+  const myCode = MY_PROFILE?.invite_code || null;
   ob.innerHTML = `
     <div class="ob-step">
       <h1>Pair with your partner</h1>
-      <p class="sub">Share your code, or enter theirs.</p>
+      <p class="sub">Send them your code, or put in theirs. They need nothing installed.</p>
 
-      <div class="code-display">
-        <div class="code-label">Your code</div>
-        <div class="code-value" id="myInviteCode">${escapeHtml(myCode)}</div>
-        <button type="button" class="btn-secondary" id="shareCodeBtn" style="margin-top:10px;">Share my code</button>
+      <div class="pair-panel mine">
+        <h3>Invite them</h3>
+        <div class="pair-code">
+          <b id="myInviteCode" class="${myCode ? "" : "pair-wait"}">${myCode ? escapeHtml(myCode) : "Code unavailable"}</b>
+          <button type="button" class="pair-copy" id="copyMyCode" ${myCode ? "" : "hidden"}>Copy</button>
+        </div>
+        <button type="button" class="btn-primary" id="shareCodeBtn" ${myCode ? "" : "disabled"}>Send the invite</button>
       </div>
 
-      <div class="code-divider"><span>or</span></div>
+      <div class="pair-or"><span>or</span></div>
 
-      <input id="partnerCodeInput" type="text" placeholder="Enter partner's code" maxlength="6"
-             autocapitalize="characters" autocomplete="off" spellcheck="false" class="code-input" />
-      <button class="btn-primary" id="redeemCodeBtn">Pair up</button>
+      <div class="pair-panel theirs">
+        <h3>They sent you a code</h3>
+        <input id="partnerCodeInput" type="text" placeholder="ABC123" maxlength="6"
+               autocapitalize="characters" autocomplete="off" spellcheck="false" class="code-input"
+               value="${escapeHtml(PENDING_INVITE || "")}" />
+        <button class="btn-secondary" id="redeemCodeBtn">Pair up</button>
+      </div>
+
       <button class="btn-ghost" id="backToSetup">Back</button>
     </div>`;
+
+  $("copyMyCode").onclick = async () => {
+    if (!myCode) return;
+    try { await navigator.clipboard.writeText(myCode); toast("Code copied"); } catch { toast(myCode); }
+  };
+  if (focusCode || PENDING_INVITE) $("partnerCodeInput").focus();
 
   $("shareCodeBtn").onclick = async () => {
     /* No profile gets a real invite_code from the client; it has to come from
@@ -4802,11 +4946,13 @@ function renderCodeScreen() {
        than let "My code is undefined" go out over a real share sheet. */
     const code = MY_PROFILE?.invite_code;
     if (!code) { toast("Your code isn't ready yet"); return; }
-    const text = `Train with me on Fit Together. My code is ${code}. ${location.origin}`;
+    /* The link carries the code so they never have to be told to find a code
+       screen and retype it, and the message says what they are joining. */
+    const text = inviteMessage({ name: ME, goalLabel: MY_PROFILE?.goal }, code);
     try {
       if (navigator.share) await navigator.share({ text });
-      else { await navigator.clipboard.writeText(text); toast("Copied"); }
-    } catch {}
+      else { await navigator.clipboard.writeText(text); toast("Invite copied"); }
+    } catch { /* they dismissed the share sheet */ }
   };
   $("partnerCodeInput").oninput = (e) => {
     e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -4815,10 +4961,11 @@ function renderCodeScreen() {
     const code = $("partnerCodeInput").value.trim().toUpperCase();
     if (code.length !== 6) { toast("Codes are 6 characters"); return; }
     $("redeemCodeBtn").disabled = true;
-    const { error } = await sb.rpc("redeem_invite_code", { code });
+    const { data: res, error } = await sb.rpc("redeem_invite_code", { code });
     $("redeemCodeBtn").disabled = false;
-    if (error) { toast(error.message || "That code did not work"); return; }
-    localStorage.removeItem(SOLO_KEY);
+    if (!redeemOk(res, error)) return;
+    clearSolo();
+    clearPendingInvite();
     await checkPartnershipThenEnter();
   };
   $("backToSetup").onclick = () => renderPairingScreen();
@@ -4883,6 +5030,139 @@ const ONBOARD_INTRO = [
     sub: "That's the whole app. Everything else is just the tools to make it easy.",
   },
 ];
+
+/* ---------- The pairing step ----------
+   This app does not work with one person in it, so the partner is asked for
+   inside onboarding rather than offered as a menu item afterwards. Two things
+   about the backend shape this screen:
+
+   - profiles.invite_code is generated by a server default on INSERT, so there
+     is no code to share until a profile row exists. Reaching this step creates
+     one from the name and goal we already have; finishOnboarding still writes
+     the full row afterwards.
+   - redeem_invite_code reads the caller's email from the JWT and never touches
+     the caller's profile, so entering THEIR code works even before any of that.
+
+   Which is why the invite side is the one that needs the upsert and the
+   "enter their code" side does not. */
+
+async function ensureProfileForInvite(data) {
+  if (MY_PROFILE?.invite_code) return MY_PROFILE.invite_code;
+  const { data: saved, error } = await sb.from("profiles").upsert({
+    email: MY_EMAIL,
+    user_name: data.name,
+    goal: goalTileFor(data.goal_bubble)?.title || null,
+    goal_bubble: data.goal_bubble || null,
+    goal_child: data.goal_child || null,
+    updated_at: new Date().toISOString(),
+  }).select().maybeSingle();
+  if (error) { console.error(error); return null; }
+  MY_PROFILE = saved || MY_PROFILE;
+  return MY_PROFILE?.invite_code || null;
+}
+
+/* What person B is actually being asked to join. The goal is the part worth
+   saying: Runbuds sends the real challenge stats, Finch sends the real goal
+   card, and a concrete invite is the one that gets accepted. */
+function inviteMessage(data, code) {
+  const goal = (data.goalLabel || goalTileFor(data.goal_bubble)?.title || "").toLowerCase();
+  const who = data.name || ME || "Someone";
+  const line = goal ? `${who} is starting on Fit Together: ${goal}.` : `${who} is starting on Fit Together.`;
+  return `${line}
+They asked you to keep them honest. The app does not celebrate when only one of you finishes.
+
+Nothing to install, it opens in your browser:
+${location.origin}/?invite=${code}`;
+}
+
+function renderOnboardPairStep(data = {}) {
+  const ob = $("onboard");
+  const onward = () => {
+    if (goalTileFor(data.goal_bubble)?.askDetail) renderOnboardStep("detail", data);
+    else renderOnboardStep("pace", data);
+  };
+
+  ob.innerHTML = `
+    <div class="ob-step">
+      <h1>Bring in your partner</h1>
+      <p class="sub">Fit Together works by not letting each other off the hook. Send them your
+        code, or put in theirs.</p>
+
+      <div class="pair-panel mine">
+        <h3>Invite them</h3>
+        <p class="pair-hint">They need nothing installed. The link opens in any browser.</p>
+        <div class="pair-code">
+          <b id="obInviteCode" class="pair-wait">Getting your code</b>
+          <button type="button" class="pair-copy" id="obCopyCode" hidden>Copy</button>
+        </div>
+        <button type="button" class="btn-primary" id="obShareCode" disabled>Send the invite</button>
+      </div>
+
+      <div class="pair-or"><span>or</span></div>
+
+      <div class="pair-panel theirs">
+        <h3>They already sent you a code</h3>
+        <p class="pair-hint">Six characters, from their invite.</p>
+        <input id="obPartnerCode" type="text" class="code-input" maxlength="6" placeholder="ABC123"
+               autocapitalize="characters" autocomplete="off" spellcheck="false"
+               value="${escapeHtml(PENDING_INVITE || "")}" />
+        <button type="button" class="btn-secondary" id="obPairNow">Pair up</button>
+      </div>
+
+      <button type="button" class="pair-skip" id="obPairSkip">I will do this later</button>
+      <p class="pair-alt">Training people instead? <button type="button" id="obCoachLink">Set up a coaching group</button></p>
+    </div>`;
+
+  /* The code arrives from the server, so the button stays disabled and the
+     slot says so rather than showing a placeholder anyone might read out. */
+  ensureProfileForInvite(data).then((code) => {
+    const slot = $("obInviteCode");
+    if (!slot) return;                       // they moved on while this was in flight
+    if (!code) { slot.textContent = "Code unavailable"; return; }
+    slot.textContent = code;
+    slot.classList.remove("pair-wait");
+    $("obCopyCode").hidden = false;
+    $("obShareCode").disabled = false;
+  });
+
+  $("obCopyCode").onclick = async () => {
+    const code = MY_PROFILE?.invite_code;
+    if (!code) return;
+    try { await navigator.clipboard.writeText(code); toast("Code copied"); } catch { toast(code); }
+  };
+
+  $("obShareCode").onclick = async () => {
+    const code = MY_PROFILE?.invite_code;
+    if (!code) { toast("Your code isn't ready yet"); return; }
+    const text = inviteMessage(data, code);
+    try {
+      if (navigator.share) await navigator.share({ text });
+      else { await navigator.clipboard.writeText(text); toast("Invite copied"); }
+    } catch { /* they dismissed the share sheet */ }
+  };
+
+  $("obPartnerCode").oninput = (e) => {
+    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  };
+  $("obPairNow").onclick = async () => {
+    const code = $("obPartnerCode").value.trim().toUpperCase();
+    if (code.length !== 6) { toast("Codes are 6 characters"); return; }
+    const btn = $("obPairNow");
+    btn.disabled = true;
+    const { data: res, error } = await sb.rpc("redeem_invite_code", { code });
+    btn.disabled = false;
+    if (!redeemOk(res, error)) return;
+    clearSolo();
+    clearPendingInvite();
+    toast(res.partner_name ? `Paired with ${res.partner_name}` : "Paired");
+    onward();
+  };
+
+  /* Skipping is a quiet text button, not one of three equal choices with
+     "Just me" listed first, and it snoozes rather than answering forever. */
+  $("obPairSkip").onclick = () => { snoozeSolo(); onward(); };
+  $("obCoachLink").onclick = () => chooseSetup("coach");
+}
 
 /* Nothing is written to the DB until Start, same as the workout builder's
    draft: a reload before then used to drop the whole wizard back to the
@@ -5016,8 +5296,13 @@ function renderGoalTilesStep(data = {}) {
     onPick: ({ bubble, child, label }) => {
       const tile = goalTileFor(bubble);
       const next = { ...data, goalKey: tile.legacy, goal_bubble: bubble, goal_child: child, goalLabel: label };
-      if (tile.askDetail) renderOnboardStep("detail", next);
-      else renderOnboardStep("pace", { ...next, detail: child ? label : null });
+      /* The partner question goes here, straight after the goal, rather than
+         after the plan. By this point they have made the one choice that
+         matters, so the invite can name it ("Mo wants to lose weight"), and
+         they have not yet reached the "I am done, let me in" state where an
+         extra screen reads as an obstacle. Paired and Feeld both ask at their
+         midpoint for the same reason. */
+      renderOnboardStep("pair", tile.askDetail ? next : { ...next, detail: child ? label : null });
     },
   });
   $("goalBackBtn").onclick = () => renderOnboardStep("name", data);
@@ -5679,7 +5964,7 @@ function renderOnboardStep(step, data = {}) {
     ob.innerHTML = `
       <div class="ob-step">
         <h1>What should we call you?</h1>
-        <p class="sub">This is what the people training with you will see.</p>
+        <p class="sub">This is what your partner will see when you invite them.</p>
         <input id="nameInput" type="text" placeholder="Your name" value="${escapeHtml(data.name || "")}"
                autocomplete="given-name" maxlength="24" />
         <button class="btn-primary" id="nextBtn">Continue</button>
@@ -5695,8 +5980,13 @@ function renderOnboardStep(step, data = {}) {
     return;
   }
 
+  if (step === "pair") {
+    renderOnboardPairStep(data);
+    return;
+  }
+
   if (step === "goal") {
-    renderGoalTilesStep(data);   // advances to detail or pace on its own
+    renderGoalTilesStep(data);   // advances to pair on its own
     return;
   }
 
@@ -5860,16 +6150,17 @@ function showApp() {
   $("setupPairBtn").addEventListener("click", async () => {
     const code = $("setupPartnerCode").value.trim().toUpperCase();
     if (code.length !== 6) { toast("Codes are 6 characters"); return; }
-    const { error } = await sb.rpc("redeem_invite_code", { code });
-    if (error) { toast(error.message || "That code did not work"); return; }
-    localStorage.removeItem(SOLO_KEY);
-    toast("Paired");
+    const { data: res, error } = await sb.rpc("redeem_invite_code", { code });
+    if (!redeemOk(res, error)) return;
+    clearSolo();
+    clearPendingInvite();
+    toast(res.partner_name ? `Paired with ${res.partner_name}` : "Paired");
     await checkPartnershipThenEnter();
   });
   $("setupShareCodeBtn").addEventListener("click", async () => {
     const code = MY_PROFILE?.invite_code;
     if (!code) return;
-    const text = `Join me on Fit Together. My pairing code is ${code}: ${window.location.origin}`;
+    const text = inviteMessage({ name: ME, goalLabel: MY_PROFILE?.goal }, code);
     if (navigator.share) {
       try { await navigator.share({ text }); return; } catch { /* dismissed, fall through */ }
     }
@@ -16564,8 +16855,10 @@ async function leavePartnership() {
   MY_PARTNERSHIP = null;
   PARTNER_EMAIL = null;
   PARTNER_PROFILE = null;
-  // Training alone is a real state here, not an unfinished pairing.
-  try { localStorage.setItem(SOLO_KEY, "1"); } catch {}
+  // Training alone is a real state here, not an unfinished pairing. Snoozed
+  // rather than permanent: someone who just ended a partnership should not be
+  // walled today, and should not be silently never asked again either.
+  snoozeSolo();
   toast("Partnership ended");
   await loadAll();
   closeSettingsPage();
