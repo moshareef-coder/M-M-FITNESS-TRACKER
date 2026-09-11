@@ -734,6 +734,16 @@
   /* Past the target, the only state worth a colour change. */
   .rest-bar.over .rest-clock { color: var(--up); }
   .rest-bar.over .rest-fill { background: var(--up); }
+  .rest-pref { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .rest-pref button {
+    min-height: 44px; padding: 10px 0; border-radius: 12px; cursor: pointer;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    font-family: inherit; font-size: 14px; font-weight: 700;
+    font-variant-numeric: tabular-nums; transition: background .15s, border-color .15s, color .15s;
+  }
+  .rest-pref button:active { transform: scale(.96); }
+  .rest-pref button.on { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+
   .rest-adjust { display: flex; gap: 8px; }
   .rest-adjust button {
     flex: 1; min-height: 40px; padding: 9px 0; border-radius: 10px; cursor: pointer;
@@ -3906,6 +3916,11 @@
         <label>Workout days per week (just you)</label>
         <input type="number" id="setupChallengeTarget" min="1" max="7" value="4" />
       </div>
+    </div>
+    <div class="card">
+      <h2>Rest between sets</h2>
+      <p class="muted-note" style="margin-top:-6px;">Used for workouts you build yourself. A generated plan budgets its own rest per exercise, because a heavy squat and a lateral raise do not want the same wait.</p>
+      <div class="rest-pref" id="setupRestChoices"></div>
     </div>
     <div class="card">
       <h2>Stretching</h2>
@@ -11735,17 +11750,26 @@ function formatRest(ms) {
 /* Kept with the session, so it survives a reload mid-workout. It changes
    nothing about what is RECORDED: recordRest still banks the real elapsed
    rest, whatever the target says. */
+/* Three sources, in order of how much they know.
+   1. What the engine budgeted for THIS lift (CONTRACT.md restSec). It is per
+      exercise and the session time estimate was costed with it, so it wins.
+   2. Your own default, set once in Setup. It covers everything the engine did
+      not budget: every hand-built workout, and every plan older than the field.
+   3. Ninety seconds, for a session that has neither.
+   Nothing here is adjustable mid-set any more. The plus and minus existed
+   because the baseline was a guess, and it is not a guess now. */
+const REST_CHOICES = [60, 90, 120, 180];
+
 function restTargetSec() {
-  const v = Number(SESSION?.restTargetSec);
-  if (Number.isFinite(v) && v > 0) return v;
-  /* The rest the engine budgeted this lift at (CONTRACT.md restSec), the same
-     number the session estimate was costed with. Audit of 2026-09-10: it was
-     the only figure in the time budget the app could not see, so a strength
-     lift budgeted at 180 seconds ran on the 90 second default. The plus and
-     minus above still win once tapped; 90 stays the fallback for a plan that
-     predates the field. */
   const planned = Number(TODAY_WORKOUT?.exercises?.[SESSION?.exerciseIndex]?.restSec);
-  return Number.isFinite(planned) && planned > 0 ? planned : DEFAULT_REST_SEC;
+  if (Number.isFinite(planned) && planned > 0) return planned;
+  const mine = Number(MY_PROFILE?.rest_sec);
+  return Number.isFinite(mine) && mine > 0 ? mine : DEFAULT_REST_SEC;
+}
+
+function restLabel(sec) {
+  if (sec % 60 === 0) return `${sec / 60}m`;
+  return `${sec}s`;
 }
 
 /* One place decides what the strip says, so the first paint and the ticker can
@@ -11779,13 +11803,6 @@ function paintRest() {
 }
 
 let REST_BUZZED_AT = null;
-
-function adjustRestTarget(delta) {
-  if (!SESSION) return;
-  SESSION.restTargetSec = Math.max(15, restTargetSec() + delta);
-  saveSessionToStorage();
-  paintRest();
-}
 
 function startRestTicker() {
   stopRestTicker();
@@ -12474,8 +12491,6 @@ function renderSession() {
         <span class="rest-clock" id="restClock">${restNow.text}</span>
         <div class="rest-track"><div class="rest-fill" id="restFill" style="width:${(restNow.pct * 100).toFixed(1)}%"></div></div>
         <div class="rest-adjust">
-          <button type="button" id="restMinus">&minus;15s</button>
-          <button type="button" id="restPlus">+15s</button>
           <button type="button" id="restSkip">Skip</button>
         </div>
       </div>` : ""}
@@ -12519,8 +12534,6 @@ function renderSession() {
   if (resting) startRestTicker();
   else stopRestTicker();
 
-  if ($("restMinus")) $("restMinus").onclick = () => adjustRestTarget(-15);
-  if ($("restPlus")) $("restPlus").onclick = () => adjustRestTarget(15);
   if ($("restSkip")) $("restSkip").onclick = () => startNextSet(currentSet);
 
   if ($("sessPrivacyBtn")) $("sessPrivacyBtn").onclick = openWorkoutPrivacy;
@@ -16588,6 +16601,31 @@ function closeSettingsPage() {
   window.scrollTo({ top: SETUP_SCROLL });
 }
 
+/* Four buttons, one of them on. Saved the moment it is tapped rather than
+   waiting for the Save button at the bottom of the page, because a rest length
+   is not the kind of thing anybody expects to have to confirm. */
+function renderRestChoices() {
+  const el = $("setupRestChoices");
+  if (!el) return;
+  /* Your setting, not restTargetSec(): that answers "what is this exercise
+     resting at right now", which mid-session is the plan's number, not yours,
+     and would light the wrong button. */
+  const mine = Number(MY_PROFILE?.rest_sec);
+  const current = Number.isFinite(mine) && mine > 0 ? mine : DEFAULT_REST_SEC;
+  el.innerHTML = REST_CHOICES.map((s) =>
+    `<button type="button" class="${s === current ? "on" : ""}" data-rest="${s}">${restLabel(s)}</button>`).join("");
+  el.querySelectorAll("[data-rest]").forEach((b) => {
+    b.onclick = async () => {
+      const sec = Number(b.dataset.rest);
+      if (MY_PROFILE) MY_PROFILE.rest_sec = sec;
+      renderRestChoices();
+      const { error } = await sb.from("profiles").update({ rest_sec: sec }).eq("email", MY_EMAIL);
+      if (error) { console.warn("could not save rest length", error); toast("Could not save that"); return; }
+      toast(`Rest set to ${restLabel(sec)}`);
+    };
+  });
+}
+
 function renderSetupTab() {
   $("setupDisplayName").value = ME || "";
   $("appVersion").textContent = APP_VERSION;
@@ -16651,6 +16689,7 @@ function renderSetupTab() {
       }, 0);
     };
   }
+  renderRestChoices();
   renderPushToggle();
   renderSetupPhoto();
 

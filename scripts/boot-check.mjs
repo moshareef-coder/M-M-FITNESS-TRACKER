@@ -17,7 +17,7 @@ const nodes = {};
 const MISSES = new Set();
 /* Ids created at runtime via createElement, so absence from markup is expected.
    Every one of these MUST be null-checked at its lookup site. */
-const DYNAMIC = new Set(["weightEmpty", "proofRemoveBtn"]);
+const DYNAMIC = new Set(["weightEmpty", "proofRemoveBtn", "clipHomeCard"]);
 /* Ids built from template literals inside an innerHTML the same code just
    wrote, e.g. `${containerId}_${s.key}_val`. They exist by lookup time. */
 const DYNAMIC_PATTERNS = [/_val$/];
@@ -48,18 +48,30 @@ globalThis.document = {
   },
   querySelectorAll: () => [], querySelector: () => null,
   createElement: () => mk("tmp"), addEventListener() {}, hidden: false,
-  documentElement: { getAttribute: () => "dark", setAttribute() {}, style: { setProperty() {} } },
+  /* preferredTextScale() probes the reader's own font size by appending a span
+     to the root and measuring it, so documentElement has to accept a child the
+     way the real one does. Without it the whole script throws on load and every
+     check below reports nothing. */
+  documentElement: {
+    getAttribute: () => "dark", setAttribute() {}, style: { setProperty() {} },
+    appendChild() {}, removeChild() {},
+  },
   body: mk("body"),
 };
 globalThis.window = { addEventListener() {}, matchMedia: () => ({ matches: false, addEventListener() {} }) };
 globalThis.location = { reload() {} };
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
-globalThis.getComputedStyle = () => ({ getPropertyValue: () => "#3b82f6" });
+globalThis.getComputedStyle = () => ({ getPropertyValue: () => "#3b82f6", fontSize: "16px" });
 // The Body tab animates its rings on the next frame; here there is no frame, so run it now.
 globalThis.requestAnimationFrame = (fn) => { fn(0); return 0; };
 globalThis.cancelAnimationFrame = () => {};
 Object.defineProperty(globalThis, "navigator", { value: { onLine: true }, configurable: true });
 globalThis.Chart = function () { return { destroy() {} }; };
+/* Observers the app wires up at load. They never fire here, which is right:
+   nothing in a fake DOM mutates, resizes or scrolls into view. */
+globalThis.MutationObserver = class { observe() {} disconnect() {} takeRecords() { return []; } };
+globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+globalThis.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} takeRecords() { return []; } };
 
 const chain = (rows = []) => {
   const p = Promise.resolve({ data: rows, error: null });
