@@ -91,6 +91,35 @@ Rules:
 - Keep exercise names simple and standard (e.g. "Barbell Squat", "Lat Pulldown", "Plank") so weight history can be tracked across days.
 - No markdown, no code fences, no explanation, JSON object only.`;
 
+/* The model's answer, reduced to the shape the app actually consumes. Returns
+   null when there is nothing usable in it. Lengths follow the prompt's own
+   contract (a short label, a standard exercise name, a cue under 100 chars). */
+function sanitizeWorkout(raw: any): { focus: string; exercises: any[] } | null {
+  if (!raw || typeof raw !== "object") return null;
+  const list = Array.isArray(raw.exercises) ? raw.exercises : [];
+  const exercises = list
+    .filter((e: any) => e && typeof e === "object" && typeof e.name === "string" && e.name.trim())
+    .slice(0, 8)
+    .map((e: any) => {
+      const num = (v: unknown, lo: number, hi: number, fallback: number) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : fallback;
+      };
+      return {
+        name: String(e.name).trim().slice(0, 60),
+        sets: num(e.sets, 1, 20, 3),
+        reps: num(e.reps, 1, 200, 10),
+        targetWeight: num(e.targetWeight, 0, 2000, 0),
+        note: typeof e.note === "string" ? e.note.trim().slice(0, 100) : "",
+      };
+    });
+  if (!exercises.length) return null;
+  const focus = typeof raw.focus === "string" && raw.focus.trim()
+    ? raw.focus.trim().slice(0, 40)
+    : "Today's session";
+  return { focus, exercises };
+}
+
 /* The model path, lifted out of the handler unchanged. It answers either
    `{ workout }` or `{ response }`, because both of its failures are Responses
    with wording the app already shows and a thrown error would lose them. */
@@ -135,9 +164,10 @@ Generate today's workout JSON now.`;
   });
 
   if (!resp.ok) {
-    const errText = await resp.text();
+    // The upstream body can name the org and the key that failed, so it is logged, not returned.
+    console.error("anthropic error", resp.status, await resp.text());
     return {
-      response: new Response(JSON.stringify({ error: "Claude API error", detail: errText }), {
+      response: new Response(JSON.stringify({ error: "The coach is unavailable right now. Try again." }), {
         status: 502,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       }),
@@ -159,14 +189,14 @@ Generate today's workout JSON now.`;
   try {
     workout = JSON.parse(jsonText);
   } catch (parseErr) {
-    // Keep a snippet of the raw text so a future failure is diagnosable
-    // from the client error instead of a bare "Unexpected token" message.
+    /* The snippet used to ride back in the response so a failure was
+       diagnosable from the client. It is model output shaped by the user's own
+       free text, so it is a way to get arbitrary text onto the screen; the
+       snippet is logged instead and the caller gets the reason only. */
+    console.error("model response was not JSON", String(parseErr), data.stop_reason, text.slice(0, 400));
     return {
       response: new Response(JSON.stringify({
-        error: "Coach's response wasn't valid JSON — try again",
-        detail: String(parseErr),
-        raw: text.slice(0, 400),
-        stopReason: data.stop_reason,
+        error: "The coach's answer was unreadable. Try again.",
       }), {
         status: 502,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
@@ -174,7 +204,68 @@ Generate today's workout JSON now.`;
     };
   }
 
-  return { workout };
+  /* The model is told what shape to answer in; it is not trusted to have
+     obeyed. Whatever comes back here is written to ai_workouts by the client
+     and then read by a partner, so it is checked and trimmed to the five
+     fields the app consumes before it leaves this function. A crafted goal
+     note cannot turn an exercise name into a paragraph of someone else's
+     choosing, because a name that is not a short string does not survive. */
+  const clean = sanitizeWorkout(workout);
+  if (!clean) {
+    console.error("model returned an unusable workout shape");
+    return {
+      response: new Response(JSON.stringify({
+        error: "The coach's answer was unusable. Try again.",
+      }), {
+        status: 502,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      }),
+    };
+  }
+
+  return { workout: clean };
+}
+
+/* Nothing in the payload is trusted. The engine walks `logs` row by row and
+   matches three hundred aliases against the free text, so an unbounded body is
+   CPU and memory the caller chose on our behalf, fifteen times a day. The caps
+   below are far above anything the app itself sends: the client trims logs to
+   ninety days and plans to thirty. */
+const MAX_BODY_BYTES = 512 * 1024;
+const MAX_ROWS = 2000;
+const MAX_TEXT = 200;
+const TEXT_FIELDS = [
+  "user_name", "focus", "goal", "goal_detail", "goal_bubble", "goal_child",
+  "activity_level", "sex", "focus_chosen_at",
+];
+const ROW_FIELDS = ["history", "logs", "plans", "swaps", "focus_groups"];
+/* [min, max] for the numbers that reach a formula. Out of range is dropped
+   rather than clamped: a height of 900 inches is not a tall person, it is
+   somebody probing, and the engine already has an answer for "not given". */
+const NUMBER_FIELDS: Record<string, [number, number]> = {
+  age: [10, 120],
+  height_in: [20, 108],
+  current_weight: [40, 1500],
+  gym_days_this_week: [0, 14],
+  challenge_target: [0, 14],
+};
+
+function boundPayload(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, any> = { ...(raw as Record<string, any>) };
+  for (const k of TEXT_FIELDS) {
+    if (out[k] != null) out[k] = String(out[k]).slice(0, MAX_TEXT);
+  }
+  for (const k of ROW_FIELDS) {
+    if (out[k] == null) continue;
+    out[k] = Array.isArray(out[k]) ? out[k].slice(0, MAX_ROWS) : [];
+  }
+  for (const [k, [lo, hi]] of Object.entries(NUMBER_FIELDS)) {
+    if (out[k] == null) continue;
+    const n = Number(out[k]);
+    out[k] = Number.isFinite(n) && n >= lo && n <= hi ? n : null;
+  }
+  return out;
 }
 
 /* The engine path. Everything it needs is in the payload, so there is no
@@ -204,14 +295,25 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
     const authHeader = req.headers.get("Authorization") || "";
     const token = authHeader.replace(/^Bearer\s+/i, "");
+    /* The email is asked of the auth server rather than read out of the token
+       body. Decoding the middle segment of a JWT reads a claim nobody checked
+       the signature on, and everything below (the quota, the usage row) is
+       keyed on this string. */
     let callerEmail = "";
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-      callerEmail = (payload.email || "").toLowerCase();
-    } catch {
-      // fall through to the empty-email rejection below
+    if (token) {
+      const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: { apikey: SERVICE_KEY!, Authorization: `Bearer ${token}` },
+      });
+      if (userRes.ok) {
+        const user = await userRes.json();
+        callerEmail = String(user?.email ?? "").toLowerCase();
+      }
     }
     if (!callerEmail) {
       return new Response(JSON.stringify({ error: "Not signed in" }), {
@@ -221,9 +323,6 @@ Deno.serve(async (req) => {
     }
 
     // Must have a profile in this app. RLS means this only returns the caller's own row.
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
-    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const profileResp = await fetch(
       `${SUPABASE_URL}/rest/v1/profiles?select=email&email=eq.${encodeURIComponent(callerEmail)}`,
       { headers: { apikey: SUPABASE_ANON_KEY!, Authorization: `Bearer ${token}` } },
@@ -275,7 +374,29 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ email: callerEmail }),
     }).catch((e) => console.error("could not log usage", e));
 
-    const body = await req.json();
+    const declared = Number(req.headers.get("content-length") || 0);
+    if (declared > MAX_BODY_BYTES) {
+      return new Response(JSON.stringify({ error: "That request was too large." }), {
+        status: 413,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+    const rawBody = await req.text();
+    if (rawBody.length > MAX_BODY_BYTES) {
+      return new Response(JSON.stringify({ error: "That request was too large." }), {
+        status: 413,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+    let body: Record<string, unknown>;
+    try {
+      body = boundPayload(JSON.parse(rawBody));
+    } catch {
+      return new Response(JSON.stringify({ error: "Could not read that request." }), {
+        status: 400,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
 
     if (ENGINE !== "llm") {
       let result;
@@ -286,7 +407,7 @@ Deno.serve(async (req) => {
            string is worth more here than a stack it will never show. */
         console.error("workout engine failed", engineErr);
         return new Response(
-          JSON.stringify({ error: "Workout engine failed", detail: String(engineErr) }),
+          JSON.stringify({ error: "Workout engine failed. Please try again." }),
           { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
         );
       }
@@ -304,7 +425,12 @@ Deno.serve(async (req) => {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), {
+    /* The real reason stays in the function log. It used to be returned
+       verbatim, and the app prints data.error straight onto the screen, so any
+       internal wording (a URL, a table name, a key that failed to read) was
+       shown to whoever asked for it. */
+    console.error("generate-workout failed", err);
+    return new Response(JSON.stringify({ error: "Could not generate a workout. Please try again." }), {
       status: 500,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     });

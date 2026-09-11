@@ -36,21 +36,37 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
+/* Compared character by character to the end, so a wrong secret cannot be
+   narrowed down by timing how quickly it was rejected. */
+function secretOk(given: string, expected: string) {
+  if (!expected || given.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < given.length; i++) diff |= given.charCodeAt(i) ^ expected.charCodeAt(i);
+  return diff === 0;
+}
+
+/* Every string below is free text somebody typed into their profile or their
+   session, and all of it lands in a push payload that has a hard size limit.
+   Clamped here rather than trusted, so one long name cannot silently cost a
+   pair their notification. */
+const clamp = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
+
 Deno.serve(async (req) => {
   const auth = (req.headers.get("Authorization") ?? "").replace("Bearer ", "").trim();
-  if (!CRON_SECRET || auth !== CRON_SECRET) return json({ error: "forbidden" }, 403);
+  if (!secretOk(auth, CRON_SECRET)) return json({ error: "forbidden" }, 403);
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) return json({ error: "VAPID keys not configured" }, 500);
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "bad json" }, 400); }
-  const to = String(body.to_email || "").toLowerCase();
-  if (!to) return json({ error: "to_email required" }, 400);
+  if (!body || typeof body !== "object") return json({ error: "bad json" }, 400);
+  const to = clamp(body.to_email, 254).toLowerCase();
+  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return json({ error: "to_email required" }, 400);
 
-  const trainerName = String(body.from_name || "Your partner");
-  const detailsShared = !!body.details_shared;
-  const allowCheers = !!body.allow_cheers;
-  const focus = detailsShared ? String(body.focus || "").trim() : "";
-  const exerciseName = detailsShared ? String(body.exercise_name || "").trim() : "";
+  const trainerName = clamp(body.from_name, 60) || "Your partner";
+  const detailsShared = body.details_shared === true;
+  const allowCheers = body.allow_cheers === true;
+  const focus = detailsShared ? clamp(body.focus, 40) : "";
+  const exerciseName = detailsShared ? clamp(body.exercise_name, 60) : "";
 
   const title = focus ? `${trainerName} just started ${focus}` : `${trainerName} just started training`;
   const body_ = exerciseName

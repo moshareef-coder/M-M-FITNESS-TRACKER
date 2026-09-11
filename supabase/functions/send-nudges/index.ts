@@ -28,6 +28,15 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
+/* Compared character by character to the end, so a wrong secret cannot be
+   narrowed down by timing how quickly it was rejected. */
+function secretOk(given: string, expected: string) {
+  if (!expected || given.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < given.length; i++) diff |= given.charCodeAt(i) ^ expected.charCodeAt(i);
+  return diff === 0;
+}
+
 async function q(path: string) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: svc });
   if (!r.ok) throw new Error(`${path} -> ${r.status} ${await r.text()}`);
@@ -56,7 +65,7 @@ const shift = (d: string, days: number) =>
 
 Deno.serve(async (req) => {
   const auth = (req.headers.get("Authorization") ?? "").replace("Bearer ", "").trim();
-  if (!CRON_SECRET || auth !== CRON_SECRET) return json({ error: "forbidden" }, 403);
+  if (!secretOk(auth, CRON_SECRET)) return json({ error: "forbidden" }, 403);
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) return json({ error: "VAPID keys not configured" }, 500);
 
   webpush.setVapidDetails(CONTACT, VAPID_PUBLIC, VAPID_PRIVATE);
@@ -86,8 +95,14 @@ Deno.serve(async (req) => {
     partnerOf.set(b, a);
   }
 
+  /* Clamped because user_name is free text the person types and it goes
+     straight into a push title, and a push payload has a hard size limit that
+     a long enough name would push the whole notification past. */
   const nameOf = new Map<string, string>(
-    profiles.map((p: any) => [(p.email || "").toLowerCase(), p.user_name || "Your partner"]),
+    profiles.map((p: any) => [
+      (p.email || "").toLowerCase(),
+      String(p.user_name || "Your partner").slice(0, 60),
+    ]),
   );
 
   // Only the dates anyone is actually standing in right now.

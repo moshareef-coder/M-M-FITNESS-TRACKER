@@ -23,10 +23,19 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
+/* Compared character by character to the end, so a wrong secret cannot be
+   narrowed down by timing how quickly it was rejected. */
+function secretOk(given: string, expected: string) {
+  if (!expected || given.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < given.length; i++) diff |= given.charCodeAt(i) ^ expected.charCodeAt(i);
+  return diff === 0;
+}
+
 Deno.serve(async (req) => {
   // Destructive, so it runs only for the scheduler's shared secret.
   const auth = (req.headers.get("Authorization") ?? "").replace("Bearer ", "").trim();
-  if (!CRON_SECRET || auth !== CRON_SECRET) return json({ error: "forbidden" }, 403);
+  if (!secretOk(auth, CRON_SECRET)) return json({ error: "forbidden" }, 403);
 
   const cutoff = new Date(Date.now() - CLIP_TTL_MINUTES * 60_000).toISOString();
 
@@ -34,7 +43,11 @@ Deno.serve(async (req) => {
     `${SUPABASE_URL}/rest/v1/live_clips?select=id,path&created_at=lt.${cutoff}&limit=500`,
     { headers: svc },
   );
-  if (!res.ok) return json({ error: "could not list", detail: await res.text() }, 500);
+  // Database wording stays in the function log; the caller gets the shape only.
+  if (!res.ok) {
+    console.error("could not list clips", res.status, await res.text());
+    return json({ error: "could not list" }, 500);
+  }
 
   const rows: Array<{ id: string; path: string }> = await res.json();
   if (!rows.length) return json({ ok: true, expired: 0, cutoff });
@@ -46,14 +59,20 @@ Deno.serve(async (req) => {
     headers: svc,
     body: JSON.stringify({ prefixes: rows.map((r) => r.path) }),
   });
-  if (!del.ok) return json({ error: "storage delete failed", detail: await del.text() }, 500);
+  if (!del.ok) {
+    console.error("clip storage delete failed", del.status, await del.text());
+    return json({ error: "storage delete failed" }, 500);
+  }
 
   const ids = rows.map((r) => `"${r.id}"`).join(",");
   const drop = await fetch(`${SUPABASE_URL}/rest/v1/live_clips?id=in.(${ids})`, {
     method: "DELETE",
     headers: svc,
   });
-  if (!drop.ok) return json({ error: "row delete failed", detail: await drop.text() }, 500);
+  if (!drop.ok) {
+    console.error("clip row delete failed", drop.status, await drop.text());
+    return json({ error: "row delete failed" }, 500);
+  }
 
   return json({ ok: true, expired: rows.length, cutoff });
 });

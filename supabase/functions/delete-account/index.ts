@@ -24,7 +24,10 @@ function json(body: unknown, status = 200) {
   });
 }
 
-/* Tables keyed by a single email-ish column. */
+/* Tables keyed by a single email-ish column. A table that does not exist on a
+   given project answers 404 and del() ignores that, so listing one that was
+   added later is safe. Everything the app writes has to be here: a row left
+   behind is data Apple was told would be gone. */
 const BY_EMAIL: Array<[string, string]> = [
   ["ai_usage_log", "email"],
   ["ai_workouts", "email"],
@@ -36,6 +39,16 @@ const BY_EMAIL: Array<[string, string]> = [
   ["arcs", "created_by"],
   ["weekly_stakes", "created_by"],
   ["allowed_emails", "email"],
+  ["exercise_swaps", "email"],
+  ["saved_workouts", "email"],
+  ["user_goals", "email"],
+  ["milestone_badges", "email"],
+  ["nudge_log", "email"],
+  /* Left behind, this one keeps pushing notifications to a phone whose
+     account no longer exists. */
+  ["push_subscriptions", "email"],
+  ["live_sessions", "email"],
+  ["group_members", "email"],
 ];
 
 async function del(path: string) {
@@ -107,14 +120,43 @@ Deno.serve(async (req) => {
     console.error("storage cleanup failed", e);
   }
 
+  /* 1b. Live clips, which are video of this person and are keyed by a stored
+     path rather than by a folder we could list. Files first, then the rows,
+     so a storage failure leaves the rows for expire-clips to retry rather
+     than orphaning objects nobody can find. Clips sent TO them are deleted
+     too: the recipient's copy is still footage of the person leaving. */
+  try {
+    const clipsRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/live_clips?select=path&or=(from_email.eq.${enc},to_email.eq.${enc})&limit=1000`,
+      { headers: svc },
+    );
+    if (clipsRes.ok) {
+      const clips: Array<{ path: string }> = await clipsRes.json();
+      const paths = (clips ?? []).map((c) => c.path).filter(Boolean);
+      if (paths.length) {
+        await fetch(`${SUPABASE_URL}/storage/v1/object/live-clips`, {
+          method: "DELETE",
+          headers: svc,
+          body: JSON.stringify({ prefixes: paths }),
+        });
+      }
+    }
+  } catch (e) {
+    console.error("clip cleanup failed", e);
+  }
+  await del(`live_clips?from_email=eq.${enc}`);
+  await del(`live_clips?to_email=eq.${enc}`);
+
   // 2. Rows keyed by this user.
   for (const [table, col] of BY_EMAIL) {
     await del(`${table}?${col}=eq.${enc}`);
   }
 
-  // 3. Encouragements in either direction.
+  // 3. Encouragements and reactions in either direction.
   await del(`encouragements?from_email=eq.${enc}`);
   await del(`encouragements?to_email=eq.${enc}`);
+  await del(`session_reactions?from_email=eq.${enc}`);
+  await del(`session_reactions?to_email=eq.${enc}`);
 
   // 4. Partnerships on either side. This unpairs the partner rather than
   //    leaving them pointing at an account that no longer exists.
