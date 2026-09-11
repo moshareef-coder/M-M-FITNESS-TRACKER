@@ -6600,16 +6600,16 @@ const INFO_TOPICS = {
   muscleLevels: () => ({
     eyebrow: "Low, medium, high",
     paras: [
-      "The bar behind each muscle is how much work it got against a full dose: six blocks, filling as the sets add up.",
-      "Low is one or two hard sets, medium is around half a dose, high is a full one. A dose is about eight hard sets in a day, or fourteen across a week.",
-      "Helping muscles count for half. A row trains your lats and helps your biceps, so the biceps bar moves at half speed.",
+      "The word beside each muscle is how much work it got against a full dose. A dose is about eight hard sets in a day, or fourteen across a week.",
+      "High is three quarters of that dose or more, medium is at least four tenths of it, low is everything under. Across a week that puts high from about ten and a half sets and low at anything up to five and a half.",
+      "Helping muscles count for half. A row trains your lats and helps your biceps, so the biceps level moves at half speed.",
     ],
   }),
   impact: () => ({
     eyebrow: "Training impact",
     paras: [
       "Each ring is one muscle group against a full training dose for the period you are looking at: about eight hard sets in a day, fourteen in a week.",
-      "100% does not mean stop. It means that group has had a full week's work, which is the point at which more sets stop paying you back.",
+      "100% does not mean stop. It means that group has had a full dose for the period you are looking at, which is the point at which more sets stop paying you back.",
     ],
   }),
   pieces: () => ({
@@ -6623,7 +6623,7 @@ const INFO_TOPICS = {
     eyebrow: "What to train next",
     paras: [
       `A muscle takes about ${BODY_RECOVERY_HOURS} hours to repair after the session that worked it. That is the usual window, not a rule about how you feel.`,
-      `Green, ready now: it has had the full ${BODY_RECOVERY_HOURS} hours, or you have not trained it at all this week.`,
+      `Green, ready now: it has had the full ${BODY_RECOVERY_HOURS} hours since the last session that worked it, or you have never trained it.`,
       `Amber, fine to train: worked between ${BODY_FRESH_HOURS} and ${BODY_RECOVERY_HOURS} hours ago. Not fully repaired, but training it again is a normal thing to do and the app is not going to argue. Expect less than your best.`,
       `Red, give it a day: worked in the last ${BODY_FRESH_HOURS} hours. This is the one worth leaving alone if you have a choice.`,
       "The number on an amber or red chip is the hours until that area is fully recovered, so a red one turns amber well before it runs out.",
@@ -12220,6 +12220,7 @@ function makeReorderable(container, onDrop) {
     if (!drag) return;
     drag.row.classList.remove("dragging");
     drag.row.style.transform = "";
+    drag.row.style.animation = "";
     container.classList.remove("reordering");
     const order = rowsIn().map((r) => parseInt(r.dataset.idx, 10));
     const moved = order.some((v, i) => v !== i);
@@ -12238,6 +12239,10 @@ function makeReorderable(container, onDrop) {
       e.preventDefault();
       try { grip.setPointerCapture(e.pointerId); } catch { /* older browsers */ }
       drag = { row, grip, startY: e.clientY, id: e.pointerId };
+      /* A row that arrived with an entry animation keeps it filled forwards,
+         and a filled animation beats an inline transform, so the builder's
+         rows sat still under the finger and nothing ever crossed a midpoint. */
+      row.style.animation = "none";
       row.classList.add("dragging");
       container.classList.add("reordering");
     });
@@ -12275,6 +12280,9 @@ function makeReorderable(container, onDrop) {
 
     grip.addEventListener("pointerup", finish);
     grip.addEventListener("pointercancel", finish);
+    // A release the grip never hears leaves the list reordered on screen and
+    // unchanged underneath, which is worse than not reordering at all.
+    grip.addEventListener("lostpointercapture", finish);
   });
 }
 
@@ -13513,7 +13521,7 @@ function cbRowHTML(ex, i) {
     <span class="cb-n">${i + 1}</span>
     <button type="button" class="cb-row-body" data-edit aria-label="Change ${escapeHtml(ex.name)}" style="background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;">
       <span class="cb-row-name">${escapeHtml(ex.name)}</span>
-      <span class="cb-row-sets" data-sets>${escapeHtml(cbDose(ex))}</span>
+      <span class="cb-row-sets" data-sets style="white-space:normal;">${escapeHtml(cbDose(ex))}</span>
     </button>
     <span class="cb-step">
       <button type="button" data-less aria-label="Fewer sets">&minus;</button>
@@ -14697,11 +14705,11 @@ function renderBodyDetail() {
     ${heads ? `<div class="bi-detail-label">Parts</div><div class="bi-chips">${heads}</div>` : ""}
     <div class="bi-detail-label">${sets > 0 ? "Hit by" : "Try"}</div>
     ${sets > 0
-      /* Counted, not logged. The headline is weighted (a helping muscle earns half),
-         so a row printing its raw set count made the list contradict the total above
-         it. An assisting row now shows both numbers and the rows add up again. */
-      ? hits.map((h) => `<div class="bi-hit"><span class="bi-hit-name">${escapeHtml(h.name)}</span><span class="bi-hit-sets ${h.weight < 1 ? "assist" : ""}">${
-          h.weight < 1 ? `${bodyFmtSets(h.sets * h.weight)} of ${Math.round(h.sets * 10) / 10}` : bodyFmtSets(h.sets)}</span></div>`).join("")
+      /* What each exercise counted toward this muscle, not what was logged: the
+         headline is weighted, a helping muscle earning half, so rows printing raw
+         set counts added to more than the total above them. Same unit both places
+         now, with the assist label saying why a row is worth less than it looks. */
+      ? hits.map((h) => `<div class="bi-hit"><span class="bi-hit-name">${escapeHtml(h.name)}</span><span class="bi-hit-sets ${h.weight < 1 ? "assist" : ""}">${bodyFmtSets(h.sets * h.weight)}</span></div>`).join("")
       : `<div class="bi-try"><b>${escapeHtml(piece.try)}</b> targets it directly.</div>`}`;
 
   // Below: every piece of the same group, hit or not.
@@ -14727,6 +14735,11 @@ function renderBodyDetail() {
     const wrap = fig.querySelector(".bi-callouts");
     if (fig.dataset.view !== f.view) { wrap.innerHTML = ""; return; }
     wrap.innerHTML = pieces.map((k) => {
+      /* Worked pieces and the one you tapped. A callout also hides when its anchor
+         projects off the canvas, and that is positional, so labelling untouched
+         pieces too meant a piece you trained could go unlabelled while one you did
+         not sat there named. The list below still names every piece. */
+      if (k !== f.muscle && !((volumes[k] || 0) > 0)) return "";
       const box = bounds.boundsFor(artboard, k, f.side);
       if (!box) return "";
       return `<button type="button" class="bi-callout ${k === f.muscle ? "on" : ""} ${(volumes[k] || 0) > 0 ? "" : "off"}" data-muscle="${k}"
@@ -14888,6 +14901,10 @@ function renderBodyNext(animate) {
   const list = (xs) => xs.map((a) => a.label);
   const phrase = (names) => names.length <= 1 ? (names[0] || "")
     : names.slice(0, -1).join(", ") + " or " + names[names.length - 1];
+  // "or" offers a choice, which is right for a suggestion and wrong for a
+  // statement about what you already did.
+  const phraseAnd = (names) => names.length <= 1 ? (names[0] || "")
+    : names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
 
   let headline, why;
   if (!trained.length) {
@@ -14901,7 +14918,10 @@ function renderBodyNext(animate) {
          group here read as a warning about something the app is happy for you
          to train. */
       why = `Nothing this week has touched your ${phrase(list(pick.slice(0, 2))).toLowerCase()}.` +
-        (holding.length ? ` ${phrase(list(holding.slice(0, 2)))} ${holding.length > 1 ? "were" : "was"} worked in the last ${BODY_FRESH_HOURS} hours.` : "");
+        (holding.length ? (() => {
+          const named = list(holding.slice(0, 2));
+          return ` Your ${phraseAnd(named).toLowerCase()} ${named.length > 1 ? "were" : "was"} worked in the last ${BODY_FRESH_HOURS} hours.`;
+        })() : "");
     } else if (ready.length) {
       const leanest = ready.slice().sort((a, b) => a.weekSets - b.weekSets).slice(0, 2);
       headline = phrase(list(leanest));
@@ -14932,7 +14952,10 @@ function renderBodyNext(animate) {
   const lastWk = Math.round(sum(computeMuscleVolumeBetween(ME, isoDate(lastStart), isoDate(lastCut))));
   let weekLine;
   if (!thisWk && !lastWk) weekLine = "Nothing logged yet this week.";
-  else if (!lastWk) weekLine = `${thisWk} sets so far. Nothing to compare it with yet, so this week is the baseline.`;
+  /* The comparison window is this far into last week, not all of it, so a session
+     that fell on last Sunday is outside it. Saying "nothing to compare with" read
+     as "last week was empty" while the Last week tab was listing its muscles. */
+  else if (!lastWk) weekLine = `${thisWk} sets so far. Nothing was logged by this point last week, so there is nothing to compare with yet.`;
   else {
     const pct = Math.round(((thisWk - lastWk) / lastWk) * 100);
     weekLine = `${thisWk} sets so far, ${pct >= 0 ? "up" : "down"} ${Math.abs(pct)}% on the same point last week.`;

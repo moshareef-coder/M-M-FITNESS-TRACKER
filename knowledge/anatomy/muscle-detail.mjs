@@ -79,29 +79,32 @@ export const DETAIL_RULES = [
   { match: ["romanian deadlift", "rdl", "stiff leg"], hits: { bicepsFemoris: P, semitendinosus: P, gluteusMaximus: S, erectorSpinae: S } },
   { match: ["deadlift"], hits: { bicepsFemoris: P, semitendinosus: P, gluteusMaximus: P, erectorSpinae: P, trapezius: S, upperTraps: S, latissimusDorsi: S, ...GRIP } },
   { match: ["back extension", "hyperextension", "good morning"], hits: { erectorSpinae: P, bicepsFemoris: S, semitendinosus: S, gluteusMaximus: S } },
+  // Above the squat rule, matching index.html: a leg press calf raise is calf work.
+  { match: ["seated calf"], hits: { soleus: P } },
+  { match: ["calf"], hits: { gastrocnemius: P, soleus: P } },
   { match: ["lunge", "step up", "step-up", "bulgarian", "split squat"], hits: { rectusFemoris: P, vastusLateralis: P, vastusMedialis: P, sartorius: S, gluteusMaximus: S, gluteusMedius: S, bicepsFemoris: S, semitendinosus: S } },
   { match: ["squat", "leg press"], hits: { rectusFemoris: P, vastusLateralis: P, vastusMedialis: P, adductorMagnus: P, gluteusMaximus: S, bicepsFemoris: S, semitendinosus: S } },
   { match: ["leg extension"], hits: { rectusFemoris: P, vastusLateralis: P, vastusMedialis: P } },
   { match: ["leg curl", "hamstring curl", "nordic"], hits: { bicepsFemoris: P, semitendinosus: P } },
-  { match: ["seated calf"], hits: { soleus: P } },
-  { match: ["calf"], hits: { gastrocnemius: P, soleus: P } },
   { match: ["tibialis", "toe raise"], hits: { tibialisAnterior: P } },
   { match: ["lat pulldown", "pulldown", "pull-up", "pullup", "chin-up", "chinup"], hits: { latissimusDorsi: P, teresMajor: P, biceps: S, bicepsLong: S, bicepsShort: S, brachialis: S, brachioradialis: S, flexorCarpiUlnaris: S } },
   { match: ["upright row"], hits: { deltoids: P, lateralDeltoid: P, trapezius: P, upperTraps: P, biceps: S, brachialis: S } },
   { match: ["row"], hits: { latissimusDorsi: P, teresMajor: P, biceps: S, brachialis: S, trapezius: S, midTraps: S, posteriorDeltoid: S } },
   { match: ["shrug"], hits: { trapezius: P, upperTraps: P, flexorCarpiUlnaris: S, flexorCarpiRadialis: S } },
-  { match: ["face pull", "rear delt", "reverse fly", "reverse flye"], hits: { posteriorDeltoid: P, trapezius: S, midTraps: S } },
+  { match: ["face pull", "rear delt", "reverse fly", "reverse flye", "reverse pec deck"], hits: { posteriorDeltoid: P, trapezius: S, midTraps: S } },
   { match: ["lateral raise", "side raise"], hits: { deltoids: P, lateralDeltoid: P, trapezius: S, upperTraps: S } },
   { match: ["front raise"], hits: { deltoids: P, anteriorDeltoid: P } },
   { match: ["arnold", "overhead press", "military press", "ohp", "shoulder press", "push press"], hits: { deltoids: P, anteriorDeltoid: P, lateralDeltoid: P, ...TRI_ALL, trapezius: S, upperTraps: S } },
   { match: ["reverse wrist", "wrist extension"], hits: { extensorCarpiUlnaris: P, brachioradialis: S } },
   { match: ["wrist"], hits: { flexorCarpiRadialis: P, flexorCarpiUlnaris: P } },
+  // Before the grip rule, same reason index.html gives: a close grip bench is a
+  // triceps lift, and "grip" alone must not take it.
+  { match: ["close grip", "close-grip"], hits: { tricepsBrachii: P, tricepsLong: P, tricepsLateral: P, tricepsMedial: P, pectoralisMajor: S, pecSternal: S, deltoids: S, anteriorDeltoid: S } },
   { match: ["forearm", "farmer", "grip"], hits: { brachioradialis: P, flexorCarpiRadialis: P, flexorCarpiUlnaris: P, extensorCarpiUlnaris: P } },
   { match: ["hammer curl", "reverse curl"], hits: { brachialis: P, biceps: P, bicepsLong: P, brachioradialis: S } },
   { match: ["preacher", "concentration", "spider curl"], hits: { biceps: P, bicepsShort: P, bicepsLong: S, brachialis: P, brachioradialis: S } },
   { match: ["incline curl"], hits: { biceps: P, bicepsLong: P, bicepsShort: S, brachialis: S } },
   { match: ["bicep", "curl"], hits: { biceps: P, bicepsLong: P, bicepsShort: P, brachialis: P, brachioradialis: S } },
-  { match: ["close grip", "close-grip"], hits: { tricepsBrachii: P, tricepsLong: P, tricepsLateral: P, tricepsMedial: P, pectoralisMajor: S, pecSternal: S, deltoids: S, anteriorDeltoid: S } },
   { match: ["decline"], hits: { pectoralisMajor: P, pecSternal: P, ...TRI_ALL, deltoids: S, anteriorDeltoid: S } },
   { match: ["incline"], hits: { pectoralisMajor: P, pecClavicular: P, pecSternal: S, deltoids: P, anteriorDeltoid: P, ...TRI_ALL } },
   { match: ["dip"], hits: { pectoralisMajor: P, pecSternal: P, ...TRI_ALL, deltoids: S, anteriorDeltoid: S } },
@@ -119,35 +122,66 @@ export const DETAIL_RULES = [
   { match: ["neck"], hits: { sternocleidomastoid: P, trapezius: S, upperTraps: S } },
 ];
 
+/* Word aware, exactly as classifyMuscles in index.html: a bare substring test read
+   "crunch" as a run and "Crow Pose" as a row. Separators are levelled so "Pull Up",
+   "Pull-up" and "Pullup" all match one keyword. */
+const KEYWORD_RE = new Map();
+const words = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+function keywordHit(text, joined, keyword) {
+  let re = KEYWORD_RE.get(keyword);
+  if (re === undefined) {
+    const k = words(keyword);
+    re = k ? new RegExp(`\\b${k.replace(/ /g, "\\s")}(?:e?s|ing|ed|er|ers)?\\b`) : null;
+    KEYWORD_RE.set(keyword, re);
+  }
+  if (!re) return false;
+  return re.test(text) || joined === words(keyword).replace(/ /g, "");
+}
+
 export function detailRuleFor(exerciseName) {
-  const n = exerciseName.toLowerCase();
+  const n = words(exerciseName);
+  const joined = n.replace(/ /g, "");
   for (const rule of DETAIL_RULES) {
-    if (rule.match.some((k) => n.includes(k))) return rule;
+    if (rule.match.some((k) => keywordHit(n, joined, k))) return rule;
   }
   return null;
 }
 
+const groupOfKey = (key) => MUSCLE_PIECES[key]?.group || MUSCLE_PIECES[MUSCLE_HEADS[key]?.of]?.group || null;
+
 /**
  * Credit per piece and head for one logged exercise, as { key: weight }.
  * `groupRule` is the app's broad-group classification ({ primary, secondary }) for the
- * same exercise, used when no detail rule matches: every piece of a primary group gets
- * 1, of a secondary group 0.5, heads included. Returns null when neither knows the
- * exercise. `general` is true when the fallback was used.
+ * same exercise, and it is the authority: the rings and the drill-down used to run off
+ * two independent rule lists, so a group could read 100% on its ring and "Not hit" when
+ * you tapped it. Pieces of a group the group rule does not credit are dropped, a piece
+ * can never weigh more than its group, and a credited group the detail rule says nothing
+ * about spreads over all of its pieces. Returns null when the group rule knows nothing,
+ * since a piece must never show work its group does not show. `general` is true when a
+ * group was filled in by that spread rather than named by a rule.
  */
 export function hitsForExercise(exerciseName, groupRule) {
+  if (!groupRule) return null;
   const rule = detailRuleFor(exerciseName);
   const hits = {};
   let general = false;
+  const groupWeight = {};
+  (groupRule.secondary || []).forEach((g) => { groupWeight[g] = S; });
+  (groupRule.primary || []).forEach((g) => { groupWeight[g] = P; });
+
   if (rule) {
-    Object.assign(hits, rule.hits);
-  } else if (groupRule) {
-    general = true;
-    const spread = (groups, w) => (groups || []).forEach((g) => (PIECES_BY_GROUP[g] || []).forEach((k) => { hits[k] = Math.max(hits[k] || 0, w); }));
-    spread(groupRule.secondary, S);
-    spread(groupRule.primary, P);
-  } else {
-    return null;
+    for (const [k, w] of Object.entries(rule.hits)) {
+      const g = groupOfKey(k);
+      if (g && g in groupWeight) hits[k] = Math.min(w, groupWeight[g]);
+    }
   }
+  for (const [g, w] of Object.entries(groupWeight)) {
+    const pieces = PIECES_BY_GROUP[g] || [];
+    if (pieces.some((k) => k in hits)) continue;
+    general = true;
+    pieces.forEach((k) => { hits[k] = Math.max(hits[k] || 0, w); });
+  }
+  if (!Object.keys(hits).length) return null;
   // A rule that credits a muscle but says nothing about its heads means all of them.
   for (const [key, w] of Object.entries(hits)) {
     const heads = MUSCLE_PIECES[key]?.heads;
