@@ -108,10 +108,15 @@
         note: "The list that used to be called a loadout. Tap one to see its exercises, tap an exercise for the detail. Nothing here says loadout any more.",
         run: (w) => { w.switchTab("workout"); w.openSavedList(); } },
 
+      { t: "Warm-up first", scenario: "paired",
+        s: "Two timed moves before the first set",
+        note: "Start opens on the warm-up, not the bench. One move at a time with a countdown on the same strip the rest timer uses, the cue under the name, Next to skip a hold, Skip warm-up to drop the block for today (remembered on the plan, so it does not come back on reopen). The clock rolls the next move in on its own. Nothing here is a set: the exercise log stays exactly as it was until the first lift.",
+        run: (w) => { w.switchTab("workout"); w.startWorkout(); } },
+
       { t: "Do the workout", scenario: "paired",
         s: "Five exercises, live timer",
-        note: "The real session screen on today's push day. Log sets, change weights, tap through exercises. Weight and reps should sit on the same baseline in every row. Finish it and the completion screen banks the workout into the fake database.",
-        run: (w) => { w.switchTab("workout"); w.startWorkout(); } },
+        note: "The real session screen on today's push day, reached the way Next through the warm-up reaches it. Log sets, change weights, tap through exercises. Weight and reps should sit on the same baseline in every row. Finish it and the cool-down runs, then the completion screen banks the workout into the fake database.",
+        run: (w) => { w.switchTab("workout"); w.startWorkout(); w.endStretchPhase(); } },
 
       { t: "Resting between sets", scenario: "paired",
         s: "A plain clock, counting up",
@@ -119,6 +124,7 @@
         run: (w) => {
           w.switchTab("workout");
           w.startWorkout();
+          w.endStretchPhase();
           setSessionWeight(w, 175);
           w.toggleSet(0);
         } },
@@ -129,8 +135,32 @@
         run: (w) => {
           w.switchTab("workout");
           w.startWorkout();
+          w.endStretchPhase();
           setSessionWeight(w, 190);
           w.toggleSet(0);
+        } },
+
+      { t: "Cool-down after the last lift", scenario: "paired",
+        s: "Holds, then the summary",
+        note: "Every set on every lift is logged through the app's own buttons, so the last Finish workout tap lands on the cool-down instead of the summary: HOLD, a countdown, a per side hold that runs left then right, Skip cool-down when you are done. The summary waits for it. Ending a workout early does not come through here; someone leaving is never held back. Watch the fake exercise_logs on the right: five rows for five lifts, none for a stretch.",
+        run: async (w) => {
+          w.switchTab("workout");
+          w.startWorkout();
+          w.endStretchPhase();
+          const doc = w.document;
+          const tick = () => new Promise((r) => setTimeout(r, 120));
+          /* Thumb through it: log every set, skip every rest, next every lift.
+             Bounded so a changed session screen fails loudly rather than
+             spinning. */
+          for (let guard = 0; guard < 60; guard++) {
+            const log = doc.getElementById("logSetBtn");
+            const next = doc.getElementById("nextExBtn");
+            const skipRest = doc.getElementById("restSkip");
+            if (skipRest) { skipRest.click(); await tick(); continue; }
+            if (log && !log.classList.contains("hidden")) { log.click(); await tick(); continue; }
+            if (next && !next.classList.contains("hidden")) { next.click(); await tick(); await tick(); await tick(); continue; }
+            break;
+          }
         } },
 
       { t: "Finishing", scenario: "finished",
@@ -392,7 +422,12 @@
          step that actually wants a session calls startWorkout() itself
          right after, which makes a fresh one unconditionally, so clearing
          here costs those steps nothing. */
-      try { win.closeAllOverlays?.(); win.closeSettingsPage?.(); win.closeSavedSheet?.(); win.discardSession?.(); } catch {}
+      try { win.closeAllOverlays?.(); win.closeSettingsPage?.(); win.closeSavedSheet?.(); } catch {}
+      /* discardSession is async: it banks the current exercise first and only
+         then nulls the session. Fired and not awaited, that null landed AFTER
+         the next step's startWorkout(), so every session step revisited in the
+         same world showed the lift screen over no session at all. Awaited. */
+      try { await win.discardSession?.(); } catch {}
     }
     device.classList.remove("loading");
     if (!win) return;
