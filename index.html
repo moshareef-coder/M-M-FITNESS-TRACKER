@@ -3002,6 +3002,14 @@
   /* flex-shrink, or a long label squashes the box into a 13px wide oval. */
   .gym-toggle input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--accent); }
   .gym-toggle.checked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
+  /* A text action inside a row header: Skip today / Put it back on the plan's
+     stretch blocks. A button so it is keyboard reachable, styled as a link so
+     it does not compete with the real buttons on the screen. */
+  .link-btn {
+    background: none; border: 0; padding: 0; margin: 0; color: var(--accent);
+    font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .link-btn:active { opacity: .6; }
 
 
   .log-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
@@ -3714,6 +3722,14 @@
         <label>Workout days per week (just you)</label>
         <input type="number" id="setupChallengeTarget" min="1" max="7" value="4" />
       </div>
+    </div>
+    <div class="card">
+      <h2>Stretching</h2>
+      <label class="gym-toggle" id="skipStretchWrap">
+        <span>Skip the warm-up and cool-down</span>
+        <input type="checkbox" id="skipStretchToggle" />
+      </label>
+      <p class="muted-note">Every generated workout opens with a few minutes of timed dynamic moves and closes with a few holds for what you worked. Off here means never; you can also skip either one on the day.</p>
     </div>
     <button class="btn-primary" id="saveSetupBtn">Save preferences</button>
     </div>
@@ -10291,11 +10307,23 @@ function closeGenOverlay() {
    here rather than in a toast: it is the caveat on the plan you are reading,
    so it sits above the rows in the sheet's own muted line and stays on screen
    for as long as they do. */
-function revealGeneratedPlan(workout, honest, onGo, planDate) {
+function revealGeneratedPlan(workout, honest, onGo, planDate, notes = []) {
   if (genCancelled) return;   // they left; the workout is saved either way
   stopGenTicker();
   paintGen(100);
   const list = (workout.exercises || []).slice(0, 8);
+  /* What the plan said about itself (CONTRACT.md `notes`): the limits summary,
+     the softened warning when a slot kept a movement that loads a joint they
+     said hurts, the day-count clamp. Until 2026-09-10 the engine computed all
+     of it and none of it reached a screen, so its defence for prescribing a
+     movement someone said hurts ("the plan says so out loud") was false end to
+     end. Three at most; the first three are the ones that matter. */
+  const said = (Array.isArray(notes) ? notes : []).filter((n) => typeof n === "string" && n.trim()).slice(0, 3);
+  const wu = workout.warmup || [];
+  const cd = workout.cooldown || [];
+  const stretchLine = wu.length || cd.length
+    ? `Opens with ${wu.length ? `a ${wu.length} move warm-up` : "no warm-up"}, closes with ${cd.length ? `${cd.length} ${cd.some((m) => m.kind === "mobility") ? "mobility moves" : "stretches"}` : "no cool-down"}. Timed, and you can skip either.`
+    : "";
   /* The one unprompted offer, and it is here rather than in onboarding because
      a limit is a constraint on how a goal gets trained for, not a goal: asking
      up front turns "what do you want" into "what is wrong with you" and can
@@ -10312,6 +10340,8 @@ function revealGeneratedPlan(workout, honest, onGo, planDate) {
       <div class="gen-done-head">Your workout</div>
       <div class="gen-focus">${escapeHtml(displayFocus(workout.focus, workout.exercises) || "Ready")}</div>
       ${honest ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(honest)}</p>` : ""}
+      ${said.map((n) => `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(n)}</p>`).join("")}
+      ${stretchLine ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(stretchLine)}</p>` : ""}
       <div class="gen-rows" id="genRows">
         ${list.map((ex, i) => `
           <div class="gen-row" data-ex="${i}" style="--d:${i * 70}ms">
@@ -10670,6 +10700,9 @@ async function generateWorkout(forDate) {
         logs: recentLogs,
         plans: recentPlans,
         swaps: recentSwaps,
+        /* Setup > Training. True strips the engine's timed warm-up and
+           cool-down; the lifts underneath are byte for byte the same plan. */
+        skip_stretching: MY_PROFILE?.skip_stretching === true,
       }),
     });
     /* Read as text first. When the function errors it can answer with an HTML
@@ -10700,6 +10733,13 @@ async function generateWorkout(forDate) {
       entry_date: target,
       focus: data.workout.focus,
       exercises: data.workout.exercises,
+      /* The timed blocks, kept apart from `exercises` on purpose: everything
+         that iterates that array treats an entry as sets of a lift, and a
+         stretch must never become a logged set. null from an engine that sent
+         none reads the same as two empty arrays everywhere below. */
+      mobility: (data.workout.warmup?.length || data.workout.cooldown?.length)
+        ? { warmup: data.workout.warmup || [], cooldown: data.workout.cooldown || [], skipped: false }
+        : null,
       archived: false,
     }, { onConflict: "email,entry_date" });
     // Supabase upsert does not throw on its own -- it was failing silently here, which
@@ -10712,10 +10752,10 @@ async function generateWorkout(forDate) {
       await loadTodayWorkout();
       FRESH_PLAN_ID = TODAY_WORKOUT?.id || null;
       renderWorkoutTab();
-      revealGeneratedPlan(data.workout, data.honest, () => switchTab("workout"), target);
+      revealGeneratedPlan(data.workout, data.honest, () => switchTab("workout"), target, data.notes);
     } else {
       renderHero();
-      revealGeneratedPlan(data.workout, data.honest, () => toast("Tomorrow is planned"), target);
+      revealGeneratedPlan(data.workout, data.honest, () => toast("Tomorrow is planned"), target, data.notes);
     }
   } catch (err) {
     console.error("generateWorkout failed:", err);
@@ -10989,6 +11029,16 @@ function startWorkout() {
     return;
   }
 
+  /* A fresh session opens on the warm-up when the plan carries one and it has
+     not been skipped for the day. Resuming a session that already logged a set
+     never goes back to it: the warm-up is for cold muscles. */
+  const mob = planMobility();
+  if (mob && !mob.skipped && mob.warmup.length && !SESSION.completed.some(Boolean)) {
+    SESSION.phase = "warmup";
+    SESSION.stretchIndex = 0;
+    SESSION.stretchSide = 1;
+    SESSION.stretchStartedAt = Date.now();
+  }
   saveSessionToStorage();
   startLive();
   openSessionUI();
@@ -11081,7 +11131,15 @@ function formatRest(ms) {
    rest, whatever the target says. */
 function restTargetSec() {
   const v = Number(SESSION?.restTargetSec);
-  return Number.isFinite(v) && v > 0 ? v : DEFAULT_REST_SEC;
+  if (Number.isFinite(v) && v > 0) return v;
+  /* The rest the engine budgeted this lift at (CONTRACT.md restSec), the same
+     number the session estimate was costed with. Audit of 2026-09-10: it was
+     the only figure in the time budget the app could not see, so a strength
+     lift budgeted at 180 seconds ran on the 90 second default. The plus and
+     minus above still win once tapped; 90 stays the fallback for a plan that
+     predates the field. */
+  const planned = Number(TODAY_WORKOUT?.exercises?.[SESSION?.exerciseIndex]?.restSec);
+  return Number.isFinite(planned) && planned > 0 ? planned : DEFAULT_REST_SEC;
 }
 
 /* One place decides what the strip says, so the first paint and the ticker can
@@ -11428,6 +11486,20 @@ async function doFinishExerciseAndAdvance() {
   saveSessionToStorage();
 
   if (nextIdx === -1) {
+    /* The last lift is banked. If the plan carries a cool-down and it was
+       not skipped for the day, the session ends through it; the summary
+       waits until the holds are done or skipped. Ending early (endWorkoutNow)
+       does not come through here, so someone leaving is never held back. */
+    const mob = planMobility();
+    if (mob && !mob.skipped && mob.cooldown.length) {
+      SESSION.phase = "cooldown";
+      SESSION.stretchIndex = 0;
+      SESSION.stretchSide = 1;
+      SESSION.stretchStartedAt = Date.now();
+      saveSessionToStorage();
+      renderSession();
+      return;
+    }
     clearSessionStorage();
     renderSessionComplete();
   } else {
@@ -11464,11 +11536,138 @@ async function logExerciseSilent(name, weight, reps, sets) {
   }
 }
 
+/* ---------- The timed phases: warm-up before the first set, cool-down after the last ----------
+   One move at a time, a countdown, per side runs twice, and the clock rolls
+   the next move in on its own so the phone can sit on the floor. Next skips a
+   hold, Skip drops the whole block for today. Nothing here writes a row: a
+   stretch is not a set, and the Body tab and recovery must never see one. */
+let STRETCH_TICKER = null;
+
+function stretchList() {
+  const mob = planMobility();
+  if (!mob || !SESSION) return [];
+  return SESSION.phase === "warmup" ? mob.warmup : SESSION.phase === "cooldown" ? mob.cooldown : [];
+}
+
+function stopStretchTicker() {
+  if (STRETCH_TICKER) { clearInterval(STRETCH_TICKER); STRETCH_TICKER = null; }
+}
+function startStretchTicker() {
+  stopStretchTicker();
+  STRETCH_TICKER = setInterval(paintStretch, 250);
+}
+
+function paintStretch() {
+  if (!SESSION || (SESSION.phase !== "warmup" && SESSION.phase !== "cooldown")) { stopStretchTicker(); return; }
+  if (SESSION.pausedAt) return;   // a paused workout holds the stretch where it is
+  const move = stretchList()[SESSION.stretchIndex];
+  const clock = document.getElementById("stretchClock");
+  const fill = document.getElementById("stretchFill");
+  if (!move || !clock) { stopStretchTicker(); return; }
+  const total = Math.max(1, Number(move.seconds) || 30);
+  const left = total - (Date.now() - (SESSION.stretchStartedAt || Date.now())) / 1000;
+  if (left <= 0) { buzz([18, 60, 18]); stretchAdvance(); return; }
+  clock.textContent = formatRest(left * 1000);
+  if (fill) fill.style.width = `${((left / total) * 100).toFixed(1)}%`;
+}
+
+/* Next side, next move, or the end of the block. */
+function stretchAdvance() {
+  if (!SESSION) return;
+  const list = stretchList();
+  const move = list[SESSION.stretchIndex];
+  if (move && move.perSide && SESSION.stretchSide === 1) {
+    SESSION.stretchSide = 2;
+  } else {
+    SESSION.stretchIndex = (SESSION.stretchIndex || 0) + 1;
+    SESSION.stretchSide = 1;
+  }
+  SESSION.stretchStartedAt = Date.now();
+  if (SESSION.stretchIndex >= list.length) { endStretchPhase(); return; }
+  saveSessionToStorage();
+  renderStretchPhase();
+}
+
+function endStretchPhase() {
+  if (!SESSION) return;
+  stopStretchTicker();
+  const was = SESSION.phase;
+  SESSION.phase = "lift";
+  SESSION.stretchIndex = 0;
+  SESSION.stretchSide = 1;
+  SESSION.stretchStartedAt = null;
+  if (was === "cooldown") {
+    clearSessionStorage();
+    renderSessionComplete();
+    return;
+  }
+  saveSessionToStorage();
+  renderSession();
+}
+
+/* Skip is for today only and is remembered on the row, so reopening the plan
+   does not offer the same block again. The profile switch is in Setup. */
+async function skipStretchPhase() {
+  const was = SESSION?.phase;
+  if (was === "warmup") await setStretchSkipped(true);
+  endStretchPhase();
+  if (was === "warmup") toast("Warm-up skipped today");
+}
+
+function renderStretchPhase() {
+  const list = stretchList();
+  const i = SESSION.stretchIndex || 0;
+  const move = list[i];
+  if (!move) { endStretchPhase(); return; }
+  const isWarm = SESSION.phase === "warmup";
+  const total = Math.max(1, Number(move.seconds) || 30);
+  const left = Math.max(0, total - (Date.now() - (SESSION.stretchStartedAt || Date.now())) / 1000);
+  const next = list[i + 1];
+  const nextUp = move.perSide && SESSION.stretchSide === 1 ? "other side" : next ? next.name : (isWarm ? "first lift" : "finish");
+  SESSION_LAST_EX = null;   // the first lift after the warm-up slides in like a new exercise
+  $("sessionProgressFill").style.width = isWarm ? "0%" : "100%";
+
+  $("sessionBody").innerHTML = `
+    <div class="sess-card ex-in">
+      <div class="sess-step-row">
+        <div class="sess-step">${isWarm ? "WARM-UP" : "COOL-DOWN"} · ${i + 1} OF ${list.length}</div>
+      </div>
+      <h2 class="sess-name">${escapeHtml(move.name || "")}</h2>
+      <div class="sess-meta">
+        <span class="sess-target">${total}s${move.perSide ? ` · ${SESSION.stretchSide === 1 ? "left" : "right"} side` : ""}</span>
+        ${move.group ? `<span class="sess-target">${escapeHtml(BODY_GROUP_LABELS?.[move.group] || move.group)}</span>` : ""}
+      </div>
+      ${move.cue ? `<div class="sess-note">${escapeHtml(move.cue)}</div>` : ""}
+    </div>
+
+    <div class="rest-bar" id="stretchTimer">
+      <div class="rest-head">
+        <span class="rest-label">${isWarm ? "MOVING" : "HOLD"}</span>
+        <span class="rest-next">Next: ${escapeHtml(nextUp)}</span>
+      </div>
+      <span class="rest-clock" id="stretchClock">${formatRest(left * 1000)}</span>
+      <div class="rest-track"><div class="rest-fill" id="stretchFill" style="width:${((left / total) * 100).toFixed(1)}%"></div></div>
+      <div class="rest-adjust">
+        <button type="button" id="stretchNext">Next</button>
+        <button type="button" id="stretchSkipAll">${isWarm ? "Skip warm-up" : "Skip cool-down"}</button>
+      </div>
+    </div>
+    ${isWarm ? "" : `<p class="muted-note" style="margin-top:12px;">Your lifts are banked. This is the part that makes tomorrow easier.</p>`}`;
+
+  $("stretchNext").onclick = stretchAdvance;
+  $("stretchSkipAll").onclick = skipStretchPhase;
+  startStretchTicker();
+}
+
 let SESSION_JUST_SET = null;   // a set logged a moment ago, popped once on redraw
 let SESSION_LAST_EX = null;    // the exercise last drawn, so a change can slide in
 
 function renderSession() {
   beatLive();
+  /* The two timed phases have their own screen. Everything below this line is
+     the lift, and none of it can see a stretch. */
+  if (SESSION.phase === "warmup" || SESSION.phase === "cooldown") { renderStretchPhase(); return; }
+  stopStretchTicker();
   const ei = SESSION.exerciseIndex;
   const total = TODAY_WORKOUT.exercises.length;
   // Progress is what is finished, not where you are standing. Jumping to the
@@ -13757,6 +13956,61 @@ async function saveManualWorkout() {
   toast(forToday ? "Workout plan saved" : "Added to that day");
 }
 
+/* ---------- The timed blocks on a plan ----------
+   The engine's warm-up and cool-down (CONTRACT.md: workout.warmup and
+   workout.cooldown) ride on ai_workouts.mobility, apart from `exercises` so
+   nothing that iterates lifts ever sees a stretch. Timed, per side doubles,
+   and skippable for the day with one tap; the profile switch in Setup is the
+   "never" answer and lives on the payload instead. A finished day shows
+   nothing here: the blocks are for the session, not the record. */
+function planMobility() {
+  const m = TODAY_WORKOUT?.mobility;
+  if (!m || typeof m !== "object") return null;
+  return { warmup: Array.isArray(m.warmup) ? m.warmup : [], cooldown: Array.isArray(m.cooldown) ? m.cooldown : [], skipped: !!m.skipped };
+}
+
+function stretchBlockHTML(which, finished) {
+  const m = planMobility();
+  if (!m || finished) return "";
+  const list = m[which];
+  if (!list.length) return "";
+  const title = which === "warmup" ? "Warm-up" : "Cool-down";
+  const secs = list.reduce((t, s) => t + (Number(s.seconds) || 0) * (s.perSide ? 2 : 1), 0);
+  const mins = Math.max(1, Math.round(secs / 60));
+  if (m.skipped) {
+    return which === "warmup" ? `
+      <div class="muted-note" style="margin:6px 0 10px;">Stretching skipped today.
+        <button type="button" class="link-btn" data-stretch-undo>Put it back</button></div>` : "";
+  }
+  return `
+    <div class="workout-progress-row" style="margin-top:${which === "warmup" ? 0 : 12}px;">
+      <span>${title} · about ${mins} min</span>
+      ${which === "warmup" ? `<button type="button" class="link-btn" data-stretch-skip>Skip today</button>` : ""}
+    </div>
+    <div class="reorder-list">
+      ${list.map((s) => `<div class="exercise-row">
+        <div class="ex-icon" style="font-size:11px;font-weight:650;">${Number(s.seconds) || 0}s</div>
+        <div class="ex-body">
+          <div class="ex-name">${escapeHtml(s.name || "")}</div>
+          <div class="ex-target">${s.perSide ? "each side · " : ""}${escapeHtml(BODY_GROUP_LABELS?.[s.group] || s.group || "")}</div>
+          ${s.cue ? `<div class="ex-note">${escapeHtml(s.cue)}</div>` : ""}
+        </div>
+      </div>`).join("")}
+    </div>`;
+}
+
+/* One tap, one row update, and nothing about the lifts moves. The write goes
+   to the same row the plan lives on, so a reload shows the same answer. */
+async function setStretchSkipped(skipped) {
+  const m = planMobility();
+  if (!m || !TODAY_WORKOUT?.id) return;
+  const next = { ...m, skipped };
+  TODAY_WORKOUT.mobility = next;
+  renderPlanPreview();
+  const { error } = await sb.from("ai_workouts").update({ mobility: next }).eq("id", TODAY_WORKOUT.id);
+  if (error) { console.error(error); toast("That didn't save"); }
+}
+
 function renderPlanPreview() {
   // Reachable straight from choose/manual/week now, each of which stamps its
   // own heading here, clear it or their title outlives them on this screen.
@@ -13797,7 +14051,9 @@ function renderPlanPreview() {
       <span class="workout-progress-count">${doneCount}/${total}</span>
     </div>
     <div class="workout-progress-track"><div class="workout-progress-fill" style="width:${total ? (doneCount / total) * 100 : 0}%"></div></div>
+    ${stretchBlockHTML("warmup", finished)}
     <div class="reorder-list" id="planRows">${rows}</div>
+    ${stretchBlockHTML("cooldown", finished)}
     ${finished ? "" : PLAN_EDIT_ADDING ? `
       <div class="add-ex-form">
         <input type="text" id="planAddExName" placeholder="Exercise name" />
@@ -13837,6 +14093,11 @@ function renderPlanPreview() {
       after: () => renderPlanPreview(),
     });
   });
+
+  const skipBtn = $("workoutContent").querySelector("[data-stretch-skip]");
+  if (skipBtn) skipBtn.onclick = () => setStretchSkipped(true);
+  const undoBtn = $("workoutContent").querySelector("[data-stretch-undo]");
+  if (undoBtn) undoBtn.onclick = () => setStretchSkipped(false);
 
   $("workoutContent").querySelectorAll("[data-remove-plan]").forEach((btn) => {
     btn.onclick = async () => {
@@ -15507,6 +15768,9 @@ function renderSetupTab() {
     if (MY_PROFILE.goal) $("setupGoal").value = MY_PROFILE.goal;
     $("setupGoalDetail").value = MY_PROFILE.goal_detail || "";
     $("setupChallengeTarget").value = MY_PROFILE.challenge_target || 4;
+    $("skipStretchToggle").checked = MY_PROFILE.skip_stretching === true;
+    $("skipStretchWrap").classList.toggle("checked", MY_PROFILE.skip_stretching === true);
+    $("skipStretchToggle").onchange = (e) => $("skipStretchWrap").classList.toggle("checked", e.target.checked);
     const shared = MY_PARTNERSHIP?.shared_weekly_goal;
     $("sharedGoalToggle").checked = !!shared;
     $("setupSharedGoal").value = shared || 4;
@@ -15647,6 +15911,7 @@ async function saveSetup() {
     activity_level: $("setupActivity").value || null,
     theme: SETUP_THEME || "dark",
     share_workout_details: $("shareDetailsToggle").checked,
+    skip_stretching: $("skipStretchToggle").checked,
     updated_at: new Date().toISOString(),
   };
   const { error } = await sb.from("profiles").upsert(payload);

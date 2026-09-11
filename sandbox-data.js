@@ -75,7 +75,21 @@
         { id: "x5", email: THEM, user_name: "Mell", entry_date: day(-2), exercise_name: "Leg Press", sets: 3, reps: 12, weight: 180, created_at: day(-2) + "T07:00:00Z" },
       ],
       ai_workouts: [
-        { id: "w1", email: ME, entry_date: day(0), archived: false, focus: "Push Day", created_at: day(0) + "T05:00:00Z", exercises: pushWorkout },
+        { id: "w1", email: ME, entry_date: day(0), archived: false, focus: "Push Day", created_at: day(0) + "T05:00:00Z", exercises: pushWorkout,
+          /* The engine's timed blocks ride on the row apart from `exercises`
+             (ai_workouts.mobility). Two moves each, short, so a walkthrough
+             reaches the first lift in under a minute. */
+          mobility: {
+            warmup: [
+              { name: "Arm Circles", seconds: 20, perSide: false, group: "shoulders", kind: "dynamic", cue: "Start with small circles and let them grow. Keep the ribs down so the movement happens at the shoulder." },
+              { name: "Cross-Body Arm Swings", seconds: 20, perSide: false, group: "chest", kind: "dynamic", cue: "Swing the arms wide open, then cross them in front. Stay relaxed, this is not a stretch you force." },
+            ],
+            cooldown: [
+              { name: "Doorway Chest Stretch", seconds: 20, perSide: false, group: "chest", kind: "static", cue: "Forearms on the frame, step through until the chest opens. Breathe out into it." },
+              { name: "Overhead Triceps Stretch", seconds: 20, perSide: true, group: "triceps", kind: "static", cue: "Elbow to the ceiling, hand down the spine, ease the elbow back with the other hand." },
+            ],
+            skipped: false,
+          } },
       ],
       saved_workouts: [
         { id: "s1", email: ME, name: "Full body reset", focus: "Full body", created_at: day(-6) + "T10:00:00Z",
