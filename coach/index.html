@@ -225,7 +225,9 @@ const $ = (id) => document.getElementById(id);
 let ME = "", GROUP = null, MEMBERS = [], ENTRIES = [], LOGS = [], PROFILES = [];
 
 function toast(m) { const t = $("toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2600); }
-function esc(s) { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; }
+/* Quotes too: this is printed into data-email and data-remove attributes, and
+   the text node serializer alone leaves a quote free to close them. */
+function esc(s) { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
 function todayStr() { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
 function weekStart() { const d = new Date(todayStr() + "T00:00:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); }
 function initials(n) { return (n || "?").trim().slice(0, 1).toUpperCase(); }

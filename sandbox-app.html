@@ -10412,10 +10412,15 @@ async function confirmDeleteDay(date) {
   }
 }
 
+/* textContent into innerHTML is the TEXT NODE serializer: it escapes & < > and
+   nothing else. Most call sites here print into a quoted attribute, and a value
+   carrying a quote closes that attribute and starts writing its own, which is
+   arbitrary script from any name a partner can type. Quotes are escaped
+   explicitly for that reason. */
 function escapeHtml(s) {
   const d = document.createElement("div");
-  d.textContent = s;
-  return d.innerHTML;
+  d.textContent = s ?? "";
+  return d.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 /* ---------- Workout tab ---------- */
