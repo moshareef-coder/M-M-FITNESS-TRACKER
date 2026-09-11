@@ -6917,7 +6917,7 @@ const INFO_TOPICS = {
   planMatch: () => ({
     eyebrow: "The match figure",
     paras: [
-      "How well the plan we drafted lines up with what you have actually been doing: the muscles you have trained recently, the equipment your logged exercises use, and the days you train.",
+      "How much of this session lands on what your week has trained least. Once a workout exists the figure is measured off that workout's own exercises; before one exists it scores the focus we are proposing.",
       "It is a fit score, not a grade. A low number usually means we do not know you well enough yet, which fixes itself after a few logged sessions.",
     ],
   }),
@@ -13199,7 +13199,74 @@ const EQUIPMENT_WORDS = [
    scores high; train everything evenly and every proposal scores middling,
    which is the correct signal. It is not a claim about workout quality, which
    is a question we cannot answer until the algorithm work lands. */
+/* The same card, two jobs. Before a workout exists it proposes one; once one
+   exists it describes THAT one, because a card that keeps predicting a
+   different session while a real plan is sitting behind it is the app
+   disagreeing with itself. Mo, 2026-09-11: "it should match it with the
+   workout that was generated, it'll show me what exactly I'm doing."
+   Everything below is measured off the plan's own exercises, so Focus,
+   Duration, Equipment and Target Muscles describe the thing you are about to
+   do rather than a second opinion about it. */
+function planFromToday() {
+  const list = TODAY_WORKOUT?.exercises || [];
+  if (!list.length) return null;
+
+  const names = list.map((e) => (e.name || "").toLowerCase());
+  const kit = EQUIPMENT_WORDS
+    .filter(([, words]) => names.some((n) => words.some((w) => n.includes(w))))
+    .map(([label]) => label)
+    .slice(0, 3);
+
+  /* Muscles from the exercises themselves, primaries first, so the chips are
+     what this session actually trains. */
+  const counts = {};
+  for (const ex of list) {
+    const rule = classifyMuscles(ex.name || "");
+    if (!rule) continue;
+    for (const g of rule.primary) counts[g] = (counts[g] || 0) + 2;
+    for (const g of rule.secondary) counts[g] = (counts[g] || 0) + 1;
+  }
+  const pretty = { lowerback: "Lower back", abs: "Core", obliques: "Obliques" };
+  const targets = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 4)
+    .map(([g]) => pretty[g] || g.charAt(0).toUpperCase() + g.slice(1));
+
+  /* The same arithmetic the engine costs a session with: work plus the rest
+     between sets, plus the warm-up minutes. A range, because reps vary. */
+  const secs = list.reduce((t, e) => t + (e.sets || 3) * (30 + (Number(e.restSec) || DEFAULT_REST_SEC)), 0);
+  const mins = Math.round(secs / 60) + 5;
+
+  /* Match, defined the same way as the proposal below: how much of this
+     session lands on what the week has trained least. A plan that hits your
+     most neglected regions scores high; one more chest day in a chest-heavy
+     week scores low. It is a claim about balance, not about quality. */
+  const vols = computeMuscleVolume(ME, 0);
+  const regionVol = Object.entries(REGION_MUSCLES).map(([name, muscles]) => ({
+    name, volume: muscles.reduce((sum, m) => sum + (vols[m] || 0), 0),
+  }));
+  const heaviest = Math.max(...regionVol.map((r) => r.volume), 0);
+  const hit = regionVol.filter((r) => REGION_MUSCLES[r.name].some((m) => counts[m]));
+  const restedness = heaviest > 0 && hit.length
+    ? 1 - (hit.reduce((sum, r) => sum + r.volume, 0) / (hit.length * heaviest))
+    : 1;
+
+  return {
+    real: true,
+    focus: displayFocus(TODAY_WORKOUT.focus, list),
+    match: Math.max(35, Math.min(99, Math.round(restedness * 100))),
+    duration: `${Math.max(10, mins - 5)}-${mins + 5} min`,
+    equipment: kit.length ? kit.join(", ") : null,
+    targets,
+    count: list.length,
+    done: gymDaysThisWeek(ME),
+    target: weeklyGoalFor(MY_EMAIL) || 4,
+  };
+}
+
 function planPreview() {
+  /* A real plan wins over a proposal, always. */
+  const real = planFromToday();
+  if (real) return real;
+
   const vols = computeMuscleVolume(ME, 0);
 
   const regions = Object.entries(REGION_MUSCLES).map(([name, muscles]) => ({
@@ -13477,15 +13544,22 @@ function renderChooseScreen() {
   const preview = coached ? "" : `
     <div class="spp">
       <div class="spp-top">
-        <span class="spp-spark">${icon("star", 18)}</span>
-        <h3>Smart Plan Preview</h3>
-        <button type="button" class="spp-cust" id="sppCustomise">Customize</button>
+        <span class="spp-spark">${icon(p.real ? "dumbbell" : "star", 18)}</span>
+        <h3>${p.real ? "Today&rsquo;s Workout" : "Smart Plan Preview"}</h3>
+        ${p.real
+          /* Only once there is something to customize. Mo: "it wouldn't show me
+             customize until I either plan my workout or I generate my workout,
+             otherwise that button shouldn't be there." Before that the card is
+             a proposal and the buttons underneath are how you act on it. */
+          ? `<button type="button" class="spp-cust" id="sppCustomise">Customize</button>`
+          : ""}
       </div>
       <div class="spp-body">
         <div class="spp-facts">
           <div class="spp-fact"><div class="k">Focus</div><div class="v">${escapeHtml(p.focus)}</div></div>
           ${p.duration ? `<div class="spp-fact"><div class="k">Est. Duration</div><div class="v">${escapeHtml(p.duration)}</div></div>` : ""}
           ${p.equipment ? `<div class="spp-fact"><div class="k">Equipment</div><div class="v">${escapeHtml(p.equipment)}</div></div>` : ""}
+          ${p.real ? `<div class="spp-fact"><div class="k">Exercises</div><div class="v">${p.count}</div></div>` : ""}
           <div class="spp-fact">
             <div class="k">Target Muscles</div>
             <div class="spp-chips">${p.targets.map((t) => `<span class="spp-chip">${escapeHtml(t)}</span>`).join("")}</div>
@@ -13494,7 +13568,7 @@ function renderChooseScreen() {
       </div>
       <p class="spp-match">
         <span class="spp-match-bar" aria-hidden="true"><span style="width:${Math.max(0, Math.min(100, p.match))}%"></span></span>
-        ${p.match}% match to your recent sessions ${infoDot("planMatch", "What the match figure means")}
+        ${p.match}% match ${p.real ? "for what you have trained this week" : "to your recent sessions"} ${infoDot("planMatch", "What the match figure means")}
       </p>
     </div>`;
 
@@ -13526,7 +13600,10 @@ function renderChooseScreen() {
     before: () => { if (!MANUAL_DRAFT.length) MANUAL_DRAFT = loadDraft(); },   // pick up where you left off
   });
 
-  if ($("sppCustomise")) $("sppCustomise").onclick = toManual;
+  /* Customize on a real plan opens THAT plan, where reorder, swap, remove and
+     add already live. It used to open the empty manual builder, which is how
+     you make a different workout, not how you look at this one. */
+  if ($("sppCustomise")) $("sppCustomise").onclick = () => (p.real ? goWorkoutScreen(null) : toManual());
   if (!coached) $("chooseGenerateBtn").onclick = () => generateWorkout();
   $("choosePlanBtn").onclick = toManual;
   $("chooseWeekBtn").onclick = () => goWorkoutScreen("week");
