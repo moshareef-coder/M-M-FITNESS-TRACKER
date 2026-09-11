@@ -3330,9 +3330,20 @@
     background: var(--accent); color: var(--on-accent);
     border-radius: 14px; padding: 12px 15px;
     box-shadow: 0 16px 34px -12px color-mix(in srgb, var(--accent) 60%, transparent);
-    transform: translateY(-160%); transition: transform .5s cubic-bezier(.2,.9,.25,1.25);
+    /* The retract has to clear the top of the SCREEN, not 160% of the banner.
+       A percentage translate is relative to the element's own height, so with
+       a Dynamic Island the banner starts 59px down, slides up ~90px, and
+       parks with its bottom still 35px on screen: a green sliver stuck under
+       the status bar for the rest of the workout, which is exactly what it
+       did on Mo's phone. On a simulator the inset is 0, it cleared, and no
+       headless test ever saw it. This distance is its own height plus however
+       far down it started, so it is gone at any inset and any height, and the
+       fade is belt and braces in case the geometry ever moves again. */
+    transform: translateY(calc(-100% - 24px - env(safe-area-inset-top, 0px)));
+    opacity: 0;
+    transition: transform .5s cubic-bezier(.2,.9,.25,1.25), opacity .3s ease;
   }
-  .pr-pop.show { transform: none; }
+  .pr-pop.show { transform: none; opacity: 1; }
   .pr-pop-ico { flex-shrink: 0; display: flex; }
   .pr-pop-kicker { display: block; font-size: 11px; font-weight: 800; letter-spacing: .11em; opacity: .75; }
   .pr-pop-val { display: block; font-size: 15.5px; font-weight: 800; letter-spacing: -.01em; }
