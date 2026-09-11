@@ -584,6 +584,16 @@ export function buildPlan({
          than handing back the same muscles the Body tab is, right now, saying
          to leave alone. */
       mainGroups: [...mainGroupsForDay(SLOTS[key])],
+      /* The movement patterns this day is built out of, in slot order. Muscle
+         groups alone cannot tell a squat day from a leg press day, and the
+         warm-up for the two is not the same: one needs ankles and hip flexors
+         under load, the other does not. engine/mobility.mjs reads this to pick
+         preparation for the movements rather than for the muscles, which is
+         research/13 and the difference Mo asked for. Mains first, because a
+         warm-up that prepares the accessories and not the main lift has the
+         priority backwards. */
+      mainPatterns: [...new Set(SLOTS[key].filter((s) => s.role === "main").map((s) => s.pattern))],
+      allPatterns: [...new Set(SLOTS[key].map((s) => s.pattern))],
       exercises,
     };
   });

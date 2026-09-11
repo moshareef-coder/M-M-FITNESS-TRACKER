@@ -1390,6 +1390,75 @@ test("skip_stretching strips the blocks and changes nothing else about the answe
   assert.deepEqual(off2.workout.warmup, []);
 });
 
+/* ---- the warm-up prepares the movements, not just the muscles (research/13) ---- */
+
+/* Enough dated sessions that training-age stops saying beginner, which is what
+   puts the week on a push/pull/legs split instead of full body. Spread three a
+   week so sessionsPerWeek reads honestly rather than as one huge block. */
+function manySessions(n) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const back = 2 + Math.floor(i / 3) * 7 + (i % 3) * 2;
+    for (const name of ["Barbell Bench Press", "Barbell Back Squat", "Lat Pulldown"]) {
+      out.push({ entry_date: day(-back), exercise_name: name, sets: 3, reps: 8, weight: 135 + Math.round(i / 6) * 5 });
+    }
+  }
+  return out;
+}
+
+test("every dynamic and mobility move declares which movement patterns it prepares", () => {
+  const PATTERNS = ["squat", "hinge", "lunge", "horizontalPush", "verticalPush", "horizontalPull", "verticalPull", "core", "isolation"];
+  const cov = {};
+  for (const p of PATTERNS) cov[p] = 0;
+  for (const c of STRETCH_LIB.categories) {
+    for (const e of c.exercises) {
+      if (c.key === "static") { assert.ok(!e.prepares, `${e.name} is static and must not declare prepares`); continue; }
+      assert.ok(Array.isArray(e.prepares), `${e.name} declares prepares`);
+      for (const p of e.prepares) assert.ok(PATTERNS.includes(p), `${e.name} pattern ${p}`);
+      if (c.key === "dynamic") for (const p of e.prepares) cov[p]++;
+    }
+  }
+  /* Three deep on every pattern, so a week never has to repeat a warm-up move
+     and a limit can remove one without emptying the pattern. */
+  for (const p of PATTERNS) assert.ok(cov[p] >= 3, `${p} is prepared by only ${cov[p]} dynamic moves`);
+});
+
+test("every day plan.mjs builds says which movement patterns it is made of", () => {
+  const plan = buildPlan({ goal: { bubble: "get-stronger", child: null }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 3 }, logs: manySessions(80) });
+  for (const d of plan.week) {
+    assert.ok(Array.isArray(d.mainPatterns) && d.mainPatterns.length > 0, `${d.name} mainPatterns`);
+    assert.ok(Array.isArray(d.allPatterns) && d.allPatterns.length >= d.mainPatterns.length, `${d.name} allPatterns`);
+    for (const p of d.mainPatterns) assert.ok(d.allPatterns.includes(p), `${d.name}: ${p} is in allPatterns too`);
+  }
+});
+
+test("a push day and a leg day do not get the same warm-up any more", () => {
+  const plan = buildPlan({ goal: { bubble: "get-stronger", child: null }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 3 }, logs: manySessions(80) });
+  const names = plan.week.map((d) => d.name);
+  assert.deepEqual(names, ["Push day", "Pull day", "Leg day"], "the fixture really is a push/pull/legs split");
+  const [push, pull, legs] = plan.week.map((d) => d.mobility.warmup.map((m) => m.name));
+  const overlap = (a, b) => a.filter((n) => b.includes(n)).length;
+  assert.ok(overlap(push, legs) <= 1, `push and legs share ${overlap(push, legs)} warm-up moves: ${push.join(", ")} vs ${legs.join(", ")}`);
+  assert.ok(overlap(pull, legs) <= 2, `pull and legs share ${overlap(pull, legs)}`);
+  /* And each day's warm-up actually serves that day's main movements. */
+  for (const d of plan.week) {
+    const wanted = new Set(d.mainPatterns);
+    const served = d.mobility.warmup.filter((m) => (m.prepares || []).some((p) => wanted.has(p))).length;
+    assert.ok(served >= 2, `${d.name}: only ${served} warm-up moves prepare ${[...wanted].join("/")}`);
+  }
+});
+
+test("a leg day warm-up is not filled with arm moves once its own patterns are covered", () => {
+  const plan = buildPlan({ goal: { bubble: "get-stronger", child: null }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 3 }, logs: manySessions(80) });
+  const legs = plan.week.find((d) => d.name === "Leg day");
+  const UPPER_ONLY = ["verticalPush", "horizontalPush", "verticalPull", "horizontalPull"];
+  for (const m of legs.mobility.warmup) {
+    const prep = m.prepares || [];
+    const upperOnly = prep.length > 0 && prep.every((p) => UPPER_ONLY.includes(p) || p === "isolation");
+    assert.ok(!upperOnly, `${m.name} (${prep.join("/")}) is upper-body prep on a leg day`);
+  }
+});
+
 test("no equipment means no roller, band or bench in either block, and the plan says so", () => {
   const kit = new Set(STRETCH_ALL.filter((e) => !["none", "wall", "doorway", undefined, null, ""].includes(e.equipment)).map((e) => e.name));
   assert.ok(kit.size > 0, "the library has at least one stretch that needs kit");

@@ -100,24 +100,35 @@ const toMove = (e) => ({
      library where recovery would read them, which it deliberately does not. */
   group: (e.primary || [])[0] || null,
   kind: e.kind,
+  /* Which of today's movements this move is here for. The app shows it as
+     "for your squats", which is the difference between a stretch that feels
+     like homework and one that has an obvious reason to exist. */
+  prepares: Array.isArray(e.prepares) ? e.prepares : [],
 });
 
 /**
- * One block, greedily, for the groups the day cares about.
+ * One block, greedily, for what the day is about to ask of the body.
  *
- * Coverage first: each pick is the move that covers the most target groups
- * nobody has covered yet, so a leg day gets hips, hamstrings and calves before
- * it gets a second hamstring stretch. Then the level nearest theirs, then the
- * shorter move, then the name, so two runs with the same input give the same
- * block. The budget is filled toward, not merely respected: once every target
- * group is covered it keeps adding the next best move until the minutes are
- * used or `maxMoves` is reached. The first version stopped at coverage and
- * handed the mobility goal six minutes of its ten, which is the block those
- * people came for, cut short by a rule meant to stop padding. A pool with
- * nothing for the target groups still yields a block: a warm-up for a day the
- * library does not describe well is better than no warm-up.
+ * Two things decide a pick, in this order:
+ *
+ * 1. PATTERNS, when the caller passes any. A warm-up exists to prepare the
+ *    movements that are coming, and the library says which movements each
+ *    move prepares (`prepares`, added 2026-09-11). A squat day wants ankles
+ *    and hip flexors; a bench day wants pecs, t-spine and the cuff. Muscle
+ *    coverage alone could not tell those apart, which is why a push day and a
+ *    leg day used to open with near-identical warm-ups. research/13.
+ * 2. MUSCLE COVERAGE, which is all a cool-down needs: statics run after, so
+ *    what matters is what was worked, not what is next, and static entries
+ *    carry no `prepares` at all.
+ *
+ * Then the level nearest theirs, then the shorter move, then the name, so two
+ * runs with the same input give the same block. The budget is filled toward,
+ * not merely respected: once everything is covered it keeps adding the next
+ * best move until the minutes are used or `maxMoves` is reached. A pool with
+ * nothing for the target still yields a block: a warm-up for a day the library
+ * does not describe well is better than no warm-up.
  */
-export function pickBlock({ kind, groups = [], budgetSec, hurts = [], missing = [], level = "beginner", exclude = null, pools = null, maxMoves = MAX_MOVES }) {
+export function pickBlock({ kind, groups = [], patterns = [], budgetSec, hurts = [], missing = [], level = "beginner", exclude = null, pools = null, maxMoves = MAX_MOVES }) {
   const want = new Set((groups || []).filter((g) => GROUPS.has(g)));
   const bodyweightOnly = (missing || []).includes("none");
   const source = pools || [poolFor(kind)];
@@ -135,7 +146,9 @@ export function pickBlock({ kind, groups = [], budgetSec, hurts = [], missing = 
   if (!candidates.length) return [];
 
   const rank = LEVEL_RANK[level] ?? 0;
+  const wantPatterns = new Set(patterns || []);
   const covered = new Set();
+  const coveredPatterns = new Set();
   const picks = [];
   let spent = 0;
   const left = new Set(candidates.map((e) => e.name));
@@ -152,7 +165,15 @@ export function pickBlock({ kind, groups = [], budgetSec, hurts = [], missing = 
       if (spent + secs > budgetSec && picks.length >= MIN_MOVES) continue;
       const fresh = (e.primary || []).filter((g) => want.has(g) && !covered.has(g)).length;
       const touch = (e.secondary || []).filter((g) => want.has(g) && !covered.has(g)).length;
+      /* How many of today's movements this move prepares that nothing picked
+         so far has prepared. Zero for every static entry, which is correct:
+         with no patterns asked for, this term is constant and the ranking
+         below collapses to exactly the muscle coverage it always was. */
+      const newPatterns = (e.prepares || []).filter((p) => wantPatterns.has(p) && !coveredPatterns.has(p)).length;
+      const anyPattern = (e.prepares || []).some((p) => wantPatterns.has(p)) ? 0 : 1;
       const key = [
+        -newPatterns,
+        anyPattern,
         -fresh,
         -touch,
         Math.abs(rank - (LEVEL_RANK[e.level] ?? 0)),
@@ -165,6 +186,7 @@ export function pickBlock({ kind, groups = [], budgetSec, hurts = [], missing = 
     picks.push(toMove(best));
     spent += moveSeconds(best);
     for (const g of best.primary || []) covered.add(g);
+    for (const p of best.prepares || []) coveredPatterns.add(p);
     left.delete(best.name);
   }
   return picks;
@@ -201,7 +223,16 @@ export function mobilityFor(day, { level = "beginner", hurts = [], missing = [],
   const worked = [...new Set([...(day?.exercises || []).map((e) => e.group).filter(Boolean), ...mainGroups])];
   const mobilityGoal = MOBILITY_CHILDREN.includes(goalChild);
 
-  const warmup = pickBlock({ kind: "dynamic", groups: mainGroups, budgetSec: WARMUP_SECONDS, hurts, missing, level });
+  /* Mains first, then the accessories, so the warm-up prepares the movement
+     the day is named for before it prepares the last accessory slot.
+     "isolation" is dropped on the way through: in SLOTS it is not a movement
+     quality, it is "whatever fills this accessory slot", so a leg day's calf
+     slot and a warm-up move tagged isolation have nothing to do with each
+     other. Leaving it in put Elbow Circles and Band Pull-Apart in a leg day
+     warm-up, which is exactly the generic block this change exists to end. */
+  const patterns = [...new Set([...(day?.mainPatterns || []), ...(day?.allPatterns || [])])]
+    .filter((p) => p !== "isolation");
+  const warmup = pickBlock({ kind: "dynamic", groups: mainGroups, patterns, budgetSec: WARMUP_SECONDS, hurts, missing, level });
   const cooldown = mobilityGoal
     ? pickBlock({
         kind: "mobility", groups: worked, budgetSec: MOBILITY_GOAL_SECONDS, hurts, missing, level,
