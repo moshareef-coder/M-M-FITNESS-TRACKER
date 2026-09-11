@@ -960,6 +960,17 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
           missing: limits.missing,
           excludedCount: (plan.limits?.excluded || []).length,
         },
+        /* The cardio the goal actually asks for. resolveGoal has returned this
+           since the first run and plan.cardio has carried it since, and it has
+           never once left this function, so somebody whose goal is to lose
+           weight was prescribed two easy 30 minute sessions a week by an
+           engine that then told nobody. Mo, 2026-09-11: "if my goal is to lose
+           weight, will it tell me hey you need to run on a treadmill?" It does
+           now. Sessions and minutes are the prescription; `zone` is how hard,
+           and the app turns it into words. */
+        cardio: plan.cardio && plan.cardio.sessions
+          ? { sessions: plan.cardio.sessions, minutes: plan.cardio.minutes, zone: plan.cardio.zone }
+          : null,
         source: "engine",
         /* The warm-up and cool-down in three numbers and a reason, so the
            reveal can say "plus five minutes after" without reading the arrays,

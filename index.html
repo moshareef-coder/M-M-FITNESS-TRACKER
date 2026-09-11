@@ -616,6 +616,52 @@
 
   /* The same hue on the plan overview, so the shape of the session is legible
      before it starts: blue at the top, lifting in the middle, blue at the end. */
+  /* ---------- The folded stretch blocks on the plan overview ----------
+     Closed, a block is one quiet line: what it is, how many moves, how long.
+     The lifts below keep their full rows and the accent colour, so the eye
+     lands on the workout first and the stretching reads as bookends. */
+  .stretch-fold {
+    border: 1px solid color-mix(in srgb, var(--stretch) 26%, var(--border));
+    background: color-mix(in srgb, var(--stretch) 7%, var(--panel));
+    border-radius: 14px; overflow: hidden; margin: 8px 0;
+  }
+  .stretch-head {
+    width: 100%; display: flex; align-items: center; gap: 11px;
+    padding: 11px 13px; background: none; border: 0; cursor: pointer;
+    font-family: inherit; color: var(--text); text-align: left;
+  }
+  .stretch-head:active { background: color-mix(in srgb, var(--stretch) 12%, transparent); }
+  .stretch-head-ico {
+    width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--stretch) 20%, transparent); color: var(--stretch-ink);
+  }
+  .stretch-head-text { flex: 1; min-width: 0; }
+  .stretch-head-text b { display: block; font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
+  .stretch-head-text i {
+    display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 1px;
+    font-variant-numeric: tabular-nums;
+  }
+  .stretch-head-chev { color: var(--muted); display: flex; transition: transform .2s ease; }
+  .stretch-fold.open .stretch-head-chev { transform: rotate(180deg); }
+  .stretch-fold .stretch-list { border-left: 0; padding: 0 13px 4px; margin: 0; }
+  .stretch-fold .stretch-skip { display: block; margin: 2px 13px 12px; }
+
+  /* Advice, not an exercise: no row chrome, no drag handle, nothing that
+     invites a tap expecting sets and reps. */
+  .cardio-note {
+    display: flex; gap: 11px; align-items: flex-start; margin: 10px 0 2px;
+    padding: 11px 13px; border-radius: 14px;
+    background: var(--panel-2); border: 1px dashed var(--border);
+  }
+  .cardio-note-ico {
+    width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink);
+  }
+  .cardio-note b { display: block; font-size: 13.5px; font-weight: 650; letter-spacing: -.01em; }
+  .cardio-note i { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
   .workout-progress-row.stretch-row { color: var(--stretch-ink); font-weight: 700; }
   .workout-progress-row.stretch-row .link-btn { color: var(--stretch-ink); }
   .reorder-list.stretch-list {
@@ -11238,6 +11284,10 @@ async function generateWorkout(forDate) {
          day as trained rather than planned, and the new workout's summary
          reported the first one's duration. "Legs this morning, arms tonight"
          is an ordinary Saturday. */
+      /* Weekly cardio the goal asks for, written on the plan because that is
+         the screen somebody reads to know what they are meant to do. Advisory:
+         never a set, never logged, never in `exercises`. */
+      cardio: data.meta?.cardio || null,
       completed_at: null,
       duration_sec: null,
     }, { onConflict: "email,entry_date" });
@@ -12766,8 +12816,6 @@ function clearDraft() {
   MANUAL_DRAFT = [];
   try { localStorage.removeItem(draftKey()); } catch { /* nothing to clear */ }
 }
-let PLAN_EDIT_ADDING = false;
-const ADD_EX_STATE = { sets: 3, reps: 8, weight: 0 };
 
 /* Body tab: what is recovered, what still needs work. */
 /* ---------- Session timer + pause ---------- */
@@ -13070,8 +13118,6 @@ function renderWorkoutTab({ respectMode = false } = {}) {
     renderManualBuildScreen();
   } else if (WORKOUT_MODE === "week") {
     renderWeekPlanner();
-  } else if (WORKOUT_MODE === "activity") {
-    renderActivityScreen();
   } else {
     /* Build Next Workout is the tab, not a screen behind a button. The old
        "Go again / Begin Workout" step was a waiting room: it asked you to
@@ -13588,8 +13634,6 @@ function renderChooseScreen() {
         coached)}
     ${optionCard("chooseWeekBtn", "checklist", "Plan your week",
         "Put saved workouts on the days you will do them.", false)}
-    ${optionCard("chooseActivityBtn", "run", "Log a class or cardio",
-        "Pilates, yoga, a run: counted by minutes.", false)}
     ${savedWorkoutsHTML()}
     ${workoutCalendarHTML()}`;
   wireSavedWorkouts($("workoutContent"));
@@ -13607,92 +13651,11 @@ function renderChooseScreen() {
   if (!coached) $("chooseGenerateBtn").onclick = () => generateWorkout();
   $("choosePlanBtn").onclick = toManual;
   $("chooseWeekBtn").onclick = () => goWorkoutScreen("week");
-  $("chooseActivityBtn").onclick = () => goWorkoutScreen("activity");
 
   // Every recent chip opens its recap.
   $("workoutContent").querySelectorAll("[data-recap]").forEach((b) => {
     b.onclick = () => openRecap(MY_EMAIL, ME, b.dataset.recap);
   });
-}
-
-/* Not everything is sets and reps. Pilates, yoga, a run and a swim are measured
-   in minutes, so they get their own path rather than being forced into a
-   lifting shape with fake 1x1 sets. */
-const ACTIVITY_PRESETS = [
-  "Pilates", "Yoga", "Barre", "Running", "Walking", "Hiking",
-  "Cycling", "Spin class", "Swimming", "Rowing machine", "Elliptical", "Stair climber",
-  "Boxing", "Kickboxing", "HIIT", "CrossFit", "Jump rope", "Dance",
-  "Basketball", "Soccer", "Tennis", "Climbing", "Skiing", "Stretching",
-];
-const ACTIVITY_STATE = { name: "", minutes: 45 };
-
-function renderActivityScreen() {
-  $("workoutCardTitle").textContent = "Log a class or cardio";
-  $("workoutContent").innerHTML = `
-    ${backBar("Back", () => goWorkoutScreen("choose", { back: true }))}
-    <p class="muted-note">Tracked by time, not sets. It still counts as a workout.</p>
-    <div class="activity-chips" id="activityChips">
-      ${ACTIVITY_PRESETS.map((a) => `<button type="button" class="activity-chip ${ACTIVITY_STATE.name === a ? "on" : ""}" data-act="${escapeHtml(a)}">${escapeHtml(a)}</button>`).join("")}
-    </div>
-    <input type="text" id="activityName" placeholder="Or type something else" value="${escapeHtml(ACTIVITY_PRESETS.includes(ACTIVITY_STATE.name) ? "" : ACTIVITY_STATE.name)}" style="margin-top:12px;" />
-    <div class="field-stack" style="margin-top:12px;">
-      <div class="field-row">
-        <label class="field-label">Minutes</label>
-        <div class="field-controls">
-          <button type="button" class="stepper-btn" id="actMinusBtn">${icon("minus", 16)}</button>
-          <input class="field-input" id="actMinutes" type="number" inputmode="numeric" step="5" min="1" value="${ACTIVITY_STATE.minutes}" />
-          <button type="button" class="stepper-btn" id="actPlusBtn">${icon("plus", 16)}</button>
-        </div>
-      </div>
-    </div>
-    <button type="button" class="btn-primary" id="saveActivityBtn">Log it</button>
-    <button type="button" class="btn-ghost" id="cancelActivityBtn">Cancel</button>`;
-
-  $("activityChips").querySelectorAll("[data-act]").forEach((b) => {
-    b.onclick = () => {
-      ACTIVITY_STATE.name = b.dataset.act;
-      $("activityName").value = "";
-      renderActivityScreen();
-    };
-  });
-  $("activityName").oninput = (e) => { ACTIVITY_STATE.name = e.target.value; };
-  const setMin = (v) => {
-    ACTIVITY_STATE.minutes = Math.max(1, v);
-    $("actMinutes").value = ACTIVITY_STATE.minutes;
-  };
-  $("actMinusBtn").onclick = () => setMin(ACTIVITY_STATE.minutes - 5);
-  $("actPlusBtn").onclick = () => setMin(ACTIVITY_STATE.minutes + 5);
-  $("actMinutes").oninput = (e) => {
-    const v = parseInt(e.target.value, 10);
-    ACTIVITY_STATE.minutes = isNaN(v) ? 1 : Math.max(1, v);
-  };
-  $("saveActivityBtn").onclick = saveActivity;
-  $("cancelActivityBtn").onclick = () => goWorkoutScreen("choose", { back: true });
-}
-
-async function saveActivity() {
-  const typed = $("activityName").value.trim();
-  const name = typed || ACTIVITY_STATE.name;
-  if (!name) { toast("Pick or type an activity"); return; }
-
-  const btn = $("saveActivityBtn");
-  btn.disabled = true;
-
-  const payload = {
-    user_name: ME, email: MY_EMAIL, entry_date: todayStr(),
-    exercise_name: name, weight: null, reps: null, sets: 1,
-    duration_min: ACTIVITY_STATE.minutes,
-  };
-  const landed = await safeWrite("exercise_logs", "insert", payload);
-  if (!landed) applyLocally("exercise_logs", payload);
-
-  await markGymDayDone();
-  ACTIVITY_STATE.name = "";
-  ACTIVITY_STATE.minutes = 45;
-  WORKOUT_MODE = null;
-  toast(`${name} logged, ${payload.duration_min} min`);
-  await loadAll();
-  renderWorkoutTab();
 }
 
 /* ---- Saved workouts ----
@@ -14238,7 +14201,23 @@ function renderManualBuildScreen() {
    and the workout being built is still there underneath when it closes. */
 let CB_PENDING = null;   // the exercise waiting on its sets and reps
 
-function cbOpenPicker() {
+/* Where a picked exercise lands. The sheet was written for the manual
+   builder's MANUAL_DRAFT, and the plan overview wanted the same sheet writing
+   into the plan that already exists: Mo, 2026-09-11, "when I add an exercise
+   it should be the UI we have now, it comes up, drop down, boom boom pick."
+   One target switch rather than a second copy of the picker, because two
+   pickers drift and only one of them ever gets the next fix. */
+let CB_TARGET = "draft";
+const cbList = () => (CB_TARGET === "plan" ? (TODAY_WORKOUT?.exercises || []) : MANUAL_DRAFT);
+
+async function cbCommit() {
+  if (CB_TARGET === "plan") { await savePlanExercises(); renderPlanPreview(); return; }
+  saveDraft();
+  cbUpdateCharacter();
+}
+
+function cbOpenPicker(target = "draft") {
+  CB_TARGET = target;
   $("cbPickScrim").classList.remove("hidden");
   $("cbPickScrim").onclick = (e) => { if (e.target === $("cbPickScrim")) cbClosePicker(); };
   cbRenderPicker();
@@ -14246,13 +14225,14 @@ function cbOpenPicker() {
 
 function cbClosePicker() {
   CB_PENDING = null;
+  CB_TARGET = "draft";
   $("cbPickScrim").classList.add("hidden");
   pinSheets();
 }
 
 function cbRenderPicker() {
   CB_PENDING = null;
-  const n = MANUAL_DRAFT.length;
+  const n = cbList().length;
   $("cbPickSheet").innerHTML = `
     <div class="ds-grip"></div>
     <div class="cb-sheet-head">
@@ -14311,7 +14291,7 @@ function cbRenderGrid() {
     $("cbOwnBtn").onclick = () => cbConfirmStep({ name: query, own: true });
     return;
   }
-  const chosen = new Set(MANUAL_DRAFT.map((e) => e.name));
+  const chosen = new Set(cbList().map((e) => e.name));
   grid.innerHTML = list.map((ex, i) => `
     <button type="button" class="cb-card${chosen.has(ex.name) ? " picked" : ""}" data-pick="${escapeHtml(ex.name)}" style="--d:${Math.min(i, 12) * 22}ms">
       <span class="cb-card-name">${escapeHtml(ex.name)}</span>
@@ -14323,8 +14303,8 @@ function cbRenderGrid() {
     b.onclick = () => {
       // The tick means it is already in there, so this tap changes that entry
       // rather than quietly making a second identical one.
-      const at = MANUAL_DRAFT.findIndex((e) => e.name === ex.name);
-      if (at >= 0) { cbConfirmStep(MANUAL_DRAFT[at], { editIndex: at }); return; }
+      const at = cbList().findIndex((e) => e.name === ex.name);
+      if (at >= 0) { cbConfirmStep(cbList()[at], { editIndex: at }); return; }
       cbConfirmStep(ex);
     };
   });
@@ -14423,8 +14403,11 @@ function cbConfirmStep(ex, { editIndex = null } = {}) {
       const { name, sets, reps, weight, editIndex: at } = CB_PENDING;
       CB_PENDING = null;
       if (at != null) {
-        const row = MANUAL_DRAFT[at];
-        if (row) { row.sets = sets; row.reps = reps; row.targetWeight = weight; saveDraft(); }
+        const row = cbList()[at];
+        const toPlan = CB_TARGET === "plan";
+        if (row) { row.sets = sets; row.reps = reps; row.targetWeight = weight; }
+        if (toPlan) { cbClosePicker(); savePlanExercises().then(renderPlanPreview); return; }
+        saveDraft();
         cbClosePicker();
         cbRenderLineup();
         cbUpdateCharacter();
@@ -14441,11 +14424,18 @@ function cbConfirmStep(ex, { editIndex = null } = {}) {
 function cbAdd(name, sets, reps, weight = 0) {
   /* The card carries a tick once it is in the draft, and tapping it again used
      to add a second identical row without a word. */
-  if (MANUAL_DRAFT.some((e) => e.name === name)) {
+  if (cbList().some((e) => e.name === name)) {
     toast(`${name} is already in your workout`);
     return;
   }
-  MANUAL_DRAFT.push({ name, sets, reps, targetWeight: weight || 0 });
+  cbList().push({ name, sets, reps, targetWeight: weight || 0 });
+  /* Writing into the plan means the plan screen redraws underneath, and none
+     of the builder's row animation applies. */
+  if (CB_TARGET === "plan") {
+    savePlanExercises().then(renderPlanPreview);
+    toast(`${name} added`);
+    return;
+  }
   saveDraft();
   const rows = $("draftRows");
   if (rows) {
@@ -14732,6 +14722,36 @@ function planMobility() {
   };
 }
 
+/* The cardio the goal asks for, said in words rather than as a row you could
+   mistake for a lift. It is a weekly number, so it is phrased weekly and sits
+   under the session as advice, not as a sixth exercise: the engine has always
+   prescribed this (plan.cardio) and until today never told anybody. A goal
+   that asks for none renders nothing at all. */
+const CARDIO_ZONE_WORDS = {
+  easy: "easy pace, you can still hold a conversation",
+  moderate: "moderate, breathing hard but steady",
+  hard: "hard intervals",
+};
+function cardioNoteHTML(finished) {
+  const c = TODAY_WORKOUT?.cardio;
+  if (finished || !c || !c.sessions) return "";
+  const zone = CARDIO_ZONE_WORDS[c.zone] || c.zone || "";
+  return `
+    <div class="cardio-note">
+      <span class="cardio-note-ico">${icon("run", 15)}</span>
+      <div>
+        <b>${c.sessions}x ${c.minutes} min of cardio this week</b>
+        <i>Run, bike or incline walk. ${escapeHtml(zone)}. Separate from this session, on a day that suits you.</i>
+      </div>
+    </div>`;
+}
+
+/* Which fold is open, remembered while the tab is alive so opening the
+   warm-up to read a cue and coming back from the session does not shut it
+   again. Not persisted: the default every morning is closed, because the
+   lifts are what the screen is for. */
+const STRETCH_OPEN = { warmup: false, cooldown: false };
+
 function stretchBlockHTML(which, finished) {
   const m = planMobility();
   if (!m || finished) return "";
@@ -14752,23 +14772,36 @@ function stretchBlockHTML(which, finished) {
   if (!list.length) return "";
   const title = which === "warmup" ? "Warm-up" : "Cool-down";
   const mins = Math.max(1, Math.round(stretchBlockSeconds(list) / 60));
-  /* The same blue that takes over the session screen, used here as a stripe
-     down the block so the overview already tells you which parts of this
-     workout are stretching and which are lifting. */
+  /* Folded shut by default, and this is the whole point: eight warm-up moves
+     and five holds, each with a cue, buried the five lifts the workout is
+     actually about. One quiet line says what it is and how long it takes, and
+     opening it is one tap for the day you want to read the cues. The lifts
+     keep the full-height treatment and the accent colour; stretching gets a
+     summary and the blue. Hierarchy does the work that a second bright colour
+     would otherwise have to, which is why there is no third hue here. */
+  const open = STRETCH_OPEN[which];
   return `
-    <div class="workout-progress-row stretch-row" style="margin-top:${which === "warmup" ? 0 : 12}px;">
-      <span>${title} · about ${mins} min</span>
-      ${which === (m.warmup.length ? "warmup" : "cooldown") ? `<button type="button" class="link-btn" data-stretch-skip>Skip today</button>` : ""}
-    </div>
-    <div class="reorder-list stretch-list">
-      ${list.map((s) => `<div class="exercise-row">
-        <div class="ex-icon" style="font-size:11px;font-weight:650;">${Number(s.seconds) || 0}s</div>
-        <div class="ex-body">
-          <div class="ex-name">${escapeHtml(s.name || "")}</div>
-          <div class="ex-target">${s.perSide ? "each side · " : ""}${escapeHtml(preparesLabel(s) || BODY_GROUP_LABELS?.[s.group] || s.group || "")}</div>
-          ${s.cue ? `<div class="ex-note">${escapeHtml(s.cue)}</div>` : ""}
+    <div class="stretch-fold${open ? " open" : ""}">
+      <button type="button" class="stretch-head" data-stretch-toggle="${which}" aria-expanded="${open}">
+        <span class="stretch-head-ico">${icon(which === "warmup" ? "flame" : "heart", 15)}</span>
+        <span class="stretch-head-text">
+          <b>${title}</b>
+          <i>${list.length} moves · about ${mins} min</i>
+        </span>
+        <span class="stretch-head-chev">${icon("chevronDown", 16)}</span>
+      </button>
+      ${open ? `
+        <div class="reorder-list stretch-list">
+          ${list.map((s) => `<div class="exercise-row">
+            <div class="ex-icon" style="font-size:11px;font-weight:650;">${Number(s.seconds) || 0}s</div>
+            <div class="ex-body">
+              <div class="ex-name">${escapeHtml(s.name || "")}</div>
+              <div class="ex-target">${s.perSide ? "each side · " : ""}${escapeHtml(preparesLabel(s) || BODY_GROUP_LABELS?.[s.group] || s.group || "")}</div>
+              ${s.cue ? `<div class="ex-note">${escapeHtml(s.cue)}</div>` : ""}
+            </div>
+          </div>`).join("")}
         </div>
-      </div>`).join("")}
+        <button type="button" class="link-btn stretch-skip" data-stretch-skip>Skip stretching today</button>` : ""}
     </div>`;
 }
 
@@ -14851,12 +14884,8 @@ function renderPlanPreview() {
     ${stretchBlockHTML("warmup", finished)}
     <div class="reorder-list" id="planRows">${rows}</div>
     ${stretchBlockHTML("cooldown", finished)}
-    ${finished ? "" : PLAN_EDIT_ADDING ? `
-      <div class="add-ex-form">
-        <input type="text" id="planAddExName" placeholder="Exercise name" />
-        <div class="stepper-row compact" id="planAddExStepperRow"></div>
-        <button type="button" class="btn-secondary" id="planAddExConfirmBtn">Add</button>
-      </div>` : `<button type="button" class="btn-ghost" id="planAddExToggleBtn">+ Add exercise</button>`}
+    ${cardioNoteHTML(finished)}
+    ${finished ? "" : `<button type="button" class="btn-ghost" id="planAddExToggleBtn">+ Add exercise</button>`}
     ${finished
       ? `<p class="muted-note" style="text-align:center;margin:14px 0 10px;">${icon("check", 14)} Workout complete.</p>
          <button type="button" class="btn-primary" id="planNewBtn">Start new workout</button>`
@@ -14891,6 +14920,13 @@ function renderPlanPreview() {
     });
   });
 
+  $("workoutContent").querySelectorAll("[data-stretch-toggle]").forEach((b) => {
+    b.onclick = () => {
+      const key = b.dataset.stretchToggle;
+      STRETCH_OPEN[key] = !STRETCH_OPEN[key];
+      renderPlanPreview();
+    };
+  });
   const skipBtn = $("workoutContent").querySelector("[data-stretch-skip]");
   if (skipBtn) skipBtn.onclick = () => setStretchSkipped(true);
   const undoBtn = $("workoutContent").querySelector("[data-stretch-undo]");
@@ -14905,23 +14941,12 @@ function renderPlanPreview() {
     };
   });
 
-  if (PLAN_EDIT_ADDING) {
-    buildStepperRow("planAddExStepperRow", [
-      { key: "sets", unit: "sets", step: 1, min: 1 },
-      { key: "reps", unit: "reps", step: 1, min: 1 },
-      { key: "weight", unit: "lbs", step: 2.5, min: 0 },
-    ], ADD_EX_STATE);
-    $("planAddExConfirmBtn").onclick = async () => {
-      const name = $("planAddExName").value.trim();
-      if (!name) { toast("Give it a name first"); $("planAddExName").focus(); return; }
-      TODAY_WORKOUT.exercises.push({ name, sets: ADD_EX_STATE.sets, reps: ADD_EX_STATE.reps, targetWeight: ADD_EX_STATE.weight || 0 });
-      await savePlanExercises();
-      ADD_EX_STATE.sets = 3; ADD_EX_STATE.reps = 8; ADD_EX_STATE.weight = 0;
-      PLAN_EDIT_ADDING = false;
-      renderPlanPreview();
-    };
-  } else if ($("planAddExToggleBtn")) {
-    $("planAddExToggleBtn").onclick = () => { PLAN_EDIT_ADDING = true; renderPlanPreview(); };
+  /* The same sheet the builder uses: search, categories, tap a card, set the
+     dials, add. It used to be a bare text field here, so adding to a plan meant
+     typing an exercise name from memory with no library behind it, and the same
+     app had a proper picker one screen away. */
+  if ($("planAddExToggleBtn")) {
+    $("planAddExToggleBtn").onclick = () => cbOpenPicker("plan");
   }
 
   // These three are mutually exclusive depending on how far the workout got.
