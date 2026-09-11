@@ -11970,6 +11970,24 @@ async function skipStretchPhase() {
   if (was === "warmup") toast("Warm-up skipped today");
 }
 
+/* Why this stretch is on today's list, in the words of the movement it is for.
+   The engine tags every warm-up move with the patterns it prepares
+   (mo-knowledge/engine/mobility.mjs, research/13); this turns those tags into
+   the sentence a coach would say. A move with no tags falls back to the muscle
+   it works, which is what every static hold does, because a cool-down is about
+   what you just did rather than what is next. */
+const PATTERN_WORDS = {
+  squat: "squats", hinge: "deadlifts", lunge: "lunges",
+  horizontalPush: "pressing", verticalPush: "overhead work",
+  horizontalPull: "rows", verticalPull: "pull-ups", core: "core work",
+};
+function preparesLabel(move) {
+  const words = (move?.prepares || []).map((p) => PATTERN_WORDS[p]).filter(Boolean);
+  if (!words.length) return "";
+  const shown = words.slice(0, 2);
+  return `for your ${shown.length > 1 ? `${shown[0]} and ${shown[1]}` : shown[0]}`;
+}
+
 /* A block's real length: per side runs twice, so a 40 second hold done both
    sides is 80. The same arithmetic the plan overview uses, kept in one place
    so the overview and the session can never quote different numbers. */
@@ -14381,7 +14399,7 @@ function stretchBlockHTML(which, finished) {
         <div class="ex-icon" style="font-size:11px;font-weight:650;">${Number(s.seconds) || 0}s</div>
         <div class="ex-body">
           <div class="ex-name">${escapeHtml(s.name || "")}</div>
-          <div class="ex-target">${s.perSide ? "each side · " : ""}${escapeHtml(BODY_GROUP_LABELS?.[s.group] || s.group || "")}</div>
+          <div class="ex-target">${s.perSide ? "each side · " : ""}${escapeHtml(preparesLabel(s) || BODY_GROUP_LABELS?.[s.group] || s.group || "")}</div>
           ${s.cue ? `<div class="ex-note">${escapeHtml(s.cue)}</div>` : ""}
         </div>
       </div>`).join("")}
