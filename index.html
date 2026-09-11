@@ -3166,6 +3166,22 @@
   }
   .cst-caption { text-align: center; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
 
+  /* The little square Mo asked for: proof the photo landed, still on screen
+     after the toast that said the same thing has faded. */
+  .sc-proof {
+    display: flex; align-items: center; gap: 12px; text-align: left;
+    margin: 14px 0 0; padding: 10px 12px; border-radius: 14px;
+    background: var(--panel-2); border: 1px solid var(--border);
+  }
+  .sc-proof-thumb {
+    width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0; overflow: hidden;
+    background: var(--panel); display: flex; align-items: center; justify-content: center; color: var(--muted);
+  }
+  .sc-proof-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .sc-proof-body { min-width: 0; }
+  .sc-proof-body .muted-note { margin: 0; }
+  .sc-proof-body .link-btn { margin-top: 3px; }
+
   /* The strength card's lift list: tap a row and the chart above switches to
      it, the same "tap to re-focus" idea the Body tab already uses. */
   .str-list { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 4px; }
@@ -3315,6 +3331,12 @@
     transform: scale(1.1); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
   }
   .set-circle:disabled { opacity: 0.4; cursor: not-allowed; }
+  /* Dashed rather than solid, so it reads as "start something new" next to a
+     row of circles that are all either done or waiting on a number. */
+  .set-circle.set-add {
+    background: none; border-style: dashed; border-color: var(--muted); color: var(--muted);
+  }
+  .set-circle.set-add:active { border-color: var(--accent); color: var(--accent-ink); }
 
   /* A personal record is the point of the session, so it is said on the set
      that broke it rather than turning up later as a tag in Recent Activity.
@@ -10050,6 +10072,22 @@ function todayEntryFor(email) {
   return ALL_ENTRIES.find((e) => e.email === email && e.entry_date === todayStr()) || null;
 }
 
+/* uploadProof/removeProof used to always redraw #workoutContent, which sits
+   BEHIND the session overlay once a workout is finished. Taking the proof
+   photo from the completion screen updated the database and the toast said
+   "Proof saved", but the screen actually on top, the one the toast text was
+   describing, never repainted: the button stayed "Take proof photo" and
+   nothing on screen ever showed the photo landed. Mo could not tell whether
+   it went through, because nothing he could see changed. This redraws
+   whichever screen is really visible. */
+function refreshAfterProofChange() {
+  if (SESSION?.finished && document.body.classList.contains("session-open")) {
+    renderSessionComplete();
+  } else {
+    renderWorkoutTab();
+  }
+}
+
 async function uploadProof(file) {
   toast("Uploading photo…");
   try {
@@ -10082,7 +10120,7 @@ async function uploadProof(file) {
 
     toast("Proof saved");
     await loadAll();
-    renderWorkoutTab();
+    refreshAfterProofChange();
   } catch (err) {
     console.error(err);
     toast("Upload failed, try again");
@@ -10099,7 +10137,7 @@ async function removeProof() {
   if (error) { console.error(error); toast("Could not remove the photo"); return; }
   toast("Photo removed");
   await loadAll();
-  renderWorkoutTab();
+  refreshAfterProofChange();
 }
 
 
@@ -12303,6 +12341,33 @@ function confettiBurst(fromEl, count = 20) {
   }
 }
 
+/* "I did an extra set and didn't know how to log it because I was already
+   preconfined onto what I'm doing." Mo, 2026-09-12. The set row was always
+   exactly as long as the plan said, so finishing every prescribed set left no
+   circle to tap for the one more you actually did.
+
+   Appears once every planned set is ticked, adds one open circle, and that is
+   the whole feature: it becomes the new current set through the exact same
+   toggleSet path every other circle uses, so weight, rest and PR detection
+   all behave for it precisely as they do for a set the plan asked for. The
+   plan's own number moves with it (savePlanExercises), so "3 sets" becomes
+   "4 sets" everywhere that reads TODAY_WORKOUT rather than just in this
+   session, and a reload does not forget the fourth circle was ever added. */
+async function addSet() {
+  if (!SESSION) return;
+  const ei = SESSION.exerciseIndex;
+  const ex = TODAY_WORKOUT?.exercises?.[ei];
+  if (!ex) return;
+  SESSION.setsDone[ei].push(false);
+  if (!SESSION.setWeights) SESSION.setWeights = TODAY_WORKOUT.exercises.map((e) => new Array(e.sets || 3).fill(null));
+  if (!SESSION.setWeights[ei]) SESSION.setWeights[ei] = [];
+  SESSION.setWeights[ei].push(null);
+  ex.sets = (ex.sets || 0) + 1;
+  saveSessionToStorage();
+  renderSession();
+  await savePlanExercises();
+}
+
 function toggleSet(setIdx) {
   const ei = SESSION.exerciseIndex;
   const sets = SESSION.setsDone[ei];
@@ -12818,6 +12883,10 @@ function renderSession() {
             <div class="set-weight">${done ? (w != null ? `${w} lb` : "done") : isCurrent ? "pending" : "&nbsp;"}</div>
           </div>`;
         }).join("")}
+        ${allDone ? `<div class="set-col">
+          <button type="button" class="set-circle set-add" id="addSetBtn" aria-label="Add another set">${icon("plus", 20)}</button>
+          <div class="set-weight">extra</div>
+        </div>` : ""}
       </div>
     </div>
 
@@ -12887,9 +12956,10 @@ function renderSession() {
     b.onclick = () => jumpToExercise(parseInt(b.dataset.jump, 10));
   });
 
-  $("sessionBody").querySelectorAll(".set-circle").forEach((btn) => {
+  $("sessionBody").querySelectorAll(".set-circle[data-set]").forEach((btn) => {
     btn.onclick = () => toggleSet(parseInt(btn.dataset.set, 10));
   });
+  if ($("addSetBtn")) $("addSetBtn").onclick = addSet;
   const stepWeight = (delta) => {
     SESSION.weights[ei] = Math.max(0, (parseFloat(SESSION.weights[ei]) || 0) + delta);
     $("sessWeightVal").value = SESSION.weights[ei];
@@ -13028,7 +13098,12 @@ async function renderSessionComplete() {
   $("sessionProgressFill").style.width = "100%";
   $("sessionCard").classList.add("finished");
   stopSessionTimer();
-  const hasProof = !!todayEntryFor(MY_EMAIL)?.proof_path;
+  const proofEntry = todayEntryFor(MY_EMAIL);
+  const hasProof = !!proofEntry?.proof_path;
+  /* Fetched here rather than left for an <img> to resolve on its own, so the
+     square either shows the real photo or the fallback icon and never a
+     broken-image glyph while a signed URL is still in flight. */
+  const proofUrl = hasProof ? await signedProofUrl(proofEntry.proof_path) : null;
   /* The numbers that make this feel like it counted. Volume is the lifter's
      figure; on a class or cardio day there is none, so the exercise count
      takes that tile rather than printing a proud zero. */
@@ -13080,7 +13155,19 @@ async function renderSessionComplete() {
         You + ${escapeHtml(partner)}: ${myDays + theirDays} of ${myTarget + theirTarget} this week
       </div>` : `<div class="sc-team">${myDays} of ${myTarget} workouts this week</div>`}
       ${hasProof
-        ? `<p class="muted-note">${icon("check", 14)} Proof saved. ${escapeHtml(partnerName())} can see it.</p>`
+        /* Mo, 2026-09-12: "there's no way of telling if I've submitted a
+           photo... I need to be able to tell." The checkmark line was the
+           only signal, and it sat right where the toast that said the same
+           thing a moment earlier had already faded. A square thumbnail is
+           still there after the toast is gone, and it is the actual photo,
+           not a promise that one exists. */
+        ? `<div class="sc-proof">
+             <div class="sc-proof-thumb">${proofUrl ? `<img src="${proofUrl}" alt="Your proof photo" />` : icon("camera", 22)}</div>
+             <div class="sc-proof-body">
+               <p class="muted-note">${icon("check", 14)} Proof saved. ${escapeHtml(partnerName())} can see it.</p>
+               <button type="button" class="link-btn" id="sessionProofChangeBtn">Change photo</button>
+             </div>
+           </div>`
         : `<p class="muted-note">One last thing: snap a photo to lock this in.</p>
            <button type="button" class="btn-primary" id="sessionProofBtn">Take proof photo</button>`}
       ${PARTNER_EMAIL ? `<button type="button" class="btn-secondary" id="sessionNoteBtn">Say something to ${escapeHtml(partnerName())}</button>` : ""}
@@ -13106,6 +13193,8 @@ async function renderSessionComplete() {
 
   if (!hasProof) {
     $("sessionProofBtn").onclick = () => $("proofInput").click();
+  } else {
+    $("sessionProofChangeBtn").onclick = () => $("proofInput").click();
   }
   if (PARTNER_EMAIL) $("sessionNoteBtn").onclick = () => openNoteComposer("workout");
   $("sessionDoneBtn").onclick = sessionDone;
