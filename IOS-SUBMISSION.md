@@ -160,7 +160,7 @@ been copied into `www/`.
 
 Derived from the code paths and schema that actually collect each type, not from the current
 (out of date) privacy.html. This is a draft for the owner to enter into App Store Connect and to
-use as the source of truth for rewriting the policy; it is not legal text.
+use as the source of truth for the privacy questionnaire; it is not legal text. Corrected 11 September 2026 against the code, and privacy.html now matches it.
 
 No tracking of any kind was found anywhere in the app: no analytics SDK, no ad SDK, no
 `gtag`/Mixpanel/Amplitude/Segment/Sentry/PostHog, nothing that correlates the user across other
@@ -172,14 +172,14 @@ apps or sites. Every "Used for tracking" answer below is **No**.
 | Name | Yes | Yes | No | App functionality (display to partner) |
 | Health & fitness: workouts, sets, reps, weights lifted, exercise history | Yes | Yes | No | App functionality (the core product) |
 | Health & fitness: body weight (weigh-ins) | Yes | Yes | No | App functionality |
-| Health & fitness: height, age, sex, training goals, training preferences, physical limits/equipment | Yes | Yes | No | App functionality (workout tailoring); also sent to Anthropic's Claude API for AI-generated plans, without name/email/photos, per the existing privacy.html claim, spot-checked against the generate-workout function's inputs by the code path this pass could see |
+| Health & fitness: height, age, sex, training goals, training preferences, physical limits/equipment | Yes | Yes | No | App functionality (workout tailoring); also sent to Anthropic's Claude API for AI-generated plans, with no name, email or photos: the client sends none and the function strips identifying keys before reading the payload |
 | Photos: progress photos and workout proof photos (`workout-proof` storage bucket) | Yes | Yes | No | App functionality |
-| Photos: profile picture/avatar (`avatars`, keyed off `profiles.avatar_path`) | Yes | Yes | No | App functionality |
-| User-generated video/audio clips (`live-clips` storage bucket, camera and microphone) | Yes | Yes | No | App functionality (short clip to training partner, deleted after two views, plus a scheduled `expire-clips` cleanup) |
+| Photos: profile picture (`workout-proof` bucket under `{email}/avatar/`, keyed off `profiles.avatar_path`) | Yes | Yes | No | App functionality |
+| User-generated video/audio clips (`live-clips` storage bucket, camera and microphone) | Yes | Yes | No | App functionality (short clip to training partner, deleted on first view, with a scheduled `expire-clips` cleanup as a two-hour backstop) |
 | Live session / presence data (`live_sessions` table) | Yes | Yes | No | App functionality (real-time "who's training now" between partner pair) |
 | User content: exercise names, notes, comments, reactions typed into the app | Yes | Yes | No | App functionality |
 | Partner graph (who is paired with whom, coach/client groups) | Yes | Yes | No | App functionality |
-| Push token (`push_subscriptions`: endpoint, p256dh, auth, user agent) | Yes, if the owner wires up working push (see gap noted above) | Yes | No | App functionality (nudges, live-session notifications) |
+| Push token (`push_subscriptions`: endpoint, p256dh, auth, user agent) | Yes, if the user turns notifications on | Yes | No | App functionality (nudges, live-session notifications) |
 | Usage data (nudge send log, badge/milestone unlocks, saved workouts, exercise swaps) | Yes | Yes | No | App functionality |
 | Device timezone | Yes (`profiles.timezone`, captured on sign-in) | Yes | No | App functionality (sending nudges at the right local hour) |
 | Diagnostics/crash data | Not found in this pass. No crash reporter or logging service was found wired into `index.html` or the native project. | n/a | n/a | n/a |
@@ -192,67 +192,59 @@ Notes for App Store Connect specifically:
   the purpose for all of them here is "App Functionality," never "Third-Party Advertising" or
   "Analytics."
 
-## 6. Privacy policy gap list
+## 6. Privacy policy: rewritten, and what is left for a lawyer
 
-`privacy.html` (restyled tonight, content dated "30 August 2026") does not match current
-collection. Concrete gaps, for a human to rewrite from, not for this agent to redraft:
+`privacy.html` was rewritten on 11 September 2026 from an inventory of what the code actually
+touches (17 tables, 2 storage buckets, 6 service providers) rather than from the previous text.
+Every gap this checklist previously listed is closed, and three corrections were made to the
+draft above while doing it:
 
-**Claims that are now incomplete or wrong:**
-- "Photos you choose to upload: workout proof photos and progress photos" omits the profile
-  picture/avatar upload (`avatars` bucket via `profiles.avatar_path`), which is a third photo
-  surface not mentioned at all.
-- The policy never mentions the **camera or microphone** at all, even though `Info.plist` now
-  carries both usage strings for the live-clip feature. A reviewer who reads both documents will
-  find the plist requesting camera/mic access for a feature the policy is silent on.
-- "Who can see it: Only you and the one partner you pair with" is no longer fully accurate now
-  that the schema supports **coach/client groups** (`focus_groups` migration, up to a coach and
-  multiple clients per the security brief's own description of the app), not strictly one-to-one
-  pairing. The policy should describe the actual visibility model, including the asymmetric
-  coach/client case if that shipped.
-- "Data is stored with Supabase... encrypted in transit" is still true but says nothing about the
-  **live/real-time presence** channel (Supabase Realtime over `wss`), which is a distinct data flow
-  from the REST API the rest of the policy implicitly describes.
-- The deletion section describes account deletion accurately in spirit but does not mention that
-  deletion also **unpairs and affects the partner's own data** (it does say "unpairs your partner,"
-  so this one is actually fine, listed here only to confirm it was checked, not to flag it).
+- There is no `avatars` bucket. Profile pictures go to `workout-proof` under
+  `{email}/avatar/{ts}.jpg`, so they are covered by the existing deletion sweep and by the same
+  signed-URL rule as every other photo.
+- There is no `clip_replays` table and a clip is not replayable twice. `destroyClip()` removes the
+  storage object and the row on first view; `expire-clips` is the two-hour backstop.
+- `user_name` is no longer sent to Anthropic. The client stopped sending it and the function now
+  strips `user_name`, `name`, `email`, `user_email` and `partner_name` from any payload before
+  reading it, so the claim holds even for a phone still running a cached older build.
 
-**Collection the policy never mentions at all:**
-- **Live sessions / presence**: that the app broadcasts "I am training now" to a partner in
-  real time.
-- **Short video/audio clips** sent to a training partner (camera and microphone content), including
-  that they are stored, replayed a limited number of times, and auto-expire/delete
-  (`expire-clips` function, `clip_replays` table). The policy needs to state the clip's storage
-  location, retention, and deletion mechanism explicitly, not just "photos."
-  Say who can trigger a replay, whether the sender is notified,
-  and confirm expiry is enforced server-side, not just client-side.
-- **Push notifications**: that the app can send notifications (nudges, live-session alerts), that
-  this requires storing a push subscription token, and how to turn it off.
-- **Milestone badges and saved workouts** as retained history, if the owner considers this beyond
-  "workouts, exercises, sets, reps" already disclosed. Likely covered by the existing "fitness data
-  you enter" language, but worth an explicit read-through against `20260908_milestone_badges.sql`
-  and `20260905_saved_workouts.sql` to confirm nothing new is collected there beyond what workouts
-  already imply.
-- **Device timezone**, captured on sign-in and used to time nudges.
-- **Per-workout privacy / share-details toggle** (`per_workout_privacy`,
-  `share_workout_details` migrations): the policy should say that some fields are shareable with a
-  partner by choice and default state should be described (does a new entry default to shared or
-  private, and can a user tell after the fact what their partner has seen).
+One thing the policy now discloses rather than hides: the share-workout-details switch controls
+what the partner's app renders, not what it downloads. That paragraph comes out of the policy when
+column-level policy lands, and not before.
 
-**Suggested outline for the rewrite** (structure only, not text):
-1. What we collect (expand the existing bulleted list to include camera/mic clips, avatar photo,
-   push token, timezone, live/presence status)
-2. Who can see it (rewrite to cover both the one-partner pairing case and any coach/client group
-   case, and state the per-workout share toggle's default and effect)
-3. Live sessions and clips (new section: what "live" broadcasts, what a clip contains, how long it
-   is kept, how replay-limited deletion works, who can see when you are live)
-4. Push notifications (new section: what triggers one, what data a subscription holds, how to
-   disable it)
-5. Workout generation (keep, already accurate per this pass's check of what's sent to Claude)
-6. Where it is stored (keep, consider naming the Realtime/websocket channel alongside REST/storage)
-7. Deleting your data (keep, already accurate)
-8. Children (keep)
-9. Changes (keep)
-10. Contact (keep)
+**Two blocking dependencies before this policy is true in production:**
+
+1. **Deploy `delete-account`.** The policy lists every table and both buckets that deletion
+   clears. The repo version does that; the deployed version still clears ten tables and touches
+   neither `live-clips` nor the newer tables. Until it ships, the deletion section is a promise
+   the server does not keep, which is exactly the claim Guideline 5.1.1(v) is about.
+2. **Deploy `generate-workout`.** Same reasoning for the "we do not send your name" claim.
+
+**What still needs an actual lawyer, and why I did not write it:**
+
+- **GDPR lawful basis.** If anyone in the EU or UK installs this, the policy needs to name a basis
+  per purpose (contract for the core tracker, consent for notifications, and so on), and health
+  data is an Article 9 special category, which generally needs explicit consent rather than
+  contract. Getting that wrong is the expensive kind of wrong. The policy currently describes
+  behaviour truthfully but claims no basis.
+- **Controller identity and address.** A GDPR-facing policy has to name the legal entity and a
+  postal address. The page currently gives an email only.
+- **Data location and transfers.** I did not assert a storage region because I could not verify
+  the Supabase project's region from the repo. If EU users are in scope, that region plus the
+  transfer mechanism (SCCs) has to be stated.
+- **CCPA/CPRA.** California requires a specific set of named rights and a "we do not sell or share"
+  statement in their defined sense. The policy says we do not sell, in plain English, which is
+  true but is not the statutory formulation.
+- **Age.** The policy says 13. Whether that is right depends on where users are (GDPR sets 13 to 16
+  by member state) and whether COPPA applies. There is currently no age gate in the app at all, so
+  the 13 line is a statement of intent rather than an enforced control.
+- **Retention periods for the rest.** "Until you delete it" is honest but is not a retention
+  schedule, which some regimes expect.
+- **The coach relationship.** If a coach ever pays for access to clients' data, the coach is
+  plausibly a separate controller and that needs a processing agreement, not just a policy line.
+
+None of this blocks an App Store submission. It blocks being comfortable if a European user or a
+regulator ever reads the page.
 
 ## 7. Report summary
 
