@@ -10,6 +10,11 @@ const out = join(root, "www");
 
 const ASSETS = [
   "index.html",
+  /* Setup links to both of these with a root-relative href. On the web that
+     resolves; inside the Capacitor wrap the root is the bundle, so leaving
+     them out gives a 404 where App Review expects to find a privacy policy. */
+  "privacy.html",
+  "support.html",
   "manifest.webmanifest",
   "sw.js",
   "icon-192.png",
