@@ -21,6 +21,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { root, src, style, fonts, grab, fn, section, SNAP_SPECS, SNAP_PROFILES } from "./lift.mjs";
 import { hitsForExercise, MUSCLE_PIECES, MUSCLE_HEADS } from "../knowledge/anatomy/muscle-detail.mjs";
+import { TRAININGS as EXERCISE_TRAININGS_REAL } from "../knowledge/exercise-library/index.mjs";
 
 /* ---- lift the real thing out of the app ---- */
 
@@ -39,13 +40,15 @@ const BODY_TAB = grab(/ {2}<!-- BODY TAB -->\n([\s\S]*?)\n {2}<!-- PROGRESS TAB 
 const PROGRESS_TAB = grab(/ {2}<!-- PROGRESS TAB -->\n([\s\S]*?)\n {2}<!-- SETUP TAB -->/, "the progress tab", 1);
 
 const FUNCS = [
-  "icon", "personRing", "hydrateAvatars", "renderHero", "renderTopStreak",
+  "icon", "personRing", "ringLockup", "hydrateAvatars", "renderHero", "renderTopStreak",
   "entryOn", "dotHTML", "renderWeekStrips",
   "timelineSessions", "reactionsFor", "nameFor", "timelineItemHTML", "wireTimeline", "renderTimeline",
   "liveAgeMs", "liveStateLabel", "renderLiveCard", "renderLiveSheet",
-  "classifyMuscles", "profileFor", "renderClipPill",
+  "classifyMuscles", "normalizeSearch", "libraryMuscles", "muscleWords", "muscleKeywordHit",
+  "bestEverFor", "bodyHiddenToday", "stopSessionTimer", "defaultTrackedMetrics",
+  "profileFor", "renderClipPill",
   "clipRecorderHTML", "clipViewerHTML", "clipGoneHTML", "clipSavedForLaterHTML", "clipSentHTML", "clipSendFailedHTML",
-  "formatRest",
+  "formatRest", "restTargetSec", "restState", "planVolumeLb", "todaysPRLogs", "todaysPRLabel", "lastTimeFor",
   "renderSession", "renderSessionComplete", "openEffortInfo", "openInfo", "infoDot",
   "openWorkoutPrivacy", "workoutPrivacy", "defaultWorkoutPrivacy", "privacySummary", "workoutPrivacyLocked",
   "liveDetailsShared", "openGenOverlay", "paintGen", "stopGenTicker", "revealGeneratedPlan",
@@ -59,8 +62,21 @@ const FUNCS = [
   "countUp", "bodyCountUp", "bodyAreaStates", "avatarHTML",
   "renderBodyTab", "renderBodyList", "renderBodyRings", "renderBodyDetail",
   "renderBodyNext", "renderBodyShare",
-  /* Progress. */
+  /* Progress. Weight/Strength/Volume/Consistency were built after this list
+     was first written and never added, so the gallery's Progress page had
+     been silently drawing an incomplete render (only renderProgressTab
+     itself, none of the cards it calls) since -- caught by rendering the
+     gallery headless and reading what actually throws, not by inspection. */
   "emptyState", "myTrackedMetrics", "renderScaleCheck", "renderMetricPicker", "renderLog",
+  "chartUnavailable", "chartWash", "rgbOf", "cssVar", "fmtElapsed", "previousBest",
+  "bodyEmptyLine", "isBodyHidden",
+  "weighInsFor", "weightRangeStart", "weightGoalFor",
+  "renderWeightStats", "renderWeightRange", "renderWeightHistory", "renderWeightChart",
+  "personalRecords", "topLiftsFor", "liftHistory",
+  "renderStrengthStats", "renderStrengthChart",
+  "volumeWeeks", "renderVolumeStats", "renderVolumeChart",
+  "gymDaysInWeek", "personalDayStreak", "consistencyWeeks",
+  "renderConsistencyStats", "renderConsistencyChart",
   "renderProgressTab",
 ].map(fn).join("\n");
 
@@ -93,7 +109,14 @@ const DATA = [
    The muscle detail modules are ES modules the app imports at runtime. A
    standalone page cannot, so the answers for the gallery's exercises are
    worked out here in Node, with the app's own classifier, and embedded. */
-const classifyMuscles = new Function(`${DATA}\n${fn("classifyMuscles")}\nreturn classifyMuscles;`)();
+const LIBRARY_PRELUDE = `
+let EXERCISE_TRAININGS = ${JSON.stringify(EXERCISE_TRAININGS_REAL)};
+let LIBRARY_MUSCLES = null, LIBRARY_MUSCLES_FOR = -1;
+let MUSCLE_KEYWORD_RE = new Map();
+`;
+const classifyMuscles = new Function(
+  `${DATA}\n${LIBRARY_PRELUDE}\n${fn("normalizeSearch")}\n${fn("libraryMuscles")}\n${fn("muscleWords")}\n${fn("muscleKeywordHit")}\n${fn("classifyMuscles")}\nreturn classifyMuscles;`,
+)();
 const GALLERY_EXERCISES = [...new Set([...SNAP_SPECS.map((s) => s.exerciseName), "Turkish Get-Up"])];
 const HITS = Object.fromEntries(GALLERY_EXERCISES.map((name) =>
   [name.toLowerCase(), hitsForExercise(name, classifyMuscles(name))]));
@@ -775,6 +798,13 @@ const toggleSet = () => {};
 const startNextSet = () => {};
 const jumpToExercise = () => {};
 const finishExerciseAndAdvance = () => {};
+// Writes to ai_workouts and navigates away; a capture only needs the button
+// to have a handler assigned, never for it to actually fire.
+const sessionDone = () => {};
+// Opens the swap sheet and mutates SESSION; same reasoning as sessionDone.
+const swapCurrentExercise = () => {};
+// Confirms, then ends and writes; same reasoning again.
+const endWorkoutNow = () => {};
 /* The Body tab's figure is Rive on a WebGL canvas. It cannot run in a static
    capture, so everything that touches it is a no-op and the canvas is labelled
    in the frame instead of pretending. The rings, the ranked list, the detail
@@ -782,6 +812,14 @@ const finishExerciseAndAdvance = () => {};
 let BODY_PERIOD = null, BODY_LAST_KEY = null, BODY_LAST_TARGET = {}, BODY_PULSE_RAF = null;
 let BODY_GREENED = null, BODY_HEAT_PALETTE = null, BODY_MUSCLE_COLOR = {}, BODY_ALL_MUSCLES = [];
 let riveFrontCtrl = null, riveBackCtrl = null, riveLoadedSex = "Male";
+/* classifyMuscles falls back to the real exercise library's own primary/
+   secondary tags when the keyword rules do not match, via libraryMuscles().
+   The real module, not a hand-copied excerpt, so a new exercise added there
+   is covered here too. */
+let EXERCISE_TRAININGS = ${JSON.stringify(EXERCISE_TRAININGS_REAL)};
+let LIBRARY_MUSCLES = null, LIBRARY_MUSCLES_FOR = -1;
+let MUSCLE_KEYWORD_RE = new Map();
+let SESSION_TIMER = null;
 /* The app's weekStartStr reads the real clock, which would put the fixture
    week out of range and leave every "this week" panel empty. Same rule,
    anchored to the fixture day instead. */
@@ -803,17 +841,22 @@ const bodyClearFocusUI = () => {};
 const bodyPositionCallouts = () => {};
 const bodyFocusMuscle = async () => {};
 
-/* Progress: the chart needs Chart.js off a CDN and the photos need signed
-   storage URLs, so those two panels are stubbed and the rest is real. */
+/* Progress: photos need signed storage URLs the gallery has no server for, so
+   that panel alone is stubbed. The four charts are real, including the network
+   failure: loadScriptOnce REJECTS rather than pretending Chart.js loaded, so
+   each chart's own .catch(() => chartUnavailable(...)) fires exactly as it
+   would offline in the real app, and shows the same honest placeholder rather
+   than a canvas that silently never draws. */
 let PROGRESS_VIEW = "me";
+const WEIGHT_RANGES = [["1W", 7], ["1M", 30], ["3M", 90], ["6M", 180], ["All", null]];
+let PROGRESS_RANGE = "1M";
+let STRENGTH_LIFT = null, STRENGTH_LIFT_FOR = null;
 const SCALE_STATE = { weight: 0 };
-const renderWeightChart = () => {};
 const renderBodyPhotos = async () => {};
 const loadBodyPhotos = async () => [];
 const deleteBodyPhoto = () => {};
 const toggleMetric = () => {};
-const cssVar = () => "#888";
-const loadScriptOnce = () => Promise.resolve();
+const loadScriptOnce = () => Promise.reject(new Error("no network in the gallery build"));
 
 /* The app loads these as ES modules. Here the answers are baked in. */
 let riveBodyPromise = null, bodyDetailPromise = null;
@@ -821,6 +864,8 @@ const ensureRiveBodyModule = () => Promise.resolve(null);
 const ensureBodyDetailModules = () => Promise.resolve(BODY_DETAIL);
 const BODY_RECOVERY_HOURS = 48;
 const BODY_FRESH_HOURS = 24;
+const BODY_MIN_CREDIT_SETS = 2;
+const DEFAULT_REST_SEC = 90;
 let BODY_DETAIL = { detail: {
   hitsForExercise: (name) => HITS[String(name).toLowerCase()] || null,
   MUSCLE_PIECES: ${JSON.stringify(MUSCLE_PIECES)},
