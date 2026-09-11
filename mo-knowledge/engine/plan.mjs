@@ -311,7 +311,7 @@ function candidates({ groups, pattern, level, equipment, role = "accessory", his
 
 export function buildPlan({
   goal, person = {}, logs = [], plans = [], swaps = [], equipment = null, today = new Date(), priorityOverride = null,
-  limits = null,
+  limits = null, avoid = [],
 } = {}) {
   const { bodyWeightLb = null, sex = null, daysAsked = null } = person;
 
@@ -437,7 +437,18 @@ export function buildPlan({
     : equipment;
   /* One set into the one `exclude` parameter, so there is still exactly one
      path into selection and the rotation and the limits cannot fight. */
-  const excludeOut = limitOut.size ? new Set([...rotateOut, ...limitOut]) : rotateOut;
+  /* Movements the caller wants a different answer than. This engine is
+     deterministic on purpose, so asking it for the same day twice returns the
+     same day twice, which is right until somebody looks at their back day and
+     wants a different back day. Handing back what they already have is not an
+     answer. So "give me another one" is expressed as "not these", and the
+     never-empty-a-slot fallback in `candidates` still applies: where the
+     library has no alternative at this level the same movement comes back,
+     which is honest rather than a hole in the week. */
+  const avoidOut = new Set((Array.isArray(avoid) ? avoid : []).map((n) => String(n || "").toLowerCase()).filter(Boolean));
+  const excludeOut = (limitOut.size || avoidOut.size)
+    ? new Set([...rotateOut, ...limitOut, ...avoidOut])
+    : rotateOut;
 
   const split = splitFor(days, level).slice(0, days);
   /* One lever, pulled once. A systemic volume cut is the same 0.85 that

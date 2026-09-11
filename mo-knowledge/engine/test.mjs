@@ -1459,6 +1459,38 @@ test("a leg day warm-up is not filled with arm moves once its own patterns are c
   }
 });
 
+test("avoid gives a genuinely different version of the same day, and never empties a slot", () => {
+  const base = { goal_bubble: "build-muscle", challenge_target: 3, current_weight: 190, sex: "Male", logs: manySessions(80), focus: "Pull" };
+  const today = new Date("2026-09-11T12:00:00");
+  const first = generateFromPayload(base, { today });
+  const names = first.workout.exercises.map((e) => e.name);
+  assert.ok(names.length >= 3, "the first answer is a real day");
+
+  /* Same day type, different exercises. This is the Regenerate on a plan you
+     are looking at: "give me another back day", not "give me another day". */
+  const second = generateFromPayload({ ...base, avoid: names }, { today });
+  assert.equal(second.workout.focus, first.workout.focus, "same day type");
+  const repeated = second.workout.exercises.filter((e) => names.includes(e.name));
+  assert.equal(repeated.length, 0, `repeated ${repeated.map((e) => e.name).join(", ")}`);
+  assert.ok(second.workout.exercises.length >= 3, "and it is still a full day");
+
+  /* Accumulating walks the library rather than ping-ponging between two. */
+  const seen = [...names];
+  for (let i = 0; i < 3; i++) {
+    const next = generateFromPayload({ ...base, avoid: [...seen] }, { today });
+    for (const e of next.workout.exercises) {
+      assert.ok(!seen.includes(e.name), `${e.name} came back after being avoided`);
+      seen.push(e.name);
+    }
+  }
+
+  /* Avoid the entire library and the slot keeps its best candidate rather than
+     coming back empty: a hole in the week is worse than a repeat. */
+  const everything = TRAININGS.flatMap((t) => t.categories.flatMap((c) => c.exercises.map((e) => e.name)));
+  const cornered = generateFromPayload({ ...base, avoid: everything }, { today });
+  assert.ok(cornered.workout.exercises.length >= 3, "still a day when everything is excluded");
+});
+
 test("no equipment means no roller, band or bench in either block, and the plan says so", () => {
   const kit = new Set(STRETCH_ALL.filter((e) => !["none", "wall", "doorway", undefined, null, ""].includes(e.equipment)).map((e) => e.name));
   assert.ok(kit.size > 0, "the library has at least one stretch that needs kit");

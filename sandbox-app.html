@@ -694,6 +694,17 @@
 
   /* Advice, not an exercise: no row chrome, no drag handle, nothing that
      invites a tap expecting sets and reps. */
+  /* The row body is a button now, because tapping it opens the sets and reps.
+     Everything here is undoing button chrome so it still reads as the row it
+     has always been, plus the one affordance that says it is tappable. */
+  .ex-body.ex-tap {
+    display: block; width: 100%; text-align: left; background: none; border: 0;
+    padding: 0; font: inherit; color: inherit; cursor: pointer; min-width: 0;
+  }
+  .ex-body.ex-tap:disabled { cursor: default; opacity: 1; }
+  .ex-body.ex-tap:not(:disabled):active { opacity: .6; }
+  .ex-body.ex-tap .ex-target svg { opacity: .5; vertical-align: -1px; margin-left: 2px; }
+
   .cardio-note {
     display: flex; gap: 11px; align-items: flex-start; margin: 10px 0 2px;
     padding: 11px 13px; border-radius: 14px;
@@ -11467,8 +11478,29 @@ function failGenOverlay(message) {
   }
 }
 
-async function generateWorkout(forDate) {
+/* `sameAgain` is the Regenerate on a plan you are looking at: keep this day
+   type and give me a different version of it. The engine is deterministic, so
+   without the avoid list it would hand back the identical workout and the
+   button would look broken. */
+/* Everything a "give me another one" has already shown for this focus today.
+   Excluding only what is on screen makes the button ping-pong between two
+   versions: ask from A and it avoids A and returns B, ask from B and it
+   avoids B and returns A. Accumulating walks through the library instead, and
+   when the pool is genuinely exhausted `candidates` falls back to the ranked
+   list rather than emptying a slot, so it cycles rather than failing. Reset
+   whenever a plan is generated the ordinary way, or the focus changes. */
+let REGEN_SEEN = { focus: null, names: [] };
+
+async function generateWorkout(forDate, { sameAgain = false } = {}) {
   if (isCoachedClient()) { toast("Your coach sets your workouts"); return; }
+  const keepFocus = sameAgain ? TODAY_WORKOUT?.focus || null : null;
+  if (!sameAgain || REGEN_SEEN.focus !== keepFocus) REGEN_SEEN = { focus: keepFocus, names: [] };
+  if (sameAgain) {
+    for (const e of TODAY_WORKOUT?.exercises || []) {
+      if (!REGEN_SEEN.names.includes(e.name)) REGEN_SEEN.names.push(e.name);
+    }
+  }
+  const avoid = sameAgain ? [...REGEN_SEEN.names] : [];
   /* This used to be wired straight to onclick, which handed it a PointerEvent
      as forDate. That went all the way into entry_date and came back as
      "invalid input syntax for type date" from Postgres. Only a real date is
@@ -11522,9 +11554,14 @@ async function generateWorkout(forDate) {
     const resp = await fetch(FUNCTION_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token },
+      /* No name and no email in here on purpose. The privacy policy promises
+         that nothing identifying leaves for the model, and the name did no
+         work in the prompt anyway: the plan is built from the body metrics
+         and the history below it. Keep it that way, or the policy becomes
+         a false statement the moment someone adds a field. */
       body: JSON.stringify({
-        user_name: ME,
-        focus: MY_PROFILE?.focus,
+        focus: keepFocus || MY_PROFILE?.focus,
+        avoid,
         goal: MY_PROFILE?.goal,
         goal_detail: MY_PROFILE?.goal_detail,
         sex: MY_PROFILE?.sex,
@@ -15169,11 +15206,11 @@ function renderPlanPreview() {
     return `<div class="exercise-row ${isDone ? "ex-done" : ""} ${started ? "" : "draggable"}" data-idx="${i}">
       ${started ? "" : `<button type="button" class="grip" data-grip aria-label="Drag to reorder">${icon("grip", 16)}</button>`}
       <div class="ex-icon">${doneMark}</div>
-      <div class="ex-body">
+      <button type="button" class="ex-body ex-tap" data-plan-edit="${i}"${isDone ? " disabled" : ""}>
         <div class="ex-name">${escapeHtml(ex.name)}</div>
-        <div class="ex-target">${ex.sets} sets · ${ex.reps} reps</div>
+        <div class="ex-target">${ex.sets} sets · ${ex.reps} reps${Number(ex.targetWeight) > 0 ? ` · ${ex.targetWeight} lb` : ""}${isDone ? "" : ` ${icon("pencil", 11)}`}</div>
         ${ex.note ? `<div class="ex-note">${escapeHtml(humanizeNoteDates(ex.note))}</div>` : ""}
-      </div>
+      </button>
       ${isDone ? "" : `<button type="button" class="wp-chip" data-plan-swap="${i}" aria-label="Swap ${escapeHtml(ex.name)}">${icon("swap", 15)}</button>`}
       ${started ? "" : `<button type="button" class="row-btn" data-remove-plan="${i}" title="Remove">${icon("close", 13)}</button>`}
     </div>`;
@@ -15232,6 +15269,24 @@ function renderPlanPreview() {
       renderPlanPreview();
     };
   });
+  /* Tapping a row opens the same sets/reps/weight dials the picker's second
+     step uses, pointed at this plan. Mo, 2026-09-11: "I can go inside the
+     workout in a certain exercise and add a set or add reps, when I click on
+     it." One sheet doing both jobs, so the numbers are changed the same way
+     wherever you are. A logged exercise is not editable: the sets are already
+     in the log and changing the plan underneath them would not move them. */
+  $("workoutContent").querySelectorAll("[data-plan-edit]").forEach((b) => {
+    b.onclick = () => {
+      const at = Number(b.dataset.planEdit);
+      const ex = TODAY_WORKOUT.exercises[at];
+      if (!ex) return;
+      CB_TARGET = "plan";
+      $("cbPickScrim").classList.remove("hidden");
+      $("cbPickScrim").onclick = (e) => { if (e.target === $("cbPickScrim")) cbClosePicker(); };
+      cbConfirmStep(ex, { editIndex: at });
+    };
+  });
+
   const skipBtn = $("workoutContent").querySelector("[data-stretch-skip]");
   if (skipBtn) skipBtn.onclick = () => setStretchSkipped(true);
   const undoBtn = $("workoutContent").querySelector("[data-stretch-undo]");
@@ -15263,11 +15318,11 @@ function renderPlanPreview() {
     $("planRegenBtn").onclick = async () => {
       const ok = await askConfirm({
         heading: "Regenerate this plan",
-        body: `${displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises)} and its ${total} exercise${total === 1 ? "" : "s"} are replaced, including anything you added, swapped or reordered. There is no way back to it.`,
-        ok: "Regenerate",
+        body: `A different ${displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises).toLowerCase()}: same muscles, different exercises. The ${total} on this plan are replaced, including anything you added, swapped or reordered. There is no way back to it.`,
+        ok: "Give me another",
         cancel: "Keep this plan",
       });
-      if (ok) generateWorkout();
+      if (ok) generateWorkout(null, { sameAgain: true });
     };
   }
   if ($("planNewBtn")) $("planNewBtn").onclick = startFreshWorkout;

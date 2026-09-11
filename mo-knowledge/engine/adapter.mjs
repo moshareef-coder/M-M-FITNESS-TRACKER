@@ -879,6 +879,11 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
       today,
       priorityOverride: merged.priority,
       limits,
+      /* "Give me a different one." The app sends the exercises already on the
+         plan so a regenerate of the same day comes back genuinely different
+         rather than identical, which is what a deterministic engine otherwise
+         has to return. */
+      avoid: Array.isArray(payload.avoid) ? payload.avoid : [],
     });
 
     step = "nextDayIndex";
