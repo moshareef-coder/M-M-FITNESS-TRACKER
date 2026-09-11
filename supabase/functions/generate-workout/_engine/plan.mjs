@@ -61,7 +61,12 @@ const VOLUME_SLACK = 2;
    worse than the minute. Nothing goes below four exercises (PLAN.md's contract
    with the app) and a main movement is never the thing that goes. */
 const REP_SECONDS = 30;
-const WARMUP_MIN = 5;
+/* Six, matching mobility.mjs WARMUP_SECONDS. These two numbers are the same
+   minutes counted twice: this one reserves them inside the session estimate,
+   that one fills them with moves. They were 5 and 5; research/13 moved the
+   block to 6 and this followed, or the estimate would quietly under-report
+   every session by a minute. */
+const WARMUP_MIN = 6;
 const TIME_TOLERANCE = 1.15;
 
 function estimateMinutes(exercises) {

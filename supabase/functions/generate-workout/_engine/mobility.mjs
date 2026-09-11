@@ -36,7 +36,18 @@
 import { TRAININGS } from "../_library/index.mjs";
 import { MUSCLE_GROUPS } from "./focus.mjs";
 
-export const WARMUP_SECONDS = 300;
+/* research/13, and the answer to "fifteen to thirty minutes?": no. ACSM says 5
+   to 10 minutes; Li 2023 (network meta, 35 studies) puts the optimum for
+   explosive output at 7 to 10 minutes of dynamic work; McGowan 2015 shows a
+   long warm-up costs performance through fatigue; Behm 2016 shows the acute
+   range it buys has expired inside 30 minutes, so most of a 20 minute warm-up
+   is gone before the last working set. Six minutes, and the rest of the
+   preparation belongs in ramp-up sets of the lift itself.
+   The cool-down is five because the flexibility literature caps out there: a
+   2024 Sports Medicine meta-regression finds range-of-motion gains plateau at
+   about 4 minutes per session and 10 per week, which three sessions of five
+   already clears. Ten for the two goals where the stretching IS the plan. */
+export const WARMUP_SECONDS = 360;
 export const COOLDOWN_SECONDS = 300;
 export const MOBILITY_GOAL_SECONDS = 600;
 /* The goal children whose whole point is this block. Ids from goal-tree.json;
@@ -47,7 +58,11 @@ export const MOBILITY_CHILDREN = Object.freeze(["flexibility", "mobility"]);
    minutes and nobody holds anything long enough to matter; the ten minute
    mobility block gets room for ten, because the block is the point for them. */
 export const MIN_MOVES = 2;
-export const MAX_MOVES = 6;
+/* Eight, not six: the library's dynamic moves are 20 to 30 seconds each, so a
+   six move cap could only ever spend three of the six minutes research/13
+   asks for, and push and pull days were coming back at half the warm-up a leg
+   day got purely because their moves are shorter. */
+export const MAX_MOVES = 8;
 export const MAX_MOBILITY_MOVES = 10;
 
 const LEVEL_RANK = { beginner: 0, novice: 1, intermediate: 2, advanced: 3 };
@@ -128,7 +143,7 @@ const toMove = (e) => ({
  * nothing for the target still yields a block: a warm-up for a day the library
  * does not describe well is better than no warm-up.
  */
-export function pickBlock({ kind, groups = [], patterns = [], budgetSec, hurts = [], missing = [], level = "beginner", exclude = null, pools = null, maxMoves = MAX_MOVES }) {
+export function pickBlock({ kind, groups = [], patterns = [], budgetSec, hurts = [], missing = [], level = "beginner", exclude = null, pools = null, maxMoves = MAX_MOVES, stopAtCoverage = false }) {
   const want = new Set((groups || []).filter((g) => GROUPS.has(g)));
   const bodyweightOnly = (missing || []).includes("none");
   const source = pools || [poolFor(kind)];
@@ -161,8 +176,18 @@ export function pickBlock({ kind, groups = [], patterns = [], budgetSec, hurts =
       const secs = moveSeconds(e);
       /* Budget is a ceiling, not a target: a move that does not fit is skipped,
          not shortened, because the seconds on it are the seconds it needs. The
-         minimum is exempt so a big first pick cannot leave a one move block. */
-      if (spent + secs > budgetSec && picks.length >= MIN_MOVES) continue;
+         minimum is exempt so a big first pick cannot leave a one move block.
+         research/13 caught what this rule did on its own: a leg day cool-down
+         skipped Figure Four (80s, glutes, the group the day actually worked)
+         because only 65s were left, and spent them on a hold for a group the
+         day never touched. Skipping the right move and then padding with the
+         wrong one is worse than running a few seconds long, so a move that
+         still covers something nothing else has covered is allowed to
+         overrun. Only filler has to fit. */
+      const coversSomethingNew =
+        (e.prepares || []).some((p) => wantPatterns.has(p) && !coveredPatterns.has(p)) ||
+        (e.primary || []).some((g) => want.has(g) && !covered.has(g));
+      if (spent + secs > budgetSec && picks.length >= MIN_MOVES && !coversSomethingNew) continue;
       const fresh = (e.primary || []).filter((g) => want.has(g) && !covered.has(g)).length;
       const touch = (e.secondary || []).filter((g) => want.has(g) && !covered.has(g)).length;
       /* How many of today's movements this move prepares that nothing picked
@@ -183,6 +208,20 @@ export function pickBlock({ kind, groups = [], patterns = [], budgetSec, hurts =
       if (!best || compare(key, bestKey) < 0) { best = e; bestKey = key; }
     }
     if (!best) break;
+    /* A cool-down stops when it has covered what the day actually worked.
+       Filling the remaining seconds means reaching for a group the session
+       never touched, and research/13 is blunt about this: the honest
+       justification for a cool-down is cumulative range of motion plus a
+       session having an ending, and five real minutes beat fifteen fake ones.
+       A warm-up does keep filling, because more preparation for what is about
+       to happen is still preparation. The mobility goal keeps filling too,
+       because for those two goals the block is the plan. */
+    if (stopAtCoverage && picks.length >= MIN_MOVES) {
+      const coversNew =
+        (best.primary || []).some((g) => want.has(g) && !covered.has(g)) ||
+        (best.secondary || []).some((g) => want.has(g) && !covered.has(g));
+      if (!coversNew) break;
+    }
     picks.push(toMove(best));
     spent += moveSeconds(best);
     for (const g of best.primary || []) covered.add(g);
@@ -241,7 +280,7 @@ export function mobilityFor(day, { level = "beginner", hurts = [], missing = [],
         pools: [poolFor("mobility"), poolFor("static")],
         maxMoves: MAX_MOBILITY_MOVES,
       })
-    : pickBlock({ kind: "static", groups: worked, budgetSec: COOLDOWN_SECONDS, hurts, missing, level });
+    : pickBlock({ kind: "static", groups: worked, budgetSec: COOLDOWN_SECONDS, hurts, missing, level, stopAtCoverage: true });
 
   const why = [];
   if ((missing || []).includes("none")) {
