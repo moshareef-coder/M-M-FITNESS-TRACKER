@@ -16662,15 +16662,20 @@ function headlineKindFor(profile) {
 }
 
 /* Which existing card each headline is the summary of, so the tab can put that
-   one directly under the answer and leave the rest in their old order. */
+   one directly under the answer and leave the rest in their old order. The
+   pull-up and push-up headline points at the activity log rather than at
+   Strength, because Strength is built out of topLiftsFor, which keeps only
+   logs that carry a weight: a bodyweight movement is not in it, and sending
+   someone to a card that does not contain the thing they came for is worse
+   than sending them nowhere. */
 const HEADLINE_CARD = {
   scale: "cardWeight", recomp: "cardConsistency", lift: "cardStrength",
-  volume: "cardVolume", reps: "cardStrength", endurance: "cardActivity",
+  volume: "cardVolume", reps: "cardActivity", endurance: "cardActivity",
   habit: "cardConsistency",
 };
 const HEADLINE_METRIC = {
   scale: "weight", recomp: "consistency", lift: "strength",
-  volume: "volume", reps: "strength", endurance: "activity",
+  volume: "volume", reps: "activity", endurance: "activity",
   habit: "consistency",
 };
 /* Named for what the person would go looking for, not for the card's own
@@ -16678,7 +16683,7 @@ const HEADLINE_METRIC = {
 const HEADLINE_MORE = {
   scale: "the whole weight trend", recomp: "the last eight weeks",
   lift: "every lift you track", volume: "the weekly totals",
-  reps: "every lift you track", endurance: "everything logged",
+  reps: "everything logged", endurance: "everything logged",
   habit: "the last eight weeks",
 };
 
@@ -16689,7 +16694,8 @@ const HEADLINE_MORE = {
 function defaultTrackedMetrics() {
   const kind = headlineKindFor(MY_PROFILE);
   const lead = HEADLINE_METRIC[kind] || "consistency";
-  const second = kind === "scale" || kind === "recomp" ? "photos" : "activity";
+  const second = kind === "scale" || kind === "recomp" ? "photos"
+    : lead === "activity" ? "consistency" : "activity";
   return lead === second ? [lead] : [lead, second];
 }
 
