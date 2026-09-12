@@ -1982,8 +1982,60 @@
     padding: 10px 12px; border-radius: 100px; background: var(--panel-2); border: 1px solid var(--border);
   }
   .focus-pick-action:active, .limit-clear:active { transform: scale(.97); }
+  /* 44px, because these two are the picker's only non-figure controls and a
+     41px pill is under the minimum on a phone. */
+  .focus-pick-action { min-height: 44px; }
+  .focus-pick-action.on { background: color-mix(in srgb, var(--accent) 16%, var(--panel-2)); border-color: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent-ink); }
   .focus-pick-summary { margin-top: 12px; min-height: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
   .focus-pick-summary b { color: var(--accent-ink); font-weight: 700; }
+
+  /* The three tiers. Hue is the fast read and it is never the only one: every
+     surface that carries a tier also carries the word (Main / Secondary /
+     Light) and a count of filled pips, because red and green is the one pair a
+     twelfth of men cannot separate and this app's users skew male. --accent,
+     --warn and --up are the palette's existing green, amber and red; no new
+     hue was invented for this. */
+  .focus-t1 { --tier: var(--accent); --tier-ink: var(--accent-ink); }
+  .focus-t2 { --tier: var(--warn); --tier-ink: var(--warn); }
+  .focus-t3 { --tier: var(--up); --tier-ink: var(--up); }
+  .focus-pips { display: inline-flex; gap: 3px; flex: none; }
+  .focus-pips i {
+    width: 6px; height: 6px; border-radius: 100px; display: block;
+    border: 1.5px solid var(--tier-ink); background: transparent;
+  }
+  .focus-pips i.on { background: var(--tier); border-color: var(--tier); }
+  /* The budget, spelled out rather than enforced with a refusal: nine cells,
+     one per unit, plus however many units the picks run over. */
+  .focus-budget { margin-top: 14px; }
+  .focus-meter { display: flex; gap: 3px; }
+  .focus-meter i {
+    flex: 1 1 0; height: 8px; border-radius: 9px; display: block;
+    background: var(--panel-2); border: 1px solid var(--border);
+  }
+  .focus-meter i.used { background: var(--tier); border-color: var(--tier); }
+  .focus-meter i.over { background: transparent; border-style: dashed; border-color: var(--up); }
+  .focus-budget-read { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .focus-budget-read b { color: var(--text); font-weight: 700; }
+  .focus-budget-read.over b { color: var(--up); }
+  .focus-tier-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .focus-tier-chip {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer;
+    font: inherit; font-size: 12.5px; font-weight: 700; color: var(--text); text-align: left;
+    padding: 10px 14px; border-radius: 14px; background: var(--panel-2);
+    border: 1px solid color-mix(in srgb, var(--tier) 55%, var(--border));
+    transition: transform .12s ease;
+  }
+  .focus-tier-chip:active { transform: scale(.97); }
+  .focus-tier-chip.spent { border-style: dashed; opacity: .65; }
+  .focus-tier-word { color: var(--tier-ink); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+  .focus-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .focus-legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--muted); }
+  /* The Body impact drill-down's one line about a group's tier, same pips. */
+  .bi-focus-tier { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12.5px; color: var(--muted); }
+  .bi-focus-tier b { color: var(--tier-ink); font-weight: 700; }
+  @media (prefers-reduced-motion: reduce) {
+    .focus-pick-action:active, .limit-clear:active, .focus-tier-chip:active { transition: none; transform: none; }
+  }
 
   /* renderLimitsPage, the Limits and injuries settings page. Same figure as
      Focus areas above (.bi-figures / .bi-fig / .bi-canvas, Body Impact's own
@@ -5662,14 +5714,15 @@ function closeBodyFocusPage() {
 }
 
 async function saveBodyFocus() {
-  const groups = FOCUS_GROUP_ORDER.filter((g) => FOCUS_PICKED.has(g));
+  const entries = focusPickEntries();
   const btn = $("focusPickSaveBtn");
   btn.disabled = true;
-  const ok = await saveFocusGroups(groups);
+  const ok = await saveFocusGroups(entries);
   btn.disabled = false;
   if (!ok) return;
-  toast(groups.length
-    ? "Focus saved: " + groups.map((g) => BODY_GROUP_LABELS[g]).join(", ")
+  if (FOCUS_ALL) toast("Whole body saved. Nothing stands out, so nothing gets extra.");
+  else toast(entries.length
+    ? "Focus saved: " + focusPickOrder().map(([g, t]) => `${BODY_GROUP_LABELS[g]} ${FOCUS_TIER_WORD[t].toLowerCase()}`).join(", ")
     : "Focus cleared");
   closeSettingsPage();
 }
@@ -5678,12 +5731,17 @@ async function saveBodyFocus() {
    this page, and the shortcut on a muscle in Body impact. Same upsert shape as
    saveSetup, and focus_chosen_at goes with every write because the engine
    reports a choice older than 60 days as stale rather than trusting it forever.
-   Callers do their own toast: what they just did is not the same sentence. */
-async function saveFocusGroups(groups) {
+   Callers do their own toast: what they just did is not the same sentence.
+
+   `entries` is already in the column's own shape, "chest:3" and the rest, or
+   the single token "all". Nothing is trimmed on the way out: the budget is
+   shown on the picker and honoured by the engine, and a writer that quietly
+   drops the tail is how a picker ends up unable to repaint its own output. */
+async function saveFocusGroups(entries) {
   const { error } = await sb.from("profiles").upsert({
     email: MY_EMAIL,
     user_name: ME,
-    focus_groups: groups.slice(0, MAX_FOCUS_GROUPS),
+    focus_groups: entries,
     focus_chosen_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
@@ -5692,25 +5750,146 @@ async function saveFocusGroups(groups) {
   return true;
 }
 
-/* "Glutes, hamstrings", not a list of proper nouns: this reads as a sentence
-   fragment under a row title, the way every other set-sub does. */
+/* "Chest (main), glutes (light)", not a list of proper nouns: this reads as a
+   sentence fragment under a row title, the way every other set-sub does. The
+   tier is spelled out because this row has no colour to carry it. */
 function focusGroupsSubtitle() {
-  const names = FOCUS_GROUP_ORDER
-    .filter((g) => (MY_PROFILE?.focus_groups || []).includes(g))
-    .map((g) => BODY_GROUP_LABELS[g]);
-  if (!names.length) return "Not set";
-  return names.map((n, i) => (i ? n.toLowerCase() : n)).join(", ");
+  const { all, picked } = focusParseStored(MY_PROFILE?.focus_groups);
+  if (all) return "Whole body";
+  const parts = focusOrderOf(picked).map(([g, t], i) => {
+    const name = BODY_GROUP_LABELS[g];
+    return `${i ? name.toLowerCase() : name} (${FOCUS_TIER_WORD[t].toLowerCase()})`;
+  });
+  return parts.length ? parts.join(", ") : "Not set";
 }
 
 const FOCUS_GROUP_ORDER = ["chest", "shoulders", "traps", "lats", "lowerback", "biceps", "triceps", "forearms", "abs", "obliques", "glutes", "quads", "hamstrings", "calves"];
-const FOCUS_PICK_GREEN = { r: 0x3b, g: 0xe7, b: 0x6b };   // same accent Body Impact isolates a muscle in
-/* Must stay in step with MAX_FOCUS in mo-knowledge/engine/focus.mjs: anything
-   past the fourth is dropped there anyway, and a saved fifth group that never
-   changes the plan is worse than not offering it. */
-const MAX_FOCUS_GROUPS = 4;
+
+/* The three tiers, spelled the way mo-knowledge/engine/focus.mjs spells them:
+   3 main, 2 secondary, 1 light, and a stored entry with no tier at all reads
+   as 2, which is what every pick saved before the tiers landed already meant.
+
+   A tier costs its own number in emphasis units and the picker gets 9 of them,
+   so three mains, four secondaries or nine lights are all the same spend. That
+   is not a rule this file invented: FOCUS_BUDGET is read off the engine below,
+   because a budget the picker and the plan disagree about is worse than no
+   budget at all. The costs are the tier numbers themselves (TIER_COST in that
+   file is { 3: 3, 2: 2, 1: 1 }), and it is the one thing here that is mirrored
+   rather than imported, because that table is not exported. If it ever stops
+   being the tier number, this is the line that has to move with it. */
+const FOCUS_TIERS = Object.freeze({ main: 3, secondary: 2, light: 1 });
+const FOCUS_TIER_WORD = Object.freeze({ 3: "Main", 2: "Secondary", 1: "Light" });
+const FOCUS_TIER_MEANS = Object.freeze({
+  3: "what you really want to hit",
+  2: "a second priority",
+  1: "a nudge, nothing more",
+});
+/* The tier hues, read off the stylesheet rather than written twice, the same
+   way limitWarnRgb() reads --partner: the figure is WebGL and cannot resolve a
+   CSS variable itself, but it can be handed the value the chips are using, so
+   a palette change moves both. Fallbacks are the dark theme's own values. */
+const FOCUS_TIER_VAR = Object.freeze({ 3: "--up", 2: "--warn", 1: "--accent" });
+const FOCUS_TIER_FALLBACK = Object.freeze({
+  3: { r: 0xe2, g: 0x56, b: 0x6c },
+  2: { r: 0xf0, g: 0xb4, b: 0x29 },
+  1: { r: 0xa8, g: 0xff, b: 0x00 },
+});
+/* Overwritten by the engine's own FOCUS_BUDGET as soon as focus.mjs loads. */
+let FOCUS_BUDGET_UNITS = 9;
+let focusEnginePromise = null;
+function ensureFocusBudget() {
+  if (!focusEnginePromise) {
+    focusEnginePromise = import("/mo-knowledge/engine/focus.mjs")
+      .then((m) => { if (Number.isFinite(m.FOCUS_BUDGET)) FOCUS_BUDGET_UNITS = m.FOCUS_BUDGET; })
+      .catch((e) => { console.warn("focus budget: using the built-in 9", e); });
+  }
+  return focusEnginePromise;
+}
 
 let FOCUS_PICK_FRONT_CTRL = null, FOCUS_PICK_BACK_CTRL = null, FOCUS_PICK_GEN = 0;
-const FOCUS_PICKED = new Set();
+/* group -> tier. A Map rather than a Set now that a pick carries a level. */
+const FOCUS_PICKED = new Map();
+/* The whole body pick, which is one stored token and not fourteen rows. */
+let FOCUS_ALL = false;
+
+/* Read the column. Legacy "chest" is tier 2 and stays tier 2 forever: those are
+   live rows and nothing about what they already mean is allowed to move. */
+function focusParseStored(stored) {
+  const list = Array.isArray(stored) ? stored : [];
+  const picked = new Map();
+  if (list.length === 1 && /^(all|everything|whole[-_]?body|full[-_]?body)$/i.test(String(list[0]).trim())) {
+    for (const g of FOCUS_GROUP_ORDER) picked.set(g, FOCUS_TIERS.light);
+    return { all: true, picked };
+  }
+  for (const raw of list) {
+    const s = String(raw ?? "").trim();
+    if (!s) continue;
+    const cut = s.search(/[:=]/);
+    const group = (cut < 0 ? s : s.slice(0, cut)).trim().toLowerCase();
+    if (!BODY_GROUP_LABELS[group]) continue;
+    const n = cut < 0 ? NaN : Number(s.slice(cut + 1).trim());
+    picked.set(group, (n === 1 || n === 2 || n === 3) ? n : FOCUS_TIERS.secondary);
+  }
+  return { all: false, picked };
+}
+
+/* Highest tier first, then the body's own order, everywhere: on the chips, in
+   the saved array and in the budget. The engine spends the budget in exactly
+   this order, so what the picker shows going over is what the plan drops. */
+function focusOrderOf(picked) {
+  return [...picked.entries()].sort((a, b) => (b[1] - a[1]) || (FOCUS_GROUP_ORDER.indexOf(a[0]) - FOCUS_GROUP_ORDER.indexOf(b[0])));
+}
+function focusPickOrder() { return focusOrderOf(FOCUS_PICKED); }
+
+function focusPickEntries() {
+  if (FOCUS_ALL) return ["all"];
+  return focusPickOrder().map(([g, t]) => `${g}:${t}`);
+}
+
+/* The engine's own greedy spend, mirrored so the screen can say which picks are
+   not earning anything before somebody saves them: highest tier first, and it
+   keeps going past one that does not fit rather than stopping there, so a main
+   that missed by a unit still leaves room for a light behind it. */
+function focusSpend() {
+  const order = focusPickOrder();
+  const kept = new Set();
+  let spent = 0, total = 0;
+  for (const [g, t] of order) {
+    total += t;
+    if (spent + t <= FOCUS_BUDGET_UNITS) { spent += t; kept.add(g); }
+  }
+  return { order, kept, spent, total };
+}
+
+function focusPips(tier) {
+  return `<span class="focus-pips" aria-hidden="true">${[1, 2, 3].map((n) => `<i class="${n <= tier ? "on" : ""}"></i>`).join("")}</span>`;
+}
+
+function focusTierLegend() {
+  return [3, 2, 1].map((t) =>
+    `<span class="focus-t${t}">${focusPips(t)}${escapeHtml(FOCUS_TIER_WORD[t])}, ${escapeHtml(FOCUS_TIER_MEANS[t])}</span>`).join("");
+}
+
+/* The saved tier for one group, or 0. Used by Body impact's drill-down, which
+   only ever asks "is this one of mine, and how badly". */
+function focusTierOfGroup(group) {
+  return focusParseStored(MY_PROFILE?.focus_groups).picked.get(group) || 0;
+}
+
+/* "calves", "calves and forearms", "calves, forearms and abs". Lower cased,
+   because these land mid sentence and not as a heading. */
+function focusNameList(names) {
+  let n = names.map((s) => s.toLowerCase());
+  // Past three the list stops being a list and starts being a paragraph.
+  if (n.length > 4) n = n.slice(0, 3).concat(`${n.length - 3} more`);
+  if (n.length <= 1) return n[0] || "";
+  return n.slice(0, -1).join(", ") + " and " + n[n.length - 1];
+}
+
+function focusTierRgb(tier) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(cssVar(FOCUS_TIER_VAR[tier]));
+  return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : FOCUS_TIER_FALLBACK[tier];
+}
 
 /* Own generation counter, same shape as ADVANCING elsewhere in this file: the
    canvases are new DOM nodes every time this screen is (re)rendered (unlike
@@ -5725,11 +5904,14 @@ async function initBodyFocusRive() {
   FOCUS_PICK_BACK_CTRL?.destroy(); FOCUS_PICK_BACK_CTRL = null;
   // Whatever is on file is what the page opens on, so this reads as editing a
   // saved answer rather than starting over every visit.
+  const stored = focusParseStored(MY_PROFILE?.focus_groups);
+  FOCUS_ALL = stored.all;
   FOCUS_PICKED.clear();
-  for (const g of MY_PROFILE?.focus_groups || []) if (BODY_GROUP_LABELS[g]) FOCUS_PICKED.add(g);
+  for (const [g, t] of stored.picked) FOCUS_PICKED.set(g, t);
 
   let mod;
   try {
+    await ensureFocusBudget();
     mod = await ensureRiveBodyModule();
   } catch (e) {
     console.error("body focus: figure failed to load", e);
@@ -5741,42 +5923,110 @@ async function initBodyFocusRive() {
   if (!figuresEl) return;                     // navigated away entirely while this loaded
 
   const summaryEl = $("focusPickSummary");
+  const budgetEl = $("focusPickBudget");
+  const listEl = $("focusPickList");
   const clearBtn = $("focusPickClear");
+  const allBtn = $("focusPickAll");
   const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
 
   function repaintIntensities() {
     const on = {};
     for (const m of mod.ALL_MUSCLES) on[m] = 0;
-    for (const group of FOCUS_PICKED) {
+    for (const group of FOCUS_PICKED.keys()) {
       for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[group] || []) on[m] = 4;
     }
     FOCUS_PICK_FRONT_CTRL?.setIntensities(on);
     FOCUS_PICK_BACK_CTRL?.setIntensities(on);
   }
 
-  function paintGreen(group) {
-    const pal = { base: mod.APP_HEAT_PALETTE.base, level1: FOCUS_PICK_GREEN, level2: FOCUS_PICK_GREEN, level3: FOCUS_PICK_GREEN, level4: FOCUS_PICK_GREEN };
+  /* The figure is the one surface that cannot carry a word, so the tier is
+     doubled up in brightness as well as hue: a Main muscle is the tier colour
+     at full strength, a Light one is most of the way back to the unmarked
+     grey. Luminance is a channel colour blindness leaves alone, so red and
+     green still separate on a figure where the labels do not fit. */
+  const FIG_STRENGTH = { 3: 1, 2: 0.72, 1: 0.42 };
+  function paintTier(group, tier) {
+    const base = mod.APP_HEAT_PALETTE.base;
+    const c = focusTierRgb(tier);
+    const k = FIG_STRENGTH[tier];
+    const fill = {
+      r: Math.round(base.r + (c.r - base.r) * k),
+      g: Math.round(base.g + (c.g - base.g) * k),
+      b: Math.round(base.b + (c.b - base.b) * k),
+    };
+    const pal = { base, level1: fill, level2: fill, level3: fill, level4: fill };
     for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[group] || []) {
       FOCUS_PICK_FRONT_CTRL?.setMusclePalette(m, pal);
       FOCUS_PICK_BACK_CTRL?.setMusclePalette(m, pal);
     }
   }
+  function repaintTiers() { for (const [g, t] of FOCUS_PICKED) paintTier(g, t); }
 
   function sync() {
-    const names = FOCUS_GROUP_ORDER.filter((k) => FOCUS_PICKED.has(k)).map((k) => BODY_GROUP_LABELS[k]);
-    summaryEl.innerHTML = names.length
-      ? "Marked: <b>" + escapeHtml(names.join(", ")) + "</b>"
-      : "Nothing marked. Saving now clears whatever is on file.";
+    const { order, kept, spent, total } = focusSpend();
+    const over = Math.max(0, total - FOCUS_BUDGET_UNITS);
+
+    /* The budget is shown, not enforced. Nine cells, one per unit, plus a
+       dashed cell for every unit the picks run over, so "too much" is a thing
+       you can see rather than a thing a toast tells you off about. */
+    const cells = order.flatMap(([g, t]) => Array.from({ length: t }, () => `<i class="focus-t${t} ${kept.has(g) ? "used" : "over"}"></i>`));
+    while (cells.length < FOCUS_BUDGET_UNITS) cells.push("<i></i>");
+    const losing = order.filter(([g]) => !kept.has(g));
+    const dropped = losing.map(([g]) => BODY_GROUP_LABELS[g]);
+    /* Naming what would free the room, rather than refusing the tap. Clearing
+       the ones that are not earning always fits, by definition. The second
+       offer is only made when it is actually true: taking one group down a
+       level frees exactly one unit, which is only enough to buy back a Light. */
+    const demote = order.find(([g, t]) => kept.has(g) && t > FOCUS_TIERS.light);
+    const swap = demote && losing.length && losing[0][1] === FOCUS_TIERS.light;
+    let read;
+    if (FOCUS_ALL) {
+      read = `<b>${total} of ${FOCUS_BUDGET_UNITS}.</b> Whole body is all fourteen at Light, which is past anything ${FOCUS_BUDGET_UNITS} points can buy, so the plan reads it as no focus at all.`;
+    } else if (!total) {
+      read = `<b>Nothing marked.</b> You have ${FOCUS_BUDGET_UNITS} points of emphasis to spend: Main costs 3, Secondary 2, Light 1.`;
+    } else if (!over) {
+      read = `<b>${spent} of ${FOCUS_BUDGET_UNITS}</b> points of emphasis spent. Main costs 3, Secondary 2, Light 1.`;
+    } else {
+      read = `<b>${total} of ${FOCUS_BUDGET_UNITS}</b>, which is ${over} too many. A week only has so many sets to move around, so ${escapeHtml(focusNameList(dropped))} ${dropped.length > 1 ? "are" : "is"} not earning anything extra. Clear ${dropped.length > 1 ? "them" : "it"}`
+        + (swap
+          ? `, or take ${escapeHtml(BODY_GROUP_LABELS[demote[0]].toLowerCase())} down a level and ${escapeHtml(BODY_GROUP_LABELS[losing[0][0]].toLowerCase())} fits instead.`
+          : " to get back under.");
+    }
+    budgetEl.innerHTML = `<div class="focus-meter">${cells.join("")}</div><p class="focus-budget-read ${over ? "over" : ""}">${read}</p>`;
+
+    /* Every marked group again as a chip: the word and the pip count are what
+       carry the level here, because hue on its own is the one thing a red and
+       green picker is not allowed to lean on. Tapping a chip cycles it exactly
+       the way tapping the muscle does, which also gives the small groups a
+       44px target the figure cannot give them. */
+    listEl.innerHTML = order.map(([g, t]) =>
+      `<button type="button" class="focus-tier-chip focus-t${t} ${kept.has(g) ? "" : "spent"}" data-group="${g}">
+        ${focusPips(t)}<span>${escapeHtml(BODY_GROUP_LABELS[g])}</span><span class="focus-tier-word">${escapeHtml(FOCUS_TIER_WORD[t])}</span>
+      </button>`).join("");
+    for (const btn of listEl.querySelectorAll(".focus-tier-chip")) {
+      btn.onclick = () => cycle(btn.dataset.group);
+    }
+
+    allBtn.classList.toggle("on", FOCUS_ALL);
+    /* The honest answer to "focus on everything", which is the same sentence
+       the engine puts in the plan's notes rather than a second opinion. */
+    summaryEl.innerHTML = FOCUS_ALL
+      ? "<b>Whole body.</b> Every muscle marked Light, which comes out the same as marking none: extra sets have to be taken from somewhere, and if everything is up then nothing is. Mark two or three Main if you want the week to actually change."
+      : (total ? "" : "Nothing marked. Saving now clears whatever is on file.");
   }
 
-  function onTap(muscle, group) {
-    if (!group) return;
-    const wasPicked = FOCUS_PICKED.has(group);
-    // The cap is refused out loud rather than silently: a tap that does nothing
-    // and says nothing reads as the figure being broken.
-    if (!wasPicked && FOCUS_PICKED.size >= MAX_FOCUS_GROUPS) { toast("Four is plenty, drop one first"); return; }
-    if (wasPicked) FOCUS_PICKED.delete(group); else FOCUS_PICKED.add(group);
-    if (!wasPicked) paintGreen(group);
+  /* One tap, one step: nothing, Light, Secondary, Main, nothing again. Bound to
+     the figure's own click event rather than dblclick, which does not survive a
+     touchscreen and would put a delay on the first tap of every muscle. The
+     cycle closes on nothing, so a mis-tap is always recoverable in place and
+     the budget never has to refuse anything. */
+  function cycle(group) {
+    if (!group || !BODY_GROUP_LABELS[group]) return;
+    const next = (FOCUS_PICKED.get(group) || 0) + 1;
+    // Any change to one muscle makes this a list of muscles, not "whole body".
+    FOCUS_ALL = false;
+    if (next > FOCUS_TIERS.main) FOCUS_PICKED.delete(group);
+    else { FOCUS_PICKED.set(group, next); paintTier(group, next); }
     repaintIntensities();
     sync();
   }
@@ -5789,8 +6039,8 @@ async function initBodyFocusRive() {
       /* A per muscle palette needs the view model, which does not exist until
          the figure has loaded, so what is already on file is painted from here
          rather than straight after this call. */
-      onLoad: () => { for (const g of FOCUS_PICKED) paintGreen(g); repaintIntensities(); },
-      onMuscleClick: (muscle, group) => onTap(muscle, group),
+      onLoad: () => { repaintTiers(); repaintIntensities(); },
+      onMuscleClick: (muscle, group) => cycle(group),
     });
   }
 
@@ -5798,7 +6048,20 @@ async function initBodyFocusRive() {
   FOCUS_PICK_BACK_CTRL = make("focusPickBack", "Back");
 
   clearBtn.onclick = () => {
+    FOCUS_ALL = false;
     FOCUS_PICKED.clear();
+    repaintIntensities();
+    sync();
+  };
+
+  /* Whole body is a real pick and not a select-all: it stores the single token
+     "all", the engine expands it and answers it, and the summary says what that
+     answer is before anybody saves it. Pressing it again clears. */
+  allBtn.onclick = () => {
+    FOCUS_ALL = !FOCUS_ALL;
+    FOCUS_PICKED.clear();
+    if (FOCUS_ALL) for (const g of FOCUS_GROUP_ORDER) FOCUS_PICKED.set(g, FOCUS_TIERS.light);
+    repaintTiers();
     repaintIntensities();
     sync();
   };
@@ -5878,7 +6141,7 @@ const emptyLimits = () => ({ hurts: [], missing: [], note: null, updated_at: new
 
 /* The figure has to be exactly the colour the chips are, and --partner has a
    separate value per theme, so it is read off the stylesheet rather than
-   duplicated here. Same argument as FOCUS_PICK_GREEN matching the ring. */
+   duplicated here. Same argument as focusTierRgb() reading the tier hues. */
 function limitWarnRgb() {
   const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(cssVar("--partner"));
   return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : { r: 0xff, g: 0x6b, b: 0x4a };
@@ -16535,14 +16798,22 @@ async function bodyFocusGroup(group) {
 /* Body impact is a viewer, and this is its one way out to a real preference:
    you tapped a muscle to read it, and if that turns out to be the thing you
    care about, saying so here means the next generated week acts on it. The
-   picker in Setup is still where a focus is built or dropped. */
+   picker in Setup is still where a focus is built or dropped, and it is still
+   the only place a level is chosen: this shortcut adds at Secondary, the middle
+   tier, which is what a pick with no level on it has always meant. */
 async function addFocusGroup(group) {
-  const current = (MY_PROFILE?.focus_groups || []).filter((g) => BODY_GROUP_LABELS[g]);
-  if (!group || current.includes(group)) return;
-  if (current.length >= MAX_FOCUS_GROUPS) { toast("Four is plenty, drop one first"); return; }
-  const next = [...current, group];
-  if (!await saveFocusGroups(next)) return;
-  toast("Focus saved: " + next.map((g) => BODY_GROUP_LABELS[g]).join(", "));
+  await ensureFocusBudget();
+  const { all, picked } = focusParseStored(MY_PROFILE?.focus_groups);
+  if (!group || !BODY_GROUP_LABELS[group] || picked.has(group)) return;
+  // Whole body is one token, and adding a group to it is what un-picks it.
+  const next = all ? new Map() : picked;
+  next.set(group, FOCUS_TIERS.secondary);
+  const order = focusOrderOf(next);
+  if (!await saveFocusGroups(order.map(([g, t]) => `${g}:${t}`))) return;
+  const spent = order.reduce((n, [, t]) => n + t, 0);
+  toast(spent > FOCUS_BUDGET_UNITS
+    ? `${BODY_GROUP_LABELS[group]} added. That is over the ${FOCUS_BUDGET_UNITS} point budget, so Focus areas will show what stopped earning.`
+    : `${BODY_GROUP_LABELS[group]} added as a secondary focus.`);
   renderBodyDetail();
 }
 
@@ -16583,8 +16854,11 @@ function renderBodyDetail() {
         : `<div class="bi-detail-pct none">Not hit ${escapeHtml(word)}</div>`}
     </div>
     <div class="bi-detail-bar" style="--heat:${heatOf(f.muscle)}"><i style="--fill:${pct.toFixed(3)}"></i></div>
-    ${(MY_PROFILE?.focus_groups || []).includes(piece.group)
-      ? `<div class="bi-detail-sub" style="margin-top:12px;">${icon("check", 13)} ${escapeHtml(groupLabel)} is one of your focus areas.</div>`
+    ${focusTierOfGroup(piece.group)
+      ? (() => { const t = focusTierOfGroup(piece.group);
+          /* The level is named and counted in pips, never just tinted: this
+             line is the one place outside the picker that reports a tier. */
+          return `<div class="bi-detail-sub bi-focus-tier focus-t${t}" style="margin-top:12px;">${focusPips(t)} ${escapeHtml(groupLabel)} is a <b>${escapeHtml(FOCUS_TIER_WORD[t].toLowerCase())}</b> focus area.</div>`; })()
       : `<button type="button" class="bi-back" id="biFocusAdd" data-group="${piece.group}" style="margin:12px 0 0;">${icon("dumbbell", 13)} Focus on this</button>`}
     ${heads ? `<div class="bi-detail-label">Parts</div><div class="bi-chips">${heads}</div>` : ""}
     <div class="bi-detail-label">${sets > 0 ? "Hit by" : "Try"}</div>
