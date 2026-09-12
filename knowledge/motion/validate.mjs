@@ -137,6 +137,12 @@ function checkMove(name, move) {
   if (keys.length && keys[0].t !== 0) fail(name, "first keyframe must be t 0");
   if (keys.length && keys[keys.length - 1].t !== 1) fail(name, "last keyframe must be t 1");
 
+  if (move.litPeak !== undefined && !(move.litPeak >= 0 && move.litPeak <= 1)) {
+    fail(name, `litPeak ${move.litPeak} is outside 0..1`);
+  }
+  if (move.litFloor !== undefined && !(move.litFloor >= 0 && move.litFloor <= 1)) {
+    fail(name, `litFloor ${move.litFloor} is outside 0..1`);
+  }
   for (const p of move.props || []) {
     if (!PROP_TYPES.includes(p.type)) fail(name, `unknown prop type "${p.type}"`);
   }

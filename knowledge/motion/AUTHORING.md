@@ -390,6 +390,48 @@ view, it is a different set of trade-offs:
   with none of a front view's symmetry.
 - It **does not fix foreshortening**, it trades which limb suffers from it.
 
+### Muscles that fire
+
+The anatomy skin can light the muscles a move works. The caller passes which
+ones and one colour:
+
+```js
+mountMove(canvas, "Goblet Squat", {
+  skin: "anatomy",
+  lit: { muscles: ["quads", "glutes"], color: "#e0521f" },   // the PEAK colour
+});
+```
+
+Intensity is not the caller's job, it is the move's. A muscle fires through the
+rep and lets go at the other end, so the plate ramps between a resting tint and
+the passed colour, and the resting tint is that same colour mixed back toward
+the plate. A muscle at rest still reads as the muscle this exercise works.
+
+The default curve, by loop style:
+
+| loop | curve | peaks at |
+| --- | --- | --- |
+| `pingpong` | ramps to the working end of the rep and eases back, smoothstepped | cycle 0.5, the far keyframe: the bottom of a squat, the top of a curl |
+| `hold` | a slow breathing pulse, because a held position is still working | cycle 0.5 |
+| `oneway` | ramps through the drill and releases as it resets | cycle 0.82, the far keyframe |
+
+Two optional per-move fields override it:
+
+```js
+litPeak: 0.35,     // cycle position of peak effort. Default: the far keyframe.
+litFloor: 0.2,     // resting intensity, 0..1. Default 0.35.
+```
+
+Use `litPeak` when the hard part is not the far end of the rep. A kettlebell
+swing peaks on the way up, not at the top; a negative peaks on the way down.
+Use `litFloor` 0 for a move where the muscle genuinely switches off between
+reps, and leave it alone otherwise: at 0 the plate falls back to plain grey and
+the card stops saying which muscle the exercise is for.
+
+Off-centre peaks wrap correctly (the distance is measured around the cycle), and
+a caller that needs a fixed value can still pass `intensity` in the `lit` object
+to pin it. The mannequin skin ignores all of this.
+
 ### Hands
 
 Five grip states, picked automatically and overridable with `grip: { R: "flat" }`:

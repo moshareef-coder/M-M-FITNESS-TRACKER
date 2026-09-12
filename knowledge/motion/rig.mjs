@@ -689,9 +689,42 @@ export const MUSCLE_GROUPS = [
   "chest", "back", "lats", "shoulders", "traps", "biceps", "triceps", "forearms",
   "abs", "obliques", "lowerback", "glutes", "quads", "hamstrings", "calves",
 ];
+// A muscle is not lit like a light switch. It fires through the rep and lets go
+// at the other end, so the plate ramps between a resting tint and the caller's
+// colour. The colour the app passes stays the PEAK colour; the resting tint is
+// that colour mixed back toward the plate, so a lit muscle at rest still reads
+// as the same muscle.
 function litFill(group, C, lit) {
-  if (lit && lit.color && (lit.muscles || []).includes(group)) return lit.color;
-  return C.plate;
+  if (!lit || !lit.color || !(lit.muscles || []).includes(group)) return C.plate;
+  const i = lit.intensity === undefined ? 1 : clamp(lit.intensity, 0, 1);
+  if (i >= 0.999 || !/^#[0-9a-fA-F]{6}$/.test(lit.color)) return lit.color;
+  return mix(C.plate, lit.color, i);
+}
+
+// Effort over the cycle, 0 at rest and 1 at the working end of the movement.
+//   pingpong  ramps to the far end of the rep and eases back: the bottom of a
+//             squat, the top of a curl
+//   hold      a slow breathing pulse, because a held position is still working
+//   oneway    ramps through the drill and releases as it resets
+// litPeak moves the peak (cycle position, default the far keyframe) and
+// litFloor sets how bright a resting muscle stays.
+export function litIntensity(move, cycle) {
+  const floor = move.litFloor === undefined ? 0.35 : move.litFloor;
+  const peak = move.litPeak === undefined ? (move.loop === "oneway" ? 0.82 : 0.5) : move.litPeak;
+  const c = ((cycle % 1) + 1) % 1;
+  let shape;
+  if (move.loop === "hold") {
+    shape = 0.5 - 0.5 * Math.cos((c - peak + 0.5) * Math.PI * 2);
+  } else if (move.loop === "oneway") {
+    shape = c <= peak ? c / Math.max(0.001, peak) : 1 - (c - peak) / Math.max(0.001, 1 - peak);
+  } else {
+    // Circular distance, so an off-centre peak still meets itself at the wrap.
+    const d = Math.abs(c - peak);
+    shape = 1 - Math.min(d, 1 - d) / 0.5;
+  }
+  shape = clamp(shape, 0, 1);
+  const smooth = shape * shape * (3 - 2 * shape);
+  return clamp(floor + (1 - floor) * smooth, 0, 1);
 }
 // One flat plate riding on a segment. `face` is the projected anterior axis of
 // the bone, so a plate stays on the front of the limb as the camera moves.
@@ -1182,7 +1215,11 @@ export function render(canvas, move, C, cycle, timeSec = 0, opts = {}) {
   const dpr = Math.min(2.5, globalThis.devicePixelRatio || 1);
   const w = canvas.clientWidth || canvas.width || 160;
   const h = canvas.clientHeight || canvas.height || 160;
-  if (canvas.width !== Math.round(w * dpr)) {
+  // Both dimensions, not just the width: a canvas with no width/height
+  // attributes defaults to 300x150, and a 150 CSS px canvas at dpr 2 wants
+  // exactly 300 wide, so a width-only check silently leaves the height at 150
+  // and draws the figure at double scale, cropped.
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
   }
@@ -1198,11 +1235,16 @@ export function render(canvas, move, C, cycle, timeSec = 0, opts = {}) {
     ctx.translate(-cx, -cy);
   }
   const view = opts.view || move.view;
+  // The caller passes which muscles and what peak colour; when they fire is the
+  // move's business, so it is worked out here rather than by every caller.
+  const lit = opts.lit
+    ? { ...opts.lit, intensity: opts.lit.intensity === undefined ? litIntensity(move, cycle) : opts.lit.intensity }
+    : null;
   const S = solvePose(samplePose(move, cycle, timeSec), view);
   S.farSide = move.farSide || null;
   S.facing = move.facing || "toward";
   drawFigure(ctx, S, C, {
-    props: move.props, floor: move.floor, lit: opts.lit,
+    props: move.props, floor: move.floor, lit,
     grip: gripSides(move, S),
     detail: opts.detail === undefined ? w >= 190 : opts.detail,
   });

@@ -12,16 +12,16 @@
 // Importable under plain node (validate.mjs does it): nothing here touches the
 // DOM until mountMove is called.
 
-import { palette, render, samplePose, solvePose, jointAngles, cameraFor, VB, GROUND, PROP_TYPES,
-  LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY } from "./rig.mjs";
+import { palette, render, samplePose, solvePose, jointAngles, cameraFor, litIntensity, VB, GROUND,
+  PROP_TYPES, LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY } from "./rig.mjs";
 import { MOVES as WEIGHT_TRAINING } from "./moves/weight-training.mjs";
 import { MOVES as YOGA } from "./moves/yoga.mjs";
 import { MOVES as PILATES } from "./moves/pilates.mjs";
 import { MOVES as CALISTHENICS } from "./moves/calisthenics.mjs";
 import { MOVES as STRETCHING } from "./moves/stretching.mjs";
 
-export { palette, render, samplePose, solvePose, jointAngles, cameraFor, VB, GROUND, PROP_TYPES,
-  LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY };
+export { palette, render, samplePose, solvePose, jointAngles, cameraFor, litIntensity, VB, GROUND,
+  PROP_TYPES, LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY };
 
 // Keyed by the training id used in knowledge/exercise-library/index.mjs.
 export const MOVES_BY_LIBRARY = {
@@ -111,7 +111,9 @@ export function mountMove(canvas, name, opts = {}) {
     theme: opts.theme || "dark",
     accent: opts.accent || "action",
     skin: opts.skin || "mannequin",
-    // { muscles: ["chest","triceps"], color: "#e0521f" } from bodyHeatRGB
+    // { muscles: ["chest","triceps"], color: "#e0521f" } from bodyHeatRGB. The
+    // colour is the PEAK colour: intensity follows the rep unless the caller
+    // pins it by passing an explicit `intensity`.
     lit: opts.lit || null,
     // camera override: a preset name, or { yaw, pitch, plane }. Null means the
     // move's own view, which is what everything except the lab wants.
