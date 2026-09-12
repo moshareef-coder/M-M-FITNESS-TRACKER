@@ -1853,7 +1853,11 @@
      and a word, so this is the one place in the whole flow where nothing
      scrolls and nothing is hidden by default. */
   .goal-tile-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 6px;
+    /* minmax(0, 1fr), not 1fr. A grid track defaults to a min of auto, so the
+       three tiles refused to go below their own min-content and the page ran
+       49px wider than a 390px phone. Nine tiles, nine reasons nobody noticed:
+       every one of them was cut off past the right edge. */
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 6px;
     transition: transform .28s cubic-bezier(.22,1,.36,1), filter .28s ease;
   }
   .goal-tile-grid.dim { transform: scale(.97); filter: brightness(.9); }
@@ -1861,6 +1865,7 @@
     aspect-ratio: 1; border-radius: 16px; background: var(--panel); border: 1.5px solid var(--border);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
     font-family: inherit; color: var(--text); cursor: pointer; padding: 8px; position: relative;
+    min-width: 0;
     transition: border-color .18s ease, background .18s ease;
   }
   .goal-tile:active { transform: scale(.985); }
@@ -1870,15 +1875,32 @@
     display: flex; align-items: center; justify-content: center; color: var(--accent-ink);
   }
   .goal-tile.on .goal-tile-ico { background: var(--accent); color: var(--on-accent); }
-  .goal-tile-label { font-size: 12.5px; font-weight: 700; letter-spacing: -.01em; text-align: center; line-height: 1.2; }
-  .goal-tile-sub { font-size: 10.5px; color: var(--muted); text-align: center; line-height: 1.25; margin-top: 2px; }
+  .goal-tile-label { font-size: 12.5px; font-weight: 700; letter-spacing: -.01em; text-align: center; line-height: 1.2; max-width: 100%; overflow-wrap: anywhere; }
+  .goal-tile-sub { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.25; margin-top: 2px; max-width: 100%; overflow-wrap: anywhere; }
   .pgs-text { flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: left; }
   .pgs-sub { font-size: 12px; color: var(--muted); font-weight: 500; }
   .pgs-go { color: var(--muted); display: flex; }
+  /* A band across the top of the tile rather than a corner pill: a pill wide
+     enough to hold a word sits on top of the icon at this tile size, and the
+     band is also the thing you can read from across the grid without looking
+     at any one tile. */
   .goal-tile-badge {
-    position: absolute; top: 8px; right: 8px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 100px;
+    position: absolute; top: 0; left: 0; right: 0; height: 18px; border-radius: 14px 14px 0 0;
     background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 800;
+    letter-spacing: .06em; text-transform: uppercase;
     display: flex; align-items: center; justify-content: center;
+  }
+  .goal-tile.on { padding-top: 24px; }
+  /* The main goal wears the accent; an extra goal wears the outline. One look
+     is filled in and one is not, which is the whole point: they are not the
+     same kind of thing and must never read as three equal chips. */
+  /* An extra goal keeps `on`, because A11Y_STATE_MAP mirrors that class into
+     aria-pressed and an extra goal IS selected. `also` then takes the fill
+     back off, which is the whole difference. */
+  .goal-tile.on.also { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--panel); }
+  .goal-tile.on.also .goal-tile-ico { background: var(--panel-2); color: var(--accent-ink); }
+  .goal-tile-badge.alt {
+    background: var(--panel-2); color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 700;
   }
   /* The category sheet reuses .sheet-scrim, the same fixed dark overlay every
      other sheet in the app opens on, so this reads as the app's own bottom
@@ -1909,6 +1931,44 @@
     display: flex; align-items: center; justify-content: center; color: transparent; background: var(--panel);
   }
   .pgs-row.on .pgs-box { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+  .pgs-row.on.alt { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); background: var(--panel-2); }
+  .pgs-row.on.alt .pgs-box { background: var(--panel); border-color: var(--accent); color: var(--accent-ink); }
+  .pgs-tag { font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--accent-ink); flex-shrink: 0; }
+  .pgs-row.on.alt .pgs-tag { color: var(--muted); }
+  /* The sheet no longer closes itself on a pick, so it needs a way out that
+     is a decision rather than an accident. */
+  .pgs-foot {
+    position: sticky; bottom: 0; margin-top: 14px; padding: 12px 0 2px;
+    background: linear-gradient(to bottom, transparent, var(--panel) 22%);
+  }
+  .pgs-foot-note { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 0 0 10px; }
+
+  /* What you have picked, under the grid, in words. The main goal sits on an
+     accent rule and reads a size larger; the extras sit plain underneath it.
+     Rows on hairlines rather than panels, because this whole block already
+     lives inside a .card on the settings page. */
+  .goal-picks { margin-top: 16px; display: flex; flex-direction: column; }
+  .goal-pick { padding: 14px 0 14px 12px; border-top: 1px solid var(--border); border-left: 2px solid transparent; }
+  .goal-pick:first-child { border-top: none; }
+  .goal-pick.main { border-left-color: var(--accent); }
+  .goal-pick-tag { display: block; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .goal-pick.main .goal-pick-tag { color: var(--accent-ink); }
+  .goal-pick-name { display: block; font-size: 15.5px; font-weight: 600; letter-spacing: -.01em; margin-top: 3px; }
+  .goal-pick.main .goal-pick-name { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+  .goal-pick-why { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.45; margin-top: 4px; }
+  .goal-pick-why.flat { color: var(--warn); }
+  .goal-pick-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .goal-pick-acts button {
+    min-height: 44px; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-family: inherit; font-size: 12.5px; font-weight: 700;
+    cursor: pointer; transition: background .15s ease, transform .12s ease;
+  }
+  .goal-pick-acts button:active { transform: scale(.985); background: var(--panel); }
+  .goal-picks-note { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 12px 0 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .goal-tile-grid, .goal-tile:active, .pgs-row:active, .goal-pick-acts button:active { transition: none; transform: none; }
+    .goal-sheet { animation: none; }
+  }
 
   /* renderBodyFocusPage, the Focus areas settings page. The figures themselves
      are .bi-figures / .bi-fig / .bi-canvas, the exact classes Body Impact's own
@@ -5143,11 +5203,16 @@ function renderOnboardIntro(i, data) {
    you are through. Two taps, never a third, which is research/11's rule for
    the first screen.
 
-   Single select, on purpose. The prototype let you pick several; the engine's
-   contract is one goal (goal_bubble and goal_child, see
-   mo-knowledge/engine/CONTRACT.md), and a plan built for two goals is a plan
-   built for neither. The four families with no legacy string still write a
-   valid `goal` ("Stay consistent"), so every existing reader keeps working.
+   One main goal and up to two extras, since 2026-09-12. It used to be one
+   goal and only one, and the reason given was that a plan built for two goals
+   is a plan built for neither. That is still true of the training parameters,
+   and it is still how the engine works: the main goal alone sets rep ranges,
+   rest, session length and day count (goal_bubble and goal_child). An extra
+   goal (goal_secondary) may add three things and nothing else, muscle groups
+   to prioritise, the ten minute mobility cool-down, and cardio. Two extras is
+   the engine's cap, defended in mo-knowledge/engine/README.md, so the picker
+   does not offer a third. The four families with no legacy string still write
+   a valid `goal` ("Stay consistent"), so every existing reader keeps working.
 
    Labels, sub lines and ids come from mo-knowledge/goals/goal-tree.json and
    are used verbatim; the longer phrasings people actually type live there as
@@ -5180,8 +5245,82 @@ function goalTileFor(bubble) { return GOAL_TILES.find((t) => t.id === bubble) ||
 function goalTileLabel(profile) {
   const t = goalTileFor(profile?.goal_bubble);
   if (!t) return profile?.goal || "Not set";
-  const kid = t.kids.find((k) => k.id === profile?.goal_child);
+  return goalPickLabel(profile.goal_bubble, profile.goal_child);
+}
+
+/* The same words from a pair of ids rather than a profile row. The engine
+   reports goals as ids, because it has no label table and cannot read
+   goal-tree.json at runtime; GOAL_TILES is where the words live, so this is
+   the only place an id can be turned back into something a person recognises. */
+function goalPickLabel(bubble, child) {
+  const t = goalTileFor(bubble);
+  if (!t) return bubble || "";
+  const kid = t.kids.find((k) => k.id === child);
   return kid ? `${t.title}, ${kid.label.toLowerCase()}` : t.title;
+}
+
+/* profiles.goal_secondary comes back as an array, as the JSON string a jsonb
+   column round trips as through some clients, as null from a database that
+   does not have the column yet, and as junk from an older client. All four
+   have to mean the same thing as an empty list, because the picker opens on
+   whatever it is handed. */
+function normaliseGoalSecondary(raw) {
+  let v = raw;
+  if (typeof v === "string") { try { v = JSON.parse(v); } catch { return []; } }
+  if (!Array.isArray(v)) return [];
+  const out = [];
+  for (const e of v) {
+    const bubble = e && typeof e === "object" ? e.bubble : null;
+    if (!goalTileFor(bubble)) continue;
+    if (out.some((o) => o.bubble === bubble)) continue;
+    const tile = goalTileFor(bubble);
+    const child = tile.kids.some((k) => k.id === e.child) ? e.child : null;
+    out.push({ bubble, child });
+    if (out.length === 2) break;
+  }
+  return out;
+}
+
+/* What the last plan actually did with the extra goals: meta.goals, straight
+   off the generator, kept per account. Read back in the picker so an extra
+   goal cannot sit there looking active while the engine is on record saying
+   it changed nothing. */
+let GOAL_OUTCOME;
+
+function goalOutcomeKey() { return `ft-goal-outcome:${MY_EMAIL || ""}`; }
+
+function rememberGoalOutcome(goals) {
+  GOAL_OUTCOME = goals && typeof goals === "object" ? goals : null;
+  try {
+    if (GOAL_OUTCOME) localStorage.setItem(goalOutcomeKey(), JSON.stringify(GOAL_OUTCOME));
+    else localStorage.removeItem(goalOutcomeKey());
+  } catch { /* private mode, and the picker just says "not yet" instead */ }
+}
+
+function loadGoalOutcome() {
+  if (GOAL_OUTCOME !== undefined) return GOAL_OUTCOME;
+  try { GOAL_OUTCOME = JSON.parse(localStorage.getItem(goalOutcomeKey()) || "null"); }
+  catch { GOAL_OUTCOME = null; }
+  return GOAL_OUTCOME;
+}
+
+/* One extra goal's verdict, in a sentence, or null when this goal has not been
+   through a generation yet. "We do not know yet" and "it did nothing" are
+   different answers and only one of them is a warning, so they never share a
+   return value. `flat` is the one that is a warning. */
+function goalOutcomeFor(bubble, child) {
+  const g = loadGoalOutcome();
+  if (!g || typeof g !== "object") return null;
+  const same = (e) => e && e.bubble === bubble && (e.child || null) === (child || null);
+  const ignored = (Array.isArray(g.ignored) ? g.ignored : []).find(same);
+  if (ignored) return { flat: true, text: ignored.why || "Your last plan did not use this one." };
+  const hit = (Array.isArray(g.secondary) ? g.secondary : []).find(same);
+  if (!hit) return null;
+  const effect = (Array.isArray(hit.effect) ? hit.effect : []).filter((s) => typeof s === "string" && s.trim());
+  if (!effect.length) {
+    return { flat: true, text: "Changed nothing in your last plan. It asked for no muscle groups, no cool-down and no extra cardio, and those three are all an extra goal can add." };
+  }
+  return { flat: false, text: effect.join(" ") };
 }
 
 /* Onboarding's goal step. Picking advances on its own. The four legacy
@@ -5195,15 +5334,16 @@ function renderGoalTilesStep(data = {}) {
   ob.innerHTML = `
     <div class="ob-step">
       <h1>What do you want?</h1>
-      <p class="sub">Tap one, then tell us what you mean by it.</p>
+      <p class="sub">Tap one, then tell us what you mean by it. You can pick more than one.</p>
       <div class="goal-tile-grid" id="goalTileGrid"></div>
       <button type="button" class="btn-ghost" id="goalBackBtn">Back</button>
     </div>`;
   initGoalTiles($("goalTileGrid"), {
-    selected: { bubble: data.goal_bubble || null, child: data.goal_child || null },
-    onPick: ({ bubble, child, label }) => {
+    confirmLabel: "Continue",
+    selected: { bubble: data.goal_bubble || null, child: data.goal_child || null, secondary: data.goal_secondary },
+    onPick: ({ bubble, child, label, secondary }) => {
       const tile = goalTileFor(bubble);
-      const next = { ...data, goalKey: tile.legacy, goal_bubble: bubble, goal_child: child, goalLabel: label };
+      const next = { ...data, goalKey: tile.legacy, goal_bubble: bubble, goal_child: child, goalLabel: label, goal_secondary: secondary };
       if (tile.askDetail) renderOnboardStep("detail", next);
       else renderOnboardStep("pace", { ...next, detail: child ? label : null });
     },
@@ -5215,38 +5355,144 @@ function renderGoalTilesStep(data = {}) {
    SAME .sheet-scrim overlay every other sheet in the app uses. The first row
    in the sheet is the plain category ("Just lose weight"), for people who do
    not want to be more specific than that. */
-function initGoalTiles(grid, { selected = {}, onPick } = {}) {
-  let openId = null;
+function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my goals" } = {}) {
+  const MAX_EXTRA = 2;   // the engine's cap, and it is argued for in mo-knowledge/engine/README.md
   const scrimId = "goalSheetScrim";
+  let primary = goalTileFor(selected.bubble) ? { bubble: selected.bubble, child: selected.child || null } : null;
+  let extras = normaliseGoalSecondary(selected.secondary).filter((e) => e.bubble !== primary?.bubble);
+  let openId = null;
 
-  function paint() {
+  /* The picks list and the confirm button live next to the grid rather than
+     inside it, and are reused when the settings page is opened a second time. */
+  let picksEl = grid.parentElement.querySelector(".goal-picks");
+  if (!picksEl) {
+    picksEl = document.createElement("div");
+    picksEl.className = "goal-picks";
+    grid.insertAdjacentElement("afterend", picksEl);
+  }
+  let confirmEl = grid.parentElement.querySelector(".goal-confirm");
+  if (!confirmEl) {
+    confirmEl = document.createElement("button");
+    confirmEl.type = "button";
+    confirmEl.className = "btn-primary goal-confirm";
+    picksEl.insertAdjacentElement("afterend", confirmEl);
+  }
+
+  const isMain = (bubble, child) => !!primary && primary.bubble === bubble && (primary.child || null) === (child || null);
+  const extraAt = (bubble, child) => extras.findIndex((e) => e.bubble === bubble && (e.child || null) === (child || null));
+
+  /* One pick per category, which is why a second tap inside a category moves
+     that category's pick rather than adding a second one: "lose belly fat" and
+     "lose the last 10 pounds" are the same goal answered twice. Untapping the
+     main goal promotes the first extra rather than leaving extras with nothing
+     to be extra to. */
+  function choose(bubble, child) {
+    if (isMain(bubble, child)) { primary = extras.shift() || null; return; }
+    const at = extraAt(bubble, child);
+    if (at >= 0) { extras.splice(at, 1); return; }
+    if (primary?.bubble === bubble) { primary = { bubble, child }; return; }
+    const same = extras.findIndex((e) => e.bubble === bubble);
+    if (same >= 0) { extras[same] = { bubble, child }; return; }
+    if (!primary) { primary = { bubble, child }; return; }
+    if (extras.length < MAX_EXTRA) { extras.push({ bubble, child }); return; }
+    toast("Two extra goals is the cap. Remove one first.");
+  }
+
+  function paintGrid() {
     grid.classList.toggle("dim", !!openId);
-    grid.innerHTML = GOAL_TILES.map((t) => `
-      <button type="button" class="goal-tile${selected.bubble === t.id ? " on" : ""}" data-tile="${t.id}">
+    grid.innerHTML = GOAL_TILES.map((t) => {
+      const main = primary?.bubble === t.id;
+      const also = extras.some((e) => e.bubble === t.id);
+      const badge = main ? `<span class="goal-tile-badge">Main</span>`
+        : also ? `<span class="goal-tile-badge alt">Also</span>` : "";
+      return `
+      <button type="button" class="goal-tile${main || also ? " on" : ""}${also ? " also" : ""}" data-tile="${t.id}"
+        aria-label="${escapeHtml(t.title)}${main ? ", your main goal" : also ? ", an extra goal" : ""}">
+        ${badge}
         <span class="goal-tile-ico">${icon(t.ico, 18)}</span>
         <span class="goal-tile-label">${escapeHtml(t.title)}</span>
         <span class="goal-tile-sub">${escapeHtml(t.sub)}</span>
-      </button>`).join("");
+      </button>`;
+    }).join("");
     grid.querySelectorAll("[data-tile]").forEach((b) => {
-      b.onclick = () => { openId = b.dataset.tile; paint(); };
+      b.onclick = () => openSheet(b.dataset.tile);
     });
+  }
 
+  /* The picks, in words, under the grid. The main goal is a size up, on an
+     accent rule, and carries the sentence about what it alone decides; the
+     extras are plain rows under it carrying what the engine said they bought.
+     That difference is the point: they are not three equal chips. */
+  function paintPicks() {
+    const rows = [];
+    if (primary) {
+      rows.push(`
+        <div class="goal-pick main">
+          <span class="goal-pick-tag">Main goal</span>
+          <span class="goal-pick-name">${escapeHtml(goalPickLabel(primary.bubble, primary.child))}</span>
+          <span class="goal-pick-why">This one sets the rep ranges, the rest between sets, how long a session runs and how many days a week. Nothing else does.</span>
+        </div>`);
+    }
+    extras.forEach((e, i) => {
+      const out = goalOutcomeFor(e.bubble, e.child);
+      const why = out ? out.text
+        : "Can add muscle groups to prioritise, a longer cool-down, or more cardio. Your next plan will say which of those it bought.";
+      rows.push(`
+        <div class="goal-pick">
+          <span class="goal-pick-tag">Also</span>
+          <span class="goal-pick-name">${escapeHtml(goalPickLabel(e.bubble, e.child))}</span>
+          <span class="goal-pick-why${out?.flat ? " flat" : ""}">${escapeHtml(why)}</span>
+          <span class="goal-pick-acts">
+            <button type="button" data-promote="${i}">Make this the main one</button>
+            <button type="button" data-drop="${i}">Remove</button>
+          </span>
+        </div>`);
+    });
+    const note = !primary
+      ? "Tap a category, then the version of it you actually mean. The first one you pick is the main goal."
+      : extras.length >= MAX_EXTRA
+        ? "Two extras is the cap. Past two, a third can only ever be told it did nothing."
+        : "You can add up to two extra goals. An extra can add muscle groups to prioritise, a longer cool-down or more cardio, and that is all: the rep ranges, the rest, the session length and the day count belong to the main goal.";
+    picksEl.innerHTML = rows.join("") + `<p class="goal-picks-note">${escapeHtml(note)}</p>`;
+    picksEl.querySelectorAll("[data-promote]").forEach((b) => {
+      b.onclick = () => {
+        const i = Number(b.dataset.promote);
+        const was = primary;
+        primary = extras[i];
+        extras[i] = was;                 // a straight swap, so nobody loses a pick to change their mind
+        paintGrid(); paintPicks(); paintConfirm();
+      };
+    });
+    picksEl.querySelectorAll("[data-drop]").forEach((b) => {
+      b.onclick = () => {
+        extras.splice(Number(b.dataset.drop), 1);
+        paintGrid(); paintPicks(); paintConfirm();
+      };
+    });
+  }
+
+  function paintConfirm() {
+    confirmEl.disabled = !primary;
+    confirmEl.textContent = primary ? confirmLabel : "Pick a goal first";
+  }
+
+  function openSheet(id) {
+    openId = id;
+    const t = goalTileFor(id);
+    if (!t) return;
     let scrim = document.getElementById(scrimId);
-    const t = GOAL_TILES.find((x) => x.id === openId);
-    if (!t) { if (scrim) scrim.classList.add("hidden"); return; }
     if (!scrim) {
       scrim = document.createElement("div");
       scrim.id = scrimId;
       scrim.className = "sheet-scrim hidden";
       grid.parentElement.appendChild(scrim);
     }
-    const row = (id, label, sub) => {
-      const on = selected.bubble === t.id && (selected.child || null) === id;
-      return `<button type="button" class="pgs-row${on ? " on" : ""}" data-pick="${id || ""}">
+    const row = (cid, label, sub) => `
+      <button type="button" class="pgs-row" data-pick="${cid || ""}">
+        <span class="pgs-box">${icon("check", 13)}</span>
         <span class="pgs-text"><span>${escapeHtml(label)}</span>${sub ? `<span class="pgs-sub">${escapeHtml(sub)}</span>` : ""}</span>
-        <span class="pgs-go">${icon("chevronRight", 16)}</span>
+        <span class="pgs-tag"></span>
       </button>`;
-    };
     scrim.classList.remove("hidden");
     scrim.innerHTML = `
       <div class="goal-sheet">
@@ -5259,44 +5505,114 @@ function initGoalTiles(grid, { selected = {}, onPick } = {}) {
           ${row(null, "Just " + t.title.toLowerCase(), t.sub)}
           ${t.kids.map((k) => row(k.id, k.label)).join("")}
         </div>
+        <div class="pgs-foot">
+          <p class="pgs-foot-note" id="goalSheetNote"></p>
+          <button type="button" class="btn-primary" id="goalSheetDone">Done</button>
+        </div>
       </div>`;
-    const close = () => { openId = null; paint(); };
+    /* Picking no longer closes the sheet. It used to, and it read as the app
+       taking the decision off you the instant you touched it: no chance to see
+       what you had chosen, change it, or pick a second thing. The way out is
+       Done, the close button, or a tap on the scrim, all of which are leaving
+       on purpose. */
+    const close = () => { openId = null; if (scrim) scrim.classList.add("hidden"); paintGrid(); };
     scrim.onclick = (e) => { if (e.target === scrim) close(); };
     scrim.querySelector("#goalSheetClose").onclick = close;
+    scrim.querySelector("#goalSheetDone").onclick = close;
     scrim.querySelectorAll("[data-pick]").forEach((b) => {
-      b.onclick = () => {
-        const child = b.dataset.pick || null;
-        const kid = t.kids.find((k) => k.id === child);
-        openId = null;
-        scrim.classList.add("hidden");
-        onPick?.({ bubble: t.id, child, label: kid ? kid.label : t.title });
-      };
+      b.onclick = () => { choose(t.id, b.dataset.pick || null); syncSheet(t); paintPicks(); paintConfirm(); };
     });
+    syncSheet(t);
+    paintGrid();
   }
-  paint();
+
+  /* Repaints the rows in place rather than rebuilding the sheet, so tapping a
+     row does not replay the sheet's slide-up animation under your finger. */
+  function syncSheet(t) {
+    const scrim = document.getElementById(scrimId);
+    if (!scrim) return;
+    scrim.querySelectorAll("[data-pick]").forEach((b) => {
+      const child = b.dataset.pick || null;
+      const main = isMain(t.id, child);
+      const also = extraAt(t.id, child) >= 0;
+      b.classList.toggle("on", main || also);
+      b.classList.toggle("alt", also);
+      b.querySelector(".pgs-tag").textContent = main ? "Main" : also ? "Also" : "";
+    });
+    const note = scrim.querySelector("#goalSheetNote");
+    if (note) {
+      note.textContent = !primary
+        ? "The first goal you pick is the main one, and it sets every training parameter."
+        : extras.length >= MAX_EXTRA
+          ? "That is the main goal and both extras. Tap one again to take it off."
+          : "Picked. Tap another category to add it as an extra, or Done.";
+    }
+  }
+
+  confirmEl.onclick = () => {
+    if (!primary) return;
+    const tile = goalTileFor(primary.bubble);
+    const kid = tile.kids.find((k) => k.id === primary.child);
+    onPick?.({
+      bubble: primary.bubble,
+      child: primary.child,
+      label: kid ? kid.label : tile.title,
+      secondary: extras.map((e) => ({ bubble: e.bubble, child: e.child })),
+    });
+  };
+
+  paintGrid();
+  paintPicks();
+  paintConfirm();
 }
 
 /* The same tiles from Setup, writing straight to the profile. A specific from
    the sheet becomes the goal detail; "Just X" leaves whatever detail was there. */
 function renderGoalPage() {
-  $("goalPageNote").textContent = "Tap one, then what you mean by it. The next plan you generate is built for it.";
+  $("goalPageNote").textContent = "One main goal, and up to two more you also care about. The next plan you generate is built for them.";
   initGoalTiles($("goalPageGrid"), {
-    selected: { bubble: MY_PROFILE?.goal_bubble || null, child: MY_PROFILE?.goal_child || null },
-    onPick: async ({ bubble, child, label }) => {
+    selected: {
+      bubble: MY_PROFILE?.goal_bubble || null,
+      child: MY_PROFILE?.goal_child || null,
+      secondary: MY_PROFILE?.goal_secondary,
+    },
+    onPick: async ({ bubble, child, label, secondary }) => {
       const tile = goalTileFor(bubble);
       const legacy = GOALS.find((g) => g.key === tile.legacy);
       /* Upsert on the email key, the way every other profile write here is
          done (saveSetup, saveFocusGroups), rather than update().eq(): one
-         write path, and it is the one the sandbox's fake client persists. */
-      const patch = { email: MY_EMAIL, user_name: ME, goal: legacy.goal, goal_bubble: bubble, goal_child: child, updated_at: new Date().toISOString() };
+         write path, and it is the one the sandbox's fake client persists.
+         All four goal fields go in one write, so no reader ever sees a legacy
+         string that disagrees with the ids next to it. */
+      const patch = {
+        email: MY_EMAIL, user_name: ME, goal: legacy.goal,
+        goal_bubble: bubble, goal_child: child, goal_secondary: secondary || [],
+        updated_at: new Date().toISOString(),
+      };
       if (child) patch.goal_detail = label;
-      const { error } = await sb.from("profiles").upsert(patch);
+      const { error, droppedSecondary } = await upsertGoalFields(patch);
       if (error) { toast("Could not save the goal"); console.error(error); return; }
       await loadAll();
-      toast("Goal updated");
+      toast(droppedSecondary ? "Main goal saved. The extra goals are not being stored yet." : "Goal updated");
       closeSettingsPage();
     },
   });
+}
+
+/* profiles.goal_secondary is behind a migration that is written and not
+   applied, so right now every account is on a database without that column and
+   a write that mentions it comes back PGRST204. Dropping the field and writing
+   the rest is the only version of this that does not lose somebody's main goal
+   over a column that does not exist yet. It reports what it dropped rather
+   than swallowing it, because "saved" when the extras were not saved is the
+   kind of quiet lie this app does not tell. */
+async function upsertGoalFields(patch) {
+  const { data, error } = await sb.from("profiles").upsert(patch).select().maybeSingle();
+  const missing = error && /goal_secondary/.test(`${error.message || ""} ${error.details || ""} ${error.hint || ""}`);
+  if (!missing) return { data, error, droppedSecondary: false };
+  const { goal_secondary, ...rest } = patch;
+  const retry = await sb.from("profiles").upsert(rest).select().maybeSingle();
+  return { data: retry.data, error: retry.error, droppedSecondary: !retry.error };
 }
 
 /* The Focus areas page, opened from Setup. Went through a zoom-on-tap pass,
@@ -5304,22 +5620,28 @@ function renderGoalPage() {
    need zoom at all, so both are gone. A tap only ever marks or unmarks the
    group it belongs to, full stop.
 
-   Four is the cap, because the engine gives a picked group 1.4x its weekly
-   sets out of a fixed weekly volume: past four the plan is the same plan with
-   a longer explanation. That is why there is no Full body button any more,
-   only Clear all. */
+   A tap does not toggle any more, it cycles: nothing, Light, Secondary, Main,
+   and round to nothing again, so a mis-tap is always one more tap from undone
+   and there is no clear control to go hunting for. Each level is worth a
+   different multiplier on the group's weekly sets (1.2x, 1.4x, 1.75x) and
+   costs a different share of one fixed budget, which is why there is no longer
+   a count cap. See the emphasis budget note below. */
 function renderBodyFocusPage() {
   $("focusPickRoot").innerHTML = `
     <div class="card">
       <h2>Which muscles do you want to focus on?</h2>
-      <p class="muted-note">Tap up to ${MAX_FOCUS_GROUPS}. Each one earns extra sets in the workouts you generate.</p>
+      <p class="muted-note">Tap a muscle to mark it lightly. Tap it again to push it up a level, and once more to clear it.</p>
       <div class="bi-figures" id="focusPickFigures">
         <div class="bi-fig" data-view="Front"><canvas id="focusPickFront" class="bi-canvas"></canvas></div>
         <div class="bi-fig" data-view="Back"><canvas id="focusPickBack" class="bi-canvas"></canvas></div>
       </div>
+      <div class="focus-legend">${focusTierLegend()}</div>
       <div class="focus-pick-actions">
+        <button type="button" class="focus-pick-action" id="focusPickAll">${icon("target", 13)} Whole body</button>
         <button type="button" class="focus-pick-action" id="focusPickClear">${icon("close", 13)} Clear all</button>
       </div>
+      <div class="focus-budget" id="focusPickBudget"></div>
+      <div class="focus-tier-list" id="focusPickList"></div>
       <p class="focus-pick-summary" id="focusPickSummary">Loading the figure...</p>
     </div>
     <button type="button" class="btn-primary" id="focusPickSaveBtn">Save focus</button>`;
@@ -5955,6 +6277,7 @@ function renderOnboardStep(step, data = {}) {
       goal: g.goal,
       goal_bubble: data.goal_bubble || null,
       goal_child: data.goal_child || null,
+      goal_secondary: data.goal_secondary || [],
       goal_detail: data.detail || null,
       focus: g.focus,
       challenge_target: days,
@@ -5974,18 +6297,23 @@ async function finishOnboarding(data) {
   ME = data.name;
   // Biometrics are no longer asked for up front. They are optional refinements
   // in Setup, because every question before the plan is a chance to lose someone.
-  const { data: saved, error } = await sb.from("profiles").upsert({
+  /* Through upsertGoalFields, not straight at the table: goal_secondary is
+     behind an unapplied migration, and a first-run setup must not fail on a
+     column that does not exist yet. */
+  const { data: saved, error, droppedSecondary } = await upsertGoalFields({
     email: MY_EMAIL,
     user_name: ME,
     focus: data.focus,
     goal: data.goal,
     goal_bubble: data.goal_bubble || null,
     goal_child: data.goal_child || null,
+    goal_secondary: data.goal_secondary || [],
     goal_detail: data.goal_detail || null,
     challenge_target: data.challenge_target || 4,
     updated_at: new Date().toISOString(),
-  }).select().maybeSingle();
+  });
   if (error) { toast("Setup failed, try again"); console.error(error); return; }
+  if (droppedSecondary && (data.goal_secondary || []).length) toast("Your extra goals are not being stored yet.");
   MY_PROFILE = saved;
   clearObDraft();
   if (data.goal_key) await setActiveGoal(data);
@@ -11537,6 +11865,10 @@ async function generateWorkout(forDate, { sameAgain = false } = {}) {
         limits: MY_PROFILE?.limits ?? null,
         goal_bubble: MY_PROFILE?.goal_bubble ?? null,
         goal_child: MY_PROFILE?.goal_child ?? null,
+        /* The "and also" goals. null on a database without the column yet, and
+           the contract says null, [] and nonsense all mean the same as not
+           sending it, so this line is safe before the migration runs. */
+        goal_secondary: MY_PROFILE?.goal_secondary ?? null,
         history,
         logs: recentLogs,
         plans: recentPlans,
@@ -11564,6 +11896,12 @@ async function generateWorkout(forDate, { sameAgain = false } = {}) {
     }
     if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
     if (!data.workout?.exercises?.length) throw new Error("Coach returned an empty workout");
+
+    /* meta.goals is the engine's read-back of what each extra goal actually
+       bought, and an empty `effect` means it bought nothing. It names ids, not
+       labels, so the goal picker is the only screen that can turn it into a
+       sentence with a goal's name in it. Kept here for that. */
+    rememberGoalOutcome(data.meta?.goals);
 
     /* data.honest is not written here: ai_workouts has no column for it, and
        migrations are owned elsewhere. It lives as long as the reveal sheet
