@@ -1907,3 +1907,107 @@ test("a tier costs its own number, which is what the picker mirrors", () => {
   assert.equal(4 * TIER_COST[TIERS.secondary], 8, "four yellows fit");
   assert.ok(5 * TIER_COST[TIERS.secondary] > FOCUS_BUDGET, "five do not, same as the old cap");
 });
+
+/* ---------- audit of 2026-09-12: finding 1, the weekly target ---------- */
+
+/* The history the sweep uses to reach the top two levels: enough sessions, and
+   the weight climbing one step every six of them so nothing reads as a stall. */
+function longHistory(weeks) {
+  const names = ["Barbell Bench Press", "Barbell Back Squat", "Barbell Row", "Overhead Press",
+    "Romanian Deadlift", "Lat Pulldown", "Dumbbell Curl", "Leg Press"];
+  const logs = [];
+  const total = weeks * 3;
+  for (let s = 0; s < total; s++) {
+    const back = Math.round((total - 1 - s) * (7 / 3));
+    for (let k = 0; k < 4; k++) {
+      logs.push({ entry_date: day(-back), exercise_name: names[(s * 4 + k) % names.length], sets: 3, reps: 8, weight: 100 + 5 * Math.floor(s / 6) });
+    }
+  }
+  return logs;
+}
+
+test("a weekly target never asks for more sets than the split can physically deliver", () => {
+  /* Finding 1. The target used to be the level's number whatever the split was,
+     so a three day Push/Pull/Legs week asked 14 triceps sets of one slot that
+     tops out at 6 and filed the gap as the plan falling short. 71% of every
+     intermediate group and 78% of every advanced one landed under 0.8 of target
+     and nothing anywhere overshot, which is a constant being subtracted rather
+     than a measurement. */
+  const today = new Date("2026-09-10T12:00:00");
+  for (const [weeks, days] of [[26, 3], [26, 5], [78, 3], [78, 4], [78, 5]]) {
+    const out = generateFromPayload(
+      { goal_bubble: "build-muscle", challenge_target: days, current_weight: 195, sex: "Male", logs: longHistory(weeks) },
+      { today, includePlan: true },
+    );
+    for (const [group, v] of Object.entries(out.plan.weeklyVolume)) {
+      /* Six sets is the top of the per-session clamp, two on a short day, so
+         this is the arithmetic ceiling of the week and not a preference. */
+      let deliverable = 0;
+      for (const d of out.plan.week) for (const e of d.exercises) if (e.group === group) deliverable += d.short ? 2 : 6;
+      assert.ok(v.target <= deliverable, `${days}d ${group}: target ${v.target} over a ceiling of ${deliverable}`);
+    }
+  }
+});
+
+test("a group the split touches once a week says so instead of reporting a shortfall", () => {
+  const today = new Date("2026-09-10T12:00:00");
+  const out = generateFromPayload(
+    { goal_bubble: "build-muscle", challenge_target: 3, current_weight: 195, sex: "Male", logs: longHistory(78) },
+    { today, includePlan: true },
+  );
+  assert.equal(out.meta.level, "advanced", "the history reaches the level the finding is about");
+  const capped = out.plan.volumeNotes.frequencyCapped;
+  assert.ok(capped.length, "the three day split caps somebody");
+  const tri = capped.find((c) => c.group === "triceps");
+  assert.ok(tri, "triceps is one of them on Push/Pull/Legs");
+  assert.equal(tri.sessions, 1, "and it is trained once");
+  assert.ok(tri.wanted > tri.target, `the level wanted ${tri.wanted} and the week aims at ${tri.target}`);
+  /* The ledger carries both numbers, so nothing downstream has to guess which
+     of the two it is looking at. */
+  assert.equal(out.plan.weeklyVolume.triceps.target, tri.target);
+  assert.equal(out.plan.weeklyVolume.triceps.wanted, tri.wanted);
+  /* And it reaches the person rather than only the ledger. */
+  assert.ok(out.notes.some((n) => /top out below what your level/.test(n)), "a dayNote says it out loud");
+  /* A capped group is not also reported as a shortfall the week could have
+     closed: that was the double-counting the finding is about. */
+  for (const u of out.plan.volumeNotes.under) {
+    assert.ok(!capped.some((c) => c.group === u.group), `${u.group} is either capped or short, never filed as both`);
+  }
+});
+
+test("no weekly ask goes past the MRV in volume-landmarks.md, focus tiers included", () => {
+  /* The focus-tier work left this open: an advanced base of 16 with a red focus
+     asks for 28 weekly sets, past every MRV in the table, and the only reason
+     nobody was prescribed 28 was the session clamp catching it on the way out.
+     The ceiling is now explicit, so it holds whatever the clamp does. */
+  const MRV = { chest: 22, lats: 25, shoulders: 24, quads: 20, hamstrings: 18, glutes: 18, biceps: 22, triceps: 20, calves: 22, abs: 20, obliques: 20 };
+  const today = new Date("2026-09-10T12:00:00");
+  for (const focus of [["chest:3", "triceps:3"], ["lats:3", "biceps:3"], ["quads:3", "glutes:3"]]) {
+    for (const days of [2, 3, 4, 5]) {
+      const out = generateFromPayload(
+        { goal_bubble: "build-muscle", challenge_target: days, current_weight: 195, sex: "Male", logs: longHistory(78), focus_groups: focus },
+        { today, includePlan: true },
+      );
+      for (const [group, v] of Object.entries(out.plan.weeklyVolume)) {
+        if (!MRV[group]) continue;
+        assert.ok(v.wanted <= MRV[group], `${days}d ${group}: asked for ${v.wanted}, MRV is ${MRV[group]}`);
+        assert.ok(v.sets <= MRV[group], `${days}d ${group}: prescribed ${v.sets}, MRV is ${MRV[group]}`);
+      }
+    }
+  }
+});
+
+test("the MRV ceiling never takes back the set a focus tier guarantees", () => {
+  /* The ceiling caps the boosted week before the divide and sits outside the +1
+     guarantee on purpose: an ask past what a week can recover from is a reason
+     to stop adding, not a reason to make the colour mean nothing. */
+  const today = new Date("2026-09-10T12:00:00");
+  const base = { goal_bubble: "build-muscle", challenge_target: 4, current_weight: 195, sex: "Male", logs: longHistory(78) };
+  const without = generateFromPayload(base, { today, includePlan: true });
+  const withFocus = generateFromPayload({ ...base, focus_groups: ["hamstrings:3", "glutes:3"] }, { today, includePlan: true });
+  for (const g of ["hamstrings", "glutes"]) {
+    const before = without.plan.weeklyVolume[g]?.sets ?? 0;
+    const after = withFocus.plan.weeklyVolume[g]?.sets ?? 0;
+    assert.ok(after >= before, `${g}: ${before} sets without the focus, ${after} with, and 18 is its MRV`);
+  }
+});

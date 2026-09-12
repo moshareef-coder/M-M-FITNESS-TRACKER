@@ -94,7 +94,10 @@ note when there is one (today: the sentence saying a whole-body pick changed
 nothing). It carries the limits summary, the
 softened warning when a slot kept a movement that loads a joint they said
 hurts, the over-budget number, the day-count clamp, the capacity shortening,
-the plateau answers. Until 2026-09-10 all of it was computed and none of it
+the plateau answers, and, new on 2026-09-12, the sentence naming the muscle
+groups whose weekly sets are capped by how often the split trains them ("more
+of those muscles means another day in the week, not more sets in the days you
+have"). Nothing in `meta` changed shape for it. Until 2026-09-10 all of it was computed and none of it
 left the engine. Render it under `honest` in the reveal; nothing needs storing,
 `ai_workouts` does not store `honest` either.
 
@@ -252,7 +255,7 @@ One line each, so a screen can say what an answer buys.
 | `plans` | joined with logs to calibrate: last week too hard makes this one lighter, and it says so |
 | `history` | starting loads only. It has no dates, so it can never set an experience level |
 | `focus` | which day of the rotation comes back |
-| `focus_groups` | a weekly sets multiplier per group, by tier: 1.75x red, 1.4x yellow, 1.2x green. Merged with the goal's own priority list, which enters at yellow and acts as a floor, so a tap never buys a group less than no tap would. Capped by an emphasis budget rather than by a count, and what did not fit is named in `meta.focus.why`. Every group at one tier is not a focus and comes back as none, with a sentence in `notes` saying so |
+| `focus_groups` | a weekly sets multiplier per group, by tier: 1.75x red, 1.4x yellow, 1.2x green. Merged with the goal's own priority list, which enters at yellow and acts as a floor, so a tap never buys a group less than no tap would. Capped by an emphasis budget rather than by a count, and what did not fit is named in `meta.focus.why`. Every group at one tier is not a focus and comes back as none, with a sentence in `notes` saying so. The weekly ask is capped at the group's MRV from `knowledge/principles/volume-landmarks.md`, so a red focus on an advanced lifter asks for that muscle's ceiling rather than 16 x 1.75 = 28; the cap moves no set count today, since the per-session clamp already binds first |
 | `focus_chosen_at` | reports staleness past 60 days. Nothing acts on it yet |
 | `limits.hurts` | removes every movement `joint-load.mjs` says loads that joint heavily. A slot the library cannot otherwise fill keeps its least loaded option and the plan says so out loud rather than pretending |
 | `limits.missing` | narrows the equipment the plan may prescribe at all. This one is hard: a slot with nothing left is dropped, because a barbell they do not own is not a workout |

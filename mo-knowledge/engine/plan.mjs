@@ -37,13 +37,39 @@ const CALIS = TRAININGS.find((t) => t.id === "calisthenics");
    beginners: research/09 says the first weeks decide retention, and nobody ever
    quit because week one was too easy. */
 const BASE_WEEKLY_SETS = { beginner: 8, novice: 10, intermediate: 14, advanced: 16 };
-/* The multiplier a prioritised group earns, by focus tier: 1.6 red, 1.4 yellow,
-   1.2 green, and 1.0 for everything else. Tier 0 is "not a priority" and is the
+/* The multiplier a prioritised group earns, by focus tier: 1.75 red, 1.4
+   yellow, 1.2 green, and 1.0 for everything else. Tier 0 is "not a priority" and is the
    only entry this file invents; the other three, and the reasoning for the 0.2
    step between them, live in engine/focus.mjs next to the tiers themselves.
    A goal's own priority list has no tiers and lands on the middle one, which is
    the flat 1.4x this constant used to be. */
 const PRIORITY_MULTIPLIER = { 0: 1, ...TIER_MULTIPLIER };
+
+/* MRV, the weekly ceiling, straight off the table in
+   knowledge/principles/volume-landmarks.md. Past it "fatigue outpaces recovery
+   and performance degrades even though more sets feels like it should mean more
+   progress", which is a different claim from the clamp in `setsFor`: that one is
+   about what a session can hold, this one is about what a week can recover from.
+
+   It exists because the focus tiers could ask for a number no source in
+   knowledge/ supports. An advanced base of 16 with a red focus is 16 x 1.75 =
+   28 weekly sets, past the highest MRV in the table for any muscle, and the
+   only reason nobody was ever prescribed 28 was the session clamp catching it
+   on the way out. A ceiling the engine happens to be saved from by an unrelated
+   limit is not a ceiling.
+
+   It caps the ASK and not the prescription, and measurably so: the session
+   clamp binds first in every combination the sweep covers, so turning this on
+   moved no set count and no warning total. What it changes is the largest
+   number the ledger can carry, which was 28 and is now the muscle's own MRV.
+   The table's rows are the groups it names, so "Back (lats/rows)" is lats and
+   "Abs/core" covers abs and obliques. Traps and forearms have no row and are
+   left uncapped rather than given an invented number; every split in this file
+   touches them once a week, so the frequency cap below is what binds on them. */
+const WEEKLY_MRV = {
+  chest: 22, lats: 25, shoulders: 24, quads: 20, hamstrings: 18,
+  glutes: 18, biceps: 22, triceps: 20, calves: 22, abs: 20, obliques: 20,
+};
 
 /* A short day is fewer sets and less time, not half a session. It used to hand
    back the main slots alone, which is two exercises on a push or a pull day, and
@@ -51,6 +77,15 @@ const PRIORITY_MULTIPLIER = { 0: 1, ...TIER_MULTIPLIER };
    to four and the sets come down instead. */
 const SHORT_DAY_MIN = 4;
 const SHORT_DAY_SETS = 2;
+
+/* The top of the per-session sets clamp, named because two things now read it.
+   `setsFor` clamps to [2, MAX_SETS_PER_SESSION] because a session is what a
+   person reads and eleven sets of one movement is not a session; the weekly
+   ledger reads it to work out what a split can physically deliver in a week.
+   It was a bare 6 inside setsFor and the ledger had no way to know about it,
+   which is how a weekly target of 14 could be asked of a slot that tops out at
+   6 and the shortfall be filed as the plan's fault. */
+const MAX_SETS_PER_SESSION = 6;
 
 /* How far a group's weekly total is allowed to drift from its target before the
    plan does something about it. Two sets, because the target is itself a round
@@ -111,15 +146,21 @@ function estimateMinutes(exercises) {
       stall: the cut moved 2 slots out of 11. Now a main lift always gives up a
       set to a back-off, floor 2, and the only thing that can swallow it is the
       floor itself, which is a real limit rather than an accident of ordering. */
-function setsFor({ base, hitCount, tier, backOff, isMain }) {
+function setsFor({ base, hitCount, tier, backOff, isMain, ceiling = Infinity }) {
   const per = (weekly) => Math.round(weekly / Math.max(1, hitCount));
   const plain = per(base);
   /* The +1 guarantee is a floor and not a bonus, so it is the same +1 at every
      tier. A group somebody marked green has to come back with more sets than an
      identical group they did not mark, or the colour was decoration; how much
-     more than that is the multiplier's job. */
-  const wanted = tier ? Math.max(per(base * PRIORITY_MULTIPLIER[tier]), plain + 1) : plain;
-  const sets = Math.max(2, Math.min(6, wanted));
+     more than that is the multiplier's job.
+
+     `ceiling` is the group's MRV and it caps the boosted week before the divide,
+     never the +1: a focus still always earns its set, because an ask past what a
+     week can recover from is a reason to stop adding, not a reason to take the
+     colour back. It sits outside the Math.max for exactly that reason. */
+  const boosted = Math.min(base * PRIORITY_MULTIPLIER[tier], ceiling);
+  const wanted = tier ? Math.max(per(boosted), plain + 1) : plain;
+  const sets = Math.max(2, Math.min(MAX_SETS_PER_SESSION, wanted));
   if (!backOff) return sets;
   /* The accessories take the 0.85 they always took. A main lift takes whichever
      is smaller, so the cut is never less than one set: that is the whole promise
@@ -635,7 +676,10 @@ export function buildPlan({
       const tier = tierFor(group);
       const priority = tier > 0;
       const isMain = slot.role === "main";
-      const full = setsFor({ base: baseSets, hitCount: hits[group] || 1, tier, backOff, isMain });
+      const full = setsFor({
+        base: baseSets, hitCount: hits[group] || 1, tier, backOff, isMain,
+        ceiling: WEEKLY_MRV[group] ?? Infinity,
+      });
       /* A short day is the session they were least likely to make, so it stays
          small however the multipliers landed. */
       const sets = isShort ? SHORT_DAY_SETS : full;
@@ -711,7 +755,57 @@ export function buildPlan({
      days, which is the same direction her loop corrects in: the days furthest
      from being decided are the ones that give the sets back.
      Accessories only. A main movement is the reason the day exists. */
-  const weeklyTargetFor = (group) => baseSets * PRIORITY_MULTIPLIER[tierFor(group)];
+  /* What the LEVEL asks for, before the week is allowed to argue with it. This
+     is the number BASE_WEEKLY_SETS and the focus multiplier between them come
+     to, and it is still the number every set count is divided out of in
+     `setsFor`. It is kept separate from the target below because the two mean
+     different things now and the ledger reports both. */
+  const wantedFor = (group) =>
+    Math.min(baseSets * PRIORITY_MULTIPLIER[tierFor(group)], WEEKLY_MRV[group] ?? Infinity);
+
+  /* What this week could spend on a group if every one of its exercises ran at
+     the top of the clamp. A group the split touches once cannot be handed more
+     than MAX_SETS_PER_SESSION however loudly the level asks, and a short day
+     cannot be handed more than SHORT_DAY_SETS, so this is the ceiling the plan
+     is physically built out of rather than an opinion about training.
+
+     Counted off the week rather than off `hits`, because the time trim can drop
+     an accessory after `hits` was taken and a group that lost its only
+     accessory to the clock really can deliver less this week. */
+  const deliverableFor = (group) => {
+    let cap = 0;
+    for (const d of week) {
+      for (const e of d.exercises) {
+        if (e.group === group) cap += d.short ? SHORT_DAY_SETS : MAX_SETS_PER_SESSION;
+      }
+    }
+    return cap;
+  };
+
+  /* The target the week is actually held to, and the finding-1 fix. It used to
+     be `wantedFor` alone, which asked a three day Push/Pull/Legs week for 14
+     triceps sets out of one triceps slot that tops out at 6, and then filed the
+     8 set gap as the plan's fault. The sweep measured that as 71% of every
+     intermediate group and 78% of every advanced one landing under 0.8 of
+     target, with nothing anywhere overshooting: a ledger that is wrong in one
+     direction only is not measuring, it is subtracting a constant.
+
+     knowledge/principles/volume-landmarks.md is explicit that the weekly number
+     is not a property of the lifter alone: "a new trainee or someone training
+     2-3 days/week should sit near MEV-to-low-MAV per muscle", and "someone
+     training hard 4-6 days/week with a real history can run mid-to-high MAV".
+     BASE_WEEKLY_SETS reads level and never read frequency, so an advanced
+     lifter on three days a week was being handed the 4-6 day number. Capping
+     the target at what the split can deliver is that sentence, applied per
+     group instead of per person, since frequency is a per-group fact: the same
+     three day week hits lats four times and forearms once.
+
+     This changes no prescription. `setsFor` still divides `wantedFor` and still
+     clamps, so the sets on the card are the sets that were there yesterday.
+     What changes is what the plan claims it was aiming at, and the gap between
+     the two is now said out loud in `volumeNotes.frequencyCapped` rather than
+     shown as a shortfall the week could have closed and did not. */
+  const weeklyTargetFor = (group) => Math.min(wantedFor(group), deliverableFor(group));
   const plannedByGroup = () => {
     const totals = {};
     for (const d of week) for (const e of d.exercises) totals[e.group] = (totals[e.group] || 0) + e.sets;
@@ -834,13 +928,54 @@ export function buildPlan({
      which is the same data with a way to get them out of step. */
   const weeklyVolume = {};
   for (const [group, sets] of Object.entries(finalTotals)) {
-    weeklyVolume[group] = { sets, target: +weeklyTargetFor(group).toFixed(1) };
+    /* `wanted` rides alongside because the two are a different claim now.
+       `target` is what this week was held to and `wanted` is what the level
+       would have asked for at a frequency this split does not have, so a
+       reader can tell "you hit your number" from "your number was lowered to
+       what one session a week can hold". Equal on most groups, and the entry
+       carries both rather than only the difference so nothing downstream has
+       to know which case it is looking at. */
+    weeklyVolume[group] = {
+      sets,
+      target: +weeklyTargetFor(group).toFixed(1),
+      wanted: +wantedFor(group).toFixed(1),
+    };
   }
+
+  /* The gap the cap above stopped pretending was a shortfall. A group the split
+     touches once a week, or twice on an advanced target, cannot reach the
+     level's number out of the slots it has, and that is a fact about the split
+     rather than about the week: the answer is another training day or a
+     different split, and neither is a decision a ledger gets to make. So it is
+     reported, and one sentence reaches dayNotes, on the same principle as the
+     over-budget day and the softened limit: the uncomfortable number gets said
+     rather than absorbed. */
+  const frequencyCapped = [];
+  for (const group of Object.keys(finalTotals)) {
+    const wanted = wantedFor(group);
+    const deliverable = deliverableFor(group);
+    if (deliverable >= wanted - VOLUME_SLACK) continue;
+    const sessions = week.reduce((n, d) => n + d.exercises.filter((e) => e.group === group).length, 0);
+    frequencyCapped.push({
+      group, wanted: +wanted.toFixed(1), target: +deliverable.toFixed(1), sessions,
+      why: `${group} gets ${sessions === 1 ? "one session" : `${sessions} sessions`} a week on this split, which tops out at `
+        + `${deliverable} sets. Your level asks for ${+wanted.toFixed(1)}, so the week aims at ${deliverable} and the rest `
+        + `needs another training day rather than more sets in the one you have.`,
+    });
+  }
+  if (frequencyCapped.length) {
+    const names = frequencyCapped.map((f) => f.group);
+    const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+    dayNotes.push(`This split trains ${list} once or twice a week, so their weekly sets top out below what your `
+      + `level would otherwise ask for. That is the split talking, not the effort: more of those muscles means `
+      + `another day in the week, not more sets in the days you have.`);
+  }
+
   const volumeUnder = [];
   for (const [group, planned] of Object.entries(finalTotals)) {
     const target = weeklyTargetFor(group);
     if (planned >= target - VOLUME_SLACK) continue;
-    const room = week.some((d) => d.exercises.some((e) => e.group === group && roleOf.get(e) === "accessory" && e.sets < 6));
+    const room = week.some((d) => d.exercises.some((e) => e.group === group && roleOf.get(e) === "accessory" && e.sets < MAX_SETS_PER_SESSION));
     if (!room) continue;
     volumeUnder.push({
       group, target: +target.toFixed(1), planned,
@@ -947,7 +1082,7 @@ export function buildPlan({
        the ledger rather than inside it so that `weeklyVolume` stays a plain map
        from group to numbers and a caller can iterate it without having to know
        which keys are muscles and which are bookkeeping. */
-    volumeNotes: { trimmed: volumeTrimmed, over: volumeOver, under: volumeUnder, timeTrimmed, overBudget },
+    volumeNotes: { trimmed: volumeTrimmed, over: volumeOver, under: volumeUnder, frequencyCapped, timeTrimmed, overBudget },
     cardio: P.cardio,
     /* What was asked for, what it cost, and what it could not buy. `excluded`
        is every movement the joint table ruled out across both libraries, not

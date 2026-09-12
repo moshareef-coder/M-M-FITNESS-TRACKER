@@ -348,9 +348,27 @@ function checkOne(input, out) {
   }
 
   /* ---- the weekly ledger ---- */
+  /* What the week could spend on a group if every one of its exercises ran at
+     the top of the per-session clamp, which is 6, or 2 on a short day. Written
+     out here rather than imported, on the same principle as the rest of this
+     file: the sweep checks the engine's claim against an independent sum, and a
+     sum that imported the engine's own constant would agree with it by
+     construction. Finding 1 of the 2026-09-10 audit is the reason: a target
+     above this number is one the split was never going to reach, and it used to
+     be three quarters of every intermediate and advanced row. */
+  const deliverable = {};
+  for (const d of plan.week || []) {
+    for (const e of d.exercises) deliverable[e.group] = (deliverable[e.group] || 0) + (d.short ? 2 : 6);
+  }
   for (const [group, row] of Object.entries(plan.weeklyVolume || {})) {
     if (!(row.sets >= 0)) fail("volume-ledger", input, `${group} sets ${JSON.stringify(row.sets)}`);
     if (!(row.target > 0)) fail("volume-ledger", input, `${group} target ${JSON.stringify(row.target)}`);
+    if (row.target > (deliverable[group] ?? 0)) {
+      fail("volume-target-unreachable", input, `${group} target ${row.target} over a ceiling of ${deliverable[group] ?? 0}`);
+    }
+    if (!(row.wanted >= row.target)) {
+      fail("volume-ledger", input, `${group} wanted ${JSON.stringify(row.wanted)} under target ${row.target}`);
+    }
     if (row.target > 0) ratios.push({ level: out.meta.level, days: plan.days, group, ratio: row.sets / row.target });
   }
 

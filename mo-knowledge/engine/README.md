@@ -883,14 +883,10 @@ moves between commits is a change somebody should be able to explain.
 
 **Measured and left open, in the order a user would notice:**
 
-1. **Volume above beginner is mostly under target, by design of the clamp.**
-   Three quarters of every group in every intermediate and advanced plan lands
-   under 0.8 of its weekly target (83% intermediate at 3 days, 88% advanced at
-   5). Cause: `setsFor` clamps to `[2, 6]` per session and a group hit once a
-   week wants 14 or 16. Nothing overshoots above beginner. Two honest fixes:
-   scale the target to the frequency the split can deliver, or give the split
-   a second weekly touch per group (the 4 day upper/lower already does, which
-   is why it is the least bad). Product call.
+1. ~~**Volume above beginner is mostly under target, by design of the clamp.**~~
+   **Fixed on 2026-09-12: the target is scaled to the frequency the split
+   delivers.** See "Finding 1, and why the target was the thing that was wrong"
+   below for the numbers on both options.
 2. **There is no calendar.** `restDays: 7 - days` is read by the demo only; the
    app's rest day is a separate 2-a-week streak token; nothing places a day on
    a weekday and the week never says "today is a rest day". Spacing between
@@ -911,3 +907,176 @@ clean plans; the novice band (weeks 7 to 20) is never swept because the four
 history lengths land either side of it; `over-time-budget` rose from 704 to
 1,268 days when the drop lever stopped removing priority work, which is the
 honest number replacing a quiet deletion.
+
+## Finding 1, and why the target was the thing that was wrong
+
+Resolved 2026-09-12. The sweep's first finding was that three quarters of every
+intermediate and advanced group landed under 0.8 of its weekly target and
+nothing above beginner ever overshot. A ledger that is wrong in one direction
+only is not measuring anything; it is subtracting a constant. Two fixes were
+named at the time and they are not the same kind of change, so both were built
+and measured before either was kept.
+
+**Option A, scale the target to the frequency the split delivers.** Bookkeeping.
+Nobody's training moves by one set; the ledger stops asking for volume the split
+was never going to produce.
+
+**Option B, give each muscle a second weekly touch.** A real training change. It
+delivers more volume and changes the plan every existing user gets tomorrow.
+
+### What the probe found before either was written
+
+Sorting every ledger row by how many times the split actually touched the group
+says the whole thing in one table. Intermediate and advanced only, no focus:
+
+```
+group        rows   under 0.8   avg sets   avg target   touches per week
+triceps       344         291        6.0         12.4   1x:244  2x:100
+biceps        364         297        6.6         12.4   1x:244  2x:120
+traps         240         239        4.9         12.1   1x:240
+forearms      227         226        4.8         12.3   1x:227
+calves        378         376        5.6         12.0   1x:190  2x:188
+obliques      134         134        3.9         12.1   1x:134
+chest         416         111       10.6         12.3   2x:366  3x:50
+lats          416          62       11.0         12.0   2x:232  4x:184
+```
+
+Every group the split touches once is under, every group it touches three or
+four times is fine, and the two-touch groups are split down the middle. The
+binding number is not the clamp and not the target on its own, it is the two
+of them meeting: one touch times six sets is six, and the level is asking for
+fourteen or sixteen.
+
+Which makes the arithmetic case against B on its own, before any code: **two
+touches is not enough either.** An advanced base of 16 over two sessions at the
+top of the clamp is 12 sets, which is 0.75 of target and still counts as under.
+Only three touches a week closes an advanced target, and no split in this file
+is a three-touch split except lats on upper/lower.
+
+### What the research says, which is not what was assumed
+
+`knowledge/principles/volume-landmarks.md` is the source, and it contains the
+frequency clause nobody had read against this code:
+
+> A new trainee or someone training 2-3 days/week should sit near MEV-to-low-MAV
+> per muscle, not chase MRV. Someone training hard 4-6 days/week with a real
+> history can run mid-to-high MAV.
+
+`BASE_WEEKLY_SETS` reads level and has never read frequency, so an advanced
+lifter training three days a week was being handed the 4-6 day number and then
+marked down for not reaching it. The weekly target is not a property of the
+lifter alone, and it is not even a property of the week: it is per group, since
+the same three day split hits lats four times and forearms once.
+
+That same table also settles B. Its MEV column gives triceps and biceps 6 and
+hamstrings/glutes 6. A three day intermediate getting 6 direct triceps sets on
+top of roughly 12 sets of pressing is exactly the MEV-to-low-MAV the source
+prescribes for somebody training three days a week. B would have pushed that to
+12 direct sets, which is mid-MAV, which is the 4-6 day prescription handed to a
+3 day trainee. The research argues for B where the split already allows it and
+against inventing the second touch on a split that does not.
+
+### B, built and measured anyway
+
+Second touches added to the three day Push/Pull/Legs split at the cheapest
+places the slot table allows: calves onto Push, core onto Pull, triceps isolation
+onto Legs. Against A as the baseline:
+
+```
+                          A       A+B     delta
+under 0.8, inter 3d    21.5%     27.0%    worse
+under 0.8, advan 3d    20.1%     25.6%    worse
+over-time-budget        1369      1493     +124
+duplicate-in-week       8780      9532     +752
+excluded-prescribed    12679     13219     +540
+hurt-joint-prescribed  12679     13219     +540
+```
+
+Every column moved the wrong way. The second touch raises what the split could
+deliver, the time trim immediately shaves the new tail accessory back off, and
+the week ends further from its own target than before: one problem traded for
+another, which is the thing the time budget exists to catch. The 752 extra
+`duplicate-in-week` rows are the library running out of distinct calf and core
+movements, and the 540 extra forced prescriptions are the same shortage seen
+through the limits filter. B is not taken, and the numbers rather than the
+argument are why.
+
+Worth saying: the 4 day upper/lower already gives every group two touches and is
+the only split that does, which is why it was the least bad in the original
+table. Nothing was taken away from it.
+
+### What shipped
+
+`weeklyTargetFor` is now `min(what the level asks, what the week can deliver)`,
+where the second half is counted off the finished week at
+`MAX_SETS_PER_SESSION` per exercise, or `SHORT_DAY_SETS` on a short day. The
+count is taken after the time trim rather than from `hits`, so a group that lost
+its only accessory to the clock is credited with the smaller week it really got.
+
+No prescription changed. `setsFor` still divides the level's number and still
+clamps, so every set count is the set count it was the day before. What changed
+is what the plan claims it was aiming at:
+
+```
+level         groups    under 0.8    over 1.25          under 0.8    over 1.25
+                                        before                          after
+beginner       32925        19.8%         3.1%              9.2%         3.1%
+intermediate   22096        71.2%         0.0%             18.7%         0.0%
+advanced       15270        77.9%         0.0%             16.0%         0.0%
+
+inter 3d       10037        79.9%         0.0%             21.5%         0.0%
+advan 3d        6654        87.6%         0.0%             20.1%         0.0%
+advan 5d        3400        87.4%         0.0%              6.8%         0.0%
+```
+
+Every warning total is byte-identical to the run before it, which is the proof
+that nothing in anybody's week moved: `same-group-twice-in-day` 19147,
+`over-time-budget` 1369, `duplicate-in-week` 8780, all unchanged. The over
+column cannot move either, and not by luck: a group's sets can never exceed
+touches times the clamp, so a target capped at that number can only be
+approached from below.
+
+Beginners were not broken to fix the top: 19.8% under became 9.2% and the 3.1%
+over is the same 3.1%.
+
+**The residual under is now a real one.** The 16 to 20% left is groups whose
+slots did not run at the top of the clamp: the time trim shaved the tail
+accessory, or `enforcePriorityFloor` capped an unfocused lift next to a
+prioritised one. Traps, forearms and obliques average 4.9 sets against a
+deliverable 6. That is the number `volumeNotes.under` was always meant to be,
+and it now points at the time budget rather than at arithmetic.
+
+**The gap is announced, not absorbed.** `volumeNotes.frequencyCapped` carries
+one row per group, with `wanted`, `target` and how many sessions it gets, and
+`weeklyVolume[group]` carries `wanted` alongside `sets` and `target` so a reader
+can tell "you hit your number" from "your number was lowered to what one session
+a week can hold". One sentence reaches `dayNotes` and therefore the app: the
+split trains these muscles once or twice a week, their weekly sets top out
+below what the level would ask, and the answer is another training day rather
+than more sets in the days that exist. An existing user's week is unchanged
+tomorrow; what is new is that the app now says why.
+
+### The advanced 28, closed
+
+The focus-tier work left an advanced lifter at base 16 with a red 1.75x focus
+holding a weekly TARGET of 28 sets, past anything in the volume research, and it
+was left uncapped because capping the multiplier changes what every 1.4x
+priority means too.
+
+It is capped at the muscle's own MRV instead, from the table in
+volume-landmarks.md, which is not the same lever: the multiplier still means
+exactly what it meant, and the ceiling is the muscle's rather than the tier's.
+`WEEKLY_MRV` caps the boosted week before `setsFor` divides it, so the ledger
+and the prescription read one number rather than two that can drift. It sits
+outside the +1 guarantee deliberately: an ask past what a week can recover from
+is a reason to stop adding, not a reason to make the colour mean nothing.
+
+It moves nothing today and that is measured, not asserted. Turning it on left
+the sweep byte-identical in every warning total and every cell of the volume
+table, because the per-session clamp binds first in every combination swept. The
+largest number the ledger can now carry is 25, lats at MRV, and the largest
+target observed is 24, which is four touches of an upper/lower week at the top
+of the clamp and a real prescription rather than a ledger artifact. Traps and
+forearms have no row in the source table and are left uncapped rather than given
+an invented number; every split here touches them once a week, so the frequency
+cap is what binds on them anyway.
