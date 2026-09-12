@@ -117,15 +117,17 @@
         s: "The moving figure on rows, cards and the session",
         note: "Plan rows, picker cards, the confirm sheet, the warm-up and the session card all carry the same drawn figure from knowledge/motion, animating the move. A name with no move yet keeps the old dumbbell icon, so nothing looks broken while the library fills in. Open Add exercise and the Chest chips to see the cards; Begin Workout to see the warm-up in blue with the chest lit and the bench press on the session card with its working muscles lit.",
         run: (w) => {
-          w.TODAY_WORKOUT.exercises = [
+          // TODAY_WORKOUT is a top-level let in the app, not a window property,
+          // so it has to be reached through eval in the app's own scope.
+          w.eval(`TODAY_WORKOUT.exercises = [
             { name: "Barbell Bench Press", sets: 3, reps: 8 },
             { name: "Goblet Squat", sets: 3, reps: 10 },
             { name: "Face Pull", sets: 3, reps: 15 },
           ];
-          w.TODAY_WORKOUT.mobility = { warmup: [
+          TODAY_WORKOUT.mobility = { warmup: [
             { name: "Doorway Pec Stretch", seconds: 30, kind: "static", group: "chest", cue: "Palm flat on the frame, step through until the chest opens." },
             { name: "Band Pull-Apart", seconds: 30, kind: "dynamic", group: "back" },
-          ], cooldown: [] };
+          ], cooldown: [] };`);
           w.switchTab("workout"); w.renderPlanPreview();
         } },
 
