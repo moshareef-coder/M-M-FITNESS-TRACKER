@@ -30,19 +30,57 @@ const verbose = process.argv.includes("--verbose");
 const RANGE = {
   hipFlex: [-35, 150],      // + = thigh toward the chest
   kneeFlex: [-8, 155],      // + = heel toward the glute
-  shoulderElev: [-62, 196], // + = arm away from the torso, 180 = straight overhead
-  elbowFlex: [-12, 155],
+  shoulderElev: [-95, 196], // + = arm away from the torso, 180 = straight overhead
+  elbowFlex: [-12, 168],
   ankleDorsi: [-58, 46],    // + = toes up
   spine: [-45, 65],
   neck: [-55, 55],
 };
+
+// The front view measures the same joints in the frontal plane, where two
+// things the side view cannot do become legal:
+//
+//   shoulderElev below zero is the arm ADDUCTING across the chest. Pallof
+//   press, woodchopper, Russian twist, cross-body swings and thread the needle
+//   all put a hand at or past the midline, which reads as roughly -60 to -110
+//   of elevation on the adduction side. In the side view a number like that
+//   would be shoulder extension no shoulder reaches, so the limit stays tight
+//   there.
+//
+// The same goes for the elbow, and not only in the front view: see
+// MAGNITUDE_ONLY below.
+const FRONT_RANGE = {
+  shoulderElev: [-120, 196],
+};
+
+// When the elbow's projected fold direction is an artefact of the view rather
+// than an anatomical fact, check how far the elbow is bent and not which way it
+// appears to bend. Two cases:
+//
+//   front view, because the rig has no humeral rotation: an internally rotated
+//   arm folds toward the midline and an externally rotated one folds away, and
+//   both project into the frontal plane with opposite signs.
+//
+//   any view with the shoulder extended behind the torso, which is how a hand
+//   reaches a bar racked on the traps. Reaching back and folding the forearm up
+//   to the bar needs external rotation the rig cannot carry, so the fold reads
+//   as negative in the chain even though the elbow is closing normally.
+//
+// The magnitude cap still applies, so an impossible 175 degree fold is still
+// caught. What this gives up is catching a forearm that folds the wrong way in
+// those two cases, which is a contact sheet job, not a numbers job.
+const SHOULDER_EXTENDED = -25;
 const FLOOR_TOL = 1.0;      // a joint centre this far below GROUND is a clip
 const SAMPLES = 24;
 
 // Wrap each angle into the 360 degree window centred on the middle of what the
 // joint can do, not into -180..180. An arm straight overhead is 183 degrees of
 // elevation, and a plain wrap turns that into -177 and reports a broken figure.
-const CENTRE = { hipFlex: 57, kneeFlex: 73, shoulderElev: 67, elbowFlex: 71, ankleDorsi: -6, spine: 10, neck: 0 };
+// The centre also has to leave room for the widest legal value of each joint,
+// or a real angle wraps out the far side of its own window: with shoulderElev
+// centred at 67 an arm adducted to -120 came back as +240 and failed for the
+// wrong reason.
+const CENTRE = { hipFlex: 57, kneeFlex: 73, shoulderElev: 40, elbowFlex: 0, ankleDorsi: -6, spine: 10, neck: 0 };
 const wrap = (deg, key) => {
   const c = CENTRE[key] === undefined ? 0 : CENTRE[key];
   return c + (((deg - c + 180) % 360 + 360) % 360 - 180);
@@ -54,8 +92,8 @@ const fail = (name, msg) => errors.push(`${name}: ${msg}`);
 
 const wrap2 = (key, deg) => wrap(deg, key);
 
-function checkRange(name, key, value, where) {
-  const [lo, hi] = RANGE[key];
+function checkRange(name, key, value, where, view) {
+  const [lo, hi] = (view === "front" && FRONT_RANGE[key]) || RANGE[key];
   if (value < lo || value > hi) {
     const hint = (key === "kneeFlex" && value < lo) ? " (legs pin with bend -1)"
       : (key === "elbowFlex" && value < lo) ? " (arms pin with bend +1)" : "";
@@ -92,21 +130,24 @@ function checkMove(name, move) {
     const S = solvePose(pose, move.view);
     const where = `at cycle ${cycle.toFixed(2)}`;
 
-    checkRange(name, "spine", wrap(pose.joints.spine || 0, "spine"), where);
-    checkRange(name, "neck", wrap(pose.joints.neck || 0, "neck"), where);
+    checkRange(name, "spine", wrap(pose.joints.spine || 0, "spine"), where, move.view);
+    checkRange(name, "neck", wrap(pose.joints.neck || 0, "neck"), where, move.view);
 
     for (const side of ["L", "R"]) {
       const k = S.sides[side];
-      checkRange(name, "hipFlex", wrap2("hipFlex", (k.legA + S.t) * R2D), `${where} (${side})`);
-      checkRange(name, "kneeFlex", wrap2("kneeFlex", (k.legA - k.shinA) * R2D), `${where} (${side})`);
-      checkRange(name, "shoulderElev", wrap2("shoulderElev", (k.armA + S.t) * R2D), `${where} (${side})`);
-      checkRange(name, "elbowFlex", wrap2("elbowFlex", (k.foreA - k.armA) * R2D), `${where} (${side})`);
+      checkRange(name, "hipFlex", wrap2("hipFlex", (k.legA + S.t) * R2D), `${where} (${side})`, move.view);
+      checkRange(name, "kneeFlex", wrap2("kneeFlex", (k.legA - k.shinA) * R2D), `${where} (${side})`, move.view);
+      const elev = wrap2("shoulderElev", (k.armA + S.t) * R2D);
+      checkRange(name, "shoulderElev", elev, `${where} (${side})`, move.view);
+      const flex = wrap2("elbowFlex", (k.foreA - k.armA) * R2D);
+      const magnitudeOnly = move.view === "front" || elev < SHOULDER_EXTENDED;
+      checkRange(name, "elbowFlex", magnitudeOnly ? Math.abs(flex) : flex, `${where} (${side})`, move.view);
       // A move that authors feet explicitly (front view, where a foot pointing
       // at the camera has to be drawn short rather than rotated) is making a
       // drawing decision, not an ankle angle, so there is nothing to check.
       const authoredFoot = move.feet && move.feet[side] && move.feet[side].ang !== undefined;
       if (!authoredFoot) {
-        checkRange(name, "ankleDorsi", wrap2("ankleDorsi", (k.footA - k.shinA) * R2D - 90), `${where} (${side})`);
+        checkRange(name, "ankleDorsi", wrap2("ankleDorsi", (k.footA - k.shinA) * R2D - 90), `${where} (${side})`, move.view);
       }
     }
 

@@ -4,7 +4,12 @@
 // Push-Up and Pull-Up are bodyweight moves that appear in both libraries under
 // the same name, so they are imported from calisthenics.mjs rather than copied.
 
-import { PUSH_UP, PULL_UP } from "./calisthenics.mjs";
+// Bodyweight names the lifting library shares with calisthenics are authored
+// once, over there, and imported here so the same figure shows in both.
+import {
+  PUSH_UP, PULL_UP, INCLINE_PUSH_UP, INVERTED_ROW, CHIN_UP, DIAMOND_PUSH_UP, DEAD_HANG,
+  WALKING_LUNGE, BULGARIAN_SPLIT_SQUAT, NORDIC_CURL, PLANK, HANGING_LEG_RAISE, SIDE_PLANK,
+} from "./calisthenics.mjs";
 // The 120 lifts are authored in two part files so two people can work on them
 // at once without editing the same file: upper body (chest, back, shoulders,
 // arms, forearms) and lower body plus core. This file keeps the shared seeds
@@ -156,6 +161,17 @@ export const MOVES = {
   ...LOWER,
   "Push-Up": PUSH_UP,
   "Pull-Up": PULL_UP,
+  "Incline Push-Up": INCLINE_PUSH_UP,
+  "Inverted Row": INVERTED_ROW,
+  "Chin-Up": CHIN_UP,
+  "Diamond Push-Up": DIAMOND_PUSH_UP,
+  "Dead Hang": DEAD_HANG,
+  "Walking Lunge": WALKING_LUNGE,
+  "Bulgarian Split Squat": BULGARIAN_SPLIT_SQUAT,
+  "Nordic Curl": NORDIC_CURL,
+  "Plank": PLANK,
+  "Hanging Leg Raise": HANGING_LEG_RAISE,
+  "Side Plank": SIDE_PLANK,
   "Goblet Squat": GOBLET_SQUAT,
   "Barbell Bench Press": BARBELL_BENCH_PRESS,
   "Lat Pulldown": LAT_PULLDOWN,

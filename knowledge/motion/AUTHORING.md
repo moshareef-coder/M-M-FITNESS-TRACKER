@@ -100,10 +100,12 @@ ik: {
 "chest"` makes the target an offset from the chest point, which is how a
 dumbbell racked at the chest rides along with the torso.
 
-**Legs pin with `bend: -1`. Arms pin with `bend: +1`.** Always. That is the
-combination that produces knee flexion rather than hyperextension and elbow
-flexion rather than a backwards elbow. If the pose looks wrong with those, the
-pose is wrong, not the bend: move the root or move the pin.
+**Legs pin with `bend: -1`. Arms pin with `bend: +1`.** That is the combination
+that produces knee flexion rather than hyperextension and elbow flexion rather
+than a backwards elbow. If the pose looks wrong with those, the pose is usually
+wrong, not the bend: move the root or move the pin. The two exceptions, both
+covered below, are an arm folding across the body in the front view and an arm
+reaching back to a bar on the traps; both pin with `bend: -1`.
 
 Pinning is what keeps hands and feet welded to the floor while the root moves.
 Authoring a squat as hip and knee angles means re-deriving both every time you
@@ -113,6 +115,68 @@ legs follow, like a person.
 A pinned ankle also means a **flat foot** on the floor. If you want tucked toes
 (push-up) or pointed toes (hanging), do not pin: use `hip`, `knee` and `ankle`
 angles.
+
+### Reaching across the body, and reaching behind it
+
+Two limits were lifted after the first batch, because both were costing
+accuracy rather than protecting it.
+
+**Front view: an arm may cross the midline.** A shoulder angle can go negative
+past the torso, which adducts the arm across the chest, and the elbow may fold
+inward as well. Any move where the hands meet at the sternum or travel past the
+midline needs this: Pallof press, woodchopper, Russian twist, cross-body arm
+swings, cross-body shoulder stretch, thread the needle.
+
+- Pin those wrists with **`bend: -1`**, not `+1`. In the front view `+1` swings
+  the elbow up and over the opposite shoulder; `-1` drops it down and out, which
+  is what a hand held at the sternum actually looks like.
+- The rig works out the z-order itself: an arm whose wrist comes inside five
+  units of its own shoulder draws **in front of the torso**, in the near tone.
+  Nothing to author.
+- The validator checks the **magnitude** of elbow flexion in the front view, not
+  its sign, because the rig has no humeral rotation: an internally rotated arm
+  folds toward the midline and an externally rotated one folds away, and both
+  project into the frontal plane with opposite signs. A forearm folding the
+  wrong way is now a contact sheet catch, not a validator catch. Look for it.
+- Shoulder elevation may run to -120 in the front view. It stays at -95 in the
+  side view, where a number like that would be shoulder extension no shoulder
+  reaches.
+
+**Side view: a hand may rest on a bar racked on the traps.** Back squat, good
+morning, and anything else carrying a bar behind the neck.
+
+```js
+props: [{ type: "barbell", place: "traps", up: 6.5, back: 5.5, r: 8.5, front: true }],
+// and in each keyframe:
+ik: { wristR: { rel: "chest", x: -4.4, y: -7.3, bend: -1 }, ... }
+```
+
+`place: "traps"` puts the bar at `chest + up * up(t) - back * perp(t)`, so it
+leans and travels with the shoulders instead of hovering in world space. Pin the
+wrists to the same point, as a chest offset, with **`bend: -1`** so the elbow
+goes behind rather than over the head.
+
+That pose reaches about 85 degrees of shoulder extension and 155 of elbow
+flexion. Both are legal now (the limits are -95 and 168) and both are really the
+projection of a wide grip, not a shoulder doing something strange: the hands are
+out to the sides, which a side view cannot show. The same magnitude-only rule
+applies to the elbow whenever the shoulder is extended past -25, because
+reaching back and folding up to a bar needs external rotation the rig cannot
+carry.
+
+**Watch the interpolation, not just the keyframes.** `rel: "chest"` offsets are
+world-space, so between two keyframes they travel in a straight line while the
+torso swings through its arc. On a good morning, where the torso goes from
+almost upright to almost horizontal, the hands come off the bar in the middle
+of the rep and the elbow folds past what a joint does. The fix is a third
+keyframe at t 0.5 with the offset recomputed for the halfway torso angle. The
+validator samples 24 points precisely so it can see this.
+
+**What these did NOT fix.** A seated front view is still mush: there is no way
+to foreshorten a shin pointed at the camera, so a seated figure has to splay its
+knees wide and the limbs pile up. The Russian twist was tried in the front view
+with the new cross-body arms, and the arms worked while the legs did not, so it
+stayed side on. When a limit lifts, re-test the move; do not assume.
 
 ### Loop style by kind
 
@@ -160,7 +224,9 @@ to the body (`{ type: "dumbbell", side: "R", point: "hand", dx, dy, rot, k }`).
 Two that are not obvious:
 
 - **A barbell seen from the side is a disc**, not a bar. Drawing the bar
-  sideways is the most common way these illustrations look wrong.
+  sideways is the most common way these illustrations look wrong. Add
+  `place: "traps"` to rack it across the upper back so it carries with the
+  torso.
 - **A band sags by its slack**, so give it a `rest` length close to the hand
   separation at the end of the rep. The sag going to zero is the rep.
 
@@ -185,8 +251,10 @@ Do that rather than copying, and fix a pose in one place.
 
 ## Ten things that will bite you
 
-1. **Legs `bend: -1`, arms `bend: +1`.** Anything else is a joint bending the
-   wrong way. The validator names it `kneeFlex` or `elbowFlex` negative.
+1. **Legs `bend: -1`, arms `bend: +1`,** except for an arm crossing the body in
+   the front view or reaching a bar on the traps, which both use `-1`. Anything
+   else is a joint bending the wrong way, and the validator names it `kneeFlex`
+   or `elbowFlex` negative.
 2. **`rot > 0` is face down, `rot < 0` is face up.** Check it before you place
    a single prop.
 3. **Hip and knee angles are relative to the pelvis**, so a rotated root makes

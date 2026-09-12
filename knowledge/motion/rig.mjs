@@ -537,6 +537,15 @@ function bar(ctx, C, p0, p1, r, fill) {
   ctx.fill();
 }
 
+// Where a bar racked across the upper back sits, in torso space, so it leans
+// with the shoulders instead of hovering in world coordinates.
+export function barOnTraps(S, p = {}) {
+  const u = upV(S.t), f = perpV(S.t);
+  const up = p.up === undefined ? 5.5 : p.up;
+  const back = p.back === undefined ? 2.4 : p.back;
+  return add(add(S.chest, scl(u, up)), scl(f, -back));
+}
+
 // Where a prop hangs off the body. Accepts {side, point} or plain {x, y}.
 function anchor(spec, S) {
   if (!spec) return null;
@@ -697,8 +706,14 @@ const PROPS = {
   },
   // Seen from the side a loaded bar is a disc, end on. Drawing the bar sideways
   // is the single most common way these illustrations look wrong.
+  //
+  // place: "traps" racks the bar across the upper back and carries it with the
+  // torso, which is what a back squat or a good morning needs: the bar has to
+  // travel and tilt with the shoulders, not sit at a fixed point in the world.
+  // The bar centre is chest + 5.5 up + 2.4 back, in torso space; pin the wrists
+  // near that point and the hands land on it.
   barbell(ctx, C, p, S) {
-    const at = anchor(p, S);
+    const at = p.place === "traps" ? barOnTraps(S, p) : anchor(p, S);
     if (!at) return;
     const r = p.r || 9.5;
     ctx.strokeStyle = C.edge; ctx.lineWidth = 3; ctx.lineJoin = "round";
@@ -780,6 +795,21 @@ function drawFloor(ctx, C, S) {
   ctx.globalAlpha = 1;
 }
 
+// How far inboard of its own shoulder a wrist has to come before we call the
+// arm "across the body". A hanging arm sits about 11.5 out, so 5 catches a hand
+// at the sternum or past the midline without ever catching one at the hip.
+const CROSS_X = 5;
+
+// Front view only: an arm folded across the chest is physically in front of the
+// ribs, so it has to draw OVER the torso and in the near tone. Without this a
+// Pallof Press, woodchopper or cross-body stretch buries the working arm behind
+// the torso, which is the one arm the user needs to see.
+function crossesBody(S, s) {
+  if (S.view !== "front") return false;
+  const sgn = s === "R" ? 1 : -1;
+  return (S.sides[s].wrist.x - S.chest.x) * sgn < CROSS_X;
+}
+
 export function drawFigure(ctx, S, C, opts = {}) {
   if (opts.floor !== false) drawFloor(ctx, C, S);
   drawProps(ctx, C, opts.props, S, "back");
@@ -791,12 +821,22 @@ export function drawFigure(ctx, S, C, opts = {}) {
   const grip = opts.grip || {};
   const skinOpts = C.skin === "anatomy" ? { plates: true, lit: opts.lit } : null;
   const farFill = symmetric ? C.ink : C.far;
-  drawArm(ctx, S, far, C, farFill, grip[far], symmetric ? skinOpts : null);
+
+  const arms = [far, near].map((s) => {
+    const crossing = crossesBody(S, s);
+    return {
+      s,
+      over: crossing || s === near,
+      fill: crossing || s === near ? C.inkHi : farFill,
+      plates: crossing || s === near || symmetric ? skinOpts : null,
+    };
+  });
+  for (const a of arms) if (!a.over) drawArm(ctx, S, a.s, C, a.fill, grip[a.s], a.plates);
   drawLeg(ctx, S, far, C, farFill, symmetric ? skinOpts : null);
   drawTorso(ctx, S, C, C.ink, skinOpts);
   drawHead(ctx, S, C, C.ink);
   drawLeg(ctx, S, near, C, C.inkHi, skinOpts);
-  drawArm(ctx, S, near, C, C.inkHi, grip[near], skinOpts);
+  for (const a of arms) if (a.over) drawArm(ctx, S, a.s, C, a.fill, grip[a.s], a.plates);
   drawProps(ctx, C, opts.props, S, "front");
 }
 
@@ -804,6 +844,7 @@ export function drawFigure(ctx, S, C, opts = {}) {
 export function gripSides(props) {
   const g = {};
   for (const p of props || []) {
+    if (p.type === "barbell" && p.place === "traps") { g.L = true; g.R = true; continue; }
     if (["barbell", "dumbbell", "kettlebell"].includes(p.type) && p.point !== "wrist") g[p.side || "R"] = true;
     if (p.type === "cable" && p.to && p.to.side) g[p.to.side] = true;
     if (p.type === "band") for (const e of [p.from, p.to]) if (e && e.side) g[e.side] = true;
