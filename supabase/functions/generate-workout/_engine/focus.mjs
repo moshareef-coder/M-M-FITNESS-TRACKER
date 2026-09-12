@@ -97,15 +97,25 @@ const TIER_NAME = Object.freeze({ 3: "main", 2: "secondary", 1: "light" });
  * September. A refactor that quietly reweights the plans of everybody who
  * already chose is not a refactor, it is a silent change of prescription.
  *
- * Red is 1.6 and green is 1.2, one step of 0.2 either side, and the step is
- * that size for a measurable reason rather than a tidy one. `setsFor` clamps a
- * session to [2, 6] sets and rounds to whole sets, so a multiplier only shows
- * up in the plan when it is worth at least half a set on the per-session
- * number. At the beginner base of 8 weekly sets over a group hit three times a
- * week, 1.2x, 1.4x and 1.6x come out at 3, 4 and 5 sets: three tiers, three
- * answers, which is the whole point of the feature. A 0.1 step would have red
- * and yellow round to the same number in most of the table and the picker
- * would be showing a difference the plan does not have.
+ * Green is 1.2 and red is 1.75, and the gap on the red side is wider than the
+ * one on the green side because the plan is made of whole sets, not of
+ * multipliers. `setsFor` divides a weekly target by how often the group is hit,
+ * rounds to a whole set and clamps the session to [2, 6], so two multipliers
+ * that are close together come back as the same prescription and the picker
+ * ends up showing a difference the plan does not have. That was measured
+ * rather than guessed: across 286 goal, day count and group combinations, a
+ * red of 1.6 gave red and yellow the identical weekly total 90 times and never
+ * once produced four distinct answers for none, green, yellow and red. At 1.75
+ * the identical pairs drop to 40 and the four-way ladder appears (a 4 day
+ * lose-a-number week reads chest 6, 8, 10, 12 sets). Above 1.75 nothing
+ * further moves, because what is left is the clamp rather than the rounding,
+ * so 1.75 is the smallest red that is a different prescription rather than a
+ * different label.
+ *
+ * Green is 1.2 and could be 1.15 or 1.25 for all the difference it makes: all
+ * three landed on identical numbers everywhere in that same run, because
+ * `setsFor`'s +1 floor is what a light focus actually buys. 1.2 is the honest
+ * label for "one more set than you would have had".
  *
  * Above the clamp the tiers converge, and that is honest rather than broken.
  * An intermediate's base of 14 sets is already over the per-session ceiling on
@@ -113,8 +123,13 @@ const TIER_NAME = Object.freeze({ 3: "main", 2: "secondary", 1: "light" });
  * shows up only in the weekly ledger's target (README, "The sweep", finding 1,
  * which is the same clamp seen from the other side). The tiers bite hardest
  * exactly where somebody is new enough for the volume to matter and it has
- * room to move. */
-export const TIER_MULTIPLIER = Object.freeze({ 3: 1.6, 2: 1.4, 1: 1.2 });
+ * room to move. The other end of that is a red target an advanced lifter's
+ * week cannot spend: 16 base sets at 1.75 is a target of 28, past anything in
+ * volume-landmarks.md, and the only reason it is not a prescription of 28 sets
+ * is the same clamp. It is reported in README under the sweep rather than
+ * quietly capped here, because capping it is a change to what every existing
+ * 1.4x priority means too. */
+export const TIER_MULTIPLIER = Object.freeze({ 3: 1.75, 2: 1.4, 1: 1.2 });
 
 /* What each tier costs out of the emphasis budget below. Cost is the tier
    number itself: red is worth three greens, because red is asking for three

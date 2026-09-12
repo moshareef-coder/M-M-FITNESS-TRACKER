@@ -36,7 +36,7 @@ somebody on day zero who has answered nothing, and it does.
 | `gym_days_this_week` | number | engine | fallback day count when `challenge_target` is absent |
 | `challenge_target` | number | engine | days per week they chose themselves, 2 to 6. Beats everything else |
 | `focus` | text | engine | a day name ("Push day"), which day of the week they want. Beats the rotation |
-| `focus_groups` | text[] | engine | the body map pick. Muscle group keys or the finer piece keys the zoomed view uses; both are flattened to the app's fourteen groups |
+| `focus_groups` | text[] | engine | the body map pick, now with a priority tier on each entry. `"chest:3"` is red, `"chest:2"` yellow, `"chest:1"` green, and a bare `"chest"` with no tier is yellow, which is what every pick saved before 2026-09-12 means. Muscle group keys or the finer piece keys the zoomed view uses; both are flattened to the app's fourteen groups. The single entry `"all"` is "select my whole body" and expands to every group at green. A jsonb object, `{"chest":3}`, is accepted too, so the column can become jsonb later without the engine changing |
 | `focus_chosen_at` | timestamptz | engine | when that pick was made. Older than 60 days comes back as `meta.focus.stale` |
 | `limits` | jsonb or JSON string | engine | **new.** What hurts and what they do not own. Shape in section (c) |
 | `history` | array | engine | the old flattened map of best lifts, `{ exercise_name, weight }`, no dates. Used for loads and never for experience level |
@@ -89,7 +89,9 @@ inside it are dropped in silence.
 }
 ```
 
-`notes` is the plan's own `dayNotes`, unfiltered: the limits summary, the
+`notes` is the plan's own `dayNotes`, unfiltered, plus the focus merge's own
+note when there is one (today: the sentence saying a whole-body pick changed
+nothing). It carries the limits summary, the
 softened warning when a slot kept a movement that loads a joint they said
 hurts, the over-budget number, the day-count clamp, the capacity shortening,
 the plateau answers. Until 2026-09-10 all of it was computed and none of it
@@ -114,8 +116,10 @@ bodyweight only pull day honestly has no curl in it).
 | `days` | number | days in the week the plan was built for |
 | `dayName` | text | the day that came back, same string as `workout.focus` |
 | `focusHonoured` | bool | whether `payload.focus` picked the day, or the rotation did |
-| `focus.requested` | text[] | the body map groups asked for, flattened |
+| `focus.requested` | text[] | the body map groups asked for, flattened, highest tier first. Uncapped: this is the ask, not the answer |
+| `focus.requestedTiers` | object | `{ chest: 3 }`, the tier each requested group was asked at |
 | `focus.applied` | text[] | the groups that actually earned extra volume, goal priority merged in |
+| `focus.tiers` | object | the tier each applied group really ran at, which is not always the one it was asked at: the goal's own priority raises a green group to yellow rather than letting a tap reduce it |
 | `focus.why` | text[] | plain sentences explaining that merge |
 | `focus.stale` | bool | the pick is older than 60 days. Nothing acts on it yet, on purpose |
 | `limits.hurts` | text[] | **new.** The joint keys that survived validation |
@@ -137,7 +141,7 @@ bodyweight only pull day honestly has no curl in it).
 
 | column | type | migration | shape |
 |---|---|---|---|
-| `focus_groups` | `text[]` | `20260909_focus_groups.sql` | at most four muscle group keys from the body map |
+| `focus_groups` | `text[]` | `20260909_focus_groups.sql` | the body map pick, one entry per group, each `"<group>:<tier>"` with tier 3 red, 2 yellow, 1 green. A bare `"<group>"` is tier 2. No migration: the tier rides inside the existing `text[]`, so there is no second column to keep in step and no window where the groups and the tiers can disagree. How many entries is not capped by the column, it is capped by the emphasis budget in `focus.mjs`, which comes to four groups at yellow, three at red, or nine at green |
 | `focus_chosen_at` | `timestamptz` | `20260909_focus_groups.sql` | when that pick was made |
 | `goal_bubble` | `text` | added separately | one goal-tree bubble id, exactly as spelled in `mo-knowledge/goals/goal-tree.json` |
 | `goal_child` | `text` | added separately | one goal-tree child id under that bubble, same spelling. Both are plain text ids and neither is a label |
@@ -248,7 +252,7 @@ One line each, so a screen can say what an answer buys.
 | `plans` | joined with logs to calibrate: last week too hard makes this one lighter, and it says so |
 | `history` | starting loads only. It has no dates, so it can never set an experience level |
 | `focus` | which day of the rotation comes back |
-| `focus_groups` | 1.4x weekly sets on those groups, merged with the goal's own priority list, capped at five |
+| `focus_groups` | a weekly sets multiplier per group, by tier: 1.75x red, 1.4x yellow, 1.2x green. Merged with the goal's own priority list, which enters at yellow and acts as a floor, so a tap never buys a group less than no tap would. Capped by an emphasis budget rather than by a count, and what did not fit is named in `meta.focus.why`. Every group at one tier is not a focus and comes back as none, with a sentence in `notes` saying so |
 | `focus_chosen_at` | reports staleness past 60 days. Nothing acts on it yet |
 | `limits.hurts` | removes every movement `joint-load.mjs` says loads that joint heavily. A slot the library cannot otherwise fill keeps its least loaded option and the plan says so out loud rather than pretending |
 | `limits.missing` | narrows the equipment the plan may prescribe at all. This one is hard: a slot with nothing left is dropped, because a barbell they do not own is not a workout |

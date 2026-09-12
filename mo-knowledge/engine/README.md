@@ -396,9 +396,10 @@ floor should never fire.
 can act on. The picker works at the level of a muscle piece and a head, because
 that is what you can point at on a figure; `plan.mjs` has only ever thought in
 the app's fourteen muscle groups, and it already has the lever this needs.
-`P.priority` earns a group 1.4x its weekly sets through `setsFor`. A user chosen
-focus is that same mechanism with a different source, so nothing new was
-invented for it: `normalizeFocus` flattens pieces and heads down to groups,
+`P.priority` earns a group a multiplier on its weekly sets through `setsFor`,
+1.4x flat until the tiers landed. A user chosen focus is that same mechanism
+with a different source, so nothing new was invented for it: `parseFocus`
+flattens pieces and heads down to groups and reads the tier off each,
 `mergePriority` decides whose list wins, and `buildPlan` takes the result as
 `priorityOverride`. Null there means nobody merged anything and the goal decides,
 which is every caller that existed before this landed.
@@ -412,11 +413,73 @@ disagree the measured one is right, because somebody who picked glutes in
 January and has not hip thrusted since February has told us something newer than
 the tap.
 
-Today `mergePriority` puts the tap first and the goal's own priority second, and
-caps the combination at five, because the 1.4x has to come out of a fixed weekly
-volume and once most of the body is on the list the plan is the same plan with a
-longer explanation. A single tap is capped at four for the same reason: focusing
-on everything is focusing on nothing.
+### The three tiers, 2026-09-12
+
+A pick now carries how badly they want it. Red, yellow and green in the picker;
+3, 2 and 1 in the column; 1.75x, 1.4x and 1.2x on the group's weekly sets.
+
+**Yellow is 1.4 because it already was.** `profiles.focus_groups` is a live
+`text[]` with real picks in it, and a legacy entry that carries no tier reads as
+yellow, so every plan built for somebody who chose before this landed is the
+identical plan afterwards. That is why the middle tier was not free to be
+anything else, and it is why the sweep's warning counts did not move when the
+tiers shipped.
+
+**Red is 1.75 because 1.6 was a label rather than a prescription.** The plan is
+made of whole sets: `setsFor` divides a weekly target by how often the group is
+hit, rounds, and clamps the session to [2, 6], so two close multipliers come
+back as the same number of sets. Measured across 286 goal, day count and group
+combinations: at 1.6 red and yellow produced the identical weekly total 90
+times and no combination anywhere produced four distinct totals for none,
+green, yellow and red. At 1.75 the identical pairs fall to 40 and the four-way
+ladder appears (a 4 day lose-a-number week reads chest at 6, 8, 10 and 12 sets).
+Past 1.75 nothing more moves, because what is left is the clamp and not the
+rounding. Green could equally be 1.15 or 1.25; all three give identical plans
+everywhere in that run, because what a light focus really buys is `setsFor`'s
++1 floor.
+
+**The tier is a floor, never a ceiling.** The first sweep run of the tiers
+failed on this: marking biceps GREEN under a goal that already prioritises arms
+came back with fewer weekly sets than not touching the body map at all, 10
+against 12, because the light tap replaced the goal's own 1.4x. Nobody taps a
+muscle in order to train it less. A group both sources name takes the higher of
+the two, the raise is paid for even when it puts the emphasis budget over, and
+`why` says so.
+
+**The cap is a budget, not a count.** The old rule was four groups and no more,
+because the extra sets come out of a fixed weekly volume: focusing on everything
+is focusing on nothing. Four groups is the wrong unit once groups are not worth
+the same, so the cap is 9 units of tier-cost (red 3, yellow 2, green 1), which
+is exactly what the old four-at-yellow cap cost plus one green. Spend it as
+three reds, or four yellows, or nine greens. The combined budget after the
+goal's own groups merge in is 11, which is the old five-group cap said the same
+way. `MAX_FOCUS` and `MAX_PRIORITY` still exist and are now derived from the
+budgets rather than declared, because index.html and the tests were written
+against them.
+
+**Whole body is answered, not swallowed.** Twelve or more of the fourteen groups
+at one level is not emphasis, because there is nobody left to take the sets
+from. Rather than greedily keeping the first three, the merge clears the user
+half, leaves the goal's own priority standing, and puts a sentence in the plan's
+`notes` saying the pick changed nothing and that marking two or three red would.
+"Select my whole body" is stored as the single entry `"all"`, which expands to
+every group at green and then takes exactly that path, so the button and
+fourteen individual taps cannot drift apart.
+
+The sweep grew a block for this: the same week built four times, once per tier
+and once with no focus. A tier coming back with fewer sets than the tier below
+it is a FAIL. Coming back with the SAME number is a warn, `tiers-indistinguishable`,
+41 of 312 group checks, and that count is the honest measure of how much of the
+table the [2, 6] clamp is eating. A separate 114 are groups the split has no
+slot for at all, where no multiplier can conjure sets.
+
+One thing left open, and it is the other end of finding 1 below: an advanced
+base of 16 sets at 1.75 is a weekly target of 28, past anything in
+volume-landmarks.md. The prescription is not 28, because the session clamp
+stops it, but the ledger's target is, and a target nothing can reach is the
+thing the ledger exists to report. Capping it is a change to what every
+existing 1.4x priority means too, so it is named here rather than quietly
+applied.
 
 The `revealed` argument is where W3's output lands, shaped
 `{ avoid: [], prefer: [] }` and null until it ships. When it does, an `avoid`
@@ -431,8 +494,9 @@ Nothing in the engine discounts a stale focus, because the honest thing to do
 with an old answer is to ask for a new one, not to quietly weight the old one
 down. That decision belongs with W3, which will have the measurement to make it.
 
-`meta.focus` is `{ requested, applied, why, stale }`: what came out of the
-profile, what really ended up prioritised after the merge and the cap, the plain
+`meta.focus` is `{ requested, requestedTiers, applied, tiers, why, stale }`:
+what came out of the profile and at which tier, what really ended up prioritised
+after the merge and the budget and at which tier it really ran, the plain
 sentences explaining it, and whether the choice is old. The gap between
 `requested` and `applied` is the interesting field, and it is the first question
 support gets when somebody says their week did not change.
@@ -780,8 +844,10 @@ lifting file would not. Harmless today, worth one cleanup pass.
 `node mo-knowledge/engine/sweep.mjs` runs every goal selection (52: nine
 bubbles, every child plus every bubble default) across 2 to 6 days, four
 history lengths, six limits cases, with sex, bodyweight and focus cycled
-through, 7,872 generate calls in about fourteen seconds, and checks twenty
-odd invariants on each. It exits 1 on any FAIL and is part of the gate now.
+through, 8,912 generate calls in about sixteen seconds, and checks twenty
+odd invariants on each. 1,040 of those calls are the tier ladder added on
+2026-09-12, which builds the same week at each of the three focus tiers and
+once without one; see Focus above for what it found. It exits 1 on any FAIL and is part of the gate now.
 WARNs are counted, not failed, and the counts are the point: a number that
 moves between commits is a change somebody should be able to explain.
 

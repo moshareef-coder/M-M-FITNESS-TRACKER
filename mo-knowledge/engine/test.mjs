@@ -24,7 +24,7 @@ import { coldStart1RM, prescribeLoad, patternFor, variantFactor, roundLoad } fro
 import { buildPlan } from "./plan.mjs";
 import { conjunctiveWeek, chooseComparison, sharedSchedule, relativeScore, PRODUCTIVE_GAP } from "./pair.mjs";
 
-import { normalizeFocus, mergePriority, focusFreshness, MUSCLE_GROUPS } from "./focus.mjs";
+import { normalizeFocus, parseFocus, mergePriority, focusFreshness, MUSCLE_GROUPS, TIERS } from "./focus.mjs";
 import { mobilityFor, pickBlock, moveSeconds, stripMobility, WARMUP_SECONDS, COOLDOWN_SECONDS, MOBILITY_GOAL_SECONDS, MOBILITY_CHILDREN, MIN_MOVES, MAX_MOVES } from "./mobility.mjs";
 import { scoreAlternatives } from "./alternatives.mjs";
 import { learnPreferences, applyPreferences, avoidNote, SOFT_AT, HARD_AT } from "./preferences.mjs";
@@ -566,15 +566,18 @@ test("the budget is spent highest tier first, and what did not fit is named", ()
 
 test("each tier moves weekly volume by a different amount", () => {
   const today = new Date("2026-09-12T12:00:00Z");
-  const base = { goal_bubble: "build-muscle", goal_child: "build-overall", challenge_target: 3, current_weight: 180, sex: "Male" };
+  /* A four day lose-a-number week, where the group is hit often enough that
+     the rounding does not swallow the difference. This is the case the
+     multipliers were chosen against; see TIER_MULTIPLIER in focus.mjs. */
+  const base = { goal_bubble: "lose-weight", goal_child: "lose-a-number", challenge_target: 4, current_weight: 180, sex: "Male" };
   const setsFor = (focus_groups) => {
     const out = generateFromPayload({ ...base, focus_groups }, { today, includePlan: true });
-    return out.plan.weeklyVolume.calves?.sets ?? 0;
+    return out.plan.weeklyVolume.chest?.sets ?? 0;
   };
   const none = setsFor(null);
-  const green = setsFor(["calves:1"]);
-  const yellow = setsFor(["calves:2"]);
-  const red = setsFor(["calves:3"]);
+  const green = setsFor(["chest:1"]);
+  const yellow = setsFor(["chest:2"]);
+  const red = setsFor(["chest:3"]);
   assert.ok(green > none, `green ${green} against none ${none}`);
   assert.ok(yellow > green, `yellow ${yellow} against green ${green}`);
   assert.ok(red > yellow, `red ${red} against yellow ${yellow}`);
