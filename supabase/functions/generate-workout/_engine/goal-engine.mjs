@@ -135,6 +135,73 @@ export const GOAL_PARAMS = {
   },
 };
 
+/* One primary goal, and any number of "and also" goals.
+ *
+ * index.html has carried a note since the tile picker landed saying single
+ * select is deliberate, because "a plan built for two goals is a plan built for
+ * neither". That is true of the parameter set above and of nothing else. Two
+ * goals genuinely cannot both set a rep range: 3 to 6 reps at 180 seconds rest
+ * and 8 to 15 at 60 are not a thing you can average into a week that trains
+ * either quality. A day count is the same, the session length is the same, the
+ * sets factor is the same.
+ *
+ * But "I want to build muscle and touch my toes" is not two rep ranges. It is a
+ * rep range plus ten minutes of hip and thoracic work after the last set, and
+ * refusing it is not coherence, it is the app failing to listen. So the split
+ * is by what a second goal can add without contradicting the first:
+ *
+ *   the primary sets   repRange, restSec, setsFactor, sessionMin, minDays,
+ *                      maxDays, emphasis, and the honest timeline
+ *   a secondary adds   priority muscle groups, the mobility cool-down block,
+ *                      and cardio, and only ever upward
+ *
+ * Everything a secondary touches is additive by construction. Priority is a
+ * 1.4x on a group's weekly sets taken out of a fixed budget, so naming another
+ * group moves volume around inside the week the primary already decided.
+ * Cardio is prescribed beside the lifting and never inside the session budget.
+ * The mobility block sits after the last set. None of the three can move a rep
+ * range, and none of them can add a day.
+ */
+
+/* Mirrored from MOBILITY_CHILDREN in mobility.mjs. Importing it would drag the
+   whole exercise library into what is otherwise a table of numbers, and this
+   file is the one every other module already depends on. A test pins the two
+   lists equal, same convention as checkTreeCoverage over GOAL_PARAMS. */
+const MOBILITY_CHILDREN = ["flexibility", "mobility"];
+
+/* Five groups is where the 1.4x stops meaning anything: the extra volume comes
+   out of a fixed weekly budget, so once most of the body is a priority the plan
+   is the same plan with a longer explanation. focus.mjs caps the merged list at
+   five for exactly this reason and this is the same cap one layer earlier. */
+const PRIORITY_CAP = 5;
+
+/* Two secondaries, and the number is arguable but it is not arbitrary. The only
+   lever a secondary has on the split is the priority list, and that list is full
+   at five: a primary already naming four groups plus one secondary naming four
+   saturates it, so a third secondary can only ever be told it did nothing. The
+   other two levers (cardio, the mobility block) are each a single slot that the
+   first goal asking for them wins. Past two, the honest answer is that there is
+   nothing left to give, and a picker that lets somebody tap six things and then
+   tells them five did nothing is worse than one that stops at two. */
+export const MAX_SECONDARY_GOALS = 2;
+
+/* Weekly cardio, as one number, so two prescriptions can be compared. A whole
+   prescription is taken or not taken: maxing sessions from one and minutes from
+   another would invent a dose nothing in sources.md ever wrote down. */
+const cardioLoad = (c) => (c && c.sessions ? c.sessions * c.minutes : 0);
+
+/* bubble + child -> which entry of GOAL_PARAMS actually runs. Null for a bubble
+   the table has never heard of, because a secondary from an old client should
+   cost its own effect and never the plan. */
+function resolveOne(bubble, child) {
+  const table = GOAL_PARAMS[bubble];
+  if (!table) return null;
+  /* Same rule as the primary below: a child this bubble has no entry for falls
+     to the bubble default and says "_default" rather than going quiet. */
+  const childUsed = table[child] ? child : "_default";
+  return { bubble, child: child ?? null, childUsed, params: table[childUsed] };
+}
+
 function weeksBetween(from, to) {
   return Math.max(0, Math.round((to - from) / 604800000));
 }
@@ -220,11 +287,14 @@ function absTimeline({ bodyFatPct, sex, bodyWeightLb, today }) {
 }
 
 /**
- * @param {object} sel  { bubble, child, amountLb?, byDate?, bodyWeightLb?, bodyFatPct?, sex?, level?, today? }
+ * @param {object} sel  { bubble, child, secondary?, amountLb?, byDate?, bodyWeightLb?, bodyFatPct?, sex?, level?, today? }
+ *                      `secondary` is an optional array of { bubble, child },
+ *                      the "and also" goals. Absent, empty or full of nonsense
+ *                      is the single goal path, unchanged.
  */
 export function resolveGoal(sel = {}) {
   const {
-    bubble, child, amountLb = null, byDate = null, bodyWeightLb = null,
+    bubble, child, secondary = [], amountLb = null, byDate = null, bodyWeightLb = null,
     bodyFatPct = null, sex = null, level = "beginner", today = new Date(),
   } = sel;
 
@@ -237,6 +307,66 @@ export function resolveGoal(sel = {}) {
      "_default" out loud is how meta.childUsed can be audited later. */
   const childUsed = table[child] ? child : "_default";
   const params = table[childUsed];
+
+  /* ---- the "and also" goals ---- */
+  const asked = Array.isArray(secondary) ? secondary : [];
+  const seen = new Set([`${bubble}/${childUsed}`]);
+  const accepted = [];
+  const ignoredSecondary = [];
+  for (const s of asked) {
+    const r = s && typeof s === "object" ? resolveOne(s.bubble, s.child) : null;
+    const entry = { bubble: (s && s.bubble) ?? null, child: (s && s.child) ?? null };
+    if (!r) { ignoredSecondary.push({ ...entry, why: "not a goal we know" }); continue; }
+    const key = `${r.bubble}/${r.childUsed}`;
+    /* Two taps that resolve to the same parameter entry are one goal said
+       twice, and counting it against the cap would spend a slot on nothing. */
+    if (seen.has(key)) { ignoredSecondary.push({ ...entry, why: "the same goal as one already picked" }); continue; }
+    seen.add(key);
+    if (accepted.length >= MAX_SECONDARY_GOALS) {
+      ignoredSecondary.push({ ...entry, why: `over the limit of ${MAX_SECONDARY_GOALS} extra goals` });
+      continue;
+    }
+    accepted.push(r);
+  }
+
+  const priority = [...(params.priority || [])];
+  let cardio = params.cardio;
+  /* The primary keeps the block when it is one of the two mobility children, so
+     a single goal resolves to exactly the child it always did. */
+  let mobilityChild = MOBILITY_CHILDREN.includes(childUsed) ? childUsed : null;
+
+  const secondaryResolved = accepted.map((r) => {
+    const gainedGroups = [];
+    for (const g of r.params.priority || []) {
+      if (priority.includes(g)) continue;
+      if (priority.length >= PRIORITY_CAP) break;
+      priority.push(g);
+      gainedGroups.push(g);
+    }
+    /* Upward only. A secondary that would lower the cardio the primary
+       prescribes is contradicting it, which is the thing a secondary may never
+       do; a secondary that raises it is asking for work that happens beside the
+       session and takes nothing away from it. The literal rule of "cardio only
+       when the primary prescribes none" is dead code here: every entry in the
+       table above prescribes at least one session, so nothing would ever have
+       fired. This is the same idea that can actually happen. */
+    const gainedCardio = cardioLoad(r.params.cardio) > cardioLoad(cardio);
+    if (gainedCardio) cardio = r.params.cardio;
+    const gainedMobility = !mobilityChild && MOBILITY_CHILDREN.includes(r.childUsed);
+    if (gainedMobility) mobilityChild = r.childUsed;
+
+    const effect = [];
+    if (gainedGroups.length) effect.push(`extra weekly sets for ${gainedGroups.join(", ")}`);
+    if (gainedCardio) effect.push(`${cardio.sessions} cardio sessions a week of about ${cardio.minutes} minutes`);
+    if (gainedMobility) effect.push("a ten minute mobility block after the last set");
+    /* The parameter object is deliberately not carried out: a secondary's
+       repRange and restSec never ran, and returning them invites a caller to
+       read them as though they had. */
+    return {
+      bubble: r.bubble, child: r.child, childUsed: r.childUsed,
+      priority: gainedGroups, cardio: gainedCardio, mobility: gainedMobility, effect,
+    };
+  });
 
   let timeline = null;
   if (child === "abs") {
@@ -259,7 +389,17 @@ export function resolveGoal(sel = {}) {
 
   return {
     bubble, child, childUsed,
-    params: { ...params, priority: params.priority || [] },
+    params: { ...params, priority, cardio },
+    /* Which of the extra goals were honoured and with what, and which were not
+       taken at all. Empty and empty for every caller that predates this. */
+    secondary: secondaryResolved,
+    ignoredSecondary,
+    /* The child whose ten minute hips and upper back block runs, which is the
+       primary's own child unless a secondary is the one asking for it. Null
+       when nobody is: mobility.mjs treats that as the ordinary cool-down. */
+    mobilityChild,
+    /* The primary alone. A second goal cannot change what is reachable by a
+       date, because it is not what the rate was computed from. */
     timeline,
     /* research/09: a plan nobody does produces nothing, so the days a person will
        really train beats the days they said. Callers pass observed capacity in. */

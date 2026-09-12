@@ -19,7 +19,7 @@
  * alias table below is hand written rather than loaded from goal-tree.json.
  */
 import { buildPlan } from "./plan.mjs";
-import { normalizeFocus, mergePriority, focusFreshness } from "./focus.mjs";
+import { parseFocus, mergePriority, focusFreshness } from "./focus.mjs";
 import { normalizeLimits } from "./limits.mjs";
 /* Read only, for one field. See the focus block in generateFromPayload. */
 import { resolveGoal } from "./goal-engine.mjs";
@@ -84,6 +84,32 @@ function isValidBubble(bubble) {
 
 function isValidChild(bubble, child) {
   return typeof child === "string" && (TREE_CHILDREN[bubble] || []).includes(child);
+}
+
+/* profiles.goal_secondary, whatever shape it arrives in. A jsonb column reaches
+   this function as an array through most clients and as the string of that
+   array through some, and as null for everybody who never opened the screen;
+   all three have to end at a list, because a goal picker that throws on a
+   stale client is a goal picker that loses the plan. Anything that is not a
+   recognised bubble is dropped here rather than sent on, so goal-engine only
+   ever has to explain choices a person really made. A silently truncated list
+   would be a promise quietly broken, so the count is not capped here: the
+   engine takes the ones it can honour and names the rest in meta and in the
+   notes. */
+function normalizeSecondaryGoals(raw) {
+  let list = raw;
+  if (typeof list === "string") {
+    try { list = JSON.parse(list); } catch { return []; }
+  }
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const b = item.bubble;
+    if (!isValidBubble(b)) continue;
+    out.push({ bubble: b, child: isValidChild(b, item.child) ? item.child : undefined });
+  }
+  return out;
 }
 
 /* Hand written from the `aliases` arrays in ../goals/goal-tree.json, plus a
@@ -497,10 +523,21 @@ function bestAlias(detail) {
  * were never sent, silently, so a bad value degrades to the old behaviour
  * rather than throwing.
  *
- * @param {{ goal?: string, goal_detail?: string, goal_bubble?: string, goal_child?: string, today?: Date }} input
- * @returns {{ bubble: string, child: string|undefined, amountLb?: number, byDate?: Date }}
+ * `goal_secondary` is the "and also" list, and it is a separate field rather
+ * than a longer `goal_bubble` because `profiles.goal_bubble` and
+ * `profiles.goal_child` are live text columns with real rows in them. It takes
+ * the object array, the string a jsonb column round trips as through some
+ * clients, and null, same three ways `limits` is accepted and for the same
+ * reason. Entries are validated exactly like the primary tap: an unknown
+ * bubble is dropped, and a child that does not belong to its bubble is
+ * dropped while the bubble stays, so the bubble default runs. The key is
+ * omitted from the return entirely when nothing survives, so a payload
+ * without one produces the object this function has always produced.
+ *
+ * @param {{ goal?: string, goal_detail?: string, goal_bubble?: string, goal_child?: string, goal_secondary?: object[]|string, today?: Date }} input
+ * @returns {{ bubble: string, child: string|undefined, secondary?: {bubble: string, child: string|undefined}[], amountLb?: number, byDate?: Date }}
  */
-export function mapGoal({ goal, goal_detail, goal_bubble, goal_child, today = new Date() } = {}) {
+export function mapGoal({ goal, goal_detail, goal_bubble, goal_child, goal_secondary, today = new Date() } = {}) {
   const tileBubble = isValidBubble(goal_bubble) ? goal_bubble : null;
   const tileChild = tileBubble && isValidChild(tileBubble, goal_child) ? goal_child : null;
 
@@ -535,6 +572,8 @@ export function mapGoal({ goal, goal_detail, goal_bubble, goal_child, today = ne
   }
 
   const out = { bubble, child };
+  const secondary = normalizeSecondaryGoals(goal_secondary);
+  if (secondary.length) out.secondary = secondary;
   const amountLb = parseAmountLb(goal_detail);
   if (amountLb != null) out.amountLb = amountLb;
   const byDate = parseByDate(goal_detail, today);
@@ -812,6 +851,7 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
       goal_detail: payload.goal_detail,
       goal_bubble: payload.goal_bubble,
       goal_child: payload.goal_child,
+      goal_secondary: payload.goal_secondary,
       today,
     });
     /* Same validity check mapGoal uses internally to decide whether the tile
@@ -850,12 +890,16 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
        resolve for itself a few lines down, and reading it is preferable to
        building the week twice or to copying the goal table into this file. */
     const goalPriority = resolveGoal({ ...goal, today }).params.priority;
-    const requestedFocus = normalizeFocus(payload.focus_groups);
+    /* `requested` is what they asked for, uncapped and untrimmed, because the
+       gap between it and `applied` is the field support reads first. The
+       budget lives in mergePriority; reading the column here only translates
+       it. */
+    const requested = parseFocus(payload.focus_groups);
     const freshness = focusFreshness({ chosenAt: payload.focus_chosen_at ?? null, today });
     /* `revealed` is W3's measured preference and does not exist yet, so this is
        null and the tap stands unopposed. When it lands, this is the one line
        that changes. */
-    const merged = mergePriority({ goalPriority, userFocus: requestedFocus, revealed: null });
+    const merged = mergePriority({ goalPriority, userFocus: payload.focus_groups, revealed: null });
 
     step = "limits";
     /* What hurts and what they do not own, from the optional onboarding sheet.
@@ -878,7 +922,7 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
       },
       logs,
       today,
-      priorityOverride: merged.priority,
+      priorityOverride: merged.tiers,
       limits,
       /* "Give me a different one." The app sends the exercises already on the
          plan so a regenerate of the same day comes back genuinely different
@@ -924,7 +968,12 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
          movement someone said hurts ("the plan says so out loud") held inside
          the engine and was false end to end. Additive, next to honest, which
          the reveal already has one slot for. */
-      notes: Array.isArray(plan.dayNotes) ? plan.dayNotes : [],
+      /* Plus the one thing the focus merge has to say on the card rather than
+         in a meta block. buildPlan cannot say it: `priorityOverride` is the
+         only channel into it and a tier map has nowhere to carry a sentence,
+         and the plan genuinely does not know a flattened whole-body pick from
+         no pick at all, which is the point of the sentence. */
+      notes: [...(Array.isArray(plan.dayNotes) ? plan.dayNotes : []), ...merged.notes],
       /* Same object the day was cut from, not a second build of it, so a lab
          showing both can never show a week the day did not come out of. */
       ...(includePlan ? { plan } : {}),
@@ -935,6 +984,22 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
            different plan, and support cannot tell the two apart from the
            output alone. */
         childUsed: plan.goal?.childUsed ?? null,
+        /* Which goal set the parameters, which extra ones bought something and
+           what, and which were not used at all. The screens need this because
+           the engine cannot name a goal in a sentence (no label table, see the
+           note in plan.mjs) and because an app that lets somebody tap a second
+           goal owes them a straight answer about what the tap did. `primary` is
+           the same pair `childUsed` reports, kept together here so one object
+           can be rendered without cross referencing. */
+        goals: {
+          primary: {
+            bubble: plan.goal?.bubble ?? null,
+            child: plan.goal?.child ?? null,
+            childUsed: plan.goal?.childUsed ?? null,
+          },
+          secondary: plan.goal?.secondary ?? [],
+          ignored: plan.goal?.ignoredSecondary ?? [],
+        },
         /* From the old payload this is always "none": one undated row per lift
            cannot say how long somebody has trained, and saying so is cheaper
            than a level nobody can audit. */
@@ -952,8 +1017,16 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
            sentences saying why, and whether the choice is old enough that it is
            worth asking again. Nothing acts on `stale` yet, on purpose. */
         focus: {
-          requested: requestedFocus,
+          requested: requested.groups,
+          /* The tier each requested group was asked at, 3 red, 2 yellow,
+             1 green. A legacy pick with no tiers in it reads as all 2s, which
+             is what a legacy pick has always been worth. */
+          requestedTiers: requested.tiers,
           applied: merged.priority,
+          /* Same map for what really ran, so the app can paint the body in the
+             colours the plan actually used rather than the ones that were
+             tapped. Where the two differ, `why` says why. */
+          tiers: merged.tiers,
           why: merged.why,
           stale: freshness.stale,
         },

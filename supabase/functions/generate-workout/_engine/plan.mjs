@@ -27,6 +27,7 @@ import { scoreAlternatives } from "./alternatives.mjs";
 import { planPlateauResponse, applyRotateFallback } from "./plateau-response.mjs";
 import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary, softenedNote } from "./limits.mjs";
 import { mainGroupsForDay } from "./recovery.mjs";
+import { TIER_MULTIPLIER, TIERS } from "./focus.mjs";
 import { mobilityFor } from "./mobility.mjs";
 
 const WEIGHTS = TRAININGS.find((t) => t.id === "weight-training");
@@ -37,7 +38,13 @@ const CALIS = TRAININGS.find((t) => t.id === "calisthenics");
    beginners: research/09 says the first weeks decide retention, and nobody ever
    quit because week one was too easy. */
 const BASE_WEEKLY_SETS = { beginner: 8, novice: 10, intermediate: 14, advanced: 16 };
-const PRIORITY_MULTIPLIER = 1.4;
+/* The multiplier a prioritised group earns, by focus tier: 1.6 red, 1.4 yellow,
+   1.2 green, and 1.0 for everything else. Tier 0 is "not a priority" and is the
+   only entry this file invents; the other three, and the reasoning for the 0.2
+   step between them, live in engine/focus.mjs next to the tiers themselves.
+   A goal's own priority list has no tiers and lands on the middle one, which is
+   the flat 1.4x this constant used to be. */
+const PRIORITY_MULTIPLIER = { 0: 1, ...TIER_MULTIPLIER };
 
 /* A short day is fewer sets and less time, not half a session. It used to hand
    back the main slots alone, which is two exercises on a push or a pull day, and
@@ -105,10 +112,14 @@ function estimateMinutes(exercises) {
       stall: the cut moved 2 slots out of 11. Now a main lift always gives up a
       set to a back-off, floor 2, and the only thing that can swallow it is the
       floor itself, which is a real limit rather than an accident of ordering. */
-function setsFor({ base, hitCount, priority, backOff, isMain }) {
+function setsFor({ base, hitCount, tier, backOff, isMain }) {
   const per = (weekly) => Math.round(weekly / Math.max(1, hitCount));
   const plain = per(base);
-  const wanted = priority ? Math.max(per(base * PRIORITY_MULTIPLIER), plain + 1) : plain;
+  /* The +1 guarantee is a floor and not a bonus, so it is the same +1 at every
+     tier. A group somebody marked green has to come back with more sets than an
+     identical group they did not mark, or the colour was decoration; how much
+     more than that is the multiplier's job. */
+  const wanted = tier ? Math.max(per(base * PRIORITY_MULTIPLIER[tier]), plain + 1) : plain;
   const sets = Math.max(2, Math.min(6, wanted));
   if (!backOff) return sets;
   /* The accessories take the 0.85 they always took. A main lift takes whichever
@@ -116,6 +127,27 @@ function setsFor({ base, hitCount, priority, backOff, isMain }) {
      the note in dayNotes makes on the user's behalf. */
   const eased = Math.round(sets * 0.85);
   return Math.max(2, isMain ? Math.min(eased, sets - 1) : eased);
+}
+
+/* Either shape of a priority list, read as one map. An array is the old shape
+   and every entry in it is a middle-tier group; an object is already the map
+   engine/focus.mjs produces. Unknown tiers are floored at the middle one rather
+   than dropped, on the same principle as focus.mjs: a group somebody named is a
+   group they want, whatever nonsense came with it. */
+function toTierMap(input) {
+  const out = {};
+  if (Array.isArray(input)) {
+    for (const g of input) if (typeof g === "string") out[g] = TIERS.secondary;
+    return out;
+  }
+  if (input && typeof input === "object") {
+    for (const [g, t] of Object.entries(input)) {
+      const n = Math.round(Number(t));
+      if (!n) continue;
+      out[g] = TIER_MULTIPLIER[n] ? n : TIERS.secondary;
+    }
+  }
+  return out;
 }
 
 /* Priority has to hold inside one session and not only across the week, because
@@ -127,12 +159,19 @@ function setsFor({ base, hitCount, priority, backOff, isMain }) {
    The extra volume a priority earns has to come out of a fixed weekly budget
    (see engine/README.md, Focus), so this takes it from the neighbours rather
    than adding it on top: on any day that has a priority exercise, nothing
-   without the flag carries more sets than the lowest priority lift there. */
+   without the flag carries more sets than the lowest priority lift there.
+
+   Tiers narrowed this on both ends, and deliberately. Only a red or a yellow
+   sets the ceiling: a green is "slightly focusing on it", and letting a slight
+   preference cap every other lift on the card is the tail wagging the session.
+   And only an unfocused lift is capped by it, so a green never has sets taken
+   off it to protect a red. The result for a legacy pick, where everything is
+   yellow and nothing is green, is the function this has always been. */
 function enforcePriorityFloor(exercises) {
-  const priority = exercises.filter((e) => e.priority);
+  const priority = exercises.filter((e) => e.focusTier >= TIERS.secondary);
   if (!priority.length) return;
   const ceiling = Math.min(...priority.map((e) => e.sets));
-  for (const e of exercises) if (!e.priority) e.sets = Math.max(2, Math.min(e.sets, ceiling));
+  for (const e of exercises) if (!e.focusTier) e.sets = Math.max(2, Math.min(e.sets, ceiling));
 }
 
 /* A day is a list of slots. Each slot names a movement pattern and the muscle
@@ -354,6 +393,34 @@ export function buildPlan({
       : `You asked for ${asked} days. This goal needs at least ${days} to work, so the week is ${days}, with the extra kept short.`);
   }
 
+  /* A second goal that changed nothing has to say so. The tap happened, the
+     person believes it bought something, and the only thing worse than an app
+     that refuses a second goal is one that accepts it and quietly builds the
+     same plan. goal-engine.mjs decides what a secondary may contribute
+     (priority groups, the mobility block, more cardio) and returns an empty
+     `effect` for one that contributed none of the three, which is what a
+     strength ask under a fat loss plan honestly comes to: rep ranges and rest
+     belong to the primary and that goal had nothing else to give.
+
+     The ids are not spelled out here on purpose. The engine has no label table
+     and reading goal-tree.json is not available to it in Deno, so naming the
+     goal would mean mirroring a third copy of the tree; the app already knows
+     the labels and `meta.goals.secondary` carries the ids to pair them with. */
+  const deadSecondary = (resolved.secondary || []).filter((s) => !s.effect.length);
+  if (deadSecondary.length) {
+    const which = resolved.secondary.length === 1
+      ? "The second goal you picked"
+      : `${deadSecondary.length} of the extra goals you picked`;
+    dayNotes.push(`${which} changed nothing in this plan. Rep ranges, rest, session length and the `
+      + `day count all come from your main goal, because two goals cannot set them at once. An `
+      + `extra goal can only add priority muscles, mobility work or cardio on top, and there was `
+      + `none of that to add.`);
+  }
+  if ((resolved.ignoredSecondary || []).length) {
+    dayNotes.push(`${resolved.ignoredSecondary.length} of the goals you picked were not used at all: `
+      + `${resolved.ignoredSecondary.map((s) => s.why).join(", ")}.`);
+  }
+
   /* research/09 and open question 9: honour the number they asked for, because
      overriding a stated preference is the paternalism the product rule exists to
      prevent. Then make the sessions they are least likely to make small enough
@@ -548,7 +615,16 @@ export function buildPlan({
      kept beside the week in a map keyed by the exercise object rather than
      added to it as a field nothing outside this file would read. */
   const roleOf = new Map();
-  const isPriority = (group) => (priorityOverride ?? P.priority).includes(group);
+  /* Which groups are pushed, and by how much. `priorityOverride` arrives from
+     engine/focus.mjs as a tier map, `{ chest: 3, calves: 1 }`, and is also
+     still accepted as the bare group list it used to be: the goal tree's own
+     `P.priority` is one of those, and so is every caller written before tiers
+     existed. A bare list is read at the middle tier, which is the flat 1.4x
+     that list has always earned. Null means nobody merged anything and the goal
+     decides, which is every call that existed before focus.mjs landed. */
+  const tierMap = toTierMap(priorityOverride ?? P.priority);
+  const tierFor = (group) => tierMap[group] || 0;
+  const isPriority = (group) => tierFor(group) > 0;
   const week = selected.map(({ name, key, isShort, picks }) => {
     const exercises = picks.map(({ slot, pick, swap, alternatives, offPattern }) => {
       const group = groupFor(slot, pick);
@@ -557,9 +633,10 @@ export function buildPlan({
          that merged list arrives as priorityOverride and stands in for the
          goal's. Null means nobody merged anything and the goal decides, which
          is every call that existed before this line. */
-      const priority = isPriority(group);
+      const tier = tierFor(group);
+      const priority = tier > 0;
       const isMain = slot.role === "main";
-      const full = setsFor({ base: baseSets, hitCount: hits[group] || 1, priority, backOff, isMain });
+      const full = setsFor({ base: baseSets, hitCount: hits[group] || 1, tier, backOff, isMain });
       /* A short day is the session they were least likely to make, so it stays
          small however the multipliers landed. */
       const sets = isShort ? SHORT_DAY_SETS : full;
@@ -579,7 +656,14 @@ export function buildPlan({
            attached and two more options behind it. */
         swap: swap ? swap.name : null,
         alternatives,
+        /* Two fields for one fact, because two things read it. `priority` is the
+           boolean every trim in this file already guards on, and it is true at
+           every tier: a green lift is still a lift somebody asked for, and the
+           time trim must not delete it (the sweep of 2026-09-10, "asking for a
+           focus deleted that group's work"). `focusTier` is how badly, for the
+           two places that need to tell a red from a green. */
         priority,
+        focusTier: tier,
         /* Said out loud rather than hidden: this slot wanted a movement pattern
            the library could not supply at this level. */
         note: offPattern ? `Standing in for a ${slot.pattern} movement; the library has none at this level.` : null,
@@ -628,7 +712,7 @@ export function buildPlan({
      days, which is the same direction her loop corrects in: the days furthest
      from being decided are the ones that give the sets back.
      Accessories only. A main movement is the reason the day exists. */
-  const weeklyTargetFor = (group) => baseSets * (isPriority(group) ? PRIORITY_MULTIPLIER : 1);
+  const weeklyTargetFor = (group) => baseSets * PRIORITY_MULTIPLIER[tierFor(group)];
   const plannedByGroup = () => {
     const totals = {};
     for (const d of week) for (const e of d.exercises) totals[e.group] = (totals[e.group] || 0) + e.sets;
@@ -830,7 +914,11 @@ export function buildPlan({
      feeds the volume ledger or recovery: a stretch is not a set. See
      engine/mobility.mjs for the reasoning and the research. */
   for (const d of week) {
-    d.mobility = mobilityFor(d, { level, hurts: limitsUsed.hurts, missing: limitsUsed.missing, goalChild: resolved.childUsed });
+    /* `mobilityChild` is the primary's own child whenever that child is one of
+       the two mobility ones, so this is what it always was, and it is a
+       secondary goal's child only when the primary had no claim on the block.
+       "Build muscle and touch my toes" is the case it exists for. */
+    d.mobility = mobilityFor(d, { level, hurts: limitsUsed.hurts, missing: limitsUsed.missing, goalChild: resolved.mobilityChild });
     d.totalMinutes = d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60);
   }
 

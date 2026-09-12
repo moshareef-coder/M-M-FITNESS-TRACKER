@@ -539,7 +539,67 @@ instead of an empty table.
 
 ## Goal storage
 
-`profiles.goal` still holds one of the five legacy strings ("Lose weight", etc). `profiles.goal_bubble` and `profiles.goal_child` hold ids from `mo-knowledge/goals/goal-tree.json` instead, once the tile picker writes them. When `goal_bubble` is a valid bubble id, `mo-knowledge/engine/adapter.mjs`'s `mapGoal` uses it over the legacy string, and a valid `goal_child` under it wins over anything parsed from `goal_detail`; an invalid or absent value falls back to the legacy parsing silently.
+`profiles.goal` still holds one of the five legacy strings ("Lose weight", etc). `profiles.goal_bubble` and `profiles.goal_child` hold ids from `mo-knowledge/goals/goal-tree.json` instead, once the tile picker writes them. When `goal_bubble` is a valid bubble id, `mo-knowledge/engine/adapter.mjs`'s `mapGoal` uses it over the legacy string, and a valid `goal_child` under it wins over anything parsed from `goal_detail`; an invalid or absent value falls back to the legacy parsing silently. `profiles.goal_secondary` holds the extra goals; see the section below.
+
+## More than one goal
+
+`profiles.goal_secondary` (migration `20260912_goal_secondary.sql`, written and
+not applied) holds the "and also" goals as `[{ bubble, child }]`. One primary,
+and the primary alone decides every parameter.
+
+The single select note in `index.html` was half right and it is worth saying
+which half. Rep ranges, rest, the sets factor, the session length and the day
+count genuinely cannot be shared: 3 to 6 reps at 180 seconds of rest and 8 to
+15 at 60 do not average into a week that trains either quality, and a week that
+is both 3 days and 5 days is not a week. That is the half the note gets right,
+and none of it moved. What the note got wrong is that it treated the whole goal
+as the parameter set. "Build muscle and touch my toes" is not two rep ranges.
+It is one rep range plus ten minutes of hips and upper back after the last set,
+and refusing it was the app failing to listen rather than the app staying
+coherent.
+
+So a secondary may contribute exactly three things, and all three are additive
+by construction:
+
+| lever | why it cannot contradict the primary |
+|---|---|
+| priority muscle groups | a priority is a multiplier on a group's share of a **fixed** weekly budget, so it moves volume around inside the week the primary already decided |
+| the mobility cool-down | it sits after the last set, outside the session estimate and outside the volume ledger. A stretch is not a set |
+| cardio, upward only | it is prescribed beside the lifting and has never been inside the session budget. Lowering it would be contradicting the primary, so a secondary can only raise it |
+
+And nothing else. A secondary never touches `repRange`, `restSec`,
+`setsFactor`, `sessionMin`, `minDays`, `maxDays` or `emphasis`, and it never
+touches the honest timeline, because the timeline is a rate computed from the
+primary and a second goal does not make anybody lose weight faster.
+
+**Two extras, and the number is defended rather than picked.** The priority
+list is full at five groups (`focus.mjs` caps it there because the extra volume
+comes out of a fixed budget), a primary naming four plus one secondary naming
+four already saturates it, and the other two levers are single slots that the
+first goal asking for them wins. Past two, a third can only ever be told it did
+nothing, and a picker that takes six taps and then reports five of them dead is
+worse than one that stops at two. Extras past the cap, repeats, and ids the
+tree does not know are listed in `meta.goals.ignored` with a reason and said out
+loud in `notes`; they are never silently dropped.
+
+**A goal that bought nothing says so.** Strength as a second goal under a fat
+loss primary is the honest case: strength is a rep range and a rest, it names
+no priority groups, it asks for no mobility block and it prescribes less cardio,
+so it contributes literally nothing. `meta.goals.secondary[n].effect` comes back
+empty and `notes` carries a sentence saying the tap changed nothing and why.
+The alternative, accepting the tap and building the same plan, is the thing
+this codebase exists not to do.
+
+**One consequence worth knowing.** `flexibility` and `mobility` resolve to the
+health parameter set, which prescribes more easy cardio than hypertrophy does.
+So "build muscle and touch my toes" raises the cardio line as well as adding
+the mobility block, and both are reported. That is the table being honest about
+what those goals are, not a leak between goals.
+
+The one rule that was not taken as written: the brief said a secondary may
+supply cardio only when the primary prescribes none. Every entry in
+`GOAL_PARAMS` prescribes at least one session, so that rule could never have
+fired. "Upward only" is the same idea in a form the table can actually reach.
 
 ## Limits: what hurts, and what they do not own
 

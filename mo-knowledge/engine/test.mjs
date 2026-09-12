@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 import { deriveTrainingAge, observedCapacity, THRESHOLDS, detectPlateau } from "./training-age.mjs";
-import { resolveGoal, GOAL_PARAMS } from "./goal-engine.mjs";
+import { resolveGoal, GOAL_PARAMS, MAX_SECONDARY_GOALS } from "./goal-engine.mjs";
 import { coldStart1RM, prescribeLoad, patternFor, variantFactor, roundLoad } from "./load.mjs";
 import { buildPlan } from "./plan.mjs";
 import { conjunctiveWeek, chooseComparison, sharedSchedule, relativeScore, PRODUCTIVE_GAP } from "./pair.mjs";
@@ -537,6 +537,98 @@ test("mergePriority drops a group present in revealed.avoid and says so in why",
   assert.ok(!r.priority.includes("chest"));
   assert.ok(r.priority.includes("quads"));
   assert.ok(r.why.some((w) => w.includes("chest")), `why was: ${r.why.join(" | ")}`);
+});
+
+/* ---- the three tiers, 2026-09-12 ---- */
+
+test("a legacy focus_groups array still means every group at the middle tier", () => {
+  const r = mergePriority({ userFocus: ["chest", "glutes"] });
+  assert.deepEqual(r.tiers, { chest: TIERS.secondary, glutes: TIERS.secondary });
+  assert.deepEqual(r.priority, ["chest", "glutes"]);
+});
+
+test("parseFocus reads the encoded tier, the tier words and the object map", () => {
+  assert.deepEqual(parseFocus(["chest:3", "glutes:1"]).tiers, { chest: 3, glutes: 1 });
+  assert.deepEqual(parseFocus(["chest=red", "glutes:green"]).tiers, { chest: 3, glutes: 1 });
+  assert.deepEqual(parseFocus({ chest: 3, glutes: "green" }).tiers, { chest: 3, glutes: 1 });
+  /* Pieces and heads carry a tier the same way whole groups do. */
+  assert.deepEqual(parseFocus(["gluteusMaximus:3"]).tiers, { glutes: 3 });
+  /* An unreadable tier on a real group is still a group they tapped. */
+  assert.deepEqual(parseFocus(["chest:banana"]).tiers, { chest: TIERS.secondary });
+});
+
+test("the budget is spent highest tier first, and what did not fit is named", () => {
+  /* Three reds is nine, the whole budget, so the yellow behind them misses. */
+  const r = mergePriority({ userFocus: ["chest:3", "lats:3", "quads:3", "biceps:2"] });
+  assert.deepEqual(r.priority, ["chest", "lats", "quads"]);
+  assert.ok(r.why.some((w) => w.includes("biceps") && w.includes("did not fit")), r.why.join(" | "));
+});
+
+test("each tier moves weekly volume by a different amount", () => {
+  const today = new Date("2026-09-12T12:00:00Z");
+  const base = { goal_bubble: "build-muscle", goal_child: "build-overall", challenge_target: 3, current_weight: 180, sex: "Male" };
+  const setsFor = (focus_groups) => {
+    const out = generateFromPayload({ ...base, focus_groups }, { today, includePlan: true });
+    return out.plan.weeklyVolume.calves?.sets ?? 0;
+  };
+  const none = setsFor(null);
+  const green = setsFor(["calves:1"]);
+  const yellow = setsFor(["calves:2"]);
+  const red = setsFor(["calves:3"]);
+  assert.ok(green > none, `green ${green} against none ${none}`);
+  assert.ok(yellow > green, `yellow ${yellow} against green ${green}`);
+  assert.ok(red > yellow, `red ${red} against yellow ${yellow}`);
+});
+
+test("a tier never buys less than the tier below it, or than no focus at all", () => {
+  const today = new Date("2026-09-12T12:00:00Z");
+  /* build-a-part already prioritises arms, so a green tap on biceps is the
+     case where a light preference could have UNDERCUT the goal's own 1.4x.
+     The goal's claim is a floor: the sweep caught this one. */
+  const base = { goal_bubble: "build-muscle", goal_child: "build-a-part", challenge_target: 5, current_weight: 180, sex: "Male" };
+  const setsFor = (focus_groups) => {
+    const out = generateFromPayload({ ...base, focus_groups }, { today, includePlan: true });
+    return out.plan.weeklyVolume.biceps?.sets ?? 0;
+  };
+  assert.ok(setsFor(["biceps:1"]) >= setsFor(null), "green must not undercut the goal's own priority");
+  const merged = mergePriority({ goalPriority: ["biceps"], userFocus: ["biceps:1"] });
+  assert.equal(merged.tiers.biceps, TIERS.secondary);
+  assert.ok(merged.why.some((w) => w.includes("never buys less")), merged.why.join(" | "));
+});
+
+test("the whole body at one level is no focus at all, and the plan says so", () => {
+  const all = mergePriority({ userFocus: MUSCLE_GROUPS.map((g) => `${g}:3`) });
+  assert.deepEqual(all.priority, [], "nothing is pushed ahead of anything else");
+  assert.ok(all.notes.length === 1 && all.notes[0].includes("whole body"), all.notes.join(" | "));
+  /* The picker's own "select my whole body" token takes the same path. */
+  const token = mergePriority({ userFocus: ["all"] });
+  assert.deepEqual(token.priority, []);
+  assert.deepEqual(token.notes, all.notes);
+  /* And the goal's own priority survives it: that was never the tap to flatten. */
+  const withGoal = mergePriority({ goalPriority: ["quads"], userFocus: ["all"] });
+  assert.deepEqual(withGoal.priority, ["quads"]);
+});
+
+test("an all red pick reaches the app as a note next to honest, not as a silent flattening", () => {
+  const today = new Date("2026-09-12T12:00:00Z");
+  const out = generateFromPayload({
+    goal_bubble: "build-muscle", goal_child: "build-overall", challenge_target: 3,
+    current_weight: 180, sex: "Male", focus_groups: MUSCLE_GROUPS.map((g) => `${g}:3`),
+  }, { today, includePlan: true });
+  assert.equal(out.meta.focus.requested.length, MUSCLE_GROUPS.length, "all fourteen were asked for");
+  assert.ok(out.notes.some((n) => n.includes("whole body")), out.notes.join(" | "));
+});
+
+test("meta.focus carries the tier on both sides of the merge", () => {
+  const today = new Date("2026-09-12T12:00:00Z");
+  const out = generateFromPayload({
+    goal_bubble: "build-muscle", goal_child: "build-overall", challenge_target: 3,
+    current_weight: 180, sex: "Male", focus_groups: ["chest:3", "calves:1"],
+  }, { today });
+  assert.deepEqual(out.meta.focus.requestedTiers, { chest: 3, calves: 1 });
+  assert.equal(out.meta.focus.tiers.chest, 3);
+  assert.equal(out.meta.focus.tiers.calves, 1);
+  for (const g of out.meta.focus.applied) assert.ok(out.meta.focus.tiers[g], `${g} applied with no tier`);
 });
 
 test("focusFreshness flags a pick older than sixty days as stale", () => {
@@ -1626,4 +1718,173 @@ test("stripMobility empties the two arrays and leaves every other key alone", ()
   const s = stripMobility(w);
   assert.deepEqual(s, { focus: "Push day", exercises: [{ name: "x" }], warmup: [], cooldown: [] });
   assert.deepEqual(w.warmup, [{ name: "a" }], "input not mutated");
+});
+
+/* ------------------------------------------------------------------ *
+ * More than one goal: one primary, up to two secondaries
+ * ------------------------------------------------------------------ */
+
+/* The test that protects everybody who already has a row in profiles. Every
+   existing user has one bubble and one child and nothing else, and the plan
+   they get has to be the plan they got yesterday, to the byte. */
+test("a single bubble and child produce exactly the plan they always did", () => {
+  const base = {
+    goal_bubble: "build-muscle", goal_child: "build-a-part", challenge_target: 4,
+    current_weight: 180, sex: "Male",
+  };
+  const today = new Date("2026-09-12T12:00:00Z");
+  const plain = JSON.stringify(generateFromPayload(base, { today, includePlan: true }));
+  /* Every way a client can fail to send a second goal, including the shapes a
+     jsonb column round trips as and an entry the tree has never heard of. */
+  for (const extra of [undefined, null, [], "[]", "not json", {}, [null], [{ bubble: "not-a-bubble" }], [{ child: "abs" }]]) {
+    const out = generateFromPayload({ ...base, goal_secondary: extra }, { today, includePlan: true });
+    assert.equal(JSON.stringify(out), plain, `goal_secondary: ${JSON.stringify(extra) ?? "undefined"}`);
+  }
+});
+
+test("resolveGoal with no secondary returns the goal table's own parameters", () => {
+  const r = resolveGoal({ bubble: "get-stronger", child: "strong-a-lift" });
+  assert.deepEqual(r.params, { ...GOAL_PARAMS["get-stronger"]["strong-a-lift"], priority: [] });
+  assert.deepEqual(r.secondary, []);
+  assert.deepEqual(r.ignoredSecondary, []);
+  assert.equal(r.mobilityChild, null);
+});
+
+test("a secondary goal adds priority muscles and moves no parameter", () => {
+  const solo = resolveGoal({ bubble: "build-muscle", child: "build-overall" });
+  const both = resolveGoal({
+    bubble: "build-muscle", child: "build-overall",
+    secondary: [{ bubble: "tone-lean-abs", child: "abs" }],
+  });
+  assert.deepEqual(both.params.repRange, solo.params.repRange);
+  assert.equal(both.params.restSec, solo.params.restSec);
+  assert.equal(both.params.setsFactor, solo.params.setsFactor);
+  assert.equal(both.params.sessionMin, solo.params.sessionMin);
+  assert.deepEqual(both.dayRange, solo.dayRange);
+  assert.deepEqual(both.params.priority, ["abs", "obliques"]);
+  assert.deepEqual(both.secondary[0].priority, ["abs", "obliques"]);
+});
+
+/* The uncomfortable one. Strength as a second goal cannot be honoured: the
+   rep range and the rest are the primary's and strength has no priority
+   groups, no mobility block and less cardio, so it buys nothing at all. */
+test("a secondary that contributes nothing says so, in the plan's own notes", () => {
+  const r = resolveGoal({
+    bubble: "lose-weight", child: "lose-a-number",
+    secondary: [{ bubble: "get-stronger", child: "strong-a-lift" }],
+  });
+  assert.deepEqual(r.params.repRange, GOAL_PARAMS["lose-weight"]["lose-a-number"].repRange);
+  assert.deepEqual(r.secondary[0].effect, []);
+
+  const plan = buildPlan({
+    goal: { bubble: "lose-weight", child: "lose-a-number", secondary: [{ bubble: "get-stronger", child: "strong-a-lift" }] },
+    person: { bodyWeightLb: 180, sex: "Male", daysAsked: 4 },
+  });
+  assert.ok(plan.dayNotes.some((n) => n.includes("changed nothing in this plan")), plan.dayNotes.join(" | "));
+});
+
+/* Mo's example, and the reason the single-select note in index.html was only
+   half right: build muscle and touch my toes is a rep range plus ten minutes
+   of hips and upper back, not two rep ranges. */
+test("build muscle and touch my toes keeps the hypertrophy week and adds the mobility block", () => {
+  const today = new Date("2026-09-12T12:00:00Z");
+  const payload = {
+    goal_bubble: "build-muscle", goal_child: "build-overall", challenge_target: 4,
+    current_weight: 180, sex: "Male",
+    goal_secondary: [{ bubble: "do-a-thing", child: "flexibility" }],
+  };
+  const out = generateFromPayload(payload, { today, includePlan: true });
+  assert.equal(out.plan.goal.params.repRange[0], 6, "still the hypertrophy rep range");
+  assert.equal(out.plan.goal.params.restSec, 90);
+  assert.equal(out.plan.days, 4, "the day count is the primary's");
+  assert.equal(out.meta.stretching.mobilityGoal, true);
+  /* The block is budgeted at MOBILITY_GOAL_SECONDS and filled with whole
+     moves, so it lands under the budget and well over the ordinary cool-down. */
+  assert.ok(out.meta.stretching.cooldownMinutes > COOLDOWN_SECONDS / 60, out.meta.stretching.cooldownMinutes);
+  assert.ok(out.meta.stretching.cooldownMinutes <= MOBILITY_GOAL_SECONDS / 60);
+  /* Two things, not one: `flexibility` resolves to the health parameter set,
+     which prescribes more easy cardio than hypertrophy does, so the cardio
+     line rises too and the plan says both out loud. */
+  assert.deepEqual(out.meta.goals.secondary[0].effect, [
+    "3 cardio sessions a week of about 30 minutes",
+    "a ten minute mobility block after the last set",
+  ]);
+});
+
+test("cardio only ever rises for a secondary, never falls", () => {
+  const up = resolveGoal({
+    bubble: "build-muscle", child: "build-overall",
+    secondary: [{ bubble: "do-a-thing", child: "run-5k" }],
+  });
+  assert.deepEqual(up.params.cardio, GOAL_PARAMS["do-a-thing"]["run-5k"].cardio);
+  assert.equal(up.secondary[0].cardio, true);
+
+  const down = resolveGoal({
+    bubble: "do-a-thing", child: "run-5k",
+    secondary: [{ bubble: "build-muscle", child: "build-overall" }],
+  });
+  assert.deepEqual(down.params.cardio, GOAL_PARAMS["do-a-thing"]["run-5k"].cardio);
+  assert.equal(down.secondary[0].cardio, false);
+});
+
+test("past two extra goals the rest are named rather than quietly dropped", () => {
+  const r = resolveGoal({
+    bubble: "build-muscle", child: "build-overall",
+    secondary: [
+      { bubble: "tone-lean-abs", child: "abs" },
+      { bubble: "do-a-thing", child: "flexibility" },
+      { bubble: "feel-better", child: "pain" },
+      /* The same goal twice is one goal, and it does not spend a slot. */
+      { bubble: "tone-lean-abs", child: "abs" },
+    ],
+  });
+  assert.equal(r.secondary.length, MAX_SECONDARY_GOALS);
+  assert.equal(r.ignoredSecondary.length, 2);
+  assert.ok(r.ignoredSecondary[0].why.includes(String(MAX_SECONDARY_GOALS)));
+  assert.ok(r.ignoredSecondary[1].why.includes("same goal"));
+});
+
+test("the priority list a secondary feeds is capped at five groups", () => {
+  const r = resolveGoal({
+    bubble: "tone-lean-abs", child: "tone-part",
+    secondary: [{ bubble: "feel-better", child: "pain" }],
+  });
+  assert.equal(r.params.priority.length, 5, "four plus five does not make nine");
+  /* Nothing got in, so the goal is told it bought nothing rather than being
+     listed as honoured. */
+  assert.deepEqual(r.secondary[0].priority, []);
+});
+
+test("goal-engine's mobility children are mobility.mjs's mobility children", () => {
+  /* Mirrored rather than imported, so this is the drift check. */
+  for (const id of MOBILITY_CHILDREN) {
+    const r = resolveGoal({ bubble: "build-muscle", child: "build-overall", secondary: [{ bubble: "do-a-thing", child: id }] });
+    const viaFeelBetter = resolveGoal({ bubble: "build-muscle", child: "build-overall", secondary: [{ bubble: "feel-better", child: id }] });
+    assert.ok(r.mobilityChild === id || viaFeelBetter.mobilityChild === id, `${id} reaches the block`);
+  }
+});
+
+test("mapGoal takes the secondary list as an array, as a jsonb string, or not at all", () => {
+  const asArray = mapGoal({ goal_bubble: "build-muscle", goal_child: "build-overall", goal_secondary: [{ bubble: "tone-lean-abs", child: "abs" }] });
+  const asString = mapGoal({ goal_bubble: "build-muscle", goal_child: "build-overall", goal_secondary: JSON.stringify([{ bubble: "tone-lean-abs", child: "abs" }]) });
+  assert.deepEqual(asArray.secondary, [{ bubble: "tone-lean-abs", child: "abs" }]);
+  assert.deepEqual(asString, asArray);
+  /* A child that does not belong to its bubble is dropped and the bubble
+     stays, exactly as the primary tap behaves. */
+  const wrongChild = mapGoal({ goal_bubble: "build-muscle", goal_secondary: [{ bubble: "tone-lean-abs", child: "first-pullup" }] });
+  assert.deepEqual(wrongChild.secondary, [{ bubble: "tone-lean-abs", child: undefined }]);
+  assert.ok(!("secondary" in mapGoal({ goal_bubble: "build-muscle" })), "no key at all when nothing survives");
+});
+
+test("meta.goals says which goal set the parameters and what the others bought", () => {
+  const out = generateFromPayload({
+    goal_bubble: "build-muscle", goal_child: "build-overall", challenge_target: 4, current_weight: 180,
+    goal_secondary: [{ bubble: "tone-lean-abs", child: "abs" }, { bubble: "get-stronger", child: "strong-a-lift" }],
+  }, { today: new Date("2026-09-12T12:00:00Z") });
+  assert.deepEqual(out.meta.goals.primary, { bubble: "build-muscle", child: "build-overall", childUsed: "build-overall" });
+  assert.equal(out.meta.goals.secondary.length, 2);
+  assert.deepEqual(out.meta.goals.secondary[0].priority, ["abs", "obliques"]);
+  assert.deepEqual(out.meta.goals.secondary[1].effect, [], "strength as a second goal buys nothing");
+  assert.ok(out.meta.focus.applied.includes("abs"), "and the week really prioritises it");
+  assert.ok(out.notes.some((n) => n.includes("changed nothing in this plan")));
 });

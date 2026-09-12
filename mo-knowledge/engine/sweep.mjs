@@ -163,8 +163,9 @@ const DAY_COUNTS = [2, 3, 4, 5, 6];
  * comparing a 130 lb woman with no logs against a 195 lb man with eighteen
  * months would not be an inversion, it would be two different people.
  *
- * Four smaller blocks then cover what a round robin cannot: matched focus
- * pairs, trained-yesterday recovery, the focus day request, and determinism.
+ * Five smaller blocks then cover what a round robin cannot: matched focus
+ * pairs, the three focus tiers against each other, trained-yesterday recovery,
+ * the focus day request, and determinism.
  */
 
 /* ------------------------------------------------------------------ *
@@ -486,6 +487,83 @@ for (const goal of GOALS) {
 }
 function out_requested(out) {
   return out.meta?.focus?.requested || [];
+}
+
+/* ------------------------------------------------------------------ *
+ * Block B2: three tiers, or one tier painted three colours
+ * ------------------------------------------------------------------ *
+ * Red, yellow and green buy 1.6x, 1.4x and 1.2x of a group's weekly sets, and
+ * the only way to know that is three answers rather than one is to build the
+ * same week four times, once at each tier and once with no focus at all, and
+ * read the group's weekly total back.
+ *
+ * Monotonic is the invariant, and it is a FAIL: a group marked red can never
+ * come back with fewer sets than the same group marked green, or the picker is
+ * lying about what the colours do. Strictly increasing is NOT the invariant and
+ * must not be, because `setsFor` clamps a session to [2, 6] and rounds to whole
+ * sets, so above the beginner base every tier lands on the same ceiling. Where
+ * the four runs come back identical it is warned instead, and that count is the
+ * honest measurement of how much of the table the clamp is eating: it belongs
+ * next to README "The sweep" finding 1, which is the same clamp seen from the
+ * volume side.
+ *
+ * And the whole-body case, which is the one somebody will tap on the first day:
+ * every group at one level is not a focus, and the plan has to say so in words
+ * rather than pick three of the fourteen on their behalf. */
+const TIER_LADDER = [
+  { id: "green", tier: 1 }, { id: "yellow", tier: 2 }, { id: "red", tier: 3 },
+];
+for (const goal of GOALS) {
+  for (const days of [3, 5]) {
+    for (const focusCase of focusAsks) {
+      const base = {
+        goal, days, history: HISTORY[0], limitCase: LIMIT_CASES[0], sex: "Male", bodyWeight: 180,
+        focusCase: FOCUS_CASES[0],
+      };
+      const runs = [{ id: "none", out: run(base) }];
+      for (const step of TIER_LADDER) {
+        const cell = { ...base, focusCase: { id: `${focusCase.id}-${step.id}`, groups: focusCase.groups.map((g) => `${g}:${step.tier}`) } };
+        runs.push({ id: step.id, out: run(cell), cell });
+      }
+      if (runs.some((r) => !r.out)) continue;
+      const input = tag({ ...base, focusCase: { id: `${focusCase.id}-ladder` }, note: "tier-ladder" });
+      for (const r of runs.slice(1)) checkOne(input, r.out);
+      const setsOf = (out, g) => out.plan?.weeklyVolume?.[g]?.sets ?? 0;
+      for (const g of focusCase.groups) {
+        const ladder = runs.map((r) => setsOf(r.out, g));
+        for (let i = 1; i < ladder.length; i++) {
+          if (ladder[i] < ladder[i - 1]) {
+            fail("tier-not-monotone", input, `${g}: ${runs.map((r, j) => `${r.id}=${ladder[j]}`).join(" ")}`);
+          }
+        }
+        /* Two different findings wear the same shape, so they are counted
+           apart. All zeroes means the split never trains that group at all and
+           no multiplier can conjure a slot, which is a fact about SLOTS and the
+           goal, not about the tiers. Equal and non-zero is the clamp. */
+        if (new Set(ladder).size === 1) {
+          if (ladder[0] === 0) warn("focus-group-not-in-split", input, `${g}: the split has no slot for it, so no tier can add sets`);
+          else warn("tiers-indistinguishable", input, `${g}: every tier and no focus all come to ${ladder[0]} weekly sets`);
+        }
+      }
+      /* Every group at one level, which is what "select my whole body" stores.
+         The user half of the pick has to come back empty and the plan has to
+         carry the sentence saying why; the goal's own priority still stands,
+         so `applied` is checked against the goal run rather than against []. */
+      const whole = run({ ...base, focusCase: { id: "whole-body", groups: ["all"] } });
+      if (whole) {
+        const wholeInput = tag({ ...base, focusCase: { id: "whole-body" }, note: "whole-body" });
+        checkOne(wholeInput, whole);
+        const applied = whole.meta?.focus?.applied || [];
+        const goalApplied = runs[0].out.meta?.focus?.applied || [];
+        if (applied.length !== goalApplied.length || applied.some((g) => !goalApplied.includes(g))) {
+          fail("whole-body-not-flattened", wholeInput, `applied ${JSON.stringify(applied)} against ${JSON.stringify(goalApplied)}`);
+        }
+        if (!(whole.notes || []).some((n) => n.includes("whole body"))) {
+          fail("whole-body-unexplained", wholeInput, "no note said the pick changed nothing");
+        }
+      }
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ *

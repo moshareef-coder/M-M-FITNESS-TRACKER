@@ -27,6 +27,7 @@ somebody on day zero who has answered nothing, and it does.
 | `goal_detail` | text | engine | the free text sentence. Matched against the alias table, and a confident match can outrank the button |
 | `goal_bubble` | text | engine | a goal-tree bubble id, from the tile picker. Nine of them: `lose-weight`, `build-muscle`, `get-stronger`, `tone-lean-abs`, `do-a-thing`, `event`, `feel-better`, `get-back`, `consistent`. A valid one beats `goal` and `goal_detail` |
 | `goal_child` | text | engine | a goal-tree child id under that bubble, from the same picker. Validated against the bubble; an id that does not belong to it is dropped and the bubble default runs |
+| `goal_secondary` | jsonb or JSON string | engine | **new.** The "and also" goals, `[{ bubble, child }]`, same ids as above. Optional, and absent, `null`, `[]` and nonsense all behave identically to not sending it. The first entry the engine can honour and the second one are used; the rest are named in `meta.goals.ignored` and in `notes`. What a secondary may and may not change is section (e) |
 | `sex` | text | engine | `"Male"` / `"Female"`. Changes the pattern ratios that set starting loads |
 | `age` | number | function | TDEE only |
 | `height_in` | number | function | TDEE only |
@@ -106,6 +107,9 @@ bodyweight only pull day honestly has no curl in it).
 |---|---|---|
 | `level` | text | `beginner` / `novice` / `intermediate` / `advanced`, measured from logs, never asked |
 | `childUsed` | text or null | which goal-tree child's parameters really ran, `"_default"` included |
+| `goals.primary` | object | **new.** `{ bubble, child, childUsed }`. The goal that set every parameter |
+| `goals.secondary` | object[] | **new.** One entry per honoured extra goal, in the order they were sent: `{ bubble, child, childUsed, priority: text[], cardio: bool, mobility: bool, effect: text[] }`. `effect` is plain sentences and an **empty `effect` means that goal changed nothing**, which the screen should show rather than hide |
+| `goals.ignored` | object[] | **new.** `{ bubble, child, why }` for every extra goal that was not used at all: unknown, a repeat of one already picked, or past the limit of two |
 | `confidence` | text | how much the level is worth: `none` / `low` / `medium` / `high` |
 | `days` | number | days in the week the plan was built for |
 | `dayName` | text | the day that came back, same string as `workout.focus` |
@@ -137,6 +141,7 @@ bodyweight only pull day honestly has no curl in it).
 | `focus_chosen_at` | `timestamptz` | `20260909_focus_groups.sql` | when that pick was made |
 | `goal_bubble` | `text` | added separately | one goal-tree bubble id, exactly as spelled in `mo-knowledge/goals/goal-tree.json` |
 | `goal_child` | `text` | added separately | one goal-tree child id under that bubble, same spelling. Both are plain text ids and neither is a label |
+| `goal_secondary` | `jsonb` | `20260912_goal_secondary.sql` (written, not applied) | `[{ "bubble": "do-a-thing", "child": "flexibility" }]`, default `[]`. A separate column on purpose: `goal_bubble` and `goal_child` hold live rows and nothing about them changes |
 | `limits` | `jsonb` | `20260909_limits.sql` | below |
 
 `profiles.limits`, exactly:
@@ -233,6 +238,7 @@ One line each, so a screen can say what an answer buys.
 | input | what happens |
 |---|---|
 | `goal_bubble` + `goal_child` | picks the parameter set: rep ranges, rest, weekly sets factor, session length, cardio, and which muscle groups the goal itself prioritises |
+| `goal_secondary` | adds priority muscle groups, the ten minute mobility cool-down, and more cardio, and nothing else. It can never move a rep range, a rest, the sets factor, the session length or the day count, and it never changes the honest timeline. A secondary that turns out to add none of those three is reported with an empty `effect` and the plan says in `notes` that the tap changed nothing |
 | `goal` + `goal_detail` | the same, reached by parsing instead of by tapping, and beaten by a valid bubble |
 | `challenge_target` | how many days the week has, clamped to what the goal supports |
 | `gym_days_this_week` | the day count when nobody chose one |

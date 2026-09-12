@@ -4,8 +4,14 @@
  * the outer hamstring, or the rear delt, and it zooms. `plan.mjs` has never
  * heard of a rear delt. It thinks in the app's fourteen groups, and it already
  * has a lever for exactly this: `P.priority`, a list of group keys that earns
- * 1.4x weekly sets through `setsFor`. So this module is a translator and a
- * merge, and nothing else. It decides no volume and picks no exercise.
+ * a weekly sets multiplier through `setsFor`. So this module is a translator
+ * and a merge, and nothing else. It decides no volume and picks no exercise.
+ *
+ * Since 2026-09-12 a pick also carries how badly they want it. Three tiers,
+ * red, yellow and green in the picker, 3, 2 and 1 in the column, and the tier
+ * is what chooses the multiplier. See TIER_MULTIPLIER and FOCUS_BUDGET below
+ * for the two decisions that matters most: how much each tier is worth, and
+ * what stops somebody from marking the whole body red.
  *
  * Two signals arrive here and they are not equal (PLAN-2's table). The goal's
  * own priority is what the tree says people with that goal need. The user's
@@ -73,49 +79,224 @@ const GROUP_FOR_PIECE = {
 const FOLDED_PIECE = {};
 for (const [k, g] of Object.entries(GROUP_FOR_PIECE)) FOLDED_PIECE[k.toLowerCase()] = g;
 
-/* Four, and not more. A priority list is a share of a fixed weekly volume: the
-   1.4x has to come out of somewhere, and once most of the body is on the list
-   the plan is the same plan with a longer explanation. Focusing on everything
-   is focusing on nothing. */
-export const MAX_FOCUS = 4;
+/* The three tiers. The picker paints them red, yellow and green; the column
+   stores the number, because a colour is a decision the app is allowed to
+   change and 3 is not. `secondary` is deliberately the middle one AND the
+   default, so a legacy pick that carries no tier at all means exactly what it
+   meant before any of this existed. */
+export const TIERS = Object.freeze({ main: 3, secondary: 2, light: 1 });
+const TIER_NAME = Object.freeze({ 3: "main", 2: "secondary", 1: "light" });
 
-/* The combined list is capped one higher, because the goal's own priority has
-   a claim too and a person whose goal already named two groups should not lose
-   both to a four group tap. Five is the point where `setsFor` is still moving
-   a meaningfully smaller set of lifts than it leaves alone. */
-export const MAX_PRIORITY = 5;
+/* What each tier is worth in weekly sets, and the reason for these three
+   numbers rather than three others.
+ *
+ * The middle one is 1.4 because it already was. Every plan built before tiers
+ * existed ran one flat 1.4x, and a legacy `["chest","back"]` pick normalises to
+ * this tier, so somebody who tapped chest in August gets the identical week in
+ * September. A refactor that quietly reweights the plans of everybody who
+ * already chose is not a refactor, it is a silent change of prescription.
+ *
+ * Red is 1.6 and green is 1.2, one step of 0.2 either side, and the step is
+ * that size for a measurable reason rather than a tidy one. `setsFor` clamps a
+ * session to [2, 6] sets and rounds to whole sets, so a multiplier only shows
+ * up in the plan when it is worth at least half a set on the per-session
+ * number. At the beginner base of 8 weekly sets over a group hit three times a
+ * week, 1.2x, 1.4x and 1.6x come out at 3, 4 and 5 sets: three tiers, three
+ * answers, which is the whole point of the feature. A 0.1 step would have red
+ * and yellow round to the same number in most of the table and the picker
+ * would be showing a difference the plan does not have.
+ *
+ * Above the clamp the tiers converge, and that is honest rather than broken.
+ * An intermediate's base of 14 sets is already over the per-session ceiling on
+ * any group hit once or twice a week, so every tier lands on 6 and the tier
+ * shows up only in the weekly ledger's target (README, "The sweep", finding 1,
+ * which is the same clamp seen from the other side). The tiers bite hardest
+ * exactly where somebody is new enough for the volume to matter and it has
+ * room to move. */
+export const TIER_MULTIPLIER = Object.freeze({ 3: 1.6, 2: 1.4, 1: 1.2 });
 
-/* Anything unrecognised is dropped in silence. This runs on a stored profile
-   column that older clients wrote and newer ones will rewrite, so a stale piece
-   name is an expected input, not an error worth failing a whole plan over. */
-export function normalizeFocus(input) {
-  return toGroups(input).slice(0, MAX_FOCUS);
+/* What each tier costs out of the emphasis budget below. Cost is the tier
+   number itself: red is worth three greens, because red is asking for three
+   times as much of a fixed thing. */
+const TIER_COST = Object.freeze({ 3: 3, 2: 2, 1: 1 });
+
+/* The old cap was four groups and no more, for a reason that has not changed:
+   the extra sets come out of a fixed weekly volume, so once most of the body is
+   on the list the plan is the same plan with a longer explanation. Focusing on
+   everything is focusing on nothing.
+ *
+   What changed is that four groups is the wrong unit once the groups are not
+   all worth the same. So the cap is a budget in tier-cost, and it is set to
+   exactly what the old four-group cap cost: four groups at the middle tier, 2
+   each, is 8, and 9 is that plus one green. Spend it however: three reds, or
+   four yellows, or one red, two yellows and two greens, or nine greens. A
+   legacy pick of five groups still keeps four and drops the fifth, to the
+   letter, because 8 fits in 9 and 10 does not. */
+export const FOCUS_BUDGET = 9;
+
+/* The combined budget, after the goal's own priority groups are merged in, is
+   two higher for the same reason the old combined cap was one group higher:
+   the goal has a claim too, and a person whose goal already named two groups
+   should not lose both to a tap. Eleven is five middle-tier groups, which is
+   what MAX_PRIORITY was. */
+export const MAX_PRIORITY_BUDGET = 11;
+
+/* Kept, and now derived rather than declared, because index.html and the tests
+   both talk in groups and both were written against these two numbers. They
+   are what the budgets come to when every group is at the middle tier, which is
+   the only world that existed when they were written. */
+export const MAX_FOCUS = Math.floor(FOCUS_BUDGET / TIER_COST[TIERS.secondary]);
+export const MAX_PRIORITY = Math.floor(MAX_PRIORITY_BUDGET / TIER_COST[TIERS.secondary]);
+
+/* "Select my whole body", as one token the picker can store instead of writing
+   fourteen rows. It expands to every group at the lightest tier, which then
+   trips the rule below and comes back as no focus at all with a sentence
+   saying so. That round trip is deliberate: the button is a real thing people
+   will tap, and the honest answer to it has to be computed by the same code
+   that would answer fourteen individual taps, or the two would drift. */
+const WHOLE_BODY_WORDS = new Set(["all", "everything", "wholebody", "whole-body", "whole_body", "full-body", "fullbody"]);
+
+/* Where a pick stops being emphasis and becomes the baseline. Twelve of the
+   fourteen at one level leaves two groups to surrender the volume, and two
+   groups do not have that much to give. Below twelve the budget above handles
+   it by dropping what does not fit; at or above it, nothing was really asked
+   for and the plan says that out loud rather than picking three of the fourteen
+   on the person's behalf. */
+export const WHOLE_BODY_MIN = 12;
+
+/* One token to one group, or null. Piece keys are camelCase and group keys are
+   lower case, so the lookup is done twice: once verbatim, once folded. */
+function groupOf(token) {
+  if (typeof token !== "string") return null;
+  const s = token.trim();
+  if (!s) return null;
+  const low = s.toLowerCase();
+  return IS_GROUP.has(low) ? low : (GROUP_FOR_PIECE[s] || FOLDED_PIECE[low] || null);
 }
 
-/* The same translation with no cap. The cap belongs to what a person taps, not
-   to what the goal tree already says: one recomp child names five groups, and
-   running it through the four cap would quietly change the plan for everybody
-   with that goal and nothing to do with the picker. */
-function toGroups(input) {
+const TIER_WORD = { main: 3, red: 3, primary: 3, high: 3, secondary: 2, yellow: 2, medium: 2, light: 1, green: 1, low: 1 };
+
+/* An unreadable tier on a readable group falls back to the middle, rather than
+   dropping the group. Somebody tapped that muscle; the worst honest reading of
+   "chest:banana" is still "they want chest". Same instinct as the rest of this
+   file, where a stale piece name costs a filter and never a plan. */
+function tierOf(token) {
+  if (token == null || token === true || token === "") return TIERS.secondary;
+  const n = typeof token === "number" ? token : Number(String(token).trim());
+  if (Number.isFinite(n)) return TIER_NAME[Math.round(n)] ? Math.round(n) : TIERS.secondary;
+  const w = TIER_WORD[String(token).trim().toLowerCase()];
+  return w || TIERS.secondary;
+}
+
+/* Every shape the column has ever held or will hold, flattened to one map.
+ *
+ * `profiles.focus_groups` is a live `text[]` with real picks in it, so the
+ * three accepted shapes are not generosity, they are the migration:
+ *
+ *   ["chest", "back"]            the legacy pick. Every group at TIERS.secondary
+ *   ["chest:3", "calves:1"]      the tiered pick, still a text[], still one column
+ *   { chest: 3, calves: "green" }  the same thing as jsonb, for whoever moves the column later
+ *
+ * The encoded string is what the app writes today. It is not the prettiest
+ * shape in this repo and it is the only one that needed no migration and no
+ * second column, which means there is no window where the tier and the group
+ * list can disagree with each other, and no dual write to get wrong. The
+ * object form costs six lines here and buys the option of changing the column
+ * type later without touching the engine again.
+ *
+ * A duplicate group takes the highest tier it was given, because the two ways
+ * to reach one group (tap the muscle, tap a head inside it) are the same
+ * intent and the stronger one is what they meant. */
+function toTiers(input) {
+  const map = {};
+  const order = [];
+  const add = (rawGroup, rawTier) => {
+    const group = groupOf(rawGroup);
+    if (!group) return;
+    const tier = tierOf(rawTier);
+    if (!order.includes(group)) order.push(group);
+    map[group] = Math.max(map[group] || 0, tier);
+  };
+
+  if (input && typeof input === "object" && !Array.isArray(input)) {
+    for (const [k, v] of Object.entries(input)) {
+      if (v === false || v === null || v === undefined) continue;
+      add(k, v);
+    }
+    return { map, order };
+  }
+
   let list;
   if (Array.isArray(input)) list = input;
   else if (typeof input === "string") list = input.split(",");
-  else return [];
+  else return { map, order };
 
-  const out = [];
   for (const raw of list) {
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) { add(raw.group ?? raw.key, raw.tier ?? raw.level); continue; }
     if (typeof raw !== "string") continue;
     const s = raw.trim();
     if (!s) continue;
-    const low = s.toLowerCase();
-    const group = IS_GROUP.has(low) ? low : (GROUP_FOR_PIECE[s] || FOLDED_PIECE[low] || null);
-    if (!group || out.includes(group)) continue;
-    out.push(group);
+    if (WHOLE_BODY_WORDS.has(s.toLowerCase())) {
+      for (const g of MUSCLE_GROUPS) add(g, TIERS.light);
+      continue;
+    }
+    const cut = s.search(/[:=]/);
+    if (cut < 0) add(s, null);
+    else add(s.slice(0, cut), s.slice(cut + 1));
   }
-  return out;
+  return { map, order };
+}
+
+/* The pick as the rest of the engine wants to read it: a tier map, plus the
+   groups in the order the budget should be spent on them. Highest tier first,
+   and within a tier the order they were tapped in, so the thing that loses when
+   somebody overspends is the lightest and latest pick rather than an accident
+   of the alphabet. */
+export function parseFocus(input) {
+  const { map, order } = toTiers(input);
+  const groups = order.slice().sort((a, b) => (map[b] - map[a]) || (order.indexOf(a) - order.indexOf(b)));
+  return { tiers: map, groups };
+}
+
+/* Anything unrecognised is dropped in silence. This runs on a stored profile
+   column that older clients wrote and newer ones will rewrite, so a stale piece
+   name is an expected input, not an error worth failing a whole plan over.
+ *
+   Kept at the old shape, a plain group list spent against the budget, because
+   callers outside this module still ask the old question. `parseFocus` is the
+   one that carries the tiers. */
+export function normalizeFocus(input) {
+  const { tiers, groups } = parseFocus(input);
+  return spend(groups, tiers, FOCUS_BUDGET).kept;
+}
+
+/* The same translation with no cap and no tiers. The cap belongs to what a
+   person taps, not to what the goal tree already says: one recomp child names
+   five groups, and running it through the budget would quietly change the plan
+   for everybody with that goal and nothing to do with the picker. */
+function toGroups(input) {
+  const { map, order } = toTiers(input);
+  return order.filter((g) => map[g]);
+}
+
+/* Greedy, highest tier first, and it keeps going past a group that does not
+   fit rather than stopping there. A red that missed by one leaves room for a
+   green behind it, and spending the last unit of the budget on the lightest
+   thing somebody asked for is better than handing it back. Everything that did
+   not fit comes out in `dropped` and gets named, never silently lost. */
+function spend(groups, tiers, budget) {
+  const kept = [];
+  const dropped = [];
+  let left = budget;
+  for (const g of groups) {
+    const cost = TIER_COST[tiers[g]] || TIER_COST[TIERS.secondary];
+    if (cost <= left) { kept.push(g); left -= cost; } else dropped.push(g);
+  }
+  return { kept, dropped, left };
 }
 
 const listOut = (a) => a.length === 1 ? a[0] : `${a.slice(0, -1).join(", ")} and ${a[a.length - 1]}`;
+const plural = (a, one, many) => a.length === 1 ? one : many;
 
 /* Both sources in, one priority list out, plus the sentences that explain it.
  *
@@ -131,36 +312,97 @@ const listOut = (a) => a.length === 1 ? a[0] : `${a.slice(0, -1).join(", ")} and
  * round has evidence for. `prefer` is read by nobody yet, deliberately. */
 export function mergePriority({ goalPriority = [], userFocus = [], revealed = null } = {}) {
   const goal = toGroups(goalPriority);
-  const asked = normalizeFocus(userFocus);
+  const { tiers: asked, groups: askedOrder } = parseFocus(userFocus);
   const why = [];
+  /* The subset of `why` that has to reach the plan's own dayNotes rather than
+     only meta.focus. One sentence qualifies today: the one that says the pick
+     was so wide it changed nothing. A person who taps every muscle and gets an
+     ordinary week back deserves to read why on the card, not in a meta block
+     nothing renders. */
+  const notes = [];
 
   const avoid = revealed && Array.isArray(revealed.avoid) ? toGroups(revealed.avoid) : [];
-  const kept = asked.filter((g) => !avoid.includes(g));
-  const dropped = asked.filter((g) => avoid.includes(g));
+  const overruled = askedOrder.filter((g) => avoid.includes(g));
+  let wanted = askedOrder.filter((g) => !avoid.includes(g));
 
-  if (dropped.length) {
-    why.push(`You picked ${listOut(dropped)}, but your last few weeks say otherwise, `
+  if (overruled.length) {
+    why.push(`You picked ${listOut(overruled)}, but your last few weeks say otherwise, `
       + `so it is not being pushed this week. What you train is newer information than what you tapped.`);
+  }
+
+  /* Emphasis is relative or it is nothing. Past WHOLE_BODY_MIN groups at one
+     level there is nobody left to take the sets from, so the answer is the
+     plain week, said out loud. This is also what "select my whole body"
+     resolves to, by design: the button is answerable, and the answer is that it
+     does not change the plan. The goal's own priority still stands underneath,
+     because that was never the user's tap to flatten. */
+  const levels = new Set(wanted.map((g) => asked[g]));
+  if (wanted.length >= WHOLE_BODY_MIN && levels.size === 1) {
+    const say = wanted.length === MUSCLE_GROUPS.length
+      ? "You picked your whole body at one level, which is the same week as picking none of it: the extra sets a focus earns have to come out of the groups you did not pick. Volume is spread evenly. Mark two or three red and the week changes shape."
+      : `You picked ${wanted.length} of the fourteen muscle groups at the same level, and the extra sets a focus earns have to come out of the ones you did not pick. There are not enough of those left, so volume is spread evenly. Mark two or three red and the week changes shape.`;
+    why.push(say);
+    notes.push(say);
+    wanted = [];
   }
 
   /* The tap goes first. It is explicit, it is recent, and it is the only one of
      the two the person can see themselves having made. */
-  const priority = [];
-  for (const g of [...kept, ...goal]) {
-    if (!priority.includes(g)) priority.push(g);
-    if (priority.length >= MAX_PRIORITY) break;
+  const mine = spend(wanted, asked, FOCUS_BUDGET);
+  const tiers = {};
+  let spent = 0;
+  for (const g of mine.kept) { tiers[g] = asked[g]; spent += TIER_COST[asked[g]]; }
+
+  /* The goal's own groups come in at the middle tier, which is the multiplier
+     they have always had: the goal tree says "prioritise these" and has never
+     said how much.
+   *
+     And the goal's claim is a floor, never a ceiling. The sweep of 2026-09-12
+     caught the alternative on the first run: marking biceps GREEN on a goal
+     that already prioritises arms came back with fewer weekly sets than not
+     touching the body map at all, 10 against 12, because a light tap replaced
+     the goal's own 1.4x with 1.2x. Nobody taps a muscle to train it less. So a
+     group both of them name takes the higher of the two, and the raise is paid
+     for out of budget even when that puts the total over: not raising it would
+     be taking volume away from somebody for asking, and there is no budget
+     argument that survives that. */
+  const fromGoal = [];
+  const raised = [];
+  for (const g of goal) {
+    if (tiers[g]) {
+      if (tiers[g] < TIERS.secondary) {
+        spent += TIER_COST[TIERS.secondary] - TIER_COST[tiers[g]];
+        tiers[g] = TIERS.secondary;
+        raised.push(g);
+      }
+      continue;
+    }
+    if (spent + TIER_COST[TIERS.secondary] > MAX_PRIORITY_BUDGET) continue;
+    tiers[g] = TIERS.secondary;
+    spent += TIER_COST[TIERS.secondary];
+    fromGoal.push(g);
   }
 
-  if (kept.length) why.push(`Extra volume on ${listOut(kept)}, because you picked ${kept.length === 1 ? "it" : "them"} on the body map.`);
-  const fromGoal = priority.filter((g) => !kept.includes(g));
+  const priority = [...mine.kept, ...fromGoal];
+
+  /* Read off the tiers that really ran, not the ones that were tapped, because
+     a group the goal raised is now a secondary focus and saying "a light nudge"
+     about it would be describing a plan that was not built. */
+  const byTier = (t) => mine.kept.filter((g) => tiers[g] === t);
+  const red = byTier(TIERS.main), yellow = byTier(TIERS.secondary), green = byTier(TIERS.light);
+  if (red.length) why.push(`Most of the extra volume goes to ${listOut(red)}, ${plural(red, "the group", "the groups")} you marked red.`);
+  if (yellow.length) why.push(`${listOut(yellow)} ${plural(yellow, "is a secondary focus and gets", "are secondary focuses and get")} a smaller share.`);
+  if (green.length) why.push(`${listOut(green)} ${plural(green, "gets", "get")} a light nudge, which is what green asks for.`);
+  if (raised.length) why.push(`Your goal already pushes ${listOut(raised)}, so ${plural(raised, "it stays", "they stay")} a secondary focus `
+    + `rather than dropping to the light one you picked. A tap never buys less than no tap.`);
   if (fromGoal.length) why.push(`Your goal also puts ${listOut(fromGoal)} ahead of the rest of the week.`);
-  if (!priority.length) why.push("No group is being pushed ahead of the others this week, so volume is spread evenly.");
+  if (!priority.length && !notes.length) why.push("No group is being pushed ahead of the others this week, so volume is spread evenly.");
 
-  const overflow = [...kept, ...goal].filter((g, i, a) => a.indexOf(g) === i).length - priority.length;
-  if (overflow > 0) why.push(`${overflow} more ${overflow === 1 ? "group was" : "groups were"} in line and did not fit. `
-    + `Past about ${MAX_PRIORITY} the extra volume stops being extra.`);
+  const missed = [...mine.dropped, ...goal.filter((g) => !tiers[g])].filter((g, i, a) => a.indexOf(g) === i);
+  if (missed.length) why.push(`${listOut(missed)} ${plural(missed, "was", "were")} in line and did not fit. `
+    + `A focus is a share of one week's volume, and past about ${MAX_PRIORITY} groups the extra stops being extra.`);
 
-  return { priority, why };
+  return { priority, tiers, why, notes };
 }
 
 /* Sixty days. Long enough that a January answer is not thrown away in March,
