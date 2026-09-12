@@ -3776,7 +3776,7 @@
         </button>
         <button type="button" class="set-row" id="setRow-training" data-page="training">
           <span class="set-ico" data-ico="target"></span>
-          <span class="set-txt"><span class="set-title">Training</span><span class="set-sub">Focus, goal and weekly target</span></span>
+          <span class="set-txt"><span class="set-title">Training</span><span class="set-sub">Weekly target, rest and stretching</span></span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
         <button type="button" class="set-row" id="setRow-milestones" data-page="milestones">
@@ -3904,26 +3904,16 @@
         <div class="scr-title">Training</div>
         <div class="spacer"></div>
       </div>
-    <div class="card">
-      <h2>Main focus</h2>
-      <select id="setupFocus">
-        <option value="Strength">Strength</option>
-        <option value="Muscle Gain">Muscle Gain</option>
-        <option value="Fat Loss">Fat Loss</option>
-        <option value="General Fitness">General Fitness</option>
-        <option value="Endurance">Endurance</option>
-      </select>
+    <div class="set-group" style="margin-bottom:10px;">
+      <button type="button" class="set-row" id="setupGoalRow" data-page="goal">
+        <span class="set-ico" data-ico="medal"></span>
+        <span class="set-txt"><span class="set-title">Your goal</span><span class="set-sub" id="setupGoalSub">Not set</span></span>
+        <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+      </button>
     </div>
     <div class="card">
-      <h2>Body goal</h2>
-      <select id="setupGoal">
-        <option value="Lose weight">Lose weight</option>
-        <option value="Build muscle">Build muscle</option>
-        <option value="Recomp (lose fat, gain muscle)">Recomp (lose fat, gain muscle)</option>
-        <option value="Get stronger">Get stronger</option>
-        <option value="Maintain">Maintain</option>
-      </select>
-      <label style="margin-top:10px;">More detail (optional)</label>
+      <h2>More about your goal</h2>
+      <p class="muted-note" style="margin-top:-6px;">Optional. Anything the goal above does not say on its own.</p>
       <textarea id="setupGoalDetail" placeholder="e.g. training for a wedding in June, prefer 4 days/week"></textarea>
     </div>
     <div class="card">
@@ -16900,6 +16890,9 @@ function openSettingsPage(key) {
   // The only two pages whose contents are built rather than sitting in the
   // markup: both carry a Rive canvas that has to be created and destroyed.
   if (key === "goal") renderGoalPage();
+  // Training shows the goal in words rather than owning a second copy of it,
+  // so it has to re-read the profile every time it is opened.
+  if (key === "training") $("setupGoalSub").textContent = goalTileLabel(MY_PROFILE);
   if (key === "focus") renderBodyFocusPage();
   if (key === "limits") renderLimitsPage();
   window.scrollTo({ top: 0 });
@@ -17050,8 +17043,7 @@ function renderSetupTab() {
   if (MY_EMAIL === ADMIN_EMAIL) renderAdminPanel();
 
   if (MY_PROFILE) {
-    if (MY_PROFILE.focus) $("setupFocus").value = MY_PROFILE.focus;
-    if (MY_PROFILE.goal) $("setupGoal").value = MY_PROFILE.goal;
+    $("setupGoalSub").textContent = goalTileLabel(MY_PROFILE);
     $("setupGoalDetail").value = MY_PROFILE.goal_detail || "";
     $("setupChallengeTarget").value = MY_PROFILE.challenge_target || 4;
     $("skipStretchToggle").checked = MY_PROFILE.skip_stretching === true;
@@ -17209,9 +17201,11 @@ async function saveSetup() {
   const payload = {
     email: MY_EMAIL,
     user_name: ME,
-    focus: $("setupFocus").value,
-    goal: $("setupGoal").value,
-    ...($("setupGoal").value !== MY_PROFILE?.goal ? { goal_bubble: null, goal_child: null } : {}),
+    /* The goal itself is not here any more. It is one tap away on the goal
+       page, which writes goal, goal_bubble and goal_child together. Saving
+       preferences must never touch it: the old dropdown held five strings the
+       tiles do not all produce, so a profile set to "Stay consistent" opened
+       Training reading "Lose weight" and one Save wrote that over it. */
     goal_detail: $("setupGoalDetail").value.trim() || null,
     challenge_target: clampNum($("setupChallengeTarget").value, 1, 7, 4),
     sex: $("setupSex").value || null,
