@@ -133,8 +133,16 @@ export const TIER_MULTIPLIER = Object.freeze({ 3: 1.75, 2: 1.4, 1: 1.2 });
 
 /* What each tier costs out of the emphasis budget below. Cost is the tier
    number itself: red is worth three greens, because red is asking for three
-   times as much of a fixed thing. */
-const TIER_COST = Object.freeze({ 3: 3, 2: 2, 1: 1 });
+   times as much of a fixed thing.
+
+   Exported because the picker in index.html spends this budget too, and it
+   cannot show somebody nine cells and then have the plan disagree about what
+   fills them. It mirrors the table rather than importing it, since the values
+   are the tier numbers and a dynamic import would make the first paint wait on
+   the engine for three integers. That mirror is only safe while cost really is
+   the tier number, so the test suite pins exactly that: change this table to
+   anything else and the engine's own tests fail and name the picker. */
+export const TIER_COST = Object.freeze({ 3: 3, 2: 2, 1: 1 });
 
 /* The old cap was four groups and no more, for a reason that has not changed:
    the extra sets come out of a fixed weekly volume, so once most of the body is

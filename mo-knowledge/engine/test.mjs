@@ -24,7 +24,7 @@ import { coldStart1RM, prescribeLoad, patternFor, variantFactor, roundLoad } fro
 import { buildPlan } from "./plan.mjs";
 import { conjunctiveWeek, chooseComparison, sharedSchedule, relativeScore, PRODUCTIVE_GAP } from "./pair.mjs";
 
-import { normalizeFocus, parseFocus, mergePriority, focusFreshness, MUSCLE_GROUPS, TIERS } from "./focus.mjs";
+import { normalizeFocus, parseFocus, mergePriority, focusFreshness, MUSCLE_GROUPS, TIERS, TIER_COST, FOCUS_BUDGET } from "./focus.mjs";
 import { mobilityFor, pickBlock, moveSeconds, stripMobility, WARMUP_SECONDS, COOLDOWN_SECONDS, MOBILITY_GOAL_SECONDS, MOBILITY_CHILDREN, MIN_MOVES, MAX_MOVES } from "./mobility.mjs";
 import { scoreAlternatives } from "./alternatives.mjs";
 import { learnPreferences, applyPreferences, avoidNote, SOFT_AT, HARD_AT } from "./preferences.mjs";
@@ -1890,4 +1890,20 @@ test("meta.goals says which goal set the parameters and what the others bought",
   assert.deepEqual(out.meta.goals.secondary[1].effect, [], "strength as a second goal buys nothing");
   assert.ok(out.meta.focus.applied.includes("abs"), "and the week really prioritises it");
   assert.ok(out.notes.some((n) => n.includes("changed nothing in this plan")));
+});
+
+/* The picker in index.html draws this budget as nine cells and works out what
+   each tap spends from the tier number alone, because importing a three entry
+   table would make the first paint wait on the engine. That mirror is correct
+   only while cost IS the tier number, so this is the tripwire: if TIER_COST
+   ever stops being the identity, this fails here rather than silently letting
+   the picker promise a budget the plan does not honour. */
+test("a tier costs its own number, which is what the picker mirrors", () => {
+  for (const tier of [TIERS.main, TIERS.secondary, TIERS.light]) {
+    assert.equal(TIER_COST[tier], tier, `tier ${tier} must cost ${tier}, index.html spends it that way`);
+  }
+  assert.equal(FOCUS_BUDGET, 9, "the picker draws exactly this many cells");
+  // The old four-group cap, priced at the middle tier, is what the budget replaced.
+  assert.equal(4 * TIER_COST[TIERS.secondary], 8, "four yellows fit");
+  assert.ok(5 * TIER_COST[TIERS.secondary] > FOCUS_BUDGET, "five do not, same as the old cap");
 });
