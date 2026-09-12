@@ -302,9 +302,9 @@ for (const g of GROUPS) MUSCLES_BY_GROUP[g] = MUSCLES.filter((m) => m.group === 
 //         radius, anterior squash, tube radius
 export const SKELETON = [
   ["head", { ell: [1.06, [-0.7, 0.4, 0], [5.6, 6.3, 5.9]] }, "pale"],   // cranial dome
-  ["head", { ell: [0.86, [2.9, 0.2, 0], [2.9, 3.6, 4.2]] }, "pale"],    // maxilla
-  ["head", { box: [[4.1, 10.4, 0], [0.85, 0.75, 4.0]] }, "pale"],       // brow ridge
-  ["head", { ell: [0.52, [2.5, 0.0, 0], [2.7, 2.5, 3.6]] }, "pale"],    // mandible
+  ["head", { ell: [0.84, [1.5, 0.2, 0], [2.5, 3.4, 3.9]] }, "pale"],    // maxilla
+  ["head", { box: [[2.9, 10.7, 0], [0.7, 0.62, 3.5]] }, "pale"],        // brow ridge
+  ["head", { ell: [0.50, [1.4, 0.0, 0], [2.3, 2.3, 3.2]] }, "pale"],    // mandible
   ["neck", { cap: [-0.1, 1.05, 2.3, 0, [-1.6, 0, 0]] }],
   ["spine", { cap: [0.30, 1.0, 2.2, 0, [-3.2, 0, 0]] }],        // thoracic
   ["spine", { cap: [0.02, 0.34, 2.4, 0, [-2.6, 0, 0]] }],       // lumbar
@@ -334,31 +334,36 @@ export const SKELETON = [
   // ---- the hand. Local space is the rig's own hand frame: y runs wrist to
   // knuckles, +x is the thumb side of the palm and +z is lateral, so the palm
   // faces -z, which is exactly what the 2D renderer means by palmN.
-  ["hand", { box: [[0.0, 2.30, 0.0], [1.10, 2.10, 2.55]] }, "pale"],     // palm block
-  ["hand", { box: [[1.95, 0.95, 0.0], [0.62, 1.25, 1.15]] }, "pale"],    // thenar
+  ["hand", { box: [[0.0, 2.20, 0.0], [2.55, 2.20, 1.15]] }, "pale"],     // palm block
+  ["hand", { box: [[-0.15, 4.70, 0.0], [2.45, 0.85, 1.10]] }, "pale"],   // knuckle row
+  ["hand", { box: [[1.95, 1.10, 0.10], [1.10, 1.55, 1.05]] }, "pale"],   // thenar
   // ---- the foot. y runs ankle to toe, +x is the top of the foot, the sole
   // sits at x = -4.4 because that is where the rig puts the floor.
   ["foot", { box: [[-2.30, -1.85, 0.0], [2.10, 2.45, 2.05]] }, "pale"],  // calcaneus
   ["foot", { box: [[-1.55, 2.60, 0.0], [1.85, 2.80, 2.15]] }, "pale"],   // arch, lifted off the sole
   ["foot", { box: [[-3.15, 7.10, 0.0], [1.30, 2.60, 2.70]] }, "pale"],   // ball
-  ["foot", { box: [[-3.55, 10.10, 0.0], [0.88, 1.40, 2.50]] }, "pale"],  // toe block
-  ["foot", { ell: [0.0, [-3.5, 11.6, -1.95], [0.95, 1.05, 0.90]] }, "pale"],
-  ["foot", { ell: [0.0, [-3.6, 11.7, -0.55], [0.78, 0.95, 0.68]] }, "pale"],
-  ["foot", { ell: [0.0, [-3.6, 11.5, 0.62], [0.72, 0.88, 0.62]] }, "pale"],
-  ["foot", { ell: [0.0, [-3.6, 11.2, 1.62], [0.66, 0.80, 0.56]] }, "pale"],
-  ["foot", { ell: [0.0, [-3.6, 10.8, 2.42], [0.60, 0.72, 0.50]] }, "pale"],
+  ["foot", { box: [[-3.50, 10.05, 0.0], [0.78, 1.35, 2.30]] }, "pale"],  // toe block
+  ["foot", { ell: [0.0, [-3.5, 11.3, -1.70], [0.85, 1.00, 0.82]] }, "pale"],
+  ["foot", { ell: [0.0, [-3.55, 11.4, -0.50], [0.72, 0.90, 0.62]] }, "pale"],
+  ["foot", { ell: [0.0, [-3.55, 11.25, 0.55], [0.68, 0.84, 0.58]] }, "pale"],
+  ["foot", { ell: [0.0, [-3.55, 11.0, 1.45], [0.62, 0.78, 0.53]] }, "pale"],
+  ["foot", { ell: [0.0, [-3.55, 10.7, 2.15], [0.56, 0.70, 0.48]] }, "pale"],
 ];
 
 // The five digits of the hand, in the hand bone's local space. Each is a chain
 // of segments that flexes toward the palm by an amount the grip decides, so
 // the same geometry is an open hand, a flat palm on the floor and a fist.
 // Lengths add up to BODY.finger and BODY.thumb.
+// Short, thick and nearly touching. Five separate rods read as a claw at
+// 320px; what is wanted is a mitt with knuckle hints, so the fingers sit one
+// width apart (the seam pass draws the groove between them for free), come off
+// a knuckle row that belongs to the palm, and are two phalanxes, not three.
 export const DIGITS = [
-  { kind: "finger", root: [ 1.95, 4.25, 0.0], w: 0.60, t: 0.74, seg: [1.85, 1.25, 0.95] },
-  { kind: "finger", root: [ 0.65, 4.40, 0.0], w: 0.62, t: 0.76, seg: [2.00, 1.35, 1.00] },
-  { kind: "finger", root: [-0.65, 4.35, 0.0], w: 0.60, t: 0.74, seg: [1.90, 1.30, 0.95] },
-  { kind: "finger", root: [-1.90, 4.15, 0.0], w: 0.55, t: 0.68, seg: [1.55, 1.05, 0.85] },
-  { kind: "thumb",  root: [ 2.40, 1.95, 0.0], w: 0.80, t: 0.86, seg: [2.30, 1.70] },
+  { kind: "finger", root: [ 1.86, 5.45, 0.0], w: 0.62, t: 0.92, seg: [1.30, 0.95] },
+  { kind: "finger", root: [ 0.62, 5.60, 0.0], w: 0.62, t: 0.95, seg: [1.45, 1.00] },
+  { kind: "finger", root: [-0.62, 5.55, 0.0], w: 0.62, t: 0.92, seg: [1.35, 0.95] },
+  { kind: "finger", root: [-1.86, 5.35, 0.0], w: 0.58, t: 0.86, seg: [1.10, 0.85] },
+  { kind: "thumb",  root: [ 2.35, 2.10, 0.2], w: 0.92, t: 0.98, seg: [1.95, 1.45] },
 ];
 
 // The rig's own grip table (rig.mjs GRIP_SPEC), read the same way: curl is the
@@ -372,4 +377,4 @@ export const GRIP_SPEC = {
   hook:   { curl: 104, thumb: 14, over: 0.10 },
 };
 // cumulative flexion per joint, as a multiple of curl
-export const DIGIT_CURL = [0.55, 1.0, 1.25];
+export const DIGIT_CURL = [0.62, 1.08];

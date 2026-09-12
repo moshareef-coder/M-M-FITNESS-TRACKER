@@ -122,8 +122,62 @@ export function boneTable(S, out) {
     dirOf(K.frames.foot.x, fx); dirOf(K.frames.foot.z, fz);
     posOf(K.p3.ankle, mid, A); posOf(K.p3.heel, mid, B);
     set("calc" + s, A, B, fx, fz, 1);
+    if (S.frontal) faceFootForward(t, s, TX);
   }
   return t;
+}
+
+// The ankle angle is real; the plane the rig swings it in is not. A frontal
+// move rotates the foot inside the frontal plane, which in three dimensions
+// points the toes straight out to the side. Keep the angle the foot makes with
+// the shin and swing it into the sagittal plane instead, with the small splay
+// a standing person actually has.
+const SPLAY = 14 * Math.PI / 180;
+const _f1 = new Float64Array(3), _f2 = new Float64Array(3), _f3 = new Float64Array(3);
+function faceFootForward(t, s, anterior) {
+  const foot = t["foot" + s], shin = t["tibia" + s], calc = t["calc" + s];
+  if (!foot || !shin) return;
+  const lat = s === "R" ? 1 : -1;
+  const cosA = Math.max(-1, Math.min(1, dot(shin.Y, foot.Y)));
+  const ang = Math.acos(cosA);
+  // anterior, with any component along the shin removed
+  const d = dot(anterior, shin.Y);
+  for (let k = 0; k < 3; k++) _f1[k] = anterior[k] - shin.Y[k] * d;
+  nrm(_f1);
+  // lateral, perpendicular to both, for the splay
+  cross(shin.Y, _f1, _f2); nrm(_f2);
+  const sl = Math.sin(SPLAY) * lat * (dot(_f2, shin.Z) < 0 ? -1 : 1);
+  const cs = Math.cos(ang), sn = Math.sin(ang) * Math.cos(SPLAY), sx = Math.sin(ang) * sl;
+  for (let k = 0; k < 3; k++) _f3[k] = shin.Y[k] * cs + _f1[k] * sn + _f2[k] * sx;
+  nrm(_f3);
+  const reframe = (bone, len, sign) => {
+    for (let k = 0; k < 3; k++) bone.Y[k] = _f3[k] * sign;
+    // x is the top of the foot: perpendicular to the sole, away from the shin
+    const dd = dot(shin.Y, bone.Y);
+    for (let k = 0; k < 3; k++) bone.X[k] = -(shin.Y[k] - bone.Y[k] * dd);
+    nrm(bone.X);
+    cross(bone.X, bone.Y, bone.Z);
+    if (dot(bone.Z, shin.Z) < 0) { bone.Z[0] *= -1; bone.Z[1] *= -1; bone.Z[2] *= -1;
+      bone.X[0] *= -1; bone.X[1] *= -1; bone.X[2] *= -1; }
+    bone.len = len;
+  };
+  reframe(foot, foot.len, 1);
+  if (calc) reframe(calc, calc.len, -1);
+}
+
+// A hand the rig has decided is flat on the floor should have its palm on the
+// floor, not on its edge. Roll the hand about its own long axis; nothing else
+// about the pose changes.
+const _p1 = new Float64Array(3);
+function flattenPalm(bone, s) {
+  const lat = s === "R" ? 1 : -1;
+  const d = -bone.Y[1];                     // world down, projected off Y
+  _p1[0] = -bone.Y[0] * d; _p1[1] = -1 - bone.Y[1] * d; _p1[2] = -bone.Y[2] * d;
+  const L = Math.hypot(_p1[0], _p1[1], _p1[2]);
+  if (L < 0.12) return;                     // pointing straight down, no roll to pick
+  for (let k = 0; k < 3; k++) bone.Z[k] = -lat * _p1[k] / L;
+  cross(bone.Y, bone.Z, bone.X);
+  nrm(bone.X);
 }
 
 // One attachment, for strand j in [-0.5, +0.5] and side lat (+1 right).
@@ -194,7 +248,7 @@ function wideAt(m, s) {
 }
 
 // ----------------------------------------------------------- the generator --
-const RING = 9;          // ring segments around a tube
+const RING = 8;          // ring segments around a tube
 const LONG = 11;         // samples along any muscle
 
 export function buildFigure(opts = {}) {
@@ -213,16 +267,18 @@ export function buildFigure(opts = {}) {
     for (const side of (m.side === "mid" ? [0] : [1, -1])) {
       const sfx = side > 0 ? "R" : "L";
       const region = GROUPS.indexOf(m.group);
+      const wideArr = new Float64Array(LONG);
+      for (let i = 0; i < LONG; i++) wideArr[i] = wideAt(m, i / (LONG - 1));
       if (m.kind === "tube") {
         const nv = RING * LONG + 2;
         const ni = RING * (LONG - 1) * 6 + RING * 6;
-        items.push({ m, lat: side, sfx, region, kind: 1, v0: vTotal, nv, i0: iTotal, ni });
+        items.push({ m, lat: side, sfx, region, kind: 1, wideArr, v0: vTotal, nv, i0: iTotal, ni });
         vTotal += nv; iTotal += ni;
       } else {
         const nj = m.strands || 6;
         const nv = nj * LONG * 2;
         const ni = (nj - 1) * (LONG - 1) * 12;
-        items.push({ m, lat: side, sfx, region, kind: 2, nj, v0: vTotal, nv, i0: iTotal, ni });
+        items.push({ m, lat: side, sfx, region, kind: 2, nj, wideArr, v0: vTotal, nv, i0: iTotal, ni });
         vTotal += nv; iTotal += ni;
       }
     }
@@ -266,22 +322,37 @@ export function buildFigure(opts = {}) {
   const position = new Float32Array(vTotal * 3);
   const normal = new Float32Array(vTotal * 3);
   const region = new Float32Array(vTotal);
+  // Every muscle and every bone solid carries its own id, so the seam pass can
+  // ask "is my neighbour a different part" instead of guessing from normals.
+  const partId = new Float32Array(vTotal);
   const index = new (vTotal > 65535 ? Uint32Array : Uint16Array)(iTotal);
 
   // ---- indices, once. Winding is decided at build time from the rest pose
   // (see finish()), so the outline shell can safely draw back faces only.
+  let nextId = 1;
+  const partNames = ["background"];
   for (const it of items) {
-    const r = it.region;
-    for (let v = 0; v < it.nv; v++) region[it.v0 + v] = r;
+    partNames.push(it.m.id + "." + it.sfx);
   }
   for (const rp of rigid) {
-    for (let v = 0; v < rp.nv; v++) region[rp.v0 + v] = rp.region;
+    partNames.push("bone:" + rp.bone + (rp.digit ? ".d" + rp.digit.d + "." + rp.digit.k : ""));
   }
+  for (const it of items) {
+    const r = it.region, id = nextId++;
+    for (let v = 0; v < it.nv; v++) { region[it.v0 + v] = r; partId[it.v0 + v] = id; }
+  }
+  for (const rp of rigid) {
+    const id = nextId++;
+    for (let v = 0; v < rp.nv; v++) { region[rp.v0 + v] = rp.region; partId[rp.v0 + v] = id; }
+  }
+  // The seam pass encodes the id in one byte, so it has to stay under 256.
+  if (nextId > 255) for (let v = 0; v < vTotal; v++) partId[v] = 1 + (partId[v] % 254);
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(position, 3));
   geo.setAttribute("normal", new THREE.BufferAttribute(normal, 3));
   geo.setAttribute("aRegion", new THREE.BufferAttribute(region, 1));
+  geo.setAttribute("aId", new THREE.BufferAttribute(partId, 1));
   geo.setIndex(new THREE.BufferAttribute(index, 1));
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 45, 0), 130);
 
@@ -290,6 +361,7 @@ export function buildFigure(opts = {}) {
   const cpts = new Float64Array(LONG * 3);
   const uS = new Float64Array(LONG * 3);
   const grid = new Float64Array(10 * LONG * 3);
+  const prof = new Float64Array(LONG);
   const U0 = new Float64Array(3), U1 = new Float64Array(3);
   const T = new Float64Array(3), V = new Float64Array(3), N = new Float64Array(3),
         Tj = new Float64Array(3), tmp = new Float64Array(3);
@@ -302,7 +374,7 @@ export function buildFigure(opts = {}) {
     attach(bones, m.from, sfx, lat, 0, ctrl, 0, U0); n++;
     if (m.via) for (const v of m.via) { attach(bones, v, sfx, lat, 0, ctrl, n * 3, null); n++; }
     attach(bones, m.to, sfx, lat, 0, ctrl, n * 3, U1); n++;
-    const bulge = (m.bulge || 0) * (1 + 0.30 * (it.c || 0));
+    const bulge = (m.bulge || 0) * (1 + 0.60 * (it.c || 0));
     if (n === 2 && bulge !== 0) {
       // no wrap point: the belly IS the control point, pushed off the chord
       // along the average of the two surface normals.
@@ -332,10 +404,11 @@ export function buildFigure(opts = {}) {
     // to look inflated.
     const c = it.c || 0;
     const r0 = m.r[0] * (1 - 0.06 * c), r1 = m.r[1] * (1 + 0.12 * c), r2 = m.r[2] * (1 - 0.06 * c);
-    const sharp = 1 + 0.55 * c;
+    const sharp = 1 + 0.35 * c;
     const P = position, NM = normal;
+    const WA = it.wideArr;
+    for (let i = 0; i < LONG; i++) prof[i] = bellyProfile(i / (LONG - 1), r0, r1, r2, peak, sharp);
     for (let i = 0; i < LONG; i++) {
-      const s = i / (LONG - 1);
       const i0 = Math.max(0, i - 1) * 3, i1 = Math.min(LONG - 1, i + 1) * 3;
       T[0] = cpts[i1] - cpts[i0]; T[1] = cpts[i1 + 1] - cpts[i0 + 1]; T[2] = cpts[i1 + 2] - cpts[i0 + 2];
       const segLen = Math.hypot(T[0], T[1], T[2]) || 1;
@@ -344,15 +417,13 @@ export function buildFigure(opts = {}) {
       N[0] = uS[i * 3] - T[0] * d; N[1] = uS[i * 3 + 1] - T[1] * d; N[2] = uS[i * 3 + 2] - T[2] * d;
       nrm(N);
       cross(T, N, V); nrm(V);
-      const rad = bellyProfile(s, r0, r1, r2, peak, sharp);
-      const w = rad * wideAt(m, s);
+      const rad = prof[i];
+      const w = rad * WA[i];
       const h = rad * flat;
-      // taper slope, for the normal
-      const sPrev = Math.max(0, s - 1 / (LONG - 1)), sNext = Math.min(1, s + 1 / (LONG - 1));
       // dr / d(arc length): T was a central difference, so the arc step and
       // the radius step share the same denominator and it cancels.
-      const dw = (bellyProfile(sNext, r0, r1, r2, peak, sharp) * wideAt(m, sNext)
-                - bellyProfile(sPrev, r0, r1, r2, peak, sharp) * wideAt(m, sPrev)) / segLen;
+      const ia = Math.max(0, i - 1), ib = Math.min(LONG - 1, i + 1);
+      const dw = (prof[ib] * WA[ib] - prof[ia] * WA[ia]) / segLen;
       const base = (it.v0 + i * RING) * 3;
       for (let a = 0; a < RING; a++) {
         const c = ringC[a], si = ringS[a];
@@ -383,7 +454,7 @@ export function buildFigure(opts = {}) {
     const peak = m.peak === undefined ? 0.5 : m.peak;
     const cc = it.c || 0;
     const h0 = m.h[0] * (1 - 0.06 * cc), h1 = m.h[1] * (1 + 0.12 * cc), h2 = m.h[2] * (1 - 0.06 * cc);
-    const hSharp = 1 + 0.55 * cc;
+    const hSharp = 1 + 0.35 * cc;
     // strand order is reversed on the left so the slab's two faces keep the
     // same winding on both sides of the body
     for (let jj = 0; jj < nj; jj++) {
@@ -392,7 +463,7 @@ export function buildFigure(opts = {}) {
       attach(bones, m.from, sfx, lat, j, ctrl, 0, U0); n++;
       if (m.via) for (const v of m.via) { attach(bones, v, sfx, lat, j, ctrl, n * 3, null); n++; }
       attach(bones, m.to, sfx, lat, j, ctrl, n * 3, U1); n++;
-      const bulge = (m.bulge || 0) * (1 + 0.30 * cc);
+      const bulge = (m.bulge || 0) * (1 + 0.60 * cc);
       if (n === 2 && bulge !== 0) {
         ctrl[6] = ctrl[3]; ctrl[7] = ctrl[4]; ctrl[8] = ctrl[5];
         for (let k = 0; k < 3; k++)
@@ -414,6 +485,7 @@ export function buildFigure(opts = {}) {
     // centreline of the sheet by the width profile, so a fan can be a sheet at
     // its origin and a strap at its insertion without moving either
     // attachment. cpts is free here: only the tube path uses it.
+    const WA = it.wideArr;
     if (m.wide) {
       for (let i = 0; i < LONG; i++) {
         let mx = 0, my = 0, mz = 0;
@@ -424,7 +496,7 @@ export function buildFigure(opts = {}) {
         cpts[i * 3] = mx / nj; cpts[i * 3 + 1] = my / nj; cpts[i * 3 + 2] = mz / nj;
       }
       for (let i = 0; i < LONG; i++) {
-        const k = wideAt(m, i / (LONG - 1));
+        const k = WA[i];
         const mx = cpts[i * 3], my = cpts[i * 3 + 1], mz = cpts[i * 3 + 2];
         for (let jj = 0; jj < nj; jj++) {
           const g = (jj * LONG + i) * 3;
@@ -451,6 +523,7 @@ export function buildFigure(opts = {}) {
       cross(T, Tj, N);
       if (N[0] * uS[im * 3] + N[1] * uS[im * 3 + 1] + N[2] * uS[im * 3 + 2] < 0) sheetSign = -1;
     }
+    for (let i = 0; i < LONG; i++) prof[i] = bellyProfile(i / (LONG - 1), h0, h1, h2, peak, hSharp);
     for (let jj = 0; jj < nj; jj++) {
       const ju = nj === 1 ? 0.5 : jj / (nj - 1);
       // lens: full thickness through the middle of the sheet, knife edge at
@@ -470,7 +543,7 @@ export function buildFigure(opts = {}) {
         if (Math.hypot(N[0], N[1], N[2]) < 1e-6) { N[0] = uS[i * 3]; N[1] = uS[i * 3 + 1]; N[2] = uS[i * 3 + 2]; }
         nrm(N);
         if (sheetSign < 0) { N[0] = -N[0]; N[1] = -N[1]; N[2] = -N[2]; }
-        const h = bellyProfile(s, h0, h1, h2, peak, hSharp) * e;
+        const h = prof[i] * e;
         const o = jj * LONG + i;
         for (let k = 0; k < 3; k++) {
           P[top + o * 3 + k] = grid[g + k] + N[k] * h;
@@ -661,6 +734,7 @@ export function buildFigure(opts = {}) {
     for (const sfx of ["L", "R"]) {
       const g = (grips && grips[sfx]) || "open";
       if (g !== gripNow[sfx]) { computeChain(sfx, g); gripNow[sfx] = g; }
+      if (g === "flat" && bones["hand" + sfx]) flattenPalm(bones["hand" + sfx], sfx);
     }
     for (const it of items) {
       it.c = con ? con[it.region] : 0;
@@ -673,14 +747,15 @@ export function buildFigure(opts = {}) {
   }
 
   return { geometry: geo, update, vertices: vTotal, triangles: iTotal / 3,
-           muscleCount: items.length, boneParts: rigid.length };
+           muscleCount: items.length, boneParts: rigid.length, partCount: nextId - 1,
+           partNames };
 }
 
 // One phalanx, baked from its joint along +y. x is across the hand, z is the
 // palm-to-back thickness.
 function bakeDigit(dg, k) {
   const L = dg.seg[k];
-  const taper = 1 - k * 0.10;
+  const taper = 1 - k * 0.06;
   const g = new THREE.BoxGeometry(dg.w * 2 * taper, L, dg.t * 2 * taper);
   g.translate(0, L / 2, 0);
   const pos = new Float32Array(g.getAttribute("position").array);
@@ -700,7 +775,7 @@ function bakePart(spec, len) {
   if (spec.cap) {
     const [y0, y1, r, , off = [0, 0, 0]] = spec.cap;
     const a = y0 * len, b = y1 * len;
-    g = new THREE.CapsuleGeometry(r, Math.max(0.1, Math.abs(b - a) - 2 * r), 3, 8);
+    g = new THREE.CapsuleGeometry(r, Math.max(0.1, Math.abs(b - a) - 2 * r), 2, 6);
     g.translate(off[0], (a + b) / 2, off[2]);
   } else if (spec.box) {
     const [c, h] = spec.box;
@@ -708,12 +783,12 @@ function bakePart(spec, len) {
     g.translate(c[0], c[1], c[2]);
   } else if (spec.ell) {
     const [y, off, rad] = spec.ell;
-    g = new THREE.SphereGeometry(1, 12, 8);
+    g = new THREE.SphereGeometry(1, 9, 6);
     g.scale(rad[0], rad[1], rad[2]);
     g.translate(off[0], y * len + off[1], off[2]);
   } else {
     const [y, rl, sx, rt] = spec.ring;
-    g = new THREE.TorusGeometry(rl, rt, 5, 20);
+    g = new THREE.TorusGeometry(rl, rt, 4, 14);
     g.rotateX(Math.PI / 2);
     g.scale(sx, 1, 1);
     g.translate(0, y * len, 0);

@@ -31,6 +31,10 @@ const { PALETTE, makeGradientMap, makeStage, frameStage, aimCamera, setLit,
      contractionFor  per group 0..1 so a working muscle swells on the rep
      gripSides       which hand is on which implement, for the hand pose */
 const contractionFor = VIEW.contractionFor || null;
+// gripsFor knows a barbell is two handed and asks where the wrist is, not
+// the fingertips, so a push-up hand lands flat. Older view.mjs copies only
+// had the rig's gripSides; fall through to that when it is missing.
+const gripsFor = VIEW.gripsFor || null;
 const gripSides = RIG.gripSides || null;
 
 // The outline ink and the contact shadow are the two things that read wrong if
@@ -170,16 +174,24 @@ function paint(m) {
   const intensity = litIntensity(move, cycle);
   m.st.fig.update(S, {
     contraction: contractionFor ? contractionFor(groups, intensity) : undefined,
-    grips: gripSides ? gripSides(move, S) : undefined,
+    grips: gripsFor ? gripsFor(move, S) : (gripSides ? gripSides(move, S) : undefined),
   });
   setLit(m.st.mat, groups, m.lit && m.lit.color, intensity);
   const drift = m.paused3d ? 0 : DRIFT_DEG * Math.sin((m.time / DRIFT_SEC) * Math.PI * 2);
   aimCamera(m.st, S.frontal ? 0 : -90, m.yaw + drift);
   resize(m);
-  m.renderer.render(m.st.scene, m.st.cam);
+  // renderStage is the three pass draw (part ids and depth, figure, seam),
+  // which only inks where two muscles meet. Without it the old outline shell
+  // stays on, so a view.mjs without renderStage still draws something.
+  if (VIEW.renderStage) VIEW.renderStage(m.renderer, m.st, m.w, m.h);
+  else m.renderer.render(m.st.scene, m.st.cam);
 }
 
 function applyTheme(m) {
+  // view.mjs owns the palette (muscle, bone, seam ink, lights) per theme and
+  // re-skins every live stage; the shell and shadow tweaks below are the
+  // mount's own leftovers for a view.mjs without setTheme.
+  if (VIEW.setTheme) VIEW.setTheme(m.theme);
   const t = THEME[m.theme] || THEME.dark;
   m.st.shell.material.color.setHex(t.ink);
   m.st.shadow.material.opacity = t.shadow;
