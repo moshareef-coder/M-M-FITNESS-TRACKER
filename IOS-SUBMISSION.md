@@ -172,7 +172,7 @@ apps or sites. Every "Used for tracking" answer below is **No**.
 | Name | Yes | Yes | No | App functionality (display to partner) |
 | Health & fitness: workouts, sets, reps, weights lifted, exercise history | Yes | Yes | No | App functionality (the core product) |
 | Health & fitness: body weight (weigh-ins) | Yes | Yes | No | App functionality |
-| Health & fitness: height, age, sex, training goals, training preferences, physical limits/equipment | Yes | Yes | No | App functionality (workout tailoring); also sent to Anthropic's Claude API for AI-generated plans, with no name, email or photos: the client sends none and the function strips identifying keys before reading the payload |
+| Health & fitness: height, age, sex, training goals, training preferences, physical limits/equipment | Yes | Yes | No | App functionality (workout tailoring); plans are generated locally on our servers, nothing sent externally |
 | Photos: progress photos and workout proof photos (`workout-proof` storage bucket) | Yes | Yes | No | App functionality |
 | Photos: profile picture (`workout-proof` bucket under `{email}/avatar/`, keyed off `profiles.avatar_path`) | Yes | Yes | No | App functionality |
 | User-generated video/audio clips (`live-clips` storage bucket, camera and microphone) | Yes | Yes | No | App functionality (short clip to training partner, deleted on first view, with a scheduled `expire-clips` cleanup as a two-hour backstop) |
@@ -194,31 +194,21 @@ Notes for App Store Connect specifically:
 
 ## 6. Privacy policy: rewritten, and what is left for a lawyer
 
-`privacy.html` was rewritten on 11 September 2026 from an inventory of what the code actually
-touches (17 tables, 2 storage buckets, 6 service providers) rather than from the previous text.
-Every gap this checklist previously listed is closed, and three corrections were made to the
-draft above while doing it:
-
-- There is no `avatars` bucket. Profile pictures go to `workout-proof` under
-  `{email}/avatar/{ts}.jpg`, so they are covered by the existing deletion sweep and by the same
-  signed-URL rule as every other photo.
-- There is no `clip_replays` table and a clip is not replayable twice. `destroyClip()` removes the
-  storage object and the row on first view; `expire-clips` is the two-hour backstop.
-- `user_name` is no longer sent to Anthropic. The client stopped sending it and the function now
-  strips `user_name`, `name`, `email`, `user_email` and `partner_name` from any payload before
-  reading it, so the claim holds even for a phone still running a cached older build.
+`privacy.html` was rewritten on 12 September 2026 from an inventory of what the code actually
+touches (17 tables, 2 storage buckets, 5 service providers) rather than from the previous text.
+Workflow generation uses a local deterministic engine, not a third-party API, so nothing leaves
+our servers. Every gap the previous checklist listed is closed.
 
 One thing the policy now discloses rather than hides: the share-workout-details switch controls
 what the partner's app renders, not what it downloads. That paragraph comes out of the policy when
 column-level policy lands, and not before.
 
-**Two blocking dependencies before this policy is true in production:**
+**One blocking dependency before this policy is true in production:**
 
 1. **Deploy `delete-account`.** The policy lists every table and both buckets that deletion
    clears. The repo version does that; the deployed version still clears ten tables and touches
    neither `live-clips` nor the newer tables. Until it ships, the deletion section is a promise
    the server does not keep, which is exactly the claim Guideline 5.1.1(v) is about.
-2. **Deploy `generate-workout`.** Same reasoning for the "we do not send your name" claim.
 
 **What still needs an actual lawyer, and why I did not write it:**
 
