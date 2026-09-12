@@ -819,31 +819,42 @@ const STRAIGHT_ARM_BAND_PULLDOWN = {
   ],
 };
 
-// Face down with the arms out in a Y, lifting the thumbs a couple of inches off
-// the floor. Seen from above and behind, which is the only view where a Y is a
-// Y: side on it is two arms hidden behind a head. There is no floor line drawn,
-// because a floor drawn at the bottom of a view that is looking down at the
-// figure reads as the figure standing up.
+// Face down on the mat with the arms long past the head, lifting the thumbs a
+// couple of inches off the floor and putting them down again. The thing that
+// MUST be visible is that the body is FACE DOWN ON THE FLOOR while the arms
+// lift, because a Y raise done standing is a different exercise for a different
+// muscle. This was authored top down first, and top down a prone figure with
+// its arms in a Y is pixel for pixel a standing figure with its arms in a Y:
+// nothing in the frame said floor. Side on, the mat under the belly and the
+// hands travelling up off it say it in one glance, at the cost of the Y itself
+// (the two arms overlap side on). That trade is the right way round: the lift
+// is the rep, the width of the Y is a detail the cue can carry.
+//
+// rot 90 is face down with the head at +x, so the legs run out to -x and the
+// arms reach past the head to +x. The thumbs-up grip is a forearm rotation the
+// rig has no axis for, so it lives in the cue, not the picture.
 const PRONE_Y_RAISE = {
-  view: "front",
-  facing: "away",
+  view: "side",
   loop: "pingpong",
   dur: 3.2,
-  breath: 0.3,
-  floor: false,
-  feet: { R: { ang: 7, len: 0.95, w: 0.95 }, L: { ang: 7, len: 0.95, w: 0.95 } },
+  breath: 0.25,
+  fit: { k: 0.94, dx: -2, dy: -26 },
+  props: [{ type: "mat", x: -6, w: 152 }],
   keys: [
-    { // arms resting in the Y, thumbs on the floor
+    { // down: hands resting on the mat out past the head, elbows almost straight
       t: 0,
-      root: { x: 70, y: 54, rot: 0 },
-      joints: { spine: 2, neck: 4, shoulderR: 143, shoulderL: 143, elbowR: 14, elbowL: 14,
-                wristR: -6, wristL: -6, hipR: 3, hipL: 3, kneeR: 2, kneeL: 2 },
+      root: { x: 68, y: 105, rot: 90 },
+      joints: { spine: -2, neck: 9, shoulderR: -7, shoulderL: -5, elbowR: 8, elbowL: 8,
+                wristR: 2, wristL: 2, hipR: -178, hipL: -178, kneeR: 3, kneeL: 3,
+                ankleR: -56, ankleL: -56 },
     },
-    { // lifted: small and slow, the low traps do this one
+    { // lifted: the hands come off the mat and the chest follows a degree. Small
+      // and slow on purpose, this is a low trap raise, not a back extension.
       t: 1,
-      root: { x: 70, y: 54, rot: 0 },
-      joints: { spine: -4, neck: -2, shoulderR: 157, shoulderL: 157, elbowR: 8, elbowL: 8,
-                wristR: -2, wristL: -2, hipR: 3, hipL: 3, kneeR: 2, kneeL: 2 },
+      root: { x: 68, y: 105, rot: 90 },
+      joints: { spine: -3, neck: 6, shoulderR: 19, shoulderL: 17, elbowR: 4, elbowL: 4,
+                wristR: -2, wristL: -2, hipR: -177, hipL: -177, kneeR: 3, kneeL: 3,
+                ankleR: -56, ankleL: -56 },
     },
   ],
 };
@@ -1057,30 +1068,45 @@ const WRIST_FLEXOR_STRETCH = {
 // view: the threading arm runs away from the camera, so what carries the move
 // is the silhouette, hips high and one shoulder down on the floor, which no
 // other move in this library makes.
+//
+// Second pass fixed the silhouette, which was the whole point of the view and
+// was not actually there. The head was floating six units clear of the mat, and
+// both arms were propped out in front, so it read as an ordinary all fours
+// position with the chin tucked. Now the head is down ON the mat, the pelvis
+// sits a full 27 units above it at thigh height over the knees so the hips are
+// unmistakably the high point, and the FAR arm is the threading one, running
+// out along the mat under the chest and past the knees.
+//
+// The shoulder is not on the mat and cannot be. Getting it there needs the
+// torso rotated another 25 degrees, and at that angle the supporting arm
+// reaching forward along the mat measures over 200 degrees of shoulder
+// elevation against a 196 cap. The head down plus the hips high is the most of
+// the silhouette the rig will give.
 const THREAD_THE_NEEDLE_STRETCH = {
   view: "side",
   loop: "hold",
   dur: 5.8,
   breath: 0.9,
   breathRate: 0.8,
-  props: [{ type: "mat", x: 8, w: 120 }],
+  fit: { k: 1.1, dx: 6, dy: -20 },
+  props: [{ type: "mat", x: 4, w: 128 }],
   keys: [
-    { // settled, shoulder and ear down, hips over the knees
+    { // settled, ear and shoulder down on the mat, hips up over the knees
       t: 0,
-      root: { x: 48, y: 84.7, rot: 105 },
-      joints: { spine: 20, neck: -30, hipR: -105, hipL: -105, kneeR: 94, kneeL: 94,
-                ankleR: -50, ankleL: -50, wristR: 30, wristL: 30 },
+      root: { x: 48, y: 83, rot: 109 },
+      joints: { spine: 10, neck: 15, hipR: -109, hipL: -109, kneeR: 94, kneeL: 94,
+                ankleR: -58, ankleL: -58, wristR: 25, wristL: -16 },
       ik: {
-        wristR: { x: 98, y: 109, bend: 1 }, wristL: { x: 86, y: 103, bend: 1 },
+        wristR: { x: 104, y: 112, bend: 1 }, wristL: { x: 40, y: 112.5, bend: 1 },
       },
     },
     { // a touch deeper on the exhale, hips unmoved
       t: 1,
-      root: { x: 48, y: 85.6, rot: 107 },
-      joints: { spine: 21, neck: -31, hipR: -107, hipL: -107, kneeR: 94, kneeL: 94,
-                ankleR: -50, ankleL: -50, wristR: 30, wristL: 30 },
+      root: { x: 48, y: 83.6, rot: 110 },
+      joints: { spine: 10, neck: 15, hipR: -110, hipL: -110, kneeR: 94, kneeL: 94,
+                ankleR: -58, ankleL: -58, wristR: 25, wristL: -16 },
       ik: {
-        wristR: { x: 100, y: 109, bend: 1 }, wristL: { x: 88, y: 103, bend: 1 },
+        wristR: { x: 105, y: 112, bend: 1 }, wristL: { x: 37, y: 112.5, bend: 1 },
       },
     },
   ],
@@ -1307,6 +1333,7 @@ const FIGURE_FOUR_STRETCH = {
   dur: 6.0,
   breath: 0.9,
   breathRate: 0.8,
+  fit: { k: 1.3, dx: 6, dy: -22 },
   props: [{ type: "mat", x: 8, w: 120 }],
   keys: [
     { // settled, shin crossing the lifted thigh, head heavy on the floor
@@ -1389,7 +1416,9 @@ const COUCH_STRETCH = {
 // Knees wide with the shins in line behind them, forearms down, rocking the
 // hips back. Front view as suggested, which here is the view from above the
 // figure: that is the only one where both knees are visible and the M of the
-// wide legs reads. No floor line, because the floor is behind the figure.
+// wide legs reads. No floor line, because a line under a figure the camera is
+// looking DOWN at reads as the ground a standing figure is on. The top-down mat
+// is what says floor instead, and without it this was a wide squat.
 const FROG_STRETCH = {
   view: "front",
   loop: "hold",
@@ -1398,6 +1427,8 @@ const FROG_STRETCH = {
   breathRate: 0.8,
   floor: false,
   feet: { R: { ang: 150, len: 0.8, w: 1 }, L: { ang: 150, len: 0.8, w: 1 } },
+  fit: { k: 0.86 },
+  props: [{ type: "mat", top: true, x: 14, y: -9, w: 112, h: 156, r: 13 }],
   keys: [
     { // settled, knees wide, shins in line with the thighs
       t: 0,
@@ -1549,7 +1580,8 @@ const BENT_KNEE_CALF_STRETCH = {
 // side, then rotating the whole lot over to the other side. Front view, which
 // here is from above: the switch is a rotation about the vertical axis and side
 // on it is one leg hiding the other. No floor line, for the same reason as the
-// frog: the floor is behind the figure, not below it.
+// frog, and a top-down mat instead: without it a figure with its knees at right
+// angles seen from above is a figure squatting seen from the front.
 const HIP_SWITCH_90_90 = {
   view: "front",
   loop: "pingpong",
@@ -1558,6 +1590,8 @@ const HIP_SWITCH_90_90 = {
   breathRate: 0.9,
   floor: false,
   feet: { R: { ang: 120, len: 0.85, w: 1 }, L: { ang: 120, len: 0.85, w: 1 } },
+  fit: { k: 0.86 },
+  props: [{ type: "mat", top: true, x: 17, y: -9, w: 107, h: 156, r: 13 }],
   keys: [
     { // knees to the left: front shin across the body, back knee out
       t: 0,
@@ -1699,8 +1733,13 @@ const STANDING_HIP_AIRPLANE = {
 // Lying on one side with the knees stacked, the top arm opening across the body
 // while the knees stay put. Front view, which here is looking down at the figure
 // on its side: that is the only view where the arm sweeping across is a sweep.
+// Top-down mat rather than a floor line, so the figure reads as lying down.
+//
 // The rig's shoulder stops short of the far side, so the arm opens to overhead
-// rather than all the way to the floor behind, and the head follows it.
+// rather than all the way to the floor behind, and the head follows it. That is
+// a hard stop, not a choice: the hand has to travel from three o'clock through
+// twelve to nine, and the shoulder's 196 degrees of elevation runs out just past
+// twelve. Half the sweep is all there is.
 const OPEN_BOOK_THORACIC_ROTATION = {
   view: "front",
   loop: "pingpong",
@@ -1710,6 +1749,8 @@ const OPEN_BOOK_THORACIC_ROTATION = {
   floor: false,
   farSide: "L",
   feet: { R: { ang: 40, len: 0.8, w: 1 }, L: { ang: 40, len: 0.8, w: 1 } },
+  fit: { k: 0.8, dx: -6, dy: 12 },
+  props: [{ type: "mat", top: true, x: 28, y: -31, w: 95, h: 168, r: 14 }],
   keys: [
     { // start: hands stacked together, knees bent to one side
       t: 0,
@@ -1825,7 +1866,10 @@ const CHIN_TUCKS = {
 // opposite hand. Seen from above and behind, as suggested: the reach crosses the
 // midline, which is exactly what the back view shows and what a side view turns
 // into a leg disappearing behind a body. No floor line, because the floor is
-// behind the figure here.
+// behind the figure here; the top-down mat carries it instead, and it has to,
+// because a face down figure with its arms wide drawn on nothing is a figure
+// standing in a T. The arms hang off the sides of the mat, which is what they
+// would do.
 const PRONE_SCORPION_STRETCH = {
   view: "front",
   facing: "away",
@@ -1835,6 +1879,8 @@ const PRONE_SCORPION_STRETCH = {
   breathRate: 0.9,
   floor: false,
   feet: { R: { ang: -80, len: 0.95, w: 0.95 }, L: { ang: 7, len: 0.95, w: 0.95 } },
+  fit: { k: 0.82, dy: 4 },
+  props: [{ type: "mat", top: true, x: 33, y: -18, w: 73, h: 163, r: 13 }],
   keys: [
     { // lying long, arms wide
       t: 0,

@@ -612,13 +612,25 @@ const SUMO_DEADLIFT = {
 // nearly touches. Must be visible: the crossing, which is a lateral thing the
 // side view flattens into an ordinary reverse lunge, so this one deviates from
 // the suggested side view to the front.
+//
+// The working leg is authored by angles, not pinned. Two reasons. A pinned
+// ankle is a flat foot and the trailing foot in a curtsy is up on the ball of
+// it; and two bone IK between a hip and a planted ankle only has two solutions,
+// knee swung wide or knee tucked inside, and neither of them is a leg crossing
+// behind. Authored, the thigh sweeps 50 degrees across the midline (hipFlex
+// -42, which needs the front view's adduction range: the old floor of -35 was
+// the side view's hip extension limit and it was capping how far this could
+// cross) and the shin drops from there to a toe planted past the standing foot.
+// The shin reads as almost straight because the real bend in it is sagittal,
+// pointing away from the camera, which is also why its projected flexion comes
+// out negative and gets checked by magnitude.
 const CURTSY_LUNGE = {
   view: "front",
   loop: "pingpong",
   dur: 3.2,
   breath: 0.2,
   farSide: "L",
-  feet: { R: { ang: 6, len: 0.4, w: 1.3 }, L: { ang: 46, len: 0.6, w: 1.05 } },
+  feet: { R: { ang: 6, len: 0.4, w: 1.3 }, L: { ang: 30, len: 0.42, w: 1.2 } },
   props: [
     { type: "dumbbell", side: "R", point: "hand", dx: 2, dy: 5, rot: 0, k: 0.8, front: true },
     { type: "dumbbell", side: "L", point: "hand", dx: -2, dy: 5, rot: 0, k: 0.8 },
@@ -626,15 +638,27 @@ const CURTSY_LUNGE = {
   keys: [
     { // stood tall, feet under the hips
       t: 0,
-      root: { x: 72, y: 62, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: -3, elbowR: 4, shoulderL: -3, elbowL: 4 },
-      ik: { ankleR: { x: 78, y: 113.4, bend: -1 }, ankleL: { x: 66, y: 112, bend: -1 } },
+      root: { x: 72, y: 61.4, rot: 0 },
+      joints: { spine: 0, neck: 0, shoulderR: -3, elbowR: 4, shoulderL: -3, elbowL: 4,
+                hipL: 0, kneeL: 4 },
+      ik: { ankleR: { x: 78, y: 113.4, bend: -1 } },
     },
-    { // sunk, left foot crossed behind and past the right, hips square
+    { // mid step: the trailing foot is in the AIR on its way across, knee bent
+      // so the toe clears the floor. Without this keyframe the straight line
+      // interpolation between the two ends drags the toe through the ground.
+      t: 0.5,
+      root: { x: 73, y: 68, rot: 1 },
+      joints: { spine: 3, neck: -1, shoulderR: 5, elbowR: 4, shoulderL: 5, elbowL: 4,
+                hipL: -18, kneeL: 30 },
+      ik: { ankleR: { x: 78, y: 113.4, bend: -1 } },
+    },
+    { // sunk, left thigh swept behind and well past the right leg, toe planted
+      // out past the standing foot, hips still square to the front
       t: 1,
-      root: { x: 76, y: 78, rot: 2 },
-      joints: { spine: 6, neck: -2, shoulderR: -3, elbowR: 4, shoulderL: -3, elbowL: 4 },
-      ik: { ankleR: { x: 78, y: 113.4, bend: -1 }, ankleL: { x: 92, y: 112, bend: -1 } },
+      root: { x: 74, y: 74, rot: 2 },
+      joints: { spine: 6, neck: -2, shoulderR: -3, elbowR: 4, shoulderL: -3, elbowL: 4,
+                hipL: -52, kneeL: -20 },
+      ik: { ankleR: { x: 78, y: 113.4, bend: -1 } },
     },
   ],
 };
@@ -642,18 +666,26 @@ const CURTSY_LUNGE = {
 // Soles of the feet pressed together with the knees fallen wide, then short
 // sharp hip drives off the floor. Must be visible: that the person is LYING ON
 // THEIR BACK driving the hips, with the heels drawn right up under them.
-// This deviates from the suggested front view. Front on, a figure with the
-// knees splayed and the heels together is drawn standing, and it read as a deep
-// sumo squat: a clean pose of the wrong movement. Side on the knee splay is
-// invisible, but the lying position, the tucked heels and the hip drive are all
-// true, so the wrong thing that is missing is smaller. Supine, so rot is
-// negative and the head is at -x.
+//
+// Three views have been tried. Front on, standing, it read as a deep sumo
+// squat. Top down on a mat, which the mat prop now makes possible, the diamond
+// of the splayed knees and the touching soles is perfectly clear and the figure
+// reads as SITTING in a butterfly stretch: same shape as Frog Stretch two
+// entries away, and with the drive pointing at the camera there is nothing
+// moving. That is a clean pose of the wrong movement, so it went back.
+//
+// Side on the knee splay is invisible, but the lying position, the tucked heels
+// and the hip drive are all true, so the wrong thing that is missing is
+// smaller. What this pass changed is the size of the drive and the size of the
+// figure: the bridge now lifts far enough to read as a rep at thumbnail size.
+// Supine, so rot is negative and the head is at -x.
 const FROG_PUMP = {
   view: "side",
   loop: "pingpong",
   dur: 2.2,
   breath: 0.25,
-  props: [{ type: "mat", x: 14, w: 110 }],
+  fit: { k: 1.3, dx: 4, dy: -34 },
+  props: [{ type: "mat", x: 8, w: 122 }],
   keys: [
     { // hips down, heels tucked in tight under the hips
       t: 0,
@@ -666,8 +698,8 @@ const FROG_PUMP = {
     },
     { // short sharp drive up, knees stay high over the heels
       t: 1,
-      root: { x: 72, y: 96, rot: -112 },
-      joints: { spine: 0, neck: 16 },
+      root: { x: 70, y: 92, rot: -120 },
+      joints: { spine: 0, neck: 20 },
       ik: {
         ankleR: { x: 90, y: 113.4, bend: -1 }, ankleL: { x: 86, y: 113.4, bend: -1 },
         wristR: { x: 88, y: 110, bend: 1 }, wristL: { x: 85, y: 111, bend: 1 },
@@ -1331,10 +1363,20 @@ const WOODCHOPPER = {
 // Hanging from a bar with the legs held high, the feet sweep from one side to
 // the other like a wiper. Must be visible: the legs staying HIGH the whole time,
 // which is what separates it from the hanging leg raise it sits beside.
-// The sweep itself is lateral and this rig cannot draw it: front on, the leg that
-// travels away from its own side needs a hip angle no hip reaches, and the check
-// is right to refuse it. So the side view keeps the true part, legs pinned high
-// under a bar and moving through the top of the arc, and loses the direction.
+//
+// The sweep itself is lateral and this rig still cannot draw it. Re-tested after
+// the front view got its wider adduction range, because that is exactly the kind
+// of limit that was blocking it, and it is not enough: with both legs swept to
+// one side the trailing leg has to point up and ACROSS its own midline, which is
+// past 180 on the far side, around 210. The range that opened runs the other
+// way, down across the body to -95. Nothing legal gets the pair of legs over to
+// one side together.
+//
+// So the side view keeps the true part, legs pinned high under a bar and moving
+// through the top of the arc while the body counter-rotates, and loses the
+// direction. This pass shrank the dip: the legs used to fall 44 degrees between
+// the ends, which is a hanging leg raise, and now they stay high and the torso
+// does most of the moving.
 const HANGING_WINDSHIELD_WIPER = {
   view: "side",
   loop: "pingpong",
@@ -1345,19 +1387,19 @@ const HANGING_WINDSHIELD_WIPER = {
   keys: [
     { // legs high and forward, hips already fully flexed
       t: 0,
-      root: { x: 72, y: 70, rot: -16 },
+      root: { x: 72, y: 70, rot: -18 },
       joints: {
         spine: 0, neck: -4,
-        hipR: 172, kneeR: 8, ankleR: -34, hipL: 170, kneeL: 10, ankleL: -34,
+        hipR: 170, kneeR: 8, ankleR: -34, hipL: 168, kneeL: 10, ankleL: -34,
       },
       ik: { wristR: { x: 70, y: 9, bend: 1 }, wristL: { x: 65, y: 9, bend: 1 } },
     },
     { // swept across, still high, body counter-rotating under the bar
       t: 1,
-      root: { x: 68, y: 72, rot: -4 },
+      root: { x: 66, y: 72, rot: 0 },
       joints: {
         spine: 0, neck: -4,
-        hipR: 128, kneeR: 12, ankleR: -30, hipL: 126, kneeL: 14, ankleL: -30,
+        hipR: 148, kneeR: 12, ankleR: -30, hipL: 146, kneeL: 14, ankleL: -30,
       },
       ik: { wristR: { x: 70, y: 9, bend: 1 }, wristL: { x: 65, y: 9, bend: 1 } },
     },

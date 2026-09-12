@@ -142,6 +142,32 @@ swings, cross-body shoulder stretch, thread the needle.
   side view, where a number like that would be shoulder extension no shoulder
   reaches.
 
+**Front view: a thigh may cross the midline too, and the knee is checked by
+magnitude.** The same two lifts as the arms, one floor down, and for the same
+reason: the frontal projection of a rotated leg is not the sagittal angle the
+side view measures.
+
+- `hipFlex` runs to **-95** in the front view instead of -35. Negative is the
+  thigh crossing the body. -35 is the side view's number, where it really is
+  the limit of hip extension, and for a while it was quietly deciding how far a
+  curtsy lunge could cross, how deep a cossack could sit and how a 90/90 could
+  fold. A thigh lying across the body is a position most people can sit in.
+- `kneeFlex` is checked by **magnitude** in the front view, like the elbow. The
+  rig has no femoral rotation, so an internally rotated leg folds its shin
+  toward the midline and an externally rotated one folds it away, and only one
+  of those two signs survives the projection. A shin folding the wrong way is
+  now a contact sheet catch, not a validator catch. Look for it.
+- The curtsy lunge is the worked case. Its trailing leg is authored by angles,
+  not pinned, because two bone IK between a hip and a planted ankle only has
+  two solutions, knee swung wide or knee tucked inside, and neither of them is
+  a leg crossing behind. The thigh sweeps 50 degrees across (hipFlex -42) and
+  the shin drops from there to a toe planted past the standing foot.
+
+What this did NOT fix, because it runs the other way: a hanging windshield
+wiper needs BOTH legs over to one side, and the trailing one then points up and
+past its own midline, around 210. The range that opened goes down across the
+body, not up over it. That move is still side on.
+
 **Side view: a hand may rest on a bar racked on the traps.** Back squat, good
 morning, and anything else carrying a bar behind the neck.
 
@@ -206,8 +232,19 @@ stayed side on. When a limit lifts, re-test the move; do not assume.
 
 `feet` is only for the front view, where a foot pointing at the camera has to be
 drawn short and wide rather than rotated. `ang` is its angle in the frontal
-plane, `len` and `w` scale it. Warrior II's front foot is `{ ang: 8, len: 0.34,
-w: 1.35 }` and its turned-out back foot is `{ ang: 74, len: 1.05, w: 0.95 }`.
+plane, `len` and `w` scale it. `ang` 0 is a foot pointing straight at the
+camera, which has to be drawn short and wide (`len` about 0.4, `w` about 1.3);
+`ang` 90 is a foot pointing straight out to the side, drawn long and narrow
+(`len` about 1.0, `w` about 0.95).
+
+Get the stance right before you pick numbers. Warrior II is set up ALONG the
+mat, so both of its feet are long: the front foot points down the mat, which in
+this view is out to the side, `{ ang: 86, len: 1.05, w: 0.95 }`, and the back
+foot lies along the back edge with the toes turned in a few degrees,
+`{ ang: 74, len: 1.0, w: 0.95 }`. Neither points at the camera. For a long time
+the front one was short and wide, which is the Warrior I set-up, and it turned
+the whole stance ninety degrees without anything looking broken. Extended Side
+Angle and Triangle Pose are the same stance and carry the same pair.
 
 `fit` exists because a hanging body under a pull-up bar, or a body standing on a
 box, is taller than 140 units. Zoom out; never crop the head.
@@ -221,14 +258,28 @@ They either sit in the world (`{ type: "bench", x, y, w, incline }`) or attach
 to the body (`{ type: "dumbbell", side: "R", point: "hand", dx, dy, rot, k }`).
 `front: true` draws a prop over the figure instead of behind it.
 
-Two that are not obvious:
+Three that are not obvious:
 
+- **A mat has two forms.** `{ type: "mat", x, w }` is the side view strip on the
+  floor under a kneeling or lying figure. `{ type: "mat", top: true, x, y, w, h }`
+  is the whole rectangle seen from ABOVE, and it is the only thing that tells a
+  reader a top-down pose is a top-down pose. A figure drawn face down with its
+  arms in a Y is pixel for pixel a figure standing with its arms in a Y; a
+  prone scorpion is a standing twist; a frog stretch is a wide squat. Any move
+  with `floor: false`, which is every top-down pose, needs one. Size it to the
+  figure's own bounds plus about ten units on each side, let wide limbs hang off
+  the sides the way they would in life, and reach for `fit` if the figure has to
+  shrink to leave the mat room.
 - **A barbell seen from the side is a disc**, not a bar. Drawing the bar
   sideways is the most common way these illustrations look wrong. Add
   `place: "traps"` to rack it across the upper back so it carries with the
   torso.
 - **A band sags by its slack**, so give it a `rest` length close to the hand
   separation at the end of the rep. The sag going to zero is the rep.
+
+`dipBars` draws two rails, a dim far one and the near one. One rail side on is
+a handrail, and a figure with its hands on the END of a handrail is leaning on
+it. Run the rails well past the body in both directions.
 
 `machine` is one abstraction for every seated machine: `parts: ["seat",
 "backPad", "thighPad", "lever"]`. `cable` draws a stack, a pulley and a line
@@ -352,10 +403,12 @@ actually works.
 
 ## Worked example 2: Warrior II (front view, hold, authored feet)
 
-What it looks like: a wide stance, front knee bent to about 90 with the shin
-vertical, back leg straight with the foot turned out, arms reaching level in
-opposite directions. Must be visible: the width of the stance and the bent front
-knee. Front view, because side on it collapses into one leg and one arm.
+What it looks like: a wide stance set up ALONG the mat, front knee bent to
+about 90 with the shin vertical, front foot pointing down the mat, back leg
+straight with its foot along the back edge of the mat and the toes turned in a
+few degrees, arms reaching level in opposite directions. Must be visible: the
+width of the stance and the bent front knee. Front view, because side on it
+collapses into one leg and one arm.
 
 ```js
 const WARRIOR_II = {
@@ -365,7 +418,9 @@ const WARRIOR_II = {
   breath: 1.0,
   breathRate: 0.8,
   farSide: "L",
-  feet: { R: { ang: 8, len: 0.34, w: 1.35 }, L: { ang: 74, len: 1.05, w: 0.95 } },
+  // both feet long: the front one down the mat, the back one along its back
+  // edge with the toes turned in. Neither foot points at the camera.
+  feet: { R: { ang: 86, len: 1.05, w: 0.95 }, L: { ang: 74, len: 1.0, w: 0.95 } },
   keys: [
     { // settle into the stance
       t: 0,
@@ -388,6 +443,14 @@ const WARRIOR_II = {
 `farSide: "L"` is what makes the back leg and arm draw in the dimmer tone. Leave
 it out on a genuinely symmetric move (band pull-apart, doorway pec stretch) or
 one half of the figure reads as a lighting mistake.
+
+The feet are the part of this that was wrong for a long time, and it is worth
+saying why it survived review. The front foot was authored short and wide, the
+camera-facing shape, and the back foot long. That is a real stance, it is just
+Warrior I: square to the front with the back foot turned out. Every other line
+in the entry was Warrior II, so nothing looked broken and the picture read as a
+confident pose of a different one. If a move has a mat, work out which way the
+mat runs before you pick a foot angle.
 
 The two keyframes are nearly identical on purpose. A hold is not a rep: the
 motion is a settle plus breathing, and if you animate more than that it stops

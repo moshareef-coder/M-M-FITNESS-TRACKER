@@ -13,9 +13,13 @@
 // down, rot < 0 is face up, and the head goes where upV(rot) points.
 
 // Front view, because the whole shape of Warrior II is lateral: side on it
-// collapses into one leg and one arm. The feet are authored explicitly because
-// the front foot points at the camera and has to be drawn short and wide while
-// the back foot is turned out and long.
+// collapses into one leg and one arm. The feet are authored explicitly, and
+// BOTH of them are long. Warrior II is set up along the mat, not across it: the
+// front foot points down the mat, which in this view is straight out to the
+// side, and the back foot sits parallel to the back edge of the mat with the
+// toes turned in a few degrees. Neither foot points at the camera. We had the
+// front foot short and wide for a while, which is the Warrior I set-up, and it
+// quietly turned the stance ninety degrees.
 // Side Plank is the calisthenics one, authored once and shared.
 import { SIDE_PLANK } from "./calisthenics.mjs";
 
@@ -26,7 +30,7 @@ const WARRIOR_II = {
   breath: 1.0,
   breathRate: 0.8,
   farSide: "L",
-  feet: { R: { ang: 8, len: 0.34, w: 1.35 }, L: { ang: 74, len: 1.05, w: 0.95 } },
+  feet: { R: { ang: 86, len: 1.05, w: 0.95 }, L: { ang: 74, len: 1.0, w: 0.95 } },
   keys: [
     { // settle into the stance
       t: 0,
@@ -156,7 +160,9 @@ const EXTENDED_SIDE_ANGLE = {
   breathRate: 0.76,
   farSide: "L",
   fit: { k: 0.92, dy: 2 },
-  feet: { R: { ang: 70, len: 1.05, w: 0.95 }, L: { ang: 8, len: 0.34, w: 1.35 } },
+  // Same stance as Warrior II, so the same feet: front foot long down the mat,
+  // back foot long along the back edge with the toes turned in a touch.
+  feet: { R: { ang: 74, len: 1.0, w: 0.95 }, L: { ang: 86, len: 1.05, w: 0.95 } },
   keys: [
     { // settle over the front leg, hand down, top arm long over the ear
       t: 0,
@@ -194,7 +200,8 @@ const TRIANGLE_POSE = {
   breathRate: 0.76,
   farSide: "R",
   fit: { k: 0.88, dy: 6 },
-  feet: { R: { ang: 70, len: 1.0, w: 0.95 }, L: { ang: 8, len: 0.34, w: 1.35 } },
+  // Warrior II stance again: both feet long, back toes turned in a touch.
+  feet: { R: { ang: 74, len: 1.0, w: 0.95 }, L: { ang: 86, len: 1.05, w: 0.95 } },
   keys: [
     { // settle: hand to the shin, top arm stacked over the shoulder
       t: 0,
@@ -679,14 +686,21 @@ const BRIDGE_POSE = {
 // From lying on the back with the hands planted by the ears, the whole body
 // presses up into an arch on the hands and feet with the head hanging. What
 // must be visible is the press itself, so this is a pingpong from the set-up to
-// the arch. The top is as deep an arch as the figure's joints allow: a full
-// wheel needs more hip extension than the rig will draw, so this reads as a
+// the arch. The top is as deep an arch as the figure's joints allow, and that
+// is now literally true: a search over the root position and the foot placement
+// found 31 units of hip lift as the most that keeps the torso-to-thigh angle
+// inside the -35 hip extension limit and the shoulder inside its own, and this is that pose. A full wheel needs
+// more than the rig will draw, because the validator measures torso to thigh
+// and so charges the whole backbend, spine included, to the hip. It reads as a
 // strong press rather than a competition backbend.
 const WHEEL_POSE = {
   view: "side",
   loop: "pingpong",
   dur: 3.6,
   breath: 0.25,
+  // A body on the floor only ever uses the bottom third of the box, so zoom in
+  // on it: at 140 units the arch was a thumbnail with an empty sky over it.
+  fit: { k: 1.25, dx: 15, dy: -31 },
   props: [{ type: "mat", x: 12, w: 116 }],
   keys: [
     { // set-up: on the back, hands by the ears, knees bent, feet flat
@@ -694,16 +708,19 @@ const WHEEL_POSE = {
       root: { x: 66, y: 106, rot: -90 },
       joints: { spine: 0, neck: -4, wristR: 70, wristL: 70 },
       ik: {
-        ankleR: { x: 90, y: 113.4, bend: -1 }, ankleL: { x: 86, y: 113.4, bend: -1 },
+        ankleR: { x: 86, y: 113.4, bend: -1 }, ankleL: { x: 82, y: 113.4, bend: -1 },
         wristR: { x: 28, y: 113, bend: 1 }, wristL: { x: 32, y: 113, bend: 1 },
       },
     },
-    { // pressed up into the arch: hips are the high point, head hanging back
+    { // pressed up into the arch: hips are the high point, head hanging back.
+      // Pushed as far as the joint checks allow, which is a long way past where
+      // this sat before: the limit that stops it is hip extension, so the hips
+      // are the high point and the shoulders stay under the hands.
       t: 1,
-      root: { x: 62, y: 84, rot: -110 },
-      joints: { spine: 0, neck: -10, wristR: 60, wristL: 60 },
+      root: { x: 62, y: 82.5, rot: -108 },
+      joints: { spine: 0, neck: -12, wristR: 58, wristL: 58 },
       ik: {
-        ankleR: { x: 90, y: 113.4, bend: -1 }, ankleL: { x: 86, y: 113.4, bend: -1 },
+        ankleR: { x: 86, y: 113.4, bend: -1 }, ankleL: { x: 82, y: 113.4, bend: -1 },
         wristR: { x: 24, y: 113, bend: 1 }, wristL: { x: 28, y: 113, bend: 1 },
       },
     },

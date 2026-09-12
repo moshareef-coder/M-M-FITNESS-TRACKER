@@ -1585,9 +1585,9 @@ const BENCH_DIP = {
   fit: { k: 0.94, dy: 2 },
   props: [{ type: "bench", x: 14, y: 82, w: 36 }],
   keys: [
-    { // top, arms straight, hips up level with the bench edge
+    { // top, arms straight, hips just off the front edge and level with it
       t: 0,
-      root: { x: 59.6, y: 70.2, rot: -4 },
+      root: { x: 57.4, y: 75.6, rot: -5 },
       joints: { spine: 0, neck: -2 },
       ik: {
         wristR: { x: 46, y: 78, bend: 1 }, wristL: { x: 42, y: 78.5, bend: 1 },
@@ -1599,7 +1599,7 @@ const BENCH_DIP = {
       // into extension than a shoulder actually does, which is also why this
       // exercise has the reputation it has.
       t: 1,
-      root: { x: 50.1, y: 81.3, rot: -6 },
+      root: { x: 55.2, y: 86.4, rot: -7 },
       joints: { spine: 0, neck: -4 },
       ik: {
         wristR: { x: 46, y: 78, bend: 1 }, wristL: { x: 42, y: 78.5, bend: 1 },

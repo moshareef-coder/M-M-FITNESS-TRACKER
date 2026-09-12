@@ -164,7 +164,7 @@ export const DIP = {
   dur: 3.0,
   breath: 0.2,
   fit: { k: 0.92, dy: 6 },
-  props: [{ type: "dipBars", x0: 60, x1: 116, y: 70 }],
+  props: [{ type: "dipBars", x0: 38, x1: 110, y: 70 }],
   keys: [
     { // lockout, arms straight under the shoulders, shins tucked behind
       t: 0,

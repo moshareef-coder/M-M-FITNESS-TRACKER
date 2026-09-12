@@ -37,7 +37,7 @@ const RANGE = {
   neck: [-55, 55],
 };
 
-// The front view measures the same joints in the frontal plane, where two
+// The front view measures the same joints in the frontal plane, where three
 // things the side view cannot do become legal:
 //
 //   shoulderElev below zero is the arm ADDUCTING across the chest. Pallof
@@ -47,10 +47,21 @@ const RANGE = {
 //   would be shoulder extension no shoulder reaches, so the limit stays tight
 //   there.
 //
-// The same goes for the elbow, and not only in the front view: see
-// MAGNITUDE_ONLY below.
+//   hipFlex below zero is the same thing one floor down: the thigh crossing the
+//   midline. A curtsy lunge sweeps the working leg behind and across the
+//   standing one, a cossack squat leaves the straight leg out past the far foot
+//   with the pelvis over the bent one, and any 90/90 or cross-legged sit puts
+//   one thigh across the body. The old floor of -35 was the side view's
+//   number, where -35 really is the limit of hip extension, and it was quietly
+//   deciding how deep those three moves could go. In the frontal plane the same
+//   measurement is adduction plus internal rotation and -95, a thigh lying
+//   across the body, is a position most people can sit in.
+//
+// The same goes for the elbow and the knee, and for the elbow not only in the
+// front view: see MAGNITUDE_ONLY below.
 const FRONT_RANGE = {
   shoulderElev: [-120, 196],
+  hipFlex: [-95, 150],
 };
 
 // When the elbow's projected fold direction is an artefact of the view rather
@@ -59,7 +70,10 @@ const FRONT_RANGE = {
 //
 //   front view, because the rig has no humeral rotation: an internally rotated
 //   arm folds toward the midline and an externally rotated one folds away, and
-//   both project into the frontal plane with opposite signs.
+//   both project into the frontal plane with opposite signs. The knee is the
+//   same story with the femur: side lying at 90/90, or kneeling with the shins
+//   swept to one side, the shin folds toward the midline on one leg and away on
+//   the other, and only one of those two signs survives a frontal projection.
 //
 //   any view with the shoulder extended behind the torso, which is how a hand
 //   reaches a bar racked on the traps. Reaching back and folding the forearm up
@@ -136,7 +150,8 @@ function checkMove(name, move) {
     for (const side of ["L", "R"]) {
       const k = S.sides[side];
       checkRange(name, "hipFlex", wrap2("hipFlex", (k.legA + S.t) * R2D), `${where} (${side})`, move.view);
-      checkRange(name, "kneeFlex", wrap2("kneeFlex", (k.legA - k.shinA) * R2D), `${where} (${side})`, move.view);
+      const kneeF = wrap2("kneeFlex", (k.legA - k.shinA) * R2D);
+      checkRange(name, "kneeFlex", move.view === "front" ? Math.abs(kneeF) : kneeF, `${where} (${side})`, move.view);
       const elev = wrap2("shoulderElev", (k.armA + S.t) * R2D);
       checkRange(name, "shoulderElev", elev, `${where} (${side})`, move.view);
       const flex = wrap2("elbowFlex", (k.foreA - k.armA) * R2D);

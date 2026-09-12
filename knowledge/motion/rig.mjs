@@ -561,9 +561,35 @@ export const PROP_TYPES = [
 ];
 
 const PROPS = {
+  // A mat has two forms.
+  //
+  // Side on it is a strip lying on the floor under a kneeling or lying figure:
+  // `{ type: "mat", x, w }`.
+  //
+  // Seen from above it is the whole rectangle the figure lies on:
+  // `{ type: "mat", top: true, x, y, w, h }`. That form exists because a
+  // top-down pose has no floor line (`floor: false`, since a line drawn under a
+  // figure the camera is looking down at reads as the ground the figure is
+  // standing on) and therefore nothing in the frame says which way is down. The
+  // mat is that one thing. Soft rounded rectangle, surface tone, one thin edge,
+  // and deliberately no shadow or floor line: it should sit behind the figure
+  // and say "floor", not compete with it.
   mat(ctx, C, p) {
-    ctx.fillStyle = C.propDark;
-    roundRect(ctx, p.x, GROUND - 2.4, p.w, 4.4, 2.2); ctx.fill();
+    if (!p.top) {
+      ctx.fillStyle = C.propDark;
+      roundRect(ctx, p.x, GROUND - 2.4, p.w, 4.4, 2.2); ctx.fill();
+      return;
+    }
+    const w = p.w === undefined ? 74 : p.w;
+    const h = p.h === undefined ? 126 : p.h;
+    const x = p.x === undefined ? (VB - w) / 2 : p.x;
+    const y = p.y === undefined ? (VB - h) / 2 : p.y;
+    const r = p.r === undefined ? 10 : p.r;
+    roundRect(ctx, x, y, w, h, r);
+    ctx.fillStyle = mix(C.bg, C.prop, 0.42); ctx.fill();
+    roundRect(ctx, x + 1.2, y + 1.2, w - 2.4, h - 2.4, Math.max(1, r - 1.2));
+    ctx.strokeStyle = mix(C.bg, C.prop, 0.74);
+    ctx.lineWidth = 1.1; ctx.stroke();
   },
   wall(ctx, C, p) {
     ctx.fillStyle = C.prop;
@@ -634,8 +660,17 @@ const PROPS = {
       roundRect(ctx, x, 0, 5, y - 1.5, 2); ctx.fill();
     }
   },
+  // Parallel bars, so draw TWO of them: a dim far rail set back and up, then
+  // the near one. One rail side on is a handrail, and a figure with its hands
+  // on one end of a handrail is leaning on it, not dipping between bars. Give
+  // the move a rail that runs well past the body in BOTH directions too, or the
+  // hands read as gripping the end of something.
   dipBars(ctx, C, p) {
     const y = p.y === undefined ? 86 : p.y;
+    const d = p.depth === undefined ? 5.5 : p.depth;
+    ctx.fillStyle = C.propDark;
+    roundRect(ctx, p.x0 - d, y - d - 2.0, p.x1 - p.x0, 4.0, 2.0); ctx.fill();
+    for (const x of [p.x0 - d + 2, p.x1 - d - 7]) { roundRect(ctx, x, y - d, 4.4, GROUND - y + d, 1.8); ctx.fill(); }
     ctx.fillStyle = C.prop;
     roundRect(ctx, p.x0, y - 2.2, p.x1 - p.x0, 4.4, 2.2); ctx.fill();
     for (const x of [p.x0 + 2, p.x1 - 7]) { roundRect(ctx, x, y, 5, GROUND - y, 2); ctx.fill(); }
