@@ -113,7 +113,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 
 <script type="module">
 import { TRAININGS } from "./knowledge/exercise-library/index.mjs";
-import { mountMove, hasMove, moveFor, MOVE_NAMES, MOVES_BY_LIBRARY } from "./knowledge/motion/index.mjs";
+import { mountMove, hasMove, moveFor, MOVE_NAMES, MOVES_BY_LIBRARY, samplePose, cameraFor } from "./knowledge/motion/index.mjs";
 
 window.addEventListener("error", (e) => {
   const el = document.getElementById("err");
@@ -198,7 +198,7 @@ if (q.get("sheet") === "compare") {
     const card = document.createElement("div");
     card.className = "scard";
     card.innerHTML = `<div class="srow"><canvas></canvas><canvas></canvas></div>
-      <div class="n">${name}</div><div class="s">${m.view} &middot; ${m.loop}</div>`;
+      <div class="n">${name}</div><div class="s">${typeof m.view === "object" ? `yaw ${m.view.yaw || 0}${m.view.pitch ? " pitch " + m.view.pitch : ""}` : (m.view || "side")} &middot; ${m.loop}</div>`;
     grid.appendChild(card);
     const [a, b] = card.querySelectorAll("canvas");
     for (const [cv, t] of [[a, 0], [b, 0.5]]) {
@@ -229,6 +229,9 @@ function buildLab() {
         <div class="vmeta" id="vmeta">&nbsp;</div>
         <div class="ctrl"><label for="scrub">t</label><input id="scrub" type="range" min="0" max="1" step="0.005" value="0"><span class="val" id="tval">0.00</span></div>
         <div class="ctrl"><label for="speed">speed</label><input id="speed" type="range" min="0.2" max="2" step="0.05" value="1"><span class="val" id="sval">1.0x</span></div>
+        <div class="ctrl"><label for="yaw">yaw</label><input id="yaw" type="range" min="-180" max="180" step="1" value="0"><span class="val" id="yval">0</span></div>
+        <div class="ctrl"><label for="pitch">pitch</label><input id="pitch" type="range" min="-90" max="90" step="1" value="0"><span class="val" id="pval">0</span></div>
+        <div class="chans" id="chans"></div>
         <div class="btnrow">
           <button class="btn" id="play" aria-pressed="true">Pause</button>
           <button class="btn" id="accent" aria-pressed="${accent === "stretch"}">Stretch tint</button>
@@ -245,7 +248,7 @@ function buildLab() {
   const state = {
     lib: TRAININGS[0].id,
     name: q.get("name") || null,
-    theme, accent, skin,
+    theme, accent, skin, yaw: 0, pitch: 0,
     playing: !q.has("t"),
     speed: 1,
     anim: null,
@@ -312,10 +315,22 @@ function buildLab() {
     const move = moveFor(name);
     const info = entries.get(name);
     root.querySelector("#vname").textContent = name;
+    const cam = move ? cameraFor(move.view) : null;
     root.querySelector("#vmeta").textContent = move
-      ? `${move.view} view, ${move.loop}, ${move.dur}s cycle, ${move.keys.length} keyframes`
+      ? `${cam.plane} plane, yaw ${cam.yaw}, pitch ${cam.pitch}, ${move.loop}, ${move.dur}s, ${move.keys.length} keyframes`
       : "no move authored";
+    // Start the sliders where the move actually is, so dragging them is a
+    // deviation from the authored camera and not from an imaginary zero.
+    if (cam) {
+      state.yaw = cam.yaw; state.pitch = cam.pitch;
+      root.querySelector("#yaw").value = String(cam.yaw);
+      root.querySelector("#pitch").value = String(cam.pitch);
+      root.querySelector("#yval").textContent = cam.yaw;
+      root.querySelector("#pval").textContent = cam.pitch;
+    }
     renderInfo(name, info);
+    renderChannels(name, parseFloat(root.querySelector("#scrub").value) || 0);
+    applyCam();
     if (q.has("t") && q.get("name") === name) {
       const t = parseFloat(q.get("t"));
       state.playing = false;
@@ -324,6 +339,7 @@ function buildLab() {
       root.querySelector("#scrub").value = String(t);
       root.querySelector("#tval").textContent = t.toFixed(2);
       if (state.anim) { state.anim.pause(); state.anim.seek(t); }
+      renderChannels(name, t);
     }
     window.__ready = true;
   }
@@ -353,6 +369,7 @@ function buildLab() {
   root.querySelector("#scrub").oninput = (ev) => {
     const t = parseFloat(ev.target.value);
     root.querySelector("#tval").textContent = t.toFixed(2);
+    renderChannels(state.name, t);
     state.playing = false;
     root.querySelector("#play").textContent = "Play";
     root.querySelector("#play").setAttribute("aria-pressed", "false");
@@ -363,6 +380,46 @@ function buildLab() {
     root.querySelector("#sval").textContent = state.speed.toFixed(2).replace(/0$/, "") + "x";
     if (state.anim) state.anim.setSpeed(state.speed);
   };
+  // Camera: yaw and pitch are degrees away from the move's own plane, so 0,0
+  // is always what the move was authored against.
+  function camera() {
+    const base = cameraFor(moveFor(state.name) ? moveFor(state.name).view : "side");
+    return { yaw: state.yaw, pitch: state.pitch, plane: base.plane };
+  }
+  function applyCam() {
+    if (state.anim) state.anim.setView(camera());
+  }
+  root.querySelector("#yaw").oninput = (ev) => {
+    state.yaw = parseFloat(ev.target.value);
+    root.querySelector("#yval").textContent = state.yaw;
+    applyCam();
+  };
+  root.querySelector("#pitch").oninput = (ev) => {
+    state.pitch = parseFloat(ev.target.value);
+    root.querySelector("#pval").textContent = state.pitch;
+    applyCam();
+  };
+
+  // What is actually driving this frame. v2 added nineteen channels and the
+  // only way to author with them is to watch them move.
+  const BASE_CH = new Set(["spine", "neck"]);
+  function renderChannels(name, t) {
+    const el = root.querySelector("#chans");
+    const mv = moveFor(name);
+    if (!mv) { el.textContent = ""; return; }
+    const pose = samplePose(mv, t, t * mv.dur);
+    const rows = [];
+    rows.push(`root ${pose.root.x.toFixed(0)},${pose.root.y.toFixed(0)} rot ${(pose.root.rot || 0).toFixed(0)}`);
+    const live = Object.entries(pose.joints)
+      .filter(([k, v]) => Math.abs(v) > 0.5 && !BASE_CH.has(k))
+      .sort(([a], [b]) => a.localeCompare(b));
+    const v2ch = live.filter(([k]) => /Twist|Roll|Girdle|Pron|Rot[LR]$|Abd|Fwd/.test(k));
+    const base = live.filter(([k]) => !/Twist|Roll|Girdle|Pron|Rot[LR]$|Abd|Fwd/.test(k));
+    if (v2ch.length) rows.push("<b>" + v2ch.map(([k, v]) => `${k} ${v.toFixed(0)}`).join("  ") + "</b>");
+    if (base.length) rows.push(base.map(([k, v]) => `${k} ${v.toFixed(0)}`).join("  "));
+    el.innerHTML = rows.join("<br>");
+  }
+
   root.querySelector("#play").onclick = (ev) => {
     state.playing = !state.playing;
     ev.target.textContent = state.playing ? "Pause" : "Play";

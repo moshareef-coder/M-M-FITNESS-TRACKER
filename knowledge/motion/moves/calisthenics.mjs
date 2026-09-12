@@ -36,7 +36,8 @@ export const PUSH_UP = {
 // once you add a hanging body under a bar, so this one zooms out with `fit`
 // rather than cropping the feet. Knees stay bent because a hanging adult's feet
 // would otherwise be through the floor, which is also true in a real doorway.
-export const PULL_UP = {
+export // v2: PRONATED grip, knuckles toward the face, against Chin-Up below.
+const PULL_UP = {
   view: "side",
   loop: "pingpong",
   dur: 3.0,
@@ -47,7 +48,7 @@ export const PULL_UP = {
     { // dead hang
       t: 0,
       root: { x: 70, y: 73, rot: 0 },
-      joints: { spine: 2, neck: 0, hipL: -12, hipR: -10, kneeL: 74, kneeR: 70,
+      joints: { forearmPronR: 74, forearmPronL: 74, spine: 2, neck: 0, hipL: -12, hipR: -10, kneeL: 74, kneeR: 70,
                 ankleL: -16, ankleR: -16 },
       ik: { wristR: { x: 70, y: 9, bend: 1 }, wristL: { x: 65, y: 9, bend: 1 } },
     },
@@ -56,7 +57,7 @@ export const PULL_UP = {
       // and the whole thing reads as a scrunch rather than a pull-up.
       t: 1,
       root: { x: 70, y: 55, rot: 0 },
-      joints: { spine: -6, neck: -10, hipL: -16, hipR: -14, kneeL: 78, kneeR: 74,
+      joints: { forearmPronR: 74, forearmPronL: 74, spine: -6, neck: -10, hipL: -16, hipR: -14, kneeL: 78, kneeR: 74,
                 ankleL: -16, ankleR: -16 },
       ik: { wristR: { x: 70, y: 9, bend: 1 }, wristL: { x: 65, y: 9, bend: 1 } },
     },
@@ -365,7 +366,10 @@ export const NEGATIVE_PULL_UP = {
 // visible: the hands close together, the chin finishing above the bar and the
 // elbows tracking in front. Side view. The hands curl back over the bar, which
 // is the only way a supinated grip shows side on.
-export const CHIN_UP = {
+export // v2: SUPINATED grip, palms toward the face. That is the only difference from
+// a pull-up and until the forearm channel existed the two cards were the same
+// drawing with different names.
+const CHIN_UP = {
   view: "side",
   loop: "pingpong",
   dur: 3.0,
@@ -376,14 +380,14 @@ export const CHIN_UP = {
     { // hang, palms toward the face, hands close
       t: 0,
       root: { x: 70, y: 72.6, rot: 0 },
-      joints: { spine: 2, neck: 0, hipL: -12, hipR: -10, kneeL: 74, kneeR: 70,
+      joints: { forearmPronR: -76, forearmPronL: -76, spine: 2, neck: 0, hipL: -12, hipR: -10, kneeL: 74, kneeR: 70,
                 ankleL: -16, ankleR: -16, wristL: -40, wristR: -40 },
       ik: { wristR: { x: 70, y: 9, bend: 1 }, wristL: { x: 66, y: 9.5, bend: 1 } },
     },
     { // top, chin above the bar, elbows down in front of the ribs
       t: 1,
       root: { x: 70, y: 52, rot: 0 },
-      joints: { spine: -4, neck: -8, hipL: -18, hipR: -16, kneeL: 80, kneeR: 76,
+      joints: { forearmPronR: -76, forearmPronL: -76, spine: -4, neck: -8, hipL: -18, hipR: -16, kneeL: 80, kneeR: 76,
                 ankleL: -16, ankleR: -16, wristL: -40, wristR: -40 },
       ik: { wristR: { x: 70, y: 9, bend: 1 }, wristL: { x: 66, y: 9.5, bend: 1 } },
     },
@@ -727,7 +731,13 @@ export const PLANK = {
 // which is what stops it reading as a plank. Side view. The authored shoulder
 // numbers look extreme because the root is rotated 76 degrees: an arm pointing
 // at the ceiling off a near horizontal torso is a big number, not a mistake.
-export const SIDE_PLANK = {
+export // v2 note: rolling the body onto its side with pelvisTwist and viewing it from
+// three quarters was tried and reverted. The roll works, but the arms were
+// authored as in-plane angles against a flat side view, so carrying them round
+// the long axis folds them into the torso and the pose collapses. Re-authoring
+// the whole shape in the rolled frame is the right fix and is more than this
+// pass; the v1 pose still reads as a side plank, so it stays.
+const SIDE_PLANK = {
   view: "side",
   loop: "hold",
   dur: 6.0,

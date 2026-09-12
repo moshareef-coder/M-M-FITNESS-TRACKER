@@ -326,8 +326,11 @@ const BRIDGE = {
 // away from the bottom one like a shell while the feet stay glued. Must be
 // visible: the gap opening between the two knees with the feet still touching.
 // Side view, see the note above.
+// v2: a clamshell is hip EXTERNAL ROTATION with the feet together. v1 had to
+// fake it by swinging the whole thigh, which is a different exercise. Now the
+// hip rotates and a three-quarter camera shows the knee opening.
 const CLAMSHELL = {
-  view: "side",
+  view: { yaw: 34, plane: "sagittal" },
   loop: "pingpong",
   dur: 2.8,
   breath: 0.22,
@@ -337,14 +340,14 @@ const CLAMSHELL = {
     { // closed, knees stacked
       t: 0,
       root: { x: 70, y: 100, rot: -90 },
-      joints: { spine: 0, neck: 0, hipR: 212, kneeR: 100, ankleR: -10,
+      joints: { hipRotR: 0, hipAbdR: 0, spine: 0, neck: 0, hipR: 212, kneeR: 100, ankleR: -10,
                 hipL: 202, kneeL: 95, ankleL: -10 },
       ik: { wristR: { x: 80, y: 99, bend: 1 }, wristL: { x: 8, y: 104, bend: 1 } },
     },
     { // open, top knee lifted away, heels still together
       t: 1,
       root: { x: 70, y: 100, rot: -90 },
-      joints: { spine: 0, neck: 0, hipR: 240, kneeR: 128, ankleR: -10,
+      joints: { hipRotR: 46, hipAbdR: 34, spine: 0, neck: 0, hipR: 212, kneeR: 100, ankleR: -10,
                 hipL: 202, kneeL: 95, ankleL: -10 },
       ik: { wristR: { x: 80, y: 99, bend: 1 }, wristL: { x: 8, y: 104, bend: 1 } },
     },

@@ -863,6 +863,9 @@ const PRONE_Y_RAISE = {
 // then push the floor away. The suggested view was back, where a plank seen from
 // above hides the sink entirely. Side on, the chest dropping while the elbows
 // stay locked is exactly what the picture has to prove, so this deviates.
+// v2: the movement IS the shoulder girdle, so it is authored as the girdle
+// channel: protracted at the top, retracted as the chest sinks. Elbows stay
+// straight, which is what separates it from a push-up.
 const SCAPULAR_PUSH_UP = {
   view: "side",
   loop: "pingpong",
@@ -872,14 +875,14 @@ const SCAPULAR_PUSH_UP = {
     { // pushed away, upper back rounded up between the arms
       t: 0,
       root: { x: 69.6, y: 85.6, rot: 68 },
-      joints: { spine: 4, neck: -22, hipL: -138, hipR: -138, kneeL: 2, kneeR: 2,
+      joints: { shoulderGirdleProtR: 7, shoulderGirdleProtL: 7, spine: 4, neck: -22, hipL: -138, hipR: -138, kneeL: 2, kneeR: 2,
                 ankleL: -12, ankleR: -12, wristL: 86, wristR: 86 },
       ik: { wristR: { x: 98, y: 114.6, bend: 1 }, wristL: { x: 92, y: 114.6, bend: 1 } },
     },
     { // sunk, chest dropped between the blades, elbows still straight
       t: 1,
       root: { x: 68.4, y: 89.4, rot: 71 },
-      joints: { spine: -4, neck: -26, hipL: -145, hipR: -145, kneeL: 2, kneeR: 2,
+      joints: { shoulderGirdleProtR: -3, shoulderGirdleProtL: -3, spine: -4, neck: -26, hipL: -145, hipR: -145, kneeL: 2, kneeR: 2,
                 ankleL: -8, ankleR: -8, wristL: 86, wristR: 86 },
       ik: { wristR: { x: 98, y: 114.6, bend: 1 }, wristL: { x: 92, y: 114.6, bend: 1 } },
     },
@@ -1082,8 +1085,10 @@ const WRIST_FLEXOR_STRETCH = {
 // reaching forward along the mat measures over 200 degrees of shoulder
 // elevation against a 196 cap. The head down plus the hips high is the most of
 // the silhouette the rig will give.
+// v2: the thread is a thoracic rotation under the body, so it is authored as
+// spine twist and viewed from three quarters.
 const THREAD_THE_NEEDLE_STRETCH = {
-  view: "side",
+  view: { yaw: 26, plane: "sagittal" },
   loop: "hold",
   dur: 5.8,
   breath: 0.9,
@@ -1094,7 +1099,7 @@ const THREAD_THE_NEEDLE_STRETCH = {
     { // settled, ear and shoulder down on the mat, hips up over the knees
       t: 0,
       root: { x: 48, y: 83, rot: 109 },
-      joints: { spine: 10, neck: 15, hipR: -109, hipL: -109, kneeR: 94, kneeL: 94,
+      joints: { spineTwist: -42, spine: 10, neck: 15, hipR: -109, hipL: -109, kneeR: 94, kneeL: 94,
                 ankleR: -58, ankleL: -58, wristR: 25, wristL: -16 },
       ik: {
         wristR: { x: 104, y: 112, bend: 1 }, wristL: { x: 40, y: 112.5, bend: 1 },
@@ -1103,7 +1108,7 @@ const THREAD_THE_NEEDLE_STRETCH = {
     { // a touch deeper on the exhale, hips unmoved
       t: 1,
       root: { x: 48, y: 83.6, rot: 110 },
-      joints: { spine: 10, neck: 15, hipR: -110, hipL: -110, kneeR: 94, kneeL: 94,
+      joints: { spineTwist: -44, spine: 10, neck: 15, hipR: -110, hipL: -110, kneeR: 94, kneeL: 94,
                 ankleR: -58, ankleL: -58, wristR: 25, wristL: -16 },
       ik: {
         wristR: { x: 105, y: 112, bend: 1 }, wristL: { x: 37, y: 112.5, bend: 1 },
@@ -1327,8 +1332,10 @@ const KNEES_TO_CHEST_STRETCH = {
 // the camera, which no 2D view can show, so it is drawn as the shin crossing
 // over the lifted thigh: that crossing is the shape people recognise, and the
 // hands pulling the far thigh in carry the rest.
+// v2: the crossed leg is externally rotated and abducted, which is the whole
+// shape of a figure four and was previously drawn as a plain bent knee.
 const FIGURE_FOUR_STRETCH = {
-  view: "side",
+  view: { yaw: 30, plane: "sagittal" },
   loop: "hold",
   dur: 6.0,
   breath: 0.9,
@@ -1339,13 +1346,13 @@ const FIGURE_FOUR_STRETCH = {
     { // settled, shin crossing the lifted thigh, head heavy on the floor
       t: 0,
       root: { x: 76, y: 106, rot: -90 },
-      joints: { spine: 0, neck: 6, hipR: -42, kneeR: 145, hipL: -65, kneeL: 95 },
+      joints: { hipRotR: 46, hipAbdR: 24, spine: 0, neck: 6, hipR: -42, kneeR: 145, hipL: -65, kneeL: 95 },
       ik: { wristR: { x: 68, y: 97, bend: 1 }, wristL: { x: 72, y: 101, bend: 1 } },
     },
     { // far thigh drawn a little closer on the exhale
       t: 1,
       root: { x: 76, y: 106.6, rot: -90 },
-      joints: { spine: 1, neck: 7, hipR: -40, kneeR: 145, hipL: -61, kneeL: 95 },
+      joints: { hipRotR: 48, hipAbdR: 26, spine: 1, neck: 7, hipR: -40, kneeR: 145, hipL: -61, kneeL: 95 },
       ik: { wristR: { x: 66, y: 95, bend: 1 }, wristL: { x: 70, y: 99, bend: 1 } },
     },
   ],
@@ -1582,8 +1589,11 @@ const BENT_KNEE_CALF_STRETCH = {
 // on it is one leg hiding the other. No floor line, for the same reason as the
 // frog, and a top-down mat instead: without it a figure with its knees at right
 // angles seen from above is a figure squatting seen from the front.
+// v2: the switch is hip rotation, one leg externally rotated and the other
+// internally, trading places. Three-quarter camera because straight on the
+// rotation happens along the line of sight.
 const HIP_SWITCH_90_90 = {
-  view: "front",
+  view: { yaw: 28, plane: "frontal" },
   loop: "pingpong",
   dur: 4.6,
   breath: 0.4,
@@ -1596,13 +1606,13 @@ const HIP_SWITCH_90_90 = {
     { // knees to the left: front shin across the body, back knee out
       t: 0,
       root: { x: 70, y: 76, rot: 0 },
-      joints: { spine: -2, neck: 0, hipR: 84, kneeR: 144, hipL: 96, kneeL: 120,
+      joints: { hipRotR: 48, hipRotL: -38, spine: -2, neck: 0, hipR: 84, kneeR: 144, hipL: 96, kneeL: 120,
                 shoulderR: 14, elbowR: 20, shoulderL: 14, elbowL: 20 },
     },
     { // rotated through to the other side, chest still tall
       t: 1,
       root: { x: 70, y: 76, rot: 0 },
-      joints: { spine: 2, neck: 0, hipR: 96, kneeR: 120, hipL: 84, kneeL: 144,
+      joints: { hipRotR: -38, hipRotL: 48, spine: 2, neck: 0, hipR: 96, kneeR: 120, hipL: 84, kneeL: 144,
                 shoulderR: 14, elbowR: 20, shoulderL: 14, elbowL: 20 },
     },
   ],
@@ -1740,6 +1750,8 @@ const STANDING_HIP_AIRPLANE = {
 // a hard stop, not a choice: the hand has to travel from three o'clock through
 // twelve to nine, and the shoulder's 196 degrees of elevation runs out just past
 // twelve. Half the sweep is all there is.
+// v2: the chest actually rotates now. The top arm opening was always drawn;
+// the thoracic rotation underneath it was not, and that is the exercise.
 const OPEN_BOOK_THORACIC_ROTATION = {
   view: "front",
   loop: "pingpong",
@@ -1755,14 +1767,14 @@ const OPEN_BOOK_THORACIC_ROTATION = {
     { // start: hands stacked together, knees bent to one side
       t: 0,
       root: { x: 66, y: 58, rot: 0 },
-      joints: { spine: 0, neck: 18, shoulderR: 84, elbowR: 8, wristR: -4,
+      joints: { spineTwist: 0, spine: 0, neck: 18, shoulderR: 84, elbowR: 8, wristR: -4,
                 shoulderL: -54, elbowL: 26, wristL: -4,
                 hipR: 72, kneeR: 86, hipL: -30, kneeL: 80 },
     },
     { // top arm opens across and overhead, eyes following it, knees unmoved
       t: 1,
       root: { x: 66, y: 58, rot: 0 },
-      joints: { spine: 0, neck: -18, shoulderR: 184, elbowR: 6, wristR: -4,
+      joints: { spineTwist: 52, spine: 0, neck: -18, shoulderR: 184, elbowR: 6, wristR: -4,
                 shoulderL: -50, elbowL: 30, wristL: -4,
                 hipR: 72, kneeR: 86, hipL: -30, kneeL: 80 },
     },

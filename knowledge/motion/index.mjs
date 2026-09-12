@@ -12,14 +12,16 @@
 // Importable under plain node (validate.mjs does it): nothing here touches the
 // DOM until mountMove is called.
 
-import { palette, render, samplePose, solvePose, VB, GROUND, PROP_TYPES, LOOPS, VIEWS, SKINS, MUSCLE_GROUPS } from "./rig.mjs";
+import { palette, render, samplePose, solvePose, jointAngles, cameraFor, VB, GROUND, PROP_TYPES,
+  LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY } from "./rig.mjs";
 import { MOVES as WEIGHT_TRAINING } from "./moves/weight-training.mjs";
 import { MOVES as YOGA } from "./moves/yoga.mjs";
 import { MOVES as PILATES } from "./moves/pilates.mjs";
 import { MOVES as CALISTHENICS } from "./moves/calisthenics.mjs";
 import { MOVES as STRETCHING } from "./moves/stretching.mjs";
 
-export { palette, render, samplePose, solvePose, VB, GROUND, PROP_TYPES, LOOPS, VIEWS, SKINS, MUSCLE_GROUPS };
+export { palette, render, samplePose, solvePose, jointAngles, cameraFor, VB, GROUND, PROP_TYPES,
+  LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY };
 
 // Keyed by the training id used in knowledge/exercise-library/index.mjs.
 export const MOVES_BY_LIBRARY = {
@@ -92,7 +94,7 @@ function tick(now) {
 
 function paint(m) {
   const cycle = ((m.time / m.move.dur) % 1 + 1) % 1;
-  render(m.canvas, m.move, m.colors, cycle, m.time, { lit: m.lit });
+  render(m.canvas, m.move, m.colors, cycle, m.time, { lit: m.lit, view: m.view });
 }
 
 /**
@@ -111,6 +113,9 @@ export function mountMove(canvas, name, opts = {}) {
     skin: opts.skin || "mannequin",
     // { muscles: ["chest","triceps"], color: "#e0521f" } from bodyHeatRGB
     lit: opts.lit || null,
+    // camera override: a preset name, or { yaw, pitch, plane }. Null means the
+    // move's own view, which is what everything except the lab wants.
+    view: opts.view || null,
     speed: opts.speed || 1,
     time: opts.t === undefined ? 0 : opts.t * move.dur,
     playing: !opts.paused,
@@ -168,6 +173,14 @@ export function mountMove(canvas, name, opts = {}) {
     // the same RGB the body heat map uses so the two never disagree.
     setLit(lit) {
       m.lit = lit;
+      m.dirty = true;
+      if (still) paint(m); else pump();
+      return api;
+    },
+    // Drive the camera at runtime. The move's own view is the default; this is
+    // for the lab and for any screen that wants to spin a figure.
+    setView(view) {
+      m.view = view;
       m.dirty = true;
       if (still) paint(m); else pump();
       return api;

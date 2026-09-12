@@ -659,6 +659,8 @@ const frontBar = (front) => ([
 // rig has a fixed shoulder girdle, so the shoulders cannot actually rise. The
 // rep is carried by the chest lifting, the chin coming up and the knees
 // softening at the bottom. The implement is what identifies the exercise.
+// v2: the shrug is the girdle channel now, not a spine and neck cheat. The
+// shoulders rise and the arms hang off them, which is the movement.
 const DUMBBELL_SHRUG = {
   view: "front",
   loop: "pingpong",
@@ -673,13 +675,13 @@ const DUMBBELL_SHRUG = {
     { // bottom, shoulders let down, knees soft, chin level
       t: 0,
       root: { x: 70, y: 62.6, rot: 0 },
-      joints: { spine: 3, neck: 5, shoulderR: 2, shoulderL: 2, elbowR: 4, elbowL: 4 },
+      joints: { shoulderGirdleElevR: 0, shoulderGirdleElevL: 0, spine: 3, neck: 5, shoulderR: 2, shoulderL: 2, elbowR: 4, elbowL: 4 },
       ik: { ...stand(78, 62) },
     },
     { // top, chest lifted and chin up, arms still dead straight
       t: 1,
       root: { x: 70, y: 61.4, rot: 0 },
-      joints: { spine: -3, neck: -6, shoulderR: -2, shoulderL: -2, elbowR: 8, elbowL: 8 },
+      joints: { shoulderGirdleElevR: 7.5, shoulderGirdleElevL: 7.5, spine: -3, neck: -6, shoulderR: -2, shoulderL: -2, elbowR: 8, elbowL: 8 },
       ik: { ...stand(78, 62) },
     },
   ],
@@ -695,13 +697,13 @@ const BARBELL_SHRUG = {
     { // bottom, bar hanging at the thighs on a shoulder width grip
       t: 0,
       root: { x: 70, y: 62.6, rot: 0 },
-      joints: { spine: 3, neck: 5, shoulderR: 12, shoulderL: 12, elbowR: 4, elbowL: 4 },
+      joints: { shoulderGirdleElevR: 0, shoulderGirdleElevL: 0, spine: 3, neck: 5, shoulderR: 12, shoulderL: 12, elbowR: 4, elbowL: 4 },
       ik: { ...stand(78, 62) },
     },
     { // top, chest lifted and chin up, arms still dead straight
       t: 1,
       root: { x: 70, y: 61.4, rot: 0 },
-      joints: { spine: -3, neck: -6, shoulderR: 11, shoulderL: 11, elbowR: 6, elbowL: 6 },
+      joints: { shoulderGirdleElevR: 7, shoulderGirdleElevL: 7, spine: -3, neck: -6, shoulderR: 11, shoulderL: 11, elbowR: 6, elbowL: 6 },
       ik: { ...stand(78, 62) },
     },
   ],
@@ -1252,6 +1254,8 @@ const standingCurlKeys = [
 // elbow pinned. Must be visible: the elbow staying put while only the forearm
 // swings. Side view, sagittal. The bell is drawn across the hand (rot 90) for
 // the supinated grip, which is what separates it from the hammer curl.
+// v2: palms fully turned up. The shared curl keys stay neutral, so Hammer Curl
+// keeps its thumbs-up grip and the three curls stop being the same picture.
 const DUMBBELL_CURL = {
   view: "side",
   loop: "pingpong",
@@ -1261,7 +1265,7 @@ const DUMBBELL_CURL = {
     { type: "dumbbell", side: "L", point: "hand", rot: 90, k: 0.8 },
     { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.8, front: true },
   ],
-  keys: standingCurlKeys,
+  keys: standingCurlKeys.map((k) => ({ ...k, joints: { ...k.joints, forearmPronR: -86, forearmPronL: -86 } })),
 };
 
 // The same curl with a neutral, thumbs up grip. Must be visible: the bell IN
@@ -1294,12 +1298,14 @@ const BARBELL_CURL = {
 // Must be visible: the same curl arc. Side view. Honest caveat: side on, a
 // cambered bar and a straight bar are the same disc, so the only difference
 // from Barbell Curl on the card is the smaller plate and the angled wrist.
+// v2: semi-supinated, which is what the cambered bar is for. Barbell Curl
+// two cards away is the same movement with the palms fully turned up.
 const EZ_BAR_CURL = {
   ...DUMBBELL_CURL,
   props: [{ type: "barbell", side: "R", point: "hand", r: 8, front: true }],
   keys: [
-    { ...standingCurlKeys[0], joints: { spine: 2, neck: 0, wristR: -14, wristL: -14 } },
-    { ...standingCurlKeys[1], joints: { spine: 0, neck: -2, wristR: -14, wristL: -14 } },
+    { ...standingCurlKeys[0], joints: { forearmPronR: -42, forearmPronL: -42, spine: 2, neck: 0, wristR: -14, wristL: -14 } },
+    { ...standingCurlKeys[1], joints: { forearmPronR: -42, forearmPronL: -42, spine: 0, neck: -2, wristR: -14, wristL: -14 } },
   ],
 };
 
@@ -1676,6 +1682,9 @@ const CLOSE_GRIP_BENCH_PRESS = {
 // knees, palms up, the wrist alone curls the weight up. Must be visible: the
 // forearm welded to the thigh so the HAND is the only thing that moves.
 // Side view.
+// v2: palms UP. The forearm channel is the entire difference between this
+// and the reverse curl below, and before it existed the two cards were the
+// same picture.
 const WRIST_CURL = {
   view: "side",
   loop: "pingpong",
@@ -1689,7 +1698,7 @@ const WRIST_CURL = {
     { // bottom, hand rolled open and hanging below the knee
       t: 0,
       root: { x: 46, y: 88, rot: 14 },
-      joints: { spine: 18, neck: -12, wristR: -35, wristL: -35 },
+      joints: { forearmPronR: -78, forearmPronL: -78, spine: 18, neck: -12, wristR: -35, wristL: -35 },
       ik: {
         wristR: { x: 76, y: 90, bend: 1 }, wristL: { x: 72, y: 92, bend: 1 },
         ankleR: { x: 76, y: FLOOR, bend: -1 }, ankleL: { x: 70, y: FLOOR, bend: -1 },
@@ -1698,7 +1707,7 @@ const WRIST_CURL = {
     { // top, hand curled up toward the forearm, elbows never leaving the thighs
       t: 1,
       root: { x: 46, y: 88, rot: 14 },
-      joints: { spine: 18, neck: -12, wristR: 50, wristL: 50 },
+      joints: { forearmPronR: -78, forearmPronL: -78, spine: 18, neck: -12, wristR: 50, wristL: 50 },
       ik: {
         wristR: { x: 76, y: 90, bend: 1 }, wristL: { x: 72, y: 92, bend: 1 },
         ankleR: { x: 76, y: FLOOR, bend: -1 }, ankleL: { x: 70, y: FLOOR, bend: -1 },
@@ -1712,11 +1721,12 @@ const WRIST_CURL = {
 // welded forearm with a small knuckles up lift. Side view. Honest caveat: with
 // no forearm twist in the rig, palms up and palms down look the same, so the
 // short range here is the only thing separating it from Wrist Curl.
+// v2: palms DOWN, the mirror of Wrist Curl.
 const REVERSE_WRIST_CURL = {
   ...WRIST_CURL,
   keys: [
-    { ...WRIST_CURL.keys[0], joints: { spine: 18, neck: -12, wristR: -18, wristL: -18 } },
-    { ...WRIST_CURL.keys[1], joints: { spine: 18, neck: -12, wristR: 16, wristL: 16 } },
+    { ...WRIST_CURL.keys[0], joints: { forearmPronR: 78, forearmPronL: 78, spine: 18, neck: -12, wristR: -18, wristL: -18 } },
+    { ...WRIST_CURL.keys[1], joints: { forearmPronR: 78, forearmPronL: 78, spine: 18, neck: -12, wristR: 16, wristL: 16 } },
   ],
 };
 

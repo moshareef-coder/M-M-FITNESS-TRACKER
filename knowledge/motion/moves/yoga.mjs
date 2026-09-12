@@ -268,8 +268,10 @@ const WARRIOR_III = {
 // what is drawn is the part that survives: the long stance, the flat folded
 // torso, the low hand beside the front foot and the top arm lifted off the
 // back. Side view, because the stance and the fold are both sagittal.
+// v2: the revolve is a spine twist. Without it this was a triangle pose with
+// an arm in the air, which is the pose it is named against.
 const REVOLVED_TRIANGLE = {
-  view: "side",
+  view: { yaw: 24, plane: "sagittal" },
   loop: "hold",
   dur: 6.2,
   breath: 1.0,
@@ -279,7 +281,7 @@ const REVOLVED_TRIANGLE = {
     { // folded over the front leg, bottom hand reaching for the floor
       t: 0,
       root: { x: 58, y: 72, rot: 56 },
-      joints: { spine: 16, neck: -28, shoulderR: 160, elbowR: 6, elbowL: 4, wristR: -6 },
+      joints: { spineTwist: 46, spine: 16, neck: -28, shoulderR: 160, elbowR: 6, elbowL: 4, wristR: -6 },
       ik: {
         wristL: { x: 88, y: 100, bend: 1 },
         ankleR: { x: 90, y: 113.4, bend: -1 }, ankleL: { x: 28, y: 113.4, bend: -1 },
@@ -288,7 +290,7 @@ const REVOLVED_TRIANGLE = {
     { // settle deeper into the fold and open the top shoulder further
       t: 1,
       root: { x: 58, y: 73, rot: 58 },
-      joints: { spine: 17, neck: -30, shoulderR: 164, elbowR: 2, elbowL: 2, wristR: -4 },
+      joints: { spineTwist: 48, spine: 17, neck: -30, shoulderR: 164, elbowR: 2, elbowL: 2, wristR: -4 },
       ik: {
         wristL: { x: 89, y: 103, bend: 1 },
         ankleR: { x: 90, y: 113.4, bend: -1 }, ankleL: { x: 28, y: 113.4, bend: -1 },
@@ -335,6 +337,9 @@ const TREE_POSE = {
 // wrap is a lateral relationship and side on the two legs sit on top of each
 // other. The free shin is drawn hooking out past the standing shin rather than
 // tucked behind it, which is the only way a wrap survives a flat projection.
+// v2: eagle arms are two arms wrapped across the midline with the forearms
+// turned, and eagle legs are one thigh crossed over the other. All four of
+// those are v2 channels; before this the figure just stood there.
 const EAGLE_POSE = {
   view: "front",
   loop: "hold",
@@ -347,7 +352,7 @@ const EAGLE_POSE = {
     { // wrapped and settled, sitting into the standing knee
       t: 0,
       root: { x: 70, y: 65, rot: 0 },
-      joints: { spine: 2, neck: 0, wristR: 6, wristL: 6 },
+      joints: { shoulderFwdR: 74, shoulderFwdL: 74, shoulderAbdR: -22, shoulderAbdL: -14, elbowR: 98, elbowL: 112, forearmPronR: 62, forearmPronL: 44, hipAbdR: -26, hipRotR: -22, spine: 2, neck: 0, wristR: 6, wristL: 6 },
       ik: {
         ankleL: { x: 68, y: 113.4, bend: -1 }, ankleR: { x: 58, y: 100, bend: -1 },
         wristR: { x: 68, y: 27, bend: 1 }, wristL: { x: 72, y: 31, bend: 1 },
@@ -356,7 +361,7 @@ const EAGLE_POSE = {
     { // sink a little deeper into the standing leg and squeeze the wrap in
       t: 1,
       root: { x: 70, y: 67, rot: 0 },
-      joints: { spine: 3, neck: 1, wristR: 8, wristL: 8 },
+      joints: { shoulderFwdR: 76, shoulderFwdL: 76, shoulderAbdR: -24, shoulderAbdL: -16, elbowR: 100, elbowL: 114, forearmPronR: 64, forearmPronL: 46, hipAbdR: -28, hipRotR: -24, spine: 3, neck: 1, wristR: 8, wristL: 8 },
       ik: {
         ankleL: { x: 68, y: 113.4, bend: -1 }, ankleR: { x: 57, y: 99, bend: -1 },
         wristR: { x: 68, y: 29, bend: 1 }, wristL: { x: 72, y: 33, bend: 1 },
@@ -1112,8 +1117,10 @@ const CORPSE_POSE = {
 // suggested, which is honest about what it can show: the rotation itself points
 // at the camera, so the two knees are drawn at slightly different angles to say
 // they have travelled to one side.
+// v2: knees fall one way (pelvis twist), shoulders stay down (spine twist back
+// the other way). That opposition is the whole stretch.
 const RECLINED_TWIST = {
-  view: "side",
+  view: { yaw: 18, pitch: -24, plane: "sagittal" },
   loop: "hold",
   dur: 6.6,
   breath: 1.0,
@@ -1123,14 +1130,14 @@ const RECLINED_TWIST = {
     { // settled: knees over, shoulders heavy, arms out
       t: 0,
       root: { x: 66, y: 107, rot: -90 },
-      joints: { spine: 0, neck: -6, hipR: 290, kneeR: 140, ankleR: -20,
+      joints: { pelvisTwist: 0, spineTwist: 0, spine: 0, neck: -6, hipR: 290, kneeR: 140, ankleR: -20,
                 hipL: 282, kneeL: 134, ankleL: -20, wristR: 0, wristL: 0 },
       ik: { wristR: { x: 8, y: 110, bend: 1 }, wristL: { x: 12, y: 111, bend: 1 } },
     },
     { // let the knees travel a touch further over on the exhale
       t: 1,
       root: { x: 66, y: 107, rot: -90 },
-      joints: { spine: 0, neck: -8, hipR: 254, kneeR: 143, ankleR: -20,
+      joints: { pelvisTwist: -62, spineTwist: 40, spine: 0, neck: -8, hipR: 254, kneeR: 143, ankleR: -20,
                 hipL: 244, kneeL: 137, ankleL: -20, wristR: 0, wristL: 0 },
       ik: { wristR: { x: 8, y: 110.5, bend: 1 }, wristL: { x: 12, y: 111.5, bend: 1 } },
     },

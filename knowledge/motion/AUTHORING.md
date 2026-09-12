@@ -300,6 +300,160 @@ Do that rather than copying, and fix a pose in one place.
 
 ---
 
+## Rig v2: the third dimension
+
+The rig is a real skeleton in three dimensions now, projected orthographically.
+Everything above still applies: the v1 angles are the IN-PLANE component of each
+joint, every one of the 262 moves authored against v1 renders on the same pixel,
+and if you never touch a v2 channel you will never notice the difference.
+
+What v2 adds is everything that is made of rotation. Before it, a wrist curl and
+a reverse wrist curl were the same drawing, a chin-up and a pull-up were the same
+drawing, and a shrug was faked with the spine and neck.
+
+### The anatomical frame
+
+X is anterior (the way the figure faces), Y is down, Z is to the figure's right.
+A move's `plane` decides which of those the authored in-plane angles rotate in:
+
+- `sagittal` (X and Y) for side views. This is the default.
+- `frontal` (Z and Y) for front views.
+
+The channels below are named for the anatomy, not for the plane, so each one
+means the same thing whichever view the move uses.
+
+### The channels, all defaulting to zero
+
+| channel | range | what it is |
+| --- | --- | --- |
+| `spineTwist` | -55..55 | axial rotation at the chest, + turns the front of the body toward its right |
+| `pelvisTwist` | -180..180 | the same at the root, so it rotates the whole figure about its long axis |
+| `neckTwist` | -80..80 | the head turning |
+| `torsoRoll` | -45..45 | lateral flexion, + toward the figure's right |
+| `shoulderFwdL/R`, `hipFwdL/R` | free | anatomical flexion, added to the in-plane angle where they coincide |
+| `shoulderAbdL/R` | -45..185 | abduction away from the midline; negative crosses the body |
+| `hipAbdL/R` | -40..80 | the same for the leg |
+| `shoulderRotL/R` | -95..95 | axial rotation of the humerus, + external. Sets which way the elbow bends |
+| `hipRotL/R` | -50..65 | axial rotation of the femur, + external. Clamshells, 90/90, frog pumps |
+| `forearmPronL/R` | -95..95 | + pronation (palm turns to face back or down), - supination. 0 is neutral |
+| `shoulderGirdleElevL/R` | -4..9 units | shrug. Not degrees: it moves the shoulder anchor along the torso |
+| `shoulderGirdleProtL/R` | -5..8 units | protraction, + forward. Scapular push-ups |
+
+Three things worth knowing about them:
+
+- **They ride on top, they do not replace.** `shoulderR: 40, shoulderFwdR: 20`
+  is 60 degrees of flexion. The in-plane channel stays the primary one.
+- **A twist carries everything above it.** `spineTwist` turns the chest, and the
+  arms hang off the chest, so they come with it. `pelvisTwist` turns the lot.
+- **External rotation moves the joint below, not the joint itself.** A clamshell
+  is the classic trap: `hipRot` spins the femur about its own axis, so with a
+  bent knee it sweeps the SHIN and the knee barely moves. What lifts the knee is
+  `hipAbd`. The real exercise is both, and so is ours.
+
+### The camera
+
+`view` is a preset name or an object:
+
+```js
+view: "side"                              // sagittal, straight on. The default.
+view: "front"                             // frontal, straight on
+view: "back"                              // frontal from behind
+view: "top"                               // looking down
+view: { yaw: 30, plane: "sagittal" }      // three quarters
+view: { yaw: 18, pitch: -24, plane: "sagittal" }
+```
+
+`yaw` and `pitch` are degrees away from the move's own plane, so `{ yaw: 0 }` is
+always exactly what a v1 author drew. Always state the `plane` explicitly.
+
+Depth sorting happens per frame, so limbs pass in front of and behind the torso
+correctly at any angle, and a limb pointing at the camera foreshortens honestly
+instead of being drawn at full length. Draw order is depth; the near/far tone
+still follows the near side, flipping once the camera passes 90 degrees, because
+a limb that changes colour mid-orbit reads as a bug.
+
+**Props stay in screen space.** They are scenery, not skeleton, so a yawed
+camera moves the figure and not the bench. Nudge the prop `x` by hand when you
+yaw a move that stands on something.
+
+### What a three-quarter view changes
+
+Go back to step 0 and ask the question again. Three quarters is not a nicer side
+view, it is a different set of trade-offs:
+
+- It shows **rotation**, which is the only view that does. Twists, hip rotation,
+  anything that happens around the body's long axis.
+- It **costs you the clean silhouette**. A squat's hip and knee angles read
+  perfectly at yaw 0 and get muddier at every degree after that. If the thing
+  that MUST be visible is a joint angle in the sagittal plane, stay at yaw 0.
+- Useful range is about **20 to 40 degrees**. Past 45 you are in a front view
+  with none of a front view's symmetry.
+- It **does not fix foreshortening**, it trades which limb suffers from it.
+
+### Hands
+
+Five grip states, picked automatically and overridable with `grip: { R: "flat" }`:
+
+| state | when | looks like |
+| --- | --- | --- |
+| `open` | default | fingers out, thumb spread |
+| `flat` | the hand is on the floor (detected) | fingers straight, thumb tucked |
+| `closed` | a barbell, dumbbell, kettlebell, cable or band is on that hand | fingers wrapped, thumb over |
+| `fist` | authored | compact |
+| `hook` | a pull-up bar prop | fingers curled, thumb alongside |
+
+The hand has a palm, four fingers as one block in two phalanxes, and a thumb,
+and it is oriented by `forearmPron`: palms up and palms down genuinely differ.
+**Below 190 CSS pixels the hand simplifies to the v1 mitt automatically**, since
+fingers at 160px are three grey pixels and a rumour. The mitt still puts its
+thumb on the real thumb side, so pronation survives at card size even when the
+fingers do not.
+
+### Worked example: a twist (Russian Twist)
+
+```js
+const RUSSIAN_TWIST = {
+  view: { yaw: 34, plane: "sagittal" },    // three quarters, to see the rotation
+  loop: "pingpong",
+  keys: [
+    { t: 0, root: { x: 62, y: 100, rot: -35 },
+      joints: { spineTwist: 36, hipR: 145, kneeR: 70, /* ... */ }, ik: { /* ... */ } },
+    { t: 1, root: { x: 62, y: 100, rot: -30 },
+      joints: { spineTwist: -36, hipR: 140, kneeR: 66, /* ... */ }, ik: { /* ... */ } },
+  ],
+};
+```
+
+The V-sit is authored exactly as it was in v1, in the sagittal plane. The only
+new numbers are `spineTwist` swinging through 72 degrees and a yawed camera to
+see it happen. v1 could draw the sit or the twist, never both.
+
+### Worked example: a roll (Reclined Twist)
+
+```js
+view: { yaw: 18, pitch: -24, plane: "sagittal" },
+// t 0
+joints: { pelvisTwist: 0, spineTwist: 0, hipR: 290, kneeR: 140, /* ... */ }
+// t 1
+joints: { pelvisTwist: -62, spineTwist: 40, hipR: 254, kneeR: 143, /* ... */ }
+```
+
+Knees fall one way, shoulders stay down. That is `pelvisTwist` rotating the whole
+body about its long axis and `spineTwist` giving 40 of it back at the chest, so
+the shoulders stay near the floor while the hips turn. The opposition between the
+two is the entire stretch, and the pitched camera is what shows it.
+
+**The one that did not work.** Side Plank was tried as `pelvisTwist: -72` plus a
+three-quarter camera, to roll the body onto its side properly instead of faking
+the stack with extreme shoulder numbers. The roll itself is correct. The arms
+are not: they were authored as in-plane angles against a flat side view, so
+carrying them round the long axis folds them into the torso. Rolling a body needs
+its limbs authored in the rolled frame from the start. It was reverted, the v1
+pose stands, and the comment in the move says so.
+
+
+---
+
 ## Ten things that will bite you
 
 1. **Legs `bend: -1`, arms `bend: +1`,** except for an arm crossing the body in
@@ -322,7 +476,10 @@ Do that rather than copying, and fix a pose in one place.
    fixed frame while the body moves, pin the wrist with IK and leave the prop in
    world coordinates.
 9. **Breathing 1.0 on a rep looks like a shiver.** 0.2 for reps, 1.0 for holds.
-10. **Deep folds read as blobs.** At the bottom of a real push-up the elbow sits
+10. **A rotation channel moves the joint BELOW it.** hipRot sweeps the shin,
+    not the knee; shoulderRot sweeps the forearm, not the elbow. If you want the
+    knee to travel, that is hipAbd.
+11. **Deep folds read as blobs.** At the bottom of a real push-up the elbow sits
     inside the torso silhouette; we pull the bottom of the rep up slightly so
     the bent arm still reads. Three quarters of the true range that reads beats
     the full range that does not.

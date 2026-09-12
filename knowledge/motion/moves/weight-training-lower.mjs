@@ -679,8 +679,10 @@ const CURTSY_LUNGE = {
 // smaller. What this pass changed is the size of the drive and the size of the
 // figure: the bridge now lifts far enough to read as a rep at thumbnail size.
 // Supine, so rot is negative and the head is at -x.
+// v2: knees out, soles together. That is abduction plus external rotation,
+// neither of which existed before, and it is what makes a frog pump a frog.
 const FROG_PUMP = {
-  view: "side",
+  view: { yaw: 30, plane: "sagittal" },
   loop: "pingpong",
   dur: 2.2,
   breath: 0.25,
@@ -690,7 +692,7 @@ const FROG_PUMP = {
     { // hips down, heels tucked in tight under the hips
       t: 0,
       root: { x: 72, y: 108, rot: -90 },
-      joints: { spine: 0, neck: 4 },
+      joints: { hipAbdR: 42, hipAbdL: 42, hipRotR: 38, hipRotL: 38, spine: 0, neck: 4 },
       ik: {
         ankleR: { x: 90, y: 113.4, bend: -1 }, ankleL: { x: 86, y: 113.4, bend: -1 },
         wristR: { x: 86, y: 110, bend: 1 }, wristL: { x: 83, y: 111, bend: 1 },
@@ -699,7 +701,7 @@ const FROG_PUMP = {
     { // short sharp drive up, knees stay high over the heels
       t: 1,
       root: { x: 70, y: 92, rot: -120 },
-      joints: { spine: 0, neck: 20 },
+      joints: { hipAbdR: 46, hipAbdL: 46, hipRotR: 42, hipRotL: 42, spine: 0, neck: 20 },
       ik: {
         ankleR: { x: 90, y: 113.4, bend: -1 }, ankleL: { x: 86, y: 113.4, bend: -1 },
         wristR: { x: 88, y: 110, bend: 1 }, wristL: { x: 85, y: 111, bend: 1 },
@@ -1204,8 +1206,11 @@ const AB_WHEEL_ROLLOUT = {
 // whole thing collapses into a ball of overlapping limbs at any size. Side on,
 // the V-sit, the lifted feet and the arc of the hands are all true, and that
 // setup is unique in this library.
+// v2: the twist is real now. v1 kept the side view because the rotation was
+// undrawable and the V-sit was worth more; with spineTwist and a
+// three-quarter camera we get both.
 const RUSSIAN_TWIST = {
-  view: "side",
+  view: { yaw: 34, plane: "sagittal" },
   loop: "pingpong",
   dur: 2.8,
   breath: 0.25,
@@ -1214,7 +1219,7 @@ const RUSSIAN_TWIST = {
     { // hands high on one side, chest open
       t: 0,
       root: { x: 62, y: 100, rot: -35 },
-      joints: {
+      joints: { spineTwist: 36,
         spine: 0, neck: 4,
         hipR: 145, kneeR: 70, ankleR: -25, hipL: 143, kneeL: 72, ankleL: -25,
       },
@@ -1223,7 +1228,7 @@ const RUSSIAN_TWIST = {
     { // swung down and across toward the other hip
       t: 1,
       root: { x: 62, y: 100, rot: -30 },
-      joints: {
+      joints: { spineTwist: -36,
         spine: 0, neck: 8,
         hipR: 140, kneeR: 66, ankleR: -25, hipL: 138, kneeL: 68, ankleL: -25,
       },
@@ -1313,6 +1318,7 @@ const PALLOF_PRESS = {
 // draws in front of the torso. The body leans after the handle, which is the
 // rig's stand-in for a rotation it cannot make: with no twist about the spine,
 // the far shoulder cannot travel, so the lean is what buys the reach.
+// v2: the torso rotates through the chop instead of only leaning.
 const WOODCHOPPER = {
   view: "front",
   loop: "pingpong",
@@ -1324,7 +1330,7 @@ const WOODCHOPPER = {
     { // wound up high to the right
       t: 0,
       root: { x: 70, y: 62, rot: 10 },
-      joints: {
+      joints: { spineTwist: -24,
         spine: 0, neck: -4,
         hipR: 5, hipL: 5, kneeR: 4, kneeL: 4,
       },
@@ -1336,7 +1342,7 @@ const WOODCHOPPER = {
     { // through the middle of the arc, hands outside the near shoulder
       t: 0.5,
       root: { x: 70, y: 68, rot: 0 },
-      joints: {
+      joints: { spineTwist: 0,
         spine: 0, neck: 0,
         hipR: 5, hipL: 5, kneeR: 4, kneeL: 4,
       },
@@ -1348,7 +1354,7 @@ const WOODCHOPPER = {
     { // chopped through to the low left, hips and knees giving with it
       t: 1,
       root: { x: 70, y: 76, rot: -8 },
-      joints: {
+      joints: { spineTwist: 24,
         spine: 0, neck: 6,
         hipR: 5, hipL: 5, kneeR: 4, kneeL: 4,
       },
@@ -1377,8 +1383,10 @@ const WOODCHOPPER = {
 // direction. This pass shrank the dip: the legs used to fall 44 degrees between
 // the ends, which is a hanging leg raise, and now they stay high and the torso
 // does most of the moving.
+// v2: the wiper is the pelvis rotating about the hanging body, which is now
+// a channel rather than something the side view could only imply.
 const HANGING_WINDSHIELD_WIPER = {
-  view: "side",
+  view: { yaw: 30, plane: "sagittal" },
   loop: "pingpong",
   dur: 3.0,
   breath: 0.2,
@@ -1388,7 +1396,7 @@ const HANGING_WINDSHIELD_WIPER = {
     { // legs high and forward, hips already fully flexed
       t: 0,
       root: { x: 72, y: 70, rot: -18 },
-      joints: {
+      joints: { pelvisTwist: 34,
         spine: 0, neck: -4,
         hipR: 170, kneeR: 8, ankleR: -34, hipL: 168, kneeL: 10, ankleL: -34,
       },
@@ -1397,7 +1405,7 @@ const HANGING_WINDSHIELD_WIPER = {
     { // swept across, still high, body counter-rotating under the bar
       t: 1,
       root: { x: 66, y: 72, rot: 0 },
-      joints: {
+      joints: { pelvisTwist: -34,
         spine: 0, neck: -4,
         hipR: 148, kneeR: 12, ankleR: -30, hipL: 146, kneeL: 14, ankleL: -30,
       },
