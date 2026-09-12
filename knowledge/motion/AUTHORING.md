@@ -587,6 +587,40 @@ chains of circles rather than single capsules:
 
 ---
 
+## Rig v4: skin, not armour
+
+v3 got the proportions human and the figure still read as a space suit. The
+cause was the seam treatment: every capsule carried its own knockout outline and
+its own offset shade plate, so the body read as a set of armour segments, and on
+the head that inner plate sat exactly where a visor would.
+
+**Seams only where a body creases.** Shoulder cap, upper arm and forearm are now
+one shape with one run of shading; hip, thigh and shin likewise. The outlines
+that remain are the ones a real body shows at 160px: neck to torso, armpit,
+waist, groin, wrist and ankle (the hand and foot are still their own shapes).
+
+**Creases replace seams at the elbow and knee.** A crease is thin, soft, stops
+short of the silhouette, and **only appears when the joint is bent**, deepening
+with the bend. A line drawn across a straight limb is not a crease, it is a scar,
+and the first version of this looked exactly like one.
+
+**The head** is one silhouette with one soft shade down the shaded side and a
+hair mass clipped to the skull, giving a hairline. No inner plate. Still
+faceless: the hairline is a shape, not a feature.
+
+**`restPose(view)`** is exported from the rig: a canonical figure at rest for
+placeholders and empty states, with a couple of degrees of posterior pelvic tilt,
+the upper spine curving forward over it, soft knees, elbows carrying some
+flexion, relaxed wrists and feet that are not quite level. It is not a library
+move and authored moves must not import it.
+
+`shoulderW` went 12.6 to 13.4 so the arms hang beside the body rather than
+against it in the front view. Human half biacromial is 12.9; the extra half unit
+buys the daylight that makes arms read as arms.
+
+
+---
+
 ## Ten things that will bite you
 
 1. **Legs `bend: -1`, arms `bend: +1`,** except for an arm crossing the body in

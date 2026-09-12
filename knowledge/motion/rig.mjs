@@ -134,11 +134,75 @@ export const BODY = {
   rHandA: 4.0, rHandB: 2.9, rThumb: 2.1,
   rHip: 8.0, rThighMid: 8.7, rKnee: 6.3,
   rCalf: 6.9, rAnkle: 4.4, rToe: 3.2, rHeel: 4.0,
-  shoulderW: 12.6, hipW: 6.2, depth: 1.7,
+  shoulderW: 13.4, hipW: 6.2, depth: 1.7,
   // hand v2
   palm: 5.0, palmHalf: 2.9, finger: 4.4, rPalm: 3.0, rFinger: 2.4, thumb: 5.0,
 };
 export const LEG_TO_FLOOR = BODY.thigh + BODY.shin + BODY.rAnkle;
+
+// A canonical figure at rest, for placeholders, empty states and anything that
+// wants a person rather than an exercise. Not a library move and not something
+// an authored move should import: it is the reference posture.
+//
+// Nobody stands like a diagram. The pelvis tilts back a couple of degrees, the
+// upper spine curves forward over it, the head sits back on that, the elbows
+// carry a few degrees of flexion, the knees are soft rather than locked and the
+// feet are not quite level. Every one of those is small, and together they are
+// the difference between standing and being stood up.
+export function restPose(view = "side") {
+  const frontal = view !== "side";
+  const sway = (a, b) => [
+    { t: 0, root: a.root, joints: a.joints, ik: a.ik },
+    { t: 1, root: b.root, joints: b.joints, ik: b.ik },
+  ];
+  const side = {
+    root: { x: 70, y: STAND_Y + 0.3, rot: -2 },
+    joints: {
+      spine: 5, neck: -4,
+      shoulderR: -7, elbowR: 15, wristR: 9,
+      shoulderL: -5, elbowL: 12, wristL: 7,
+      hipR: 3, kneeR: 5, ankleR: -1,
+      hipL: -2, kneeL: 4, ankleL: 1,
+    },
+  };
+  const side2 = {
+    root: { x: 70, y: STAND_Y + 0.7, rot: -1 },
+    joints: {
+      spine: 4, neck: -3,
+      shoulderR: -6, elbowR: 17, wristR: 10,
+      shoulderL: -4, elbowL: 14, wristL: 8,
+      hipR: 3, kneeR: 4, ankleR: -1,
+      hipL: -2, kneeL: 3, ankleL: 1,
+    },
+  };
+  const front = {
+    root: { x: 70, y: STAND_Y + 0.3, rot: 1 },
+    joints: {
+      spine: 0, neck: 1,
+      shoulderR: 7, elbowR: 11, wristR: -4,
+      shoulderL: 6, elbowL: 9, wristL: -3,
+      hipR: 5, hipL: 4, kneeR: 3, kneeL: 4,
+    },
+    ik: { ankleR: { x: 77, y: 113.7, bend: -1 }, ankleL: { x: 63, y: 113.7, bend: -1 } },
+  };
+  const front2 = {
+    root: { x: 70, y: STAND_Y + 0.8, rot: 0 },
+    joints: {
+      spine: 1, neck: 0,
+      shoulderR: 8, elbowR: 13, wristR: -4,
+      shoulderL: 7, elbowL: 11, wristL: -3,
+      hipR: 5, hipL: 4, kneeR: 2, kneeL: 3,
+    },
+    ik: { ankleR: { x: 77, y: 113.7, bend: -1 }, ankleL: { x: 63, y: 113.7, bend: -1 } },
+  };
+  return {
+    view: view === "back" ? "front" : view,
+    facing: view === "back" ? "away" : undefined,
+    loop: "hold", dur: 7, breath: 0.7, breathRate: 0.7,
+    feet: frontal ? { R: { ang: 11, len: 0.42, w: 1.3 }, L: { ang: 13, len: 0.42, w: 1.3 } } : undefined,
+    keys: frontal ? sway(front, front2) : sway(side, side2),
+  };
+}
 export const STAND_Y = GROUND - LEG_TO_FLOOR; // 61.4
 
 // ------------------------------------------------------------------ colour --
@@ -187,7 +251,12 @@ export function palette(theme = "dark", accent = "action", skin = "mannequin") {
       : (dark ? mix(ink, "#ffffff", 0.16) : mix(ink, T.bg, 0.14)),
     far: skin === "anatomy" ? (dark ? mix(T.bg, skinBase, 0.46) : mix(skinBase, T.bg, 0.30))
       : (dark ? mix(T.bg, ink, 0.46) : mix(ink, T.bg, 0.52)),
-    shade: dark ? "rgba(9,11,15,0.30)" : "rgba(37,45,58,0.16)",
+    shade: dark ? "rgba(9,11,15,0.26)" : "rgba(37,45,58,0.14)",
+    // A crease is not a seam. Seams are where two pieces of armour meet; creases
+    // are where skin folds, and they are thin, soft and only in the eight places
+    // a body actually creases at this size.
+    crease: dark ? "rgba(9,11,15,0.34)" : "rgba(37,45,58,0.20)",
+    hair: dark ? "rgba(9,11,15,0.20)" : "rgba(37,45,58,0.13)",
     shadeSoft: dark ? "rgba(9,11,15,0.17)" : "rgba(37,45,58,0.09)",
     edge: T.bg,
     accent: A.accent,
@@ -544,6 +613,24 @@ function part(ctx, C, pts, o = {}) {
 }
 const limb = (ctx, C, p0, r0, p1, r1, o) => part(ctx, C, [[p0, r0], [p1, r1]], o);
 
+// A soft fold across a joint, drawn instead of a knockout seam. It appears only
+// when the joint is actually bent, and deepens with the bend, because a straight
+// limb has no crease and a line drawn across one reads as a scar. It also stops
+// short of the silhouette edge so it never reads as a cut.
+function crease(ctx, C, p, a, b, r, span = 0.5, w = 0.42) {
+  const bend = Math.acos(clamp(a.x * b.x + a.y * b.y, -1, 1)) * 180 / Math.PI;
+  if (bend < 12) return;
+  const k = Math.min(1, (bend - 12) / 45);
+  const n = V(-b.y, b.x);
+  const L = r * span * (0.55 + 0.45 * k);
+  ctx.save();
+  ctx.globalAlpha = 0.35 + 0.65 * k;
+  capsulePath(ctx, V(p.x - n.x * L, p.y - n.y * L), w, V(p.x + n.x * L, p.y + n.y * L), w);
+  ctx.fillStyle = C.crease;
+  ctx.fill();
+  ctx.restore();
+}
+
 // The convex hull of a set of circles, drawn as every pairwise capsule in one
 // stroke-then-fill pass. This is what makes a palm a slab rather than a stick.
 function hull(ctx, C, circles, o = {}) {
@@ -553,7 +640,32 @@ function hull(ctx, C, circles, o = {}) {
       segs.push([circles[i][0], circles[i][1], circles[j][0], circles[j][1]]);
     }
   }
+  if (o.clip) {
+    const p = new Path2D();
+    for (const g of segs) capsulePathInto(p, g[0], g[1], g[2], g[3]);
+    ctx.clip(p);
+    return;
+  }
   part(ctx, C, circles, { ...o, segs });
+}
+
+// capsulePath draws into the context; this draws the same geometry into a
+// Path2D so it can be used as a clip region.
+function capsulePathInto(path, p0, r0, p1, r1) {
+  const dx = p1.x - p0.x, dy = p1.y - p0.y;
+  const d = Math.hypot(dx, dy);
+  if (d < 0.001 || Math.abs(r0 - r1) >= d) {
+    const big = r0 >= r1 ? [p0, r0] : [p1, r1];
+    path.moveTo(big[0].x + big[1], big[0].y);
+    path.arc(big[0].x, big[0].y, big[1], 0, Math.PI * 2);
+    return;
+  }
+  const a = Math.atan2(dy, dx);
+  const phi = Math.acos((r0 - r1) / d);
+  path.moveTo(p0.x + Math.cos(a + phi) * r0, p0.y + Math.sin(a + phi) * r0);
+  path.arc(p0.x, p0.y, r0, a + phi, a - phi + Math.PI * 2);
+  path.arc(p1.x, p1.y, r1, a - phi, a + phi);
+  path.closePath();
 }
 
 // ------------------------------------------------------------------ hands ---
@@ -650,32 +762,48 @@ function drawFoot(ctx, S, side, C, fill) {
   ], { fill, shadeR: 0.44, shadeOff: 0.36 });
 }
 
-// Head: a skull rather than an egg. Cranium set back and high, brow forward,
-// jaw dropping to a chin, plus an ear. Three circles hulled together, which is
-// what gives it a human profile at 16 units tall without a single feature on it.
+// Head: one silhouette with a hair mass and one soft shade. The v3 head carried
+// an offset inner plate like every other segment, and on a head that plate sits
+// exactly where a visor would, which is most of why the figure read as a space
+// suit. Still faceless: the hairline is the only feature and it is a shape, not
+// a face.
 function drawHead(ctx, S, C, fill) {
   const B = BODY;
   const u = norm2(S.neckAxis.y), f = norm2(S.neckAxis.x);
   const flat = S.frontal;
   const away = S.facing === "away";
   const at = (up, fwd) => add(add(S.head, scl(u, up)), scl(f, fwd));
-  if (flat) {
-    // Front on there is no profile to draw, so the shape is a tapered oval:
-    // wide at the temples, narrower at the jaw, with a short chin.
-    const jawR = away ? B.rHeadBack * 0.9 : B.rHeadBack * 0.78;
-    hull(ctx, C, [[at(2.4, 0), B.rHeadBack], [at(-1.0, 0), B.rHeadBack * 0.94], [at(-4.2, 0), jawR]],
-         { fill, shadeOff: 0.3, shadeR: 0.58 });
-  } else {
-    hull(ctx, C, [
-      [at(1.9, -1.4), B.rHeadBack],          // cranium, set back and high
-      [at(0.6, 2.0), B.rHeadBack * 0.84],    // brow and face
-      [at(-3.4, 2.4), B.rHeadJaw],           // jaw
-      [at(-4.6, 3.4), B.rHeadJaw * 0.62],    // chin
-    ], { fill, shadeOff: 0.3, shadeR: 0.56 });
-  }
+  const skull = flat
+    ? [[at(2.4, 0), B.rHeadBack], [at(-1.0, 0), B.rHeadBack * 0.94],
+       [at(-4.2, 0), away ? B.rHeadBack * 0.9 : B.rHeadBack * 0.78]]
+    : [[at(1.9, -1.4), B.rHeadBack], [at(0.6, 2.0), B.rHeadBack * 0.84],
+       [at(-3.4, 2.4), B.rHeadJaw], [at(-4.6, 3.4), B.rHeadJaw * 0.62]];
+  hull(ctx, C, skull, { fill, shade: false });
+  // one soft shade down the shaded side of the face and jaw, no hard edge
+  const n = flat ? V(f.x, f.y) : V(f.x, f.y);
+  const sd = (n.x * 0.42 + n.y * 0.91 < 0) ? -1 : 1;
+  capsulePath(ctx,
+    add(at(1.4, 0), scl(n, sd * B.rHeadBack * 0.34)), B.rHeadBack * 0.66,
+    add(at(-3.2, flat ? 0 : 1.6), scl(n, sd * B.rHeadBack * 0.3)), B.rHeadJaw * 0.72);
+  ctx.fillStyle = C.shade;
+  ctx.fill();
+  // hair: a mass over the cranium with a hairline, which is what stops a
+  // faceless head reading as an egg
+  const hair = flat
+    ? [[at(3.0, 0), B.rHeadBack * 0.94], [at(0.4, 0), B.rHeadBack * 0.9]]
+    : [[at(2.4, -1.8), B.rHeadBack * 0.9], [at(1.0, 0.4), B.rHeadBack * 0.82],
+       [at(-1.6, -2.4), B.rHeadBack * 0.72]];
+  const segs = [];
+  for (let i = 0; i < hair.length - 1; i++) segs.push([hair[i][0], hair[i][1], hair[i + 1][0], hair[i + 1][1]]);
+  ctx.save();
+  hull(ctx, C, skull, { fill, halo: false, shade: false, clip: true });
+  ctx.clip();
+  ctx.fillStyle = C.hair;
+  for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.fill(); }
+  ctx.restore();
   const ears = flat ? (away ? [-1, 1] : []) : [-1];
-  for (const sd of ears) {
-    const ear = at(-0.2, sd * (flat ? B.rHeadBack * 0.84 : 1.9));
+  for (const sd2 of ears) {
+    const ear = at(-0.2, sd2 * (flat ? B.rHeadBack * 0.84 : 1.9));
     capsulePath(ctx, ear, 2.2, add(ear, scl(u, -1.4)), 1.8);
     ctx.fillStyle = C.shade; ctx.fill();
   }
@@ -694,10 +822,19 @@ function drawArm(ctx, S, side, C, fill, grip, skinOpts, detail) {
   drawHand(ctx, S, side, C, fill, grip, detail);
 }
 
+// Hip, thigh and shin as one surface, with a crease at the knee.
 function drawLeg(ctx, S, side, C, fill, skinOpts) {
   const B = BODY, k = S.sides[side];
-  part(ctx, C, [[k.hip, B.rHip], [lerpV(k.hip, k.knee, 0.42), B.rThighMid], [k.knee, B.rKnee]], { fill });
-  part(ctx, C, [[k.knee, B.rKnee], [lerpV(k.knee, k.ankle, 0.30), B.rCalf], [k.ankle, B.rAnkle]], { fill });
+  const sh = norm2(sub(k.ankle, k.knee));
+  part(ctx, C, [
+    [k.hip, B.rHip],
+    [lerpV(k.hip, k.knee, 0.42), B.rThighMid],
+    [lerpV(k.hip, k.knee, 0.86), B.rKnee * 1.1],
+    [k.knee, B.rKnee],
+    [lerpV(k.knee, k.ankle, 0.30), B.rCalf],
+    [k.ankle, B.rAnkle],
+  ], { fill, shadeOff: 0.42, shadeR: 0.52 });
+  crease(ctx, C, k.knee, norm2(sub(k.knee, k.hip)), sh, B.rKnee, 0.56, 0.46);
   if (skinOpts && skinOpts.plates) legPlates(ctx, S, side, C, skinOpts.lit);
   drawFoot(ctx, S, side, C, fill);
 }
@@ -720,13 +857,19 @@ function drawTorso(ctx, S, C, fill, skinOpts) {
   part(ctx, C, [[S.pelvis, B.rPelvis], [waist, B.rWaist], [S.chest, S.chestR]],
        { fill, shadeOff: fv ? 0.18 : 0.44, shadeR: fv ? 0.62 : 0.54 });
   if (skinOpts && skinOpts.plates) { torsoPlates(ctx, S, C, skinOpts.lit); return; }
+  // A single soft mass under the collarbone gives the chest volume. It used to
+  // be a hard edged capsule across the whole chest, which at 160px read as the
+  // front panel of a vest.
   const u = norm2(S.torsoAxis.y), f = norm2(S.torsoAxis.x);
-  const a = fv ? add(add(S.chest, scl(f, -6.4)), scl(u, -1.0))
-               : add(add(S.chest, scl(f, 3.4)), scl(u, 1.2));
-  const b = fv ? add(add(S.chest, scl(f, 6.4)), scl(u, -1.0))
-               : add(add(S.chest, scl(f, 1.6)), scl(u, -6.5));
-  capsulePath(ctx, a, fv ? 5.4 : 4.7, b, fv ? 5.4 : 5.3);
+  const a = fv ? add(add(S.chest, scl(f, -4.6)), scl(u, -1.6))
+               : add(add(S.chest, scl(f, 2.6)), scl(u, 0.4));
+  const b = fv ? add(add(S.chest, scl(f, 4.6)), scl(u, -1.6))
+               : add(add(S.chest, scl(f, 1.2)), scl(u, -5.0));
+  ctx.save();
+  ctx.globalAlpha = 0.62;
+  capsulePath(ctx, a, fv ? 5.0 : 4.2, b, fv ? 5.0 : 4.6);
   ctx.fillStyle = C.shadeSoft; ctx.fill();
+  ctx.restore();
 }
 
 // ---------------------------------------------------------- anatomy skin ---
