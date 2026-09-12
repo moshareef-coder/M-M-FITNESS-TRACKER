@@ -129,6 +129,21 @@
           w.switchTab("workout"); w.renderPlanPreview();
         } },
 
+      { t: "Muscle body in 3D", scenario: "paired",
+        s: "The session figure as a real ecorche",
+        note: "The same move, drawn as the procedural muscle body instead of flat vector art: 45 muscles swept over the rig's own joint frames, rebuilt every frame, with the worked ones lit in the heat colour the rings use. Only the session card and the stretch phase get it, at 240 px with a few degrees of idle yaw drift so the volume reads. Everything else stays 2D. A device with no usable WebGL falls back to the 2D figure with nothing to see.",
+        run: (w) => {
+          /* TODAY_WORKOUT is a top-level `let`, so it is a lexical binding and
+             not a window property: w.TODAY_WORKOUT from out here is undefined.
+             Same origin, so the iframe's own eval can see it. */
+          w.eval(`TODAY_WORKOUT.exercises = [
+            { name: "Barbell Bench Press", sets: 3, reps: 8 },
+            { name: "Goblet Squat", sets: 3, reps: 10 },
+          ];
+          TODAY_WORKOUT.mobility = { warmup: [], cooldown: [] };`);
+          w.switchTab("workout"); w.startWorkout();
+        } },
+
       { t: "Do the workout", scenario: "paired",
         s: "Five exercises, live timer",
         note: "The real session screen on today's push day, reached the way Next through the warm-up reaches it. Log sets, change weights, tap through exercises. Weight and reps should sit on the same baseline in every row. Finish it and the cool-down runs, then the completion screen banks the workout into the fake database.",

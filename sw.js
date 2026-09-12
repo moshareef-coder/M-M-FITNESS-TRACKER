@@ -5,13 +5,15 @@
    338 KB .riv before anything appeared. Now:
 
      immutable assets (/vendor, the .riv, icons)  cache first, they never change
+     (that covers /vendor/three: the three.js build is version named in its
+      filename, so a bump changes the url and the old copy is simply unused)
      the anatomy and formula modules              cache first, refreshed behind you
      the app shell                                cache first, refreshed behind you
 
    A deploy is still never masked: it ships a new sw.js with a new cache name,
    which drops this cache on activate, and the page reloads itself when the new
    worker takes over. */
-const CACHE = "fit-together-2026.09.12.6";
+const CACHE = "fit-together-2026.09.12.7";
 /* Version named or content named files live outside the versioned cache, so a
    deploy does not throw away the 2 MB Rive wasm and the .riv and make the next
    launch download them all over again. */

@@ -31,6 +31,15 @@
         integrity="sha384-JBR+x8blGwjDRO63aHCGiZMD4VNiTR4ZUGA+N6ZKLf3zNt1fK8IBpcgPaMrxqWBp"
         crossorigin="anonymous"></script>
 <script src="/sandbox-data.js"></script>
+<!-- body3d: the procedural muscle body under knowledge/motion/body3d is copied
+     in from the anatomy workspace byte for byte, and those files import the bare
+     specifier "three". This pins it to the vendored, tree-shaken build. It has to
+     be the SAME url mount.mjs imports by relative path, or the page would end up
+     with two THREE instances. Nothing loads until a 3D figure is actually
+     mounted: an importmap is resolution, not a fetch. -->
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three-0.160.1.module.js" } }
+</script>
 <style>
   /* Palette: graphite/charcoal ink / cobalt blue (you) / coral orange (partner) / electric lime (action) */
   :root {
@@ -1404,6 +1413,11 @@
   .stretch-fig { display: flex; justify-content: center; margin: 6px 0 4px; }
   .stretch-fig canvas { width: 176px; height: 176px; }
   .stretch-fig.fig-none { display: none; }
+  /* body3d: the muscle body is a solid, not a line drawing, so it needs more
+     canvas than the 2D figure before the volume reads at all. Only the two
+     figures that carry a whole screen get it; cards and plan rows stay 2D. */
+  .sess-fig[data-fig3d].fig-3d canvas { width: 240px; height: 240px; }
+  .stretch-fig[data-fig3d].fig-3d canvas { width: 240px; height: 240px; }
   .cb-confirm-fig canvas { width: 124px; height: 124px; margin-bottom: 2px; }
   .cb-confirm-fig.fig-none { display: none; }
   .cb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
@@ -12694,7 +12708,7 @@ function renderStretchPhase() {
           return text ? `<span class="sess-target">${escapeHtml(text)}</span>` : "";
         })()}
       </div>
-      <div class="stretch-fig" data-fig="${escapeHtml(move.name || "")}" data-accent="stretch" data-skin="anatomy"
+      <div class="stretch-fig" data-fig="${escapeHtml(move.name || "")}" data-fig3d data-accent="stretch" data-skin="anatomy"
         data-lit="${escapeHtml(move.group || "")}" data-lit-color="stretch"></div>
       ${move.cue ? `<div class="sess-note">${escapeHtml(move.cue)}</div>` : ""}
     </div>
@@ -12803,7 +12817,7 @@ function renderSession() {
           : `Best ${pbWeight} lb${pbReps ? ` × ${pbReps}` : ""}`}</span>` : ""}
       </div>
       ${ex.note ? `<div class="sess-note">${escapeHtml(ex.note)}</div>` : ""}
-      <div class="sess-fig" data-fig="${escapeHtml(ex.name)}" data-skin="anatomy" data-lit="${escapeHtml(motionLitFor(ex.name))}"></div>
+      <div class="sess-fig" data-fig="${escapeHtml(ex.name)}" data-fig3d data-skin="anatomy" data-lit="${escapeHtml(motionLitFor(ex.name))}"></div>
       ${workingMusclesHTML(ex.name, { who: "me", size: "sm", email: MY_EMAIL })}
 
       <div class="set-circles">
@@ -15849,6 +15863,26 @@ function ensureMotionModule() {
   }
   return motionPromise;
 }
+/* body3d: the same move, drawn as the procedural muscle body in WebGL instead
+   of as flat vector art. Only the two figures that carry a whole screen use it
+   (the session card and the stretch phase, marked data-fig3d); cards and plan
+   rows stay 2D, because a list of ten WebGL contexts is not a trade worth
+   making. Flip BODY3D to false and every one of them silently goes back to
+   the 2D figure, which is also what happens on its own if the device has no
+   usable WebGL or the mount throws. */
+let BODY3D = true;
+let body3dPromise = null;
+function ensureBody3DModule() {
+  if (!body3dPromise) {
+    body3dPromise = import("./knowledge/motion/body3d/mount.mjs")
+      .then((m) => {
+        if (!m.body3DSupported()) { BODY3D = false; return null; }
+        return m;
+      })
+      .catch((e) => { console.warn("body3d unavailable, falling back to 2D", e); BODY3D = false; return null; });
+  }
+  return body3dPromise;
+}
 const MOTION_MOUNTS = new Set();
 function currentTheme() {
   return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
@@ -15889,7 +15923,24 @@ async function mountMotionFigures(root) {
     if (litColor === "stretch") litColor = getComputedStyle(document.documentElement).getPropertyValue("--stretch").trim() || "#2ea8ff";
     const lit = el.dataset.lit ? { muscles: el.dataset.lit.split(",").filter(Boolean), color: litColor } : null;
     el.replaceChildren(canvas);
-    const ctl = mod.mountMove(canvas, name, {
+    /* body3d: try the muscle body first on the elements that asked for it. A
+       null back (no WebGL, or the mount threw) leaves the canvas untouched and
+       drops through to the 2D figure below, so a device that cannot do this
+       never sees an empty box. */
+    let ctl = null;
+    if (BODY3D && el.hasAttribute("data-fig3d")) {
+      const b3 = await ensureBody3DModule();
+      if (b3) {
+        /* Sized before the mount, not after: the renderer reads the canvas's
+           CSS box, and a mount at 156 px followed by a class that says 240
+           would render one blurry upscaled frame first. */
+        el.classList.add("fig-3d");
+        try { ctl = b3.mountBody3D(canvas, name, { theme: currentTheme(), lit }); }
+        catch (e) { console.warn("body3d mount", e); ctl = null; }
+        if (!ctl) el.classList.remove("fig-3d");
+      }
+    }
+    if (!ctl) ctl = mod.mountMove(canvas, name, {
       theme: currentTheme(), accent: el.dataset.accent || "action", skin: el.dataset.skin || "mannequin", lit,
     });
     if (!ctl) { canvas.remove(); el.classList.add("fig-none"); continue; }
