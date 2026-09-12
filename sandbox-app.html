@@ -739,14 +739,21 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .rest-clock {
-    font-size: 34px; font-weight: 800; letter-spacing: -.03em; line-height: 1;
+    font-size: 28px; font-weight: 800; letter-spacing: -.03em; line-height: 1;
     font-variant-numeric: tabular-nums;
   }
   .rest-track { height: 2px; border-radius: 9px; background: var(--panel); overflow: hidden; }
   .rest-fill { height: 100%; width: 100%; background: var(--accent); border-radius: 9px; transition: width 1s linear; }
-  /* Past the target, the only state worth a colour change. */
-  .rest-bar.over .rest-clock { color: var(--up); }
-  .rest-bar.over .rest-fill { background: var(--up); }
+  /* The advice, not a deadline. It stays the same size whichever thing it is
+     saying, so reaching the recommendation does not make the strip jump. */
+  .rest-advice { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+  /* Accent, not --up: --up is the coral that means a number went the wrong way,
+     and reaching your rest recommendation is not a warning. */
+  .rest-bar.ready .rest-advice { color: var(--accent-ink); font-weight: 700; }
+  .rest-bar.ready .rest-advice::before {
+    content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 100px;
+    background: var(--accent-ink); margin-right: 7px; vertical-align: middle;
+  }
   .rest-pref { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
   .rest-pref button {
     min-height: 44px; padding: 10px 0; border-radius: 12px; cursor: pointer;
@@ -759,9 +766,9 @@
 
   .rest-adjust { display: flex; gap: 8px; }
   .rest-adjust button {
-    flex: 1; min-height: 40px; padding: 9px 0; border-radius: 10px; cursor: pointer;
+    flex: 1; min-height: 44px; padding: 14px 16px; border-radius: 12px; cursor: pointer;
     background: var(--panel); border: 1px solid var(--border); color: var(--text);
-    font-family: inherit; font-size: 12.5px; font-weight: 700;
+    font-family: inherit; font-size: 14px; font-weight: 700;
   }
   .rest-adjust button:active { transform: scale(.96); }
 
@@ -2697,6 +2704,33 @@
     border: none; cursor: pointer; background: var(--up); color: #fff; font-size: 15.5px; line-height: 1;
   }
 
+  /* The Progress headline. One answer, at the top, before any chart. The
+     number is the only 28px on the tab on purpose: everything under it is
+     detail for people who want detail. */
+  .ph-eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 10px;
+  }
+  .ph-figure { display: flex; align-items: baseline; gap: 7px; margin-bottom: 8px; flex-wrap: wrap; }
+  .ph-figure b {
+    font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.03em;
+    line-height: 1.05; font-variant-numeric: tabular-nums;
+  }
+  .ph-figure i { font-style: normal; font-size: 14px; font-weight: 700; color: var(--muted); }
+  .ph-figure.good b { color: var(--accent-ink); }
+  .ph-figure.warn b { color: var(--warn); }
+  .ph-line { font-size: 17px; font-weight: 600; line-height: 1.45; }
+  .ph-note { font-size: 14px; color: var(--muted); line-height: 1.5; margin-top: 8px; }
+  .ph-jump {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    width: 100%; margin-top: 14px; min-height: 44px;
+    padding: 14px 16px; border-radius: 12px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    font-family: inherit; font-size: 14px; font-weight: 700; text-align: left; cursor: pointer;
+  }
+  .ph-jump:active { transform: scale(0.985); }
+  .ph-jump .link-arrow { color: var(--muted); }
+
   /* Progress controls */
   .person-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
   .person-toggle .tab-pill { flex: 1; padding: 9px 14px; font-size: 14px; }
@@ -3682,6 +3716,8 @@
       <button type="button" class="tab-pill" id="progPartnerBtn">Partner</button>
     </div>
 
+    <div class="card" id="progHeadline"></div>
+
 
     <div class="card metric-card" id="cardWeight">
       <h2>Weight trend</h2>
@@ -3777,7 +3813,7 @@
         </button>
         <button type="button" class="set-row" id="setRow-training" data-page="training">
           <span class="set-ico" data-ico="target"></span>
-          <span class="set-txt"><span class="set-title">Training</span><span class="set-sub">Focus, goal and weekly target</span></span>
+          <span class="set-txt"><span class="set-title">Training</span><span class="set-sub">Weekly target, rest and stretching</span></span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
         <button type="button" class="set-row" id="setRow-milestones" data-page="milestones">
@@ -3905,26 +3941,16 @@
         <div class="scr-title">Training</div>
         <div class="spacer"></div>
       </div>
-    <div class="card">
-      <h2>Main focus</h2>
-      <select id="setupFocus">
-        <option value="Strength">Strength</option>
-        <option value="Muscle Gain">Muscle Gain</option>
-        <option value="Fat Loss">Fat Loss</option>
-        <option value="General Fitness">General Fitness</option>
-        <option value="Endurance">Endurance</option>
-      </select>
+    <div class="set-group" style="margin-bottom:10px;">
+      <button type="button" class="set-row" id="setupGoalRow" data-page="goal">
+        <span class="set-ico" data-ico="medal"></span>
+        <span class="set-txt"><span class="set-title">Your goal</span><span class="set-sub" id="setupGoalSub">Not set</span></span>
+        <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+      </button>
     </div>
     <div class="card">
-      <h2>Body goal</h2>
-      <select id="setupGoal">
-        <option value="Lose weight">Lose weight</option>
-        <option value="Build muscle">Build muscle</option>
-        <option value="Recomp (lose fat, gain muscle)">Recomp (lose fat, gain muscle)</option>
-        <option value="Get stronger">Get stronger</option>
-        <option value="Maintain">Maintain</option>
-      </select>
-      <label style="margin-top:10px;">More detail (optional)</label>
+      <h2>More about your goal</h2>
+      <p class="muted-note" style="margin-top:-6px;">Optional. Anything the goal above does not say on its own.</p>
       <textarea id="setupGoalDetail" placeholder="e.g. training for a wedding in June, prefer 4 days/week"></textarea>
     </div>
     <div class="card">
@@ -12020,17 +12046,33 @@ function restLabel(sec) {
 }
 
 /* One place decides what the strip says, so the first paint and the ticker can
-   never disagree. Past the target it counts up with a plus rather than sitting
-   on zero, because standing there for four minutes is worth knowing. */
+   never disagree. The clock counts UP from the moment the set ended, because
+   that is the part the app actually knows: it cannot tell when YOU are
+   recovered. A countdown implied it could, and implied you had failed at zero.
+   The recommendation sits beside the number as advice instead, and past it the
+   clock keeps counting plainly, because standing there for four minutes is
+   worth knowing. */
 function restState(ms) {
   const target = restTargetSec();
-  const left = target - Math.max(0, ms) / 1000;
-  const over = left < 0;
-  return {
-    over,
-    text: over ? `+${formatRest(-left * 1000)}` : formatRest(left * 1000),
-    pct: over ? 0 : Math.max(0, Math.min(1, left / target)),
-  };
+  const elapsed = Math.max(0, ms) / 1000;
+  return { target, ready: elapsed >= target, text: formatRest(elapsed * 1000) };
+}
+
+/* Why the number is the number. A recommendation you can trace back to your own
+   goal gets trusted; a bare number gets ignored. Same three sources as
+   restTargetSec(), in the same order, said in a few words. */
+function restAdvice(s) {
+  if (s.ready) return `Good to go, ${restLabel(s.target)} was the recommendation`;
+  const planned = Number(TODAY_WORKOUT?.exercises?.[SESSION?.exerciseIndex]?.restSec);
+  if (Number.isFinite(planned) && planned > 0) {
+    const goal = goalTileFor(MY_PROFILE?.goal_bubble)?.title;
+    return goal
+      ? `About ${restLabel(planned)} here, what a ${goal.toLowerCase()} plan rests for`
+      : `About ${restLabel(planned)} here, what this lift is planned for`;
+  }
+  const mine = Number(MY_PROFILE?.rest_sec);
+  if (Number.isFinite(mine) && mine > 0) return `About ${restLabel(mine)} here, your own default from Setup`;
+  return `About ${restLabel(DEFAULT_REST_SEC)} here, a safe default for most lifts`;
 }
 
 function paintRest() {
@@ -12039,11 +12081,12 @@ function paintRest() {
   if (!bar || !clock || !SESSION?.restStartedAt) { stopRestTicker(); return; }
   const s = restState(Date.now() - SESSION.restStartedAt);
   clock.textContent = s.text;
-  bar.classList.toggle("over", s.over);
-  const fill = document.getElementById("restFill");
-  if (fill) fill.style.width = `${(s.pct * 100).toFixed(1)}%`;
-  // One buzz as the target lands, once per rest however long you stand there.
-  if (s.over && REST_BUZZED_AT !== SESSION.restStartedAt) {
+  bar.classList.toggle("ready", s.ready);
+  const advice = document.getElementById("restAdvice");
+  if (advice) advice.textContent = restAdvice(s);
+  // One buzz as the recommendation lands, once per rest however long you stand
+  // there. It says "you are good to go", not "you are late".
+  if (s.ready && REST_BUZZED_AT !== SESSION.restStartedAt) {
     REST_BUZZED_AT = SESSION.restStartedAt;
     buzz([18, 60, 18]);
   }
@@ -12761,15 +12804,15 @@ function renderSession() {
     </div>
 
     ${resting ? `
-      <div class="rest-bar${restNow.over ? " over" : ""}" id="restTimer">
+      <div class="rest-bar${restNow.ready ? " ready" : ""}" id="restTimer">
         <div class="rest-head">
           <span class="rest-label">RESTING</span>
           ${nextUp ? `<span class="rest-next">Next: ${escapeHtml(nextUp)}</span>` : ""}
         </div>
         <span class="rest-clock" id="restClock">${restNow.text}</span>
-        <div class="rest-track"><div class="rest-fill" id="restFill" style="width:${(restNow.pct * 100).toFixed(1)}%"></div></div>
+        <div class="rest-advice" id="restAdvice">${escapeHtml(restAdvice(restNow))}</div>
         <div class="rest-adjust">
-          <button type="button" id="restSkip">Skip</button>
+          <button type="button" id="restSkip">Start next set</button>
         </div>
       </div>` : ""}
 
@@ -16552,20 +16595,102 @@ const TRACK_OPTIONS = [
   { key: "steps",       label: "Steps",        icon: "run",       card: null, needsApp: true },
 ];
 
-/* The starting point before anyone has touched "Customise this tab", chosen by
-   what they actually said they wanted at onboarding rather than one default
-   for everyone. The old default was a flat ["weight", "trained"] regardless
-   of goal, and "trained" was not even a real card key, so a Get-stronger user
-   and a Stay-consistent user both landed on a weight chart. "Recomp" is
-   checked before the muscle test below, since its full string is "Recomp
-   (lose fat, gain muscle)" and would otherwise match on the word "muscle". */
+/* ---------- What this tab is supposed to answer ----------
+
+   Progress used to open with a metric picker: six cards of equal weight, the
+   same six for everybody, and no answer to the only question anybody opens
+   this tab to ask, which is "am I actually doing well". Two people with
+   different goals do not share a definition of well, so the answer has to come
+   from the goal they picked (profiles.goal_bubble / goal_child, the nine
+   bubbles and forty three children in mo-knowledge/goals/goal-tree.json).
+
+   Forty three children do not need forty three headlines. They need to land on
+   the handful of things this app actually measures, and the grouping is:
+
+     scale      lose-weight (every child except "lose fat and build muscle"),
+                build-muscle / "gain weight"
+                -> weight, the direction it is moving, and the rate a week
+
+     recomp     tone-lean-abs (all), "lose fat and build muscle", "skinny fat"
+                -> sessions a week, with the scale reported as steady or not.
+                   Leading with the scale here is wrong on purpose: the whole
+                   point of a recomp is that the number does not move much
+
+     lift       get-stronger (all five)
+                -> one lift's estimated 1RM and what it has done since
+
+     volume     build-muscle (arms and chest, glutes, without getting bulky)
+                -> weight moved a week against the eight week average
+
+     reps       do-a-thing / first pull-up, push-ups
+                -> the best set on that one movement, and nothing else
+
+     endurance  do-a-thing / run a 5K, run faster
+                -> longest logged run, plus the admission that we hold minutes
+                   and not distance, so we cannot call a 5K time
+
+     habit      do-a-thing (touch my toes, handstand), event, feel-better,
+                get-back, consistent, and anything unmapped
+                -> sessions this week against the target, and weeks hit.
+                   Showing this person a weight chart is actively discouraging
+
+   Profiles saved before the bubbles existed carry only the legacy `goal`
+   string, so that falls through the same table at the bottom. */
+function headlineKindFor(profile) {
+  const child = profile?.goal_child || "";
+  if (child === "lose-and-build" || child === "build-skinny-fat") return "recomp";
+  if (child === "build-overall") return "scale";
+  if (child === "first-pullup" || child === "first-pushup") return "reps";
+  if (child === "run-5k" || child === "faster-mile") return "endurance";
+  switch (profile?.goal_bubble || "") {
+    case "lose-weight":   return "scale";
+    case "build-muscle":  return "volume";
+    case "get-stronger":  return "lift";
+    case "tone-lean-abs": return "recomp";
+    case "do-a-thing": case "event": case "feel-better":
+    case "get-back": case "consistent": return "habit";
+  }
+  /* Legacy order matters: "Recomp (lose fat, gain muscle)" carries the word
+     muscle, and "Lose weight" carries the word weight, so the more specific
+     test has to run first or both land on the wrong card. */
+  const legacy = (profile?.goal || "").toLowerCase();
+  if (/recomp|tone/.test(legacy)) return "recomp";
+  if (/stronger/.test(legacy)) return "lift";
+  if (/muscle/.test(legacy)) return "volume";
+  if (/lose|weight/.test(legacy)) return "scale";
+  return "habit";
+}
+
+/* Which existing card each headline is the summary of, so the tab can put that
+   one directly under the answer and leave the rest in their old order. */
+const HEADLINE_CARD = {
+  scale: "cardWeight", recomp: "cardConsistency", lift: "cardStrength",
+  volume: "cardVolume", reps: "cardStrength", endurance: "cardActivity",
+  habit: "cardConsistency",
+};
+const HEADLINE_METRIC = {
+  scale: "weight", recomp: "consistency", lift: "strength",
+  volume: "volume", reps: "strength", endurance: "activity",
+  habit: "consistency",
+};
+/* Named for what the person would go looking for, not for the card's own
+   title: "see the body weight behind this" is a card name read out loud. */
+const HEADLINE_MORE = {
+  scale: "the whole weight trend", recomp: "the last eight weeks",
+  lift: "every lift you track", volume: "the weekly totals",
+  reps: "every lift you track", endurance: "everything logged",
+  habit: "the last eight weeks",
+};
+
+/* The starting point before anyone has touched "Customise this tab": the card
+   the headline is about, plus one supporting card. Same mapping the headline
+   uses, so the answer and the chart under it can never disagree about which
+   goal this person has. */
 function defaultTrackedMetrics() {
-  const goal = (MY_PROFILE?.goal || "").toLowerCase();
-  if (/consistent/.test(goal)) return ["consistency", "activity"];
-  if (/stronger/.test(goal)) return ["strength", "activity"];
-  if (/recomp/.test(goal)) return ["weight", "photos"];
-  if (/muscle/.test(goal)) return ["volume", "photos"];
-  return ["weight", "photos"];
+  const kind = headlineKindFor(MY_PROFILE);
+  const lead = HEADLINE_METRIC[kind] || "consistency";
+  const second = kind === "scale" || kind === "recomp" ? "photos" : "activity";
+  return lead === second ? [lead] : [lead, second];
 }
 
 /* Profiles saved under older defaults carry keys that match no card ("prs",
@@ -16601,6 +16726,342 @@ function renderMetricPicker() {
   });
 }
 
+/* ---------- Reading the data honestly ----------
+   Every one of these can come back with nothing, and saying so is the point.
+   Two readings do not make a trend, and a line drawn through them is a lie
+   with a chart around it. */
+
+/* Weigh-ins over a fixed window, deliberately NOT the range pill above the
+   weight chart: the headline is an answer, and an answer that changes because
+   someone tapped "1W" is not one. */
+function headlineWeighIns(name, days = 42) {
+  const from = new Date(todayStr() + "T00:00:00");
+  from.setDate(from.getDate() - days);
+  const fromStr = isoDate(from);
+  return entriesFor(name).filter((e) => e.weight != null && e.entry_date >= fromStr);
+}
+
+function daysBetween(a, b) {
+  return Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
+}
+
+/* Least squares through every reading rather than last minus first, because
+   the first and last weigh-in are the two most likely to be a bad morning,
+   and one of them landing wrong flips the verdict. */
+function lbsPerWeek(rows) {
+  const n = rows.length;
+  if (n < 2) return null;
+  const t0 = rows[0].entry_date;
+  const xs = rows.map((r) => daysBetween(t0, r.entry_date));
+  const ys = rows.map((r) => r.weight);
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  let num = 0, den = 0;
+  for (let i = 0; i < n; i++) { num += (xs[i] - mx) * (ys[i] - my); den += (xs[i] - mx) ** 2; }
+  return den ? (num / den) * 7 : null;
+}
+
+/* Epley, capped at twelve reps. Past that the formula drifts into fantasy and
+   a set of twenty light reps reads as a bigger single than a heavy triple. */
+function e1rm(weight, reps) {
+  return weight * (1 + Math.min(Math.max(reps || 1, 1), 12) / 30);
+}
+
+/* Best estimated single per DAY for one lift, so warm-up sets and a top set on
+   the same morning are one point, not four. Same shape as liftHistory, but on
+   the estimate rather than the raw load: a person who took their bench from
+   5 reps to 9 at the same weight got stronger, and the raw load says flat. */
+function liftE1rmHistory(name, exerciseName, weeks = 16) {
+  const key = (exerciseName || "").trim().toLowerCase();
+  const from = new Date(todayStr() + "T00:00:00");
+  from.setDate(from.getDate() - weeks * 7);
+  const fromStr = isoDate(from);
+  const byDate = new Map();
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== name || l.weight == null || l.duration_min) continue;
+    if ((l.exercise_name || "").trim().toLowerCase() !== key) continue;
+    if (l.entry_date < fromStr) continue;
+    byDate.set(l.entry_date, Math.max(byDate.get(l.entry_date) || 0, e1rm(l.weight, l.reps)));
+  }
+  return [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b))
+    .map(([entry_date, est]) => ({ entry_date, est }));
+}
+
+/* Best single set on a movement matched by name. Bodyweight work has no load,
+   so reps are the whole measurement here. */
+function bestRepsFor(name, re, before) {
+  let top = null;
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== name || !l.reps || l.duration_min) continue;
+    if (!re.test(l.exercise_name || "")) continue;
+    if (before && l.entry_date >= before) continue;
+    if (!top || l.reps > top.reps) top = { reps: l.reps, date: l.entry_date, name: l.exercise_name };
+  }
+  return top;
+}
+
+function runLogsFor(name, days) {
+  const from = new Date(todayStr() + "T00:00:00");
+  from.setDate(from.getDate() - days);
+  const fromStr = isoDate(from);
+  return ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && l.duration_min
+    && /run|jog|treadmill|sprint|5 ?k|mile/i.test(l.exercise_name || "") && l.entry_date >= fromStr);
+}
+
+function shortDate(d) {
+  return new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/* One headline. `third` is the partner view, where everything is said about
+   someone else and in their name rather than "you". */
+function progressHeadline(kind, name, email, profile, third) {
+  const Subj = third ? escapeHtml(name) : "You";
+  const have = third ? "has" : "have";
+  const are = third ? "is" : "are";
+  const their = third ? "their" : "your";
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+  if (kind === "scale") {
+    const rows = headlineWeighIns(name, 42);
+    const goal = weightGoalFor(email);
+    const first = rows[0]?.weight ?? null;
+    const up = goal ? goal.target_value > (goal.start_value ?? first ?? 0)
+      : profile?.goal_bubble === "build-muscle" || /muscle|gain/.test((profile?.goal || "").toLowerCase());
+    if (!rows.length) {
+      return { value: "—", line: `${Subj} ${have} not logged a weigh-in yet.`,
+        note: "One number on the scale starts this. Two weeks of them and it can tell you the rate you are moving at." };
+    }
+    const now = rows[rows.length - 1].weight;
+    const span = daysBetween(rows[0].entry_date, rows[rows.length - 1].entry_date);
+    if (rows.length < 3 || span < 14) {
+      return { value: now.toFixed(1), unit: "lbs", line: `${Subj} ${are} at ${now.toFixed(1)} lbs.`,
+        note: `Not enough to call a trend yet. Two weeks of weigh-ins is the least this can read a rate from, and ${third ? "they are" : "you are"} ${plural(span, "day")} in.` };
+    }
+    const rate = lbsPerWeek(rows);
+    const change = now - first;
+    const weeks = Math.max(1, Math.round(span / 7));
+    const out = {
+      value: `${change > 0 ? "+" : ""}${change.toFixed(1)}`,
+      unit: `lbs in ${plural(weeks, "week")}`,
+    };
+    if (rate == null || Math.abs(rate) < 0.15) {
+      out.line = `${Subj} ${third ? "has" : "have"} held steady for the last ${plural(weeks, "week")}.`;
+      out.note = goal ? `That is not moving toward ${goal.target_value.toFixed(0)} lbs yet. A flat month is a flat month, not a failure, but it is worth a look at the week.` : "Steady is a result, not a gap in the data. It only becomes a problem if it is not what you wanted.";
+      return out;
+    }
+    const right = (rate > 0) === up;
+    out.tone = right ? "good" : "warn";
+    out.line = `${Subj} ${are} ${rate < 0 ? "losing" : "gaining"} about ${Math.abs(rate).toFixed(1)} lbs a week${right ? "" : ", which is away from the target rather than toward it"}.`;
+    const notes = [];
+    if (right && goal) {
+      const togo = goal.target_value - now;
+      const wks = togo / rate;
+      if (wks > 0 && wks < 104) {
+        const eta = new Date(todayStr() + "T00:00:00");
+        eta.setDate(eta.getDate() + Math.round(wks * 7));
+        notes.push(`At this rate ${third ? "they reach" : "you reach"} ${goal.target_value.toFixed(0)} lbs around ${shortDate(isoDate(eta))}. Rates change, so treat that as a direction and not a date.`);
+      }
+    }
+    if (right && Math.abs(rate) / now > 0.0125) {
+      notes.push("That is faster than the half to one percent of bodyweight a week worth aiming for, and early weeks are mostly water.");
+    }
+    if (!right) notes.push("Four weeks is a short read and bodies move around. What matters is where this sits a month from now.");
+    out.note = notes.join(" ");
+    return out;
+  }
+
+  if (kind === "recomp") {
+    const weeks = consistencyWeeks(name, 9);
+    const finished = weeks.slice(0, -1);
+    const trained = finished.filter((w) => w.days > 0);
+    if (trained.length < 2) {
+      return { value: "—", line: `${Subj} ${have} not finished two weeks of training yet.`,
+        note: "This goal is judged on whether the sessions keep happening, so it needs a couple of finished weeks before it can say anything." };
+    }
+    const recent = finished.slice(-4);
+    const per = recent.reduce((s, w) => s + w.days, 0) / recent.length;
+    const rows = headlineWeighIns(name, 42);
+    const span = rows.length > 1 ? daysBetween(rows[0].entry_date, rows[rows.length - 1].entry_date) : 0;
+    const rate = rows.length >= 3 && span >= 14 ? lbsPerWeek(rows) : null;
+    // A whole number of sessions should read as one, not as "4.0".
+    const per1 = per % 1 === 0 ? String(per) : per.toFixed(1);
+    const out = {
+      value: per1, unit: "sessions a week", tone: per >= 2.5 ? "good" : "",
+      line: `${Subj} ${have} trained ${per1} times a week over the last ${plural(recent.length, "week")}.`,
+    };
+    out.note = rate == null
+      ? "On this goal the scale is the wrong thing to judge by, because muscle arriving and fat leaving cancel out on it. Photos show it first."
+      : Math.abs(rate) < 0.4
+        ? "The scale has barely moved, which is exactly what this goal looks like when it is working. Photos show it before the number does."
+        : `The scale is ${rate < 0 ? "down" : "up"} about ${Math.abs(rate).toFixed(1)} lbs a week. On this goal that number matters less than the sessions above it.`;
+    return out;
+  }
+
+  if (kind === "lift") {
+    const lifts = topLiftsFor(name, 12);
+    if (!lifts.length) {
+      return { value: "—", line: `${Subj} ${have} not logged a weighted set yet.`,
+        note: "Log one weighted exercise and this starts following what it does over the weeks." };
+    }
+    const want = `${profile?.goal_detail || ""} ${profile?.goal || ""}`.toLowerCase();
+    const picked = lifts.find((l) => want.includes(l.name.toLowerCase())) || lifts[0];
+    const hist = liftE1rmHistory(name, picked.name);
+    const lift = escapeHtml(picked.name);
+    if (!hist.length) {
+      return { value: "—", line: `${Subj} ${have} not logged ${lift} in the last sixteen weeks.`,
+        note: "The lift is in the history but not recently enough to read a direction off." };
+    }
+    const last = Math.round(hist[hist.length - 1].est);
+    const span = daysBetween(hist[0].entry_date, hist[hist.length - 1].entry_date);
+    if (hist.length < 3 || span < 14) {
+      return { value: String(last), unit: "lbs estimated single",
+        line: `${Subj} ${have} logged ${lift} ${plural(hist.length, "time")} so far.`,
+        note: "One or two sessions is a data point, not a direction. A couple more over the next few weeks and this can say whether it is climbing." };
+    }
+    const delta = hist[hist.length - 1].est - hist[0].est;
+    const weeks = Math.max(1, Math.round(span / 7));
+    const out = { value: String(last), unit: "lbs estimated single" };
+    if (Math.abs(delta) < 2.5) {
+      out.line = `${lift} has not moved in ${plural(weeks, "week")}.`;
+      out.note = "A stall this long usually wants a lighter week or a different rep range rather than more effort. Estimated from the best set each session, not a max anyone actually lifted.";
+    } else {
+      out.tone = delta > 0 ? "good" : "warn";
+      out.line = `${lift} is ${delta > 0 ? "up" : "down"} about ${Math.abs(Math.round(delta))} lbs in ${plural(weeks, "week")}.`;
+      out.note = "Estimated from the best set each session, not a max anyone actually lifted.";
+    }
+    return out;
+  }
+
+  if (kind === "volume") {
+    const weeks = volumeWeeks(name, 9);
+    const finished = weeks.slice(0, -1);
+    const lifted = finished.filter((w) => w.volume > 0);
+    if (lifted.length < 3) {
+      return { value: "—", line: "Not enough finished weeks to compare against yet.",
+        note: `Three is the least this can call a week busy or quiet from, and there ${lifted.length === 1 ? "is 1" : `are ${lifted.length}`} so far. Until then there is no usual week to be above or below.` };
+    }
+    const last = finished[finished.length - 1];
+    const prior = lifted.filter((w) => w.weekStart !== last.weekStart);
+    const avg = prior.reduce((s, w) => s + w.volume, 0) / prior.length;
+    const pct = avg > 0 ? Math.round(((last.volume - avg) / avg) * 100) : 0;
+    const out = { value: fmtVolume(last.volume), unit: "lbs moved last week" };
+    if (last.volume === 0) {
+      out.line = `${Subj} logged no sets at all last week.`;
+      out.note = "One quiet week is a quiet week. Two in a row is the thing worth noticing.";
+    } else if (Math.abs(pct) < 8) {
+      out.line = `That is right on ${their} usual week.`;
+      out.note = "Holding is fine. Size comes from the work adding up, not from every week beating the last.";
+    } else {
+      out.tone = pct > 0 ? "good" : "";
+      out.line = `That is ${Math.abs(pct)}% ${pct > 0 ? "more" : "less"} than ${their} usual week.`;
+      out.note = "Total weight moved, weight times reps times sets, which is the number that tracks with building size.";
+    }
+    return out;
+  }
+
+  if (kind === "reps") {
+    const isPull = profile?.goal_child === "first-pullup";
+    const re = isPull ? /pull ?-? ?up|chin ?-? ?up/i : /push ?-? ?up|press ?-? ?up/i;
+    const label = isPull ? "pull-up" : "push-up";
+    const best = bestRepsFor(name, re);
+    if (!best) {
+      return { value: "—", line: `${Subj} ${have} not logged a ${label} yet.`,
+        note: `Log a set, even an assisted one${isPull ? " on the band or the machine" : " off your knees"}. The number climbing is the whole goal, and it cannot climb from nothing.` };
+    }
+    const month = new Date(todayStr() + "T00:00:00");
+    month.setDate(month.getDate() - 28);
+    const older = bestRepsFor(name, re, isoDate(month));
+    const out = { value: String(best.reps), unit: `${label}s in one set`, tone: "good" };
+    out.line = `${third ? escapeHtml(name) + "'s" : "Your"} best set is ${plural(best.reps, label)}.`;
+    out.note = older
+      ? older.reps < best.reps
+        ? `Up from ${plural(older.reps, label)} a month ago.`
+        : `Same as a month ago. Reps on one movement move slowly, so a month flat is normal rather than a warning.`
+      : "Nothing from more than a month ago to compare against yet, so there is no direction to call.";
+    return out;
+  }
+
+  if (kind === "endurance") {
+    const runs = runLogsFor(name, 28);
+    if (!runs.length) {
+      return { value: "—", line: `${Subj} ${have} not logged a run in the last four weeks.`,
+        note: "Log a run with its minutes and this starts following time on feet." };
+    }
+    const longest = Math.max(...runs.map((r) => r.duration_min));
+    const days = new Set(runs.map((r) => r.entry_date)).size;
+    return {
+      value: String(longest), unit: "minutes, longest run", tone: "good",
+      line: `${Subj} ${have} run ${plural(days, "time")} in the last four weeks, the longest ${longest} minutes.`,
+      note: "The app holds minutes, not distance or pace, so it cannot call a 5K time or tell you whether you are getting faster. Time on feet is the honest stand-in until it can.",
+    };
+  }
+
+  // habit, and the fallback for every goal the app cannot measure directly
+  const target = weeklyGoalFor(email);
+  const thisWeek = gymDaysThisWeek(name);
+  const weeks = consistencyWeeks(name, 9);
+  const finished = weeks.slice(0, -1);
+  const streak = personalDayStreak(name);
+  if (!entriesFor(name).some((e) => e.gym)) {
+    return { value: `0/${target}`, unit: "this week", line: `${Subj} ${have} not logged a session yet.`,
+      note: "One session is the entire job this week. Everything on this tab is built out of them." };
+  }
+  const out = {
+    value: `${thisWeek}/${target}`, unit: "this week",
+    tone: thisWeek >= target ? "good" : "",
+  };
+  out.line = thisWeek >= target
+    ? `${Subj} ${have} already hit ${their} ${plural(target, "day")} this week.`
+    : `${plural(target - thisWeek, "more session")} this week and ${third ? "they hit" : "you hit"} the target.`;
+  const trained = finished.filter((w) => w.days > 0);
+  if (trained.length < 4) {
+    out.note = `${trained.length ? `Only ${plural(trained.length, "finished week")}` : "No finished week"} to go on so far. Four of them and this can tell you how often the week actually lands.`;
+  } else {
+    const hit = finished.filter((w) => w.days >= w.target).length;
+    out.note = `Target hit in ${hit} of the last ${finished.length} weeks${streak > 1 ? `, and ${third ? "they are" : "you are"} ${plural(streak, "day")} into a streak` : ""}.`;
+  }
+  return out;
+}
+
+/* The genuinely new person. Six empty cards is what this tab used to give them,
+   and six ways to start is no way to start, so everything else is hidden and
+   exactly one green button is left on screen. Which one depends on the goal:
+   on a weight goal the first useful act is a number on the scale, and the card
+   for that is already sitting underneath this, so the empty state points at it
+   rather than growing a second button that does the same thing. Every other
+   goal needs a session, which happens on Home. */
+function renderProgressEmpty(kind) {
+  const weightLed = kind === "scale" || kind === "recomp";
+  $("progHeadline").innerHTML =
+    emptyState(weightLed ? "trending" : "dumbbell", "Nothing to measure yet",
+      weightLed
+        ? "Type your weight in below. One number starts the trend, and a couple of weeks of them makes it readable."
+        : "Log one session and this turns into an answer instead of a question.")
+    + (weightLed ? "" : `<button type="button" class="btn-primary" id="progFirstAction">Go to today</button>`);
+  if (!weightLed) $("progFirstAction").onclick = () => switchTab("home");
+}
+
+function renderProgressHeadline(kind, name, email, profile, third, sharing) {
+  const el = $("progHeadline");
+  const tile = goalTileFor(profile?.goal_bubble);
+  const goalText = tile ? goalTileLabel(profile) : (profile?.goal || null);
+  const eyebrow = third
+    ? goalText ? `${name}: ${goalText}` : `${name}'s progress`
+    : goalText ? `Your goal: ${goalText}` : "Where you are";
+  const h = progressHeadline(kind, name, email, profile, third);
+  const lead = HEADLINE_CARD[kind];
+  const leadEl = lead ? $(lead) : null;
+  const leadOn = leadEl && !leadEl.classList.contains("hidden");
+  const leadLabel = HEADLINE_MORE[kind] || "the detail";
+  el.innerHTML = `
+    <div class="ph-eyebrow">${escapeHtml(eyebrow)}</div>
+    <div class="ph-figure${h.tone ? " " + h.tone : ""}"><b>${h.value}</b>${h.unit ? `<i>${escapeHtml(h.unit)}</i>` : ""}</div>
+    <div class="ph-line">${h.line}</div>
+    ${h.note ? `<div class="ph-note">${escapeHtml(h.note)}${!sharing ? ` ${escapeHtml(name)} keeps the detail of their workouts private, so this is built from the days they trained.` : ""}</div>` : ""}
+    ${leadOn ? `<button type="button" class="ph-jump" id="progJump"><span>See ${escapeHtml(leadLabel)}</span><span class="link-arrow">&rsaquo;</span></button>` : ""}`;
+  if (leadOn) $("progJump").onclick = () => leadEl.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function renderProgressTab() {
   const isPartner = PROGRESS_VIEW === "partner";
   // Logging weight only makes sense for yourself, hide it entirely on your
@@ -16622,12 +17083,40 @@ function renderProgressTab() {
 
   renderMetricPicker();
 
-  const on = new Set(myTrackedMetrics());
+  const name = isPartner ? partnerName() : ME;
+  const email = isPartner ? PARTNER_EMAIL : MY_EMAIL;
+  const profile = isPartner ? PARTNER_PROFILE : MY_PROFILE;
+  /* A partner's per exercise history is theirs to give, and the timeline, the
+     day sheet and the live sheet all already ask before showing it. This tab
+     did not: the Strength card listed every lift and load they had ever done
+     while the rest of the app was carefully hiding exactly that. */
+  const sharing = !isPartner || PARTNER_PROFILE?.share_workout_details !== false;
+  let kind = headlineKindFor(profile);
+  if (!sharing && (kind === "lift" || kind === "volume" || kind === "reps")) kind = "habit";
+
+  const blank = !isPartner && !entriesFor(ME).length
+    && !ALL_EXERCISE_LOGS.some((l) => l.user_name === ME);
+  const on = new Set(blank ? [] : myTrackedMetrics());
   TRACK_OPTIONS.forEach((o) => {
     if (!o.card) return;
     const el = $(o.card);
-    if (el) el.classList.toggle("hidden", !on.has(o.key));
+    const hidden = !on.has(o.key) || (!sharing && (o.key === "strength" || o.key === "volume"));
+    if (el) el.classList.toggle("hidden", hidden);
   });
+  $("customiseCard").classList.toggle("hidden", blank);
+  if (blank && kind !== "scale" && kind !== "recomp") $("scaleCheckCard").classList.add("hidden");
+
+  if (blank) renderProgressEmpty(kind);
+  else renderProgressHeadline(kind, name, email, profile, isPartner, sharing);
+
+  /* The card the headline is drawn from sits directly under it; everything
+     else keeps the order it had. Re-ordering rather than deleting, because
+     people who came here for the charts still get all of them. */
+  const leadEl = $(HEADLINE_CARD[kind] || "");
+  const anchor = $("progHeadline");
+  if (leadEl && !leadEl.classList.contains("hidden") && anchor?.parentNode?.insertBefore) {
+    anchor.parentNode.insertBefore(leadEl, anchor.nextSibling);
+  }
 
   if (on.has("weight")) { renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); }
   if (on.has("consistency")) { renderConsistencyChart(); renderConsistencyStats(); }
@@ -16901,6 +17390,9 @@ function openSettingsPage(key) {
   // The only two pages whose contents are built rather than sitting in the
   // markup: both carry a Rive canvas that has to be created and destroyed.
   if (key === "goal") renderGoalPage();
+  // Training shows the goal in words rather than owning a second copy of it,
+  // so it has to re-read the profile every time it is opened.
+  if (key === "training") $("setupGoalSub").textContent = goalTileLabel(MY_PROFILE);
   if (key === "focus") renderBodyFocusPage();
   if (key === "limits") renderLimitsPage();
   window.scrollTo({ top: 0 });
@@ -17051,8 +17543,7 @@ function renderSetupTab() {
   if (MY_EMAIL === ADMIN_EMAIL) renderAdminPanel();
 
   if (MY_PROFILE) {
-    if (MY_PROFILE.focus) $("setupFocus").value = MY_PROFILE.focus;
-    if (MY_PROFILE.goal) $("setupGoal").value = MY_PROFILE.goal;
+    $("setupGoalSub").textContent = goalTileLabel(MY_PROFILE);
     $("setupGoalDetail").value = MY_PROFILE.goal_detail || "";
     $("setupChallengeTarget").value = MY_PROFILE.challenge_target || 4;
     $("skipStretchToggle").checked = MY_PROFILE.skip_stretching === true;
@@ -17210,9 +17701,11 @@ async function saveSetup() {
   const payload = {
     email: MY_EMAIL,
     user_name: ME,
-    focus: $("setupFocus").value,
-    goal: $("setupGoal").value,
-    ...($("setupGoal").value !== MY_PROFILE?.goal ? { goal_bubble: null, goal_child: null } : {}),
+    /* The goal itself is not here any more. It is one tap away on the goal
+       page, which writes goal, goal_bubble and goal_child together. Saving
+       preferences must never touch it: the old dropdown held five strings the
+       tiles do not all produce, so a profile set to "Stay consistent" opened
+       Training reading "Lose weight" and one Save wrote that over it. */
     goal_detail: $("setupGoalDetail").value.trim() || null,
     challenge_target: clampNum($("setupChallengeTarget").value, 1, 7, 4),
     sex: $("setupSex").value || null,
