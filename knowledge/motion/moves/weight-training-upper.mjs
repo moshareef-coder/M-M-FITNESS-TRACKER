@@ -46,13 +46,13 @@ const DUMBBELL_BENCH_PRESS = {
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -4 },
-      ik: { wristR: { x: 58, y: 45, bend: 1 }, wristL: { x: 62, y: 47, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 55.0, y: 45.0, bend: 1 }, wristL: { x: 59.0, y: 47.0, bend: 1 }, ...stand(92, 96) },
     },
     { // bottom, bells beside the chest, elbows folded out under the hands
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 2, neck: -6 },
-      ik: { wristR: { x: 56, y: 62, bend: 1 }, wristL: { x: 60, y: 64, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 53.0, y: 61.9, bend: 1 }, wristL: { x: 57.0, y: 63.9, bend: 1 }, ...stand(92, 96) },
     },
   ],
 };
@@ -75,13 +75,13 @@ const MACHINE_CHEST_PRESS = {
       t: 0,
       root: { x: 52, y: 86, rot: -6 },
       joints: { spine: 0, neck: -2 },
-      ik: { wristR: { x: 68, y: 66, bend: 1 }, wristL: { x: 65, y: 68, bend: 1 }, ...stand(82, 78) },
+      ik: { wristR: { x: 67.7, y: 63.0, bend: 1 }, wristL: { x: 64.7, y: 65.0, bend: 1 }, ...stand(82, 78) },
     },
     { // lockout, arms long, chest still against the pad
       t: 1,
       root: { x: 52, y: 86, rot: -4 },
       joints: { spine: -2, neck: -3 },
-      ik: { wristR: { x: 84, y: 60, bend: 1 }, wristL: { x: 81, y: 62, bend: 1 }, ...stand(82, 78) },
+      ik: { wristR: { x: 83.7, y: 57.0, bend: 1 }, wristL: { x: 80.7, y: 59.0, bend: 1 }, ...stand(82, 78) },
     },
   ],
 };
@@ -165,13 +165,13 @@ const LOW_TO_HIGH_CABLE_FLY = {
       t: 0,
       root: { x: 64, y: 61.4, rot: 2 },
       joints: { spine: 6, neck: -4 },
-      ik: { wristR: { x: 42, y: 86, bend: 1 }, wristL: { x: 39, y: 88, bend: 1 }, ...stand(66, 61) },
+      ik: { wristR: { x: 42.5, y: 83.0, bend: 1 }, wristL: { x: 39.5, y: 85.0, bend: 1 }, ...stand(66, 61) },
     },
     { // top, hands together out in front at eye height
       t: 1,
       root: { x: 64, y: 61.4, rot: 2 },
       joints: { spine: 2, neck: -8 },
-      ik: { wristR: { x: 100, y: 22, bend: 1 }, wristL: { x: 97, y: 25, bend: 1 }, ...stand(66, 61) },
+      ik: { wristR: { x: 100.2, y: 19.0, bend: 1 }, wristL: { x: 97.2, y: 22.0, bend: 1 }, ...stand(66, 61) },
     },
   ],
 };
@@ -195,13 +195,13 @@ const INCLINE_DUMBBELL_PRESS = {
       t: 0,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 0, neck: -6 },
-      ik: { wristR: { x: 83, y: 45, bend: 1 }, wristL: { x: 86, y: 48, bend: 1 }, ...stand(110, 104) },
+      ik: { wristR: { x: 80.5, y: 43.3, bend: 1 }, wristL: { x: 83.5, y: 46.3, bend: 1 }, ...stand(110, 104) },
     },
     { // bottom, bells beside the upper chest
       t: 1,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 2, neck: -8 },
-      ik: { wristR: { x: 74, y: 58, bend: 1 }, wristL: { x: 77, y: 61, bend: 1 }, ...stand(110, 104) },
+      ik: { wristR: { x: 71.6, y: 56.2, bend: 1 }, wristL: { x: 74.6, y: 59.2, bend: 1 }, ...stand(110, 104) },
     },
   ],
 };
@@ -227,13 +227,13 @@ const DECLINE_DUMBBELL_PRESS = {
       t: 0,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 0, neck: 6 },
-      ik: { wristR: { x: 38, y: 42, bend: 1 }, wristL: { x: 41, y: 45, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 35.3, y: 43.3, bend: 1 }, wristL: { x: 38.3, y: 46.3, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
     },
     { // bottom, bells beside the lower chest
       t: 1,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 2, neck: 8 },
-      ik: { wristR: { x: 45, y: 57, bend: 1 }, wristL: { x: 48, y: 60, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 42.2, y: 58.2, bend: 1 }, wristL: { x: 45.2, y: 61.2, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
     },
   ],
 };
@@ -252,13 +252,13 @@ const INCLINE_BARBELL_PRESS = {
       t: 0,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 0, neck: -6 },
-      ik: { wristR: { x: 83, y: 45, bend: 1 }, wristL: { x: 85, y: 47, bend: 1 }, ...stand(110, 104) },
+      ik: { wristR: { x: 80.5, y: 43.3, bend: 1 }, wristL: { x: 82.5, y: 45.3, bend: 1 }, ...stand(110, 104) },
     },
     { // bar down to the collarbone, elbows under the bar
       t: 1,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 2, neck: -8 },
-      ik: { wristR: { x: 74, y: 58, bend: 1 }, wristL: { x: 76, y: 60, bend: 1 }, ...stand(110, 104) },
+      ik: { wristR: { x: 71.6, y: 56.2, bend: 1 }, wristL: { x: 73.6, y: 58.2, bend: 1 }, ...stand(110, 104) },
     },
   ],
 };
@@ -278,13 +278,13 @@ const DECLINE_BARBELL_PRESS = {
       t: 0,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 0, neck: 6 },
-      ik: { wristR: { x: 38, y: 42, bend: 1 }, wristL: { x: 40, y: 44, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 35.3, y: 43.3, bend: 1 }, wristL: { x: 37.3, y: 45.3, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
     },
     { // bar down to the lower chest, elbows under the bar
       t: 1,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 2, neck: 8 },
-      ik: { wristR: { x: 45, y: 57, bend: 1 }, wristL: { x: 47, y: 59, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 42.2, y: 58.2, bend: 1 }, wristL: { x: 44.2, y: 60.2, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
     },
   ],
 };
@@ -309,13 +309,13 @@ const LANDMINE_PRESS = {
       t: 0,
       root: { x: 56, y: 61.4, rot: 2 },
       joints: { spine: 4, neck: -2, shoulderL: 14, elbowL: 30 },
-      ik: { wristR: { x: 78, y: 42, bend: 1 }, ...stand(58, 54) },
+      ik: { wristR: { x: 78.3, y: 39.0, bend: 1 }, ...stand(58, 54) },
     },
     { // pressed, arm long up and forward, ribs down
       t: 1,
       root: { x: 56, y: 61.4, rot: 2 },
       joints: { spine: 0, neck: -8, shoulderL: 20, elbowL: 36 },
-      ik: { wristR: { x: 88, y: 12, bend: 1 }, ...stand(58, 54) },
+      ik: { wristR: { x: 88.1, y: 9.0, bend: 1 }, ...stand(58, 54) },
     },
   ],
 };
@@ -337,7 +337,7 @@ const WEIGHTED_DIP = {
   keys: [
     { // top, arms locked out, body hanging tall between the bars
       t: 0,
-      root: { x: 62, y: 52, rot: 14 },
+      root: { x: 61.9, y: 53.3, rot: 14 },
       joints: { spine: 4, neck: -6, hipR: -15, kneeR: 70, ankleR: -28, hipL: -19, kneeL: 74, ankleL: -26 },
       ik: { wristR: { x: 70, y: 60, bend: 1 }, wristL: { x: 66, y: 60.5, bend: 1 } },
     },
@@ -373,7 +373,7 @@ const CLOSE_GRIP_PULLDOWN = {
       root: { x: 52, y: 86, rot: -4 },
       joints: { spine: 0, neck: -6 },
       ik: {
-        wristR: { x: 56, y: 25, bend: 1 }, wristL: { x: 55, y: 26, bend: 1 },
+        wristR: { x: 55.8, y: 22.0, bend: 1 }, wristL: { x: 54.8, y: 23.0, bend: 1 },
         ...stand(80, 76),
       },
     },
@@ -382,7 +382,7 @@ const CLOSE_GRIP_PULLDOWN = {
       root: { x: 52, y: 86, rot: -6 },
       joints: { spine: -3, neck: -2 },
       ik: {
-        wristR: { x: 60, y: 58, bend: 1 }, wristL: { x: 59, y: 59, bend: 1 },
+        wristR: { x: 59.6, y: 55.0, bend: 1 }, wristL: { x: 58.6, y: 56.0, bend: 1 },
         ...stand(80, 76),
       },
     },
@@ -408,7 +408,7 @@ const SEATED_CABLE_ROW = {
       root: { x: 44, y: 98, rot: 16 },
       joints: { spine: 12, neck: -6 },
       ik: {
-        wristR: { x: 94, y: 80, bend: 1 }, wristL: { x: 91, y: 82, bend: 1 },
+        wristR: { x: 95.4, y: 77.4, bend: 1 }, wristL: { x: 92.4, y: 79.4, bend: 1 },
         ankleR: { x: 80, y: FLOOR, bend: -1 }, ankleL: { x: 76, y: FLOOR, bend: -1 },
       },
     },
@@ -417,7 +417,7 @@ const SEATED_CABLE_ROW = {
       root: { x: 44, y: 98, rot: -6 },
       joints: { spine: -4, neck: -2 },
       ik: {
-        wristR: { x: 62, y: 84, bend: 1 }, wristL: { x: 59, y: 86, bend: 1 },
+        wristR: { x: 61.5, y: 81.1, bend: 1 }, wristL: { x: 58.5, y: 83.1, bend: 1 },
         ankleR: { x: 80, y: FLOOR, bend: -1 }, ankleL: { x: 76, y: FLOOR, bend: -1 },
       },
     },
@@ -443,7 +443,7 @@ const DUMBBELL_ROW = {
       root: { x: 58, y: 61.4, rot: 80 },
       joints: { spine: -4, neck: -22 },
       ik: {
-        wristR: { x: 78, y: 92, bend: 1 }, wristL: { x: 104, y: 88, bend: 1 },
+        wristR: { x: 80.9, y: 91.2, bend: 1 }, wristL: { x: 106.9, y: 87.2, bend: 1 },
         ankleR: { x: 52, y: FLOOR, bend: -1 }, ankleL: { x: 47, y: FLOOR, bend: -1 },
       },
     },
@@ -452,7 +452,7 @@ const DUMBBELL_ROW = {
       root: { x: 58, y: 61.4, rot: 80 },
       joints: { spine: -6, neck: -22 },
       ik: {
-        wristR: { x: 72, y: 74, bend: 1 }, wristL: { x: 104, y: 88, bend: 1 },
+        wristR: { x: 74.8, y: 73.2, bend: 1 }, wristL: { x: 106.8, y: 87.2, bend: 1 },
         ankleR: { x: 52, y: FLOOR, bend: -1 }, ankleL: { x: 47, y: FLOOR, bend: -1 },
       },
     },
@@ -475,7 +475,7 @@ const STRAIGHT_ARM_PULLDOWN = {
       root: { x: 56, y: 61.4, rot: 4 },
       joints: { spine: 16, neck: -10 },
       ik: {
-        wristR: { x: 92, y: 14, bend: 1 }, wristL: { x: 89, y: 17, bend: 1 },
+        wristR: { x: 93.1, y: 11.1, bend: 1 }, wristL: { x: 90.1, y: 14.1, bend: 1 },
         ...stand(58, 53),
       },
     },
@@ -484,7 +484,7 @@ const STRAIGHT_ARM_PULLDOWN = {
       root: { x: 56, y: 61.4, rot: 4 },
       joints: { spine: 20, neck: -6 },
       ik: {
-        wristR: { x: 74, y: 70, bend: 1 }, wristL: { x: 71, y: 72, bend: 1 },
+        wristR: { x: 75.2, y: 67.2, bend: 1 }, wristL: { x: 72.2, y: 69.2, bend: 1 },
         ...stand(58, 53),
       },
     },
@@ -513,7 +513,7 @@ const CHEST_SUPPORTED_ROW = {
       root: { x: 46, y: 66, rot: 55 },
       joints: { spine: 0, neck: -14 },
       ik: {
-        wristR: { x: 72, y: 87, bend: 1 }, wristL: { x: 68, y: 88, bend: 1 },
+        wristR: { x: 74.5, y: 85.3, bend: 1 }, wristL: { x: 70.5, y: 86.3, bend: 1 },
         ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },
       },
     },
@@ -522,7 +522,7 @@ const CHEST_SUPPORTED_ROW = {
       root: { x: 46, y: 66, rot: 55 },
       joints: { spine: 0, neck: -14 },
       ik: {
-        wristR: { x: 62, y: 70, bend: 1 }, wristL: { x: 58, y: 71, bend: 1 },
+        wristR: { x: 64.5, y: 68.3, bend: 1 }, wristL: { x: 60.5, y: 69.3, bend: 1 },
         ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },
       },
     },
@@ -548,7 +548,7 @@ const T_BAR_ROW = {
       root: { x: 66, y: 61.4, rot: 16 },
       joints: { spine: 30, neck: -14 },
       ik: {
-        wristR: { x: 94, y: 78, bend: 1 }, wristL: { x: 91, y: 80, bend: 1 },
+        wristR: { x: 96.2, y: 75.9, bend: 1 }, wristL: { x: 93.2, y: 77.9, bend: 1 },
         ...stand(64, 59),
       },
     },
@@ -557,7 +557,7 @@ const T_BAR_ROW = {
       root: { x: 66, y: 61.4, rot: 16 },
       joints: { spine: 30, neck: -14 },
       ik: {
-        wristR: { x: 86, y: 62, bend: 1 }, wristL: { x: 83, y: 64, bend: 1 },
+        wristR: { x: 88.2, y: 59.9, bend: 1 }, wristL: { x: 85.2, y: 61.9, bend: 1 },
         ...stand(64, 59),
       },
     },
@@ -579,7 +579,7 @@ const BARBELL_ROW = {
       root: { x: 64, y: 61.4, rot: 14 },
       joints: { spine: 32, neck: -14 },
       ik: {
-        wristR: { x: 92, y: 78, bend: 1 }, wristL: { x: 89, y: 80, bend: 1 },
+        wristR: { x: 94.2, y: 75.9, bend: 1 }, wristL: { x: 91.2, y: 77.9, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -588,7 +588,7 @@ const BARBELL_ROW = {
       root: { x: 64, y: 61.4, rot: 14 },
       joints: { spine: 32, neck: -14 },
       ik: {
-        wristR: { x: 84, y: 62, bend: 1 }, wristL: { x: 81, y: 64, bend: 1 },
+        wristR: { x: 86.2, y: 59.9, bend: 1 }, wristL: { x: 83.2, y: 61.9, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -612,7 +612,7 @@ const PENDLAY_ROW = {
       root: { x: 62, y: 64, rot: 20 },
       joints: { spine: 48, neck: -30 },
       ik: {
-        wristR: { x: 91.5, y: 92, bend: 1 }, wristL: { x: 88.5, y: 93, bend: 1 },
+        wristR: { x: 94.3, y: 90.9, bend: 1 }, wristL: { x: 91.3, y: 91.9, bend: 1 },
         ...stand(58, 54),
       },
     },
@@ -621,7 +621,7 @@ const PENDLAY_ROW = {
       root: { x: 62, y: 64, rot: 20 },
       joints: { spine: 48, neck: -30 },
       ik: {
-        wristR: { x: 88, y: 72, bend: 1 }, wristL: { x: 85, y: 73, bend: 1 },
+        wristR: { x: 90.8, y: 70.9, bend: 1 }, wristL: { x: 87.8, y: 71.9, bend: 1 },
         ...stand(58, 54),
       },
     },
@@ -735,7 +735,7 @@ const FACE_PULL = {
       root: { x: 58, y: 61.4, rot: 2 },
       joints: { spine: 6, neck: -4 },
       ik: {
-        wristR: { x: 96, y: 30, bend: 1 }, wristL: { x: 93, y: 33, bend: 1 },
+        wristR: { x: 96.5, y: 27.0, bend: 1 }, wristL: { x: 93.5, y: 30.0, bend: 1 },
         ...stand(60, 55),
       },
     },
@@ -744,7 +744,7 @@ const FACE_PULL = {
       root: { x: 58, y: 61.4, rot: 2 },
       joints: { spine: 2, neck: -6 },
       ik: {
-        wristR: { x: 76, y: 24, bend: 1 }, wristL: { x: 73, y: 27, bend: 1 },
+        wristR: { x: 76.2, y: 21.0, bend: 1 }, wristL: { x: 73.2, y: 24.0, bend: 1 },
         ...stand(60, 55),
       },
     },
@@ -871,7 +871,7 @@ const SNATCH_GRIP_HIGH_PULL = {
       root: { x: 62, y: 70, rot: 14 },
       joints: { spine: 34, neck: -18 },
       ik: {
-        wristR: { x: 88, y: 88, bend: 1 }, wristL: { x: 85, y: 89, bend: 1 },
+        wristR: { x: 90.3, y: 86.0, bend: 1 }, wristL: { x: 87.3, y: 87.0, bend: 1 },
         ...stand(62, 58),
       },
     },
@@ -880,7 +880,7 @@ const SNATCH_GRIP_HIGH_PULL = {
       root: { x: 64, y: 61.4, rot: -4 },
       joints: { spine: -6, neck: -4 },
       ik: {
-        wristR: { x: 79, y: 45, bend: 1 }, wristL: { x: 76, y: 47, bend: 1 },
+        wristR: { x: 78.5, y: 42.1, bend: 1 }, wristL: { x: 75.5, y: 44.1, bend: 1 },
         ...stand(62, 58),
       },
     },
@@ -967,7 +967,7 @@ const FRONT_RAISE = {
       root: { x: 60, y: 61.4, rot: 2 },
       joints: { spine: 2, neck: 0 },
       ik: {
-        wristR: { x: 68, y: 70, bend: 1 }, wristL: { x: 65, y: 72, bend: 1 },
+        wristR: { x: 68.2, y: 67.0, bend: 1 }, wristL: { x: 65.2, y: 69.0, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -976,7 +976,7 @@ const FRONT_RAISE = {
       root: { x: 60, y: 61.4, rot: 2 },
       joints: { spine: 0, neck: -2 },
       ik: {
-        wristR: { x: 98, y: 30, bend: 1 }, wristL: { x: 95, y: 33, bend: 1 },
+        wristR: { x: 98.1, y: 27.0, bend: 1 }, wristL: { x: 95.1, y: 30.0, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -1002,13 +1002,13 @@ const MACHINE_SHOULDER_PRESS = {
       t: 0,
       root: { x: 52, y: 86, rot: -4 },
       joints: { spine: 0, neck: -2 },
-      ik: { wristR: { x: 68, y: 50, bend: 1 }, wristL: { x: 65, y: 52, bend: 1 }, ...stand(82, 78) },
+      ik: { wristR: { x: 67.8, y: 47.0, bend: 1 }, wristL: { x: 64.8, y: 49.0, bend: 1 }, ...stand(82, 78) },
     },
     { // lockout, arms long overhead, back still on the pad
       t: 1,
       root: { x: 52, y: 86, rot: -4 },
       joints: { spine: -2, neck: -4 },
-      ik: { wristR: { x: 58, y: 22, bend: 1 }, wristL: { x: 55, y: 24, bend: 1 }, ...stand(82, 78) },
+      ik: { wristR: { x: 57.7, y: 19.0, bend: 1 }, wristL: { x: 54.7, y: 21.0, bend: 1 }, ...stand(82, 78) },
     },
   ],
 };
@@ -1032,13 +1032,13 @@ const SEATED_DUMBBELL_PRESS = {
       t: 0,
       root: { x: 52, y: 86, rot: -4 },
       joints: { spine: 0, neck: -2 },
-      ik: { wristR: { x: 68, y: 50, bend: 1 }, wristL: { x: 64, y: 53, bend: 1 }, ...stand(82, 78) },
+      ik: { wristR: { x: 67.8, y: 47.0, bend: 1 }, wristL: { x: 63.8, y: 50.0, bend: 1 }, ...stand(82, 78) },
     },
     { // lockout, bells nearly touching over the head
       t: 1,
       root: { x: 52, y: 86, rot: -4 },
       joints: { spine: -2, neck: -4 },
-      ik: { wristR: { x: 58, y: 22, bend: 1 }, wristL: { x: 55, y: 25, bend: 1 }, ...stand(82, 78) },
+      ik: { wristR: { x: 57.7, y: 19.0, bend: 1 }, wristL: { x: 54.7, y: 22.0, bend: 1 }, ...stand(82, 78) },
     },
   ],
 };
@@ -1175,7 +1175,7 @@ const OVERHEAD_PRESS = {
       root: { x: 60, y: 61.4, rot: 2 },
       joints: { spine: 2, neck: 0 },
       ik: {
-        wristR: { x: 74, y: 44, bend: 1 }, wristL: { x: 71, y: 46, bend: 1 },
+        wristR: { x: 74.2, y: 41.0, bend: 1 }, wristL: { x: 71.2, y: 43.0, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -1184,7 +1184,7 @@ const OVERHEAD_PRESS = {
       root: { x: 60, y: 61.4, rot: 2 },
       joints: { spine: -3, neck: -6 },
       ik: {
-        wristR: { x: 66, y: 4, bend: 1 }, wristL: { x: 63, y: 6, bend: 1 },
+        wristR: { x: 65.9, y: 1.0, bend: 1 }, wristL: { x: 62.9, y: 3.0, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -1207,7 +1207,7 @@ const PUSH_PRESS = {
       root: { x: 60, y: 68, rot: 2 },
       joints: { spine: 2, neck: 0 },
       ik: {
-        wristR: { x: 74, y: 50, bend: 1 }, wristL: { x: 71, y: 52, bend: 1 },
+        wristR: { x: 74.2, y: 47.0, bend: 1 }, wristL: { x: 71.2, y: 49.0, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -1216,7 +1216,7 @@ const PUSH_PRESS = {
       root: { x: 60, y: 61.4, rot: 2 },
       joints: { spine: -3, neck: -6 },
       ik: {
-        wristR: { x: 66, y: 4, bend: 1 }, wristL: { x: 63, y: 6, bend: 1 },
+        wristR: { x: 65.9, y: 1.0, bend: 1 }, wristL: { x: 62.9, y: 3.0, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -1235,7 +1235,7 @@ const standingCurlKeys = [
     root: { x: 60, y: 61.4, rot: 2 },
     joints: { spine: 2, neck: 0 },
     ik: {
-      wristR: { x: 66, y: 71, bend: 1 }, wristL: { x: 63, y: 73, bend: 1 },
+      wristR: { x: 66.2, y: 68.0, bend: 1 }, wristL: { x: 63.2, y: 70.0, bend: 1 },
       ...stand(62, 57),
     },
   },
@@ -1244,7 +1244,7 @@ const standingCurlKeys = [
     root: { x: 60, y: 61.4, rot: 2 },
     joints: { spine: 0, neck: -2 },
     ik: {
-      wristR: { x: 76, y: 46, bend: 1 }, wristL: { x: 73, y: 48, bend: 1 },
+      wristR: { x: 76.1, y: 43.0, bend: 1 }, wristL: { x: 73.1, y: 45.0, bend: 1 },
       ...stand(62, 57),
     },
   },
@@ -1327,7 +1327,7 @@ const CONCENTRATION_CURL = {
       root: { x: 46, y: 88, rot: 18 },
       joints: { spine: 22, neck: -18 },
       ik: {
-        wristR: { x: 84, y: 100, bend: 1 }, wristL: { x: 60, y: 96, bend: 1 },
+        wristR: { x: 86.0, y: 97.7, bend: 1 }, wristL: { x: 62.0, y: 93.7, bend: 1 },
         ankleR: { x: 76, y: FLOOR, bend: -1 }, ankleL: { x: 70, y: FLOOR, bend: -1 },
       },
     },
@@ -1336,7 +1336,7 @@ const CONCENTRATION_CURL = {
       root: { x: 46, y: 88, rot: 18 },
       joints: { spine: 22, neck: -14 },
       ik: {
-        wristR: { x: 78, y: 74, bend: 1 }, wristL: { x: 60, y: 96, bend: 1 },
+        wristR: { x: 80.0, y: 71.7, bend: 1 }, wristL: { x: 62.0, y: 93.7, bend: 1 },
         ankleR: { x: 76, y: FLOOR, bend: -1 }, ankleL: { x: 70, y: FLOOR, bend: -1 },
       },
     },
@@ -1398,7 +1398,7 @@ const INCLINE_DUMBBELL_CURL = {
       root: { x: 84, y: 84, rot: -44 },
       joints: { spine: 0, neck: -4 },
       ik: {
-        wristR: { x: 74, y: 100, bend: 1 }, wristL: { x: 77, y: 101, bend: 1 },
+        wristR: { x: 71.9, y: 97.8, bend: 1 }, wristL: { x: 74.9, y: 98.8, bend: 1 },
         ...stand(110, 104),
       },
     },
@@ -1407,7 +1407,7 @@ const INCLINE_DUMBBELL_CURL = {
       root: { x: 84, y: 84, rot: -44 },
       joints: { spine: 0, neck: -6 },
       ik: {
-        wristR: { x: 82, y: 80, bend: 1 }, wristL: { x: 85, y: 81, bend: 1 },
+        wristR: { x: 79.9, y: 77.8, bend: 1 }, wristL: { x: 82.9, y: 78.8, bend: 1 },
         ...stand(110, 104),
       },
     },
@@ -1434,7 +1434,7 @@ const SPIDER_CURL = {
       root: { x: 46, y: 66, rot: 55 },
       joints: { spine: 0, neck: -14 },
       ik: {
-        wristR: { x: 70, y: 89, bend: 1 }, wristL: { x: 66, y: 90, bend: 1 },
+        wristR: { x: 72.5, y: 87.3, bend: 1 }, wristL: { x: 68.5, y: 88.3, bend: 1 },
         ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },
       },
     },
@@ -1443,7 +1443,7 @@ const SPIDER_CURL = {
       root: { x: 46, y: 66, rot: 55 },
       joints: { spine: 0, neck: -14 },
       ik: {
-        wristR: { x: 80, y: 66, bend: 1 }, wristL: { x: 76, y: 67, bend: 1 },
+        wristR: { x: 82.5, y: 64.3, bend: 1 }, wristL: { x: 78.5, y: 65.3, bend: 1 },
         ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },
       },
     },
@@ -1471,7 +1471,7 @@ const TRICEPS_PUSHDOWN = {
       root: { x: 46, y: 61.4, rot: 2 },
       joints: { spine: 4, neck: -4 },
       ik: {
-        wristR: { x: 60, y: 54, bend: 1 }, wristL: { x: 57, y: 56, bend: 1 },
+        wristR: { x: 60.3, y: 51.0, bend: 1 }, wristL: { x: 57.3, y: 53.0, bend: 1 },
         ...stand(48, 43),
       },
     },
@@ -1480,7 +1480,7 @@ const TRICEPS_PUSHDOWN = {
       root: { x: 46, y: 61.4, rot: 2 },
       joints: { spine: 4, neck: -4 },
       ik: {
-        wristR: { x: 54, y: 71, bend: 1 }, wristL: { x: 51, y: 73, bend: 1 },
+        wristR: { x: 54.3, y: 68.0, bend: 1 }, wristL: { x: 51.3, y: 70.0, bend: 1 },
         ...stand(48, 43),
       },
     },
@@ -1501,7 +1501,7 @@ const ROPE_PUSHDOWN = {
       root: { x: 46, y: 61.4, rot: 2 },
       joints: { spine: 4, neck: -4, wristR: 0, wristL: 0 },
       ik: {
-        wristR: { x: 60, y: 54, bend: 1 }, wristL: { x: 57, y: 56, bend: 1 },
+        wristR: { x: 60.3, y: 51.0, bend: 1 }, wristL: { x: 57.3, y: 53.0, bend: 1 },
         ...stand(48, 43),
       },
     },
@@ -1510,7 +1510,7 @@ const ROPE_PUSHDOWN = {
       root: { x: 46, y: 61.4, rot: 2 },
       joints: { spine: 4, neck: -4, wristR: 26, wristL: -22 },
       ik: {
-        wristR: { x: 56, y: 72, bend: 1 }, wristL: { x: 50, y: 72, bend: 1 },
+        wristR: { x: 56.3, y: 69.0, bend: 1 }, wristL: { x: 50.3, y: 69.0, bend: 1 },
         ...stand(48, 43),
       },
     },
@@ -1534,7 +1534,7 @@ const OVERHEAD_TRICEPS_EXTENSION = {
       root: { x: 58, y: 61.4, rot: 2 },
       joints: { spine: 2, neck: -2 },
       ik: {
-        wristR: { x: 50, y: 28, bend: 1 }, wristL: { x: 47, y: 25, bend: 1 },
+        wristR: { x: 50.2, y: 25.0, bend: 1 }, wristL: { x: 47.2, y: 22.0, bend: 1 },
         ...stand(60, 55),
       },
     },
@@ -1543,7 +1543,7 @@ const OVERHEAD_TRICEPS_EXTENSION = {
       root: { x: 58, y: 61.4, rot: 2 },
       joints: { spine: 0, neck: -4 },
       ik: {
-        wristR: { x: 62, y: -2, bend: 1 }, wristL: { x: 59, y: -1, bend: 1 },
+        wristR: { x: 62.1, y: -5.0, bend: 1 }, wristL: { x: 59.1, y: -4.0, bend: 1 },
         ...stand(60, 55),
       },
     },
@@ -1569,13 +1569,13 @@ const TRICEPS_KICKBACK = {
       t: 0,
       root: { x: 62, y: 61.4, rot: 14 },
       joints: { spine: 34, neck: -18, shoulderR: -138, elbowR: 95 },
-      ik: { wristL: { x: 96, y: 76, bend: 1 }, ...stand(60, 55) },
+      ik: { wristL: { x: 98.3, y: 74.0, bend: 1 }, ...stand(60, 55) },
     },
     { // finish, forearm swung back to a straight arm, upper arm unmoved
       t: 1,
       root: { x: 62, y: 61.4, rot: 14 },
       joints: { spine: 34, neck: -18, shoulderR: -138, elbowR: 6 },
-      ik: { wristL: { x: 96, y: 76, bend: 1 }, ...stand(60, 55) },
+      ik: { wristL: { x: 98.3, y: 74.0, bend: 1 }, ...stand(60, 55) },
     },
   ],
 };
@@ -1596,7 +1596,7 @@ const BENCH_DIP = {
       root: { x: 57.4, y: 75.6, rot: -5 },
       joints: { spine: 0, neck: -2 },
       ik: {
-        wristR: { x: 46, y: 78, bend: 1 }, wristL: { x: 42, y: 78.5, bend: 1 },
+        wristR: { x: 45.8, y: 75.0, bend: 1 }, wristL: { x: 41.8, y: 75.5, bend: 1 },
         ankleR: { x: 88, y: FLOOR, bend: -1 }, ankleL: { x: 82, y: FLOOR, bend: -1 },
       },
     },
@@ -1608,7 +1608,7 @@ const BENCH_DIP = {
       root: { x: 55.2, y: 86.4, rot: -7 },
       joints: { spine: 0, neck: -4 },
       ik: {
-        wristR: { x: 46, y: 78, bend: 1 }, wristL: { x: 42, y: 78.5, bend: 1 },
+        wristR: { x: 45.6, y: 75.0, bend: 1 }, wristL: { x: 41.6, y: 75.5, bend: 1 },
         ankleR: { x: 88, y: FLOOR, bend: -1 }, ankleL: { x: 82, y: FLOOR, bend: -1 },
       },
     },
@@ -1635,13 +1635,13 @@ const SKULL_CRUSHER = {
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -4 },
-      ik: { wristR: { x: 58, y: 45, bend: 1 }, wristL: { x: 61, y: 46, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 55.0, y: 45.0, bend: 1 }, wristL: { x: 58.0, y: 46.0, bend: 1 }, ...stand(92, 96) },
     },
     { // bottom, elbow folded, bar swung back to just above the forehead
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -6 },
-      ik: { wristR: { x: 46, y: 70, bend: 1 }, wristL: { x: 49, y: 71, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 43.0, y: 70.0, bend: 1 }, wristL: { x: 46.0, y: 71.0, bend: 1 }, ...stand(92, 96) },
     },
   ],
 };
@@ -1665,13 +1665,13 @@ const CLOSE_GRIP_BENCH_PRESS = {
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -4 },
-      ik: { wristR: { x: 62, y: 46, bend: 1 }, wristL: { x: 64, y: 47, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 59.0, y: 46.0, bend: 1 }, wristL: { x: 61.0, y: 47.0, bend: 1 }, ...stand(92, 96) },
     },
     { // bottom, bar low on the sternum, elbows tucked toward the feet
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 2, neck: -6 },
-      ik: { wristR: { x: 66, y: 68, bend: 1 }, wristL: { x: 68, y: 69, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 63.0, y: 67.9, bend: 1 }, wristL: { x: 65.0, y: 68.9, bend: 1 }, ...stand(92, 96) },
     },
   ],
 };
@@ -1700,7 +1700,7 @@ const WRIST_CURL = {
       root: { x: 46, y: 88, rot: 14 },
       joints: { forearmPronR: -78, forearmPronL: -78, spine: 18, neck: -12, wristR: -35, wristL: -35 },
       ik: {
-        wristR: { x: 76, y: 90, bend: 1 }, wristL: { x: 72, y: 92, bend: 1 },
+        wristR: { x: 77.6, y: 87.4, bend: 1 }, wristL: { x: 73.6, y: 89.4, bend: 1 },
         ankleR: { x: 76, y: FLOOR, bend: -1 }, ankleL: { x: 70, y: FLOOR, bend: -1 },
       },
     },
@@ -1709,7 +1709,7 @@ const WRIST_CURL = {
       root: { x: 46, y: 88, rot: 14 },
       joints: { forearmPronR: -78, forearmPronL: -78, spine: 18, neck: -12, wristR: 50, wristL: 50 },
       ik: {
-        wristR: { x: 76, y: 90, bend: 1 }, wristL: { x: 72, y: 92, bend: 1 },
+        wristR: { x: 77.6, y: 87.4, bend: 1 }, wristL: { x: 73.6, y: 89.4, bend: 1 },
         ankleR: { x: 76, y: FLOOR, bend: -1 }, ankleL: { x: 70, y: FLOOR, bend: -1 },
       },
     },
@@ -1746,7 +1746,7 @@ const REVERSE_CURL = {
       root: { x: 60, y: 61.4, rot: 2 },
       joints: { spine: 2, neck: 0, wristR: 20, wristL: 20 },
       ik: {
-        wristR: { x: 66, y: 71, bend: 1 }, wristL: { x: 63, y: 73, bend: 1 },
+        wristR: { x: 66.2, y: 68.0, bend: 1 }, wristL: { x: 63.2, y: 70.0, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -1755,7 +1755,7 @@ const REVERSE_CURL = {
       root: { x: 60, y: 61.4, rot: 2 },
       joints: { spine: 0, neck: -2, wristR: 24, wristL: 24 },
       ik: {
-        wristR: { x: 80, y: 54, bend: 1 }, wristL: { x: 77, y: 56, bend: 1 },
+        wristR: { x: 80.1, y: 51.0, bend: 1 }, wristL: { x: 77.1, y: 53.0, bend: 1 },
         ...stand(62, 57),
       },
     },

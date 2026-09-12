@@ -98,7 +98,7 @@ const FOAM_ROLLER_THORACIC_EXTENSION = {
       root: { x: 66, y: 108, rot: -62 },
       joints: { spine: 2, neck: -22 },
       ik: {
-        wristR: { x: 24, y: 90, bend: 1 }, wristL: { x: 27, y: 92, bend: 1 },
+        wristR: { x: 21.4, y: 88.5, bend: 1 }, wristL: { x: 24.4, y: 90.5, bend: 1 },
         ankleR: { x: 100, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
       },
     },
@@ -107,7 +107,7 @@ const FOAM_ROLLER_THORACIC_EXTENSION = {
       root: { x: 64, y: 105.5, rot: -62 },
       joints: { spine: -8, neck: -34 },
       ik: {
-        wristR: { x: 22, y: 94, bend: 1 }, wristL: { x: 25, y: 96, bend: 1 },
+        wristR: { x: 19.1, y: 92.9, bend: 1 }, wristL: { x: 22.1, y: 94.9, bend: 1 },
         ankleR: { x: 100, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
       },
     },
@@ -580,7 +580,7 @@ const WORLDS_GREATEST_STRETCH = {
                 shoulderR: -30, elbowR: 22, wristR: 58 },
       ik: {
         ankleR: { x: 98, y: 113.6, bend: -1 },
-        wristL: { x: 95, y: 109, bend: 1 },
+        wristL: { x: 97.0, y: 106.7, bend: 1 },
       },
     },
     { // chest opens, the free arm reaches for the ceiling and the eyes follow.
@@ -592,7 +592,7 @@ const WORLDS_GREATEST_STRETCH = {
                 shoulderR: 96, elbowR: 6, wristR: -4 },
       ik: {
         ankleR: { x: 98, y: 113.6, bend: -1 },
-        wristL: { x: 95, y: 109, bend: 1 },
+        wristL: { x: 96.6, y: 106.5, bend: 1 },
       },
     },
   ],
@@ -675,7 +675,7 @@ const SQUAT_TO_STAND = {
       joints: { spine: 58, neck: -20 },
       ik: {
         ankleR: { x: 66, y: 113.6, bend: -1 }, ankleL: { x: 61, y: 113.6, bend: -1 },
-        wristR: { x: 73, y: 104, bend: 1 }, wristL: { x: 68, y: 105, bend: 1 },
+        wristR: { x: 75.8, y: 105.2, bend: 1 }, wristL: { x: 70.8, y: 106.2, bend: 1 },
       },
     },
     { // bottom of the squat, heels down, chest lifted
@@ -684,7 +684,7 @@ const SQUAT_TO_STAND = {
       joints: { spine: 15, neck: -14 },
       ik: {
         ankleR: { x: 66, y: 113.6, bend: -1 }, ankleL: { x: 61, y: 113.6, bend: -1 },
-        wristR: { x: 73, y: 104, bend: 1 }, wristL: { x: 68, y: 105, bend: 1 },
+        wristR: { x: 74.5, y: 101.4, bend: 1 }, wristL: { x: 69.5, y: 102.4, bend: 1 },
       },
     },
     { // stood the legs back up, still holding on
@@ -693,7 +693,7 @@ const SQUAT_TO_STAND = {
       joints: { spine: 58, neck: -20 },
       ik: {
         ankleR: { x: 66, y: 113.6, bend: -1 }, ankleL: { x: 61, y: 113.6, bend: -1 },
-        wristR: { x: 73, y: 104, bend: 1 }, wristL: { x: 68, y: 105, bend: 1 },
+        wristR: { x: 75.8, y: 105.2, bend: 1 }, wristL: { x: 70.8, y: 106.2, bend: 1 },
       },
     },
   ],
@@ -747,10 +747,10 @@ const INCHWORM_WALKOUT = {
   keys: [
     { // folded over, hands about to land in front of the feet
       t: 0,
-      root: { x: 30, y: 63.5, rot: 55 },
+      root: { x: 29, y: 67.1, rot: 55 },
       joints: { spine: 58, neck: -18, hipR: -34, hipL: -34, kneeR: 72, kneeL: 72,
-                ankleR: 2, ankleL: 2, wristR: 74, wristL: 74 },
-      ik: { wristR: { x: 44, y: 109, bend: 1 }, wristL: { x: 39, y: 109, bend: 1 } },
+                ankleR: 14, ankleL: 14, wristR: 74, wristL: 74 },
+      ik: { wristR: { x: 47.7, y: 110.6, bend: 1 }, wristL: { x: 42.7, y: 110.6, bend: 1 } },
     },
     { // halfway out, hips high. This key exists so the walk passes through a
       // real pose: with only fold and plank the interpolation swings the feet
@@ -767,7 +767,7 @@ const INCHWORM_WALKOUT = {
       t: 0.5,
       root: { x: 75.3, y: 86.4, rot: 72 },
       joints: { spine: 0, neck: -24, hipR: -144, hipL: -144, kneeR: 2, kneeL: 2,
-                ankleR: -44, ankleL: -44, wristR: 84, wristL: 84 },
+                ankleR: -28, ankleL: -28, wristR: 84, wristL: 84 },
       ik: { wristR: { x: 126, y: 114.6, bend: 1 }, wristL: { x: 121, y: 114.6, bend: 1 } },
     },
     { // walking the hands back in, hips high again
@@ -779,10 +779,10 @@ const INCHWORM_WALKOUT = {
     },
     { // back to the fold it started in, so the loop closes on itself
       t: 1,
-      root: { x: 30, y: 63.5, rot: 55 },
+      root: { x: 29, y: 67.1, rot: 55 },
       joints: { spine: 58, neck: -18, hipR: -34, hipL: -34, kneeR: 72, kneeL: 72,
-                ankleR: 2, ankleL: 2, wristR: 74, wristL: 74 },
-      ik: { wristR: { x: 44, y: 109, bend: 1 }, wristL: { x: 39, y: 109, bend: 1 } },
+                ankleR: 14, ankleL: 14, wristR: 74, wristL: 74 },
+      ik: { wristR: { x: 47.7, y: 110.6, bend: 1 }, wristL: { x: 42.7, y: 110.6, bend: 1 } },
     },
   ],
 };
@@ -881,8 +881,8 @@ const SCAPULAR_PUSH_UP = {
     },
     { // sunk, chest dropped between the blades, elbows still straight
       t: 1,
-      root: { x: 68.4, y: 89.4, rot: 71 },
-      joints: { shoulderGirdleProtR: -3, shoulderGirdleProtL: -3, spine: -4, neck: -26, hipL: -145, hipR: -145, kneeL: 2, kneeR: 2,
+      root: { x: 68.4, y: 89.4, rot: 81.5 },
+      joints: { shoulderGirdleProtR: -3, shoulderGirdleProtL: -3, spine: -4, neck: -26, hipL: -155.5, hipR: -155.5, kneeL: 2, kneeR: 2,
                 ankleL: -8, ankleR: -8, wristL: 86, wristR: 86 },
       ik: { wristR: { x: 98, y: 114.6, bend: 1 }, wristL: { x: 92, y: 114.6, bend: 1 } },
     },
@@ -1049,7 +1049,7 @@ const WRIST_FLEXOR_STRETCH = {
       root: { x: 62, y: 61.6, rot: 0 },
       joints: { spine: 2, neck: -2, shoulderR: 86, elbowR: 2, wristR: 88 },
       ik: {
-        wristL: { x: 96, y: 30, bend: 1 },
+        wristL: { x: 96.1, y: 27.0, bend: 1 },
         ankleR: { x: 64, y: 113.6, bend: -1 }, ankleL: { x: 59, y: 113.6, bend: -1 },
       },
     },
@@ -1058,7 +1058,7 @@ const WRIST_FLEXOR_STRETCH = {
       root: { x: 62, y: 61.8, rot: 0 },
       joints: { spine: 2, neck: -2, shoulderR: 88, elbowR: 0, wristR: 96 },
       ik: {
-        wristL: { x: 95, y: 28, bend: 1 },
+        wristL: { x: 95.1, y: 25.0, bend: 1 },
         ankleR: { x: 64, y: 113.6, bend: -1 }, ankleL: { x: 59, y: 113.6, bend: -1 },
       },
     },
@@ -1102,7 +1102,7 @@ const THREAD_THE_NEEDLE_STRETCH = {
       joints: { spineTwist: -42, spine: 10, neck: 15, hipR: -109, hipL: -109, kneeR: 94, kneeL: 94,
                 ankleR: -58, ankleL: -58, wristR: 25, wristL: -16 },
       ik: {
-        wristR: { x: 104, y: 112, bend: 1 }, wristL: { x: 40, y: 112.5, bend: 1 },
+        wristR: { x: 104, y: 112, bend: 1 }, wristL: { x: 40, y: 111.0, bend: 1 },
       },
     },
     { // a touch deeper on the exhale, hips unmoved
@@ -1133,14 +1133,14 @@ const KNEELING_LAT_STRETCH = {
       root: { x: 50, y: 86, rot: 90 },
       joints: { spine: 7, neck: -26, hipR: -90, hipL: -90, kneeR: 105, kneeL: 105,
                 ankleR: -50, ankleL: -50, wristR: 10, wristL: 10 },
-      ik: { wristR: { x: 104, y: 84, bend: 1 }, wristL: { x: 99, y: 85, bend: 1 } },
+      ik: { wristR: { x: 107.0, y: 84.4, bend: 1 }, wristL: { x: 102.0, y: 85.4, bend: 1 } },
     },
     { // chest sinks a little further on the exhale
       t: 1,
       root: { x: 50, y: 87.5, rot: 90 },
       joints: { spine: 12, neck: -28, hipR: -90, hipL: -90, kneeR: 105, kneeL: 105,
                 ankleR: -50, ankleL: -50, wristR: 10, wristL: 10 },
-      ik: { wristR: { x: 104, y: 84, bend: 1 }, wristL: { x: 99, y: 85, bend: 1 } },
+      ik: { wristR: { x: 106.9, y: 84.6, bend: 1 }, wristL: { x: 101.9, y: 85.6, bend: 1 } },
     },
   ],
 };
@@ -1191,7 +1191,7 @@ const WRIST_EXTENSOR_STRETCH = {
       root: { x: 62, y: 61.6, rot: 0 },
       joints: { spine: 2, neck: -2, shoulderR: 86, elbowR: 2, wristR: -86 },
       ik: {
-        wristL: { x: 94, y: 44, bend: 1 },
+        wristL: { x: 94.1, y: 41.0, bend: 1 },
         ankleR: { x: 64, y: 113.6, bend: -1 }, ankleL: { x: 59, y: 113.6, bend: -1 },
       },
     },
@@ -1200,7 +1200,7 @@ const WRIST_EXTENSOR_STRETCH = {
       root: { x: 62, y: 61.8, rot: 0 },
       joints: { spine: 2, neck: -2, shoulderR: 88, elbowR: 0, wristR: -94 },
       ik: {
-        wristL: { x: 93, y: 46, bend: 1 },
+        wristL: { x: 93.1, y: 43.0, bend: 1 },
         ankleR: { x: 64, y: 113.6, bend: -1 }, ankleL: { x: 59, y: 113.6, bend: -1 },
       },
     },
@@ -1256,16 +1256,16 @@ const SEATED_SPINAL_TWIST = {
       joints: { spine: -4, neck: -2, hipR: 130, kneeR: 149,
                 hipL: 84, kneeL: -4, ankleL: -50 },
       ik: {
-        wristR: { x: 80, y: 92, bend: 1 }, wristL: { x: 38, y: 110, bend: 1 },
+        wristR: { x: 79.8, y: 89.0, bend: 1 }, wristL: { x: 38, y: 110, bend: 1 },
       },
     },
     { // grows taller on the inhale and levers a degree further on the exhale
       t: 1,
-      root: { x: 56, y: 105, rot: -2 },
+      root: { x: 55.8, y: 105.5, rot: -2 },
       joints: { spine: -6, neck: -3, hipR: 132, kneeR: 149,
                 hipL: 84, kneeL: -4, ankleL: -50 },
       ik: {
-        wristR: { x: 78, y: 90, bend: 1 }, wristL: { x: 37, y: 110, bend: 1 },
+        wristR: { x: 77.5, y: 87.0, bend: 1 }, wristL: { x: 37, y: 110, bend: 1 },
       },
     },
   ],
@@ -1316,13 +1316,13 @@ const KNEES_TO_CHEST_STRETCH = {
       t: 0,
       root: { x: 76, y: 106, rot: -90 },
       joints: { spine: 0, neck: 6, hipR: -40, hipL: -44, kneeR: 120, kneeL: 118 },
-      ik: { wristR: { x: 68, y: 84, bend: 1 }, wristL: { x: 64, y: 88, bend: 1 } },
+      ik: { wristR: { x: 65.0, y: 84.0, bend: 1 }, wristL: { x: 61.0, y: 88.0, bend: 1 } },
     },
     { // drawn a touch closer on the exhale
       t: 1,
       root: { x: 76, y: 106.6, rot: -90 },
       joints: { spine: 2, neck: 8, hipR: -36, hipL: -40, kneeR: 124, kneeL: 122 },
-      ik: { wristR: { x: 66, y: 82, bend: 1 }, wristL: { x: 62, y: 86, bend: 1 } },
+      ik: { wristR: { x: 63.0, y: 81.9, bend: 1 }, wristL: { x: 59.0, y: 85.9, bend: 1 } },
     },
   ],
 };
@@ -1347,13 +1347,13 @@ const FIGURE_FOUR_STRETCH = {
       t: 0,
       root: { x: 76, y: 106, rot: -90 },
       joints: { hipRotR: 46, hipAbdR: 24, spine: 0, neck: 6, hipR: -42, kneeR: 145, hipL: -65, kneeL: 95 },
-      ik: { wristR: { x: 68, y: 97, bend: 1 }, wristL: { x: 72, y: 101, bend: 1 } },
+      ik: { wristR: { x: 65.0, y: 97.0, bend: 1 }, wristL: { x: 69.0, y: 101.0, bend: 1 } },
     },
     { // far thigh drawn a little closer on the exhale
       t: 1,
       root: { x: 76, y: 106.6, rot: -90 },
       joints: { hipRotR: 48, hipAbdR: 26, spine: 1, neck: 7, hipR: -40, kneeR: 145, hipL: -61, kneeL: 95 },
-      ik: { wristR: { x: 66, y: 95, bend: 1 }, wristL: { x: 70, y: 99, bend: 1 } },
+      ik: { wristR: { x: 63.0, y: 94.9, bend: 1 }, wristL: { x: 67.0, y: 98.9, bend: 1 } },
     },
   ],
 };
@@ -1405,7 +1405,7 @@ const COUCH_STRETCH = {
       joints: { spine: 2, neck: -2, hipL: -35, kneeL: 137, ankleL: -58 },
       ik: {
         ankleR: { x: 66, y: 113.6, bend: -1 },
-        wristR: { x: 60, y: 86, bend: 1 }, wristL: { x: 55, y: 88, bend: 1 },
+        wristR: { x: 60.5, y: 83.0, bend: 1 }, wristL: { x: 55.5, y: 85.0, bend: 1 },
       },
     },
     { // pelvis tucks and the chest comes up a degree on the exhale
@@ -1414,7 +1414,7 @@ const COUCH_STRETCH = {
       joints: { spine: 4, neck: -3, hipL: -27, kneeL: 137, ankleL: -58 },
       ik: {
         ankleR: { x: 66, y: 113.6, bend: -1 },
-        wristR: { x: 61, y: 85, bend: 1 }, wristL: { x: 56, y: 87, bend: 1 },
+        wristR: { x: 61.1, y: 82.0, bend: 1 }, wristL: { x: 56.1, y: 84.0, bend: 1 },
       },
     },
   ],
@@ -1471,7 +1471,7 @@ const STANDING_HAMSTRING_STRETCH = {
       joints: { spine: 38, neck: -14, hipR: 13, kneeR: 6, ankleR: 23 },
       ik: {
         ankleL: { x: 56, y: 113.6, bend: -1 },
-        wristR: { x: 88, y: 82, bend: 1 }, wristL: { x: 83, y: 84, bend: 1 },
+        wristR: { x: 90.3, y: 80.0, bend: 1 }, wristL: { x: 85.3, y: 82.0, bend: 1 },
       },
     },
     { // hinges a degree further on the exhale, spine still flat
@@ -1480,7 +1480,7 @@ const STANDING_HAMSTRING_STRETCH = {
       joints: { spine: 42, neck: -16, hipR: 13, kneeR: 4, ankleR: 26 },
       ik: {
         ankleL: { x: 56, y: 113.6, bend: -1 },
-        wristR: { x: 88, y: 86, bend: 1 }, wristL: { x: 83, y: 88, bend: 1 },
+        wristR: { x: 90.4, y: 84.2, bend: 1 }, wristL: { x: 85.4, y: 86.2, bend: 1 },
       },
     },
   ],
@@ -1506,14 +1506,14 @@ const SUPINE_HAMSTRING_STRETCH = {
       root: { x: 60, y: 106, rot: -90 },
       joints: { spine: 0, neck: 6, hipR: -90, kneeR: 6, ankleR: 10,
                 hipL: 180, kneeL: 2, ankleL: -30 },
-      ik: { wristR: { x: 50, y: 88, bend: 1 }, wristL: { x: 46, y: 92, bend: 1 } },
+      ik: { wristR: { x: 47.0, y: 88.0, bend: 1 }, wristL: { x: 43.0, y: 92.0, bend: 1 } },
     },
     { // drawn a little closer on the exhale, knee still soft
       t: 1,
       root: { x: 60, y: 106.6, rot: -90 },
       joints: { spine: 1, neck: 7, hipR: -98, kneeR: 4, ankleR: 14,
                 hipL: 180, kneeL: 2, ankleL: -30 },
-      ik: { wristR: { x: 48, y: 86, bend: 1 }, wristL: { x: 44, y: 90, bend: 1 } },
+      ik: { wristR: { x: 45.0, y: 85.9, bend: 1 }, wristL: { x: 41.0, y: 89.9, bend: 1 } },
     },
   ],
 };
@@ -1663,7 +1663,7 @@ const DEEP_SQUAT_HOLD = {
       joints: { spine: 16, neck: -10 },
       ik: {
         ankleR: { x: 68, y: 113.6, bend: -1 }, ankleL: { x: 63, y: 113.6, bend: -1 },
-        wristR: { x: 78, y: 76, bend: 1 }, wristL: { x: 74, y: 78, bend: 1 },
+        wristR: { x: 79.6, y: 73.5, bend: 1 }, wristL: { x: 75.6, y: 75.5, bend: 1 },
       },
     },
     { // sinks a fraction on the exhale, heels still down
@@ -1672,7 +1672,7 @@ const DEEP_SQUAT_HOLD = {
       joints: { spine: 18, neck: -11 },
       ik: {
         ankleR: { x: 68, y: 113.6, bend: -1 }, ankleL: { x: 63, y: 113.6, bend: -1 },
-        wristR: { x: 78, y: 78, bend: 1 }, wristL: { x: 74, y: 80, bend: 1 },
+        wristR: { x: 79.7, y: 75.5, bend: 1 }, wristL: { x: 75.7, y: 77.5, bend: 1 },
       },
     },
   ],
@@ -1922,14 +1922,14 @@ const STANDING_FORWARD_HANG = {
     { // hanging, chin tucked in toward the chest
       t: 0,
       root: { x: 62, y: 62.6, rot: 50 },
-      joints: { spine: 55, neck: 22, shoulderR: -105, elbowR: 14, shoulderL: -102, elbowL: 16,
+      joints: { spine: 55, neck: 22, shoulderR: -105, elbowR: 30, shoulderL: -102, elbowL: 32,
                 wristR: -30, wristL: -30 },
       ik: { ankleR: { x: 64, y: 113.6, bend: -1 }, ankleL: { x: 59, y: 113.6, bend: -1 } },
     },
     { // head nods the other way, everything else stays heavy
       t: 1,
       root: { x: 62, y: 63.2, rot: 52 },
-      joints: { spine: 57, neck: -18, shoulderR: -107, elbowR: 12, shoulderL: -104, elbowL: 14,
+      joints: { spine: 57, neck: -18, shoulderR: -107, elbowR: 28, shoulderL: -104, elbowL: 30,
                 wristR: -30, wristL: -30 },
       ik: { ankleR: { x: 64, y: 113.6, bend: -1 }, ankleL: { x: 59, y: 113.6, bend: -1 } },
     },

@@ -74,7 +74,7 @@ const BARBELL_BENCH_PRESS = {
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -4, wristR: 0, wristL: 0 },
       ik: {
-        wristR: { x: 58, y: 45, bend: 1 }, wristL: { x: 61, y: 46, bend: 1 },
+        wristR: { x: 55.0, y: 45.0, bend: 1 }, wristL: { x: 58.0, y: 46.0, bend: 1 },
         ankleR: { x: 92, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
       },
     },
@@ -83,7 +83,7 @@ const BARBELL_BENCH_PRESS = {
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 2, neck: -6, wristR: 0, wristL: 0 },
       ik: {
-        wristR: { x: 56, y: 65, bend: 1 }, wristL: { x: 59, y: 66, bend: 1 },
+        wristR: { x: 53.0, y: 64.9, bend: 1 }, wristL: { x: 56.0, y: 65.9, bend: 1 },
         ankleR: { x: 92, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
       },
     },
@@ -107,7 +107,7 @@ const LAT_PULLDOWN = {
       root: { x: 52, y: 86, rot: -8 },
       joints: { spine: -2, neck: -6 },
       ik: {
-        wristR: { x: 56, y: 24, bend: 1 }, wristL: { x: 51, y: 25, bend: 1 },
+        wristR: { x: 55.5, y: 21.1, bend: 1 }, wristL: { x: 50.5, y: 22.1, bend: 1 },
         ankleR: { x: 80, y: 113.4, bend: -1 }, ankleL: { x: 76, y: 113.4, bend: -1 },
       },
     },
@@ -116,7 +116,7 @@ const LAT_PULLDOWN = {
       root: { x: 52, y: 86, rot: -12 },
       joints: { spine: -6, neck: -2 },
       ik: {
-        wristR: { x: 58, y: 56, bend: 1 }, wristL: { x: 53, y: 57, bend: 1 },
+        wristR: { x: 57.1, y: 53.2, bend: 1 }, wristL: { x: 52.1, y: 54.2, bend: 1 },
         ankleR: { x: 80, y: 113.4, bend: -1 }, ankleL: { x: 76, y: 113.4, bend: -1 },
       },
     },

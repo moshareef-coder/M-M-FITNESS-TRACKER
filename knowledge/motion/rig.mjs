@@ -108,21 +108,35 @@ const axial = (F, a, side) => rotY(F, -side * a);
 // Roughly 7 heads tall. Radii are the half thickness at each joint. Segments
 // with a mid entry are drawn as a three circle chain so the belly of the muscle
 // is wider than its ends.
+// v3 proportions. Measured against standard adult fractions of stature, with
+// the hip height (thigh + shin + ankle = 56.4) pinned as the anchor, which puts
+// stature at 56.4 / 0.53 = 106.4 rig units. Everything else is checked against
+// that: acromion 0.818H, head top 1.0H, hand 0.108H, foot 0.152H. Note the
+// foot was already right: `foot` is ankle to toe and the heel adds 4 behind it,
+// so the drawn foot is 16 units against a human 16.2.
+//
+// LEG LENGTHS AND HIP HEIGHT ARE DELIBERATELY UNCHANGED. Every authored move
+// pins its feet in absolute units, so touching the legs would move 262 moves'
+// contact points; touching the torso and head moves nothing that is pinned.
+// The old figure's problem was never the legs: it was a head and neck stack of
+// 28.1 units above the shoulder where a human carries 19.4, plus a torso that
+// was 3.5 short. That reads as a child's proportions, which is most of what
+// made it look like a doll.
 export const BODY = {
-  spine: 27, neck: 8.5, headOff: 11.6,
-  upperArm: 20, forearm: 17, hand: 7.5,
+  spine: 30, neck: 7.4, headOff: 8.0,
+  upperArm: 20, forearm: 17, hand: 8.6,
   thigh: 27, shin: 25, foot: 12,
-  rPelvis: 9.9, rWaist: 8.5, rChest: 11.8,
-  rNeckTop: 4.3, rNeckBot: 5.2,
-  rHeadBack: 8.0, rHeadJaw: 6.2,
-  rShoulder: 7.0, rDelt: 7.9, rElbow: 5.4, rWrist: 4.1,
+  rPelvis: 9.3, rWaist: 7.9, rChest: 12.3,
+  rNeckTop: 4.2, rNeckBot: 5.6,
+  rHeadBack: 7.3, rHeadJaw: 5.4,
+  rShoulder: 7.0, rDelt: 8.1, rElbow: 5.4, rWrist: 4.0,
   rUpperArmMid: 6.6, rForearmMid: 5.2,
-  rHandA: 4.1, rHandB: 3.0, rThumb: 2.2,
+  rHandA: 4.0, rHandB: 2.9, rThumb: 2.1,
   rHip: 8.0, rThighMid: 8.7, rKnee: 6.3,
-  rCalf: 6.9, rAnkle: 4.4, rToe: 3.0, rHeel: 3.9,
-  shoulderW: 11.5, hipW: 6.9, depth: 1.7,
+  rCalf: 6.9, rAnkle: 4.4, rToe: 3.2, rHeel: 4.0,
+  shoulderW: 12.6, hipW: 6.2, depth: 1.7,
   // hand v2
-  palm: 4.2, palmHalf: 2.6, finger: 3.6, rPalm: 2.9, rFinger: 2.3, thumb: 4.2,
+  palm: 5.0, palmHalf: 2.9, finger: 4.4, rPalm: 3.0, rFinger: 2.4, thumb: 5.0,
 };
 export const LEG_TO_FLOOR = BODY.thigh + BODY.shin + BODY.rAnkle;
 export const STAND_Y = GROUND - LEG_TO_FLOOR; // 61.4
@@ -569,9 +583,20 @@ function drawMitt(ctx, S, side, C, fill, closed) {
   const base = add(k.wrist, scl(d, L * (closed ? 0.30 : 0.38)));
   const thumbRoot = add(base, scl(n, closed ? 1.4 : 1.8));
   const thumbTip = add(add(thumbRoot, scl(d, L * (closed ? 0.42 : 0.55))), scl(n, closed ? 0.6 : 1.5));
-  part(ctx, C, [[k.wrist, B.rHandA], [tip, closed ? B.rHandB * 1.25 : B.rHandB]],
+  part(ctx, C, [[k.wrist, B.rHandA], [lerpV(k.wrist, tip, 0.62), B.rHandA * 0.94],
+                [tip, closed ? B.rHandB * 1.25 : B.rHandB]],
        { fill, shadeR: 0.42, shadeOff: 0.34 });
   part(ctx, C, [[thumbRoot, B.rThumb], [thumbTip, B.rThumb * 0.82]], { fill, shade: false, haloW: 2.6 });
+  // two knuckle hints across the back of the hand. At 160px they are the only
+  // thing that says hand rather than paddle.
+  const kn = add(k.wrist, scl(d, L * 0.74));
+  const across = V(-d.y, d.x);
+  ctx.fillStyle = C.shade;
+  for (const o of [-1, 1]) {
+    const c0 = add(kn, scl(across, o * B.rHandB * 0.5));
+    capsulePath(ctx, c0, B.rHandB * 0.34, add(c0, scl(d, B.rHandB * 0.5)), B.rHandB * 0.26);
+    ctx.fill();
+  }
 }
 
 function drawHand(ctx, S, side, C, fill, grip, detail) {
@@ -617,29 +642,41 @@ function drawFoot(ctx, S, side, C, fill) {
   const d = norm2(sub(k.toe, k.heel));
   const mid = lerpV(k.ankle, k.toe, 0.45);
   part(ctx, C, [
-    [k.heel, B.rHeel * w],
-    [add(k.ankle, scl(d, 0.5)), B.rAnkle * 1.06 * w],
-    [mid, B.rToe * 1.25 * w],
-    [k.toe, B.rToe * w],
+    [add(k.heel, scl(d, -0.4)), B.rHeel * 1.04 * w],      // heel, squared off
+    [add(k.ankle, scl(d, 0.4)), B.rAnkle * 1.02 * w],     // ankle and instep
+    [mid, B.rToe * 1.16 * w],                             // arch into the ball
+    [add(k.toe, scl(d, -0.8)), B.rToe * 1.22 * w],        // toe box, blunt
+    [k.toe, B.rToe * 0.82 * w],
   ], { fill, shadeR: 0.44, shadeOff: 0.36 });
 }
 
-// Head: skull mass set back, jaw tapering forward, a hint of an ear. Seen from
-// behind the skull stays round and both ears show.
+// Head: a skull rather than an egg. Cranium set back and high, brow forward,
+// jaw dropping to a chin, plus an ear. Three circles hulled together, which is
+// what gives it a human profile at 16 units tall without a single feature on it.
 function drawHead(ctx, S, C, fill) {
   const B = BODY;
   const u = norm2(S.neckAxis.y), f = norm2(S.neckAxis.x);
   const flat = S.frontal;
   const away = S.facing === "away";
-  const top = flat ? add(S.head, scl(u, 2.2)) : add(add(S.head, scl(u, 2.2)), scl(f, -1.5));
-  const jawR = flat ? (away ? B.rHeadBack * 0.94 : B.rHeadBack * 0.86) : B.rHeadJaw;
-  const jaw = flat ? add(S.head, scl(u, away ? -2.2 : -2.8))
-                   : add(add(S.head, scl(u, -2.6)), scl(f, 2.8));
-  part(ctx, C, [[top, B.rHeadBack], [jaw, jawR]], { fill, shadeOff: 0.34, shadeR: 0.56 });
+  const at = (up, fwd) => add(add(S.head, scl(u, up)), scl(f, fwd));
+  if (flat) {
+    // Front on there is no profile to draw, so the shape is a tapered oval:
+    // wide at the temples, narrower at the jaw, with a short chin.
+    const jawR = away ? B.rHeadBack * 0.9 : B.rHeadBack * 0.78;
+    hull(ctx, C, [[at(2.4, 0), B.rHeadBack], [at(-1.0, 0), B.rHeadBack * 0.94], [at(-4.2, 0), jawR]],
+         { fill, shadeOff: 0.3, shadeR: 0.58 });
+  } else {
+    hull(ctx, C, [
+      [at(1.9, -1.4), B.rHeadBack],          // cranium, set back and high
+      [at(0.6, 2.0), B.rHeadBack * 0.84],    // brow and face
+      [at(-3.4, 2.4), B.rHeadJaw],           // jaw
+      [at(-4.6, 3.4), B.rHeadJaw * 0.62],    // chin
+    ], { fill, shadeOff: 0.3, shadeR: 0.56 });
+  }
   const ears = flat ? (away ? [-1, 1] : []) : [-1];
   for (const sd of ears) {
-    const ear = add(add(S.head, scl(f, sd * (flat ? B.rHeadBack * 0.86 : 2.2))), scl(u, -0.4));
-    capsulePath(ctx, ear, 2.3, add(ear, scl(u, -1.3)), 1.9);
+    const ear = at(-0.2, sd * (flat ? B.rHeadBack * 0.84 : 1.9));
+    capsulePath(ctx, ear, 2.2, add(ear, scl(u, -1.4)), 1.8);
     ctx.fillStyle = C.shade; ctx.fill();
   }
 }
@@ -669,7 +706,15 @@ function drawLeg(ctx, S, side, C, fill, skinOpts) {
 // soft chest plate. Flat two tone: a designed figure, not an anatomy chart.
 function drawTorso(ctx, S, C, fill, skinOpts) {
   const B = BODY;
-  limb(ctx, C, S.chest, B.rNeckBot * 0.95, S.neckTop, B.rNeckTop, { fill, shade: false });
+  // The neck flares into the shoulders instead of standing on them like a peg.
+  // The wide bottom circle is the trapezius, and it is most of what stops the
+  // head reading as a ball on a stick.
+  const nu = norm2(S.torsoAxis.y);
+  part(ctx, C, [
+    [add(S.chest, scl(nu, -0.6)), B.rNeckBot * 1.12],
+    [lerpV(S.chest, S.neckTop, 0.55), B.rNeckBot * 0.86],
+    [S.neckTop, B.rNeckTop],
+  ], { fill, shade: false });
   const waist = lerpV(S.pelvis, S.chest, 0.46);
   const fv = S.frontal;
   part(ctx, C, [[S.pelvis, B.rPelvis], [waist, B.rWaist], [S.chest, S.chestR]],
@@ -726,92 +771,168 @@ export function litIntensity(move, cycle) {
   const smooth = shape * shape * (3 - 2 * shape);
   return clamp(floor + (1 - floor) * smooth, 0, 1);
 }
-// One flat plate riding on a segment. `face` is the projected anterior axis of
-// the bone, so a plate stays on the front of the limb as the camera moves.
-function musclePlate(ctx, C, group, lit, p0, r0, p1, r1, face, o) {
-  const a = lerpV(p0, p1, o.from), b = lerpV(p0, p1, o.to);
-  const ra = r0 + (r1 - r0) * o.from, rb = r0 + (r1 - r0) * o.to;
+
+// A muscle plate: a chain of circles riding on a bone, drawn as one hull with a
+// thin light seam. Shapes are taken from the purchased anatomy figure rather
+// than invented, which is why they are chains and not ovals: a quad is a long
+// tapering mass with a teardrop above the knee, a calf is a high belly running
+// down to nothing, and a patch of colour in the middle of a limb reads as a
+// sticker.
+//
+// `specs` are positions along the bone: at = fraction, w = fraction of the
+// bone's radius, side = +1 front, -1 back, 0 centred. Front view collapses
+// front and back onto each other, so everything there is centred.
+function bonePlate(ctx, C, group, lit, p0, r0, p1, r1, face, specs) {
   const d = norm2(sub(p1, p0));
   let n = V(-d.y, d.x);
   if (n.x * face.x + n.y * face.y < 0) n = V(-n.x, -n.y);
-  const side = o.side === undefined ? 0 : o.side;
-  const w = o.w === undefined ? 0.6 : o.w;
-  const oa = ra * (1 - w) * side, ob = rb * (1 - w) * side;
-  capsulePath(ctx, V(a.x + n.x * oa, a.y + n.y * oa), ra * w,
-                   V(b.x + n.x * ob, b.y + n.y * ob), rb * w);
+  const circles = specs.map((sp) => {
+    const p = lerpV(p0, p1, sp.at);
+    const r = r0 + (r1 - r0) * sp.at;
+    const o = r * (1 - sp.w) * (sp.side || 0);
+    return [V(p.x + n.x * o, p.y + n.y * o), Math.max(0.6, r * sp.w)];
+  });
+  const segs = [];
+  for (let i = 0; i < circles.length - 1; i++) {
+    segs.push([circles[i][0], circles[i][1], circles[i + 1][0], circles[i + 1][1]]);
+  }
   ctx.strokeStyle = C.seam;
   ctx.lineWidth = 1.1;
-  ctx.stroke();
+  for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.stroke(); }
   ctx.fillStyle = litFill(group, C, lit);
-  ctx.fill();
+  for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.fill(); }
 }
+
+// A free plate that does not ride a bone: pecs, lats, abs. Same seam and fill.
+function freePlate(ctx, C, group, lit, circles) {
+  const segs = [];
+  for (let i = 0; i < circles.length - 1; i++) {
+    segs.push([circles[i][0], circles[i][1], circles[i + 1][0], circles[i + 1][1]]);
+  }
+  ctx.strokeStyle = C.seam;
+  ctx.lineWidth = 1.1;
+  for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.stroke(); }
+  ctx.fillStyle = litFill(group, C, lit);
+  for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.fill(); }
+}
+
 function armPlates(ctx, S, side, C, lit) {
   const B = BODY, k = S.sides[side];
   const flat = S.frontal;
   const face = flat ? V(0, 0) : k.axis.arm.x;
   const faceF = flat ? V(0, 0) : k.axis.fore.x;
-  const sh = add(k.shoulder, scl(norm2(sub(k.elbow, k.shoulder)), -1.2));
-  musclePlate(ctx, C, "shoulders", lit, sh, B.rDelt, k.elbow, B.rElbow, face,
-              { from: 0.02, to: 0.30, w: 0.86, side: 0 });
-  musclePlate(ctx, C, "biceps", lit, k.shoulder, B.rShoulder, k.elbow, B.rElbow, face,
-              { from: 0.34, to: 0.92, w: flat ? 0.66 : 0.54, side: flat ? 0 : 1 });
+  const sh = add(k.shoulder, scl(norm2(sub(k.elbow, k.shoulder)), -1.6));
+  // deltoid: a cap over the joint that tapers a third of the way down the arm
+  bonePlate(ctx, C, "shoulders", lit, sh, B.rDelt, k.elbow, B.rElbow, face, [
+    { at: 0.0, w: 0.99, side: 0 }, { at: 0.12, w: 0.95, side: 0 },
+    { at: 0.26, w: 0.78, side: 0 }, { at: 0.36, w: 0.5, side: 0 },
+  ]);
+  bonePlate(ctx, C, "biceps", lit, k.shoulder, B.rShoulder, k.elbow, B.rElbow, face,
+    flat ? [{ at: 0.36, w: 0.66, side: 0 }, { at: 0.62, w: 0.74, side: 0 }, { at: 0.94, w: 0.5, side: 0 }]
+         : [{ at: 0.34, w: 0.44, side: 1 }, { at: 0.6, w: 0.56, side: 1 }, { at: 0.93, w: 0.38, side: 1 }]);
   if (!flat) {
-    musclePlate(ctx, C, "triceps", lit, k.shoulder, B.rShoulder, k.elbow, B.rElbow, face,
-                { from: 0.30, to: 0.95, w: 0.48, side: -1 });
+    bonePlate(ctx, C, "triceps", lit, k.shoulder, B.rShoulder, k.elbow, B.rElbow, face, [
+      { at: 0.3, w: 0.4, side: -1 }, { at: 0.62, w: 0.5, side: -1 }, { at: 0.96, w: 0.34, side: -1 },
+    ]);
   }
-  musclePlate(ctx, C, "forearms", lit, k.elbow, B.rElbow, k.wrist, B.rWrist, faceF,
-              { from: 0.06, to: 0.78, w: flat ? 0.66 : 0.58, side: flat ? 0 : 1 });
+  // forearm: thick at the elbow, running out to nothing at the wrist
+  bonePlate(ctx, C, "forearms", lit, k.elbow, B.rElbow, k.wrist, B.rWrist, faceF,
+    flat ? [{ at: 0.04, w: 0.72, side: 0 }, { at: 0.3, w: 0.68, side: 0 }, { at: 0.82, w: 0.42, side: 0 }]
+         : [{ at: 0.04, w: 0.64, side: 1 }, { at: 0.3, w: 0.6, side: 1 }, { at: 0.84, w: 0.36, side: 1 }]);
 }
+
 function legPlates(ctx, S, side, C, lit) {
   const B = BODY, k = S.sides[side];
   const flat = S.frontal;
   const face = flat ? V(0, 0) : k.axis.thigh.x;
   const faceS = flat ? V(0, 0) : k.axis.shin.x;
-  musclePlate(ctx, C, "glutes", lit, k.hip, B.rHip, k.knee, B.rKnee, face,
-              { from: 0.0, to: 0.24, w: flat ? 0.7 : 0.62, side: flat ? 0 : -1 });
-  musclePlate(ctx, C, "quads", lit, k.hip, B.rHip, k.knee, B.rKnee, face,
-              { from: 0.22, to: 0.92, w: flat ? 0.68 : 0.56, side: flat ? 0 : 1 });
+  bonePlate(ctx, C, "glutes", lit, k.hip, B.rHip, k.knee, B.rKnee, face,
+    flat ? [{ at: 0.0, w: 0.84, side: 0 }, { at: 0.16, w: 0.72, side: 0 }, { at: 0.28, w: 0.46, side: 0 }]
+         : [{ at: -0.04, w: 0.78, side: -1 }, { at: 0.14, w: 0.66, side: -1 }, { at: 0.3, w: 0.4, side: -1 }]);
+  // quads: one long mass with the teardrop sitting just above the knee
+  bonePlate(ctx, C, "quads", lit, k.hip, B.rHip, k.knee, B.rKnee, face,
+    flat ? [{ at: 0.16, w: 0.66, side: 0 }, { at: 0.48, w: 0.78, side: 0 },
+            { at: 0.74, w: 0.72, side: 0 }, { at: 0.88, w: 0.58, side: 0 }, { at: 0.96, w: 0.34, side: 0 }]
+         : [{ at: 0.16, w: 0.48, side: 1 }, { at: 0.46, w: 0.6, side: 1 },
+            { at: 0.74, w: 0.56, side: 1 }, { at: 0.88, w: 0.46, side: 1 }, { at: 0.96, w: 0.28, side: 1 }]);
   if (!flat) {
-    musclePlate(ctx, C, "hamstrings", lit, k.hip, B.rHip, k.knee, B.rKnee, face,
-                { from: 0.26, to: 0.9, w: 0.44, side: -1 });
+    bonePlate(ctx, C, "hamstrings", lit, k.hip, B.rHip, k.knee, B.rKnee, face, [
+      { at: 0.26, w: 0.4, side: -1 }, { at: 0.56, w: 0.48, side: -1 },
+      { at: 0.8, w: 0.42, side: -1 }, { at: 0.94, w: 0.26, side: -1 },
+    ]);
   }
-  musclePlate(ctx, C, "calves", lit, k.knee, B.rKnee, k.ankle, B.rAnkle, faceS,
-              { from: 0.06, to: 0.56, w: flat ? 0.7 : 0.6, side: flat ? 0 : -1 });
+  // calf: belly high on the shin, tapering into the achilles
+  bonePlate(ctx, C, "calves", lit, k.knee, B.rKnee, k.ankle, B.rAnkle, faceS,
+    flat ? [{ at: 0.06, w: 0.56, side: 0 }, { at: 0.26, w: 0.76, side: 0 },
+            { at: 0.5, w: 0.58, side: 0 }, { at: 0.78, w: 0.3, side: 0 }]
+         : [{ at: 0.06, w: 0.5, side: -1 }, { at: 0.26, w: 0.68, side: -1 },
+            { at: 0.5, w: 0.52, side: -1 }, { at: 0.8, w: 0.26, side: -1 }]);
 }
+
 function torsoPlates(ctx, S, C, lit) {
   const B = BODY;
   const P = S.pelvis, Ch = S.chest, rP = B.rPelvis, rC = S.chestR;
-  const u = norm2(S.torsoAxis.y), f = norm2(S.torsoAxis.x);
   const flat = S.frontal;
-  const seg = (group, o) => musclePlate(ctx, C, group, lit, P, rP, Ch, rC, f, o);
-  if (flat) {
-    const pec = (sgn) => {
-      const c = add(add(Ch, scl(f, sgn * 5.4)), scl(u, -1.6));
-      capsulePath(ctx, add(c, scl(u, 2.4)), 5.0, add(c, scl(u, -2.6)), 4.6);
-      ctx.strokeStyle = C.seam; ctx.lineWidth = 1.1; ctx.stroke();
-      ctx.fillStyle = litFill("chest", C, lit); ctx.fill();
-    };
+  const u = norm2(S.torsoAxis.y);
+  // Lateral axis and anterior axis project to different things depending on the
+  // view: front on, the anterior axis points at the camera and has no screen
+  // direction at all, so the lateral one has to carry the layout.
+  const lat = flat ? norm2(S.torsoAxis.z) : norm2(S.torsoAxis.x);
+  const at = (up, side) => add(add(Ch, scl(u, up)), scl(lat, side));
+  if (flat && S.facing === "away") {
+    // trapezius sheet from the neck out over both shoulders
+    const trap = (sgn) => freePlate(ctx, C, "traps", lit, [
+      [at(2.0, sgn * 1.0), 3.4], [at(0.2, sgn * 5.4), 4.2], [at(-1.6, sgn * 9.0), 3.2],
+    ]);
+    trap(-1); trap(1);
+    // lats: wings from under the armpit down into the waist
+    const lat_ = (sgn) => freePlate(ctx, C, "lats", lit, [
+      [at(-2.0, sgn * 8.6), 4.2], [at(-8.5, sgn * 7.2), 4.6], [at(-15.0, sgn * 4.2), 3.0],
+    ]);
+    lat_(-1); lat_(1);
+    freePlate(ctx, C, "lowerback", lit, [[at(-12.0, 0), 3.0], [at(-18.0, 0), 2.8]]);
+  } else if (flat) {
+    // pec: a fan from the sternum out to the armpit, not a blob on the chest
+    const pec = (sgn) => freePlate(ctx, C, "chest", lit, [
+      [at(-1.8, sgn * 1.5), 2.6], [at(-0.6, sgn * 5.2), 4.6], [at(-1.2, sgn * 8.8), 4.2],
+    ]);
     pec(-1); pec(1);
-    seg("abs", { from: 0.34, to: 0.56, w: 0.44, side: 0 });
-    seg("abs", { from: 0.58, to: 0.76, w: 0.46, side: 0 });
-    const ob = (sgn) => {
-      const c = add(add(P, scl(f, sgn * 6.2)), scl(u, 12));
-      capsulePath(ctx, add(c, scl(u, 3.4)), 3.0, add(c, scl(u, -2.2)), 2.4);
-      ctx.strokeStyle = C.seam; ctx.lineWidth = 1.1; ctx.stroke();
-      ctx.fillStyle = litFill("obliques", C, lit); ctx.fill();
-    };
+    // rectus: two blocks, stacked and narrow
+    for (const [a, b, w] of [[-7.5, -11.5, 4.2], [-12.5, -16.5, 4.2]]) {
+      freePlate(ctx, C, "abs", lit, [[at(a, 0), w], [at(b, 0), w * 0.96]]);
+    }
+    const ob = (sgn) => freePlate(ctx, C, "obliques", lit, [
+      [at(-7.0, sgn * 6.2), 2.8], [at(-13.0, sgn * 5.0), 2.4],
+    ]);
     ob(-1); ob(1);
   } else {
-    seg("chest", { from: 0.74, to: 0.97, w: 0.62, side: 1 });
-    seg("lats", { from: 0.52, to: 0.95, w: 0.52, side: -1 });
-    seg("lowerback", { from: 0.20, to: 0.50, w: 0.46, side: -1 });
-    seg("abs", { from: 0.40, to: 0.60, w: 0.40, side: 1 });
-    seg("abs", { from: 0.62, to: 0.72, w: 0.40, side: 1 });
-    seg("obliques", { from: 0.26, to: 0.40, w: 0.40, side: 1 });
+    // side on: pec sheet at the front of the chest, lats sweeping from the
+    // lower back up into the armpit, abs down the front
+    freePlate(ctx, C, "chest", lit, [
+      [at(1.6, 6.2), 4.2], [at(-2.4, 7.4), 4.6], [at(-6.0, 6.4), 3.4],
+    ]);
+    freePlate(ctx, C, "lats", lit, [
+      [add(add(P, scl(u, 9)), scl(lat, -6.4)), 3.0],
+      [add(add(P, scl(u, 17)), scl(lat, -7.6)), 4.4],
+      [at(-1.0, -8.0), 5.0],
+      [at(1.8, -5.6), 4.0],
+    ]);
+    freePlate(ctx, C, "lowerback", lit, [
+      [add(add(P, scl(u, 5)), scl(lat, -5.6)), 3.2],
+      [add(add(P, scl(u, 12)), scl(lat, -6.6)), 3.4],
+    ]);
+    freePlate(ctx, C, "abs", lit, [
+      [at(-8.0, 5.6), 3.2], [at(-13.0, 5.0), 3.0], [at(-17.5, 4.2), 2.6],
+    ]);
+    freePlate(ctx, C, "obliques", lit, [
+      [at(-12.0, 3.0), 2.6], [at(-17.0, 2.0), 2.4],
+    ]);
   }
-  const t0 = add(S.chest, scl(u, 1.5)), t1 = add(S.neckTop, scl(u, -0.5));
-  musclePlate(ctx, C, "traps", lit, t0, B.rNeckBot * 1.5, t1, B.rNeckTop, f,
-              { from: 0.0, to: 0.9, w: 0.8, side: 0 });
+  // traps: from the neck out over the shoulder line
+  const t0 = add(S.chest, scl(u, 1.2)), t1 = add(S.neckTop, scl(u, -0.6));
+  bonePlate(ctx, C, "traps", lit, t0, B.rNeckBot * 1.5, t1, B.rNeckTop, lat, [
+    { at: 0.0, w: 0.92, side: 0 }, { at: 0.5, w: 0.8, side: 0 }, { at: 0.95, w: 0.7, side: 0 },
+  ]);
 }
 
 // ------------------------------------------------------------------ props ---
@@ -1066,6 +1187,7 @@ function drawFloor(ctx, C, S) {
   }
   ctx.globalAlpha = 1;
 }
+
 
 // How far inboard of its own shoulder a wrist has to come before we call the
 // arm "across the body". A hanging arm sits about 11.5 out.

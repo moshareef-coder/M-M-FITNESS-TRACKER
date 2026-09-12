@@ -496,6 +496,97 @@ pose stands, and the comment in the move says so.
 
 ---
 
+## Rig v3: the figure
+
+The skeleton and every angle are unchanged. What changed is the body that hangs
+on it, because the v2 figure read as a doll: a big head, a short torso and a
+neck you could not see.
+
+### Proportions
+
+Measured against standard adult fractions of stature, anchoring on hip height
+(thigh + shin + ankle = 56.4 units), which puts stature at 56.4 / 0.53 = 106.4
+rig units:
+
+| | v2 | v3 | human |
+| --- | --- | --- | --- |
+| torso, pelvis to shoulder | 27 | **30** | 30.6 |
+| torso as a fraction of hip height | 0.479 | **0.532** | 0.543 |
+| neck plus head above the shoulder | 28.1 | **22.7** | 19.4 |
+| shoulder half width | 11.5 | **12.6** | 12.9 |
+| hip joint half width | 6.9 | **6.2** | 5.3 |
+| hand, wrist to fingertip | 7.5 | **8.6** | 11.5 |
+| total height, rig units | 111.5 | **109.1** | 106.4 |
+| total height in heads | 7.0 | **7.5** | 7.5 |
+
+**Leg lengths and hip height are deliberately untouched.** Every authored move
+pins its feet in absolute units, so changing the legs would move 262 moves'
+contact points. Changing the torso and head moves nothing that is pinned, which
+is why the migration below was possible at all.
+
+Three of these are still short of human on purpose. The head stack is 3 units
+tall because a truly human head on this body looks like a pinhead at 160px. The
+hand is short because the drawn hand is a mitt with a thumb, and at full human
+length it reads as a paddle. The hip joints stay wider than anatomy because the
+legs are drawn as capsules and a true 5.3 puts the thighs in contact.
+
+### What the migration did
+
+Growing the torso moves the shoulders 3 units further from the pelvis, and every
+absolute wrist pin was authored against where the shoulders used to be. So:
+
+1. **Pins that hold something that moves with the body** (a dumbbell, a cable
+   handle, a bar in the hands) were shifted by the same 3 units along the torso
+   axis. 378 pins across the seven move files.
+2. **Pins that hold the world** (a hand on the floor, on a pull-up bar, on a
+   door frame) were left exactly where they were. Those are contacts.
+3. **Ten keyframes** where the supporting arm could no longer reach a world
+   contact were fixed: eight by sliding the whole body toward the contact
+   (dips, L-sits, a planche) and two by flattening the body angle with the hips
+   compensated so the feet stayed put. One, Planche Lean, was reverted because
+   the fix put the hand through the floor, which is worse than an arm two units
+   short.
+
+The proof is a contact harness that solves every move at 24 points in both the
+old and the new rig and asserts that anything touching the world still touches
+it: a pinned ankle within 0.5 units, a hand on the floor still on the floor
+within 1 unit, and a hand on a plane allowed to slide along that plane but not
+leave it. 13,790 contacts checked. Pins the old rig could not reach either are
+reported separately and not counted, because there was no contact to preserve.
+
+### Head, neck, hands, feet
+
+- **Head** is three or four circles hulled together rather than an egg: cranium
+  set back and high, brow, jaw, chin, plus an ear. Front on it is a tapered
+  oval, wide at the temples and narrower at the jaw.
+- **Neck** flares into the shoulders instead of standing on them like a peg.
+  The wide bottom circle is the trapezius and it is most of what stops the head
+  reading as a ball on a stick.
+- **Mitt** (the card-size hand) has a thumb on the real thumb side, so pronation
+  still shows, and two knuckle hints across the back.
+- **Foot** has a squared heel, an instep, an arch and a blunt toe box. Note that
+  `BODY.foot` is ankle to toe and the heel adds 4 behind it, so the drawn foot
+  is already 16 units against a human 16.2. It did not need lengthening, and
+  lengthening it put toes through the floor in every pose with a pointed foot.
+
+### Anatomy plates
+
+Reshaped from ovals to the silhouettes on the purchased Rive body, drawn as
+chains of circles rather than single capsules:
+
+- deltoid cap over the joint, tapering a third of the way down the arm
+- pec fan from the sternum out to the armpit
+- lats sweeping from the lower back up into the armpit (side view) or as wings
+  under the armpits (back view)
+- quads as one long mass with the teardrop above the knee
+- hamstrings tapering at both ends, calf belly high on the shin
+- seen from behind (`facing: "away"`), the torso draws traps, lats and spinal
+  erectors instead of pecs and abs. Showing someone's chest on their back was
+  the single most obviously wrong thing the anatomy skin did.
+
+
+---
+
 ## Ten things that will bite you
 
 1. **Legs `bend: -1`, arms `bend: +1`,** except for an arm crossing the body in

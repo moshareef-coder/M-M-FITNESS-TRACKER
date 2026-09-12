@@ -178,7 +178,7 @@ const LEG_PRESS = {
         spine: 2, neck: 6,
         hipR: 117, kneeR: 8, ankleR: 0, hipL: 114, kneeL: 10, ankleL: 2,
       },
-      ik: { wristR: { x: 50, y: 100, bend: 1 }, wristL: { x: 44, y: 101, bend: 1 } },
+      ik: { wristR: { x: 49.1, y: 97.2, bend: 1 }, wristL: { x: 43.1, y: 98.2, bend: 1 } },
     },
     { // deep, knees folded toward the chest, shins angled down to the plate
       t: 1,
@@ -187,7 +187,7 @@ const LEG_PRESS = {
         spine: 3, neck: 8,
         hipR: 170, kneeR: 87, ankleR: 22, hipL: 166, kneeL: 89, ankleL: 24,
       },
-      ik: { wristR: { x: 50, y: 100, bend: 1 }, wristL: { x: 44, y: 101, bend: 1 } },
+      ik: { wristR: { x: 49.1, y: 97.2, bend: 1 }, wristL: { x: 43.1, y: 98.2, bend: 1 } },
     },
   ],
 };
@@ -213,7 +213,7 @@ const LEG_EXTENSION = {
         spine: 2, neck: 2,
         hipR: 98, kneeR: 90, ankleR: 0, hipL: 96, kneeL: 88, ankleL: 0,
       },
-      ik: { wristR: { x: 54, y: 100, bend: 1 }, wristL: { x: 48, y: 101, bend: 1 } },
+      ik: { wristR: { x: 53.7, y: 97.0, bend: 1 }, wristL: { x: 47.7, y: 98.0, bend: 1 } },
     },
     { // locked out, shin in line with the thigh, toes pointed
       t: 1,
@@ -222,7 +222,7 @@ const LEG_EXTENSION = {
         spine: 0, neck: 0,
         hipR: 98, kneeR: 6, ankleR: -16, hipL: 96, kneeL: 8, ankleL: -14,
       },
-      ik: { wristR: { x: 54, y: 100, bend: 1 }, wristL: { x: 48, y: 101, bend: 1 } },
+      ik: { wristR: { x: 53.5, y: 97.0, bend: 1 }, wristL: { x: 47.5, y: 98.0, bend: 1 } },
     },
   ],
 };
@@ -420,7 +420,7 @@ const LEG_CURL = {
         spine: 0, neck: -16,
         hipR: -180, kneeR: 6, ankleR: 0, hipL: -178, kneeL: 8, ankleL: 0,
       },
-      ik: { wristR: { x: 110, y: 104, bend: 1 }, wristL: { x: 106, y: 103, bend: 1 } },
+      ik: { wristR: { x: 113.0, y: 104.0, bend: 1 }, wristL: { x: 109.0, y: 103.0, bend: 1 } },
     },
     { // top of the curl, heels pulled up over the back of the knee
       t: 1,
@@ -429,7 +429,7 @@ const LEG_CURL = {
         spine: 0, neck: -18,
         hipR: -184, kneeR: 100, ankleR: 0, hipL: -182, kneeL: 98, ankleL: 0,
       },
-      ik: { wristR: { x: 110, y: 104, bend: 1 }, wristL: { x: 106, y: 103, bend: 1 } },
+      ik: { wristR: { x: 113.0, y: 104.0, bend: 1 }, wristL: { x: 109.0, y: 103.0, bend: 1 } },
     },
   ],
 };
@@ -486,7 +486,7 @@ const CABLE_PULL_THROUGH = {
       joints: { spine: 3, neck: -2 },
       ik: {
         ...SQUAT_FEET,
-        wristR: { x: 70, y: 72, bend: 1 }, wristL: { x: 66, y: 73, bend: 1 },
+        wristR: { x: 70.2, y: 69.0, bend: 1 }, wristL: { x: 66.2, y: 70.0, bend: 1 },
       },
     },
     { // hinged back, hands reaching between the legs toward the stack
@@ -495,7 +495,7 @@ const CABLE_PULL_THROUGH = {
       joints: { spine: 36, neck: -24 },
       ik: {
         ...SQUAT_FEET,
-        wristR: { x: 70, y: 86, bend: 1 }, wristL: { x: 66, y: 87, bend: 1 },
+        wristR: { x: 72.6, y: 84.6, bend: 1 }, wristL: { x: 68.6, y: 85.6, bend: 1 },
       },
     },
   ],
@@ -522,16 +522,14 @@ const GLUTE_BRIDGE = {
       joints: { spine: 0, neck: 4 },
       ik: {
         ankleR: { x: 100, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
-        wristR: { x: 86, y: 110, bend: 1 }, wristL: { x: 83, y: 111, bend: 1 },
       },
     },
     { // hips high, shins vertical, shoulders still down
       t: 1,
-      root: { x: 72, y: 92, rot: -120 },
+      root: { x: 70.8, y: 92.5, rot: -120 },
       joints: { spine: 0, neck: 20 },
       ik: {
         ankleR: { x: 100, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
-        wristR: { x: 88, y: 110, bend: 1 }, wristL: { x: 85, y: 111, bend: 1 },
       },
     },
   ],
@@ -556,7 +554,7 @@ const HIP_THRUST = {
       joints: { spine: 0, neck: 10 },
       ik: {
         ankleR: { x: 104, y: 113.4, bend: -1 }, ankleL: { x: 100, y: 113.4, bend: -1 },
-        wristR: { x: 82, y: 104, bend: 1 }, wristL: { x: 79, y: 105, bend: 1 },
+        wristR: { x: 79.6, y: 102.1, bend: 1 }, wristL: { x: 76.6, y: 103.1, bend: 1 },
       },
     },
     { // lockout, knee to shoulder level, shins vertical
@@ -565,7 +563,7 @@ const HIP_THRUST = {
       joints: { spine: 0, neck: 18 },
       ik: {
         ankleR: { x: 104, y: 113.4, bend: -1 }, ankleL: { x: 100, y: 113.4, bend: -1 },
-        wristR: { x: 84, y: 98, bend: 1 }, wristL: { x: 81, y: 99, bend: 1 },
+        wristR: { x: 81.0, y: 98.0, bend: 1 }, wristL: { x: 78.0, y: 99.0, bend: 1 },
       },
     },
   ],
@@ -593,7 +591,7 @@ const SUMO_DEADLIFT = {
       joints: { spine: 2, neck: 0 },
       ik: {
         ankleR: { x: 96, y: 111, bend: -1 }, ankleL: { x: 44, y: 111, bend: -1 },
-        wristR: { x: 80, y: 84, bend: 1 }, wristL: { x: 60, y: 84, bend: 1 },
+        wristR: { x: 80.2, y: 81.0, bend: 1 }, wristL: { x: 60.2, y: 81.0, bend: 1 },
       },
     },
     { // start position, hips down, knees shoved out, arms long inside them
@@ -602,7 +600,7 @@ const SUMO_DEADLIFT = {
       joints: { spine: 18, neck: -8 },
       ik: {
         ankleR: { x: 96, y: 111, bend: -1 }, ankleL: { x: 44, y: 111, bend: -1 },
-        wristR: { x: 78, y: 100, bend: 1 }, wristL: { x: 62, y: 101, bend: 1 },
+        wristR: { x: 79.2, y: 97.2, bend: 1 }, wristL: { x: 63.2, y: 98.2, bend: 1 },
       },
     },
   ],
@@ -695,7 +693,6 @@ const FROG_PUMP = {
       joints: { hipAbdR: 42, hipAbdL: 42, hipRotR: 38, hipRotL: 38, spine: 0, neck: 4 },
       ik: {
         ankleR: { x: 90, y: 113.4, bend: -1 }, ankleL: { x: 86, y: 113.4, bend: -1 },
-        wristR: { x: 86, y: 110, bend: 1 }, wristL: { x: 83, y: 111, bend: 1 },
       },
     },
     { // short sharp drive up, knees stay high over the heels
@@ -704,7 +701,6 @@ const FROG_PUMP = {
       joints: { hipAbdR: 46, hipAbdL: 46, hipRotR: 42, hipRotL: 42, spine: 0, neck: 20 },
       ik: {
         ankleR: { x: 90, y: 113.4, bend: -1 }, ankleL: { x: 86, y: 113.4, bend: -1 },
-        wristR: { x: 88, y: 110, bend: 1 }, wristL: { x: 85, y: 111, bend: 1 },
       },
     },
   ],
@@ -865,7 +861,7 @@ const LEG_PRESS_CALF_RAISE = {
         spine: 2, neck: 6,
         hipR: 113, kneeR: 12, ankleR: 34, hipL: 110, kneeL: 14, ankleL: 34,
       },
-      ik: { wristR: { x: 50, y: 100, bend: 1 }, wristL: { x: 44, y: 101, bend: 1 } },
+      ik: { wristR: { x: 49.1, y: 97.2, bend: 1 }, wristL: { x: 43.1, y: 98.2, bend: 1 } },
     },
     { // pressed away through the ball of the foot, knee barely changed
       t: 1,
@@ -874,7 +870,7 @@ const LEG_PRESS_CALF_RAISE = {
         spine: 2, neck: 6,
         hipR: 117, kneeR: 8, ankleR: -34, hipL: 114, kneeL: 10, ankleL: -34,
       },
-      ik: { wristR: { x: 50, y: 100, bend: 1 }, wristL: { x: 44, y: 101, bend: 1 } },
+      ik: { wristR: { x: 49.1, y: 97.2, bend: 1 }, wristL: { x: 43.1, y: 98.2, bend: 1 } },
     },
   ],
 };
@@ -930,7 +926,7 @@ const DONKEY_CALF_RAISE = {
         spine: 44, neck: -34,
         hipR: -30, kneeR: 3, ankleR: 22, hipL: -30, kneeL: 3, ankleL: 22,
       },
-      ik: { wristR: { x: 92, y: 68, bend: 1 }, wristL: { x: 88, y: 69, bend: 1 } },
+      ik: { wristR: { x: 94.8, y: 67.2, bend: 1 }, wristL: { x: 90.8, y: 68.2, bend: 1 } },
     },
     { // heels high, hips lifting with them
       t: 1,
@@ -939,7 +935,7 @@ const DONKEY_CALF_RAISE = {
         spine: 44, neck: -34,
         hipR: -30, kneeR: 3, ankleR: -42, hipL: -30, kneeL: 3, ankleL: -42,
       },
-      ik: { wristR: { x: 92, y: 68, bend: 1 }, wristL: { x: 88, y: 69, bend: 1 } },
+      ik: { wristR: { x: 94.8, y: 67.2, bend: 1 }, wristL: { x: 90.8, y: 68.2, bend: 1 } },
     },
   ],
 };
@@ -964,7 +960,7 @@ const CRUNCH = {
       joints: { spine: 0, neck: 5 },
       ik: {
         ankleR: { x: 100, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
-        wristR: { x: 74, y: 100, bend: 1 }, wristL: { x: 70, y: 101, bend: 1 },
+        wristR: { x: 71.0, y: 100.0, bend: 1 }, wristL: { x: 67.0, y: 101.0, bend: 1 },
       },
     },
     { // top, shoulder blades up, ribs pulled toward the hips, hips still down
@@ -973,7 +969,7 @@ const CRUNCH = {
       joints: { spine: 30, neck: 20 },
       ik: {
         ankleR: { x: 100, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
-        wristR: { x: 82, y: 96, bend: 1 }, wristL: { x: 78, y: 97, bend: 1 },
+        wristR: { x: 79.4, y: 94.5, bend: 1 }, wristL: { x: 75.4, y: 95.5, bend: 1 },
       },
     },
   ],
@@ -995,7 +991,7 @@ const SIT_UP = {
       joints: { spine: 0, neck: 5 },
       ik: {
         ankleR: { x: 100, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
-        wristR: { x: 74, y: 100, bend: 1 }, wristL: { x: 70, y: 101, bend: 1 },
+        wristR: { x: 71.0, y: 100.0, bend: 1 }, wristL: { x: 67.0, y: 101.0, bend: 1 },
       },
     },
     { // all the way up, torso vertical, hands reaching for the feet
@@ -1004,7 +1000,7 @@ const SIT_UP = {
       joints: { spine: 20, neck: 10 },
       ik: {
         ankleR: { x: 100, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
-        wristR: { x: 96, y: 92, bend: 1 }, wristL: { x: 92, y: 93, bend: 1 },
+        wristR: { x: 96.2, y: 89.0, bend: 1 }, wristL: { x: 92.2, y: 90.0, bend: 1 },
       },
     },
   ],
@@ -1013,6 +1009,9 @@ const SIT_UP = {
 // Shoulders stay down, the knees are drawn in and the hips curl off the floor.
 // Must be visible: the hips leaving the floor with the chest never moving, which
 // is the exact opposite of the crunch. Side view, supine.
+// v3: the wrist pins here were authored where no arm on this body could
+// reach, in v2 as well, so the arm stretched for them and put the elbow
+// through the floor. Unpinned: the arms hang where the angles put them.
 const REVERSE_CRUNCH = {
   view: "side",
   loop: "pingpong",
@@ -1022,21 +1021,21 @@ const REVERSE_CRUNCH = {
   keys: [
     { // start, thighs vertical, shins level, hips on the floor
       t: 0,
-      root: { x: 72, y: 108, rot: -90 },
-      joints: {
+      root: { x: 70, y: 108, rot: -90 },
+      joints: { 
         spine: 0, neck: 6,
         hipR: 270, kneeR: 90, ankleR: -20, hipL: 268, kneeL: 92, ankleL: -20,
       },
-      ik: { wristR: { x: 88, y: 110, bend: 1 }, wristL: { x: 85, y: 111, bend: 1 } },
+      ik: { wristL: { x: 85, y: 111, bend: 1 } },
     },
     { // knees pulled over the chest, hips curled up off the floor
       t: 1,
       root: { x: 70, y: 100, rot: -105 },
-      joints: {
+      joints: { 
         spine: 0, neck: 14,
         hipR: 335, kneeR: 120, ankleR: -16, hipL: 333, kneeL: 122, ankleL: -16,
       },
-      ik: { wristR: { x: 88, y: 110, bend: 1 }, wristL: { x: 85, y: 111, bend: 1 } },
+      ik: { wristL: { x: 85, y: 111, bend: 1 } },
     },
   ],
 };
@@ -1058,7 +1057,7 @@ const CABLE_CRUNCH = {
         spine: 0, neck: -2,
         hipR: -10, kneeR: 90, ankleR: -58, hipL: -10, kneeL: 90, ankleL: -58,
       },
-      ik: { wristR: { x: 82, y: 30, bend: 1 }, wristL: { x: 78, y: 32, bend: 1 } },
+      ik: { wristR: { x: 82.5, y: 27.1, bend: 1 }, wristL: { x: 78.5, y: 29.1, bend: 1 } },
     },
     { // crunched, spine rounded, elbows driven toward the thighs
       t: 1,
@@ -1067,7 +1066,7 @@ const CABLE_CRUNCH = {
         spine: 50, neck: 22,
         hipR: -10, kneeR: 90, ankleR: -58, hipL: -10, kneeL: 90, ankleL: -58,
       },
-      ik: { wristR: { x: 104, y: 46, bend: 1 }, wristL: { x: 100, y: 48, bend: 1 } },
+      ik: { wristR: { x: 106.6, y: 44.5, bend: 1 }, wristL: { x: 102.6, y: 46.5, bend: 1 } },
     },
   ],
 };
@@ -1088,7 +1087,7 @@ const V_UP = {
         spine: 0, neck: 2,
         hipR: 180, kneeR: 4, ankleR: -30, hipL: 178, kneeL: 6, ankleL: -30,
       },
-      ik: { wristR: { x: 18, y: 104, bend: 1 }, wristL: { x: 22, y: 105, bend: 1 } },
+      ik: { wristR: { x: 15.0, y: 104.0, bend: 1 }, wristL: { x: 19.0, y: 105.0, bend: 1 } },
     },
     { // half way, arms sweeping past the head rather than through the shoulder
       t: 0.5,
@@ -1097,7 +1096,7 @@ const V_UP = {
         spine: 12, neck: 4,
         hipR: 187, kneeR: 4, ankleR: -30, hipL: 185, kneeL: 6, ankleL: -30,
       },
-      ik: { wristR: { x: 46, y: 74, bend: 1 }, wristL: { x: 42, y: 76, bend: 1 } },
+      ik: { wristR: { x: 43.3, y: 72.7, bend: 1 }, wristL: { x: 39.3, y: 74.7, bend: 1 } },
     },
     { // the V, hands out at the shins
       t: 1,
@@ -1106,7 +1105,7 @@ const V_UP = {
         spine: 25, neck: 6,
         hipR: 195, kneeR: 4, ankleR: -30, hipL: 193, kneeL: 6, ankleL: -30,
       },
-      ik: { wristR: { x: 92, y: 82, bend: 1 }, wristL: { x: 88, y: 84, bend: 1 } },
+      ik: { wristR: { x: 90.3, y: 79.5, bend: 1 }, wristL: { x: 86.3, y: 81.5, bend: 1 } },
     },
   ],
 };
@@ -1181,7 +1180,7 @@ const AB_WHEEL_ROLLOUT = {
         spine: 30, neck: -18,
         hipR: -25, kneeR: 90, ankleR: -58, hipL: -25, kneeL: 90, ankleL: -58,
       },
-      ik: { wristR: { x: 86, y: 97, bend: 1 }, wristL: { x: 82, y: 98, bend: 1 } },
+      ik: { wristR: { x: 88.5, y: 95.3, bend: 1 }, wristL: { x: 84.5, y: 96.3, bend: 1 } },
     },
     { // rolled out, knee to shoulder one long line just off the floor
       t: 1,
@@ -1190,7 +1189,7 @@ const AB_WHEEL_ROLLOUT = {
         spine: 44, neck: -26,
         hipR: -84, kneeR: 26, ankleR: -58, hipL: -84, kneeL: 26, ankleL: -58,
       },
-      ik: { wristR: { x: 118, y: 101, bend: 1 }, wristL: { x: 114, y: 102, bend: 1 } },
+      ik: { wristR: { x: 120.7, y: 99.6, bend: 1 }, wristL: { x: 116.7, y: 100.6, bend: 1 } },
     },
   ],
 };
@@ -1223,7 +1222,7 @@ const RUSSIAN_TWIST = {
         spine: 0, neck: 4,
         hipR: 145, kneeR: 70, ankleR: -25, hipL: 143, kneeL: 72, ankleL: -25,
       },
-      ik: { wristR: { x: 78, y: 76, bend: 1 }, wristL: { x: 74, y: 78, bend: 1 } },
+      ik: { wristR: { x: 76.3, y: 73.5, bend: 1 }, wristL: { x: 72.3, y: 75.5, bend: 1 } },
     },
     { // swung down and across toward the other hip
       t: 1,
@@ -1232,7 +1231,7 @@ const RUSSIAN_TWIST = {
         spine: 0, neck: 8,
         hipR: 140, kneeR: 66, ankleR: -25, hipL: 138, kneeL: 68, ankleL: -25,
       },
-      ik: { wristR: { x: 68, y: 102, bend: 1 }, wristL: { x: 64, y: 103, bend: 1 } },
+      ik: { wristR: { x: 66.5, y: 99.4, bend: 1 }, wristL: { x: 62.5, y: 100.4, bend: 1 } },
     },
   ],
 };
@@ -1291,7 +1290,7 @@ const PALLOF_PRESS = {
       },
       ik: {
         ankleR: { x: 82, y: 113.4, bend: -1 }, ankleL: { x: 68, y: 113.4, bend: -1 },
-        wristR: { x: 73, y: 40, bend: -1 }, wristL: { x: 70, y: 41, bend: -1 },
+        wristR: { x: 73.0, y: 37.0, bend: -1 }, wristL: { x: 70.0, y: 38.0, bend: -1 },
       },
     },
     { // pressed long, hands still dead centre, body refusing to rotate
@@ -1303,7 +1302,7 @@ const PALLOF_PRESS = {
       },
       ik: {
         ankleR: { x: 82, y: 113.4, bend: -1 }, ankleL: { x: 68, y: 113.4, bend: -1 },
-        wristR: { x: 72, y: 52, bend: -1 }, wristL: { x: 69, y: 53, bend: -1 },
+        wristR: { x: 71.9, y: 49.0, bend: -1 }, wristL: { x: 68.9, y: 50.0, bend: -1 },
       },
     },
   ],
@@ -1336,7 +1335,7 @@ const WOODCHOPPER = {
       },
       ik: {
         ankleR: { x: 80, y: 113.4, bend: -1 }, ankleL: { x: 60, y: 113.4, bend: -1 },
-        wristR: { x: 104, y: 28, bend: -1 }, wristL: { x: 100, y: 31, bend: -1 },
+        wristR: { x: 104.5, y: 25.1, bend: -1 }, wristL: { x: 100.5, y: 28.1, bend: -1 },
       },
     },
     { // through the middle of the arc, hands outside the near shoulder
@@ -1348,7 +1347,7 @@ const WOODCHOPPER = {
       },
       ik: {
         ankleR: { x: 80, y: 113.4, bend: -1 }, ankleL: { x: 60, y: 113.4, bend: -1 },
-        wristR: { x: 86, y: 58, bend: -1 }, wristL: { x: 82, y: 60, bend: -1 },
+        wristR: { x: 86.0, y: 55.0, bend: -1 }, wristL: { x: 82.0, y: 57.0, bend: -1 },
       },
     },
     { // chopped through to the low left, hips and knees giving with it
@@ -1360,7 +1359,7 @@ const WOODCHOPPER = {
       },
       ik: {
         ankleR: { x: 80, y: 113.4, bend: -1 }, ankleL: { x: 60, y: 113.4, bend: -1 },
-        wristR: { x: 60, y: 78, bend: -1 }, wristL: { x: 56, y: 80, bend: -1 },
+        wristR: { x: 59.5, y: 75.0, bend: -1 }, wristL: { x: 55.5, y: 77.0, bend: -1 },
       },
     },
   ],
@@ -1432,7 +1431,7 @@ const BIRD_DOG = {
       root: { x: 66, y: 84, rot: 90 },
       joints: {
         spine: 0, neck: -14, wristR: 86, wristL: 86,
-        hipR: -90, kneeR: 90, ankleR: -58, hipL: -90, kneeL: 90, ankleL: -58,
+        hipR: -90, kneeR: 90, ankleR: -61, hipL: -90, kneeL: 90, ankleL: -61,
       },
       ik: {
         wristR: { x: 95, y: 113, bend: 1 }, wristL: { x: 91, y: 113, bend: 1 },
@@ -1443,10 +1442,10 @@ const BIRD_DOG = {
       root: { x: 66, y: 84, rot: 90 },
       joints: {
         spine: 0, neck: -10, wristR: 86, wristL: 0,
-        hipR: -90, kneeR: 90, ankleR: -58, hipL: -180, kneeL: 4, ankleL: -20,
+        hipR: -90, kneeR: 90, ankleR: -61, hipL: -180, kneeL: 4, ankleL: -20,
       },
       ik: {
-        wristR: { x: 95, y: 113, bend: 1 }, wristL: { x: 124, y: 80, bend: 1 },
+        wristR: { x: 95, y: 113, bend: 1 }, wristL: { x: 127.0, y: 80.0, bend: 1 },
       },
     },
   ],
@@ -1473,7 +1472,7 @@ const SUPERMAN = {
         spine: 0, neck: -10,
         hipR: -180, kneeR: 4, ankleR: -58, hipL: -180, kneeL: 6, ankleL: -58,
       },
-      ik: { wristR: { x: 132, y: 108, bend: 1 }, wristL: { x: 128, y: 109, bend: 1 } },
+      ik: { wristR: { x: 135.0, y: 108.0, bend: 1 }, wristL: { x: 131.0, y: 109.0, bend: 1 } },
     },
     { // chest and feet both lifted, back extended
       t: 1,
@@ -1482,7 +1481,7 @@ const SUPERMAN = {
         spine: -15, neck: -22,
         hipR: -176, kneeR: 4, ankleR: -58, hipL: -176, kneeL: 6, ankleL: -58,
       },
-      ik: { wristR: { x: 132, y: 96, bend: 1 }, wristL: { x: 128, y: 97, bend: 1 } },
+      ik: { wristR: { x: 134.7, y: 94.7, bend: 1 }, wristL: { x: 130.7, y: 95.7, bend: 1 } },
     },
   ],
 };
@@ -1548,7 +1547,7 @@ const REVERSE_HYPEREXTENSION = {
         spine: 0, neck: -12,
         hipR: -90, kneeR: 5, ankleR: -20, hipL: -90, kneeL: 7, ankleL: -20,
       },
-      ik: { wristR: { x: 104, y: 70, bend: 1 }, wristL: { x: 100, y: 71, bend: 1 } },
+      ik: { wristR: { x: 107.0, y: 70.0, bend: 1 }, wristL: { x: 103.0, y: 71.0, bend: 1 } },
     },
     { // swung up to level with the pad, glutes and lower back doing it
       t: 1,
@@ -1557,7 +1556,7 @@ const REVERSE_HYPEREXTENSION = {
         spine: 0, neck: -16,
         hipR: -170, kneeR: 5, ankleR: -40, hipL: -170, kneeL: 7, ankleL: -40,
       },
-      ik: { wristR: { x: 104, y: 70, bend: 1 }, wristL: { x: 100, y: 71, bend: 1 } },
+      ik: { wristR: { x: 107.0, y: 70.0, bend: 1 }, wristL: { x: 103.0, y: 71.0, bend: 1 } },
     },
   ],
 };

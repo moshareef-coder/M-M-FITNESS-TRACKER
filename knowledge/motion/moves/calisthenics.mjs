@@ -17,8 +17,8 @@ export const PUSH_UP = {
   keys: [
     { // top of the rep, arms locked out, one line from heel to head
       t: 0,
-      root: { x: 69.6, y: 87.2, rot: 70 },
-      joints: { spine: 0, neck: -25, hipL: -140, hipR: -140, kneeL: 2, kneeR: 2,
+      root: { x: 69.6, y: 87.2, rot: 76.5 },
+      joints: { spine: 0, neck: -25, hipL: -153.0, hipR: -153.0, kneeL: 2, kneeR: 2,
                 ankleL: -10, ankleR: -10, wristL: 86, wristR: 86 },
       ik: { wristR: { x: 98, y: 114.6, bend: 1 }, wristL: { x: 92, y: 114.6, bend: 1 } },
     },
@@ -114,14 +114,14 @@ export const INCLINE_PUSH_UP = {
       root: { x: 63.4, y: 68.9, rot: 46 },
       joints: { spine: 0, neck: -16, hipL: -92, hipR: -92, kneeL: 2, kneeR: 2,
                 ankleL: -34, ankleR: -34, wristL: 86, wristR: 86 },
-      ik: { wristR: { x: 85, y: 85, bend: 1 }, wristL: { x: 80, y: 85, bend: 1 } },
+      ik: { wristR: { x: 87.2, y: 82.9, bend: 1 }, wristL: { x: 82.2, y: 82.9, bend: 1 } },
     },
     { // bottom, chest at the pad, elbows tracking back
       t: 1,
       root: { x: 68.1, y: 74.4, rot: 54 },
       joints: { spine: 0, neck: -20, hipL: -108, hipR: -108, kneeL: 2, kneeR: 2,
                 ankleL: -26, ankleR: -26, wristL: 86, wristR: 86 },
-      ik: { wristR: { x: 85, y: 85, bend: 1 }, wristL: { x: 80, y: 85, bend: 1 } },
+      ik: { wristR: { x: 87.4, y: 83.2, bend: 1 }, wristL: { x: 82.4, y: 83.2, bend: 1 } },
     },
   ],
 };
@@ -140,9 +140,9 @@ export const DIAMOND_PUSH_UP = {
   keys: [
     { // top, arms locked, hands touching under the sternum
       t: 0,
-      root: { x: 69.6, y: 86.2, rot: 68 },
-      joints: { spine: 0, neck: -25, hipL: -136, hipR: -136, kneeL: 2, kneeR: 2,
-                ankleL: -16, ankleR: -16, wristL: 86, wristR: 86 },
+      root: { x: 69.6, y: 86.2, rot: 81.5 },
+      joints: { spine: 0, neck: -25, hipL: -163.0, hipR: -163.0, kneeL: 2, kneeR: 2,
+                ankleL: -11, ankleR: -11, wristL: 86, wristR: 86 },
       ik: { wristR: { x: 90, y: 114.6, bend: 1 }, wristL: { x: 87, y: 114.6, bend: 1 } },
     },
     { // bottom, elbows folded tight to the ribs
@@ -169,7 +169,7 @@ export const DIP = {
   keys: [
     { // lockout, arms straight under the shoulders, shins tucked behind
       t: 0,
-      root: { x: 74, y: 60, rot: 14 },
+      root: { x: 73, y: 64.2, rot: 14 },
       joints: { spine: 4, neck: -4, hipR: -6, hipL: -10, kneeR: 100, kneeL: 104,
                 ankleR: -20, ankleL: -20 },
       ik: { wristR: { x: 76, y: 70, bend: 1 }, wristL: { x: 72, y: 70.5, bend: 1 } },
@@ -228,7 +228,7 @@ export const PSEUDO_PLANCHE_PUSH_UP = {
   keys: [
     { // top, shoulders well past the hands, arms long and slanted back
       t: 0,
-      root: { x: 70, y: 93.3, rot: 77 },
+      root: { x: 69.7, y: 93.6, rot: 77 },
       joints: { spine: 0, neck: -30, hipL: -154, hipR: -154, kneeL: 2, kneeR: 2,
                 ankleL: -3, ankleR: -3, wristL: 120, wristR: 120 },
       ik: { wristR: { x: 74, y: 114.6, bend: 1 }, wristL: { x: 78, y: 114.6, bend: 1 } },
@@ -811,14 +811,14 @@ export const TUCK_L_SIT = {
   keys: [
     { // set, arms locked, knees to the chest
       t: 0,
-      root: { x: 74, y: 77, rot: -4 },
+      root: { x: 73.8, y: 80.2, rot: -4 },
       joints: { spine: 4, neck: 0, hipL: 112, hipR: 114, kneeL: 128, kneeR: 130,
                 ankleL: -30, ankleR: -30 },
       ik: { wristR: { x: 74, y: 86, bend: 1 }, wristL: { x: 70, y: 86.5, bend: 1 } },
     },
     { // settle
       t: 1,
-      root: { x: 74, y: 78, rot: -3 },
+      root: { x: 73.8, y: 80.2, rot: -3 },
       joints: { spine: 4, neck: 1, hipL: 110, hipR: 112, kneeL: 126, kneeR: 128,
                 ankleL: -30, ankleR: -30 },
       ik: { wristR: { x: 74, y: 86, bend: 1 }, wristL: { x: 70, y: 86.5, bend: 1 } },
@@ -840,14 +840,14 @@ export const L_SIT = {
   keys: [
     { // set, legs level, toes pointed
       t: 0,
-      root: { x: 72, y: 77, rot: -2 },
+      root: { x: 71.8, y: 80.2, rot: -2 },
       joints: { spine: 2, neck: 0, hipL: 90, hipR: 92, kneeL: 2, kneeR: 2,
                 ankleL: -45, ankleR: -45 },
       ik: { wristR: { x: 72, y: 86, bend: 1 }, wristL: { x: 68, y: 86.5, bend: 1 } },
     },
     { // settle, legs a degree lower
       t: 1,
-      root: { x: 72, y: 78, rot: -1 },
+      root: { x: 71.8, y: 80.2, rot: -1 },
       joints: { spine: 2, neck: 1, hipL: 87, hipR: 89, kneeL: 2, kneeR: 2,
                 ankleL: -45, ankleR: -45 },
       ik: { wristR: { x: 72, y: 86, bend: 1 }, wristL: { x: 68, y: 86.5, bend: 1 } },
@@ -869,14 +869,14 @@ export const V_SIT = {
   keys: [
     { // set, legs high, torso leaning back under them
       t: 0,
-      root: { x: 70, y: 80, rot: -12 },
+      root: { x: 70.7, y: 83.8, rot: -12 },
       joints: { spine: -2, neck: 6, hipL: 140, hipR: 142, kneeL: 2, kneeR: 2,
                 ankleL: -45, ankleR: -45 },
       ik: { wristR: { x: 72, y: 90, bend: 1 }, wristL: { x: 68, y: 90.5, bend: 1 } },
     },
     { // settle
       t: 1,
-      root: { x: 70, y: 81, rot: -11 },
+      root: { x: 70.5, y: 83.8, rot: -11 },
       joints: { spine: -2, neck: 7, hipL: 137, hipR: 139, kneeL: 2, kneeR: 2,
                 ankleL: -45, ankleR: -45 },
       ik: { wristR: { x: 72, y: 90, bend: 1 }, wristL: { x: 68, y: 90.5, bend: 1 } },
@@ -1012,7 +1012,10 @@ export const HANDSTAND_PUSH_UP = {
 // there. Must be visible: the shoulders well ahead of the hands with the body
 // flat, and that nothing is moving. Side view, hold, which is what separates it
 // from PSEUDO_PLANCHE_PUSH_UP.
-export const PLANCHE_LEAN = {
+export // v3: the flatten migration that fixed the shoulder reach here put the hand
+// through the floor, which is worse than an arm two units short, so this one
+// keeps its authored angle and carries the shortfall.
+const PLANCHE_LEAN = {
   view: "side",
   loop: "hold",
   dur: 6.0,
@@ -1022,15 +1025,15 @@ export const PLANCHE_LEAN = {
   keys: [
     { // leaning, hands back at the hips, body flat
       t: 0,
-      root: { x: 70, y: 97, rot: 84 },
-      joints: { spine: 0, neck: -32, hipL: -168, hipR: -168, kneeL: 2, kneeR: 2,
+      root: { x: 67.9, y: 98.6, rot: 84 },
+      joints: { spine: 0, neck: -32, hipL: -168.0, hipR: -168.0, kneeL: 2, kneeR: 2,
                 ankleL: 0, ankleR: 0, wristL: 120, wristR: 120 },
       ik: { wristR: { x: 66, y: 114.6, bend: 1 }, wristL: { x: 70, y: 114.6, bend: 1 } },
     },
     { // settle, a degree further forward
       t: 1,
-      root: { x: 70.4, y: 97.6, rot: 85 },
-      joints: { spine: 0, neck: -33, hipL: -170, hipR: -170, kneeL: 2, kneeR: 2,
+      root: { x: 68.3, y: 99.1, rot: 84.5 },
+      joints: { spine: 0, neck: -33, hipL: -169.5, hipR: -169.5, kneeL: 2, kneeR: 2,
                 ankleL: 1, ankleR: 1, wristL: 120, wristR: 120 },
       ik: { wristR: { x: 66, y: 114.6, bend: 1 }, wristL: { x: 70, y: 114.6, bend: 1 } },
     },
@@ -1051,14 +1054,14 @@ export const TUCK_PLANCHE = {
   keys: [
     { // holding, knees under the chest, hips up
       t: 0,
-      root: { x: 59, y: 84, rot: 81.5 },
+      root: { x: 55.5, y: 90.2, rot: 81.5 },
       joints: { spine: 0, neck: -30, hipL: -19.5, hipR: -19.5, kneeL: 145, kneeR: 145,
                 ankleL: -40, ankleR: -40, wristL: 110, wristR: 110 },
       ik: { wristR: { x: 70, y: 114.6, bend: 1 }, wristL: { x: 65, y: 114.6, bend: 1 } },
     },
     { // settle
       t: 1,
-      root: { x: 59.4, y: 84.8, rot: 82.5 },
+      root: { x: 56.1, y: 90.2, rot: 82.5 },
       joints: { spine: 0, neck: -31, hipL: -21, hipR: -21, kneeL: 143, kneeR: 143,
                 ankleL: -40, ankleR: -40, wristL: 110, wristR: 110 },
       ik: { wristR: { x: 70, y: 114.6, bend: 1 }, wristL: { x: 65, y: 114.6, bend: 1 } },
@@ -1081,14 +1084,14 @@ export const FULL_PLANCHE = {
   keys: [
     { // holding, one straight line from toe to head, nothing on the floor
       t: 0,
-      root: { x: 59, y: 84, rot: 81.5 },
+      root: { x: 55.5, y: 90.2, rot: 81.5 },
       joints: { spine: 0, neck: -30, hipL: -163, hipR: -163, kneeL: 2, kneeR: 2,
                 ankleL: 0, ankleR: 0, wristL: 110, wristR: 110 },
       ik: { wristR: { x: 70, y: 114.6, bend: 1 }, wristL: { x: 65, y: 114.6, bend: 1 } },
     },
     { // settle
       t: 1,
-      root: { x: 59.4, y: 84.8, rot: 82.5 },
+      root: { x: 56.1, y: 90.2, rot: 82.5 },
       joints: { spine: 0, neck: -31, hipL: -165, hipR: -165, kneeL: 2, kneeR: 2,
                 ankleL: 1, ankleR: 1, wristL: 110, wristR: 110 },
       ik: { wristR: { x: 70, y: 114.6, bend: 1 }, wristL: { x: 65, y: 114.6, bend: 1 } },
@@ -1112,14 +1115,14 @@ export const FRONT_LEVER = {
   keys: [
     { // holding level, toes long
       t: 0,
-      root: { x: 52, y: 61, rot: -90 },
+      root: { x: 51.9, y: 58.2, rot: -90 },
       joints: { spine: 0, neck: 6, hipL: 180, hipR: 180, kneeL: 2, kneeR: 2,
                 ankleL: -40, ankleR: -40 },
       ik: { wristR: { x: 25, y: 23, bend: 1 }, wristL: { x: 21, y: 23.5, bend: 1 } },
     },
     { // settle, hips a shade lower
       t: 1,
-      root: { x: 52, y: 62.4, rot: -87.5 },
+      root: { x: 51.9, y: 59.5, rot: -87.5 },
       joints: { spine: 0, neck: 7, hipL: 175, hipR: 175, kneeL: 2, kneeR: 2,
                 ankleL: -40, ankleR: -40 },
       ik: { wristR: { x: 25, y: 23, bend: 1 }, wristL: { x: 21, y: 23.5, bend: 1 } },
@@ -1142,14 +1145,14 @@ export const TUCK_FRONT_LEVER = {
   keys: [
     { // holding, knees to the chest, hips level with the shoulders
       t: 0,
-      root: { x: 52, y: 61, rot: -90 },
+      root: { x: 51.9, y: 58.2, rot: -90 },
       joints: { spine: 0, neck: 6, hipL: -40, hipR: -40, kneeL: 140, kneeR: 140,
                 ankleL: -40, ankleR: -40 },
       ik: { wristR: { x: 25, y: 23, bend: 1 }, wristL: { x: 21, y: 23.5, bend: 1 } },
     },
     { // settle
       t: 1,
-      root: { x: 52, y: 62.2, rot: -88 },
+      root: { x: 51.9, y: 59.2, rot: -88 },
       joints: { spine: 0, neck: 7, hipL: -37, hipR: -37, kneeL: 138, kneeR: 138,
                 ankleL: -40, ankleR: -40 },
       ik: { wristR: { x: 25, y: 23, bend: 1 }, wristL: { x: 21, y: 23.5, bend: 1 } },
