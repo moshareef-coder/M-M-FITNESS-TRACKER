@@ -4260,7 +4260,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.11.2";
+const APP_VERSION = "2026.09.12.1";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -7289,11 +7289,21 @@ function renderRestDayPrompt() {
   if (!save) { banner.classList.add("hidden"); return; }
   // The streak as it would be once the day is saved, not the one left behind it.
   const streak = computeStreak(ME, save);
+  /* Loss aversion, pointed outward. A shared streak is the thing neither of
+     you owns, so the sentence worth reading is the one about them, not about
+     your own number. Only said when it is actually true: the shared streak
+     survives this day only if THEY were accounted for on it too, and if they
+     were not, there is nothing here to save and we fall back to your own. */
+  const shared = sharedDayStreak(save);
+  const saves = shared > sharedDayStreak();   // only true if resting actually rescues it
+  const line = saves
+    ? `Call it a rest day and the ${shared} days you and ${escapeHtml(partnerName())} have going stay intact.`
+    : `Call it a rest day and keep your ${streak > 0 ? streak + " day " : ""}streak.`;
   banner.classList.remove("hidden");
   banner.innerHTML = `
     <div class="rest-copy">
       <strong>Missed yesterday?</strong>
-      <span>Call it a rest day and keep your ${streak > 0 ? streak + " day " : ""}streak. ${restDaysLeft(ME)} left of ${REST_ALLOWANCE} in any 7 days.</span>
+      <span>${line} ${restDaysLeft(ME)} left of ${REST_ALLOWANCE} in any 7 days.</span>
     </div>
     <button type="button" class="rest-btn" id="restDayBtn">Rest day</button>`;
   $("restDayBtn").onclick = () => markRestDay(save);
@@ -7433,24 +7443,49 @@ function sharedWeekStreak() {
   return streak;
 }
 
-/* Consecutive days, right up to today, where you BOTH actually trained,
-   the daily counterpart to sharedWeekStreak's weekly gate. This is the one
-   that resets fast and is felt immediately, on purpose: the weekly streak
-   forgives an off day, this one doesn't, so it's the number that makes
-   "did we both show up today" feel like it matters in the moment. */
-function sharedDayStreak() {
+/* Consecutive days, right up to today, where you BOTH trained, the daily
+   counterpart to sharedWeekStreak's weekly gate. It still resets fast and is
+   felt immediately, which is the point of having it: the weekly streak
+   forgives a quiet week, this one is about today.
+
+   What it no longer does is treat a rest day as a failure. It used to read
+   only `gym`, so a logged rest day reset it to zero -- including when BOTH
+   people deliberately rested on the same day, which is the single healthiest
+   thing this app can produce. Home prints this number first (see homeStreak),
+   so the headline figure was punishing the best possible behaviour, while
+   computeStreak had the rule right for one person all along.
+
+   Same three-way rule as computeStreak now. A day COUNTS when both trained.
+   The chain HOLDS, without counting, when each of you either trained or
+   logged a rest day. It BREAKS only when somebody simply did not show up.
+   Rest is capped at REST_ALLOWANCE in any 7 days at the point it is offered,
+   so this cannot be used to hold a streak open indefinitely. */
+function sharedDayStreak(asIfRested = null) {
   if (!PARTNER_EMAIL) return 0;
   const partner = partnerName();
   let streak = 0;
   const cursor = new Date(todayStr() + "T00:00:00");
   for (let i = 0; i < 365; i++) {
     const ds = isoDate(cursor);
-    const mine = !!entryOn(ME, ds)?.gym;
-    const theirs = !!entryOn(partner, ds)?.gym;
-    if (!mine && !theirs && i > 0) break; // neither trained -- streak is over (today gets a pass while the day is still open)
-    if (mine && theirs) streak++;
-    else if (i === 0) { /* today not logged yet by one or both -- don't break on today itself */ }
-    else break;
+    const mineEntry = entryOn(ME, ds);
+    const theirEntry = entryOn(partner, ds);
+    const mine = !!mineEntry?.gym, theirs = !!theirEntry?.gym;
+    /* `asIfRested` answers "what would this be if I marked that day as rest",
+       which is the number the rest-day offer has to quote. Same contract as
+       computeStreak's parameter of the same name. */
+    const myRest = !!mineEntry?.rest_day || ds === asIfRested;
+    const theirRest = !!theirEntry?.rest_day;
+
+    if (i === 0) {
+      // Today is still open, so nothing about it can break the chain yet.
+      if (mine && theirs) streak++;
+    } else if (mine && theirs) {
+      streak++;
+    } else if ((mine || myRest) && (theirs || theirRest)) {
+      // Both accounted for, at least one of you resting: held, not counted.
+    } else {
+      break;
+    }
     cursor.setDate(cursor.getDate() - 1);
   }
   return streak;
