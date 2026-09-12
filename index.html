@@ -738,14 +738,21 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .rest-clock {
-    font-size: 34px; font-weight: 800; letter-spacing: -.03em; line-height: 1;
+    font-size: 28px; font-weight: 800; letter-spacing: -.03em; line-height: 1;
     font-variant-numeric: tabular-nums;
   }
   .rest-track { height: 2px; border-radius: 9px; background: var(--panel); overflow: hidden; }
   .rest-fill { height: 100%; width: 100%; background: var(--accent); border-radius: 9px; transition: width 1s linear; }
-  /* Past the target, the only state worth a colour change. */
-  .rest-bar.over .rest-clock { color: var(--up); }
-  .rest-bar.over .rest-fill { background: var(--up); }
+  /* The advice, not a deadline. It stays the same size whichever thing it is
+     saying, so reaching the recommendation does not make the strip jump. */
+  .rest-advice { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+  /* Accent, not --up: --up is the coral that means a number went the wrong way,
+     and reaching your rest recommendation is not a warning. */
+  .rest-bar.ready .rest-advice { color: var(--accent-ink); font-weight: 700; }
+  .rest-bar.ready .rest-advice::before {
+    content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 100px;
+    background: var(--accent-ink); margin-right: 7px; vertical-align: middle;
+  }
   .rest-pref { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
   .rest-pref button {
     min-height: 44px; padding: 10px 0; border-radius: 12px; cursor: pointer;
@@ -758,9 +765,9 @@
 
   .rest-adjust { display: flex; gap: 8px; }
   .rest-adjust button {
-    flex: 1; min-height: 40px; padding: 9px 0; border-radius: 10px; cursor: pointer;
+    flex: 1; min-height: 44px; padding: 14px 16px; border-radius: 12px; cursor: pointer;
     background: var(--panel); border: 1px solid var(--border); color: var(--text);
-    font-family: inherit; font-size: 12.5px; font-weight: 700;
+    font-family: inherit; font-size: 14px; font-weight: 700;
   }
   .rest-adjust button:active { transform: scale(.96); }
 
@@ -12009,17 +12016,33 @@ function restLabel(sec) {
 }
 
 /* One place decides what the strip says, so the first paint and the ticker can
-   never disagree. Past the target it counts up with a plus rather than sitting
-   on zero, because standing there for four minutes is worth knowing. */
+   never disagree. The clock counts UP from the moment the set ended, because
+   that is the part the app actually knows: it cannot tell when YOU are
+   recovered. A countdown implied it could, and implied you had failed at zero.
+   The recommendation sits beside the number as advice instead, and past it the
+   clock keeps counting plainly, because standing there for four minutes is
+   worth knowing. */
 function restState(ms) {
   const target = restTargetSec();
-  const left = target - Math.max(0, ms) / 1000;
-  const over = left < 0;
-  return {
-    over,
-    text: over ? `+${formatRest(-left * 1000)}` : formatRest(left * 1000),
-    pct: over ? 0 : Math.max(0, Math.min(1, left / target)),
-  };
+  const elapsed = Math.max(0, ms) / 1000;
+  return { target, ready: elapsed >= target, text: formatRest(elapsed * 1000) };
+}
+
+/* Why the number is the number. A recommendation you can trace back to your own
+   goal gets trusted; a bare number gets ignored. Same three sources as
+   restTargetSec(), in the same order, said in a few words. */
+function restAdvice(s) {
+  if (s.ready) return `Good to go, ${restLabel(s.target)} was the recommendation`;
+  const planned = Number(TODAY_WORKOUT?.exercises?.[SESSION?.exerciseIndex]?.restSec);
+  if (Number.isFinite(planned) && planned > 0) {
+    const goal = goalTileFor(MY_PROFILE?.goal_bubble)?.title;
+    return goal
+      ? `About ${restLabel(planned)} here, what a ${goal.toLowerCase()} plan rests for`
+      : `About ${restLabel(planned)} here, what this lift is planned for`;
+  }
+  const mine = Number(MY_PROFILE?.rest_sec);
+  if (Number.isFinite(mine) && mine > 0) return `About ${restLabel(mine)} here, your own default from Setup`;
+  return `About ${restLabel(DEFAULT_REST_SEC)} here, a safe default for most lifts`;
 }
 
 function paintRest() {
@@ -12028,11 +12051,12 @@ function paintRest() {
   if (!bar || !clock || !SESSION?.restStartedAt) { stopRestTicker(); return; }
   const s = restState(Date.now() - SESSION.restStartedAt);
   clock.textContent = s.text;
-  bar.classList.toggle("over", s.over);
-  const fill = document.getElementById("restFill");
-  if (fill) fill.style.width = `${(s.pct * 100).toFixed(1)}%`;
-  // One buzz as the target lands, once per rest however long you stand there.
-  if (s.over && REST_BUZZED_AT !== SESSION.restStartedAt) {
+  bar.classList.toggle("ready", s.ready);
+  const advice = document.getElementById("restAdvice");
+  if (advice) advice.textContent = restAdvice(s);
+  // One buzz as the recommendation lands, once per rest however long you stand
+  // there. It says "you are good to go", not "you are late".
+  if (s.ready && REST_BUZZED_AT !== SESSION.restStartedAt) {
     REST_BUZZED_AT = SESSION.restStartedAt;
     buzz([18, 60, 18]);
   }
@@ -12750,15 +12774,15 @@ function renderSession() {
     </div>
 
     ${resting ? `
-      <div class="rest-bar${restNow.over ? " over" : ""}" id="restTimer">
+      <div class="rest-bar${restNow.ready ? " ready" : ""}" id="restTimer">
         <div class="rest-head">
           <span class="rest-label">RESTING</span>
           ${nextUp ? `<span class="rest-next">Next: ${escapeHtml(nextUp)}</span>` : ""}
         </div>
         <span class="rest-clock" id="restClock">${restNow.text}</span>
-        <div class="rest-track"><div class="rest-fill" id="restFill" style="width:${(restNow.pct * 100).toFixed(1)}%"></div></div>
+        <div class="rest-advice" id="restAdvice">${escapeHtml(restAdvice(restNow))}</div>
         <div class="rest-adjust">
-          <button type="button" id="restSkip">Skip</button>
+          <button type="button" id="restSkip">Start next set</button>
         </div>
       </div>` : ""}
 
