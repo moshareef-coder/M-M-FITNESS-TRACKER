@@ -40,7 +40,7 @@ const BODY_TAB = grab(/ {2}<!-- BODY TAB -->\n([\s\S]*?)\n {2}<!-- PROGRESS TAB 
 const PROGRESS_TAB = grab(/ {2}<!-- PROGRESS TAB -->\n([\s\S]*?)\n {2}<!-- SETUP TAB -->/, "the progress tab", 1);
 
 const FUNCS = [
-  "icon", "personRing", "ringLockup", "hydrateAvatars", "renderHero", "renderTopStreak",
+  "icon", "personRing", "hydrateAvatars", "renderHero", "renderTopStreak",
   "entryOn", "dotHTML", "renderWeekStrips",
   "timelineSessions", "reactionsFor", "nameFor", "timelineItemHTML", "wireTimeline", "renderTimeline",
   "liveAgeMs", "liveStateLabel", "renderLiveCard", "renderLiveSheet",
