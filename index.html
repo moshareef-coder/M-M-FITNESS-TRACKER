@@ -4457,7 +4457,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.12.8";
+const APP_VERSION = "2026.09.12.11";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -5450,33 +5450,41 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
   const isMain = (bubble, child) => !!primary && primary.bubble === bubble && (primary.child || null) === (child || null);
   const extraAt = (bubble, child) => extras.findIndex((e) => e.bubble === bubble && (e.child || null) === (child || null));
 
-  /* One pick per category, which is why a second tap inside a category moves
-     that category's pick rather than adding a second one: "lose belly fat" and
-     "lose the last 10 pounds" are the same goal answered twice. Untapping the
-     main goal promotes the first extra rather than leaving extras with nothing
-     to be extra to. */
+  /* Two children of one category used to replace each other, on the argument
+     that "lose belly fat" and "lose the last 10 pounds" are one goal said
+     twice. That is true of those two and false in general: under Build muscle,
+     Glutes and Arms are different muscle groups and goal-engine.mjs keys its
+     own dedupe on bubble AND child, so it already treats them as two goals and
+     prices them separately. The picker was refusing a combination the engine
+     supports. A pair that really is one goal twice resolves to the same
+     parameter entry and comes back named in meta.goals.ignored, which is the
+     right place to say so, after the plan is built rather than under a finger.
+     Untapping the main goal still promotes the first extra rather than leaving
+     extras with nothing to be extra to. */
   function choose(bubble, child) {
     if (isMain(bubble, child)) { primary = extras.shift() || null; return; }
     const at = extraAt(bubble, child);
     if (at >= 0) { extras.splice(at, 1); return; }
-    if (primary?.bubble === bubble) { primary = { bubble, child }; return; }
-    const same = extras.findIndex((e) => e.bubble === bubble);
-    if (same >= 0) { extras[same] = { bubble, child }; return; }
     if (!primary) { primary = { bubble, child }; return; }
     if (extras.length < MAX_EXTRA) { extras.push({ bubble, child }); return; }
-    toast("Two extra goals is the cap. Remove one first.");
+    toast(`${MAX_EXTRA} extra goals is the cap. Remove one first.`);
   }
 
   function paintGrid() {
     grid.classList.toggle("dim", !!openId);
     grid.innerHTML = GOAL_TILES.map((t) => {
       const main = primary?.bubble === t.id;
-      const also = extras.some((e) => e.bubble === t.id);
-      const badge = main ? `<span class="goal-tile-badge">Main</span>`
-        : also ? `<span class="goal-tile-badge alt">Also</span>` : "";
+      /* Counted, not just detected: one category can hold the main goal and an
+         extra at the same time now, and a badge that named only the first
+         thing it found would quietly under-report what the tile is holding. */
+      const alsoCount = extras.filter((e) => e.bubble === t.id).length;
+      const also = alsoCount > 0;
+      const badge = main
+        ? `<span class="goal-tile-badge">Main${alsoCount ? ` +${alsoCount}` : ""}</span>`
+        : also ? `<span class="goal-tile-badge alt">${alsoCount > 1 ? `${alsoCount} extras` : "Also"}</span>` : "";
       return `
       <button type="button" class="goal-tile${main || also ? " on" : ""}${also ? " also" : ""}" data-tile="${t.id}"
-        aria-label="${escapeHtml(t.title)}${main ? ", your main goal" : also ? ", an extra goal" : ""}">
+        aria-label="${escapeHtml(t.title)}${main ? ", your main goal" : ""}${alsoCount ? `, ${alsoCount} extra goal${alsoCount > 1 ? "s" : ""}` : ""}">
         ${badge}
         <span class="goal-tile-ico">${icon(t.ico, 18)}</span>
         <span class="goal-tile-label">${escapeHtml(t.title)}</span>
