@@ -2098,6 +2098,31 @@
   /* This week: seven columns, a dot per person per day. Filled with a tick
      when they trained, an empty ring when they did not, and today's column
      boxed with its own label. */
+  /* The deal, stated above the grid: what you each signed up for and how far
+     along the pair is. The pooled number is the only figure on Home that
+     belongs to neither of you, which is what stops it reading as a score. */
+  .pact-line { font-size: 14.5px; line-height: 1.45; color: var(--muted); margin: 2px 0 12px; }
+  .pact-line b { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pact-foot { margin-top: 12px; }
+  .pact-shared {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13.5px; color: var(--muted); margin: 0 0 10px;
+  }
+  .pact-shared b { color: var(--accent-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pact-act {
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 13px 14px; border-radius: 13px; cursor: pointer;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    font: inherit; font-size: 14.5px; font-weight: 700; letter-spacing: -.01em;
+  }
+  .pact-act:active { filter: brightness(.92); }
+  .pact-act .pact-av {
+    width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; font-size: 9.5px; font-weight: 800;
+    background: color-mix(in srgb, var(--partner) 18%, var(--panel)); color: var(--partner-ink);
+    border: 1.5px solid var(--partner);
+  }
+
   .wk-legend { display: flex; align-items: center; gap: 14px; font-size: 14px; font-weight: 600; color: var(--text); }
   .wk-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
   .wk-legend i.me { background: var(--me); }
@@ -3869,22 +3894,22 @@
 
     <div class="card" id="heroCard"></div>
 
-    <div class="card">
+    <!-- One card where there used to be two. The week grid was already the
+         right picture (a day reads DOWN its column: did we both go on
+         Wednesday, or just one of us) and the timeline above it was a preview
+         of the sheet that "See all" already opens, so Home was carrying the
+         same feed twice. What the grid never said out loud was the deal: what
+         you each signed up for, how far along the pair is, and what is left.
+         That is the pact line above it and the shared line under it. -->
+    <div class="card" id="weekTogetherCard">
       <div class="card-head">
-        <h2>This week <button type="button" class="info-dot" data-info="weekStrip" aria-label="What the day tiles mean">i</button></h2>
-        <div class="wk-legend" id="weekLegend"></div>
-      </div>
-      <!-- Seven columns, one dot per person per day, so a day reads down its
-           column: did we both go on Wednesday, or just one of us. -->
-      <div class="wk" id="weekGrid"></div>
-    </div>
-
-    <div class="card" id="timelineCard">
-      <div class="card-head">
-        <h2 id="timelineTitle">Together timeline</h2>
+        <h2 id="weekTogetherTitle">This week <button type="button" class="info-dot" data-info="weekStrip" aria-label="What the day tiles mean">i</button></h2>
         <button type="button" class="card-link ink" id="timelineAllBtn">See all <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
       </div>
-      <div id="timelineList"></div>
+      <p class="pact-line" id="pactLine"></p>
+      <div class="wk-legend" id="weekLegend"></div>
+      <div class="wk" id="weekGrid"></div>
+      <div class="pact-foot" id="pactFoot"></div>
     </div>
 
     <button type="button" class="card momentum" id="momentumCard">
@@ -4361,6 +4386,7 @@ let EXERCISE_TRAININGS = [{"id":"weight-training","label":"Weight Training","tra
 let LIBRARY_MUSCLES = null, LIBRARY_MUSCLES_FOR = -1;
 let MUSCLE_KEYWORD_RE = new Map();
 let SESSION_TIMER = null;
+let STRETCH_TICKER = null;
 /* The app's weekStartStr reads the real clock, which would put the fixture
    week out of range and leave every "this week" panel empty. Same rule,
    anchored to the fixture day instead. */
@@ -4772,6 +4798,70 @@ function renderTopStreak() {
 }
 
 
+function homeStreak() {
+  const together = sharedDayStreak();
+  if (together > 0) return { n: together, unit: "day", label: "Together", full: "Together streak" };
+  const weeks = sharedWeekStreak();
+  if (weeks > 0) return { n: weeks, unit: "week", label: "Together weeks", full: "Together week streak" };
+  const mine = computeStreak(ME);
+  if (mine > 0) return { n: mine, unit: "day", label: "Your streak", full: "Your streak" };
+  return null;
+}
+
+
+function computeStreak(name, asIfRested = null) {
+  const entries = entriesFor(name);
+  const gymDays = new Set(entries.filter((e) => e.gym).map((e) => e.entry_date));
+  const restDays = new Set(entries.filter((e) => e.rest_day).map((e) => e.entry_date));
+  if (asIfRested) restDays.add(asIfRested);
+  if (gymDays.size === 0) return 0;
+
+  let streak = 0;
+  let cursor = new Date(todayStr() + "T00:00:00");
+  if (!gymDays.has(todayStr()) && !restDays.has(todayStr())) cursor.setDate(cursor.getDate() - 1);
+  while (true) {
+    const key = isoDate(cursor);
+    if (gymDays.has(key)) { streak++; cursor.setDate(cursor.getDate() - 1); }
+    else if (restDays.has(key)) { cursor.setDate(cursor.getDate() - 1); }  // held, not counted
+    else break;
+  }
+  return streak;
+}
+
+
+function renderClipHomeCard() {
+  const home = $("tab-home");
+  if (!home) return;
+  let card = $("clipHomeCard");
+  const next = (!SESSION || SESSION.finished) ? CLIP_INBOX[0] : null;
+  if (!next) { card && card.classList.add("hidden"); return; }
+  if (!card) {
+    card = document.createElement("button");
+    card.type = "button";
+    card.id = "clipHomeCard";
+    card.className = "live-card";
+    home.insertBefore(card, $("liveCard") || home.firstChild);
+  }
+  const from = nameFor(next.from_email);
+  const more = CLIP_INBOX.length > 1 ? ` (${CLIP_INBOX.length})` : "";
+  card.innerHTML = `
+    <span class="live-av">${escapeHtml(initials(from))}</span>
+    <span class="live-body">
+      <span class="live-head"><span class="live-dot"></span><span class="live-label">Clip waiting</span></span>
+      <span class="live-name">${escapeHtml(from)} sent you a clip${more}</span>
+      <span class="live-what">${next.views ? "One watch left, then it is gone." : "Two watches, then it is gone."}</span>
+    </span>
+    <span class="live-go">${icon("chevronRight", 20)}</span>`;
+  card.classList.remove("hidden");
+  card.onclick = openNextClip;
+}
+
+
+function stopStretchTicker() {
+  if (STRETCH_TICKER) { clearInterval(STRETCH_TICKER); STRETCH_TICKER = null; }
+}
+
+
 function entryOn(name, date) {
   return entriesFor(name).find((e) => e.entry_date === date) || null;
 }
@@ -4802,6 +4892,7 @@ async function renderWeekStrips(animate = false) {
   const today = todayStr();
   const partner = PARTNER_EMAIL ? partnerName() : null;
 
+  renderPact();
   $("weekLegend").innerHTML = `<span><i class="me"></i>${escapeHtml(ME)}</span>`
     + (partner ? `<span><i class="them"></i>${escapeHtml(partner)}</span>` : "");
 
@@ -4940,22 +5031,61 @@ function wireTimeline(root) {
 }
 
 
-async function renderTimeline(animate = false) {
-  const el = $("timelineList");
-  if (!el) return;
-  const items = timelineSessions(3);
-  if (!items.length) {
-    el.innerHTML = `<div class="tl-empty">Nothing logged yet. Your first workout shows up here.</div>`;
+function sharedDaysThisWeek() {
+  if (!PARTNER_EMAIL) return 0;
+  const partner = partnerName();
+  return currentWeekDates().filter((d) =>
+    d <= todayStr() && !!entryOn(ME, d)?.gym && !!entryOn(partner, d)?.gym).length;
+}
+
+
+function renderPact() {
+  const line = $("pactLine");
+  const foot = $("pactFoot");
+  if (!line || !foot) return;
+
+  const ws = weekStartStr();
+  const myTarget = weeklyGoalFor(MY_EMAIL) || 0;
+  const mine = gymDaysInWeek(ME, ws);
+
+  if (!PARTNER_EMAIL) {
+    line.innerHTML = myTarget
+      ? `You said <b>${myTarget}</b> days this week. <b>${mine}</b> done.`
+      : `<b>${mine}</b> ${mine === 1 ? "day" : "days"} logged this week.`;
+    foot.innerHTML = "";
     return;
   }
-  el.innerHTML = (await Promise.all(items.map(timelineItemHTML))).join("");
-  if (animate) {
-    el.querySelectorAll(".tl-item").forEach((it, i) => {
-      it.style.setProperty("--d", `${320 + i * 70}ms`);
-      it.classList.add("h-rise");
-    });
-  }
-  wireTimeline(el);
+
+  const partner = partnerName();
+  const theirTarget = weeklyGoalFor(PARTNER_EMAIL) || 0;
+  const theirs = gymDaysInWeek(partner, ws);
+  const pool = myTarget + theirTarget;
+  const done = mine + theirs;
+  const left = Math.max(0, pool - done);
+
+  /* Same target on both sides is the common case and reads better as one
+     number ("5 each") than as an addition problem. */
+  const deal = myTarget && theirTarget
+    ? (myTarget === theirTarget
+        ? `You both said <b>${myTarget}</b> days.`
+        : `You said <b>${myTarget}</b>, ${escapeHtml(partner)} said <b>${theirTarget}</b>.`)
+    : "";
+  line.innerHTML = pool
+    ? `${deal} <b>${done}</b> of <b>${pool}</b> done between you.`
+    : `<b>${done}</b> between you this week.`;
+
+  const shared = sharedDaysThisWeek();
+  const sharedLine = shared > 0
+    ? `<b>${shared}</b> ${shared === 1 ? "day" : "days"} you both showed up.`
+    : (left > 0 ? `${left} left. Either of you can take them.` : "");
+
+  foot.innerHTML = `
+    ${sharedLine ? `<p class="pact-shared">${sharedLine}</p>` : ""}
+    <button type="button" class="pact-act" id="pactActBtn">
+      <span class="pact-av">${escapeHtml(initials(partner))}</span>
+      Send ${escapeHtml(partner)} something
+    </button>`;
+  $("pactActBtn").onclick = () => openNoteComposer("congratulate");
 }
 
 
@@ -7636,7 +7766,6 @@ async function renderHomeState() {
   renderTopStreak();
   await renderLiveCard();
   renderWeekStrips();
-  await renderTimeline();
   await settle();
   return '<div class="gal-inner">' + deId(header.outerHTML + home.innerHTML) + "</div>";
 }

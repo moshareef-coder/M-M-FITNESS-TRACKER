@@ -2119,6 +2119,31 @@
   /* This week: seven columns, a dot per person per day. Filled with a tick
      when they trained, an empty ring when they did not, and today's column
      boxed with its own label. */
+  /* The deal, stated above the grid: what you each signed up for and how far
+     along the pair is. The pooled number is the only figure on Home that
+     belongs to neither of you, which is what stops it reading as a score. */
+  .pact-line { font-size: 14.5px; line-height: 1.45; color: var(--muted); margin: 2px 0 12px; }
+  .pact-line b { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pact-foot { margin-top: 12px; }
+  .pact-shared {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13.5px; color: var(--muted); margin: 0 0 10px;
+  }
+  .pact-shared b { color: var(--accent-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pact-act {
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 13px 14px; border-radius: 13px; cursor: pointer;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    font: inherit; font-size: 14.5px; font-weight: 700; letter-spacing: -.01em;
+  }
+  .pact-act:active { filter: brightness(.92); }
+  .pact-act .pact-av {
+    width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; font-size: 9.5px; font-weight: 800;
+    background: color-mix(in srgb, var(--partner) 18%, var(--panel)); color: var(--partner-ink);
+    border: 1.5px solid var(--partner);
+  }
+
   .wk-legend { display: flex; align-items: center; gap: 14px; font-size: 14px; font-weight: 600; color: var(--text); }
   .wk-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
   .wk-legend i.me { background: var(--me); }
@@ -3558,22 +3583,22 @@
 
     <div class="card" id="heroCard"></div>
 
-    <div class="card">
+    <!-- One card where there used to be two. The week grid was already the
+         right picture (a day reads DOWN its column: did we both go on
+         Wednesday, or just one of us) and the timeline above it was a preview
+         of the sheet that "See all" already opens, so Home was carrying the
+         same feed twice. What the grid never said out loud was the deal: what
+         you each signed up for, how far along the pair is, and what is left.
+         That is the pact line above it and the shared line under it. -->
+    <div class="card" id="weekTogetherCard">
       <div class="card-head">
-        <h2>This week <button type="button" class="info-dot" data-info="weekStrip" aria-label="What the day tiles mean">i</button></h2>
-        <div class="wk-legend" id="weekLegend"></div>
-      </div>
-      <!-- Seven columns, one dot per person per day, so a day reads down its
-           column: did we both go on Wednesday, or just one of us. -->
-      <div class="wk" id="weekGrid"></div>
-    </div>
-
-    <div class="card" id="timelineCard">
-      <div class="card-head">
-        <h2 id="timelineTitle">Together timeline</h2>
+        <h2 id="weekTogetherTitle">This week <button type="button" class="info-dot" data-info="weekStrip" aria-label="What the day tiles mean">i</button></h2>
         <button type="button" class="card-link ink" id="timelineAllBtn">See all <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
       </div>
-      <div id="timelineList"></div>
+      <p class="pact-line" id="pactLine"></p>
+      <div class="wk-legend" id="weekLegend"></div>
+      <div class="wk" id="weekGrid"></div>
+      <div class="pact-foot" id="pactFoot"></div>
     </div>
 
     <button type="button" class="card momentum" id="momentumCard">
@@ -4260,7 +4285,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.12.1";
+const APP_VERSION = "2026.09.12.2";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -8449,9 +8474,6 @@ function renderHero(animate = false) {
    invitation. */
 function renderPairCopy() {
   const paired = !!PARTNER_EMAIL;
-  const title = $("timelineTitle");
-  if (title) title.textContent = paired ? "Together timeline" : "Your timeline";
-
   const mTitle = $("momentumTitle");
   const mBody = $("momentumBody");
   if (mTitle && mBody) {
@@ -8487,7 +8509,19 @@ function momentumCopy(paired) {
   if (theirs === 0) {
     return { title: `You are ${mine} in this week.`, body: `${partner} has not logged one yet.` };
   }
-  return { title: `${mine + theirs} workouts between you this week.`, body: "Momentum is real. Keep it going." };
+  /* The pooled count moved to the pact line, directly above the grid that
+     explains it, so repeating it here was the same number twice on one
+     screen. This slot says the thing that line cannot: who the week is
+     actually waiting on. */
+  const myLeft = Math.max(0, target - mine);
+  const theirLeft = Math.max(0, theirTarget - theirs);
+  if (myLeft && !theirLeft) {
+    return { title: `${partner} is done for the week.`, body: `You are ${myLeft} short.` };
+  }
+  if (theirLeft && !myLeft) {
+    return { title: "You are done for the week.", body: `${partner} is ${theirLeft} short.` };
+  }
+  return { title: `${myLeft + theirLeft} to go between you.`, body: "Either of you can take the next one." };
 }
 
 /* The header pill: the same streak the hero badge shows, never a second one,
@@ -8606,10 +8640,73 @@ async function dotHTML(name, email, date, cls) {
   return `<span class="dot" role="img" aria-label="${escapeHtml(name)}, ${relDayLabel(date)}, nothing logged"></span>`;
 }
 
+/* Days this week where BOTH of you trained. The pair's own number: neither
+   person can move it alone, which is exactly why it is the one worth printing
+   on a screen that is trying not to be a scoreboard. */
+function sharedDaysThisWeek() {
+  if (!PARTNER_EMAIL) return 0;
+  const partner = partnerName();
+  return currentWeekDates().filter((d) =>
+    d <= todayStr() && !!entryOn(ME, d)?.gym && !!entryOn(partner, d)?.gym).length;
+}
+
+/* The deal, and where the two of you are inside it. Paired alone gets the
+   pooled version; on your own there is no pact to state, so it degrades to
+   your own number rather than inventing a partner. */
+function renderPact() {
+  const line = $("pactLine");
+  const foot = $("pactFoot");
+  if (!line || !foot) return;
+
+  const ws = weekStartStr();
+  const myTarget = weeklyGoalFor(MY_EMAIL) || 0;
+  const mine = gymDaysInWeek(ME, ws);
+
+  if (!PARTNER_EMAIL) {
+    line.innerHTML = myTarget
+      ? `You said <b>${myTarget}</b> days this week. <b>${mine}</b> done.`
+      : `<b>${mine}</b> ${mine === 1 ? "day" : "days"} logged this week.`;
+    foot.innerHTML = "";
+    return;
+  }
+
+  const partner = partnerName();
+  const theirTarget = weeklyGoalFor(PARTNER_EMAIL) || 0;
+  const theirs = gymDaysInWeek(partner, ws);
+  const pool = myTarget + theirTarget;
+  const done = mine + theirs;
+  const left = Math.max(0, pool - done);
+
+  /* Same target on both sides is the common case and reads better as one
+     number ("5 each") than as an addition problem. */
+  const deal = myTarget && theirTarget
+    ? (myTarget === theirTarget
+        ? `You both said <b>${myTarget}</b> days.`
+        : `You said <b>${myTarget}</b>, ${escapeHtml(partner)} said <b>${theirTarget}</b>.`)
+    : "";
+  line.innerHTML = pool
+    ? `${deal} <b>${done}</b> of <b>${pool}</b> done between you.`
+    : `<b>${done}</b> between you this week.`;
+
+  const shared = sharedDaysThisWeek();
+  const sharedLine = shared > 0
+    ? `<b>${shared}</b> ${shared === 1 ? "day" : "days"} you both showed up.`
+    : (left > 0 ? `${left} left. Either of you can take them.` : "");
+
+  foot.innerHTML = `
+    ${sharedLine ? `<p class="pact-shared">${sharedLine}</p>` : ""}
+    <button type="button" class="pact-act" id="pactActBtn">
+      <span class="pact-av">${escapeHtml(initials(partner))}</span>
+      Send ${escapeHtml(partner)} something
+    </button>`;
+  $("pactActBtn").onclick = () => openNoteComposer("congratulate");
+}
+
 async function renderWeekStrips(animate = false) {
   const today = todayStr();
   const partner = PARTNER_EMAIL ? partnerName() : null;
 
+  renderPact();
   $("weekLegend").innerHTML = `<span><i class="me"></i>${escapeHtml(ME)}</span>`
     + (partner ? `<span><i class="them"></i>${escapeHtml(partner)}</span>` : "");
 
@@ -9432,24 +9529,6 @@ function wireTimeline(root) {
   hydrateAvatars(root);
 }
 
-async function renderTimeline(animate = false) {
-  const el = $("timelineList");
-  if (!el) return;
-  const items = timelineSessions(3);
-  if (!items.length) {
-    el.innerHTML = `<div class="tl-empty">Nothing logged yet. Your first workout shows up here.</div>`;
-    return;
-  }
-  el.innerHTML = (await Promise.all(items.map(timelineItemHTML))).join("");
-  if (animate) {
-    el.querySelectorAll(".tl-item").forEach((it, i) => {
-      it.style.setProperty("--d", `${320 + i * 70}ms`);
-      it.classList.add("h-rise");
-    });
-  }
-  wireTimeline(el);
-}
-
 async function toggleReaction(email, date, btn) {
   if ((email || "").toLowerCase() === MY_EMAIL) return;   // a cheer from you to you is not a cheer
   const rx = reactionsFor(email, date);
@@ -9464,7 +9543,6 @@ async function toggleReaction(email, date, btn) {
     if (error) { toast("Couldn't send"); console.error(error); btn.disabled = false; return; }
     ALL_REACTIONS = [...(data || []), ...ALL_REACTIONS];
   }
-  renderTimeline();
   if (!$("timelineScrim").classList.contains("hidden")) openTimelineSheet();
 }
 
@@ -9529,7 +9607,6 @@ function openSessionComment(email, date) {
     ALL_REACTIONS = [...(data || []), ...ALL_REACTIONS];
     close();
     toast("Posted");
-    renderTimeline();
     if (!$("timelineScrim").classList.contains("hidden")) openTimelineSheet();
   };
 }
@@ -10093,7 +10170,6 @@ function renderHome(animate = false) {
   renderPartnerNotice();
   renderClipPill();
   renderWeekStrips(animate);
-  renderTimeline(animate);
   renderRestDayPrompt();
   renderEncouragementBanner();
   // Last, so every card has settled whether it is showing before they stagger.

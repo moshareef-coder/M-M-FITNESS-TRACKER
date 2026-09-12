@@ -41,8 +41,19 @@ const PROGRESS_TAB = grab(/ {2}<!-- PROGRESS TAB -->\n([\s\S]*?)\n {2}<!-- SETUP
 
 const FUNCS = [
   "icon", "personRing", "hydrateAvatars", "renderHero", "renderTopStreak",
+  /* The streak family and two Home cards that other work added without
+     telling the gallery, so 16 states were rendering the "this state threw"
+     placeholder instead of a screen. Found by dumping the rendered DOM and
+     grepping for that marker, which is the only way this stays honest. */
+  /* sharedDayStreak and sharedWeekStreak are deliberately NOT here: the
+     gallery stubs them below so a state can set the streak it wants to show. */
+  "homeStreak", "computeStreak", "renderClipHomeCard", "stopStretchTicker",
   "entryOn", "dotHTML", "renderWeekStrips",
-  "timelineSessions", "reactionsFor", "nameFor", "timelineItemHTML", "wireTimeline", "renderTimeline",
+  "timelineSessions", "reactionsFor", "nameFor", "timelineItemHTML", "wireTimeline",
+  /* Home no longer previews the timeline: the week card and the feed were
+     merged, and the feed lives behind "See all". renderPact fills the line
+     above the grid and the shared line under it. */
+  "sharedDaysThisWeek", "renderPact",
   "liveAgeMs", "liveStateLabel", "renderLiveCard", "renderLiveSheet",
   "classifyMuscles", "normalizeSearch", "libraryMuscles", "muscleWords", "muscleKeywordHit",
   "bestEverFor", "bodyHiddenToday", "stopSessionTimer", "defaultTrackedMetrics",
@@ -820,6 +831,7 @@ let EXERCISE_TRAININGS = ${JSON.stringify(EXERCISE_TRAININGS_REAL)};
 let LIBRARY_MUSCLES = null, LIBRARY_MUSCLES_FOR = -1;
 let MUSCLE_KEYWORD_RE = new Map();
 let SESSION_TIMER = null;
+let STRETCH_TICKER = null;
 /* The app's weekStartStr reads the real clock, which would put the fixture
    week out of range and leave every "this week" panel empty. Same rule,
    anchored to the fixture day instead. */
@@ -1254,7 +1266,6 @@ async function renderHomeState() {
   renderTopStreak();
   await renderLiveCard();
   renderWeekStrips();
-  await renderTimeline();
   await settle();
   return '<div class="gal-inner">' + deId(header.outerHTML + home.innerHTML) + "</div>";
 }
