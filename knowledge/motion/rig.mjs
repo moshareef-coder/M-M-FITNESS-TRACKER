@@ -126,17 +126,21 @@ export const BODY = {
   spine: 30, neck: 7.4, headOff: 8.0,
   upperArm: 20, forearm: 17, hand: 8.6,
   thigh: 27, shin: 25, foot: 12,
-  rPelvis: 9.3, rWaist: 7.9, rChest: 12.3,
-  rNeckTop: 4.2, rNeckBot: 5.6,
+  // Radii are the slim silhouette Mo approved in the first prototype, taken
+  // in a further ten percent, and every mid-limb radius sits below the joint
+  // above it so limbs taper instead of bulging. The previous set (chest 12.3,
+  // thigh mid 8.7 over a hip of 8.0) read as heavy, and he said so.
+  rPelvis: 8.4, rWaist: 7.0, rChest: 10.6,
+  rNeckTop: 4.0, rNeckBot: 5.2,
   rHeadBack: 7.3, rHeadJaw: 5.4,
-  rShoulder: 7.0, rDelt: 8.1, rElbow: 5.4, rWrist: 4.0,
-  rUpperArmMid: 6.6, rForearmMid: 5.2,
-  rHandA: 4.0, rHandB: 2.9, rThumb: 2.1,
-  rHip: 8.0, rThighMid: 8.7, rKnee: 6.3,
-  rCalf: 6.9, rAnkle: 4.4, rToe: 3.2, rHeel: 4.0,
-  shoulderW: 13.4, hipW: 6.2, depth: 1.7,
+  rShoulder: 6.2, rDelt: 6.6, rElbow: 4.7, rWrist: 3.6,
+  rUpperArmMid: 5.5, rForearmMid: 4.4,
+  rHandA: 3.5, rHandB: 2.6, rThumb: 1.9,
+  rHip: 7.2, rThighMid: 7.0, rKnee: 5.5,
+  rCalf: 5.6, rAnkle: 4.4, rToe: 2.8, rHeel: 3.5,
+  shoulderW: 12.6, hipW: 6.2, depth: 1.7,
   // hand v2
-  palm: 5.0, palmHalf: 2.9, finger: 4.4, rPalm: 3.0, rFinger: 2.4, thumb: 5.0,
+  palm: 5.0, palmHalf: 2.7, finger: 4.4, rPalm: 2.7, rFinger: 2.1, thumb: 5.0,
 };
 export const LEG_TO_FLOOR = BODY.thigh + BODY.shin + BODY.rAnkle;
 
