@@ -127,15 +127,18 @@ export function palette(theme = "dark", accent = "action", skin = "mannequin") {
   // neutral silhouette with flat dark muscle plates and thin light seams. Base
   // stays neutral rather than accent tinted, because the plates are the thing
   // carrying colour once a move lights the muscles it works.
-  const skinBase = dark ? "#dcdfea" : "#b9bfcd";
+  // Light mode lifts the whole skin a step: a charcoal figure with charcoal
+  // plates on white read as a silhouette in the session card and the lit
+  // muscle had nothing to stand out from.
+  const skinBase = dark ? "#dcdfea" : "#cdd3de";
   return {
     skin,
     bg: T.bg,
     surface: T.surface,
     ink: skin === "anatomy" ? skinBase : ink,
     mannequinInk: ink,
-    plate: dark ? "#232a31" : "#2b323b",
-    plateFar: dark ? "#1a2027" : "#555d6a",
+    plate: dark ? "#232a31" : "#4f5967",
+    plateFar: dark ? "#1a2027" : "#7b8593",
     seam: skin === "anatomy" ? (dark ? "#dcdfea" : "#cfd4de") : T.bg,
     inkHi: skin === "anatomy" ? (dark ? mix(skinBase, "#ffffff", 0.3) : mix(skinBase, "#ffffff", 0.35))
       : (dark ? mix(ink, "#ffffff", 0.16) : mix(ink, T.bg, 0.14)),

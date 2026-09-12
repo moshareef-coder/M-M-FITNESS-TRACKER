@@ -1389,6 +1389,23 @@
   }
   .cb-chip.on { background: var(--accent); border-color: transparent; color: var(--on-accent); }
 
+  /* The moving figure (knowledge/motion). One canvas per [data-fig]; a name
+     with no move yet keeps whatever fallback the element already held, so
+     rows and cards look exactly as before until the animation exists. */
+  [data-fig] canvas { display: block; margin: 0 auto; }
+  .cb-fig { height: 88px; margin: -2px 0 -4px; }
+  .cb-fig canvas { width: 88px; height: 88px; }
+  .cb-fig.fig-none { display: none; }
+  .exercise-row .ex-icon.fig-live { width: 46px; height: 46px; background: transparent; }
+  .exercise-row .ex-icon.fig-live canvas { width: 46px; height: 46px; }
+  .sess-fig { display: flex; justify-content: center; margin: 4px 0 2px; }
+  .sess-fig canvas { width: 156px; height: 156px; }
+  .sess-fig.fig-none { display: none; }
+  .stretch-fig { display: flex; justify-content: center; margin: 6px 0 4px; }
+  .stretch-fig canvas { width: 176px; height: 176px; }
+  .stretch-fig.fig-none { display: none; }
+  .cb-confirm-fig canvas { width: 124px; height: 124px; margin-bottom: 2px; }
+  .cb-confirm-fig.fig-none { display: none; }
   .cb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
   .cb-card {
     position: relative; overflow: hidden; text-align: left; cursor: pointer; font: inherit;
@@ -4530,6 +4547,7 @@ function shiftDate(dateStr, days) {
 
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme === "light" ? "light" : "dark");
+  if (typeof retintMotionFigures === "function") retintMotionFigures();
 }
 
 
@@ -12676,6 +12694,8 @@ function renderStretchPhase() {
           return text ? `<span class="sess-target">${escapeHtml(text)}</span>` : "";
         })()}
       </div>
+      <div class="stretch-fig" data-fig="${escapeHtml(move.name || "")}" data-accent="stretch" data-skin="anatomy"
+        data-lit="${escapeHtml(move.group || "")}" data-lit-color="stretch"></div>
       ${move.cue ? `<div class="sess-note">${escapeHtml(move.cue)}</div>` : ""}
     </div>
 
@@ -12695,6 +12715,7 @@ function renderStretchPhase() {
 
   $("stretchNext").onclick = stretchAdvance;
   $("stretchSkipAll").onclick = skipStretchPhase;
+  mountMotionFigures($("sessionBody"));
   startStretchTicker();
 }
 
@@ -12782,6 +12803,7 @@ function renderSession() {
           : `Best ${pbWeight} lb${pbReps ? ` × ${pbReps}` : ""}`}</span>` : ""}
       </div>
       ${ex.note ? `<div class="sess-note">${escapeHtml(ex.note)}</div>` : ""}
+      <div class="sess-fig" data-fig="${escapeHtml(ex.name)}" data-skin="anatomy" data-lit="${escapeHtml(motionLitFor(ex.name))}"></div>
       ${workingMusclesHTML(ex.name, { who: "me", size: "sm", email: MY_EMAIL })}
 
       <div class="set-circles">
@@ -12852,6 +12874,7 @@ function renderSession() {
     })()}
     <button type="button" class="link-danger" id="endWorkoutBtn">End workout here</button>`;
 
+  mountMotionFigures($("sessionBody"));
   if (resting) startRestTicker();
   else stopRestTicker();
 
@@ -14648,6 +14671,7 @@ function cbRenderGrid() {
   const chosen = new Set(cbList().map((e) => e.name));
   grid.innerHTML = list.map((ex, i) => `
     <button type="button" class="cb-card${chosen.has(ex.name) ? " picked" : ""}" data-pick="${escapeHtml(ex.name)}" style="--d:${Math.min(i, 12) * 22}ms">
+      <span class="cb-fig" data-fig="${escapeHtml(ex.name)}"></span>
       <span class="cb-card-name">${escapeHtml(ex.name)}</span>
       <span class="cb-card-meta">${escapeHtml(ex.equipment || "")}${ex.level ? ` · ${escapeHtml(ex.level)}` : ""}</span>
       <span class="cb-tick">${icon("check", 26)}</span>
@@ -14662,6 +14686,7 @@ function cbRenderGrid() {
       cbConfirmStep(ex);
     };
   });
+  mountMotionFigures(grid);
 }
 
 function cbRenderOwn(query) {
@@ -14705,6 +14730,7 @@ function cbConfirmStep(ex, { editIndex = null } = {}) {
         <button type="button" class="ds-x" id="cbPickX" aria-label="Close">&times;</button>
       </div>
       <div class="cb-confirm">
+        <div class="cb-confirm-fig" data-fig="${escapeHtml(CB_PENDING.name)}"></div>
         <div class="cb-confirm-name">${escapeHtml(CB_PENDING.name)}</div>
         <div class="cb-confirm-meta">${escapeHtml(CB_PENDING.meta || "")}</div>
         <div class="cb-dials">
@@ -14740,6 +14766,7 @@ function cbConfirmStep(ex, { editIndex = null } = {}) {
       </div>`;
     $("cbPickX").onclick = cbClosePicker;
     $("cbBackBtn").onclick = editing ? cbClosePicker : cbRenderPicker;
+    mountMotionFigures($("cbPickSheet"));
     $("cbPickSheet").querySelectorAll("[data-d]").forEach((b) => {
       b.onclick = () => {
         const [field, delta] = b.dataset.d.split(":");
@@ -15217,7 +15244,7 @@ function renderPlanPreview() {
     const doneMark = isDone ? icon("check") : icon("dumbbell");
     return `<div class="exercise-row ${isDone ? "ex-done" : ""} ${started ? "" : "draggable"}" data-idx="${i}">
       ${started ? "" : `<button type="button" class="grip" data-grip aria-label="Drag to reorder">${icon("grip", 16)}</button>`}
-      <div class="ex-icon">${doneMark}</div>
+      <div class="ex-icon"${isDone ? "" : ` data-fig="${escapeHtml(ex.name)}"`}>${doneMark}</div>
       <button type="button" class="ex-body ex-tap" data-plan-edit="${i}"${isDone ? " disabled" : ""}>
         <div class="ex-name">${escapeHtml(ex.name)}</div>
         <div class="ex-target">${ex.sets} sets · ${ex.reps} reps${Number(ex.targetWeight) > 0 ? ` · ${ex.targetWeight} lb` : ""}${isDone ? "" : ` ${icon("pencil", 11)}`}</div>
@@ -15250,6 +15277,7 @@ function renderPlanPreview() {
            </button>` : ""}
          <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume Workout" : "Begin Workout"}</button>
          ${started || isCoachedClient() ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`}`;
+  mountMotionFigures($("workoutContent"));
 
   makeReorderable($("planRows"), async (order) => {
     TODAY_WORKOUT.exercises = order.map((i) => TODAY_WORKOUT.exercises[i]);
@@ -15807,6 +15835,70 @@ function ensureRiveRuntime() {
       });
   }
   return riveRuntimePromise;
+}
+
+/* Exercise animations: the procedural figure in knowledge/motion, one move
+   per library name. Loaded on first use like the body figure, then mounted
+   into every [data-fig] a screen just rendered. Screens replace innerHTML
+   wholesale, so controllers whose canvas has left the document are destroyed
+   on the next pass instead of each render leaving one more rAF subscriber. */
+let motionPromise = null;
+function ensureMotionModule() {
+  if (!motionPromise) {
+    motionPromise = import("./knowledge/motion/index.mjs").catch((e) => { console.error(e); motionPromise = null; return null; });
+  }
+  return motionPromise;
+}
+const MOTION_MOUNTS = new Set();
+function currentTheme() {
+  return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+}
+function heatHex(pct) {
+  const c = bodyHeatRGB(pct);
+  return "#" + [c.r, c.g, c.b].map((v) => v.toString(16).padStart(2, "0")).join("");
+}
+/* Which groups to light on the anatomy skin: the library's primary muscles,
+   the same list the "You are working" legend prints, so the figure and the
+   words never disagree. */
+function motionLitFor(exerciseName) {
+  const want = String(exerciseName || "").toLowerCase();
+  for (const t of EXERCISE_TRAININGS) {
+    for (const c of t.categories || []) {
+      const hit = (c.exercises || []).find((e) => e.name.toLowerCase() === want);
+      if (hit) return (hit.primary || []).join(",");
+    }
+  }
+  return "";
+}
+async function mountMotionFigures(root) {
+  const scope = root || document;
+  const targets = [...scope.querySelectorAll("[data-fig]:not([data-fig-done])")];
+  if (!targets.length) return;
+  const mod = await ensureMotionModule();
+  if (!mod) return;
+  for (const m of [...MOTION_MOUNTS]) {
+    if (!m.canvas.isConnected) { m.ctl.destroy(); MOTION_MOUNTS.delete(m); }
+  }
+  for (const el of targets) {
+    if (!el.isConnected || el.hasAttribute("data-fig-done")) continue;
+    el.setAttribute("data-fig-done", "1");
+    const name = el.dataset.fig;
+    if (!mod.hasMove(name)) { el.classList.add("fig-none"); continue; }
+    const canvas = document.createElement("canvas");
+    let litColor = el.dataset.litColor || heatHex(0.67);
+    if (litColor === "stretch") litColor = getComputedStyle(document.documentElement).getPropertyValue("--stretch").trim() || "#2ea8ff";
+    const lit = el.dataset.lit ? { muscles: el.dataset.lit.split(",").filter(Boolean), color: litColor } : null;
+    el.replaceChildren(canvas);
+    const ctl = mod.mountMove(canvas, name, {
+      theme: currentTheme(), accent: el.dataset.accent || "action", skin: el.dataset.skin || "mannequin", lit,
+    });
+    if (!ctl) { canvas.remove(); el.classList.add("fig-none"); continue; }
+    el.classList.add("fig-live");
+    MOTION_MOUNTS.add({ canvas, ctl });
+  }
+}
+function retintMotionFigures() {
+  for (const m of MOTION_MOUNTS) if (m.canvas.isConnected) m.ctl.setTheme(currentTheme());
 }
 
 function ensureRiveBodyModule() {

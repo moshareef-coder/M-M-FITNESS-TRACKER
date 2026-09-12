@@ -113,6 +113,22 @@
         note: "Start opens on the warm-up, not the bench. One move at a time with a countdown on the same strip the rest timer uses, the cue under the name, Next to skip a hold, Skip warm-up to drop the block for today (remembered on the plan, so it does not come back on reopen). The clock rolls the next move in on its own. Nothing here is a set: the exercise log stays exactly as it was until the first lift.",
         run: (w) => { w.switchTab("workout"); w.startWorkout(); } },
 
+      { t: "Exercise figures", scenario: "paired",
+        s: "The moving figure on rows, cards and the session",
+        note: "Plan rows, picker cards, the confirm sheet, the warm-up and the session card all carry the same drawn figure from knowledge/motion, animating the move. A name with no move yet keeps the old dumbbell icon, so nothing looks broken while the library fills in. Open Add exercise and the Chest chips to see the cards; Begin Workout to see the warm-up in blue with the chest lit and the bench press on the session card with its working muscles lit.",
+        run: (w) => {
+          w.TODAY_WORKOUT.exercises = [
+            { name: "Barbell Bench Press", sets: 3, reps: 8 },
+            { name: "Goblet Squat", sets: 3, reps: 10 },
+            { name: "Face Pull", sets: 3, reps: 15 },
+          ];
+          w.TODAY_WORKOUT.mobility = { warmup: [
+            { name: "Doorway Pec Stretch", seconds: 30, kind: "static", group: "chest", cue: "Palm flat on the frame, step through until the chest opens." },
+            { name: "Band Pull-Apart", seconds: 30, kind: "dynamic", group: "back" },
+          ], cooldown: [] };
+          w.switchTab("workout"); w.renderPlanPreview();
+        } },
+
       { t: "Do the workout", scenario: "paired",
         s: "Five exercises, live timer",
         note: "The real session screen on today's push day, reached the way Next through the warm-up reaches it. Log sets, change weights, tap through exercises. Weight and reps should sit on the same baseline in every row. Finish it and the cool-down runs, then the completion screen banks the workout into the fake database.",
