@@ -22,7 +22,7 @@ somebody on day zero who has answered nothing, and it does.
 
 | field | type | read by | what it does |
 |---|---|---|---|
-| `user_name` | text | function | greeting only, never reaches the engine |
+| ~~`user_name`~~ | | | **removed 2026-09-12.** The client no longer sends it and the function deletes it, along with `name`, `email`, `user_email` and `partner_name`, before anything reads the payload. Nothing in the engine ever wanted a name; privacy.html now promises none is collected here |
 | `goal` | text | engine | one of the five legacy strings ("Lose weight", "Build muscle", "Get stronger", "Recomp (lose fat, gain muscle)", "Stay consistent") |
 | `goal_detail` | text | engine | the free text sentence. Matched against the alias table, and a confident match can outrank the button |
 | `goal_bubble` | text | engine | a goal-tree bubble id, from the tile picker. Nine of them: `lose-weight`, `build-muscle`, `get-stronger`, `tone-lean-abs`, `do-a-thing`, `event`, `feel-better`, `get-back`, `consistent`. A valid one beats `goal` and `goal_detail` |
@@ -122,7 +122,7 @@ bodyweight only pull day honestly has no curl in it).
 | `stretching.cooldownMinutes` | number | **new.** Rounded minutes of the cool-down. On top of the session: five by default, ten for the `flexibility` and `mobility` goal children |
 | `stretching.mobilityGoal` | bool | **new.** The goal child is one of those two, so the cool-down is the ten minute hips and upper back block the goal tree asks for |
 | `stretching.why` | text[] | **new.** Plain sentences: what was picked, for which groups, and what a joint limit left out |
-| `source` | text | `engine` or `llm` |
+| `source` | text | always `engine`. The `llm` path was removed 2026-09-12; the key stays so a reader of an older stored plan can still tell which built it |
 | `goalSource` | text | `tiles` if `goal_bubble` was valid, `legacy` if the five strings and the free text were parsed |
 | `logsSource` | text | `logs` / `history` / `none` |
 | `missing` | text[] | what would have sharpened the plan and was not there, in plain words |
