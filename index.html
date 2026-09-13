@@ -1417,15 +1417,19 @@
   .sess-card.sess-sets { padding-top: 6px; padding-bottom: 6px; }
   .sess-card.sess-sets .set-circles { border-top: 0; margin-top: 4px; padding-top: 4px; }
   .sess-card.sess-bottom { margin-top: 12px; }
-  /* The set button stays pinned to the bottom of the screen: it sits last in
-     the flow and sticks up from below, so it is always reachable without a
-     scroll and settles into place at the very end. */
+  /* One bar, fixed to the bottom of the session screen. Sticky drew the
+     button twice on a long screenshot, once pinned and once in place, and a
+     gradient over the content read as floating. This is a solid bar the page
+     scrolls under, and the overlay reserves room so nothing hides behind it. */
   .sess-cta {
-    position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 6px); z-index: 3;
-    margin: 14px -4px 0; padding: 10px 4px 0;
-    background: linear-gradient(to top, var(--bg) 72%, transparent);
+    position: fixed; left: 0; right: 0; z-index: 4;
+    bottom: 0; padding: 12px 18px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg); border-top: 1px solid var(--border);
   }
-  .sess-cta .btn-big { margin: 0; }
+  .sess-cta .btn-big {
+    margin: 0; min-height: 62px; font-size: 19px; border-radius: 18px;
+  }
+  .session-overlay { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
   .sess-card.sess-bottom .sess-note { margin-bottom: 8px; }
   .sess-fig.fig-none { display: none; }
   .stretch-fig { display: flex; justify-content: center; margin: 6px 0 4px; }
@@ -12696,9 +12700,9 @@ function askPauseOrEnd() {
             <div class="pop-who" style="color:var(--muted)">HOLD ON</div>
             <button type="button" class="ds-x" data-choice="" aria-label="Close">&times;</button>
           </div>
-          <button type="button" class="btn-primary" data-choice="pause" style="margin-top:8px;">Pause workout</button>
+          <button type="button" class="btn-primary" data-choice="" style="margin-top:8px;">Keep going</button>
+          <button type="button" class="btn-ghost" data-choice="pause">Pause workout</button>
           <button type="button" class="btn-ghost" data-choice="end" style="color:var(--danger, #ff5c5c);">End workout here</button>
-          <button type="button" class="btn-ghost" data-choice="">Keep going</button>
         </div>
       </div>`;
     document.body.appendChild(scrim);
@@ -13710,10 +13714,9 @@ function renderSession() {
         </div>
       </div>`;
     })()}
-    <div class="sess-card sess-bottom">
-      ${ex.note ? `<div class="sess-note">${escapeHtml(ex.note)}</div>` : ""}
-      ${workingMusclesHTML(ex.name, { who: "me", size: "sm", email: MY_EMAIL })}
-    </div>
+    ${ex.note ? `<div class="sess-card sess-bottom">
+      <div class="sess-note">${escapeHtml(ex.note)}</div>
+    </div>` : ""}
     <div class="sess-cta">
       <button type="button" class="btn-big btn-primary ${allDone ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>
       <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">${SESSION.completed.some((c, i) => !c && i !== ei) ? "Next exercise" : "Finish workout"}</button>
