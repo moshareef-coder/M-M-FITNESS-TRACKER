@@ -1438,7 +1438,7 @@
 
   /* Weight and reps side by side: two thirds of the height they used to take,
      which is what let the figure and the progress both stay on screen. */
-  .sess-entry { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .sess-entry { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-bottom: 12px; }
   .sess-entry-cell {
     background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
     padding: 10px 10px 12px; text-align: center;
@@ -1466,14 +1466,27 @@
   #sessionBody .sess-progress-now span { font-size: 15px; font-weight: 700; }
   #sessionBody .sess-progress-sets { font-size: 15px; font-weight: 700; letter-spacing: 0; text-transform: none; }
   #sessionBody .sess-progress-pips { margin: 8px 0 0; }
-  #sessionBody .sess-name { font-size: 30px; letter-spacing: -.03em; margin-top: 2px; }
+  /* The name and the two action chips share one line: the chips used to sit
+     on a row of their own above the title, which read as a floating toolbar.
+     The sets and reps line is gone, the set circles say it already. */
+  #sessionBody .sess-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  #sessionBody .sess-name { font-size: 28px; letter-spacing: -.03em; margin: 0; min-width: 0; }
+  #sessionBody .sess-step-acts { flex-shrink: 0; }
   #sessionBody .set-circles { gap: 10px; margin: 14px 0 0; }
   /* The entry row: two numbers, a hairline between them, nothing around them. */
   #sessionBody .sess-entry {
     gap: 0; margin: 4px 0 0; padding: 14px 0 2px;
     border-top: 1px solid var(--border);
   }
+  /* The minus, the number and the plus are one tight cluster in the middle of
+     each half, with room either side, so the controls do not hug the divider
+     or the screen edge. */
+  #sessionBody .sess-entry-cell { padding: 0 8px; min-width: 0; }
   #sessionBody .sess-entry-cell + .sess-entry-cell { border-left: 1px solid var(--border); }
+  #sessionBody .sess-entry-ctl { gap: 10px; }
+  #sessionBody .sess-entry-ctl .sess-input {
+    width: auto; min-width: 0; max-width: 74px; flex: 1 1 auto; text-align: center;
+  }
   #sessionBody .sess-entry-label { font-size: 12px; letter-spacing: .08em; }
   #sessionBody .sess-entry-ctl .sess-input {
     font-size: 34px; font-weight: 800; letter-spacing: -.02em;
@@ -1486,7 +1499,30 @@
      ruled line across the screen. */
   .sess-cta { border-top: 0; }
   .sess-cta .btn-big { border-radius: 999px; }
-  #sessionBody .switch-chip { border-radius: 999px; }
+  /* Up next: a horizontal rail that snaps, so two or three sit on screen and
+     the rest are a swipe away. */
+  .upnext { margin: 18px -18px 4px; }
+  .upnext-label {
+    font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); margin: 0 18px 10px;
+  }
+  .upnext-rail {
+    display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory;
+    padding: 0 18px 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .upnext-rail::-webkit-scrollbar { display: none; }
+  .upnext-card {
+    flex: 0 0 auto; scroll-snap-align: start; cursor: pointer; font-family: inherit;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+    min-width: 140px; max-width: 190px; padding: 12px 14px; border-radius: 16px;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text); text-align: left;
+  }
+  .upnext-card:active { border-color: var(--accent); }
+  .upnext-name {
+    font-size: 14.5px; font-weight: 700; line-height: 1.25;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+  }
+  .upnext-meta { font-size: 12.5px; color: var(--muted); }
   /* One bar, fixed to the bottom of the session screen. Sticky drew the
      button twice on a long screenshot, once pinned and once in place, and a
      gradient over the content read as floating. This is a solid bar the page
@@ -12948,23 +12984,24 @@ function renderSession() {
     </div>
 
     <div class="sess-card${exChanged ? " ex-in" : ""}">
-      <div class="sess-step-row">
+      <div class="sess-head">
+        <h2 class="sess-name">${escapeHtml(ex.name)}</h2>
         <div class="sess-step-acts">
           <button type="button" class="wp-chip" id="sessSwapBtn" aria-label="Swap this exercise">${icon("swap", 14)}</button>
           ${PARTNER_EMAIL ? `<button type="button" class="wp-chip${workoutPrivacyLocked() ? " on" : ""}" id="sessPrivacyBtn"
             aria-label="Who can see this workout">${icon(workoutPrivacyLocked() ? "lock" : "people", 14)}</button>` : ""}
         </div>
       </div>
-      <h2 class="sess-name">${escapeHtml(ex.name)}</h2>
-      <div class="sess-meta">
-        <span class="sess-target">${ex.sets} sets × ${ex.reps} reps</span>
-        ${pbWeight != null ? `<span class="sess-best${beatenPB ? " beaten" : ""}">${icon("trophy", 13)}${beatenPB
+      ${pbWeight != null ? `<div class="sess-meta">
+        <span class="sess-best${beatenPB ? " beaten" : ""}">${icon("trophy", 13)}${beatenPB
           ? `Beat it, was ${pbWeight} lb`
-          : `Best ${pbWeight} lb${pbReps ? ` × ${pbReps}` : ""}`}</span>` : ""}
-      </div>
+          : `Best ${pbWeight} lb${pbReps ? ` × ${pbReps}` : ""}`}</span>
+      </div>` : ""}
 
       <div class="sess-fig sess-fig-hero" data-fig="${escapeHtml(ex.name)}" data-mood="${beatenPB ? "surprised" : justSet != null ? "happy" : "neutral"}"></div>
     </div>
+
+    ${sessionRampHTML(ex, ei, setsDone)}
 
     ${resting ? `
       <div class="rest-bar${restNow.ready ? " ready" : ""}" id="restTimer">
@@ -13007,16 +13044,18 @@ function renderSession() {
         .map((x, i) => ({ x, i }))
         .filter(({ i }) => i !== ei && !SESSION.completed[i]);
       if (!others.length) return "";
-      return `<div class="switch-ex">
-        <div class="switch-label">Machine taken? Do another first</div>
-        <div class="switch-list">
-          ${others.map(({ x, i }) => `<button type="button" class="switch-chip" data-jump="${i}">${escapeHtml(x.name)}</button>`).join("")}
+      /* A swipeable rail instead of a wrapped bag of chips: two or three fit,
+         the rest are a flick away, and each one says what it actually is. */
+      return `<div class="upnext">
+        <div class="upnext-label">Up next</div>
+        <div class="upnext-rail">
+          ${others.map(({ x, i }) => `<button type="button" class="upnext-card" data-jump="${i}">
+            <span class="upnext-name">${escapeHtml(x.name)}</span>
+            <span class="upnext-meta">${x.sets} &times; ${x.reps}</span>
+          </button>`).join("")}
         </div>
       </div>`;
     })()}
-    ${ex.note ? `<div class="sess-card sess-bottom">
-      <div class="sess-note">${escapeHtml(ex.note)}</div>
-    </div>` : ""}
     <div class="sess-cta">
       <button type="button" class="btn-big btn-primary ${allDone ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>
       <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">${SESSION.completed.some((c, i) => !c && i !== ei) ? "Next exercise" : "Finish workout"}</button>
