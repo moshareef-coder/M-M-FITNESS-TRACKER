@@ -314,8 +314,11 @@ export function palette(theme = "dark", accent = "action", skin = "mannequin", b
   // on a white card is an outline and nothing else, so the body takes the dark
   // tone and the shading goes light. That is what the first prototype did and
   // it is still the only version that reads on white.
-  const body = dark ? "#f6f5f3" : "#2b3038";
-  const bodyShade = dark ? "#ece9e5" : "#3b414b";
+  // Light keeps the same white-body-with-outline drawing as dark, just a
+  // touch of grey so the body still separates from a white card, because
+  // the face (a dark visor with lime eyes) disappears on a charcoal head.
+  const body = dark ? "#f6f5f3" : "#eef0f4";
+  const bodyShade = dark ? "#ece9e5" : "#e0e4ea";
   return {
     skin,
     body: BODIES[bodyKind] ? bodyKind : "male",
@@ -325,10 +328,10 @@ export function palette(theme = "dark", accent = "action", skin = "mannequin", b
     inkHi: body,
     // The far side is a clear step, not a whisper: it has to survive being 40
     // pixels tall on a session card.
-    far: dark ? "#e6e3df" : "#474e59",
-    farShade: dark ? "#dcd8d3" : "#575f6c",
+    far: dark ? "#e6e3df" : "#d3d8e0",
+    farShade: dark ? "#dcd8d3" : "#c7cdd6",
     shade: bodyShade,
-    shadeSoft: dark ? "#e8e6e3" : "#353b44",
+    shadeSoft: dark ? "#e8e6e3" : "#e5e8ed",
     // One line colour. The whole silhouette carries it heavy, the seams inside
     // carry it thin. Nothing on this figure is drawn in a middle grey.
     seam: "#1c1f26",
