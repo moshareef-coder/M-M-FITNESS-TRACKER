@@ -3458,19 +3458,23 @@
               border: 1px solid var(--border); background: var(--panel-2); color: var(--text); }
   /* The match figure used to be a 110px ring in the accent colour, which made
      the loudest thing on the screen a number our own explainer calls a fit
-     score rather than a grade. A 99% ring invites the question "99% of what?",
-     and precision we cannot defend costs more trust than it buys. It is a
-     footnote to the plan now, and it still explains itself on tap. */
+     score rather than a grade. That went to a thin bar as a footnote instead,
+     which left the right side of the card empty next to the facts list. Mo
+     asked for the ring back specifically to fill that space, sized to sit
+     beside the facts rather than dominate the card (84px, not 110px), with
+     the caption below still explaining it on tap. */
+  .spp-ring { width: 84px; height: 84px; flex-shrink: 0; position: relative; }
+  .spp-ring-num {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-family: var(--font-display);
+  }
+  .spp-ring-num b { font-size: 21px; font-weight: 800; letter-spacing: -.03em; line-height: 1; color: var(--accent-ink); }
+  .spp-ring-num i { font-style: normal; font-size: 11px; letter-spacing: .1em; color: var(--muted); font-weight: 700; margin-top: 3px; }
   .spp-match {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--border);
     font-size: 12.5px; color: var(--muted);
   }
-  .spp-match-bar {
-    width: 46px; height: 4px; border-radius: 100px; background: var(--panel-2);
-    overflow: hidden; flex-shrink: 0;
-  }
-  .spp-match-bar span { display: block; height: 100%; background: var(--accent); border-radius: 100px; }
   .build-q { font-size: 14px; color: var(--muted); margin: 0 0 12px; }
   /* Recent workouts */
   .recent-head { display: flex; align-items: baseline; justify-content: space-between; margin: 24px 0 12px; }
@@ -5274,7 +5278,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.13.22";
+const APP_VERSION = "2026.09.13.23";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -16291,10 +16295,13 @@ function renderChooseScreen() {
             <div class="spp-chips">${p.targets.map((t) => `<span class="spp-chip">${escapeHtml(t)}</span>`).join("")}</div>
           </div>
         </div>
+        <div class="spp-ring">
+          ${ringSVG(Math.max(0, Math.min(100, p.match)) / 100, "var(--accent)", 84)}
+          <div class="spp-ring-num"><b>${p.match}%</b><i>Match</i></div>
+        </div>
       </div>
       <p class="spp-match">
-        <span class="spp-match-bar" aria-hidden="true"><span style="width:${Math.max(0, Math.min(100, p.match))}%"></span></span>
-        ${p.match}% match ${p.real ? "for what you have trained this week" : "to your recent sessions"} ${infoDot("planMatch", "What the match figure means")}
+        ${p.real ? "For what you have trained this week" : "To your recent sessions"} ${infoDot("planMatch", "What the match figure means")}
       </p>
     </div>`;
 
