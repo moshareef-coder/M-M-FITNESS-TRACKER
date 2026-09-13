@@ -980,7 +980,36 @@ function drawHead(ctx, S, C, fill) {
       ctx.save();
       hull(ctx, C, skull, { clip: true });
       ctx.fillStyle = C.seam;
-      if (FACE === "visor") {
+      if (FACE === "robot" || FACE === "robotglow" || FACE === "robotvisor") {
+        // A cute robot: two tall rounded eyes, blinking now and then. Sized
+        // to read at card size, which the dots did not. "robotglow" lights
+        // them in the accent so the character carries the app's colour;
+        // "robotvisor" sets them in a dark band.
+        const up = norm2(ax.y);
+        const blink = FACE_TIME > 0 && ((FACE_TIME % 4.3) < 0.11);
+        // Big: each eye about a third of the head's width, or they are dots.
+        const eh = blink ? R * 0.04 : R * 0.26, ew = R * 0.2;
+        const eyeSpread = R * 0.36;
+        const eyeAt = latLen < 0.28 ? [fwd] : [add(fwd, scl(Lt, eyeSpread)), add(fwd, scl(Lt, -eyeSpread))];
+        if (FACE === "robotvisor") {
+          const a = add(fwd, scl(Lt, eyeSpread * 1.6)), b = add(fwd, scl(Lt, -eyeSpread * 1.6));
+          ctx.fillStyle = C.seam;
+          capsulePath(ctx, latLen < 0.28 ? add(fwd, scl(F, 0.8)) : a, R * 0.42, latLen < 0.28 ? add(fwd, scl(F, -0.8)) : b, R * 0.42);
+          ctx.fill();
+        }
+        for (const e of eyeAt) {
+          const top = add(e, scl(up, eh)), bot = add(e, scl(up, -eh));
+          if (FACE === "robot") {
+            ctx.fillStyle = C.seam; capsulePath(ctx, top, ew, bot, ew); ctx.fill();
+          } else if (FACE === "robotvisor") {
+            ctx.fillStyle = C.accent; capsulePath(ctx, top, ew * 0.8, bot, ew * 0.8); ctx.fill();
+          } else {
+            // a dark rim so the glow reads on the white head, then the light
+            ctx.fillStyle = C.seam; capsulePath(ctx, top, ew * 1.25, bot, ew * 1.25); ctx.fill();
+            ctx.fillStyle = C.accent; capsulePath(ctx, top, ew * 0.85, bot, ew * 0.85); ctx.fill();
+          }
+        }
+      } else if (FACE === "visor") {
         // one soft band across the eye line, the visor read some robots have
         const a = add(fwd, scl(Lt, spread * 1.15)), b = add(fwd, scl(Lt, -spread * 1.15));
         capsulePath(ctx, latLen < 0.28 ? add(fwd, scl(F, 0.3)) : a, R * 0.11, latLen < 0.28 ? add(fwd, scl(F, -0.3)) : b, R * 0.11);
@@ -1760,7 +1789,7 @@ function outline(ctx, C, segs) {
 // for a face instead. Two eye dots do the job at any size: two from the
 // front, one from the side, none from behind, and they never distort with a
 // pose the way body lines do. `lines` keeps the old torso lines available.
-export const STYLE = { face: "dots", lines: false };
+export const STYLE = { face: "robotglow", lines: false };
 export function setStyle(o = {}) { Object.assign(STYLE, o); return STYLE; }
 
 let FACE = STYLE.face, LINES_TORSO = STYLE.lines;
@@ -1903,7 +1932,12 @@ export function samplePose(move, cycle, timeSec = 0) {
 // Fingers below 190 CSS pixels turn to porridge, so the hand falls back to the
 // v1 mitt there; the app's 160px cards get the mitt, the session screen gets
 // the hand.
+// The blink clock: render stamps the wall time so the face can close its eyes
+// for a tenth of a second every few seconds. Static renders (sheets, t pins)
+// pass 0 and never blink.
+let FACE_TIME = 0;
 export function render(canvas, move, C, cycle, timeSec = 0, opts = {}) {
+  FACE_TIME = timeSec || 0;
   const dpr = Math.min(2.5, globalThis.devicePixelRatio || 1);
   const w = canvas.clientWidth || canvas.width || 160;
   const h = canvas.clientHeight || canvas.height || 160;
@@ -1942,6 +1976,7 @@ export function render(canvas, move, C, cycle, timeSec = 0, opts = {}) {
   drawFigure(ctx, S, C, {
     props: move.props, floor: move.floor, lit,
     grip: gripSides(move, S),
+    face: opts.face, lines: opts.lines,
   });
   return S;
 }
