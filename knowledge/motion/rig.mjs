@@ -61,6 +61,7 @@ export const CENTER_X = 70; // the camera orbits this vertical line
 export const CENTER_Y = 78;
 
 const D = (d) => (d * Math.PI) / 180;
+const RAD2DEG = (r) => (r * 180) / Math.PI;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 // ------------------------------------------------------------- 3D basics ----
@@ -1786,9 +1787,20 @@ const PROPS = {
     const at = anchor(p, S);
     if (!at) return;
     const k = p.k || 1;
+    // A dumbbell is gripped, not floating: the handle sits in the fist at a
+    // fixed angle to the forearm (about 90 degrees, straight across the palm)
+    // and never changes that relationship, so as the elbow bends through a
+    // rep the handle has to turn with it. This used to be a flat authored
+    // number, the same for every frame, which held the icon dead level while
+    // the arm swung through 90-plus degrees under it: right for the one pose
+    // it was tuned against, wrong everywhere else in the rep. `rot` is now
+    // that fixed grip angle (default a square hold), added to the hand's own
+    // current screen angle, so the dumbbell is rigidly carried by the hand.
+    const side = S.sides[p.side || "R"];
+    const handDeg = RAD2DEG(Math.atan2(side.axis.hand.y.y, side.axis.hand.y.x));
     ctx.save();
     ctx.translate(at.x, at.y);
-    ctx.rotate(D(p.rot === undefined ? 0 : p.rot));
+    ctx.rotate(D(handDeg + (p.rot === undefined ? 90 : p.rot)));
     ctx.strokeStyle = C.edge; ctx.lineWidth = 3.2; ctx.lineJoin = "round";
     const shapes = [
       () => roundRect(ctx, -2.4, -9 * k, 4.8, 18 * k, 2.2),

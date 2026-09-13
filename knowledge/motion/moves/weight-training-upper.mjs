@@ -38,8 +38,8 @@ const DUMBBELL_BENCH_PRESS = {
   breath: 0.25,
   props: [
     { type: "bench", x: 26, y: 92, w: 78 },
-    { type: "dumbbell", side: "L", point: "hand", rot: 90, k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.8, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // lockout, bells nearly touching over the chest
@@ -190,8 +190,8 @@ const INCLINE_DUMBBELL_PRESS = {
   fit: { k: 0.95, dy: 0 },
   props: [
     { type: "bench", x: 32, y: 89, w: 72, incline: -35 },
-    { type: "dumbbell", side: "L", point: "hand", rot: 55, k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 55, k: 0.8, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // lockout, arms long square to the reclined torso
@@ -222,8 +222,8 @@ const DECLINE_DUMBBELL_PRESS = {
     { type: "bench", x: 32, y: 78, w: 76, incline: 25 },
     { type: "roller", x: 116, y: 48, r: 5 },
     { type: "roller", x: 116, y: 66, r: 5 },
-    { type: "dumbbell", side: "L", point: "hand", rot: 115, k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 115, k: 0.8, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // lockout, bells square to the declined torso
@@ -422,7 +422,7 @@ const DUMBBELL_ROW = {
   fit: { k: 0.92, dy: 4 },
   props: [
     { type: "bench", x: 94, y: 92, w: 40 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.85, front: true },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.85, front: true },
   ],
   keys: [
     { // bottom, the working arm hanging straight down under the shoulder
@@ -491,8 +491,8 @@ const CHEST_SUPPORTED_ROW = {
   fit: { k: 0.95, dy: 2 },
   props: [
     { type: "bench", x: 31, y: 71, w: 70, incline: 35 },
-    { type: "dumbbell", side: "L", point: "hand", rot: 90, k: 0.78 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.78, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
     { // bottom, both arms hanging long under the shoulders
@@ -657,8 +657,8 @@ const DUMBBELL_SHRUG = {
   breath: 0.2,
   feet: FRONT_FEET,
   props: [
-    { type: "dumbbell", side: "L", point: "hand", rot: 90, k: 0.85 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.85, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.85 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.85, front: true },
   ],
   keys: [
     { // bottom, shoulders let down, knees soft, chin level
@@ -761,8 +761,8 @@ const REAR_DELT_FLY = {
   breath: 0.2,
   fit: { k: 0.92, dy: 4 },
   props: [
-    { type: "dumbbell", side: "L", point: "hand", rot: 90, k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.8, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // bottom, arms hanging straight down from the shoulders, elbows soft
@@ -897,8 +897,8 @@ const LATERAL_RAISE = {
   fit: { k: 0.86, dy: 2 },
   feet: FRONT_FEET,
   props: [
-    { type: "dumbbell", side: "L", point: "hand", rot: 90, k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.8, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // bottom, bells beside the thighs, arms long
@@ -954,8 +954,8 @@ const FRONT_RAISE = {
   dur: 2.8,
   breath: 0.2,
   props: [
-    { type: "dumbbell", side: "L", point: "hand", rot: 0, k: 0.78 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 0, k: 0.78, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
     { // bottom, bells resting against the thighs
@@ -1020,8 +1020,8 @@ const SEATED_DUMBBELL_PRESS = {
   props: [
     { type: "bench", x: 36, y: 96, w: 36 },
     { type: "bench", x: 20, y: 70, w: 44, incline: -78 },
-    { type: "dumbbell", side: "L", point: "hand", rot: 0, k: 0.78 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 0, k: 0.78, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
     { // start, bells at the shoulders, elbows under the hands
@@ -1051,8 +1051,8 @@ const DUMBBELL_SHOULDER_PRESS = {
   fit: { k: 0.78, dy: 14 },
   feet: FRONT_FEET,
   props: [
-    { type: "dumbbell", side: "L", point: "hand", rot: 90, k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.8, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // racked, elbows out level with the shoulders, forearms vertical
@@ -1084,8 +1084,8 @@ const ARNOLD_PRESS = {
   breath: 0.2,
   fit: { k: 0.84, dy: 10 },
   props: [
-    { type: "dumbbell", side: "L", point: "hand", rot: 0, k: 0.78 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 0, k: 0.78, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
     { // start, elbows down and forward, bells in front of the chin
@@ -1121,8 +1121,8 @@ const CUBAN_PRESS = {
   breath: 0.2,
   fit: { k: 0.84, dy: 10 },
   props: [
-    { type: "dumbbell", side: "L", point: "hand", rot: 0, k: 0.72 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 0, k: 0.72, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.72 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.72, front: true },
   ],
   keys: [
     { // bells at the thighs, arms long
@@ -1262,8 +1262,8 @@ const DUMBBELL_CURL = {
   dur: 2.8,
   breath: 0.2,
   props: [
-    { type: "dumbbell", side: "L", point: "hand", rot: 90, k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.8, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: standingCurlKeys.map((k) => ({ ...k, joints: { ...k.joints, forearmPronR: -86, forearmPronL: -86 } })),
 };
@@ -1274,8 +1274,8 @@ const DUMBBELL_CURL = {
 const HAMMER_CURL = {
   ...DUMBBELL_CURL,
   props: [
-    { type: "dumbbell", side: "L", point: "hand", rot: 0, k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 0, k: 0.8, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
 };
 
@@ -1319,7 +1319,7 @@ const CONCENTRATION_CURL = {
   breath: 0.2,
   props: [
     { type: "bench", x: 30, y: 96, w: 44 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.85, front: true },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.85, front: true },
   ],
   keys: [
     { // bottom, working arm hanging long inside the knee
@@ -1389,8 +1389,8 @@ const INCLINE_DUMBBELL_CURL = {
   fit: { k: 0.95, dy: 0 },
   props: [
     { type: "bench", x: 32, y: 81, w: 72, incline: -46 },
-    { type: "dumbbell", side: "L", point: "hand", rot: 90, k: 0.78 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.78, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
     { // bottom, arms hanging straight down behind the line of the torso
@@ -1425,8 +1425,8 @@ const SPIDER_CURL = {
   fit: { k: 0.95, dy: 2 },
   props: [
     { type: "bench", x: 31, y: 71, w: 70, incline: 35 },
-    { type: "dumbbell", side: "L", point: "hand", rot: 90, k: 0.78 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.78, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
     { // bottom, arms hanging dead straight under the shoulders
@@ -1527,7 +1527,7 @@ const OVERHEAD_TRICEPS_EXTENSION = {
   dur: 3.0,
   breath: 0.2,
   fit: { k: 0.84, dy: 10 },
-  props: [{ type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.85, front: true }],
+  props: [{ type: "dumbbell", side: "R", point: "hand", k: 0.85, front: true }],
   keys: [
     { // bottom, bell behind the head, elbows up
       t: 0,
@@ -1563,7 +1563,7 @@ const TRICEPS_KICKBACK = {
   fit: { k: 0.95, dy: 4 },
   props: [
     { type: "bench", x: 84, y: 80, w: 40 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.8, front: true },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // start, upper arm back and level, forearm hanging straight down
@@ -1693,7 +1693,7 @@ const WRIST_CURL = {
   breath: 0.18,
   props: [
     { type: "bench", x: 26, y: 96, w: 40 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.75, front: true },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.75, front: true },
   ],
   keys: [
     { // bottom, hand rolled open and hanging below the knee
@@ -1803,8 +1803,8 @@ const FARMERS_CARRY = {
   dur: 2.6,
   breath: 0.22,
   props: [
-    { type: "dumbbell", side: "L", point: "hand", rot: 0, k: 0.9 },
-    { type: "dumbbell", side: "R", point: "hand", rot: 0, k: 0.9, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.9 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.9, front: true },
   ],
   keys: [
     { // right foot forward, left trailing

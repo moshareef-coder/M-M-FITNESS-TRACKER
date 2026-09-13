@@ -258,7 +258,16 @@ They either sit in the world (`{ type: "bench", x, y, w, incline }`) or attach
 to the body (`{ type: "dumbbell", side: "R", point: "hand", dx, dy, rot, k }`).
 `front: true` draws a prop over the figure instead of behind it.
 
-Three that are not obvious:
+Four that are not obvious:
+
+- **A dumbbell is rigid, not floating.** A gripped dumbbell's handle stays at a
+  fixed angle to the forearm for the whole rep (a hand does not let go and
+  re-grip), so `dumbbell`'s `rot` is added to the hand's OWN current screen
+  angle every frame, not used on its own. Its default is 90, a handle held
+  square across the palm, which is correct for nearly every grip; only
+  override it for a genuinely twisted hold. Getting this wrong used to mean a
+  dumbbell that stayed dead level while the arm swung 90-plus degrees under
+  it: right for one frame, wrong everywhere else in the rep.
 
 - **A mat has two forms.** `{ type: "mat", x, w }` is the side view strip on the
   floor under a kneeling or lying figure. `{ type: "mat", top: true, x, y, w, h }`
@@ -1056,7 +1065,7 @@ const GOBLET_SQUAT = {
   dur: 3.0,
   breath: 0.2,
   fit: { k: 1.1, dy: 2 },
-  props: [{ type: "dumbbell", side: "R", point: "wrist", dx: 3, dy: 1, rot: 0, k: 0.95, front: true }],
+  props: [{ type: "dumbbell", side: "R", point: "wrist", dx: 3, dy: 1, k: 0.95, front: true }],
   keys: [
     { // standing tall, bell racked at the chest
       t: 0,
