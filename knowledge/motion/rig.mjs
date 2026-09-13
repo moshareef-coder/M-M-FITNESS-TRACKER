@@ -133,7 +133,9 @@ export const BODY = {
   // in a further ten percent, and every mid-limb radius sits below the joint
   // above it so limbs taper instead of bulging. The previous set (chest 12.3,
   // thigh mid 8.7 over a hip of 8.0) read as heavy, and he said so.
-  rPelvis: 8.0, rWaist: 6.6, rChest: 9.8,
+  // Pelvis and hip spacing came in again (8.0 / 6.2) after Mo said the hips
+  // were too wide on the phone even with the cap flush to the thigh.
+  rPelvis: 7.3, rWaist: 6.4, rChest: 9.8,
   rNeckTop: 3.3, rNeckBot: 4.5,
   rHeadBack: 6.5, rHeadJaw: 4.8,
   rShoulder: 5.8, rDelt: 6.0, rElbow: 3.5, rWrist: 2.4,
@@ -141,7 +143,7 @@ export const BODY = {
   rHandA: 2.9, rHandB: 2.2, rThumb: 1.8,
   rHip: 6.3, rThighMid: 5.9, rKnee: 4.0,
   rCalf: 4.7, rAnkle: 4.0, rAnkleDraw: 2.7, rToe: 2.2, rHeel: 2.6,
-  shoulderW: 12.2, hipW: 6.2, depth: 1.7,
+  shoulderW: 12.2, hipW: 5.5, depth: 1.7,
   // hand v2
   palm: 5.0, palmHalf: 2.7, finger: 4.4, rPalm: 2.7, rFinger: 2.1, thumb: 5.0,
   // The product figure is one neutral bald body: Mo asked for "just the white",
@@ -2024,10 +2026,10 @@ function drawHips(ctx, S, C, fills) {
     /* Mo's second pass: the 0.18 / 0.6 bulge read as a pear on the phone,
        "does not look human at all". The rounding is now a hint: the joint
        circle barely outgrows the thigh and moves out a whisker. */
-    const outward = len2(lat) > 0.5 ? scl(norm2(lat), 0.15 * w) : V(0, 0);
+    const outward = len2(lat) > 0.5 ? scl(norm2(lat), 0.10 * w) : V(0, 0);
     part(ctx, C, [
-      [add(S.pelvis, scl(up, B.rPelvis * 0.70)), B.rPelvis * 0.86],
-      [add(k.hip, outward), B.rHip * (1.06 + 0.04 * w)],
+      [add(S.pelvis, scl(up, B.rPelvis * 0.70)), B.rPelvis * 0.84],
+      [add(k.hip, outward), B.rHip * (1.0 + 0.03 * w)],
       [lerpV(k.hip, k.knee, 0.34), B.rHip * 0.98],
     ], { fill: fills[s], line: false });
   }
