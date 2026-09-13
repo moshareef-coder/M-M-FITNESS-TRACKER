@@ -1990,6 +1990,34 @@ function drawYoke(ctx, S, C, fill) {
   for (const c of caps) part(ctx, C, c, { fill, line: false });
 }
 
+/* The trunk ends in a pelvis capsule that is narrower than the top of the
+   thigh, so the front view used to step straight out at each hip: a near
+   vertical thigh edge meeting the trunk's near vertical one in a concave
+   nick, one on each side. Mo inked over both nicks and asked for a hip that
+   runs from the waist into the thigh in one curve, "blending it in well with
+   the body". This is the yoke idea at the other end of the trunk: a short
+   chain that starts buried in the pelvis, runs out and down through the hip
+   joint and dies into the upper thigh, so the only new material is the wedge
+   the trunk and the thigh used to leave empty. It is painted FIRST, under
+   both thighs and the trunk, so it can only ever fill, never cover. It takes
+   the fill of the leg it belongs to, so the far side stays the far tone. No
+   seam and no DRAWN_TAG: the hip carries no line on either side (see
+   drawLeg), and the arm seam machinery is for arms only. The lower circle
+   rides the femur rather than hanging straight down, so a seated or supine
+   pose keeps it inside the thigh instead of growing a lump under the hip. */
+function drawHips(ctx, S, C, fills) {
+  const B = ACTIVE;
+  const up = norm2(sub(S.chest, S.pelvis));
+  for (const s of ["L", "R"]) {
+    const k = S.sides[s];
+    part(ctx, C, [
+      [add(S.pelvis, scl(up, B.rPelvis * 1.30)), B.rPelvis * 0.84],
+      [k.hip, B.rHip * 1.14],
+      [lerpV(k.hip, k.knee, 0.26), B.rHip * 0.98],
+    ], { fill: fills[s], line: false });
+  }
+}
+
 // Draw order is by depth now, not by a fixed list. The tie-break keeps the v1
 // order exactly for a planar camera, where every limb sits at the same depth as
 // its opposite number and only the old near/far rule can separate them.
@@ -2072,6 +2100,7 @@ export function drawFigure(ctx, S, C, opts = {}) {
   };
 
   const items = [];
+  const legFills = {};
   for (const s of ["L", "R"]) {
     const k = S.sides[s];
     const crossing = crossesBody(S, s);
@@ -2087,9 +2116,10 @@ export function drawFigure(ctx, S, C, opts = {}) {
       fill: armFar ? C.far : C.inkHi,
       plates: armFar ? null : skinOpts,
     });
+    legFills[s] = legFar ? C.far : C.inkHi;
     items.push({
       d: legD, o: s === near ? 4 : 1, kind: "leg", s,
-      fill: legFar ? C.far : C.inkHi,
+      fill: legFills[s],
       plates: legFar ? null : skinOpts,
     });
   }
@@ -2102,6 +2132,9 @@ export function drawFigure(ctx, S, C, opts = {}) {
     ? { d: Math.max(S.head.d, armOnFace), o: 6, kind: "head" }
     : { d: S.head.d, o: 3, kind: "head" });
   items.sort((a, b) => (a.d + a.o * 0.0001) - (b.d + b.o * 0.0001));
+  // Not part of the depth sort: the hip fillers are only ever allowed to show
+  // through where the trunk and the thighs leave a gap, so they go first.
+  items.unshift({ kind: "hip", fills: legFills });
 
   const walk = () => {
     for (const it of items) {
@@ -2109,6 +2142,7 @@ export function drawFigure(ctx, S, C, opts = {}) {
       else if (it.kind === "yoke") drawYoke(ctx, S, C, C.ink);
       else if (it.kind === "leg") drawLeg(ctx, S, it.s, C, it.fill, it.plates);
       else if (it.kind === "torso") drawTorso(ctx, S, C, C.ink, skinOpts);
+      else if (it.kind === "hip") drawHips(ctx, S, C, it.fills);
       else drawHead(ctx, S, C, C.ink);
     }
   };
