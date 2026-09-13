@@ -172,9 +172,13 @@
   }
   /* viewport-fit=cover + black-translucent puts content under the status bar,
      so the top padding must clear the notch / Dynamic Island. */
+  /* The bottom padding is the docked tab bar's height (68px, measured) plus
+     22px of breathing room, so the last card on every tab scrolls clear of the
+     bar instead of stopping under it. Keep it in step with .tabs. The safe
+     area is added on top of both, since the bar eats it too. */
   #app {
     max-width: 480px; margin: 0 auto; min-height: 100dvh;
-    padding: calc(22px + env(safe-area-inset-top, 0px)) 18px calc(104px + env(safe-area-inset-bottom, 0px));
+    padding: calc(22px + env(safe-area-inset-top, 0px)) 18px calc(90px + env(safe-area-inset-bottom, 0px));
   }
   .hidden { display: none !important; }
 
@@ -257,16 +261,25 @@
   .top-streak .go { color: var(--muted); display: flex; }
   .icon-btn { background: none; border: none; color: var(--muted); font-size: 17px; cursor: pointer; padding: 4px 6px; }
 
+  /* Docked, not floating: the bar is the floor of the app. Edge to edge, flush
+     to the bottom, square corners and one hairline along the top, the same
+     shape as .sess-cta so both read as the same kind of surface. No shadow,
+     because the panel fill is already lighter than the page in dark mode and
+     the hairline carries it in light mode. The bottom padding swallows the
+     home indicator so the buttons sit above it, never under it. Side padding
+     grows on a wide window so the five buttons stay in the app's own column
+     while the bar itself still runs edge to edge. */
   .tabs {
-    position: fixed; left: 14px; right: 14px; max-width: 452px; margin: 0 auto;
-    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    position: fixed; left: 0; right: 0; bottom: 0;
     display: flex; align-items: center;
-    background: color-mix(in srgb, var(--panel) 92%, transparent);
+    /* Full bleed now, so page text scrolling under it showed through the
+       blur as a faint ghost strip. A touch more opaque and it reads as a
+       floor, not a window. */
+    background: color-mix(in srgb, var(--panel) 96%, transparent);
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
-    border: 1px solid var(--border); border-radius: 26px;
-    padding: 8px 8px;
-    box-shadow: var(--shadow-float);
+    border-top: 1px solid var(--border);
+    padding: 8px max(14px, calc((100% - 452px) / 2)) calc(8px + env(safe-area-inset-bottom, 0px));
     z-index: 10;
   }
   .tab-btn {
@@ -278,9 +291,14 @@
   }
   .tab-btn.active { color: var(--accent-ink); }
 
-  /* Raised primary action, the one thing the app wants you to do. */
+  /* Raised primary action, the one thing the app wants you to do. Aligned to
+     the top of the row rather than its centre so the lift is a fixed number:
+     the bar's 1px hairline plus 8px of padding put the item at 9px, and the
+     -19px top margin breaks the circle 10px above the hairline. Enough to read
+     as deliberately raised now the bar is a straight edge, not so far that it
+     floats away from it. */
   .fab {
-    flex: 0 0 auto; width: 54px; height: 54px; margin: -18px 4px 0;
+    flex: 0 0 auto; align-self: flex-start; width: 54px; height: 54px; margin: -19px 4px 0;
     border-radius: 50%; border: none; cursor: pointer;
     background: var(--accent);
     color: var(--on-accent); display: flex; align-items: center; justify-content: center;
@@ -999,6 +1017,53 @@
   .pz-play:active { transform: scale(.95); }
   /* The shared icon set is stroked; a play triangle wants to be solid. */
   .pz-play svg { fill: currentColor; margin-left: 6px; }
+
+  /* ---- Going again -----------------------------------------------------
+     Mo: "zoom in and then bring up every asset in there... as if you're
+     preparing." So the button is not a control at this moment, it is the door:
+     it swells past the camera and carries the held screen out with it, and the
+     lift screen is built behind it (.sess-live.wake, further down) rather than
+     swapped in after it. The class goes on for the length of the zoom only,
+     and the whole paused screen is thrown away at the end of it.
+     Accelerating rather than settling, because this one is leaving, not
+     arriving: the same reason the overlay's own exit uses an ease-in. */
+  .pz.pz-going { overflow: hidden; }
+  .pz.pz-going .pz-play {
+    /* The resting glow has to go the moment the zoom starts. A box shadow is
+       rasterised once at the element's own size and then stretched with it, so
+       at 6x its texture edge shows up as a hard rounded square hanging in the
+       air behind the circle. Dropped rather than faded because fading a paint
+       property would pull the whole zoom off the compositor. */
+    box-shadow: none;
+    animation: pzThrough .27s cubic-bezier(.42, 0, .75, .15) both;
+    /* A second tap during the zoom would resume a session that is already
+       resuming, so the door closes behind the first one. */
+    pointer-events: none;
+  }
+  /* The circle is gone before the swap rather than exactly on it. Landing the
+     two together left a half transparent lime disc on screen at the moment the
+     screen was rebuilt, which cut rather than dissolved: a frame of animation
+     lag was all it took. Gone by 84% buys that margin.
+     The linear on the second leg is deliberate: the ease in belongs to the
+     scale, which should keep accelerating, while a dissolve wants an even
+     rate or it hangs bright and then drops out. */
+  @keyframes pzThrough {
+    0%   { opacity: 1; transform: scale(1); }
+    45%  { opacity: .8; animation-timing-function: linear; }
+    84%  { opacity: 0; }
+    100% { opacity: 0; transform: scale(6); }
+  }
+  .pz.pz-going .pz-top,
+  .pz.pz-going .pz-eyebrow,
+  .pz.pz-going .pz-clock,
+  .pz.pz-going .pz-where,
+  .pz.pz-going .pz-fig,
+  .pz.pz-going .pz-foot {
+    animation: pzGoFade .22s ease-out both;
+  }
+  /* No from: the ghosted figure starts at its own .4 rather than snapping to
+     full strength for a frame on the way out. */
+  @keyframes pzGoFade { to { opacity: 0; } }
 
   .pz-foot { flex: 0 0 auto; display: flex; flex-direction: column; gap: 12px; }
   .pz-live {
@@ -1977,9 +2042,101 @@
   .sess-live.ex-in .sess-view { animation: exIn .44s cubic-bezier(.22,1,.36,1) both; }
   .sess-live.ex-in-next .sess-view { animation: exInNext .32s cubic-bezier(.22,1,.36,1) both; }
   .sess-live.ex-in-prev .sess-view { animation: exInPrev .32s cubic-bezier(.22,1,.36,1) both; }
+
+  /* ---- Waking the screen, the fourth way in ----------------------------
+     Mo: "bring them up from the floor or from the top, depending if they're at
+     the top or the floor, and make it like a super cool animation as if you're
+     preparing." So the screen assembles itself: what lives at the top drops in
+     from above, what lives at the bottom comes up off the floor, the sheet
+     first and its controls after it in the order the thumb reads them, and the
+     figure steps onto the stage last.
+
+     Every rule here is keyed to one class that only a resume puts on. That
+     matters more than the motion does: this screen is redrawn on every logged
+     set, every swipe and every rest tick, and an entrance hung off the render
+     rather than off the class would replay all day. Transform and opacity
+     only, so none of it can cost a layout while the figure is mounting.
+     Same easing and the same --d stagger property as the Home entrance. */
+  .sess-live.wake .sess-segs,
+  .sess-live.wake .sess-where,
+  .sess-live.wake .sess-titlerow {
+    animation: wakeDrop .38s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
+  }
+  .sess-live.wake .sess-segs { --d: 40ms; }
+  .sess-live.wake .sess-where { --d: 85ms; }
+  .sess-live.wake .sess-titlerow { --d: 130ms; }
+  @keyframes wakeDrop { from { opacity: 0; transform: translateY(-26px); } to { opacity: 1; transform: none; } }
+  /* The clock and the two round keys are the overlay's own chrome rather than
+     part of .sess-live, and the paused screen hides them outright, so without
+     this they were the one thing on the screen arriving with a hard cut. They
+     are the highest thing there is, so they lead. */
+  .session-overlay.lifting.waking .session-bar {
+    animation: wakeDrop .38s cubic-bezier(.22,1,.36,1) both;
+  }
+
+  /* The sheet is the floor, so it is the first thing to exist and everything
+     else lands on it. It travels further than its contents do because it is
+     coming from off the bottom of the phone rather than from just below rest. */
+  .sess-live.wake .sess-sheet {
+    animation: wakeRise .4s cubic-bezier(.22,1,.36,1) both; --d: 60ms; animation-delay: var(--d);
+  }
+  @keyframes wakeRise { from { opacity: 0; transform: translateY(150px); } to { opacity: 1; transform: none; } }
+  .sess-live.wake .sess-grab,
+  .sess-live.wake .sess-chips,
+  .sess-live.wake .sess-lastline,
+  .sess-live.wake .sess-dials,
+  .sess-live.wake .sess-cta {
+    animation: wakeLift .3s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
+  }
+  .sess-live.wake .sess-grab { --d: 130ms; }
+  .sess-live.wake .sess-chips { --d: 175ms; }
+  .sess-live.wake .sess-lastline { --d: 210ms; }
+  .sess-live.wake .sess-dials { --d: 245ms; }
+  .sess-live.wake .sess-cta { --d: 275ms; }
+  @keyframes wakeLift { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+
+  /* The figure last, and the only thing that goes past its size, by a hair:
+     someone stepping onto the stage, not a toy popping out of a box. */
+  .sess-live.wake .sess-stage {
+    animation: wakeStage .43s cubic-bezier(.22,1,.36,1) both; --d: 150ms; animation-delay: var(--d);
+  }
+  @keyframes wakeStage {
+    0%   { opacity: 0; transform: scale(.68); }
+    64%  { opacity: 1; transform: scale(1.035); }
+    100% { opacity: 1; transform: none; }
+  }
+  /* The stage lighting coming up. It is a veil of the app's own ground fading
+     off, not the gradient fading in, because the gradient is the overlay's
+     background and a background is not animatable on transform and opacity
+     alone. z-index -1 puts it over that background and under every child, so
+     the title, the figure and the sheet all sit in front of it as it clears. */
+  .session-overlay.lifting.waking::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background: var(--bg); animation: wakeWash .46s cubic-bezier(.33,0,.5,1) both;
+  }
+  /* Nearly even rather than the app's usual ease out: this is the only thing
+     on the screen that is not arriving, and the settling curve spent it in the
+     first quarter of its time, which made the lights look already on. It also
+     never reaches full black, so the stage is dim at the start rather than
+     gone, and the zoom does not hand over to an empty screen. */
+  @keyframes wakeWash { from { opacity: .68; } to { opacity: 0; } }
+  /* Resuming from the workout tab re-shows the overlay, which restarts its own
+     entrance underneath all of the above. One sequence, not two on top of
+     each other. */
+  /* :not(.leaving) so that minimising within the wake still gets the overlay's
+     exit. Suppressing the entrance must not cost the way out. */
+  .session-overlay.waking:not(.leaving) { animation: none; }
+
   @media (prefers-reduced-motion: reduce) {
     .sess-live.ex-in .sess-view, .sess-live.ex-in-next .sess-view, .sess-live.ex-in-prev .sess-view,
+    .sess-live.wake .sess-segs, .sess-live.wake .sess-where, .sess-live.wake .sess-titlerow,
+    .sess-live.wake .sess-sheet, .sess-live.wake .sess-grab, .sess-live.wake .sess-chips,
+    .sess-live.wake .sess-lastline, .sess-live.wake .sess-dials, .sess-live.wake .sess-cta,
+    .sess-live.wake .sess-stage, .session-overlay.lifting.waking .session-bar,
     .sess-chip.just-done { animation: none; }
+    /* Not animation: none. The veil's resting state is opaque, so stopping it
+       would leave the stage painted out. */
+    .session-overlay.lifting.waking::before { display: none; }
     /* no draw-on, but the tick still has to be a whole tick */
     .sess-chip.just-done .tick path { animation: none; stroke-dasharray: none; stroke-dashoffset: 0; }
     .sess-sheet .upnext { transition: none; }
@@ -2328,8 +2485,8 @@
   .cb-dial-ctl button:active { opacity: .6; }
   .cb-own { width: 100%; margin-bottom: 12px; }
   /* Sits at the end of the list, in the flow. It used to be sticky at bottom:0,
-     which parked it underneath the floating tab bar and cut the label in half.
-     #app already reserves 104px plus the safe area down there, so the buttons
+     which parked it underneath the tab bar and cut the label in half.
+     #app already reserves the bar's height plus the safe area down there, so the buttons
      clear the bar on their own once they scroll into view. */
   .cb-go {
     display: flex; flex-direction: column; gap: 10px; margin-top: 8px;
@@ -5117,7 +5274,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.13.8";
+const APP_VERSION = "2026.09.13.9";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -14179,6 +14336,11 @@ function endStretchPhase() {
     return;
   }
   saveSessionToStorage();
+  /* The first lift after the warm-up is the other moment that is literally
+     beginning the workout, so the screen stands itself up there too. No zoom
+     here: there is no button to go through, the stretch screen simply hands
+     over. */
+  SESSION_WAKE = true;
   renderSession();
 }
 
@@ -14315,6 +14477,11 @@ let SESSION_JUST_RAMP = null;  // same for a warm-up rung, so ticking one pops t
 const CHIP_TICK = `<svg class="tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.6 12.7l4.3 4.3L18.4 7.4"/></svg>`;
 let SESSION_LAST_EX = null;    // the exercise last drawn, so a change can slide in
 let SESSION_SWIPE_DIR = 0;     // +1/-1 when the last exercise change was a swipe, consumed once
+/* Armed by the play button (and by the end of the warm-up), read and cleared
+   by the one renderSession that follows it. It has to be one shot: this screen
+   is rebuilt on every logged set, every swipe and every rest tick, so an
+   entrance that is not gated on something the user just did replays forever. */
+let SESSION_WAKE = false;
 /* Whether the bottom sheet is pulled up over the stage to show what is next.
    Collapsed by default, every time: the screen's job is the set in front of
    you, and the list of what is coming is a question you ask, not a shelf. */
@@ -14362,12 +14529,44 @@ function rampRungLabel(s) {
   return `${Number(s.weight) > 0 ? `${s.weight} lb` : "the bar"} × ${s.reps}`;
 }
 
+/* The card half of the wake. Two things live above .sess-live and so cannot be
+   done with the markup class: the overlay's own entrance has to be held off
+   (resuming from the workout tab re-shows the overlay, which restarts it), and
+   the stage lighting comes up on a pseudo-element of the overlay.
+   Both come off at the end, so the next redraw of this screen is plain and
+   nothing is left holding a transform or an opacity. */
+let SESSION_WAKE_OFF = null;
+function startSessionWake() {
+  const card = $("sessionCard");
+  card.classList.add("waking");
+  /* The overlay's own entrance sits this one out, and it has to STAY out for
+     the rest of this open. Suppressing it only while `waking` was on meant
+     that dropping the class at 620 ms restarted sessionIn from opacity 0,
+     and the whole screen blinked out for a frame at about 0.95 s, with the
+     workout tab showing through. Inline, so no class change can bring it
+     back; closeSessionUI clears it so the next open gets its entrance. */
+  card.style.animation = "none";
+  clearTimeout(SESSION_WAKE_OFF);
+  // The longest delay plus its own duration. Past this nothing is in flight,
+  // and dropping the class lets every element rest at its natural state, which
+  // is where the animations already left it, so there is nothing to see.
+  SESSION_WAKE_OFF = setTimeout(() => {
+    SESSION_WAKE_OFF = null;
+    card.classList.remove("waking");
+    document.querySelector(".sess-live.wake")?.classList.remove("wake");
+  }, 620);
+}
+
 function renderSession() {
   beatLive();
   /* The two timed phases have their own screen. Everything below this line is
      the lift, and none of it can see a stretch. */
   if (SESSION.phase === "warmup" || SESSION.phase === "cooldown") { renderStretchPhase(); return; }
   stopStretchTicker();
+  /* Read it here, above every early return, so a render that bails out still
+     disarms it rather than handing the entrance to an unrelated redraw later. */
+  const waking = SESSION_WAKE;
+  SESSION_WAKE = false;
   /* Back to lifting, so the screen goes back to lime. Removed here rather than
      in endStretchPhase because every route into the lift screen comes through
      renderSession, including a resume from storage mid-session. */
@@ -14421,7 +14620,11 @@ function renderSession() {
   SESSION_LAST_EX = ei;
   const swipeDir = SESSION_SWIPE_DIR;
   SESSION_SWIPE_DIR = 0;
-  const enterClass = !exChanged ? "" : swipeDir > 0 ? " ex-in-next" : swipeDir < 0 ? " ex-in-prev" : " ex-in";
+  /* The wake owns the whole screen, so the per-exercise slide does not also
+     run: they animate the same nodes and would fight over them. */
+  const enterClass = waking
+    ? " wake"
+    : !exChanged ? "" : swipeDir > 0 ? " ex-in-next" : swipeDir < 0 ? " ex-in-prev" : " ex-in";
   const justSet = SESSION_JUST_SET;
   SESSION_JUST_SET = null;
   const justRamp = SESSION_JUST_RAMP;
@@ -14546,6 +14749,7 @@ function renderSession() {
      so the class goes on here and comes off in each of those. */
   $("sessionCard").classList.add("lifting");
   $("sessionCard").classList.remove("paused-screen");
+  if (waking) startSessionWake(); else $("sessionCard").classList.remove("waking");
   mountMotionFigures($("sessionBody"));
   /* The rest clock lives in the top bar now, so there is no bar to tick and
      nothing to paint except that one number, which the session timer already
@@ -15175,9 +15379,10 @@ function closeSessionUI() {
   renderClipPill();
   document.body.classList.remove("session-open");
   const card = $("sessionCard");
+  card.style.animation = "";   // a wake parked the entrance; the exit must still run
   card.classList.add("leaving");
   setTimeout(() => {
-    card.classList.remove("leaving");
+    card.classList.remove("leaving", "waking");
     card.classList.add("hidden");
   }, 200);
 }
@@ -15284,16 +15489,43 @@ function startPausedClock() {
   }, 1000);
 }
 
+/* Pressing play. In the session the button only has to unpause. From the tab it
+   is the way back in, so it opens the session first and then unpauses into it:
+   on its own, togglePause renders the lift screen into an overlay that is still
+   hidden, which left the tab showing a paused screen for a running workout.
+
+   Either way the swap waits for the zoom. The button is the last thing on the
+   held screen and it grows until it is the only thing, so the lift screen
+   arriving underneath reads as what was behind the button all along. The wait
+   is a timer rather than an animationend listener because the element the
+   listener would sit on is the one being thrown away.
+
+   With motion turned down there is no door and no wake: the screens just swap. */
+const PZ_ZOOM_MS = 285;
+function resumeFromPaused({ overlay }) {
+  const go = () => {
+    SESSION_WAKE = true;
+    if (overlay) togglePause();
+    else {
+      reopenSession();
+      if (SESSION?.pausedAt) togglePause();
+    }
+    // Never leave it armed: a path that did not repaint the lift screen would
+    // otherwise hand the wake to whatever redraw came next.
+    SESSION_WAKE = false;
+  };
+  const pz = document.querySelector(".pz");
+  const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!pz || reduced) { go(); return; }
+  if (pz.classList.contains("pz-going")) return;   // one door, one tap
+  pz.classList.add("pz-going");
+  setTimeout(go, PZ_ZOOM_MS);
+}
+
 function wirePausedScreen({ overlay }) {
   const root = overlay ? $("sessionBody") : $("workoutContent");
   $("pzHome").onclick = goHomeFromSession;
-  /* In the session the button only has to unpause. From the tab it is the way
-     back in, so it opens the session first and then unpauses into it: on its
-     own, togglePause renders the lift screen into an overlay that is still
-     hidden, which left the tab showing a paused screen for a running workout. */
-  $("pzResume").onclick = overlay
-    ? togglePause
-    : () => { reopenSession(); if (SESSION?.pausedAt) togglePause(); };
+  $("pzResume").onclick = () => resumeFromPaused({ overlay });
   mountMotionFigures(root);
   renderPausedLive();
   wireHoldToEnd({ overlay });
