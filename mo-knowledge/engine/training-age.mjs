@@ -44,12 +44,32 @@ export const THRESHOLDS = {
 const DAY = 86400000;
 const iso = (d) => new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const parse = (s) => new Date(String(s) + "T12:00:00Z");
-const norm = (s) => String(s || "").trim().toLowerCase();
+const norm = (s) => String(s ?? "").trim().toLowerCase();
+
+/* Every row that reaches this file is read through here first.
+ *
+ * `logs` is handed to the engine by its caller, not fetched by it, and the edge
+ * function's payload bound slices the array without ever looking inside it. So a
+ * null row, a row that is a number, and a row whose entry_date is 20260910
+ * rather than "2026-09-10" all arrive, and each of them used to be a 500:
+ * `l.entry_date` on null, and `a[0].localeCompare` on a numeric map key.
+ * calibrate.mjs, load.mjs and recovery.mjs all already skip a row that is not an
+ * object and coerce the two text fields before comparing them, so this is the
+ * same answer rather than a fourth one. The date is kept as text because that is
+ * what every sort, every Map key and every gap calculation in here assumes, and
+ * a number that reads as a date is still a usable one once it is a string. */
+function usableRows(logs) {
+  return (Array.isArray(logs) ? logs : []).filter((l) => l && typeof l === "object");
+}
+const rowDate = (l) => {
+  const d = l.entry_date;
+  return d == null || d === "" ? null : String(d);
+};
 
 /* Distinct training days, sorted. A session is a day with anything logged, which
    is how the app already thinks about it. */
 function sessionDays(logs) {
-  return [...new Set(logs.map((l) => l.entry_date).filter(Boolean))].sort();
+  return [...new Set(logs.map(rowDate).filter(Boolean))].sort();
 }
 
 /* Is this person still adding weight to the same movement most times they do it?
@@ -57,10 +77,10 @@ function sessionDays(logs) {
 function linearProgress(logs) {
   const byExercise = new Map();
   for (const l of logs) {
-    if (l.weight == null || !l.exercise_name) continue;
     const k = norm(l.exercise_name);
+    if (l.weight == null || !k) continue;
     if (!byExercise.has(k)) byExercise.set(k, []);
-    byExercise.get(k).push({ date: l.entry_date, weight: Number(l.weight) });
+    byExercise.get(k).push({ date: rowDate(l), weight: Number(l.weight) });
   }
 
   let judged = 0, climbing = 0;
@@ -102,14 +122,15 @@ export function detectPlateau({ logs = [], today = new Date(), weeks = THRESHOLD
   /* Per exercise, the best weight on each training day, oldest first. A day is the unit
      because that is what a session is everywhere else in this file. */
   const byExercise = new Map();
-  for (const l of logs) {
-    if (l.weight == null || !l.exercise_name || !l.entry_date) continue;
+  for (const l of usableRows(logs)) {
     const k = norm(l.exercise_name);
+    const date = rowDate(l);
+    if (l.weight == null || !k || !date) continue;
     if (!byExercise.has(k)) byExercise.set(k, { name: String(l.exercise_name).trim(), days: new Map() });
     const rec = byExercise.get(k);
     const w = Number(l.weight);
     if (!Number.isFinite(w)) continue;
-    rec.days.set(l.entry_date, Math.max(w, rec.days.get(l.entry_date) ?? -Infinity));
+    rec.days.set(date, Math.max(w, rec.days.get(date) ?? -Infinity));
   }
 
   const lifts = [];
@@ -160,8 +181,9 @@ export function detectPlateau({ logs = [], today = new Date(), weeks = THRESHOLD
  * @param {{ logs?: Array, today?: Date }} input
  * @returns {{ level: string, confidence: "none"|"low"|"medium"|"high", ... }}
  */
-export function deriveTrainingAge({ logs = [], today = new Date() } = {}) {
+export function deriveTrainingAge({ logs: given = [], today = new Date() } = {}) {
   const why = [];
+  const logs = usableRows(given);
   const days = sessionDays(logs);
   const todayStr = iso(today);
 
@@ -200,7 +222,10 @@ export function deriveTrainingAge({ logs = [], today = new Date() } = {}) {
   const recent = effectiveDays.filter((d) => parse(d) >= cutoff).length;
   const sessionsPerWeek = +(recent / THRESHOLDS.recentWeeks).toFixed(1);
 
-  const prog = linearProgress(logs.filter((l) => l.entry_date >= effectiveDays[0]));
+  const prog = linearProgress(logs.filter((l) => {
+    const d = rowDate(l);
+    return d != null && d >= effectiveDays[0];
+  }));
   const returning = daysSinceLast >= THRESHOLDS.layoffDays;
 
   /* Level. Session count sets the ceiling, and still-working linear progression

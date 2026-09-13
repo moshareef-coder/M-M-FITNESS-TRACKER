@@ -15,6 +15,8 @@
  * Every rate below is sourced in ../sources.md. None of them is invented here.
  */
 
+import { humanBodyWeight } from "./load.mjs";
+
 const WEEKS_PER_MONTH = 4.345;
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 
@@ -292,7 +294,14 @@ function weeksBetween(from, to) {
 }
 
 /* The whole point. What is actually reachable, said plainly, with the date. */
-function weightTimeline({ bubble, amountLb, byDate, bodyWeightLb, level, today }) {
+function weightTimeline({ bubble, amountLb, byDate, bodyWeightLb: given, level, today }) {
+  /* The same window load.mjs believes a bodyweight lives in, for the same
+     reason and so the two cannot disagree. A current_weight of 1e-9 is not a
+     very light person, and it used to reach the arithmetic below, drive the
+     weekly rate to zero, divide by it, and build a Date out of Infinity: the
+     whole call died with "Invalid time value" rather than the timeline going
+     quiet. A weight we do not believe is the same as no weight at all. */
+  const bodyWeightLb = humanBodyWeight(given);
   if (!bodyWeightLb) return null;
   const gaining = bubble === "build-muscle";
   let perWeek;

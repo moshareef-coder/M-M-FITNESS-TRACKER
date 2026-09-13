@@ -509,6 +509,71 @@ test("a nonsense log weight can never put a non-finite number into the plan", ()
   }
 });
 
+/* The second half of the same fuzz run. The cap above only ever bounded a
+   GUESS, on the argument that a logged row is a measurement. The session weight
+   field has no max on it, so a logged 5000 lb Front Squat is a typo with a date
+   attached, and the old no-human line of 1500 lb handed it straight back: 2,882
+   cases came out above what anybody that size lifts. Every assertion here is in
+   pounds off the prescription, not on a factor. */
+test("a mistyped four figure log row never becomes a four figure prescription", () => {
+  for (const weight of [5000, 99999, 1e15]) {
+    const logs = [{ entry_date: day(-4), exercise_name: "Front Squat", weight, reps: 8 }];
+    const r = prescribeLoad({
+      exercise: { name: "Front Squat", equipment: "barbell" }, reps: 8,
+      bodyWeightLb: 165, sex: "Male", level: "novice", logs,
+    });
+    /* Four times bodyweight at novice is the rail, and it is a rail rather than
+       a prescription: the note has to say so or the number is a lie. */
+    assert.ok(r.weight <= 165 * 4, `${weight} lb logged gave ${r.weight}`);
+    assert.equal(r.capped, true);
+    assert.match(r.note, /ceiling, not a prescription/);
+  }
+});
+
+test("the ceiling on a measured row is the person's size, not one flat number", () => {
+  const logs = [{ entry_date: day(-4), exercise_name: "Leg Press", weight: 9000, reps: 8 }];
+  const ex = { exercise: { name: "Leg Press", equipment: "machine" }, reps: 8, sex: "Male", logs };
+  const small = prescribeLoad({ ...ex, bodyWeightLb: 120, level: "beginner" });
+  const big = prescribeLoad({ ...ex, bodyWeightLb: 240, level: "advanced" });
+  assert.ok(small.weight <= 120 * 3, `120 lb beginner got ${small.weight}`);
+  assert.ok(big.weight <= 240 * 6, `240 lb advanced got ${big.weight}`);
+  assert.ok(big.weight > small.weight, `${big.weight} should beat ${small.weight}`);
+});
+
+test("a real lifter's own logged weight is handed straight back, rail or no rail", () => {
+  const logs = [{ entry_date: day(-4), exercise_name: "Barbell Back Squat", weight: 315, reps: 5 }];
+  const r = prescribeLoad({
+    exercise: { name: "Barbell Back Squat", equipment: "barbell" }, reps: 5,
+    bodyWeightLb: 180, sex: "Male", level: "intermediate", logs,
+  });
+  assert.equal(r.weight, 315);
+  assert.equal(r.capped, false);
+});
+
+/* A bodyweight outside the range a person lives in is a bad row, not a heavy
+   person, and the allometric curve keeps climbing forever if you let it: a
+   current_weight of 1e308 was producing a 2.7e206 lb Goblet Squat. The answer
+   for a weight we do not believe is the answer for a weight we were never
+   given, which is to omit the load. */
+test("a bodyweight nobody has cannot become a starting weight", () => {
+  for (const bodyWeightLb of [1e308, 1e-9, -200, "heavy", NaN, 40000]) {
+    const r = prescribeLoad({
+      exercise: { name: "Goblet Squat", equipment: "dumbbell" }, reps: 8,
+      bodyWeightLb, sex: "Male", level: "beginner", logs: [],
+    });
+    assert.equal(r.weight, null, `${bodyWeightLb} lb gave ${r.weight}`);
+    assert.equal(r.basis, "unknown");
+  }
+});
+
+test("the heaviest bodyweight the payload bound accepts still gets a liftable number", () => {
+  const r = prescribeLoad({
+    exercise: { name: "Leg Press", equipment: "machine" }, reps: 3,
+    bodyWeightLb: 1500, sex: "Male", level: "advanced", logs: [],
+  });
+  assert.ok(r.weight <= 1200, `1500 lb advanced got ${r.weight}`);
+});
+
 test("roundLoad refuses a non-finite weight rather than passing it on", () => {
   assert.equal(roundLoad(Infinity), null);
   assert.equal(roundLoad(NaN), null);
@@ -1349,6 +1414,65 @@ test("generateFromPayload never throws on an empty payload or a junk goal", () =
   }
   const r2 = generateFromPayload({ goal: "some junk goal that matches nothing at all" });
   assert.ok(r2.workout.exercises.length >= 3 && r2.workout.exercises.length <= 6);
+});
+
+/* The edge function's payload bound slices `logs` and never looks inside a row,
+   so the shape of every field in one is whatever the caller typed. The fuzz run
+   of 2026-09-12 turned three of them into a 500 rather than a plan: a numeric
+   exercise_name off `.toLowerCase`, a numeric entry_date off `.localeCompare`,
+   and a current_weight of 1e-9 off a Date built from a rate of zero. `history`,
+   `plans` and `swaps` already skipped a row they could not read, and this is the
+   same answer rather than a fourth one. Asserted on the workout that comes back,
+   because a degraded plan is the outcome and not-throwing is only half of it. */
+test("a log row the engine cannot read is skipped, not fatal", () => {
+  const good = { entry_date: "2026-09-08", exercise_name: "Barbell Bench Press", sets: 3, reps: 8, weight: 135 };
+  const rows = {
+    "a numeric name": { ...good, exercise_name: 42 },
+    "a name that is an object": { ...good, exercise_name: { id: 3 } },
+    "a numeric date": { ...good, entry_date: 20260908 },
+    "no date at all": { ...good, entry_date: null },
+  };
+  for (const [what, row] of Object.entries(rows)) {
+    /* Two rows of the same movement, because the date sort that broke only runs
+       once a lift has been done more than once. */
+    const r = generateFromPayload({ goal_bubble: "build-muscle", current_weight: 180, sex: "Male", logs: [row, { ...row }] });
+    assert.ok(r.workout.exercises.length >= 3, `${what} gave ${r.workout.exercises.length} exercises`);
+    for (const e of r.workout.exercises) {
+      assert.equal(typeof e.targetWeight, "number", `${what}: ${e.name} targetWeight ${e.targetWeight}`);
+      assert.ok(Number.isFinite(e.targetWeight), `${what}: ${e.name} targetWeight ${e.targetWeight}`);
+    }
+  }
+  /* And the readable row beside an unreadable one still counts: skipping is not
+     the same as throwing the history away. */
+  const mixed = generateFromPayload({
+    goal_bubble: "build-muscle", current_weight: 180, sex: "Male",
+    logs: [{ ...good, exercise_name: 42 }, good],
+  });
+  const bench = mixed.workout.exercises.find((e) => e.name === "Barbell Bench Press");
+  if (bench) assert.equal(bench.targetWeight, 135);
+});
+
+test("a bodyweight of almost nothing gives a plan instead of an invalid date", () => {
+  const r = generateFromPayload({ goal: "Build muscle", goal_detail: "I want to lose 20 lb by June", current_weight: 1e-9 });
+  assert.ok(r.workout.exercises.length >= 3);
+  assert.ok(r.workout.exercises.every((e) => Number.isFinite(e.targetWeight)));
+});
+
+/* Same rows, one level down, because deriveTrainingAge reads them first and is
+   what actually threw. The level is the assertion: an unreadable row must not
+   promote or demote anybody. */
+test("deriveTrainingAge reads past a row it cannot use", () => {
+  const usable = Array.from({ length: 8 }, (_, i) => ({
+    entry_date: `2026-08-${String(10 + i).padStart(2, "0")}`, exercise_name: "Barbell Bench Press", weight: 135, sets: 3, reps: 8,
+  }));
+  const clean = deriveTrainingAge({ logs: usable, today: new Date(2026, 8, 10) });
+  const dirty = deriveTrainingAge({
+    logs: [...usable, null, undefined, 42, "a row", { entry_date: 20260901, exercise_name: 7, weight: 100 }],
+    today: new Date(2026, 8, 10),
+  });
+  assert.equal(dirty.level, clean.level);
+  assert.equal(dirty.sessions, clean.sessions + 1);   // the numeric date is a real day, once it is text
+  assert.equal(typeof dirty.plateau.stalled, "boolean");
 });
 
 test("focusDayIndex picks a push day when one exists and falls back to -1 otherwise", () => {

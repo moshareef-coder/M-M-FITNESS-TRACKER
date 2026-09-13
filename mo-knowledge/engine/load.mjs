@@ -176,6 +176,22 @@ export const roundLoad = (lb) =>
   lb == null || !Number.isFinite(Number(lb)) ? null
     : lb < 40 ? Math.round(lb / 2.5) * 2.5 : Math.round(lb / 5) * 5;
 
+/* The window a bodyweight has to be inside before this module will do
+   arithmetic with it. Same 40 to 1500 the edge function's own payload bound
+   uses, on purpose: the two should not disagree about what a person weighs.
+   Anything outside it is not a light person or a heavy one, it is a bad row, a
+   kilogram figure typed into a pound field, or a hostile body, and the honest
+   answer to all three is the same as the answer to a missing weight. research/05
+   again: we would rather say nothing than guess from a number we do not believe.
+   Returns null so every caller can use the branch it already has for "we were
+   never told how heavy they are". */
+const HUMAN_BW_LB = [40, 1500];
+export function humanBodyWeight(bodyWeightLb) {
+  const n = Number(bodyWeightLb);
+  if (!Number.isFinite(n) || n < HUMAN_BW_LB[0] || n > HUMAN_BW_LB[1]) return null;
+  return n;
+}
+
 /* No history at all. Bodyweight, sex and level, scaled properly. */
 export function coldStart1RM({ exercise, bodyWeightLb, sex = "Male", level = "beginner" }) {
   const female = String(sex).toLowerCase().startsWith("f");
@@ -183,10 +199,11 @@ export function coldStart1RM({ exercise, bodyWeightLb, sex = "Male", level = "be
   const pattern = patternFor(exercise);
   const ratio = (PATTERN_RATIO[pattern] || PATTERN_RATIO.isolation)[female ? 1 : 0];
   if (!ratio) return null;                       // bodyweight or core work, no load to set
-  if (!bodyWeightLb) return null;                // research/05: never guess, just omit it
+  const bw = humanBodyWeight(bodyWeightLb);
+  if (!bw) return null;                          // research/05: never guess, just omit it
 
   const benchAtRef = ref.bench[level] || ref.bench.beginner;
-  const scaled = benchAtRef * Math.pow(bodyWeightLb / ref.bw, ALLOMETRIC_EXPONENT);
+  const scaled = benchAtRef * Math.pow(bw / ref.bw, ALLOMETRIC_EXPONENT);
   return scaled * ratio * variantFactor(exercise, pattern);
 }
 
@@ -216,13 +233,25 @@ function bestRow(rows, reps, weightOf) {
 
 const byDateDesc = (a, b) => String(b.entry_date).localeCompare(String(a.entry_date));
 
+/* One reading of a log row's exercise name, lowercased and trimmed, for every
+   comparison in this file. Exported because training-age.mjs asks the same
+   question of the same rows and the two must never answer it differently. */
+export const logName = (row) => String(row?.exercise_name ?? "").trim().toLowerCase();
+
 /* History wins the moment it exists. Exact name first, then the same pattern,
    which is how a coach would guess a new movement from a known one. */
 export function fromHistory({ exercise, logs = [], reps = null }) {
   const target = String(exercise?.name || exercise || "").toLowerCase();
-  const withWeight = logs.filter((l) => l && l.exercise_name && Number(l.weight) > 0);
+  /* `exercise_name` is whatever the row carried. It is a text column and every
+     client writes a string into it, but the engine is handed rows it did not
+     fetch, and a number there used to be a 500 off `.toLowerCase`. Same answer
+     as everywhere else that reads a name out of a row: coerce it, then judge it.
+     A row whose name is an object stringifies to something no library entry
+     matches, which is the same outcome as a name nobody has ever logged. */
+  const withWeight = (Array.isArray(logs) ? logs : [])
+    .filter((l) => l && typeof l === "object" && logName(l) && Number(l.weight) > 0);
   const exact = withWeight
-    .filter((l) => l.exercise_name.toLowerCase() === target)
+    .filter((l) => logName(l) === target)
     .sort(byDateDesc)
     .slice(0, HISTORY_WINDOW);
   if (exact.length) {
@@ -293,9 +322,8 @@ function applyCalibration(weight, note, calibration, exercise) {
  * unsure, as it does everywhere else in this file: wrong-low costs one easy set,
  * wrong-high costs the session.
  *
- * Only the guess is capped. An exact history row is a measurement of something
- * the person actually did, and capping a measurement would be the engine telling
- * somebody they did not lift what they lifted. */
+ * The guess is capped hardest. See the bodyweight rail below for the measured
+ * row, which used to be capped at nothing a real lifter could reach. */
 const EXTRAPOLATION_TRUST = [1.5, 2.0, 2.5];   // by how many rows are behind the guess
 
 /* The last resort, for when bodyweight is missing and there is no size-based
@@ -303,14 +331,59 @@ const EXTRAPOLATION_TRUST = [1.5, 2.0, 2.5];   // by how many rows are behind th
    line past which no working set is a real person, and it exists so that a bad
    row cannot turn into a four figure prescription just because we never asked
    how heavy the user is. */
-const NO_HUMAN_LB = 1500;
+const NO_HUMAN_LB = 1200;
 
-function extrapolationCeiling({ exercise, reps, bodyWeightLb, sex, level, rows = 1 }) {
-  const trust = EXTRAPOLATION_TRUST[Math.min(Math.max(rows, 1), EXTRAPOLATION_TRUST.length) - 1];
-  const oneRM = coldStart1RM({ exercise, bodyWeightLb, sex, level });
-  const sizeBased = oneRM ? workingFrom1RM(oneRM, reps ?? 8) : null;
-  return sizeBased ? Math.min(sizeBased * trust, NO_HUMAN_LB) : NO_HUMAN_LB;
+/* The second rail, and the one that does the work on a MEASURED row.
+ *
+ * The first version of this cap only bounded a guess, on the argument that
+ * capping a measurement would be the engine telling somebody they did not lift
+ * what they lifted. That argument was right about measurements and wrong about
+ * rows: the session weight field is `type="number"` with no max, so a logged
+ * 5000 lb Front Squat is not a measurement, it is a typo with a date on it, and
+ * the old no-human line of 1500 lb was happy to hand it back. The fuzz run of
+ * 2026-09-12 found 2,882 of these, most of them a four figure load read straight
+ * off one absurd row.
+ *
+ * So the ceiling is now a multiple of the person's own bodyweight as well. Not a
+ * strength standard and not an opinion about anybody's best lift: it is the line
+ * where somebody reading the card would decide the app is broken. A beginner
+ * told to put three times their own bodyweight on a bar has been told something
+ * useless whether or not a row somewhere says so.
+ *
+ * It is a multiple by LEVEL because a training history is what earns the
+ * headroom, and level here is derived from logged sessions rather than claimed. */
+const BODYWEIGHT_MULTIPLE = { beginner: 3, novice: 4, intermediate: 5, advanced: 6 };
+
+/* When we were never told a bodyweight, the rail still has to exist, because the
+   history path hands out loads with or without one. A 200 lb person is the
+   stand-in: it is not a guess about this user, it only decides how loose the
+   rail is, and it is deliberately on the heavy side so the rail never binds on
+   somebody real. */
+const ASSUMED_BW_LB = 200;
+
+/* One ceiling, three bounds, the tightest wins.
+ *
+ * `trust` is null for a measured row, which is the difference between the two
+ * kinds of evidence: an exact row is bounded only by what a person of this size
+ * could plausibly be doing, while a guess is bounded by what this module itself
+ * would have prescribed from size alone, times how many rows are behind the
+ * guess. One row of a different movement is a rumour; three rows is a pattern. */
+function sanityCeiling({ exercise, reps, bodyWeightLb, sex, level, trust = null }) {
+  const bw = humanBodyWeight(bodyWeightLb) ?? ASSUMED_BW_LB;
+  const multiple = BODYWEIGHT_MULTIPLE[level] ?? BODYWEIGHT_MULTIPLE.advanced;
+  let ceiling = Math.min(NO_HUMAN_LB, bw * multiple);
+  if (trust != null) {
+    const oneRM = coldStart1RM({ exercise, bodyWeightLb, sex, level });
+    const sizeBased = oneRM ? workingFrom1RM(oneRM, reps ?? 8) : null;
+    if (sizeBased) ceiling = Math.min(ceiling, sizeBased * trust);
+  }
+  /* Rounded DOWN to the step every load leaves here on, because roundLoad rounds
+     to the nearest 5 and a ceiling that rounds up is not a ceiling. */
+  return Math.floor(ceiling / 5) * 5;
 }
+
+const trustFor = (rows = 1) =>
+  EXTRAPOLATION_TRUST[Math.min(Math.max(rows, 1), EXTRAPOLATION_TRUST.length) - 1];
 
 /**
  * The load for one exercise, and an honest note about where the number came from.
@@ -339,23 +412,28 @@ export function prescribeLoad({ exercise, reps, bodyWeightLb, sex, level, logs =
       calibration, exercise);
 
     /* The cap, applied last so that everything which can legitimately lower the
-       number has already had its turn. It only ever lowers, and it only ever
-       touches a guess. When it binds it says so, because a capped number
-       presented as a derived one is the engine lying quietly, and this file's
-       whole argument is that the number should be honest about where it came
-       from. `capped` rides along so the caller can lift it into a day note. */
+       number has already had its turn. It only ever lowers. When it binds it
+       says so, because a capped number presented as a derived one is the engine
+       lying quietly, and this file's whole argument is that the number should be
+       honest about where it came from. `capped` rides along so the caller can
+       lift it into a day note. */
     let weight = tuned.weight;
     let note = tuned.note;
     let capped = false;
     if (weight != null && !Number.isNaN(Number(weight))) {
-      /* An exact row is a measurement and gets only the no-human line, which no
-         real lifter will ever reach. The guess gets the real ceiling. Written as
-         `!(weight <= ceiling)` rather than `weight > ceiling` on purpose: an
-         Infinity that came out of a 1e308 log fails the first and passes the
-         second, and it has to be clamped rather than quietly become a null. */
-      const ceiling = hist.source === "pattern"
-        ? extrapolationCeiling({ exercise, reps, bodyWeightLb, sex, level, rows: hist.rows })
-        : NO_HUMAN_LB;
+      /* Both kinds of evidence get a ceiling now, and they get different ones.
+         A guess is bounded by what this module would have prescribed from size
+         alone; a measured row is bounded only by the bodyweight rail, because a
+         row IS what somebody did right up to the point where it stops being a
+         weight a person of that size lifts and starts being a typo.
+         Written as `!(weight <= ceiling)` rather than `weight > ceiling` on
+         purpose: an Infinity that came out of a 1e308 log fails the first and
+         passes the second, and it has to be clamped rather than quietly become
+         a null. */
+      const ceiling = sanityCeiling({
+        exercise, reps, bodyWeightLb, sex, level,
+        trust: hist.source === "pattern" ? trustFor(hist.rows) : null,
+      });
       if (!(weight <= ceiling)) {
         weight = ceiling;
         capped = true;
@@ -363,7 +441,7 @@ export function prescribeLoad({ exercise, reps, bodyWeightLb, sex, level, logs =
           ? `${note} That worked out far above what your size and level suggest, off `
             + `${hist.rows === 1 ? "one session" : `${hist.rows} sessions`} of a different movement, so it is held here. `
             + `Treat it as a guess and change it if it is wrong.`
-          : `${note} That is not a weight anybody lifts, so the logged row behind it is wrong. `
+          : `${note} That is far above what anybody your size lifts, so the logged row behind it is wrong. `
             + `This is a ceiling, not a prescription: put in what you can actually do.`;
       }
     }
@@ -388,8 +466,16 @@ export function prescribeLoad({ exercise, reps, bodyWeightLb, sex, level, logs =
   const cold = applyCalibration(working * 0.9,
     "A starting guess from your bodyweight. Deliberately light. Log what you actually do and the next one will be right.",
     calibration, exercise);
+  /* The same rail over the guess from size, which sounds circular and is not:
+     the allometric curve keeps climbing past the top of the bodyweight window,
+     so at the heaviest weight the payload bound will accept it asks an advanced
+     lifter for a four figure leg press off no evidence at all. One ceiling for
+     every number that leaves this module is also simply easier to reason about
+     than one ceiling for the paths somebody remembered. */
+  const ceiling = sanityCeiling({ exercise, reps, bodyWeightLb, sex, level });
+  const held = cold.weight != null && !(cold.weight <= ceiling);
   return {
-    weight: roundLoad(cold.weight),
+    weight: roundLoad(held ? ceiling : cold.weight),
     basis: "your size",
     note: cold.note,
   };
