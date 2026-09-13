@@ -130,17 +130,20 @@ export const BODY = {
   // in a further ten percent, and every mid-limb radius sits below the joint
   // above it so limbs taper instead of bulging. The previous set (chest 12.3,
   // thigh mid 8.7 over a hip of 8.0) read as heavy, and he said so.
-  rPelvis: 7.9, rWaist: 6.6, rChest: 10.2,
+  rPelvis: 8.0, rWaist: 6.6, rChest: 9.8,
   rNeckTop: 4.0, rNeckBot: 5.2,
   rHeadBack: 6.5, rHeadJaw: 4.8,
-  rShoulder: 5.7, rDelt: 6.0, rElbow: 3.5, rWrist: 2.4,
+  rShoulder: 5.8, rDelt: 6.0, rElbow: 3.5, rWrist: 2.4,
   rUpperArmMid: 4.6, rForearmMid: 3.7,
   rHandA: 2.9, rHandB: 2.2, rThumb: 1.8,
   rHip: 6.3, rThighMid: 5.9, rKnee: 4.0,
-  rCalf: 4.7, rAnkle: 4.0, rAnkleDraw: 2.7, rToe: 2.5, rHeel: 3.0,
-  shoulderW: 12.6, hipW: 6.2, depth: 1.7,
+  rCalf: 4.7, rAnkle: 4.0, rAnkleDraw: 2.7, rToe: 2.2, rHeel: 2.6,
+  shoulderW: 12.2, hipW: 6.2, depth: 1.7,
   // hand v2
   palm: 5.0, palmHalf: 2.7, finger: 4.4, rPalm: 2.7, rFinger: 2.1, thumb: 5.0,
+  // The product figure is one neutral bald body: Mo asked for "just the white",
+  // no hair, no female variant for now.
+  hairStyle: "none",
 };
 // Identical on both bodies by construction, so the floor is in the same place.
 export const LEG_TO_FLOOR = BODY.thigh + BODY.shin + BODY.rAnkle;
@@ -841,8 +844,9 @@ function drawFoot(ctx, S, side, C, fill) {
   // the side on shape, which is correct.
   if (S.frontal && Math.abs(d.x) < 0.45) {
     const sole = Math.max(k.toe.y, k.heel.y, k.ankle.y + B.rAnkle * 0.8);
-    const r = B.rToe * 1.12 * w;
-    const half = B.rToe * 1.0 * w;
+    // Narrow pads: the sheet's feet are barely wider than the ankle.
+    const r = B.rToe * 0.95 * w;
+    const half = B.rToe * 0.55 * w;
     const c = V(k.ankle.x, sole - r * 0.9);
     part(ctx, C, [[V(c.x - half, c.y), r], [V(c.x + half, c.y), r]],
          { fill, shadeR: 0.42, shadeOff: 0.36 });
@@ -850,11 +854,11 @@ function drawFoot(ctx, S, side, C, fill) {
   }
   const mid = lerpV(k.ankle, k.toe, 0.45);
   part(ctx, C, [
-    [add(k.heel, scl(d, -0.4)), B.rHeel * 1.04 * w],      // heel, squared off
-    [add(k.ankle, scl(d, 0.4)), B.rAnkleDraw * 1.15 * w],     // ankle and instep, sized to the drawn shin end
-    [mid, B.rToe * 1.16 * w],                             // arch into the ball
-    [add(k.toe, scl(d, -0.8)), B.rToe * 1.22 * w],        // toe box, blunt
-    [k.toe, B.rToe * 0.82 * w],
+    [add(k.heel, scl(d, -0.3)), B.rHeel * 0.95 * w],      // heel
+    [add(k.ankle, scl(d, 0.4)), B.rAnkleDraw * 1.05 * w],  // instep, sized to the drawn shin end
+    [mid, B.rToe * 1.0 * w],                              // arch into the ball
+    [add(k.toe, scl(d, -0.8)), B.rToe * 1.02 * w],        // toe box
+    [k.toe, B.rToe * 0.7 * w],
   ], { fill, shadeR: 0.44, shadeOff: 0.36 });
 }
 
@@ -930,6 +934,7 @@ function drawHead(ctx, S, C, fill) {
   // behind the ear, clipped to the skull so it never breaks the silhouette
   ctx.save();
   hull(ctx, C, skull, { clip: true });
+  if (B.hairStyle === "none") { ctx.restore(); return; }
   // The cap is drawn with circles far above the head, so the edge that lands on
   // the skull is nearly straight: that edge IS the hairline. Front on it runs
   // level across the forehead; side on it slopes down behind the ear. From
