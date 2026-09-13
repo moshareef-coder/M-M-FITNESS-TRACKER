@@ -835,21 +835,32 @@ function drawFoot(ctx, S, side, C, fill) {
   const B = ACTIVE, k = S.sides[side];
   const w = k.footW;
   const d = norm2(sub(k.toe, k.heel));
-  // As simple as it gets, which is what Mo asked for after every cleverer foot
-  // read as a ball on the end of the leg. Front on, the shin just continues
-  // to the floor and ends round. Side on, one capsule from a heel just behind
-  // the ankle to the toe, tapering a little, joined to the shin at the ankle.
   const r = B.rAnkleDraw * w;
+  // Front on, the shin just continues to the floor and ends round.
   if (S.frontal && Math.abs(d.x) < 0.45) {
     const sole = Math.max(k.toe.y, k.heel.y, k.ankle.y + B.rAnkle * 0.8);
     const bottom = V(k.ankle.x, Math.max(k.ankle.y + r * 0.5, sole - r * 1.05));
     part(ctx, C, [[k.ankle, r], [bottom, r * 1.05]], { fill });
     return;
   }
+  // Side on. A foot ON THE FLOOR is built from the ankle alone: a short heel
+  // behind it, the toe ahead of it, both on the ground, one capsule. The
+  // solved foot frame is ignored here on purpose: in a squat the frame tilts
+  // with the shin and the capsule built from it put the heel a long way behind
+  // the leg and the toe under it, which is the foot Mo circled. Only a foot in
+  // the air (a hang, a kick, a raised heel) follows the frame.
   const sole = Math.max(k.toe.y, k.heel.y);
-  const heel = V(k.heel.x - d.x * 0.3, sole - r * 0.95);
-  const toe = V(k.toe.x - d.x * 0.3, sole - r * 0.8);
-  part(ctx, C, [[k.ankle, r], [heel, r * 0.95], [toe, r * 0.8]], { fill });
+  const onFloor = sole > GROUND - 2.5 && k.ankle.y > GROUND - B.foot * 0.9;
+  if (onFloor) {
+    const fwd = d.x >= 0 ? 1 : -1;
+    const y = GROUND - r * 0.9;
+    const heel = V(k.ankle.x - fwd * B.foot * 0.28, y);
+    const toe = V(k.ankle.x + fwd * B.foot * 0.78, y);
+    part(ctx, C, [[k.ankle, r], [heel, r * 0.92], [toe, r * 0.78]], { fill });
+    return;
+  }
+  const heel = add(k.ankle, scl(d, -B.foot * 0.25));
+  part(ctx, C, [[k.ankle, r], [heel, r * 0.9], [k.toe, r * 0.75]], { fill });
 }
 
 // Head: one silhouette with a hair mass and one soft shade. The v3 head carried
