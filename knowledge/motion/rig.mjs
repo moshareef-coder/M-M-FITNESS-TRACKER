@@ -686,9 +686,12 @@ function shadeSide(p0, p1) {
 // the figure read as armour plates rather than one body.
 let COLLECT = null;
 let LINES = true;
-// Pass two only: every capsule painted so far, in order. drawTorso reads it to
-// find the limbs that are UNDER the torso, so it can give them a seam too.
+// Pass two only: every ARM capsule painted so far, in order. drawTorso reads
+// it to find the arms that are UNDER the torso, so it can give them the same
+// shoulder seam a near arm leaves. Legs are deliberately not recorded: the hip
+// carries no seam on either side (see drawLeg).
 let DRAWN = null;
+let DRAWN_TAG = null;
 
 function part(ctx, C, pts, o = {}) {
   const fill = o.fill || C.ink;
@@ -715,7 +718,7 @@ function part(ctx, C, pts, o = {}) {
   }
   ctx.fillStyle = fill;
   for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.fill(); }
-  if (DRAWN) for (const g of segs) DRAWN.push(g);
+  if (DRAWN && DRAWN_TAG === "arm") for (const g of segs) DRAWN.push(g);
   // The shade band is OPT IN now. The reference is flat white: one white, one
   // very soft far side tone, nothing else. A crescent on every thigh, torso and
   // upper arm reads as facets, and that was the main thing still separating the
@@ -1208,7 +1211,12 @@ function drawLeg(ctx, S, side, C, fill, skinOpts) {
   // Thigh and shin are separate parts so the knee carries the ring the
   // reference draws on a straight leg. The crease below only fires when the
   // knee is actually bent and deepens the same line.
-  part(ctx, C, taper(k.hip, k.knee, [B.rHip, B.rHip * 0.95, B.rThighMid * 0.92, B.rKnee * 1.12, B.rKnee]), { fill });
+  /* No seam where the thigh meets the pelvis. With one, the near leg left an
+     arc bulging UP into the pelvis and the far leg got the pelvis edge bulging
+     DOWN into the thigh: two different curves, one each side, and Mo read the
+     pair as a pelvis turned away from the camera. Seamless hips face straight.
+     The knee keeps its seam and its crease. */
+  part(ctx, C, taper(k.hip, k.knee, [B.rHip, B.rHip * 0.95, B.rThighMid * 0.92, B.rKnee * 1.12, B.rKnee]), { fill, line: false });
   part(ctx, C, taper(k.knee, k.ankle, [B.rKnee * 0.98, B.rCalf, B.rCalf * 0.92, B.rCalf * 0.68, B.rAnkleDraw]), { fill });
   if (skinOpts && skinOpts.plates) legPlates(ctx, S, side, C, skinOpts.lit);
   drawFoot(ctx, S, side, C, fill);
@@ -1298,7 +1306,8 @@ function drawTorso(ctx, S, C, fill, skinOpts) {
      runs over something painted before them (the far arm, the far thigh),
      then filled again so the inner half of that stroke is covered and what
      survives is the same outer hairline a limb on top leaves. Both shoulders
-     and both hips now carry one seam each, whichever side the camera is on. */
+     carry one seam each, whichever side the camera is on. Only arms are
+     recorded in DRAWN, so this never seams a far thigh: hips are seamless. */
   const under = DRAWN ? DRAWN.slice() : [];
   const yokes = ["L", "R"].map((ys) => {
     const sh = S.sides[ys].shoulder;
@@ -2060,7 +2069,7 @@ export function drawFigure(ctx, S, C, opts = {}) {
 
   const walk = () => {
     for (const it of items) {
-      if (it.kind === "arm") drawArm(ctx, S, it.s, C, it.fill, grips[it.s], it.plates);
+      if (it.kind === "arm") { DRAWN_TAG = "arm"; drawArm(ctx, S, it.s, C, it.fill, grips[it.s], it.plates); DRAWN_TAG = null; }
       else if (it.kind === "leg") drawLeg(ctx, S, it.s, C, it.fill, it.plates);
       else if (it.kind === "torso") drawTorso(ctx, S, C, C.ink, skinOpts);
       else drawHead(ctx, S, C, C.ink);
