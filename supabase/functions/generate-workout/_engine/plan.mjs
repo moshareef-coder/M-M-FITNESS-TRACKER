@@ -1515,7 +1515,12 @@ export function buildPlan({
       for (const ramp of wanted) {
         if (!ramp) continue;
         const cost = Math.round(ramp.seconds / 60);
-        if (cost > spare()) break;
+        /* `continue` rather than `break`: the first main's four rung ramp costs
+           five minutes and the second main's single rung costs one, so a day
+           with two minutes left can afford the second when it cannot afford the
+           first. Refusing the cheap one because the dear one did not fit is a
+           false economy, not an ordering. */
+        if (cost > spare()) continue;
         d.rampSets.push(ramp);
         d.rampMinutes += cost;
         timeBought.push({ day: d.name, bought: "ramp", exercise: ramp.exercise, sets: ramp.sets.length, minutes: cost });
