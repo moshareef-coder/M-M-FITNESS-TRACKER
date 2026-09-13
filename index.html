@@ -1698,6 +1698,21 @@
     transition: opacity .12s ease;
   }
   .sess-title:active { opacity: .6; }
+  .sess-titlerow { display: flex; align-items: center; gap: 10px; }
+  .sess-titlerow .sess-title { flex: 1 1 auto; min-width: 0; }
+  /* Round, quiet, and the same 44px target as every other control on the
+     screen. It sits on the stage gradient, so its ground is the ink colour at
+     low strength rather than a panel token, which would be invisible here. */
+  .sess-more {
+    flex: 0 0 44px; width: 44px; height: 44px; margin-top: 5px;
+    display: flex; align-items: center; justify-content: center;
+    border: 0; border-radius: 50%; cursor: pointer; color: var(--sess-ink);
+    background: color-mix(in srgb, var(--sess-ink) 10%, transparent);
+    transition: background .15s ease, transform .12s ease;
+  }
+  .sess-more:active {
+    background: color-mix(in srgb, var(--sess-ink) 18%, transparent); transform: scale(.92);
+  }
 
   /* The figure gets everything between the title and the sheet, and is clipped
      rather than allowed to push either of them. */
@@ -1726,10 +1741,10 @@
   }
   .sess-grab {
     display: block; width: 100%; border: 0; background: none; cursor: pointer;
-    padding: 16px 0 12px; touch-action: none;
+    padding: 14px 0 12px; touch-action: none;
   }
   .sess-grab i {
-    display: block; width: 42px; height: 4px; border-radius: 100px; margin: 0 auto;
+    display: block; width: 54px; height: 5px; border-radius: 100px; margin: 0 auto;
     background: color-mix(in srgb, var(--text) 26%, transparent);
     transition: background .15s ease;
   }
@@ -1813,11 +1828,20 @@
     margin: 0 -20px; max-height: 0; opacity: 0; overflow: hidden;
     transition: max-height .3s cubic-bezier(.22,1,.36,1), opacity .2s ease, margin-top .3s cubic-bezier(.22,1,.36,1);
   }
-  .sess-sheet.open .upnext { max-height: 168px; opacity: 1; margin-top: 18px; }
+  /* A cap, not a height: the rail is shorter than this, so nothing is padded
+     out, and a longer one is never cut off halfway through a card. */
+  .sess-sheet.open .upnext { max-height: 220px; opacity: 1; margin-top: 18px; }
+  /* While a finger is on it the rail follows the finger, so the transition has
+     to be out of the way or every frame fights it. */
+  .sess-sheet.dragging .upnext { transition: none; }
   .sess-sheet .upnext-label { margin: 0 20px 10px; }
+  /* The whole sheet is the grip. pan-x leaves the rail free to scroll sideways
+     and hands every vertical gesture to the drag below instead of the browser. */
+  .sess-sheet { touch-action: pan-x; }
   /* Without the scroll padding the snap eats the left inset and the first
      card sits flush against the edge of the phone. */
   .sess-sheet .upnext-rail { padding: 0 20px 6px; scroll-padding-left: 20px; }
+  .upnext-rail { overflow-y: hidden; touch-action: pan-x; }
 
   .sess-live.ex-in .sess-top,
   .sess-live.ex-in .sess-fig-stage { animation: exIn .44s cubic-bezier(.22,1,.36,1) both; }
@@ -5024,6 +5048,8 @@ const ICON_PATHS = {
   flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5Z"/>',
   sunMoon: '<path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/>',
   swap: '<path d="M7 4v13M7 4 3 8M7 4l4 4M17 20V7m0 13 4-4m-4 4-4-4"/>',
+  // Filled, because a 3px ring at this size reads as three smudges.
+  more: '<circle cx="5" cy="12" r="1.9" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.9" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.9" fill="currentColor" stroke="none"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
   google: '<path fill="#4285F4" stroke="none" d="M21.6 12.23c0-.7-.06-1.38-.18-2.03H12v3.84h5.4a4.62 4.62 0 0 1-2 3.03v2.5h3.24c1.9-1.75 3-4.32 3-7.34Z"/><path fill="#34A853" stroke="none" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.5c-.9.6-2.05.96-3.4.96-2.6 0-4.8-1.76-5.6-4.12H3.05v2.58A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" stroke="none" d="M6.4 13.9a5.98 5.98 0 0 1 0-3.8V7.52H3.05a10 10 0 0 0 0 8.96l3.36-2.58Z"/><path fill="#EA4335" stroke="none" d="M12 6.06c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.96 9.96 0 0 0 12 2a10 10 0 0 0-8.95 5.52L6.4 10.1C7.2 7.74 9.4 6.06 12 6.06Z"/>',
   /* Traced from the reference artwork, measured off the image rather than
@@ -14153,8 +14179,14 @@ function renderSession() {
           <span>Exercise ${ei + 1} of ${total}</span>
           <span>${escapeHtml(displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises))}</span>
         </div>
-        <button type="button" class="sess-title" id="sessTitleBtn" aria-haspopup="dialog"
-          aria-label="${escapeHtml(ex.name)}, change this exercise">${escapeHtml(ex.name)}</button>
+        <div class="sess-titlerow">
+          <button type="button" class="sess-title" id="sessTitleBtn" aria-haspopup="dialog"
+            aria-label="${escapeHtml(ex.name)}, change this exercise">${escapeHtml(ex.name)}</button>
+          <!-- The name stays tappable, but a word does not look like a button.
+               This is the thing you can see: swap, skip and who can see it. -->
+          <button type="button" class="sess-more" id="sessMoreBtn" aria-haspopup="dialog"
+            aria-label="Options for ${escapeHtml(ex.name)}">${icon("more", 22)}</button>
+        </div>
       </div>
 
       <div class="sess-stage">
@@ -14263,6 +14295,7 @@ function renderSession() {
   wireSessionSheet();
 
   $("sessTitleBtn").onclick = openExerciseActions;
+  $("sessMoreBtn").onclick = openExerciseActions;
 
   const logBtn = $("logSetBtn");
   if (logBtn) logBtn.onclick = () => { if (currentSet >= 0) toggleSet(currentSet); };
@@ -14336,22 +14369,104 @@ function wireSessionSheet() {
   const grab = $("sessGrab");
   if (!sheet || !grab) return;
   const set = (open) => {
+    // One short tick when it actually snaps, so the sheet answers the thumb
+    // even before the eye catches up. Nothing on a no-op.
+    if (open !== SESSION_SHEET_OPEN) buzz(9);
     SESSION_SHEET_OPEN = open;
     sheet.classList.toggle("open", open);
     grab.setAttribute("aria-expanded", open ? "true" : "false");
     grab.setAttribute("aria-label", open ? "Hide what is up next" : "Show what is up next");
   };
-  let startY = null;
   grab.onclick = () => set(!SESSION_SHEET_OPEN);
-  grab.onpointerdown = (e) => { startY = e.clientY; };
-  grab.onpointerup = (e) => {
-    if (startY == null) return;
-    const dy = startY - e.clientY;
-    startY = null;
-    // Anything under the threshold is a tap, and onclick has it.
-    if (Math.abs(dy) < 24) return;
-    set(dy > 0);
+
+  const rail = sheet.querySelector(".upnext");
+  if (!rail) return;   // last exercise: nothing to pull up
+
+  /* The drag. The old one only listened on the handle, only looked at where
+     the finger left, and moved nothing on the way, so a slow pull did nothing
+     and a fast one felt like a coin flip. This one takes the gesture anywhere
+     on the sheet that is not a control, follows the finger frame by frame, and
+     decides on release by where it ended OR how fast it was flicked. */
+  const full = () => rail.scrollHeight || 1;
+  let pid = null, y0 = 0, x0 = 0, t0 = 0, base = 0, live = false, dragged = false;
+  // Where the finger actually was last. pointercancel arrives with no useful
+  // coordinates (clientY 0), and reading it turned a pull DOWN into a 900px
+  // pull up, which slammed the sheet open.
+  let lastY = 0, lastT = 0;
+
+  const paint = (h) => {
+    const k = Math.max(0, Math.min(1, h / full()));
+    rail.style.maxHeight = `${h}px`;
+    rail.style.opacity = String(k);
+    rail.style.marginTop = `${18 * k}px`;
   };
+  const clear = () => {
+    sheet.classList.remove("dragging");
+    rail.style.maxHeight = rail.style.opacity = rail.style.marginTop = "";
+  };
+
+  sheet.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    // Typing a weight is not a drag.
+    if (e.target.closest("input")) return;
+    pid = e.pointerId; y0 = lastY = e.clientY; x0 = e.clientX; t0 = lastT = e.timeStamp;
+    base = SESSION_SHEET_OPEN ? full() : 0;
+    live = false;
+    /* Clear it HERE, at the start of the next gesture, not in the click
+       handler: a touch drag never produces a click, so the flag outlived its
+       gesture and ate the tap that came after it. */
+    dragged = false;
+    listen();
+  });
+  /* The rest of the gesture is watched on the DOCUMENT, not on the sheet. As
+     the rail collapses the sheet shrinks out from under the finger, and a
+     listener on the sheet simply stops hearing the drag halfway down: pulling
+     up worked and pushing down never finished. */
+  const onMove = (e) => {
+    if (e.pointerId !== pid) return;
+    const dy = y0 - e.clientY;
+    if (!live) {
+      // Claim the gesture only once it is clearly vertical, so a sideways
+      // swipe still scrolls the Up next rail.
+      if (Math.abs(dy) < 7 || Math.abs(dy) <= Math.abs(e.clientX - x0)) return;
+      live = dragged = true;
+      sheet.classList.add("dragging");
+    }
+    lastY = e.clientY; lastT = e.timeStamp;
+    paint(Math.max(0, Math.min(full(), base + dy)));
+    e.preventDefault();
+  };
+  const end = (e) => {
+    if (e.pointerId !== pid) return;
+    pid = null;
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", end);
+    document.removeEventListener("pointercancel", end);
+    if (!live) return;   // it was a tap; the click handlers own it
+    live = false;
+    const dy = y0 - lastY;
+    const v = dy / Math.max(1, lastT - t0);   // px per ms, + is upward
+    clear();
+    /* Three ways to decide, in order. A flick goes where it was thrown. A
+       deliberate pull of more than about a thumb's width commits in the
+       direction it was pulled, so swiping down closes even though half the
+       rail is still showing. Anything shorter falls to whichever end it is
+       nearest, which is what a hesitant drag should do. */
+    if (Math.abs(v) > 0.35) set(v > 0);
+    else if (Math.abs(dy) > 40) set(dy > 0);
+    else set(base + dy > full() / 2);
+  };
+  const listen = () => {
+    document.addEventListener("pointermove", onMove, { passive: false });
+    document.addEventListener("pointerup", end);
+    document.addEventListener("pointercancel", end);
+  };
+  /* A drag that started on a card must not also count as tapping that card.
+     Capture phase, so it is swallowed before the card's own handler. */
+  sheet.addEventListener("click", (e) => {
+    if (!dragged) return;
+    e.stopPropagation(); e.preventDefault();
+  }, true);
 }
 
 /* Everything you can do TO this exercise, behind its name. The three things
