@@ -143,7 +143,7 @@ export const BODY = {
   palm: 5.0, palmHalf: 2.7, finger: 4.4, rPalm: 2.7, rFinger: 2.1, thumb: 5.0,
   // The product figure is one neutral bald body: Mo asked for "just the white",
   // no hair, no female variant for now.
-  hairStyle: "none",
+  hairStyle: "cap",
 };
 // Identical on both bodies by construction, so the floor is in the same place.
 export const LEG_TO_FLOOR = BODY.thigh + BODY.shin + BODY.rAnkle;
@@ -827,6 +827,15 @@ function drawHand(ctx, S, side, C, fill, grip) {
     [lerpV(k.wrist, tip, 0.62), rRoot * 0.94],
     [tip, rTip],
   ], { fill, shadeR: 0.42, shadeOff: 0.34 });
+  // The thumb: a small bump on the body side of the mitt, a third of the way
+  // down. The sheet's hands are mitts with exactly this one feature.
+  if (grip !== "flat" && grip !== "closed" && grip !== "hook") {
+    const perp = V(-d.y, d.x);
+    const toBody = sub(S.chest, k.wrist);
+    const sgn = (perp.x * toBody.x + perp.y * toBody.y) >= 0 ? 1 : -1;
+    const at = add(lerpV(k.wrist, tip, 0.34), scl(perp, sgn * rRoot * 0.78));
+    part(ctx, C, [[at, rRoot * 0.42], [add(at, scl(perp, sgn * rRoot * 0.18)), rRoot * 0.38]], { fill });
+  }
 }
 
 // A foot with a heel and a toe: instep from the ankle, sole along the ground,
@@ -844,22 +853,20 @@ function drawFoot(ctx, S, side, C, fill) {
   // the side on shape, which is correct.
   if (S.frontal && Math.abs(d.x) < 0.45) {
     const sole = Math.max(k.toe.y, k.heel.y, k.ankle.y + B.rAnkle * 0.8);
-    // Narrow pads: the sheet's feet are barely wider than the ankle.
-    const r = B.rToe * 0.95 * w;
-    const half = B.rToe * 0.55 * w;
-    const c = V(k.ankle.x, sole - r * 0.9);
-    part(ctx, C, [[V(c.x - half, c.y), r], [V(c.x + half, c.y), r]],
-         { fill, shadeR: 0.42, shadeOff: 0.36 });
+    // A short cylinder under the ankle, the sheet's shoe seen from the front.
+    const r = B.rAnkleDraw * 1.15 * w;
+    const half = B.rAnkleDraw * 0.55 * w;
+    const c = V(k.ankle.x, sole - r);
+    part(ctx, C, [[V(c.x - half, c.y), r], [V(c.x + half, c.y), r]], { fill });
     return;
   }
-  const mid = lerpV(k.ankle, k.toe, 0.45);
-  part(ctx, C, [
-    [add(k.heel, scl(d, -0.3)), B.rHeel * 0.95 * w],      // heel
-    [add(k.ankle, scl(d, 0.4)), B.rAnkleDraw * 1.05 * w],  // instep, sized to the drawn shin end
-    [mid, B.rToe * 1.0 * w],                              // arch into the ball
-    [add(k.toe, scl(d, -0.8)), B.rToe * 1.02 * w],        // toe box
-    [k.toe, B.rToe * 0.7 * w],
-  ], { fill, shadeR: 0.44, shadeOff: 0.36 });
+  // Side on, a cylinder from heel to toe: one radius, rounded ends, the
+  // sheet's simple shoe. No arch, no heel bump, no toe box.
+  const rf = B.rAnkleDraw * 1.1 * w;
+  const sole = Math.max(k.toe.y, k.heel.y);
+  const heel = V(k.heel.x - d.x * 0.6, sole - rf);
+  const toe = V(k.toe.x - d.x * 0.4, sole - rf);
+  part(ctx, C, [[heel, rf], [toe, rf]], { fill });
 }
 
 // Head: one silhouette with a hair mass and one soft shade. The v3 head carried
@@ -876,12 +883,11 @@ function drawHead(ctx, S, C, fill) {
   // Skull from the reference sheet: a high round cranium, a brow, a jaw that
   // angles back under the ear and a short chin. Front on it is an oval that
   // narrows to the jaw.
-  const skull = flat
-    ? [[at(2.6, 0), B.rHeadBack * 0.97], [at(-0.4, 0), B.rHeadBack * 0.93],
-       [at(-3.4, 0), B.rHeadBack * 0.74], [at(-5.0, 0), B.rHeadBack * 0.5]]
-    : [[at(2.2, -1.6), B.rHeadBack], [at(1.4, 1.8), B.rHeadBack * 0.86],
-       [at(-2.2, 2.6), B.rHeadJaw], [at(-4.4, 2.2), B.rHeadJaw * 0.66],
-       [at(-3.0, -1.0), B.rHeadJaw * 0.82]];
+  // A symmetric oval on the neck axis in every view. The offset jaw and the
+  // ear made the head lopsided at card size (Mo's word), and the sheet's head
+  // is a plain egg: wide at the crown, narrowing to a centred chin.
+  const skull = [[at(2.8, 0), B.rHeadBack * 0.98], [at(-0.6, 0), B.rHeadBack * 0.92],
+                 [at(-3.6, 0), B.rHeadBack * 0.72], [at(-5.4, 0), B.rHeadBack * 0.48]];
   hull(ctx, C, skull, { fill, shade: false });
   // Her hair, as one of three shapes. `hairStyle` on the body table picks it:
   // "bun" is the rolled up knot, "tail" a thin ponytail, "cap" nothing at all
@@ -940,9 +946,10 @@ function drawHead(ctx, S, C, fill) {
   // level across the forehead; side on it slopes down behind the ear. From
   // BEHIND there is no hairline at all: the whole skull is hair down to the
   // nape, which is what you actually see of the back of a head.
-  const hair = flat
-    ? (away ? [[at(23, -8), 27], [at(23, 8), 27]] : [[at(36, -8), 32], [at(36, 8), 32]])
-    : [[at(34, 7), 30], [at(31, -9), 32]];
+  // A small cap on the crown, the same from every side: the sheet's figure
+  // wears a little dark cap that stops well above the brow.
+  const capTop = 5.2;
+  const hair = [[at(capTop + 30, -5), 30], [at(capTop + 30, 5), 30]];
   const hsegs = [];
   for (let i = 0; i < hair.length - 1; i++) hsegs.push([hair[i][0], hair[i][1], hair[i + 1][0], hair[i + 1][1]]);
   ctx.fillStyle = C.hair;
@@ -950,19 +957,16 @@ function drawHead(ctx, S, C, fill) {
   // A small peak down the centre of the forehead. Without it the hairline is a
   // ruled line across the head and the cap reads as a swimming cap; the sheet
   // has a soft point in the middle.
-  if (!away) {
+  {
     const peakF = flat ? 0 : -B.rHeadBack * 0.1;
-    capsulePath(ctx, at(3.8, peakF), B.rHeadBack * 0.26, at(2.5, peakF), B.rHeadBack * 0.1);
+    capsulePath(ctx, at(capTop + 0.4, peakF), B.rHeadBack * 0.22, at(capTop - 1.4, peakF), B.rHeadBack * 0.08);
     ctx.fill();
   }
   // the sideburn: a short tab of the cap running down in front of the ear
-  if (!flat) {
-    capsulePath(ctx, at(0.6, -B.rHeadBack * 0.34), 1.5, at(-2.4, -B.rHeadBack * 0.44), 1.1);
-    ctx.fill();
-  }
+
   ctx.restore();
   // ear: a small shape at the hairline, the only feature on the head
-  const ears = flat ? (away ? [-1, 1] : []) : [-1];
+  const ears = [];  // the sheet's head has no ear
   for (const sd2 of ears) {
     // Behind the cheekbone, not on it. At 1.0 forward the ear landed in the
     // middle of the face and read as a single staring eye.
@@ -996,6 +1000,14 @@ function taper(a, b, radii, n = 7) {
   return out;
 }
 
+// A ring at a joint, the way a drawing doll shows its elbow and knee. Drawn
+// after the limb is filled so it sits on top; skipped in the collect pass.
+function ring(ctx, C, p, r) {
+  if (COLLECT) return;
+  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+  ctx.strokeStyle = C.seam; ctx.lineWidth = 0.5; ctx.stroke();
+}
+
 function drawArm(ctx, S, side, C, fill, grip, skinOpts) {
   const B = ACTIVE, k = S.sides[side];
   const d = norm2(sub(k.elbow, k.shoulder));
@@ -1010,6 +1022,7 @@ function drawArm(ctx, S, side, C, fill, grip, skinOpts) {
   const top = add(k.shoulder, scl(d, 1.6));
   part(ctx, C, taper(top, k.elbow, [B.rDelt * 0.92, B.rUpperArmMid * 1.06, B.rUpperArmMid * 0.94, B.rElbow * 1.08, B.rElbow]), { fill });
   part(ctx, C, taper(k.elbow, k.wrist, [B.rElbow, B.rForearmMid, B.rForearmMid * 0.9, B.rWrist * 1.25, B.rWrist]), { fill });
+  ring(ctx, C, k.elbow, B.rElbow * 0.9);
   if (skinOpts && skinOpts.plates) armPlates(ctx, S, side, C, skinOpts.lit);
   drawHand(ctx, S, side, C, fill, grip);
 }
@@ -1023,7 +1036,7 @@ function drawLeg(ctx, S, side, C, fill, skinOpts) {
   // knee is actually bent and deepens the same line.
   part(ctx, C, taper(k.hip, k.knee, [B.rHip, B.rHip * 0.95, B.rThighMid * 0.92, B.rKnee * 1.12, B.rKnee]), { fill });
   part(ctx, C, taper(k.knee, k.ankle, [B.rKnee * 0.98, B.rCalf, B.rCalf * 0.92, B.rCalf * 0.68, B.rAnkleDraw]), { fill });
-  crease(ctx, C, k.knee, norm2(sub(k.knee, k.hip)), sh, B.rKnee, 0.56, 0.46);
+  ring(ctx, C, k.knee, B.rKnee * 0.92);
   if (skinOpts && skinOpts.plates) legPlates(ctx, S, side, C, skinOpts.lit);
   drawFoot(ctx, S, side, C, fill);
 }
