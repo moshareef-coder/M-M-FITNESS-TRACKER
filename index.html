@@ -13465,7 +13465,7 @@ function renderSession() {
       </label>
       <div class="sess-field-ctl">
         <button type="button" class="round-btn" id="sessWeightMinus" aria-label="Less weight">&minus;</button>
-        <input class="sess-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" value="${SESSION.weights[ei] || 0}" />
+        <input class="sess-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" max="2000" value="${SESSION.weights[ei] || 0}" />
         <button type="button" class="round-btn" id="sessWeightPlus" aria-label="More weight">+</button>
       </div>
     </div>
@@ -13474,7 +13474,7 @@ function renderSession() {
       <label class="sess-field-label">Reps</label>
       <div class="sess-field-ctl">
         <button type="button" class="round-btn" id="sessRepsMinus" aria-label="Fewer reps">&minus;</button>
-        <input class="sess-input" id="sessRepsVal" type="number" inputmode="numeric" step="1" min="0" value="${SESSION.reps[ei] || 0}" />
+        <input class="sess-input" id="sessRepsVal" type="number" inputmode="numeric" step="1" min="0" max="500" value="${SESSION.reps[ei] || 0}" />
         <button type="button" class="round-btn" id="sessRepsPlus" aria-label="More reps">+</button>
       </div>
     </div>
@@ -13534,16 +13534,29 @@ function renderSession() {
   // Typing straight into the field beats tapping + fifteen times.
   // The clamp has to reach the field as well as the value: a set logged at 0
   // while the box still shows -40 is the app disagreeing with itself.
+  /* There was a floor and no ceiling, and the ceiling is the one that hurts.
+     A logged lift is not just a record, it is the input the generator
+     extrapolates the next prescription from, so a missed decimal point comes
+     back as a target. A fuzz run found a single 200 lb goblet squat producing
+     an 870 lb leg press, and a typed 99,999 producing 33,250. Both caps sit
+     well above any real human lift, so they never argue with a true number
+     and only ever catch a typo. The engine has its own guard; this stops the
+     bad number reaching the log in the first place. */
+  const MAX_LIFT_LB = 2000;
+  const MAX_REPS = 500;
+  const clampInput = (el, v, lo, hi) => {
+    const n = Math.min(hi, Math.max(lo, v));
+    if (v < lo || v > hi) el.value = n;
+    return n;
+  };
   $("sessWeightVal").oninput = (e) => {
     const v = parseFloat(e.target.value);
-    SESSION.weights[ei] = isNaN(v) ? 0 : Math.max(0, v);
-    if (v < 0) e.target.value = SESSION.weights[ei];
+    SESSION.weights[ei] = isNaN(v) ? 0 : clampInput(e.target, v, 0, MAX_LIFT_LB);
     saveSessionToStorage();
   };
   $("sessRepsVal").oninput = (e) => {
     const v = parseInt(e.target.value, 10);
-    SESSION.reps[ei] = isNaN(v) ? 0 : Math.max(0, v);
-    if (v < 0) e.target.value = SESSION.reps[ei];
+    SESSION.reps[ei] = isNaN(v) ? 0 : clampInput(e.target, v, 0, MAX_REPS);
     saveSessionToStorage();
   };
   // An emptied field logged 0 while showing nothing, so put the real number
