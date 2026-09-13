@@ -439,9 +439,12 @@
     try {
       const payload = init && init.body ? JSON.parse(init.body) : {};
       const { generateFromPayload } = await import("/mo-knowledge/engine/adapter.mjs");
-      const { workout, honest, meta } = generateFromPayload(payload);
-      window.__SANDBOX.lastGenerated = { payload, workout, honest, meta };
-      return new Response(JSON.stringify({ workout, honest, meta }), {
+      /* `notes` too: the real function returns it, the reveal renders it, and
+         leaving it out of the fake made every sentence the plan says about
+         itself invisible in the one place the app is reviewed. */
+      const { workout, honest, meta, notes } = generateFromPayload(payload);
+      window.__SANDBOX.lastGenerated = { payload, workout, honest, meta, notes };
+      return new Response(JSON.stringify({ workout, honest, meta, notes }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });

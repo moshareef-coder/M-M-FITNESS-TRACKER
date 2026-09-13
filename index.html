@@ -761,6 +761,9 @@
     font-family: inherit; font-size: 14px; font-weight: 700;
     font-variant-numeric: tabular-nums; transition: background .15s, border-color .15s, color .15s;
   }
+  /* Session length asks five questions' worth of answer in the same row, so the
+     only thing that changes is how many columns it is cut into. */
+  .rest-pref.five { grid-template-columns: repeat(5, 1fr); }
   .rest-pref button:active { transform: scale(.96); }
   .rest-pref button.on { background: var(--accent); border-color: transparent; color: var(--on-accent); }
 
@@ -1075,6 +1078,13 @@
     display: flex; flex-direction: column; justify-content: space-between; height: 100%;
   }
   .gen-scrim.done .gen-stage { justify-content: center; }
+  /* A reveal can be taller than the screen: a day that could not be made to fit
+     the time you have says so in full, and the sentences saying it were being
+     squashed into each other by a stage pinned to exactly one screen. Only on
+     .done, so the generating animation above it keeps its fixed chamber. */
+  .gen-scrim.done { overflow-y: auto; }
+  .gen-scrim.done .gen-stage { height: auto; }
+  .gen-scrim.done .gen-step { flex-shrink: 0; }
   .gen-head { padding-top: 6px; }
   .gen-word-wrap { position: relative; display: inline-block; }
   .gen-word {
@@ -4115,6 +4125,12 @@
       </div>
     </div>
     <div class="card">
+      <h2>How long per session?</h2>
+      <p class="muted-note" style="margin-top:-6px;">Minutes. The plan is built to fit it: fewer sets when the time is short, more when there is room.</p>
+      <div class="rest-pref five" id="setupSessionLen"></div>
+      <p class="muted-note" id="setupSessionLenNote"></p>
+    </div>
+    <div class="card">
       <h2>Rest between sets</h2>
       <p class="muted-note" style="margin-top:-6px;">Used for workouts you build yourself. A generated plan budgets its own rest per exercise, because a heavy squat and a lateral raise do not want the same wait.</p>
       <div class="rest-pref" id="setupRestChoices"></div>
@@ -5676,20 +5692,28 @@ function renderGoalPage() {
   });
 }
 
-/* profiles.goal_secondary is behind a migration that is written and not
-   applied, so right now every account is on a database without that column and
-   a write that mentions it comes back PGRST204. Dropping the field and writing
-   the rest is the only version of this that does not lose somebody's main goal
-   over a column that does not exist yet. It reports what it dropped rather
-   than swallowing it, because "saved" when the extras were not saved is the
-   kind of quiet lie this app does not tell. */
+/* Two columns here are behind migrations that are written and not applied, so
+   right now every account is on a database without them and a write that
+   mentions one comes back PGRST204. Dropping the named field and writing the
+   rest is the only version of this that does not lose somebody's main goal over
+   a column that does not exist yet. It reports what it dropped rather than
+   swallowing it, because "saved" when half of it was not saved is the kind of
+   quiet lie this app does not tell. */
+const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes"];
+
 async function upsertGoalFields(patch) {
   const { data, error } = await sb.from("profiles").upsert(patch).select().maybeSingle();
-  const missing = error && /goal_secondary/.test(`${error.message || ""} ${error.details || ""} ${error.hint || ""}`);
-  if (!missing) return { data, error, droppedSecondary: false };
-  const { goal_secondary, ...rest } = patch;
+  const said = error ? `${error.message || ""} ${error.details || ""} ${error.hint || ""}` : "";
+  const missing = PENDING_PROFILE_COLUMNS.filter((c) => c in patch && said.includes(c));
+  if (!missing.length) return { data, error, droppedSecondary: false, droppedSession: false };
+  const rest = { ...patch };
+  for (const c of missing) delete rest[c];
   const retry = await sb.from("profiles").upsert(rest).select().maybeSingle();
-  return { data: retry.data, error: retry.error, droppedSecondary: !retry.error };
+  const dropped = (c) => !retry.error && missing.includes(c);
+  return {
+    data: retry.data, error: retry.error,
+    droppedSecondary: dropped("goal_secondary"), droppedSession: dropped("session_minutes"),
+  };
 }
 
 /* The Focus areas page, opened from Setup. Went through a zoom-on-tap pass,
@@ -6557,9 +6581,17 @@ function renderOnboardStep(step, data = {}) {
           <div class="ob-row"><span>Focus</span><b>${escapeHtml(g.focus)}</b></div>
           <div class="ob-row"><span>Pace</span><b>${escapeHtml(p.label)}, ${p.weeks} weeks</b></div>
         </div>
+        <p class="sub" style="margin:18px 0 0;"><strong>About how long per session?</strong></p>
+        <div class="rest-pref five" id="obSessionLen"></div>
+        <p class="sub" id="obSessionNote" style="margin:10px 0 0;"></p>
         <button class="btn-primary" id="startBtn">Start</button>
         <button class="btn-ghost" id="backBtn">Change something</button>
       </div>`;
+    /* The one question this step asks rather than states, and it is here rather
+       than on the goal step because the length the goal would pick on its own
+       is only knowable once the goal is picked, and lighting the wrong chip is
+       worse than asking a step later. Tapping nothing sends nothing. */
+    paintObSessionLengths(data);
     $("startBtn").onclick = () => finishOnboarding({
       name: data.name,
       goal: g.goal,
@@ -6575,10 +6607,34 @@ function renderOnboardStep(step, data = {}) {
       pace: p.key,
       weeks: p.weeks,
       days_per_week: days,
+      /* null unless they tapped one. The engine treats null, 0 and nonsense
+         identically to never having been asked, and that is the guarantee that
+         keeps every plan built before this question existed exactly as it was,
+         so a default must never be written here. */
+      session_minutes: Number.isFinite(data.session_minutes) ? data.session_minutes : null,
     });
     $("backBtn").onclick = () => renderOnboardStep("pace", data);   // one step back, not all the way to goal
     return;
   }
+}
+
+/* Async because the goal's own length is read from the engine's table. The
+   chips paint a moment after the step does, which is fine: nothing here is
+   needed to press Start. */
+async function paintObSessionLengths(data) {
+  const el = $("obSessionLen");
+  if (!el) return;
+  const suggested = nearestSessionLength(await goalSessionMinutes(data.goal_bubble, data.goal_child));
+  if (!$("obSessionLen")) return;   // they moved on while the table loaded
+  const paint = () => {
+    const chosen = Number.isFinite(data.session_minutes) ? data.session_minutes : null;
+    $("obSessionNote").textContent = sessionLengthNote(chosen, suggested);
+    renderSessionLengths(el, {
+      chosen, suggested,
+      onPick: (minutes) => { data.session_minutes = minutes; paint(); },
+    });
+  };
+  paint();
 }
 
 async function finishOnboarding(data) {
@@ -6588,10 +6644,14 @@ async function finishOnboarding(data) {
   /* Through upsertGoalFields, not straight at the table: goal_secondary is
      behind an unapplied migration, and a first-run setup must not fail on a
      column that does not exist yet. */
-  const { data: saved, error, droppedSecondary } = await upsertGoalFields({
+  const { data: saved, error, droppedSecondary, droppedSession } = await upsertGoalFields({
     email: MY_EMAIL,
     user_name: ME,
     focus: data.focus,
+    /* Only present when they actually tapped a length. Sending null instead
+       would put every new account through the missing-column retry below for a
+       value that means the same as the column's own default. */
+    ...(Number.isFinite(data.session_minutes) ? { session_minutes: data.session_minutes } : {}),
     goal: data.goal,
     goal_bubble: data.goal_bubble || null,
     goal_child: data.goal_child || null,
@@ -6602,6 +6662,7 @@ async function finishOnboarding(data) {
   });
   if (error) { toast("Setup failed, try again"); console.error(error); return; }
   if (droppedSecondary && (data.goal_secondary || []).length) toast("Your extra goals are not being stored yet.");
+  if (droppedSession) toast("Your session length is not being stored yet.");
   MY_PROFILE = saved;
   clearObDraft();
   if (data.goal_key) await setActiveGoal(data);
@@ -11716,18 +11777,66 @@ function closeGenOverlay() {
    here rather than in a toast: it is the caveat on the plan you are reading,
    so it sits above the rows in the sheet's own muted line and stays on screen
    for as long as they do. */
-function revealGeneratedPlan(workout, honest, onGo, planDate, notes = []) {
+/* One sentence off meta.session (CONTRACT.md): the clock this day was costed
+   against, whose clock it was, and what the day really comes to. `budgetMinutes`
+   is this DAY's budget and a short day is six tenths of the week's, so when it
+   disagrees with what was asked for the sentence says which is which rather
+   than reading as the engine ignoring the answer. The two trades, a day that
+   does not fit and a rest that was shortened, are the engine's own sentences
+   and are shown from `notes` instead of being written again here. */
+function sessionRevealLine(session) {
+  const budget = Number(session?.budgetMinutes);
+  if (!Number.isFinite(budget) || budget <= 0) return "";
+  const est = Number(session.estimatedMinutes);
+  const comes = Number.isFinite(est) && est > 0 ? ` This one comes to about ${est}.` : "";
+  /* The engine spells the stated case "asked" (plan.mjs `sessionBudget.source`).
+     Tested for the goal case rather than the other one so a third value could
+     only ever read as a number somebody gave, which is the harmless way round. */
+  if (session.source === "goal") {
+    return `You have not said how long you have, so your goal set the clock at ${budget} minutes.${comes}`
+      + ` Setup, then Training, if that is wrong.`;
+  }
+  const asked = Number(session.asked);
+  if (Number.isFinite(asked) && asked !== budget) {
+    return `You asked for about ${asked} minutes a session. This is a shorter day, built for ${budget}.${comes}`;
+  }
+  return `Built for the ${budget} minutes you asked for.${comes}`;
+}
+
+function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], session = null) {
   if (genCancelled) return;   // they left; the workout is saved either way
   stopGenTicker();
   paintGen(100);
   const list = (workout.exercises || []).slice(0, 8);
+  /* The clock, closed back. meta.session says which clock this day was costed
+     against and whose it was, and a length somebody asked for that is never
+     mentioned again is a question that might as well not have been asked. */
+  const sessionLine = sessionRevealLine(session);
+  /* Two of the four things meta.session can report are trades rather than
+     reassurances: the day that still does not fit, and the rest that was
+     shortened to buy the minutes. The engine already says both out loud in
+     `notes`, so when either happened every note is shown rather than the first
+     three, because the one that got cut would be the one worth reading. */
+  const loud = session?.fits === false || session?.restCompressed === true;
   /* What the plan said about itself (CONTRACT.md `notes`): the limits summary,
      the softened warning when a slot kept a movement that loads a joint they
      said hurts, the day-count clamp. Until 2026-09-10 the engine computed all
      of it and none of it reached a screen, so its defence for prescribing a
      movement someone said hurts ("the plan says so out loud") was false end to
      end. Three at most; the first three are the ones that matter. */
-  const said = (Array.isArray(notes) ? notes : []).filter((n) => typeof n === "string" && n.trim()).slice(0, 3);
+  /* The day that does not fit is said once per day and this sheet is one day,
+     so the other days' copies are dropped. Four near identical paragraphs
+     naming days you are not doing today is a scold, which is the same reason
+     the engine says the rest compression sentence once for the whole week.
+     Keyed off the engine's own sentence, and a rewording there costs this
+     filter and never a note: nothing matching means nothing dropped. */
+  const otherDay = (n) => {
+    const m = /^(.+?) (?:still )?comes to about \d+ minutes against/.exec(n);
+    return !!m && m[1] !== (workout.focus || "");
+  };
+  const heard = (Array.isArray(notes) ? notes : [])
+    .filter((n) => typeof n === "string" && n.trim() && !otherDay(n));
+  const said = loud ? heard : heard.slice(0, 3);
   const wu = workout.warmup || [];
   const cd = workout.cooldown || [];
   /* Only mention the halves that exist: the old template printed "Opens with
@@ -11767,6 +11876,7 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = []) {
       <div class="gen-focus">${escapeHtml(displayFocus(workout.focus, workout.exercises) || "Ready")}</div>
       ${forToday ? "" : `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(forDate)}</p>`}
       ${honest ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(honest)}</p>` : ""}
+      ${sessionLine ? `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(sessionLine)}</p>` : ""}
       ${said.map((n) => `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(n)}</p>`).join("")}
       ${stretchLine ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(stretchLine)}</p>` : ""}
       <div class="gen-rows" id="genRows">
@@ -12144,6 +12254,10 @@ async function generateWorkout(forDate, { sameAgain = false } = {}) {
         current_weight: recentWeight,
         gym_days_this_week: recentGymDays,
         challenge_target: MY_PROFILE?.challenge_target ?? null,
+        /* How long one session should take, from Setup > Training. null on a
+           database without the column yet and on anybody who never answered,
+           and the contract says null is byte for byte "never asked". */
+        session_minutes: MY_PROFILE?.session_minutes ?? null,
         focus_groups: MY_PROFILE?.focus_groups ?? null,
         focus_chosen_at: MY_PROFILE?.focus_chosen_at ?? null,
         limits: MY_PROFILE?.limits ?? null,
@@ -12228,10 +12342,10 @@ async function generateWorkout(forDate, { sameAgain = false } = {}) {
       await loadTodayWorkout();
       FRESH_PLAN_ID = TODAY_WORKOUT?.id || null;
       renderWorkoutTab();
-      revealGeneratedPlan(data.workout, data.honest, () => switchTab("workout"), target, data.notes);
+      revealGeneratedPlan(data.workout, data.honest, () => switchTab("workout"), target, data.notes, data.meta?.session);
     } else {
       renderHero();
-      revealGeneratedPlan(data.workout, data.honest, () => toast("Tomorrow is planned"), target, data.notes);
+      revealGeneratedPlan(data.workout, data.honest, () => toast("Tomorrow is planned"), target, data.notes, data.meta?.session);
     }
   } catch (err) {
     console.error("generateWorkout failed:", err);
@@ -18169,7 +18283,11 @@ function openSettingsPage(key) {
   if (key === "goal") renderGoalPage();
   // Training shows the goal in words rather than owning a second copy of it,
   // so it has to re-read the profile every time it is opened.
-  if (key === "training") $("setupGoalSub").textContent = goalTileLabel(MY_PROFILE);
+  if (key === "training") {
+    $("setupGoalSub").textContent = goalTileLabel(MY_PROFILE);
+    // Same reason: what the goal suggests moves when the goal does.
+    renderSessionLengthPage();
+  }
   if (key === "focus") renderBodyFocusPage();
   if (key === "limits") renderLimitsPage();
   window.scrollTo({ top: 0 });
@@ -18208,6 +18326,109 @@ function renderRestChoices() {
       if (error) { console.warn("could not save rest length", error); toast("Could not save that"); return; }
       toast(`Rest set to ${restLabel(sec)}`);
     };
+  });
+}
+
+/* ---------- How long you actually have ----------
+   Mo: "some people they wanna do more, or they wanna do less. So maybe we
+   should also have it be where, how long are you wanting to work out for?"
+
+   One question, five answers, and not answering is itself an answer: null in
+   profiles.session_minutes means the goal's own session length runs and the
+   plan is byte for byte the plan it was before this question existed. Which is
+   why the pre-selected chip below is a DISPLAY of what will happen and never a
+   value that gets written on its own. Nobody who skips this lands on a number.
+
+   Five lengths rather than a slider: a slider makes a person tune a number
+   they have no way to evaluate, and the engine's four levers do not resolve
+   finely enough for 47 minutes to mean anything 45 does not. */
+const SESSION_LENGTHS = [20, 30, 45, 60, 90];
+
+/* The goal's own length comes from the engine's own table rather than a copy of
+   it, the same way the limits chips do. Forty three goal children map onto six
+   session lengths and a second copy of that mapping would go stale the first
+   time a goal was tuned. */
+let goalParamsPromise = null;
+function ensureGoalParams() {
+  if (!goalParamsPromise) {
+    goalParamsPromise = import("/mo-knowledge/engine/goal-engine.mjs")
+      .then((m) => m.GOAL_PARAMS || null)
+      .catch((e) => { console.warn("session length: no goal table, suggesting 45", e); return null; });
+  }
+  return goalParamsPromise;
+}
+
+async function goalSessionMinutes(bubble, child) {
+  const table = await ensureGoalParams();
+  const family = table && bubble ? table[bubble] : null;
+  const params = family ? (family[child] || family._default) : null;
+  return Number.isFinite(params?.sessionMin) ? params.sessionMin : null;
+}
+
+/* Ties go to the shorter one. The only goal length that ties is the 25 minutes
+   of "I have no time", where 20 is plainly the better guess than 30. */
+function nearestSessionLength(minutes) {
+  if (!Number.isFinite(minutes)) return 45;
+  return SESSION_LENGTHS.reduce((best, m) =>
+    (Math.abs(m - minutes) < Math.abs(best - minutes) ? m : best), SESSION_LENGTHS[0]);
+}
+
+/* `chosen` is the stored answer and null is nobody has answered; `suggested` is
+   what the goal picks on its own and is only ever lit, never saved. Tapping the
+   answer you already gave takes it back off, which is the only way back to
+   letting the goal decide. */
+function renderSessionLengths(el, { chosen, suggested, onPick }) {
+  if (!el) return;
+  const lit = Number.isFinite(chosen) ? chosen : suggested;
+  el.innerHTML = SESSION_LENGTHS.map((m) => `
+    <button type="button" class="${m === lit ? "on" : ""}" data-len="${m}"
+      aria-pressed="${m === lit}" aria-label="${m} minutes">${m}</button>`).join("");
+  el.querySelectorAll("[data-len]").forEach((b) => {
+    b.onclick = () => {
+      const m = Number(b.dataset.len);
+      onPick(chosen === m ? null : m);
+    };
+  });
+}
+
+function sessionLengthNote(chosen, suggested) {
+  return Number.isFinite(chosen)
+    ? `Every plan is built to fit about ${chosen} minutes. Tap it again to let your goal decide instead.`
+    : `Not set, so your goal picks the length and that comes to about ${suggested} minutes. Tap one to say otherwise.`;
+}
+
+/* Setup > Training. Saved on the tap, like the rest length above it, because a
+   session length is not the kind of thing anybody expects to confirm. */
+async function renderSessionLengthPage() {
+  const el = $("setupSessionLen");
+  if (!el) return;
+  const goalMin = await goalSessionMinutes(MY_PROFILE?.goal_bubble, MY_PROFILE?.goal_child);
+  const suggested = nearestSessionLength(goalMin);
+  const chosen = Number.isFinite(MY_PROFILE?.session_minutes) ? MY_PROFILE.session_minutes : null;
+  $("setupSessionLenNote").textContent = sessionLengthNote(chosen, suggested);
+  renderSessionLengths(el, {
+    chosen, suggested,
+    onPick: async (minutes) => {
+      /* Through upsertGoalFields for the same reason the goal page goes through
+         it: session_minutes is behind a migration that is written and not
+         applied, and a write that names a column the database does not have
+         comes back PGRST204 and takes the whole row with it. */
+      const { error, droppedSession } = await upsertGoalFields({
+        email: MY_EMAIL, user_name: ME, session_minutes: minutes,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) { toast("Could not save that"); console.error(error); return; }
+      if (droppedSession) {
+        /* Not saved, so nothing here pretends it was. The picker goes back to
+           what the database actually holds. */
+        toast("Session length is not being stored yet.");
+        renderSessionLengthPage();
+        return;
+      }
+      if (MY_PROFILE) MY_PROFILE.session_minutes = minutes;
+      renderSessionLengthPage();
+      toast(minutes === null ? "Your goal picks the length again" : `Sessions set to about ${minutes} minutes`);
+    },
   });
 }
 
