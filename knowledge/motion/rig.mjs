@@ -827,16 +827,6 @@ function drawHand(ctx, S, side, C, fill, grip) {
     [lerpV(k.wrist, tip, 0.62), rRoot * 0.94],
     [tip, rTip],
   ], { fill, shadeR: 0.42, shadeOff: 0.34 });
-  // The thumb: a small bump on the body side of the mitt, a third of the way
-  // down. The sheet's hands are mitts with exactly this one feature.
-  if (grip !== "flat" && grip !== "closed" && grip !== "hook") {
-    const perp = V(-d.y, d.x);
-    const toBody = sub(S.chest, k.wrist);
-    const sgn = (perp.x * toBody.x + perp.y * toBody.y) >= 0 ? 1 : -1;
-    // A bump, not a ball: mostly inside the mitt, only its edge past the outline.
-    const at = add(lerpV(k.wrist, tip, 0.36), scl(perp, sgn * rRoot * 0.62));
-    part(ctx, C, [[at, rRoot * 0.36], [add(at, scl(perp, sgn * rRoot * 0.12)), rRoot * 0.33]], { fill });
-  }
 }
 
 // A foot with a heel and a toe: instep from the ankle, sole along the ground,
@@ -845,35 +835,21 @@ function drawFoot(ctx, S, side, C, fill) {
   const B = ACTIVE, k = S.sides[side];
   const w = k.footW;
   const d = norm2(sub(k.toe, k.heel));
-  // A foot pointing at the camera is not a side view of a foot. In a front or
-  // back view an untwisted foot projects almost straight down the screen, and
-  // the old chain drew that as a boat seen from the side on a figure facing
-  // you. Here it is a simple rounded pad under the ankle, outlined like every
-  // other part and nothing else: no toe splits, no Achilles, no offset. A
-  // deliberately turned out foot (Warrior II) fails the vertical test and keeps
-  // the side on shape, which is correct.
+  // As simple as it gets, which is what Mo asked for after every cleverer foot
+  // read as a ball on the end of the leg. Front on, the shin just continues
+  // to the floor and ends round. Side on, one capsule from a heel just behind
+  // the ankle to the toe, tapering a little, joined to the shin at the ankle.
+  const r = B.rAnkleDraw * w;
   if (S.frontal && Math.abs(d.x) < 0.45) {
     const sole = Math.max(k.toe.y, k.heel.y, k.ankle.y + B.rAnkle * 0.8);
-    // The foot grows OUT of the shin: it starts at the ankle at the shin's own
-    // radius and widens to the sole, one shape, no gap. Drawn as a separate
-    // pad under the ankle it read as a ball with a foot beneath it (Mo: "you
-    // can see the ball of his foot before the foot").
-    const rTop = B.rAnkleDraw * 1.0 * w;
-    const rSole = B.rAnkleDraw * 1.35 * w;
-    const bottom = V(k.ankle.x, Math.max(k.ankle.y + rTop, sole - rSole));
-    part(ctx, C, [[k.ankle, rTop], [bottom, rSole]], { fill });
+    const bottom = V(k.ankle.x, Math.max(k.ankle.y + r * 0.5, sole - r * 1.05));
+    part(ctx, C, [[k.ankle, r], [bottom, r * 1.05]], { fill });
     return;
   }
-  // Side on, a cylinder from heel to toe: one radius, rounded ends, the
-  // sheet's simple shoe. No arch, no heel bump, no toe box.
-  const rf = B.rAnkleDraw * 1.1 * w;
   const sole = Math.max(k.toe.y, k.heel.y);
-  const heel = V(k.heel.x - d.x * 0.6, sole - rf);
-  const toe = V(k.toe.x - d.x * 0.4, sole - rf);
-  // The ankle joins the shoe: a short bridge from the shin's end down into the
-  // heel half, so the leg and the foot are one silhouette here too.
-  part(ctx, C, [[k.ankle, B.rAnkleDraw * 0.98 * w], [lerpV(heel, toe, 0.3), rf]], { fill });
-  part(ctx, C, [[heel, rf], [toe, rf]], { fill });
+  const heel = V(k.heel.x - d.x * 0.3, sole - r * 0.95);
+  const toe = V(k.toe.x - d.x * 0.3, sole - r * 0.8);
+  part(ctx, C, [[k.ankle, r], [heel, r * 0.95], [toe, r * 0.8]], { fill });
 }
 
 // Head: one silhouette with a hair mass and one soft shade. The v3 head carried
@@ -1029,7 +1005,6 @@ function drawArm(ctx, S, side, C, fill, grip, skinOpts) {
   const top = add(k.shoulder, scl(d, 1.6));
   part(ctx, C, taper(top, k.elbow, [B.rDelt * 0.92, B.rUpperArmMid * 1.06, B.rUpperArmMid * 0.94, B.rElbow * 1.08, B.rElbow]), { fill });
   part(ctx, C, taper(k.elbow, k.wrist, [B.rElbow, B.rForearmMid, B.rForearmMid * 0.9, B.rWrist * 1.25, B.rWrist]), { fill });
-  ring(ctx, C, k.elbow, B.rElbow * 0.9);
   if (skinOpts && skinOpts.plates) armPlates(ctx, S, side, C, skinOpts.lit);
   drawHand(ctx, S, side, C, fill, grip);
 }
@@ -1043,7 +1018,6 @@ function drawLeg(ctx, S, side, C, fill, skinOpts) {
   // knee is actually bent and deepens the same line.
   part(ctx, C, taper(k.hip, k.knee, [B.rHip, B.rHip * 0.95, B.rThighMid * 0.92, B.rKnee * 1.12, B.rKnee]), { fill });
   part(ctx, C, taper(k.knee, k.ankle, [B.rKnee * 0.98, B.rCalf, B.rCalf * 0.92, B.rCalf * 0.68, B.rAnkleDraw]), { fill });
-  ring(ctx, C, k.knee, B.rKnee * 0.92);
   if (skinOpts && skinOpts.plates) legPlates(ctx, S, side, C, skinOpts.lit);
   drawFoot(ctx, S, side, C, fill);
 }
