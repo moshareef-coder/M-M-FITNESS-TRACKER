@@ -1307,11 +1307,16 @@ function drawTorso(ctx, S, C, fill, skinOpts) {
   }
   // The neck goes on LAST so its base arc lands on top of the chest: that arc
   // is the neck seam the sheet draws, and drawn first it was painted over.
+  /* The neck carries its own outline only while the torso is upright, where
+     that arc is the collar line the reference sheet draws. Lying down the
+     same arc runs across the chest and into the arm, which is a line through
+     the body rather than a neck, so there it is silhouette only. */
+  const upright = Math.abs(nu.y) > 0.72;
   part(ctx, C, [
     [add(S.chest, scl(nu, -0.6)), B.rNeckBot * 1.2],
     [lerpV(S.chest, S.neckTop, 0.5), B.rNeckBot * 0.8],
     [S.neckTop, B.rNeckTop],
-  ], { fill });
+  ], { fill, line: upright });
   if (skinOpts && skinOpts.plates) { torsoPlates(ctx, S, C, skinOpts.lit); return; }
   torsoLines(ctx, S, C);
   // A single soft mass under the collarbone gives the chest volume. It used to
