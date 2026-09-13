@@ -390,7 +390,15 @@ view, it is a different set of trade-offs:
   with none of a front view's symmetry.
 - It **does not fix foreshortening**, it trades which limb suffers from it.
 
-### Muscles that fire
+### Muscles that fire (OFF in the product)
+
+Mo cut muscle highlighting and the anatomy skin from the product: the plain skin
+is the only one that ships. The code below stays in the rig because the anatomy
+skin is useful for checking that a move works the muscle it claims to, but
+nothing in the app turns it on, and **the plain skin ignores `lit` entirely**, so
+a stale caller passing muscles cannot light anything. Do not add `litPeak` or
+`litFloor` to new moves; the validator still range checks them for the moves that
+already carry them.
 
 The anatomy skin can light the muscles a move works. The caller passes which
 ones and one colour:
@@ -430,26 +438,28 @@ the card stops saying which muscle the exercise is for.
 
 Off-centre peaks wrap correctly (the distance is measured around the cycle), and
 a caller that needs a fixed value can still pass `intensity` in the `lit` object
-to pin it. The mannequin skin ignores all of this.
+to pin it. The mannequin skin, which is the one that ships, ignores all of this.
 
 ### Hands
 
-Five grip states, picked automatically and overridable with `grip: { R: "flat" }`:
+The hand is a soft rounded mitt at every size: no fingers, no thumb, no knuckles.
+The fingered hand is gone from the rig, not merely switched off, so there is no
+flag that can bring it back. Mo saw it on the approval sheet and it read as a
+claw at 320px and as porridge at 160px, and on a bar it fought the prop.
+
+Five grip states, picked automatically and overridable with `grip: { R: "flat" }`.
+They change the SHAPE of the mitt, not its parts:
 
 | state | when | looks like |
 | --- | --- | --- |
-| `open` | default | fingers out, thumb spread |
-| `flat` | the hand is on the floor (detected) | fingers straight, thumb tucked |
-| `closed` | a barbell, dumbbell, kettlebell, cable or band is on that hand | fingers wrapped, thumb over |
-| `fist` | authored | compact |
-| `hook` | a pull-up bar prop | fingers curled, thumb alongside |
+| `open` | default | the neutral rounded end |
+| `flat` | the hand is on the floor (detected) | a longer, flatter paddle |
+| `closed` | a barbell, dumbbell, kettlebell, cable or band is on that hand | short, flattened against what it holds |
+| `fist` | authored | shortest and thickest |
+| `hook` | a pull-up bar prop | short, slightly flattened |
 
-The hand has a palm, four fingers as one block in two phalanxes, and a thumb,
-and it is oriented by `forearmPron`: palms up and palms down genuinely differ.
-**Below 190 CSS pixels the hand simplifies to the v1 mitt automatically**, since
-fingers at 160px are three grey pixels and a rumour. The mitt still puts its
-thumb on the real thumb side, so pronation survives at card size even when the
-fingers do not.
+The mitt is still oriented by `forearmPron`, so a wrist curl and a reverse wrist
+curl are still different pictures.
 
 ### Worked example: a twist (Russian Twist)
 
@@ -515,7 +525,7 @@ rig units:
 | neck plus head above the shoulder | 28.1 | **22.7** | 19.4 |
 | shoulder half width | 11.5 | **12.6** | 12.9 |
 | hip joint half width | 6.9 | **6.2** | 5.3 |
-| hand, wrist to fingertip | 7.5 | **8.6** | 11.5 |
+| hand, wrist to hand tip | 7.5 | **8.6** | 11.5 |
 | total height, rig units | 111.5 | **109.1** | 106.4 |
 | total height in heads | 7.0 | **7.5** | 7.5 |
 
@@ -526,8 +536,8 @@ is why the migration below was possible at all.
 
 Three of these are still short of human on purpose. The head stack is 3 units
 tall because a truly human head on this body looks like a pinhead at 160px. The
-hand is short because the drawn hand is a mitt with a thumb, and at full human
-length it reads as a paddle. The hip joints stay wider than anatomy because the
+hand is short because the drawn hand is a rounded mitt, and at full human length
+it reads as a paddle. The hip joints stay wider than anatomy because the
 legs are drawn as capsules and a true 5.3 puts the thighs in contact.
 
 ### What the migration did
@@ -617,6 +627,74 @@ move and authored moves must not import it.
 `shoulderW` went 12.6 to 13.4 so the arms hang beside the body rather than
 against it in the front view. Human half biacromial is 12.9; the extra half unit
 buys the daylight that makes arms read as arms.
+
+
+## Rig v5: matched to the reference sheets
+
+Mo generated two reference sheets, `reference/figure-turnaround.png` and
+`reference/figure-muscles.png`, and approved them as the look. Everything below
+is the rig moving toward them. If you are changing how the figure is drawn, open
+both sheets first, then render `motion-lab.html?sheet=compare`.
+
+**One outline for the whole body, not one per segment.** This is the change that
+finally killed the armour look. `drawFigure` runs the same draw calls twice: the
+first pass sets the module level `COLLECT` and gathers every capsule instead of
+painting, and the union of those capsules is stroked once in `C.seam`; the
+second pass paints the fills with `LINES` off, which downgrades every per part
+outline to a light hairline in `C.seamSoft`. So the silhouette is one dark
+contour and the internal boundaries are faint lines that only say where one form
+laps over another. Before this, an arm laid across the chest carried its own
+dark ring over the chest, and at 160px that is indistinguishable from a chest
+plate.
+
+If you add a draw function, it must go through `part()` or `hull()` so it is
+collected, and anything that is inner detail rather than silhouette (creases,
+torso lines, anatomy panels, knuckles, hair, the ear) must start with
+`if (COLLECT) return;`. Forgetting the guard paints inner detail into the
+outline pass and thickens the contour in a way that is hard to spot.
+
+**The palette is sampled off the sheets, not invented.** Body `#bbb8b5`, its
+shadow `#a6a3a0`, far side `#8e8c8a`, hair `#807f7f`, contour `#2a2d30`, the
+light internal line `#6f6d6c`, muscle panels `#989694`, lit `#dc551e`. The body
+is deliberately **not** accent tinted: the reference body is a neutral warm grey
+and tinting it green was most of what made the figure read as a prop. The accent
+survives on the floor line and in the UI around the canvas.
+
+**One shade band per form, on one side.** `shadeSide` fixes the light at the
+upper left for the whole figure, so every crescent falls on the lower right.
+Two lights, or a shade that follows each limb's own direction, reads as plastic.
+
+**The trapezius yoke.** The torso draws a capsule from the base of the neck out
+to each shoulder joint before the chest. Without it the neck stands on a flat
+shelf and the deltoids read as pads bolted to the corners of the torso; the
+reference has one unbroken slope from ear to shoulder.
+
+**Hands.** One rounded mitt at every size, shaped by the grip. See Hands above:
+the fingered version was cut after the approval sheet and the code is gone.
+
+**The ear sits behind the cheekbone**, not on it. At one unit forward it landed
+in the middle of the face and read as a single staring eye. This is the kind of
+thing only a render shows you.
+
+**Anatomy panels** are mid grey on the light body, separated by the body colour
+showing through rather than by dark lines. They are off in the product: the
+anatomy skin and muscle highlighting were both cut, and `render()` only builds a
+`lit` object when the palette's skin is `anatomy`. The panels stay in the rig as
+a checking tool. Panels are drawn for near side limbs only; a far side limb in a
+lunge or a Warrior II shows none, which is deliberate.
+
+**The cost of the second pass.** Drawing the body twice roughly doubles the
+canvas work: 0.451 ms per figure per frame at 160px and 0.410 ms at 320px, so a
+screen showing twelve animated figures spends about 5.4 ms a frame drawing them,
+against a 16.7 ms budget. That was measured with `/tmp/v2sheet/perf.html`. A
+single compound `Path2D` for the outline measures no faster than stroking each
+capsule, so the outline stays a plain loop.
+
+**What still does not match the sheets**, so nobody rediscovers it: the head is
+rounder and a little larger than the reference skull; the limbs are tapered
+capsules rather than the reference's anatomical swells at the biceps and calf;
+the feet have a heel, arch and toe box but no separated toes; and the hand is a
+mitt by decision, not by limitation.
 
 
 ---

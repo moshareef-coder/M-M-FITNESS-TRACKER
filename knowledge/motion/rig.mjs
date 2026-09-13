@@ -123,7 +123,7 @@ const axial = (F, a, side) => rotY(F, -side * a);
 // was 3.5 short. That reads as a child's proportions, which is most of what
 // made it look like a doll.
 export const BODY = {
-  spine: 30, neck: 7.4, headOff: 8.0,
+  spine: 30, neck: 8.2, headOff: 8.8,
   upperArm: 20, forearm: 17, hand: 8.6,
   thigh: 27, shin: 25, foot: 12,
   // Radii are the slim silhouette Mo approved in the first prototype, taken
@@ -132,7 +132,7 @@ export const BODY = {
   // thigh mid 8.7 over a hip of 8.0) read as heavy, and he said so.
   rPelvis: 8.4, rWaist: 7.0, rChest: 10.6,
   rNeckTop: 4.0, rNeckBot: 5.2,
-  rHeadBack: 7.3, rHeadJaw: 5.4,
+  rHeadBack: 6.8, rHeadJaw: 5.0,
   rShoulder: 6.2, rDelt: 6.6, rElbow: 4.7, rWrist: 3.6,
   rUpperArmMid: 5.5, rForearmMid: 4.4,
   rHandA: 3.5, rHandB: 2.6, rThumb: 1.9,
@@ -163,8 +163,8 @@ export function restPose(view = "side") {
     root: { x: 70, y: STAND_Y + 0.3, rot: -2 },
     joints: {
       spine: 5, neck: -4,
-      shoulderR: -7, elbowR: 15, wristR: 9,
-      shoulderL: -5, elbowL: 12, wristL: 7,
+      shoulderR: -5, elbowR: 7, wristR: 5,
+      shoulderL: -3, elbowL: 5, wristL: 4,
       hipR: 3, kneeR: 5, ankleR: -1,
       hipL: -2, kneeL: 4, ankleL: 1,
     },
@@ -173,8 +173,8 @@ export function restPose(view = "side") {
     root: { x: 70, y: STAND_Y + 0.7, rot: -1 },
     joints: {
       spine: 4, neck: -3,
-      shoulderR: -6, elbowR: 17, wristR: 10,
-      shoulderL: -4, elbowL: 14, wristL: 8,
+      shoulderR: -4, elbowR: 9, wristR: 6,
+      shoulderL: -2, elbowL: 7, wristL: 5,
       hipR: 3, kneeR: 4, ankleR: -1,
       hipL: -2, kneeL: 3, ankleL: 1,
     },
@@ -183,8 +183,8 @@ export function restPose(view = "side") {
     root: { x: 70, y: STAND_Y + 0.3, rot: 1 },
     joints: {
       spine: 0, neck: 1,
-      shoulderR: 7, elbowR: 11, wristR: -4,
-      shoulderL: 6, elbowL: 9, wristL: -3,
+      shoulderR: 9, elbowR: 4, wristR: -1,
+      shoulderL: 8, elbowL: 3, wristL: -1,
       hipR: 5, hipL: 4, kneeR: 3, kneeL: 4,
     },
     ik: { ankleR: { x: 77, y: 113.7, bend: -1 }, ankleL: { x: 63, y: 113.7, bend: -1 } },
@@ -193,8 +193,8 @@ export function restPose(view = "side") {
     root: { x: 70, y: STAND_Y + 0.8, rot: 0 },
     joints: {
       spine: 1, neck: 0,
-      shoulderR: 8, elbowR: 13, wristR: -4,
-      shoulderL: 7, elbowL: 11, wristL: -3,
+      shoulderR: 10, elbowR: 5, wristR: -1,
+      shoulderL: 9, elbowL: 4, wristL: -1,
       hipR: 5, hipL: 4, kneeR: 2, kneeL: 3,
     },
     ik: { ankleR: { x: 77, y: 113.7, bend: -1 }, ankleL: { x: 63, y: 113.7, bend: -1 } },
@@ -203,7 +203,7 @@ export function restPose(view = "side") {
     view: view === "back" ? "front" : view,
     facing: view === "back" ? "away" : undefined,
     loop: "hold", dur: 7, breath: 0.7, breathRate: 0.7,
-    feet: frontal ? { R: { ang: 11, len: 0.42, w: 1.3 }, L: { ang: 13, len: 0.42, w: 1.3 } } : undefined,
+    feet: frontal ? { R: { ang: 10, len: 0.46, w: 1.08 }, L: { ang: 12, len: 0.46, w: 1.08 } } : undefined,
     keys: frontal ? sway(front, front2) : sway(side, side2),
   };
 }
@@ -239,30 +239,39 @@ export function palette(theme = "dark", accent = "action", skin = "mannequin") {
   const A = typeof accent === "string"
     ? (ACCENTS[accent] || ACCENTS.action)[dark ? "dark" : "light"]
     : accent;
-  const tint = dark ? A.accent : A.accentInk;
-  const ink = mix(T.baseInk, tint, dark ? 0.085 : 0.06);
-  const skinBase = dark ? "#dcdfea" : "#b9bfcd";
+  // Sampled off knowledge/motion/reference/figure-turnaround.png: body #bbb8b5,
+  // its shadow #949290, hair #807f7f, the seam lines #2a2d30, and from
+  // figure-muscles.png the muscle panels #7e7d7e over the same light body with
+  // the body colour showing through as the seam between them, lit #dc551e.
+  //
+  // The figure is deliberately NOT accent tinted any more. The reference body is
+  // a neutral warm grey and tinting it green was one of the things that made it
+  // read as a prop rather than a person. The accent survives on the floor line.
+  const body = dark ? "#bbb8b5" : "#b3b0ad";
+  const bodyShade = dark ? "#a6a3a0" : "#a09e9b";
   return {
     skin,
     bg: T.bg,
     surface: T.surface,
-    ink: skin === "anatomy" ? skinBase : ink,
-    mannequinInk: ink,
-    plate: dark ? "#232a31" : "#2b323b",
-    plateFar: dark ? "#1a2027" : "#555d6a",
-    seam: skin === "anatomy" ? (dark ? "#dcdfea" : "#cfd4de") : T.bg,
-    inkHi: skin === "anatomy" ? (dark ? mix(skinBase, "#ffffff", 0.3) : mix(skinBase, "#ffffff", 0.35))
-      : (dark ? mix(ink, "#ffffff", 0.16) : mix(ink, T.bg, 0.14)),
-    far: skin === "anatomy" ? (dark ? mix(T.bg, skinBase, 0.46) : mix(skinBase, T.bg, 0.30))
-      : (dark ? mix(T.bg, ink, 0.46) : mix(ink, T.bg, 0.52)),
-    shade: dark ? "rgba(9,11,15,0.26)" : "rgba(37,45,58,0.14)",
-    // A crease is not a seam. Seams are where two pieces of armour meet; creases
-    // are where skin folds, and they are thin, soft and only in the eight places
-    // a body actually creases at this size.
-    crease: dark ? "rgba(9,11,15,0.34)" : "rgba(37,45,58,0.20)",
-    hair: dark ? "rgba(9,11,15,0.20)" : "rgba(37,45,58,0.13)",
-    shadeSoft: dark ? "rgba(9,11,15,0.17)" : "rgba(37,45,58,0.09)",
+    ink: body,
+    inkHi: body,
+    far: dark ? "#8e8c8a" : "#9c9997",
+    farShade: dark ? "#767473" : "#828080",
+    shade: bodyShade,
+    shadeSoft: dark ? "#a9a6a3" : "#a2a09d",
+    // A drawn line, not a knockout. The reference has no heavy outline: the
+    // silhouette is carried by a hairline dark edge and the internal boundaries
+    // are the same line where a real body creases.
+    seam: dark ? "#2a2d30" : "#3a3d42",
+    seamSoft: dark ? "#6f6d6c" : "#7d7b79",
+    // creases are the same drawn line, lighter, because a fold is not an edge
+    crease: dark ? "#6b6968" : "#767473",
+    // panels are separated by the body showing through, not by a dark line
+    plateSeam: dark ? "#bbb8b5" : "#b3b0ad",
     edge: T.bg,
+    hair: dark ? "#807f7f" : "#787776",
+    plate: dark ? "#989694" : "#9d9b99",
+    plateFar: dark ? "#7d7b7a" : "#84827f",
     accent: A.accent,
     accentInk: A.accentInk,
     line: dark ? A.accent : A.accentInk,
@@ -586,6 +595,15 @@ function shadeSide(p0, p1) {
 // is painted over and the outline reads as one shape. Joints BETWEEN parts keep
 // their seam on purpose: that thin dark line is what makes the figure read as
 // articulated.
+// The whole figure is outlined ONCE, as a union, instead of every segment
+// outlining itself. Two passes: pass one walks the same draw calls with COLLECT
+// set and gathers every capsule, then the union of those capsules is stroked;
+// pass two draws the fills with LINES off. Without this an arm laid across the
+// chest carries its own dark ring over the chest, which is exactly what made
+// the figure read as armour plates rather than one body.
+let COLLECT = null;
+let LINES = true;
+
 function part(ctx, C, pts, o = {}) {
   const fill = o.fill || C.ink;
   const segs = o.segs || (() => {
@@ -593,19 +611,26 @@ function part(ctx, C, pts, o = {}) {
     for (let i = 0; i < pts.length - 1; i++) out.push([pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]]);
     return out;
   })();
-  if (o.halo !== false) {
-    ctx.strokeStyle = C.edge;
-    ctx.lineWidth = o.haloW || 3.4;
+  // Stroke every segment first, then fill every segment. The strokes that fall
+  // inside the shape are painted over, so what survives is the outer contour
+  // only: one continuous hairline round the whole limb instead of a ring at
+  // every circle in the chain.
+  if (COLLECT) { for (const g of segs) COLLECT.push(g); return; }
+  if (o.line !== false) {
+    ctx.strokeStyle = LINES ? (o.lineColor || C.seam) : C.seamSoft;
+    ctx.lineWidth = (LINES ? (o.lineW || 0.28) : 0.2) * 2;
     ctx.lineJoin = "round";
     for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.stroke(); }
   }
   ctx.fillStyle = fill;
   for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.fill(); }
   if (o.shade !== false) {
+    // One soft band down the shaded side, flat and opaque like the reference,
+    // kept inside the silhouette so it never touches the edge.
     const a = pts[0], b = pts[pts.length - 1];
     const n = shadeSide(a[0], b[0]);
-    const k = o.shadeOff === undefined ? 0.40 : o.shadeOff;
-    const q = o.shadeR === undefined ? 0.50 : o.shadeR;
+    const k = o.shadeOff === undefined ? 0.60 : o.shadeOff;
+    const q = o.shadeR === undefined ? 0.44 : o.shadeR;
     ctx.fillStyle = o.shadeFill || C.shade;
     for (const g of segs) {
       capsulePath(ctx,
@@ -615,6 +640,7 @@ function part(ctx, C, pts, o = {}) {
     }
   }
 }
+
 const limb = (ctx, C, p0, r0, p1, r1, o) => part(ctx, C, [[p0, r0], [p1, r1]], o);
 
 // A soft fold across a joint, drawn instead of a knockout seam. It appears only
@@ -622,6 +648,7 @@ const limb = (ctx, C, p0, r0, p1, r1, o) => part(ctx, C, [[p0, r0], [p1, r1]], o
 // limb has no crease and a line drawn across one reads as a scar. It also stops
 // short of the silhouette edge so it never reads as a cut.
 function crease(ctx, C, p, a, b, r, span = 0.5, w = 0.42) {
+  if (COLLECT) return;
   const bend = Math.acos(clamp(a.x * b.x + a.y * b.y, -1, 1)) * 180 / Math.PI;
   if (bend < 12) return;
   const k = Math.min(1, (bend - 12) / 45);
@@ -676,78 +703,33 @@ function capsulePathInto(path, p0, r0, p1, r1) {
 // Five states. A hand on a bar is not a hand on the floor is not a hand hanging
 // off a pull-up bar, and at 320px you can see the difference.
 export const GRIPS = ["open", "flat", "closed", "fist", "hook"];
-const GRIP_SPEC = {
-  open:   { curl: 14, thumb: 44, fing: 1.00, over: 0.0 },
-  flat:   { curl: 2, thumb: 22, fing: 1.06, over: 0.0 },
-  closed: { curl: 92, thumb: 58, fing: 0.94, over: 0.45 },
-  fist:   { curl: 142, thumb: 62, fing: 0.84, over: 0.55 },
-  hook:   { curl: 104, thumb: 14, fing: 0.98, over: 0.1 },
+
+// The hand is a soft rounded mitt at every size. Mo looked at the fingered
+// version on the approval sheet and rejected it: four fingers and a thumb read
+// as a claw at 320px and as porridge at 160px, and on a bar they fought the
+// prop. There is no fingered path any more, so nothing can turn one back on.
+// The grip changes the SHAPE of the mitt, not its parts: a closed hand is short
+// and flattened against what it holds, a flat hand is a long paddle on the
+// floor, an open hand is the neutral rounded end.
+const MITT = {
+  open:   { len: 0.98, root: 1.00, tip: 1.00 },
+  flat:   { len: 1.06, root: 0.94, tip: 1.06 },
+  closed: { len: 0.66, root: 1.02, tip: 1.22 },
+  fist:   { len: 0.58, root: 1.06, tip: 1.24 },
+  hook:   { len: 0.70, root: 1.00, tip: 1.16 },
 };
 
-// The mitt from v1, still used below 190px where fingers turn to porridge.
-function drawMitt(ctx, S, side, C, fill, closed) {
+function drawHand(ctx, S, side, C, fill, grip) {
   const B = BODY, k = S.sides[side];
+  const m = MITT[grip] || MITT.open;
   const d = norm2(k.axis.hand.y);
-  const L = B.hand * (closed ? 0.66 : 0.98);
+  const L = B.hand * m.len;
   const tip = add(k.wrist, scl(d, L));
-  // The thumb rides the hand's real thumb side rather than whichever edge
-  // happens to point up the screen. It is the only pronation cue that survives
-  // at 160px, and it is what tells a wrist curl from a reverse wrist curl.
-  const acr = k.axis.hand.x;
-  let n = len2(acr) > 0.25 ? norm2(acr) : V(-d.y, d.x);
-  if (len2(acr) <= 0.25 && n.y > 0) n = V(-n.x, -n.y);
-  const base = add(k.wrist, scl(d, L * (closed ? 0.30 : 0.38)));
-  const thumbRoot = add(base, scl(n, closed ? 1.4 : 1.8));
-  const thumbTip = add(add(thumbRoot, scl(d, L * (closed ? 0.42 : 0.55))), scl(n, closed ? 0.6 : 1.5));
-  part(ctx, C, [[k.wrist, B.rHandA], [lerpV(k.wrist, tip, 0.62), B.rHandA * 0.94],
-                [tip, closed ? B.rHandB * 1.25 : B.rHandB]],
-       { fill, shadeR: 0.42, shadeOff: 0.34 });
-  part(ctx, C, [[thumbRoot, B.rThumb], [thumbTip, B.rThumb * 0.82]], { fill, shade: false, haloW: 2.6 });
-  // two knuckle hints across the back of the hand. At 160px they are the only
-  // thing that says hand rather than paddle.
-  const kn = add(k.wrist, scl(d, L * 0.74));
-  const across = V(-d.y, d.x);
-  ctx.fillStyle = C.shade;
-  for (const o of [-1, 1]) {
-    const c0 = add(kn, scl(across, o * B.rHandB * 0.5));
-    capsulePath(ctx, c0, B.rHandB * 0.34, add(c0, scl(d, B.rHandB * 0.5)), B.rHandB * 0.26);
-    ctx.fill();
-  }
-}
-
-function drawHand(ctx, S, side, C, fill, grip, detail) {
-  const B = BODY, k = S.sides[side];
-  if (!detail) return drawMitt(ctx, S, side, C, fill, grip === "closed" || grip === "fist" || grip === "hook");
-  const spec = GRIP_SPEC[grip] || GRIP_SPEC.open;
-  const A = k.axis.hand;
-  const along = A.y;                       // wrist to knuckles, foreshortens
-  const across = A.x;                      // thumb side of the palm
-  const palmN = scl(A.z, -k.lat);          // the way the palm faces
-  const W = k.wrist;
-  const knuck = add(W, scl(along, B.palm));
-  const hw = B.palmHalf;
-  const kL = add(knuck, scl(across, -hw));
-  const kR = add(knuck, scl(across, hw));
-  // palm slab
-  hull(ctx, C, [[W, B.rPalm * 0.94], [kL, B.rPalm], [kR, B.rPalm]],
-       { fill, shadeR: 0.46, shadeOff: 0.34 });
-  // four fingers as one block, in two phalanxes so a curl reads as a curl
-  const c1 = D(spec.curl * 0.55), c2 = D(spec.curl);
-  const dir1 = add(scl(along, Math.cos(c1)), scl(palmN, Math.sin(c1)));
-  const dir2 = add(scl(along, Math.cos(c2)), scl(palmN, Math.sin(c2)));
-  const fl = B.finger * spec.fing;
-  const mL = add(kL, scl(dir1, fl * 0.55)), mR = add(kR, scl(dir1, fl * 0.55));
-  const tL = add(mL, scl(dir2, fl * 0.55)), tR = add(mR, scl(dir2, fl * 0.55));
-  hull(ctx, C, [[kL, B.rFinger], [kR, B.rFinger], [mL, B.rFinger], [mR, B.rFinger]],
-       { fill, shade: false, haloW: 2.6 });
-  hull(ctx, C, [[mL, B.rFinger * 0.94], [mR, B.rFinger * 0.94], [tL, B.rFinger * 0.86], [tR, B.rFinger * 0.86]],
-       { fill, shadeR: 0.4, shadeOff: 0.3, haloW: 2.6 });
-  // thumb, on the anterior edge of the palm, wrapping over for a closed grip
-  const th = D(spec.thumb);
-  const troot = add(add(W, scl(along, B.palm * 0.42)), scl(across, hw * 0.95));
-  const tdir = add(add(scl(along, Math.cos(th)), scl(across, Math.sin(th))), scl(palmN, spec.over));
-  const ttip = add(troot, scl(tdir, B.thumb));
-  part(ctx, C, [[troot, B.rThumb], [ttip, B.rThumb * 0.84]], { fill, shade: false, haloW: 2.6 });
+  part(ctx, C, [
+    [k.wrist, B.rHandA * m.root],
+    [lerpV(k.wrist, tip, 0.62), B.rHandA * 0.94 * m.root],
+    [tip, B.rHandB * m.tip],
+  ], { fill, shadeR: 0.42, shadeOff: 0.34 });
 }
 
 // A foot with a heel and a toe: instep from the ankle, sole along the ground,
@@ -777,53 +759,67 @@ function drawHead(ctx, S, C, fill) {
   const flat = S.frontal;
   const away = S.facing === "away";
   const at = (up, fwd) => add(add(S.head, scl(u, up)), scl(f, fwd));
+  // Skull from the reference sheet: a high round cranium, a brow, a jaw that
+  // angles back under the ear and a short chin. Front on it is an oval that
+  // narrows to the jaw.
   const skull = flat
-    ? [[at(2.4, 0), B.rHeadBack], [at(-1.0, 0), B.rHeadBack * 0.94],
-       [at(-4.2, 0), away ? B.rHeadBack * 0.9 : B.rHeadBack * 0.78]]
-    : [[at(1.9, -1.4), B.rHeadBack], [at(0.6, 2.0), B.rHeadBack * 0.84],
-       [at(-3.4, 2.4), B.rHeadJaw], [at(-4.6, 3.4), B.rHeadJaw * 0.62]];
+    ? [[at(2.6, 0), B.rHeadBack * 0.97], [at(-0.4, 0), B.rHeadBack * 0.93],
+       [at(-3.4, 0), B.rHeadBack * 0.74], [at(-5.0, 0), B.rHeadBack * 0.5]]
+    : [[at(2.2, -1.6), B.rHeadBack], [at(1.4, 1.8), B.rHeadBack * 0.86],
+       [at(-2.2, 2.6), B.rHeadJaw], [at(-4.4, 2.2), B.rHeadJaw * 0.66],
+       [at(-3.0, -1.0), B.rHeadJaw * 0.82]];
   hull(ctx, C, skull, { fill, shade: false });
-  // one soft shade down the shaded side of the face and jaw, no hard edge
-  const n = flat ? V(f.x, f.y) : V(f.x, f.y);
-  const sd = (n.x * 0.42 + n.y * 0.91 < 0) ? -1 : 1;
+  if (COLLECT) return;
+  // one soft tone down the shaded side of the face and jaw
+  const sd = (f.x * 0.42 + f.y * 0.91 < 0) ? -1 : 1;
+  ctx.save();
+  hull(ctx, C, skull, { clip: true });
   capsulePath(ctx,
-    add(at(1.4, 0), scl(n, sd * B.rHeadBack * 0.34)), B.rHeadBack * 0.66,
-    add(at(-3.2, flat ? 0 : 1.6), scl(n, sd * B.rHeadBack * 0.3)), B.rHeadJaw * 0.72);
+    add(at(2.0, 0), scl(f, sd * B.rHeadBack * 0.72)), B.rHeadBack * 0.62,
+    add(at(-4.0, flat ? 0 : 1.2), scl(f, sd * B.rHeadBack * 0.5)), B.rHeadJaw * 0.62);
   ctx.fillStyle = C.shade;
   ctx.fill();
-  // hair: a mass over the cranium with a hairline, which is what stops a
-  // faceless head reading as an egg
-  const hair = flat
-    ? [[at(3.0, 0), B.rHeadBack * 0.94], [at(0.4, 0), B.rHeadBack * 0.9]]
-    : [[at(2.4, -1.8), B.rHeadBack * 0.9], [at(1.0, 0.4), B.rHeadBack * 0.82],
-       [at(-1.6, -2.4), B.rHeadBack * 0.72]];
-  const segs = [];
-  for (let i = 0; i < hair.length - 1; i++) segs.push([hair[i][0], hair[i][1], hair[i + 1][0], hair[i + 1][1]]);
-  ctx.save();
-  hull(ctx, C, skull, { fill, halo: false, shade: false, clip: true });
-  ctx.clip();
-  ctx.fillStyle = C.hair;
-  for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.fill(); }
   ctx.restore();
+  // hair: a cap over the cranium ending in a hairline at the forehead and
+  // behind the ear, clipped to the skull so it never breaks the silhouette
+  ctx.save();
+  hull(ctx, C, skull, { clip: true });
+  // The cap is drawn with circles far above the head, so the edge that lands on
+  // the skull is nearly straight: that edge IS the hairline. Front on it runs
+  // level across the forehead; side on it slopes down behind the ear.
+  const hair = flat
+    ? [[at(34, -8), 32], [at(34, 8), 32]]
+    : [[at(33, 7), 29], [at(30, -9), 31]];
+  const hsegs = [];
+  for (let i = 0; i < hair.length - 1; i++) hsegs.push([hair[i][0], hair[i][1], hair[i + 1][0], hair[i + 1][1]]);
+  ctx.fillStyle = C.hair;
+  for (const g of hsegs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.fill(); }
+  ctx.restore();
+  // ear: a small shape at the hairline, the only feature on the head
   const ears = flat ? (away ? [-1, 1] : []) : [-1];
   for (const sd2 of ears) {
-    const ear = at(-0.2, sd2 * (flat ? B.rHeadBack * 0.84 : 1.9));
-    capsulePath(ctx, ear, 2.2, add(ear, scl(u, -1.4)), 1.8);
-    ctx.fillStyle = C.shade; ctx.fill();
+    // Behind the cheekbone, not on it. At 1.0 forward the ear landed in the
+    // middle of the face and read as a single staring eye.
+    const ear = at(-1.2, sd2 * (flat ? B.rHeadBack * 0.78 : 3.0));
+    const tip = add(ear, scl(u, -1.3));
+    capsulePath(ctx, ear, 1.35, tip, 1.1);
+    ctx.fillStyle = fill; ctx.fill();
+    capsulePath(ctx, ear, 1.55, tip, 1.25);
+    ctx.strokeStyle = C.seamSoft; ctx.lineWidth = 0.3; ctx.stroke();
   }
 }
 
-function drawArm(ctx, S, side, C, fill, grip, skinOpts, detail) {
+function drawArm(ctx, S, side, C, fill, grip, skinOpts) {
   const B = BODY, k = S.sides[side];
   const d = norm2(sub(k.elbow, k.shoulder));
   part(ctx, C, [
-    [add(k.shoulder, scl(d, -1.2)), B.rDelt],
-    [add(k.shoulder, scl(d, 5.0)), B.rShoulder],
+    [add(k.shoulder, scl(d, -0.2)), B.rDelt],
+    [add(k.shoulder, scl(d, 5.6)), B.rShoulder],
     [k.elbow, B.rElbow],
   ], { fill });
   part(ctx, C, [[k.elbow, B.rElbow], [lerpV(k.elbow, k.wrist, 0.3), B.rForearmMid], [k.wrist, B.rWrist]], { fill });
   if (skinOpts && skinOpts.plates) armPlates(ctx, S, side, C, skinOpts.lit);
-  drawHand(ctx, S, side, C, fill, grip, detail);
+  drawHand(ctx, S, side, C, fill, grip);
 }
 
 // Hip, thigh and shin as one surface, with a crease at the knee.
@@ -843,6 +839,62 @@ function drawLeg(ctx, S, side, C, fill, skinOpts) {
   drawFoot(ctx, S, side, C, fill);
 }
 
+// The lines the reference sheet draws on the torso: the pec underline, the
+// waist, the hip crease, and on the back the spine and the shoulder blades.
+// They are the same hairline as the silhouette, clipped inside the body, and
+// they are most of what makes a flat grey shape read as a torso.
+function torsoLines(ctx, S, C) {
+  if (COLLECT) return;
+  const B = BODY;
+  const u = norm2(S.torsoAxis.y);
+  const flat = S.frontal;
+  const lat = flat ? norm2(S.torsoAxis.z) : norm2(S.torsoAxis.x);
+  const at = (up, side) => add(add(S.chest, scl(u, up)), scl(lat, side));
+  const line = (pts, w = 0.5) => {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length - 1; i++) {
+      const m = { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 };
+      ctx.quadraticCurveTo(pts[i].x, pts[i].y, m.x, m.y);
+    }
+    const L = pts[pts.length - 1];
+    ctx.lineTo(L.x, L.y);
+    ctx.strokeStyle = C.seam;
+    ctx.lineWidth = w;
+    ctx.lineCap = "round";
+    ctx.stroke();
+  };
+  ctx.save();
+  const waist = lerpV(S.pelvis, S.chest, 0.46);
+  const body = [[S.pelvis, B.rPelvis], [waist, B.rWaist], [S.chest, S.chestR]];
+  const clip = new Path2D();
+  for (let i = 0; i < body.length - 1; i++) {
+    capsulePathInto(clip, body[i][0], body[i][1], body[i + 1][0], body[i + 1][1]);
+  }
+  ctx.clip(clip);
+  if (flat && S.facing === "away") {
+    line([at(4, 0), at(-6, 0), at(-14, 0)], 0.55);                       // spine
+    for (const g of [-1, 1]) {
+      line([at(2.4, g * 2.2), at(-1.0, g * 7.0), at(-5.0, g * 8.2)]);    // shoulder blade
+    }
+    line([at(-20, -7), at(-21.5, 0), at(-20, 7)], 0.5);                  // top of the glutes
+  } else if (flat) {
+    for (const g of [-1, 1]) {
+      line([at(1.6, g * 1.2), at(-3.2, g * 5.6), at(-2.6, g * 9.6)]);    // pec underline
+    }
+    line([at(-3.0, 0), at(-9, 0), at(-14, 0)], 0.38);                    // linea alba
+    for (const g of [-1, 1]) {
+      line([at(-19, g * 8.4), at(-23, g * 4.4), at(-25.5, 0)], 0.55);    // hip crease
+    }
+  } else {
+    line([at(1.8, 5.6), at(-3.0, 7.0), at(-3.4, 3.0)]);                  // pec underline
+    line([at(-12.5, 5.6), at(-13.5, 2.0)], 0.42);                        // lower ribs
+    line([at(-19, 6.6), at(-23, 4.0), at(-25, 0)], 0.55);                // hip crease
+    line([at(-16, -7.0), at(-21, -7.6), at(-25, -5.0)], 0.5);            // glute
+  }
+  ctx.restore();
+}
+
 // Three circles down the torso so the silhouette narrows at the waist, plus a
 // soft chest plate. Flat two tone: a designed figure, not an anatomy chart.
 function drawTorso(ctx, S, C, fill, skinOpts) {
@@ -851,6 +903,19 @@ function drawTorso(ctx, S, C, fill, skinOpts) {
   // The wide bottom circle is the trapezius, and it is most of what stops the
   // head reading as a ball on a stick.
   const nu = norm2(S.torsoAxis.y);
+  // Clavicle and trapezius: a yoke from the base of the neck out to each
+  // shoulder joint. Without it the neck stands on a flat shelf and the
+  // deltoids read as pads bolted on; the reference sheet has one unbroken
+  // slope from ear to shoulder.
+  const yoke = lerpV(S.chest, S.neckTop, 0.26);
+  for (const ys of ["L", "R"]) {
+    const sh = S.sides[ys].shoulder;
+    part(ctx, C, [
+      [yoke, B.rNeckBot * 0.98],
+      [lerpV(yoke, sh, 0.62), B.rShoulder * 0.76],
+      [sh, B.rShoulder * 0.82],
+    ], { fill, shade: false });
+  }
   part(ctx, C, [
     [add(S.chest, scl(nu, -0.6)), B.rNeckBot * 1.12],
     [lerpV(S.chest, S.neckTop, 0.55), B.rNeckBot * 0.86],
@@ -861,19 +926,12 @@ function drawTorso(ctx, S, C, fill, skinOpts) {
   part(ctx, C, [[S.pelvis, B.rPelvis], [waist, B.rWaist], [S.chest, S.chestR]],
        { fill, shadeOff: fv ? 0.18 : 0.44, shadeR: fv ? 0.62 : 0.54 });
   if (skinOpts && skinOpts.plates) { torsoPlates(ctx, S, C, skinOpts.lit); return; }
+  torsoLines(ctx, S, C);
   // A single soft mass under the collarbone gives the chest volume. It used to
   // be a hard edged capsule across the whole chest, which at 160px read as the
   // front panel of a vest.
   const u = norm2(S.torsoAxis.y), f = norm2(S.torsoAxis.x);
-  const a = fv ? add(add(S.chest, scl(f, -4.6)), scl(u, -1.6))
-               : add(add(S.chest, scl(f, 2.6)), scl(u, 0.4));
-  const b = fv ? add(add(S.chest, scl(f, 4.6)), scl(u, -1.6))
-               : add(add(S.chest, scl(f, 1.2)), scl(u, -5.0));
-  ctx.save();
-  ctx.globalAlpha = 0.62;
-  capsulePath(ctx, a, fv ? 5.0 : 4.2, b, fv ? 5.0 : 4.6);
-  ctx.fillStyle = C.shadeSoft; ctx.fill();
-  ctx.restore();
+  void fv;
 }
 
 // ---------------------------------------------------------- anatomy skin ---
@@ -943,7 +1001,9 @@ function bonePlate(ctx, C, group, lit, p0, r0, p1, r1, face, specs) {
   for (let i = 0; i < circles.length - 1; i++) {
     segs.push([circles[i][0], circles[i][1], circles[i + 1][0], circles[i + 1][1]]);
   }
-  ctx.strokeStyle = C.seam;
+  // Panels are separated by the body showing through, exactly as in
+  // figure-muscles.png. A dark line here turns every limb into armour.
+  ctx.strokeStyle = C.plateSeam;
   ctx.lineWidth = 1.1;
   for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.stroke(); }
   ctx.fillStyle = litFill(group, C, lit);
@@ -956,130 +1016,166 @@ function freePlate(ctx, C, group, lit, circles) {
   for (let i = 0; i < circles.length - 1; i++) {
     segs.push([circles[i][0], circles[i][1], circles[i + 1][0], circles[i + 1][1]]);
   }
-  ctx.strokeStyle = C.seam;
-  ctx.lineWidth = 1.1;
+  ctx.strokeStyle = C.plateSeam;
+  ctx.lineWidth = 1.4;
   for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.stroke(); }
   ctx.fillStyle = litFill(group, C, lit);
   for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.fill(); }
 }
 
+// Panels traced off knowledge/motion/reference/figure-muscles.png: mid grey
+// shapes on the light body, with the body showing through between them as the
+// light seam. Each view draws the panels that view actually shows.
 function armPlates(ctx, S, side, C, lit) {
+  if (COLLECT) return;
   const B = BODY, k = S.sides[side];
   const flat = S.frontal;
+  const back = flat && S.facing === "away";
   const face = flat ? V(0, 0) : k.axis.arm.x;
   const faceF = flat ? V(0, 0) : k.axis.fore.x;
-  const sh = add(k.shoulder, scl(norm2(sub(k.elbow, k.shoulder)), -1.6));
-  // deltoid: a cap over the joint that tapers a third of the way down the arm
+  const sh = add(k.shoulder, scl(norm2(sub(k.elbow, k.shoulder)), -1.8));
+  // deltoid: a cap over the joint running a third of the way down
   bonePlate(ctx, C, "shoulders", lit, sh, B.rDelt, k.elbow, B.rElbow, face, [
-    { at: 0.0, w: 0.99, side: 0 }, { at: 0.12, w: 0.95, side: 0 },
-    { at: 0.26, w: 0.78, side: 0 }, { at: 0.36, w: 0.5, side: 0 },
+    { at: 0.02, w: 0.94, side: 0 }, { at: 0.16, w: 0.9, side: 0 },
+    { at: 0.3, w: 0.72, side: 0 }, { at: 0.4, w: 0.42, side: 0 },
   ]);
-  bonePlate(ctx, C, "biceps", lit, k.shoulder, B.rShoulder, k.elbow, B.rElbow, face,
-    flat ? [{ at: 0.36, w: 0.66, side: 0 }, { at: 0.62, w: 0.74, side: 0 }, { at: 0.94, w: 0.5, side: 0 }]
-         : [{ at: 0.34, w: 0.44, side: 1 }, { at: 0.6, w: 0.56, side: 1 }, { at: 0.93, w: 0.38, side: 1 }]);
-  if (!flat) {
+  if (back || (!flat)) {
+    // triceps: the long mass down the back of the upper arm
     bonePlate(ctx, C, "triceps", lit, k.shoulder, B.rShoulder, k.elbow, B.rElbow, face, [
-      { at: 0.3, w: 0.4, side: -1 }, { at: 0.62, w: 0.5, side: -1 }, { at: 0.96, w: 0.34, side: -1 },
+      { at: 0.3, w: back ? 0.62 : 0.44, side: back ? 0 : -1 },
+      { at: 0.62, w: back ? 0.7 : 0.52, side: back ? 0 : -1 },
+      { at: 0.96, w: back ? 0.5 : 0.34, side: back ? 0 : -1 },
     ]);
   }
-  // forearm: thick at the elbow, running out to nothing at the wrist
+  if (!back) {
+    bonePlate(ctx, C, "biceps", lit, k.shoulder, B.rShoulder, k.elbow, B.rElbow, face,
+      flat ? [{ at: 0.36, w: 0.62, side: 0 }, { at: 0.64, w: 0.7, side: 0 }, { at: 0.94, w: 0.46, side: 0 }]
+           : [{ at: 0.34, w: 0.42, side: 1 }, { at: 0.62, w: 0.54, side: 1 }, { at: 0.94, w: 0.36, side: 1 }]);
+  }
+  // forearm: a broad mass at the elbow running out to nothing at the wrist
   bonePlate(ctx, C, "forearms", lit, k.elbow, B.rElbow, k.wrist, B.rWrist, faceF,
-    flat ? [{ at: 0.04, w: 0.72, side: 0 }, { at: 0.3, w: 0.68, side: 0 }, { at: 0.82, w: 0.42, side: 0 }]
-         : [{ at: 0.04, w: 0.64, side: 1 }, { at: 0.3, w: 0.6, side: 1 }, { at: 0.84, w: 0.36, side: 1 }]);
+    flat ? [{ at: 0.06, w: 0.74, side: 0 }, { at: 0.34, w: 0.66, side: 0 }, { at: 0.86, w: 0.4, side: 0 }]
+         : [{ at: 0.06, w: 0.62, side: 1 }, { at: 0.34, w: 0.58, side: 1 }, { at: 0.86, w: 0.34, side: 1 }]);
+  if (!flat) {
+    bonePlate(ctx, C, "forearms", lit, k.elbow, B.rElbow, k.wrist, B.rWrist, faceF, [
+      { at: 0.1, w: 0.42, side: -1 }, { at: 0.5, w: 0.36, side: -1 }, { at: 0.8, w: 0.24, side: -1 },
+    ]);
+  }
 }
 
 function legPlates(ctx, S, side, C, lit) {
+  if (COLLECT) return;
   const B = BODY, k = S.sides[side];
   const flat = S.frontal;
+  const back = flat && S.facing === "away";
   const face = flat ? V(0, 0) : k.axis.thigh.x;
   const faceS = flat ? V(0, 0) : k.axis.shin.x;
-  bonePlate(ctx, C, "glutes", lit, k.hip, B.rHip, k.knee, B.rKnee, face,
-    flat ? [{ at: 0.0, w: 0.84, side: 0 }, { at: 0.16, w: 0.72, side: 0 }, { at: 0.28, w: 0.46, side: 0 }]
-         : [{ at: -0.04, w: 0.78, side: -1 }, { at: 0.14, w: 0.66, side: -1 }, { at: 0.3, w: 0.4, side: -1 }]);
-  // quads: one long mass with the teardrop sitting just above the knee
-  bonePlate(ctx, C, "quads", lit, k.hip, B.rHip, k.knee, B.rKnee, face,
-    flat ? [{ at: 0.16, w: 0.66, side: 0 }, { at: 0.48, w: 0.78, side: 0 },
-            { at: 0.74, w: 0.72, side: 0 }, { at: 0.88, w: 0.58, side: 0 }, { at: 0.96, w: 0.34, side: 0 }]
-         : [{ at: 0.16, w: 0.48, side: 1 }, { at: 0.46, w: 0.6, side: 1 },
-            { at: 0.74, w: 0.56, side: 1 }, { at: 0.88, w: 0.46, side: 1 }, { at: 0.96, w: 0.28, side: 1 }]);
-  if (!flat) {
-    bonePlate(ctx, C, "hamstrings", lit, k.hip, B.rHip, k.knee, B.rKnee, face, [
-      { at: 0.26, w: 0.4, side: -1 }, { at: 0.56, w: 0.48, side: -1 },
-      { at: 0.8, w: 0.42, side: -1 }, { at: 0.94, w: 0.26, side: -1 },
+  if (back) {
+    // glute as one round mass per side, then two hamstring strips
+    bonePlate(ctx, C, "glutes", lit, k.hip, B.rHip, k.knee, B.rKnee, face, [
+      { at: -0.1, w: 0.92, side: 0 }, { at: 0.06, w: 0.94, side: 0 }, { at: 0.2, w: 0.66, side: 0 },
     ]);
+    for (const o of [-0.42, 0.42]) {
+      bonePlate(ctx, C, "hamstrings", lit, k.hip, B.rHip, k.knee, B.rKnee, face, [
+        { at: 0.3, w: 0.34, side: o }, { at: 0.6, w: 0.4, side: o }, { at: 0.9, w: 0.28, side: o },
+      ]);
+    }
+  } else {
+    bonePlate(ctx, C, "glutes", lit, k.hip, B.rHip, k.knee, B.rKnee, face,
+      flat ? [{ at: -0.02, w: 0.72, side: 0 }, { at: 0.14, w: 0.6, side: 0 }]
+           : [{ at: -0.08, w: 0.82, side: -1 }, { at: 0.1, w: 0.7, side: -1 }, { at: 0.26, w: 0.44, side: -1 }]);
+    if (flat) {
+      // quads: rectus down the middle, vastus lateralis outside, and the
+      // medialis teardrop just above the knee
+      bonePlate(ctx, C, "quads", lit, k.hip, B.rHip, k.knee, B.rKnee, face, [
+        { at: 0.2, w: 0.4, side: 0 }, { at: 0.52, w: 0.46, side: 0 }, { at: 0.86, w: 0.34, side: 0 },
+      ]);
+      bonePlate(ctx, C, "quads", lit, k.hip, B.rHip, k.knee, B.rKnee, face, [
+        { at: 0.16, w: 0.34, side: k.lat * 0.5 }, { at: 0.5, w: 0.4, side: k.lat * 0.52 },
+        { at: 0.78, w: 0.26, side: k.lat * 0.5 },
+      ]);
+      bonePlate(ctx, C, "quads", lit, k.hip, B.rHip, k.knee, B.rKnee, face, [
+        { at: 0.68, w: 0.26, side: -k.lat * 0.5 }, { at: 0.84, w: 0.34, side: -k.lat * 0.52 },
+        { at: 0.95, w: 0.22, side: -k.lat * 0.48 },
+      ]);
+    } else {
+      bonePlate(ctx, C, "quads", lit, k.hip, B.rHip, k.knee, B.rKnee, face, [
+        { at: 0.16, w: 0.46, side: 1 }, { at: 0.5, w: 0.58, side: 1 },
+        { at: 0.78, w: 0.52, side: 1 }, { at: 0.93, w: 0.3, side: 1 },
+      ]);
+      bonePlate(ctx, C, "hamstrings", lit, k.hip, B.rHip, k.knee, B.rKnee, face, [
+        { at: 0.3, w: 0.4, side: -1 }, { at: 0.6, w: 0.46, side: -1 }, { at: 0.92, w: 0.26, side: -1 },
+      ]);
+    }
   }
-  // calf: belly high on the shin, tapering into the achilles
-  bonePlate(ctx, C, "calves", lit, k.knee, B.rKnee, k.ankle, B.rAnkle, faceS,
-    flat ? [{ at: 0.06, w: 0.56, side: 0 }, { at: 0.26, w: 0.76, side: 0 },
-            { at: 0.5, w: 0.58, side: 0 }, { at: 0.78, w: 0.3, side: 0 }]
-         : [{ at: 0.06, w: 0.5, side: -1 }, { at: 0.26, w: 0.68, side: -1 },
-            { at: 0.5, w: 0.52, side: -1 }, { at: 0.8, w: 0.26, side: -1 }]);
+  // calf: two heads from behind, one belly from the front or side
+  if (back) {
+    for (const o of [-0.34, 0.34]) {
+      bonePlate(ctx, C, "calves", lit, k.knee, B.rKnee, k.ankle, B.rAnkle, faceS, [
+        { at: 0.1, w: 0.38, side: o }, { at: 0.3, w: 0.46, side: o }, { at: 0.62, w: 0.22, side: o },
+      ]);
+    }
+  } else {
+    bonePlate(ctx, C, "calves", lit, k.knee, B.rKnee, k.ankle, B.rAnkle, faceS,
+      flat ? [{ at: 0.08, w: 0.54, side: k.lat * 0.4 }, { at: 0.3, w: 0.62, side: k.lat * 0.4 },
+              { at: 0.66, w: 0.3, side: k.lat * 0.36 }]
+           : [{ at: 0.06, w: 0.5, side: -1 }, { at: 0.28, w: 0.64, side: -1 },
+              { at: 0.52, w: 0.5, side: -1 }, { at: 0.8, w: 0.24, side: -1 }]);
+  }
 }
 
 function torsoPlates(ctx, S, C, lit) {
+  if (COLLECT) return;
   const B = BODY;
-  const P = S.pelvis, Ch = S.chest, rP = B.rPelvis, rC = S.chestR;
+  const P = S.pelvis, Ch = S.chest;
   const flat = S.frontal;
+  const back = flat && S.facing === "away";
   const u = norm2(S.torsoAxis.y);
-  // Lateral axis and anterior axis project to different things depending on the
-  // view: front on, the anterior axis points at the camera and has no screen
-  // direction at all, so the lateral one has to carry the layout.
   const lat = flat ? norm2(S.torsoAxis.z) : norm2(S.torsoAxis.x);
   const at = (up, side) => add(add(Ch, scl(u, up)), scl(lat, side));
-  if (flat && S.facing === "away") {
-    // trapezius sheet from the neck out over both shoulders
-    const trap = (sgn) => freePlate(ctx, C, "traps", lit, [
-      [at(2.0, sgn * 1.0), 3.4], [at(0.2, sgn * 5.4), 4.2], [at(-1.6, sgn * 9.0), 3.2],
+  if (back) {
+    // trapezius diamond from the neck out over both shoulders and down the back
+    freePlate(ctx, C, "traps", lit, [
+      [at(3.2, 0), 4.0], [at(0.6, -6.4), 3.6], [at(-4.0, -3.0), 3.4],
+      [at(-7.0, 0), 3.2], [at(-4.0, 3.0), 3.4], [at(0.6, 6.4), 3.6], [at(3.2, 0), 4.0],
     ]);
-    trap(-1); trap(1);
-    // lats: wings from under the armpit down into the waist
-    const lat_ = (sgn) => freePlate(ctx, C, "lats", lit, [
-      [at(-2.0, sgn * 8.6), 4.2], [at(-8.5, sgn * 7.2), 4.6], [at(-15.0, sgn * 4.2), 3.0],
-    ]);
-    lat_(-1); lat_(1);
-    freePlate(ctx, C, "lowerback", lit, [[at(-12.0, 0), 3.0], [at(-18.0, 0), 2.8]]);
-  } else if (flat) {
-    // pec: a fan from the sternum out to the armpit, not a blob on the chest
-    const pec = (sgn) => freePlate(ctx, C, "chest", lit, [
-      [at(-1.8, sgn * 1.5), 2.6], [at(-0.6, sgn * 5.2), 4.6], [at(-1.2, sgn * 8.8), 4.2],
-    ]);
-    pec(-1); pec(1);
-    // rectus: two blocks, stacked and narrow
-    for (const [a, b, w] of [[-7.5, -11.5, 4.2], [-12.5, -16.5, 4.2]]) {
-      freePlate(ctx, C, "abs", lit, [[at(a, 0), w], [at(b, 0), w * 0.96]]);
+    // lats: wings from under each armpit converging into the waist
+    for (const g of [-1, 1]) {
+      freePlate(ctx, C, "lats", lit, [
+        [at(-1.6, g * 8.4), 3.6], [at(-7.5, g * 7.0), 4.0], [at(-13.5, g * 3.6), 2.8],
+      ]);
     }
-    const ob = (sgn) => freePlate(ctx, C, "obliques", lit, [
-      [at(-7.0, sgn * 6.2), 2.8], [at(-13.0, sgn * 5.0), 2.4],
-    ]);
-    ob(-1); ob(1);
+    for (const g of [-1, 1]) {
+      freePlate(ctx, C, "lowerback", lit, [[at(-11.5, g * 1.9), 1.9], [at(-18.0, g * 1.9), 1.9]]);
+    }
+  } else if (flat) {
+    for (const g of [-1, 1]) {
+      freePlate(ctx, C, "traps", lit, [[at(3.4, g * 1.6), 2.6], [at(1.0, g * 6.6), 3.0]]);
+      // pec: a broad panel from the sternum out to the armpit
+      freePlate(ctx, C, "chest", lit, [
+        [at(-0.6, g * 2.0), 3.4], [at(0.4, g * 5.6), 4.4], [at(-0.8, g * 8.8), 4.0],
+      ]);
+      // serratus and obliques at the side of the ribs
+      freePlate(ctx, C, "obliques", lit, [[at(-9.5, g * 6.6), 2.4], [at(-15.0, g * 5.2), 2.6]]);
+    }
+    // rectus: three rows of two
+    for (const [up, r] of [[-6.4, 2.5], [-10.6, 2.5], [-14.6, 2.3]]) {
+      for (const g of [-1, 1]) freePlate(ctx, C, "abs", lit, [[at(up, g * 2.9), r]]);
+    }
   } else {
-    // side on: pec sheet at the front of the chest, lats sweeping from the
-    // lower back up into the armpit, abs down the front
+    freePlate(ctx, C, "traps", lit, [[at(3.6, 1.0), 2.8], [at(1.4, -4.6), 3.0]]);
     freePlate(ctx, C, "chest", lit, [
-      [at(1.6, 6.2), 4.2], [at(-2.4, 7.4), 4.6], [at(-6.0, 6.4), 3.4],
+      [at(1.2, 6.0), 3.6], [at(-2.6, 7.2), 4.0], [at(-5.4, 5.6), 3.0],
     ]);
     freePlate(ctx, C, "lats", lit, [
-      [add(add(P, scl(u, 9)), scl(lat, -6.4)), 3.0],
-      [add(add(P, scl(u, 17)), scl(lat, -7.6)), 4.4],
-      [at(-1.0, -8.0), 5.0],
-      [at(1.8, -5.6), 4.0],
+      [at(-1.2, -7.4), 4.2], [at(-7.5, -8.0), 4.4], [at(-14.0, -5.6), 3.2],
     ]);
-    freePlate(ctx, C, "lowerback", lit, [
-      [add(add(P, scl(u, 5)), scl(lat, -5.6)), 3.2],
-      [add(add(P, scl(u, 12)), scl(lat, -6.6)), 3.4],
-    ]);
-    freePlate(ctx, C, "abs", lit, [
-      [at(-8.0, 5.6), 3.2], [at(-13.0, 5.0), 3.0], [at(-17.5, 4.2), 2.6],
-    ]);
-    freePlate(ctx, C, "obliques", lit, [
-      [at(-12.0, 3.0), 2.6], [at(-17.0, 2.0), 2.4],
-    ]);
+    freePlate(ctx, C, "lowerback", lit, [[at(-16.0, -6.0), 2.8], [at(-21.0, -5.0), 2.6]]);
+    for (const [up, r] of [[-7.0, 2.3], [-11.4, 2.3], [-15.4, 2.1]]) {
+      freePlate(ctx, C, "abs", lit, [[at(up, 5.4), r]]);
+    }
+    freePlate(ctx, C, "obliques", lit, [[at(-12.0, 1.6), 2.6], [at(-17.5, 1.0), 2.4]]);
   }
-  // traps: from the neck out over the shoulder line
-  const t0 = add(S.chest, scl(u, 1.2)), t1 = add(S.neckTop, scl(u, -0.6));
-  bonePlate(ctx, C, "traps", lit, t0, B.rNeckBot * 1.5, t1, B.rNeckTop, lat, [
-    { at: 0.0, w: 0.92, side: 0 }, { at: 0.5, w: 0.8, side: 0 }, { at: 0.95, w: 0.7, side: 0 },
-  ]);
 }
 
 // ------------------------------------------------------------------ props ---
@@ -1372,6 +1468,18 @@ export function gripSides(move, S) {
 // Draw order is by depth now, not by a fixed list. The tie-break keeps the v1
 // order exactly for a planar camera, where every limb sits at the same depth as
 // its opposite number and only the old near/far rule can separate them.
+// One stroke round the union of every capsule in the body. Drawn before any
+// fill, so only the part of it outside the silhouette survives.
+function outline(ctx, C, segs) {
+  ctx.strokeStyle = C.seam;
+  ctx.lineWidth = 1.1;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  // Measured both ways: one compound Path2D and a single stroke call is no
+  // faster than stroking each capsule, so this stays the simple loop.
+  for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.stroke(); }
+}
+
 export function drawFigure(ctx, S, C, opts = {}) {
   if (opts.floor !== false) drawFloor(ctx, C, S);
   drawProps(ctx, C, opts.props, S, "back");
@@ -1379,7 +1487,6 @@ export function drawFigure(ctx, S, C, opts = {}) {
   const near = S.frontal ? (S.farSide === "R" ? "L" : "R") : "R";
   const far = near === "R" ? "L" : "R";
   const grips = opts.grip || {};
-  const detail = opts.detail !== false;
   const skinOpts = C.skin === "anatomy" ? { plates: true, lit: opts.lit } : null;
   const farFill = symmetric ? C.ink : C.far;
   // Depth decides draw ORDER. Tone stays on the near/far rule, flipped once the
@@ -1412,12 +1519,20 @@ export function drawFigure(ctx, S, C, opts = {}) {
   items.push({ d: S.head.d, o: 3, kind: "head" });
   items.sort((a, b) => (a.d + a.o * 0.0001) - (b.d + b.o * 0.0001));
 
-  for (const it of items) {
-    if (it.kind === "arm") drawArm(ctx, S, it.s, C, it.fill, grips[it.s], it.plates, detail);
-    else if (it.kind === "leg") drawLeg(ctx, S, it.s, C, it.fill, it.plates);
-    else if (it.kind === "torso") drawTorso(ctx, S, C, C.ink, skinOpts);
-    else drawHead(ctx, S, C, C.ink);
-  }
+  const walk = () => {
+    for (const it of items) {
+      if (it.kind === "arm") drawArm(ctx, S, it.s, C, it.fill, grips[it.s], it.plates);
+      else if (it.kind === "leg") drawLeg(ctx, S, it.s, C, it.fill, it.plates);
+      else if (it.kind === "torso") drawTorso(ctx, S, C, C.ink, skinOpts);
+      else drawHead(ctx, S, C, C.ink);
+    }
+  };
+  // pass one: gather every capsule and stroke the union once
+  COLLECT = [];
+  try { walk(); } finally { const segs = COLLECT; COLLECT = null; outline(ctx, C, segs); }
+  // pass two: fills and inner detail, with per part outlines off
+  LINES = false;
+  try { walk(); } finally { LINES = true; }
   drawProps(ctx, C, opts.props, S, "front");
 }
 
@@ -1506,7 +1621,10 @@ export function render(canvas, move, C, cycle, timeSec = 0, opts = {}) {
   const view = opts.view || move.view;
   // The caller passes which muscles and what peak colour; when they fire is the
   // move's business, so it is worked out here rather than by every caller.
-  const lit = opts.lit
+  // Muscle highlighting is OFF in the product. It only exists on the anatomy
+  // skin, which nothing ships with, and the plain skin ignores opts.lit
+  // entirely so a stale caller passing muscles cannot light anything.
+  const lit = C.skin === "anatomy" && opts.lit
     ? { ...opts.lit, intensity: opts.lit.intensity === undefined ? litIntensity(move, cycle) : opts.lit.intensity }
     : null;
   const S = solvePose(samplePose(move, cycle, timeSec), view);
@@ -1515,7 +1633,6 @@ export function render(canvas, move, C, cycle, timeSec = 0, opts = {}) {
   drawFigure(ctx, S, C, {
     props: move.props, floor: move.floor, lit,
     grip: gripSides(move, S),
-    detail: opts.detail === undefined ? w >= 190 : opts.detail,
   });
   return S;
 }
