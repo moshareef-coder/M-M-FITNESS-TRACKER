@@ -10,3 +10,11 @@ darker shade on the far side and no heavy outline, thin seams only where
 the sheet has them (neck, pec line, waist, hip crease, knee, wrist), the
 darker hair cap, five-fingered hands, feet with toes, and the muscle panel
 shapes and their light seams.
+
+figure-female.png (added 2026-09-12, approved by Mo): the female version of
+the same character, front, side, back, resting on top and with chest and
+quads lit below. Same style rules. What to copy: narrower shoulders over
+wider hips, a defined waist, the chest line on the side view, slimmer arms,
+the hair bun, and the same mitt hands and plain feet as the male figure.
+The muscle panels and the orange highlight are reference only; the product
+shows neither.
