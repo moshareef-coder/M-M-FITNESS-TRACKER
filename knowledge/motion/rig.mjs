@@ -123,7 +123,7 @@ const axial = (F, a, side) => rotY(F, -side * a);
 // was 3.5 short. That reads as a child's proportions, which is most of what
 // made it look like a doll.
 export const BODY = {
-  spine: 30, neck: 8.2, headOff: 8.8,
+  spine: 30, neck: 8.4, headOff: 8.8,
   upperArm: 20, forearm: 17, hand: 8.6,
   thigh: 27, shin: 25, foot: 12,
   // Radii are the slim silhouette Mo approved in the first prototype, taken
@@ -131,7 +131,7 @@ export const BODY = {
   // above it so limbs taper instead of bulging. The previous set (chest 12.3,
   // thigh mid 8.7 over a hip of 8.0) read as heavy, and he said so.
   rPelvis: 8.0, rWaist: 6.6, rChest: 9.8,
-  rNeckTop: 4.0, rNeckBot: 5.2,
+  rNeckTop: 3.3, rNeckBot: 4.5,
   rHeadBack: 6.5, rHeadJaw: 4.8,
   rShoulder: 5.8, rDelt: 6.0, rElbow: 3.5, rWrist: 2.4,
   rUpperArmMid: 4.6, rForearmMid: 3.7,
@@ -159,7 +159,7 @@ export const LEG_TO_FLOOR = BODY.thigh + BODY.shin + BODY.rAnkle;
 export const BODY_FEMALE = {
   ...BODY,
   rPelvis: 8.3, rWaist: 5.9, rChest: 9.1,
-  rNeckTop: 3.6, rNeckBot: 4.7,
+  rNeckTop: 3.0, rNeckBot: 4.1,
   rHeadBack: 6.1, rHeadJaw: 4.3,
   rShoulder: 5.1, rDelt: 5.3, rElbow: 3.1, rWrist: 2.2,
   rUpperArmMid: 4.1, rForearmMid: 3.3,
@@ -1308,8 +1308,8 @@ function drawTorso(ctx, S, C, fill, skinOpts) {
   // The neck goes on LAST so its base arc lands on top of the chest: that arc
   // is the neck seam the sheet draws, and drawn first it was painted over.
   part(ctx, C, [
-    [add(S.chest, scl(nu, -0.6)), B.rNeckBot * 1.12],
-    [lerpV(S.chest, S.neckTop, 0.55), B.rNeckBot * 0.86],
+    [add(S.chest, scl(nu, -0.6)), B.rNeckBot * 1.2],
+    [lerpV(S.chest, S.neckTop, 0.5), B.rNeckBot * 0.8],
     [S.neckTop, B.rNeckTop],
   ], { fill });
   if (skinOpts && skinOpts.plates) { torsoPlates(ctx, S, C, skinOpts.lit); return; }
