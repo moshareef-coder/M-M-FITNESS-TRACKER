@@ -310,10 +310,13 @@ const STIFF_LEG_DEADLIFT = {
       joints: { spine: 2, neck: -2, shoulderR: -4, elbowR: 2, shoulderL: -4, elbowL: 3 },
       ik: { ...SQUAT_FEET },
     },
-    { // bottom, knees all but locked, torso past 70 degrees
+    { // bottom, knees all but locked, torso past 70 degrees. The pelvis stays
+      // HIGH and travels back only a little: with the feet pinned, dropping it
+      // the way the Romanian one does is what bends the knee, and a knee as
+      // bent as the Romanian's leaves the two moves telling the same story.
       t: 1,
-      root: { x: 50, y: 64, rot: 30 },
-      joints: { spine: 42, neck: -12, shoulderR: -72, elbowR: 2, shoulderL: -72, elbowL: 3 },
+      root: { x: 56, y: 60.6, rot: 34 },
+      joints: { spine: 46, neck: -12, shoulderR: -80, elbowR: 2, shoulderL: -80, elbowL: 3 },
       ik: { ...SQUAT_FEET },
     },
   ],
@@ -1604,7 +1607,10 @@ const SUITCASE_CARRY = {
         spine: 0, neck: 0, shoulderR: 2, elbowR: 3, shoulderL: 14, elbowL: 10,
         hipR: 4, hipL: 4, kneeR: 3, kneeL: 3,
       },
-      ik: { ankleR: { x: 75, y: 113.4, bend: -1 }, ankleL: { x: 64, y: 101, bend: -1 } },
+      // the trailing foot lifts about five units, no more: this is a frontal
+      // view, which cannot foreshorten a leg swinging forward, so a bigger lift
+      // folds the thigh up on the spot and reads as a marching knee raise.
+      ik: { ankleR: { x: 75, y: 113.4, bend: -1 }, ankleL: { x: 66, y: 108, bend: -1 } },
     },
   ],
 };

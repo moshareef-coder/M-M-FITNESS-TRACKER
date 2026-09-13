@@ -866,53 +866,53 @@ const STRAIGHT_ARM_BAND_PULLDOWN = {
   ],
 };
 
-// Face down on the mat with the arms long past the head, lifting the thumbs a
-// couple of inches off the floor and putting them down again. The thing that
-// MUST be visible is that the body is FACE DOWN ON THE FLOOR while the arms
-// lift, because a Y raise done standing is a different exercise for a different
-// muscle. This was authored top down first, and top down a prone figure with
-// its arms in a Y is pixel for pixel a standing figure with its arms in a Y:
-// nothing in the frame said floor. Side on, the mat under the belly and the
-// hands travelling up off it say it in one glance, at the cost of the Y itself
-// (the two arms overlap side on). That trade is the right way round: the lift
-// is the rep, the width of the Y is a detail the cue can carry.
+// Face down on the floor, arms overhead and out at about forty five degrees so
+// the body makes a Y, thumbs up, lifting the hands a couple of inches off the
+// floor and putting them down again. The thing that MUST be visible is the Y
+// itself with the body FACE DOWN, because a Y raise done standing is a
+// different exercise for a different muscle.
 //
-// rot 90 is face down with the head at +x, so the legs run out to -x and the
-// arms reach past the head to +x. The thumbs-up grip is a forearm rotation the
-// rig has no axis for, so it lives in the cue, not the picture.
+// This was side on until the seam QA pass. Side on a prone figure is a flat bar
+// eight units thick, both arms overlap each other and the head, and the lift
+// cannot be opened up to compensate: the derived shoulder elevation of a prone
+// arm reaching past the head already sits at 193, three degrees under the 196
+// ceiling, so the hands can never rise clear of the skull. The picture was a
+// sausage on a mat. Top down, the Y is unmistakable and the top mat is what
+// says floor, which is the one thing the earlier top down attempt was missing
+// (it had no mat, so a prone Y was pixel for pixel a standing Y). The cost is
+// that the lift itself is invisible from above, so the arms travel from a low
+// wide V into the tight Y instead: the shape change is the rep.
+//
+// The thumbs-up grip is a forearm rotation the rig has no axis for, so it lives
+// in the cue, not the picture.
 const PRONE_Y_RAISE = {
-  view: "side",
+  view: "front",
+  facing: "away",
   loop: "pingpong",
   dur: 3.2,
   breath: 0.25,
-  fit: { k: 0.94, dx: -2, dy: -26 },
-  props: [{ type: "mat", x: -6, w: 152 }],
+  floor: false,
+  feet: { R: { ang: -6, len: 0.95, w: 0.95 }, L: { ang: 6, len: 0.95, w: 0.95 } },
+  fit: { k: 0.86, dy: 2 },
+  props: [{ type: "mat", top: true, x: 24, y: -8, w: 92, h: 130 }],
   keys: [
-    { // down: hands resting on the mat out past the head, elbows almost straight
+    { // down: hands resting on the mat, arms wide and low, a shallow V
       t: 0,
-      root: { x: 68, y: 105, rot: 90 },
-      joints: { spine: -2, neck: 9, shoulderR: -7, shoulderL: -5, elbowR: 8, elbowL: 8,
-                wristR: 2, wristL: 2, hipR: -178, hipL: -178, kneeR: 3, kneeL: 3,
-                ankleR: -78, ankleL: -78 },
+      root: { x: 70, y: 54, rot: 0 },
+      joints: { spine: 0, neck: 0, shoulderR: 112, shoulderL: 112, elbowR: 8, elbowL: 8,
+                wristR: 0, wristL: 0, hipR: 4, hipL: 4, kneeR: 4, kneeL: 4 },
     },
-    { // lifted: the hands come off the mat and the chest follows a degree. Small
-      // and slow on purpose, this is a low trap raise, not a back extension.
+    { // up: the arms sweep out and overhead into the Y and the hands leave the
+      // mat. Long elbows, because a bent elbow here is a W raise, a different
+      // drill in the same family.
       t: 1,
-      root: { x: 68, y: 105, rot: 90 },
-      joints: { spine: -3, neck: 6, shoulderR: 19, shoulderL: 17, elbowR: 4, elbowL: 4,
-                wristR: -2, wristL: -2, hipR: -177, hipL: -177, kneeR: 3, kneeL: 3,
-                ankleR: -78, ankleL: -78 },
+      root: { x: 70, y: 54, rot: 0 },
+      joints: { spine: 0, neck: 0, shoulderR: 140, shoulderL: 140, elbowR: 3, elbowL: 3,
+                wristR: 0, wristL: 0, hipR: 4, hipL: 4, kneeR: 4, kneeL: 4 },
     },
   ],
 };
 
-// In a plank on straight arms, let the chest sink between the shoulder blades,
-// then push the floor away. The suggested view was back, where a plank seen from
-// above hides the sink entirely. Side on, the chest dropping while the elbows
-// stay locked is exactly what the picture has to prove, so this deviates.
-// v2: the movement IS the shoulder girdle, so it is authored as the girdle
-// channel: protracted at the top, retracted as the chest sinks. Elbows stay
-// straight, which is what separates it from a push-up.
 const SCAPULAR_PUSH_UP = {
   view: "side",
   loop: "pingpong",
