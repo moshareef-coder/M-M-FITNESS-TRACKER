@@ -939,6 +939,19 @@
       radial-gradient(120% 52% at 50% 46%, color-mix(in srgb, var(--text) 10%, transparent), transparent 72%),
       var(--bg);
   }
+  /* On the workout tab the screen sits inside the page rather than over it:
+     the tab has its own header and nav bar, so it takes the room that is left
+     instead of the whole phone. */
+  .pz-inline {
+    min-height: min(76vh, 660px); padding: 4px 0 2px;
+    background: radial-gradient(120% 48% at 50% 44%, color-mix(in srgb, var(--text) 8%, transparent), transparent 72%);
+    border-radius: 20px;
+  }
+  /* Nothing to go back from on the tab, so Exit is alone on its row. */
+  .pz-inline .pz-top { justify-content: flex-end; }
+  .pz-inline .pz-clock { font-size: clamp(56px, 17vw, 76px); }
+  .pz-inline .pz-fig canvas { width: min(260px, 66vw); height: min(260px, 66vw); }
+  .pz-inline .pz-play { width: min(132px, 36vw); height: min(132px, 36vw); }
   .pz-top { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .pz-min {
     width: 52px; height: 52px; border-radius: 50%; border: 0; cursor: pointer;
@@ -5104,7 +5117,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.13.5";
+const APP_VERSION = "2026.09.13.6";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -15199,7 +15212,16 @@ function renderPausedSheet() {
   const card = $("sessionCard");
   card.classList.remove("lifting");
   card.classList.add("paused-screen");
+  $("sessionBody").innerHTML = pausedScreenHTML({ overlay: true });
+  wirePausedScreen({ overlay: true });
+}
 
+/* The same screen serves two places, because they are the same moment. Inside
+   the session it is what a pause looks like; on the workout tab it is what
+   coming back looks like, which used to be a flat card offering Resume and
+   Discard. `overlay` is the only difference: in the session there is a chevron
+   to back out of, on the tab you are already out. */
+function pausedScreenHTML({ overlay }) {
   const ei = SESSION.exerciseIndex;
   const ex = TODAY_WORKOUT?.exercises?.[ei];
   const stretching = SESSION.phase === "warmup" || SESSION.phase === "cooldown";
@@ -15213,15 +15235,17 @@ function renderPausedSheet() {
       ? `${ex.name}${currentSet >= 0 ? ` &middot; set ${currentSet + 1} of ${setsDone.length}` : ""}`
       : "";
 
-  $("sessionBody").innerHTML = `
-    <div class="pz">
+  return `
+    <div class="pz${overlay ? "" : " pz-inline"}">
       <div class="pz-top">
-        <button type="button" class="pz-min" id="pzMin" aria-label="Back, without ending the workout">${icon("chevronDown", 20)}</button>
+        ${overlay
+          ? `<button type="button" class="pz-min" id="pzMin" aria-label="Back, without ending the workout">${icon("chevronDown", 20)}</button>`
+          : `<span></span>`}
         <button type="button" class="pz-exit" id="pzExit">Exit workout</button>
       </div>
 
       <div class="pz-mid">
-        <div class="pz-eyebrow">Paused</div>
+        <div class="pz-eyebrow">${SESSION.pausedAt ? "Paused" : "In progress"}</div>
         <div class="pz-clock" id="pzClock">${fmtElapsed(sessionElapsed())}</div>
         ${where ? `<div class="pz-where">${where}</div>` : ""}
         <div class="pz-stage">
@@ -15238,11 +15262,20 @@ function renderPausedSheet() {
         </button>
       </div>
     </div>`;
+}
 
-  $("pzMin").onclick = minimiseSession;
+function wirePausedScreen({ overlay }) {
+  const root = overlay ? $("sessionBody") : $("workoutContent");
+  if ($("pzMin")) $("pzMin").onclick = minimiseSession;
   $("pzExit").onclick = endWorkoutNow;
-  $("pzResume").onclick = togglePause;
-  mountMotionFigures($("sessionBody"));
+  /* In the session the button only has to unpause. From the tab it is the way
+     back in, so it opens the session first and then unpauses into it: on its
+     own, togglePause renders the lift screen into an overlay that is still
+     hidden, which left the tab showing a paused screen for a running workout. */
+  $("pzResume").onclick = overlay
+    ? togglePause
+    : () => { reopenSession(); if (SESSION?.pausedAt) togglePause(); };
+  mountMotionFigures(root);
   renderPausedLive();
   wireHoldToDiscard();
 }
@@ -15428,26 +15461,18 @@ function renderWorkoutTab({ respectMode = false } = {}) {
   if (SESSION) FRESH_PLAN_ID = null;   // once it is being lifted it is not untouched any more
   $("workoutContent").classList.remove("hidden");
 
-  // A workout already underway: offer it rather than hijacking the screen.
+  /* A workout already underway. Coming back to one is the same moment as
+     pausing it, so it gets the same screen rather than a card offering Resume
+     and Discard: the clock you stopped at, where you were, and one target to
+     get back in. Rendered here rather than reopening the session, because
+     minimising lands on this tab and would bounce straight back in. */
   if (SESSION && TODAY_WORKOUT) {
-    const total = TODAY_WORKOUT.exercises.length;
-    const doneEx = SESSION.completed.filter(Boolean).length;
-    $("workoutCardTitle").textContent = "Workout in progress";
-    $("workoutContent").innerHTML = `
-      <p class="muted-note">${doneEx} of ${total} exercises done · ${fmtElapsed(sessionElapsed())} so far${SESSION.pausedAt ? " · paused" : ""}.</p>
-      <button class="btn-primary" id="resumeOpenBtn" style="margin-top:10px;">Resume workout</button>
-      <button class="btn-ghost" id="discardSessionBtn">Discard it</button>`;
-    $("resumeOpenBtn").onclick = reopenSession;
-    $("discardSessionBtn").onclick = async () => {
-      const ok = await askConfirm({
-        heading: "Discard this workout",
-        body: "The sets you have already ticked are kept, this exercise included. The day is not counted as a workout.",
-        ok: "Discard it",
-      });
-      if (!ok) return;
-      await discardSession();
-      renderWorkoutTab();
-    };
+    /* The screen says Paused itself, in the right place, and names the
+       exercise: the card's own heading and focus line only repeated it. */
+    $("workoutCardTitle").textContent = "";
+    $("workoutFocusRow").textContent = "";
+    $("workoutContent").innerHTML = pausedScreenHTML({ overlay: false });
+    wirePausedScreen({ overlay: false });
     return;
   }
 
