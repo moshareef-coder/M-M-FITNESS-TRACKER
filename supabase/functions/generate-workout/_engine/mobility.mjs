@@ -249,7 +249,12 @@ const total = (moves) => moves.reduce((t, m) => t + moveSeconds(m), 0);
  * @param hurts      limits.hurts, validated joint keys
  * @param goalChild  plan.goal.childUsed, so the two mobility children get their block
  */
-export function mobilityFor(day, { level = "beginner", hurts = [], missing = [], goalChild = null } = {}) {
+/* `longCooldown` is the ten minute block bought by a stated session length.
+   It grows the cool-down and never the warm-up: research/13 has a long warm-up
+   costing performance (McGowan 2015 on fatigue, Behm 2016 on shelf life, Oliva
+   2026 on peak force) and a long cool-down costing nothing (Van Hooren 2018)
+   while buying the one outcome stretching reliably produces. */
+export function mobilityFor(day, { level = "beginner", hurts = [], missing = [], goalChild = null, longCooldown = false } = {}) {
   const lib = library();
   if (!lib) {
     return { warmup: [], cooldown: [], warmupSeconds: 0, cooldownSeconds: 0, mobilityGoal: false,
@@ -272,7 +277,8 @@ export function mobilityFor(day, { level = "beginner", hurts = [], missing = [],
   const patterns = [...new Set([...(day?.mainPatterns || []), ...(day?.allPatterns || [])])]
     .filter((p) => p !== "isolation");
   const warmup = pickBlock({ kind: "dynamic", groups: mainGroups, patterns, budgetSec: WARMUP_SECONDS, hurts, missing, level });
-  const cooldown = mobilityGoal
+  const longBlock = mobilityGoal || longCooldown;
+  const cooldown = longBlock
     ? pickBlock({
         kind: "mobility", groups: worked, budgetSec: MOBILITY_GOAL_SECONDS, hurts, missing, level,
         /* Mobility moves first, then static holds for whatever those left out.
@@ -292,7 +298,9 @@ export function mobilityFor(day, { level = "beginner", hurts = [], missing = [],
   if (cooldown.length) {
     why.push(mobilityGoal
       ? `A ten minute mobility block after, hips and upper back first, because the goal is the range of motion itself (goal-tree: "5 to 10 min daily").`
-      : `${cooldown.length} static holds after, for what the day worked.`);
+      : longCooldown
+        ? `A ten minute block after instead of five, bought with the session length you asked for. It is the cool-down and not the warm-up that grows, because a longer warm-up costs performance and a longer cool-down costs nothing.`
+        : `${cooldown.length} static holds after, for what the day worked.`);
   }
   if (hurts.length) {
     const dropped = [...poolFor("dynamic"), ...poolFor("static"), ...poolFor("mobility")]

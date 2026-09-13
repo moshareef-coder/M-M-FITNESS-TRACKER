@@ -478,9 +478,11 @@ const META_SUBKEYS = {
   focus: ["requested", "requestedTiers", "applied", "tiers", "why", "stale"],
   limits: ["hurts", "missing", "excludedCount"],
   stretching: ["included", "warmupMinutes", "cooldownMinutes", "mobilityGoal", "why"],
-  session: ["budgetMinutes", "source", "asked", "goalMinutes", "estimatedMinutes", "fits", "restCompressed"],
+  session: ["budgetMinutes", "source", "asked", "goalMinutes", "estimatedMinutes", "rampMinutes", "fits", "restCompressed"],
 };
-const WORKOUT_KEYS = new Set(["focus", "exercises", "warmup", "cooldown"]);
+const WORKOUT_KEYS = new Set(["focus", "exercises", "warmup", "cooldown", "rampSets"]);
+const RAMP_KEYS = new Set(["exercise", "group", "sets", "seconds"]);
+const RAMP_SET_KEYS = new Set(["weight", "reps", "restSec", "pct", "cue"]);
 const EXERCISE_KEYS = new Set(["name", "sets", "reps", "targetWeight", "note", "swap", "alternatives", "restSec"]);
 const LEVELS = new Set(["beginner", "novice", "intermediate", "advanced"]);
 const CONFIDENCES = new Set(["none", "low", "medium", "high"]);
@@ -555,6 +557,37 @@ function checkResult(ctx, out, payload) {
      when the library genuinely cannot fill the day. */
   if (w.exercises.length < 3) fail("exercise-count", ctx, `${w.exercises.length} on ${w.focus}`);
   if (w.exercises.length > 6) fail("exercise-count", ctx, `${w.exercises.length} on ${w.focus}`);
+
+  /* Ramp-up sets. The contract's promise about them is the one worth fuzzing:
+     they are warm-up sets of a lift already on the card, at less than its
+     working weight, and they are never logged as working sets. So a ramp naming
+     a movement the day does not contain, or carrying a load at or above the
+     working one, is the bug that would put a person under a heavier bar than
+     the plan meant or write a set into calibration that was never prescribed. */
+  if (w.rampSets !== undefined) {
+    if (!Array.isArray(w.rampSets)) fail("ramp-shape", ctx, `rampSets is ${typeof w.rampSets}`);
+    else {
+      const working = new Map(w.exercises.map((e) => [String(e?.name), Number(e?.targetWeight)]));
+      for (const r of w.rampSets) {
+        if (!r || typeof r !== "object") { fail("ramp-shape", ctx, `ramp is ${typeof r}`); continue; }
+        for (const k of Object.keys(r)) if (!RAMP_KEYS.has(k)) fail("ramp-extra-key", ctx, k);
+        if (!working.has(String(r.exercise))) fail("ramp-off-card", ctx, `${r.exercise} is not on ${w.focus}`);
+        if (!Array.isArray(r.sets) || !r.sets.length) { fail("ramp-shape", ctx, `${r.exercise} has no sets`); continue; }
+        const top = working.get(String(r.exercise));
+        for (const s of r.sets) {
+          if (!s || typeof s !== "object") { fail("ramp-shape", ctx, `ramp set is ${typeof s}`); continue; }
+          for (const k of Object.keys(s)) if (!RAMP_SET_KEYS.has(k)) fail("ramp-extra-key", ctx, k);
+          if (typeof s.weight !== "number" || !Number.isFinite(s.weight) || s.weight < 0) {
+            fail("ramp-weight", ctx, `${r.exercise} ramp weight ${stable(s.weight)}`);
+          } else if (Number.isFinite(top) && top > 0 && s.weight >= top) {
+            fail("ramp-not-submaximal", ctx, `${r.exercise} ramps at ${s.weight} against a working ${top}`);
+          }
+          if (!Number.isInteger(s.reps) || s.reps < 1 || s.reps > 30) fail("ramp-reps", ctx, `${r.exercise} ramp reps ${stable(s.reps)}`);
+          if (!Number.isInteger(s.restSec) || s.restSec < 0 || s.restSec > 600) fail("ramp-rest", ctx, `${r.exercise} ramp rest ${stable(s.restSec)}`);
+        }
+      }
+    }
+  }
 
   const bwRaw = Number(payload && payload.current_weight);
   const bw = Number.isFinite(bwRaw) && bwRaw >= 40 && bwRaw <= 1500 ? bwRaw : 200;

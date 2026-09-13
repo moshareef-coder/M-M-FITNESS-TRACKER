@@ -886,6 +886,89 @@ the longest day averages about half that budget across the matrix. The plan
 hands the difference back with a sentence rather than inventing volume to fill
 the clock.
 
+### And when the ledger is full: what the surplus buys, 2026-09-12
+
+The paragraph above was right about volume and wrong about the control. A 90
+minute chip that produces a 29 minute plan is the dead "Main focus" dropdown
+wearing an explanation, and the engine's own refusal sentence already named
+three things worth doing with the time. It now does them instead of only naming
+them. Three levers, in the order of what they are worth, all of them costing
+zero recovery and none of them touching a hard set:
+
+1. **The rest goes back.** If the clock compressed rest below the goal's
+   prescribed interval, the surplus repays that first, back up the same 0.05
+   ladder it came down. This can only fire on a week the calibration or the
+   plateau response backed off, and it is worth saying why: compression happens
+   exactly when a day is over budget, so a day cannot be both in debt and roomy
+   at the same instant. What makes it real is that the back-off takes sets off
+   **after** the compression and leaves the short rest sitting there. Measured:
+   72 days across the goal matrix were carrying a rest debt the week no longer
+   needed. The "your rest came down" sentence, and `meta.session.restCompressed`,
+   now drop for a day that got it back.
+2. **Ramp-up sets on the day's main lifts** (`workout.rampSets`). research/13
+   section 5 ranked this the highest-value missing feature in the engine and it
+   is the only design in that file tested against its alternative: Oliva 2026
+   measured peak squat force falling 3.8% after a general mobility warm-up and
+   holding after a movement-specific one, which is a close description of what
+   this engine shipped. The table is the research's own, 0 / 50 / 70 / 88% of the
+   working weight at 8 / 5 / 3 / 2 reps. How many rungs comes off the working
+   reps, because reps are the only proxy for %1RM this engine has and the rule
+   is stated in %1RM: four at six reps or fewer, three to ten, two above that,
+   and one for a second main. None for accessories, none for a lift with no
+   prescribed weight, because a ramp needs load to ramp and the regression ladder
+   research/13 asks for (an incline push-up for a push-up) does not exist here.
+3. **A ten minute stretching block instead of five**, and the block that grows
+   is the cool-down. The old sentence offered "a longer warm-up" and research/13
+   is against it three ways: McGowan 2015 has a long warm-up costing performance
+   through accumulated fatigue, Behm 2016 has the range it buys expiring inside
+   thirty minutes, and Oliva 2026 is above. The cool-down is the opposite case.
+   Van Hooren 2018 finds it neither helps recovery nor costs anything, and the
+   2024 *Sports Medicine* meta-regression puts the range-of-motion plateau at
+   four minutes a session, which five barely clears and ten comfortably does.
+   `MOBILITY_GOAL_SECONDS` already built that block for the two mobility goal
+   children; `longCooldown` opens it to anybody who paid for it.
+
+**What is deliberately not here is optional accessory work**, for three reasons
+and not one. The ledger: a surplus only survives the fill pass when the fill
+pass could find no group under its ceiling, so at the moment this code runs
+there is by construction no room left under MRV, and optional sets would be
+volume past the ceiling the whole file exists to respect the moment somebody
+actually did them. The slot table: adding a movement instead is the same thing
+the fill pass already refuses to do with the same spare minutes. And
+calibration, which went live the day before: a prescribed lift a person
+reasonably skips reads as a shortfall and takes weight off them next week, so
+shipping optional work in `exercises` would punish somebody for taking the
+optional extra.
+
+**Zero volume, proved rather than asserted.** Across every goal and child, four
+day counts, three histories, both sexes and seven stated session lengths, 1512
+plans: weekly hard sets changed on **0**, the rows the app copies into
+`ai_workouts.exercises` changed on **0**, and no group's weekly total rose above
+what the same plan produced before this change. With `session_minutes` absent,
+all 216 plans are byte for byte identical, which is why `volumeNotes.timeBought`
+is spread in rather than always present.
+
+**What it moved.** Minutes used against minutes asked, same matrix:
+
+| | median | p10 | p90 | under 0.6 | 0.8 to 1.0 |
+|---|---|---|---|---|---|
+| before | 0.80 | 0.38 | 1.13 | 33.5% | 18.3% |
+| after | 0.87 | 0.42 | 1.15 | 27.0% | 22.6% |
+
+Still not 1.0, and it should not be. When there is genuinely nothing left worth
+buying the engine still says so, and the sentence now ends "spend what is left
+on a walk, or take it back" rather than recommending the longer warm-up the
+research says costs performance.
+
+**The known gap.** The ramp is gated on surplus, so the person it matters most
+for does not get it: an advanced lifter on a strength goal is already over the
+90 minutes they asked for, and research/13's whole point is that the ramp
+matters most on heavy, low-rep days. research/13 also says the ramp should
+*replace* time rather than add to it, being the potentiate phase of RAMP. Doing
+that means giving every heavy main a ramp regardless of the clock, which changes
+the no-`session_minutes` baseline, and that baseline is currently a fixed point.
+It is the right next move and it needs its own decision.
+
 ### What the sweep does and does not cover
 
 `sweep.mjs` sends no `session_minutes` today, so its `over-time-budget` count
@@ -894,6 +977,14 @@ no-answer path, which is exactly the path this change leaves alone. The numbers
 in the table above come from the same 3824 day matrix run five times with a
 target set. A `session_minutes` axis belongs in `sweep.mjs` and is the obvious
 next thing to add there.
+
+Still true on 2026-09-12, and now it costs something: every sweep count is
+identical before and after the surplus work above, which reads as "no
+regressions" and is really "the instrument is not pointed at it". The proof
+numbers in the section below come from a separate matrix for exactly that
+reason. `fuzz.mjs` **is** pointed at it, and it grew checks to match: a ramp that
+names a movement not on the day, or carries a load at or above the working
+weight, is a FAIL there.
 
 ## What `emphasis` does, and what it does not
 
@@ -1069,6 +1160,18 @@ back" in the tree. For them the cool-down grows to ten minutes and draws from
 the mobility category first, then static holds for whatever is left. Ten is the
 top of the range the research names, and for these people the block is the
 plan.
+
+**Anyone can now have that block, if they paid for it.** 2026-09-12: a stated
+`session_minutes` with minutes left over after the fill pass buys the same ten
+minute cool-down for anybody (`mobilityFor(..., { longCooldown: true })`). The
+warm-up does not grow and will not: research/13 has McGowan 2015 on the fatigue
+a long warm-up accumulates, Behm 2016 on the acute range expiring inside thirty
+minutes, and Oliva 2026 on a general mobility warm-up costing 3.8% of peak squat
+force outright. The cool-down is the free one (Van Hooren 2018: no recovery
+benefit, no cost either) and it is where the one real outcome lives. The surplus
+therefore grows the block that is free and leaves alone the block that is not.
+`meta.stretching.mobilityGoal` stays the goal-child flag; `why` says which of
+the two happened.
 
 **What it is not.** Volume. Nothing here touches `weeklyVolume`, `recovery.mjs`
 never credits a stretch (a test guarantees no stretch shares a name with a

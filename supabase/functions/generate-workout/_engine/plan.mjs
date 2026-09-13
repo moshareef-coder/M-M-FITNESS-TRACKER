@@ -20,7 +20,7 @@
 import { TRAININGS } from "../_library/index.mjs";
 import { resolveGoal, barredMovements, movementCautionNotes } from "./goal-engine.mjs";
 import { deriveTrainingAge, observedCapacity } from "./training-age.mjs";
-import { prescribeLoad, patternFor } from "./load.mjs";
+import { prescribeLoad, patternFor, roundLoad } from "./load.mjs";
 import { calibrate } from "./calibrate.mjs";
 import { learnPreferences, applyPreferences, avoidNote, openWeekBudget, heldBackNote, actedOn } from "./preferences.mjs";
 import { scoreAlternatives } from "./alternatives.mjs";
@@ -28,7 +28,7 @@ import { planPlateauResponse, applyRotateFallback, repShiftFor } from "./plateau
 import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary, softenedNote } from "./limits.mjs";
 import { mainGroupsForDay } from "./recovery.mjs";
 import { TIER_MULTIPLIER, TIERS } from "./focus.mjs";
-import { mobilityFor } from "./mobility.mjs";
+import { mobilityFor, COOLDOWN_SECONDS } from "./mobility.mjs";
 
 const WEIGHTS = TRAININGS.find((t) => t.id === "weight-training");
 const CALIS = TRAININGS.find((t) => t.id === "calisthenics");
@@ -139,6 +139,46 @@ const MAIN_SETS_FLOOR = 3;
 const REST_FLOOR_FACTOR = 0.6;
 const REST_FLOOR_SEC = 45;
 
+/* ---- ramp-up sets, which a longer session buys first ----
+   research/13 section 5. The warm-up today is a screen of stretches and then the
+   session opens at the working weight, which is the one design that file tests
+   against an alternative and loses: Oliva 2026 measured peak squat force falling
+   3.8% after a general mobility warm-up and holding after a movement-specific
+   one. Iversen 2021 says the same thing from the review side, "restrict the
+   warm-up to exercise-specific warm-ups", with the nuance that matters here:
+   the need for a specific ramp scales with load, and at twelve reps the first
+   reps of the working set already are the ramp.
+
+   The table is research/13's own: empty bar, then 50, 70 and 88% of the working
+   weight, at 8, 5, 3 and 2 reps, resting 45, 45, 60 and 60 seconds. How many of
+   them is read off the working reps, because reps are the only proxy for %1RM
+   this file has and the research's rule is stated in %1RM: a main at six reps
+   or fewer is the heavy, low-rep day the ramp matters most on, and anything past
+   ten is the beginner set of twelve it matters least on.
+
+   A ramp set carries no volume. It is never counted in the weekly ledger, never
+   seen by recovery.mjs, never written as an exercise_log, and never appears in
+   `d.exercises`, which is the array the app copies into `ai_workouts.exercises`
+   and therefore the only array calibrate.mjs can join against. That separation
+   is the whole reason these live on their own key.
+
+   Fifteen seconds a set rather than the REP_SECONDS 30 a working set costs: two
+   light reps off a rack is not thirty seconds of work, and the rests are what
+   the ramp actually spends. A full four set ramp comes to about four and a half
+   minutes, which is research/13's "about three to four" plus the rest before
+   the first working set. */
+const RAMP_TABLE = [
+  { pct: 0, reps: 8, restSec: 45 },
+  { pct: 0.5, reps: 5, restSec: 45 },
+  { pct: 0.7, reps: 3, restSec: 60 },
+  { pct: 0.88, reps: 2, restSec: 60 },
+];
+const RAMP_SET_SECONDS = 15;
+/* The second main of a day needs at most one, and research/13 says why: the body
+   is warm by then and what is left is neural rehearsal of the specific movement.
+   70% is the middle rung, heavy enough to rehearse and light enough to be free. */
+const RAMP_SECOND_MAIN = [2];
+
 /* "3:00", for the one sentence that has to compare two rest intervals. */
 function clock(seconds) {
   const m = Math.floor(seconds / 60);
@@ -149,6 +189,60 @@ function clock(seconds) {
 function estimateMinutes(exercises) {
   const seconds = exercises.reduce((t, e) => t + e.sets * (REP_SECONDS + e.restSec), 0);
   return Math.round(WARMUP_MIN + seconds / 60);
+}
+
+/* The ramp for one lift, or null when there is nothing to ramp.
+
+   Two things disqualify a movement outright. A lift with no prescribed weight is
+   bodyweight or unknown, and a ramp needs load to ramp: research/13 open
+   question 9 wants a regression ladder per pattern (an incline push-up for a
+   push-up, a box squat for a squat) and this engine does not have one, so the
+   honest answer is no ramp rather than a guessed one. And a working weight small
+   enough that 50% of it rounds to nothing is a light dumbbell, where the ramp
+   would be four sets of the same weight written four times.
+
+   `rungs` is which rows of RAMP_TABLE to use. The first main gets the top of the
+   research's range on a heavy day and less as the reps climb; a second main gets
+   the one rung. */
+function rampFor(exercise, rungs) {
+  const working = Number(exercise?.weight);
+  if (!Number.isFinite(working) || working <= 0) return null;
+  const sets = [];
+  for (const i of rungs) {
+    const row = RAMP_TABLE[i];
+    const weight = row.pct === 0 ? 0 : roundLoad(working * row.pct);
+    /* A rung that rounds onto the rung before it is the same set twice, and two
+       identical sets is not a ramp. Drop it rather than print it. */
+    if (row.pct !== 0 && (!weight || weight >= working || sets.some((s) => s.weight === weight))) continue;
+    sets.push({
+      weight, reps: row.reps, restSec: row.restSec, pct: row.pct,
+      /* The zero rung is the only one a number cannot say. "Empty bar" is what
+         research/13 writes and it is wrong for a leg press and for dumbbells,
+         so the cue names the idea rather than the equipment. */
+      cue: row.pct === 0 ? "The bar on its own, the machine empty, or the lightest weight you have." : null,
+    });
+  }
+  /* A ramp that asked for four rungs and kept one is a gesture, not a ramp: the
+     rungs collapsed onto each other, which means the working weight is light
+     enough that there is nothing to work up to. A ramp that only ever asked for
+     one rung is the second main, and one rung is what research/13 prescribes
+     there, so it stands. */
+  if (!sets.length || (rungs.length > 1 && sets.length < 2)) return null;
+  return {
+    exercise: exercise.name,
+    group: exercise.group,
+    sets,
+    seconds: sets.reduce((t, s) => t + RAMP_SET_SECONDS + s.restSec, 0),
+  };
+}
+
+/* How many rungs the first main of a day earns, from its working reps, which is
+   the only read on %1RM this file has. research/13: three to four for a main at
+   or above 80% of one rep max, least for a beginner doing sets of twelve. */
+function rungsForReps(reps) {
+  if (reps <= 6) return [0, 1, 2, 3];
+  if (reps <= 10) return [0, 1, 2];
+  return [0, 1];
 }
 
 /* The sets clamp used to be Math.max(2, Math.min(5, ...)) applied straight to
@@ -1220,25 +1314,21 @@ export function buildPlan({
         }
         const from = Math.max(...restBefore);
         const to = Math.max(...d.exercises.map((e) => e.restSec));
-        if (to < from) restCompressed.push({ day: d.name, fromSec: from, toSec: to, factor });
+        /* `restBefore` rides along, because the fill pass below may be able to
+           hand some of this back and cannot do it from two summary numbers. */
+        if (to < from) restCompressed.push({ day: d.name, fromSec: from, toSec: to, factor, startFactor: factor, before: restBefore, d });
       }
     }
 
     d.estimatedMinutes = estimate;
   }
 
-  /* Said once for the week rather than once a day, because it is the same
-     decision on every day and three copies of it is a scold. */
-  if (restCompressed.length) {
-    const worst = restCompressed.reduce((a, b) => (b.toSec / b.fromSec < a.toSec / a.fromSec ? b : a));
-    dayNotes.push(`To fit the ${sessionBudgetMin} minutes you asked for, the rest between sets came down from `
-      + `${clock(worst.fromSec)} to ${clock(worst.toSec)}${restCompressed.length > 1 ? ` on ${restCompressed.length} days` : ` on ${worst.day}`}. `
-      + `That is less recovery than this goal asks for, and it is a real cost rather than a rounding: the last sets `
-      + `will feel harder and the heaviest work will climb more slowly. Sets came off first and this is what was left. `
-      + `If you ever have the longer session, take it.`);
-  }
+  /* The rest sentence used to be said here. It is said after the fill pass now,
+     because the back-off below can free the minutes the compression was taken to
+     buy, and a plan that tells somebody their rest is short while handing them
+     the full interval is the plan saying one thing and doing another.
 
-  /* ---- the other direction: more time should mean more work ----
+     ---- the other direction: more time should mean more work ----
      "Some people they wanna do more." A budget bigger than the plan needs is
      slack today, and slack is not a plan. So the extra minutes buy sets, and
      they buy them where the week's own ledger already says there is room: a
@@ -1316,16 +1406,191 @@ export function buildPlan({
     }
   }
 
+  /* ---- what the extra minutes buy when they cannot buy sets ----
+     The fill pass above stops at the weekly ceiling, and past that point every
+     further minute is one the engine used to hand back with a sentence. That
+     sentence is right about volume and wrong about the clock: a 90 minute chip
+     that produces a 29 minute plan is the dead "main focus" dropdown wearing an
+     explanation. So the surplus buys the three things that cost no recovery, in
+     the order of what they are worth.
+
+     Ceilings first, because both of them matter. The surplus is measured against
+     `d.minutes` flat, with no TIME_TOLERANCE: the fill pass is allowed its 15%
+     overshoot because a set is indivisible and half a set is not a thing, while
+     everything here is discretionary and spending a person past the clock they
+     named to give them something they did not ask for is the wrong mistake. And
+     the five minutes of cool-down are counted against the clock even though
+     `estimatedMinutes` has never included them, because the person named how
+     long they are in the gym, not how long the middle of it is.
+
+     Short days are skipped for the same reason the fill pass skips them: a short
+     day is deliberately the session they were least likely to make, and topping
+     it up deletes the only thing that made it short.
+
+     1. REST. If the clock compressed rest below what the goal prescribes, the
+        minutes go back there first, because that is repaying a debt the engine
+        announced taking on rather than buying something new. This can only ever
+        fire on a back-off week: compression happens exactly when a day is over
+        budget, so a day cannot be both compressed and roomy at the same moment.
+        What makes it real is the back-off below the compression, which takes
+        sets off afterwards and leaves the short rest in place. Measured across
+        the sweep, and the count is in the report.
+     2. RAMP-UP SETS. research/13 section 5, and the file's own highest ranked
+        missing feature. See RAMP_TABLE above for the evidence and the shape.
+     3. A LONGER COOL-DOWN, not a longer warm-up. The engine's old sentence
+        offered "a longer warm-up" and research/13 is against it: McGowan 2015
+        has a long warm-up costing performance through accumulated fatigue, Behm
+        2016 has the range it buys expiring inside thirty minutes, and Oliva 2026
+        has general mobility work costing peak force outright. The cool-down is
+        the opposite case. Van Hooren 2018 finds it does not help recovery and
+        does not cost anything either, and the 2024 Sports Medicine
+        meta-regression puts the range-of-motion plateau at four minutes a
+        session, which five minutes barely clears and ten comfortably does. So
+        the extra time grows the block that is free and leaves alone the block
+        that is not.
+
+     What is NOT here is optional accessory work, and the reason is the ledger
+     rather than a worry. A surplus only survives the fill pass when the fill
+     pass could find no group under its ceiling, so by construction there is no
+     room left under MRV at the moment this code runs; anything optional added
+     here would be volume past the ceiling the whole file exists to respect the
+     moment somebody actually did it. Adding a movement instead would break the
+     slot table for the same spare fifteen minutes the fill pass already refuses
+     to spend that way. And the calibration hazard is real on top of both: a
+     prescribed lift that a person reasonably skips reads to calibrate.mjs as a
+     shortfall and backs their weights off next week, which would punish them for
+     taking the optional extra. Three reasons, one answer. */
+  const timeBought = [];
+  if (askedMinutes !== null) {
+    const compressedOf = new Map(restCompressed.map((r) => [r.d, r]));
+    for (const d of week) {
+      d.rampSets = [];
+      d.rampMinutes = 0;
+
+      /* 1. rest, back up the same 0.05 ladder it came down, against the same
+         ceiling it came down to meet. Not the tighter one the two purchases
+         below use: the debt was taken to fit `d.minutes * TIME_TOLERANCE` with
+         no cool-down reserved, so repaying it against a stricter number would
+         make the engine unable to give back what it just took. And this runs on
+         a short day too, where the purchases do not: a short day is kept small
+         on purpose, and restoring the rest between its sets does not make it
+         bigger, it makes the sets it already has count. */
+      const rc = compressedOf.get(d);
+      if (rc) {
+        let factor = rc.factor;
+        const setRest = (f) => d.exercises.forEach((e, i) => {
+          e.restSec = Math.min(rc.before[i], Math.max(REST_FLOOR_SEC, Math.round(rc.before[i] * f)));
+        });
+        while (factor < 1 - 1e-9) {
+          const next = Math.min(1, +(factor + 0.05).toFixed(2));
+          setRest(next);
+          const est = estimateMinutes(d.exercises);
+          /* One step too far is undone rather than accepted. */
+          if (est > d.minutes * TIME_TOLERANCE) { setRest(factor); break; }
+          d.estimatedMinutes = est;
+          factor = next;
+        }
+        rc.factor = factor;
+        rc.toSec = Math.max(...d.exercises.map((e) => e.restSec));
+        rc.repaid = rc.toSec >= rc.fromSec;
+        if (factor > rc.startFactor) {
+          timeBought.push({ day: d.name, bought: "rest", toSec: rc.toSec, minutes: 0 });
+        }
+      }
+
+      if (d.short) continue;
+      /* The nominal cool-down, not the measured one: the block is picked after
+         this pass, so five minutes is what the clock can know here. Reserved
+         because the person named how long they are in the gym, not how long the
+         middle of it is, and unlike the repayment above these are additions. */
+      const cooldownMin = Math.round(COOLDOWN_SECONDS / 60);
+      const spare = () => d.minutes - d.estimatedMinutes - d.rampMinutes - cooldownMin - (d.longCooldown ? 5 : 0);
+      if (spare() <= 0) continue;
+
+      /* 2. ramp-up sets, first main then second, each only if it fits whole. */
+      const mains = d.exercises.filter((e) => roleOf.get(e) === "main");
+      const wanted = [];
+      if (mains[0]) wanted.push(rampFor(mains[0], rungsForReps(mains[0].reps)));
+      if (mains[1]) wanted.push(rampFor(mains[1], RAMP_SECOND_MAIN));
+      for (const ramp of wanted) {
+        if (!ramp) continue;
+        const cost = Math.round(ramp.seconds / 60);
+        if (cost > spare()) break;
+        d.rampSets.push(ramp);
+        d.rampMinutes += cost;
+        timeBought.push({ day: d.name, bought: "ramp", exercise: ramp.exercise, sets: ramp.sets.length, minutes: cost });
+      }
+
+      /* 3. the ten minute block, all or nothing: half of it is the five it
+         already had. `mobilityFor` reads this flag below. */
+      if (!resolved.mobilityChild && spare() >= 5) {
+        d.longCooldown = true;
+        timeBought.push({ day: d.name, bought: "cooldown", minutes: 5 });
+      }
+    }
+  }
+
+  /* Said once for the week rather than once a day, because it is the same
+     decision on every day and three copies of it is a scold. Entries the fill
+     pass paid back in full drop out: rest that is back where the goal wanted it
+     is not a cost to report. */
+  const restStillShort = restCompressed.filter((r) => !r.repaid);
+  if (restStillShort.length) {
+    const worst = restStillShort.reduce((a, b) => (b.toSec / b.fromSec < a.toSec / a.fromSec ? b : a));
+    dayNotes.push(`To fit the ${sessionBudgetMin} minutes you asked for, the rest between sets came down from `
+      + `${clock(worst.fromSec)} to ${clock(worst.toSec)}${restStillShort.length > 1 ? ` on ${restStillShort.length} days` : ` on ${worst.day}`}. `
+      + `That is less recovery than this goal asks for, and it is a real cost rather than a rounding: the last sets `
+      + `will feel harder and the heaviest work will climb more slowly. Sets came off first and this is what was left. `
+      + `If you ever have the longer session, take it.`);
+  }
+  const restRepaid = restCompressed.filter((r) => r.repaid);
+  if (restRepaid.length) {
+    dayNotes.push(`The rest between sets is back to the full ${clock(restRepaid[0].fromSec)} on `
+      + `${restRepaid.length === 1 ? restRepaid[0].day : `${restRepaid.length} days`}. It was cut to fit the clock, and this `
+      + `week is lighter, so the minutes it cost went back into it. Full rest is what makes a heavy set heavy.`);
+  }
+
+  /* What the extras bought, in the voice of the sentence they replaced. Said
+     once for the week, listing the kinds rather than every day, because the
+     answer is the same on every day it fired. */
+  if (timeBought.length) {
+    const ramps = timeBought.filter((t) => t.bought === "ramp");
+    const cools = timeBought.filter((t) => t.bought === "cooldown");
+    const parts = [];
+    if (ramps.length) {
+      parts.push(ramps.length === 1
+        ? `${ramps[0].sets} ramp-up sets working up to your first real set of ${ramps[0].exercise}`
+        : `ramp-up sets on ${ramps.length} of the week's main lifts, light sets working up to the first real one`);
+    }
+    if (cools.length) parts.push(`a ten minute stretching block after instead of five`);
+    dayNotes.push(`You asked for ${askedMinutes} minutes and the training itself needs less than that. The extra did not `
+      + `become more hard sets, because more than this is past what your week recovers from. It bought `
+      + `${parts.join(", and ")}. `
+      + (ramps.length
+        ? `Ramp sets are light sets of the lift itself, and they are the part of a warm-up with the best evidence behind it: `
+          + `a general stretch does not prepare a heavy squat and may cost you a little off the top of it. `
+        : "")
+      + `None of it counts as a set, none of it is logged, and none of it changes the weight you are working up to.`);
+  }
+
   /* A budget nothing could spend. Worth a sentence for the same reason the
      over-budget day gets one: they answered a question and the answer moved
      nothing, and an app that quietly pockets the answer is the dead "main
      focus" dropdown. Only when they asked for MORE than the goal wanted, since
-     below that the budget is doing plenty. */
-  const longestDay = week.reduce((m, d) => Math.max(m, d.estimatedMinutes), 0);
+     below that the budget is doing plenty.
+
+     The ramp minutes count toward the longest day, because they are minutes the
+     person is in the gym doing the lift. The cool-down still does not, for the
+     same reason it never did: `estimatedMinutes` is the session and the block
+     sits on top of it. And the old closing advice, "spend the rest on a longer
+     warm-up", is gone: research/13 says a longer warm-up costs performance, so
+     the engine should not have been recommending one. */
+  const longestDay = week.reduce((m, d) => Math.max(m, d.estimatedMinutes + (d.rampMinutes || 0)), 0);
   if (askedMinutes !== null && askedMinutes > P.sessionMin && longestDay < askedMinutes * 0.8) {
     dayNotes.push(`You have ${askedMinutes} minutes and the longest day here needs about ${longestDay}. That is not the `
       + `plan being lazy: more sets than this is past what your level recovers from in a week, and volume you cannot `
-      + `recover from is not training. Spend the rest on a longer warm-up, the stretching block, or a walk.`);
+      + `recover from is not training. Everything that could be bought without costing you recovery already has been. `
+      + `Spend what is left on a walk, or take it back.`);
   }
 
   /* And when neither lever was enough, the day says so instead of leaving the
@@ -1504,8 +1769,17 @@ export function buildPlan({
        the two mobility ones, so this is what it always was, and it is a
        secondary goal's child only when the primary had no claim on the block.
        "Build muscle and touch my toes" is the case it exists for. */
-    d.mobility = mobilityFor(d, { level, hurts: limitsUsed.hurts, missing: limitsUsed.missing, goalChild: resolved.mobilityChild });
-    d.totalMinutes = d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60);
+    d.mobility = mobilityFor(d, {
+      level, hurts: limitsUsed.hurts, missing: limitsUsed.missing, goalChild: resolved.mobilityChild,
+      /* Set by the fill pass above, and only there: a longer block is something
+         a stated session length bought, never a default. */
+      longCooldown: !!d.longCooldown,
+    });
+    /* The ramp is minutes in the gym like any other, so it is in the honest
+       total. It is not in `estimatedMinutes`, which is the working session and
+       has to stay comparable to the number every trim above was measured
+       against. */
+    d.totalMinutes = d.estimatedMinutes + (d.rampMinutes || 0) + Math.round(d.mobility.cooldownSeconds / 60);
   }
 
   const progression = level === "beginner" || level === "novice"
@@ -1555,7 +1829,18 @@ export function buildPlan({
          movements. `timeAdded` is the fill pass, one entry per lift that grew,
          not one per set. Both are empty on every plan built without a stated
          session length, which is every plan built before today. */
-      restCompressed, timeAdded: [...timeAdded.values()],
+      /* Published without the working fields the fill pass needed: `before` is
+         one number per exercise and `d` is the day itself, and neither belongs
+         in a ledger a caller iterates. `factor` and `toSec` are whatever the
+         repayment left them at, so the published row is what the person got. */
+      restCompressed: restCompressed.map(({ day, fromSec, toSec, factor, repaid }) => ({ day, fromSec, toSec, factor, repaid: !!repaid })),
+      timeAdded: [...timeAdded.values()],
+      /* What the surplus bought once sets were off the table. Spread in rather
+         than always present, the same way `preferences.budget` is: a plan built
+         without a stated session length has no clock to have spent, and the
+         honest shape for that is the object it was before this key existed
+         rather than that object plus an empty array. */
+      ...(askedMinutes === null ? {} : { timeBought }),
     },
     /* What the week was costed against and where that number came from, because
        "45 minutes" means a different thing when the goal chose it and when the

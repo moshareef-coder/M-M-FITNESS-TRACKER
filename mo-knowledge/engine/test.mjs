@@ -2874,3 +2874,133 @@ test("asking for a focus still never costs that group its work, however tight th
     }
   }
 });
+
+/* ---------------------------------------------------------------- *
+ * What a longer session buys when it cannot buy sets
+ * ---------------------------------------------------------------- */
+
+test("extra time buys ramp-up sets, and they are never working sets", () => {
+  const goal = { bubble: "build-muscle" };
+  const person = { daysAsked: 4, bodyWeightLb: 180, sex: "Male" };
+  const logs = longHistory(78);
+  const base = buildPlan({ goal, person, logs });
+  const long = buildPlan({ goal, person: { ...person, sessionMinutes: 90 }, logs });
+
+  const ramps = long.week.flatMap((d) => d.rampSets || []);
+  assert.ok(ramps.length, "a 90 minute answer on a hypertrophy goal buys a ramp somewhere");
+
+  for (const r of ramps) {
+    const day = long.week.find((d) => (d.rampSets || []).includes(r));
+    const lift = day.exercises.find((e) => e.name === r.exercise);
+    assert.ok(lift, `${r.exercise} is a lift on the day it ramps`);
+    assert.ok(r.sets.length >= 1 && r.sets.length <= 4, "one to four rungs, research/13");
+    for (const s of r.sets) {
+      assert.ok(s.weight < lift.weight, `${r.exercise} ramps at ${s.weight} under a working ${lift.weight}`);
+      assert.ok(s.restSec >= 45 && s.restSec <= 60, "the research's own rests");
+    }
+  }
+
+  /* The whole point: zero volume. Not one hard set moved, not one weekly total,
+     so nothing reaches recovery.mjs or the MRV ceiling through this door. */
+  const sets = (p) => p.week.map((d) => d.exercises.map((e) => `${e.name}:${e.sets}`).join("|")).join("//");
+  const longNoExtras = buildPlan({ goal, person: { ...person, sessionMinutes: 90 }, logs });
+  assert.equal(sets(long), sets(longNoExtras), "the same input gives the same sets");
+  for (const [group, row] of Object.entries(long.weeklyVolume)) {
+    assert.ok(row.sets <= row.target + 2 + 0.001, `${group} past its weekly target plus the slack`);
+  }
+  /* And the ramp is not hiding in the day's own count of what it is doing. */
+  for (const d of long.week) {
+    for (const r of d.rampSets || []) {
+      assert.ok(!d.exercises.some((e) => e.name === `${r.exercise} ramp`), "no ramp masquerading as a lift");
+    }
+  }
+  assert.equal(base.volumeNotes.timeBought, undefined, "a plan with no stated clock has no ledger of what it spent");
+});
+
+test("ramp-up sets never reach what calibration counts as prescribed", () => {
+  const goal = { bubble: "build-muscle" };
+  const person = { daysAsked: 4, bodyWeightLb: 180, sex: "Male" };
+  const logs = longHistory(78);
+  const long = buildPlan({ goal, person: { ...person, sessionMinutes: 90 }, logs });
+  let sawRamp = false;
+  for (let i = 0; i < long.week.length; i++) {
+    const w = toWorkout(long, i);
+    if (w.rampSets) sawRamp = true;
+    /* `exercises` is the array the app copies into `ai_workouts.exercises`, and
+       that row is the only thing calibrate.mjs joins a log against. A ramp set
+       in it would be read as work the person did not do. */
+    const names = w.exercises.map((e) => e.name);
+    assert.equal(new Set(names).size, names.length, "no duplicated rows");
+    for (const r of w.rampSets || []) {
+      const rows = w.exercises.filter((e) => e.name === r.exercise);
+      assert.equal(rows.length, 1, `${r.exercise} appears once, as the working lift`);
+      assert.equal(rows[0].sets, long.week[i].exercises.find((e) => e.name === r.exercise).sets,
+        "the prescribed set count is the working count and nothing else");
+    }
+  }
+  assert.ok(sawRamp, "the workout carries the ramp for the app to render separately");
+});
+
+test("extra time grows the cool-down and never the warm-up", () => {
+  const goal = { bubble: "consistent", child: "no-time" };
+  const person = { daysAsked: 3, bodyWeightLb: 180, sex: "Male" };
+  const logs = longHistory(78);
+  const base = buildPlan({ goal, person, logs });
+  const long = buildPlan({ goal, person: { ...person, sessionMinutes: 120 }, logs });
+  const grew = long.week.filter((d) => d.longCooldown);
+  assert.ok(grew.length, "two hours against a no-time goal buys the ten minute block");
+  for (let i = 0; i < long.week.length; i++) {
+    /* research/13: McGowan 2015, Behm 2016 and Oliva 2026 all argue against a
+       longer warm-up, so the minutes may only ever go to the block after. */
+    assert.ok(long.week[i].mobility.warmupSeconds <= WARMUP_SECONDS + 60,
+      "the warm-up stays at the six minutes the research asks for");
+    if (long.week[i].longCooldown) {
+      assert.ok(long.week[i].mobility.cooldownSeconds > base.week[i].mobility.cooldownSeconds,
+        "the cool-down is what grew");
+    }
+  }
+});
+
+test("a shorter budget that later gets lighter gives the rest back and says so", () => {
+  const goal = { bubble: "get-stronger" };
+  const person = { daysAsked: 4, bodyWeightLb: 180, sex: "Male", sessionMinutes: 30 };
+  /* A week the calibration backs off: everything prescribed, much less logged.
+     The back-off takes sets off AFTER the clock compressed the rest, which is
+     the only way a day can be both in debt and roomy at the same moment. */
+  const names = ["Barbell Back Squat", "Barbell Bench Press", "Barbell Deadlift", "Barbell Row"];
+  const logs = [];
+  const plans = [];
+  const today = new Date();
+  for (let w = 0; w < 40; w++) {
+    const day = new Date(today.getTime() - w * 3 * 86400000).toISOString().slice(0, 10);
+    for (const n of names) logs.push({ entry_date: day, exercise_name: n, sets: 2, reps: 3, weight: 150 });
+    plans.push({ entry_date: day, completed_at: day, exercises: names.map((n) => ({ name: n, sets: 5, reps: 5, targetWeight: 225 })) });
+  }
+  const plan = buildPlan({ goal, person, logs, plans, today });
+  const repaid = (plan.volumeNotes.restCompressed || []).filter((r) => r.repaid);
+  assert.ok(repaid.length, "a lighter week hands back the rest the clock took");
+  for (const r of repaid) assert.equal(r.toSec, r.fromSec, "back to what the goal prescribes");
+  assert.ok(plan.dayNotes.some((n) => /rest between sets is back to the full/.test(n)),
+    "and the plan says so rather than leaving it to be noticed");
+  /* The sentence that says rest is short must not survive its own repayment. */
+  const stillShort = (plan.volumeNotes.restCompressed || []).filter((r) => !r.repaid);
+  if (!stillShort.length) {
+    assert.ok(!plan.dayNotes.some((n) => /rest between sets came down/.test(n)),
+      "nothing tells them their rest is short when it is not");
+  }
+});
+
+test("a stated session length that buys something says what it bought", () => {
+  const plan = buildPlan({
+    goal: { bubble: "consistent", child: "no-time" },
+    person: { daysAsked: 3, bodyWeightLb: 180, sex: "Male", sessionMinutes: 90 },
+    logs: longHistory(78),
+  });
+  assert.ok(plan.volumeNotes.timeBought.length, "there was something to buy");
+  const say = plan.dayNotes.find((n) => /It bought/.test(n));
+  assert.ok(say, "and the plan says what it was");
+  assert.ok(/none of it is logged/.test(say), "and that none of it counts as a set");
+  /* The refusal, when it still fires, must no longer recommend the thing the
+     research says costs performance. */
+  for (const n of plan.dayNotes) assert.ok(!/longer warm-up/.test(n), "no engine advice to warm up for longer");
+});

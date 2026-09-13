@@ -798,7 +798,18 @@ export function toWorkout(plan, dayIndex = 0) {
      credited as a set would light the Body tab and tell recovery.mjs a muscle
      was worked when it was only loosened. */
   const mob = day.mobility || { warmup: [], cooldown: [] };
-  return { focus: day.name, exercises, warmup: mob.warmup, cooldown: mob.cooldown };
+  /* Ramp-up sets, and the reason they are a third array rather than rows in
+     `exercises`. The app copies `exercises` into `ai_workouts.exercises`, and
+     `ai_workouts.exercises` is the only thing calibrate.mjs joins against. A
+     ramp set in that array would be counted as prescribed work, the person would
+     correctly not log four light singles as a set, and calibration would read
+     the gap as a shortfall and take weight off them next week. They are also not
+     volume: nothing here reaches the weekly ledger or recovery.mjs, exactly like
+     the stretches. Present only when a stated session length bought them, so a
+     plan built without one is the object it was before this key existed. */
+  const workout = { focus: day.name, exercises, warmup: mob.warmup, cooldown: mob.cooldown };
+  if (Array.isArray(day.rampSets) && day.rampSets.length) workout.rampSets = day.rampSets;
+  return workout;
 }
 
 /* ------------------------------------------------------------------ *
@@ -1125,15 +1136,26 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
           asked: plan.sessionBudget?.asked ?? null,
           goalMinutes: plan.sessionBudget?.goalMinutes ?? null,
           estimatedMinutes: dayBuilt?.estimatedMinutes ?? null,
-          /* No `totalMinutes` here, deliberately. The session plus the cool-down
-             is `estimatedMinutes + stretching.cooldownMinutes`, both of which
-             are already in this block, and carrying the sum as a third number
-             would be the one field in `meta` that moves when `skip_stretching`
-             moves. "Stretching off changes the two blocks and nothing else" is
-             a contract with a test behind it, and a convenience field is not
-             worth spending it. */
+          /* What the ramp-up sets cost, so a screen can print the whole visit
+             without summing `workout.rampSets` itself. Zero on every day that
+             did not buy any, which is every day of every plan built without a
+             stated session length. `estimatedMinutes` deliberately does not
+             include it: that number is the working session and it has to stay
+             comparable to the budget every trim was measured against.
+
+             No `totalMinutes` here, deliberately. The whole visit is
+             `estimatedMinutes + rampMinutes + stretching.cooldownMinutes`, all
+             three of which are already in this block, and carrying the sum as a
+             fourth number would be the one field in `meta` that moves when
+             `skip_stretching` moves. "Stretching off changes the two blocks and
+             nothing else" is a contract with a test behind it, and a
+             convenience field is not worth spending it. */
+          rampMinutes: dayBuilt?.rampMinutes ?? 0,
           fits: !(plan.volumeNotes?.overBudget || []).some((o) => o.day === (dayBuilt?.name)),
-          restCompressed: (plan.volumeNotes?.restCompressed || []).some((r) => r.day === (dayBuilt?.name)),
+          /* Repaid entries do not count. The fill pass can hand the minutes back
+             on a lighter week, and a screen showing "your rest was cut" beside a
+             card printing the full interval is the app contradicting itself. */
+          restCompressed: (plan.volumeNotes?.restCompressed || []).some((r) => r.day === (dayBuilt?.name) && !r.repaid),
         },
         source: "engine",
         /* The warm-up and cool-down in three numbers and a reason, so the

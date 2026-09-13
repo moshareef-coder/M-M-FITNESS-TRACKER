@@ -35,7 +35,7 @@ somebody on day zero who has answered nothing, and it does.
 | `current_weight` | number | engine | pounds. Without it there are no starting weights at all, and the plan says so in `meta.missing` |
 | `gym_days_this_week` | number | engine | fallback day count when `challenge_target` is absent |
 | `challenge_target` | number | engine | days per week they chose themselves, 2 to 6. Beats everything else |
-| `session_minutes` | number | engine | **new.** How long one session should take, in minutes. Absent, `null`, `0` and nonsense all mean "never answered" and the goal's own session length runs, which is byte for byte the plan that was built yesterday. A real answer replaces it: the week is built to fit the number, in both directions. Clamped to 15 and 120, and the clamp is said in `notes` |
+| `session_minutes` | number | engine | **new.** How long one session should take, in minutes. Absent, `null`, `0` and nonsense all mean "never answered" and the goal's own session length runs, which is byte for byte the plan that was built yesterday. A real answer replaces it: the week is built to fit the number, in both directions. Clamped to 15 and 120, and the clamp is said in `notes`. **2026-09-12**: a longer answer than the plan needs now buys three things that cost no recovery, in this order: the rest the clock took back if a lighter week left room for it, ramp-up sets on the day's main lifts (`workout.rampSets`), and a ten minute stretching block instead of five. It still never buys hard sets past the weekly ceiling, and when there is nothing left to buy it still says so |
 | `focus` | text | engine | a day name ("Push day"), which day of the week they want. Beats the rotation |
 | `focus_groups` | text[] | engine | the body map pick, now with a priority tier on each entry. `"chest:3"` is red, `"chest:2"` yellow, `"chest:1"` green, and a bare `"chest"` with no tier is yellow, which is what every pick saved before 2026-09-12 means. Muscle group keys or the finer piece keys the zoomed view uses; both are flattened to the app's fourteen groups. The single entry `"all"` is "select my whole body" and expands to every group at green. A jsonb object, `{"chest":3}`, is accepted too, so the column can become jsonb later without the engine changing |
 | `focus_chosen_at` | timestamptz | engine | when that pick was made. Older than 60 days comes back as `meta.focus.stale` |
@@ -44,7 +44,7 @@ somebody on day zero who has answered nothing, and it does.
 | `logs` | array | engine | real sessions, `{ entry_date, exercise_name, weight, reps, sets }`. Beats `history` whenever there is any |
 | `plans` | array | engine | completed plans, `{ entry_date, focus, exercises, completed_at }`. Joined against `logs` to calibrate. **Live as of 2026-09-12**: this row has described the join since it was written and the adapter was not passing the column, so until that date every verdict came back `unknown` and nothing behind one ever ran. Only rows carrying `completed_at` are evidence; a plan that was generated and never finished is ignored on purpose. A row that is not an object is dropped, and a row whose `exercises` is not a list keeps its dates and loses the list, so the rotation still sees the session and the join has nothing to join |
 | `swaps` | array | engine | `exercise_swaps` rows, `{ entry_date, planned_exercise, chosen_exercise }`. What somebody reached for instead. **Live as of the same date and for the same reason.** With `plans`, it feeds `preferences.mjs`: two occurrences inside 90 days sink a movement to the bottom of its pool, three take it out of the plan and the plan says so by name. It reorders the candidates for a slot and nothing else. It never changes a set count, a rep range, a load or the split, and it never leaves a slot empty |
-| `skip_stretching` | bool | engine | **new.** `true` strips `workout.warmup` and `workout.cooldown` and changes nothing else. From `profiles.skip_stretching`. A client may also send `stretching: false`, same effect |
+| `skip_stretching` | bool | engine | **new.** `true` strips `workout.warmup` and `workout.cooldown` and changes nothing else. From `profiles.skip_stretching`. A client may also send `stretching: false`, same effect. It does NOT strip `workout.rampSets`: a ramp set is light sets of the lift itself, not stretching, and somebody who turned the stretching off did not turn off warming up to their working weight |
 
 `limits` is accepted three ways and all three are safe: the object, the string a
 jsonb column round trips as through some clients, and `null`. Unknown keys
@@ -80,6 +80,19 @@ inside it are dropped in silence.
     ],
     cooldown: [                         // new. Static holds after the last set, or a mobility block for the flexibility and mobility goals
       { name: "Standing Calf Stretch", seconds: 30, perSide: true, group: "calves", kind: "static", cue: "..." }
+    ],
+    rampSets: [                         // new 2026-09-12. ABSENT unless a stated session_minutes bought them. See below
+      {
+        exercise: "Barbell Back Squat", // always a lift already in `exercises` on this same day
+        group: "quads",
+        seconds: 270,                   // what the whole ramp costs, rests included
+        sets: [
+          { weight: 0,   reps: 8, restSec: 45, pct: 0,    cue: "The bar on its own, the machine empty, or the lightest weight you have." },
+          { weight: 140, reps: 5, restSec: 45, pct: 0.5,  cue: null },
+          { weight: 195, reps: 3, restSec: 60, pct: 0.7,  cue: null },
+          { weight: 240, reps: 2, restSec: 60, pct: 0.88, cue: null }
+        ]
+      }
     ]
   },
   honest: "Six weeks is enough for about twelve pounds, and here is the plan for twelve.",  // or null
@@ -91,6 +104,29 @@ inside it are dropped in silence.
 }
 ```
 
+### `workout.rampSets`, and the one rule the app must not break
+
+Ramp-up sets are warm-up sets of a lift that is already on the card, at less
+than its working weight, so the first real set is not also the warm-up
+(`mo-knowledge/research/13-warmup-cooldown.md` section 5, and its checklist item
+9). **They are never working sets.** Concretely, the app must:
+
+- render them as part of the warm-up or on the first lift's card, and **never**
+  as rows in `exercises`;
+- **never** write them to `exercise_logs`, for the same reason a stretch is not
+  written there: a ramp set credited as a set would light the Body tab and tell
+  `recovery.mjs` a muscle was worked;
+- **never** add them to `ai_workouts.exercises`. That row is the only thing
+  calibration joins a log against, so a ramp set in it would be read as
+  prescribed work the person did not do, and their weights would come down next
+  week for taking the extra.
+
+`weight: 0` on the first rung means the empty bar, the empty machine, or the
+lightest thing they have, and the `cue` says so; it does not mean bodyweight.
+`pct` is the fraction of the working weight the rung was built from, before
+rounding to the plate grid. The key is **absent entirely** on a day that bought
+none, which is every day of every plan built without `session_minutes`.
+
 `notes` is the plan's own `dayNotes`, unfiltered, plus the focus merge's own
 note when there is one (today: the sentence saying a whole-body pick changed
 nothing). It carries the limits summary, the
@@ -100,12 +136,13 @@ the plateau answers, and, new on 2026-09-12, the sentence naming the muscle
 groups whose weekly sets are capped by how often the split trains them ("more
 of those muscles means another day in the week, not more sets in the days you
 have"). Also new on 2026-09-12: the session-length sentences, when `session_minutes`
-was sent. Up to four of them, and each one is a real event rather than a
+was sent. Up to six of them, and each one is a real event rather than a
 reassurance: the clamp when the number was outside 15 to 120, the rest
-compression when sets alone could not buy the minutes, the day that still does
-not fit after everything, and the budget that could not be spent because more
-sets than this is past what the level recovers from. None of them appear when
-`session_minutes` is absent. Also new on 2026-09-12: the sentence naming a
+compression when sets alone could not buy the minutes, the rest going back up
+when a lighter week made room for it, what the extra minutes bought when they
+could not buy sets, the day that still does not fit after everything, and the
+budget that could not be spent because more sets than this is past what the
+level recovers from. None of them appear when `session_minutes` is absent. Also new on 2026-09-12: the sentence naming a
 starting weight that was capped, which happens when a guess extrapolated from
 very little history off a different movement came out above what the person's
 size and level support; the per-exercise `note` has always said it and now the
@@ -157,9 +194,11 @@ bodyweight only pull day honestly has no curl in it).
 | `session.source` | text | **new.** `asked` when `session_minutes` set the budget, `goal` when the goal's own session length did. Every plan built before this column existed reads `goal` |
 | `session.asked` | number or null | **new.** What arrived before the clamp, so a screen can tell a clamp from a coincidence. Null when nothing was sent |
 | `session.goalMinutes` | number | **new.** What the goal would have chosen on its own. Equal to `budgetMinutes` when `source` is `goal` |
-| `session.estimatedMinutes` | number | **new.** What this day really comes to: sets times reps time, plus the rest between them, plus the warm-up. The same number `stretching.warmupMinutes` is counted inside. There is deliberately no `totalMinutes` here: the session plus the cool-down is this plus `stretching.cooldownMinutes`, and carrying the sum would make `meta` move when `skip_stretching` moves |
+| `session.estimatedMinutes` | number | **new.** What this day really comes to: sets times reps time, plus the rest between them, plus the warm-up. The same number `stretching.warmupMinutes` is counted inside. It does NOT include `session.rampMinutes`, because this number has to stay comparable to the budget every trim was measured against. There is deliberately no `totalMinutes` here: the whole visit is this plus `session.rampMinutes` plus `stretching.cooldownMinutes`, and carrying the sum would make `meta` move when `skip_stretching` moves |
+| `session.rampMinutes` | number | **new 2026-09-12.** What `workout.rampSets` costs on this day, rests included. `0` on every day that bought none, which is every day of every plan built without `session_minutes`. Zero volume: it is warm-up time, not work |
 | `session.fits` | bool | **new.** `false` is the day that could not be squeezed into the answer they gave, after every lever ran. The sentence saying so is already in `notes` |
-| `session.restCompressed` | bool | **new.** The budget on this day was partly bought by shortening the rest between sets, which is the one trim that changes what a set is worth. The sentence is in `notes` |
+| `session.restCompressed` | bool | **new.** The budget on this day was partly bought by shortening the rest between sets, which is the one trim that changes what a set is worth. The sentence is in `notes`. **Changed 2026-09-12**: a day whose rest was given back in full reads `false`, because a screen saying "your rest was cut" beside a card printing the full interval is the app contradicting itself |
+| `stretching.cooldownMinutes` (changed) | number | **2026-09-12.** Can now be ten for anyone, not only the `flexibility` and `mobility` goal children, when a stated `session_minutes` had minutes left over and bought the longer block. `stretching.mobilityGoal` stays the goal-child flag and does not go true for a bought block; `stretching.why` says which happened |
 | `source` | text | always `engine`. The `llm` path was removed 2026-09-12; the key stays so a reader of an older stored plan can still tell which built it |
 | `goalSource` | text | `tiles` if `goal_bubble` was valid, `legacy` if the five strings and the free text were parsed |
 | `emphasis` | **not returned** | the goal table has an `emphasis` on every entry and it never leaves the engine, deliberately. It has two behaviours in the whole codebase, both `=== "strength"`, and the other seven values change nothing. Do not surface it and do not add it here: see "What `emphasis` does, and what it does not" in `README.md` |
