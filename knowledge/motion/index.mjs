@@ -87,8 +87,12 @@ function watcher() {
 function pump() {
   if (frameId !== null) return;
   const anyLive = [...mounts].some((m) => m.dirty || (m.playing && m.visible));
-  if (!anyLive) return;
-  lastNow = 0;
+  // Nothing to draw: park the loop AND forget the timestamp, so that when it
+  // starts again the gap since the last frame is not charged to one step.
+  // The reset used to live below, on the scheduling path, which meant tick()
+  // zeroed it on its way out every frame: dt was always 0, the clock never
+  // advanced and every figure sat on the frame it was born with.
+  if (!anyLive) { lastNow = 0; return; }
   frameId = globalThis.requestAnimationFrame(tick);
 }
 
@@ -97,6 +101,15 @@ function tick(now) {
   const dt = lastNow ? Math.min(0.05, (now - lastNow) / 1000) : 0;
   lastNow = now;
   for (const m of mounts) {
+    /* A canvas the page has thrown away (every session redraw replaces its
+       figures) must not keep costing a paint per frame: the loop is real now,
+       so a leaked mount is real work. The app prunes on its next mount pass;
+       this catches them a frame after they leave the document. */
+    if (!m.canvas.isConnected) {
+      if (observer) observer.unobserve(m.canvas);
+      mounts.delete(m);
+      continue;
+    }
     const running = m.playing && m.visible;
     if (!running && !m.dirty) continue;
     if (running) m.time += dt * m.speed;
@@ -148,63 +161,59 @@ export function mountMove(canvas, name, opts = {}) {
   };
   mounts.add(m);
 
-  // Someone who asked the OS to stop animating things meant it. Draw the most
-  // representative frame of the move (mid cycle, which for a pingpong rep is
-  // the far end of the rep) and leave it there.
-  const still = reducedMotion();
-  if (still) {
-    m.playing = false;
-    m.time = move.dur * 0.5;
-    paint(m);
-  } else {
-    const ob = watcher();
-    if (ob) ob.observe(canvas);
-    pump();
-  }
+  /* The figure is the instruction, not decoration: a still picture of a bench
+     press does not teach the movement, which is the whole reason it is on the
+     screen. So it loops for everyone, and reduced motion buys a slower, calmer
+     rep rather than a frozen one. Every decorative animation in the app (the
+     pops, the confetti, the slide-ins) still stops dead when the OS asks. */
+  if (reducedMotion()) m.speed *= 0.6;
+  const ob = watcher();
+  if (ob) ob.observe(canvas);
+  pump();
 
   const api = {
-    play() { if (!still) { m.playing = true; pump(); } return api; },
+    play() { m.playing = true; pump(); return api; },
     pause() { m.playing = false; return api; },
     seek(t) {
       // the clock is modulo the cycle, so seek(1) would wrap to the start;
       // clamp just short of it so a oneway move's last keyframe is reachable
       m.time = Math.min(typeof t === "number" ? t : 0, 0.999999) * move.dur;
       m.dirty = true;
-      if (still) paint(m); else pump();
+      pump();
       return api;
     },
     setAccent(accent) {
       m.accent = accent;
       m.colors = palette(m.theme, accent, m.skin, m.bodyKind);
       m.dirty = true;
-      if (still) paint(m); else pump();
+      pump();
       return api;
     },
     setTheme(theme) {
       m.theme = theme;
       m.colors = palette(theme, m.accent, m.skin, m.bodyKind);
       m.dirty = true;
-      if (still) paint(m); else pump();
+      pump();
       return api;
     },
     setMood(mood) {
       m.mood = mood || undefined;
       m.dirty = true;
-      if (still) paint(m); else pump();
+      pump();
       return api;
     },
     setSkin(skin) {
       m.skin = skin;
       m.colors = palette(m.theme, m.accent, skin, m.bodyKind);
       m.dirty = true;
-      if (still) paint(m); else pump();
+      pump();
       return api;
     },
     setBody(bodyKind) {
       m.bodyKind = bodyKind;
       m.colors = palette(m.theme, m.accent, m.skin, bodyKind);
       m.dirty = true;
-      if (still) paint(m); else pump();
+      pump();
       return api;
     },
     // Light the muscles a move works, in the caller's colour. The app passes
@@ -212,7 +221,7 @@ export function mountMove(canvas, name, opts = {}) {
     setLit(lit) {
       m.lit = lit;
       m.dirty = true;
-      if (still) paint(m); else pump();
+      pump();
       return api;
     },
     // Drive the camera at runtime. The move's own view is the default; this is
@@ -220,7 +229,7 @@ export function mountMove(canvas, name, opts = {}) {
     setView(view) {
       m.view = view;
       m.dirty = true;
-      if (still) paint(m); else pump();
+      pump();
       return api;
     },
     setSpeed(x) { m.speed = x; return api; },
