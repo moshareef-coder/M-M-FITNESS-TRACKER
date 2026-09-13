@@ -773,6 +773,51 @@ says how much slack a contact check is allowed on that pin, and `lerpIk` carries
 it through pose interpolation so a harness can read it off a sampled pose.
 
 
+## The top view, and what a frontal plane does to a knee
+
+Two things caught me out authoring the back view pull-ups and the top down
+Russian Twist. Both are about which plane a channel acts in.
+
+**In a frontal move, `hipAbd` is the OUT of plane channel and `knee` is the in
+plane one.** `hipAbd` goes through `outPlane`, so in a front or back view it
+swings the leg forward and backward, invisibly. `knee` goes through `inPlane`,
+so a bent knee swings the shin sideways across the screen. That is why a hanging
+figure with bent knees reads as a frog from behind: the shins fly out laterally
+instead of folding back. To fold a knee backward in a frontal view, pin the
+ankle and give the pin `pole: [0, 0, -1]`, the lateral axis, which puts the bend
+in the sagittal plane where it belongs. Watch the sign: with that pole,
+`bend: 1` bends the knee the human way and `bend: -1` hyperextends it, which the
+validator catches as a negative `kneeFlex`.
+
+**A pin at the edge of reach is fragile authoring.** The first back view hang put
+the wrist 35 units from a shoulder with 37 units of arm, and that one clamped on
+one body and reached on another, which the contact harness saw as the pin
+moving. Leave a few units of margin; on the pull-ups that meant hanging from
+`root.y 71` rather than 74.
+
+**Screen space pins cannot move laterally in a sagittal move.** An `ik` target
+written as `{ x, y }` is a screen point, and `inLimbPlane` slides it into the
+limb's own plane, which for a sagittal move means discarding its lateral
+component entirely. A Russian Twist authored that way has hands that never
+leave the midline. Give the pin an explicit `z` instead: `{ x, y, z }` is a
+WORLD target, taken as is, with x running head to feet, y height (larger is
+lower) and z the body's own left to right. `lerpIk` interpolates z along with
+x and y.
+
+**The `mat` prop knows about the camera.** Seen edge on it is a stripe below the
+figure, which makes a top view read as a side view of somebody floating. Past
+55 degrees of pitch it draws as a rectangle on the floor under the body instead.
+Any prop that is really a floor patch should do the same.
+
+**The top view is legible but dense.** Looking straight down, this rig has no
+depth cue except draw order: everything is the same flat grey with one
+silhouette, so limbs that overlap merge. It works when the exercise's whole
+point is rotation about the body's long axis, which is the one thing side and
+front cannot show, and only if the moving part is pushed well clear of the
+torso outline. A steep three quarter pitch, around -64, is far more legible and
+still reads as looking down, so prefer it unless a true overhead is the point.
+
+
 ---
 
 ## Ten things that will bite you

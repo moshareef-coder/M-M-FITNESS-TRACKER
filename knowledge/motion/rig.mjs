@@ -1298,8 +1298,14 @@ export const PROP_TYPES = [
 ];
 
 const PROPS = {
-  mat(ctx, C, p) {
+  mat(ctx, C, p, S) {
     ctx.fillStyle = C.propDark;
+    // Looking down, a mat seen edge on is a stripe below the figure, which
+    // makes a top view read as a side view of somebody floating. From a steep
+    // pitch it becomes what it actually is: a rectangle on the floor under the
+    // body.
+    const steep = S && S.cam && Math.abs(S.cam.pitch || 0) > 55;
+    if (steep) { roundRect(ctx, p.x, CENTER_Y - 26, p.w, 52, 6); ctx.fill(); return; }
     roundRect(ctx, p.x, GROUND - 2.4, p.w, 4.4, 2.2); ctx.fill();
   },
   wall(ctx, C, p) {
@@ -1648,10 +1654,18 @@ function lerpIk(a, b, u) {
     const ax = Array.isArray(A) ? A[0] : A.x, ay = Array.isArray(A) ? A[1] : A.y;
     const bx = Array.isArray(B) ? B[0] : B.x, by = Array.isArray(B) ? B[1] : B.y;
     const bend = Array.isArray(A) ? A[2] : A.bend;
+    // A pin with an explicit z is a WORLD target rather than a screen one, and
+    // its z has to interpolate like the other two. Without this a lateral sweep
+    // collapses to whichever z the first keyframe had.
+    const az = Array.isArray(A) ? undefined : A.z, bz = Array.isArray(B) ? undefined : B.z;
     // `tol` rides along: it is not geometry, it is how much slack a contact
     // check is allowed on that pin, and a harness reads it off the sampled pose.
     out[k] = { rel: A.rel || B.rel, x: ax + (bx - ax) * u, y: ay + (by - ay) * u, bend,
                pole: A.pole || B.pole, tol: A.tol || B.tol };
+    if (az !== undefined || bz !== undefined) {
+      const z0 = az === undefined ? bz : az, z1 = bz === undefined ? az : bz;
+      out[k].z = z0 + (z1 - z0) * u;
+    }
   }
   return out;
 }

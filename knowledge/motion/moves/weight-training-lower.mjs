@@ -1236,6 +1236,7 @@ const RUSSIAN_TWIST = {
   ],
 };
 
+
 // A bell in one hand, bend sideways at the waist and come back up. Must be
 // visible: the sideways bend, which only exists in the frontal plane. Front view.
 const SIDE_BEND = {

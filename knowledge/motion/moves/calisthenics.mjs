@@ -38,31 +38,45 @@ export const PUSH_UP = {
 // would otherwise be through the floor, which is also true in a real doorway.
 export // v2: PRONATED grip, knuckles toward the face, against Chin-Up below.
 const PULL_UP = {
-  view: "side",
+  // BACK view, because that is the angle the exercise is actually judged from:
+  // the grip wider than the shoulders, the elbows driving down and back, the
+  // shoulder blades pulling together. Side on, the upper arm projects straight
+  // through the head at the top, which is why the old side version stopped at
+  // three quarters range and still read as a scrunch. From behind it can go all
+  // the way to chin over bar.
+  view: "front",
+  facing: "away",
   loop: "pingpong",
   dur: 3.0,
   breath: 0.2,
-  fit: { k: 0.82, dy: 4 },
-  props: [{ type: "pullupBar", y: 8, x0: 34, x1: 106 }],
+  fit: { k: 0.84, dy: 4 },
+  // The bar is nearer the camera than the figure, so at the top the head rises
+  // behind it rather than through it.
+  grip: { L: "closed", R: "closed" },
+  props: [{ type: "pullupBar", y: 8, x0: 24, x1: 116, front: true }],
+  feet: { R: { ang: 10, len: 0.55, w: 0.95 }, L: { ang: -10, len: 0.55, w: 0.95 } },
   keys: [
-    { // dead hang
+    { // dead hang, arms long, feet crossed behind
       t: 0,
-      root: { x: 70, y: 73, rot: 0 },
-      joints: { forearmPronR: 74, forearmPronL: 74, spine: 2, neck: 0, hipL: -12, hipR: -10, kneeL: 74, kneeR: 70,
-                ankleL: -16, ankleR: -16 },
-      ik: { wristR: { x: 70, y: 9, bend: 1 }, wristL: { x: 65, y: 9, bend: 1 } },
+      root: { x: 70, y: 71, rot: 0 },
+      joints: { spine: 0, neck: 0,
+        hipAbdR: -34, hipAbdL: -34, ankleR: -8, ankleL: -8 },
+      ik: { wristR: { x: 88, y: 9, bend: 1 }, wristL: { x: 52, y: 9, bend: 1 },
+            ankleR: { x: 66.5, y: 112, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 73.5, y: 112, bend: 1, pole: [0, 0, -1] } },
     },
-    { // top. Deliberately three quarters of the true range: at a full chin
-      // over bar the upper arm projects straight through the head in side view
-      // and the whole thing reads as a scrunch rather than a pull-up.
+    { // top, chin over the bar, elbows down and back
       t: 1,
-      root: { x: 70, y: 55, rot: 0 },
-      joints: { forearmPronR: 74, forearmPronL: 74, spine: -6, neck: -10, hipL: -16, hipR: -14, kneeL: 78, kneeR: 74,
-                ankleL: -16, ankleR: -16 },
-      ik: { wristR: { x: 70, y: 9, bend: 1 }, wristL: { x: 65, y: 9, bend: 1 } },
+      root: { x: 70, y: 51, rot: 0 },
+      joints: { spine: -3, neck: -4,
+        hipAbdR: -36, hipAbdL: -36, ankleR: -8, ankleL: -8 },
+      ik: { wristR: { x: 88, y: 9, bend: 1 }, wristL: { x: 52, y: 9, bend: 1 },
+            ankleR: { x: 66.5, y: 89, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 73.5, y: 89, bend: 1, pole: [0, 0, -1] } },
     },
   ],
 };
+
 
 // Standing an arm's length from a wall, hands on it at chest height, the body
 // stays one straight line from heel to head while the elbows bend and the chest
@@ -278,30 +292,40 @@ export const ONE_ARM_PUSH_UP = {
 // same reason PULL_UP bends them: a hanging adult at this scale would have its
 // feet through the floor.
 export const DEAD_HANG = {
-  view: "side",
+  // The bottom of the pull-up, held. Back view for the same reason: what a dead
+  // hang is FOR is the shoulders opening under load, and that is a back picture.
+  view: "front",
+  facing: "away",
   loop: "hold",
   dur: 6.0,
   breath: 1.0,
   breathRate: 0.8,
-  fit: { k: 0.82, dy: 4 },
-  props: [{ type: "pullupBar", y: 8, x0: 34, x1: 106 }],
+  fit: { k: 0.84, dy: 4 },
+  grip: { L: "closed", R: "closed" },
+  props: [{ type: "pullupBar", y: 8, x0: 24, x1: 116, front: true }],
+  feet: { R: { ang: 10, len: 0.55, w: 0.95 }, L: { ang: -10, len: 0.55, w: 0.95 } },
   keys: [
     { // hanging long, shoulders open
       t: 0,
-      root: { x: 70, y: 72.5, rot: 0 },
-      joints: { spine: 1, neck: -2, hipL: -12, hipR: -14, kneeL: 66, kneeR: 70,
-                ankleL: -18, ankleR: -18 },
-      ik: { wristR: { x: 70, y: 9, bend: 1 }, wristL: { x: 65, y: 9, bend: 1 } },
+      root: { x: 70, y: 71, rot: 0 },
+      joints: { spine: 0, neck: 0,
+        hipAbdR: -34, hipAbdL: -34, ankleR: -8, ankleL: -8 },
+      ik: { wristR: { x: 86, y: 9, bend: 1 }, wristL: { x: 54, y: 9, bend: 1 },
+            ankleR: { x: 66.5, y: 112, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 73.5, y: 112, bend: 1, pole: [0, 0, -1] } },
     },
-    { // settle, a breath of sway, nothing more
+    { // a breath of sway, nothing more
       t: 1,
-      root: { x: 70.6, y: 73, rot: 1 },
-      joints: { spine: 2, neck: -3, hipL: -12, hipR: -14, kneeL: 68, kneeR: 72,
-                ankleL: -20, ankleR: -20 },
-      ik: { wristR: { x: 70, y: 9, bend: 1 }, wristL: { x: 65, y: 9, bend: 1 } },
+      root: { x: 70.5, y: 71.4, rot: 0 },
+      joints: { spine: 1, neck: -1,
+        hipAbdR: -33, hipAbdL: -33, ankleR: -8, ankleL: -8 },
+      ik: { wristR: { x: 86, y: 9, bend: 1 }, wristL: { x: 54, y: 9, bend: 1 },
+            ankleR: { x: 67.5, y: 112, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 74.5, y: 112, bend: 1, pole: [0, 0, -1] } },
     },
   ],
 };
+
 
 // Lying face up under a low bar, heels on the floor, body held as one straight
 // line while the arms pull the chest up to the bar. Must be visible: the
@@ -337,29 +361,39 @@ export const INVERTED_ROW = {
 // bottom. Side view, oneway loop, which is the whole difference from PULL_UP:
 // a negative is the lowering half only.
 export const NEGATIVE_PULL_UP = {
-  view: "side",
+  // The lowering half of a pull-up, so it is Pull-Up's two keys in the other
+  // order with a oneway loop: start at the top, finish hanging.
+  view: "front",
+  facing: "away",
   loop: "oneway",
   dur: 3.6,
   breath: 0.2,
-  fit: { k: 0.82, dy: 4 },
-  props: [{ type: "pullupBar", y: 8, x0: 34, x1: 106 }],
+  fit: { k: 0.84, dy: 4 },
+  grip: { L: "closed", R: "closed" },
+  props: [{ type: "pullupBar", y: 8, x0: 24, x1: 116, front: true }],
+  feet: { R: { ang: 10, len: 0.55, w: 0.95 }, L: { ang: -10, len: 0.55, w: 0.95 } },
   keys: [
-    { // start at the top, chin at the bar
+    { // start at the top, chin over the bar
       t: 0,
-      root: { x: 70, y: 55, rot: 0 },
-      joints: { spine: -6, neck: -10, hipL: -16, hipR: -14, kneeL: 78, kneeR: 74,
-                ankleL: -16, ankleR: -16 },
-      ik: { wristR: { x: 70, y: 9, bend: 1 }, wristL: { x: 65, y: 9, bend: 1 } },
+      root: { x: 70, y: 51, rot: 0 },
+      joints: { spine: -3, neck: -4,
+        hipAbdR: -36, hipAbdL: -36, ankleR: -8, ankleL: -8 },
+      ik: { wristR: { x: 88, y: 9, bend: 1 }, wristL: { x: 52, y: 9, bend: 1 },
+            ankleR: { x: 66.5, y: 89, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 73.5, y: 89, bend: 1, pole: [0, 0, -1] } },
     },
-    { // finish hanging, arms straight
+    { // finish hanging, arms long
       t: 1,
-      root: { x: 70, y: 73, rot: 0 },
-      joints: { spine: 2, neck: 0, hipL: -12, hipR: -10, kneeL: 74, kneeR: 70,
-                ankleL: -16, ankleR: -16 },
-      ik: { wristR: { x: 70, y: 9, bend: 1 }, wristL: { x: 65, y: 9, bend: 1 } },
+      root: { x: 70, y: 71, rot: 0 },
+      joints: { spine: 0, neck: 0,
+        hipAbdR: -34, hipAbdL: -34, ankleR: -8, ankleL: -8 },
+      ik: { wristR: { x: 88, y: 9, bend: 1 }, wristL: { x: 52, y: 9, bend: 1 },
+            ankleR: { x: 66.5, y: 112, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 73.5, y: 112, bend: 1, pole: [0, 0, -1] } },
     },
   ],
 };
+
 
 // Hanging from a narrow underhand grip and pulling until the chin clears the
 // bar, elbows driving down in front of the ribs rather than out. Must be
@@ -370,29 +404,40 @@ export // v2: SUPINATED grip, palms toward the face. That is the only difference
 // a pull-up and until the forearm channel existed the two cards were the same
 // drawing with different names.
 const CHIN_UP = {
-  view: "side",
+  // Same back view as Pull-Up, and the two must not look alike: the grip is
+  // SHOULDER WIDTH here, not wider, and the palms face the figure, so the
+  // elbows finish tight to the ribs rather than flared.
+  view: "front",
+  facing: "away",
   loop: "pingpong",
   dur: 3.0,
   breath: 0.2,
-  fit: { k: 0.8, dy: 6 },
-  props: [{ type: "pullupBar", y: 8, x0: 34, x1: 106 }],
+  fit: { k: 0.84, dy: 4 },
+  grip: { L: "closed", R: "closed" },
+  props: [{ type: "pullupBar", y: 8, x0: 24, x1: 116, front: true }],
+  feet: { R: { ang: 10, len: 0.55, w: 0.95 }, L: { ang: -10, len: 0.55, w: 0.95 } },
   keys: [
-    { // hang, palms toward the face, hands close
+    { // hang, hands shoulder width, palms back toward the camera
       t: 0,
-      root: { x: 70, y: 72.6, rot: 0 },
-      joints: { forearmPronR: -76, forearmPronL: -76, spine: 2, neck: 0, hipL: -12, hipR: -10, kneeL: 74, kneeR: 70,
-                ankleL: -16, ankleR: -16, wristL: -40, wristR: -40 },
-      ik: { wristR: { x: 70, y: 9, bend: 1 }, wristL: { x: 66, y: 9.5, bend: 1 } },
+      root: { x: 70, y: 71, rot: 0 },
+      joints: { spine: 0, neck: 0, forearmPronR: -74, forearmPronL: -74,
+        hipAbdR: -34, hipAbdL: -34, ankleR: -8, ankleL: -8 },
+      ik: { wristR: { x: 83, y: 9, bend: 1 }, wristL: { x: 57, y: 9, bend: 1 },
+            ankleR: { x: 66.5, y: 112, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 73.5, y: 112, bend: 1, pole: [0, 0, -1] } },
     },
-    { // top, chin above the bar, elbows down in front of the ribs
+    { // top, chin over the bar, elbows driving down close to the body
       t: 1,
-      root: { x: 70, y: 52, rot: 0 },
-      joints: { forearmPronR: -76, forearmPronL: -76, spine: -4, neck: -8, hipL: -18, hipR: -16, kneeL: 80, kneeR: 76,
-                ankleL: -16, ankleR: -16, wristL: -40, wristR: -40 },
-      ik: { wristR: { x: 70, y: 9, bend: 1 }, wristL: { x: 66, y: 9.5, bend: 1 } },
+      root: { x: 70, y: 51, rot: 0 },
+      joints: { spine: -3, neck: -4, forearmPronR: -74, forearmPronL: -74,
+        hipAbdR: -36, hipAbdL: -36, ankleR: -8, ankleL: -8 },
+      ik: { wristR: { x: 83, y: 9, bend: 1 }, wristL: { x: 57, y: 9, bend: 1 },
+            ankleR: { x: 66.5, y: 89, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 73.5, y: 89, bend: 1, pole: [0, 0, -1] } },
     },
   ],
 };
+
 
 // Hanging from a wide grip and pulling the body up to one hand while the other
 // arm stays long along the bar. Must be visible: one arm bent and loaded, one
