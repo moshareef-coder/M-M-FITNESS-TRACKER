@@ -991,7 +991,9 @@ function drawHead(ctx, S, C, fill) {
         // surprised, sleepy. Everything is a few flat shapes so it survives
         // card size; the grille and the nose drop out below 200px.
         const up = norm2(ax.y);
-        const big = (ctx.getTransform ? ctx.getTransform().a : 2) * R > 14;
+        const px = (ctx.getTransform ? ctx.getTransform().a : 2) * R;   // head radius in device pixels
+        const big = px > 14;
+        const tiny = px < 11;   // rows and small cards: a visor band only, eyes would be a smudge
         const blink = FACE_TIME > 0 && ((FACE_TIME % 4.3) < 0.11);
         const eyeLine = add(centre, scl(up, R * 0.12));
         // Side on, the visor wraps only the FRONT half of the head, the way
@@ -1006,6 +1008,14 @@ function drawHead(ctx, S, C, fill) {
         ctx.fillStyle = C.seam;
         capsulePath(ctx, a, halfH, b, halfH); ctx.fill();
         const lime = C.accent;
+        if (tiny) {
+          // two soft lime marks inside the band so it still reads as a face
+          ctx.fillStyle = lime;
+          const e1 = add(vis, scl(along, R * 0.3)), e2 = add(vis, scl(along, -R * 0.3));
+          for (const e of (latLen < 0.28 ? [vis] : [e1, e2])) { ctx.beginPath(); ctx.arc(e.x, e.y, R * 0.16, 0, Math.PI * 2); ctx.fill(); }
+          ctx.restore();
+          return;
+        }
         const eyeSpread = R * 0.36 * (latLen < 0.28 ? 0.35 : 1);
         const eyeAt = [add(vis, scl(along, eyeSpread)), add(vis, scl(along, -eyeSpread))];
         const eyeH = R * 0.26, eyeW = R * 0.105;
@@ -2030,7 +2040,7 @@ export function samplePose(move, cycle, timeSec = 0) {
 let FACE_TIME = 0;
 export function render(canvas, move, C, cycle, timeSec = 0, opts = {}) {
   FACE_TIME = timeSec || 0;
-  const dpr = Math.min(2.5, globalThis.devicePixelRatio || 1);
+  const dpr = Math.min(3, globalThis.devicePixelRatio || 1);
   const w = canvas.clientWidth || canvas.width || 160;
   const h = canvas.clientHeight || canvas.height || 160;
   // Both dimensions, not just the width: a canvas with no width/height
