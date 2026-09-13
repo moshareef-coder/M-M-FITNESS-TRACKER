@@ -24,6 +24,9 @@
  */
 import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
 import { generateFromPayload } from "./adapter.mjs";
+import { buildPlan } from "./plan.mjs";
+import { calibrate } from "./calibrate.mjs";
+import { learnPreferences } from "./preferences.mjs";
 import { jointLoadFor } from "./joint-load.mjs";
 import { MUSCLE_GROUPS } from "./focus.mjs";
 import { buildMuscleIndex, muscleRecoveryStates } from "./recovery.mjs";
@@ -174,12 +177,48 @@ const DAY_COUNTS = [2, 3, 4, 5, 6];
 
 const FAIL = "fail";
 const WARN = "warn";
-const results = new Map();   // invariant -> { fail: [], warn: [], fails: n, warns: n }
+
+/* A third state, and the reason it exists rather than a second WARN.
+ *
+ * Two of the invariants added on 2026-09-12 fire on live code, and the fix for
+ * each is in a file this sweep does not own. A FAIL would paint the gate red for
+ * everybody working in the tree today over a bug none of them introduced, and a
+ * permanently red instrument is one nobody reads, which is the failure this
+ * whole exercise is about. A WARN would file a broken promise next to "the four
+ * day split repeats Step-Up", which is not the same kind of fact.
+ *
+ * So they are FAILs, written as FAILs, counted apart, and printed in their own
+ * section with what is wrong and where. Deleting a line from this map turns one
+ * back into a gate-breaking FAIL, and that is the whole of the fix procedure:
+ * fix the module, delete the line, watch it stay green. Nothing else in this
+ * file knows the difference. */
+const KNOWN_OPEN = new Map([
+  ["plateau-rep-range-not-applied",
+    "plan.mjs reads P.repRange and nothing else, so a rep-range plateau answer is a "
+    + "sentence promising 8 to 12 attached to a day still prescribing 3. Owner: plan.mjs."],
+  ["adapter-drops-plans",
+    "adapter.mjs passes payload.plans to nextDayIndex and never to buildPlan, so calibration, "
+    + "the back-off and every plateau answer that depends on a verdict are unreachable from a "
+    + "payload. CONTRACT.md line 44 says plans are joined against logs to calibrate. "
+    + "One argument. Owner: adapter.mjs."],
+  ["back-off-added-sets",
+    "the back-off lever works and a later pass undoes it: setsFor takes a set off every main, "
+    + "then the volume ledger's under-target top-up puts more than that back into the accessory "
+    + "slots, so a week the plan calls lighter is handed over with more total sets than the same "
+    + "week uncalibrated. Found 2026-09-12 on identical logs, the only difference being `plans`. "
+    + "Owner: plan.mjs, and the fix is an ordering question rather than a number."],
+  ["adapter-drops-swaps",
+    "same line, same fix: buildPlan takes `swaps` and the adapter never sends them, so "
+    + "preferences.mjs is dead end to end. Owner: adapter.mjs."],
+]);
+
+const results = new Map();   // invariant -> { fail: [], warn: [], open: [], fails, warns, opens }
 
 function record(kind, invariant, input, detail) {
   let row = results.get(invariant);
-  if (!row) { row = { fail: [], warn: [], fails: 0, warns: 0 }; results.set(invariant, row); }
-  if (kind === FAIL) { row.fails++; if (row.fail.length < 5) row.fail.push({ input, detail }); }
+  if (!row) { row = { fail: [], warn: [], open: [], fails: 0, warns: 0, opens: 0 }; results.set(invariant, row); }
+  if (kind === FAIL && KNOWN_OPEN.has(invariant)) { row.opens++; if (row.open.length < 5) row.open.push({ input, detail }); }
+  else if (kind === FAIL) { row.fails++; if (row.fail.length < 5) row.fail.push({ input, detail }); }
   else { row.warns++; if (row.warn.length < 5) row.warn.push({ input, detail }); }
 }
 const fail = (inv, input, detail) => record(FAIL, inv, input, detail);
@@ -224,7 +263,6 @@ const LEVEL_RANK = { beginner: 0, novice: 1, intermediate: 2, advanced: 3 };
 const ratios = [];   // { level, days, group, ratio }
 
 function checkOne(input, out) {
-  const plan = out.plan;
   const w = out.workout;
 
   /* ---- the day the app is handed ---- */
@@ -244,6 +282,32 @@ function checkOne(input, out) {
     seenToday.add(e.name);
   }
 
+  if (!(typeof out.honest === "string" || out.honest === null)) {
+    fail("honest-type", input, `honest is ${typeof out.honest}`);
+  }
+  if (!Array.isArray(out.meta?.missing) || out.meta.missing.some((m) => typeof m !== "string")) {
+    fail("meta-missing-type", input, JSON.stringify(out.meta?.missing));
+  }
+  if (!LEVEL_RANK.hasOwnProperty(out.meta?.level)) {
+    fail("level-value", input, `level ${JSON.stringify(out.meta?.level)}`);
+  }
+
+  /* ---- focus, the body map half ---- */
+  const applied = out.meta?.focus?.applied || [];
+  if (!Array.isArray(applied) || applied.some((g) => !GROUP_SET.has(g))) {
+    fail("focus-applied-subset", input, JSON.stringify(applied));
+  }
+
+  if (!out.plan) return;
+  checkPlan(input, out.plan, out.meta?.level);
+}
+
+/* The week half, split out of `checkOne` so the blocks that drive `buildPlan`
+   directly can use it too. Those blocks exist because `plans` never reaches
+   buildPlan through the adapter, so a calibrated week cannot be produced from a
+   payload at all; see block G. Nothing in here reads `workout` or `meta`, which
+   is why the split was possible without changing a single check. */
+function checkPlan(input, plan, level) {
   /* Not one of the named invariants, but it is the same claim one level down.
      The SLOTS comment in plan.mjs says two slots can never quietly land on the
      same muscle group, which is the first complaint in the brief (two shrugs in
@@ -258,18 +322,6 @@ function checkOne(input, out) {
     for (const [g, n] of seen) if (n > 1) groupsToday.set(`${d.name}:${g}`, n);
   }
   for (const [where, n] of groupsToday) warn("same-group-twice-in-day", input, `${where} x${n}`);
-
-  if (!(typeof out.honest === "string" || out.honest === null)) {
-    fail("honest-type", input, `honest is ${typeof out.honest}`);
-  }
-  if (!Array.isArray(out.meta?.missing) || out.meta.missing.some((m) => typeof m !== "string")) {
-    fail("meta-missing-type", input, JSON.stringify(out.meta?.missing));
-  }
-  if (!LEVEL_RANK.hasOwnProperty(out.meta?.level)) {
-    fail("level-value", input, `level ${JSON.stringify(out.meta?.level)}`);
-  }
-
-  if (!plan) return;
 
   /* ---- the week ---- */
   /* Against plan.days rather than against the number asked for, because
@@ -297,7 +349,7 @@ function checkOne(input, out) {
     if (!Number.isInteger(d.estimatedMinutes) || d.estimatedMinutes <= 0) {
       fail("estimated-minutes", input, `${d.name} estimatedMinutes ${JSON.stringify(d.estimatedMinutes)}`);
     } else if (d.estimatedMinutes > d.minutes * 1.15) {
-      warn("over-time-budget", input, `${d.name} ${d.estimatedMinutes} min against ${d.minutes} (${out.meta.level})`);
+      warn("over-time-budget", input, `${d.name} ${d.estimatedMinutes} min against ${d.minutes} (${level})`);
     }
     for (const e of d.exercises) {
       seenWeek.set(e.name, (seenWeek.get(e.name) || 0) + 1);
@@ -369,13 +421,7 @@ function checkOne(input, out) {
     if (!(row.wanted >= row.target)) {
       fail("volume-ledger", input, `${group} wanted ${JSON.stringify(row.wanted)} under target ${row.target}`);
     }
-    if (row.target > 0) ratios.push({ level: out.meta.level, days: plan.days, group, ratio: row.sets / row.target });
-  }
-
-  /* ---- focus, the body map half ---- */
-  const applied = out.meta?.focus?.applied || [];
-  if (!Array.isArray(applied) || applied.some((g) => !GROUP_SET.has(g))) {
-    fail("focus-applied-subset", input, JSON.stringify(applied));
+    if (row.target > 0) ratios.push({ level, days: plan.days, group, ratio: row.sets / row.target });
   }
 }
 
@@ -682,6 +728,612 @@ for (let i = 0; i < blockA.length; i += 12) {
   }
 }
 
+/* ------------------------------------------------------------------ *
+ * Blocks F to I: what happens NEXT week
+ * ------------------------------------------------------------------ *
+ * Everything above this line generates one day for one person once, and that is
+ * why 8,913 runs never caught the bug of 2026-09-12, where a 2.5 percent
+ * multiplier could not clear a 5 lb rounding step and a curl sat at 25 lb
+ * through eight weeks of perfect training. `sweep.mjs` never passed `plans`, so
+ * `calibrate.mjs` saw no completed sessions, returned `unknown` on every single
+ * run, and calibration, the back-off lever, progression and the whole plateau
+ * response had zero coverage. A no-op cannot fail an instrument that is not
+ * pointed at it, and "SWEEP CLEAN" was overstating what had been checked.
+ *
+ * These four blocks point it at them. Two things make them different in kind
+ * from blocks A to E:
+ *
+ * 1. They call `buildPlan` directly rather than `generateFromPayload`. Not a
+ *    shortcut: `adapter.mjs` passes `payload.plans` to `nextDayIndex` and never
+ *    to `buildPlan`, so a calibrated week cannot be produced from a payload at
+ *    all. Block I asserts exactly that and it is in KNOWN_OPEN above.
+ * 2. Block F runs a SEQUENCE. Every other block asks what the engine says
+ *    today; the question that hid three bugs is what it says on week eight when
+ *    you did everything it asked, and only a replay can ask it.
+ *
+ * Cost was the constraint. Multiplying the main matrix by a history axis would
+ * have made the sweep unusable, so these are targeted blocks the same way the
+ * tier ladder was: a fixed few runs per goal rather than a new dimension.
+ */
+
+let builds = 0;
+
+/* The `buildPlan` twin of `run`. Same accounting, same one line reproduction in
+   the failure report, and the same refusal to print the log array. */
+function build(where, args) {
+  builds++;
+  try {
+    return buildPlan(args);
+  } catch (err) {
+    threw++;
+    fail("throws", where, `buildPlan: ${err?.message || err}`);
+    return null;
+  }
+}
+
+/* The tile pick a payload would have produced, without the payload. mapGoal
+   turns a valid bubble and child straight into this shape and does nothing else
+   to it, so a goal built here is the same goal block A swept. */
+const asGoal = (g) => ({ bubble: g.goal_bubble, child: g.goal_child || undefined });
+
+const dayBack = (n) => isoLocal(new Date(TODAY.getTime() - n * DAY_MS));
+
+/* roundLoad's grid, mirrored from calibrate.mjs for the same reason the volume
+   ceiling above is written out rather than imported: a check that borrows the
+   engine's own constant agrees with it by construction. Anything smaller than
+   one grid space is not a step, it is the no-op. */
+const gridAt = (lb) => (lb < 40 ? 2.5 : 5);
+
+/* First prescription per exercise across a week, which is what the person is
+   handed. Name keyed, because that is the only handle the app and the logs
+   share. */
+function prescriptionsOf(plan) {
+  const m = new Map();
+  for (const d of plan?.week || []) {
+    for (const e of d.exercises) if (!m.has(e.name)) m.set(e.name, e);
+  }
+  return m;
+}
+
+/* A history table turned into dated rows, three sessions a week, four movements
+   a session, ending where the caller says. Same shape as `syntheticLogs` and
+   kept separate from it because these two need control over the loads: the
+   whole point of the light table is that its weights sit either side of
+   roundLoad's 40 lb boundary, which is where the no-op lived. */
+function seededLogs(table, weeks, until) {
+  const logs = [];
+  const total = weeks * 3;
+  for (let s = 0; s < total; s++) {
+    const date = isoLocal(new Date(until.getTime() - Math.round((total - 1 - s) * (7 / 3)) * DAY_MS));
+    for (let k = 0; k < 4; k++) {
+      const [name, lb] = table[(s * 4 + k) % table.length];
+      logs.push({ entry_date: date, exercise_name: name, sets: 3, reps: 10, weight: lb + 5 * Math.floor(s / 6) });
+    }
+  }
+  return logs;
+}
+
+/* Under 40 lb the grid is 2.5 and a percentage step rounds to nothing; over it
+   the grid is 5 and the same percentage rounds to nothing for longer. Both
+   sides are swept because the bug lived on one of them and its sibling on the
+   other. */
+const LIGHT_HISTORY = [
+  ["Dumbbell Curl", 20], ["Triceps Pushdown", 25], ["Lateral Raise", 10], ["Goblet Squat", 35],
+  ["Dumbbell Bench Press", 30], ["Seated Cable Row", 45], ["Leg Curl", 30], ["Calf Raise", 25],
+];
+const HEAVY_HISTORY = LOG_NAMES.map((n, i) => [n, 95 + 5 * i]);
+
+const REPLAY_PEOPLE = [
+  { id: "light", person: { bodyWeightLb: 125, sex: "Female", daysAsked: 3 }, table: LIGHT_HISTORY, weeks: 10 },
+  { id: "heavy", person: { bodyWeightLb: 195, sex: "Male", daysAsked: 4 }, table: HEAVY_HISTORY, weeks: 26 },
+];
+
+/* ------------------------------------------------------------------ *
+ * Block F: eight weeks of doing exactly what it said
+ * ------------------------------------------------------------------ *
+ * The replay. Build a week, write every day of it back as a completed
+ * `ai_workouts` row plus the `exercise_logs` rows of somebody who hit every
+ * prescribed set, rep and pound, hand both back, build the next week, eight
+ * times. That is the user this engine is for and it had never been simulated.
+ *
+ * The invariant is one sentence: if you do everything it asks for eight weeks,
+ * the weight on the bar has to go up. Asserted on the OUTPUT in pounds after
+ * rounding, never on a multiplier, because all three bugs of 2026-09-12 had a
+ * multiplier that looked right and a prescription that never moved.
+ *
+ * Two people rather than one, alternating by goal so the cost stays at eight
+ * builds per goal: the light one lives under roundLoad's 40 lb boundary where
+ * the step was being rounded away, the heavy one above it.
+ */
+const REPLAY_WEEKS = 8;
+
+for (let gi = 0; gi < GOALS.length; gi++) {
+  const g = GOALS[gi];
+  const who = REPLAY_PEOPLE[gi % REPLAY_PEOPLE.length];
+  const start = new Date(TODAY.getTime() - (REPLAY_WEEKS - 1) * 7 * DAY_MS);
+  const input = tag({
+    goal: g, days: who.person.daysAsked, history: { id: `${who.id} replay` },
+    limitCase: { id: "none" }, sex: who.person.sex, bodyWeight: who.person.bodyWeightLb,
+    focusCase: { id: "none" }, note: `${REPLAY_WEEKS} perfect weeks`,
+  });
+
+  const logs = seededLogs(who.table, who.weeks, new Date(start.getTime() - 7 * DAY_MS));
+  const plans = [];
+  const byWeek = new Map();   // exercise name -> the prescribed weight, one per week
+  let sawPush = false;
+  let last = null;
+
+  for (let w = 0; w < REPLAY_WEEKS; w++) {
+    const day = new Date(start.getTime() + w * 7 * DAY_MS);
+    const plan = build(input, { goal: asGoal(g), person: who.person, logs, plans, today: day });
+    if (!plan) break;
+    last = plan;
+    if (plan.calibration?.overall === "push") sawPush = true;
+
+    for (const [name, e] of prescriptionsOf(plan)) {
+      if (typeof e.weight !== "number" || !(e.weight > 0)) continue;
+      if (!byWeek.has(name)) byWeek.set(name, []);
+      byWeek.get(name).push(e.weight);
+    }
+
+    /* The week done as written, one day after another. `completed_at` is what
+       makes a row evidence: joinPlanToActual ignores a plan that was generated
+       and never started, which is the right call and also the reason a replay
+       that forgot this field would silently sweep nothing at all. */
+    plan.week.forEach((d, i) => {
+      const stamp = isoLocal(new Date(day.getTime() + i * DAY_MS));
+      plans.push({
+        entry_date: stamp, focus: d.name, completed_at: `${stamp}T18:00:00Z`,
+        exercises: d.exercises.map((e) => ({ name: e.name, sets: e.sets, reps: e.reps, targetWeight: e.weight })),
+      });
+      for (const e of d.exercises) {
+        logs.push({ entry_date: stamp, exercise_name: e.name, sets: e.sets, reps: e.reps, weight: e.weight ?? 0 });
+      }
+    });
+  }
+  if (last) checkPlan(input, last, last.level);
+
+  /* The instrument checking itself, which is the lesson of this whole exercise.
+     If a refactor ever stops the replay feeding calibration, every check below
+     goes quietly green on a person the engine never calibrated, exactly as the
+     8,912 runs did. So: eight weeks of perfect training must have produced at
+     least one "push" week, or the block is not measuring anything. */
+  if (!sawPush) {
+    fail("calibration-never-ran", input, "eight perfect weeks and calibration never once said push");
+  }
+
+  for (const [name, weights] of byWeek) {
+    /* Three weeks is the floor for a verdict at all: calibrateExercise needs two
+       finished sessions of the movement before it will say anything, so a lift
+       that appeared twice has not been asked the question yet. */
+    if (weights.length < 3) continue;
+    const first = weights[0], end = weights[weights.length - 1];
+    const seq = `${weights.join(" -> ")}`;
+    if (end === first) {
+      fail("progress-stalled-under-perfect-training", input,
+        `${name} prescribed ${weights.length} weeks running, every rep hit, still ${end} lb: ${seq}`);
+    } else if (end < first) {
+      fail("progress-went-backwards", input, `${name} ${first} lb down to ${end} lb on perfect logs: ${seq}`);
+    }
+    for (let i = 1; i < weights.length; i++) {
+      if (weights[i] < weights[i - 1]) warn("progress-not-monotone", input, `${name}: ${seq}`);
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Blocks G and H: the plan against what actually happened
+ * ------------------------------------------------------------------ *
+ * One seed week per goal, three completed sessions of its first day, and then
+ * the same week rebuilt with `plans` and without them. Identical logs on both
+ * sides, so level, training age and every starting weight are the same object:
+ * the only difference between the two plans is that one of them knows what was
+ * prescribed. That subtraction is what makes "the load moved" attributable, and
+ * it is the same trick block B uses for focus.
+ *
+ * Four scenarios, one per row of research/07's table, because a verdict nobody
+ * reaches is a branch nobody sweeps.
+ */
+
+/* Days back for the three completed sessions. Off the seed history's own 7/3
+   grid on purpose: an overlapping date lets a leftover history row win
+   joinPlanToActual's first-hit-per-date-and-name rule, and the scenario then
+   quietly measures something other than what it says. Found the hard way. */
+const CAL_SESSIONS = [5, 12, 19];
+
+/* `include` keeps a movement out of the PLAN as well as out of the logs where
+   the scenario cannot be expressed on it. A single at the planned reps is not
+   "one rep short" of anything, it is the target hit, and on the goals whose
+   main works at one rep the matched scenario was quietly producing a too-easy
+   verdict and measuring the wrong branch. Dropping it from the plan keeps the
+   join clean rather than turning it into a skip. */
+const CAL_SCENARIOS = [
+  {
+    id: "beat-the-plan", wants: "too-easy", overall: "push",
+    log: (e) => ({ sets: e.sets, reps: e.reps + 1, weight: e.weight ?? 0 }),
+  },
+  {
+    id: "matched-the-plan", wants: "on-track", overall: "hold",
+    include: (e) => e.reps >= 2,
+    log: (e) => ({ sets: e.sets, reps: e.reps - 1, weight: e.weight ?? 0 }),
+  },
+  {
+    id: "missed-the-plan", wants: "too-heavy", overall: "back-off",
+    include: (e) => e.sets >= 2,
+    log: (e) => ({ sets: e.sets - 1, reps: e.reps, weight: e.weight ?? 0 }),
+  },
+  /* No rows at all for a session they finished. Not an absence of data: it is
+     the pain or preference signal, and the one verdict that is about which
+     exercise rather than about how much. */
+  { id: "never-logged-it", wants: "skipped", overall: "hold", log: () => null },
+];
+
+const VERDICT_COUNTER = { "too-easy": "tooEasy", "on-track": "onTrack", "too-heavy": "tooHeavy", skipped: "skipped" };
+
+/* Three shapes of stall, chosen for the three branches of planPlateauResponse
+   that a log history alone can reach. `pr` is how many days ago the lift last
+   set a best: 37 lands on five weeks flat, which is over minWeeksFlat and under
+   shortStallWeeks, and 65 lands on nine, which is past rotateFromWeeks. */
+const STALL_SHAPES = [
+  { id: "flat-5-weeks", pr: 37, lifts: 1 },
+  { id: "flat-9-weeks", pr: 65, lifts: 1 },
+  { id: "three-lifts-flat", pr: 65, lifts: 3 },
+];
+
+const CAL_PERSON = { bodyWeightLb: 180, sex: "Male", daysAsked: 3 };
+
+for (const g of GOALS) {
+  const goal = asGoal(g);
+  const base = {
+    goal: g, days: CAL_PERSON.daysAsked, limitCase: { id: "none" },
+    sex: CAL_PERSON.sex, bodyWeight: CAL_PERSON.bodyWeightLb, focusCase: { id: "none" },
+  };
+  /* Ends 26 days back so nothing in it can land on a session date below, and so
+     the person is not inside layoffDays and reading as a return. */
+  const seedLogs = seededLogs(HEAVY_HISTORY, 26, new Date(TODAY.getTime() - 26 * DAY_MS));
+  const seedInput = tag({ ...base, history: { id: "26w seed" }, note: "calibration seed" });
+  const seed = build(seedInput, { goal, person: CAL_PERSON, logs: seedLogs, today: TODAY });
+  if (!seed?.week?.length) continue;
+  const seedDay = seed.week[0];
+  const seedReps = prescriptionsOf(seed);
+
+  /* ---- Block G: the four verdicts ---- */
+  for (const sc of CAL_SCENARIOS) {
+    const input = tag({ ...base, history: { id: `26w + ${sc.id}` }, note: "plan vs actual" });
+    const doing = seedDay.exercises.filter((e) => (sc.include ? sc.include(e) : true));
+    if (doing.length < 2) continue;
+    const plans = [];
+    const sessionLogs = [];
+    for (const backDays of CAL_SESSIONS) {
+      const stamp = dayBack(backDays);
+      plans.push({
+        entry_date: stamp, focus: seedDay.name, completed_at: `${stamp}T18:00:00Z`,
+        exercises: doing.map((e) => ({ name: e.name, sets: e.sets, reps: e.reps, targetWeight: e.weight })),
+      });
+      for (const e of doing) {
+        const row = sc.log(e);
+        if (row) sessionLogs.push({ entry_date: stamp, exercise_name: e.name, ...row });
+      }
+    }
+    const logs = seedLogs.concat(sessionLogs);
+    const ctl = build(input, { goal, person: CAL_PERSON, logs, today: TODAY });
+    const trt = build(input, { goal, person: CAL_PERSON, logs, plans, today: TODAY });
+    if (!ctl || !trt) continue;
+    checkPlan(input, trt, trt.level);
+
+    /* Recomputed here rather than read off the plan, which only carries the
+       summary. Same reasoning as the volume ceiling: the sweep needs its own
+       answer to check the engine's against. */
+    const cal = calibrate({ plans, logs });
+
+    /* Self check first, and it is a FAIL rather than a warning. If the scenario
+       stops producing the verdict it is named after, every assertion under it
+       passes on a person nobody calibrated, which is precisely how the sweep
+       was clean through three bugs. */
+    if (!(cal.summary[VERDICT_COUNTER[sc.wants]] >= 1)) {
+      fail("calibration-branch-not-reached", input,
+        `${sc.id} produced no ${sc.wants} verdict: ${JSON.stringify(cal.summary)}`);
+    }
+    if (trt.calibration?.overall !== sc.overall) {
+      fail("calibration-branch-not-reached", input,
+        `${sc.id} should read as ${sc.overall}, plan says ${trt.calibration?.overall}`);
+    }
+    if (ctl.calibration?.overall !== "unknown") {
+      fail("calibration-without-plans", input,
+        `no plans given and the week still calibrated: ${ctl.calibration?.overall}`);
+    }
+
+    const before = prescriptionsOf(ctl);
+    const after = prescriptionsOf(trt);
+    for (const [name, e] of after) {
+      const was = before.get(name);
+      if (!was) { warn("calibration-changed-selection", input, `${name} is in the calibrated week and not in the control`); continue; }
+      const a = was.weight, b = e.weight;
+      if (typeof a !== "number" || typeof b !== "number" || !(a > 0)) continue;   // bodyweight work has no load to move
+      const verdict = cal.byExercise[name.trim().toLowerCase()]?.verdict || null;
+
+      if (verdict === "too-easy") {
+        /* THE invariant. Three bugs on 2026-09-12 wore this exact shape: a
+           factor that said "go up" and a prescription in pounds that did not
+           move, because the step was smaller than the grid it rounds to. It is
+           asserted on the pounds the person is handed, and the floor is one
+           grid space, because a move the rack cannot express is not a move. */
+        if (b === a) {
+          fail("advance-did-not-move-load", input,
+            `${name}: calibration says too-easy and the prescription is ${a} lb either way`);
+        } else if (b < a) {
+          fail("advance-moved-load-down", input, `${name}: too-easy and ${a} lb fell to ${b} lb`);
+        } else if (b - a < gridAt(a)) {
+          fail("advance-under-one-grid-step", input,
+            `${name}: ${a} lb to ${b} lb, under the ${gridAt(a)} lb the rack can express`);
+        } else if (b - a > 10) {
+          warn("advance-over-a-heavy-step", input, `${name}: ${a} lb to ${b} lb in one week`);
+        }
+      } else if (verdict === "too-heavy") {
+        /* The same claim in the other direction, and the same bug: the back-off
+           told people the weight was coming down and handed them the same
+           weight. Only asserted where there is room to come down: at or under
+           one grid space the floor in calibrate.mjs is doing its job and a
+           prescription of nothing is not a back-off. */
+        if (a > gridAt(a)) {
+          if (b === a) {
+            fail("back-off-did-not-reduce-load", input,
+              `${name}: calibration says too-heavy and the prescription is ${a} lb either way`);
+          } else if (b > a) {
+            fail("back-off-raised-load", input, `${name}: too-heavy and ${a} lb rose to ${b} lb`);
+          }
+        }
+      } else if (b !== a) {
+        /* on-track, skipped, or no verdict at all. calibrate.mjs returns a
+           factor of exactly 1 for all three, so a load that moved anyway is
+           something else reaching the bar. */
+        fail("uncalibrated-load-moved", input, `${name}: verdict ${verdict || "none"} and ${a} lb became ${b} lb`);
+      }
+    }
+
+    /* A back-off is a lighter week as well as a lighter bar. Not asserted as a
+       strict drop: setsFor floors a main at 2, so a week already at the floor
+       has nowhere to go. Going UP under a back-off is the failure. */
+    if (sc.overall === "back-off") {
+      /* Summed over the exercises both weeks prescribe, so a movement that only
+         one of them picked cannot make the total move on its own. The two weeks
+         share their logs, so this really is the back-off lever and nothing
+         else. */
+      let x = 0, y = 0;
+      for (const [name, e] of after) {
+        if (!before.has(name)) continue;
+        y += e.sets; x += before.get(name).sets;
+      }
+      if (y > x) fail("back-off-added-sets", input, `back-off week has ${y} weekly sets against ${x} on the same exercises`);
+      else if (y === x) warn("back-off-changed-no-sets", input, `${x} weekly sets either way`);
+    }
+  }
+
+  /* ---- Block H: a stall gets an answer, and the answer has to be visible ---- */
+  for (const shape of STALL_SHAPES) {
+    const loaded = seedDay.exercises.filter((e) => typeof e.weight === "number" && e.weight > 0);
+    if (loaded.length < shape.lifts) continue;
+    const picked = loaded.slice(0, shape.lifts);
+    const names = picked.map((e) => e.name);
+    const input = tag({ ...base, history: { id: `26w + ${shape.id}` }, note: "stall" });
+
+    /* The stalled lift's own history is replaced rather than added to, because a
+       lift that climbed last month is not flat however many flat weeks follow
+       it: detectPlateau reads the best day in the window against the ones
+       before it. */
+    const logs = seedLogs.filter((l) => !names.includes(l.exercise_name));
+    for (const e of picked) {
+      for (let d = shape.pr; d >= 1; d -= 3) {
+        logs.push({ entry_date: dayBack(d), exercise_name: e.name, sets: 3, reps: 5, weight: e.weight });
+      }
+    }
+    const trt = build(input, { goal, person: CAL_PERSON, logs, today: TODAY });
+    if (!trt) continue;
+    checkPlan(input, trt, trt.level);
+
+    const responses = trt.plateau?.responses || [];
+    const summary = trt.plateau?.summary || { action: "none" };
+    const notes = trt.dayNotes || [];
+    const week = prescriptionsOf(trt);
+
+    if (!responses.length && summary.action === "none") {
+      fail("stall-not-detected", input,
+        `${names.join(" + ")} flat since ${shape.pr} days ago and nothing was said`);
+    }
+
+    for (const r of responses) {
+      /* Said out loud. A response with a sentence nobody ever sees is the same
+         failure as a response with no lever behind it. */
+      if (r.say && !notes.includes(r.say)) {
+        fail("plateau-answer-unspoken", input, `${r.exercise}: ${r.action} decided and the note never reached dayNotes`);
+      }
+      const here = week.get(r.exercise);
+      if (r.action === "rotate") {
+        if (here) fail("plateau-rotate-not-applied", input, `${r.exercise} was rotated out and is still in the week`);
+      } else if (r.action === "rep-range") {
+        /* The note promises a different rep range for the block. Nothing in
+           plan.mjs reads the response, so the reps come off P.repRange exactly
+           as they did before the stall, and the person is told the reps changed
+           while being handed the same prescription. Checked against the
+           un-stalled seed rather than against the sentence, because reps depend
+           on the goal alone and not on the logs, so the seed is a clean control
+           for this one field. */
+        const was = seedReps.get(r.exercise);
+        if (here && was && here.reps === was.reps) {
+          fail("plateau-rep-range-not-applied", input,
+            `${r.exercise}: answer is rep-range, the note says so, and the day still prescribes ${here.reps} reps`);
+        }
+      } else if (r.action === "deload-lift") {
+        /* Deliberately not checked here. deload-lift only fires when calibrate
+           already says too-heavy, and that lever is the one block G measures in
+           pounds; asserting it twice would be asserting the same move twice. */
+      } else if (r.action !== "wait") {
+        fail("plateau-action-unobservable", input,
+          `${r.action} is a response this sweep has no observable for, so nothing is checking it did anything`);
+      }
+    }
+
+    if (summary.action === "volume-cut") {
+      if (summary.say && !notes.includes(summary.say)) {
+        fail("plateau-answer-unspoken", input, "volume-cut decided and the week never said so");
+      }
+      /* Whether the cut cuts. The control is the same person with the same logs
+         and one heavier session on each stalled lift, which is the smallest
+         edit that stops detectPlateau calling it flat, so selection and level
+         hold still and the backOff lever is what differs. Not exact: a lighter
+         main frees time, the volume ledger tops accessories back up, and both
+         can add sets back. Counted rather than failed for that reason, and the
+         count is the honest measure of how much of the cut survives. */
+      const broken = logs.concat(picked.map((e) => ({
+        entry_date: dayBack(1), exercise_name: e.name, sets: 3, reps: 5, weight: e.weight + 10,
+      })));
+      const ctl = build(input, { goal, person: CAL_PERSON, logs: broken, today: TODAY });
+      if (ctl) {
+        const shared = prescriptionsOf(ctl);
+        let was = 0, now = 0;
+        for (const [name, e] of week) {
+          if (!shared.has(name)) continue;
+          now += e.sets; was += shared.get(name).sets;
+        }
+        if (now >= was) {
+          warn("volume-cut-did-not-cut", input,
+            `${summary.lifts} lifts stalled, weekly sets on the shared exercises went ${was} to ${now}`);
+        }
+      }
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Block I: the claims nothing was checking
+ * ------------------------------------------------------------------ *
+ * Four fields that reach `generateFromPayload` and have a stated promise
+ * attached, none of which had a check anywhere. Each is a matched pair against
+ * the same person with the field absent, so the assertion is about the
+ * difference and not about the plan.
+ */
+const CLAIM_HISTORY = HISTORY[2];   // six months, so there is a level to disturb
+
+for (const goal of GOALS) {
+  const cell = {
+    goal, days: 3, history: CLAIM_HISTORY, limitCase: LIMIT_CASES[0],
+    sex: "Male", bodyWeight: 180, focusCase: FOCUS_CASES[0],
+  };
+  const plain = run(cell);
+  if (!plain?.plan) continue;
+
+  /* ---- stretching can be turned off, and turning it off moves nothing else ---- */
+  const skipped = run(cell, { skip_stretching: true });
+  if (skipped?.plan) {
+    const input = tag({ ...cell, note: "skip_stretching" });
+    checkOne(input, skipped);
+    if (skipped.meta.stretching.included !== false || skipped.meta.stretching.warmupMinutes !== 0) {
+      fail("stretching-not-skipped", input, JSON.stringify(skipped.meta.stretching));
+    }
+    /* adapter.mjs: "the plan, the day, the rotation and every other field of
+       meta are byte for byte what they were". Nobody had ever checked it. */
+    if (JSON.stringify(plain.plan) !== JSON.stringify(skipped.plan)) {
+      fail("skip-stretching-changed-the-plan", input, "the week is not the week it would have been");
+    }
+    const bare = (w) => JSON.stringify((w.exercises || []).map((e) => [e.name, e.sets, e.reps, e.targetWeight]));
+    if (bare(plain.workout) !== bare(skipped.workout)) {
+      fail("skip-stretching-changed-the-day", input, "the exercises moved when only the mobility blocks should have");
+    }
+  }
+
+  /* ---- a stale focus is flagged and acts on nothing ---- */
+  const withFocus = { focus_groups: ["chest", "glutes"] };
+  const fresh = run(cell, { ...withFocus, focus_chosen_at: dayBack(1) });
+  const stale = run(cell, { ...withFocus, focus_chosen_at: dayBack(400) });
+  if (fresh?.plan && stale?.plan) {
+    const input = tag({ ...cell, note: "focus_chosen_at" });
+    checkOne(input, stale);
+    if (fresh.meta.focus.stale !== false) fail("focus-freshness-wrong", input, "a focus picked yesterday reads as stale");
+    if (stale.meta.focus.stale !== true) fail("focus-freshness-wrong", input, "a focus picked 400 days ago reads as current");
+    /* The comment in adapter.mjs says nothing acts on `stale` yet, on purpose.
+       That is a claim about the whole plan and this is the only thing asserting
+       it, so the day it stops being true somebody finds out here. */
+    const minusStale = (o) => JSON.stringify({ plan: o.plan, workout: o.workout, notes: o.notes });
+    if (minusStale(fresh) !== minusStale(stale)) {
+      fail("stale-focus-changed-the-plan", input, "stale is supposed to be a flag and it moved the week");
+    }
+  }
+
+  /* ---- a second goal is reported honestly ---- */
+  const secondary = [{ bubble: "feel-better" }, { bubble: "get-stronger", child: "lift-heavier" }];
+  const withSecond = run(cell, { goal_secondary: [...secondary, { bubble: "mobility" }] });
+  if (withSecond?.plan) {
+    const input = tag({ ...cell, note: "goal_secondary" });
+    checkOne(input, withSecond);
+    const said = withSecond.meta.goals;
+    const named = new Set([...(said.secondary || []), ...(said.ignored || [])].map((s) => s.bubble || s));
+    /* Every extra goal somebody taps has to come back either bought or ignored,
+       because the meta block's whole job is to give the app a straight answer
+       about what the second tap did. */
+    for (const s of secondary) {
+      if (!named.has(s.bubble) && s.bubble !== goal.goal_bubble) {
+        fail("secondary-goal-unaccounted", input, `${s.bubble} was asked for and is neither applied nor ignored`);
+      }
+    }
+    /* "mobility" is not a bubble in the tree, and normalizeSecondaryGoals drops
+       a bubble it does not know before resolveGoal ever sees it, so it never
+       reaches `ignored` and nobody is told. The right call about the plan and a
+       silent one about the tap: a client sending a retired id gets no answer at
+       all. Counted rather than failed, because nothing has decided what it
+       should say instead. */
+    if (!named.has("mobility")) {
+      warn("unknown-secondary-goal-dropped-silently", input, "mobility was sent, is not a bubble, and is in neither list");
+    }
+    if (said.primary.bubble !== plain.meta.goals.primary.bubble || said.primary.childUsed !== plain.meta.goals.primary.childUsed) {
+      fail("secondary-goal-moved-the-primary", input,
+        `primary went from ${plain.meta.goals.primary.childUsed} to ${said.primary.childUsed}`);
+    }
+  }
+
+  /* ---- and the two fields the adapter accepts and throws away ---- */
+  /* Both are in KNOWN_OPEN. The check is here rather than in a bug report
+     because a bug report goes stale and this does not: the day somebody adds
+     the argument, this stops firing on its own. */
+  const day0 = plain.plan.week[0];
+  const donePlans = CAL_SESSIONS.map((backDays) => ({
+    entry_date: dayBack(backDays), focus: day0.name, completed_at: `${dayBack(backDays)}T18:00:00Z`,
+    exercises: day0.exercises.map((e) => ({ name: e.name, sets: e.sets, reps: e.reps, targetWeight: e.weight })),
+  }));
+  const doneLogs = [];
+  for (const backDays of CAL_SESSIONS) {
+    for (const e of day0.exercises) {
+      doneLogs.push({ entry_date: dayBack(backDays), exercise_name: e.name, sets: e.sets, reps: e.reps + 1, weight: e.weight ?? 0 });
+    }
+  }
+  const logs = CLAIM_HISTORY.logs.concat(doneLogs);
+  const withoutPlans = run({ ...cell, history: { id: "6months+done", logs } });
+  const withPlans = run({ ...cell, history: { id: "6months+done", logs } }, { plans: donePlans });
+  if (withoutPlans?.plan && withPlans?.plan) {
+    const input = tag({ ...cell, note: "payload.plans" });
+    const truth = calibrate({ plans: donePlans, logs });
+    if (truth.overall !== "unknown" && withPlans.plan.calibration.overall === "unknown") {
+      fail("adapter-drops-plans", input,
+        `calibrate() on this payload says ${truth.overall}, the plan built from it says unknown`);
+    }
+  }
+
+  const swaps = day0.exercises.slice(0, 1).flatMap((e) => [1, 2, 3].map((n) => ({
+    entry_date: dayBack(n * 3), planned_exercise: e.name, chosen_exercise: "Machine Chest Press",
+  })));
+  const withSwaps = run(cell, { swaps });
+  if (withSwaps?.plan) {
+    const input = tag({ ...cell, note: "payload.swaps" });
+    const prefs = learnPreferences({ swaps, logs: CLAIM_HISTORY.logs, today: TODAY });
+    const hard = (prefs.avoid || []).filter((a) => a.strength === "hard").map((a) => a.name.toLowerCase());
+    const still = prescriptionsOf(withSwaps.plan);
+    for (const name of hard) {
+      if ([...still.keys()].some((k) => k.toLowerCase() === name)) {
+        fail("adapter-drops-swaps", input, `${name} was swapped out three times and is still prescribed`);
+      }
+    }
+  }
+}
+
 /* The shared log arrays are the one piece of state this script reuses across
    thousands of runs, so the assumption that the engine never writes to them is
    checked rather than trusted. If it were false every result after the first
@@ -723,10 +1375,13 @@ function pct(n, of) { return of ? `${(100 * n / of).toFixed(1)}%` : "-"; }
 
 const failing = [...results.entries()].filter(([, r]) => r.fails);
 const warning = [...results.entries()].filter(([, r]) => r.warns);
+const opened = [...results.entries()].filter(([, r]) => r.opens);
 
 console.log("");
 console.log("ENGINE SWEEP");
-console.log(`  runs              ${runs}`);
+console.log(`  runs              ${runs + builds}`);
+console.log(`    payload         ${runs} through generateFromPayload`);
+console.log(`    direct          ${builds} through buildPlan, which is the only way to reach calibration`);
 console.log(`  goal selections   ${GOALS.length} (9 bubbles, every child plus every bubble default)`);
 console.log(`  threw             ${threw}`);
 console.log(`  ledger rows       ${ratios.length}`);
@@ -736,6 +1391,15 @@ console.log("FAILS");
 if (!failing.length) console.log("  none");
 for (const [inv, r] of failing.sort((a, b) => b[1].fails - a[1].fails)) {
   console.log(`  ${String(r.fails).padStart(7)}  ${inv}`);
+}
+console.log("");
+
+console.log("KNOWN OPEN, would be FAILs");
+if (!opened.length) console.log("  none");
+for (const [inv, r] of opened.sort((a, b) => b[1].opens - a[1].opens)) {
+  console.log(`  ${String(r.opens).padStart(7)}  ${inv}`);
+  console.log(`           ${KNOWN_OPEN.get(inv)}`);
+  for (const f of r.open.slice(0, 2)) console.log(`           ${JSON.stringify(f.input)}  ${f.detail}`);
 }
 console.log("");
 
@@ -791,5 +1455,9 @@ if (warning.length) {
   console.log("");
 }
 
-console.log(failing.length ? "SWEEP FAILED" : "SWEEP CLEAN");
+console.log(failing.length
+  ? "SWEEP FAILED"
+  : opened.length
+    ? `SWEEP CLEAN, ${opened.length} known open finding(s) above that the fix for lives elsewhere`
+    : "SWEEP CLEAN");
 process.exit(failing.length ? 1 : 0);

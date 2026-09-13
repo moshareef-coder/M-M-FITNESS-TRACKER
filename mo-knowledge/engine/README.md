@@ -970,12 +970,123 @@ lifting file would not. Harmless today, worth one cleanup pass.
 `node mo-knowledge/engine/sweep.mjs` runs every goal selection (52: nine
 bubbles, every child plus every bubble default) across 2 to 6 days, four
 history lengths, six limits cases, with sex, bodyweight and focus cycled
-through, 8,912 generate calls in about sixteen seconds, and checks twenty
-odd invariants on each. 1,040 of those calls are the tier ladder added on
+through, **10,421 plans in about twenty-two seconds**, and checks thirty
+odd invariants on each. 1,040 of those are the tier ladder added on
 2026-09-12, which builds the same week at each of the three focus tiers and
 once without one; see Focus above for what it found. It exits 1 on any FAIL and is part of the gate now.
 WARNs are counted, not failed, and the counts are the point: a number that
 moves between commits is a change somebody should be able to explain.
+
+**9,329 of those go through `generateFromPayload` and 1,092 call `buildPlan`
+directly, which is not a shortcut: `adapter.mjs` hands `payload.plans` to
+`nextDayIndex` and never to `buildPlan`, so a calibrated week cannot be
+produced from a payload at all.** That is the sweep's own confession, added
+2026-09-12. Until then the sweep never passed `plans`, `calibrate.mjs` saw no
+completed sessions and returned `unknown` on every one of 8,912 runs, and
+calibration, the back-off lever, progression and the entire plateau response
+had zero coverage. The bug fixed that morning, a 2.5 percent multiplier that
+could not clear a 5 lb rounding step so a curl sat at 25 lb through eight
+weeks of perfect training, survived 8,913 clean runs because the instrument
+was not pointed at it. "SWEEP CLEAN" was overstating what had been checked.
+
+**What was added to close that, and what each one asserts:**
+
+- **Eight weeks of doing exactly what it said** (block F, 8 builds per goal).
+  Build a week, write every day back as a completed `ai_workouts` row plus the
+  logs of somebody who hit every set, rep and pound, rebuild, eight times. The
+  invariant is one sentence: *if you do everything it asks for eight weeks, the
+  weight on the bar has to go up.* `progress-stalled-under-perfect-training`
+  fails on a lift prescribed three or more weeks running whose last
+  prescription equals its first, **in pounds after rounding, never on a
+  multiplier**, because all three bugs of that morning had a factor that looked
+  right and a prescription that never moved. Two people alternate by goal, one
+  living under `roundLoad`'s 40 lb boundary and one above it, because that
+  boundary is where the no-op lived.
+- **Plan against actual, all four verdicts** (block G). One seed week per goal,
+  three completed sessions of its first day, then the same week built with
+  `plans` and without them on *identical logs*, so level, training age and every
+  starting weight are the same object and the only difference is that one plan
+  knows what was prescribed. Beat it, matched it, missed it, never logged it.
+  `advance-did-not-move-load` and `back-off-did-not-reduce-load` are the two
+  headline invariants and they are the exact shape that hid three bugs;
+  `advance-under-one-grid-step` catches the near miss, a move the rack cannot
+  express; `uncalibrated-load-moved` catches the opposite, a load that moved
+  with no verdict behind it. `calibration-branch-not-reached` is the instrument
+  checking itself: if a scenario stops producing the verdict it is named after,
+  every assertion under it would pass on a person nobody calibrated, which is
+  exactly how the sweep stayed clean before.
+- **A stall gets an answer, and the answer has to be visible** (block H). Three
+  stall shapes per goal: five weeks flat, nine weeks flat, three lifts flat at
+  once. A `rotate` whose lift is still in the week fails, a response whose
+  sentence never reached `dayNotes` fails, and an action this file has no
+  observable for fails on sight, so a new action added without a lever cannot
+  arrive silently.
+- **The claims nothing was checking** (block I). `skip_stretching` really does
+  leave the plan byte for byte what it was; a stale `focus_chosen_at` is flagged
+  and acts on nothing; every `goal_secondary` comes back either bought or
+  ignored; and the two fields the adapter accepts and throws away.
+
+**Found by the new invariants on their first run, all four still open, all four
+owned by a file the sweep does not own. They print under KNOWN OPEN rather than
+FAILS: they are written as FAILs and counted apart, because a permanently red
+gate is one nobody reads. Deleting a line from `KNOWN_OPEN` in `sweep.mjs` is
+the whole of the fix procedure.**
+
+1. **`plans` and `swaps` never reach `buildPlan`.** `adapter.mjs` passes
+   `payload.plans` to `nextDayIndex` only, and `payload.swaps` nowhere.
+   `CONTRACT.md` says `plans` is joined against `logs` to calibrate and the edge
+   function already reads both columns, so the data arrives at the engine's door
+   and is dropped one line inside it. End to end, in the shipped app, calibration
+   has never run, the back-off has never fired, `preferences.mjs` is dead code
+   and every plateau answer that depends on a verdict takes its "no verdict"
+   branch. One argument each. This is the single biggest thing in this file.
+2. **A back-off week can come back with more sets than the week it backed off
+   from.** `setsFor` takes a set off every main, then the volume ledger's
+   under-target top-up puts more than that back into the accessory slots: 48
+   weekly sets became 50 on the identical exercise list with identical logs, the
+   only difference being `plans`. 6 of 52 goals. An ordering question rather
+   than a number.
+3. **A `rep-range` plateau answer is a sentence and nothing else.** The note
+   says "the lift stays and the reps change: 8 to 12 for this block instead of 3
+   to 6" and the day still prescribes 3, because nothing in `plan.mjs` reads the
+   response. `rotate` is applied, `volume-cut` is applied, this one is not. 5 of
+   52 goals, every one of them a strength goal with a short stall.
+
+**WARN counts moved, and why.** The run count moved, so some had to.
+`same-group-twice-in-day` 18,567 to 20,151 and `over-time-budget` 1,341 to
+1,399: the new blocks check their plans with the same invariants, so these are
+new plans, not new faults. `days-clamped` 3,243 to 3,245: two of the five goals
+that clamp a four day ask to three land on the replay's four day person.
+`excluded-prescribed`, `hurt-joint-prescribed`, `duplicate-in-week` and
+`tiers-indistinguishable` are unchanged to the unit, because the new blocks send
+no limits. New counters: `calibration-changed-selection` 260 (a skipped exercise
+teaches `preferences.mjs` to avoid it, which is the system working),
+`unknown-secondary-goal-dropped-silently` 52, `volume-cut-did-not-cut` 12,
+`back-off-changed-no-sets` 6.
+
+**What the sweep still cannot see.** The most useful sentence in this section.
+
+- **The app.** Everything here checks the engine's return. Nothing checks that
+  `index.html` renders `notes`, the rest timer, the cardio prescription or a
+  plateau sentence, and the audit of 2026-09-10 found five things computed and
+  never returned. The same class of bug one layer up is uncovered.
+- **Real data.** Every log in the sweep is synthetic and tidy: three sessions a
+  week, whole pounds, no double entries, no typos, no 400 lb curl. `fuzz.mjs`
+  covers the hostile end of that and the two do not meet in the middle.
+- **The calendar.** Blocks F to I step a week at a time on a fixed clock. Nobody
+  trains on Tuesday and Saturday, takes a holiday, comes back after five weeks
+  or logs a session at 06:00 and another at 23:00 the same day.
+- **Deloads over time.** `deload` is still a sentence and week six is identical
+  to week five, so the replay cannot catch a deload that never arrives: there is
+  nothing to catch it with.
+- **The novice band** (weeks 7 to 20), still, and now for a second reason: the
+  four history lengths land either side of it and the replay's two people land
+  on beginner and intermediate.
+- **Everything between the verdicts.** Block G sends four clean scenarios. A
+  person who beats the plan on Monday, misses it on Wednesday and skips Friday
+  is the common case and is not swept.
+- **`goal_secondary` beyond its bookkeeping.** That the second goal is reported
+  honestly is checked. That it bought the right thing is not.
 
 **Fixed from the first run, all pinned by tests:**
 
