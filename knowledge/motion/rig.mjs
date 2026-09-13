@@ -991,8 +991,12 @@ function drawHead(ctx, S, C, fill) {
         const big = (ctx.getTransform ? ctx.getTransform().a : 2) * R > 14;
         const blink = FACE_TIME > 0 && ((FACE_TIME % 4.3) < 0.11);
         const eyeLine = add(centre, scl(up, R * 0.12));
-        const vis = add(eyeLine, scl(F, R * 0.66));
-        const halfW = R * 0.8, halfH = R * 0.42;
+        // Side on, the visor wraps only the FRONT half of the head, the way
+        // the reference draws it, with the ear clear behind it. Face on it
+        // spans the face.
+        const sideOn = latLen < 0.28;
+        const vis = add(eyeLine, scl(F, R * (sideOn ? 0.72 : 0.66)));
+        const halfW = R * (sideOn ? 0.5 : 0.8), halfH = R * 0.42;
         const along = latLen < 0.28 ? scl(F, 0.9) : Lt;     // visor runs across the face, or along it side on
         const alongLen = latLen < 0.28 ? 0.9 : latLen;
         const a = add(vis, scl(along, halfW)), b = add(vis, scl(along, -halfW));
@@ -1056,10 +1060,10 @@ function drawHead(ctx, S, C, fill) {
         // that side faces the camera enough to see it (side and three
         // quarter views). Face on, the ears sit on the silhouette edge and the
         // reference shows none, so none are drawn.
-        if (big && latLen < 0.75) {
+        if (big && latLen < 0.9) {
           const sideSign = (ax.z.d >= 0 ? 1 : -1) * (away ? -1 : 1);
           // behind the visor, level with the eyes, out on the side of the skull
-          const ep = add(add(add(centre, scl(up, R * 0.08)), scl(F, -R * 0.34)), scl(Lt, sideSign * R * 0.62));
+          const ep = add(add(add(centre, scl(up, R * 0.08)), scl(F, -R * 0.3)), scl(Lt, sideSign * R * 0.66));
           ctx.strokeStyle = C.seam; ctx.lineWidth = R * 0.045;
           ctx.beginPath(); ctx.arc(ep.x, ep.y, R * 0.17, 0, Math.PI * 2); ctx.stroke();
           ctx.fillStyle = C.seam; ctx.beginPath(); ctx.arc(ep.x, ep.y, R * 0.06, 0, Math.PI * 2); ctx.fill();
