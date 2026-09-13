@@ -293,6 +293,21 @@ it is not paying attention.
   and a genuine hinge, and `load.mjs` was filing it as isolation because
   `pull.?through` sat in the isolation line above the hinge line. Reordering that
   table gave beginners a loadable hinge without anything in Jawa's folder moving.
+- **A preference can be held back for good on the smallest weeks.** The cap is a
+  quarter of the week's slots with a floor of two, so a two day week acts on
+  three or four preferences and somebody with eight will never see the last of
+  them honoured while the first four still cost something. That is deliberate:
+  the alternative is a two day card that stops resembling itself. It is not
+  silent either, `heldBackNote` names every queued preference every week. What
+  is a real limit is that the queue only advances when an honoured preference
+  stops costing anything, which on a two day week may never happen.
+- **The cap cannot count its own knock-on.** `applyPreferences` is handed one
+  pool at a time and bounds the slots it directly moves. It cannot see that
+  displacing a lift on Monday makes it the least recently used candidate for a
+  related slot on Thursday, through `plan.mjs`'s own no-repeats rule. Measured
+  at roughly one extra slot per direct move, which is why `MAX_WEEK_SHARE` is a
+  quarter and the promise is a third. Counting it properly needs the week built
+  twice.
 - **`PRODUCTIVE_GAP` in `pair.mjs` is a guess.** The Köhler effect needs a moderate
   ability gap and neither the research nor this code can say where the band ends.
   It is open question 7 and it is the biggest hole in the folder's main claim.
@@ -1216,6 +1231,17 @@ prescription rather than only a sentence, which moves two plans. Ledger rows
 `duplicate-in-week`, `days-clamped`, `over-time-budget`,
 `focus-group-not-in-split`, `tiers-indistinguishable` and
 `unknown-secondary-goal-dropped-silently` are unchanged to the unit.
+
+**And once more when the preference cap landed, the day after.** One counter
+moved and every other total, plus every cell of the volume table, is identical
+to the unit. `calibration-changed-selection` 258 to 208. That warning fires when
+a movement is in the calibrated week and not in the control, which is exactly
+the thing the cap exists to ration: a skipped exercise teaches `preferences.mjs`
+to avoid it and the selection changes. 258 was every such change firing at once.
+208 is the same signals arriving under a ceiling, with the fifty that no longer
+fire held back and named in `dayNotes` instead. Down is the direction that means
+the cap works; zero would mean revealed preference had stopped doing anything,
+which would be worse than the lurch.
 
 **What the sweep still cannot see.** The most useful sentence in this section.
 

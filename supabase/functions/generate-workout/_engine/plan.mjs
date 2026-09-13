@@ -22,7 +22,7 @@ import { resolveGoal, barredMovements, movementCautionNotes } from "./goal-engin
 import { deriveTrainingAge, observedCapacity } from "./training-age.mjs";
 import { prescribeLoad, patternFor } from "./load.mjs";
 import { calibrate } from "./calibrate.mjs";
-import { learnPreferences, applyPreferences, avoidNote } from "./preferences.mjs";
+import { learnPreferences, applyPreferences, avoidNote, openWeekBudget, heldBackNote, actedOn } from "./preferences.mjs";
 import { scoreAlternatives } from "./alternatives.mjs";
 import { planPlateauResponse, applyRotateFallback, repShiftFor } from "./plateau-response.mjs";
 import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary, softenedNote } from "./limits.mjs";
@@ -380,7 +380,7 @@ const loadPenalty = (ex) => LOAD_PENALTY[ex.equipment] ?? 1;
    every deadlift, Romanian deadlift and hip thrust in the library is tagged
    intermediate or above, which is defensible on technique and leaves a beginner
    with no posterior chain work, which is worse. See engine/README.md. */
-function candidates({ groups, pattern, level, equipment, role = "accessory", historyNames = [], preferences = null, exclude = null, emphasis = null, barred = null }) {
+function candidates({ groups, pattern, level, equipment, role = "accessory", historyNames = [], preferences = null, prefBudget = null, exclude = null, emphasis = null, barred = null }) {
   const ceiling = (LEVEL_RANK[level] ?? 0) + (role === "main" ? 2 : 1);
   const match = (needPattern) => {
     const pool = [];
@@ -449,7 +449,7 @@ function candidates({ groups, pattern, level, equipment, role = "accessory", his
      stronger signal than anything they could tell us. It is applied here, on
      the ranked pool, so a preference reorders the same candidates rather than
      reaching into the split, the sets or the load. */
-  return applyPreferences(pool, preferences);
+  return applyPreferences(pool, preferences, prefBudget);
 }
 
 export function buildPlan({
@@ -683,6 +683,17 @@ export function buildPlan({
      Friday when the pool has others in it. */
   const swapsThisWeek = new Set();
 
+  /* How much of this week the swap history is allowed to rewrite. Counted here
+     rather than in preferences.mjs because the slot table is this file's
+     knowledge and a share of the week is meaningless without it: a cap of three
+     movements is most of a two day week and a tenth of a six day one. Opened
+     before the first pick and spent as the week is built, so it is the same one
+     counter for all of pass 2. See openWeekBudget. */
+  const prefSlots = split.reduce(
+    (n, [, key], i) => n + slotsForDay(key, shortFrom != null && i >= shortFrom).length, 0,
+  );
+  const prefBudget = openWeekBudget(preferences, { slots: prefSlots });
+
   const selected = split.map(([name, key], dayIndex) => {
     const isShort = shortFrom != null && dayIndex >= shortFrom;
     const usedToday = new Set();
@@ -695,7 +706,7 @@ export function buildPlan({
     let taken = 0;
     const picks = slots.map((slot) => {
       if (isShort && slot.role !== "main" && taken >= SHORT_DAY_MIN) return null;
-      const args = { ...slot, level, equipment: kit, role: slot.role, historyNames, preferences, exclude: excludeOut, emphasis: P.emphasis };
+      const args = { ...slot, level, equipment: kit, role: slot.role, historyNames, preferences, prefBudget, exclude: excludeOut, emphasis: P.emphasis };
       const pool = candidates({ ...args, barred: goalBarred });
       if (!pool.length) {
         /* Empty for want of equipment is an old and quiet case, handled by
@@ -704,7 +715,10 @@ export function buildPlan({
            has none here, and the only wrong answer is saying nothing. Asked a
            second time without the bar, because that is the only way to tell
            the two causes apart, and it runs at most once per empty slot. */
-        if (goalBarred.size && candidates(args).length) {
+        /* No budget on the diagnostic re-ask. This pool is thrown away after
+           its length is read, and a week that spent a move on a slot it did not
+           fill would be charged for nothing. */
+        if (goalBarred.size && candidates({ ...args, prefBudget: null }).length) {
           cautionEmpty.push({ day: name, groups: slot.groups.join(" and ") });
         }
         return null;
@@ -1450,6 +1464,14 @@ export function buildPlan({
     if (a.strength === "hard" && !inWeek.has(a.name.toLowerCase())) dayNotes.push(avoidNote(a));
   }
 
+  /* And the other half of the same promise. A hard avoid that is still on the
+     card because the week ran out of moves would otherwise read as a tap that
+     did nothing, which is exactly the silence avoidNote exists to break. Said
+     once for the week rather than once per lift, because "more than one week
+     should change at once" is one fact and repeating it is nagging. */
+  const heldSay = heldBackNote(prefBudget);
+  if (heldSay) dayNotes.push(heldSay);
+
   /* Same argument, for the limits. A slot the library could fill no other way
      kept a movement that still loads a joint they named, and the person has to
      be told rather than left to find out under a bar. */
@@ -1501,6 +1523,19 @@ export function buildPlan({
     preferences: {
       avoid: preferences.avoid, prefer: preferences.prefer,
       equipmentBias: preferences.equipmentBias, confidence: preferences.confidence,
+      /* What the week's cap did, published so a reader can tell "your swap
+         changed nothing" from "your swap is next in the queue". Spread rather
+         than set to null, so the plan of somebody with nothing to act on is the
+         object it was before this existed rather than that object plus a key,
+         which is the difference between "nothing changed" and "nothing changed,
+         probably". */
+      ...(prefBudget ? {
+        budget: {
+          cap: prefBudget.cap, slots: prefBudget.slots,
+          acted: [...prefBudget.active].filter((k) => k !== " equipment").map((k) => prefBudget.nameOf.get(k) || k),
+          held: [...prefBudget.held.values()].map((h) => h.name),
+        },
+      } : {}),
     },
     days, dayNotes, restDays: 7 - days,
     week, progression, deload,

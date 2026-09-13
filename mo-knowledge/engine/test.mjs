@@ -27,7 +27,10 @@ import { conjunctiveWeek, chooseComparison, sharedSchedule, relativeScore, PRODU
 import { normalizeFocus, parseFocus, mergePriority, focusFreshness, MUSCLE_GROUPS, TIERS, TIER_COST, FOCUS_BUDGET } from "./focus.mjs";
 import { mobilityFor, pickBlock, moveSeconds, stripMobility, WARMUP_SECONDS, COOLDOWN_SECONDS, MOBILITY_GOAL_SECONDS, MOBILITY_CHILDREN, MIN_MOVES, MAX_MOVES } from "./mobility.mjs";
 import { scoreAlternatives } from "./alternatives.mjs";
-import { learnPreferences, applyPreferences, avoidNote, SOFT_AT, HARD_AT } from "./preferences.mjs";
+import {
+  learnPreferences, applyPreferences, avoidNote, openWeekBudget, heldBackNote, actedOn,
+  SOFT_AT, HARD_AT, MAX_WEEK_SHARE, MIN_WEEK_MOVES,
+} from "./preferences.mjs";
 import { planPlateauResponse, applyRotateFallback, PLATEAU_RESPONSE } from "./plateau-response.mjs";
 import { BODY_AREAS, EQUIPMENT_OPTIONS, normalizeLimits, applyLimits, limitsSummary, softenedNote } from "./limits.mjs";
 import { JOINTS, JOINT_LOAD, defaultJointLoad } from "./joint-load.mjs";
@@ -1056,6 +1059,144 @@ test("applyPreferences removes a hard avoid and sinks a soft avoid to the end", 
   };
   const result = applyPreferences(pool, prefs).map((e) => e.name);
   assert.deepEqual(result, ["C", "B"]);
+});
+
+/* ---- the week cap, added the day after this module went live ---- */
+
+const manySwaps = (names, each) => names.flatMap((n, i) => Array.from({ length: each }, (_, k) => ({
+  entry_date: day(-(3 + i * 7 + k * 2)), planned_exercise: n, chosen_exercise: `Alt ${n}`,
+})));
+
+test("the cap is a share of the week, so a two day week and a six day week are not the same feature", () => {
+  const prefs = learnPreferences({ swaps: manySwaps(["A", "B", "C", "D"], HARD_AT) });
+  assert.equal(openWeekBudget(prefs, { slots: 10 }).cap, Math.round(10 * MAX_WEEK_SHARE));
+  assert.equal(openWeekBudget(prefs, { slots: 30 }).cap, Math.round(30 * MAX_WEEK_SHARE));
+  assert.ok(openWeekBudget(prefs, { slots: 30 }).cap > openWeekBudget(prefs, { slots: 10 }).cap);
+});
+
+test("the smallest week is not frozen: the cap never falls below its floor", () => {
+  const prefs = learnPreferences({ swaps: manySwaps(["A", "B", "C"], HARD_AT) });
+  assert.equal(openWeekBudget(prefs, { slots: 1 }).cap, MIN_WEEK_MOVES);
+  assert.equal(openWeekBudget(prefs, { slots: 0 }).cap, MIN_WEEK_MOVES);
+});
+
+test("nothing to act on opens no budget at all", () => {
+  assert.equal(openWeekBudget(learnPreferences({ swaps: [] }), { slots: 15 }), null);
+  assert.equal(openWeekBudget(null, { slots: 15 }), null);
+});
+
+test("without a budget applyPreferences is exactly what it was", () => {
+  const pool = [{ name: "A", equipment: "barbell" }, { name: "B", equipment: "barbell" }, { name: "C", equipment: "barbell" }];
+  const prefs = { avoid: [{ name: "A", strength: "hard" }], prefer: [{ name: "C" }], equipmentBias: null };
+  assert.deepEqual(applyPreferences(pool, prefs).map((e) => e.name), ["C", "B"]);
+});
+
+test("the cap stops letting preferences in once the week has spent its moves", () => {
+  /* Four hard avoids, each alone in its own slot, and a cap of two. The two
+     loudest come out of the week and the other two stay, which is the whole
+     point: a preference held back is a movement still on the card. */
+  const prefs = learnPreferences({ swaps: manySwaps(["A", "B", "C", "D"], HARD_AT) });
+  const budget = openWeekBudget(prefs, { slots: 6 });   // floor, so cap is MIN_WEEK_MOVES
+  assert.equal(budget.cap, MIN_WEEK_MOVES);
+  const heads = ["A", "B", "C", "D"].map((n) => applyPreferences(
+    [{ name: n, equipment: "barbell" }, { name: `Alt ${n}`, equipment: "barbell" }], prefs, budget,
+  )[0].name);
+  const moved = heads.filter((h) => h.startsWith("Alt")).length;
+  assert.equal(moved, MIN_WEEK_MOVES, `${moved} slots moved against a cap of ${MIN_WEEK_MOVES}`);
+  assert.equal(budget.held.size, 4 - MIN_WEEK_MOVES);
+});
+
+test("when two preferences want the same slot the loudest one gets it", () => {
+  /* Same three decisions each, so the raw counts tie and only recency can
+     separate them. The recent one is honoured and the stale one is what the
+     slot falls back to. */
+  const swaps = [
+    ...[2, 4, 6].map((d) => ({ entry_date: day(-d), planned_exercise: "Recent", chosen_exercise: "Alt Recent" })),
+    ...[70, 80, 88].map((d) => ({ entry_date: day(-d), planned_exercise: "Stale", chosen_exercise: "Alt Stale" })),
+  ];
+  const prefs = learnPreferences({ swaps });
+  assert.equal(prefs.avoid.find((a) => a.name === "Recent").count, HARD_AT);
+  assert.equal(prefs.avoid.find((a) => a.name === "Stale").count, HARD_AT);
+  assert.equal(prefs.avoid[0].name, "Recent", "the recent one should be first in the queue");
+
+  const budget = { ...openWeekBudget(prefs, { slots: 3 }), cap: 1 };
+  const got = applyPreferences([
+    { name: "Recent", equipment: "barbell" }, { name: "Stale", equipment: "barbell" }, { name: "Other", equipment: "barbell" },
+  ], prefs, budget).map((e) => e.name);
+  assert.ok(!got.includes("Recent"), "the loud preference should have been honoured");
+  assert.equal(got[0], "Stale", "the quiet one is what the slot falls back to");
+  assert.deepEqual([...budget.held.values()].map((h) => h.name), ["Stale"]);
+});
+
+test("a preference held back is named out loud rather than left to be noticed", () => {
+  const prefs = learnPreferences({ swaps: manySwaps(["Leg Press", "Barbell Curl"], HARD_AT) });
+  const budget = { ...openWeekBudget(prefs, { slots: 3 }), cap: 1 };
+  for (const n of ["Leg Press", "Barbell Curl"]) {
+    applyPreferences([{ name: n, equipment: "machine" }, { name: "Other", equipment: "machine" }], prefs, budget);
+  }
+  const say = heldBackNote(budget);
+  assert.ok(say, "expected a sentence for the preference that was held back");
+  assert.ok(/still in here/.test(say), say);
+  assert.ok(say.includes([...budget.held.values()][0].name), "the note has to name the movement");
+  assert.equal(heldBackNote(null), null);
+  assert.equal(heldBackNote(openWeekBudget(prefs, { slots: 40 })), null, "nothing held, nothing said");
+});
+
+test("a preference already honoured costs the week nothing the second time", () => {
+  /* The easing in, and the only mechanism there is for it: this engine has no
+     week counter. A preference that is no longer changing anything, because the
+     replacement is now the lift they train, stops holding a place and the next
+     one in the queue gets it. */
+  const prefs = learnPreferences({ swaps: manySwaps(["A", "B"], HARD_AT) });
+  const budget = { ...openWeekBudget(prefs, { slots: 3 }), cap: 1 };
+  applyPreferences([{ name: "A", equipment: "barbell" }, { name: "Alt A", equipment: "barbell" }], prefs, budget);
+  assert.equal(budget.active.size, 1);
+  /* A second slot where the avoided lift was never the top candidate anyway. */
+  const free = applyPreferences([{ name: "Alt A", equipment: "barbell" }, { name: "A", equipment: "barbell" }], prefs, budget);
+  assert.equal(free[0].name, "Alt A");
+  assert.equal(budget.active.size, 1, "a preference that changed nothing must not spend a place");
+});
+
+test("the equipment nudge is inside the cap, because it can move a movement", () => {
+  /* It was outside it in the first version and a dumbbell skew alone turned
+     three bodyweight movements into dumbbell ones under a cap that believed it
+     had let two preferences through. */
+  const prefs = learnPreferences({
+    swaps: [1, 2, 3].map((d) => ({
+      entry_date: day(-d * 5), planned_exercise: "Barbell Bench Press", chosen_exercise: "Dumbbell Bench Press",
+    })),
+  });
+  assert.equal(prefs.equipmentBias.equipment, "dumbbell");
+  const budget = { ...openWeekBudget(prefs, { slots: 3 }), cap: 0 };
+  const pool = [{ name: "Push-Up", equipment: "none" }, { name: "Dumbbell Fly", equipment: "dumbbell" }];
+  assert.equal(applyPreferences(pool, prefs, budget)[0].name, "Push-Up", "no room left, so the nudge waits too");
+  assert.ok(!actedOn(budget).length);
+});
+
+test("actedOn names movements and never the equipment sentinel", () => {
+  const prefs = learnPreferences({
+    swaps: [1, 2, 3].map((d) => ({
+      entry_date: day(-d * 5), planned_exercise: "Barbell Bench Press", chosen_exercise: "Dumbbell Bench Press",
+    })),
+  });
+  const budget = openWeekBudget(prefs, { slots: 20 });
+  applyPreferences([{ name: "Push-Up", equipment: "none" }, { name: "Dumbbell Fly", equipment: "dumbbell" }], prefs, budget);
+  for (const n of actedOn(budget)) assert.ok(/^[A-Za-z]/.test(n), `actedOn returned ${JSON.stringify(n)}`);
+  assert.equal(actedOn(null).length, 0);
+});
+
+test("one loud signal is never the thing that gets capped", () => {
+  /* The cap exists for the person with eight preferences, not the person with
+     one. A single hard avoid must still come out of the plan on any week. */
+  const prefs = learnPreferences({ swaps: manySwaps(["Leg Press"], HARD_AT) });
+  for (const slots of [6, 10, 15, 22, 26]) {
+    const budget = openWeekBudget(prefs, { slots });
+    const got = applyPreferences(
+      [{ name: "Leg Press", equipment: "machine" }, { name: "Hack Squat", equipment: "machine" }], prefs, budget,
+    );
+    assert.equal(got[0].name, "Hack Squat", `a lone hard avoid was held back on a ${slots} slot week`);
+    assert.equal(budget.held.size, 0);
+  }
 });
 
 /* =========================================================================
