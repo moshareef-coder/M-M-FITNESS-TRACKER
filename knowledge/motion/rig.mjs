@@ -2021,10 +2021,13 @@ function drawHips(ctx, S, C, fills) {
        cut without that scaling pushed a paunch out of every squat. */
     const lat = sub(k.hip, S.pelvis);
     const w = clamp(len2(lat) / B.hipW, 0, 1);
-    const outward = len2(lat) > 0.5 ? scl(norm2(lat), 0.6 * w) : V(0, 0);
+    /* Mo's second pass: the 0.18 / 0.6 bulge read as a pear on the phone,
+       "does not look human at all". The rounding is now a hint: the joint
+       circle barely outgrows the thigh and moves out a whisker. */
+    const outward = len2(lat) > 0.5 ? scl(norm2(lat), 0.15 * w) : V(0, 0);
     part(ctx, C, [
-      [add(S.pelvis, scl(up, B.rPelvis * 0.70)), B.rPelvis * 0.90],
-      [add(k.hip, outward), B.rHip * (1.14 + 0.18 * w)],
+      [add(S.pelvis, scl(up, B.rPelvis * 0.70)), B.rPelvis * 0.86],
+      [add(k.hip, outward), B.rHip * (1.06 + 0.04 * w)],
       [lerpV(k.hip, k.knee, 0.34), B.rHip * 0.98],
     ], { fill: fills[s], line: false });
   }
