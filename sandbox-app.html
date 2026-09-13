@@ -457,14 +457,6 @@
   .link-row:last-child { border-bottom: none; }
   .link-arrow { color: var(--muted); font-size: 21px; line-height: 1; }
 
-  .customise-toggle {
-    width: 100%; display: flex; align-items: center; justify-content: space-between;
-    background: none; border: none; padding: 5px 0; min-height: 32px; cursor: pointer;
-    font-size: 15.5px; font-weight: 700; color: var(--text); font-family: inherit;
-  }
-  .customise-toggle .link-arrow { transition: transform 0.2s; }
-  .customise-toggle.open .link-arrow { transform: rotate(90deg); }
-
   .fatal-banner {
     position: sticky; top: 0; z-index: 60;
     display: flex; flex-direction: column; gap: 7px; align-items: flex-start;
@@ -658,6 +650,67 @@
   .stretch-fold .stretch-list { border-left: 0; padding: 0 13px 4px; margin: 0; }
   .stretch-fold .stretch-skip { display: block; margin: 2px 13px 12px; }
 
+  /* ---------- Ramp-up sets (CONTRACT.md workout.rampSets) ----------
+     Light sets of the lift itself, worked up to the first real one. They are
+     preparation, so they wear the same blue as the timed blocks and the same
+     flame; they are loads rather than seconds, so they are written as loads and
+     they hang off the lift instead of sitting in the warm-up fold. Nothing here
+     is ever tickable: a ramp set is not a set, and the surest way to keep it out
+     of the counters is to give it no control that could log one. */
+  /* Wrapping rather than truncating: a ramp cut off after the second rung hides
+     the heaviest load, which is the one worth knowing. Two short lines in a
+     narrow row is the honest version. */
+  .ex-ramp {
+    display: flex; align-items: flex-start; gap: 5px; margin-top: 3px;
+    font-size: 12.5px; line-height: 1.35; color: var(--stretch-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .ex-ramp svg { flex-shrink: 0; opacity: .8; margin-top: 2px; }
+  .ex-ramp span { min-width: 0; }
+  .gen-row-ramp {
+    display: block; margin-top: 2px; font-size: 11px; line-height: 1.35;
+    color: var(--stretch-ink); font-variant-numeric: tabular-nums;
+  }
+
+  .ramp-fold {
+    border: 1px solid color-mix(in srgb, var(--stretch) 26%, var(--border));
+    background: color-mix(in srgb, var(--stretch) 7%, var(--panel));
+    border-radius: 14px; overflow: hidden; margin: 0 0 12px;
+  }
+  .ramp-head {
+    width: 100%; min-height: 44px; display: flex; align-items: center; gap: 11px;
+    padding: 11px 13px; background: none; border: 0; cursor: pointer;
+    font-family: inherit; color: var(--text); text-align: left;
+  }
+  .ramp-head:active { background: color-mix(in srgb, var(--stretch) 12%, transparent); }
+  .ramp-head-ico {
+    width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--stretch) 20%, transparent); color: var(--stretch-ink);
+  }
+  .ramp-head-text { flex: 1; min-width: 0; }
+  .ramp-head-text b { display: block; font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
+  .ramp-head-text i {
+    display: block; font-style: normal; font-size: 12.5px; color: var(--muted); margin-top: 1px;
+    font-variant-numeric: tabular-nums;
+  }
+  .ramp-head-chev { color: var(--muted); display: flex; transition: transform .2s ease; }
+  .ramp-fold.open .ramp-head-chev { transform: rotate(180deg); }
+  .ramp-rungs { padding: 0 13px 2px; }
+  .ramp-rung {
+    display: flex; align-items: baseline; gap: 8px; padding: 7px 0;
+    border-top: 1px solid color-mix(in srgb, var(--stretch) 16%, transparent);
+    font-variant-numeric: tabular-nums;
+  }
+  .ramp-rung-load { font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; min-width: 76px; }
+  .ramp-rung-reps { font-size: 14px; color: var(--text); flex: 1; }
+  .ramp-rung-rest { font-size: 11px; color: var(--muted); }
+  .ramp-cue { font-size: 11px; color: var(--muted); line-height: 1.4; padding: 0 0 7px; }
+  .ramp-fold .ramp-skip { display: block; min-height: 44px; margin: 0 13px 4px; }
+  @media (prefers-reduced-motion: reduce) {
+    .ramp-head-chev { transition: none; }
+  }
+
   /* Advice, not an exercise: no row chrome, no drag handle, nothing that
      invites a tap expecting sets and reps. */
   /* The row body is a button now, because tapping it opens the sets and reps.
@@ -770,6 +823,9 @@
     font-family: inherit; font-size: 14px; font-weight: 700;
     font-variant-numeric: tabular-nums; transition: background .15s, border-color .15s, color .15s;
   }
+  /* Session length asks five questions' worth of answer in the same row, so the
+     only thing that changes is how many columns it is cut into. */
+  .rest-pref.five { grid-template-columns: repeat(5, 1fr); }
   .rest-pref button:active { transform: scale(.96); }
   .rest-pref button.on { background: var(--accent); border-color: transparent; color: var(--on-accent); }
 
@@ -1084,6 +1140,13 @@
     display: flex; flex-direction: column; justify-content: space-between; height: 100%;
   }
   .gen-scrim.done .gen-stage { justify-content: center; }
+  /* A reveal can be taller than the screen: a day that could not be made to fit
+     the time you have says so in full, and the sentences saying it were being
+     squashed into each other by a stage pinned to exactly one screen. Only on
+     .done, so the generating animation above it keeps its fixed chamber. */
+  .gen-scrim.done { overflow-y: auto; }
+  .gen-scrim.done .gen-stage { height: auto; }
+  .gen-scrim.done .gen-step { flex-shrink: 0; }
   .gen-head { padding-top: 6px; }
   .gen-word-wrap { position: relative; display: inline-block; }
   .gen-word {
@@ -1996,7 +2059,11 @@
      and a word, so this is the one place in the whole flow where nothing
      scrolls and nothing is hidden by default. */
   .goal-tile-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 6px;
+    /* minmax(0, 1fr), not 1fr. A grid track defaults to a min of auto, so the
+       three tiles refused to go below their own min-content and the page ran
+       49px wider than a 390px phone. Nine tiles, nine reasons nobody noticed:
+       every one of them was cut off past the right edge. */
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 6px;
     transition: transform .28s cubic-bezier(.22,1,.36,1), filter .28s ease;
   }
   .goal-tile-grid.dim { transform: scale(.97); filter: brightness(.9); }
@@ -2004,6 +2071,7 @@
     aspect-ratio: 1; border-radius: 16px; background: var(--panel); border: 1.5px solid var(--border);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
     font-family: inherit; color: var(--text); cursor: pointer; padding: 8px; position: relative;
+    min-width: 0;
     transition: border-color .18s ease, background .18s ease;
   }
   .goal-tile:active { transform: scale(.985); }
@@ -2013,15 +2081,32 @@
     display: flex; align-items: center; justify-content: center; color: var(--accent-ink);
   }
   .goal-tile.on .goal-tile-ico { background: var(--accent); color: var(--on-accent); }
-  .goal-tile-label { font-size: 12.5px; font-weight: 700; letter-spacing: -.01em; text-align: center; line-height: 1.2; }
-  .goal-tile-sub { font-size: 10.5px; color: var(--muted); text-align: center; line-height: 1.25; margin-top: 2px; }
+  .goal-tile-label { font-size: 12.5px; font-weight: 700; letter-spacing: -.01em; text-align: center; line-height: 1.2; max-width: 100%; overflow-wrap: anywhere; }
+  .goal-tile-sub { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.25; margin-top: 2px; max-width: 100%; overflow-wrap: anywhere; }
   .pgs-text { flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: left; }
   .pgs-sub { font-size: 12px; color: var(--muted); font-weight: 500; }
   .pgs-go { color: var(--muted); display: flex; }
+  /* A band across the top of the tile rather than a corner pill: a pill wide
+     enough to hold a word sits on top of the icon at this tile size, and the
+     band is also the thing you can read from across the grid without looking
+     at any one tile. */
   .goal-tile-badge {
-    position: absolute; top: 8px; right: 8px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 100px;
+    position: absolute; top: 0; left: 0; right: 0; height: 18px; border-radius: 14px 14px 0 0;
     background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 800;
+    letter-spacing: .06em; text-transform: uppercase;
     display: flex; align-items: center; justify-content: center;
+  }
+  .goal-tile.on { padding-top: 24px; }
+  /* The main goal wears the accent; an extra goal wears the outline. One look
+     is filled in and one is not, which is the whole point: they are not the
+     same kind of thing and must never read as three equal chips. */
+  /* An extra goal keeps `on`, because A11Y_STATE_MAP mirrors that class into
+     aria-pressed and an extra goal IS selected. `also` then takes the fill
+     back off, which is the whole difference. */
+  .goal-tile.on.also { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--panel); }
+  .goal-tile.on.also .goal-tile-ico { background: var(--panel-2); color: var(--accent-ink); }
+  .goal-tile-badge.alt {
+    background: var(--panel-2); color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 700;
   }
   /* The category sheet reuses .sheet-scrim, the same fixed dark overlay every
      other sheet in the app opens on, so this reads as the app's own bottom
@@ -2052,6 +2137,44 @@
     display: flex; align-items: center; justify-content: center; color: transparent; background: var(--panel);
   }
   .pgs-row.on .pgs-box { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+  .pgs-row.on.alt { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); background: var(--panel-2); }
+  .pgs-row.on.alt .pgs-box { background: var(--panel); border-color: var(--accent); color: var(--accent-ink); }
+  .pgs-tag { font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--accent-ink); flex-shrink: 0; }
+  .pgs-row.on.alt .pgs-tag { color: var(--muted); }
+  /* The sheet no longer closes itself on a pick, so it needs a way out that
+     is a decision rather than an accident. */
+  .pgs-foot {
+    position: sticky; bottom: 0; margin-top: 14px; padding: 12px 0 2px;
+    background: linear-gradient(to bottom, transparent, var(--panel) 22%);
+  }
+  .pgs-foot-note { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 0 0 10px; }
+
+  /* What you have picked, under the grid, in words. The main goal sits on an
+     accent rule and reads a size larger; the extras sit plain underneath it.
+     Rows on hairlines rather than panels, because this whole block already
+     lives inside a .card on the settings page. */
+  .goal-picks { margin-top: 16px; display: flex; flex-direction: column; }
+  .goal-pick { padding: 14px 0 14px 12px; border-top: 1px solid var(--border); border-left: 2px solid transparent; }
+  .goal-pick:first-child { border-top: none; }
+  .goal-pick.main { border-left-color: var(--accent); }
+  .goal-pick-tag { display: block; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .goal-pick.main .goal-pick-tag { color: var(--accent-ink); }
+  .goal-pick-name { display: block; font-size: 15.5px; font-weight: 600; letter-spacing: -.01em; margin-top: 3px; }
+  .goal-pick.main .goal-pick-name { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+  .goal-pick-why { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.45; margin-top: 4px; }
+  .goal-pick-why.flat { color: var(--warn); }
+  .goal-pick-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .goal-pick-acts button {
+    min-height: 44px; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-family: inherit; font-size: 12.5px; font-weight: 700;
+    cursor: pointer; transition: background .15s ease, transform .12s ease;
+  }
+  .goal-pick-acts button:active { transform: scale(.985); background: var(--panel); }
+  .goal-picks-note { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 12px 0 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .goal-tile-grid, .goal-tile:active, .pgs-row:active, .goal-pick-acts button:active { transition: none; transform: none; }
+    .goal-sheet { animation: none; }
+  }
 
   /* renderBodyFocusPage, the Focus areas settings page. The figures themselves
      are .bi-figures / .bi-fig / .bi-canvas, the exact classes Body Impact's own
@@ -2065,8 +2188,60 @@
     padding: 10px 12px; border-radius: 100px; background: var(--panel-2); border: 1px solid var(--border);
   }
   .focus-pick-action:active, .limit-clear:active { transform: scale(.97); }
+  /* 44px, because these two are the picker's only non-figure controls and a
+     41px pill is under the minimum on a phone. */
+  .focus-pick-action { min-height: 44px; }
+  .focus-pick-action.on { background: color-mix(in srgb, var(--accent) 16%, var(--panel-2)); border-color: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent-ink); }
   .focus-pick-summary { margin-top: 12px; min-height: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
   .focus-pick-summary b { color: var(--accent-ink); font-weight: 700; }
+
+  /* The three tiers. Hue is the fast read and it is never the only one: every
+     surface that carries a tier also carries the word (Main / Secondary /
+     Light) and a count of filled pips, because red and green is the one pair a
+     twelfth of men cannot separate and this app's users skew male. --accent,
+     --warn and --up are the palette's existing green, amber and red; no new
+     hue was invented for this. */
+  .focus-t1 { --tier: var(--accent); --tier-ink: var(--accent-ink); }
+  .focus-t2 { --tier: var(--warn); --tier-ink: var(--warn); }
+  .focus-t3 { --tier: var(--up); --tier-ink: var(--up); }
+  .focus-pips { display: inline-flex; gap: 3px; flex: none; }
+  .focus-pips i {
+    width: 6px; height: 6px; border-radius: 100px; display: block;
+    border: 1.5px solid var(--tier-ink); background: transparent;
+  }
+  .focus-pips i.on { background: var(--tier); border-color: var(--tier); }
+  /* The budget, spelled out rather than enforced with a refusal: nine cells,
+     one per unit, plus however many units the picks run over. */
+  .focus-budget { margin-top: 14px; }
+  .focus-meter { display: flex; gap: 3px; }
+  .focus-meter i {
+    flex: 1 1 0; height: 8px; border-radius: 9px; display: block;
+    background: var(--panel-2); border: 1px solid var(--border);
+  }
+  .focus-meter i.used { background: var(--tier); border-color: var(--tier); }
+  .focus-meter i.over { background: transparent; border-style: dashed; border-color: var(--up); }
+  .focus-budget-read { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .focus-budget-read b { color: var(--text); font-weight: 700; }
+  .focus-budget-read.over b { color: var(--up); }
+  .focus-tier-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .focus-tier-chip {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer;
+    font: inherit; font-size: 12.5px; font-weight: 700; color: var(--text); text-align: left;
+    padding: 10px 14px; border-radius: 14px; background: var(--panel-2);
+    border: 1px solid color-mix(in srgb, var(--tier) 55%, var(--border));
+    transition: transform .12s ease;
+  }
+  .focus-tier-chip:active { transform: scale(.97); }
+  .focus-tier-chip.spent { border-style: dashed; opacity: .65; }
+  .focus-tier-word { color: var(--tier-ink); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+  .focus-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .focus-legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--muted); }
+  /* The Body impact drill-down's one line about a group's tier, same pips. */
+  .bi-focus-tier { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12.5px; color: var(--muted); }
+  .bi-focus-tier b { color: var(--tier-ink); font-weight: 700; }
+  @media (prefers-reduced-motion: reduce) {
+    .focus-pick-action:active, .limit-clear:active, .focus-tier-chip:active { transition: none; transform: none; }
+  }
 
   /* renderLimitsPage, the Limits and injuries settings page. Same figure as
      Focus areas above (.bi-figures / .bi-fig / .bi-canvas, Body Impact's own
@@ -2405,6 +2580,9 @@
     animation: fadeIn .2s ease;
   }
   @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  /* Above the generating overlay, which is the one thing in the app that sits
+     higher than a sheet. */
+  .pop-scrim.over-gen { z-index: 96; }
   .pop {
     width: 100%; max-width: 400px; background: var(--panel); border-radius: 22px; overflow: hidden;
     border: 1px solid var(--border); box-shadow: var(--shadow-lift);
@@ -2880,29 +3058,37 @@
   .ph-figure.warn b { color: var(--warn); }
   .ph-line { font-size: 17px; font-weight: 600; line-height: 1.45; }
   .ph-note { font-size: 14px; color: var(--muted); line-height: 1.5; margin-top: 8px; }
-  .ph-jump {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    width: 100%; margin-top: 14px; min-height: 44px;
-    padding: 14px 16px; border-radius: 12px;
-    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
-    font-family: inherit; font-size: 14px; font-weight: 700; text-align: left; cursor: pointer;
+  /* Three tiers of surface, so the tab reads as composed rather than as a
+     stack of identical rectangles. The answer is lit like the Home hero, the
+     cards the goal asked for carry the ordinary card shadow, and everything
+     the goal did not ask for keeps the fill but loses the shadow, which is
+     what puts it behind them without dimming it or hiding it. Dark mode never
+     gets depth from a shadow anyway, so there the separation is doing the same
+     job the rule below is. */
+  #progHeadline { box-shadow: var(--shadow-lift); margin-bottom: 14px; }
+  /* Below the rule the card chrome comes off entirely. Keeping it and only
+     softening the shadow changed nothing you could see, because the page and a
+     white card are four percent apart: eight identical rounded rectangles is
+     what made this tab read as a list in the first place. So the goal's cards
+     are the only cards, and everything under the rule is plain content on the
+     page, divided by a hairline, at the same inset so the two tiers still line
+     up. Nothing is dimmed and no number loses contrast: it is behind, not
+     quieter. */
+  #tab-progress .card.quiet {
+    box-shadow: none; background: transparent; border-color: transparent;
+    border-radius: 0; margin-bottom: 4px; padding: 10px 15px 18px;
   }
-  .ph-jump:active { transform: scale(0.985); }
-  .ph-jump .link-arrow { color: var(--muted); }
+  #tab-progress .card.quiet + .card.quiet { border-top-color: var(--border); padding-top: 26px; }
+  .prog-rule { display: flex; align-items: center; gap: 12px; margin: 26px 2px 12px; }
+  .prog-rule b {
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted); white-space: nowrap;
+  }
+  .prog-rule i { flex: 1; height: 1px; background: var(--border); }
 
   /* Progress controls */
   .person-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
   .person-toggle .tab-pill { flex: 1; padding: 9px 14px; font-size: 14px; }
-  .metric-picker { display: flex; flex-wrap: wrap; gap: 8px; }
-  .metric-chip {
-    display: flex; align-items: center; gap: 7px; padding: 8px 13px; border-radius: 100px;
-    border: 1px solid var(--border); background: var(--panel-2); color: var(--muted);
-    font-size: 14px; font-weight: 600; cursor: pointer;
-  }
-  .metric-chip.on { border-color: var(--accent); color: var(--text); background: color-mix(in srgb, var(--accent) 14%, var(--panel-2)); }
-  .metric-chip.on svg { color: var(--accent-ink); }
-  .metric-chip:disabled { opacity: 0.45; cursor: not-allowed; }
-
   .photo-strip { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px 12px; padding: 4px 16px 6px; }
   .photo-item { flex-shrink: 0; width: 116px; }
   .photo-item img {
@@ -3393,11 +3579,19 @@
   .link-btn:active { opacity: .6; }
 
 
-  .log-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
+  /* No inner scroller. A 260px scroll box inside a card is a second scrollbar
+     on a page that already has one, and it ends mid row, which reads as broken
+     rather than as "there is more". The list is short and it finishes. */
+  .log-list { display: flex; flex-direction: column; gap: 8px; }
   .log-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
   .log-item:last-child { border-bottom: none; }
-  .log-item .date { color: var(--muted); width: 60px; flex-shrink: 0; }
-  .log-item .w { font-weight: 600; width: 56px; flex-shrink: 0; }
+  /* Wide enough for a weekday. These rows used to read "09-12" while the
+     weigh-in list two cards up read "Today", which is the same date said two
+     ways on one screen. */
+  .log-item .date { color: var(--muted); width: 84px; flex-shrink: 0; white-space: nowrap; }
+  /* "193.9 lbs" is nine characters and the column was built for six, so every
+     row with a weigh-in on it was two lines tall and the list combed. */
+  .log-item .w { font-weight: 600; width: 76px; flex-shrink: 0; white-space: nowrap; }
   .log-item .note { color: var(--muted); flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   .log-item .gym-yes { color: var(--down); }
   .muted-note { color: var(--muted); font-size: 14px; }
@@ -3407,6 +3601,23 @@
   .workout-progress-count { color: var(--accent-ink); font-weight: 700; }
   .workout-progress-track { height: 5px; border-radius: 100px; background: var(--panel-2); overflow: hidden; margin-bottom: 4px; }
   .workout-progress-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.3s; }
+  /* The session estimate, which is a control rather than a label. It reads as a
+     line of the plan, so no button chrome; the padding and the negative margin
+     buy the 44px target that 12.5px of text does not, the same trick
+     .lw-effort .lw-why uses, and the line sits where it would have anyway. */
+  .plan-time-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 2px 0 6px; }
+  .plan-time {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
+    margin: -11px 0; padding: 11px 0; background: none; border: 0; cursor: pointer;
+    color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 600;
+  }
+  .plan-time b { color: var(--accent-ink); font-weight: 700; }
+  .plan-time:active { opacity: .6; }
+  .gen-scrim .plan-time-row { justify-content: center; }
+  /* The reveal is white on a dark scrim whatever the theme is, so the same
+     control needs its own two colours there rather than the card's. */
+  .gen-scrim .plan-time { color: rgba(255,255,255,.72); }
+  .gen-scrim .plan-time b { color: #fff; }
   .exercise-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
   .exercise-row:last-child { border-bottom: none; padding-bottom: 0; }
   .exercise-row .ex-icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; background: var(--panel-2); display: flex; align-items: center; justify-content: center; color: var(--muted); }
@@ -3681,7 +3892,7 @@
   /* ---- Press feedback and hit areas (one house rule, applied late) ----
      Every tappable thing answers a press the same way: a 1.5 percent squash
      and, where it has a surface, a --panel-2 wash. */
-  .tab-btn:active, .sv-day:active, .metric-chip:active, .tab-pill:active,
+  .tab-btn:active, .sv-day:active, .tab-pill:active,
   .activity-chip:active, .ob-pace:active, .rest-btn:active, .card-link:active,
   .notice-x:active, .reminder-banner .rb-dismiss:active, .ds-x:active,
   .lw-effort .lw-why:active, .intro-back:active, .intro-skip:active,
@@ -3692,7 +3903,7 @@
   .switch-chip:active, .photo-del:active, .rep-del:active, .stepper-btn:active {
     transform: scale(.985);
   }
-  .sv-day:active, .metric-chip:active, .tab-pill:active, .activity-chip:active,
+  .sv-day:active, .tab-pill:active, .activity-chip:active,
   .ob-pace:active, .gym-toggle:active, .notice-x:active, .ds-x:active,
   .intro-back:active, .wk-nav-btn:active, .spp-cust:active, .rc-share:active,
   .scr-back:active,
@@ -3942,15 +4153,10 @@
       <div class="log-list" id="logList"></div>
     </div>
 
-    <div class="card" id="customiseCard">
-      <button type="button" class="customise-toggle" id="customiseToggle">
-        <span>Customise this tab</span><span class="link-arrow" id="customiseChevron">&rsaquo;</span>
-      </button>
-      <div id="customiseBody" class="hidden">
-        <p class="muted-note">Turn cards on or off. Nothing is deleted.</p>
-        <div class="metric-picker" id="metricPicker"></div>
-      </div>
-    </div>
+    <!-- Everything the goal did not ask for still lives on this tab, under
+         this rule, in the same order for everybody. Nobody has to turn a
+         card on to find a number they logged. -->
+    <div class="prog-rule" id="progRuleElse"><b>Everything else you have logged</b><i></i></div>
 
   </div>
 
@@ -4130,6 +4336,12 @@
         <label>Workout days per week (just you)</label>
         <input type="number" id="setupChallengeTarget" min="1" max="7" value="4" />
       </div>
+    </div>
+    <div class="card">
+      <h2>How long per session?</h2>
+      <p class="muted-note" style="margin-top:-6px;">Minutes. The plan is built to fit it: fewer sets when the time is short, more when there is room.</p>
+      <div class="rest-pref five" id="setupSessionLen"></div>
+      <p class="muted-note" id="setupSessionLenNote"></p>
     </div>
     <div class="card">
       <h2>Rest between sets</h2>
@@ -4474,7 +4686,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.12.7";
+const APP_VERSION = "2026.09.12.35";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -5289,11 +5501,16 @@ function renderOnboardIntro(i, data) {
    you are through. Two taps, never a third, which is research/11's rule for
    the first screen.
 
-   Single select, on purpose. The prototype let you pick several; the engine's
-   contract is one goal (goal_bubble and goal_child, see
-   mo-knowledge/engine/CONTRACT.md), and a plan built for two goals is a plan
-   built for neither. The four families with no legacy string still write a
-   valid `goal` ("Stay consistent"), so every existing reader keeps working.
+   One main goal and up to two extras, since 2026-09-12. It used to be one
+   goal and only one, and the reason given was that a plan built for two goals
+   is a plan built for neither. That is still true of the training parameters,
+   and it is still how the engine works: the main goal alone sets rep ranges,
+   rest, session length and day count (goal_bubble and goal_child). An extra
+   goal (goal_secondary) may add three things and nothing else, muscle groups
+   to prioritise, the ten minute mobility cool-down, and cardio. Two extras is
+   the engine's cap, defended in mo-knowledge/engine/README.md, so the picker
+   does not offer a third. The four families with no legacy string still write
+   a valid `goal` ("Stay consistent"), so every existing reader keeps working.
 
    Labels, sub lines and ids come from mo-knowledge/goals/goal-tree.json and
    are used verbatim; the longer phrasings people actually type live there as
@@ -5326,8 +5543,82 @@ function goalTileFor(bubble) { return GOAL_TILES.find((t) => t.id === bubble) ||
 function goalTileLabel(profile) {
   const t = goalTileFor(profile?.goal_bubble);
   if (!t) return profile?.goal || "Not set";
-  const kid = t.kids.find((k) => k.id === profile?.goal_child);
+  return goalPickLabel(profile.goal_bubble, profile.goal_child);
+}
+
+/* The same words from a pair of ids rather than a profile row. The engine
+   reports goals as ids, because it has no label table and cannot read
+   goal-tree.json at runtime; GOAL_TILES is where the words live, so this is
+   the only place an id can be turned back into something a person recognises. */
+function goalPickLabel(bubble, child) {
+  const t = goalTileFor(bubble);
+  if (!t) return bubble || "";
+  const kid = t.kids.find((k) => k.id === child);
   return kid ? `${t.title}, ${kid.label.toLowerCase()}` : t.title;
+}
+
+/* profiles.goal_secondary comes back as an array, as the JSON string a jsonb
+   column round trips as through some clients, as null from a database that
+   does not have the column yet, and as junk from an older client. All four
+   have to mean the same thing as an empty list, because the picker opens on
+   whatever it is handed. */
+function normaliseGoalSecondary(raw) {
+  let v = raw;
+  if (typeof v === "string") { try { v = JSON.parse(v); } catch { return []; } }
+  if (!Array.isArray(v)) return [];
+  const out = [];
+  for (const e of v) {
+    const bubble = e && typeof e === "object" ? e.bubble : null;
+    if (!goalTileFor(bubble)) continue;
+    if (out.some((o) => o.bubble === bubble)) continue;
+    const tile = goalTileFor(bubble);
+    const child = tile.kids.some((k) => k.id === e.child) ? e.child : null;
+    out.push({ bubble, child });
+    if (out.length === 2) break;
+  }
+  return out;
+}
+
+/* What the last plan actually did with the extra goals: meta.goals, straight
+   off the generator, kept per account. Read back in the picker so an extra
+   goal cannot sit there looking active while the engine is on record saying
+   it changed nothing. */
+let GOAL_OUTCOME;
+
+function goalOutcomeKey() { return `ft-goal-outcome:${MY_EMAIL || ""}`; }
+
+function rememberGoalOutcome(goals) {
+  GOAL_OUTCOME = goals && typeof goals === "object" ? goals : null;
+  try {
+    if (GOAL_OUTCOME) localStorage.setItem(goalOutcomeKey(), JSON.stringify(GOAL_OUTCOME));
+    else localStorage.removeItem(goalOutcomeKey());
+  } catch { /* private mode, and the picker just says "not yet" instead */ }
+}
+
+function loadGoalOutcome() {
+  if (GOAL_OUTCOME !== undefined) return GOAL_OUTCOME;
+  try { GOAL_OUTCOME = JSON.parse(localStorage.getItem(goalOutcomeKey()) || "null"); }
+  catch { GOAL_OUTCOME = null; }
+  return GOAL_OUTCOME;
+}
+
+/* One extra goal's verdict, in a sentence, or null when this goal has not been
+   through a generation yet. "We do not know yet" and "it did nothing" are
+   different answers and only one of them is a warning, so they never share a
+   return value. `flat` is the one that is a warning. */
+function goalOutcomeFor(bubble, child) {
+  const g = loadGoalOutcome();
+  if (!g || typeof g !== "object") return null;
+  const same = (e) => e && e.bubble === bubble && (e.child || null) === (child || null);
+  const ignored = (Array.isArray(g.ignored) ? g.ignored : []).find(same);
+  if (ignored) return { flat: true, text: ignored.why || "Your last plan did not use this one." };
+  const hit = (Array.isArray(g.secondary) ? g.secondary : []).find(same);
+  if (!hit) return null;
+  const effect = (Array.isArray(hit.effect) ? hit.effect : []).filter((s) => typeof s === "string" && s.trim());
+  if (!effect.length) {
+    return { flat: true, text: "Changed nothing in your last plan. It asked for no muscle groups, no cool-down and no extra cardio, and those three are all an extra goal can add." };
+  }
+  return { flat: false, text: effect.join(" ") };
 }
 
 /* Onboarding's goal step. Picking advances on its own. The four legacy
@@ -5341,15 +5632,16 @@ function renderGoalTilesStep(data = {}) {
   ob.innerHTML = `
     <div class="ob-step">
       <h1>What do you want?</h1>
-      <p class="sub">Tap one, then tell us what you mean by it.</p>
+      <p class="sub">Tap one, then tell us what you mean by it. You can pick more than one.</p>
       <div class="goal-tile-grid" id="goalTileGrid"></div>
       <button type="button" class="btn-ghost" id="goalBackBtn">Back</button>
     </div>`;
   initGoalTiles($("goalTileGrid"), {
-    selected: { bubble: data.goal_bubble || null, child: data.goal_child || null },
-    onPick: ({ bubble, child, label }) => {
+    confirmLabel: "Continue",
+    selected: { bubble: data.goal_bubble || null, child: data.goal_child || null, secondary: data.goal_secondary },
+    onPick: ({ bubble, child, label, secondary }) => {
       const tile = goalTileFor(bubble);
-      const next = { ...data, goalKey: tile.legacy, goal_bubble: bubble, goal_child: child, goalLabel: label };
+      const next = { ...data, goalKey: tile.legacy, goal_bubble: bubble, goal_child: child, goalLabel: label, goal_secondary: secondary };
       if (tile.askDetail) renderOnboardStep("detail", next);
       else renderOnboardStep("pace", { ...next, detail: child ? label : null });
     },
@@ -5361,38 +5653,152 @@ function renderGoalTilesStep(data = {}) {
    SAME .sheet-scrim overlay every other sheet in the app uses. The first row
    in the sheet is the plain category ("Just lose weight"), for people who do
    not want to be more specific than that. */
-function initGoalTiles(grid, { selected = {}, onPick } = {}) {
-  let openId = null;
+function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my goals" } = {}) {
+  const MAX_EXTRA = 2;   // the engine's cap, and it is argued for in mo-knowledge/engine/README.md
   const scrimId = "goalSheetScrim";
+  let primary = goalTileFor(selected.bubble) ? { bubble: selected.bubble, child: selected.child || null } : null;
+  let extras = normaliseGoalSecondary(selected.secondary).filter((e) => e.bubble !== primary?.bubble);
+  let openId = null;
 
-  function paint() {
+  /* The picks list and the confirm button live next to the grid rather than
+     inside it, and are reused when the settings page is opened a second time. */
+  let picksEl = grid.parentElement.querySelector(".goal-picks");
+  if (!picksEl) {
+    picksEl = document.createElement("div");
+    picksEl.className = "goal-picks";
+    grid.insertAdjacentElement("afterend", picksEl);
+  }
+  let confirmEl = grid.parentElement.querySelector(".goal-confirm");
+  if (!confirmEl) {
+    confirmEl = document.createElement("button");
+    confirmEl.type = "button";
+    confirmEl.className = "btn-primary goal-confirm";
+    picksEl.insertAdjacentElement("afterend", confirmEl);
+  }
+
+  const isMain = (bubble, child) => !!primary && primary.bubble === bubble && (primary.child || null) === (child || null);
+  const extraAt = (bubble, child) => extras.findIndex((e) => e.bubble === bubble && (e.child || null) === (child || null));
+
+  /* Two children of one category used to replace each other, on the argument
+     that "lose belly fat" and "lose the last 10 pounds" are one goal said
+     twice. That is true of those two and false in general: under Build muscle,
+     Glutes and Arms are different muscle groups and goal-engine.mjs keys its
+     own dedupe on bubble AND child, so it already treats them as two goals and
+     prices them separately. The picker was refusing a combination the engine
+     supports. A pair that really is one goal twice resolves to the same
+     parameter entry and comes back named in meta.goals.ignored, which is the
+     right place to say so, after the plan is built rather than under a finger.
+     Untapping the main goal still promotes the first extra rather than leaving
+     extras with nothing to be extra to. */
+  function choose(bubble, child) {
+    if (isMain(bubble, child)) { primary = extras.shift() || null; return; }
+    const at = extraAt(bubble, child);
+    if (at >= 0) { extras.splice(at, 1); return; }
+    if (!primary) { primary = { bubble, child }; return; }
+    if (extras.length < MAX_EXTRA) { extras.push({ bubble, child }); return; }
+    toast(`${MAX_EXTRA} extra goals is the cap. Remove one first.`);
+  }
+
+  function paintGrid() {
     grid.classList.toggle("dim", !!openId);
-    grid.innerHTML = GOAL_TILES.map((t) => `
-      <button type="button" class="goal-tile${selected.bubble === t.id ? " on" : ""}" data-tile="${t.id}">
+    grid.innerHTML = GOAL_TILES.map((t) => {
+      const main = primary?.bubble === t.id;
+      /* Counted, not just detected: one category can hold the main goal and an
+         extra at the same time now, and a badge that named only the first
+         thing it found would quietly under-report what the tile is holding. */
+      const alsoCount = extras.filter((e) => e.bubble === t.id).length;
+      const also = alsoCount > 0;
+      const badge = main
+        ? `<span class="goal-tile-badge">Main${alsoCount ? ` +${alsoCount}` : ""}</span>`
+        : also ? `<span class="goal-tile-badge alt">${alsoCount > 1 ? `${alsoCount} extras` : "Also"}</span>` : "";
+      return `
+      <button type="button" class="goal-tile${main || also ? " on" : ""}${also ? " also" : ""}" data-tile="${t.id}"
+        aria-label="${escapeHtml(t.title)}${main ? ", your main goal" : ""}${alsoCount ? `, ${alsoCount} extra goal${alsoCount > 1 ? "s" : ""}` : ""}">
+        ${badge}
         <span class="goal-tile-ico">${icon(t.ico, 18)}</span>
         <span class="goal-tile-label">${escapeHtml(t.title)}</span>
         <span class="goal-tile-sub">${escapeHtml(t.sub)}</span>
-      </button>`).join("");
+      </button>`;
+    }).join("");
     grid.querySelectorAll("[data-tile]").forEach((b) => {
-      b.onclick = () => { openId = b.dataset.tile; paint(); };
+      b.onclick = () => openSheet(b.dataset.tile);
     });
+  }
 
+  /* The picks, in words, under the grid. The main goal is a size up, on an
+     accent rule, and carries the sentence about what it alone decides; the
+     extras are plain rows under it carrying what the engine said they bought.
+     That difference is the point: they are not three equal chips. */
+  function paintPicks() {
+    const rows = [];
+    if (primary) {
+      rows.push(`
+        <div class="goal-pick main">
+          <span class="goal-pick-tag">Main goal</span>
+          <span class="goal-pick-name">${escapeHtml(goalPickLabel(primary.bubble, primary.child))}</span>
+          <span class="goal-pick-why">This one sets the rep ranges, the rest between sets, how long a session runs and how many days a week. Nothing else does.</span>
+        </div>`);
+    }
+    extras.forEach((e, i) => {
+      const out = goalOutcomeFor(e.bubble, e.child);
+      const why = out ? out.text
+        : "Can add muscle groups to prioritise, a longer cool-down, or more cardio. Your next plan will say which of those it bought.";
+      rows.push(`
+        <div class="goal-pick">
+          <span class="goal-pick-tag">Also</span>
+          <span class="goal-pick-name">${escapeHtml(goalPickLabel(e.bubble, e.child))}</span>
+          <span class="goal-pick-why${out?.flat ? " flat" : ""}">${escapeHtml(why)}</span>
+          <span class="goal-pick-acts">
+            <button type="button" data-promote="${i}">Make this the main one</button>
+            <button type="button" data-drop="${i}">Remove</button>
+          </span>
+        </div>`);
+    });
+    const note = !primary
+      ? "Tap a category, then the version of it you actually mean. The first one you pick is the main goal."
+      : extras.length >= MAX_EXTRA
+        ? "Two extras is the cap. Past two, a third can only ever be told it did nothing."
+        : "You can add up to two extra goals. An extra can add muscle groups to prioritise, a longer cool-down or more cardio, and that is all: the rep ranges, the rest, the session length and the day count belong to the main goal.";
+    picksEl.innerHTML = rows.join("") + `<p class="goal-picks-note">${escapeHtml(note)}</p>`;
+    picksEl.querySelectorAll("[data-promote]").forEach((b) => {
+      b.onclick = () => {
+        const i = Number(b.dataset.promote);
+        const was = primary;
+        primary = extras[i];
+        extras[i] = was;                 // a straight swap, so nobody loses a pick to change their mind
+        paintGrid(); paintPicks(); paintConfirm();
+      };
+    });
+    picksEl.querySelectorAll("[data-drop]").forEach((b) => {
+      b.onclick = () => {
+        extras.splice(Number(b.dataset.drop), 1);
+        paintGrid(); paintPicks(); paintConfirm();
+      };
+    });
+  }
+
+  function paintConfirm() {
+    confirmEl.disabled = !primary;
+    confirmEl.textContent = primary ? confirmLabel : "Pick a goal first";
+  }
+
+  function openSheet(id) {
+    openId = id;
+    const t = goalTileFor(id);
+    if (!t) return;
     let scrim = document.getElementById(scrimId);
-    const t = GOAL_TILES.find((x) => x.id === openId);
-    if (!t) { if (scrim) scrim.classList.add("hidden"); return; }
     if (!scrim) {
       scrim = document.createElement("div");
       scrim.id = scrimId;
       scrim.className = "sheet-scrim hidden";
       grid.parentElement.appendChild(scrim);
     }
-    const row = (id, label, sub) => {
-      const on = selected.bubble === t.id && (selected.child || null) === id;
-      return `<button type="button" class="pgs-row${on ? " on" : ""}" data-pick="${id || ""}">
+    const row = (cid, label, sub) => `
+      <button type="button" class="pgs-row" data-pick="${cid || ""}">
+        <span class="pgs-box">${icon("check", 13)}</span>
         <span class="pgs-text"><span>${escapeHtml(label)}</span>${sub ? `<span class="pgs-sub">${escapeHtml(sub)}</span>` : ""}</span>
-        <span class="pgs-go">${icon("chevronRight", 16)}</span>
+        <span class="pgs-tag"></span>
       </button>`;
-    };
     scrim.classList.remove("hidden");
     scrim.innerHTML = `
       <div class="goal-sheet">
@@ -5405,44 +5811,122 @@ function initGoalTiles(grid, { selected = {}, onPick } = {}) {
           ${row(null, "Just " + t.title.toLowerCase(), t.sub)}
           ${t.kids.map((k) => row(k.id, k.label)).join("")}
         </div>
+        <div class="pgs-foot">
+          <p class="pgs-foot-note" id="goalSheetNote"></p>
+          <button type="button" class="btn-primary" id="goalSheetDone">Done</button>
+        </div>
       </div>`;
-    const close = () => { openId = null; paint(); };
+    /* Picking no longer closes the sheet. It used to, and it read as the app
+       taking the decision off you the instant you touched it: no chance to see
+       what you had chosen, change it, or pick a second thing. The way out is
+       Done, the close button, or a tap on the scrim, all of which are leaving
+       on purpose. */
+    const close = () => { openId = null; if (scrim) scrim.classList.add("hidden"); paintGrid(); };
     scrim.onclick = (e) => { if (e.target === scrim) close(); };
     scrim.querySelector("#goalSheetClose").onclick = close;
+    scrim.querySelector("#goalSheetDone").onclick = close;
     scrim.querySelectorAll("[data-pick]").forEach((b) => {
-      b.onclick = () => {
-        const child = b.dataset.pick || null;
-        const kid = t.kids.find((k) => k.id === child);
-        openId = null;
-        scrim.classList.add("hidden");
-        onPick?.({ bubble: t.id, child, label: kid ? kid.label : t.title });
-      };
+      b.onclick = () => { choose(t.id, b.dataset.pick || null); syncSheet(t); paintPicks(); paintConfirm(); };
     });
+    syncSheet(t);
+    paintGrid();
   }
-  paint();
+
+  /* Repaints the rows in place rather than rebuilding the sheet, so tapping a
+     row does not replay the sheet's slide-up animation under your finger. */
+  function syncSheet(t) {
+    const scrim = document.getElementById(scrimId);
+    if (!scrim) return;
+    scrim.querySelectorAll("[data-pick]").forEach((b) => {
+      const child = b.dataset.pick || null;
+      const main = isMain(t.id, child);
+      const also = extraAt(t.id, child) >= 0;
+      b.classList.toggle("on", main || also);
+      b.classList.toggle("alt", also);
+      b.querySelector(".pgs-tag").textContent = main ? "Main" : also ? "Also" : "";
+    });
+    const note = scrim.querySelector("#goalSheetNote");
+    if (note) {
+      note.textContent = !primary
+        ? "The first goal you pick is the main one, and it sets every training parameter."
+        : extras.length >= MAX_EXTRA
+          ? "That is the main goal and both extras. Tap one again to take it off."
+          : "Picked. Tap another category to add it as an extra, or Done.";
+    }
+  }
+
+  confirmEl.onclick = () => {
+    if (!primary) return;
+    const tile = goalTileFor(primary.bubble);
+    const kid = tile.kids.find((k) => k.id === primary.child);
+    onPick?.({
+      bubble: primary.bubble,
+      child: primary.child,
+      label: kid ? kid.label : tile.title,
+      secondary: extras.map((e) => ({ bubble: e.bubble, child: e.child })),
+    });
+  };
+
+  paintGrid();
+  paintPicks();
+  paintConfirm();
 }
 
 /* The same tiles from Setup, writing straight to the profile. A specific from
    the sheet becomes the goal detail; "Just X" leaves whatever detail was there. */
 function renderGoalPage() {
-  $("goalPageNote").textContent = "Tap one, then what you mean by it. The next plan you generate is built for it.";
+  $("goalPageNote").textContent = "One main goal, and up to two more you also care about. The next plan you generate is built for them.";
   initGoalTiles($("goalPageGrid"), {
-    selected: { bubble: MY_PROFILE?.goal_bubble || null, child: MY_PROFILE?.goal_child || null },
-    onPick: async ({ bubble, child, label }) => {
+    selected: {
+      bubble: MY_PROFILE?.goal_bubble || null,
+      child: MY_PROFILE?.goal_child || null,
+      secondary: MY_PROFILE?.goal_secondary,
+    },
+    onPick: async ({ bubble, child, label, secondary }) => {
       const tile = goalTileFor(bubble);
       const legacy = GOALS.find((g) => g.key === tile.legacy);
       /* Upsert on the email key, the way every other profile write here is
          done (saveSetup, saveFocusGroups), rather than update().eq(): one
-         write path, and it is the one the sandbox's fake client persists. */
-      const patch = { email: MY_EMAIL, user_name: ME, goal: legacy.goal, goal_bubble: bubble, goal_child: child, updated_at: new Date().toISOString() };
+         write path, and it is the one the sandbox's fake client persists.
+         All four goal fields go in one write, so no reader ever sees a legacy
+         string that disagrees with the ids next to it. */
+      const patch = {
+        email: MY_EMAIL, user_name: ME, goal: legacy.goal,
+        goal_bubble: bubble, goal_child: child, goal_secondary: secondary || [],
+        updated_at: new Date().toISOString(),
+      };
       if (child) patch.goal_detail = label;
-      const { error } = await sb.from("profiles").upsert(patch);
+      const { error, droppedSecondary } = await upsertGoalFields(patch);
       if (error) { toast("Could not save the goal"); console.error(error); return; }
       await loadAll();
-      toast("Goal updated");
+      toast(droppedSecondary ? "Main goal saved. The extra goals are not being stored yet." : "Goal updated");
       closeSettingsPage();
     },
   });
+}
+
+/* Two columns here are behind migrations that are written and not applied, so
+   right now every account is on a database without them and a write that
+   mentions one comes back PGRST204. Dropping the named field and writing the
+   rest is the only version of this that does not lose somebody's main goal over
+   a column that does not exist yet. It reports what it dropped rather than
+   swallowing it, because "saved" when half of it was not saved is the kind of
+   quiet lie this app does not tell. */
+const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes"];
+
+async function upsertGoalFields(patch) {
+  const { data, error } = await sb.from("profiles").upsert(patch).select().maybeSingle();
+  const said = error ? `${error.message || ""} ${error.details || ""} ${error.hint || ""}` : "";
+  const missing = PENDING_PROFILE_COLUMNS.filter((c) => c in patch && said.includes(c));
+  if (!missing.length) return { data, error, droppedSecondary: false, droppedSession: false };
+  const rest = { ...patch };
+  for (const c of missing) delete rest[c];
+  const retry = await sb.from("profiles").upsert(rest).select().maybeSingle();
+  const dropped = (c) => !retry.error && missing.includes(c);
+  return {
+    data: retry.data, error: retry.error,
+    droppedSecondary: dropped("goal_secondary"), droppedSession: dropped("session_minutes"),
+  };
 }
 
 /* The Focus areas page, opened from Setup. Went through a zoom-on-tap pass,
@@ -5450,22 +5934,28 @@ function renderGoalPage() {
    need zoom at all, so both are gone. A tap only ever marks or unmarks the
    group it belongs to, full stop.
 
-   Four is the cap, because the engine gives a picked group 1.4x its weekly
-   sets out of a fixed weekly volume: past four the plan is the same plan with
-   a longer explanation. That is why there is no Full body button any more,
-   only Clear all. */
+   A tap does not toggle any more, it cycles: nothing, Light, Secondary, Main,
+   and round to nothing again, so a mis-tap is always one more tap from undone
+   and there is no clear control to go hunting for. Each level is worth a
+   different multiplier on the group's weekly sets (1.2x, 1.4x, 1.75x) and
+   costs a different share of one fixed budget, which is why there is no longer
+   a count cap. See the emphasis budget note below. */
 function renderBodyFocusPage() {
   $("focusPickRoot").innerHTML = `
     <div class="card">
       <h2>Which muscles do you want to focus on?</h2>
-      <p class="muted-note">Tap up to ${MAX_FOCUS_GROUPS}. Each one earns extra sets in the workouts you generate.</p>
+      <p class="muted-note">Tap a muscle to mark it lightly. Tap it again to push it up a level, and once more to clear it.</p>
       <div class="bi-figures" id="focusPickFigures">
         <div class="bi-fig" data-view="Front"><canvas id="focusPickFront" class="bi-canvas"></canvas></div>
         <div class="bi-fig" data-view="Back"><canvas id="focusPickBack" class="bi-canvas"></canvas></div>
       </div>
+      <div class="focus-legend">${focusTierLegend()}</div>
       <div class="focus-pick-actions">
+        <button type="button" class="focus-pick-action" id="focusPickAll">${icon("target", 13)} Whole body</button>
         <button type="button" class="focus-pick-action" id="focusPickClear">${icon("close", 13)} Clear all</button>
       </div>
+      <div class="focus-budget" id="focusPickBudget"></div>
+      <div class="focus-tier-list" id="focusPickList"></div>
       <p class="focus-pick-summary" id="focusPickSummary">Loading the figure...</p>
     </div>
     <button type="button" class="btn-primary" id="focusPickSaveBtn">Save focus</button>`;
@@ -5486,14 +5976,15 @@ function closeBodyFocusPage() {
 }
 
 async function saveBodyFocus() {
-  const groups = FOCUS_GROUP_ORDER.filter((g) => FOCUS_PICKED.has(g));
+  const entries = focusPickEntries();
   const btn = $("focusPickSaveBtn");
   btn.disabled = true;
-  const ok = await saveFocusGroups(groups);
+  const ok = await saveFocusGroups(entries);
   btn.disabled = false;
   if (!ok) return;
-  toast(groups.length
-    ? "Focus saved: " + groups.map((g) => BODY_GROUP_LABELS[g]).join(", ")
+  if (FOCUS_ALL) toast("Whole body saved. Nothing stands out, so nothing gets extra.");
+  else toast(entries.length
+    ? "Focus saved: " + focusPickOrder().map(([g, t]) => `${BODY_GROUP_LABELS[g]} ${FOCUS_TIER_WORD[t].toLowerCase()}`).join(", ")
     : "Focus cleared");
   closeSettingsPage();
 }
@@ -5502,12 +5993,17 @@ async function saveBodyFocus() {
    this page, and the shortcut on a muscle in Body impact. Same upsert shape as
    saveSetup, and focus_chosen_at goes with every write because the engine
    reports a choice older than 60 days as stale rather than trusting it forever.
-   Callers do their own toast: what they just did is not the same sentence. */
-async function saveFocusGroups(groups) {
+   Callers do their own toast: what they just did is not the same sentence.
+
+   `entries` is already in the column's own shape, "chest:3" and the rest, or
+   the single token "all". Nothing is trimmed on the way out: the budget is
+   shown on the picker and honoured by the engine, and a writer that quietly
+   drops the tail is how a picker ends up unable to repaint its own output. */
+async function saveFocusGroups(entries) {
   const { error } = await sb.from("profiles").upsert({
     email: MY_EMAIL,
     user_name: ME,
-    focus_groups: groups.slice(0, MAX_FOCUS_GROUPS),
+    focus_groups: entries,
     focus_chosen_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
@@ -5516,25 +6012,146 @@ async function saveFocusGroups(groups) {
   return true;
 }
 
-/* "Glutes, hamstrings", not a list of proper nouns: this reads as a sentence
-   fragment under a row title, the way every other set-sub does. */
+/* "Chest (main), glutes (light)", not a list of proper nouns: this reads as a
+   sentence fragment under a row title, the way every other set-sub does. The
+   tier is spelled out because this row has no colour to carry it. */
 function focusGroupsSubtitle() {
-  const names = FOCUS_GROUP_ORDER
-    .filter((g) => (MY_PROFILE?.focus_groups || []).includes(g))
-    .map((g) => BODY_GROUP_LABELS[g]);
-  if (!names.length) return "Not set";
-  return names.map((n, i) => (i ? n.toLowerCase() : n)).join(", ");
+  const { all, picked } = focusParseStored(MY_PROFILE?.focus_groups);
+  if (all) return "Whole body";
+  const parts = focusOrderOf(picked).map(([g, t], i) => {
+    const name = BODY_GROUP_LABELS[g];
+    return `${i ? name.toLowerCase() : name} (${FOCUS_TIER_WORD[t].toLowerCase()})`;
+  });
+  return parts.length ? parts.join(", ") : "Not set";
 }
 
 const FOCUS_GROUP_ORDER = ["chest", "shoulders", "traps", "lats", "lowerback", "biceps", "triceps", "forearms", "abs", "obliques", "glutes", "quads", "hamstrings", "calves"];
-const FOCUS_PICK_GREEN = { r: 0x3b, g: 0xe7, b: 0x6b };   // same accent Body Impact isolates a muscle in
-/* Must stay in step with MAX_FOCUS in mo-knowledge/engine/focus.mjs: anything
-   past the fourth is dropped there anyway, and a saved fifth group that never
-   changes the plan is worse than not offering it. */
-const MAX_FOCUS_GROUPS = 4;
+
+/* The three tiers, spelled the way mo-knowledge/engine/focus.mjs spells them:
+   3 main, 2 secondary, 1 light, and a stored entry with no tier at all reads
+   as 2, which is what every pick saved before the tiers landed already meant.
+
+   A tier costs its own number in emphasis units and the picker gets 9 of them,
+   so three mains, four secondaries or nine lights are all the same spend. That
+   is not a rule this file invented: FOCUS_BUDGET is read off the engine below,
+   because a budget the picker and the plan disagree about is worse than no
+   budget at all. The costs are the tier numbers themselves (TIER_COST in that
+   file is { 3: 3, 2: 2, 1: 1 }), and it is the one thing here that is mirrored
+   rather than imported, because that table is not exported. If it ever stops
+   being the tier number, this is the line that has to move with it. */
+const FOCUS_TIERS = Object.freeze({ main: 3, secondary: 2, light: 1 });
+const FOCUS_TIER_WORD = Object.freeze({ 3: "Main", 2: "Secondary", 1: "Light" });
+const FOCUS_TIER_MEANS = Object.freeze({
+  3: "what you really want to hit",
+  2: "a second priority",
+  1: "a nudge, nothing more",
+});
+/* The tier hues, read off the stylesheet rather than written twice, the same
+   way limitWarnRgb() reads --partner: the figure is WebGL and cannot resolve a
+   CSS variable itself, but it can be handed the value the chips are using, so
+   a palette change moves both. Fallbacks are the dark theme's own values. */
+const FOCUS_TIER_VAR = Object.freeze({ 3: "--up", 2: "--warn", 1: "--accent" });
+const FOCUS_TIER_FALLBACK = Object.freeze({
+  3: { r: 0xe2, g: 0x56, b: 0x6c },
+  2: { r: 0xf0, g: 0xb4, b: 0x29 },
+  1: { r: 0xa8, g: 0xff, b: 0x00 },
+});
+/* Overwritten by the engine's own FOCUS_BUDGET as soon as focus.mjs loads. */
+let FOCUS_BUDGET_UNITS = 9;
+let focusEnginePromise = null;
+function ensureFocusBudget() {
+  if (!focusEnginePromise) {
+    focusEnginePromise = import("/mo-knowledge/engine/focus.mjs")
+      .then((m) => { if (Number.isFinite(m.FOCUS_BUDGET)) FOCUS_BUDGET_UNITS = m.FOCUS_BUDGET; })
+      .catch((e) => { console.warn("focus budget: using the built-in 9", e); });
+  }
+  return focusEnginePromise;
+}
 
 let FOCUS_PICK_FRONT_CTRL = null, FOCUS_PICK_BACK_CTRL = null, FOCUS_PICK_GEN = 0;
-const FOCUS_PICKED = new Set();
+/* group -> tier. A Map rather than a Set now that a pick carries a level. */
+const FOCUS_PICKED = new Map();
+/* The whole body pick, which is one stored token and not fourteen rows. */
+let FOCUS_ALL = false;
+
+/* Read the column. Legacy "chest" is tier 2 and stays tier 2 forever: those are
+   live rows and nothing about what they already mean is allowed to move. */
+function focusParseStored(stored) {
+  const list = Array.isArray(stored) ? stored : [];
+  const picked = new Map();
+  if (list.length === 1 && /^(all|everything|whole[-_]?body|full[-_]?body)$/i.test(String(list[0]).trim())) {
+    for (const g of FOCUS_GROUP_ORDER) picked.set(g, FOCUS_TIERS.light);
+    return { all: true, picked };
+  }
+  for (const raw of list) {
+    const s = String(raw ?? "").trim();
+    if (!s) continue;
+    const cut = s.search(/[:=]/);
+    const group = (cut < 0 ? s : s.slice(0, cut)).trim().toLowerCase();
+    if (!BODY_GROUP_LABELS[group]) continue;
+    const n = cut < 0 ? NaN : Number(s.slice(cut + 1).trim());
+    picked.set(group, (n === 1 || n === 2 || n === 3) ? n : FOCUS_TIERS.secondary);
+  }
+  return { all: false, picked };
+}
+
+/* Highest tier first, then the body's own order, everywhere: on the chips, in
+   the saved array and in the budget. The engine spends the budget in exactly
+   this order, so what the picker shows going over is what the plan drops. */
+function focusOrderOf(picked) {
+  return [...picked.entries()].sort((a, b) => (b[1] - a[1]) || (FOCUS_GROUP_ORDER.indexOf(a[0]) - FOCUS_GROUP_ORDER.indexOf(b[0])));
+}
+function focusPickOrder() { return focusOrderOf(FOCUS_PICKED); }
+
+function focusPickEntries() {
+  if (FOCUS_ALL) return ["all"];
+  return focusPickOrder().map(([g, t]) => `${g}:${t}`);
+}
+
+/* The engine's own greedy spend, mirrored so the screen can say which picks are
+   not earning anything before somebody saves them: highest tier first, and it
+   keeps going past one that does not fit rather than stopping there, so a main
+   that missed by a unit still leaves room for a light behind it. */
+function focusSpend() {
+  const order = focusPickOrder();
+  const kept = new Set();
+  let spent = 0, total = 0;
+  for (const [g, t] of order) {
+    total += t;
+    if (spent + t <= FOCUS_BUDGET_UNITS) { spent += t; kept.add(g); }
+  }
+  return { order, kept, spent, total };
+}
+
+function focusPips(tier) {
+  return `<span class="focus-pips" aria-hidden="true">${[1, 2, 3].map((n) => `<i class="${n <= tier ? "on" : ""}"></i>`).join("")}</span>`;
+}
+
+function focusTierLegend() {
+  return [3, 2, 1].map((t) =>
+    `<span class="focus-t${t}">${focusPips(t)}${escapeHtml(FOCUS_TIER_WORD[t])}, ${escapeHtml(FOCUS_TIER_MEANS[t])}</span>`).join("");
+}
+
+/* The saved tier for one group, or 0. Used by Body impact's drill-down, which
+   only ever asks "is this one of mine, and how badly". */
+function focusTierOfGroup(group) {
+  return focusParseStored(MY_PROFILE?.focus_groups).picked.get(group) || 0;
+}
+
+/* "calves", "calves and forearms", "calves, forearms and abs". Lower cased,
+   because these land mid sentence and not as a heading. */
+function focusNameList(names) {
+  let n = names.map((s) => s.toLowerCase());
+  // Past three the list stops being a list and starts being a paragraph.
+  if (n.length > 4) n = n.slice(0, 3).concat(`${n.length - 3} more`);
+  if (n.length <= 1) return n[0] || "";
+  return n.slice(0, -1).join(", ") + " and " + n[n.length - 1];
+}
+
+function focusTierRgb(tier) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(cssVar(FOCUS_TIER_VAR[tier]));
+  return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : FOCUS_TIER_FALLBACK[tier];
+}
 
 /* Own generation counter, same shape as ADVANCING elsewhere in this file: the
    canvases are new DOM nodes every time this screen is (re)rendered (unlike
@@ -5549,11 +6166,14 @@ async function initBodyFocusRive() {
   FOCUS_PICK_BACK_CTRL?.destroy(); FOCUS_PICK_BACK_CTRL = null;
   // Whatever is on file is what the page opens on, so this reads as editing a
   // saved answer rather than starting over every visit.
+  const stored = focusParseStored(MY_PROFILE?.focus_groups);
+  FOCUS_ALL = stored.all;
   FOCUS_PICKED.clear();
-  for (const g of MY_PROFILE?.focus_groups || []) if (BODY_GROUP_LABELS[g]) FOCUS_PICKED.add(g);
+  for (const [g, t] of stored.picked) FOCUS_PICKED.set(g, t);
 
   let mod;
   try {
+    await ensureFocusBudget();
     mod = await ensureRiveBodyModule();
   } catch (e) {
     console.error("body focus: figure failed to load", e);
@@ -5565,42 +6185,110 @@ async function initBodyFocusRive() {
   if (!figuresEl) return;                     // navigated away entirely while this loaded
 
   const summaryEl = $("focusPickSummary");
+  const budgetEl = $("focusPickBudget");
+  const listEl = $("focusPickList");
   const clearBtn = $("focusPickClear");
+  const allBtn = $("focusPickAll");
   const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
 
   function repaintIntensities() {
     const on = {};
     for (const m of mod.ALL_MUSCLES) on[m] = 0;
-    for (const group of FOCUS_PICKED) {
+    for (const group of FOCUS_PICKED.keys()) {
       for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[group] || []) on[m] = 4;
     }
     FOCUS_PICK_FRONT_CTRL?.setIntensities(on);
     FOCUS_PICK_BACK_CTRL?.setIntensities(on);
   }
 
-  function paintGreen(group) {
-    const pal = { base: mod.APP_HEAT_PALETTE.base, level1: FOCUS_PICK_GREEN, level2: FOCUS_PICK_GREEN, level3: FOCUS_PICK_GREEN, level4: FOCUS_PICK_GREEN };
+  /* The figure is the one surface that cannot carry a word, so the tier is
+     doubled up in brightness as well as hue: a Main muscle is the tier colour
+     at full strength, a Light one is most of the way back to the unmarked
+     grey. Luminance is a channel colour blindness leaves alone, so red and
+     green still separate on a figure where the labels do not fit. */
+  const FIG_STRENGTH = { 3: 1, 2: 0.72, 1: 0.42 };
+  function paintTier(group, tier) {
+    const base = mod.APP_HEAT_PALETTE.base;
+    const c = focusTierRgb(tier);
+    const k = FIG_STRENGTH[tier];
+    const fill = {
+      r: Math.round(base.r + (c.r - base.r) * k),
+      g: Math.round(base.g + (c.g - base.g) * k),
+      b: Math.round(base.b + (c.b - base.b) * k),
+    };
+    const pal = { base, level1: fill, level2: fill, level3: fill, level4: fill };
     for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[group] || []) {
       FOCUS_PICK_FRONT_CTRL?.setMusclePalette(m, pal);
       FOCUS_PICK_BACK_CTRL?.setMusclePalette(m, pal);
     }
   }
+  function repaintTiers() { for (const [g, t] of FOCUS_PICKED) paintTier(g, t); }
 
   function sync() {
-    const names = FOCUS_GROUP_ORDER.filter((k) => FOCUS_PICKED.has(k)).map((k) => BODY_GROUP_LABELS[k]);
-    summaryEl.innerHTML = names.length
-      ? "Marked: <b>" + escapeHtml(names.join(", ")) + "</b>"
-      : "Nothing marked. Saving now clears whatever is on file.";
+    const { order, kept, spent, total } = focusSpend();
+    const over = Math.max(0, total - FOCUS_BUDGET_UNITS);
+
+    /* The budget is shown, not enforced. Nine cells, one per unit, plus a
+       dashed cell for every unit the picks run over, so "too much" is a thing
+       you can see rather than a thing a toast tells you off about. */
+    const cells = order.flatMap(([g, t]) => Array.from({ length: t }, () => `<i class="focus-t${t} ${kept.has(g) ? "used" : "over"}"></i>`));
+    while (cells.length < FOCUS_BUDGET_UNITS) cells.push("<i></i>");
+    const losing = order.filter(([g]) => !kept.has(g));
+    const dropped = losing.map(([g]) => BODY_GROUP_LABELS[g]);
+    /* Naming what would free the room, rather than refusing the tap. Clearing
+       the ones that are not earning always fits, by definition. The second
+       offer is only made when it is actually true: taking one group down a
+       level frees exactly one unit, which is only enough to buy back a Light. */
+    const demote = order.find(([g, t]) => kept.has(g) && t > FOCUS_TIERS.light);
+    const swap = demote && losing.length && losing[0][1] === FOCUS_TIERS.light;
+    let read;
+    if (FOCUS_ALL) {
+      read = `<b>${total} of ${FOCUS_BUDGET_UNITS}.</b> Whole body is all fourteen at Light, which is past anything ${FOCUS_BUDGET_UNITS} points can buy, so the plan reads it as no focus at all.`;
+    } else if (!total) {
+      read = `<b>Nothing marked.</b> You have ${FOCUS_BUDGET_UNITS} points of emphasis to spend: Main costs 3, Secondary 2, Light 1.`;
+    } else if (!over) {
+      read = `<b>${spent} of ${FOCUS_BUDGET_UNITS}</b> points of emphasis spent. Main costs 3, Secondary 2, Light 1.`;
+    } else {
+      read = `<b>${total} of ${FOCUS_BUDGET_UNITS}</b>, which is ${over} too many. A week only has so many sets to move around, so ${escapeHtml(focusNameList(dropped))} ${dropped.length > 1 ? "are" : "is"} not earning anything extra. Clear ${dropped.length > 1 ? "them" : "it"}`
+        + (swap
+          ? `, or take ${escapeHtml(BODY_GROUP_LABELS[demote[0]].toLowerCase())} down a level and ${escapeHtml(BODY_GROUP_LABELS[losing[0][0]].toLowerCase())} fits instead.`
+          : " to get back under.");
+    }
+    budgetEl.innerHTML = `<div class="focus-meter">${cells.join("")}</div><p class="focus-budget-read ${over ? "over" : ""}">${read}</p>`;
+
+    /* Every marked group again as a chip: the word and the pip count are what
+       carry the level here, because hue on its own is the one thing a red and
+       green picker is not allowed to lean on. Tapping a chip cycles it exactly
+       the way tapping the muscle does, which also gives the small groups a
+       44px target the figure cannot give them. */
+    listEl.innerHTML = order.map(([g, t]) =>
+      `<button type="button" class="focus-tier-chip focus-t${t} ${kept.has(g) ? "" : "spent"}" data-group="${g}">
+        ${focusPips(t)}<span>${escapeHtml(BODY_GROUP_LABELS[g])}</span><span class="focus-tier-word">${escapeHtml(FOCUS_TIER_WORD[t])}</span>
+      </button>`).join("");
+    for (const btn of listEl.querySelectorAll(".focus-tier-chip")) {
+      btn.onclick = () => cycle(btn.dataset.group);
+    }
+
+    allBtn.classList.toggle("on", FOCUS_ALL);
+    /* The honest answer to "focus on everything", which is the same sentence
+       the engine puts in the plan's notes rather than a second opinion. */
+    summaryEl.innerHTML = FOCUS_ALL
+      ? "<b>Whole body.</b> Every muscle marked Light, which comes out the same as marking none: extra sets have to be taken from somewhere, and if everything is up then nothing is. Mark two or three Main if you want the week to actually change."
+      : (total ? "" : "Nothing marked. Saving now clears whatever is on file.");
   }
 
-  function onTap(muscle, group) {
-    if (!group) return;
-    const wasPicked = FOCUS_PICKED.has(group);
-    // The cap is refused out loud rather than silently: a tap that does nothing
-    // and says nothing reads as the figure being broken.
-    if (!wasPicked && FOCUS_PICKED.size >= MAX_FOCUS_GROUPS) { toast("Four is plenty, drop one first"); return; }
-    if (wasPicked) FOCUS_PICKED.delete(group); else FOCUS_PICKED.add(group);
-    if (!wasPicked) paintGreen(group);
+  /* One tap, one step: nothing, Light, Secondary, Main, nothing again. Bound to
+     the figure's own click event rather than dblclick, which does not survive a
+     touchscreen and would put a delay on the first tap of every muscle. The
+     cycle closes on nothing, so a mis-tap is always recoverable in place and
+     the budget never has to refuse anything. */
+  function cycle(group) {
+    if (!group || !BODY_GROUP_LABELS[group]) return;
+    const next = (FOCUS_PICKED.get(group) || 0) + 1;
+    // Any change to one muscle makes this a list of muscles, not "whole body".
+    FOCUS_ALL = false;
+    if (next > FOCUS_TIERS.main) FOCUS_PICKED.delete(group);
+    else { FOCUS_PICKED.set(group, next); paintTier(group, next); }
     repaintIntensities();
     sync();
   }
@@ -5613,8 +6301,8 @@ async function initBodyFocusRive() {
       /* A per muscle palette needs the view model, which does not exist until
          the figure has loaded, so what is already on file is painted from here
          rather than straight after this call. */
-      onLoad: () => { for (const g of FOCUS_PICKED) paintGreen(g); repaintIntensities(); },
-      onMuscleClick: (muscle, group) => onTap(muscle, group),
+      onLoad: () => { repaintTiers(); repaintIntensities(); },
+      onMuscleClick: (muscle, group) => cycle(group),
     });
   }
 
@@ -5622,7 +6310,20 @@ async function initBodyFocusRive() {
   FOCUS_PICK_BACK_CTRL = make("focusPickBack", "Back");
 
   clearBtn.onclick = () => {
+    FOCUS_ALL = false;
     FOCUS_PICKED.clear();
+    repaintIntensities();
+    sync();
+  };
+
+  /* Whole body is a real pick and not a select-all: it stores the single token
+     "all", the engine expands it and answers it, and the summary says what that
+     answer is before anybody saves it. Pressing it again clears. */
+  allBtn.onclick = () => {
+    FOCUS_ALL = !FOCUS_ALL;
+    FOCUS_PICKED.clear();
+    if (FOCUS_ALL) for (const g of FOCUS_GROUP_ORDER) FOCUS_PICKED.set(g, FOCUS_TIERS.light);
+    repaintTiers();
     repaintIntensities();
     sync();
   };
@@ -5702,7 +6403,7 @@ const emptyLimits = () => ({ hurts: [], missing: [], note: null, updated_at: new
 
 /* The figure has to be exactly the colour the chips are, and --partner has a
    separate value per theme, so it is read off the stylesheet rather than
-   duplicated here. Same argument as FOCUS_PICK_GREEN matching the ring. */
+   duplicated here. Same argument as focusTierRgb() reading the tier hues. */
 function limitWarnRgb() {
   const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(cssVar("--partner"));
   return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : { r: 0xff, g: 0x6b, b: 0x4a };
@@ -6093,14 +6794,23 @@ function renderOnboardStep(step, data = {}) {
           <div class="ob-row"><span>Focus</span><b>${escapeHtml(g.focus)}</b></div>
           <div class="ob-row"><span>Pace</span><b>${escapeHtml(p.label)}, ${p.weeks} weeks</b></div>
         </div>
+        <p class="sub" style="margin:18px 0 0;"><strong>About how long per session?</strong></p>
+        <div class="rest-pref five" id="obSessionLen"></div>
+        <p class="sub" id="obSessionNote" style="margin:10px 0 0;"></p>
         <button class="btn-primary" id="startBtn">Start</button>
         <button class="btn-ghost" id="backBtn">Change something</button>
       </div>`;
+    /* The one question this step asks rather than states, and it is here rather
+       than on the goal step because the length the goal would pick on its own
+       is only knowable once the goal is picked, and lighting the wrong chip is
+       worse than asking a step later. Tapping nothing sends nothing. */
+    paintObSessionLengths(data);
     $("startBtn").onclick = () => finishOnboarding({
       name: data.name,
       goal: g.goal,
       goal_bubble: data.goal_bubble || null,
       goal_child: data.goal_child || null,
+      goal_secondary: data.goal_secondary || [],
       goal_detail: data.detail || null,
       focus: g.focus,
       challenge_target: days,
@@ -6110,28 +6820,62 @@ function renderOnboardStep(step, data = {}) {
       pace: p.key,
       weeks: p.weeks,
       days_per_week: days,
+      /* null unless they tapped one. The engine treats null, 0 and nonsense
+         identically to never having been asked, and that is the guarantee that
+         keeps every plan built before this question existed exactly as it was,
+         so a default must never be written here. */
+      session_minutes: Number.isFinite(data.session_minutes) ? data.session_minutes : null,
     });
     $("backBtn").onclick = () => renderOnboardStep("pace", data);   // one step back, not all the way to goal
     return;
   }
 }
 
+/* Async because the goal's own length is read from the engine's table. The
+   chips paint a moment after the step does, which is fine: nothing here is
+   needed to press Start. */
+async function paintObSessionLengths(data) {
+  const el = $("obSessionLen");
+  if (!el) return;
+  const suggested = nearestSessionLength(await goalSessionMinutes(data.goal_bubble, data.goal_child));
+  if (!$("obSessionLen")) return;   // they moved on while the table loaded
+  const paint = () => {
+    const chosen = Number.isFinite(data.session_minutes) ? data.session_minutes : null;
+    $("obSessionNote").textContent = sessionLengthNote(chosen, suggested);
+    renderSessionLengths(el, {
+      chosen, suggested,
+      onPick: (minutes) => { data.session_minutes = minutes; paint(); },
+    });
+  };
+  paint();
+}
+
 async function finishOnboarding(data) {
   ME = data.name;
   // Biometrics are no longer asked for up front. They are optional refinements
   // in Setup, because every question before the plan is a chance to lose someone.
-  const { data: saved, error } = await sb.from("profiles").upsert({
+  /* Through upsertGoalFields, not straight at the table: goal_secondary is
+     behind an unapplied migration, and a first-run setup must not fail on a
+     column that does not exist yet. */
+  const { data: saved, error, droppedSecondary, droppedSession } = await upsertGoalFields({
     email: MY_EMAIL,
     user_name: ME,
     focus: data.focus,
+    /* Only present when they actually tapped a length. Sending null instead
+       would put every new account through the missing-column retry below for a
+       value that means the same as the column's own default. */
+    ...(Number.isFinite(data.session_minutes) ? { session_minutes: data.session_minutes } : {}),
     goal: data.goal,
     goal_bubble: data.goal_bubble || null,
     goal_child: data.goal_child || null,
+    goal_secondary: data.goal_secondary || [],
     goal_detail: data.goal_detail || null,
     challenge_target: data.challenge_target || 4,
     updated_at: new Date().toISOString(),
-  }).select().maybeSingle();
+  });
   if (error) { toast("Setup failed, try again"); console.error(error); return; }
+  if (droppedSecondary && (data.goal_secondary || []).length) toast("Your extra goals are not being stored yet.");
+  if (droppedSession) toast("Your session length is not being stored yet.");
   MY_PROFILE = saved;
   clearObDraft();
   if (data.goal_key) await setActiveGoal(data);
@@ -6266,12 +7010,6 @@ function showApp() {
     if (PARTNER_EMAIL) { switchTab("progress"); return; }
     switchTab("setup");
     openSettingsPage("partner");
-  });
-
-  $("customiseToggle").addEventListener("click", () => {
-    const body = $("customiseBody");
-    const open = body.classList.toggle("hidden") === false;
-    $("customiseToggle").classList.toggle("open", open);
   });
 
   $("progMeBtn").addEventListener("click", () => { PROGRESS_VIEW = "me"; renderProgressTab(); });
@@ -10925,7 +11663,9 @@ function renderLog() {
   const viewedIsMe = PROGRESS_VIEW !== "partner";
   const combined = ALL_ENTRIES
     .filter((e) => e.user_name === (viewedIsMe ? ME : partnerName()))
-    .sort((a, b) => b.entry_date.localeCompare(a.entry_date)).slice(0, 20);
+    // Ten, not twenty. Now that the list is not inside its own scroller it is
+    // as long as it looks, and the whole history is two taps away on Home.
+    .sort((a, b) => b.entry_date.localeCompare(a.entry_date)).slice(0, 10);
   const list = $("logList");
   if (combined.length === 0) {
     list.innerHTML = emptyState("checklist", "Nothing logged yet",
@@ -10950,7 +11690,7 @@ function renderLog() {
        legend, so the size travels with the markup. */
     return `<div class="log-item">
       <span class="dot" style="background:${color};width:8px;height:8px;flex:none;border:none;border-radius:50%"></span>
-      <span class="date">${e.entry_date.slice(5)}</span>
+      <span class="date">${escapeHtml(relDayLabel(e.entry_date))}</span>
       <span class="w">${w}</span>${gym}${sets}${rest}
       <span class="note"></span>${edit}
     </div>`;
@@ -11250,18 +11990,74 @@ function closeGenOverlay() {
    here rather than in a toast: it is the caveat on the plan you are reading,
    so it sits above the rows in the sheet's own muted line and stays on screen
    for as long as they do. */
-function revealGeneratedPlan(workout, honest, onGo, planDate, notes = []) {
+/* One sentence off meta.session (CONTRACT.md): the clock this day was costed
+   against, whose clock it was, and what the day really comes to. `budgetMinutes`
+   is this DAY's budget and a short day is six tenths of the week's, so when it
+   disagrees with what was asked for the sentence says which is which rather
+   than reading as the engine ignoring the answer. The two trades, a day that
+   does not fit and a rest that was shortened, are the engine's own sentences
+   and are shown from `notes` instead of being written again here. */
+function sessionRevealLine(session) {
+  const budget = Number(session?.budgetMinutes);
+  if (!Number.isFinite(budget) || budget <= 0) return "";
+  const est = Number(session.estimatedMinutes);
+  const comes = Number.isFinite(est) && est > 0 ? ` This one comes to about ${est}.` : "";
+  /* The engine spells the stated case "asked" (plan.mjs `sessionBudget.source`).
+     Tested for the goal case rather than the other one so a third value could
+     only ever read as a number somebody gave, which is the harmless way round. */
+  if (session.source === "goal") {
+    return `You have not said how long you have, so your goal set the clock at ${budget} minutes.${comes}`
+      + ` Setup, then Training, if that is wrong.`;
+  }
+  const asked = Number(session.asked);
+  if (Number.isFinite(asked) && asked !== budget) {
+    return `You asked for about ${asked} minutes a session. This is a shorter day, built for ${budget}.${comes}`;
+  }
+  return `Built for the ${budget} minutes you asked for.${comes}`;
+}
+
+function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], session = null) {
   if (genCancelled) return;   // they left; the workout is saved either way
   stopGenTicker();
   paintGen(100);
   const list = (workout.exercises || []).slice(0, 8);
+  /* The clock, closed back. meta.session says which clock this day was costed
+     against and whose it was, and a length somebody asked for that is never
+     mentioned again is a question that might as well not have been asked. */
+  const sessionLine = sessionRevealLine(session);
+  /* Two of the four things meta.session can report are trades rather than
+     reassurances: the day that still does not fit, and the rest that was
+     shortened to buy the minutes. The engine already says both out loud in
+     `notes`, so when either happened every note is shown rather than the first
+     three, because the one that got cut would be the one worth reading. */
+  const loud = session?.fits === false || session?.restCompressed === true;
   /* What the plan said about itself (CONTRACT.md `notes`): the limits summary,
      the softened warning when a slot kept a movement that loads a joint they
      said hurts, the day-count clamp. Until 2026-09-10 the engine computed all
      of it and none of it reached a screen, so its defence for prescribing a
      movement someone said hurts ("the plan says so out loud") was false end to
      end. Three at most; the first three are the ones that matter. */
-  const said = (Array.isArray(notes) ? notes : []).filter((n) => typeof n === "string" && n.trim()).slice(0, 3);
+  /* The day that does not fit is said once per day and this sheet is one day,
+     so the other days' copies are dropped. Four near identical paragraphs
+     naming days you are not doing today is a scold, which is the same reason
+     the engine says the rest compression sentence once for the whole week.
+     Keyed off the engine's own sentence, and a rewording there costs this
+     filter and never a note: nothing matching means nothing dropped. */
+  const otherDay = (n) => {
+    const m = /^(.+?) (?:still )?comes to about \d+ minutes against/.exec(n);
+    return !!m && m[1] !== (workout.focus || "");
+  };
+  const heard = (Array.isArray(notes) ? notes : [])
+    .filter((n) => typeof n === "string" && n.trim() && !otherDay(n));
+  const said = loud ? heard : heard.slice(0, 3);
+  /* The engine's own sentence about ramp-up sets: what they are, and that none
+     of it counts as a set or gets logged. It is the only place the app explains
+     them, and it arrives well down `notes`, so a day that bought a ramp keeps
+     that sentence even when the list is trimmed to three. Matched on the
+     engine's phrase, so a rewording there costs this line and never a note. */
+  const ramps = workout.rampSets || [];
+  const rampNote = ramps.length ? heard.find((n) => /ramp-up sets/i.test(n)) : null;
+  if (rampNote && !said.includes(rampNote)) said.push(rampNote);
   const wu = workout.warmup || [];
   const cd = workout.cooldown || [];
   /* Only mention the halves that exist: the old template printed "Opens with
@@ -11293,6 +12089,16 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = []) {
     const forDate = target.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
     const dayAfter = new Date(todayStr() + "T00:00:00");
     dayAfter.setDate(dayAfter.getDate() + 1);
+    /* The estimate is tappable here too, because this is the moment the
+       question gets asked: the plan and the clock are on screen together. The
+       engine's own number when it sent one, the same arithmetic off the
+       exercises when it did not. Today only, since a day queued ahead has no
+       "today" to be a one-off about, and the card it lands on carries the same
+       control anyway. */
+    const estMin = Number(session?.estimatedMinutes) > 0
+      ? Number(session.estimatedMinutes)
+      : sessionEstimateMinutes(workout.exercises);
+    const canRebudget = forToday && !SESSION && !isCoachedClient() && !!estMin;
     const head = forToday
       ? "Your workout"
       : `Queued for ${planDate === isoDate(dayAfter) ? "tomorrow" : target.toLocaleDateString(undefined, { weekday: "long" })}`;
@@ -11301,6 +12107,12 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = []) {
       <div class="gen-focus">${escapeHtml(displayFocus(workout.focus, workout.exercises) || "Ready")}</div>
       ${forToday ? "" : `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(forDate)}</p>`}
       ${honest ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(honest)}</p>` : ""}
+      ${sessionLine ? `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(sessionLine)}</p>` : ""}
+      ${canRebudget ? `<div class="plan-time-row">
+        <button type="button" class="plan-time" id="genTimeBtn" aria-label="About ${estMin} minutes. Change how long you have today.">
+          ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
+        </button>
+      </div>` : ""}
       ${said.map((n) => `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(n)}</p>`).join("")}
       ${stretchLine ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(stretchLine)}</p>` : ""}
       <div class="gen-rows" id="genRows">
@@ -11310,6 +12122,13 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = []) {
             <span class="gen-row-b">
               <span class="gen-row-name">${escapeHtml(ex.name || "")}</span>
               <span class="gen-row-t">${ex.sets || 3} sets · ${ex.reps || 10} reps</span>
+              ${(() => {
+                /* Which lifts have a ramp, and the loads, in one line under the
+                   row. The count and the sentence are above; this is the part
+                   somebody actually needs at the rack. */
+                const r = rampForExercise(ramps, ex.name);
+                return r ? `<span class="gen-row-ramp">Ramp ${escapeHtml(rampLoadsLine(r))}</span>` : "";
+              })()}
             </span>
             <button type="button" class="wp-chip" data-swap="${i}" aria-label="Swap ${escapeHtml(ex.name || "")}">${icon("swap", 15)}</button>
           </div>`).join("")}
@@ -11334,10 +12153,23 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = []) {
           if (!row) return;
           row.querySelector(".gen-row-name").textContent = ex.name;
           row.querySelector(".gen-row-t").textContent = `${ex.sets || 3} sets · ${ex.reps || 10} reps`;
+          /* The ramp was built from the weight of the lift that just left, so it
+             goes with it rather than sitting under a movement it was never for. */
+          row.querySelector(".gen-row-ramp")?.remove();
           row.querySelector("[data-swap]")?.setAttribute("aria-label", `Swap ${ex.name}`);
         },
       });
     });
+    if ($("genTimeBtn")) {
+      $("genTimeBtn").onclick = () => openSessionBudgetSheet({
+        estimate: estMin,
+        current: Number(session?.budgetMinutes) || null,
+        overReveal: true,
+        /* The overlay closes first: applySessionBudget runs a generate, and
+           that opens this same overlay again from the top. */
+        onPick: (m) => { closeGenOverlay(); applySessionBudget(m); },
+      });
+    }
     $("genGoBtn").onclick = () => {
       // Dismissing the offer is itself an answer, and recording it is what keeps
       // "offered once" true rather than "offered after every single plan".
@@ -11598,15 +12430,23 @@ function failGenOverlay(message) {
    whenever a plan is generated the ordinary way, or the focus changes. */
 let REGEN_SEEN = { focus: null, names: [] };
 
-async function generateWorkout(forDate, { sameAgain = false } = {}) {
-  if (isCoachedClient()) { toast("Your coach sets your workouts"); return; }
-  const keepFocus = sameAgain ? TODAY_WORKOUT?.focus || null : null;
+/* `sessionMinutes` is the one-off budget for this call only (applySessionBudget)
+   and is never written to profiles.session_minutes. `wantFocus` keeps the day
+   type across a rebuild that was not asking for different movements. */
+async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = null, keepFocus: wantFocus = null } = {}) {
+  if (isCoachedClient()) { toast("Your coach sets your workouts"); return false; }
+  const keepFocus = sameAgain ? TODAY_WORKOUT?.focus || null : wantFocus || null;
   if (!sameAgain || REGEN_SEEN.focus !== keepFocus) REGEN_SEEN = { focus: keepFocus, names: [] };
   if (sameAgain) {
     for (const e of TODAY_WORKOUT?.exercises || []) {
       if (!REGEN_SEEN.names.includes(e.name)) REGEN_SEEN.names.push(e.name);
     }
   }
+  /* Empty for a budget change, on purpose. "Give me a different one" and "give
+     me a shorter one" are different asks: avoiding what is on the plan would
+     hand back other movements when the person only ever said they had less
+     time, and it would fight the engine's own ladder, which shortens a session
+     by trimming sets off THESE lifts before it drops any of them. */
   const avoid = sameAgain ? [...REGEN_SEEN.names] : [];
   /* This used to be wired straight to onclick, which handed it a PointerEvent
      as forDate. That went all the way into entry_date and came back as
@@ -11678,11 +12518,22 @@ async function generateWorkout(forDate, { sameAgain = false } = {}) {
         current_weight: recentWeight,
         gym_days_this_week: recentGymDays,
         challenge_target: MY_PROFILE?.challenge_target ?? null,
+        /* How long one session should take, from Setup > Training. null on a
+           database without the column yet and on anybody who never answered,
+           and the contract says null is byte for byte "never asked".
+           A one-off budget is this same field with a different number on this
+           one call, which is all the engine needs and all it ever gets: the
+           profile column stays exactly as it was. */
+        session_minutes: Number.isFinite(sessionMinutes) ? sessionMinutes : (MY_PROFILE?.session_minutes ?? null),
         focus_groups: MY_PROFILE?.focus_groups ?? null,
         focus_chosen_at: MY_PROFILE?.focus_chosen_at ?? null,
         limits: MY_PROFILE?.limits ?? null,
         goal_bubble: MY_PROFILE?.goal_bubble ?? null,
         goal_child: MY_PROFILE?.goal_child ?? null,
+        /* The "and also" goals. null on a database without the column yet, and
+           the contract says null, [] and nonsense all mean the same as not
+           sending it, so this line is safe before the migration runs. */
+        goal_secondary: MY_PROFILE?.goal_secondary ?? null,
         history,
         logs: recentLogs,
         plans: recentPlans,
@@ -11706,10 +12557,16 @@ async function generateWorkout(forDate, { sameAgain = false } = {}) {
     if (resp.status === 429) {
       failGenOverlay(data.error || "You have hit today's limit on new workouts. Try again tomorrow.");
       isToday ? renderWorkoutTab() : renderHero();
-      return;
+      return false;
     }
     if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
     if (!data.workout?.exercises?.length) throw new Error("Coach returned an empty workout");
+
+    /* meta.goals is the engine's read-back of what each extra goal actually
+       bought, and an empty `effect` means it bought nothing. It names ids, not
+       labels, so the goal picker is the only screen that can turn it into a
+       sentence with a goal's name in it. Kept here for that. */
+    rememberGoalOutcome(data.meta?.goals);
 
     /* data.honest is not written here: ai_workouts has no column for it, and
        migrations are owned elsewhere. It lives as long as the reveal sheet
@@ -11724,8 +12581,13 @@ async function generateWorkout(forDate, { sameAgain = false } = {}) {
          that iterates that array treats an entry as sets of a lift, and a
          stretch must never become a logged set. null from an engine that sent
          none reads the same as two empty arrays everywhere below. */
-      mobility: (data.workout.warmup?.length || data.workout.cooldown?.length)
-        ? { warmup: data.workout.warmup || [], cooldown: data.workout.cooldown || [], skipped: false }
+      /* `ramp` is workout.rampSets, kept in this same not-a-set bucket rather
+         than given a column of its own: the rule that matters is that it never
+         reaches `exercises`, and this is already the column for everything the
+         day asks for that must never be counted, logged or calibrated against. */
+      mobility: (data.workout.warmup?.length || data.workout.cooldown?.length || data.workout.rampSets?.length)
+        ? { warmup: data.workout.warmup || [], cooldown: data.workout.cooldown || [],
+            ramp: data.workout.rampSets || [], skipped: false }
         : null,
       archived: false,
       /* The other two writers of this row clear these and the generator did
@@ -11752,17 +12614,21 @@ async function generateWorkout(forDate, { sameAgain = false } = {}) {
       await loadTodayWorkout();
       FRESH_PLAN_ID = TODAY_WORKOUT?.id || null;
       renderWorkoutTab();
-      revealGeneratedPlan(data.workout, data.honest, () => switchTab("workout"), target, data.notes);
+      revealGeneratedPlan(data.workout, data.honest, () => switchTab("workout"), target, data.notes, data.meta?.session);
     } else {
       renderHero();
-      revealGeneratedPlan(data.workout, data.honest, () => toast("Tomorrow is planned"), target, data.notes);
+      revealGeneratedPlan(data.workout, data.honest, () => toast("Tomorrow is planned"), target, data.notes, data.meta?.session);
     }
+    /* Answered, so a caller that has to undo something on failure can tell the
+       two apart. Nothing else reads it. */
+    return true;
   } catch (err) {
     console.error("generateWorkout failed:", err);
     // Showing the real reason (not a generic line) is what makes the NEXT failure
     // self-diagnosing instead of another silent "try again and hope" report.
     failGenOverlay(err.message || String(err));
     isToday ? renderWorkoutTab() : renderHero();
+    return false;
   }
 }
 
@@ -12892,6 +13758,52 @@ function renderStretchPhase() {
 let SESSION_JUST_SET = null;   // a set logged a moment ago, popped once on redraw
 let SESSION_LAST_EX = null;    // the exercise last drawn, so a change can slide in
 
+/* Which lift's ramp is folded open, by index, while the session is alive. Open
+   is the default because the loads are the whole point of showing it, and the
+   fold is for the second lift of a day you already know the numbers on. Closing
+   it is not "done": that is the dismiss below, which is remembered. */
+const RAMP_OPEN = {};
+
+/* The ramp above the working sets, at the one moment it is useful: standing at
+   the bar deciding what to load. It carries NO tickable control of any kind and
+   writes nothing, which is how a ramp set stays out of SESSION.setsDone, out of
+   the set counter and the progress bar, out of exercise_logs and out of the
+   volume and XP that are summed from those. It disappears on its own the moment
+   a working set of this lift is logged, and "I'm warmed up" hides it for the
+   rest of the session for anyone who walked in warm. */
+function sessionRampHTML(ex, ei, setsDone) {
+  const ramp = rampForExercise(planMobility()?.ramp, ex?.name);
+  if (!ramp || setsDone.some(Boolean) || SESSION?.rampDone?.[ei]) return "";
+  const open = RAMP_OPEN[ei] !== false;
+  const mins = Math.max(1, Math.round((Number(ramp.seconds) || 0) / 60));
+  const top = Number(ex.targetWeight) > 0 ? ` up to ${ex.targetWeight} lb` : "";
+  /* The second main lift of a day earns exactly one rung, so the singular is a
+     real case rather than a defensive one. */
+  const n = ramp.sets.length;
+  return `
+    <div class="ramp-fold${open ? " open" : ""}">
+      <button type="button" class="ramp-head" data-ramp-toggle aria-expanded="${open}">
+        <span class="ramp-head-ico">${icon("flame", 15)}</span>
+        <span class="ramp-head-text">
+          <b>Warm-up set${n === 1 ? "" : "s"}${top}</b>
+          <i>${n} light set${n === 1 ? "" : "s"} · about ${mins} min · nothing to log</i>
+        </span>
+        <span class="ramp-head-chev">${icon("chevronDown", 16)}</span>
+      </button>
+      ${open ? `
+        <div class="ramp-rungs">
+          ${ramp.sets.map((s) => `
+            <div class="ramp-rung">
+              <span class="ramp-rung-load">${Number(s.weight) > 0 ? `${s.weight} lb` : "Bar"}</span>
+              <span class="ramp-rung-reps">× ${s.reps}</span>
+              <span class="ramp-rung-rest">${s.restSec}s rest</span>
+            </div>
+            ${s.cue ? `<div class="ramp-cue">${escapeHtml(s.cue)}</div>` : ""}`).join("")}
+        </div>
+        <button type="button" class="link-btn ramp-skip" data-ramp-done>I'm warmed up</button>` : ""}
+    </div>`;
+}
+
 function renderSession() {
   beatLive();
   /* The two timed phases have their own screen. Everything below this line is
@@ -13067,6 +13979,18 @@ function renderSession() {
 
   if ($("restSkip")) $("restSkip").onclick = () => startNextSet(currentSet);
 
+  /* Both of these only touch the ramp: neither goes near SESSION.setsDone,
+     SESSION.completed or the log. The dismiss is remembered on SESSION so it
+     survives a reload mid-session rather than coming back on every redraw. */
+  const rampToggle = $("sessionBody").querySelector("[data-ramp-toggle]");
+  if (rampToggle) rampToggle.onclick = () => { RAMP_OPEN[ei] = RAMP_OPEN[ei] === false; renderSession(); };
+  const rampDone = $("sessionBody").querySelector("[data-ramp-done]");
+  if (rampDone) rampDone.onclick = () => {
+    SESSION.rampDone = { ...(SESSION.rampDone || {}), [ei]: true };
+    saveSessionToStorage();
+    renderSession();
+  };
+
   if ($("sessPrivacyBtn")) $("sessPrivacyBtn").onclick = openWorkoutPrivacy;
   if ($("sessSwapBtn")) $("sessSwapBtn").onclick = swapCurrentExercise;
 
@@ -13100,16 +14024,29 @@ function renderSession() {
   // Typing straight into the field beats tapping + fifteen times.
   // The clamp has to reach the field as well as the value: a set logged at 0
   // while the box still shows -40 is the app disagreeing with itself.
+  /* There was a floor and no ceiling, and the ceiling is the one that hurts.
+     A logged lift is not just a record, it is the input the generator
+     extrapolates the next prescription from, so a missed decimal point comes
+     back as a target. A fuzz run found a single 200 lb goblet squat producing
+     an 870 lb leg press, and a typed 99,999 producing 33,250. Both caps sit
+     well above any real human lift, so they never argue with a true number
+     and only ever catch a typo. The engine has its own guard; this stops the
+     bad number reaching the log in the first place. */
+  const MAX_LIFT_LB = 2000;
+  const MAX_REPS = 500;
+  const clampInput = (el, v, lo, hi) => {
+    const n = Math.min(hi, Math.max(lo, v));
+    if (v < lo || v > hi) el.value = n;
+    return n;
+  };
   $("sessWeightVal").oninput = (e) => {
     const v = parseFloat(e.target.value);
-    SESSION.weights[ei] = isNaN(v) ? 0 : Math.max(0, v);
-    if (v < 0) e.target.value = SESSION.weights[ei];
+    SESSION.weights[ei] = isNaN(v) ? 0 : clampInput(e.target, v, 0, MAX_LIFT_LB);
     saveSessionToStorage();
   };
   $("sessRepsVal").oninput = (e) => {
     const v = parseInt(e.target.value, 10);
-    SESSION.reps[ei] = isNaN(v) ? 0 : Math.max(0, v);
-    if (v < 0) e.target.value = SESSION.reps[ei];
+    SESSION.reps[ei] = isNaN(v) ? 0 : clampInput(e.target, v, 0, MAX_REPS);
     saveSessionToStorage();
   };
   // An emptied field logged 0 while showing nothing, so put the real number
@@ -13806,6 +14743,25 @@ const EQUIPMENT_WORDS = [
   ["Bodyweight", ["push up", "push-up", "pull up", "pull-up", "chin up", "dip", "plank", "sit up"]],
 ];
 
+/* What a plan costs in minutes, costed the way the engine costs it:
+   mo-knowledge/engine/plan.mjs `estimateMinutes`, which is thirty seconds of
+   work per set plus that set's own rest, plus the warm-up.
+
+   Derived from the exercises rather than read off a stored meta.session, for
+   two reasons. ai_workouts has no column for the engine's session block, and a
+   stored number would stop being true the moment somebody added, removed,
+   swapped or re-dialled a row, all of which are one tap away on the same
+   screen. A row the engine never wrote carries no restSec, so the app's own
+   default stands in, which is the fallback the rest timer already uses. */
+const PLAN_REP_SECONDS = 30;   // plan.mjs REP_SECONDS
+const PLAN_WARMUP_MIN = 6;     // plan.mjs WARMUP_MIN
+function sessionEstimateMinutes(list) {
+  const ex = (list || []).filter((e) => e && e.name);
+  if (!ex.length) return null;
+  const seconds = ex.reduce((t, e) => t + (e.sets || 3) * (PLAN_REP_SECONDS + (Number(e.restSec) || DEFAULT_REST_SEC)), 0);
+  return Math.round(PLAN_WARMUP_MIN + seconds / 60);
+}
+
 /* What we can honestly propose for the next session, all of it measured from
    the user's own logs.
 
@@ -13846,10 +14802,10 @@ function planFromToday() {
   const targets = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 4)
     .map(([g]) => pretty[g] || g.charAt(0).toUpperCase() + g.slice(1));
 
-  /* The same arithmetic the engine costs a session with: work plus the rest
-     between sets, plus the warm-up minutes. A range, because reps vary. */
-  const secs = list.reduce((t, e) => t + (e.sets || 3) * (30 + (Number(e.restSec) || DEFAULT_REST_SEC)), 0);
-  const mins = Math.round(secs / 60) + 5;
+  /* The same arithmetic the engine costs a session with, and now literally the
+     same function the tappable estimate on the plan uses, so the two numbers on
+     two screens cannot disagree. A range, because reps vary. */
+  const mins = sessionEstimateMinutes(list);
 
   /* Match, defined the same way as the proposal below: how much of this
      session lands on what the week has trained least. A plan that hits your
@@ -15293,7 +16249,34 @@ function planMobility() {
     skipped: !!m.skipped,
     skippedWarmup: m.skippedWarmup ?? !!m.skipped,
     skippedCooldown: m.skippedCooldown ?? !!m.skipped,
+    /* Ramp-up sets ride here for exactly the reason the stretches do: this
+       column is everything the day asks for that is NOT a working set, and
+       `exercises` is the only array calibration joins a log against. A ramp set
+       written there would be read as prescribed work that was skipped, and next
+       week's weights would come down for it (CONTRACT.md, workout.rampSets).
+       Written by the generator as `ramp`; absent on every plan built before
+       today and on every day that bought none, which reads as [] here. */
+    ramp: Array.isArray(m.ramp) ? m.ramp : [],
   };
+}
+
+/* The ramp for one lift, by name, or null. A swapped exercise finds nothing,
+   which is right: the ramp was built from the weight of the lift it replaced. */
+function rampForExercise(list, name) {
+  const want = String(name || "").trim().toLowerCase();
+  if (!want) return null;
+  const found = (Array.isArray(list) ? list : [])
+    .find((r) => String(r?.exercise || "").trim().toLowerCase() === want);
+  return found && Array.isArray(found.sets) && found.sets.length ? found : null;
+}
+
+/* One ramp said as loads, which is the part worth reading: "bar × 8 · 40 × 5".
+   `weight: 0` is the empty bar, the empty machine or the lightest thing they
+   have (CONTRACT.md), so it is a word rather than a zero. */
+function rampLoadsLine(ramp) {
+  return (ramp?.sets || [])
+    .map((s) => `${Number(s.weight) > 0 ? s.weight : "bar"} × ${s.reps}`)
+    .join(" · ");
 }
 
 /* The cardio the goal asks for, said in words rather than as a row you could
@@ -15415,6 +16398,141 @@ async function savePlanExercises() {
   return true;
 }
 
+/* ---------- How long you have TODAY ----------
+   Mo: "you see your workout, the time on the workout. It would be like,
+   estimated time thirty minutes, and you can always say, oh, sixty minutes.
+   And then it would remove the workouts that would basically try to equate to
+   that time."
+
+   Not by removing exercises. The engine already has four levers for a budget
+   and it runs them gentlest first: shave a set off a non-priority accessory,
+   drop that accessory, shave sets off everything including the mains, and only
+   then compress the rest between sets, which it announces because that is a
+   real trade against what the goal prescribed. Deleting a movement is the
+   second of the four and the most training value per minute saved, so this
+   control never touches the list. It asks the engine for the same day at a
+   different budget and takes back whatever the ladder built.
+
+   One-off, and profiles.session_minutes is deliberately not written. That
+   column is the sticky answer and has its own control in Setup > Training. A
+   Tuesday with a meeting on it must not quietly become "short sessions, for
+   ever", which is what writing the column on a tap would mean.
+
+   And the stored row is REPLACED rather than the screen being trimmed over a
+   stale one. Calibration went live today: it reads the plan that was prescribed
+   against what was logged and backs the weights off on a shortfall. A 45 minute
+   row left in the database under a 30 minute session is somebody punished with
+   lighter weights for having been busy on a Tuesday. */
+let ONE_OFF_SESSION = null;   // { date, minutes, made, from: { minutes, focus, exercises, mobility, cardio } }
+
+/* Enough of a plan to tell whether it is still the one the budget change made.
+   Anything else writing this day (a plain Regenerate, a saved workout dropped
+   on it, a row removed by hand) moves this string, and the offer to put the
+   original back takes itself off rather than restoring over work it never saw. */
+const planSignature = (list) => (list || []).map((e) => `${e?.name}:${e?.sets}x${e?.reps}`).join("|");
+
+/* The five lengths are the ones Setup uses, on purpose: two controls that mean
+   the same thing should not offer different numbers. `current` is what we know
+   this day was built for, and it only lights a chip. */
+function openSessionBudgetSheet({ estimate, current, onPick, overReveal = false }) {
+  const lit = SESSION_LENGTHS.includes(current) ? current : nearestSessionLength(estimate);
+  const scrim = document.createElement("div");
+  /* The reveal is a full screen overlay above everything else, so a sheet
+     opened from it has to sit above that rather than behind it. Dismissing it
+     leaves the reveal exactly where it was, which is why this is not "close the
+     reveal first". */
+  scrim.className = overReveal ? "pop-scrim over-gen" : "pop-scrim";
+  scrim.innerHTML = `
+    <div class="pop">
+      <div class="pop-body">
+        <div class="ds-top">
+          <div class="pop-who" style="color:var(--muted)">JUST FOR TODAY</div>
+          <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
+        </div>
+        <p class="muted-note">This one comes to about ${estimate} minutes. Say what you actually have and the plan is rebuilt to fit: sets come off the accessories first, a lift only if that is not enough, and the rest between sets last. Anything you added or swapped by hand is replaced.</p>
+        <div class="rest-pref five" id="oneOffLengths"></div>
+        <p class="muted-note" style="margin-top:12px;">Today only. Your usual session length, in Setup then Training, is not touched.</p>
+        <button type="button" class="btn-ghost" data-close>Keep this one</button>
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+  const close = () => scrim.remove();
+  scrim.querySelectorAll("[data-close]").forEach((b) => { b.onclick = close; });
+  scrim.onclick = (e) => { if (e.target === scrim) close(); };
+  renderSessionLengths($("oneOffLengths"), {
+    chosen: lit, suggested: lit,
+    onPick: (minutes) => {
+      close();
+      /* renderSessionLengths answers null when the lit chip was the one tapped,
+         which in Setup means "let the goal decide again". Here the lit chip is
+         the length this day already has, so tapping it is "leave it alone" and
+         must not spend a generate on rebuilding the same plan. */
+      if (minutes === null || minutes === lit) return;
+      onPick(minutes);
+    },
+  });
+}
+
+/* One generate at the new budget, and the row it writes is the row on screen.
+   The plan being replaced is kept whole in memory first: ai_workouts holds one
+   row per person per day, so there is nowhere in the database to park the old
+   version (archiving it would only mean the next upsert wrote onto the archived
+   row), and a snapshot that lives as long as the app is open is the right
+   length for the change of mind it exists for. */
+async function applySessionBudget(minutes) {
+  if (!TODAY_WORKOUT?.exercises?.length) return;
+  /* Belt and braces against a caller that got its hands on this while a session
+     is open. Mid-session is the third case and it is not this control. */
+  if (SESSION) return;
+  const date = TODAY_WORKOUT.entry_date || todayStr();
+  /* The snapshot is the ORIGINAL session, not the previous one. Shorten twice
+     and "back to" still means the plan the day started with, which is the thing
+     somebody is actually trying to get back to; keeping the last step instead
+     would strand them one version away from it with nothing named on screen. */
+  const snapshot = {
+    date,
+    minutes,
+    from: (ONE_OFF_SESSION?.date === date && ONE_OFF_SESSION.from) || {
+      minutes: sessionEstimateMinutes(TODAY_WORKOUT.exercises),
+      focus: TODAY_WORKOUT.focus,
+      exercises: JSON.parse(JSON.stringify(TODAY_WORKOUT.exercises)),
+      mobility: TODAY_WORKOUT.mobility ? JSON.parse(JSON.stringify(TODAY_WORKOUT.mobility)) : null,
+      cardio: TODAY_WORKOUT.cardio ?? null,
+    },
+  };
+  const keepFocus = TODAY_WORKOUT.focus;
+  ONE_OFF_SESSION = snapshot;
+  /* A failed generate leaves the old plan exactly where it was, so there is
+     nothing to offer to put back. */
+  const ok = await generateWorkout(null, { sessionMinutes: minutes, keepFocus });
+  if (!ok) { if (ONE_OFF_SESSION === snapshot) ONE_OFF_SESSION = null; return; }
+  snapshot.made = planSignature(TODAY_WORKOUT?.exercises);
+  /* The reveal is already on screen by now and the card behind it was rendered
+     before `made` was stamped, so it is redrawn with the offer on it. */
+  renderWorkoutTab();
+}
+
+/* "Actually, put it back." Written the same way every other writer of this row
+   writes it, and it clears the same two fields for the same reason: the row the
+   screen shows has to be the row calibration later reads. */
+async function restoreSessionBudget() {
+  const snap = ONE_OFF_SESSION;
+  if (!snap?.from?.exercises?.length) return;
+  const { error } = await sb.from("ai_workouts").upsert({
+    user_name: ME, email: MY_EMAIL, entry_date: snap.date,
+    focus: snap.from.focus, exercises: snap.from.exercises,
+    mobility: snap.from.mobility, cardio: snap.from.cardio,
+    archived: false, completed_at: null, duration_sec: null,
+  }, { onConflict: "email,entry_date" });
+  if (error) { console.error("could not put the original plan back", error); toast("Couldn't put that back. Try again."); return; }
+  ONE_OFF_SESSION = null;
+  await loadAll();
+  await loadTodayWorkout();
+  FRESH_PLAN_ID = TODAY_WORKOUT?.id || null;
+  renderWorkoutTab();
+  toast("Your original session is back");
+}
+
 function renderPlanPreview() {
   // Reachable straight from choose/manual/week now, each of which stamps its
   // own heading here, clear it or their title outlives them on this screen.
@@ -15432,8 +16550,31 @@ function renderPlanPreview() {
   const started = doneCount > 0 && !fresh;
   const finished = doneCount >= total && total > 0 && !fresh;
 
+  /* The estimate, tappable. Gone the moment a session is open, whether or not a
+     set has been ticked: from there only what is LEFT of the day can be
+     re-planned, which is a different algorithm and a different control (see
+     ONE_OFF_SESSION above), and rebuilding the whole day underneath a live
+     SESSION would strand the sets already done against exercises that are no
+     longer on the plan. Gone for a coached client for the same reason
+     Regenerate is: their coach writes this. */
+  const estMin = sessionEstimateMinutes(TODAY_WORKOUT.exercises);
+  const oneOff = (ONE_OFF_SESSION?.date === (TODAY_WORKOUT.entry_date || todayStr())
+    && ONE_OFF_SESSION.made === planSignature(TODAY_WORKOUT.exercises)) ? ONE_OFF_SESSION : null;
+  const timeRow = (started || finished || SESSION || isCoachedClient() || !estMin) ? "" : `
+    <div class="plan-time-row">
+      <button type="button" class="plan-time" id="planTimeBtn" aria-label="About ${estMin} minutes. Change how long you have today.">
+        ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
+      </button>
+      ${oneOff?.from?.minutes ? `<button type="button" class="link-btn" id="planTimeBackBtn">Back to ${oneOff.from.minutes} min</button>` : ""}
+    </div>`;
+
+  const planRamps = planMobility()?.ramp || [];
   const rows = TODAY_WORKOUT.exercises.map((ex, i) => {
     const isDone = loggedNow.has(ex.name.toLowerCase());
+    /* One quiet line, not a block: the card is the list of lifts, and a ramp is
+       something you read at the rack rather than here. Gone once the lift is
+       logged, because by then it has been done or it has not. */
+    const ramp = isDone ? null : rampForExercise(planRamps, ex.name);
     const doneMark = isDone ? icon("check") : icon("dumbbell");
     return `<div class="exercise-row ${isDone ? "ex-done" : ""} ${started ? "" : "draggable"}" data-idx="${i}">
       ${started ? "" : `<button type="button" class="grip" data-grip aria-label="Drag to reorder">${icon("grip", 16)}</button>`}
@@ -15441,6 +16582,7 @@ function renderPlanPreview() {
       <button type="button" class="ex-body ex-tap" data-plan-edit="${i}"${isDone ? " disabled" : ""}>
         <div class="ex-name">${escapeHtml(ex.name)}</div>
         <div class="ex-target">${ex.sets} sets · ${ex.reps} reps${Number(ex.targetWeight) > 0 ? ` · ${ex.targetWeight} lb` : ""}${isDone ? "" : ` ${icon("pencil", 11)}`}</div>
+        ${ramp ? `<div class="ex-ramp">${icon("flame", 11)}<span>Ramp ${escapeHtml(rampLoadsLine(ramp))}</span></div>` : ""}
         ${ex.note ? `<div class="ex-note">${escapeHtml(humanizeNoteDates(ex.note))}</div>` : ""}
       </button>
       ${isDone ? "" : `<button type="button" class="wp-chip" data-plan-swap="${i}" aria-label="Swap ${escapeHtml(ex.name)}">${icon("swap", 15)}</button>`}
@@ -15455,6 +16597,7 @@ function renderPlanPreview() {
       <span class="workout-progress-count">${doneCount}/${total}</span>
     </div>
     <div class="workout-progress-track"><div class="workout-progress-fill" style="width:${total ? (doneCount / total) * 100 : 0}%"></div></div>
+    ${timeRow}
     ${stretchBlockHTML("warmup", finished)}
     <div class="reorder-list" id="planRows">${rows}</div>
     ${stretchBlockHTML("cooldown", finished)}
@@ -15541,6 +16684,15 @@ function renderPlanPreview() {
   if ($("planAddExToggleBtn")) {
     $("planAddExToggleBtn").onclick = () => cbOpenPicker("plan");
   }
+
+  if ($("planTimeBtn")) {
+    $("planTimeBtn").onclick = () => openSessionBudgetSheet({
+      estimate: estMin,
+      current: oneOff?.minutes ?? null,
+      onPick: applySessionBudget,
+    });
+  }
+  if ($("planTimeBackBtn")) $("planTimeBackBtn").onclick = restoreSessionBudget;
 
   // These three are mutually exclusive depending on how far the workout got.
   if ($("planPrivacyBtn")) $("planPrivacyBtn").onclick = openWorkoutPrivacy;
@@ -16438,14 +17590,22 @@ async function bodyFocusGroup(group) {
 /* Body impact is a viewer, and this is its one way out to a real preference:
    you tapped a muscle to read it, and if that turns out to be the thing you
    care about, saying so here means the next generated week acts on it. The
-   picker in Setup is still where a focus is built or dropped. */
+   picker in Setup is still where a focus is built or dropped, and it is still
+   the only place a level is chosen: this shortcut adds at Secondary, the middle
+   tier, which is what a pick with no level on it has always meant. */
 async function addFocusGroup(group) {
-  const current = (MY_PROFILE?.focus_groups || []).filter((g) => BODY_GROUP_LABELS[g]);
-  if (!group || current.includes(group)) return;
-  if (current.length >= MAX_FOCUS_GROUPS) { toast("Four is plenty, drop one first"); return; }
-  const next = [...current, group];
-  if (!await saveFocusGroups(next)) return;
-  toast("Focus saved: " + next.map((g) => BODY_GROUP_LABELS[g]).join(", "));
+  await ensureFocusBudget();
+  const { all, picked } = focusParseStored(MY_PROFILE?.focus_groups);
+  if (!group || !BODY_GROUP_LABELS[group] || picked.has(group)) return;
+  // Whole body is one token, and adding a group to it is what un-picks it.
+  const next = all ? new Map() : picked;
+  next.set(group, FOCUS_TIERS.secondary);
+  const order = focusOrderOf(next);
+  if (!await saveFocusGroups(order.map(([g, t]) => `${g}:${t}`))) return;
+  const spent = order.reduce((n, [, t]) => n + t, 0);
+  toast(spent > FOCUS_BUDGET_UNITS
+    ? `${BODY_GROUP_LABELS[group]} added. That is over the ${FOCUS_BUDGET_UNITS} point budget, so Focus areas will show what stopped earning.`
+    : `${BODY_GROUP_LABELS[group]} added as a secondary focus.`);
   renderBodyDetail();
 }
 
@@ -16486,8 +17646,11 @@ function renderBodyDetail() {
         : `<div class="bi-detail-pct none">Not hit ${escapeHtml(word)}</div>`}
     </div>
     <div class="bi-detail-bar" style="--heat:${heatOf(f.muscle)}"><i style="--fill:${pct.toFixed(3)}"></i></div>
-    ${(MY_PROFILE?.focus_groups || []).includes(piece.group)
-      ? `<div class="bi-detail-sub" style="margin-top:12px;">${icon("check", 13)} ${escapeHtml(groupLabel)} is one of your focus areas.</div>`
+    ${focusTierOfGroup(piece.group)
+      ? (() => { const t = focusTierOfGroup(piece.group);
+          /* The level is named and counted in pips, never just tinted: this
+             line is the one place outside the picker that reports a tier. */
+          return `<div class="bi-detail-sub bi-focus-tier focus-t${t}" style="margin-top:12px;">${focusPips(t)} ${escapeHtml(groupLabel)} is a <b>${escapeHtml(FOCUS_TIER_WORD[t].toLowerCase())}</b> focus area.</div>`; })()
       : `<button type="button" class="bi-back" id="biFocusAdd" data-group="${piece.group}" style="margin:12px 0 0;">${icon("dumbbell", 13)} Focus on this</button>`}
     ${heads ? `<div class="bi-detail-label">Parts</div><div class="bi-chips">${heads}</div>` : ""}
     <div class="bi-detail-label">${sets > 0 ? "Hit by" : "Try"}</div>
@@ -16917,14 +18080,14 @@ let PROGRESS_VIEW = "me";
 function viewedName() { return PROGRESS_VIEW === "partner" ? partnerName() : ME; }
 function viewedEmail() { return PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY_EMAIL; }
 
-const TRACK_OPTIONS = [
-  { key: "weight",      label: "Body weight",  icon: "trending",  card: "cardWeight" },
-  { key: "strength",    label: "Strength",     icon: "dumbbell",  card: "cardStrength" },
-  { key: "volume",      label: "Volume",       icon: "bolt",      card: "cardVolume" },
-  { key: "consistency", label: "Consistency",  icon: "flame",     card: "cardConsistency" },
-  { key: "photos",      label: "Body photos",  icon: "camera",    card: "cardPhotos" },
-  { key: "activity",    label: "Activity log", icon: "checklist", card: "cardActivity" },
-  { key: "steps",       label: "Steps",        icon: "run",       card: null, needsApp: true },
+/* Every card this tab owns, in ONE fixed order. Whatever the goal does not ask
+   for falls through to the section under the rule in exactly this sequence, so
+   the bottom of the tab is the same shape for everybody and a person who
+   learned where their weigh-ins are does not find them somewhere else when
+   their goal changes. */
+const PROGRESS_CARDS = [
+  "cardWeight", "scaleCheckCard", "cardConsistency",
+  "cardStrength", "cardVolume", "cardPhotos", "cardActivity",
 ];
 
 /* ---------- What this tab is supposed to answer ----------
@@ -16993,76 +18156,44 @@ function headlineKindFor(profile) {
   return "habit";
 }
 
-/* Which existing card each headline is the summary of, so the tab can put that
-   one directly under the answer and leave the rest in their old order. The
-   pull-up and push-up headline points at the activity log rather than at
-   Strength, because Strength is built out of topLiftsFor, which keeps only
-   logs that carry a weight: a bodyweight movement is not in it, and sending
-   someone to a card that does not contain the thing they came for is worse
-   than sending them nowhere. */
-const HEADLINE_CARD = {
-  scale: "cardWeight", recomp: "cardConsistency", lift: "cardStrength",
-  volume: "cardVolume", reps: "cardActivity", endurance: "cardActivity",
-  habit: "cardConsistency",
+/* ---------- What the goal puts on the screen ----------
+
+   There used to be a "Customise this tab" card with a row of chips in it, and
+   `tracked_metrics` on the profile behind them. It is gone, and nothing writes
+   or reads that column any more.
+
+   Asking somebody which charts they would like is asking them to do the app's
+   job. They already answered the only question that matters, at onboarding,
+   when they said what they wanted. A person should never have to make a
+   decision in order to see their progress.
+
+   So the goal owns the whole screen. These are the cards that are genuinely
+   part of each reading's story, in the order they should be read, with the one
+   the headline was computed from first:
+
+     scale      weight, then the scale, then photos, then the weeks. Fat loss
+                is a rate and a habit, and the photo strip is the part that
+                keeps people going when the number stalls
+     recomp     weeks first and the scale LAST, because the whole claim of this
+                goal is that the number is not the measure
+     lift       the lift, then the weeks that produced it
+     volume     tonnage, then the lifts under it, then the weeks
+     reps       the log, then the weeks. Strength is deliberately not here: it
+                is built from weighted logs and a pull-up carries no weight
+     endurance  same, for the same reason
+     habit      the weeks, then the log. No weight chart anywhere near it
+
+   Everything left over is not deleted and not hidden behind a control: it is
+   under the rule at the bottom, in PROGRESS_CARDS order, same for everyone. */
+const GOAL_CARDS = {
+  scale:     ["cardWeight", "scaleCheckCard", "cardPhotos", "cardConsistency"],
+  recomp:    ["cardConsistency", "cardPhotos", "cardWeight", "scaleCheckCard"],
+  lift:      ["cardStrength", "cardConsistency"],
+  volume:    ["cardVolume", "cardStrength", "cardConsistency"],
+  reps:      ["cardConsistency", "cardActivity"],
+  endurance: ["cardConsistency", "cardActivity"],
+  habit:     ["cardConsistency", "cardActivity"],
 };
-const HEADLINE_METRIC = {
-  scale: "weight", recomp: "consistency", lift: "strength",
-  volume: "volume", reps: "activity", endurance: "activity",
-  habit: "consistency",
-};
-/* Named for what the person would go looking for, not for the card's own
-   title: "see the body weight behind this" is a card name read out loud. */
-const HEADLINE_MORE = {
-  scale: "the whole weight trend", recomp: "the last eight weeks",
-  lift: "every lift you track", volume: "the weekly totals",
-  reps: "everything logged", endurance: "everything logged",
-  habit: "the last eight weeks",
-};
-
-/* The starting point before anyone has touched "Customise this tab": the card
-   the headline is about, plus one supporting card. Same mapping the headline
-   uses, so the answer and the chart under it can never disagree about which
-   goal this person has. */
-function defaultTrackedMetrics() {
-  const kind = headlineKindFor(MY_PROFILE);
-  const lead = HEADLINE_METRIC[kind] || "consistency";
-  const second = kind === "scale" || kind === "recomp" ? "photos"
-    : lead === "activity" ? "consistency" : "activity";
-  return lead === second ? [lead] : [lead, second];
-}
-
-/* Profiles saved under older defaults carry keys that match no card ("prs",
-   "trained"), and an unknown key is indistinguishable from "off": it hid every
-   card but Weight with nothing on screen to explain why. Keep only real keys,
-   and treat a list with nothing real left in it as never having been set. */
-function myTrackedMetrics() {
-  const known = new Set(TRACK_OPTIONS.map((o) => o.key));
-  const stored = Array.isArray(MY_PROFILE?.tracked_metrics)
-    ? MY_PROFILE.tracked_metrics.filter((k) => known.has(k))
-    : [];
-  return stored.length ? stored : defaultTrackedMetrics();
-}
-
-async function toggleMetric(key) {
-  const set = new Set(myTrackedMetrics());
-  set.has(key) ? set.delete(key) : set.add(key);
-  const next = [...set];
-  const { error } = await sb.from("profiles").update({ tracked_metrics: next }).eq("email", MY_EMAIL);
-  if (error) { toast("Could not save"); console.error(error); return; }
-  MY_PROFILE.tracked_metrics = next;
-  renderProgressTab();
-}
-
-function renderMetricPicker() {
-  const on = new Set(myTrackedMetrics());
-  $("metricPicker").innerHTML = TRACK_OPTIONS.map((o) => `
-    <button type="button" class="metric-chip ${on.has(o.key) ? "on" : ""}" data-metric="${o.key}" ${o.needsApp ? "disabled" : ""}>
-      ${icon(o.icon, 15)}<span>${escapeHtml(o.label)}${o.needsApp ? " (app only)" : ""}</span>
-    </button>`).join("");
-  $("metricPicker").querySelectorAll("[data-metric]").forEach((b) => {
-    if (!b.disabled) b.onclick = () => toggleMetric(b.dataset.metric);
-  });
-}
 
 /* ---------- Reading the data honestly ----------
    Every one of these can come back with nothing, and saying so is the point.
@@ -17071,8 +18202,12 @@ function renderMetricPicker() {
 
 /* Weigh-ins over a fixed window, deliberately NOT the range pill above the
    weight chart: the headline is an answer, and an answer that changes because
-   someone tapped "1W" is not one. */
-function headlineWeighIns(name, days = 42) {
+   someone tapped "1W" is not one. Thirty days because that is where the pill
+   underneath starts, so the two agree on first read: a headline saying four
+   pounds down directly above a card saying three is the kind of thing that
+   makes a whole screen feel untrustworthy, whichever number is right. */
+const HEADLINE_WEIGHT_DAYS = 30;
+function headlineWeighIns(name, days = HEADLINE_WEIGHT_DAYS) {
   const from = new Date(todayStr() + "T00:00:00");
   from.setDate(from.getDate() - days);
   const fromStr = isoDate(from);
@@ -17160,7 +18295,7 @@ function progressHeadline(kind, name, email, profile, third) {
   const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
   if (kind === "scale") {
-    const rows = headlineWeighIns(name, 42);
+    const rows = headlineWeighIns(name);
     const goal = weightGoalFor(email);
     const first = rows[0]?.weight ?? null;
     const up = goal ? goal.target_value > (goal.start_value ?? first ?? 0)
@@ -17218,7 +18353,7 @@ function progressHeadline(kind, name, email, profile, third) {
     }
     const recent = finished.slice(-4);
     const per = recent.reduce((s, w) => s + w.days, 0) / recent.length;
-    const rows = headlineWeighIns(name, 42);
+    const rows = headlineWeighIns(name);
     const span = rows.length > 1 ? daysBetween(rows[0].entry_date, rows[rows.length - 1].entry_date) : 0;
     const rate = rows.length >= 3 && span >= 14 ? lbsPerWeek(rows) : null;
     // A whole number of sessions should read as one, not as "4.0".
@@ -17387,17 +18522,15 @@ function renderProgressHeadline(kind, name, email, profile, third, sharing) {
     ? goalText ? `${name}: ${goalText}` : `${name}'s progress`
     : goalText ? `Your goal: ${goalText}` : "Where you are";
   const h = progressHeadline(kind, name, email, profile, third);
-  const lead = HEADLINE_CARD[kind];
-  const leadEl = lead ? $(lead) : null;
-  const leadOn = leadEl && !leadEl.classList.contains("hidden");
-  const leadLabel = HEADLINE_MORE[kind] || "the detail";
+  /* No "see the detail" button any more. It used to scroll to the card the
+     number came from, back when the picker could have that card switched off
+     and anywhere on the page. The goal now puts it immediately underneath, and
+     a button that scrolls you one card down is furniture. */
   el.innerHTML = `
     <div class="ph-eyebrow">${escapeHtml(eyebrow)}</div>
     <div class="ph-figure${h.tone ? " " + h.tone : ""}"><b>${h.value}</b>${h.unit ? `<i>${escapeHtml(h.unit)}</i>` : ""}</div>
     <div class="ph-line">${h.line}</div>
-    ${h.note ? `<div class="ph-note">${escapeHtml(h.note)}${!sharing ? ` ${escapeHtml(name)} keeps the detail of their workouts private, so this is built from the days they trained.` : ""}</div>` : ""}
-    ${leadOn ? `<button type="button" class="ph-jump" id="progJump"><span>See ${escapeHtml(leadLabel)}</span><span class="link-arrow">&rsaquo;</span></button>` : ""}`;
-  if (leadOn) $("progJump").onclick = () => leadEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    ${h.note ? `<div class="ph-note">${escapeHtml(h.note)}${!sharing ? ` ${escapeHtml(name)} keeps the detail of their workouts private, so this is built from the days they trained.` : ""}</div>` : ""}`;
 }
 
 function renderProgressTab() {
@@ -17410,16 +18543,13 @@ function renderProgressTab() {
   $("progMeBtn").classList.toggle("active", !isPartner);
   $("progPartnerBtn").classList.toggle("active", isPartner);
   $("progPartnerBtn").textContent = PARTNER_EMAIL ? partnerName() : "Partner";
-  /* Same dimming the disabled metric chip gets from `.metric-chip:disabled`,
-     which `.tab-pill` has no equivalent of: without it the pill looks tappable
-     and simply does nothing when you are training alone. */
+  /* `.tab-pill` has no disabled style of its own, and without one the pill
+     looks tappable and simply does nothing when you are training alone. */
   const soloed = !PARTNER_EMAIL;
   $("progPartnerBtn").disabled = soloed;
   $("progPartnerBtn").style.opacity = soloed ? "0.45" : "";
   $("progPartnerBtn").style.cursor = soloed ? "not-allowed" : "";
   $("progPartnerBtn").title = soloed ? "Pair up to see their progress here" : "";
-
-  renderMetricPicker();
 
   const name = isPartner ? partnerName() : ME;
   const email = isPartner ? PARTNER_EMAIL : MY_EMAIL;
@@ -17434,35 +18564,60 @@ function renderProgressTab() {
 
   const blank = !isPartner && !entriesFor(ME).length
     && !ALL_EXERCISE_LOGS.some((l) => l.user_name === ME);
-  const on = new Set(blank ? [] : myTrackedMetrics());
-  TRACK_OPTIONS.forEach((o) => {
-    if (!o.card) return;
-    const el = $(o.card);
-    const hidden = !on.has(o.key) || (!sharing && (o.key === "strength" || o.key === "volume"));
-    if (el) el.classList.toggle("hidden", hidden);
+
+  /* Cards nobody should be offered at all, before the goal gets a say. The
+     scale writes to YOUR row, so it has no business on a partner's screen, and
+     a partner's lift-by-lift history is theirs to give: same gate the
+     timeline, the day sheet and the live sheet already apply. */
+  const barred = new Set();
+  if (isPartner) barred.add("scaleCheckCard");
+  if (!sharing) { barred.add("cardStrength"); barred.add("cardVolume"); }
+
+  const wanted = (GOAL_CARDS[kind] || GOAL_CARDS.habit).filter((c) => !barred.has(c));
+  const rest = PROGRESS_CARDS.filter((c) => !barred.has(c) && !wanted.includes(c));
+  /* On a brand new account every card is an empty card, so none of them are
+     drawn. The one exception is the weigh-in box on a weight goal, because
+     that IS the single action the empty state is pointing at. */
+  const weightLed = kind === "scale" || kind === "recomp";
+  const shown = blank
+    ? (weightLed && !isPartner ? ["scaleCheckCard"] : [])
+    : wanted.concat(rest);
+  const quiet = new Set(blank ? [] : rest);
+
+  PROGRESS_CARDS.forEach((id) => {
+    const el = $(id);
+    if (!el) return;
+    el.classList.toggle("hidden", !shown.includes(id));
+    el.classList.toggle("quiet", quiet.has(id));
   });
-  $("customiseCard").classList.toggle("hidden", blank);
-  if (blank && kind !== "scale" && kind !== "recomp") $("scaleCheckCard").classList.add("hidden");
 
   if (blank) renderProgressEmpty(kind);
   else renderProgressHeadline(kind, name, email, profile, isPartner, sharing);
 
-  /* The card the headline is drawn from sits directly under it; everything
-     else keeps the order it had. Re-ordering rather than deleting, because
-     people who came here for the charts still get all of them. */
-  const leadEl = $(HEADLINE_CARD[kind] || "");
-  const anchor = $("progHeadline");
-  if (leadEl && !leadEl.classList.contains("hidden") && anchor?.parentNode?.insertBefore) {
-    anchor.parentNode.insertBefore(leadEl, anchor.nextSibling);
+  /* The goal's cards, in the goal's order, straight under the answer; then the
+     rule; then everything else in PROGRESS_CARDS order. Re-ordering the nodes
+     that are already there rather than rebuilding them keeps the canvases and
+     their Chart instances alive across a re-render. */
+  const host = $("tab-progress");
+  const rule = $("progRuleElse");
+  if (host?.insertBefore) {
+    let after = $("progHeadline");
+    for (const id of wanted) { const el = $(id); if (el) { host.insertBefore(el, after.nextSibling); after = el; } }
+    host.insertBefore(rule, after.nextSibling);
+    after = rule;
+    for (const id of rest) { const el = $(id); if (el) { host.insertBefore(el, after.nextSibling); after = el; } }
   }
+  // The rule is a label for what follows it, so with nothing following it, and
+  // on a brand new account where nothing is on screen at all, it says nothing.
+  rule.classList.toggle("hidden", blank || !rest.length);
 
-  if (on.has("weight")) { renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); }
-  if (on.has("consistency")) { renderConsistencyChart(); renderConsistencyStats(); }
-  if (on.has("strength")) { renderStrengthChart(); renderStrengthStats(); }
-  if (on.has("volume")) { renderVolumeChart(); renderVolumeStats(); }
-  if (on.has("activity")) renderLog();
-  if (on.has("photos")) renderBodyPhotos();
-
+  const live = new Set(shown);
+  if (live.has("cardWeight")) { renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); }
+  if (live.has("cardConsistency")) { renderConsistencyChart(); renderConsistencyStats(); }
+  if (live.has("cardStrength")) { renderStrengthChart(); renderStrengthStats(); }
+  if (live.has("cardVolume")) { renderVolumeChart(); renderVolumeStats(); }
+  if (live.has("cardActivity")) renderLog();
+  if (live.has("cardPhotos")) renderBodyPhotos();
 }
 
 /* ---------- Couple tab ---------- */
@@ -17730,7 +18885,11 @@ function openSettingsPage(key) {
   if (key === "goal") renderGoalPage();
   // Training shows the goal in words rather than owning a second copy of it,
   // so it has to re-read the profile every time it is opened.
-  if (key === "training") $("setupGoalSub").textContent = goalTileLabel(MY_PROFILE);
+  if (key === "training") {
+    $("setupGoalSub").textContent = goalTileLabel(MY_PROFILE);
+    // Same reason: what the goal suggests moves when the goal does.
+    renderSessionLengthPage();
+  }
   if (key === "focus") renderBodyFocusPage();
   if (key === "limits") renderLimitsPage();
   window.scrollTo({ top: 0 });
@@ -17769,6 +18928,109 @@ function renderRestChoices() {
       if (error) { console.warn("could not save rest length", error); toast("Could not save that"); return; }
       toast(`Rest set to ${restLabel(sec)}`);
     };
+  });
+}
+
+/* ---------- How long you actually have ----------
+   Mo: "some people they wanna do more, or they wanna do less. So maybe we
+   should also have it be where, how long are you wanting to work out for?"
+
+   One question, five answers, and not answering is itself an answer: null in
+   profiles.session_minutes means the goal's own session length runs and the
+   plan is byte for byte the plan it was before this question existed. Which is
+   why the pre-selected chip below is a DISPLAY of what will happen and never a
+   value that gets written on its own. Nobody who skips this lands on a number.
+
+   Five lengths rather than a slider: a slider makes a person tune a number
+   they have no way to evaluate, and the engine's four levers do not resolve
+   finely enough for 47 minutes to mean anything 45 does not. */
+const SESSION_LENGTHS = [20, 30, 45, 60, 90];
+
+/* The goal's own length comes from the engine's own table rather than a copy of
+   it, the same way the limits chips do. Forty three goal children map onto six
+   session lengths and a second copy of that mapping would go stale the first
+   time a goal was tuned. */
+let goalParamsPromise = null;
+function ensureGoalParams() {
+  if (!goalParamsPromise) {
+    goalParamsPromise = import("/mo-knowledge/engine/goal-engine.mjs")
+      .then((m) => m.GOAL_PARAMS || null)
+      .catch((e) => { console.warn("session length: no goal table, suggesting 45", e); return null; });
+  }
+  return goalParamsPromise;
+}
+
+async function goalSessionMinutes(bubble, child) {
+  const table = await ensureGoalParams();
+  const family = table && bubble ? table[bubble] : null;
+  const params = family ? (family[child] || family._default) : null;
+  return Number.isFinite(params?.sessionMin) ? params.sessionMin : null;
+}
+
+/* Ties go to the shorter one. The only goal length that ties is the 25 minutes
+   of "I have no time", where 20 is plainly the better guess than 30. */
+function nearestSessionLength(minutes) {
+  if (!Number.isFinite(minutes)) return 45;
+  return SESSION_LENGTHS.reduce((best, m) =>
+    (Math.abs(m - minutes) < Math.abs(best - minutes) ? m : best), SESSION_LENGTHS[0]);
+}
+
+/* `chosen` is the stored answer and null is nobody has answered; `suggested` is
+   what the goal picks on its own and is only ever lit, never saved. Tapping the
+   answer you already gave takes it back off, which is the only way back to
+   letting the goal decide. */
+function renderSessionLengths(el, { chosen, suggested, onPick }) {
+  if (!el) return;
+  const lit = Number.isFinite(chosen) ? chosen : suggested;
+  el.innerHTML = SESSION_LENGTHS.map((m) => `
+    <button type="button" class="${m === lit ? "on" : ""}" data-len="${m}"
+      aria-pressed="${m === lit}" aria-label="${m} minutes">${m}</button>`).join("");
+  el.querySelectorAll("[data-len]").forEach((b) => {
+    b.onclick = () => {
+      const m = Number(b.dataset.len);
+      onPick(chosen === m ? null : m);
+    };
+  });
+}
+
+function sessionLengthNote(chosen, suggested) {
+  return Number.isFinite(chosen)
+    ? `Every plan is built to fit about ${chosen} minutes. Tap it again to let your goal decide instead.`
+    : `Not set, so your goal picks the length and that comes to about ${suggested} minutes. Tap one to say otherwise.`;
+}
+
+/* Setup > Training. Saved on the tap, like the rest length above it, because a
+   session length is not the kind of thing anybody expects to confirm. */
+async function renderSessionLengthPage() {
+  const el = $("setupSessionLen");
+  if (!el) return;
+  const goalMin = await goalSessionMinutes(MY_PROFILE?.goal_bubble, MY_PROFILE?.goal_child);
+  const suggested = nearestSessionLength(goalMin);
+  const chosen = Number.isFinite(MY_PROFILE?.session_minutes) ? MY_PROFILE.session_minutes : null;
+  $("setupSessionLenNote").textContent = sessionLengthNote(chosen, suggested);
+  renderSessionLengths(el, {
+    chosen, suggested,
+    onPick: async (minutes) => {
+      /* Through upsertGoalFields for the same reason the goal page goes through
+         it: session_minutes is behind a migration that is written and not
+         applied, and a write that names a column the database does not have
+         comes back PGRST204 and takes the whole row with it. */
+      const { error, droppedSession } = await upsertGoalFields({
+        email: MY_EMAIL, user_name: ME, session_minutes: minutes,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) { toast("Could not save that"); console.error(error); return; }
+      if (droppedSession) {
+        /* Not saved, so nothing here pretends it was. The picker goes back to
+           what the database actually holds. */
+        toast("Session length is not being stored yet.");
+        renderSessionLengthPage();
+        return;
+      }
+      if (MY_PROFILE) MY_PROFILE.session_minutes = minutes;
+      renderSessionLengthPage();
+      toast(minutes === null ? "Your goal picks the length again" : `Sessions set to about ${minutes} minutes`);
+    },
   });
 }
 
@@ -18176,7 +19438,6 @@ const A11Y_STATE_MAP = [
   [".bi-period button[data-period]", "aria-pressed", "active"],
   [".tab-pill", "aria-pressed", "active"],
   [".wt-pill[data-range]", "aria-pressed", "on"],
-  [".metric-chip[data-metric]", "aria-pressed", "on"],
   [".cb-chip[data-group]", "aria-pressed", "on"],
   [".ob-chip", "aria-pressed", "on"],
   [".goal-tile[data-tile]", "aria-pressed", "on"],
