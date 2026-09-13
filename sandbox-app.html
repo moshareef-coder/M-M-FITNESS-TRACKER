@@ -1411,11 +1411,44 @@
   .sess-fig canvas { width: 220px; height: 220px; }
   /* Mo's session layout: progress on top, the avatar big in the middle, then
      weight and sets, everything else below. */
-  .sess-fig.sess-fig-hero { margin: 10px 0 0; }
-  .sess-fig.sess-fig-hero canvas { width: min(300px, 78vw); height: min(300px, 78vw); }
+  .sess-fig.sess-fig-hero { margin: 2px 0 0; }
+  .sess-fig.sess-fig-hero canvas { width: min(240px, 62vw); height: min(240px, 62vw); }
   .sess-card.sess-sets { padding-top: 6px; padding-bottom: 6px; }
   .sess-card.sess-sets .set-circles { border-top: 0; margin-top: 4px; padding-top: 4px; }
   .sess-card.sess-bottom { margin-top: 12px; }
+  /* Progress is the headline now: where you are in the workout and in this
+     exercise, with the set circles right under it, instead of a hairline at
+     the top and the circles buried halfway down the page. */
+  .sess-progress {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 18px;
+    padding: 14px 16px 6px; margin-bottom: 12px;
+  }
+  .sess-progress-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .sess-progress-now { font-size: 21px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
+  .sess-progress-now span { font-size: 14px; font-weight: 600; color: var(--muted); }
+  .sess-progress-sets { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); }
+  .sess-progress-pips { display: flex; gap: 5px; margin: 10px 0 2px; }
+  .sess-progress-pips i {
+    flex: 1; height: 5px; border-radius: 100px; background: var(--panel-2);
+    transition: background .3s ease;
+  }
+  .sess-progress-pips i.done { background: var(--accent); }
+  .sess-progress-pips i.now { background: color-mix(in srgb, var(--accent) 55%, var(--panel-2)); }
+  .sess-progress .set-circles { border-top: 0; margin: 6px 0 0; padding-top: 6px; }
+
+  /* Weight and reps side by side: two thirds of the height they used to take,
+     which is what let the figure and the progress both stay on screen. */
+  .sess-entry { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .sess-entry-cell {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+    padding: 10px 10px 12px; text-align: center;
+  }
+  .sess-entry-label { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  .sess-entry-unit { font-size: 11px; }
+  .sess-entry-ctl { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 6px; }
+  .sess-entry-ctl .sess-input { width: 100%; min-width: 0; font-size: 26px; }
+  .sess-entry-last { font-size: 11.5px; color: var(--muted); margin-top: 5px; min-height: 14px; }
+  .round-btn.sm { width: 38px; height: 38px; font-size: 19px; }
   /* One bar, fixed to the bottom of the session screen. Sticky drew the
      button twice on a long screenshot, once pinned and once in place, and a
      gradient over the content read as floating. This is a solid bar the page
@@ -1781,7 +1814,7 @@
   .wp-row span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .wp-row b { font-size: 14px; font-weight: 700; }
   .wp-row i { font-size: 12.5px; font-style: normal; color: var(--muted); line-height: 1.4; }
-  .sess-step-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .sess-step-row { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
   .sess-step-acts { display: flex; align-items: center; gap: 8px; }
   .wp-chip {
     display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -3714,7 +3747,10 @@
         <div class="session-clock"><span class="rec-dot" id="recDot"></span><span class="session-timer" id="sessionTimer">0:00</span></div>
         <button type="button" class="session-pause" id="sessionPauseBtn" aria-label="Pause workout"></button>
       </div>
-      <div class="session-progress-track"><div class="session-progress-fill" id="sessionProgressFill" style="width:0%"></div></div>
+      <!-- The progress hairline moved into the body: see .sess-progress, which
+           carries the exercise count, the pips and the set circles. The fill
+           element stays because the stretch phases still drive it. -->
+      <div class="session-progress-track hidden"><div class="session-progress-fill" id="sessionProgressFill" style="width:0%"></div></div>
       <div id="sessionBody"></div>
     </div>
 
@@ -12846,9 +12882,35 @@ function renderSession() {
   SESSION_JUST_SET = null;
 
   $("sessionBody").innerHTML = `
+    <div class="sess-progress">
+      <div class="sess-progress-top">
+        <div class="sess-progress-now">Exercise ${ei + 1} <span>of ${total}</span></div>
+        <div class="sess-progress-sets">Set ${Math.min(currentSet < 0 ? setsDone.length : currentSet + 1, setsDone.length)} of ${setsDone.length}</div>
+      </div>
+      <div class="sess-progress-pips">
+        ${TODAY_WORKOUT.exercises.map((_, i) => `<i class="${SESSION.completed[i] ? "done" : i === ei ? "now" : ""}"></i>`).join("")}
+      </div>
+      <div class="set-circles">
+        ${setsDone.map((done, i) => {
+          const w = SESSION.setWeights?.[ei]?.[i];
+          const isCurrent = i === currentSet;
+          return `<div class="set-col${exChanged ? " h-pop" : ""}" style="--d:${140 + i * 55}ms">
+            <button type="button" class="set-circle ${done ? "done" : ""} ${isCurrent ? "current" : ""}${justSet === i ? " just-done" : ""}"
+              data-set="${i}" ${done || isCurrent ? "" : "disabled"}
+              aria-pressed="${done ? "true" : "false"}"
+              aria-label="Set ${i + 1}, ${done ? "done" : isCurrent ? "current" : "not started"}">${done ? icon("check", 18) : i + 1}</button>
+            <div class="set-weight">${done ? (w != null ? `${w} lb` : "done") : isCurrent ? "pending" : "&nbsp;"}</div>
+          </div>`;
+        }).join("")}
+        ${allDone ? `<div class="set-col">
+          <button type="button" class="set-circle set-add" id="addSetBtn" aria-label="Add another set">${icon("plus", 20)}</button>
+          <div class="set-weight">extra</div>
+        </div>` : ""}
+      </div>
+    </div>
+
     <div class="sess-card${exChanged ? " ex-in" : ""}">
       <div class="sess-step-row">
-        <div class="sess-step">${doneEx} OF ${total} DONE</div>
         <div class="sess-step-acts">
           <button type="button" class="wp-chip" id="sessSwapBtn" aria-label="Swap this exercise">${icon("swap", 14)}</button>
           ${PARTNER_EMAIL ? `<button type="button" class="wp-chip${workoutPrivacyLocked() ? " on" : ""}" id="sessPrivacyBtn"
@@ -12879,48 +12941,29 @@ function renderSession() {
         </div>
       </div>` : ""}
 
-    <div class="sess-field">
-      <label class="sess-field-label">Weight <span class="sess-field-unit">lb</span>
-        ${lastTime ? `<span class="sess-field-last">Last time ${lastTime.weight}${lastTime.reps ? ` &times; ${lastTime.reps}` : " lb"}</span>` : ""}
-      </label>
-      <div class="sess-field-ctl">
-        <button type="button" class="round-btn" id="sessWeightMinus" aria-label="Less weight">&minus;</button>
-        <input class="sess-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" value="${SESSION.weights[ei] || 0}" />
-        <button type="button" class="round-btn" id="sessWeightPlus" aria-label="More weight">+</button>
+    <div class="sess-entry">
+      <div class="sess-entry-cell">
+        <div class="sess-entry-label">Weight <span class="sess-entry-unit">lb</span></div>
+        <div class="sess-entry-ctl">
+          <button type="button" class="round-btn sm" id="sessWeightMinus" aria-label="Less weight">&minus;</button>
+          <input class="sess-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" max="2000" value="${SESSION.weights[ei] || 0}" />
+          <button type="button" class="round-btn sm" id="sessWeightPlus" aria-label="More weight">+</button>
+        </div>
+        ${lastTime ? `<div class="sess-entry-last">Last ${lastTime.weight}${lastTime.reps ? ` &times; ${lastTime.reps}` : " lb"}</div>` : ""}
+      </div>
+      <div class="sess-entry-cell">
+        <div class="sess-entry-label">Reps</div>
+        <div class="sess-entry-ctl">
+          <button type="button" class="round-btn sm" id="sessRepsMinus" aria-label="Fewer reps">&minus;</button>
+          <input class="sess-input" id="sessRepsVal" type="number" inputmode="numeric" step="1" min="0" max="500" value="${SESSION.reps[ei] || 0}" />
+          <button type="button" class="round-btn sm" id="sessRepsPlus" aria-label="More reps">+</button>
+        </div>
+        ${lastTime ? `<div class="sess-entry-last">&nbsp;</div>` : ""}
       </div>
     </div>
 
-    <div class="sess-field">
-      <label class="sess-field-label">Reps</label>
-      <div class="sess-field-ctl">
-        <button type="button" class="round-btn" id="sessRepsMinus" aria-label="Fewer reps">&minus;</button>
-        <input class="sess-input" id="sessRepsVal" type="number" inputmode="numeric" step="1" min="0" max="500" value="${SESSION.reps[ei] || 0}" />
-        <button type="button" class="round-btn" id="sessRepsPlus" aria-label="More reps">+</button>
-      </div>
     </div>
 
-    <div class="sess-card sess-sets">
-      <div class="set-circles">
-        ${setsDone.map((done, i) => {
-          const w = SESSION.setWeights?.[ei]?.[i];
-          const isCurrent = i === currentSet;
-          return `<div class="set-col${exChanged ? " h-pop" : ""}" style="--d:${140 + i * 55}ms">
-            <button type="button" class="set-circle ${done ? "done" : ""} ${isCurrent ? "current" : ""}${justSet === i ? " just-done" : ""}"
-              data-set="${i}" ${done || isCurrent ? "" : "disabled"}
-              aria-pressed="${done ? "true" : "false"}"
-              aria-label="Set ${i + 1}, ${done ? "done" : isCurrent ? "current" : "not started"}">${done ? icon("check", 18) : i + 1}</button>
-            <div class="set-weight">${done ? (w != null ? `${w} lb` : "done") : isCurrent ? "pending" : "&nbsp;"}</div>
-          </div>`;
-        }).join("")}
-        ${allDone ? `<div class="set-col">
-          <button type="button" class="set-circle set-add" id="addSetBtn" aria-label="Add another set">${icon("plus", 20)}</button>
-          <div class="set-weight">extra</div>
-        </div>` : ""}
-      </div>
-    </div>
-
-    <button type="button" class="btn-big btn-primary ${allDone ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>
-    <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">${SESSION.completed.some((c, i) => !c && i !== ei) ? "Next exercise" : "Finish workout"}</button>
     ${(() => {
       const others = TODAY_WORKOUT.exercises
         .map((x, i) => ({ x, i }))
