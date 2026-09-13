@@ -5274,7 +5274,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.13.9";
+const APP_VERSION = "2026.09.13.10";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -15482,10 +15482,13 @@ let PZ_TICKER = null;
 function startPausedClock() {
   clearInterval(PZ_TICKER);
   PZ_TICKER = setInterval(() => {
-    const el = document.getElementById("pzClock");
-    if (!el || !SESSION) { clearInterval(PZ_TICKER); PZ_TICKER = null; return; }
+    // both copies, when both exist: a clock left frozen on the hidden one
+    // would be wrong the moment it was uncovered
+    const els = document.querySelectorAll(".pz-clock");
+    if (!els.length || !SESSION) { clearInterval(PZ_TICKER); PZ_TICKER = null; return; }
     if (SESSION.pausedAt) return;
-    el.textContent = fmtElapsed(sessionElapsed());
+    const t = fmtElapsed(sessionElapsed());
+    for (const el of els) el.textContent = t;
   }, 1000);
 }
 
@@ -15502,7 +15505,7 @@ function startPausedClock() {
 
    With motion turned down there is no door and no wake: the screens just swap. */
 const PZ_ZOOM_MS = 285;
-function resumeFromPaused({ overlay }) {
+function resumeFromPaused({ overlay, root }) {
   const go = () => {
     SESSION_WAKE = true;
     if (overlay) togglePause();
@@ -15514,7 +15517,7 @@ function resumeFromPaused({ overlay }) {
     // otherwise hand the wake to whatever redraw came next.
     SESSION_WAKE = false;
   };
-  const pz = document.querySelector(".pz");
+  const pz = root.querySelector(".pz");
   const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (!pz || reduced) { go(); return; }
   if (pz.classList.contains("pz-going")) return;   // one door, one tap
@@ -15524,11 +15527,18 @@ function resumeFromPaused({ overlay }) {
 
 function wirePausedScreen({ overlay }) {
   const root = overlay ? $("sessionBody") : $("workoutContent");
-  $("pzHome").onclick = goHomeFromSession;
-  $("pzResume").onclick = () => resumeFromPaused({ overlay });
+  /* Every lookup is scoped to THIS copy. The screen exists twice whenever the
+     session is reopened after going Home: once on the workout tab underneath
+     and once in the overlay on top, with the same ids in both. A bare
+     getElementById returns the first in document order, which is the hidden
+     tab copy, so the buttons the user could actually see were wired to
+     nothing. That was "the buttons don't work on this page". */
+  const q = (id) => root.querySelector("#" + id);
+  q("pzHome").onclick = goHomeFromSession;
+  q("pzResume").onclick = () => resumeFromPaused({ overlay, root });
   mountMotionFigures(root);
-  renderPausedLive();
-  wireHoldToEnd({ overlay });
+  renderPausedLive(root);
+  wireHoldToEnd({ overlay, root });
   startPausedClock();
 }
 
@@ -15547,8 +15557,8 @@ function goHomeFromSession() {
 /* The partner card, only when there is a partner mid session. Same privacy
    rule as everywhere else: with details off you get that they are training
    and how long, never what. */
-function renderPausedLive() {
-  const el = $("pzLive");
+function renderPausedLive(root) {
+  const el = root.querySelector("#pzLive");
   if (!el || !LIVE_PARTNER) return;
   const row = LIVE_PARTNER;
   const name = row.user_name || partnerName();
@@ -15568,7 +15578,7 @@ function renderPausedLive() {
         <span class="pz-live-what">${what}</span>
       </span>
     </button>`;
-  $("pzLiveBtn").onclick = openLiveSheet;
+  el.querySelector("#pzLiveBtn").onclick = openLiveSheet;
   hydrateAvatars(el);
 }
 
@@ -15578,8 +15588,8 @@ function renderPausedLive() {
    cancel, so there is no dialog to read and no second button to hit by
    accident. */
 const END_HOLD_MS = 900;
-function wireHoldToEnd({ overlay }) {
-  const btn = $("pzEnd");
+function wireHoldToEnd({ overlay, root }) {
+  const btn = root.querySelector("#pzEnd");
   if (!btn) return;
   const fill = btn.querySelector(".pz-discard-fill");
   const txt = btn.querySelector(".pz-discard-txt");
