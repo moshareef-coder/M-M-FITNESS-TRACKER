@@ -88,6 +88,23 @@
               { name: "Doorway Chest Stretch", seconds: 20, perSide: false, group: "chest", kind: "static", cue: "Forearms on the frame, step through until the chest opens. Breathe out into it." },
               { name: "Overhead Triceps Stretch", seconds: 20, perSide: true, group: "triceps", kind: "static", cue: "Elbow to the ceiling, hand down the spine, ease the elbow back with the other hand." },
             ],
+            /* Ramp-up sets (CONTRACT.md workout.rampSets), which a stated
+               session length longer than the day needs buys. They ride in this
+               same column because they are the other thing that is never a
+               working set: never logged, never counted, never calibrated
+               against. The first main gets the full ladder, the second main the
+               one rung the research prescribes there. */
+            ramp: [
+              { exercise: "Bench Press", group: "chest", seconds: 270, sets: [
+                { weight: 0, reps: 8, restSec: 45, pct: 0, cue: "The bar on its own, the machine empty, or the lightest weight you have." },
+                { weight: 95, reps: 5, restSec: 45, pct: 0.5, cue: null },
+                { weight: 130, reps: 3, restSec: 60, pct: 0.7, cue: null },
+                { weight: 165, reps: 2, restSec: 60, pct: 0.88, cue: null },
+              ] },
+              { exercise: "Overhead Press", group: "shoulders", seconds: 75, sets: [
+                { weight: 65, reps: 3, restSec: 60, pct: 0.7, cue: null },
+              ] },
+            ],
             skipped: false,
           } },
       ],

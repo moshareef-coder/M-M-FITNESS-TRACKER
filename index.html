@@ -649,6 +649,67 @@
   .stretch-fold .stretch-list { border-left: 0; padding: 0 13px 4px; margin: 0; }
   .stretch-fold .stretch-skip { display: block; margin: 2px 13px 12px; }
 
+  /* ---------- Ramp-up sets (CONTRACT.md workout.rampSets) ----------
+     Light sets of the lift itself, worked up to the first real one. They are
+     preparation, so they wear the same blue as the timed blocks and the same
+     flame; they are loads rather than seconds, so they are written as loads and
+     they hang off the lift instead of sitting in the warm-up fold. Nothing here
+     is ever tickable: a ramp set is not a set, and the surest way to keep it out
+     of the counters is to give it no control that could log one. */
+  /* Wrapping rather than truncating: a ramp cut off after the second rung hides
+     the heaviest load, which is the one worth knowing. Two short lines in a
+     narrow row is the honest version. */
+  .ex-ramp {
+    display: flex; align-items: flex-start; gap: 5px; margin-top: 3px;
+    font-size: 12.5px; line-height: 1.35; color: var(--stretch-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .ex-ramp svg { flex-shrink: 0; opacity: .8; margin-top: 2px; }
+  .ex-ramp span { min-width: 0; }
+  .gen-row-ramp {
+    display: block; margin-top: 2px; font-size: 11px; line-height: 1.35;
+    color: var(--stretch-ink); font-variant-numeric: tabular-nums;
+  }
+
+  .ramp-fold {
+    border: 1px solid color-mix(in srgb, var(--stretch) 26%, var(--border));
+    background: color-mix(in srgb, var(--stretch) 7%, var(--panel));
+    border-radius: 14px; overflow: hidden; margin: 0 0 12px;
+  }
+  .ramp-head {
+    width: 100%; min-height: 44px; display: flex; align-items: center; gap: 11px;
+    padding: 11px 13px; background: none; border: 0; cursor: pointer;
+    font-family: inherit; color: var(--text); text-align: left;
+  }
+  .ramp-head:active { background: color-mix(in srgb, var(--stretch) 12%, transparent); }
+  .ramp-head-ico {
+    width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--stretch) 20%, transparent); color: var(--stretch-ink);
+  }
+  .ramp-head-text { flex: 1; min-width: 0; }
+  .ramp-head-text b { display: block; font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
+  .ramp-head-text i {
+    display: block; font-style: normal; font-size: 12.5px; color: var(--muted); margin-top: 1px;
+    font-variant-numeric: tabular-nums;
+  }
+  .ramp-head-chev { color: var(--muted); display: flex; transition: transform .2s ease; }
+  .ramp-fold.open .ramp-head-chev { transform: rotate(180deg); }
+  .ramp-rungs { padding: 0 13px 2px; }
+  .ramp-rung {
+    display: flex; align-items: baseline; gap: 8px; padding: 7px 0;
+    border-top: 1px solid color-mix(in srgb, var(--stretch) 16%, transparent);
+    font-variant-numeric: tabular-nums;
+  }
+  .ramp-rung-load { font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; min-width: 76px; }
+  .ramp-rung-reps { font-size: 14px; color: var(--text); flex: 1; }
+  .ramp-rung-rest { font-size: 11px; color: var(--muted); }
+  .ramp-cue { font-size: 11px; color: var(--muted); line-height: 1.4; padding: 0 0 7px; }
+  .ramp-fold .ramp-skip { display: block; min-height: 44px; margin: 0 13px 4px; }
+  @media (prefers-reduced-motion: reduce) {
+    .ramp-head-chev { transition: none; }
+  }
+
   /* Advice, not an exercise: no row chrome, no drag handle, nothing that
      invites a tap expecting sets and reps. */
   /* The row body is a button now, because tapping it opens the sets and reps.
@@ -11914,6 +11975,14 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
   const heard = (Array.isArray(notes) ? notes : [])
     .filter((n) => typeof n === "string" && n.trim() && !otherDay(n));
   const said = loud ? heard : heard.slice(0, 3);
+  /* The engine's own sentence about ramp-up sets: what they are, and that none
+     of it counts as a set or gets logged. It is the only place the app explains
+     them, and it arrives well down `notes`, so a day that bought a ramp keeps
+     that sentence even when the list is trimmed to three. Matched on the
+     engine's phrase, so a rewording there costs this line and never a note. */
+  const ramps = workout.rampSets || [];
+  const rampNote = ramps.length ? heard.find((n) => /ramp-up sets/i.test(n)) : null;
+  if (rampNote && !said.includes(rampNote)) said.push(rampNote);
   const wu = workout.warmup || [];
   const cd = workout.cooldown || [];
   /* Only mention the halves that exist: the old template printed "Opens with
@@ -11978,6 +12047,13 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
             <span class="gen-row-b">
               <span class="gen-row-name">${escapeHtml(ex.name || "")}</span>
               <span class="gen-row-t">${ex.sets || 3} sets · ${ex.reps || 10} reps</span>
+              ${(() => {
+                /* Which lifts have a ramp, and the loads, in one line under the
+                   row. The count and the sentence are above; this is the part
+                   somebody actually needs at the rack. */
+                const r = rampForExercise(ramps, ex.name);
+                return r ? `<span class="gen-row-ramp">Ramp ${escapeHtml(rampLoadsLine(r))}</span>` : "";
+              })()}
             </span>
             <button type="button" class="wp-chip" data-swap="${i}" aria-label="Swap ${escapeHtml(ex.name || "")}">${icon("swap", 15)}</button>
           </div>`).join("")}
@@ -12002,6 +12078,9 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
           if (!row) return;
           row.querySelector(".gen-row-name").textContent = ex.name;
           row.querySelector(".gen-row-t").textContent = `${ex.sets || 3} sets · ${ex.reps || 10} reps`;
+          /* The ramp was built from the weight of the lift that just left, so it
+             goes with it rather than sitting under a movement it was never for. */
+          row.querySelector(".gen-row-ramp")?.remove();
           row.querySelector("[data-swap]")?.setAttribute("aria-label", `Swap ${ex.name}`);
         },
       });
@@ -12427,8 +12506,13 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
          that iterates that array treats an entry as sets of a lift, and a
          stretch must never become a logged set. null from an engine that sent
          none reads the same as two empty arrays everywhere below. */
-      mobility: (data.workout.warmup?.length || data.workout.cooldown?.length)
-        ? { warmup: data.workout.warmup || [], cooldown: data.workout.cooldown || [], skipped: false }
+      /* `ramp` is workout.rampSets, kept in this same not-a-set bucket rather
+         than given a column of its own: the rule that matters is that it never
+         reaches `exercises`, and this is already the column for everything the
+         day asks for that must never be counted, logged or calibrated against. */
+      mobility: (data.workout.warmup?.length || data.workout.cooldown?.length || data.workout.rampSets?.length)
+        ? { warmup: data.workout.warmup || [], cooldown: data.workout.cooldown || [],
+            ramp: data.workout.rampSets || [], skipped: false }
         : null,
       archived: false,
       /* The other two writers of this row clear these and the generator did
@@ -13599,6 +13683,52 @@ function renderStretchPhase() {
 let SESSION_JUST_SET = null;   // a set logged a moment ago, popped once on redraw
 let SESSION_LAST_EX = null;    // the exercise last drawn, so a change can slide in
 
+/* Which lift's ramp is folded open, by index, while the session is alive. Open
+   is the default because the loads are the whole point of showing it, and the
+   fold is for the second lift of a day you already know the numbers on. Closing
+   it is not "done": that is the dismiss below, which is remembered. */
+const RAMP_OPEN = {};
+
+/* The ramp above the working sets, at the one moment it is useful: standing at
+   the bar deciding what to load. It carries NO tickable control of any kind and
+   writes nothing, which is how a ramp set stays out of SESSION.setsDone, out of
+   the set counter and the progress bar, out of exercise_logs and out of the
+   volume and XP that are summed from those. It disappears on its own the moment
+   a working set of this lift is logged, and "I'm warmed up" hides it for the
+   rest of the session for anyone who walked in warm. */
+function sessionRampHTML(ex, ei, setsDone) {
+  const ramp = rampForExercise(planMobility()?.ramp, ex?.name);
+  if (!ramp || setsDone.some(Boolean) || SESSION?.rampDone?.[ei]) return "";
+  const open = RAMP_OPEN[ei] !== false;
+  const mins = Math.max(1, Math.round((Number(ramp.seconds) || 0) / 60));
+  const top = Number(ex.targetWeight) > 0 ? ` up to ${ex.targetWeight} lb` : "";
+  /* The second main lift of a day earns exactly one rung, so the singular is a
+     real case rather than a defensive one. */
+  const n = ramp.sets.length;
+  return `
+    <div class="ramp-fold${open ? " open" : ""}">
+      <button type="button" class="ramp-head" data-ramp-toggle aria-expanded="${open}">
+        <span class="ramp-head-ico">${icon("flame", 15)}</span>
+        <span class="ramp-head-text">
+          <b>Warm-up set${n === 1 ? "" : "s"}${top}</b>
+          <i>${n} light set${n === 1 ? "" : "s"} · about ${mins} min · nothing to log</i>
+        </span>
+        <span class="ramp-head-chev">${icon("chevronDown", 16)}</span>
+      </button>
+      ${open ? `
+        <div class="ramp-rungs">
+          ${ramp.sets.map((s) => `
+            <div class="ramp-rung">
+              <span class="ramp-rung-load">${Number(s.weight) > 0 ? `${s.weight} lb` : "Bar"}</span>
+              <span class="ramp-rung-reps">× ${s.reps}</span>
+              <span class="ramp-rung-rest">${s.restSec}s rest</span>
+            </div>
+            ${s.cue ? `<div class="ramp-cue">${escapeHtml(s.cue)}</div>` : ""}`).join("")}
+        </div>
+        <button type="button" class="link-btn ramp-skip" data-ramp-done>I'm warmed up</button>` : ""}
+    </div>`;
+}
+
 function renderSession() {
   beatLive();
   /* The two timed phases have their own screen. Everything below this line is
@@ -13709,6 +13839,8 @@ function renderSession() {
       <div class="sess-fig sess-fig-hero" data-fig="${escapeHtml(ex.name)}" data-mood="${beatenPB ? "surprised" : justSet != null ? "happy" : "neutral"}"></div>
     </div>
 
+    ${sessionRampHTML(ex, ei, setsDone)}
+
     ${resting ? `
       <div class="rest-bar${restNow.ready ? " ready" : ""}" id="restTimer">
         <div class="rest-head">
@@ -13770,6 +13902,18 @@ function renderSession() {
   else stopRestTicker();
 
   if ($("restSkip")) $("restSkip").onclick = () => startNextSet(currentSet);
+
+  /* Both of these only touch the ramp: neither goes near SESSION.setsDone,
+     SESSION.completed or the log. The dismiss is remembered on SESSION so it
+     survives a reload mid-session rather than coming back on every redraw. */
+  const rampToggle = $("sessionBody").querySelector("[data-ramp-toggle]");
+  if (rampToggle) rampToggle.onclick = () => { RAMP_OPEN[ei] = RAMP_OPEN[ei] === false; renderSession(); };
+  const rampDone = $("sessionBody").querySelector("[data-ramp-done]");
+  if (rampDone) rampDone.onclick = () => {
+    SESSION.rampDone = { ...(SESSION.rampDone || {}), [ei]: true };
+    saveSessionToStorage();
+    renderSession();
+  };
 
   if ($("sessPrivacyBtn")) $("sessPrivacyBtn").onclick = openWorkoutPrivacy;
   if ($("sessSwapBtn")) $("sessSwapBtn").onclick = swapCurrentExercise;
@@ -16029,7 +16173,34 @@ function planMobility() {
     skipped: !!m.skipped,
     skippedWarmup: m.skippedWarmup ?? !!m.skipped,
     skippedCooldown: m.skippedCooldown ?? !!m.skipped,
+    /* Ramp-up sets ride here for exactly the reason the stretches do: this
+       column is everything the day asks for that is NOT a working set, and
+       `exercises` is the only array calibration joins a log against. A ramp set
+       written there would be read as prescribed work that was skipped, and next
+       week's weights would come down for it (CONTRACT.md, workout.rampSets).
+       Written by the generator as `ramp`; absent on every plan built before
+       today and on every day that bought none, which reads as [] here. */
+    ramp: Array.isArray(m.ramp) ? m.ramp : [],
   };
+}
+
+/* The ramp for one lift, by name, or null. A swapped exercise finds nothing,
+   which is right: the ramp was built from the weight of the lift it replaced. */
+function rampForExercise(list, name) {
+  const want = String(name || "").trim().toLowerCase();
+  if (!want) return null;
+  const found = (Array.isArray(list) ? list : [])
+    .find((r) => String(r?.exercise || "").trim().toLowerCase() === want);
+  return found && Array.isArray(found.sets) && found.sets.length ? found : null;
+}
+
+/* One ramp said as loads, which is the part worth reading: "bar × 8 · 40 × 5".
+   `weight: 0` is the empty bar, the empty machine or the lightest thing they
+   have (CONTRACT.md), so it is a word rather than a zero. */
+function rampLoadsLine(ramp) {
+  return (ramp?.sets || [])
+    .map((s) => `${Number(s.weight) > 0 ? s.weight : "bar"} × ${s.reps}`)
+    .join(" · ");
 }
 
 /* The cardio the goal asks for, said in words rather than as a row you could
@@ -16321,8 +16492,13 @@ function renderPlanPreview() {
       ${oneOff?.from?.minutes ? `<button type="button" class="link-btn" id="planTimeBackBtn">Back to ${oneOff.from.minutes} min</button>` : ""}
     </div>`;
 
+  const planRamps = planMobility()?.ramp || [];
   const rows = TODAY_WORKOUT.exercises.map((ex, i) => {
     const isDone = loggedNow.has(ex.name.toLowerCase());
+    /* One quiet line, not a block: the card is the list of lifts, and a ramp is
+       something you read at the rack rather than here. Gone once the lift is
+       logged, because by then it has been done or it has not. */
+    const ramp = isDone ? null : rampForExercise(planRamps, ex.name);
     const doneMark = isDone ? icon("check") : icon("dumbbell");
     return `<div class="exercise-row ${isDone ? "ex-done" : ""} ${started ? "" : "draggable"}" data-idx="${i}">
       ${started ? "" : `<button type="button" class="grip" data-grip aria-label="Drag to reorder">${icon("grip", 16)}</button>`}
@@ -16330,6 +16506,7 @@ function renderPlanPreview() {
       <button type="button" class="ex-body ex-tap" data-plan-edit="${i}"${isDone ? " disabled" : ""}>
         <div class="ex-name">${escapeHtml(ex.name)}</div>
         <div class="ex-target">${ex.sets} sets · ${ex.reps} reps${Number(ex.targetWeight) > 0 ? ` · ${ex.targetWeight} lb` : ""}${isDone ? "" : ` ${icon("pencil", 11)}`}</div>
+        ${ramp ? `<div class="ex-ramp">${icon("flame", 11)}<span>Ramp ${escapeHtml(rampLoadsLine(ramp))}</span></div>` : ""}
         ${ex.note ? `<div class="ex-note">${escapeHtml(humanizeNoteDates(ex.note))}</div>` : ""}
       </button>
       ${isDone ? "" : `<button type="button" class="wp-chip" data-plan-swap="${i}" aria-label="Swap ${escapeHtml(ex.name)}">${icon("swap", 15)}</button>`}
