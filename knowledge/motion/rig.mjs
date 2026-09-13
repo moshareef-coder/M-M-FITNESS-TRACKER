@@ -135,7 +135,9 @@ export const BODY = {
   // thigh mid 8.7 over a hip of 8.0) read as heavy, and he said so.
   // Pelvis and hip spacing came in again (8.0 / 6.2) after Mo said the hips
   // were too wide on the phone even with the cap flush to the thigh.
-  rPelvis: 7.3, rWaist: 6.4, rChest: 9.8,
+  // Waist then went back OUT (6.4 to 7.4): with the narrow hips the trunk
+  // pinched into an hourglass and Mo asked for a wider stomach.
+  rPelvis: 7.3, rWaist: 7.4, rChest: 9.8,
   rNeckTop: 3.3, rNeckBot: 4.5,
   rHeadBack: 6.5, rHeadJaw: 4.8,
   rShoulder: 5.8, rDelt: 6.0, rElbow: 3.5, rWrist: 2.4,
