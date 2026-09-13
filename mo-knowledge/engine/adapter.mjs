@@ -918,6 +918,13 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
         bodyWeightLb: payload.current_weight ?? null,
         sex: payload.sex ?? null,
         daysAsked,
+        /* How long they want one session to be, from profiles.session_minutes.
+           Absent, null, zero and nonsense all mean "never answered" and the
+           goal's own session length runs, which is every plan built before this
+           column existed. The engine does the clamping and the saying so; this
+           line only carries the number, for the same reason `limits` is
+           normalised in one place rather than in two. */
+        sessionMinutes: payload.session_minutes ?? null,
       },
       logs,
       today,
@@ -1049,6 +1056,31 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
         cardio: plan.cardio && plan.cardio.sessions
           ? { sessions: plan.cardio.sessions, minutes: plan.cardio.minutes, zone: plan.cardio.zone }
           : null,
+        /* How long this day is costed at, what it was costed against, and
+           whether the two agree. `budgetMinutes` is the clock the week was
+           built to and `source` says whose clock it was, because "45 minutes"
+           means a different thing when the goal chose it and when the person
+           did. `fits` is the one boolean a screen needs: false is the day that
+           could not be squeezed into the answer they gave, and the sentence
+           explaining it is already in `notes`. `restCompressed` is true when
+           the budget was bought with shorter rests, which is the one trim that
+           costs the goal something; the sentence for that is in `notes` too. */
+        session: {
+          budgetMinutes: plan.week[dayIndex]?.minutes ?? plan.sessionBudget?.minutes ?? null,
+          source: plan.sessionBudget?.source ?? "goal",
+          asked: plan.sessionBudget?.asked ?? null,
+          goalMinutes: plan.sessionBudget?.goalMinutes ?? null,
+          estimatedMinutes: dayBuilt?.estimatedMinutes ?? null,
+          /* No `totalMinutes` here, deliberately. The session plus the cool-down
+             is `estimatedMinutes + stretching.cooldownMinutes`, both of which
+             are already in this block, and carrying the sum as a third number
+             would be the one field in `meta` that moves when `skip_stretching`
+             moves. "Stretching off changes the two blocks and nothing else" is
+             a contract with a test behind it, and a convenience field is not
+             worth spending it. */
+          fits: !(plan.volumeNotes?.overBudget || []).some((o) => o.day === (dayBuilt?.name)),
+          restCompressed: (plan.volumeNotes?.restCompressed || []).some((r) => r.day === (dayBuilt?.name)),
+        },
         source: "engine",
         /* The warm-up and cool-down in three numbers and a reason, so the
            reveal can say "plus five minutes after" without reading the arrays,

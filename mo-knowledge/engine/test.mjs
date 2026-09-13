@@ -2468,3 +2468,144 @@ test("a slot dropped to avoid a repeat says so rather than shipping a shorter da
   assert.ok(said.length, "the day that lost a slot is named");
   assert.ok(/not two exercises/.test(said[0]), "and why it was not filled with the repeat");
 });
+
+/* ------------------------------------------------------------------ *
+ * How long you actually have (session_minutes)
+ * ------------------------------------------------------------------ */
+
+test("no session length means the goal decides, and the plan is the one it always was", () => {
+  const args = {
+    goal: { bubble: "get-stronger" },
+    person: { daysAsked: 3, bodyWeightLb: 180, sex: "Male" },
+    logs: longHistory(78),
+  };
+  const base = buildPlan(args);
+  /* Every shape a column, an old client or a slider can produce for "nothing
+     was answered". All of them have to be the same plan, not a similar one. */
+  for (const v of [null, undefined, 0, "", NaN, {}, "abc"]) {
+    const plan = buildPlan({ ...args, person: { ...args.person, sessionMinutes: v } });
+    assert.equal(plan.sessionBudget.source, "goal", `${String(v)} reached the budget`);
+    assert.deepEqual(
+      plan.week.map((d) => [d.minutes, d.estimatedMinutes, d.exercises.map((e) => [e.name, e.sets, e.restSec])]),
+      base.week.map((d) => [d.minutes, d.estimatedMinutes, d.exercises.map((e) => [e.name, e.sets, e.restSec])]),
+      `${String(v)} changed the week`);
+    assert.deepEqual(plan.dayNotes, base.dayNotes, `${String(v)} changed what the plan said`);
+  }
+});
+
+test("a stated session length replaces the goal's, and the week is costed against it", () => {
+  const plan = buildPlan({
+    goal: { bubble: "get-stronger" },
+    person: { daysAsked: 3, bodyWeightLb: 180, sex: "Male", sessionMinutes: 30 },
+    logs: longHistory(78),
+  });
+  assert.equal(plan.sessionBudget.source, "asked");
+  assert.equal(plan.sessionBudget.minutes, 30);
+  assert.equal(plan.sessionBudget.goalMinutes, 60, "the goal's own number is still reported");
+  for (const d of plan.week) assert.equal(d.short ? Math.round(30 * 0.6) : 30, d.minutes);
+});
+
+test("a short answer takes sets off the mains before it touches the rest, and never below three", () => {
+  const plan = buildPlan({
+    goal: { bubble: "consistent", child: "no-time" },
+    person: { daysAsked: 2, bodyWeightLb: 180, sex: "Male", sessionMinutes: 30 },
+    logs: longHistory(78),
+  });
+  const day = plan.week[0];
+  assert.ok(day.estimatedMinutes <= 30 * 1.15, `${day.estimatedMinutes} against 30`);
+  assert.ok(day.exercises.every((e) => e.sets >= 2), "nothing went under the accessory floor");
+  /* This is the day the README's known limit was written about: four mains at
+     six sets, 48 minutes against a 25 minute goal. Sets alone buy 30 minutes,
+     so the rest is untouched and nothing is said about it. */
+  assert.deepEqual(plan.volumeNotes.restCompressed, [], "sets alone were enough");
+});
+
+test("shortening the rest to make the clock work is said out loud, every time", () => {
+  const plan = buildPlan({
+    goal: { bubble: "get-stronger" },
+    person: { daysAsked: 3, bodyWeightLb: 180, sex: "Male", sessionMinutes: 30 },
+    logs: longHistory(78),
+  });
+  assert.ok(plan.volumeNotes.restCompressed.length, "a strength day at 30 minutes cannot be bought with sets alone");
+  for (const r of plan.volumeNotes.restCompressed) {
+    assert.ok(r.toSec < r.fromSec, "rest only ever comes down");
+    assert.ok(r.toSec >= 45, "and never under 45 seconds");
+    assert.ok(r.toSec >= Math.round(r.fromSec * 0.6) - 1, "and never past 40% off");
+  }
+  assert.ok(plan.dayNotes.some((n) => /rest between sets came down/.test(n)),
+    "the plan says the rest came down rather than leaving it to be noticed");
+});
+
+test("a budget the engine cannot meet says the honest number instead of pretending", () => {
+  const plan = buildPlan({
+    goal: { bubble: "get-stronger" },
+    person: { daysAsked: 3, bodyWeightLb: 180, sex: "Male", sessionMinutes: 20 },
+    logs: longHistory(78),
+  });
+  assert.ok(plan.volumeNotes.overBudget.length, "20 minutes of long-rest strength work does not exist");
+  for (const o of plan.volumeNotes.overBudget) {
+    assert.ok(/after the sets came down and the rest with them/.test(o.why),
+      "and it says what was already tried");
+  }
+});
+
+test("a longer answer buys sets and never passes the weekly ceiling", () => {
+  const goal = { bubble: "build-muscle" };
+  const person = { daysAsked: 4, bodyWeightLb: 180, sex: "Male" };
+  const logs = longHistory(78);
+  const base = buildPlan({ goal, person, logs });
+  const long = buildPlan({ goal, person: { ...person, sessionMinutes: 90 }, logs });
+  const total = (p) => p.week.reduce((n, d) => n + d.exercises.reduce((m, e) => m + e.sets, 0), 0);
+  assert.ok(total(long) >= total(base), "more time is never less work");
+  for (const [group, row] of Object.entries(long.weeklyVolume)) {
+    assert.ok(row.sets <= row.target + 2 + 0.001, `${group} went past its weekly target plus the slack`);
+  }
+  for (const d of long.week) for (const e of d.exercises) assert.ok(e.sets <= 6, `${e.name} past the session clamp`);
+});
+
+test("a budget that cannot be spent is handed back rather than filled with junk sets", () => {
+  const plan = buildPlan({
+    goal: { bubble: "consistent", child: "no-time" },
+    person: { daysAsked: 2, bodyWeightLb: 180, sex: "Male", sessionMinutes: 120 },
+    logs: longHistory(78),
+  });
+  assert.ok(plan.dayNotes.some((n) => /the longest day here needs about/.test(n)),
+    "the plan says the time could not be spent and why");
+});
+
+test("a session length outside the clamp is clamped and the clamp is spoken", () => {
+  const tiny = buildPlan({
+    goal: { bubble: "build-muscle" },
+    person: { daysAsked: 3, bodyWeightLb: 180, sex: "Male", sessionMinutes: 5 },
+  });
+  assert.equal(tiny.sessionBudget.minutes, 15);
+  assert.equal(tiny.sessionBudget.asked, 5);
+  assert.ok(tiny.dayNotes.some((n) => /There is no session that short/.test(n)));
+  const huge = buildPlan({
+    goal: { bubble: "build-muscle" },
+    person: { daysAsked: 3, bodyWeightLb: 180, sex: "Male", sessionMinutes: 600 },
+  });
+  assert.equal(huge.sessionBudget.minutes, 120);
+  assert.ok(huge.dayNotes.some((n) => /what a week can recover from/.test(n)));
+});
+
+test("asking for a focus still never costs that group its work, however tight the clock", () => {
+  for (const minutes of [15, 20, 25, 30, 45]) {
+    const plan = buildPlan({
+      goal: { bubble: "get-stronger" },
+      person: { daysAsked: 3, bodyWeightLb: 180, sex: "Male", sessionMinutes: minutes },
+      logs: longHistory(78),
+      priorityOverride: { biceps: 3, triceps: 3 },
+    });
+    for (const d of plan.week) {
+      const focused = d.exercises.filter((e) => e.focusTier >= 2);
+      if (!focused.length) continue;
+      const ceiling = Math.min(...focused.map((e) => e.sets));
+      for (const e of d.exercises) {
+        if (e.focusTier) continue;
+        assert.ok(e.sets <= ceiling,
+          `${minutes} min: ${e.name} at ${e.sets} sets over a focused lift at ${ceiling} on ${d.name}`);
+      }
+    }
+  }
+});

@@ -35,6 +35,7 @@ somebody on day zero who has answered nothing, and it does.
 | `current_weight` | number | engine | pounds. Without it there are no starting weights at all, and the plan says so in `meta.missing` |
 | `gym_days_this_week` | number | engine | fallback day count when `challenge_target` is absent |
 | `challenge_target` | number | engine | days per week they chose themselves, 2 to 6. Beats everything else |
+| `session_minutes` | number | engine | **new.** How long one session should take, in minutes. Absent, `null`, `0` and nonsense all mean "never answered" and the goal's own session length runs, which is byte for byte the plan that was built yesterday. A real answer replaces it: the week is built to fit the number, in both directions. Clamped to 15 and 120, and the clamp is said in `notes` |
 | `focus` | text | engine | a day name ("Push day"), which day of the week they want. Beats the rotation |
 | `focus_groups` | text[] | engine | the body map pick, now with a priority tier on each entry. `"chest:3"` is red, `"chest:2"` yellow, `"chest:1"` green, and a bare `"chest"` with no tier is yellow, which is what every pick saved before 2026-09-12 means. Muscle group keys or the finer piece keys the zoomed view uses; both are flattened to the app's fourteen groups. The single entry `"all"` is "select my whole body" and expands to every group at green. A jsonb object, `{"chest":3}`, is accepted too, so the column can become jsonb later without the engine changing |
 | `focus_chosen_at` | timestamptz | engine | when that pick was made. Older than 60 days comes back as `meta.focus.stale` |
@@ -97,7 +98,17 @@ hurts, the over-budget number, the day-count clamp, the capacity shortening,
 the plateau answers, and, new on 2026-09-12, the sentence naming the muscle
 groups whose weekly sets are capped by how often the split trains them ("more
 of those muscles means another day in the week, not more sets in the days you
-have"). Also new on 2026-09-12: for the `pain` and `back-postpartum` children,
+have"). Also new on 2026-09-12: the session-length sentences, when `session_minutes`
+was sent. Up to four of them, and each one is a real event rather than a
+reassurance: the clamp when the number was outside 15 to 120, the rest
+compression when sets alone could not buy the minutes, the day that still does
+not fit after everything, and the budget that could not be spent because more
+sets than this is past what the level recovers from. None of them appear when
+`session_minutes` is absent. Also new on 2026-09-12: the sentence naming a
+starting weight that was capped, which happens when a guess extrapolated from
+very little history off a different movement came out above what the person's
+size and level support; the per-exercise `note` has always said it and now the
+week says it once as well, with the ask to change it. And, also 2026-09-12: for the `pain` and `back-postpartum` children,
 two sentences saying the core work here holds position rather than bending or
 twisting under load, and one saying this is general training guidance that
 somebody training around pain or a recent pregnancy should run past their own
@@ -141,6 +152,13 @@ bodyweight only pull day honestly has no curl in it).
 | `stretching.cooldownMinutes` | number | **new.** Rounded minutes of the cool-down. On top of the session: five by default, ten for the `flexibility` and `mobility` goal children |
 | `stretching.mobilityGoal` | bool | **new.** The goal child is one of those two, so the cool-down is the ten minute hips and upper back block the goal tree asks for |
 | `stretching.why` | text[] | **new.** Plain sentences: what was picked, for which groups, and what a joint limit left out |
+| `session.budgetMinutes` | number | **new.** The clock THIS day was costed against. A short day is six tenths of the week's budget, so this is not always the same number as `session.asked` |
+| `session.source` | text | **new.** `asked` when `session_minutes` set the budget, `goal` when the goal's own session length did. Every plan built before this column existed reads `goal` |
+| `session.asked` | number or null | **new.** What arrived before the clamp, so a screen can tell a clamp from a coincidence. Null when nothing was sent |
+| `session.goalMinutes` | number | **new.** What the goal would have chosen on its own. Equal to `budgetMinutes` when `source` is `goal` |
+| `session.estimatedMinutes` | number | **new.** What this day really comes to: sets times reps time, plus the rest between them, plus the warm-up. The same number `stretching.warmupMinutes` is counted inside. There is deliberately no `totalMinutes` here: the session plus the cool-down is this plus `stretching.cooldownMinutes`, and carrying the sum would make `meta` move when `skip_stretching` moves |
+| `session.fits` | bool | **new.** `false` is the day that could not be squeezed into the answer they gave, after every lever ran. The sentence saying so is already in `notes` |
+| `session.restCompressed` | bool | **new.** The budget on this day was partly bought by shortening the rest between sets, which is the one trim that changes what a set is worth. The sentence is in `notes` |
 | `source` | text | always `engine`. The `llm` path was removed 2026-09-12; the key stays so a reader of an older stored plan can still tell which built it |
 | `goalSource` | text | `tiles` if `goal_bubble` was valid, `legacy` if the five strings and the free text were parsed |
 | `emphasis` | **not returned** | the goal table has an `emphasis` on every entry and it never leaves the engine, deliberately. It has two behaviours in the whole codebase, both `=== "strength"`, and the other seven values change nothing. Do not surface it and do not add it here: see "What `emphasis` does, and what it does not" in `README.md` |
@@ -157,6 +175,7 @@ bodyweight only pull day honestly has no curl in it).
 | `focus_chosen_at` | `timestamptz` | `20260909_focus_groups.sql` | when that pick was made |
 | `goal_bubble` | `text` | added separately | one goal-tree bubble id, exactly as spelled in `mo-knowledge/goals/goal-tree.json` |
 | `goal_child` | `text` | added separately | one goal-tree child id under that bubble, same spelling. Both are plain text ids and neither is a label |
+| `session_minutes` | `int` | `20260912_session_minutes.sql` (written, not applied) | minutes, nullable, no default. Null is "never answered" and the goal decides. No check constraint: the engine clamps to 15..120 and says what it did, so a slider that ships with a wider track costs a clamp and a sentence rather than a failed save |
 | `goal_secondary` | `jsonb` | `20260912_goal_secondary.sql` (written, not applied) | `[{ "bubble": "do-a-thing", "child": "flexibility" }]`, default `[]`. A separate column on purpose: `goal_bubble` and `goal_child` hold live rows and nothing about them changes |
 | `limits` | `jsonb` | `20260909_limits.sql` | below |
 
@@ -257,6 +276,7 @@ One line each, so a screen can say what an answer buys.
 | `goal_secondary` | adds priority muscle groups, the ten minute mobility cool-down, and more cardio, and nothing else. It can never move a rep range, a rest, the sets factor, the session length or the day count, and it never changes the honest timeline. A secondary that turns out to add none of those three is reported with an empty `effect` and the plan says in `notes` that the tap changed nothing |
 | `goal` + `goal_detail` | the same, reached by parsing instead of by tapping, and beaten by a valid bubble |
 | `challenge_target` | how many days the week has, clamped to what the goal supports |
+| `session_minutes` | the clock the whole week is costed against, replacing the goal's own `sessionMin`. Under it, the plan comes down to meet it in four steps, gentlest first: sets off a non-priority accessory to a floor of two, then a non-priority accessory movement goes, then sets come off everything including the main lifts down to a floor of three (largest first, so the emphasis survives), and only then does the rest between sets shorten, to at most 40% off and never below 45 seconds. The last one costs the goal something real and always produces a sentence in `notes`. Over it, the extra minutes buy sets on the groups the weekly ledger already reports as under target, capped at that target plus the usual slack and at the group's MRV, and never a new exercise or a new main movement. A budget that cannot be spent inside those rules is handed back with a sentence rather than filled with junk sets. A day that still does not fit after all four says its honest number, same as it always did |
 | `gym_days_this_week` | the day count when nobody chose one |
 | `current_weight` | starting loads, scaled allometrically. Without it every weight is omitted rather than guessed |
 | `sex` | which column of pattern ratios sets those loads |

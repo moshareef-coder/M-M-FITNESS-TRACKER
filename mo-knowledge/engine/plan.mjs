@@ -110,6 +110,41 @@ const REP_SECONDS = 30;
 const WARMUP_MIN = 6;
 const TIME_TOLERANCE = 1.15;
 
+/* The three numbers the person's own clock needs, and none of them are read
+   unless they gave one. See the budget block in `buildPlan`.
+
+   15 and 120 are the clamp on what a slider may send. Below 15 there is no
+   session at all: four movements at the smallest prescription this engine has,
+   two sets and the shortest rest it will allow, is 21 minutes with the warm-up,
+   so anything under that is a number the plan can only fail to meet. Above 120
+   nothing changes, because the volume ceilings stop the fill pass long before
+   the clock does; the ceiling is there so a typed 6000 does not turn into a
+   loop that adds sets until MRV catches it one at a time.
+
+   MAIN_SETS_FLOOR is 3 rather than the 2 an accessory can go to. A main lift at
+   two sets is not the movement the day was built around any more, and the whole
+   argument for letting the clock touch a main at all is that fewer real sets
+   beats more rushed ones. Three is where it stops being real.
+
+   The rest floor is a fraction and an absolute, and both are needed: 0.6 keeps
+   the shape of the goal's prescription (a strength rest stays long relative to
+   an accessory rest), and 45 seconds is the point below which a set stops being
+   a set and becomes conditioning. Rest is the LAST lever on purpose, because it
+   is the only one that changes what a set is worth rather than how many there
+   are, and it is the only one that has to say out loud what it did. */
+const SESSION_MIN_FLOOR = 15;
+const SESSION_MIN_CEILING = 120;
+const MAIN_SETS_FLOOR = 3;
+const REST_FLOOR_FACTOR = 0.6;
+const REST_FLOOR_SEC = 45;
+
+/* "3:00", for the one sentence that has to compare two rest intervals. */
+function clock(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 function estimateMinutes(exercises) {
   const seconds = exercises.reduce((t, e) => t + e.sets * (REP_SECONDS + e.restSec), 0);
   return Math.round(WARMUP_MIN + seconds / 60);
@@ -402,7 +437,7 @@ export function buildPlan({
   goal, person = {}, logs = [], plans = [], swaps = [], equipment = null, today = new Date(), priorityOverride = null,
   limits = null, avoid = [],
 } = {}) {
-  const { bodyWeightLb = null, sex = null, daysAsked = null } = person;
+  const { bodyWeightLb = null, sex = null, daysAsked = null, sessionMinutes = null } = person;
 
   /* ---- who they are, measured not asked ---- */
   const trainingAge = deriveTrainingAge({ logs, today });
@@ -746,6 +781,53 @@ export function buildPlan({
   const tierMap = toTierMap(priorityOverride ?? P.priority);
   const tierFor = (group) => tierMap[group] || 0;
   const isPriority = (group) => tierFor(group) > 0;
+
+  /* ---- how long they actually have ----
+     `P.sessionMin` is the goal's answer to this and it is a considered number:
+     a strength goal really does need the three minutes between heavy sets that
+     make it 60. What it never was is a fact about this person's Tuesday. Mo,
+     2026-09-12: "sometimes you put like five sets, six sets, whatever. But some
+     people they wanna do more, or they wanna do less. So maybe we should also
+     have it be where, how long are you wanting to work out for?"
+
+     A stated answer REPLACES the goal's number rather than clamping it or
+     averaging with it. It is the same class of input as a missing barbell: a
+     fact about the world the plan has to build around, not an opinion the
+     engine gets a vote on. What the goal keeps is everything else it sets, and
+     that is the trade this makes visible: 25 minutes of a strength goal is
+     still strength rep ranges and long rests, it is just fewer of them.
+
+     Clamped to 15 and 120 because a slider can send anything, and said out loud
+     when the clamp bites, on the same principle as the day count above: the
+     number is a statement rather than a discrepancy.
+
+     Null, absent, zero and nonsense all mean "never answered", the goal decides,
+     and every line below behaves exactly as it did before this existed. That is
+     load bearing rather than polite: the two passes that can touch a main lift,
+     and the one that can shorten a rest, are all guarded on `askedMinutes`, so
+     a plan built without it is the plan it was yesterday to the byte. */
+  /* A boolean is excluded by hand because `Number(true)` is 1 and 1 is finite,
+     so a client that sent `session_minutes: true` would have bought a 15 minute
+     week off a value that means nothing. Every other junk shape (a string, an
+     object, an array, a negative) already falls out as NaN or as a number the
+     guard below rejects. */
+  const rawAsked = typeof sessionMinutes === "boolean" ? NaN : Number(sessionMinutes);
+  const askedMinutes = Number.isFinite(rawAsked) && rawAsked > 0
+    ? Math.min(SESSION_MIN_CEILING, Math.max(SESSION_MIN_FLOOR, Math.round(rawAsked)))
+    : null;
+  if (askedMinutes !== null && askedMinutes !== Math.round(rawAsked)) {
+    dayNotes.push(askedMinutes === SESSION_MIN_FLOOR
+      ? `You asked for ${Math.round(rawAsked)} minutes a session. There is no session that short: four movements at `
+        + `two sets and the shortest rest worth calling rest is about 21 minutes once the warm-up is in, so the plan `
+        + `is built for ${askedMinutes} and tells you when a day still runs over.`
+      : `You asked for ${Math.round(rawAsked)} minutes a session. The plan is built for ${askedMinutes}, because past `
+        + `that the limit stops being the clock and starts being what a week can recover from.`);
+  }
+  const sessionBudgetMin = askedMinutes ?? P.sessionMin;
+
+  /* Filled by pass 3 below, spoken once after it. See the note at the call. */
+  const cappedLoads = new Set();
+
   const week = selected.map(({ name, key, isShort, picks }) => {
     const exercises = picks.map(({ slot, pick, swap, alternatives, offPattern }) => {
       const group = groupFor(slot, pick);
@@ -770,6 +852,13 @@ export function buildPlan({
         exercise: pick, reps, bodyWeightLb, sex, level, logs, returning: trainingAge.returning,
         calibration: calibration.byExercise,
       });
+      /* load.mjs caps a guess that extrapolated past what the person's size and
+         level can support: one logged 200 lb Goblet Squat was producing an 870
+         lb Leg Press. The cap already writes the reason into the exercise's own
+         note, and `capped` rides back specifically so the week can say it once
+         out loud as well, because a number on a card is read and a note under
+         it often is not. Collected here, spoken below with the rest of pass 3. */
+      if (load.capped) cappedLoads.add(pick.name);
 
       const exercise = {
         name: pick.name, group, equipment: pick.equipment, sets, reps,
@@ -798,7 +887,11 @@ export function buildPlan({
 
     return {
       name, focus: key, short: isShort,
-      minutes: isShort ? Math.round(P.sessionMin * 0.6) : P.sessionMin,
+      /* The budget is the person's when they named one and the goal's when they
+         did not. A short day is still six tenths of it: a short day is the
+         session they were least likely to make, and that is as true of a 90
+         minute answer as of a 45 minute goal. */
+      minutes: isShort ? Math.round(sessionBudgetMin * 0.6) : sessionBudgetMin,
       /* Filled in below, once the sets have stopped moving. Declared here so the
          key is on every day whatever the trimming does. */
       estimatedMinutes: null,
@@ -946,7 +1039,21 @@ export function buildPlan({
      guarantee settled above cannot be undone from here. A day that is still
      over after both levers is a day of long-rested main lifts, and it says the
      honest number rather than the budget it was asked for. */
+  /* The capped guesses, said once. The number on the card is a ceiling rather
+     than a prescription and the person is the only one who can correct it, so
+     the ask is explicit: change it. Named rather than counted, because "one of
+     your weights was held back" sends somebody hunting through the week. */
+  if (cappedLoads.size) {
+    const names = [...cappedLoads];
+    const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+    dayNotes.push(`The starting weight on ${list} is a guess held back on purpose. It was worked out from very little `
+      + `history on a different movement and it came out higher than your size and level support, so it is capped `
+      + `rather than shown as it calculated. Treat it as a starting point and change it to what you can actually do: `
+      + `one logged session replaces the guess entirely.`);
+  }
+
   const timeTrimmed = [];
+  const restCompressed = [];
   const lastIndex = (list, ok) => { for (let i = list.length - 1; i >= 0; i--) if (ok(list[i], i)) return i; return -1; };
   for (const d of week) {
     let estimate = estimateMinutes(d.exercises);
@@ -973,7 +1080,146 @@ export function buildPlan({
       d.exercises.splice(last, 1);
       estimate = estimateMinutes(d.exercises);
     }
+
+    /* ---- the third lever, and it exists only when the person named the clock ----
+       Everything above this line refuses to touch a main lift, and the reasoning
+       is still right for the budget it was written against: `P.sessionMin` is
+       the engine's own estimate of how long this goal takes, and an estimate has
+       no business deleting sets off the movement the day is built around.
+
+       A stated session length is a different kind of number. Somebody with 25
+       minutes has 25 minutes, and the two answers available are a session that
+       fits and a session that does not. So when, and only when, they told us,
+       the clock is allowed to take sets off a main, down to MAIN_SETS_FLOOR.
+
+       Largest first, one set at a time, which is an even haircut rather than one
+       movement being gutted: it never takes a lift below a lift that had fewer
+       sets than it, so the relative emphasis the whole file spent four passes
+       building survives the trim, and the priority floor survives with it. A
+       priority lift gets the main floor too, not the accessory one, so shaving
+       cannot walk a focused group down under an unfocused one, which is the
+       2026-09-10 bug in a new place. `enforcePriorityFloor` runs again after,
+       because it only ever lowers sets and a guarantee worth stating is worth
+       re-checking rather than reasoned about. */
+    if (askedMinutes !== null) {
+      const setsFloor = (e) => (roleOf.get(e) === "main" || e.priority ? MAIN_SETS_FLOOR : SHORT_DAY_SETS);
+      while (overBudget()) {
+        let pick = -1;
+        for (let i = 0; i < d.exercises.length; i++) {
+          const e = d.exercises[i];
+          if (e.sets <= setsFloor(e)) continue;
+          if (pick < 0 || e.sets >= d.exercises[pick].sets) pick = i;
+        }
+        if (pick < 0) break;
+        d.exercises[pick].sets -= 1;
+        estimate = estimateMinutes(d.exercises);
+      }
+      enforcePriorityFloor(d.exercises);
+      estimate = estimateMinutes(d.exercises);
+
+      /* ---- and the fourth, which costs the goal something and says so ----
+         Rest is last because it is the only lever that changes what a set is
+         worth instead of how many of them there are. knowledge/ prescribes the
+         interval per goal for a reason: three minutes between heavy triples is
+         the difference between a strength set and a hard set. Cutting it buys
+         minutes at the price of the thing the goal was for, so it runs only
+         after every set that could come off has come off, it stops at 60% of
+         what was prescribed and never under 45 seconds, and it is the one trim
+         in this file that always produces a sentence. Never upward: a floor
+         that raised an accessory's 42 second rest to 45 would be this pass
+         spending time rather than saving it. */
+      if (overBudget()) {
+        const restBefore = d.exercises.map((e) => e.restSec);
+        let factor = 1;
+        while (factor > REST_FLOOR_FACTOR + 1e-9 && overBudget()) {
+          factor = Math.max(REST_FLOOR_FACTOR, +(factor - 0.05).toFixed(2));
+          d.exercises.forEach((e, i) => {
+            e.restSec = Math.min(restBefore[i], Math.max(REST_FLOOR_SEC, Math.round(restBefore[i] * factor)));
+          });
+          estimate = estimateMinutes(d.exercises);
+        }
+        const from = Math.max(...restBefore);
+        const to = Math.max(...d.exercises.map((e) => e.restSec));
+        if (to < from) restCompressed.push({ day: d.name, fromSec: from, toSec: to, factor });
+      }
+    }
+
     d.estimatedMinutes = estimate;
+  }
+
+  /* Said once for the week rather than once a day, because it is the same
+     decision on every day and three copies of it is a scold. */
+  if (restCompressed.length) {
+    const worst = restCompressed.reduce((a, b) => (b.toSec / b.fromSec < a.toSec / a.fromSec ? b : a));
+    dayNotes.push(`To fit the ${sessionBudgetMin} minutes you asked for, the rest between sets came down from `
+      + `${clock(worst.fromSec)} to ${clock(worst.toSec)}${restCompressed.length > 1 ? ` on ${restCompressed.length} days` : ` on ${worst.day}`}. `
+      + `That is less recovery than this goal asks for, and it is a real cost rather than a rounding: the last sets `
+      + `will feel harder and the heaviest work will climb more slowly. Sets came off first and this is what was left. `
+      + `If you ever have the longer session, take it.`);
+  }
+
+  /* ---- the other direction: more time should mean more work ----
+     "Some people they wanna do more." A budget bigger than the plan needs is
+     slack today, and slack is not a plan. So the extra minutes buy sets, and
+     they buy them where the week's own ledger already says there is room: a
+     group under its weekly target that has an accessory slot below the session
+     clamp. `volumeNotes.under` has been reporting exactly that list since it
+     was written, with a comment saying it would be acted on "when there is a
+     caller". This is the caller.
+
+     What it will NOT do is more interesting than what it will. It adds no
+     exercise and no main movement, because the slot table is the argument of
+     this whole file and a spare fifteen minutes is not a reason to put two
+     lifts on the same muscle. And it never crosses `weeklyTargetFor` plus the
+     same VOLUME_SLACK the over-trim uses, which is itself capped at the group's
+     MRV, so more time can approach what the research supports and can never
+     pass it. A budget that cannot be spent inside those two rules is handed
+     back with a sentence rather than filled with junk sets.
+
+     Skips short days: a short day is deliberately small and topping it up with
+     the extra time would delete the only thing that makes it short. */
+  const timeAdded = new Map();
+  if (askedMinutes !== null) {
+    for (const d of week) {
+      if (d.short) continue;
+      /* Unfocused lifts may not climb past the priority floor's ceiling, which
+         is the smallest set count among the day's focused lifts. Same guarantee
+         `enforcePriorityFloor` makes, enforced before the fact rather than
+         undone after it, since undoing it would hand back minutes already
+         counted as spent. */
+      const focused = d.exercises.filter((e) => e.focusTier >= TIERS.secondary);
+      const floorCeiling = focused.length ? Math.min(...focused.map((e) => e.sets)) : Infinity;
+      for (;;) {
+        const totals = plannedByGroup();
+        let best = null;
+        let bestGap = 0;
+        for (const e of d.exercises) {
+          if (e.sets >= MAX_SETS_PER_SESSION) continue;
+          if (!e.focusTier && e.sets + 1 > floorCeiling) continue;
+          const ceiling = Math.min(weeklyTargetFor(e.group) + VOLUME_SLACK, WEEKLY_MRV[e.group] ?? Infinity);
+          const gap = ceiling - (totals[e.group] || 0);
+          if (gap < 1) continue;
+          if (!best || gap > bestGap) { best = e; bestGap = gap; }
+        }
+        if (!best) break;
+        best.sets += 1;
+        if (estimateMinutes(d.exercises) > d.minutes * TIME_TOLERANCE) { best.sets -= 1; break; }
+        timeAdded.set(`${d.name}|${best.name}`, { day: d.name, exercise: best.name, group: best.group, to: best.sets });
+      }
+      d.estimatedMinutes = estimateMinutes(d.exercises);
+    }
+  }
+
+  /* A budget nothing could spend. Worth a sentence for the same reason the
+     over-budget day gets one: they answered a question and the answer moved
+     nothing, and an app that quietly pockets the answer is the dead "main
+     focus" dropdown. Only when they asked for MORE than the goal wanted, since
+     below that the budget is doing plenty. */
+  const longestDay = week.reduce((m, d) => Math.max(m, d.estimatedMinutes), 0);
+  if (askedMinutes !== null && askedMinutes > P.sessionMin && longestDay < askedMinutes * 0.8) {
+    dayNotes.push(`You have ${askedMinutes} minutes and the longest day here needs about ${longestDay}. That is not the `
+      + `plan being lazy: more sets than this is past what your level recovers from in a week, and volume you cannot `
+      + `recover from is not training. Spend the rest on a longer warm-up, the stretching block, or a walk.`);
   }
 
   /* And when neither lever was enough, the day says so instead of leaving the
@@ -985,12 +1231,23 @@ export function buildPlan({
      belongs to calibration and the plateau response rather than to a clock.
      Measured across 3816 days of goal, day count and history combinations: 90
      stay over, every one of them a day whose accessories are gone or at the
-     floor. Named, so the number is a statement rather than a discrepancy. */
+     floor. Named, so the number is a statement rather than a discrepancy.
+
+     When they named the clock themselves, three more levers ran and the
+     sentence has to be a different one: "everything left on it is a main lift"
+     is no longer true, because the mains came down too and so did the rest.
+     What is left over is the floor of the engine itself, four movements at
+     three sets and the shortest rest it will prescribe, and the honest thing to
+     say is that the budget is smaller than any real session of this goal. */
   const overBudget = week
     .filter((d) => d.estimatedMinutes > d.minutes * TIME_TOLERANCE)
     .map((d) => ({
       day: d.name, estimatedMinutes: d.estimatedMinutes, budget: d.minutes,
-      why: `${d.name} comes to about ${d.estimatedMinutes} minutes against the ${d.minutes} you asked for. Everything left on it is a main lift, so the time goes to the rest between sets.`,
+      why: askedMinutes === null
+        ? `${d.name} comes to about ${d.estimatedMinutes} minutes against the ${d.minutes} you asked for. Everything left on it is a main lift, so the time goes to the rest between sets.`
+        : `${d.name} still comes to about ${d.estimatedMinutes} minutes against the ${d.minutes} you asked for, and that is `
+          + `after the sets came down and the rest with them. This goal cannot honestly be done in ${d.minutes} minutes: `
+          + `give it the extra or pick a goal with shorter rests.`,
     }));
   for (const o of overBudget) dayNotes.push(o.why);
 
@@ -1163,7 +1420,26 @@ export function buildPlan({
        the ledger rather than inside it so that `weeklyVolume` stays a plain map
        from group to numbers and a caller can iterate it without having to know
        which keys are muscles and which are bookkeeping. */
-    volumeNotes: { trimmed: volumeTrimmed, over: volumeOver, under: volumeUnder, frequencyCapped, timeTrimmed, overBudget },
+    volumeNotes: {
+      trimmed: volumeTrimmed, over: volumeOver, under: volumeUnder, frequencyCapped, timeTrimmed, overBudget,
+      /* The two new halves of the time ledger. `restCompressed` is the only
+         trim in this file that changes what a set is worth, so it is reported
+         separately from `timeTrimmed` rather than folded in with the dropped
+         movements. `timeAdded` is the fill pass, one entry per lift that grew,
+         not one per set. Both are empty on every plan built without a stated
+         session length, which is every plan built before today. */
+      restCompressed, timeAdded: [...timeAdded.values()],
+    },
+    /* What the week was costed against and where that number came from, because
+       "45 minutes" means a different thing when the goal chose it and when the
+       person did. `asked` is what arrived before the clamp, so a screen can tell
+       a clamp from a coincidence. */
+    sessionBudget: {
+      minutes: sessionBudgetMin,
+      source: askedMinutes === null ? "goal" : "asked",
+      asked: Number.isFinite(rawAsked) && rawAsked > 0 ? Math.round(rawAsked) : null,
+      goalMinutes: P.sessionMin,
+    },
     cardio: P.cardio,
     /* What was asked for, what it cost, and what it could not buy. `excluded`
        is every movement the joint table ruled out across both libraries, not

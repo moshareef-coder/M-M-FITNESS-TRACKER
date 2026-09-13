@@ -314,15 +314,50 @@ it is not paying attention.
   prevent. `volumeNotes.over` and `volumeNotes.under` report both. Acting on
   either one means changing the split, which is a larger decision than a ledger
   should be allowed to make on its own.
-- **A day of four main lifts at long rests will not fit a short budget.** An
-  advanced lifter who picks the no-time goal gets four main movements at six
-  sets, which is about 47 minutes against the 25 they asked for, and both time
-  levers stop before touching a main. 90 days out of 3816 land here.
-  `volumeNotes.overBudget` names them and the sentence reaches `dayNotes`, so
-  the number is a statement rather than a discrepancy. Shaving a main's sets
-  would fix the clock by pulling the back-off lever, which belongs to
-  calibration and the plateau response, and two hands on one lever is the bug
-  this folder already has a section about.
+- **A day of four main lifts at long rests will not fit a short budget, when
+  the budget is the GOAL's.** An advanced lifter who picks the no-time goal
+  gets four main movements at six sets, which is about 47 minutes against the
+  25 that goal asks for, and the two accessory levers stop before touching a
+  main. 125 days out of 3824 land here. `volumeNotes.overBudget` names them and
+  the sentence reaches `dayNotes`, so the number is a statement rather than a
+  discrepancy. This half of the limit is deliberate and stays: `P.sessionMin`
+  is the engine's own estimate of how long a goal takes, and an estimate has no
+  business deleting sets off the movement the day is built around. Shaving a
+  main's sets to satisfy it would fix the clock by pulling the back-off lever,
+  which belongs to calibration and the plateau response, and two hands on one
+  lever is the bug this folder already has a section about.
+
+  The other half is closed as of 2026-09-12. When the PERSON names the clock,
+  through `session_minutes`, two more levers run and then a third: sets come
+  off everything including the mains, largest first, down to a floor of three,
+  and only after that does the rest between sets shorten, by at most 40% and
+  never below 45 seconds. A stated time is a fact about somebody's Tuesday
+  rather than an estimate, which is why it may do what `P.sessionMin` may not.
+  Measured over the same 3824 days, against the two old levers alone: at a 20
+  minute target 75.3% of days ran over and now 32.8% do; at 30 minutes 27.0%
+  and now 1.8%; at 45 minutes 5.9% and now none. What is left at 20 minutes is
+  the engine's own floor, four movements at three sets and the shortest rest it
+  will prescribe, which is about 21 minutes before a single long-rest strength
+  lift is costed. Those days say so in plain words and name the two honest
+  answers, more time or a goal with shorter rests.
+
+  Rest compression is the one trim in the file that changes what a set is worth
+  rather than how many there are, so it runs last, it stops at 60% of what the
+  goal prescribed, and it always produces a sentence. That is not politeness:
+  `knowledge/principles/` prescribes the interval per goal for a reason, and an
+  engine that quietly shortens it is selling a strength block that is not one.
+- **More time can only buy what the week can recover from.** The other
+  direction of `session_minutes` adds sets to the groups the weekly ledger
+  already reports as under target, capped at that target plus the usual slack
+  and at the group's MRV, and it adds no exercise and no main movement, because
+  the slot table is the argument of `plan.mjs` and a spare fifteen minutes is
+  not a reason to put two lifts on the same muscle. So a 90 minute answer is
+  mostly unspent: across the sweep matrix the longest day comes to about half
+  the budget, and 4,466 lifts grow a set across the whole space rather than
+  every day filling up. The plan says that out loud rather than inventing
+  volume to fill the time. Whether the honest answer to "I have 90 minutes and
+  three days" is a different SPLIT rather than a fuller day is a real question
+  and the ledger does not get to answer it, same as the frequency cap above.
 - **`detectPlateau` can rarely report a stall shorter than its own window.**
   `weeksFlat` is measured from the first day the all time best was set, and a lift
   whose best sits inside the six week window counts as climbing, so a 4 or 5 week
@@ -762,6 +797,88 @@ Related and not ours: `Weighted Dip` is tagged `equipment: "bodyweight"` in
 `knowledge/exercise-library/`, so it appears on a bodyweight only week. That is
 a data fact in a read-only folder, and it is a request for Jawa rather than an
 edit here.
+
+## How long you actually have, 2026-09-12
+
+Mo: "sometimes you put like five sets, six sets, whatever. But some people they
+wanna do more, or they wanna do less. So maybe we should also have it be where,
+how long are you wanting to work out for?"
+
+There was always a time budget. It just came from the goal. `P.sessionMin` is
+25, 30, 40, 45, 50 or 60 depending on the tile, and until 2026-09-10 only the
+display read it. Now `session_minutes` can replace it.
+
+**Replace, not clamp.** A goal's session length is a considered number and it
+is also a guess about somebody's life. A stated one is a fact, the same class
+of input as a missing barbell, and this file already has a rule for facts: they
+win. What the goal keeps is everything else, and that is the trade the design
+makes visible rather than hiding. Twenty-five minutes of a strength goal is
+still strength rep ranges and long rests; it is just fewer of them.
+
+**Absent is not a value.** Null, zero, a string and nonsense all mean "never
+answered", the goal decides, and the whole matrix comes out byte for byte what
+it was. That is load bearing rather than polite: the three levers that can
+touch a main lift or a rest interval are guarded on the stated answer, so
+nobody who skipped the question can reach them.
+
+### Down: four levers, gentlest first
+
+1. Sets off a non-priority accessory, to a floor of two. Already existed.
+2. A non-priority accessory movement goes, to a floor of four exercises.
+   Already existed. Priority accessories are exempt from both, which is the
+   2026-09-10 bug where asking for arms deleted the arm work.
+3. **New.** Sets off everything, mains included, to a floor of three. Largest
+   first, one at a time, which is an even haircut rather than one movement
+   being gutted: it never takes a lift below a lift that already had fewer
+   sets, so the emphasis four passes spent building survives the trim and the
+   priority floor survives with it. A priority lift gets the main floor too, so
+   shaving cannot walk a focused group under an unfocused one.
+4. **New, and last.** The rest between sets, to at most 40% off and never below
+   45 seconds. Last because it is the only lever that changes what a set is
+   worth instead of how many there are, and it is the only one that always
+   produces a sentence. Three minutes between heavy triples is the difference
+   between a strength set and a hard set; buying minutes with it is a real cost
+   and the plan says so.
+
+Below all four there is a floor: four movements at three sets and the shortest
+rest the engine will prescribe is about 21 minutes with the warm-up in, so a
+20 minute answer against a long-rest strength goal still runs over. Those days
+say the honest number and name the two real answers, more time or a goal with
+shorter rests. Measured, over 3824 days, against the two old levers alone:
+
+| target | over budget before | over budget now |
+|---|---|---|
+| 20 min | 75.3% | 32.8% |
+| 30 min | 27.0% | 1.8% |
+| 45 min | 5.9% | 0% |
+| 60 min | 0% | 0% |
+
+### Up: the ledger decides, not the clock
+
+More time buys sets, and it buys them where the week's own ledger already says
+there is room: a group under its weekly target with an accessory slot below the
+session clamp. `volumeNotes.under` has reported exactly that list since it was
+written, with a comment saying it would be acted on "when there is a caller".
+This is the caller.
+
+What it will not do matters more. No new exercise and no new main movement,
+because the slot table is the argument of this file and a spare fifteen minutes
+is not a reason to put two lifts on the same muscle. Never past
+`weeklyTargetFor` plus the same slack the over-trim uses, which is itself
+capped at the group's MRV, so more time approaches what the research supports
+and can never pass it. A 90 minute answer therefore comes out mostly unspent:
+the longest day averages about half that budget across the matrix. The plan
+hands the difference back with a sentence rather than inventing volume to fill
+the clock.
+
+### What the sweep does and does not cover
+
+`sweep.mjs` sends no `session_minutes` today, so its `over-time-budget` count
+is unmoved at 1399 and that is the correct reading: the sweep measures the
+no-answer path, which is exactly the path this change leaves alone. The numbers
+in the table above come from the same 3824 day matrix run five times with a
+target set. A `session_minutes` axis belongs in `sweep.mjs` and is the obvious
+next thing to add there.
 
 ## What `emphasis` does, and what it does not
 

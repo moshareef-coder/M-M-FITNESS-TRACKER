@@ -332,6 +332,10 @@ function makePayload(seed) {
      range, and absurd values for the gym_days fallback under it. */
   if (r.chance(0.8)) p.challenge_target = real ? 2 + r.int(5) : r.pick([1, 2, 6, 7, 0, -3, 14, 15, 3.5, "4", NaN, Infinity, null]);
   if (r.chance(0.5)) p.gym_days_this_week = real ? r.int(8) : r.pick([-1, 0, 4, 99, 1e9, "7", NaN, null, {}]);
+  /* How long they have. The engine clamps to 15..120 and says so, so the junk
+     side is mostly about the two ends of that clamp and the values a column
+     can carry that are not numbers at all. */
+  if (r.chance(0.4)) p.session_minutes = real ? r.pick([20, 30, 45, 60, 75, 90]) : r.pick([0, -30, 1, 14, 121, 600, 1e9, 45.7, "45", "", NaN, Infinity, null, {}, []]);
   if (r.chance(0.45)) p.focus = real ? r.pick(DAY_NAMES) : r.pick([...DAY_NAMES, "Arm day", "", "push", LONG, junk(r)]);
   if (r.chance(0.6)) p.focus_groups = focusGroups(r, real);
   if (r.chance(0.4)) p.focus_chosen_at = real ? isoLocal(new Date(TODAY.getTime() - r.int(400) * DAY_MS)) : r.pick(["not-a-date", "", 0, -1, "9999-99-99", junk(r)]);
@@ -380,7 +384,7 @@ const IDENTIFYING_FIELDS = ["user_name", "name", "email", "user_email", "partner
 const ROW_FIELDS = ["history", "logs", "plans", "swaps", "focus_groups"];
 const NUMBER_FIELDS = {
   age: [10, 120], height_in: [20, 108], current_weight: [40, 1500],
-  gym_days_this_week: [0, 14], challenge_target: [0, 14],
+  gym_days_this_week: [0, 14], challenge_target: [0, 14], session_minutes: [0, 600],
 };
 
 function boundPayload(raw) {
@@ -463,7 +467,7 @@ function badValues(v, path = "", out = [], seen = new Set()) {
  */
 const META_KEYS = new Set([
   "level", "childUsed", "goals", "confidence", "days", "dayName", "focusHonoured",
-  "focus", "limits", "stretching", "source", "goalSource", "logsSource", "missing",
+  "focus", "limits", "stretching", "session", "source", "goalSource", "logsSource", "missing",
 ]);
 /* Documented in the contract's prose and missing from its table. Warned, not
    failed: the key is deliberate and it is the TABLE that is behind, which is a
@@ -474,6 +478,7 @@ const META_SUBKEYS = {
   focus: ["requested", "requestedTiers", "applied", "tiers", "why", "stale"],
   limits: ["hurts", "missing", "excludedCount"],
   stretching: ["included", "warmupMinutes", "cooldownMinutes", "mobilityGoal", "why"],
+  session: ["budgetMinutes", "source", "asked", "goalMinutes", "estimatedMinutes", "fits", "restCompressed"],
 };
 const WORKOUT_KEYS = new Set(["focus", "exercises", "warmup", "cooldown"]);
 const EXERCISE_KEYS = new Set(["name", "sets", "reps", "targetWeight", "note", "swap", "alternatives", "restSec"]);
