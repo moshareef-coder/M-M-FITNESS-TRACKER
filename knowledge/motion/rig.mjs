@@ -142,7 +142,40 @@ export const BODY = {
   // hand v2
   palm: 5.0, palmHalf: 2.7, finger: 4.4, rPalm: 2.7, rFinger: 2.1, thumb: 5.0,
 };
+// Identical on both bodies by construction, so the floor is in the same place.
 export const LEG_TO_FLOOR = BODY.thigh + BODY.shin + BODY.rAnkle;
+
+// The female figure from knowledge/motion/reference/figure-female.png. SAME
+// skeleton: every bone length is identical and so is rAnkle, which means hip
+// height and LEG_TO_FLOOR are identical too, so every authored foot pin stays
+// valid on either body. What changes is width: narrower shoulders over wider
+// hips, a waist that is actually narrower than both, and slimmer arms and
+// lower legs. Two fields exist only here: `bust`, the soft convex curve the
+// sheet draws on the front of the side view, and `bun`, the hair knot at the
+// back of the skull.
+export const BODY_FEMALE = {
+  ...BODY,
+  rPelvis: 8.8, rWaist: 6.4, rChest: 9.6,
+  rNeckTop: 3.6, rNeckBot: 4.7,
+  rHeadBack: 6.4, rHeadJaw: 4.5,
+  rShoulder: 5.5, rDelt: 5.8, rElbow: 4.2, rWrist: 3.2,
+  rUpperArmMid: 4.8, rForearmMid: 3.9,
+  rHandA: 3.2, rHandB: 2.4, rThumb: 1.7,
+  rHip: 7.4, rThighMid: 7.0, rKnee: 5.0,
+  rCalf: 5.2, rToe: 2.6, rHeel: 3.2,
+  shoulderW: 11.2, hipW: 7.0,
+  bust: 2.0, bustAt: 0.80, bun: 3.4,
+};
+
+export const BODIES = { male: BODY, female: BODY_FEMALE };
+
+// Which table the rig is drawing with right now. render() sets it from the
+// palette or the caller's option; solvePose takes it as an optional argument so
+// a harness can measure one body without disturbing another.
+let ACTIVE = BODY;
+export const activeBody = () => ACTIVE;
+export function useBody(name) { ACTIVE = BODIES[name] || BODY; return ACTIVE; }
+
 
 // A canonical figure at rest, for placeholders, empty states and anything that
 // wants a person rather than an exercise. Not a library move and not something
@@ -233,7 +266,8 @@ export const ACCENTS = {
 };
 export const SKINS = ["mannequin", "anatomy"];
 
-export function palette(theme = "dark", accent = "action", skin = "mannequin") {
+export const BODY_KINDS = ["male", "female"];
+export function palette(theme = "dark", accent = "action", skin = "mannequin", bodyKind = "male") {
   const dark = theme !== "light";
   const T = dark ? THEMES.dark : THEMES.light;
   const A = typeof accent === "string"
@@ -251,6 +285,7 @@ export function palette(theme = "dark", accent = "action", skin = "mannequin") {
   const bodyShade = dark ? "#a6a3a0" : "#a09e9b";
   return {
     skin,
+    body: BODIES[bodyKind] ? bodyKind : "male",
     bg: T.bg,
     surface: T.surface,
     ink: body,
@@ -395,7 +430,8 @@ const DOWN0 = { x: V3(1, 0, 0), y: V3(0, 1, 0), z: V3(0, 0, 1) };
 const UP0 = { x: V3(1, 0, 0), y: V3(0, -1, 0), z: V3(0, 0, 1) };
 const carry = (C, F) => ({ x: local(C, F.x), y: local(C, F.y), z: local(C, F.z) });
 
-export function solvePose(pose, view) {
+export function solvePose(pose, view, body) {
+  if (body) useBody(body);
   const cam = cameraFor(view);
   const frontal = cam.plane === "frontal";
   const J = pose.joints || {};
@@ -416,7 +452,7 @@ export function solvePose(pose, view) {
   // torso: y runs UP the body here, which is the one place v1's convention
   // flips. Keeping the flip is what keeps 262 moves on the same pixels.
   let Ft = carry(C, inPlane(UP0, D(t), frontal, 1));
-  const spineLen = BODY.spine * (1 + breath * 0.012);
+  const spineLen = ACTIVE.spine * (1 + breath * 0.012);
   const chest = add3(pelvis, scl3(Ft.y, spineLen));
 
   // carrier for the chest and everything hanging off it
@@ -428,13 +464,13 @@ export function solvePose(pose, view) {
   let Cn = Ct;
   if (g("neckTwist")) Cn = rotY(Cn, -D(g("neckTwist")));
   const Fn = carry(Cn, inPlane(UP0, D(tn), frontal, 1));
-  const neckTop = add3(chest, scl3(Fn.y, BODY.neck));
-  const head = add3(neckTop, scl3(Fn.y, BODY.headOff));
+  const neckTop = add3(chest, scl3(Fn.y, ACTIVE.neck));
+  const head = add3(neckTop, scl3(Fn.y, ACTIVE.headOff));
 
   const out = {
     view, cam, plane: cam.plane, frontal,
     t, tn, rot,
-    chestR: BODY.rChest * (1 + breath * 0.02),
+    chestR: ACTIVE.rChest * (1 + breath * 0.02),
     facing: pose.facing || "toward",
     farSide: pose.farSide || null,
     frames: { torso: Ftw, neck: Fn, pelvis: carry(C, inPlane(DOWN0, D(rot), frontal, 1)) },
@@ -451,8 +487,8 @@ export function solvePose(pose, view) {
     // ---- shoulder anchor, including the girdle
     const girdleUp = g("shoulderGirdleElev" + s);
     const girdleFwd = g("shoulderGirdleProt" + s);
-    let shoulder = add3(chest, scl3(Ftw.z, lat * BODY.shoulderW));
-    if (!frontal) shoulder = add3(shoulder, scl3(Ftw.x, screenSign * BODY.depth));
+    let shoulder = add3(chest, scl3(Ftw.z, lat * ACTIVE.shoulderW));
+    if (!frontal) shoulder = add3(shoulder, scl3(Ftw.x, screenSign * ACTIVE.depth));
     if (girdleUp) shoulder = add3(shoulder, scl3(Ftw.y, girdleUp));
     if (girdleFwd) {
       shoulder = add3(shoulder, scl3(Ftw.x, girdleFwd));
@@ -464,23 +500,23 @@ export function solvePose(pose, view) {
     let Fa = carry(Ct, inPlane(DOWN0, D(armAbs), frontal, side));
     if (g("shoulderAbd" + s)) Fa = outPlane(Fa, D(g("shoulderAbd" + s)), frontal, side);
     if (g("shoulderRot" + s)) Fa = axial(Fa, D(g("shoulderRot" + s)), lat);
-    let elbow = add3(shoulder, scl3(Fa.y, BODY.upperArm));
+    let elbow = add3(shoulder, scl3(Fa.y, ACTIVE.upperArm));
     let Ff = inPlane(Fa, D(g("elbow" + s)), frontal, side);
-    let wrist = add3(elbow, scl3(Ff.y, BODY.forearm));
+    let wrist = add3(elbow, scl3(Ff.y, ACTIVE.forearm));
 
     const wIk = ikTarget(ik["wrist" + s], { chest }, cam);
     if (wIk) {
       const n = wIk.pole ? norm3(V3(wIk.pole[0], wIk.pole[1], wIk.pole[2]))
         : (frontal ? scl3(Ct.x, -side) : Ct.z);
       const wt = wIk.flat === false ? wIk.p : inLimbPlane(shoulder, wIk.p, frontal);
-      const r = twoBone3(shoulder, wt, BODY.upperArm, BODY.forearm, n, wIk.bend);
+      const r = twoBone3(shoulder, wt, ACTIVE.upperArm, ACTIVE.forearm, n, wIk.bend);
       elbow = r.mid; wrist = r.end;
       Fa = frameFromDir(sub3(elbow, shoulder), n, frontal, side);
       Ff = frameFromDir(sub3(wrist, elbow), n, frontal, side);
     }
     let Fh = inPlane(Ff, D(g("wrist" + s)), frontal, side);
     if (g("forearmPron" + s)) Fh = rotY(Fh, -lat * D(g("forearmPron" + s)));
-    const hand = add3(wrist, scl3(Fh.y, BODY.hand));
+    const hand = add3(wrist, scl3(Fh.y, ACTIVE.hand));
 
     // ---- leg
     const legAbs = rot + g("hip" + s) + g("hipFwd" + s);
@@ -489,18 +525,18 @@ export function solvePose(pose, view) {
     if (g("hipRot" + s)) Fl = axial(Fl, D(g("hipRot" + s)), lat);
     // v1 hung the hip anchors off the torso angle rather than the pelvis, and
     // every authored move is calibrated to that. Kept deliberately.
-    let hip = add3(pelvis, scl3(Ft.z, lat * BODY.hipW));
-    if (!frontal) hip = add3(hip, scl3(Ft.x, screenSign * BODY.depth * 0.8));
-    let knee = add3(hip, scl3(Fl.y, BODY.thigh));
+    let hip = add3(pelvis, scl3(Ft.z, lat * ACTIVE.hipW));
+    if (!frontal) hip = add3(hip, scl3(Ft.x, screenSign * ACTIVE.depth * 0.8));
+    let knee = add3(hip, scl3(Fl.y, ACTIVE.thigh));
     let Fs = inPlane(Fl, -D(g("knee" + s)), frontal, side);
-    let ankle = add3(knee, scl3(Fs.y, BODY.shin));
+    let ankle = add3(knee, scl3(Fs.y, ACTIVE.shin));
 
     const aIk = ikTarget(ik["ankle" + s], { chest }, cam);
     if (aIk) {
       const n = aIk.pole ? norm3(V3(aIk.pole[0], aIk.pole[1], aIk.pole[2]))
         : (frontal ? scl3(C.x, -side) : C.z);
       const at = aIk.flat === false ? aIk.p : inLimbPlane(hip, aIk.p, frontal);
-      const r = twoBone3(hip, at, BODY.thigh, BODY.shin, n, aIk.bend);
+      const r = twoBone3(hip, at, ACTIVE.thigh, ACTIVE.shin, n, aIk.bend);
       knee = r.mid; ankle = r.end;
       Fl = frameFromDir(sub3(knee, hip), n, frontal, side);
       Fs = frameFromDir(sub3(ankle, knee), n, frontal, side);
@@ -517,7 +553,7 @@ export function solvePose(pose, view) {
     } else {
       Ffoot = inPlane(Fs, Math.PI / 2 + D(g("ankle" + s)), frontal, side);
     }
-    const footLen = BODY.foot * ((fm && fm.len) || 1);
+    const footLen = ACTIVE.foot * ((fm && fm.len) || 1);
     const toe = add3(ankle, scl3(Ffoot.y, footLen));
     const heel = add3(ankle, scl3(Ffoot.y, -4.0));
 
@@ -720,22 +756,41 @@ const MITT = {
 };
 
 function drawHand(ctx, S, side, C, fill, grip) {
-  const B = BODY, k = S.sides[side];
+  const B = ACTIVE, k = S.sides[side];
   const m = MITT[grip] || MITT.open;
-  const d = norm2(k.axis.hand.y);
+  const rRoot = B.rHandA * m.root, rTip = B.rHandB * m.tip;
   const L = B.hand * m.len;
-  const tip = add(k.wrist, scl(d, L));
+  let d = norm2(k.axis.hand.y);
+  let tip = add(k.wrist, scl(d, L));
+  if (grip === "flat") {
+    // A hand on the floor LIES ALONG it, palm down, fingers toward the head end
+    // of the body. The authored wrist angle rotates the hand frame in the
+    // forearm's plane, and in a push-up that left the mitt standing on its heel
+    // pointing at the ceiling, which is what Mo saw on the card. So the flat
+    // hand ignores the hand frame and takes the floor tangent instead: the
+    // forearm's own forward direction, flattened.
+    let fwd = k.wrist.x - k.elbow.x;
+    // A near vertical forearm (a handstand, a bear crawl) gives no usable
+    // horizontal component, so fall back to which way the head is.
+    if (Math.abs(fwd) < 0.8) fwd = S.head.x - k.wrist.x;
+    if (Math.abs(fwd) < 0.001) fwd = d.x || 1;
+    const sgn = fwd < 0 ? -1 : 1;
+    d = V(sgn, 0);
+    // Tilt the centre line by the difference in radius so the UNDERSIDE is
+    // level: a flat hand is a paddle resting on a surface, not a wedge.
+    tip = V(k.wrist.x + sgn * L, k.wrist.y + (rRoot - rTip));
+  }
   part(ctx, C, [
-    [k.wrist, B.rHandA * m.root],
-    [lerpV(k.wrist, tip, 0.62), B.rHandA * 0.94 * m.root],
-    [tip, B.rHandB * m.tip],
+    [k.wrist, rRoot],
+    [lerpV(k.wrist, tip, 0.62), rRoot * 0.94],
+    [tip, rTip],
   ], { fill, shadeR: 0.42, shadeOff: 0.34 });
 }
 
 // A foot with a heel and a toe: instep from the ankle, sole along the ground,
 // heel bump behind. Three circles, one silhouette.
 function drawFoot(ctx, S, side, C, fill) {
-  const B = BODY, k = S.sides[side];
+  const B = ACTIVE, k = S.sides[side];
   const w = k.footW;
   const d = norm2(sub(k.toe, k.heel));
   const mid = lerpV(k.ankle, k.toe, 0.45);
@@ -754,7 +809,7 @@ function drawFoot(ctx, S, side, C, fill) {
 // suit. Still faceless: the hairline is the only feature and it is a shape, not
 // a face.
 function drawHead(ctx, S, C, fill) {
-  const B = BODY;
+  const B = ACTIVE;
   const u = norm2(S.neckAxis.y), f = norm2(S.neckAxis.x);
   const flat = S.frontal;
   const away = S.facing === "away";
@@ -769,6 +824,14 @@ function drawHead(ctx, S, C, fill) {
        [at(-2.2, 2.6), B.rHeadJaw], [at(-4.4, 2.2), B.rHeadJaw * 0.66],
        [at(-3.0, -1.0), B.rHeadJaw * 0.82]];
   hull(ctx, C, skull, { fill, shade: false });
+  // The knot at the back of the skull on the female sheet. It is part of the
+  // silhouette, so it is drawn before the collect pass returns, not with the
+  // hair cap below.
+  if (B.bun) {
+    const root = flat ? at(4.6, 0) : at(3.4, -B.rHeadBack * 0.62);
+    const knot = flat ? at(7.4, 0) : at(5.6, -B.rHeadBack * 1.28);
+    part(ctx, C, [[root, B.bun * 0.62], [knot, B.bun]], { fill: C.hair, shade: false });
+  }
   if (COLLECT) return;
   // one soft tone down the shaded side of the face and jaw
   const sd = (f.x * 0.42 + f.y * 0.91 < 0) ? -1 : 1;
@@ -810,7 +873,7 @@ function drawHead(ctx, S, C, fill) {
 }
 
 function drawArm(ctx, S, side, C, fill, grip, skinOpts) {
-  const B = BODY, k = S.sides[side];
+  const B = ACTIVE, k = S.sides[side];
   const d = norm2(sub(k.elbow, k.shoulder));
   part(ctx, C, [
     [add(k.shoulder, scl(d, -0.2)), B.rDelt],
@@ -824,7 +887,7 @@ function drawArm(ctx, S, side, C, fill, grip, skinOpts) {
 
 // Hip, thigh and shin as one surface, with a crease at the knee.
 function drawLeg(ctx, S, side, C, fill, skinOpts) {
-  const B = BODY, k = S.sides[side];
+  const B = ACTIVE, k = S.sides[side];
   const sh = norm2(sub(k.ankle, k.knee));
   part(ctx, C, [
     [k.hip, B.rHip],
@@ -845,7 +908,7 @@ function drawLeg(ctx, S, side, C, fill, skinOpts) {
 // they are most of what makes a flat grey shape read as a torso.
 function torsoLines(ctx, S, C) {
   if (COLLECT) return;
-  const B = BODY;
+  const B = ACTIVE;
   const u = norm2(S.torsoAxis.y);
   const flat = S.frontal;
   const lat = flat ? norm2(S.torsoAxis.z) : norm2(S.torsoAxis.x);
@@ -898,7 +961,7 @@ function torsoLines(ctx, S, C) {
 // Three circles down the torso so the silhouette narrows at the waist, plus a
 // soft chest plate. Flat two tone: a designed figure, not an anatomy chart.
 function drawTorso(ctx, S, C, fill, skinOpts) {
-  const B = BODY;
+  const B = ACTIVE;
   // The neck flares into the shoulders instead of standing on them like a peg.
   // The wide bottom circle is the trapezius, and it is most of what stops the
   // head reading as a ball on a stick.
@@ -925,6 +988,22 @@ function drawTorso(ctx, S, C, fill, skinOpts) {
   const fv = S.frontal;
   part(ctx, C, [[S.pelvis, B.rPelvis], [waist, B.rWaist], [S.chest, S.chestR]],
        { fill, shadeOff: fv ? 0.18 : 0.44, shadeR: fv ? 0.62 : 0.54 });
+  // The soft convex curve the female sheet draws on the front of the torso,
+  // between the shoulder and the waist. Side view only: face on, the same shape
+  // would be two circles stuck to a flat chest, which is not what the sheet
+  // does. It is a separate part so the union outline absorbs it into one
+  // silhouette instead of drawing a ring round it.
+  if (B.bust && !fv) {
+    const f = norm2(S.torsoAxis.x);
+    const at = lerpV(S.pelvis, S.chest, B.bustAt);
+    const rHere = B.rWaist + (S.chestR - B.rWaist) * 0.62;
+    const rb = B.rChest * 0.44;
+    const out = rHere + B.bust - rb;
+    part(ctx, C, [
+      [add(at, scl(f, out * 0.30)), rb * 0.92],
+      [add(at, scl(f, out)), rb],
+    ], { fill, shadeOff: 0.5, shadeR: 0.4 });
+  }
   if (skinOpts && skinOpts.plates) { torsoPlates(ctx, S, C, skinOpts.lit); return; }
   torsoLines(ctx, S, C);
   // A single soft mass under the collarbone gives the chest volume. It used to
@@ -1028,7 +1107,7 @@ function freePlate(ctx, C, group, lit, circles) {
 // light seam. Each view draws the panels that view actually shows.
 function armPlates(ctx, S, side, C, lit) {
   if (COLLECT) return;
-  const B = BODY, k = S.sides[side];
+  const B = ACTIVE, k = S.sides[side];
   const flat = S.frontal;
   const back = flat && S.facing === "away";
   const face = flat ? V(0, 0) : k.axis.arm.x;
@@ -1065,7 +1144,7 @@ function armPlates(ctx, S, side, C, lit) {
 
 function legPlates(ctx, S, side, C, lit) {
   if (COLLECT) return;
-  const B = BODY, k = S.sides[side];
+  const B = ACTIVE, k = S.sides[side];
   const flat = S.frontal;
   const back = flat && S.facing === "away";
   const face = flat ? V(0, 0) : k.axis.thigh.x;
@@ -1126,7 +1205,7 @@ function legPlates(ctx, S, side, C, lit) {
 
 function torsoPlates(ctx, S, C, lit) {
   if (COLLECT) return;
-  const B = BODY;
+  const B = ACTIVE;
   const P = S.pelvis, Ch = S.chest;
   const flat = S.frontal;
   const back = flat && S.facing === "away";
@@ -1455,10 +1534,21 @@ export function gripSides(move, S) {
     if (p.grip) g[p.grip] = "closed";
   }
   if (S) {
+    // Flat surfaces the hand can rest on: the floor, and the top of a bench or
+    // a box. The old test also looked at where the HAND point had landed, which
+    // was circular: a hand drawn standing on its heel never read as flat, so it
+    // never got laid down. Only the wrist decides now.
+    const tops = [];
+    for (const p of (move && move.props) || []) {
+      if (p.type === "bench") tops.push({ y: p.y - 3.6, x0: p.x, x1: p.x + p.w });
+      else if (p.type === "box") tops.push({ y: p.y, x0: p.x, x1: p.x + p.w });
+    }
     for (const s of ["L", "R"]) {
       if (g[s]) continue;
-      const k = S.sides[s];
-      if (k.hand.y > GROUND - 7 && k.wrist.y > GROUND - 12) g[s] = "flat";
+      const w = S.sides[s].wrist;
+      const onFloor = w.y > GROUND - 8;
+      const onTop = tops.some((t) => w.y > t.y - 8 && w.y < t.y + 3 && w.x > t.x0 - 4 && w.x < t.x1 + 4);
+      if (onFloor || onTop) g[s] = "flat";
     }
   }
   if (move && move.grip) Object.assign(g, move.grip);
@@ -1558,7 +1648,10 @@ function lerpIk(a, b, u) {
     const ax = Array.isArray(A) ? A[0] : A.x, ay = Array.isArray(A) ? A[1] : A.y;
     const bx = Array.isArray(B) ? B[0] : B.x, by = Array.isArray(B) ? B[1] : B.y;
     const bend = Array.isArray(A) ? A[2] : A.bend;
-    out[k] = { rel: A.rel || B.rel, x: ax + (bx - ax) * u, y: ay + (by - ay) * u, bend, pole: A.pole || B.pole };
+    // `tol` rides along: it is not geometry, it is how much slack a contact
+    // check is allowed on that pin, and a harness reads it off the sampled pose.
+    out[k] = { rel: A.rel || B.rel, x: ax + (bx - ax) * u, y: ay + (by - ay) * u, bend,
+               pole: A.pole || B.pole, tol: A.tol || B.tol };
   }
   return out;
 }
@@ -1618,6 +1711,7 @@ export function render(canvas, move, C, cycle, timeSec = 0, opts = {}) {
     ctx.scale(fit.k || 1, fit.k || 1);
     ctx.translate(-cx, -cy);
   }
+  useBody(opts.body || C.body || "male");
   const view = opts.view || move.view;
   // The caller passes which muscles and what peak colour; when they fire is the
   // move's business, so it is worked out here rather than by every caller.

@@ -13,7 +13,8 @@
 // DOM until mountMove is called.
 
 import { palette, render, samplePose, solvePose, jointAngles, cameraFor, litIntensity, VB, GROUND,
-  PROP_TYPES, LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY } from "./rig.mjs";
+  PROP_TYPES, LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY,
+  BODY_FEMALE, BODIES, BODY_KINDS, useBody, restPose, gripSides } from "./rig.mjs";
 import { MOVES as WEIGHT_TRAINING } from "./moves/weight-training.mjs";
 import { MOVES as YOGA } from "./moves/yoga.mjs";
 import { MOVES as PILATES } from "./moves/pilates.mjs";
@@ -21,7 +22,8 @@ import { MOVES as CALISTHENICS } from "./moves/calisthenics.mjs";
 import { MOVES as STRETCHING } from "./moves/stretching.mjs";
 
 export { palette, render, samplePose, solvePose, jointAngles, cameraFor, litIntensity, VB, GROUND,
-  PROP_TYPES, LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY };
+  PROP_TYPES, LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY,
+  BODY_FEMALE, BODIES, BODY_KINDS, useBody, restPose, gripSides };
 
 // Keyed by the training id used in knowledge/exercise-library/index.mjs.
 export const MOVES_BY_LIBRARY = {
@@ -111,6 +113,9 @@ export function mountMove(canvas, name, opts = {}) {
     theme: opts.theme || "dark",
     accent: opts.accent || "action",
     skin: opts.skin || "mannequin",
+    // "male" (default) or "female". Same skeleton and the same moves, a second
+    // proportion table; see BODY_FEMALE in rig.mjs.
+    bodyKind: opts.body || "male",
     // { muscles: ["chest","triceps"], color: "#e0521f" } from bodyHeatRGB. The
     // colour is the PEAK colour: intensity follows the rep unless the caller
     // pins it by passing an explicit `intensity`.
@@ -123,7 +128,8 @@ export function mountMove(canvas, name, opts = {}) {
     playing: !opts.paused,
     visible: true,
     dirty: true,
-    colors: palette(opts.theme || "dark", opts.accent || "action", opts.skin || "mannequin"),
+    colors: palette(opts.theme || "dark", opts.accent || "action", opts.skin || "mannequin",
+      opts.body || "male"),
   };
   mounts.add(m);
 
@@ -152,21 +158,28 @@ export function mountMove(canvas, name, opts = {}) {
     },
     setAccent(accent) {
       m.accent = accent;
-      m.colors = palette(m.theme, accent, m.skin);
+      m.colors = palette(m.theme, accent, m.skin, m.bodyKind);
       m.dirty = true;
       if (still) paint(m); else pump();
       return api;
     },
     setTheme(theme) {
       m.theme = theme;
-      m.colors = palette(theme, m.accent, m.skin);
+      m.colors = palette(theme, m.accent, m.skin, m.bodyKind);
       m.dirty = true;
       if (still) paint(m); else pump();
       return api;
     },
     setSkin(skin) {
       m.skin = skin;
-      m.colors = palette(m.theme, m.accent, skin);
+      m.colors = palette(m.theme, m.accent, skin, m.bodyKind);
+      m.dirty = true;
+      if (still) paint(m); else pump();
+      return api;
+    },
+    setBody(bodyKind) {
+      m.bodyKind = bodyKind;
+      m.colors = palette(m.theme, m.accent, m.skin, bodyKind);
       m.dirty = true;
       if (still) paint(m); else pump();
       return api;

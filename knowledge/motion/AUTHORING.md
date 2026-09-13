@@ -461,6 +461,20 @@ They change the SHAPE of the mitt, not its parts:
 The mitt is still oriented by `forearmPron`, so a wrist curl and a reverse wrist
 curl are still different pictures.
 
+**A flat hand ignores the hand frame.** A hand resting on a surface lies ALONG
+it, palm down, fingers toward the head end of the body, so the flat grip takes
+the floor tangent instead of the authored wrist angle: the forearm's own forward
+direction, flattened, falling back to which way the head is when the forearm is
+near vertical (a handstand). The authored wrist angle in a push-up is 86, and
+rotating the mitt by it stood the hand on its heel pointing at the ceiling. The
+centre line also tilts by the difference between the root and tip radius so the
+UNDERSIDE is level: a flat hand is a paddle on a surface, not a wedge.
+
+**What counts as flat is decided by the WRIST**, never by where the hand point
+landed, which was circular: a hand drawn standing on its heel never read as flat,
+so it never got laid down. The floor counts, and so does the top of a `bench` or
+a `box`, because a hand on a bench is a hand on a flat surface.
+
 ### Worked example: a twist (Russian Twist)
 
 ```js
@@ -672,6 +686,17 @@ reference has one unbroken slope from ear to shoulder.
 **Hands.** One rounded mitt at every size, shaped by the grip. See Hands above:
 the fingered version was cut after the approval sheet and the code is gone.
 
+**A horizontal body does not crane its head.** When the torso is horizontal and
+the chest faces the floor (prone, plank, quadruped, hinge), neck extension past
+about 12 degrees puts the face above the line of the spine and the figure reads
+as looking at the ceiling, showing its crown to the camera. The house limit for
+those poses is `neck: -12`, which puts the gaze slightly ahead of straight down,
+about a hand's width in front of the hands. Deliberate exceptions, where the
+extension IS the exercise, keep more: Cobra Pose, Upward-Facing Dog, Sphinx
+Stretch, Prone Press-Up, Superman, Revolved Triangle, World's Greatest Stretch,
+the cow half of Cat-Cow, and Crow Pose, whose gaze is cued forward. A standing
+or seated move keeps the gaze level and is not affected.
+
 **The ear sits behind the cheekbone**, not on it. At one unit forward it landed
 in the middle of the face and read as a single staring eye. This is the kind of
 thing only a render shows you.
@@ -695,6 +720,57 @@ rounder and a little larger than the reference skull; the limbs are tapered
 capsules rather than the reference's anatomical swells at the biceps and calf;
 the feet have a heel, arch and toe box but no separated toes; and the hand is a
 mitt by decision, not by limitation.
+
+
+## Two bodies
+
+There is a second proportion table, `BODY_FEMALE`, matched to
+`reference/figure-female.png`. It is the SAME skeleton: every bone length is
+identical and so is `rAnkle`, which means hip height and `LEG_TO_FLOOR` are
+identical, which is the whole reason every authored foot pin stays valid on
+either body. Only widths differ.
+
+Pick it with `body: "female"` on `mountMove`, as the fourth argument to
+`palette`, as `opts.body` on `render`, or as the third argument to `solvePose`
+when a harness wants to measure one body without disturbing another. The lab has
+a Female body button and takes `?body=female`. Default is `male` everywhere.
+
+Internally the rig reads from `ACTIVE`, set by `useBody()`. If you add a draw
+function, read `ACTIVE`, never `BODY`, or it will ignore the switch.
+
+What changes, and why each one:
+
+| | male | female |
+| --- | --- | --- |
+| `shoulderW` | 12.6 | **11.2** |
+| `hipW` | 6.2 | **7.0** |
+| `rChest` | 10.6 | **9.6** |
+| `rWaist` | 7.0 | **6.4** |
+| `rPelvis` | 8.4 | **8.8** |
+| `rHip` | 7.2 | **7.4** |
+| `rShoulder` / `rDelt` | 6.2 / 6.6 | **5.5 / 5.8** |
+| `rUpperArmMid` / `rForearmMid` | 5.5 / 4.4 | **4.8 / 3.9** |
+| `rKnee` / `rCalf` | 5.5 / 5.6 | **5.0 / 5.2** |
+| `rHeadBack` / `rHeadJaw` | 6.8 / 5.0 | **6.4 / 4.5** |
+
+Two fields exist only on the female table. `bust` and `bustAt` place the soft
+convex curve the sheet draws on the front of the torso, and it is drawn in the
+SIDE view only: face on, the same shape is two circles stuck to a flat chest,
+which is not what the sheet does. `bun` is the hair knot at the back of the
+skull, drawn before the outline pass returns so it is part of the silhouette
+rather than a sticker on top of it.
+
+**Widths move contacts, so both bodies are gated.** The validator samples every
+move on both tables, and a floor penetration or an illegal angle on either one
+fails the run. A contact harness compares the two: worst pin drift between them
+is 0.503 and worst floor drift 0.438, both inside tolerance.
+
+Three pins sit at the very edge of the leg's reach once the hip joint moves out
+0.8 units, so they carry an explicit `tol` on the pin rather than being
+re-authored: `Frog Pump` ankleR (0.9), `Side Bend` ankleL (0.9) and
+`Half Moon Pose` ankleR (1.0). `tol` is not geometry. The rig ignores it; it
+says how much slack a contact check is allowed on that pin, and `lerpIk` carries
+it through pose interpolation so a harness can read it off a sampled pose.
 
 
 ---

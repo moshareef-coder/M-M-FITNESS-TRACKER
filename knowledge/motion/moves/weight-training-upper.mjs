@@ -441,7 +441,7 @@ const DUMBBELL_ROW = {
     { // bottom, the working arm hanging straight down under the shoulder
       t: 0,
       root: { x: 58, y: 61.4, rot: 80 },
-      joints: { spine: -4, neck: -22 },
+      joints: { spine: -4, neck: -12 },
       ik: {
         wristR: { x: 80.9, y: 91.2, bend: 1 }, wristL: { x: 106.9, y: 87.2, bend: 1 },
         ankleR: { x: 52, y: FLOOR, bend: -1 }, ankleL: { x: 47, y: FLOOR, bend: -1 },
@@ -450,7 +450,7 @@ const DUMBBELL_ROW = {
     { // top, elbow driven up past the ribs, back still flat
       t: 1,
       root: { x: 58, y: 61.4, rot: 80 },
-      joints: { spine: -6, neck: -22 },
+      joints: { spine: -6, neck: -12 },
       ik: {
         wristR: { x: 74.8, y: 73.2, bend: 1 }, wristL: { x: 106.8, y: 87.2, bend: 1 },
         ankleR: { x: 52, y: FLOOR, bend: -1 }, ankleL: { x: 47, y: FLOOR, bend: -1 },
@@ -511,7 +511,7 @@ const CHEST_SUPPORTED_ROW = {
     { // bottom, both arms hanging long under the shoulders
       t: 0,
       root: { x: 46, y: 66, rot: 55 },
-      joints: { spine: 0, neck: -14 },
+      joints: { spine: 0, neck: -12 },
       ik: {
         wristR: { x: 74.5, y: 85.3, bend: 1 }, wristL: { x: 70.5, y: 86.3, bend: 1 },
         ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },
@@ -520,7 +520,7 @@ const CHEST_SUPPORTED_ROW = {
     { // top, elbows up behind the ribs, chest still pinned to the pad
       t: 1,
       root: { x: 46, y: 66, rot: 55 },
-      joints: { spine: 0, neck: -14 },
+      joints: { spine: 0, neck: -12 },
       ik: {
         wristR: { x: 64.5, y: 68.3, bend: 1 }, wristL: { x: 60.5, y: 69.3, bend: 1 },
         ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },
@@ -546,7 +546,7 @@ const T_BAR_ROW = {
     { // bottom, arms long, the bar hanging at the end of the arc
       t: 0,
       root: { x: 66, y: 61.4, rot: 16 },
-      joints: { spine: 30, neck: -14 },
+      joints: { spine: 30, neck: -12 },
       ik: {
         wristR: { x: 96.2, y: 75.9, bend: 1 }, wristL: { x: 93.2, y: 77.9, bend: 1 },
         ...stand(64, 59),
@@ -555,7 +555,7 @@ const T_BAR_ROW = {
     { // top, handle into the belly, elbows behind the ribs, torso angle unchanged
       t: 1,
       root: { x: 66, y: 61.4, rot: 16 },
-      joints: { spine: 30, neck: -14 },
+      joints: { spine: 30, neck: -12 },
       ik: {
         wristR: { x: 88.2, y: 59.9, bend: 1 }, wristL: { x: 85.2, y: 61.9, bend: 1 },
         ...stand(64, 59),
@@ -577,7 +577,7 @@ const BARBELL_ROW = {
     { // bottom, bar hanging under the shoulders
       t: 0,
       root: { x: 64, y: 61.4, rot: 14 },
-      joints: { spine: 32, neck: -14 },
+      joints: { spine: 32, neck: -12 },
       ik: {
         wristR: { x: 94.2, y: 75.9, bend: 1 }, wristL: { x: 91.2, y: 77.9, bend: 1 },
         ...stand(62, 57),
@@ -586,7 +586,7 @@ const BARBELL_ROW = {
     { // top, bar at the belly, elbows past the torso
       t: 1,
       root: { x: 64, y: 61.4, rot: 14 },
-      joints: { spine: 32, neck: -14 },
+      joints: { spine: 32, neck: -12 },
       ik: {
         wristR: { x: 86.2, y: 59.9, bend: 1 }, wristL: { x: 83.2, y: 61.9, bend: 1 },
         ...stand(62, 57),
@@ -610,7 +610,7 @@ const PENDLAY_ROW = {
     { // dead stop, bar on the plates, back flat and horizontal
       t: 0,
       root: { x: 62, y: 64, rot: 20 },
-      joints: { spine: 48, neck: -30 },
+      joints: { spine: 48, neck: -12 },
       ik: {
         wristR: { x: 94.3, y: 90.9, bend: 1 }, wristL: { x: 91.3, y: 91.9, bend: 1 },
         ...stand(58, 54),
@@ -619,7 +619,7 @@ const PENDLAY_ROW = {
     { // pulled to the belly, back still horizontal
       t: 1,
       root: { x: 62, y: 64, rot: 20 },
-      joints: { spine: 48, neck: -30 },
+      joints: { spine: 48, neck: -12 },
       ik: {
         wristR: { x: 90.8, y: 70.9, bend: 1 }, wristL: { x: 87.8, y: 71.9, bend: 1 },
         ...stand(58, 54),
@@ -869,7 +869,7 @@ const SNATCH_GRIP_HIGH_PULL = {
     { // start, hinged over with the bar hanging at the knee, arms long
       t: 0,
       root: { x: 62, y: 70, rot: 14 },
-      joints: { spine: 34, neck: -18 },
+      joints: { spine: 34, neck: -12 },
       ik: {
         wristR: { x: 90.3, y: 86.0, bend: 1 }, wristL: { x: 87.3, y: 87.0, bend: 1 },
         ...stand(62, 58),
@@ -1325,7 +1325,7 @@ const CONCENTRATION_CURL = {
     { // bottom, working arm hanging long inside the knee
       t: 0,
       root: { x: 46, y: 88, rot: 18 },
-      joints: { spine: 22, neck: -18 },
+      joints: { spine: 22, neck: -12 },
       ik: {
         wristR: { x: 86.0, y: 97.7, bend: 1 }, wristL: { x: 62.0, y: 93.7, bend: 1 },
         ankleR: { x: 76, y: FLOOR, bend: -1 }, ankleL: { x: 70, y: FLOOR, bend: -1 },
@@ -1334,7 +1334,7 @@ const CONCENTRATION_CURL = {
     { // top, bell curled to the shoulder, elbow never leaving the thigh
       t: 1,
       root: { x: 46, y: 88, rot: 18 },
-      joints: { spine: 22, neck: -14 },
+      joints: { spine: 22, neck: -12 },
       ik: {
         wristR: { x: 80.0, y: 71.7, bend: 1 }, wristL: { x: 62.0, y: 93.7, bend: 1 },
         ankleR: { x: 76, y: FLOOR, bend: -1 }, ankleL: { x: 70, y: FLOOR, bend: -1 },
@@ -1432,7 +1432,7 @@ const SPIDER_CURL = {
     { // bottom, arms hanging dead straight under the shoulders
       t: 0,
       root: { x: 46, y: 66, rot: 55 },
-      joints: { spine: 0, neck: -14 },
+      joints: { spine: 0, neck: -12 },
       ik: {
         wristR: { x: 72.5, y: 87.3, bend: 1 }, wristL: { x: 68.5, y: 88.3, bend: 1 },
         ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },
@@ -1441,7 +1441,7 @@ const SPIDER_CURL = {
     { // top, bells curled up in front of the face
       t: 1,
       root: { x: 46, y: 66, rot: 55 },
-      joints: { spine: 0, neck: -14 },
+      joints: { spine: 0, neck: -12 },
       ik: {
         wristR: { x: 82.5, y: 64.3, bend: 1 }, wristL: { x: 78.5, y: 65.3, bend: 1 },
         ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },
@@ -1568,13 +1568,13 @@ const TRICEPS_KICKBACK = {
     { // start, upper arm back and level, forearm hanging straight down
       t: 0,
       root: { x: 62, y: 61.4, rot: 14 },
-      joints: { spine: 34, neck: -18, shoulderR: -138, elbowR: 95 },
+      joints: { spine: 34, neck: -12, shoulderR: -138, elbowR: 95 },
       ik: { wristL: { x: 98.3, y: 74.0, bend: 1 }, ...stand(60, 55) },
     },
     { // finish, forearm swung back to a straight arm, upper arm unmoved
       t: 1,
       root: { x: 62, y: 61.4, rot: 14 },
-      joints: { spine: 34, neck: -18, shoulderR: -138, elbowR: 6 },
+      joints: { spine: 34, neck: -12, shoulderR: -138, elbowR: 6 },
       ik: { wristL: { x: 98.3, y: 74.0, bend: 1 }, ...stand(60, 55) },
     },
   ],

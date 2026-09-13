@@ -126,6 +126,7 @@ const root = document.getElementById("root");
 const theme = q.get("theme") === "light" ? "light" : "dark";
 const accent = q.get("accent") === "stretch" ? "stretch" : "action";
 const skin = q.get("skin") === "anatomy" ? "anatomy" : "mannequin";
+const bodyKind = q.get("body") === "female" ? "female" : "male";
 document.documentElement.dataset.theme = theme;
 document.documentElement.dataset.accent = accent;
 
@@ -237,6 +238,7 @@ function buildLab() {
           <button class="btn" id="accent" aria-pressed="${accent === "stretch"}">Stretch tint</button>
           <button class="btn" id="theme">${theme === "dark" ? "Light" : "Dark"}</button>
           <button class="btn" id="skin" aria-pressed="${skin === "anatomy"}">Anatomy skin</button>
+          <button class="btn" id="body" aria-pressed="${bodyKind === "female"}">Female body</button>
         </div>
       </div>
       <div class="info" id="info"></div>
@@ -248,7 +250,7 @@ function buildLab() {
   const state = {
     lib: TRAININGS[0].id,
     name: q.get("name") || null,
-    theme, accent, skin, yaw: 0, pitch: 0,
+    theme, accent, skin, bodyKind, yaw: 0, pitch: 0,
     playing: !q.has("t"),
     speed: 1,
     anim: null,
@@ -296,7 +298,7 @@ function buildLab() {
       const rec = { el: cell, anim: null };
       state.cells.set(name, rec);
       if (has) {
-        rec.anim = mountMove(cell.querySelector("canvas"), name, { theme: state.theme, accent: state.accent, skin: state.skin });
+        rec.anim = mountMove(cell.querySelector("canvas"), name, { theme: state.theme, accent: state.accent, skin: state.skin, body: state.bodyKind });
         cell.onclick = () => select(name);
       }
     }
@@ -308,7 +310,7 @@ function buildLab() {
     if (state.anim) state.anim.destroy();
     const hero = root.querySelector("#hero");
     state.anim = mountMove(hero, name, {
-      theme: state.theme, accent: state.accent, skin: state.skin, paused: !state.playing,
+      theme: state.theme, accent: state.accent, skin: state.skin, body: state.bodyKind, paused: !state.playing,
       lit: state.skin === "anatomy" ? { muscles: LIT[name] || [], color: LIT_COLOR } : null,
     });
     if (state.anim) state.anim.setSpeed(state.speed);
@@ -432,6 +434,12 @@ function buildLab() {
     document.documentElement.dataset.accent = state.accent;
     if (state.anim) state.anim.setAccent(state.accent);
     for (const rec of state.cells.values()) if (rec.anim) rec.anim.setAccent(state.accent);
+  };
+  root.querySelector("#body").onclick = (ev) => {
+    state.bodyKind = state.bodyKind === "female" ? "male" : "female";
+    ev.target.setAttribute("aria-pressed", String(state.bodyKind === "female"));
+    if (state.anim) state.anim.setBody(state.bodyKind);
+    for (const rec of state.cells.values()) if (rec.anim) rec.anim.setBody(state.bodyKind);
   };
   root.querySelector("#skin").onclick = (ev) => {
     state.skin = state.skin === "anatomy" ? "mannequin" : "anatomy";

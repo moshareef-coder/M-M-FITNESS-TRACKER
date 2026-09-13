@@ -18,7 +18,7 @@
 
 import { TRAININGS } from "../exercise-library/index.mjs";
 import { MOVES_BY_LIBRARY, MOVE_NAMES } from "./index.mjs";
-import { solvePose, samplePose, jointAngles, GROUND, PROP_TYPES, LOOPS, VIEWS, PRESETS } from "./rig.mjs";
+import { solvePose, samplePose, jointAngles, GROUND, PROP_TYPES, LOOPS, VIEWS, PRESETS, BODY_KINDS } from "./rig.mjs";
 
 const allowMissing = process.argv.includes("--allow-missing");
 const verbose = process.argv.includes("--verbose");
@@ -149,12 +149,16 @@ function checkMove(name, move) {
 
   // Sample the whole cycle, not just the keyframes: easing between two legal
   // poses can still swing a limb through the floor on the way.
-  for (let i = 0; i < SAMPLES; i++) {
-    const cycle = i / SAMPLES;
+  // Both bodies. The female table is the same skeleton with different widths,
+  // and a width can push a knee or a hand through the floor in a pose the male
+  // body clears, so the gate has to see it.
+  for (let i = 0; i < SAMPLES * BODY_KINDS.length; i++) {
+    const kind = BODY_KINDS[i % BODY_KINDS.length];
+    const cycle = Math.floor(i / BODY_KINDS.length) / SAMPLES;
     const pose = samplePose(move, cycle, cycle * move.dur);
-    const S = solvePose(pose, move.view);
+    const S = solvePose(pose, move.view, kind);
     const A = jointAngles(S);
-    const where = `at cycle ${cycle.toFixed(2)}`;
+    const where = `at cycle ${cycle.toFixed(2)} (${kind})`;
 
     checkRange(name, "spine", pose.joints.spine || 0, where, move.view);
     checkRange(name, "neck", pose.joints.neck || 0, where, move.view);
