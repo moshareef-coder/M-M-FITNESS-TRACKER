@@ -164,7 +164,7 @@ export const BODY_FEMALE = {
   rHip: 7.4, rThighMid: 7.0, rKnee: 5.0,
   rCalf: 5.2, rToe: 2.6, rHeel: 3.2,
   shoulderW: 11.2, hipW: 7.0,
-  bust: 2.0, bustAt: 0.80, bun: 3.4,
+  bust: 2.0, bustAt: 0.80, tail: 13.0, tailR: 2.9,
 };
 
 export const BODIES = { male: BODY, female: BODY_FEMALE };
@@ -294,6 +294,10 @@ export function palette(theme = "dark", accent = "action", skin = "mannequin", b
     farShade: dark ? "#767473" : "#828080",
     shade: bodyShade,
     shadeSoft: dark ? "#a9a6a3" : "#a2a09d",
+    // A plane slightly LIGHTER than the body. It is the whole reason a front
+    // view reads as a front view: a face catches the light, the back of a
+    // skull does not.
+    face: dark ? "#cbc8c5" : "#c4c1be",
     // A drawn line, not a knockout. The reference has no heavy outline: the
     // silhouette is carried by a hairline dark edge and the internal boundaries
     // are the same line where a real body creases.
@@ -793,6 +797,38 @@ function drawFoot(ctx, S, side, C, fill) {
   const B = ACTIVE, k = S.sides[side];
   const w = k.footW;
   const d = norm2(sub(k.toe, k.heel));
+  // A foot pointing at the camera is not a side view of a foot. In a front or
+  // back view an untwisted foot projects almost straight down the screen, and
+  // the old chain drew that as a boat seen from the side on a figure facing
+  // you. Here it becomes what it is: toes from the front, heel from behind. A
+  // deliberately turned out foot (Warrior II) keeps the side on shape, which is
+  // what the horizontal test picks up.
+  if (S.frontal && Math.abs(d.x) < 0.45) {
+    const away = S.facing === "away";
+    const sole = Math.max(k.toe.y, k.heel.y, k.ankle.y + B.rAnkle * 0.8);
+    const r = B.rToe * (away ? 1.02 : 1.1) * w;
+    const half = B.rToe * (away ? 0.72 : 1.28) * w;
+    const c = V(k.ankle.x, sole - r * 0.9);
+    part(ctx, C, [[V(c.x - half, c.y), r], [V(c.x + half, c.y), r]],
+         { fill, shadeR: 0.42, shadeOff: 0.36 });
+    if (COLLECT) return;
+    ctx.strokeStyle = C.seamSoft;
+    ctx.lineWidth = 0.28;
+    ctx.lineCap = "round";
+    if (away) {
+      // the Achilles, straight up the back of the heel
+      ctx.beginPath();
+      ctx.moveTo(c.x, c.y - r * 0.5); ctx.lineTo(c.x, c.y - r * 1.5); ctx.stroke();
+    } else {
+      // three short toe splits along the front edge
+      for (const t of [-0.5, 0, 0.5]) {
+        const x = c.x + half * t * 1.25;
+        ctx.beginPath();
+        ctx.moveTo(x, c.y + r * 0.18); ctx.lineTo(x, c.y + r * 0.78); ctx.stroke();
+      }
+    }
+    return;
+  }
   const mid = lerpV(k.ankle, k.toe, 0.45);
   part(ctx, C, [
     [add(k.heel, scl(d, -0.4)), B.rHeel * 1.04 * w],      // heel, squared off
@@ -824,13 +860,29 @@ function drawHead(ctx, S, C, fill) {
        [at(-2.2, 2.6), B.rHeadJaw], [at(-4.4, 2.2), B.rHeadJaw * 0.66],
        [at(-3.0, -1.0), B.rHeadJaw * 0.82]];
   hull(ctx, C, skull, { fill, shade: false });
-  // The knot at the back of the skull on the female sheet. It is part of the
-  // silhouette, so it is drawn before the collect pass returns, not with the
-  // hair cap below.
-  if (B.bun) {
-    const root = flat ? at(4.6, 0) : at(3.4, -B.rHeadBack * 0.62);
-    const knot = flat ? at(7.4, 0) : at(5.6, -B.rHeadBack * 1.28);
-    part(ctx, C, [[root, B.bun * 0.62], [knot, B.bun]], { fill: C.hair, shade: false });
+  // Ponytail. Part of the silhouette, so it is drawn before the collect pass
+  // returns rather than with the hair cap below.
+  if (B.tail) {
+    // It hangs off the BACK of the skull, and gravity wins: the tail falls down
+    // the screen, pulled part of the way toward the back of the head so it
+    // swings when the head turns instead of standing straight out behind like a
+    // rudder. In a hinge or a plank that means it drops toward the floor, which
+    // is the whole test of whether hair reads as hair.
+    const back = flat ? V(0, 0) : scl(f, -1);
+    const dir = norm2(add(V(0, 1), scl(back, 0.5)));
+    // Front on the tail is directly behind the head, so a centred one is
+    // invisible. It is nudged off the midline instead, which is what you
+    // actually catch of a ponytail from the front: a bit of it past the neck.
+    const off = flat && !away ? V(-B.rHeadBack * 0.5, 0) : V(0, 0);
+    const root = flat ? add(at(1.4, 0), off) : add(at(1.6, -B.rHeadBack * 0.66), scl(dir, 1.2));
+    const len = B.tail * (flat && !away ? 0.86 : 1);
+    const mid = add(root, scl(dir, len * 0.5));
+    const tip = add(mid, scl(dir, len * 0.5));
+    part(ctx, C, [
+      [root, B.tailR * (away || !flat ? 1 : 0.82)],
+      [mid, B.tailR * 0.94],
+      [tip, B.tailR * 0.46],
+    ], { fill: C.hair, shade: false });
   }
   if (COLLECT) return;
   // one soft tone down the shaded side of the face and jaw
@@ -843,15 +895,39 @@ function drawHead(ctx, S, C, fill) {
   ctx.fillStyle = C.shade;
   ctx.fill();
   ctx.restore();
+  // The face plane. Front on only: a slightly lighter oval from the hairline to
+  // the chin, with a brow line and a chin line. A head with this on it is
+  // unmistakably facing the camera, and a head without it is unmistakably
+  // turned away, which is the single strongest front/back cue on the figure.
+  if (flat && !away) {
+    ctx.save();
+    hull(ctx, C, skull, { clip: true });
+    hull(ctx, C, [
+      [at(0.4, 0), B.rHeadBack * 0.8],
+      [at(-3.2, 0), B.rHeadJaw * 0.86],
+      [at(-5.2, 0), B.rHeadJaw * 0.54],
+    ], { fill: C.face, shade: false, line: false });
+    const across = V(-u.y, u.x);
+    const line2 = (upAt, half, w) => {
+      const a = add(at(upAt, 0), scl(across, -half)), b = add(at(upAt, 0), scl(across, half));
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = C.seamSoft; ctx.lineWidth = w; ctx.lineCap = "round"; ctx.stroke();
+    };
+    line2(1.0, B.rHeadBack * 0.52, 0.34);     // brow
+    line2(-4.0, B.rHeadJaw * 0.42, 0.3);      // chin
+    ctx.restore();
+  }
   // hair: a cap over the cranium ending in a hairline at the forehead and
   // behind the ear, clipped to the skull so it never breaks the silhouette
   ctx.save();
   hull(ctx, C, skull, { clip: true });
   // The cap is drawn with circles far above the head, so the edge that lands on
   // the skull is nearly straight: that edge IS the hairline. Front on it runs
-  // level across the forehead; side on it slopes down behind the ear.
+  // level across the forehead; side on it slopes down behind the ear. From
+  // BEHIND there is no hairline at all: the whole skull is hair down to the
+  // nape, which is what you actually see of the back of a head.
   const hair = flat
-    ? [[at(34, -8), 32], [at(34, 8), 32]]
+    ? (away ? [[at(24, -8), 27], [at(24, 8), 27]] : [[at(34, -8), 32], [at(34, 8), 32]])
     : [[at(33, 7), 29], [at(30, -9), 31]];
   const hsegs = [];
   for (let i = 0; i < hair.length - 1; i++) hsegs.push([hair[i][0], hair[i][1], hair[i + 1][0], hair[i + 1][1]]);
@@ -898,6 +974,29 @@ function drawLeg(ctx, S, side, C, fill, skinOpts) {
     [k.ankle, B.rAnkle],
   ], { fill, shadeOff: 0.42, shadeR: 0.52 });
   crease(ctx, C, k.knee, norm2(sub(k.knee, k.hip)), sh, B.rKnee, 0.56, 0.46);
+  // A kneecap front on, the two heads of the calf from behind. Small, but at
+  // 160px they are the difference between a leg pointing at you and a leg
+  // pointing away.
+  if (S.frontal && !COLLECT) {
+    const away = S.facing === "away";
+    ctx.strokeStyle = C.seamSoft;
+    ctx.lineWidth = 0.3;
+    ctx.lineCap = "round";
+    if (away) {
+      const calf = lerpV(k.knee, k.ankle, 0.34);
+      for (const g of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(calf.x + g * B.rCalf * 0.42, calf.y - B.rCalf * 0.5);
+        ctx.lineTo(calf.x + g * B.rCalf * 0.3, calf.y + B.rCalf * 0.7);
+        ctx.stroke();
+      }
+    } else {
+      const cap = lerpV(k.knee, k.ankle, 0.06);
+      ctx.beginPath();
+      ctx.arc(cap.x, cap.y, B.rKnee * 0.52, Math.PI * 0.15, Math.PI * 0.85);
+      ctx.stroke();
+    }
+  }
   if (skinOpts && skinOpts.plates) legPlates(ctx, S, side, C, skinOpts.lit);
   drawFoot(ctx, S, side, C, fill);
 }
@@ -927,6 +1026,7 @@ function torsoLines(ctx, S, C) {
     ctx.lineCap = "round";
     ctx.stroke();
   };
+  let navel = null;
   ctx.save();
   const waist = lerpV(S.pelvis, S.chest, 0.46);
   const body = [[S.pelvis, B.rPelvis], [waist, B.rWaist], [S.chest, S.chestR]];
@@ -936,16 +1036,25 @@ function torsoLines(ctx, S, C) {
   }
   ctx.clip(clip);
   if (flat && S.facing === "away") {
-    line([at(4, 0), at(-6, 0), at(-14, 0)], 0.55);                       // spine
+    line([at(5.2, 0), at(-6, 0), at(-16, 0)], 0.6);                      // spine, root to nape
     for (const g of [-1, 1]) {
       line([at(2.4, g * 2.2), at(-1.0, g * 7.0), at(-5.0, g * 8.2)]);    // shoulder blade
     }
     line([at(-20, -7), at(-21.5, 0), at(-20, 7)], 0.5);                  // top of the glutes
+    // the crease between the glutes: short, central, and the one line that
+    // says back rather than front at 160px
+    line([at(-24, 0), at(-27.5, 0)], 0.5);
   } else if (flat) {
+    // collarbones. A front view without them has a flat shelf where the
+    // shoulders meet the neck, which is most of why it read the same as a back.
+    for (const g of [-1, 1]) {
+      line([at(5.6, g * 1.0), at(4.4, g * 5.2), at(3.0, g * 9.4)], 0.42);
+    }
     for (const g of [-1, 1]) {
       line([at(1.6, g * 1.2), at(-3.2, g * 5.6), at(-2.6, g * 9.6)]);    // pec underline
     }
     line([at(-3.0, 0), at(-9, 0), at(-14, 0)], 0.38);                    // linea alba
+    navel = at(-15.6, 0);
     for (const g of [-1, 1]) {
       line([at(-19, g * 8.4), at(-23, g * 4.4), at(-25.5, 0)], 0.55);    // hip crease
     }
@@ -956,6 +1065,14 @@ function torsoLines(ctx, S, C) {
     line([at(-16, -7.0), at(-21, -7.6), at(-25, -5.0)], 0.5);            // glute
   }
   ctx.restore();
+  // The navel is a mark, not a line, so it is drawn as a dot after the clip is
+  // released rather than as a one point stroke inside it.
+  if (navel) {
+    ctx.beginPath();
+    ctx.arc(navel.x, navel.y, 0.62, 0, Math.PI * 2);
+    ctx.fillStyle = C.seamSoft;
+    ctx.fill();
+  }
 }
 
 // Three circles down the torso so the silhouette narrows at the waist, plus a
@@ -1579,36 +1696,47 @@ function outline(ctx, C, segs) {
 export function drawFigure(ctx, S, C, opts = {}) {
   if (opts.floor !== false) drawFloor(ctx, C, S);
   drawProps(ctx, C, opts.props, S, "back");
-  const symmetric = S.frontal && !S.farSide;
   const near = S.frontal ? (S.farSide === "R" ? "L" : "R") : "R";
-  const far = near === "R" ? "L" : "R";
   const grips = opts.grip || {};
   const skinOpts = C.skin === "anatomy" ? { plates: true, lit: opts.lit } : null;
-  const farFill = symmetric ? C.ink : C.far;
-  // Depth decides draw ORDER. Tone stays on the near/far rule, flipped once the
-  // camera has swung past the figure, because a depth threshold makes limbs
-  // change colour mid-orbit for no reason a viewer can read.
-  const behind = Math.abs(((S.cam.yaw || 0) + 180) % 360 - 180) > 90;
   const mean = (...ps) => ps.reduce((a, p) => a + p.d, 0) / ps.length;
   const torsoD = mean(S.pelvis, S.chest);
+  // TONE follows real depth, not the authored side. The old rule painted one
+  // half of every front view in the far tone whether or not that half was
+  // actually further away, and on a symmetric standing pose that reads as a
+  // torso twisted toward the camera. A limb takes the far tone only when it
+  // sits at least this far behind its opposite number: a yawed camera, a leg
+  // stepped back, an arm reaching across. Order still comes from depth plus the
+  // near/far hint, which is unchanged.
+  const DEPTH_EPS = 1.6;
+  const depths = { arm: {}, leg: {} };
+  for (const s of ["L", "R"]) {
+    const k = S.sides[s];
+    depths.arm[s] = mean(k.shoulder, k.elbow, k.wrist);
+    depths.leg[s] = mean(k.hip, k.knee, k.ankle);
+  }
+  const isFar = (kind, s) => depths[kind][s] - depths[kind][s === "R" ? "L" : "R"] > DEPTH_EPS;
 
   const items = [];
   for (const s of ["L", "R"]) {
     const k = S.sides[s];
     const crossing = crossesBody(S, s);
-    const armD = mean(k.shoulder, k.elbow, k.wrist);
-    const legD = mean(k.hip, k.knee, k.ankle);
-    const armFar = (!(crossing || s === near)) !== behind;
-    const legFar = (s !== near) !== behind;
+    const armD = depths.arm[s];
+    const legD = depths.leg[s];
+    // An arm reaching across the body is always the near one, whatever the
+    // depth arithmetic says: it is drawn over the chest, so it cannot be shaded
+    // as though it were behind it.
+    const armFar = !crossing && isFar("arm", s);
+    const legFar = isFar("leg", s);
     items.push({
       d: armD, o: s === near ? 5 : (crossing ? 4.5 : 0), kind: "arm", s,
-      fill: armFar ? farFill : C.inkHi,
-      plates: !armFar || symmetric ? skinOpts : null,
+      fill: armFar ? C.far : C.inkHi,
+      plates: armFar ? null : skinOpts,
     });
     items.push({
       d: legD, o: s === near ? 4 : 1, kind: "leg", s,
-      fill: legFar ? farFill : C.inkHi,
-      plates: !legFar || symmetric ? skinOpts : null,
+      fill: legFar ? C.far : C.inkHi,
+      plates: legFar ? null : skinOpts,
     });
   }
   items.push({ d: torsoD, o: 2, kind: "torso" });

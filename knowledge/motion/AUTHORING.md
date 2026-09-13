@@ -818,6 +818,58 @@ torso outline. A steep three quarter pitch, around -64, is far more legible and
 still reads as looking down, so prefer it unless a true overhead is the point.
 
 
+## Front is not back
+
+A front view and a back view used to be nearly the same shape, and a symmetric
+standing pose read as a torso twisted toward the camera. Four changes fixed it,
+and all four are in the rig rather than in the moves.
+
+**Tone follows real depth, not the authored side.** `drawFigure` used to paint
+one half of every front view in the far tone whenever a move set `farSide`,
+whether or not that half was actually further away. Now it compares the two
+sides' mean depth and uses the far tone only when a limb sits at least 1.6 units
+behind its opposite number: a yawed camera, a leg stepped back, an arm reaching
+across. An arm crossing the body is always near, whatever the arithmetic says,
+because it is drawn over the chest.
+
+`farSide` is still read, but ONLY as a draw ORDER hint, which is what it is
+really for: in a pose that is flat in depth it decides which of two overlapping
+limbs lands on top. Eighteen front and back moves carry it on a depth symmetric
+pose and are listed in the report for this round; they all draw in one tone now
+and the flag is doing nothing but ordering. `/tmp/farside-audit.mjs` is the
+script that finds them.
+
+**Front cues, back cues.** Front on the figure gets a face plane, a slightly
+LIGHTER oval from hairline to chin with a brow line and a chin line, plus
+collarbones, the pec line, the linea alba and a navel mark, a kneecap arc on
+each leg, and feet seen from the front. From behind there is no face plane at
+all, the hair cap covers the whole skull down to the nape instead of stopping at
+a hairline, and the figure gets a spine line from nape to sacrum, shoulder
+blades, the top of the glutes, the crease between them, the two heads of each
+calf, and heels.
+
+**A foot pointing at the camera is not a side view of a foot.** In a frontal
+view `drawFoot` checks whether the drawn heel to toe direction is near vertical.
+If it is, the foot is pointing at or away from the camera and is drawn as a
+short wide pad with three toe splits (front) or a narrower heel with an Achilles
+line (back). A deliberately turned out foot, Warrior II for instance, fails that
+test and keeps the side on shape, which is correct.
+
+**The ponytail.** The female figure has a tail rather than a bun: `tail` is its
+length and `tailR` its thickness. It hangs from the back of the skull and
+gravity wins, so it falls down the SCREEN, pulled halfway toward the back of the
+head so it swings when the head turns instead of standing out behind like a
+rudder. In a hinge or a plank it drops toward the floor, which is the test of
+whether hair reads as hair. Front on it is nudged off the midline, because a
+tail hanging directly behind the head is invisible and what you actually catch
+from the front is a bit of it past the neck. It is drawn before the collect pass
+returns, so it is part of the silhouette.
+
+One trap worth naming: `drawHead` normalises the projected anterior axis into
+`f`, so `len2(f)` is always 1 and cannot be used to test whether the camera is
+flat on. `S.frontal`, carried as `flat`, is the camera's own answer.
+
+
 ---
 
 ## Ten things that will bite you
