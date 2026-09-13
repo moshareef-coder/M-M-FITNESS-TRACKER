@@ -2766,7 +2766,9 @@ test("a stated session length replaces the goal's, and the week is costed agains
   });
   assert.equal(plan.sessionBudget.source, "asked");
   assert.equal(plan.sessionBudget.minutes, 30);
-  assert.equal(plan.sessionBudget.goalMinutes, 60, "the goal's own number is still reported");
+  /* 63 since 2026-09-12: the strength table's session length grew by the three
+     minutes the ramp on a three rep main costs. goal-engine.mjs says why. */
+  assert.equal(plan.sessionBudget.goalMinutes, 63, "the goal's own number is still reported");
   for (const d of plan.week) assert.equal(d.short ? Math.round(30 * 0.6) : 30, d.minutes);
 });
 
@@ -2928,12 +2930,20 @@ test("what counts as heavy: mains yes, accessories never, bodyweight never", () 
     person: { daysAsked: 4, bodyWeightLb: 180, sex: "Male" },
     logs: longHistory(78),
   });
+  /* How many leading slots of each day type are mains, mirrored from plan.mjs
+     SLOTS on purpose rather than imported: a check that borrows the thing it is
+     checking agrees with it by construction. Same reason sweep.mjs writes out
+     the volume ceiling. A full body day has four mains, an upper day three. */
+  const MAIN_SLOTS = { fullBody: 4, push: 2, pull: 2, legs: 2, upper: 3, lower: 2 };
   for (const d of plan.week) {
     const ramped = new Set((d.rampSets || []).map((r) => r.exercise));
-    /* research/13: "none for accessories and isolation". The first two slots of
-       a day are its mains, so anything past them must never carry a ramp. */
-    for (const e of d.exercises.slice(2)) {
-      assert.ok(!ramped.has(e.name), `${e.name} is an accessory and must not be ramped`);
+    assert.ok(ramped.size <= 2, `${d.name} ramps ${ramped.size} lifts; research/13 caps it at two`);
+    /* research/13: "none for accessories and isolation". Mains lead the day, so
+       anything past the day type's main slots must never carry a ramp. */
+    const mains = MAIN_SLOTS[d.focus];
+    assert.ok(mains, `${d.focus} is not in the mirrored slot table`);
+    for (const e of d.exercises.slice(mains)) {
+      assert.ok(!ramped.has(e.name), `${e.name} is an accessory on ${d.focus} and must not be ramped`);
     }
     for (const r of d.rampSets || []) {
       const lift = d.exercises.find((e) => e.name === r.exercise);
@@ -3087,4 +3097,68 @@ test("a stated session length that buys something says what it bought", () => {
   /* The refusal, when it still fires, must no longer recommend the thing the
      research says costs performance. */
   for (const n of plan.dayNotes) assert.ok(!/longer warm-up/.test(n), "no engine advice to warm up for longer");
+});
+
+test("each goal's session length covers the ramp it actually prescribes", () => {
+  /* The staleness this closes: `sessionMin` was set for a session that opened
+     cold, so the day the ramp shipped it was short by the ramp's cost and 517
+     sweep days read as over budget with nothing a person would feel having
+     changed. The fix has to stay DERIVED rather than drift into a magic number,
+     so this asserts the derivation rather than the numbers: how many rungs a
+     main earns comes off `repRange[0]` on the goal's own row, and what a day
+     reserves for preparation must be the six minutes it always reserved plus
+     exactly what those rungs cost. If somebody tunes a rep range and forgets the
+     session length, this is what says so. */
+  const extraFor = (reps) => (reps <= 5 ? 3 : reps <= 9 ? 1 : 0);
+  for (const bubble of Object.keys(GOAL_PARAMS)) {
+    for (const child of Object.keys(GOAL_PARAMS[bubble])) {
+      const params = GOAL_PARAMS[bubble][child];
+      if (!params || !Array.isArray(params.repRange)) continue;
+      const plan = buildPlan({
+        goal: { bubble, child: child === "_default" ? undefined : child },
+        person: { daysAsked: 4, bodyWeightLb: 180, sex: "Male" },
+        logs: [],
+      });
+      const want = extraFor(params.repRange[0]);
+      for (const d of plan.week) {
+        /* A day with nothing loaded to ramp reserves the plain six and that is
+           correct; the claim is only that a day WITH a ramp reserves what the
+           goal's rep range predicts. */
+        if (!d.rampSets.length) { assert.equal(d.prepMinutes, 6, `${bubble}/${child} ${d.name}`); continue; }
+        /* The FIRST main's ramp only, which is the mandatory part and the part
+           `sessionMin` was derived from. The second main's rung is added later
+           and only where the day already has room, so budgeting for it would be
+           budgeting for something optional. */
+        const mandatory = Math.round((240 + d.rampSets[0].seconds) / 60) - 6;
+        assert.equal(mandatory, want,
+          `${bubble}/${child} ${d.name}: reps ${params.repRange[0]} should cost ${want} extra minutes`);
+      }
+    }
+  }
+});
+
+test("the one goal whose session length did not move, and why", () => {
+  /* "I have no time" stays at 25 while every other length grew. The app's
+     session-length chips are 20/30/45/60/90 and it suggests the nearest, ties to
+     the shorter, so 25 suggests 20 and 26 would suggest 30. Growing it by the
+     one minute the ramp costs would offer somebody who told us they have no time
+     a session half again as long as the one they asked for. */
+  const noTime = buildPlan({
+    goal: { bubble: "consistent", child: "no-time" },
+    person: { daysAsked: 3, bodyWeightLb: 180, sex: "Male" },
+    logs: [],
+  });
+  assert.equal(noTime.sessionBudget.goalMinutes, 25);
+
+  /* And the check behind that reasoning, so the chips and the table cannot drift
+     apart in silence: every goal length still suggests the chip it suggested
+     before the ramp. index.html SESSION_LENGTHS, mirrored on purpose. */
+  const CHIPS = [20, 30, 45, 60, 90];
+  const nearest = (m) => CHIPS.reduce((best, c) => (Math.abs(c - m) < Math.abs(best - m) ? c : best), CHIPS[0]);
+  const WAS = { 45: 46, 60: 61, 63: 60, 50: 51, 48: 45, 41: 40, 31: 30, 25: 25, 46: 45, 51: 50, 61: 60 };
+  for (const [now, before] of [[46, 45], [61, 60], [63, 60], [51, 50], [48, 45], [41, 40], [31, 30], [25, 25]]) {
+    assert.equal(nearest(now), nearest(before),
+      `a session length of ${before} became ${now} and that changes the chip the app suggests`);
+  }
+  assert.ok(WAS, "kept so the mapping above reads as a table rather than a list");
 });

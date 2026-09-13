@@ -1773,7 +1773,12 @@ export function buildPlan({
     .map((d) => ({
       day: d.name, estimatedMinutes: d.estimatedMinutes, budget: d.minutes,
       why: askedMinutes === null
-        ? `${d.name} comes to about ${d.estimatedMinutes} minutes against the ${d.minutes} you asked for. Everything left on it is a main lift, so the time goes to the rest between sets.`
+        /* "you asked for" is wrong on this branch and always was: `askedMinutes`
+           is null here, so the number is the goal's own, not theirs. It went
+           unnoticed while every goal length was a round 45 or 60; the ramp made
+           them 46 and 63 and a conspicuous number in a sentence that misnames
+           where it came from is worth one word. */
+        ? `${d.name} comes to about ${d.estimatedMinutes} minutes against the ${d.minutes} this goal is built around. Everything left on it is a main lift, so the time goes to the rest between sets.`
         : `${d.name} still comes to about ${d.estimatedMinutes} minutes against the ${d.minutes} you asked for, and that is `
           + `after the sets came down and the rest with them. This goal cannot honestly be done in ${d.minutes} minutes: `
           + `give it the extra or pick a goal with shorter rests.`,

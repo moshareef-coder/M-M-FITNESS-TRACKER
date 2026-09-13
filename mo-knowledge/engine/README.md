@@ -1112,21 +1112,118 @@ none, so its WARN deltas mean something for the first time.
 
 FAILs none and KNOWN OPEN none, before and after.
 
-**Why +517 is acceptable, stated rather than waved at.** Those days are 0 to 2
-minutes past a 15% tolerance line, median 0: they are boundary cases, not
-sessions that stopped fitting in any way a person would feel. Nothing about them
-is caused by what the person asked for. And the warn is the instrument reading
-correctly: `P.sessionMin`, the goal's own session length, was set for a session
-that opened cold, and it is now two to three minutes short of what that goal
-genuinely takes. The day says so in `notes`, per day, by name.
+**Why +517 happened, and it was not acceptable.** Those days were 0 to 2 minutes
+past a 15% tolerance line, median 0, which is a boundary case rather than a
+session that stopped fitting. But the warn was the instrument reading correctly:
+`P.sessionMin`, the goal's own session length, was set for a session that opened
+cold and was now short by exactly what the ramp costs. The fix was to make the
+number honest, and it shipped the same day. Next section.
 
-**The follow-up that would actually close it**, not shipped because it is a
-product decision rather than an engine one: raise `sessionMin` in
-`goal-engine.mjs` by the ramp's cost for the goals whose mains ramp. It would
-take `over-time-budget` back toward 1399 honestly rather than by hiding minutes.
-It also changes what nine goals advertise as their session length and it gives
-the fill pass more room, which pushes volume back up toward MRV, so it needs
-measuring on its own and an owner's yes.
+## The session lengths grew to cover the ramp, 2026-09-12
+
+`sessionMin` in `goal-engine.mjs` had not moved since it was written. The ramp
+made it stale rather than wrong: a session genuinely takes two and a half
+minutes longer than it did that morning, so 517 sweep days read as over budget
+with nothing a person would feel having changed.
+
+### The increase is derived, not flat
+
+How many rungs a main earns comes off its prescribed reps, and a main's reps are
+`repRange[0]` on the same row `sessionMin` sits on. So the cost falls out of the
+row it is being added to:
+
+| `repRange[0]` | rungs | block 6 min goes to 4, ramp costs | move |
+|---|---|---|---|
+| 5 or fewer | 4 | 4.5 min | **+3** |
+| 6 to 9 | 3 | 3.25 min | **+1** |
+| 10 or more | none | nothing | **0** |
+
+Measured before it was applied, across every bubble, every child, four day
+counts, three histories and both sexes: the added preparation is **exactly 3 on
+every strength and skill day and exactly 1 everywhere else, with no spread at
+all**. Not an average that happened to land near a round number, a constant.
+
+| table | was | now | why |
+|---|---|---|---|
+| strength | 60 | 63 | mains at 3 reps, 4 rungs |
+| skill | 45 | 48 | mains at 3 reps, 4 rungs |
+| hypertrophy | 60 | 61 | mains at 6 reps, 3 rungs |
+| fatloss | 45 | 46 | mains at 8 reps |
+| recomp | 50 | 51 | mains at 8 reps |
+| endurance | 40 | 41 | mains at 8 reps |
+| health | 40 | 41 | mains at 8 reps |
+| habit | 30 | 31 | mains at 8 reps |
+| `no-time` child | 25 | **25** | held, see below |
+
+Not rounded to the nearest five. 63 and 46 are numbers a person says out loud,
+and rounding to 65 and 45 would either buy volume the ramp never cost or leave
+the staleness in place. Only the mandatory first-main ramp is budgeted for; the
+second main's rung is added afterwards and only where the day already fits, so
+budgeting for it would be budgeting for something optional.
+
+### The chips, and the one goal that did not move
+
+`sessionMin` has exactly one reader outside the engine: the session-length UI
+pre-selects from it, mapping the goal's number to the nearest of 20/30/45/60/90
+with ties going to the shorter. **Every moved goal keeps the chip it had.** 46
+and 48 still suggest 45, 51 still suggests 45, 61 and 63 still suggest 60, 41
+still suggests 45, 31 still suggests 30.
+
+The exception is `no-time` at 25, which is the only length that ties, so it
+suggests 20 today and 26 would suggest 30. Raising it by the one minute its ramp
+costs would offer somebody who told us they have no time a session half again as
+long as the one they asked for. It stays at 25, a no-time day stays one minute
+under-reserved, and it says so when it runs over. A test asserts the whole chip
+mapping so the table and the app cannot drift apart in silence.
+
+### What recovered, measured
+
+Sweep, 10,421 runs, none of which sends a `session_minutes`, so this is the path
+`sessionMin` governs:
+
+| | this morning | ramp only | ramp + honest lengths |
+|---|---|---|---|
+| over-time-budget | 1399 | 1916 | **1319** |
+| ledger rows (weekly sets) | 77428 | 77218 | **77506** |
+
+And on the default path of the goal matrix, 216 plans: weekly hard sets **11202
+before the ramp and 11202 after both changes**, 0 plans with different sets, 0
+with different rows for `calibrate.mjs`, group-weeks above MRV plus slack 8 and
+8. The ramp is now free in volume terms on the path it governs.
+
+**It slightly over-recovered, which is worth knowing.** Sweep-wide it ended 80
+days *under* the pre-ramp over-budget count and 78 sets *above* the pre-ramp
+ledger. The mechanism is the 15% tolerance, which scales with the budget: a day
+whose budget grew 3 minutes gained 3.45 minutes of effective ceiling, and across
+enough days that occasional half-minute fits one more accessory set. It is 0.1%
+of the week's volume, **MRV is untouched** (40 group-weeks sat above target plus
+slack before all of this and 40 sit above it now, and the sweep's own over-1.25
+column is unmoved at 3.1% beginner, 0.0% intermediate and advanced), and the
+fill pass cannot cross the ceiling by construction. Worth naming rather than
+presenting as a clean revert.
+
+### Sweep WARN deltas, this change on its own
+
+| WARN | ramp only | after | why |
+|---|---|---|---|
+| over-time-budget | 1916 | 1319 | the point of the change |
+| same-group-twice-in-day | 20146 | 20207 | fewer accessories deleted by the clock, so more groups appear twice again |
+| excluded-prescribed | 12291 | 12307 | same cause: the clock was suppressing these by deleting the offending accessory, not by selecting better |
+| hurt-joint-prescribed | 12291 | 12307 | same |
+| duplicate-in-week | 9828 | 9831 | same |
+| days-clamped | 3245 | 3245 | unchanged |
+| calibration-changed-selection | 208 | 208 | unchanged |
+| focus-group-not-in-split | 114 | 114 | unchanged |
+| unknown-secondary-goal | 52 | 52 | unchanged |
+| tiers-indistinguishable | 46 | 46 | unchanged |
+
+The four that rose are one finding, not four: those movements were already being
+prescribed and the time trim was deleting them before the checker saw them. A
+bigger budget stops deleting them, so the warns surface. That is a pre-existing
+selection problem becoming visible, not a new one, and it belongs to
+`excluded-prescribed` rather than to the clock.
+
+FAILs none and KNOWN OPEN none throughout.
 
 ### What the sweep does and does not cover
 

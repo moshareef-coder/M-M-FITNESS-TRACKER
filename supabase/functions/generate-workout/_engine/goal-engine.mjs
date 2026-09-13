@@ -56,16 +56,45 @@ export const KNOWN_PROGRAMMES = {
 
 /* Training parameters per goal. emphasis drives the split and the set counts,
    repRange and restSec come from the goal, priority lifts a muscle group's share
-   of weekly volume without changing the shape of the week. */
+   of weekly volume without changing the shape of the week.
+
+   `sessionMin` moved on 2026-09-12, for the first time since it was written, and
+   the reason is worth keeping next to the numbers. The engine now ramps the main
+   lift of every day it can (engine/plan.mjs RAMP_TABLE), and a ramp is warm-up
+   time the session genuinely spends. These numbers were set for a session that
+   opened cold, so they became stale on the day the ramp shipped: 517 days across
+   the sweep read as over budget when nothing a person would feel had changed.
+
+   The increase is DERIVED and not flat, because the ramp is not the same size
+   everywhere. How many rungs a main earns comes off its prescribed reps, which
+   is `repRange[0]` on this very table, so the cost falls out of the row it is
+   being added to:
+
+     repRange[0] of 5 or fewer  ->  4 rungs  ->  the general block drops from 6
+                                    minutes to 4 and the ramp costs 4.5, so +3
+     repRange[0] of 6 to 9      ->  3 rungs  ->  same block, ramp costs 3.25, +1
+     repRange[0] of 10 or more  ->  no ramp  ->  no change, and no row is here
+
+   Measured rather than reasoned: across every bubble, every child, four day
+   counts, three histories and both sexes, the added minutes are exactly 3 on
+   every strength and skill day and exactly 1 everywhere else, with no spread at
+   all. `strength` and `skill` are the two rows at 3 reps.
+
+   Not rounded to the nearest five. 63 and 46 are numbers a person says out loud,
+   and rounding to 65 and 45 would either buy volume the ramp never cost or leave
+   the staleness in place. Nobody is shown the raw number anyway: the session
+   length chips are 20/30/45/60/90 and the app picks the nearest, which every one
+   of these moves leaves unchanged. See `no-time` below for the one that would
+   not have. */
 const P = {
-  fatloss:    { emphasis: "fatloss", repRange: [8, 15], restSec: 60, setsFactor: 0.85, cardio: { sessions: 2, minutes: 30, zone: "easy" }, minDays: 3, maxDays: 5, sessionMin: 45 },
-  hypertrophy:{ emphasis: "hypertrophy", repRange: [6, 12], restSec: 90, setsFactor: 1.0, cardio: { sessions: 1, minutes: 20, zone: "easy" }, minDays: 3, maxDays: 5, sessionMin: 60 },
-  strength:   { emphasis: "strength", repRange: [3, 6], restSec: 180, setsFactor: 0.9, cardio: { sessions: 1, minutes: 20, zone: "easy" }, minDays: 3, maxDays: 4, sessionMin: 60 },
-  recomp:     { emphasis: "recomp", repRange: [8, 12], restSec: 75, setsFactor: 1.0, cardio: { sessions: 2, minutes: 25, zone: "easy" }, minDays: 3, maxDays: 5, sessionMin: 50 },
-  skill:      { emphasis: "skill", repRange: [3, 8], restSec: 120, setsFactor: 0.8, cardio: { sessions: 1, minutes: 20, zone: "easy" }, minDays: 3, maxDays: 4, sessionMin: 45 },
-  endurance:  { emphasis: "endurance", repRange: [8, 15], restSec: 60, setsFactor: 0.6, cardio: { sessions: 3, minutes: 35, zone: "mixed" }, minDays: 3, maxDays: 5, sessionMin: 40 },
-  health:     { emphasis: "health", repRange: [8, 12], restSec: 75, setsFactor: 0.8, cardio: { sessions: 3, minutes: 30, zone: "easy" }, minDays: 2, maxDays: 4, sessionMin: 40 },
-  habit:      { emphasis: "habit", repRange: [8, 12], restSec: 75, setsFactor: 0.7, cardio: { sessions: 1, minutes: 20, zone: "easy" }, minDays: 2, maxDays: 3, sessionMin: 30 },
+  fatloss:    { emphasis: "fatloss", repRange: [8, 15], restSec: 60, setsFactor: 0.85, cardio: { sessions: 2, minutes: 30, zone: "easy" }, minDays: 3, maxDays: 5, sessionMin: 46 },
+  hypertrophy:{ emphasis: "hypertrophy", repRange: [6, 12], restSec: 90, setsFactor: 1.0, cardio: { sessions: 1, minutes: 20, zone: "easy" }, minDays: 3, maxDays: 5, sessionMin: 61 },
+  strength:   { emphasis: "strength", repRange: [3, 6], restSec: 180, setsFactor: 0.9, cardio: { sessions: 1, minutes: 20, zone: "easy" }, minDays: 3, maxDays: 4, sessionMin: 63 },
+  recomp:     { emphasis: "recomp", repRange: [8, 12], restSec: 75, setsFactor: 1.0, cardio: { sessions: 2, minutes: 25, zone: "easy" }, minDays: 3, maxDays: 5, sessionMin: 51 },
+  skill:      { emphasis: "skill", repRange: [3, 8], restSec: 120, setsFactor: 0.8, cardio: { sessions: 1, minutes: 20, zone: "easy" }, minDays: 3, maxDays: 4, sessionMin: 48 },
+  endurance:  { emphasis: "endurance", repRange: [8, 15], restSec: 60, setsFactor: 0.6, cardio: { sessions: 3, minutes: 35, zone: "mixed" }, minDays: 3, maxDays: 5, sessionMin: 41 },
+  health:     { emphasis: "health", repRange: [8, 12], restSec: 75, setsFactor: 0.8, cardio: { sessions: 3, minutes: 30, zone: "easy" }, minDays: 2, maxDays: 4, sessionMin: 41 },
+  habit:      { emphasis: "habit", repRange: [8, 12], restSec: 75, setsFactor: 0.7, cardio: { sessions: 1, minutes: 20, zone: "easy" }, minDays: 2, maxDays: 3, sessionMin: 31 },
 };
 
 const pri = (params, groups) => ({ ...params, priority: groups });
@@ -217,6 +246,14 @@ export const GOAL_PARAMS = {
   "consistent": {
     _default: P.habit,
     "keep-quitting": P.habit, "dont-know": P.habit,
+    /* The one `sessionMin` that did NOT move for the ramp, and it is the app's
+       session-length chips that stop it. Those are 20/30/45/60/90 and the app
+       picks the nearest, ties to the shorter. 25 is the only goal length that
+       ties, so it suggests 20 today; 26 suggests 30. Raising this by the one
+       minute the ramp costs would offer somebody who told us they have no time a
+       session half again as long as the one they asked for, which is a worse
+       thing to get wrong than a minute of budget. So a no-time day stays one
+       minute under-reserved and says so when it runs over. */
     "no-time": { ...P.habit, sessionMin: 25, maxDays: 4 },
   },
 };
