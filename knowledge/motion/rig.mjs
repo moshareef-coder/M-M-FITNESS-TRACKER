@@ -686,6 +686,9 @@ function shadeSide(p0, p1) {
 // the figure read as armour plates rather than one body.
 let COLLECT = null;
 let LINES = true;
+// Pass two only: every capsule painted so far, in order. drawTorso reads it to
+// find the limbs that are UNDER the torso, so it can give them a seam too.
+let DRAWN = null;
 
 function part(ctx, C, pts, o = {}) {
   const fill = o.fill || C.ink;
@@ -699,18 +702,12 @@ function part(ctx, C, pts, o = {}) {
   // only: one continuous hairline round the whole limb instead of a ring at
   // every circle in the chain.
   if (COLLECT) { for (const g of segs) COLLECT.push(g); return; }
-  /* No per part stroke in this pass any more. The silhouette already gets its
-     one line from the union pass above, so all this stroke ever produced was
-     the INTERNAL edges: wherever a part drawn later overlapped one drawn
-     earlier, its faint hairline survived across it. That is the line at the
-     base of the neck, the cap of the thigh over the pelvis, the ring where the
-     near arm meets the torso, and it is why one arm was clean and the other
-     was not: the far arm is drawn first and the torso paints over its edge,
-     the near arm is drawn last and nothing covers it. Mo asked for all of
-     those gone. The only lines left inside the outline are the bent joint
-     creases, which are drawn on purpose by crease(). A part can still opt in
-     with line: true if a seam is ever wanted again. */
-  if (o.line === true) {
+  /* Every part strokes its own edge and then fills, so where a part drawn
+     later overlaps one drawn earlier its hairline survives across it: that is
+     the seam at a shoulder or a hip, and Mo wants those kept. What he does not
+     want is the seam showing on one side only, which happens when the part
+     UNDERNEATH declines to stroke (see drawTorso). Opt out with line: false. */
+  if (o.line !== false) {
     ctx.strokeStyle = o.lineColor || C.seam;
     ctx.lineWidth = (LINES ? (o.lineW || 0.28) : 0.15) * 2;
     ctx.lineJoin = "round";
@@ -718,6 +715,7 @@ function part(ctx, C, pts, o = {}) {
   }
   ctx.fillStyle = fill;
   for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.fill(); }
+  if (DRAWN) for (const g of segs) DRAWN.push(g);
   // The shade band is OPT IN now. The reference is flat white: one white, one
   // very soft far side tone, nothing else. A crescent on every thigh, torso and
   // upper arm reads as facets, and that was the main thing still separating the
@@ -1292,21 +1290,45 @@ function drawTorso(ctx, S, C, fill, skinOpts) {
   const yoke = lerpV(S.chest, S.neckTop, 0.26);
   const fv = S.frontal;
   const waist = lerpV(S.pelvis, S.chest, 0.46);
-  // The yoke and the torso carry NO internal outline. They used to, and where a
-  // limb starts on top of them the two arcs sat a unit apart and read as a
-  // double seam at the shoulder and at the hip. The union pass still outlines
-  // the silhouette, the limb on top still outlines itself, and the lines the
-  // sheet actually draws on the torso come from torsoLines below.
-  for (const ys of ["L", "R"]) {
+  /* The yoke and the torso carry no outline of their own: where a limb starts
+     on top of them, its arc and theirs sat a unit apart and read as a double
+     seam. But a limb that starts UNDERNEATH them then got no seam at all,
+     which is the one-arm-has-a-line-and-the-other-does-not that Mo circled.
+     So they are filled plain first, then their edge is stroked only where it
+     runs over something painted before them (the far arm, the far thigh),
+     then filled again so the inner half of that stroke is covered and what
+     survives is the same outer hairline a limb on top leaves. Both shoulders
+     and both hips now carry one seam each, whichever side the camera is on. */
+  const under = DRAWN ? DRAWN.slice() : [];
+  const yokes = ["L", "R"].map((ys) => {
     const sh = S.sides[ys].shoulder;
-    part(ctx, C, [
+    return [
       [yoke, B.rNeckBot * 0.98],
       [lerpV(yoke, sh, 0.6), B.rShoulder * 0.8],
       [add(sh, scl(norm2(sub(sh, yoke)), 0.6)), B.rDelt * 0.9],
-    ], { fill, line: false });
+    ];
+  });
+  const trunk = [[S.pelvis, B.rPelvis], [waist, B.rWaist], [S.chest, S.chestR]];
+  const paintTrunk = () => {
+    for (const y of yokes) part(ctx, C, y, { fill, line: false });
+    part(ctx, C, trunk, { fill, line: false });
+  };
+  paintTrunk();
+  if (!COLLECT && under.length) {
+    const below = new Path2D();
+    for (const g of under) capsulePathInto(below, g[0], g[1], g[2], g[3]);
+    ctx.save();
+    ctx.clip(below);
+    ctx.strokeStyle = C.seam; ctx.lineWidth = 0.3; ctx.lineJoin = "round";
+    for (const pts of [...yokes, trunk]) {
+      for (let i = 0; i < pts.length - 1; i++) {
+        capsulePath(ctx, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+    paintTrunk();
   }
-  part(ctx, C, [[S.pelvis, B.rPelvis], [waist, B.rWaist], [S.chest, S.chestR]],
-       { fill, line: false });
   // The soft convex curve the female sheet draws on the front of the torso,
   // between the shoulder and the waist. Side view only: face on, the same shape
   // would be two circles stuck to a flat chest, which is not what the sheet
@@ -1332,7 +1354,7 @@ function drawTorso(ctx, S, C, fill, skinOpts) {
     [add(S.chest, scl(nu, -0.6)), B.rNeckBot * 1.2],
     [lerpV(S.chest, S.neckTop, 0.5), B.rNeckBot * 0.8],
     [S.neckTop, B.rNeckTop],
-  ], { fill });
+  ], { fill, line: false });
   if (skinOpts && skinOpts.plates) { torsoPlates(ctx, S, C, skinOpts.lit); return; }
   torsoLines(ctx, S, C);
   // A single soft mass under the collarbone gives the chest volume. It used to
@@ -2048,8 +2070,8 @@ export function drawFigure(ctx, S, C, opts = {}) {
   COLLECT = [];
   try { walk(); } finally { const segs = COLLECT; COLLECT = null; outline(ctx, C, segs); }
   // pass two: fills and inner detail, with per part outlines off
-  LINES = false;
-  try { walk(); } finally { LINES = true; }
+  LINES = false; DRAWN = [];
+  try { walk(); } finally { LINES = true; DRAWN = null; }
   drawProps(ctx, C, opts.props, S, "front");
 }
 
