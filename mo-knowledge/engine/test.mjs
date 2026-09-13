@@ -2415,3 +2415,56 @@ test("for everyday life and get back to where I was are two different plans", ()
   const againWeek = buildPlan({ goal: { bubble: "get-stronger", child: "strong-again" }, person });
   assert.notEqual(lifeWeek.days, againWeek.days, "the returning plan allows a fifth day and the strength one does not");
 });
+
+/* ------------------------------------------------------------------ *
+ * One exercise is never two exercises
+ * ------------------------------------------------------------------ */
+
+test("no day prescribes the same exercise twice", () => {
+  /* A 50,017 case fuzz run of 2026-09-12 found Dip at 3x8 in the chest slot and
+     Dip again at 3x12 in the triceps slot on the same push day. Dip is
+     primary ["chest", "triceps"], so it is a fair candidate for both, and on a
+     bodyweight only week with a sore wrist the pool has nothing else left by
+     the time the second slot is filled. The last-resort fallback was `pool[0]`,
+     which did not care that the movement was already on the card. Not an exotic
+     input: training at home with a sore wrist is the population the limits
+     feature exists for. */
+  const limitCases = [
+    ["bodyweight, sore wrist", { hurts: ["wrist"], missing: ["none"] }],
+    ["bodyweight, sore wrist and shoulder", { hurts: ["wrist", "shoulder"], missing: ["none"] }],
+    ["bodyweight only", { missing: ["none"] }],
+    ["no barbell or machine, sore elbow", { hurts: ["elbow"], missing: ["barbell", "machine"] }],
+  ];
+  for (const goal of [{ bubble: "build-muscle", child: "build-overall" }, { bubble: "get-stronger", child: "strong-a-lift" }, { bubble: "feel-better", child: "pain" }]) {
+    for (const days of [2, 3, 4, 5, 6]) {
+      for (const [label, limits] of limitCases) {
+        for (const logs of [[], longHistory(78)]) {
+          const plan = buildPlan({ goal, logs, limits, person: { daysAsked: days, bodyWeightLb: 170, sex: "Male" } });
+          for (const d of plan.week) {
+            const names = d.exercises.map((e) => e.name);
+            assert.equal(new Set(names).size, names.length,
+              `${goal.child} ${days}d ${label} ${d.name}: ${names.join(", ")}`);
+          }
+          /* CONTRACT.md promises three to six. Deduping must not quietly break
+             that, and the adapter's borrow-from-the-next-day floor is what
+             catches it, so it is checked here rather than assumed. */
+          for (let i = 0; i < plan.week.length; i++) {
+            assert.ok(toWorkout(plan, i).exercises.length >= 3,
+              `${goal.child} ${days}d ${label} day ${i} fell under the floor`);
+          }
+        }
+      }
+    }
+  }
+});
+
+test("a slot dropped to avoid a repeat says so rather than shipping a shorter day", () => {
+  const plan = buildPlan({
+    goal: { bubble: "build-muscle", child: "build-overall" },
+    person: { daysAsked: 3, bodyWeightLb: 170, sex: "Male" },
+    logs: longHistory(78), limits: { hurts: ["wrist"], missing: ["none"] },
+  });
+  const said = plan.dayNotes.filter((n) => /is a slot short/.test(n));
+  assert.ok(said.length, "the day that lost a slot is named");
+  assert.ok(/not two exercises/.test(said[0]), "and why it was not filled with the repeat");
+});

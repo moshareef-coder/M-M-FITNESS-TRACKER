@@ -329,6 +329,17 @@ it is not paying attention.
   stall only appears on a lift newer than the window. In practice `rotate` is the
   common answer and `rep-range` fires mostly for recently introduced lifts.
   `detectPlateau` is Jawa's and was not touched.
+- **The library has no Dead Bug, and no way to say what a movement is.** Both
+  `pain` and `back-postpartum` name dead bug in their goal-tree plan and it is
+  not in `knowledge/exercise-library/` at all. Bird Dog is, and is unreachable,
+  because it is tagged `lowerback` and no slot in `SLOTS` names that group. And
+  because a library row records no movement class, the exclusion table in
+  `goal-engine.mjs` is a list of exercise names kept in step by hand rather than
+  a property of the movement. All three are requests for Jawa rather than edits
+  to her folder. See "A goal can rule out a movement".
+- **`emphasis` is almost inert.** Two behaviours, both of them
+  `emphasis === "strength"`; the other seven values change nothing anywhere.
+  Documented in full above so nobody builds a screen on it.
 - **No nutrition, and it matters.** For every fat loss goal the training is maybe a
   fifth of the outcome. The plan says so rather than implying the workouts will do
   it.
@@ -665,6 +676,120 @@ The one rule that was not taken as written: the brief said a secondary may
 supply cardio only when the primary prescribes none. Every entry in
 `GOAL_PARAMS` prescribes at least one session, so that rule could never have
 fired. "Upward only" is the same idea in a form the table can actually reach.
+
+## A goal can rule out a movement, 2026-09-12
+
+A goal-tree audit found two goals prescribing the opposite of what their own
+entry in `goals/goal-tree.json` says. `pain` ("Aches and pains") writes down
+glute bridge, bird dog, dead bug and was handed **Crunch** and **Sit-Up**.
+`back-postpartum` writes down core and pelvic floor first, function before
+appearance, and was handed **Russian Twist** and **Side Bend**. Both for the
+same mechanical reason: they prioritise `abs` and `obliques`, the slot table has
+one core slot per day, and `candidates` fills it with whatever ranks first. The
+library's obliques rows start with Russian Twist and Side Bend, its abs rows
+with Plank and Crunch, so the goal's note never entered into it.
+
+**This is a contradiction fix, not a training opinion.** The engine is not
+writing a rehabilitation protocol, it makes no claim about what is safe for
+anybody, and it decides nothing clinical. What it does now is obey the goal that
+was already written down, which is the same class of bug as a secondary goal
+being accepted and then ignored.
+
+The mechanism is a per-goal exclusion, the way `limits.hurts` is a per-person
+one. `MOVEMENT_CLASSES` in `goal-engine.mjs` names two classes, repeated trunk
+flexion under load and trunk rotation or side bending under load, and lists the
+weight-training and calisthenics rows in each. A goal names a class in
+`avoidMovements` and `barredMovements` turns that into the set. No goal id
+appears in a conditional anywhere, and a new goal can name a class without this
+code learning about that goal.
+
+**It is the one exclusion in `plan.mjs` with no fallback**, and that is the
+point. Everything else there (a plateau rotation, a painful joint, a hard avoid)
+has a never-empty-a-slot rule, because a hole in the week is worse than one
+movement that is not ideal. Applied here that rule would hand back the exact
+movement the goal pointed away from whenever it was the last one standing, which
+is the bug. So the bar filters the pool inside `candidates`, before the
+loose-pattern fallback can reach around it, and a slot it empties is **dropped
+and named in `dayNotes`** rather than filled.
+
+What actually fills those slots now is what the library already had: Plank and
+Hollow Body Hold for abs, Side Plank for obliques, all bodyweight and beginner,
+so the bodyweight-only week is unaffected. Pallof Press is the better
+anti-rotation answer and needs a cable machine and an intermediate level, so it
+cannot be the only answer; the notes say so in both places. The empty-slot path
+is reachable in practice: a cable-only beginner has Cable Crunch as the whole of
+the abs pool, and the week comes back with no abs slot and three sentences
+saying which days lost it and why.
+
+Two sentences reach `dayNotes` for any goal naming a class. One says what the
+core work does instead, in movement words. The other is one line saying this is
+general training guidance and somebody training around pain or a recent
+pregnancy should run it past their own clinician. Deliberately the shortest
+thing that can be said: no condition is named, nothing is diagnosed, and
+nothing is promised.
+
+**What we do not have.** There is no Dead Bug in
+`knowledge/exercise-library/` at all, and both goals' notes ask for it by name.
+There is also no movement-class field on a library row, which is why the table
+above is a list of names rather than a query. Both are requests for the
+`knowledge/` owner rather than edits to her folder. Bird Dog *is* in the library
+and is still unreachable, because it is tagged `lowerback` and no slot in
+`SLOTS` names that group; widening a slot changes every goal's week and is a
+bigger decision than this fix.
+
+## One exercise is never two exercises, 2026-09-12
+
+A 50,017 case fuzz run found a push day carrying **Dip at 3x8** in the chest
+slot and **Dip again at 3x12** in the triceps slot. `Dip` is
+`primary: ["chest", "triceps"]`, so it is a fair candidate for both; on a
+bodyweight only week with a sore wrist the pool has nothing else left by the
+time the second slot is filled; and the last-resort fallback in `buildPlan` was
+`pool[0]`, which did not care that the movement was already on the card. It
+fires at every day count from 2 to 6.
+
+Not an exotic input. Training at home with a sore wrist is an ordinary person
+and it is exactly the population the limits feature was built for, which is the
+worst place for a selector bug to land.
+
+The fallback now stops at "anything not already on today's card", and a slot
+with nothing of its own left is dropped and named in `dayNotes` rather than
+filled with the repeat. The floor still holds: `toWorkout`'s
+`MIN_EXERCISES` borrow from the next day of the same week catches any day that
+falls under three, and a test now checks that across the matrix rather than
+trusting the comment that says it should never fire.
+
+Related and not ours: `Weighted Dip` is tagged `equipment: "bodyweight"` in
+`knowledge/exercise-library/`, so it appears on a bodyweight only week. That is
+a data fact in a read-only folder, and it is a request for Jawa rather than an
+edit here.
+
+## What `emphasis` does, and what it does not
+
+`emphasis` is on every entry of `GOAL_PARAMS` and reads like the field that
+drives the plan. It is not. As of 2026-09-12 it has exactly two behaviours in
+the whole engine, and both of them are the same question:
+
+| where | what it does |
+|---|---|
+| `plan.mjs`, `candidates` | `emphasis === "strength"` on a **main** slot turns on `LOAD_PENALTY`, which ranks a loadable movement over a bodyweight one so a strength goal does not get push-ups at three reps |
+| `plateau-response.mjs`, `isStrengthGoal` | `emphasis === "strength"` (or a bubble of `get-stronger`) picks the strength branch of the stall answer |
+
+That is all of it. The other seven values, `fatloss`, `hypertrophy`, `recomp`,
+`skill`, `endurance`, `health` and `habit`, are **decorative**: nothing anywhere
+branches on them, and changing one to another changes no set, no exercise, no
+rest and no sentence. What actually separates those goals is `repRange`,
+`restSec`, `setsFactor`, `minDays`, `maxDays`, `sessionMin`, `cardio` and
+`priority`, every one of which is a number the goal table sets directly.
+
+**Do not build a screen on it.** "Your emphasis is hypertrophy" is a label with
+nothing behind it, and a reader who assumes the field drives the split will be
+wrong. It does not leave the engine today: it is not in `meta`, and the only
+correct use of it outside these two call sites is none.
+
+Giving the other seven values real behaviour is a design decision about what
+each quality should change, not a bug fix, and it is not one this section is
+making. It is recorded here so that the gap is on the record rather than
+discovered by somebody trusting the name.
 
 ## Limits: what hurts, and what they do not own
 

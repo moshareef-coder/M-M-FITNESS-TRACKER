@@ -17,7 +17,7 @@
  * comparison is about the algorithm rather than about who wrote a better list.
  */
 import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
-import { resolveGoal } from "./goal-engine.mjs";
+import { resolveGoal, barredMovements, movementCautionNotes } from "./goal-engine.mjs";
 import { deriveTrainingAge, observedCapacity } from "./training-age.mjs";
 import { prescribeLoad, patternFor } from "./load.mjs";
 import { calibrate } from "./calibrate.mjs";
@@ -326,7 +326,7 @@ const loadPenalty = (ex) => LOAD_PENALTY[ex.equipment] ?? 1;
    every deadlift, Romanian deadlift and hip thrust in the library is tagged
    intermediate or above, which is defensible on technique and leaves a beginner
    with no posterior chain work, which is worse. See engine/README.md. */
-function candidates({ groups, pattern, level, equipment, role = "accessory", historyNames = [], preferences = null, exclude = null, emphasis = null }) {
+function candidates({ groups, pattern, level, equipment, role = "accessory", historyNames = [], preferences = null, exclude = null, emphasis = null, barred = null }) {
   const ceiling = (LEVEL_RANK[level] ?? 0) + (role === "main" ? 2 : 1);
   const match = (needPattern) => {
     const pool = [];
@@ -336,6 +336,15 @@ function candidates({ groups, pattern, level, equipment, role = "accessory", his
           if (!(ex.primary || []).some((g) => groups.includes(g))) continue;
           if ((LEVEL_RANK[ex.level] ?? 0) > ceiling) continue;
           if (equipment && !equipment.includes(ex.equipment)) continue;
+          /* The goal's own "not these". This is the one exclusion in the file
+             with no fallback and it sits here, inside the pool build, rather
+             than beside `exclude` below: everything below has a
+             never-empty-a-slot rule, and a never-empty rule applied to this
+             list would hand back the exact movement the goal warned about
+             whenever it was the only one left, which is the bug. So it filters
+             both the exact-pattern pass and the loose one, and where that
+             leaves nothing the slot goes empty and buildPlan says so. */
+          if (barred && barred.has(ex.name.toLowerCase())) continue;
           if (needPattern && patternFor(ex) !== pattern) continue;
           pool.push(ex);
         }
@@ -558,6 +567,29 @@ export function buildPlan({
     ? new Set([...rotateOut, ...limitOut, ...avoidOut])
     : rotateOut;
 
+  /* ---- what the goal itself points away from (engine/goal-engine.mjs) ----
+     A third exclusion, and it is a different kind again from the two above. A
+     joint is the person's answer and a missing barbell is a fact about their
+     room; this one is the goal's own note, read back. Two children in the tree
+     write down what they train and the selector was handing them the opposite,
+     because they prioritise abs and obliques and the library fills those slots
+     with whatever ranks first. Fixing that is not a training opinion, it is
+     making the plan agree with the goal it was built from.
+
+     Hard, with no fallback, unlike `exclude`. The never-empty-a-slot rule is
+     right for a rotation and for a sore shoulder, where the worst case is one
+     movement that is not ideal; here the worst case is the movement the goal
+     specifically pointed away from, arriving because nothing else fitted. So
+     an unfillable slot is dropped and named in dayNotes instead, which is what
+     this file does with every other uncomfortable number. */
+  const goalBarred = barredMovements(P);
+  for (const say of movementCautionNotes(P)) dayNotes.push(say);
+  /* Slots the bar emptied, filled during selection and spoken after it. */
+  const cautionEmpty = [];
+  /* And slots that emptied because everything left in them is already on the
+     same card. Same shape, different cause, so a different sentence. */
+  const dedupeEmpty = [];
+
   const split = splitFor(days, level).slice(0, days);
   /* One lever, pulled once. A systemic volume cut is the same 0.85 that
      calibration's back-off already runs through `setsFor`, so it reuses that
@@ -593,12 +625,36 @@ export function buildPlan({
     let taken = 0;
     const picks = slots.map((slot) => {
       if (isShort && slot.role !== "main" && taken >= SHORT_DAY_MIN) return null;
-      const pool = candidates({ ...slot, level, equipment: kit, role: slot.role, historyNames, preferences, exclude: excludeOut, emphasis: P.emphasis });
-      if (!pool.length) return null;
+      const args = { ...slot, level, equipment: kit, role: slot.role, historyNames, preferences, exclude: excludeOut, emphasis: P.emphasis };
+      const pool = candidates({ ...args, barred: goalBarred });
+      if (!pool.length) {
+        /* Empty for want of equipment is an old and quiet case, handled by
+           dropping the slot. Empty because of the goal's own bar is new and it
+           is not allowed to be quiet: the person asked for core work, the week
+           has none here, and the only wrong answer is saying nothing. Asked a
+           second time without the bar, because that is the only way to tell
+           the two causes apart, and it runs at most once per empty slot. */
+        if (goalBarred.size && candidates(args).length) {
+          cautionEmpty.push({ day: name, groups: slot.groups.join(" and ") });
+        }
+        return null;
+      }
       /* Prefer something not already used this week, so a week of five days does
-         not become the same four lifts five times. */
+         not become the same four lifts five times. Then anything not already on
+         today's card, and then nothing.
+         The third fallback used to be `pool[0]`, which could be a movement
+         already picked today, and a 50,017 case fuzz run found it: a bodyweight
+         only week with a sore wrist leaves Dip as the whole triceps pool and as
+         the whole chest pool, so the push day came back with Dip at 3x8 in the
+         chest slot and Dip again at 3x12 four lines below it. That is not two
+         exercises, it is one exercise the card is asking for twice at different
+         rep counts, and no set count downstream can make sense of it. A slot
+         with nothing left of its own is a slot the library cannot fill, which
+         is a state this file already has an answer for. */
       const pick = pool.find((e) => !usedToday.has(e.name) && (usedThisWeek.get(e.name) || 0) === 0)
-        || pool.find((e) => !usedToday.has(e.name)) || pool[0];
+        || pool.find((e) => !usedToday.has(e.name))
+        || null;
+      if (!pick) { dedupeEmpty.push({ day: name, groups: slot.groups.join(" and ") }); return null; }
       /* A rotated lift that got picked anyway means excluding it would have left
          this slot with nothing. Recorded now, answered after selection. */
       if (rotateOut.has(pick.name.toLowerCase())) rotateBlocked.add(pick.name);
@@ -629,6 +685,31 @@ export function buildPlan({
 
     return { name, key, isShort, picks };
   });
+
+  /* The slots the goal's bar emptied, said out loud. Nothing silently replaced
+     them, because the replacement would have been the movement the goal pointed
+     away from, and a missing slot somebody has been told about beats a slot
+     filled with the wrong thing. One sentence per day, not per slot, since two
+     empty core slots on one day is still one thing that happened to that day. */
+  for (const day of [...new Set(cautionEmpty.map((c) => c.day))]) {
+    const groups = [...new Set(cautionEmpty.filter((c) => c.day === day).map((c) => c.groups))].join(", ");
+    dayNotes.push(`${day} has no ${groups} exercise in it. At your level and with the equipment you have, `
+      + `everything the library offers for that slot is the kind of movement this goal points away from, so `
+      + `the slot is left out rather than filled with one of those. The work that would fill it is planks `
+      + `and side planks, or a Pallof Press if you have a cable machine.`);
+  }
+
+  /* And the slots that emptied because the only movements left were already on
+     the card. Said out loud for the same reason as everything else in here: a
+     day that is one exercise shorter than its neighbours is a thing somebody
+     will notice, and the choice between a short day and the same lift twice is
+     one the plan should be seen making rather than making quietly. */
+  for (const day of [...new Set(dedupeEmpty.map((c) => c.day))]) {
+    const groups = [...new Set(dedupeEmpty.filter((c) => c.day === day).map((c) => c.groups))].join(", ");
+    dayNotes.push(`${day} is a slot short. The only ${groups} movements left after your equipment and what `
+      + `you said hurts were already on that card, and the same exercise twice in one session is not two `
+      + `exercises. The day runs one movement lighter instead.`);
+  }
 
   /* How often each group really gets hit, from what was picked, so weekly volume
      can be split across sessions rather than guessed per session. */

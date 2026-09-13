@@ -97,7 +97,15 @@ hurts, the over-budget number, the day-count clamp, the capacity shortening,
 the plateau answers, and, new on 2026-09-12, the sentence naming the muscle
 groups whose weekly sets are capped by how often the split trains them ("more
 of those muscles means another day in the week, not more sets in the days you
-have"). Nothing in `meta` changed shape for it. Until 2026-09-10 all of it was computed and none of it
+have"). Also new on 2026-09-12: for the `pain` and `back-postpartum` children,
+two sentences saying the core work here holds position rather than bending or
+twisting under load, and one saying this is general training guidance that
+somebody training around pain or a recent pregnancy should run past their own
+clinician. A day whose core slot the goal's exclusion emptied gets a sentence
+naming that day too, and so does a day that gave up a slot rather than
+prescribe a movement already on the same card (a bodyweight week with a sore
+wrist can leave one movement qualifying for two slots). All of them are plain `notes` strings; nothing in `meta`
+changed shape for them, and nothing needs storing. Nothing in `meta` changed shape for it. Until 2026-09-10 all of it was computed and none of it
 left the engine. Render it under `honest` in the reveal; nothing needs storing,
 `ai_workouts` does not store `honest` either.
 
@@ -135,6 +143,7 @@ bodyweight only pull day honestly has no curl in it).
 | `stretching.why` | text[] | **new.** Plain sentences: what was picked, for which groups, and what a joint limit left out |
 | `source` | text | always `engine`. The `llm` path was removed 2026-09-12; the key stays so a reader of an older stored plan can still tell which built it |
 | `goalSource` | text | `tiles` if `goal_bubble` was valid, `legacy` if the five strings and the free text were parsed |
+| `emphasis` | **not returned** | the goal table has an `emphasis` on every entry and it never leaves the engine, deliberately. It has two behaviours in the whole codebase, both `=== "strength"`, and the other seven values change nothing. Do not surface it and do not add it here: see "What `emphasis` does, and what it does not" in `README.md` |
 | `logsSource` | text | `logs` / `history` / `none` |
 | `missing` | text[] | what would have sharpened the plan and was not there, in plain words |
 

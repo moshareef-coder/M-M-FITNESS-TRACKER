@@ -67,6 +67,89 @@ const P = {
 
 const pri = (params, groups) => ({ ...params, priority: groups });
 
+/* ---- movements a goal rules out, the way limits.hurts rules out a joint ----
+ *
+ * This is an internal-consistency fix and nothing more. Two goals in
+ * ../goals/goal-tree.json write down what they train and then, because they
+ * prioritise abs and obliques and the library fills those slots with whatever
+ * ranks first, were handed the opposite of what they wrote. "pain" says glute
+ * bridge, bird dog, dead bug and got Crunch and Sit-Up. "back-postpartum" says
+ * core and pelvic floor first, function before appearance, and got Russian
+ * Twist and Side Bend. A plan that contradicts its own goal's note is a wiring
+ * bug, and this is the wiring. It is not a rehabilitation protocol, it decides
+ * nothing about any individual, and it makes no claim about what is safe: it
+ * makes the selector obey the goal that was already written down.
+ *
+ * Two classes, because the two notes point away from the same two things:
+ * repeated trunk flexion under load or leverage, and trunk rotation or side
+ * bending under load. Both notes ask instead for braced, anti-movement work,
+ * which is what Bird Dog and Pallof Press are and what the library already has.
+ *
+ * By name, because the library records no movement-class field. That is not the
+ * shape anybody would choose, and the honest version of it is a tag in
+ * knowledge/exercise-library, which is not ours to add. So the table is here,
+ * the mechanism reads it rather than testing for two exercise names in an if,
+ * and any goal can name a class without this file learning about that goal. It
+ * covers the weight-training and calisthenics rows, because those are the two
+ * libraries plan.mjs selects from.
+ */
+export const MOVEMENT_CLASSES = {
+  loadedSpinalFlexion: {
+    say: "repeated bending of the spine under load",
+    names: [
+      "Crunch", "Sit-Up", "Reverse Crunch", "Cable Crunch", "V-Up",
+      "Hanging Leg Raise", "Toes-to-Bar",
+    ],
+  },
+  loadedRotation: {
+    say: "twisting and side bending under load",
+    names: ["Russian Twist", "Side Bend", "Woodchopper", "Hanging Windshield Wiper"],
+  },
+};
+
+/* The goal says "not these" and the engine works out what that comes to. Same
+   argument as limits.mjs: a list a caller has to expand itself is a list that
+   goes stale in three places at once. */
+export function barredMovements(params) {
+  const out = new Set();
+  for (const key of params?.avoidMovements || []) {
+    for (const n of MOVEMENT_CLASSES[key]?.names || []) out.add(n.toLowerCase());
+  }
+  return out;
+}
+
+/* What the plan says out loud about it, in the goal's own terms rather than in
+   anything that reads as a diagnosis. One sentence for what is left out, one
+   for what the person should do with that, and the second one is deliberately
+   the shortest thing that can be said: we are not their clinician and the plan
+   should not sound like one. */
+export function movementCautionNotes(params) {
+  const keys = (params?.avoidMovements || []).filter((k) => MOVEMENT_CLASSES[k]);
+  if (!keys.length) return [];
+  const say = keys.map((k) => MOVEMENT_CLASSES[k].say);
+  const list = say.length === 1 ? say[0] : `${say.slice(0, -1).join(", ")} and ${say[say.length - 1]}`;
+  return [
+    `This goal is about steadying your middle rather than crunching it, so the core work here holds `
+      + `position instead of ${list}. Planks and side planks with no kit, a Pallof Press if you have a `
+      + `cable machine. That is what the goal asks for, not a judgement about you.`,
+    `This is general training guidance. If you are training around pain or a recent pregnancy, run it `
+      + `past your own clinician first.`,
+  ];
+}
+
+/* One shape for a goal that is coming back to training, used twice.
+   goal-tree.json's "strong-again" says in as many words "Route to the
+   get-back-into-it bubble", and the table below had it as a copy of
+   "strong-for-life" instead, so the two goals that should differ were
+   byte-identical and the one that should route elsewhere did not. Written once
+   here so the routing is a fact of the table rather than two literals somebody
+   has to keep in step. */
+const RETURNING = { ...P.hypertrophy, setsFactor: 0.6 };
+
+/* The two goals whose own notes point away from loaded flexion and rotation.
+   Named once, applied twice, so the reason lives in one place. */
+const BRACED_CORE = ["loadedSpinalFlexion", "loadedRotation"];
+
 /* Keyed to goal-tree.json. bubble id -> child id -> parameters. */
 export const GOAL_PARAMS = {
   "lose-weight": {
@@ -87,7 +170,8 @@ export const GOAL_PARAMS = {
     "strong-a-lift": P.strength, "strong-multiples": P.strength,
     "strong-not-bigger": { ...P.strength, repRange: [1, 5], setsFactor: 0.75 },
     "strong-for-life": { ...P.strength, repRange: [5, 8] },
-    "strong-again": { ...P.strength, repRange: [5, 8] },
+    /* Not a strength entry at all. See RETURNING above. */
+    "strong-again": RETURNING,
   },
   "tone-lean-abs": {
     _default: P.recomp,
@@ -119,12 +203,12 @@ export const GOAL_PARAMS = {
     "mental": { ...P.health, cardio: { sessions: 3, minutes: 30, zone: "easy" } },
     "longevity": P.health, "energy": { ...P.health, cardio: { sessions: 4, minutes: 30, zone: "easy" } },
     "prevent": P.health, "mobility": { ...P.health, setsFactor: 0.6 },
-    "pain": pri({ ...P.health, setsFactor: 0.6 }, ["abs", "glutes", "lowerback"]),
+    "pain": pri({ ...P.health, setsFactor: 0.6, avoidMovements: BRACED_CORE }, ["abs", "glutes", "lowerback"]),
   },
   "get-back": {
     _default: P.habit,
-    "back-after-years": { ...P.hypertrophy, setsFactor: 0.6 },
-    "back-postpartum": pri({ ...P.health, setsFactor: 0.5 }, ["abs", "glutes"]),
+    "back-after-years": RETURNING,
+    "back-postpartum": pri({ ...P.health, setsFactor: 0.5, avoidMovements: BRACED_CORE }, ["abs", "glutes"]),
     "start-fresh": P.habit,
   },
   "consistent": {
@@ -150,7 +234,8 @@ export const GOAL_PARAMS = {
  * is by what a second goal can add without contradicting the first:
  *
  *   the primary sets   repRange, restSec, setsFactor, sessionMin, minDays,
- *                      maxDays, emphasis, and the honest timeline
+ *                      maxDays, emphasis, avoidMovements, and the honest
+ *                      timeline
  *   a secondary adds   priority muscle groups, the mobility cool-down block,
  *                      and cardio, and only ever upward
  *
