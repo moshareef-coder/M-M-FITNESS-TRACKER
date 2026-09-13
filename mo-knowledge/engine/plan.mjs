@@ -27,7 +27,7 @@ import { planPlateauResponse, applyRotateFallback, repShiftFor } from "./plateau
 import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary, softenedNote } from "./limits.mjs";
 import { mainGroupsForDay } from "./recovery.mjs";
 import { TIER_MULTIPLIER, TIERS } from "./focus.mjs";
-import { mobilityFor, COOLDOWN_SECONDS } from "./mobility.mjs";
+import { mobilityFor, COOLDOWN_SECONDS, WARMUP_SECONDS, RAMPED_WARMUP_SECONDS } from "./mobility.mjs";
 
 const WEIGHTS = TRAININGS.find((t) => t.id === "weight-training");
 const CALIS = TRAININGS.find((t) => t.id === "calisthenics");
@@ -106,8 +106,13 @@ const REP_SECONDS = 30;
    minutes counted twice: this one reserves them inside the session estimate,
    that one fills them with moves. They were 5 and 5; research/13 moved the
    block to 6 and this followed, or the estimate would quietly under-report
-   every session by a minute. */
-const WARMUP_MIN = 6;
+   every session by a minute.
+
+   Both are now derived rather than written, because a day that ramps its first
+   lift gets a shorter general block (mobility.mjs RAMPED_WARMUP_SECONDS) and a
+   ramp on top of it. `prepMinutesFor` below is the one place the two halves are
+   added up, and `estimateMinutes` reserves whatever it says. */
+const WARMUP_MIN = Math.round(WARMUP_SECONDS / 60);
 const TIME_TOLERANCE = 1.15;
 
 /* The three numbers the person's own clock needs, and none of them are read
@@ -149,11 +154,46 @@ const REST_FLOOR_SEC = 45;
    reps of the working set already are the ramp.
 
    The table is research/13's own: empty bar, then 50, 70 and 88% of the working
-   weight, at 8, 5, 3 and 2 reps, resting 45, 45, 60 and 60 seconds. How many of
-   them is read off the working reps, because reps are the only proxy for %1RM
-   this file has and the research's rule is stated in %1RM: a main at six reps
-   or fewer is the heavy, low-rep day the ramp matters most on, and anything past
-   ten is the beginner set of twelve it matters least on.
+   weight, at 8, 5, 3 and 2 reps, resting 45, 45, 60 and 60 seconds.
+
+   WHAT COUNTS AS HEAVY, which is the whole rule, stated where it is decided:
+
+   research/13 puts it in %1RM and nowhere else. "Three to four ramp sets for a
+   main compound at or above 80% 1RM; one to two for a second main; none for
+   accessories and isolation", and Iversen 2021's nuance underneath it, "the need
+   for a specific warm-up scales with load. Above about 80% 1RM it matters. In
+   higher rep ranges, the first few reps of the working set already are the
+   specific warm-up." So the gate is %1RM, and `impliedPct` below reads it off
+   the prescribed reps by inverting load.mjs's own `workingFrom1RM` at the RIR it
+   prescribes with. That inversion matters: the number agrees with how the weight
+   on the card was worked out, rather than being a second opinion about the same
+   lifter.
+
+   Three conditions, all required:
+
+   1. A MAIN slot. research/13 is explicit that accessories and isolation get
+      none, so a lateral raise cannot reach this code however many reps it has.
+   2. A prescribed weight above zero. See `rampFor`: a push-up has nothing to
+      ramp and this engine has no regression ladder to ramp it with.
+   3. At or above RAMP_PCT_FLOOR of one rep max.
+
+   And then the count, from the two thresholds:
+
+   | prescribed reps | implied %1RM | rungs | why |
+   |---|---|---|---|
+   | 5 or fewer | 81% and up | 4 | research/13's "at or above 80% 1RM", top of its 3 to 4 |
+   | 6 to 9 | 73 to 79% | 3 | under the threshold where it "matters", still a load nobody meets cold. Bottom of the same 3 to 4 |
+   | 10 or more | 71% and down | 0 | Iversen: the first reps of the working set already are the specific warm-up |
+
+   A second main is gated the same way and gets one rung whatever it clears by,
+   because research/13 caps it there: the body is warm by then and what is left
+   is neural rehearsal of the movement.
+
+   This is deliberately NOT gated on the clock any more. It was, for one day, and
+   the effect was that an advanced lifter on a strength goal got nothing, because
+   that person is already over the session length they asked for. They are also
+   exactly the person research/13 is describing. A ramp is part of the warm-up,
+   not something spare minutes buy, and `prepMinutesFor` costs it that way.
 
    A ramp set carries no volume. It is never counted in the weekly ledger, never
    seen by recovery.mjs, never written as an exercise_log, and never appears in
@@ -173,10 +213,24 @@ const RAMP_TABLE = [
   { pct: 0.88, reps: 2, restSec: 60 },
 ];
 const RAMP_SET_SECONDS = 15;
-/* The second main of a day needs at most one, and research/13 says why: the body
-   is warm by then and what is left is neural rehearsal of the specific movement.
-   70% is the middle rung, heavy enough to rehearse and light enough to be free. */
+/* 70% is the middle rung, heavy enough to rehearse and light enough to be free. */
 const RAMP_SECOND_MAIN = [2];
+const RAMP_PCT_HEAVY = 0.80;
+/* Where "not worth a ramp" starts. Chosen so the cut lands between 9 and 10
+   prescribed reps, which is where Iversen's "higher rep ranges" argument takes
+   over from the load argument, and it is a real cut rather than a tidy one:
+   nine reps implies 73% and ten implies 71%. */
+const RAMP_PCT_FLOOR = 0.72;
+
+/* What fraction of one rep max a set of `reps` at the RIR this engine prescribes
+   with actually is. The inverse of load.mjs `workingFrom1RM`, written out here
+   rather than imported because that function goes the other way and inverting it
+   in place would mean a caller could not tell which direction it was being asked
+   for. Same formula, same default RIR, so the two agree by construction. */
+function impliedPct(reps) {
+  const rirTrim = 1 - Math.min(0.10, 2 * 0.025);
+  return (1 / (1 + reps / 30)) * rirTrim;
+}
 
 /* "3:00", for the one sentence that has to compare two rest intervals. */
 function clock(seconds) {
@@ -185,25 +239,48 @@ function clock(seconds) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function estimateMinutes(exercises) {
+/* The warm-up minutes a day reserves, general block plus ramp, rounded once at
+   the end rather than half by half: rounding 240 and 270 seconds separately
+   turns eight and a half minutes into nine and hands the day a minute it never
+   spends. A day with no ramp is WARMUP_MIN, which is what every day was before
+   ramps existed and what the whole file was measured against. */
+function prepMinutesFor(day) {
+  const rampSec = (day?.rampSets || []).reduce((t, r) => t + r.seconds, 0);
+  if (!rampSec) return WARMUP_MIN;
+  return Math.round((RAMPED_WARMUP_SECONDS + rampSec) / 60);
+}
+
+function estimateMinutes(exercises, prepMinutes = WARMUP_MIN) {
   const seconds = exercises.reduce((t, e) => t + e.sets * (REP_SECONDS + e.restSec), 0);
-  return Math.round(WARMUP_MIN + seconds / 60);
+  return Math.round(prepMinutes + seconds / 60);
 }
 
 /* The ramp for one lift, or null when there is nothing to ramp.
 
-   Two things disqualify a movement outright. A lift with no prescribed weight is
-   bodyweight or unknown, and a ramp needs load to ramp: research/13 open
-   question 9 wants a regression ladder per pattern (an incline push-up for a
-   push-up, a box squat for a squat) and this engine does not have one, so the
-   honest answer is no ramp rather than a guessed one. And a working weight small
-   enough that 50% of it rounds to nothing is a light dumbbell, where the ramp
-   would be four sets of the same weight written four times.
+   BODYWEIGHT AND ANYTHING ELSE THAT CANNOT BE LOADED GETS NONE, deliberately and
+   not by accident. A ramp is a load and a rep count, and `targetWeight` of 0 is
+   this engine's word for "bodyweight, or we do not know". For a push-up the ramp
+   would have to be an incline push-up and for a squat a box squat, which is
+   research/13 open question 9, and the answer there is that the engine would
+   need a regression ladder per movement pattern. It does not have one: checked
+   2026-09-12, `knowledge/exercise-library/calisthenics.mjs` carries `name`,
+   `primary`, `secondary`, `equipment` and `level` and nothing that orders two
+   movements on the same pattern by difficulty, so there is no way to say that a
+   wall push-up is the easier version of a push-up rather than a different
+   exercise for the same muscle. Guessing a ladder from `level` would put a
+   beginner-tagged movement in front of an intermediate one on a pattern they do
+   not share. So: no ramp, written down here and in LIBRARY-REQUESTS.md, rather
+   than a ramp that is wrong. A plank gets none for the same reason and also
+   because it is never a main slot.
 
-   `rungs` is which rows of RAMP_TABLE to use. The first main gets the top of the
-   research's range on a heavy day and less as the reps climb; a second main gets
-   the one rung. */
+   A working weight small enough that 50% of it rounds onto the rung below is a
+   light dumbbell, where the ramp would be four sets of the same weight written
+   four times. Same answer.
+
+   `rungs` is which rows of RAMP_TABLE to use, from `rungsForReps` for a first
+   main and the single middle rung for a second. */
 function rampFor(exercise, rungs) {
+  if (!rungs || !rungs.length) return null;
   const working = Number(exercise?.weight);
   if (!Number.isFinite(working) || working <= 0) return null;
   const sets = [];
@@ -235,13 +312,75 @@ function rampFor(exercise, rungs) {
   };
 }
 
-/* How many rungs the first main of a day earns, from its working reps, which is
-   the only read on %1RM this file has. research/13: three to four for a main at
-   or above 80% of one rep max, least for a beginner doing sets of twelve. */
+/* How many rungs the first main of a day earns. The table is in the comment on
+   RAMP_TABLE; this is it in code. An empty list is "no ramp", which is the
+   answer for anything under the floor. */
 function rungsForReps(reps) {
-  if (reps <= 6) return [0, 1, 2, 3];
-  if (reps <= 10) return [0, 1, 2];
-  return [0, 1];
+  const pct = impliedPct(reps);
+  if (pct >= RAMP_PCT_HEAVY) return [0, 1, 2, 3];
+  if (pct >= RAMP_PCT_FLOOR) return [0, 1, 2];
+  return [];
+}
+
+/* The first main's ramp, decided by the lift alone and not by the clock. Runs
+   before the time passes, because `prepMinutesFor` has to be able to cost it and
+   the trims have to be able to see what it costs.
+
+   The second main's single rung is NOT here, and that is a measurement rather
+   than an oversight. research/13 asks for one to two rungs on a second main, but
+   it is the weakest claim in that section: "the body is warm by then and the
+   value of the ramp is mostly neural rehearsal", with no citation attached, and
+   section 5's own confidence note does not cover it. Built it unconditionally
+   first and swept it: it put 319 more days over their time budget and cost 164
+   real working sets across the matrix, because the trims took the minutes out of
+   the sets. Trading a person's working sets for an uncited rehearsal rung is a
+   bad trade. So it moved to `addSecondMainRamps` below, which adds it only where
+   the day already has room, and it is therefore free by construction. */
+function rampsForDay(exercises, roleOf) {
+  /* The first main that CAN be ramped, not simply the first main. A day that
+     opens with a pull-up and follows it with a barbell row used to come back
+     with nothing, because the ramp stopped at the first slot and that slot was
+     bodyweight. The row is then the first loaded thing the person meets, and it
+     is the one that should not be met cold. */
+  for (const e of exercises) {
+    if (roleOf.get(e) !== "main") continue;
+    const r = rampFor(e, rungsForReps(e.reps));
+    if (r) return [r];
+  }
+  return [];
+}
+
+/* The second main's one rung, added only where it costs the day nothing. Runs
+   after every trim and after the back-off, so `d.estimatedMinutes` is final and
+   the question "does this still fit" has an answer. A day that cannot take it
+   keeps its sets, which is the trade the comment above measured. */
+function addSecondMainRamps(week, roleOf) {
+  for (const d of week) {
+    if (!d.rampSets.length) continue;
+    /* The next main after the one already ramped, by the same "first that can
+       be" rule. A second main clears the same load floor before it earns its
+       rung: research/13 caps the count there, it does not lower the bar. */
+    const already = d.rampSets[0].exercise;
+    let second = null;
+    let seen = false;
+    for (const e of d.exercises) {
+      if (roleOf.get(e) !== "main") continue;
+      if (e.name === already) { seen = true; continue; }
+      if (!seen) continue;
+      if (impliedPct(e.reps) < RAMP_PCT_FLOOR) continue;
+      const candidate = rampFor(e, RAMP_SECOND_MAIN);
+      if (candidate) { second = candidate; break; }
+    }
+    const r = second;
+    if (!r) continue;
+    const withIt = [...d.rampSets, r];
+    const prep = prepMinutesFor({ rampSets: withIt });
+    if (estimateMinutes(d.exercises, prep) > d.minutes * TIME_TOLERANCE) continue;
+    d.rampSets = withIt;
+    d.prepMinutes = prep;
+    d.rampMinutes = Math.round(withIt.reduce((t, x) => t + x.seconds, 0) / 60);
+    d.estimatedMinutes = estimateMinutes(d.exercises, prep);
+  }
 }
 
 /* The sets clamp used to be Math.max(2, Math.min(5, ...)) applied straight to
@@ -1225,17 +1364,53 @@ export function buildPlan({
       + `one logged session replaces the guess entirely.`);
   }
 
+  /* ---- ramp-up sets, decided before the clock rather than by it ----
+     research/13 section 5, and see RAMP_TABLE for the evidence and the rule for
+     what counts as heavy. This runs here, after the loads are prescribed and
+     before a single trim, for two reasons. The ramp is read off the working
+     weight and the working reps, both of which are final by now and neither of
+     which any trim below moves. And it has to be costed before the trims run,
+     because a warm-up the session estimate cannot see is the exact bug the
+     comment on `WARMUP_MIN` was written about: minutes the person spends that
+     the number on the screen does not.
+
+     So `prepMinutesFor` folds it into what the day reserves, the general block
+     shrinks from six minutes to four on a ramped day (mobility.mjs
+     RAMPED_WARMUP_SECONDS), and every estimate below reserves the sum. The net
+     is one to three minutes a day, not four, and the trims see all of it. */
+  const ramped = [];
+  for (const d of week) {
+    d.rampSets = rampsForDay(d.exercises, roleOf);
+    d.rampMinutes = Math.round((d.rampSets.reduce((t, r) => t + r.seconds, 0)) / 60);
+    d.prepMinutes = prepMinutesFor(d);
+    for (const r of d.rampSets) ramped.push({ day: d.name, exercise: r.exercise, sets: r.sets.length, seconds: r.seconds });
+  }
+
+  /* Said once for the week, because a ramp is now normal rather than something
+     spare minutes bought, and because it is new on every existing plan: the
+     first thing a person will notice is sets on their card that are not work.
+     The sentence has to answer "why is there a set of the empty bar on here"
+     and "does this count", in that order. */
+  if (ramped.length) {
+    const heaviest = ramped[0];
+    dayNotes.push(`Your main lift now starts with ${heaviest.sets} ramp-up sets, light sets working up to the weight on `
+      + `the card rather than meeting it cold. ${heaviest.exercise} is the first one. They are not work: they are not `
+      + `logged, they do not count toward your week, and the weight you are aiming at has not changed. The stretching `
+      + `before the session is shorter to make room, which is the trade on purpose. A general stretch does not prepare `
+      + `a heavy lift and light sets of the lift itself do.`);
+  }
+
   const timeTrimmed = [];
   const restCompressed = [];
   const lastIndex = (list, ok) => { for (let i = list.length - 1; i >= 0; i--) if (ok(list[i], i)) return i; return -1; };
   for (const d of week) {
-    let estimate = estimateMinutes(d.exercises);
+    let estimate = estimateMinutes(d.exercises, d.prepMinutes);
     const overBudget = () => estimate > d.minutes * TIME_TOLERANCE;
     while (overBudget()) {
       const shave = lastIndex(d.exercises, (e) => roleOf.get(e) === "accessory" && !e.priority && e.sets > SHORT_DAY_SETS);
       if (shave >= 0) {
         d.exercises[shave].sets -= 1;
-        estimate = estimateMinutes(d.exercises);
+        estimate = estimateMinutes(d.exercises, d.prepMinutes);
         continue;
       }
       if (d.exercises.length <= SHORT_DAY_MIN) break;
@@ -1251,7 +1426,7 @@ export function buildPlan({
       if (last < 0) break;
       timeTrimmed.push({ day: d.name, dropped: d.exercises[last].name });
       d.exercises.splice(last, 1);
-      estimate = estimateMinutes(d.exercises);
+      estimate = estimateMinutes(d.exercises, d.prepMinutes);
     }
 
     /* ---- the third lever, and it exists only when the person named the clock ----
@@ -1285,10 +1460,10 @@ export function buildPlan({
         }
         if (pick < 0) break;
         d.exercises[pick].sets -= 1;
-        estimate = estimateMinutes(d.exercises);
+        estimate = estimateMinutes(d.exercises, d.prepMinutes);
       }
       enforcePriorityFloor(d.exercises);
-      estimate = estimateMinutes(d.exercises);
+      estimate = estimateMinutes(d.exercises, d.prepMinutes);
 
       /* ---- and the fourth, which costs the goal something and says so ----
          Rest is last because it is the only lever that changes what a set is
@@ -1309,7 +1484,7 @@ export function buildPlan({
           d.exercises.forEach((e, i) => {
             e.restSec = Math.min(restBefore[i], Math.max(REST_FLOOR_SEC, Math.round(restBefore[i] * factor)));
           });
-          estimate = estimateMinutes(d.exercises);
+          estimate = estimateMinutes(d.exercises, d.prepMinutes);
         }
         const from = Math.max(...restBefore);
         const to = Math.max(...d.exercises.map((e) => e.restSec));
@@ -1372,10 +1547,10 @@ export function buildPlan({
         }
         if (!best) break;
         best.sets += 1;
-        if (estimateMinutes(d.exercises) > d.minutes * TIME_TOLERANCE) { best.sets -= 1; break; }
+        if (estimateMinutes(d.exercises, d.prepMinutes) > d.minutes * TIME_TOLERANCE) { best.sets -= 1; break; }
         timeAdded.set(`${d.name}|${best.name}`, { day: d.name, exercise: best.name, group: best.group, to: best.sets });
       }
-      d.estimatedMinutes = estimateMinutes(d.exercises);
+      d.estimatedMinutes = estimateMinutes(d.exercises, d.prepMinutes);
     }
   }
 
@@ -1401,9 +1576,14 @@ export function buildPlan({
     for (const d of week) {
       for (const e of d.exercises) e.sets = easeSets(e.sets, roleOf.get(e) === "main");
       enforcePriorityFloor(d.exercises);
-      d.estimatedMinutes = estimateMinutes(d.exercises);
+      d.estimatedMinutes = estimateMinutes(d.exercises, d.prepMinutes);
     }
   }
+
+  /* Now that the minutes have stopped moving, the second main can have its rung
+     on any day with room for it. Before the surplus pass below, because a rung
+     on the lift is worth more than five more minutes of stretching. */
+  addSecondMainRamps(week, roleOf);
 
   /* ---- what the extra minutes buy when they cannot buy sets ----
      The fill pass above stops at the weekly ceiling, and past that point every
@@ -1434,9 +1614,7 @@ export function buildPlan({
         What makes it real is the back-off below the compression, which takes
         sets off afterwards and leaves the short rest in place. Measured across
         the sweep, and the count is in the report.
-     2. RAMP-UP SETS. research/13 section 5, and the file's own highest ranked
-        missing feature. See RAMP_TABLE above for the evidence and the shape.
-     3. A LONGER COOL-DOWN, not a longer warm-up. The engine's old sentence
+     2. A LONGER COOL-DOWN, not a longer warm-up. The engine's old sentence
         offered "a longer warm-up" and research/13 is against it: McGowan 2015
         has a long warm-up costing performance through accumulated fatigue, Behm
         2016 has the range it buys expiring inside thirty minutes, and Oliva 2026
@@ -1447,6 +1625,14 @@ export function buildPlan({
         session, which five minutes barely clears and ten comfortably does. So
         the extra time grows the block that is free and leaves alone the block
         that is not.
+
+     RAMP-UP SETS WERE ITEM 2 HERE FOR ONE DAY AND ARE NOT ANY MORE. Buying them
+     with spare minutes meant the person research/13 is actually describing, an
+     advanced lifter working up to a heavy low-rep main, got none of them,
+     because that person is already over the session length they asked for. A
+     ramp is part of warming up, not a luxury a long clock affords, so it is
+     decided by the lifts up at the ramp pass and costed inside the budget like
+     any other warm-up minute.
 
      What is NOT here is optional accessory work, and the reason is the ledger
      rather than a worry. A surplus only survives the fill pass when the fill
@@ -1463,9 +1649,6 @@ export function buildPlan({
   if (askedMinutes !== null) {
     const compressedOf = new Map(restCompressed.map((r) => [r.d, r]));
     for (const d of week) {
-      d.rampSets = [];
-      d.rampMinutes = 0;
-
       /* 1. rest, back up the same 0.05 ladder it came down, against the same
          ceiling it came down to meet. Not the tighter one the two purchases
          below use: the debt was taken to fit `d.minutes * TIME_TOLERANCE` with
@@ -1483,7 +1666,7 @@ export function buildPlan({
         while (factor < 1 - 1e-9) {
           const next = Math.min(1, +(factor + 0.05).toFixed(2));
           setRest(next);
-          const est = estimateMinutes(d.exercises);
+          const est = estimateMinutes(d.exercises, d.prepMinutes);
           /* One step too far is undone rather than accepted. */
           if (est > d.minutes * TIME_TOLERANCE) { setRest(factor); break; }
           d.estimatedMinutes = est;
@@ -1503,29 +1686,12 @@ export function buildPlan({
          because the person named how long they are in the gym, not how long the
          middle of it is, and unlike the repayment above these are additions. */
       const cooldownMin = Math.round(COOLDOWN_SECONDS / 60);
-      const spare = () => d.minutes - d.estimatedMinutes - d.rampMinutes - cooldownMin - (d.longCooldown ? 5 : 0);
+      /* `estimatedMinutes` already carries the ramp, because `prepMinutes` is
+         inside it, so there is nothing to subtract for it here. */
+      const spare = () => d.minutes - d.estimatedMinutes - cooldownMin - (d.longCooldown ? 5 : 0);
       if (spare() <= 0) continue;
 
-      /* 2. ramp-up sets, first main then second, each only if it fits whole. */
-      const mains = d.exercises.filter((e) => roleOf.get(e) === "main");
-      const wanted = [];
-      if (mains[0]) wanted.push(rampFor(mains[0], rungsForReps(mains[0].reps)));
-      if (mains[1]) wanted.push(rampFor(mains[1], RAMP_SECOND_MAIN));
-      for (const ramp of wanted) {
-        if (!ramp) continue;
-        const cost = Math.round(ramp.seconds / 60);
-        /* `continue` rather than `break`: the first main's four rung ramp costs
-           five minutes and the second main's single rung costs one, so a day
-           with two minutes left can afford the second when it cannot afford the
-           first. Refusing the cheap one because the dear one did not fit is a
-           false economy, not an ordering. */
-        if (cost > spare()) continue;
-        d.rampSets.push(ramp);
-        d.rampMinutes += cost;
-        timeBought.push({ day: d.name, bought: "ramp", exercise: ramp.exercise, sets: ramp.sets.length, minutes: cost });
-      }
-
-      /* 3. the ten minute block, all or nothing: half of it is the five it
+      /* 2. the ten minute block, all or nothing: half of it is the five it
          already had. `mobilityFor` reads this flag below. */
       if (!resolved.mobilityChild && spare() >= 5) {
         d.longCooldown = true;
@@ -1557,24 +1723,12 @@ export function buildPlan({
   /* What the extras bought, in the voice of the sentence they replaced. Said
      once for the week, listing the kinds rather than every day, because the
      answer is the same on every day it fired. */
-  if (timeBought.length) {
-    const ramps = timeBought.filter((t) => t.bought === "ramp");
-    const cools = timeBought.filter((t) => t.bought === "cooldown");
-    const parts = [];
-    if (ramps.length) {
-      parts.push(ramps.length === 1
-        ? `${ramps[0].sets} ramp-up sets working up to your first real set of ${ramps[0].exercise}`
-        : `ramp-up sets on ${ramps.length} of the week's main lifts, light sets working up to the first real one`);
-    }
-    if (cools.length) parts.push(`a ten minute stretching block after instead of five`);
+  const cools = timeBought.filter((t) => t.bought === "cooldown");
+  if (cools.length) {
     dayNotes.push(`You asked for ${askedMinutes} minutes and the training itself needs less than that. The extra did not `
-      + `become more hard sets, because more than this is past what your week recovers from. It bought `
-      + `${parts.join(", and ")}. `
-      + (ramps.length
-        ? `Ramp sets are light sets of the lift itself, and they are the part of a warm-up with the best evidence behind it: `
-          + `a general stretch does not prepare a heavy squat and may cost you a little off the top of it. `
-        : "")
-      + `None of it counts as a set, none of it is logged, and none of it changes the weight you are working up to.`);
+      + `become more hard sets, because more than this is past what your week recovers from. It bought a ten minute `
+      + `stretching block after instead of five, which is the one thing more of reliably gives you something: range of `
+      + `motion over weeks. It does not count as a set and it is not logged.`);
   }
 
   /* A budget nothing could spend. Worth a sentence for the same reason the
@@ -1583,13 +1737,13 @@ export function buildPlan({
      focus" dropdown. Only when they asked for MORE than the goal wanted, since
      below that the budget is doing plenty.
 
-     The ramp minutes count toward the longest day, because they are minutes the
-     person is in the gym doing the lift. The cool-down still does not, for the
-     same reason it never did: `estimatedMinutes` is the session and the block
-     sits on top of it. And the old closing advice, "spend the rest on a longer
-     warm-up", is gone: research/13 says a longer warm-up costs performance, so
-     the engine should not have been recommending one. */
-  const longestDay = week.reduce((m, d) => Math.max(m, d.estimatedMinutes + (d.rampMinutes || 0)), 0);
+     The ramp minutes are already inside `estimatedMinutes`, because a ramp is
+     warm-up and the warm-up has always been inside it. The cool-down still is
+     not, for the same reason it never was: it sits on top and `totalMinutes` is
+     where the two are added. And the old closing advice, "spend the rest on a
+     longer warm-up", is gone: research/13 says a longer warm-up costs
+     performance, so the engine should not have been recommending one. */
+  const longestDay = week.reduce((m, d) => Math.max(m, d.estimatedMinutes), 0);
   if (askedMinutes !== null && askedMinutes > P.sessionMin && longestDay < askedMinutes * 0.8) {
     dayNotes.push(`You have ${askedMinutes} minutes and the longest day here needs about ${longestDay}. That is not the `
       + `plan being lazy: more sets than this is past what your level recovers from in a week, and volume you cannot `
@@ -1779,11 +1933,9 @@ export function buildPlan({
          a stated session length bought, never a default. */
       longCooldown: !!d.longCooldown,
     });
-    /* The ramp is minutes in the gym like any other, so it is in the honest
-       total. It is not in `estimatedMinutes`, which is the working session and
-       has to stay comparable to the number every trim above was measured
-       against. */
-    d.totalMinutes = d.estimatedMinutes + (d.rampMinutes || 0) + Math.round(d.mobility.cooldownSeconds / 60);
+    /* The ramp is already inside `estimatedMinutes` by way of `prepMinutes`, so
+       it must not be added again here. Only the cool-down sits on top. */
+    d.totalMinutes = d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60);
   }
 
   const progression = level === "beginner" || level === "novice"
@@ -1833,6 +1985,10 @@ export function buildPlan({
          movements. `timeAdded` is the fill pass, one entry per lift that grew,
          not one per set. Both are empty on every plan built without a stated
          session length, which is every plan built before today. */
+      /* Every ramp in the week, one entry per lift rather than per set, so the
+         sweep and a screen can read what was prepared without walking the days.
+         Always present: a ramp is decided by the lifts, not by the clock. */
+      ramped,
       /* Published without the working fields the fill pass needed: `before` is
          one number per exercise and `d` is the day itself, and neither belongs
          in a ledger a caller iterates. `factor` and `toSec` are whatever the

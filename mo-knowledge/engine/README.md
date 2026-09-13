@@ -960,14 +960,173 @@ buying the engine still says so, and the sentence now ends "spend what is left
 on a walk, or take it back" rather than recommending the longer warm-up the
 research says costs performance.
 
-**The known gap.** The ramp is gated on surplus, so the person it matters most
-for does not get it: an advanced lifter on a strength goal is already over the
-90 minutes they asked for, and research/13's whole point is that the ramp
-matters most on heavy, low-rep days. research/13 also says the ramp should
-*replace* time rather than add to it, being the potentiate phase of RAMP. Doing
-that means giving every heavy main a ramp regardless of the clock, which changes
-the no-`session_minutes` baseline, and that baseline is currently a fixed point.
-It is the right next move and it needs its own decision.
+**That known gap is closed.** It was recorded here as: the ramp is gated on
+surplus, so the advanced lifter on a strength goal, already over the 90 minutes
+they asked for, gets none, and that person is exactly who research/13 is
+describing. The owner lifted the byte-identical baseline the same day and the
+ramp became unconditional. What follows is that change.
+
+## Ramp-up sets are normal now, 2026-09-12
+
+Nobody works up to a 240 lb squat cold, and until this change the engine told
+them to. Ramp sets are no longer bought with spare minutes. They are decided by
+the lifts, they are costed inside the session budget like any other warm-up
+minute, and they are on nearly every day.
+
+### What counts as heavy, and where the rule comes from
+
+research/13 states it in %1RM and in nothing else: "three to four ramp sets for
+a main compound at or above 80% 1RM; one to two for a second main; none for
+accessories and isolation", under Iversen 2021's "the need for a specific
+warm-up scales with load. Above about 80% 1RM it matters. In higher rep ranges,
+the first few reps of the working set already are the specific warm-up."
+
+So the gate is %1RM, read off the prescribed reps by inverting `load.mjs`'s own
+`workingFrom1RM` at the RIR it prescribes with. Inverting the engine's own
+function rather than picking a second formula matters: the number agrees with
+how the weight on the card was worked out.
+
+| prescribed reps | implied %1RM | rungs |
+|---|---|---|
+| 5 or fewer | 81% and up | 4 |
+| 6 to 9 | 73 to 79% | 3 |
+| 10 or more | 71% and down | 0 |
+
+Plus two hard conditions: a **main** slot, so a lateral raise can never reach
+the code, and a **prescribed weight above zero**.
+
+**And an honest note about what this rule cannot do.** It does not distinguish a
+240 lb back squat from a beginner's 35 lb goblet squat, and it cannot, because
+both are about 78% of that person's own one rep max. The working weight was
+derived from the estimated 1RM by this same relation, so asking "what fraction
+of their max is this" gives back the reps it started from. That is not a defect
+hiding in the rule, it is the rule being relative: 78% of your max is heavy for
+you whoever you are, and both of those lifters should work up to it. What the
+rule does exclude is accessories, isolation, anything unloadable, high-rep
+mains, and any load light enough that the rungs round onto each other.
+
+### Bodyweight and unloadable movements, decided rather than skipped
+
+A push-up and a plank get no ramp, on purpose. A ramp is a load and a rep count.
+research/13 open question 9 says what it would take: a regression ladder per
+movement pattern, an incline push-up for a push-up, a box squat for a squat, and
+suggests `calisthenics.mjs` may already have one. Checked on 2026-09-12: it does
+not. Every entry carries `name`, `primary`, `secondary`, `equipment` and `level`
+and nothing that orders two movements on the same pattern by difficulty, so
+there is no way to say a wall push-up is the easier version of a push-up rather
+than a different exercise for the same muscle. Deriving a ladder from `level`
+would put a beginner-tagged movement in front of an intermediate one on a
+pattern they do not share. Requested in `LIBRARY-REQUESTS.md`; until it exists,
+no ramp is the honest answer and a guessed one is not.
+
+One consequence worth naming: **the first main that can be ramped is the one
+that ramps, not simply the first slot.** A day that opens with pull-ups and
+follows with a barbell row ramps the row. The first version stopped at slot one
+and handed that day nothing, which is the same starving bug in a new place.
+
+### Replace, not add: did it pay for itself
+
+Partly, and the honest answer is no, not fully. On a day with a ramp the general
+warm-up block drops from six minutes to four (`RAMPED_WARMUP_SECONDS`), so the
+person gets four minutes of general work plus about four and a half of ramp:
+**more** preparation than the six they had, and a larger share of it the
+movement-specific kind Iversen asks to prioritise. Eight and a half minutes of
+preparation sits inside ACSM's five to ten, counting the ramp as warm-up, which
+RAMP does.
+
+Measured across 3,690 days: the ramp costs **4.5 minutes**, the shorter block
+gives back **2.0**, net **+2.5 minutes on a ramped day**, and the whole-matrix
+average session estimate goes from 35.3 to 37.7 minutes.
+
+It cannot fully pay for itself, and the arithmetic says why rather than the
+judgement: the ramp's four rests are 45, 45, 60 and 60 seconds, which is 3.5
+minutes before a single rep is counted. Absorbing that would need the general
+block at about 90 seconds, which is not a warm-up. Going below four minutes was
+tried and rejected: it saves roughly one more minute and it would be picking a
+number to hit a counter. research/13 recommendation 10 asks for 360 seconds
+*with* the ramp on top, so four minutes already goes one step further than that
+file does, and the step is argued rather than assumed: 360 was chosen when the
+engine had no potentiate phase and the block was implicitly, badly, doing that
+job.
+
+### The second main's rung was built, measured worse, and made discretionary
+
+research/13 asks for one to two rungs on a second main. Built it unconditionally
+and swept it: **319 more days over their time budget and 164 fewer real working
+sets**, because the trims took the minutes out of the sets. The claim behind it
+is the weakest in section 5, "the body is warm by then and the value of the ramp
+is mostly neural rehearsal", with no citation and outside that section's own
+confidence note. Trading a person's working sets for an uncited rehearsal rung
+is a bad trade. So it moved to `addSecondMainRamps`, which runs after every trim
+and adds the rung only where the day already fits with it, making it free by
+construction. It still lands on 76% of days.
+
+### Blast radius, measured
+
+Same matrix as the surplus work: every goal bubble and child, four day counts,
+three histories, both sexes, five session-length settings. 1,080 plans, 3,690
+days.
+
+| | before | after |
+|---|---|---|
+| days with a ramp | 0 | 3,690 (100%) |
+| of which a second main too | 0 | 2,804 (76%) |
+| prep minutes reserved per day | 6.0 | 8.8 |
+| session estimate per day | 35.3 | 37.7 |
+| weekly hard sets, whole matrix | 60,380 | 59,686 (-1.1%) |
+| group-weeks above MRV plus slack | 40 | 40 |
+
+Main slots across the matrix: 7,380, of which 5,830 (79%) carry a load and 1,550
+do not. Ramp coverage is 100% of days and not 100% of main slots, because a day
+whose first main is bodyweight ramps the next one that is not.
+
+**Volume is no longer untouched, and it should not be.** This is the one
+property that held for the surplus-gated version and deliberately does not hold
+here: 280 of 1,080 plans lose sets and 318 have different rows for
+`calibrate.mjs` to join. That is the time budget doing its job. A warm-up the
+session estimate cannot see is exactly the bug the comment on `WARMUP_MIN` was
+written about, minutes the person spends that the number on the screen does not
+know about, so the ramp is inside `estimatedMinutes` and the trims see all of
+it. Hiding it outside the budget would have frozen every counter in this table
+and lied about the clock. **MRV is untouched**: 40 group-weeks sat above target
+plus slack before this change and 40 sit above it after, the same 40.
+
+### `over-time-budget`, which is the counter to watch
+
+`sweep.mjs` now genuinely covers this, where it gave the surplus-gated version
+none, so its WARN deltas mean something for the first time.
+
+| WARN | before | after | why |
+|---|---|---|---|
+| over-time-budget | 1399 | 1916 | **+517.** The real cost, below |
+| same-group-twice-in-day | 20149 | 20146 | -3. Three days lost a trailing accessory to the clock, so its group stopped appearing twice |
+| ledger rows | 77428 | 77218 | -210 sets, the same trims |
+| excluded-prescribed | 12291 | 12291 | unchanged |
+| hurt-joint-prescribed | 12291 | 12291 | unchanged |
+| duplicate-in-week | 9828 | 9828 | unchanged |
+| days-clamped | 3245 | 3245 | unchanged |
+| calibration-changed-selection | 208 | 208 | unchanged |
+| focus-group-not-in-split | 114 | 114 | unchanged |
+| unknown-secondary-goal | 52 | 52 | unchanged |
+| tiers-indistinguishable | 46 | 46 | unchanged |
+
+FAILs none and KNOWN OPEN none, before and after.
+
+**Why +517 is acceptable, stated rather than waved at.** Those days are 0 to 2
+minutes past a 15% tolerance line, median 0: they are boundary cases, not
+sessions that stopped fitting in any way a person would feel. Nothing about them
+is caused by what the person asked for. And the warn is the instrument reading
+correctly: `P.sessionMin`, the goal's own session length, was set for a session
+that opened cold, and it is now two to three minutes short of what that goal
+genuinely takes. The day says so in `notes`, per day, by name.
+
+**The follow-up that would actually close it**, not shipped because it is a
+product decision rather than an engine one: raise `sessionMin` in
+`goal-engine.mjs` by the ramp's cost for the goals whose mains ramp. It would
+take `over-time-budget` back toward 1399 honestly rather than by hiding minutes.
+It also changes what nine goals advertise as their session length and it gives
+the fill pass more room, which pushes volume back up toward MRV, so it needs
+measuring on its own and an owner's yes.
 
 ### What the sweep does and does not cover
 
@@ -978,13 +1137,17 @@ in the table above come from the same 3824 day matrix run five times with a
 target set. A `session_minutes` axis belongs in `sweep.mjs` and is the obvious
 next thing to add there.
 
-Still true on 2026-09-12, and now it costs something: every sweep count is
-identical before and after the surplus work above, which reads as "no
-regressions" and is really "the instrument is not pointed at it". The proof
-numbers in the section below come from a separate matrix for exactly that
-reason. `fuzz.mjs` **is** pointed at it, and it grew checks to match: a ramp that
-names a movement not on the day, or carries a load at or above the working
-weight, is a FAIL there.
+Still true of the surplus work on 2026-09-12, and it cost something: every sweep
+count was identical before and after it, which reads as "no regressions" and was
+really "the instrument is not pointed at it". The proof numbers in the section
+below come from a separate matrix for exactly that reason. `fuzz.mjs` **is**
+pointed at it, and it grew checks to match: a ramp that names a movement not on
+the day, or carries a load at or above the working weight, is a FAIL there.
+
+Fixed by accident later the same day. Unconditional ramp sets are on the default
+path, so `sweep.mjs` covers them without a `session_minutes` axis, and its
+deltas are reported properly two sections down. A `session_minutes` axis is
+still the obvious next thing to add, and it is still missing.
 
 ## What `emphasis` does, and what it does not
 

@@ -103,7 +103,33 @@ Suggested: Wall Sit, Spanish Squat, Box Squat, Terminal Knee Extension.
 
 ---
 
-## 5. Smaller data problems
+## 5. A difficulty ladder inside a movement pattern
+
+**Asked for 2026-09-12, by the ramp-up sets in `engine/plan.mjs`.**
+
+A ramp works up to the working weight in light sets of the same lift. For a
+loaded movement the engine builds it from the weight. For a bodyweight movement
+there is no weight to scale, so the ramp has to be an easier version of the same
+movement: an incline push-up before a push-up, a box squat before a squat, a
+band-assisted pull-up before a pull-up. research/13 open question 9 assumed
+`calisthenics.mjs` might already carry this.
+
+It does not. Every entry has `name`, `primary`, `secondary`, `equipment` and
+`level`, and nothing that orders two movements on the same pattern by
+difficulty. `level` cannot stand in: it ranks an exercise against the population,
+not against its own siblings, so it will happily put a beginner-tagged movement
+from one pattern in front of an intermediate one from another.
+
+What would fix it: one field per entry naming the easier movement on the same
+pattern, for example `regressionOf: "Push-Up"` or `easierThan`. A single link per
+row is enough; the engine can walk the chain. Until it exists, **bodyweight main
+lifts get no ramp at all**, which is currently 21% of main slots across the goal
+matrix. That is a deliberate refusal rather than a gap, and it is written down in
+`engine/plan.mjs` at `rampFor` and in `CONTRACT.md`.
+
+---
+
+## 6. Smaller data problems
 
 - **Weighted Dip is tagged `equipment: "bodyweight"`,** so it appears on
   bodyweight-only weeks. Found by the fuzzer.

@@ -48,6 +48,25 @@ import { MUSCLE_GROUPS } from "./focus.mjs";
    about 4 minutes per session and 10 per week, which three sessions of five
    already clears. Ten for the two goals where the stretching IS the plan. */
 export const WARMUP_SECONDS = 360;
+/* The general block on a day that ramps its first lift, 2026-09-12.
+   research/13 recommendation 10 set WARMUP_SECONDS to 360 "with the warm-up
+   block explicitly not including the ramp sets", so this goes one step past what
+   that file asks for and the reason is worth writing down. 360 was chosen when
+   the engine had no potentiate phase at all, and the block was implicitly doing
+   that job badly: it is the general mobility warm-up Oliva 2026 measured 3.8% of
+   peak squat force disappearing after. Now that the ramp exists, the block's job
+   is narrower (raise, activate, mobilise) and the fourth phase has somewhere
+   better to be.
+
+   Four minutes, not less. Total preparation on a ramped day goes from six
+   minutes of general work to about four general plus four specific, so the
+   person gets MORE preparation than before and a larger share of it is the kind
+   Iversen 2021 says to prioritise: "restrict the warm-up to exercise-specific
+   warm-ups". Eight minutes sits inside ACSM's five to ten and well inside
+   McGowan 2015's ten to fifteen, counting the ramp as warm-up, which RAMP does.
+   Going lower would be picking a number to hit a minutes target rather than
+   because the evidence moved, and the evidence stops supporting cuts here. */
+export const RAMPED_WARMUP_SECONDS = 240;
 export const COOLDOWN_SECONDS = 300;
 export const MOBILITY_GOAL_SECONDS = 600;
 /* The goal children whose whole point is this block. Ids from goal-tree.json;
@@ -276,7 +295,13 @@ export function mobilityFor(day, { level = "beginner", hurts = [], missing = [],
      warm-up, which is exactly the generic block this change exists to end. */
   const patterns = [...new Set([...(day?.mainPatterns || []), ...(day?.allPatterns || [])])]
     .filter((p) => p !== "isolation");
-  const warmup = pickBlock({ kind: "dynamic", groups: mainGroups, patterns, budgetSec: WARMUP_SECONDS, hurts, missing, level });
+  /* A day whose first lift is ramped gets the shorter general block, because the
+     ramp is the potentiate phase and the block no longer has to pretend to be
+     it. See RAMPED_WARMUP_SECONDS. plan.mjs decides which days ramp and reserves
+     exactly these seconds inside the session estimate, so the two agree. */
+  const ramped = Array.isArray(day?.rampSets) && day.rampSets.length > 0;
+  const warmupSec = ramped ? RAMPED_WARMUP_SECONDS : WARMUP_SECONDS;
+  const warmup = pickBlock({ kind: "dynamic", groups: mainGroups, patterns, budgetSec: warmupSec, hurts, missing, level });
   const longBlock = mobilityGoal || longCooldown;
   const cooldown = longBlock
     ? pickBlock({
@@ -294,7 +319,11 @@ export function mobilityFor(day, { level = "beginner", hurts = [], missing = [],
       .filter((e) => !FREE_KIT.has(e.equipment)).length;
     if (kitOnly) why.push(`${kitOnly} stretches that need a roller, a band or a bench left out, since there is no equipment.`);
   }
-  if (warmup.length) why.push(`${warmup.length} dynamic moves for ${mainGroups.length ? mainGroups.join(", ") : "the whole body"} before the first set, inside the five minutes the session already budgets.`);
+  if (warmup.length) {
+    why.push(ramped
+      ? `${warmup.length} dynamic moves for ${mainGroups.length ? mainGroups.join(", ") : "the whole body"} before the first set. Shorter than the usual block, because the ramp-up sets on the first lift do the rest of the preparing and do it on the movement itself.`
+      : `${warmup.length} dynamic moves for ${mainGroups.length ? mainGroups.join(", ") : "the whole body"} before the first set, inside the five minutes the session already budgets.`);
+  }
   if (cooldown.length) {
     why.push(mobilityGoal
       ? `A ten minute mobility block after, hips and upper back first, because the goal is the range of motion itself (goal-tree: "5 to 10 min daily").`

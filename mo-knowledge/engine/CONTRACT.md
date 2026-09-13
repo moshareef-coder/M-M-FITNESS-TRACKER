@@ -35,7 +35,7 @@ somebody on day zero who has answered nothing, and it does.
 | `current_weight` | number | engine | pounds. Without it there are no starting weights at all, and the plan says so in `meta.missing` |
 | `gym_days_this_week` | number | engine | fallback day count when `challenge_target` is absent |
 | `challenge_target` | number | engine | days per week they chose themselves, 2 to 6. Beats everything else |
-| `session_minutes` | number | engine | **new.** How long one session should take, in minutes. Absent, `null`, `0` and nonsense all mean "never answered" and the goal's own session length runs, which is byte for byte the plan that was built yesterday. A real answer replaces it: the week is built to fit the number, in both directions. Clamped to 15 and 120, and the clamp is said in `notes`. **2026-09-12**: a longer answer than the plan needs now buys three things that cost no recovery, in this order: the rest the clock took back if a lighter week left room for it, ramp-up sets on the day's main lifts (`workout.rampSets`), and a ten minute stretching block instead of five. It still never buys hard sets past the weekly ceiling, and when there is nothing left to buy it still says so |
+| `session_minutes` | number | engine | **new.** How long one session should take, in minutes. Absent, `null`, `0` and nonsense all mean "never answered" and the goal's own session length runs. A real answer replaces it: the week is built to fit the number, in both directions. Clamped to 15 and 120, and the clamp is said in `notes`. **2026-09-12**: a longer answer than the plan needs buys two things that cost no recovery: the rest the clock took back, if a lighter week left room for it, and a ten minute stretching block instead of five. It never buys hard sets past the weekly ceiling, and when there is nothing left to buy it still says so. Ramp sets are NOT among them: they are warm-up, they are on every day that has something to ramp, and no session length decides them |
 | `focus` | text | engine | a day name ("Push day"), which day of the week they want. Beats the rotation |
 | `focus_groups` | text[] | engine | the body map pick, now with a priority tier on each entry. `"chest:3"` is red, `"chest:2"` yellow, `"chest:1"` green, and a bare `"chest"` with no tier is yellow, which is what every pick saved before 2026-09-12 means. Muscle group keys or the finer piece keys the zoomed view uses; both are flattened to the app's fourteen groups. The single entry `"all"` is "select my whole body" and expands to every group at green. A jsonb object, `{"chest":3}`, is accepted too, so the column can become jsonb later without the engine changing |
 | `focus_chosen_at` | timestamptz | engine | when that pick was made. Older than 60 days comes back as `meta.focus.stale` |
@@ -81,7 +81,7 @@ inside it are dropped in silence.
     cooldown: [                         // new. Static holds after the last set, or a mobility block for the flexibility and mobility goals
       { name: "Standing Calf Stretch", seconds: 30, perSide: true, group: "calves", kind: "static", cue: "..." }
     ],
-    rampSets: [                         // new 2026-09-12. ABSENT unless a stated session_minutes bought them. See below
+    rampSets: [                         // new 2026-09-12. On nearly every day now. ABSENT when the day has nothing loaded to ramp. See below
       {
         exercise: "Barbell Back Squat", // always a lift already in `exercises` on this same day
         group: "quads",
@@ -124,8 +124,34 @@ than its working weight, so the first real set is not also the warm-up
 `weight: 0` on the first rung means the empty bar, the empty machine, or the
 lightest thing they have, and the `cue` says so; it does not mean bodyweight.
 `pct` is the fraction of the working weight the rung was built from, before
-rounding to the plate grid. The key is **absent entirely** on a day that bought
-none, which is every day of every plan built without `session_minutes`.
+rounding to the plate grid. The key is **absent entirely** on a day with nothing
+to ramp.
+
+**Changed 2026-09-12, later the same day.** Ramp sets were briefly something a
+long `session_minutes` bought. They are not: they are part of warming up, they
+appear on nearly every day, and no session length is involved in deciding them.
+The array's shape did not change.
+
+**When a day has one.** All three conditions must hold:
+
+- the lift is in a **main** slot. research/13 is explicit that accessories and
+  isolation get none, so a lateral raise can never carry one;
+- it has a prescribed weight above zero. A push-up, a plank and anything else
+  unloadable get none, because a ramp is a load and a rep count and this engine
+  has no regression ladder to build one from (research/13 open question 9, and
+  `LIBRARY-REQUESTS.md`). This is a decision, not an omission;
+- the prescribed reps imply at least 72% of one rep max, which is 9 reps or
+  fewer. Above that, Iversen 2021's point applies: the first reps of the working
+  set already are the specific warm-up.
+
+**How many rungs**: 4 at 5 reps or fewer (81% of 1RM and up, research/13's "at
+or above 80% 1RM"), 3 at 6 to 9 reps, none above. The next main on the day gets
+one extra rung at 70%, but only when the day has room for it inside its time
+budget, so it can never be the thing that pushes a session over.
+
+**The day's first loadable main is the one that ramps**, not simply the first
+slot. A day that opens with pull-ups and follows with a barbell row ramps the
+row, because the row is the first loaded thing the person meets.
 
 `notes` is the plan's own `dayNotes`, unfiltered, plus the focus merge's own
 note when there is one (today: the sentence saying a whole-body pick changed
@@ -136,7 +162,9 @@ the plateau answers, and, new on 2026-09-12, the sentence naming the muscle
 groups whose weekly sets are capped by how often the split trains them ("more
 of those muscles means another day in the week, not more sets in the days you
 have"). Also new on 2026-09-12: the session-length sentences, when `session_minutes`
-was sent. Up to six of them, and each one is a real event rather than a
+was sent, plus one that is sent whatever the session length is: the sentence
+explaining the ramp-up sets on the main lift, which appears on any plan that has
+them. Up to six of the session-length ones, and each one is a real event rather than a
 reassurance: the clamp when the number was outside 15 to 120, the rest
 compression when sets alone could not buy the minutes, the rest going back up
 when a lighter week made room for it, what the extra minutes bought when they
@@ -186,7 +214,7 @@ bodyweight only pull day honestly has no curl in it).
 | `limits.missing` | text[] | **new.** The equipment keys that survived validation |
 | `limits.excludedCount` | number | **new.** How many library movements those two answers ruled out. The names and the per-movement reasons stay on the plan, because on a bodyweight only week the list runs past a hundred |
 | `stretching.included` | bool | **new.** `false` when `skip_stretching` stripped the blocks |
-| `stretching.warmupMinutes` | number | **new.** Rounded minutes of the warm-up. Inside the session budget: those five minutes were always in `estimatedMinutes` and were empty until now |
+| `stretching.warmupMinutes` | number | **new.** Rounded minutes of the general warm-up block. Inside the session budget: those minutes were always in `estimatedMinutes` and were empty until 2026-09-10. **2026-09-12**: six minutes normally, four on a day that has `workout.rampSets`, because the ramp is the rest of the preparation and it is better preparation. The two together are more than the six they replace |
 | `stretching.cooldownMinutes` | number | **new.** Rounded minutes of the cool-down. On top of the session: five by default, ten for the `flexibility` and `mobility` goal children |
 | `stretching.mobilityGoal` | bool | **new.** The goal child is one of those two, so the cool-down is the ten minute hips and upper back block the goal tree asks for |
 | `stretching.why` | text[] | **new.** Plain sentences: what was picked, for which groups, and what a joint limit left out |
@@ -194,8 +222,8 @@ bodyweight only pull day honestly has no curl in it).
 | `session.source` | text | **new.** `asked` when `session_minutes` set the budget, `goal` when the goal's own session length did. Every plan built before this column existed reads `goal` |
 | `session.asked` | number or null | **new.** What arrived before the clamp, so a screen can tell a clamp from a coincidence. Null when nothing was sent |
 | `session.goalMinutes` | number | **new.** What the goal would have chosen on its own. Equal to `budgetMinutes` when `source` is `goal` |
-| `session.estimatedMinutes` | number | **new.** What this day really comes to: sets times reps time, plus the rest between them, plus the warm-up. The same number `stretching.warmupMinutes` is counted inside. It does NOT include `session.rampMinutes`, because this number has to stay comparable to the budget every trim was measured against. There is deliberately no `totalMinutes` here: the whole visit is this plus `session.rampMinutes` plus `stretching.cooldownMinutes`, and carrying the sum would make `meta` move when `skip_stretching` moves |
-| `session.rampMinutes` | number | **new 2026-09-12.** What `workout.rampSets` costs on this day, rests included. `0` on every day that bought none, which is every day of every plan built without `session_minutes`. Zero volume: it is warm-up time, not work |
+| `session.estimatedMinutes` | number | **new.** What this day really comes to: sets times reps time, plus the rest between them, plus the warm-up. Both halves of the warm-up: `stretching.warmupMinutes` AND `session.rampMinutes` are counted inside it. There is deliberately no `totalMinutes` here: the whole visit is this plus `stretching.cooldownMinutes`, and carrying the sum would make `meta` move when `skip_stretching` moves |
+| `session.rampMinutes` | number | **new 2026-09-12, and its meaning changed the same day. Read this before summing anything.** What `workout.rampSets` costs on this day, rests included. It is a **component of** `estimatedMinutes`, not an addition to it: **the whole visit is `estimatedMinutes + stretching.cooldownMinutes` and nothing else.** Adding `rampMinutes` on top double counts it. `0` on a day with nothing to ramp. Zero volume either way: it is warm-up time, not work |
 | `session.fits` | bool | **new.** `false` is the day that could not be squeezed into the answer they gave, after every lever ran. The sentence saying so is already in `notes` |
 | `session.restCompressed` | bool | **new.** The budget on this day was partly bought by shortening the rest between sets, which is the one trim that changes what a set is worth. The sentence is in `notes`. **Changed 2026-09-12**: a day whose rest was given back in full reads `false`, because a screen saying "your rest was cut" beside a card printing the full interval is the app contradicting itself |
 | `stretching.cooldownMinutes` (changed) | number | **2026-09-12.** Can now be ten for anyone, not only the `flexibility` and `mobility` goal children, when a stated `session_minutes` had minutes left over and bought the longer block. `stretching.mobilityGoal` stays the goal-child flag and does not go true for a bought block; `stretching.why` says which happened |

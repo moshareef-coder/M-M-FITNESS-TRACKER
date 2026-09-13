@@ -25,7 +25,7 @@ import { buildPlan } from "./plan.mjs";
 import { conjunctiveWeek, chooseComparison, sharedSchedule, relativeScore, PRODUCTIVE_GAP } from "./pair.mjs";
 
 import { normalizeFocus, parseFocus, mergePriority, focusFreshness, MUSCLE_GROUPS, TIERS, TIER_COST, FOCUS_BUDGET } from "./focus.mjs";
-import { mobilityFor, pickBlock, moveSeconds, stripMobility, WARMUP_SECONDS, COOLDOWN_SECONDS, MOBILITY_GOAL_SECONDS, MOBILITY_CHILDREN, MIN_MOVES, MAX_MOVES } from "./mobility.mjs";
+import { mobilityFor, pickBlock, moveSeconds, stripMobility, WARMUP_SECONDS, RAMPED_WARMUP_SECONDS, COOLDOWN_SECONDS, MOBILITY_GOAL_SECONDS, MOBILITY_CHILDREN, MIN_MOVES, MAX_MOVES } from "./mobility.mjs";
 import { scoreAlternatives } from "./alternatives.mjs";
 import {
   learnPreferences, applyPreferences, avoidNote, openWeekBudget, heldBackNote, actedOn,
@@ -2879,15 +2879,20 @@ test("asking for a focus still never costs that group its work, however tight th
  * What a longer session buys when it cannot buy sets
  * ---------------------------------------------------------------- */
 
-test("extra time buys ramp-up sets, and they are never working sets", () => {
-  const goal = { bubble: "build-muscle" };
+test("every heavy main lift is ramped, with no clock involved", () => {
+  const goal = { bubble: "get-stronger" };
   const person = { daysAsked: 4, bodyWeightLb: 180, sex: "Male" };
   const logs = longHistory(78);
   const base = buildPlan({ goal, person, logs });
   const long = buildPlan({ goal, person: { ...person, sessionMinutes: 90 }, logs });
 
+  /* The bug this closes: an advanced lifter on a strength goal is already over
+     the session length they asked for, so a surplus-gated ramp gave the person
+     research/13 is describing exactly nothing. */
+  assert.ok(base.week.every((d) => d.rampSets.length),
+    "an advanced strength week ramps every day, with no session length sent at all");
   const ramps = long.week.flatMap((d) => d.rampSets || []);
-  assert.ok(ramps.length, "a 90 minute answer on a hypertrophy goal buys a ramp somewhere");
+  assert.ok(ramps.length, "and a stated clock does not take it away either");
 
   for (const r of ramps) {
     const day = long.week.find((d) => (d.rampSets || []).includes(r));
@@ -2917,8 +2922,82 @@ test("extra time buys ramp-up sets, and they are never working sets", () => {
   assert.equal(base.volumeNotes.timeBought, undefined, "a plan with no stated clock has no ledger of what it spent");
 });
 
+test("what counts as heavy: mains yes, accessories never, bodyweight never", () => {
+  const plan = buildPlan({
+    goal: { bubble: "get-stronger" },
+    person: { daysAsked: 4, bodyWeightLb: 180, sex: "Male" },
+    logs: longHistory(78),
+  });
+  for (const d of plan.week) {
+    const ramped = new Set((d.rampSets || []).map((r) => r.exercise));
+    /* research/13: "none for accessories and isolation". The first two slots of
+       a day are its mains, so anything past them must never carry a ramp. */
+    for (const e of d.exercises.slice(2)) {
+      assert.ok(!ramped.has(e.name), `${e.name} is an accessory and must not be ramped`);
+    }
+    for (const r of d.rampSets || []) {
+      const lift = d.exercises.find((e) => e.name === r.exercise);
+      assert.ok(lift.weight > 0, `${r.exercise} has no load to ramp and must not have one`);
+    }
+  }
+  /* A bodyweight-only week has nothing loaded to ramp, and says nothing rather
+     than inventing a regression ladder the library does not carry. */
+  const bw = buildPlan({
+    goal: { bubble: "get-stronger" },
+    person: { daysAsked: 3, bodyWeightLb: 180, sex: "Male" },
+    limits: { missing: ["none"] },
+  });
+  for (const d of bw.week) {
+    for (const r of d.rampSets || []) {
+      const lift = d.exercises.find((e) => e.name === r.exercise);
+      assert.ok(lift && lift.weight > 0, `${r.exercise} was ramped with no weight on it`);
+    }
+  }
+});
+
+test("a ramp is inside the session estimate, never bolted on after it", () => {
+  const plan = buildPlan({
+    goal: { bubble: "get-stronger" },
+    person: { daysAsked: 4, bodyWeightLb: 180, sex: "Male" },
+    logs: longHistory(78),
+  });
+  for (const d of plan.week) {
+    /* The bug the WARMUP_MIN comment was written about: minutes the person
+       spends that the number on the screen does not know about. A ramped day
+       reserves the shorter general block plus the ramp, and the sum is what the
+       estimate carries. */
+    const rampSec = d.rampSets.reduce((t, r) => t + r.seconds, 0);
+    const expected = rampSec
+      ? Math.round((RAMPED_WARMUP_SECONDS + rampSec) / 60)
+      : Math.round(WARMUP_SECONDS / 60);
+    assert.equal(d.prepMinutes, expected, `${d.name} reserves what it spends`);
+    const work = d.exercises.reduce((t, e) => t + e.sets * (30 + e.restSec), 0);
+    assert.equal(d.estimatedMinutes, Math.round(d.prepMinutes + work / 60),
+      `${d.name}: the estimate is the prep plus the work and nothing else`);
+    /* totalMinutes adds the cool-down and must not add the ramp twice. */
+    assert.equal(d.totalMinutes, d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60),
+      `${d.name}: the ramp is counted once`);
+  }
+});
+
+test("a ramped day gets the shorter general warm-up, and only a ramped day", () => {
+  const plan = buildPlan({
+    goal: { bubble: "get-stronger" },
+    person: { daysAsked: 4, bodyWeightLb: 180, sex: "Male" },
+    logs: longHistory(78),
+  });
+  for (const d of plan.week) {
+    if (!d.rampSets.length) continue;
+    /* Four minutes of general work plus about four of ramp is more preparation
+       than the six it replaces, and more of it is specific, which is the whole
+       argument. It must never come back longer than the unramped block. */
+    assert.ok(d.mobility.warmupSeconds <= WARMUP_SECONDS,
+      `${d.name} ramps and still got the full block`);
+  }
+});
+
 test("ramp-up sets never reach what calibration counts as prescribed", () => {
-  const goal = { bubble: "build-muscle" };
+  const goal = { bubble: "get-stronger" };
   const person = { daysAsked: 4, bodyWeightLb: 180, sex: "Male" };
   const logs = longHistory(78);
   const long = buildPlan({ goal, person: { ...person, sessionMinutes: 90 }, logs });
@@ -2997,9 +3076,14 @@ test("a stated session length that buys something says what it bought", () => {
     logs: longHistory(78),
   });
   assert.ok(plan.volumeNotes.timeBought.length, "there was something to buy");
-  const say = plan.dayNotes.find((n) => /It bought/.test(n));
+  const say = plan.dayNotes.find((n) => /It bought a ten minute/.test(n));
   assert.ok(say, "and the plan says what it was");
-  assert.ok(/none of it is logged/.test(say), "and that none of it counts as a set");
+  assert.ok(/it is not logged/.test(say), "and that it does not count as a set");
+  /* The ramp is no longer something spare minutes bought, so the sentence that
+     describes it must not claim otherwise. */
+  const rampSay = plan.dayNotes.find((n) => /ramp-up sets/.test(n));
+  assert.ok(rampSay, "the ramp is explained");
+  assert.ok(!/asked for/.test(rampSay), "and not as something the clock paid for");
   /* The refusal, when it still fires, must no longer recommend the thing the
      research says costs performance. */
   for (const n of plan.dayNotes) assert.ok(!/longer warm-up/.test(n), "no engine advice to warm up for longer");
