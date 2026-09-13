@@ -1417,6 +1417,15 @@
   .sess-card.sess-sets { padding-top: 6px; padding-bottom: 6px; }
   .sess-card.sess-sets .set-circles { border-top: 0; margin-top: 4px; padding-top: 4px; }
   .sess-card.sess-bottom { margin-top: 12px; }
+  /* The set button stays pinned to the bottom of the screen: it sits last in
+     the flow and sticks up from below, so it is always reachable without a
+     scroll and settles into place at the very end. */
+  .sess-cta {
+    position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 6px); z-index: 3;
+    margin: 14px -4px 0; padding: 10px 4px 0;
+    background: linear-gradient(to top, var(--bg) 72%, transparent);
+  }
+  .sess-cta .btn-big { margin: 0; }
   .sess-card.sess-bottom .sess-note { margin-bottom: 8px; }
   .sess-fig.fig-none { display: none; }
   .stretch-fig { display: flex; justify-content: center; margin: 6px 0 4px; }
@@ -12674,6 +12683,32 @@ function askConfirm({ heading, body, ok, cancel = "Keep going" }) {
   });
 }
 
+/* The pause button asks what you meant. Mo did not want an End workout link
+   buried under the fold; pausing and ending are the same tap, then a choice. */
+function askPauseOrEnd() {
+  return new Promise((resolve) => {
+    const scrim = document.createElement("div");
+    scrim.className = "pop-scrim";
+    scrim.innerHTML = `
+      <div class="pop">
+        <div class="pop-body">
+          <div class="ds-top">
+            <div class="pop-who" style="color:var(--muted)">HOLD ON</div>
+            <button type="button" class="ds-x" data-choice="" aria-label="Close">&times;</button>
+          </div>
+          <button type="button" class="btn-primary" data-choice="pause" style="margin-top:8px;">Pause workout</button>
+          <button type="button" class="btn-ghost" data-choice="end" style="color:var(--danger, #ff5c5c);">End workout here</button>
+          <button type="button" class="btn-ghost" data-choice="">Keep going</button>
+        </div>
+      </div>`;
+    document.body.appendChild(scrim);
+    scrim.querySelectorAll("[data-choice]").forEach((b) => {
+      b.onclick = () => { scrim.remove(); resolve(b.dataset.choice || null); };
+    });
+    scrim.onclick = (e) => { if (e.target === scrim) { scrim.remove(); resolve(null); } };
+  });
+}
+
 /* Abandons an in-progress workout without banking the day. The sets already
    ticked are written first, including the ones on the exercise you are
    standing on, so "I am not counting this workout" never means losing the
@@ -13679,7 +13714,10 @@ function renderSession() {
       ${ex.note ? `<div class="sess-note">${escapeHtml(ex.note)}</div>` : ""}
       ${workingMusclesHTML(ex.name, { who: "me", size: "sm", email: MY_EMAIL })}
     </div>
-    <button type="button" class="link-danger" id="endWorkoutBtn">End workout here</button>`;
+    <div class="sess-cta">
+      <button type="button" class="btn-big btn-primary ${allDone ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>
+      <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">${SESSION.completed.some((c, i) => !c && i !== ei) ? "Next exercise" : "Finish workout"}</button>
+    </div>`;
 
   mountMotionFigures($("sessionBody"));
   if (resting) startRestTicker();
@@ -13750,7 +13788,7 @@ function renderSession() {
   $("sessWeightVal").onblur = (e) => { e.target.value = SESSION.weights[ei] || 0; };
   $("sessRepsVal").onblur = (e) => { e.target.value = SESSION.reps[ei] || 0; };
   $("nextExBtn").onclick = finishExerciseAndAdvance;
-  $("endWorkoutBtn").onclick = endWorkoutNow;
+  // Ending lives behind the pause button now (askPauseOrEnd).
 }
 
 let MARKING_DAY = false;
@@ -14078,7 +14116,13 @@ function openSessionUI() {
   $("sessionCard").classList.remove("finished");
   $("sessionCard").classList.remove("stretching");   // never leak a block's colour into the next workout
   $("sessionPauseBtn").innerHTML = icon("pause", 18);
-  $("sessionPauseBtn").onclick = togglePause;
+  $("sessionPauseBtn").onclick = async () => {
+    if (!SESSION || SESSION.finished) return;
+    if (SESSION.pausedAt) { togglePause(); return; }   // the play icon just resumes
+    const choice = await askPauseOrEnd();
+    if (choice === "pause") togglePause();
+    else if (choice === "end") endWorkoutNow();
+  };
   $("sessionMinBtn").innerHTML = icon("chevronDown", 20);
   $("sessionMinBtn").onclick = minimiseSession;
   startSessionTimer();
