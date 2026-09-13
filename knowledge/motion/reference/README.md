@@ -1,20 +1,14 @@
 # Figure reference
 
-Two turnaround sheets Mo generated on 2026-09-12 and approved as the look
-the drawn figure should match. figure-turnaround.png is the plain body
-(front, side, back); figure-muscles.png is the same body with the muscle
-groups as flat panels, resting on top and with chest and quads lit below.
+figure-final.png is THE reference (approved by Mo 2026-09-12, "this is
+great, replicate this as much as possible"). Both bodies, front, side, back
+and three-quarter: flat white body, a clean dark outline, thin dark seam
+lines only at the neck, chest line, waist, elbows, wrists, knees and ankles,
+a soft grey shade on the far side, simple rounded mitt hands, simple rounded
+feet, faceless heads with a dark hair cap (short hair on him, a small bun on
+her), feet side by side pointing forward in the front and back views.
 
-What to copy: proportions, the silhouette, flat light warm grey with a soft
-darker shade on the far side and no heavy outline, thin seams only where
-the sheet has them (neck, pec line, waist, hip crease, knee, wrist), the
-darker hair cap, five-fingered hands, feet with toes, and the muscle panel
-shapes and their light seams.
-
-figure-female.png (added 2026-09-12, approved by Mo): the female version of
-the same character, front, side, back, resting on top and with chest and
-quads lit below. Same style rules. What to copy: narrower shoulders over
-wider hips, a defined waist, the chest line on the side view, slimmer arms,
-the hair bun, and the same mitt hands and plain feet as the male figure.
-The muscle panels and the orange highlight are reference only; the product
-shows neither.
+The earlier sheets (figure-turnaround.png, figure-muscles.png,
+figure-female.png) were the grey-style attempt; keep them only for the
+muscle panel shapes and proportions. The product shows no muscle panels and
+no highlights.
