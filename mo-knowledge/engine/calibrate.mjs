@@ -22,17 +22,72 @@
  * research/07 rates that table "medium confidence: coaching judgement, tune it
  * against real data before it drives anything automatically". So the numbers
  * here are small on purpose. The largest thing this file can do to a load is
- * move it five percent.
+ * move it one step, 2.5 to 10 lb depending on the lift, and never more than a
+ * tenth of what is already on the bar.
  */
 import { patternFor } from "./load.mjs";
 
-/* How far a load moves when the evidence says it should. Deliberately timid,
-   and asymmetric: a compound climbs faster than an isolation lift because five
-   percent of a curl is a number no gym owns, and research/05's rule holds here
-   too, wrong low costs one easy set and wrong high costs the session. */
-export const PUSH_COMPOUND = 1.05;
-export const PUSH_ISOLATION = 1.025;
-export const BACK_OFF = 0.95;
+/* How far a load moves when the evidence says it should.
+ *
+ * This used to be a percentage: 1.05 on a compound, 1.025 on an isolation lift.
+ * The percentage was the wrong shape, not the wrong number, and it is worth
+ * saying why before somebody is tempted to tune 1.025 up to 1.05 and call it
+ * fixed. `roundLoad` snaps to a 2.5 lb grid under 40 lb and a 5 lb grid above
+ * it, because that is what a rack actually holds. A multiplier produces a step
+ * proportional to the weight, so at small weights the step lands inside the grid
+ * and rounds straight back to where it started. 2.5 percent of a 25 lb curl is
+ * 0.625 lb, which is no lb. Eight weeks of hitting every rep left that curl at
+ * 25 while the bench went 70 to 100. PUSH_COMPOUND had the same disease in the
+ * range beginners actually live in: 5 percent of anything under 50 lb is under
+ * 2.5, so a 45 lb goblet squat never moved either. Raising the percentage only
+ * moves the weight at which it starts failing; it cannot fix a mechanism whose
+ * step shrinks exactly where the grid is coarsest relative to the load.
+ *
+ * knowledge/principles/progressive-overload.md prescribes the right shape
+ * directly: "If they hit their planned reps last time: add load. Typical jump is
+ * 2.5-10lb depending on the lift (small joints/isolation moves get smaller jumps
+ * than squat/deadlift/bench)." An absolute step in pounds. So that is what this
+ * file computes now, and the factor it hands back is only the transport, because
+ * load.mjs multiplies.
+ *
+ * The pattern comes from load.mjs, which already classifies every exercise by
+ * name. No new input.
+ */
+export const STEP_ISOLATION = 2.5;   // curls, raises, pushdowns, calves, core
+export const STEP_COMPOUND = 5;      // bench, press, row, pull, lunge, carry
+export const STEP_HEAVY = 10;        // squat and hinge, the two the note names
+
+const STEP_BY_PATTERN = {
+  isolation: STEP_ISOLATION,
+  core: STEP_ISOLATION,
+  squat: STEP_HEAVY,
+  hinge: STEP_HEAVY,
+};
+
+/* A ceiling, not the mechanism. research/05's rule still holds, wrong low costs
+   one easy set and wrong high costs the session, and 10 lb onto a 45 lb goblet
+   squat is a fifth of the lift. So the absolute step decides the move and a
+   percentage only ever trims it, never sets it, and never below one grid space,
+   because trimming under the grid is how the no-op got here in the first
+   place. */
+const STEP_CEILING_PCT = 0.10;
+
+/* load.mjs's `roundLoad` grid, mirrored rather than imported because it is not
+   exported as a number. Anything smaller than one grid space is not a step, it
+   is the no-op this file exists to remove, so the grid is the floor in both
+   directions: a 2.5 lb move on a 45 lb pushdown rounds straight back to 45 going
+   up and to 45 going down, and the person sees nothing happen either way. That
+   is why a 45 lb curl moves 5 lb and a 25 lb curl moves 2.5. If roundLoad ever
+   learns about a real plate inventory, this follows it. */
+const gridAt = (lb) => (lb < 40 ? 2.5 : 5);
+
+export function stepFor(name, currentLb) {
+  const step = STEP_BY_PATTERN[patternFor({ name })] ?? STEP_COMPOUND;
+  if (!(currentLb > 0)) return step;
+  const grid = gridAt(currentLb);
+  const capped = Math.min(step, currentLb * STEP_CEILING_PCT);
+  return Math.max(grid, Math.round(capped / grid) * grid);
+}
 
 /* Three sessions is the window. Two is enough to see a pattern and four starts
    describing a person they no longer are. */
@@ -113,10 +168,24 @@ const isStruggle = (r) =>
     || repsShort(r.planned, r.actual) >= 3
   );
 
-const isIsolation = (name) => {
-  const p = patternFor({ name });
-  return p === "isolation" || p === "core";
+/* What the person is actually lifting on this movement right now, which is what
+   an absolute step has to be measured against. The heaviest logged weight in the
+   window rather than the most recent, because that is the row load.mjs's
+   `fromHistory` will pick as the base, and a step measured against a different
+   base than it is applied to is a step of the wrong size. Falls back to what was
+   prescribed, and comes back 0 for bodyweight work, which has no load to add. */
+const currentLoad = (rows) => {
+  let w = 0;
+  for (const r of rows) {
+    w = Math.max(w, Number(r.actual?.weight) || 0, Number(r.planned?.targetWeight) || 0);
+  }
+  return w;
 };
+
+/* Pounds turned into the factor load.mjs multiplies by. A move of zero pounds,
+   which is every bodyweight movement, comes back as 1 rather than as a division
+   by zero, so a push-up is left alone on purpose and not by accident. */
+const factorFor = (current, stepLb) => (current > 0 ? (current + stepLb) / current : 1);
 
 /**
  * One exercise's joined rows in, a verdict and a load factor out.
@@ -131,7 +200,7 @@ export function calibrateExercise(rows = []) {
   const base = { name, sessions: recent.length };
 
   if (recent.length < 2) {
-    return { ...base, verdict: "unknown", nextLoadFactor: 1, why: "Not enough finished sessions with this movement yet to say anything honest about the weight." };
+    return { ...base, verdict: "unknown", nextLoadStep: 0, nextLoadFactor: 1, why: "Not enough finished sessions with this movement yet to say anything honest about the weight." };
   }
 
   /* Checked before anything numeric, because a skipped exercise produces no
@@ -142,6 +211,7 @@ export function calibrateExercise(rows = []) {
     return {
       ...base,
       verdict: "skipped",
+      nextLoadStep: 0,
       nextLoadFactor: 1,
       swapSuggested: true,
       why: "This was in the last two sessions you finished and it never got logged, so it is either sore or it is not for you. The swap is there.",
@@ -150,26 +220,37 @@ export function calibrateExercise(rows = []) {
 
   const done = recent.filter((r) => r.actual);
   if (done.length < 2) {
-    return { ...base, verdict: "unknown", nextLoadFactor: 1, why: "Only one logged set of numbers so far, so the weight stays where it is until there are two." };
+    return { ...base, verdict: "unknown", nextLoadStep: 0, nextLoadFactor: 1, why: "Only one logged set of numbers so far, so the weight stays where it is until there are two." };
   }
+
+  const current = currentLoad(done);
+  const step = current > 0 ? stepFor(name, current) : 0;
 
   const pair = done.slice(0, 2);
   if (pair.every(isEasy)) {
-    const isolation = isIsolation(name);
     return {
       ...base,
       verdict: "too-easy",
-      nextLoadFactor: isolation ? PUSH_ISOLATION : PUSH_COMPOUND,
+      nextLoadStep: step,
+      nextLoadFactor: factorFor(current, step),
       why: "You hit every set, every rep and the target weight twice in a row, so that weight is no longer the hard part.",
     };
   }
 
   const last = done[0];
   if (isStruggle(last)) {
+    /* Down by the same step it would have gone up by. A percentage failed in
+       this direction too: 0.95 of a 25 lb curl is 23.75, which rounds back to
+       25, so the back-off a struggling person was promised never happened. */
+    /* Never far enough down to reach zero or below: the lightest thing the grid
+       can express is one 2.5 lb step, and a prescription of nothing is not a
+       back-off, it is a missing exercise. */
+    const down = Math.min(step, Math.max(0, current - gridAt(current)));
     return {
       ...base,
       verdict: "too-heavy",
-      nextLoadFactor: BACK_OFF,
+      nextLoadStep: -down,
+      nextLoadFactor: factorFor(current, -down),
       why: "Last time the sets or the reps came up short of the plan, so the weight comes down slightly rather than you failing it again.",
     };
   }
@@ -177,6 +258,7 @@ export function calibrateExercise(rows = []) {
   return {
     ...base,
     verdict: "on-track",
+    nextLoadStep: 0,
     nextLoadFactor: 1,
     why: "You are finishing the sets and landing a rep or two under target, which is exactly where the weight should be.",
   };

@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 import { deriveTrainingAge, observedCapacity, THRESHOLDS, detectPlateau } from "./training-age.mjs";
-import { resolveGoal, GOAL_PARAMS, MAX_SECONDARY_GOALS } from "./goal-engine.mjs";
+import { resolveGoal, GOAL_PARAMS, MAX_SECONDARY_GOALS, MOVEMENT_CLASSES, barredMovements, movementCautionNotes } from "./goal-engine.mjs";
 import { coldStart1RM, prescribeLoad, patternFor, variantFactor, roundLoad } from "./load.mjs";
 import { buildPlan } from "./plan.mjs";
 import { conjunctiveWeek, chooseComparison, sharedSchedule, relativeScore, PRODUCTIVE_GAP } from "./pair.mjs";
@@ -31,7 +31,7 @@ import { learnPreferences, applyPreferences, avoidNote, SOFT_AT, HARD_AT } from 
 import { planPlateauResponse, applyRotateFallback, PLATEAU_RESPONSE } from "./plateau-response.mjs";
 import { BODY_AREAS, EQUIPMENT_OPTIONS, normalizeLimits, applyLimits, limitsSummary, softenedNote } from "./limits.mjs";
 import { JOINTS, JOINT_LOAD, defaultJointLoad } from "./joint-load.mjs";
-import { joinPlanToActual, calibrateExercise, calibrate, PUSH_COMPOUND, PUSH_ISOLATION, BACK_OFF } from "./calibrate.mjs";
+import { joinPlanToActual, calibrateExercise, calibrate, stepFor, STEP_ISOLATION, STEP_COMPOUND, STEP_HEAVY } from "./calibrate.mjs";
 import { mapGoal, generateFromPayload, toWorkout, focusDayIndex, nextDayIndex } from "./adapter.mjs";
 import { buildMuscleIndex, muscleRecoveryStates, mainGroupsForDay, dayIsFresh, skipFreshDays, FRESH_HOURS, RECOVERY_HOURS, MIN_CREDIT_SETS } from "./recovery.mjs";
 
@@ -251,6 +251,160 @@ test("patternFor sorts exercises into the right movement pattern", () => {
   assert.equal(patternFor("Pull-Up"), "verticalPull");
   assert.equal(patternFor("Barbell Row"), "horizontalPull");
   assert.equal(patternFor("Plank"), "core");
+});
+
+/* Every exercise in the library, pinned.
+ *
+ * NAME_PATTERN is an ordered list where the first regex to match wins, so the
+ * only thing keeping a specific movement away from the broad line whose word it
+ * contains is where it sits in that list. Nobody had written that down, and the
+ * audit of 2026-09-12 found nineteen exercises filed wrong because of it: "squat"
+ * ate Split Squat so a lunge slot had one beginner option, "extension" ate Back
+ * Extension, "pull through" sat in the isolation line so the one hinge a beginner
+ * can do was not a hinge, "push up" ate Handstand Push-Up, and every incline and
+ * decline press matched nothing and fell through to the isolation default, which
+ * prices a movement at a fifth of a bench.
+ *
+ * Spot checks would not have caught any of that, because each one looks fine on
+ * its own and only the pattern it lost to is wrong. So this walks the whole
+ * library against a table written out by hand. It is deliberately tedious: a
+ * reorder that re-prices somebody's incline press has to fail here rather than
+ * ship, and a new library row has to be classified on purpose rather than
+ * inherit the default in silence. */
+const EXPECTED_PATTERN = {
+  horizontalPush: [
+    "Archer Push-Up", "Barbell Bench Press", "Bench Dip", "Close-Grip Bench Press",
+    "Decline Barbell Press", "Decline Dumbbell Press", "Diamond Push-Up", "Dip",
+    "Dumbbell Bench Press", "Incline Barbell Press", "Incline Dumbbell Press",
+    "Incline Push-Up", "Landmine Press", "Machine Chest Press", "One-Arm Push-Up",
+    "Pseudo Planche Push-Up", "Push-Up", "Wall Push-Up", "Weighted Dip",
+  ],
+  verticalPush: [
+    "Arnold Press", "Cuban Press", "Dumbbell Shoulder Press", "Freestanding Handstand",
+    "Handstand Push-Up", "Machine Shoulder Press", "Overhead Press", "Push Press",
+    "Seated Dumbbell Press", "Wall Handstand Hold",
+  ],
+  horizontalPull: [
+    "Barbell Row", "Chest-Supported Row", "Dumbbell Row", "Inverted Row", "Pendlay Row",
+    "Seated Cable Row", "T-Bar Row", "Upright Row",
+  ],
+  verticalPull: [
+    "Archer Pull-Up", "Chin-Up", "Close-Grip Pulldown", "Lat Pulldown", "Muscle-Up",
+    "Negative Pull-Up", "One-Arm Pull-Up", "Pull-Up", "Weighted Pull-Up",
+  ],
+  squat: [
+    "Barbell Back Squat", "Bodyweight Squat", "Front Squat", "Goblet Squat", "Hack Squat",
+    "Leg Press", "Pistol Squat", "Shrimp Squat", "Sissy Squat", "Zercher Squat",
+  ],
+  hinge: [
+    "Back Extension", "Cable Pull-Through", "Deadlift", "Glute Bridge", "Good Morning",
+    "Hip Thrust", "Romanian Deadlift", "Single-Leg Romanian Deadlift", "Stiff-Leg Deadlift",
+    "Sumo Deadlift",
+  ],
+  lunge: [
+    "Bulgarian Split Squat", "Curtsy Lunge", "Split Squat", "Step-Up", "Walking Lunge",
+  ],
+  carry: [
+    "Farmer's Carry", "Suitcase Carry",
+  ],
+  core: [
+    "Ab Wheel Rollout", "Bird Dog", "Cable Crunch", "Crunch", "Hanging Leg Raise",
+    "Hanging Windshield Wiper", "Hollow Body Hold", "Human Flag", "L-Sit", "Pallof Press",
+    "Plank", "Reverse Crunch", "Russian Twist", "Side Bend", "Side Plank", "Sit-Up", "Superman",
+    "Toes-to-Bar", "Tuck L-Sit", "V-Sit", "V-Up", "Woodchopper",
+  ],
+  isolation: [
+    "Barbell Curl", "Barbell Shrug", "Behind-the-Back Shrug", "Cable Curl", "Cable Fly",
+    "Cable Kickback", "Cable Lateral Raise", "Concentration Curl", "Dead Hang",
+    "Donkey Calf Raise", "Dumbbell Calf Raise", "Dumbbell Curl", "Dumbbell Shrug",
+    "EZ-Bar Curl", "Face Pull", "Frog Pump", "Front Lever", "Front Raise", "Full Planche",
+    "Glute-Ham Raise", "Hammer Curl", "Incline Dumbbell Curl", "Lateral Raise", "Leg Curl",
+    "Leg Extension", "Leg Press Calf Raise", "Low-to-High Cable Fly", "Nordic Curl",
+    "Overhead Triceps Extension", "Pec Deck", "Planche Lean", "Plate Pinch", "Preacher Curl",
+    "Rear Delt Fly", "Reverse Curl", "Reverse Hyperextension", "Reverse Pec Deck",
+    "Reverse Wrist Curl", "Rope Pushdown", "Seated Calf Raise", "Single-Leg Calf Raise",
+    "Skull Crusher", "Snatch-Grip High Pull", "Spider Curl", "Standing Calf Raise",
+    "Straight-Arm Pulldown", "Triceps Kickback", "Triceps Pushdown", "Tuck Front Lever",
+    "Tuck Planche", "Wrist Curl",
+  ],
+};
+
+const EXPECTED_BY_NAME = new Map(
+  Object.entries(EXPECTED_PATTERN).flatMap(([pattern, names]) => names.map((n) => [n, pattern])),
+);
+
+test("patternFor classifies every exercise in the library as the table says", () => {
+  const wrong = [];
+  for (const ex of LIBRARY_POOL) {
+    const want = EXPECTED_BY_NAME.get(ex.name);
+    if (want === undefined) continue;          // the coverage test below owns this case
+    const got = patternFor(ex);
+    if (got !== want) wrong.push(`${ex.name}: expected ${want}, got ${got}`);
+  }
+  assert.deepEqual(wrong, [], `\n  ${[...new Set(wrong)].join("\n  ")}\n`);
+});
+
+test("the expected-pattern table and the library cover each other exactly", () => {
+  const inLibrary = new Set(LIBRARY_POOL.map((e) => e.name));
+  const missing = [...inLibrary].filter((n) => !EXPECTED_BY_NAME.has(n));
+  const stale = [...EXPECTED_BY_NAME.keys()].filter((n) => !inLibrary.has(n));
+  assert.deepEqual(missing, [], `library exercises with no expected pattern: ${missing.join(", ")}`);
+  assert.deepEqual(stale, [], `expected patterns for exercises no longer in the library: ${stale.join(", ")}`);
+});
+
+/* The order itself, stated as the rule rather than as nineteen outcomes, so the
+   next person reading a failure knows which line moved and what it broke. Each
+   pair is a name that contains another line's word: the specific one has to win.
+   Bare strings, not library rows, because calibrate.mjs and fromHistory classify
+   a logged name with no muscle groups attached and must get the same answer. */
+test("NAME_PATTERN keeps the specific line ahead of the broad one whose word it contains", () => {
+  assert.equal(patternFor("Split Squat"), "lunge");                  // not "squat"
+  assert.equal(patternFor("Bulgarian Split Squat"), "lunge");
+  assert.equal(patternFor("Leg Press"), "squat");                    // still a squat, though
+  assert.equal(patternFor("Leg Press Calf Raise"), "isolation");     // not "leg press"
+  assert.equal(patternFor("Cable Pull-Through"), "hinge");           // not a pull, not isolation
+  assert.equal(patternFor("Back Extension"), "hinge");               // not "extension"
+  assert.equal(patternFor("Reverse Hyperextension"), "isolation");   // but this one really is
+  assert.equal(patternFor("Handstand Push-Up"), "verticalPush");     // not "push up"
+  assert.equal(patternFor("Push Press"), "verticalPush");            // not "press"
+  assert.equal(patternFor("Overhead Triceps Extension"), "isolation"); // not "overhead"
+  assert.equal(patternFor("Overhead Press"), "verticalPush");        // this one is
+  assert.equal(patternFor("Pallof Press"), "core");                  // a press only in name
+  assert.equal(patternFor("Hanging Leg Raise"), "core");             // not "raise"
+  assert.equal(patternFor("Lateral Raise"), "isolation");            // this one is
+  assert.equal(patternFor("Straight-Arm Pulldown"), "isolation");    // one joint, not a pulldown
+  assert.equal(patternFor("Muscle-Up"), "verticalPull");
+});
+
+/* The bug this reorder is paid for. An incline press is a bench press with the
+   bench tilted, and it was priced as a curl: 0.20 of bench rather than 1.00,
+   which told a 180 lb beginner to incline press about a fifth of what he should.
+   Asserted as a relationship to the flat press rather than as a number, since
+   the reference standards move and the relationship is the claim. */
+test("an incline press is priced against the bench, not against a curl", () => {
+  const person = { reps: 8, bodyWeightLb: 180, sex: "Male", level: "beginner", logs: [] };
+  const flat = prescribeLoad({ exercise: { name: "Dumbbell Bench Press", equipment: "dumbbell" }, ...person });
+  const incline = prescribeLoad({ exercise: { name: "Incline Dumbbell Press", equipment: "dumbbell" }, ...person });
+  const curl = prescribeLoad({ exercise: { name: "Dumbbell Curl", equipment: "dumbbell" }, ...person });
+  assert.ok(incline.weight > curl.weight * 2, `incline ${incline.weight} vs curl ${curl.weight}`);
+  assert.ok(incline.weight >= flat.weight * 0.7, `incline ${incline.weight} vs flat ${flat.weight}`);
+  assert.ok(incline.weight <= flat.weight, `incline ${incline.weight} should not exceed flat ${flat.weight}`);
+});
+
+/* The README listed "no hinge a beginner can be given" as a known limit of the
+   library. It was never true; the one beginner hinge was filed as isolation. */
+test("the library has a beginner hinge, and it is loadable", () => {
+  const hinges = LIBRARY_POOL.filter((e) => patternFor(e) === "hinge" && e.level === "beginner");
+  assert.ok(hinges.length > 0, "no beginner hinge in the library");
+  assert.ok(hinges.some((e) => e.equipment !== "bodyweight"), `beginner hinges are all bodyweight: ${hinges.map((e) => e.name).join(", ")}`);
+});
+
+/* The lunge slot held exactly one beginner option, so a 4 day split put Step-Up
+   on both leg days. Two is the difference between a repeat and a choice. */
+test("the lunge slot has more than one beginner option", () => {
+  const lunges = LIBRARY_POOL.filter((e) => patternFor(e) === "lunge" && e.level === "beginner");
+  const names = new Set(lunges.map((e) => e.name));
+  assert.ok(names.size > 1, `beginner lunges: ${[...names].join(", ")}`);
 });
 
 test("variantFactor discounts a goblet squat, boosts a leg press, and leaves a plain barbell alone", () => {
@@ -935,22 +1089,76 @@ test("joinPlanToActual skips plans with no completed_at", () => {
   assert.equal(rows.length, 0);
 });
 
-test("calibrateExercise verdicts too-easy at the compound and isolation factors", () => {
-  const compoundRows = [day(-1), day(-4)].map((d) => ({
-    entry_date: d, exercise: "Bench Press",
-    planned: { sets: 3, reps: 8, targetWeight: 135 }, actual: { sets: 3, reps: 8, weight: 135 },
-  }));
-  const compound = calibrateExercise(compoundRows);
-  assert.equal(compound.verdict, "too-easy");
-  assert.equal(compound.nextLoadFactor, PUSH_COMPOUND);
+/* Asserted in pounds, never as a factor. The bug this replaces was a 1.025
+   multiplier that a factor assertion passed happily while no curl in the product
+   ever got heavier, so these check the weight a person is handed. */
+const easyRows = (name, weight, reps = 10) => [day(-1), day(-4)].map((d) => ({
+  entry_date: d, exercise: name,
+  planned: { sets: 3, reps, targetWeight: weight }, actual: { sets: 3, reps, weight },
+}));
 
-  const isolationRows = [day(-1), day(-4)].map((d) => ({
-    entry_date: d, exercise: "Lateral Raise",
-    planned: { sets: 3, reps: 12, targetWeight: 20 }, actual: { sets: 3, reps: 12, weight: 20 },
+/* What the person actually sees next session: the calibrated factor applied to
+   the weight they are on and snapped to the rack, which is the whole round trip
+   through load.mjs that the old percentage silently lost. */
+const nextWeight = (rows, weight) => {
+  const c = calibrateExercise(rows);
+  return { verdict: c.verdict, weight: roundLoad(weight * c.nextLoadFactor) };
+};
+
+test("calibrateExercise moves an isolation lift by the step the research names, not by a percentage", () => {
+  /* knowledge/principles/progressive-overload.md: "Typical jump is 2.5-10lb
+     depending on the lift (small joints/isolation moves get smaller jumps than
+     squat/deadlift/bench)." A 20 lb curl goes to 22.5, and the point is that it
+     goes anywhere at all: under the old 1.025 it stayed at 20 forever. */
+  for (const [name, from, to] of [
+    ["Barbell Curl", 15, 17.5],
+    ["Barbell Curl", 20, 22.5],
+    ["Barbell Curl", 25, 27.5],
+    ["Lateral Raise", 15, 17.5],
+    ["Tricep Pushdown", 30, 32.5],
+  ]) {
+    const r = nextWeight(easyRows(name, from), from);
+    assert.equal(r.verdict, "too-easy");
+    assert.equal(r.weight, to, `${name} at ${from} should go to ${to}, got ${r.weight}`);
+    assert.equal(r.weight - from, STEP_ISOLATION);
+  }
+
+  /* Above 40 lb the rack itself is on a 5 lb grid, so a 2.5 lb step would round
+     back to where it started. The step follows the grid rather than vanishing
+     into it, and 5 lb is still inside the range the research allows. */
+  const heavy = nextWeight(easyRows("Cable Curl", 45), 45);
+  assert.equal(heavy.weight, 50);
+});
+
+test("calibrateExercise moves a compound by its own larger step", () => {
+  const bench = nextWeight(easyRows("Bench Press", 135, 8), 135);
+  assert.equal(bench.verdict, "too-easy");
+  assert.equal(bench.weight - 135, STEP_COMPOUND);
+
+  const dl = nextWeight(easyRows("Deadlift", 225, 5), 225);
+  assert.equal(dl.weight - 225, STEP_HEAVY);
+
+  /* A small joint and a deadlift must not advance by the same number. */
+  assert.ok(STEP_ISOLATION < STEP_COMPOUND && STEP_COMPOUND < STEP_HEAVY);
+});
+
+test("stepFor never hands a beginner a step that is a fifth of the lift", () => {
+  /* 10 lb onto a 45 lb goblet squat is not progressive overload, it is a jump.
+     The absolute step is the mechanism and the percentage is only a ceiling. */
+  assert.equal(stepFor("Goblet Squat", 45), 5);
+  assert.equal(stepFor("Back Squat", 225), STEP_HEAVY);
+});
+
+test("calibrateExercise leaves bodyweight work alone rather than adding 2.5 lb to nothing", () => {
+  const rows = [day(-1), day(-4)].map((d) => ({
+    entry_date: d, exercise: "Push-Up",
+    planned: { sets: 3, reps: 12, targetWeight: 0 }, actual: { sets: 3, reps: 12, weight: 0 },
   }));
-  const isolation = calibrateExercise(isolationRows);
-  assert.equal(isolation.verdict, "too-easy");
-  assert.equal(isolation.nextLoadFactor, PUSH_ISOLATION);
+  const r = calibrateExercise(rows);
+  assert.equal(r.verdict, "too-easy");
+  assert.equal(r.nextLoadStep, 0);
+  assert.equal(r.nextLoadFactor, 1);
+  assert.equal(roundLoad(0 * r.nextLoadFactor), 0);
 });
 
 test("calibrateExercise verdicts too-heavy at the back-off factor", () => {
@@ -960,7 +1168,17 @@ test("calibrateExercise verdicts too-heavy at the back-off factor", () => {
   ];
   const r = calibrateExercise(rows);
   assert.equal(r.verdict, "too-heavy");
-  assert.equal(r.nextLoadFactor, BACK_OFF);
+  assert.equal(roundLoad(225 * r.nextLoadFactor), 215);
+
+  /* The back-off had the same disease as the push: 0.95 of a 25 lb curl is
+     23.75, which rounds straight back to 25, so nothing came off the bar. */
+  const curl = [
+    { entry_date: day(-1), exercise: "Barbell Curl", planned: { sets: 3, reps: 10, targetWeight: 25 }, actual: { sets: 1, reps: 10, weight: 25 } },
+    { entry_date: day(-4), exercise: "Barbell Curl", planned: { sets: 3, reps: 10, targetWeight: 25 }, actual: { sets: 3, reps: 10, weight: 25 } },
+  ];
+  const c = calibrateExercise(curl);
+  assert.equal(c.verdict, "too-heavy");
+  assert.equal(roundLoad(25 * c.nextLoadFactor), 22.5);
 });
 
 test("calibrateExercise verdicts skipped with a swap suggested after two null sessions", () => {
@@ -2010,4 +2228,128 @@ test("the MRV ceiling never takes back the set a focus tier guarantees", () => {
     const after = withFocus.plan.weeklyVolume[g]?.sets ?? 0;
     assert.ok(after >= before, `${g}: ${before} sets without the focus, ${after} with, and 18 is its MRV`);
   }
+});
+
+/* ------------------------------------------------------------------ *
+ * A goal never prescribes what its own note warns against
+ * ------------------------------------------------------------------ */
+
+/* The four movements the goal-tree audit of 2026-09-12 found on the two goals
+   whose notes point the other way. "pain" writes down bird dog and dead bug and
+   was handed Crunch and Sit-Up; "back-postpartum" writes down pelvic floor
+   first and was handed Russian Twist and Side Bend. Both because they prioritise
+   abs and obliques and the library fills those slots with whatever ranks first. */
+const CONTRADICTED = ["crunch", "sit-up", "russian twist", "side bend"];
+const CAUTIONED_GOALS = [
+  { bubble: "feel-better", child: "pain" },
+  { bubble: "get-back", child: "back-postpartum" },
+];
+
+test("a goal that points away from loaded flexion and rotation never prescribes them", () => {
+  const limitCases = [
+    ["no limits", null],
+    /* The case the fix has to survive, because it is the one with the fewest
+       movements left: no cable, so no Pallof Press, and nothing to load. */
+    ["bodyweight only", { missing: ["none"] }],
+    ["no barbell", { missing: ["barbell"] }],
+    ["no dumbbells or machines", { missing: ["dumbbell", "machine"] }],
+    ["lower back hurts", { hurts: ["lowerback"] }],
+    ["shoulder and wrist hurt", { hurts: ["shoulder", "wrist"] }],
+  ];
+  for (const goal of CAUTIONED_GOALS) {
+    for (const days of [2, 3, 4, 5, 6]) {
+      for (const [label, limits] of limitCases) {
+        for (const logs of [[], longHistory(78)]) {
+          const plan = buildPlan({
+            goal, logs, limits,
+            person: { daysAsked: days, bodyWeightLb: 160, sex: "Female" },
+          });
+          for (const d of plan.week) {
+            for (const e of d.exercises) {
+              assert.ok(!CONTRADICTED.includes(e.name.toLowerCase()),
+                `${goal.child} ${days}d ${label}: ${e.name} on ${d.name}`);
+              /* The swap offered is the same prescription one tap away, so it
+                 has to obey the same bar. */
+              assert.ok(!CONTRADICTED.includes(String(e.swap || "").toLowerCase()),
+                `${goal.child} ${days}d ${label}: ${e.name} swaps to ${e.swap}`);
+            }
+          }
+        }
+      }
+    }
+  }
+});
+
+test("the two cautioned goals say what they leave out and whose call it is", () => {
+  for (const goal of CAUTIONED_GOALS) {
+    const plan = buildPlan({ goal, person: { daysAsked: 3, bodyWeightLb: 160 } });
+    const notes = plan.dayNotes.join(" ");
+    assert.ok(/holds position/.test(notes), `${goal.child} says what the core work does instead`);
+    assert.ok(/clinician/.test(notes), `${goal.child} hands the judgement back to a clinician`);
+    /* Non-clinical on purpose. The engine describes movements, never conditions. */
+    assert.ok(!/diastasis|pelvic floor|injury|diagnos/i.test(notes), `${goal.child} makes no clinical claim`);
+  }
+});
+
+test("a slot the bar empties is named rather than filled with the barred movement", () => {
+  /* Cable only at beginner level is the case where it really happens: every abs
+     movement the library offers on a cable is a crunch, and the Pallof Press
+     that would fill the obliques slot is intermediate. The slot goes, and the
+     day says so. */
+  const plan = buildPlan({
+    goal: { bubble: "feel-better", child: "pain" },
+    person: { daysAsked: 3, bodyWeightLb: 160 }, equipment: ["cable"],
+  });
+  const names = plan.week.flatMap((d) => d.exercises.map((e) => e.name.toLowerCase()));
+  assert.ok(!names.includes("cable crunch"), "the barred movement did not come back as the fallback");
+  assert.ok(plan.dayNotes.some((n) => /has no abs exercise in it/.test(n)), "the missing slot is said out loud");
+  assert.ok(plan.dayNotes.some((n) => /Pallof Press/.test(n)), "and what would have filled it");
+});
+
+test("a goal with no movement bar is left exactly as it was", () => {
+  /* The bar is per goal and data driven, so a goal that names no class must not
+     pay for the mechanism existing. Crunches are still a fine answer for abs. */
+  const plan = buildPlan({ goal: { bubble: "tone-lean-abs", child: "abs" }, person: { daysAsked: 3, bodyWeightLb: 160 } });
+  assert.equal(barredMovements(plan.goal.params).size, 0);
+  assert.deepEqual(movementCautionNotes(plan.goal.params), []);
+});
+
+test("the movement bar is a table any goal can name, not two exercises in an if", () => {
+  const params = { avoidMovements: ["loadedRotation"] };
+  const barred = barredMovements(params);
+  for (const n of MOVEMENT_CLASSES.loadedRotation.names) assert.ok(barred.has(n.toLowerCase()));
+  for (const n of MOVEMENT_CLASSES.loadedSpinalFlexion.names) assert.ok(!barred.has(n.toLowerCase()));
+  /* A class nobody has heard of costs its own effect and never the plan, same
+     rule as an unknown secondary goal. */
+  assert.equal(barredMovements({ avoidMovements: ["nonsense"] }).size, 0);
+  assert.deepEqual(movementCautionNotes({ avoidMovements: ["nonsense"] }), []);
+  assert.equal(barredMovements(null).size, 0);
+});
+
+/* ------------------------------------------------------------------ *
+ * strong-again routes to the returning cluster, strong-for-life does not
+ * ------------------------------------------------------------------ */
+
+test("get back to where I was is the returning plan, not the strength plan", () => {
+  /* goal-tree.json's own entry for strong-again says "Route to the
+     get-back-into-it bubble". The table had it as a byte-identical copy of
+     strong-for-life instead, so the goal that should route elsewhere did not. */
+  const again = resolveGoal({ bubble: "get-stronger", child: "strong-again" }).params;
+  const years = resolveGoal({ bubble: "get-back", child: "back-after-years" }).params;
+  assert.deepEqual(again, years, "strong-again is back-after-years");
+  assert.equal(again.emphasis, "hypertrophy");
+  assert.equal(again.setsFactor, 0.6);
+});
+
+test("for everyday life and get back to where I was are two different plans", () => {
+  const life = resolveGoal({ bubble: "get-stronger", child: "strong-for-life" }).params;
+  const again = resolveGoal({ bubble: "get-stronger", child: "strong-again" }).params;
+  assert.notDeepEqual(life, again, "two goals that mean different things must not be one object");
+  assert.equal(life.emphasis, "strength");
+  assert.deepEqual(life.repRange, [5, 8]);
+  /* And the difference reaches the week rather than stopping at the table. */
+  const person = { daysAsked: 5, bodyWeightLb: 180, sex: "Male" };
+  const lifeWeek = buildPlan({ goal: { bubble: "get-stronger", child: "strong-for-life" }, person });
+  const againWeek = buildPlan({ goal: { bubble: "get-stronger", child: "strong-again" }, person });
+  assert.notEqual(lifeWeek.days, againWeek.days, "the returning plan allows a fifth day and the strength one does not");
 });
