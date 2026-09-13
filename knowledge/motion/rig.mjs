@@ -980,7 +980,91 @@ function drawHead(ctx, S, C, fill) {
       ctx.save();
       hull(ctx, C, skull, { clip: true });
       ctx.fillStyle = C.seam;
-      if (FACE === "robot" || FACE === "robotglow" || FACE === "robotvisor") {
+      if (FACE === "buddy") {
+        // The face Mo approved (reference/face-buddy.png): a dark visor with
+        // two lime pill eyes and grille marks, a tiny nose tick, a small
+        // mouth, a lime chin light, an ear disc seen from the side. Moods
+        // change only the eyes and the mouth: neutral, happy, focused,
+        // surprised, sleepy. Everything is a few flat shapes so it survives
+        // card size; the grille and the nose drop out below 200px.
+        const up = norm2(ax.y);
+        const big = (ctx.getTransform ? ctx.getTransform().a : 2) * R > 14;
+        const blink = FACE_TIME > 0 && ((FACE_TIME % 4.3) < 0.11);
+        const eyeLine = add(centre, scl(up, R * 0.12));
+        const vis = add(eyeLine, scl(F, R * 0.66));
+        const halfW = R * 0.8, halfH = R * 0.42;
+        const along = latLen < 0.28 ? scl(F, 0.9) : Lt;     // visor runs across the face, or along it side on
+        const alongLen = latLen < 0.28 ? 0.9 : latLen;
+        const a = add(vis, scl(along, halfW)), b = add(vis, scl(along, -halfW));
+        ctx.fillStyle = C.seam;
+        capsulePath(ctx, a, halfH, b, halfH); ctx.fill();
+        const lime = C.accent;
+        const eyeSpread = R * 0.36 * (latLen < 0.28 ? 0.35 : 1);
+        const eyeAt = [add(vis, scl(along, eyeSpread)), add(vis, scl(along, -eyeSpread))];
+        const eyeH = R * 0.26, eyeW = R * 0.105;
+        const mood = MOOD || "neutral";
+        ctx.strokeStyle = lime; ctx.lineCap = "round"; ctx.lineWidth = eyeW * 1.6;
+        for (let i = 0; i < eyeAt.length; i++) {
+          const e = eyeAt[i], sign = i === 0 ? 1 : -1;
+          if (blink || mood === "sleepy") {
+            // a closed eye: a soft downward arc
+            ctx.beginPath();
+            const l = add(e, scl(along, -eyeW * 1.6)), r2 = add(e, scl(along, eyeW * 1.6)), m = add(e, scl(up, -eyeW * 0.9));
+            ctx.moveTo(l.x, l.y); ctx.quadraticCurveTo(m.x, m.y, r2.x, r2.y); ctx.stroke();
+          } else if (mood === "happy") {
+            // an upward arc, the ^ ^ of a smile with the eyes
+            ctx.beginPath();
+            const l = add(e, scl(along, -eyeW * 1.6)), r2 = add(e, scl(along, eyeW * 1.6)), m = add(e, scl(up, eyeW * 1.6));
+            ctx.moveTo(l.x, l.y); ctx.quadraticCurveTo(m.x, m.y, r2.x, r2.y); ctx.stroke();
+          } else if (mood === "focused") {
+            // a wedge tilted in toward the nose: effort
+            const tilt = scl(along, sign * eyeW * 1.2);
+            ctx.fillStyle = lime;
+            const top = add(add(e, scl(up, eyeH * 0.6)), tilt), bot = add(e, scl(up, -eyeH * 0.6));
+            capsulePath(ctx, top, eyeW * 0.55, bot, eyeW * 1.1); ctx.fill();
+          } else {
+            const tall = mood === "surprised" ? 1.25 : 1;
+            ctx.fillStyle = lime;
+            capsulePath(ctx, add(e, scl(up, eyeH * tall)), eyeW, add(e, scl(up, -eyeH * tall)), eyeW); ctx.fill();
+          }
+        }
+        if (big && latLen >= 0.28) {
+          // grille: three short dashes just outside each eye
+          ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = R * 0.045; ctx.lineCap = "round";
+          for (const sign of [1, -1]) for (let k = -1; k <= 1; k++) {
+            const g = add(add(vis, scl(along, sign * R * 0.62)), scl(up, k * R * 0.12));
+            ctx.beginPath(); ctx.moveTo(g.x - along.x * R * 0.07, g.y - along.y * R * 0.07); ctx.lineTo(g.x + along.x * R * 0.07, g.y + along.y * R * 0.07); ctx.stroke();
+          }
+        }
+        // mouth: a short dark line below the visor; a smile when happy or at
+        // rest, straight when focused or neutral, a small ring when surprised
+        const mouthAt = add(add(centre, scl(F, R * 0.7)), scl(up, -R * 0.42));
+        ctx.strokeStyle = C.seam; ctx.lineWidth = R * 0.05; ctx.lineCap = "round";
+        const mw = R * 0.16 * (latLen < 0.28 ? 0.5 : 1);
+        if (mood === "surprised") {
+          ctx.beginPath(); ctx.arc(mouthAt.x, mouthAt.y, R * 0.06, 0, Math.PI * 2); ctx.stroke();
+        } else {
+          const l = add(mouthAt, scl(along, -mw)), r2 = add(mouthAt, scl(along, mw));
+          const dip = (mood === "happy" || mood === "neutral") ? add(mouthAt, scl(up, -R * 0.06)) : mouthAt;
+          ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.quadraticCurveTo(dip.x, dip.y, r2.x, r2.y); ctx.stroke();
+        }
+        // chin light: a short lime capsule low on the face
+        const chin = add(add(centre, scl(F, R * 0.62)), scl(up, -R * 0.66));
+        ctx.fillStyle = lime;
+        capsulePath(ctx, add(chin, scl(along, -R * 0.08)), R * 0.03, add(chin, scl(along, R * 0.08)), R * 0.03); ctx.fill();
+        // Ear disc: a ring with a dot on the side of the head, drawn only when
+        // that side faces the camera enough to see it (side and three
+        // quarter views). Face on, the ears sit on the silhouette edge and the
+        // reference shows none, so none are drawn.
+        if (big && latLen < 0.75) {
+          const sideSign = (ax.z.d >= 0 ? 1 : -1) * (away ? -1 : 1);
+          // behind the visor, level with the eyes, out on the side of the skull
+          const ep = add(add(add(centre, scl(up, R * 0.08)), scl(F, -R * 0.34)), scl(Lt, sideSign * R * 0.62));
+          ctx.strokeStyle = C.seam; ctx.lineWidth = R * 0.045;
+          ctx.beginPath(); ctx.arc(ep.x, ep.y, R * 0.17, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = C.seam; ctx.beginPath(); ctx.arc(ep.x, ep.y, R * 0.06, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (FACE === "robot" || FACE === "robotglow" || FACE === "robotvisor") {
         // A cute robot: two tall rounded eyes, blinking now and then. Sized
         // to read at card size, which the dots did not. "robotglow" lights
         // them in the accent so the character carries the app's colour;
@@ -1789,12 +1873,13 @@ function outline(ctx, C, segs) {
 // for a face instead. Two eye dots do the job at any size: two from the
 // front, one from the side, none from behind, and they never distort with a
 // pose the way body lines do. `lines` keeps the old torso lines available.
-export const STYLE = { face: "robotglow", lines: false };
+export const STYLE = { face: "buddy", mood: "neutral", lines: false };
 export function setStyle(o = {}) { Object.assign(STYLE, o); return STYLE; }
 
-let FACE = STYLE.face, LINES_TORSO = STYLE.lines;
+let FACE = STYLE.face, MOOD = STYLE.mood, LINES_TORSO = STYLE.lines;
 export function drawFigure(ctx, S, C, opts = {}) {
   FACE = opts.face !== undefined ? opts.face : STYLE.face;
+  MOOD = opts.mood !== undefined ? opts.mood : STYLE.mood;
   LINES_TORSO = opts.lines !== undefined ? opts.lines : STYLE.lines;
   if (opts.floor !== false) drawFloor(ctx, C, S);
   drawProps(ctx, C, opts.props, S, "back");
@@ -1976,7 +2061,7 @@ export function render(canvas, move, C, cycle, timeSec = 0, opts = {}) {
   drawFigure(ctx, S, C, {
     props: move.props, floor: move.floor, lit,
     grip: gripSides(move, S),
-    face: opts.face, lines: opts.lines,
+    face: opts.face, mood: opts.mood, lines: opts.lines,
   });
   return S;
 }
