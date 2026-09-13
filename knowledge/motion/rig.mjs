@@ -143,7 +143,7 @@ export const BODY = {
   palm: 5.0, palmHalf: 2.7, finger: 4.4, rPalm: 2.7, rFinger: 2.1, thumb: 5.0,
   // The product figure is one neutral bald body: Mo asked for "just the white",
   // no hair, no female variant for now.
-  hairStyle: "cap",
+  hairStyle: "none",
 };
 // Identical on both bodies by construction, so the floor is in the same place.
 export const LEG_TO_FLOOR = BODY.thigh + BODY.shin + BODY.rAnkle;
@@ -833,8 +833,9 @@ function drawHand(ctx, S, side, C, fill, grip) {
     const perp = V(-d.y, d.x);
     const toBody = sub(S.chest, k.wrist);
     const sgn = (perp.x * toBody.x + perp.y * toBody.y) >= 0 ? 1 : -1;
-    const at = add(lerpV(k.wrist, tip, 0.34), scl(perp, sgn * rRoot * 0.78));
-    part(ctx, C, [[at, rRoot * 0.42], [add(at, scl(perp, sgn * rRoot * 0.18)), rRoot * 0.38]], { fill });
+    // A bump, not a ball: mostly inside the mitt, only its edge past the outline.
+    const at = add(lerpV(k.wrist, tip, 0.36), scl(perp, sgn * rRoot * 0.62));
+    part(ctx, C, [[at, rRoot * 0.36], [add(at, scl(perp, sgn * rRoot * 0.12)), rRoot * 0.33]], { fill });
   }
 }
 
@@ -853,11 +854,14 @@ function drawFoot(ctx, S, side, C, fill) {
   // the side on shape, which is correct.
   if (S.frontal && Math.abs(d.x) < 0.45) {
     const sole = Math.max(k.toe.y, k.heel.y, k.ankle.y + B.rAnkle * 0.8);
-    // A short cylinder under the ankle, the sheet's shoe seen from the front.
-    const r = B.rAnkleDraw * 1.15 * w;
-    const half = B.rAnkleDraw * 0.55 * w;
-    const c = V(k.ankle.x, sole - r);
-    part(ctx, C, [[V(c.x - half, c.y), r], [V(c.x + half, c.y), r]], { fill });
+    // The foot grows OUT of the shin: it starts at the ankle at the shin's own
+    // radius and widens to the sole, one shape, no gap. Drawn as a separate
+    // pad under the ankle it read as a ball with a foot beneath it (Mo: "you
+    // can see the ball of his foot before the foot").
+    const rTop = B.rAnkleDraw * 1.0 * w;
+    const rSole = B.rAnkleDraw * 1.35 * w;
+    const bottom = V(k.ankle.x, Math.max(k.ankle.y + rTop, sole - rSole));
+    part(ctx, C, [[k.ankle, rTop], [bottom, rSole]], { fill });
     return;
   }
   // Side on, a cylinder from heel to toe: one radius, rounded ends, the
@@ -866,6 +870,9 @@ function drawFoot(ctx, S, side, C, fill) {
   const sole = Math.max(k.toe.y, k.heel.y);
   const heel = V(k.heel.x - d.x * 0.6, sole - rf);
   const toe = V(k.toe.x - d.x * 0.4, sole - rf);
+  // The ankle joins the shoe: a short bridge from the shin's end down into the
+  // heel half, so the leg and the foot are one silhouette here too.
+  part(ctx, C, [[k.ankle, B.rAnkleDraw * 0.98 * w], [lerpV(heel, toe, 0.3), rf]], { fill });
   part(ctx, C, [[heel, rf], [toe, rf]], { fill });
 }
 
