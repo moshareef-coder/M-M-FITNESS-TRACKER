@@ -300,8 +300,8 @@ const STIFF_LEG_DEADLIFT = {
   ...ROMANIAN_DEADLIFT,
   dur: 3.3,
   props: [
-    { type: "dumbbell", side: "L", point: "hand", dx: -1, dy: 4, k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", dx: 1, dy: 4, k: 0.8, front: true },
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", dx: -1, dy: 4, k: 0.8 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", dx: 1, dy: 4, k: 0.8, front: true },
   ],
   keys: [
     { // stood tall, bells at the front of the thighs
@@ -328,7 +328,7 @@ const SINGLE_LEG_ROMANIAN_DEADLIFT = {
   dur: 3.4,
   breath: 0.2,
   fit: { k: 0.9, dy: 2 },
-  props: [{ type: "dumbbell", side: "R", point: "hand", dx: 1, dy: 4, k: 0.85, front: true }],
+  props: [{ type: "dumbbell", hold: "follow", side: "R", point: "hand", dx: 1, dy: 4, k: 0.85, front: true }],
   keys: [
     { // stood tall on the right leg, free leg just off the floor behind
       t: 0,
@@ -635,8 +635,8 @@ const CURTSY_LUNGE = {
   farSide: "L",
   feet: { R: { ang: 6, len: 0.4, w: 1.3 }, L: { ang: 30, len: 0.42, w: 1.2 } },
   props: [
-    { type: "dumbbell", side: "R", point: "hand", dx: 2, dy: 5, k: 0.8, front: true },
-    { type: "dumbbell", side: "L", point: "hand", dx: -2, dy: 5, k: 0.8 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", dx: 2, dy: 5, k: 0.8, front: true },
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", dx: -2, dy: 5, k: 0.8 },
   ],
   keys: [
     { // stood tall, feet under the hips
@@ -757,7 +757,7 @@ const DUMBBELL_CALF_RAISE = {
   dur: 2.4,
   breath: 0.2,
   fit: { k: 0.92, dy: 4 },
-  props: [{ type: "dumbbell", side: "R", point: "hand", dx: 2, dy: 5, k: 0.85, front: true }],
+  props: [{ type: "dumbbell", hold: "follow", side: "R", point: "hand", dx: 2, dy: 5, k: 0.85, front: true }],
   keys: [
     { // heels down, feet flat
       t: 0,
@@ -1254,7 +1254,7 @@ const SIDE_BEND = {
   loop: "pingpong",
   dur: 2.8,
   breath: 0.2,
-  props: [{ type: "dumbbell", side: "R", point: "hand", dx: 3, dy: 5, k: 0.85, front: true }],
+  props: [{ type: "dumbbell", hold: "follow", side: "R", point: "hand", dx: 3, dy: 5, k: 0.85, front: true }],
   keys: [
     { // stood square, bell hanging at the side
       t: 0,
@@ -1585,7 +1585,7 @@ const SUITCASE_CARRY = {
   breathRate: 0.9,
   farSide: "L",
   feet: { R: { ang: 8, len: 0.42, w: 1.3 }, L: { ang: 8, len: 0.42, w: 1.3 } },
-  props: [{ type: "dumbbell", side: "R", point: "hand", dx: 4, dy: 6, k: 0.95, front: true }],
+  props: [{ type: "dumbbell", hold: "follow", side: "R", point: "hand", dx: 4, dy: 6, k: 0.95, front: true }],
   keys: [
     { // square under the load, free arm quiet
       t: 0,

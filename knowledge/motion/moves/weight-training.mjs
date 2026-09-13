@@ -26,7 +26,7 @@ const GOBLET_SQUAT = {
   dur: 3.0,
   breath: 0.2,
   fit: { k: 1.1, dy: 2 },
-  props: [{ type: "dumbbell", side: "R", point: "wrist", dx: 3, dy: 1, k: 0.95, front: true }],
+  props: [{ type: "dumbbell", hold: "upright", side: "R", point: "wrist", dx: 3, dy: 1, k: 0.95, front: true }],
   keys: [
     { // standing tall, bell racked at the chest
       t: 0,
@@ -134,8 +134,8 @@ const STEP_UP = {
   fit: { k: 0.8, dy: 8 },
   props: [
     { type: "box", x: 76, y: 100, w: 44 },
-    { type: "dumbbell", side: "R", point: "hand", dx: 1, dy: 5, k: 0.8, front: true },
-    { type: "dumbbell", side: "L", point: "hand", dx: -1, dy: 5, k: 0.8 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", dx: 1, dy: 5, k: 0.8, front: true },
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", dx: -1, dy: 5, k: 0.8 },
   ],
   keys: [
     { // bottom, lead foot on the box, trail foot on the floor

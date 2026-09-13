@@ -422,7 +422,7 @@ const DUMBBELL_ROW = {
   fit: { k: 0.92, dy: 4 },
   props: [
     { type: "bench", x: 94, y: 92, w: 40 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.85, front: true },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.85, front: true },
   ],
   keys: [
     { // bottom, the working arm hanging straight down under the shoulder
@@ -491,8 +491,8 @@ const CHEST_SUPPORTED_ROW = {
   fit: { k: 0.95, dy: 2 },
   props: [
     { type: "bench", x: 31, y: 71, w: 70, incline: 35 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
     { // bottom, both arms hanging long under the shoulders
@@ -1274,8 +1274,8 @@ const DUMBBELL_CURL = {
 const HAMMER_CURL = {
   ...DUMBBELL_CURL,
   props: [
-    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.8, front: true },
   ],
 };
 
@@ -1527,7 +1527,7 @@ const OVERHEAD_TRICEPS_EXTENSION = {
   dur: 3.0,
   breath: 0.2,
   fit: { k: 0.84, dy: 10 },
-  props: [{ type: "dumbbell", side: "R", point: "hand", k: 0.85, front: true }],
+  props: [{ type: "dumbbell", hold: "upright", side: "R", point: "hand", k: 0.85, front: true }],
   keys: [
     { // bottom, bell behind the head, elbows up
       t: 0,
@@ -1563,7 +1563,7 @@ const TRICEPS_KICKBACK = {
   fit: { k: 0.95, dy: 4 },
   props: [
     { type: "bench", x: 84, y: 80, w: 40 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // start, upper arm back and level, forearm hanging straight down
@@ -1803,8 +1803,8 @@ const FARMERS_CARRY = {
   dur: 2.6,
   breath: 0.22,
   props: [
-    { type: "dumbbell", side: "L", point: "hand", k: 0.9 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.9, front: true },
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", k: 0.9 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.9, front: true },
   ],
   keys: [
     { // right foot forward, left trailing

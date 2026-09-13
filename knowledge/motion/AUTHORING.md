@@ -260,14 +260,24 @@ to the body (`{ type: "dumbbell", side: "R", point: "hand", dx, dy, rot, k }`).
 
 Four that are not obvious:
 
-- **A dumbbell is rigid, not floating.** A gripped dumbbell's handle stays at a
-  fixed angle to the forearm for the whole rep (a hand does not let go and
-  re-grip), so `dumbbell`'s `rot` is added to the hand's OWN current screen
-  angle every frame, not used on its own. Its default is 90, a handle held
-  square across the palm, which is correct for nearly every grip; only
-  override it for a genuinely twisted hold. Getting this wrong used to mean a
-  dumbbell that stayed dead level while the arm swung 90-plus degrees under
-  it: right for one frame, wrong everywhere else in the rep.
+- **A dumbbell faces the way the GRIP says, not the arm.** The handle is always
+  square to the forearm, but which picture that gives depends on which way the
+  fist is turned, so `dumbbell` takes a `hold`:
+  - `level` (the default) is a palm-down or palm-up grip. The handle runs
+    across the body, nearly end on to a side camera, so it is drawn as the
+    long side of the bell lying flat, and it STAYS flat for the whole rep
+    however far the arm travels. Presses, raises, flyes, rows on a bench,
+    straight curls, shrugs, wrist curls.
+  - `follow` is a neutral, thumb-up grip. The handle runs front to back, the
+    camera sees its full length, and it genuinely tilts with the forearm:
+    hammer curl, one-arm row, kickback, carries, anything held at the side.
+  - `upright` is the goblet hold, stood on one end and cupped in both hands.
+
+  `rot` is a nudge on top of whichever of those applies, and is rarely needed.
+  Getting this wrong is very visible in both directions: a `follow` on a
+  pressing grip tips the bell over as the arm travels, which no dumbbell ever
+  does, and a fixed angle on a hammer curl leaves it dead level while the arm
+  swings 90-plus degrees under it.
 
 - **A mat has two forms.** `{ type: "mat", x, w }` is the side view strip on the
   floor under a kneeling or lying figure. `{ type: "mat", top: true, x, y, w, h }`
