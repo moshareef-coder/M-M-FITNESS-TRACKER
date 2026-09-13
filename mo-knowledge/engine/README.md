@@ -1095,10 +1095,13 @@ WARNs are counted, not failed, and the counts are the point: a number that
 moves between commits is a change somebody should be able to explain.
 
 **9,329 of those go through `generateFromPayload` and 1,092 call `buildPlan`
-directly, which is not a shortcut: `adapter.mjs` hands `payload.plans` to
-`nextDayIndex` and never to `buildPlan`, so a calibrated week cannot be
-produced from a payload at all.** That is the sweep's own confession, added
-2026-09-12. Until then the sweep never passed `plans`, `calibrate.mjs` saw no
+directly.** When those blocks were written that was not a shortcut but a
+confession: `adapter.mjs` handed `payload.plans` to `nextDayIndex` and never to
+`buildPlan`, so a calibrated week could not be produced from a payload at all.
+It can now, as of later the same day, and the direct calls stay because they are
+the only way to hold `logs` fixed while varying `plans`, which is the
+subtraction that makes "calibration did this" attributable. Until 2026-09-12 the
+sweep never passed `plans`, `calibrate.mjs` saw no
 completed sessions and returned `unknown` on every one of 8,912 runs, and
 calibration, the back-off lever, progression and the entire plateau response
 had zero coverage. The bug fixed that morning, a 2.5 percent multiplier that
@@ -1143,31 +1146,52 @@ was not pointed at it. "SWEEP CLEAN" was overstating what had been checked.
   and acts on nothing; every `goal_secondary` comes back either bought or
   ignored; and the two fields the adapter accepts and throws away.
 
-**Found by the new invariants on their first run, all four still open, all four
-owned by a file the sweep does not own. They print under KNOWN OPEN rather than
-FAILS: they are written as FAILs and counted apart, because a permanently red
-gate is one nobody reads. Deleting a line from `KNOWN_OPEN` in `sweep.mjs` is
-the whole of the fix procedure.**
+**Found by the new invariants on their first run, all four closed the same day.**
+They printed under KNOWN OPEN rather than FAILS: written as FAILs and counted
+apart, because a permanently red gate is one nobody reads. Deleting a line from
+`KNOWN_OPEN` in `sweep.mjs` is the whole of the fix procedure, and all four
+lines are gone. `KNOWN_OPEN` itself stays, empty, for the next one.
 
-1. **`plans` and `swaps` never reach `buildPlan`.** `adapter.mjs` passes
-   `payload.plans` to `nextDayIndex` only, and `payload.swaps` nowhere.
-   `CONTRACT.md` says `plans` is joined against `logs` to calibrate and the edge
-   function already reads both columns, so the data arrives at the engine's door
-   and is dropped one line inside it. End to end, in the shipped app, calibration
-   has never run, the back-off has never fired, `preferences.mjs` is dead code
-   and every plateau answer that depends on a verdict takes its "no verdict"
-   branch. One argument each. This is the single biggest thing in this file.
-2. **A back-off week can come back with more sets than the week it backed off
-   from.** `setsFor` takes a set off every main, then the volume ledger's
-   under-target top-up puts more than that back into the accessory slots: 48
-   weekly sets became 50 on the identical exercise list with identical logs, the
-   only difference being `plans`. 6 of 52 goals. An ordering question rather
-   than a number.
-3. **A `rep-range` plateau answer is a sentence and nothing else.** The note
-   says "the lift stays and the reps change: 8 to 12 for this block instead of 3
-   to 6" and the day still prescribes 3, because nothing in `plan.mjs` reads the
-   response. `rotate` is applied, `volume-cut` is applied, this one is not. 5 of
-   52 goals, every one of them a strength goal with a short stall.
+1. **`plans` and `swaps` never reached `buildPlan`. Closed 2026-09-12.**
+   `adapter.mjs` passed `payload.plans` to `nextDayIndex` only, and
+   `payload.swaps` nowhere. `CONTRACT.md` said `plans` is joined against `logs`
+   to calibrate, the edge function already read both columns and the app already
+   sent them, so the data arrived at the engine's door and was dropped one line
+   inside it. End to end, in the shipped app, calibration had never run, the
+   back-off had never fired, `preferences.mjs` was dead code and every plateau
+   answer that depends on a verdict took its "no verdict" branch. It was one
+   argument each, and the fix is those two arguments plus the three things that
+   only broke once they were passed: the two below, and `missing` asking
+   `plans.length` where it meant `calibration.overall === "unknown"`, which made
+   the "nothing was calibrated" sentence disappear for somebody carrying an
+   unfinished plan. The shape of a plan row is now settled in `adapter.mjs`,
+   which is where a payload stops being input and becomes an argument: the fuzz
+   found a crafted body with a number where a plan should be within the hour.
+2. **A back-off week could come back with more sets than the week it backed off
+   from. Closed 2026-09-12.** `setsFor` took a set off every main in pass 2, and
+   pass 2 runs in front of three passes that all re-decide a set count and none
+   of which knows a back-off is in force: the volume ledger, the clock's trim
+   and the stated-session-length top-up. A lighter week is a cheaper week in
+   minutes, so the clock had less to shave and the accessories kept sets the
+   uncalibrated week lost. 48 weekly sets became 50 on the identical exercise
+   list with identical logs, the only difference being `plans`. 6 of 52 goals.
+   An ordering question rather than a number, and the ordering is the fix: the
+   ease is now the LAST thing that happens to a set count, in `easeSets`, so a
+   calibrated back-off week is the week the person would otherwise have had
+   minus the cut, and nothing downstream can hand any of it back. Measured after:
+   every one of the 52 goals loses 4 to 10 weekly sets on a back-off and none
+   gains any. `volume-cut-did-not-cut`, which was 12, is now 0 for the same
+   reason: the same lever was being undone the same way.
+3. **A `rep-range` plateau answer was a sentence and nothing else. Closed
+   2026-09-12.** The note said "the lift stays and the reps change: 8 to 12 for
+   this block instead of 3 to 6" and the day still prescribed 3, because nothing
+   in `plan.mjs` read the response. `rotate` was applied, `volume-cut` was
+   applied, this one was not. 5 of 52 goals, every one a strength goal with a
+   short stall. `plan.mjs` now reads `repShiftFor` out of `plateau-response.mjs`
+   rather than keeping a second copy of the rule, and it applies the range at
+   prescription time rather than in a tidy pass at the end: `prescribeLoad`
+   works the weight back from the rep count, so eight reps at the three rep
+   weight would be a harder week wearing the note of a lighter one.
 
 **WARN counts moved, and why.** The run count moved, so some had to.
 `same-group-twice-in-day` 18,567 to 20,151 and `over-time-budget` 1,341 to
@@ -1180,6 +1204,18 @@ no limits. New counters: `calibration-changed-selection` 260 (a skipped exercise
 teaches `preferences.mjs` to avoid it, which is the system working),
 `unknown-secondary-goal-dropped-silently` 52, `volume-cut-did-not-cut` 12,
 `back-off-changed-no-sets` 6.
+
+**And again when calibration was switched on, later the same day.** Four
+counters moved and everything else held to the unit, which is the point of
+counting them. `volume-cut-did-not-cut` 12 to 0 and `back-off-changed-no-sets`
+6 to 0: both were the back-off being handed back by a later pass, and both are
+gone with the ordering fix. `calibration-changed-selection` 260 to 258 and
+`same-group-twice-in-day` 20,151 to 20,149: two rep-range answers now change a
+prescription rather than only a sentence, which moves two plans. Ledger rows
+77,436 to 77,428. `excluded-prescribed`, `hurt-joint-prescribed`,
+`duplicate-in-week`, `days-clamped`, `over-time-budget`,
+`focus-group-not-in-split`, `tiers-indistinguishable` and
+`unknown-secondary-goal-dropped-silently` are unchanged to the unit.
 
 **What the sweep still cannot see.** The most useful sentence in this section.
 

@@ -95,7 +95,40 @@ export function stepFor(name, currentLb) {
 const WINDOW = 3;
 
 const lower = (s) => String(s || "").trim().toLowerCase();
-const num = (v) => (v == null || v === "" ? null : Number(v));
+
+/* A number this file is willing to do arithmetic with, or nothing.
+ *
+ * This module was written against `ai_workouts` rows as the app writes them and
+ * it had never once run on real input, because the two arguments it needs were
+ * not being passed (see adapter.mjs). The day they started being passed, every
+ * read in here became a read of whatever a payload happens to carry, and the
+ * fuzz found the difference immediately. So the rule for the whole file is the
+ * one the rest of the engine already uses for row data: a row we cannot believe
+ * contributes NO signal, and never an exception. A bad row in somebody's plan
+ * history has to degrade to "nothing learned from that row". A throw here is a
+ * failed generate, and a failed generate is no workout at all, which is a far
+ * worse answer than an uncalibrated one.
+ *
+ * `Number("")` is 0 and `Number({})` is NaN, and both used to get through. A
+ * NaN never throws, it just makes every comparison below false in silence,
+ * which is the quietest way to get a wrong verdict. Non-finite is not a number
+ * to this file, it is an absence, and an absence already has a branch. */
+const num = (v) => {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+/* A row is a row: a plain object, not a number, a string, an array or a null.
+   The app never sends anything else; a crafted body does. */
+const isRow = (v) => Boolean(v) && typeof v === "object" && !Array.isArray(v);
+const rowsOf = (v) => (Array.isArray(v) ? v.filter(isRow) : []);
+/* `entry_date` is only ever used as a map key and a sort key, so it wants to be
+   a string and does not have to be a date. Anything unstringable is not a day. */
+const dateOf = (v) => (typeof v === "string" || typeof v === "number" ? String(v) : "");
+/* A name is the only handle plans and logs share, so a row without a usable one
+   cannot be joined to anything and is not evidence about any exercise. */
+const nameOf = (v) => (typeof v === "string" ? v.trim() : "");
 
 /**
  * Join what was planned to what was done.
@@ -106,27 +139,36 @@ const num = (v) => (v == null || v === "" ? null : Number(v));
  *
  * A planned exercise with no matching log comes back with `actual: null`, which
  * is the skip signal rather than an absence of data.
+ *
+ * Every read below is guarded, and the guards drop rather than repair: see
+ * `num` above for why a row we cannot believe has to contribute nothing.
  */
 export function joinPlanToActual({ plans = [], logs = [] } = {}) {
-  const done = plans.filter((p) => p && p.completed_at);
+  const done = rowsOf(plans).filter((p) => p.completed_at);
 
   /* One pass over the logs, bucketed by date and name, so a long history does
      not turn this into a nested scan. */
   const byDateName = new Map();
-  for (const l of logs) {
-    if (!l || !l.exercise_name) continue;
-    const key = `${l.entry_date}|${lower(l.exercise_name)}`;
+  for (const l of rowsOf(logs)) {
+    const name = nameOf(l.exercise_name);
+    if (!name) continue;
+    const key = `${dateOf(l.entry_date)}|${lower(name)}`;
     if (!byDateName.has(key)) byDateName.set(key, l);
   }
 
   const rows = [];
   for (const p of done) {
-    for (const ex of p.exercises || []) {
-      if (!ex || !ex.name) continue;
-      const hit = byDateName.get(`${p.entry_date}|${lower(ex.name)}`);
+    const date = dateOf(p.entry_date);
+    /* `p.exercises` is a list on every row the app writes and can be anything
+       at all on a row it did not. Not iterable is not empty: it is a row that
+       says nothing, which is the same answer. */
+    for (const ex of rowsOf(p.exercises)) {
+      const name = nameOf(ex.name);
+      if (!name) continue;
+      const hit = byDateName.get(`${date}|${lower(name)}`);
       rows.push({
-        entry_date: p.entry_date,
-        exercise: ex.name,
+        entry_date: date,
+        exercise: name,
         planned: {
           sets: num(ex.sets),
           reps: num(ex.reps),
@@ -195,7 +237,14 @@ const factorFor = (current, stepLb) => (current > 0 ? (current + stepLb) / curre
  * defend from those rows, which is why `why` is a sentence rather than a code.
  */
 export function calibrateExercise(rows = []) {
-  const sorted = [...rows].sort((a, b) => String(b.entry_date).localeCompare(String(a.entry_date)));
+  /* Exported, so it is not only `calibrate` below that reaches it, and a caller
+     holding rows it built itself is exactly how a shape this file does not
+     expect gets in. Same rule as everywhere else here: a row that is not a row
+     is not evidence, and `planned` and `actual` are filled in rather than
+     assumed, because every predicate below reads through them. */
+  const sorted = rowsOf(rows)
+    .map((r) => ({ ...r, planned: isRow(r.planned) ? r.planned : {}, actual: isRow(r.actual) ? r.actual : null }))
+    .sort((a, b) => String(b.entry_date).localeCompare(String(a.entry_date)));
   const recent = sorted.slice(0, WINDOW);
   const name = recent[0]?.exercise || sorted[0]?.exercise || null;
   const base = { name, sessions: recent.length };

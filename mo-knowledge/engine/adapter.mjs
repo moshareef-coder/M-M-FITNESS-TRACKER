@@ -841,9 +841,17 @@ function logsFromHistory(history, today) {
  *                          which is what engine-lab.html exists to show.
  * @returns {{ workout: object, honest: string|null, meta: object, plan?: object }}
  */
-export function generateFromPayload(payload = {}, { today = new Date(), includePlan = false } = {}) {
+export function generateFromPayload(rawPayload = {}, { today = new Date(), includePlan = false } = {}) {
   let step = "start";
   try {
+    /* A default parameter only fires on `undefined`, so `generateFromPayload(null)`
+       threw before it reached a single guard. The edge function never sends that,
+       because `boundPayload` in index.ts has already made an object of it, but
+       engine-lab.html and sandbox.html call this directly and a `null` is one
+       mistyped fetch away. Same treatment as every other shape this file does not
+       recognise: it becomes the empty payload, which already has an answer. */
+    const payload = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload) ? rawPayload : {};
+
     step = "mapGoal";
     const goal = mapGoal({
       goal: payload.goal,
@@ -859,9 +867,39 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
     const goalSource = isValidBubble(payload.goal_bubble) ? "tiles" : "legacy";
 
     step = "logs";
-    const given = Array.isArray(payload.logs) ? payload.logs : null;
+    /* Rows only, for the same reason `plans` is shaped below: `exercise_logs`
+       never holds a null and a crafted body can. Filtered here rather than in
+       each of the four modules that read a log row. */
+    const given = Array.isArray(payload.logs)
+      ? payload.logs.filter((l) => l && typeof l === "object" && !Array.isArray(l))
+      : null;
     const logs = given && given.length ? given : logsFromHistory(payload.history, today);
     const logsSource = given && given.length ? "logs" : logs.length ? "history" : "none";
+
+    step = "plans";
+    /* A payload is not a database. index.ts bounds how MANY rows these columns
+       may carry and nothing anywhere checks the shape of one, because until
+       today `plans` only ever reached `nextDayIndex`, which reads two string
+       fields off a row and shrugs at anything else. `calibrate.mjs` walks
+       `row.exercises`, and it is a pure function that trusts its arguments the
+       way every module in this folder does. The fuzz found the gap inside the
+       hour these two arguments started being passed: a crafted body with a bare
+       number where a plan should be, and a row whose `exercises` is a number
+       rather than a list, both of which threw.
+
+       So the shape is settled here, once, for the same reason `limits` is
+       normalised here rather than in two places: the adapter is where a payload
+       stops being input and starts being an argument. A row that is not an
+       object is dropped and a row whose exercise list is not a list keeps its
+       dates and loses the list, so the rotation below still sees the session
+       happened and the join simply has nothing to join. Dropped in silence,
+       which is what this file already does with every other piece of nonsense a
+       payload can carry. */
+    const plans = (Array.isArray(payload.plans) ? payload.plans : [])
+      .filter((p) => p && typeof p === "object" && !Array.isArray(p))
+      .map((p) => (Array.isArray(p.exercises) ? p : { ...p, exercises: [] }));
+    const swaps = (Array.isArray(payload.swaps) ? payload.swaps : [])
+      .filter((s) => s && typeof s === "object" && !Array.isArray(s));
 
     step = "buildPlan";
     /* The days a person actually chose beat anything we can infer. The app's
@@ -927,6 +965,21 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
         sessionMinutes: payload.session_minutes ?? null,
       },
       logs,
+      /* The two arguments this file forgot, and the cost of forgetting them was
+         the whole second half of the engine. `buildPlan` has taken `plans` and
+         `swaps` since calibration was written; this call site sent neither, so
+         `calibrate` always joined an empty plan list, always came back
+         "unknown", and every branch behind a verdict was unreachable from a
+         payload: progressive overload measured against what was prescribed, the
+         back-off, the plateau answers that read a verdict, and preferences.mjs
+         end to end. CONTRACT.md has promised since it was written that plans are
+         joined against logs to calibrate, index.ts has always selected both
+         columns and the app has always sent them. Only this line was missing.
+         Do not delete either of them as unused: `plans` is read twice on
+         purpose, once by `nextDayIndex` below for the rotation and once here for
+         the join, and they are different questions about the same rows. */
+      plans,
+      swaps,
       today,
       priorityOverride: merged.tiers,
       limits,
@@ -938,7 +991,7 @@ export function generateFromPayload(payload = {}, { today = new Date(), includeP
     });
 
     step = "nextDayIndex";
-    const rotation = nextDayIndex(plan, { logs, plans: payload.plans || [], today });
+    const rotation = nextDayIndex(plan, { logs, plans, today });
     /* A stated preference outranks the rotation, which is the same product rule
        that stops us overriding the day count somebody asked for. */
     const asked = focusDayIndex(plan, payload.focus, { from: rotation });

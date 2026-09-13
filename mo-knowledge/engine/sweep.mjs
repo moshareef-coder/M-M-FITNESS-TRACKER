@@ -192,25 +192,21 @@ const WARN = "warn";
  * back into a gate-breaking FAIL, and that is the whole of the fix procedure:
  * fix the module, delete the line, watch it stay green. Nothing else in this
  * file knows the difference. */
-const KNOWN_OPEN = new Map([
-  ["plateau-rep-range-not-applied",
-    "plan.mjs reads P.repRange and nothing else, so a rep-range plateau answer is a "
-    + "sentence promising 8 to 12 attached to a day still prescribing 3. Owner: plan.mjs."],
-  ["adapter-drops-plans",
-    "adapter.mjs passes payload.plans to nextDayIndex and never to buildPlan, so calibration, "
-    + "the back-off and every plateau answer that depends on a verdict are unreachable from a "
-    + "payload. CONTRACT.md line 44 says plans are joined against logs to calibrate. "
-    + "One argument. Owner: adapter.mjs."],
-  ["back-off-added-sets",
-    "the back-off lever works and a later pass undoes it: setsFor takes a set off every main, "
-    + "then the volume ledger's under-target top-up puts more than that back into the accessory "
-    + "slots, so a week the plan calls lighter is handed over with more total sets than the same "
-    + "week uncalibrated. Found 2026-09-12 on identical logs, the only difference being `plans`. "
-    + "Owner: plan.mjs, and the fix is an ordering question rather than a number."],
-  ["adapter-drops-swaps",
-    "same line, same fix: buildPlan takes `swaps` and the adapter never sends them, so "
-    + "preferences.mjs is dead end to end. Owner: adapter.mjs."],
-]);
+/* Empty, and kept rather than deleted. Every entry it ever held was closed on
+   2026-09-12 by the change that switched calibration on:
+
+     adapter-drops-plans / adapter-drops-swaps  the two missing arguments, now
+       passed, so calibration and preferences.mjs are reachable from a payload.
+     back-off-added-sets  the back-off moved to the last pass in plan.mjs, so
+       nothing downstream can hand back what it took.
+     plateau-rep-range-not-applied  plan.mjs prescribes the rep range the note
+       promises, at prescription time so the load follows it.
+
+   All four are live FAIL-on-regression checks now. The mechanism stays because
+   the lesson does: a failure the sweep can see and name is worth more than a
+   gate that is permanently red, and the next real finding should land here
+   rather than in a comment somewhere. */
+const KNOWN_OPEN = new Map([]);
 
 const results = new Map();   // invariant -> { fail: [], warn: [], open: [], fails, warns, opens }
 

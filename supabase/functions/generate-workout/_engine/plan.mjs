@@ -24,7 +24,7 @@ import { prescribeLoad, patternFor } from "./load.mjs";
 import { calibrate } from "./calibrate.mjs";
 import { learnPreferences, applyPreferences, avoidNote } from "./preferences.mjs";
 import { scoreAlternatives } from "./alternatives.mjs";
-import { planPlateauResponse, applyRotateFallback } from "./plateau-response.mjs";
+import { planPlateauResponse, applyRotateFallback, repShiftFor } from "./plateau-response.mjs";
 import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary, softenedNote } from "./limits.mjs";
 import { mainGroupsForDay } from "./recovery.mjs";
 import { TIER_MULTIPLIER, TIERS } from "./focus.mjs";
@@ -179,10 +179,24 @@ function estimateMinutes(exercises) {
       cut it was meant to protect: 14 weekly sets over one hit is 14, times 0.85
       is 12, and both come out of the clamp at 6, so the plan said "this week is
       lighter" and handed back the same six sets. Measured on a three lift
-      stall: the cut moved 2 slots out of 11. Now a main lift always gives up a
-      set to a back-off, floor 2, and the only thing that can swallow it is the
-      floor itself, which is a real limit rather than an accident of ordering. */
-function setsFor({ base, hitCount, tier, backOff, isMain, ceiling = Infinity }) {
+      stall: the cut moved 2 slots out of 11.
+
+   Round four took the back-off out of here altogether, and it is the same
+   lesson one level up. Subtracting it in pass 2 put it in front of three later
+   passes that all re-decide a set count and none of which knows a back-off is
+   in force: the volume ledger trims a group that is over target, the clock
+   shaves accessories off a day that runs long, and a stated session length buys
+   sets back where the ledger says there is room. A lighter week is a cheaper
+   week in minutes, so the clock had less to shave, and the sweep of 2026-09-12
+   measured the result: get-stronger/strong-not-bigger on identical logs came
+   back with 50 weekly sets when calibration said back off and 48 when it said
+   nothing. The back-off was real in every single number and the week it
+   produced was bigger. Two hands on one lever, and the fix is to take the
+   second hand off rather than to change what either of them pulls: the ease is
+   the last thing that happens to a set count now, in `easeSets` below, so the
+   back-off week is the week the person would have had minus the cut, and
+   nothing downstream can hand any of it back. */
+function setsFor({ base, hitCount, tier, ceiling = Infinity }) {
   const per = (weekly) => Math.round(weekly / Math.max(1, hitCount));
   const plain = per(base);
   /* The +1 guarantee is a floor and not a bonus, so it is the same +1 at every
@@ -196,11 +210,15 @@ function setsFor({ base, hitCount, tier, backOff, isMain, ceiling = Infinity }) 
      colour back. It sits outside the Math.max for exactly that reason. */
   const boosted = Math.min(base * PRIORITY_MULTIPLIER[tier], ceiling);
   const wanted = tier ? Math.max(per(boosted), plain + 1) : plain;
-  const sets = Math.max(2, Math.min(MAX_SETS_PER_SESSION, wanted));
-  if (!backOff) return sets;
-  /* The accessories take the 0.85 they always took. A main lift takes whichever
-     is smaller, so the cut is never less than one set: that is the whole promise
-     the note in dayNotes makes on the user's behalf. */
+  return Math.max(2, Math.min(MAX_SETS_PER_SESSION, wanted));
+}
+
+/* The back-off itself, unchanged in what it takes and moved in when it takes
+   it. The accessories take the 0.85 they always took. A main lift takes
+   whichever is smaller, so the cut is never less than one set: that is the whole
+   promise the note in dayNotes makes on the user's behalf. Floor of two, because
+   a prescription of one set is not a lighter week, it is a missing exercise. */
+function easeSets(sets, isMain) {
   const eased = Math.round(sets * 0.85);
   return Math.max(2, isMain ? Math.min(eased, sets - 1) : eased);
 }
@@ -435,10 +453,26 @@ function candidates({ groups, pattern, level, equipment, role = "accessory", his
 }
 
 export function buildPlan({
-  goal, person = {}, logs = [], plans = [], swaps = [], equipment = null, today = new Date(), priorityOverride = null,
+  goal, person = {}, logs: rawLogs = [], plans = [], swaps = [], equipment = null, today = new Date(), priorityOverride = null,
   limits = null, avoid = [],
 } = {}) {
   const { bodyWeightLb = null, sex = null, daysAsked = null, sessionMinutes = null } = person;
+
+  /* A log row is an object or it is not a row. Eight passes in this file, plus
+     load.mjs, training-age.mjs, calibrate.mjs and preferences.mjs, read fields
+     off these rows, and every one of them guarding separately is eleven places
+     to forget: `historyNames` below was the one that did, and it threw on a
+     single `null` in the array. Filtered once here, at the door, so everything
+     downstream inherits it.
+
+     `adapter.mjs` does the same thing to a payload's rows on its way in. Not a
+     duplicate: that is a different door. `buildPlan` is a public entry point
+     with callers of its own (the sweep, the fuzz's direct channel, the tests),
+     and a guard that only exists on the other side of the adapter is not a
+     guard on this function. */
+  const logs = Array.isArray(rawLogs)
+    ? rawLogs.filter((l) => l && typeof l === "object" && !Array.isArray(l))
+    : [];
 
   /* ---- who they are, measured not asked ---- */
   const trainingAge = deriveTrainingAge({ logs, today });
@@ -829,6 +863,36 @@ export function buildPlan({
   /* Filled by pass 3 below, spoken once after it. See the note at the call. */
   const cappedLoads = new Set();
 
+  /* ---- the plateau answer that is a number and not only a sentence ----
+     `rep-range` was the one response in plateau-response.mjs with nothing on the
+     other end of it. The note went out saying "the lift stays and the reps
+     change: 8 to 12 for this block instead of 3 to 6" and the day underneath it
+     still said 3, because the reps came off `P.repRange` and nothing read the
+     response. A promise in a sentence and a contradiction in the prescription is
+     worse than never having made the promise.
+
+     Applied here, at prescription time, rather than in a tidy pass at the end,
+     because reps and load are one decision and not two: `prescribeLoad` takes
+     the rep count and works the weight back from it, so eight reps at the
+     three rep weight would be a HARDER week wearing the note of a lighter one,
+     which is the opposite of what a stalled lifter is being offered.
+
+     Both sources of the answer are already known by now. `planPlateauResponse`
+     decided some of them above, and a rotation the library could not afford
+     becomes a rep-range answer too: `rotateBlocked` was filled during selection,
+     and `applyRotateFallback` further down turns exactly that set of rotates
+     into rep-range responses, so this map is the same set it will produce and
+     not a guess at it. Mains take the low end and accessories the high end, the
+     same convention the goal's own range is read with one line below. */
+  const repRangeFor = new Map();
+  {
+    const shifted = repShiftFor(resolved).to;
+    for (const r of plateauPlan.responses) {
+      if (r.action === "rep-range") repRangeFor.set(r.exercise.toLowerCase(), shifted);
+    }
+    for (const name of rotateBlocked) repRangeFor.set(name.toLowerCase(), shifted);
+  }
+
   const week = selected.map(({ name, key, isShort, picks }) => {
     const exercises = picks.map(({ slot, pick, swap, alternatives, offPattern }) => {
       const group = groupFor(slot, pick);
@@ -841,13 +905,14 @@ export function buildPlan({
       const priority = tier > 0;
       const isMain = slot.role === "main";
       const full = setsFor({
-        base: baseSets, hitCount: hits[group] || 1, tier, backOff, isMain,
+        base: baseSets, hitCount: hits[group] || 1, tier,
         ceiling: WEEKLY_MRV[group] ?? Infinity,
       });
       /* A short day is the session they were least likely to make, so it stays
          small however the multipliers landed. */
       const sets = isShort ? SHORT_DAY_SETS : full;
-      const reps = isMain ? P.repRange[0] : P.repRange[1];
+      const repRange = repRangeFor.get(pick.name.toLowerCase()) || P.repRange;
+      const reps = isMain ? repRange[0] : repRange[1];
 
       const load = prescribeLoad({
         exercise: pick, reps, bodyWeightLb, sex, level, logs, returning: trainingAge.returning,
@@ -1211,6 +1276,32 @@ export function buildPlan({
     }
   }
 
+  /* ---- the back-off, last, because a back-off has to be the last word ----
+     Everything above this line decides how big the week is. This decides how
+     much of it comes off, and it runs after all of them for the reason spelled
+     out at `setsFor`: while the cut lived in pass 2 it was in front of the
+     volume ledger, the clock and the time top-up, none of which knows a
+     back-off is in force, and all three could hand back more than it took.
+     Running it here makes the calibrated week an exact subtraction from the
+     uncalibrated one, which is the property the note in dayNotes is claiming on
+     the user's behalf and the property the sweep asserts.
+
+     The priority floor is re-run after, for the same reason the clock re-runs
+     it: `enforcePriorityFloor` only ever lowers sets, so re-checking it costs
+     nothing and a guarantee worth stating is worth checking rather than
+     reasoned about. The minutes are re-estimated because the day genuinely got
+     shorter, and a back-off week that still prints the long week's number would
+     be the plan saying one thing and doing another. What it deliberately does
+     NOT do is give the freed minutes back to the top-up above: those minutes
+     are the back-off. */
+  if (backOff) {
+    for (const d of week) {
+      for (const e of d.exercises) e.sets = easeSets(e.sets, roleOf.get(e) === "main");
+      enforcePriorityFloor(d.exercises);
+      d.estimatedMinutes = estimateMinutes(d.exercises);
+    }
+  }
+
   /* A budget nothing could spend. Worth a sentence for the same reason the
      over-budget day gets one: they answered a question and the answer moved
      nothing, and an app that quietly pockets the answer is the dead "main
@@ -1461,7 +1552,16 @@ export function buildPlan({
          and nothing about what was asked for, so calibrate.mjs has no join to
          make and every verdict comes back unknown. Worth naming, because the
          fix is one table the app already writes. */
-      logs.length && !plans.length
+      /* Asked of the calibration and not of `plans.length`, which is the
+         difference between "there are rows" and "there was anything to join".
+         A plan that was generated and never finished carries no `completed_at`,
+         `joinPlanToActual` ignores it on purpose, and counting it here made the
+         sentence disappear for somebody nothing had in fact been calibrated
+         for. `overall` is "unknown" exactly when the join came back empty, so
+         it is the same question asked of the answer instead of the input.
+         Found the day `plans` started arriving: before that this branch had
+         never seen a payload carrying an unfinished plan. */
+      logs.length && calibration.overall === "unknown"
         ? "any completed plans, so nothing was calibrated against what you actually did"
         : null,
       sex ? null : "sex, so upper body starting weights use the cautious default",

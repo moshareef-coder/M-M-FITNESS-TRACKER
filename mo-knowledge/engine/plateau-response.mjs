@@ -126,8 +126,15 @@ const goalRepRange = (goal) => {
 
 /* Which way the reps move. A heavy range has nowhere to go but up, and a range
    that is already high has nowhere to go but down. Either direction is a new
-   stimulus, which is the entire point. */
-function repShiftFor(goal) {
+   stimulus, which is the entire point.
+
+   Exported since 2026-09-12 because plan.mjs has to prescribe the range this
+   returns rather than only print it. It reads this function rather than
+   carrying its own copy of the rule, for the same reason the sweep recomputes
+   the volume ceiling instead of trusting the plan: two copies of one number
+   agree until the day they do not, and the day they do not is the day a note
+   promises 8 to 12 over a day prescribing 3. */
+export function repShiftFor(goal) {
   const from = goalRepRange(goal);
   const to = !from || from[1] <= 6 ? [8, 12] : [4, 6];
   return { from, to };
