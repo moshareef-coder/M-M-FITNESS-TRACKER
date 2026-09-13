@@ -982,13 +982,24 @@
     letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums;
   }
   .pz-where { margin-top: 10px; font-size: 19px; font-weight: 700; letter-spacing: -.015em; text-align: center; }
-  .pz-stage { position: relative; width: 100%; display: flex; align-items: center; justify-content: center; }
+  /* The BUTTON owns the height here and the figure floats behind it. The other
+     way round (figure in flow, button absolutely centred on it) worked only
+     while there was a figure to measure: a warm-up move or a lift with no
+     drawing yet collapsed the stage to nothing, and the button, still centred
+     on nothing, sat straight on top of the clock and the exercise name. */
+  .pz-stage {
+    position: relative; width: 100%; margin-top: 18px;
+    display: flex; align-items: center; justify-content: center;
+  }
   /* Ghosted on purpose: the movement you were on is still there, just held. */
-  .pz-fig { margin: 0; opacity: .4; }
+  .pz-fig {
+    position: absolute; inset: 0; margin: 0; opacity: .4; pointer-events: none;
+    display: flex; align-items: center; justify-content: center;
+  }
   .pz-fig.fig-none { display: none; }
   .pz-fig canvas { width: min(340px, 86vw); height: min(340px, 86vw); }
   .pz-play {
-    position: absolute; width: min(158px, 42vw); height: min(158px, 42vw);
+    position: relative; flex: 0 0 auto; width: min(158px, 42vw); height: min(158px, 42vw);
     border-radius: 50%; border: 0; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     background: var(--accent); color: var(--on-accent);
@@ -5116,7 +5127,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.13.6";
+const APP_VERSION = "2026.09.13.7";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -15228,10 +15239,16 @@ function pausedScreenHTML({ overlay }) {
   const currentSet = setsDone.findIndex((d) => !d);
   /* Mid stretch there is no set to be on, and past the last set "set 5 of 4"
      is worse than saying nothing. */
+  /* Mid stretch there is no set to be on, but there is still a move, and
+     "Warm-up" on its own does not answer where was I. */
+  const stretchMove = stretching ? stretchList()[SESSION.stretchIndex || 0] : null;
+  // A stretch has a drawn move too, so the screen is not blank behind the button.
+  const figName = stretching ? stretchMove?.name : ex?.name;
+  const block = SESSION.phase === "warmup" ? "Warm-up" : "Cool-down";
   const where = stretching
-    ? (SESSION.phase === "warmup" ? "Warm-up" : "Cool-down")
+    ? (stretchMove ? `${escapeHtml(stretchMove.name)} &middot; ${block}` : block)
     : ex
-      ? `${ex.name}${currentSet >= 0 ? ` &middot; set ${currentSet + 1} of ${setsDone.length}` : ""}`
+      ? `${escapeHtml(ex.name)}${currentSet >= 0 ? ` &middot; set ${currentSet + 1} of ${setsDone.length}` : ""}`
       : "";
 
   return `
@@ -15248,7 +15265,7 @@ function pausedScreenHTML({ overlay }) {
         <div class="pz-clock" id="pzClock">${fmtElapsed(sessionElapsed())}</div>
         ${where ? `<div class="pz-where">${where}</div>` : ""}
         <div class="pz-stage">
-          ${ex && !stretching ? `<div class="sess-fig pz-fig" data-fig="${escapeHtml(ex.name)}" data-mood="sleepy"></div>` : ""}
+          ${figName ? `<div class="sess-fig pz-fig" data-fig="${escapeHtml(figName)}" data-mood="sleepy"></div>` : ""}
           <button type="button" class="pz-play" id="pzResume" aria-label="Resume workout">${icon("play", 40)}</button>
         </div>
       </div>
@@ -15261,6 +15278,20 @@ function pausedScreenHTML({ overlay }) {
         </button>
       </div>
     </div>`;
+}
+
+/* A paused clock standing still is the point. A running one standing still
+   just looks broken, which is what the workout tab showed: the screen is
+   rendered once and nothing came back to move the number. */
+let PZ_TICKER = null;
+function startPausedClock() {
+  clearInterval(PZ_TICKER);
+  PZ_TICKER = setInterval(() => {
+    const el = document.getElementById("pzClock");
+    if (!el || !SESSION) { clearInterval(PZ_TICKER); PZ_TICKER = null; return; }
+    if (SESSION.pausedAt) return;
+    el.textContent = fmtElapsed(sessionElapsed());
+  }, 1000);
 }
 
 function wirePausedScreen({ overlay }) {
@@ -15277,6 +15308,7 @@ function wirePausedScreen({ overlay }) {
   mountMotionFigures(root);
   renderPausedLive();
   wireHoldToDiscard();
+  startPausedClock();
 }
 
 /* The partner card, only when there is a partner mid session. Same privacy
