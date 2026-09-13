@@ -1588,10 +1588,16 @@
   .upnext-rail::-webkit-scrollbar { display: none; }
   .upnext-card {
     flex: 0 0 auto; scroll-snap-align: start; cursor: pointer; font-family: inherit;
-    display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
-    min-width: 140px; max-width: 190px; padding: 12px 14px; border-radius: 16px;
+    display: flex; align-items: center; gap: 10px;
+    min-width: 168px; max-width: 214px; padding: 10px 14px 10px 10px; border-radius: 16px;
     background: var(--panel); border: 1px solid var(--border); color: var(--text); text-align: left;
   }
+  /* The move itself, animating, so the rail reads as the workout rather than a
+     list of names. Small enough that the figure falls back to its tiny face. */
+  .upnext-fig { flex: 0 0 46px; width: 46px; height: 46px; display: block; }
+  .upnext-fig canvas { display: block; width: 46px; height: 46px; }
+  .upnext-fig.fig-none { display: none; }
+  .upnext-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .upnext-card:active { border-color: var(--accent); }
   .upnext-name {
     font-size: 14.5px; font-weight: 700; line-height: 1.25;
@@ -1749,7 +1755,21 @@
   .sess-chip.done { background: var(--accent); color: var(--on-accent); border-color: transparent; }
   .sess-chip.current { background: var(--bg); border-color: var(--accent); color: var(--accent-ink); }
   .sess-chip:not(:disabled):active { transform: scale(.94); }
-  .sess-chip.just-done { animation: setPop .52s cubic-bezier(.22,1,.36,1); }
+  /* A banked set is a tick, not a number and never a lime W: once it is behind
+     you the only thing worth saying is that it is done, and the position in the
+     row already says which one it was. The label lives on in aria-label. */
+  .sess-chip .tick { display: block; width: 21px; height: 21px; overflow: visible; }
+  .sess-chip .tick path {
+    fill: none; stroke: currentColor; stroke-width: 3.4;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  /* The pop: the chip springs past its size and settles, a ring of accent
+     breathes out of it, and the tick draws itself in behind the bounce. */
+  .sess-chip.just-done { animation: chipPop .56s cubic-bezier(.22,1,.36,1); }
+  .sess-chip.just-done .tick path {
+    stroke-dasharray: 27; stroke-dashoffset: 27;
+    animation: tickDraw .3s cubic-bezier(.62,0,.25,1) .07s forwards;
+  }
 
   /* What you did last time, and the mark worth beating. This is the whole of
      the PB line now: no trophy chip, no "guessed from" note. */
@@ -1805,6 +1825,8 @@
   @media (prefers-reduced-motion: reduce) {
     .sess-live.ex-in .sess-top, .sess-live.ex-in .sess-fig-stage,
     .sess-chip.just-done { animation: none; }
+    /* no draw-on, but the tick still has to be a whole tick */
+    .sess-chip.just-done .tick path { animation: none; stroke-dasharray: none; stroke-dashoffset: 0; }
     .sess-sheet .upnext { transition: none; }
   }
 
@@ -2868,6 +2890,13 @@
   /* The pop carries a ring of light out with it, so a logged set reads as
      landing rather than as a colour swap. */
   .set-circle.just-done { animation: setPop .52s cubic-bezier(.22,1,.36,1); }
+  @keyframes chipPop {
+    0%   { transform: scale(.72); box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 62%, transparent); }
+    42%  { transform: scale(1.2); }
+    68%  { transform: scale(.96); }
+    100% { transform: scale(1); box-shadow: 0 0 0 15px color-mix(in srgb, var(--accent) 0%, transparent); }
+  }
+  @keyframes tickDraw { to { stroke-dashoffset: 0; } }
   @keyframes setPop {
     0% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--down) 55%, transparent); }
     34% { transform: scale(1.24); box-shadow: 0 0 0 11px color-mix(in srgb, var(--down) 0%, transparent); }
@@ -4165,8 +4194,11 @@
   /* While a lift is on screen the only button is the lime bar at the bottom,
      and a toast at bottom 20px sat right on top of it. Park it on the stage,
      between the title and the figure's head, where nothing is tappable. */
+  body:has(.session-overlay.lifting) .pr-pop {
+    top: 18%; left: 20px; right: 20px;
+  }
   body:has(.session-overlay.lifting) .toast {
-    bottom: auto; top: 19%; white-space: nowrap; max-width: calc(100% - 48px); overflow: hidden; text-overflow: ellipsis;
+    bottom: auto; top: 30%; white-space: nowrap; max-width: calc(100% - 48px); overflow: hidden; text-overflow: ellipsis;
   }
   .toast.show { opacity: 1; }
 
@@ -13998,6 +14030,10 @@ function renderStretchPhase() {
 }
 
 let SESSION_JUST_SET = null;   // a set logged a moment ago, popped once on redraw
+let SESSION_JUST_RAMP = null;  // same for a warm-up rung, so ticking one pops too
+/* Drawn rather than a font glyph: it has to take the chip's colour, scale with
+   it, and be strokeable so the pop can draw it on. */
+const CHIP_TICK = `<svg class="tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.6 12.7l4.3 4.3L18.4 7.4"/></svg>`;
 let SESSION_LAST_EX = null;    // the exercise last drawn, so a change can slide in
 /* Whether the bottom sheet is pulled up over the stage to show what is next.
    Collapsed by default, every time: the screen's job is the set in front of
@@ -14032,7 +14068,10 @@ function tickRampSet(ei, i, rungs) {
   if (!SESSION.rampTicks) SESSION.rampTicks = {};
   const now = rampTicksFor(ei, rungs, SESSION.setsDone[ei] || []);
   // Tapping the last ticked rung un-ticks it; tapping any other counts up to it.
-  SESSION.rampTicks[ei] = now === i + 1 ? i : i + 1;
+  const next = now === i + 1 ? i : i + 1;
+  // pop the rung that just landed, and nothing when a tap takes one back off
+  SESSION_JUST_RAMP = next > now ? next - 1 : null;
+  SESSION.rampTicks[ei] = next;
   saveSessionToStorage();
   renderSession();
 }
@@ -14102,6 +14141,8 @@ function renderSession() {
   SESSION_LAST_EX = ei;
   const justSet = SESSION_JUST_SET;
   SESSION_JUST_SET = null;
+  const justRamp = SESSION_JUST_RAMP;
+  SESSION_JUST_RAMP = null;
 
   $("sessionBody").innerHTML = `
     <div class="sess-live${exChanged ? " ex-in" : ""}">
@@ -14134,14 +14175,14 @@ function renderSession() {
           aria-label="${SESSION_SHEET_OPEN ? "Hide what is up next" : "Show what is up next"}"><i></i></button>
 
         <div class="sess-chips">
-          ${rungs.map((r, i) => `<button type="button" class="sess-chip${i < rampTicks ? " done" : ""}"
+          ${rungs.map((r, i) => `<button type="button" class="sess-chip${i < rampTicks ? " done" : ""}${justRamp === i ? " just-done" : ""}"
             data-ramp="${i}" title="Warm-up, ${escapeHtml(rampRungLabel(r))}"
-            aria-label="Warm-up ${i + 1}, ${escapeHtml(rampRungLabel(r))}, ${i < rampTicks ? "done" : "not done"}">W</button>`).join("")}
+            aria-label="Warm-up ${i + 1}, ${escapeHtml(rampRungLabel(r))}, ${i < rampTicks ? "done" : "not done"}">${i < rampTicks ? CHIP_TICK : "W"}</button>`).join("")}
           ${setsDone.map((done, i) => {
             const isCurrent = i === currentSet;
             return `<button type="button" class="sess-chip${done ? " done" : ""}${isCurrent ? " current" : ""}${justSet === i ? " just-done" : ""}"
               data-set="${i}" ${done || isCurrent ? "" : "disabled"}
-              aria-label="Set ${i + 1}, ${done ? "done" : isCurrent ? "current" : "not started"}">${i + 1}</button>`;
+              aria-label="Set ${i + 1}, ${done ? "done" : isCurrent ? "current" : "not started"}">${done ? CHIP_TICK : i + 1}</button>`;
           }).join("")}
           ${allDone ? `<button type="button" class="sess-chip" id="addSetBtn" aria-label="Add another set">+</button>` : ""}
         </div>
@@ -14197,8 +14238,11 @@ function renderSession() {
             <div class="upnext-label">Up next</div>
             <div class="upnext-rail">
               ${others.map(({ x, i }) => `<button type="button" class="upnext-card" data-jump="${i}">
-                <span class="upnext-name">${escapeHtml(x.name)}</span>
-                <span class="upnext-meta">${x.sets} &times; ${x.reps}</span>
+                <span class="upnext-fig" data-fig="${escapeHtml(x.name)}"></span>
+                <span class="upnext-text">
+                  <span class="upnext-name">${escapeHtml(x.name)}</span>
+                  <span class="upnext-meta">${x.sets} &times; ${x.reps}</span>
+                </span>
               </button>`).join("")}
             </div>
           </div>`;
