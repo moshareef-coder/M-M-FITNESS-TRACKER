@@ -133,12 +133,12 @@
 
             { t: "Do the workout", scenario: "paired",
         s: "Five exercises, live timer",
-        note: "The real session screen on today's push day, reached the way Next through the warm-up reaches it. Log sets, change weights, tap through exercises. Weight and reps should sit on the same baseline in every row. Finish it and the cool-down runs, then the completion screen banks the workout into the fake database.",
+        note: "The real session screen on today's push day, reached the way Next through the warm-up reaches it. One screen, no scrolling: the figure stands on a light stage, everything you touch is in the sheet under your thumb. The chips are the sets, W is a warm-up rung off the plan's ramp and is never logged. Tap the exercise name for swap, skip and sharing; pull the handle for what is up next; tap the clock while it is counting a rest to go again. Finish it and the cool-down runs, then the completion screen banks the workout into the fake database.",
         run: (w) => { w.switchTab("workout"); w.startWorkout(); w.endStretchPhase(); } },
 
       { t: "Resting between sets", scenario: "paired",
-        s: "A plain clock, counting up",
-        note: "One set logged, so rest has started: RESTING and a clock counting up from zero, nothing to read or adjust mid-set. The weight is dropped under the bench best first, so this step shows rest on its own without a record firing over it.",
+        s: "The top clock counts the rest down",
+        note: "One set logged, so rest has started. The clock at the top of the screen is the rest clock now, with a lime dot instead of the red one, counting down to what this lift is planned to rest for and then carrying on past zero with a +, because standing there for four minutes is worth knowing. Tap it to say you are going again; logging the next set does the same thing. The weight is dropped under the bench best first, so this step shows rest on its own without a record firing over it.",
         run: (w) => {
           w.switchTab("workout");
           w.startWorkout();
@@ -169,12 +169,12 @@
           const tick = () => new Promise((r) => setTimeout(r, 120));
           /* Thumb through it: log every set, skip every rest, next every lift.
              Bounded so a changed session screen fails loudly rather than
-             spinning. */
+             spinning. Nothing skips the rest here any more: the rest clock
+             lives in the top bar and logging the next set ends it, which is
+             exactly what this loop does. */
           for (let guard = 0; guard < 60; guard++) {
             const log = doc.getElementById("logSetBtn");
             const next = doc.getElementById("nextExBtn");
-            const skipRest = doc.getElementById("restSkip");
-            if (skipRest) { skipRest.click(); await tick(); continue; }
             if (log && !log.classList.contains("hidden")) { log.click(); await tick(); continue; }
             if (next && !next.classList.contains("hidden")) { next.click(); await tick(); await tick(); await tick(); continue; }
             break;

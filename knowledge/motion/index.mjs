@@ -40,8 +40,20 @@ const ALL = {};
 for (const lib of Object.values(MOVES_BY_LIBRARY)) Object.assign(ALL, lib);
 
 export const MOVE_NAMES = Object.keys(ALL).sort();
-export const hasMove = (name) => Object.prototype.hasOwnProperty.call(ALL, name);
-export const moveFor = (name) => ALL[name] || null;
+export const hasMove = (name) => moveFor(name) !== null;
+// Names that older plans and logs use for a move the library files under a
+// longer name. A row with an unknown name keeps its old icon, so the miss is
+// quiet, but the session hero should not be blank for the commonest lift.
+const ALIASES = {
+  "Bench Press": "Barbell Bench Press",
+  "Squat": "Barbell Back Squat",
+  "Back Squat": "Barbell Back Squat",
+  "Shoulder Press": "Overhead Press",
+  "Military Press": "Overhead Press",
+  "Deadlifts": "Deadlift",
+  "RDL": "Romanian Deadlift",
+};
+export const moveFor = (name) => ALL[name] || ALL[ALIASES[name]] || null;
 
 // ------------------------------------------------------------ the runtime ---
 // One requestAnimationFrame loop drives every mounted canvas on the page. A

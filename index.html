@@ -888,7 +888,19 @@
   }
 
   .session-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
-  .session-clock { display: flex; align-items: center; gap: 11px; }
+  /* A button, but it must read as a clock until there is a rest to skip, so
+     no chrome of its own: the press state is all the affordance it gets. */
+  .session-clock {
+    display: flex; align-items: center; gap: 11px;
+    border: 0; background: none; padding: 4px 10px; border-radius: 100px;
+    font-family: inherit; color: inherit; cursor: pointer;
+    transition: transform .12s ease, background .12s ease;
+  }
+  .session-clock:active { transform: scale(.96); }
+  /* Resting: same slot, lime dot instead of the red record dot, and the number
+     goes lime once the recommendation has been reached. */
+  .session-clock.resting .rec-dot { background: var(--accent); }
+  .session-clock.resting.ready .session-timer { color: var(--accent-ink); }
   .rec-dot {
     width: 11px; height: 11px; border-radius: 50%; background: var(--up); flex-shrink: 0;
     animation: recPulse 2s ease-in-out infinite;
@@ -1598,6 +1610,216 @@
     margin: 0; min-height: 62px; font-size: 19px; border-radius: 18px;
   }
   .session-overlay { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+
+  /* ---------- The live lift screen ----------
+     Mo's mockup, built as one screen that does not scroll: a grey stage with
+     the figure standing in it takes the top two thirds, and everything you
+     touch lives in a sheet pinned under your thumb. A flex column rather than
+     a scrolling document, because the sheet has to sit on the bottom of the
+     phone whatever the exercise name does, and the stage takes what is left.
+     Only this one screen: the warm-up, the paused sheet and the wrap-up all
+     still scroll, which is why the class is added and removed per render. */
+  .session-overlay.lifting {
+    display: flex; flex-direction: column;
+    overflow: hidden; padding: 0;
+    /* The stage. Dark at the very top so the clock and the title read white,
+       light through the middle where the figure stands, dropping away again
+       toward the sheet so the stage has a floor rather than an edge. It is
+       painted on the overlay and stopped at 68% because that is where the
+       sheet begins; below it, the app's own ground. */
+    --sess-ink: #f4f6f8;
+    --sess-stage: linear-gradient(180deg, #3a3d42 0%, #abadb1 26%, #e7e9ec 50%, #e4e6e9 70%, #a9acb1 88%, #74787e 100%);
+    --sess-sheet: linear-gradient(180deg, #24272e 0%, #101218 58%, #0d0f14 100%);
+    /* The fill under anything tappable that is not the CTA: on the stage it
+       has to sit on grey, in the sheet on near-black, so it is a tint of the
+       local ink rather than a panel colour. */
+    --sess-key: rgba(255,255,255,.13);
+    --sess-key-press: rgba(255,255,255,.22);
+    background: var(--sess-stage) no-repeat top / 100% 68%, var(--bg);
+  }
+  html[data-theme="light"] .session-overlay.lifting {
+    --sess-ink: #111318;
+    /* Ends deeper than the sheet it runs into, or a white sheet on a white
+       stage has nothing but its hairline to say it is a separate thing. */
+    --sess-stage: linear-gradient(180deg, #e6e9ee 0%, #f2f4f7 26%, #ffffff 50%, #fbfcfd 70%, #e2e6ed 88%, #ccd2dc 100%);
+    --sess-sheet: linear-gradient(180deg, #ffffff 0%, #ffffff 100%);
+    --sess-key: rgba(17,19,24,.07);
+    --sess-key-press: rgba(17,19,24,.13);
+  }
+  /* The top bar rides on the stage, so it takes the stage's ink rather than
+     the app's, and the two round buttons become ghosts on it. */
+  .session-overlay.lifting .session-bar {
+    flex-shrink: 0; margin: 0; color: var(--sess-ink);
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 18px 0;
+  }
+  .session-overlay.lifting .session-pause,
+  .session-overlay.lifting .session-min {
+    width: 44px; height: 44px; border: 0; color: var(--sess-ink); background: var(--sess-key);
+  }
+  .session-overlay.lifting .session-pause:active,
+  .session-overlay.lifting .session-min:active { background: var(--sess-key-press); }
+  .session-overlay.lifting .session-clock { color: var(--sess-ink); }
+  .session-overlay.lifting .session-clock:active { background: var(--sess-key); }
+  .session-overlay.lifting .session-timer { font-size: 32px; }
+
+  /* The body is the middle of the column, so it has to stretch: without this
+     it is content-height and the sheet floats up under the title. */
+  .session-overlay.lifting #sessionBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .sess-live { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .sess-top { flex-shrink: 0; padding: 12px 18px 0; color: var(--sess-ink); }
+  /* One segment per exercise. Done and current are lit, so the bar answers
+     "how much of this is behind me" at a glance and nothing else. */
+  .sess-segs { display: flex; gap: 5px; }
+  .sess-segs i {
+    flex: 1; height: 4px; border-radius: 100px;
+    background: color-mix(in srgb, var(--sess-ink) 24%, transparent);
+    transition: background .3s ease;
+  }
+  .sess-segs i.done, .sess-segs i.now { background: var(--accent); }
+  .sess-where {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    margin-top: 14px; font-size: 16px; font-weight: 700; letter-spacing: -.01em;
+    color: color-mix(in srgb, var(--sess-ink) 82%, transparent);
+  }
+  .sess-where span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* The name is the button that opens swap, skip and sharing: the three chips
+     that used to float beside it are gone, and the biggest word on the screen
+     is the thing you press to change what you are doing. */
+  .sess-title {
+    display: block; width: 100%; margin: 5px 0 0; padding: 0; border: 0; background: none;
+    text-align: left; font-family: var(--font-display); color: var(--sess-ink);
+    font-size: 33px; font-weight: 800; letter-spacing: -.03em; line-height: 1.08; cursor: pointer;
+    transition: opacity .12s ease;
+  }
+  .sess-title:active { opacity: .6; }
+
+  /* The figure gets everything between the title and the sheet, and is clipped
+     rather than allowed to push either of them. */
+  .sess-stage {
+    position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sess-fig.sess-fig-stage { margin: 0; }
+  .sess-stage-none {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #8f959d; opacity: .28; pointer-events: none;
+  }
+  .sess-stage:has(.fig-live) .sess-stage-none { display: none; }
+  .sess-fig.sess-fig-stage canvas { width: min(360px, 88vw); height: min(360px, 88vw); }
+
+  /* The sheet: everything you touch, in one place, at the bottom of the phone. */
+  .sess-sheet {
+    flex-shrink: 0; position: relative; z-index: 2;
+    background: var(--sess-sheet); border-radius: 28px 28px 0 0;
+    padding: 0 20px calc(22px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -20px 44px -26px rgba(0,0,0,.8);
+  }
+  html[data-theme="light"] .sess-sheet {
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -16px 36px -28px rgba(17,19,24,.5);
+  }
+  .sess-grab {
+    display: block; width: 100%; border: 0; background: none; cursor: pointer;
+    padding: 16px 0 12px; touch-action: none;
+  }
+  .sess-grab i {
+    display: block; width: 42px; height: 4px; border-radius: 100px; margin: 0 auto;
+    background: color-mix(in srgb, var(--text) 26%, transparent);
+    transition: background .15s ease;
+  }
+  .sess-grab:active i { background: color-mix(in srgb, var(--text) 45%, transparent); }
+
+  /* One chip per set: filled when it is banked, outlined when it is the one
+     you are standing on, dim when it is still ahead. W is a warm-up rung from
+     the plan's ramp, which is never logged and never counted. */
+  /* They share the row evenly, but only up to a point: three sets stretched to
+     130px each stopped reading as chips and started reading as buttons. Capped
+     and centred, so a short row is deliberate and a long one still fills. */
+  .sess-chips { display: flex; justify-content: center; gap: 7px; }
+  .sess-chip {
+    flex: 1 1 0; min-width: 0; max-width: 92px;
+    height: 40px; border-radius: 12px; border: 2px solid transparent; cursor: pointer;
+    font-family: inherit; font-size: 16px; font-weight: 800; letter-spacing: -.01em;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--panel-2); color: var(--muted);
+    transition: transform .12s ease, background .18s ease, color .18s ease, border-color .18s ease;
+  }
+  .sess-chip:disabled { cursor: default; }
+  .sess-chip.done { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+  .sess-chip.current { background: var(--bg); border-color: var(--accent); color: var(--accent-ink); }
+  .sess-chip:not(:disabled):active { transform: scale(.94); }
+  .sess-chip.just-done { animation: setPop .52s cubic-bezier(.22,1,.36,1); }
+
+  /* What you did last time, and the mark worth beating. This is the whole of
+     the PB line now: no trophy chip, no "guessed from" note. */
+  .sess-lastline {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    margin-top: 15px; font-size: 15.5px;
+  }
+  .sess-lastline .last { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sess-lastline .beat { color: var(--accent-ink); font-weight: 700; flex-shrink: 0; }
+
+  /* Weight and reps, one cluster each, thumb-sized keys either side of a
+     number big enough to read at arm's length on the floor. */
+  .sess-dials { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 14px; }
+  .sess-dial { min-width: 0; text-align: center; }
+  .sess-dial-label {
+    font-size: 12px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
+  }
+  .sess-dial-ctl { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 10px; }
+  /* Same button geometry as everywhere else in the app, sized up for the sheet
+     and squared off to match the chips above it. */
+  .sess-sheet .round-btn.sm {
+    width: 44px; height: 44px; flex: 0 0 44px; border-radius: 14px;
+    border: 0; background: var(--sess-key); color: var(--text); font-size: 21px;
+  }
+  .sess-sheet .round-btn.sm:active { background: var(--sess-key-press); transform: scale(.94); }
+  .sess-sheet .sess-input {
+    flex: 1 1 auto; width: 100%; min-width: 0; max-width: none; text-align: center;
+    background: transparent; border: 0; padding: 0; color: var(--text);
+    font-size: 38px; font-weight: 800; letter-spacing: -.02em;
+  }
+
+  /* The one log button on the screen. It lives in the sheet now rather than
+     floating over the page, so there is nothing for it to overlap. */
+  .sess-sheet .sess-cta {
+    position: static; padding: 0; margin-top: 18px; background: none; border: 0;
+  }
+  .sess-sheet .sess-cta .btn-big { margin: 0; min-height: 62px; font-size: 19px; border-radius: 18px; }
+
+  /* Up next is folded away under the CTA. The handle opens it, and the stage
+     gives up the room, so nothing is ever hidden behind the sheet. */
+  .sess-sheet .upnext {
+    margin: 0 -20px; max-height: 0; opacity: 0; overflow: hidden;
+    transition: max-height .3s cubic-bezier(.22,1,.36,1), opacity .2s ease, margin-top .3s cubic-bezier(.22,1,.36,1);
+  }
+  .sess-sheet.open .upnext { max-height: 168px; opacity: 1; margin-top: 18px; }
+  .sess-sheet .upnext-label { margin: 0 20px 10px; }
+  /* Without the scroll padding the snap eats the left inset and the first
+     card sits flush against the edge of the phone. */
+  .sess-sheet .upnext-rail { padding: 0 20px 6px; scroll-padding-left: 20px; }
+
+  .sess-live.ex-in .sess-top,
+  .sess-live.ex-in .sess-fig-stage { animation: exIn .44s cubic-bezier(.22,1,.36,1) both; }
+  @media (prefers-reduced-motion: reduce) {
+    .sess-live.ex-in .sess-top, .sess-live.ex-in .sess-fig-stage,
+    .sess-chip.just-done { animation: none; }
+    .sess-sheet .upnext { transition: none; }
+  }
+
+  /* The action sheet behind the exercise name. */
+  .sess-acts { display: flex; flex-direction: column; gap: 8px; }
+  .sess-act {
+    display: flex; align-items: center; gap: 12px; width: 100%; cursor: pointer;
+    padding: 14px 15px; border-radius: 14px; text-align: left; font-family: inherit;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    font-size: 15.5px; font-weight: 700;
+    transition: transform .12s ease, border-color .12s ease;
+  }
+  .sess-act:active { transform: scale(.985); border-color: var(--accent); }
+  .sess-act[disabled] { opacity: .45; cursor: not-allowed; }
+  .sess-act i { display: block; font-style: normal; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-top: 2px; }
+  .sess-act-ico { flex-shrink: 0; display: flex; color: var(--accent-ink); }
   .sess-card.sess-bottom .sess-note { margin-bottom: 8px; }
   .sess-fig.fig-none { display: none; }
   .stretch-fig { display: flex; justify-content: center; margin: 6px 0 4px; }
@@ -3939,6 +4161,12 @@
     padding: 10px 18px; border-radius: 100px; font-size: 15.5px; z-index: 100;
     opacity: 0; pointer-events: none; transition: opacity 0.25s;
   }
+  /* While a lift is on screen the only button is the lime bar at the bottom,
+     and a toast at bottom 20px sat right on top of it. Park it on the stage,
+     between the title and the figure's head, where nothing is tappable. */
+  body:has(.session-overlay.lifting) .toast {
+    bottom: auto; top: 19%; white-space: nowrap; max-width: calc(100% - 48px); overflow: hidden; text-overflow: ellipsis;
+  }
   .toast.show { opacity: 1; }
 
   .challenge-bar-wrap { margin-bottom: 14px; }
@@ -4028,7 +4256,10 @@
     <div id="sessionCard" class="session-overlay hidden">
       <div class="session-bar">
         <button type="button" class="session-min" id="sessionMinBtn" aria-label="Back, without ending the workout"></button>
-        <div class="session-clock"><span class="rec-dot" id="recDot"></span><span class="session-timer" id="sessionTimer">0:00</span></div>
+        <!-- The clock is a button because it is two things: the elapsed
+             workout time, and the rest countdown once a set lands. Tapping it
+             while resting is how you say you are going again. -->
+        <button type="button" class="session-clock" id="sessionClock" aria-label="Workout time"><span class="rec-dot" id="recDot"></span><span class="session-timer" id="sessionTimer">0:00</span></button>
         <button type="button" class="session-pause" id="sessionPauseBtn" aria-label="Pause workout"></button>
       </div>
       <!-- The progress hairline moved into the body: see .sess-progress, which
@@ -13099,17 +13330,21 @@ function restLabel(sec) {
   return `${sec}s`;
 }
 
-/* One place decides what the strip says, so the first paint and the ticker can
-   never disagree. The clock counts UP from the moment the set ended, because
-   that is the part the app actually knows: it cannot tell when YOU are
-   recovered. A countdown implied it could, and implied you had failed at zero.
-   The recommendation sits beside the number as advice instead, and past it the
-   clock keeps counting plainly, because standing there for four minutes is
-   worth knowing. */
+/* One place decides what the clock says, so the first paint and the ticker can
+   never disagree. It counts DOWN to the rest this lift is planned for, which
+   is what Mo's mockup asks for and what you actually want to see between sets.
+   Past zero it does NOT stop or reset: it keeps counting, with a +, because
+   the app cannot tell when YOU are recovered and standing there for four
+   minutes is worth knowing. The recorded rest is the real elapsed time either
+   way (recordRest), whatever the target said. */
 function restState(ms) {
   const target = restTargetSec();
   const elapsed = Math.max(0, ms) / 1000;
-  return { target, ready: elapsed >= target, text: formatRest(elapsed * 1000) };
+  const left = target - elapsed;
+  return {
+    target, elapsed, ready: left <= 0,
+    text: left > 0 ? formatRest(left * 1000) : `+${formatRest(-left * 1000)}`,
+  };
 }
 
 /* Why the number is the number. A recommendation you can trace back to your own
@@ -13130,14 +13365,20 @@ function restAdvice(s) {
 }
 
 function paintRest() {
-  const bar = document.getElementById("restTimer");
-  const clock = document.getElementById("restClock");
-  if (!bar || !clock || !SESSION?.restStartedAt) { stopRestTicker(); return; }
+  const el = $("sessionTimer");
+  if (!el || !restingNow()) { stopRestTicker(); return; }
   const s = restState(Date.now() - SESSION.restStartedAt);
-  clock.textContent = s.text;
-  bar.classList.toggle("ready", s.ready);
-  const advice = document.getElementById("restAdvice");
-  if (advice) advice.textContent = restAdvice(s);
+  el.textContent = s.text;
+  const clock = $("sessionClock");
+  if (clock) {
+    clock.classList.add("resting");
+    clock.classList.toggle("ready", s.ready);
+    clock.setAttribute("aria-label", `Resting ${s.text}, tap to start the next set`);
+    /* Why the number is the number. It is no longer a line on the screen (the
+       screen is the mockup's, and it has no room for one), but the reasoning
+       still has to exist somewhere you can reach: press and hold the clock. */
+    clock.title = restAdvice(s);
+  }
   // One buzz as the recommendation lands, once per rest however long you stand
   // there. It says "you are good to go", not "you are late".
   if (s.ready && REST_BUZZED_AT !== SESSION.restStartedAt) {
@@ -13691,6 +13932,7 @@ function renderStretchPhase() {
   const next = list[i + 1];
   const nextUp = move.perSide && SESSION.stretchSide === 1 ? "other side" : next ? next.name : (isWarm ? "first lift" : "finish");
   SESSION_LAST_EX = null;   // the first lift after the warm-up slides in like a new exercise
+  $("sessionCard").classList.remove("lifting");   // the timed blocks scroll, the lift screen does not
   $("sessionProgressFill").style.width = isWarm ? "0%" : "100%";
   /* The whole screen changes colour for the duration of the block. See the
      .session-overlay.stretching rules: one class, every accent follows. */
@@ -13756,51 +13998,48 @@ function renderStretchPhase() {
 
 let SESSION_JUST_SET = null;   // a set logged a moment ago, popped once on redraw
 let SESSION_LAST_EX = null;    // the exercise last drawn, so a change can slide in
+/* Whether the bottom sheet is pulled up over the stage to show what is next.
+   Collapsed by default, every time: the screen's job is the set in front of
+   you, and the list of what is coming is a question you ask, not a shelf. */
+let SESSION_SHEET_OPEN = false;
 
-/* Which lift's ramp is folded open, by index, while the session is alive. Open
-   is the default because the loads are the whole point of showing it, and the
-   fold is for the second lift of a day you already know the numbers on. Closing
-   it is not "done": that is the dismiss below, which is remembered. */
-const RAMP_OPEN = {};
+/* THE WARM-UP RUNGS, as the W chips at the head of the set row. They are the
+   plan's ramp (planMobility().ramp), and they stay what they always were:
+   never logged, never counted, never calibrated against. Ticking one writes a
+   number on SESSION and nothing else, so a ramp set still cannot reach
+   SESSION.setsDone, exercise_logs, the progress bar or the volume.
 
-/* The ramp above the working sets, at the one moment it is useful: standing at
-   the bar deciding what to load. It carries NO tickable control of any kind and
-   writes nothing, which is how a ramp set stays out of SESSION.setsDone, out of
-   the set counter and the progress bar, out of exercise_logs and out of the
-   volume and XP that are summed from those. It disappears on its own the moment
-   a working set of this lift is logged, and "I'm warmed up" hides it for the
-   rest of the session for anyone who walked in warm. */
-function sessionRampHTML(ex, ei, setsDone) {
+   They are shown for the whole exercise rather than vanishing at the first
+   working set, because a row of chips that changes length under your thumb is
+   worse than two ticked chips you can ignore. */
+function rampSetsFor(ex) {
   const ramp = rampForExercise(planMobility()?.ramp, ex?.name);
-  if (!ramp || setsDone.some(Boolean) || SESSION?.rampDone?.[ei]) return "";
-  const open = RAMP_OPEN[ei] !== false;
-  const mins = Math.max(1, Math.round((Number(ramp.seconds) || 0) / 60));
-  const top = Number(ex.targetWeight) > 0 ? ` up to ${ex.targetWeight} lb` : "";
-  /* The second main lift of a day earns exactly one rung, so the singular is a
-     real case rather than a defensive one. */
-  const n = ramp.sets.length;
-  return `
-    <div class="ramp-fold${open ? " open" : ""}">
-      <button type="button" class="ramp-head" data-ramp-toggle aria-expanded="${open}">
-        <span class="ramp-head-ico">${icon("flame", 15)}</span>
-        <span class="ramp-head-text">
-          <b>Warm-up set${n === 1 ? "" : "s"}${top}</b>
-          <i>${n} light set${n === 1 ? "" : "s"} · about ${mins} min · nothing to log</i>
-        </span>
-        <span class="ramp-head-chev">${icon("chevronDown", 16)}</span>
-      </button>
-      ${open ? `
-        <div class="ramp-rungs">
-          ${ramp.sets.map((s) => `
-            <div class="ramp-rung">
-              <span class="ramp-rung-load">${Number(s.weight) > 0 ? `${s.weight} lb` : "Bar"}</span>
-              <span class="ramp-rung-reps">× ${s.reps}</span>
-              <span class="ramp-rung-rest">${s.restSec}s rest</span>
-            </div>
-            ${s.cue ? `<div class="ramp-cue">${escapeHtml(s.cue)}</div>` : ""}`).join("")}
-        </div>
-        <button type="button" class="link-btn ramp-skip" data-ramp-done>I'm warmed up</button>` : ""}
-    </div>`;
+  return ramp?.sets || [];
+}
+
+/* How many rungs are behind you. A working set already logged means the
+   warm-up is over whatever was tapped, and rampDone is the old "I'm warmed up"
+   dismissal, still honoured for a session saved before this screen existed. */
+function rampTicksFor(ei, rungs, setsDone) {
+  if (!rungs.length) return 0;
+  if (setsDone.some(Boolean) || SESSION?.rampDone?.[ei]) return rungs.length;
+  return Math.min(rungs.length, Number(SESSION?.rampTicks?.[ei]) || 0);
+}
+
+function tickRampSet(ei, i, rungs) {
+  if (!SESSION) return;
+  if (!SESSION.rampTicks) SESSION.rampTicks = {};
+  const now = rampTicksFor(ei, rungs, SESSION.setsDone[ei] || []);
+  // Tapping the last ticked rung un-ticks it; tapping any other counts up to it.
+  SESSION.rampTicks[ei] = now === i + 1 ? i : i + 1;
+  saveSessionToStorage();
+  renderSession();
+}
+
+/* One rung said in the fewest words that still name a load: "the bar", because
+   `weight: 0` is the empty bar or the lightest thing in the room. */
+function rampRungLabel(s) {
+  return `${Number(s.weight) > 0 ? `${s.weight} lb` : "the bar"} × ${s.reps}`;
 }
 
 function renderSession() {
@@ -13851,15 +14090,12 @@ function renderSession() {
   // starting the next one, so the clock measures actual rest rather than
   // rest plus the set you were busy doing.
   const resting = !!SESSION.restStartedAt && !allDone;
-  const restMs = SESSION.restStartedAt ? Date.now() - SESSION.restStartedAt : 0;
-  const restNow = restState(restMs);
-  /* What is actually next, named. Rest is the one moment in a set cycle when
-     somebody is looking at the phone, and a bare clock wastes it. */
-  const nextUp = currentSet >= 0 && currentSet < setsDone.length
-    ? `set ${currentSet + 1} of ${setsDone.length}`
-    : (ei + 1 < total ? escapeHtml(TODAY_WORKOUT.exercises[ei + 1].name) : "finish");
 
   const lastTime = lastTimeFor(ex.name);
+  /* The warm-up rungs of this lift, if the plan bought any. No ramp is the
+     normal case, and it renders nothing: there is no warm-up set to invent. */
+  const rungs = rampSetsFor(ex);
+  const rampTicks = rampTicksFor(ei, rungs, setsDone);
 
   const exChanged = SESSION_LAST_EX !== ei;
   SESSION_LAST_EX = ei;
@@ -13867,143 +14103,135 @@ function renderSession() {
   SESSION_JUST_SET = null;
 
   $("sessionBody").innerHTML = `
-    <div class="sess-progress">
-      <div class="sess-progress-top">
-        <div class="sess-progress-now">Exercise ${ei + 1} <span>of ${total}</span></div>
-        <div class="sess-progress-sets">Set ${Math.min(currentSet < 0 ? setsDone.length : currentSet + 1, setsDone.length)} of ${setsDone.length}</div>
+    <div class="sess-live${exChanged ? " ex-in" : ""}">
+      <div class="sess-top">
+        <div class="sess-segs">
+          ${TODAY_WORKOUT.exercises.map((_, i) => `<i class="${SESSION.completed[i] ? "done" : i === ei ? "now" : ""}"></i>`).join("")}
+        </div>
+        <div class="sess-where">
+          <span>Exercise ${ei + 1} of ${total}</span>
+          <span>${escapeHtml(displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises))}</span>
+        </div>
+        <button type="button" class="sess-title" id="sessTitleBtn" aria-haspopup="dialog"
+          aria-label="${escapeHtml(ex.name)}, change this exercise">${escapeHtml(ex.name)}</button>
       </div>
-      <div class="sess-progress-pips">
-        ${TODAY_WORKOUT.exercises.map((_, i) => `<i class="${SESSION.completed[i] ? "done" : i === ei ? "now" : ""}"></i>`).join("")}
+
+      <div class="sess-stage">
+        <!-- The figure is always drawn in the light palette, whatever theme the
+             app is in: it stands on the light stage, not on the app's ground. -->
+        <div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(ex.name)}" data-theme="light"
+          data-mood="${beatenPB ? "surprised" : justSet != null ? "happy" : "neutral"}"></div>
+        <!-- Not every lift in the library has a drawn move yet. The stage is
+             the tallest thing on the screen, so an empty one reads as broken;
+             this is the one mark that says "no figure for this one", quietly,
+             and it is hidden the moment a real figure mounts. -->
+        <div class="sess-stage-none" aria-hidden="true">${icon("dumbbell", 72)}</div>
       </div>
-      <div class="set-circles">
-        ${setsDone.map((done, i) => {
-          const w = SESSION.setWeights?.[ei]?.[i];
-          const isCurrent = i === currentSet;
-          return `<div class="set-col${exChanged ? " h-pop" : ""}" style="--d:${140 + i * 55}ms">
-            <button type="button" class="set-circle ${done ? "done" : ""} ${isCurrent ? "current" : ""}${justSet === i ? " just-done" : ""}"
+
+      <div class="sess-sheet${SESSION_SHEET_OPEN ? " open" : ""}" id="sessSheet">
+        <button type="button" class="sess-grab" id="sessGrab" aria-expanded="${SESSION_SHEET_OPEN ? "true" : "false"}"
+          aria-label="${SESSION_SHEET_OPEN ? "Hide what is up next" : "Show what is up next"}"><i></i></button>
+
+        <div class="sess-chips">
+          ${rungs.map((r, i) => `<button type="button" class="sess-chip${i < rampTicks ? " done" : ""}"
+            data-ramp="${i}" title="Warm-up, ${escapeHtml(rampRungLabel(r))}"
+            aria-label="Warm-up ${i + 1}, ${escapeHtml(rampRungLabel(r))}, ${i < rampTicks ? "done" : "not done"}">W</button>`).join("")}
+          ${setsDone.map((done, i) => {
+            const isCurrent = i === currentSet;
+            return `<button type="button" class="sess-chip${done ? " done" : ""}${isCurrent ? " current" : ""}${justSet === i ? " just-done" : ""}"
               data-set="${i}" ${done || isCurrent ? "" : "disabled"}
-              aria-pressed="${done ? "true" : "false"}"
-              aria-label="Set ${i + 1}, ${done ? "done" : isCurrent ? "current" : "not started"}">${done ? icon("check", 18) : i + 1}</button>
-            <div class="set-weight">${done ? (w != null ? `${w} lb` : "done") : isCurrent ? "pending" : "&nbsp;"}</div>
+              aria-label="Set ${i + 1}, ${done ? "done" : isCurrent ? "current" : "not started"}">${i + 1}</button>`;
+          }).join("")}
+          ${allDone ? `<button type="button" class="sess-chip" id="addSetBtn" aria-label="Add another set">+</button>` : ""}
+        </div>
+
+        <div class="sess-lastline">
+          ${(() => {
+            /* While there are rungs left, the left slot carries the one you are
+               on, because "what do I put on the bar" is the live question. Once
+               the warm-up is behind you it goes back to last time's numbers. */
+            if (rampTicks < rungs.length) return `<span class="last">Warm-up, ${escapeHtml(rampRungLabel(rungs[rampTicks]))}</span>`;
+            return lastTime
+              ? `<span class="last">Last time ${lastTime.weight} lb${lastTime.reps ? ` &times; ${lastTime.reps}` : ""}</span>`
+              : `<span class="last">First time on this lift</span>`;
+          })()}
+          ${pbWeight == null ? "" : beatenPB
+            ? `<span class="beat">New best, ${sessionTop} lb</span>`
+            : `<span class="beat">Beat it, was ${pbWeight}${pbReps ? ` &times; ${pbReps}` : " lb"}</span>`}
+        </div>
+
+        <div class="sess-dials">
+          <div class="sess-dial">
+            <div class="sess-dial-label">Weight lb</div>
+            <div class="sess-dial-ctl">
+              <button type="button" class="round-btn sm" id="sessWeightMinus" aria-label="Less weight">&minus;</button>
+              <input class="sess-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" max="2000" value="${SESSION.weights[ei] || 0}" />
+              <button type="button" class="round-btn sm" id="sessWeightPlus" aria-label="More weight">+</button>
+            </div>
+          </div>
+          <div class="sess-dial">
+            <div class="sess-dial-label">Reps</div>
+            <div class="sess-dial-ctl">
+              <button type="button" class="round-btn sm" id="sessRepsMinus" aria-label="Fewer reps">&minus;</button>
+              <input class="sess-input" id="sessRepsVal" type="number" inputmode="numeric" step="1" min="0" max="500" value="${SESSION.reps[ei] || 0}" />
+              <button type="button" class="round-btn sm" id="sessRepsPlus" aria-label="More reps">+</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sess-cta">
+          <button type="button" class="btn-big btn-primary ${allDone ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>
+          <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">${SESSION.completed.some((c, i) => !c && i !== ei) ? "Next exercise" : "Finish workout"}</button>
+        </div>
+
+        ${(() => {
+          const others = TODAY_WORKOUT.exercises
+            .map((x, i) => ({ x, i }))
+            .filter(({ i }) => i !== ei && !SESSION.completed[i]);
+          if (!others.length) return "";
+          /* Folded away under the sheet until the handle is pulled: what is
+             coming is worth one tap, not a permanent shelf on a screen whose
+             whole job is the set in front of you. */
+          return `<div class="upnext">
+            <div class="upnext-label">Up next</div>
+            <div class="upnext-rail">
+              ${others.map(({ x, i }) => `<button type="button" class="upnext-card" data-jump="${i}">
+                <span class="upnext-name">${escapeHtml(x.name)}</span>
+                <span class="upnext-meta">${x.sets} &times; ${x.reps}</span>
+              </button>`).join("")}
+            </div>
           </div>`;
-        }).join("")}
-        ${allDone ? `<div class="set-col">
-          <button type="button" class="set-circle set-add" id="addSetBtn" aria-label="Add another set">${icon("plus", 20)}</button>
-          <div class="set-weight">extra</div>
-        </div>` : ""}
+        })()}
       </div>
-    </div>
-
-    <div class="sess-card${exChanged ? " ex-in" : ""}">
-      <div class="sess-head">
-        <h2 class="sess-name">${escapeHtml(ex.name)}</h2>
-        <div class="sess-step-acts">
-          <button type="button" class="wp-chip" id="sessSwapBtn" aria-label="Swap this exercise">${icon("swap", 14)}</button>
-          ${PARTNER_EMAIL ? `<button type="button" class="wp-chip${workoutPrivacyLocked() ? " on" : ""}" id="sessPrivacyBtn"
-            aria-label="Who can see this workout">${icon(workoutPrivacyLocked() ? "lock" : "people", 14)}</button>` : ""}
-        </div>
-      </div>
-      ${pbWeight != null ? `<div class="sess-meta">
-        <span class="sess-best${beatenPB ? " beaten" : ""}">${icon("trophy", 13)}${beatenPB
-          ? `Beat it, was ${pbWeight} lb`
-          : `Best ${pbWeight} lb${pbReps ? ` × ${pbReps}` : ""}`}</span>
-      </div>` : ""}
-
-      <div class="sess-fig sess-fig-hero" data-fig="${escapeHtml(ex.name)}" data-mood="${beatenPB ? "surprised" : justSet != null ? "happy" : "neutral"}"></div>
-    </div>
-
-    ${sessionRampHTML(ex, ei, setsDone)}
-
-    ${resting ? `
-      <div class="rest-bar${restNow.ready ? " ready" : ""}" id="restTimer">
-        <div class="rest-head">
-          <span class="rest-label">RESTING</span>
-          ${nextUp ? `<span class="rest-next">Next: ${escapeHtml(nextUp)}</span>` : ""}
-        </div>
-        <span class="rest-clock" id="restClock">${restNow.text}</span>
-        <div class="rest-advice" id="restAdvice">${escapeHtml(restAdvice(restNow))}</div>
-        <div class="rest-adjust">
-          <button type="button" id="restSkip">Start next set</button>
-        </div>
-      </div>` : ""}
-
-    <div class="sess-entry">
-      <div class="sess-entry-cell">
-        <div class="sess-entry-label">Weight <span class="sess-entry-unit">lb</span></div>
-        <div class="sess-entry-ctl">
-          <button type="button" class="round-btn sm" id="sessWeightMinus" aria-label="Less weight">&minus;</button>
-          <input class="sess-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" max="2000" value="${SESSION.weights[ei] || 0}" />
-          <button type="button" class="round-btn sm" id="sessWeightPlus" aria-label="More weight">+</button>
-        </div>
-        ${lastTime ? `<div class="sess-entry-last">Last ${lastTime.weight}${lastTime.reps ? ` &times; ${lastTime.reps}` : " lb"}</div>` : ""}
-      </div>
-      <div class="sess-entry-cell">
-        <div class="sess-entry-label">Reps</div>
-        <div class="sess-entry-ctl">
-          <button type="button" class="round-btn sm" id="sessRepsMinus" aria-label="Fewer reps">&minus;</button>
-          <input class="sess-input" id="sessRepsVal" type="number" inputmode="numeric" step="1" min="0" max="500" value="${SESSION.reps[ei] || 0}" />
-          <button type="button" class="round-btn sm" id="sessRepsPlus" aria-label="More reps">+</button>
-        </div>
-        ${lastTime ? `<div class="sess-entry-last">&nbsp;</div>` : ""}
-      </div>
-    </div>
-
-    </div>
-
-    ${(() => {
-      const others = TODAY_WORKOUT.exercises
-        .map((x, i) => ({ x, i }))
-        .filter(({ i }) => i !== ei && !SESSION.completed[i]);
-      if (!others.length) return "";
-      /* A swipeable rail instead of a wrapped bag of chips: two or three fit,
-         the rest are a flick away, and each one says what it actually is. */
-      return `<div class="upnext">
-        <div class="upnext-label">Up next</div>
-        <div class="upnext-rail">
-          ${others.map(({ x, i }) => `<button type="button" class="upnext-card" data-jump="${i}">
-            <span class="upnext-name">${escapeHtml(x.name)}</span>
-            <span class="upnext-meta">${x.sets} &times; ${x.reps}</span>
-          </button>`).join("")}
-        </div>
-      </div>`;
-    })()}
-    <div class="sess-cta">
-      <button type="button" class="btn-big btn-primary ${allDone ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>
-      <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">${SESSION.completed.some((c, i) => !c && i !== ei) ? "Next exercise" : "Finish workout"}</button>
     </div>`;
 
+  /* This screen is the one that does not scroll. Every other thing the overlay
+     draws (the stretch blocks, the paused sheet, the wrap-up) is a document,
+     so the class goes on here and comes off in each of those. */
+  $("sessionCard").classList.add("lifting");
   mountMotionFigures($("sessionBody"));
-  if (resting) startRestTicker();
-  else stopRestTicker();
+  /* The rest clock lives in the top bar now, so there is no bar to tick and
+     nothing to paint except that one number, which the session timer already
+     does every second. */
+  if (resting) startRestTicker(); else stopRestTicker();
+  tickTimer();
 
-  if ($("restSkip")) $("restSkip").onclick = () => startNextSet(currentSet);
+  wireSessionSheet();
 
-  /* Both of these only touch the ramp: neither goes near SESSION.setsDone,
-     SESSION.completed or the log. The dismiss is remembered on SESSION so it
-     survives a reload mid-session rather than coming back on every redraw. */
-  const rampToggle = $("sessionBody").querySelector("[data-ramp-toggle]");
-  if (rampToggle) rampToggle.onclick = () => { RAMP_OPEN[ei] = RAMP_OPEN[ei] === false; renderSession(); };
-  const rampDone = $("sessionBody").querySelector("[data-ramp-done]");
-  if (rampDone) rampDone.onclick = () => {
-    SESSION.rampDone = { ...(SESSION.rampDone || {}), [ei]: true };
-    saveSessionToStorage();
-    renderSession();
-  };
-
-  if ($("sessPrivacyBtn")) $("sessPrivacyBtn").onclick = openWorkoutPrivacy;
-  if ($("sessSwapBtn")) $("sessSwapBtn").onclick = swapCurrentExercise;
+  $("sessTitleBtn").onclick = openExerciseActions;
 
   const logBtn = $("logSetBtn");
   if (logBtn) logBtn.onclick = () => { if (currentSet >= 0) toggleSet(currentSet); };
-
-
 
   $("sessionBody").querySelectorAll("[data-jump]").forEach((b) => {
     b.onclick = () => jumpToExercise(parseInt(b.dataset.jump, 10));
   });
 
-  $("sessionBody").querySelectorAll(".set-circle[data-set]").forEach((btn) => {
+  $("sessionBody").querySelectorAll(".sess-chip[data-set]").forEach((btn) => {
     btn.onclick = () => toggleSet(parseInt(btn.dataset.set, 10));
+  });
+  $("sessionBody").querySelectorAll(".sess-chip[data-ramp]").forEach((btn) => {
+    btn.onclick = () => tickRampSet(ei, parseInt(btn.dataset.ramp, 10), rungs);
   });
   if ($("addSetBtn")) $("addSetBtn").onclick = addSet;
   const stepWeight = (delta) => {
@@ -14054,6 +14282,83 @@ function renderSession() {
   $("sessRepsVal").onblur = (e) => { e.target.value = SESSION.reps[ei] || 0; };
   $("nextExBtn").onclick = finishExerciseAndAdvance;
   // Ending lives behind the pause button now (askPauseOrEnd).
+}
+
+/* The handle: a tap toggles, and a drag does the obvious thing in either
+   direction. The sheet does not float over the content when it opens, it takes
+   room from the stage, so nothing is ever hidden behind it. */
+function wireSessionSheet() {
+  const sheet = $("sessSheet");
+  const grab = $("sessGrab");
+  if (!sheet || !grab) return;
+  const set = (open) => {
+    SESSION_SHEET_OPEN = open;
+    sheet.classList.toggle("open", open);
+    grab.setAttribute("aria-expanded", open ? "true" : "false");
+    grab.setAttribute("aria-label", open ? "Hide what is up next" : "Show what is up next");
+  };
+  let startY = null;
+  grab.onclick = () => set(!SESSION_SHEET_OPEN);
+  grab.onpointerdown = (e) => { startY = e.clientY; };
+  grab.onpointerup = (e) => {
+    if (startY == null) return;
+    const dy = startY - e.clientY;
+    startY = null;
+    // Anything under the threshold is a tap, and onclick has it.
+    if (Math.abs(dy) < 24) return;
+    set(dy > 0);
+  };
+}
+
+/* Everything you can do TO this exercise, behind its name. The three things
+   that used to be chips on the title line: swap it, skip it, and who can see
+   it. Each one is the handler that was already behind the chip. */
+function openExerciseActions() {
+  if (!SESSION || SESSION.finished) return;
+  const ei = SESSION.exerciseIndex;
+  const ex = TODAY_WORKOUT?.exercises?.[ei];
+  if (!ex) return;
+  const nextIdx = TODAY_WORKOUT.exercises.findIndex((x, i) => i !== ei && !SESSION.completed[i]);
+
+  const scrim = document.createElement("div");
+  scrim.className = "pop-scrim";
+  scrim.innerHTML = `
+    <div class="pop">
+      <div class="pop-body">
+        <div class="ds-top">
+          <div class="pop-who" style="color:var(--muted)">${escapeHtml(ex.name.toUpperCase())}</div>
+          <button type="button" class="ds-x" data-act="" aria-label="Close">&times;</button>
+        </div>
+        <div class="sess-acts">
+          <button type="button" class="sess-act" data-act="swap">
+            <span class="sess-act-ico">${icon("swap", 18)}</span>
+            <span>Swap exercise<i>A different movement for the same muscles</i></span>
+          </button>
+          <button type="button" class="sess-act" data-act="skip"${nextIdx === -1 ? " disabled" : ""}>
+            <span class="sess-act-ico">${icon("chevronRight", 18)}</span>
+            <span>Skip exercise<i>${nextIdx === -1
+              ? "Nothing else left to move to"
+              : `Move on to ${escapeHtml(TODAY_WORKOUT.exercises[nextIdx].name)}, come back any time`}</i></span>
+          </button>
+          ${PARTNER_EMAIL ? `<button type="button" class="sess-act" data-act="privacy">
+            <span class="sess-act-ico">${icon(workoutPrivacyLocked() ? "lock" : "people", 18)}</span>
+            <span>Who can see this<i>${escapeHtml(privacySummary())}</i></span>
+          </button>` : ""}
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+  const close = () => scrim.remove();
+  scrim.onclick = (e) => { if (e.target === scrim) close(); };
+  scrim.querySelectorAll("[data-act]").forEach((b) => {
+    b.onclick = () => {
+      const act = b.dataset.act;
+      close();
+      if (act === "swap") swapCurrentExercise();
+      else if (act === "skip" && nextIdx !== -1) jumpToExercise(nextIdx);
+      else if (act === "privacy") openWorkoutPrivacy();
+    };
+  });
 }
 
 let MARKING_DAY = false;
@@ -14155,6 +14460,7 @@ async function renderSessionComplete() {
   const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
   const full = doneCount >= total;
   $("sessionProgressFill").style.width = "100%";
+  $("sessionCard").classList.remove("lifting");
   $("sessionCard").classList.add("finished");
   stopSessionTimer();
   const proofEntry = todayEntryFor(MY_EMAIL);
@@ -14358,9 +14664,34 @@ function sessionElapsed() {
   return SESSION.pausedAt || !SESSION.startedAt ? base : base + (Date.now() - SESSION.startedAt);
 }
 
+/* One slot, two numbers. While you are resting it is the rest clock, and the
+   rest of the time it is how long the workout has been running. They cannot
+   both be on screen, so they cannot disagree, and the rest bar that used to
+   sit in the session body is gone. */
 function tickTimer() {
   const el = $("sessionTimer");
-  if (el) el.textContent = fmtElapsed(sessionElapsed());
+  if (!el) return;
+  const clock = $("sessionClock");
+  if (restingNow()) { paintRest(); return; }
+  clock?.classList.remove("resting", "ready");
+  clock?.setAttribute("aria-label", "Workout time");
+  el.textContent = fmtElapsed(sessionElapsed());
+}
+
+/* Resting is a state of the LIFT screen only: a warm-up hold or a finished
+   workout has its own clock and must not be overwritten by a stale rest. */
+function restingNow() {
+  return !!(SESSION && SESSION.restStartedAt && !SESSION.finished
+    && SESSION.phase !== "warmup" && SESSION.phase !== "cooldown");
+}
+
+/* Ends the rest early. Tapping the clock is the only way out of it now, and it
+   banks the real elapsed rest on the way past exactly as the old button did. */
+function skipRest() {
+  if (!restingNow()) return;
+  const sets = SESSION.setsDone?.[SESSION.exerciseIndex] || [];
+  const cur = sets.findIndex((d) => !d);
+  startNextSet(cur < 0 ? sets.length : cur);
 }
 
 function startSessionTimer() {
@@ -14390,6 +14721,9 @@ function openSessionUI() {
   };
   $("sessionMinBtn").innerHTML = icon("chevronDown", 20);
   $("sessionMinBtn").onclick = minimiseSession;
+  // Tapping the clock means "I am going again" while it is counting a rest,
+  // and nothing at all while it is counting the workout.
+  $("sessionClock").onclick = skipRest;
   startSessionTimer();
 }
 
@@ -14450,6 +14784,7 @@ function togglePause() {
 }
 
 function renderPausedSheet() {
+  $("sessionCard").classList.remove("lifting");
   $("sessionBody").innerHTML = `
     <div class="session-paused-sheet">
       <h3>Paused</h3>
@@ -17249,6 +17584,12 @@ async function mountMotionFigures(root) {
     const name = el.dataset.fig;
     if (!mod.hasMove(name)) { el.classList.add("fig-none"); continue; }
     const canvas = document.createElement("canvas");
+    /* Usually the figure follows the app's theme. The session stage is the
+       exception: it is a light grey panel in BOTH themes, so the figure
+       standing on it has to be the light one or it disappears into its own
+       shadow. The element says so, and the mount and every later retint
+       honour it. */
+    const figTheme = el.dataset.theme || null;
     let litColor = el.dataset.litColor || heatHex(0.67);
     if (litColor === "stretch") litColor = getComputedStyle(document.documentElement).getPropertyValue("--stretch").trim() || "#2ea8ff";
     const lit = el.dataset.lit ? { muscles: el.dataset.lit.split(",").filter(Boolean), color: litColor } : null;
@@ -17265,7 +17606,7 @@ async function mountMotionFigures(root) {
            CSS box, and a mount at 156 px followed by a class that says 240
            would render one blurry upscaled frame first. */
         el.classList.add("fig-3d");
-        try { ctl = b3.mountBody3D(canvas, name, { theme: currentTheme(), lit }); }
+        try { ctl = b3.mountBody3D(canvas, name, { theme: figTheme || currentTheme(), lit }); }
         catch (e) { console.warn("body3d mount", e); ctl = null; }
         if (!ctl) el.classList.remove("fig-3d");
       }
@@ -17274,7 +17615,7 @@ async function mountMotionFigures(root) {
       /* Plain figure only. Mo looked at the muscle skin and the lit working
          muscle on real moves and asked for neither: the figure shows the
          movement, the legend under it names the muscles. */
-      theme: currentTheme(), accent: el.dataset.accent || "action", skin: "mannequin", lit: null,
+      theme: figTheme || currentTheme(), accent: el.dataset.accent || "action", skin: "mannequin", lit: null,
       // One neutral figure for everyone. Mo looked at the female variant and
       // asked for a single bald, neutral body for now; the rig still knows
       // how to draw her if that changes.
@@ -17285,11 +17626,13 @@ async function mountMotionFigures(root) {
     });
     if (!ctl) { canvas.remove(); el.classList.add("fig-none"); continue; }
     el.classList.add("fig-live");
-    MOTION_MOUNTS.add({ canvas, ctl });
+    MOTION_MOUNTS.add({ canvas, ctl, theme: figTheme });
   }
 }
 function retintMotionFigures() {
-  for (const m of MOTION_MOUNTS) if (m.canvas.isConnected) m.ctl.setTheme(currentTheme());
+  // A figure pinned to a theme by its element stays pinned when the app's
+  // theme changes: the stage it stands on did not change colour.
+  for (const m of MOTION_MOUNTS) if (m.canvas.isConnected) m.ctl.setTheme(m.theme || currentTheme());
 }
 
 function ensureRiveBodyModule() {
