@@ -96,7 +96,7 @@ function tick(now) {
 
 function paint(m) {
   const cycle = ((m.time / m.move.dur) % 1 + 1) % 1;
-  render(m.canvas, m.move, m.colors, cycle, m.time, { lit: m.lit, view: m.view });
+  render(m.canvas, m.move, m.colors, cycle, m.time, { lit: m.lit, view: m.view, mood: m.mood });
 }
 
 /**
@@ -113,6 +113,9 @@ export function mountMove(canvas, name, opts = {}) {
     theme: opts.theme || "dark",
     accent: opts.accent || "action",
     skin: opts.skin || "mannequin",
+    // The face's mood: neutral, happy, focused, surprised, sleepy. The app
+    // sets it from what just happened (a logged set, a beaten record).
+    mood: opts.mood || undefined,
     // "male" (default) or "female". Same skeleton and the same moves, a second
     // proportion table; see BODY_FEMALE in rig.mjs.
     bodyKind: opts.body || "male",
@@ -166,6 +169,12 @@ export function mountMove(canvas, name, opts = {}) {
     setTheme(theme) {
       m.theme = theme;
       m.colors = palette(theme, m.accent, m.skin, m.bodyKind);
+      m.dirty = true;
+      if (still) paint(m); else pump();
+      return api;
+    },
+    setMood(mood) {
+      m.mood = mood || undefined;
       m.dirty = true;
       if (still) paint(m); else pump();
       return api;
