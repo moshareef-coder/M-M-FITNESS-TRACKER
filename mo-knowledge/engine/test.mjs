@@ -280,9 +280,8 @@ const EXPECTED_PATTERN = {
     "Pseudo Planche Push-Up", "Push-Up", "Wall Push-Up", "Weighted Dip",
   ],
   verticalPush: [
-    "Arnold Press", "Cuban Press", "Dumbbell Shoulder Press", "Freestanding Handstand",
-    "Handstand Push-Up", "Machine Shoulder Press", "Overhead Press", "Push Press",
-    "Seated Dumbbell Press", "Wall Handstand Hold",
+    "Arnold Press", "Cuban Press", "Dumbbell Shoulder Press", "Handstand Push-Up",
+    "Machine Shoulder Press", "Overhead Press", "Push Press", "Seated Dumbbell Press",
   ],
   horizontalPull: [
     "Barbell Row", "Chest-Supported Row", "Dumbbell Row", "Inverted Row", "Pendlay Row",
@@ -317,7 +316,8 @@ const EXPECTED_PATTERN = {
     "Barbell Curl", "Barbell Shrug", "Behind-the-Back Shrug", "Cable Curl", "Cable Fly",
     "Cable Kickback", "Cable Lateral Raise", "Concentration Curl", "Dead Hang",
     "Donkey Calf Raise", "Dumbbell Calf Raise", "Dumbbell Curl", "Dumbbell Shrug",
-    "EZ-Bar Curl", "Face Pull", "Frog Pump", "Front Lever", "Front Raise", "Full Planche",
+    "EZ-Bar Curl", "Face Pull", "Freestanding Handstand", "Frog Pump", "Front Lever",
+    "Front Raise", "Full Planche",
     "Glute-Ham Raise", "Hammer Curl", "Incline Dumbbell Curl", "Lateral Raise", "Leg Curl",
     "Leg Extension", "Leg Press Calf Raise", "Low-to-High Cable Fly", "Nordic Curl",
     "Overhead Triceps Extension", "Pec Deck", "Planche Lean", "Plate Pinch", "Preacher Curl",
@@ -325,7 +325,7 @@ const EXPECTED_PATTERN = {
     "Reverse Wrist Curl", "Rope Pushdown", "Seated Calf Raise", "Single-Leg Calf Raise",
     "Skull Crusher", "Snatch-Grip High Pull", "Spider Curl", "Standing Calf Raise",
     "Straight-Arm Pulldown", "Triceps Kickback", "Triceps Pushdown", "Tuck Front Lever",
-    "Tuck Planche", "Wrist Curl",
+    "Tuck Planche", "Wall Handstand Hold", "Wrist Curl",
   ],
 };
 
@@ -451,6 +451,68 @@ test("cold start loads for a 265 lb male beginner stay conservative", () => {
   });
   assert.ok(squat.weight < 80, `goblet squat cold start was ${squat.weight}`);
   assert.ok(raise.weight < 30, `lateral raise cold start was ${raise.weight}`);
+});
+
+/* The fuzz run of 2026-09-12: one logged Goblet Squat at 200 lb turned into an
+   870 lb Leg Press for a 180 lb man the engine itself called a beginner. Every
+   assertion here is on the pounds that come out, never on a ratio or a factor,
+   because the ratios were all doing what they were told and the number was still
+   one nobody can lift. */
+test("a load extrapolated from one row of a different lift is capped, and says so", () => {
+  const logs = [{ entry_date: day(-4), exercise_name: "Goblet Squat", weight: 200, reps: 10 }];
+  const r = prescribeLoad({
+    exercise: { name: "Leg Press", equipment: "machine" }, reps: 10,
+    bodyWeightLb: 180, sex: "Male", level: "beginner", logs,
+  });
+  assert.equal(r.capped, true);
+  assert.ok(r.weight < 500, `capped leg press was ${r.weight}`);
+  assert.match(r.note, /guess/i);
+});
+
+test("three rows behind a guess buy it more room than one row does", () => {
+  const at = (name, weight, d) => ({ entry_date: day(d), exercise_name: name, weight, reps: 10 });
+  const person = { exercise: { name: "Leg Press", equipment: "machine" }, reps: 10, bodyWeightLb: 180, sex: "Male", level: "beginner" };
+  const one = prescribeLoad({ ...person, logs: [at("Goblet Squat", 200, -4)] });
+  const three = prescribeLoad({ ...person, logs: [at("Goblet Squat", 200, -4), at("Goblet Squat", 200, -7), at("Goblet Squat", 200, -10)] });
+  assert.equal(one.capped, true);
+  assert.ok(three.weight > one.weight, `three rows ${three.weight} should beat one row ${one.weight}`);
+});
+
+test("an ordinary guess from a similar lift is not capped and does not gain a caveat", () => {
+  const logs = [{ entry_date: day(-4), exercise_name: "Goblet Squat", weight: 50, reps: 10 }];
+  const r = prescribeLoad({
+    exercise: { name: "Barbell Back Squat", equipment: "barbell" }, reps: 10,
+    bodyWeightLb: 180, sex: "Male", level: "beginner", logs,
+  });
+  assert.equal(r.capped, false);
+  assert.doesNotMatch(r.note, /held here/);
+});
+
+/* CONTRACT.md: targetWeight is a number the app does arithmetic on, 0 means
+   bodyweight or unknown, never a string and never null. A log weight of 1e308 is
+   valid JSON, overflows a pattern ratio to Infinity, and JSON.stringify writes
+   Infinity as null. Asserted through JSON, because JSON is where it broke. */
+test("a nonsense log weight can never put a non-finite number into the plan", () => {
+  const cases = [1e308, Infinity, -Infinity, "not a number"];
+  for (const weight of cases) {
+    const logs = [{ entry_date: day(-4), exercise_name: "Goblet Squat", weight }];
+    for (const name of ["Leg Press", "Goblet Squat"]) {
+      const r = prescribeLoad({
+        exercise: { name, equipment: "machine" }, reps: 10,
+        bodyWeightLb: 180, sex: "Male", level: "beginner", logs,
+      });
+      const targetWeight = JSON.parse(JSON.stringify({ targetWeight: r.weight ?? 0 })).targetWeight;
+      assert.equal(typeof targetWeight, "number", `${name} from ${weight} gave ${targetWeight}`);
+      assert.ok(Number.isFinite(targetWeight), `${name} from ${weight} gave ${targetWeight}`);
+      assert.ok(targetWeight <= 1500, `${name} from ${weight} gave ${targetWeight}`);
+    }
+  }
+});
+
+test("roundLoad refuses a non-finite weight rather than passing it on", () => {
+  assert.equal(roundLoad(Infinity), null);
+  assert.equal(roundLoad(NaN), null);
+  assert.equal(roundLoad(1e308 * 10), null);
 });
 
 test("roundLoad rounds to the nearest quarter plate under forty and the nearest five above", () => {

@@ -287,11 +287,12 @@ it is not paying attention.
 - **Cold start loads for isolation work are the weakest numbers here.** A formula
   cannot really tell a lateral raise from a curl. They are deliberately light and
   the note says so, and one logged session replaces them.
-- **The library has no beginner hinge.** Every deadlift, Romanian deadlift and hip
-  thrust in `knowledge/exercise-library/` is tagged intermediate or above. That is
-  defensible on technique demand and it leaves a beginner with no posterior chain,
-  which is worse. Worked around here; worth raising with Jawa rather than fixing
-  in her folder.
+- ~~**The library has no beginner hinge.**~~ Closed 2026-09-12, and it was never
+  true. Every deadlift, Romanian deadlift and hip thrust is indeed tagged
+  intermediate or above, but Cable Pull-Through is hamstrings-primary, beginner
+  and a genuine hinge, and `load.mjs` was filing it as isolation because
+  `pull.?through` sat in the isolation line above the hinge line. Reordering that
+  table gave beginners a loadable hinge without anything in Jawa's folder moving.
 - **`PRODUCTIVE_GAP` in `pair.mjs` is a guess.** The Köhler effect needs a moderate
   ability gap and neither the research nor this code can say where the band ends.
   It is open question 7 and it is the biggest hole in the folder's main claim.
