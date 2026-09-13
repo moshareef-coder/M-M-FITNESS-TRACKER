@@ -106,13 +106,15 @@ const PEC_DECK = {
       joints: { spine: 0, neck: 0, shoulderR: 95, shoulderL: 95, elbowR: 90, elbowL: 90 },
       ik: { ...stand(86, 54) },
     },
-    { // squeezed: the elbows drop in to the ribs and the forearms sweep ACROSS
-      // to meet in front of the chest. The fold has to be negative here, which
-      // is the front view's inward fold: positive swings the hands out to the
-      // sides and the card reads as a shrug.
+    { // squeezed: the elbows travel in to meet in front of the chest with the
+      // forearms still up. The fold is turned by shoulderRot rather than by
+      // flipping the sign of the elbow: a sign flip passes through a straight
+      // arm halfway up the rep, and mid rep this read as a wide fly with two
+      // dead straight arms, which is a different exercise.
       t: 1,
       root: { x: 70, y: 80, rot: 0 },
-      joints: { spine: 3, neck: 0, shoulderR: 26, shoulderL: 26, elbowR: -142, elbowL: -142 },
+      joints: { spine: 0, neck: 0, shoulderR: 17, shoulderL: 17, elbowR: 96, elbowL: 96,
+                shoulderRotR: -95, shoulderRotL: -95 },
       ik: { ...stand(86, 54) },
     },
   ],
@@ -145,7 +147,7 @@ const CABLE_FLY = {
     { // closed, hands crossing in front of the hips, elbows still soft
       t: 1,
       root: { x: 70, y: 62, rot: 0 },
-      joints: { spine: 3, neck: 2, shoulderR: -12, shoulderL: -12, elbowR: 28, elbowL: 28 },
+      joints: { spine: 0, neck: 0, shoulderR: -12, shoulderL: -12, elbowR: 28, elbowL: 28 },
       ik: { ...stand(78, 62) },
     },
   ],
@@ -456,24 +458,24 @@ const STRAIGHT_ARM_PULLDOWN = {
   dur: 3.0,
   breath: 0.2,
   props: [{ type: "cable", x: 120, top: 10, y0: 42, to: { side: "R", point: "hand" }, front: true }],
+  // Authored as shoulder ANGLES with the elbow pinned at 2 degrees, not as
+  // wrist pins. Two wrist pins interpolate along the CHORD between them, and
+  // the chord of this 123 degree sweep passed 16 units from the shoulder, so
+  // mid rep the elbow was folded to 129 degrees and the card read as a triceps
+  // pushdown. The one thing that must be visible here is a straight arm, and a
+  // straight arm swinging through an arc is exactly what a shoulder angle is.
   keys: [
     { // top, arms long and high out in front, lats stretched
       t: 0,
       root: { x: 56, y: 61.4, rot: 4 },
-      joints: { spine: 16, neck: -10 },
-      ik: {
-        wristR: { x: 93.1, y: 11.1, bend: 1 }, wristL: { x: 90.1, y: 14.1, bend: 1 },
-        ...stand(58, 53),
-      },
+      joints: { spine: 16, neck: -10, shoulderR: 95, shoulderL: 98, elbowR: 2, elbowL: 2 },
+      ik: { ...stand(58, 53) },
     },
     { // finish, arms still long, bar at the front of the thighs
       t: 1,
       root: { x: 56, y: 61.4, rot: 4 },
-      joints: { spine: 20, neck: -6 },
-      ik: {
-        wristR: { x: 75.2, y: 67.2, bend: 1 }, wristL: { x: 72.2, y: 69.2, bend: 1 },
-        ...stand(58, 53),
-      },
+      joints: { spine: 20, neck: -6, shoulderR: -15, shoulderL: -12, elbowR: 2, elbowL: 2 },
+      ik: { ...stand(58, 53) },
     },
   ],
 };
@@ -644,12 +646,13 @@ const frontBar = (front) => ([
 // toward the ears and let them down. Must be visible: the load hanging dead
 // straight from a still arm, so nothing but the shoulder girdle moves. Front
 // view, because a shrug is symmetric across the midline.
-// Known limit, and the honest reason this is the weakest card in the file: the
-// rig has a fixed shoulder girdle, so the shoulders cannot actually rise. The
-// rep is carried by the chest lifting, the chin coming up and the knees
-// softening at the bottom. The implement is what identifies the exercise.
-// v2: the shrug is the girdle channel now, not a spine and neck cheat. The
-// shoulders rise and the arms hang off them, which is the movement.
+// v2: the shrug is the girdle channel, not a spine and neck cheat. The
+// shoulders rise and the arms hang off them, which is the movement. The old
+// spine and neck cheat is now removed rather than merely unused: in a FRONTAL
+// move the in plane spine and neck angles are a side bend, not a chest lift,
+// so `spine: 3, neck: 5` swinging to `spine: -3, neck: -6` tipped the head
+// four units off the midline and dropped one shoulder below the other. On a
+// symmetric front view that reads as a figure turned away, not as a shrug.
 const DUMBBELL_SHRUG = {
   view: "front",
   loop: "pingpong",
@@ -664,13 +667,13 @@ const DUMBBELL_SHRUG = {
     { // bottom, shoulders let down, knees soft, chin level
       t: 0,
       root: { x: 70, y: 62.6, rot: 0 },
-      joints: { shoulderGirdleElevR: 0, shoulderGirdleElevL: 0, spine: 3, neck: 5, shoulderR: 10, shoulderL: 10, elbowR: 4, elbowL: 4 },
+      joints: { shoulderGirdleElevR: 0, shoulderGirdleElevL: 0, spine: 0, neck: 0, shoulderR: 10, shoulderL: 10, elbowR: 4, elbowL: 4 },
       ik: { ...stand(78, 62) },
     },
-    { // top, chest lifted and chin up, arms still dead straight
+    { // top, the girdle carries the shoulders up, arms still dead straight
       t: 1,
       root: { x: 70, y: 61.4, rot: 0 },
-      joints: { shoulderGirdleElevR: 7.5, shoulderGirdleElevL: 7.5, spine: -3, neck: -6, shoulderR: 8, shoulderL: 8, elbowR: 8, elbowL: 8 },
+      joints: { shoulderGirdleElevR: 7.5, shoulderGirdleElevL: 7.5, spine: 0, neck: 0, shoulderR: 8, shoulderL: 8, elbowR: 8, elbowL: 8 },
       ik: { ...stand(78, 62) },
     },
   ],
@@ -686,13 +689,13 @@ const BARBELL_SHRUG = {
     { // bottom, bar hanging at the thighs on a shoulder width grip
       t: 0,
       root: { x: 70, y: 62.6, rot: 0 },
-      joints: { shoulderGirdleElevR: 0, shoulderGirdleElevL: 0, spine: 3, neck: 5, shoulderR: 12, shoulderL: 12, elbowR: 4, elbowL: 4 },
+      joints: { shoulderGirdleElevR: 0, shoulderGirdleElevL: 0, spine: 0, neck: 0, shoulderR: 12, shoulderL: 12, elbowR: 4, elbowL: 4 },
       ik: { ...stand(78, 62) },
     },
-    { // top, chest lifted and chin up, arms still dead straight
+    { // top, the girdle carries the shoulders up, arms still dead straight
       t: 1,
       root: { x: 70, y: 61.4, rot: 0 },
-      joints: { shoulderGirdleElevR: 7, shoulderGirdleElevL: 7, spine: -3, neck: -6, shoulderR: 11, shoulderL: 11, elbowR: 6, elbowL: 6 },
+      joints: { shoulderGirdleElevR: 7, shoulderGirdleElevL: 7, spine: 0, neck: 0, shoulderR: 11, shoulderL: 11, elbowR: 6, elbowL: 6 },
       ik: { ...stand(78, 62) },
     },
   ],
@@ -808,7 +811,7 @@ const REVERSE_PEC_DECK = {
     { // finish, arms swept wide and level with the shoulders
       t: 1,
       root: { x: 70, y: 80, rot: 0 },
-      joints: { spine: -2, neck: 0, shoulderR: 88, shoulderL: 88, elbowR: 28, elbowL: 28 },
+      joints: { spine: 0, neck: 0, shoulderR: 88, shoulderL: 88, elbowR: 28, elbowL: 28 },
       ik: { ...stand(86, 54) },
     },
   ],
@@ -822,7 +825,9 @@ const REVERSE_PEC_DECK = {
 // joint, and the arm solves through that singularity with the elbow snapping
 // from outside to inside, which no amount of tuning fixes. Side on the bar path
 // hugging the body and the high leading elbow both read, and the disc is the
-// honest side view of a loaded bar.
+// honest side view of a loaded bar. What the side view cannot show is the
+// elbow flaring out sideways, so the middle of the rep is carried by a third
+// keyframe instead: see the note on it below.
 const UPRIGHT_ROW = {
   view: "side",
   loop: "pingpong",
@@ -836,6 +841,24 @@ const UPRIGHT_ROW = {
       joints: {
         spine: 4, neck: 0,
         shoulderR: 4, elbowR: 6, shoulderL: 2, elbowL: 8,
+      },
+      ik: { ...stand(62, 57) },
+    },
+    { // halfway, the elbow has folded and the bar is at the navel, still in
+      // against the body. Without this key the two end poses interpolate
+      // through shoulder 41 and elbow 65, which swings the bar a whole arm's
+      // length out in front at chest height: mid rep the card was a Front
+      // Raise, which is a different exercise in the same library. The rep now
+      // folds the elbow first and drives the elbow up second, which is the
+      // order the real lift happens in. A little shoulderAbd flares the elbow
+      // sideways as well; much more than 20 and the upper arm foreshortens to
+      // nothing and the bar reads as floating beside the belly.
+      t: 0.5,
+      root: { x: 60, y: 61.4, rot: 2 },
+      joints: {
+        spine: 1, neck: -2,
+        shoulderR: 4, elbowR: 116, shoulderL: 2, elbowL: 118,
+        shoulderAbdR: 20, shoulderAbdL: 20,
       },
       ik: { ...stand(62, 57) },
     },
@@ -939,7 +962,7 @@ const CABLE_LATERAL_RAISE = {
     { // top, working arm level with the shoulder, the other hanging quiet
       t: 1,
       root: { x: 70, y: 61.4, rot: 0 },
-      joints: { spine: -2, neck: 0, shoulderR: 88, shoulderL: 6, elbowR: 8, elbowL: 10 },
+      joints: { spine: 0, neck: 0, shoulderR: 88, shoulderL: 6, elbowR: 8, elbowL: 10 },
       ik: { ...stand(78, 62) },
     },
   ],
@@ -1064,7 +1087,7 @@ const DUMBBELL_SHOULDER_PRESS = {
     { // lockout, arms long overhead, bells close together
       t: 1,
       root: { x: 70, y: 61.4, rot: 0 },
-      joints: { spine: -2, neck: -2, shoulderR: 168, shoulderL: 168, elbowR: 6, elbowL: 6 },
+      joints: { spine: 0, neck: 0, shoulderR: 168, shoulderL: 168, elbowR: 6, elbowL: 6 },
       ik: { ...stand(78, 62) },
     },
   ],

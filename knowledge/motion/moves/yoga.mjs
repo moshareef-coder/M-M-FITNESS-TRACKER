@@ -311,6 +311,9 @@ const REVOLVED_TRIANGLE = {
 // that foot pressed into the inner thigh, arms lifting overhead like branches.
 // What must be visible is the open knee with the sole on the standing thigh, so
 // front view: side on the lifted knee points at the camera and disappears.
+// v6: both hands were cut off flat by the top of the frame. Arms overhead put
+// the fingertips 16 units above the box before fit, and k 0.88 with dy 6 left
+// them sitting on the edge. k 0.84 and dy 9 brings the whole figure inside.
 const TREE_POSE = {
   view: "front",
   loop: "hold",
@@ -318,7 +321,7 @@ const TREE_POSE = {
   breath: 1.0,
   breathRate: 0.72,
   farSide: "L",
-  fit: { k: 0.88, dy: 6 },
+  fit: { k: 0.84, dy: 9 },
   feet: { R: { ang: 7, len: 0.42, w: 1.3 }, L: { ang: -17, len: 0.62, w: 1.0 } },
   keys: [
     { // find the balance, sole pressed into the inner thigh, arms up in a V
@@ -667,6 +670,16 @@ const COBRA_POSE = {
 // lifted clear of the floor, only the hands and the tops of the feet touching,
 // chest open and shoulders back. What must be visible is the straight arms and
 // the gap under the thighs. Side view, prone, so root rot is positive.
+// v6: it was a plank with pointed toes. The torso stood at 63 degrees off
+// vertical against Plank Pose's 76.5, five units of hip sag being the only
+// thing between two cards in the same library, and it was FLATTER than Cobra,
+// which is backwards: up dog is the deeper opening of the two. The arms were
+// already at full stretch from the pinned hands, so the chest could not rise;
+// what moves instead is the pelvis. Holding the chest where the arms can reach
+// it and taking the spine to -44, the house limit for extension, drops the
+// hips five units and swings the torso to 54 degrees, and the thigh angles
+// came back seven degrees to keep the toes on the mat. Cobra hips down, up dog
+// hips up and chest steep, plank one line: three different pictures now.
 const UPWARD_FACING_DOG = {
   view: "side",
   loop: "hold",
@@ -677,15 +690,15 @@ const UPWARD_FACING_DOG = {
   keys: [
     { // pressed up, thighs off the mat, shoulders stacked over the wrists
       t: 0,
-      root: { x: 72, y: 92, rot: 98 },
-      joints: { spine: -35, neck: -18, hipR: -173.0, hipL: -171.0, kneeR: 3, kneeL: 4,
+      root: { x: 74.4, y: 96.0, rot: 98 },
+      joints: { spine: -44, neck: -18, hipR: -175.0, hipL: -173.0, kneeR: 3, kneeL: 4,
                 ankleR: -42, ankleL: -42, wristR: 84, wristL: 84 },
       ik: { wristR: { x: 96, y: 113, bend: 1 }, wristL: { x: 92, y: 113, bend: 1 } },
     },
     { // press the floor further away and draw the chest through the arms
       t: 1,
-      root: { x: 71, y: 90.5, rot: 105 },
-      joints: { spine: -39, neck: -22, hipR: -179.0, hipL: -177.0, kneeR: 2, kneeL: 3,
+      root: { x: 72.4, y: 93.3, rot: 105 },
+      joints: { spine: -45, neck: -22, hipR: -179.0, hipL: -177.0, kneeR: 2, kneeL: 3,
                 ankleR: -44, ankleL: -44, wristR: 84, wristL: 84 },
       ik: { wristR: { x: 96, y: 113, bend: 1 }, wristL: { x: 92, y: 113, bend: 1 } },
     },
@@ -887,10 +900,18 @@ const DOWNWARD_FACING_DOG = {
 // v5: the hands used to end up an inch UNDER the floor line, and the head sat
 // right on top of them. Both mitts are flat on the floor now and the crown is
 // tucked a little further so it hangs behind the hands rather than between
-// them. The head still hangs out ahead of the feet and cannot be brought back:
-// with the torso-to-thigh check capped at 150 this is the deepest fold the rig
-// will draw, and every arrangement that puts the crown over the ankles either
-// bends the knees past a straight leg or fails that check. See RIG ISSUES.
+// them.
+// v6: the legs were BENT. The pelvis sat at x 72 over ankles pinned at 56 and
+// 60 and at y 63, so the hip was 11 units in front of the foot and 1.6 short of
+// standing height, which is 24 degrees of knee flexion on one leg while the
+// other stopped 1.9 units short of its pin and hung off the floor. Straight
+// legs are the one thing this card has to show, and a straight leg is the hip
+// directly over the ankle at standing height: the root is now (60, 60.6) and
+// both knees read 176 to 179. That costs fold depth, because the torso to
+// thigh check caps at 150 and a vertical thigh spends more of it, so the spine
+// came back from 58 to 52 and the hands moved back with the body to stay under
+// the shoulders. The crown still hangs ahead of the ankles, which is as deep
+// as the rig folds.
 const FORWARD_FOLD = {
   view: "side",
   loop: "hold",
@@ -900,19 +921,19 @@ const FORWARD_FOLD = {
   keys: [
     { // folded, hands flat under the shoulders, crown tucked and heavy
       t: 0,
-      root: { x: 72, y: 63, rot: 90 },
-      joints: { spine: 58, neck: 16, wristR: 36, wristL: 36 },
+      root: { x: 60, y: 60.6, rot: 90 },
+      joints: { spine: 52, neck: 16, wristR: 36, wristL: 36 },
       ik: {
-        wristR: { x: 88, y: 112.6, bend: 1 }, wristL: { x: 84, y: 112.3, bend: 1 },
+        wristR: { x: 78, y: 112.6, bend: 1 }, wristL: { x: 74, y: 112.3, bend: 1 },
         ankleR: { x: 60, y: 113.4, bend: -1 }, ankleL: { x: 56, y: 113.4, bend: -1 },
       },
     },
     { // soften a degree deeper: the crown drops and the elbows fold further
       t: 1,
-      root: { x: 72, y: 62.6, rot: 90.5 },
-      joints: { spine: 59, neck: 18, wristR: 36, wristL: 36 },
+      root: { x: 59.6, y: 60.4, rot: 90.5 },
+      joints: { spine: 53, neck: 18, wristR: 36, wristL: 36 },
       ik: {
-        wristR: { x: 89, y: 112.8, bend: 1 }, wristL: { x: 85, y: 112.5, bend: 1 },
+        wristR: { x: 79, y: 112.8, bend: 1 }, wristL: { x: 75, y: 112.5, bend: 1 },
         ankleR: { x: 60, y: 113.4, bend: -1 }, ankleL: { x: 56, y: 113.4, bend: -1 },
       },
     },

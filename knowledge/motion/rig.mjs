@@ -2042,7 +2042,13 @@ export function drawFigure(ctx, S, C, opts = {}) {
     depths.arm[s] = mean(k.shoulder, k.elbow, k.wrist);
     depths.leg[s] = mean(k.hip, k.knee, k.ankle);
   }
-  const isFar = (kind, s) => depths[kind][s] - depths[kind][s === "R" ? "L" : "R"] > DEPTH_EPS;
+  /* Larger depth draws LAST, which is nearest the camera (that is what the
+     ascending sort below does with it). So a limb is far when its depth is
+     SMALLER than its opposite number's. This used to compare the other way
+     round and painted the limb on top in the far tone, in every side view,
+     for the whole life of the rig. Subtle enough (the two tones are a few
+     units apart) that it took a pixel count on Chair Pose to notice. */
+  const isFar = (kind, s) => depths[kind][s === "R" ? "L" : "R"] - depths[kind][s] > DEPTH_EPS;
   // A near arm raised overhead in a side view projects straight across the
   // skull (the shoulder sits at the head's x), and the plain tie-break painted
   // it over the face, so every lockout read as headless. When the upper arm or
@@ -2053,12 +2059,16 @@ export function drawFigure(ctx, S, C, opts = {}) {
     const t = Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / L2));
     return Math.hypot(p.x - (a.x + vx * t), p.y - (a.y + vy * t));
   };
-  const overHead = (s) => {
+  /* A near arm that crosses the skull in a side view: an overhead lockout,
+     a hang, a handstand, a prone reach. Left to the depth sort the arm wins,
+     because in a side view the near arm is always deeper than the head, and
+     the figure reads as headless. The head is drawn LAST in that case (see
+     the head item below); a nudge to the arm's tie-break did nothing, since
+     the tie-break only decides between equal depths. Any direction counts:
+     the prone reach in Swimming runs level with the shoulder, not above it. */
+  const crossesHead = (s) => {
     if (S.frontal) return false;
     const k = S.sides[s];
-    if (k.elbow.y > k.shoulder.y - 4) return false;
-    // generous: a hanging arm sits a neck's length beside the skull and still
-    // covers the visor
     const r = ACTIVE.rHeadBack * 1.7;
     return segDist(S.head, k.shoulder, k.elbow) < r || segDist(S.head, k.elbow, k.wrist) < r;
   };
@@ -2075,7 +2085,7 @@ export function drawFigure(ctx, S, C, opts = {}) {
     const armFar = !crossing && isFar("arm", s);
     const legFar = isFar("leg", s);
     items.push({
-      d: armD, o: s === near ? (overHead(s) ? 2.5 : 5) : (crossing ? 4.5 : 0), kind: "arm", s,
+      d: armD, o: s === near ? 5 : (crossing ? 4.5 : 0), kind: "arm", s,
       fill: armFar ? C.far : C.inkHi,
       plates: armFar ? null : skinOpts,
     });
@@ -2086,7 +2096,12 @@ export function drawFigure(ctx, S, C, opts = {}) {
     });
   }
   items.push({ d: torsoD, o: 2, kind: "torso" });
-  items.push({ d: S.head.d, o: 3, kind: "head" });
+  // The head goes on top of any near arm that crosses it, and stays where it
+  // was otherwise, so a hand held in front of the chest is still in front.
+  const armOnFace = crossesHead(near) ? depths.arm[near] : null;
+  items.push(armOnFace !== null
+    ? { d: Math.max(S.head.d, armOnFace), o: 6, kind: "head" }
+    : { d: S.head.d, o: 3, kind: "head" });
   items.sort((a, b) => (a.d + a.o * 0.0001) - (b.d + b.o * 0.0001));
 
   const walk = () => {
