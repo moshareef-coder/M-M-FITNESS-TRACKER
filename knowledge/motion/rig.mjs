@@ -934,7 +934,7 @@ function drawHead(ctx, S, C, fill) {
   // behind the ear, clipped to the skull so it never breaks the silhouette
   ctx.save();
   hull(ctx, C, skull, { clip: true });
-  if (B.hairStyle === "none") { ctx.restore(); return; }
+  if (B.hairStyle !== "none") {
   // The cap is drawn with circles far above the head, so the edge that lands on
   // the skull is nearly straight: that edge IS the hairline. Front on it runs
   // level across the forehead; side on it slopes down behind the ear. From
@@ -958,9 +958,45 @@ function drawHead(ctx, S, C, fill) {
   }
   // the sideburn: a short tab of the cap running down in front of the ear
 
+  }
   ctx.restore();
   // ear: a small shape at the hairline, the only feature on the head
   const ears = [];  // the sheet's head has no ear
+  // The face. Placed from the head's PROJECTED axes so it lands right in any
+  // view: forward along the anterior axis (which foreshortens to nothing face
+  // on and to full length side on), spread along the lateral axis (the other
+  // way round). Hidden when the face points away from the camera.
+  if (!COLLECT && FACE && FACE !== "none") {
+    const ax = S.neckAxis;
+    const toward = away ? -ax.x.d : ax.x.d;
+    if (toward > -0.08) {
+      const R = B.rHeadBack;
+      const centre = add(S.head, scl(norm2(ax.y), -0.9));
+      const F = V(ax.x.x, ax.x.y), Lt = V(ax.z.x, ax.z.y);
+      const latLen = Math.hypot(Lt.x, Lt.y);
+      const fwd = add(centre, scl(F, R * 0.66));
+      const spread = R * 0.4;
+      const eyes = latLen < 0.28 ? [fwd] : [add(fwd, scl(Lt, spread)), add(fwd, scl(Lt, -spread))];
+      ctx.save();
+      hull(ctx, C, skull, { clip: true });
+      ctx.fillStyle = C.seam;
+      if (FACE === "visor") {
+        // one soft band across the eye line, the visor read some robots have
+        const a = add(fwd, scl(Lt, spread * 1.15)), b = add(fwd, scl(Lt, -spread * 1.15));
+        capsulePath(ctx, latLen < 0.28 ? add(fwd, scl(F, 0.3)) : a, R * 0.11, latLen < 0.28 ? add(fwd, scl(F, -0.3)) : b, R * 0.11);
+        ctx.fill();
+      } else {
+        for (const e of eyes) { ctx.beginPath(); ctx.arc(e.x, e.y, R * 0.1, 0, Math.PI * 2); ctx.fill(); }
+        if (FACE === "dotsmouth") {
+          const m = add(add(centre, scl(F, R * 0.66)), scl(norm2(ax.y), -R * 0.42));
+          const half = latLen < 0.28 ? R * 0.08 : spread * 0.45;
+          ctx.strokeStyle = C.seam; ctx.lineWidth = 0.5; ctx.lineCap = "round";
+          ctx.beginPath(); ctx.moveTo(m.x - Lt.x * half, m.y - Lt.y * half); ctx.lineTo(m.x + Lt.x * half, m.y + Lt.y * half); ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+  }
   for (const sd2 of ears) {
     // Behind the cheekbone, not on it. At 1.0 forward the ear landed in the
     // middle of the face and read as a single staring eye.
@@ -1039,6 +1075,7 @@ function drawLeg(ctx, S, side, C, fill, skinOpts) {
 // they are most of what makes a flat grey shape read as a torso.
 function torsoLines(ctx, S, C) {
   if (COLLECT) return;
+  if (!LINES_TORSO) return;
   const B = ACTIVE;
   const u = norm2(S.torsoAxis.y);
   const flat = S.frontal;
@@ -1717,7 +1754,19 @@ function outline(ctx, C, segs) {
   for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.stroke(); }
 }
 
+
+// How the figure shows which way it faces. Mo found the torso lines (pec,
+// spine, blades) unreliable, they get adjusted oddly in some poses, and asked
+// for a face instead. Two eye dots do the job at any size: two from the
+// front, one from the side, none from behind, and they never distort with a
+// pose the way body lines do. `lines` keeps the old torso lines available.
+export const STYLE = { face: "dots", lines: false };
+export function setStyle(o = {}) { Object.assign(STYLE, o); return STYLE; }
+
+let FACE = STYLE.face, LINES_TORSO = STYLE.lines;
 export function drawFigure(ctx, S, C, opts = {}) {
+  FACE = opts.face !== undefined ? opts.face : STYLE.face;
+  LINES_TORSO = opts.lines !== undefined ? opts.lines : STYLE.lines;
   if (opts.floor !== false) drawFloor(ctx, C, S);
   drawProps(ctx, C, opts.props, S, "back");
   const near = S.frontal ? (S.farSide === "R" ? "L" : "R") : "R";

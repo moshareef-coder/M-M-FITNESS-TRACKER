@@ -14,7 +14,7 @@
 
 import { palette, render, samplePose, solvePose, jointAngles, cameraFor, litIntensity, VB, GROUND,
   PROP_TYPES, LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY,
-  BODY_FEMALE, BODIES, BODY_KINDS, HAIR_KINDS, useBody, restPose, gripSides } from "./rig.mjs";
+  BODY_FEMALE, BODIES, BODY_KINDS, HAIR_KINDS, useBody, restPose, gripSides, STYLE, setStyle } from "./rig.mjs";
 import { MOVES as WEIGHT_TRAINING } from "./moves/weight-training.mjs";
 import { MOVES as YOGA } from "./moves/yoga.mjs";
 import { MOVES as PILATES } from "./moves/pilates.mjs";
@@ -23,7 +23,7 @@ import { MOVES as STRETCHING } from "./moves/stretching.mjs";
 
 export { palette, render, samplePose, solvePose, jointAngles, cameraFor, litIntensity, VB, GROUND,
   PROP_TYPES, LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY,
-  BODY_FEMALE, BODIES, BODY_KINDS, HAIR_KINDS, useBody, restPose, gripSides };
+  BODY_FEMALE, BODIES, BODY_KINDS, HAIR_KINDS, useBody, restPose, gripSides, STYLE, setStyle };
 
 // Keyed by the training id used in knowledge/exercise-library/index.mjs.
 export const MOVES_BY_LIBRARY = {
