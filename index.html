@@ -1672,6 +1672,11 @@
      it is content-height and the sheet floats up under the title. */
   .session-overlay.lifting #sessionBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
   .sess-live { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  /* Everything a horizontal swipe carries: the header and the figure. The
+     sheet is a sibling, not a child, so a swipe never drags the weight and
+     rep controls around underneath your thumb. */
+  .sess-view { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .sess-view.dragging { transition: none; }
   .sess-top { flex-shrink: 0; padding: 12px 18px 0; color: var(--sess-ink); }
   /* One segment per exercise. Done and current are lit, so the bar answers
      "how much of this is behind me" at a glance and nothing else. */
@@ -1719,6 +1724,10 @@
   .sess-stage {
     position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden;
     display: flex; align-items: center; justify-content: center;
+    /* Vertical panning is not this element's job (nothing here scrolls), so
+       the browser is told to leave the horizontal axis alone rather than
+       treat a swipe as its own edge-navigation gesture. */
+    touch-action: pan-y;
   }
   .sess-fig.sess-fig-stage { margin: 0; }
   .sess-stage-none {
@@ -1843,10 +1852,15 @@
   .sess-sheet .upnext-rail { padding: 0 20px 6px; scroll-padding-left: 20px; }
   .upnext-rail { overflow-y: hidden; touch-action: pan-x; }
 
-  .sess-live.ex-in .sess-top,
-  .sess-live.ex-in .sess-fig-stage { animation: exIn .44s cubic-bezier(.22,1,.36,1) both; }
+  /* Three ways in: cold open (no direction, the old fade-and-nudge), and the
+     two swipe directions, which enter from the edge you pulled the last
+     screen toward, so the motion reads as one continuous filmstrip rather
+     than three unrelated screens. */
+  .sess-live.ex-in .sess-view { animation: exIn .44s cubic-bezier(.22,1,.36,1) both; }
+  .sess-live.ex-in-next .sess-view { animation: exInNext .32s cubic-bezier(.22,1,.36,1) both; }
+  .sess-live.ex-in-prev .sess-view { animation: exInPrev .32s cubic-bezier(.22,1,.36,1) both; }
   @media (prefers-reduced-motion: reduce) {
-    .sess-live.ex-in .sess-top, .sess-live.ex-in .sess-fig-stage,
+    .sess-live.ex-in .sess-view, .sess-live.ex-in-next .sess-view, .sess-live.ex-in-prev .sess-view,
     .sess-chip.just-done { animation: none; }
     /* no draw-on, but the tick still has to be a whole tick */
     .sess-chip.just-done .tick path { animation: none; stroke-dasharray: none; stroke-dashoffset: 0; }
@@ -2910,6 +2924,10 @@
      pops. Both are one-shot, both are keyed to something the user just did. */
   .sess-card.ex-in { animation: exIn .44s cubic-bezier(.22,1,.36,1) both; }
   @keyframes exIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+  /* Swiped forward: the new exercise arrives from the right, the direction a
+     leftward swipe pulls the next thing in from. Swiped back is the mirror. */
+  @keyframes exInNext { from { opacity: 0; transform: translateX(46px); } to { opacity: 1; transform: none; } }
+  @keyframes exInPrev { from { opacity: 0; transform: translateX(-46px); } to { opacity: 1; transform: none; } }
   /* The pop carries a ring of light out with it, so a logged set reads as
      landing rather than as a colour swap. */
   .set-circle.just-done { animation: setPop .52s cubic-bezier(.22,1,.36,1); }
@@ -13469,6 +13487,112 @@ function buzz(pattern) {
    here, so it reflects time actually spent resting. */
 /* Move to a different exercise without losing progress on this one. Sets
    already logged here stay logged, and you can come back to it. */
+/* Swipe navigation, unlike jumpToExercise, never blocks on a completed
+   exercise: it is a carousel through the whole day, not a "move my work
+   somewhere useful" action, so looking back at what you already finished is
+   fine. It also does not wrap: the last exercise has no next, and the
+   gesture handler rubber-bands there instead of cycling to the first. */
+function stepExercise(dir) {
+  if (!SESSION) return false;
+  const idx = SESSION.exerciseIndex + dir;
+  if (idx < 0 || idx >= TODAY_WORKOUT.exercises.length) return false;
+  SESSION.exerciseIndex = idx;
+  SESSION.restStartedAt = null;
+  stopRestTicker();
+  saveSessionToStorage();
+  SESSION_SWIPE_DIR = dir;
+  renderSession();
+  return true;
+}
+
+/* The swipe: left goes to the next exercise, right to the previous, same
+   sense as flipping forward and back through a stack of cards. It lives on
+   the stage, not the whole screen, so the buttons in the top bar (which sit
+   in the same swiped column) are never mistaken for the start of a drag. The
+   figure tracks the finger the entire way, the same rule the bottom sheet
+   uses: a flick wins outright, a deliberate drag past a thumb's width commits
+   in that direction, anything shorter snaps back. */
+function wireSessionSwipe(ei) {
+  const stage = $("sessStage");
+  const view = $("sessView");
+  if (!stage || !view) return;
+  let pid = null, x0 = 0, y0 = 0, t0 = 0, live = false, dragged = false;
+  let lastX = 0, lastT = 0;   // pointercancel carries no usable coordinates
+
+  const bounds = () => ({
+    canPrev: ei > 0,
+    canNext: ei < TODAY_WORKOUT.exercises.length - 1,
+  });
+  const paint = (dx) => {
+    const { canPrev, canNext } = bounds();
+    // Past either end there is nothing to swipe to, so the drag drags back:
+    // the same rubber band the sheet uses at its own limits.
+    const eased = (dx > 0 && !canPrev) || (dx < 0 && !canNext) ? dx * 0.35 : dx;
+    view.style.transform = `translateX(${eased}px)`;
+    view.style.opacity = String(Math.max(0.5, 1 - Math.abs(eased) / 500));
+  };
+  const settle = () => {
+    view.classList.remove("dragging");
+    view.style.transition = "transform .26s cubic-bezier(.22,1,.36,1), opacity .2s ease";
+    view.style.transform = "";
+    view.style.opacity = "";
+    setTimeout(() => { view.style.transition = ""; }, 280);
+  };
+
+  stage.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    pid = e.pointerId; x0 = lastX = e.clientX; y0 = e.clientY; t0 = lastT = e.timeStamp;
+    live = false;
+    dragged = false;
+    document.addEventListener("pointermove", onMove, { passive: false });
+    document.addEventListener("pointerup", onEnd);
+    document.addEventListener("pointercancel", onEnd);
+  });
+  function onMove(e) {
+    if (e.pointerId !== pid) return;
+    const dx = e.clientX - x0, dy = e.clientY - y0;
+    if (!live) {
+      // Claim it only once it is clearly horizontal, so a vertical brush
+      // across the figure still does nothing unexpected.
+      if (Math.abs(dx) < 8 || Math.abs(dx) <= Math.abs(dy)) return;
+      live = dragged = true;
+      view.classList.add("dragging");
+    }
+    lastX = e.clientX; lastT = e.timeStamp;
+    paint(dx);
+    e.preventDefault();
+  }
+  function onEnd(e) {
+    if (e.pointerId !== pid) return;
+    pid = null;
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onEnd);
+    document.removeEventListener("pointercancel", onEnd);
+    if (!live) return;
+    live = false;
+    const dx = lastX - x0;
+    const v = dx / Math.max(1, lastT - t0);
+    const { canPrev, canNext } = bounds();
+    const wantNext = dx < 0 && canNext, wantPrev = dx > 0 && canPrev;
+    const commit = (Math.abs(v) > 0.5 || Math.abs(dx) > 64) && (wantNext || wantPrev);
+    if (!commit) { settle(); return; }
+    const dir = wantNext ? 1 : -1;
+    buzz(9);
+    // Finish the motion off-screen, THEN swap: the eye is following the old
+    // content leaving before the new content's own entrance takes over.
+    view.style.transition = "transform .15s cubic-bezier(.4,0,.7,1), opacity .15s ease";
+    view.style.transform = `translateX(${dir > 0 ? -160 : 160}px)`;
+    view.style.opacity = "0";
+    setTimeout(() => stepExercise(dir), 150);
+  }
+  // A drag that ended as a real swipe must not also register as the tap that
+  // a pointerup ordinarily produces on whatever sits under the finger.
+  stage.addEventListener("click", (e) => {
+    if (!dragged) return;
+    e.stopPropagation(); e.preventDefault();
+  }, true);
+}
+
 function jumpToExercise(idx) {
   if (!SESSION || idx == null || idx < 0) return;
   if (idx >= TODAY_WORKOUT.exercises.length) return;
@@ -14060,6 +14184,7 @@ let SESSION_JUST_RAMP = null;  // same for a warm-up rung, so ticking one pops t
    it, and be strokeable so the pop can draw it on. */
 const CHIP_TICK = `<svg class="tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.6 12.7l4.3 4.3L18.4 7.4"/></svg>`;
 let SESSION_LAST_EX = null;    // the exercise last drawn, so a change can slide in
+let SESSION_SWIPE_DIR = 0;     // +1/-1 when the last exercise change was a swipe, consumed once
 /* Whether the bottom sheet is pulled up over the stage to show what is next.
    Collapsed by default, every time: the screen's job is the set in front of
    you, and the list of what is coming is a question you ask, not a shelf. */
@@ -14164,13 +14289,17 @@ function renderSession() {
 
   const exChanged = SESSION_LAST_EX !== ei;
   SESSION_LAST_EX = ei;
+  const swipeDir = SESSION_SWIPE_DIR;
+  SESSION_SWIPE_DIR = 0;
+  const enterClass = !exChanged ? "" : swipeDir > 0 ? " ex-in-next" : swipeDir < 0 ? " ex-in-prev" : " ex-in";
   const justSet = SESSION_JUST_SET;
   SESSION_JUST_SET = null;
   const justRamp = SESSION_JUST_RAMP;
   SESSION_JUST_RAMP = null;
 
   $("sessionBody").innerHTML = `
-    <div class="sess-live${exChanged ? " ex-in" : ""}">
+    <div class="sess-live${enterClass}">
+      <div class="sess-view" id="sessView">
       <div class="sess-top">
         <div class="sess-segs">
           ${TODAY_WORKOUT.exercises.map((_, i) => `<i class="${SESSION.completed[i] ? "done" : i === ei ? "now" : ""}"></i>`).join("")}
@@ -14189,7 +14318,7 @@ function renderSession() {
         </div>
       </div>
 
-      <div class="sess-stage">
+      <div class="sess-stage" id="sessStage">
         <!-- The figure is always drawn in the light palette, whatever theme the
              app is in: it stands on the light stage, not on the app's ground. -->
         <div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(ex.name)}" data-theme="light"
@@ -14199,6 +14328,7 @@ function renderSession() {
              this is the one mark that says "no figure for this one", quietly,
              and it is hidden the moment a real figure mounts. -->
         <div class="sess-stage-none" aria-hidden="true">${icon("dumbbell", 72)}</div>
+      </div>
       </div>
 
       <div class="sess-sheet${SESSION_SHEET_OPEN ? " open" : ""}" id="sessSheet">
@@ -14293,6 +14423,7 @@ function renderSession() {
   tickTimer();
 
   wireSessionSheet();
+  wireSessionSwipe(ei);
 
   $("sessTitleBtn").onclick = openExerciseActions;
   $("sessMoreBtn").onclick = openExerciseActions;
