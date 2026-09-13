@@ -699,7 +699,18 @@ function part(ctx, C, pts, o = {}) {
   // only: one continuous hairline round the whole limb instead of a ring at
   // every circle in the chain.
   if (COLLECT) { for (const g of segs) COLLECT.push(g); return; }
-  if (o.line !== false) {
+  /* No per part stroke in this pass any more. The silhouette already gets its
+     one line from the union pass above, so all this stroke ever produced was
+     the INTERNAL edges: wherever a part drawn later overlapped one drawn
+     earlier, its faint hairline survived across it. That is the line at the
+     base of the neck, the cap of the thigh over the pelvis, the ring where the
+     near arm meets the torso, and it is why one arm was clean and the other
+     was not: the far arm is drawn first and the torso paints over its edge,
+     the near arm is drawn last and nothing covers it. Mo asked for all of
+     those gone. The only lines left inside the outline are the bent joint
+     creases, which are drawn on purpose by crease(). A part can still opt in
+     with line: true if a seam is ever wanted again. */
+  if (o.line === true) {
     ctx.strokeStyle = o.lineColor || C.seam;
     ctx.lineWidth = (LINES ? (o.lineW || 0.28) : 0.15) * 2;
     ctx.lineJoin = "round";
@@ -1313,16 +1324,15 @@ function drawTorso(ctx, S, C, fill, skinOpts) {
   }
   // The neck goes on LAST so its base arc lands on top of the chest: that arc
   // is the neck seam the sheet draws, and drawn first it was painted over.
-  /* The neck carries its own outline only while the torso is upright, where
-     that arc is the collar line the reference sheet draws. Lying down the
-     same arc runs across the chest and into the arm, which is a line through
-     the body rather than a neck, so there it is silhouette only. */
-  const upright = Math.abs(nu.y) > 0.72;
+  /* The neck has no line of its own in any pose. It is part of the one
+     silhouette the union pass draws; an internal outline here read as a
+     collar when upright and as a bar across the chest when lying, and Mo
+     asked for it gone both times. */
   part(ctx, C, [
     [add(S.chest, scl(nu, -0.6)), B.rNeckBot * 1.2],
     [lerpV(S.chest, S.neckTop, 0.5), B.rNeckBot * 0.8],
     [S.neckTop, B.rNeckTop],
-  ], { fill, line: upright });
+  ], { fill });
   if (skinOpts && skinOpts.plates) { torsoPlates(ctx, S, C, skinOpts.lit); return; }
   torsoLines(ctx, S, C);
   // A single soft mass under the collarbone gives the chest volume. It used to
