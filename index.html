@@ -2390,6 +2390,9 @@
     animation: fadeIn .2s ease;
   }
   @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  /* Above the generating overlay, which is the one thing in the app that sits
+     higher than a sheet. */
+  .pop-scrim.over-gen { z-index: 96; }
   .pop {
     width: 100%; max-width: 400px; background: var(--panel); border-radius: 22px; overflow: hidden;
     border: 1px solid var(--border); box-shadow: var(--shadow-lift);
@@ -3408,6 +3411,23 @@
   .workout-progress-count { color: var(--accent-ink); font-weight: 700; }
   .workout-progress-track { height: 5px; border-radius: 100px; background: var(--panel-2); overflow: hidden; margin-bottom: 4px; }
   .workout-progress-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.3s; }
+  /* The session estimate, which is a control rather than a label. It reads as a
+     line of the plan, so no button chrome; the padding and the negative margin
+     buy the 44px target that 12.5px of text does not, the same trick
+     .lw-effort .lw-why uses, and the line sits where it would have anyway. */
+  .plan-time-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 2px 0 6px; }
+  .plan-time {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
+    margin: -11px 0; padding: 11px 0; background: none; border: 0; cursor: pointer;
+    color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 600;
+  }
+  .plan-time b { color: var(--accent-ink); font-weight: 700; }
+  .plan-time:active { opacity: .6; }
+  .gen-scrim .plan-time-row { justify-content: center; }
+  /* The reveal is white on a dark scrim whatever the theme is, so the same
+     control needs its own two colours there rather than the card's. */
+  .gen-scrim .plan-time { color: rgba(255,255,255,.72); }
+  .gen-scrim .plan-time b { color: #fff; }
   .exercise-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
   .exercise-row:last-child { border-bottom: none; padding-bottom: 0; }
   .exercise-row .ex-icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; background: var(--panel-2); display: flex; align-items: center; justify-content: center; color: var(--muted); }
@@ -11868,6 +11888,16 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
     const forDate = target.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
     const dayAfter = new Date(todayStr() + "T00:00:00");
     dayAfter.setDate(dayAfter.getDate() + 1);
+    /* The estimate is tappable here too, because this is the moment the
+       question gets asked: the plan and the clock are on screen together. The
+       engine's own number when it sent one, the same arithmetic off the
+       exercises when it did not. Today only, since a day queued ahead has no
+       "today" to be a one-off about, and the card it lands on carries the same
+       control anyway. */
+    const estMin = Number(session?.estimatedMinutes) > 0
+      ? Number(session.estimatedMinutes)
+      : sessionEstimateMinutes(workout.exercises);
+    const canRebudget = forToday && !SESSION && !isCoachedClient() && !!estMin;
     const head = forToday
       ? "Your workout"
       : `Queued for ${planDate === isoDate(dayAfter) ? "tomorrow" : target.toLocaleDateString(undefined, { weekday: "long" })}`;
@@ -11877,6 +11907,11 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
       ${forToday ? "" : `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(forDate)}</p>`}
       ${honest ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(honest)}</p>` : ""}
       ${sessionLine ? `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(sessionLine)}</p>` : ""}
+      ${canRebudget ? `<div class="plan-time-row">
+        <button type="button" class="plan-time" id="genTimeBtn" aria-label="About ${estMin} minutes. Change how long you have today.">
+          ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
+        </button>
+      </div>` : ""}
       ${said.map((n) => `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(n)}</p>`).join("")}
       ${stretchLine ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(stretchLine)}</p>` : ""}
       <div class="gen-rows" id="genRows">
@@ -11914,6 +11949,16 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
         },
       });
     });
+    if ($("genTimeBtn")) {
+      $("genTimeBtn").onclick = () => openSessionBudgetSheet({
+        estimate: estMin,
+        current: Number(session?.budgetMinutes) || null,
+        overReveal: true,
+        /* The overlay closes first: applySessionBudget runs a generate, and
+           that opens this same overlay again from the top. */
+        onPick: (m) => { closeGenOverlay(); applySessionBudget(m); },
+      });
+    }
     $("genGoBtn").onclick = () => {
       // Dismissing the offer is itself an answer, and recording it is what keeps
       // "offered once" true rather than "offered after every single plan".
@@ -12174,15 +12219,23 @@ function failGenOverlay(message) {
    whenever a plan is generated the ordinary way, or the focus changes. */
 let REGEN_SEEN = { focus: null, names: [] };
 
-async function generateWorkout(forDate, { sameAgain = false } = {}) {
-  if (isCoachedClient()) { toast("Your coach sets your workouts"); return; }
-  const keepFocus = sameAgain ? TODAY_WORKOUT?.focus || null : null;
+/* `sessionMinutes` is the one-off budget for this call only (applySessionBudget)
+   and is never written to profiles.session_minutes. `wantFocus` keeps the day
+   type across a rebuild that was not asking for different movements. */
+async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = null, keepFocus: wantFocus = null } = {}) {
+  if (isCoachedClient()) { toast("Your coach sets your workouts"); return false; }
+  const keepFocus = sameAgain ? TODAY_WORKOUT?.focus || null : wantFocus || null;
   if (!sameAgain || REGEN_SEEN.focus !== keepFocus) REGEN_SEEN = { focus: keepFocus, names: [] };
   if (sameAgain) {
     for (const e of TODAY_WORKOUT?.exercises || []) {
       if (!REGEN_SEEN.names.includes(e.name)) REGEN_SEEN.names.push(e.name);
     }
   }
+  /* Empty for a budget change, on purpose. "Give me a different one" and "give
+     me a shorter one" are different asks: avoiding what is on the plan would
+     hand back other movements when the person only ever said they had less
+     time, and it would fight the engine's own ladder, which shortens a session
+     by trimming sets off THESE lifts before it drops any of them. */
   const avoid = sameAgain ? [...REGEN_SEEN.names] : [];
   /* This used to be wired straight to onclick, which handed it a PointerEvent
      as forDate. That went all the way into entry_date and came back as
@@ -12256,8 +12309,11 @@ async function generateWorkout(forDate, { sameAgain = false } = {}) {
         challenge_target: MY_PROFILE?.challenge_target ?? null,
         /* How long one session should take, from Setup > Training. null on a
            database without the column yet and on anybody who never answered,
-           and the contract says null is byte for byte "never asked". */
-        session_minutes: MY_PROFILE?.session_minutes ?? null,
+           and the contract says null is byte for byte "never asked".
+           A one-off budget is this same field with a different number on this
+           one call, which is all the engine needs and all it ever gets: the
+           profile column stays exactly as it was. */
+        session_minutes: Number.isFinite(sessionMinutes) ? sessionMinutes : (MY_PROFILE?.session_minutes ?? null),
         focus_groups: MY_PROFILE?.focus_groups ?? null,
         focus_chosen_at: MY_PROFILE?.focus_chosen_at ?? null,
         limits: MY_PROFILE?.limits ?? null,
@@ -12290,7 +12346,7 @@ async function generateWorkout(forDate, { sameAgain = false } = {}) {
     if (resp.status === 429) {
       failGenOverlay(data.error || "You have hit today's limit on new workouts. Try again tomorrow.");
       isToday ? renderWorkoutTab() : renderHero();
-      return;
+      return false;
     }
     if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
     if (!data.workout?.exercises?.length) throw new Error("Coach returned an empty workout");
@@ -12347,12 +12403,16 @@ async function generateWorkout(forDate, { sameAgain = false } = {}) {
       renderHero();
       revealGeneratedPlan(data.workout, data.honest, () => toast("Tomorrow is planned"), target, data.notes, data.meta?.session);
     }
+    /* Answered, so a caller that has to undo something on failure can tell the
+       two apart. Nothing else reads it. */
+    return true;
   } catch (err) {
     console.error("generateWorkout failed:", err);
     // Showing the real reason (not a generic line) is what makes the NEXT failure
     // self-diagnosing instead of another silent "try again and hope" report.
     failGenOverlay(err.message || String(err));
     isToday ? renderWorkoutTab() : renderHero();
+    return false;
   }
 }
 
@@ -14360,6 +14420,25 @@ const EQUIPMENT_WORDS = [
   ["Bodyweight", ["push up", "push-up", "pull up", "pull-up", "chin up", "dip", "plank", "sit up"]],
 ];
 
+/* What a plan costs in minutes, costed the way the engine costs it:
+   mo-knowledge/engine/plan.mjs `estimateMinutes`, which is thirty seconds of
+   work per set plus that set's own rest, plus the warm-up.
+
+   Derived from the exercises rather than read off a stored meta.session, for
+   two reasons. ai_workouts has no column for the engine's session block, and a
+   stored number would stop being true the moment somebody added, removed,
+   swapped or re-dialled a row, all of which are one tap away on the same
+   screen. A row the engine never wrote carries no restSec, so the app's own
+   default stands in, which is the fallback the rest timer already uses. */
+const PLAN_REP_SECONDS = 30;   // plan.mjs REP_SECONDS
+const PLAN_WARMUP_MIN = 6;     // plan.mjs WARMUP_MIN
+function sessionEstimateMinutes(list) {
+  const ex = (list || []).filter((e) => e && e.name);
+  if (!ex.length) return null;
+  const seconds = ex.reduce((t, e) => t + (e.sets || 3) * (PLAN_REP_SECONDS + (Number(e.restSec) || DEFAULT_REST_SEC)), 0);
+  return Math.round(PLAN_WARMUP_MIN + seconds / 60);
+}
+
 /* What we can honestly propose for the next session, all of it measured from
    the user's own logs.
 
@@ -14400,10 +14479,10 @@ function planFromToday() {
   const targets = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 4)
     .map(([g]) => pretty[g] || g.charAt(0).toUpperCase() + g.slice(1));
 
-  /* The same arithmetic the engine costs a session with: work plus the rest
-     between sets, plus the warm-up minutes. A range, because reps vary. */
-  const secs = list.reduce((t, e) => t + (e.sets || 3) * (30 + (Number(e.restSec) || DEFAULT_REST_SEC)), 0);
-  const mins = Math.round(secs / 60) + 5;
+  /* The same arithmetic the engine costs a session with, and now literally the
+     same function the tappable estimate on the plan uses, so the two numbers on
+     two screens cannot disagree. A range, because reps vary. */
+  const mins = sessionEstimateMinutes(list);
 
   /* Match, defined the same way as the proposal below: how much of this
      session lands on what the week has trained least. A plan that hits your
@@ -15969,6 +16048,141 @@ async function savePlanExercises() {
   return true;
 }
 
+/* ---------- How long you have TODAY ----------
+   Mo: "you see your workout, the time on the workout. It would be like,
+   estimated time thirty minutes, and you can always say, oh, sixty minutes.
+   And then it would remove the workouts that would basically try to equate to
+   that time."
+
+   Not by removing exercises. The engine already has four levers for a budget
+   and it runs them gentlest first: shave a set off a non-priority accessory,
+   drop that accessory, shave sets off everything including the mains, and only
+   then compress the rest between sets, which it announces because that is a
+   real trade against what the goal prescribed. Deleting a movement is the
+   second of the four and the most training value per minute saved, so this
+   control never touches the list. It asks the engine for the same day at a
+   different budget and takes back whatever the ladder built.
+
+   One-off, and profiles.session_minutes is deliberately not written. That
+   column is the sticky answer and has its own control in Setup > Training. A
+   Tuesday with a meeting on it must not quietly become "short sessions, for
+   ever", which is what writing the column on a tap would mean.
+
+   And the stored row is REPLACED rather than the screen being trimmed over a
+   stale one. Calibration went live today: it reads the plan that was prescribed
+   against what was logged and backs the weights off on a shortfall. A 45 minute
+   row left in the database under a 30 minute session is somebody punished with
+   lighter weights for having been busy on a Tuesday. */
+let ONE_OFF_SESSION = null;   // { date, minutes, made, from: { minutes, focus, exercises, mobility, cardio } }
+
+/* Enough of a plan to tell whether it is still the one the budget change made.
+   Anything else writing this day (a plain Regenerate, a saved workout dropped
+   on it, a row removed by hand) moves this string, and the offer to put the
+   original back takes itself off rather than restoring over work it never saw. */
+const planSignature = (list) => (list || []).map((e) => `${e?.name}:${e?.sets}x${e?.reps}`).join("|");
+
+/* The five lengths are the ones Setup uses, on purpose: two controls that mean
+   the same thing should not offer different numbers. `current` is what we know
+   this day was built for, and it only lights a chip. */
+function openSessionBudgetSheet({ estimate, current, onPick, overReveal = false }) {
+  const lit = SESSION_LENGTHS.includes(current) ? current : nearestSessionLength(estimate);
+  const scrim = document.createElement("div");
+  /* The reveal is a full screen overlay above everything else, so a sheet
+     opened from it has to sit above that rather than behind it. Dismissing it
+     leaves the reveal exactly where it was, which is why this is not "close the
+     reveal first". */
+  scrim.className = overReveal ? "pop-scrim over-gen" : "pop-scrim";
+  scrim.innerHTML = `
+    <div class="pop">
+      <div class="pop-body">
+        <div class="ds-top">
+          <div class="pop-who" style="color:var(--muted)">JUST FOR TODAY</div>
+          <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
+        </div>
+        <p class="muted-note">This one comes to about ${estimate} minutes. Say what you actually have and the plan is rebuilt to fit: sets come off the accessories first, a lift only if that is not enough, and the rest between sets last. Anything you added or swapped by hand is replaced.</p>
+        <div class="rest-pref five" id="oneOffLengths"></div>
+        <p class="muted-note" style="margin-top:12px;">Today only. Your usual session length, in Setup then Training, is not touched.</p>
+        <button type="button" class="btn-ghost" data-close>Keep this one</button>
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+  const close = () => scrim.remove();
+  scrim.querySelectorAll("[data-close]").forEach((b) => { b.onclick = close; });
+  scrim.onclick = (e) => { if (e.target === scrim) close(); };
+  renderSessionLengths($("oneOffLengths"), {
+    chosen: lit, suggested: lit,
+    onPick: (minutes) => {
+      close();
+      /* renderSessionLengths answers null when the lit chip was the one tapped,
+         which in Setup means "let the goal decide again". Here the lit chip is
+         the length this day already has, so tapping it is "leave it alone" and
+         must not spend a generate on rebuilding the same plan. */
+      if (minutes === null || minutes === lit) return;
+      onPick(minutes);
+    },
+  });
+}
+
+/* One generate at the new budget, and the row it writes is the row on screen.
+   The plan being replaced is kept whole in memory first: ai_workouts holds one
+   row per person per day, so there is nowhere in the database to park the old
+   version (archiving it would only mean the next upsert wrote onto the archived
+   row), and a snapshot that lives as long as the app is open is the right
+   length for the change of mind it exists for. */
+async function applySessionBudget(minutes) {
+  if (!TODAY_WORKOUT?.exercises?.length) return;
+  /* Belt and braces against a caller that got its hands on this while a session
+     is open. Mid-session is the third case and it is not this control. */
+  if (SESSION) return;
+  const date = TODAY_WORKOUT.entry_date || todayStr();
+  /* The snapshot is the ORIGINAL session, not the previous one. Shorten twice
+     and "back to" still means the plan the day started with, which is the thing
+     somebody is actually trying to get back to; keeping the last step instead
+     would strand them one version away from it with nothing named on screen. */
+  const snapshot = {
+    date,
+    minutes,
+    from: (ONE_OFF_SESSION?.date === date && ONE_OFF_SESSION.from) || {
+      minutes: sessionEstimateMinutes(TODAY_WORKOUT.exercises),
+      focus: TODAY_WORKOUT.focus,
+      exercises: JSON.parse(JSON.stringify(TODAY_WORKOUT.exercises)),
+      mobility: TODAY_WORKOUT.mobility ? JSON.parse(JSON.stringify(TODAY_WORKOUT.mobility)) : null,
+      cardio: TODAY_WORKOUT.cardio ?? null,
+    },
+  };
+  const keepFocus = TODAY_WORKOUT.focus;
+  ONE_OFF_SESSION = snapshot;
+  /* A failed generate leaves the old plan exactly where it was, so there is
+     nothing to offer to put back. */
+  const ok = await generateWorkout(null, { sessionMinutes: minutes, keepFocus });
+  if (!ok) { if (ONE_OFF_SESSION === snapshot) ONE_OFF_SESSION = null; return; }
+  snapshot.made = planSignature(TODAY_WORKOUT?.exercises);
+  /* The reveal is already on screen by now and the card behind it was rendered
+     before `made` was stamped, so it is redrawn with the offer on it. */
+  renderWorkoutTab();
+}
+
+/* "Actually, put it back." Written the same way every other writer of this row
+   writes it, and it clears the same two fields for the same reason: the row the
+   screen shows has to be the row calibration later reads. */
+async function restoreSessionBudget() {
+  const snap = ONE_OFF_SESSION;
+  if (!snap?.from?.exercises?.length) return;
+  const { error } = await sb.from("ai_workouts").upsert({
+    user_name: ME, email: MY_EMAIL, entry_date: snap.date,
+    focus: snap.from.focus, exercises: snap.from.exercises,
+    mobility: snap.from.mobility, cardio: snap.from.cardio,
+    archived: false, completed_at: null, duration_sec: null,
+  }, { onConflict: "email,entry_date" });
+  if (error) { console.error("could not put the original plan back", error); toast("Couldn't put that back. Try again."); return; }
+  ONE_OFF_SESSION = null;
+  await loadAll();
+  await loadTodayWorkout();
+  FRESH_PLAN_ID = TODAY_WORKOUT?.id || null;
+  renderWorkoutTab();
+  toast("Your original session is back");
+}
+
 function renderPlanPreview() {
   // Reachable straight from choose/manual/week now, each of which stamps its
   // own heading here, clear it or their title outlives them on this screen.
@@ -15985,6 +16199,24 @@ function renderPlanPreview() {
   const fresh = !!FRESH_PLAN_ID && FRESH_PLAN_ID === TODAY_WORKOUT.id;
   const started = doneCount > 0 && !fresh;
   const finished = doneCount >= total && total > 0 && !fresh;
+
+  /* The estimate, tappable. Gone the moment a session is open, whether or not a
+     set has been ticked: from there only what is LEFT of the day can be
+     re-planned, which is a different algorithm and a different control (see
+     ONE_OFF_SESSION above), and rebuilding the whole day underneath a live
+     SESSION would strand the sets already done against exercises that are no
+     longer on the plan. Gone for a coached client for the same reason
+     Regenerate is: their coach writes this. */
+  const estMin = sessionEstimateMinutes(TODAY_WORKOUT.exercises);
+  const oneOff = (ONE_OFF_SESSION?.date === (TODAY_WORKOUT.entry_date || todayStr())
+    && ONE_OFF_SESSION.made === planSignature(TODAY_WORKOUT.exercises)) ? ONE_OFF_SESSION : null;
+  const timeRow = (started || finished || SESSION || isCoachedClient() || !estMin) ? "" : `
+    <div class="plan-time-row">
+      <button type="button" class="plan-time" id="planTimeBtn" aria-label="About ${estMin} minutes. Change how long you have today.">
+        ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
+      </button>
+      ${oneOff?.from?.minutes ? `<button type="button" class="link-btn" id="planTimeBackBtn">Back to ${oneOff.from.minutes} min</button>` : ""}
+    </div>`;
 
   const rows = TODAY_WORKOUT.exercises.map((ex, i) => {
     const isDone = loggedNow.has(ex.name.toLowerCase());
@@ -16009,6 +16241,7 @@ function renderPlanPreview() {
       <span class="workout-progress-count">${doneCount}/${total}</span>
     </div>
     <div class="workout-progress-track"><div class="workout-progress-fill" style="width:${total ? (doneCount / total) * 100 : 0}%"></div></div>
+    ${timeRow}
     ${stretchBlockHTML("warmup", finished)}
     <div class="reorder-list" id="planRows">${rows}</div>
     ${stretchBlockHTML("cooldown", finished)}
@@ -16095,6 +16328,15 @@ function renderPlanPreview() {
   if ($("planAddExToggleBtn")) {
     $("planAddExToggleBtn").onclick = () => cbOpenPicker("plan");
   }
+
+  if ($("planTimeBtn")) {
+    $("planTimeBtn").onclick = () => openSessionBudgetSheet({
+      estimate: estMin,
+      current: oneOff?.minutes ?? null,
+      onPick: applySessionBudget,
+    });
+  }
+  if ($("planTimeBackBtn")) $("planTimeBackBtn").onclick = restoreSessionBudget;
 
   // These three are mutually exclusive depending on how far the workout got.
   if ($("planPrivacyBtn")) $("planPrivacyBtn").onclick = openWorkoutPrivacy;
