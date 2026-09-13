@@ -922,6 +922,110 @@
   .session-pause:active, .session-min:active { transform: scale(.985); background: var(--panel); }
   .session-bar { gap: 12px; }
   .session-paused-sheet { text-align: center; padding: 28px 6px 8px; }
+
+  /* ---- Paused, the screen you come back to ---------------------------- */
+  /* The overlay gives up its own padding and scroll here: this one is a
+     single screen that fills the phone, not a document. */
+  .session-overlay.paused-screen { padding: 0; overflow: hidden; }
+  .session-overlay.paused-screen .session-bar,
+  .session-overlay.paused-screen .session-progress-track { display: none; }
+  .pz {
+    min-height: 100dvh; display: flex; flex-direction: column;
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 18px calc(20px + env(safe-area-inset-bottom, 0px));
+    /* A held session, not a closed one: the light stays up in the middle
+       where the work is, and falls away at the edges. */
+    background:
+      radial-gradient(120% 52% at 50% 46%, color-mix(in srgb, var(--text) 10%, transparent), transparent 72%),
+      var(--bg);
+  }
+  .pz-top { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .pz-min {
+    width: 52px; height: 52px; border-radius: 50%; border: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--text) 13%, transparent); color: var(--text);
+    transition: transform .12s ease;
+  }
+  .pz-min:active { transform: scale(.93); }
+  /* Ending and discarding are the two ways to lose this session, so they are
+     the only red things on the screen and they sit as far apart as it allows. */
+  .pz-exit {
+    padding: 13px 22px; border-radius: 100px; cursor: pointer; font: inherit;
+    font-size: 16px; font-weight: 700; background: none;
+    border: 1px solid color-mix(in srgb, var(--up) 55%, transparent); color: var(--up);
+  }
+  .pz-exit:active { background: color-mix(in srgb, var(--up) 14%, transparent); }
+
+  .pz-mid {
+    flex: 1 1 auto; min-height: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .pz-eyebrow {
+    font-size: 12.5px; font-weight: 800; letter-spacing: .24em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .pz-clock {
+    margin-top: 12px; font-family: var(--font-display);
+    font-size: clamp(62px, 19vw, 88px); font-weight: 800;
+    letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .pz-where { margin-top: 10px; font-size: 19px; font-weight: 700; letter-spacing: -.015em; text-align: center; }
+  .pz-stage { position: relative; width: 100%; display: flex; align-items: center; justify-content: center; }
+  /* Ghosted on purpose: the movement you were on is still there, just held. */
+  .pz-fig { margin: 0; opacity: .4; }
+  .pz-fig.fig-none { display: none; }
+  .pz-fig canvas { width: min(340px, 86vw); height: min(340px, 86vw); }
+  .pz-play {
+    position: absolute; width: min(158px, 42vw); height: min(158px, 42vw);
+    border-radius: 50%; border: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--accent); color: var(--on-accent);
+    box-shadow: 0 0 64px -8px color-mix(in srgb, var(--accent) 65%, transparent);
+    transition: transform .12s ease;
+  }
+  .pz-play:active { transform: scale(.95); }
+  /* The shared icon set is stroked; a play triangle wants to be solid. */
+  .pz-play svg { fill: currentColor; margin-left: 6px; }
+
+  .pz-foot { flex: 0 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .pz-live {
+    width: 100%; display: flex; align-items: center; gap: 14px; text-align: left;
+    font: inherit; color: var(--text); cursor: pointer; padding: 13px 16px; border-radius: 18px;
+    background: color-mix(in srgb, var(--partner) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--partner) 34%, transparent);
+  }
+  .pz-live:active { background: color-mix(in srgb, var(--partner) 16%, transparent); }
+  .pz-live-ava { position: relative; flex: 0 0 54px; width: 54px; height: 54px; }
+  .pz-live-av {
+    width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 800; color: var(--partner);
+    background: color-mix(in srgb, var(--partner) 16%, transparent);
+    border: 2px solid color-mix(in srgb, var(--partner) 72%, transparent);
+  }
+  .pz-live-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pz-live-dot {
+    position: absolute; right: 0; bottom: 1px; width: 13px; height: 13px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+  }
+  .pz-live-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .pz-live-name { font-size: 17px; font-weight: 800; letter-spacing: -.015em; }
+  .pz-live-what { font-size: 14.5px; color: var(--muted); }
+
+  /* Held, not tapped: this is the only control here that loses work, and the
+     bar filling under the thumb is both the confirmation and the way out. */
+  .pz-discard {
+    position: relative; overflow: hidden; width: 100%; padding: 16px; border-radius: 16px;
+    cursor: pointer; font: inherit; font-size: 16.5px; font-weight: 700; background: none;
+    border: 1px solid color-mix(in srgb, var(--up) 45%, transparent); color: var(--up);
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .pz-discard.holding { border-color: var(--up); }
+  .pz-discard-fill {
+    position: absolute; inset: 0; transform: scaleX(0); transform-origin: left;
+    background: color-mix(in srgb, var(--up) 24%, transparent);
+  }
+  .pz-discard-txt { position: relative; }
+
   .session-paused-sheet h3 { font-size: 21px; margin: 0 0 6px; }
 
   .photo-item { position: relative; }
@@ -14123,7 +14227,7 @@ function renderStretchPhase() {
   const next = list[i + 1];
   const nextUp = move.perSide && SESSION.stretchSide === 1 ? "other side" : next ? next.name : (isWarm ? "first lift" : "finish");
   SESSION_LAST_EX = null;   // the first lift after the warm-up slides in like a new exercise
-  $("sessionCard").classList.remove("lifting");   // the timed blocks scroll, the lift screen does not
+  $("sessionCard").classList.remove("lifting", "paused-screen");   // the timed blocks scroll, the lift screen does not
   $("sessionProgressFill").style.width = isWarm ? "0%" : "100%";
   /* The whole screen changes colour for the duration of the block. See the
      .session-overlay.stretching rules: one class, every accent follows. */
@@ -14424,6 +14528,7 @@ function renderSession() {
      draws (the stretch blocks, the paused sheet, the wrap-up) is a document,
      so the class goes on here and comes off in each of those. */
   $("sessionCard").classList.add("lifting");
+  $("sessionCard").classList.remove("paused-screen");
   mountMotionFigures($("sessionBody"));
   /* The rest clock lives in the top bar now, so there is no bar to tick and
      nothing to paint except that one number, which the session timer already
@@ -14759,7 +14864,7 @@ async function renderSessionComplete() {
   const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
   const full = doneCount >= total;
   $("sessionProgressFill").style.width = "100%";
-  $("sessionCard").classList.remove("lifting");
+  $("sessionCard").classList.remove("lifting", "paused-screen");
   $("sessionCard").classList.add("finished");
   stopSessionTimer();
   const proofEntry = todayEntryFor(MY_EMAIL);
@@ -15082,17 +15187,132 @@ function togglePause() {
   }
 }
 
+/* Coming back to a paused workout. The one question this screen answers is
+   "where was I", so the clock and the exercise you were on are the whole
+   middle of it, the figure sits behind dimmed because the session is still
+   there waiting, and going again is one enormous target. Leaving is three
+   different things and they are kept apart on purpose: the chevron backs out
+   and leaves it running, Exit ends it and keeps every set, and discard throws
+   the session away, which is why that one has to be held rather than tapped. */
 function renderPausedSheet() {
-  $("sessionCard").classList.remove("lifting");
+  const card = $("sessionCard");
+  card.classList.remove("lifting");
+  card.classList.add("paused-screen");
+
+  const ei = SESSION.exerciseIndex;
+  const ex = TODAY_WORKOUT?.exercises?.[ei];
+  const stretching = SESSION.phase === "warmup" || SESSION.phase === "cooldown";
+  const setsDone = SESSION.setsDone?.[ei] || [];
+  const currentSet = setsDone.findIndex((d) => !d);
+  /* Mid stretch there is no set to be on, and past the last set "set 5 of 4"
+     is worse than saying nothing. */
+  const where = stretching
+    ? (SESSION.phase === "warmup" ? "Warm-up" : "Cool-down")
+    : ex
+      ? `${ex.name}${currentSet >= 0 ? ` &middot; set ${currentSet + 1} of ${setsDone.length}` : ""}`
+      : "";
+
   $("sessionBody").innerHTML = `
-    <div class="session-paused-sheet">
-      <h3>Paused</h3>
-      <p class="muted-note">${fmtElapsed(sessionElapsed())} so far. Take your time.</p>
-      <button type="button" class="btn-primary" id="resumeSessionBtn" style="margin-top:18px;">Resume</button>
-      <button type="button" class="btn-ghost" id="endSessionBtn">End workout</button>
+    <div class="pz">
+      <div class="pz-top">
+        <button type="button" class="pz-min" id="pzMin" aria-label="Back, without ending the workout">${icon("chevronDown", 20)}</button>
+        <button type="button" class="pz-exit" id="pzExit">Exit workout</button>
+      </div>
+
+      <div class="pz-mid">
+        <div class="pz-eyebrow">Paused</div>
+        <div class="pz-clock" id="pzClock">${fmtElapsed(sessionElapsed())}</div>
+        ${where ? `<div class="pz-where">${where}</div>` : ""}
+        <div class="pz-stage">
+          ${ex && !stretching ? `<div class="sess-fig pz-fig" data-fig="${escapeHtml(ex.name)}" data-mood="sleepy"></div>` : ""}
+          <button type="button" class="pz-play" id="pzResume" aria-label="Resume workout">${icon("play", 40)}</button>
+        </div>
+      </div>
+
+      <div class="pz-foot">
+        <div id="pzLive"></div>
+        <button type="button" class="pz-discard" id="pzDiscard">
+          <span class="pz-discard-fill" aria-hidden="true"></span>
+          <span class="pz-discard-txt">Hold to discard</span>
+        </button>
+      </div>
     </div>`;
-  $("resumeSessionBtn").onclick = togglePause;
-  $("endSessionBtn").onclick = endWorkoutNow;
+
+  $("pzMin").onclick = minimiseSession;
+  $("pzExit").onclick = endWorkoutNow;
+  $("pzResume").onclick = togglePause;
+  mountMotionFigures($("sessionBody"));
+  renderPausedLive();
+  wireHoldToDiscard();
+}
+
+/* The partner card, only when there is a partner mid session. Same privacy
+   rule as everywhere else: with details off you get that they are training
+   and how long, never what. */
+function renderPausedLive() {
+  const el = $("pzLive");
+  if (!el || !LIVE_PARTNER) return;
+  const row = LIVE_PARTNER;
+  const name = row.user_name || partnerName();
+  const mins = Math.max(1, Math.round((row.elapsed_sec || 0) / 60));
+  const sharing = liveDetailsShared(row);
+  const what = sharing
+    ? `${escapeHtml(row.focus || "A workout")} &middot; ${mins} minutes in`
+    : `${mins} minutes in`;
+  el.innerHTML = `
+    <button type="button" class="pz-live" id="pzLiveBtn">
+      <span class="pz-live-ava">
+        <span class="pz-live-av" data-av-email="${escapeHtml(row.email)}">${escapeHtml(initials(name))}</span>
+        <i class="pz-live-dot"></i>
+      </span>
+      <span class="pz-live-body">
+        <span class="pz-live-name">${escapeHtml(name)} is still going</span>
+        <span class="pz-live-what">${what}</span>
+      </span>
+    </button>`;
+  $("pzLiveBtn").onclick = openLiveSheet;
+  hydrateAvatars(el);
+}
+
+/* Discard is the only thing on this screen that loses work, so it is the only
+   thing that cannot happen on a tap. The bar fills under your thumb and the
+   session goes at the end of it; letting go early is the cancel, so there is
+   no dialog to read and no second button to hit by accident. */
+const DISCARD_HOLD_MS = 900;
+function wireHoldToDiscard() {
+  const btn = $("pzDiscard");
+  if (!btn) return;
+  const fill = btn.querySelector(".pz-discard-fill");
+  const txt = btn.querySelector(".pz-discard-txt");
+  let timer = null, done = false;
+
+  const stop = () => {
+    clearTimeout(timer); timer = null;
+    if (done) return;
+    btn.classList.remove("holding");
+    fill.style.transition = "transform .18s ease";
+    fill.style.transform = "scaleX(0)";
+    txt.textContent = "Hold to discard";
+  };
+  btn.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    done = false;
+    btn.classList.add("holding");
+    txt.textContent = "Keep holding";
+    fill.style.transition = `transform ${DISCARD_HOLD_MS}ms linear`;
+    fill.style.transform = "scaleX(1)";
+    buzz(8);
+    timer = setTimeout(async () => {
+      done = true;
+      buzz([30, 40, 30]);
+      txt.textContent = "Discarded";
+      await discardSession();
+      closeSessionUI();
+      renderWorkoutTab();
+      renderFab();
+    }, DISCARD_HOLD_MS);
+  });
+  for (const ev of ["pointerup", "pointercancel", "pointerleave"]) btn.addEventListener(ev, stop);
 }
 
 function renderFab() {
