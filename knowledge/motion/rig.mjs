@@ -2010,10 +2010,22 @@ function drawHips(ctx, S, C, fills) {
   const up = norm2(sub(S.chest, S.pelvis));
   for (const s of ["L", "R"]) {
     const k = S.sides[s];
+    /* Mo drew the hip as one rounded mass from just under the waist, out
+       past the joint and back into the thigh, not the straight taper the
+       first cut had. The middle circle carries that: it sits a little
+       outboard of the joint and is the widest of the three, so the profile
+       is convex. How far out to the side the hip joint sits ON SCREEN is 0
+       in a side view (the joint is behind the pelvis centre there) and 1
+       face on, and the extra mass scales with it: face on it rounds the hip
+       out, side on it adds only a little glute, never a belly. The first
+       cut without that scaling pushed a paunch out of every squat. */
+    const lat = sub(k.hip, S.pelvis);
+    const w = clamp(len2(lat) / B.hipW, 0, 1);
+    const outward = len2(lat) > 0.5 ? scl(norm2(lat), 0.6 * w) : V(0, 0);
     part(ctx, C, [
-      [add(S.pelvis, scl(up, B.rPelvis * 1.30)), B.rPelvis * 0.84],
-      [k.hip, B.rHip * 1.14],
-      [lerpV(k.hip, k.knee, 0.26), B.rHip * 0.98],
+      [add(S.pelvis, scl(up, B.rPelvis * 0.70)), B.rPelvis * 0.90],
+      [add(k.hip, outward), B.rHip * (1.14 + 0.18 * w)],
+      [lerpV(k.hip, k.knee, 0.34), B.rHip * 0.98],
     ], { fill: fills[s], line: false });
   }
 }
