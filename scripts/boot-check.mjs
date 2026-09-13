@@ -255,5 +255,25 @@ try {
 }
 
 if (MISSES.size) { failed++; console.log("\n  ids used in JS but MISSING from markup:", [...MISSES].join(", ")); }
+
+/* The page carries its own version so it can tell when a NEWER build is
+   deployed than the one it is running, and act on it. That only works while
+   the two numbers are kept in step. They drifted for eight deploys once,
+   which left every launch convinced it was stale: an "Updating..." toast and
+   a wasted reload every session, and the wrong version in Settings. Nothing
+   catches that at runtime, because a permanently stale page looks exactly
+   like a correctly detected update. So it is caught here instead, where it
+   cannot ship. */
+{
+  const appV = (readFileSync(join(root, "index.html"), "utf8").match(/const APP_VERSION = "([^"]+)"/) || [])[1];
+  const swV = (readFileSync(join(root, "sw.js"), "utf8").match(/fit-together-([0-9.]+)/) || [])[1];
+  if (appV !== swV) {
+    failed++;
+    console.log(`\n  VERSION DRIFT: index.html APP_VERSION is ${appV}, sw.js cache is ${swV}.`);
+    console.log("  Bump both together: node scripts/bump-version.mjs");
+  } else {
+    console.log(`\n  version ${appV} (index.html and sw.js agree)`);
+  }
+}
 console.log(failed ? "\nBOOT CHECK FAILED" : "\nBOOT CHECK PASSED");
 process.exit(failed ? 1 : 0);
