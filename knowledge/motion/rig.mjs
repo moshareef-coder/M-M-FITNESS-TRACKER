@@ -130,14 +130,14 @@ export const BODY = {
   // in a further ten percent, and every mid-limb radius sits below the joint
   // above it so limbs taper instead of bulging. The previous set (chest 12.3,
   // thigh mid 8.7 over a hip of 8.0) read as heavy, and he said so.
-  rPelvis: 8.4, rWaist: 7.0, rChest: 10.6,
+  rPelvis: 7.9, rWaist: 6.6, rChest: 10.2,
   rNeckTop: 4.0, rNeckBot: 5.2,
-  rHeadBack: 6.8, rHeadJaw: 5.0,
-  rShoulder: 6.2, rDelt: 6.6, rElbow: 4.7, rWrist: 3.6,
-  rUpperArmMid: 5.5, rForearmMid: 4.4,
-  rHandA: 3.5, rHandB: 2.6, rThumb: 1.9,
-  rHip: 7.2, rThighMid: 7.0, rKnee: 5.5,
-  rCalf: 5.6, rAnkle: 4.4, rToe: 2.8, rHeel: 3.5,
+  rHeadBack: 6.5, rHeadJaw: 4.8,
+  rShoulder: 5.7, rDelt: 6.0, rElbow: 3.5, rWrist: 2.4,
+  rUpperArmMid: 4.6, rForearmMid: 3.7,
+  rHandA: 2.9, rHandB: 2.2, rThumb: 1.8,
+  rHip: 6.3, rThighMid: 5.9, rKnee: 4.0,
+  rCalf: 4.7, rAnkle: 4.0, rAnkleDraw: 2.7, rToe: 2.5, rHeel: 3.0,
   shoulderW: 12.6, hipW: 6.2, depth: 1.7,
   // hand v2
   palm: 5.0, palmHalf: 2.7, finger: 4.4, rPalm: 2.7, rFinger: 2.1, thumb: 5.0,
@@ -155,19 +155,28 @@ export const LEG_TO_FLOOR = BODY.thigh + BODY.shin + BODY.rAnkle;
 // back of the skull.
 export const BODY_FEMALE = {
   ...BODY,
-  rPelvis: 8.8, rWaist: 6.4, rChest: 9.6,
+  rPelvis: 8.3, rWaist: 5.9, rChest: 9.1,
   rNeckTop: 3.6, rNeckBot: 4.7,
-  rHeadBack: 6.4, rHeadJaw: 4.5,
-  rShoulder: 5.5, rDelt: 5.8, rElbow: 4.2, rWrist: 3.2,
-  rUpperArmMid: 4.8, rForearmMid: 3.9,
-  rHandA: 3.2, rHandB: 2.4, rThumb: 1.7,
-  rHip: 7.4, rThighMid: 7.0, rKnee: 5.0,
-  rCalf: 5.2, rToe: 2.6, rHeel: 3.2,
+  rHeadBack: 6.1, rHeadJaw: 4.3,
+  rShoulder: 5.1, rDelt: 5.3, rElbow: 3.1, rWrist: 2.2,
+  rUpperArmMid: 4.1, rForearmMid: 3.3,
+  rHandA: 2.6, rHandB: 2.0, rThumb: 1.6,
+  rHip: 6.7, rThighMid: 6.1, rKnee: 3.7,
+  rCalf: 4.3, rAnkle: 4.0, rAnkleDraw: 2.5, rToe: 2.3, rHeel: 2.8,
   shoulderW: 11.2, hipW: 7.0,
-  bust: 2.0, bustAt: 0.80, tail: 13.0, tailR: 2.9,
+  bust: 2.0, bustAt: 0.80,
+  // "bun", "tail" or "cap"; see drawHead
+  hairStyle: "bun", tail: 9.5, tailR: 1.5,
 };
 
-export const BODIES = { male: BODY, female: BODY_FEMALE };
+// The hair variants are separate tables so a sheet can put them side by side
+// without reaching into the rig. Only BODY_FEMALE ships.
+export const BODY_FEMALE_BUN = { ...BODY_FEMALE, hairStyle: "bun" };
+export const BODY_FEMALE_CAP = { ...BODY_FEMALE, hairStyle: "cap" };
+export const BODIES = {
+  male: BODY, female: BODY_FEMALE,
+  "female-bun": BODY_FEMALE_BUN, "female-cap": BODY_FEMALE_CAP,
+};
 
 // Which table the rig is drawing with right now. render() sets it from the
 // palette or the caller's option; solvePose takes it as an optional argument so
@@ -198,8 +207,8 @@ export function restPose(view = "side") {
       spine: 5, neck: -4,
       shoulderR: -5, elbowR: 7, wristR: 5,
       shoulderL: -3, elbowL: 5, wristL: 4,
-      hipR: 3, kneeR: 5, ankleR: -1,
-      hipL: -2, kneeL: 4, ankleL: 1,
+      hipR: 1, kneeR: 0, ankleR: -1,
+      hipL: -1, kneeL: 0, ankleL: 1,
     },
   };
   const side2 = {
@@ -208,35 +217,45 @@ export function restPose(view = "side") {
       spine: 4, neck: -3,
       shoulderR: -4, elbowR: 9, wristR: 6,
       shoulderL: -2, elbowL: 7, wristL: 5,
-      hipR: 3, kneeR: 4, ankleR: -1,
-      hipL: -2, kneeL: 3, ankleL: 1,
+      hipR: 1, kneeR: 0, ankleR: -1,
+      hipL: -1, kneeL: 0, ankleL: 1,
     },
   };
+  // The front stance is SYMMETRIC, deliberately and exactly. Every left and
+  // right value matches, both ankles sit on the same line at hip width, and the
+  // breath keyframe moves the whole body rather than one side of it. A degree
+  // of difference between the two halves does not read as life at card size, it
+  // reads as a figure turned slightly away, which is the thing Mo kept seeing.
+  // Feet at hip width and directly under the hip joints, so the legs hang as
+  // two straight verticals. Anything wider bows the knees outward.
+  const STANCE = { R: BODY.hipW, L: -BODY.hipW };
   const front = {
-    root: { x: 70, y: STAND_Y + 0.3, rot: 1 },
+    root: { x: 70, y: STAND_Y + 0.3, rot: 0 },
     joints: {
-      spine: 0, neck: 1,
-      shoulderR: 9, elbowR: 4, wristR: -1,
-      shoulderL: 8, elbowL: 3, wristL: -1,
-      hipR: 5, hipL: 4, kneeR: 3, kneeL: 4,
+      spine: 0, neck: 0,
+      shoulderR: 7, elbowR: 3, wristR: -1,
+      shoulderL: 7, elbowL: 3, wristL: -1,
+      hipR: 0, hipL: 0, kneeR: 0, kneeL: 0,
     },
-    ik: { ankleR: { x: 77, y: 113.7, bend: -1 }, ankleL: { x: 63, y: 113.7, bend: -1 } },
+    ik: { ankleR: { x: 70 + STANCE.R, y: 113.7, bend: -1 },
+          ankleL: { x: 70 + STANCE.L, y: 113.7, bend: -1 } },
   };
   const front2 = {
     root: { x: 70, y: STAND_Y + 0.8, rot: 0 },
     joints: {
       spine: 1, neck: 0,
-      shoulderR: 10, elbowR: 5, wristR: -1,
-      shoulderL: 9, elbowL: 4, wristL: -1,
-      hipR: 5, hipL: 4, kneeR: 2, kneeL: 3,
+      shoulderR: 8, elbowR: 4, wristR: -1,
+      shoulderL: 8, elbowL: 4, wristL: -1,
+      hipR: 0, hipL: 0, kneeR: 0, kneeL: 0,
     },
-    ik: { ankleR: { x: 77, y: 113.7, bend: -1 }, ankleL: { x: 63, y: 113.7, bend: -1 } },
+    ik: { ankleR: { x: 70 + STANCE.R, y: 113.7, bend: -1 },
+          ankleL: { x: 70 + STANCE.L, y: 113.7, bend: -1 } },
   };
   return {
     view: view === "back" ? "front" : view,
     facing: view === "back" ? "away" : undefined,
     loop: "hold", dur: 7, breath: 0.7, breathRate: 0.7,
-    feet: frontal ? { R: { ang: 10, len: 0.46, w: 1.08 }, L: { ang: 12, len: 0.46, w: 1.08 } } : undefined,
+    feet: frontal ? { R: { ang: 0, len: 0.5, w: 1.05 }, L: { ang: 0, len: 0.5, w: 1.05 } } : undefined,
     keys: frontal ? sway(front, front2) : sway(side, side2),
   };
 }
@@ -267,6 +286,8 @@ export const ACCENTS = {
 export const SKINS = ["mannequin", "anatomy"];
 
 export const BODY_KINDS = ["male", "female"];
+const HAIR_KINDS = ["female-bun", "female-cap"];
+export { HAIR_KINDS };
 export function palette(theme = "dark", accent = "action", skin = "mannequin", bodyKind = "male") {
   const dark = theme !== "light";
   const T = dark ? THEMES.dark : THEMES.light;
@@ -281,8 +302,17 @@ export function palette(theme = "dark", accent = "action", skin = "mannequin", b
   // The figure is deliberately NOT accent tinted any more. The reference body is
   // a neutral warm grey and tinting it green was one of the things that made it
   // read as a prop rather than a person. The accent survives on the floor line.
-  const body = dark ? "#bbb8b5" : "#b3b0ad";
-  const bodyShade = dark ? "#a6a3a0" : "#a09e9b";
+  // Sampled off knowledge/motion/reference/figure-final.png, which Mo approved
+  // as the definitive look: a flat white body on near black, one clean dark
+  // outline, thin dark seams at the joints, a soft light grey shade on the far
+  // side, and hair that is nearly as dark as the outline.
+  //
+  // On light the same drawing is inverted rather than recoloured: a white body
+  // on a white card is an outline and nothing else, so the body takes the dark
+  // tone and the shading goes light. That is what the first prototype did and
+  // it is still the only version that reads on white.
+  const body = dark ? "#f6f5f3" : "#2b3038";
+  const bodyShade = dark ? "#ece9e5" : "#3b414b";
   return {
     skin,
     body: BODIES[bodyKind] ? bodyKind : "male",
@@ -290,27 +320,25 @@ export function palette(theme = "dark", accent = "action", skin = "mannequin", b
     surface: T.surface,
     ink: body,
     inkHi: body,
-    far: dark ? "#8e8c8a" : "#9c9997",
-    farShade: dark ? "#767473" : "#828080",
+    // The far side is a clear step, not a whisper: it has to survive being 40
+    // pixels tall on a session card.
+    far: dark ? "#e6e3df" : "#474e59",
+    farShade: dark ? "#dcd8d3" : "#575f6c",
     shade: bodyShade,
-    shadeSoft: dark ? "#a9a6a3" : "#a2a09d",
-    // A plane slightly LIGHTER than the body. It is the whole reason a front
-    // view reads as a front view: a face catches the light, the back of a
-    // skull does not.
-    face: dark ? "#cbc8c5" : "#c4c1be",
-    // A drawn line, not a knockout. The reference has no heavy outline: the
-    // silhouette is carried by a hairline dark edge and the internal boundaries
-    // are the same line where a real body creases.
-    seam: dark ? "#2a2d30" : "#3a3d42",
-    seamSoft: dark ? "#6f6d6c" : "#7d7b79",
-    // creases are the same drawn line, lighter, because a fold is not an edge
-    crease: dark ? "#6b6968" : "#767473",
-    // panels are separated by the body showing through, not by a dark line
-    plateSeam: dark ? "#bbb8b5" : "#b3b0ad",
+    shadeSoft: dark ? "#e8e6e3" : "#353b44",
+    // One line colour. The whole silhouette carries it heavy, the seams inside
+    // carry it thin. Nothing on this figure is drawn in a middle grey.
+    seam: "#1c1f26",
+    seamSoft: "#1c1f26",
+    crease: dark ? "#4c525c" : "#6d7480",
+    plateSeam: dark ? "#f6f5f3" : "#2b3038",
     edge: T.bg,
-    hair: dark ? "#807f7f" : "#787776",
-    plate: dark ? "#989694" : "#9d9b99",
-    plateFar: dark ? "#7d7b7a" : "#84827f",
+    // Hair is nearly the outline colour, and on the back view it is the whole
+    // cue. On light the body is charcoal, so the hair has to go darker still or
+    // it disappears into the head.
+    hair: dark ? "#2f343d" : "#12161d",
+    plate: dark ? "#dcd9d5" : "#4a5058",
+    plateFar: dark ? "#c2bfba" : "#5a616b",
     accent: A.accent,
     accentInk: A.accentInk,
     line: dark ? A.accent : A.accentInk,
@@ -324,12 +352,15 @@ export function palette(theme = "dark", accent = "action", skin = "mannequin", b
 // A move is authored in a plane. The camera starts looking straight at that
 // plane (yaw 0, pitch 0), which reproduces v1 exactly, and yaw/pitch orbit away
 // from it. Presets are just named yaw/pitch/plane triples.
-export const VIEWS = ["side", "front", "back", "top"];
+export const VIEWS = ["side", "front", "back", "threequarter", "top"];
 export const PRESETS = {
   side: { plane: "sagittal", yaw: 0, pitch: 0 },
   front: { plane: "frontal", yaw: 0, pitch: 0 },
   back: { plane: "frontal", yaw: 180, pitch: 0 },
   top: { plane: "sagittal", yaw: 0, pitch: -88 },
+  // the fourth view on figure-final.png: turned far enough to read as a
+  // body with depth, not far enough to lose the front cues
+  threequarter: { plane: "frontal", yaw: 34, pitch: 0 },
 };
 
 export function cameraFor(view) {
@@ -657,14 +688,18 @@ function part(ctx, C, pts, o = {}) {
   // every circle in the chain.
   if (COLLECT) { for (const g of segs) COLLECT.push(g); return; }
   if (o.line !== false) {
-    ctx.strokeStyle = LINES ? (o.lineColor || C.seam) : C.seamSoft;
-    ctx.lineWidth = (LINES ? (o.lineW || 0.28) : 0.2) * 2;
+    ctx.strokeStyle = o.lineColor || C.seam;
+    ctx.lineWidth = (LINES ? (o.lineW || 0.28) : 0.15) * 2;
     ctx.lineJoin = "round";
     for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.stroke(); }
   }
   ctx.fillStyle = fill;
   for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.fill(); }
-  if (o.shade !== false) {
+  // The shade band is OPT IN now. The reference is flat white: one white, one
+  // very soft far side tone, nothing else. A crescent on every thigh, torso and
+  // upper arm reads as facets, and that was the main thing still separating the
+  // rig from the sheet.
+  if (o.shade === true) {
     // One soft band down the shaded side, flat and opaque like the reference,
     // kept inside the silhouette so it never touches the edge.
     const a = pts[0], b = pts[pts.length - 1];
@@ -800,39 +835,23 @@ function drawFoot(ctx, S, side, C, fill) {
   // A foot pointing at the camera is not a side view of a foot. In a front or
   // back view an untwisted foot projects almost straight down the screen, and
   // the old chain drew that as a boat seen from the side on a figure facing
-  // you. Here it becomes what it is: toes from the front, heel from behind. A
-  // deliberately turned out foot (Warrior II) keeps the side on shape, which is
-  // what the horizontal test picks up.
+  // you. Here it is a simple rounded pad under the ankle, outlined like every
+  // other part and nothing else: no toe splits, no Achilles, no offset. A
+  // deliberately turned out foot (Warrior II) fails the vertical test and keeps
+  // the side on shape, which is correct.
   if (S.frontal && Math.abs(d.x) < 0.45) {
-    const away = S.facing === "away";
     const sole = Math.max(k.toe.y, k.heel.y, k.ankle.y + B.rAnkle * 0.8);
-    const r = B.rToe * (away ? 1.02 : 1.1) * w;
-    const half = B.rToe * (away ? 0.72 : 1.28) * w;
+    const r = B.rToe * 1.12 * w;
+    const half = B.rToe * 1.0 * w;
     const c = V(k.ankle.x, sole - r * 0.9);
     part(ctx, C, [[V(c.x - half, c.y), r], [V(c.x + half, c.y), r]],
          { fill, shadeR: 0.42, shadeOff: 0.36 });
-    if (COLLECT) return;
-    ctx.strokeStyle = C.seamSoft;
-    ctx.lineWidth = 0.28;
-    ctx.lineCap = "round";
-    if (away) {
-      // the Achilles, straight up the back of the heel
-      ctx.beginPath();
-      ctx.moveTo(c.x, c.y - r * 0.5); ctx.lineTo(c.x, c.y - r * 1.5); ctx.stroke();
-    } else {
-      // three short toe splits along the front edge
-      for (const t of [-0.5, 0, 0.5]) {
-        const x = c.x + half * t * 1.25;
-        ctx.beginPath();
-        ctx.moveTo(x, c.y + r * 0.18); ctx.lineTo(x, c.y + r * 0.78); ctx.stroke();
-      }
-    }
     return;
   }
   const mid = lerpV(k.ankle, k.toe, 0.45);
   part(ctx, C, [
     [add(k.heel, scl(d, -0.4)), B.rHeel * 1.04 * w],      // heel, squared off
-    [add(k.ankle, scl(d, 0.4)), B.rAnkle * 1.02 * w],     // ankle and instep
+    [add(k.ankle, scl(d, 0.4)), B.rAnkleDraw * 1.15 * w],     // ankle and instep, sized to the drawn shin end
     [mid, B.rToe * 1.16 * w],                             // arch into the ball
     [add(k.toe, scl(d, -0.8)), B.rToe * 1.22 * w],        // toe box, blunt
     [k.toe, B.rToe * 0.82 * w],
@@ -860,14 +879,22 @@ function drawHead(ctx, S, C, fill) {
        [at(-2.2, 2.6), B.rHeadJaw], [at(-4.4, 2.2), B.rHeadJaw * 0.66],
        [at(-3.0, -1.0), B.rHeadJaw * 0.82]];
   hull(ctx, C, skull, { fill, shade: false });
-  // Ponytail. Part of the silhouette, so it is drawn before the collect pass
-  // returns rather than with the hair cap below.
-  if (B.tail) {
-    // It hangs off the BACK of the skull, and gravity wins: the tail falls down
+  // Her hair, as one of three shapes. `hairStyle` on the body table picks it:
+  // "bun" is the rolled up knot, "tail" a thin ponytail, "cap" nothing at all
+  // beyond the cap every figure gets. All of them are drawn before the collect
+  // pass returns, so they are part of the silhouette rather than stuck on top.
+  if (B.hairStyle === "bun") {
+    // Small, high, and at the BACK of the skull. Front on almost none of it
+    // clears the head, which is exactly what the sheet shows.
+    const root = flat ? at(4.6, 0) : at(3.6, -B.rHeadBack * 0.72);
+    const knot = flat ? at(7.6, 0) : at(5.8, -B.rHeadBack * 1.2);
+    part(ctx, C, [[root, 1.5], [knot, 2.9]], { fill: C.hair, shade: false });
+  } else if (B.hairStyle === "tail") {
+    // It hangs off the BACK of the skull and gravity wins: the tail falls down
     // the screen, pulled part of the way toward the back of the head so it
     // swings when the head turns instead of standing straight out behind like a
-    // rudder. In a hinge or a plank that means it drops toward the floor, which
-    // is the whole test of whether hair reads as hair.
+    // rudder. In a hinge or a plank it drops toward the floor, which is the
+    // whole test of whether hair reads as hair.
     const back = flat ? V(0, 0) : scl(f, -1);
     const dir = norm2(add(V(0, 1), scl(back, 0.5)));
     // Front on the tail is directly behind the head, so a centred one is
@@ -895,28 +922,10 @@ function drawHead(ctx, S, C, fill) {
   ctx.fillStyle = C.shade;
   ctx.fill();
   ctx.restore();
-  // The face plane. Front on only: a slightly lighter oval from the hairline to
-  // the chin, with a brow line and a chin line. A head with this on it is
-  // unmistakably facing the camera, and a head without it is unmistakably
-  // turned away, which is the single strongest front/back cue on the figure.
-  if (flat && !away) {
-    ctx.save();
-    hull(ctx, C, skull, { clip: true });
-    hull(ctx, C, [
-      [at(0.4, 0), B.rHeadBack * 0.8],
-      [at(-3.2, 0), B.rHeadJaw * 0.86],
-      [at(-5.2, 0), B.rHeadJaw * 0.54],
-    ], { fill: C.face, shade: false, line: false });
-    const across = V(-u.y, u.x);
-    const line2 = (upAt, half, w) => {
-      const a = add(at(upAt, 0), scl(across, -half)), b = add(at(upAt, 0), scl(across, half));
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-      ctx.strokeStyle = C.seamSoft; ctx.lineWidth = w; ctx.lineCap = "round"; ctx.stroke();
-    };
-    line2(1.0, B.rHeadBack * 0.52, 0.34);     // brow
-    line2(-4.0, B.rHeadJaw * 0.42, 0.3);      // chin
-    ctx.restore();
-  }
+  // No face plane and no brow line. In the bold style the front of the head is
+  // a plain light shape and the HAIRLINE is what tells you it is facing you:
+  // front on the cap stops level across the forehead, from behind there is no
+  // hairline at all because the whole skull is hair.
   // hair: a cap over the cranium ending in a hairline at the forehead and
   // behind the ear, clipped to the skull so it never breaks the silhouette
   ctx.save();
@@ -927,19 +936,35 @@ function drawHead(ctx, S, C, fill) {
   // BEHIND there is no hairline at all: the whole skull is hair down to the
   // nape, which is what you actually see of the back of a head.
   const hair = flat
-    ? (away ? [[at(24, -8), 27], [at(24, 8), 27]] : [[at(34, -8), 32], [at(34, 8), 32]])
-    : [[at(33, 7), 29], [at(30, -9), 31]];
+    ? (away ? [[at(23, -8), 27], [at(23, 8), 27]] : [[at(36, -8), 32], [at(36, 8), 32]])
+    : [[at(34, 7), 30], [at(31, -9), 32]];
   const hsegs = [];
   for (let i = 0; i < hair.length - 1; i++) hsegs.push([hair[i][0], hair[i][1], hair[i + 1][0], hair[i + 1][1]]);
   ctx.fillStyle = C.hair;
   for (const g of hsegs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.fill(); }
+  // A small peak down the centre of the forehead. Without it the hairline is a
+  // ruled line across the head and the cap reads as a swimming cap; the sheet
+  // has a soft point in the middle.
+  if (!away) {
+    const peakF = flat ? 0 : -B.rHeadBack * 0.1;
+    capsulePath(ctx, at(3.8, peakF), B.rHeadBack * 0.26, at(2.5, peakF), B.rHeadBack * 0.1);
+    ctx.fill();
+  }
+  // the sideburn: a short tab of the cap running down in front of the ear
+  if (!flat) {
+    capsulePath(ctx, at(0.6, -B.rHeadBack * 0.34), 1.5, at(-2.4, -B.rHeadBack * 0.44), 1.1);
+    ctx.fill();
+  }
   ctx.restore();
   // ear: a small shape at the hairline, the only feature on the head
   const ears = flat ? (away ? [-1, 1] : []) : [-1];
   for (const sd2 of ears) {
     // Behind the cheekbone, not on it. At 1.0 forward the ear landed in the
     // middle of the face and read as a single staring eye.
-    const ear = at(-1.2, sd2 * (flat ? B.rHeadBack * 0.78 : 3.0));
+    const across = V(-u.y, u.x);
+    const ear = flat
+      ? add(at(-1.2, 0), scl(across, sd2 * B.rHeadBack * 0.8))
+      : at(-1.2, sd2 * 3.0);
     const tip = add(ear, scl(u, -1.3));
     capsulePath(ctx, ear, 1.35, tip, 1.1);
     ctx.fillStyle = fill; ctx.fill();
@@ -948,15 +973,38 @@ function drawHead(ctx, S, C, fill) {
   }
 }
 
+// A limb segment as a smooth taper: radii are control points along the bone
+// (Catmull-Rom between them), sampled into a chain of circles that part()
+// joins with capsules. This is what makes an arm read as an arm: thick at the
+// shoulder, narrow at the wrist, one swell in the forearm, no ball at the
+// joint. Mo looked at tube limbs with joint balls and said "something is
+// wrong with the legs and arms", and this was it.
+function taper(a, b, radii, n = 7) {
+  const out = [];
+  const m = radii.length - 1;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, x = t * m, k = Math.max(0, Math.min(m - 1, Math.floor(x))), u = x - k;
+    const p0 = radii[Math.max(0, k - 1)], p1 = radii[k], p2 = radii[k + 1], p3 = radii[Math.min(m, k + 2)];
+    const r = 0.5 * ((2 * p1) + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u + (-p0 + 3 * p1 - 3 * p2 + p3) * u * u * u);
+    out.push([lerpV(a, b, t), r]);
+  }
+  return out;
+}
+
 function drawArm(ctx, S, side, C, fill, grip, skinOpts) {
   const B = ACTIVE, k = S.sides[side];
   const d = norm2(sub(k.elbow, k.shoulder));
-  part(ctx, C, [
-    [add(k.shoulder, scl(d, -0.2)), B.rDelt],
-    [add(k.shoulder, scl(d, 5.6)), B.rShoulder],
-    [k.elbow, B.rElbow],
-  ], { fill });
-  part(ctx, C, [[k.elbow, B.rElbow], [lerpV(k.elbow, k.wrist, 0.3), B.rForearmMid], [k.wrist, B.rWrist]], { fill });
+  // Three parts, not one: deltoid, upper arm, forearm. The reference draws a
+  // seam where the shoulder cap meets the arm and a ring at the elbow, and the
+  // cheapest way to get exactly those two lines and no others is to let them be
+  // the boundaries between parts.
+  // The deltoid belongs to the TORSO's yoke, not to the arm. Drawing it here as
+  // well put two outlines across each other at the shoulder and made an X. The
+  // arm now starts just below the cap, so the shoulder carries exactly one
+  // seam, which is what the reference draws.
+  const top = add(k.shoulder, scl(d, 1.6));
+  part(ctx, C, taper(top, k.elbow, [B.rDelt * 0.92, B.rUpperArmMid * 1.06, B.rUpperArmMid * 0.94, B.rElbow * 1.08, B.rElbow]), { fill });
+  part(ctx, C, taper(k.elbow, k.wrist, [B.rElbow, B.rForearmMid, B.rForearmMid * 0.9, B.rWrist * 1.25, B.rWrist]), { fill });
   if (skinOpts && skinOpts.plates) armPlates(ctx, S, side, C, skinOpts.lit);
   drawHand(ctx, S, side, C, fill, grip);
 }
@@ -965,38 +1013,12 @@ function drawArm(ctx, S, side, C, fill, grip, skinOpts) {
 function drawLeg(ctx, S, side, C, fill, skinOpts) {
   const B = ACTIVE, k = S.sides[side];
   const sh = norm2(sub(k.ankle, k.knee));
-  part(ctx, C, [
-    [k.hip, B.rHip],
-    [lerpV(k.hip, k.knee, 0.42), B.rThighMid],
-    [lerpV(k.hip, k.knee, 0.86), B.rKnee * 1.1],
-    [k.knee, B.rKnee],
-    [lerpV(k.knee, k.ankle, 0.30), B.rCalf],
-    [k.ankle, B.rAnkle],
-  ], { fill, shadeOff: 0.42, shadeR: 0.52 });
+  // Thigh and shin are separate parts so the knee carries the ring the
+  // reference draws on a straight leg. The crease below only fires when the
+  // knee is actually bent and deepens the same line.
+  part(ctx, C, taper(k.hip, k.knee, [B.rHip, B.rHip * 0.95, B.rThighMid * 0.92, B.rKnee * 1.12, B.rKnee]), { fill });
+  part(ctx, C, taper(k.knee, k.ankle, [B.rKnee * 0.98, B.rCalf, B.rCalf * 0.92, B.rCalf * 0.68, B.rAnkleDraw]), { fill });
   crease(ctx, C, k.knee, norm2(sub(k.knee, k.hip)), sh, B.rKnee, 0.56, 0.46);
-  // A kneecap front on, the two heads of the calf from behind. Small, but at
-  // 160px they are the difference between a leg pointing at you and a leg
-  // pointing away.
-  if (S.frontal && !COLLECT) {
-    const away = S.facing === "away";
-    ctx.strokeStyle = C.seamSoft;
-    ctx.lineWidth = 0.3;
-    ctx.lineCap = "round";
-    if (away) {
-      const calf = lerpV(k.knee, k.ankle, 0.34);
-      for (const g of [-1, 1]) {
-        ctx.beginPath();
-        ctx.moveTo(calf.x + g * B.rCalf * 0.42, calf.y - B.rCalf * 0.5);
-        ctx.lineTo(calf.x + g * B.rCalf * 0.3, calf.y + B.rCalf * 0.7);
-        ctx.stroke();
-      }
-    } else {
-      const cap = lerpV(k.knee, k.ankle, 0.06);
-      ctx.beginPath();
-      ctx.arc(cap.x, cap.y, B.rKnee * 0.52, Math.PI * 0.15, Math.PI * 0.85);
-      ctx.stroke();
-    }
-  }
   if (skinOpts && skinOpts.plates) legPlates(ctx, S, side, C, skinOpts.lit);
   drawFoot(ctx, S, side, C, fill);
 }
@@ -1026,7 +1048,6 @@ function torsoLines(ctx, S, C) {
     ctx.lineCap = "round";
     ctx.stroke();
   };
-  let navel = null;
   ctx.save();
   const waist = lerpV(S.pelvis, S.chest, 0.46);
   const body = [[S.pelvis, B.rPelvis], [waist, B.rWaist], [S.chest, S.chestR]];
@@ -1036,27 +1057,22 @@ function torsoLines(ctx, S, C) {
   }
   ctx.clip(clip);
   if (flat && S.facing === "away") {
-    line([at(5.2, 0), at(-6, 0), at(-16, 0)], 0.6);                      // spine, root to nape
+    // Back: shoulder blades, a spine line and the crease between the glutes.
+    line([at(4.0, 0), at(-6, 0), at(-16, 0)], 0.5);
     for (const g of [-1, 1]) {
-      line([at(2.4, g * 2.2), at(-1.0, g * 7.0), at(-5.0, g * 8.2)]);    // shoulder blade
+      line([at(2.0, g * 2.4), at(-1.6, g * 6.8), at(-5.4, g * 7.6)], 0.44);
     }
-    line([at(-20, -7), at(-21.5, 0), at(-20, 7)], 0.5);                  // top of the glutes
-    // the crease between the glutes: short, central, and the one line that
-    // says back rather than front at 160px
-    line([at(-24, 0), at(-27.5, 0)], 0.5);
+    line([at(-22.5, 0), at(-27.5, 0)], 0.5);
+    line([at(-16.5, -9), at(-17.6, 0), at(-16.5, 9)], 0.44);           // waist
   } else if (flat) {
-    // collarbones. A front view without them has a flat shelf where the
-    // shoulders meet the neck, which is most of why it read the same as a back.
+    // Front: the chest line and the abdominal centre line, plus the waist.
     for (const g of [-1, 1]) {
-      line([at(5.6, g * 1.0), at(4.4, g * 5.2), at(3.0, g * 9.4)], 0.42);
+      line([at(1.6, g * 1.2), at(-3.4, g * 5.8), at(-2.8, g * 9.6)], 0.5);
     }
+    line([at(-4.0, 0), at(-10, 0), at(-16, 0)], 0.42);
+    line([at(-16.5, -9), at(-17.6, 0), at(-16.5, 9)], 0.44);           // waist
     for (const g of [-1, 1]) {
-      line([at(1.6, g * 1.2), at(-3.2, g * 5.6), at(-2.6, g * 9.6)]);    // pec underline
-    }
-    line([at(-3.0, 0), at(-9, 0), at(-14, 0)], 0.38);                    // linea alba
-    navel = at(-15.6, 0);
-    for (const g of [-1, 1]) {
-      line([at(-19, g * 8.4), at(-23, g * 4.4), at(-25.5, 0)], 0.55);    // hip crease
+      line([at(-19.5, g * 8.4), at(-23.5, g * 4.4), at(-26, 0)], 0.5); // groin
     }
   } else {
     line([at(1.8, 5.6), at(-3.0, 7.0), at(-3.4, 3.0)]);                  // pec underline
@@ -1065,14 +1081,6 @@ function torsoLines(ctx, S, C) {
     line([at(-16, -7.0), at(-21, -7.6), at(-25, -5.0)], 0.5);            // glute
   }
   ctx.restore();
-  // The navel is a mark, not a line, so it is drawn as a dot after the clip is
-  // released rather than as a one point stroke inside it.
-  if (navel) {
-    ctx.beginPath();
-    ctx.arc(navel.x, navel.y, 0.62, 0, Math.PI * 2);
-    ctx.fillStyle = C.seamSoft;
-    ctx.fill();
-  }
 }
 
 // Three circles down the torso so the silhouette narrows at the waist, plus a
@@ -1088,28 +1096,27 @@ function drawTorso(ctx, S, C, fill, skinOpts) {
   // deltoids read as pads bolted on; the reference sheet has one unbroken
   // slope from ear to shoulder.
   const yoke = lerpV(S.chest, S.neckTop, 0.26);
+  const fv = S.frontal;
+  const waist = lerpV(S.pelvis, S.chest, 0.46);
+  // The yoke and the torso carry NO internal outline. They used to, and where a
+  // limb starts on top of them the two arcs sat a unit apart and read as a
+  // double seam at the shoulder and at the hip. The union pass still outlines
+  // the silhouette, the limb on top still outlines itself, and the lines the
+  // sheet actually draws on the torso come from torsoLines below.
   for (const ys of ["L", "R"]) {
     const sh = S.sides[ys].shoulder;
     part(ctx, C, [
       [yoke, B.rNeckBot * 0.98],
-      [lerpV(yoke, sh, 0.62), B.rShoulder * 0.76],
-      [sh, B.rShoulder * 0.82],
-    ], { fill, shade: false });
+      [lerpV(yoke, sh, 0.6), B.rShoulder * 0.8],
+      [add(sh, scl(norm2(sub(sh, yoke)), 0.6)), B.rDelt * 0.9],
+    ], { fill, line: false });
   }
-  part(ctx, C, [
-    [add(S.chest, scl(nu, -0.6)), B.rNeckBot * 1.12],
-    [lerpV(S.chest, S.neckTop, 0.55), B.rNeckBot * 0.86],
-    [S.neckTop, B.rNeckTop],
-  ], { fill, shade: false });
-  const waist = lerpV(S.pelvis, S.chest, 0.46);
-  const fv = S.frontal;
   part(ctx, C, [[S.pelvis, B.rPelvis], [waist, B.rWaist], [S.chest, S.chestR]],
-       { fill, shadeOff: fv ? 0.18 : 0.44, shadeR: fv ? 0.62 : 0.54 });
+       { fill, line: false });
   // The soft convex curve the female sheet draws on the front of the torso,
   // between the shoulder and the waist. Side view only: face on, the same shape
   // would be two circles stuck to a flat chest, which is not what the sheet
-  // does. It is a separate part so the union outline absorbs it into one
-  // silhouette instead of drawing a ring round it.
+  // does.
   if (B.bust && !fv) {
     const f = norm2(S.torsoAxis.x);
     const at = lerpV(S.pelvis, S.chest, B.bustAt);
@@ -1119,8 +1126,15 @@ function drawTorso(ctx, S, C, fill, skinOpts) {
     part(ctx, C, [
       [add(at, scl(f, out * 0.30)), rb * 0.92],
       [add(at, scl(f, out)), rb],
-    ], { fill, shadeOff: 0.5, shadeR: 0.4 });
+    ], { fill });
   }
+  // The neck goes on LAST so its base arc lands on top of the chest: that arc
+  // is the neck seam the sheet draws, and drawn first it was painted over.
+  part(ctx, C, [
+    [add(S.chest, scl(nu, -0.6)), B.rNeckBot * 1.12],
+    [lerpV(S.chest, S.neckTop, 0.55), B.rNeckBot * 0.86],
+    [S.neckTop, B.rNeckTop],
+  ], { fill });
   if (skinOpts && skinOpts.plates) { torsoPlates(ctx, S, C, skinOpts.lit); return; }
   torsoLines(ctx, S, C);
   // A single soft mass under the collarbone gives the chest volume. It used to
@@ -1685,7 +1699,7 @@ export function gripSides(move, S) {
 // fill, so only the part of it outside the silhouette survives.
 function outline(ctx, C, segs) {
   ctx.strokeStyle = C.seam;
-  ctx.lineWidth = 1.1;
+  ctx.lineWidth = 1.75;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   // Measured both ways: one compound Path2D and a single stroke call is no

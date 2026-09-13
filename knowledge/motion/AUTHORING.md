@@ -870,6 +870,72 @@ One trap worth naming: `drawHead` normalises the projected anterior axis into
 flat on. `S.frontal`, carried as `flat`, is the camera's own answer.
 
 
+## The final look
+
+`reference/figure-final.png` is the approved character: both bodies, front, side,
+back and three quarter. Everything about how the figure is drawn now answers to
+that sheet, and the reference-sheet style that came before it (warm grey body,
+hairline contour, muscle panels) is gone. If you are changing the drawing, open
+that file first.
+
+**Flat white on dark, charcoal on light.** Body `#f6f5f3`, its shade `#e7e5e1`,
+the far side `#ddd9d4`, one line colour `#1c1f26` and hair at `#2f343d`. On the
+light theme the drawing is INVERTED rather than recoloured: a white body on a
+white card is an outline and nothing else, so the body takes the charcoal tone,
+the shading goes light and the hair goes darker still so it does not vanish into
+the head. That is what the first prototype did and it is still the only version
+that reads on white.
+
+**One heavy outline, hairline seams.** The union pass strokes the whole
+silhouette at 1.75; inside it every part edge is the same colour at 0.3. There is
+no middle grey anywhere on this figure, which is the thing that made the
+previous style read as mud at 160px.
+
+**Flat means flat.** The per part shade band is OPT IN (`shade: true`) and
+nothing in the plain style asks for it. A crescent on every thigh, torso and
+upper arm reads as facets, and that was the single biggest thing separating the
+rig from the sheet. What survives is the far side tone on genuinely far limbs
+and one soft shade under the chin, both of them light.
+
+**The torso and the yoke carry no internal outline** (`line: false`). They used
+to, and where a limb starts on top of them the two arcs sat a unit apart and read
+as a double seam at the shoulder and at the hip. The neck is drawn LAST inside
+`drawTorso` so its base arc lands on top of the chest instead of being painted
+over: that arc is the neck seam the sheet draws.
+
+**Seams are part boundaries, not drawn lines.** The reference puts a seam at the
+neck base, the shoulder cap, the elbow, the wrist, the knee and the ankle, and
+the cheapest way to get exactly those and no others is to let them fall out of
+where one part stops and the next starts. So the arm is deltoid, upper arm and
+forearm rather than one chain, and the leg is thigh and shin. The deltoid
+belongs to the TORSO's yoke, not to the arm: drawing it in both put two outlines
+across each other at the shoulder and made an X.
+
+The only lines actually drawn are on the torso: front gets the chest line, the
+abdominal centre line, the waist and the groin; back gets the spine, the
+shoulder blades, the waist and the glute crease. The collarbones, navel dot,
+kneecap arcs, calf hints, face plane and brow line from the round before are all
+gone, because four faint marks on a white torso is exactly the grey on grey that
+got rejected.
+
+**Hair carries front versus back.** Front on, the cap stops in a hairline across
+the forehead over a plain faceless head, with a sideburn in the side view. From
+behind there is no hairline at all: the whole skull is dark. Hers adds a small
+bun high on the back of the head (`hairStyle: "bun"`). `hairStyle` also takes
+`"tail"` and `"cap"`, which exist because Mo asked to see the options.
+
+**The front stance is symmetric, deliberately and exactly.** Every left and
+right value in `restPose("front")` matches, both ankles sit on the same line at
+`BODY.hipW` either side of centre, so the legs hang as two straight verticals,
+and the knees are locked at zero in every rest view. Feet wider than the hip
+joints bow the knees outward. The breath keyframe moves the whole body rather
+than one side of it. A degree of difference between the two halves does not read as life at card
+size, it reads as a figure turned slightly away.
+
+**`threequarter` is a camera preset**, frontal plane at yaw 34, matching the
+fourth view on the sheet. Moves can use it like any other view.
+
+
 ---
 
 ## Ten things that will bite you
