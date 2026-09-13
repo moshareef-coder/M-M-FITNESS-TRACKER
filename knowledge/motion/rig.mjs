@@ -690,7 +690,7 @@ let LINES = true;
 // it to find the arms that are UNDER the torso, so it can give them the same
 // shoulder seam a near arm leaves. Legs are deliberately not recorded: the hip
 // carries no seam on either side (see drawLeg).
-let DRAWN = null;
+let DRAWN = null;   // { L: [...], R: [...] } arm capsules by side
 let DRAWN_TAG = null;
 
 function part(ctx, C, pts, o = {}) {
@@ -718,7 +718,7 @@ function part(ctx, C, pts, o = {}) {
   }
   ctx.fillStyle = fill;
   for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.fill(); }
-  if (DRAWN && DRAWN_TAG === "arm") for (const g of segs) DRAWN.push(g);
+  if (DRAWN && DRAWN_TAG) for (const g of segs) DRAWN[DRAWN_TAG].push(g);
   // The shade band is OPT IN now. The reference is flat white: one white, one
   // very soft far side tone, nothing else. A crescent on every thigh, torso and
   // upper arm reads as facets, and that was the main thing still separating the
@@ -1298,45 +1298,27 @@ function drawTorso(ctx, S, C, fill, skinOpts) {
   const yoke = lerpV(S.chest, S.neckTop, 0.26);
   const fv = S.frontal;
   const waist = lerpV(S.pelvis, S.chest, 0.46);
-  /* The yoke and the torso carry no outline of their own: where a limb starts
-     on top of them, its arc and theirs sat a unit apart and read as a double
-     seam. But a limb that starts UNDERNEATH them then got no seam at all,
-     which is the one-arm-has-a-line-and-the-other-does-not that Mo circled.
-     So they are filled plain first, then their edge is stroked only where it
-     runs over something painted before them (the far arm, the far thigh),
-     then filled again so the inner half of that stroke is covered and what
-     survives is the same outer hairline a limb on top leaves. Both shoulders
-     carry one seam each, whichever side the camera is on. Only arms are
-     recorded in DRAWN, so this never seams a far thigh: hips are seamless. */
-  const under = DRAWN ? DRAWN.slice() : [];
-  const yokes = ["L", "R"].map((ys) => {
-    const sh = S.sides[ys].shoulder;
-    return [
-      [yoke, B.rNeckBot * 0.98],
-      [lerpV(yoke, sh, 0.6), B.rShoulder * 0.8],
-      [add(sh, scl(norm2(sub(sh, yoke)), 0.6)), B.rDelt * 0.9],
-    ];
-  });
+  /* The trunk carries no outline of its own (a stroke doubled up with the
+     limb on top). It paints plain, then its edge is stroked only where it
+     runs over an arm painted before it, then it is filled again so only the
+     outer half of that stroke survives: the same hairline a near arm leaves.
+     The shoulder yoke is NOT drawn here any more, see drawYoke: it goes on
+     after both arms so the deltoid cap sits over the arm on both sides. */
+  const under = DRAWN ? [...DRAWN.L, ...DRAWN.R] : [];
   const trunk = [[S.pelvis, B.rPelvis], [waist, B.rWaist], [S.chest, S.chestR]];
-  const paintTrunk = () => {
-    for (const y of yokes) part(ctx, C, y, { fill, line: false });
-    part(ctx, C, trunk, { fill, line: false });
-  };
-  paintTrunk();
+  part(ctx, C, trunk, { fill, line: false });
   if (!COLLECT && under.length) {
     const below = new Path2D();
     for (const g of under) capsulePathInto(below, g[0], g[1], g[2], g[3]);
     ctx.save();
     ctx.clip(below);
     ctx.strokeStyle = C.seam; ctx.lineWidth = 0.3; ctx.lineJoin = "round";
-    for (const pts of [...yokes, trunk]) {
-      for (let i = 0; i < pts.length - 1; i++) {
-        capsulePath(ctx, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
-        ctx.stroke();
-      }
+    for (let k = 0; k < trunk.length - 1; k++) {
+      capsulePath(ctx, trunk[k][0], trunk[k][1], trunk[k + 1][0], trunk[k + 1][1]);
+      ctx.stroke();
     }
     ctx.restore();
-    paintTrunk();
+    part(ctx, C, trunk, { fill, line: false });
   }
   // The soft convex curve the female sheet draws on the front of the torso,
   // between the shoulder and the waist. Side view only: face on, the same shape
@@ -1970,6 +1952,44 @@ export function gripSides(move, S) {
   return g;
 }
 
+/* The shoulder yoke: clavicle and trapezius from the base of the neck out to
+   each deltoid cap. Drawn as its own item AFTER both arms, so the cap sits
+   over the top of the upper arm on both sides, which is how a shoulder is
+   built and, more to the point, how both shoulders end up identical: the
+   seam on each is the cap's own edge, stroked only where it crosses that
+   arm, then filled again so only the outer hairline survives. Before this the
+   yoke was part of the torso, so the near arm was painted on top of it with
+   its own outline while the far arm went under it: one shoulder read as a
+   rounded cap with a seam beneath, the other as an arm pasted on. Mo asked
+   for the right to match the left exactly, and the left was the cap. */
+function drawYoke(ctx, S, C, fill) {
+  const B = ACTIVE;
+  const yoke = lerpV(S.chest, S.neckTop, 0.26);
+  const caps = ["L", "R"].map((ys) => {
+    const sh = S.sides[ys].shoulder;
+    return [
+      [yoke, B.rNeckBot * 0.98],
+      [lerpV(yoke, sh, 0.6), B.rShoulder * 0.8],
+      [add(sh, scl(norm2(sub(sh, yoke)), 0.6)), B.rDelt * 0.9],
+    ];
+  });
+  for (const c of caps) part(ctx, C, c, { fill, line: false });
+  if (COLLECT || !DRAWN) return;
+  const arms = [...DRAWN.L, ...DRAWN.R];
+  if (!arms.length) return;
+  const region = new Path2D();
+  for (const g of arms) capsulePathInto(region, g[0], g[1], g[2], g[3]);
+  ctx.save();
+  ctx.clip(region);
+  ctx.strokeStyle = C.seam; ctx.lineWidth = 0.3; ctx.lineJoin = "round";
+  for (const c of caps) for (let k = 0; k < c.length - 1; k++) {
+    capsulePath(ctx, c[k][0], c[k][1], c[k + 1][0], c[k + 1][1]);
+    ctx.stroke();
+  }
+  ctx.restore();
+  for (const c of caps) part(ctx, C, c, { fill, line: false });
+}
+
 // Draw order is by depth now, not by a fixed list. The tie-break keeps the v1
 // order exactly for a planar camera, where every limb sits at the same depth as
 // its opposite number and only the old near/far rule can separate them.
@@ -2074,6 +2094,7 @@ export function drawFigure(ctx, S, C, opts = {}) {
     });
   }
   items.push({ d: torsoD, o: 2, kind: "torso" });
+  items.push({ d: Math.max(torsoD, depths.arm.L, depths.arm.R), o: 5.5, kind: "yoke" });
   // The head goes on top of any near arm that crosses it, and stays where it
   // was otherwise, so a hand held in front of the chest is still in front.
   const armOnFace = crossesHead(near) ? depths.arm[near] : null;
@@ -2084,7 +2105,8 @@ export function drawFigure(ctx, S, C, opts = {}) {
 
   const walk = () => {
     for (const it of items) {
-      if (it.kind === "arm") { DRAWN_TAG = "arm"; drawArm(ctx, S, it.s, C, it.fill, grips[it.s], it.plates); DRAWN_TAG = null; }
+      if (it.kind === "arm") { DRAWN_TAG = it.s; drawArm(ctx, S, it.s, C, it.fill, grips[it.s], it.plates); DRAWN_TAG = null; }
+      else if (it.kind === "yoke") drawYoke(ctx, S, C, C.ink);
       else if (it.kind === "leg") drawLeg(ctx, S, it.s, C, it.fill, it.plates);
       else if (it.kind === "torso") drawTorso(ctx, S, C, C.ink, skinOpts);
       else drawHead(ctx, S, C, C.ink);
@@ -2094,7 +2116,7 @@ export function drawFigure(ctx, S, C, opts = {}) {
   COLLECT = [];
   try { walk(); } finally { const segs = COLLECT; COLLECT = null; outline(ctx, C, segs); }
   // pass two: fills and inner detail, with per part outlines off
-  LINES = false; DRAWN = [];
+  LINES = false; DRAWN = { L: [], R: [] };
   try { walk(); } finally { LINES = true; DRAWN = null; }
   drawProps(ctx, C, opts.props, S, "front");
 }
