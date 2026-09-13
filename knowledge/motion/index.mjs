@@ -154,7 +154,9 @@ export function mountMove(canvas, name, opts = {}) {
     play() { if (!still) { m.playing = true; pump(); } return api; },
     pause() { m.playing = false; return api; },
     seek(t) {
-      m.time = (typeof t === "number" ? t : 0) * move.dur;
+      // the clock is modulo the cycle, so seek(1) would wrap to the start;
+      // clamp just short of it so a oneway move's last keyframe is reachable
+      m.time = Math.min(typeof t === "number" ? t : 0, 0.999999) * move.dur;
       m.dirty = true;
       if (still) paint(m); else pump();
       return api;

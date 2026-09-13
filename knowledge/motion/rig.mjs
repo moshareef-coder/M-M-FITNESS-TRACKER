@@ -46,6 +46,8 @@
 //   view: "side" | "front" | "back" | "top", or { yaw, pitch, plane }.
 //   yaw and pitch are degrees away from the move's own plane, so 0,0 is always
 //   exactly what v1 drew. yaw 30 is the three-quarter view illustrators use.
+//   Positive pitch puts the camera ABOVE the figure (the top preset is +88);
+//   negative pitch looks up from below, which is almost never what you want.
 //   Everything is depth sorted per frame, so limbs pass in front of and behind
 //   the torso correctly at any angle, and a limb pointed at the camera
 //   foreshortens instead of being drawn at full length.
@@ -363,7 +365,10 @@ export const PRESETS = {
   side: { plane: "sagittal", yaw: 0, pitch: 0 },
   front: { plane: "frontal", yaw: 0, pitch: 0 },
   back: { plane: "frontal", yaw: 180, pitch: 0 },
-  top: { plane: "sagittal", yaw: 0, pitch: -88 },
+  // Larger depth draws nearer, and a positive pitch pushes the head end of
+  // the body nearer, so +pitch is a camera ABOVE the figure. This preset was
+  // -88 for a while and quietly rendered a prone figure's face from below.
+  top: { plane: "sagittal", yaw: 0, pitch: 88 },
   // the fourth view on figure-final.png: turned far enough to read as a
   // body with depth, not far enough to lose the front cues
   threequarter: { plane: "frontal", yaw: 34, pitch: 0 },
@@ -1617,8 +1622,14 @@ const PROPS = {
     // makes a top view read as a side view of somebody floating. From a steep
     // pitch it becomes what it actually is: a rectangle on the floor under the
     // body.
+    // An author can ask for the same thing with top: true on a floor rotation
+    // that is drawn as seen from overhead at pitch 0 (90/90, open book).
     const steep = S && S.cam && Math.abs(S.cam.pitch || 0) > 55;
-    if (steep) { roundRect(ctx, p.x, CENTER_Y - 26, p.w, 52, 6); ctx.fill(); return; }
+    if (steep || p.top) {
+      const h = p.h || 52, y = p.y === undefined ? CENTER_Y - h / 2 : p.y;
+      roundRect(ctx, p.x, y, p.w, h, p.r === undefined ? 6 : p.r); ctx.fill();
+      return;
+    }
     roundRect(ctx, p.x, GROUND - 2.4, p.w, 4.4, 2.2); ctx.fill();
   },
   wall(ctx, C, p) {
@@ -1682,11 +1693,22 @@ const PROPS = {
     roundRect(ctx, x0, y - 2.4, x1 - x0, 4.8, 2.4); ctx.fill();
     for (const x of [x0, x1 - 5]) { roundRect(ctx, x, 0, 5, y - 1.5, 2); ctx.fill(); }
   },
-  dipBars(ctx, C, p) {
+  dipBars(ctx, C, p, S, layer) {
     const y = p.y === undefined ? 86 : p.y;
-    ctx.fillStyle = C.prop;
-    roundRect(ctx, p.x0, y - 2.2, p.x1 - p.x0, 4.4, 2.2); ctx.fill();
-    for (const x of [p.x0 + 2, p.x1 - 7]) { roundRect(ctx, x, y, 5, GROUND - y, 2); ctx.fill(); }
+    // Two rails, one each side of the body: the far one dim and behind the
+    // figure, the near one in front of it and a touch lower (parallax from a
+    // camera a little above the rails). One rail behind the body read as a
+    // table the figure was sitting on. near: false keeps only the back rail.
+    if (layer === "back") {
+      ctx.fillStyle = C.propDark;
+      roundRect(ctx, p.x0, y - 2.2, p.x1 - p.x0, 4.4, 2.2); ctx.fill();
+      for (const x of [p.x0 + 2, p.x1 - 7]) { roundRect(ctx, x, y, 5, GROUND - y, 2); ctx.fill(); }
+    } else if (p.near !== false) {
+      const ny = y + 1.4;
+      ctx.fillStyle = C.prop;
+      roundRect(ctx, p.x0, ny - 2.2, p.x1 - p.x0, 4.4, 2.2); ctx.fill();
+      for (const x of [p.x0 + 2, p.x1 - 7]) { roundRect(ctx, x, ny, 5, GROUND - ny, 2); ctx.fill(); }
+    }
   },
   machine(ctx, C, p) {
     const parts = p.parts || ["seat"];
@@ -1740,9 +1762,11 @@ const PROPS = {
     const rest = p.rest === undefined ? 40 : p.rest;
     const slack = Math.max(0, rest - d);
     const m = lerpV(a, b, 0.5);
-    const c = V(m.x, m.y + slack * 0.55 + 1.2);
+    // A band is rubber, not a bar: keep the stroke thin and cap the sag so a
+    // slack band droops instead of closing into a loop.
+    const c = V(m.x, m.y + Math.min(slack * 0.5, 12) + 1.2);
     ctx.strokeStyle = C.propTop;
-    ctx.lineWidth = Math.max(1.4, 3.2 - slack * 0.05);
+    ctx.lineWidth = Math.max(1.1, 2.0 - slack * 0.04);
     ctx.lineCap = "round";
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo(c.x, c.y, b.x, b.y); ctx.stroke();
   },
@@ -1799,9 +1823,12 @@ const PROPS = {
 
 function drawProps(ctx, C, list, S, layer) {
   for (const p of list || []) {
-    if ((p.front ? "front" : "back") !== layer) continue;
+    // dip bars have a rail on each side of the body, so they draw in both
+    // layers and sort out front and back themselves
+    const both = p.type === "dipBars";
+    if (!both && (p.front ? "front" : "back") !== layer) continue;
     const fn = PROPS[p.type];
-    if (fn) fn(ctx, C, p, S);
+    if (fn) fn(ctx, C, p, S, layer);
   }
 }
 
@@ -1861,6 +1888,8 @@ export function gripSides(move, S) {
     for (const p of (move && move.props) || []) {
       if (p.type === "bench") tops.push({ y: p.y - 3.6, x0: p.x, x1: p.x + p.w });
       else if (p.type === "box") tops.push({ y: p.y, x0: p.x, x1: p.x + p.w });
+      // a dip bar or parallette rail is a surface the hand rests on, palm down
+      else if (p.type === "dipBars") tops.push({ y: (p.y === undefined ? 86 : p.y) - 2.2, x0: p.x0, x1: p.x1 });
     }
     for (const s of ["L", "R"]) {
       if (g[s]) continue;
@@ -1925,6 +1954,25 @@ export function drawFigure(ctx, S, C, opts = {}) {
     depths.leg[s] = mean(k.hip, k.knee, k.ankle);
   }
   const isFar = (kind, s) => depths[kind][s] - depths[kind][s === "R" ? "L" : "R"] > DEPTH_EPS;
+  // A near arm raised overhead in a side view projects straight across the
+  // skull (the shoulder sits at the head's x), and the plain tie-break painted
+  // it over the face, so every lockout read as headless. When the upper arm or
+  // forearm crosses the head circle the arm is drawn between the torso and the
+  // head instead: the face stays visible and the bar can sit over the midline.
+  const segDist = (p, a, b) => {
+    const vx = b.x - a.x, vy = b.y - a.y, L2 = vx * vx + vy * vy || 1;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / L2));
+    return Math.hypot(p.x - (a.x + vx * t), p.y - (a.y + vy * t));
+  };
+  const overHead = (s) => {
+    if (S.frontal) return false;
+    const k = S.sides[s];
+    if (k.elbow.y > k.shoulder.y - 4) return false;
+    // generous: a hanging arm sits a neck's length beside the skull and still
+    // covers the visor
+    const r = ACTIVE.rHeadBack * 1.7;
+    return segDist(S.head, k.shoulder, k.elbow) < r || segDist(S.head, k.elbow, k.wrist) < r;
+  };
 
   const items = [];
   for (const s of ["L", "R"]) {
@@ -1938,7 +1986,7 @@ export function drawFigure(ctx, S, C, opts = {}) {
     const armFar = !crossing && isFar("arm", s);
     const legFar = isFar("leg", s);
     items.push({
-      d: armD, o: s === near ? 5 : (crossing ? 4.5 : 0), kind: "arm", s,
+      d: armD, o: s === near ? (overHead(s) ? 2.5 : 5) : (crossing ? 4.5 : 0), kind: "arm", s,
       fill: armFar ? C.far : C.inkHi,
       plates: armFar ? null : skinOpts,
     });
@@ -1990,7 +2038,10 @@ function lerpIk(a, b, u) {
     if (!A || !B) { out[k] = A || B; continue; }
     const ax = Array.isArray(A) ? A[0] : A.x, ay = Array.isArray(A) ? A[1] : A.y;
     const bx = Array.isArray(B) ? B[0] : B.x, by = Array.isArray(B) ? B[1] : B.y;
-    const bend = Array.isArray(A) ? A[2] : A.bend;
+    // bend is a sign, so it cannot be interpolated: the earlier keyframe of the
+    // pair owns it, and the later one is only consulted when the earlier says
+    // nothing. A pin whose bend must flip mid rep needs a keyframe at the flip.
+    const bend = (Array.isArray(A) ? A[2] : A.bend) ?? (Array.isArray(B) ? B[2] : B.bend);
     // A pin with an explicit z is a WORLD target rather than a screen one, and
     // its z has to interpolate like the other two. Without this a lateral sweep
     // collapses to whichever z the first keyframe had.

@@ -49,7 +49,10 @@ const RANGE = {
   kneeMag: [0, 157],
   elbowFlex: [-12, 168],
   kneeFlex: [-8, 157],
-  ankleDorsi: [-62, 48],
+  // plantarflexion runs to -90 for the doll: a pointed foot on a horizontal
+  // leg (planche, front lever, a pointed toe in pilates) must continue the leg
+  // line, and the joint-table -62 hooked every one of them
+  ankleDorsi: [-90, 48],
   spine: [-45, 65],
   neck: [-55, 55],
 };

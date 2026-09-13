@@ -24,6 +24,14 @@ const SCRATCH = "/private/tmp/claude-501/-Users-creativelab1/ef418cb8-6e15-4c42-
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const LIBRARIES = ["weight-training", "yoga", "pilates", "calisthenics", "stretching"];
 
+// The window has to be as tall as the sheet, or the screenshot silently cuts
+// the last rows off (stretching lost 19 moves at the old fixed 1500).
+import { MOVES_BY_LIBRARY } from "../knowledge/motion/index.mjs";
+const sheetHeight = (lib) => {
+  const n = (MOVES_BY_LIBRARY[lib] || []).length || 40;
+  return 140 + Math.ceil(n / 5) * 200;
+};
+
 const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const theme = process.argv.includes("--light") ? "light" : "dark";
 const libs = args[0] ? [args[0]] : LIBRARIES;
@@ -98,7 +106,7 @@ for (const lib of libs) {
     "--no-default-browser-check", "--disable-extensions",
     "--force-device-scale-factor=2", "--virtual-time-budget=6000",
     `--user-data-dir=${profile}`,
-    `--screenshot=${out}`, "--window-size=1280,1500", url,
+    `--screenshot=${out}`, `--window-size=1280,${sheetHeight(lib)}`, url,
   ], out);
   try { rmSync(profile, { recursive: true, force: true, maxRetries: 3 }); } catch { /* chrome still letting go of it */ }
   if (code === 0 && existsSync(out)) written.push(out);

@@ -970,6 +970,49 @@ fourth view on the sheet. Moves can use it like any other view.
 
 ---
 
+## Rig limits found in the final QA (2026-09-12)
+
+Things the rig cannot draw, or draws in a way that surprises an author. Each
+one was hit by a QA agent on a real move; work round them rather than fighting
+them, and if one blocks a move, note it in the move's comment.
+
+- **Check the sampled extremes, not just the keys.** Pins interpolate linearly
+  in screen space and joints ease between keys, so a heel or a hand can dip
+  through the floor between two legal keyframes. The validator samples the
+  cycle; the sheet shows three frames. Look at the middle one.
+- **A pin's `bend` is a sign and cannot tween.** The earlier keyframe of each
+  pair owns it (the later one is only read when the earlier says nothing). If
+  the elbow has to flip sides mid rep, add a keyframe at the flip.
+- **`shoulderAbd` and `hipAbd` are NOT mirrored in a sagittal move.** Out of the
+  frontal plane both sides get the same sign, so a T needs opposite signs on L
+  and R. The validator reports the number you wrote, not the anatomical one.
+- **Positive pitch is a camera above.** `top` is `pitch: 88`. A negative pitch
+  looks up from below and shows a prone figure's face.
+- **A supine figure's arms want IK pins, not angles.** With `root.rot` past
+  -90 the shoulder angle runs the other way on screen, and `bend: 1` throws
+  the elbow into the mat. Pin the wrist beside the hip, nearly straight.
+- **A side-lying figure cannot plant a hand on the mat.** Both elbow solutions
+  go through the floor or hyperextend. Rest the arm along the body instead.
+- **Hands behind the head are unreachable side on** (the skull is between the
+  shoulder and the target). Pin above and behind; the reader fills in the rest.
+- **A flat hand only knows the floor, a bench, a box and a dip rail.** On a wall
+  or door frame the mitt stays rounded; do not force `flat`, it would take the
+  floor tangent and lie the wrong way.
+- **A prop on the hand always draws over a world prop.** A dumbbell cannot
+  sort behind an incline pad.
+- **`machine` parts are world static.** A shoulder pad on a calf raise sits at
+  one point of the rep; place it at the mid-rep shoulder so it overlaps both ends.
+- **A knee cannot open while its ankle stays pinned** (two-bone IK has two
+  solutions and nothing in between). Clamshell lifts the heel with the knee.
+- **Seated front views splay the knees**: a frontal camera cannot foreshorten a
+  shin, so an ankle pinned near the hip reads as a wide squat. Prefer a side or
+  three-quarter camera for seated machines.
+- **Side-on support holds sit the pelvis on the rail** (arm 37, torso 30, so
+  the hips land 7 units above the grip and the pelvis radius is 8). Move the
+  hands behind the hips so the arm reads; the near rail now draws in front.
+- **`seek(1)` used to wrap**; it now clamps, so a oneway move's last key can
+  be inspected at t 1.
+
 ## The review loop
 
 Run all of it, every time, for every move.

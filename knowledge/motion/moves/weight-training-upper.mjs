@@ -7,7 +7,7 @@
 // visible, and the view that shows it. Where the view differs from the
 // suggested one in AUTHORING.md the comment says why.
 
-import { PULL_UP } from "./calisthenics.mjs";
+import { PULL_UP, DIP } from "./calisthenics.mjs";
 
 const FLOOR = 113.4;   // y of a pinned ankle standing on the ground
 const stand = (xr, xl) => ({
@@ -98,18 +98,21 @@ const PEC_DECK = {
   dur: 3.0,
   breath: 0.2,
   fit: { k: 0.96, dy: 2 },
-  props: [{ type: "machine", x: 50, y: 90, w: 40, parts: ["seat"] }],
+  props: [{ type: "machine", x: 50, y: 86, w: 40, parts: ["seat"] }],
   keys: [
     { // open, elbows wide out at shoulder height, forearms up on the pads
       t: 0,
-      root: { x: 70, y: 84, rot: 0 },
+      root: { x: 70, y: 80, rot: 0 },
       joints: { spine: 0, neck: 0, shoulderR: 95, shoulderL: 95, elbowR: 90, elbowL: 90 },
       ik: { ...stand(86, 54) },
     },
-    { // squeezed, elbows dropped in until they nearly meet in front of the chest
+    { // squeezed: the elbows drop in to the ribs and the forearms sweep ACROSS
+      // to meet in front of the chest. The fold has to be negative here, which
+      // is the front view's inward fold: positive swings the hands out to the
+      // sides and the card reads as a shrug.
       t: 1,
-      root: { x: 70, y: 84, rot: 0 },
-      joints: { spine: 3, neck: 0, shoulderR: -10, shoulderL: -10, elbowR: 150, elbowL: 150 },
+      root: { x: 70, y: 80, rot: 0 },
+      joints: { spine: 3, neck: 0, shoulderR: 26, shoulderL: 26, elbowR: -142, elbowL: -142 },
       ik: { ...stand(86, 54) },
     },
   ],
@@ -301,52 +304,36 @@ const LANDMINE_PRESS = {
   dur: 3.0,
   breath: 0.2,
   props: [
-    { type: "band", rest: 0, from: { x: 14, y: 116 }, to: { side: "R", point: "hand" } },
+    { type: "band", rest: 0, from: { x: 26, y: 116 }, to: { side: "R", point: "hand" } },
     { type: "barbell", side: "R", point: "hand", r: 8, front: true },
   ],
   keys: [
     { // racked, bar end at the front of the shoulder, elbow tucked in
       t: 0,
-      root: { x: 56, y: 61.4, rot: 2 },
+      root: { x: 52, y: 61.4, rot: 2 },
       joints: { spine: 4, neck: -2, shoulderL: 14, elbowL: 30 },
-      ik: { wristR: { x: 78.3, y: 39.0, bend: 1 }, ...stand(58, 54) },
+      ik: { wristR: { x: 74.3, y: 39.0, bend: 1 }, ...stand(54, 50) },
     },
     { // pressed, arm long up and forward, ribs down
       t: 1,
-      root: { x: 56, y: 61.4, rot: 2 },
+      root: { x: 52, y: 61.4, rot: 2 },
       joints: { spine: 0, neck: -8, shoulderL: 20, elbowL: 36 },
-      ik: { wristR: { x: 88.1, y: 9.0, bend: 1 }, ...stand(58, 54) },
+      ik: { wristR: { x: 84.1, y: 9.0, bend: 1 }, ...stand(54, 50) },
     },
   ],
 };
 
-// Supported on two parallel bars with the torso leaning forward and the knees
-// tucked behind, lower until the shoulder drops below the elbow and press back
-// up, with a plate hanging from a belt. Must be visible: the deep elbow bend
-// with the whole body hanging between the bars, plus the hanging plate. Side view.
+// The dip with a plate hung from a belt between the legs. Imported rather than
+// copied so the dip itself stays fixed in one place; the only edit is the
+// plate. Must be visible: the deep elbow bend with the whole body hanging
+// between the bars, AND the hanging plate. Side view.
+// Was authored separately and sat too low on the bars: the rail crossed the
+// hips and the figure read as sitting on it with its legs draped over.
 const WEIGHTED_DIP = {
-  view: "side",
-  loop: "pingpong",
-  dur: 3.0,
-  breath: 0.2,
-  fit: { k: 0.88, dy: 6 },
+  ...DIP,
   props: [
-    { type: "dipBars", x0: 44, x1: 100, y: 60 },
-    { type: "barbell", side: "R", point: "hip", dx: -8, dy: 30, r: 7, front: true },
-  ],
-  keys: [
-    { // top, arms locked out, body hanging tall between the bars
-      t: 0,
-      root: { x: 61.9, y: 53.3, rot: 14 },
-      joints: { spine: 4, neck: -6, hipR: -15, kneeR: 70, ankleR: -28, hipL: -19, kneeL: 74, ankleL: -26 },
-      ik: { wristR: { x: 70, y: 60, bend: 1 }, wristL: { x: 66, y: 60.5, bend: 1 } },
-    },
-    { // bottom, shoulder below the elbow, chest tipped forward over the bars
-      t: 1,
-      root: { x: 60, y: 66, rot: 20 },
-      joints: { spine: 6, neck: -8, hipR: -15, kneeR: 75, ankleR: -28, hipL: -19, kneeL: 79, ankleL: -26 },
-      ik: { wristR: { x: 70, y: 60, bend: 1 }, wristL: { x: 66, y: 60.5, bend: 1 } },
-    },
+    ...DIP.props,
+    { type: "barbell", side: "R", point: "hip", dx: -6, dy: 28, r: 7, front: true },
   ],
 };
 
@@ -382,7 +369,7 @@ const CLOSE_GRIP_PULLDOWN = {
       root: { x: 52, y: 86, rot: -6 },
       joints: { spine: -3, neck: -2 },
       ik: {
-        wristR: { x: 59.6, y: 55.0, bend: 1 }, wristL: { x: 58.6, y: 56.0, bend: 1 },
+        wristR: { x: 57.8, y: 60.0, bend: 1 }, wristL: { x: 56.8, y: 61.0, bend: 1 },
         ...stand(80, 76),
       },
     },
@@ -607,21 +594,23 @@ const PENDLAY_ROW = {
   fit: { k: 0.95, dy: 4 },
   props: [{ type: "barbell", side: "R", point: "hand", r: 11, front: true }],
   keys: [
-    { // dead stop, bar on the plates, back flat and horizontal
+    { // dead stop, bar resting on the plates, back truly parallel to the floor.
+      // The old pair only reached 68 degrees of hinge, so the shoulders sat
+      // above the hips and it read as an ordinary bent-over row.
       t: 0,
-      root: { x: 62, y: 64, rot: 20 },
-      joints: { spine: 48, neck: -12 },
+      root: { x: 62, y: 64, rot: 34 },
+      joints: { spine: 56, neck: -12 },
       ik: {
-        wristR: { x: 94.3, y: 90.9, bend: 1 }, wristL: { x: 91.3, y: 91.9, bend: 1 },
+        wristR: { x: 92.0, y: 97.0, bend: 1 }, wristL: { x: 89.0, y: 98.0, bend: 1 },
         ...stand(58, 54),
       },
     },
     { // pulled to the belly, back still horizontal
       t: 1,
-      root: { x: 62, y: 64, rot: 20 },
-      joints: { spine: 48, neck: -12 },
+      root: { x: 62, y: 64, rot: 34 },
+      joints: { spine: 56, neck: -12 },
       ik: {
-        wristR: { x: 90.8, y: 70.9, bend: 1 }, wristL: { x: 87.8, y: 71.9, bend: 1 },
+        wristR: { x: 88.0, y: 78.0, bend: 1 }, wristL: { x: 85.0, y: 79.0, bend: 1 },
         ...stand(58, 54),
       },
     },
@@ -635,7 +624,7 @@ const WEIGHTED_PULL_UP = {
   ...PULL_UP,
   props: [
     ...PULL_UP.props,
-    { type: "barbell", side: "R", point: "hip", dx: -3, dy: 30, r: 7.5, front: true },
+    { type: "barbell", side: "R", point: "hip", dx: -4, dy: 17, r: 7.5, front: true },
   ],
 };
 
@@ -675,13 +664,13 @@ const DUMBBELL_SHRUG = {
     { // bottom, shoulders let down, knees soft, chin level
       t: 0,
       root: { x: 70, y: 62.6, rot: 0 },
-      joints: { shoulderGirdleElevR: 0, shoulderGirdleElevL: 0, spine: 3, neck: 5, shoulderR: 2, shoulderL: 2, elbowR: 4, elbowL: 4 },
+      joints: { shoulderGirdleElevR: 0, shoulderGirdleElevL: 0, spine: 3, neck: 5, shoulderR: 10, shoulderL: 10, elbowR: 4, elbowL: 4 },
       ik: { ...stand(78, 62) },
     },
     { // top, chest lifted and chin up, arms still dead straight
       t: 1,
       root: { x: 70, y: 61.4, rot: 0 },
-      joints: { shoulderGirdleElevR: 7.5, shoulderGirdleElevL: 7.5, spine: -3, neck: -6, shoulderR: -2, shoulderL: -2, elbowR: 8, elbowL: 8 },
+      joints: { shoulderGirdleElevR: 7.5, shoulderGirdleElevL: 7.5, spine: -3, neck: -6, shoulderR: 8, shoulderL: 8, elbowR: 8, elbowL: 8 },
       ik: { ...stand(78, 62) },
     },
   ],
@@ -760,29 +749,35 @@ const FACE_PULL = {
 // the card is the facing, the bent elbow and the sweep finishing slightly below
 // shoulder height.
 const REAR_DELT_FLY = {
-  view: "front",
-  facing: "away",
+  // Hinged at the hip with the back flat, bells hanging under the chest, then
+  // swept out level with the back. Neither a front nor a back camera can hinge
+  // the torso, and a pure side view hides the sweep (it points at the camera),
+  // so this is a side-plane hinge seen from behind and beside the figure: the
+  // hinge and the spread both read. The abduction signs are opposite on L and
+  // R because out-of-plane channels are not mirrored in a sagittal move.
+  view: { plane: "sagittal", yaw: -42 },
   loop: "pingpong",
   dur: 3.0,
   breath: 0.2,
-  fit: { k: 0.9, dy: 2 },
-  feet: FRONT_FEET,
+  fit: { k: 0.92, dy: 4 },
   props: [
     { type: "dumbbell", side: "L", point: "hand", rot: 90, k: 0.8 },
     { type: "dumbbell", side: "R", point: "hand", rot: 90, k: 0.8, front: true },
   ],
   keys: [
-    { // bottom, bells hanging together under the chest, elbows soft
+    { // bottom, arms hanging straight down from the shoulders, elbows soft
       t: 0,
-      root: { x: 70, y: 61.4, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 6, shoulderL: 6, elbowR: 24, elbowL: 24 },
-      ik: { ...stand(78, 62) },
+      root: { x: 58, y: 61.4, rot: 78 },
+      joints: { spine: -4, neck: -12, shoulderR: -78, shoulderL: -78, elbowR: 18, elbowL: 18,
+                shoulderAbdR: 6, shoulderAbdL: 6 },
+      ik: { ankleR: { x: 52, y: FLOOR, bend: -1 }, ankleL: { x: 47, y: FLOOR, bend: -1 } },
     },
-    { // top, arms swept wide and level, shoulder blades squeezed
+    { // top, arms swept out to the sides level with the back, blades squeezed
       t: 1,
-      root: { x: 70, y: 61.4, rot: 0 },
-      joints: { spine: -2, neck: -2, shoulderR: 86, shoulderL: 86, elbowR: 26, elbowL: 26 },
-      ik: { ...stand(78, 62) },
+      root: { x: 58, y: 61.4, rot: 78 },
+      joints: { spine: -6, neck: -12, shoulderR: -78, shoulderL: -78, elbowR: 22, elbowL: 22,
+                shoulderAbdR: 84, shoulderAbdL: 84 },
+      ik: { ankleR: { x: 52, y: FLOOR, bend: -1 }, ankleL: { x: 47, y: FLOOR, bend: -1 } },
     },
   ],
 };
@@ -799,20 +794,20 @@ const REVERSE_PEC_DECK = {
   breath: 0.2,
   fit: { k: 0.92, dy: 2 },
   props: [
-    { type: "machine", x: 50, y: 90, w: 40, parts: ["seat"] },
+    { type: "machine", x: 50, y: 86, w: 40, parts: ["seat"] },
     { type: "barbell", side: "L", point: "hand", r: 4 },
     { type: "barbell", side: "R", point: "hand", r: 4, front: true },
   ],
   keys: [
     { // start, handles together in front, elbows soft
       t: 0,
-      root: { x: 70, y: 84, rot: 0 },
+      root: { x: 70, y: 80, rot: 0 },
       joints: { spine: 0, neck: 0, shoulderR: 20, shoulderL: 20, elbowR: 30, elbowL: 30 },
       ik: { ...stand(86, 54) },
     },
     { // finish, arms swept wide and level with the shoulders
       t: 1,
-      root: { x: 70, y: 84, rot: 0 },
+      root: { x: 70, y: 80, rot: 0 },
       joints: { spine: -2, neck: 0, shoulderR: 88, shoulderL: 88, elbowR: 28, elbowL: 28 },
       ik: { ...stand(86, 54) },
     },
@@ -844,12 +839,13 @@ const UPRIGHT_ROW = {
       },
       ik: { ...stand(62, 57) },
     },
-    { // top, bar at the collarbone with the elbow up in front of the shoulder
+    { // top, bar at the collarbone with the elbow up in front of the shoulder.
+      // The old pair finished at the chin, which put the disc over the visor.
       t: 1,
       root: { x: 60, y: 61.4, rot: 2 },
       joints: {
-        spine: -2, neck: -16,
-        shoulderR: 96, elbowR: 122, shoulderL: 92, elbowL: 120,
+        spine: -2, neck: -4,
+        shoulderR: 78, elbowR: 124, shoulderL: 74, elbowL: 122,
       },
       ik: { ...stand(62, 57) },
     },
@@ -908,7 +904,7 @@ const LATERAL_RAISE = {
     { // bottom, bells beside the thighs, arms long
       t: 0,
       root: { x: 70, y: 61.4, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 4, shoulderL: 4, elbowR: 6, elbowL: 6 },
+      joints: { spine: 0, neck: 0, shoulderR: 13, shoulderL: 13, elbowR: 6, elbowL: 6 },
       ik: { ...stand(78, 62) },
     },
     { // top, arms out level with the shoulders, elbows only softly bent
@@ -1101,12 +1097,13 @@ const ARNOLD_PRESS = {
       },
       ik: { ...stand(62, 57) },
     },
-    { // lockout, arms long overhead
+    { // lockout, arms long and a few degrees past vertical, so the arm passes
+      // over the BACK of the skull and the face is still readable
       t: 1,
       root: { x: 60, y: 61.4, rot: 2 },
       joints: {
-        spine: -2, neck: -4,
-        shoulderR: 176, elbowR: 6, shoulderL: 173, elbowL: 8,
+        spine: -2, neck: 12,
+        shoulderR: 191, elbowR: 6, shoulderL: 188, elbowL: 8,
       },
       ik: { ...stand(62, 57) },
     },
@@ -1137,21 +1134,24 @@ const CUBAN_PRESS = {
       },
       ik: { ...stand(62, 57) },
     },
-    { // elbows pulled up high with the forearms still hanging down
+    { // elbows pulled up high, bells at the chest. Kept clear of the chin: the
+      // rig folds the forearm up from a forward upper arm, so a higher elbow
+      // here puts the bells on the face rather than under it.
       t: 0.45,
       root: { x: 60, y: 61.4, rot: 2 },
       joints: {
         spine: 0, neck: -2,
-        shoulderR: 88, elbowR: 96, shoulderL: 85, elbowL: 94,
+        shoulderR: 70, elbowR: 78, shoulderL: 67, elbowL: 76,
       },
       ik: { ...stand(62, 57) },
     },
-    { // rotated up and pressed to lockout
+    { // rotated up and pressed to lockout, arm just past vertical so the face
+      // is not buried under it
       t: 1,
       root: { x: 60, y: 61.4, rot: 2 },
       joints: {
-        spine: -2, neck: -4,
-        shoulderR: 176, elbowR: 8, shoulderL: 173, elbowL: 10,
+        spine: -2, neck: 12,
+        shoulderR: 191, elbowR: 8, shoulderL: 188, elbowL: 10,
       },
       ik: { ...stand(62, 57) },
     },
@@ -1179,12 +1179,12 @@ const OVERHEAD_PRESS = {
         ...stand(62, 57),
       },
     },
-    { // lockout, bar over the middle of the body, ribs down
+    { // lockout, arms long, bar just behind the crown so the face stays clear
       t: 1,
       root: { x: 60, y: 61.4, rot: 2 },
-      joints: { spine: -3, neck: -6 },
+      joints: { spine: -2, neck: 12 },
       ik: {
-        wristR: { x: 65.9, y: 1.0, bend: 1 }, wristL: { x: 62.9, y: 3.0, bend: 1 },
+        wristR: { x: 54.7, y: -4.7, bend: 1 }, wristL: { x: 51.7, y: -3.2, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -1211,12 +1211,12 @@ const PUSH_PRESS = {
         ...stand(62, 57),
       },
     },
-    { // drive, legs straight and the bar punched to lockout
+    { // drive, legs straight and the bar punched to lockout behind the crown
       t: 1,
       root: { x: 60, y: 61.4, rot: 2 },
-      joints: { spine: -3, neck: -6 },
+      joints: { spine: -2, neck: 12 },
       ik: {
-        wristR: { x: 65.9, y: 1.0, bend: 1 }, wristL: { x: 62.9, y: 3.0, bend: 1 },
+        wristR: { x: 54.7, y: -4.7, bend: 1 }, wristL: { x: 51.7, y: -3.2, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -1371,7 +1371,7 @@ const PREACHER_CURL = {
       root: { x: 44, y: 88, rot: 6 },
       joints: {
         spine: 10, neck: -2,
-        shoulderR: 55, elbowR: 135, shoulderL: 53, elbowL: 133,
+        shoulderR: 55, elbowR: 100, shoulderL: 53, elbowL: 98,
       },
       ik: { ankleR: { x: 76, y: FLOOR, bend: -1 }, ankleL: { x: 70, y: FLOOR, bend: -1 } },
     },
@@ -1538,12 +1538,13 @@ const OVERHEAD_TRICEPS_EXTENSION = {
         ...stand(60, 55),
       },
     },
-    { // lockout, arms long overhead, elbows in the same place
+    { // lockout, arms long and a touch behind vertical, elbows in the same
+      // place. Dead vertical put the whole arm over the face.
       t: 1,
       root: { x: 58, y: 61.4, rot: 2 },
-      joints: { spine: 0, neck: -4 },
+      joints: { spine: 0, neck: 12 },
       ik: {
-        wristR: { x: 62.1, y: -5.0, bend: 1 }, wristL: { x: 59.1, y: -4.0, bend: 1 },
+        wristR: { x: 52.7, y: -4.7, bend: 1 }, wristL: { x: 49.7, y: -3.7, bend: 1 },
         ...stand(60, 55),
       },
     },
@@ -1593,10 +1594,10 @@ const BENCH_DIP = {
   keys: [
     { // top, arms straight, hips just off the front edge and level with it
       t: 0,
-      root: { x: 57.4, y: 75.6, rot: -5 },
+      root: { x: 57.4, y: 73.6, rot: -5 },
       joints: { spine: 0, neck: -2 },
       ik: {
-        wristR: { x: 45.8, y: 75.0, bend: 1 }, wristL: { x: 41.8, y: 75.5, bend: 1 },
+        wristR: { x: 42.0, y: 76.0, bend: 1 }, wristL: { x: 38.0, y: 76.5, bend: 1 },
         ankleR: { x: 88, y: FLOOR, bend: -1 }, ankleL: { x: 82, y: FLOOR, bend: -1 },
       },
     },
@@ -1608,7 +1609,7 @@ const BENCH_DIP = {
       root: { x: 55.2, y: 86.4, rot: -7 },
       joints: { spine: 0, neck: -4 },
       ik: {
-        wristR: { x: 45.6, y: 75.0, bend: 1 }, wristL: { x: 41.6, y: 75.5, bend: 1 },
+        wristR: { x: 41.8, y: 76.0, bend: 1 }, wristL: { x: 37.8, y: 76.5, bend: 1 },
         ankleR: { x: 88, y: FLOOR, bend: -1 }, ankleL: { x: 82, y: FLOOR, bend: -1 },
       },
     },
@@ -1619,8 +1620,8 @@ const BENCH_DIP = {
 // over the head, the bar lowered past the forehead on a bent elbow. Must be
 // visible: the upper arm staying put while the bar swings back past the head,
 // which is what separates it from a bench press. Side view, root.rot -90 supine.
-// The bar stops just short of the forehead on purpose: at the true bottom the
-// disc lands on the skull and the whole card turns to mush.
+// The bar stops above and behind the forehead on purpose: at the true bottom
+// the disc overlaps the skull and the whole card turns to mush.
 const SKULL_CRUSHER = {
   view: "side",
   loop: "pingpong",
@@ -1641,7 +1642,7 @@ const SKULL_CRUSHER = {
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -6 },
-      ik: { wristR: { x: 43.0, y: 70.0, bend: 1 }, wristL: { x: 46.0, y: 71.0, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 42.0, y: 62.0, bend: 1 }, wristL: { x: 45.0, y: 63.0, bend: 1 }, ...stand(92, 96) },
     },
   ],
 };
