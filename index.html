@@ -1410,6 +1410,14 @@
   .exercise-row .ex-icon.fig-live canvas { width: 56px; height: 56px; }
   .sess-fig { display: flex; justify-content: center; margin: 4px 0 2px; }
   .sess-fig canvas { width: 220px; height: 220px; }
+  /* Mo's session layout: progress on top, the avatar big in the middle, then
+     weight and sets, everything else below. */
+  .sess-fig.sess-fig-hero { margin: 10px 0 0; }
+  .sess-fig.sess-fig-hero canvas { width: min(300px, 78vw); height: min(300px, 78vw); }
+  .sess-card.sess-sets { padding-top: 6px; padding-bottom: 6px; }
+  .sess-card.sess-sets .set-circles { border-top: 0; margin-top: 4px; padding-top: 4px; }
+  .sess-card.sess-bottom { margin-top: 12px; }
+  .sess-card.sess-bottom .sess-note { margin-bottom: 8px; }
   .sess-fig.fig-none { display: none; }
   .stretch-fig { display: flex; justify-content: center; margin: 6px 0 4px; }
   .stretch-fig canvas { width: 220px; height: 220px; }
@@ -13596,27 +13604,8 @@ function renderSession() {
           ? `Beat it, was ${pbWeight} lb`
           : `Best ${pbWeight} lb${pbReps ? ` × ${pbReps}` : ""}`}</span>` : ""}
       </div>
-      ${ex.note ? `<div class="sess-note">${escapeHtml(ex.note)}</div>` : ""}
-      <div class="sess-fig" data-fig="${escapeHtml(ex.name)}" data-mood="${beatenPB ? "surprised" : justSet != null ? "happy" : "neutral"}"></div>
-      ${workingMusclesHTML(ex.name, { who: "me", size: "sm", email: MY_EMAIL })}
 
-      <div class="set-circles">
-        ${setsDone.map((done, i) => {
-          const w = SESSION.setWeights?.[ei]?.[i];
-          const isCurrent = i === currentSet;
-          return `<div class="set-col${exChanged ? " h-pop" : ""}" style="--d:${140 + i * 55}ms">
-            <button type="button" class="set-circle ${done ? "done" : ""} ${isCurrent ? "current" : ""}${justSet === i ? " just-done" : ""}"
-              data-set="${i}" ${done || isCurrent ? "" : "disabled"}
-              aria-pressed="${done ? "true" : "false"}"
-              aria-label="Set ${i + 1}, ${done ? "done" : isCurrent ? "current" : "not started"}">${done ? icon("check", 18) : i + 1}</button>
-            <div class="set-weight">${done ? (w != null ? `${w} lb` : "done") : isCurrent ? "pending" : "&nbsp;"}</div>
-          </div>`;
-        }).join("")}
-        ${allDone ? `<div class="set-col">
-          <button type="button" class="set-circle set-add" id="addSetBtn" aria-label="Add another set">${icon("plus", 20)}</button>
-          <div class="set-weight">extra</div>
-        </div>` : ""}
-      </div>
+      <div class="sess-fig sess-fig-hero" data-fig="${escapeHtml(ex.name)}" data-mood="${beatenPB ? "surprised" : justSet != null ? "happy" : "neutral"}"></div>
     </div>
 
     ${resting ? `
@@ -13652,6 +13641,26 @@ function renderSession() {
       </div>
     </div>
 
+    <div class="sess-card sess-sets">
+      <div class="set-circles">
+        ${setsDone.map((done, i) => {
+          const w = SESSION.setWeights?.[ei]?.[i];
+          const isCurrent = i === currentSet;
+          return `<div class="set-col${exChanged ? " h-pop" : ""}" style="--d:${140 + i * 55}ms">
+            <button type="button" class="set-circle ${done ? "done" : ""} ${isCurrent ? "current" : ""}${justSet === i ? " just-done" : ""}"
+              data-set="${i}" ${done || isCurrent ? "" : "disabled"}
+              aria-pressed="${done ? "true" : "false"}"
+              aria-label="Set ${i + 1}, ${done ? "done" : isCurrent ? "current" : "not started"}">${done ? icon("check", 18) : i + 1}</button>
+            <div class="set-weight">${done ? (w != null ? `${w} lb` : "done") : isCurrent ? "pending" : "&nbsp;"}</div>
+          </div>`;
+        }).join("")}
+        ${allDone ? `<div class="set-col">
+          <button type="button" class="set-circle set-add" id="addSetBtn" aria-label="Add another set">${icon("plus", 20)}</button>
+          <div class="set-weight">extra</div>
+        </div>` : ""}
+      </div>
+    </div>
+
     <button type="button" class="btn-big btn-primary ${allDone ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>
     <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">${SESSION.completed.some((c, i) => !c && i !== ei) ? "Next exercise" : "Finish workout"}</button>
     ${(() => {
@@ -13666,6 +13675,10 @@ function renderSession() {
         </div>
       </div>`;
     })()}
+    <div class="sess-card sess-bottom">
+      ${ex.note ? `<div class="sess-note">${escapeHtml(ex.note)}</div>` : ""}
+      ${workingMusclesHTML(ex.name, { who: "me", size: "sm", email: MY_EMAIL })}
+    </div>
     <button type="button" class="link-danger" id="endWorkoutBtn">End workout here</button>`;
 
   mountMotionFigures($("sessionBody"));
