@@ -3448,12 +3448,25 @@
     border: 1px solid var(--border); background: var(--panel-2); color: var(--text); min-height: 44px;
     border-radius: 100px; padding: 7px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
   }
-  .spp-body { display: flex; gap: 16px; align-items: flex-start; }
-  .spp-facts { flex: 1; min-width: 0; }
-  .spp-fact { margin-bottom: 11px; }
-  .spp-fact .k { font-size: 12.5px; color: var(--muted); }
-  .spp-fact .v { font-size: 14px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.01em; margin-top: 1px; }
-  .spp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+  /* Facts used to be a tall thin column with the ring beside it, which left
+     roughly 220px of empty card to the ring's right (measured: facts 301px
+     tall, ring 84px). The ring now sits on one full-width row with the reading
+     spelled out next to it, and the facts run underneath as a two-up grid, so
+     nothing is stranded and each fact gets room to breathe. */
+  .spp-body { display: block; }
+  .spp-read {
+    display: flex; align-items: center; gap: 14px;
+    padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--border);
+  }
+  .spp-read-txt { flex: 1; min-width: 0; }
+  .spp-read-txt b { display: block; font-size: 15px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.015em; }
+  .spp-read-txt span { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.4; margin-top: 3px; }
+  .spp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+  .spp-fact { min-width: 0; }
+  .spp-fact.wide { grid-column: 1 / -1; }
+  .spp-fact .k { font-size: 11.5px; color: var(--muted); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+  .spp-fact .v { font-size: 14.5px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.01em; margin-top: 2px; }
+  .spp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   .spp-chip { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 100px;
               border: 1px solid var(--border); background: var(--panel-2); color: var(--text); }
   /* The match figure used to be a 110px ring in the accent colour, which made
@@ -5278,7 +5291,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.13.23";
+const APP_VERSION = "2026.09.13.24";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -8643,10 +8656,10 @@ const INFO_TOPICS = {
     ],
   }),
   planMatch: () => ({
-    eyebrow: "The match figure",
+    eyebrow: "The freshness figure",
     paras: [
-      "How much of this session lands on what your week has trained least. Once a workout exists the figure is measured off that workout's own exercises; before one exists it scores the focus we are proposing.",
-      "It is a fit score, not a grade. A low number usually means we do not know you well enough yet, which fixes itself after a few logged sessions.",
+      "How much room the muscles in this session have left, compared with whichever area you have worked hardest so far this week. Once a workout exists it is measured off that workout's own exercises; before one exists it scores the focus we are proposing.",
+      "It is not a grade on the workout. A low number means those muscles have already had a lot this week, so expect less than your best numbers, go lighter, or swap the focus. A high number means they are rested.",
     ],
   }),
   calendarKey: () => ({
@@ -15992,6 +16005,24 @@ function planFromToday() {
   };
 }
 
+/* The figure is restedness: how much room the target muscles have left
+   relative to the region you have hammered hardest this week. It was labelled
+   "Match", which reads as a grade on the plan the app just built for you, so a
+   perfectly sensible session came back as "41% Match" and looked like a bad
+   recommendation. It is not a fit score, it is a freshness score, and a low
+   one is a caution rather than a failure. Labelled and worded accordingly. */
+function freshReading(pct) {
+  if (pct >= 75) return { title: "Fresh and ready", body: "These muscles have had a proper rest since you last worked them." };
+  if (pct >= 55) return { title: "Good to go", body: "Some overlap with earlier this week, but nothing that should hold you back." };
+  if (pct >= 40) return { title: "Partly worked already", body: "You have hit some of this recently. Expect less than your best numbers." };
+  return { title: "Still recovering", body: "These muscles are the ones you have worked hardest this week. Go lighter, or swap the focus." };
+}
+function freshTone(pct) {
+  if (pct >= 55) return "var(--accent)";
+  if (pct >= 40) return "var(--warn)";
+  return "var(--up)";
+}
+
 function planPreview() {
   /* A real plan wins over a proposal, always. */
   const real = planFromToday();
@@ -16285,24 +16316,27 @@ function renderChooseScreen() {
           : ""}
       </div>
       <div class="spp-body">
-        <div class="spp-facts">
+        <div class="spp-read">
+          <div class="spp-ring">
+            ${ringSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 84)}
+            <div class="spp-ring-num"><b>${p.match}%</b><i>Fresh</i></div>
+          </div>
+          <div class="spp-read-txt">
+            <b>${escapeHtml(freshReading(p.match).title)}</b>
+            <span>${escapeHtml(freshReading(p.match).body)} ${infoDot("planMatch", "How this is worked out")}</span>
+          </div>
+        </div>
+        <div class="spp-grid">
           <div class="spp-fact"><div class="k">Focus</div><div class="v">${escapeHtml(p.focus)}</div></div>
-          ${p.duration ? `<div class="spp-fact"><div class="k">Est. Duration</div><div class="v">${escapeHtml(p.duration)}</div></div>` : ""}
-          ${p.equipment ? `<div class="spp-fact"><div class="k">Equipment</div><div class="v">${escapeHtml(p.equipment)}</div></div>` : ""}
+          ${p.duration ? `<div class="spp-fact"><div class="k">Duration</div><div class="v">${escapeHtml(p.duration)}</div></div>` : ""}
           ${p.real ? `<div class="spp-fact"><div class="k">Exercises</div><div class="v">${p.count}</div></div>` : ""}
-          <div class="spp-fact">
-            <div class="k">Target Muscles</div>
+          ${p.equipment ? `<div class="spp-fact${p.real ? "" : " wide"}"><div class="k">Equipment</div><div class="v">${escapeHtml(p.equipment)}</div></div>` : ""}
+          <div class="spp-fact wide">
+            <div class="k">Target muscles</div>
             <div class="spp-chips">${p.targets.map((t) => `<span class="spp-chip">${escapeHtml(t)}</span>`).join("")}</div>
           </div>
         </div>
-        <div class="spp-ring">
-          ${ringSVG(Math.max(0, Math.min(100, p.match)) / 100, "var(--accent)", 84)}
-          <div class="spp-ring-num"><b>${p.match}%</b><i>Match</i></div>
-        </div>
       </div>
-      <p class="spp-match">
-        ${p.real ? "For what you have trained this week" : "To your recent sessions"} ${infoDot("planMatch", "What the match figure means")}
-      </p>
     </div>`;
 
   $("workoutContent").innerHTML = `
