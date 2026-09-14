@@ -1906,15 +1906,26 @@
        treat a swipe as its own edge-navigation gesture. */
     touch-action: pan-y;
   }
+  /* The strip he speaks from is reserved whether or not he is speaking. Mo
+     moved the bubble out of the column because taking a row only while
+     talking made the figure jump 343 to 303 and back on every line, and he
+     was right about that. But overlaying it assumes the top of the stage is
+     empty, which is true of a bench press and false of every standing pose:
+     a resting figure's head sits exactly where the bubble goes, and it did.
+     Reserving the strip permanently is the version with neither problem. The
+     figure is a little smaller than it was, always, and never moves. */
   .sess-stage-main {
     position: relative; flex: 1 1 auto; min-height: 0;
     display: flex; align-items: center; justify-content: center;
+    padding-top: var(--quip-strip, 86px);
   }
   /* A layer, not a row: taking it out of the column is the whole fix. Clicks
      pass through the empty parts so nothing behind it goes dead. */
   .sess-quip-slot {
     position: absolute; left: 0; right: 0; top: 0; z-index: 4;
-    display: flex; justify-content: flex-start; padding: 10px 14px 0;
+    height: var(--quip-strip, 86px);
+    display: flex; align-items: flex-start; justify-content: flex-start;
+    padding: 8px 14px 0;
     pointer-events: none;
   }
   .sess-quip-slot > * { pointer-events: auto; }
@@ -1996,6 +2007,9 @@
   .sess-quip-line {
     display: block; font-size: 14px; font-weight: 600; line-height: 1.34;
     letter-spacing: -.01em; color: #111318;
+    /* Two lines is what the reserved strip holds, so nothing he says can grow
+       past it and back over the figure. The banks are written to fit. */
+    max-height: 2.68em; overflow: hidden;
   }
   /* Sits on the last character while typing, gone the moment he finishes. */
   .sess-quip-cur {
@@ -5422,7 +5436,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.14.6";
+const APP_VERSION = "2026.09.14.7";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -14287,6 +14301,26 @@ const QUIPS = {
     (c) => (c.streak >= 2 ? `That is ${c.streak} days. I am keeping count so you do not have to.` : null),
   ],
 
+  idle: [
+    "Still here. Still drawn.",
+    "I am not going to fill every silence. I am going to fill this one.",
+    "Just checking you have not left. You have not. Good.",
+    "I have been thinking about the bench. No conclusions.",
+    "Nothing is happening. I am narrating it anyway.",
+    "This is a nice screen. We made a nice screen.",
+    "I could stand here all day. I will, in fact.",
+    "Do you ever think about how the weights just sit there. Waiting.",
+    "I have counted my limbs. All present.",
+    "No notes. Still no notes. I will tell you if notes arrive.",
+    "I am being supportive. This is what it looks like.",
+    "Some say I talk too much. They are inside the phone with me.",
+    (c) => (c.setsLeft ? `${c.setsLeft} ${c.setsLeft === 1 ? "set" : "sets"} left, whenever you are ready. No rush. Slight rush.` : null),
+    (c) => (c.name ? `${c.name}. Still. It has not changed.` : null),
+    (c) => (c.streak >= 2 ? `${c.streak} days. I keep mentioning it because I am proud.` : null),
+    (c) => (c.partner ? `${c.partner} is somewhere doing something. Not this, though.` : null),
+    (c) => (c.hour >= 21 ? "It is late. We are both being a bit silly." : null),
+  ],
+
   nextExercise: [
     "New lift. New chance for me to stand near you supportively.",
     "Moving on. I liked that one, I am easy to please.",
@@ -14349,7 +14383,7 @@ function pickQuip(key) {
    Everything else is odds, and the odds are high: Mo asked for a lot more of
    him, so the quiet beats are the exception now rather than the rule. */
 const QUIP_ALWAYS = new Set(["pr", "start"]);
-const QUIP_ODDS = { set: 0.92, lastSet: 1, restLong: 1, nextExercise: 1, rest: 0.75, warmup: 0.8, cooldown: 0.8 };
+const QUIP_ODDS = { set: 0.92, lastSet: 1, restLong: 1, nextExercise: 1, rest: 0.75, warmup: 0.8, cooldown: 0.8, idle: 1 };
 const QUIP_FLOOR_MS = 9000;    // two lines never stack; beyond that he is free
 
 /* The two things that are drawn OVER the session rather than in it: the set
@@ -14449,6 +14483,42 @@ function typeQuip(target, line, done) {
     target.textContent = line.slice(0, ++i);
     if (i >= line.length) { clearInterval(QUIP_TYPE); QUIP_TYPE = null; done(); }
   }, 17);
+}
+
+/* Mo: say something every fifteen seconds while I am on this screen.
+
+   A heartbeat rather than a pile of one-off timers, so there is one place that
+   decides how often he speaks and one place to turn it down. It picks the line
+   that suits whatever the screen is doing right now, which is why the banks are
+   keyed by moment: resting gets rest talk, a warm-up hold gets warm-up talk,
+   and a lift with nothing happening gets the idle bank, which exists for
+   exactly this.
+
+   It stands down when there is nothing to talk to: no session, paused,
+   muted, the tab in the background, or the summary screen where he has no
+   bubble to speak from. The floor still applies, so a line that has just
+   landed pushes the next beat out rather than stacking on it. */
+const QUIP_BEAT_MS = 15000;
+let QUIP_BEAT = null;
+
+function startQuipBeat() {
+  stopQuipBeat();
+  QUIP_BEAT = setInterval(() => {
+    if (!SESSION || SESSION.finished || SESSION.pausedAt) return;
+    if (quipsMuted() || document.hidden) return;
+    if (!$("sessQuipSlot")) return;
+    // Something he said recently still counts as him having spoken.
+    if (Date.now() - QUIP_LAST_AT < QUIP_BEAT_MS - 500) return;
+    if (SESSION.phase === "warmup") sayQuip("warmup");
+    else if (SESSION.phase === "cooldown") sayQuip("cooldown");
+    else if (SESSION.restStartedAt) sayQuip("rest");
+    else sayQuip("idle");
+  }, 2500);
+}
+
+function stopQuipBeat() {
+  clearInterval(QUIP_BEAT);
+  QUIP_BEAT = null;
 }
 
 /* A second beat a little way into a rest. The set line lands the moment the
@@ -16005,6 +16075,7 @@ function stopSessionTimer() {
 
 function openSessionUI() {
   document.body.classList.add("session-open");
+  startQuipBeat();   // he talks on a clock while this screen is up
   $("sessionCard").classList.remove("hidden");
   // Last session's completion screen left this on, which would hide the clock
   // and the pause button on the next workout.
@@ -16043,6 +16114,7 @@ function minimiseSession() {
 
 function closeSessionUI() {
   stopSessionTimer();
+  stopQuipBeat();
   /* The stretch clock ticks every 250ms and advances the block on its own, so
      leaving it running against a closed overlay finished the workout behind
      the user's back: minimise during a cool-down, wait, and paintStretch ran
