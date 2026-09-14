@@ -585,55 +585,11 @@
       linear-gradient(180deg, color-mix(in srgb, var(--stretch) 13%, transparent) 0%, color-mix(in srgb, var(--stretch) 9%, transparent) 100%),
       var(--bg);
   }
-  /* The panels lift toward the hue too, or a blue screen with grey cards on it
-     reads as a bug rather than a mode. */
-  .session-overlay.stretching .sess-card {
-    background: color-mix(in srgb, var(--stretch) 9%, var(--panel));
-    border-color: color-mix(in srgb, var(--stretch) 28%, var(--border));
-  }
-  .session-overlay.stretching .rest-bar {
-    background: color-mix(in srgb, var(--stretch) 12%, var(--panel-2));
-  }
-  .session-overlay.stretching .rest-adjust button {
-    background: color-mix(in srgb, var(--stretch) 7%, var(--panel));
-    border-color: color-mix(in srgb, var(--stretch) 30%, var(--border));
-  }
-
-  /* The banner that names the mode and says how long it runs. Mo asked for the
-     length to be on screen, because "a few stretches" and "ten minutes of
-     stretching" are different commitments and you decide which one you are
-     doing before you start, not three moves in. */
-  .stretch-banner {
-    display: flex; align-items: center; gap: 12px;
-    background: color-mix(in srgb, var(--stretch) 16%, var(--panel));
-    border: 1px solid color-mix(in srgb, var(--stretch) 38%, transparent);
-    border-radius: 16px; padding: 13px 15px; margin-bottom: 12px;
-    animation: hRise .38s cubic-bezier(.22,1,.36,1) both;
-  }
-  .stretch-banner-icon {
-    width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--stretch); color: var(--on-stretch);
-  }
-  .stretch-banner-body { min-width: 0; flex: 1; }
-  .stretch-banner-title {
-    font-size: 13px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase;
-    color: var(--stretch-ink); line-height: 1.2;
-  }
-  .stretch-banner-sub {
-    font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.35;
-    font-variant-numeric: tabular-nums;
-  }
-  /* Where you are in the block, as dashes rather than a second progress bar:
-     the session already has one at the top and two bars competing is the
-     mistake the rest strip comment warns about. */
-  .stretch-pips { display: flex; gap: 4px; margin-top: 8px; }
-  .stretch-pips i {
-    flex: 1; height: 3px; border-radius: 9px; background: color-mix(in srgb, var(--stretch) 22%, transparent);
-    transition: background .25s ease;
-  }
-  .stretch-pips i.done { background: color-mix(in srgb, var(--stretch) 55%, transparent); }
-  .stretch-pips i.now { background: var(--stretch); }
+  /* The stretch screen itself is the lift screen's stage-and-sheet layout in
+     this hue; its rules sit with the lift screen further down, under
+     .session-overlay.lifting.stretching, because they are overrides of that
+     layout rather than a second one. The wash above still paints the paused
+     sheet, which is the one stretch-time screen without a stage. */
 
   /* The same hue on the plan overview, so the shape of the session is legible
      before it starts: blue at the top, lifting in the middle, blue at the end. */
@@ -799,41 +755,12 @@
   .sess-note { font-size: 12.5px; color: var(--muted); margin-top: 10px; line-height: 1.45; }
 
 
-  /* Rest counts DOWN against a target. Counting up answers "how long have I
-     been standing here", which nobody asks; counting down answers "can I go
-     yet", which is the only question rest raises. Consistent rest is also what
-     makes progressive overload mean anything, so the target is training
-     information rather than decoration.
-     Deliberately a strip and not a ring: a ring implies precision and invites
-     tick marks, gradients and a second progress metaphor competing with the
-     number. A hairline bar cannot. */
-  .rest-bar {
-    display: flex; flex-direction: column; gap: 9px;
-    background: var(--panel-2); border-radius: 14px; padding: 14px 16px;
-    margin-bottom: 14px;
-  }
-  .rest-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-  .rest-label { font-size: 12.5px; font-weight: 800; letter-spacing: .11em; color: var(--muted); }
-  .rest-next {
-    font-size: 12.5px; color: var(--muted); min-width: 0;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .rest-clock {
-    font-size: 28px; font-weight: 800; letter-spacing: -.03em; line-height: 1;
-    font-variant-numeric: tabular-nums;
-  }
+  /* A countdown is a hairline strip and not a ring: a ring implies precision
+     and invites tick marks, gradients and a second progress metaphor competing
+     with the number. A hairline bar cannot. The stretch hold is the one
+     countdown left on screen (rest lives in the top clock now). */
   .rest-track { height: 2px; border-radius: 9px; background: var(--panel); overflow: hidden; }
   .rest-fill { height: 100%; width: 100%; background: var(--accent); border-radius: 9px; transition: width 1s linear; }
-  /* The advice, not a deadline. It stays the same size whichever thing it is
-     saying, so reaching the recommendation does not make the strip jump. */
-  .rest-advice { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
-  /* Accent, not --up: --up is the coral that means a number went the wrong way,
-     and reaching your rest recommendation is not a warning. */
-  .rest-bar.ready .rest-advice { color: var(--accent-ink); font-weight: 700; }
-  .rest-bar.ready .rest-advice::before {
-    content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 100px;
-    background: var(--accent-ink); margin-right: 7px; vertical-align: middle;
-  }
   .rest-pref { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
   .rest-pref button {
     min-height: 44px; padding: 10px 0; border-radius: 12px; cursor: pointer;
@@ -846,14 +773,6 @@
   .rest-pref.five { grid-template-columns: repeat(5, 1fr); }
   .rest-pref button:active { transform: scale(.96); }
   .rest-pref button.on { background: var(--accent); border-color: transparent; color: var(--on-accent); }
-
-  .rest-adjust { display: flex; gap: 8px; }
-  .rest-adjust button {
-    flex: 1; min-height: 44px; padding: 14px 16px; border-radius: 12px; cursor: pointer;
-    background: var(--panel); border: 1px solid var(--border); color: var(--text);
-    font-family: inherit; font-size: 14px; font-weight: 700;
-  }
-  .rest-adjust button:active { transform: scale(.96); }
 
   /* Grid, not space-between: "Weight (lb)" is a wider label than "Reps", so
      with flex the two control groups started at different places and the minus
@@ -916,10 +835,11 @@
     transition: transform .12s ease, background .12s ease;
   }
   .session-clock:active { transform: scale(.96); }
-  /* Resting: same slot, lime dot instead of the red record dot, and the number
-     goes lime once the recommendation has been reached. */
+  /* Resting: the number stays the workout time (the rest has its own clock on
+     the stage), so only the dot changes, lime instead of the red record dot,
+     and it stops pulsing once the planned rest is up. */
   .session-clock.resting .rec-dot { background: var(--accent); }
-  .session-clock.resting.ready .session-timer { color: var(--accent-ink); }
+  .session-clock.resting.ready .rec-dot { animation: none; }
   .rec-dot {
     width: 11px; height: 11px; border-radius: 50%; background: var(--up); flex-shrink: 0;
     animation: recPulse 2s ease-in-out infinite;
@@ -1402,18 +1322,27 @@
     background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); color: #f4f6f8;
   }
   .gen-nudge button:active { transform: scale(.97); }
-  /* Standing on the accent: the primary button would be green on green, and
-     muted grey type disappears, so the whole stage inverts. */
   /* The reveal is the plan, not the chamber, so the figure and grid fade back
      and the rows sit on the dark ground rather than on top of a body. */
   .gen-scrim.done .gen-holo { opacity: .12; transition: opacity .5s ease; }
   .gen-scrim.done .gen-grid { opacity: .35; transition: opacity .5s ease; }
   .gen-scrim.done .gen-done-head { color: rgba(255,255,255,.6); }
   .gen-scrim.done .gen-focus { color: #f4f6f8; }
+  /* White on purpose, in both themes. This used to be the accent with
+     --accent-ink for the label, and on the dark palette --accent-ink IS the
+     accent, so the label was lime on lime and the button read as an empty
+     bar. Fixed colours rather than tokens because the stage is always dark,
+     and white is the one thing guaranteed to stand off it whatever the accent
+     is. Everything else on this screen is a row or a chip, so the only solid
+     white block is the way out. */
   .gen-scrim.done .gen-go {
-    background: var(--accent); color: var(--accent-ink); border: none;
+    background: #fff; color: #0b0d11; border: none;
     box-shadow: 0 10px 26px rgba(0,0,0,.35);
   }
+  .gen-scrim.done .gen-go:active { background: #dfe3e8; box-shadow: none; }
+  /* The global ring is the accent, and a white button already carries the
+     brightest thing on the stage, so the ring is white too and sits off it. */
+  .gen-scrim.done .gen-go:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
   .gen-err { font-size: 14px; color: rgba(255,255,255,.66); line-height: 1.5; margin: 12px 0 18px; }
   .gen-scrim:not(.done) .gen-focus { color: #f4f6f8; }
   @media (prefers-reduced-motion: reduce) {
@@ -1807,8 +1736,9 @@
      touch lives in a sheet pinned under your thumb. A flex column rather than
      a scrolling document, because the sheet has to sit on the bottom of the
      phone whatever the exercise name does, and the stage takes what is left.
-     Only this one screen: the warm-up, the paused sheet and the wrap-up all
-     still scroll, which is why the class is added and removed per render. */
+     The lift and the two timed blocks share it: the paused sheet and the
+     wrap-up still scroll, which is why the class is added and removed per
+     render. */
   .session-overlay.lifting {
     display: flex; flex-direction: column;
     overflow: hidden; padding: 0;
@@ -1836,6 +1766,59 @@
     --sess-key: rgba(17,19,24,.07);
     --sess-key-press: rgba(17,19,24,.13);
   }
+  /* ---- The stretch screen: the same stage and sheet, lit blue ----------
+     Mo: "similar to the workouts, of course keep it blue." So the warm-up and
+     cool-down are this exact layout, and the only things that change are what
+     the tokens say. The accent swap on .stretching already turns every accent
+     blue; these two re-light the stage and the sheet so the ground changes
+     with the mode too, the way the old wash did on the scrolling version.
+     The lift's greys with the stretch hue mixed in, so the figure still stands
+     on a light stage and the sheet is still near-black, just cooler. */
+  .session-overlay.lifting.stretching {
+    --sess-stage: linear-gradient(180deg, #2a3949 0%, #9ab6cf 26%, #dfebf6 50%, #dbe8f4 70%, #98b4cc 88%, #62809b 100%);
+    --sess-sheet: linear-gradient(180deg, #1b2a3a 0%, #0d161f 58%, #0a1119 100%);
+    --sess-key: rgba(160,205,255,.16);
+    --sess-key-press: rgba(160,205,255,.28);
+  }
+  html[data-theme="light"] .session-overlay.lifting.stretching {
+    --sess-stage: linear-gradient(180deg, #d5e5f2 0%, #e9f2f9 26%, #ffffff 50%, #f6fafd 70%, #d3e3f0 88%, #b5cde2 100%);
+    --sess-sheet: linear-gradient(180deg, #ffffff 0%, #f7fbfe 100%);
+    --sess-key: rgba(11,127,199,.09);
+    --sess-key-press: rgba(11,127,199,.17);
+  }
+  /* What replaces the set chips: the hold. One number, big enough to read
+     from the floor, the hairline track under it, and the line above saying
+     which side and what comes next in the same slot "Last time / Beat it"
+     uses on the lift. Centred because there is nothing to pair it with. */
+  .stretch-hold { text-align: center; }
+  .stretch-hold .sess-lastline { margin-top: 0; }
+  .stretch-clock {
+    font-size: 64px; font-weight: 800; letter-spacing: -.04em; line-height: 1;
+    font-variant-numeric: tabular-nums; color: var(--text); margin: 8px 0 12px;
+  }
+  /* The track sits on the sheet, not on a panel, so it takes the sheet's key
+     tint rather than --panel, which is invisible on the near-black. */
+  .stretch-hold .rest-track { height: 3px; background: var(--sess-key); }
+  /* The seconds, the side and what the move is for, under the name. The lift
+     puts nothing here because its numbers live in the dials; a stretch has no
+     dials, and "40s, left side, for your squats" is the whole brief. */
+  .stretch-sub {
+    margin-top: 6px; font-size: 15.5px; font-weight: 600; letter-spacing: -.01em;
+    color: color-mix(in srgb, var(--sess-ink) 72%, transparent);
+  }
+  .stretch-cue {
+    margin: 14px 0 0; font-size: 14px; line-height: 1.4; color: var(--muted); text-align: center;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  /* Skip is a way out, not a choice between equals, so it is a text link under
+     the CTA rather than the second of two buttons the old strip had. */
+  .stretch-skip {
+    display: block; width: 100%; min-height: 40px; margin: 6px 0 0; padding: 8px;
+    background: none; border: 0; cursor: pointer; font-family: inherit;
+    font-size: 14px; font-weight: 700; color: var(--muted); transition: opacity .12s ease;
+  }
+  .stretch-skip:active { opacity: .55; }
+  .stretch-note { margin: 2px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--muted); text-align: center; }
   /* The top bar rides on the stage, so it takes the stage's ink rather than
      the app's, and the two round buttons become ghosts on it. */
   .session-overlay.lifting .session-bar {
@@ -1913,13 +1896,52 @@
        treat a swipe as its own edge-navigation gesture. */
     touch-action: pan-y;
   }
-  .sess-fig.sess-fig-stage { margin: 0; }
+  /* Stretched to the stage's height, so the canvas below can size itself off
+     it. The stage is not one height: the warm-up and cool-down sheets are
+     taller than the lift's, and a standing stretch drawn at the lift's fixed
+     360px lost its head and shoulders above the top of the stage. */
+  .sess-fig.sess-fig-stage { margin: 0; align-self: stretch; min-height: 0; display: flex; align-items: center; justify-content: center; }
   .sess-stage-none {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     color: #8f959d; opacity: .28; pointer-events: none;
   }
   .sess-stage:has(.fig-live) .sess-stage-none { display: none; }
-  .sess-fig.sess-fig-stage canvas { width: min(360px, 88vw); height: min(360px, 88vw); }
+  .sess-fig.sess-fig-stage canvas {
+    width: auto; height: min(360px, 88vw, 100%); max-width: 88vw; aspect-ratio: 1 / 1;
+  }
+
+  /* Resting. The figure steps to the right and the rest clock takes the left
+     of the stage. It counts UP from the moment the set landed, because Mo
+     asked for up rather than down, and the planned rest sits under it as the
+     quiet reference that still tells you when you are ready. The block sits on
+     the pale middle of the stage gradient in both themes, so it carries its
+     own dark ink rather than the stage's, which is white on dark. */
+  .sess-stage.resting .sess-fig-stage canvas { transform: translateX(14%); }
+  .sess-rest {
+    position: absolute; left: 22px; top: 50%; transform: translateY(-56%);
+    color: #111318; pointer-events: none; max-width: 46%;
+  }
+  .sess-rest-eyebrow {
+    font-size: 12.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: rgba(17,19,24,.58);
+  }
+  .sess-rest-clock {
+    margin-top: 4px; font-family: var(--font-display); font-size: 60px; font-weight: 800;
+    letter-spacing: -.045em; line-height: 1; font-variant-numeric: tabular-nums;
+    transition: color .3s ease;
+  }
+  .sess-rest-plan { margin-top: 8px; font-size: 14.5px; font-weight: 600; line-height: 1.3; color: rgba(17,19,24,.58); }
+  /* Past the plan: the number goes lime and the line says so. Nothing stops
+     and nothing nags; the clock keeps counting, because standing there for
+     four minutes is worth knowing. */
+  .sess-rest.ready .sess-rest-clock, .sess-rest.ready .sess-rest-plan { color: var(--accent-ink); }
+  /* The one-tap path back while resting: the chip logs the set directly, and
+     this says so, under the Start set button rather than beside it. */
+  .sess-cta-alt {
+    display: block; width: 100%; margin: 6px 0 -6px; padding: 8px; border: 0; background: none;
+    font-family: inherit; font-size: 14.5px; font-weight: 600; color: var(--muted); cursor: pointer;
+    text-decoration: underline; text-underline-offset: 3px;
+  }
 
   /* The sheet: everything you touch, in one place, at the bottom of the phone. */
   .sess-sheet {
@@ -2158,14 +2180,10 @@
   .sess-act-ico { flex-shrink: 0; display: flex; color: var(--accent-ink); }
   .sess-card.sess-bottom .sess-note { margin-bottom: 8px; }
   .sess-fig.fig-none { display: none; }
-  .stretch-fig { display: flex; justify-content: center; margin: 6px 0 4px; }
-  .stretch-fig canvas { width: 220px; height: 220px; }
-  .stretch-fig.fig-none { display: none; }
   /* body3d: the muscle body is a solid, not a line drawing, so it needs more
-     canvas than the 2D figure before the volume reads at all. Only the two
-     figures that carry a whole screen get it; cards and plan rows stay 2D. */
+     canvas than the 2D figure before the volume reads at all. Only the figure
+     that carries a whole screen gets it; cards and plan rows stay 2D. */
   .sess-fig[data-fig3d].fig-3d canvas { width: 240px; height: 240px; }
-  .stretch-fig[data-fig3d].fig-3d canvas { width: 240px; height: 240px; }
   .cb-confirm-fig canvas { width: 124px; height: 124px; margin-bottom: 2px; }
   .cb-confirm-fig.fig-none { display: none; }
   .cb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
@@ -2776,19 +2794,6 @@
     border: 1.5px solid var(--tier-ink); background: transparent;
   }
   .focus-pips i.on { background: var(--tier); border-color: var(--tier); }
-  /* The budget, spelled out rather than enforced with a refusal: nine cells,
-     one per unit, plus however many units the picks run over. */
-  .focus-budget { margin-top: 14px; }
-  .focus-meter { display: flex; gap: 3px; }
-  .focus-meter i {
-    flex: 1 1 0; height: 8px; border-radius: 9px; display: block;
-    background: var(--panel-2); border: 1px solid var(--border);
-  }
-  .focus-meter i.used { background: var(--tier); border-color: var(--tier); }
-  .focus-meter i.over { background: transparent; border-style: dashed; border-color: var(--up); }
-  .focus-budget-read { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
-  .focus-budget-read b { color: var(--text); font-weight: 700; }
-  .focus-budget-read.over b { color: var(--up); }
   .focus-tier-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .focus-tier-chip {
     display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer;
@@ -2798,7 +2803,9 @@
     transition: transform .12s ease;
   }
   .focus-tier-chip:active { transform: scale(.97); }
-  .focus-tier-chip.spent { border-style: dashed; opacity: .65; }
+  /* A pick the plan will not get to, dashed and faded so the chip agrees with
+     the sentence under it rather than looking as earned as the others. */
+  .focus-tier-chip.dropped { border-style: dashed; opacity: .65; }
   .focus-tier-word { color: var(--tier-ink); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
   .focus-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
   .focus-legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--muted); }
@@ -4247,6 +4254,9 @@
      control needs its own two colours there rather than the card's. */
   .gen-scrim .plan-time { color: rgba(255,255,255,.72); }
   .gen-scrim .plan-time b { color: #fff; }
+  /* What a budget change did, under the control that did it. */
+  .plan-time-change { margin: -2px 0 10px; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
+  .gen-scrim .plan-time-change { margin: 0 0 12px; text-align: center; color: rgba(255,255,255,.72); }
   .exercise-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
   .exercise-row:last-child { border-bottom: none; padding-bottom: 0; }
   .exercise-row .ex-icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; background: var(--panel-2); display: flex; align-items: center; justify-content: center; color: var(--muted); }
@@ -5327,7 +5337,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.14.1";
+const APP_VERSION = "2026.09.14.2";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -6602,9 +6612,14 @@ async function upsertGoalFields(patch) {
    A tap does not toggle any more, it cycles: nothing, Light, Secondary, Main,
    and round to nothing again, so a mis-tap is always one more tap from undone
    and there is no clear control to go hunting for. Each level is worth a
-   different multiplier on the group's weekly sets (1.2x, 1.4x, 1.75x) and
-   costs a different share of one fixed budget, which is why there is no longer
-   a count cap. See the emphasis budget note below. */
+   different multiplier on the group's weekly sets (1.2x, 1.4x, 1.75x).
+
+   There is no count cap and no points meter. There was one for a day, nine
+   points with Main costing three, and Mo did not want it: the picker is the
+   figure and the three levels, nothing to add up. The engine still only pushes
+   so many groups at once (see focusKept below), and when a pick falls past
+   that the page says so in one plain sentence, naming the groups, with no
+   arithmetic in it. */
 function renderBodyFocusPage() {
   $("focusPickRoot").innerHTML = `
     <div class="card">
@@ -6619,7 +6634,6 @@ function renderBodyFocusPage() {
         <button type="button" class="focus-pick-action" id="focusPickAll">${icon("target", 13)} Whole body</button>
         <button type="button" class="focus-pick-action" id="focusPickClear">${icon("close", 13)} Clear all</button>
       </div>
-      <div class="focus-budget" id="focusPickBudget"></div>
       <div class="focus-tier-list" id="focusPickList"></div>
       <p class="focus-pick-summary" id="focusPickSummary">Loading the figure...</p>
     </div>
@@ -6661,8 +6675,8 @@ async function saveBodyFocus() {
    Callers do their own toast: what they just did is not the same sentence.
 
    `entries` is already in the column's own shape, "chest:3" and the rest, or
-   the single token "all". Nothing is trimmed on the way out: the budget is
-   shown on the picker and honoured by the engine, and a writer that quietly
+   the single token "all". Nothing is trimmed on the way out: the engine does
+   its own cut, the picker says what that cut is, and a writer that quietly
    drops the tail is how a picker ends up unable to repaint its own output. */
 async function saveFocusGroups(entries) {
   const { error } = await sb.from("profiles").upsert({
@@ -6696,14 +6710,16 @@ const FOCUS_GROUP_ORDER = ["chest", "shoulders", "traps", "lats", "lowerback", "
    3 main, 2 secondary, 1 light, and a stored entry with no tier at all reads
    as 2, which is what every pick saved before the tiers landed already meant.
 
-   A tier costs its own number in emphasis units and the picker gets 9 of them,
-   so three mains, four secondaries or nine lights are all the same spend. That
-   is not a rule this file invented: FOCUS_BUDGET is read off the engine below,
-   because a budget the picker and the plan disagree about is worse than no
-   budget at all. The costs are the tier numbers themselves (TIER_COST in that
-   file is { 3: 3, 2: 2, 1: 1 }), and it is the one thing here that is mirrored
-   rather than imported, because that table is not exported. If it ever stops
-   being the tier number, this is the line that has to move with it. */
+   The engine has a limit on how much it will push at once: each tier costs
+   its own number against FOCUS_BUDGET in focus.mjs, highest tier first, and a
+   group that does not fit gets no extra sets at all. That number is read off
+   the engine below and never shown to the user as a number. The picker used
+   to spell it out as points and a meter, and Mo did not want that, so the only
+   trace of it on screen is one sentence naming which picks the plan will not
+   get to. The costs are the tier numbers themselves (TIER_COST in that file is
+   { 3: 3, 2: 2, 1: 1 }), mirrored rather than imported because that is what
+   the engine's own tests pin. If it ever stops being the tier number, this is
+   the line that has to move with it. */
 const FOCUS_TIERS = Object.freeze({ main: 3, secondary: 2, light: 1 });
 const FOCUS_TIER_WORD = Object.freeze({ 3: "Main", 2: "Secondary", 1: "Light" });
 const FOCUS_TIER_MEANS = Object.freeze({
@@ -6721,14 +6737,23 @@ const FOCUS_TIER_FALLBACK = Object.freeze({
   2: { r: 0xf0, g: 0xb4, b: 0x29 },
   1: { r: 0xa8, g: 0xff, b: 0x00 },
 });
-/* Overwritten by the engine's own FOCUS_BUDGET as soon as focus.mjs loads. */
+/* Both overwritten by the engine's own numbers as soon as focus.mjs loads, so
+   what this page says the plan will do is what the plan does. The fallbacks
+   are the engine's values on the day this was written. FOCUS_WHOLE_BODY_MIN is
+   the engine's other rule: that many groups or more at one level is "focus on
+   everything", which it answers with the plain week, so the sentence for that
+   case is the whole-body one and not a list of names. */
 let FOCUS_BUDGET_UNITS = 9;
+let FOCUS_WHOLE_BODY_MIN = 12;
 let focusEnginePromise = null;
 function ensureFocusBudget() {
   if (!focusEnginePromise) {
     focusEnginePromise = import("/mo-knowledge/engine/focus.mjs")
-      .then((m) => { if (Number.isFinite(m.FOCUS_BUDGET)) FOCUS_BUDGET_UNITS = m.FOCUS_BUDGET; })
-      .catch((e) => { console.warn("focus budget: using the built-in 9", e); });
+      .then((m) => {
+        if (Number.isFinite(m.FOCUS_BUDGET)) FOCUS_BUDGET_UNITS = m.FOCUS_BUDGET;
+        if (Number.isFinite(m.WHOLE_BODY_MIN)) FOCUS_WHOLE_BODY_MIN = m.WHOLE_BODY_MIN;
+      })
+      .catch((e) => { console.warn("focus limits: using the built-in numbers", e); });
   }
   return focusEnginePromise;
 }
@@ -6760,9 +6785,9 @@ function focusParseStored(stored) {
   return { all: false, picked };
 }
 
-/* Highest tier first, then the body's own order, everywhere: on the chips, in
-   the saved array and in the budget. The engine spends the budget in exactly
-   this order, so what the picker shows going over is what the plan drops. */
+/* Highest tier first, then the body's own order, everywhere: on the chips and
+   in the saved array. The engine walks the picks in exactly this order, so
+   what the picker names as not fitting is what the plan drops. */
 function focusOrderOf(picked) {
   return [...picked.entries()].sort((a, b) => (b[1] - a[1]) || (FOCUS_GROUP_ORDER.indexOf(a[0]) - FOCUS_GROUP_ORDER.indexOf(b[0])));
 }
@@ -6773,19 +6798,20 @@ function focusPickEntries() {
   return focusPickOrder().map(([g, t]) => `${g}:${t}`);
 }
 
-/* The engine's own greedy spend, mirrored so the screen can say which picks are
-   not earning anything before somebody saves them: highest tier first, and it
-   keeps going past one that does not fit rather than stopping there, so a main
-   that missed by a unit still leaves room for a light behind it. */
-function focusSpend() {
-  const order = focusPickOrder();
+/* The engine's own cut, mirrored so the screen can say which picks the plan
+   will not get to before somebody saves them: highest tier first, and it keeps
+   going past one that does not fit rather than stopping there, so a main that
+   missed by a little still leaves room for a light behind it. The arithmetic
+   stays in here; nothing on screen shows a number. */
+function focusKept(picked) {
+  const order = focusOrderOf(picked);
   const kept = new Set();
-  let spent = 0, total = 0;
+  let spent = 0;
   for (const [g, t] of order) {
-    total += t;
     if (spent + t <= FOCUS_BUDGET_UNITS) { spent += t; kept.add(g); }
   }
-  return { order, kept, spent, total };
+  const dropped = order.filter(([g]) => !kept.has(g));
+  return { order, kept, dropped };
 }
 
 function focusPips(tier) {
@@ -6850,7 +6876,6 @@ async function initBodyFocusRive() {
   if (!figuresEl) return;                     // navigated away entirely while this loaded
 
   const summaryEl = $("focusPickSummary");
-  const budgetEl = $("focusPickBudget");
   const listEl = $("focusPickList");
   const clearBtn = $("focusPickClear");
   const allBtn = $("focusPickAll");
@@ -6890,44 +6915,20 @@ async function initBodyFocusRive() {
   function repaintTiers() { for (const [g, t] of FOCUS_PICKED) paintTier(g, t); }
 
   function sync() {
-    const { order, kept, spent, total } = focusSpend();
-    const over = Math.max(0, total - FOCUS_BUDGET_UNITS);
-
-    /* The budget is shown, not enforced. Nine cells, one per unit, plus a
-       dashed cell for every unit the picks run over, so "too much" is a thing
-       you can see rather than a thing a toast tells you off about. */
-    const cells = order.flatMap(([g, t]) => Array.from({ length: t }, () => `<i class="focus-t${t} ${kept.has(g) ? "used" : "over"}"></i>`));
-    while (cells.length < FOCUS_BUDGET_UNITS) cells.push("<i></i>");
-    const losing = order.filter(([g]) => !kept.has(g));
-    const dropped = losing.map(([g]) => BODY_GROUP_LABELS[g]);
-    /* Naming what would free the room, rather than refusing the tap. Clearing
-       the ones that are not earning always fits, by definition. The second
-       offer is only made when it is actually true: taking one group down a
-       level frees exactly one unit, which is only enough to buy back a Light. */
-    const demote = order.find(([g, t]) => kept.has(g) && t > FOCUS_TIERS.light);
-    const swap = demote && losing.length && losing[0][1] === FOCUS_TIERS.light;
-    let read;
-    if (FOCUS_ALL) {
-      read = `<b>${total} of ${FOCUS_BUDGET_UNITS}.</b> Whole body is all fourteen at Light, which is past anything ${FOCUS_BUDGET_UNITS} points can buy, so the plan reads it as no focus at all.`;
-    } else if (!total) {
-      read = `<b>Nothing marked.</b> You have ${FOCUS_BUDGET_UNITS} points of emphasis to spend: Main costs 3, Secondary 2, Light 1.`;
-    } else if (!over) {
-      read = `<b>${spent} of ${FOCUS_BUDGET_UNITS}</b> points of emphasis spent. Main costs 3, Secondary 2, Light 1.`;
-    } else {
-      read = `<b>${total} of ${FOCUS_BUDGET_UNITS}</b>, which is ${over} too many. A week only has so many sets to move around, so ${escapeHtml(focusNameList(dropped))} ${dropped.length > 1 ? "are" : "is"} not earning anything extra. Clear ${dropped.length > 1 ? "them" : "it"}`
-        + (swap
-          ? `, or take ${escapeHtml(BODY_GROUP_LABELS[demote[0]].toLowerCase())} down a level and ${escapeHtml(BODY_GROUP_LABELS[losing[0][0]].toLowerCase())} fits instead.`
-          : " to get back under.");
-    }
-    budgetEl.innerHTML = `<div class="focus-meter">${cells.join("")}</div><p class="focus-budget-read ${over ? "over" : ""}">${read}</p>`;
+    const { order, kept, dropped } = focusKept(FOCUS_PICKED);
+    /* The engine's other flattening rule, mirrored: that many groups or more
+       all at one level is "everything", and everything is answered with the
+       plain week whether it came from the Whole body button or from taps. */
+    const flat = FOCUS_ALL || (order.length >= FOCUS_WHOLE_BODY_MIN && new Set(order.map(([, t]) => t)).size === 1);
 
     /* Every marked group again as a chip: the word and the pip count are what
        carry the level here, because hue on its own is the one thing a red and
        green picker is not allowed to lean on. Tapping a chip cycles it exactly
        the way tapping the muscle does, which also gives the small groups a
-       44px target the figure cannot give them. */
+       44px target the figure cannot give them. A chip the plan will not get
+       to is dashed, so it agrees with the sentence under it. */
     listEl.innerHTML = order.map(([g, t]) =>
-      `<button type="button" class="focus-tier-chip focus-t${t} ${kept.has(g) ? "" : "spent"}" data-group="${g}">
+      `<button type="button" class="focus-tier-chip focus-t${t} ${kept.has(g) || flat ? "" : "dropped"}" data-group="${g}">
         ${focusPips(t)}<span>${escapeHtml(BODY_GROUP_LABELS[g])}</span><span class="focus-tier-word">${escapeHtml(FOCUS_TIER_WORD[t])}</span>
       </button>`).join("");
     for (const btn of listEl.querySelectorAll(".focus-tier-chip")) {
@@ -6935,18 +6936,31 @@ async function initBodyFocusRive() {
     }
 
     allBtn.classList.toggle("on", FOCUS_ALL);
-    /* The honest answer to "focus on everything", which is the same sentence
-       the engine puts in the plan's notes rather than a second opinion. */
-    summaryEl.innerHTML = FOCUS_ALL
-      ? "<b>Whole body.</b> Every muscle marked Light, which comes out the same as marking none: extra sets have to be taken from somewhere, and if everything is up then nothing is. Mark two or three Main if you want the week to actually change."
-      : (total ? "" : "Nothing marked. Saving now clears whatever is on file.");
+    /* One plain sentence about what the plan will do with the picks, and only
+       when that differs from what was tapped. No points, no counts, no advice
+       about what to demote: the groups are named and that is the whole
+       message. The whole-body line is the same answer the engine puts in the
+       plan's notes rather than a second opinion. */
+    let read = "";
+    if (flat) {
+      read = "<b>Whole body.</b> Every muscle marked at one level, which comes out the same as marking none: extra sets have to be taken from somewhere, and if everything is up then nothing is. Mark two or three Main if you want the week to actually change.";
+    } else if (!order.length) {
+      read = "Nothing marked. Saving now clears whatever is on file.";
+    } else if (dropped.length) {
+      const keptNames = focusNameList(order.filter(([g]) => kept.has(g)).map(([g]) => BODY_GROUP_LABELS[g]));
+      // focusNameList lower-cases for mid sentence use; this one opens a sentence.
+      const droppedNames = focusNameList(dropped.map(([g]) => BODY_GROUP_LABELS[g])).replace(/^./, (c) => c.toUpperCase());
+      read = `The plan can only push a few groups at once, so it concentrates on <b>${escapeHtml(keptNames)}</b>. `
+        + `${escapeHtml(droppedNames)} ${dropped.length > 1 ? "stay" : "stays"} at normal volume.`;
+    }
+    summaryEl.innerHTML = read;
   }
 
   /* One tap, one step: nothing, Light, Secondary, Main, nothing again. Bound to
      the figure's own click event rather than dblclick, which does not survive a
      touchscreen and would put a delay on the first tap of every muscle. The
      cycle closes on nothing, so a mis-tap is always recoverable in place and
-     the budget never has to refuse anything. */
+     no tap ever has to be refused. */
   function cycle(group) {
     if (!group || !BODY_GROUP_LABELS[group]) return;
     const next = (FOCUS_PICKED.get(group) || 0) + 1;
@@ -12652,89 +12666,47 @@ function closeGenOverlay() {
 /* The payoff: the plan lands a row at a time. Quick, 70ms apart, so five
    exercises are all in within half a second.
 
-   `honest` is the generator's one plain sentence about pace, and it belongs
-   here rather than in a toast: it is the caveat on the plan you are reading,
-   so it sits above the rows in the sheet's own muted line and stays on screen
-   for as long as they do. */
-/* One sentence off meta.session (CONTRACT.md): the clock this day was costed
-   against, whose clock it was, and what the day really comes to. `budgetMinutes`
-   is this DAY's budget and a short day is six tenths of the week's, so when it
-   disagrees with what was asked for the sentence says which is which rather
-   than reading as the engine ignoring the answer. The two trades, a day that
-   does not fit and a rest that was shortened, are the engine's own sentences
-   and are shown from `notes` instead of being written again here. */
-function sessionRevealLine(session) {
-  const budget = Number(session?.budgetMinutes);
-  if (!Number.isFinite(budget) || budget <= 0) return "";
-  const est = Number(session.estimatedMinutes);
-  const comes = Number.isFinite(est) && est > 0 ? ` This one comes to about ${est}.` : "";
-  /* The engine spells the stated case "asked" (plan.mjs `sessionBudget.source`).
-     Tested for the goal case rather than the other one so a third value could
-     only ever read as a number somebody gave, which is the harmless way round. */
-  if (session.source === "goal") {
-    return `You have not said how long you have, so your goal set the clock at ${budget} minutes.${comes}`
-      + ` Setup, then Training, if that is wrong.`;
-  }
-  const asked = Number(session.asked);
-  if (Number.isFinite(asked) && asked !== budget) {
-    return `You asked for about ${asked} minutes a session. This is a shorter day, built for ${budget}.${comes}`;
-  }
-  return `Built for the ${budget} minutes you asked for.${comes}`;
-}
-
+   The rows are the screen. Until 2026-09-14 this sheet also carried the
+   generator's pace sentence (`honest`), the session-clock sentence off
+   meta.session, up to a dozen lines of `notes` and a warm-up count, and on a
+   phone the plan started below the fold, under paragraphs nobody read before
+   tapping the button. Mo asked for the explanation to go. `honest` and
+   `session` still arrive because the callers and the engine contract have not
+   changed, and `session` still sets the estimate on the tappable clock. */
 function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], session = null) {
   if (genCancelled) return;   // they left; the workout is saved either way
   stopGenTicker();
   paintGen(100);
   const list = (workout.exercises || []).slice(0, 8);
-  /* The clock, closed back. meta.session says which clock this day was costed
-     against and whose it was, and a length somebody asked for that is never
-     mentioned again is a question that might as well not have been asked. */
-  const sessionLine = sessionRevealLine(session);
-  /* Two of the four things meta.session can report are trades rather than
-     reassurances: the day that still does not fit, and the rest that was
-     shortened to buy the minutes. The engine already says both out loud in
-     `notes`, so when either happened every note is shown rather than the first
-     three, because the one that got cut would be the one worth reading. */
-  const loud = session?.fits === false || session?.restCompressed === true;
-  /* What the plan said about itself (CONTRACT.md `notes`): the limits summary,
-     the softened warning when a slot kept a movement that loads a joint they
-     said hurts, the day-count clamp. Until 2026-09-10 the engine computed all
-     of it and none of it reached a screen, so its defence for prescribing a
-     movement someone said hurts ("the plan says so out loud") was false end to
-     end. Three at most; the first three are the ones that matter. */
-  /* The day that does not fit is said once per day and this sheet is one day,
-     so the other days' copies are dropped. Four near identical paragraphs
-     naming days you are not doing today is a scold, which is the same reason
-     the engine says the rest compression sentence once for the whole week.
-     Keyed off the engine's own sentence, and a rewording there costs this
-     filter and never a note: nothing matching means nothing dropped. */
-  const otherDay = (n) => {
-    const m = /^(.+?) (?:still )?comes to about \d+ minutes against/.exec(n);
-    return !!m && m[1] !== (workout.focus || "");
-  };
-  const heard = (Array.isArray(notes) ? notes : [])
-    .filter((n) => typeof n === "string" && n.trim() && !otherDay(n));
-  const said = loud ? heard : heard.slice(0, 3);
-  /* The engine's own sentence about ramp-up sets: what they are, and that none
-     of it counts as a set or gets logged. It is the only place the app explains
-     them, and it arrives well down `notes`, so a day that bought a ramp keeps
-     that sentence even when the list is trimmed to three. Matched on the
-     engine's phrase, so a rewording there costs this line and never a note. */
-  const ramps = workout.rampSets || [];
-  const rampNote = ramps.length ? heard.find((n) => /ramp-up sets/i.test(n)) : null;
-  if (rampNote && !said.includes(rampNote)) said.push(rampNote);
-  const wu = workout.warmup || [];
-  const cd = workout.cooldown || [];
-  /* Only mention the halves that exist: the old template printed "Opens with
-     no warm-up" and "a 8 move warm-up". */
-  const coolWord = cd.some((m) => m.kind === "mobility") ? "mobility moves" : "stretches";
-  const parts = [];
-  if (wu.length) parts.push(`opens with ${wu.length === 8 || wu.length === 11 ? "an" : "a"} ${wu.length} move warm-up`);
-  if (cd.length) parts.push(`closes with ${cd.length} ${coolWord}`);
-  const stretchLine = parts.length
-    ? `${parts.join(", ")[0].toUpperCase()}${parts.join(", ").slice(1)}. Timed, and you can skip either.`
+  /* The one kind of note that stays: a warning, not an explanation. The
+     softened sentence for a slot that kept a movement loading a joint they
+     said hurts, and the clinician line for the pain and postpartum goals.
+     Neither is stored anywhere and neither reaches another screen, so dropping
+     them here would make the engine's defence for prescribing a movement
+     someone said hurts ("the plan says so out loud") false again. Matched on
+     the engine's own phrases, so a rewording there costs a line and never a
+     plan. */
+  const warnings = (Array.isArray(notes) ? notes : [])
+    .filter((n) => typeof n === "string" && /stop if it hurts|clinician/i.test(n));
+  /* The whole visit, from the same function the plan card uses. The engine's
+     `estimatedMinutes` leaves the cool-down out by contract, so it is not
+     printed here: a plan that says 39 on the reveal and 45 on the card is the
+     app disagreeing with itself. The blocks are the engine's fresh answer,
+     since the stored row is not what is on screen yet. */
+  const revealBlocks = { warmup: workout.warmup || [], cooldown: workout.cooldown || [], ramp: workout.rampSets || [] };
+  const estMin = sessionEstimateMinutes(workout.exercises, revealBlocks);
+  /* When this reveal is the answer to "how long do you have", say what the
+     answer did. ONE_OFF_SESSION is set before the generate runs and stamped
+     with `made` after it, and this paints on a timer, so either state can be
+     the one it sees: unstamped, or stamped with this very plan. */
+  const forDay = planDate || todayStr();
+  const oneOff = ONE_OFF_SESSION?.date === forDay
+    && (!ONE_OFF_SESSION.made || ONE_OFF_SESSION.made === planSignature(workout.exercises))
+    ? ONE_OFF_SESSION : null;
+  const changeLine = oneOff
+    ? budgetChangeLine(oneOff.from, { exercises: workout.exercises, minutes: estMin }, { restCompressed: session?.restCompressed === true })
     : "";
+  const ramps = workout.rampSets || [];
   /* The one unprompted offer, and it is here rather than in onboarding because
      a limit is a constraint on how a goal gets trained for, not a goal: asking
      up front turns "what do you want" into "what is wrong with you" and can
@@ -12756,14 +12728,9 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
     const dayAfter = new Date(todayStr() + "T00:00:00");
     dayAfter.setDate(dayAfter.getDate() + 1);
     /* The estimate is tappable here too, because this is the moment the
-       question gets asked: the plan and the clock are on screen together. The
-       engine's own number when it sent one, the same arithmetic off the
-       exercises when it did not. Today only, since a day queued ahead has no
-       "today" to be a one-off about, and the card it lands on carries the same
-       control anyway. */
-    const estMin = Number(session?.estimatedMinutes) > 0
-      ? Number(session.estimatedMinutes)
-      : sessionEstimateMinutes(workout.exercises);
+       question gets asked: the plan and the clock are on screen together.
+       Today only, since a day queued ahead has no "today" to be a one-off
+       about, and the card it lands on carries the same control anyway. */
     const canRebudget = forToday && !SESSION && !isCoachedClient() && !!estMin;
     const head = forToday
       ? "Your workout"
@@ -12772,15 +12739,13 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
       <div class="gen-done-head">${escapeHtml(head)}</div>
       <div class="gen-focus">${escapeHtml(displayFocus(workout.focus, workout.exercises) || "Ready")}</div>
       ${forToday ? "" : `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(forDate)}</p>`}
-      ${honest ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(honest)}</p>` : ""}
-      ${sessionLine ? `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(sessionLine)}</p>` : ""}
       ${canRebudget ? `<div class="plan-time-row">
         <button type="button" class="plan-time" id="genTimeBtn" aria-label="About ${estMin} minutes. Change how long you have today.">
           ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
         </button>
       </div>` : ""}
-      ${said.map((n) => `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(n)}</p>`).join("")}
-      ${stretchLine ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(stretchLine)}</p>` : ""}
+      ${changeLine ? `<p class="plan-time-change" id="genTimeChange">${escapeHtml(changeLine)}</p>` : ""}
+      ${warnings.map((n) => `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(n)}</p>`).join("")}
       <div class="gen-rows" id="genRows">
         ${list.map((ex, i) => `
           <div class="gen-row" data-ex="${i}" style="--d:${i * 70}ms">
@@ -13233,6 +13198,7 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
        labels, so the goal picker is the only screen that can turn it into a
        sentence with a goal's name in it. Kept here for that. */
     rememberGoalOutcome(data.meta?.goals);
+    LAST_GEN_SESSION = data.meta?.session || null;
 
     /* data.honest is not written here: ai_workouts has no column for it, and
        migrations are owned elsewhere. It lives as long as the reveal sheet
@@ -13767,20 +13733,35 @@ function restLabel(sec) {
 }
 
 /* One place decides what the clock says, so the first paint and the ticker can
-   never disagree. It counts DOWN to the rest this lift is planned for, which
-   is what Mo's mockup asks for and what you actually want to see between sets.
-   Past zero it does NOT stop or reset: it keeps counting, with a +, because
-   the app cannot tell when YOU are recovered and standing there for four
-   minutes is worth knowing. The recorded rest is the real elapsed time either
-   way (recordRest), whatever the target said. */
+   never disagree. It counts UP from the moment the set landed: Mo asked for
+   up, not down, and a stopwatch is what you glance at between sets. On its own
+   a stopwatch would never tell you when you are ready, so the planned rest
+   for this lift rides under it as the reference, and the number goes lime
+   once you are past it. It does NOT stop or reset there: it keeps counting,
+   because the app cannot tell when YOU are recovered and standing there for
+   four minutes is worth knowing. The recorded rest is the real elapsed time
+   either way (recordRest), whatever the plan said. */
 function restState(ms) {
   const target = restTargetSec();
   const elapsed = Math.max(0, ms) / 1000;
-  const left = target - elapsed;
+  const ready = elapsed >= target;
   return {
-    target, elapsed, ready: left <= 0,
-    text: left > 0 ? formatRest(left * 1000) : `+${formatRest(-left * 1000)}`,
+    target, elapsed, ready,
+    text: formatRest(elapsed * 1000),
+    plan: ready ? `Past the ${formatRest(target * 1000)} plan, go when ready` : `Plan says ${formatRest(target * 1000)}`,
   };
+}
+
+/* What the figure does while you rest. Mirrors IDLE_NAMES in
+   knowledge/motion/index.mjs, listed here because the choice is made
+   synchronously as the set lands and the motion module loads on demand; a
+   name the module does not know falls back to the empty-stage mark, never to
+   a crash. Never the same one twice running, so it reads as a person between
+   sets rather than a routine. */
+const REST_ANTICS = ["Rest: Water", "Rest: Phone", "Rest: Towel", "Rest: Shake-out", "Rest: Watch"];
+function pickRestAntic() {
+  const pool = REST_ANTICS.filter((n) => n !== SESSION?.restAntic);
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 /* Why the number is the number. A recommendation you can trace back to your own
@@ -13800,19 +13781,25 @@ function restAdvice(s) {
   return `About ${restLabel(DEFAULT_REST_SEC)} here, a safe default for most lifts`;
 }
 
+/* The rest clock lives on the stage, beside the figure. The top-bar clock
+   keeps showing the workout time throughout (tickTimer), and only its dot
+   turns lime to say a rest is running. The paused screen has no stage clock,
+   so a paint with nothing to paint stands the ticker down; renderSession
+   starts it again on the way back. */
 function paintRest() {
-  const el = $("sessionTimer");
+  const el = $("sessRestClock");
   if (!el || !restingNow()) { stopRestTicker(); return; }
   const s = restState(Date.now() - SESSION.restStartedAt);
   el.textContent = s.text;
+  const plan = $("sessRestPlan");
+  if (plan) plan.textContent = s.plan;
+  $("sessRest")?.classList.toggle("ready", s.ready);
   const clock = $("sessionClock");
   if (clock) {
     clock.classList.add("resting");
     clock.classList.toggle("ready", s.ready);
-    clock.setAttribute("aria-label", `Resting ${s.text}, tap to start the next set`);
-    /* Why the number is the number. It is no longer a line on the screen (the
-       screen is the mockup's, and it has no room for one), but the reasoning
-       still has to exist somewhere you can reach: press and hold the clock. */
+    clock.setAttribute("aria-label", `Workout time. Resting ${s.text}, tap to start the next set`);
+    /* Why the number is the number: press and hold the clock. */
     clock.title = restAdvice(s);
   }
   // One buzz as the recommendation lands, once per rest however long you stand
@@ -13825,13 +13812,24 @@ function paintRest() {
 
 let REST_BUZZED_AT = null;
 
+/* The value is always computed from the wall clock, so an interval cannot
+   drift the NUMBER; what it can drift is the moment the number changes, and a
+   second that flips 900ms late reads as a stuck clock. So the first tick is
+   lined up with the rest's own second boundary and the interval runs from
+   there, the same way the session clock keys off its start. */
 function startRestTicker() {
   stopRestTicker();
-  REST_TICKER = setInterval(paintRest, 1000);
+  const since = SESSION?.restStartedAt ? Date.now() - SESSION.restStartedAt : 0;
+  const wait = 1000 - (((since % 1000) + 1000) % 1000);
+  REST_TICKER = setTimeout(() => {
+    paintRest();
+    REST_TICKER = setInterval(paintRest, 1000);
+  }, wait);
 }
 
 function stopRestTicker() {
-  if (REST_TICKER) { clearInterval(REST_TICKER); REST_TICKER = null; }
+  // One handle for both phases: clearTimeout and clearInterval share ids.
+  if (REST_TICKER) { clearTimeout(REST_TICKER); clearInterval(REST_TICKER); REST_TICKER = null; }
 }
 
 /* Haptics where the browser allows them. Android Chrome honours this; iOS
@@ -14151,6 +14149,7 @@ function toggleSet(setIdx) {
     const w = parseFloat(SESSION.weights[ei]);
     SESSION.setWeights[ei][setIdx] = isNaN(w) ? null : w;
     SESSION.restStartedAt = Date.now();   // rest begins the moment a set lands
+    SESSION.restAntic = pickRestAntic();  // and the figure picks what to do with it
   } else {
     SESSION.setWeights[ei][setIdx] = null;
     SESSION.restStartedAt = null;
@@ -14393,6 +14392,21 @@ function stretchAdvance() {
   renderStretchPhase();
 }
 
+/* Tapping a move in the Up next rail goes straight to it, the way tapping an
+   exercise there jumps the lift. Always from side one: a hold you jumped to
+   has not been held yet. Moves passed over are not marked done anywhere,
+   because a stretch writes nothing, so there is nothing to mark. */
+function jumpToStretch(n) {
+  if (!SESSION) return;
+  const list = stretchList();
+  if (n < 0 || n >= list.length) return;
+  SESSION.stretchIndex = n;
+  SESSION.stretchSide = 1;
+  SESSION.stretchStartedAt = Date.now();
+  saveSessionToStorage();
+  renderStretchPhase();
+}
+
 function endStretchPhase() {
   if (!SESSION) return;
   stopStretchTicker();
@@ -14480,69 +14494,104 @@ function renderStretchPhase() {
   const total = Math.max(1, Number(move.seconds) || 30);
   const left = Math.max(0, total - (Date.now() - (SESSION.stretchStartedAt || Date.now())) / 1000);
   const next = list[i + 1];
-  const nextUp = move.perSide && SESSION.stretchSide === 1 ? "other side" : next ? next.name : (isWarm ? "first lift" : "finish");
+  const otherSide = !!move.perSide && SESSION.stretchSide === 1;
+  const nextUp = otherSide ? "other side" : next ? next.name : (isWarm ? "first lift" : "finish");
+  const lastHold = !otherSide && !next;
   SESSION_LAST_EX = null;   // the first lift after the warm-up slides in like a new exercise
-  $("sessionCard").classList.remove("lifting", "paused-screen");   // the timed blocks scroll, the lift screen does not
+  const card = $("sessionCard");
+  /* Same skeleton as the lift (the stage and the sheet, one screen that does
+     not scroll), so `lifting` goes on here too: it is the layout class, not a
+     statement about what you are doing. `stretching` re-lights it blue. */
+  card.classList.add("lifting", "stretching");
+  card.classList.remove("paused-screen", "waking");
   $("sessionProgressFill").style.width = isWarm ? "0%" : "100%";
-  /* The whole screen changes colour for the duration of the block. See the
-     .session-overlay.stretching rules: one class, every accent follows. */
-  $("sessionCard").classList.add("stretching");
 
-  /* How long the block runs, and how much of it is left, both said out loud.
-     Counted from the moves themselves rather than a constant, so it can never
-     promise eight minutes and deliver three. */
+  /* How much of the block is left, said out loud. Counted from the moves
+     themselves rather than a constant, so it can never promise eight minutes
+     and deliver three. */
   const blockSec = stretchBlockSeconds(list);
   const doneSec = stretchBlockSeconds(list.slice(0, i))
-    + (move.perSide && SESSION.stretchSide === 2 ? Math.max(1, Number(move.seconds) || 30) : 0);
+    + (move.perSide && SESSION.stretchSide === 2 ? total : 0);
   const leftMin = Math.max(1, Math.round((blockSec - doneSec) / 60));
 
+  /* What it is for beats what it works: "for your squats" is a reason to do
+     it, "Quads" is a label. Falls back to the muscle for the static holds,
+     which carry no patterns. */
+  const why = preparesLabel(move) || (move.group ? (BODY_GROUP_LABELS?.[move.group] || move.group) : "");
+  const side = move.perSide ? (SESSION.stretchSide === 1 ? "left side" : "right side") : "";
+  const sub = [`${total}s${isWarm ? "" : " hold"}`, side, why].filter(Boolean).join(" · ");
+  const remaining = list.map((m, n) => ({ m, n })).filter(({ n }) => n > i);
+
   $("sessionBody").innerHTML = `
-    <div class="stretch-banner">
-      <span class="stretch-banner-icon">${icon(isWarm ? "flame" : "heart", 19)}</span>
-      <div class="stretch-banner-body">
-        <div class="stretch-banner-title">${isWarm ? "Warming up" : "Cooling down"}</div>
-        <div class="stretch-banner-sub">${Math.max(1, Math.round(blockSec / 60))} min in total · about ${leftMin} min left</div>
-        <div class="stretch-pips">${list.map((_, n) => `<i class="${n < i ? "done" : n === i ? "now" : ""}"></i>`).join("")}</div>
+    <div class="sess-live ex-in">
+      <div class="sess-view" id="sessView">
+      <div class="sess-top">
+        <div class="sess-segs">
+          ${list.map((_, n) => `<i class="${n < i ? "done" : n === i ? "now" : ""}"></i>`).join("")}
+        </div>
+        <div class="sess-where">
+          <span>${isWarm ? "Warm-up" : "Cool-down"} ${i + 1} of ${list.length}</span>
+          <span>About ${leftMin} min left</span>
+        </div>
+        <!-- The name is not a button here: a stretch has nothing to swap or
+             share, and a word that does nothing must not look pressable. -->
+        <div class="sess-titlerow"><h2 class="sess-title">${escapeHtml(move.name || "")}</h2></div>
+        <div class="stretch-sub">${escapeHtml(sub)}</div>
       </div>
-    </div>
 
-    <div class="sess-card ex-in">
-      <div class="sess-step-row">
-        <div class="sess-step">${isWarm ? "WARM-UP" : "COOL-DOWN"} · ${i + 1} OF ${list.length}</div>
+      <div class="sess-stage" id="sessStage">
+        <!-- Light palette on the light stage, as on the lift; the accent is
+             the stretch blue so the working muscles light in the mode's hue. -->
+        <div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(move.name || "")}" data-theme="light" data-accent="stretch"></div>
+        <div class="sess-stage-none" aria-hidden="true">${icon(isWarm ? "flame" : "heart", 72)}</div>
       </div>
-      <h2 class="sess-name">${escapeHtml(move.name || "")}</h2>
-      <div class="sess-meta">
-        <span class="sess-target">${total}s${move.perSide ? ` · ${SESSION.stretchSide === 1 ? "left" : "right"} side` : ""}</span>
-        ${(() => {
-          /* What it is for beats what it works: "for your squats" is a reason
-             to do it, "Quads" is a label. Falls back to the muscle for the
-             static holds, which carry no patterns. */
-          const why = preparesLabel(move);
-          const text = why || (move.group ? (BODY_GROUP_LABELS?.[move.group] || move.group) : "");
-          return text ? `<span class="sess-target">${escapeHtml(text)}</span>` : "";
-        })()}
       </div>
-      <div class="stretch-fig" data-fig="${escapeHtml(move.name || "")}" data-accent="stretch"></div>
-      ${move.cue ? `<div class="sess-note">${escapeHtml(move.cue)}</div>` : ""}
-    </div>
 
-    <div class="rest-bar" id="stretchTimer">
-      <div class="rest-head">
-        <span class="rest-label">${isWarm ? "MOVING" : "HOLD"}</span>
-        <span class="rest-next">Next: ${escapeHtml(nextUp)}</span>
+      <div class="sess-sheet${SESSION_SHEET_OPEN ? " open" : ""}" id="sessSheet">
+        <button type="button" class="sess-grab" id="sessGrab" aria-expanded="${SESSION_SHEET_OPEN ? "true" : "false"}"
+          aria-label="${SESSION_SHEET_OPEN ? "Hide what is up next" : "Show what is up next"}"><i></i></button>
+
+        <!-- The hold, where the lift keeps its set chips: the one number this
+             screen is about, with the side and what follows above it. -->
+        <div class="stretch-hold" id="stretchTimer">
+          <div class="sess-lastline">
+            <span class="last">${isWarm ? "Moving" : "Hold"}${side ? `, ${side}` : ""}</span>
+            <span class="beat">Next: ${escapeHtml(nextUp)}</span>
+          </div>
+          <div class="stretch-clock" id="stretchClock" aria-live="off">${formatRest(left * 1000)}</div>
+          <div class="rest-track"><div class="rest-fill" id="stretchFill" style="width:${((left / total) * 100).toFixed(1)}%"></div></div>
+        </div>
+        ${move.cue ? `<p class="stretch-cue">${escapeHtml(move.cue)}</p>` : ""}
+
+        <div class="sess-cta">
+          <button type="button" class="btn-big btn-primary" id="stretchNext">${lastHold ? (isWarm ? "Start lifting" : "Finish workout") : "Next"}</button>
+        </div>
+        <button type="button" class="stretch-skip" id="stretchSkipAll">${isWarm ? "Skip warm-up" : "Skip cool-down"}</button>
+        ${isWarm ? "" : `<p class="stretch-note">Your lifts are banked. This is the part that makes tomorrow easier.</p>`}
+
+        ${remaining.length ? `<div class="upnext">
+          <div class="upnext-label">Up next</div>
+          <div class="upnext-rail">
+            ${remaining.map(({ m, n }) => `<button type="button" class="upnext-card" data-jump-stretch="${n}">
+              <span class="upnext-fig" data-fig="${escapeHtml(m.name || "")}" data-accent="stretch"></span>
+              <span class="upnext-text">
+                <span class="upnext-name">${escapeHtml(m.name || "")}</span>
+                <span class="upnext-meta">${Math.max(1, Number(m.seconds) || 30)}s${m.perSide ? " per side" : ""}</span>
+              </span>
+            </button>`).join("")}
+          </div>
+        </div>` : ""}
       </div>
-      <span class="rest-clock" id="stretchClock">${formatRest(left * 1000)}</span>
-      <div class="rest-track"><div class="rest-fill" id="stretchFill" style="width:${((left / total) * 100).toFixed(1)}%"></div></div>
-      <div class="rest-adjust">
-        <button type="button" id="stretchNext">Next</button>
-        <button type="button" id="stretchSkipAll">${isWarm ? "Skip warm-up" : "Skip cool-down"}</button>
-      </div>
-    </div>
-    ${isWarm ? "" : `<p class="muted-note" style="margin-top:12px;">Your lifts are banked. This is the part that makes tomorrow easier.</p>`}`;
+    </div>`;
 
   $("stretchNext").onclick = stretchAdvance;
   $("stretchSkipAll").onclick = skipStretchPhase;
+  $("sessionBody").querySelectorAll("[data-jump-stretch]").forEach((b) => {
+    b.onclick = () => jumpToStretch(parseInt(b.dataset.jumpStretch, 10));
+  });
+  wireSessionSheet();
   mountMotionFigures($("sessionBody"));
+  tickTimer();
   startStretchTicker();
 }
 
@@ -14685,6 +14734,12 @@ function renderSession() {
   // starting the next one, so the clock measures actual rest rather than
   // rest plus the set you were busy doing.
   const resting = !!SESSION.restStartedAt && !allDone;
+  /* A rest that arrived without an antic (a session saved before this
+     existed, or a rest begun by addSet) gets one here, and the choice is kept
+     on the session so a redraw or a reload mid-rest does not reshuffle the
+     figure. */
+  if (resting && !SESSION.restAntic) { SESSION.restAntic = pickRestAntic(); saveSessionToStorage(); }
+  const restNow = resting ? restState(Date.now() - SESSION.restStartedAt) : null;
 
   const lastTime = lastTimeFor(ex.name);
   /* The warm-up rungs of this lift, if the plan bought any. No ramp is the
@@ -14727,11 +14782,22 @@ function renderSession() {
         </div>
       </div>
 
-      <div class="sess-stage" id="sessStage">
+      <div class="sess-stage${resting ? " resting" : ""}" id="sessStage">
         <!-- The figure is always drawn in the light palette, whatever theme the
-             app is in: it stands on the light stage, not on the app's ground. -->
-        <div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(ex.name)}" data-theme="light"
-          data-mood="${beatenPB ? "surprised" : justSet != null ? "happy" : "neutral"}"></div>
+             app is in: it stands on the light stage, not on the app's ground.
+             While resting it stops doing the lift and does whatever the rest
+             picked (a drink, the phone, a towel): a fresh mount of that move,
+             swapped back to the exercise by Start set. data-fig-still asks the
+             mount to hold the pose instead of looping when the OS asks for
+             reduced motion: an antic is decoration, unlike the lift itself. -->
+        <div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(resting ? SESSION.restAntic : ex.name)}" data-theme="light"
+          ${resting ? 'data-fig-still="1"' : ""}
+          data-mood="${beatenPB ? "surprised" : (justSet != null || resting) ? "happy" : "neutral"}"></div>
+        ${resting ? `<div class="sess-rest${restNow.ready ? " ready" : ""}" id="sessRest">
+          <div class="sess-rest-eyebrow">Resting</div>
+          <div class="sess-rest-clock" id="sessRestClock">${restNow.text}</div>
+          <div class="sess-rest-plan" id="sessRestPlan">${escapeHtml(restNow.plan)}</div>
+        </div>` : ""}
         <!-- Not every lift in the library has a drawn move yet. The stage is
              the tallest thing on the screen, so an empty one reads as broken;
              this is the one mark that says "no figure for this one", quietly,
@@ -14792,7 +14858,13 @@ function renderSession() {
         </div>
 
         <div class="sess-cta">
-          <button type="button" class="btn-big btn-primary ${allDone ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>
+          <!-- Resting: the one button is Start set, which ends the rest and
+               brings the lift back. The chip still logs the next set in one
+               tap for anyone who did the set without announcing it, and the
+               line under the button says so. -->
+          <button type="button" class="btn-big btn-primary ${resting ? "" : "hidden"}" id="startSetBtn">Start set ${currentSet + 1} of ${setsDone.length}</button>
+          <button type="button" class="btn-big btn-primary ${allDone || resting ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>
+          ${resting ? `<button type="button" class="sess-cta-alt" id="logNowBtn">Already done it? Log set ${currentSet + 1}</button>` : ""}
           <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">${SESSION.completed.some((c, i) => !c && i !== ei) ? "Next exercise" : "Finish workout"}</button>
         </div>
 
@@ -14820,9 +14892,9 @@ function renderSession() {
       </div>
     </div>`;
 
-  /* This screen is the one that does not scroll. Every other thing the overlay
-     draws (the stretch blocks, the paused sheet, the wrap-up) is a document,
-     so the class goes on here and comes off in each of those. */
+  /* This screen does not scroll, and neither do the stretch blocks, which
+     share its layout. The paused sheet and the wrap-up are documents, so the
+     class goes on here and comes off in each of those. */
   $("sessionCard").classList.add("lifting");
   $("sessionCard").classList.remove("paused-screen");
   if (waking) startSessionWake(); else $("sessionCard").classList.remove("waking");
@@ -14841,6 +14913,10 @@ function renderSession() {
 
   const logBtn = $("logSetBtn");
   if (logBtn) logBtn.onclick = () => { if (currentSet >= 0) toggleSet(currentSet); };
+  const startBtn = $("startSetBtn");
+  if (startBtn) startBtn.onclick = () => { buzz(9); skipRest(); };
+  const logNow = $("logNowBtn");
+  if (logNow) logNow.onclick = () => { if (currentSet >= 0) toggleSet(currentSet); };
 
   $("sessionBody").querySelectorAll("[data-jump]").forEach((b) => {
     b.onclick = () => jumpToExercise(parseInt(b.dataset.jump, 10));
@@ -15365,18 +15441,19 @@ function sessionElapsed() {
   return SESSION.pausedAt || !SESSION.startedAt ? base : base + (Date.now() - SESSION.startedAt);
 }
 
-/* One slot, two numbers. While you are resting it is the rest clock, and the
-   rest of the time it is how long the workout has been running. They cannot
-   both be on screen, so they cannot disagree, and the rest bar that used to
-   sit in the session body is gone. */
+/* The top-bar clock is the workout time, always, including while resting:
+   the rest has its own clock on the stage (paintRest), so the two numbers
+   are both on screen and neither has to give way. Resting only changes the
+   dot beside this one to lime. */
 function tickTimer() {
   const el = $("sessionTimer");
   if (!el) return;
   const clock = $("sessionClock");
+  el.textContent = fmtElapsed(sessionElapsed());
   if (restingNow()) { paintRest(); return; }
   clock?.classList.remove("resting", "ready");
   clock?.setAttribute("aria-label", "Workout time");
-  el.textContent = fmtElapsed(sessionElapsed());
+  clock?.removeAttribute("title");
 }
 
 /* Resting is a state of the LIFT screen only: a warm-up hold or a finished
@@ -15478,6 +15555,10 @@ function togglePause() {
     SESSION.elapsedMs = sessionElapsed();
     SESSION.pausedAt = Date.now();
     stopSessionTimer();
+    /* The rest itself carries on (restStartedAt is a wall-clock stamp, and
+       you are still resting while paused), but its stage clock is about to
+       be replaced by the paused screen, so nothing should be painting it. */
+    stopRestTicker();
     $("sessionPauseBtn").innerHTML = icon("play", 18);
     $("sessionTimer").classList.add("paused");
     saveSessionToStorage();
@@ -15974,22 +16055,130 @@ const EQUIPMENT_WORDS = [
 ];
 
 /* What a plan costs in minutes, costed the way the engine costs it:
-   mo-knowledge/engine/plan.mjs `estimateMinutes`, which is thirty seconds of
-   work per set plus that set's own rest, plus the warm-up.
+   mo-knowledge/engine/plan.mjs `estimateMinutes`, and the five numbers below
+   are that file's, mirrored. Change one there, change it here.
+
+   Until 2026-09-14 this was thirty seconds a set plus its rest plus a six
+   minute warm-up, and nothing else in the visit was counted, so Mo's five
+   exercise plan printed "About 21 min" over a session that ran him past
+   thirty: "it says 6 min for warm up, 5 min for cool down and then I have 5
+   exercises and it says I can finish it in 20 mins, like no I can't."
+
+   Per set: ten seconds to get set and about four seconds a rep, so a set of
+   eight is 42 seconds and a set of fifteen is 70. Between sets: the prescribed
+   rest, (sets - 1) of them, because the rest after the LAST set of a movement
+   is the walk to the next station, and that is charged once per exercise as a
+   75 second transition (re-rack, walk, load, adjust the seat). Ten seconds a
+   set for ticking it in the app. Then the warm-up block, the ramp-up sets and
+   the cool-down, each read off the plan's own mobility blocks, so they are
+   counted exactly once and only when the day has them: a skipped block costs
+   nothing and a plan without one carries nothing for it.
+
+   Worked example, five exercises at three sets of ten, 90 seconds rest, a six
+   minute warm-up and a five minute cool-down:
+     work        15 sets x (10 + 4 x 10) = 750 s
+     logging     15 x 10                 = 150 s
+     rest        5 x 2 x 90              = 900 s
+     transitions 5 x 75                  = 375 s
+     lifting                             = 2175 s = 36.25 min
+     + warm-up 6 + cool-down 5           = 47.25, prints 47 min
+   The old arithmetic said 6 + 15 x 120 / 60 = 36 for the same day.
 
    Derived from the exercises rather than read off a stored meta.session, for
    two reasons. ai_workouts has no column for the engine's session block, and a
    stored number would stop being true the moment somebody added, removed,
    swapped or re-dialled a row, all of which are one tap away on the same
    screen. A row the engine never wrote carries no restSec, so the app's own
-   default stands in, which is the fallback the rest timer already uses. */
-const PLAN_REP_SECONDS = 30;   // plan.mjs REP_SECONDS
-const PLAN_WARMUP_MIN = 6;     // plan.mjs WARMUP_MIN
-function sessionEstimateMinutes(list) {
+   default stands in, which is the fallback the rest timer already uses.
+
+   One function, every screen. The reveal, the plan card, the Smart Plan
+   Duration fact, the one-off budget sheet and the "Back to N min" offer all
+   read this and nothing else, so no two screens can print different minutes
+   over the same plan. */
+const PLAN_SET_SETUP_SECONDS = 10;    // plan.mjs SET_SETUP_SECONDS
+const PLAN_REP_SECONDS = 4;           // plan.mjs REP_SECONDS
+const PLAN_LOG_SECONDS = 10;          // plan.mjs LOG_SECONDS
+const PLAN_TRANSITION_SECONDS = 75;   // plan.mjs TRANSITION_SECONDS
+const PLAN_REPS_COSTED_MAX = 30;      // plan.mjs REPS_COSTED_MAX
+function planLiftingSeconds(list) {
+  return (list || []).filter((e) => e && e.name).reduce((t, e) => {
+    const sets = Math.max(0, Math.round(Number(e.sets) || 3));
+    if (!sets) return t;
+    const reps = Math.min(PLAN_REPS_COSTED_MAX, Math.max(1, Math.round(Number(e.reps) || 10)));
+    const rest = Number(e.restSec) > 0 ? Number(e.restSec) : DEFAULT_REST_SEC;
+    return t + sets * (PLAN_SET_SETUP_SECONDS + PLAN_REP_SECONDS * reps + PLAN_LOG_SECONDS)
+      + (sets - 1) * rest + PLAN_TRANSITION_SECONDS;
+  }, 0);
+}
+/* The timed blocks a plan carries, in seconds, honouring today's skips. Takes
+   either shape the app has for them: the stored ai_workouts.mobility row
+   (planMobility) or the engine's fresh answer at the reveal, where the ramp is
+   still called rampSets. Per side doubles, the same way the session runs it. */
+function planBlocksSeconds(mobility) {
+  if (!mobility || typeof mobility !== "object") return { warmup: 0, ramp: 0, cooldown: 0 };
+  const skippedAll = !!mobility.skipped;
+  const skipWarm = mobility.skippedWarmup ?? skippedAll;
+  const skipCool = mobility.skippedCooldown ?? skippedAll;
+  const ramp = Array.isArray(mobility.ramp) ? mobility.ramp : Array.isArray(mobility.rampSets) ? mobility.rampSets : [];
+  return {
+    warmup: skipWarm ? 0 : stretchBlockSeconds(mobility.warmup),
+    ramp: ramp.reduce((t, r) => t + (Number(r?.seconds) || 0), 0),
+    cooldown: skipCool ? 0 : stretchBlockSeconds(mobility.cooldown),
+  };
+}
+function sessionEstimateMinutes(list, mobility = planMobility()) {
   const ex = (list || []).filter((e) => e && e.name);
   if (!ex.length) return null;
-  const seconds = ex.reduce((t, e) => t + (e.sets || 3) * (PLAN_REP_SECONDS + (Number(e.restSec) || DEFAULT_REST_SEC)), 0);
-  return Math.round(PLAN_WARMUP_MIN + seconds / 60);
+  const b = planBlocksSeconds(mobility);
+  return Math.round((planLiftingSeconds(ex) + b.warmup + b.ramp + b.cooldown) / 60);
+}
+
+/* One plain sentence about what a budget change did, measured off the two
+   lists rather than asserted. Needed because the engine's ladder can answer a
+   bigger number with the same lifts (the week is at its recovery ceiling, so
+   the extra bought a longer cool-down and nothing else) and a smaller one with
+   the same lifts at fewer sets, and a control that then shows nothing is the
+   control Mo reported: "if I add more or less it doesn't change my workout or
+   anything". `from` and `to` are { exercises, minutes }. `restCompressed` is
+   the engine's own word (meta.session.restCompressed) on whether the rest was
+   cut to make the clock: a plan somebody wrote by hand carries no restSec, so
+   comparing intervals alone would call the app's default a cut. */
+function budgetChangeLine(from, to, { restCompressed = null } = {}) {
+  const before = (from?.exercises || []).filter((e) => e && e.name);
+  const after = (to?.exercises || []).filter((e) => e && e.name);
+  if (!before.length || !after.length) return "";
+  const key = (e) => String(e.name || "").trim().toLowerCase();
+  const a = new Set(before.map(key));
+  const b = new Set(after.map(key));
+  const dropped = before.filter((e) => !b.has(key(e))).map((e) => e.name);
+  const added = after.filter((e) => !a.has(key(e))).map((e) => e.name);
+  const sets = (l) => l.reduce((t, e) => t + (Number(e.sets) || 0), 0);
+  const dSets = sets(after) - sets(before);
+  const restOf = (l) => Math.max(...l.map((e) => (Number(e.restSec) > 0 ? Number(e.restSec) : DEFAULT_REST_SEC)));
+  const restBefore = restOf(before);
+  const restAfter = restOf(after);
+  const parts = [];
+  if (dropped.length + added.length > 3) {
+    parts.push(after.length === before.length ? "different lifts" : `${after.length} lifts in place of ${before.length}`);
+  } else {
+    if (dropped.length) parts.push(`${dropped.join(" and ")} ${dropped.length === 1 ? "is" : "are"} off`);
+    if (added.length) parts.push(`${added.join(" and ")} added`);
+  }
+  if (dSets) parts.push(`${Math.abs(dSets)} ${dSets > 0 ? "more" : "fewer"} set${Math.abs(dSets) === 1 ? "" : "s"}`);
+  if (restCompressed === true || (restCompressed === null && restAfter < restBefore)) {
+    parts.push(`rest between sets down to ${restLabel(restAfter)}`);
+  }
+  const fromMin = Number(from?.minutes);
+  const toMin = Number(to?.minutes);
+  const clock = Number.isFinite(fromMin) && Number.isFinite(toMin) && fromMin !== toMin
+    ? `${toMin > fromMin ? "Up" : "Down"} from about ${fromMin} to ${toMin} min`
+    : "";
+  if (!parts.length) {
+    return clock
+      ? `${clock}: same lifts and sets, the difference is the stretching.`
+      : "Same plan: it already fits, and more sets than this is past what your week recovers from.";
+  }
+  return `${clock ? `${clock}: ` : "Changed: "}${parts.join(", ")}.`;
 }
 
 /* What we can honestly propose for the next session, all of it measured from
@@ -16035,7 +16224,7 @@ function planFromToday() {
   /* The same arithmetic the engine costs a session with, and now literally the
      same function the tappable estimate on the plan uses, so the two numbers on
      two screens cannot disagree. A range, because reps vary. */
-  const mins = sessionEstimateMinutes(list);
+  const mins = sessionEstimateMinutes(list, planMobility());
 
   /* Match, defined the same way as the proposal below: how much of this
      session lands on what the week has trained least. A plan that hits your
@@ -17597,6 +17786,9 @@ const CARDIO_ZONE_WORDS = {
   easy: "easy pace, you can still hold a conversation",
   moderate: "moderate, breathing hard but steady",
   hard: "hard intervals",
+  /* The endurance goal emits "mixed" and this table had no words for it, so
+     the card printed "mixed." as a sentence. */
+  mixed: "mix it up, one easy session, one with hard intervals, one longer and steady",
 };
 function cardioNoteHTML(finished) {
   const c = TODAY_WORKOUT?.cardio;
@@ -17732,7 +17924,12 @@ async function savePlanExercises() {
    against what was logged and backs the weights off on a shortfall. A 45 minute
    row left in the database under a 30 minute session is somebody punished with
    lighter weights for having been busy on a Tuesday. */
-let ONE_OFF_SESSION = null;   // { date, minutes, made, from: { minutes, focus, exercises, mobility, cardio } }
+let ONE_OFF_SESSION = null;   // { date, minutes, made, changed, from: { minutes, focus, exercises, mobility, cardio } }
+/* meta.session from the last generate, whoever asked for it. generateWorkout
+   hands the reveal its copy directly; this is for applySessionBudget, which
+   only gets a boolean back and needs the engine's `restCompressed` to describe
+   the change honestly. */
+let LAST_GEN_SESSION = null;
 
 /* Enough of a plan to tell whether it is still the one the budget change made.
    Anything else writing this day (a plain Regenerate, a saved workout dropped
@@ -17758,7 +17955,7 @@ function openSessionBudgetSheet({ estimate, current, onPick, overReveal = false 
           <div class="pop-who" style="color:var(--muted)">JUST FOR TODAY</div>
           <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
         </div>
-        <p class="muted-note">This one comes to about ${estimate} minutes. Say what you actually have and the plan is rebuilt to fit: sets come off the accessories first, a lift only if that is not enough, and the rest between sets last. Anything you added or swapped by hand is replaced.</p>
+        <p class="muted-note">This one comes to about ${estimate} minutes, warm-up and cool-down included. Say what you actually have and the plan is rebuilt to fit: sets come off the accessories first, a lift only if that is not enough, and the rest between sets last. More time buys sets where your week has room for them, and a longer cool-down once it does not. Anything you added or swapped by hand is replaced.</p>
         <div class="rest-pref five" id="oneOffLengths"></div>
         <p class="muted-note" style="margin-top:12px;">Today only. Your usual session length, in Setup then Training, is not touched.</p>
         <button type="button" class="btn-ghost" data-close>Keep this one</button>
@@ -17776,7 +17973,10 @@ function openSessionBudgetSheet({ estimate, current, onPick, overReveal = false 
          which in Setup means "let the goal decide again". Here the lit chip is
          the length this day already has, so tapping it is "leave it alone" and
          must not spend a generate on rebuilding the same plan. */
-      if (minutes === null || minutes === lit) return;
+      if (minutes === null || minutes === lit) {
+        toast(`Already about ${estimate} min. Pick a different length to change it.`);
+        return;
+      }
       onPick(minutes);
     },
   });
@@ -17802,7 +18002,7 @@ async function applySessionBudget(minutes) {
     date,
     minutes,
     from: (ONE_OFF_SESSION?.date === date && ONE_OFF_SESSION.from) || {
-      minutes: sessionEstimateMinutes(TODAY_WORKOUT.exercises),
+      minutes: sessionEstimateMinutes(TODAY_WORKOUT.exercises, planMobility()),
       focus: TODAY_WORKOUT.focus,
       exercises: JSON.parse(JSON.stringify(TODAY_WORKOUT.exercises)),
       mobility: TODAY_WORKOUT.mobility ? JSON.parse(JSON.stringify(TODAY_WORKOUT.mobility)) : null,
@@ -17816,6 +18016,12 @@ async function applySessionBudget(minutes) {
   const ok = await generateWorkout(null, { sessionMinutes: minutes, keepFocus });
   if (!ok) { if (ONE_OFF_SESSION === snapshot) ONE_OFF_SESSION = null; return; }
   snapshot.made = planSignature(TODAY_WORKOUT?.exercises);
+  /* What the answer did, in one line, kept with the snapshot so the card can
+     say it for as long as the offer to go back is on screen. */
+  snapshot.changed = budgetChangeLine(snapshot.from, {
+    exercises: TODAY_WORKOUT?.exercises,
+    minutes: sessionEstimateMinutes(TODAY_WORKOUT?.exercises, planMobility()),
+  }, { restCompressed: LAST_GEN_SESSION?.restCompressed === true });
   /* The reveal is already on screen by now and the card behind it was rendered
      before `made` was stamped, so it is redrawn with the offer on it. */
   renderWorkoutTab();
@@ -17875,7 +18081,8 @@ function renderPlanPreview() {
         ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
       </button>
       ${oneOff?.from?.minutes ? `<button type="button" class="link-btn" id="planTimeBackBtn">Back to ${oneOff.from.minutes} min</button>` : ""}
-    </div>`;
+    </div>
+    ${oneOff?.changed ? `<p class="plan-time-change" id="planTimeChange">${escapeHtml(oneOff.changed)}</p>` : ""}`;
 
   const planRamps = planMobility()?.ramp || [];
   const rows = TODAY_WORKOUT.exercises.map((ex, i) => {
@@ -18524,6 +18731,9 @@ function ensureBody3DModule() {
   return body3dPromise;
 }
 const MOTION_MOUNTS = new Set();
+function prefersReducedMotion() {
+  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 function currentTheme() {
   return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
 }
@@ -18586,6 +18796,11 @@ async function mountMotionFigures(root) {
         if (!ctl) el.classList.remove("fig-3d");
       }
     }
+    /* A lift loops even under reduced motion, because the figure IS the
+       instruction (see mountMove). A rest antic is not: it is the character
+       being cute, so with motion turned down it holds its most telling pose
+       (the middle of the loop, bottle at the lips) and does not move. */
+    const still = el.hasAttribute("data-fig-still") && prefersReducedMotion();
     if (!ctl) ctl = mod.mountMove(canvas, name, {
       /* Plain figure only. Mo looked at the muscle skin and the lit working
          muscle on real moves and asked for neither: the figure shows the
@@ -18598,6 +18813,8 @@ async function mountMotionFigures(root) {
       // The face reacts: the session card sets data-mood from what just
       // happened. Cards and rows leave it unset and get the neutral face.
       mood: el.dataset.mood || undefined,
+      paused: still,
+      t: still ? 0.5 : undefined,
     });
     if (!ctl) { canvas.remove(); el.classList.add("fig-none"); continue; }
     el.classList.add("fig-live");
@@ -18917,12 +19134,13 @@ async function addFocusGroup(group) {
   // Whole body is one token, and adding a group to it is what un-picks it.
   const next = all ? new Map() : picked;
   next.set(group, FOCUS_TIERS.secondary);
-  const order = focusOrderOf(next);
+  const { order, kept } = focusKept(next);
   if (!await saveFocusGroups(order.map(([g, t]) => `${g}:${t}`))) return;
-  const spent = order.reduce((n, [, t]) => n + t, 0);
-  toast(spent > FOCUS_BUDGET_UNITS
-    ? `${BODY_GROUP_LABELS[group]} added. That is over the ${FOCUS_BUDGET_UNITS} point budget, so Focus areas will show what stopped earning.`
-    : `${BODY_GROUP_LABELS[group]} added as a secondary focus.`);
+  /* Same cut the picker shows, said without a number: the pick is saved either
+     way, and if the plan will not get to it, Focus areas is where that shows. */
+  toast(kept.has(group)
+    ? `${BODY_GROUP_LABELS[group]} added as a secondary focus.`
+    : `${BODY_GROUP_LABELS[group]} added. The plan already pushes as much as it can, so Focus areas shows which picks it gets to.`);
   renderBodyDetail();
 }
 
