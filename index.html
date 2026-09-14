@@ -5326,7 +5326,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.13.29";
+const APP_VERSION = "2026.09.14.1";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -16384,26 +16384,38 @@ function renderChooseScreen() {
   $("workoutFocusRow").textContent = "";
 
   /* Mo: the ways to build a workout belong inside the Smart Plan card, with
-     Generate for me in the middle of it and the rest directly under. So the
-     card is now the whole build surface: the reading at the top, what you can
-     do about it in the middle, and the detail of the proposal underneath. A
-     coached client has no card (their coach sets the training), so for them
-     these same buttons still render on their own below the question. */
+     the first thing you would do in the middle of it and the rest directly
+     under. So the card is the whole build surface: the reading at the top,
+     what you can do about it in the middle, and, once there is a plan, its
+     detail underneath. A coached client has no card (their coach sets the
+     training), so for them these buttons still render on their own below the
+     question. */
+
+  /* With a plan already made, the first thing you want is to start it, not to
+     make another one. Some of it logged already means you are partway in, so
+     it says so rather than offering to begin something you have begun. */
+  const loggedNow = p.real ? todaysLoggedExerciseNames() : null;
+  const partway = p.real && (TODAY_WORKOUT.exercises || []).some((ex) => loggedNow.has(ex.name.toLowerCase()));
   const actions = `
-    ${coached ? "" : optionCard("chooseGenerateBtn", "wand", "Generate for me",
-        "Built around your goals and stats.", true)}
+    ${coached ? "" : p.real
+      /* Plain apostrophe, not an entity: optionCard escapes its text, so a
+         &rsquo; would print literally. */
+      ? optionCard("chooseBeginBtn", "play", partway ? "Resume workout" : "Begin workout",
+          "Today’s plan, ready when you are.", true)
+      : optionCard("chooseGenerateBtn", "wand", "Generate for me",
+          "Built around your goals and stats.", true)}
     ${optionCard("choosePlanBtn", "pencil",
         coached ? "Log a workout" : "I'll plan my own",
         coached ? "Record the session your coach set." : "Start from scratch and add your own exercises.",
-        coached)}
-    ${optionCard("chooseWeekBtn", "checklist", "Plan your week",
-        "Put saved workouts on the days you will do them.", false)}`;
+        coached)}`;
 
   const preview = coached ? "" : `
     <div class="spp">
       <div class="spp-top">
         <span class="spp-spark">${icon(p.real ? "dumbbell" : "star", 18)}</span>
-        <h3>${p.real ? "Today&rsquo;s Workout" : "Smart Plan Preview"}</h3>
+        ${/* Without a plan this card is not a preview of anything, it is what
+              we think you should train. Mo asked it to say so. */ ""}
+        <h3>${p.real ? "Today&rsquo;s Workout" : "Today&rsquo;s Suggestion"}</h3>
         ${p.real
           /* Only once there is something to customize. Mo: "it wouldn't show me
              customize until I either plan my workout or I generate my workout,
@@ -16421,16 +16433,22 @@ function renderChooseScreen() {
         <p class="spp-tagline">${escapeHtml(matchReading(p.match))} ${infoDot("planMatch", "How the match is worked out")}</p>
         <hr class="spp-hr" />
         <div class="spp-actions">${actions}</div>
+        ${/* Only a real plan has real numbers. As a suggestion these were a
+              duration averaged from past sessions and equipment read off what
+              you happened to lift lately, presented in the same bold type as
+              facts about a workout that exists. Mo: they should not be there
+              until the plan is. */ ""}
+        ${p.real ? `
         <hr class="spp-hr" />
         <div class="spp-grid">
           ${p.duration ? `<div class="spp-fact"><div class="k">Duration</div><div class="v">${escapeHtml(p.duration)}</div></div>` : ""}
-          ${p.real ? `<div class="spp-fact"><div class="k">Exercises</div><div class="v">${p.count}</div></div>` : ""}
-          ${p.equipment ? `<div class="spp-fact${p.real ? "" : " wide"}"><div class="k">Equipment</div><div class="v">${escapeHtml(p.equipment)}</div></div>` : ""}
+          <div class="spp-fact"><div class="k">Exercises</div><div class="v">${p.count}</div></div>
+          ${p.equipment ? `<div class="spp-fact wide"><div class="k">Equipment</div><div class="v">${escapeHtml(p.equipment)}</div></div>` : ""}
           <div class="spp-fact wide">
             <div class="k">Target muscles</div>
             <div class="spp-chips">${p.targets.map((t) => `<span class="spp-chip">${escapeHtml(t)}</span>`).join("")}</div>
           </div>
-        </div>
+        </div>` : ""}
       </div>
     </div>`;
 
@@ -16443,6 +16461,11 @@ function renderChooseScreen() {
       ? `<p class="build-q">${escapeHtml(coachName)} sets your training. Log what you did, or add something extra.</p>${actions}`
       : ""}
     ${savedWorkoutsHTML()}
+    ${/* Planning the week is a calendar job, not a "how do I build today's
+          workout" job, so it sits with the calendar rather than in the card.
+          Mo asked for it here. */ ""}
+    ${optionCard("chooseWeekBtn", "checklist", "Plan your week",
+        "Put saved workouts on the days you will do them.", false)}
     ${workoutCalendarHTML()}`;
   wireSavedWorkouts($("workoutContent"));
   wireWorkoutCalendar($("workoutContent"));
@@ -16456,7 +16479,10 @@ function renderChooseScreen() {
      add already live. It used to open the empty manual builder, which is how
      you make a different workout, not how you look at this one. */
   if ($("sppCustomise")) $("sppCustomise").onclick = () => (p.real ? goWorkoutScreen(null) : toManual());
-  if (!coached) $("chooseGenerateBtn").onclick = () => generateWorkout();
+  /* Generate and Begin are the same slot in the card: whichever one this
+     state offers is the one that exists to wire. */
+  if ($("chooseGenerateBtn")) $("chooseGenerateBtn").onclick = () => generateWorkout();
+  if ($("chooseBeginBtn")) $("chooseBeginBtn").onclick = startWorkout;
   $("choosePlanBtn").onclick = toManual;
   $("chooseWeekBtn").onclick = () => goWorkoutScreen("week");
 
