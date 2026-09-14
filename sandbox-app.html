@@ -1907,26 +1907,29 @@
        treat a swipe as its own edge-navigation gesture. */
     touch-action: pan-y;
   }
-  /* The strip he speaks from is reserved whether or not he is speaking. Mo
-     moved the bubble out of the column because taking a row only while
-     talking made the figure jump 343 to 303 and back on every line, and he
-     was right about that. But overlaying it assumes the top of the stage is
-     empty, which is true of a bench press and false of every standing pose:
-     a resting figure's head sits exactly where the bubble goes, and it did.
-     Reserving the strip permanently is the version with neither problem. The
-     figure is a little smaller than it was, always, and never moves. */
+  /* The strip he speaks from is reserved whether or not he is speaking, and
+     it is at the BOTTOM of the stage, under him and just above the sheet.
+     Reserved rather than overlaid because overlaying assumes the stage has an
+     empty edge, which is true of a bench press and false of every standing
+     pose; a resting figure was covered from the shoulders up. Reserving means
+     the figure never moves or resizes when he opens his mouth, which was the
+     other failure mode.
+     Under him rather than over him because Mo asked to see it there and it is
+     plainly better: the figure gets the whole top of the stage, so he stands
+     up near the exercise name with some presence instead of being tucked
+     under a caption. */
   .sess-stage-main {
     position: relative; flex: 1 1 auto; min-height: 0;
     display: flex; align-items: center; justify-content: center;
-    padding-top: var(--quip-strip, 86px);
+    padding-bottom: var(--quip-strip, 86px);
   }
   /* A layer, not a row: taking it out of the column is the whole fix. Clicks
      pass through the empty parts so nothing behind it goes dead. */
   .sess-quip-slot {
-    position: absolute; left: 0; right: 0; top: 0; z-index: 4;
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
     height: var(--quip-strip, 86px);
-    display: flex; align-items: flex-start; justify-content: flex-start;
-    padding: 8px 14px 0;
+    display: flex; align-items: flex-end; justify-content: flex-start;
+    padding: 0 14px 10px;
     pointer-events: none;
   }
   .sess-quip-slot > * { pointer-events: auto; }
@@ -1985,7 +1988,7 @@
      that lands fully formed reads as a notification, one that arrives a
      character at a time reads as somebody talking to you. */
   .sess-quip {
-    display: flex; align-items: flex-start; gap: 10px;
+    display: flex; align-items: flex-end; gap: 10px;
     max-width: min(100%, 288px); padding: 0; border: 0; background: none;
     font-family: inherit; text-align: left; cursor: pointer;
     animation: quipIn .34s cubic-bezier(.22,1,.36,1) both;
@@ -1998,7 +2001,9 @@
   }
   .sess-quip-bub {
     min-width: 0; background: #fff; border: 1px solid rgba(17,19,24,.10);
-    border-radius: 16px 16px 16px 5px; padding: 9px 13px 10px;
+    /* Notch at the TOP corner, on the avatar's side: the bubble now sits
+       below him, so a tail pointing down would read as the sheet talking. */
+    border-radius: 5px 16px 16px 16px; padding: 9px 13px 10px;
     box-shadow: 0 10px 24px -14px rgba(11,13,17,.45);
   }
   .sess-quip-who {
@@ -5437,7 +5442,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.14.7";
+const APP_VERSION = "2026.09.14.8";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
