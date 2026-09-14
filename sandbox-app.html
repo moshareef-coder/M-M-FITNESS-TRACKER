@@ -2079,6 +2079,19 @@
   .sess-chip.done { background: var(--accent); color: var(--on-accent); border-color: transparent; }
   .sess-chip.current { background: var(--bg); border-color: var(--accent); color: var(--accent-ink); }
   .sess-chip:not(:disabled):active { transform: scale(.94); }
+  /* A warm-up chip says warm-up. "W" was a letter you had to be told the
+     meaning of, sitting in a row of numbers that meant something else. The
+     flame is the mark the rest of the app already uses for preparation, and
+     the blue is the same blue the warm-up and cool-down blocks wear, so a
+     glance at the row separates what is rehearsal from what is the workout. */
+  .sess-chip.warm {
+    color: var(--stretch-ink);
+    background: color-mix(in srgb, var(--stretch) 14%, var(--panel-2));
+  }
+  .sess-chip.warm.done {
+    background: var(--stretch); color: var(--on-stretch);
+  }
+  .sess-chip.warm svg { opacity: .95; }
   /* A banked set is a tick, not a number and never a lime W: once it is behind
      you the only thing worth saying is that it is done, and the position in the
      row already says which one it was. The label lives on in aria-label. */
@@ -5440,7 +5453,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.14.9";
+const APP_VERSION = "2026.09.14.10";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -15406,9 +15419,9 @@ function renderSession() {
           aria-label="${SESSION_SHEET_OPEN ? "Hide what is up next" : "Show what is up next"}"><i></i></button>
 
         <div class="sess-chips">
-          ${rungs.map((r, i) => `<button type="button" class="sess-chip${i < rampTicks ? " done" : ""}${justRamp === i ? " just-done" : ""}"
+          ${rungs.map((r, i) => `<button type="button" class="sess-chip warm${i < rampTicks ? " done" : ""}${justRamp === i ? " just-done" : ""}"
             data-ramp="${i}" title="Warm-up, ${escapeHtml(rampRungLabel(r))}"
-            aria-label="Warm-up ${i + 1}, ${escapeHtml(rampRungLabel(r))}, ${i < rampTicks ? "done" : "not done"}">${i < rampTicks ? CHIP_TICK : "W"}</button>`).join("")}
+            aria-label="Warm-up ${i + 1}, ${escapeHtml(rampRungLabel(r))}, ${i < rampTicks ? "done" : "not done"}">${i < rampTicks ? CHIP_TICK : icon("flame", 18)}</button>`).join("")}
           ${setsDone.map((done, i) => {
             const isCurrent = i === currentSet;
             return `<button type="button" class="sess-chip${done ? " done" : ""}${isCurrent ? " current" : ""}${justSet === i ? " just-done" : ""}"
@@ -18357,12 +18370,63 @@ function planMobility() {
 
 /* The ramp for one lift, by name, or null. A swapped exercise finds nothing,
    which is right: the ramp was built from the weight of the lift it replaced. */
+/* How much of the ramp to actually show. The engine plans the whole ladder and
+   it is right to, but four rungs on every lift is not what warming up means,
+   and on the session screen they outnumbered the sets that count. Mo sent the
+   rule the lifting sources agree on, and this is it:
+
+     full ladder   the first lift of the day, and heavy compound lifts, where
+                   the joints and the pattern both need rehearsing
+     one feeler    a lift whose muscles an earlier lift already warmed
+     none          isolation work late in a session, and any set of fifteen or
+                   more, where the first easy reps ARE the warm-up
+
+   Trimmed here rather than at the session because this is the single door
+   every screen reads a ramp through, so the plan, the reveal and the session
+   cannot end up quoting different ladders. Nothing is invented: the rungs are
+   the engine's own, this only decides how many of them are worth your time. */
+const RAMP_COMPOUND = /squat|deadlift|bench|overhead press|shoulder press|military|row\b|pull.?up|chin.?up|dip\b|clean|snatch|thrust|lunge|leg press|front press|push press/i;
+const RAMP_ISOLATION = /curl|pushdown|extension|raise|fly|flye|shrug|calf|crunch|kickback|pull.?over|face pull|lateral/i;
+
+function rampRungsWanted(name) {
+  const list = TODAY_WORKOUT?.exercises || [];
+  const want = String(name || "").trim().toLowerCase();
+  const idx = list.findIndex((e) => String(e?.name || "").trim().toLowerCase() === want);
+  const ex = idx >= 0 ? list[idx] : null;
+  const reps = Number(ex?.reps) || 0;
+
+  // Fifteen or more reps warms itself on the way up. Nothing to add.
+  if (reps >= 15) return 0;
+
+  const first = idx === 0;
+  const compound = RAMP_COMPOUND.test(name);
+  const isolation = !compound && RAMP_ISOLATION.test(name);
+
+  /* Already warm: any earlier lift today that trains one of the same primary
+     muscles. That is the difference between the first chest press of the day
+     and the third. */
+  let warm = false;
+  if (idx > 0) {
+    const mine = new Set(classifyMuscles(name)?.primary || []);
+    warm = list.slice(0, idx).some((e) => (classifyMuscles(e?.name || "")?.primary || []).some((m) => mine.has(m)));
+  }
+
+  if (isolation && (warm || !first)) return 0;
+  if (first || (compound && !warm)) return 4;    // the engine rarely writes more
+  return 1;
+}
+
 function rampForExercise(list, name) {
   const want = String(name || "").trim().toLowerCase();
   if (!want) return null;
   const found = (Array.isArray(list) ? list : [])
     .find((r) => String(r?.exercise || "").trim().toLowerCase() === want);
-  return found && Array.isArray(found.sets) && found.sets.length ? found : null;
+  if (!found || !Array.isArray(found.sets) || !found.sets.length) return null;
+  const wanted = rampRungsWanted(name);
+  if (!wanted) return null;
+  // The heaviest rungs are the useful ones: they rehearse the working weight.
+  const sets = found.sets.slice(-wanted);
+  return { ...found, sets };
 }
 
 /* One ramp said as loads, which is the part worth reading: "bar × 8 · 40 × 5".
