@@ -3461,6 +3461,15 @@
   .spp-read-txt { flex: 1; min-width: 0; }
   .spp-read-txt b { display: block; font-size: 15px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.015em; }
   .spp-read-txt span { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.4; margin-top: 3px; }
+  /* One bar per muscle the session actually trains. The single percentage says
+     how good a fit the workout is; these say which part of it is the reason,
+     which is the question the number always prompted and never answered. */
+  .spp-bars { display: flex; flex-direction: column; gap: 8px; }
+  .spp-bar-top { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; font-weight: 700; margin-bottom: 3px; }
+  .spp-bar-top i { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .spp-track { height: 5px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+  .spp-track i { display: block; height: 100%; border-radius: 3px; }
+  .spp-why { margin: 0 0 14px; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
   .spp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
   .spp-fact { min-width: 0; }
   .spp-fact.wide { grid-column: 1 / -1; }
@@ -5291,7 +5300,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.13.24";
+const APP_VERSION = "2026.09.13.25";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -8656,10 +8665,11 @@ const INFO_TOPICS = {
     ],
   }),
   planMatch: () => ({
-    eyebrow: "The freshness figure",
+    eyebrow: "The match figure",
     paras: [
-      "How much room the muscles in this session have left, compared with whichever area you have worked hardest so far this week. Once a workout exists it is measured off that workout's own exercises; before one exists it scores the focus we are proposing.",
-      "It is not a grade on the workout. A low number means those muscles have already had a lot this week, so expect less than your best numbers, go lighter, or swap the focus. A high number means they are rested.",
+      "How well this session fits what your body has room for right now. Every muscle the workout trains is scored against whichever single muscle you have worked hardest this week, and the match is the average. High means the session lands on what your week has had least of.",
+      "It is scored on the exact muscles the workout trains, not on the broad area they belong to. That matters: a push day works your triceps, and charging it for a week of bicep curls made a well chosen session look like a bad one.",
+      "A low number is a caution rather than a failure. It means most of this has had work already, so go lighter or swap the focus.",
     ],
   }),
   calendarKey: () => ({
@@ -15982,20 +15992,13 @@ function planFromToday() {
      session lands on what the week has trained least. A plan that hits your
      most neglected regions scores high; one more chest day in a chest-heavy
      week scores low. It is a claim about balance, not about quality. */
-  const vols = computeMuscleVolume(ME, 0);
-  const regionVol = Object.entries(REGION_MUSCLES).map(([name, muscles]) => ({
-    name, volume: muscles.reduce((sum, m) => sum + (vols[m] || 0), 0),
-  }));
-  const heaviest = Math.max(...regionVol.map((r) => r.volume), 0);
-  const hit = regionVol.filter((r) => REGION_MUSCLES[r.name].some((m) => counts[m]));
-  const restedness = heaviest > 0 && hit.length
-    ? 1 - (hit.reduce((sum, r) => sum + r.volume, 0) / (hit.length * heaviest))
-    : 1;
+  const md = matchDetail(counts);
 
   return {
     real: true,
     focus: displayFocus(TODAY_WORKOUT.focus, list),
-    match: Math.max(35, Math.min(99, Math.round(restedness * 100))),
+    match: md.match,
+    muscles: md.muscles,
     duration: `${Math.max(10, mins - 5)}-${mins + 5} min`,
     equipment: kit.length ? kit.join(", ") : null,
     targets,
@@ -16005,21 +16008,44 @@ function planFromToday() {
   };
 }
 
-/* The figure is restedness: how much room the target muscles have left
-   relative to the region you have hammered hardest this week. It was labelled
-   "Match", which reads as a grade on the plan the app just built for you, so a
-   perfectly sensible session came back as "41% Match" and looked like a bad
-   recommendation. It is not a fit score, it is a freshness score, and a low
-   one is a caution rather than a failure. Labelled and worded accordingly. */
-function freshReading(pct) {
-  if (pct >= 75) return { title: "Fresh and ready", body: "These muscles have had a proper rest since you last worked them." };
-  if (pct >= 55) return { title: "Good to go", body: "Some overlap with earlier this week, but nothing that should hold you back." };
-  if (pct >= 40) return { title: "Partly worked already", body: "You have hit some of this recently. Expect less than your best numbers." };
-  return { title: "Still recovering", body: "These muscles are the ones you have worked hardest this week. Go lighter, or swap the focus." };
+/* Match: how well this session fits what the body has room for right now.
+   High is good, which is the whole point of showing it.
+
+   It used to be scored on whole REGIONS while the workout targets individual
+   MUSCLES, and that broke it. A push day trains triceps and traps, which live
+   in the Arms and Back regions, so the score charged the session for every
+   bicep curl and every row logged that week. Measured on the paired fixture:
+   the workout actually trains chest 4, triceps 2, shoulders 2, traps 3, all
+   light, yet it was billed for Arms 14 and Back 15 and came out at
+   1 - (34 / (4 * 15)) = 41%. The app had picked the two areas its own Body tab
+   calls "ready" and then graded itself a failure for volume it was not doing.
+
+   Scored per muscle against the single most-worked muscle of the week, the
+   same session reads 68%, which is the honest number and agrees with the Body
+   tab instead of contradicting it. */
+function matchDetail(counts) {
+  const vols = computeMuscleVolume(ME, 0);
+  const trained = Object.keys(counts || {});
+  const peak = Math.max(...Object.values(vols), 0);
+  if (!trained.length) return { match: 99, muscles: [] };
+  const pretty = { lowerback: "Lower back", abs: "Core", obliques: "Obliques" };
+  const muscles = trained.map((m) => ({
+    name: pretty[m] || m.charAt(0).toUpperCase() + m.slice(1),
+    fresh: peak > 0 ? Math.max(0, Math.min(100, Math.round((1 - (vols[m] || 0) / peak) * 100))) : 100,
+  })).sort((a, b) => b.fresh - a.fresh);
+  const match = Math.round(muscles.reduce((s, x) => s + x.fresh, 0) / muscles.length);
+  return { match: Math.max(35, Math.min(99, match)), muscles: muscles.slice(0, 4) };
+}
+
+function matchReading(pct) {
+  if (pct >= 80) return "Everything here is rested. Good day to push.";
+  if (pct >= 65) return "Lands on what your week has had least of.";
+  if (pct >= 50) return "Reasonable fit. Some of this has had work already.";
+  return "Most of this is already worked. Go lighter, or swap the focus.";
 }
 function freshTone(pct) {
-  if (pct >= 55) return "var(--accent)";
-  if (pct >= 40) return "var(--warn)";
+  if (pct >= 65) return "var(--accent)";
+  if (pct >= 45) return "var(--warn)";
   return "var(--up)";
 }
 
@@ -16041,10 +16067,12 @@ function planPreview() {
   const pick = regions.slice(0, 2);
   const focus = pick.map((r) => r.name).join(" & ");
 
-  const restedness = heaviest > 0
-    ? 1 - (pick.reduce((s, r) => s + r.volume, 0) / (pick.length * heaviest))
-    : 1;
-  const match = Math.max(35, Math.min(99, Math.round(restedness * 100)));
+  /* Same per-muscle scoring as a real plan, so the proposal and the workout it
+     turns into cannot quote two different numbers. */
+  const proposed = {};
+  for (const r of pick) for (const m of r.muscles) proposed[m] = 1;
+  const md = matchDetail(proposed);
+  const match = md.match;
 
   // Duration from the user's own finished sessions, not a guess.
   const durations = (ALL_PLANS || [])
@@ -16073,6 +16101,7 @@ function planPreview() {
   return {
     focus,
     match,
+    muscles: md.muscles,
     duration: avg ? `${Math.max(15, avg - 5)}-${avg + 5} min` : null,
     equipment: kit.length ? kit.join(", ") : null,
     targets,
@@ -16319,13 +16348,18 @@ function renderChooseScreen() {
         <div class="spp-read">
           <div class="spp-ring">
             ${ringSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 84)}
-            <div class="spp-ring-num"><b>${p.match}%</b><i>Fresh</i></div>
+            <div class="spp-ring-num"><b>${p.match}%</b><i>Match</i></div>
           </div>
           <div class="spp-read-txt">
-            <b>${escapeHtml(freshReading(p.match).title)}</b>
-            <span>${escapeHtml(freshReading(p.match).body)} ${infoDot("planMatch", "How this is worked out")}</span>
+            ${(p.muscles || []).length ? `<div class="spp-bars">${p.muscles.map((m) => `
+              <div class="spp-bar">
+                <div class="spp-bar-top"><span>${escapeHtml(m.name)}</span><i>${m.fresh}%</i></div>
+                <div class="spp-track"><i style="width:${Math.max(3, m.fresh)}%;background:${freshTone(m.fresh)}"></i></div>
+              </div>`).join("")}</div>`
+              : `<span>${escapeHtml(matchReading(p.match))}</span>`}
           </div>
         </div>
+        <p class="spp-why">${escapeHtml(matchReading(p.match))} ${infoDot("planMatch", "How the match is worked out")}</p>
         <div class="spp-grid">
           <div class="spp-fact"><div class="k">Focus</div><div class="v">${escapeHtml(p.focus)}</div></div>
           ${p.duration ? `<div class="spp-fact"><div class="k">Duration</div><div class="v">${escapeHtml(p.duration)}</div></div>` : ""}
