@@ -95,13 +95,56 @@ const VOLUME_SLACK = 2;
 
 /* The time budget. `P.sessionMin` has existed since the first version and only
    the display ever read it, so a strength day of six lifts at six sets and three
-   minutes of rest printed "~60 min" over something closer to two hours. A set is
-   about 30 seconds of actual work, the rest interval is already prescribed per
-   exercise, and 5 minutes covers getting warm. 15% over is the tolerance,
-   because the estimate is an estimate and trimming a session for one minute is
-   worse than the minute. Nothing goes below four exercises (PLAN.md's contract
-   with the app) and a main movement is never the thing that goes. */
-const REP_SECONDS = 30;
+   minutes of rest printed "~60 min" over something closer to two hours. 15% over
+   is the tolerance, because the estimate is an estimate and trimming a session
+   for one minute is worse than the minute. Nothing goes below four exercises
+   (PLAN.md's contract with the app) and a main movement is never the thing that
+   goes.
+
+   What a set costs, 2026-09-14. Until today a set was a flat thirty seconds
+   plus its rest, and nothing else in the visit was counted, so a five exercise
+   beginner day printed "About 21 min" over something closer to half an hour.
+   Mo, on his own plan: "it says 6 min for warm up, 5 min for cool down and
+   then I have 5 exercises and it says I can finish it in 20 mins, like no I
+   can't." The minutes now come from what a person actually does at the rack:
+
+     work        SET_SETUP_SECONDS + REP_SECONDS x reps. Ten seconds to get
+                 under the bar, set the grip and unrack, then about four seconds
+                 a rep at a controlled tempo. Eight reps is 42 seconds, fifteen
+                 is 70, which is what a timed set of either really reads.
+     rest        the prescribed interval, between sets, so (sets - 1) of them.
+                 The rest after the LAST set of a movement is not a rest, it is
+                 the walk to the next station, and that is charged as:
+     transition  TRANSITION_SECONDS per exercise. Re-racking, walking, loading
+                 the next bar, adjusting a seat. Measured sessions put this at a
+                 minute to a minute and a half; 75 is the middle.
+     logging     LOG_SECONDS per set, for ticking the set in the app. It
+                 overlaps the rest some of the time and not all of it.
+     warm-up     `prepMinutes`, the general block plus the ramp, unchanged.
+     cool-down   on top, see COOLDOWN_MIN and `overClock`.
+
+   Worked example, so the number can be checked by reading: five exercises at
+   three sets of ten with 90 seconds rest, a six minute warm-up and a five
+   minute cool-down.
+     work        15 sets x (10 + 4 x 10) = 750 s
+     logging     15 sets x 10             = 150 s
+     rest        5 x 2 x 90               = 900 s
+     transitions 5 x 75                   = 375 s
+     lifting                              = 2175 s = 36.25 min
+     + warm-up 6 = 42.25, rounds to 42 for `estimatedMinutes`
+     + cool-down 5 = 47 for the whole visit.
+   The old arithmetic said 6 + 15 x 120 / 60 = 36 for the same day.
+
+   index.html mirrors these four numbers in `sessionEstimateMinutes` so the
+   card and the clock the plan was built to are the same arithmetic. Change
+   one, change both. */
+const SET_SETUP_SECONDS = 10;
+const REP_SECONDS = 4;
+const LOG_SECONDS = 10;
+const TRANSITION_SECONDS = 75;
+/* A rep count outside this is a typo or a timed hold written as reps, and
+   either way it is not four seconds a rep, so the work time is clamped. */
+const REPS_COSTED_MAX = 30;
 /* Six, matching mobility.mjs WARMUP_SECONDS. These two numbers are the same
    minutes counted twice: this one reserves them inside the session estimate,
    that one fills them with moves. They were 5 and 5; research/13 moved the
@@ -113,6 +156,15 @@ const REP_SECONDS = 30;
    ramp on top of it. `prepMinutesFor` below is the one place the two halves are
    added up, and `estimateMinutes` reserves whatever it says. */
 const WARMUP_MIN = Math.round(WARMUP_SECONDS / 60);
+/* The nominal cool-down, and it is now inside every clock check. The fill pass
+   has always reasoned that "the person named how long they are in the gym, not
+   how long the middle of it is" and counted these five minutes against the
+   budget; the trim ladder did not, so a 30 minute answer built a 30 minute
+   working session and the app then printed 35 over it. One rule now: the
+   budget is the whole visit. `estimatedMinutes` itself still excludes the
+   cool-down (CONTRACT.md: the visit is `estimatedMinutes + cooldownMinutes`)
+   so that number keeps meaning what it always meant. */
+const COOLDOWN_MIN = Math.round(COOLDOWN_SECONDS / 60);
 const TIME_TOLERANCE = 1.15;
 
 /* The three numbers the person's own clock needs, and none of them are read
@@ -120,8 +172,9 @@ const TIME_TOLERANCE = 1.15;
 
    15 and 120 are the clamp on what a slider may send. Below 15 there is no
    session at all: four movements at the smallest prescription this engine has,
-   two sets and the shortest rest it will allow, is 21 minutes with the warm-up,
-   so anything under that is a number the plan can only fail to meet. Above 120
+   two sets and the shortest rest it will allow, is about 25 minutes once the
+   warm-up and cool-down are in, so anything under that is a number the plan can
+   only fail to meet. Above 120
    nothing changes, because the volume ceilings stop the fill pass long before
    the clock does; the ceiling is there so a typed 6000 does not turn into a
    loop that adds sets until MRV catches it one at a time.
@@ -201,7 +254,7 @@ const REST_FLOOR_SEC = 45;
    and therefore the only array calibrate.mjs can join against. That separation
    is the whole reason these live on their own key.
 
-   Fifteen seconds a set rather than the REP_SECONDS 30 a working set costs: two
+   Fifteen seconds a set rather than the setup and reps a working set costs: two
    light reps off a rack is not thirty seconds of work, and the rests are what
    the ramp actually spends. A full four set ramp comes to about four and a half
    minutes, which is research/13's "about three to four" plus the rest before
@@ -250,9 +303,29 @@ function prepMinutesFor(day) {
   return Math.round((RAMPED_WARMUP_SECONDS + rampSec) / 60);
 }
 
-function estimateMinutes(exercises, prepMinutes = WARMUP_MIN) {
-  const seconds = exercises.reduce((t, e) => t + e.sets * (REP_SECONDS + e.restSec), 0);
-  return Math.round(prepMinutes + seconds / 60);
+/* The lifting itself, in seconds, costed the way the comment on REP_SECONDS
+   lays out. Exported so test.mjs asserts the same arithmetic rather than a
+   copy of it, and so a reader of index.html's mirror has one place to check. */
+export function setWorkSeconds(reps) {
+  const r = Math.min(REPS_COSTED_MAX, Math.max(1, Math.round(Number(reps) || 0) || 1));
+  return SET_SETUP_SECONDS + REP_SECONDS * r;
+}
+export function exerciseSeconds(e) {
+  const sets = Math.max(0, Math.round(Number(e?.sets) || 0));
+  if (!sets) return 0;
+  const rest = Math.max(0, Number(e.restSec) || 0);
+  return sets * (setWorkSeconds(e.reps) + LOG_SECONDS) + (sets - 1) * rest + TRANSITION_SECONDS;
+}
+export function sessionSeconds(exercises) {
+  return (exercises || []).reduce((t, e) => t + exerciseSeconds(e), 0);
+}
+export function estimateMinutes(exercises, prepMinutes = WARMUP_MIN) {
+  return Math.round(prepMinutes + sessionSeconds(exercises) / 60);
+}
+/* Whether a day runs past its clock, with the cool-down counted. Every trim,
+   fill and ramp decision measures against this one line. */
+function overClock(estimate, budgetMinutes) {
+  return estimate + COOLDOWN_MIN > budgetMinutes * TIME_TOLERANCE;
 }
 
 /* The ramp for one lift, or null when there is nothing to ramp.
@@ -375,7 +448,7 @@ function addSecondMainRamps(week, roleOf) {
     if (!r) continue;
     const withIt = [...d.rampSets, r];
     const prep = prepMinutesFor({ rampSets: withIt });
-    if (estimateMinutes(d.exercises, prep) > d.minutes * TIME_TOLERANCE) continue;
+    if (overClock(estimateMinutes(d.exercises, prep), d.minutes)) continue;
     d.rampSets = withIt;
     d.prepMinutes = prep;
     d.rampMinutes = Math.round(withIt.reduce((t, x) => t + x.seconds, 0) / 60);
@@ -1099,7 +1172,7 @@ export function buildPlan({
   if (askedMinutes !== null && askedMinutes !== Math.round(rawAsked)) {
     dayNotes.push(askedMinutes === SESSION_MIN_FLOOR
       ? `You asked for ${Math.round(rawAsked)} minutes a session. There is no session that short: four movements at `
-        + `two sets and the shortest rest worth calling rest is about 21 minutes once the warm-up is in, so the plan `
+        + `two sets and the shortest rest worth calling rest is about 25 minutes once the warm-up and cool-down are in, so the plan `
         + `is built for ${askedMinutes} and tells you when a day still runs over.`
       : `You asked for ${Math.round(rawAsked)} minutes a session. The plan is built for ${askedMinutes}, because past `
         + `that the limit stops being the clock and starts being what a week can recover from.`);
@@ -1405,7 +1478,7 @@ export function buildPlan({
   const lastIndex = (list, ok) => { for (let i = list.length - 1; i >= 0; i--) if (ok(list[i], i)) return i; return -1; };
   for (const d of week) {
     let estimate = estimateMinutes(d.exercises, d.prepMinutes);
-    const overBudget = () => estimate > d.minutes * TIME_TOLERANCE;
+    const overBudget = () => overClock(estimate, d.minutes);
     while (overBudget()) {
       const shave = lastIndex(d.exercises, (e) => roleOf.get(e) === "accessory" && !e.priority && e.sets > SHORT_DAY_SETS);
       if (shave >= 0) {
@@ -1547,7 +1620,7 @@ export function buildPlan({
         }
         if (!best) break;
         best.sets += 1;
-        if (estimateMinutes(d.exercises, d.prepMinutes) > d.minutes * TIME_TOLERANCE) { best.sets -= 1; break; }
+        if (overClock(estimateMinutes(d.exercises, d.prepMinutes), d.minutes)) { best.sets -= 1; break; }
         timeAdded.set(`${d.name}|${best.name}`, { day: d.name, exercise: best.name, group: best.group, to: best.sets });
       }
       d.estimatedMinutes = estimateMinutes(d.exercises, d.prepMinutes);
@@ -1668,7 +1741,7 @@ export function buildPlan({
           setRest(next);
           const est = estimateMinutes(d.exercises, d.prepMinutes);
           /* One step too far is undone rather than accepted. */
-          if (est > d.minutes * TIME_TOLERANCE) { setRest(factor); break; }
+          if (overClock(est, d.minutes)) { setRest(factor); break; }
           d.estimatedMinutes = est;
           factor = next;
         }
@@ -1743,7 +1816,7 @@ export function buildPlan({
      where the two are added. And the old closing advice, "spend the rest on a
      longer warm-up", is gone: research/13 says a longer warm-up costs
      performance, so the engine should not have been recommending one. */
-  const longestDay = week.reduce((m, d) => Math.max(m, d.estimatedMinutes), 0);
+  const longestDay = week.reduce((m, d) => Math.max(m, d.estimatedMinutes + COOLDOWN_MIN), 0);
   if (askedMinutes !== null && askedMinutes > P.sessionMin && longestDay < askedMinutes * 0.8) {
     dayNotes.push(`You have ${askedMinutes} minutes and the longest day here needs about ${longestDay}. That is not the `
       + `plan being lazy: more sets than this is past what your level recovers from in a week, and volume you cannot `
@@ -1769,17 +1842,17 @@ export function buildPlan({
      three sets and the shortest rest it will prescribe, and the honest thing to
      say is that the budget is smaller than any real session of this goal. */
   const overBudget = week
-    .filter((d) => d.estimatedMinutes > d.minutes * TIME_TOLERANCE)
+    .filter((d) => overClock(d.estimatedMinutes, d.minutes))
     .map((d) => ({
-      day: d.name, estimatedMinutes: d.estimatedMinutes, budget: d.minutes,
+      day: d.name, estimatedMinutes: d.estimatedMinutes, totalMinutes: d.estimatedMinutes + COOLDOWN_MIN, budget: d.minutes,
       why: askedMinutes === null
         /* "you asked for" is wrong on this branch and always was: `askedMinutes`
            is null here, so the number is the goal's own, not theirs. It went
            unnoticed while every goal length was a round 45 or 60; the ramp made
            them 46 and 63 and a conspicuous number in a sentence that misnames
            where it came from is worth one word. */
-        ? `${d.name} comes to about ${d.estimatedMinutes} minutes against the ${d.minutes} this goal is built around. Everything left on it is a main lift, so the time goes to the rest between sets.`
-        : `${d.name} still comes to about ${d.estimatedMinutes} minutes against the ${d.minutes} you asked for, and that is `
+        ? `${d.name} comes to about ${d.estimatedMinutes + COOLDOWN_MIN} minutes with the cool-down, against the ${d.minutes} this goal is built around. Everything left on it is a main lift, so the time goes to the rest between sets.`
+        : `${d.name} still comes to about ${d.estimatedMinutes + COOLDOWN_MIN} minutes with the cool-down, against the ${d.minutes} you asked for, and that is `
           + `after the sets came down and the rest with them. This goal cannot honestly be done in ${d.minutes} minutes: `
           + `give it the extra or pick a goal with shorter rests.`,
     }));

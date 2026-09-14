@@ -21,7 +21,7 @@ import { dirname, join } from "node:path";
 import { deriveTrainingAge, observedCapacity, THRESHOLDS, detectPlateau } from "./training-age.mjs";
 import { resolveGoal, GOAL_PARAMS, MAX_SECONDARY_GOALS, MOVEMENT_CLASSES, barredMovements, movementCautionNotes } from "./goal-engine.mjs";
 import { coldStart1RM, prescribeLoad, patternFor, variantFactor, roundLoad } from "./load.mjs";
-import { buildPlan } from "./plan.mjs";
+import { buildPlan, estimateMinutes, sessionSeconds } from "./plan.mjs";
 import { conjunctiveWeek, chooseComparison, sharedSchedule, relativeScore, PRODUCTIVE_GAP } from "./pair.mjs";
 
 import { normalizeFocus, parseFocus, mergePriority, focusFreshness, MUSCLE_GROUPS, TIERS, TIER_COST, FOCUS_BUDGET } from "./focus.mjs";
@@ -2514,9 +2514,18 @@ test("a group the split touches once a week says so instead of reporting a short
   /* And it reaches the person rather than only the ledger. */
   assert.ok(out.notes.some((n) => /top out below what your level/.test(n)), "a dayNote says it out loud");
   /* A capped group is not also reported as a shortfall the week could have
-     closed: that was the double-counting the finding is about. */
+     closed: that was the double-counting the finding is about. The one way a
+     group can honestly be both is the clock: since the costing of 2026-09-14
+     an advanced push day of five lifts at six sets no longer pretends to fit
+     61 minutes, so the ladder shaves the last accessory and that group ends
+     under the split's own ceiling. Both are then true statements with
+     different causes, and the invariant is that "both" only ever means the
+     clock took it below what the split could deliver. */
   for (const u of out.plan.volumeNotes.under) {
-    assert.ok(!capped.some((c) => c.group === u.group), `${u.group} is either capped or short, never filed as both`);
+    const cap = capped.find((c) => c.group === u.group);
+    if (!cap) continue;
+    assert.ok(u.planned < cap.target,
+      `${u.group} is filed as both, so the clock must have taken it under the ${cap.target} the split delivers, not the split itself`);
   }
 });
 
@@ -2779,12 +2788,21 @@ test("a short answer takes sets off the mains before it touches the rest, and ne
     logs: longHistory(78),
   });
   const day = plan.week[0];
-  assert.ok(day.estimatedMinutes <= 30 * 1.15, `${day.estimatedMinutes} against 30`);
+  /* The clock is the whole visit now, cool-down included (plan.mjs overClock). */
+  assert.ok(day.estimatedMinutes + Math.round(COOLDOWN_SECONDS / 60) <= 30 * 1.15, `${day.estimatedMinutes} against 30`);
   assert.ok(day.exercises.every((e) => e.sets >= 2), "nothing went under the accessory floor");
   /* This is the day the README's known limit was written about: four mains at
-     six sets, 48 minutes against a 25 minute goal. Sets alone buy 30 minutes,
-     so the rest is untouched and nothing is said about it. */
-  assert.deepEqual(plan.volumeNotes.restCompressed, [], "sets alone were enough");
+     six sets against a 25 minute goal. Under the flat thirty seconds a set the
+     engine used to cost with, sets alone bought the 30 minutes and the rest was
+     never touched. Costed honestly (setup, reps, transitions, logging and the
+     cool-down), four mains at the floor of three sets with 75 seconds rest run
+     to about 38 minutes, so the rest lever has to run after them. The claim
+     that survives is the ORDER: rest is only shortened once every set that can
+     come off has come off, so a compressed day has every main at the floor. */
+  if (plan.volumeNotes.restCompressed.length) {
+    assert.ok(day.exercises.every((e) => e.sets <= 3), "rest was only touched after the sets were at the floor");
+    for (const r of plan.volumeNotes.restCompressed) assert.ok(r.toSec >= 45 && r.toSec < r.fromSec);
+  }
 });
 
 test("shortening the rest to make the clock work is said out loud, every time", () => {
@@ -2981,9 +2999,12 @@ test("a ramp is inside the session estimate, never bolted on after it", () => {
       ? Math.round((RAMPED_WARMUP_SECONDS + rampSec) / 60)
       : Math.round(WARMUP_SECONDS / 60);
     assert.equal(d.prepMinutes, expected, `${d.name} reserves what it spends`);
-    const work = d.exercises.reduce((t, e) => t + e.sets * (30 + e.restSec), 0);
-    assert.equal(d.estimatedMinutes, Math.round(d.prepMinutes + work / 60),
+    /* The exported costing rather than a copy of it, so a change to what a set
+       costs is made in one place; the worked example on REP_SECONDS in plan.mjs
+       is where a reader checks the arithmetic itself. */
+    assert.equal(d.estimatedMinutes, Math.round(d.prepMinutes + sessionSeconds(d.exercises) / 60),
       `${d.name}: the estimate is the prep plus the work and nothing else`);
+    assert.equal(d.estimatedMinutes, estimateMinutes(d.exercises, d.prepMinutes));
     /* totalMinutes adds the cool-down and must not add the ramp twice. */
     assert.equal(d.totalMinutes, d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60),
       `${d.name}: the ramp is counted once`);
@@ -3052,7 +3073,11 @@ test("extra time grows the cool-down and never the warm-up", () => {
 
 test("a shorter budget that later gets lighter gives the rest back and says so", () => {
   const goal = { bubble: "get-stronger" };
-  const person = { daysAsked: 4, bodyWeightLb: 180, sex: "Male", sessionMinutes: 30 };
+  /* 35 rather than 30 since the costing of 2026-09-14: at 30 the honest clock
+     leaves a backed-off strength day of four mains no room at all, so there is
+     nothing to repay into. At 35 the back-off frees enough to hand three of the
+     four days their full rest back, which is the mechanism under test. */
+  const person = { daysAsked: 4, bodyWeightLb: 180, sex: "Male", sessionMinutes: 35 };
   /* A week the calibration backs off: everything prescribed, much less logged.
      The back-off takes sets off AFTER the clock compressed the rest, which is
      the only way a day can be both in debt and roomy at the same moment. */

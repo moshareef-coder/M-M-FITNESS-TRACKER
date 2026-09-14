@@ -4213,6 +4213,9 @@
      control needs its own two colours there rather than the card's. */
   .gen-scrim .plan-time { color: rgba(255,255,255,.72); }
   .gen-scrim .plan-time b { color: #fff; }
+  /* What a budget change did, under the control that did it. */
+  .plan-time-change { margin: -2px 0 10px; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
+  .gen-scrim .plan-time-change { margin: 0 0 12px; text-align: center; color: rgba(255,255,255,.72); }
   .exercise-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
   .exercise-row:last-child { border-bottom: none; padding-bottom: 0; }
   .exercise-row .ex-icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; background: var(--panel-2); display: flex; align-items: center; justify-content: center; color: var(--muted); }
@@ -12644,6 +12647,24 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
      plan. */
   const warnings = (Array.isArray(notes) ? notes : [])
     .filter((n) => typeof n === "string" && /stop if it hurts|clinician/i.test(n));
+  /* The whole visit, from the same function the plan card uses. The engine's
+     `estimatedMinutes` leaves the cool-down out by contract, so it is not
+     printed here: a plan that says 39 on the reveal and 45 on the card is the
+     app disagreeing with itself. The blocks are the engine's fresh answer,
+     since the stored row is not what is on screen yet. */
+  const revealBlocks = { warmup: workout.warmup || [], cooldown: workout.cooldown || [], ramp: workout.rampSets || [] };
+  const estMin = sessionEstimateMinutes(workout.exercises, revealBlocks);
+  /* When this reveal is the answer to "how long do you have", say what the
+     answer did. ONE_OFF_SESSION is set before the generate runs and stamped
+     with `made` after it, and this paints on a timer, so either state can be
+     the one it sees: unstamped, or stamped with this very plan. */
+  const forDay = planDate || todayStr();
+  const oneOff = ONE_OFF_SESSION?.date === forDay
+    && (!ONE_OFF_SESSION.made || ONE_OFF_SESSION.made === planSignature(workout.exercises))
+    ? ONE_OFF_SESSION : null;
+  const changeLine = oneOff
+    ? budgetChangeLine(oneOff.from, { exercises: workout.exercises, minutes: estMin }, { restCompressed: session?.restCompressed === true })
+    : "";
   const ramps = workout.rampSets || [];
   /* The one unprompted offer, and it is here rather than in onboarding because
      a limit is a constraint on how a goal gets trained for, not a goal: asking
@@ -12666,14 +12687,9 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
     const dayAfter = new Date(todayStr() + "T00:00:00");
     dayAfter.setDate(dayAfter.getDate() + 1);
     /* The estimate is tappable here too, because this is the moment the
-       question gets asked: the plan and the clock are on screen together. The
-       engine's own number when it sent one, the same arithmetic off the
-       exercises when it did not. Today only, since a day queued ahead has no
-       "today" to be a one-off about, and the card it lands on carries the same
-       control anyway. */
-    const estMin = Number(session?.estimatedMinutes) > 0
-      ? Number(session.estimatedMinutes)
-      : sessionEstimateMinutes(workout.exercises);
+       question gets asked: the plan and the clock are on screen together.
+       Today only, since a day queued ahead has no "today" to be a one-off
+       about, and the card it lands on carries the same control anyway. */
     const canRebudget = forToday && !SESSION && !isCoachedClient() && !!estMin;
     const head = forToday
       ? "Your workout"
@@ -12687,6 +12703,7 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
           ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
         </button>
       </div>` : ""}
+      ${changeLine ? `<p class="plan-time-change" id="genTimeChange">${escapeHtml(changeLine)}</p>` : ""}
       ${warnings.map((n) => `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(n)}</p>`).join("")}
       <div class="gen-rows" id="genRows">
         ${list.map((ex, i) => `
@@ -13140,6 +13157,7 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
        labels, so the goal picker is the only screen that can turn it into a
        sentence with a goal's name in it. Kept here for that. */
     rememberGoalOutcome(data.meta?.goals);
+    LAST_GEN_SESSION = data.meta?.session || null;
 
     /* data.honest is not written here: ai_workouts has no column for it, and
        migrations are owned elsewhere. It lives as long as the reveal sheet
@@ -15931,22 +15949,130 @@ const EQUIPMENT_WORDS = [
 ];
 
 /* What a plan costs in minutes, costed the way the engine costs it:
-   mo-knowledge/engine/plan.mjs `estimateMinutes`, which is thirty seconds of
-   work per set plus that set's own rest, plus the warm-up.
+   mo-knowledge/engine/plan.mjs `estimateMinutes`, and the five numbers below
+   are that file's, mirrored. Change one there, change it here.
+
+   Until 2026-09-14 this was thirty seconds a set plus its rest plus a six
+   minute warm-up, and nothing else in the visit was counted, so Mo's five
+   exercise plan printed "About 21 min" over a session that ran him past
+   thirty: "it says 6 min for warm up, 5 min for cool down and then I have 5
+   exercises and it says I can finish it in 20 mins, like no I can't."
+
+   Per set: ten seconds to get set and about four seconds a rep, so a set of
+   eight is 42 seconds and a set of fifteen is 70. Between sets: the prescribed
+   rest, (sets - 1) of them, because the rest after the LAST set of a movement
+   is the walk to the next station, and that is charged once per exercise as a
+   75 second transition (re-rack, walk, load, adjust the seat). Ten seconds a
+   set for ticking it in the app. Then the warm-up block, the ramp-up sets and
+   the cool-down, each read off the plan's own mobility blocks, so they are
+   counted exactly once and only when the day has them: a skipped block costs
+   nothing and a plan without one carries nothing for it.
+
+   Worked example, five exercises at three sets of ten, 90 seconds rest, a six
+   minute warm-up and a five minute cool-down:
+     work        15 sets x (10 + 4 x 10) = 750 s
+     logging     15 x 10                 = 150 s
+     rest        5 x 2 x 90              = 900 s
+     transitions 5 x 75                  = 375 s
+     lifting                             = 2175 s = 36.25 min
+     + warm-up 6 + cool-down 5           = 47.25, prints 47 min
+   The old arithmetic said 6 + 15 x 120 / 60 = 36 for the same day.
 
    Derived from the exercises rather than read off a stored meta.session, for
    two reasons. ai_workouts has no column for the engine's session block, and a
    stored number would stop being true the moment somebody added, removed,
    swapped or re-dialled a row, all of which are one tap away on the same
    screen. A row the engine never wrote carries no restSec, so the app's own
-   default stands in, which is the fallback the rest timer already uses. */
-const PLAN_REP_SECONDS = 30;   // plan.mjs REP_SECONDS
-const PLAN_WARMUP_MIN = 6;     // plan.mjs WARMUP_MIN
-function sessionEstimateMinutes(list) {
+   default stands in, which is the fallback the rest timer already uses.
+
+   One function, every screen. The reveal, the plan card, the Smart Plan
+   Duration fact, the one-off budget sheet and the "Back to N min" offer all
+   read this and nothing else, so no two screens can print different minutes
+   over the same plan. */
+const PLAN_SET_SETUP_SECONDS = 10;    // plan.mjs SET_SETUP_SECONDS
+const PLAN_REP_SECONDS = 4;           // plan.mjs REP_SECONDS
+const PLAN_LOG_SECONDS = 10;          // plan.mjs LOG_SECONDS
+const PLAN_TRANSITION_SECONDS = 75;   // plan.mjs TRANSITION_SECONDS
+const PLAN_REPS_COSTED_MAX = 30;      // plan.mjs REPS_COSTED_MAX
+function planLiftingSeconds(list) {
+  return (list || []).filter((e) => e && e.name).reduce((t, e) => {
+    const sets = Math.max(0, Math.round(Number(e.sets) || 3));
+    if (!sets) return t;
+    const reps = Math.min(PLAN_REPS_COSTED_MAX, Math.max(1, Math.round(Number(e.reps) || 10)));
+    const rest = Number(e.restSec) > 0 ? Number(e.restSec) : DEFAULT_REST_SEC;
+    return t + sets * (PLAN_SET_SETUP_SECONDS + PLAN_REP_SECONDS * reps + PLAN_LOG_SECONDS)
+      + (sets - 1) * rest + PLAN_TRANSITION_SECONDS;
+  }, 0);
+}
+/* The timed blocks a plan carries, in seconds, honouring today's skips. Takes
+   either shape the app has for them: the stored ai_workouts.mobility row
+   (planMobility) or the engine's fresh answer at the reveal, where the ramp is
+   still called rampSets. Per side doubles, the same way the session runs it. */
+function planBlocksSeconds(mobility) {
+  if (!mobility || typeof mobility !== "object") return { warmup: 0, ramp: 0, cooldown: 0 };
+  const skippedAll = !!mobility.skipped;
+  const skipWarm = mobility.skippedWarmup ?? skippedAll;
+  const skipCool = mobility.skippedCooldown ?? skippedAll;
+  const ramp = Array.isArray(mobility.ramp) ? mobility.ramp : Array.isArray(mobility.rampSets) ? mobility.rampSets : [];
+  return {
+    warmup: skipWarm ? 0 : stretchBlockSeconds(mobility.warmup),
+    ramp: ramp.reduce((t, r) => t + (Number(r?.seconds) || 0), 0),
+    cooldown: skipCool ? 0 : stretchBlockSeconds(mobility.cooldown),
+  };
+}
+function sessionEstimateMinutes(list, mobility = planMobility()) {
   const ex = (list || []).filter((e) => e && e.name);
   if (!ex.length) return null;
-  const seconds = ex.reduce((t, e) => t + (e.sets || 3) * (PLAN_REP_SECONDS + (Number(e.restSec) || DEFAULT_REST_SEC)), 0);
-  return Math.round(PLAN_WARMUP_MIN + seconds / 60);
+  const b = planBlocksSeconds(mobility);
+  return Math.round((planLiftingSeconds(ex) + b.warmup + b.ramp + b.cooldown) / 60);
+}
+
+/* One plain sentence about what a budget change did, measured off the two
+   lists rather than asserted. Needed because the engine's ladder can answer a
+   bigger number with the same lifts (the week is at its recovery ceiling, so
+   the extra bought a longer cool-down and nothing else) and a smaller one with
+   the same lifts at fewer sets, and a control that then shows nothing is the
+   control Mo reported: "if I add more or less it doesn't change my workout or
+   anything". `from` and `to` are { exercises, minutes }. `restCompressed` is
+   the engine's own word (meta.session.restCompressed) on whether the rest was
+   cut to make the clock: a plan somebody wrote by hand carries no restSec, so
+   comparing intervals alone would call the app's default a cut. */
+function budgetChangeLine(from, to, { restCompressed = null } = {}) {
+  const before = (from?.exercises || []).filter((e) => e && e.name);
+  const after = (to?.exercises || []).filter((e) => e && e.name);
+  if (!before.length || !after.length) return "";
+  const key = (e) => String(e.name || "").trim().toLowerCase();
+  const a = new Set(before.map(key));
+  const b = new Set(after.map(key));
+  const dropped = before.filter((e) => !b.has(key(e))).map((e) => e.name);
+  const added = after.filter((e) => !a.has(key(e))).map((e) => e.name);
+  const sets = (l) => l.reduce((t, e) => t + (Number(e.sets) || 0), 0);
+  const dSets = sets(after) - sets(before);
+  const restOf = (l) => Math.max(...l.map((e) => (Number(e.restSec) > 0 ? Number(e.restSec) : DEFAULT_REST_SEC)));
+  const restBefore = restOf(before);
+  const restAfter = restOf(after);
+  const parts = [];
+  if (dropped.length + added.length > 3) {
+    parts.push(after.length === before.length ? "different lifts" : `${after.length} lifts in place of ${before.length}`);
+  } else {
+    if (dropped.length) parts.push(`${dropped.join(" and ")} ${dropped.length === 1 ? "is" : "are"} off`);
+    if (added.length) parts.push(`${added.join(" and ")} added`);
+  }
+  if (dSets) parts.push(`${Math.abs(dSets)} ${dSets > 0 ? "more" : "fewer"} set${Math.abs(dSets) === 1 ? "" : "s"}`);
+  if (restCompressed === true || (restCompressed === null && restAfter < restBefore)) {
+    parts.push(`rest between sets down to ${restLabel(restAfter)}`);
+  }
+  const fromMin = Number(from?.minutes);
+  const toMin = Number(to?.minutes);
+  const clock = Number.isFinite(fromMin) && Number.isFinite(toMin) && fromMin !== toMin
+    ? `${toMin > fromMin ? "Up" : "Down"} from about ${fromMin} to ${toMin} min`
+    : "";
+  if (!parts.length) {
+    return clock
+      ? `${clock}: same lifts and sets, the difference is the stretching.`
+      : "Same plan: it already fits, and more sets than this is past what your week recovers from.";
+  }
+  return `${clock ? `${clock}: ` : "Changed: "}${parts.join(", ")}.`;
 }
 
 /* What we can honestly propose for the next session, all of it measured from
@@ -15992,7 +16118,7 @@ function planFromToday() {
   /* The same arithmetic the engine costs a session with, and now literally the
      same function the tappable estimate on the plan uses, so the two numbers on
      two screens cannot disagree. A range, because reps vary. */
-  const mins = sessionEstimateMinutes(list);
+  const mins = sessionEstimateMinutes(list, planMobility());
 
   /* Match, defined the same way as the proposal below: how much of this
      session lands on what the week has trained least. A plan that hits your
@@ -17692,7 +17818,12 @@ async function savePlanExercises() {
    against what was logged and backs the weights off on a shortfall. A 45 minute
    row left in the database under a 30 minute session is somebody punished with
    lighter weights for having been busy on a Tuesday. */
-let ONE_OFF_SESSION = null;   // { date, minutes, made, from: { minutes, focus, exercises, mobility, cardio } }
+let ONE_OFF_SESSION = null;   // { date, minutes, made, changed, from: { minutes, focus, exercises, mobility, cardio } }
+/* meta.session from the last generate, whoever asked for it. generateWorkout
+   hands the reveal its copy directly; this is for applySessionBudget, which
+   only gets a boolean back and needs the engine's `restCompressed` to describe
+   the change honestly. */
+let LAST_GEN_SESSION = null;
 
 /* Enough of a plan to tell whether it is still the one the budget change made.
    Anything else writing this day (a plain Regenerate, a saved workout dropped
@@ -17718,7 +17849,7 @@ function openSessionBudgetSheet({ estimate, current, onPick, overReveal = false 
           <div class="pop-who" style="color:var(--muted)">JUST FOR TODAY</div>
           <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
         </div>
-        <p class="muted-note">This one comes to about ${estimate} minutes. Say what you actually have and the plan is rebuilt to fit: sets come off the accessories first, a lift only if that is not enough, and the rest between sets last. Anything you added or swapped by hand is replaced.</p>
+        <p class="muted-note">This one comes to about ${estimate} minutes, warm-up and cool-down included. Say what you actually have and the plan is rebuilt to fit: sets come off the accessories first, a lift only if that is not enough, and the rest between sets last. More time buys sets where your week has room for them, and a longer cool-down once it does not. Anything you added or swapped by hand is replaced.</p>
         <div class="rest-pref five" id="oneOffLengths"></div>
         <p class="muted-note" style="margin-top:12px;">Today only. Your usual session length, in Setup then Training, is not touched.</p>
         <button type="button" class="btn-ghost" data-close>Keep this one</button>
@@ -17736,7 +17867,10 @@ function openSessionBudgetSheet({ estimate, current, onPick, overReveal = false 
          which in Setup means "let the goal decide again". Here the lit chip is
          the length this day already has, so tapping it is "leave it alone" and
          must not spend a generate on rebuilding the same plan. */
-      if (minutes === null || minutes === lit) return;
+      if (minutes === null || minutes === lit) {
+        toast(`Already about ${estimate} min. Pick a different length to change it.`);
+        return;
+      }
       onPick(minutes);
     },
   });
@@ -17762,7 +17896,7 @@ async function applySessionBudget(minutes) {
     date,
     minutes,
     from: (ONE_OFF_SESSION?.date === date && ONE_OFF_SESSION.from) || {
-      minutes: sessionEstimateMinutes(TODAY_WORKOUT.exercises),
+      minutes: sessionEstimateMinutes(TODAY_WORKOUT.exercises, planMobility()),
       focus: TODAY_WORKOUT.focus,
       exercises: JSON.parse(JSON.stringify(TODAY_WORKOUT.exercises)),
       mobility: TODAY_WORKOUT.mobility ? JSON.parse(JSON.stringify(TODAY_WORKOUT.mobility)) : null,
@@ -17776,6 +17910,12 @@ async function applySessionBudget(minutes) {
   const ok = await generateWorkout(null, { sessionMinutes: minutes, keepFocus });
   if (!ok) { if (ONE_OFF_SESSION === snapshot) ONE_OFF_SESSION = null; return; }
   snapshot.made = planSignature(TODAY_WORKOUT?.exercises);
+  /* What the answer did, in one line, kept with the snapshot so the card can
+     say it for as long as the offer to go back is on screen. */
+  snapshot.changed = budgetChangeLine(snapshot.from, {
+    exercises: TODAY_WORKOUT?.exercises,
+    minutes: sessionEstimateMinutes(TODAY_WORKOUT?.exercises, planMobility()),
+  }, { restCompressed: LAST_GEN_SESSION?.restCompressed === true });
   /* The reveal is already on screen by now and the card behind it was rendered
      before `made` was stamped, so it is redrawn with the offer on it. */
   renderWorkoutTab();
@@ -17835,7 +17975,8 @@ function renderPlanPreview() {
         ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
       </button>
       ${oneOff?.from?.minutes ? `<button type="button" class="link-btn" id="planTimeBackBtn">Back to ${oneOff.from.minutes} min</button>` : ""}
-    </div>`;
+    </div>
+    ${oneOff?.changed ? `<p class="plan-time-change" id="planTimeChange">${escapeHtml(oneOff.changed)}</p>` : ""}`;
 
   const planRamps = planMobility()?.ramp || [];
   const rows = TODAY_WORKOUT.exercises.map((ex, i) => {
