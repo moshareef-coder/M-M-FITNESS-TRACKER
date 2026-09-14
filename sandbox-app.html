@@ -1888,14 +1888,18 @@
 
   /* The figure gets everything between the title and the sheet, and is clipped
      rather than allowed to push either of them. */
-  /* The stage is a column: anything he says takes a row of its own at the
-     top, and the figure gets what is left. Mo: the text must never touch him
-     or anything else, even if other things have to move to make room. Laying
-     it out rather than floating it over him is what makes that a guarantee
-     instead of a set of magic numbers that hold until a line runs long. The
-     figure's canvas is already sized off the height it is given, so it
-     shrinks to fit the moment a bubble appears and grows back when it goes. */
+  /* He speaks in a layer OVER the stage, not in a row of it.
+     The bubble used to take its own row in this column, which kept the
+     promise that the text never touches him but paid for it with a visible
+     jump: measured at 390x844, the figure went 343px to 303px the moment he
+     opened his mouth and back again when he stopped, every single line. Mo
+     called that out, and he is right, the shrinking is worse than the risk it
+     was avoiding.
+     Overlaying is safe here because the figure is centred in a stage taller
+     than it, so the top strip is empty by construction, and the bubble is
+     pinned to that strip rather than floated at a guessed offset. */
   .sess-stage {
+    position: relative;
     flex: 1 1 auto; min-height: 0; overflow: hidden;
     display: flex; flex-direction: column;
     /* Vertical panning is not this element's job (nothing here scrolls), so
@@ -1907,11 +1911,15 @@
     position: relative; flex: 1 1 auto; min-height: 0;
     display: flex; align-items: center; justify-content: center;
   }
-  /* No bubble, no row. Rendered with nothing inside it so :empty is true. */
-  .sess-quip-slot { flex: 0 0 auto; display: flex; justify-content: center; padding: 0 14px; }
-  .sess-quip-slot:empty { display: none; }
-  /* He stands right of centre while resting, so the bubble leans that way and
-     its tail points at him rather than at the rest clock. */
+  /* A layer, not a row: taking it out of the column is the whole fix. Clicks
+     pass through the empty parts so nothing behind it goes dead. */
+  .sess-quip-slot {
+    position: absolute; left: 0; right: 0; top: 0; z-index: 4;
+    display: flex; justify-content: flex-start; padding: 10px 14px 0;
+    pointer-events: none;
+  }
+  .sess-quip-slot > * { pointer-events: auto; }
+  /* He stands right of centre while resting, so he speaks from that side. */
   .sess-stage.resting .sess-quip-slot { justify-content: flex-end; }
   /* Stretched to the stage's height, so the canvas below can size itself off
      it. The stage is not one height: the warm-up and cool-down sheets are
@@ -1962,28 +1970,48 @@
      themes, since the stage is a light panel even in dark mode. In the flow
      rather than floating: see the stage column above. Tappable to dismiss,
      and it blocks nothing behind it because there is nothing behind it. */
+  /* Avatar, name, and the line writing itself. Typing is the point: a line
+     that lands fully formed reads as a notification, one that arrives a
+     character at a time reads as somebody talking to you. */
   .sess-quip {
-    /* Capped short of the stage's width on purpose: a bubble that reaches
-       both edges reads as a banner, not as somebody speaking. */
-    position: relative; margin: 12px 0 16px; max-width: min(100%, 330px);
-    padding: 12px 15px; border-radius: 18px; border: 0;
-    background: #14171d; color: #f4f6f8; text-align: left;
-    font-family: inherit; font-size: 15px; font-weight: 600; line-height: 1.34;
-    letter-spacing: -.01em; box-shadow: 0 10px 26px -12px rgba(11,13,17,.55);
-    cursor: pointer; animation: quipIn .34s cubic-bezier(.22,1,.36,1) both;
+    display: flex; align-items: flex-start; gap: 10px;
+    max-width: min(100%, 288px); padding: 0; border: 0; background: none;
+    font-family: inherit; text-align: left; cursor: pointer;
+    animation: quipIn .34s cubic-bezier(.22,1,.36,1) both;
   }
-  .sess-quip::after {
-    content: ""; position: absolute; left: 50%; margin-left: -6px; bottom: -5px;
-    width: 13px; height: 13px; background: inherit; border-radius: 0 0 4px 0;
-    transform: rotate(45deg);
+  .sess-quip-av {
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    background: #14171d; color: #a8ff00;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 16px -8px rgba(11,13,17,.5);
   }
-  .sess-stage.resting .sess-quip::after { left: auto; margin-left: 0; right: 32px; }
+  .sess-quip-bub {
+    min-width: 0; background: #fff; border: 1px solid rgba(17,19,24,.10);
+    border-radius: 16px 16px 16px 5px; padding: 9px 13px 10px;
+    box-shadow: 0 10px 24px -14px rgba(11,13,17,.45);
+  }
+  .sess-quip-who {
+    display: block; font-size: 10px; font-weight: 800; letter-spacing: .11em;
+    text-transform: uppercase; color: #8b94a3; margin-bottom: 3px;
+  }
+  .sess-quip-line {
+    display: block; font-size: 14px; font-weight: 600; line-height: 1.34;
+    letter-spacing: -.01em; color: #111318;
+  }
+  /* Sits on the last character while typing, gone the moment he finishes. */
+  .sess-quip-cur {
+    display: inline-block; width: 2px; height: 14px; vertical-align: -2px;
+    margin-left: 2px; background: #1aa34a; animation: quipCaret .9s steps(1) infinite;
+  }
+  .sess-quip.done .sess-quip-cur { display: none; }
   .sess-quip.go { animation: quipOut .3s ease forwards; }
   @keyframes quipIn  { from { opacity: 0; transform: translateY(8px) scale(.96) } to { opacity: 1; transform: none } }
   @keyframes quipOut { to { opacity: 0; transform: translateY(-5px) scale(.98) } }
+  @keyframes quipCaret { 50% { opacity: 0 } }
   @media (prefers-reduced-motion: reduce) {
     .sess-quip { animation: none; }
     .sess-quip.go { animation: none; opacity: 0; }
+    .sess-quip-cur { animation: none; }
   }
   /* The one-tap path back while resting: the chip logs the set directly, and
      this says so, under the Start set button rather than beside it. */
@@ -5395,7 +5423,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.14.5";
+const APP_VERSION = "2026.09.14.6";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -14296,6 +14324,7 @@ let QUIP_TIMER = null;
 let QUIP_IDLE = null;          // the aside he drops in mid rest
 let QUIP_STRETCH_AT = null;    // which hold he last spoke on
 let QUIP_WAIT = null;          // a line held back behind the toast or the record pop
+let QUIP_TYPE = null;          // the interval writing the current line out
 
 /* A line from `key` that has not been used yet this session, so he works
    through the bank before he repeats himself and never says the same thing
@@ -14364,19 +14393,63 @@ function sayQuip(key) {
   clearTimeout(QUIP_WAIT);
   clearTimeout(QUIP_TIMER);
   slot.replaceChildren();
+  clearInterval(QUIP_TYPE);
   const el = document.createElement("button");
   el.type = "button";
   el.className = "sess-quip";
   /* A button, so it can be dismissed and so a screen reader is offered it
-     rather than having it read out in the middle of the set count. */
-  el.innerHTML = line;
-  el.setAttribute("aria-label", `He says: ${el.textContent}`);
+     rather than having it read out in the middle of the set count. The full
+     line goes on aria-label immediately: nobody should have to wait for an
+     animation to finish before their screen reader will tell them what it
+     said. */
+  el.innerHTML = `
+    <span class="sess-quip-av">${icon("dumbbell", 15)}</span>
+    <span class="sess-quip-bub">
+      <span class="sess-quip-who">Coach</span>
+      <span class="sess-quip-line"><span class="sess-quip-txt"></span><i class="sess-quip-cur"></i></span>
+    </span>`;
+  /* The lines are written with HTML entities (&rsquo;, &ldquo;) because they
+     used to be set with innerHTML, which decoded them. Typing writes with
+     textContent, which does not, so "Don&rsquo;t" appeared on screen exactly
+     like that. Decoded once here rather than rewriting every line in the
+     list, which would only wait for the next apostrophe to come back. */
+  const said = decodeEntities(line);
+  el.setAttribute("aria-label", `He says: ${said}`);
   el.onclick = () => hideQuip();
   slot.appendChild(el);
-  // Long enough to read twice, short enough that it is gone before it is
-  // scenery. Scaled to the line, because they are not the same length.
-  const hold = Math.min(7000, 2600 + line.length * 45);
-  QUIP_TIMER = setTimeout(hideQuip, hold);
+
+  /* Hold starts when he STOPS typing, not when he starts, or a long line gets
+     pulled off the screen halfway through saying itself. */
+  const hold = Math.min(7000, 2600 + said.length * 45);
+  const rest = () => { el.classList.add("done"); QUIP_TIMER = setTimeout(hideQuip, hold); };
+  typeQuip(el.querySelector(".sess-quip-txt"), said, rest);
+}
+
+function decodeEntities(str) {
+  const d = document.createElement("textarea");
+  d.innerHTML = str;
+  return d.value;
+}
+
+/* Reduced motion gets the whole line at once: the typing is flavour, and
+   flavour is not worth withholding the words from somebody who asked the
+   system to stop animating things. */
+function typeQuip(target, line, done) {
+  if (!target) { done(); return; }
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+    target.textContent = line;
+    done();
+    return;
+  }
+  let i = 0;
+  target.textContent = "";
+  QUIP_TYPE = setInterval(() => {
+    /* The node can be gone mid-type: a new line, a dismiss tap, or the screen
+       changing under it. Stop rather than write into a detached element. */
+    if (!target.isConnected) { clearInterval(QUIP_TYPE); QUIP_TYPE = null; return; }
+    target.textContent = line.slice(0, ++i);
+    if (i >= line.length) { clearInterval(QUIP_TYPE); QUIP_TYPE = null; done(); }
+  }, 17);
 }
 
 /* A second beat a little way into a rest. The set line lands the moment the
@@ -14392,6 +14465,8 @@ function scheduleRestAside() {
 
 function hideQuip() {
   clearTimeout(QUIP_TIMER);
+  clearInterval(QUIP_TYPE);
+  QUIP_TYPE = null;
   const el = $("sessQuipSlot")?.querySelector(".sess-quip");
   if (!el) return;
   el.classList.add("go");
