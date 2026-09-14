@@ -17,7 +17,7 @@
 //   4. a prop type nothing draws, which fails silently
 
 import { TRAININGS } from "../exercise-library/index.mjs";
-import { MOVES_BY_LIBRARY, MOVE_NAMES } from "./index.mjs";
+import { MOVES_BY_LIBRARY, MOVE_NAMES, IDLES } from "./index.mjs";
 import { solvePose, samplePose, jointAngles, GROUND, PROP_TYPES, LOOPS, VIEWS, PRESETS, BODY_KINDS } from "./rig.mjs";
 
 const allowMissing = process.argv.includes("--allow-missing");
@@ -230,6 +230,12 @@ for (const training of TRAININGS) {
 for (const [id, lib] of Object.entries(MOVES_BY_LIBRARY)) {
   for (const [name, move] of Object.entries(lib)) checkMove(`${id}/${name}`, move);
 }
+// The rest antics are not exercises, so they skip the library name check, but
+// a bottle arm through the face or a knee bent backwards is just as wrong on
+// a figure that is only resting.
+const idleNames = Object.keys(IDLES);
+for (const name of idleNames) checkMove(`idle/${name}`, IDLES[name]);
+lines.push(`  ${"idle".padEnd(16)} ${String(idleNames.length).padStart(3)} rest antics, not library moves`);
 
 console.log("motion validate\n");
 console.log(lines.join("\n"));
@@ -243,5 +249,5 @@ if (missing && !allowMissing) {
 }
 
 const bad = errors.length;
-console.log(`\nmotion: ${MOVE_NAMES.length} moves, ${missing} missing, ${bad} invalid`);
+console.log(`\nmotion: ${MOVE_NAMES.length} moves, ${idleNames.length} rest antics, ${missing} missing, ${bad} invalid`);
 process.exit(bad || (missing && !allowMissing) ? 1 : 0);
