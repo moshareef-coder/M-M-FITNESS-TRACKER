@@ -3300,6 +3300,36 @@
     padding: 10px 18px calc(26px + env(safe-area-inset-bottom, 0px));
     animation: sheetUp .28s cubic-bezier(.22,1,.36,1);
   }
+
+  /* ---- Swipe a sheet away ----
+     Every sheet in the app opens by sliding up, and until now the only ways
+     out were the X and a tap on the backdrop: pulling one down did nothing,
+     which is the first thing a thumb tries. wireSheetDrag() gives all of them
+     the gesture the session sheet already had.
+
+     A grabber, so the gesture is visible rather than a secret. Most sheets
+     already draw their own .ds-grip and keep it; this only fills in the ones
+     that never had one, so no sheet ends up wearing two. */
+  .partner-sheet:not(:has(.ds-grip))::before,
+  .day-sheet:not(:has(.ds-grip))::before {
+    content: ""; display: block; width: 38px; height: 4px; border-radius: 100px;
+    background: var(--border); margin: 0 auto 8px; flex-shrink: 0;
+  }
+  .partner-sheet.no-grab::before, .day-sheet.no-grab::before { display: none; }
+  /* Contained, so a pull at the top of a sheet's own scroll cannot rubber-band
+     the page behind it instead of moving the sheet. */
+  .partner-sheet, .day-sheet, .pop { overscroll-behavior: contain; }
+  /* While the finger is down the panel follows it exactly: no transition, and
+     no opening animation still running underneath to fight the transform. */
+  .sheet-dragging { animation: none !important; transition: none !important; will-change: transform; }
+  /* Let go short of the threshold and it springs back; past it, it carries on
+     out of the screen and the sheet's own close path runs when it lands. */
+  .sheet-settle { transition: transform .22s cubic-bezier(.22,1,.36,1); }
+  .sheet-closing { transition: transform .2s cubic-bezier(.4,0,1,1), opacity .2s ease; }
+  .scrim-fading { transition: opacity .2s ease; }
+  @media (prefers-reduced-motion: reduce) {
+    .sheet-settle, .sheet-closing, .scrim-fading { transition: none; }
+  }
   .ps-head { display: flex; justify-content: flex-end; }
   .ps-hero { text-align: center; padding: 2px 0 18px; }
   .ps-ring {
@@ -5297,7 +5327,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.13.28";
+const APP_VERSION = "2026.09.13.29";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -9195,7 +9225,7 @@ async function openAvatarEditor(source) {
   $("cropSheet").innerHTML = `
     <div class="ds-grip"></div>
     <div class="scr-head">
-      <button type="button" class="scr-back" id="cropCancel" aria-label="Cancel">${icon("chevronLeft", 18)}</button>
+      <button type="button" class="scr-back" id="cropCancel" aria-label="Cancel" data-sheet-dismiss>${icon("chevronLeft", 18)}</button>
       <div class="scr-title">Move and scale</div>
       <div class="spacer"></div>
     </div>
@@ -20750,6 +20780,207 @@ const A11Y_SHEETS = {
 const A11Y_TITLE_SEL = ".scr-title, .pop-who, .ps-label, .cb-sheet-title, .ds-date, .sv-title, h1, h2, h3";
 const A11Y_FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 const A11Y_CLOSE_SEL = '[aria-label="Close"], .ds-x, .cb-x, .notice-x';
+
+/* Close a sheet the way that sheet wants to be closed. Every one of them
+   needs something different on the way out (a draft saved, a crop thrown
+   away, a picker torn down), and all of that already lives behind its own X
+   or its own scrim tap. So this presses one of those rather than hiding the
+   scrim behind their backs, which would leave that cleanup undone. Escape
+   and the swipe both come through here.
+
+   Split in two because the swipe has to know BEFORE it animates whether
+   there is any way out at all: a sheet you cannot close should spring back
+   under the finger, not slide away and reappear. */
+function sheetCloser(scrim) {
+  if (!scrim || scrim.classList.contains("hidden")) return null;
+  const sheet = scrim.firstElementChild;
+  /* An explicit opt-in first, for a sheet whose way out is not called Close:
+     the crop sheet's is Cancel, and naming it here is safer than widening
+     the shared selector until it starts matching buttons it should not. */
+  const own = sheet?.querySelector("[data-sheet-dismiss]");
+  if (own) return () => own.click();
+  const x = sheet?.querySelector(A11Y_CLOSE_SEL);
+  if (x) return () => x.click();
+  if (typeof scrim.onclick === "function") {
+    return () => scrim.dispatchEvent(new MouseEvent("click", { bubbles: false }));
+  }
+  return null;
+}
+function dismissSheet(scrim) {
+  const close = sheetCloser(scrim);
+  if (!close) return false;
+  close();
+  return true;
+}
+
+/* ---- Swipe any sheet away ----
+   One controller for every sheet and every popped card, delegated from the
+   document so a sheet built long after this ran still has the gesture, and
+   so there is one set of rules to keep smooth rather than fifteen copies to
+   keep in sync. The rules are the ones the session sheet arrived at:
+
+   - claim the gesture only once it is clearly vertical and downward, so a
+     sideways swipe still scrolls a rail and an upward one still scrolls the
+     sheet's own content;
+   - only start at all if whatever is under the finger is already scrolled to
+     its top, which is the difference between reading a long sheet and
+     dismissing it;
+   - follow the finger exactly while it is down;
+   - decide on release by flick speed first and distance second, so a fast
+     flick goes where it was thrown and a slow drag commits once it is past
+     about a quarter of the panel.
+
+   Everything is watched on the document rather than the panel: a panel that
+   is translating away stops receiving its own pointer events partway down,
+   which is exactly the "doesn't work very well" half-close this replaces. */
+(function wireSheetDrag() {
+  const SHEETS = ".sheet-scrim, .pop-scrim";
+  const NO_DRAG = "input, textarea, select, [contenteditable], [data-no-drag]";
+  const FLICK = 0.35;       // px per ms
+  const CLAIM = 6;          // px of downward travel before the drag is ours
+  let scrim = null, panel = null, height = 1, armed = false, live = false, busy = false;
+  let y0 = 0, x0 = 0, t0 = 0, lastY = 0, lastT = 0;
+
+  /* Touch events rather than pointer events, which is not a style choice:
+     Chrome decides a touch is a pan of its own and stops sending pointermove
+     partway down, which is exactly the half-finished drag this replaces.
+     touchmove keeps arriving, and preventDefault on it while we hold the
+     gesture is what stops the browser scrolling underneath us. The mouse
+     still comes through pointer events, for the desktop build. */
+  const scrolledToTop = (from) => {
+    for (let el = from; el && el !== scrim; el = el.parentElement) {
+      if (el.scrollHeight > el.clientHeight + 1) {
+        const oy = getComputedStyle(el).overflowY;
+        if (oy === "auto" || oy === "scroll") return el.scrollTop <= 1;
+      }
+    }
+    return true;
+  };
+
+  const paint = (dy) => {
+    panel.style.transform = `translateY(${dy}px)`;
+    // The backdrop thins as the sheet leaves, so what is behind comes back at
+    // the same rate rather than all at once at the end.
+    scrim.style.opacity = String(Math.max(0.15, 1 - (dy / height) * 0.9));
+  };
+  const reset = (s, p) => {
+    p.classList.remove("sheet-dragging", "sheet-settle", "sheet-closing");
+    s.classList.remove("scrim-fading");
+    p.style.transform = "";
+    p.style.pointerEvents = "";
+    s.style.opacity = "";
+  };
+
+  function down(x, y, target, time) {
+    if (busy || armed) return;
+    const s = target.closest(SHEETS);
+    if (!s || s.classList.contains("hidden")) return;
+    const p = s.firstElementChild;
+    // A tap on the backdrop already closes; only the panel itself drags.
+    if (!p || !p.contains(target)) return;
+    if (target.closest(NO_DRAG)) return;
+    if (!sheetCloser(s)) return;          // nothing to close: never start
+    scrim = s; panel = p;
+    if (!scrolledToTop(target)) return;   // that finger belongs to a scroller
+    armed = true; live = false;
+    y0 = lastY = y; x0 = x; t0 = lastT = time;
+  }
+
+  // Returns true once the gesture is ours, so the caller can preventDefault.
+  function move(x, y, time) {
+    if (!armed) return false;
+    const dy = y - y0;
+    if (!live) {
+      if (dy < CLAIM || dy <= Math.abs(x - x0)) {
+        // Not a downward pull: hand it back to the content for good.
+        if (Math.abs(dy) > 12 || Math.abs(x - x0) > 12) armed = false;
+        return false;
+      }
+      live = true;
+      height = Math.max(panel.getBoundingClientRect().height, 1);
+      panel.classList.add("sheet-dragging");
+    }
+    lastY = y; lastT = time;
+    paint(Math.max(0, dy));
+    return true;
+  }
+
+  function up() {
+    if (!armed) return;
+    armed = false;
+    const s = scrim, p = panel;
+    if (!live) return;        // it was a tap; the sheet's own handlers own it
+    live = false;
+    const dy = Math.max(0, lastY - y0);
+    const v = dy / Math.max(1, lastT - t0);
+    const close = sheetCloser(s);
+    /* Flick speed first, then distance: a fast flick goes where it was
+       thrown, and a slower drag commits once it is past about a quarter of
+       the panel. Anything less springs back. */
+    const go = !!close && (v > FLICK || dy > Math.min(110, height * 0.25));
+
+    /* A drag never becomes a tap: the click a touch release leaves behind
+       would otherwise land on whatever row was under the thumb and open it.
+       It has to be disarmed on a timer rather than left as a one-shot,
+       because a drag often leaves no click at all and a listener still
+       sitting there would eat the next real one. */
+    const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+    document.addEventListener("click", swallow, true);
+    const disarm = () => document.removeEventListener("click", swallow, true);
+    setTimeout(disarm, 320);
+
+    p.classList.remove("sheet-dragging");
+    s.classList.add("scrim-fading");
+    if (!go) {
+      p.classList.add("sheet-settle");
+      p.style.transform = "";
+      s.style.opacity = "";
+      setTimeout(() => reset(s, p), 240);
+    } else {
+      busy = true;
+      p.classList.add("sheet-closing");
+      p.style.transform = `translateY(${height + 60}px)`;
+      s.style.opacity = "0";
+      // Nothing under a panel on its way out is tappable any more.
+      p.style.pointerEvents = "none";
+      setTimeout(() => {
+        /* Disarmed FIRST. Closing presses the sheet's own X, and the swallow
+           above would otherwise eat that click and leave the sheet open
+           behind an animation that says it left. */
+        disarm();
+        close();
+        /* Cleared only once it is hidden, so clearing the transform cannot
+           flash the panel back into place on its way out. */
+        requestAnimationFrame(() => { reset(s, p); busy = false; });
+      }, 190);
+    }
+  }
+
+  document.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) { armed = false; return; }
+    const t = e.touches[0];
+    down(t.clientX, t.clientY, e.target, e.timeStamp);
+  }, { passive: true });
+  document.addEventListener("touchmove", (e) => {
+    if (!armed) return;
+    if (e.touches.length !== 1) { armed = false; return; }
+    const t = e.touches[0];
+    if (move(t.clientX, t.clientY, e.timeStamp) && e.cancelable) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener("touchend", up);
+  document.addEventListener("touchcancel", up);
+
+  // Mouse only; touch is handled above and would otherwise run twice.
+  document.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    down(e.clientX, e.clientY, e.target, e.timeStamp);
+  });
+  document.addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "mouse") return;
+    if (move(e.clientX, e.clientY, e.timeStamp)) e.preventDefault();
+  });
+  document.addEventListener("pointerup", (e) => { if (e.pointerType === "mouse") up(); });
+})();
 const a11yOpenSheets = [];               // innermost last, so Escape closes the top one
 let a11yTitleSeq = 0;
 
@@ -20862,12 +21093,7 @@ function a11yInit() {
     const scrim = a11yOpenSheets[a11yOpenSheets.length - 1];
 
     if (e.key === "Escape" && scrim) {
-      const sheet = scrim.firstElementChild;
-      const x = sheet?.querySelector(A11Y_CLOSE_SEL);
-      if (x) { e.preventDefault(); x.click(); return; }
-      /* No close control: the sheets that have none close on a scrim tap, so
-         reuse that path rather than hiding the scrim behind its own code. */
-      if (typeof scrim.onclick === "function") { e.preventDefault(); scrim.dispatchEvent(new MouseEvent("click", { bubbles: false })); }
+      if (dismissSheet(scrim)) e.preventDefault();
       return;
     }
 
