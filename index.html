@@ -2150,6 +2150,9 @@
     position: static; padding: 0; margin-top: 18px; background: none; border: 0;
   }
   .sess-sheet .sess-cta .btn-big { margin: 0; min-height: 62px; font-size: 19px; border-radius: 18px; }
+  /* The warm-up's own blue, so the button agrees with the chip and the line
+     above it rather than being the one lime thing on a blue moment. */
+  .sess-cta .btn-big.warm { background: var(--stretch); color: var(--on-stretch); }
 
   /* Up next is folded away under the CTA. The handle opens it, and the stage
      gives up the room, so nothing is ever hidden behind the sheet. */
@@ -5459,7 +5462,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.14.11";
+const APP_VERSION = "2026.09.14.12";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -15487,7 +15490,15 @@ function renderSession() {
                tap for anyone who did the set without announcing it, and the
                line under the button says so. -->
           <button type="button" class="btn-big btn-primary ${resting ? "" : "hidden"}" id="startSetBtn">Start set ${currentSet + 1} of ${setsDone.length}</button>
-          <button type="button" class="btn-big btn-primary ${allDone || resting ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>
+          ${/* The big button is whatever you are actually on. While a warm-up
+                is waiting it is the warm-up: saying "Log set 1 of 4" over a
+                blue chip that says this is a warm-up set was the screen
+                contradicting itself, and tapping it logged a working set you
+                had not done. It wears the warm-up blue for the same reason
+                the chip does. */ ""}
+          ${rampTicks < rungs.length
+            ? `<button type="button" class="btn-big btn-primary warm ${resting ? "hidden" : ""}" id="logWarmBtn">Log warm-up set</button>`
+            : `<button type="button" class="btn-big btn-primary ${allDone || resting ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>`}
           ${resting ? `<button type="button" class="sess-cta-alt" id="logNowBtn">Already done it? Log set ${currentSet + 1}</button>` : ""}
           <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">${SESSION.completed.some((c, i) => !c && i !== ei) ? "Next exercise" : "Finish workout"}</button>
         </div>
@@ -15537,6 +15548,9 @@ function renderSession() {
 
   const logBtn = $("logSetBtn");
   if (logBtn) logBtn.onclick = () => { if (currentSet >= 0) toggleSet(currentSet); };
+  // Ticks the rung the chip and the line are both showing.
+  const warmBtn = $("logWarmBtn");
+  if (warmBtn) warmBtn.onclick = () => tickRampSet(ei, rampTicks, rungs);
   const startBtn = $("startSetBtn");
   if (startBtn) startBtn.onclick = () => { buzz(9); skipRest(); };
   const logNow = $("logNowBtn");
