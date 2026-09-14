@@ -20,6 +20,7 @@ import { MOVES as YOGA } from "./moves/yoga.mjs";
 import { MOVES as PILATES } from "./moves/pilates.mjs";
 import { MOVES as CALISTHENICS } from "./moves/calisthenics.mjs";
 import { MOVES as STRETCHING } from "./moves/stretching.mjs";
+import { MOVES as IDLE } from "./moves/idle.mjs";
 
 export { palette, render, samplePose, solvePose, jointAngles, cameraFor, litIntensity, VB, GROUND,
   PROP_TYPES, LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY,
@@ -39,7 +40,15 @@ export const MOVES_BY_LIBRARY = {
 const ALL = {};
 for (const lib of Object.values(MOVES_BY_LIBRARY)) Object.assign(ALL, lib);
 
+// The exercise names only: every count in the lab and the validator is a
+// count of library coverage, and the rest antics must not inflate it.
 export const MOVE_NAMES = Object.keys(ALL).sort();
+
+// The rest antics (moves/idle.mjs). Mountable by name like any move, so the
+// session stage can swap to one between sets, but not part of any library.
+export const IDLES = IDLE;
+export const IDLE_NAMES = Object.keys(IDLE);
+Object.assign(ALL, IDLE);
 export const hasMove = (name) => moveFor(name) !== null;
 // Names that older plans and logs use for a move the library files under a
 // longer name. A row with an unknown name keeps its old icon, so the miss is

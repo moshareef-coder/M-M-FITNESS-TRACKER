@@ -113,7 +113,13 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 
 <script type="module">
 import { TRAININGS } from "./knowledge/exercise-library/index.mjs";
-import { mountMove, hasMove, moveFor, MOVE_NAMES, MOVES_BY_LIBRARY, samplePose, cameraFor } from "./knowledge/motion/index.mjs";
+import { mountMove, hasMove, moveFor, MOVE_NAMES, MOVES_BY_LIBRARY, IDLES, IDLE_NAMES, samplePose, cameraFor } from "./knowledge/motion/index.mjs";
+
+// The rest antics get a tab of their own. They are not in any library, so
+// they are given the shape of one here and nowhere else: `sheet=idle` and
+// the Rest tab both read it.
+const IDLE_TAB = { id: "idle", label: "Rest", categories: [{ label: "Between sets", exercises: IDLE_NAMES.map((name) => ({ name })) }] };
+const LAB_LIBS = { ...MOVES_BY_LIBRARY, idle: IDLES };
 
 window.addEventListener("error", (e) => {
   const el = document.getElementById("err");
@@ -188,7 +194,7 @@ if (q.get("sheet") === "compare") {
 } else if (q.get("sheet")) {
   const libId = q.get("sheet");
   const cols = Math.max(1, Math.min(8, parseInt(q.get("cols") || "6", 10)));
-  const lib = MOVES_BY_LIBRARY[libId] || {};
+  const lib = LAB_LIBS[libId] || {};
   const names = Object.keys(lib).sort();
   root.className = "sheet";
   root.innerHTML = `<h1>${libId} <span class="sub">${names.length} authored, t = 0 and t = 0.5</span></h1>
@@ -259,9 +265,11 @@ function buildLab() {
   if (state.name && entries.has(state.name)) {
     const owner = TRAININGS.find((tr) => (tr.categories || []).some((c) => (c.exercises || []).some((e) => e.name === state.name)));
     if (owner) state.lib = owner.id;
+  } else if (state.name && IDLE_NAMES.includes(state.name)) {
+    state.lib = IDLE_TAB.id;
   }
 
-  for (const tr of TRAININGS) {
+  for (const tr of [...TRAININGS, IDLE_TAB]) {
     const names = libNames(tr);
     const n = names.filter(hasMove).length;
     const b = document.createElement("button");
@@ -285,7 +293,7 @@ function buildLab() {
     for (const c of state.cells.values()) if (c.anim) c.anim.destroy();
     state.cells.clear();
     gridEl.innerHTML = "";
-    const tr = TRAININGS.find((t) => t.id === state.lib);
+    const tr = [...TRAININGS, IDLE_TAB].find((t) => t.id === state.lib);
     for (const name of libNames(tr)) {
       const has = hasMove(name);
       const cell = document.createElement("div");

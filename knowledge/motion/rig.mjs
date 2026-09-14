@@ -1641,7 +1641,28 @@ function anchor(spec, S) {
 export const PROP_TYPES = [
   "mat", "wall", "doorway", "doorframe", "bench", "box", "roller", "pullupBar",
   "dipBars", "machine", "cable", "band", "barbell", "dumbbell", "kettlebell",
+  // The rest-time props: what the figure fiddles with between sets. Hand held
+  // and drawn small, so they read as a thing in a hand and not as equipment.
+  "bottle", "phone", "towel", "watch",
 ];
+
+/* A hand-held object that is not a weight sits ALONG the forearm rather than
+   across the fist: a bottle tipped to the mouth, a phone held out to read,
+   both continue the forearm line and tilt with it. `rot` is a nudge on top,
+   `along` slides the object's centre out along that line from the hand point,
+   `k` scales it. The dumbbell's grip rule does not apply: nobody holds a
+   bottle like a hammer curl. */
+function handHeldFrame(ctx, p, S) {
+  const at = anchor(p, S);
+  if (!at) return null;
+  const k = S.sides[p.side || "R"];
+  const d = norm2(sub(k.wrist, k.elbow));
+  const deg = RAD2DEG(Math.atan2(d.y, d.x)) + (p.rot || 0);
+  ctx.save();
+  ctx.translate(at.x + d.x * (p.along || 0), at.y + d.y * (p.along || 0));
+  ctx.rotate(D(deg));
+  return true;
+}
 
 const PROPS = {
   mat(ctx, C, p, S) {
@@ -1872,6 +1893,83 @@ const PROPS = {
     ctx.lineWidth = 3.4 * k; ctx.strokeStyle = C.prop; ctx.stroke();
     ctx.restore();
   },
+  // A gym water bottle: a tall capsule with a neck and a cap, the cap at the
+  // forearm's far end so tipping the forearm up tips the bottle to the mouth.
+  // Local +x runs from the elbow out past the hand, so the cap sits at +x.
+  bottle(ctx, C, p, S) {
+    if (!handHeldFrame(ctx, p, S)) return;
+    const k = p.k || 1;
+    ctx.strokeStyle = C.edge; ctx.lineWidth = 3; ctx.lineJoin = "round";
+    const body = () => roundRect(ctx, -8 * k, -3.2 * k, 14 * k, 6.4 * k, 3 * k);
+    const neck = () => roundRect(ctx, 5.4 * k, -2 * k, 3.4 * k, 4 * k, 1.2 * k);
+    const cap = () => roundRect(ctx, 8.2 * k, -2.5 * k, 3.2 * k, 5 * k, 1.4 * k);
+    for (const sh of [body, neck, cap]) { sh(); ctx.stroke(); }
+    ctx.fillStyle = C.propTop; body(); ctx.fill();
+    ctx.fillStyle = C.prop; neck(); ctx.fill();
+    ctx.fillStyle = C.propDark; cap(); ctx.fill();
+    // a label band and a water line, so it is a bottle and not a baton
+    ctx.fillStyle = C.prop;
+    roundRect(ctx, -4.6 * k, -3.2 * k, 5 * k, 6.4 * k, 0); ctx.fill();
+    ctx.restore();
+  },
+  // A phone: a rounded slab with a lit screen, held so the screen faces the
+  // figure's face. The slab lies along the forearm line; `rot` tips it.
+  phone(ctx, C, p, S) {
+    if (!handHeldFrame(ctx, p, S)) return;
+    const k = p.k || 1;
+    ctx.strokeStyle = C.edge; ctx.lineWidth = 3; ctx.lineJoin = "round";
+    const slab = () => roundRect(ctx, -6.4 * k, -3.6 * k, 12.8 * k, 7.2 * k, 1.6 * k);
+    slab(); ctx.stroke();
+    ctx.fillStyle = C.propDark; slab(); ctx.fill();
+    // the screen, in the accent so it reads as lit
+    ctx.fillStyle = C.accent;
+    roundRect(ctx, -5.4 * k, -2.7 * k, 10.8 * k, 5.4 * k, 1 * k); ctx.fill();
+    // two faint lines of "content" on the screen
+    ctx.fillStyle = C.propDark; ctx.globalAlpha = 0.35;
+    roundRect(ctx, -4 * k, -1.2 * k, 6.5 * k, 0.9 * k, 0.45 * k); ctx.fill();
+    roundRect(ctx, -4 * k, 0.6 * k, 4.5 * k, 0.9 * k, 0.45 * k); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  },
+  // A small towel: a soft cloth bunched in the fist with a tail that hangs
+  // straight down from the hand, because cloth obeys gravity and not the arm.
+  towel(ctx, C, p, S) {
+    const at = anchor(p, S);
+    if (!at) return;
+    const k = p.k || 1;
+    const len = (p.len === undefined ? 12 : p.len) * k;
+    ctx.strokeStyle = C.edge; ctx.lineWidth = 3; ctx.lineJoin = "round";
+    const tail = () => {
+      ctx.beginPath();
+      ctx.moveTo(at.x - 3 * k, at.y + 1);
+      ctx.quadraticCurveTo(at.x - 4.4 * k, at.y + len * 0.55, at.x - 2.2 * k, at.y + len);
+      ctx.quadraticCurveTo(at.x + 0.2 * k, at.y + len + 1.4 * k, at.x + 2.4 * k, at.y + len * 0.92);
+      ctx.quadraticCurveTo(at.x + 3.6 * k, at.y + len * 0.45, at.x + 3 * k, at.y + 1);
+      ctx.closePath();
+    };
+    const knot = () => { ctx.beginPath(); ctx.ellipse(at.x, at.y, 4.6 * k, 3.4 * k, 0, 0, Math.PI * 2); };
+    tail(); ctx.stroke(); knot(); ctx.stroke();
+    ctx.fillStyle = C.propTop; tail(); ctx.fill(); knot(); ctx.fill();
+    // one fold line down the tail
+    ctx.strokeStyle = C.prop; ctx.lineWidth = 0.9;
+    ctx.beginPath(); ctx.moveTo(at.x + 0.4 * k, at.y + 3 * k); ctx.quadraticCurveTo(at.x - 1.2 * k, at.y + len * 0.5, at.x + 0.3 * k, at.y + len * 0.86); ctx.stroke();
+  },
+  // A wristwatch: a band across the wrist and a face on top, drawn at the
+  // wrist point, square to the forearm so it rides round with it.
+  watch(ctx, C, p, S) {
+    const k = S.sides[p.side || "L"];
+    const d = norm2(sub(k.wrist, k.elbow));
+    const n = V(-d.y, d.x);
+    const at = add(k.wrist, scl(d, -1.4));
+    const r = ACTIVE.rWrist * 1.15 * (p.k || 1);
+    ctx.strokeStyle = C.propDark; ctx.lineWidth = 2.2; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(at.x - n.x * r, at.y - n.y * r); ctx.lineTo(at.x + n.x * r, at.y + n.y * r); ctx.stroke();
+    const face = add(at, scl(n, (p.flip ? -1 : 1) * r * 0.9));
+    ctx.beginPath(); ctx.arc(face.x, face.y, 2.1 * (p.k || 1), 0, Math.PI * 2);
+    ctx.fillStyle = C.propDark; ctx.fill();
+    ctx.beginPath(); ctx.arc(face.x, face.y, 1.3 * (p.k || 1), 0, Math.PI * 2);
+    ctx.fillStyle = C.accent; ctx.fill();
+  },
 };
 
 function drawProps(ctx, C, list, S, layer) {
@@ -1926,7 +2024,7 @@ export function gripSides(move, S) {
   const g = {};
   for (const p of (move && move.props) || []) {
     if (p.type === "barbell" && p.place === "traps") { g.L = "closed"; g.R = "closed"; continue; }
-    if (["barbell", "dumbbell", "kettlebell"].includes(p.type) && p.point !== "wrist") g[p.side || "R"] = "closed";
+    if (["barbell", "dumbbell", "kettlebell", "bottle", "phone", "towel"].includes(p.type) && p.point !== "wrist") g[p.side || "R"] = "closed";
     if (p.type === "cable" && p.to && p.to.side) g[p.to.side] = "closed";
     if (p.type === "band") for (const e of [p.from, p.to]) if (e && e.side) g[e.side] = "closed";
     if (p.type === "pullupBar") { g.L = g.L || "hook"; g.R = g.R || "hook"; }
