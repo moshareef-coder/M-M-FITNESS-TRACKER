@@ -584,55 +584,11 @@
       linear-gradient(180deg, color-mix(in srgb, var(--stretch) 13%, transparent) 0%, color-mix(in srgb, var(--stretch) 9%, transparent) 100%),
       var(--bg);
   }
-  /* The panels lift toward the hue too, or a blue screen with grey cards on it
-     reads as a bug rather than a mode. */
-  .session-overlay.stretching .sess-card {
-    background: color-mix(in srgb, var(--stretch) 9%, var(--panel));
-    border-color: color-mix(in srgb, var(--stretch) 28%, var(--border));
-  }
-  .session-overlay.stretching .rest-bar {
-    background: color-mix(in srgb, var(--stretch) 12%, var(--panel-2));
-  }
-  .session-overlay.stretching .rest-adjust button {
-    background: color-mix(in srgb, var(--stretch) 7%, var(--panel));
-    border-color: color-mix(in srgb, var(--stretch) 30%, var(--border));
-  }
-
-  /* The banner that names the mode and says how long it runs. Mo asked for the
-     length to be on screen, because "a few stretches" and "ten minutes of
-     stretching" are different commitments and you decide which one you are
-     doing before you start, not three moves in. */
-  .stretch-banner {
-    display: flex; align-items: center; gap: 12px;
-    background: color-mix(in srgb, var(--stretch) 16%, var(--panel));
-    border: 1px solid color-mix(in srgb, var(--stretch) 38%, transparent);
-    border-radius: 16px; padding: 13px 15px; margin-bottom: 12px;
-    animation: hRise .38s cubic-bezier(.22,1,.36,1) both;
-  }
-  .stretch-banner-icon {
-    width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--stretch); color: var(--on-stretch);
-  }
-  .stretch-banner-body { min-width: 0; flex: 1; }
-  .stretch-banner-title {
-    font-size: 13px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase;
-    color: var(--stretch-ink); line-height: 1.2;
-  }
-  .stretch-banner-sub {
-    font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.35;
-    font-variant-numeric: tabular-nums;
-  }
-  /* Where you are in the block, as dashes rather than a second progress bar:
-     the session already has one at the top and two bars competing is the
-     mistake the rest strip comment warns about. */
-  .stretch-pips { display: flex; gap: 4px; margin-top: 8px; }
-  .stretch-pips i {
-    flex: 1; height: 3px; border-radius: 9px; background: color-mix(in srgb, var(--stretch) 22%, transparent);
-    transition: background .25s ease;
-  }
-  .stretch-pips i.done { background: color-mix(in srgb, var(--stretch) 55%, transparent); }
-  .stretch-pips i.now { background: var(--stretch); }
+  /* The stretch screen itself is the lift screen's stage-and-sheet layout in
+     this hue; its rules sit with the lift screen further down, under
+     .session-overlay.lifting.stretching, because they are overrides of that
+     layout rather than a second one. The wash above still paints the paused
+     sheet, which is the one stretch-time screen without a stage. */
 
   /* The same hue on the plan overview, so the shape of the session is legible
      before it starts: blue at the top, lifting in the middle, blue at the end. */
@@ -798,41 +754,12 @@
   .sess-note { font-size: 12.5px; color: var(--muted); margin-top: 10px; line-height: 1.45; }
 
 
-  /* Rest counts DOWN against a target. Counting up answers "how long have I
-     been standing here", which nobody asks; counting down answers "can I go
-     yet", which is the only question rest raises. Consistent rest is also what
-     makes progressive overload mean anything, so the target is training
-     information rather than decoration.
-     Deliberately a strip and not a ring: a ring implies precision and invites
-     tick marks, gradients and a second progress metaphor competing with the
-     number. A hairline bar cannot. */
-  .rest-bar {
-    display: flex; flex-direction: column; gap: 9px;
-    background: var(--panel-2); border-radius: 14px; padding: 14px 16px;
-    margin-bottom: 14px;
-  }
-  .rest-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-  .rest-label { font-size: 12.5px; font-weight: 800; letter-spacing: .11em; color: var(--muted); }
-  .rest-next {
-    font-size: 12.5px; color: var(--muted); min-width: 0;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .rest-clock {
-    font-size: 28px; font-weight: 800; letter-spacing: -.03em; line-height: 1;
-    font-variant-numeric: tabular-nums;
-  }
+  /* A countdown is a hairline strip and not a ring: a ring implies precision
+     and invites tick marks, gradients and a second progress metaphor competing
+     with the number. A hairline bar cannot. The stretch hold is the one
+     countdown left on screen (rest lives in the top clock now). */
   .rest-track { height: 2px; border-radius: 9px; background: var(--panel); overflow: hidden; }
   .rest-fill { height: 100%; width: 100%; background: var(--accent); border-radius: 9px; transition: width 1s linear; }
-  /* The advice, not a deadline. It stays the same size whichever thing it is
-     saying, so reaching the recommendation does not make the strip jump. */
-  .rest-advice { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
-  /* Accent, not --up: --up is the coral that means a number went the wrong way,
-     and reaching your rest recommendation is not a warning. */
-  .rest-bar.ready .rest-advice { color: var(--accent-ink); font-weight: 700; }
-  .rest-bar.ready .rest-advice::before {
-    content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 100px;
-    background: var(--accent-ink); margin-right: 7px; vertical-align: middle;
-  }
   .rest-pref { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
   .rest-pref button {
     min-height: 44px; padding: 10px 0; border-radius: 12px; cursor: pointer;
@@ -845,14 +772,6 @@
   .rest-pref.five { grid-template-columns: repeat(5, 1fr); }
   .rest-pref button:active { transform: scale(.96); }
   .rest-pref button.on { background: var(--accent); border-color: transparent; color: var(--on-accent); }
-
-  .rest-adjust { display: flex; gap: 8px; }
-  .rest-adjust button {
-    flex: 1; min-height: 44px; padding: 14px 16px; border-radius: 12px; cursor: pointer;
-    background: var(--panel); border: 1px solid var(--border); color: var(--text);
-    font-family: inherit; font-size: 14px; font-weight: 700;
-  }
-  .rest-adjust button:active { transform: scale(.96); }
 
   /* Grid, not space-between: "Weight (lb)" is a wider label than "Reps", so
      with flex the two control groups started at different places and the minus
@@ -1815,8 +1734,9 @@
      touch lives in a sheet pinned under your thumb. A flex column rather than
      a scrolling document, because the sheet has to sit on the bottom of the
      phone whatever the exercise name does, and the stage takes what is left.
-     Only this one screen: the warm-up, the paused sheet and the wrap-up all
-     still scroll, which is why the class is added and removed per render. */
+     The lift and the two timed blocks share it: the paused sheet and the
+     wrap-up still scroll, which is why the class is added and removed per
+     render. */
   .session-overlay.lifting {
     display: flex; flex-direction: column;
     overflow: hidden; padding: 0;
@@ -1844,6 +1764,59 @@
     --sess-key: rgba(17,19,24,.07);
     --sess-key-press: rgba(17,19,24,.13);
   }
+  /* ---- The stretch screen: the same stage and sheet, lit blue ----------
+     Mo: "similar to the workouts, of course keep it blue." So the warm-up and
+     cool-down are this exact layout, and the only things that change are what
+     the tokens say. The accent swap on .stretching already turns every accent
+     blue; these two re-light the stage and the sheet so the ground changes
+     with the mode too, the way the old wash did on the scrolling version.
+     The lift's greys with the stretch hue mixed in, so the figure still stands
+     on a light stage and the sheet is still near-black, just cooler. */
+  .session-overlay.lifting.stretching {
+    --sess-stage: linear-gradient(180deg, #2a3949 0%, #9ab6cf 26%, #dfebf6 50%, #dbe8f4 70%, #98b4cc 88%, #62809b 100%);
+    --sess-sheet: linear-gradient(180deg, #1b2a3a 0%, #0d161f 58%, #0a1119 100%);
+    --sess-key: rgba(160,205,255,.16);
+    --sess-key-press: rgba(160,205,255,.28);
+  }
+  html[data-theme="light"] .session-overlay.lifting.stretching {
+    --sess-stage: linear-gradient(180deg, #d5e5f2 0%, #e9f2f9 26%, #ffffff 50%, #f6fafd 70%, #d3e3f0 88%, #b5cde2 100%);
+    --sess-sheet: linear-gradient(180deg, #ffffff 0%, #f7fbfe 100%);
+    --sess-key: rgba(11,127,199,.09);
+    --sess-key-press: rgba(11,127,199,.17);
+  }
+  /* What replaces the set chips: the hold. One number, big enough to read
+     from the floor, the hairline track under it, and the line above saying
+     which side and what comes next in the same slot "Last time / Beat it"
+     uses on the lift. Centred because there is nothing to pair it with. */
+  .stretch-hold { text-align: center; }
+  .stretch-hold .sess-lastline { margin-top: 0; }
+  .stretch-clock {
+    font-size: 64px; font-weight: 800; letter-spacing: -.04em; line-height: 1;
+    font-variant-numeric: tabular-nums; color: var(--text); margin: 8px 0 12px;
+  }
+  /* The track sits on the sheet, not on a panel, so it takes the sheet's key
+     tint rather than --panel, which is invisible on the near-black. */
+  .stretch-hold .rest-track { height: 3px; background: var(--sess-key); }
+  /* The seconds, the side and what the move is for, under the name. The lift
+     puts nothing here because its numbers live in the dials; a stretch has no
+     dials, and "40s, left side, for your squats" is the whole brief. */
+  .stretch-sub {
+    margin-top: 6px; font-size: 15.5px; font-weight: 600; letter-spacing: -.01em;
+    color: color-mix(in srgb, var(--sess-ink) 72%, transparent);
+  }
+  .stretch-cue {
+    margin: 14px 0 0; font-size: 14px; line-height: 1.4; color: var(--muted); text-align: center;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  /* Skip is a way out, not a choice between equals, so it is a text link under
+     the CTA rather than the second of two buttons the old strip had. */
+  .stretch-skip {
+    display: block; width: 100%; min-height: 40px; margin: 6px 0 0; padding: 8px;
+    background: none; border: 0; cursor: pointer; font-family: inherit;
+    font-size: 14px; font-weight: 700; color: var(--muted); transition: opacity .12s ease;
+  }
+  .stretch-skip:active { opacity: .55; }
+  .stretch-note { margin: 2px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--muted); text-align: center; }
   /* The top bar rides on the stage, so it takes the stage's ink rather than
      the app's, and the two round buttons become ghosts on it. */
   .session-overlay.lifting .session-bar {
@@ -2166,14 +2139,10 @@
   .sess-act-ico { flex-shrink: 0; display: flex; color: var(--accent-ink); }
   .sess-card.sess-bottom .sess-note { margin-bottom: 8px; }
   .sess-fig.fig-none { display: none; }
-  .stretch-fig { display: flex; justify-content: center; margin: 6px 0 4px; }
-  .stretch-fig canvas { width: 220px; height: 220px; }
-  .stretch-fig.fig-none { display: none; }
   /* body3d: the muscle body is a solid, not a line drawing, so it needs more
-     canvas than the 2D figure before the volume reads at all. Only the two
-     figures that carry a whole screen get it; cards and plan rows stay 2D. */
+     canvas than the 2D figure before the volume reads at all. Only the figure
+     that carries a whole screen gets it; cards and plan rows stay 2D. */
   .sess-fig[data-fig3d].fig-3d canvas { width: 240px; height: 240px; }
-  .stretch-fig[data-fig3d].fig-3d canvas { width: 240px; height: 240px; }
   .cb-confirm-fig canvas { width: 124px; height: 124px; margin-bottom: 2px; }
   .cb-confirm-fig.fig-none { display: none; }
   .cb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
@@ -14331,6 +14300,21 @@ function stretchAdvance() {
   renderStretchPhase();
 }
 
+/* Tapping a move in the Up next rail goes straight to it, the way tapping an
+   exercise there jumps the lift. Always from side one: a hold you jumped to
+   has not been held yet. Moves passed over are not marked done anywhere,
+   because a stretch writes nothing, so there is nothing to mark. */
+function jumpToStretch(n) {
+  if (!SESSION) return;
+  const list = stretchList();
+  if (n < 0 || n >= list.length) return;
+  SESSION.stretchIndex = n;
+  SESSION.stretchSide = 1;
+  SESSION.stretchStartedAt = Date.now();
+  saveSessionToStorage();
+  renderStretchPhase();
+}
+
 function endStretchPhase() {
   if (!SESSION) return;
   stopStretchTicker();
@@ -14418,69 +14402,104 @@ function renderStretchPhase() {
   const total = Math.max(1, Number(move.seconds) || 30);
   const left = Math.max(0, total - (Date.now() - (SESSION.stretchStartedAt || Date.now())) / 1000);
   const next = list[i + 1];
-  const nextUp = move.perSide && SESSION.stretchSide === 1 ? "other side" : next ? next.name : (isWarm ? "first lift" : "finish");
+  const otherSide = !!move.perSide && SESSION.stretchSide === 1;
+  const nextUp = otherSide ? "other side" : next ? next.name : (isWarm ? "first lift" : "finish");
+  const lastHold = !otherSide && !next;
   SESSION_LAST_EX = null;   // the first lift after the warm-up slides in like a new exercise
-  $("sessionCard").classList.remove("lifting", "paused-screen");   // the timed blocks scroll, the lift screen does not
+  const card = $("sessionCard");
+  /* Same skeleton as the lift (the stage and the sheet, one screen that does
+     not scroll), so `lifting` goes on here too: it is the layout class, not a
+     statement about what you are doing. `stretching` re-lights it blue. */
+  card.classList.add("lifting", "stretching");
+  card.classList.remove("paused-screen", "waking");
   $("sessionProgressFill").style.width = isWarm ? "0%" : "100%";
-  /* The whole screen changes colour for the duration of the block. See the
-     .session-overlay.stretching rules: one class, every accent follows. */
-  $("sessionCard").classList.add("stretching");
 
-  /* How long the block runs, and how much of it is left, both said out loud.
-     Counted from the moves themselves rather than a constant, so it can never
-     promise eight minutes and deliver three. */
+  /* How much of the block is left, said out loud. Counted from the moves
+     themselves rather than a constant, so it can never promise eight minutes
+     and deliver three. */
   const blockSec = stretchBlockSeconds(list);
   const doneSec = stretchBlockSeconds(list.slice(0, i))
-    + (move.perSide && SESSION.stretchSide === 2 ? Math.max(1, Number(move.seconds) || 30) : 0);
+    + (move.perSide && SESSION.stretchSide === 2 ? total : 0);
   const leftMin = Math.max(1, Math.round((blockSec - doneSec) / 60));
 
+  /* What it is for beats what it works: "for your squats" is a reason to do
+     it, "Quads" is a label. Falls back to the muscle for the static holds,
+     which carry no patterns. */
+  const why = preparesLabel(move) || (move.group ? (BODY_GROUP_LABELS?.[move.group] || move.group) : "");
+  const side = move.perSide ? (SESSION.stretchSide === 1 ? "left side" : "right side") : "";
+  const sub = [`${total}s${isWarm ? "" : " hold"}`, side, why].filter(Boolean).join(" · ");
+  const remaining = list.map((m, n) => ({ m, n })).filter(({ n }) => n > i);
+
   $("sessionBody").innerHTML = `
-    <div class="stretch-banner">
-      <span class="stretch-banner-icon">${icon(isWarm ? "flame" : "heart", 19)}</span>
-      <div class="stretch-banner-body">
-        <div class="stretch-banner-title">${isWarm ? "Warming up" : "Cooling down"}</div>
-        <div class="stretch-banner-sub">${Math.max(1, Math.round(blockSec / 60))} min in total · about ${leftMin} min left</div>
-        <div class="stretch-pips">${list.map((_, n) => `<i class="${n < i ? "done" : n === i ? "now" : ""}"></i>`).join("")}</div>
+    <div class="sess-live ex-in">
+      <div class="sess-view" id="sessView">
+      <div class="sess-top">
+        <div class="sess-segs">
+          ${list.map((_, n) => `<i class="${n < i ? "done" : n === i ? "now" : ""}"></i>`).join("")}
+        </div>
+        <div class="sess-where">
+          <span>${isWarm ? "Warm-up" : "Cool-down"} ${i + 1} of ${list.length}</span>
+          <span>About ${leftMin} min left</span>
+        </div>
+        <!-- The name is not a button here: a stretch has nothing to swap or
+             share, and a word that does nothing must not look pressable. -->
+        <div class="sess-titlerow"><h2 class="sess-title">${escapeHtml(move.name || "")}</h2></div>
+        <div class="stretch-sub">${escapeHtml(sub)}</div>
       </div>
-    </div>
 
-    <div class="sess-card ex-in">
-      <div class="sess-step-row">
-        <div class="sess-step">${isWarm ? "WARM-UP" : "COOL-DOWN"} · ${i + 1} OF ${list.length}</div>
+      <div class="sess-stage" id="sessStage">
+        <!-- Light palette on the light stage, as on the lift; the accent is
+             the stretch blue so the working muscles light in the mode's hue. -->
+        <div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(move.name || "")}" data-theme="light" data-accent="stretch"></div>
+        <div class="sess-stage-none" aria-hidden="true">${icon(isWarm ? "flame" : "heart", 72)}</div>
       </div>
-      <h2 class="sess-name">${escapeHtml(move.name || "")}</h2>
-      <div class="sess-meta">
-        <span class="sess-target">${total}s${move.perSide ? ` · ${SESSION.stretchSide === 1 ? "left" : "right"} side` : ""}</span>
-        ${(() => {
-          /* What it is for beats what it works: "for your squats" is a reason
-             to do it, "Quads" is a label. Falls back to the muscle for the
-             static holds, which carry no patterns. */
-          const why = preparesLabel(move);
-          const text = why || (move.group ? (BODY_GROUP_LABELS?.[move.group] || move.group) : "");
-          return text ? `<span class="sess-target">${escapeHtml(text)}</span>` : "";
-        })()}
       </div>
-      <div class="stretch-fig" data-fig="${escapeHtml(move.name || "")}" data-accent="stretch"></div>
-      ${move.cue ? `<div class="sess-note">${escapeHtml(move.cue)}</div>` : ""}
-    </div>
 
-    <div class="rest-bar" id="stretchTimer">
-      <div class="rest-head">
-        <span class="rest-label">${isWarm ? "MOVING" : "HOLD"}</span>
-        <span class="rest-next">Next: ${escapeHtml(nextUp)}</span>
+      <div class="sess-sheet${SESSION_SHEET_OPEN ? " open" : ""}" id="sessSheet">
+        <button type="button" class="sess-grab" id="sessGrab" aria-expanded="${SESSION_SHEET_OPEN ? "true" : "false"}"
+          aria-label="${SESSION_SHEET_OPEN ? "Hide what is up next" : "Show what is up next"}"><i></i></button>
+
+        <!-- The hold, where the lift keeps its set chips: the one number this
+             screen is about, with the side and what follows above it. -->
+        <div class="stretch-hold" id="stretchTimer">
+          <div class="sess-lastline">
+            <span class="last">${isWarm ? "Moving" : "Hold"}${side ? `, ${side}` : ""}</span>
+            <span class="beat">Next: ${escapeHtml(nextUp)}</span>
+          </div>
+          <div class="stretch-clock" id="stretchClock" aria-live="off">${formatRest(left * 1000)}</div>
+          <div class="rest-track"><div class="rest-fill" id="stretchFill" style="width:${((left / total) * 100).toFixed(1)}%"></div></div>
+        </div>
+        ${move.cue ? `<p class="stretch-cue">${escapeHtml(move.cue)}</p>` : ""}
+
+        <div class="sess-cta">
+          <button type="button" class="btn-big btn-primary" id="stretchNext">${lastHold ? (isWarm ? "Start lifting" : "Finish workout") : "Next"}</button>
+        </div>
+        <button type="button" class="stretch-skip" id="stretchSkipAll">${isWarm ? "Skip warm-up" : "Skip cool-down"}</button>
+        ${isWarm ? "" : `<p class="stretch-note">Your lifts are banked. This is the part that makes tomorrow easier.</p>`}
+
+        ${remaining.length ? `<div class="upnext">
+          <div class="upnext-label">Up next</div>
+          <div class="upnext-rail">
+            ${remaining.map(({ m, n }) => `<button type="button" class="upnext-card" data-jump-stretch="${n}">
+              <span class="upnext-fig" data-fig="${escapeHtml(m.name || "")}" data-accent="stretch"></span>
+              <span class="upnext-text">
+                <span class="upnext-name">${escapeHtml(m.name || "")}</span>
+                <span class="upnext-meta">${Math.max(1, Number(m.seconds) || 30)}s${m.perSide ? " per side" : ""}</span>
+              </span>
+            </button>`).join("")}
+          </div>
+        </div>` : ""}
       </div>
-      <span class="rest-clock" id="stretchClock">${formatRest(left * 1000)}</span>
-      <div class="rest-track"><div class="rest-fill" id="stretchFill" style="width:${((left / total) * 100).toFixed(1)}%"></div></div>
-      <div class="rest-adjust">
-        <button type="button" id="stretchNext">Next</button>
-        <button type="button" id="stretchSkipAll">${isWarm ? "Skip warm-up" : "Skip cool-down"}</button>
-      </div>
-    </div>
-    ${isWarm ? "" : `<p class="muted-note" style="margin-top:12px;">Your lifts are banked. This is the part that makes tomorrow easier.</p>`}`;
+    </div>`;
 
   $("stretchNext").onclick = stretchAdvance;
   $("stretchSkipAll").onclick = skipStretchPhase;
+  $("sessionBody").querySelectorAll("[data-jump-stretch]").forEach((b) => {
+    b.onclick = () => jumpToStretch(parseInt(b.dataset.jumpStretch, 10));
+  });
+  wireSessionSheet();
   mountMotionFigures($("sessionBody"));
+  tickTimer();
   startStretchTicker();
 }
 
@@ -14758,9 +14777,9 @@ function renderSession() {
       </div>
     </div>`;
 
-  /* This screen is the one that does not scroll. Every other thing the overlay
-     draws (the stretch blocks, the paused sheet, the wrap-up) is a document,
-     so the class goes on here and comes off in each of those. */
+  /* This screen does not scroll, and neither do the stretch blocks, which
+     share its layout. The paused sheet and the wrap-up are documents, so the
+     class goes on here and comes off in each of those. */
   $("sessionCard").classList.add("lifting");
   $("sessionCard").classList.remove("paused-screen");
   if (waking) startSessionWake(); else $("sessionCard").classList.remove("waking");
