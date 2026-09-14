@@ -2091,6 +2091,12 @@
     background: var(--stretch); color: var(--on-stretch);
   }
   .sess-chip.warm svg { opacity: .95; }
+  /* The one you are on, in the warm-up's own blue rather than the working
+     set's lime, so "which set am I doing" and "is this a warm-up" are the
+     same glance. */
+  .sess-chip.warm.current {
+    background: var(--bg); border-color: var(--stretch); color: var(--stretch-ink);
+  }
   /* A banked set is a tick, not a number and never a lime W: once it is behind
      you the only thing worth saying is that it is done, and the position in the
      row already says which one it was. The label lives on in aria-label. */
@@ -2114,6 +2120,7 @@
     margin-top: 15px; font-size: 15.5px;
   }
   .sess-lastline .last { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sess-lastline .last.warm { color: var(--stretch-ink); font-weight: 700; }
   .sess-lastline .beat { color: var(--accent-ink); font-weight: 700; flex-shrink: 0; }
 
   /* Weight and reps, one cluster each, thumb-sized keys either side of a
@@ -5452,7 +5459,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.14.10";
+const APP_VERSION = "2026.09.14.11";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -15418,11 +15425,14 @@ function renderSession() {
           aria-label="${SESSION_SHEET_OPEN ? "Hide what is up next" : "Show what is up next"}"><i></i></button>
 
         <div class="sess-chips">
-          ${rungs.map((r, i) => `<button type="button" class="sess-chip warm${i < rampTicks ? " done" : ""}${justRamp === i ? " just-done" : ""}"
+          ${rungs.map((r, i) => `<button type="button" class="sess-chip warm${i < rampTicks ? " done" : ""}${i === rampTicks ? " current" : ""}${justRamp === i ? " just-done" : ""}"
             data-ramp="${i}" title="Warm-up, ${escapeHtml(rampRungLabel(r))}"
             aria-label="Warm-up ${i + 1}, ${escapeHtml(rampRungLabel(r))}, ${i < rampTicks ? "done" : "not done"}">${i < rampTicks ? CHIP_TICK : icon("flame", 18)}</button>`).join("")}
           ${setsDone.map((done, i) => {
-            const isCurrent = i === currentSet;
+            /* Only one chip is the live one. While a warm-up is still waiting,
+               that is the warm-up, so the first working set does not also wear
+               a ring and leave two places claiming to be where you are. */
+            const isCurrent = i === currentSet && rampTicks >= rungs.length;
             return `<button type="button" class="sess-chip${done ? " done" : ""}${isCurrent ? " current" : ""}${justSet === i ? " just-done" : ""}"
               data-set="${i}" ${done || isCurrent ? "" : "disabled"}
               aria-label="Set ${i + 1}, ${done ? "done" : isCurrent ? "current" : "not started"}">${done ? CHIP_TICK : i + 1}</button>`;
@@ -15435,12 +15445,19 @@ function renderSession() {
             /* While there are rungs left, the left slot carries the one you are
                on, because "what do I put on the bar" is the live question. Once
                the warm-up is behind you it goes back to last time's numbers. */
-            if (rampTicks < rungs.length) return `<span class="last">Warm-up, ${escapeHtml(rampRungLabel(rungs[rampTicks]))}</span>`;
+            /* Said outright while you are on it. "Warm-up, the bar x 8" told
+               you the load but left you to work out what kind of set it was,
+               which is the same thing the W chip did. */
+            if (rampTicks < rungs.length) return `<span class="last warm">This is a warm-up set, ${escapeHtml(rampRungLabel(rungs[rampTicks]))}</span>`;
             return lastTime
               ? `<span class="last">Last time ${lastTime.weight} lb${lastTime.reps ? ` &times; ${lastTime.reps}` : ""}</span>`
               : `<span class="last">First time on this lift</span>`;
           })()}
-          ${pbWeight == null ? "" : beatenPB
+          ${/* The record line is about the working set, so it stands down while a
+                warm-up is still the live thing. It was also what squeezed the
+                warm-up line into an ellipsis, and the load is the half of that
+                sentence you actually act on. */ ""}
+          ${rampTicks < rungs.length || pbWeight == null ? "" : beatenPB
             ? `<span class="beat">New best, ${sessionTop} lb</span>`
             : `<span class="beat">Beat it, was ${pbWeight}${pbReps ? ` &times; ${pbReps}` : " lb"}</span>`}
         </div>
@@ -18374,11 +18391,16 @@ function planMobility() {
    and on the session screen they outnumbered the sets that count. Mo sent the
    rule the lifting sources agree on, and this is it:
 
-     full ladder   the first lift of the day, and heavy compound lifts, where
-                   the joints and the pattern both need rehearsing
-     one feeler    a lift whose muscles an earlier lift already warmed
-     none          isolation work late in a session, and any set of fifteen or
-                   more, where the first easy reps ARE the warm-up
+     one    the first lift of the day, and heavy compound lifts, where the
+            joints and the pattern need rehearsing, and any lift whose muscles
+            are still cold
+     none   isolation work late in a session, a lift an earlier one already
+            warmed, and any set of fifteen or more reps, where the first easy
+            reps ARE the warm-up
+
+   One is the most it is ever worth. Mo: I do not know why we have more than
+   one, it is just one warm-up set. So the rule decides WHETHER, never how
+   many.
 
    Trimmed here rather than at the session because this is the single door
    every screen reads a ramp through, so the plan, the reveal and the session
@@ -18411,7 +18433,7 @@ function rampRungsWanted(name) {
   }
 
   if (isolation && (warm || !first)) return 0;
-  if (first || (compound && !warm)) return 4;    // the engine rarely writes more
+  if (warm && !first && !compound) return 0;   // already warmed by an earlier lift
   return 1;
 }
 
@@ -18421,11 +18443,10 @@ function rampForExercise(list, name) {
   const found = (Array.isArray(list) ? list : [])
     .find((r) => String(r?.exercise || "").trim().toLowerCase() === want);
   if (!found || !Array.isArray(found.sets) || !found.sets.length) return null;
-  const wanted = rampRungsWanted(name);
-  if (!wanted) return null;
-  // The heaviest rungs are the useful ones: they rehearse the working weight.
-  const sets = found.sets.slice(-wanted);
-  return { ...found, sets };
+  if (!rampRungsWanted(name)) return null;
+  // The last rung, which is the heaviest: it rehearses the working weight,
+  // which is the only thing a single warm-up set can usefully do.
+  return { ...found, sets: found.sets.slice(-1) };
 }
 
 /* One ramp said as loads, which is the part worth reading: "bar × 8 · 40 × 5".
