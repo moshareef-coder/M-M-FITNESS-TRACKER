@@ -1401,18 +1401,27 @@
     background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); color: #f4f6f8;
   }
   .gen-nudge button:active { transform: scale(.97); }
-  /* Standing on the accent: the primary button would be green on green, and
-     muted grey type disappears, so the whole stage inverts. */
   /* The reveal is the plan, not the chamber, so the figure and grid fade back
      and the rows sit on the dark ground rather than on top of a body. */
   .gen-scrim.done .gen-holo { opacity: .12; transition: opacity .5s ease; }
   .gen-scrim.done .gen-grid { opacity: .35; transition: opacity .5s ease; }
   .gen-scrim.done .gen-done-head { color: rgba(255,255,255,.6); }
   .gen-scrim.done .gen-focus { color: #f4f6f8; }
+  /* White on purpose, in both themes. This used to be the accent with
+     --accent-ink for the label, and on the dark palette --accent-ink IS the
+     accent, so the label was lime on lime and the button read as an empty
+     bar. Fixed colours rather than tokens because the stage is always dark,
+     and white is the one thing guaranteed to stand off it whatever the accent
+     is. Everything else on this screen is a row or a chip, so the only solid
+     white block is the way out. */
   .gen-scrim.done .gen-go {
-    background: var(--accent); color: var(--accent-ink); border: none;
+    background: #fff; color: #0b0d11; border: none;
     box-shadow: 0 10px 26px rgba(0,0,0,.35);
   }
+  .gen-scrim.done .gen-go:active { background: #dfe3e8; box-shadow: none; }
+  /* The global ring is the accent, and a white button already carries the
+     brightest thing on the stage, so the ring is white too and sits off it. */
+  .gen-scrim.done .gen-go:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
   .gen-err { font-size: 14px; color: rgba(255,255,255,.66); line-height: 1.5; margin: 12px 0 18px; }
   .gen-scrim:not(.done) .gen-focus { color: #f4f6f8; }
   @media (prefers-reduced-motion: reduce) {
@@ -12651,89 +12660,29 @@ function closeGenOverlay() {
 /* The payoff: the plan lands a row at a time. Quick, 70ms apart, so five
    exercises are all in within half a second.
 
-   `honest` is the generator's one plain sentence about pace, and it belongs
-   here rather than in a toast: it is the caveat on the plan you are reading,
-   so it sits above the rows in the sheet's own muted line and stays on screen
-   for as long as they do. */
-/* One sentence off meta.session (CONTRACT.md): the clock this day was costed
-   against, whose clock it was, and what the day really comes to. `budgetMinutes`
-   is this DAY's budget and a short day is six tenths of the week's, so when it
-   disagrees with what was asked for the sentence says which is which rather
-   than reading as the engine ignoring the answer. The two trades, a day that
-   does not fit and a rest that was shortened, are the engine's own sentences
-   and are shown from `notes` instead of being written again here. */
-function sessionRevealLine(session) {
-  const budget = Number(session?.budgetMinutes);
-  if (!Number.isFinite(budget) || budget <= 0) return "";
-  const est = Number(session.estimatedMinutes);
-  const comes = Number.isFinite(est) && est > 0 ? ` This one comes to about ${est}.` : "";
-  /* The engine spells the stated case "asked" (plan.mjs `sessionBudget.source`).
-     Tested for the goal case rather than the other one so a third value could
-     only ever read as a number somebody gave, which is the harmless way round. */
-  if (session.source === "goal") {
-    return `You have not said how long you have, so your goal set the clock at ${budget} minutes.${comes}`
-      + ` Setup, then Training, if that is wrong.`;
-  }
-  const asked = Number(session.asked);
-  if (Number.isFinite(asked) && asked !== budget) {
-    return `You asked for about ${asked} minutes a session. This is a shorter day, built for ${budget}.${comes}`;
-  }
-  return `Built for the ${budget} minutes you asked for.${comes}`;
-}
-
+   The rows are the screen. Until 2026-09-14 this sheet also carried the
+   generator's pace sentence (`honest`), the session-clock sentence off
+   meta.session, up to a dozen lines of `notes` and a warm-up count, and on a
+   phone the plan started below the fold, under paragraphs nobody read before
+   tapping the button. Mo asked for the explanation to go. `honest` and
+   `session` still arrive because the callers and the engine contract have not
+   changed, and `session` still sets the estimate on the tappable clock. */
 function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], session = null) {
   if (genCancelled) return;   // they left; the workout is saved either way
   stopGenTicker();
   paintGen(100);
   const list = (workout.exercises || []).slice(0, 8);
-  /* The clock, closed back. meta.session says which clock this day was costed
-     against and whose it was, and a length somebody asked for that is never
-     mentioned again is a question that might as well not have been asked. */
-  const sessionLine = sessionRevealLine(session);
-  /* Two of the four things meta.session can report are trades rather than
-     reassurances: the day that still does not fit, and the rest that was
-     shortened to buy the minutes. The engine already says both out loud in
-     `notes`, so when either happened every note is shown rather than the first
-     three, because the one that got cut would be the one worth reading. */
-  const loud = session?.fits === false || session?.restCompressed === true;
-  /* What the plan said about itself (CONTRACT.md `notes`): the limits summary,
-     the softened warning when a slot kept a movement that loads a joint they
-     said hurts, the day-count clamp. Until 2026-09-10 the engine computed all
-     of it and none of it reached a screen, so its defence for prescribing a
-     movement someone said hurts ("the plan says so out loud") was false end to
-     end. Three at most; the first three are the ones that matter. */
-  /* The day that does not fit is said once per day and this sheet is one day,
-     so the other days' copies are dropped. Four near identical paragraphs
-     naming days you are not doing today is a scold, which is the same reason
-     the engine says the rest compression sentence once for the whole week.
-     Keyed off the engine's own sentence, and a rewording there costs this
-     filter and never a note: nothing matching means nothing dropped. */
-  const otherDay = (n) => {
-    const m = /^(.+?) (?:still )?comes to about \d+ minutes against/.exec(n);
-    return !!m && m[1] !== (workout.focus || "");
-  };
-  const heard = (Array.isArray(notes) ? notes : [])
-    .filter((n) => typeof n === "string" && n.trim() && !otherDay(n));
-  const said = loud ? heard : heard.slice(0, 3);
-  /* The engine's own sentence about ramp-up sets: what they are, and that none
-     of it counts as a set or gets logged. It is the only place the app explains
-     them, and it arrives well down `notes`, so a day that bought a ramp keeps
-     that sentence even when the list is trimmed to three. Matched on the
-     engine's phrase, so a rewording there costs this line and never a note. */
+  /* The one kind of note that stays: a warning, not an explanation. The
+     softened sentence for a slot that kept a movement loading a joint they
+     said hurts, and the clinician line for the pain and postpartum goals.
+     Neither is stored anywhere and neither reaches another screen, so dropping
+     them here would make the engine's defence for prescribing a movement
+     someone said hurts ("the plan says so out loud") false again. Matched on
+     the engine's own phrases, so a rewording there costs a line and never a
+     plan. */
+  const warnings = (Array.isArray(notes) ? notes : [])
+    .filter((n) => typeof n === "string" && /stop if it hurts|clinician/i.test(n));
   const ramps = workout.rampSets || [];
-  const rampNote = ramps.length ? heard.find((n) => /ramp-up sets/i.test(n)) : null;
-  if (rampNote && !said.includes(rampNote)) said.push(rampNote);
-  const wu = workout.warmup || [];
-  const cd = workout.cooldown || [];
-  /* Only mention the halves that exist: the old template printed "Opens with
-     no warm-up" and "a 8 move warm-up". */
-  const coolWord = cd.some((m) => m.kind === "mobility") ? "mobility moves" : "stretches";
-  const parts = [];
-  if (wu.length) parts.push(`opens with ${wu.length === 8 || wu.length === 11 ? "an" : "a"} ${wu.length} move warm-up`);
-  if (cd.length) parts.push(`closes with ${cd.length} ${coolWord}`);
-  const stretchLine = parts.length
-    ? `${parts.join(", ")[0].toUpperCase()}${parts.join(", ").slice(1)}. Timed, and you can skip either.`
-    : "";
   /* The one unprompted offer, and it is here rather than in onboarding because
      a limit is a constraint on how a goal gets trained for, not a goal: asking
      up front turns "what do you want" into "what is wrong with you" and can
@@ -12771,15 +12720,12 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
       <div class="gen-done-head">${escapeHtml(head)}</div>
       <div class="gen-focus">${escapeHtml(displayFocus(workout.focus, workout.exercises) || "Ready")}</div>
       ${forToday ? "" : `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(forDate)}</p>`}
-      ${honest ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(honest)}</p>` : ""}
-      ${sessionLine ? `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(sessionLine)}</p>` : ""}
       ${canRebudget ? `<div class="plan-time-row">
         <button type="button" class="plan-time" id="genTimeBtn" aria-label="About ${estMin} minutes. Change how long you have today.">
           ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
         </button>
       </div>` : ""}
-      ${said.map((n) => `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(n)}</p>`).join("")}
-      ${stretchLine ? `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(stretchLine)}</p>` : ""}
+      ${warnings.map((n) => `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(n)}</p>`).join("")}
       <div class="gen-rows" id="genRows">
         ${list.map((ex, i) => `
           <div class="gen-row" data-ex="${i}" style="--d:${i * 70}ms">
