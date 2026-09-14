@@ -1887,14 +1887,31 @@
 
   /* The figure gets everything between the title and the sheet, and is clipped
      rather than allowed to push either of them. */
+  /* The stage is a column: anything he says takes a row of its own at the
+     top, and the figure gets what is left. Mo: the text must never touch him
+     or anything else, even if other things have to move to make room. Laying
+     it out rather than floating it over him is what makes that a guarantee
+     instead of a set of magic numbers that hold until a line runs long. The
+     figure's canvas is already sized off the height it is given, so it
+     shrinks to fit the moment a bubble appears and grows back when it goes. */
   .sess-stage {
-    position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden;
-    display: flex; align-items: center; justify-content: center;
+    flex: 1 1 auto; min-height: 0; overflow: hidden;
+    display: flex; flex-direction: column;
     /* Vertical panning is not this element's job (nothing here scrolls), so
        the browser is told to leave the horizontal axis alone rather than
        treat a swipe as its own edge-navigation gesture. */
     touch-action: pan-y;
   }
+  .sess-stage-main {
+    position: relative; flex: 1 1 auto; min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  /* No bubble, no row. Rendered with nothing inside it so :empty is true. */
+  .sess-quip-slot { flex: 0 0 auto; display: flex; justify-content: center; padding: 0 14px; }
+  .sess-quip-slot:empty { display: none; }
+  /* He stands right of centre while resting, so the bubble leans that way and
+     its tail points at him rather than at the rest clock. */
+  .sess-stage.resting .sess-quip-slot { justify-content: flex-end; }
   /* Stretched to the stage's height, so the canvas below can size itself off
      it. The stage is not one height: the warm-up and cool-down sheets are
      taller than the lift's, and a standing stretch drawn at the lift's fixed
@@ -1938,6 +1955,35 @@
      up on both themes. Nothing stops and nothing nags; the clock keeps
      counting, because standing there for four minutes is worth knowing. */
   .sess-rest.ready .sess-rest-clock, .sess-rest.ready .sess-rest-plan { color: var(--up); }
+
+  /* ---- What he says ----
+     A speech bubble in its own row above him, dark on the pale stage in both
+     themes, since the stage is a light panel even in dark mode. In the flow
+     rather than floating: see the stage column above. Tappable to dismiss,
+     and it blocks nothing behind it because there is nothing behind it. */
+  .sess-quip {
+    /* Capped short of the stage's width on purpose: a bubble that reaches
+       both edges reads as a banner, not as somebody speaking. */
+    position: relative; margin: 12px 0 16px; max-width: min(100%, 330px);
+    padding: 12px 15px; border-radius: 18px; border: 0;
+    background: #14171d; color: #f4f6f8; text-align: left;
+    font-family: inherit; font-size: 15px; font-weight: 600; line-height: 1.34;
+    letter-spacing: -.01em; box-shadow: 0 10px 26px -12px rgba(11,13,17,.55);
+    cursor: pointer; animation: quipIn .34s cubic-bezier(.22,1,.36,1) both;
+  }
+  .sess-quip::after {
+    content: ""; position: absolute; left: 50%; margin-left: -6px; bottom: -5px;
+    width: 13px; height: 13px; background: inherit; border-radius: 0 0 4px 0;
+    transform: rotate(45deg);
+  }
+  .sess-stage.resting .sess-quip::after { left: auto; margin-left: 0; right: 32px; }
+  .sess-quip.go { animation: quipOut .3s ease forwards; }
+  @keyframes quipIn  { from { opacity: 0; transform: translateY(8px) scale(.96) } to { opacity: 1; transform: none } }
+  @keyframes quipOut { to { opacity: 0; transform: translateY(-5px) scale(.98) } }
+  @media (prefers-reduced-motion: reduce) {
+    .sess-quip { animation: none; }
+    .sess-quip.go { animation: none; opacity: 0; }
+  }
   /* The one-tap path back while resting: the chip logs the set directly, and
      this says so, under the Start set button rather than beside it. */
   .sess-cta-alt {
@@ -5003,6 +5049,14 @@
       <div class="rest-pref" id="setupRestChoices"></div>
     </div>
     <div class="card">
+      <h2>Your training partner</h2>
+      <label class="gym-toggle" id="quipsWrap">
+        <span>Let him talk during a workout</span>
+        <input type="checkbox" id="quipsToggle" />
+      </label>
+      <p class="muted-note">The figure on the session screen says something now and then: after a record, when a rest is running long, between lifts. He is quiet most sets. Off here means never, on this phone.</p>
+    </div>
+    <div class="card">
       <h2>Stretching</h2>
       <label class="gym-toggle" id="skipStretchWrap">
         <span>Skip the warm-up and cool-down</span>
@@ -5340,7 +5394,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.14.3";
+const APP_VERSION = "2026.09.14.4";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -13621,6 +13675,11 @@ function startWorkout() {
   openSessionUI();
   $("workoutContent").classList.add("hidden");
   renderSession();
+  /* He opens. Only on a session that has logged nothing, so resuming a
+     half-done workout is not greeted as a beginning. A beat after the screen
+     arrives, so it does not race the entrance animation. */
+  QUIP_RECENT = {}; QUIP_LAST_AT = 0;
+  if (!SESSION.completed.some(Boolean)) setTimeout(() => sayQuip("start"), 1200);
 }
 
 function sessionMatchesPlan(saved) {
@@ -13811,9 +13870,17 @@ function paintRest() {
     REST_BUZZED_AT = SESSION.restStartedAt;
     buzz([18, 60, 18]);
   }
+  /* Standing about well past the plan is the moment he has the most to say,
+     and it is once per rest however long you stay: the buzz already marks
+     "you are good to go", this is the nudge after it. */
+  if (s.ready && QUIP_RESTED_AT !== SESSION.restStartedAt) {
+    QUIP_RESTED_AT = SESSION.restStartedAt;
+    sayQuip("restLong");
+  }
 }
 
 let REST_BUZZED_AT = null;
+let QUIP_RESTED_AT = null;
 
 /* The value is always computed from the wall clock, so an interval cannot
    drift the NUMBER; what it can drift is the moment the number changes, and a
@@ -13986,6 +14053,139 @@ function recordRest(ei, setIdx) {
 
 /* The half second after a set lands: a buzz, and a line naming exactly what
    was recorded, so "did that go in?" never has to be asked mid-workout. */
+/* ---- What he says ----
+   The figure talks. He is the only character in the app and he already does
+   the whole workout beside you, so the cheapest way to make a session feel
+   like company rather than a form is to let him have an opinion about it.
+
+   The voice, so later lines stay in it: dry, a bit pathetic, and aware he is
+   a drawing. He is not a coach and he never gives form advice he cannot back,
+   because a joke that is also wrong instruction is worse than no joke. He
+   punches at himself, at the situation, and occasionally at you, never at
+   your numbers.
+
+   The hard part of a talking character is not the writing, it is the volume.
+   A line you have read forty times is not funny, it is furniture you have to
+   read around. So: nothing on most sets, a hard floor between lines, no
+   repeat until the bank for that moment is used up, and a switch in Setup for
+   the days you want to be left alone. */
+const QUIPS = {
+  start: [
+    "Right. Let us both pretend we want this.",
+    "I have stretched. I am a drawing, but I have stretched.",
+    "Whatever happens, I am contractually here for all of it.",
+  ],
+  set: [
+    "Don&rsquo;t look at my screen time.",
+    "Logged. I am writing it down in my little book.",
+    "That one counted. They all count, that is the problem.",
+    "Good. Now do it again but somehow less tired.",
+    "I would spot you but I have no depth perception.",
+    "Between us, that looked easier than the last one.",
+    "One down. I have lost count. You have the app for that.",
+  ],
+  pr: [
+    "That is a PR. I would clap but my hands are drawn on.",
+    "New best. I am telling everyone. I only know you.",
+    "Personal record. I felt that and I did nothing.",
+  ],
+  lastSet: [
+    "Last one. Make it look deliberate.",
+    "Final set. Then we never speak of this exercise again.",
+    "One more and the machine is somebody else&rsquo;s problem.",
+  ],
+  restLong: [
+    "It has been a while. I finished the water. There is no more water.",
+    "We have rested so long I started a podcast.",
+    "I am not rushing you. I am simply standing here. Forever.",
+    "Take your time. I have nowhere else to be drawn.",
+  ],
+  nextExercise: [
+    "New lift. New chance for me to stand near you supportively.",
+    "Moving on. I liked that one, I am easy to please.",
+  ],
+};
+/* No finish line: the summary screen replaces the session view outright, so
+   the stage he speaks from does not exist by the time a workout ends. That
+   screen has its own celebration and does not need him talking over it. */
+
+/* Quiet is a per-device choice, not an account one: it is about the mood you
+   are in on the phone in your hand, and it needs no schema for that. */
+const QUIP_OFF_KEY = "ft-quips-off";
+function quipsMuted() {
+  try { return localStorage.getItem(QUIP_OFF_KEY) === "1"; } catch { return false; }
+}
+function setQuipsMuted(off) {
+  try { off ? localStorage.setItem(QUIP_OFF_KEY, "1") : localStorage.removeItem(QUIP_OFF_KEY); }
+  catch { /* private mode: it just talks */ }
+}
+
+let QUIP_LAST_AT = 0;          // when he last said anything
+let QUIP_RECENT = {};          // per moment, the lines already used
+let QUIP_TIMER = null;
+
+/* A line from `key` that has not been used yet this session, so he works
+   through the bank before he repeats himself and never says the same thing
+   twice running. */
+function pickQuip(key) {
+  const bank = QUIPS[key] || [];
+  if (!bank.length) return null;
+  const used = QUIP_RECENT[key] || (QUIP_RECENT[key] = []);
+  if (used.length >= bank.length) used.length = 0;
+  const left = bank.filter((l) => !used.includes(l));
+  const line = left[Math.floor(Math.random() * left.length)];
+  used.push(line);
+  return line;
+}
+
+/* The moments that always earn a line, against the ones that only sometimes
+   do. A record and the end of a workout are events; a set in the middle of
+   five is not, and treating it like one is how a character becomes wallpaper.
+   `force` skips the floor as well, because a PR that waits its turn behind a
+   cooldown lands after you have moved on. */
+const QUIP_ALWAYS = new Set(["pr", "start"]);
+const QUIP_ODDS = { set: 0.4, lastSet: 0.7, restLong: 0.8, nextExercise: 0.5 };
+const QUIP_FLOOR_MS = 40000;   // no two lines closer than this, events aside
+
+function sayQuip(key) {
+  if (quipsMuted() || !SESSION) return;
+  const slot = $("sessQuipSlot");
+  if (!slot) return;
+  const always = QUIP_ALWAYS.has(key);
+  if (!always) {
+    if (Date.now() - QUIP_LAST_AT < QUIP_FLOOR_MS) return;
+    if (Math.random() > (QUIP_ODDS[key] ?? 0.5)) return;
+  }
+  const line = pickQuip(key);
+  if (!line) return;
+  QUIP_LAST_AT = Date.now();
+  clearTimeout(QUIP_TIMER);
+  slot.replaceChildren();
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = "sess-quip";
+  /* A button, so it can be dismissed and so a screen reader is offered it
+     rather than having it read out in the middle of the set count. */
+  el.innerHTML = line;
+  el.setAttribute("aria-label", `He says: ${el.textContent}`);
+  el.onclick = () => hideQuip();
+  slot.appendChild(el);
+  // Long enough to read twice, short enough that it is gone before it is
+  // scenery. Scaled to the line, because they are not the same length.
+  const hold = Math.min(7000, 2600 + line.length * 45);
+  QUIP_TIMER = setTimeout(hideQuip, hold);
+}
+
+function hideQuip() {
+  clearTimeout(QUIP_TIMER);
+  const el = $("sessQuipSlot")?.querySelector(".sess-quip");
+  if (!el) return;
+  el.classList.add("go");
+  /* Removed, not just faded: the slot has to go back to empty or it keeps
+     holding a row of height and the figure never grows back. */
+  setTimeout(() => el.remove(), 320);
+}
+
 function celebrateSet(ei, setIdx) {
   const ex = TODAY_WORKOUT.exercises[ei];
   const w = SESSION.setWeights?.[ei]?.[setIdx];
@@ -13994,7 +14194,13 @@ function celebrateSet(ei, setIdx) {
   toast(w > 0
     ? `Set ${setIdx + 1} logged: ${w} lb × ${reps}`
     : `Set ${setIdx + 1} logged: ${reps} reps`);
-  maybeAnnouncePR(ex.name, w);
+  const wasPR = maybeAnnouncePR(ex.name, w);
+  /* He does not talk over the record pop, which is its own celebration and
+     already owns the top of the screen for a moment. The PR line waits for it
+     to retract. */
+  const last = setIdx >= (SESSION.setsDone?.[ei]?.length || 1) - 1;
+  if (wasPR) setTimeout(() => sayQuip("pr"), 2600);
+  else sayQuip(last ? "lastSet" : "set");
 }
 
 /* What you actually did last time on this lift, which is the number worth
@@ -14034,16 +14240,19 @@ function bestEverFor(name) {
    exercise_logs yet (those are written when the exercise ends), so the check
    is against the history plus whatever this session already announced, which
    is what stops three sets at the same new weight firing three times. */
+// Returns whether it announced one, so the caller can let the pop have the
+// screen to itself before the figure says anything about it.
 function maybeAnnouncePR(name, weight) {
-  if (!(weight > 0)) return;
+  if (!(weight > 0)) return false;
   const prev = bestEverFor(name);
-  if (prev == null) return;
+  if (prev == null) return false;
   const key = (name || "").trim().toLowerCase();
   SESSION.prShown = SESSION.prShown || {};
-  if (weight <= prev || weight <= (SESSION.prShown[key] || 0)) return;
+  if (weight <= prev || weight <= (SESSION.prShown[key] || 0)) return false;
   SESSION.prShown[key] = weight;
   saveSessionToStorage();
   showPRPop(name, weight);
+  return true;
 }
 
 /* Drops in over the session, bursts once, retracts on its own. Fixed and
@@ -14291,6 +14500,8 @@ async function doFinishExerciseAndAdvance() {
   const nextIdx = SESSION.completed.findIndex((c) => !c);
   SESSION.exerciseIndex = nextIdx === -1 ? TODAY_WORKOUT.exercises.length : nextIdx;
   saveSessionToStorage();
+  // A new lift is on the stage. Said after the render below has put it there.
+  if (nextIdx !== -1) setTimeout(() => sayQuip("nextExercise"), 900);
 
   if (nextIdx === -1) {
     /* The last lift is banked. If the plan carries a cool-down and it was
@@ -14543,10 +14754,12 @@ function renderStretchPhase() {
       </div>
 
       <div class="sess-stage" id="sessStage">
+        <div class="sess-stage-main">
         <!-- Light palette on the light stage, as on the lift; the accent is
              the stretch blue so the working muscles light in the mode's hue. -->
         <div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(move.name || "")}" data-theme="light" data-accent="stretch"></div>
         <div class="sess-stage-none" aria-hidden="true">${icon(isWarm ? "flame" : "heart", 72)}</div>
+        </div>
       </div>
       </div>
 
@@ -14786,6 +14999,10 @@ function renderSession() {
       </div>
 
       <div class="sess-stage${resting ? " resting" : ""}" id="sessStage">
+        <!-- Anything he says lands here, above everything else and touching
+             none of it. Empty until he speaks, and an empty row is no row. -->
+        <div class="sess-quip-slot" id="sessQuipSlot"></div>
+        <div class="sess-stage-main">
         <!-- The figure is always drawn in the light palette, whatever theme the
              app is in: it stands on the light stage, not on the app's ground.
              While resting it stops doing the lift and does whatever the rest
@@ -14806,6 +15023,7 @@ function renderSession() {
              this is the one mark that says "no figure for this one", quietly,
              and it is hidden the moment a real figure mounts. -->
         <div class="sess-stage-none" aria-hidden="true">${icon("dumbbell", 72)}</div>
+        </div>
       </div>
       </div>
 
@@ -20684,6 +20902,15 @@ function renderSetupTab() {
     $("setupGoalSub").textContent = goalTileLabel(MY_PROFILE);
     $("setupGoalDetail").value = MY_PROFILE.goal_detail || "";
     $("setupChallengeTarget").value = MY_PROFILE.challenge_target || 4;
+    /* Device preference, not an account one, so it is read off localStorage
+       here rather than off the profile with the rest of this page. */
+    $("quipsToggle").checked = !quipsMuted();
+    $("quipsWrap").classList.toggle("checked", !quipsMuted());
+    $("quipsToggle").onchange = (e) => {
+      setQuipsMuted(!e.target.checked);
+      $("quipsWrap").classList.toggle("checked", e.target.checked);
+      if (!e.target.checked) hideQuip();
+    };
     $("skipStretchToggle").checked = MY_PROFILE.skip_stretching === true;
     $("skipStretchWrap").classList.toggle("checked", MY_PROFILE.skip_stretching === true);
     $("skipStretchToggle").onchange = (e) => $("skipStretchWrap").classList.toggle("checked", e.target.checked);
