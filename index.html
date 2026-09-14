@@ -3466,8 +3466,11 @@
      touching it. */
   .spp-arc { position: relative; width: 100%; max-width: 172px; margin: 0 auto; }
   .spp-arc svg { display: block; width: 100%; height: auto; }
+  /* Centred in the bowl of the arc, not near its top: the arc's own circle
+     centre is at 65% of the box and the open ends are at 90%, so 56% puts the
+     number and its label in the middle of the space the arc encloses. */
   .spp-arc-num {
-    position: absolute; left: 0; right: 0; top: 44%; transform: translateY(-50%);
+    position: absolute; left: 0; right: 0; top: 56%; transform: translateY(-50%);
     display: flex; flex-direction: column; align-items: center; font-family: var(--font-display);
   }
   .spp-arc-num b { font-size: 26px; font-weight: 800; letter-spacing: -.03em; line-height: 1; color: var(--accent-ink); }
@@ -3477,6 +3480,11 @@
                font-family: var(--font-display); letter-spacing: -.02em; }
   .spp-tagline { margin: 4px 0 0; text-align: center; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
   .spp-hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+  /* The build options sit inside the card now, so they drop the card
+     treatment: a raised card inside a raised card reads as a mistake. */
+  .spp-actions .opt-card { background: var(--panel-2); box-shadow: none; animation: none; }
+  .spp-actions .opt-card:last-child { margin-bottom: 0; }
+  .spp-actions .opt-card.primary { background: color-mix(in srgb, var(--accent) 10%, var(--panel-2)); }
   .spp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
   .spp-fact { min-width: 0; }
   .spp-fact.wide { grid-column: 1 / -1; }
@@ -5288,7 +5296,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.13.27";
+const APP_VERSION = "2026.09.13.28";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -16123,7 +16131,11 @@ function planPreview() {
 /* The pieces of the Build screen come in one after another, same easing and
    stagger as Home, so the tab arrives rather than appearing. */
 function staggerWorkoutCards() {
-  const parts = [...$("workoutContent").querySelectorAll(".spp, .opt-card, .sv-saved, .cal")];
+  /* Only top-level pieces. The build options live inside the Smart Plan card
+     now, and giving them their own rise inside a card that is itself rising
+     compounds the two transforms and wobbles. */
+  const parts = [...$("workoutContent").querySelectorAll(".spp, .opt-card, .sv-saved, .cal")]
+    .filter((el) => !el.closest(".spp-actions"));
   parts.forEach((el, i) => {
     el.classList.remove("h-rise");
     void el.offsetWidth;
@@ -16341,6 +16353,22 @@ function renderChooseScreen() {
   $("workoutCardTitle").textContent = "";
   $("workoutFocusRow").textContent = "";
 
+  /* Mo: the ways to build a workout belong inside the Smart Plan card, with
+     Generate for me in the middle of it and the rest directly under. So the
+     card is now the whole build surface: the reading at the top, what you can
+     do about it in the middle, and the detail of the proposal underneath. A
+     coached client has no card (their coach sets the training), so for them
+     these same buttons still render on their own below the question. */
+  const actions = `
+    ${coached ? "" : optionCard("chooseGenerateBtn", "wand", "Generate for me",
+        "Built around your goals and stats.", true)}
+    ${optionCard("choosePlanBtn", "pencil",
+        coached ? "Log a workout" : "I'll plan my own",
+        coached ? "Record the session your coach set." : "Start from scratch and add your own exercises.",
+        coached)}
+    ${optionCard("chooseWeekBtn", "checklist", "Plan your week",
+        "Put saved workouts on the days you will do them.", false)}`;
+
   const preview = coached ? "" : `
     <div class="spp">
       <div class="spp-top">
@@ -16362,6 +16390,8 @@ function renderChooseScreen() {
         <p class="spp-focus">${escapeHtml(p.focus)}</p>
         <p class="spp-tagline">${escapeHtml(matchReading(p.match))} ${infoDot("planMatch", "How the match is worked out")}</p>
         <hr class="spp-hr" />
+        <div class="spp-actions">${actions}</div>
+        <hr class="spp-hr" />
         <div class="spp-grid">
           ${p.duration ? `<div class="spp-fact"><div class="k">Duration</div><div class="v">${escapeHtml(p.duration)}</div></div>` : ""}
           ${p.real ? `<div class="spp-fact"><div class="k">Exercises</div><div class="v">${p.count}</div></div>` : ""}
@@ -16379,17 +16409,9 @@ function renderChooseScreen() {
       <div class="scr-title">Build Next Workout</div>
     </div>
     ${preview}
-    <p class="build-q">${coached
-      ? `${escapeHtml(coachName)} sets your training. Log what you did, or add something extra.`
-      : "How do you want to build your next workout?"}</p>
-    ${coached ? "" : optionCard("chooseGenerateBtn", "wand", "Generate for me",
-        "Built around your goals and stats.", true)}
-    ${optionCard("choosePlanBtn", "pencil",
-        coached ? "Log a workout" : "I'll plan my own",
-        coached ? "Record the session your coach set." : "Start from scratch and add your own exercises.",
-        coached)}
-    ${optionCard("chooseWeekBtn", "checklist", "Plan your week",
-        "Put saved workouts on the days you will do them.", false)}
+    ${coached
+      ? `<p class="build-q">${escapeHtml(coachName)} sets your training. Log what you did, or add something extra.</p>${actions}`
+      : ""}
     ${savedWorkoutsHTML()}
     ${workoutCalendarHTML()}`;
   wireSavedWorkouts($("workoutContent"));
