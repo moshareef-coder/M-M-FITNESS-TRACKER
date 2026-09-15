@@ -3041,12 +3041,17 @@
   .prog-arrange button { background: none; border: 1px solid var(--border); color: var(--muted);
     font: 600 12.5px/1 inherit; padding: 8px 12px; border-radius: 100px; cursor: pointer; }
   .prog-arrange button.on { background: var(--accent); color: var(--bg); border-color: var(--accent); }
-  body.arranging .card { position: relative; touch-action: none; }
+  /* NOT touch-action:none on the card. That was the first version and it made
+     the page unscrollable on a phone the instant Rearrange was switched on:
+     the finger had nothing left to scroll with, because every card was
+     swallowing the gesture. Only the grip takes the touch, so the rest of the
+     card scrolls the page exactly as it always did. */
+  body.arranging .card { position: relative; }
   body.arranging .card::after { content: ""; position: absolute; inset: 0; border-radius: inherit;
     border: 1.5px dashed var(--border); pointer-events: none; }
   body.arranging .card .prog-grip { display: grid; }
   .prog-grip { display: none; position: absolute; top: 8px; right: 8px; z-index: 3;
-    width: 30px; height: 30px; place-items: center; border-radius: 8px;
+    width: 38px; height: 38px; place-items: center; border-radius: 9px; touch-action: none;
     background: var(--panel-2); color: var(--muted); cursor: grab; }
   .card.dragging { opacity: .9; z-index: 5; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
   .ob-inline { background: none; border: 0; padding: 0; font: inherit; color: var(--accent);
@@ -5547,7 +5552,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.6";
+const APP_VERSION = "2026.09.15.7";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -5861,6 +5866,13 @@ function initOnboard() {
     if (event === "SIGNED_OUT") location.reload();
   });
   registerAuthDeepLink();
+  registerPushHandlers();
+  /* An unregistered native plugin is undefined rather than an error, so a whole
+     feature can be missing with nothing in the log to say so. This is one line
+     and it makes the registry visible at boot. */
+  if (isNativeApp()) {
+    console.log("native plugins:", Object.keys(window.Capacitor.Plugins || {}).sort().join(", "));
+  }
   sb.auth.getSession().then(({ data }) => {
     if (data.session) handleSignedIn(data.session);
     else renderSignInScreen();
@@ -14749,7 +14761,11 @@ function pickQuip(key) {
    him, so the quiet beats are the exception now rather than the rule. */
 const QUIP_ALWAYS = new Set(["pr", "start"]);
 const QUIP_ODDS = { set: 0.92, lastSet: 1, restLong: 1, nextExercise: 1, rest: 0.75, warmup: 0.8, cooldown: 0.8, idle: 1 };
-const QUIP_FLOOR_MS = 9000;    // two lines never stack; beyond that he is free
+/* Thirty seconds between any two lines, up from nine. Nine was set when the
+   ask was "a lot more often" and it turned out to be too much: he was
+   commenting on a rest that had barely started. Mo, on his phone: space them
+   out to about half a minute. */
+const QUIP_FLOOR_MS = 30000;
 
 /* The two things that are drawn OVER the session rather than in it: the set
    toast and the record pop. Both are fixed to the page, so the stage's column
@@ -14818,7 +14834,11 @@ function sayQuip(key) {
 
   /* Hold starts when he STOPS typing, not when he starts, or a long line gets
      pulled off the screen halfway through saying itself. */
-  const hold = Math.min(7000, 2600 + said.length * 45);
+  /* Longer on screen than it used to be: 4s minimum rising with the length of
+     the line, capped at 11. A line you are still reading when it disappears is
+     worse than one that lingers a beat too long, and now that he speaks half
+     as often there is room for it. */
+  const hold = Math.min(11000, 4000 + said.length * 55);
   const rest = () => { el.classList.add("done"); QUIP_TIMER = setTimeout(hideQuip, hold); };
   typeQuip(el.querySelector(".sess-quip-txt"), said, rest);
 }
@@ -14863,7 +14883,7 @@ function typeQuip(target, line, done) {
    muted, the tab in the background, or the summary screen where he has no
    bubble to speak from. The floor still applies, so a line that has just
    landed pushes the next beat out rather than stacking on it. */
-const QUIP_BEAT_MS = 15000;
+const QUIP_BEAT_MS = 30000;   // the idle heartbeat, matched to the floor above
 let QUIP_BEAT = null;
 
 function startQuipBeat() {
@@ -16470,6 +16490,7 @@ let LIVE_ACTIVITY_ON = false;
 let LAST_LIVE_ACTIVITY = null;
 let LIVE_QUIP = "";
 let LIVE_QUIP_FOR = null;
+let LIVE_PLUGIN_WARNED = false;
 
 function liveActivityFields() {
   const ex = TODAY_WORKOUT?.exercises?.[SESSION.exerciseIndex];
@@ -16511,7 +16532,16 @@ function liveActivityFields() {
 async function pushLiveActivity() {
   if (!isNativeApp() || !SESSION || SESSION.finished) return;
   const live = window.Capacitor.Plugins.LiveWorkout;
-  if (!live) return;
+  /* An unregistered plugin is undefined rather than throwing, so returning
+     quietly here once hid a whole broken feature. Say it out loud. */
+  if (!live) {
+    if (!LIVE_PLUGIN_WARNED) {
+      LIVE_PLUGIN_WARNED = true;
+      console.error("LiveWorkout plugin is not registered");
+      toast("Live Activity plugin missing from this build");
+    }
+    return;
+  }
   const fields = liveActivityFields();
   /* A running countdown must not be resent on every redraw or it restarts from
      full each time, so rest compares as on or off rather than as seconds. */
@@ -21548,6 +21578,41 @@ function nativePush() {
   return isNativeApp() ? window.Capacitor.Plugins.PushNotifications : null;
 }
 
+/* Buttons on a notification, and somewhere for a tap to land. Without this a
+   nudge can only ever open the app on whatever screen it was last left on,
+   which wastes the one moment the person is actually paying attention. */
+let PUSH_HANDLERS_ON = false;
+
+async function registerPushHandlers() {
+  const push = nativePush();
+  if (!push || PUSH_HANDLERS_ON) return;
+  PUSH_HANDLERS_ON = true;
+  try {
+    /* The buttons themselves are declared natively in AppDelegate. This plugin
+       has no registerActionTypes: that belongs to local-notifications, and
+       calling it here threw on every launch. */
+    push.addListener("pushNotificationActionPerformed", (event) => {
+      const action = event && event.actionId;
+      /* "later" is a real answer, so it dismisses and does nothing rather than
+         dragging someone into the app to close it again. */
+      if (action === "later") return;
+      const url = event?.notification?.data?.url || "/";
+      /* The native bundle only carries index.html, so a path like /coach/ has
+         nothing to open. Route what we can and otherwise just come to front. */
+      if (url.startsWith("/coach")) { try { switchTab("home"); } catch {} return; }
+      try { switchTab(action === "start" ? "workout" : "home"); } catch {}
+    });
+  } catch (err) {
+    /* Capacitor rejects with a bare object here, so the message has to be dug
+       out or the log says nothing at all. */
+    console.error("push handlers failed:", err?.message || err?.errorMessage || JSON.stringify(err));
+    /* Registering action types can fail before anything has asked for
+       permission, so let enabling reminders try again rather than leaving the
+       buttons off for the rest of the session. */
+    PUSH_HANDLERS_ON = false;
+  }
+}
+
 /* APNs hands the token to a listener rather than returning it, so the register
    call has to be wrapped to be awaited like anything else. */
 function awaitApnsToken(timeoutMs = 15000) {
@@ -21622,6 +21687,9 @@ async function enablePush() {
       const push = nativePush();
       const asked = await push.requestPermissions();
       if (asked.receive !== "granted") { toast("Reminders need permission"); return; }
+      /* Retried here because the boot attempt runs before anyone has granted
+         anything, and that is where it tends to fail. */
+      await registerPushHandlers();
       const token = await awaitApnsToken();
       const { error: apnsErr } = await sb.from("apns_tokens").upsert({
         email: MY_EMAIL,
