@@ -3036,6 +3036,9 @@
   .goal-row-tick { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
                    border: 1.5px solid var(--border); color: var(--bg); }
   .goal-row-tick.on { background: var(--accent); border-color: var(--accent); }
+  .ob-inline { background: none; border: 0; padding: 0; font: inherit; color: var(--accent);
+               text-decoration: underline; cursor: pointer; }
+  #onboard .btn-primary:disabled { opacity: .45; pointer-events: none; }
   .ob-tl { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 20px; }
   .ob-tl.hidden { display: none; }
   .ob-tl .ob-pace.on { border-color: var(--accent); }
@@ -5535,7 +5538,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.3";
+const APP_VERSION = "2026.09.15.4";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -7814,18 +7817,23 @@ function renderOnboardStep(step, data = {}) {
      flavour of a thing they had already named, and the engine treated most of
      those answers identically anyway. A weight is different: it is a number
      only they know, it changes the plan, and it turns on the chart's goal line
-     and the projection. */
+     and the projection.
+
+     DIRECTION IS ASYMMETRIC, on purpose. Picking "lose weight" and then typing
+     a heavier target is a contradiction and gets stopped. Picking "build
+     muscle" and typing a LIGHTER one is not: that is a recomp, it is what a
+     lot of people actually mean, and it is allowed. So the tile constrains
+     downward-only; it never forces upward. */
   if (step === "target") {
-    const dir = goalTileFor(data.goal_bubble)?.askTarget || "lose";
-    const gaining = dir === "gain";
+    const lockedDown = goalTileFor(data.goal_bubble)?.askTarget === "lose";
     const ftv = data.height_in ? Math.floor(data.height_in / 12) : "";
     const inv = data.height_in ? data.height_in % 12 : "";
     ob.innerHTML = `
       <div class="ob-step">
-        <h1>${gaining ? "Aiming for a weight?" : "How much do you want to lose?"}</h1>
-        <p class="sub">${gaining
-          ? "Plenty of people build muscle without watching the scale. Skip this if that is you."
-          : "All of this is optional, and you can change any of it later."}</p>
+        <h1>${lockedDown ? "How much do you want to lose?" : "Aiming for a weight?"}</h1>
+        <p class="sub">${lockedDown
+          ? "All of this is optional, and you can change any of it later."
+          : "Plenty of people build muscle without watching the scale. Skip this if that is you."}</p>
 
         <label class="ob-lab">Right now</label>
         <div class="ob-row">
@@ -7836,12 +7844,12 @@ function renderOnboardStep(step, data = {}) {
         <div class="ob-row">
           <input id="obGoalLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.goal_weight_lb || ""}" />
         </div>
-        ${gaining ? "" : `
+
         <label class="ob-lab">Height <span class="ob-opt">so we can check the goal is a safe one</span></label>
         <div class="ob-row">
           <input id="obFt" type="number" inputmode="numeric" min="3" max="8" placeholder="feet" value="${ftv}" />
           <input id="obIn" type="number" inputmode="numeric" min="0" max="11" placeholder="inches" value="${inv}" />
-        </div>`}
+        </div>
 
         <div id="obReal" class="ob-real hidden"></div>
         <div id="obTl" class="ob-tl hidden"></div>
@@ -7852,26 +7860,57 @@ function renderOnboardStep(step, data = {}) {
       </div>`;
 
     const readHeight = () => {
-      if (gaining) return data.height_in || null;
       const f = parseInt($("obFt").value, 10) || 0;
       const i = parseInt($("obIn").value, 10) || 0;
       return f || i ? f * 12 + i : null;
     };
     let picked = data.pace || "steady";
+    let blocked = false;
 
     const paint = () => {
       const cur = parseFloat($("obLb").value) || null;
       const goalLb = parseFloat($("obGoalLb").value) || null;
-      const box = $("obReal"), tl = $("obTl");
+      const box = $("obReal"), tl = $("obTl"), next = $("targetNext");
+      const hide = () => { tl.className = "ob-tl hidden"; tl.innerHTML = ""; };
+      blocked = false;
 
-      if (gaining) {
-        tl.className = "ob-tl hidden"; tl.innerHTML = "";
+      /* Contradiction first, before anything tries to compute a plan from a
+         pair of numbers that do not agree with the goal above them. Not
+         enforced by clamping the field: people type a number left to right, so
+         a clamp fires on the "1" of 175 and fights the keyboard. */
+      if (lockedDown && cur && goalLb && goalLb >= cur) {
+        blocked = true;
+        box.className = "ob-real warn";
+        box.innerHTML = `Your goal is to lose weight, and ${escapeHtml(String(goalLb))} is
+          ${goalLb === cur ? "the same as what you weigh now" : "more than you weigh now"}.
+          Set a lower number, or <button type="button" class="ob-inline" id="obSwap">switch to Build muscle</button>
+          if gaining is what you meant.`;
+        hide();
+        next.disabled = true;
+        $("obSwap").onclick = () => renderOnboardStep("target", {
+          ...data, goal_bubble: "build-muscle", goalKey: "muscle", goalLabel: "Build muscle",
+          weight_lb: cur, goal_weight_lb: goalLb, height_in: readHeight(),
+        });
+        return;
+      }
+      next.disabled = false;
+
+      /* Direction comes from the numbers, not the tile. Build muscle with a
+         lighter target is a recomp and is allowed to say so. */
+      if (cur && goalLb && goalLb > cur) {
+        hide();
         const g = gainOutlook(cur, goalLb);
-        if (!g) { box.className = "ob-real hidden"; box.innerHTML = ""; return; }
         box.className = "ob-real";
         box.innerHTML = `Putting on ${g.amount.toFixed(0)} pounds of real size usually takes
           <b>${g.lo} to ${g.hi} months</b>. Muscle does not come faster than that no matter how the training
           is arranged, so we will not pretend it can. Eating harder than that adds fat, not muscle.`;
+        return;
+      }
+      if (cur && goalLb && goalLb === cur) {
+        hide();
+        box.className = "ob-real";
+        box.innerHTML = `Same weight, different shape. That is a real goal and a slow one:
+          the scale will not move much, so judge it by the lifts and the mirror rather than by weighing in.`;
         return;
       }
 
@@ -7883,13 +7922,13 @@ function renderOnboardStep(step, data = {}) {
           you want and we will carry on logging what you weigh, but the app will not set a target, project a
           date, or build a plan aimed at getting you there. If this is something you are working through, a
           doctor is the right person to have alongside you.`;
-        tl.className = "ob-tl hidden"; tl.innerHTML = "";
+        hide();
         return;
       }
       box.className = "ob-real hidden"; box.innerHTML = "";
 
       const opts = lossTimelines(cur, goalLb);
-      if (!opts.length) { tl.className = "ob-tl hidden"; tl.innerHTML = ""; return; }
+      if (!opts.length) { hide(); return; }
       if (!opts.some((o) => o.key === picked)) picked = (opts.find((o) => o.rec) || opts[0]).key;
       tl.className = "ob-tl";
       tl.innerHTML = `<label class="ob-lab">How long</label>` + opts.map((o) => `
@@ -7901,16 +7940,18 @@ function renderOnboardStep(step, data = {}) {
         b2.onclick = () => { picked = b2.dataset.tl; paint(); };
       });
     };
-    ["obLb", "obGoalLb", "obFt", "obIn"].forEach((id) => { if ($(id)) $(id).oninput = paint; });
+    ["obLb", "obGoalLb", "obFt", "obIn"].forEach((id) => { $(id).oninput = paint; });
     paint();
 
     const go = (skip) => {
+      if (blocked && !skip) return;
       const cur = parseFloat($("obLb").value) || null;
       const goalLb = skip ? null : parseFloat($("obGoalLb").value) || null;
       const heightIn = readHeight();
       const floor = healthyFloorLb(heightIn);
-      const chosen = gaining ? null : lossTimelines(cur, goalLb).find((o) => o.key === picked);
-      const outlook = gaining ? gainOutlook(cur, goalLb) : null;
+      const losing = !!(cur && goalLb && goalLb < cur);
+      const chosen = losing ? lossTimelines(cur, goalLb).find((o) => o.key === picked) : null;
+      const outlook = cur && goalLb && goalLb > cur ? gainOutlook(cur, goalLb) : null;
       const weeks = chosen ? chosen.weeks : outlook ? Math.round(outlook.hi * 4.345) : null;
       renderOnboardStep("plan", {
         ...data,
@@ -7920,7 +7961,7 @@ function renderOnboardStep(step, data = {}) {
         goal_by_date: weeks ? isoDate(new Date(Date.now() + weeks * 604800000)) : null,
         weeks,
         pace: chosen ? chosen.key : "steady",
-        goal_withhold: !!(!gaining && goalLb && floor && goalLb < floor),
+        goal_withhold: !!(losing && goalLb && floor && goalLb < floor),
       });
     };
     $("targetNext").onclick = () => go(false);
@@ -10437,8 +10478,41 @@ async function openPartnerSheet() {
 
 function closePartnerSheet() { $("partnerSheetScrim").classList.add("hidden"); }
 
+/* The widget is a separate process that cannot read anything the app holds in
+   memory, so the numbers it draws have to be handed over deliberately. */
+let LAST_WIDGET_SNAPSHOT = null;
+
+async function pushWidgetSnapshot() {
+  if (!isNativeApp()) return;
+  const bridge = window.Capacitor.Plugins.WidgetBridge;
+  if (!bridge) return;
+  try {
+    const partner = PARTNER_EMAIL ? partnerName() : null;
+    const hs = homeStreak();
+    const snapshot = {
+      myName: ME || "You",
+      myDays: gymDaysThisWeek(ME),
+      myTarget: weeklyGoalFor(MY_EMAIL),
+      partnerName: partner,
+      theirDays: partner ? gymDaysThisWeek(partner) : 0,
+      theirTarget: partner ? weeklyGoalFor(PARTNER_EMAIL) : 0,
+      streak: hs ? hs.n : 0,
+      streakLabel: hs ? hs.label : "",
+    };
+    /* Redrawing a timeline costs the widget its refresh budget, so this only
+       goes over when a number actually moved. */
+    const fingerprint = JSON.stringify(snapshot);
+    if (fingerprint === LAST_WIDGET_SNAPSHOT) return;
+    LAST_WIDGET_SNAPSHOT = fingerprint;
+    await bridge.save({ json: JSON.stringify({ ...snapshot, updatedAt: new Date().toISOString() }) });
+  } catch (err) {
+    console.error("widget snapshot failed", err);
+  }
+}
+
 function renderHero(animate = false) {
   const el = $("heroCard");
+  pushWidgetSnapshot();
   const coachLine = isCoachedClient() && MY_COACH
     ? `<div class="coach-line">${icon("check", 13)} Coached by ${escapeHtml(MY_COACH.split("@")[0])}</div>` : "";
   const myDays = gymDaysThisWeek(ME);
