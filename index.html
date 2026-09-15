@@ -3036,6 +3036,9 @@
   .goal-row-tick { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
                    border: 1.5px solid var(--border); color: var(--bg); }
   .goal-row-tick.on { background: var(--accent); border-color: var(--accent); }
+  .wt-more { display: block; width: 100%; margin-top: 10px; padding: 11px; border-radius: 10px;
+    border: 1px solid var(--border); background: none; color: var(--muted);
+    font: 600 13.5px/1 inherit; cursor: pointer; }
   /* Rearranging the Progress tab */
   .prog-arrange { display: flex; justify-content: flex-end; margin: 0 0 10px; }
   .prog-arrange button { background: none; border: 1px solid var(--border); color: var(--muted);
@@ -3082,16 +3085,23 @@
     content: "tap to see"; position: absolute; right: 58px; top: 50%;
     transform: translateY(-50%); font-size: 11px; color: var(--muted); opacity: .75;
   }
+  /* Sits ON the tab bar rather than above it. z-index has to beat .tabs AND
+     the FAB, which is raised with a negative margin and poked through the
+     first version of this bar as a green dome. The tab bar is hidden outright
+     while arranging: it navigates away from a job that is half done, and this
+     is the only thing the bottom of the screen should offer here. */
+  body.arranging .tabs { display: none; }
   .prog-bar {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 900;
-    display: flex; gap: 10px; justify-content: center; align-items: center;
-    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 2000;
+    display: flex; gap: 12px; justify-content: space-between; align-items: center;
+    padding: 14px 18px calc(16px + env(safe-area-inset-bottom, 0px));
     background: var(--panel); border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 24px rgba(0,0,0,.18);
   }
-  .prog-bar span { color: var(--muted); font-size: 13px; }
+  .prog-bar span { color: var(--muted); font-size: 13px; line-height: 1.35; flex: 1; }
   .prog-bar button {
-    padding: 11px 20px; border-radius: 100px; border: 0;
-    background: var(--accent); color: var(--bg); font: 700 14px/1 inherit; cursor: pointer;
+    flex: 0 0 auto; padding: 13px 26px; border-radius: 100px; border: 0;
+    background: var(--accent); color: var(--bg); font: 700 15px/1 inherit; cursor: pointer;
   }
   body.arranging .card::after { content: ""; position: absolute; inset: 0; border-radius: inherit;
     border: 1.5px dashed var(--border); pointer-events: none; }
@@ -3099,7 +3109,8 @@
   .prog-grip { display: none; position: absolute; top: 8px; right: 8px; z-index: 3;
     width: 38px; height: 38px; place-items: center; border-radius: 9px; touch-action: none;
     background: var(--panel-2); color: var(--muted); cursor: grab; }
-  .card.dragging { opacity: .9; z-index: 5; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+  .card.dragging { z-index: 5; box-shadow: 0 12px 34px rgba(0,0,0,.4); transition: none !important; }
+  body.arranging .card:not(.dragging) { transition: transform .18s cubic-bezier(.2,.8,.3,1); }
   .ob-inline { background: none; border: 0; padding: 0; font: inherit; color: var(--accent);
                text-decoration: underline; cursor: pointer; }
   #onboard .btn-primary:disabled { opacity: .45; pointer-events: none; }
@@ -5598,7 +5609,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.9";
+const APP_VERSION = "2026.09.15.10";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -12551,8 +12562,14 @@ function renderWeightHistory() {
   const rows = weighInsFor(name).slice().reverse();
   const el = $("weightHistory");
   if (!rows.length) { el.innerHTML = ""; return; }
+  /* Three, then a button. Twelve rows of "191.5 lbs, 0.0" pushed everything
+     below this card off the bottom of the phone, and the recent ones are the
+     only ones anybody reads at a glance. */
+  const SHOWN = 3;
+  const all = el.dataset.expanded === "1";
+  const list = all ? rows : rows.slice(0, SHOWN);
   el.innerHTML = `<div class="wt-history-head">${rows.length} weigh-in${rows.length === 1 ? "" : "s"}</div>` +
-    rows.slice(0, 12).map((e, i) => {
+    list.map((e, i) => {
       const prev = rows[i + 1];
       const d = prev ? e.weight - prev.weight : null;
       return `<${mine ? "button" : "div"} class="wt-row"${mine ? ` type="button" data-day="${e.entry_date}"` : ""}>
@@ -12561,8 +12578,13 @@ function renderWeightHistory() {
         <span class="wt-row-x ${d == null ? "" : d < 0 ? "down" : d > 0 ? "up" : ""}">${
           d == null ? "" : d === 0 ? "0.0" : `${d > 0 ? "+" : ""}${d.toFixed(1)}`}</span>
       </${mine ? "button" : "div"}>`;
-    }).join("");
+    }).join("") +
+    (rows.length > SHOWN
+      ? `<button type="button" class="wt-more" data-more>${all ? "Show less" : `View all ${rows.length}`}</button>`
+      : "");
   el.querySelectorAll("[data-day]").forEach((b) => { b.onclick = () => openDaySheet(MY_EMAIL, b.dataset.day); });
+  const more = el.querySelector("[data-more]");
+  if (more) more.onclick = () => { el.dataset.expanded = all ? "0" : "1"; renderWeightHistory(); };
 }
 
 /* ---------- Consistency card ----------
@@ -21361,8 +21383,27 @@ function startCardDrag(e, card, host) {
       /* Swap once the dragged card's middle passes a neighbour's middle, so
          the list parts around it instead of jumping when two edges touch. */
       if (mid > r.top && mid < r.bottom) {
+        /* FLIP, so the cards being displaced slide rather than teleport.
+           insertBefore is instant and unanimatable on its own: measure where
+           everything was, move it, then put each card back where it started
+           with a transform and release that to zero on the next frame. */
+        const was = new Map();
+        for (const c of host.querySelectorAll(".card:not(.hidden)")) {
+          was.set(c, c.getBoundingClientRect().top);
+        }
         host.insertBefore(card, dy > 0 ? other.nextSibling : other);
         card.style.transform = "";
+        for (const [c, top] of was) {
+          if (c === card) continue;
+          const delta = top - c.getBoundingClientRect().top;
+          if (!delta) continue;
+          c.style.transition = "none";
+          c.style.transform = `translateY(${delta}px)`;
+          requestAnimationFrame(() => {
+            c.style.transition = "transform .18s cubic-bezier(.2,.8,.3,1)";
+            c.style.transform = "";
+          });
+        }
         anchorY = ev.clientY;
         return;
       }
@@ -21371,6 +21412,7 @@ function startCardDrag(e, card, host) {
   const onUp = () => {
     card.classList.remove("dragging");
     card.style.transform = "";
+    for (const c of host.querySelectorAll(".card")) { c.style.transition = ""; c.style.transform = ""; }
     document.removeEventListener("pointermove", onMove);
     document.removeEventListener("pointerup", onUp);
     document.removeEventListener("pointercancel", onUp);
@@ -21431,7 +21473,7 @@ function setArranging(on, host) {
       bar = document.createElement("div");
       bar.id = "progBar";
       bar.className = "prog-bar";
-      bar.innerHTML = '<span>Tap a row to see it, drag the handle to move it</span><button type="button">Done</button>';
+      bar.innerHTML = '<span>Tap a row to see it, drag the handle to move it</span><button type="button">Save</button>';
       document.body.appendChild(bar);
       bar.querySelector("button").onclick = () => setArranging(false, host);
     }
