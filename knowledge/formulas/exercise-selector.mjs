@@ -139,6 +139,28 @@ export function repsForGoal(goal) {
   return Math.round((lo + hi) / 2);
 }
 
+// Isometric holds (Plank, Dead Hang, L-Sit, Farmer's Carry, etc. -- tagged isHold: true in the
+// exercise library) are prescribed as a duration, not a rep count. "3 x 10" is meaningless for
+// a plank. Levels get progressively longer holds, same tiering logic as reps-by-goal.
+export const HOLD_SECONDS_BY_LEVEL = { beginner: 20, intermediate: 35, advanced: 50 };
+
+export function holdSecondsForLevel(level) {
+  return HOLD_SECONDS_BY_LEVEL[level] ?? HOLD_SECONDS_BY_LEVEL.beginner;
+}
+
+/**
+ * Progression for a hold, mirroring progressiveOverload()'s "hit target -> push further, miss
+ * it -> hold" logic, but the lever is time instead of load -- consistent with
+ * ../principles/equipment-substitution.md, which established that bodyweight/no-load
+ * progression needs a different mechanism than adding plates.
+ */
+export function progressiveHold({ lastLog, level }) {
+  const base = holdSecondsForLevel(level);
+  if (!lastLog) return base;
+  const hitTarget = lastLog.secondsAchieved >= lastLog.targetSeconds;
+  return hitTarget ? lastLog.targetSeconds + 5 : lastLog.targetSeconds; // missed: hold, don't push further
+}
+
 // Circuit-style structure (short rest, elevated heart rate throughout) is a distinct session
 // shape from traditional straight-sets training, not just "the same session but rushed" -- see
 // ../principles/weight-loss-training.md. General-fitness/fat-loss sessions use it; strength and
@@ -398,6 +420,13 @@ export function buildWeightTrainingPlan({
           ?? coldStartWeight(ex.name, level, bodyWeightLb)
           ?? genericColdStartWeight(ex.equipment, level, bodyWeightLb)
           ?? null;
+      if (ex.isHold) {
+        return {
+          name: ex.name, sets, reps: null, holdSeconds: progressiveHold({ lastLog, level }),
+          targetWeight: isBodyweight ? 0 : weight, isEstimate: false,
+          primary: ex.primary, equipment: ex.equipment, level: ex.level, isHold: true,
+        };
+      }
       return {
         name: ex.name, sets, reps, targetWeight: weight,
         isEstimate: !isBodyweight && weight != null && !lastLog,
