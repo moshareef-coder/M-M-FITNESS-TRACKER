@@ -2914,7 +2914,7 @@
      body diagram already uses (defined further down, near #biFigures), not a
      lookalike. Everything below is this screen's own: the clear-all row and
      the summary. */
-  .fa-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0 12px; }
+  .fa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 14px 0 12px; }
   .fa-card .fa-sub { display: none; }
   .fa-card {
     display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
@@ -2923,7 +2923,7 @@
     transition: background .15s, border-color .15s;
   }
   .fa-rank { font: 800 11px/1 inherit; letter-spacing: .08em; text-transform: uppercase; min-height: 11px; color: var(--muted); }
-  .fa-label { font: 700 15px/1.1 inherit; }
+  .fa-label { font: 700 15.5px/1.15 inherit; }
   .fa-sub { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
   /* A heat ramp of its own rather than the app's semantic colours. The first
      version reached for --down, --warn and --gold and got green, brown, green:
@@ -5641,7 +5641,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.13";
+const APP_VERSION = "2026.09.15.14";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -7137,16 +7137,15 @@ async function upsertGoalFields(patch) {
    them, biggest and most trainable first. Shoulders and core are deliberately
    NOT here: they belong to no area anyone would call legs, arms, chest or
    back, and putting them under "arms" would train the wrong thing. They are
-   reachable nowhere else now, which is the one cost of this design.
-   Shoulders is the last group with no home: it is pressed and raised, so it
-   belongs to neither chest nor back cleanly, and filing it under arms would
-   put lateral raises in an arms week. It cannot be prioritised at all. */
+   Grouped the way Mo trains rather than the way an anatomy chart splits
+   things: shoulders go with arms because that is the day they get trained on,
+   and core rides with legs for the same reason. Every one of the fourteen
+   muscle groups now belongs to exactly one area, so nothing is unreachable. */
 const FOCUS_AREAS = [
-  { key: "legs",  label: "Legs",  groups: ["quads", "hamstrings", "glutes", "calves"] },
-  { key: "back",  label: "Back",  groups: ["lats", "traps", "lowerback"] },
-  { key: "chest", label: "Chest", groups: ["chest"] },
-  { key: "arms",  label: "Arms",  groups: ["biceps", "triceps", "forearms"] },
-  { key: "core",  label: "Core",  groups: ["abs", "obliques"] },
+  { key: "armsdelts", label: "Arms & Shoulders", groups: ["biceps", "triceps", "shoulders", "forearms"] },
+  { key: "legscore",  label: "Legs & Core",      groups: ["quads", "hamstrings", "glutes", "abs", "obliques", "calves"] },
+  { key: "chest",     label: "Chest",            groups: ["chest"] },
+  { key: "back",      label: "Back",             groups: ["lats", "traps", "lowerback"] },
 ];
 const FOCUS_RANK_WORD = ["", "1st", "2nd", "3rd", "4th"];
 
@@ -7183,6 +7182,8 @@ function focusEntriesFromAreas() {
 const AREA_RANK_TIER = { 1: 3, 2: 2, 3: 1 };
 function syncPickedFromAreas() {
   FOCUS_PICKED.clear();
+  /* FOCUS_ALL is read straight off the global by the repaint, which paints the
+     whole body green from it, so there is deliberately nothing to mirror here. */
   if (FOCUS_ALL) return;
   for (const area of FOCUS_AREAS) {
     const tier = AREA_RANK_TIER[FOCUS_AREA_RANK[area.key]];
@@ -7548,14 +7549,30 @@ async function initBodyFocusRive() {
      closer to the unmarked grey. Luminance carries the order as well as hue,
      so the ranking still reads on a figure where colour vision does not. */
   const FIG_STRENGTH = { 3: 1, 2: 0.72, 1: 0.42 };
-  function paintTier(group, tier) {
-    const base = mod.APP_HEAT_PALETTE.base;
-    const c = focusTierRgb(tier);
-    const k = FIG_STRENGTH[tier];
-    const fill = {
-      r: Math.round(base.r + (c.r - base.r) * k),
-      g: Math.round(base.g + (c.g - base.g) * k),
-      b: Math.round(base.b + (c.b - base.b) * k),
+
+  /* Everything level is the whole body in one green rather than a blank
+     figure, because "no area stands out" is a real answer and should look
+     like one. */
+  const LEVEL_RGB = { r: 51, g: 180, b: 101 };
+
+  /* The module's own base is {35,42,49}, a near-black chosen for the dark
+     theme. Painting it onto a light-theme figure is what turned every
+     deselected muscle black: the original picker never called
+     setMusclePalette on an unranked muscle at all, so those kept the
+     artboard's own pale fill, and the moment this started repainting
+     everything to fix stale colours it inherited the dark base with it.
+     So the unlit colour is chosen for the theme on screen, not taken from
+     the module. */
+  const unlit = () => (currentTheme() === "dark"
+    ? mod.APP_HEAT_PALETTE.base
+    : { r: 203, g: 209, b: 219 });
+
+  function paintFill(group, rgb, k) {
+    const base = unlit();
+    const fill = k >= 1 ? rgb : {
+      r: Math.round(base.r + (rgb.r - base.r) * k),
+      g: Math.round(base.g + (rgb.g - base.g) * k),
+      b: Math.round(base.b + (rgb.b - base.b) * k),
     };
     const pal = { base, level1: fill, level2: fill, level3: fill, level4: fill };
     for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[group] || []) {
@@ -7567,12 +7584,27 @@ async function initBodyFocusRive() {
   FOCUS_FIGURE_REPAINT = () => {
     const on = {};
     for (const m of mod.ALL_MUSCLES) on[m] = 0;
-    for (const group of FOCUS_PICKED.keys()) {
-      for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[group] || []) on[m] = 4;
+
+    /* EVERY group is repainted, not only the ranked ones. Painting just the
+       picked set left a deselected muscle wearing the palette it had when it
+       was ranked, and with its intensity dropped to zero that rendered black.
+       A group with no rank is explicitly put back to base. */
+    for (const area of FOCUS_AREAS) {
+      const tier = FOCUS_PICKED.get(area.groups[0]);
+      for (const g of area.groups) {
+        if (FOCUS_ALL) {
+          paintFill(g, LEVEL_RGB, 1);
+          for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) on[m] = 4;
+        } else if (tier) {
+          paintFill(g, focusTierRgb(tier), FIG_STRENGTH[tier]);
+          for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) on[m] = 4;
+        } else {
+          paintFill(g, unlit(), 1);
+        }
+      }
     }
     FOCUS_PICK_FRONT_CTRL?.setIntensities(on);
     FOCUS_PICK_BACK_CTRL?.setIntensities(on);
-    for (const [g, t] of FOCUS_PICKED) paintTier(g, t);
   };
   FOCUS_FIGURE_REPAINT();
 }
