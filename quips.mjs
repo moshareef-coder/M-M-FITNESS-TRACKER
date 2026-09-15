@@ -57,6 +57,15 @@ export const QUIPS = {
   ],
 
   set: [
+    "&ldquo;I am proud of you \u{1F97A}&rdquo; is something I would say if I had emotions.",
+    "&ldquo;That was beautiful \u{1F62D}&rdquo; is what I would say if I had tear ducts.",
+    "&ldquo;I felt that \u{1F4AA}&rdquo; is a thing humans say. I felt nothing. Good set though.",
+    "&ldquo;LET&rsquo;S GO \u{1F525}&rdquo; is apparently how this is done.",
+    "The human word for that is: nice.",
+    "The human word for this is: wow.",
+    "Searching for the human word. Found it. Strong \u{1F4AA}",
+    "Humans call this &ldquo;easy work \u{1F624}&rdquo;. I am trying it out.",
+    "I am told the correct thing to say is &ldquo;yes \u{1F525}&rdquo;. So. Yes \u{1F525}",
     "Don&rsquo;t look at my screen time.",
     "Logged. I am writing it down in my little book.",
     "That one counted. They all count, that is the problem.",
@@ -95,6 +104,8 @@ export const QUIPS = {
   ],
 
   pr: [
+    "&ldquo;My heart is so full \u2764\uFE0F&rdquo; would go here. I do not have one of those.",
+    "&ldquo;I am so happy for you \u{1F970}&rdquo; is the correct human response. Consider it said.",
     "That is a PR. I would clap but my hands are drawn on.",
     "New best. I am telling everyone. I only know you.",
     "Personal record. I felt that and I did nothing.",
