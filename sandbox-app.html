@@ -3053,20 +3053,36 @@
      card is which, so each one folds to its heading: seven cards at a
      readable size fit a phone with room to spare, and the drag needs no
      coordinate maths because nothing is transformed. */
-  body.arranging { overflow: hidden; }
-  body.arranging .card {
+  /* Not overflow:hidden on the body. Collapsed, the list always fits, but a
+     row opened for a look is full height again and has to be scrollable. */
+  /* Everything here is scoped to :not(.peek). An opened row must be left
+     completely alone: the first version hid children with display:none and
+     put them back on .peek with display:revert, but revert goes to the
+     BROWSER default rather than to the app's own rule, so .wt-stats came back
+     as block and the START/NOW/CHANGE/GOAL row stacked into a column. Never
+     touching an opened card means there is nothing to restore. */
+  body.arranging .card:not(.peek) {
     position: relative; max-height: 58px; overflow: hidden;
     padding-top: 16px; padding-bottom: 16px; margin-bottom: 8px;
-    display: flex; align-items: center;
+    display: flex; align-items: center; cursor: pointer;
   }
-  body.arranging .card > * { display: none; }
-  body.arranging .card > h2,
-  body.arranging .card > h3,
-  body.arranging .card > .prog-grip { display: block; }
-  body.arranging .card > h2,
-  body.arranging .card > h3 { margin: 0; font-size: 15px; }
+  body.arranging .card:not(.peek) > * { display: none; }
+  body.arranging .card:not(.peek) > h2,
+  body.arranging .card:not(.peek) > h3 { display: block; margin: 0; font-size: 15px; }
+  body.arranging .card:not(.peek) > .prog-grip { display: grid; }
   body.arranging #progHeadline { display: none; }
   body.arranging .prog-grip { display: grid; }
+
+  /* Opened for a look. A title alone is not always enough to tell "Weight
+     trend" from "Log your weight", so any row can be tapped to show what it
+     actually is, and tapped again to fold back. */
+  body.arranging .card.peek {
+    position: relative; outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  body.arranging .card:not(.peek)::before {
+    content: "tap to see"; position: absolute; right: 58px; top: 50%;
+    transform: translateY(-50%); font-size: 11px; color: var(--muted); opacity: .75;
+  }
   .prog-bar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 900;
     display: flex; gap: 10px; justify-content: center; align-items: center;
@@ -5583,7 +5599,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.8";
+const APP_VERSION = "2026.09.15.9";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -21393,6 +21409,17 @@ function paintArrangeUI(host) {
     grip.innerHTML = icon("grip", 16);
     grip.onpointerdown = (e) => startCardDrag(e, card, host);
     card.appendChild(grip);
+    /* One open at a time, so opening a second folds the first and the list
+       never grows into a scroll you have to fight while reordering. */
+    card.addEventListener("click", (e) => {
+      if (!PROG_ARRANGING || e.target.closest(".prog-grip")) return;
+      const wasOpen = card.classList.contains("peek");
+      host.querySelectorAll(".card.peek").forEach((c) => c.classList.remove("peek"));
+      if (!wasOpen) {
+        card.classList.add("peek");
+        card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    });
   }
 }
 
@@ -21405,7 +21432,7 @@ function setArranging(on, host) {
       bar = document.createElement("div");
       bar.id = "progBar";
       bar.className = "prog-bar";
-      bar.innerHTML = '<span>Drag the handles to reorder</span><button type="button">Done</button>';
+      bar.innerHTML = '<span>Tap a row to see it, drag the handle to move it</span><button type="button">Done</button>';
       document.body.appendChild(bar);
       bar.querySelector("button").onclick = () => setArranging(false, host);
     }
