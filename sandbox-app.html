@@ -3011,6 +3011,9 @@
   .ob-real.warn { background: rgba(200,130,30,.14); }
   .ob-real.care { background: rgba(190,70,60,.13); }
   .ob-real.hidden { display: none; }
+  .ob-tl { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 20px; }
+  .ob-tl.hidden { display: none; }
+  .ob-tl .ob-pace.on { border-color: var(--accent); }
   .ob-chip {
     width: 100%; text-align: left; padding: 17px 18px; border-radius: 14px; cursor: pointer;
     border: 1px solid var(--border); background: var(--panel); color: var(--text);
@@ -5507,7 +5510,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.14.17";
+const APP_VERSION = "2026.09.14.18";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -6552,6 +6555,38 @@ function lossRealism(currentLb, goalLb, byDate, today = new Date()) {
   return { amount, planned, ceiling, need, weeks, honestWeeks, honestDate, band };
 }
 
+/* Three timelines for a given amount, computed from the engine's own LOSS_RATE
+   bands rather than offered as fixed three/six/twelve month chips. Someone
+   losing 10 pounds and someone losing 80 should never be shown the same three
+   durations, and this way nobody can choose one that cannot happen: the
+   impossible option is simply not on the page, which beats letting them pick
+   it and then correcting them.
+
+   Replaces the pace step for weight goals. Steady, quicker and gentle were
+   always 12, 8 and 16 weeks regardless of what anyone was actually chasing. */
+function lossTimelines(currentLb, goalLb) {
+  const amount = (currentLb || 0) - (goalLb || 0);
+  if (!currentLb || !goalLb || amount <= 0) return [];
+  const rate = (pct) => Math.min(2, Math.max(0.5, currentLb * pct));
+  const out = [];
+  for (const o of [
+    { key: "quick", pct: 0.01, note: "Fast. No room for a bad week." },
+    { key: "steady", pct: 0.0075, note: "The one we would pick.", rec: true },
+    { key: "gentle", pct: 0.005, note: "Gentle. Fits around a full life." },
+  ]) {
+    const perWeek = rate(o.pct);
+    const weeks = Math.max(1, Math.round(amount / perWeek));
+    const label = weeks < 9 ? `${weeks} weeks`
+      : (Math.round(weeks / 4.345) === 1 ? "1 month" : `${Math.round(weeks / 4.345)} months`);
+    /* Small amounts collapse two bands onto the same rounded label. Showing
+       "3 weeks" twice reads as a bug, so the recommended one wins the slot. */
+    const clash = out.findIndex((x) => x.label === label);
+    if (clash >= 0) { if (o.rec) out[clash] = { ...o, perWeek, weeks, label }; continue; }
+    out.push({ ...o, perWeek, weeks, label });
+  }
+  return out;
+}
+
 /* BMI 18.5 is the clinical underweight line. Below it the app still takes the
    number, and then stops being the engine for it: no goal line on the chart,
    no projection, no deficit plan. Refusing the number instead would only teach
@@ -6670,7 +6705,7 @@ function renderGoalTilesStep(data = {}) {
       else renderOnboardStep("pace", { ...next, detail: child ? label : null });
     },
   });
-  $("goalBackBtn").onclick = () => renderOnboardStep("stats", data);
+  $("goalBackBtn").onclick = () => renderOnboardStep("name", data);
 }
 
 /* Nine tiles, always visible, no scrolling to find them. Tapping one opens the
@@ -7750,7 +7785,7 @@ function renderOnboardStep(step, data = {}) {
     const go = () => {
       const name = $("nameInput").value.trim();
       if (!name) { toast("Enter a name"); return; }
-      renderOnboardStep("stats", { ...data, name });
+      renderOnboardStep("goal", { ...data, name });
     };
     $("nextBtn").onclick = go;
     $("nameInput").onkeydown = (e) => { if (e.key === "Enter") go(); };
@@ -7763,129 +7798,108 @@ function renderOnboardStep(step, data = {}) {
     return;
   }
 
-  /* Height and weight before the goal, so the goal step can ask a concrete
-     question ("you are at 210, what is your goal?") instead of offering bands
-     to choose from. It also feeds bodyWeightLb, which the engine uses to set
-     starting loads on EVERY goal, not just the weight ones. */
-  if (step === "stats") {
-    const ft = data.height_in ? Math.floor(data.height_in / 12) : "";
-    const inch = data.height_in ? data.height_in % 12 : "";
+  /* Everything the weight goal needs, on one page: what they weigh, how tall
+     they are, what they are aiming at, and how long it takes. Asked here
+     rather than as an upfront stats interrogation because a number means
+     something at the moment it is relevant and is just a toll booth before it.
+
+     The date field this replaces was a mistake. It let someone type a date
+     that could not happen and then corrected them, which is a worse trade
+     than only ever offering durations that can. */
+  if (step === "target") {
+    const ftv = data.height_in ? Math.floor(data.height_in / 12) : "";
+    const inv = data.height_in ? data.height_in % 12 : "";
     ob.innerHTML = `
       <div class="ob-step">
-        <h1>Two numbers.</h1>
-        <p class="sub">These set your starting weights. Only you and whoever you train with ever see them.</p>
-        <label class="ob-lab">Height</label>
-        <div class="ob-row">
-          <input id="obFt" type="number" inputmode="numeric" min="3" max="8" placeholder="feet" value="${ft}" />
-          <input id="obIn" type="number" inputmode="numeric" min="0" max="11" placeholder="inches" value="${inch}" />
-        </div>
-        <label class="ob-lab">Weight <span class="ob-opt">optional</span></label>
+        <h1>How much do you want to lose?</h1>
+        <p class="sub">All of this is optional, and you can change any of it later.</p>
+
+        <label class="ob-lab">Right now</label>
         <div class="ob-row">
           <input id="obLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.weight_lb || ""}" />
         </div>
-        <button class="btn-primary" id="statsNext">Continue</button>
-        <button class="btn-ghost" id="statsBack">Back</button>
-      </div>`;
-    const go = () => {
-      const ftv = parseInt($("obFt").value, 10) || 0;
-      const inv = parseInt($("obIn").value, 10) || 0;
-      const lb = parseFloat($("obLb").value) || null;
-      renderOnboardStep("goal", {
-        ...data,
-        height_in: ftv || inv ? ftv * 12 + inv : null,
-        weight_lb: lb,
-      });
-    };
-    $("statsNext").onclick = go;
-    $("statsBack").onclick = () => renderOnboardStep("name", data);
-    return;
-  }
 
-  /* Replaces the old three-option detail screen, which asked "a few pounds /
-     10 to 20 / more than 20" straight after the goal step had already asked
-     the same thing, and whose answer never reached the engine at all. A real
-     goal weight gives amountLb and byDate, both of which resolveGoal already
-     accepts, and lights the goal line and the projection that are already
-     built against user_goals.target_value. */
-  if (step === "target") {
-    const cur = data.weight_lb;
-    ob.innerHTML = `
-      <div class="ob-step">
-        <h1>${cur ? `You are at ${escapeHtml(String(cur))} pounds.` : "Losing weight."}</h1>
-        <p class="sub">${cur ? "Where do you want to get to? Both of these are optional and you can change them any time." : "Tell us a goal weight if you have one in mind. Optional, and you can change it any time."}</p>
         <label class="ob-lab">Goal weight</label>
         <div class="ob-row">
           <input id="obGoalLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.goal_weight_lb || ""}" />
         </div>
-        <label class="ob-lab">By when <span class="ob-opt">optional</span></label>
+
+        <label class="ob-lab">Height <span class="ob-opt">so we can check the goal is a safe one</span></label>
         <div class="ob-row">
-          <input id="obGoalBy" type="date" value="${data.goal_by_date || ""}" />
+          <input id="obFt" type="number" inputmode="numeric" min="3" max="8" placeholder="feet" value="${ftv}" />
+          <input id="obIn" type="number" inputmode="numeric" min="0" max="11" placeholder="inches" value="${inv}" />
         </div>
+
         <div id="obReal" class="ob-real hidden"></div>
+        <div id="obTl" class="ob-tl hidden"></div>
+
         <button class="btn-primary" id="targetNext">Continue</button>
         <button class="btn-ghost" id="targetSkip">I do not have a number</button>
         <button class="btn-ghost" id="targetBack">Back</button>
       </div>`;
 
-    /* Said while they type rather than after they commit, so it reads as the
-       app thinking alongside them instead of rejecting them at a gate. */
+    const readHeight = () => {
+      const f = parseInt($("obFt").value, 10) || 0;
+      const i = parseInt($("obIn").value, 10) || 0;
+      return f || i ? f * 12 + i : null;
+    };
+    let picked = data.pace || "steady";
+
+    /* Recomputed as they type, so the durations follow the number instead of
+       waiting behind a Continue press. */
     const paint = () => {
+      const cur = parseFloat($("obLb").value) || null;
       const goalLb = parseFloat($("obGoalLb").value) || null;
-      const by = $("obGoalBy").value || null;
-      const box = $("obReal");
-      const floor = healthyFloorLb(data.height_in);
+      const box = $("obReal"), tl = $("obTl");
+      const floor = healthyFloorLb(readHeight());
+
       if (goalLb && floor && goalLb < floor) {
         box.className = "ob-real care";
         box.innerHTML = `<b>We will track it, but we will not coach toward it.</b>
-          ${escapeHtml(String(goalLb))} pounds is below a healthy weight for your height. You can keep the number
-          and we will keep logging what you weigh, but the app will not draw a target, project a date, or build
-          a plan aimed at getting you there. If this is something you are working through, a doctor is the
-          right person to have alongside you.`;
+          ${escapeHtml(String(goalLb))} pounds is below a healthy weight for your height. Keep the number if
+          you want and we will carry on logging what you weigh, but the app will not set a target, project a
+          date, or build a plan aimed at getting you there. If this is something you are working through, a
+          doctor is the right person to have alongside you.`;
+        tl.className = "ob-tl hidden"; tl.innerHTML = "";
         return;
       }
-      const r = lossRealism(cur, goalLb, by);
-      if (!r) { box.className = "ob-real hidden"; box.innerHTML = ""; return; }
-      const when = (d) => d.toLocaleDateString(undefined, { month: "long", day: "numeric" });
-      if (r.band === "nodate") {
-        box.className = "ob-real";
-        box.innerHTML = `${r.amount.toFixed(0)} pounds at a healthy pace puts you there around
-          <b>${escapeHtml(when(r.honestDate))}</b>. Add a date if you have one in mind.`;
-      } else if (r.band === "fine") {
-        box.className = "ob-real ok";
-        box.innerHTML = `That works. ${r.amount.toFixed(0)} pounds by then is about
-          ${r.need.toFixed(1)} a week, inside a healthy pace.`;
-      } else if (r.band === "aggressive") {
-        box.className = "ob-real warn";
-        box.innerHTML = `That is a fast pace, about ${r.need.toFixed(1)} pounds a week. It is doable and it
-          leaves no room for a bad week. Yours to keep if you want it.`;
-      } else {
-        box.className = "ob-real warn";
-        box.innerHTML = `${r.amount.toFixed(0)} pounds is very doable. By then is not, that would be about
-          ${r.need.toFixed(1)} pounds a week and a healthy pace tops out near ${r.ceiling.toFixed(1)}.
-          At that pace you would be there around <b>${escapeHtml(when(r.honestDate))}</b>.
-          Keep your date if you want, we will just be honest about it.`;
-      }
+      box.className = "ob-real hidden"; box.innerHTML = "";
+
+      const opts = lossTimelines(cur, goalLb);
+      if (!opts.length) { tl.className = "ob-tl hidden"; tl.innerHTML = ""; return; }
+      if (!opts.some((o) => o.key === picked)) picked = (opts.find((o) => o.rec) || opts[0]).key;
+      tl.className = "ob-tl";
+      tl.innerHTML = `<label class="ob-lab">How long</label>` + opts.map((o) => `
+        <button type="button" class="ob-pace ${o.key === picked ? "on" : ""}" data-tl="${o.key}">
+          <span class="ob-pace-top"><strong>${escapeHtml(o.label)}</strong><span>about ${o.perWeek.toFixed(1)} lb a week</span></span>
+          <span class="ob-pace-note">${escapeHtml(o.note)}</span>
+        </button>`).join("");
+      tl.querySelectorAll("[data-tl]").forEach((b2) => {
+        b2.onclick = () => { picked = b2.dataset.tl; paint(); };
+      });
     };
-    $("obGoalLb").oninput = paint;
-    $("obGoalBy").onchange = paint;
+    ["obLb", "obGoalLb", "obFt", "obIn"].forEach((id) => { $(id).oninput = paint; });
     paint();
 
     const go = (skip) => {
+      const cur = parseFloat($("obLb").value) || null;
       const goalLb = skip ? null : parseFloat($("obGoalLb").value) || null;
-      const by = skip ? null : $("obGoalBy").value || null;
-      const floor = healthyFloorLb(data.height_in);
-      const next = {
+      const heightIn = readHeight();
+      const floor = healthyFloorLb(heightIn);
+      const chosen = lossTimelines(cur, goalLb).find((o) => o.key === picked);
+      const by = chosen ? isoDate(new Date(Date.now() + chosen.weeks * 604800000)) : null;
+      renderOnboardStep("plan", {
         ...data,
+        height_in: heightIn,
+        weight_lb: cur,
         goal_weight_lb: goalLb,
         goal_by_date: by,
-        /* The one flag the rest of the app reads to know it should record the
-           number and withhold the target, the projection and the deficit. */
+        weeks: chosen ? chosen.weeks : null,
+        /* The duration chips ARE the pace question, answered against their own
+           number rather than against a flat 8/12/16. */
+        pace: chosen ? chosen.key : "steady",
         goal_withhold: !!(goalLb && floor && goalLb < floor),
-      };
-      /* A date and a pace are the same question. Asking both is the double-ask
-         this screen exists to delete, so a given date skips the pace step. */
-      if (by) renderOnboardStep("plan", { ...next, pace: "steady" });
-      else renderOnboardStep("pace", next);
+      });
     };
     $("targetNext").onclick = () => go(false);
     $("targetSkip").onclick = () => go(true);
