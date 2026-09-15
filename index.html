@@ -3036,6 +3036,19 @@
   .goal-row-tick { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
                    border: 1.5px solid var(--border); color: var(--bg); }
   .goal-row-tick.on { background: var(--accent); border-color: var(--accent); }
+  /* Rearranging the Progress tab */
+  .prog-arrange { display: flex; justify-content: flex-end; margin: 0 0 10px; }
+  .prog-arrange button { background: none; border: 1px solid var(--border); color: var(--muted);
+    font: 600 12.5px/1 inherit; padding: 8px 12px; border-radius: 100px; cursor: pointer; }
+  .prog-arrange button.on { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  body.arranging .card { position: relative; touch-action: none; }
+  body.arranging .card::after { content: ""; position: absolute; inset: 0; border-radius: inherit;
+    border: 1.5px dashed var(--border); pointer-events: none; }
+  body.arranging .card .prog-grip { display: grid; }
+  .prog-grip { display: none; position: absolute; top: 8px; right: 8px; z-index: 3;
+    width: 30px; height: 30px; place-items: center; border-radius: 8px;
+    background: var(--panel-2); color: var(--muted); cursor: grab; }
+  .card.dragging { opacity: .9; z-index: 5; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
   .ob-inline { background: none; border: 0; padding: 0; font: inherit; color: var(--accent);
                text-decoration: underline; cursor: pointer; }
   #onboard .btn-primary:disabled { opacity: .45; pointer-events: none; }
@@ -4992,10 +5005,6 @@
       <button type="button" class="btn-secondary" id="addBodyPhotoBtn">Add today's photo</button>
     </div>
 
-    <div class="card metric-card" id="cardActivity">
-      <h2>Recent activity</h2>
-      <div class="log-list" id="logList"></div>
-    </div>
 
     <!-- Everything the goal did not ask for still lives on this tab, under
          this rule, in the same order for everybody. Nobody has to turn a
@@ -5538,7 +5547,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.5";
+const APP_VERSION = "2026.09.15.6";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -15626,6 +15635,7 @@ function startSessionWake() {
 
 function renderSession() {
   beatLive();
+  pushLiveActivity();
   /* The two timed phases have their own screen. Everything below this line is
      the lift, and none of it can see a stretch. */
   if (SESSION.phase === "warmup" || SESSION.phase === "cooldown") { renderStretchPhase(); return; }
@@ -16143,6 +16153,9 @@ async function doMarkGymDayDone() {
 async function finishWorkout() {
   if (!SESSION || SESSION.finished) return;   // already banked
   SESSION.finished = true;
+  /* Not in closeSessionUI: minimising leaves the workout running, and the Lock
+     Screen is exactly where it should still be visible. */
+  endLiveActivity();
   saveSessionToStorage();
 
   // Persist how long it took and how long the rests were. Without this the
@@ -16448,6 +16461,85 @@ function startSessionTimer() {
 
 function stopSessionTimer() {
   if (SESSION_TIMER) { clearInterval(SESSION_TIMER); SESSION_TIMER = null; }
+}
+
+/* The Lock Screen and Dynamic Island copy of the session. The privacy rules on
+   live_sessions do not apply here: this is your own phone, not something your
+   partner is being shown. */
+let LIVE_ACTIVITY_ON = false;
+let LAST_LIVE_ACTIVITY = null;
+let LIVE_QUIP = "";
+let LIVE_QUIP_FOR = null;
+
+function liveActivityFields() {
+  const ex = TODAY_WORKOUT?.exercises?.[SESSION.exerciseIndex];
+  const sets = SESSION.setsDone?.[SESSION.exerciseIndex] || [];
+  const done = sets.filter(Boolean).length;
+  const total = sets.length;
+  /* The Lock Screen counts down from an end date by itself, so it only needs
+     telling how long is left at the moment rest begins. */
+  let restSeconds = 0;
+  if (SESSION.restStartedAt && !SESSION.pausedAt) {
+    const left = restTargetSec() - Math.round((Date.now() - SESSION.restStartedAt) / 1000);
+    if (left > 0) restSeconds = left;
+  }
+  /* One line per rest, picked when the rest starts. A locked phone suspends
+     the app, so it could not be changed mid-rest even if we wanted to, and
+     pickQuip already avoids repeating itself until the bank runs out. */
+  /* Keyed on the beat rather than the clock: a new line when a rest starts and
+     a new one when a set is logged, so he changes when something happened
+     rather than on every redraw. */
+  const beat = restSeconds > 0 ? `rest:${SESSION.restStartedAt}` : `set:${SESSION.exerciseIndex}:${done}`;
+  if (LIVE_QUIP_FOR !== beat) {
+    LIVE_QUIP_FOR = beat;
+    LIVE_QUIP = (restSeconds > 0
+      ? pickQuip("rest") || pickQuip("restLong")
+      : pickQuip("set") || pickQuip("nextExercise")) || "";
+  }
+
+  return {
+    exercise: ex?.name || "Workout",
+    detail: total ? `Set ${Math.min(done + 1, total)} of ${total}` : "",
+    done,
+    total,
+    restSeconds,
+    paused: !!SESSION.pausedAt,
+    quip: LIVE_QUIP,
+  };
+}
+
+async function pushLiveActivity() {
+  if (!isNativeApp() || !SESSION || SESSION.finished) return;
+  const live = window.Capacitor.Plugins.LiveWorkout;
+  if (!live) return;
+  const fields = liveActivityFields();
+  /* A running countdown must not be resent on every redraw or it restarts from
+     full each time, so rest compares as on or off rather than as seconds. */
+  const fingerprint = JSON.stringify({ ...fields, restSeconds: fields.restSeconds > 0 });
+  if (fingerprint === LAST_LIVE_ACTIVITY) return;
+  LAST_LIVE_ACTIVITY = fingerprint;
+  try {
+    if (!LIVE_ACTIVITY_ON) {
+      const res = await live.start(fields);
+      LIVE_ACTIVITY_ON = !!(res && res.started);
+      /* A Live Activity that never appears looks identical to one that is not
+         built, so say which it is rather than leaving it to guesswork. */
+      if (!LIVE_ACTIVITY_ON && res && res.why) toast(res.why);
+      return;
+    }
+    await live.update(fields);
+  } catch (err) {
+    console.error("live activity failed", err);
+    toast(String(err && err.message ? err.message : err).slice(0, 90));
+  }
+}
+
+async function endLiveActivity() {
+  LAST_LIVE_ACTIVITY = null;
+  if (!isNativeApp() || !LIVE_ACTIVITY_ON) return;
+  LIVE_ACTIVITY_ON = false;
+  try { await window.Capacitor.Plugins.LiveWorkout.end(); }
+  catch (err) { console.error("live activity end failed", err); }
 }
 
 /* A phone going dark mid-set is the same failure as a video player letting the
@@ -20683,7 +20775,7 @@ function viewedEmail() { return PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY
    their goal changes. */
 const PROGRESS_CARDS = [
   "cardWeight", "scaleCheckCard", "cardConsistency",
-  "cardStrength", "cardVolume", "cardPhotos", "cardActivity",
+  "cardStrength", "cardVolume", "cardPhotos",
 ];
 
 /* ---------- What this tab is supposed to answer ----------
@@ -20790,9 +20882,9 @@ const GOAL_CARDS = {
   recomp:    ["cardConsistency", "cardPhotos", "cardWeight", "scaleCheckCard"],
   lift:      ["cardStrength", "cardConsistency"],
   volume:    ["cardVolume", "cardStrength", "cardWeight", "scaleCheckCard", "cardConsistency"],
-  reps:      ["cardConsistency", "cardActivity"],
-  endurance: ["cardConsistency", "cardActivity"],
-  habit:     ["cardConsistency", "cardActivity"],
+  reps:      ["cardConsistency"],
+  endurance: ["cardConsistency"],
+  habit:     ["cardConsistency"],
 };
 
 /* ---------- Reading the data honestly ----------
@@ -21006,32 +21098,53 @@ function progressHeadline(kind, name, email, profile, third) {
   }
 
   if (kind === "volume") {
-    const weeks = volumeWeeks(name, 9);
-    const finished = weeks.slice(0, -1);
-    const lifted = finished.filter((w) => w.volume > 0);
-    if (lifted.length < 3) {
-      return { value: "—", line: "Not enough finished weeks to compare against yet.",
-        note: `Three is the least this can call a week busy or quiet from, and there ${lifted.length === 1 ? "is 1" : `are ${lifted.length}`} so far. Until then there is no usual week to be above or below.` };
+    /* Hard sets per muscle group per week, not total weight moved.
+       Tonnage was the headline here and it is the weakest of the obvious
+       three. It is not comparable across exercises, so the number mostly
+       reports which lifts someone happened to do: ten thousand pounds of leg
+       press and ten thousand of lateral raises are not the same stimulus. It
+       rewards the wrong direction, because dropping the load and adding reps
+       raises tonnage while the stimulus often falls. And leg days dwarf
+       everything, so a weekly total mostly says which split was run.
+
+       Lifetime PRs, the other candidate, measure strength rather than size and
+       decelerate badly: a beginner sets them constantly and an intermediate
+       waits months, so it reads worst exactly when encouragement matters most.
+
+       Sets per muscle group per week is the dose-response variable the
+       hypertrophy literature actually supports, around 10 to 20 a week. The
+       app already believes this: BODY_IMPACT_TARGET is 14 a week and the Body
+       tab has been drawing rings against it all along. This headline just
+       stops the Progress tab from measuring something else.
+
+       Tonnage is not deleted, it keeps its own card. It is a good number to
+       watch and a bad number to be judged by. */
+    const end = new Date(); end.setDate(end.getDate() + 1);
+    const start = new Date(); start.setDate(start.getDate() - 7);
+    const vols = computeMuscleVolumeBetween(name, isoDate(start), isoDate(end));
+    const groups = Object.entries(vols).filter(([, v]) => v > 0);
+    const total = Math.round(groups.reduce((n, [, v]) => n + v, 0));
+    if (!total) {
+      return { value: "—", line: `${Subj} ${have} not logged any sets in the last seven days.`,
+        note: "Muscle is built by hard sets per muscle group per week, about 10 to 20 each. Log a session and this starts counting them." };
     }
-    const last = finished[finished.length - 1];
-    const prior = lifted.filter((w) => w.weekStart !== last.weekStart);
-    const avg = prior.reduce((s, w) => s + w.volume, 0) / prior.length;
-    const pct = avg > 0 ? Math.round(((last.volume - avg) / avg) * 100) : 0;
-    const out = { value: fmtVolume(last.volume), unit: "lbs moved last week" };
-    if (last.volume === 0) {
-      out.line = `${Subj} logged no sets at all last week.`;
-      out.note = "One quiet week is a quiet week. Two in a row is the thing worth noticing.";
-    } else if (Math.abs(pct) < 8) {
-      out.line = `That is right on ${their} usual week.`;
-      out.note = "Holding is fine. Size comes from the work adding up, not from every week beating the last.";
+    const target = BODY_IMPACT_TARGET.week;
+    const inRange = groups.filter(([, v]) => v >= target * 0.7).length;
+    const short = groups.filter(([, v]) => v > 0 && v < target * 0.7)
+      .sort((a, b) => a[1] - b[1]).slice(0, 2).map(([g]) => g);
+    const out = { value: String(total), unit: "hard sets this week" };
+    if (inRange >= 5) {
+      out.tone = "good";
+      out.line = `${inRange} muscle groups got a full week's work.`;
+      out.note = "About 10 to 20 hard sets a week per muscle is the range that builds size. Total weight moved is on its own card below; it is a good number to watch and a poor one to be judged by.";
     } else {
-      out.tone = pct > 0 ? "good" : "";
-      out.line = `That is ${Math.abs(pct)}% ${pct > 0 ? "more" : "less"} than ${their} usual week.`;
-      out.note = "Total weight moved, weight times reps times sets, which is the number that tracks with building size.";
+      out.line = `${inRange} muscle ${inRange === 1 ? "group" : "groups"} got a full week's work.`;
+      out.note = short.length
+        ? `${short.join(" and ")} ${short.length === 1 ? "is" : "are"} furthest behind. About 10 to 20 hard sets a week per muscle is what builds size.`
+        : "About 10 to 20 hard sets a week per muscle is what builds size.";
     }
     return out;
   }
-
   if (kind === "reps") {
     const isPull = profile?.goal_child === "first-pullup";
     const re = isPull ? /pull ?-? ?up|chin ?-? ?up/i : /push ?-? ?up|press ?-? ?up/i;
@@ -21133,6 +21246,93 @@ function renderProgressHeadline(kind, name, email, profile, third, sharing) {
     ${h.note ? `<div class="ph-note">${escapeHtml(h.note)}${!sharing ? ` ${escapeHtml(name)} keeps the detail of their workouts private, so this is built from the days they trained.` : ""}</div>` : ""}`;
 }
 
+/* ---- Rearranging the Progress tab ----
+   Mo asked to be able to drag the cards into the order he wants. The order is
+   per device rather than per account, on the same reasoning as the quiet
+   switch: it is about the phone in your hand, and it needs no schema for it.
+
+   Stored as a list of card ids. Anything not in the list keeps its goal-given
+   position, so a saved order made before a card existed does not hide the new
+   card, it just does not have an opinion about where it goes. */
+const PROG_ORDER_KEY = "ft-progress-order";
+function progOrder() {
+  try { return JSON.parse(localStorage.getItem(PROG_ORDER_KEY) || "[]"); } catch { return []; }
+}
+function saveProgOrder(ids) {
+  try { localStorage.setItem(PROG_ORDER_KEY, JSON.stringify(ids)); } catch { /* private mode */ }
+}
+let PROG_ARRANGING = false;
+
+/* Pointer events, not HTML5 drag-and-drop: the latter does not fire on touch
+   at all, and this is a phone app first. One handler covers mouse and finger. */
+function startCardDrag(e, card, host) {
+  if (!PROG_ARRANGING) return;
+  e.preventDefault();
+  card.classList.add("dragging");
+  card.setPointerCapture?.(e.pointerId);
+  /* Re-based on every swap rather than measured from the original press, so a
+     long drag past several cards does not accumulate an offset and run away
+     from the finger. */
+  let anchorY = e.clientY;
+
+  const onMove = (ev) => {
+    const dy = ev.clientY - anchorY;
+    card.style.transform = `translateY(${dy}px)`;
+    const mid = card.getBoundingClientRect().top + card.offsetHeight / 2;
+    for (const other of host.querySelectorAll(".card:not(.hidden)")) {
+      if (other === card) continue;
+      const r = other.getBoundingClientRect();
+      /* Swap once the dragged card's middle passes a neighbour's middle, so
+         the list parts around it instead of jumping when two edges touch. */
+      if (mid > r.top && mid < r.bottom) {
+        host.insertBefore(card, dy > 0 ? other.nextSibling : other);
+        card.style.transform = "";
+        anchorY = ev.clientY;
+        return;
+      }
+    }
+  };
+  const onUp = () => {
+    card.classList.remove("dragging");
+    card.style.transform = "";
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    document.removeEventListener("pointercancel", onUp);
+    saveProgOrder([...host.querySelectorAll(".card")].map((c) => c.id).filter((id) => id && id !== "progHeadline"));
+  };
+  document.addEventListener("pointermove", onMove, { passive: false });
+  document.addEventListener("pointerup", onUp);
+  document.addEventListener("pointercancel", onUp);
+}
+
+function paintArrangeUI(host) {
+  let bar = host.querySelector(".prog-arrange");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.className = "prog-arrange";
+    bar.innerHTML = '<button type="button" id="progArrangeBtn"></button>';
+    host.insertBefore(bar, host.firstChild);
+  }
+  const btn = bar.querySelector("#progArrangeBtn");
+  btn.textContent = PROG_ARRANGING ? "Done" : "Rearrange";
+  btn.classList.toggle("on", PROG_ARRANGING);
+  btn.onclick = () => {
+    PROG_ARRANGING = !PROG_ARRANGING;
+    document.body.classList.toggle("arranging", PROG_ARRANGING);
+    paintArrangeUI(host);
+  };
+  /* The headline is not a card you can move. It is the answer the whole tab
+     exists to give, and it belongs above the things that explain it. */
+  for (const card of host.querySelectorAll(".card")) {
+    if (card.id === "progHeadline" || card.querySelector(".prog-grip")) continue;
+    const grip = document.createElement("div");
+    grip.className = "prog-grip";
+    grip.innerHTML = icon("grip", 16);
+    grip.onpointerdown = (e) => startCardDrag(e, card, host);
+    card.appendChild(grip);
+  }
+}
+
 function renderProgressTab() {
   const isPartner = PROGRESS_VIEW === "partner";
   // Logging weight only makes sense for yourself, hide it entirely on your
@@ -21203,6 +21403,18 @@ function renderProgressTab() {
   if (host?.insertBefore) {
     let after = $("progHeadline");
     for (const id of wanted) { const el = $(id); if (el) { host.insertBefore(el, after.nextSibling); after = el; } }
+    /* A saved order wins over the goal's order, because someone who dragged a
+       card there meant it. Cards it has no opinion about keep the place the
+       goal gave them. */
+    const custom = progOrder();
+    if (custom.length) {
+      let prev = $("progHeadline");
+      for (const id of custom) {
+        const el = $(id);
+        if (el && !el.classList.contains("hidden")) { host.insertBefore(el, prev.nextSibling); prev = el; }
+      }
+    }
+    paintArrangeUI(host);
     host.insertBefore(rule, after.nextSibling);
     after = rule;
     for (const id of rest) { const el = $(id); if (el) { host.insertBefore(el, after.nextSibling); after = el; } }
@@ -21216,7 +21428,6 @@ function renderProgressTab() {
   if (live.has("cardConsistency")) { renderConsistencyChart(); renderConsistencyStats(); }
   if (live.has("cardStrength")) { renderStrengthChart(); renderStrengthStats(); }
   if (live.has("cardVolume")) { renderVolumeChart(); renderVolumeStats(); }
-  if (live.has("cardActivity")) renderLog();
   if (live.has("cardPhotos")) renderBodyPhotos();
 }
 
