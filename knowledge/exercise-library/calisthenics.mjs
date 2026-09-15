@@ -28,7 +28,7 @@ export const CALISTHENICS = {
       key: "pull",
       label: "Pull progressions",
       exercises: [
-        { name: "Dead Hang", primary: ["forearms"], secondary: ["lats"], equipment: "bodyweight", level: "beginner" },
+        { name: "Dead Hang", primary: ["forearms"], secondary: ["lats"], equipment: "bodyweight", level: "beginner", isHold: true },
         { name: "Inverted Row", primary: ["lats"], secondary: ["biceps", "traps"], equipment: "bodyweight", level: "beginner" },
         { name: "Negative Pull-Up", primary: ["lats"], secondary: ["biceps", "forearms"], equipment: "bodyweight", level: "beginner" },
         { name: "Pull-Up", primary: ["lats"], secondary: ["biceps", "forearms"], equipment: "bodyweight", level: "intermediate" },
@@ -55,13 +55,13 @@ export const CALISTHENICS = {
       key: "core-statics",
       label: "Core & static holds",
       exercises: [
-        { name: "Plank", primary: ["abs"], secondary: ["obliques"], equipment: "bodyweight", level: "beginner" },
-        { name: "Hollow Body Hold", primary: ["abs"], secondary: [], equipment: "bodyweight", level: "beginner" },
-        { name: "Side Plank", primary: ["obliques"], secondary: ["abs"], equipment: "bodyweight", level: "beginner" },
-        { name: "Tuck L-Sit", primary: ["abs"], secondary: ["triceps", "forearms"], equipment: "bodyweight", level: "intermediate" },
+        { name: "Plank", primary: ["abs"], secondary: ["obliques"], equipment: "bodyweight", level: "beginner", isHold: true },
+        { name: "Hollow Body Hold", primary: ["abs"], secondary: [], equipment: "bodyweight", level: "beginner", isHold: true },
+        { name: "Side Plank", primary: ["obliques"], secondary: ["abs"], equipment: "bodyweight", level: "beginner", isHold: true },
+        { name: "Tuck L-Sit", primary: ["abs"], secondary: ["triceps", "forearms"], equipment: "bodyweight", level: "intermediate", isHold: true },
         { name: "Hanging Leg Raise", primary: ["abs"], secondary: ["forearms"], equipment: "bodyweight", level: "intermediate" },
-        { name: "L-Sit", primary: ["abs"], secondary: ["triceps", "forearms"], equipment: "bodyweight", level: "advanced" },
-        { name: "V-Sit", primary: ["abs"], secondary: ["hamstrings", "triceps"], equipment: "bodyweight", level: "advanced" },
+        { name: "L-Sit", primary: ["abs"], secondary: ["triceps", "forearms"], equipment: "bodyweight", level: "advanced", isHold: true },
+        { name: "V-Sit", primary: ["abs"], secondary: ["hamstrings", "triceps"], equipment: "bodyweight", level: "advanced", isHold: true },
       ],
     },
     {
