@@ -3033,6 +3033,9 @@
   .goal-kid-tick { flex: none; display: grid; place-items: center; width: 20px; height: 20px;
                    border-radius: 6px; border: 1.5px solid var(--border); color: var(--accent); }
   .goal-kid.on .goal-kid-tick { border-color: var(--accent); }
+  .goal-row-tick { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+                   border: 1.5px solid var(--border); color: var(--bg); }
+  .goal-row-tick.on { background: var(--accent); border-color: var(--accent); }
   .ob-tl { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 20px; }
   .ob-tl.hidden { display: none; }
   .ob-tl .ob-pace.on { border-color: var(--accent); }
@@ -5532,7 +5535,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.2";
+const APP_VERSION = "2026.09.15.3";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -6614,44 +6617,37 @@ function renderOnboardIntro(i, data) {
    are used verbatim; the longer phrasings people actually type live there as
    aliases and never go on a button. */
 const GOAL_TILES = [
-  { id: "lose-weight", legacy: "lose", askTarget: true, ico: "arrowDown", title: "Lose weight", sub: "and keep it off",
-    kids: [] },
-  { id: "build-muscle", legacy: "muscle", ico: "dumbbell", title: "Build muscle", sub: "get bigger",
-    kids: [{ id: "build-overall", label: "Gain weight" }, { id: "build-a-part", label: "Arms, chest, shoulders" }, { id: "build-glutes", label: "Glutes" }, { id: "build-skinny-fat", label: "Skinny fat" }, { id: "build-women", label: "Without getting bulky" }] },
-  { id: "get-stronger", legacy: "stronger", ico: "bolt", title: "Get stronger", sub: "lift heavier",
-    kids: [{ id: "strong-a-lift", label: "Hit a number" }, { id: "strong-multiples", label: "Lift my bodyweight" }, { id: "strong-not-bigger", label: "Stronger, not bigger" }, { id: "strong-for-life", label: "For everyday life" }, { id: "strong-again", label: "Get back to where I was" }] },
-  { id: "tone-lean-abs", legacy: "recomp", ico: "refresh", title: "Tone up", sub: "get lean, see abs",
-    kids: [{ id: "tone-part", label: "Arms, legs, stomach" }, { id: "abs", label: "Abs" }, { id: "lean-shredded", label: "Get lean" }] },
-  { id: "build-endurance", legacy: "consistent", ico: "run", title: "Build endurance", sub: "last longer, breathe easier",
-    kids: [{ id: "stamina", label: "General stamina" }, { id: "run-5k", label: "Run a 5K" }, { id: "faster-mile", label: "Run faster" }, { id: "event-run", label: "A race" }, { id: "event-hyrox", label: "Hyrox" }, { id: "event-ocr", label: "Obstacle race" }] },
-  { id: "move-better", legacy: "consistent", ico: "body", title: "Move better", sub: "mobility, flexibility, less pain",
-    kids: [{ id: "mobility", label: "Loosen up" }, { id: "flexibility", label: "Touch my toes" }, { id: "pain", label: "Aches and pains" }, { id: "back-postpartum", label: "After a baby" }] },
-  { id: "feel-better", legacy: "consistent", ico: "heart", title: "Feel better and stay consistent", sub: "energy, sleep, actually sticking to it",
-    kids: [{ id: "mental", label: "Mood, stress, sleep" }, { id: "energy", label: "More energy" }, { id: "longevity", label: "Live longer" }, { id: "prevent", label: "Doctor's orders" }, { id: "keep-quitting", label: "I keep quitting" }, { id: "dont-know", label: "Don't know where to start" }, { id: "back-after-years", label: "After years off" }, { id: "start-fresh", label: "Total beginner" }] },
-  { id: "consistent", legacy: "consistent", ico: "info", title: "Not sure yet", sub: "we will start somewhere sensible",
-    kids: [] },
+  { id: "lose-weight", legacy: "lose", askTarget: "lose", ico: "arrowDown", title: "Lose weight", sub: "and keep it off", kids: [] },
+  { id: "build-muscle", legacy: "muscle", askTarget: "gain", ico: "dumbbell", title: "Build muscle", sub: "get bigger", kids: [] },
+  { id: "get-stronger", legacy: "stronger", ico: "bolt", title: "Get stronger", sub: "lift heavier", kids: [] },
+  { id: "tone-lean-abs", legacy: "recomp", ico: "refresh", title: "Tone up", sub: "get lean, see abs", kids: [] },
+  { id: "build-endurance", legacy: "consistent", ico: "run", title: "Build endurance", sub: "last longer, breathe easier", kids: [] },
+  { id: "move-better", legacy: "consistent", ico: "body", title: "Move better", sub: "mobility, flexibility, less pain", kids: [] },
+  { id: "feel-better", legacy: "consistent", ico: "heart", title: "Feel better and stay consistent", sub: "energy, sleep, actually sticking to it", kids: [] },
+  { id: "consistent", legacy: "consistent", ico: "info", title: "Not sure yet", sub: "we will start somewhere sensible", kids: [] },
 ];
 
-/* The safe rate of loss is the engine's, never a number invented at the UI:
-   0.5 to 1% of bodyweight a week, floor half a pound, ceiling two, planning on
-   0.75%. CDC and Harvard, cited at LOSS_RATE in goal-engine.mjs. Duplicated as
-   literals here only because this runs before the engine module is imported;
-   if those constants move, this moves with them. */
-function lossRealism(currentLb, goalLb, byDate, today = new Date()) {
-  const amount = Math.max(0, (currentLb || 0) - (goalLb || 0));
+/* Muscle gain does NOT get a pace to choose, and that asymmetry is deliberate.
+   A bigger deficit really does lose fat faster, at a cost, so offering someone
+   a faster and a gentler route to a goal weight is offering a real choice.
+   Nobody can decide to build muscle quicker: the rate is physiological, and
+   eating harder past it adds fat rather than muscle. Chips saying "6 months"
+   and "4 months" would be inventing a decision that does not exist, so gaining
+   gets one honest range and no buttons.
+
+   GAIN_RATE_PER_MONTH's beginner band, from goal-engine.mjs: 1 to 1.5% of
+   bodyweight a month. Beginner because that is who is standing in onboarding,
+   and it is the fastest band, so the number we show is the optimistic end and
+   the truth cannot be slower than we implied. */
+function gainOutlook(currentLb, goalLb) {
+  const amount = (goalLb || 0) - (currentLb || 0);
   if (!currentLb || !goalLb || amount <= 0) return null;
-  const planned = Math.min(2, Math.max(0.5, currentLb * 0.0075));
-  const ceiling = Math.min(2, Math.max(0.5, currentLb * 0.01));
-  const honestWeeks = amount / planned;
-  const honestDate = new Date(today.getTime() + honestWeeks * 604800000);
-  if (!byDate) return { amount, planned, honestWeeks, honestDate, band: "nodate" };
-  const weeks = (new Date(byDate + "T00:00:00") - today) / 604800000;
-  const need = weeks > 0 ? amount / weeks : Infinity;
-  const band = need <= planned ? "fine" : need <= ceiling ? "aggressive" : "over";
-  return { amount, planned, ceiling, need, weeks, honestWeeks, honestDate, band };
+  const fastMonths = amount / (currentLb * 0.015);
+  const slowMonths = amount / (currentLb * 0.01);
+  return { amount, lo: Math.max(1, Math.round(fastMonths)), hi: Math.max(2, Math.round(slowMonths)) };
 }
 
-/* Three timelines for a given amount, computed from the engine's own LOSS_RATE
+/* Three timelines for a given amount/* Three timelines for a given amount, computed from the engine's own LOSS_RATE
    bands rather than offered as fixed three/six/twelve month chips. Someone
    losing 10 pounds and someone losing 80 should never be shown the same three
    durations, and this way nobody can choose one that cannot happen: the
@@ -6889,7 +6885,9 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
             <span class="goal-row-sub">${escapeHtml(t.sub)}</span>
           </span>
           ${badge}
-          <span class="goal-row-chev">${icon(isOpen ? "chevronDown" : "chevronRight", 17)}</span>
+          <span class="goal-row-chev">${t.kids.length
+            ? icon(isOpen ? "chevronDown" : "chevronRight", 17)
+            : `<span class="goal-row-tick${main || alsoCount ? " on" : ""}">${main || alsoCount ? icon("check", 14) : ""}</span>`}</span>
         </button>
         ${kids}
       </div>`;
@@ -7811,37 +7809,39 @@ function renderOnboardStep(step, data = {}) {
     return;
   }
 
-  /* Everything the weight goal needs, on one page: what they weigh, how tall
-     they are, what they are aiming at, and how long it takes. Asked here
-     rather than as an upfront stats interrogation because a number means
-     something at the moment it is relevant and is just a toll booth before it.
-
-     The date field this replaces was a mistake. It let someone type a date
-     that could not happen and then corrected them, which is a worse trade
-     than only ever offering durations that can. */
+  /* The one follow-up question left in the whole picker. Every other goal goes
+     straight through, because a list of sub-goals was asking people to name a
+     flavour of a thing they had already named, and the engine treated most of
+     those answers identically anyway. A weight is different: it is a number
+     only they know, it changes the plan, and it turns on the chart's goal line
+     and the projection. */
   if (step === "target") {
+    const dir = goalTileFor(data.goal_bubble)?.askTarget || "lose";
+    const gaining = dir === "gain";
     const ftv = data.height_in ? Math.floor(data.height_in / 12) : "";
     const inv = data.height_in ? data.height_in % 12 : "";
     ob.innerHTML = `
       <div class="ob-step">
-        <h1>How much do you want to lose?</h1>
-        <p class="sub">All of this is optional, and you can change any of it later.</p>
+        <h1>${gaining ? "Aiming for a weight?" : "How much do you want to lose?"}</h1>
+        <p class="sub">${gaining
+          ? "Plenty of people build muscle without watching the scale. Skip this if that is you."
+          : "All of this is optional, and you can change any of it later."}</p>
 
         <label class="ob-lab">Right now</label>
         <div class="ob-row">
           <input id="obLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.weight_lb || ""}" />
         </div>
 
-        <label class="ob-lab">Goal weight</label>
+        <label class="ob-lab">Goal weight <span class="ob-opt">optional</span></label>
         <div class="ob-row">
           <input id="obGoalLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.goal_weight_lb || ""}" />
         </div>
-
+        ${gaining ? "" : `
         <label class="ob-lab">Height <span class="ob-opt">so we can check the goal is a safe one</span></label>
         <div class="ob-row">
           <input id="obFt" type="number" inputmode="numeric" min="3" max="8" placeholder="feet" value="${ftv}" />
           <input id="obIn" type="number" inputmode="numeric" min="0" max="11" placeholder="inches" value="${inv}" />
-        </div>
+        </div>`}
 
         <div id="obReal" class="ob-real hidden"></div>
         <div id="obTl" class="ob-tl hidden"></div>
@@ -7852,20 +7852,30 @@ function renderOnboardStep(step, data = {}) {
       </div>`;
 
     const readHeight = () => {
+      if (gaining) return data.height_in || null;
       const f = parseInt($("obFt").value, 10) || 0;
       const i = parseInt($("obIn").value, 10) || 0;
       return f || i ? f * 12 + i : null;
     };
     let picked = data.pace || "steady";
 
-    /* Recomputed as they type, so the durations follow the number instead of
-       waiting behind a Continue press. */
     const paint = () => {
       const cur = parseFloat($("obLb").value) || null;
       const goalLb = parseFloat($("obGoalLb").value) || null;
       const box = $("obReal"), tl = $("obTl");
-      const floor = healthyFloorLb(readHeight());
 
+      if (gaining) {
+        tl.className = "ob-tl hidden"; tl.innerHTML = "";
+        const g = gainOutlook(cur, goalLb);
+        if (!g) { box.className = "ob-real hidden"; box.innerHTML = ""; return; }
+        box.className = "ob-real";
+        box.innerHTML = `Putting on ${g.amount.toFixed(0)} pounds of real size usually takes
+          <b>${g.lo} to ${g.hi} months</b>. Muscle does not come faster than that no matter how the training
+          is arranged, so we will not pretend it can. Eating harder than that adds fat, not muscle.`;
+        return;
+      }
+
+      const floor = healthyFloorLb(readHeight());
       if (goalLb && floor && goalLb < floor) {
         box.className = "ob-real care";
         box.innerHTML = `<b>We will track it, but we will not coach toward it.</b>
@@ -7891,7 +7901,7 @@ function renderOnboardStep(step, data = {}) {
         b2.onclick = () => { picked = b2.dataset.tl; paint(); };
       });
     };
-    ["obLb", "obGoalLb", "obFt", "obIn"].forEach((id) => { $(id).oninput = paint; });
+    ["obLb", "obGoalLb", "obFt", "obIn"].forEach((id) => { if ($(id)) $(id).oninput = paint; });
     paint();
 
     const go = (skip) => {
@@ -7899,19 +7909,18 @@ function renderOnboardStep(step, data = {}) {
       const goalLb = skip ? null : parseFloat($("obGoalLb").value) || null;
       const heightIn = readHeight();
       const floor = healthyFloorLb(heightIn);
-      const chosen = lossTimelines(cur, goalLb).find((o) => o.key === picked);
-      const by = chosen ? isoDate(new Date(Date.now() + chosen.weeks * 604800000)) : null;
+      const chosen = gaining ? null : lossTimelines(cur, goalLb).find((o) => o.key === picked);
+      const outlook = gaining ? gainOutlook(cur, goalLb) : null;
+      const weeks = chosen ? chosen.weeks : outlook ? Math.round(outlook.hi * 4.345) : null;
       renderOnboardStep("plan", {
         ...data,
         height_in: heightIn,
         weight_lb: cur,
         goal_weight_lb: goalLb,
-        goal_by_date: by,
-        weeks: chosen ? chosen.weeks : null,
-        /* The duration chips ARE the pace question, answered against their own
-           number rather than against a flat 8/12/16. */
+        goal_by_date: weeks ? isoDate(new Date(Date.now() + weeks * 604800000)) : null,
+        weeks,
         pace: chosen ? chosen.key : "steady",
-        goal_withhold: !!(goalLb && floor && goalLb < floor),
+        goal_withhold: !!(!gaining && goalLb && floor && goalLb < floor),
       });
     };
     $("targetNext").onclick = () => go(false);
@@ -21243,7 +21252,29 @@ function b64ToBytes(base64url) {
 /* iOS only exposes PushManager once the app has been added to the home screen,
    so "unsupported" there usually means "not installed yet", which is worth
    saying rather than leaving a dead button. */
+/* The native build registers with APNs instead. Web Push does not work inside a
+   WKWebView at all, which is why the wrapped app could offer reminders and then
+   never deliver one. */
+function nativePush() {
+  return isNativeApp() ? window.Capacitor.Plugins.PushNotifications : null;
+}
+
+/* APNs hands the token to a listener rather than returning it, so the register
+   call has to be wrapped to be awaited like anything else. */
+function awaitApnsToken(timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const push = nativePush();
+    let done = false;
+    const finish = (fn, value) => { if (!done) { done = true; fn(value); } };
+    push.addListener("registration", (t) => finish(resolve, t.value));
+    push.addListener("registrationError", (e) => finish(reject, new Error(e.error || "registration failed")));
+    push.register();
+    setTimeout(() => finish(reject, new Error("timed out waiting for a device token")), timeoutMs);
+  });
+}
+
 function pushSupport() {
+  if (isNativeApp()) return { ok: true };
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const installed = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
@@ -21258,6 +21289,14 @@ function pushSupport() {
 }
 
 async function currentPushSub() {
+  /* On device the truth is a row, not a browser subscription object: the token
+     lives with APNs and we only ever held a copy of it. */
+  if (isNativeApp()) {
+    try {
+      const { data } = await sb.from("apns_tokens").select("token").eq("email", MY_EMAIL).limit(1);
+      return data && data.length ? data[0] : null;
+    } catch { return null; }
+  }
   try {
     const reg = await navigator.serviceWorker.ready;
     return await reg.pushManager.getSubscription();
@@ -21290,6 +21329,24 @@ async function enablePush() {
   btn.textContent = "Turning on…";
   note.textContent = "Waiting for your answer to the permission prompt.";
   try {
+    if (isNativeApp()) {
+      const push = nativePush();
+      const asked = await push.requestPermissions();
+      if (asked.receive !== "granted") { toast("Reminders need permission"); return; }
+      const token = await awaitApnsToken();
+      const { error: apnsErr } = await sb.from("apns_tokens").upsert({
+        email: MY_EMAIL,
+        token,
+        /* Matches aps-environment in App.entitlements. A sandbox token is
+           rejected outright by the production gateway. */
+        environment: "development",
+        failures: 0,
+      }, { onConflict: "token" });
+      if (apnsErr) throw apnsErr;
+      toast("Reminders on");
+      return;
+    }
+
     /* Must be inside the click. Asking on page load is how you get denied
        permanently, and iOS requires a gesture regardless. */
     const perm = await Notification.requestPermission();
@@ -21324,6 +21381,13 @@ async function disablePush() {
   const btn = $("pushToggleBtn");
   btn.disabled = true;
   try {
+    if (isNativeApp()) {
+      /* Dropping the row is what stops delivery. The OS registration can stay:
+         nothing has our token any more, so nothing can send to it. */
+      await sb.from("apns_tokens").delete().eq("email", MY_EMAIL);
+      toast("Reminders off");
+      return;
+    }
     const sub = await currentPushSub();
     if (sub) {
       await sb.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
