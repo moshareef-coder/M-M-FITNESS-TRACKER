@@ -70,9 +70,43 @@ export function pickFocusCategories({ level, weeklyVolumeByCategory = {}, count 
     .map((c) => c.key);
 }
 
-// ---------------------------------------------------------------------------
-// Rep ranges and set counts by goal (see ../principles/rpe-autoregulation.md).
-// ---------------------------------------------------------------------------
+/**
+ * Circuit-style sessions (fat-loss/general-fitness goal) need full-body coverage EVERY
+ * session, not a rotating body-part split -- that's the whole point of the modality (see
+ * ../principles/weight-loss-training.md). pickFocusCategories() picks the N most-behind
+ * muscle groups in declaration order, which produces a de-facto bro-split when N is small
+ * relative to the 14 total groups, and can skip entire movement patterns for a whole week.
+ *
+ * This picks one category from each fundamental movement pattern instead, so every circuit
+ * day always includes a squat, a hinge, a push, a pull, and core -- the skeleton already
+ * specified in weight-loss-training.md's equipment-variant table. Within a pattern that maps
+ * to more than one muscle group (e.g. push -> chest/shoulders/triceps), the most-behind one
+ * this week wins, same ranking logic as pickFocusCategories.
+ */
+const MOVEMENT_PATTERNS = {
+  squat: ["quads"],
+  hinge: ["hamstrings", "glutes", "lowerback"],
+  push: ["chest", "shoulders", "triceps"],
+  pull: ["lats", "traps", "biceps"],
+  core: ["abs", "obliques"],
+};
+const PATTERN_ORDER = ["squat", "hinge", "push", "pull", "core"];
+
+export function pickCircuitCategories({ level, weeklyVolumeByCategory = {} }) {
+  return PATTERN_ORDER.map((pattern) => {
+    const candidates = MOVEMENT_PATTERNS[pattern];
+    const [best] = candidates
+      .map((key) => {
+        const target = weeklyVolumeTarget(key, level) || 1;
+        const done = weeklyVolumeByCategory[key] || 0;
+        return { key, gap: (target - done) / target };
+      })
+      .sort((a, b) => b.gap - a.gap);
+    return best.key;
+  });
+}
+
+
 export const REP_RANGES = {
   strength: [3, 6],
   hypertrophy: [6, 15],
@@ -226,26 +260,87 @@ export const COLD_START_MULTIPLIER = {
 
 export function coldStartWeight(exerciseName, level, bodyWeightLb) {
   const table = COLD_START_MULTIPLIER[exerciseName];
-  if (!table || !bodyWeightLb) return null;
-  return Math.round((bodyWeightLb * table[level]) / 2.5) * 2.5; // round to nearest 2.5lb plate
+  if (table && bodyWeightLb) {
+    return Math.round((bodyWeightLb * table[level]) / 2.5) * 2.5;
+  }
+  return null;
+}
+
+// Fallback for every exercise NOT in the named-lift table above -- which, for a circuit-style
+// session, is most of them (dumbbell/cable/machine variety, not the 5 big barbell lifts).
+// Deliberately light and equipment-general rather than exercise-specific: the point is to give
+// a real, non-zero, safe-to-attempt first number so the trainee isn't left guessing, not to be
+// precise -- progressiveOverload()/RPE self-correct it within a session or two either way.
+const GENERIC_COLD_START_FRACTION = { barbell: 0.35, machine: 0.25, cable: 0.15, dumbbell: 0.12 };
+
+export function genericColdStartWeight(equipment, level, bodyWeightLb) {
+  const frac = GENERIC_COLD_START_FRACTION[equipment];
+  if (!frac || !bodyWeightLb) return null;
+  const levelScale = { beginner: 0.7, intermediate: 1, advanced: 1.3 }[level] ?? 1;
+  const raw = bodyWeightLb * frac * levelScale;
+  const rounded = equipment === "dumbbell" || equipment === "cable" ? 2.5 : 5;
+  return Math.max(rounded, Math.round(raw / rounded) * rounded);
+}
+
+
+// ---------------------------------------------------------------------------
+// Day names and deloads -- both flagged directly in BRIEF-workout-algorithm.md's known
+// bugs. Circuit sessions hit the same 5 movement patterns every day by design, so naming
+// them by category would be noisy; a full-body circuit is legitimately just "Full Body
+// Circuit" every time, with a letter to distinguish the week's sessions from each other.
+// Split-style sessions get named from whichever categories they actually cover.
+// ---------------------------------------------------------------------------
+const CATEGORY_LABELS = {
+  chest: "Chest", lats: "Back", traps: "Traps", shoulders: "Shoulders",
+  biceps: "Biceps", triceps: "Triceps", forearms: "Forearms", quads: "Legs",
+  hamstrings: "Hamstrings", glutes: "Glutes", calves: "Calves",
+  abs: "Abs", obliques: "Core", lowerback: "Lower Back",
+};
+
+export function nameForDay({ categories, sessionStyle, dayIndex = 0 }) {
+  if (sessionStyle === "circuit") {
+    return `Full Body Circuit ${String.fromCharCode(65 + (dayIndex % 26))}`; // A, B, C...
+  }
+  const labels = [...new Set(categories.map((c) => CATEGORY_LABELS[c] || c))].slice(0, 2);
+  return labels.length ? `${labels.join(" & ")} Day` : "Training Day";
 }
 
 // ---------------------------------------------------------------------------
-// Weight training: the full plan for one session.
+// Deload detection (see ../principles/periodization-deloads.md): not on a rigid calendar,
+// triggered by real signals, with a floor so fatigue that isn't consciously felt still gets
+// addressed. A deload week keeps intensity normal and cuts volume roughly in half.
 // ---------------------------------------------------------------------------
+export function shouldDeload({ weeksSinceLastDeload = 0, missedRepStreak = 0, risingRpeStreak = 0 }) {
+  if (missedRepStreak >= 2) return true;   // reps missed across 2+ consecutive sessions
+  if (risingRpeStreak >= 2) return true;   // RPE creeping up at the same weight, 2+ sessions
+  if (weeksSinceLastDeload >= 8) return true; // floor: fatigue accrues even unfelt
+  return false;
+}
+
+export function applyDeload(sets, isDeloadWeek) {
+  return isDeloadWeek ? Math.max(1, Math.round(sets / 2)) : sets;
+}
+
+
 export function buildWeightTrainingPlan({
   level, goal, weeklyVolumeByCategory = {}, recentExerciseNames = [],
   equipmentAvailable = null, historyByExercise = {}, bodyWeightLb = null,
-  focusCategoryCount = 2, exercisesPerCategory = 2,
+  focusCategoryCount = 2, exercisesPerCategory = 2, dayIndex = 0, isDeloadWeek = false,
 }) {
-  const categories = pickFocusCategories({ level, weeklyVolumeByCategory, count: focusCategoryCount });
+  const isCircuit = sessionStyleForGoal(goal) === "circuit";
+  const categories = isCircuit
+    ? pickCircuitCategories({ level, weeklyVolumeByCategory })
+    : pickFocusCategories({ level, weeklyVolumeByCategory, count: focusCategoryCount });
+  // Circuit sessions cover 5 movement patterns in one exercise each (full-body every time);
+  // split-style sessions go deeper on fewer categories instead.
+  const perCategoryCount = isCircuit ? 1 : exercisesPerCategory;
   const reps = repsForGoal(goal);
-  const sets = setsPerExercise(level);
+  const sets = applyDeload(setsPerExercise(level), isDeloadWeek);
 
   const exercises = categories.flatMap((categoryKey) =>
     selectExercisesForCategory({
       trainingId: "weight-training", categoryKey, level, equipmentAvailable,
-      recentExerciseNames, count: exercisesPerCategory,
+      recentExerciseNames, count: perCategoryCount,
     }).map((ex) => {
       const lastLog = historyByExercise[ex.name] || null;
       const isBodyweight = ex.equipment === "bodyweight";
@@ -253,7 +348,10 @@ export function buildWeightTrainingPlan({
       // prescription. Bodyweight moves have no load at all, which is a different, known 0.
       const weight = isBodyweight
         ? 0
-        : progressiveOverload({ lastLog, equipment: ex.equipment }) ?? coldStartWeight(ex.name, level, bodyWeightLb) ?? null;
+        : progressiveOverload({ lastLog, equipment: ex.equipment })
+          ?? coldStartWeight(ex.name, level, bodyWeightLb)
+          ?? genericColdStartWeight(ex.equipment, level, bodyWeightLb)
+          ?? null;
       return {
         name: ex.name, sets, reps, targetWeight: weight,
         isEstimate: !isBodyweight && weight != null && !lastLog,
@@ -262,9 +360,11 @@ export function buildWeightTrainingPlan({
     })
   );
 
+  const sessionStyle = sessionStyleForGoal(goal);
   return {
     trainingId: "weight-training", focusCategories: categories, exercises,
-    sessionStyle: sessionStyleForGoal(goal), restSeconds: restSecondsForGoal(goal),
+    dayName: nameForDay({ categories, sessionStyle, dayIndex }),
+    sessionStyle, restSeconds: restSecondsForGoal(goal), isDeloadWeek,
   };
 }
 
@@ -285,15 +385,16 @@ export function sessionCapacity(minutesAvailable) {
 // next day is generated, so day 4 already "knows" what days 1-3 did -- the same mechanic that
 // makes today's plan depend on yesterday's real logged history once this is wired into the app.
 // ---------------------------------------------------------------------------
-export function buildWeekPlan({ level, goal, daysPerWeek = 4, equipmentAvailable = null, bodyWeightLb = null, focusCategoryCount = 2, exercisesPerCategory = 2 }) {
+export function buildWeekPlan({ level, goal, daysPerWeek = 4, equipmentAvailable = null, bodyWeightLb = null, focusCategoryCount = 2, exercisesPerCategory = 2, weeksSinceLastDeload = 0, missedRepStreak = 0, risingRpeStreak = 0 }) {
   const days = [];
   let weeklyVolumeByCategory = {};
   let recentExerciseNames = [];
+  const isDeloadWeek = shouldDeload({ weeksSinceLastDeload, missedRepStreak, risingRpeStreak });
 
   for (let day = 0; day < daysPerWeek; day++) {
     const plan = buildWeightTrainingPlan({
       level, goal, weeklyVolumeByCategory, recentExerciseNames, equipmentAvailable, bodyWeightLb,
-      focusCategoryCount, exercisesPerCategory,
+      focusCategoryCount, exercisesPerCategory, dayIndex: day, isDeloadWeek,
     });
     days.push(plan);
 
