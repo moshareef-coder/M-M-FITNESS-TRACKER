@@ -5538,7 +5538,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.4";
+const APP_VERSION = "2026.09.15.5";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -20728,16 +20728,20 @@ const PROGRESS_CARDS = [
    Profiles saved before the bubbles existed carry only the legacy `goal`
    string, so that falls through the same table at the bottom. */
 function headlineKindFor(profile) {
-  const child = profile?.goal_child || "";
-  if (child === "lose-and-build" || child === "build-skinny-fat") return "recomp";
-  if (child === "build-overall") return "scale";
-  if (child === "first-pullup" || child === "first-pushup") return "reps";
-  if (child === "run-5k" || child === "faster-mile") return "endurance";
+  /* The four goal_child tests that used to sit here are gone with the
+     sub-goals. goal_child is null on every profile written since, and the old
+     ones it still matched resolved to the same kind their bubble gives anyway. */
   switch (profile?.goal_bubble || "") {
     case "lose-weight":   return "scale";
     case "build-muscle":  return "volume";
     case "get-stronger":  return "lift";
     case "tone-lean-abs": return "recomp";
+    case "build-endurance": return "endurance";
+    /* Move better has no number that honestly measures it. Range of motion is
+       not something this app can see, so it gets the same showing-up card as
+       the habit goals rather than a made-up mobility score. */
+    case "move-better":   return "habit";
+    /* Kept: profiles written before the tiles collapsed still carry these. */
     case "do-a-thing": case "event": case "feel-better":
     case "get-back": case "consistent": return "habit";
   }
@@ -20785,7 +20789,7 @@ const GOAL_CARDS = {
   scale:     ["cardWeight", "scaleCheckCard", "cardPhotos", "cardConsistency"],
   recomp:    ["cardConsistency", "cardPhotos", "cardWeight", "scaleCheckCard"],
   lift:      ["cardStrength", "cardConsistency"],
-  volume:    ["cardVolume", "cardStrength", "cardConsistency"],
+  volume:    ["cardVolume", "cardStrength", "cardWeight", "scaleCheckCard", "cardConsistency"],
   reps:      ["cardConsistency", "cardActivity"],
   endurance: ["cardConsistency", "cardActivity"],
   habit:     ["cardConsistency", "cardActivity"],
