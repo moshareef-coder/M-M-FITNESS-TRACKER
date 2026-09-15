@@ -121,8 +121,16 @@ export function normalizeGoal(goal) {
 }
 
 /** Sets per exercise today. Beginners get less per movement -- they're doing more total
- *  movements across the same volume target while they're still learning technique. */
-export function setsPerExercise(level) {
+ *  movements across the same volume target while they're still learning technique.
+ *  Hypertrophy sessions run higher (see build-muscle-training.md): the upper/lower split
+ *  above covers each muscle with fewer, more-targeted exercises hit ~2x/week, which needs
+ *  more sets per exercise than a variety-heavy session to still land near weekly volume
+ *  targets -- one exercise at the generic 3 sets would leave most muscles under their own
+ *  MEV floor. */
+export function setsPerExercise(level, goal = null) {
+  if (goal && normalizeGoal(goal) === "hypertrophy") {
+    return { beginner: 4, intermediate: 4, advanced: 5 }[level] ?? 4;
+  }
   return { beginner: 3, intermediate: 3, advanced: 4 }[level] ?? 3;
 }
 
@@ -283,6 +291,37 @@ export function genericColdStartWeight(equipment, level, bodyWeightLb) {
 }
 
 
+/**
+ * Hypertrophy-goal split (see ../principles/build-muscle-training.md): frequency matters more
+ * here than for other goals -- each muscle group benefits from roughly twice-weekly training,
+ * not once. pickFocusCategories's small top-N picks would otherwise produce a bro-split that
+ * skips whole movement patterns for a week, same failure mode fixed for circuit sessions above.
+ * Alternating upper/lower across the week guarantees full coverage AND ~2x/week frequency at
+ * once. Core rotates in on every session (most-behind of abs/obliques/lowerback), since ab work
+ * is a normal finisher regardless of which half of the body the rest of the session covers.
+ */
+const HYPERTROPHY_SPLIT = {
+  // Forearms and calves are deliberately left off dedicated slots here, same call already
+  // made for the circuit fix above -- they get real incidental work from rows/curls and
+  // squats/lunges respectively, and a full 7-category upper day would bloat into an
+  // unrealistic 12-14 exercise session for little extra benefit.
+  upper: ["chest", "lats", "traps", "shoulders", "biceps", "triceps"],
+  lower: ["quads", "hamstrings", "glutes"],
+  core: ["abs", "obliques", "lowerback"],
+};
+
+export function pickSplitCategories({ level, weeklyVolumeByCategory = {}, dayIndex = 0 }) {
+  const half = dayIndex % 2 === 0 ? "upper" : "lower";
+  const [bestCore] = HYPERTROPHY_SPLIT.core
+    .map((key) => {
+      const target = weeklyVolumeTarget(key, level) || 1;
+      const done = weeklyVolumeByCategory[key] || 0;
+      return { key, gap: (target - done) / target };
+    })
+    .sort((a, b) => b.gap - a.gap);
+  return [...HYPERTROPHY_SPLIT[half], bestCore.key];
+}
+
 // ---------------------------------------------------------------------------
 // Day names and deloads -- both flagged directly in BRIEF-workout-algorithm.md's known
 // bugs. Circuit sessions hit the same 5 movement patterns every day by design, so naming
@@ -297,9 +336,12 @@ const CATEGORY_LABELS = {
   abs: "Abs", obliques: "Core", lowerback: "Lower Back",
 };
 
-export function nameForDay({ categories, sessionStyle, dayIndex = 0 }) {
+export function nameForDay({ categories, sessionStyle, dayIndex = 0, isHypertrophy = false }) {
   if (sessionStyle === "circuit") {
     return `Full Body Circuit ${String.fromCharCode(65 + (dayIndex % 26))}`; // A, B, C...
+  }
+  if (isHypertrophy) {
+    return dayIndex % 2 === 0 ? "Upper Body Day" : "Lower Body Day";
   }
   const labels = [...new Set(categories.map((c) => CATEGORY_LABELS[c] || c))].slice(0, 2);
   return labels.length ? `${labels.join(" & ")} Day` : "Training Day";
@@ -328,14 +370,18 @@ export function buildWeightTrainingPlan({
   focusCategoryCount = 2, exercisesPerCategory = 2, dayIndex = 0, isDeloadWeek = false,
 }) {
   const isCircuit = sessionStyleForGoal(goal) === "circuit";
+  const isHypertrophy = normalizeGoal(goal) === "hypertrophy";
   const categories = isCircuit
     ? pickCircuitCategories({ level, weeklyVolumeByCategory })
-    : pickFocusCategories({ level, weeklyVolumeByCategory, count: focusCategoryCount });
+    : isHypertrophy
+      ? pickSplitCategories({ level, weeklyVolumeByCategory, dayIndex })
+      : pickFocusCategories({ level, weeklyVolumeByCategory, count: focusCategoryCount });
   // Circuit sessions cover 5 movement patterns in one exercise each (full-body every time);
-  // split-style sessions go deeper on fewer categories instead.
-  const perCategoryCount = isCircuit ? 1 : exercisesPerCategory;
+  // hypertrophy sessions alternate upper/lower for full coverage at ~2x/week frequency;
+  // other split-style sessions go deeper on fewer categories instead.
+  const perCategoryCount = (isCircuit || isHypertrophy) ? 1 : exercisesPerCategory;
   const reps = repsForGoal(goal);
-  const sets = applyDeload(setsPerExercise(level), isDeloadWeek);
+  const sets = applyDeload(setsPerExercise(level, goal), isDeloadWeek);
 
   const exercises = categories.flatMap((categoryKey) =>
     selectExercisesForCategory({
@@ -363,7 +409,7 @@ export function buildWeightTrainingPlan({
   const sessionStyle = sessionStyleForGoal(goal);
   return {
     trainingId: "weight-training", focusCategories: categories, exercises,
-    dayName: nameForDay({ categories, sessionStyle, dayIndex }),
+    dayName: nameForDay({ categories, sessionStyle, dayIndex, isHypertrophy }),
     sessionStyle, restSeconds: restSecondsForGoal(goal), isDeloadWeek,
   };
 }
