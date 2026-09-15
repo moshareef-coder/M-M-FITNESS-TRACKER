@@ -3046,7 +3046,37 @@
      the finger had nothing left to scroll with, because every card was
      swallowing the gesture. Only the grip takes the touch, so the rest of the
      card scrolls the page exactly as it always did. */
-  body.arranging .card { position: relative; }
+  /* Collapsed to titles, not zoomed out. The first version scaled the whole
+     tab down to fit and hit its 28% floor without fitting, at which point
+     nothing on screen was legible anyway. Reordering only needs to know which
+     card is which, so each one folds to its heading: seven cards at a
+     readable size fit a phone with room to spare, and the drag needs no
+     coordinate maths because nothing is transformed. */
+  body.arranging { overflow: hidden; }
+  body.arranging .card {
+    position: relative; max-height: 58px; overflow: hidden;
+    padding-top: 16px; padding-bottom: 16px; margin-bottom: 8px;
+    display: flex; align-items: center;
+  }
+  body.arranging .card > * { display: none; }
+  body.arranging .card > h2,
+  body.arranging .card > h3,
+  body.arranging .card > .prog-grip { display: block; }
+  body.arranging .card > h2,
+  body.arranging .card > h3 { margin: 0; font-size: 15px; }
+  body.arranging #progHeadline { display: none; }
+  body.arranging .prog-grip { display: grid; }
+  .prog-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 900;
+    display: flex; gap: 10px; justify-content: center; align-items: center;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: var(--panel); border-top: 1px solid var(--border);
+  }
+  .prog-bar span { color: var(--muted); font-size: 13px; }
+  .prog-bar button {
+    padding: 11px 20px; border-radius: 100px; border: 0;
+    background: var(--accent); color: var(--bg); font: 700 14px/1 inherit; cursor: pointer;
+  }
   body.arranging .card::after { content: ""; position: absolute; inset: 0; border-radius: inherit;
     border: 1.5px dashed var(--border); pointer-events: none; }
   body.arranging .card .prog-grip { display: grid; }
@@ -5552,7 +5582,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.7";
+const APP_VERSION = "2026.09.15.8";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -21335,24 +21365,26 @@ function startCardDrag(e, card, host) {
   document.addEventListener("pointercancel", onUp);
 }
 
+/* Collapsed, everything fits, so put the list at the top where it starts. */
+function applyArrangeZoom(host) {
+  if (!PROG_ARRANGING) return;
+  const first = host.querySelector(".card:not(#progHeadline)");
+  if (first) window.scrollTo(0, Math.max(0, first.getBoundingClientRect().top + window.scrollY - 70));
+}
+
 function paintArrangeUI(host) {
-  let bar = host.querySelector(".prog-arrange");
-  if (!bar) {
-    bar = document.createElement("div");
-    bar.className = "prog-arrange";
-    bar.innerHTML = '<button type="button" id="progArrangeBtn"></button>';
-    host.insertBefore(bar, host.firstChild);
+  /* The toggle lives in the tab when idle and becomes a fixed bar across the
+     bottom while arranging, where a thumb actually is. */
+  let toggle = host.querySelector(".prog-arrange");
+  if (!toggle) {
+    toggle = document.createElement("div");
+    toggle.className = "prog-arrange";
+    toggle.innerHTML = '<button type="button" id="progArrangeBtn">Rearrange</button>';
+    host.insertBefore(toggle, host.firstChild);
+    toggle.querySelector("button").onclick = () => setArranging(true, host);
   }
-  const btn = bar.querySelector("#progArrangeBtn");
-  btn.textContent = PROG_ARRANGING ? "Done" : "Rearrange";
-  btn.classList.toggle("on", PROG_ARRANGING);
-  btn.onclick = () => {
-    PROG_ARRANGING = !PROG_ARRANGING;
-    document.body.classList.toggle("arranging", PROG_ARRANGING);
-    paintArrangeUI(host);
-  };
-  /* The headline is not a card you can move. It is the answer the whole tab
-     exists to give, and it belongs above the things that explain it. */
+  toggle.classList.toggle("hidden", PROG_ARRANGING);
+
   for (const card of host.querySelectorAll(".card")) {
     if (card.id === "progHeadline" || card.querySelector(".prog-grip")) continue;
     const grip = document.createElement("div");
@@ -21361,6 +21393,27 @@ function paintArrangeUI(host) {
     grip.onpointerdown = (e) => startCardDrag(e, card, host);
     card.appendChild(grip);
   }
+}
+
+function setArranging(on, host) {
+  PROG_ARRANGING = on;
+  document.body.classList.toggle("arranging", on);
+  let bar = document.getElementById("progBar");
+  if (on) {
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "progBar";
+      bar.className = "prog-bar";
+      bar.innerHTML = '<span>Drag the handles to reorder</span><button type="button">Done</button>';
+      document.body.appendChild(bar);
+      bar.querySelector("button").onclick = () => setArranging(false, host);
+    }
+    bar.classList.remove("hidden");
+  } else if (bar) {
+    bar.remove();
+  }
+  paintArrangeUI(host);
+  applyArrangeZoom(host);
 }
 
 function renderProgressTab() {
@@ -21445,6 +21498,7 @@ function renderProgressTab() {
       }
     }
     paintArrangeUI(host);
+    applyArrangeZoom(host);
     host.insertBefore(rule, after.nextSibling);
     after = rule;
     for (const id of rest) { const el = $(id); if (el) { host.insertBefore(el, after.nextSibling); after = el; } }
