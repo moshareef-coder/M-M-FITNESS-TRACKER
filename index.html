@@ -2808,17 +2808,13 @@
     min-width: 0;
     transition: border-color .18s ease, background .18s ease;
   }
-  .goal-tile:active { transform: scale(.985); }
   .goal-tile.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
   .goal-tile-ico {
     width: 36px; height: 36px; border-radius: 11px; background: var(--panel-2);
     display: flex; align-items: center; justify-content: center; color: var(--accent-ink);
   }
   .goal-tile.on .goal-tile-ico { background: var(--accent); color: var(--on-accent); }
-  .goal-tile-label { font-size: 12.5px; font-weight: 700; letter-spacing: -.01em; text-align: center; line-height: 1.2; max-width: 100%; overflow-wrap: anywhere; }
-  .goal-tile-sub { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.25; margin-top: 2px; max-width: 100%; overflow-wrap: anywhere; }
   .pgs-text { flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: left; }
-  .pgs-sub { font-size: 12px; color: var(--muted); font-weight: 500; }
   .pgs-go { color: var(--muted); display: flex; }
   /* A band across the top of the tile rather than a corner pill: a pill wide
      enough to hold a word sits on top of the icon at this tile size, and the
@@ -2851,7 +2847,6 @@
     padding: 10px 18px calc(20px + env(safe-area-inset-bottom, 0px));
     animation: sheetUp .28s cubic-bezier(.22,1,.36,1);
   }
-  .pgs-head { display: flex; align-items: center; gap: 10px; padding: 6px 0 16px; }
   .pgs-ico {
     width: 32px; height: 32px; border-radius: 10px; background: var(--accent); color: var(--on-accent);
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -2864,7 +2859,6 @@
     color: var(--text); font-family: inherit; font-size: 14px; font-weight: 600; letter-spacing: -.005em;
     transition: border-color .15s, background .15s, transform .12s ease;
   }
-  .pgs-row:active { transform: scale(.985); background: var(--panel-2); }
   .pgs-row.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
   .pgs-box {
     flex-shrink: 0; width: 21px; height: 21px; border-radius: 9px; border: 1.5px solid var(--border);
@@ -2873,7 +2867,6 @@
   .pgs-row.on .pgs-box { background: var(--accent); border-color: transparent; color: var(--on-accent); }
   .pgs-row.on.alt { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); background: var(--panel-2); }
   .pgs-row.on.alt .pgs-box { background: var(--panel); border-color: var(--accent); color: var(--accent-ink); }
-  .pgs-tag { font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--accent-ink); flex-shrink: 0; }
   .pgs-row.on.alt .pgs-tag { color: var(--muted); }
   /* The sheet no longer closes itself on a pick, so it needs a way out that
      is a decision rather than an accident. */
@@ -2907,7 +2900,6 @@
   .goal-picks-note { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 12px 0 0; }
   @media (prefers-reduced-motion: reduce) {
     .goal-tile-grid, .goal-tile:active, .pgs-row:active, .goal-pick-acts button:active { transition: none; transform: none; }
-    .goal-sheet { animation: none; }
   }
 
   /* renderBodyFocusPage, the Focus areas settings page. The figures themselves
@@ -3011,7 +3003,7 @@
   .ob-real.care { background: rgba(190,70,60,.13); }
   .ob-real.hidden { display: none; }
   /* Rows: the list and accordion layouts. */
-  .goal-tile-grid.lay-list, .goal-tile-grid.lay-accordion { display: flex; flex-direction: column; gap: 8px; }
+  .goal-tile-grid { display: flex; flex-direction: column; gap: 8px; }
   .goal-row-wrap { border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: var(--panel); }
   .goal-row-wrap.open { border-color: var(--accent); }
   .goal-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 14px;
@@ -5534,7 +5526,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.14.19";
+const APP_VERSION = "2026.09.15.1";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -6619,16 +6611,6 @@ function healthyFloorLb(heightIn) {
   return heightIn ? Math.round((18.5 * heightIn * heightIn) / 703) : null;
 }
 
-/* Three ways to show the same goals, so the choice can be made by clicking
-   them rather than by imagining them. The selection logic below is entirely
-   layout-independent: primary, extras, choose() and the picks list do not know
-   or care which of these is on, so a layout only ever changes paintGrid. */
-let GOAL_LAYOUT = (() => { try { return localStorage.getItem("ft-goal-layout") || "grid"; } catch { return "grid"; } })();
-function setGoalLayout(v) {
-  GOAL_LAYOUT = v;
-  try { localStorage.setItem("ft-goal-layout", v); } catch { /* private mode: it just does not stick */ }
-}
-
 function goalTileFor(bubble) { return GOAL_TILES.find((t) => t.id === bubble) || null; }
 
 /* "Tone up, get lean" for a Setup subtitle, or the legacy string for a profile
@@ -6748,7 +6730,6 @@ function renderGoalTilesStep(data = {}) {
    not want to be more specific than that. */
 function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my goals" } = {}) {
   const MAX_EXTRA = 2;   // the engine's cap, and it is argued for in mo-knowledge/engine/README.md
-  const scrimId = "goalSheetScrim";
   let primary = goalTileFor(selected.bubble) ? { bubble: selected.bubble, child: selected.child || null } : null;
   let extras = normaliseGoalSecondary(selected.secondary).filter((e) => e.bubble !== primary?.bubble);
   let openId = null;
@@ -6792,50 +6773,22 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
     toast(`${MAX_EXTRA} extra goals is the cap. Remove one first.`);
   }
 
+  /* Full-width rows that open in place. Replaced a three-by-three grid of
+     squares, which had two problems: a tile was as tall as the tallest title
+     in its row, so "Feel better and stay consistent" wrapping to three lines
+     dragged two innocent neighbours taller with it; and the sub-goals arrived
+     in a sheet thrown over the screen, so picking a main goal plus two extras
+     meant three round trips during which you could not see what you had
+     already chosen. Inline, the whole selection stays on one page. */
   function paintGrid() {
-    grid.className = "goal-tile-grid lay-" + GOAL_LAYOUT;
-    /* Only the grid dims behind its sheet. The rows either open the same sheet
-       (list) or expand in place (accordion), and dimming the thing you are
-       reading would be wrong in both. */
-    grid.classList.toggle("dim", !!openId && GOAL_LAYOUT === "grid");
-    if (GOAL_LAYOUT !== "grid") { paintRows(); return; }
-    grid.innerHTML = GOAL_TILES.map((t) => {
-      const main = primary?.bubble === t.id;
-      /* Counted, not just detected: one category can hold the main goal and an
-         extra at the same time now, and a badge that named only the first
-         thing it found would quietly under-report what the tile is holding. */
-      const alsoCount = extras.filter((e) => e.bubble === t.id).length;
-      const also = alsoCount > 0;
-      const badge = main
-        ? `<span class="goal-tile-badge">Main${alsoCount ? ` +${alsoCount}` : ""}</span>`
-        : also ? `<span class="goal-tile-badge alt">${alsoCount > 1 ? `${alsoCount} extras` : "Also"}</span>` : "";
-      return `
-      <button type="button" class="goal-tile${main || also ? " on" : ""}${also ? " also" : ""}" data-tile="${t.id}"
-        aria-label="${escapeHtml(t.title)}${main ? ", your main goal" : ""}${alsoCount ? `, ${alsoCount} extra goal${alsoCount > 1 ? "s" : ""}` : ""}">
-        ${badge}
-        <span class="goal-tile-ico">${icon(t.ico, 18)}</span>
-        <span class="goal-tile-label">${escapeHtml(t.title)}</span>
-        <span class="goal-tile-sub">${escapeHtml(t.sub)}</span>
-      </button>`;
-    }).join("");
-    grid.querySelectorAll("[data-tile]").forEach((b) => {
-      b.onclick = () => openSheet(b.dataset.tile);
-    });
-  }
-
-  /* Full-width rows, shared by the list and accordion layouts. A row can hold
-     a title that wraps without making its neighbours taller, which is the
-     thing the square grid could not do: "Feel better and stay consistent" was
-     three lines in a tile and stretched its whole row of squares to match. */
-  function paintRows() {
-    const open = GOAL_LAYOUT === "accordion";
+    grid.className = "goal-tile-grid";
     grid.innerHTML = GOAL_TILES.map((t) => {
       const main = primary?.bubble === t.id;
       const alsoCount = extras.filter((e) => e.bubble === t.id).length;
       const badge = main
         ? `<span class="goal-row-badge">Main${alsoCount ? ` +${alsoCount}` : ""}</span>`
         : alsoCount ? `<span class="goal-row-badge alt">${alsoCount > 1 ? `${alsoCount} extras` : "Also"}</span>` : "";
-      const isOpen = open && openId === t.id;
+      const isOpen = openId === t.id;
       const kids = !isOpen ? "" : `
         <div class="goal-kids">
           ${[{ id: null, label: `Just ${t.title.toLowerCase()}` }].concat(t.kids).map((k) => {
@@ -6856,7 +6809,7 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
             <span class="goal-row-sub">${escapeHtml(t.sub)}</span>
           </span>
           ${badge}
-          <span class="goal-row-chev">${icon(open ? (isOpen ? "chevronDown" : "chevronRight") : "chevronRight", 17)}</span>
+          <span class="goal-row-chev">${icon(isOpen ? "chevronDown" : "chevronRight", 17)}</span>
         </button>
         ${kids}
       </div>`;
@@ -6868,7 +6821,6 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
         /* A category with nothing under it has nothing to open, so tapping it
            is the pick itself rather than a door to one row. */
         if (!t.kids.length) { choose(t.id, null); openId = null; paintGrid(); paintPicks(); paintConfirm(); return; }
-        if (!open) { openSheet(b.dataset.tile); return; }
         openId = openId === b.dataset.tile ? null : b.dataset.tile;
         paintGrid();
       };
@@ -6936,79 +6888,6 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
   function paintConfirm() {
     confirmEl.disabled = !primary;
     confirmEl.textContent = primary ? confirmLabel : "Pick a goal first";
-  }
-
-  function openSheet(id) {
-    openId = id;
-    const t = goalTileFor(id);
-    if (!t) return;
-    let scrim = document.getElementById(scrimId);
-    if (!scrim) {
-      scrim = document.createElement("div");
-      scrim.id = scrimId;
-      scrim.className = "sheet-scrim hidden";
-      grid.parentElement.appendChild(scrim);
-    }
-    const row = (cid, label, sub) => `
-      <button type="button" class="pgs-row" data-pick="${cid || ""}">
-        <span class="pgs-box">${icon("check", 13)}</span>
-        <span class="pgs-text"><span>${escapeHtml(label)}</span>${sub ? `<span class="pgs-sub">${escapeHtml(sub)}</span>` : ""}</span>
-        <span class="pgs-tag"></span>
-      </button>`;
-    scrim.classList.remove("hidden");
-    scrim.innerHTML = `
-      <div class="goal-sheet">
-        <div class="pgs-head">
-          <span class="pgs-ico">${icon(t.ico, 16)}</span>
-          <span class="pgs-title">${escapeHtml(t.title)}</span>
-          <button type="button" class="ds-x" id="goalSheetClose" aria-label="Close">&times;</button>
-        </div>
-        <div class="pgs-rows">
-          ${row(null, "Just " + t.title.toLowerCase(), t.sub)}
-          ${t.kids.map((k) => row(k.id, k.label)).join("")}
-        </div>
-        <div class="pgs-foot">
-          <p class="pgs-foot-note" id="goalSheetNote"></p>
-          <button type="button" class="btn-primary" id="goalSheetDone">Done</button>
-        </div>
-      </div>`;
-    /* Picking no longer closes the sheet. It used to, and it read as the app
-       taking the decision off you the instant you touched it: no chance to see
-       what you had chosen, change it, or pick a second thing. The way out is
-       Done, the close button, or a tap on the scrim, all of which are leaving
-       on purpose. */
-    const close = () => { openId = null; if (scrim) scrim.classList.add("hidden"); paintGrid(); };
-    scrim.onclick = (e) => { if (e.target === scrim) close(); };
-    scrim.querySelector("#goalSheetClose").onclick = close;
-    scrim.querySelector("#goalSheetDone").onclick = close;
-    scrim.querySelectorAll("[data-pick]").forEach((b) => {
-      b.onclick = () => { choose(t.id, b.dataset.pick || null); syncSheet(t); paintPicks(); paintConfirm(); };
-    });
-    syncSheet(t);
-    paintGrid();
-  }
-
-  /* Repaints the rows in place rather than rebuilding the sheet, so tapping a
-     row does not replay the sheet's slide-up animation under your finger. */
-  function syncSheet(t) {
-    const scrim = document.getElementById(scrimId);
-    if (!scrim) return;
-    scrim.querySelectorAll("[data-pick]").forEach((b) => {
-      const child = b.dataset.pick || null;
-      const main = isMain(t.id, child);
-      const also = extraAt(t.id, child) >= 0;
-      b.classList.toggle("on", main || also);
-      b.classList.toggle("alt", also);
-      b.querySelector(".pgs-tag").textContent = main ? "Main" : also ? "Also" : "";
-    });
-    const note = scrim.querySelector("#goalSheetNote");
-    if (note) {
-      note.textContent = !primary
-        ? "The first goal you pick is the main one, and it sets every training parameter."
-        : extras.length >= MAX_EXTRA
-          ? "That is the main goal and both extras. Tap one again to take it off."
-          : "Picked. Tap another category to add it as an extra, or Done.";
-    }
   }
 
   confirmEl.onclick = () => {
