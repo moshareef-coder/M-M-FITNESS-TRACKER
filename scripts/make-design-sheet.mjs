@@ -1,4 +1,4 @@
-/* Generates design-sheet.html: every Fit Together component rendered from the
+/* Generates design-sheet.html: every Unio component rendered from the
    app's REAL <style> block, laid out for import into Figma via html.to.design.
    Regenerate after any CSS change: node scripts/make-design-sheet.mjs */
 import { readFileSync, writeFileSync } from "node:fs";
@@ -35,7 +35,7 @@ const sec = (title, note, inner) => `
 const body = `
 <div class="sheet">
   <header class="sheet-top">
-    <h1>Fit Together</h1>
+    <h1>Unio</h1>
     <p>Component sheet. Every element below is rendered from the live app stylesheet, so colours, type and spacing match production exactly.</p>
   </header>
 
@@ -207,6 +207,6 @@ const sheetCss = `
 writeFileSync(join(root, "design-sheet.html"),
 `<!doctype html><html lang="en" data-theme="dark"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fit Together · component sheet</title>${fonts}
+<title>Unio · component sheet</title>${fonts}
 <style>${style}${sheetCss}</style></head><body>${body}</body></html>`);
 console.log("design-sheet.html written");

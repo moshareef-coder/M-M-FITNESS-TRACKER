@@ -266,7 +266,7 @@ if (MISSES.size) { failed++; console.log("\n  ids used in JS but MISSING from ma
    cannot ship. */
 {
   const appV = (readFileSync(join(root, "index.html"), "utf8").match(/const APP_VERSION = "([^"]+)"/) || [])[1];
-  const swV = (readFileSync(join(root, "sw.js"), "utf8").match(/fit-together-([0-9.]+)/) || [])[1];
+  const swV = (readFileSync(join(root, "sw.js"), "utf8").match(/unio-([0-9.]+)/) || [])[1];
   if (appV !== swV) {
     failed++;
     console.log(`\n  VERSION DRIFT: index.html APP_VERSION is ${appV}, sw.js cache is ${swV}.`);

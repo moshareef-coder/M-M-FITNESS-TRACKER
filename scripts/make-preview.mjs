@@ -78,6 +78,6 @@ const body = `
 writeFileSync(join(root, "preview.html"),
 `<!doctype html><html lang="en" data-theme="light"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fit Together · UI preview</title>${head}
+<title>Unio · UI preview</title>${head}
 <style>${style}</style></head><body>${body}</body></html>`);
 console.log("preview.html written");

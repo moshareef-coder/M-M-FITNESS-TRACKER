@@ -19,7 +19,7 @@ const appPath = join(root, "index.html");
 
 const sw = readFileSync(swPath, "utf8");
 const app = readFileSync(appPath, "utf8");
-const current = (sw.match(/fit-together-([0-9.]+)/) || [])[1];
+const current = (sw.match(/unio-([0-9.]+)/) || [])[1];
 if (!current) { console.error("no cache version found in sw.js"); process.exit(1); }
 
 function nextVersion(from) {
@@ -36,6 +36,6 @@ if (!/^\d{4}\.\d{2}\.\d{2}\.\d+$/.test(target)) {
   process.exit(1);
 }
 
-writeFileSync(swPath, sw.replace(/fit-together-[0-9.]+/, `fit-together-${target}`));
+writeFileSync(swPath, sw.replace(/unio-[0-9.]+/, `unio-${target}`));
 writeFileSync(appPath, app.replace(/const APP_VERSION = "[^"]+"/, `const APP_VERSION = "${target}"`));
 console.log(`${current} -> ${target}  (sw.js cache and index.html APP_VERSION)`);

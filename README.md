@@ -1,4 +1,4 @@
-# Fit Together
+# Unio
 
 A gamified fitness tracker for two, a shared weight trend line and gym streaks, built from a text conversation about wanting to push each other.
 

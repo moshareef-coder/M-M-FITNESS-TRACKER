@@ -1,4 +1,4 @@
-// Fit Together: what the figure says during a session.
+// Unio: what the figure says during a session.
 //
 // The single source for every line, imported by index.html at runtime and by
 // quip-lab.html, the review page that lists every one of them. Moved out of
