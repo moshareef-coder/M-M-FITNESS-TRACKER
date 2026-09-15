@@ -351,3 +351,100 @@ export function stripMobility(workout) {
   if (!workout) return workout;
   return { ...workout, warmup: [], cooldown: [] };
 }
+
+/* ---- A whole session made of movement, not a block bolted to a lifting day ----
+ *
+ * Mo promoted "Move better" to a top-level goal and chose, when asked, that it
+ * should generate a session with no lifting in it at all: someone who picked it
+ * over "Get stronger" has said what they want. That is a different shape from
+ * everything else this engine builds, which is why it lives here beside
+ * pickBlock rather than inside plan.mjs's sets-and-load machinery. There is no
+ * load to prescribe, no ledger to feed and nothing to progress by adding a
+ * plate; the unit is a hold measured in seconds.
+ *
+ * DRAWN FROM STRETCHING ONLY, and that is a content limit rather than a choice.
+ * The yoga library has 37 poses and pilates 23, and Mo asked for both, but
+ * neither carries a hold time or a coaching cue: an entry is a name, the
+ * muscles it works and a level. Stretching's 59 moves carry seconds, perSide,
+ * equipment and a cue each. Building a session out of poses with no hold time
+ * would mean inventing one for every pose, and a session that shows a move with
+ * no coaching line under it is worse than one with fewer moves. Add `seconds`
+ * and `cue` to those 60 entries and they join this pool by changing POOLS below.
+ *
+ * Three passes, because a mobility session that repeats the same shoulder
+ * stretch six times is not a session: the daily-mobility set leads because it
+ * is the one written to be done on its own, static holds fill what mobility
+ * left uncovered, and dynamic moves open the session the way they open a
+ * warm-up.
+ */
+export const MOVEMENT_POOLS = Object.freeze(["mobility", "static", "dynamic"]);
+
+/* Not built on pickBlock, and the first attempt that was is why this comment
+   exists. pickBlock fills a warm-up or a cool-down: a small budget, and it
+   stops as soon as the muscles the day touched are covered. Coverage per
+   second is what it optimises, so it reaches for the cheapest moves that tick
+   the most groups, which are the 25-second dynamic ones. Asked for a
+   45-minute session it returned eleven warm-up moves and ten minutes of work.
+
+   A session wants the opposite: long holds, the daily-mobility and static sets
+   leading, dynamic only as a short opening, and the clock actually filled. */
+export function movementSession({
+  minutes = 30, level = "beginner", hurts = [], missing = [], groups = null,
+} = {}) {
+  const lib = library();
+  if (!lib) return { exercises: [], seconds: 0, why: ["No stretching library in this build."] };
+
+  const bodyweightOnly = (missing || []).includes("none");
+  const ok = (e) => eligible(e, { hurts, level, bodyweightOnly });
+  const pick = (kind) => poolFor(kind).filter(ok);
+
+  const budget = Math.max(300, Math.round(minutes * 60));
+  /* A couple of dynamic moves to open, capped hard. They are there to take the
+     first stiffness off, not to be the session. */
+  const opener = pick("dynamic").slice(0, 2);
+  /* The real work, mobility first because that set is the one written to stand
+     on its own, then the static holds. */
+  const core = [...pick("mobility"), ...pick("static")];
+
+  /* Spread across the body rather than working down a list: the pools are
+     ordered by muscle group, so taking them in order gives six shoulder
+     stretches before a hip ever appears. One move per group per pass, then
+     round again, which also means a short session is a whole-body session and
+     a long one just goes deeper. */
+  const want = new Set(groups && groups.length ? groups : [...GROUPS]);
+  const byGroup = new Map();
+  for (const e of core) {
+    const g = (e.primary || []).find((x) => want.has(x)) || (e.primary || [])[0] || "other";
+    if (!byGroup.has(g)) byGroup.set(g, []);
+    byGroup.get(g).push(e);
+  }
+
+  const chosen = [...opener];
+  let seconds = chosen.reduce((n, e) => n + moveSeconds(e), 0);
+  const queues = [...byGroup.values()];
+  let added = true;
+  while (seconds < budget && added) {
+    added = false;
+    for (const q of queues) {
+      if (!q.length) continue;
+      const e = q.shift();
+      if (chosen.includes(e)) continue;
+      chosen.push(e);
+      seconds += moveSeconds(e);
+      added = true;
+      if (seconds >= budget) break;
+    }
+  }
+
+  const order = { dynamic: 0, mobility: 1, static: 2 };
+  const exercises = chosen.sort((a, b) => (order[a.kind] ?? 1) - (order[b.kind] ?? 1));
+  const total = exercises.reduce((n, e) => n + moveSeconds(e), 0);
+  return {
+    exercises,
+    seconds: total,
+    why: [
+      `${exercises.length} moves, ${Math.round(total / 60)} minutes of work, spread across the whole body.`,
+      "Stretching library only: yoga and pilates carry no hold times or cues yet.",
+    ],
+  };
+}
