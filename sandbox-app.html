@@ -191,8 +191,14 @@
   .setup-title { font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
   .setup-sub { font-size: 12.5px; font-weight: 400; color: var(--muted); line-height: 1.4; }
 
-  #onboard { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; }
-  .ob-step { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: stretch; text-align: left; }
+  /* justify-content is deliberately NOT center. Centring a column flex
+     container overflows it in both directions once the content is taller than
+     the screen, and whatever lands above the scroll origin can never be
+     scrolled to. The expanding goal list is tall enough to hit that. Auto
+     margins on the child centre it while there is room and collapse to nothing
+     when there is not, which is the same look without the trap. */
+  #onboard { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 24px; text-align: center; }
+  .ob-step { width: 100%; max-width: 420px; margin-block: auto; display: flex; flex-direction: column; align-items: stretch; text-align: left; }
   #onboard h1 { font-size: 28px; letter-spacing: -.025em; line-height: 1.15; margin: 0 0 8px; }
   #onboard p.sub { color: var(--muted); margin: 0 0 4px; font-size: 15.5px; line-height: 1.5; }
   #onboard input, #onboard textarea {
@@ -5527,7 +5533,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.1";
+const APP_VERSION = "2026.09.15.2";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -5830,7 +5836,14 @@ function initOnboard() {
   applyTheme(theme);
 
   sb.auth.onAuthStateChange((event, session) => {
-    if (event === "SIGNED_IN" && session) handleSignedIn(session);
+    /* A recovery link also fires SIGNED_IN, so this has to win or the app walks
+       straight past the one screen the link existed to reach. */
+    if (event === "PASSWORD_RECOVERY") {
+      IN_PASSWORD_RECOVERY = true;
+      renderSetPasswordScreen();
+      return;
+    }
+    if (event === "SIGNED_IN" && session && !IN_PASSWORD_RECOVERY) handleSignedIn(session);
     if (event === "SIGNED_OUT") location.reload();
   });
   registerAuthDeepLink();
@@ -6015,7 +6028,11 @@ function renderSignInScreen(state = {}) {
       $("siEmail").focus();
       return;
     }
-    const { error } = await sb.auth.resetPasswordForEmail(email);
+    /* In the native build the web origin is https://localhost, which is nowhere,
+       so the reset link has to come back through the app's own scheme. */
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: isNativeApp() ? AUTH_DEEP_LINK : window.location.origin,
+    });
     if (error) {
       console.error("password reset failed", error);
       msg("Could not send the reset email. Try again in a moment.", "bad");
@@ -6061,6 +6078,69 @@ function renderSignInScreen(state = {}) {
 
   $("siEmail").onkeydown = (e) => { if (e.key === "Enter") $("siPassword").focus(); };
   $("siPassword").onkeydown = (e) => { if (e.key === "Enter") $("emailSignInBtn").click(); };
+}
+
+/* Arriving on a recovery link signs you in, which is not the same as having a
+   password again, so this screen stands between the two. */
+let IN_PASSWORD_RECOVERY = false;
+
+function renderSetPasswordScreen() {
+  const ob = $("onboard");
+  ob.innerHTML = `
+    <div class="si-screen">
+      <div class="si-hero">
+        <h1 class="si-word">Set a new password</h1>
+        <p class="si-tag">Pick something you will remember. You are already signed in on this device.</p>
+      </div>
+      <div class="si-sheet">
+        <label class="si-label" for="npPassword">New password</label>
+        <div class="si-pw-wrap">
+          <input type="password" id="npPassword" autocapitalize="off" spellcheck="false"
+                 autocomplete="new-password" placeholder="At least 6 characters" />
+          <button type="button" class="si-pw-peek" id="npPeek" aria-label="Show password">Show</button>
+        </div>
+        <button type="button" class="btn-primary" id="npSaveBtn">Save password</button>
+        <p class="si-msg" id="npMsg"></p>
+      </div>
+    </div>`;
+
+  const say = (text, tone) => {
+    const el = $("npMsg");
+    el.textContent = text;
+    el.className = "si-msg " + (tone || "");
+  };
+
+  $("npPeek").onclick = () => {
+    const input = $("npPassword");
+    const hidden = input.type === "password";
+    input.type = hidden ? "text" : "password";
+    $("npPeek").textContent = hidden ? "Hide" : "Show";
+    input.focus();
+  };
+
+  $("npSaveBtn").onclick = async () => {
+    const password = $("npPassword").value || "";
+    if (password.length < 6) {
+      say("Passwords need at least 6 characters.", "bad");
+      $("npPassword").focus();
+      return;
+    }
+    const btn = $("npSaveBtn");
+    btn.disabled = true;
+    say("Saving…", "");
+    const { error } = await sb.auth.updateUser({ password });
+    btn.disabled = false;
+    if (error) {
+      console.error("password update failed", error);
+      say(error.message || "Could not save that password. Try again.", "bad");
+      return;
+    }
+    IN_PASSWORD_RECOVERY = false;
+    const { data } = await sb.auth.getSession();
+    if (data.session) handleSignedIn(data.session);
+  };
+
+  $("npPassword").onkeydown = (e) => { if (e.key === "Enter") $("npSaveBtn").click(); };
 }
 
 let SIGN_IN_HANDLED = false;
@@ -6708,7 +6788,7 @@ function renderGoalTilesStep(data = {}) {
   ob.innerHTML = `
     <div class="ob-step">
       <h1>What do you want?</h1>
-      <p class="sub">Tap one, then tell us what you mean by it. You can pick more than one.</p>
+      <p class="sub">Pick as many as you like. The first one is your main goal.</p>
       <div class="goal-tile-grid" id="goalTileGrid"></div>
       <button type="button" class="btn-ghost" id="goalBackBtn">Back</button>
     </div>`;
@@ -6834,56 +6914,13 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
     });
   }
 
-  /* The picks, in words, under the grid. The main goal is a size up, on an
-     accent rule, and carries the sentence about what it alone decides; the
-     extras are plain rows under it carrying what the engine said they bought.
-     That difference is the point: they are not three equal chips. */
+  /* Deliberately empty. This used to print every pick back with a paragraph
+     each about what a main goal decides versus what an extra can add. The
+     rows already carry a Main or Also badge, and the rule fits in the one
+     line under the heading, so all of that was the app explaining itself
+     instead of letting someone pick three things and get on with it. */
   function paintPicks() {
-    const rows = [];
-    if (primary) {
-      rows.push(`
-        <div class="goal-pick main">
-          <span class="goal-pick-tag">Main goal</span>
-          <span class="goal-pick-name">${escapeHtml(goalPickLabel(primary.bubble, primary.child))}</span>
-          <span class="goal-pick-why">This one sets the rep ranges, the rest between sets, how long a session runs and how many days a week. Nothing else does.</span>
-        </div>`);
-    }
-    extras.forEach((e, i) => {
-      const out = goalOutcomeFor(e.bubble, e.child);
-      const why = out ? out.text
-        : "Can add muscle groups to prioritise, a longer cool-down, or more cardio. Your next plan will say which of those it bought.";
-      rows.push(`
-        <div class="goal-pick">
-          <span class="goal-pick-tag">Also</span>
-          <span class="goal-pick-name">${escapeHtml(goalPickLabel(e.bubble, e.child))}</span>
-          <span class="goal-pick-why${out?.flat ? " flat" : ""}">${escapeHtml(why)}</span>
-          <span class="goal-pick-acts">
-            <button type="button" data-promote="${i}">Make this the main one</button>
-            <button type="button" data-drop="${i}">Remove</button>
-          </span>
-        </div>`);
-    });
-    const note = !primary
-      ? "Tap a category, then the version of it you actually mean. The first one you pick is the main goal."
-      : extras.length >= MAX_EXTRA
-        ? "Two extras is the cap. Past two, a third can only ever be told it did nothing."
-        : "You can add up to two extra goals. An extra can add muscle groups to prioritise, a longer cool-down or more cardio, and that is all: the rep ranges, the rest, the session length and the day count belong to the main goal.";
-    picksEl.innerHTML = rows.join("") + `<p class="goal-picks-note">${escapeHtml(note)}</p>`;
-    picksEl.querySelectorAll("[data-promote]").forEach((b) => {
-      b.onclick = () => {
-        const i = Number(b.dataset.promote);
-        const was = primary;
-        primary = extras[i];
-        extras[i] = was;                 // a straight swap, so nobody loses a pick to change their mind
-        paintGrid(); paintPicks(); paintConfirm();
-      };
-    });
-    picksEl.querySelectorAll("[data-drop]").forEach((b) => {
-      b.onclick = () => {
-        extras.splice(Number(b.dataset.drop), 1);
-        paintGrid(); paintPicks(); paintConfirm();
-      };
-    });
+    picksEl.innerHTML = "";
   }
 
   function paintConfirm() {
@@ -16331,8 +16368,43 @@ function stopSessionTimer() {
   if (SESSION_TIMER) { clearInterval(SESSION_TIMER); SESSION_TIMER = null; }
 }
 
+/* A phone going dark mid-set is the same failure as a video player letting the
+   screen die: you are watching it, you are just not touching it. */
+let SCREEN_WAKE = null;
+
+async function keepScreenAwake() {
+  if (isNativeApp()) {
+    try { await window.Capacitor.Plugins.KeepAwake.keepAwake(); }
+    catch (err) { console.error("keep awake failed", err); }
+    return;
+  }
+  if (!("wakeLock" in navigator)) return;
+  /* Denied when the tab is backgrounded or the battery is low, which is the
+     browser's call to make, not ours. */
+  try { SCREEN_WAKE = await navigator.wakeLock.request("screen"); } catch {}
+}
+
+async function releaseScreenAwake() {
+  if (isNativeApp()) {
+    try { await window.Capacitor.Plugins.KeepAwake.allowSleep(); }
+    catch (err) { console.error("allow sleep failed", err); }
+    return;
+  }
+  try { await SCREEN_WAKE?.release(); } catch {}
+  SCREEN_WAKE = null;
+}
+
+/* A web wake lock dies whenever the page is hidden and is not handed back on
+   return, so coming out of the app switcher mid-workout needs a fresh one. */
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  if (!document.body.classList.contains("session-open")) return;
+  keepScreenAwake();
+});
+
 function openSessionUI() {
   document.body.classList.add("session-open");
+  keepScreenAwake();
   startQuipBeat();   // he talks on a clock while this screen is up
   $("sessionCard").classList.remove("hidden");
   // Last session's completion screen left this on, which would hide the clock
@@ -16373,6 +16445,7 @@ function minimiseSession() {
 function closeSessionUI() {
   stopSessionTimer();
   stopQuipBeat();
+  releaseScreenAwake();
   /* The stretch clock ticks every 250ms and advances the block on its own, so
      leaving it running against a closed overlay finished the workout behind
      the user's back: minimise during a cool-down, wait, and paintStretch ran
