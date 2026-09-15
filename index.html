@@ -160,6 +160,9 @@
   }
   html, body {
     margin: 0; padding: 0;
+    /* Rubber-band drag is what makes a wrapped app read as a web page. */
+    overflow-x: hidden;
+    overscroll-behavior: none;
     background: var(--bg);
     background-image: var(--page-wash);
     background-attachment: fixed;
@@ -2740,6 +2743,16 @@
   }
   .btn-google:active { transform: scale(.99); }
   .btn-google:disabled, .si .btn-primary:disabled { opacity: .6; cursor: default; }
+  /* Apple require their button to keep their own colours, not the app theme. */
+  .btn-apple {
+    width: 100%; padding: 14px 16px; border-radius: 12px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: #000; color: #fff; border: 1px solid #000;
+    font-family: var(--font-display); font-size: 15.5px; font-weight: 700; letter-spacing: -.01em;
+    margin-bottom: 10px;
+  }
+  .btn-apple:active { transform: scale(.99); }
+  .btn-apple:disabled { opacity: .6; cursor: default; }
   .si-or {
     display: flex; align-items: center; gap: 12px; width: 100%;
     margin: 18px 0 14px; color: var(--muted); font-size: 12.5px; font-weight: 700;
@@ -2755,6 +2768,26 @@
   .si-msg.good { color: var(--accent-ink); font-weight: 700; }
   .si-legal { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 20px 0 0; max-width: 34ch; }
   .si-legal a { color: var(--muted); text-underline-offset: 2px; }
+  .si-pw-wrap { position: relative; width: 100%; }
+  #onboard .si .si-pw-wrap input { padding-right: 68px; }
+  /* The input carries a 10px bottom margin, so the peek sits against the field
+     rather than the wrapper or it rides low. */
+  .si-pw-peek {
+    position: absolute; right: 8px; top: 0; height: calc(100% - 10px);
+    display: flex; align-items: center; padding: 0 10px;
+    background: none; border: none; cursor: pointer; font-family: inherit;
+    color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .si-switch {
+    background: none; border: none; cursor: pointer; font-family: inherit;
+    color: var(--accent-ink); font-size: 13.5px; font-weight: 700;
+    padding: 12px 4px 0; align-self: center;
+  }
+  .si-forgot {
+    background: none; border: none; cursor: pointer; font-family: inherit;
+    color: var(--muted); font-size: 12.5px; padding: 10px 4px 0; align-self: center;
+  }
 
   /* Nine categories, all on screen at once: a tile only has to hold an icon
      and a word, so this is the one place in the whole flow where nothing
@@ -5462,7 +5495,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.14.15";
+const APP_VERSION = "2026.09.14.16";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -5731,6 +5764,24 @@ function initOnboard() {
   });
 }
 
+/* Capacitor injects this global before the page loads, so no bundler or script
+   tag is involved and the web build simply sees undefined. */
+function isNativeApp() {
+  return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function"
+    && window.Capacitor.isNativePlatform());
+}
+
+/* Apple wants the nonce it signs to be the SHA-256 of a secret we keep, and
+   Supabase wants that secret, so the two values are never interchangeable. */
+async function appleNoncePair() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const raw = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+  const hashed = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+  return { raw, hashed };
+}
+
 /* The first screen anyone ever sees, and until now it was a heading and one
    button with its styling inline. It has to do four things a sign-in screen
    always has to do: say what the app is for, offer a way in that does not
@@ -5738,6 +5789,7 @@ function initOnboard() {
    legal terms in front of someone BEFORE they hand over an account. */
 function renderSignInScreen(state = {}) {
   const ob = $("onboard");
+  const signUp = state.mode === "signup";
   /* Every fitness app worth copying (Peloton, Hevy, Gymshark, Ladder) builds
      this same screen: a full-bleed hero carrying the brand, then the auth
      controls anchored at the bottom where the thumb is. The hero here is the
@@ -5761,6 +5813,7 @@ function renderSignInScreen(state = {}) {
       </div>
 
       <div class="si-sheet">
+        ${isNativeApp() ? `<button type="button" class="btn-apple" id="appleSignInBtn"><svg viewBox="0 0 384 512" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg> Continue with Apple</button>` : ""}
         <button type="button" class="btn-google" id="googleSignInBtn">${icon("google", 20)} Continue with Google</button>
 
         <div class="si-or"><span>or</span></div>
@@ -5768,7 +5821,19 @@ function renderSignInScreen(state = {}) {
         <label class="si-label" for="siEmail">Email</label>
         <input type="email" id="siEmail" inputmode="email" autocomplete="email" autocapitalize="off"
                spellcheck="false" placeholder="you@example.com" value="${escapeHtml(state.email || "")}" />
-        <button type="button" class="btn-primary" id="emailSignInBtn">Email me a sign-in link</button>
+
+        <label class="si-label" for="siPassword">Password</label>
+        <div class="si-pw-wrap">
+          <input type="password" id="siPassword" autocapitalize="off" spellcheck="false"
+                 autocomplete="${signUp ? "new-password" : "current-password"}"
+                 placeholder="${signUp ? "At least 6 characters" : "Your password"}" />
+          <button type="button" class="si-pw-peek" id="siPwPeek" aria-label="Show password">Show</button>
+        </div>
+        <button type="button" class="btn-primary" id="emailSignInBtn">${signUp ? "Create account" : "Sign in"}</button>
+        ${signUp ? "" : `<button type="button" class="si-forgot" id="siForgot">Forgot your password?</button>`}
+        <button type="button" class="si-switch" id="siSwitch">${signUp
+          ? "Already have an account? Sign in"
+          : "New here? Create an account"}</button>
 
         <p class="si-msg ${state.tone || ""}" id="siMsg">${escapeHtml(state.msg || "")}</p>
 
@@ -5782,6 +5847,39 @@ function renderSignInScreen(state = {}) {
     const el = $("siMsg");
     el.textContent = text;
     el.className = "si-msg " + (tone || "");
+  };
+
+  if ($("appleSignInBtn")) $("appleSignInBtn").onclick = async () => {
+    const btn = $("appleSignInBtn");
+    btn.disabled = true;
+    msg("", "");
+    try {
+      const { raw, hashed } = await appleNoncePair();
+      const result = await window.Capacitor.Plugins.SignInWithApple.authorize({
+        clientId: "com.creativelab1.fittogether",
+        redirectURI: "",
+        scopes: "email name",
+        nonce: hashed,
+      });
+      const token = result && result.response && result.response.identityToken;
+      /* Apple can hand back an authorisation with no token if the person backs
+         out of the sheet, and signing in with undefined fails far less
+         legibly than saying so here. */
+      if (!token) throw new Error("no identity token");
+      const { error } = await sb.auth.signInWithIdToken({
+        provider: "apple", token, nonce: raw,
+      });
+      if (error) throw error;
+      /* onAuthStateChange takes it from here, same as every other path. */
+    } catch (err) {
+      btn.disabled = false;
+      /* Backing out of Apple's sheet is a decision, not a fault, so it gets no
+         error styling. Apple reports it as 1001 or a plain cancel string. */
+      const cancelled = /1001|cancel|abort/i.test(String(err && (err.message || err.code || err)));
+      if (cancelled) { msg("", ""); return; }
+      console.error("apple sign-in failed", err);
+      msg("Could not finish signing in with Apple. Try again, or use email below.", "bad");
+    }
   };
 
   $("googleSignInBtn").onclick = async () => {
@@ -5811,37 +5909,100 @@ function renderSignInScreen(state = {}) {
     }, 6000);
   };
 
+  $("siPwPeek").onclick = () => {
+    const input = $("siPassword");
+    const hidden = input.type === "password";
+    input.type = hidden ? "text" : "password";
+    $("siPwPeek").textContent = hidden ? "Hide" : "Show";
+    $("siPwPeek").setAttribute("aria-label", hidden ? "Hide password" : "Show password");
+    input.focus();
+  };
+
+  $("siSwitch").onclick = () => renderSignInScreen({
+    mode: signUp ? "signin" : "signup",
+    email: ($("siEmail").value || "").trim(),
+  });
+
+  if ($("siForgot")) $("siForgot").onclick = async () => {
+    const email = ($("siEmail").value || "").trim();
+    if (!email || !email.includes("@")) {
+      msg("Enter your email first, then tap this again.", "bad");
+      $("siEmail").focus();
+      return;
+    }
+    const { error } = await sb.auth.resetPasswordForEmail(email);
+    if (error) {
+      console.error("password reset failed", error);
+      msg("Could not send the reset email. Try again in a moment.", "bad");
+      return;
+    }
+    msg(`Reset link sent to ${email}. Open it, set a new password, then come back and sign in.`, "good");
+  };
+
   $("emailSignInBtn").onclick = async () => {
     const email = ($("siEmail").value || "").trim();
+    const password = $("siPassword").value || "";
     /* Deliberately not a regex that tries to be clever about addresses: the
-       only real test of an email is whether the link arrives. */
+       only real test of an email is whether it authenticates. */
     if (!email || !email.includes("@") || email.length < 5) {
-      msg("Enter the email you want the link sent to.", "bad");
+      msg("Enter your email address.", "bad");
       $("siEmail").focus();
+      return;
+    }
+    if (!password) {
+      msg(signUp ? "Choose a password." : "Enter your password.", "bad");
+      $("siPassword").focus();
+      return;
+    }
+    if (signUp && password.length < 6) {
+      msg("Passwords need at least 6 characters.", "bad");
+      $("siPassword").focus();
       return;
     }
     const btn = $("emailSignInBtn");
     btn.disabled = true;
-    msg("Sending…", "");
-    const { error } = await sb.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
-    });
-    btn.disabled = false;
-    if (error) {
-      console.error("magic link failed", error);
-      /* The rate limit is the one failure worth naming exactly, because it is
-         ours rather than theirs and it looks like a broken app otherwise. */
-      const limited = /rate|limit|too many/i.test(error.message || "");
-      msg(limited
-        ? "Too many links requested just now. Wait a minute and try again."
-        : "Could not send that link. Check the address and try again.", "bad");
+    msg(signUp ? "Creating your account…" : "Signing in…", "");
+
+    if (signUp) {
+      const { data, error } = await sb.auth.signUp({ email, password });
+      btn.disabled = false;
+      if (error) {
+        console.error("sign up failed", error);
+        /* An address that already exists is the one failure worth naming, since
+           the fix is to switch mode rather than to try again. */
+        const taken = /already|exists|registered/i.test(error.message || "");
+        msg(taken
+          ? "That email already has an account. Switch to Sign in below."
+          : (error.message || "Could not create that account. Try again."), "bad");
+        return;
+      }
+      /* With email confirmation on, signUp returns a user but no session, and
+         nothing happens next unless we say so. */
+      if (!data.session) {
+        msg(`Check ${email} for a confirmation link, then come back and sign in.`, "good");
+        return;
+      }
       return;
     }
-    msg(`Link sent to ${email}. Open it on this phone and you are in.`, "good");
+
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    btn.disabled = false;
+    if (error) {
+      console.error("sign in failed", error);
+      const bad = /invalid|credential/i.test(error.message || "");
+      const unconfirmed = /confirm/i.test(error.message || "");
+      msg(unconfirmed
+        ? "That account still needs confirming. Check your email for the link."
+        : bad
+          ? "That email and password do not match. Try again, or reset it below."
+          : (error.message || "Could not sign in. Try again."), "bad");
+      return;
+    }
+    /* onAuthStateChange takes it from here. */
   };
 
-  $("siEmail").onkeydown = (e) => { if (e.key === "Enter") $("emailSignInBtn").click(); };
+  $("siEmail").onkeydown = (e) => { if (e.key === "Enter") $("siPassword").focus(); };
+  $("siPassword").onkeydown = (e) => { if (e.key === "Enter") $("emailSignInBtn").click(); };
 }
 
 let SIGN_IN_HANDLED = false;
