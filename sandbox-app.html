@@ -2690,14 +2690,19 @@
   /* The sign-in screen is the one onboarding step that goes edge to edge, so
      it opts the shared #onboard padding off rather than fighting it. */
   #onboard:has(.si-screen) { padding: 0; justify-content: stretch; }
-  .si-screen { display: flex; flex-direction: column; flex: 1; width: 100%; align-self: stretch; }
+  /* The one screen that never scrolls: the hero absorbs whatever the sheet
+     does not need, so the form stays put instead of running off the bottom. */
+  .si-screen {
+    display: flex; flex-direction: column; flex: 1; width: 100%; align-self: stretch;
+    height: 100dvh; overflow: hidden;
+  }
   .si-hero {
-    flex: 1 1 auto; display: flex; flex-direction: column;
+    flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
     align-items: center; justify-content: center; text-align: center;
-    padding: 40px 24px 24px; min-height: 38dvh;
+    padding: 24px 24px 16px;
     background: radial-gradient(120% 80% at 50% 25%, color-mix(in srgb, var(--me) 16%, transparent) 0%, transparent 70%);
   }
-  .si-rings { width: min(70vw, 260px); height: auto; display: block; }
+  .si-rings { width: min(70vw, 260px); max-height: 20dvh; height: auto; display: block; }
   .si-word {
     font-family: var(--font-display); font-size: 34px; font-weight: 800;
     letter-spacing: -.03em; margin: 18px 0 0;
@@ -2732,9 +2737,9 @@
   }
   .si-sheet .si-legal, .si-sheet .si-msg { text-align: center; max-width: none; }
   @media (max-height: 700px) {
-    .si-rings { width: min(52vw, 190px); }
-    .si-word { font-size: 28px; }
-    .si-hero { min-height: 30dvh; padding-top: 28px; }
+    .si-rings { width: min(52vw, 190px); max-height: 16dvh; }
+    .si-word { font-size: 28px; margin-top: 12px; }
+    .si-hero { padding: 16px 24px 12px; }
   }
   .btn-google {
     width: 100%; padding: 14px 16px; border-radius: 12px; cursor: pointer;
@@ -2779,11 +2784,6 @@
     background: none; border: none; cursor: pointer; font-family: inherit;
     color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: .04em;
     text-transform: uppercase;
-  }
-  .si-switch {
-    background: none; border: none; cursor: pointer; font-family: inherit;
-    color: var(--accent-ink); font-size: 13.5px; font-weight: 700;
-    padding: 12px 4px 0; align-self: center;
   }
   .si-forgot {
     background: none; border: none; cursor: pointer; font-family: inherit;
@@ -3000,6 +3000,17 @@
 
   .ob-kicker { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--accent-ink); margin-bottom: 8px; }
   .ob-chips { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+  .ob-lab { display: block; margin: 18px 0 7px; font-size: 13px; font-weight: 600; color: var(--muted); }
+  .ob-opt { font-weight: 400; color: var(--faint, var(--muted)); }
+  .ob-row { display: flex; gap: 10px; }
+  .ob-row input { flex: 1; min-width: 0; }
+  .ob-real { margin: 16px 0 18px; padding: 13px 15px; border-radius: 12px; font-size: 14px; line-height: 1.5;
+             background: var(--card2, rgba(127,127,127,.09)); color: var(--muted); }
+  .ob-real b { color: var(--text); font-weight: 600; }
+  .ob-real.ok { background: rgba(60,160,90,.12); }
+  .ob-real.warn { background: rgba(200,130,30,.14); }
+  .ob-real.care { background: rgba(190,70,60,.13); }
+  .ob-real.hidden { display: none; }
   .ob-chip {
     width: 100%; text-align: left; padding: 17px 18px; border-radius: 14px; cursor: pointer;
     border: 1px solid var(--border); background: var(--panel); color: var(--text);
@@ -5496,7 +5507,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.14.16";
+const APP_VERSION = "2026.09.14.17";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -5749,6 +5760,49 @@ function applyAccentColors() {
 
 /* ---------- Auth ---------- */
 
+const AUTH_DEEP_LINK = "fittogether://auth";
+/* Set while a browser sheet is open so the button it came from can be freed
+   again whichever way the sheet ends. */
+let AUTH_RETURN_HANDLER = null;
+
+/* The system browser hands control back through the custom scheme registered in
+   Info.plist. Without this the sheet signs in and then just sits there. */
+function registerAuthDeepLink() {
+  if (!isNativeApp()) return;
+  window.Capacitor.Plugins.App.addListener("appUrlOpen", async ({ url }) => {
+    if (!url || url.indexOf(AUTH_DEEP_LINK) !== 0) return;
+    try { await window.Capacitor.Plugins.Browser.close(); } catch {}
+    try {
+      const parsed = new URL(url);
+      const hash = new URLSearchParams((parsed.hash || "").replace(/^#/, ""));
+      const failed = parsed.searchParams.get("error_description") || hash.get("error_description");
+      if (failed) throw new Error(failed);
+      /* Which of these two arrives depends on the flow supabase-js is
+         configured for, and both are legitimate, so handle either. */
+      const code = parsed.searchParams.get("code");
+      if (code) {
+        const { error } = await sb.auth.exchangeCodeForSession(code);
+        if (error) throw error;
+      } else if (hash.get("access_token")) {
+        const { error } = await sb.auth.setSession({
+          access_token: hash.get("access_token"),
+          refresh_token: hash.get("refresh_token") || "",
+        });
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error("auth deep link failed", err);
+      const el = $("siMsg");
+      if (el) {
+        el.textContent = "Could not finish signing in. Try again.";
+        el.className = "si-msg bad";
+      }
+    } finally {
+      if (AUTH_RETURN_HANDLER) { AUTH_RETURN_HANDLER(); AUTH_RETURN_HANDLER = null; }
+    }
+  });
+}
+
 function initOnboard() {
   // iOS private browsing can throw here, and this runs before first paint.
   let theme = "light";
@@ -5759,6 +5813,7 @@ function initOnboard() {
     if (event === "SIGNED_IN" && session) handleSignedIn(session);
     if (event === "SIGNED_OUT") location.reload();
   });
+  registerAuthDeepLink();
   sb.auth.getSession().then(({ data }) => {
     if (data.session) handleSignedIn(data.session);
     else renderSignInScreen();
@@ -5790,7 +5845,6 @@ async function appleNoncePair() {
    legal terms in front of someone BEFORE they hand over an account. */
 function renderSignInScreen(state = {}) {
   const ob = $("onboard");
-  const signUp = state.mode === "signup";
   /* Every fitness app worth copying (Peloton, Hevy, Gymshark, Ladder) builds
      this same screen: a full-bleed hero carrying the brand, then the auth
      controls anchored at the bottom where the thumb is. The hero here is the
@@ -5826,15 +5880,11 @@ function renderSignInScreen(state = {}) {
         <label class="si-label" for="siPassword">Password</label>
         <div class="si-pw-wrap">
           <input type="password" id="siPassword" autocapitalize="off" spellcheck="false"
-                 autocomplete="${signUp ? "new-password" : "current-password"}"
-                 placeholder="${signUp ? "At least 6 characters" : "Your password"}" />
+                 autocomplete="current-password" placeholder="Your password" />
           <button type="button" class="si-pw-peek" id="siPwPeek" aria-label="Show password">Show</button>
         </div>
-        <button type="button" class="btn-primary" id="emailSignInBtn">${signUp ? "Create account" : "Sign in"}</button>
-        ${signUp ? "" : `<button type="button" class="si-forgot" id="siForgot">Forgot your password?</button>`}
-        <button type="button" class="si-switch" id="siSwitch">${signUp
-          ? "Already have an account? Sign in"
-          : "New here? Create an account"}</button>
+        <button type="button" class="btn-primary" id="emailSignInBtn">Sign in</button>
+        <button type="button" class="si-forgot" id="siForgot">Forgot your password?</button>
 
         <p class="si-msg ${state.tone || ""}" id="siMsg">${escapeHtml(state.msg || "")}</p>
 
@@ -5887,6 +5937,25 @@ function renderSignInScreen(state = {}) {
     const btn = $("googleSignInBtn");
     btn.disabled = true;
     msg("Opening Google…", "");
+
+    /* Google refuse OAuth inside an embedded webview, so the native build hands
+       the URL to a system browser sheet and waits for the deep link back. */
+    if (isNativeApp()) {
+      const { data, error } = await sb.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: AUTH_DEEP_LINK, skipBrowserRedirect: true },
+      });
+      if (error || !data || !data.url) {
+        console.error("google sign-in failed", error);
+        btn.disabled = false;
+        msg("Could not reach Google. Check your connection and try again.", "bad");
+        return;
+      }
+      AUTH_RETURN_HANDLER = () => { btn.disabled = false; };
+      await window.Capacitor.Plugins.Browser.open({ url: data.url, presentationStyle: "popover" });
+      return;
+    }
+
     const { error } = await sb.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },
@@ -5919,12 +5988,7 @@ function renderSignInScreen(state = {}) {
     input.focus();
   };
 
-  $("siSwitch").onclick = () => renderSignInScreen({
-    mode: signUp ? "signin" : "signup",
-    email: ($("siEmail").value || "").trim(),
-  });
-
-  if ($("siForgot")) $("siForgot").onclick = async () => {
+  $("siForgot").onclick = async () => {
     const email = ($("siEmail").value || "").trim();
     if (!email || !email.includes("@")) {
       msg("Enter your email first, then tap this again.", "bad");
@@ -5951,40 +6015,13 @@ function renderSignInScreen(state = {}) {
       return;
     }
     if (!password) {
-      msg(signUp ? "Choose a password." : "Enter your password.", "bad");
-      $("siPassword").focus();
-      return;
-    }
-    if (signUp && password.length < 6) {
-      msg("Passwords need at least 6 characters.", "bad");
+      msg("Enter your password.", "bad");
       $("siPassword").focus();
       return;
     }
     const btn = $("emailSignInBtn");
     btn.disabled = true;
-    msg(signUp ? "Creating your account…" : "Signing in…", "");
-
-    if (signUp) {
-      const { data, error } = await sb.auth.signUp({ email, password });
-      btn.disabled = false;
-      if (error) {
-        console.error("sign up failed", error);
-        /* An address that already exists is the one failure worth naming, since
-           the fix is to switch mode rather than to try again. */
-        const taken = /already|exists|registered/i.test(error.message || "");
-        msg(taken
-          ? "That email already has an account. Switch to Sign in below."
-          : (error.message || "Could not create that account. Try again."), "bad");
-        return;
-      }
-      /* With email confirmation on, signUp returns a user but no session, and
-         nothing happens next unless we say so. */
-      if (!data.session) {
-        msg(`Check ${email} for a confirmation link, then come back and sign in.`, "good");
-        return;
-      }
-      return;
-    }
+    msg("Signing in…", "");
 
     const { error } = await sb.auth.signInWithPassword({ email, password });
     btn.disabled = false;
@@ -6478,25 +6515,50 @@ function renderOnboardIntro(i, data) {
    are used verbatim; the longer phrasings people actually type live there as
    aliases and never go on a button. */
 const GOAL_TILES = [
-  { id: "lose-weight", legacy: "lose", askDetail: true, ico: "arrowDown", title: "Lose weight", sub: "and keep it off",
-    kids: [{ id: "lose-a-number", label: "A number of pounds" }, { id: "lose-belly", label: "Belly fat" }, { id: "lose-by-date", label: "Before a date" }, { id: "lose-for-health", label: "For my health" }, { id: "lose-last-10", label: "The last 10 pounds" }, { id: "lose-and-build", label: "Lose fat and build muscle" }] },
-  { id: "build-muscle", legacy: "muscle", askDetail: true, ico: "dumbbell", title: "Build muscle", sub: "get bigger",
+  { id: "lose-weight", legacy: "lose", askTarget: true, ico: "arrowDown", title: "Lose weight", sub: "and keep it off",
+    kids: [] },
+  { id: "build-muscle", legacy: "muscle", ico: "dumbbell", title: "Build muscle", sub: "get bigger",
     kids: [{ id: "build-overall", label: "Gain weight" }, { id: "build-a-part", label: "Arms, chest, shoulders" }, { id: "build-glutes", label: "Glutes" }, { id: "build-skinny-fat", label: "Skinny fat" }, { id: "build-women", label: "Without getting bulky" }] },
-  { id: "get-stronger", legacy: "stronger", askDetail: true, ico: "bolt", title: "Get stronger", sub: "lift heavier",
+  { id: "get-stronger", legacy: "stronger", ico: "bolt", title: "Get stronger", sub: "lift heavier",
     kids: [{ id: "strong-a-lift", label: "Hit a number" }, { id: "strong-multiples", label: "Lift my bodyweight" }, { id: "strong-not-bigger", label: "Stronger, not bigger" }, { id: "strong-for-life", label: "For everyday life" }, { id: "strong-again", label: "Get back to where I was" }] },
-  { id: "tone-lean-abs", legacy: "recomp", askDetail: true, ico: "refresh", title: "Tone up", sub: "get lean, see abs",
+  { id: "tone-lean-abs", legacy: "recomp", ico: "refresh", title: "Tone up", sub: "get lean, see abs",
     kids: [{ id: "tone-part", label: "Arms, legs, stomach" }, { id: "abs", label: "Abs" }, { id: "lean-shredded", label: "Get lean" }] },
-  { id: "do-a-thing", legacy: "consistent", askDetail: false, ico: "target", title: "Hit a milestone", sub: "first pull-up, first 5K",
-    kids: [{ id: "first-pullup", label: "First pull-up" }, { id: "first-pushup", label: "Push-ups" }, { id: "run-5k", label: "Run a 5K" }, { id: "faster-mile", label: "Run faster" }, { id: "flexibility", label: "Touch my toes" }, { id: "skills", label: "Handstand" }] },
-  { id: "event", legacy: "consistent", askDetail: false, ico: "medal", title: "Train for an event", sub: "a race, a test, a trip",
-    kids: [{ id: "event-run", label: "A race" }, { id: "event-hyrox", label: "Hyrox" }, { id: "event-ocr", label: "Obstacle race" }, { id: "event-test", label: "A fitness test" }, { id: "event-benchmark", label: "A workout challenge" }, { id: "event-sport", label: "A sport or a trip" }] },
-  { id: "feel-better", legacy: "consistent", askDetail: false, ico: "heart", title: "Feel better", sub: "energy, sleep, live longer",
-    kids: [{ id: "mental", label: "Mood, stress, sleep" }, { id: "longevity", label: "Live longer" }, { id: "energy", label: "More energy" }, { id: "prevent", label: "Doctor's orders" }, { id: "mobility", label: "Loosen up" }, { id: "pain", label: "Aches and pains" }] },
-  { id: "get-back", legacy: "consistent", askDetail: false, ico: "run", title: "Get back into it", sub: "after time off",
-    kids: [{ id: "back-after-years", label: "After years off" }, { id: "back-postpartum", label: "After a baby" }, { id: "start-fresh", label: "Total beginner" }] },
-  { id: "consistent", legacy: "consistent", askDetail: false, ico: "clock", title: "Stay consistent", sub: "actually stick to it",
-    kids: [{ id: "keep-quitting", label: "I keep quitting" }, { id: "dont-know", label: "Don't know where to start" }, { id: "no-time", label: "No time" }] },
+  { id: "build-endurance", legacy: "consistent", ico: "run", title: "Build endurance", sub: "last longer, breathe easier",
+    kids: [{ id: "stamina", label: "General stamina" }, { id: "run-5k", label: "Run a 5K" }, { id: "faster-mile", label: "Run faster" }, { id: "event-run", label: "A race" }, { id: "event-hyrox", label: "Hyrox" }, { id: "event-ocr", label: "Obstacle race" }] },
+  { id: "move-better", legacy: "consistent", ico: "body", title: "Move better", sub: "mobility, flexibility, less pain",
+    kids: [{ id: "mobility", label: "Loosen up" }, { id: "flexibility", label: "Touch my toes" }, { id: "pain", label: "Aches and pains" }, { id: "back-postpartum", label: "After a baby" }] },
+  { id: "feel-better", legacy: "consistent", ico: "heart", title: "Feel better and stay consistent", sub: "energy, sleep, actually sticking to it",
+    kids: [{ id: "mental", label: "Mood, stress, sleep" }, { id: "energy", label: "More energy" }, { id: "longevity", label: "Live longer" }, { id: "prevent", label: "Doctor's orders" }, { id: "keep-quitting", label: "I keep quitting" }, { id: "dont-know", label: "Don't know where to start" }, { id: "back-after-years", label: "After years off" }, { id: "start-fresh", label: "Total beginner" }] },
+  { id: "consistent", legacy: "consistent", ico: "info", title: "Not sure yet", sub: "we will start somewhere sensible",
+    kids: [] },
 ];
+
+/* The safe rate of loss is the engine's, never a number invented at the UI:
+   0.5 to 1% of bodyweight a week, floor half a pound, ceiling two, planning on
+   0.75%. CDC and Harvard, cited at LOSS_RATE in goal-engine.mjs. Duplicated as
+   literals here only because this runs before the engine module is imported;
+   if those constants move, this moves with them. */
+function lossRealism(currentLb, goalLb, byDate, today = new Date()) {
+  const amount = Math.max(0, (currentLb || 0) - (goalLb || 0));
+  if (!currentLb || !goalLb || amount <= 0) return null;
+  const planned = Math.min(2, Math.max(0.5, currentLb * 0.0075));
+  const ceiling = Math.min(2, Math.max(0.5, currentLb * 0.01));
+  const honestWeeks = amount / planned;
+  const honestDate = new Date(today.getTime() + honestWeeks * 604800000);
+  if (!byDate) return { amount, planned, honestWeeks, honestDate, band: "nodate" };
+  const weeks = (new Date(byDate + "T00:00:00") - today) / 604800000;
+  const need = weeks > 0 ? amount / weeks : Infinity;
+  const band = need <= planned ? "fine" : need <= ceiling ? "aggressive" : "over";
+  return { amount, planned, ceiling, need, weeks, honestWeeks, honestDate, band };
+}
+
+/* BMI 18.5 is the clinical underweight line. Below it the app still takes the
+   number, and then stops being the engine for it: no goal line on the chart,
+   no projection, no deficit plan. Refusing the number instead would only teach
+   someone to enter one we believe, which loses the signal AND helps nobody. */
+function healthyFloorLb(heightIn) {
+  return heightIn ? Math.round((18.5 * heightIn * heightIn) / 703) : null;
+}
 
 function goalTileFor(bubble) { return GOAL_TILES.find((t) => t.id === bubble) || null; }
 
@@ -6604,11 +6666,11 @@ function renderGoalTilesStep(data = {}) {
     onPick: ({ bubble, child, label, secondary }) => {
       const tile = goalTileFor(bubble);
       const next = { ...data, goalKey: tile.legacy, goal_bubble: bubble, goal_child: child, goalLabel: label, goal_secondary: secondary };
-      if (tile.askDetail) renderOnboardStep("detail", next);
+      if (tile.askTarget) renderOnboardStep("target", next);
       else renderOnboardStep("pace", { ...next, detail: child ? label : null });
     },
   });
-  $("goalBackBtn").onclick = () => renderOnboardStep("name", data);
+  $("goalBackBtn").onclick = () => renderOnboardStep("stats", data);
 }
 
 /* Nine tiles, always visible, no scrolling to find them. Tapping one opens the
@@ -7688,7 +7750,7 @@ function renderOnboardStep(step, data = {}) {
     const go = () => {
       const name = $("nameInput").value.trim();
       if (!name) { toast("Enter a name"); return; }
-      renderOnboardStep("goal", { ...data, name });
+      renderOnboardStep("stats", { ...data, name });
     };
     $("nextBtn").onclick = go;
     $("nameInput").onkeydown = (e) => { if (e.key === "Enter") go(); };
@@ -7701,22 +7763,133 @@ function renderOnboardStep(step, data = {}) {
     return;
   }
 
-  if (step === "detail") {
-    const g = GOALS.find((x) => x.key === data.goalKey);
-    const opts = GOAL_DETAIL[data.goalKey] || [];
+  /* Height and weight before the goal, so the goal step can ask a concrete
+     question ("you are at 210, what is your goal?") instead of offering bands
+     to choose from. It also feeds bodyWeightLb, which the engine uses to set
+     starting loads on EVERY goal, not just the weight ones. */
+  if (step === "stats") {
+    const ft = data.height_in ? Math.floor(data.height_in / 12) : "";
+    const inch = data.height_in ? data.height_in % 12 : "";
     ob.innerHTML = `
       <div class="ob-step">
-        <h1>${escapeHtml(data.goalLabel || g.label)}</h1>
-        <p class="sub">Closest one. You can change your mind later.</p>
-        ${obChips(opts, data.detail, "detail")}
-        <button class="btn-ghost" id="skipDetail">Skip this</button>
-        <button class="btn-ghost" id="detailBackBtn">Back</button>
+        <h1>Two numbers.</h1>
+        <p class="sub">These set your starting weights. Only you and whoever you train with ever see them.</p>
+        <label class="ob-lab">Height</label>
+        <div class="ob-row">
+          <input id="obFt" type="number" inputmode="numeric" min="3" max="8" placeholder="feet" value="${ft}" />
+          <input id="obIn" type="number" inputmode="numeric" min="0" max="11" placeholder="inches" value="${inch}" />
+        </div>
+        <label class="ob-lab">Weight <span class="ob-opt">optional</span></label>
+        <div class="ob-row">
+          <input id="obLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.weight_lb || ""}" />
+        </div>
+        <button class="btn-primary" id="statsNext">Continue</button>
+        <button class="btn-ghost" id="statsBack">Back</button>
       </div>`;
-    ob.querySelectorAll("[data-detail]").forEach((b) => {
-      b.onclick = () => renderOnboardStep("pace", { ...data, detail: b.dataset.detail });
-    });
-    $("skipDetail").onclick = () => renderOnboardStep("pace", { ...data, detail: null });
-    $("detailBackBtn").onclick = () => renderOnboardStep("goal", data);
+    const go = () => {
+      const ftv = parseInt($("obFt").value, 10) || 0;
+      const inv = parseInt($("obIn").value, 10) || 0;
+      const lb = parseFloat($("obLb").value) || null;
+      renderOnboardStep("goal", {
+        ...data,
+        height_in: ftv || inv ? ftv * 12 + inv : null,
+        weight_lb: lb,
+      });
+    };
+    $("statsNext").onclick = go;
+    $("statsBack").onclick = () => renderOnboardStep("name", data);
+    return;
+  }
+
+  /* Replaces the old three-option detail screen, which asked "a few pounds /
+     10 to 20 / more than 20" straight after the goal step had already asked
+     the same thing, and whose answer never reached the engine at all. A real
+     goal weight gives amountLb and byDate, both of which resolveGoal already
+     accepts, and lights the goal line and the projection that are already
+     built against user_goals.target_value. */
+  if (step === "target") {
+    const cur = data.weight_lb;
+    ob.innerHTML = `
+      <div class="ob-step">
+        <h1>${cur ? `You are at ${escapeHtml(String(cur))} pounds.` : "Losing weight."}</h1>
+        <p class="sub">${cur ? "Where do you want to get to? Both of these are optional and you can change them any time." : "Tell us a goal weight if you have one in mind. Optional, and you can change it any time."}</p>
+        <label class="ob-lab">Goal weight</label>
+        <div class="ob-row">
+          <input id="obGoalLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.goal_weight_lb || ""}" />
+        </div>
+        <label class="ob-lab">By when <span class="ob-opt">optional</span></label>
+        <div class="ob-row">
+          <input id="obGoalBy" type="date" value="${data.goal_by_date || ""}" />
+        </div>
+        <div id="obReal" class="ob-real hidden"></div>
+        <button class="btn-primary" id="targetNext">Continue</button>
+        <button class="btn-ghost" id="targetSkip">I do not have a number</button>
+        <button class="btn-ghost" id="targetBack">Back</button>
+      </div>`;
+
+    /* Said while they type rather than after they commit, so it reads as the
+       app thinking alongside them instead of rejecting them at a gate. */
+    const paint = () => {
+      const goalLb = parseFloat($("obGoalLb").value) || null;
+      const by = $("obGoalBy").value || null;
+      const box = $("obReal");
+      const floor = healthyFloorLb(data.height_in);
+      if (goalLb && floor && goalLb < floor) {
+        box.className = "ob-real care";
+        box.innerHTML = `<b>We will track it, but we will not coach toward it.</b>
+          ${escapeHtml(String(goalLb))} pounds is below a healthy weight for your height. You can keep the number
+          and we will keep logging what you weigh, but the app will not draw a target, project a date, or build
+          a plan aimed at getting you there. If this is something you are working through, a doctor is the
+          right person to have alongside you.`;
+        return;
+      }
+      const r = lossRealism(cur, goalLb, by);
+      if (!r) { box.className = "ob-real hidden"; box.innerHTML = ""; return; }
+      const when = (d) => d.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+      if (r.band === "nodate") {
+        box.className = "ob-real";
+        box.innerHTML = `${r.amount.toFixed(0)} pounds at a healthy pace puts you there around
+          <b>${escapeHtml(when(r.honestDate))}</b>. Add a date if you have one in mind.`;
+      } else if (r.band === "fine") {
+        box.className = "ob-real ok";
+        box.innerHTML = `That works. ${r.amount.toFixed(0)} pounds by then is about
+          ${r.need.toFixed(1)} a week, inside a healthy pace.`;
+      } else if (r.band === "aggressive") {
+        box.className = "ob-real warn";
+        box.innerHTML = `That is a fast pace, about ${r.need.toFixed(1)} pounds a week. It is doable and it
+          leaves no room for a bad week. Yours to keep if you want it.`;
+      } else {
+        box.className = "ob-real warn";
+        box.innerHTML = `${r.amount.toFixed(0)} pounds is very doable. By then is not, that would be about
+          ${r.need.toFixed(1)} pounds a week and a healthy pace tops out near ${r.ceiling.toFixed(1)}.
+          At that pace you would be there around <b>${escapeHtml(when(r.honestDate))}</b>.
+          Keep your date if you want, we will just be honest about it.`;
+      }
+    };
+    $("obGoalLb").oninput = paint;
+    $("obGoalBy").onchange = paint;
+    paint();
+
+    const go = (skip) => {
+      const goalLb = skip ? null : parseFloat($("obGoalLb").value) || null;
+      const by = skip ? null : $("obGoalBy").value || null;
+      const floor = healthyFloorLb(data.height_in);
+      const next = {
+        ...data,
+        goal_weight_lb: goalLb,
+        goal_by_date: by,
+        /* The one flag the rest of the app reads to know it should record the
+           number and withhold the target, the projection and the deficit. */
+        goal_withhold: !!(goalLb && floor && goalLb < floor),
+      };
+      /* A date and a pace are the same question. Asking both is the double-ask
+         this screen exists to delete, so a given date skips the pace step. */
+      if (by) renderOnboardStep("plan", { ...next, pace: "steady" });
+      else renderOnboardStep("pace", next);
+    };
+    $("targetNext").onclick = () => go(false);
+    $("targetSkip").onclick = () => go(true);
+    $("targetBack").onclick = () => renderOnboardStep("goal", data);
     return;
   }
 
@@ -7737,10 +7910,10 @@ function renderOnboardStep(step, data = {}) {
     ob.querySelectorAll("[data-pace]").forEach((b) => {
       b.onclick = () => renderOnboardStep("plan", { ...data, pace: b.dataset.pace });
     });
-    /* The detail step is skipped for tiles that don't ask it, so back has to
-       land wherever this step was actually reached from. */
+    /* Back has to land wherever this step was actually reached from, and only
+       the goal-weight screen sits between the tiles and here. */
     const tile = goalTileFor(data.goal_bubble);
-    $("paceBackBtn").onclick = () => renderOnboardStep(tile?.askDetail ? "detail" : "goal", data);
+    $("paceBackBtn").onclick = () => renderOnboardStep(tile?.askTarget ? "target" : "goal", data);
     return;
   }
 
@@ -7818,8 +7991,11 @@ async function paintObSessionLengths(data) {
 
 async function finishOnboarding(data) {
   ME = data.name;
-  // Biometrics are no longer asked for up front. They are optional refinements
-  // in Setup, because every question before the plan is a chance to lose someone.
+  /* Height and weight ARE asked up front now, on the stats step before the
+     goal, which is what lets the goal step ask "you are at 210, where do you
+     want to get to" instead of offering bands. Both are skippable, and the
+     engine uses bodyWeightLb for starting loads on every goal, not just the
+     weight ones. */
   /* Through upsertGoalFields, not straight at the table: goal_secondary is
      behind an unapplied migration, and a first-run setup must not fail on a
      column that does not exist yet. */
@@ -7836,6 +8012,7 @@ async function finishOnboarding(data) {
     goal_child: data.goal_child || null,
     goal_secondary: data.goal_secondary || [],
     goal_detail: data.goal_detail || null,
+    ...(data.height_in ? { height_in: data.height_in } : {}),
     challenge_target: data.challenge_target || 4,
     updated_at: new Date().toISOString(),
   });
@@ -7851,9 +8028,15 @@ async function finishOnboarding(data) {
 
 /* One active goal per person. Setting a new one retires the old rather than
    deleting it, so we keep a record of what someone has actually chased.
-   `metric`, `start_value` and `target_value` stay null for now. We deliberately
-   do not ask for weight before showing the plan, so there is nothing honest to
-   snapshot yet, and inventing a number would be worse than leaving it empty. */
+
+   `metric`, `start_value` and `target_value` are finally written, for weight
+   goals, now that the stats step asks for a current weight before the goal
+   step. They were left null for as long as there was nothing honest to
+   snapshot. Filling them is what turns on the goal line on the weight chart,
+   the Goal figure in the stat row and the "at this rate you reach 160 around
+   the 12th" projection, all of which were built against target_value and have
+   never once rendered, because weightGoalFor() has returned null for every
+   user since the day it was written. */
 async function setActiveGoal(data) {
   const target = new Date();
   target.setDate(target.getDate() + (data.weeks || 12) * 7);
@@ -7872,9 +8055,16 @@ async function setActiveGoal(data) {
     goal_key: data.goal_key,
     detail: data.goal_detail || null,
     pace: data.pace || "steady",
-    target_date: isoDate(target),
+    /* Their date when they gave one, since a date they chose beats a date we
+       derived from a pace chip they never saw. */
+    target_date: data.goal_by_date || isoDate(target),
     days_per_week: data.days_per_week || 4,
     status: "active",
+    ...(data.goal_weight_lb ? {
+      metric: "weight_lb",
+      start_value: data.weight_lb || null,
+      target_value: data.goal_weight_lb,
+    } : {}),
   };
   const { data: saved, error } = await sb.from("user_goals").insert(row).select().maybeSingle();
   if (error) { console.error("goal not saved", error); toast("Goal not saved, try again"); return; }
@@ -12109,7 +12299,30 @@ function weightRangeStart() {
    (target_weight/start_weight) that were never real columns. */
 function weightGoalFor(email) {
   const g = (ALL_GOALS || []).find((x) => (x.email || "").toLowerCase() === (email || "").toLowerCase());
-  return g && g.metric === "weight_lb" && g.target_value != null ? g : null;
+  if (!g || g.metric !== "weight_lb" || g.target_value == null) return null;
+  return weightGoalWithheld(email, g) ? null : g;
+}
+
+/* A goal below a healthy weight for their height is recorded and then not
+   acted on: the number stays, and the app stops being the engine driving
+   toward it. Every goal-driven surface reads weightGoalFor, so failing it here
+   darkens the chart's target line, the Goal stat and the ETA projection in one
+   place, while the weigh-in history itself is untouched and keeps logging.
+
+   Derived rather than stored as a flag: target_value and height_in are both
+   already on file, so there is no column to add and nothing to keep in sync,
+   and it corrects itself if someone fixes their height later.
+
+   Refusing the number outright was the alternative and it is worse. It teaches
+   someone to enter a weight we will believe, which loses the signal and helps
+   nobody, and it lands as a judgement from a piece of software. */
+function weightGoalWithheld(email, goal) {
+  const g = goal || (ALL_GOALS || []).find((x) => (x.email || "").toLowerCase() === (email || "").toLowerCase());
+  if (!g || g.metric !== "weight_lb" || g.target_value == null) return false;
+  const isMe = (email || "").toLowerCase() === (MY_EMAIL || "").toLowerCase();
+  const heightIn = (isMe ? MY_PROFILE : PARTNER_PROFILE)?.height_in;
+  const floor = healthyFloorLb(heightIn);
+  return !!(floor && g.target_value < floor);
 }
 
 /* Weigh-ins for one person inside the chosen window, oldest first. */

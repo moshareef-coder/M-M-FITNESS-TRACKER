@@ -236,6 +236,25 @@ export const GOAL_PARAMS = {
     "longevity": P.health, "energy": { ...P.health, cardio: { sessions: 4, minutes: 30, zone: "easy" } },
     "prevent": P.health, "mobility": { ...P.health, setsFactor: 0.6 },
     "pain": pri({ ...P.health, setsFactor: 0.6, avoidMovements: BRACED_CORE }, ["abs", "glutes", "lowerback"]),
+    /* Absorbed when Get back into it and Stay consistent collapsed into this
+       tile. Same parameters they had under their old homes. */
+    "keep-quitting": P.habit, "dont-know": P.habit,
+    "back-after-years": RETURNING, "start-fresh": P.habit,
+  },
+  /* Promoted out of do-a-thing/event (endurance) and feel-better (mobility).
+     Both were real training distinctions living as children under goals that
+     meant something else, so they keep the parameters they already had. */
+  "build-endurance": {
+    _default: P.endurance,
+    "run-5k": P.endurance, "faster-mile": P.endurance, "stamina": P.endurance,
+    "event-run": P.endurance, "event-hyrox": P.endurance, "event-ocr": P.endurance,
+  },
+  "move-better": {
+    _default: { ...P.health, setsFactor: 0.6 },
+    "flexibility": { ...P.health, setsFactor: 0.6 },
+    "mobility": { ...P.health, setsFactor: 0.6 },
+    "pain": pri({ ...P.health, setsFactor: 0.6, avoidMovements: BRACED_CORE }, ["abs", "glutes", "lowerback"]),
+    "back-postpartum": pri({ ...P.health, setsFactor: 0.5, avoidMovements: BRACED_CORE }, ["abs", "glutes"]),
   },
   "get-back": {
     _default: P.habit,
