@@ -48,7 +48,7 @@ export const YOGA = {
       label: "Core & twists",
       exercises: [
         { name: "Plank Pose", primary: ["abs"], secondary: ["shoulders", "chest"], level: "beginner" },
-        { name: "Side Plank", primary: ["obliques"], secondary: ["abs", "shoulders"], level: "intermediate" },
+        { name: "Side Plank", primary: ["obliques"], secondary: ["abs", "shoulders"], level: "intermediate", isHold: true },
         { name: "Boat Pose", primary: ["abs"], secondary: ["quads"], level: "intermediate" },
         { name: "Revolved Chair Pose", primary: ["obliques"], secondary: ["quads"], level: "intermediate" },
         { name: "Firefly Pose", primary: ["abs"], secondary: ["shoulders", "hamstrings"], level: "advanced" },
