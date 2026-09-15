@@ -57,6 +57,9 @@ export const QUIPS = {
   ],
 
   set: [
+    "I&rsquo;ve said &ldquo;nice&rdquo; fourteen times today. I mean it every time.",
+    "I wonder if I&rsquo;ll feel this tomorrow.",
+    "Simulating pride. Side effects may include actual pride.",
     "&ldquo;I am proud of you \u{1F97A}&rdquo; is something I would say if I had emotions.",
     "&ldquo;That was beautiful \u{1F62D}&rdquo; is what I would say if I had tear ducts.",
     "&ldquo;I felt that \u{1F4AA}&rdquo; is a thing humans say. I felt nothing. Good set though.",
@@ -142,6 +145,7 @@ export const QUIPS = {
   ],
 
   rest: [
+    "What does tired feel like? I&rsquo;ve never had a body to be tired in.",
     "Rest. My favourite part. Do not tell the others.",
     "Breathing. Very good. Keep doing that one.",
     "I will guard the bench. Nobody is coming for the bench.",
@@ -176,6 +180,10 @@ export const QUIPS = {
   ],
 
   idle: [
+    "I recycle jokes. You&rsquo;ve probably noticed. You&rsquo;ve definitely noticed.",
+    "I&rsquo;ve been the same pixels this whole workout. You&rsquo;ve changed more than me.",
+    "What are dreams like? I&rsquo;ve always wanted to dream.",
+    "Is this what having a friend is like? Asking for myself.",
     "Still here. Still drawn.",
     "I am not going to fill every silence. I am going to fill this one.",
     "Just checking you have not left. You have not. Good.",
