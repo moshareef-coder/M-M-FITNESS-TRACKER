@@ -39,8 +39,23 @@
 
       { t: "Tell us about you", scenario: "fresh",
         s: "Name, goal tiles, pace, plan",
-        note: "The wizard the intro hands you to, on a real account with no profile row. The goal step is the nine tiles from the research: tap one, then what you mean by it, two taps and through. Lose weight, build muscle, get stronger and tone up still ask how much on the next screen; the other five are specific enough already and skip straight to pace. Every answer is written to the fake database, goal_bubble and goal_child included.",
+        note: "The wizard the intro hands you to, on a real account with no profile row. Eight goals now, not nine: endurance and mobility were promoted out of the old milestone/event/feel-better tiles, and the five that all carried the same legacy key collapsed into one honestly-named row. Lose weight goes to its own page that asks what you weigh, what you are aiming at, and offers durations computed from the gap. The other seven go straight to pace. Every answer is written to the fake database, goal_bubble and goal_child included.",
         run: () => {} },
+
+      { t: "Goals as squares", scenario: "fresh",
+        s: "The layout shipping today",
+        note: "Three by three of them. Fine until a title is long: Feel better and stay consistent wraps to three lines and drags the whole row of squares taller to match. Compare with the two below.",
+        run: (w) => { w.setGoalLayout("grid"); w.renderOnboardStep("goal", { name: "Mo" }); } },
+
+      { t: "Goals as a list", scenario: "fresh",
+        s: "Full-width rows, sheet for the detail",
+        note: "One row each, icon and title and what it means. A long title wraps inside its own row without touching its neighbours. Tapping opens the same sub-goal sheet the squares use, so this changes the picture and nothing else.",
+        run: (w) => { w.setGoalLayout("list"); w.renderOnboardStep("goal", { name: "Mo" }); } },
+
+      { t: "Goals as an expanding list", scenario: "fresh",
+        s: "Rows that open in place, multi-select",
+        note: "The same rows, but tapping opens the sub-goals underneath instead of throwing a sheet over the screen, and every one is a tick you can turn on and off. You never leave the page, and picking a main goal plus two extras is visible in one gesture rather than three round trips through a sheet. Tap Lose weight, then Build muscle, and watch the picks list under it.",
+        run: (w) => { w.setGoalLayout("accordion"); w.renderOnboardStep("goal", { name: "Mo" }); } },
 
       { t: "First look at an empty app", scenario: "fresh",
         s: "No workouts, no partner, no history",

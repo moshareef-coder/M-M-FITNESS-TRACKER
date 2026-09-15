@@ -3011,6 +3011,31 @@
   .ob-real.warn { background: rgba(200,130,30,.14); }
   .ob-real.care { background: rgba(190,70,60,.13); }
   .ob-real.hidden { display: none; }
+  /* Rows: the list and accordion layouts. */
+  .goal-tile-grid.lay-list, .goal-tile-grid.lay-accordion { display: flex; flex-direction: column; gap: 8px; }
+  .goal-row-wrap { border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: var(--panel); }
+  .goal-row-wrap.open { border-color: var(--accent); }
+  .goal-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 14px;
+              background: none; border: 0; text-align: left; color: inherit; cursor: pointer; }
+  .goal-row.on { background: color-mix(in srgb, var(--accent) 11%, transparent); }
+  .goal-row-ico { flex: none; display: grid; place-items: center; width: 34px; height: 34px;
+                  border-radius: 10px; background: var(--panel-2); color: var(--accent); }
+  .goal-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .goal-row-title { font-weight: 650; font-size: 15px; line-height: 1.25; }
+  .goal-row-sub { font-size: 12.5px; color: var(--muted); line-height: 1.3; }
+  .goal-row-chev { flex: none; color: var(--muted); display: grid; place-items: center; }
+  .goal-row-badge { flex: none; font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
+                    padding: 3px 8px; border-radius: 100px; background: var(--accent); color: var(--bg); }
+  .goal-row-badge.alt { background: var(--panel-2); color: var(--muted); }
+  .goal-kids { display: flex; flex-direction: column; border-top: 1px solid var(--border); background: var(--bg); }
+  .goal-kid { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 14px 11px 12px;
+              background: none; border: 0; border-bottom: 1px solid var(--border); text-align: left;
+              color: var(--muted); font-size: 14px; cursor: pointer; }
+  .goal-kid:last-child { border-bottom: 0; }
+  .goal-kid.on { color: var(--text); font-weight: 600; }
+  .goal-kid-tick { flex: none; display: grid; place-items: center; width: 20px; height: 20px;
+                   border-radius: 6px; border: 1.5px solid var(--border); color: var(--accent); }
+  .goal-kid.on .goal-kid-tick { border-color: var(--accent); }
   .ob-tl { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 20px; }
   .ob-tl.hidden { display: none; }
   .ob-tl .ob-pace.on { border-color: var(--accent); }
@@ -5510,7 +5535,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.14.18";
+const APP_VERSION = "2026.09.14.19";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -6595,6 +6620,16 @@ function healthyFloorLb(heightIn) {
   return heightIn ? Math.round((18.5 * heightIn * heightIn) / 703) : null;
 }
 
+/* Three ways to show the same goals, so the choice can be made by clicking
+   them rather than by imagining them. The selection logic below is entirely
+   layout-independent: primary, extras, choose() and the picks list do not know
+   or care which of these is on, so a layout only ever changes paintGrid. */
+let GOAL_LAYOUT = (() => { try { return localStorage.getItem("ft-goal-layout") || "grid"; } catch { return "grid"; } })();
+function setGoalLayout(v) {
+  GOAL_LAYOUT = v;
+  try { localStorage.setItem("ft-goal-layout", v); } catch { /* private mode: it just does not stick */ }
+}
+
 function goalTileFor(bubble) { return GOAL_TILES.find((t) => t.id === bubble) || null; }
 
 /* "Tone up, get lean" for a Setup subtitle, or the legacy string for a profile
@@ -6759,7 +6794,12 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
   }
 
   function paintGrid() {
-    grid.classList.toggle("dim", !!openId);
+    grid.className = "goal-tile-grid lay-" + GOAL_LAYOUT;
+    /* Only the grid dims behind its sheet. The rows either open the same sheet
+       (list) or expand in place (accordion), and dimming the thing you are
+       reading would be wrong in both. */
+    grid.classList.toggle("dim", !!openId && GOAL_LAYOUT === "grid");
+    if (GOAL_LAYOUT !== "grid") { paintRows(); return; }
     grid.innerHTML = GOAL_TILES.map((t) => {
       const main = primary?.bubble === t.id;
       /* Counted, not just detected: one category can hold the main goal and an
@@ -6781,6 +6821,64 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
     }).join("");
     grid.querySelectorAll("[data-tile]").forEach((b) => {
       b.onclick = () => openSheet(b.dataset.tile);
+    });
+  }
+
+  /* Full-width rows, shared by the list and accordion layouts. A row can hold
+     a title that wraps without making its neighbours taller, which is the
+     thing the square grid could not do: "Feel better and stay consistent" was
+     three lines in a tile and stretched its whole row of squares to match. */
+  function paintRows() {
+    const open = GOAL_LAYOUT === "accordion";
+    grid.innerHTML = GOAL_TILES.map((t) => {
+      const main = primary?.bubble === t.id;
+      const alsoCount = extras.filter((e) => e.bubble === t.id).length;
+      const badge = main
+        ? `<span class="goal-row-badge">Main${alsoCount ? ` +${alsoCount}` : ""}</span>`
+        : alsoCount ? `<span class="goal-row-badge alt">${alsoCount > 1 ? `${alsoCount} extras` : "Also"}</span>` : "";
+      const isOpen = open && openId === t.id;
+      const kids = !isOpen ? "" : `
+        <div class="goal-kids">
+          ${[{ id: null, label: `Just ${t.title.toLowerCase()}` }].concat(t.kids).map((k) => {
+            const on = isMain(t.id, k.id) || extraAt(t.id, k.id) >= 0;
+            return `<button type="button" class="goal-kid${on ? " on" : ""}" data-kid="${k.id || ""}" data-kb="${t.id}">
+              <span class="goal-kid-tick">${on ? icon("check", 15) : ""}</span>
+              <span>${escapeHtml(k.label)}</span>
+            </button>`;
+          }).join("")}
+        </div>`;
+      return `
+      <div class="goal-row-wrap${isOpen ? " open" : ""}">
+        <button type="button" class="goal-row${main || alsoCount ? " on" : ""}" data-tile="${t.id}"
+          aria-expanded="${isOpen}" aria-label="${escapeHtml(t.title)}">
+          <span class="goal-row-ico">${icon(t.ico, 19)}</span>
+          <span class="goal-row-text">
+            <span class="goal-row-title">${escapeHtml(t.title)}</span>
+            <span class="goal-row-sub">${escapeHtml(t.sub)}</span>
+          </span>
+          ${badge}
+          <span class="goal-row-chev">${icon(open ? (isOpen ? "chevronDown" : "chevronRight") : "chevronRight", 17)}</span>
+        </button>
+        ${kids}
+      </div>`;
+    }).join("");
+
+    grid.querySelectorAll("[data-tile]").forEach((b) => {
+      b.onclick = () => {
+        const t = goalTileFor(b.dataset.tile);
+        /* A category with nothing under it has nothing to open, so tapping it
+           is the pick itself rather than a door to one row. */
+        if (!t.kids.length) { choose(t.id, null); openId = null; paintGrid(); paintPicks(); paintConfirm(); return; }
+        if (!open) { openSheet(b.dataset.tile); return; }
+        openId = openId === b.dataset.tile ? null : b.dataset.tile;
+        paintGrid();
+      };
+    });
+    grid.querySelectorAll("[data-kid]").forEach((b) => {
+      b.onclick = () => {
+        choose(b.dataset.kb, b.dataset.kid || null);
+        paintGrid(); paintPicks(); paintConfirm();
+      };
     });
   }
 
