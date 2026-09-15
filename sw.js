@@ -1,4 +1,4 @@
-/* Fit Together service worker.
+/* Unio service worker.
 
    The app used to be network-first for everything it serves itself, which
    meant every launch re-downloaded the whole shell, the anatomy modules and a
@@ -13,10 +13,14 @@
    A deploy is still never masked: it ships a new sw.js with a new cache name,
    which drops this cache on activate, and the page reloads itself when the new
    worker takes over. */
-const CACHE = "fit-together-2026.09.15.10";
+const CACHE = "unio-2026.09.15.12";
 /* Version named or content named files live outside the versioned cache, so a
    deploy does not throw away the 2 MB Rive wasm and the .riv and make the next
    launch download them all over again. */
+/* Deliberately still named fit-together: this cache holds the Rive wasm and
+   the .riv, activate never clears it, and renaming the key would drop about
+   2 MB on every installed device for nothing. The key is internal, the app
+   name is not in it for users to see. */
 const ASSETS = "fit-together-assets-v1";
 const KEEP = new Set([CACHE, ASSETS]);
 const STATIC_ASSETS = [
@@ -109,7 +113,7 @@ self.addEventListener("message", (event) => {
 /* Push groundwork. Wired now so the native/push step later only needs
    a subscription and a sender, not a service worker rewrite. */
 self.addEventListener("push", (event) => {
-  let payload = { title: "Fit Together", body: "Your partner just logged a workout." };
+  let payload = { title: "Unio", body: "Your partner just logged a workout." };
   try { if (event.data) payload = { ...payload, ...event.data.json() }; } catch { /* keep default */ }
   event.waitUntil(self.registration.showNotification(payload.title, {
     body: payload.body,

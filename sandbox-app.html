@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Fit Together (sandbox)</title>
+<title>Unio (sandbox)</title>
 <meta name="description" content="Train with your partner. Rank up together." />
 <meta name="theme-color" content="#0c0e13" />
 <link rel="manifest" href="/manifest.webmanifest" />
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Fit Together" />
+<meta name="apple-mobile-web-app-title" content="Unio" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
@@ -2914,6 +2914,36 @@
      body diagram already uses (defined further down, near #biFigures), not a
      lookalike. Everything below is this screen's own: the clear-all row and
      the summary. */
+  .fa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0 12px; }
+  .fa-card {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+    padding: 15px 14px; border-radius: 14px; cursor: pointer; text-align: left;
+    border: 1.5px solid var(--border); background: var(--panel-2); color: var(--text);
+    transition: background .15s, border-color .15s;
+  }
+  .fa-rank { font: 800 11px/1 inherit; letter-spacing: .08em; text-transform: uppercase; min-height: 11px; color: var(--muted); }
+  .fa-label { font: 700 17px/1.1 inherit; }
+  .fa-sub { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
+  /* A heat ramp of its own rather than the app's semantic colours. The first
+     version reached for --down, --warn and --gold and got green, brown, green:
+     those names mean "weight fell", "careful" and "medal" elsewhere, and none
+     of them means "first". Green is reserved here for everything-level,
+     because that is what Mo asked green to mean. */
+  .fa-card { --heat: transparent; }
+  .fa-card.r1 { --heat: #e0443a; }
+  .fa-card.r2 { --heat: #f08a24; }
+  .fa-card.r3 { --heat: #e8bf2e; }
+  .fa-card.level { --heat: #33b465; }
+  .fa-card.r1, .fa-card.r2, .fa-card.r3, .fa-card.level {
+    background: color-mix(in srgb, var(--heat) 15%, var(--panel-2));
+    border-color: var(--heat);
+  }
+  .fa-card.r1 .fa-rank, .fa-card.r2 .fa-rank,
+  .fa-card.r3 .fa-rank, .fa-card.level .fa-rank { color: var(--heat); }
+  .fa-card.r1 .fa-label, .fa-card.r2 .fa-label,
+  .fa-card.r3 .fa-label, .fa-card.level .fa-label { color: var(--text); }
+  .fa-card.none { opacity: .72; }
+  .fa-balance { width: 100%; justify-content: center; }
   .focus-pick-actions { display: flex; gap: 8px; margin-top: 10px; }
   .focus-pick-action, .limit-clear {
     flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -4885,7 +4915,7 @@
   <header class="top">
     <div class="brand">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4M20 10v4M2 12h2M20 12h2M6 8v8M18 8v8M9 12h6"/></svg>
-      <span>Fit Together</span>
+      <span>UNIO</span>
     </div>
     <div class="top-right">
       <button type="button" class="top-streak hidden" id="topStreak"></button>
@@ -5610,7 +5640,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.10";
+const APP_VERSION = "2026.09.15.12";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -5980,7 +6010,7 @@ function renderSignInScreen(state = {}) {
           <circle cx="78" cy="60" r="38" fill="none" stroke="var(--me)" stroke-width="9" filter="url(#siGlow)"/>
           <circle cx="122" cy="60" r="38" fill="none" stroke="var(--partner)" stroke-width="9" filter="url(#siGlow)"/>
         </svg>
-        <h1 class="si-word">Fit Together</h1>
+        <h1 class="si-word">UNIO</h1>
         <p class="si-tag">Neither of you gets to quit quietly.</p>
       </div>
 
@@ -6550,7 +6580,7 @@ function obChips(items, selected, attr) {
    works, dots that show there are exactly three of these and no more.
    The point of writing this at all: the 5-step wizard right after it (name,
    goal, detail, pace, plan) never once mentions a partner, on an app called
-   Fit Together. This is where that gets said, first, before anything else. */
+   Unio. This is where that gets said, first, before anything else. */
 const ONBOARD_INTRO = [
   {
     ring: "both",
@@ -6605,7 +6635,7 @@ async function ensureProfileForInvite(data) {
 function inviteMessage(data, code) {
   const goal = (data.goalLabel || goalTileFor(data.goal_bubble)?.title || "").toLowerCase();
   const who = data.name || ME || "Someone";
-  const line = goal ? `${who} is starting on Fit Together: ${goal}.` : `${who} is starting on Fit Together.`;
+  const line = goal ? `${who} is starting on Unio: ${goal}.` : `${who} is starting on Unio.`;
   return `${line}
 They asked you to keep them honest. The app does not celebrate when only one of you finishes.
 
@@ -7097,26 +7127,130 @@ async function upsertGoalFields(patch) {
    so many groups at once (see focusKept below), and when a pick falls past
    that the page says so in one plain sentence, naming the groups, with no
    arithmetic in it. */
+/* ---- Focus by area, ranked ----
+   Mo wanted the picker down to four things you can put in order rather than
+   fourteen muscles you tap individually: legs, arms, chest, back, ranked 1st
+   to 4th, or everything level when nothing in particular matters.
+
+   Each area lists its muscle groups in the order the engine should reach for
+   them, biggest and most trainable first. Shoulders and core are deliberately
+   NOT here: they belong to no area anyone would call legs, arms, chest or
+   back, and putting them under "arms" would train the wrong thing. They are
+   reachable nowhere else now, which is the one cost of this design. */
+const FOCUS_AREAS = [
+  { key: "legs",  label: "Legs",  groups: ["quads", "hamstrings", "glutes", "calves"] },
+  { key: "back",  label: "Back",  groups: ["lats", "traps", "lowerback"] },
+  { key: "chest", label: "Chest", groups: ["chest"] },
+  { key: "arms",  label: "Arms",  groups: ["biceps", "triceps", "forearms"] },
+];
+const FOCUS_RANK_WORD = ["", "1st", "2nd", "3rd", "4th"];
+
+let FOCUS_AREA_RANK = {};
+
+/* A ranking spent against the engine's own budget, which is 9 points with a
+   top-tier group costing 3, the next 2 and the lightest 1. Two groups from the
+   first area, one from the second, one from the third comes to exactly 9, so
+   the ranking lands whole instead of being silently trimmed by spend().
+   Fourth gets nothing, which is what fourth means. */
+const AREA_SPEND = [
+  { tier: 3, take: 2 },
+  { tier: 2, take: 1 },
+  { tier: 1, take: 1 },
+];
+function focusEntriesFromAreas() {
+  const ranked = FOCUS_AREAS
+    .filter((a) => FOCUS_AREA_RANK[a.key])
+    .sort((a, b) => FOCUS_AREA_RANK[a.key] - FOCUS_AREA_RANK[b.key]);
+  const out = [];
+  ranked.forEach((area, i) => {
+    const plan = AREA_SPEND[i];
+    if (!plan) return;
+    area.groups.slice(0, plan.take).forEach((g) => out.push([g, plan.tier]));
+  });
+  return out;
+}
+
+function focusAreaTap(key) {
+  FOCUS_ALL = false;
+  if (FOCUS_AREA_RANK[key]) {
+    /* Untapping closes the gap rather than leaving a hole, so the list is
+       always 1, 2, 3 with nothing missing out of the middle. */
+    const gone = FOCUS_AREA_RANK[key];
+    delete FOCUS_AREA_RANK[key];
+    for (const k of Object.keys(FOCUS_AREA_RANK)) {
+      if (FOCUS_AREA_RANK[k] > gone) FOCUS_AREA_RANK[k]--;
+    }
+  } else {
+    const used = Object.keys(FOCUS_AREA_RANK).length;
+    if (used >= FOCUS_AREAS.length) return;
+    FOCUS_AREA_RANK[key] = used + 1;
+  }
+  paintFocusAreas();
+}
+
+function paintFocusAreas() {
+  const grid = $("focusAreaGrid");
+  if (!grid) return;
+  const anyRanked = Object.keys(FOCUS_AREA_RANK).length > 0;
+  grid.innerHTML = FOCUS_AREAS.map((a) => {
+    const r = FOCUS_AREA_RANK[a.key] || 0;
+    const cls = FOCUS_ALL ? "level" : r ? "r" + r : "none";
+    return `<button type="button" class="fa-card ${cls}" data-area="${a.key}">
+      <span class="fa-rank">${FOCUS_ALL ? "Even" : r ? FOCUS_RANK_WORD[r] : ""}</span>
+      <span class="fa-label">${escapeHtml(a.label)}</span>
+      <span class="fa-sub">${a.groups.map((g) => BODY_GROUP_LABELS[g]).join(", ")}</span>
+    </button>`;
+  }).join("");
+  grid.querySelectorAll("[data-area]").forEach((b) => {
+    b.onclick = () => focusAreaTap(b.dataset.area);
+  });
+  $("focusAreaBalance").classList.toggle("on", FOCUS_ALL);
+
+  const note = $("focusAreaNote");
+  if (FOCUS_ALL) {
+    note.textContent = "Everything level. No area gets extra, which is the right answer more often than it sounds.";
+  } else if (!anyRanked) {
+    note.textContent = "Tap an area to make it first. Tap more to rank them after it.";
+  } else {
+    const order = FOCUS_AREAS.filter((a) => FOCUS_AREA_RANK[a.key])
+      .sort((a, b) => FOCUS_AREA_RANK[a.key] - FOCUS_AREA_RANK[b.key]);
+    const said = order.map((a, i) => {
+      const plan = AREA_SPEND[i];
+      return plan ? `${a.label.toLowerCase()} ${i === 0 ? "hardest" : i === 1 ? "next" : "a little"}` : `${a.label.toLowerCase()} not at all`;
+    });
+    note.textContent = "Your weeks will push " + said.join(", ") + ".";
+  }
+}
+
 function renderBodyFocusPage() {
   $("focusPickRoot").innerHTML = `
     <div class="card">
-      <h2>Which muscles do you want to focus on?</h2>
-      <p class="muted-note">Tap a muscle to mark it lightly. Tap it again to push it up a level, and once more to clear it.</p>
-      <div class="bi-figures" id="focusPickFigures">
-        <div class="bi-fig" data-view="Front"><canvas id="focusPickFront" class="bi-canvas"></canvas></div>
-        <div class="bi-fig" data-view="Back"><canvas id="focusPickBack" class="bi-canvas"></canvas></div>
-      </div>
-      <div class="focus-legend">${focusTierLegend()}</div>
-      <div class="focus-pick-actions">
-        <button type="button" class="focus-pick-action" id="focusPickAll">${icon("target", 13)} Whole body</button>
-        <button type="button" class="focus-pick-action" id="focusPickClear">${icon("close", 13)} Clear all</button>
-      </div>
-      <div class="focus-tier-list" id="focusPickList"></div>
-      <p class="focus-pick-summary" id="focusPickSummary">Loading the figure...</p>
+      <h2>What do you want to push hardest?</h2>
+      <p class="muted-note">Tap to rank them. First gets the most work, fourth gets none of the extra. Or level everything out if nothing stands out.</p>
+      <div class="fa-grid" id="focusAreaGrid"></div>
+      <button type="button" class="focus-pick-action fa-balance" id="focusAreaBalance">${icon("target", 13)} Everything level</button>
+      <p class="focus-pick-summary" id="focusAreaNote"></p>
     </div>
     <button type="button" class="btn-primary" id="focusPickSaveBtn">Save focus</button>`;
 
-  initBodyFocusRive();
+  /* Seeded from whatever is stored, so reopening the page shows the ranking
+     that is actually in force rather than an empty board. */
+  FOCUS_AREA_RANK = {};
+  if (!FOCUS_ALL) {
+    const stored = focusPickEntries();
+    const best = {};
+    for (const [g, t] of stored) {
+      const area = FOCUS_AREAS.find((a) => a.groups.includes(g));
+      if (area) best[area.key] = Math.max(best[area.key] || 0, t);
+    }
+    Object.entries(best).sort((a, b) => b[1] - a[1]).forEach(([k], i) => { FOCUS_AREA_RANK[k] = i + 1; });
+  }
+  paintFocusAreas();
+  $("focusAreaBalance").onclick = () => {
+    FOCUS_ALL = !FOCUS_ALL;
+    if (FOCUS_ALL) FOCUS_AREA_RANK = {};
+    paintFocusAreas();
+  };
   $("focusPickSaveBtn").onclick = saveBodyFocus;
 }
 
@@ -7132,7 +7266,7 @@ function closeBodyFocusPage() {
 }
 
 async function saveBodyFocus() {
-  const entries = focusPickEntries();
+  const entries = FOCUS_ALL ? [] : focusEntriesFromAreas();
   const btn = $("focusPickSaveBtn");
   btn.disabled = true;
   const ok = await saveFocusGroups(entries);
@@ -10400,7 +10534,7 @@ async function shareRecap(r) {
       return;
     }
     if (navigator.share) {
-      await navigator.share({ title: "Fit Together", text, url: SHARE_URL });
+      await navigator.share({ title: "Unio", text, url: SHARE_URL });
       return;
     }
     await navigator.clipboard.writeText(`${text} ${SHARE_URL}`);
@@ -21757,7 +21891,7 @@ function pushSupport() {
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const installed = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
     return { ok: false, why: iOS && !installed
-      ? "Add Fit Together to your home screen first, then reminders can be turned on."
+      ? "Add Unio to your home screen first, then reminders can be turned on."
       : "This browser cannot show reminders." };
   }
   if (Notification.permission === "denied") {
