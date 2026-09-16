@@ -264,15 +264,37 @@ if (MISSES.size) { failed++; console.log("\n  ids used in JS but MISSING from ma
    catches that at runtime, because a permanently stale page looks exactly
    like a correctly detected update. So it is caught here instead, where it
    cannot ship. */
+/* Read with the app's OWN pattern rather than a copy of it. The copy is how
+   this check went blind: index.html matched sw.js on /fit-together-([0-9.]+)/
+   while this file and bump-version.mjs matched on /unio-/, so the rename left
+   the two scripts passing and the app's update path silently dead. No match
+   means no live version, and ensureLatestBuild() gives up on the next line, so
+   a broken check and an up-to-date app look identical at runtime.
+
+   So SW_VERSION_RE is lifted out of index.html as a literal and run here
+   against the real sw.js. Rename the cache to whatever you like; change the
+   version's shape and the build fails here instead of going quiet in the
+   field. */
 {
-  const appV = (readFileSync(join(root, "index.html"), "utf8").match(/const APP_VERSION = "([^"]+)"/) || [])[1];
-  const swV = (readFileSync(join(root, "sw.js"), "utf8").match(/unio-([0-9.]+)/) || [])[1];
-  if (appV !== swV) {
+  const appV = (html.match(/const APP_VERSION = "([^"]+)"/) || [])[1];
+  const lit = (html.match(/const SW_VERSION_RE = \/(.+?)\/;/) || [])[1];
+  if (!lit) {
     failed++;
-    console.log(`\n  VERSION DRIFT: index.html APP_VERSION is ${appV}, sw.js cache is ${swV}.`);
-    console.log("  Bump both together: node scripts/bump-version.mjs");
+    console.log("\n  SW_VERSION_RE has gone from index.html. The app's build-update check cannot be verified,");
+    console.log("  which is exactly the state it was in while it was dead. Put the named literal back.");
   } else {
-    console.log(`\n  version ${appV} (index.html and sw.js agree)`);
+    const swV = (readFileSync(join(root, "sw.js"), "utf8").match(new RegExp(lit)) || [])[1];
+    if (!swV) {
+      failed++;
+      console.log(`\n  UPDATE CHECK DEAD: index.html reads sw.js with /${lit}/ and it matches nothing there.`);
+      console.log("  Every launch would decide it is up to date. Fix the pattern or the sw.js cache line.");
+    } else if (appV !== swV) {
+      failed++;
+      console.log(`\n  VERSION DRIFT: index.html APP_VERSION is ${appV}, sw.js cache is ${swV}.`);
+      console.log("  Bump both together: node scripts/bump-version.mjs");
+    } else {
+      console.log(`\n  version ${appV} (index.html and sw.js agree, read with the app's own pattern)`);
+    }
   }
 }
 console.log(failed ? "\nBOOT CHECK FAILED" : "\nBOOT CHECK PASSED");

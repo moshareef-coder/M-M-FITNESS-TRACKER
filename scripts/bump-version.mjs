@@ -19,8 +19,16 @@ const appPath = join(root, "index.html");
 
 const sw = readFileSync(swPath, "utf8");
 const app = readFileSync(appPath, "utf8");
-const current = (sw.match(/unio-([0-9.]+)/) || [])[1];
-if (!current) { console.error("no cache version found in sw.js"); process.exit(1); }
+/* Anchored on sw.js's CACHE declaration and the version's shape, naming no
+   product. All three files that read that line used to hardcode a name, and
+   when the cache was renamed to "unio-" only two of them were updated: this
+   one and boot-check.mjs kept passing while index.html's update check matched
+   nothing and quietly stopped offering new builds. Renaming the cache is a
+   one-line edit in sw.js now, and boot-check.mjs runs index.html's own literal
+   against the file so a shape change fails loudly instead. */
+const SW_CACHE_RE = /(CACHE\s*=\s*["'][^"']*?)(\d{4}\.\d{2}\.\d{2}\.\d+)(["'])/;
+const current = (sw.match(SW_CACHE_RE) || [])[2];
+if (!current) { console.error('no cache version found in sw.js (expected CACHE = "<name>-YYYY.MM.DD.N")'); process.exit(1); }
 
 function nextVersion(from) {
   const now = new Date();
@@ -36,6 +44,6 @@ if (!/^\d{4}\.\d{2}\.\d{2}\.\d+$/.test(target)) {
   process.exit(1);
 }
 
-writeFileSync(swPath, sw.replace(/unio-[0-9.]+/, `unio-${target}`));
+writeFileSync(swPath, sw.replace(SW_CACHE_RE, (_m, pre, _was, post) => `${pre}${target}${post}`));
 writeFileSync(appPath, app.replace(/const APP_VERSION = "[^"]+"/, `const APP_VERSION = "${target}"`));
 console.log(`${current} -> ${target}  (sw.js cache and index.html APP_VERSION)`);
