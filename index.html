@@ -1528,6 +1528,24 @@
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
   .clip-who { color: #fff; font-size: 14px; font-weight: 700; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  /* A link inside body copy. Left alone it renders as browser-default blue with
+     an underline, which is the one piece of unstyled chrome on the page. */
+  .muted-note a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .muted-note a:hover { text-decoration: underline; }
+  /* One blocked person. The address can be long and the button must not be
+     pushed off the edge by it, so the name takes the slack and ellipsises. */
+  .block-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+  .block-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .block-undo { width: auto; flex: 0 0 auto; padding: 6px 14px; }
+  /* Deliberately quieter than the close button. It has to be findable without
+     looking for it, and it must never be the thing a thumb lands on by
+     accident while reaching to close a video. */
+  .clip-flag {
+    width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+    display: grid; place-items: center;
+    background: rgba(0,0,0,.45); color: rgba(255,255,255,.75);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
   .clip-bottom {
     position: absolute; left: 0; right: 0; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     display: flex; flex-direction: column; align-items: center; gap: 14px; z-index: 2; padding: 0 20px;
@@ -5447,6 +5465,16 @@
           <span class="set-val" id="setAboutSub"></span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
+        <!-- Its own row rather than a card buried inside Account. Somebody
+             looking for this is usually not calm and should not have to guess
+             which page it is under, and it is also the first thing an App
+             Review reader goes hunting for. -->
+        <button type="button" class="set-row" id="setRow-safety" data-page="safety">
+          <span class="set-ico" data-ico="flag"></span>
+          <span class="set-txt"><span class="set-title">Safety</span></span>
+          <span class="set-val" id="setSafetySub"></span>
+          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+        </button>
         <button type="button" class="set-row" id="setRow-account" data-page="account">
           <span class="set-ico" data-ico="gear"></span>
           <span class="set-txt"><span class="set-title">Account</span></span>
@@ -5747,6 +5775,38 @@
         <span>Support</span><span class="link-arrow">&rsaquo;</span>
       </a>
       <p class="muted-note" style="margin-top:12px;opacity:.7;">Version <span id="appVersion"></span></p>
+      </div>
+    </div>
+    <!-- Reporting and blocking. Its own page because App Store Review
+         Guideline 1.2 requires both of anything carrying user content, and
+         because the person who needs it should find it by looking for the
+         obvious word rather than by opening Account and reading past two
+         buttons that erase their data. -->
+    <div class="settings-page hidden" id="page-safety">
+      <div class="scr-head">
+        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+        <div class="scr-title">Safety</div>
+        <div class="spacer"></div>
+      </div>
+      <div class="card" id="safetyCard">
+        <h2>Report something</h2>
+        <p class="muted-note" style="margin-top:-6px;">
+          Tap the flag while a clip is playing. We look at every report within a day,
+          and the person is not told who reported them. You can also email
+          <a href="mailto:mo.shareef@creativelab1.com">mo.shareef@creativelab1.com</a>.
+        </p>
+      </div>
+      <div class="card">
+        <h2>Block</h2>
+        <p class="muted-note" style="margin-top:-6px;">
+          Blocking unpairs you, stops anything more arriving, and stops them pairing
+          with you again. They are not told, and you can undo it here.
+        </p>
+        <div id="blockLive" class="hidden">
+          <button type="button" class="btn-danger" id="blockPartnerBtn">Block my partner</button>
+        </div>
+        <p class="muted-note" id="blockNoPartner">You are not paired with anyone right now.</p>
+        <div id="blockList"></div>
       </div>
     </div>
     <div class="settings-page hidden" id="page-account">
@@ -6105,6 +6165,7 @@ const ICON_PATHS = {
   body: '<circle cx="12" cy="4.5" r="2.2"/><path d="M8.5 8h7l1.5 5-2 .6V20h-3v-4h-1v4h-3v-6.4l-2-.6z"/>',
   play: '<path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none"/>',
   camera: '<path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4z"/><circle cx="12" cy="13" r="3.5"/>',
+  flag: '<path d="M4 21V4.5S6 3 9 4.5s6 1.5 6 1.5v9s-3 1.5-6 0-5-.5-5-.5"/>',
   trophy: '<path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a2 2 0 0 0 0 4h1M16 5h3a2 2 0 0 1 0 4h-1"/><path d="M12 12v3M9 20h6M9.5 15.5h5l.5 4.5h-6l.5-4.5Z"/>',
   star: '<path d="M12 3l2.5 5.6 6.1.6-4.6 4.1 1.3 6-5.3-3.1L6.7 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z"/>',
   trending: '<path d="M3 17 9 11l4 4 8-8"/><path d="M17 7h4v4"/>',
@@ -12447,11 +12508,23 @@ function clipViewerHTML(fromName, src, last) {
     <div class="clip-top">
       <button type="button" class="clip-x" id="clipViewX" aria-label="Close">&times;</button>
       <span class="clip-who">${escapeHtml(fromName)}</span>
+      <button type="button" class="clip-flag" id="clipReport" aria-label="Report this clip">${icon("flag", 18)}</button>
     </div>
     <div class="clip-bottom">
       <div class="clip-note">${last
         ? "Last watch. Closing this ends it."
         : "It loops while you are here. Close it and you have one more watch."}</div>
+    </div>`;
+}
+
+/* Says what happens next, because "reported" on its own leaves somebody
+   wondering whether anything was actually done with it. */
+function clipReportedHTML() {
+  return `<div class="clip-stage" style="align-items:center;justify-content:center">
+      <div class="clip-gone">
+        <b>Reported</b>
+        <span>We will look at it within a day. You can block them in Setup.</span>
+      </div>
     </div>`;
 }
 
@@ -12746,6 +12819,18 @@ async function openNextClip() {
     }
   };
   $("clipViewX").onclick = done;
+  /* Reporting closes the viewer without spending a watch. Charging somebody a
+     watch for reporting a clip would mean the only way to report the second
+     one is to watch it again. */
+  $("clipReport").onclick = async () => {
+    if (closing) return;
+    const player = $("clipPlayer");
+    if (player) player.pause();
+    const filed = await reportClip(clip);
+    if (!filed) { player?.play?.().catch(() => {}); return; }
+    closing = true;
+    close(clipReportedHTML());
+  };
   const player = $("clipPlayer");
   player.ontimeupdate = () => {
     const bar = $("clipBar");
@@ -12755,6 +12840,143 @@ async function openNextClip() {
      same as one that did. */
   player.onerror = () => { toast("That clip would not play"); closing = true; destroyClip(clip).then(() => close(clipGoneHTML())); };
   renderClipPill();
+}
+
+/* ---- reporting and blocking ----
+
+   App Store Review Guideline 1.2 requires both of these of anything carrying
+   user generated content, and this app carries video between two people. They
+   are separate on purpose: a report is about a thing and says "look at this",
+   a block is about a person and says "this is done". Reporting somebody does
+   not quietly end the relationship, because a mis-tap should not, and blocking
+   files no report, because most people who walk away are not making a case. */
+
+const REPORT_REASONS = [
+  ["sexual", "Nudity or sexual content"],
+  ["abuse", "Harassment or abuse"],
+  ["violence", "Violence or threats"],
+  ["other", "Something else"],
+];
+
+function askReportReason(fromName) {
+  return new Promise((resolve) => {
+    const scrim = document.createElement("div");
+    scrim.className = "pop-scrim";
+    scrim.innerHTML = `
+      <div class="pop">
+        <div class="pop-body">
+          <div class="ds-top">
+            <div class="pop-who" style="color:var(--muted)">REPORT THIS CLIP</div>
+            <button type="button" class="ds-x" data-reason="" aria-label="Close">&times;</button>
+          </div>
+          <p class="muted-note">We look at every report within a day. ${escapeHtml(fromName)} is not told that you reported this.</p>
+          ${REPORT_REASONS.map(([k, label]) =>
+            `<button type="button" class="btn-ghost" data-reason="${k}">${escapeHtml(label)}</button>`).join("")}
+        </div>
+      </div>`;
+    document.body.appendChild(scrim);
+    scrim.querySelectorAll("[data-reason]").forEach((b) => {
+      b.onclick = () => { scrim.remove(); resolve(b.dataset.reason || null); };
+    });
+    scrim.onclick = (e) => { if (e.target === scrim) { scrim.remove(); resolve(null); } };
+  });
+}
+
+/* The clip stops expiring the moment it is reported, so there is something
+   left to look at. Marked before the report row is written: if only one of the
+   two can land, keeping the evidence is the half worth having, because a
+   report pointing at a deleted file cannot be acted on at all. */
+async function reportClip(clip) {
+  const from = nameFor(clip.from_email);
+  const reason = await askReportReason(from);
+  if (!reason) return false;
+
+  const mark = await sb.from("live_clips")
+    .update({ reported_at: new Date().toISOString() }).eq("id", clip.id);
+  if (mark.error) console.warn("could not hold the reported clip", mark.error);
+
+  const { error } = await sb.from("content_reports").insert({
+    reporter_email: MY_EMAIL,
+    subject_email: clip.from_email,
+    kind: "clip",
+    ref_id: clip.id,
+    evidence_path: clip.path,
+    reason,
+  });
+  if (error) { console.error("report failed", error); toast("Could not send that report"); return false; }
+
+  /* Taken out of the inbox rather than left on the pill. Nobody who has just
+     reported a video wants the app offering it to them again, and the row and
+     file stay on the server where they are needed. */
+  CLIP_INBOX = CLIP_INBOX.filter((c) => c.id !== clip.id);
+  renderClipPill();
+  toast("Reported. We will look at it within a day.");
+  return true;
+}
+
+/* Blocking is one server call because a block that half applies is worse than
+   none: it says it worked while leaving the channel open. block_person ends
+   the partnership as a standing refusal, so they cannot ask again, and clears
+   anything of theirs already waiting. */
+async function blockPerson(email) {
+  const who = nameFor(email) || "them";
+  const yes = await askConfirm({
+    heading: "Block and unpair",
+    body: `${who} will be unpaired from you, will not be able to send you anything, and will not be able to pair with you again. They are not told. You can undo this in Setup.`,
+    ok: "Block",
+    cancel: "Cancel",
+  });
+  if (!yes) return false;
+  const { error } = await sb.rpc("block_person", { p_email: email });
+  if (error) { console.error("block failed", error); toast("Could not block right now"); return false; }
+  toast(`${who} is blocked`);
+  /* Everything on screen assumes a partner, so the app is reloaded into the
+     state it would have had if they had never been paired, rather than patched
+     tab by tab and left with one card still holding their name. */
+  setTimeout(() => location.reload(), 900);
+  return true;
+}
+
+/* The Safety card in Setup. Read fresh each time rather than cached, because
+   the list has to be right the moment somebody comes here to undo a block. */
+async function renderSafetyCard() {
+  const live = $("blockLive");
+  const none = $("blockNoPartner");
+  if (!live || !none) return;
+  const paired = Boolean(PARTNER_EMAIL);
+  live.classList.toggle("hidden", !paired);
+  none.classList.toggle("hidden", paired);
+  if (paired) {
+    $("blockPartnerBtn").textContent = `Block ${nameFor(PARTNER_EMAIL) || "my partner"}`;
+    $("blockPartnerBtn").onclick = () => blockPerson(PARTNER_EMAIL);
+  }
+
+  const list = $("blockList");
+  if (!list) return;
+  const { data, error } = await sb.from("blocks").select("blocked_email, created_at")
+    .order("created_at", { ascending: false });
+  if (error) { console.warn("could not read blocks", error); return; }
+  const rows = data || [];
+  if (!rows.length) { list.innerHTML = ""; return; }
+  list.innerHTML = `<p class="muted-note" style="margin-top:14px;">Blocked</p>` + rows.map((b) => `
+    <div class="block-row">
+      <span class="block-who">${escapeHtml(b.blocked_email)}</span>
+      <button type="button" class="btn-ghost block-undo" data-unblock="${escapeHtml(b.blocked_email)}">Unblock</button>
+    </div>`).join("");
+  list.querySelectorAll("[data-unblock]").forEach((b) => {
+    b.onclick = () => unblockPerson(b.dataset.unblock);
+  });
+}
+
+/* Unblocking undoes the block and nothing else. The partnership stays a
+   standing refusal, so neither of them is quietly put back together by this:
+   if they want that, one of them types the other's code and the other agrees,
+   which is the same consent every pairing needs. */
+async function unblockPerson(email) {
+  const { error } = await sb.from("blocks").delete().eq("blocked_email", email);
+  if (error) { console.error("unblock failed", error); toast("Could not unblock right now"); return; }
+  toast("Unblocked. You are still not paired.");
+  renderSafetyCard();
 }
 
 /* One watch used up. The row stays, so the clip survives the app being closed
@@ -23882,6 +24104,10 @@ function openSettingsPage(key) {
   }
   if (key === "focus") renderBodyFocusPage();
   if (key === "limits") renderLimitsPage();
+  /* Re-read every time rather than rendered once with the tab: somebody who
+     comes here to undo a block must not be shown a list from before they made
+     it. */
+  if (key === "safety") renderSafetyCard();
   window.scrollTo({ top: 0 });
 }
 

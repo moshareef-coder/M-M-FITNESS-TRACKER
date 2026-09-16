@@ -39,8 +39,13 @@ Deno.serve(async (req) => {
 
   const cutoff = new Date(Date.now() - CLIP_TTL_MINUTES * 60_000).toISOString();
 
+  /* Reported clips are exempt. A report that points at a deleted file is a
+     report nobody can act on, and acting on them within a day is the
+     obligation that comes with carrying video between people at all. They are
+     removed by hand once the report is handled, which is the only place that
+     decision belongs. */
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/live_clips?select=id,path&created_at=lt.${cutoff}&limit=500`,
+    `${SUPABASE_URL}/rest/v1/live_clips?select=id,path&created_at=lt.${cutoff}&reported_at=is.null&limit=500`,
     { headers: svc },
   );
   // Database wording stays in the function log; the caller gets the shape only.
