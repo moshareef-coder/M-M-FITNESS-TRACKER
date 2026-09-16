@@ -14,7 +14,8 @@
 
 import { palette, render, samplePose, solvePose, jointAngles, cameraFor, litIntensity, VB, GROUND,
   PROP_TYPES, LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY,
-  BODY_FEMALE, BODIES, BODY_KINDS, HAIR_KINDS, useBody, restPose, gripSides, STYLE, setStyle } from "./rig.mjs";
+  BODY_FEMALE, BODIES, BODY_KINDS, HAIR_KINDS, useBody, restPose, gripSides, STYLE, setStyle,
+  onArtworkReady } from "./rig.mjs";
 import { MOVES as WEIGHT_TRAINING } from "./moves/weight-training.mjs";
 import { MOVES as YOGA } from "./moves/yoga.mjs";
 import { MOVES as PILATES } from "./moves/pilates.mjs";
@@ -69,6 +70,9 @@ export const moveFor = (name) => ALL[name] || ALL[ALIASES[name]] || null;
 // session screen can show a hero animation and a strip of upcoming moves; that
 // must not be five independent rAF loops each doing their own clock.
 const mounts = new Set();
+// A machine drawing that arrives after a paused mount painted: repaint them
+// all, or the still is missing its machine.
+onArtworkReady(() => { for (const m of mounts) m.dirty = true; pump(); });
 let frameId = null;
 let lastNow = 0;
 

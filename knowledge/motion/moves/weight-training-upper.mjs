@@ -134,8 +134,8 @@ const CABLE_FLY = {
   fit: { k: 0.88, dy: 2 },
   feet: FRONT_FEET,
   props: [
-    { type: "cable", x: 10, top: 10, y0: 44, to: { side: "L", point: "hand" } },
-    { type: "cable", x: 130, top: 10, y0: 44, to: { side: "R", point: "hand" }, front: true },
+    { type: "cable", x: 10, top: 10, y0: 44, grip: "handle", to: { side: "L", point: "hand" } },
+    { type: "cable", x: 130, top: 10, y0: 44, grip: "handle", to: { side: "R", point: "hand" }, front: true },
   ],
   keys: [
     { // open, arms wide at shoulder height, chest stretched
@@ -162,8 +162,8 @@ const LOW_TO_HIGH_CABLE_FLY = {
   dur: 3.2,
   breath: 0.2,
   props: [
-    { type: "cable", x: 14, top: 98, y0: 101, to: { side: "L", point: "hand" } },
-    { type: "cable", x: 14, top: 98, y0: 101, to: { side: "R", point: "hand" }, front: true },
+    { type: "cable", x: 14, top: 98, y0: 101, grip: "handle", to: { side: "L", point: "hand" } },
+    { type: "cable", x: 14, top: 98, y0: 101, grip: "handle", to: { side: "R", point: "hand" }, front: true },
   ],
   keys: [
     { // bottom, hands low and behind the hips
@@ -354,7 +354,7 @@ const CLOSE_GRIP_PULLDOWN = {
   breath: 0.2,
   props: [
     { type: "machine", x: 34, y: 95, w: 38, parts: ["seat", "thighPad"], padX: 62, padY: 76, padW: 22 },
-    { type: "cable", x: 96, top: 14, y0: 44, to: { side: "R", point: "hand" }, front: true },
+    { type: "cable", x: 96, top: 14, y0: 44, grip: "vbar", to: { side: "R", point: "hand" }, front: true },
   ],
   keys: [
     { // arms long overhead, hands together on the handle
@@ -389,7 +389,7 @@ const SEATED_CABLE_ROW = {
   breath: 0.2,
   props: [
     { type: "bench", x: 22, y: 108, w: 44 },
-    { type: "cable", x: 124, top: 96, y0: 99, to: { side: "R", point: "hand" }, front: true },
+    { type: "cable", x: 124, top: 96, y0: 99, grip: "vbar", to: { side: "R", point: "hand" }, front: true },
   ],
   keys: [
     { // reach, torso forward, arms long, lats stretched
@@ -457,7 +457,7 @@ const STRAIGHT_ARM_PULLDOWN = {
   loop: "pingpong",
   dur: 3.0,
   breath: 0.2,
-  props: [{ type: "cable", x: 120, top: 10, y0: 42, to: { side: "R", point: "hand" }, front: true }],
+  props: [{ type: "cable", x: 120, top: 10, y0: 42, grip: "bar", barW: 14, to: { side: "R", point: "hand" }, front: true }],
   // Authored as shoulder ANGLES with the elbow pinned at 2 degrees, not as
   // wrist pins. Two wrist pins interpolate along the CHORD between them, and
   // the chord of this 123 degree sweep passed 16 units from the shoulder, so
@@ -738,7 +738,7 @@ const FACE_PULL = {
   loop: "pingpong",
   dur: 3.0,
   breath: 0.2,
-  props: [{ type: "cable", x: 122, top: 18, y0: 48, to: { side: "R", point: "hand" }, front: true }],
+  props: [{ type: "cable", x: 122, top: 18, y0: 48, grip: "rope", to: { side: "R", point: "hand" }, front: true }],
   keys: [
     { // start, arms long out in front at eye height
       t: 0,
@@ -969,7 +969,7 @@ const CABLE_LATERAL_RAISE = {
   fit: { k: 0.86, dy: 2 },
   farSide: "L",
   feet: FRONT_FEET,
-  props: [{ type: "cable", x: 10, top: 104, y0: 107, to: { side: "R", point: "hand" }, front: true }],
+  props: [{ type: "cable", x: 10, top: 104, y0: 107, grip: "handle", to: { side: "R", point: "hand" }, front: true }],
   keys: [
     { // bottom, working hand in front of the far thigh, cable slack taken up
       t: 0,
@@ -1333,7 +1333,7 @@ const HAMMER_CURL = {
 // the hand staying taut through the arc. Side view.
 const CABLE_CURL = {
   ...DUMBBELL_CURL,
-  props: [{ type: "cable", x: 116, top: 100, y0: 103, to: { side: "R", point: "hand" }, front: true }],
+  props: [{ type: "cable", x: 116, top: 100, y0: 103, grip: "bar", barW: 14, to: { side: "R", point: "hand" }, front: true }],
 };
 
 // The same curl with a barbell, both hands on one bar. Must be visible: the
@@ -1511,8 +1511,7 @@ const TRICEPS_PUSHDOWN = {
   dur: 2.8,
   breath: 0.2,
   props: [
-    { type: "cable", x: 78, top: 12, y0: 42, to: { side: "R", point: "hand" }, front: true },
-    { type: "barbell", side: "R", point: "hand", r: 4.5, front: true },
+    { type: "cable", x: 78, top: 12, y0: 42, grip: "bar", barW: 13, to: { side: "R", point: "hand" }, front: true },
   ],
   keys: [
     { // start, forearm up at about ninety, elbow at the rib
@@ -1543,7 +1542,7 @@ const TRICEPS_PUSHDOWN = {
 // only difference from Triceps Pushdown.
 const ROPE_PUSHDOWN = {
   ...TRICEPS_PUSHDOWN,
-  props: [{ type: "cable", x: 78, top: 12, y0: 42, to: { side: "R", point: "hand" }, front: true }],
+  props: [{ type: "cable", x: 78, top: 12, y0: 42, grip: "rope", to: { side: "R", point: "hand" }, front: true }],
   keys: [
     { // start, forearms up, hands together on the rope
       t: 0,

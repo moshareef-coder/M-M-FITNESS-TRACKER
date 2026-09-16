@@ -482,7 +482,7 @@ const CABLE_PULL_THROUGH = {
   loop: "pingpong",
   dur: 3.0,
   breath: 0.2,
-  props: [{ type: "cable", x: 16, top: 96, y0: 100, to: { side: "R", point: "hand" } }],
+  props: [{ type: "cable", x: 16, top: 96, y0: 100, grip: "rope", to: { side: "R", point: "hand" } }],
   keys: [
     { // stood tall, hips through, rope in front of the hips
       t: 0,
@@ -724,7 +724,7 @@ const CABLE_KICKBACK = {
   loop: "pingpong",
   dur: 2.8,
   breath: 0.2,
-  props: [{ type: "cable", x: 112, top: 102, y0: 106, to: { side: "R", point: "ankle" } }],
+  props: [{ type: "cable", x: 112, top: 102, y0: 106, grip: "strap", to: { side: "R", point: "ankle" } }],
   keys: [
     { // start, working leg under the hip
       t: 0,
@@ -1060,7 +1060,7 @@ const CABLE_CRUNCH = {
   loop: "pingpong",
   dur: 3.0,
   breath: 0.2,
-  props: [{ type: "cable", x: 124, top: 10, y0: 48, to: { side: "R", point: "hand" } }],
+  props: [{ type: "cable", x: 124, top: 10, y0: 48, grip: "rope", to: { side: "R", point: "hand" } }],
   keys: [
     { // tall, hips stacked over the knees, rope held beside the head
       t: 0,
@@ -1293,7 +1293,7 @@ const PALLOF_PRESS = {
   loop: "pingpong",
   dur: 2.8,
   breath: 0.2,
-  props: [{ type: "cable", x: 16, top: 44, y0: 52, to: { side: "L", point: "hand" } }],
+  props: [{ type: "cable", x: 16, top: 44, y0: 52, grip: "handle", to: { side: "L", point: "hand" } }],
   keys: [
     { // handle held at the sternum, elbows tucked down
       t: 0,
@@ -1338,7 +1338,7 @@ const WOODCHOPPER = {
   dur: 3.0,
   breath: 0.2,
   farSide: "L",
-  props: [{ type: "cable", x: 122, top: 14, y0: 44, to: { side: "R", point: "hand" } }],
+  props: [{ type: "cable", x: 122, top: 14, y0: 44, grip: "handle", to: { side: "R", point: "hand" } }],
   keys: [
     { // wound up high to the right
       t: 0,

@@ -358,8 +358,24 @@ export function palette(theme = "dark", accent = "action", skin = "mannequin", b
     prop: dark ? mix(T.bg, "#93a3b8", 0.55) : mix(T.surface, "#3c4757", 0.42),
     propTop: dark ? mix(T.bg, "#c3d0e0", 0.78) : mix(T.surface, "#56637a", 0.66),
     propDark: dark ? mix(T.bg, "#93a3b8", 0.32) : mix(T.surface, "#3c4757", 0.62),
+    ...GEAR,
   };
 }
+
+/* Gym equipment is the same colour in both themes: the powder-coated steel,
+   black vinyl pads and cast iron of the real thing, sampled to match the
+   machine artwork in knowledge/motion/props/ so a drawn bench and an SVG
+   machine sit in the same picture. The old theme-mixed greys made a barbell
+   look like a lump of the background, and Mo approved the dark steel machine
+   on the light card before any of this was drawn. */
+const GEAR = {
+  steel: "#454c56", steelHi: "#5c646f", steelLo: "#30363d",
+  pad: "#20242a", padHi: "#31363d", padLine: "#3a4049",
+  iron: "#262a30", ironHi: "#3a4048", rubber: "#16191d",
+  chrome: "#8b95a2", chromeHi: "#b4bcc6", chromeLo: "#5d6672",
+  rope: "#4a4640", ropeHi: "#6a655d",
+  cableLine: "#7a838e",
+};
 
 // ------------------------------------------------------------- the camera ---
 // A move is authored in a plane. The camera starts looking straight at that
@@ -1622,6 +1638,147 @@ function bar(ctx, C, p0, p1, r, fill) {
   ctx.fillStyle = fill || C.prop;
   ctx.fill();
 }
+// ---- the parts every piece of gym equipment is built from ----
+// The unit of a real gym is box-section steel, round tube, black vinyl pad
+// and chrome bar. Drawing those four well once is what makes a bench, a rack
+// and a cable column look like they came from the same catalogue.
+// Which way is "up" for a highlight on a tube that runs at any angle.
+function upNormal(a, b) {
+  const d = norm2(sub(b, a));
+  const n = V(-d.y, d.x);
+  return n.y < 0 ? n : V(-n.x, -n.y);
+}
+// A square-section upright from `top` down to `bottom`, with a flat foot on
+// the floor unless told otherwise. `far` dims it for the far side of a frame.
+function steelPost(ctx, C, x, top, bottom, w, far = false, foot = true) {
+  ctx.fillStyle = far ? C.steelLo : C.steel;
+  roundRect(ctx, x - w / 2, top, w, bottom - top, 1.3); ctx.fill();
+  ctx.fillStyle = far ? C.steel : C.steelHi;
+  roundRect(ctx, x - w / 2 + 0.7, top + 0.7, w * 0.26, bottom - top - 1.4, 0.7); ctx.fill();
+  if (foot) {
+    ctx.fillStyle = C.steelLo;
+    roundRect(ctx, x - w * 1.7, bottom - 2.6, w * 3.4, 2.6, 1.2); ctx.fill();
+  }
+}
+// A round tube between two points, lit along its upper edge.
+function steelTube(ctx, C, a, b, r, far = false) {
+  capsulePath(ctx, a, r, b, r);
+  ctx.fillStyle = far ? C.steelLo : C.steel; ctx.fill();
+  const n = scl(upNormal(a, b), r * 0.45);
+  capsulePath(ctx, add(a, n), r * 0.28, add(b, n), r * 0.28);
+  ctx.fillStyle = far ? C.steel : C.steelHi; ctx.fill();
+}
+// A vinyl pad of thickness t centred on the line a to b, with the stitched
+// seam that runs along the top of every real one.
+function padSlab(ctx, C, a, b, t) {
+  const r = t / 2;
+  capsulePath(ctx, a, r, b, r);
+  ctx.fillStyle = C.pad; ctx.fill();
+  const d = norm2(sub(b, a)), n = scl(upNormal(a, b), r * 0.55);
+  capsulePath(ctx, add(add(a, n), scl(d, 2.2)), r * 0.2, add(add(b, n), scl(d, -2.2)), r * 0.2);
+  ctx.fillStyle = C.padLine; ctx.fill();
+}
+// A chrome bar, knurled if asked, dimmed if far.
+function chromeBar(ctx, C, a, b, r, knurl = false, far = false) {
+  capsulePath(ctx, a, r, b, r);
+  ctx.fillStyle = far ? C.chromeLo : C.chrome; ctx.fill();
+  const n = scl(upNormal(a, b), r * 0.42);
+  capsulePath(ctx, add(a, n), r * 0.3, add(b, n), r * 0.3);
+  ctx.fillStyle = far ? C.chrome : C.chromeHi; ctx.fill();
+  if (knurl) {
+    const d = norm2(sub(b, a)), L = len2(sub(b, a)), m = upNormal(a, b);
+    ctx.strokeStyle = C.chromeLo; ctx.lineWidth = 0.6;
+    for (let s = 7; s < L - 7; s += 2.1) {
+      const q = add(a, scl(d, s));
+      ctx.beginPath(); ctx.moveTo(q.x - m.x * r * 0.85, q.y - m.y * r * 0.85); ctx.lineTo(q.x + m.x * r * 0.85, q.y + m.y * r * 0.85); ctx.stroke();
+    }
+  }
+}
+// A pulley: a chrome wheel with a dark hub, in a bracket if the caller draws one.
+function pulleyWheel(ctx, C, x, y, r) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = C.chrome; ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, r * 0.62, 0, Math.PI * 2); ctx.fillStyle = C.chromeLo; ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, r * 0.24, 0, Math.PI * 2); ctx.fillStyle = C.rubber; ctx.fill();
+}
+/* A single-column cable machine: the upright, the weight stack in its housing
+   round the foot of it, guide rods, a selector pin. The carriage with the
+   pulley is drawn by the cable prop at whatever height the move needs, so one
+   tower serves a high pulley and a low one. */
+function cableTower(ctx, C, x, y0) {
+  steelPost(ctx, C, x, 3, y0 + 3, 6.5, false, false);
+  ctx.fillStyle = C.iron;
+  roundRect(ctx, x - 9.5, y0, 19, GROUND - y0, 2); ctx.fill();
+  ctx.fillStyle = C.steelLo;
+  roundRect(ctx, x - 14, GROUND - 2.6, 28, 2.6, 1.2); ctx.fill();
+  ctx.fillStyle = C.ironHi;
+  for (let y = y0 + 3.5; y < GROUND - 6; y += 5.2) { roundRect(ctx, x - 7.5, y, 15, 3.8, 1); ctx.fill(); }
+  ctx.fillStyle = C.chromeLo;
+  roundRect(ctx, x - 5.2, y0 + 1, 0.9, GROUND - y0 - 4, 0); ctx.fill();
+  roundRect(ctx, x + 4.3, y0 + 1, 0.9, GROUND - y0 - 4, 0); ctx.fill();
+  ctx.fillStyle = C.chrome;
+  roundRect(ctx, x + 9, y0 + 4.5, 4.2, 1.5, 0.75); ctx.fill();
+}
+/* What is clipped to the end of a cable. `o` is where the hand holds it, `u`
+   the direction the cable pulls (unit vector, pulley toward the hand). Items
+   a hand steers (rope, V-bar, stirrup) hang along the cable; a bar stays
+   level whatever the hands do, because a loaded bar cannot tilt. Returns how
+   far back along the cable the clip sits, so the line can stop there. */
+const GRIP_CLIP = { bar: 3.4, lat: 3.6, rope: 7.2, vbar: 7.6, handle: 7.4, strap: 2.6, none: 0 };
+function cableGrip(ctx, C, grip, o, u, p) {
+  const clip = GRIP_CLIP[grip] === undefined ? GRIP_CLIP.bar : GRIP_CLIP[grip];
+  if (grip === "none") return 0;
+  ctx.save();
+  ctx.translate(o.x, o.y);
+  const along = grip === "rope" || grip === "vbar" || grip === "handle";
+  if (along) ctx.rotate(Math.atan2(u.y, u.x) - Math.PI / 2);
+  // the snap hook between line and handle
+  const hook = along ? V(0, -clip + 1.3) : V(-u.x * (clip - 1.3), -u.y * (clip - 1.3));
+  ctx.strokeStyle = C.chrome; ctx.lineWidth = 1.1;
+  ctx.beginPath(); ctx.ellipse(hook.x, hook.y, 1.3, 1.9, along ? 0 : Math.atan2(u.y, u.x) - Math.PI / 2, 0, Math.PI * 2); ctx.stroke();
+  if (grip === "bar") {
+    const half = (p.barW === undefined ? 15 : p.barW) / 2;
+    chromeBar(ctx, C, V(-half, 0), V(half, 0), 2.4, true);
+  } else if (grip === "lat") {
+    const half = (p.barW === undefined ? 36 : p.barW) / 2;
+    chromeBar(ctx, C, V(-half + 6, 0), V(half - 6, 0), 2.2, true);
+    steelTube(ctx, C, V(-half + 6, 0), V(-half, 2.8), 2);
+    steelTube(ctx, C, V(half - 6, 0), V(half, 2.8), 2);
+  } else if (grip === "rope") {
+    // the U: two strands off one ring, a rubber stopper on each end
+    ctx.strokeStyle = C.rope; ctx.lineWidth = 2.3; ctx.lineCap = "round";
+    for (const s of [-1, 1]) {
+      ctx.beginPath(); ctx.moveTo(0, -5.6); ctx.quadraticCurveTo(s * 1.2, 0.5, s * 3.9, 4.2); ctx.stroke();
+    }
+    ctx.strokeStyle = C.ropeHi; ctx.lineWidth = 0.7;
+    for (const s of [-1, 1]) {
+      ctx.beginPath(); ctx.moveTo(s * 0.5, -5); ctx.quadraticCurveTo(s * 1.4, 0.2, s * 3.6, 3.6); ctx.stroke();
+    }
+    for (const s of [-1, 1]) {
+      ctx.save(); ctx.translate(s * 4.4, 5.2); ctx.rotate(s * 0.55);
+      ctx.fillStyle = C.rubber; roundRect(ctx, -1.9, -2.6, 3.8, 5.2, 1.4); ctx.fill();
+      ctx.fillStyle = C.padHi; roundRect(ctx, -1.9, -2.6, 3.8, 1.4, 0.7); ctx.fill();
+      ctx.restore();
+    }
+  } else if (grip === "vbar") {
+    // the close-grip triangle: two arms off the ring down to a pair of grips
+    steelTube(ctx, C, V(0, -6.2), V(-5.2, 1.4), 1.5);
+    steelTube(ctx, C, V(0, -6.2), V(5.2, 1.4), 1.5);
+    chromeBar(ctx, C, V(-5.4, 1.4), V(-1.6, 1.4), 1.9);
+    chromeBar(ctx, C, V(1.6, 1.4), V(5.4, 1.4), 1.9);
+  } else if (grip === "handle") {
+    // a stirrup handle: chrome D with the rubber grip across the hand
+    ctx.strokeStyle = C.chrome; ctx.lineWidth = 1.5; ctx.lineJoin = "round";
+    roundRect(ctx, -3.6, -6.2, 7.2, 8, 2.4); ctx.stroke();
+    ctx.fillStyle = C.rubber; roundRect(ctx, -4.4, -1.6, 8.8, 3.2, 1.4); ctx.fill();
+    ctx.fillStyle = C.padHi; roundRect(ctx, -4.4, -1.6, 8.8, 0.9, 0.45); ctx.fill();
+  } else if (grip === "strap") {
+    // an ankle cuff: a padded band with a D-ring on the cable side
+    ctx.fillStyle = C.rubber; roundRect(ctx, -4.2, -2.8, 8.4, 5.6, 2); ctx.fill();
+    ctx.fillStyle = C.padHi; roundRect(ctx, -4.2, -2.8, 8.4, 1.1, 0.55); ctx.fill();
+  }
+  ctx.restore();
+  return clip;
+}
 // Where a bar racked across the upper back sits, in torso space, so it leans
 // with the shoulders instead of hovering in world coordinates.
 export function barOnTraps(S, p = {}) {
@@ -1641,7 +1798,7 @@ function anchor(spec, S) {
 export const PROP_TYPES = [
   "mat", "wall", "doorway", "doorframe", "bench", "box", "roller", "pullupBar",
   "dipBars", "machine", "cable", "band", "barbell", "dumbbell", "kettlebell",
-  "artwork",
+  "artwork", "lever",
   // The rest-time props: what the figure fiddles with between sets. Hand held
   // and drawn small, so they read as a thing in a hand and not as equipment.
   "bottle", "phone", "towel", "watch",
@@ -1707,41 +1864,72 @@ const PROPS = {
     ctx.fillStyle = C.propTop;
     roundRect(ctx, p.x, -6, 2.2, GROUND + 6, 1.1); ctx.fill();
   },
+  /* A gym bench, the real object: a black vinyl pad on a steel spine, legs
+     with flat feet on the floor. `incline` tips the pad about its centre; past
+     30 degrees it is a back rest and stands on one post with a strut, because
+     a raised pad on two full-height legs is a ladder, not a bench. The
+     parameters are unchanged from the old capsule drawing so every move that
+     already placed a bench keeps its geometry. */
   bench(ctx, C, p) {
     const w = p.w, y = p.y, x = p.x, inc = D(p.incline || 0);
     const c = V(x + w / 2, y);
     const dx = Math.cos(inc) * (w / 2), dy = Math.sin(inc) * (w / 2);
     const A = V(c.x - dx, c.y + dy), Bp = V(c.x + dx, c.y - dy);
-    capsulePath(ctx, A, 3.6, Bp, 3.6);
-    ctx.fillStyle = C.prop; ctx.fill();
-    capsulePath(ctx, V(A.x, A.y - 1.4), 2.0, V(Bp.x, Bp.y - 1.4), 2.0);
-    ctx.fillStyle = C.propTop; ctx.fill();
-    ctx.fillStyle = C.propDark;
-    for (const f of [0.16, 0.84]) {
+    const steep = Math.abs(p.incline || 0) > 30;
+    const legs = steep ? [0.42] : [0.16, 0.84];
+    // frame first: feet, legs, then the spine under the pad
+    for (const f of legs) {
       const fp = lerpV(A, Bp, f);
-      roundRect(ctx, fp.x - 2.4, fp.y, 4.8, GROUND - fp.y, 2); ctx.fill();
+      steelPost(ctx, C, fp.x, fp.y + 1.5, GROUND, 4.6);
     }
+    if (steep) {
+      // the strut that holds a back rest at its angle
+      const fp = lerpV(A, Bp, 0.42), hp = lerpV(A, Bp, 0.82);
+      steelTube(ctx, C, V(fp.x, GROUND - 3), V(hp.x, hp.y + 2.5), 1.6);
+    } else {
+      steelTube(ctx, C, V(A.x + 4, A.y + 3.2), V(Bp.x - 4, Bp.y + 3.2), 1.7);
+    }
+    padSlab(ctx, C, A, Bp, 5.6);
   },
+  /* A plyo box or a step: a dark padded block with a lighter top face and a
+     seam where the two halves of the cover meet. */
   box(ctx, C, p) {
-    ctx.fillStyle = C.prop;
-    roundRect(ctx, p.x, p.y, p.w, GROUND - p.y, 3); ctx.fill();
-    ctx.fillStyle = C.propTop;
-    roundRect(ctx, p.x, p.y, p.w, 3.2, 1.6); ctx.fill();
+    const h = GROUND - p.y;
+    ctx.fillStyle = C.pad;
+    roundRect(ctx, p.x, p.y, p.w, h, 2.6); ctx.fill();
+    ctx.fillStyle = C.padHi;
+    roundRect(ctx, p.x, p.y, p.w, 3.4, 1.7); ctx.fill();
+    ctx.fillStyle = C.padLine;
+    roundRect(ctx, p.x + 1.5, p.y + h * 0.5, p.w - 3, 0.9, 0.45); ctx.fill();
+    // corner guards
+    ctx.fillStyle = C.steelLo;
+    roundRect(ctx, p.x, GROUND - 2.4, p.w, 2.4, 1); ctx.fill();
   },
+  /* A foam roller seen end on, or the leg lock pads on a decline bench: a
+     black cylinder with a lighter core and a highlight across the top. */
   roller(ctx, C, p) {
     const r = p.r || 5.4;
     ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = C.prop; ctx.fill();
-    ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.42, 0, Math.PI * 2);
-    ctx.fillStyle = C.propDark; ctx.fill();
+    ctx.fillStyle = C.pad; ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.5, 0, Math.PI * 2);
+    ctx.fillStyle = C.padHi; ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.16, 0, Math.PI * 2);
+    ctx.fillStyle = C.steelLo; ctx.fill();
+    ctx.strokeStyle = C.padLine; ctx.lineWidth = 0.9;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r - 0.9, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
   },
+  /* A pull-up bar: a knurled chrome bar between two steel uprights that go up
+     out of the frame, with a bracket plate where each upright meets the bar. */
   pullupBar(ctx, C, p) {
     const y = p.y === undefined ? 10 : p.y;
     const x0 = p.x0 === undefined ? 30 : p.x0;
     const x1 = p.x1 === undefined ? 110 : p.x1;
-    ctx.fillStyle = C.prop;
-    roundRect(ctx, x0, y - 2.4, x1 - x0, 4.8, 2.4); ctx.fill();
-    for (const x of [x0, x1 - 5]) { roundRect(ctx, x, 0, 5, y - 1.5, 2); ctx.fill(); }
+    for (const x of [x0 + 2.5, x1 - 2.5]) {
+      steelTube(ctx, C, V(x, -4), V(x, y - 1), 2.4);
+      ctx.fillStyle = C.steelLo;
+      roundRect(ctx, x - 4, y - 5.2, 8, 4.4, 1.2); ctx.fill();
+    }
+    chromeBar(ctx, C, V(x0, y), V(x1, y), 2.3, true);
   },
   dipBars(ctx, C, p, S, layer) {
     const y = p.y === undefined ? 86 : p.y;
@@ -1749,90 +1937,110 @@ const PROPS = {
     // figure, the near one in front of it and a touch lower (parallax from a
     // camera a little above the rails). One rail behind the body read as a
     // table the figure was sitting on. near: false keeps only the back rail.
-    if (layer === "back") {
-      ctx.fillStyle = C.propDark;
-      roundRect(ctx, p.x0, y - 2.2, p.x1 - p.x0, 4.4, 2.2); ctx.fill();
-      for (const x of [p.x0 + 2, p.x1 - 7]) { roundRect(ctx, x, y, 5, GROUND - y, 2); ctx.fill(); }
-    } else if (p.near !== false) {
-      const ny = y + 1.4;
-      ctx.fillStyle = C.prop;
-      roundRect(ctx, p.x0, ny - 2.2, p.x1 - p.x0, 4.4, 2.2); ctx.fill();
-      for (const x of [p.x0 + 2, p.x1 - 7]) { roundRect(ctx, x, ny, 5, GROUND - ny, 2); ctx.fill(); }
-    }
+    const rail = (ry, far) => {
+      for (const x of [p.x0 + 4.5, p.x1 - 4.5]) {
+        steelPost(ctx, C, x, ry + 1, GROUND, 4.4, far);
+      }
+      chromeBar(ctx, C, V(p.x0, ry), V(p.x1, ry), 2.3, false, far);
+    };
+    if (layer === "back") rail(y, true);
+    else if (p.near !== false) rail(y + 1.4, false);
   },
+  /* The generic seat-and-pad machine. Anything with a real shape has its own
+     artwork now; this is the fallback for a move nobody has drawn yet. */
   machine(ctx, C, p) {
     const parts = p.parts || ["seat"];
-    ctx.fillStyle = C.prop;
     if (parts.includes("seat")) {
-      roundRect(ctx, p.x, p.y, p.w, 5.4, 2.7); ctx.fill();
-      roundRect(ctx, p.x + p.w * 0.42, p.y + 5.4, 6, GROUND - p.y - 5.4, 2.4); ctx.fill();
-      ctx.fillStyle = C.propTop;
-      roundRect(ctx, p.x, p.y, p.w, 2.2, 1.1); ctx.fill();
-      ctx.fillStyle = C.prop;
+      steelPost(ctx, C, p.x + p.w * 0.5, p.y + 5, GROUND, 6);
+      padSlab(ctx, C, V(p.x, p.y + 2.7), V(p.x + p.w, p.y + 2.7), 5.4);
     }
     if (parts.includes("backPad")) {
-      roundRect(ctx, p.x - 6.5, p.y - (p.padH || 26), 6.5, (p.padH || 26) + 4, 3); ctx.fill();
+      const h = (p.padH || 26) + 4;
+      padSlab(ctx, C, V(p.x - 3.2, p.y + 4), V(p.x - 3.2, p.y + 4 - h), 6.5);
     }
     if (parts.includes("thighPad")) {
       const px = p.padX === undefined ? p.x + p.w * 0.6 : p.padX;
       const py = p.padY === undefined ? p.y - 16 : p.padY;
-      roundRect(ctx, px, py, p.padW || 20, 5.4, 2.7); ctx.fill();
-      roundRect(ctx, px + (p.padW || 20) * 0.5 - 2, py + 5.4, 4, p.y - py - 5.4, 2); ctx.fill();
+      const pw = p.padW || 20;
+      steelTube(ctx, C, V(px + pw * 0.5, py + 4), V(px + pw * 0.5, p.y), 2);
+      padSlab(ctx, C, V(px, py + 2.7), V(px + pw, py + 2.7), 5.4);
     }
     if (parts.includes("lever")) {
       const lx = p.leverX === undefined ? p.x + p.w : p.leverX;
       const ly = p.leverY === undefined ? p.y - 22 : p.leverY;
-      bar(ctx, C, V(p.x + p.w * 0.45, p.y - 4), V(lx, ly), 2.2);
-      ctx.beginPath(); ctx.arc(lx, ly, 4.2, 0, Math.PI * 2); ctx.fill();
+      steelTube(ctx, C, V(p.x + p.w * 0.45, p.y - 4), V(lx, ly), 2.2);
+      ctx.beginPath(); ctx.arc(lx, ly, 4.2, 0, Math.PI * 2); ctx.fillStyle = C.rubber; ctx.fill();
     }
   },
   artwork,
+  /* A machine's moving arm: a steel tube from a fixed pivot to a joint on the
+     body, so a chest press handle, a leg extension pad or a landmine bar
+     follows the figure while the machine itself stays a still drawing.
+       pivot {x,y}   where the arm hinges on the frame
+       to            a body anchor { side, point, dx, dy }
+       past          extend the tube this far beyond the joint
+       end           what is at the body end: "grip" (a rubber handle seen end
+                     on), "pad" (a roller pad across the limb, padW long),
+                     "plate" (a loaded bar end, plateR), or nothing
+       r             tube radius */
+  lever(ctx, C, p, S) {
+    const to = anchor(p.to, S);
+    if (!to || !p.pivot) return;
+    const pv = V(p.pivot.x, p.pivot.y);
+    const r = p.r || 2.2;
+    const d = norm2(sub(to, pv));
+    const end = add(to, scl(d, p.past || 0));
+    steelTube(ctx, C, pv, end, r);
+    ctx.beginPath(); ctx.arc(pv.x, pv.y, r * 1.7, 0, Math.PI * 2); ctx.fillStyle = C.steelLo; ctx.fill();
+    ctx.beginPath(); ctx.arc(pv.x, pv.y, r * 0.75, 0, Math.PI * 2); ctx.fillStyle = C.chrome; ctx.fill();
+    if (p.end === "grip") {
+      const g = p.gripR || 3.2;
+      ctx.strokeStyle = C.edge; ctx.lineWidth = 2.6;
+      ctx.beginPath(); ctx.arc(to.x, to.y, g, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = C.rubber; ctx.fill();
+      ctx.beginPath(); ctx.arc(to.x, to.y, g * 0.45, 0, Math.PI * 2); ctx.fillStyle = C.padHi; ctx.fill();
+    } else if (p.end === "pad") {
+      const n = V(-d.y, d.x), half = (p.padW || 10) / 2;
+      padSlab(ctx, C, add(to, scl(n, -half)), add(to, scl(n, half)), p.padT || 5.2);
+    } else if (p.end === "plate") {
+      PROPS.barbell(ctx, C, { x: end.x, y: end.y, r: p.plateR || 8 }, S);
+    }
+  },
+  /* A cable station.
+       x, top      where the pulley is
+       y0          top of the weight stack
+       stack:false a machine drawn as artwork supplies the frame and stack, so
+                   this draws only the moving parts: pulley, line, attachment.
+                   Two stacks in the same place is worse than none.
+       plumb       the line drops straight down from the pulley and the
+                   attachment sits on that line at the hand's height. How a
+                   pulldown really hangs. Mo, on a photo of the real machine:
+                   "the machine is straight and then goes down with the rope
+                   and then you see the handle."
+       grip        what is clipped on: bar (default), lat, rope, vbar, handle,
+                   strap, none. See cableGrip.
+       barW        width of a bar grip
+     Without plumb the line runs from the pulley to the hand, which is right
+     for a row, a curl, a fly: anything pulled away from the machine. A bar on
+     either stays level, because a loaded bar cannot tilt with a wrist. */
   cable(ctx, C, p, S) {
     const top = p.top === undefined ? 16 : p.top;
     const y0 = p.y0 === undefined ? 46 : p.y0;
-    ctx.fillStyle = C.prop;
-    /* The post is the machine's own upright, drawn back when the cable prop
-       had to be the whole machine. With artwork supplying the frame it is a
-       fat grey bar hanging in mid air beside the cable, which is exactly what
-       Mo saw: "the rope still stays there." A plumb cable is a line and a
-       handle, nothing else. */
-    if (!p.plumb) { roundRect(ctx, p.x - 2, top, 4, y0 - top, 2); ctx.fill(); }
-    /* `stack: false` leaves the plates to somebody else. A machine supplied as
-       artwork draws its own stack, and two stacks in the same place is worse
-       than none: the cable still owns the pulley, the line and the bar, which
-       are the parts that actually move. */
     if (p.stack !== false) {
-      roundRect(ctx, p.x - 9, y0, 18, GROUND - y0, 2.6); ctx.fill();
-      ctx.fillStyle = C.propDark;
-      for (let y = y0 + 3; y < GROUND - 4; y += 6) { roundRect(ctx, p.x - 7, y, 14, 4, 1.6); ctx.fill(); }
+      cableTower(ctx, C, p.x, y0);
+      ctx.fillStyle = C.steelHi;
+      roundRect(ctx, p.x - 3.8, top - 3.6, 7.6, 7.2, 1.5); ctx.fill();
     }
-    ctx.fillStyle = C.propTop;
-    ctx.beginPath(); ctx.arc(p.x, top, 4.4, 0, Math.PI * 2); ctx.fill();
+    pulleyWheel(ctx, C, p.x, top, p.stack === false ? 3.2 : 2.9);
     const h = anchor(p.to || { side: "R", point: "hand" }, S);
     if (!h) return;
-    ctx.strokeStyle = C.propTop; ctx.lineWidth = 1.5;
-    /* `plumb` is how a pulldown actually hangs, and it is the default shape
-       anyone recognises: the line drops straight from the pulley and the bar
-       stays level, however the hands are angled. Mo, on a photo of the real
-       machine: "the machine is straight and then goes down with the rope and
-       then you see the handle."
-
-       Without it the line was drawn from the pulley TO the hand, so it leaned
-       across the frame, and the bar was laid along the hand's own axis, so it
-       tilted with the wrist. A cable cannot lean and a loaded bar cannot tilt:
-       both were the drawing following the body instead of gravity. */
-    if (p.plumb) {
-      ctx.beginPath(); ctx.moveTo(p.x, top); ctx.lineTo(p.x, h.y); ctx.stroke();
-      const half = (p.barW === undefined ? 15 : p.barW) / 2;
-      capsulePath(ctx, V(p.x - half, h.y), 2.4, V(p.x + half, h.y), 2.4);
-      ctx.fillStyle = C.prop; ctx.fill();
-      return;
-    }
-    ctx.beginPath(); ctx.moveTo(p.x, top); ctx.lineTo(h.x, h.y); ctx.stroke();
-    const k = S.sides[(p.to && p.to.side) || "R"];
-    const d = norm2(k.axis.hand.x);
-    capsulePath(ctx, V(h.x - d.x * 7, h.y - d.y * 7), 2.4, V(h.x + d.x * 7, h.y + d.y * 7), 2.4);
-    ctx.fillStyle = C.prop; ctx.fill();
+    const grip = p.grip || "bar";
+    const o = p.plumb ? V(p.x, h.y) : h;
+    const u = p.plumb ? V(0, 1) : norm2(sub(h, V(p.x, top)));
+    const clip = GRIP_CLIP[grip] === undefined ? GRIP_CLIP.bar : GRIP_CLIP[grip];
+    ctx.strokeStyle = C.cableLine; ctx.lineWidth = 1.5; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(p.x, top); ctx.lineTo(o.x - u.x * clip, o.y - u.y * clip); ctx.stroke();
+    cableGrip(ctx, C, grip, o, u, p);
   },
   band(ctx, C, p, S) {
     const a = anchor(p.from, S), b = anchor(p.to, S);
@@ -1853,13 +2061,23 @@ const PROPS = {
     const at = p.place === "traps" ? barOnTraps(S, p) : anchor(p, S);
     if (!at) return;
     const r = p.r || 9.5;
+    /* A loaded bar seen end on: the outer plate, cast iron with its raised
+       centre ring and a lit rim, and the chrome sleeve of the bar through the
+       hub. Small radii (a machine handle, a pad) are just the disc. */
+    ctx.save();
+    ctx.translate(at.x, at.y);
     ctx.strokeStyle = C.edge; ctx.lineWidth = 3; ctx.lineJoin = "round";
-    ctx.beginPath(); ctx.arc(at.x, at.y, r, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = C.prop; ctx.fill();
-    ctx.beginPath(); ctx.arc(at.x, at.y, r * 0.62, 0, Math.PI * 2);
-    ctx.fillStyle = C.propDark; ctx.fill();
-    ctx.beginPath(); ctx.arc(at.x, at.y, 2.6, 0, Math.PI * 2);
-    ctx.fillStyle = C.propTop; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = C.iron; ctx.fill();
+    if (r >= 6) {
+      ctx.strokeStyle = C.ironHi; ctx.lineWidth = Math.max(1, r * 0.15);
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.64, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = Math.max(0.8, r * 0.08);
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.9, Math.PI * 1.08, Math.PI * 1.72); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(0, 0, Math.min(3, r * 0.3), 0, Math.PI * 2); ctx.fillStyle = C.chrome; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, Math.min(1.4, r * 0.13), 0, Math.PI * 2); ctx.fillStyle = C.chromeLo; ctx.fill();
+    ctx.restore();
   },
   dumbbell(ctx, C, p, S) {
     const at = anchor(p, S);
@@ -1893,18 +2111,32 @@ const PROPS = {
     ctx.save();
     ctx.translate(at.x, at.y);
     ctx.rotate(D(deg + (p.rot || 0)));
+    /* A hex dumbbell: two cast heads with the facet that catches the light
+       along one side, a knurled chrome handle with a collar at each end. The
+       geometry is the old one, so nothing about where a hand holds it moved. */
     ctx.strokeStyle = C.edge; ctx.lineWidth = 3.2; ctx.lineJoin = "round";
-    const shapes = [
-      () => roundRect(ctx, -2.4, -9 * k, 4.8, 18 * k, 2.2),
-      () => roundRect(ctx, -7.2, -17 * k, 14.4, 8.4 * k, 3),
-      () => roundRect(ctx, -7.2, 8.6 * k, 14.4, 8.4 * k, 3),
+    const handle = () => roundRect(ctx, -2.4, -9 * k, 4.8, 18 * k, 2.2);
+    const heads = [
+      () => roundRect(ctx, -7.2, -17 * k, 14.4, 8.4 * k, 2.4),
+      () => roundRect(ctx, -7.2, 8.6 * k, 14.4, 8.4 * k, 2.4),
     ];
-    for (const sh of shapes) { sh(); ctx.stroke(); }
-    ctx.fillStyle = C.prop;
-    for (const sh of shapes) { sh(); ctx.fill(); }
-    ctx.fillStyle = C.propTop;
-    roundRect(ctx, -7.2, -17 * k, 14.4, 2.4, 1.2); ctx.fill();
-    roundRect(ctx, -7.2, 8.6 * k, 14.4, 2.4, 1.2); ctx.fill();
+    for (const sh of [handle, ...heads]) { sh(); ctx.stroke(); }
+    ctx.fillStyle = C.chrome; handle(); ctx.fill();
+    ctx.fillStyle = C.chromeHi; roundRect(ctx, -2.4, -9 * k, 1.5, 18 * k, 0.75); ctx.fill();
+    ctx.strokeStyle = C.chromeLo; ctx.lineWidth = 0.55;
+    for (let y = -6.4 * k; y <= 6.4 * k; y += 1.6) { ctx.beginPath(); ctx.moveTo(-2, y); ctx.lineTo(2, y); ctx.stroke(); }
+    ctx.fillStyle = C.chromeLo;
+    roundRect(ctx, -3.1, -9.4 * k, 6.2, 1.7, 0.8); ctx.fill();
+    roundRect(ctx, -3.1, 7.7 * k, 6.2, 1.7, 0.8); ctx.fill();
+    ctx.fillStyle = C.iron;
+    for (const sh of heads) { sh(); ctx.fill(); }
+    // the lit facet and the shadowed one, which is what says "hex" side on
+    ctx.fillStyle = C.ironHi;
+    roundRect(ctx, -7.2, -17 * k, 4.2, 8.4 * k, 2); ctx.fill();
+    roundRect(ctx, -7.2, 8.6 * k, 4.2, 8.4 * k, 2); ctx.fill();
+    ctx.fillStyle = C.rubber;
+    roundRect(ctx, 4.2, -17 * k, 3, 8.4 * k, 2); ctx.fill();
+    roundRect(ctx, 4.2, 8.6 * k, 3, 8.4 * k, 2); ctx.fill();
     ctx.restore();
   },
   kettlebell(ctx, C, p, S) {
@@ -1914,13 +2146,22 @@ const PROPS = {
     ctx.save();
     ctx.translate(at.x, at.y);
     ctx.rotate(D(p.rot === undefined ? 0 : p.rot));
-    ctx.strokeStyle = C.edge; ctx.lineWidth = 3; ctx.lineJoin = "round";
-    ctx.beginPath();
-    ctx.arc(0, 11 * k, 8.2 * k, 0, Math.PI * 2);
-    ctx.stroke(); ctx.fillStyle = C.prop; ctx.fill();
-    ctx.beginPath();
-    ctx.arc(0, 2.5 * k, 5.6 * k, Math.PI * 1.12, Math.PI * 1.88);
-    ctx.lineWidth = 3.4 * k; ctx.strokeStyle = C.prop; ctx.stroke();
+    /* Cast iron: a bell with a flat base, a lit shoulder, and the thick
+       handle arching over it, outlined like the bell so it separates from a
+       hand. Geometry unchanged. */
+    const handleArc = () => { ctx.beginPath(); ctx.arc(0, 2.5 * k, 5.6 * k, Math.PI * 1.12, Math.PI * 1.88); };
+    ctx.strokeStyle = C.edge; ctx.lineWidth = 3.4 * k + 3; ctx.lineCap = "round";
+    handleArc(); ctx.stroke();
+    ctx.lineWidth = 3; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.arc(0, 11 * k, 8.2 * k, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = C.iron; ctx.fill();
+    ctx.strokeStyle = C.ironHi; ctx.lineWidth = 1.4 * k;
+    ctx.beginPath(); ctx.arc(0, 11 * k, 6.2 * k, Math.PI * 1.05, Math.PI * 1.55); ctx.stroke();
+    ctx.fillStyle = C.rubber;
+    roundRect(ctx, -4.6 * k, 18.2 * k, 9.2 * k, 1.6 * k, 0.8 * k); ctx.fill();
+    ctx.strokeStyle = C.iron; ctx.lineWidth = 3.4 * k; handleArc(); ctx.stroke();
+    ctx.strokeStyle = C.ironHi; ctx.lineWidth = 0.9 * k;
+    ctx.beginPath(); ctx.arc(0, 2.5 * k, 6.4 * k, Math.PI * 1.2, Math.PI * 1.6); ctx.stroke();
     ctx.restore();
   },
   // A gym water bottle: a tall capsule with a neck and a cap, the cap at the
@@ -2019,6 +2260,13 @@ const PROPS = {
  * the next frame picks it up. Every move using artwork animates, so the gap is
  * one frame; a paused render can pass onReady to be told. */
 const ARTWORK = new Map();
+/* Who to tell when a drawing arrives. A paused mount (the lab grid, the
+   pose-check sheet, a session card before it scrolls into view) has painted
+   once and will not paint again on its own, so without this the machine is
+   simply missing from every still. index.mjs registers one listener that
+   marks every mount dirty. */
+const ARTWORK_READY = new Set();
+export function onArtworkReady(fn) { ARTWORK_READY.add(fn); return () => ARTWORK_READY.delete(fn); }
 
 function artworkFor(src, onReady) {
   let rec = ARTWORK.get(src);
@@ -2042,7 +2290,11 @@ function artworkFor(src, onReady) {
         if (!found && layer === "front") { rec.front = null; continue; }
         const blob = new Blob([new XMLSerializer().serializeToString(copy)], { type: "image/svg+xml" });
         const img = new Image();
-        img.onload = () => { URL.revokeObjectURL(img.src); if (onReady) onReady(); };
+        img.onload = () => {
+          URL.revokeObjectURL(img.src);
+          if (onReady) onReady();
+          for (const fn of ARTWORK_READY) fn(src);
+        };
         img.src = URL.createObjectURL(blob);
         rec[layer] = img;
       }
@@ -2051,18 +2303,53 @@ function artworkFor(src, onReady) {
   return rec;
 }
 
+/* Two ways to place a drawing:
+
+   scenery   { type: "artwork", src, dx, dy, flip }
+             drawn over the whole 140 box, so the file is authored in figure
+             units with the floor at 118. `dx`/`dy` slide it, `flip` mirrors it
+             about the box's centre line, so one side-view machine serves a
+             move that faces the other way. Both layers draw, #back and
+             #front, and the body goes between them.
+   held      { type: "artwork", src, side, point, dx, dy, k, rot, front }
+             a sprite pinned to a joint, drawn at the file's own width and
+             height (in figure units) centred on that point, times `k`.
+             `rot` is degrees, or "forearm" to lie along the forearm the way a
+             held thing does. Only its own layer draws, like a dumbbell. */
 function artwork(ctx, C, p, S, layer) {
   const rec = artworkFor(p.src, p.onReady);
   const img = layer === "front" ? rec.front : rec.back;
   if (!img || !img.complete || !img.naturalWidth) return;
-  ctx.drawImage(img, 0, 0, VB, VB);
+  ctx.save();
+  if (isHeldArtwork(p)) {
+    const at = anchor(p, S);
+    if (at) {
+      let deg = typeof p.rot === "number" ? p.rot : 0;
+      if (p.rot === "forearm") {
+        const k = S.sides[p.side || "R"];
+        const d = norm2(sub(k.wrist, k.elbow));
+        deg = RAD2DEG(Math.atan2(d.y, d.x));
+      }
+      const k = p.k || 1, w = img.naturalWidth * k, h = img.naturalHeight * k;
+      ctx.translate(at.x, at.y);
+      ctx.rotate(D(deg));
+      ctx.drawImage(img, -w / 2 + (p.ox || 0), -h / 2 + (p.oy || 0), w, h);
+    }
+  } else {
+    ctx.translate(p.dx || 0, p.dy || 0);
+    if (p.flip) { ctx.translate(VB, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(img, 0, 0, VB, VB);
+  }
+  ctx.restore();
 }
+const isHeldArtwork = (p) => p.type === "artwork" && p.side !== undefined;
 
 function drawProps(ctx, C, list, S, layer) {
   for (const p of list || []) {
     // dip bars have a rail on each side of the body, so they draw in both
-    // layers and sort out front and back themselves
-    const both = p.type === "dipBars" || p.type === "artwork";
+    // layers and sort out front and back themselves; scenery artwork carries
+    // its own back and front groups
+    const both = p.type === "dipBars" || (p.type === "artwork" && !isHeldArtwork(p));
     if (!both && (p.front ? "front" : "back") !== layer) continue;
     const fn = PROPS[p.type];
     if (fn) fn(ctx, C, p, S, layer);

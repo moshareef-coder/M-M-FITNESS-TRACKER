@@ -1,0 +1,53 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Pose check</title>
+<!--
+  A still-frame contact sheet for one or more moves, for eyes and for headless
+  Chrome (scripts/motion-shoot.mjs). Not linked from the app.
+
+    pose-check.html?move=Lat%20Pulldown            three frames, both themes
+    pose-check.html?move=Lat%20Pulldown&t=0,0.25,0.5,0.75,1&theme=light&size=360
+    pose-check.html?moves=Cable%20Curl,Face%20Pull  one row per move
+
+  t is a fraction of the move's cycle (0 = first key, 1 = last), not seconds.
+-->
+<style>
+  html { background: #0f1115; color: #cfd4dc; font: 12px/1.4 -apple-system, system-ui, sans-serif; }
+  body { margin: 0; padding: 10px; }
+  .row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+  .row h2 { writing-mode: vertical-rl; transform: rotate(180deg); margin: 0; font-size: 12px; font-weight: 600; color: #8b93a1; }
+  .cell { border-radius: 8px; overflow: hidden; }
+  .cell[data-theme="dark"] { background: #0b0d10; }
+  .cell[data-theme="light"] { background: #f7f8fa; }
+  .cell canvas { display: block; }
+  .cell span { display: block; text-align: center; font-size: 10px; color: #8b93a1; padding: 2px 0 3px; }
+  .missing { color: #ff7d7d; padding: 20px; }
+</style>
+<div id="root"></div>
+<script type="module">
+  import { mountMove, hasMove } from "./knowledge/motion/index.mjs";
+  const q = new URLSearchParams(location.search);
+  const names = (q.get("moves") || q.get("move") || "Lat Pulldown").split(",").map((s) => s.trim()).filter(Boolean);
+  const ts = (q.get("t") || "0,0.5,1").split(",").map(Number);
+  const themes = q.get("theme") === "both" || !q.get("theme") ? ["dark", "light"] : [q.get("theme")];
+  const size = Number(q.get("size") || 300);
+  const skin = q.get("skin") || "mannequin";
+  const root = document.getElementById("root");
+  for (const name of names) {
+    const row = document.createElement("div"); row.className = "row";
+    const h = document.createElement("h2"); h.textContent = name; row.appendChild(h);
+    if (!hasMove(name)) {
+      const m = document.createElement("div"); m.className = "missing"; m.textContent = "no move called " + name; row.appendChild(m); root.appendChild(row); continue;
+    }
+    for (const theme of themes) for (const t of ts) {
+      const cell = document.createElement("div"); cell.className = "cell"; cell.dataset.theme = theme;
+      const cv = document.createElement("canvas"); cv.width = size; cv.height = size; cv.style.width = size + "px"; cv.style.height = size + "px";
+      const cap = document.createElement("span"); cap.textContent = `${theme} t=${t}`;
+      cell.append(cv, cap); row.appendChild(cell);
+      const anim = mountMove(cv, name, { theme, skin, paused: true });
+      if (anim) anim.seek(t);
+    }
+    root.appendChild(row);
+  }
+  document.title = "Pose check: " + names.join(", ");
+</script>
