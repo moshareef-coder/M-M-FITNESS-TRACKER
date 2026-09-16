@@ -1059,8 +1059,8 @@ const SEATED_DUMBBELL_PRESS = {
   breath: 0.2,
   fit: { k: 0.92, dy: 6 },
   props: [
-    { type: "bench", x: 36, y: 96, w: 36 },
     { type: "bench", x: 20, y: 70, w: 44, incline: -78 },
+    { type: "bench", x: 36, y: 96, w: 36 },
     { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
     { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
   ],
@@ -1131,8 +1131,8 @@ const ARNOLD_PRESS = {
      sitting down. */
   fit: { k: 0.92, dy: 6 },
   props: [
-    { type: "bench", x: 36, y: 96, w: 36 },
     { type: "bench", x: 20, y: 70, w: 44, incline: -78 },
+    { type: "bench", x: 36, y: 96, w: 36 },
     { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
     { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
   ],
@@ -1401,8 +1401,9 @@ const PREACHER_CURL = {
   dur: 3.0,
   breath: 0.2,
   props: [
-    { type: "bench", x: 26, y: 96, w: 34 },
-    { type: "bench", x: 48, y: 73.3, w: 42, incline: -43 },
+    // the preacher bench drawn as one object; its seat and arm pad sit exactly
+    // where the two bench props used to
+    { type: "artwork", src: "/knowledge/motion/props/preacher.svg" },
     { type: "barbell", side: "R", point: "hand", r: 8, front: true },
   ],
   keys: [

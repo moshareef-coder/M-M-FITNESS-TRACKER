@@ -1694,6 +1694,20 @@ function chromeBar(ctx, C, a, b, r, knurl = false, far = false) {
     }
   }
 }
+// A box-section tube between two points at any angle, lit along whichever
+// long edge faces up on screen. steelPost is the vertical special case; a
+// bench leg that splays or a spine under a tilted pad needs this one.
+function boxTube(ctx, C, a, b, w, far = false) {
+  const d = norm2(sub(b, a)), L = len2(sub(b, a));
+  const up = upNormal(a, b), side = -d.y * up.x + d.x * up.y > 0 ? 1 : -1;
+  ctx.save();
+  ctx.translate(a.x, a.y); ctx.rotate(Math.atan2(d.y, d.x));
+  ctx.fillStyle = far ? C.steelLo : C.steel;
+  roundRect(ctx, -0.6, -w / 2, L + 1.2, w, 1.3); ctx.fill();
+  ctx.fillStyle = far ? C.steel : C.steelHi;
+  roundRect(ctx, 0.3, side > 0 ? w / 2 - 0.7 - w * 0.26 : -w / 2 + 0.7, L - 0.6, w * 0.26, 0.6); ctx.fill();
+  ctx.restore();
+}
 // A pulley: a chrome wheel with a dark hub, in a bracket if the caller draws one.
 function pulleyWheel(ctx, C, x, y, r) {
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = C.chrome; ctx.fill();
@@ -1864,32 +1878,90 @@ const PROPS = {
     ctx.fillStyle = C.propTop;
     roundRect(ctx, p.x, -6, 2.2, GROUND + 6, 1.1); ctx.fill();
   },
-  /* A gym bench, the real object: a black vinyl pad on a steel spine, legs
-     with flat feet on the floor. `incline` tips the pad about its centre; past
-     30 degrees it is a back rest and stands on one post with a strut, because
-     a raised pad on two full-height legs is a ladder, not a bench. The
-     parameters are unchanged from the old capsule drawing so every move that
-     already placed a bench keeps its geometry. */
+  /* A gym bench, the real object. Flat: a black vinyl pad on a box-section
+     spine, two legs splayed a touch outward to wide feet on the floor (the
+     Rogue flat utility bench profile). Past 30 degrees it is the back pad of
+     an adjustable bench: a square post under the raised end, a toothed ladder
+     strut from the post's foot up to the pad, a stub post under the low end
+     and a base rail joining the feet. A shallow positive incline is a decline
+     bench, so the leg-lock upright is drawn off its raised end; the moves put
+     `roller` props on it. The parameters and the pad are unchanged from the
+     old drawing, so every move that placed a bench keeps its geometry: the
+     pad's top surface is still 2.8 above the line from (x, y) tipped by
+     `incline` about its centre. */
   bench(ctx, C, p) {
-    const w = p.w, y = p.y, x = p.x, inc = D(p.incline || 0);
+    const w = p.w, y = p.y, x = p.x, incDeg = p.incline || 0, inc = D(incDeg);
     const c = V(x + w / 2, y);
     const dx = Math.cos(inc) * (w / 2), dy = Math.sin(inc) * (w / 2);
     const A = V(c.x - dx, c.y + dy), Bp = V(c.x + dx, c.y - dy);
-    const steep = Math.abs(p.incline || 0) > 30;
-    const legs = steep ? [0.42] : [0.16, 0.84];
-    // frame first: feet, legs, then the spine under the pad
-    for (const f of legs) {
-      const fp = lerpV(A, Bp, f);
-      steelPost(ctx, C, fp.x, fp.y + 1.5, GROUND, 4.6);
-    }
-    if (steep) {
-      // the strut that holds a back rest at its angle
-      const fp = lerpV(A, Bp, 0.42), hp = lerpV(A, Bp, 0.82);
-      steelTube(ctx, C, V(fp.x, GROUND - 3), V(hp.x, hp.y + 2.5), 1.6);
+    const T = 5.6;
+    // the pad in its own terms: hi is the raised end, lo the other, and n
+    // points down out of the underside, away from the body
+    const hi = A.y <= Bp.y ? A : Bp, lo = hi === A ? Bp : A;
+    const d = norm2(sub(lo, hi));
+    const n = scl(upNormal(hi, lo), -1);
+    const under = (u, e = 0) => add(lerpV(hi, lo, u), scl(n, T / 2 + e));
+    const foot = (fx, fw) => {
+      ctx.fillStyle = C.steelLo;
+      roundRect(ctx, fx - fw / 2, GROUND - 2.8, fw, 2.8, 1.2); ctx.fill();
+      ctx.fillStyle = C.rubber;
+      roundRect(ctx, fx - fw / 2, GROUND - 1.6, 2.6, 1.6, 0.6); ctx.fill();
+      roundRect(ctx, fx + fw / 2 - 2.6, GROUND - 1.6, 2.6, 1.6, 0.6); ctx.fill();
+    };
+    if (Math.abs(incDeg) <= 30) {
+      // legs first so the spine sits over their tops, splayed 2.5 outward
+      for (const [u, s] of [[0.2, -1], [0.8, 1]]) {
+        const top = under(u, 2.4), bx = top.x + s * 2.5;
+        foot(bx, 15);
+        boxTube(ctx, C, top, V(bx, GROUND - 1.4), 4.6);
+      }
+      boxTube(ctx, C, under(0.05, 1.9), under(0.95, 1.9), 3.6);
+      if (incDeg > 8) {
+        // decline bench: the leg-lock upright off the raised end. The move's
+        // roller props sit on the axle at the end of this arm.
+        const axle = add(hi, scl(d, -12));
+        boxTube(ctx, C, add(hi, scl(d, 6)), axle, 3.6);
+        steelTube(ctx, C, add(axle, V(0, -13)), add(axle, V(0, 13)), 2.2);
+        ctx.beginPath(); ctx.arc(axle.x, axle.y, 1.6, 0, Math.PI * 2); ctx.fillStyle = C.chromeLo; ctx.fill();
+      }
     } else {
-      steelTube(ctx, C, V(A.x + 4, A.y + 3.2), V(Bp.x - 4, Bp.y + 3.2), 1.7);
+      const rear = under(0.24), front = under(0.92);
+      const span = Math.abs(front.x - rear.x);
+      const wide = span > 12;
+      if (wide) {
+        // base rail between the two feet
+        const x0 = Math.min(rear.x, front.x) - 7, x1 = Math.max(rear.x, front.x) + 7;
+        ctx.fillStyle = C.steelLo;
+        roundRect(ctx, x0, GROUND - 3, x1 - x0, 3, 1.2); ctx.fill();
+        ctx.fillStyle = C.steel;
+        roundRect(ctx, x0 + 1, GROUND - 3, x1 - x0 - 2, 1, 0.5); ctx.fill();
+        ctx.fillStyle = C.rubber;
+        roundRect(ctx, x0, GROUND - 1.6, 3, 1.6, 0.6); ctx.fill();
+        roundRect(ctx, x1 - 3, GROUND - 1.6, 3, 1.6, 0.6); ctx.fill();
+        steelPost(ctx, C, front.x, front.y - 1, GROUND - 1.5, 4.2, false, false);
+        // the ladder: a toothed strut from the rear foot up to the pad, the
+        // arm of the back pad rests in one of its notches
+        const a = V(rear.x + 3, GROUND - 3), b = under(0.72, 0.6);
+        steelTube(ctx, C, a, b, 1.9);
+        const ld = norm2(sub(b, a)), L = len2(sub(b, a)), m = upNormal(a, b);
+        ctx.strokeStyle = C.steelLo; ctx.lineWidth = 1;
+        for (let s = L * 0.3; s < L * 0.8; s += 3.4) {
+          const q = add(a, scl(ld, s));
+          ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x + m.x * 2.6, q.y + m.y * 2.6); ctx.stroke();
+        }
+      } else {
+        foot(rear.x, 15);
+      }
+      // the post under the raised end, square section, full height
+      steelPost(ctx, C, rear.x, rear.y - 1, GROUND - (wide ? 1.5 : 1.2), 4.8, false, false);
+      if (!wide) {
+        // near vertical: the arm and its ladder sit behind the pad, so only a
+        // short adjuster bracket shows below the pad's low end
+        const b = under(0.86, 0.6);
+        steelTube(ctx, C, V(rear.x, b.y + 4), b, 1.6);
+      }
     }
-    padSlab(ctx, C, A, Bp, 5.6);
+    padSlab(ctx, C, A, Bp, T);
   },
   /* A plyo box or a step: a dark padded block with a lighter top face and a
      seam where the two halves of the cover meet. */
