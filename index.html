@@ -6165,8 +6165,22 @@ let AUTH_RETURN_HANDLER = null;
 
 /* The system browser hands control back through the custom scheme registered in
    Info.plist. Without this the sheet signs in and then just sits there. */
+/* Coming back to the front, as the native side sees it.
+   visibilitychange is the web's idea of the same moment and it is not reliable
+   in a WKWebView: taps made on the Lock Screen were still sitting in the queue
+   when the app was already on screen showing the lift you had moved off. The
+   drain is safe to run twice, so both signals feed it rather than picking one
+   and hoping. */
+function registerResumeDrain() {
+  if (!isNativeApp()) return;
+  window.Capacitor.Plugins.App.addListener("appStateChange", ({ isActive }) => {
+    if (isActive) reconcileNativeSurfaces();
+  });
+}
+
 function registerAuthDeepLink() {
   if (!isNativeApp()) return;
+  registerResumeDrain();
   window.Capacitor.Plugins.App.addListener("appUrlOpen", async ({ url }) => {
     if (!url || url.indexOf(AUTH_DEEP_LINK) !== 0) return;
     try { await window.Capacitor.Plugins.Browser.close(); } catch {}
@@ -18054,6 +18068,13 @@ async function drainLockScreenSets() {
     for (let i = 0; i < (advances || 0); i++) {
       if (SESSION.finished) break;
       await finishExerciseAndAdvance();
+    }
+    /* Both replays redraw as they go, but only the screen they think is up. If
+       the session was minimised while the taps happened, the workout tab behind
+       it is still showing the lift you were on before them. */
+    if ((count || 0) || (advances || 0)) {
+      if (document.body.classList.contains("session-open")) renderSession();
+      else if (typeof renderWorkoutTab === "function") renderWorkoutTab();
     }
   } catch (err) {
     console.error("draining lock screen sets failed", err);
