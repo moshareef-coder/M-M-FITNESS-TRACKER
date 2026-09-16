@@ -202,9 +202,10 @@ const LEG_EXTENSION = {
   dur: 2.8,
   breath: 0.2,
   props: [
-    { type: "machine", x: 40, y: 94, w: 32, parts: ["seat", "backPad"], padH: 30 },
-    { type: "barbell", side: "L", point: "ankle", dx: 3, dy: 0, r: 6 },
-    { type: "barbell", side: "R", point: "ankle", dx: 4, dy: 0, r: 6, front: true },
+    /* The machine is artwork; the shin pad is a lever hinged at the machine's
+       knee axis (level with the figure's knees) so it swings with the legs. */
+    { type: "artwork", src: "/knowledge/motion/props/leg-extension.svg" },
+    { type: "lever", pivot: { x: 79, y: 86 }, to: { side: "R", point: "ankle", dy: -3 }, r: 2.2, end: "pad", padW: 10, padT: 5.4, front: true },
   ],
   keys: [
     { // start, shins hanging straight down under the knee
@@ -412,9 +413,10 @@ const LEG_CURL = {
   dur: 2.8,
   breath: 0.2,
   props: [
-    { type: "bench", x: 32, y: 100, w: 98 },
-    { type: "barbell", side: "L", point: "ankle", dx: -2, dy: 0, r: 6 },
-    { type: "barbell", side: "R", point: "ankle", dx: -3, dy: 0, r: 6, front: true },
+    /* The bench is artwork; the ankle pad is a lever hinged beside the knees
+       so it follows the heels up and over. */
+    { type: "artwork", src: "/knowledge/motion/props/leg-curl.svg" },
+    { type: "lever", pivot: { x: 45, y: 88.5 }, to: { side: "R", point: "ankle" }, r: 2.2, end: "pad", padW: 10, padT: 5.4, front: true },
   ],
   keys: [
     { // start, legs long on the pad
