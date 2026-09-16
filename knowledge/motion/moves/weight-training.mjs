@@ -69,22 +69,36 @@ const BARBELL_BENCH_PRESS = {
     { type: "barbell", side: "R", point: "hand", r: 9.5, front: true },
   ],
   keys: [
-    { // lockout
+    /* Mo, on the gallery: "his knees cant be pointed like that, make his legs
+       straight and then go down", and "the barbell must be pressing his chest,
+       it looks like he is doing it to his face". Both were the same kind of
+       error, a target placed without checking what the limb had to do to reach
+       it.
+
+       The ankles were at x 92/96 against a hip at 86: six units of run for
+       twenty-five of drop, so the thigh and shin had nowhere to go but bow the
+       knee out into the air. Out at 108/112 the thigh lies along the bench and
+       the shin drops to the floor, which is what a bench setup looks like.
+
+       The hands were at x 53/56 with the head at the low end of the body: that
+       is over the face, not the chest. Moved toward the feet so the bar sits
+       over the shoulder at lockout and touches mid-chest at the bottom. */
+    { // lockout, bar over the shoulder
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -4, wristR: 0, wristL: 0 },
       ik: {
-        wristR: { x: 55.0, y: 45.0, bend: 1 }, wristL: { x: 58.0, y: 46.0, bend: 1 },
-        ankleR: { x: 92, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
+        wristR: { x: 66.0, y: 45.0, bend: 1 }, wristL: { x: 69.0, y: 46.0, bend: 1 },
+        ankleR: { x: 108, y: 113.4, bend: -1 }, ankleL: { x: 112, y: 113.4, bend: -1 },
       },
     },
-    { // bar touching the chest, elbows toward the feet rather than square out
+    { // bar touching mid-chest, elbows toward the feet rather than square out
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 2, neck: -6, wristR: 0, wristL: 0 },
       ik: {
-        wristR: { x: 53.0, y: 64.9, bend: 1 }, wristL: { x: 56.0, y: 65.9, bend: 1 },
-        ankleR: { x: 92, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
+        wristR: { x: 69.0, y: 64.9, bend: 1 }, wristL: { x: 72.0, y: 65.9, bend: 1 },
+        ankleR: { x: 108, y: 113.4, bend: -1 }, ankleL: { x: 112, y: 113.4, bend: -1 },
       },
     },
   ],

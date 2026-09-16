@@ -5710,7 +5710,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.18";
+const APP_VERSION = "2026.09.15.19";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -10837,10 +10837,15 @@ async function pushWidgetSnapshot() {
       theirTarget: partner ? weeklyGoalFor(PARTNER_EMAIL) : 0,
       streak: hs ? hs.n : 0,
       streakLabel: hs ? hs.label : "",
+      /* He gets the home screen too. A widget redraws rarely, so this is
+         whatever he last had to say rather than a running commentary. */
+      quip: pickQuip("idle") || "",
     };
     /* Redrawing a timeline costs the widget its refresh budget, so this only
-       goes over when a number actually moved. */
-    const fingerprint = JSON.stringify(snapshot);
+       goes over when a number actually moved. His line is deliberately left out
+       of the comparison: it changes on every render, and on its own it is not
+       worth spending a reload on. It rides along with the next real change. */
+    const fingerprint = JSON.stringify({ ...snapshot, quip: null });
     if (fingerprint === LAST_WIDGET_SNAPSHOT) return;
     LAST_WIDGET_SNAPSHOT = fingerprint;
     await bridge.save({ json: JSON.stringify({ ...snapshot, updatedAt: new Date().toISOString() }) });

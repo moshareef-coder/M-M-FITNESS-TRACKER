@@ -1105,30 +1105,38 @@ const ARNOLD_PRESS = {
   loop: "pingpong",
   dur: 3.2,
   breath: 0.2,
-  fit: { k: 0.84, dy: 10 },
+  /* Seated, on Mo's note from the gallery: "arnold press is me sitting down on
+     a bench and doing the workout". It was authored standing. Same seat and
+     upright backrest as SEATED_DUMBBELL_PRESS, so the two read as the same
+     bench, and the arm angles are untouched: the elbows-forward rack is what
+     makes this an Arnold rather than a dumbbell press and it did not change by
+     sitting down. */
+  fit: { k: 0.92, dy: 6 },
   props: [
+    { type: "bench", x: 36, y: 96, w: 36 },
+    { type: "bench", x: 20, y: 70, w: 44, incline: -78 },
     { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
     { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
     { // start, elbows down and forward, bells in front of the chin
       t: 0,
-      root: { x: 60, y: 61.4, rot: 2 },
+      root: { x: 52, y: 86, rot: -4 },
       joints: {
         spine: 2, neck: -2,
         shoulderR: 34, elbowR: 132, shoulderL: 31, elbowL: 130,
       },
-      ik: { ...stand(62, 57) },
+      ik: { ...stand(82, 78) },
     },
     { // lockout, arms long and a few degrees past vertical, so the arm passes
       // over the BACK of the skull and the face is still readable
       t: 1,
-      root: { x: 60, y: 61.4, rot: 2 },
+      root: { x: 52, y: 86, rot: -4 },
       joints: {
         spine: -2, neck: 12,
         shoulderR: 191, elbowR: 6, shoulderL: 188, elbowL: 8,
       },
-      ik: { ...stand(62, 57) },
+      ik: { ...stand(82, 78) },
     },
   ],
 };
