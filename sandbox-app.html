@@ -191,13 +191,21 @@
   /* Each arc swings in from its own side around the centre of the mark. */
   .boot-arc-l { animation: bootArcL 1.2s cubic-bezier(.34,1.24,.5,1) both; }
   .boot-arc-r { animation: bootArcR 1.2s cubic-bezier(.34,1.24,.5,1) both; }
-  /* A pop rather than a fade: it is not there, and then it is. */
-  .boot-bar   { animation: bootBar .52s cubic-bezier(.34,1.7,.64,1) .78s both; }
+  /* A pop rather than a fade: it is not there, and then it is.
+
+     Delayed until the arcs have LANDED, at 1.2s, and that is a correctness
+     rule rather than a matter of pacing. Where the arcs pass the dumbbell in
+     the artwork those pixels are arc coloured, so they live in the arc layers,
+     which means the dumbbell on its own has bites out of its plates and along
+     its bar. Assembled it is whole and nothing shows. Popped in at 0.78s, while
+     the arcs were still swinging, it was on screen alone for half a second
+     looking chipped. */
+  .boot-bar   { animation: bootBar .5s cubic-bezier(.34,1.7,.64,1) 1.16s both; }
   .boot-word {
     font-family: var(--font-display); font-weight: 800; font-size: 20px;
     letter-spacing: .22em; margin: 0; color: var(--text);
     opacity: 0;                              /* same reason as the mark above */
-    animation: bootWord .74s ease .94s both;
+    animation: bootWord .7s ease 1.52s both;
   }
   /* The hold. Added once the entrance has finished, so a slow network breathes
      rather than freezing on the last frame of an animation. */
@@ -4020,6 +4028,18 @@
   /* The strength card: a body, a key under it, and one row of detail that only
      exists once a muscle has been tapped. No bars and no chart, because the
      whole point of this card is that it can be read without decoding anything. */
+  /* The strength level bar. Five segments rather than one continuous track,
+     because the levels are the information and a smooth bar hides where the
+     boundaries are. */
+  .lvl { margin: 2px 0 10px; }
+  .lvl-segs { display: flex; gap: 4px; }
+  .lvl-segs i { flex: 1; height: 7px; border-radius: 4px; background: var(--border);
+                overflow: hidden; position: relative; }
+  .lvl-segs i b { position: absolute; inset: 0 auto 0 0; background: var(--accent);
+                  border-radius: 4px; display: block; }
+  .lvl-note { font-size: 13px; color: var(--muted); margin: 7px 0 0; line-height: 1.4; }
+  .lvl-note b { color: var(--text); font-weight: 700; }
+
   .ms-key { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
             font-size: 11.5px; color: var(--muted); margin: 6px 0 2px; }
   .ms-key span { display: flex; align-items: center; gap: 6px; }
@@ -5413,6 +5433,13 @@
     <div class="card metric-card" id="cardStrength">
       <h2>Strength</h2>
       <p class="muted-note" style="margin-top:-6px" id="strengthLead"></p>
+      <!-- Five segments, one per level, filled up to where this lift sits and
+           part filled for the level it is in. The distance to the next one is
+           the motivating half: "28 lb to Advanced" is something to go and do. -->
+      <div class="lvl hidden" id="strengthLevel">
+        <div class="lvl-segs" id="strengthLevelSegs"></div>
+        <p class="lvl-note" id="strengthLevelNote"></p>
+      </div>
       <div class="chart-wrap">
         <canvas id="strengthChart"></canvas>
         <div class="str-single hidden" id="strengthSingle"></div>
@@ -5840,10 +5867,10 @@
     <div class="card">
       <h2>Privacy &amp; support</h2>
       <p class="muted-note" style="margin-top:-6px;">How your data is handled, and how to reach us.</p>
-      <a class="link-row" href="/privacy.html" target="_blank" rel="noopener">
+      <a class="link-row" href="#" data-policy="privacy.html">
         <span>Privacy policy</span><span class="link-arrow">&rsaquo;</span>
       </a>
-      <a class="link-row" href="/support.html" target="_blank" rel="noopener">
+      <a class="link-row" href="#" data-policy="support.html">
         <span>Support</span><span class="link-arrow">&rsaquo;</span>
       </a>
       <p class="muted-note" style="margin-top:12px;opacity:.7;">Version <span id="appVersion"></span></p>
@@ -5860,12 +5887,24 @@
         <div class="scr-title">Safety</div>
         <div class="spacer"></div>
       </div>
+      <!-- Reporting has to be reachable WITHOUT a clip on screen. The flag on a
+           playing clip is the right place to report that clip, and it was the
+           only place reporting existed at all, which means somebody with a
+           problem had to wait for a video to arrive before they could say so.
+           An App Store reviewer would never see one. -->
       <div class="card" id="safetyCard">
         <h2>Report something</h2>
         <p class="muted-note" style="margin-top:-6px;">
-          Tap the flag while a clip is playing. We look at every report within a day,
-          and the person is not told who reported them. You can also email
-          <a href="mailto:mo.shareef@creativelab1.com">mo.shareef@creativelab1.com</a>.
+          We look at every report within a day, and the person is not told who
+          reported them.
+        </p>
+        <div id="reportLive" class="hidden">
+          <button type="button" class="btn-secondary" id="reportPartnerBtn">Report my partner</button>
+        </div>
+        <p class="muted-note" id="reportNoPartner">You are not paired with anyone right now.</p>
+        <p class="muted-note" style="margin-top:12px;">
+          To report one video in particular, tap the flag while it is playing. You can
+          also email <a href="mailto:mo.shareef@creativelab1.com">mo.shareef@creativelab1.com</a>.
         </p>
       </div>
       <div class="card">
@@ -6132,7 +6171,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.4";
+const APP_VERSION = "2026.09.16.5";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -6479,11 +6518,12 @@ function dismissBoot() {
   BOOT_DONE = true;
   const boot = document.getElementById("boot");
   if (!boot) return;
-  /* Let the arcs finish closing even if the session resolved instantly, so the
-     mark is never caught half assembled. The entrance runs to 1.68s: the word
-     starts at .94 and takes .74. A beat past that lets the finished mark be
-     looked at, which is the point of slowing it down. */
-  const left = Math.max(0, 1900 - (Date.now() - BOOT_STARTED));
+  /* Let the whole entrance finish even if the session resolved instantly, so
+     the mark is never caught half assembled. It runs to 2.22s: arcs to 1.2,
+     the dumbbell landing behind them at 1.16 plus 0.5, the word from 1.52
+     taking 0.7. A beat past that lets the finished mark be looked at, which is
+     the point of it. */
+  const left = Math.max(0, 2500 - (Date.now() - BOOT_STARTED));
   setTimeout(() => {
     boot.classList.add("done");
     setTimeout(() => boot.remove(), 660);
@@ -6494,7 +6534,7 @@ const BOOT_STARTED = Date.now();
    sitting on a finished animation's last frame. */
 setTimeout(() => {
   if (!BOOT_DONE) document.getElementById("boot")?.classList.add("waiting");
-}, 1700);
+}, 2300);
 
 function initOnboard() {
   // iOS private browsing can throw here, and this runs before first paint.
@@ -6637,8 +6677,8 @@ function renderSignInScreen(state = {}) {
         <p class="si-msg ${state.tone || ""}" id="siMsg">${escapeHtml(state.msg || "")}</p>
 
         <p class="si-legal">By continuing you agree to the
-          <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>. Questions go to
-          <a href="/support.html" target="_blank" rel="noopener">support</a>.</p>
+          <a href="#" data-policy="privacy.html">Privacy Policy</a>. Questions go to
+          <a href="#" data-policy="support.html">support</a>.</p>
       </div>
     </div>`;
 
@@ -6938,11 +6978,17 @@ let ALL_GOALS = [];
 const isCoachedClient = () => MY_GROUP?.kind === "coach" && MY_ROLE === "client";
 
 async function loadMyGroups() {
-  const { data } = await sb.from("group_members").select("*").is("left_at", null);
+  /* Both reads report failure rather than swallowing it. Empty and broken look
+     identical from here, and the caller uses this to decide whether somebody
+     is in a coached group, so a failed read quietly demotes a client to an
+     unpaired stranger. */
+  const { data, error } = await sb.from("group_members").select("*").is("left_at", null);
+  if (error) { console.error("could not read group members", error); return { pending: null, active: null, error }; }
   const mine = (data || []).filter((m) => m.email.toLowerCase() === MY_EMAIL);
   if (!mine.length) return { pending: null, active: null };
   const ids = mine.map((m) => m.group_id);
-  const { data: gs } = await sb.from("groups").select("*").in("id", ids);
+  const { data: gs, error: gErr } = await sb.from("groups").select("*").in("id", ids);
+  if (gErr) { console.error("could not read groups", gErr); return { pending: null, active: null, error: gErr }; }
   const groups = gs || [];
   const withGroup = mine.map((m) => ({ ...m, group: groups.find((g) => g.id === m.group_id) })).filter((m) => m.group);
   return {
@@ -6952,7 +6998,16 @@ async function loadMyGroups() {
 }
 
 async function checkPartnershipThenEnter() {
-  const { pending, active } = await loadMyGroups();
+  const { pending, active, error: groupErr } = await loadMyGroups();
+  /* Same rule as the partnership read below: a lookup that failed is not an
+     answer about who somebody trains with, and carrying on would hand a coached
+     client the setup screen. */
+  if (groupErr) {
+    SIGN_IN_HANDLED = false;
+    renderSignInScreen({ email: MY_EMAIL, tone: "bad",
+      msg: "Could not load your account. Check your connection and try again." });
+    return;
+  }
 
   // An unanswered invitation takes priority over everything else.
   if (pending) { renderInviteScreen(pending); return; }
@@ -6966,9 +7021,26 @@ async function checkPartnershipThenEnter() {
     return showApp();
   }
 
-  const { data: rows } = await sb.from("partnerships")
+  const { data: rows, error: pairErr } = await sb.from("partnerships")
     .select("*")
     .order("created_at", { ascending: false });
+  /* A failed read is not "you have no partner", and treating it as one was
+     destructive rather than merely wrong. supabase-js resolves instead of
+     throwing, so a network blip here dropped a paired person onto the "Who is
+     training with you?" setup screen with no error and no way past it. From
+     there, choosing "I coach people" inserts a real groups row for somebody who
+     is already paired, which is a change to their account caused entirely by a
+     read that failed.
+
+     Stop and say so. The same shape as the profile lookup above: when the
+     lookup itself fails, say so rather than guessing the destructive way. */
+  if (pairErr) {
+    console.error("could not read partnerships", pairErr);
+    SIGN_IN_HANDLED = false;
+    renderSignInScreen({ email: MY_EMAIL, tone: "bad",
+      msg: "Could not load your account. Check your connection and try again." });
+    return;
+  }
   const all = rows || [];
   const accepted = all.find((r) => r.status === "accepted");
 
@@ -10179,18 +10251,46 @@ async function loadAll() {
   ]);
   watchLiveSessions();
   startLiveTick();
-  ALL_REACTIONS = reactRes.data || [];
-  ALL_GOALS = goalsRes.data || [];
+
+  /* A failed read is not an empty table, and this is the one place in the app
+     where confusing the two is genuinely alarming.
+
+     supabase-js resolves rather than throwing, so every one of these eight came
+     back with an error nobody looked at and collapsed to `|| []`. The worst
+     case was reproduced: with exercise_logs failing while the writes kept
+     landing, somebody finished all five lifts and the summary told them
+     "0 of 5 exercises, 0 volume, TIME 0". Their sets were in the database. The
+     screen said they had done nothing, and the console said nothing at all.
+
+     So a failed read now keeps whatever was already in memory instead of
+     replacing it with emptiness, and says so once. Stale is a much smaller lie
+     than zero. */
+  const reads = {
+    entries: entriesRes, exerciseLogs: exLogRes, profiles: profilesRes,
+    plans: plansRes, goals: goalsRes, reactions: reactRes,
+    badges: badgesRes, swaps: swapsRes,
+  };
+  const failed = Object.entries(reads).filter(([, res]) => res && res.error);
+  for (const [what, res] of failed) console.error(`could not read ${what}`, res.error);
+  const keep = (res, current) => (res && res.error ? current : (res.data || []));
+
+  ALL_REACTIONS = keep(reactRes, ALL_REACTIONS);
+  ALL_GOALS = keep(goalsRes, ALL_GOALS);
   MY_GOAL = ALL_GOALS.find((g) => (g.email || "").toLowerCase() === MY_EMAIL) || null;
-  ALL_PLANS = plansRes.data || [];
-  ALL_ENTRIES = entriesRes.data || [];
-  ALL_EXERCISE_LOGS = exLogRes.data || [];
-  ALL_PROFILES = profilesRes.data || [];
-  ALL_MILESTONE_BADGES = badgesRes.data || [];
-  ALL_SWAPS = swapsRes.data || [];
+  ALL_PLANS = keep(plansRes, ALL_PLANS);
+  ALL_ENTRIES = keep(entriesRes, ALL_ENTRIES);
+  ALL_EXERCISE_LOGS = keep(exLogRes, ALL_EXERCISE_LOGS);
+  ALL_PROFILES = keep(profilesRes, ALL_PROFILES);
+  ALL_MILESTONE_BADGES = keep(badgesRes, ALL_MILESTONE_BADGES);
+  ALL_SWAPS = keep(swapsRes, ALL_SWAPS);
   MY_PROFILE = ALL_PROFILES.find((p) => p.email === MY_EMAIL) || MY_PROFILE;
   PARTNER_PROFILE = ALL_PROFILES.find((p) => p.email === PARTNER_EMAIL) || null;
   applyAccentColors();
+  /* Said out loud, once per failed load. Somebody looking at numbers that are
+     quietly out of date should be told, because the alternative is that they
+     believe them. Not per failed table: eight toasts is not eight times the
+     information. */
+  if (failed.length) toast("Could not refresh everything. Some numbers may be out of date.");
 
   renderAvatarPair();
   /* loadAll runs after nearly every write anywhere in the app, logging a set
@@ -12980,7 +13080,11 @@ const REPORT_REASONS = [
   ["other", "Something else"],
 ];
 
-function askReportReason(fromName) {
+/* `what` names the thing being reported, because this sheet now serves both
+   a single clip and a person, and "REPORT THIS CLIP" over a report about
+   somebody's behaviour would be telling them the wrong thing at the worst
+   possible moment. */
+function askReportReason(fromName, what = "THIS CLIP") {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "pop-scrim";
@@ -12988,7 +13092,7 @@ function askReportReason(fromName) {
       <div class="pop">
         <div class="pop-body">
           <div class="ds-top">
-            <div class="pop-who" style="color:var(--muted)">REPORT THIS CLIP</div>
+            <div class="pop-who" style="color:var(--muted)">REPORT ${escapeHtml(what)}</div>
             <button type="button" class="ds-x" data-reason="" aria-label="Close">&times;</button>
           </div>
           <p class="muted-note">We look at every report within a day. ${escapeHtml(fromName)} is not told that you reported this.</p>
@@ -13010,7 +13114,7 @@ function askReportReason(fromName) {
    report pointing at a deleted file cannot be acted on at all. */
 async function reportClip(clip) {
   const from = nameFor(clip.from_email);
-  const reason = await askReportReason(from);
+  const reason = await askReportReason(from, "THIS CLIP");
   if (!reason) return false;
 
   const mark = await sb.from("live_clips")
@@ -13034,6 +13138,37 @@ async function reportClip(clip) {
   renderClipPill();
   toast("Reported. We will look at it within a day.");
   return true;
+}
+
+/* Reporting a person rather than one piece of content.
+
+   Filed against the account, with no ref_id, because there is no single row
+   this is about: it is somebody saying this person is a problem. The queue
+   shows it the same as any other report and the same day applies.
+
+   Deliberately does NOT block as a side effect. Somebody may want it looked at
+   without ending the relationship, and deciding that for them would make
+   reporting a thing people avoid doing. The offer to block comes after, as a
+   question. */
+async function reportPartner(email) {
+  const who = nameFor(email) || "them";
+  const reason = await askReportReason(who, escapeHtml(who).toUpperCase());
+  if (!reason) return;
+  const { error } = await sb.from("content_reports").insert({
+    reporter_email: MY_EMAIL,
+    subject_email: email,
+    kind: "profile",
+    reason,
+  });
+  if (error) { console.error("report failed", error); toast("Could not send that report"); return; }
+  const alsoBlock = await askConfirm({
+    heading: "Reported",
+    body: `We will look at it within a day. ${who} is not told. Do you also want to block them?`,
+    ok: "Block them too",
+    cancel: "No, just the report",
+  });
+  if (alsoBlock) await blockPerson(email);
+  else toast("Reported");
 }
 
 /* Blocking is one server call because a block that half applies is worse than
@@ -13071,6 +13206,19 @@ async function renderSafetyCard() {
   if (paired) {
     $("blockPartnerBtn").textContent = `Block ${nameFor(PARTNER_EMAIL) || "my partner"}`;
     $("blockPartnerBtn").onclick = () => blockPerson(PARTNER_EMAIL);
+  }
+
+  /* The same paired-or-not question the Block card asks, so the two halves of
+     this page can never disagree about whether there is somebody to act on. */
+  const reportLive = $("reportLive");
+  const reportNone = $("reportNoPartner");
+  if (reportLive && reportNone) {
+    reportLive.classList.toggle("hidden", !paired);
+    reportNone.classList.toggle("hidden", paired);
+    if (paired) {
+      $("reportPartnerBtn").textContent = `Report ${nameFor(PARTNER_EMAIL) || "my partner"}`;
+      $("reportPartnerBtn").onclick = () => reportPartner(PARTNER_EMAIL);
+    }
   }
 
   const list = $("blockList");
@@ -14565,6 +14713,33 @@ function renderStrengthStats() {
   const picked = lifts.find((l) => l.name === STRENGTH_LIFT) || lifts[0];
   el.textContent = `${picked.name}, best ${picked.best} lb.`
     + (lifts.length > 1 ? " Tap another lift." : "");
+  renderStrengthLevel(name, picked.name);
+}
+
+/* The level, or nothing at all. A lift we cannot level honestly (a dumbbell,
+   a machine, somebody with no weigh-in) hides the whole block rather than
+   showing a bar with nothing in it, which would read as "you are a beginner"
+   when what it means is "we do not know". */
+function renderStrengthLevel(name, exerciseName) {
+  const wrap = $("strengthLevel");
+  if (!wrap) return;
+  const lv = strengthLevelFor(name, exerciseName);
+  if (!lv) { wrap.classList.add("hidden"); return; }
+  wrap.classList.remove("hidden");
+
+  $("strengthLevelSegs").innerHTML = STRENGTH_LEVELS.map((_, i) => {
+    const pct = i < lv.index ? 100 : i === lv.index ? Math.round(lv.within * 100) : 0;
+    return `<i><b style="width:${pct}%"></b></i>`;
+  }).join("");
+
+  /* One line, and the half that matters is the second one. "Intermediate" tells
+     you where you stand; "18 lb to Advanced" is the bit somebody can go and do
+     something about, which is the whole reason this is on the card. The
+     bodyweight ratio and the estimated single are both true and both detail,
+     and this tab has already learned what happens when detail goes up front. */
+  $("strengthLevelNote").innerHTML = lv.next
+    ? `<b>${escapeHtml(lv.level)}.</b> ${lv.toNext} lb to ${escapeHtml(lv.next)}.`
+    : `<b>${escapeHtml(lv.level)}.</b> Top of the scale.`;
 }
 
 let strengthChart = null;
@@ -23392,6 +23567,117 @@ function e1rm(weight, reps) {
   return weight * (1 + Math.min(Math.max(reps || 1, 1), 12) / 30);
 }
 
+/* ---------- How strong is that, actually ----------
+
+   An estimated single is a number, and a number cannot answer the question
+   people are really asking. 195 lb is a lot for one person and a warm-up for
+   another, and the difference is bodyweight, sex and age. A LEVEL answers it.
+   This is the one pattern in the category worth copying (Hevy's), and the
+   research behind it is in mo-knowledge/research/14-am-i-getting-stronger.md.
+
+   Thresholds are multiples of bodyweight to enter each level. Four numbers
+   make five levels: under the first is Beginner, and the last is Elite.
+
+   Pinned at three ends, and scripts/strength-standards-check.mjs holds it
+   there. The untrained majority must read Beginner, the median competitive
+   powerlifter must read Advanced, and the 90th percentile of competitors must
+   read Elite. The first pass failed that third check in the direction that
+   matters: it called an untrained woman benching 0.42x bodyweight
+   "Intermediate", which is the exact flattery this feature exists not to do. */
+const STRENGTH_STANDARDS = {
+  bench:    { Male: [0.60, 0.90, 1.30, 1.75], Female: [0.50, 0.70, 0.95, 1.25] },
+  squat:    { Male: [0.85, 1.30, 1.90, 2.55], Female: [0.70, 1.00, 1.40, 1.95] },
+  deadlift: { Male: [1.00, 1.55, 2.30, 3.05], Female: [0.85, 1.20, 1.70, 2.35] },
+  press:    { Male: [0.40, 0.60, 0.85, 1.15], Female: [0.28, 0.42, 0.58, 0.80] },
+  row:      { Male: [0.55, 0.80, 1.10, 1.50], Female: [0.35, 0.50, 0.72, 1.00] },
+};
+
+const STRENGTH_LEVELS = ["Beginner", "Novice", "Intermediate", "Advanced", "Elite"];
+
+/* Which lifts can honestly be levelled, and against which standard.
+
+   The factor is what this variant is worth against the base lift, so a front
+   squat at 0.85 is held to 85% of the back squat numbers rather than being
+   called weak for being a front squat.
+
+   What is deliberately NOT here matters as much as what is. Every dumbbell
+   lift is out, because the app stores one weight and cannot tell whether that
+   was per hand or the pair, and guessing would halve or double somebody's
+   level. Every machine is out too: a leg press sled weighs whatever that gym's
+   sled weighs, so the same effort reads differently in two gyms. Those lifts
+   still chart and still count toward a muscle getting stronger. They just do
+   not get a level, because we cannot work one out without making something up. */
+const LIFT_STANDARDS = {
+  "bench press":            ["bench", 1],
+  "barbell bench press":    ["bench", 1],
+  "incline barbell press":  ["bench", 0.85],
+  "decline barbell press":  ["bench", 1.05],
+  "close-grip bench press": ["bench", 0.90],
+  "barbell back squat":     ["squat", 1],
+  "back squat":             ["squat", 1],
+  "front squat":            ["squat", 0.85],
+  "deadlift":               ["deadlift", 1],
+  "sumo deadlift":          ["deadlift", 1],
+  "romanian deadlift":      ["deadlift", 0.85],
+  "stiff-leg deadlift":     ["deadlift", 0.85],
+  "overhead press":         ["press", 1],
+  "military press":         ["press", 1],
+  "push press":             ["press", 1.20],
+  "barbell row":            ["row", 1],
+  "pendlay row":            ["row", 0.95],
+};
+
+/* Strength peaks around 18 to 35 and falls away either side, so a fixed table
+   would tell a 58 year old they are a beginner for lifting what is genuinely
+   strong at 58. The thresholds move instead of the person. Shaped after the
+   masters coefficients powerlifting has used for decades: flat through the
+   peak, a slow decline to 60, steeper after. */
+function ageStrengthFactor(age) {
+  const a = Number(age);
+  if (!a || a < 10) return 1;                       // no age on file: adult scale
+  if (a < 18) return 0.86 + (a - 14) * 0.035;
+  if (a <= 35) return 1;
+  if (a <= 60) return 1 - (a - 35) * 0.0075;
+  return Math.max(0.55, 0.8125 - (a - 60) * 0.011);
+}
+
+/* The level for one person on one lift, or null when we cannot say honestly.
+   Null has three causes and all of them are real: the lift has no standard,
+   there is no bodyweight to divide by, or nothing has been logged. */
+function strengthLevelFor(name, exerciseName) {
+  const std = LIFT_STANDARDS[(exerciseName || "").trim().toLowerCase()];
+  if (!std) return null;
+  const bw = currentWeightLb(name);
+  if (!bw) return null;
+
+  const hist = liftE1rmHistory(name, exerciseName, 52);
+  if (!hist.length) return null;
+  const best = Math.max(...hist.map((h) => h.est));
+
+  const profile = profileFor(name === ME ? MY_EMAIL : PARTNER_EMAIL);
+  const sex = profile?.sex === "Female" ? "Female" : "Male";
+  const [key, factor] = std;
+  const age = ageStrengthFactor(profile?.age);
+  /* One scale, built once, so the bar and the sentence can never disagree. */
+  const cuts = STRENGTH_STANDARDS[key][sex].map((t) => t * factor * age * bw);
+
+  let idx = 0;
+  while (idx < cuts.length && best >= cuts[idx]) idx++;
+
+  const floor = idx === 0 ? 0 : cuts[idx - 1];
+  const ceil = idx < cuts.length ? cuts[idx] : null;
+  return {
+    level: STRENGTH_LEVELS[idx],
+    next: idx < cuts.length ? STRENGTH_LEVELS[idx + 1] : null,
+    toNext: ceil ? Math.max(1, Math.round(ceil - best)) : null,
+    /* How far through the current level, for the bar's part-filled segment. */
+    within: ceil && ceil > floor ? Math.min(1, (best - floor) / (ceil - floor)) : 1,
+    index: idx,
+    best: Math.round(best),
+    ratio: best / bw,
+  };
+}
+
 /* Best estimated single per DAY for one lift, so warm-up sets and a top set on
    the same morning are one point, not four. Same shape as liftHistory, but on
    the estimate rather than the raw load: a person who took their bench from
@@ -24514,6 +24800,40 @@ let PUSH_LAST_ERROR = null;
 /* Set when onboarding finishes, spent the first time the app is on screen. */
 const ASK_PUSH_KEY = "ft_ask_push";
 
+/* Where the privacy policy and support pages are actually readable.
+
+   Inside the app these two were plain links to /privacy.html with
+   target="_blank". Capacitor hands a blank-target link to the system browser,
+   and the app serves itself from https://localhost, so Safari opened
+   https://localhost/privacy.html and failed. Both links were dead on every
+   device, including the Privacy Policy on the sign-in screen, which is one of
+   the first things an App Review reader taps.
+
+   Absolute, and through the in-app browser, so it opens over the app rather
+   than throwing somebody out of it. */
+const POLICY_BASE = "https://m-m-fitness-tracker.vercel.app";
+
+/* Delegated from the document, once, rather than wired per screen. Two of these
+   links live on the sign-in screen, which is built before any tab exists and
+   before most of the app has run, so anything that attaches handlers later
+   would miss exactly the pair an App Review reader taps first. */
+document.addEventListener("click", (e) => {
+  const link = e.target.closest?.("[data-policy]");
+  if (!link) return;
+  e.preventDefault();
+  openPolicy(link.dataset.policy);
+});
+
+async function openPolicy(page) {
+  const url = `${POLICY_BASE}/${page}`;
+  const browser = isNativeApp() && window.Capacitor.Plugins.Browser;
+  if (browser) {
+    try { await browser.open({ url, presentationStyle: "popover" }); return; }
+    catch (err) { console.error("could not open the policy page", err); }
+  }
+  window.open(url, "_blank", "noopener");
+}
+
 /* What we promise to send, written once and shown in both places that promise
    it: the sheet that asks, and the Notifications screen in Setup.
 
@@ -25415,8 +25735,21 @@ async function commitProfile(payload, { toastText }) {
   const { error } = await sb.from("profiles")
     .upsert({ email: MY_EMAIL, user_name: ME, updated_at: new Date().toISOString(), ...payload });
   if (error) { toast("Could not save"); console.error(error); return false; }
-  const { data } = await sb.from("profiles").select("*").eq("email", MY_EMAIL).maybeSingle();
+  /* The write is what matters and it succeeded, so this still reports success.
+     But the read back can fail on its own, and when it did, MY_PROFILE stayed
+     on the old values behind a toast saying it was saved: the setting was
+     genuinely stored and the app went on showing the previous one until the
+     next full load, which reads as the save having silently not worked.
+
+     So the saved values are merged in from what we just sent, which is exactly
+     what the row now holds. */
+  const { data, error: readErr } = await sb.from("profiles")
+    .select("*").eq("email", MY_EMAIL).maybeSingle();
   if (data) MY_PROFILE = data;
+  else {
+    if (readErr) console.error("saved, but could not re-read the profile", readErr);
+    MY_PROFILE = { ...(MY_PROFILE || {}), email: MY_EMAIL, user_name: ME, ...payload };
+  }
   toast(toastText);
   return true;
 }
