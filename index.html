@@ -9486,8 +9486,14 @@ function registerBackGuard() {
 async function reconcileNativeSurfaces() {
   if (!isNativeApp()) return;
   try {
+    /* The session has to be back before the queue is read, not after. The drain
+       claims taps for whoever owns the workout that is open, and on a cold
+       launch nothing is open yet: draining first meant every set and every lift
+       change made on the Lock Screen was seen as unowned and thrown away, which
+       is the queue doing exactly its job on the wrong side of the restore. */
+    const restored = SESSION || loadSessionFromStorage();
     await drainLockScreenSets();
-    if (!SESSION && !loadSessionFromStorage()) await endLiveActivity();
+    if (!restored) await endLiveActivity();
   } catch (err) {
     console.error("reconciling native surfaces failed", err);
   }
@@ -18052,8 +18058,11 @@ async function drainLockScreenSets() {
 
     /* Owner-scoped: taps queued for anyone else, or for a workout that ended
        long ago, are dropped rather than replayed as phantom sets. */
-    const { count, dropped } = await bridge.drainPendingSets({ owner: mine });
-    if (dropped) console.log(`lock screen: dropped ${dropped} stale or unowned taps`);
+    const { count, advances, dropped } = await bridge.drainPendingSets({ owner: mine });
+    /* Logged every time, not only on a drop. Three separate failures here have
+       looked identical from the outside, and each one cost a round trip to work
+       out whether the queue was empty, unowned, or replaying into nothing. */
+    console.log(`lock screen drain: owner=${mine || "(none)"} sets=${count || 0} advances=${advances || 0} dropped=${dropped || 0}`);
     for (let i = 0; i < (count || 0); i++) {
       const sets = SESSION.setsDone?.[SESSION.exerciseIndex] || [];
       const next = sets.findIndex((d) => !d);
