@@ -5442,9 +5442,9 @@
 
     <div class="card metric-card" id="cardVolume">
       <h2>Training volume</h2>
-      <div class="wt-stats" id="volumeStats"></div>
+      <p class="muted-note" style="margin-top:-6px" id="volumeLead"></p>
       <div class="chart-wrap"><canvas id="volumeChart"></canvas></div>
-      <div class="cst-caption" id="volumeCaption"></div>
+      <div class="ms-list" id="volumeDetail"></div>
     </div>
 
     <div class="card metric-card" id="cardPhotos">
@@ -14656,18 +14656,41 @@ function volumeWeeks(name, weeks = 8) {
   return out;
 }
 
+/* One line: this week against the eight before it. It was three stat tiles
+   saying the same comparison in three pieces and leaving the reader to do the
+   subtraction. */
 function renderVolumeStats() {
-  const viewingPartner = PROGRESS_VIEW === "partner";
-  const name = viewingPartner ? partnerName() : ME;
+  const el = $("volumeLead");
+  if (!el) return;
+  const name = PROGRESS_VIEW === "partner" ? partnerName() : ME;
   const weeks = volumeWeeks(name, 8);
   const thisWeek = weeks[weeks.length - 1].volume;
   const finished = weeks.slice(0, -1).filter((w) => w.volume > 0);
   const avg = finished.length ? finished.reduce((s, w) => s + w.volume, 0) / finished.length : 0;
   const vsAvg = avg > 0 ? Math.round(((thisWeek - avg) / avg) * 100) : null;
-  $("volumeStats").innerHTML = `
-    <div class="wt-stat"><b>${fmtVolume(thisWeek)}</b><span>This week, lb</span></div>
-    <div class="wt-stat"><b>${avg > 0 ? fmtVolume(avg) : "Not yet"}</b><span>8-week avg</span></div>
-    <div class="wt-stat${vsAvg == null ? "" : vsAvg >= 0 ? " good" : ""}"><b>${vsAvg == null ? "Not yet" : `${vsAvg > 0 ? "+" : ""}${vsAvg}%`}</b><span>Vs. average</span></div>`;
+  /* Nothing at all is the chart's empty state to report, not this line's. */
+  if (!weeks.some((w) => w.volume > 0)) { el.textContent = ""; return; }
+  const against = vsAvg == null
+    ? " No finished week to compare it against yet."
+    : ` ${Math.abs(vsAvg)}% ${vsAvg >= 0 ? "above" : "below"} the eight week average.`;
+  el.textContent = `${fmtVolume(thisWeek)} lb this week.${against} Tap a week.`;
+}
+
+/* The detail slot, empty until a bar is tapped. A bar height is a shape, not a
+   number, so the tap is how you read one off it, and the definition of the
+   number rides along with the answer instead of sitting under the chart as a
+   caption nobody needs twice. */
+let VOL_WEEK = null;
+function renderVolumeDetail() {
+  const el = $("volumeDetail");
+  if (!el) return;
+  const name = PROGRESS_VIEW === "partner" ? partnerName() : ME;
+  const weeks = volumeWeeks(name, 8);
+  if (VOL_WEEK == null || VOL_WEEK >= weeks.length) { el.innerHTML = ""; return; }
+  const w = weeks[VOL_WEEK];
+  el.innerHTML = `<div class="ms-row">
+      <span class="ms-txt"><b>${fmtVolume(w.volume)} lb moved</b><span>Week of ${escapeHtml(w.weekStart.slice(5))}. Weight by reps by sets, every weighted exercise.</span></span>
+    </div>`;
 }
 
 let volumeChart = null;
@@ -14690,7 +14713,8 @@ function renderVolumeChart() {
     ph.innerHTML = emptyState("bolt", "No sets logged yet",
       "Log a weighted set and the last eight weeks start filling in here.");
     if (volumeChart) { volumeChart.destroy(); volumeChart = null; }
-    $("volumeCaption").textContent = "";
+    VOL_WEEK = null;
+    renderVolumeDetail();
     return;
   }
   card.classList.remove("chart-empty");
@@ -14710,6 +14734,14 @@ function renderVolumeChart() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
+      /* Nearest on the x axis without having to hit the bar itself: a short
+         bar in a light week is a two pixel target otherwise. */
+      onClick: (evt, els, chart) => {
+        const hit = chart.getElementsAtEventForMode(evt, "nearest", { intersect: false, axis: "x" }, true);
+        if (!hit.length) return;
+        VOL_WEEK = VOL_WEEK === hit[0].index ? null : hit[0].index;
+        renderVolumeDetail();
+      },
       scales: {
         x: { border: { display: false }, grid: { display: false }, ticks: { color: cssVar("--muted"), font: { size: 10 } } },
         y: { border: { display: false }, beginAtZero: true,
@@ -14718,7 +14750,7 @@ function renderVolumeChart() {
       },
     },
   });
-  $("volumeCaption").textContent = "Weight × reps × sets, every weighted exercise";
+  renderVolumeDetail();
 }
 
 function renderWeightChart() {
