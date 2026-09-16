@@ -159,6 +159,85 @@
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
+  /* ---------- Launch ----------
+
+     The two arcs swing shut into the ring, the dumbbell settles, and the whole
+     mark opens out to reveal the app. It is the logo assembling itself, which
+     is also the product: two halves becoming one thing.
+
+     The pieces are the real artwork, cut out of the master render by
+     scripts/split-logo-parts.py, rather than arcs redrawn as strokes. Redrawn
+     ones lose the gloss and stop being the logo.
+
+     The wait here is a network round trip, so this cannot be a fixed length: it
+     has an entrance, a hold that loops for as long as it takes, and an exit
+     fired when the app is ready. */
+  #boot {
+    position: fixed; inset: 0; z-index: 90;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 22px; background: var(--bg);
+    transition: opacity .72s ease;
+  }
+  .boot-mark { position: relative; width: min(38vw, 150px); aspect-ratio: 1; }
+  .boot-mark img {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: contain;
+    /* Hidden in the base rule, not only by animation-fill-mode. WebKit paints
+       a frame of the element as authored before it applies a delayed
+       animation's backwards fill, which was long enough to see the dumbbell
+       sitting inside the arcs before it was meant to exist. */
+    opacity: 0;
+  }
+  /* Each arc swings in from its own side around the centre of the mark. */
+  .boot-arc-l { animation: bootArcL 1.2s cubic-bezier(.34,1.24,.5,1) both; }
+  .boot-arc-r { animation: bootArcR 1.2s cubic-bezier(.34,1.24,.5,1) both; }
+  /* A pop rather than a fade: it is not there, and then it is. */
+  .boot-bar   { animation: bootBar .52s cubic-bezier(.34,1.7,.64,1) .78s both; }
+  .boot-word {
+    font-family: var(--font-display); font-weight: 800; font-size: 20px;
+    letter-spacing: .22em; margin: 0; color: var(--text);
+    opacity: 0;                              /* same reason as the mark above */
+    animation: bootWord .74s ease .94s both;
+  }
+  /* The hold. Added once the entrance has finished, so a slow network breathes
+     rather than freezing on the last frame of an animation. */
+  #boot.waiting .boot-mark { animation: bootBreath 3.4s ease-in-out infinite; }
+  /* The whole screen fades off the dashboard rather than opening out past the
+     edge. The scale read as the mark lunging at you, which is a lot of motion
+     to aim at somebody who has just unlocked their phone. */
+  #boot.done { opacity: 0; pointer-events: none; }
+
+  @keyframes bootArcL {
+    from { opacity: 0; transform: rotate(-52deg) translateX(-14%); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes bootArcR {
+    from { opacity: 0; transform: rotate(52deg) translateX(14%); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes bootBar {
+    from { opacity: 0; transform: scale(.46); }
+    60%  { opacity: 1; }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes bootWord {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes bootBreath {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.045); }
+  }
+  /* Asked not to move: the mark is simply there, and it still fades out. */
+  @media (prefers-reduced-motion: reduce) {
+    /* .boot-mark img, not the three layer classes: the base rule that hides
+       them is class-plus-element and outranks a bare class, so overriding it
+       one class at a time left the mark invisible with nothing to animate it
+       back. */
+    .boot-mark img, .boot-word { animation: none; opacity: 1; transform: none; }
+    #boot.waiting .boot-mark { animation: none; }
+  }
+
   html, body {
     margin: 0; padding: 0;
     /* Rubber-band drag is what makes a wrapped app read as a web page. */
@@ -354,6 +433,30 @@
   /* The hero is the one card that should feel lit from inside. */
   #heroCard { box-shadow: var(--shadow-lift); }
   #tab-home #heroCard { padding: 16px 15px 15px; }
+
+  /* Home reads as one card, not three.
+
+     The hero and the week grid stay two elements because renderHero() owns
+     heroCard's innerHTML and would wipe any markup nested inside it. So they
+     are joined at the seam instead: the hero loses its bottom edge and
+     radius, the week card loses its top ones and tucks up under it. The
+     result is a single block with one divider through it, and neither
+     renderer had to learn about the other.
+
+     Worth knowing if you split them again: the shadow has to come off the
+     hero too, or it draws a line across the middle of the merged card. */
+  #tab-home.home-one #heroCard {
+    border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+    border-bottom: none; box-shadow: none; margin-bottom: 0; padding-bottom: 4px;
+  }
+  #tab-home.home-one #weekTogetherCard {
+    border-top-left-radius: 0; border-top-right-radius: 0;
+    border-top: 1px solid var(--border); margin-top: 0;
+  }
+  /* The grid is the second half of a card now, not a card of its own, so it
+     drops the heading that used to name it. */
+  #tab-home.home-one #weekTogetherCard .card-head h2 { font-size: 11px; font-weight: 700;
+    letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
   .card h2 {
     font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em;
     color: var(--muted); margin: 0 0 12px; font-weight: 700;
@@ -1450,6 +1553,35 @@
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
   .clip-who { color: #fff; font-size: 14px; font-weight: 700; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  /* A link inside body copy. Left alone it renders as browser-default blue with
+     an underline, which is the one piece of unstyled chrome on the page. */
+  .muted-note a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .muted-note a:hover { text-decoration: underline; }
+  /* One open report. */
+  .report-row { padding: 12px 0; border-top: 1px solid var(--line, rgba(128,128,128,.2)); }
+  .report-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .report-why { font-weight: 700; }
+  /* The age carries the obligation, so it is the one thing that changes colour.
+     Past a day it is no longer information, it is a broken promise. */
+  .report-age { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+  .report-age.late { color: var(--danger, #ff5c5c); font-weight: 700; }
+  .report-meta { color: var(--muted); font-size: 13px; margin-top: 4px; word-break: break-word; }
+  .report-acts { display: flex; gap: 8px; margin-top: 10px; }
+  .report-acts .btn-ghost { width: auto; flex: 1 1 auto; padding: 8px 12px; font-size: 14px; }
+  /* One blocked person. The address can be long and the button must not be
+     pushed off the edge by it, so the name takes the slack and ellipsises. */
+  .block-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+  .block-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .block-undo { width: auto; flex: 0 0 auto; padding: 6px 14px; }
+  /* Deliberately quieter than the close button. It has to be findable without
+     looking for it, and it must never be the thing a thumb lands on by
+     accident while reaching to close a video. */
+  .clip-flag {
+    width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+    display: grid; place-items: center;
+    background: rgba(0,0,0,.45); color: rgba(255,255,255,.75);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
   .clip-bottom {
     position: absolute; left: 0; right: 0; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     display: flex; flex-direction: column; align-items: center; gap: 14px; z-index: 2; padding: 0 20px;
@@ -5069,6 +5201,17 @@
 </head>
 <body>
 
+<!-- In the markup, not injected, so it is on screen at first paint. Anything
+     built by JS arrives after the wait it exists to cover. -->
+<div id="boot" aria-hidden="true">
+  <div class="boot-mark">
+    <img class="boot-arc boot-arc-l" src="logo/unio-left.png" alt="" />
+    <img class="boot-arc boot-arc-r" src="logo/unio-right.png" alt="" />
+    <img class="boot-bar" src="logo/unio-bar.png" alt="" />
+  </div>
+  <p class="boot-word">UNIO</p>
+</div>
+
 <div id="onboard">
   <!-- steps injected by JS -->
 </div>
@@ -5089,11 +5232,10 @@
   <div id="connBanner" class="conn-banner hidden"></div>
 
   <!-- HOME TAB -->
-  <div id="tab-home" class="tab-panel">
+  <div id="tab-home" class="tab-panel home-one">
     <div class="reminder-banner hidden" id="encouragementBanner"></div>
     <div class="rest-banner hidden" id="restDayBanner"></div>
     <button type="button" class="live-card hidden" id="liveCard"></button>
-    <div class="notice hidden" id="partnerNotice"></div>
 
     <div class="card" id="heroCard"></div>
 
@@ -5115,7 +5257,9 @@
       <div class="pact-foot" id="pactFoot"></div>
     </div>
 
-    <button type="button" class="card momentum" id="momentumCard">
+    <div class="notice hidden" id="partnerNotice"></div>
+
+    <button type="button" class="card momentum hidden" id="momentumCard">
       <span class="momentum-ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a2 2 0 0 0 0 4h1M16 5h3a2 2 0 0 1 0 4h-1"/><path d="M12 12v3M9 20h6M9.5 15.5h5l.5 4.5h-6l.5-4.5Z"/></svg></span>
       <span class="momentum-text">
         <b id="momentumTitle">Momentum is real.</b>
@@ -5356,6 +5500,16 @@
           <span class="set-ico" data-ico="info"></span>
           <span class="set-txt"><span class="set-title">About</span></span>
           <span class="set-val" id="setAboutSub"></span>
+          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+        </button>
+        <!-- Its own row rather than a card buried inside Account. Somebody
+             looking for this is usually not calm and should not have to guess
+             which page it is under, and it is also the first thing an App
+             Review reader goes hunting for. -->
+        <button type="button" class="set-row" id="setRow-safety" data-page="safety">
+          <span class="set-ico" data-ico="flag"></span>
+          <span class="set-txt"><span class="set-title">Safety</span></span>
+          <span class="set-val" id="setSafetySub"></span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
         <button type="button" class="set-row" id="setRow-account" data-page="account">
@@ -5660,6 +5814,38 @@
       <p class="muted-note" style="margin-top:12px;opacity:.7;">Version <span id="appVersion"></span></p>
       </div>
     </div>
+    <!-- Reporting and blocking. Its own page because App Store Review
+         Guideline 1.2 requires both of anything carrying user content, and
+         because the person who needs it should find it by looking for the
+         obvious word rather than by opening Account and reading past two
+         buttons that erase their data. -->
+    <div class="settings-page hidden" id="page-safety">
+      <div class="scr-head">
+        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+        <div class="scr-title">Safety</div>
+        <div class="spacer"></div>
+      </div>
+      <div class="card" id="safetyCard">
+        <h2>Report something</h2>
+        <p class="muted-note" style="margin-top:-6px;">
+          Tap the flag while a clip is playing. We look at every report within a day,
+          and the person is not told who reported them. You can also email
+          <a href="mailto:mo.shareef@creativelab1.com">mo.shareef@creativelab1.com</a>.
+        </p>
+      </div>
+      <div class="card">
+        <h2>Block</h2>
+        <p class="muted-note" style="margin-top:-6px;">
+          Blocking unpairs you, stops anything more arriving, and stops them pairing
+          with you again. They are not told, and you can undo it here.
+        </p>
+        <div id="blockLive" class="hidden">
+          <button type="button" class="btn-danger" id="blockPartnerBtn">Block my partner</button>
+        </div>
+        <p class="muted-note" id="blockNoPartner">You are not paired with anyone right now.</p>
+        <div id="blockList"></div>
+      </div>
+    </div>
     <div class="settings-page hidden" id="page-account">
       <div class="scr-head">
         <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
@@ -5712,6 +5898,15 @@
         <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
         <div class="scr-title">Admin</div>
         <div class="spacer"></div>
+      </div>
+      <!-- The report queue, above the XP tools rather than under them. A push
+           can be dismissed on a lock screen and an email can be deleted; this
+           is the surface that still has the report tomorrow, so it is the
+           first thing on the page that carries the obligation. -->
+      <div class="card hidden" id="reportQueueCard">
+        <h2>Reports</h2>
+        <p class="muted-note" style="margin-top:-6px;" id="reportQueueSub">Loading.</p>
+        <div id="reportQueueList"></div>
       </div>
     <div class="card hidden" id="adminCard">
       <h2>Admin</h2>
@@ -6016,6 +6211,7 @@ const ICON_PATHS = {
   body: '<circle cx="12" cy="4.5" r="2.2"/><path d="M8.5 8h7l1.5 5-2 .6V20h-3v-4h-1v4h-3v-6.4l-2-.6z"/>',
   play: '<path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none"/>',
   camera: '<path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4z"/><circle cx="12" cy="13" r="3.5"/>',
+  flag: '<path d="M4 21V4.5S6 3 9 4.5s6 1.5 6 1.5v9s-3 1.5-6 0-5-.5-5-.5"/>',
   trophy: '<path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a2 2 0 0 0 0 4h1M16 5h3a2 2 0 0 1 0 4h-1"/><path d="M12 12v3M9 20h6M9.5 15.5h5l.5 4.5h-6l.5-4.5Z"/>',
   star: '<path d="M12 3l2.5 5.6 6.1.6-4.6 4.1 1.3 6-5.3-3.1L6.7 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z"/>',
   trending: '<path d="M3 17 9 11l4 4 8-8"/><path d="M17 7h4v4"/>',
@@ -6092,6 +6288,7 @@ function showFatal(what) {
   const el = document.getElementById("fatalBanner");
   if (!el) return;
   el.classList.remove("hidden");
+  dismissBoot();
   el.innerHTML = `<strong>Something broke while loading.</strong>
     <span>${escapeHtml(String(what || "")).slice(0, 160)}</span>
     <button type="button" onclick="location.reload()">Reload</button>`;
@@ -6166,8 +6363,22 @@ let AUTH_RETURN_HANDLER = null;
 
 /* The system browser hands control back through the custom scheme registered in
    Info.plist. Without this the sheet signs in and then just sits there. */
+/* Coming back to the front, as the native side sees it.
+   visibilitychange is the web's idea of the same moment and it is not reliable
+   in a WKWebView: taps made on the Lock Screen were still sitting in the queue
+   when the app was already on screen showing the lift you had moved off. The
+   drain is safe to run twice, so both signals feed it rather than picking one
+   and hoping. */
+function registerResumeDrain() {
+  if (!isNativeApp()) return;
+  window.Capacitor.Plugins.App.addListener("appStateChange", ({ isActive }) => {
+    if (isActive) reconcileNativeSurfaces();
+  });
+}
+
 function registerAuthDeepLink() {
   if (!isNativeApp()) return;
+  registerResumeDrain();
   window.Capacitor.Plugins.App.addListener("appUrlOpen", async ({ url }) => {
     if (!url || url.indexOf(AUTH_DEEP_LINK) !== 0) return;
     try { await window.Capacitor.Plugins.Browser.close(); } catch {}
@@ -6220,6 +6431,36 @@ function registerAuthDeepLink() {
   });
 }
 
+/* The launch screen comes down when there is something real behind it, not on a
+   timer. A timer either cuts the mark off mid-swing on a fast connection or
+   uncovers an empty screen on a slow one.
+
+   It is also never left up: every path that paints calls this, and a failure
+   that paints an error calls it too, because a launch screen over an error
+   message is just a hang. */
+let BOOT_DONE = false;
+function dismissBoot() {
+  if (BOOT_DONE) return;
+  BOOT_DONE = true;
+  const boot = document.getElementById("boot");
+  if (!boot) return;
+  /* Let the arcs finish closing even if the session resolved instantly, so the
+     mark is never caught half assembled. The entrance runs to 1.68s: the word
+     starts at .94 and takes .74. A beat past that lets the finished mark be
+     looked at, which is the point of slowing it down. */
+  const left = Math.max(0, 1900 - (Date.now() - BOOT_STARTED));
+  setTimeout(() => {
+    boot.classList.add("done");
+    setTimeout(() => boot.remove(), 660);
+  }, left);
+}
+const BOOT_STARTED = Date.now();
+/* The hold starts when the entrance ends, so a slow network breathes instead of
+   sitting on a finished animation's last frame. */
+setTimeout(() => {
+  if (!BOOT_DONE) document.getElementById("boot")?.classList.add("waiting");
+}, 1700);
+
 function initOnboard() {
   // iOS private browsing can throw here, and this runs before first paint.
   let theme = "light";
@@ -6245,10 +6486,27 @@ function initOnboard() {
   if (isNativeApp()) {
     console.log("native plugins:", Object.keys(window.Capacitor.Plugins || {}).sort().join(", "));
   }
+  /* RETURNED, not just called. handleSignedIn is async and the profile, the
+     partnership and the week's workouts all load inside it, so dropping its
+     promise let the launch screen come down the moment the session resolved,
+     a second or so before any of that landed. What you saw underneath was the
+     dashboard's own frame with every card empty, filling in one at a time.
+     Awaiting it means the launch screen is still there while that happens and
+     what it uncovers is a finished screen. */
   sb.auth.getSession().then(({ data }) => {
-    if (data.session) handleSignedIn(data.session);
-    else renderSignInScreen();
-  });
+    if (data.session) return handleSignedIn(data.session);
+    renderSignInScreen();
+  }).catch((err) => {
+    /* supabase-js resolves rather than throwing on a failed query, but a dead
+       network rejects here, and a launch screen left up over that is a hang. */
+    console.error("could not read the session", err);
+    renderSignInScreen();
+  }).finally(dismissBoot);
+  /* And a ceiling on that, because now something real is being waited for. A
+     query that never comes back would otherwise hold the launch screen up for
+     ever, which is the worse failure: a half painted dashboard can at least be
+     used. Long enough that it is never hit on a normal launch. */
+  setTimeout(dismissBoot, 8000);
 }
 
 /* Capacitor injects this global before the page loads, so no bundler or script
@@ -6670,8 +6928,7 @@ async function checkPartnershipThenEnter() {
     const { data: roster } = await sb.from("group_members")
       .select("email, role").eq("group_id", active.group_id).is("left_at", null);
     MY_COACH = (roster || []).find((r) => r.role === "coach" || r.role === "owner")?.email || null;
-    showApp();
-    return;
+    return showApp();
   }
 
   const { data: rows } = await sb.from("partnerships")
@@ -6685,8 +6942,7 @@ async function checkPartnershipThenEnter() {
     PARTNER_EMAIL = accepted.inviter_email.toLowerCase() === MY_EMAIL
       ? accepted.invitee_email.toLowerCase()
       : accepted.inviter_email.toLowerCase();
-    showApp();
-    return;
+    return showApp();
   }
 
   /* The consent half of pairing. After 20260915_consent_and_leak_close.sql a
@@ -6703,7 +6959,7 @@ async function checkPartnershipThenEnter() {
   const incoming = all.filter((r) => r.status === "pending" && mine(r.invitee_email));
   if (incoming.length) { renderPairRequestScreen(incoming); return; }
 
-  if (soloHeld()) { showApp(); return; }   // training alone; the seat stays open
+  if (soloHeld()) return showApp();        // training alone; the seat stays open
 
   /* My own request is my problem, not a wall: it only shows to someone who has
      not already settled on training alone. An answer I am still owed, above,
@@ -7033,8 +7289,7 @@ function renderPairingScreen() {
 async function chooseSetup(key) {
   if (key === "solo") {
     setSolo();
-    showApp();
-    return;
+    return showApp();
   }
   if (key === "pair") { renderCodeScreen(); return; }
 
@@ -9390,7 +9645,11 @@ function showApp() {
   renderFab();
   registerBackGuard();
 
-  loadAll().then(reconcileNativeSurfaces);
+  /* Returned so the launch screen can wait on it. This is the call that fills
+     every card on the dashboard, and without the promise coming back out the
+     boot path had nothing to wait for and uncovered an empty frame. Callers
+     that do not care can still ignore it. */
+  return loadAll().then(reconcileNativeSurfaces);
 }
 
 /* ---------- Back ----------
@@ -9473,8 +9732,14 @@ function registerBackGuard() {
 async function reconcileNativeSurfaces() {
   if (!isNativeApp()) return;
   try {
+    /* The session has to be back before the queue is read, not after. The drain
+       claims taps for whoever owns the workout that is open, and on a cold
+       launch nothing is open yet: draining first meant every set and every lift
+       change made on the Lock Screen was seen as unowned and thrown away, which
+       is the queue doing exactly its job on the wrong side of the restore. */
+    const restored = SESSION || loadSessionFromStorage();
     await drainLockScreenSets();
-    if (!SESSION && !loadSessionFromStorage()) await endLiveActivity();
+    if (!restored) await endLiveActivity();
   } catch (err) {
     console.error("reconciling native surfaces failed", err);
   }
@@ -11884,8 +12149,9 @@ function renderHero(animate = false) {
 
   let cta;
   if (todayPlan) {
-    cta = heroLine(`Today: ${displayFocus(todayPlan.focus, todayPlan.exercises)}, ready when you are`)
-      + ctaBtn(trainedToday ? "Start Today's Plan" : "Start Today's Workout");
+    /* The focus is the card title now, so the line under it would be the
+       third place on one screen saying the same words. */
+    cta = ctaBtn(trainedToday ? "Start Today's Plan" : "Start Today's Workout");
   } else if (restToday) {
     cta = heroLine("Rest day. Back at it tomorrow.") + ctaBtn("Train Anyway");
   } else if (!trainedToday) {
@@ -11907,25 +12173,47 @@ function renderHero(animate = false) {
     cta = ctaBtn("Plan Tomorrow's Workout");
   }
 
+  /* What the card is called depends on whether there is anything to do.
+
+     With a plan waiting, today IS the headline: the focus in the title, the
+     shape of the session under it, and Start directly beneath. "Stronger
+     Together" over "2 of 5 workouts each this week" is a status report, and
+     it was reading above the button on a screen people open in order to press
+     the button. The week has not gone anywhere, it is the rings and the grid
+     below.
+
+     With nothing to do (rest day, coached, everything already done) the week
+     framing comes back, because then the week IS the subject. */
+  const planToday = todayPlan
+    ? { title: displayFocus(todayPlan.focus, todayPlan.exercises),
+        meta: `${(todayPlan.exercises || []).length} exercises${
+          Number.isFinite(todayPlan.est_minutes) ? ` &middot; about ${todayPlan.est_minutes} min` : ""}` }
+    : null;
+
+  /* Head to head on effort sits UNDER the rings, not above the button. It is
+     worth showing, but it is a comparison of the week and nothing about the
+     week belongs between "Push Day" and Start. */
+  const effortRow = partner && (myWeekXP > 0 || theirWeekXP > 0) ? `<div class="hero-effort">
+      <button type="button" class="he-label" id="effortInfoBtn" aria-label="How effort is scored">${icon("bolt", 13)} Effort this week <span class="i-glyph">${icon("info", 13)}</span></button>
+      <span class="he-scores">
+        <span class="he-you${myWeekXP >= theirWeekXP ? " lead" : ""}">You <b data-xp="${myWeekXP}" data-delay="380">${animate ? 0 : myWeekXP}</b><span class="sr-only"> effort points${myWeekXP > theirWeekXP ? ", ahead" : ""}</span></span>
+        <span class="he-them${theirWeekXP > myWeekXP ? " lead" : ""}">${escapeHtml(partner)} <b data-xp="${theirWeekXP}" data-delay="480">${animate ? 0 : theirWeekXP}</b><span class="sr-only"> effort points${theirWeekXP > myWeekXP ? ", ahead" : ""}</span></span>
+      </span>
+    </div>` : "";
+
   el.innerHTML = `
     <div class="hero-top">
       <div>
-        <div class="hero-kicker">${partner ? "This week together" : "This week"}</div>
-        <h1 class="hero-title">${partner ? "Stronger Together" : "Your week"}</h1>
-        <p class="hero-sub">${sub} ${infoDot("weekTarget", "How the weekly target works")}</p>
+        <div class="hero-kicker">${planToday ? "Today" : partner ? "This week together" : "This week"}</div>
+        <h1 class="hero-title">${planToday ? escapeHtml(planToday.title) : partner ? "Stronger Together" : "Your week"}</h1>
+        <p class="hero-sub">${planToday ? planToday.meta : `${sub} ${infoDot("weekTarget", "How the weekly target works")}`}</p>
         ${coachLine}
-        ${partner && (myWeekXP > 0 || theirWeekXP > 0) ? `<div class="hero-effort">
-          <button type="button" class="he-label" id="effortInfoBtn" aria-label="How effort is scored">${icon("bolt", 13)} Effort this week <span class="i-glyph">${icon("info", 13)}</span></button>
-          <span class="he-scores">
-            <span class="he-you${myWeekXP >= theirWeekXP ? " lead" : ""}">You <b data-xp="${myWeekXP}" data-delay="380">${animate ? 0 : myWeekXP}</b>${myWeekXP > theirWeekXP ? `<span class="sr-only"> effort points, ahead</span>` : `<span class="sr-only"> effort points</span>`}</span>
-            <span class="he-them${theirWeekXP > myWeekXP ? " lead" : ""}">${escapeHtml(partner)} <b data-xp="${theirWeekXP}" data-delay="480">${animate ? 0 : theirWeekXP}</b>${theirWeekXP > myWeekXP ? `<span class="sr-only"> effort points, ahead</span>` : `<span class="sr-only"> effort points</span>`}</span>
-          </span>
-        </div>` : ""}
       </div>
       ${badge}
     </div>
+    ${cta}
     ${stand}
-    ${cta}`;
+    ${effortRow}`;
   hydrateAvatars(el);
 
   /* Two frames, not one: the browser has to have painted the empty ring
@@ -12289,11 +12577,23 @@ function clipViewerHTML(fromName, src, last) {
     <div class="clip-top">
       <button type="button" class="clip-x" id="clipViewX" aria-label="Close">&times;</button>
       <span class="clip-who">${escapeHtml(fromName)}</span>
+      <button type="button" class="clip-flag" id="clipReport" aria-label="Report this clip">${icon("flag", 18)}</button>
     </div>
     <div class="clip-bottom">
       <div class="clip-note">${last
         ? "Last watch. Closing this ends it."
         : "It loops while you are here. Close it and you have one more watch."}</div>
+    </div>`;
+}
+
+/* Says what happens next, because "reported" on its own leaves somebody
+   wondering whether anything was actually done with it. */
+function clipReportedHTML() {
+  return `<div class="clip-stage" style="align-items:center;justify-content:center">
+      <div class="clip-gone">
+        <b>Reported</b>
+        <span>We will look at it within a day. You can block them in Setup.</span>
+      </div>
     </div>`;
 }
 
@@ -12588,6 +12888,18 @@ async function openNextClip() {
     }
   };
   $("clipViewX").onclick = done;
+  /* Reporting closes the viewer without spending a watch. Charging somebody a
+     watch for reporting a clip would mean the only way to report the second
+     one is to watch it again. */
+  $("clipReport").onclick = async () => {
+    if (closing) return;
+    const player = $("clipPlayer");
+    if (player) player.pause();
+    const filed = await reportClip(clip);
+    if (!filed) { player?.play?.().catch(() => {}); return; }
+    closing = true;
+    close(clipReportedHTML());
+  };
   const player = $("clipPlayer");
   player.ontimeupdate = () => {
     const bar = $("clipBar");
@@ -12597,6 +12909,143 @@ async function openNextClip() {
      same as one that did. */
   player.onerror = () => { toast("That clip would not play"); closing = true; destroyClip(clip).then(() => close(clipGoneHTML())); };
   renderClipPill();
+}
+
+/* ---- reporting and blocking ----
+
+   App Store Review Guideline 1.2 requires both of these of anything carrying
+   user generated content, and this app carries video between two people. They
+   are separate on purpose: a report is about a thing and says "look at this",
+   a block is about a person and says "this is done". Reporting somebody does
+   not quietly end the relationship, because a mis-tap should not, and blocking
+   files no report, because most people who walk away are not making a case. */
+
+const REPORT_REASONS = [
+  ["sexual", "Nudity or sexual content"],
+  ["abuse", "Harassment or abuse"],
+  ["violence", "Violence or threats"],
+  ["other", "Something else"],
+];
+
+function askReportReason(fromName) {
+  return new Promise((resolve) => {
+    const scrim = document.createElement("div");
+    scrim.className = "pop-scrim";
+    scrim.innerHTML = `
+      <div class="pop">
+        <div class="pop-body">
+          <div class="ds-top">
+            <div class="pop-who" style="color:var(--muted)">REPORT THIS CLIP</div>
+            <button type="button" class="ds-x" data-reason="" aria-label="Close">&times;</button>
+          </div>
+          <p class="muted-note">We look at every report within a day. ${escapeHtml(fromName)} is not told that you reported this.</p>
+          ${REPORT_REASONS.map(([k, label]) =>
+            `<button type="button" class="btn-ghost" data-reason="${k}">${escapeHtml(label)}</button>`).join("")}
+        </div>
+      </div>`;
+    document.body.appendChild(scrim);
+    scrim.querySelectorAll("[data-reason]").forEach((b) => {
+      b.onclick = () => { scrim.remove(); resolve(b.dataset.reason || null); };
+    });
+    scrim.onclick = (e) => { if (e.target === scrim) { scrim.remove(); resolve(null); } };
+  });
+}
+
+/* The clip stops expiring the moment it is reported, so there is something
+   left to look at. Marked before the report row is written: if only one of the
+   two can land, keeping the evidence is the half worth having, because a
+   report pointing at a deleted file cannot be acted on at all. */
+async function reportClip(clip) {
+  const from = nameFor(clip.from_email);
+  const reason = await askReportReason(from);
+  if (!reason) return false;
+
+  const mark = await sb.from("live_clips")
+    .update({ reported_at: new Date().toISOString() }).eq("id", clip.id);
+  if (mark.error) console.warn("could not hold the reported clip", mark.error);
+
+  const { error } = await sb.from("content_reports").insert({
+    reporter_email: MY_EMAIL,
+    subject_email: clip.from_email,
+    kind: "clip",
+    ref_id: clip.id,
+    evidence_path: clip.path,
+    reason,
+  });
+  if (error) { console.error("report failed", error); toast("Could not send that report"); return false; }
+
+  /* Taken out of the inbox rather than left on the pill. Nobody who has just
+     reported a video wants the app offering it to them again, and the row and
+     file stay on the server where they are needed. */
+  CLIP_INBOX = CLIP_INBOX.filter((c) => c.id !== clip.id);
+  renderClipPill();
+  toast("Reported. We will look at it within a day.");
+  return true;
+}
+
+/* Blocking is one server call because a block that half applies is worse than
+   none: it says it worked while leaving the channel open. block_person ends
+   the partnership as a standing refusal, so they cannot ask again, and clears
+   anything of theirs already waiting. */
+async function blockPerson(email) {
+  const who = nameFor(email) || "them";
+  const yes = await askConfirm({
+    heading: "Block and unpair",
+    body: `${who} will be unpaired from you, will not be able to send you anything, and will not be able to pair with you again. They are not told. You can undo this in Setup.`,
+    ok: "Block",
+    cancel: "Cancel",
+  });
+  if (!yes) return false;
+  const { error } = await sb.rpc("block_person", { p_email: email });
+  if (error) { console.error("block failed", error); toast("Could not block right now"); return false; }
+  toast(`${who} is blocked`);
+  /* Everything on screen assumes a partner, so the app is reloaded into the
+     state it would have had if they had never been paired, rather than patched
+     tab by tab and left with one card still holding their name. */
+  setTimeout(() => location.reload(), 900);
+  return true;
+}
+
+/* The Safety card in Setup. Read fresh each time rather than cached, because
+   the list has to be right the moment somebody comes here to undo a block. */
+async function renderSafetyCard() {
+  const live = $("blockLive");
+  const none = $("blockNoPartner");
+  if (!live || !none) return;
+  const paired = Boolean(PARTNER_EMAIL);
+  live.classList.toggle("hidden", !paired);
+  none.classList.toggle("hidden", paired);
+  if (paired) {
+    $("blockPartnerBtn").textContent = `Block ${nameFor(PARTNER_EMAIL) || "my partner"}`;
+    $("blockPartnerBtn").onclick = () => blockPerson(PARTNER_EMAIL);
+  }
+
+  const list = $("blockList");
+  if (!list) return;
+  const { data, error } = await sb.from("blocks").select("blocked_email, created_at")
+    .order("created_at", { ascending: false });
+  if (error) { console.warn("could not read blocks", error); return; }
+  const rows = data || [];
+  if (!rows.length) { list.innerHTML = ""; return; }
+  list.innerHTML = `<p class="muted-note" style="margin-top:14px;">Blocked</p>` + rows.map((b) => `
+    <div class="block-row">
+      <span class="block-who">${escapeHtml(b.blocked_email)}</span>
+      <button type="button" class="btn-ghost block-undo" data-unblock="${escapeHtml(b.blocked_email)}">Unblock</button>
+    </div>`).join("");
+  list.querySelectorAll("[data-unblock]").forEach((b) => {
+    b.onclick = () => unblockPerson(b.dataset.unblock);
+  });
+}
+
+/* Unblocking undoes the block and nothing else. The partnership stays a
+   standing refusal, so neither of them is quietly put back together by this:
+   if they want that, one of them types the other's code and the other agrees,
+   which is the same consent every pairing needs. */
+async function unblockPerson(email) {
+  const { error } = await sb.from("blocks").delete().eq("blocked_email", email);
+  if (error) { console.error("unblock failed", error); toast("Could not unblock right now"); return; }
+  toast("Unblocked. You are still not paired.");
+  renderSafetyCard();
 }
 
 /* One watch used up. The row stays, so the clip survives the app being closed
@@ -18039,8 +18488,11 @@ async function drainLockScreenSets() {
 
     /* Owner-scoped: taps queued for anyone else, or for a workout that ended
        long ago, are dropped rather than replayed as phantom sets. */
-    const { count, dropped } = await bridge.drainPendingSets({ owner: mine });
-    if (dropped) console.log(`lock screen: dropped ${dropped} stale or unowned taps`);
+    const { count, advances, dropped } = await bridge.drainPendingSets({ owner: mine });
+    /* Logged every time, not only on a drop. Three separate failures here have
+       looked identical from the outside, and each one cost a round trip to work
+       out whether the queue was empty, unowned, or replaying into nothing. */
+    console.log(`lock screen drain: owner=${mine || "(none)"} sets=${count || 0} advances=${advances || 0} dropped=${dropped || 0}`);
     for (let i = 0; i < (count || 0); i++) {
       const sets = SESSION.setsDone?.[SESSION.exerciseIndex] || [];
       const next = sets.findIndex((d) => !d);
@@ -18048,6 +18500,20 @@ async function drainLockScreenSets() {
          advancing on this path would pick the next lift with nobody looking. */
       if (next === -1) break;
       toggleSet(next);
+    }
+    /* Moving to the next lift is its own tap on the Lock Screen now, so it is
+       its own action here. Replaying it as a set would invent one nobody did,
+       which is why the queue records which kind each tap was. */
+    for (let i = 0; i < (advances || 0); i++) {
+      if (SESSION.finished) break;
+      await finishExerciseAndAdvance();
+    }
+    /* Both replays redraw as they go, but only the screen they think is up. If
+       the session was minimised while the taps happened, the workout tab behind
+       it is still showing the lift you were on before them. */
+    if ((count || 0) || (advances || 0)) {
+      if (document.body.classList.contains("session-open")) renderSession();
+      else if (typeof renderWorkoutTab === "function") renderWorkoutTab();
     }
   } catch (err) {
     console.error("draining lock screen sets failed", err);
@@ -23438,6 +23904,22 @@ async function registerPushHandlers() {
       /* The native bundle only carries index.html, so a path like /coach/ has
          nothing to open. Route what we can and otherwise just come to front. */
       if (url.startsWith("/coach")) { try { switchTab("home"); } catch {} return; }
+      /* A clip opens. It is one notification with one thing behind it, and it
+         is spent after two watches, so landing on the home tab and leaving
+         somebody to find the pill wastes part of what they came for. The
+         inbox is reloaded first because the push very often arrives ahead of
+         the realtime row, or while the socket was asleep in the background. */
+      if (url.startsWith("/clip")) {
+        loadClipInbox().then(() => { try { openNextClip(); } catch {} });
+        return;
+      }
+      /* Straight into the queue. This banner exists because somebody has a day
+         to answer, and landing them on the home tab to go and find it is how a
+         day becomes a week. */
+      if (url.startsWith("/admin/reports")) {
+        try { switchTab("setup"); openSettingsPage("admin"); } catch {}
+        return;
+      }
       try { switchTab(action === "start" ? "workout" : "home"); } catch {}
     });
   } catch (err) {
@@ -23698,6 +24180,10 @@ function openSettingsPage(key) {
   }
   if (key === "focus") renderBodyFocusPage();
   if (key === "limits") renderLimitsPage();
+  /* Re-read every time rather than rendered once with the tab: somebody who
+     comes here to undo a block must not be shown a list from before they made
+     it. */
+  if (key === "safety") renderSafetyCard();
   window.scrollTo({ top: 0 });
 }
 
@@ -24122,7 +24608,104 @@ function buildStepperRow(containerId, specs, state, onChange) {
   });
 }
 
+/* The report queue.
+
+   A push can be swiped away on a lock screen and an email can be deleted, and
+   neither of those is allowed to be the only copy of "somebody asked for help".
+   This is the surface that still has the report tomorrow morning, so this is
+   where the day we promised is actually kept.
+
+   Reading it needs no check here: the RLS policy added in 20260916_report_alert
+   only returns other people's reports to a platform admin, so a non-admin gets
+   their own and nothing else, and the card is hidden for them anyway. */
+async function renderReportQueue() {
+  const card = $("reportQueueCard");
+  const list = $("reportQueueList");
+  const sub = $("reportQueueSub");
+  if (!card || !list || !sub) return;
+  card.classList.toggle("hidden", !isAdmin());
+  if (!isAdmin()) return;
+
+  const { data, error } = await sb.from("content_reports")
+    .select("*").is("handled_at", null).order("created_at", { ascending: true });
+  if (error) {
+    /* Said out loud rather than shown as an empty queue. "No reports" and
+       "could not read reports" look identical and mean opposite things, and
+       quietly showing the reassuring one is how a queue stops being checked. */
+    console.error("could not read reports", error);
+    sub.textContent = "Could not read the queue. Do not assume it is empty.";
+    list.innerHTML = "";
+    return;
+  }
+
+  const rows = data || [];
+  if (!rows.length) {
+    sub.textContent = "Nothing open.";
+    list.innerHTML = "";
+    return;
+  }
+
+  /* Hours rather than a date, because the only thing that matters about an
+     open report is how long it has been waiting against the day we promised. */
+  const oldest = Math.floor((Date.now() - new Date(rows[0].created_at).getTime()) / 3600000);
+  sub.textContent = rows.length === 1
+    ? `1 open, waiting ${oldest}h.`
+    : `${rows.length} open, oldest waiting ${oldest}h.`;
+
+  const words = {
+    sexual: "Nudity or sexual content",
+    abuse: "Harassment or abuse",
+    violence: "Violence or threats",
+    other: "Something else",
+  };
+  list.innerHTML = rows.map((r) => {
+    const hours = Math.floor((Date.now() - new Date(r.created_at).getTime()) / 3600000);
+    return `
+      <div class="report-row">
+        <div class="report-head">
+          <span class="report-why">${escapeHtml(words[r.reason] || r.reason || "Unspecified")}</span>
+          <span class="report-age${hours >= 24 ? " late" : ""}">${hours}h</span>
+        </div>
+        <div class="report-meta">${escapeHtml(r.reporter_email)} reported a ${escapeHtml(r.kind)} from ${escapeHtml(r.subject_email)}</div>
+        ${r.evidence_path ? `<div class="report-meta"><code>${escapeHtml(r.evidence_path)}</code></div>` : ""}
+        <div class="report-acts">
+          <button type="button" class="btn-ghost" data-close-report="${r.id}" data-action="removed">Remove the clip</button>
+          <button type="button" class="btn-ghost" data-close-report="${r.id}" data-action="no_action">No action needed</button>
+        </div>
+      </div>`;
+  }).join("");
+
+  list.querySelectorAll("[data-close-report]").forEach((b) => {
+    b.onclick = () => closeReport(b.dataset.closeReport, b.dataset.action);
+  });
+}
+
+/* Closing a report is the thing that releases the held clip. expire-clips skips
+   anything reported, so without this every reported clip is kept for ever,
+   which is the opposite of what the app promises anybody about video. */
+async function closeReport(id, action) {
+  const row = (await sb.from("content_reports").select("*").eq("id", id).maybeSingle()).data;
+  if (!row) { toast("That report has gone"); renderReportQueue(); return; }
+
+  if (action === "removed" && row.evidence_path) {
+    await sb.storage.from("live-clips").remove([row.evidence_path]);
+    if (row.ref_id) await sb.from("live_clips").delete().eq("id", row.ref_id);
+  }
+  if (action === "no_action" && row.ref_id) {
+    /* Handed back to the sweeper rather than deleted here. It is somebody's
+       clip and the normal two hour rule should finish it, not a moderator. */
+    await sb.from("live_clips").update({ reported_at: null }).eq("id", row.ref_id);
+  }
+
+  const { error } = await sb.from("content_reports")
+    .update({ handled_at: new Date().toISOString(), action_taken: action }).eq("id", id);
+  if (error) { console.error("could not close the report", error); toast("Could not close that"); return; }
+  toast("Closed");
+  renderReportQueue();
+}
+
 function renderAdminPanel() {
+  renderReportQueue();
   if (!PARTNER_PROFILE) $("adminTargetChoices").querySelector('[data-v="partner"]').classList.add("hidden");
   $("adminTargetChoices").querySelectorAll(".choice-card").forEach((c) => {
     c.classList.toggle("selected", c.dataset.v === ADMIN_TARGET);
