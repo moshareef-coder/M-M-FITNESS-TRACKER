@@ -1851,6 +1851,40 @@ function handHeldFrame(ctx, p, S) {
 
 /* A hexagon centred on the origin, vertex up, for the dumbbell end-on view.
    Six sides read as "hex head" even at 20px, which a circle would not. */
+/* The bell seen from the side, drawn along local +y. `f` squashes it along
+   that axis only, which is what a handle turned away from the camera does:
+   the heads stay their full width and the whole thing gets shorter, ending at
+   the end-on hex the caller draws instead once there is nothing left to see.
+   The geometry is the old one at f = 1, so nothing about where a hand holds
+   it moved. */
+function drawBellBody(ctx, C, k, f = 1) {
+  const y = (v) => v * k * f;
+  ctx.strokeStyle = C.edge; ctx.lineWidth = 3.2; ctx.lineJoin = "round";
+  const handle = () => roundRect(ctx, -2.4, y(-9), 4.8, y(18), 2.2);
+  const heads = [
+    () => roundRect(ctx, -7.2, y(-17), 14.4, y(8.4), 2.4),
+    () => roundRect(ctx, -7.2, y(8.6), 14.4, y(8.4), 2.4),
+  ];
+  for (const sh of [handle, ...heads]) { sh(); ctx.stroke(); }
+  ctx.fillStyle = C.chrome; handle(); ctx.fill();
+  ctx.fillStyle = C.chromeHi; roundRect(ctx, -2.4, y(-9), 1.5, y(18), 0.75); ctx.fill();
+  ctx.strokeStyle = C.chromeLo; ctx.lineWidth = 0.55;
+  const step = Math.max(0.9, 1.6 * f);
+  for (let q = y(-6.4); q <= y(6.4); q += step) { ctx.beginPath(); ctx.moveTo(-2, q); ctx.lineTo(2, q); ctx.stroke(); }
+  ctx.fillStyle = C.chromeLo;
+  roundRect(ctx, -3.1, y(-9.4), 6.2, 1.7 * f, 0.8); ctx.fill();
+  roundRect(ctx, -3.1, y(7.7), 6.2, 1.7 * f, 0.8); ctx.fill();
+  ctx.fillStyle = C.iron;
+  for (const sh of heads) { sh(); ctx.fill(); }
+  // the lit facet and the shadowed one, which is what says "hex" side on
+  ctx.fillStyle = C.ironHi;
+  roundRect(ctx, -7.2, y(-17), 4.2, y(8.4), 2); ctx.fill();
+  roundRect(ctx, -7.2, y(8.6), 4.2, y(8.4), 2); ctx.fill();
+  ctx.fillStyle = C.rubber;
+  roundRect(ctx, 4.2, y(-17), 3, y(8.4), 2); ctx.fill();
+  roundRect(ctx, 4.2, y(8.6), 3, y(8.4), 2); ctx.fill();
+}
+
 function hexPath(ctx, r) {
   ctx.beginPath();
   for (let i = 0; i < 6; i++) {
@@ -1863,9 +1897,8 @@ function hexPath(ctx, r) {
 /* The dumbbell seen end on: cast iron, the same recipe as a loaded barbell
    plate (outer edge, a lit inner ring, a chrome sleeve through the middle)
    with a hexagon standing in for the disc, because that is the head shape
-   this rig's dumbbells actually have. `rot` is degrees, used by a keyframed
-   propRot (see ARNOLD_PRESS) for the one case where the grip visibly turns;
-   a hex reads as itself at any angle, which a long capsule did not. */
+   this rig's dumbbells actually have. A hex reads as itself at any angle,
+   which a long capsule did not. */
 function drawDumbbellEnd(ctx, C, at, k, rot) {
   const r = 8.6 * k;
   ctx.save();
@@ -2319,39 +2352,31 @@ const PROPS = {
     const hold = p.hold || "level";
     if (hold === "level") { drawDumbbellEnd(ctx, C, at, k, p.rot || 0); return; }
     let deg = hold === "upright" ? 0 : 90;
+    let squash = 1;
     if (hold === "follow") {
       const side = S.sides[p.side || "R"];
       deg = RAD2DEG(Math.atan2(side.axis.hand.y.y, side.axis.hand.y.x));
     }
+    /* hold: "grip" is the honest one: the handle runs along the hand's own
+       across-the-palm axis, already projected through whatever camera the
+       move uses, so the bell foreshortens by itself. Pointed at the lens that
+       axis comes back with no length and the bell is drawn end on, which is
+       exactly what a side view of a mediolateral grip should look like and
+       what every "level" bell draws today. Turn the camera, or turn the
+       forearm with forearmPron, and the same axis opens out and the bell
+       swings broadside without anyone authoring a rotation for it. That is
+       what makes an Arnold press readable: the grip really does roll from
+       palms-to-the-face to palms-forward, and now the bell shows it. */
+    if (hold === "grip") {
+      const ax = S.sides[p.side || "R"].axis.hand.x;
+      squash = Math.hypot(ax.x, ax.y);
+      if (squash < 0.26) { drawDumbbellEnd(ctx, C, at, k, p.rot || 0); return; }
+      deg = RAD2DEG(Math.atan2(ax.y, ax.x)) - 90;   // the body runs along local +y
+    }
     ctx.save();
     ctx.translate(at.x, at.y);
     ctx.rotate(D(deg + (p.rot || 0)));
-    /* A hex dumbbell: two cast heads with the facet that catches the light
-       along one side, a knurled chrome handle with a collar at each end. The
-       geometry is the old one, so nothing about where a hand holds it moved. */
-    ctx.strokeStyle = C.edge; ctx.lineWidth = 3.2; ctx.lineJoin = "round";
-    const handle = () => roundRect(ctx, -2.4, -9 * k, 4.8, 18 * k, 2.2);
-    const heads = [
-      () => roundRect(ctx, -7.2, -17 * k, 14.4, 8.4 * k, 2.4),
-      () => roundRect(ctx, -7.2, 8.6 * k, 14.4, 8.4 * k, 2.4),
-    ];
-    for (const sh of [handle, ...heads]) { sh(); ctx.stroke(); }
-    ctx.fillStyle = C.chrome; handle(); ctx.fill();
-    ctx.fillStyle = C.chromeHi; roundRect(ctx, -2.4, -9 * k, 1.5, 18 * k, 0.75); ctx.fill();
-    ctx.strokeStyle = C.chromeLo; ctx.lineWidth = 0.55;
-    for (let y = -6.4 * k; y <= 6.4 * k; y += 1.6) { ctx.beginPath(); ctx.moveTo(-2, y); ctx.lineTo(2, y); ctx.stroke(); }
-    ctx.fillStyle = C.chromeLo;
-    roundRect(ctx, -3.1, -9.4 * k, 6.2, 1.7, 0.8); ctx.fill();
-    roundRect(ctx, -3.1, 7.7 * k, 6.2, 1.7, 0.8); ctx.fill();
-    ctx.fillStyle = C.iron;
-    for (const sh of heads) { sh(); ctx.fill(); }
-    // the lit facet and the shadowed one, which is what says "hex" side on
-    ctx.fillStyle = C.ironHi;
-    roundRect(ctx, -7.2, -17 * k, 4.2, 8.4 * k, 2); ctx.fill();
-    roundRect(ctx, -7.2, 8.6 * k, 4.2, 8.4 * k, 2); ctx.fill();
-    ctx.fillStyle = C.rubber;
-    roundRect(ctx, 4.2, -17 * k, 3, 8.4 * k, 2); ctx.fill();
-    roundRect(ctx, 4.2, 8.6 * k, 3, 8.4 * k, 2); ctx.fill();
+    drawBellBody(ctx, C, k, squash);
     ctx.restore();
   },
   kettlebell(ctx, C, p, S) {
@@ -2877,24 +2902,6 @@ function lerpObj(a, b, u, keys) {
   }
   return o;
 }
-/* A prop's own rotation, keyframed like a joint. Authored as
-   `propRot: { 0: -20 }` on a keyframe, keyed by the prop's own index in
-   move.props, degrees ADDED on top of whatever that prop's hold already
-   draws. Missing on one keyframe defaults to 0, the same rule lerpObj uses
-   for a joint the author left out, so a move that only rotates one prop
-   does not have to repeat the others' index at 0. This exists for the one
-   thing this rig has no other way to draw: a grip that visibly twists
-   during the rep, which is authored intent, not something derived from the
-   angles that are already here. See ARNOLD_PRESS. */
-function lerpPropRot(a, b, u) {
-  if (!a && !b) return null;
-  const out = {};
-  for (const k of new Set([...Object.keys(a || {}), ...Object.keys(b || {})])) {
-    const av = (a && a[k]) || 0, bv = (b && b[k]) || 0;
-    out[k] = av + (bv - av) * u;
-  }
-  return out;
-}
 function lerpIk(a, b, u) {
   const out = {};
   const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
@@ -2943,7 +2950,6 @@ export function samplePose(move, cycle, timeSec = 0) {
     root: lerpObj(a.root || {}, b.root || {}, w, ["x", "y", "rot"]),
     joints: lerpObj(a.joints || {}, b.joints || {}, w, [...jointKeys]),
     ik: lerpIk(a.ik, b.ik, w),
-    propRot: lerpPropRot(a.propRot, b.propRot, w),
     feet: move.feet,
     farSide: move.farSide,
     facing: move.facing,
@@ -2998,12 +3004,7 @@ export function render(canvas, move, C, cycle, timeSec = 0, opts = {}) {
   const S = solvePose(sampled, view);
   S.farSide = move.farSide || null;
   S.facing = move.facing || "toward";
-  // Most moves have no propRot at all, so this is a no-op skip for the whole
-  // library. The ones that do get a shallow copy per prop rather than
-  // mutating move.props, which is shared across every mount of that move.
-  const props = sampled.propRot
-    ? (move.props || []).map((p, i) => (sampled.propRot[i] === undefined ? p : { ...p, rot: (p.rot || 0) + sampled.propRot[i] }))
-    : move.props;
+  const props = move.props;
   drawFigure(ctx, S, C, {
     props, floor: move.floor, lit,
     grip: gripSides(move, S),

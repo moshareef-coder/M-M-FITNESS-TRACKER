@@ -285,20 +285,13 @@ which is a row, a curl, a fly. A bar stays level either way, because a
 loaded bar cannot tilt with a wrist. Without `stack: false` the prop draws a
 whole single-column tower with the carriage at `top` and the stack from `y0`.
 
-**A prop's `rot` can be keyframed**, when a grip genuinely twists during the
-rep rather than staying fixed. A keyframe carries `propRot: { 2: 90 }`,
-degrees added on top of whatever the prop already draws, keyed by the prop's
-own index in the move's `props` array (count from 0, in authoring order).
-It interpolates across the rep exactly like a joint, and a keyframe that
-omits an index defaults it to 0. Reach for this only when the rotation is
-real and describable, not to fake a wrist DOF this rig does not have: `hold:
-"follow"` on a dumbbell once tried to derive rotation from the forearm's own
-angle, and at any pose where the elbow sits near the head that put the bell
-through the face, because it drew the bell PARALLEL to the forearm rather
-than turning on a grip independent of where the arm points. See
-ARNOLD_PRESS for the real use: the grip is reversed at the bottom (palms
-toward the face) from the lockout (palms forward), so `propRot` on the
-bottom keyframe alone, fading to the lockout's implicit 0, draws that.
+**A grip that twists during the rep is a joint, not a prop trick.** There was
+a `propRot` channel here for a while that spun a prop by a keyframed number of
+degrees, added on an Arnold press to fake the roll from palms-toward-the-face
+to palms-forward. It is gone. `forearmPron` already turns the forearm for
+real, and a dumbbell on `hold: "grip"` reads the hand's own axis, so authoring
+the pronation gives the same picture and gives it in the right units. Anything
+that spins should spin because a joint moved.
 
 Still-frame checks: `pose-check.html?move=Name&t=0,0.5` in a browser, or
 `node scripts/motion-shoot.mjs "Name" out.png "0,0.5" both 300` headless.
@@ -317,6 +310,16 @@ Four that are not obvious:
     camera sees its full length, and it genuinely tilts with the forearm:
     hammer curl, one-arm row, kickback, carries, anything held at the side.
   - `upright` is the goblet hold, stood on one end and cupped in both hands.
+  - `grip` derives everything. The handle runs along the hand's own
+    across-the-palm axis, projected through the move's camera, so the bell
+    foreshortens by itself: end on when that axis points at the lens, full
+    length when it lies across the screen, and anywhere between on an orbited
+    camera. Use it when the grip turns during the rep, or when the camera is
+    off the sagittal plane and a flat bell would give the angle away. It needs
+    `forearmPron` authored to be worth anything, because with a neutral
+    forearm it just reports the neutral grip. ARNOLD_PRESS is the one that
+    uses it: the forearms roll from -86 to 90 and both bells swing broadside
+    halfway up and back, which is the whole point of the exercise.
 
   `rot` is a nudge on top of whichever of those applies, and is rarely needed.
   Getting this wrong is very visible in both directions: a `follow` on a
