@@ -906,7 +906,7 @@ const UPRIGHT_ROW = {
       root: { x: 60, y: 61.4, rot: 2 },
       joints: {
         spine: 4, neck: 0,
-        shoulderR: 4, elbowR: 6, shoulderL: 2, elbowL: 8,
+        shoulderR: 180, elbowR: 6, shoulderL: 177, elbowL: 8,
       },
       ik: { ...stand(62, 57) },
     },
@@ -933,7 +933,7 @@ const UPRIGHT_ROW = {
       t: 1,
       root: { x: 60, y: 61.4, rot: 2 },
       joints: {
-        spine: -2, neck: -4,
+        spine: -2, neck: -20,
         shoulderR: 78, elbowR: 124, shoulderL: 74, elbowL: 122,
       },
       ik: { ...stand(62, 57) },
@@ -1165,12 +1165,31 @@ const DUMBBELL_SHOULDER_PRESS = {
 // Bells start in front of the chest with the elbows down and the palms in, then
 // rotate out and press overhead. Must be visible: the start with the elbows IN
 // FRONT of the body rather than out to the sides, which is what separates it
-// from a straight dumbbell press. Suggested view is front; deviating to SIDE,
-// because in front view the racked elbows are in front of the torso and
-// foreshorten to nothing, while side on that forward elbow is the whole story.
+// from a straight dumbbell press. Suggested view is front; neither preset
+// works here, so this is the sagittal plane seen from 30 degrees round.
+//
+// Why not either preset. A front camera cannot draw the racked elbows (they
+// point at the lens and foreshorten to nothing) and it cannot draw a seated
+// figure at all: the leg IK solves in the camera plane, so with the hips up on
+// a bench the knees have nowhere to bend but sideways and the figure sits
+// there in a butterfly stretch. A pure side camera draws the seat correctly
+// but puts the pressing arm through the head: at lockout the near arm and the
+// skull occupy the same pixels, so either the head covers the arm (Mo: "still
+// not in front of the head") or the arm covers the face, and no lockout angle
+// between 165 and 200 separates them.
+//
+// Orbiting the same authored side pose fixes both at once, the way REAR_DELT_FLY
+// already does. The legs still solve in the sagittal plane so the seat reads;
+// the 30 degrees of yaw pushes the near arm clear to one side and the far arm
+// to the other, so at lockout the two arms frame the head with the face fully
+// visible, which is the reference photo Mo sent. It also shows the racked
+// elbow's forward reach better than a flat side view did. Checked at 20 and
+// 40: at 20 the far arm still clips the skull, at 40 the near bell eclipses
+// the far one at the rack and both bells read as one.
+//
 // The palm rotation itself is not drawable on a rig with no forearm twist.
 const ARNOLD_PRESS = {
-  view: "side",
+  view: { plane: "sagittal", yaw: 30 },
   loop: "pingpong",
   dur: 3.2,
   breath: 0.2,
@@ -1271,7 +1290,7 @@ const CUBAN_PRESS = {
       t: 1,
       root: { x: 60, y: 61.4, rot: 2 },
       joints: {
-        spine: -2, neck: 12,
+        spine: -2, neck: -20,
         shoulderR: 191, elbowR: 8, shoulderL: 188, elbowL: 10,
       },
       ik: { ...stand(62, 57) },
