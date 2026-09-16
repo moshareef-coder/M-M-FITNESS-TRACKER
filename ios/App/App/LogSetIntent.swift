@@ -11,8 +11,15 @@ import WidgetKit
 //
 // Interactive widgets are iOS 17 and up. Below that the button is simply not
 // drawn, and the Lock Screen stays read-only.
+/// LiveActivityIntent, not AppIntent.
+///
+/// A button inside a Live Activity needs this specific protocol. With a plain
+/// AppIntent the button draws, highlights, and then does nothing at all: there
+/// is no error and nothing in the log, because the system never routes the tap.
+/// Home Screen widgets accept a plain AppIntent, which is what made this look
+/// like it should already work.
 @available(iOS 17.0, *)
-struct LogSetIntent: AppIntent {
+struct LogSetIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "Log set"
     static var description = IntentDescription("Marks the set you just finished and starts the rest.")
     // Logging a set should not pull anyone into the app mid-workout.
