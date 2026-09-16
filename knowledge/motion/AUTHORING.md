@@ -285,6 +285,21 @@ which is a row, a curl, a fly. A bar stays level either way, because a
 loaded bar cannot tilt with a wrist. Without `stack: false` the prop draws a
 whole single-column tower with the carriage at `top` and the stack from `y0`.
 
+**A prop's `rot` can be keyframed**, when a grip genuinely twists during the
+rep rather than staying fixed. A keyframe carries `propRot: { 2: 90 }`,
+degrees added on top of whatever the prop already draws, keyed by the prop's
+own index in the move's `props` array (count from 0, in authoring order).
+It interpolates across the rep exactly like a joint, and a keyframe that
+omits an index defaults it to 0. Reach for this only when the rotation is
+real and describable, not to fake a wrist DOF this rig does not have: `hold:
+"follow"` on a dumbbell once tried to derive rotation from the forearm's own
+angle, and at any pose where the elbow sits near the head that put the bell
+through the face, because it drew the bell PARALLEL to the forearm rather
+than turning on a grip independent of where the arm points. See
+ARNOLD_PRESS for the real use: the grip is reversed at the bottom (palms
+toward the face) from the lockout (palms forward), so `propRot` on the
+bottom keyframe alone, fading to the lockout's implicit 0, draws that.
+
 Still-frame checks: `pose-check.html?move=Name&t=0,0.5` in a browser, or
 `node scripts/motion-shoot.mjs "Name" out.png "0,0.5" both 300` headless.
 

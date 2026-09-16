@@ -2846,6 +2846,24 @@ function lerpObj(a, b, u, keys) {
   }
   return o;
 }
+/* A prop's own rotation, keyframed like a joint. Authored as
+   `propRot: { 0: -20 }` on a keyframe, keyed by the prop's own index in
+   move.props, degrees ADDED on top of whatever that prop's hold already
+   draws. Missing on one keyframe defaults to 0, the same rule lerpObj uses
+   for a joint the author left out, so a move that only rotates one prop
+   does not have to repeat the others' index at 0. This exists for the one
+   thing this rig has no other way to draw: a grip that visibly twists
+   during the rep, which is authored intent, not something derived from the
+   angles that are already here. See ARNOLD_PRESS. */
+function lerpPropRot(a, b, u) {
+  if (!a && !b) return null;
+  const out = {};
+  for (const k of new Set([...Object.keys(a || {}), ...Object.keys(b || {})])) {
+    const av = (a && a[k]) || 0, bv = (b && b[k]) || 0;
+    out[k] = av + (bv - av) * u;
+  }
+  return out;
+}
 function lerpIk(a, b, u) {
   const out = {};
   const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
@@ -2894,6 +2912,7 @@ export function samplePose(move, cycle, timeSec = 0) {
     root: lerpObj(a.root || {}, b.root || {}, w, ["x", "y", "rot"]),
     joints: lerpObj(a.joints || {}, b.joints || {}, w, [...jointKeys]),
     ik: lerpIk(a.ik, b.ik, w),
+    propRot: lerpPropRot(a.propRot, b.propRot, w),
     feet: move.feet,
     farSide: move.farSide,
     facing: move.facing,
@@ -2944,11 +2963,18 @@ export function render(canvas, move, C, cycle, timeSec = 0, opts = {}) {
   const lit = C.skin === "anatomy" && opts.lit
     ? { ...opts.lit, intensity: opts.lit.intensity === undefined ? litIntensity(move, cycle) : opts.lit.intensity }
     : null;
-  const S = solvePose(samplePose(move, cycle, timeSec), view);
+  const sampled = samplePose(move, cycle, timeSec);
+  const S = solvePose(sampled, view);
   S.farSide = move.farSide || null;
   S.facing = move.facing || "toward";
+  // Most moves have no propRot at all, so this is a no-op skip for the whole
+  // library. The ones that do get a shallow copy per prop rather than
+  // mutating move.props, which is shared across every mount of that move.
+  const props = sampled.propRot
+    ? (move.props || []).map((p, i) => (sampled.propRot[i] === undefined ? p : { ...p, rot: (p.rot || 0) + sampled.propRot[i] }))
+    : move.props;
   drawFigure(ctx, S, C, {
-    props: move.props, floor: move.floor, lit,
+    props, floor: move.floor, lit,
     grip: gripSides(move, S),
     face: opts.face, mood: opts.mood, lines: opts.lines,
   });

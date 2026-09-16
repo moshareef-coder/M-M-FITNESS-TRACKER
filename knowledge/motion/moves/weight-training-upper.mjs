@@ -1188,7 +1188,12 @@ const ARNOLD_PRESS = {
     { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
-    { // start, elbows down and forward, bells in front of the chin
+    { // start, elbows down and forward, bells in front of the chin. The grip
+      // here is the reverse of the lockout's: palms toward the face, which a
+      // side view shows as the bell turned up on end rather than lying flat.
+      // props[2] and props[3] are the two dumbbells; propRot is degrees on
+      // top of whatever the prop's own hold already draws, keyframed the same
+      // way a joint is.
       t: 0,
       root: { x: 52, y: 86, rot: -4 },
       joints: {
@@ -1196,9 +1201,12 @@ const ARNOLD_PRESS = {
         shoulderR: 34, elbowR: 132, shoulderL: 31, elbowL: 130,
       },
       ik: { ...stand(82, 78) },
+      propRot: { 2: 90, 3: 90 },
     },
     { // lockout, arms long and a few degrees past vertical, so the arm passes
-      // over the BACK of the skull and the face is still readable
+      // over the BACK of the skull and the face is still readable. Palms
+      // forward here, the same grip a plain press lockout has, so the bell is
+      // level: propRot fades to 0 rather than being set explicitly.
       t: 1,
       root: { x: 52, y: 86, rot: -4 },
       joints: {
