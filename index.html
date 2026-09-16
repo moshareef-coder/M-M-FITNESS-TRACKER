@@ -1570,14 +1570,12 @@
   /* What notifications actually carry, as three things rather than a sentence.
      The bold half is the fact and the quiet half is him talking, so the list
      can be read for its content in one pass and for the jokes in another. */
-  .push-promise { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 11px; }
-  .push-promise li { display: flex; flex-direction: column; gap: 1px; padding-left: 15px; position: relative; }
+  .push-promise { list-style: none; margin: 8px 0 4px; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+  .push-promise li { position: relative; padding-left: 16px; font-size: 15px; color: var(--text); }
   .push-promise li::before {
     content: ""; position: absolute; left: 0; top: 8px;
     width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
   }
-  .push-promise b { font-size: 15px; font-weight: 700; color: var(--text); }
-  .push-promise span { font-size: 13.5px; color: var(--muted); }
   /* One blocked person. The address can be long and the button must not be
      pushed off the edge by it, so the name takes the slack and ellipsises. */
   .block-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
@@ -4758,21 +4756,21 @@
   .sc-proof-body .muted-note { margin: 0; }
   .sc-proof-body .link-btn { margin-top: 3px; }
 
-  /* The strength card's lift list: tap a row and the chart above switches to
-     it, the same "tap to re-focus" idea the Body tab already uses. */
-  .str-list { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 4px; }
+  /* The strength card's lift picker: tap a pill and the chart above switches
+     to it, the same "tap to re-focus" idea the Body tab already uses. It was a
+     list six rows deep, each naming a lift with its set count and its best,
+     which is three more numbers per row than the question "which lift am I
+     looking at" needs. One line of pills says the same thing in 44px. */
+  .str-list { display: flex; gap: 7px; overflow-x: auto; margin-top: 14px; scrollbar-width: none; }
+  .str-list::-webkit-scrollbar { display: none; }
   .str-row {
-    width: 100%; display: flex; align-items: baseline; gap: 10px; padding: 10px 0;
-    border-bottom: 1px solid var(--border); background: none; border-left: 0; border-right: 0; border-top: 0;
-    color: var(--text); font-family: inherit; text-align: left; cursor: pointer;
+    flex-shrink: 0; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+    padding: 10px 14px; border-radius: 100px; white-space: nowrap; min-height: 44px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+    transition: background-color .18s, color .18s, border-color .18s;
   }
-  .str-row:last-child { border-bottom: none; }
-  .str-row:active { background: var(--panel-2); }
-  .str-row.on .str-row-name { color: var(--me-ink); }
-  .str-row-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .str-row-meta { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
-  .str-row-w { font-size: 15.5px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .str-row-w i { font-style: normal; font-size: 11px; font-weight: 600; color: var(--muted); margin-left: 3px; }
+  .str-row.on { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+  .str-row:active { transform: scale(.97); }
   /* One reading, or none in the window: a real answer in place of an axis
      with nothing on it or one dot floating in the middle. */
   .str-single {
@@ -5434,7 +5432,7 @@
 
     <div class="card metric-card" id="cardStrength">
       <h2>Strength</h2>
-      <div class="wt-stats" id="strengthStats"></div>
+      <p class="muted-note" style="margin-top:-6px" id="strengthLead"></p>
       <div class="chart-wrap">
         <canvas id="strengthChart"></canvas>
         <div class="str-single hidden" id="strengthSingle"></div>
@@ -14539,16 +14537,23 @@ function liftHistory(name, exerciseName, weeks = 12) {
 let STRENGTH_LIFT = null;
 let STRENGTH_LIFT_FOR = null;
 
+/* One line, about the lift the chart is actually drawing. It used to be three
+   stat tiles counting LIFTS TRACKED / SETS LOGGED / LIFETIME PRS, none of which
+   answer the question this card is here for, which is whether the lift on the
+   screen is going up. */
 function renderStrengthStats() {
-  const viewingPartner = PROGRESS_VIEW === "partner";
-  const name = viewingPartner ? partnerName() : ME;
-  const { prCount } = personalRecords(name);
-  const lifts = topLiftsFor(name, 100);
-  const totalSets = lifts.reduce((s, l) => s + l.sets, 0);
-  $("strengthStats").innerHTML = `
-    <div class="wt-stat"><b>${lifts.length}</b><span>Lifts tracked</span></div>
-    <div class="wt-stat"><b>${totalSets}</b><span>Sets logged</span></div>
-    <div class="wt-stat${prCount > 0 ? " good" : ""}"><b>${prCount}</b><span>Lifetime PRs</span></div>`;
+  const el = $("strengthLead");
+  if (!el) return;
+  const name = PROGRESS_VIEW === "partner" ? partnerName() : ME;
+  const lifts = topLiftsFor(name);
+  /* The empty state under the chart already says there is nothing logged. */
+  if (!lifts.length) { el.textContent = ""; return; }
+  /* renderStrengthChart picks the lift, but it defers when Chart.js is still
+     downloading, so read the same default it would rather than print a stale
+     name or none at all. */
+  const picked = lifts.find((l) => l.name === STRENGTH_LIFT) || lifts[0];
+  el.textContent = `${picked.name}, best ${picked.best} lb.`
+    + (lifts.length > 1 ? " Tap another lift." : "");
 }
 
 let strengthChart = null;
@@ -14572,6 +14577,7 @@ function renderStrengthChart() {
       "Log a weighted exercise and your top lifts start ranking here.");
     if (strengthChart) { strengthChart.destroy(); strengthChart = null; }
     $("strengthList").innerHTML = "";
+    renderStrengthStats();
     return;
   }
   card.classList.remove("chart-empty");
@@ -14622,14 +14628,10 @@ function renderStrengthChart() {
     });
   }
 
-  $("strengthList").innerHTML = `<div class="wt-history-head">Charting ${escapeHtml(STRENGTH_LIFT)}</div>` +
-    lifts.map((l) => `<button type="button" class="str-row${l.name === STRENGTH_LIFT ? " on" : ""}" data-lift="${escapeHtml(l.name)}">
-      <span class="str-row-name">${escapeHtml(l.name)}</span>
-      <span class="str-row-meta">${bodyFmtSets(l.sets)}</span>
-      <span class="str-row-w">${l.best}<i>lbs</i></span>
-    </button>`).join("");
+  $("strengthList").innerHTML = lifts.map((l) =>
+    `<button type="button" class="str-row${l.name === STRENGTH_LIFT ? " on" : ""}" data-lift="${escapeHtml(l.name)}">${escapeHtml(l.name)}</button>`).join("");
   $("strengthList").querySelectorAll("[data-lift]").forEach((b) => {
-    b.onclick = () => { STRENGTH_LIFT = b.dataset.lift; renderStrengthChart(); };
+    b.onclick = () => { STRENGTH_LIFT = b.dataset.lift; renderStrengthChart(); renderStrengthStats(); };
   });
 }
 
@@ -24461,26 +24463,28 @@ const ASK_PUSH_KEY = "ft_ask_push";
    notifications that is no longer true is the kind of thing Apple reads during
    review. Kept deliberately whole: it covers everything the app can send
    rather than only the example that sells it best. */
+/* Plain, and deliberately so.
+
+   The character speaks everywhere else in this app, and this is the one screen
+   he stays off. A permission prompt is somebody deciding whether to trust us
+   with their Lock Screen, and a joke there is asking them to be charmed at the
+   moment they are being careful. Every other fitness app says this plainly
+   because plain is what reads as safe, and that is the correct instinct for a
+   surface whose only job is to be believed. */
 function pushPromise(partnerName) {
-  const who = partnerName || "your partner";
-  /* His voice, which means the joke is always on him. quips.mjs is explicit
-     that he never jokes about your body, your lifts, a set you missed or a day
-     you skipped, so none of these are about the person reading them: the plan
-     has not moved, he checked, he will act surprised, he has opinions he is
-     keeping. He is the idiot in the scene, the way he is everywhere else. */
   return [
-    [`A video from ${who}`, "It plays once, so I would hurry."],
-    ["A nudge about today's plan", "It is still sitting there. I have checked twice."],
-    ["A goal you set, reached", "I will act surprised."],
+    "Workout reminders",
+    partnerName ? `Messages from ${partnerName}` : "Messages from your partner",
+    "Goal milestones",
   ];
 }
 
-/* The same three lines as a list, for the sheet and the Setup screen. */
+/* The same three lines, for the sheet and the Setup screen. */
 function pushPromiseHtml(partnerName) {
-  const rows = pushPromise(partnerName).map(([what, aside]) => `
-    <li><b>${escapeHtml(what)}</b><span>${escapeHtml(aside)}</span></li>`).join("");
-  return `<ul class="push-promise">${rows}</ul>
-    <p class="muted-note">Nothing about anybody else's training. I have opinions. I keep them.</p>`;
+  const rows = pushPromise(partnerName)
+    .map((what) => `<li>${escapeHtml(what)}</li>`).join("");
+  return `<p class="muted-note">Get notified about:</p>
+    <ul class="push-promise">${rows}</ul>`;
 }
 
 /* The one time we ask for notifications.
@@ -24513,7 +24517,7 @@ async function maybeAskForPush() {
 
   const partner = PARTNER_EMAIL ? nameFor(PARTNER_EMAIL) : "";
   const yes = await askConfirm({
-    heading: "One thing before you start",
+    heading: "Notifications",
     /* The whole promise, not just the strongest example of it. Leading with
        the clip and stopping there would have sold this on one notification and
        then delivered several, which is how an app teaches people that its
