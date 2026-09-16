@@ -135,9 +135,15 @@ const HACK_SQUAT = {
   dur: 3.2,
   breath: 0.2,
   fit: { k: 0.9, dy: 6 },
+  // Plate loaded linear hack squat. The rails and platform are scenery; the
+  // sled (back pad, shoulder pads, carriage, plates) is a held sprite pinned
+  // to the shoulder at the pad angle of the top key, so it moves with the
+  // body the way the real sled does. See the report on the eq/sleds branch:
+  // the bottom key's pelvis travels down and BACK, off the rail line.
   props: [
-    { type: "box", x: 44, y: 104, w: 64 },
-    { type: "bench", x: 25, y: 35, w: 34, incline: -70 },
+    { type: "artwork", src: "/knowledge/motion/props/hack-squat.svg" },
+    { type: "artwork", src: "/knowledge/motion/props/hack-squat-sled.svg", side: "R", point: "shoulder", dx: -4.3, dy: 17.5, rot: -20 },
+    { type: "artwork", src: "/knowledge/motion/props/hack-squat-pad.svg", side: "R", point: "shoulder", dx: -2.5, dy: -8.4, rot: -20, front: true },
   ],
   keys: [
     { // top, legs nearly straight, back long on the pad
@@ -165,11 +171,15 @@ const LEG_PRESS = {
   loop: "pingpong",
   dur: 3.2,
   breath: 0.2,
+  // Plate loaded seated leg press: the seat, back pad and frame are scenery,
+  // the footplate is a held sprite on the toe (its face 2.4 in front of the
+  // toe, the discs on the horn above) carried by a lever from the pivot on the
+  // front bracket. That pivot is where the ankle's own arc centres (17 units
+  // from the plate at every key), so the arm neither stretches nor slips.
   props: [
-    { type: "bench", x: 4, y: 68, w: 47, incline: -70 },
-    { type: "box", x: 32, y: 95, w: 30 },
-    { type: "barbell", side: "L", point: "ankle", dx: 5, dy: -1, r: 12 },
-    { type: "barbell", side: "R", point: "ankle", dx: 6, dy: -1, r: 12, front: true },
+    { type: "artwork", src: "/knowledge/motion/props/leg-press.svg" },
+    { type: "lever", pivot: { x: 89, y: 91 }, to: { side: "R", point: "toe", dx: 4.9, dy: 12 }, r: 2.4 },
+    { type: "artwork", src: "/knowledge/motion/props/leg-press-sled.svg", side: "R", point: "toe", dx: 16.4, dy: 6, rot: 0, front: true },
   ],
   keys: [
     { // pressed out, knees long but not locked
@@ -858,11 +868,12 @@ const LEG_PRESS_CALF_RAISE = {
   loop: "pingpong",
   dur: 2.6,
   breath: 0.2,
+  // Same seated leg press as Leg Press. The plate rides higher on the toe so
+  // the heel hangs off its bottom lip, which is how a calf raise is set up.
   props: [
-    { type: "bench", x: 4, y: 68, w: 47, incline: -70 },
-    { type: "box", x: 32, y: 95, w: 30 },
-    { type: "barbell", side: "L", point: "toe", dx: 1, dy: -1, r: 12 },
-    { type: "barbell", side: "R", point: "toe", dx: 2, dy: -1, r: 12, front: true },
+    { type: "artwork", src: "/knowledge/motion/props/leg-press.svg" },
+    { type: "lever", pivot: { x: 89, y: 91 }, to: { side: "R", point: "toe", dx: 4.9, dy: 3 }, r: 2.4 },
+    { type: "artwork", src: "/knowledge/motion/props/leg-press-sled.svg", side: "R", point: "toe", dx: 16.4, dy: -15, rot: 0, front: true },
   ],
   keys: [
     { // toes taking the load, ankle pushed back toward the shin
