@@ -89,9 +89,10 @@ private struct LogSetButton: View {
     // the session screen calls that Start set N, so this does too.
     var resting: Bool = false
     var label: String = "Log set"
+    var action: String = "log"
 
     var body: some View {
-        Button(intent: LogSetIntent()) {
+        Button(intent: LogSetIntent(action: action)) {
             HStack(spacing: 5) {
                 Text(label)
                     .font(.system(size: 13.5, weight: .bold))
@@ -293,6 +294,32 @@ private struct LockScreenView: View {
     let state: WorkoutAttributes.ContentState
 
     private var resting: Bool { isResting(state) }
+    private var liftDone: Bool { state.total > 0 && state.done >= state.total }
+
+    /* One place on the card, three meanings. Coming off a rest you are starting
+       a set, not logging one, and the lift being finished means the only useful
+       thing left is moving on. Every one of these used to log a set. */
+    private var buttonAction: String {
+        if liftDone && !state.nextExercise.isEmpty { return "next" }
+        if resting { return "start" }
+        return "log"
+    }
+
+    private var buttonLabel: String {
+        if liftDone && !state.nextExercise.isEmpty { return "Next exercise" }
+        if resting { return "Start set \(min(state.done + 1, max(state.total, 1)))" }
+        return "Log set"
+    }
+
+    /* Resting is a state of the person, not of the lift, so the card says so
+       while it lasts. The lift name is not shown during a rest: the chip still
+       says which lift you are on, the load line says what the next set is, and
+       the name comes back the moment you start it. Once a lift is finished the
+       title becomes what is coming rather than what is done. */
+    private var title: String {
+        if liftDone && !state.nextExercise.isEmpty { return state.nextExercise }
+        return resting ? "Resting" : state.exercise
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -300,8 +327,9 @@ private struct LockScreenView: View {
             // position because the hero already counts sets.
             HStack(spacing: 10) {
                 UnioMark(size: 24)
-                Text(state.exercise)
+                Text(title)
                     .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(resting && !liftDone ? Unio.lime : Unio.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 Spacer(minLength: 6)
@@ -318,10 +346,7 @@ private struct LockScreenView: View {
                 if resting { RestHero(state: state) } else { HeroNumber(state: state) }
                 Spacer(minLength: 6)
                 if #available(iOS 17.0, *) {
-                    LogSetButton(resting: resting,
-                                 label: resting
-                                    ? "Start set \(min(state.done + 1, max(state.total, 1)))"
-                                    : "Log set")
+                    LogSetButton(resting: resting, label: buttonLabel, action: buttonAction)
                 }
             }
 

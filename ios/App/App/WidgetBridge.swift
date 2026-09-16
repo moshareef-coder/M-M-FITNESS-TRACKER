@@ -70,7 +70,14 @@ public class WidgetBridge: CAPPlugin, CAPBridgedPlugin {
             guard entry["owner"] as? String == owner, let at = entry["at"] as? Double else { return false }
             return now - at <= maxAge
         }
-        call.resolve(["count": mine.count, "dropped": queued.count - mine.count])
+        /* Two kinds of tap live in this queue now and they are not
+           interchangeable: replaying "move to the next lift" as a logged set
+           would invent a set nobody did. Anything unlabelled came from a build
+           before the split, when every tap was a set. */
+        let sets = mine.filter { ($0["kind"] as? String ?? "set") == "set" }.count
+        let advances = mine.filter { ($0["kind"] as? String) == "next" }.count
+        call.resolve(["count": sets, "advances": advances,
+                      "dropped": queued.count - mine.count])
     }
 
     /// Load changes made from the island, for the workout asking for them.

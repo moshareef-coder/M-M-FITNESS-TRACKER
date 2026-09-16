@@ -18048,6 +18048,13 @@ async function drainLockScreenSets() {
       if (next === -1) break;
       toggleSet(next);
     }
+    /* Moving to the next lift is its own tap on the Lock Screen now, so it is
+       its own action here. Replaying it as a set would invent one nobody did,
+       which is why the queue records which kind each tap was. */
+    for (let i = 0; i < (advances || 0); i++) {
+      if (SESSION.finished) break;
+      await finishExerciseAndAdvance();
+    }
   } catch (err) {
     console.error("draining lock screen sets failed", err);
   }

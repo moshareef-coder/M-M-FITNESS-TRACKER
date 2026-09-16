@@ -25,6 +25,18 @@ struct LogSetIntent: LiveActivityIntent {
     // Logging a set should not pull anyone into the app mid-workout.
     static var openAppWhenRun: Bool = false
 
+    /// "log", "start" or "next". One button in three states, because the same
+    /// place on the card means a different thing depending on where you are:
+    /// finishing a set, coming back off a rest, or moving to the next lift.
+    /// They were all doing the log, so Start set 2 logged set 2 the moment it
+    /// was meant to begin it.
+    @Parameter(title: "Action")
+    var action: String
+
+    init() { self.action = "log" }
+
+    init(action: String) { self.action = action }
+
     private static let appGroup = "group.com.creativelab1.fittogether"
     private static let pendingSetsKey = "pendingSetLogs"
     // Written by LiveWorkout when the app starts or updates the activity.
@@ -35,16 +47,59 @@ struct LogSetIntent: LiveActivityIntent {
     private static let ownerKey = "sessionOwner"
 
     func perform() async throws -> some IntentResult {
-        queueForTheApp()
-        // He says something new every time, the way he does in the app, rather
-        // than repeating the line that was already sitting there.
-        let line = nextLine()
-        // Confirm the tap, hold it long enough to read, then settle into the
-        // rest with him typing the new line out.
-        await advanceTheActivity(celebrating: true, quip: "")
-        try? await Task.sleep(nanoseconds: 1_400_000_000)
-        await typeOut(line)
+        switch action {
+        case "start":
+            // Ending a rest is not an event worth a green card: you are simply
+            // picking the bar back up. It just clears the clock.
+            await endTheRest()
+        case "next":
+            queueForTheApp(kind: "next")
+            await rollToNextLift()
+        default:
+            queueForTheApp(kind: "set")
+            // He says something new every time, the way he does in the app,
+            // rather than repeating the line already sitting there.
+            let line = nextLine()
+            // Confirm the tap, hold it long enough to read, then settle into
+            // the rest with him typing the new line out.
+            await advanceTheActivity(celebrating: true, quip: "")
+            try? await Task.sleep(nanoseconds: 1_400_000_000)
+            await typeOut(line)
+        }
         return .result()
+    }
+
+    /// Back to working: the clock stops and the card stops saying Resting.
+    private func endTheRest() async {
+        guard let activity = WorkoutAttributes.live else { return }
+        await activity.update(ActivityContent(state: mutate(activity.content.state) {
+            $0.restStartedAt = nil
+        }, staleDate: nil))
+    }
+
+    /// The next lift, with its own set count, and nothing logged by doing it.
+    private func rollToNextLift() async {
+        guard let activity = WorkoutAttributes.live else { return }
+        let now = activity.content.state
+        guard !now.nextExercise.isEmpty else { return }
+        await activity.update(ActivityContent(state: mutate(now) {
+            $0.exercise = now.nextExercise
+            $0.total = now.nextTotal
+            $0.done = 0
+            $0.restStartedAt = nil
+            // The app sends the real next lift on its next update; guessing
+            // further ahead here would chain the whole workout blind.
+            $0.nextExercise = ""
+            $0.nextTotal = 0
+        }, staleDate: nil))
+    }
+
+    private func mutate(_ state: WorkoutAttributes.ContentState,
+                        _ change: (inout WorkoutAttributes.ContentState) -> Void)
+        -> WorkoutAttributes.ContentState {
+        var copy = state
+        change(&copy)
+        return copy
     }
 
     /// One of the lines the app left in the App Group, avoiding the one already
@@ -87,14 +142,14 @@ struct LogSetIntent: LiveActivityIntent {
     ///
     /// No owner means no workout is running, so there is nothing for a tap to
     /// be a set of and it is not queued at all.
-    private func queueForTheApp() {
+    private func queueForTheApp(kind: String) {
         guard let defaults = UserDefaults(suiteName: Self.appGroup),
               let owner = defaults.string(forKey: Self.ownerKey), !owner.isEmpty else { return }
         // A queue written by an older build holds bare doubles, which will not
         // cast, so it is replaced rather than appended to. Unowned taps are
         // exactly what this is here to throw away.
         var pending = defaults.array(forKey: Self.pendingSetsKey) as? [[String: Any]] ?? []
-        pending.append(["at": Date().timeIntervalSince1970, "owner": owner])
+        pending.append(["at": Date().timeIntervalSince1970, "owner": owner, "kind": kind])
         defaults.set(pending, forKey: Self.pendingSetsKey)
     }
 
@@ -114,7 +169,7 @@ struct LogSetIntent: LiveActivityIntent {
         // The last set of a lift rolls straight on to the next one, the way you
         // would in the app, rather than parking on a finished exercise with a
         // button that can no longer do anything.
-        let finishedLift = !alreadyAdvanced && done >= now.total && !now.nextExercise.isEmpty
+        let finishedLift = false
         let next = WorkoutAttributes.ContentState(
             exercise: finishedLift ? now.nextExercise : now.exercise,
             detail: now.detail,
