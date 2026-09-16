@@ -158,6 +158,71 @@
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
+  /* ---------- Launch ----------
+
+     The two arcs swing shut into the ring, the dumbbell settles, and the whole
+     mark opens out to reveal the app. It is the logo assembling itself, which
+     is also the product: two halves becoming one thing.
+
+     The pieces are the real artwork, cut out of the master render by
+     scripts/split-logo-parts.py, rather than arcs redrawn as strokes. Redrawn
+     ones lose the gloss and stop being the logo.
+
+     The wait here is a network round trip, so this cannot be a fixed length: it
+     has an entrance, a hold that loops for as long as it takes, and an exit
+     fired when the app is ready. */
+  #boot {
+    position: fixed; inset: 0; z-index: 90;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 22px; background: var(--bg);
+    transition: opacity .42s ease, transform .42s cubic-bezier(.4,0,.2,1);
+  }
+  .boot-mark { position: relative; width: min(38vw, 150px); aspect-ratio: 1; }
+  .boot-mark img {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: contain;
+  }
+  /* Each arc swings in from its own side around the centre of the mark. */
+  .boot-arc-l { animation: bootArcL .78s cubic-bezier(.34,1.3,.5,1) both; }
+  .boot-arc-r { animation: bootArcR .78s cubic-bezier(.34,1.3,.5,1) both; }
+  .boot-bar   { animation: bootBar .5s ease .46s both; }
+  .boot-word {
+    font-family: var(--font-display); font-weight: 800; font-size: 20px;
+    letter-spacing: .22em; margin: 0; color: var(--text);
+    animation: bootWord .5s ease .58s both;
+  }
+  /* The hold. Added once the entrance has finished, so a slow network breathes
+     rather than freezing on the last frame of an animation. */
+  #boot.waiting .boot-mark { animation: bootBreath 2.4s ease-in-out infinite; }
+  #boot.done { opacity: 0; transform: scale(1.35); pointer-events: none; }
+
+  @keyframes bootArcL {
+    from { opacity: 0; transform: rotate(-52deg) translateX(-14%); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes bootArcR {
+    from { opacity: 0; transform: rotate(52deg) translateX(14%); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes bootBar {
+    from { opacity: 0; transform: scale(.72); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes bootWord {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes bootBreath {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.045); }
+  }
+  /* Asked not to move: the mark is simply there, and it still fades out. */
+  @media (prefers-reduced-motion: reduce) {
+    .boot-arc-l, .boot-arc-r, .boot-bar, .boot-word { animation: none; opacity: 1; transform: none; }
+    #boot.waiting .boot-mark { animation: none; }
+    #boot.done { transform: none; }
+  }
+
   html, body {
     margin: 0; padding: 0;
     /* Rubber-band drag is what makes a wrapped app read as a web page. */
@@ -5068,6 +5133,17 @@
 </head>
 <body>
 
+<!-- In the markup, not injected, so it is on screen at first paint. Anything
+     built by JS arrives after the wait it exists to cover. -->
+<div id="boot" aria-hidden="true">
+  <div class="boot-mark">
+    <img class="boot-arc boot-arc-l" src="logo/unio-left.png" alt="" />
+    <img class="boot-arc boot-arc-r" src="logo/unio-right.png" alt="" />
+    <img class="boot-bar" src="logo/unio-bar.png" alt="" />
+  </div>
+  <p class="boot-word">UNIO</p>
+</div>
+
 <div id="onboard">
   <!-- steps injected by JS -->
 </div>
@@ -6091,6 +6167,7 @@ function showFatal(what) {
   const el = document.getElementById("fatalBanner");
   if (!el) return;
   el.classList.remove("hidden");
+  dismissBoot();
   el.innerHTML = `<strong>Something broke while loading.</strong>
     <span>${escapeHtml(String(what || "")).slice(0, 160)}</span>
     <button type="button" onclick="location.reload()">Reload</button>`;
@@ -6233,6 +6310,34 @@ function registerAuthDeepLink() {
   });
 }
 
+/* The launch screen comes down when there is something real behind it, not on a
+   timer. A timer either cuts the mark off mid-swing on a fast connection or
+   uncovers an empty screen on a slow one.
+
+   It is also never left up: every path that paints calls this, and a failure
+   that paints an error calls it too, because a launch screen over an error
+   message is just a hang. */
+let BOOT_DONE = false;
+function dismissBoot() {
+  if (BOOT_DONE) return;
+  BOOT_DONE = true;
+  const boot = document.getElementById("boot");
+  if (!boot) return;
+  /* Let the arcs finish closing even if the session resolved instantly, so the
+     mark is never caught half assembled. 780ms is the entrance. */
+  const left = Math.max(0, 820 - (Date.now() - BOOT_STARTED));
+  setTimeout(() => {
+    boot.classList.add("done");
+    setTimeout(() => boot.remove(), 460);
+  }, left);
+}
+const BOOT_STARTED = Date.now();
+/* The hold starts when the entrance ends, so a slow network breathes instead of
+   sitting on a finished animation's last frame. */
+setTimeout(() => {
+  if (!BOOT_DONE) document.getElementById("boot")?.classList.add("waiting");
+}, 800);
+
 function initOnboard() {
   // iOS private browsing can throw here, and this runs before first paint.
   let theme = "light";
@@ -6261,7 +6366,12 @@ function initOnboard() {
   sb.auth.getSession().then(({ data }) => {
     if (data.session) handleSignedIn(data.session);
     else renderSignInScreen();
-  });
+  }).catch((err) => {
+    /* supabase-js resolves rather than throwing on a failed query, but a dead
+       network rejects here, and a launch screen left up over that is a hang. */
+    console.error("could not read the session", err);
+    renderSignInScreen();
+  }).finally(dismissBoot);
 }
 
 /* Capacitor injects this global before the page loads, so no bundler or script

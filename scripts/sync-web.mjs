@@ -21,6 +21,13 @@ const ASSETS = [
      throws and he has no lines at all, in the session or on the Lock Screen. */
   "quips.mjs",
   "sw.js",
+  /* The launch animation's three layers, cut from the master render by
+     scripts/split-logo-parts.py. These are <img> src rather than a runtime
+     import, so the import check below cannot catch them going missing: left
+     out, the app launches to an empty screen. */
+  "logo/unio-left.png",
+  "logo/unio-right.png",
+  "logo/unio-bar.png",
   "icon-192.png",
   "icon-512.png",
   "icon-maskable-512.png",
@@ -83,6 +90,7 @@ for (const file of ASSETS) {
     console.warn(`skip (missing): ${file}`);
     continue;
   }
+  mkdirSync(dirname(join(out, file)), { recursive: true });
   copyFileSync(src, join(out, file));
   copied++;
 }
