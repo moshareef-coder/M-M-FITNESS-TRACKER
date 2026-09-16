@@ -1203,24 +1203,28 @@ const ARNOLD_PRESS = {
       ik: { ...stand(82, 78) },
       propRot: { 2: 90, 3: 90 },
     },
-    { // lockout, arms long and a few degrees past vertical, so the arm passes
-      // over the BACK of the skull and the face is still readable. Palms
-      // forward here, the same grip a plain press lockout has, so the bell is
-      // level: propRot fades to 0 rather than being set explicitly.
+    { // lockout, arms long overhead. Palms forward here, the same grip a
+      // plain press lockout has, so the bell is level: propRot fades to 0
+      // rather than being set explicitly.
       //
-      // shoulderR was 191 here, which is a real Arnold Press lockout but sent
-      // the upper arm segment far enough behind the head that the depth sort
-      // could not treat the arm as one piece: crossesHead() draws the WHOLE
-      // near arm behind the head or the whole arm in front of it, and at 191
-      // part of the arm wanted each. Mo: "arnold press looks so weird when
-      // he's up there. as if his arm went inside of him." 183 keeps the same
-      // past-vertical lean and the same readable face, just short of where
-      // the arm splits across that boundary.
+      // This used to lean the arm back PAST vertical, "over the back of the
+      // skull", on the idea that the face should stay clear of the arm
+      // entirely. Two things were wrong with that: shoulderR 191 sent the
+      // upper arm far enough behind the head that crossesHead() (rig.mjs)
+      // could not treat the near arm as one piece, drawing part of it behind
+      // the head and part in front with a seam between ("as if his arm went
+      // inside of him"); backing off to 183 closed the seam but kept the arm
+      // tucked behind the skull, which is not what the arm does in a real
+      // Arnold press either. Mo, on a reference photo: "his arm is supposed
+      // to be in front of his face." 165 is the same lockout Seated Dumbbell
+      // Press already uses successfully: the arm passes IN FRONT, clear of
+      // the head, the ordinary depth sort handles it with no seam, and
+      // nothing here still needs the "past vertical" idea.
       t: 1,
       root: { x: 52, y: 86, rot: -4 },
       joints: {
         spine: -2, neck: 8,
-        shoulderR: 183, elbowR: 6, shoulderL: 180, elbowL: 8,
+        shoulderR: 165, elbowR: 6, shoulderL: 162, elbowL: 8,
       },
       ik: { ...stand(82, 78) },
     },
