@@ -6126,6 +6126,17 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
+/* Where the public site lives: the privacy policy, the support page, and the
+   link that goes out when somebody shares a session.
+
+   One constant because it was three, and because it is going to change. The
+   app is called Unio and this says m-m-fitness-tracker, which people see when a
+   session is shared and which an App Store reviewer sees on the privacy link
+   from the sign in screen. Both of those uses need a URL that actually
+   resolves, so this stays until there is a real domain, and then it is one line
+   rather than a hunt. */
+const PUBLIC_SITE = "https://m-m-fitness-tracker.vercel.app";
+
 const SUPABASE_URL = "https://stcpiovpjismhltklfdw.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_890hsPHDiiz4-fQi7Jqd9g_a_aoHyz2";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -7432,10 +7443,21 @@ function renderPairRefusedScreen(refused) {
    group and its member row just sat orphaned forever. Pulled until a small
    group is actually recognised somewhere, rather than shipping a choice that
    quietly does nothing. */
+/* "I coach people" is pulled for the same reason, and it is the same mistake
+   one size larger. Choosing it created a real groups row and then showed a
+   screen advertising a coach dashboard on the web, which is not being built
+   until after launch. Its Copy the link button copied location.origin + /coach/,
+   which inside the app is https://localhost/coach/ and goes nowhere.
+   So it offered a feature that does not exist, on a domain belonging to another
+   product, three taps into onboarding, which is both a promise we cannot keep
+   and the thing App Review call an incomplete app.
+   Everything behind it is left alone. Coached accounts still work, clients
+   still cannot generate their own workouts, loadMyGroups still finds a group.
+   The only thing gone is the ability to start a new one before there is
+   anywhere to manage it from. */
 const SETUPS = [
   { key: "solo",  title: "Just me",            sub: "Train alone. You can add someone whenever you like.", seats: 1 },
   { key: "pair",  title: "Me and one other",   sub: "A partner you keep each other honest with.",          seats: 2 },
-  { key: "coach", title: "I coach people",     sub: "Up to 20, including you. Managed from the web.",      seats: 20 },
 ];
 
 function renderPairingScreen() {
@@ -9934,7 +9956,7 @@ async function reconcileNativeSurfaces() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim"]
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "liftsScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
   stopGenTicker();
   $("genScrim")?.classList.add("hidden");
@@ -12012,7 +12034,7 @@ function closeRecap() { $("recapScrim").classList.add("hidden"); }
    because nobody taps an unfurled card. A bare image brings nobody back. So we
    send both: the picture people will actually look at, and the URL alongside it
    for anywhere that accepts one. */
-const SHARE_URL = "https://m-m-fitness-tracker.vercel.app";
+const SHARE_URL = PUBLIC_SITE;
 
 /* A canvas font string is not a CSS rule: an unavailable family falls back to
    the browser's default sans without an error, a warning or a visible clue.
@@ -14997,15 +15019,18 @@ function renderStrengthStats() {
 /* The level, or nothing at all. A lift we cannot level honestly (a dumbbell,
    a machine, somebody with no weigh-in) hides the whole block rather than
    showing a bar with nothing in it, which would read as "you are a beginner"
-   when what it means is "we do not know". */
-function renderStrengthLevel(name, exerciseName) {
-  const wrap = $("strengthLevel");
+   when what it means is "we do not know". Element ids are parameters, not
+   hardcoded, so the lift detail sheet can draw the same bar as the card
+   without a second copy of this to drift out of step with the first. */
+function renderStrengthLevel(name, exerciseName, ids = {}) {
+  const wrapId = ids.wrap || "strengthLevel", segsId = ids.segs || "strengthLevelSegs", noteId = ids.note || "strengthLevelNote";
+  const wrap = $(wrapId);
   if (!wrap) return;
   const lv = strengthLevelFor(name, exerciseName);
   if (!lv) { wrap.classList.add("hidden"); return; }
   wrap.classList.remove("hidden");
 
-  $("strengthLevelSegs").innerHTML = STRENGTH_LEVELS.map((_, i) => {
+  $(segsId).innerHTML = STRENGTH_LEVELS.map((_, i) => {
     const pct = i < lv.index ? 100 : i === lv.index ? Math.round(lv.within * 100) : 0;
     return `<i><b style="width:${pct}%"></b></i>`;
   }).join("");
@@ -15015,7 +15040,7 @@ function renderStrengthLevel(name, exerciseName) {
      something about, which is the whole reason this is on the card. The
      bodyweight ratio and the estimated single are both true and both detail,
      and this tab has already learned what happens when detail goes up front. */
-  $("strengthLevelNote").innerHTML = lv.next
+  $(noteId).innerHTML = lv.next
     ? `<b>${escapeHtml(lv.level)}.</b> ${lv.toNext} lb to ${escapeHtml(lv.next)}.`
     : `<b>${escapeHtml(lv.level)}.</b> Top of the scale.`;
 }
@@ -15101,6 +15126,157 @@ function renderStrengthChart() {
   $("strengthList").querySelectorAll("[data-lift]").forEach((b) => {
     b.onclick = () => { STRENGTH_LIFT = b.dataset.lift; renderStrengthChart(); renderStrengthStats(); };
   });
+
+  const allBtn = $("strengthAllBtn");
+  if (allBtn) {
+    // Partner view has no pins to manage and nothing to browse that is not
+    // already ranked on the card, so the button that would manage them is
+    // simply not there rather than opening a screen that cannot do anything.
+    allBtn.classList.toggle("hidden", viewingPartner || allLiftsFor(name).length === 0);
+    allBtn.onclick = () => openLiftBrowser(name);
+  }
+}
+
+/* ---------- Browse every lift, feature up to five ----------
+   The card can only ever show a handful of lifts before it stops being a
+   card. This is the rest of them: every weighted exercise ever logged, most
+   recently trained first, each one tappable into its own page with the full
+   chart and the same level bar the card uses. The star on that page (and on
+   each row here) is the whole feature: pin up to five, and those five are
+   what the card above shows from then on, in the order they were pinned,
+   instead of guessing off set count. */
+let LIFT_BROWSE_FOR = null;
+
+function openLiftBrowser(name) {
+  LIFT_BROWSE_FOR = name;
+  renderLiftList();
+  $("liftsScrim").classList.remove("hidden");
+  $("liftsScrim").onclick = (e) => { if (e.target === $("liftsScrim")) closeLiftBrowser(); };
+}
+function closeLiftBrowser() { $("liftsScrim").classList.add("hidden"); }
+
+function renderLiftList() {
+  const name = LIFT_BROWSE_FOR;
+  const lifts = allLiftsFor(name).sort((a, b) => b.lastDate.localeCompare(a.lastDate));
+  const pins = getPinnedLifts();
+
+  $("liftsSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="lftClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">All lifts</div>
+      <div class="spacer"></div>
+    </div>
+    <p class="muted-note" style="margin:-6px 0 14px;">
+      ${lifts.length} logged. Star up to ${MAX_PINNED_LIFTS} to feature them on Strength.
+    </p>
+    ${lifts.map((l) => {
+      const on = pins.some((p) => p.toLowerCase() === l.name.toLowerCase());
+      const lv = strengthLevelFor(name, l.name);
+      return `<div class="wk-row lft-row" data-open="${escapeHtml(l.name)}">
+        <span class="wk-ico">${icon("dumbbell", 17)}</span>
+        <span class="wk-txt">
+          <span class="wk-name">${escapeHtml(l.name)}</span>
+          <span class="wk-meta">${lv ? escapeHtml(lv.level) + " · " : ""}best ${l.best} lb · ${escapeHtml(datedLabel(l.lastDate))}</span>
+        </span>
+        <button type="button" class="lft-star${on ? " on" : ""}" data-star="${escapeHtml(l.name)}" aria-label="${on ? "Remove from Strength" : "Feature on Strength"}">${icon("star", 20)}</button>
+      </div>`;
+    }).join("")}`;
+
+  $("lftClose").onclick = closeLiftBrowser;
+  $("liftsSheet").querySelectorAll("[data-open]").forEach((row) => {
+    row.onclick = (e) => { if (e.target.closest("[data-star]")) return; openLiftDetail(row.dataset.open); };
+  });
+  $("liftsSheet").querySelectorAll("[data-star]").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      pinLiftAndToast(btn.dataset.star);
+      renderLiftList();
+    };
+  });
+}
+
+/* One toast, three meanings, so tapping the star never just changes silently.
+   "Full" matters more than the other two: without it, the fifth star does
+   nothing and looks broken rather than telling you why. */
+function pinLiftAndToast(liftName) {
+  const result = togglePinnedLift(liftName);
+  if (result === "full") { toast(`Only ${MAX_PINNED_LIFTS} at a time. Remove one first.`); return; }
+  toast(result === "added" ? `Featuring ${liftName}` : `Removed ${liftName}`);
+  if (LIFT_BROWSE_FOR) { renderStrengthChart(); renderStrengthStats(); }
+}
+
+let liftDetailChart = null;
+
+function openLiftDetail(exerciseName) {
+  const name = LIFT_BROWSE_FOR;
+  const l = allLiftsFor(name).find((x) => x.name === exerciseName);
+  if (!l) return;
+  const on = isPinnedLift(exerciseName);
+
+  $("liftsSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="lftBack" aria-label="Back">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">${escapeHtml(exerciseName)}</div>
+      <button type="button" class="lft-star${on ? " on" : ""}" id="lftStarBtn" aria-label="${on ? "Remove from Strength" : "Feature on Strength"}">${icon("star", 20)}</button>
+    </div>
+    <div class="lvl hidden" id="lftLevel">
+      <div class="lvl-segs" id="lftLevelSegs"></div>
+      <p class="lvl-note" id="lftLevelNote"></p>
+    </div>
+    <div class="chart-wrap lft-detail-chart">
+      <canvas id="lftChart"></canvas>
+      <div class="str-single hidden" id="lftSingle"></div>
+    </div>
+    <p class="muted-note">Best ${l.best} lb estimated · ${l.sets} sets logged · last done ${escapeHtml(datedLabel(l.lastDate))}.</p>
+  `;
+
+  $("lftBack").onclick = renderLiftList;
+  $("lftStarBtn").onclick = () => { pinLiftAndToast(exerciseName); openLiftDetail(exerciseName); };
+
+  renderStrengthLevel(name, exerciseName, { wrap: "lftLevel", segs: "lftLevelSegs", note: "lftLevelNote" });
+
+  const draw = () => {
+    const hist = liftE1rmHistory(name, exerciseName, 52).map((h) => ({ entry_date: h.entry_date, weight: Math.round(h.est) }));
+    const ctx = $("lftChart")?.getContext("2d");
+    if (!ctx) return;
+    if (liftDetailChart) liftDetailChart.destroy();
+    const single = $("lftSingle");
+    // Same rule as the card: a lone point has nothing to draw a line
+    // between, so say the number rather than leave an empty box.
+    if (hist.length < 2) {
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      single.classList.remove("hidden");
+      single.innerHTML = hist.length
+        ? `<b>${hist[0].weight} lbs</b><span>Logged once so far</span>`
+        : `<b>Not yet</b><span>Not logged in the last 52 weeks</span>`;
+      return;
+    }
+    single.classList.add("hidden");
+    const hex = cssVar("--me");
+    liftDetailChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: hist.map((h) => h.entry_date.slice(5)),
+        datasets: [{
+          data: hist.map((h) => h.weight), borderColor: hex, borderWidth: 2.5, tension: 0.35,
+          pointRadius: hist.map((_, i) => (i === hist.length - 1 ? 4 : 0)),
+          pointBackgroundColor: hex, pointBorderColor: cssVar("--panel"), pointBorderWidth: 2,
+          fill: true, backgroundColor: chartWash(ctx, hex),
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { border: { display: false }, grid: { display: false }, ticks: { color: cssVar("--muted"), maxTicksLimit: 6, font: { size: 10 } } },
+          y: { border: { display: false }, grid: { color: cssVar("--border"), drawTicks: false }, ticks: { color: cssVar("--muted"), font: { size: 10 }, padding: 6 } },
+        },
+      },
+    });
+  };
+  if (window.Chart) draw(); else loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(draw).catch(() => {});
 }
 
 /* ---------- Volume card ----------
@@ -25097,7 +25273,7 @@ const ASK_PUSH_KEY = "ft_ask_push";
 
    Absolute, and through the in-app browser, so it opens over the app rather
    than throwing somebody out of it. */
-const POLICY_BASE = "https://m-m-fitness-tracker.vercel.app";
+const POLICY_BASE = PUBLIC_SITE;
 
 /* Delegated from the document, once, rather than wired per screen. Two of these
    links live on the sign-in screen, which is built before any tab exists and
