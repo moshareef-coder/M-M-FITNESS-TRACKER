@@ -794,7 +794,7 @@ const STANDING_CALF_RAISE = {
   props: [
     // the shoulder-pad lever read as a pole leaning on the figure at 160px, so
     // the block alone carries the move: heels off the edge, up and down
-    { type: "box", x: 63, y: 104, w: 34 },
+    { type: "artwork", src: "/knowledge/motion/props/calf-block.svg", dx: 21 },
   ],
   keys: [
     { // stretched, heel dropped below the block
@@ -826,8 +826,12 @@ const SEATED_CALF_RAISE = {
   dur: 2.6,
   breath: 0.2,
   props: [
-    { type: "machine", x: 30, y: 94, w: 30, parts: ["seat", "thighPad"], padX: 58, padY: 70, padW: 26 },
-    { type: "box", x: 82, y: 104, w: 24 },
+    /* The real plate loaded machine: low seat, foot block at the front, a
+       thigh pad on an arm that hinges at the front column. The frame, seat,
+       block and plate horn are artwork; the pad arm is a lever so it rides
+       up with the thighs from the pivot to just behind the near knee. */
+    { type: "artwork", src: "/knowledge/motion/props/seated-calf.svg" },
+    { type: "lever", pivot: { x: 100.5, y: 100 }, to: { side: "R", point: "knee", dx: -5, dy: -7 }, r: 2.2, end: "pad", padW: 10, padT: 7, front: true },
   ],
   keys: [
     { // heels down below the block, calf stretched
@@ -896,7 +900,7 @@ const SINGLE_LEG_CALF_RAISE = {
   dur: 2.6,
   breath: 0.2,
   fit: { k: 0.8, dy: 4 },
-  props: [{ type: "box", x: 63, y: 104, w: 34 }],
+  props: [{ type: "artwork", src: "/knowledge/motion/props/calf-block.svg", dx: 21 }],
   keys: [
     { // heel dropped below the block, free leg hooked up behind
       t: 0,
@@ -927,7 +931,7 @@ const DONKEY_CALF_RAISE = {
   breath: 0.2,
   fit: { k: 0.86, dy: 4 },
   props: [
-    { type: "box", x: 42, y: 104, w: 30 },
+    { type: "artwork", src: "/knowledge/motion/props/calf-block.svg" },
     { type: "bench", x: 86, y: 74, w: 34 },
   ],
   keys: [
