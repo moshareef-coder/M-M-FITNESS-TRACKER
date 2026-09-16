@@ -1,7 +1,7 @@
 /* Copies the deployable web assets into www/ for the native wrapper.
    The web app itself still ships from the repo root on Vercel; www/ exists
    only so Capacitor has a self-contained bundle to embed in the app. */
-import { mkdirSync, copyFileSync, cpSync, rmSync, existsSync } from "node:fs";
+import { mkdirSync, copyFileSync, cpSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -41,6 +41,7 @@ const KNOWLEDGE_FILES = [
   "knowledge/formulas/tdee.mjs",
   "knowledge/formulas/calorie-math.mjs",
   "knowledge/formulas/strength-math.mjs",
+  "knowledge/equipment.mjs",
   "knowledge/exercise-library/index.mjs",
   "knowledge/exercise-library/weight-training.mjs",
   "knowledge/exercise-library/yoga.mjs",
@@ -110,3 +111,29 @@ for (const dir of DIRS) {
 }
 
 console.log(`synced ${copied}/${ASSETS.length} assets, ${filesCopied}/${KNOWLEDGE_FILES.length} knowledge files, and ${dirsCopied}/${DIRS.length} directories into www/`);
+
+/* Every runtime import index.html makes has to exist in the bundle, and the
+   lists above are hand-maintained, so they drift the moment somebody adds an
+   import without thinking about the native build. That has now cost three
+   separate features: quips.mjs (the character had no lines), knowledge/motion
+   (no animations at all, on any exercise) and knowledge/equipment.mjs. Each one
+   failed silently at runtime and looked like a rendering bug for days.
+
+   Anything deliberately left out is named below, so the warning only ever
+   fires for a genuine omission and stays worth reading. */
+const NOT_SHIPPED = new Set([
+  // Imported behind BODY3D, which is false: Mo saw the 3D bodies and said no.
+  "knowledge/motion/body3d/mount.mjs",
+]);
+const html = readFileSync(join(root, "index.html"), "utf8");
+const imported = [...html.matchAll(/import\("\.\/([^"]+)"\)/g)].map((m) => m[1]);
+const missing = [...new Set(imported)]
+  .filter((rel) => !NOT_SHIPPED.has(rel) && !existsSync(join(out, rel)));
+
+if (missing.length) {
+  console.warn("\n  WARNING: index.html imports these at runtime and they are not in www/:");
+  for (const rel of missing) console.warn(`    ${rel}`);
+  console.warn("  Add them to ASSETS or KNOWLEDGE_FILES, or the native app throws on load.\n");
+} else {
+  console.log(`checked ${new Set(imported).size} runtime imports, all present`);
+}
