@@ -341,9 +341,6 @@ export function estimateMinutes(exercises, prepMinutes = WARMUP_MIN) {
 function overClock(estimate, day) {
   return estimate + (day?.clockReserve ?? 0) > (day?.minutes ?? 0) * TIME_TOLERANCE;
 }
-function overFill(estimate, day) {
-  return estimate + (day?.clockReserve ?? 0) > (day?.minutes ?? 0) * (day?.fillTolerance ?? TIME_TOLERANCE);
-}
 
 /* The ramp for one lift, or null when there is nothing to ramp.
 
@@ -1298,7 +1295,6 @@ export function buildPlan({
          and against nothing else, because `P.sessionMin` never contained them.
          See COOLDOWN_MIN. */
       clockReserve: askedMinutes === null ? 0 : COOLDOWN_MIN,
-      fillTolerance: askedMinutes === null ? 1 : TIME_TOLERANCE,
       /* Filled in below, once the sets have stopped moving. Declared here so the
          key is on every day whatever the trimming does. */
       estimatedMinutes: null,
@@ -1616,23 +1612,7 @@ export function buildPlan({
      back with a sentence rather than filled with junk sets.
 
      Skips short days: a short day is deliberately small and topping it up with
-     the extra time would delete the only thing that makes it short.
-
-     NO LONGER GATED ON A STATED SESSION LENGTH, 2026-09-15, and that gate was
-     the other half of the 15% volume regression. It was there to keep the
-     promise made at `askedMinutes` that "a plan built without it is the plan it
-     was yesterday to the byte", which was the right caution on the day the
-     session-length feature landed and is not a correctness property: the honest
-     clock of 2026-09-14 broke that invariant anyway, from the trim side, and
-     left the one pass that could hand the sets back unreachable by the nearly
-     everybody who has never answered the question. A goal's own session length
-     is the engine's own statement of how long this goal's session takes, so a
-     group sitting under the weekly target this file computed, with room on that
-     clock, is the engine failing its own prescription for no reason anybody
-     chose. Every rule above still binds: no new exercise, no new main, never
-     past the weekly target plus VOLUME_SLACK, never past MRV, never past the
-     clock. Measured: intermediate groups under 0.8 of target 39.0% to 20.0%,
-     advanced 36.8% to 18.4%, with the fix above. */
+     the extra time would delete the only thing that makes it short. */
   const timeAdded = new Map();
   if (askedMinutes !== null) {
     for (const d of week) {
@@ -1658,7 +1638,7 @@ export function buildPlan({
         }
         if (!best) break;
         best.sets += 1;
-        if (overFill(estimateMinutes(d.exercises, d.prepMinutes), d)) { best.sets -= 1; break; }
+        if (overClock(estimateMinutes(d.exercises, d.prepMinutes), d)) { best.sets -= 1; break; }
         timeAdded.set(`${d.name}|${best.name}`, { day: d.name, exercise: best.name, group: best.group, to: best.sets });
       }
       d.estimatedMinutes = estimateMinutes(d.exercises, d.prepMinutes);

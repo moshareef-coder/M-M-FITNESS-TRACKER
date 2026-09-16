@@ -157,14 +157,26 @@ const REPS_COSTED_MAX = 30;
    ramp on top of it. `prepMinutesFor` below is the one place the two halves are
    added up, and `estimateMinutes` reserves whatever it says. */
 const WARMUP_MIN = Math.round(WARMUP_SECONDS / 60);
-/* The nominal cool-down, and it is now inside every clock check. The fill pass
-   has always reasoned that "the person named how long they are in the gym, not
-   how long the middle of it is" and counted these five minutes against the
-   budget; the trim ladder did not, so a 30 minute answer built a 30 minute
-   working session and the app then printed 35 over it. One rule now: the
-   budget is the whole visit. `estimatedMinutes` itself still excludes the
-   cool-down (CONTRACT.md: the visit is `estimatedMinutes + cooldownMinutes`)
-   so that number keeps meaning what it always meant. */
+/* The nominal cool-down, and it is inside the clock check for a budget a
+   PERSON named. The fill pass has always reasoned that "the person named how
+   long they are in the gym, not how long the middle of it is" and counted these
+   five minutes against the budget; the trim ladder did not, so a 30 minute
+   answer built a 30 minute working session and the app then printed 35 over it.
+   The rule is the budget is the whole visit, and it applies to the number
+   somebody said out loud.
+
+   It does NOT apply to `P.sessionMin`, and that is the correction of
+   2026-09-15. The goal's own length is not a statement about how long anybody
+   is in a gym: goal-engine.mjs derives it from the general warm-up plus the
+   ramp plus the sets, and its own note on the 2026-09-12 increase adds up
+   exactly those three and no cool-down. Charging five minutes of stretching
+   against a number that never contained them silently took five minutes off
+   every goal, which cost 15% of the week's volume: intermediate groups under
+   0.8 of their weekly target went 18.2% to 39.0% across the sweep, advanced
+   15.1% to 36.8%, on a matrix with no stated session length anywhere in it,
+   which is nearly every real user. So a day carries `clockReserve`: the
+   cool-down when the clock is theirs, nothing when the clock is the goal's.
+   One rule, two honest readings of what the number means. */
 const COOLDOWN_MIN = Math.round(COOLDOWN_SECONDS / 60);
 const TIME_TOLERANCE = 1.15;
 
@@ -323,10 +335,12 @@ export function sessionSeconds(exercises) {
 export function estimateMinutes(exercises, prepMinutes = WARMUP_MIN) {
   return Math.round(prepMinutes + sessionSeconds(exercises) / 60);
 }
-/* Whether a day runs past its clock, with the cool-down counted. Every trim,
-   fill and ramp decision measures against this one line. */
-function overClock(estimate, budgetMinutes) {
-  return estimate + COOLDOWN_MIN > budgetMinutes * TIME_TOLERANCE;
+/* Whether a day runs past its clock. Every trim, fill and ramp decision
+   measures against this one line. Takes the day rather than its minutes so the
+   reserve travels with the budget it belongs to: see COOLDOWN_MIN for why a
+   stated clock reserves the cool-down and the goal's own does not. */
+function overClock(estimate, day) {
+  return estimate + (day?.clockReserve ?? 0) > (day?.minutes ?? 0) * TIME_TOLERANCE;
 }
 
 /* The ramp for one lift, or null when there is nothing to ramp.
@@ -449,7 +463,7 @@ function addSecondMainRamps(week, roleOf) {
     if (!r) continue;
     const withIt = [...d.rampSets, r];
     const prep = prepMinutesFor({ rampSets: withIt });
-    if (overClock(estimateMinutes(d.exercises, prep), d.minutes)) continue;
+    if (overClock(estimateMinutes(d.exercises, prep), d)) continue;
     d.rampSets = withIt;
     d.prepMinutes = prep;
     d.rampMinutes = Math.round(withIt.reduce((t, x) => t + x.seconds, 0) / 60);
@@ -1278,6 +1292,10 @@ export function buildPlan({
          session they were least likely to make, and that is as true of a 90
          minute answer as of a 45 minute goal. */
       minutes: isShort ? Math.round(sessionBudgetMin * 0.6) : sessionBudgetMin,
+      /* Five minutes of cool-down are charged against a clock somebody named
+         and against nothing else, because `P.sessionMin` never contained them.
+         See COOLDOWN_MIN. */
+      clockReserve: askedMinutes === null ? 0 : COOLDOWN_MIN,
       /* Filled in below, once the sets have stopped moving. Declared here so the
          key is on every day whatever the trimming does. */
       estimatedMinutes: null,
@@ -1479,7 +1497,7 @@ export function buildPlan({
   const lastIndex = (list, ok) => { for (let i = list.length - 1; i >= 0; i--) if (ok(list[i], i)) return i; return -1; };
   for (const d of week) {
     let estimate = estimateMinutes(d.exercises, d.prepMinutes);
-    const overBudget = () => overClock(estimate, d.minutes);
+    const overBudget = () => overClock(estimate, d);
     while (overBudget()) {
       const shave = lastIndex(d.exercises, (e) => roleOf.get(e) === "accessory" && !e.priority && e.sets > SHORT_DAY_SETS);
       if (shave >= 0) {
@@ -1621,7 +1639,7 @@ export function buildPlan({
         }
         if (!best) break;
         best.sets += 1;
-        if (overClock(estimateMinutes(d.exercises, d.prepMinutes), d.minutes)) { best.sets -= 1; break; }
+        if (overClock(estimateMinutes(d.exercises, d.prepMinutes), d)) { best.sets -= 1; break; }
         timeAdded.set(`${d.name}|${best.name}`, { day: d.name, exercise: best.name, group: best.group, to: best.sets });
       }
       d.estimatedMinutes = estimateMinutes(d.exercises, d.prepMinutes);
@@ -1742,7 +1760,7 @@ export function buildPlan({
           setRest(next);
           const est = estimateMinutes(d.exercises, d.prepMinutes);
           /* One step too far is undone rather than accepted. */
-          if (overClock(est, d.minutes)) { setRest(factor); break; }
+          if (overClock(est, d)) { setRest(factor); break; }
           d.estimatedMinutes = est;
           factor = next;
         }
@@ -1843,7 +1861,7 @@ export function buildPlan({
      three sets and the shortest rest it will prescribe, and the honest thing to
      say is that the budget is smaller than any real session of this goal. */
   const overBudget = week
-    .filter((d) => overClock(d.estimatedMinutes, d.minutes))
+    .filter((d) => overClock(d.estimatedMinutes, d))
     .map((d) => ({
       day: d.name, estimatedMinutes: d.estimatedMinutes, totalMinutes: d.estimatedMinutes + COOLDOWN_MIN, budget: d.minutes,
       why: askedMinutes === null
@@ -1852,7 +1870,11 @@ export function buildPlan({
            unnoticed while every goal length was a round 45 or 60; the ramp made
            them 46 and 63 and a conspicuous number in a sentence that misnames
            where it came from is worth one word. */
-        ? `${d.name} comes to about ${d.estimatedMinutes + COOLDOWN_MIN} minutes with the cool-down, against the ${d.minutes} this goal is built around. Everything left on it is a main lift, so the time goes to the rest between sets.`
+        /* No cool-down in this one, because the goal's number does not contain
+           one: it is the warm-up plus the sets, and that is what is compared.
+           See COOLDOWN_MIN. `totalMinutes` above still carries the whole visit
+           for a screen that wants it. */
+        ? `${d.name} comes to about ${d.estimatedMinutes} minutes against the ${d.minutes} this goal is built around. Everything left on it is a main lift, so the time goes to the rest between sets.`
         : `${d.name} still comes to about ${d.estimatedMinutes + COOLDOWN_MIN} minutes with the cool-down, against the ${d.minutes} you asked for, and that is `
           + `after the sets came down and the rest with them. This goal cannot honestly be done in ${d.minutes} minutes: `
           + `give it the extra or pick a goal with shorter rests.`,
