@@ -432,6 +432,30 @@
   /* The hero is the one card that should feel lit from inside. */
   #heroCard { box-shadow: var(--shadow-lift); }
   #tab-home #heroCard { padding: 16px 15px 15px; }
+
+  /* Home reads as one card, not three.
+
+     The hero and the week grid stay two elements because renderHero() owns
+     heroCard's innerHTML and would wipe any markup nested inside it. So they
+     are joined at the seam instead: the hero loses its bottom edge and
+     radius, the week card loses its top ones and tucks up under it. The
+     result is a single block with one divider through it, and neither
+     renderer had to learn about the other.
+
+     Worth knowing if you split them again: the shadow has to come off the
+     hero too, or it draws a line across the middle of the merged card. */
+  #tab-home.home-one #heroCard {
+    border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+    border-bottom: none; box-shadow: none; margin-bottom: 0; padding-bottom: 4px;
+  }
+  #tab-home.home-one #weekTogetherCard {
+    border-top-left-radius: 0; border-top-right-radius: 0;
+    border-top: 1px solid var(--border); margin-top: 0;
+  }
+  /* The grid is the second half of a card now, not a card of its own, so it
+     drops the heading that used to name it. */
+  #tab-home.home-one #weekTogetherCard .card-head h2 { font-size: 11px; font-weight: 700;
+    letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
   .card h2 {
     font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em;
     color: var(--muted); margin: 0 0 12px; font-weight: 700;
@@ -5207,11 +5231,10 @@
   <div id="connBanner" class="conn-banner hidden"></div>
 
   <!-- HOME TAB -->
-  <div id="tab-home" class="tab-panel">
+  <div id="tab-home" class="tab-panel home-one">
     <div class="reminder-banner hidden" id="encouragementBanner"></div>
     <div class="rest-banner hidden" id="restDayBanner"></div>
     <button type="button" class="live-card hidden" id="liveCard"></button>
-    <div class="notice hidden" id="partnerNotice"></div>
 
     <div class="card" id="heroCard"></div>
 
@@ -5233,7 +5256,9 @@
       <div class="pact-foot" id="pactFoot"></div>
     </div>
 
-    <button type="button" class="card momentum" id="momentumCard">
+    <div class="notice hidden" id="partnerNotice"></div>
+
+    <button type="button" class="card momentum hidden" id="momentumCard">
       <span class="momentum-ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a2 2 0 0 0 0 4h1M16 5h3a2 2 0 0 1 0 4h-1"/><path d="M12 12v3M9 20h6M9.5 15.5h5l.5 4.5h-6l.5-4.5Z"/></svg></span>
       <span class="momentum-text">
         <b id="momentumTitle">Momentum is real.</b>
@@ -12123,8 +12148,9 @@ function renderHero(animate = false) {
 
   let cta;
   if (todayPlan) {
-    cta = heroLine(`Today: ${displayFocus(todayPlan.focus, todayPlan.exercises)}, ready when you are`)
-      + ctaBtn(trainedToday ? "Start Today's Plan" : "Start Today's Workout");
+    /* The focus is the card title now, so the line under it would be the
+       third place on one screen saying the same words. */
+    cta = ctaBtn(trainedToday ? "Start Today's Plan" : "Start Today's Workout");
   } else if (restToday) {
     cta = heroLine("Rest day. Back at it tomorrow.") + ctaBtn("Train Anyway");
   } else if (!trainedToday) {
@@ -12146,25 +12172,47 @@ function renderHero(animate = false) {
     cta = ctaBtn("Plan Tomorrow's Workout");
   }
 
+  /* What the card is called depends on whether there is anything to do.
+
+     With a plan waiting, today IS the headline: the focus in the title, the
+     shape of the session under it, and Start directly beneath. "Stronger
+     Together" over "2 of 5 workouts each this week" is a status report, and
+     it was reading above the button on a screen people open in order to press
+     the button. The week has not gone anywhere, it is the rings and the grid
+     below.
+
+     With nothing to do (rest day, coached, everything already done) the week
+     framing comes back, because then the week IS the subject. */
+  const planToday = todayPlan
+    ? { title: displayFocus(todayPlan.focus, todayPlan.exercises),
+        meta: `${(todayPlan.exercises || []).length} exercises${
+          Number.isFinite(todayPlan.est_minutes) ? ` &middot; about ${todayPlan.est_minutes} min` : ""}` }
+    : null;
+
+  /* Head to head on effort sits UNDER the rings, not above the button. It is
+     worth showing, but it is a comparison of the week and nothing about the
+     week belongs between "Push Day" and Start. */
+  const effortRow = partner && (myWeekXP > 0 || theirWeekXP > 0) ? `<div class="hero-effort">
+      <button type="button" class="he-label" id="effortInfoBtn" aria-label="How effort is scored">${icon("bolt", 13)} Effort this week <span class="i-glyph">${icon("info", 13)}</span></button>
+      <span class="he-scores">
+        <span class="he-you${myWeekXP >= theirWeekXP ? " lead" : ""}">You <b data-xp="${myWeekXP}" data-delay="380">${animate ? 0 : myWeekXP}</b><span class="sr-only"> effort points${myWeekXP > theirWeekXP ? ", ahead" : ""}</span></span>
+        <span class="he-them${theirWeekXP > myWeekXP ? " lead" : ""}">${escapeHtml(partner)} <b data-xp="${theirWeekXP}" data-delay="480">${animate ? 0 : theirWeekXP}</b><span class="sr-only"> effort points${theirWeekXP > myWeekXP ? ", ahead" : ""}</span></span>
+      </span>
+    </div>` : "";
+
   el.innerHTML = `
     <div class="hero-top">
       <div>
-        <div class="hero-kicker">${partner ? "This week together" : "This week"}</div>
-        <h1 class="hero-title">${partner ? "Stronger Together" : "Your week"}</h1>
-        <p class="hero-sub">${sub} ${infoDot("weekTarget", "How the weekly target works")}</p>
+        <div class="hero-kicker">${planToday ? "Today" : partner ? "This week together" : "This week"}</div>
+        <h1 class="hero-title">${planToday ? escapeHtml(planToday.title) : partner ? "Stronger Together" : "Your week"}</h1>
+        <p class="hero-sub">${planToday ? planToday.meta : `${sub} ${infoDot("weekTarget", "How the weekly target works")}`}</p>
         ${coachLine}
-        ${partner && (myWeekXP > 0 || theirWeekXP > 0) ? `<div class="hero-effort">
-          <button type="button" class="he-label" id="effortInfoBtn" aria-label="How effort is scored">${icon("bolt", 13)} Effort this week <span class="i-glyph">${icon("info", 13)}</span></button>
-          <span class="he-scores">
-            <span class="he-you${myWeekXP >= theirWeekXP ? " lead" : ""}">You <b data-xp="${myWeekXP}" data-delay="380">${animate ? 0 : myWeekXP}</b>${myWeekXP > theirWeekXP ? `<span class="sr-only"> effort points, ahead</span>` : `<span class="sr-only"> effort points</span>`}</span>
-            <span class="he-them${theirWeekXP > myWeekXP ? " lead" : ""}">${escapeHtml(partner)} <b data-xp="${theirWeekXP}" data-delay="480">${animate ? 0 : theirWeekXP}</b>${theirWeekXP > myWeekXP ? `<span class="sr-only"> effort points, ahead</span>` : `<span class="sr-only"> effort points</span>`}</span>
-          </span>
-        </div>` : ""}
       </div>
       ${badge}
     </div>
+    ${cta}
     ${stand}
-    ${cta}`;
+    ${effortRow}`;
   hydrateAvatars(el);
 
   /* Two frames, not one: the browser has to have painted the empty ring
