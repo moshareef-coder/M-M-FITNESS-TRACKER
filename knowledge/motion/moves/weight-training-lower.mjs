@@ -1505,6 +1505,12 @@ const SUPERMAN = {
 // at the hip rather than a standing hinge. Side view, prone.
 // The hip is the pivot, so the whole pelvis rotates: root.rot carries it and the
 // authored hip angle is walked back by the same amount to keep the legs still.
+// The machine is the real 45 degree hyper: the thighs lie face down on the
+// angled pad, the soles stand on the foot plate with the rollers behind the
+// calves, and the arms cross over the CHEST, on the ventral side. Mo, on a
+// photo of the real bench: "the pad faces up" and "arms crossed". The wrist
+// pins are re-aimed at each key because a rel:chest offset is a world offset
+// and the chest turns 80 degrees between the two.
 const BACK_EXTENSION = {
   view: "side",
   loop: "pingpong",
@@ -1512,32 +1518,31 @@ const BACK_EXTENSION = {
   breath: 0.25,
   fit: { k: 0.92, dy: 2 },
   props: [
-    { type: "bench", x: 54, y: 88, w: 26 },
-    { type: "roller", x: 26, y: 100, r: 5.5 },
+    { type: "artwork", src: "/knowledge/motion/props/back-extension.svg" },
   ],
   keys: [
     { // level, body in one line from heel to head
       t: 0,
-      root: { x: 66, y: 76, rot: 40 },
+      root: { x: 66, y: 64, rot: 40 },
       joints: {
         spine: 0, neck: -6,
-        hipR: -85, kneeR: 20, ankleR: -78, hipL: -85, kneeL: 20, ankleL: -78,
+        hipR: -85, kneeR: 20, ankleR: -10, hipL: -85, kneeL: 20, ankleL: -10,
       },
       ik: {
-        wristR: { rel: "chest", x: -2, y: 7, bend: 1 },
-        wristL: { rel: "chest", x: 6, y: 6, bend: 1 },
+        wristR: { rel: "chest", x: 7.1, y: 7.9, bend: 1 },
+        wristL: { rel: "chest", x: 4.7, y: 9.2, bend: 1 },
       },
     },
     { // folded down over the pad, legs untouched
       t: 1,
-      root: { x: 66, y: 76, rot: 100 },
+      root: { x: 66, y: 64, rot: 100 },
       joints: {
         spine: 20, neck: 8,
-        hipR: -145, kneeR: 20, ankleR: -78, hipL: -145, kneeL: 20, ankleL: -78,
+        hipR: -145, kneeR: 20, ankleR: -10, hipL: -145, kneeL: 20, ankleL: -10,
       },
       ik: {
-        wristR: { rel: "chest", x: -2, y: 7, bend: 1 },
-        wristL: { rel: "chest", x: 6, y: 6, bend: 1 },
+        wristR: { rel: "chest", x: -6.6, y: 8.4, bend: 1 },
+        wristL: { rel: "chest", x: -8.2, y: 6.2, bend: 1 },
       },
     },
   ],
@@ -1552,7 +1557,13 @@ const REVERSE_HYPEREXTENSION = {
   dur: 3.0,
   breath: 0.25,
   fit: { k: 0.85, dy: 6 },
-  props: [{ type: "bench", x: 62, y: 58, w: 58 }],
+  props: [
+    /* The table, the handles and the frame are artwork. The pendulum is the
+       part that travels with the legs, so it stays code: a lever from the
+       pivot under the pad to the near ankle, with the roller pad on the end. */
+    { type: "artwork", src: "/knowledge/motion/props/reverse-hyper.svg" },
+    { type: "lever", pivot: { x: 62, y: 63 }, to: { side: "R", point: "ankle" }, r: 2.2, end: "pad", padW: 13, padT: 5.5 },
+  ],
   keys: [
     { // legs hanging straight down off the end
       t: 0,
