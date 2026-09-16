@@ -25,13 +25,21 @@ WEB = ROOT / "logo"
 def classify(r, g, b, central):
     mx, mn = max(r, g, b), min(r, g, b)
     sat = mx - mn
-    # Centrality matters as well as colour: the arcs carry a pale highlight
-    # along their edge that reads as dumbbell by colour alone, and it showed as
-    # a stray hairline once the arcs rotated away from it.
-    if central and mx < 110 and sat < 60:
+    # The dumbbell is decided by colour alone, before either arc is considered.
+    #
+    # It used to need a pixel to be central as well, and the right plate runs
+    # far enough out that part of it failed that test. Coral wins any pixel
+    # where red beats blue, so that part of the plate went into the right arc
+    # and rode in with it: 947 opaque pixels of dumbbell on screen from the
+    # first frame, which is exactly the thing the animation is built to reveal.
+    #
+    # Centrality is not needed for either test. The pale highlight along an arc
+    # is bright, so it cannot pass the dark test, and it is near white, so it
+    # cannot pass the saturation floor on the lime one.
+    if mx < 110 and sat < 60:
         return "bar"                     # the dark dumbbell body
-    if central and sat > 55 and g > 120 and r < 200 and b < 120:
-        return "bar"                     # its lime plates
+    if sat > 55 and g >= r and g >= b:
+        return "bar"                     # its lime plates, green dominant
     if sat > 45 and b > r:
         return "left"                    # blue arc
     if sat > 45 and r > b:
