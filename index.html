@@ -23288,6 +23288,136 @@ function liftE1rmHistory(name, exerciseName, weeks = 16) {
     .map(([entry_date, est]) => ({ entry_date, est }));
 }
 
+/* ---------- Did the weight go up? ----------
+   Progress used to answer "how much did you do", which is volume, and volume
+   is a number people cannot act on: doing more sets of the same weight looks
+   like progress and is not. This answers the other question, the one people
+   actually ask, which is whether they are getting stronger.
+
+   The join is the whole trick and every piece of it already existed:
+   classifyMuscles() knows which muscles a lift trains, liftE1rmHistory() knows
+   what that lift's estimated single has done over time, and nothing had ever
+   put the two together. A muscle is "up" when a lift that trains it is being
+   done heavier than it was.
+
+   Four states, because three would have to lie about one of them:
+     up          a lift for this muscle got heavier
+     flat        trained under load, and the load has not moved
+     bodyweight  trained, but nothing here carries a weight to measure
+     cold        not trained at all in the window
+   Chin-ups and planks are the reason bodyweight exists. Folding them into
+   "flat" would tell somebody doing thirty hard sets of core that they are not
+   progressing, when the truth is only that we cannot see it from a load. */
+function muscleStrengthTrend(name, weeks = 12) {
+  const from = new Date(todayStr() + "T00:00:00");
+  from.setDate(from.getDate() - weeks * 7);
+  const fromStr = isoDate(from);
+
+  const out = {};
+  MUSCLE_GROUPS.forEach((g) => { out[g] = { state: "cold", from: null, to: null, lift: null, weeks: 0, sets: 0 }; });
+
+  /* One pass over the logs to find which lifts this person actually did, and
+     how much each muscle saw, rather than asking the library what exists. */
+  const lifts = new Map();
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== name || l.entry_date < fromStr) continue;
+    const key = (l.exercise_name || "").trim();
+    if (!key) continue;
+    if (!lifts.has(key)) lifts.set(key, { weighted: false });
+    if (l.weight != null && !l.duration_min) lifts.get(key).weighted = true;
+    const rule = classifyMuscles(key);
+    if (!rule) continue;
+    const sets = l.duration_min ? Math.max(1, Math.round(l.duration_min / 10)) : (l.sets || 1);
+    rule.primary.forEach((g) => { if (out[g]) out[g].sets += sets; });
+  }
+
+  for (const [exName, info] of lifts) {
+    const rule = classifyMuscles(exName);
+    if (!rule) continue;
+    const groups = rule.primary.filter((g) => out[g]);
+    if (!groups.length) continue;
+
+    if (!info.weighted) {
+      groups.forEach((g) => { if (out[g].state === "cold") out[g].state = "bodyweight"; });
+      continue;
+    }
+    const hist = liftE1rmHistory(name, exName, weeks);
+    if (hist.length < 2) {
+      /* One session is a data point, not a trend, so it counts as trained
+         rather than as evidence either way. */
+      groups.forEach((g) => { if (out[g].state === "cold") out[g].state = "flat"; });
+      continue;
+    }
+    const a = Math.round(hist[0].est), b = Math.round(hist[hist.length - 1].est);
+    const spanWeeks = Math.max(1, Math.round(
+      (new Date(hist[hist.length - 1].entry_date) - new Date(hist[0].entry_date)) / 6048e5));
+
+    /* Ranked on the estimate, SHOWN as the set that was actually done.
+       Somebody who took a bench from 165x5 to 195x5 has an estimate that went
+       193 to 228, and telling them "193 to 228 lb" names two weights they have
+       never touched. The estimate is the right thing to sort by, because it is
+       the only one that notices more reps at the same load. It is the wrong
+       thing to print. */
+    const topSet = (dateStr) => {
+      let best = null;
+      for (const l of ALL_EXERCISE_LOGS) {
+        if (l.user_name !== name || l.entry_date !== dateStr) continue;
+        if ((l.exercise_name || "").trim().toLowerCase() !== exName.trim().toLowerCase()) continue;
+        if (l.weight == null || l.duration_min) continue;
+        if (!best || e1rm(l.weight, l.reps) > e1rm(best.weight, best.reps)) best = l;
+      }
+      return best;
+    };
+    const setA = topSet(hist[0].entry_date), setB = topSet(hist[hist.length - 1].entry_date);
+
+    for (const g of groups) {
+      const cur = out[g];
+      const gain = b - a;
+      /* The lift that moved most owns the muscle's headline. A bench that went
+         up matters more than a fly that did not, and naming the fly would send
+         somebody to fix the wrong thing. */
+      const curGain = cur.state === "up" ? (cur.to - cur.from) : -Infinity;
+      const shape = { lift: exName, weeks: spanWeeks, setA, setB };
+      if (gain > 0 && gain > curGain) {
+        out[g] = { ...cur, state: "up", from: a, to: b, ...shape };
+      } else if (cur.state !== "up") {
+        out[g] = { ...cur, state: "flat", from: a, to: b, ...shape };
+      }
+    }
+  }
+  return out;
+}
+
+/* The same answer as a sentence. Kept next to the maths so the words and the
+   numbers can never drift apart. */
+function strengthSentence(group, t) {
+  const label = BODY_GROUP_LABELS[group] || group;
+  const w = (st) => (st ? `${st.weight} lb${st.reps ? ` x ${st.reps}` : ""}` : null);
+  if (t.state === "up") {
+    const a = w(t.setA), b = w(t.setB);
+    /* Same weight for more reps is the case the raw load cannot see, so it gets
+       its own sentence rather than being described as a jump in weight. */
+    const same = t.setA && t.setB && t.setA.weight === t.setB.weight;
+    return {
+      head: same ? `${label} up ${t.setB.reps - t.setA.reps} reps` : `${label} getting stronger`,
+      sub: a && b
+        ? (same
+          ? `${t.lift}: ${t.setA.weight} lb for ${t.setA.reps} reps, now ${t.setB.reps}, over ${t.weeks} week${t.weeks === 1 ? "" : "s"}.`
+          : `${t.lift}: ${a} to ${b} over ${t.weeks} week${t.weeks === 1 ? "" : "s"}.`)
+        : `${t.lift} is going up.`,
+    };
+  }
+  if (t.state === "flat") {
+    const b = w(t.setB);
+    return { head: `${label} holding`,
+      sub: t.lift ? `${t.lift} has stayed at ${b || "the same load"}. Time to add weight.` : "Trained, but the load has not moved." };
+  }
+  if (t.state === "bodyweight") {
+    return { head: `${label} trained`, sub: `${t.sets} sets, all bodyweight, so there is no load to compare.` };
+  }
+  return { head: `${label} not trained`, sub: "Nothing logged in this stretch." };
+}
+
 /* Best single set on a movement matched by name. Bodyweight work has no load,
    so reps are the whole measurement here. */
 function bestRepsFor(name, re, before) {
