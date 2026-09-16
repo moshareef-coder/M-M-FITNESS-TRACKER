@@ -4012,6 +4012,26 @@
      right where every settings app in the category puts it, so the list can be
      read rather than opened: Goal says "Build muscle", Appearance says "Dark",
      Rest says "90 sec". A row you do not need to tap is the point. */
+  /* The strength answers: a coloured dot, a headline, the evidence under it.
+     No bars and no chart, because the whole point of this card is that it can
+     be read without decoding anything. */
+  .ms-sheet { max-height: 88vh; overflow-y: auto; }
+  .ms-key { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
+            font-size: 11.5px; color: var(--muted); margin: 6px 0 2px; }
+  .ms-key span { display: flex; align-items: center; gap: 6px; }
+  .ms-key .ms-dot { margin-top: 0; }
+  .ms-list { margin-top: 4px; }
+  .ms-row { display: flex; gap: 11px; align-items: flex-start; padding: 11px 0;
+            border-bottom: 1px solid var(--border); }
+  .ms-row:last-child { border-bottom: none; }
+  .ms-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-top: 6px; }
+  .ms-dot.up { background: var(--accent); }
+  .ms-dot.flat { background: var(--muted); }
+  .ms-dot.cold { background: var(--border); }
+  .ms-txt { flex: 1; min-width: 0; }
+  .ms-txt b { display: block; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+  .ms-txt span { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
   .set-sec {
     font-size: 11.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
     color: var(--muted); margin: 20px 4px 7px;
@@ -5379,6 +5399,38 @@
       <div class="cst-caption" id="consistencyCaption"></div>
     </div>
 
+    <!-- The answer to "am I getting stronger", before the charts that show the
+         working. Four lines at most, and the body behind it is one tap away. -->
+    <!-- The same figure the Body tab draws, coloured by whether the weight
+         went up rather than by how much work was done. -->
+    <div class="sheet-scrim hidden" id="msScrim">
+      <div class="partner-sheet ms-sheet" id="msSheet">
+        <div class="ds-grip"></div>
+        <div class="ps-head">
+          <h2 id="msTitle">Getting stronger</h2>
+          <button type="button" class="ds-x" id="msClose" aria-label="Close">&times;</button>
+        </div>
+        <p class="muted-note" id="msNote"></p>
+        <div class="bi-figures" id="msFigures">
+          <div class="bi-fig" data-view="Front"><canvas id="msFront" class="bi-canvas"></canvas></div>
+          <div class="bi-fig" data-view="Back"><canvas id="msBack" class="bi-canvas"></canvas></div>
+        </div>
+        <div class="ms-key">
+          <span><i class="ms-dot up"></i> Lifting more</span>
+          <span><i class="ms-dot flat"></i> Same</span>
+          <span><i class="ms-dot cold"></i> Not trained</span>
+        </div>
+        <div class="ms-list" id="msDetail"></div>
+      </div>
+    </div>
+
+    <div class="card metric-card" id="cardMuscles">
+      <h2>Getting stronger</h2>
+      <p class="muted-note" style="margin-top:-6px" id="musclesLead"></p>
+      <div class="ms-list" id="musclesList"></div>
+      <button type="button" class="btn-ghost" id="musclesOpenBtn" style="margin-top:10px;width:100%">See it on the body</button>
+    </div>
+
     <div class="card metric-card" id="cardStrength">
       <h2>Strength</h2>
       <div class="wt-stats" id="strengthStats"></div>
@@ -5773,9 +5825,14 @@
       </div>
     <div class="card">
       <h2>Reminders</h2>
+      <!-- This screen is a promise, and Apple read it during review. It used to
+           say "only when your partner has trained and you have not", which
+           describes the one notification being removed for putting two people's
+           weeks in the same sentence. Saying less, and saying only what is
+           true today. -->
       <p class="muted-note" style="margin-bottom:10px;">
-        One a day at most, in the evening, and only when your partner has trained
-        and you have not. Nothing else.
+        Videos your partner sends you, and at most one reminder a day about your
+        own workout. Never about anybody else's.
       </p>
       <button type="button" class="btn-secondary" id="pushToggleBtn">Turn on reminders</button>
       <p class="muted-note" id="pushNote" style="margin-top:8px;"></p>
@@ -9427,6 +9484,11 @@ async function finishOnboarding(data) {
   }
   if (data.goal_key) await setActiveGoal(data);
   applyAccentColors();
+  /* Armed here rather than asked here. Onboarding ends by handing over to
+     either the app or the pairing screen, and interrupting that handover with
+     a permission sheet would put it in front of a screen the person has not
+     seen yet. The flag is spent the first time the app itself is on screen. */
+  try { localStorage.setItem(ASK_PUSH_KEY, "1"); } catch { /* private browsing */ }
   await checkPartnershipThenEnter();
   return true;
 }
@@ -9649,7 +9711,13 @@ function showApp() {
      every card on the dashboard, and without the promise coming back out the
      boot path had nothing to wait for and uncovered an empty frame. Callers
      that do not care can still ignore it. */
-  return loadAll().then(reconcileNativeSurfaces);
+  return loadAll().then(reconcileNativeSurfaces).then(() => {
+    /* After the dashboard is painted, not before. The sheet is asking for
+       something on behalf of a screen the person should be able to see behind
+       it, and it is deliberately outside the awaited chain so a slow permission
+       answer cannot hold up the launch screen. */
+    maybeAskForPush();
+  });
 }
 
 /* ---------- Back ----------
@@ -17256,6 +17324,11 @@ function renderStretchPhase() {
   const i = SESSION.stretchIndex || 0;
   const move = list[i];
   if (!move) { endStretchPhase(); return; }
+  /* The Lock Screen follows the hold. renderSession() pushes the card, but a
+     hold running out advances through paintStretch and lands here without
+     going near it, so without this the card sat on the finished hold showing
+     0:00 while the screen had already moved on. */
+  pushLiveActivity();
   const isWarm = SESSION.phase === "warmup";
   const total = Math.max(1, Number(move.seconds) || 30);
   const left = Math.max(0, total - (Date.now() - (SESSION.stretchStartedAt || Date.now())) / 1000);
@@ -18436,6 +18509,46 @@ function liveActivityFields() {
     /* Lines for the Lock Screen button to choose from. The bank is here and the
        button runs in another process, so it gets a handful to work with. */
     quipPool: LIVE_QUIP_POOL,
+    /* ---- the stretch block ----
+       The card turns blue for these two the way the session screen does, so
+       which part of the session you are in reads from across the room. */
+    ...stretchLiveFields(),
+  };
+}
+
+/* What the Lock Screen needs to draw a warm-up or a cool-down.
+
+   Everything is derived from the same SESSION fields paintStretch() reads, so
+   the card and the session screen cannot disagree about which hold is up or how
+   long is left. Lifting returns the empty shape rather than nothing, because a
+   missing key leaves the previous phase on the card and the workout then
+   carries on looking blue after the warm-up ended. */
+function stretchLiveFields() {
+  const stretching = SESSION && (SESSION.phase === "warmup" || SESSION.phase === "cooldown");
+  if (!stretching) {
+    return { phase: "lift", stretchName: "", stretchSide: 0, stretchIndex: 0, stretchCount: 0, stretchLeft: 0 };
+  }
+  const list = stretchList();
+  const move = list[SESSION.stretchIndex];
+  const total = Math.max(1, Number(move?.seconds) || 30);
+  /* Seconds left, which the native side turns into an end date. A hold counts
+     DOWN against a fixed length, the opposite of rest, so an end date is the
+     honest thing here and Text(timerInterval:) then runs it with the app
+     asleep and it costs no updates. A paused session sends zero, which stops
+     the card's clock the same way it stops the screen's. */
+  const left = SESSION.pausedAt
+    ? 0
+    : Math.max(0, total - (Date.now() - (SESSION.stretchStartedAt || Date.now())) / 1000);
+  return {
+    phase: SESSION.phase,
+    stretchName: move?.name || "",
+    /* Zero means the hold has no sides at all, which is a different thing from
+       being on the first of two, and the card says so rather than claiming
+       FIRST SIDE of a hold that only has one. */
+    stretchSide: move?.perSide ? (SESSION.stretchSide || 1) : 0,
+    stretchIndex: SESSION.stretchIndex || 0,
+    stretchCount: list.length,
+    stretchLeft: Math.round(left),
   };
 }
 
@@ -18486,6 +18599,25 @@ async function drainLockScreenSets() {
     }
     if ((edits || []).length) saveSessionToStorage();
 
+    /* Stretch taps before sets, and in the order they were made. Next and skip
+       are not interchangeable and two nexts are not one skip, so unlike sets
+       these come back as a list rather than a count and are replayed in
+       sequence. Done first because a skip can end the warm-up, and a set
+       logged after that belongs to the lifting that follows it. */
+    const { actions: stretches } = await bridge.drainPendingStretches({ owner: mine });
+    for (const kind of stretches || []) {
+      if (!SESSION || SESSION.finished) break;
+      /* Guarded every iteration rather than once up front: the first skip
+         leaves the block, and replaying a second tap into the lifting phase
+         would move a stretch that is no longer on screen. */
+      if (SESSION.phase !== "warmup" && SESSION.phase !== "cooldown") break;
+      if (kind === "skip") endStretchPhase();
+      else stretchAdvance();
+    }
+    if ((stretches || []).length) {
+      console.log(`lock screen stretch drain: ${(stretches || []).join(", ")}`);
+    }
+
     /* Owner-scoped: taps queued for anyone else, or for a workout that ended
        long ago, are dropped rather than replayed as phantom sets. */
     const { count, advances, dropped } = await bridge.drainPendingSets({ owner: mine });
@@ -18511,7 +18643,7 @@ async function drainLockScreenSets() {
     /* Both replays redraw as they go, but only the screen they think is up. If
        the session was minimised while the taps happened, the workout tab behind
        it is still showing the lift you were on before them. */
-    if ((count || 0) || (advances || 0)) {
+    if ((count || 0) || (advances || 0) || (stretches || []).length) {
       if (document.body.classList.contains("session-open")) renderSession();
       else if (typeof renderWorkoutTab === "function") renderWorkoutTab();
     }
@@ -18535,8 +18667,18 @@ async function pushLiveActivity() {
   }
   const fields = liveActivityFields();
   /* A running countdown must not be resent on every redraw or it restarts from
-     full each time, so rest compares as on or off rather than as seconds. */
-  const fingerprint = JSON.stringify({ ...fields, restSeconds: fields.restSeconds > 0 });
+     full each time, so rest compares as on or off rather than as seconds.
+     A hold is the same trap and worse: stretchLeft changes every second, so
+     comparing it literally would push an update on every redraw and hand the
+     card a new end date each time, which reads as a timer that keeps jumping
+     back. What identifies a hold is which hold it is, so that is what compares:
+     the phase, its position and its side. */
+  const fingerprint = JSON.stringify({
+    ...fields,
+    restSeconds: fields.restSeconds > 0,
+    stretchLeft: fields.stretchLeft > 0,
+    stretchAt: `${fields.phase}:${fields.stretchIndex}:${fields.stretchSide}`,
+  });
   if (fingerprint === LAST_LIVE_ACTIVITY) return;
   LAST_LIVE_ACTIVITY = fingerprint;
   try {
@@ -23003,7 +23145,7 @@ function viewedEmail() { return PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY
    their goal changes. */
 const PROGRESS_CARDS = [
   "cardWeight", "scaleCheckCard", "cardConsistency",
-  "cardStrength", "cardVolume", "cardPhotos",
+  "cardMuscles", "cardStrength", "cardVolume", "cardPhotos",
 ];
 
 /* ---------- What this tab is supposed to answer ----------
@@ -23143,8 +23285,8 @@ function headlineKindFor(profile) {
 const GOAL_CARDS = {
   scale:     ["cardWeight", "scaleCheckCard", "cardPhotos", "cardConsistency"],
   recomp:    ["cardConsistency", "cardPhotos", "cardWeight", "scaleCheckCard"],
-  lift:      ["cardStrength", "cardConsistency"],
-  volume:    ["cardVolume", "cardStrength", "cardWeight", "scaleCheckCard", "cardConsistency"],
+  lift:      ["cardMuscles", "cardStrength", "cardConsistency"],
+  volume:    ["cardMuscles", "cardVolume", "cardStrength", "cardWeight", "scaleCheckCard", "cardConsistency"],
   reps:      ["cardConsistency"],
   endurance: ["cardConsistency"],
   habit:     ["cardConsistency"],
@@ -23213,6 +23355,280 @@ function liftE1rmHistory(name, exerciseName, weeks = 16) {
   }
   return [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b))
     .map(([entry_date, est]) => ({ entry_date, est }));
+}
+
+/* ---------- Did the weight go up? ----------
+   Progress used to answer "how much did you do", which is volume, and volume
+   is a number people cannot act on: doing more sets of the same weight looks
+   like progress and is not. This answers the other question, the one people
+   actually ask, which is whether they are getting stronger.
+
+   The join is the whole trick and every piece of it already existed:
+   classifyMuscles() knows which muscles a lift trains, liftE1rmHistory() knows
+   what that lift's estimated single has done over time, and nothing had ever
+   put the two together. A muscle is "up" when a lift that trains it is being
+   done heavier than it was.
+
+   Four states, because three would have to lie about one of them:
+     up          a lift for this muscle got heavier
+     flat        trained under load, and the load has not moved
+     bodyweight  trained, but nothing here carries a weight to measure
+     cold        not trained at all in the window
+   Chin-ups and planks are the reason bodyweight exists. Folding them into
+   "flat" would tell somebody doing thirty hard sets of core that they are not
+   progressing, when the truth is only that we cannot see it from a load. */
+function muscleStrengthTrend(name, weeks = 12) {
+  const from = new Date(todayStr() + "T00:00:00");
+  from.setDate(from.getDate() - weeks * 7);
+  const fromStr = isoDate(from);
+
+  const out = {};
+  MUSCLE_GROUPS.forEach((g) => { out[g] = { state: "cold", from: null, to: null, lift: null, weeks: 0, sets: 0 }; });
+
+  /* One pass over the logs to find which lifts this person actually did, and
+     how much each muscle saw, rather than asking the library what exists. */
+  const lifts = new Map();
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== name || l.entry_date < fromStr) continue;
+    const key = (l.exercise_name || "").trim();
+    if (!key) continue;
+    if (!lifts.has(key)) lifts.set(key, { weighted: false });
+    if (l.weight != null && !l.duration_min) lifts.get(key).weighted = true;
+    const rule = classifyMuscles(key);
+    if (!rule) continue;
+    const sets = l.duration_min ? Math.max(1, Math.round(l.duration_min / 10)) : (l.sets || 1);
+    rule.primary.forEach((g) => { if (out[g]) out[g].sets += sets; });
+  }
+
+  for (const [exName, info] of lifts) {
+    const rule = classifyMuscles(exName);
+    if (!rule) continue;
+    const groups = rule.primary.filter((g) => out[g]);
+    if (!groups.length) continue;
+
+    if (!info.weighted) {
+      groups.forEach((g) => { if (out[g].state === "cold") out[g].state = "bodyweight"; });
+      continue;
+    }
+    const hist = liftE1rmHistory(name, exName, weeks);
+    if (hist.length < 2) {
+      /* One session is a data point, not a trend, so it counts as trained
+         rather than as evidence either way. */
+      groups.forEach((g) => { if (out[g].state === "cold") out[g].state = "flat"; });
+      continue;
+    }
+    const a = Math.round(hist[0].est), b = Math.round(hist[hist.length - 1].est);
+    const spanWeeks = Math.max(1, Math.round(
+      (new Date(hist[hist.length - 1].entry_date) - new Date(hist[0].entry_date)) / 6048e5));
+
+    /* Ranked on the estimate, SHOWN as the set that was actually done.
+       Somebody who took a bench from 165x5 to 195x5 has an estimate that went
+       193 to 228, and telling them "193 to 228 lb" names two weights they have
+       never touched. The estimate is the right thing to sort by, because it is
+       the only one that notices more reps at the same load. It is the wrong
+       thing to print. */
+    const topSet = (dateStr) => {
+      let best = null;
+      for (const l of ALL_EXERCISE_LOGS) {
+        if (l.user_name !== name || l.entry_date !== dateStr) continue;
+        if ((l.exercise_name || "").trim().toLowerCase() !== exName.trim().toLowerCase()) continue;
+        if (l.weight == null || l.duration_min) continue;
+        if (!best || e1rm(l.weight, l.reps) > e1rm(best.weight, best.reps)) best = l;
+      }
+      return best;
+    };
+    const setA = topSet(hist[0].entry_date), setB = topSet(hist[hist.length - 1].entry_date);
+
+    for (const g of groups) {
+      const cur = out[g];
+      const gain = b - a;
+      /* The lift that moved most owns the muscle's headline. A bench that went
+         up matters more than a fly that did not, and naming the fly would send
+         somebody to fix the wrong thing. */
+      const curGain = cur.state === "up" ? (cur.to - cur.from) : -Infinity;
+      const shape = { lift: exName, weeks: spanWeeks, setA, setB };
+      if (gain > 0 && gain > curGain) {
+        out[g] = { ...cur, state: "up", from: a, to: b, ...shape };
+      } else if (cur.state !== "up") {
+        out[g] = { ...cur, state: "flat", from: a, to: b, ...shape };
+      }
+    }
+  }
+  return out;
+}
+
+/* ---- The same body the rest of the app draws, coloured by strength ----
+
+   Its own pair of Rive controllers rather than the Body tab's, because those
+   are bound to that tab's canvases and are painted from volume. Sharing them
+   would mean whichever screen rendered last won, and the two screens answer
+   different questions with the same picture, which is exactly the confusion
+   this feature exists to remove.
+
+   Three colours, not a ramp. A ramp implies a quantity and there is no
+   quantity here: the weight either went up or it did not. */
+let MS_FRONT = null, MS_BACK = null, MS_SEX = null, MS_TREND = null, MS_NAME = null;
+const MS_COLOURS = {
+  up:         { r: 0x3b, g: 0xe7, b: 0x6b },
+  flat:       { r: 0x8b, g: 0x94, b: 0xa3 },
+  bodyweight: { r: 0x8b, g: 0x94, b: 0xa3 },
+  cold:       null,                            // null means leave the asset's base grey
+};
+
+async function openMuscleBody(name) {
+  MS_NAME = name || ME;
+  MS_TREND = muscleStrengthTrend(MS_NAME, 12);
+  const up = MUSCLE_GROUPS.filter((g) => MS_TREND[g].state === "up").length;
+  const measured = MUSCLE_GROUPS.filter((g) => ["up", "flat"].includes(MS_TREND[g].state)).length;
+  $("msTitle").textContent = MS_NAME === ME ? "Getting stronger" : `${MS_NAME} getting stronger`;
+  $("msNote").textContent = measured
+    ? `${up} of ${measured} measurable muscles are lifting more. Tap one.`
+    : "Nothing with a weight on it yet.";
+  $("msDetail").innerHTML = "";
+  $("msScrim").classList.remove("hidden");
+  $("msScrim").onclick = (e) => { if (e.target === $("msScrim")) closeMuscleBody(); };
+  $("msClose").onclick = closeMuscleBody;
+
+  try {
+    const mod = await ensureRiveBodyModule();
+    if ($("msScrim").classList.contains("hidden")) return;   // closed while loading
+    const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const paint = () => msPaint(mod);
+    if (!MS_FRONT || MS_SEX !== sex) {
+      MS_FRONT?.destroy(); MS_BACK?.destroy();
+      const make = (id, view) => {
+        const canvas = $(id);
+        canvas.width = Math.round(canvas.clientWidth * dpr);
+        canvas.height = Math.round(canvas.clientHeight * dpr);
+        return mod.createBodyHeatmap({
+          canvas, artboardName: `${sex}-${view}`, palette: mod.APP_HEAT_PALETTE, intensities: {},
+          onMuscleClick: (muscle) => msShowMuscle(mod.RIVE_TO_APP_GROUP[muscle]),
+          onLoad: paint,
+        });
+      };
+      MS_FRONT = make("msFront", "Front");
+      MS_BACK = make("msBack", "Back");
+      MS_SEX = sex;
+    } else {
+      paint();
+    }
+  } catch (e) {
+    /* The figure is the nice version, not the only version: the card behind it
+       already said everything in words. */
+    console.warn("strength body unavailable", e);
+    $("msNote").textContent = "The figure could not load. The list on the card has the same answers.";
+  }
+}
+
+function msPaint(mod) {
+  const on = {};
+  for (const muscle of mod.ALL_MUSCLES) {
+    const g = mod.RIVE_TO_APP_GROUP[muscle];
+    const state = g && MS_TREND[g] ? MS_TREND[g].state : "cold";
+    const c = MS_COLOURS[state];
+    on[muscle] = c ? 4 : 0;
+    if (c) {
+      const pal = { base: mod.APP_HEAT_PALETTE.base, level1: c, level2: c, level3: c, level4: c };
+      MS_FRONT?.setMusclePalette(muscle, pal);
+      MS_BACK?.setMusclePalette(muscle, pal);
+    }
+  }
+  MS_FRONT?.setIntensities(on);
+  MS_BACK?.setIntensities(on);
+}
+
+function msShowMuscle(group) {
+  if (!group || !MS_TREND?.[group]) return;
+  const s = strengthSentence(group, MS_TREND[group]);
+  $("msDetail").innerHTML = `<div class="ms-row">
+      <i class="ms-dot ${MS_TREND[group].state === "up" ? "up" : MS_TREND[group].state === "cold" ? "cold" : "flat"}"></i>
+      <span class="ms-txt"><b>${escapeHtml(s.head)}</b><span>${escapeHtml(s.sub)}</span></span>
+    </div>`;
+}
+
+function closeMuscleBody() {
+  $("msScrim").classList.add("hidden");
+}
+
+/* Four lines at most, biggest first. Naming fourteen muscles one by one is
+   the version of this that nobody reads, so the card groups them: the single
+   best gain in full, then counts for the rest. The body screen behind the
+   button is where somebody goes when they want it muscle by muscle. */
+function renderMuscleAnswers(name) {
+  const list = $("musclesList");
+  if (!list) return;
+  const t = muscleStrengthTrend(name, 12);
+  const of = (st) => MUSCLE_GROUPS.filter((g) => t[g].state === st);
+  const up = of("up").sort((a, b) => (t[b].to - t[b].from) - (t[a].to - t[a].from));
+  const flat = of("flat"), body = of("bodyweight"), cold = of("cold");
+  const label = (g) => (BODY_GROUP_LABELS[g] || g).toLowerCase();
+  const measured = up.length + flat.length;
+
+  $("musclesLead").textContent = measured
+    ? `${up.length} of ${measured} muscles you can measure are lifting more, over the last 12 weeks.`
+    : "Nothing with a weight on it yet, so there is no load to compare.";
+
+  const rows = [];
+  if (up[0]) {
+    const s = strengthSentence(up[0], t[up[0]]);
+    rows.push({ k: "up", head: s.head, sub: s.sub });
+  }
+  if (up.length > 1) {
+    rows.push({ k: "up", head: `${up.length} muscles are lifting more`,
+      sub: up.map(label).join(", ") + "." });
+  }
+  if (flat.length) {
+    rows.push({ k: "flat", head: `${flat.length} ${flat.length === 1 ? "has" : "have"} not moved`,
+      sub: `${flat.map(label).join(", ")}. Same load for weeks, so the next step is weight rather than sets.` });
+  }
+  if (body.length) {
+    rows.push({ k: "flat", head: `${body.map(label).join(" and ")} trained without load`,
+      sub: "Bodyweight work, so there is nothing here to compare week to week." });
+  }
+  if (cold.length) {
+    rows.push({ k: "cold", head: `${cold.length} not trained at all`,
+      sub: `${cold.map(label).join(", ")}. Nothing logged in 12 weeks.` });
+  }
+  if (!rows.length) rows.push({ k: "cold", head: "Nothing logged yet", sub: "Log a few weeks and this fills in." });
+
+  list.innerHTML = rows.map((r) => `<div class="ms-row">
+      <i class="ms-dot ${r.k}"></i>
+      <span class="ms-txt"><b>${escapeHtml(r.head)}</b><span>${escapeHtml(r.sub)}</span></span>
+    </div>`).join("");
+
+  const btn = $("musclesOpenBtn");
+  if (btn) btn.onclick = () => openMuscleBody(name);
+}
+
+/* The same answer as a sentence. Kept next to the maths so the words and the
+   numbers can never drift apart. */
+function strengthSentence(group, t) {
+  const label = BODY_GROUP_LABELS[group] || group;
+  const w = (st) => (st ? `${st.weight} lb${st.reps ? ` x ${st.reps}` : ""}` : null);
+  if (t.state === "up") {
+    const a = w(t.setA), b = w(t.setB);
+    /* Same weight for more reps is the case the raw load cannot see, so it gets
+       its own sentence rather than being described as a jump in weight. */
+    const same = t.setA && t.setB && t.setA.weight === t.setB.weight;
+    return {
+      head: same ? `${label} up ${t.setB.reps - t.setA.reps} reps` : `${label} getting stronger`,
+      sub: a && b
+        ? (same
+          ? `${t.lift}: ${t.setA.weight} lb for ${t.setA.reps} reps, now ${t.setB.reps}, over ${t.weeks} week${t.weeks === 1 ? "" : "s"}.`
+          : `${t.lift}: ${a} to ${b} over ${t.weeks} week${t.weeks === 1 ? "" : "s"}.`)
+        : `${t.lift} is going up.`,
+    };
+  }
+  if (t.state === "flat") {
+    const b = w(t.setB);
+    return { head: `${label} holding`,
+      sub: t.lift ? `${t.lift} has stayed at ${b || "the same load"}. Time to add weight.` : "Trained, but the load has not moved." };
+  }
+  if (t.state === "bodyweight") {
+    return { head: `${label} trained`, sub: `${t.sets} sets, all bodyweight, so there is no load to compare.` };
+  }
+  return { head: `${label} not trained`, sub: "Nothing logged in this stretch." };
 }
 
 /* Best single set on a movement matched by name. Bodyweight work has no load,
@@ -23688,7 +24104,9 @@ function renderProgressTab() {
      timeline, the day sheet and the live sheet already apply. */
   const barred = new Set();
   if (isPartner) barred.add("scaleCheckCard");
-  if (!sharing) { barred.add("cardStrength"); barred.add("cardVolume"); }
+  /* This card names the lifts somebody is doing and what they load them with,
+     which is exactly what share_workout_details exists to withhold. */
+  if (!sharing) { barred.add("cardStrength"); barred.add("cardVolume"); barred.add("cardMuscles"); }
 
   const wanted = (GOAL_CARDS[kind] || GOAL_CARDS.habit).filter((c) => !barred.has(c));
   const rest = PROGRESS_CARDS.filter((c) => !barred.has(c) && !wanted.includes(c));
@@ -23710,6 +24128,7 @@ function renderProgressTab() {
 
   if (blank) renderProgressEmpty(kind);
   else renderProgressHeadline(kind, name, email, profile, isPartner, sharing);
+  if (!blank && shown.includes("cardMuscles")) renderMuscleAnswers(name);
 
   /* The goal's cards, in the goal's order, straight under the answer; then the
      rule; then everything else in PROGRESS_CARDS order. Re-ordering the nodes
@@ -23935,16 +24354,44 @@ async function registerPushHandlers() {
 
 /* APNs hands the token to a listener rather than returning it, so the register
    call has to be wrapped to be awaited like anything else. */
-function awaitApnsToken(timeoutMs = 15000) {
-  return new Promise((resolve, reject) => {
-    const push = nativePush();
-    let done = false;
-    const finish = (fn, value) => { if (!done) { done = true; fn(value); } };
-    push.addListener("registration", (t) => finish(resolve, t.value));
-    push.addListener("registrationError", (e) => finish(reject, new Error(e.error || "registration failed")));
-    push.register();
-    setTimeout(() => finish(reject, new Error("timed out waiting for a device token")), timeoutMs);
-  });
+/* 45 seconds, not 15.
+   A first registration on a cold APNs connection can genuinely take half a
+   minute, and the old limit turned a slow answer into a reported failure. The
+   wait is not costly: the screen says what it is waiting for the whole time,
+   and nobody is blocked behind it. */
+/* The device token, which is the whole of what makes a phone reachable.
+   APNs hands it to a listener rather than returning it, so the call has to be
+   wrapped to be awaited like anything else.
+
+   The listeners are ATTACHED AND AWAITED BEFORE register() is called, and that
+   ordering is the entire function. addListener returns a Promise because
+   attaching a listener has to cross the bridge into the native side, and until
+   it resolves there is nothing listening. register() used to be called on the
+   line straight after, unawaited, and APNs on a real device answers in
+   milliseconds: the token arrived before the listener existed, was dropped,
+   and nothing ever fired again. No token, no registrationError, nothing in the
+   log, for ever.
+
+   It presented as a network fault and cost a phone restart and a switch to
+   mobile data before anybody suspected the code, which is the same lesson as
+   the unregistered plugins and the unbundled imports: the bugs that cost the
+   most here are the ones with no error attached. */
+async function awaitApnsToken(timeoutMs = 45000) {
+  const push = nativePush();
+  let resolve, reject, done = false;
+  const token = new Promise((res, rej) => { resolve = res; reject = rej; });
+  const finish = (fn, value) => { if (!done) { done = true; fn(value); } };
+
+  setTimeout(() => finish(reject, new Error(
+    "Apple sent nothing back in 45s. Usually a network blocking APNs: try mobile data.")), timeoutMs);
+
+  await Promise.all([
+    push.addListener("registration", (t) => finish(resolve, t.value)),
+    push.addListener("registrationError", (e) => finish(reject, new Error(e.error || "registration failed"))),
+  ]);
+  /* Only now. Everything above exists so that this line cannot outrun it. */
+  push.register();
+  return token;
 }
 
 /* Which Apple gateway minted the token we just received.
@@ -24026,8 +24473,66 @@ async function renderPushToggle() {
   const sub = await currentPushSub();
   btn.disabled = false;
   btn.textContent = sub ? "Turn off reminders" : "Turn on reminders";
-  note.textContent = sub ? "On for this device." : "Off.";
+  /* The reason the last attempt failed, kept on screen rather than thrown at a
+     toast that is gone in three seconds. Turning reminders on can fail in at
+     least four different ways and every one of them used to read as "Off.",
+     which is how a phone ends up registered nowhere with nobody any the wiser.
+     Cleared the moment it works. */
+  note.textContent = sub ? "On for this device." : (PUSH_LAST_ERROR || "Off.");
+  note.style.color = !sub && PUSH_LAST_ERROR ? "var(--danger, #ff5c5c)" : "";
   btn.onclick = sub ? disablePush : enablePush;
+}
+
+/* Why the last attempt to turn reminders on did not work. Null when it has not
+   been tried, or when it worked. */
+let PUSH_LAST_ERROR = null;
+
+/* Set when onboarding finishes, spent the first time the app is on screen. */
+const ASK_PUSH_KEY = "ft_ask_push";
+
+/* The one time we ask for notifications.
+
+   Until now the only way to turn them on was Setup, then the App section, then
+   Notifications, then a button: four taps, and nothing anywhere in the app ever
+   pointed at that screen. Nobody was going to find it, which made every
+   notification we could send theoretical.
+
+   OUR sheet, before the iOS one. iOS grants exactly one permission prompt per
+   install and a refusal can only be undone in Settings, so asking cold and
+   being told no costs the ability to ask ever again. A soft ask costs nothing:
+   "Not now" here never reaches Apple, and the switch in Setup still works for
+   anyone who changes their mind.
+
+   The reason given is the partner's, not ours, because that is the honest one
+   and it is also the only notification in the app nobody resents. Someone
+   training alone gets a different, true sentence rather than the same one with
+   the name removed. */
+async function maybeAskForPush() {
+  if (!isNativeApp()) return;
+  let armed = null;
+  try { armed = localStorage.getItem(ASK_PUSH_KEY); } catch { return; }
+  if (armed !== "1") return;
+  /* Spent whatever they answer. Asking twice is how a soft ask becomes the
+     thing people close without reading. */
+  try { localStorage.removeItem(ASK_PUSH_KEY); } catch { /* private browsing */ }
+  /* Already on, from an earlier install on this phone. Nothing to ask. */
+  if (await currentPushSub()) return;
+
+  const partner = PARTNER_EMAIL ? nameFor(PARTNER_EMAIL) : "";
+  const yes = await askConfirm({
+    heading: "One thing before you start",
+    body: partner
+      ? `${partner} can send you videos while you train, and they play once. Notifications are how you know one landed. Nothing else gets sent without asking you first.`
+      : "When you pair with someone, they can send you videos while you train, and they play once. Notifications are how you know one landed. Nothing else gets sent without asking you first.",
+    ok: "Turn on notifications",
+    cancel: "Not now",
+  });
+  if (!yes) return;
+  await enablePush();
+  /* Said plainly either way. enablePush already writes the reason it failed to
+     the Setup screen, but nobody who answered this sheet is going to Setup to
+     read it, so the outcome is said here too. */
+  toast(await currentPushSub() ? "Notifications on" : "You can turn these on later in Setup");
 }
 
 async function enablePush() {
@@ -24037,23 +24542,49 @@ async function enablePush() {
      function is waiting on it. Say so, otherwise the tap reads as dead. */
   btn.disabled = true;
   btn.textContent = "Turning on…";
-  note.textContent = "Waiting for your answer to the permission prompt.";
+  /* Each stage announces itself. This used to say one sentence about a
+     permission prompt for the whole run, which is wrong twice over: no prompt
+     appears at all if permission was already granted or already refused, and
+     when it hung there was no way to tell whether it was stuck asking iOS or
+     stuck waiting on Apple for a token. Those have completely different
+     answers, and the sentence on screen is the only instrument anybody has. */
+  const stage = (msg) => { note.style.color = ""; note.textContent = msg; };
+  stage("Asking iOS for permission.");
   try {
     if (isNativeApp()) {
       const push = nativePush();
-      const asked = await push.requestPermissions();
-      if (asked.receive !== "granted") { toast("Reminders need permission"); return; }
+      /* Named rather than assumed. If the plugin is not registered this is
+         undefined, the next line throws a TypeError, and the screen used to
+         report that as a generic failure. */
+      if (!push) throw new Error("The push plugin is missing from this build.");
+      /* Raced against a clock. If this never settles the screen sits on one
+         sentence for ever with no way to tell a slow answer from a dead call,
+         which is exactly what it did. */
+      const asked = await Promise.race([
+        push.requestPermissions(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("iOS never answered the permission request. Force quit Unio and try again.")), 20000)),
+      ]);
+      if (asked.receive !== "granted") {
+        /* The answer is quoted, because "prompt" and "denied" mean different
+           things: one is a prompt nobody tapped, the other is a standing no
+           that only Settings can undo. */
+        throw new Error(`iOS said "${asked.receive}". Settings, Notifications, Unio, Allow Notifications.`);
+      }
       /* Retried here because the boot attempt runs before anyone has granted
          anything, and that is where it tends to fail. */
       await registerPushHandlers();
+      stage("Permission granted. Waiting for Apple to send a device token.");
       const token = await awaitApnsToken();
+      stage("Token received. Saving it.");
       const { error: apnsErr } = await sb.from("apns_tokens").upsert({
         email: MY_EMAIL,
         token,
         environment: await apnsEnvironment(),
         failures: 0,
       }, { onConflict: "token" });
-      if (apnsErr) throw apnsErr;
+      if (apnsErr) throw new Error(`Could not save the token: ${apnsErr.message}`);
+      PUSH_LAST_ERROR = null;
       toast("Reminders on");
       return;
     }
@@ -24078,9 +24609,13 @@ async function enablePush() {
       failures: 0,
     }, { onConflict: "endpoint" });
     if (error) throw error;
+    PUSH_LAST_ERROR = null;
     toast("Reminders on");
   } catch (e) {
     console.error("could not enable reminders", e);
+    /* Kept, so renderPushToggle can print it under the button. A toast is the
+       wrong surface for the only explanation anybody is going to get. */
+    PUSH_LAST_ERROR = String(e && e.message ? e.message : e).slice(0, 160);
     toast("Could not turn reminders on");
   } finally {
     btn.disabled = false;
