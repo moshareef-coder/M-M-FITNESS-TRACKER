@@ -1791,7 +1791,12 @@ const PROPS = {
     const top = p.top === undefined ? 16 : p.top;
     const y0 = p.y0 === undefined ? 46 : p.y0;
     ctx.fillStyle = C.prop;
-    roundRect(ctx, p.x - 2, top, 4, y0 - top, 2); ctx.fill();
+    /* The post is the machine's own upright, drawn back when the cable prop
+       had to be the whole machine. With artwork supplying the frame it is a
+       fat grey bar hanging in mid air beside the cable, which is exactly what
+       Mo saw: "the rope still stays there." A plumb cable is a line and a
+       handle, nothing else. */
+    if (!p.plumb) { roundRect(ctx, p.x - 2, top, 4, y0 - top, 2); ctx.fill(); }
     /* `stack: false` leaves the plates to somebody else. A machine supplied as
        artwork draws its own stack, and two stacks in the same place is worse
        than none: the cable still owns the pulley, the line and the bar, which
