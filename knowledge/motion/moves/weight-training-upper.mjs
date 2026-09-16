@@ -31,6 +31,12 @@ const FRONT_FEET = { R: { ang: 12, len: 0.4, w: 1.3 }, L: { ang: 12, len: 0.4, w
 // the elbows folding out at the bottom. Side view, sagittal.
 // Same chassis as the seeded Barbell Bench Press: root.rot -90 is supine, which
 // puts the head at -x and runs the legs out to +x.
+// hold: "follow" on the bells, not the default "level": a real bench press is
+// gripped neutral (thumbs toward the head), so the camera is looking down the
+// dumbbell's length, not at its broadside. Mo, against a reference photo:
+// "look at this dumbbell bench press and how the dumbbells are facing vs
+// ours." Every dumbbell PRESS below gets the same fix; a raise, a curl or a
+// shrug keeps "level" because that grip really does stay flat.
 const DUMBBELL_BENCH_PRESS = {
   view: "side",
   loop: "pingpong",
@@ -38,8 +44,8 @@ const DUMBBELL_BENCH_PRESS = {
   breath: 0.25,
   props: [
     { type: "bench", x: 26, y: 92, w: 78 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // lockout, bells nearly touching over the chest
@@ -205,8 +211,8 @@ const INCLINE_DUMBBELL_PRESS = {
   fit: { k: 0.95, dy: 0 },
   props: [
     { type: "bench", x: 32, y: 89, w: 72, incline: -35 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // lockout, arms long square to the reclined torso
@@ -237,8 +243,8 @@ const DECLINE_DUMBBELL_PRESS = {
     { type: "bench", x: 32, y: 78, w: 76, incline: 25 },
     { type: "roller", x: 116, y: 48, r: 5 },
     { type: "roller", x: 116, y: 66, r: 5 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // lockout, bells square to the declined torso
@@ -1097,8 +1103,8 @@ const SEATED_DUMBBELL_PRESS = {
   props: [
     { type: "bench", x: 20, y: 70, w: 44, incline: -78 },
     { type: "bench", x: 36, y: 96, w: 36 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
     { // start, bells at the shoulders, elbows under the hands
@@ -1128,8 +1134,8 @@ const DUMBBELL_SHOULDER_PRESS = {
   fit: { k: 0.78, dy: 14 },
   feet: FRONT_FEET,
   props: [
-    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // racked, elbows out level with the shoulders, forearms vertical
@@ -1169,8 +1175,8 @@ const ARNOLD_PRESS = {
   props: [
     { type: "bench", x: 20, y: 70, w: 44, incline: -78 },
     { type: "bench", x: 36, y: 96, w: 36 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
     { // start, elbows down and forward, bells in front of the chin
@@ -1206,8 +1212,8 @@ const CUBAN_PRESS = {
   breath: 0.2,
   fit: { k: 0.84, dy: 10 },
   props: [
-    { type: "dumbbell", side: "L", point: "hand", k: 0.72 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.72, front: true },
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", k: 0.72 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.72, front: true },
   ],
   keys: [
     { // bells at the thighs, arms long
