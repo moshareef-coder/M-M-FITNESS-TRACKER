@@ -48,17 +48,28 @@ def classify(r, g, b, central):
 
 
 def clear_the_hole(layers, counts):
-    """Empties the middle of the ring out of both arc layers.
+    """Moves the middle of the ring out of the arcs and into the dumbbell.
+
+    MOVES, not deletes. An earlier version of this threw those pixels away and
+    it was chipping the logo: 3040 pixels, nearly one percent of the mark,
+    vanished from the assembled result. They were not all shadow. Some were
+    dumbbell pixels that colour had put in the wrong layer, and deleting them
+    took bites out of the plates.
+
+    Nothing about a pixel inside the hole says it should stop existing. It says
+    it does not belong to an arc. So it goes where it does belong, which is the
+    layer that occupies the middle of the ring.
 
     The dumbbell throws a soft brown shadow, and a shadow cannot be told from
     the coral arc's own shadow by colour: both are dark and both have red over
     blue. Geometry can tell them apart, because an arc is an annulus and
-    nothing that belongs to one lies inside the hole.
+    nothing that belongs to one lies inside the hole. The shadow then animates
+    with the dumbbell, which is correct, because it is the dumbbell's.
 
     The inner edge is measured rather than guessed. Only unmistakable arc
     pixels, opaque and saturated and bright, are allowed to define it, so a
     stray shadow cannot drag the boundary inwards over the very pixels it is
-    there to remove.
+    there to move.
     """
     strong = []
     for name in ("left", "right"):
@@ -77,21 +88,29 @@ def clear_the_hole(layers, counts):
     # A low percentile rather than the minimum: one antialiased pixel on the
     # inner lip should not set the boundary for the whole ring.
     inner = radii[int(len(radii) * 0.02)]
-    removed = 0
+    bar = layers["bar"].load()
+    moved = 0
     for name in ("left", "right"):
         img = layers[name]
         px = img.load()
         w, h = img.size
         for y in range(h):
             for x in range(w):
-                if px[x, y][3] == 0:
+                pixel = px[x, y]
+                if pixel[3] == 0:
                     continue
                 if ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5 < inner * 0.98:
                     px[x, y] = (0, 0, 0, 0)
                     counts[name] -= 1
-                    removed += 1
-    print(f"hole   inner radius {inner:.0f}px, {removed} px of shadow cleared from the arcs")
-    return removed
+                    # Only where the dumbbell layer is not already covering it,
+                    # so a real dumbbell pixel is never overwritten by a stray
+                    # one the arcs happened to be holding.
+                    if bar[x, y][3] == 0:
+                        bar[x, y] = pixel
+                        counts["bar"] += 1
+                    moved += 1
+    print(f"hole   inner radius {inner:.0f}px, {moved} px moved from the arcs into the dumbbell")
+    return moved
 
 
 def combined_bounds(layers):
@@ -124,7 +143,17 @@ def main():
             central = abs(x - w / 2) < w * 0.30 and abs(y - h / 2) < h * 0.30
             which = classify(r, g, b, central)
             if not which:
-                continue
+                # Every remaining pixel still belongs somewhere, and dropping it
+                # is a chip in the logo. These are the pale, nearly colourless
+                # ones: soft outer edges and the white glints along the arcs,
+                # which match no colour rule because they have barely any colour
+                # left to match on.
+                #
+                # Side of centre is the right call for them, because that is
+                # what they are the edge OF. Anything that lands inside the ring
+                # is corrected a moment later by clear_the_hole, which moves the
+                # whole middle into the dumbbell regardless of how it got there.
+                which = "left" if x < w / 2 else "right"
             out[which][x, y] = (r, g, b, a)
             counts[which] += 1
 

@@ -190,13 +190,21 @@
   /* Each arc swings in from its own side around the centre of the mark. */
   .boot-arc-l { animation: bootArcL 1.2s cubic-bezier(.34,1.24,.5,1) both; }
   .boot-arc-r { animation: bootArcR 1.2s cubic-bezier(.34,1.24,.5,1) both; }
-  /* A pop rather than a fade: it is not there, and then it is. */
-  .boot-bar   { animation: bootBar .52s cubic-bezier(.34,1.7,.64,1) .78s both; }
+  /* A pop rather than a fade: it is not there, and then it is.
+
+     Delayed until the arcs have LANDED, at 1.2s, and that is a correctness
+     rule rather than a matter of pacing. Where the arcs pass the dumbbell in
+     the artwork those pixels are arc coloured, so they live in the arc layers,
+     which means the dumbbell on its own has bites out of its plates and along
+     its bar. Assembled it is whole and nothing shows. Popped in at 0.78s, while
+     the arcs were still swinging, it was on screen alone for half a second
+     looking chipped. */
+  .boot-bar   { animation: bootBar .5s cubic-bezier(.34,1.7,.64,1) 1.16s both; }
   .boot-word {
     font-family: var(--font-display); font-weight: 800; font-size: 20px;
     letter-spacing: .22em; margin: 0; color: var(--text);
     opacity: 0;                              /* same reason as the mark above */
-    animation: bootWord .74s ease .94s both;
+    animation: bootWord .7s ease 1.52s both;
   }
   /* The hold. Added once the entrance has finished, so a slow network breathes
      rather than freezing on the last frame of an animation. */
@@ -5839,10 +5847,10 @@
     <div class="card">
       <h2>Privacy &amp; support</h2>
       <p class="muted-note" style="margin-top:-6px;">How your data is handled, and how to reach us.</p>
-      <a class="link-row" href="/privacy.html" target="_blank" rel="noopener">
+      <a class="link-row" href="#" data-policy="privacy.html">
         <span>Privacy policy</span><span class="link-arrow">&rsaquo;</span>
       </a>
-      <a class="link-row" href="/support.html" target="_blank" rel="noopener">
+      <a class="link-row" href="#" data-policy="support.html">
         <span>Support</span><span class="link-arrow">&rsaquo;</span>
       </a>
       <p class="muted-note" style="margin-top:12px;opacity:.7;">Version <span id="appVersion"></span></p>
@@ -6478,11 +6486,12 @@ function dismissBoot() {
   BOOT_DONE = true;
   const boot = document.getElementById("boot");
   if (!boot) return;
-  /* Let the arcs finish closing even if the session resolved instantly, so the
-     mark is never caught half assembled. The entrance runs to 1.68s: the word
-     starts at .94 and takes .74. A beat past that lets the finished mark be
-     looked at, which is the point of slowing it down. */
-  const left = Math.max(0, 1900 - (Date.now() - BOOT_STARTED));
+  /* Let the whole entrance finish even if the session resolved instantly, so
+     the mark is never caught half assembled. It runs to 2.22s: arcs to 1.2,
+     the dumbbell landing behind them at 1.16 plus 0.5, the word from 1.52
+     taking 0.7. A beat past that lets the finished mark be looked at, which is
+     the point of it. */
+  const left = Math.max(0, 2500 - (Date.now() - BOOT_STARTED));
   setTimeout(() => {
     boot.classList.add("done");
     setTimeout(() => boot.remove(), 660);
@@ -6493,7 +6502,7 @@ const BOOT_STARTED = Date.now();
    sitting on a finished animation's last frame. */
 setTimeout(() => {
   if (!BOOT_DONE) document.getElementById("boot")?.classList.add("waiting");
-}, 1700);
+}, 2300);
 
 function initOnboard() {
   // iOS private browsing can throw here, and this runs before first paint.
@@ -6636,8 +6645,8 @@ function renderSignInScreen(state = {}) {
         <p class="si-msg ${state.tone || ""}" id="siMsg">${escapeHtml(state.msg || "")}</p>
 
         <p class="si-legal">By continuing you agree to the
-          <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>. Questions go to
-          <a href="/support.html" target="_blank" rel="noopener">support</a>.</p>
+          <a href="#" data-policy="privacy.html">Privacy Policy</a>. Questions go to
+          <a href="#" data-policy="support.html">support</a>.</p>
       </div>
     </div>`;
 
@@ -24512,6 +24521,40 @@ let PUSH_LAST_ERROR = null;
 
 /* Set when onboarding finishes, spent the first time the app is on screen. */
 const ASK_PUSH_KEY = "ft_ask_push";
+
+/* Where the privacy policy and support pages are actually readable.
+
+   Inside the app these two were plain links to /privacy.html with
+   target="_blank". Capacitor hands a blank-target link to the system browser,
+   and the app serves itself from https://localhost, so Safari opened
+   https://localhost/privacy.html and failed. Both links were dead on every
+   device, including the Privacy Policy on the sign-in screen, which is one of
+   the first things an App Review reader taps.
+
+   Absolute, and through the in-app browser, so it opens over the app rather
+   than throwing somebody out of it. */
+const POLICY_BASE = "https://m-m-fitness-tracker.vercel.app";
+
+/* Delegated from the document, once, rather than wired per screen. Two of these
+   links live on the sign-in screen, which is built before any tab exists and
+   before most of the app has run, so anything that attaches handlers later
+   would miss exactly the pair an App Review reader taps first. */
+document.addEventListener("click", (e) => {
+  const link = e.target.closest?.("[data-policy]");
+  if (!link) return;
+  e.preventDefault();
+  openPolicy(link.dataset.policy);
+});
+
+async function openPolicy(page) {
+  const url = `${POLICY_BASE}/${page}`;
+  const browser = isNativeApp() && window.Capacitor.Plugins.Browser;
+  if (browser) {
+    try { await browser.open({ url, presentationStyle: "popover" }); return; }
+    catch (err) { console.error("could not open the policy page", err); }
+  }
+  window.open(url, "_blank", "noopener");
+}
 
 /* What we promise to send, written once and shown in both places that promise
    it: the sheet that asks, and the Notifications screen in Setup.
