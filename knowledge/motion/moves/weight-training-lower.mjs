@@ -154,8 +154,11 @@ const HACK_SQUAT = {
     },
     { // bottom, knees bent to about 90 with the hips low on the pad
       t: 1,
-      root: { x: 53, y: 78, rot: -28 },
-      joints: { spine: 4, neck: 6, shoulderR: 18, elbowR: 44, shoulderL: 16, elbowL: 46 },
+      // The sled slides down and FORWARD along the 22 degree pad, so the
+      // pelvis follows the rail. It used to drop down and back, which put the
+      // sled a hand's width behind its own rails at the bottom.
+      root: { x: 66, y: 78, rot: -22 },
+      joints: { spine: 2, neck: 6, shoulderR: 18, elbowR: 44, shoulderL: 16, elbowL: 46 },
       ik: { ankleR: { x: 86, y: 99.4, bend: -1 }, ankleL: { x: 81, y: 99.4, bend: -1 } },
     },
   ],
