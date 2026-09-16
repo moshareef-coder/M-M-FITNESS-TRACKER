@@ -12028,9 +12028,11 @@ function renderTopStreak() {
   if (!el) return;
   const hs = homeStreak();
   if (!hs) { el.classList.add("hidden"); return; }
-  const unit = `${hs.n} ${hs.unit}${hs.n === 1 ? "" : "s"}${hs.short ? ` ${hs.short}` : ""}`;
-  el.setAttribute("aria-label", `${hs.full}: ${unit}`);
-  el.innerHTML = `<span class="fl">${icon("flame", 18)}</span> ${unit} <span class="go">${icon("chevronRight", 16)}</span>`;
+  const count = `${hs.n} ${hs.unit}${hs.n === 1 ? "" : "s"}`;
+  // The full name already carries the concept, so the screen reader does not
+  // also need the short word the pill prints to make room for it.
+  el.setAttribute("aria-label", `${hs.full}: ${count}`);
+  el.innerHTML = `<span class="fl">${icon("flame", 18)}</span> ${count}${hs.short ? ` ${hs.short}` : ""} <span class="go">${icon("chevronRight", 16)}</span>`;
   el.classList.remove("hidden");
   el.onclick = () => switchTab("progress");
 }
@@ -15152,6 +15154,16 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
        sentence with a goal's name in it. Kept here for that. */
     rememberGoalOutcome(data.meta?.goals);
     LAST_GEN_SESSION = data.meta?.session || null;
+
+    /* We asked for a day and the engine built a different one. That happens
+       honestly: focusDayIndex only matches days that are IN this person's week,
+       and a three day beginner week is Full body A, B and C with no Push day in
+       it to find. It used to happen silently, which is how the suggestion card
+       and the button under it got away with recommending different sessions for
+       so long. Said out loud, once, and only when it is actually true. */
+    if (keepFocus && data.meta?.focusHonoured === false && data.workout.focus !== keepFocus) {
+      toast(`No ${keepFocus.toLowerCase()} in your week, so this is ${data.workout.focus}`);
+    }
 
     /* data.honest is not written here: ai_workouts has no column for it, and
        migrations are owned elsewhere. It lives as long as the reveal sheet
