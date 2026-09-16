@@ -1140,18 +1140,18 @@
   }
   .crop-canvas { display: block; border-radius: 9px; cursor: grab; background: var(--panel); }
   .crop-canvas:active { cursor: grabbing; }
-  /* closest-side, not the bare "circle" keyword: with no size keyword a CSS
-     radial-gradient defaults to farthest-corner, so the 49.5%/50% stops were
-     resolving against the diagonal rather than the side. That made the clear
-     circle about 70% of the canvas width instead of the full width, so the
-     hole you lined the photo up in was smaller than the square that actually
-     got saved -- what looked centred and safely inside the circle was really
-     cropped from well outside it. */
+  /* The stops are percentages OF THE GRADIENT'S OWN RADIUS, not of the box.
+     closest-side already sets that radius to half the canvas, so 49.5% was
+     asking for a circle half the size again: the hole came out at about a
+     quarter of the area that actually gets saved, and a face lined up neatly
+     inside it was cropped from well outside. 99%/100% is the full inscribed
+     circle, which is exactly what the saved square shows once it is displayed
+     round everywhere else in the app. */
   .crop-mask {
     position: absolute; inset: 16px; border-radius: 9px; pointer-events: none;
     background: color-mix(in srgb, var(--bg) 62%, transparent);
-    -webkit-mask-image: radial-gradient(circle closest-side at center, transparent 0 49.5%, #000 50%);
-    mask-image: radial-gradient(circle closest-side at center, transparent 0 49.5%, #000 50%);
+    -webkit-mask-image: radial-gradient(circle closest-side at center, transparent 0 99%, #000 100%);
+    mask-image: radial-gradient(circle closest-side at center, transparent 0 99%, #000 100%);
   }
   .crop-zoom { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
   .crop-zoom-ico { color: var(--muted); display: flex; flex-shrink: 0; }
@@ -3077,6 +3077,35 @@
   .goal-row-tick { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
                    border: 1.5px solid var(--border); color: var(--bg); }
   .goal-row-tick.on { background: var(--accent); border-color: var(--accent); }
+
+  /* Profile */
+  .pf-head { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; }
+  /* The shared photo block lays out as a row, which is right beside a form
+     field and wrong under a centred header. Stacked and centred here only. */
+  .pf-head .setup-photo { flex-direction: column; align-items: center; gap: 12px; margin: 2px 0 12px; }
+  .pf-head .setup-photo-acts { flex: none; align-items: center; }
+  .pf-head .setup-photo .av { width: 96px; height: 96px; font-size: 30px; }
+  .pf-id { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .pf-name { font: 800 22px/1.15 inherit; letter-spacing: -.02em; }
+  .pf-bio { font-size: 14.5px; color: var(--muted); line-height: 1.45; max-width: 30ch; }
+  .pf-bio.hidden { display: none; }
+  .pf-since { font-size: 12px; color: var(--muted); opacity: .8; }
+  .pf-stats { display: flex; width: 100%; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .pf-stat { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .pf-stat + .pf-stat { border-left: 1px solid var(--border); }
+  .pf-stat b { font: 800 19px/1 inherit; }
+  .pf-stat span { font-size: 11.5px; color: var(--muted); letter-spacing: .02em; }
+  .pf-lab { display: flex; justify-content: space-between; align-items: baseline; margin: 14px 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+  .pf-count { font-weight: 400; font-size: 12px; opacity: .8; }
+  #setupBio { width: 100%; resize: none; }
+  .pf-swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; margin-top: 12px; }
+  .pf-sw {
+    aspect-ratio: 1; border-radius: 50%; cursor: pointer;
+    background: var(--sw); border: 2px solid transparent; box-shadow: 0 0 0 1px var(--border) inset;
+  }
+  /* The ring sits outside the colour rather than on it, so a dark swatch and a
+     bright one show selection the same way. */
+  .pf-sw.on { border-color: var(--bg); box-shadow: 0 0 0 2.5px var(--sw); }
   .wt-more { display: block; width: 100%; margin-top: 10px; padding: 11px; border-radius: 10px;
     border: 1px solid var(--border); background: none; color: var(--muted);
     font: 600 13.5px/1 inherit; cursor: pointer; }
@@ -5194,14 +5223,44 @@
         <div class="scr-title">Profile</div>
         <div class="spacer"></div>
       </div>
-    <div class="card">
-      <h2>Profile</h2>
-      <input type="text" id="setupDisplayName" placeholder="Your name" maxlength="24" autocomplete="off" />
-      <button type="button" class="btn-secondary" id="saveNameBtn" style="margin-top:10px;">Save name</button>
-      <p class="muted-note" id="nameNote" style="margin-top:8px;">This is what your partner sees.</p>
-      <div class="setup-photo" id="setupPhoto"></div>
+
+      <!-- The header is the profile: face, name, and what you have actually
+           done. Everything below it is the form for editing that. -->
+      <div class="card pf-head">
+        <div class="setup-photo" id="setupPhoto"></div>
+        <div class="pf-id">
+          <div class="pf-name" id="pfName">-</div>
+          <div class="pf-bio" id="pfBio"></div>
+          <div class="pf-since" id="pfSince"></div>
+        </div>
+        <div class="pf-stats" id="pfStats"></div>
+      </div>
       <input type="file" id="avatarFile" accept="image/*" class="hidden" />
-    </div>
+
+      <div class="card">
+        <h2>Your name</h2>
+        <input type="text" id="setupDisplayName" placeholder="Your name" maxlength="24" autocomplete="off" />
+        <label class="pf-lab" for="setupBio">About you <span class="pf-count" id="bioCount">0/140</span></label>
+        <textarea id="setupBio" rows="2" maxlength="140" placeholder="A line about you. Your partner sees this."></textarea>
+        <button type="button" class="btn-secondary" id="saveNameBtn" style="margin-top:10px;">Save</button>
+        <p class="muted-note" id="nameNote" style="margin-top:8px;">This is what your partner sees.</p>
+      </div>
+
+      <!-- accent_color has been a column since the table was made and nothing
+           has ever read it. It is the one piece of this app that is visibly
+           yours: it colours your ring, your initials and your side of every
+           shared view. -->
+      <div class="card">
+        <h2>Your colour</h2>
+        <p class="muted-note" style="margin-top:-6px;">Your ring, your initials, and your side of anything you and your partner both appear in.</p>
+        <div class="pf-swatches" id="pfSwatches"></div>
+      </div>
+
+      <div class="card">
+        <h2>About your body</h2>
+        <p class="muted-note" style="margin-top:-6px;">Sex, age and height set your starting weights. They live on their own page.</p>
+        <button type="button" class="btn-secondary" id="pfBodyBtn" style="margin-top:10px;">Open Your body</button>
+      </div>
     </div>
     <div class="settings-page hidden" id="page-partner">
       <div class="scr-head">
@@ -5650,7 +5709,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.17";
+const APP_VERSION = "2026.09.15.18";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -5895,10 +5954,6 @@ function applyTheme(theme) {
   if (typeof retintMotionFigures === "function") retintMotionFigures();
 }
 
-
-function applyAccentColors() {
-  const root = document.documentElement.style;
-}
 
 
 /* ---------- Auth ---------- */
@@ -10020,7 +10075,9 @@ async function openAvatarEditor(source) {
 
   const canvas = $("cropCanvas");
   const box = canvas.parentElement.getBoundingClientRect();
-  const side = Math.round(Math.min(box.width, 320));
+  /* Was capped at 320, which left seventy pixels of a 390 phone unused and
+     made the thing you are aiming a face into smaller than it needed to be. */
+  const side = Math.round(Math.min(box.width, 420));
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   canvas.style.width = canvas.style.height = `${side}px`;
   canvas.width = canvas.height = Math.round(side * dpr);
@@ -10185,6 +10242,82 @@ async function removeAvatar() {
   await renderSetupPhoto();
 }
 
+/* The eight the rings can be. Kept deliberately far apart in hue so two
+   people in a couple never pick colours that read the same at ring size, and
+   every one of them clears contrast against both themes. */
+const ACCENT_CHOICES = [
+  { key: "lime",   label: "Lime",   hex: "#a8ff00" },
+  { key: "blue",   label: "Blue",   hex: "#2d6bff" },
+  { key: "red",    label: "Red",    hex: "#e2482a" },
+  { key: "violet", label: "Violet", hex: "#8b5cf6" },
+  { key: "teal",   label: "Teal",   hex: "#14b8a6" },
+  { key: "amber",  label: "Amber",  hex: "#f59e0b" },
+  { key: "pink",   label: "Pink",   hex: "#ec4899" },
+  { key: "slate",  label: "Slate",  hex: "#64748b" },
+];
+function accentHexFor(profile) {
+  const found = ACCENT_CHOICES.find((a) => a.key === profile?.accent_color);
+  return found ? found.hex : null;
+}
+
+/* Was an empty function for as long as accent_color has existed. It sets the
+   one variable your own ring, initials and half of every shared view read. */
+function applyAccentColors() {
+  const mine = accentHexFor(MY_PROFILE);
+  const theirs = accentHexFor(PARTNER_PROFILE);
+  const root = document.documentElement.style;
+  if (mine) root.setProperty("--me", mine); else root.removeProperty("--me");
+  /* A partner who picked the same colour keeps theirs: two identical rings is
+     their problem to notice, and quietly overriding one of them would be a
+     stranger bug than the clash. */
+  if (theirs) root.setProperty("--partner", theirs); else root.removeProperty("--partner");
+}
+
+function renderAccentSwatches() {
+  const box = $("pfSwatches");
+  if (!box) return;
+  const current = MY_PROFILE?.accent_color || "";
+  box.innerHTML = ACCENT_CHOICES.map((a) => `
+    <button type="button" class="pf-sw${a.key === current ? " on" : ""}" data-accent="${a.key}"
+      style="--sw:${a.hex}" aria-label="${escapeHtml(a.label)}"></button>`).join("");
+  box.querySelectorAll("[data-accent]").forEach((b) => {
+    b.onclick = async () => {
+      const key = b.dataset.accent === current ? null : b.dataset.accent;
+      const { error } = await sb.from("profiles")
+        .upsert({ email: MY_EMAIL, user_name: ME, accent_color: key, updated_at: new Date().toISOString() });
+      if (error) { toast("Could not save that colour"); console.error(error); return; }
+      MY_PROFILE = { ...(MY_PROFILE || {}), accent_color: key };
+      applyAccentColors();
+      renderAccentSwatches();
+    };
+  });
+}
+
+/* The header: who you are and what you have done, above the form for changing
+   it. Read-only on purpose; every number here is somewhere else in the app and
+   this is just the place they add up to a person. */
+function renderProfileHeader() {
+  if (!$("pfName")) return;
+  $("pfName").textContent = ME || "You";
+  const bio = MY_PROFILE?.bio || "";
+  $("pfBio").textContent = bio;
+  $("pfBio").classList.toggle("hidden", !bio);
+
+  const since = MY_PROFILE?.created_at ? new Date(MY_PROFILE.created_at) : null;
+  $("pfSince").textContent = since && !isNaN(since)
+    ? `Training here since ${since.toLocaleDateString(undefined, { month: "long", year: "numeric" })}`
+    : "";
+
+  const days = new Set((ALL_EXERCISE_LOGS || []).filter((l) => l.user_name === ME).map((l) => l.entry_date)).size;
+  let streak = 0; try { streak = currentDayStreak(ME) || 0; } catch { streak = 0; }
+  let prs = 0; try { prs = personalRecords(ME).prCount || 0; } catch { prs = 0; }
+  $("pfStats").innerHTML = [
+    [days, days === 1 ? "workout" : "workouts"],
+    [streak, "day streak"],
+    [prs, prs === 1 ? "record" : "records"],
+  ].map(([n, w]) => `<div class="pf-stat"><b>${n}</b><span>${escapeHtml(w)}</span></div>`).join("");
+}
+
 async function renderSetupPhoto() {
   const box = $("setupPhoto");
   if (!box) return;
@@ -10194,7 +10327,6 @@ async function renderSetupPhoto() {
     `<div class="setup-photo-acts">
        <button type="button" class="btn-secondary" id="avatarPickBtn">${has ? "Change photo" : "Add a photo"}</button>
        ${has ? `<button type="button" class="btn-ghost" id="avatarRemoveBtn">Remove photo</button>` : ""}
-       <p class="muted-note" style="margin-top:2px;">Your partner sees this. Tap the circle to change it.</p>
      </div>`);
   // The circle and the button do the same thing: picking a photo is the only
   // way in, and every photo you pick opens straight into moving and scaling
@@ -16720,9 +16852,34 @@ function liveActivityFields() {
     done,
     total,
     restSeconds,
+    /* The whole length of a rest, not what is left of this one. The Lock Screen
+       button needs it to start the next rest while the app is asleep. */
+    restTarget: restTargetSec(),
     paused: !!SESSION.pausedAt,
     quip: LIVE_QUIP,
   };
+}
+
+/* Sets logged from the Lock Screen. That button runs in the widget process and
+   cannot reach this code, so it leaves a count behind and the real logging
+   happens here, the moment the app is in front again. */
+async function drainLockScreenSets() {
+  if (!isNativeApp() || !SESSION || SESSION.finished) return;
+  const bridge = window.Capacitor.Plugins.WidgetBridge;
+  if (!bridge) return;
+  try {
+    const { count } = await bridge.drainPendingSets();
+    for (let i = 0; i < (count || 0); i++) {
+      const sets = SESSION.setsDone?.[SESSION.exerciseIndex] || [];
+      const next = sets.findIndex((d) => !d);
+      /* The exercise finished while the phone was locked. Stopping is right:
+         advancing on this path would pick the next lift with nobody looking. */
+      if (next === -1) break;
+      toggleSet(next);
+    }
+  } catch (err) {
+    console.error("draining lock screen sets failed", err);
+  }
 }
 
 async function pushLiveActivity() {
@@ -16798,6 +16955,9 @@ async function releaseScreenAwake() {
    return, so coming out of the app switcher mid-workout needs a fresh one. */
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible") return;
+  /* Coming back is also when anything tapped on the Lock Screen gets recorded,
+     whether or not the session screen is the one on top. */
+  drainLockScreenSets();
   if (!document.body.classList.contains("session-open")) return;
   keepScreenAwake();
 });
@@ -21782,8 +21942,13 @@ async function saveDisplayName() {
   const previous = ME;
 
   try {
-    const { error: pErr } = await sb.from("profiles").update({ user_name: next }).eq("email", MY_EMAIL);
+    /* The bio rides with the name: one card, one Save, and a person who
+       edited both and pressed the only button would otherwise lose half of it. */
+    const bio = ($("setupBio")?.value || "").trim().slice(0, 140) || null;
+    const { error: pErr } = await sb.from("profiles")
+      .update({ user_name: next, bio }).eq("email", MY_EMAIL);
     if (pErr) throw pErr;
+    MY_PROFILE = { ...(MY_PROFILE || {}), user_name: next, bio };
 
     // Carry the history across so nothing detaches from the new name.
     const [e1, e2] = await Promise.all([
@@ -21797,6 +21962,7 @@ async function saveDisplayName() {
     const oldKey = `ft_session_${previous}_${todayStr()}`;
     const saved = localStorage.getItem(oldKey);
     ME = next;
+    renderProfileHeader();
     if (saved) {
       localStorage.setItem(sessionStorageKey(), saved);
       localStorage.removeItem(oldKey);
@@ -22226,6 +22392,15 @@ async function renderSessionLengthPage() {
 
 function renderSetupTab() {
   $("setupDisplayName").value = ME || "";
+  if ($("setupBio")) {
+    $("setupBio").value = MY_PROFILE?.bio || "";
+    const count = () => { $("bioCount").textContent = `${$("setupBio").value.length}/140`; };
+    $("setupBio").oninput = count;
+    count();
+  }
+  renderProfileHeader();
+  renderAccentSwatches();
+  if ($("pfBodyBtn")) $("pfBodyBtn").onclick = () => openSettingsPage("stats");
   $("appVersion").textContent = APP_VERSION;
   renderMilestoneBadges();
   $("saveNameBtn").onclick = saveDisplayName;

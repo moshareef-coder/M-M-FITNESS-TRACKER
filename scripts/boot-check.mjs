@@ -24,7 +24,7 @@ const DYNAMIC_PATTERNS = [/_val$/];
 const isDynamic = (id) => DYNAMIC.has(id) || DYNAMIC_PATTERNS.some((r) => r.test(id));
 const mk = (id) => ({
   id, textContent: "", innerHTML: "", value: "", checked: false, disabled: false, title: "",
-  dataset: {}, files: [], style: { setProperty() {}, width: "" },
+  dataset: {}, files: [], style: { setProperty() {}, removeProperty() {}, width: "" },
   classList: { add() {}, remove() {}, toggle() { return false; }, contains() { return false; } },
   addEventListener() {}, removeEventListener() {},
   querySelectorAll() { return []; },
@@ -53,7 +53,7 @@ globalThis.document = {
      way the real one does. Without it the whole script throws on load and every
      check below reports nothing. */
   documentElement: {
-    getAttribute: () => "dark", setAttribute() {}, style: { setProperty() {} },
+    getAttribute: () => "dark", setAttribute() {}, style: { setProperty() {}, removeProperty() {} },
     appendChild() {}, removeChild() {},
   },
   body: mk("body"),
