@@ -449,10 +449,7 @@ const GLUTE_HAM_RAISE = {
   dur: 3.4,
   breath: 0.2,
   fit: { k: 0.9, dy: 2 },
-  props: [
-    { type: "bench", x: 24, y: 94, w: 34 },
-    { type: "box", x: 6, y: 86, w: 12 },
-  ],
+  props: [{ type: "artwork", src: "/knowledge/motion/props/ghd.svg" }],
   keys: [
     { // top, torso stacked upright over the knees
       t: 0,
