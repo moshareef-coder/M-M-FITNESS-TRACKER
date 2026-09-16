@@ -75,6 +75,36 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         UNUserNotificationCenter.current().setNotificationCategories([evening, live, clip, report, digest])
     }
 
+    // MARK: - APNs
+    //
+    // iOS hands the device token to the app delegate and nowhere else.
+    // @capacitor/push-notifications cannot receive it directly: it listens for
+    // these two NotificationCenter posts, and the app delegate is the only
+    // thing that can make them.
+    //
+    // Without these methods the whole path is silent rather than broken.
+    // register() succeeds, Apple returns a token, this class is handed it and
+    // drops it, and the JS listener waits for an event that will never be
+    // posted. No token, no registrationError, nothing in the log, for ever.
+    //
+    // It cost a phone restart, a switch to mobile data and a search for a
+    // blocked port before anybody looked here, because every symptom pointed
+    // outward at the network. Nothing was wrong with the network.
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications,
+                                        object: deviceToken)
+    }
+
+    // The failure half matters as much. Without it a refused registration is
+    // indistinguishable from a slow one, which is how a real error becomes a
+    // timeout that blames the network.
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications,
+                                        object: error)
+    }
+
     func applicationWillResignActive(_ application: UIApplication) {
         // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
         // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.

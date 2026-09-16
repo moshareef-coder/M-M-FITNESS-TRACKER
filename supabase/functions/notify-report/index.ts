@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
       const tokens = await tokRes.json();
       for (const t of tokens) {
         try {
-          await sendApns(t.token, t.environment, {
+          const usedEnv = await sendApns(t.token, t.environment, {
             title,
             subtitle: "Needs an answer today",
             body: line,
@@ -113,8 +113,30 @@ Deno.serve(async (req) => {
             threadId: "reports",
           });
           pushed++;
-        } catch (e) {
+          /* The same bookkeeping every other sender does, and it was missing
+             here. Three consequences, all of them quiet: a token minted by the
+             other gateway was never repaired, so every send paid a failed
+             round trip first; a dead token was never pruned, so it would be
+             retried for ever; and last_ok_at stayed null, so nothing recorded
+             that a moderation alert had ever actually been delivered. That
+             last one matters most, because this is the notification standing
+             behind an App Store commitment. */
+          const fixed = usedEnv !== t.environment ? { environment: usedEnv } : {};
+          await fetch(`${SUPABASE_URL}/rest/v1/apns_tokens?id=eq.${t.id}`, {
+            method: "PATCH", headers: svc,
+            body: JSON.stringify({ last_ok_at: new Date().toISOString(), failures: 0, ...fixed }),
+          });
+        } catch (e: any) {
           console.error("report push failed", e);
+          const gone = e?.status === 410 || e?.reason === "BadDeviceToken" || e?.reason === "Unregistered";
+          if (gone) {
+            await fetch(`${SUPABASE_URL}/rest/v1/apns_tokens?id=eq.${t.id}`, { method: "DELETE", headers: svc });
+          } else {
+            await fetch(`${SUPABASE_URL}/rest/v1/apns_tokens?id=eq.${t.id}`, {
+              method: "PATCH", headers: svc,
+              body: JSON.stringify({ failures: (t.failures ?? 0) + 1 }),
+            });
+          }
         }
       }
     }
