@@ -47,6 +47,53 @@ def classify(r, g, b, central):
     return None
 
 
+def clear_the_hole(layers, counts):
+    """Empties the middle of the ring out of both arc layers.
+
+    The dumbbell throws a soft brown shadow, and a shadow cannot be told from
+    the coral arc's own shadow by colour: both are dark and both have red over
+    blue. Geometry can tell them apart, because an arc is an annulus and
+    nothing that belongs to one lies inside the hole.
+
+    The inner edge is measured rather than guessed. Only unmistakable arc
+    pixels, opaque and saturated and bright, are allowed to define it, so a
+    stray shadow cannot drag the boundary inwards over the very pixels it is
+    there to remove.
+    """
+    strong = []
+    for name in ("left", "right"):
+        px = layers[name].load()
+        w, h = layers[name].size
+        for y in range(h):
+            for x in range(w):
+                r, g, b, a = px[x, y]
+                if a > 250 and max(r, g, b) > 150 and max(r, g, b) - min(r, g, b) > 60:
+                    strong.append((x, y))
+    if not strong:
+        return 0
+    cx = sum(p[0] for p in strong) / len(strong)
+    cy = sum(p[1] for p in strong) / len(strong)
+    radii = sorted(((x - cx) ** 2 + (y - cy) ** 2) ** 0.5 for x, y in strong)
+    # A low percentile rather than the minimum: one antialiased pixel on the
+    # inner lip should not set the boundary for the whole ring.
+    inner = radii[int(len(radii) * 0.02)]
+    removed = 0
+    for name in ("left", "right"):
+        img = layers[name]
+        px = img.load()
+        w, h = img.size
+        for y in range(h):
+            for x in range(w):
+                if px[x, y][3] == 0:
+                    continue
+                if ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5 < inner * 0.98:
+                    px[x, y] = (0, 0, 0, 0)
+                    counts[name] -= 1
+                    removed += 1
+    print(f"hole   inner radius {inner:.0f}px, {removed} px of shadow cleared from the arcs")
+    return removed
+
+
 def combined_bounds(layers):
     """One square covering every layer, so the assembled mark is centred."""
     boxes = [img.getbbox() for img in layers.values() if img.getbbox()]
@@ -80,6 +127,9 @@ def main():
                 continue
             out[which][x, y] = (r, g, b, a)
             counts[which] += 1
+
+    # Colour has done what colour can; the rest is geometry.
+    clear_the_hole(layers, counts)
 
     # All three cropped to ONE square, centred on the whole mark rather than on
     # each layer. The master crop left uneven padding, which put the assembled
