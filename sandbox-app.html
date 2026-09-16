@@ -643,6 +643,15 @@
   /* Wrapping rather than truncating: a ramp cut off after the second rung hides
      the heaviest load, which is the one worth knowing. Two short lines in a
      narrow row is the honest version. */
+  /* What to fetch for this lift, one quiet line under the sets and reps. It
+     sits in the muted tone, not the ramp's stretch ink: a ramp is an
+     instruction, kit is a fact about the room. */
+  .ex-kit {
+    display: flex; align-items: flex-start; gap: 5px; margin-top: 3px;
+    font-size: 12.5px; line-height: 1.35; color: var(--muted);
+  }
+  .ex-kit svg { flex-shrink: 0; opacity: .65; margin-top: 2px; }
+  .ex-kit span { min-width: 0; }
   .ex-ramp {
     display: flex; align-items: flex-start; gap: 5px; margin-top: 3px;
     font-size: 12.5px; line-height: 1.35; color: var(--stretch-ink);
@@ -1883,6 +1892,16 @@
   }
   .sess-title:active { opacity: .6; }
   .sess-titlerow { display: flex; align-items: center; gap: 10px; }
+  /* Under the name of the lift: which machine, which attachment, what angle.
+     Two lines at most on a phone, and it wraps rather than truncating,
+     because the half that gets cut is always the useful half. */
+  .sess-kit {
+    margin-top: 7px; font-size: 14px; font-weight: 600; line-height: 1.35;
+    /* The stage behind this is the figure's own light ground, not the app's,
+       so a --muted grey washes out on it. It takes the session's own ink at
+       the same strength as the row above the title. */
+    color: color-mix(in srgb, var(--sess-ink) 70%, transparent);
+  }
   .sess-titlerow .sess-title { flex: 1 1 auto; min-width: 0; }
   /* Round, quiet, and the same 44px target as every other control on the
      screen. It sits on the stage gradient, so its ground is the ink colour at
@@ -3894,6 +3913,9 @@
   .spp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   .spp-chip { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 100px;
               border: 1px solid var(--border); background: var(--panel-2); color: var(--text); }
+  /* A machine is a place you walk to, so it leads the row and carries the
+     accent edge; a barbell or a pair of dumbbells you just pick up. */
+  .spp-chip-kit { border-color: color-mix(in srgb, var(--accent) 42%, var(--border)); }
   .build-q { font-size: 14px; color: var(--muted); margin: 0 0 12px; }
   /* Recent workouts */
   .recent-head { display: flex; align-items: baseline; justify-content: space-between; margin: 24px 0 12px; }
@@ -5735,16 +5757,45 @@ const FUNCTION_URL = SUPABASE_URL + "/functions/v1/generate-workout";
    step. FIT_MATH starts empty; every caller must guard for it not being ready yet. */
 let FIT_MATH = {};
 let EXERCISE_TRAININGS = [];
+/* What each exercise is done on, generated from the props its animation is
+   drawn with (knowledge/equipment.mjs, built by scripts/build-equipment.mjs).
+   The figure on the card and the kit named beside it are the same fact, so
+   the machine in the picture is the machine in the list. */
+let EQUIPMENT = null;
 (async () => {
-  const [tdee, cal, strength, library] = await Promise.all([
+  const [tdee, cal, strength, library, equipment] = await Promise.all([
     import("./knowledge/formulas/tdee.mjs"),
     import("./knowledge/formulas/calorie-math.mjs"),
     import("./knowledge/formulas/strength-math.mjs"),
     import("./knowledge/exercise-library/index.mjs"),
+    import("./knowledge/equipment.mjs").catch((e) => { console.error("equipment", e); return null; }),
   ]);
   FIT_MATH = { ...tdee, ...cal, ...strength };
   EXERCISE_TRAININGS = library.TRAININGS;
+  EQUIPMENT = equipment;
+  /* It lands a beat after the first paint, and the workout tab is the screen
+     that names kit, so it gets one repaint rather than a permanently blank
+     line. Any other tab will name it correctly the first time it renders. */
+  if (equipment && !document.getElementById("tab-workout")?.classList.contains("hidden")) {
+    try { renderWorkoutTab({ respectMode: true }); } catch {}
+  }
 })();
+
+/* The kit for one exercise, biggest thing first: "Cable machine, rope
+   attachment, pulley at the top". Empty string until the table lands, and for
+   a name nothing knows about, because a blank line is better than a guess. */
+function kitFor(name) {
+  return EQUIPMENT ? EQUIPMENT.kitLine(name) : "";
+}
+/* Just the things to FETCH, no setup notes: what a plan row needs, where the
+   angle of the bench is somebody else's problem until they are standing at it. */
+function kitNamesFor(name) {
+  const r = EQUIPMENT ? EQUIPMENT.kitOf(name) : null;
+  return r ? r.kit.map((id) => (EQUIPMENT.KIT[id] || {}).label || id) : [];
+}
+function kitForDay(names) {
+  return EQUIPMENT ? EQUIPMENT.kitForSession(names) : [];
+}
 
 /* Every exercise across every training, flattened once. Names use hyphens ("Push-Up") but
    people type spaces ("push up"), so both the query and each candidate name are normalized to
@@ -6033,6 +6084,19 @@ function registerAuthDeepLink() {
       const hash = new URLSearchParams((parsed.hash || "").replace(/^#/, ""));
       const failed = parsed.searchParams.get("error_description") || hash.get("error_description");
       if (failed) throw new Error(failed);
+      /* A reset link and a sign-in link arrive down the same pipe and look the
+         same once the tokens are out of them. On the web supabase-js reads the
+         URL itself, sees type=recovery and raises PASSWORD_RECOVERY, which is
+         what the set-password screen listens for. Here WE read the URL and hand
+         it over as a plain setSession, so supabase-js has nothing to read and
+         fires SIGNED_IN: the app walked straight into the home screen and the
+         one screen the link existed to reach was never drawn. Nobody would have
+         caught it on the site, because on the site it works.
+
+         Claimed BEFORE setSession, because SIGNED_IN fires inside that call and
+         the handler checks this flag. */
+      const recovery = (parsed.searchParams.get("type") || hash.get("type")) === "recovery";
+      if (recovery) IN_PASSWORD_RECOVERY = true;
       /* Which of these two arrives depends on the flow supabase-js is
          configured for, and both are legitimate, so handle either. */
       const code = parsed.searchParams.get("code");
@@ -6046,8 +6110,13 @@ function registerAuthDeepLink() {
         });
         if (error) throw error;
       }
+      /* Signed in, which is not the same as having a password again. */
+      if (recovery) renderSetPasswordScreen();
     } catch (err) {
       console.error("auth deep link failed", err);
+      /* A link that failed leaves nobody mid-recovery, and leaving the flag set
+         would lock the next real sign-in out of the app. */
+      IN_PASSWORD_RECOVERY = false;
       const el = $("siMsg");
       if (el) {
         el.textContent = "Could not finish signing in. Try again.";
@@ -6095,6 +6164,30 @@ function initOnboard() {
 function isNativeApp() {
   return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function"
     && window.Capacitor.isNativePlatform());
+}
+
+/* What Apple said this person is called, on the one occasion it will say.
+   Survives a reload through localStorage, because a name Apple will not repeat
+   is not something to keep only in a variable. */
+const APPLE_NAME_KEY = "ft_apple_name";
+let APPLE_NAME = null;
+
+function captureAppleName(response) {
+  const name = [response?.givenName, response?.familyName].filter(Boolean).join(" ").trim();
+  if (!name) return;
+  APPLE_NAME = name;
+  try { localStorage.setItem(APPLE_NAME_KEY, name); } catch { /* private browsing */ }
+}
+
+/* Read once, on the way into onboarding, and cleared as it is read: it is a
+   suggestion for the name field, not a second copy of the profile. */
+function takeAppleName() {
+  let stored = null;
+  try { stored = localStorage.getItem(APPLE_NAME_KEY); } catch {}
+  const name = APPLE_NAME || stored;
+  APPLE_NAME = null;
+  try { localStorage.removeItem(APPLE_NAME_KEY); } catch {}
+  return name || null;
 }
 
 /* Apple wants the nonce it signs to be the SHA-256 of a secret we keep, and
@@ -6187,10 +6280,27 @@ function renderSignInScreen(state = {}) {
          out of the sheet, and signing in with undefined fails far less
          legibly than saying so here. */
       if (!token) throw new Error("no identity token");
+      /* The one and only time Apple will ever say who this is. givenName comes
+         back on the FIRST authorisation and never again, on any device, for the
+         life of the Apple ID: revoking the app and signing in again does not
+         bring it back. It is not in the identity token either, so Supabase
+         cannot fill it in later. Read here or lost permanently.
+
+         Caught before signInWithIdToken, because that call fires SIGNED_IN and
+         onboarding reads this on its way past. Relaying an email is the private
+         relay case, where the local part is a random string and the fallback
+         name onboarding would otherwise suggest is gibberish. */
+      captureAppleName(result.response);
       const { error } = await sb.auth.signInWithIdToken({
         provider: "apple", token, nonce: raw,
       });
       if (error) throw error;
+      /* Written to the account as well, so a reinstall on a new phone still
+         knows the name Apple will not say twice. Not worth failing over. */
+      if (APPLE_NAME) {
+        sb.auth.updateUser({ data: { full_name: APPLE_NAME } })
+          .then(({ error: e }) => { if (e) console.warn("could not keep the Apple name", e); });
+      }
       /* onAuthStateChange takes it from here, same as every other path. */
     } catch (err) {
       btn.disabled = false;
@@ -6416,7 +6526,14 @@ async function handleSignedIn(session) {
   } else {
     const draft = loadObDraft();
     if (draft) { renderOnboardStep(draft.step, draft.data); return; }
-    const suggested = session.user.user_metadata?.full_name?.split(" ")[0] || session.user.email.split("@")[0];
+    /* Apple first, because Apple's answer is the one with an expiry on it and
+       it is not in user_metadata yet: the write that puts it there is still in
+       flight when this runs. Falling through to the email is the private relay
+       case, where the local part is a random string, so a name we were actually
+       given has to beat it. */
+    const suggested = takeAppleName()?.split(" ")[0]
+      || session.user.user_metadata?.full_name?.split(" ")[0]
+      || session.user.email.split("@")[0];
     renderOnboardIntro(0, { name: suggested });
   }
 }
@@ -6971,6 +7088,18 @@ function gainOutlook(currentLb, goalLb) {
 
    Replaces the pace step for weight goals. Steady, quicker and gentle were
    always 12, 8 and 16 weeks regardless of what anyone was actually chasing. */
+/* Weeks in the words the person was offered them in. Shared by the chips and
+   by the plan screen that confirms the chip they tapped: picking "7 months" and
+   being told "30 weeks" on the very next screen is the same number twice and
+   reads as two different answers. Under nine weeks stays weeks, because "2
+   months" for seven weeks is rounding away most of a month. */
+function durationLabel(weeks) {
+  if (!weeks) return "";
+  if (weeks < 9) return `${weeks} weeks`;
+  const months = Math.round(weeks / 4.345);
+  return months === 1 ? "1 month" : `${months} months`;
+}
+
 function lossTimelines(currentLb, goalLb) {
   const amount = (currentLb || 0) - (goalLb || 0);
   if (!currentLb || !goalLb || amount <= 0) return [];
@@ -6989,8 +7118,7 @@ function lossTimelines(currentLb, goalLb) {
   ]) {
     const perWeek = rate(o.pct);
     const weeks = Math.max(1, Math.round(amount / perWeek));
-    const label = weeks < 9 ? `${weeks} weeks`
-      : (Math.round(weeks / 4.345) === 1 ? "1 month" : `${Math.round(weeks / 4.345)} months`);
+    const label = durationLabel(weeks);
     /* Small amounts collapse two bands onto the same rounded label. Showing
        "3 weeks" twice reads as a bug, so the recommended one wins the slot. */
     const clash = out.findIndex((x) => x.label === label);
@@ -7014,7 +7142,11 @@ function goalTileFor(bubble) { return GOAL_TILES.find((t) => t.id === bubble) ||
    that predates the tiles. */
 function goalTileLabel(profile) {
   const t = goalTileFor(profile?.goal_bubble);
-  if (!t) return profile?.goal || "Not set";
+  /* A retired bubble is still a goal this person picked, so the row says the
+     thing they picked. The legacy fallback under it is the same flat "Stay
+     consistent" for all three of them, which tells a milestone chaser nothing
+     about their own goal. */
+  if (!t) return RETIRED_GOALS[profile?.goal_bubble]?.title || profile?.goal || "Not set";
   return goalPickLabel(profile.goal_bubble, profile.goal_child);
 }
 
@@ -7033,18 +7165,30 @@ function goalPickLabel(bubble, child) {
    column round trips as through some clients, as null from a database that
    does not have the column yet, and as junk from an older client. All four
    have to mean the same thing as an empty list, because the picker opens on
-   whatever it is handed. */
+   whatever it is handed.
+
+   What it must NOT do is quietly shrink a real answer, and it was doing that
+   twice. It validated the child against `tile.kids`, which is empty on every
+   tile since the sub-goals went, so every stored second goal came back with
+   its specific erased; and it dropped any entry on a retired bubble outright.
+   The first save from the goal page then wrote that shorter list back. Both
+   now go through migrateGoalPick, which keeps a child the engine still honours
+   and moves a retired bubble to the goal that replaced it.
+
+   Two entries under one bubble are kept apart rather than collapsed. Glutes
+   and Arms are two goals, goal-engine.mjs prices them separately, and the
+   picker has said so since 917371d. */
 function normaliseGoalSecondary(raw) {
   let v = raw;
   if (typeof v === "string") { try { v = JSON.parse(v); } catch { return []; } }
   if (!Array.isArray(v)) return [];
   const out = [];
   for (const e of v) {
-    const bubble = e && typeof e === "object" ? e.bubble : null;
+    const stored = e && typeof e === "object" ? e.bubble : null;
+    if (!goalTileFor(stored) && !RETIRED_GOALS[stored]) continue;
+    const { bubble, child } = migrateGoalPick(stored, (e && e.child) || null);
     if (!goalTileFor(bubble)) continue;
-    if (out.some((o) => o.bubble === bubble)) continue;
-    const tile = goalTileFor(bubble);
-    const child = tile.kids.some((k) => k.id === e.child) ? e.child : null;
+    if (out.some((o) => o.bubble === bubble && (o.child || null) === (child || null))) continue;
     out.push({ bubble, child });
     if (out.length === 2) break;
   }
@@ -7115,7 +7259,13 @@ function renderGoalTilesStep(data = {}) {
       const tile = goalTileFor(bubble);
       const next = { ...data, goalKey: tile.legacy, goal_bubble: bubble, goal_child: child, goalLabel: label, goal_secondary: secondary };
       if (tile.askTarget) renderOnboardStep("target", next);
-      else renderOnboardStep("pace", { ...next, detail: child ? label : null });
+      /* Straight to the plan. The step that used to sit here asked "how fast?"
+         and offered 12, 8 or 16 weeks, of goals that have no weeks in them:
+         there is no such thing as getting to Move better quicker, and the
+         answer was written to a deadline nothing reads. A duration is only a
+         real question when there is a number to arrive at, so it is asked on
+         the target step, of the two goals that ask for one, and nowhere else. */
+      else renderOnboardStep("plan", { ...next, detail: child ? label : null });
     },
   });
   $("goalBackBtn").onclick = () => renderOnboardStep("name", data);
@@ -7127,8 +7277,17 @@ function renderGoalTilesStep(data = {}) {
    not want to be more specific than that. */
 function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my goals" } = {}) {
   const MAX_EXTRA = 2;   // the engine's cap, and it is argued for in mo-knowledge/engine/README.md
-  let primary = goalTileFor(selected.bubble) ? { bubble: selected.bubble, child: selected.child || null } : null;
-  let extras = normaliseGoalSecondary(selected.secondary).filter((e) => e.bubble !== primary?.bubble);
+  /* A retired bubble reaches this with no tile to light, which is why such a
+     profile opened the page with nothing selected and a disabled button
+     reading "Pick a goal first". It opens on the goal that replaced it
+     instead; renderGoalPage says which, above the grid. */
+  const opening = selected.bubble ? migrateGoalPick(selected.bubble, selected.child || null) : null;
+  let primary = opening && goalTileFor(opening.bubble) ? { bubble: opening.bubble, child: opening.child } : null;
+  /* Only an exact duplicate of the main goal is dropped. Filtering the whole
+     bubble threw away the pair this picker exists to allow, Glutes as the main
+     goal and Arms as the extra. */
+  let extras = normaliseGoalSecondary(selected.secondary)
+    .filter((e) => !(e.bubble === primary?.bubble && (e.child || null) === (primary?.child || null)));
   let openId = null;
 
   /* The picks list and the confirm button live next to the grid rather than
@@ -7219,7 +7378,16 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
         const t = goalTileFor(b.dataset.tile);
         /* A category with nothing under it has nothing to open, so tapping it
            is the pick itself rather than a door to one row. */
-        if (!t.kids.length) { choose(t.id, null); openId = null; paintGrid(); paintPicks(); paintConfirm(); return; }
+        if (!t.kids.length) {
+          /* Whatever is already selected under this bubble, so a tap turns off
+             the pick it is showing rather than adding a second, childless one
+             next to it. A profile carrying an older sub-goal is the only way
+             the two can differ, and that tap reads as "off" to the person
+             doing it either way. */
+          const already = primary?.bubble === t.id ? primary.child
+            : (extras.find((e) => e.bubble === t.id)?.child ?? null);
+          choose(t.id, already); openId = null; paintGrid(); paintPicks(); paintConfirm(); return;
+        }
         openId = openId === b.dataset.tile ? null : b.dataset.tile;
         paintGrid();
       };
@@ -7266,7 +7434,14 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
 /* The same tiles from Setup, writing straight to the profile. A specific from
    the sheet becomes the goal detail; "Just X" leaves whatever detail was there. */
 function renderGoalPage() {
-  $("goalPageNote").textContent = "One main goal, and up to two more you also care about. The next plan you generate is built for them.";
+  const moved = MY_PROFILE?.goal_bubble ? migrateGoalPick(MY_PROFILE.goal_bubble, MY_PROFILE.goal_child || null) : null;
+  /* Said before anything is written, not after. Someone whose goal was one of
+     the three retired bubbles is about to see a different goal ticked than the
+     one they chose, and finding that out from a toast after pressing Save is
+     how people lose things quietly. Nothing on this page writes until Save. */
+  $("goalPageNote").textContent = moved?.moved
+    ? `${moved.from} is not a goal on its own any more. The closest one we still build for is ticked below, and your goal stays exactly as it is until you save.`
+    : "One main goal, and up to two more you also care about. The next plan you generate is built for them.";
   initGoalTiles($("goalPageGrid"), {
     selected: {
       bubble: MY_PROFILE?.goal_bubble || null,
@@ -7286,7 +7461,18 @@ function renderGoalPage() {
         goal_bubble: bubble, goal_child: child, goal_secondary: secondary || [],
         updated_at: new Date().toISOString(),
       };
-      if (child) patch.goal_detail = label;
+      /* goal_detail is ALWAYS in this write now. It used to be set only when a
+         child was picked, which since the sub-goals went is never, so the
+         sentence stayed on the profile forever while the goal above it
+         changed. mapGoal parses it unconditionally, so "lose 30 lbs by June"
+         survived a switch to Build muscle and came back as a 52 week gain.
+
+         A sentence written for a goal belongs to that goal. Changing the main
+         goal clears it; keeping the same goal keeps it, so the free text
+         somebody typed on the Training page is not wiped by a visit here. */
+      patch.goal_detail = child ? label
+        : bubble === MY_PROFILE?.goal_bubble ? (MY_PROFILE?.goal_detail || null)
+        : null;
       const { error, droppedSecondary } = await upsertGoalFields(patch);
       if (error) { toast("Could not save the goal"); console.error(error); return; }
       await loadAll();
@@ -8319,7 +8505,32 @@ function renderOnboardStep(step, data = {}) {
         return;
       }
 
-      const floor = healthyFloorLb(readHeight());
+      const heightIn = readHeight();
+      const floor = healthyFloorLb(heightIn);
+      /* The floor was skippable, and skipping it was one blank field away: no
+         height, no BMI, no warning, full coaching toward any number at all.
+         A floor with a bypass that obvious is not a floor.
+
+         It is not fixed by inventing a height. There is no honest number to
+         assume, and a clinical line drawn through a guess is worse than no
+         line. So the app says the true thing instead: without a height it
+         cannot check the target, and it will not project toward a target it
+         could not check. weightGoalWithheld enforces exactly this downstream,
+         so the sentence is a promise the app keeps.
+
+         Only for a loss. A target above what they weigh now cannot be
+         underweight, so a gain keeps its projection with no height on file. */
+      const needHeight = !!(cur && goalLb && goalLb < cur && !heightIn);
+      if (needHeight) {
+        box.className = "ob-real care";
+        box.innerHTML = `<b>Add your height and we will check this is a safe target.</b>
+          Without it we will still log every weigh-in, but we will not draw the goal line or project a date
+          toward ${escapeHtml(String(goalLb))} pounds, because we have no way to tell whether getting there
+          is a good idea.`;
+        /* Advisory, not a gate. The durations under it are true whatever the
+           height is, and hiding the only content on the screen to make a point
+           would be the app sulking. */
+      }
       if (goalLb && floor && goalLb < floor) {
         box.className = "ob-real care";
         box.innerHTML = `<b>We will track it, but we will not coach toward it.</b>
@@ -8330,7 +8541,7 @@ function renderOnboardStep(step, data = {}) {
         hide();
         return;
       }
-      box.className = "ob-real hidden"; box.innerHTML = "";
+      if (!needHeight) { box.className = "ob-real hidden"; box.innerHTML = ""; }
 
       const opts = lossTimelines(cur, goalLb);
       if (!opts.length) { hide(); return; }
@@ -8353,7 +8564,6 @@ function renderOnboardStep(step, data = {}) {
       const cur = parseFloat($("obLb").value) || null;
       const goalLb = skip ? null : parseFloat($("obGoalLb").value) || null;
       const heightIn = readHeight();
-      const floor = healthyFloorLb(heightIn);
       const losing = !!(cur && goalLb && goalLb < cur);
       const chosen = losing ? lossTimelines(cur, goalLb).find((o) => o.key === picked) : null;
       const outlook = cur && goalLb && goalLb > cur ? gainOutlook(cur, goalLb) : null;
@@ -8365,8 +8575,18 @@ function renderOnboardStep(step, data = {}) {
         goal_weight_lb: goalLb,
         goal_by_date: weeks ? isoDate(new Date(Date.now() + weeks * 604800000)) : null,
         weeks,
-        pace: chosen ? chosen.key : "steady",
-        goal_withhold: !!(losing && goalLb && floor && goalLb < floor),
+        /* Null when they chose nothing, and that stays null all the way to the
+           row. It used to default to "steady", which put a pace on the plan
+           screen and in the database that nobody had agreed to, and read
+           identically to one they had. A gaining goal has a duration and no
+           pace, because the rate is not theirs to pick.
+
+           goal_withhold was computed here and read by nothing. It is gone
+           rather than wired up: weightGoalWithheld already derives the same
+           answer from target_value and height_in, both already on file, and a
+           derived answer corrects itself when somebody fixes their height
+           later where a stored flag would go stale. */
+        pace: chosen ? chosen.key : null,
       });
     };
     $("targetNext").onclick = () => go(false);
@@ -8375,45 +8595,42 @@ function renderOnboardStep(step, data = {}) {
     return;
   }
 
-  if (step === "pace") {
-    ob.innerHTML = `
-      <div class="ob-step">
-        <h1>How fast?</h1>
-        <p class="sub">Steady is the one we would pick. Nothing here is a crash plan.</p>
-        <div class="ob-paces">
-          ${PACE.map((p) => `
-            <button type="button" class="ob-pace ${p.key === "steady" ? "rec" : ""}" data-pace="${p.key}">
-              <span class="ob-pace-top"><strong>${escapeHtml(p.label)}</strong><span>${p.weeks} weeks</span></span>
-              <span class="ob-pace-note">${escapeHtml(p.note)}</span>
-            </button>`).join("")}
-        </div>
-        <button class="btn-ghost" id="paceBackBtn">Back</button>
-      </div>`;
-    ob.querySelectorAll("[data-pace]").forEach((b) => {
-      b.onclick = () => renderOnboardStep("plan", { ...data, pace: b.dataset.pace });
-    });
-    /* Back has to land wherever this step was actually reached from, and only
-       the goal-weight screen sits between the tiles and here. */
-    const tile = goalTileFor(data.goal_bubble);
-    $("paceBackBtn").onclick = () => renderOnboardStep(tile?.askTarget ? "target" : "goal", data);
-    return;
-  }
+  /* The "How fast?" step used to sit here, between the goal and the plan. It
+     offered Steady, Quicker and Gentle at 12, 8 and 16 weeks, and it was asked
+     of every goal that is not a weight: there is no quicker route to Move
+     better, and the answer was written to a deadline nothing reads. A duration
+     is a real question only where there is a number to arrive at, so the
+     target step asks it, of the two goals that ask for a number, out of the
+     amount they actually typed. */
 
   if (step === "plan") {
-    const g = GOALS.find((x) => x.key === data.goalKey);
-    const p = PACE.find((x) => x.key === data.pace) || PACE[0];
+    const g = GOALS.find((x) => x.key === data.goalKey) || GOALS[GOALS.length - 1];
+    /* Both of these come from what the person did on the previous screen, and
+       both can honestly be nothing. The screen used to read them off PACE,
+       which meant a goal with no pace at all still announced "for 12 weeks,
+       Pace Steady", and somebody who had just chosen 7 months was told 12
+       weeks on the very next screen. */
+    const chosenPace = PACE.find((x) => x.key === data.pace) || null;
+    const weeks = Number.isFinite(data.weeks) && data.weeks > 0 ? data.weeks : null;
     const days = g.days;
+    const durationRow = chosenPace && weeks
+      ? `<div class="ob-row"><span>Pace</span><b>${escapeHtml(chosenPace.label)}, ${escapeHtml(durationLabel(weeks))}</b></div>`
+      : weeks
+        /* A gain has a duration and no pace, because nobody gets to choose the
+           rate muscle arrives at. Saying "about" is the honest half of that. */
+        ? `<div class="ob-row"><span>Timeline</span><b>about ${escapeHtml(durationLabel(weeks))}</b></div>`
+        : "";
     ob.innerHTML = `
       <div class="ob-step">
         <div class="ob-kicker">YOUR PLAN</div>
-        <h1>${days} days a week, for ${p.weeks} weeks</h1>
+        <h1>${days} days a week${chosenPace && weeks ? `, for ${escapeHtml(durationLabel(weeks))}` : ""}</h1>
         <p class="sub">Built for <strong>${escapeHtml(g.label.toLowerCase())}</strong>${data.detail ? `, ${escapeHtml(data.detail.toLowerCase())}` : ""}.
           We will pick each session for you. Change any of it later in Setup.</p>
         <div class="ob-summary">
           <div class="ob-row"><span>Goal</span><b>${escapeHtml(data.goalLabel || g.goal)}</b></div>
           <div class="ob-row"><span>Training days</span><b>${days} per week</b></div>
           <div class="ob-row"><span>Focus</span><b>${escapeHtml(g.focus)}</b></div>
-          <div class="ob-row"><span>Pace</span><b>${escapeHtml(p.label)}, ${p.weeks} weeks</b></div>
+          ${durationRow}
         </div>
         <p class="sub" style="margin:18px 0 0;"><strong>About how long per session?</strong></p>
         <div class="rest-pref five" id="obSessionLen"></div>
@@ -8426,28 +8643,52 @@ function renderOnboardStep(step, data = {}) {
        is only knowable once the goal is picked, and lighting the wrong chip is
        worse than asking a step later. Tapping nothing sends nothing. */
     paintObSessionLengths(data);
-    $("startBtn").onclick = () => finishOnboarding({
-      name: data.name,
-      goal: g.goal,
-      goal_bubble: data.goal_bubble || null,
-      goal_child: data.goal_child || null,
-      goal_secondary: data.goal_secondary || [],
-      goal_detail: data.detail || null,
-      focus: g.focus,
-      challenge_target: days,
-      /* The pace was being shown on this screen and then dropped. It is the
-         only deadline the user ever agrees to, so it has to survive. */
-      goal_key: g.key,
-      pace: p.key,
-      weeks: p.weeks,
-      days_per_week: days,
-      /* null unless they tapped one. The engine treats null, 0 and nonsense
-         identically to never having been asked, and that is the guarantee that
-         keeps every plan built before this question existed exactly as it was,
-         so a default must never be written here. */
-      session_minutes: Number.isFinite(data.session_minutes) ? data.session_minutes : null,
-    });
-    $("backBtn").onclick = () => renderOnboardStep("pace", data);   // one step back, not all the way to goal
+    /* This used to be a fresh object literal, and everything the target step
+       had just collected was not in it: the goal weight, the current weight,
+       the height, the date and the duration were all typed, carried three
+       screens, and dropped on the floor here. That is why user_goals rows had
+       no metric, no start_value and no target_value, and why weightGoalFor
+       returned null for every account ever created, which took the goal line,
+       the Goal figure and the projection off the chart for everybody.
+       Everything on the screen behind this button now reaches the write. */
+    $("startBtn").onclick = () => {
+      /* One row, one tap. Two taps used to retire nothing and insert twice,
+         which in production races the one-active partial unique index and in
+         the sandbox simply leaves two active goals. Disabled rather than
+         debounced so the screen says what happened. */
+      const btn = $("startBtn");
+      if (btn.disabled) return;
+      btn.disabled = true;
+      finishOnboarding({
+        name: data.name,
+        goal: g.goal,
+        goal_bubble: data.goal_bubble || null,
+        goal_child: data.goal_child || null,
+        goal_secondary: data.goal_secondary || [],
+        goal_detail: data.detail || null,
+        focus: g.focus,
+        challenge_target: days,
+        goal_key: g.key,
+        height_in: data.height_in || null,
+        /* The two numbers that turn on every goal-driven surface there is. */
+        weight_lb: data.weight_lb || null,
+        goal_weight_lb: data.goal_weight_lb || null,
+        goal_by_date: data.goal_by_date || null,
+        /* The only deadline the user ever agrees to, as they set it, not as a
+           pace chip they were never shown would have set it. */
+        pace: chosenPace ? chosenPace.key : null,
+        weeks,
+        days_per_week: days,
+        /* null unless they tapped one. The engine treats null, 0 and nonsense
+           identically to never having been asked, and that is the guarantee that
+           keeps every plan built before this question existed exactly as it was,
+           so a default must never be written here. */
+        session_minutes: Number.isFinite(data.session_minutes) ? data.session_minutes : null,
+      }).then((ok) => { if (!ok) btn.disabled = false; })
+        .catch((err) => { console.error(err); btn.disabled = false; toast("Setup failed, try again"); });
+    };
+    /* One step back, to whichever screen was actually in front of this one. */
+    $("backBtn").onclick = () => renderOnboardStep(goalTileFor(data.goal_bubble)?.askTarget ? "target" : "goal", data);
     return;
   }
 }
@@ -8473,11 +8714,14 @@ async function paintObSessionLengths(data) {
 
 async function finishOnboarding(data) {
   ME = data.name;
-  /* Height and weight ARE asked up front now, on the stats step before the
-     goal, which is what lets the goal step ask "you are at 210, where do you
-     want to get to" instead of offering bands. Both are skippable, and the
-     engine uses bodyWeightLb for starting loads on every goal, not just the
-     weight ones. */
+  /* Height and weight are asked on the goal weight screen, the one step that
+     wants a number, rather than as a stats interrogation before anything is
+     relevant. Both are skippable, and the engine uses a body weight for
+     starting loads on every goal, not just the weight ones, which is why the
+     weigh-in below is written for anybody who typed one.
+
+     Returns true when the account is set up, so the Start button knows whether
+     it is safe to let go of itself. */
   /* Through upsertGoalFields, not straight at the table: goal_secondary is
      behind an unapplied migration, and a first-run setup must not fail on a
      column that does not exist yet. */
@@ -8498,31 +8742,42 @@ async function finishOnboarding(data) {
     challenge_target: data.challenge_target || 4,
     updated_at: new Date().toISOString(),
   });
-  if (error) { toast("Setup failed, try again"); console.error(error); return; }
+  if (error) { toast("Setup failed, try again"); console.error(error); return false; }
   if (droppedSecondary && (data.goal_secondary || []).length) toast("Your extra goals are not being stored yet.");
   if (droppedSession) toast("Your session length is not being stored yet.");
   MY_PROFILE = saved;
   clearObDraft();
+  /* The weight they just typed, logged as what it is: a weigh-in. It is the
+     start of the chart, it is the start_value the projection measures against,
+     and it is the only body weight the engine has on day one, without which
+     CONTRACT.md (a) says there are no starting weights at all and the plan
+     says so in meta.missing. Same shape and same conflict key as
+     saveScaleEntry, so a weigh-in logged later today replaces it rather than
+     colliding with it. */
+  if (data.weight_lb) {
+    await safeWrite("fit_entries", "upsert", {
+      user_name: ME, email: MY_EMAIL, entry_date: todayStr(), weight: data.weight_lb,
+      gym: false, sessions: 0, proof_path: null, rest_day: false, note: null, workout_at: null,
+    }, { onConflict: "email,entry_date" });
+  }
   if (data.goal_key) await setActiveGoal(data);
   applyAccentColors();
   await checkPartnershipThenEnter();
+  return true;
 }
 
 /* One active goal per person. Setting a new one retires the old rather than
    deleting it, so we keep a record of what someone has actually chased.
 
-   `metric`, `start_value` and `target_value` are finally written, for weight
-   goals, now that the stats step asks for a current weight before the goal
-   step. They were left null for as long as there was nothing honest to
-   snapshot. Filling them is what turns on the goal line on the weight chart,
-   the Goal figure in the stat row and the "at this rate you reach 160 around
-   the 12th" projection, all of which were built against target_value and have
-   never once rendered, because weightGoalFor() has returned null for every
-   user since the day it was written. */
+   `metric`, `start_value` and `target_value` are written for weight goals,
+   off the two numbers the target step asks for. This function has been able to
+   write them since it was written; what it never got handed was the numbers,
+   because the Start button built a fresh object without them in it. So
+   weightGoalFor() returned null for every account ever created, and the goal
+   line on the weight chart, the Goal figure in the stat row and the "at this
+   rate you reach 160 around the 12th" projection were all built against
+   target_value and never once drawn. They draw now. */
 async function setActiveGoal(data) {
-  const target = new Date();
-  target.setDate(target.getDate() + (data.weeks || 12) * 7);
-
   /* Retire the previous goal rather than deleting it, so we keep a record of
      what someone has actually chased. A partial unique index enforces one
      active goal, so this has to happen before the insert. safeWrite is no help
@@ -8536,10 +8791,14 @@ async function setActiveGoal(data) {
     email: MY_EMAIL,
     goal_key: data.goal_key,
     detail: data.goal_detail || null,
-    pace: data.pace || "steady",
-    /* Their date when they gave one, since a date they chose beats a date we
-       derived from a pace chip they never saw. */
-    target_date: data.goal_by_date || isoDate(target),
+    /* Both null when nothing was chosen, and neither is defaulted. A pace of
+       "steady" and a date twelve weeks out used to be written for goals that
+       were never asked either question, which reads back exactly like a
+       deadline somebody agreed to. The column is nullable for this reason and
+       the check constraint only allows steady, quick and easy, so a made-up
+       value is the one thing that cannot go here. */
+    pace: data.pace || null,
+    target_date: data.goal_by_date || null,
     days_per_week: data.days_per_week || 4,
     status: "active",
     ...(data.goal_weight_lb ? {
@@ -8719,8 +8978,96 @@ function showApp() {
     // silently and read as the app deciding for you.
   };
   renderFab();
+  registerBackGuard();
 
-  loadAll();
+  loadAll().then(reconcileNativeSurfaces);
+}
+
+/* ---------- Back ----------
+
+   Worth being honest about the size of this one. On iOS there is no hardware
+   back button, and Capacitor's backButton event is Android only, so it will
+   never fire in the build we are actually shipping. The edge-swipe that would
+   call history.back() is off in a WKWebView unless it is asked for, and it has
+   not been. On the phone this app is submitted for, none of this runs.
+
+   It is real in two other places: the PWA installed on an Android home screen,
+   where the system back is always there and there is nothing in the history to
+   absorb it, and any future Android build. Both leave the app mid-workout with
+   the session screen still up.
+
+   So this is the cheap version and deliberately not a router. One spare history
+   entry while the session screen is open, and a back that lands on it does what
+   the chevron in the corner of that screen already does: minimises to the
+   workout tab, workout still running. Nothing else in the app gets back
+   behaviour it did not have yesterday. */
+let BACK_GUARD_ARMED = false;
+
+function armBackGuard() {
+  if (BACK_GUARD_ARMED) return;
+  try { history.pushState({ unio: "session" }, ""); BACK_GUARD_ARMED = true; }
+  catch { /* no history to push onto, which is its own answer */ }
+}
+
+/* True when the gesture was ours to take. */
+function handleBackGesture() {
+  if (!document.body.classList.contains("session-open")) return false;
+  minimiseSession();
+  return true;
+}
+
+let BACK_GUARD_REGISTERED = false;
+
+function registerBackGuard() {
+  /* showApp runs again after pairing, and a second listener would minimise the
+     session twice on one gesture. */
+  if (BACK_GUARD_REGISTERED) return;
+  BACK_GUARD_REGISTERED = true;
+  window.addEventListener("popstate", () => {
+    BACK_GUARD_ARMED = false;
+    if (handleBackGesture()) armBackGuard();
+  });
+  /* Android only, and undefined on the web, so it stays a no-op in both places
+     this cannot fire. Left registered rather than platform-gated: the day there
+     is an Android build, back should already do the right thing. */
+  const app = isNativeApp() && window.Capacitor.Plugins.App;
+  if (!app) return;
+  try {
+    app.addListener("backButton", ({ canGoBack }) => {
+      if (handleBackGesture()) return;
+      /* Leaving is allowed. Closing the app from under a workout is not the
+         same thing, so it goes to the background rather than exiting. */
+      if (!canGoBack) { app.minimizeApp?.(); return; }
+      history.back();
+    });
+  } catch (err) {
+    console.warn("back button listener failed", err);
+  }
+}
+
+/* What the Lock Screen and the widget are showing, against what is actually
+   true, once per launch.
+
+   Both surfaces outlive the process that drew them, which is the whole reason
+   they need this. A force quit mid-workout leaves a Live Activity with nobody
+   holding a reference to it, and taps queued against a workout that ended
+   hours ago sit in the App Group until something collects them. Neither was
+   ever checked at startup: the drain only ran on visibilitychange, which does
+   not fire on a cold launch, and the end path guarded on a flag that a cold
+   launch resets to false.
+
+   Deliberately conservative about the card. A saved session is a workout
+   somebody may still come back to, so it keeps its card; only a launch with no
+   session anywhere, in memory or on disk, is certain enough to end one. The
+   twelve-hour native sweep covers the rest. */
+async function reconcileNativeSurfaces() {
+  if (!isNativeApp()) return;
+  try {
+    await drainLockScreenSets();
+    if (!SESSION && !loadSessionFromStorage()) await endLiveActivity();
+  } catch (err) {
+    console.error("reconciling native surfaces failed", err);
+  }
 }
 
 /* One place that guarantees the nav is reachable. */
@@ -8873,7 +9220,16 @@ function clearLocalAccountState() {
   if (isNativeApp()) {
     try { window.Capacitor.Plugins.WidgetBridge?.clear(); }
     catch (e) { console.warn("could not clear widget state", e); }
+    /* Same argument, different surface. Signing out and deleting the account
+       both only reloaded the page, and a reload does not touch the Lock Screen:
+       the card stayed up, still naming the exercise, for whoever signs in next.
+       This is the one place all three exits already pass through. */
+    try { endLiveActivity(); }
+    catch (e) { console.warn("could not end the live activity", e); }
   }
+  /* So the next account's identical numbers are not mistaken for "nothing
+     moved" and skipped. */
+  LAST_WIDGET_SNAPSHOT = null;
 }
 
 function queuedCount() { return readQueue().length; }
@@ -12925,6 +13281,16 @@ function weightGoalWithheld(email, goal) {
   if (!g || g.metric !== "weight_lb" || g.target_value == null) return false;
   const isMe = (email || "").toLowerCase() === (MY_EMAIL || "").toLowerCase();
   const heightIn = (isMe ? MY_PROFILE : PARTNER_PROFILE)?.height_in;
+  /* No height, no check, and a check that can be switched off by leaving a
+     field blank was never a floor. This is the only honest reading of an
+     unchecked loss target: the app does not know whether it is safe, so it
+     does not drive toward it. The target step says exactly this while the
+     height field is still on screen, and filling it in turns everything back
+     on, which is the whole reason this is derived and not stored.
+
+     A gain is exempt. A target above what they weigh now cannot be below a
+     healthy weight, so there is nothing a height would tell us. */
+  if (!heightIn) return g.start_value != null && g.target_value < g.start_value;
   const floor = healthyFloorLb(heightIn);
   return !!(floor && g.target_value < floor);
 }
@@ -14665,6 +15031,12 @@ async function discardSession() {
   await bankCurrentExercise();
   SESSION = null;
   clearSessionStorage();
+  /* Two different functions with nearly the same name, and only one of them was
+     here. endLive() drops the presence row your partner watches; endLiveActivity()
+     takes the card off your own Lock Screen. Discarding called the first, nulled
+     SESSION, and every later path that could have ended the card checks SESSION
+     first, so the card was left with nothing in the app able to reach it. */
+  await endLiveActivity();
   await endLive();
 }
 
@@ -16236,6 +16608,11 @@ function renderSession() {
           <button type="button" class="sess-more" id="sessMoreBtn" aria-haspopup="dialog"
             aria-label="Options for ${escapeHtml(ex.name)}">${icon("more", 22)}</button>
         </div>
+        ${/* Standing at the rack, the question is not "what is this called",
+              it is "which machine, which attachment, what angle". This is the
+              one place that answers all three, because it is the one place
+              where you are about to do it. */ ""}
+        ${kitFor(ex.name) ? `<div class="sess-kit">${escapeHtml(kitFor(ex.name))}</div>` : ""}
       </div>
 
       <div class="sess-stage${resting ? " resting" : ""}" id="sessStage">
@@ -17053,13 +17430,19 @@ function stopLiveQuipBeat() {
    cannot reach this code, so it leaves a count behind and the real logging
    happens here, the moment the app is in front again. */
 async function drainLockScreenSets() {
-  if (!isNativeApp() || !SESSION || SESSION.finished) return;
+  if (!isNativeApp()) return;
   const bridge = window.Capacitor.Plugins.WidgetBridge;
   if (!bridge) return;
+  /* Returning before the drain is what let the queue become a place things
+     accumulate: nothing was owed to a workout that was not open, so nothing
+     was collected, and it sat there until a workout WAS open. Draining with no
+     owner claims nothing and takes the rubbish out, which is the whole job on
+     this path. */
+  const mine = SESSION && !SESSION.finished ? (MY_EMAIL || "") : "";
   try {
     /* Owner-scoped: taps queued for anyone else, or for a workout that ended
        long ago, are dropped rather than replayed as phantom sets. */
-    const { count, dropped } = await bridge.drainPendingSets({ owner: MY_EMAIL || "" });
+    const { count, dropped } = await bridge.drainPendingSets({ owner: mine });
     if (dropped) console.log(`lock screen: dropped ${dropped} stale or unowned taps`);
     for (let i = 0; i < (count || 0); i++) {
       const sets = SESSION.setsDone?.[SESSION.exerciseIndex] || [];
@@ -17110,12 +17493,21 @@ async function pushLiveActivity() {
   }
 }
 
+/* Safe to call at any time, including when this page has never started one.
+   The LIVE_ACTIVITY_ON check used to stand in front of this, which meant the
+   one case that most needed ending could not be reached: a card left over from
+   a run that was force quit outlives the flag that knew about it, so on the
+   next launch the app believed there was nothing to end while the card was
+   sitting on the Lock Screen. Native ends every card it can see and resolves
+   quietly when there are none, so the flag is not worth guarding on. */
 async function endLiveActivity() {
   stopLiveQuipBeat();
   LAST_LIVE_ACTIVITY = null;
-  if (!isNativeApp() || !LIVE_ACTIVITY_ON) return;
   LIVE_ACTIVITY_ON = false;
-  try { await window.Capacitor.Plugins.LiveWorkout.end(); }
+  if (!isNativeApp()) return;
+  const live = window.Capacitor.Plugins.LiveWorkout;
+  if (!live) return;
+  try { await live.end(); }
   catch (err) { console.error("live activity end failed", err); }
 }
 
@@ -17159,6 +17551,7 @@ document.addEventListener("visibilitychange", () => {
 function openSessionUI() {
   document.body.classList.add("session-open");
   keepScreenAwake();
+  armBackGuard();    // something for a back gesture to land on other than the exit
   startQuipBeat();   // he talks on a clock while this screen is up
   $("sessionCard").classList.remove("hidden");
   // Last session's completion screen left this on, which would hide the clock
@@ -17912,6 +18305,10 @@ function planFromToday() {
 
   return {
     real: true,
+    /* The kit the plan actually calls for, read off the exercises on it. The
+       `equipment` line below is the old guess from recently logged names and
+       stays only as the fallback for the moment before the table loads. */
+    kit: kitForDay(list.map((ex) => ex.name)),
     focus: displayFocus(TODAY_WORKOUT.focus, list),
     match: md.match,
     muscles: md.muscles,
@@ -18311,7 +18708,10 @@ function renderChooseScreen() {
         <div class="spp-grid">
           ${p.duration ? `<div class="spp-fact"><div class="k">Duration</div><div class="v">${escapeHtml(p.duration)}</div></div>` : ""}
           <div class="spp-fact"><div class="k">Exercises</div><div class="v">${p.count}</div></div>
-          ${p.equipment ? `<div class="spp-fact wide"><div class="k">Equipment</div><div class="v">${escapeHtml(p.equipment)}</div></div>` : ""}
+          ${p.kit && p.kit.length ? `<div class="spp-fact wide">
+            <div class="k">What you need</div>
+            <div class="spp-chips">${p.kit.map((k) => `<span class="spp-chip${k.group === "machine" ? " spp-chip-kit" : ""}">${escapeHtml(k.label)}</span>`).join("")}</div>
+          </div>` : p.equipment ? `<div class="spp-fact wide"><div class="k">Equipment</div><div class="v">${escapeHtml(p.equipment)}</div></div>` : ""}
           <div class="spp-fact wide">
             <div class="k">Target muscles</div>
             <div class="spp-chips">${p.targets.map((t) => `<span class="spp-chip">${escapeHtml(t)}</span>`).join("")}</div>
@@ -19836,6 +20236,11 @@ function renderPlanPreview() {
       <button type="button" class="ex-body ex-tap" data-plan-edit="${i}"${isDone ? " disabled" : ""}>
         <div class="ex-name">${escapeHtml(ex.name)}</div>
         <div class="ex-target">${ex.sets} sets · ${ex.reps} reps${Number(ex.targetWeight) > 0 ? ` · ${ex.targetWeight} lb` : ""}${isDone ? "" : ` ${icon("pencil", 11)}`}</div>
+        ${/* What to walk to. Only the things to fetch, no setup detail: the
+              bench angle matters when you are standing at the bench, not when
+              you are reading the list. Bodyweight says nothing, because
+              "nothing needed" is not worth a line on every row. */ ""}
+        ${!isDone && kitNamesFor(ex.name).length ? `<div class="ex-kit"><span>${escapeHtml(kitNamesFor(ex.name).join(" · "))}</span></div>` : ""}
         ${ramp ? `<div class="ex-ramp">${icon("flame", 11)}<span>Ramp ${escapeHtml(rampLoadsLine(ramp))}</span></div>` : ""}
         ${ex.note ? `<div class="ex-note">${escapeHtml(humanizeNoteDates(ex.note))}</div>` : ""}
       </button>
@@ -21405,12 +21810,47 @@ const PROGRESS_CARDS = [
    Profiles saved before the bubbles existed carry only the legacy `goal`
    string, so that falls through the same table at the bottom. */
 function headlineKindFor(profile) {
-  /* The four goal_child tests that used to sit here are gone with the
-     sub-goals. goal_child is null on every profile written since, and the old
-     ones it still matched resolved to the same kind their bubble gives anyway. */
+  /* These seven are stored data, not dead code. The commit that dropped the
+     sub-goals deleted the tests for them on the grounds that they "resolved to
+     the same kind their bubble gives anyway", and that was not true of one of
+     them: every one of these seven changed the reading, and two of the changes
+     are readings the file argues against in its own words a screen above.
+     goal_child is null on everything written since, so this costs a profile
+     written today nothing at all, and it is the difference between a right and
+     a wrong answer for everyone who picked one while they were on offer.
+
+     Order matters: the child is more specific than the bubble it hangs under,
+     so it is read first. */
+  switch (profile?.goal_child || "") {
+    /* Leading a recomp with the scale is wrong ON PURPOSE, it says so under
+       GOAL_CARDS: the whole claim of the goal is that the number does not
+       move much, so opening with the number is telling them they failed. */
+    case "lose-and-build": case "build-skinny-fat": return "recomp";
+    /* "Gain weight". The one child of Build muscle whose own measure is the
+       scale rather than the tonnage. */
+    case "build-overall": return "scale";
+    /* The reps headline and bestRepsFor are reachable only from here. Nothing
+       in the live picker asks for a first pull-up, so rather than delete the
+       one card that measures the goal properly, it stays for the accounts that
+       already carry it: a pull-up carries no load, so volume, strength and the
+       scale all read it as nothing happening. */
+    case "first-pullup": case "first-pushup": return "reps";
+    case "run-5k": case "faster-mile": return "endurance";
+  }
   switch (profile?.goal_bubble || "") {
     case "lose-weight":   return "scale";
-    case "build-muscle":  return "volume";
+    /* Build muscle can carry a goal weight now, and a target ABOVE where they
+       started is the live goal set's way of saying "gain weight": it is the
+       same answer build-overall used to give, asked for with a number instead
+       of a sub-goal. Without a weight target the measure is the work done, so
+       tonnage stays the default. A target below the start is a recomp being
+       run under the Build muscle tile, and the scale is the wrong lead for
+       that one for the same reason it is wrong for tone-lean-abs. */
+    case "build-muscle": {
+      const wg = weightGoalFor(profile?.email);
+      if (!wg || wg.start_value == null) return "volume";
+      return wg.target_value > wg.start_value ? "scale" : "recomp";
+    }
     case "get-stronger":  return "lift";
     case "tone-lean-abs": return "recomp";
     case "build-endurance": return "endurance";
@@ -22253,6 +22693,42 @@ function awaitApnsToken(timeoutMs = 15000) {
   });
 }
 
+/* Which Apple gateway minted the token we just received.
+
+   This used to be the literal string "development", with a comment saying it
+   matched App.entitlements. It did match the file. The file was not what the
+   binary was signed with: a TestFlight or App Store build is signed for
+   production, APNs mints a production token, and the sender then posted it to
+   the sandbox gateway and got BadDeviceToken back. Push was dead for every
+   user who was not plugged into a cable, which is to say every user.
+
+   JavaScript cannot know this and should never have been asked to assert it.
+   The native plugin reads the aps-environment entitlement out of the signature
+   the app is actually running under, which is the same thing APNs read when it
+   decided which token to hand over. That is the only answer that cannot drift
+   from the truth.
+
+   The fallback is "production" rather than "development" on purpose. A build
+   where the plugin is missing is a build that shipped, and shipped builds are
+   production; a developer's cable install guessed wrong this way recovers on
+   the first send, because send-nudges retries the other gateway on
+   BadDeviceToken and writes the corrected value back to the row. */
+async function apnsEnvironment() {
+  const plugin = isNativeApp() && window.Capacitor.Plugins.PushEnvironment;
+  if (!plugin) {
+    console.warn("PushEnvironment plugin is missing, assuming production");
+    return "production";
+  }
+  try {
+    const { environment, source } = await plugin.get();
+    console.log(`apns environment: ${environment} (from ${source})`);
+    return environment === "development" ? "development" : "production";
+  } catch (err) {
+    console.error("could not read the apns environment", err);
+    return "production";
+  }
+}
+
 function pushSupport() {
   if (isNativeApp()) return { ok: true };
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
@@ -22320,9 +22796,7 @@ async function enablePush() {
       const { error: apnsErr } = await sb.from("apns_tokens").upsert({
         email: MY_EMAIL,
         token,
-        /* Matches aps-environment in App.entitlements. A sandbox token is
-           rejected outright by the production gateway. */
-        environment: "development",
+        environment: await apnsEnvironment(),
         failures: 0,
       }, { onConflict: "token" });
       if (apnsErr) throw apnsErr;
@@ -22529,6 +23003,11 @@ function trainingSummary() {
 }
 
 function paintSettingsValues() {
+  /* The Goal row's only writer used to be closeSettingsPage, so the row read
+     "Not set" from the moment the tab opened until you had been into a subpage
+     and back out of it, on an account with a goal. It belongs here with every
+     other row that states its own answer. */
+  settingsValue("setGoalSub", goalTileLabel(MY_PROFILE));
   settingsValue("setTrainingSub", trainingSummary());
   settingsValue("setStatsSub", bodyStatsSummary());
   settingsValue("setProfileSub", ME || "");

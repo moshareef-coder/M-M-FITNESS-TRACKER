@@ -66,7 +66,7 @@ export const EQUIPMENT = {
   "Band Pull-Apart": { kit: ["band"], setup: [] },
   "Band Shoulder External Rotation": { kit: ["band"], setup: [] },
   "Barbell Back Squat": { kit: ["rack", "barbell"], setup: [] },
-  "Barbell Bench Press": { kit: ["bench", "rack", "barbell"], setup: [] },
+  "Barbell Bench Press": { kit: ["bench", "barbell"], setup: [] },
   "Barbell Curl": { kit: ["barbell"], setup: [] },
   "Barbell Row": { kit: ["barbell"], setup: [] },
   "Barbell Shrug": { kit: ["barbell"], setup: [] },
@@ -96,7 +96,7 @@ export const EQUIPMENT = {
   "Chin Tucks": { kit: [], setup: [] },
   "Chin-Up": { kit: ["pullup-bar"], setup: [] },
   "Clamshell": { kit: ["mat"], setup: [] },
-  "Close-Grip Bench Press": { kit: ["bench", "rack", "barbell"], setup: [] },
+  "Close-Grip Bench Press": { kit: ["bench", "barbell"], setup: [] },
   "Close-Grip Pulldown": { kit: ["lat-pulldown"], setup: ["V-bar attachment", "Pulley at the top"] },
   "Cobra Pose": { kit: ["mat"], setup: [] },
   "Concentration Curl": { kit: ["bench", "dumbbell-one"], setup: [] },
@@ -115,7 +115,7 @@ export const EQUIPMENT = {
   "Dancer's Pose": { kit: [], setup: [] },
   "Dead Hang": { kit: ["pullup-bar"], setup: [] },
   "Deadlift": { kit: ["barbell"], setup: [] },
-  "Decline Barbell Press": { kit: ["bench-adjustable", "rack", "barbell"], setup: ["Bench on decline, about 25 degrees"] },
+  "Decline Barbell Press": { kit: ["bench-adjustable", "barbell"], setup: ["Bench on decline, about 25 degrees"] },
   "Decline Dumbbell Press": { kit: ["bench-adjustable", "dumbbell"], setup: ["Bench on decline, about 25 degrees"] },
   "Deep Squat Hold": { kit: [], setup: [] },
   "Diamond Push-Up": { kit: [], setup: [] },
@@ -164,7 +164,7 @@ export const EQUIPMENT = {
   "Hollow Body Hold": { kit: [], setup: [] },
   "Human Flag": { kit: ["rig-post"], setup: [] },
   "Inchworm Walkout": { kit: [], setup: [] },
-  "Incline Barbell Press": { kit: ["bench-adjustable", "rack", "barbell"], setup: ["Bench on incline, about 35 degrees"] },
+  "Incline Barbell Press": { kit: ["bench-adjustable", "barbell"], setup: ["Bench on incline, about 35 degrees"] },
   "Incline Dumbbell Curl": { kit: ["bench-adjustable", "dumbbell"], setup: ["Bench on incline, about 46 degrees"] },
   "Incline Dumbbell Press": { kit: ["bench-adjustable", "dumbbell"], setup: ["Bench on incline, about 35 degrees"] },
   "Incline Push-Up": { kit: ["bench"], setup: [] },
@@ -319,13 +319,49 @@ export const EQUIPMENT = {
   "Zercher Squat": { kit: ["rack", "barbell"], setup: [] },
 };
 
+/* People and plans do not always use the library's full name: a plan can say
+   "Bench Press" where the library says "Barbell Bench Press", and somebody
+   typing their own exercise will write "bench press" or "Bench press".
+   So: exact name, then the same name ignoring case and punctuation, then the
+   ONE library name that ends with it. Ends with, not contains, because
+   "Bench Press" is a bench press with a bar on it, while "Squat" could be six
+   different lifts and a wrong machine is worse than no line at all. */
+const NORM = new Map();
+for (const n of Object.keys(EQUIPMENT)) {
+  const k = n.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (!NORM.has(k)) NORM.set(k, n);
+}
+export function resolveName(name) {
+  if (!name) return null;
+  if (EQUIPMENT[name]) return name;
+  const k = String(name).toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (!k) return null;
+  if (NORM.has(k)) return NORM.get(k);
+  const hits = [];
+  for (const [nk, full] of NORM) if (nk.endsWith(k)) hits.push(full);
+  if (hits.length === 1) return hits[0];
+  /* Several matched. A gym settles this the same way every time: the
+     unqualified name means the barbell one. "Bench press" is the barbell
+     bench press, "row" is the barbell row, and anything else gets said out
+     loud ("dumbbell row"). So one barbell candidate wins; no barbell
+     candidate, or two, and we say nothing rather than name the wrong kit. */
+  const words = String(name).trim().split(" ").filter(Boolean).length;
+  if (words < 2) return null;      // "Press" is not a lift, it is half of one
+  const barbell = hits.filter((n) => n.startsWith("Barbell "));
+  return barbell.length === 1 ? barbell[0] : null;
+}
+export function kitOf(name) {
+  const key = resolveName(name);
+  return key ? EQUIPMENT[key] : null;
+}
+
 /* Everything one session needs, biggest thing first, deduplicated, with the
    exercises that want each so a card can say why. */
 export function kitForSession(names = []) {
   const order = ["machine","bench","station","free","small"];
   const by = new Map();
   for (const name of names) {
-    for (const id of (EQUIPMENT[name] || {}).kit || []) {
+    for (const id of (kitOf(name) || {}).kit || []) {
       if (!by.has(id)) by.set(id, []);
       by.get(id).push(name);
     }
@@ -343,7 +379,7 @@ export function kitForSession(names = []) {
 
 /* One line for a card: "Cable machine, rope attachment" or "Bodyweight". */
 export function kitLine(name) {
-  const r = EQUIPMENT[name];
+  const r = kitOf(name);
   if (!r) return "";
   const labels = (r.kit || []).map((id) => (KIT[id] || {}).label || id);
   const all = labels.concat(r.setup || []);

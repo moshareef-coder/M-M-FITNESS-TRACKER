@@ -642,6 +642,15 @@
   /* Wrapping rather than truncating: a ramp cut off after the second rung hides
      the heaviest load, which is the one worth knowing. Two short lines in a
      narrow row is the honest version. */
+  /* What to fetch for this lift, one quiet line under the sets and reps. It
+     sits in the muted tone, not the ramp's stretch ink: a ramp is an
+     instruction, kit is a fact about the room. */
+  .ex-kit {
+    display: flex; align-items: flex-start; gap: 5px; margin-top: 3px;
+    font-size: 12.5px; line-height: 1.35; color: var(--muted);
+  }
+  .ex-kit svg { flex-shrink: 0; opacity: .65; margin-top: 2px; }
+  .ex-kit span { min-width: 0; }
   .ex-ramp {
     display: flex; align-items: flex-start; gap: 5px; margin-top: 3px;
     font-size: 12.5px; line-height: 1.35; color: var(--stretch-ink);
@@ -1882,6 +1891,16 @@
   }
   .sess-title:active { opacity: .6; }
   .sess-titlerow { display: flex; align-items: center; gap: 10px; }
+  /* Under the name of the lift: which machine, which attachment, what angle.
+     Two lines at most on a phone, and it wraps rather than truncating,
+     because the half that gets cut is always the useful half. */
+  .sess-kit {
+    margin-top: 7px; font-size: 14px; font-weight: 600; line-height: 1.35;
+    /* The stage behind this is the figure's own light ground, not the app's,
+       so a --muted grey washes out on it. It takes the session's own ink at
+       the same strength as the row above the title. */
+    color: color-mix(in srgb, var(--sess-ink) 70%, transparent);
+  }
   .sess-titlerow .sess-title { flex: 1 1 auto; min-width: 0; }
   /* Round, quiet, and the same 44px target as every other control on the
      screen. It sits on the stage gradient, so its ground is the ink colour at
@@ -3893,6 +3912,9 @@
   .spp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   .spp-chip { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 100px;
               border: 1px solid var(--border); background: var(--panel-2); color: var(--text); }
+  /* A machine is a place you walk to, so it leads the row and carries the
+     accent edge; a barbell or a pair of dumbbells you just pick up. */
+  .spp-chip-kit { border-color: color-mix(in srgb, var(--accent) 42%, var(--border)); }
   .build-q { font-size: 14px; color: var(--muted); margin: 0 0 12px; }
   /* Recent workouts */
   .recent-head { display: flex; align-items: baseline; justify-content: space-between; margin: 24px 0 12px; }
@@ -5734,16 +5756,45 @@ const FUNCTION_URL = SUPABASE_URL + "/functions/v1/generate-workout";
    step. FIT_MATH starts empty; every caller must guard for it not being ready yet. */
 let FIT_MATH = {};
 let EXERCISE_TRAININGS = [];
+/* What each exercise is done on, generated from the props its animation is
+   drawn with (knowledge/equipment.mjs, built by scripts/build-equipment.mjs).
+   The figure on the card and the kit named beside it are the same fact, so
+   the machine in the picture is the machine in the list. */
+let EQUIPMENT = null;
 (async () => {
-  const [tdee, cal, strength, library] = await Promise.all([
+  const [tdee, cal, strength, library, equipment] = await Promise.all([
     import("./knowledge/formulas/tdee.mjs"),
     import("./knowledge/formulas/calorie-math.mjs"),
     import("./knowledge/formulas/strength-math.mjs"),
     import("./knowledge/exercise-library/index.mjs"),
+    import("./knowledge/equipment.mjs").catch((e) => { console.error("equipment", e); return null; }),
   ]);
   FIT_MATH = { ...tdee, ...cal, ...strength };
   EXERCISE_TRAININGS = library.TRAININGS;
+  EQUIPMENT = equipment;
+  /* It lands a beat after the first paint, and the workout tab is the screen
+     that names kit, so it gets one repaint rather than a permanently blank
+     line. Any other tab will name it correctly the first time it renders. */
+  if (equipment && !document.getElementById("tab-workout")?.classList.contains("hidden")) {
+    try { renderWorkoutTab({ respectMode: true }); } catch {}
+  }
 })();
+
+/* The kit for one exercise, biggest thing first: "Cable machine, rope
+   attachment, pulley at the top". Empty string until the table lands, and for
+   a name nothing knows about, because a blank line is better than a guess. */
+function kitFor(name) {
+  return EQUIPMENT ? EQUIPMENT.kitLine(name) : "";
+}
+/* Just the things to FETCH, no setup notes: what a plan row needs, where the
+   angle of the bench is somebody else's problem until they are standing at it. */
+function kitNamesFor(name) {
+  const r = EQUIPMENT ? EQUIPMENT.kitOf(name) : null;
+  return r ? r.kit.map((id) => (EQUIPMENT.KIT[id] || {}).label || id) : [];
+}
+function kitForDay(names) {
+  return EQUIPMENT ? EQUIPMENT.kitForSession(names) : [];
+}
 
 /* Every exercise across every training, flattened once. Names use hyphens ("Push-Up") but
    people type spaces ("push up"), so both the query and each candidate name are normalized to
@@ -7036,6 +7087,18 @@ function gainOutlook(currentLb, goalLb) {
 
    Replaces the pace step for weight goals. Steady, quicker and gentle were
    always 12, 8 and 16 weeks regardless of what anyone was actually chasing. */
+/* Weeks in the words the person was offered them in. Shared by the chips and
+   by the plan screen that confirms the chip they tapped: picking "7 months" and
+   being told "30 weeks" on the very next screen is the same number twice and
+   reads as two different answers. Under nine weeks stays weeks, because "2
+   months" for seven weeks is rounding away most of a month. */
+function durationLabel(weeks) {
+  if (!weeks) return "";
+  if (weeks < 9) return `${weeks} weeks`;
+  const months = Math.round(weeks / 4.345);
+  return months === 1 ? "1 month" : `${months} months`;
+}
+
 function lossTimelines(currentLb, goalLb) {
   const amount = (currentLb || 0) - (goalLb || 0);
   if (!currentLb || !goalLb || amount <= 0) return [];
@@ -7054,8 +7117,7 @@ function lossTimelines(currentLb, goalLb) {
   ]) {
     const perWeek = rate(o.pct);
     const weeks = Math.max(1, Math.round(amount / perWeek));
-    const label = weeks < 9 ? `${weeks} weeks`
-      : (Math.round(weeks / 4.345) === 1 ? "1 month" : `${Math.round(weeks / 4.345)} months`);
+    const label = durationLabel(weeks);
     /* Small amounts collapse two bands onto the same rounded label. Showing
        "3 weeks" twice reads as a bug, so the recommended one wins the slot. */
     const clash = out.findIndex((x) => x.label === label);
@@ -7196,7 +7258,13 @@ function renderGoalTilesStep(data = {}) {
       const tile = goalTileFor(bubble);
       const next = { ...data, goalKey: tile.legacy, goal_bubble: bubble, goal_child: child, goalLabel: label, goal_secondary: secondary };
       if (tile.askTarget) renderOnboardStep("target", next);
-      else renderOnboardStep("pace", { ...next, detail: child ? label : null });
+      /* Straight to the plan. The step that used to sit here asked "how fast?"
+         and offered 12, 8 or 16 weeks, of goals that have no weeks in them:
+         there is no such thing as getting to Move better quicker, and the
+         answer was written to a deadline nothing reads. A duration is only a
+         real question when there is a number to arrive at, so it is asked on
+         the target step, of the two goals that ask for one, and nowhere else. */
+      else renderOnboardStep("plan", { ...next, detail: child ? label : null });
     },
   });
   $("goalBackBtn").onclick = () => renderOnboardStep("name", data);
@@ -7392,7 +7460,18 @@ function renderGoalPage() {
         goal_bubble: bubble, goal_child: child, goal_secondary: secondary || [],
         updated_at: new Date().toISOString(),
       };
-      if (child) patch.goal_detail = label;
+      /* goal_detail is ALWAYS in this write now. It used to be set only when a
+         child was picked, which since the sub-goals went is never, so the
+         sentence stayed on the profile forever while the goal above it
+         changed. mapGoal parses it unconditionally, so "lose 30 lbs by June"
+         survived a switch to Build muscle and came back as a 52 week gain.
+
+         A sentence written for a goal belongs to that goal. Changing the main
+         goal clears it; keeping the same goal keeps it, so the free text
+         somebody typed on the Training page is not wiped by a visit here. */
+      patch.goal_detail = child ? label
+        : bubble === MY_PROFILE?.goal_bubble ? (MY_PROFILE?.goal_detail || null)
+        : null;
       const { error, droppedSecondary } = await upsertGoalFields(patch);
       if (error) { toast("Could not save the goal"); console.error(error); return; }
       await loadAll();
@@ -8425,7 +8504,32 @@ function renderOnboardStep(step, data = {}) {
         return;
       }
 
-      const floor = healthyFloorLb(readHeight());
+      const heightIn = readHeight();
+      const floor = healthyFloorLb(heightIn);
+      /* The floor was skippable, and skipping it was one blank field away: no
+         height, no BMI, no warning, full coaching toward any number at all.
+         A floor with a bypass that obvious is not a floor.
+
+         It is not fixed by inventing a height. There is no honest number to
+         assume, and a clinical line drawn through a guess is worse than no
+         line. So the app says the true thing instead: without a height it
+         cannot check the target, and it will not project toward a target it
+         could not check. weightGoalWithheld enforces exactly this downstream,
+         so the sentence is a promise the app keeps.
+
+         Only for a loss. A target above what they weigh now cannot be
+         underweight, so a gain keeps its projection with no height on file. */
+      const needHeight = !!(cur && goalLb && goalLb < cur && !heightIn);
+      if (needHeight) {
+        box.className = "ob-real care";
+        box.innerHTML = `<b>Add your height and we will check this is a safe target.</b>
+          Without it we will still log every weigh-in, but we will not draw the goal line or project a date
+          toward ${escapeHtml(String(goalLb))} pounds, because we have no way to tell whether getting there
+          is a good idea.`;
+        /* Advisory, not a gate. The durations under it are true whatever the
+           height is, and hiding the only content on the screen to make a point
+           would be the app sulking. */
+      }
       if (goalLb && floor && goalLb < floor) {
         box.className = "ob-real care";
         box.innerHTML = `<b>We will track it, but we will not coach toward it.</b>
@@ -8436,7 +8540,7 @@ function renderOnboardStep(step, data = {}) {
         hide();
         return;
       }
-      box.className = "ob-real hidden"; box.innerHTML = "";
+      if (!needHeight) { box.className = "ob-real hidden"; box.innerHTML = ""; }
 
       const opts = lossTimelines(cur, goalLb);
       if (!opts.length) { hide(); return; }
@@ -8459,7 +8563,6 @@ function renderOnboardStep(step, data = {}) {
       const cur = parseFloat($("obLb").value) || null;
       const goalLb = skip ? null : parseFloat($("obGoalLb").value) || null;
       const heightIn = readHeight();
-      const floor = healthyFloorLb(heightIn);
       const losing = !!(cur && goalLb && goalLb < cur);
       const chosen = losing ? lossTimelines(cur, goalLb).find((o) => o.key === picked) : null;
       const outlook = cur && goalLb && goalLb > cur ? gainOutlook(cur, goalLb) : null;
@@ -8471,8 +8574,18 @@ function renderOnboardStep(step, data = {}) {
         goal_weight_lb: goalLb,
         goal_by_date: weeks ? isoDate(new Date(Date.now() + weeks * 604800000)) : null,
         weeks,
-        pace: chosen ? chosen.key : "steady",
-        goal_withhold: !!(losing && goalLb && floor && goalLb < floor),
+        /* Null when they chose nothing, and that stays null all the way to the
+           row. It used to default to "steady", which put a pace on the plan
+           screen and in the database that nobody had agreed to, and read
+           identically to one they had. A gaining goal has a duration and no
+           pace, because the rate is not theirs to pick.
+
+           goal_withhold was computed here and read by nothing. It is gone
+           rather than wired up: weightGoalWithheld already derives the same
+           answer from target_value and height_in, both already on file, and a
+           derived answer corrects itself when somebody fixes their height
+           later where a stored flag would go stale. */
+        pace: chosen ? chosen.key : null,
       });
     };
     $("targetNext").onclick = () => go(false);
@@ -8481,45 +8594,42 @@ function renderOnboardStep(step, data = {}) {
     return;
   }
 
-  if (step === "pace") {
-    ob.innerHTML = `
-      <div class="ob-step">
-        <h1>How fast?</h1>
-        <p class="sub">Steady is the one we would pick. Nothing here is a crash plan.</p>
-        <div class="ob-paces">
-          ${PACE.map((p) => `
-            <button type="button" class="ob-pace ${p.key === "steady" ? "rec" : ""}" data-pace="${p.key}">
-              <span class="ob-pace-top"><strong>${escapeHtml(p.label)}</strong><span>${p.weeks} weeks</span></span>
-              <span class="ob-pace-note">${escapeHtml(p.note)}</span>
-            </button>`).join("")}
-        </div>
-        <button class="btn-ghost" id="paceBackBtn">Back</button>
-      </div>`;
-    ob.querySelectorAll("[data-pace]").forEach((b) => {
-      b.onclick = () => renderOnboardStep("plan", { ...data, pace: b.dataset.pace });
-    });
-    /* Back has to land wherever this step was actually reached from, and only
-       the goal-weight screen sits between the tiles and here. */
-    const tile = goalTileFor(data.goal_bubble);
-    $("paceBackBtn").onclick = () => renderOnboardStep(tile?.askTarget ? "target" : "goal", data);
-    return;
-  }
+  /* The "How fast?" step used to sit here, between the goal and the plan. It
+     offered Steady, Quicker and Gentle at 12, 8 and 16 weeks, and it was asked
+     of every goal that is not a weight: there is no quicker route to Move
+     better, and the answer was written to a deadline nothing reads. A duration
+     is a real question only where there is a number to arrive at, so the
+     target step asks it, of the two goals that ask for a number, out of the
+     amount they actually typed. */
 
   if (step === "plan") {
-    const g = GOALS.find((x) => x.key === data.goalKey);
-    const p = PACE.find((x) => x.key === data.pace) || PACE[0];
+    const g = GOALS.find((x) => x.key === data.goalKey) || GOALS[GOALS.length - 1];
+    /* Both of these come from what the person did on the previous screen, and
+       both can honestly be nothing. The screen used to read them off PACE,
+       which meant a goal with no pace at all still announced "for 12 weeks,
+       Pace Steady", and somebody who had just chosen 7 months was told 12
+       weeks on the very next screen. */
+    const chosenPace = PACE.find((x) => x.key === data.pace) || null;
+    const weeks = Number.isFinite(data.weeks) && data.weeks > 0 ? data.weeks : null;
     const days = g.days;
+    const durationRow = chosenPace && weeks
+      ? `<div class="ob-row"><span>Pace</span><b>${escapeHtml(chosenPace.label)}, ${escapeHtml(durationLabel(weeks))}</b></div>`
+      : weeks
+        /* A gain has a duration and no pace, because nobody gets to choose the
+           rate muscle arrives at. Saying "about" is the honest half of that. */
+        ? `<div class="ob-row"><span>Timeline</span><b>about ${escapeHtml(durationLabel(weeks))}</b></div>`
+        : "";
     ob.innerHTML = `
       <div class="ob-step">
         <div class="ob-kicker">YOUR PLAN</div>
-        <h1>${days} days a week, for ${p.weeks} weeks</h1>
+        <h1>${days} days a week${chosenPace && weeks ? `, for ${escapeHtml(durationLabel(weeks))}` : ""}</h1>
         <p class="sub">Built for <strong>${escapeHtml(g.label.toLowerCase())}</strong>${data.detail ? `, ${escapeHtml(data.detail.toLowerCase())}` : ""}.
           We will pick each session for you. Change any of it later in Setup.</p>
         <div class="ob-summary">
           <div class="ob-row"><span>Goal</span><b>${escapeHtml(data.goalLabel || g.goal)}</b></div>
           <div class="ob-row"><span>Training days</span><b>${days} per week</b></div>
           <div class="ob-row"><span>Focus</span><b>${escapeHtml(g.focus)}</b></div>
-          <div class="ob-row"><span>Pace</span><b>${escapeHtml(p.label)}, ${p.weeks} weeks</b></div>
+          ${durationRow}
         </div>
         <p class="sub" style="margin:18px 0 0;"><strong>About how long per session?</strong></p>
         <div class="rest-pref five" id="obSessionLen"></div>
@@ -8532,28 +8642,52 @@ function renderOnboardStep(step, data = {}) {
        is only knowable once the goal is picked, and lighting the wrong chip is
        worse than asking a step later. Tapping nothing sends nothing. */
     paintObSessionLengths(data);
-    $("startBtn").onclick = () => finishOnboarding({
-      name: data.name,
-      goal: g.goal,
-      goal_bubble: data.goal_bubble || null,
-      goal_child: data.goal_child || null,
-      goal_secondary: data.goal_secondary || [],
-      goal_detail: data.detail || null,
-      focus: g.focus,
-      challenge_target: days,
-      /* The pace was being shown on this screen and then dropped. It is the
-         only deadline the user ever agrees to, so it has to survive. */
-      goal_key: g.key,
-      pace: p.key,
-      weeks: p.weeks,
-      days_per_week: days,
-      /* null unless they tapped one. The engine treats null, 0 and nonsense
-         identically to never having been asked, and that is the guarantee that
-         keeps every plan built before this question existed exactly as it was,
-         so a default must never be written here. */
-      session_minutes: Number.isFinite(data.session_minutes) ? data.session_minutes : null,
-    });
-    $("backBtn").onclick = () => renderOnboardStep("pace", data);   // one step back, not all the way to goal
+    /* This used to be a fresh object literal, and everything the target step
+       had just collected was not in it: the goal weight, the current weight,
+       the height, the date and the duration were all typed, carried three
+       screens, and dropped on the floor here. That is why user_goals rows had
+       no metric, no start_value and no target_value, and why weightGoalFor
+       returned null for every account ever created, which took the goal line,
+       the Goal figure and the projection off the chart for everybody.
+       Everything on the screen behind this button now reaches the write. */
+    $("startBtn").onclick = () => {
+      /* One row, one tap. Two taps used to retire nothing and insert twice,
+         which in production races the one-active partial unique index and in
+         the sandbox simply leaves two active goals. Disabled rather than
+         debounced so the screen says what happened. */
+      const btn = $("startBtn");
+      if (btn.disabled) return;
+      btn.disabled = true;
+      finishOnboarding({
+        name: data.name,
+        goal: g.goal,
+        goal_bubble: data.goal_bubble || null,
+        goal_child: data.goal_child || null,
+        goal_secondary: data.goal_secondary || [],
+        goal_detail: data.detail || null,
+        focus: g.focus,
+        challenge_target: days,
+        goal_key: g.key,
+        height_in: data.height_in || null,
+        /* The two numbers that turn on every goal-driven surface there is. */
+        weight_lb: data.weight_lb || null,
+        goal_weight_lb: data.goal_weight_lb || null,
+        goal_by_date: data.goal_by_date || null,
+        /* The only deadline the user ever agrees to, as they set it, not as a
+           pace chip they were never shown would have set it. */
+        pace: chosenPace ? chosenPace.key : null,
+        weeks,
+        days_per_week: days,
+        /* null unless they tapped one. The engine treats null, 0 and nonsense
+           identically to never having been asked, and that is the guarantee that
+           keeps every plan built before this question existed exactly as it was,
+           so a default must never be written here. */
+        session_minutes: Number.isFinite(data.session_minutes) ? data.session_minutes : null,
+      }).then((ok) => { if (!ok) btn.disabled = false; })
+        .catch((err) => { console.error(err); btn.disabled = false; toast("Setup failed, try again"); });
+    };
+    /* One step back, to whichever screen was actually in front of this one. */
+    $("backBtn").onclick = () => renderOnboardStep(goalTileFor(data.goal_bubble)?.askTarget ? "target" : "goal", data);
     return;
   }
 }
@@ -8579,11 +8713,14 @@ async function paintObSessionLengths(data) {
 
 async function finishOnboarding(data) {
   ME = data.name;
-  /* Height and weight ARE asked up front now, on the stats step before the
-     goal, which is what lets the goal step ask "you are at 210, where do you
-     want to get to" instead of offering bands. Both are skippable, and the
-     engine uses bodyWeightLb for starting loads on every goal, not just the
-     weight ones. */
+  /* Height and weight are asked on the goal weight screen, the one step that
+     wants a number, rather than as a stats interrogation before anything is
+     relevant. Both are skippable, and the engine uses a body weight for
+     starting loads on every goal, not just the weight ones, which is why the
+     weigh-in below is written for anybody who typed one.
+
+     Returns true when the account is set up, so the Start button knows whether
+     it is safe to let go of itself. */
   /* Through upsertGoalFields, not straight at the table: goal_secondary is
      behind an unapplied migration, and a first-run setup must not fail on a
      column that does not exist yet. */
@@ -8604,31 +8741,42 @@ async function finishOnboarding(data) {
     challenge_target: data.challenge_target || 4,
     updated_at: new Date().toISOString(),
   });
-  if (error) { toast("Setup failed, try again"); console.error(error); return; }
+  if (error) { toast("Setup failed, try again"); console.error(error); return false; }
   if (droppedSecondary && (data.goal_secondary || []).length) toast("Your extra goals are not being stored yet.");
   if (droppedSession) toast("Your session length is not being stored yet.");
   MY_PROFILE = saved;
   clearObDraft();
+  /* The weight they just typed, logged as what it is: a weigh-in. It is the
+     start of the chart, it is the start_value the projection measures against,
+     and it is the only body weight the engine has on day one, without which
+     CONTRACT.md (a) says there are no starting weights at all and the plan
+     says so in meta.missing. Same shape and same conflict key as
+     saveScaleEntry, so a weigh-in logged later today replaces it rather than
+     colliding with it. */
+  if (data.weight_lb) {
+    await safeWrite("fit_entries", "upsert", {
+      user_name: ME, email: MY_EMAIL, entry_date: todayStr(), weight: data.weight_lb,
+      gym: false, sessions: 0, proof_path: null, rest_day: false, note: null, workout_at: null,
+    }, { onConflict: "email,entry_date" });
+  }
   if (data.goal_key) await setActiveGoal(data);
   applyAccentColors();
   await checkPartnershipThenEnter();
+  return true;
 }
 
 /* One active goal per person. Setting a new one retires the old rather than
    deleting it, so we keep a record of what someone has actually chased.
 
-   `metric`, `start_value` and `target_value` are finally written, for weight
-   goals, now that the stats step asks for a current weight before the goal
-   step. They were left null for as long as there was nothing honest to
-   snapshot. Filling them is what turns on the goal line on the weight chart,
-   the Goal figure in the stat row and the "at this rate you reach 160 around
-   the 12th" projection, all of which were built against target_value and have
-   never once rendered, because weightGoalFor() has returned null for every
-   user since the day it was written. */
+   `metric`, `start_value` and `target_value` are written for weight goals,
+   off the two numbers the target step asks for. This function has been able to
+   write them since it was written; what it never got handed was the numbers,
+   because the Start button built a fresh object without them in it. So
+   weightGoalFor() returned null for every account ever created, and the goal
+   line on the weight chart, the Goal figure in the stat row and the "at this
+   rate you reach 160 around the 12th" projection were all built against
+   target_value and never once drawn. They draw now. */
 async function setActiveGoal(data) {
-  const target = new Date();
-  target.setDate(target.getDate() + (data.weeks || 12) * 7);
-
   /* Retire the previous goal rather than deleting it, so we keep a record of
      what someone has actually chased. A partial unique index enforces one
      active goal, so this has to happen before the insert. safeWrite is no help
@@ -8642,10 +8790,14 @@ async function setActiveGoal(data) {
     email: MY_EMAIL,
     goal_key: data.goal_key,
     detail: data.goal_detail || null,
-    pace: data.pace || "steady",
-    /* Their date when they gave one, since a date they chose beats a date we
-       derived from a pace chip they never saw. */
-    target_date: data.goal_by_date || isoDate(target),
+    /* Both null when nothing was chosen, and neither is defaulted. A pace of
+       "steady" and a date twelve weeks out used to be written for goals that
+       were never asked either question, which reads back exactly like a
+       deadline somebody agreed to. The column is nullable for this reason and
+       the check constraint only allows steady, quick and easy, so a made-up
+       value is the one thing that cannot go here. */
+    pace: data.pace || null,
+    target_date: data.goal_by_date || null,
     days_per_week: data.days_per_week || 4,
     status: "active",
     ...(data.goal_weight_lb ? {
@@ -13128,6 +13280,16 @@ function weightGoalWithheld(email, goal) {
   if (!g || g.metric !== "weight_lb" || g.target_value == null) return false;
   const isMe = (email || "").toLowerCase() === (MY_EMAIL || "").toLowerCase();
   const heightIn = (isMe ? MY_PROFILE : PARTNER_PROFILE)?.height_in;
+  /* No height, no check, and a check that can be switched off by leaving a
+     field blank was never a floor. This is the only honest reading of an
+     unchecked loss target: the app does not know whether it is safe, so it
+     does not drive toward it. The target step says exactly this while the
+     height field is still on screen, and filling it in turns everything back
+     on, which is the whole reason this is derived and not stored.
+
+     A gain is exempt. A target above what they weigh now cannot be below a
+     healthy weight, so there is nothing a height would tell us. */
+  if (!heightIn) return g.start_value != null && g.target_value < g.start_value;
   const floor = healthyFloorLb(heightIn);
   return !!(floor && g.target_value < floor);
 }
@@ -16445,6 +16607,11 @@ function renderSession() {
           <button type="button" class="sess-more" id="sessMoreBtn" aria-haspopup="dialog"
             aria-label="Options for ${escapeHtml(ex.name)}">${icon("more", 22)}</button>
         </div>
+        ${/* Standing at the rack, the question is not "what is this called",
+              it is "which machine, which attachment, what angle". This is the
+              one place that answers all three, because it is the one place
+              where you are about to do it. */ ""}
+        ${kitFor(ex.name) ? `<div class="sess-kit">${escapeHtml(kitFor(ex.name))}</div>` : ""}
       </div>
 
       <div class="sess-stage${resting ? " resting" : ""}" id="sessStage">
@@ -18137,6 +18304,10 @@ function planFromToday() {
 
   return {
     real: true,
+    /* The kit the plan actually calls for, read off the exercises on it. The
+       `equipment` line below is the old guess from recently logged names and
+       stays only as the fallback for the moment before the table loads. */
+    kit: kitForDay(list.map((ex) => ex.name)),
     focus: displayFocus(TODAY_WORKOUT.focus, list),
     match: md.match,
     muscles: md.muscles,
@@ -18536,7 +18707,10 @@ function renderChooseScreen() {
         <div class="spp-grid">
           ${p.duration ? `<div class="spp-fact"><div class="k">Duration</div><div class="v">${escapeHtml(p.duration)}</div></div>` : ""}
           <div class="spp-fact"><div class="k">Exercises</div><div class="v">${p.count}</div></div>
-          ${p.equipment ? `<div class="spp-fact wide"><div class="k">Equipment</div><div class="v">${escapeHtml(p.equipment)}</div></div>` : ""}
+          ${p.kit && p.kit.length ? `<div class="spp-fact wide">
+            <div class="k">What you need</div>
+            <div class="spp-chips">${p.kit.map((k) => `<span class="spp-chip${k.group === "machine" ? " spp-chip-kit" : ""}">${escapeHtml(k.label)}</span>`).join("")}</div>
+          </div>` : p.equipment ? `<div class="spp-fact wide"><div class="k">Equipment</div><div class="v">${escapeHtml(p.equipment)}</div></div>` : ""}
           <div class="spp-fact wide">
             <div class="k">Target muscles</div>
             <div class="spp-chips">${p.targets.map((t) => `<span class="spp-chip">${escapeHtml(t)}</span>`).join("")}</div>
@@ -20061,6 +20235,11 @@ function renderPlanPreview() {
       <button type="button" class="ex-body ex-tap" data-plan-edit="${i}"${isDone ? " disabled" : ""}>
         <div class="ex-name">${escapeHtml(ex.name)}</div>
         <div class="ex-target">${ex.sets} sets · ${ex.reps} reps${Number(ex.targetWeight) > 0 ? ` · ${ex.targetWeight} lb` : ""}${isDone ? "" : ` ${icon("pencil", 11)}`}</div>
+        ${/* What to walk to. Only the things to fetch, no setup detail: the
+              bench angle matters when you are standing at the bench, not when
+              you are reading the list. Bodyweight says nothing, because
+              "nothing needed" is not worth a line on every row. */ ""}
+        ${!isDone && kitNamesFor(ex.name).length ? `<div class="ex-kit"><span>${escapeHtml(kitNamesFor(ex.name).join(" · "))}</span></div>` : ""}
         ${ramp ? `<div class="ex-ramp">${icon("flame", 11)}<span>Ramp ${escapeHtml(rampLoadsLine(ramp))}</span></div>` : ""}
         ${ex.note ? `<div class="ex-note">${escapeHtml(humanizeNoteDates(ex.note))}</div>` : ""}
       </button>
@@ -21630,12 +21809,47 @@ const PROGRESS_CARDS = [
    Profiles saved before the bubbles existed carry only the legacy `goal`
    string, so that falls through the same table at the bottom. */
 function headlineKindFor(profile) {
-  /* The four goal_child tests that used to sit here are gone with the
-     sub-goals. goal_child is null on every profile written since, and the old
-     ones it still matched resolved to the same kind their bubble gives anyway. */
+  /* These seven are stored data, not dead code. The commit that dropped the
+     sub-goals deleted the tests for them on the grounds that they "resolved to
+     the same kind their bubble gives anyway", and that was not true of one of
+     them: every one of these seven changed the reading, and two of the changes
+     are readings the file argues against in its own words a screen above.
+     goal_child is null on everything written since, so this costs a profile
+     written today nothing at all, and it is the difference between a right and
+     a wrong answer for everyone who picked one while they were on offer.
+
+     Order matters: the child is more specific than the bubble it hangs under,
+     so it is read first. */
+  switch (profile?.goal_child || "") {
+    /* Leading a recomp with the scale is wrong ON PURPOSE, it says so under
+       GOAL_CARDS: the whole claim of the goal is that the number does not
+       move much, so opening with the number is telling them they failed. */
+    case "lose-and-build": case "build-skinny-fat": return "recomp";
+    /* "Gain weight". The one child of Build muscle whose own measure is the
+       scale rather than the tonnage. */
+    case "build-overall": return "scale";
+    /* The reps headline and bestRepsFor are reachable only from here. Nothing
+       in the live picker asks for a first pull-up, so rather than delete the
+       one card that measures the goal properly, it stays for the accounts that
+       already carry it: a pull-up carries no load, so volume, strength and the
+       scale all read it as nothing happening. */
+    case "first-pullup": case "first-pushup": return "reps";
+    case "run-5k": case "faster-mile": return "endurance";
+  }
   switch (profile?.goal_bubble || "") {
     case "lose-weight":   return "scale";
-    case "build-muscle":  return "volume";
+    /* Build muscle can carry a goal weight now, and a target ABOVE where they
+       started is the live goal set's way of saying "gain weight": it is the
+       same answer build-overall used to give, asked for with a number instead
+       of a sub-goal. Without a weight target the measure is the work done, so
+       tonnage stays the default. A target below the start is a recomp being
+       run under the Build muscle tile, and the scale is the wrong lead for
+       that one for the same reason it is wrong for tone-lean-abs. */
+    case "build-muscle": {
+      const wg = weightGoalFor(profile?.email);
+      if (!wg || wg.start_value == null) return "volume";
+      return wg.target_value > wg.start_value ? "scale" : "recomp";
+    }
     case "get-stronger":  return "lift";
     case "tone-lean-abs": return "recomp";
     case "build-endurance": return "endurance";
@@ -22788,6 +23002,11 @@ function trainingSummary() {
 }
 
 function paintSettingsValues() {
+  /* The Goal row's only writer used to be closeSettingsPage, so the row read
+     "Not set" from the moment the tab opened until you had been into a subpage
+     and back out of it, on an account with a goal. It belongs here with every
+     other row that states its own answer. */
+  settingsValue("setGoalSub", goalTileLabel(MY_PROFILE));
   settingsValue("setTrainingSub", trainingSummary());
   settingsValue("setStatsSub", bodyStatsSummary());
   settingsValue("setProfileSub", ME || "");

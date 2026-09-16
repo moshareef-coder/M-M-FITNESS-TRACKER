@@ -183,14 +183,15 @@ function fromProps(move) {
 
 const base = (src) => String(src || "").split("/").pop();
 
-// Names the library uses that the props cannot know about, because the drawing
-// does not show them: an EZ bar reads as a bar, a Smith machine as a rack.
+/* Names the library uses that the props cannot know about, because the drawing
+   does not show them: an EZ bar reads as a bar, a Smith machine as a rack.
+   A bench press is NOT on this list: its bar comes off the bench's own
+   uprights, and naming a rack would send somebody across the gym. */
 const NAME_KIT = [
   [/^EZ-Bar/, ["ez-bar"], ["barbell"]],
   [/^Preacher Curl$/, ["ez-bar"], ["barbell"]],
   [/Smith/, ["smith-machine"], []],
   [/^Barbell Back Squat$|^Front Squat$|^Zercher Squat$|^Good Morning$/, ["rack"], []],
-  [/^Barbell Bench Press$|^Incline Barbell Press$|^Decline Barbell Press$|^Close-Grip Bench Press$/, ["rack"], []],
 ];
 
 /* Setup notes the props cannot carry. The lat pulldown's bar is drawn narrow
@@ -290,13 +291,49 @@ export const EQUIPMENT = {
 ${lines.join("\n")}
 };
 
+/* People and plans do not always use the library's full name: a plan can say
+   "Bench Press" where the library says "Barbell Bench Press", and somebody
+   typing their own exercise will write "bench press" or "Bench press".
+   So: exact name, then the same name ignoring case and punctuation, then the
+   ONE library name that ends with it. Ends with, not contains, because
+   "Bench Press" is a bench press with a bar on it, while "Squat" could be six
+   different lifts and a wrong machine is worse than no line at all. */
+const NORM = new Map();
+for (const n of Object.keys(EQUIPMENT)) {
+  const k = n.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (!NORM.has(k)) NORM.set(k, n);
+}
+export function resolveName(name) {
+  if (!name) return null;
+  if (EQUIPMENT[name]) return name;
+  const k = String(name).toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (!k) return null;
+  if (NORM.has(k)) return NORM.get(k);
+  const hits = [];
+  for (const [nk, full] of NORM) if (nk.endsWith(k)) hits.push(full);
+  if (hits.length === 1) return hits[0];
+  /* Several matched. A gym settles this the same way every time: the
+     unqualified name means the barbell one. "Bench press" is the barbell
+     bench press, "row" is the barbell row, and anything else gets said out
+     loud ("dumbbell row"). So one barbell candidate wins; no barbell
+     candidate, or two, and we say nothing rather than name the wrong kit. */
+  const words = String(name).trim().split(" ").filter(Boolean).length;
+  if (words < 2) return null;      // "Press" is not a lift, it is half of one
+  const barbell = hits.filter((n) => n.startsWith("Barbell "));
+  return barbell.length === 1 ? barbell[0] : null;
+}
+export function kitOf(name) {
+  const key = resolveName(name);
+  return key ? EQUIPMENT[key] : null;
+}
+
 /* Everything one session needs, biggest thing first, deduplicated, with the
    exercises that want each so a card can say why. */
 export function kitForSession(names = []) {
   const order = ${JSON.stringify(order)};
   const by = new Map();
   for (const name of names) {
-    for (const id of (EQUIPMENT[name] || {}).kit || []) {
+    for (const id of (kitOf(name) || {}).kit || []) {
       if (!by.has(id)) by.set(id, []);
       by.get(id).push(name);
     }
@@ -314,7 +351,7 @@ export function kitForSession(names = []) {
 
 /* One line for a card: "Cable machine, rope attachment" or "Bodyweight". */
 export function kitLine(name) {
-  const r = EQUIPMENT[name];
+  const r = kitOf(name);
   if (!r) return "";
   const labels = (r.kit || []).map((id) => (KIT[id] || {}).label || id);
   const all = labels.concat(r.setup || []);
