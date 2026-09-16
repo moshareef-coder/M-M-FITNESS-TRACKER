@@ -7134,7 +7134,7 @@ function renderGoalPage() {
       const tile = goalTileFor(bubble);
       const legacy = GOALS.find((g) => g.key === tile.legacy);
       /* Upsert on the email key, the way every other profile write here is
-         done (saveSetup, saveFocusGroups), rather than update().eq(): one
+         done (commitProfile, saveFocusGroups), rather than update().eq(): one
          write path, and it is the one the sandbox's fake client persists.
          All four goal fields go in one write, so no reader ever sees a legacy
          string that disagrees with the ids next to it. */
@@ -7378,7 +7378,7 @@ async function saveBodyFocus() {
 
 /* The one writer for profiles.focus_groups, because two screens offer it now:
    this page, and the shortcut on a muscle in Body impact. Same upsert shape as
-   saveSetup, and focus_chosen_at goes with every write because the engine
+   commitProfile, and focus_chosen_at goes with every write because the engine
    reports a choice older than 60 days as stale rather than trusting it forever.
    Callers do their own toast: what they just did is not the same sentence.
 
@@ -8450,8 +8450,8 @@ function showApp() {
     try { await navigator.clipboard.writeText(text); toast("Invite copied"); }
     catch { toast(`Your code is ${code}`); }
   });
-  $("saveSetupBtn").addEventListener("click", saveSetup);
-  $("saveBodyBtn").addEventListener("click", saveSetup);
+  $("saveSetupBtn").addEventListener("click", saveTrainingPrefs);
+  $("saveBodyBtn").addEventListener("click", saveBodyStats);
   $("adminGiveXpBtn").addEventListener("click", adminGiveXp);
   $("adminAddEntryBtn").addEventListener("click", adminAddEntry);
   $("adminAddExBtn").addEventListener("click", adminAddExercise);
@@ -22704,32 +22704,51 @@ function clampNum(raw, lo, hi, fallback = null) {
   return Math.min(hi, Math.max(lo, n));
 }
 
-async function saveSetup() {
-  const feetRaw = parseInt($("setupHeightFt").value, 10);
-  // A blank or zero feet field is "not set", not "three feet tall".
-  const feet = Number.isFinite(feetRaw) && feetRaw > 0 ? Math.min(8, Math.max(3, feetRaw)) : 0;
-  const inches = clampNum($("setupHeightIn").value, 0, 11, 0);
-  const payload = {
-    email: MY_EMAIL,
-    user_name: ME,
-    /* The goal itself is not here any more. It is one tap away on the goal
-       page, which writes goal, goal_bubble and goal_child together. Saving
-       preferences must never touch it: the old dropdown held five strings the
-       tiles do not all produce, so a profile set to "Stay consistent" opened
-       Training reading "Lose weight" and one Save wrote that over it. */
+/* One Save button writes one page.
+
+   This used to be a single saveSetup() bound to BOTH the Training and the Your
+   Body buttons, writing a payload that covered every field on both pages plus
+   the theme and the share toggle. Anything the current screen did not own was
+   read off the DOM anyway, which is fine while every control has been rendered
+   and wrong the moment one has not.
+
+   Share details is exactly that control. It lives in a card that is hidden
+   until you have a partner, so on a solo account renderSetupTab never sets it
+   and the checkbox sits at its markup default of unchecked. Saving your height
+   then wrote share_workout_details:false over a profile that held true, and
+   the first thing the person saw after finally pairing was their workouts
+   hidden by a choice they never made. Proved in the sandbox on the solo
+   scenario: true going in, false coming out, without the card ever being
+   visible.
+
+   So: neither saver touches share_workout_details or theme. Both of those
+   already write themselves the moment they are flipped, which is what a
+   control with no Save button next to it has to do. */
+async function commitProfile(payload, { toastText }) {
+  const { error } = await sb.from("profiles")
+    .upsert({ email: MY_EMAIL, user_name: ME, updated_at: new Date().toISOString(), ...payload });
+  if (error) { toast("Could not save"); console.error(error); return false; }
+  const { data } = await sb.from("profiles").select("*").eq("email", MY_EMAIL).maybeSingle();
+  if (data) MY_PROFILE = data;
+  toast(toastText);
+  return true;
+}
+
+/* Setup > Training. Owns the goal note, the weekly target and stretching.
+   Rest length, session length and the coach's voice all save on the tap and
+   are not read here. */
+async function saveTrainingPrefs() {
+  const ok = await commitProfile({
+    /* The goal itself is not here. It is one tap away on the goal page, which
+       writes goal, goal_bubble and goal_child together. Saving preferences
+       must never touch it: the old dropdown held five strings the tiles do not
+       all produce, so a profile set to "Stay consistent" opened Training
+       reading "Lose weight" and one Save wrote that over it. */
     goal_detail: $("setupGoalDetail").value.trim() || null,
     challenge_target: clampNum($("setupChallengeTarget").value, 1, 7, 4),
-    sex: $("setupSex").value || null,
-    age: clampNum($("setupAge").value, 13, 100),
-    height_in: (feet || inches) ? feet * 12 + inches : null,
-    activity_level: $("setupActivity").value || null,
-    theme: SETUP_THEME || "dark",
-    share_workout_details: $("shareDetailsToggle").checked,
     skip_stretching: $("skipStretchToggle").checked,
-    updated_at: new Date().toISOString(),
-  };
-  const { error } = await sb.from("profiles").upsert(payload);
-  if (error) { toast("Could not save"); console.error(error); return; }
+  }, { toastText: "Training saved" });
+  if (!ok) return;
 
   if (MY_PARTNERSHIP) {
     const sharedOn = $("sharedGoalToggle").checked;
@@ -22740,12 +22759,23 @@ async function saveSetup() {
     if (pErr) { toast("Could not save the shared goal"); console.error(pErr); }
     else MY_PARTNERSHIP.shared_weekly_goal = sharedVal;
   }
+  renderHome();
+}
 
-  toast("Preferences saved");
-  localStorage.setItem(THEME_KEY, payload.theme);
-  const { data } = await sb.from("profiles").select("*").eq("email", MY_EMAIL).maybeSingle();
-  MY_PROFILE = data;
-  applyAccentColors();
+/* Setup > Your body. Owns the four numbers the calorie and load maths reads,
+   and nothing else. */
+async function saveBodyStats() {
+  const feetRaw = parseInt($("setupHeightFt").value, 10);
+  // A blank or zero feet field is "not set", not "three feet tall".
+  const feet = Number.isFinite(feetRaw) && feetRaw > 0 ? Math.min(8, Math.max(3, feetRaw)) : 0;
+  const inches = clampNum($("setupHeightIn").value, 0, 11, 0);
+  const ok = await commitProfile({
+    sex: $("setupSex").value || null,
+    age: clampNum($("setupAge").value, 13, 100),
+    height_in: (feet || inches) ? feet * 12 + inches : null,
+    activity_level: $("setupActivity").value || null,
+  }, { toastText: "Saved" });
+  if (!ok) return;
   renderHome();
 }
 
