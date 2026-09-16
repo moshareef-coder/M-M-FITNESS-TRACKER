@@ -4305,7 +4305,6 @@
   .ph-figure.good b { color: var(--accent-ink); }
   .ph-figure.warn b { color: var(--warn); }
   .ph-line { font-size: 17px; font-weight: 600; line-height: 1.45; }
-  .ph-note { font-size: 14px; color: var(--muted); line-height: 1.5; margin-top: 8px; }
   /* Three tiers of surface, so the tab reads as composed rather than as a
      stack of identical rectangles. The answer is lit like the Home hero, the
      cards the goal asked for carry the ordinary card shadow, and everything
@@ -10813,6 +10812,13 @@ const INFO_TOPICS = {
       "A saved workout is a template, not a booking. It carries no date, so keeping one costs you nothing and commits you to nothing.",
       "Opening one shows the body it works and the exercises in it. From there you can do it today, edit a copy without touching the original, or delete it.",
     ],
+  }),
+  /* The Progress headline's own aside, whatever it happens to be saying about
+     the person on screen right now. Built at tap time off the last render, so
+     it can never disagree with the number above it. */
+  progressNote: () => ({
+    eyebrow: PROGRESS_NOTE?.eyebrow || "What this means",
+    paras: PROGRESS_NOTE?.paras || [],
   }),
   share: () => ({
     eyebrow: "What your partner sees",
@@ -23917,11 +23923,16 @@ function renderProgressEmpty(kind) {
   $("progHeadline").innerHTML =
     emptyState(weightLed ? "trending" : "dumbbell", "Nothing to measure yet",
       weightLed
-        ? "Type your weight in below. One number starts the trend, and a couple of weeks of them makes it readable."
+        ? "Type your weight in below. One number starts the trend."
         : "Log one session and this turns into an answer instead of a question.")
     + (weightLed ? "" : `<button type="button" class="btn-primary" id="progFirstAction">Go to today</button>`);
   if (!weightLed) $("progFirstAction").onclick = () => switchTab("home");
 }
+
+/* What the headline would have printed underneath itself. Held rather than
+   rendered, because the info dot builds its sheet at the moment it is tapped
+   and the reading is recomputed on every render of this tab. */
+let PROGRESS_NOTE = null;
 
 function renderProgressHeadline(kind, name, email, profile, third, sharing) {
   const el = $("progHeadline");
@@ -23931,15 +23942,24 @@ function renderProgressHeadline(kind, name, email, profile, third, sharing) {
     ? goalText ? `${name}: ${goalText}` : `${name}'s progress`
     : goalText ? `Your goal: ${goalText}` : "Where you are";
   const h = progressHeadline(kind, name, email, profile, third);
-  /* No "see the detail" button any more. It used to scroll to the card the
-     number came from, back when the picker could have that card switched off
-     and anywhere on the page. The goal now puts it immediately underneath, and
-     a button that scrolls you one card down is furniture. */
+  /* The note is a paragraph, and a paragraph is what Mo said there is too much
+     of on this tab. It has not been deleted: it is behind the dot at the end of
+     the line, which is this app's own way of saying "there is more if you want
+     it" and is already on Home, on the streak badge and on the Body tab. The
+     answer stays three lines high; the reasoning is one tap away.
+
+     No "see the detail" button either. It used to scroll to the card the number
+     came from, back when the picker could have that card switched off and
+     anywhere on the page. The goal now puts it immediately underneath, and a
+     button that scrolls you one card down is furniture. */
+  PROGRESS_NOTE = h.note ? {
+    eyebrow,
+    paras: [h.note].concat(sharing ? [] : [`${name} keeps the detail of their workouts private, so this is built from the days they trained.`]),
+  } : null;
   el.innerHTML = `
     <div class="ph-eyebrow">${escapeHtml(eyebrow)}</div>
     <div class="ph-figure${h.tone ? " " + h.tone : ""}"><b>${h.value}</b>${h.unit ? `<i>${escapeHtml(h.unit)}</i>` : ""}</div>
-    <div class="ph-line">${h.line}</div>
-    ${h.note ? `<div class="ph-note">${escapeHtml(h.note)}${!sharing ? ` ${escapeHtml(name)} keeps the detail of their workouts private, so this is built from the days they trained.` : ""}</div>` : ""}`;
+    <div class="ph-line">${h.line}${h.note ? " " + infoDot("progressNote", "What this number is built from") : ""}</div>`;
 }
 
 /* ---- Rearranging the Progress tab ----
