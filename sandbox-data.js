@@ -366,6 +366,9 @@
     pairRefused: {
       label: "They turned you down",
       apply: (db) => {
+        // The dismissal is local and per row, so the fixture has to clear it
+        // or the screen only ever shows on the first person to open it.
+        try { localStorage.removeItem("ft_pair_no_seen"); } catch {}
         db.partnerships = [{ id: "p-no", inviter_email: ME, invitee_email: THEM,
           status: "declined", created_at: day(-1) + "T09:00:00Z", responded_at: ago(120) }];
         db.profiles = db.profiles.filter((p) => p.email === ME);
@@ -453,6 +456,15 @@
       then(res, rej) { return settle().then(res, rej); },
     };
     function settle() {
+      /* lock_partnership_parties, the one rule of it a screen can walk into.
+         A sandbox that lets a client write over a declined row would have
+         shown the refused screen's dismissal working when production refuses
+         the write, which is the exact bug this fixture exists to prevent. */
+      if (pending && pending.kind === "update" && table === "partnerships"
+          && pending.patch.status && rows.some((r) => r.status === "declined")) {
+        pending = null;
+        return Promise.resolve({ data: null, error: { message: "a declined request is final" } });
+      }
       if (pending && pending.kind === "update") {
         for (const r of rows) {
           Object.assign(r, pending.patch);
@@ -487,6 +499,14 @@
     const target = DB.profiles.find((p) => String(p.invite_code || "").toUpperCase() === tidy);
     if (!target) return { ok: false, error: "That code does not match anyone" };
     if (low(target.email) === low(ME)) return { ok: false, error: "That is your own code" };
+
+    /* Their no, on the ordered pair, permanent. Checked here and not further
+       down because the order is the migration's: a person who has already been
+       refused is told so before anything else is looked at. */
+    if (pRows().some((r) => r.status === "declined"
+      && low(r.inviter_email) === low(ME) && low(r.invitee_email) === low(target.email)))
+      return { ok: false, blocked: true,
+               error: "You have already asked them. If you both want this, they can type your code instead." };
     if (pRows().some((r) => r.status === "accepted" && (party(r, ME) || party(r, target.email))))
       return { ok: false, error: "One of you already has a partner" };
 
@@ -519,10 +539,13 @@
     if (!accept) { inv.status = "declined"; inv.responded_at = now; return { ok: true, accepted: false }; }
     inv.status = "accepted";
     inv.responded_at = now;
-    // Everything else they were asked stops being an open question.
+    /* Everything else they were asked stops being an open question, as
+       'ended' and never 'declined'. You get one partner, so picking somebody
+       is not a refusal of everyone else, and recorded as one it would bar
+       them from ever asking again off a no that was never said. */
     pRows().forEach((r) => {
       if (r.status === "pending" && r.id !== id && low(r.invitee_email) === low(ME)) {
-        r.status = "declined"; r.responded_at = now;
+        r.status = "ended"; r.responded_at = now;
       }
     });
     return { ok: true, accepted: true, partner_email: low(inv.inviter_email) };
