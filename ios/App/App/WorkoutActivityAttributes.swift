@@ -28,6 +28,10 @@ struct WorkoutAttributes: ActivityAttributes {
         // nothing can change this until the next update, which is why he says
         // one thing per rest instead of chattering.
         var quip: String
+        // What the Lock Screen rolls to when the last set of this lift lands.
+        // The button runs with the app asleep and cannot ask it what is next.
+        var nextExercise: String = ""
+        var nextTotal: Int = 0
     }
 
     var startedAt: Date

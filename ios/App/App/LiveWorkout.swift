@@ -92,7 +92,9 @@ public class LiveWorkout: CAPPlugin, CAPBridgedPlugin {
             paused: call.getBool("paused") ?? false,
             // The full length of a rest, not what is left of this one.
             restSeconds: call.getInt("restTarget") ?? 90,
-            quip: call.getString("quip") ?? ""
+            quip: call.getString("quip") ?? "",
+            nextExercise: call.getString("nextExercise") ?? "",
+            nextTotal: call.getInt("nextTotal") ?? 0
         )
     }
 

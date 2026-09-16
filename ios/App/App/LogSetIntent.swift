@@ -104,13 +104,15 @@ struct LogSetIntent: AppIntent {
         // next one, which is the same rule toggleSet() follows in the app.
         let rested = max(0, now.restSeconds)
         let done = alreadyAdvanced ? now.done : min(now.done + 1, now.total)
+        // The last set of a lift rolls straight on to the next one, the way you
+        // would in the app, rather than parking on a finished exercise with a
+        // button that can no longer do anything.
+        let finishedLift = !alreadyAdvanced && done >= now.total && !now.nextExercise.isEmpty
         let next = WorkoutAttributes.ContentState(
-            exercise: now.exercise,
-            detail: now.total > 0
-                ? "Set \(min(done + 1, now.total)) of \(now.total)"
-                : now.detail,
-            done: done,
-            total: now.total,
+            exercise: finishedLift ? now.nextExercise : now.exercise,
+            detail: now.detail,
+            done: finishedLift ? 0 : done,
+            total: finishedLift ? now.nextTotal : now.total,
             // The rest clock starts on the first update and is left alone by the
             // second, so the countdown does not jump back when the card settles.
             restEndsAt: alreadyAdvanced
@@ -119,7 +121,11 @@ struct LogSetIntent: AppIntent {
             paused: now.paused,
             restSeconds: rested,
             celebrating: celebrating,
-            quip: quip ?? now.quip
+            quip: quip ?? now.quip,
+            // Cleared on the roll: the app sends the real next lift on its next
+            // update, and guessing here would chain the whole workout blind.
+            nextExercise: finishedLift ? "" : now.nextExercise,
+            nextTotal: finishedLift ? 0 : now.nextTotal
         )
         await activity.update(ActivityContent(state: next, staleDate: nil))
     }

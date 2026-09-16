@@ -250,6 +250,20 @@
   .code-input {
     text-transform: uppercase; letter-spacing: 0.16em; font-weight: 700; font-size: 21px !important;
   }
+  /* A pair request, incoming or outgoing. One card each, because up to three
+     can be outstanding at once and two stacked requests must never read as
+     one. Same panel/border as .ob-chip rather than a shadow, so dark mode
+     separates them by surface the way the rest of the app does. */
+  .pair-req {
+    width: 100%; padding: 16px 18px; border-radius: 14px; margin-bottom: 10px;
+    border: 1px solid var(--border); background: var(--panel); text-align: left;
+  }
+  .pair-req-who { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+  .pair-req-mail { font-size: 12.5px; color: var(--muted); margin-top: 2px; word-break: break-all; }
+  .pair-req-flag { font-size: 12.5px; color: var(--warn); margin-top: 8px; line-height: 1.4; }
+  .pair-req-acts { display: flex; gap: 10px; margin-top: 14px; }
+  .pair-req-acts button { flex: 1; width: auto; min-height: 44px; margin-top: 0; }
+  .pair-req-note { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 8px 0 0; text-align: left; }
 
 
   header.top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; min-height: 44px; }
@@ -5865,6 +5879,14 @@ function soloHeld() {
    code look like success: the app cleared the solo flag, re-entered, found no
    partnership and bounced back to the pairing screen with nothing said. This
    reads the verdict and surfaces the server's own wording. */
+/* After 20260915_consent_and_leak_close.sql there is a third verdict:
+   {ok:false, pending:true, partner_name, error:"Request sent to X…"}. ok is
+   false on purpose, because a request is not a partnership, so this function
+   is already right about it: it refuses, and it says the server's own sentence
+   rather than "that code did not work". Callers that can show a proper waiting
+   state read res.pending BEFORE calling this; the ones that cannot (the Setup
+   tab's pair field) get the sentence as a toast and stay where they are, which
+   is true. Nothing here may ever return true for a pending request. */
 function redeemOk(res, error) {
   if (error) { toast(error.message || "That code did not work"); return false; }
   if (!res || res.ok !== true) { toast(res?.error || "That code did not work"); return false; }
@@ -6585,7 +6607,8 @@ async function checkPartnershipThenEnter() {
   const { data: rows } = await sb.from("partnerships")
     .select("*")
     .order("created_at", { ascending: false });
-  const accepted = (rows || []).find((r) => r.status === "accepted");
+  const all = rows || [];
+  const accepted = all.find((r) => r.status === "accepted");
 
   if (accepted) {
     MY_PARTNERSHIP = accepted;
@@ -6593,11 +6616,34 @@ async function checkPartnershipThenEnter() {
       ? accepted.invitee_email.toLowerCase()
       : accepted.inviter_email.toLowerCase();
     showApp();
-  } else if (soloHeld()) {
-    showApp();                       // training alone for now; the seat stays open
-  } else {
-    renderPairingScreen();
+    return;
   }
+
+  /* The consent half of pairing. After 20260915_consent_and_leak_close.sql a
+     redeemed code writes a PENDING row with the person who typed the code as
+     inviter_email and the person whose code it was as invitee_email. That
+     direction reads backwards the first time and it is the entire point: the
+     invitee is the one nobody asked, so the invitee is the one who answers.
+
+     Until that migration runs, redeem_invite_code still writes 'accepted'
+     outright and nothing in the app or the database produces a 'pending' or
+     'declined' partnership, so every branch below finds an empty list and this
+     function behaves exactly as it did before. */
+  const mine = (v) => String(v || "").toLowerCase() === MY_EMAIL;
+  const incoming = all.filter((r) => r.status === "pending" && mine(r.invitee_email));
+  if (incoming.length) { renderPairRequestScreen(incoming); return; }
+
+  if (soloHeld()) { showApp(); return; }   // training alone; the seat stays open
+
+  /* My own request is my problem, not a wall: it only shows to someone who has
+     not already settled on training alone. An answer I am still owed, above,
+     is the opposite and comes first. */
+  const waiting = all.filter((r) => r.status === "pending" && mine(r.inviter_email));
+  const refused = all.filter((r) => r.status === "declined" && mine(r.inviter_email)
+    && r.responded_at && Date.now() - new Date(r.responded_at).getTime() < 7 * 864e5);
+  if (waiting.length || refused.length) { renderPairSentScreen(waiting, refused); return; }
+
+  renderPairingScreen();
 }
 
 /* Someone added you to their group. You decide, they do not decide for you. */
@@ -6624,6 +6670,231 @@ function renderInviteScreen(invite) {
   $("declineInviteBtn").onclick = async () => {
     if (!confirm(`Decline the invitation to ${g.name}?`)) return;
     await sb.rpc("respond_to_group_invite", { p_group_id: g.id, p_accept: false });
+    await checkPartnershipThenEnter();
+  };
+}
+
+/* ---------- Pair requests: the same rule as a group invite ----------
+   Somebody typed your invite code. That used to pair the two of you on the
+   spot, which meant anyone who had ever seen your code, on a screenshot or a
+   forwarded message, could take a look at your weight and your training at any
+   later date without you being asked or told. Now it makes a request, and this
+   is the only place it can be answered.
+
+   None of this is reachable until 20260915_consent_and_leak_close.sql runs. */
+
+/* Who has been turned down, and how many times. The database lets a declined
+   person redeem the same code again the next minute, so the only thing
+   standing between a user and a stranger who keeps asking is that the app says
+   out loud this is not the first time, and offers the one thing that actually
+   ends it: a new code. Kept locally on purpose, no table to add. */
+const DECLINED_PAIRS_KEY = "ft_declined_pairs";
+function declinedPairs() {
+  try { return JSON.parse(localStorage.getItem(DECLINED_PAIRS_KEY) || "{}") || {}; }
+  catch { return {}; }          // private mode, or someone else's junk in the key
+}
+function rememberDecline(email) {
+  const seen = declinedPairs();
+  seen[email] = (seen[email] || 0) + 1;
+  try { localStorage.setItem(DECLINED_PAIRS_KEY, JSON.stringify(seen)); } catch { /* private mode */ }
+}
+
+/* A stranger's profile is not readable until you accept, which is the point, so
+   the only thing there is to show is the address they signed up with. Same
+   local-part-as-a-name trick renderInviteScreen uses for a coach, with the
+   whole address underneath, because on a consent screen the domain is half of
+   how you recognise someone. */
+const pairWho = (email) => String(email || "").split("@")[0];
+
+async function answerPairRequest(id, accept) {
+  const { data, error } = await sb.rpc("respond_to_pair_invite", { p_id: id, p_accept: accept });
+  if (!error) {
+    if (data && data.ok === false) { toast(data.error || "That request is no longer open"); return false; }
+    return true;
+  }
+  /* The RPC only exists after the consent migration. The plain update is the
+     same write under the same rules: lock_partnership_parties lets the invitee,
+     and only the invitee, move a row out of pending. */
+  console.warn("respond_to_pair_invite unavailable, writing the row directly", error);
+  const { error: upErr } = await sb.from("partnerships")
+    .update({ status: accept ? "accepted" : "declined" }).eq("id", id);
+  if (upErr) { console.error(upErr); toast(accept ? "Could not accept that" : "Could not answer that"); return false; }
+  return true;
+}
+
+/* Ending a request I sent, or clearing one that came back declined. Either
+   party may write the row; only the status moves. */
+async function endPairRow(id) {
+  const { error } = await sb.from("partnerships").update({ status: "ended" }).eq("id", id);
+  if (error) { console.error(error); toast("Could not do that"); return false; }
+  return true;
+}
+
+function renderPairRequestScreen(reqs) {
+  const seen = declinedPairs();
+  const repeat = reqs.some((r) => seen[String(r.inviter_email).toLowerCase()]);
+  const title = reqs.length === 1
+    ? `${escapeHtml(pairWho(reqs[0].inviter_email))} wants to pair with you`
+    // Three is the ceiling the migration allows, so the words never run out.
+    : `${["", "One", "Two", "Three"][reqs.length] || reqs.length} people want to pair with you`;
+  const sub = reqs.length === 1
+    ? "They typed your invite code. Say yes and you each see the other's workouts, weight and progress. Say no and nothing of yours is shared."
+    : "They each typed your invite code. You can have one partner, so saying yes to one turns down the rest.";
+
+  const flag = (email) => {
+    const before = seen[email] || 0;
+    const times = before === 1 ? "once" : before === 2 ? "twice" : before + " times";
+    return before ? `<div class="pair-req-flag">You said no to them ${times} before.</div>` : "";
+  };
+  const acts = (r, email) => `
+    <div class="pair-req-acts">
+      <button type="button" class="btn-ghost" data-decline="${escapeHtml(r.id)}" data-email="${escapeHtml(email)}">No thanks</button>
+      <button type="button" class="btn-primary" data-accept="${escapeHtml(r.id)}">Pair up</button>
+    </div>`;
+
+  /* One request is laid out like the group invite it is the twin of: the
+     question in the h1, the two answers underneath. The card only appears once
+     there is more than one, where the boxes are what stop two requests reading
+     as one. */
+  const one = reqs.length === 1 ? String(reqs[0].inviter_email).toLowerCase() : null;
+  const body = one
+    ? `<div class="pair-req-mail" style="margin-bottom:2px;">${escapeHtml(one)}</div>
+       ${flag(one)}
+       ${acts(reqs[0], one)}`
+    : reqs.map((r) => {
+        const email = String(r.inviter_email).toLowerCase();
+        return `
+      <div class="pair-req">
+        <div class="pair-req-who">${escapeHtml(pairWho(email))}</div>
+        <div class="pair-req-mail">${escapeHtml(email)}</div>
+        ${flag(email)}
+        ${acts(r, email)}
+      </div>`;
+      }).join("");
+
+  $("onboard").innerHTML = `
+    <div class="ob-step">
+      <h1>${title}</h1>
+      <p class="sub" style="margin-bottom:16px;">${sub}</p>
+      ${body}
+      ${repeat ? `
+      <button type="button" class="btn-secondary" id="rotateMyCodeBtn">Change my invite code</button>
+      <p class="pair-req-note">Saying no does not stop them asking again. A new code does: the old one stops working for everyone, so anyone you meant to share it with will need the new one.</p>` : ""}
+    </div>`;
+  $("onboard").classList.remove("hidden");
+  $("app").classList.add("hidden");
+
+  $("onboard").querySelectorAll("[data-accept]").forEach((b) => {
+    b.onclick = async () => {
+      $("onboard").querySelectorAll("button").forEach((x) => { x.disabled = true; });
+      if (!(await answerPairRequest(b.dataset.accept, true))) {
+        $("onboard").querySelectorAll("button").forEach((x) => { x.disabled = false; });
+        return;
+      }
+      clearSolo();
+      clearPendingInvite();
+      await checkPartnershipThenEnter();
+    };
+  });
+  $("onboard").querySelectorAll("[data-decline]").forEach((b) => {
+    /* No confirm() here, unlike the group invite. Saying no is the safe answer
+       to a question you were never asked, and putting a dialog in front of it
+       makes turning someone down feel like the difficult choice. It is not. */
+    b.onclick = async () => {
+      b.disabled = true;
+      if (!(await answerPairRequest(b.dataset.decline, false))) { b.disabled = false; return; }
+      rememberDecline(b.dataset.email);
+      await checkPartnershipThenEnter();      // any others are still waiting
+    };
+  });
+
+  const rotate = $("rotateMyCodeBtn");
+  if (rotate) rotate.onclick = async () => {
+    rotate.disabled = true;
+    const { data, error } = await sb.rpc("rotate_invite_code");
+    rotate.disabled = false;
+    if (error || !data || data.ok !== true) { toast(data?.error || "Could not change your code"); return; }
+    if (MY_PROFILE) MY_PROFILE.invite_code = data.invite_code;
+    toast(`Your code is now ${data.invite_code}`);
+  };
+}
+
+/* The other side of the same handshake: I typed their code, and now I am
+   waiting on a person who has to open the app. Saying nothing here is what
+   made this look like a screen that had eaten the code. */
+/* One name in the title means a box around that same name adds nothing. The
+   card is only earned once there are several rows to tell apart. */
+function pairRowsHtml(rows, action, label) {
+  if (rows.length === 1) {
+    return `<div class="pair-req-mail" style="margin-bottom:16px;">${escapeHtml(String(rows[0].invitee_email).toLowerCase())}</div>`;
+  }
+  return rows.map((r) => `
+      <div class="pair-req">
+        <div class="pair-req-who">${escapeHtml(pairWho(r.invitee_email))}</div>
+        <div class="pair-req-mail">${escapeHtml(String(r.invitee_email).toLowerCase())}</div>
+        <div class="pair-req-acts">
+          <button type="button" class="btn-ghost" data-endrow="${escapeHtml(r.id)}">${label}</button>
+        </div>
+      </div>`).join("");
+}
+
+/* Every [data-endrow] on the screen means the same thing: this row is over. */
+function wirePairRowEnders() {
+  $("onboard").querySelectorAll("[data-endrow]").forEach((b) => {
+    b.onclick = async () => {
+      b.disabled = true;
+      if (!(await endPairRow(b.dataset.endrow))) { b.disabled = false; return; }
+      await checkPartnershipThenEnter();
+    };
+  });
+}
+
+function renderPairSentScreen(waiting) {
+  const title = waiting.length === 1
+    ? `Waiting on ${escapeHtml(pairWho(waiting[0].invitee_email))}`
+    : `Waiting on ${["", "one", "two", "three"][waiting.length] || waiting.length} people`;
+
+  $("onboard").innerHTML = `
+    <div class="ob-step">
+      <h1>${title}</h1>
+      <p class="sub" style="margin-bottom:16px;">They have to accept before anything is shared.
+        Neither of you can see the other until they do.</p>
+      ${pairRowsHtml(waiting, "endrow", "Cancel this one")}
+      <button class="btn-primary" id="waitSoloBtn">Train alone for now</button>
+      <button class="btn-ghost" id="waitAnotherBtn">Enter another code</button>
+      ${waiting.length === 1 ? `<button type="button" class="btn-ghost" data-endrow="${escapeHtml(waiting[0].id)}">Cancel the request</button>` : ""}
+    </div>`;
+  $("onboard").classList.remove("hidden");
+  $("app").classList.add("hidden");
+
+  wirePairRowEnders();
+  $("waitSoloBtn").onclick = () => { setSolo(); showApp(); };
+  $("waitAnotherBtn").onclick = () => renderCodeScreen();
+}
+
+/* They answered, and the answer was no. Saying nothing here would drop someone
+   back on the setup screen with no idea why, which is the same silence this
+   whole patch exists to end. Shown once: acknowledging it ends the row. */
+function renderPairRefusedScreen(refused) {
+  const title = refused.length === 1
+    ? `${escapeHtml(pairWho(refused[0].invitee_email))} said no`
+    : "Nobody took you up on it";
+
+  $("onboard").innerHTML = `
+    <div class="ob-step">
+      <h1>${title}</h1>
+      <p class="sub" style="margin-bottom:16px;">Nothing of yours was shared, and nothing of theirs.
+        You can pair with someone else whenever you like.</p>
+      ${pairRowsHtml(refused, "endrow", "Got it")}
+      <button class="btn-primary" id="refusedOkBtn">Got it</button>
+    </div>`;
+  $("onboard").classList.remove("hidden");
+  $("app").classList.add("hidden");
+
+  wirePairRowEnders();
+  $("refusedOkBtn").onclick = async () => {
+    $("refusedOkBtn").disabled = true;
+    for (const r of refused) await endPairRow(r.id);
     await checkPartnershipThenEnter();
   };
 }
@@ -6771,6 +7042,17 @@ function renderCodeScreen() {
     $("redeemCodeBtn").disabled = true;
     const { data: res, error } = await sb.rpc("redeem_invite_code", { code });
     $("redeemCodeBtn").disabled = false;
+    /* Read before redeemOk, so the waiting screen is the answer rather than a
+       toast on top of it. The request is out and nobody is paired, so solo is
+       deliberately left alone: this is not the moment to decide they have a
+       partner. checkPartnershipThenEnter re-reads the row and renders from it,
+       which means a reload lands on the same screen instead of forgetting.
+       Before the consent migration `pending` is never set and this is dead. */
+    if (!error && res && res.pending) {
+      clearPendingInvite();
+      await checkPartnershipThenEnter();
+      return;
+    }
     if (!redeemOk(res, error)) return;
     clearSolo();
     clearPendingInvite();
@@ -7001,7 +7283,7 @@ const TREE_KIDS = {
   "tone-lean-abs": ["tone-part", "abs", "lean-shredded"],
   "build-endurance": ["stamina", "run-5k", "faster-mile", "event-run", "event-hyrox", "event-ocr"],
   "move-better": ["mobility", "flexibility", "pain", "back-postpartum"],
-  "feel-better": ["mental", "energy", "longevity", "prevent", "keep-quitting", "dont-know", "back-after-years", "start-fresh"],
+  "feel-better": ["mental", "energy", "longevity", "prevent", "mobility", "pain", "keep-quitting", "dont-know", "back-after-years", "start-fresh"],
   "consistent": ["keep-quitting", "dont-know", "no-time"],
   "do-a-thing": ["first-pullup", "first-pushup", "run-5k", "faster-mile", "flexibility", "skills"],
   "event": ["event-run", "event-hyrox", "event-ocr", "event-test", "event-benchmark", "event-sport"],
@@ -7422,6 +7704,11 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
       bubble: primary.bubble,
       child: primary.child,
       label: kid ? kid.label : tile.title,
+      /* Null when the words for the specific are not on the tile, which since
+         the sub-goals went is always. goal_detail is a free text sentence the
+         engine matches against its alias table, and putting the bubble's own
+         title in it says nothing the bubble id did not already say. */
+      childLabel: kid ? kid.label : null,
       secondary: extras.map((e) => ({ bubble: e.bubble, child: e.child })),
     });
   };
@@ -7448,7 +7735,7 @@ function renderGoalPage() {
       child: MY_PROFILE?.goal_child || null,
       secondary: MY_PROFILE?.goal_secondary,
     },
-    onPick: async ({ bubble, child, label, secondary }) => {
+    onPick: async ({ bubble, child, childLabel, secondary }) => {
       const tile = goalTileFor(bubble);
       const legacy = GOALS.find((g) => g.key === tile.legacy);
       /* Upsert on the email key, the way every other profile write here is
@@ -7470,7 +7757,7 @@ function renderGoalPage() {
          A sentence written for a goal belongs to that goal. Changing the main
          goal clears it; keeping the same goal keeps it, so the free text
          somebody typed on the Training page is not wiped by a visit here. */
-      patch.goal_detail = child ? label
+      patch.goal_detail = childLabel ? childLabel
         : bubble === MY_PROFILE?.goal_bubble ? (MY_PROFILE?.goal_detail || null)
         : null;
       const { error, droppedSecondary } = await upsertGoalFields(patch);
@@ -8372,7 +8659,16 @@ function paintLimitsSubtitle() {
   }).catch(() => { /* the row keeps its honest fallback */ });
 }
 
+const OB_STEPS = ["name", "goal", "target", "plan"];
+
 function renderOnboardStep(step, data = {}) {
+  /* A draft is saved on every step and survives a deploy, so somebody can come
+     back to a step this build no longer has: "pace" is exactly that, as of the
+     commit that stopped asking every non-weight goal how many weeks it wanted.
+     Rendering a step that does not exist leaves an empty screen with a saved
+     draft pointing straight back at it, which nobody can get out of, so an
+     unknown step lands on a real one with their answers intact. */
+  if (!OB_STEPS.includes(step)) step = step === "pace" ? "plan" : "name";
   const ob = $("onboard");
   ob.classList.remove("hidden");
   $("app").classList.add("hidden");
@@ -17358,7 +17654,9 @@ let LIVE_PLUGIN_WARNED = false;
 let LIVE_QUIP_POOL = [];
 
 function liveActivityFields() {
-  const ex = TODAY_WORKOUT?.exercises?.[SESSION.exerciseIndex];
+  const all = TODAY_WORKOUT?.exercises || [];
+  const ex = all[SESSION.exerciseIndex];
+  const upNext = all[SESSION.exerciseIndex + 1] || null;
   const sets = SESSION.setsDone?.[SESSION.exerciseIndex] || [];
   const done = sets.filter(Boolean).length;
   const total = sets.length;
@@ -17389,9 +17687,16 @@ function liveActivityFields() {
 
   return {
     exercise: ex?.name || "Workout",
-    detail: total ? `Set ${Math.min(done + 1, total)} of ${total}` : "",
+    /* The lift you are on, not the set. The hero number already counts sets,
+       and having both say "2 of 2" in different words read as a contradiction
+       rather than as two facts. */
+    detail: all.length ? `Lift ${SESSION.exerciseIndex + 1} of ${all.length}` : "",
     done,
     total,
+    /* What the Lock Screen rolls to when the last set of this lift lands. The
+       button cannot ask the app: it is asleep. */
+    nextExercise: upNext?.name || "",
+    nextTotal: upNext ? (upNext.sets || 3) : 0,
     restSeconds,
     /* The whole length of a rest, not what is left of this one. The Lock Screen
        button needs it to start the next rest while the app is asleep. */

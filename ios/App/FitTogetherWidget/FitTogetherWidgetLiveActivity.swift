@@ -198,16 +198,20 @@ private struct CelebrationView: View {
                 Circle().fill(Unio.lime.opacity(0.20)).frame(width: 52, height: 52)
                 BotFace(size: 46, happy: true)
             }
+            /* Two different things happen on this button and they deserve
+               different words: one more set done, or a whole lift finished and
+               the next one already on screen. */
             VStack(alignment: .leading, spacing: 3) {
-                Text("Set logged")
+                Text(state.done == 0 ? "Lift done" : "Set logged")
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                     .foregroundStyle(Unio.ink)
-                Text(state.done >= state.total && state.total > 0
-                     ? "\(state.exercise) done"
+                Text(state.done == 0
+                     ? "Up next: \(state.exercise)"
                      : "\(state.done) of \(state.total) · \(state.exercise)")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             Spacer(minLength: 0)
             UnioMark(size: 30)
@@ -232,7 +236,7 @@ private struct LockScreenView: View {
             // Him in the mark, the lift, and the set as a chip rather than loose
             // grey text, so the row reads as three objects and not one sentence.
             HStack(spacing: 10) {
-                UnioBotMark(size: 24)
+                UnioMark(size: 24)
                 Text(state.exercise)
                     .font(.system(size: 16, weight: .bold))
                     .lineLimit(1)
