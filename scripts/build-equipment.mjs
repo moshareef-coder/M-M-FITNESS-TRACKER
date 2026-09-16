@@ -41,6 +41,16 @@ const KIT = {
   landmine: ["Landmine", "machine"],
   "smith-machine": ["Smith machine", "machine"],
 
+  /* What clips onto the end of the cable. Its own group, between the machine
+     you walked to and the bench you might also need, because it is the next
+     thing you have to find once you are standing at the tower. */
+  "attach-bar": ["Straight bar attachment", "attachment"],
+  "attach-lat": ["Wide lat bar", "attachment"],
+  "attach-vbar": ["V-bar attachment", "attachment"],
+  "attach-rope": ["Rope attachment", "attachment"],
+  "attach-handle": ["Single handle", "attachment"],
+  "attach-strap": ["Ankle strap", "attachment"],
+
   bench: ["Flat bench", "bench"],
   "bench-adjustable": ["Adjustable bench", "bench"],
   "preacher-bench": ["Preacher bench", "bench"],
@@ -95,22 +105,16 @@ const ARTWORK_KIT = {
   "crossover-beam.svg": "cable-crossover",
 };
 
-const GRIP_LABEL = {
-  rope: "Rope attachment",
-  vbar: "V-bar attachment",
-  lat: "Wide lat bar",
-  bar: "Straight bar attachment",
-  handle: "Single handle",
-  strap: "Ankle strap",
+// The attachment is equipment in its own right, with its own portrait, not a
+// line of setup text: you have to go and find the right one.
+const GRIP_KIT = {
+  rope: "attach-rope",
+  vbar: "attach-vbar",
+  lat: "attach-lat",
+  bar: "attach-bar",
+  handle: "attach-handle",
+  strap: "attach-strap",
 };
-
-// A pulley is described by where it is, because walking up to the wrong one is
-// the single most common way to start a cable exercise wrong.
-function pulleyNote(top) {
-  if (top <= 30) return "Pulley at the top";
-  if (top >= 90) return "Pulley at the bottom";
-  return "Pulley at chest height";
-}
 
 // Bench angles are authored as degrees, negative for a raised back rest.
 function benchNote(inc) {
@@ -137,8 +141,7 @@ function fromProps(move) {
         // cable then only contributes which attachment is on the end of it.
         if (!machineArtwork) kit.add("cable");
         const g = p.grip || "bar";
-        if (GRIP_LABEL[g]) setup.push(GRIP_LABEL[g]);
-        setup.push(pulleyNote(p.top === undefined ? 16 : p.top));
+        if (g !== "none" && GRIP_KIT[g]) kit.add(GRIP_KIT[g]);
         break;
       }
       case "bench": {
@@ -192,17 +195,18 @@ const NAME_KIT = [
   [/^Preacher Curl$/, ["ez-bar"], ["barbell"]],
   [/Smith/, ["smith-machine"], []],
   [/^Barbell Back Squat$|^Front Squat$|^Zercher Squat$|^Good Morning$/, ["rack"], []],
+  /* The lat pulldown's bar is drawn narrow so the figure reads at card size,
+     but the machine takes the wide bar, and the attachment picture should be
+     the one actually hanging there. */
+  [/^Lat Pulldown$/, ["attach-lat"], ["attach-bar"]],
 ];
 
-/* Setup notes the props cannot carry. The lat pulldown's bar is drawn narrow
-   so the figure reads at card size, but the machine takes the wide bar, and
-   the person standing at it needs to know which one to clip on. */
+/* Setup notes the props cannot carry.
+   An angled bench is authored by its geometry, and the same raised pad is a
+   decline when you lie on your back and an incline when you lie on your
+   front. The drawing cannot tell those apart, so the two prone ones say so
+   by name. */
 const NAME_SETUP = [
-  [/^Lat Pulldown$/, { drop: /attachment$/, add: ["Wide lat bar"] }],
-  /* An angled bench is authored by its geometry, and the same raised pad is a
-     decline when you lie on your back and an incline when you lie on your
-     front. The drawing cannot tell those apart, so the two prone ones say so
-     by name. */
   [/^Chest-Supported Row$|^Spider Curl$/, { drop: /^Bench on/, add: ["Bench on incline, about 45 degrees", "Lie face down on the pad"] }],
 ];
 
@@ -257,7 +261,7 @@ function build() {
 }
 
 function serialise(rows) {
-  const order = ["machine", "bench", "station", "free", "small"];
+  const order = ["machine", "attachment", "bench", "station", "free", "small"];
   const sortKit = (ids) => ids.slice().sort((a, b) => {
     const ga = order.indexOf(KIT[a]?.[1]), gb = order.indexOf(KIT[b]?.[1]);
     return ga - gb || (KIT[a]?.[0] || a).localeCompare(KIT[b]?.[0] || b);

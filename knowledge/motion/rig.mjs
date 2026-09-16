@@ -3047,6 +3047,22 @@ function loadedBar(ctx, C, y, half, plates = [9.5, 6.5]) {
     roundRect(ctx, 70 + s * (half - 2.4) - 2, y - 4, 4, 8, 1.4); ctx.fill();
   }
 }
+/* A cable attachment on its own, hanging from a short length of line: box is
+   [x, y, w, h] to crop to, `o` is where the hand grips it (cableGrip's own
+   anchor), `p` is extra params (barW). The line runs from the top of the box
+   down to the clip, so the hook cableGrip draws lands right on its end. */
+function attachmentPortrait(grip, box, p = {}) {
+  const o = V(70, 70);
+  const clip = GRIP_CLIP[grip] === undefined ? GRIP_CLIP.bar : GRIP_CLIP[grip];
+  return {
+    box,
+    draw(ctx, C) {
+      ctx.strokeStyle = C.cableLine; ctx.lineWidth = 1.5; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(o.x, box[1] + 2); ctx.lineTo(o.x, o.y - clip); ctx.stroke();
+      cableGrip(ctx, C, grip, o, V(0, 1), p);
+    },
+  };
+}
 const KIT_ART = {
   // ---- the machines, which already have their own drawings ----
   "lat-pulldown": { box: [18, 0, 100, 122], props: [{ type: "artwork", src: "/knowledge/motion/props/lat-pulldown.svg" }] },
@@ -3068,17 +3084,54 @@ const KIT_ART = {
   "calf-block": { box: [40, 92, 60, 32], props: [{ type: "artwork", src: "/knowledge/motion/props/calf-block.svg", dx: 21 }] },
 
   // ---- the cable stations, drawn by the cable prop itself ----
+  // grip: "none" here on purpose: the attachment is its own piece of kit now,
+  // with its own portrait below, so the tower stays a plain tower.
   cable: {
     box: [38, 0, 64, 124],
-    props: [{ type: "cable", x: 70, top: 14, y0: 46, plumb: true, grip: "bar", barW: 20, to: { x: 70, y: 74 } }],
+    props: [{ type: "cable", x: 70, top: 14, y0: 46, plumb: true, grip: "none", to: { x: 70, y: 74 } }],
   },
   "cable-crossover": {
     box: [2, 0, 136, 124],
     props: [
       { type: "artwork", src: "/knowledge/motion/props/crossover-beam.svg" },
-      { type: "cable", x: 14, top: 12, y0: 46, plumb: true, grip: "handle", to: { x: 14, y: 62 } },
-      { type: "cable", x: 126, top: 12, y0: 46, plumb: true, grip: "handle", to: { x: 126, y: 62 } },
+      { type: "cable", x: 14, top: 12, y0: 46, plumb: true, grip: "none", to: { x: 14, y: 62 } },
+      { type: "cable", x: 126, top: 12, y0: 46, plumb: true, grip: "none", to: { x: 126, y: 62 } },
     ],
+  },
+
+  /* ---- the attachments, on their own ----
+     Reuses cableGrip, the same code that draws the handle on a moving figure,
+     so the attachment in this picture is the attachment on the cable. A short
+     length of line above it is the only context needed: this is the thing
+     that hangs off the end of it, go find the right one. */
+  "attach-bar": attachmentPortrait("bar", [52, 44, 36, 40], { barW: 22 }),
+  "attach-lat": attachmentPortrait("lat", [44, 44, 52, 40], { barW: 34 }),
+  "attach-vbar": attachmentPortrait("vbar", [54, 42, 32, 42]),
+  "attach-rope": attachmentPortrait("rope", [56, 40, 28, 46]),
+  "attach-handle": attachmentPortrait("handle", [58, 38, 24, 48]),
+  /* The generic "strap" cableGrip draws is a small block meant to be read in
+     context, clipped round an ankle already on screen. On its own it was a
+     bucket. This is a standalone cuff instead: a padded band with a visible
+     overlap where the velcro doubles back, and a D-ring the cable clips to. */
+  "attach-strap": {
+    box: [48, 40, 44, 44],
+    draw(ctx, C) {
+      const cx = 70, top = 42, bandY = 66;
+      ctx.strokeStyle = C.cableLine; ctx.lineWidth = 1.5; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(cx, top); ctx.lineTo(cx, bandY - 7); ctx.stroke();
+      ctx.strokeStyle = C.chrome; ctx.lineWidth = 1.7;
+      ctx.beginPath(); ctx.ellipse(cx, bandY - 6, 2.4, 3.2, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = C.rubber;
+      roundRect(ctx, cx - 15, bandY - 1, 30, 9.5, 4.6); ctx.fill();
+      ctx.fillStyle = C.padHi;
+      roundRect(ctx, cx - 15, bandY - 1, 30, 2.4, 1.2); ctx.fill();
+      // the overlap where the strap fastens back on itself
+      ctx.fillStyle = C.rubber;
+      roundRect(ctx, cx + 3, bandY - 2.6, 10, 12.6, 3); ctx.fill();
+      ctx.strokeStyle = C.padLine; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(cx + 4, bandY); ctx.lineTo(cx + 12, bandY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + 4, bandY + 3.4); ctx.lineTo(cx + 12, bandY + 3.4); ctx.stroke();
+    },
   },
 
   // ---- benches and the places you stand ----

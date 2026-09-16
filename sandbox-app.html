@@ -5900,7 +5900,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.2";
+const APP_VERSION = "2026.09.16.3";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -18674,15 +18674,46 @@ function backBar(label, onBack) {
   return `<button type="button" class="back-bar" id="screenBackBtn">${icon("chevronLeft", 16)} ${escapeHtml(label)}</button>`;
 }
 
-/* What we can honestly say about the next workout before it exists.
-   Deliberately no "% match" score: that implies an algorithm we do not have
-   yet, and a made-up number is worse than an absent one. Everything here is
-   measured from the user's own logs. */
-const REGION_MUSCLES = {
-  Chest: ["chest"], Back: ["lats", "traps", "lowerback"], Shoulders: ["shoulders"],
-  Arms: ["biceps", "triceps", "forearms"], Core: ["abs", "obliques"],
-  Legs: ["glutes", "quads", "hamstrings", "calves"],
-};
+/* REGION_MUSCLES lived here and grouped the fourteen muscles into six named
+   regions. Its only reader was planPreview, which picked the two quietest and
+   printed them as the day to train; SUGGESTABLE_DAYS below replaced that and
+   left it with nobody. MUSCLE_REGIONS, which deriveFocus uses, is a different
+   table and is still very much alive. */
+
+/* THE DAYS THE GENERATOR CAN ACTUALLY BE ASKED FOR.
+
+   adapter.mjs focusDayIndex reads a requested focus through five regexes and no
+   others -- push, pull, leg|lower, upper, full|total|whole -- and the weeks the
+   engine builds name their days in exactly these words. Anything outside the
+   list reaches the engine, matches no keyword, is dropped without a word, and
+   the rotation decides instead. Measured in the sandbox on the restday fixture:
+   asking for "Chest & Back" came back Upper body with meta.focusHonoured false,
+   byte for byte the plan you get for asking nothing at all. That is why the
+   suggestion card now speaks this vocabulary rather than its own.
+
+   The muscles are the app's own group keys, used only to score a day against
+   the week through matchDetail. They are not sent anywhere and they do not
+   choose exercises: the engine does that from the day name. */
+const SUGGESTABLE_DAYS = [
+  { name: "Push day", muscles: ["chest", "shoulders", "triceps"] },
+  { name: "Pull day", muscles: ["lats", "traps", "biceps", "forearms"] },
+  { name: "Lower body", muscles: ["glutes", "quads", "hamstrings", "calves"] },
+  { name: "Upper body", muscles: ["chest", "shoulders", "triceps", "lats", "traps", "biceps"] },
+  { name: "Full body", muscles: ["chest", "shoulders", "lats", "glutes", "quads", "hamstrings", "abs"] },
+];
+
+/* Which of those five a free-text focus means, or null when it means none of
+   them. Same five patterns in the same order as adapter.mjs FOCUS_KEYWORDS, so
+   this answers "will the engine honour this string" without guessing. */
+const DAY_PATTERNS = [
+  [/push/i, "Push day"], [/pull/i, "Pull day"], [/leg|lower/i, "Lower body"],
+  [/upper/i, "Upper body"], [/full|total|whole/i, "Full body"],
+];
+function engineDayFor(focus) {
+  const s = String(focus || "").trim();
+  if (!s) return null;
+  return DAY_PATTERNS.find(([re]) => re.test(s))?.[1] || null;
+}
 
 const EQUIPMENT_WORDS = [
   ["Barbell", ["barbell", "ez-bar", "ez bar", "deadlift", "back squat", "bench press"]],
@@ -18935,24 +18966,30 @@ function planPreview() {
   const real = planFromToday();
   if (real) return real;
 
-  const vols = computeMuscleVolume(ME, 0);
+  /* The day to propose. It used to be the two least-trained REGIONS, joined
+     with an ampersand: "Chest & Back", a sentence the generator has no way to
+     read. So the card recommended one session and the button under it built
+     another, and nothing on either screen admitted it.
 
-  const regions = Object.entries(REGION_MUSCLES).map(([name, muscles]) => ({
-    name,
-    muscles,
-    volume: muscles.reduce((s, m) => s + (vols[m] || 0), 0),
-  }));
-  regions.sort((a, b) => a.volume - b.volume);
-
-  const heaviest = Math.max(...regions.map((r) => r.volume), 0);
-  const pick = regions.slice(0, 2);
-  const focus = pick.map((r) => r.name).join(" & ");
-
-  /* Same per-muscle scoring as a real plan, so the proposal and the workout it
-     turns into cannot quote two different numbers. */
-  const proposed = {};
-  for (const r of pick) for (const m of r.muscles) proposed[m] = 1;
-  const md = matchDetail(proposed);
+     The five below are the whole vocabulary the two halves of the app share,
+     and the scoring is the same matchDetail the card already prints, so the
+     figure still means what the info card says it means. Narrowest first, and
+     a strict greater-than, so a specific day wins a tie against a general one. */
+  const scored = SUGGESTABLE_DAYS.map((d) => {
+    const counts = {};
+    for (const m of d.muscles) counts[m] = 1;
+    return { ...d, md: matchDetail(counts) };
+  });
+  /* A focus the person actually set beats one we worked out from their week,
+     and generateWorkout was already sending it (`keepFocus || MY_PROFILE.focus`).
+     Without this line the card would propose one day, the button would send it,
+     and it would silently outrank a standing preference. Only when the engine
+     can parse it: one it cannot parse is not a focus as far as a plan goes. */
+  const stated = SUGGESTABLE_DAYS.find((d) => engineDayFor(MY_PROFILE?.focus) === d.name);
+  const best = (stated && scored.find((d) => d.name === stated.name))
+    || scored.reduce((a, b) => (b.md.match > a.md.match ? b : a));
+  const focus = best.name;
+  const md = best.md;
   const match = md.match;
 
   // Duration from the user's own finished sessions, not a guess.
@@ -18974,13 +19011,17 @@ function planPreview() {
     .slice(0, 3);
 
   const pretty = { lowerback: "Lower back", abs: "Core", obliques: "Obliques" };
-  const targets = pick.flatMap((r) => r.muscles)
+  const targets = best.muscles
     .map((m) => pretty[m] || m.charAt(0).toUpperCase() + m.slice(1))
     .filter((v, idx, arr) => arr.indexOf(v) === idx)
     .slice(0, 4);
 
   return {
     focus,
+    /* The string to hand generateWorkout, and it is the same string the card
+       prints, which is the whole point. Absent on a real plan, where there is a
+       Begin button rather than a Generate one. */
+    ask: focus,
     match,
     muscles: md.muscles,
     duration: avg ? `${Math.max(15, avg - 5)}-${avg + 5} min` : null,
@@ -19322,7 +19363,12 @@ function renderChooseScreen() {
   if ($("sppCustomise")) $("sppCustomise").onclick = () => (p.real ? goWorkoutScreen(null) : toManual());
   /* Generate and Begin are the same slot in the card: whichever one this
      state offers is the one that exists to wire. */
-  if ($("chooseGenerateBtn")) $("chooseGenerateBtn").onclick = () => generateWorkout();
+  /* The button builds the session the card 40px above it is recommending. It
+     called generateWorkout() bare, which sends MY_PROFILE.focus or nothing, so
+     the card could say one thing and the plan come back another with no sign
+     anywhere that they had ever been related. p.ask is the card's own focus
+     string, in the vocabulary adapter.mjs can parse (SUGGESTABLE_DAYS). */
+  if ($("chooseGenerateBtn")) $("chooseGenerateBtn").onclick = () => generateWorkout(null, { keepFocus: p.ask || null });
   if ($("chooseBeginBtn")) $("chooseBeginBtn").onclick = startWorkout;
   $("choosePlanBtn").onclick = toManual;
   $("chooseWeekBtn").onclick = () => goWorkoutScreen("week");
