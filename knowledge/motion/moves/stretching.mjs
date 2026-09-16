@@ -61,30 +61,48 @@ const BAND_PULL_APART = {
     from: { side: "L", point: "hand" }, to: { side: "R", point: "hand" }, front: true,
   }],
   keys: [
-    { // start: arms low and wide, real slack in the band. The band's `rest` is
-      // the hand separation at the FINISH, so the sag is the rep: at 94 it was
-      // the separation at the START and the band was dead straight in both
-      // keys, which left a lateral raise with a bar across it.
+    { // start: arms straight OUT IN FRONT at shoulder height, hands close. The
+      // height lives in the in-plane shoulder angle and the "in front" lives in
+      // shoulderAbd, which is the out-of-plane channel in a frontal move, so
+      // the arms foreshorten and the hands come in toward the midline without
+      // dropping. Authored as low wide arms it was the bottom of a lateral
+      // raise: a pull-apart never lets the hands fall below the shoulders.
+      // The band's `rest` is the hand separation at the FINISH, so the sag is
+      // the rep.
       t: 0,
       root: { x: 70, y: 61.4, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 55, shoulderL: 55, elbowR: -8, elbowL: -8,
+      joints: { spine: 0, neck: 0, shoulderR: 86, shoulderL: 86,
+                shoulderAbdR: 64, shoulderAbdL: 64, elbowR: 6, elbowL: 6,
                 wristR: -4, wristL: -4, hipR: 5, hipL: 5, kneeR: 3, kneeL: 3 },
       ik: { ankleR: { x: 76, y: 113.4, bend: -1 }, ankleL: { x: 64, y: 113.4, bend: -1 } },
     },
     { // finish: wide T, shoulder blades together, band straight
       t: 1,
       root: { x: 70, y: 61, rot: 0 },
-      joints: { spine: -1, neck: 0, shoulderR: 93, shoulderL: 93, elbowR: 2, elbowL: 2,
+      joints: { spine: -1, neck: 0, shoulderR: 93, shoulderL: 93,
+                shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 2, elbowL: 2,
                 wristR: 0, wristL: 0, hipR: 5, hipL: 5, kneeR: 3, kneeL: 3 },
       ik: { ankleR: { x: 76, y: 113.4, bend: -1 }, ankleL: { x: 64, y: 113.4, bend: -1 } },
     },
   ],
 };
 
-// Supine over a roller under the upper back, hips on the floor, hands behind
-// the head. Supine means root.rot is NEGATIVE, which puts the head at -x and
-// runs the legs out to +x; get that backwards and the figure is face down on
-// the roller doing something nobody should do.
+// Supine over a roller under the upper back, hips on the floor, knees bent and
+// feet flat, hands behind the head. Supine means root.rot is NEGATIVE, which
+// puts the head at -x and runs the legs out to +x; get that backwards and the
+// figure is face down on the roller doing something nobody should do.
+//
+// The rep is the THORACIC SPINE EXTENDING over the roller, so the pelvis never
+// moves and the whole change is above the roller: the chest opens and the head
+// travels back and DOWN toward the mat. The first version had the pelvis
+// lifting off the floor and only ten degrees of spine, which read as a small
+// crunch with a roller parked nearby rather than as an extension.
+//
+// The roller x is derived, not guessed: it is where the drawn back surface
+// crosses the top of a roller sitting on the mat (118 - 5.4 - 5.4 = 107.2),
+// measured off a render rather than off the torso radius, because the drawn
+// torso tapers and the capsule radius over-states it. Move the root and this
+// number has to move with it or the upper back leaves the prop.
 const FOAM_ROLLER_THORACIC_EXTENSION = {
   view: "side",
   loop: "pingpong",
@@ -93,25 +111,26 @@ const FOAM_ROLLER_THORACIC_EXTENSION = {
   breathRate: 0.9,
   props: [
     { type: "mat", x: 12, w: 116 },
-    { type: "roller", x: 42, y: 112.6, r: 5.4, foam: true },
+    { type: "roller", x: 53, y: 112.6, r: 5.4, foam: true },
   ],
   keys: [
-    { // neutral, ribs down, upper back resting on the roller
+    { // neutral, ribs down, upper back resting on the roller, hips on the mat
       t: 0,
-      root: { x: 66, y: 112.6, rot: -62 },
-      joints: { spine: 2, neck: -22 },
+      root: { x: 76, y: 110.5, rot: -62 },
+      joints: { spine: 6, neck: -4 },
       ik: {
-        wristR: { x: 21.4, y: 88.5, bend: 1 }, wristL: { x: 24.4, y: 90.5, bend: 1 },
-        ankleR: { x: 100, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
+        wristR: { x: 26.5, y: 92.0, bend: 1 }, wristL: { x: 29.5, y: 94.0, bend: 1 },
+        ankleR: { x: 104, y: 113.6, bend: -1 }, ankleL: { x: 99, y: 113.6, bend: -1 },
       },
     },
-    { // extend over the roller, head supported so the neck follows the spine
+    { // extended over the roller: chest opens, head goes back toward the mat,
+      // hips unmoved. The hands stay behind the head and travel with it.
       t: 1,
-      root: { x: 64, y: 110.1, rot: -62 },
-      joints: { spine: -8, neck: -34 },
+      root: { x: 76, y: 110.5, rot: -62 },
+      joints: { spine: -14, neck: -18 },
       ik: {
-        wristR: { x: 19.1, y: 92.9, bend: 1 }, wristL: { x: 22.1, y: 94.9, bend: 1 },
-        ankleR: { x: 100, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
+        wristR: { x: 24.0, y: 100.0, bend: 1 }, wristL: { x: 27.0, y: 102.0, bend: 1 },
+        ankleR: { x: 104, y: 113.6, bend: -1 }, ankleL: { x: 99, y: 113.6, bend: -1 },
       },
     },
   ],
@@ -123,11 +142,15 @@ const FOAM_ROLLER_THORACIC_EXTENSION = {
 // this is the side view and the circle is drawn in the sagittal plane: three
 // keys, back and low, through overhead, out to forward and low, which pingpongs
 // into a continuous sweep rather than a flap.
+// armOverHead, because the top of the circle takes the near arm straight past
+// the skull: without it the head is drawn last and the arm reads as vanishing
+// behind the head at the one frame that carries the range of motion.
 const ARM_CIRCLES = {
   view: "side",
   loop: "pingpong",
   dur: 3.2,
   breath: 0.2,
+  armOverHead: true,
   keys: [
     { // arms behind the hips, start of the sweep
       t: 0,
@@ -229,10 +252,13 @@ const WALL_SLIDES = {
   feet: { R: { ang: 11, len: 0.42, w: 1.3 }, L: { ang: 11, len: 0.42, w: 1.3 } },
   props: [{ type: "wall", x: 16, w: 108, top: 2 }],
   keys: [
-    { // goalpost: elbows down at the ribs, forearms up the wall
+    { // goalpost: upper arms out near shoulder height, forearms up the wall.
+      // At shoulderR 42 the elbows sat down by the ribs, which is a low row
+      // start; the W this drill slides out of has the elbows level with the
+      // shoulders.
       t: 0,
       root: { x: 70, y: 61.6, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 42, shoulderL: 42, elbowR: 128, elbowL: 128,
+      joints: { spine: 0, neck: 0, shoulderR: 68, shoulderL: 68, elbowR: 112, elbowL: 112,
                 wristR: -6, wristL: -6, hipR: 4, hipL: 4, kneeR: 3, kneeL: 3 },
     },
     { // slid up to a Y, elbows nearly straight, hands still on the wall
@@ -246,8 +272,22 @@ const WALL_SLIDES = {
 
 // Upper arms held out and still while the forearms draw circles from the elbow.
 // The suggested view was side, where both arms stack into one and you cannot
-// see that the upper arm is holding still, which is the whole instruction. Front
-// on, the upper arms are two fixed horizontal bars and the forearms sweep.
+// see that the upper arm is holding still, which is the whole instruction.
+//
+// What is drawn is the sweep from forearms UP to forearms DOWN with the upper
+// arms dead still, which is the frontal projection of the circle. The first
+// version only had half of that: elbow 108, 56, 62, a third key three degrees
+// from its second, so the far side of the circle was never drawn at all.
+//
+// A true circle is not authorable here and it is worth saying why, because the
+// obvious fix does not work. The real movement is axial rotation of the
+// humerus with the elbow held at ninety, which is `shoulderRot`; that channel
+// stops at 95 degrees, and a full circle needs 360, so the hand can be taken
+// from up to forward and no further. Flipping the sign of the elbow gets the
+// bottom of the circle but the interpolation between the two representations
+// passes through a straight arm, which is a position this drill never touches.
+// The elbow hinge sweep below reaches both ends honestly and only straightens
+// for the instant it passes horizontal.
 const ELBOW_CIRCLES = {
   view: "front",
   loop: "pingpong",
@@ -255,25 +295,23 @@ const ELBOW_CIRCLES = {
   breath: 0.22,
   feet: { R: { ang: 13, len: 0.4, w: 1.3 }, L: { ang: 13, len: 0.4, w: 1.3 } },
   keys: [
-    { // forearms up, hands by the ears
+    { // top of the circle: forearms up, hands by the ears
       t: 0,
       root: { x: 70, y: 61.6, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 88, shoulderL: 88, elbowR: 108, elbowL: 108,
-                wristR: 10, wristL: 10, hipR: 4, hipL: 4, kneeR: 3, kneeL: 3 },
+      joints: { spine: 0, neck: 0, shoulderR: 88, shoulderL: 88, elbowR: 104, elbowL: 104,
+                wristR: 8, wristL: 8, hipR: 4, hipL: 4, kneeR: 3, kneeL: 3 },
     },
-    { // halfway round, forearms out at forty five
+    { // halfway: forearms swung out level, upper arms unmoved
       t: 0.5,
       root: { x: 70, y: 61.6, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 88, shoulderL: 88, elbowR: 56, elbowL: 56,
+      joints: { spine: 0, neck: 0, shoulderR: 88, shoulderL: 88, elbowR: 10, elbowL: 10,
                 wristR: 0, wristL: 0, hipR: 4, hipL: 4, kneeR: 3, kneeL: 3 },
     },
-    { // forearms swung down the far side of the circle, upper arms unmoved.
-      // They stop short of straight on purpose: a straight arm here is a
-      // lateral raise, and the bent elbow is the whole point of the drill.
+    { // bottom of the circle: forearms down, elbows still out at the shoulders
       t: 1,
       root: { x: 70, y: 61.6, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 88, shoulderL: 88, elbowR: 62, elbowL: 62,
-                wristR: -12, wristL: -12, hipR: 4, hipL: 4, kneeR: 3, kneeL: 3 },
+      joints: { spine: 0, neck: 0, shoulderR: 88, shoulderL: 88, elbowR: -104, elbowL: -104,
+                wristR: -8, wristL: -8, hipR: 4, hipL: 4, kneeR: 3, kneeL: 3 },
     },
   ],
 };
@@ -325,6 +363,12 @@ const WRIST_CIRCLES = {
 // invisible side on, so this is the front view: the feet and pelvis never move
 // and both arms swing to the same side together, which is what separates it
 // from the cross-body swings above.
+//
+// The turn itself is `spineTwist`, which is the whole exercise and was missing:
+// with the arms doing all the work this was a figure swinging its arms with a
+// dead torso, which is the fault the cue names ("turn through the ribs"). The
+// twist carries the chest, and the arms hang off the chest, so the authored
+// shoulder angles are smaller than they were and the swing is still bigger.
 const TORSO_TWISTS = {
   view: "front",
   loop: "pingpong",
@@ -332,16 +376,19 @@ const TORSO_TWISTS = {
   breath: 0.25,
   feet: { R: { ang: 15, len: 0.42, w: 1.32 }, L: { ang: 15, len: 0.42, w: 1.32 } },
   keys: [
-    { // turned left: the right arm wrapped across the waist, the left trailing
+    { // turned left: ribs rotated, the right arm wrapped across the waist and
+      // the left one trailing behind
       t: 0,
       root: { x: 70, y: 61.6, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: -70, shoulderL: 24, elbowR: 26, elbowL: 52,
+      joints: { spineTwist: -42, neckTwist: -18, spine: 0, neck: 0,
+                shoulderR: -48, shoulderL: 18, elbowR: 30, elbowL: 50,
                 wristR: 8, wristL: 8, hipR: 5, hipL: 5, kneeR: 3, kneeL: 3 },
     },
     { // turned right, the mirror of it, hips and feet unmoved
       t: 1,
       root: { x: 70, y: 61.6, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 24, shoulderL: -70, elbowR: 52, elbowL: 26,
+      joints: { spineTwist: 42, neckTwist: 18, spine: 0, neck: 0,
+                shoulderR: 18, shoulderL: -48, elbowR: 50, elbowL: 30,
                 wristR: 8, wristL: 8, hipR: 5, hipL: 5, kneeR: 3, kneeL: 3 },
     },
   ],
@@ -972,6 +1019,15 @@ const BAND_SHOULDER_EXTERNAL_ROTATION = {
 // and back. Side view: the travel is sagittal and the angle between the forearm
 // and the floor is the whole point. The hands stay pinned, so the load on the
 // wrist is the body moving over them.
+//
+// The set-up numbers are the quadruped ones and they are not free. An arm is 37
+// and a thigh is 27, so on all fours the shoulders sit about ten units HIGHER
+// than the hips and the torso slopes down toward the tail: root.rot 74, not 90.
+// The first version sat the shoulders at 88 with the hands pinned sixteen units
+// in FRONT of them, which is not hands-under-shoulders, it is a bear crawl with
+// bent elbows, and the shoulders never crossed the hands at either end so the
+// rock had nothing to rock over. Now they travel from five units behind the
+// hands to five in front, which is the whole drill.
 const QUADRUPED_WRIST_ROCKS = {
   view: "side",
   loop: "pingpong",
@@ -979,19 +1035,22 @@ const QUADRUPED_WRIST_ROCKS = {
   breath: 0.25,
   props: [{ type: "mat", x: 10, w: 118 }],
   keys: [
-    { // rocked back, shoulders behind the hands
+    { // rocked back, shoulders behind the hands, thighs vertical over the knees
       t: 0,
-      root: { x: 48, y: 88.1, rot: 90 },
-      joints: { spine: 0, neck: -12, hipR: -90, hipL: -90, kneeR: 94, kneeL: 94,
-                ankleR: -78, ankleL: -78, wristR: 54, wristL: 54 },
-      ik: { wristR: { x: 94, y: 114.6, bend: 1 }, wristL: { x: 89, y: 114.6, bend: 1 } },
+      root: { x: 46, y: 88, rot: 74 },
+      joints: { spine: 0, neck: -12, hipR: -74, hipL: -74, kneeR: 94, kneeL: 94,
+                ankleR: -78, ankleL: -78, wristR: 58, wristL: 58 },
+      ik: { wristR: { x: 80, y: 114.6, bend: 1 }, wristL: { x: 75, y: 114.6, bend: 1 } },
     },
-    { // rocked forward over the hands, wrists working
+    { // rocked forward over the hands, wrists working. The hip angle takes back
+      // most of the ten units the pelvis travels so the knees stay put and the
+      // shins stay flat: without it the knees slide forward with the body and
+      // the drill reads as crawling.
       t: 1,
-      root: { x: 56, y: 88.1, rot: 90 },
-      joints: { spine: 0, neck: -12, hipR: -90, hipL: -90, kneeR: 94, kneeL: 94,
-                ankleR: -78, ankleL: -78, wristR: 68, wristL: 68 },
-      ik: { wristR: { x: 94, y: 114.6, bend: 1 }, wristL: { x: 89, y: 114.6, bend: 1 } },
+      root: { x: 56, y: 88, rot: 74 },
+      joints: { spine: 0, neck: -12, hipR: -88, hipL: -88, kneeR: 80, kneeL: 80,
+                ankleR: -78, ankleL: -78, wristR: 74, wristL: 74 },
+      ik: { wristR: { x: 80, y: 114.6, bend: 1 }, wristL: { x: 75, y: 114.6, bend: 1 } },
     },
   ],
 };
@@ -1063,7 +1122,9 @@ const OVERHEAD_TRICEPS_STRETCH = {
 // Ear toward one shoulder while the opposite arm hangs heavy. The tilt is
 // lateral, so the suggested side view would hide it completely: front on, the
 // neck angle draws as exactly what it is, the head falling toward the shoulder.
-// No hand on the head, because the cue says not to pull.
+// No hand on the head, because the cue says not to pull. The LEFT shoulder
+// girdle is depressed, which is the other half of the cue ("let the opposite
+// hand hang heavy"): a trap stretch with both shoulders level is a head tilt.
 const UPPER_TRAP_STRETCH = {
   view: "front",
   loop: "hold",
@@ -1076,13 +1137,15 @@ const UPPER_TRAP_STRETCH = {
       t: 0,
       root: { x: 70, y: 61.6, rot: 0 },
       joints: { spine: 2, neck: 26, shoulderR: 4, elbowR: 10, wristR: -4,
-                shoulderL: -12, elbowL: 2, wristL: -8, hipR: 5, hipL: 5, kneeR: 3, kneeL: 3 },
+                shoulderL: -12, elbowL: 2, wristL: -8, shoulderGirdleElevL: -3.5,
+                hipR: 5, hipL: 5, kneeR: 3, kneeL: 3 },
     },
     { // a degree or two further on the exhale, left arm still long
       t: 1,
       root: { x: 70, y: 61.8, rot: 0 },
       joints: { spine: 3, neck: 31, shoulderR: 4, elbowR: 10, wristR: -4,
-                shoulderL: -15, elbowL: 0, wristL: -8, hipR: 5, hipL: 5, kneeR: 3, kneeL: 3 },
+                shoulderL: -15, elbowL: 0, wristL: -8, shoulderGirdleElevL: -4,
+                hipR: 5, hipL: 5, kneeR: 3, kneeL: 3 },
     },
   ],
 };
@@ -1175,6 +1238,9 @@ const THREAD_THE_NEEDLE_STRETCH = {
 // Kneeling with the elbows up on a bench and the chest sinking toward the floor
 // between them. Side view, because the sink is sagittal and the bench under the
 // elbows is what makes the hang a lat stretch instead of a child's pose.
+// The torso angle is past horizontal so the chest hangs BELOW the line from the
+// hips to the hands; at rot 90 it was level with them and the sink, which is
+// the whole stretch, was not in the picture.
 const KNEELING_LAT_STRETCH = {
   view: "side",
   loop: "hold",
@@ -1185,17 +1251,17 @@ const KNEELING_LAT_STRETCH = {
   keys: [
     { // settled, arms long onto the pad, chest between them
       t: 0,
-      root: { x: 50, y: 86, rot: 90 },
-      joints: { spine: 7, neck: -12, hipR: -90, hipL: -90, kneeR: 105, kneeL: 105,
+      root: { x: 50, y: 86, rot: 91 },
+      joints: { spine: 7, neck: -12, hipR: -91, hipL: -91, kneeR: 105, kneeL: 105,
                 ankleR: -50, ankleL: -50, wristR: 10, wristL: 10 },
-      ik: { wristR: { x: 107.0, y: 84.4, bend: 1 }, wristL: { x: 102.0, y: 85.4, bend: 1 } },
+      ik: { wristR: { x: 104.0, y: 84.4, bend: 1 }, wristL: { x: 99.0, y: 85.4, bend: 1 } },
     },
     { // chest sinks a little further on the exhale
       t: 1,
-      root: { x: 50, y: 87.5, rot: 90 },
-      joints: { spine: 12, neck: -12, hipR: -90, hipL: -90, kneeR: 105, kneeL: 105,
+      root: { x: 50, y: 87.5, rot: 94 },
+      joints: { spine: 12, neck: -12, hipR: -94, hipL: -94, kneeR: 105, kneeL: 105,
                 ankleR: -50, ankleL: -50, wristR: 10, wristL: 10 },
-      ik: { wristR: { x: 106.9, y: 84.6, bend: 1 }, wristL: { x: 101.9, y: 85.6, bend: 1 } },
+      ik: { wristR: { x: 103.9, y: 84.6, bend: 1 }, wristL: { x: 98.9, y: 85.6, bend: 1 } },
     },
   ],
 };
@@ -1293,22 +1359,28 @@ const SPHINX_STRETCH = {
 };
 
 // Sitting tall with one knee crossed over and planted, the opposite arm hooked
-// over that knee and the other hand braced on the floor behind. Side view: the
-// turn itself is invisible from anywhere, so the picture has to carry the setup
-// instead, and the braced hand behind plus the arm levering on the raised knee
-// is the setup nobody else in this library has.
+// over that knee and the other hand braced on the floor behind. The setup is
+// sagittal, so the stance and the planted foot are authored side on, and the
+// camera is turned far enough to see the chest actually rotate.
+//
+// It was a flat side view with no `spineTwist` at all, and its own comment said
+// the turn was invisible from anywhere and the setup would have to carry it.
+// That is no longer true: the rig has an axial channel at the chest, and a move
+// called a spinal twist that contains no rotation is a picture of somebody
+// sitting with their legs crossed. The hands stay pinned in world space, so the
+// chest turns underneath them, which is what the twist looks like.
 const SEATED_SPINAL_TWIST = {
-  view: "side",
+  view: { yaw: 28, plane: "sagittal" },
   loop: "hold",
   dur: 6.0,
   breath: 1.0,
   breathRate: 0.8,
   props: [{ type: "mat", x: 20, w: 108 }],
   keys: [
-    { // sat tall, crossed foot planted, hand braced behind
+    { // sat tall, crossed foot planted, hand braced behind, ribs already turned
       t: 0,
       root: { x: 56, y: 106, rot: 0 },
-      joints: { spine: -4, neck: -2, hipR: 130, kneeR: 149,
+      joints: { spineTwist: 40, neckTwist: 30, spine: -4, neck: -2, hipR: 130, kneeR: 149,
                 hipL: 84, kneeL: -4, ankleL: -50 },
       ik: {
         wristR: { x: 79.8, y: 89.0, bend: 1 }, wristL: { x: 38, y: 110, bend: 1 },
@@ -1317,7 +1389,7 @@ const SEATED_SPINAL_TWIST = {
     { // grows taller on the inhale and levers a degree further on the exhale
       t: 1,
       root: { x: 55.8, y: 105.5, rot: -2 },
-      joints: { spine: -6, neck: -3, hipR: 132, kneeR: 149,
+      joints: { spineTwist: 48, neckTwist: 36, spine: -6, neck: -3, hipR: 132, kneeR: 149,
                 hipL: 84, kneeL: -4, ankleL: -50 },
       ik: {
         wristR: { x: 77.5, y: 87.0, bend: 1 }, wristL: { x: 37, y: 110, bend: 1 },
@@ -1336,6 +1408,10 @@ const STANDING_SIDE_BEND_STRETCH = {
   dur: 5.6,
   breath: 1.0,
   breathRate: 0.85,
+  // a standing figure plus an arm reaching over the top of the head is taller
+  // than the 140 box: without this the reaching hand, which is the half of the
+  // pose that says side bend, is sliced off the top edge
+  fit: { k: 0.87, dy: 8 },
   feet: { R: { ang: 13, len: 0.42, w: 1.3 }, L: { ang: 13, len: 0.42, w: 1.3 } },
   keys: [
     { // settled into the bend, top arm reaching over
@@ -1359,6 +1435,10 @@ const STANDING_SIDE_BEND_STRETCH = {
 // floor. Supine, so root.rot is negative: head at -x, legs out to +x. Side view,
 // because the fold is sagittal and the hands wrapped around the shins are what
 // says hug rather than lie.
+// The hip flexion is the exercise and it was 40 degrees, which is legs in the
+// air, not knees on the chest: the low back only rounds into the floor once the
+// thighs are past about a hundred. The pelvis also sat two units into the mat
+// at root 116; 110.5 is where a supine pelvis rests on it.
 const KNEES_TO_CHEST_STRETCH = {
   view: "side",
   loop: "hold",
@@ -1369,15 +1449,15 @@ const KNEES_TO_CHEST_STRETCH = {
   keys: [
     { // settled, knees in, back flat
       t: 0,
-      root: { x: 76, y: 116, rot: -90 },
-      joints: { spine: 0, neck: 6, hipR: -40, hipL: -44, kneeR: 120, kneeL: 118 },
-      ik: { wristR: { x: 65.0, y: 84.0, bend: 1 }, wristL: { x: 61.0, y: 88.0, bend: 1 } },
+      root: { x: 76, y: 110.5, rot: -90 },
+      joints: { spine: 0, neck: 6, hipR: -112, hipL: -108, kneeR: 100, kneeL: 104 },
+      ik: { wristR: { x: 62.0, y: 90.0, bend: 1 }, wristL: { x: 58.0, y: 94.0, bend: 1 } },
     },
     { // drawn a touch closer on the exhale
       t: 1,
-      root: { x: 76, y: 116.6, rot: -90 },
-      joints: { spine: 2, neck: 8, hipR: -36, hipL: -40, kneeR: 124, kneeL: 122 },
-      ik: { wristR: { x: 63.0, y: 81.9, bend: 1 }, wristL: { x: 59.0, y: 85.9, bend: 1 } },
+      root: { x: 76, y: 111.1, rot: -90 },
+      joints: { spine: 2, neck: 8, hipR: -118, hipL: -114, kneeR: 104, kneeL: 108 },
+      ik: { wristR: { x: 60.0, y: 88.0, bend: 1 }, wristL: { x: 56.0, y: 92.0, bend: 1 } },
     },
   ],
 };
@@ -1389,26 +1469,33 @@ const KNEES_TO_CHEST_STRETCH = {
 // hands pulling the far thigh in carry the rest.
 // v2: the crossed leg is externally rotated and abducted, which is the whole
 // shape of a figure four and was previously drawn as a plain bent knee.
+// v3: the body was floating eleven units above its own mat, because a supine
+// pelvis rests at root.y 110 and this was authored at 106. The crossed leg also
+// had its ankle four units short of the supporting thigh; it now lands on that
+// thigh just above the knee, which is the cue, with the knee dropped thirteen
+// units out to the side. hipR is capped by the validator at 150 degrees of hip
+// flexion, and a supine rot -90 puts hip 0 at 180, so -34 is as far as the
+// crossed thigh can travel toward the chest.
 const FIGURE_FOUR_STRETCH = {
   view: { yaw: 30, plane: "sagittal" },
   loop: "hold",
   dur: 6.0,
   breath: 0.9,
   breathRate: 0.8,
-  fit: { k: 1.3, dx: 6, dy: -22 },
+  fit: { k: 1.08, dx: 4, dy: -12 },
   props: [{ type: "mat", x: 8, w: 120 }],
   keys: [
     { // settled, shin crossing the lifted thigh, head heavy on the floor
       t: 0,
-      root: { x: 76, y: 106, rot: -90 },
-      joints: { hipRotR: 46, hipAbdR: 24, spine: 0, neck: 6, hipR: -42, kneeR: 145, hipL: -65, kneeL: 95 },
-      ik: { wristR: { x: 65.0, y: 97.0, bend: 1 }, wristL: { x: 69.0, y: 101.0, bend: 1 } },
+      root: { x: 76, y: 110, rot: -90 },
+      joints: { hipRotR: 48, hipAbdR: 30, spine: 0, neck: 6, hipR: -34, kneeR: 131, hipL: -64, kneeL: 92 },
+      ik: { wristR: { x: 72.0, y: 92.0, bend: 1 }, wristL: { x: 76.0, y: 96.0, bend: 1 } },
     },
     { // far thigh drawn a little closer on the exhale
       t: 1,
-      root: { x: 76, y: 106.6, rot: -90 },
-      joints: { hipRotR: 48, hipAbdR: 26, spine: 1, neck: 7, hipR: -40, kneeR: 145, hipL: -61, kneeL: 95 },
-      ik: { wristR: { x: 63.0, y: 94.9, bend: 1 }, wristL: { x: 67.0, y: 98.9, bend: 1 } },
+      root: { x: 76, y: 110.6, rot: -90 },
+      joints: { hipRotR: 50, hipAbdR: 32, spine: 1, neck: 7, hipR: -34, kneeR: 131, hipL: -70, kneeL: 92 },
+      ik: { wristR: { x: 70.0, y: 90.0, bend: 1 }, wristL: { x: 74.0, y: 94.0, bend: 1 } },
     },
   ],
 };
@@ -1446,30 +1533,43 @@ const KNEELING_HIP_FLEXOR_STRETCH = {
 // Half kneeling with the back shin up a wall behind, front foot planted, back
 // glute squeezed. Side view: the shin running up the wall behind the body is
 // the whole setup and it only exists in the sagittal plane.
+//
+// The back knee belongs in the CORNER, where the floor meets the wall, with the
+// whole shin flat against the wall above it. It was nine units out from the
+// wall face with the shin leaning away, so only the toe touched and the back
+// leg read as floating beside a wall rather than propped on it. The numbers now
+// place the knee at x 20 against a wall face at 16 and take the shin up to an
+// ankle at 16.5, which is the corner.
+//
+// The two keys differ almost entirely in root.rot: the pelvis tucks under while
+// the femur stays exactly where it is (hipL moves by the same eight degrees, in
+// the other direction), which is what a hip flexor stretch actually is. Move
+// the root x and the knee leaves the wall.
 const COUCH_STRETCH = {
   view: "side",
   loop: "hold",
   dur: 6.2,
   breath: 1.0,
   breathRate: 0.8,
-  props: [{ type: "wall", x: 4, w: 12 }, { type: "mat", x: 18, w: 106 }],
+  props: [{ type: "wall", x: 4, w: 12 }, { type: "mat", x: 16, w: 108 }],
   keys: [
-    { // settled, back shin up the wall, front shin vertical
+    { // settled, back knee in the corner, shin flat up the wall, front shin
+      // vertical over a planted foot
       t: 0,
-      root: { x: 38, y: 92.4, rot: 6 },
-      joints: { spine: 2, neck: -2, hipL: -35, kneeL: 137, ankleL: -78 },
+      root: { x: 31, y: 91.3, rot: 6 },
+      joints: { spine: 2, neck: -2, hipL: -30, kneeL: 148, ankleL: -78 },
       ik: {
-        ankleR: { x: 66, y: 113.6, bend: -1 },
-        wristR: { x: 60.5, y: 83.0, bend: 1 }, wristL: { x: 55.5, y: 85.0, bend: 1 },
+        ankleR: { x: 58, y: 113.6, bend: -1 },
+        wristR: { x: 48.0, y: 86.0, bend: 1 }, wristL: { x: 43.0, y: 88.0, bend: 1 },
       },
     },
-    { // pelvis tucks and the chest comes up a degree on the exhale
+    { // pelvis tucks and the chest comes up on the exhale, femur unmoved
       t: 1,
-      root: { x: 39, y: 92.4, rot: -2 },
-      joints: { spine: 4, neck: -3, hipL: -27, kneeL: 137, ankleL: -78 },
+      root: { x: 31, y: 91.3, rot: -4 },
+      joints: { spine: 4, neck: -3, hipL: -20, kneeL: 148, ankleL: -78 },
       ik: {
-        ankleR: { x: 66, y: 113.6, bend: -1 },
-        wristR: { x: 61.1, y: 82.0, bend: 1 }, wristL: { x: 56.1, y: 84.0, bend: 1 },
+        ankleR: { x: 58, y: 113.6, bend: -1 },
+        wristR: { x: 47.0, y: 85.0, bend: 1 }, wristL: { x: 42.0, y: 87.0, bend: 1 },
       },
     },
   ],
@@ -1523,6 +1623,14 @@ const FROG_STRETCH = {
 // than pinned, because a pinned ankle is a flat foot.
 // The front leg reaches a real stride in front of the standing one. At hipR 13
 // both legs sat under the body and the picture was a plain forward bend.
+// It then went too far the other way: at hipR 34 the front heel hung nine units
+// clear of the floor, so the cue's "heel out in front, toes up" became a leg
+// held in the air. The heel is a contact and it has to be on the ground, and
+// once it is, hipR 20 is as far as the leg can travel: any higher and the heel
+// leaves the ground, because the leg is 52 units and the hinged pelvis is only
+// 47 above the floor. The stretch lives in the TORSO hinge, not in how high the
+// front leg is carried, and a higher leg with the heel in the air is not this
+// exercise.
 const STANDING_HAMSTRING_STRETCH = {
   view: "side",
   loop: "hold",
@@ -1533,19 +1641,19 @@ const STANDING_HAMSTRING_STRETCH = {
     { // settled into the hinge, front leg long, back flat
       t: 0,
       root: { x: 62, y: 66, rot: 10 },
-      joints: { spine: 38, neck: -12, hipR: 34, kneeR: 4, ankleR: 34 },
+      joints: { spine: 38, neck: -12, hipR: 20, kneeR: 2, ankleR: 44 },
       ik: {
         ankleL: { x: 56, y: 113.6, bend: -1 },
-        wristR: { x: 90.3, y: 80.0, bend: 1 }, wristL: { x: 85.3, y: 82.0, bend: 1 },
+        wristR: { x: 90.0, y: 82.0, bend: 1 }, wristL: { x: 85.0, y: 84.0, bend: 1 },
       },
     },
     { // hinges a degree further on the exhale, spine still flat
       t: 1,
       root: { x: 61, y: 67, rot: 12 },
-      joints: { spine: 42, neck: -12, hipR: 36, kneeR: 2, ankleR: 38 },
+      joints: { spine: 42, neck: -12, hipR: 20, kneeR: 1, ankleR: 46 },
       ik: {
         ankleL: { x: 56, y: 113.6, bend: -1 },
-        wristR: { x: 90.4, y: 84.2, bend: 1 }, wristL: { x: 85.4, y: 86.2, bend: 1 },
+        wristR: { x: 90.2, y: 86.0, bend: 1 }, wristL: { x: 85.2, y: 88.0, bend: 1 },
       },
     },
   ],
@@ -1655,10 +1763,24 @@ const BENT_KNEE_CALF_STRETCH = {
 // frog, and a top-down mat instead: without it a figure with its knees at right
 // angles seen from above is a figure squatting seen from the front.
 // v2: the switch is hip rotation, one leg externally rotated and the other
-// internally, trading places. Three-quarter camera because straight on the
-// rotation happens along the line of sight.
+// internally, trading places.
+//
+// v3 fixed two things a reviewer caught. The legs were splayed symmetrically,
+// hipR 84 against hipL 96, which is a butterfly sit and not a 90/90: the two
+// knees fell away from each other instead of BOTH falling to one side, so the
+// switch had nothing to switch. One thigh is now out to the side with its shin
+// trailing the same way, and the other is carried in front with its shin swung
+// ACROSS the midline (negative knee flexion, which in a frontal view folds the
+// shin toward the body), and the pair trade places. Both knees to one side then
+// both to the other is what a reader can copy.
+//
+// And the mat: it ran the full height of the frame behind an upright figure,
+// which reads as a wall rather than a floor. It now covers the hips and legs
+// only, so it sits under the seated half of the body the way a floor patch
+// does. Drawn as a rectangle because the camera is looking DOWN at somebody on
+// the ground, which is also why there is no floor line.
 const HIP_SWITCH_90_90 = {
-  view: { yaw: 28, plane: "frontal" },
+  view: "front",
   loop: "pingpong",
   dur: 4.6,
   breath: 0.4,
@@ -1666,18 +1788,22 @@ const HIP_SWITCH_90_90 = {
   floor: false,
   feet: { R: { ang: 120, len: 0.85, w: 1 }, L: { ang: 120, len: 0.85, w: 1 } },
   fit: { k: 0.86 },
-  props: [{ type: "mat", top: true, x: 15, y: 4, w: 110, h: 114 }],
+  props: [{ type: "mat", top: true, x: 10, y: 56, w: 120, h: 64 }],
   keys: [
-    { // knees to the left: front shin across the body, back knee out
+    { // both knees fallen to the left: left thigh out to that side with its
+      // shin trailing, right thigh carried in front with its shin across
       t: 0,
-      root: { x: 70, y: 76, rot: 0 },
-      joints: { hipRotR: 48, hipRotL: -38, spine: -2, neck: 0, hipR: 84, kneeR: 144, hipL: 96, kneeL: 120,
+      root: { x: 70, y: 74, rot: 0 },
+      joints: { hipRotL: -40, hipRotR: 48, spine: -2, neck: 0,
+                hipL: 88, kneeL: 96, hipR: 34, kneeR: -90,
                 shoulderR: 14, elbowR: 20, shoulderL: 14, elbowL: 20 },
     },
-    { // rotated through to the other side, chest still tall
+    { // rotated through to the other side, chest still tall, the two legs
+      // having traded roles
       t: 1,
-      root: { x: 70, y: 76, rot: 0 },
-      joints: { hipRotR: -38, hipRotL: 48, spine: 2, neck: 0, hipR: 96, kneeR: 120, hipL: 84, kneeL: 144,
+      root: { x: 70, y: 74, rot: 0 },
+      joints: { hipRotR: -40, hipRotL: 48, spine: 2, neck: 0,
+                hipR: 88, kneeR: 96, hipL: 34, kneeL: -90,
                 shoulderR: 14, elbowR: 20, shoulderL: 14, elbowL: 20 },
     },
   ],
@@ -1723,25 +1849,27 @@ const DEEP_SQUAT_HOLD = {
   breathRate: 0.8,
   // A squat is only 60 units tall and at card size it was a ball. Zoomed in,
   // with the chest carried higher than it was, the hip and knee angles and the
-  // hands at the sternum all read.
+  // hands at the sternum all read. The pelvis sits at 93, not 88: at 88 the
+  // hips were level with the knees, which is a parallel squat, and the cue for
+  // this one is "as low as you can" with the heels down.
   fit: { k: 1.16, dy: -10 },
   keys: [
     { // settled at the bottom, heels down, chest tall between the knees
       t: 0,
-      root: { x: 52, y: 88, rot: 10 },
+      root: { x: 52, y: 93, rot: 10 },
       joints: { spine: 11, neck: -6 },
       ik: {
         ankleR: { x: 68, y: 113.6, bend: -1 }, ankleL: { x: 63, y: 113.6, bend: -1 },
-        wristR: { x: 76.5, y: 68.0, bend: 1 }, wristL: { x: 72.5, y: 70.0, bend: 1 },
+        wristR: { x: 76.5, y: 73.0, bend: 1 }, wristL: { x: 72.5, y: 75.0, bend: 1 },
       },
     },
     { // sinks a fraction on the exhale, heels still down, chest still up
       t: 1,
-      root: { x: 51, y: 90, rot: 12 },
+      root: { x: 51, y: 95, rot: 12 },
       joints: { spine: 13, neck: -7 },
       ik: {
         ankleR: { x: 68, y: 113.6, bend: -1 }, ankleL: { x: 63, y: 113.6, bend: -1 },
-        wristR: { x: 76.6, y: 70.0, bend: 1 }, wristL: { x: 72.6, y: 72.0, bend: 1 },
+        wristR: { x: 76.6, y: 75.0, bend: 1 }, wristL: { x: 72.6, y: 77.0, bend: 1 },
       },
     },
   ],
@@ -1866,6 +1994,9 @@ const OPEN_BOOK_THORACIC_ROTATION = {
 // up and sideways, and the sideways half cannot be drawn. What is drawn is the
 // elbow travelling from under the chest to up past the head, which is the half a
 // beginner can check.
+// Set-up numbers as in QUADRUPED_WRIST_ROCKS: rot 74 rather than 90, because an
+// arm is 37 and a thigh is 27, so all fours puts the shoulders ten units above
+// the hips with the supporting hand directly under them.
 const QUADRUPED_THORACIC_ROTATION = {
   view: "side",
   loop: "pingpong",
@@ -1876,19 +2007,19 @@ const QUADRUPED_THORACIC_ROTATION = {
   keys: [
     { // elbow tucked down under the chest
       t: 0,
-      root: { x: 52, y: 88.1, rot: 90 },
-      joints: { spine: 0, neck: -12, hipR: -90, hipL: -90, kneeR: 94, kneeL: 94,
+      root: { x: 50, y: 88, rot: 74 },
+      joints: { spine: 0, neck: -12, hipR: -74, hipL: -74, kneeR: 94, kneeL: 94,
                 ankleR: -78, ankleL: -78, shoulderR: -70, elbowR: 130, wristR: -10,
-                wristL: 60 },
-      ik: { wristL: { x: 92, y: 114.6, bend: 1 } },
+                wristL: 62 },
+      ik: { wristL: { x: 79, y: 114.6, bend: 1 } },
     },
     { // elbow turned up and past the head, hand still behind it
       t: 1,
-      root: { x: 52, y: 88.1, rot: 90 },
-      joints: { spine: 0, neck: -12, hipR: -90, hipL: -90, kneeR: 94, kneeL: 94,
+      root: { x: 50, y: 88, rot: 74 },
+      joints: { spine: 0, neck: -12, hipR: -74, hipL: -74, kneeR: 94, kneeL: 94,
                 ankleR: -78, ankleL: -78, shoulderR: 10, elbowR: 125, wristR: -10,
-                wristL: 60 },
-      ik: { wristL: { x: 92, y: 114.6, bend: 1 } },
+                wristL: 62 },
+      ik: { wristL: { x: 79, y: 114.6, bend: 1 } },
     },
   ],
 };
@@ -1937,9 +2068,16 @@ const FOAM_ROLLER_CHEST_OPENER = {
 
 // Sliding the chin straight back to make a double chin, then releasing. Side
 // view: the head travelling backwards over the neck is sagittal and invisible
-// from anywhere else. The rig has no neck slide, so it is carried by the neck
-// angle plus a small shift of the whole body, which is what the movement looks
-// like from across a room.
+// from anywhere else. The rig has no neck slide, so it is carried by the upper
+// back plus a small neck angle: released is a rounded upper back with the head
+// carried forward of the shoulders, tucked is a tall upper back with the chin
+// in and the back of the neck long.
+//
+// The neck angles are deliberately small. The first version swung the neck from
+// -21 to +28, a fifty degree nod, which is a neck exercise nobody should copy
+// from a card: a chin tuck is a slide, not a nod, and the neck is the one joint
+// in this library where an exaggerated range is a real injury risk. The spine
+// carries the difference instead.
 const CHIN_TUCKS = {
   view: "side",
   loop: "pingpong",
@@ -1950,13 +2088,13 @@ const CHIN_TUCKS = {
     { // released, head forward of the shoulders
       t: 0,
       root: { x: 66, y: 61.6, rot: 0 },
-      joints: { spine: 4, neck: -21, shoulderR: 4, elbowR: 12, shoulderL: 2, elbowL: 14 },
+      joints: { spine: 10, neck: -13, shoulderR: 4, elbowR: 12, shoulderL: 2, elbowL: 14 },
       ik: { ankleR: { x: 68, y: 113.6, bend: -1 }, ankleL: { x: 63, y: 113.6, bend: -1 } },
     },
     { // chin slides back and down, back of the neck long
       t: 1,
       root: { x: 65, y: 61.6, rot: 0 },
-      joints: { spine: -2, neck: 28, shoulderR: 4, elbowR: 12, shoulderL: 2, elbowL: 14 },
+      joints: { spine: -2, neck: 11, shoulderR: 4, elbowR: 12, shoulderL: 2, elbowL: 14 },
       ik: { ankleR: { x: 68, y: 113.6, bend: -1 }, ankleL: { x: 63, y: 113.6, bend: -1 } },
     },
   ],
@@ -1992,7 +2130,7 @@ const PRONE_SCORPION_STRETCH = {
       t: 1,
       root: { x: 70, y: 54, rot: 0 },
       joints: { spine: 0, neck: 0, shoulderR: 92, shoulderL: 92, elbowR: 8, elbowL: 8,
-                hipR: -30, hipL: 4, kneeR: 55, kneeL: 4 },
+                hipR: -52, hipL: 4, kneeR: 78, kneeL: 4 },
     },
   ],
 };

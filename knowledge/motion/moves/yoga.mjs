@@ -31,20 +31,21 @@ const WARRIOR_II = {
   breathRate: 0.8,
   farSide: "L",
   feet: { R: { ang: 86, len: 1.05, w: 0.95 }, L: { ang: 74, len: 1.0, w: 0.95 } },
+  fit: { k: 0.97, dy: -5 },
   keys: [
     { // settle into the stance
       t: 0,
-      root: { x: 70, y: 71.8, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 92, shoulderL: 90, elbowR: 2, elbowL: 2,
-                wristR: -3, wristL: -3 },
-      ik: { ankleR: { x: 98, y: 113.4, bend: -1 }, ankleL: { x: 32, y: 113.4, bend: -1 } },
+      root: { x: 70, y: 83.4, rot: 0 },
+      joints: { spine: 0, neck: 0, neckTwist: 58, shoulderR: 92, shoulderL: 90,
+                elbowR: 2, elbowL: 2, wristR: -3, wristL: -3 },
+      ik: { ankleR: { x: 102, y: 113.4, bend: -1 }, ankleL: { x: 21.9, y: 113.4, bend: -1 } },
     },
     { // sink a touch deeper and reach longer through the hands
       t: 1,
-      root: { x: 70, y: 73.4, rot: 0 },
-      joints: { spine: 1.5, neck: -1, shoulderR: 89, shoulderL: 87, elbowR: 0, elbowL: 0,
-                wristR: -1, wristL: -1 },
-      ik: { ankleR: { x: 99, y: 113.4, bend: -1 }, ankleL: { x: 31, y: 113.4, bend: -1 } },
+      root: { x: 70, y: 84.4, rot: 0 },
+      joints: { spine: 1.5, neck: -1, neckTwist: 60, shoulderR: 89, shoulderL: 87,
+                elbowR: 0, elbowL: 0, wristR: -1, wristL: -1 },
+      ik: { ankleR: { x: 102.3, y: 113.4, bend: -1 }, ankleL: { x: 20.9, y: 113.4, bend: -1 } },
     },
   ],
 };
@@ -83,6 +84,15 @@ const MOUNTAIN_POSE = {
 // knee bend with the hips travelling back. Deviating from the suggested front
 // view to SIDE: front on, a knee bent 90 degrees in the sagittal plane is pure
 // foreshortening and the pose reads as a short person with their arms up.
+// v6: the knees were driving PAST the toes, which is the one thing everybody
+// is told not to do in this pose: the pelvis sat over the heels and the knee
+// came out to x 82 against a toe at 80. Sitting the hips further back is what
+// pulls the shin upright, and sitting them back needs the chest to come
+// forward to pay for it, so the torso now carries 34 degrees of inclination
+// instead of 18 and the knee lands four units behind the toe. The arms stay in
+// line with the torso, which is what they do in the pose and what the extra
+// lean would otherwise have cost them. armOverHead because at this angle the
+// arms really do pass in front of the face.
 const CHAIR_POSE = {
   view: "side",
   loop: "hold",
@@ -90,18 +100,19 @@ const CHAIR_POSE = {
   breath: 1.0,
   breathRate: 0.8,
   fit: { k: 0.94, dy: 4 },
+  armOverHead: true,
   keys: [
     { // sit back, thighs on their way to parallel, arms alongside the ears
       t: 0,
-      root: { x: 58, y: 78, rot: 0 },
-      joints: { spine: 18, neck: -14, shoulderR: 138, shoulderL: 132, elbowR: 8, elbowL: 10,
+      root: { x: 49, y: 79.5, rot: 0 },
+      joints: { spine: 34, neck: -22, shoulderR: 118, shoulderL: 112, elbowR: 6, elbowL: 8,
                 wristR: -6, wristL: -6 },
       ik: { ankleR: { x: 68, y: 113.4, bend: -1 }, ankleL: { x: 64, y: 113.4, bend: -1 } },
     },
     { // sink a touch lower and reach longer through the fingertips
       t: 1,
-      root: { x: 56.5, y: 80.5, rot: 0 },
-      joints: { spine: 20, neck: -16, shoulderR: 142, shoulderL: 136, elbowR: 2, elbowL: 4,
+      root: { x: 48, y: 81, rot: 0 },
+      joints: { spine: 35, neck: -23, shoulderR: 120, shoulderL: 114, elbowR: 2, elbowL: 4,
                 wristR: -3, wristL: -3 },
       ik: { ankleR: { x: 68, y: 113.4, bend: -1 }, ankleL: { x: 64, y: 113.4, bend: -1 } },
     },
@@ -152,6 +163,16 @@ const WARRIOR_I = {
 // rolled over: root.rot in the front view is a lateral lean. farSide is the
 // bent front leg and the planted hand, which keeps the long reaching line in
 // the bright tone where it belongs.
+// v6: the bottom hand stopped six units short of the floor on an arm bent 33
+// degrees at the settle and 42 at the deepest point, so the reaching line that
+// is the whole pose ended in mid air. It is on the floor now with the arm at 37
+// of 37. The front shin also leaned, knee four units outside the ankle, which
+// is the fault this pose gets people hurt with: the stance came in so the thigh
+// is level with the knee stacked straight over the ankle, and the back leg was
+// pushed out the last unit it needed to read dead straight. The root holds
+// still between the two keys: sinking it a unit put 151 degrees of flexion in
+// the front hip and bent both knees, and a hold has no business changing a
+// joint angle the pose is judged on.
 const EXTENDED_SIDE_ANGLE = {
   view: "front",
   loop: "hold",
@@ -167,21 +188,21 @@ const EXTENDED_SIDE_ANGLE = {
     { // settle over the front leg, hand down, top arm long over the ear
       t: 0,
       root: { x: 70, y: 84, rot: -57 },
-      joints: { spine: 0, neck: 4, shoulderR: -74, shoulderL: 0, elbowR: 4, elbowL: 8,
+      joints: { spine: 0, neck: 4, shoulderR: -74, shoulderL: 0, elbowR: 2, elbowL: 0,
                 wristR: -4, wristL: 40 },
       ik: {
-        wristL: { x: 24.0, y: 110.4, bend: 1 },
-        ankleR: { x: 112, y: 113.4, bend: -1 }, ankleL: { x: 36, y: 113.4, bend: -1 },
+        wristL: { x: 25.4, y: 112.3, bend: 1 },
+        ankleR: { x: 113, y: 113.4, bend: -1 }, ankleL: { x: 40, y: 113.4, bend: -1 },
       },
     },
     { // lengthen the side body: the top hand reaches further along the line
       t: 1,
-      root: { x: 70.6, y: 84.6, rot: -59 },
-      joints: { spine: 0, neck: 5, shoulderR: -74, shoulderL: 0, elbowR: 0, elbowL: 5,
+      root: { x: 70, y: 84, rot: -57 },
+      joints: { spine: 0, neck: 5, shoulderR: -76, shoulderL: 0, elbowR: 0, elbowL: 0,
                 wristR: -2, wristL: 40 },
       ik: {
-        wristL: { x: 23.4, y: 110.6, bend: 1 },
-        ankleR: { x: 113, y: 113.4, bend: -1 }, ankleL: { x: 35.4, y: 113.4, bend: -1 },
+        wristL: { x: 25.0, y: 112.6, bend: 1 },
+        ankleR: { x: 113, y: 113.4, bend: -1 }, ankleL: { x: 40, y: 113.4, bend: -1 },
       },
     },
   ],
@@ -192,6 +213,17 @@ const EXTENDED_SIDE_ANGLE = {
 // the body makes a triangle with the floor. What must be visible is the two
 // straight legs and the vertical top arm, which is the difference between this
 // and Extended Side Angle; front view, with the lean carried by root.rot.
+// v6: the tip was only 38 degrees and the bottom hand hung a hand's width clear
+// of the shin, so the card read as somebody starting to lean rather than as
+// triangle: nothing was being stretched and nothing was being touched. The
+// torso tips 56 now, which is what brings the shoulder low enough for a nearly
+// straight arm to reach the shin, and the hand lands on it. The back knee also
+// carried 14 degrees of bend, so the stance was widened until both legs read
+// dead straight. The top arm is pinned straight up rather than authored as a
+// shoulder angle: with the torso rolled this far the shoulder line is 34
+// degrees off vertical, so the angle that puts the arm in line with the
+// shoulders is NOT the angle that puts it perpendicular to the floor, and
+// perpendicular to the floor is the pose.
 const TRIANGLE_POSE = {
   view: "front",
   loop: "hold",
@@ -199,28 +231,28 @@ const TRIANGLE_POSE = {
   breath: 1.0,
   breathRate: 0.76,
   farSide: "R",
-  fit: { k: 0.88, dy: 6 },
+  fit: { k: 0.86, dy: 4 },
   // Warrior II stance again: both feet long, back toes turned in a touch.
   feet: { R: { ang: 74, len: 1.0, w: 0.95 }, L: { ang: 86, len: 1.05, w: 0.95 } },
   keys: [
-    { // settle: hand to the shin, top arm stacked over the shoulder
+    { // settle: hand to the shin, top arm straight up over the shoulder
       t: 0,
-      root: { x: 70, y: 72, rot: -38 },
-      joints: { spine: 0, neck: 6, shoulderR: 218, shoulderL: 0, elbowR: 3, elbowL: 2,
-                wristR: -4, wristL: 4 },
+      root: { x: 70, y: 76, rot: -56 },
+      joints: { spine: 0, neck: 8, shoulderL: 0, elbowR: 0, elbowL: 0,
+                wristR: -2, wristL: 20 },
       ik: {
-        wristL: { x: 35.6, y: 91.6, bend: 1 },
-        ankleR: { x: 100, y: 113.4, bend: -1 }, ankleL: { x: 28, y: 113.4, bend: -1 },
+        wristR: { x: 52, y: 12.2, bend: 1 }, wristL: { x: 37, y: 106, bend: 1 },
+        ankleR: { x: 104, y: 113.4, bend: -1 }, ankleL: { x: 26, y: 113.4, bend: -1 },
       },
     },
-    { // tip a degree further and lengthen through the top fingertips
+    { // lengthen through both hands; the root holds still so the legs stay long
       t: 1,
-      root: { x: 70, y: 72.6, rot: -40 },
-      joints: { spine: 0, neck: 7, shoulderR: 220, shoulderL: 0, elbowR: 0, elbowL: 1,
-                wristR: -2, wristL: 4 },
+      root: { x: 70, y: 76, rot: -56 },
+      joints: { spine: 0, neck: 9, shoulderL: 0, elbowR: 0, elbowL: 0,
+                wristR: 0, wristL: 22 },
       ik: {
-        wristL: { x: 35.0, y: 93.7, bend: 1 },
-        ankleR: { x: 100.5, y: 113.4, bend: -1 }, ankleL: { x: 27.5, y: 113.4, bend: -1 },
+        wristR: { x: 52.4, y: 11.9, bend: 1 }, wristL: { x: 36.6, y: 106.8, bend: 1 },
+        ankleR: { x: 104, y: 113.4, bend: -1 }, ankleL: { x: 26, y: 113.4, bend: -1 },
       },
     },
   ],
@@ -241,22 +273,22 @@ const WARRIOR_III = {
   keys: [
     { // level: standing leg vertical, lifted leg in line with the torso
       t: 0,
-      root: { x: 60, y: 60.6, rot: 86 },
+      root: { x: 60, y: 60.0, rot: 86 },
       joints: { spine: 0, neck: 34, hipL: -176, kneeL: 2, ankleL: -4,
                 shoulderR: -4, shoulderL: -2, elbowR: 8, elbowL: 10 },
       ik: {
         ankleR: { x: 60, y: 113.4, bend: -1 },
-        wristR: { x: 125.0, y: 52.8, bend: 1 }, wristL: { x: 125.0, y: 47.8, bend: 1 },
+        wristR: { x: 126.0, y: 52.0, bend: 1 }, wristL: { x: 125.6, y: 47.2, bend: 1 },
       },
     },
     { // lift the back leg a degree higher and reach longer through the hands
       t: 1,
-      root: { x: 60, y: 60.2, rot: 86 },
+      root: { x: 60, y: 59.8, rot: 86 },
       joints: { spine: 0, neck: 36, hipL: -180, kneeL: 1, ankleL: -2,
                 shoulderR: -2, shoulderL: 0, elbowR: 3, elbowL: 5 },
       ik: {
         ankleR: { x: 60, y: 113.4, bend: -1 },
-        wristR: { x: 125.5, y: 50.8, bend: 1 }, wristL: { x: 125.5, y: 45.8, bend: 1 },
+        wristR: { x: 126.4, y: 50.2, bend: 1 }, wristL: { x: 126.0, y: 45.3, bend: 1 },
       },
     },
   ],
@@ -274,7 +306,19 @@ const WARRIOR_III = {
 // long, which is true of the pose in life as well, so the hand goes on a BLOCK,
 // the same block Half Moon uses. The top arm also pointed backwards down the
 // body rather than up; it is near vertical now, as far as the shoulder
-// extension limit allows. `wristL` lays the mitt ALONG the block top.
+// extension limit allows.
+// v6: three things. The block was pinned at x 73, which is between the two
+// feet: a prop is drawn in SCREEN space and does not orbit with the yawed
+// camera, so it had drifted out from under a hand that was nowhere near it
+// anyway. It now sits beside the front foot with the hand flat on top of it,
+// which is the only reason the block is in the pose. Second, the hand hung off
+// a bent arm (28 degrees at the settle, 44 at the deepest point); the bottom
+// arm in this pose is vertical and straight, and it is now 37 of 37 at both
+// keys. Third, and worst for a pose whose whole name is two straight legs, the
+// FRONT knee carried 22 degrees of bend and the back knee 20 at the settle,
+// because the root sank a unit while the feet stayed pinned. The root holds
+// still now and the stance is set so both legs read dead straight; the settle
+// is carried by the twist deepening instead.
 const REVOLVED_TRIANGLE = {
   view: { yaw: 24, plane: "sagittal" },
   loop: "hold",
@@ -282,26 +326,26 @@ const REVOLVED_TRIANGLE = {
   breath: 1.0,
   breathRate: 0.76,
   fit: { k: 0.9, dy: 2 },
-  props: [{ type: "box", x: 73, y: 97, w: 15, block: true }],
+  props: [{ type: "box", x: 87, y: 98, w: 13, block: true }],
   keys: [
     { // folded over the front leg, bottom hand flat on the block, top arm up
       t: 0,
       root: { x: 58, y: 72, rot: 56 },
-      joints: { spineTwist: 46, spine: 16, neck: -24, shoulderR: 132, elbowR: 6, elbowL: 10,
-                wristR: -6, wristL: 60 },
-      ik: {
-        wristL: { x: 81, y: 94, bend: 1 },
-        ankleR: { x: 90, y: 113.4, bend: -1 }, ankleL: { x: 28, y: 113.4, bend: -1 },
-      },
-    },
-    { // settle deeper into the fold and open the top shoulder further
-      t: 1,
-      root: { x: 58, y: 73, rot: 58 },
-      joints: { spineTwist: 50, spine: 17, neck: -26, shoulderR: 134, elbowR: 2, elbowL: 8,
+      joints: { spineTwist: 46, spine: 16, neck: -24, shoulderR: 132, elbowR: 2, elbowL: 0,
                 wristR: -4, wristL: 60 },
       ik: {
-        wristL: { x: 81, y: 94.4, bend: 1 },
-        ankleR: { x: 90, y: 113.4, bend: -1 }, ankleL: { x: 28, y: 113.4, bend: -1 },
+        wristL: { x: 100, y: 101, bend: 1 },
+        ankleR: { x: 91.8, y: 113.4, bend: -1 }, ankleL: { x: 26.3, y: 113.4, bend: -1 },
+      },
+    },
+    { // settle into the revolve and open the top shoulder further
+      t: 1,
+      root: { x: 58, y: 72, rot: 56 },
+      joints: { spineTwist: 50, spine: 16, neck: -26, shoulderR: 134, elbowR: 2, elbowL: 0,
+                wristR: -4, wristL: 60 },
+      ik: {
+        wristL: { x: 101, y: 101.5, bend: 1 },
+        ankleR: { x: 91.8, y: 113.4, bend: -1 }, ankleL: { x: 26.3, y: 113.4, bend: -1 },
       },
     },
   ],
@@ -326,7 +370,7 @@ const TREE_POSE = {
   keys: [
     { // find the balance, sole pressed into the inner thigh, arms up in a V
       t: 0,
-      root: { x: 72, y: 61.6, rot: 0 },
+      root: { x: 72, y: 61.3, rot: 0 },
       joints: { spine: 0, neck: 0, hipL: 35, kneeL: 134,
                 shoulderR: 168, shoulderL: 168, elbowR: 8, elbowL: 8, wristR: 0, wristL: 0 },
       ik: { ankleR: { x: 78, y: 113.4, bend: -1 } },
@@ -356,6 +400,11 @@ const TREE_POSE = {
 // front of the STERNUM: pinned lower and with `bend: -1`, the elbows drop to
 // chest height and cross, and the two mitts stack on the midline just under the
 // chin, which is the shape a reader can copy.
+// v6: the standing knee was falling ten units inside its own ankle, which on
+// the leg carrying the whole body is the collapse this pose is meant to teach
+// people out of. A frontal move bends a pinned knee LATERALLY unless the pin
+// carries `pole: [0, 0, -1]`, which puts the bend back in the sagittal plane;
+// with that and `bend: 1` the shin comes upright and the knee tracks the foot.
 const EAGLE_POSE = {
   view: "front",
   loop: "hold",
@@ -371,7 +420,7 @@ const EAGLE_POSE = {
       joints: { forearmPronR: 62, forearmPronL: 44, hipAbdR: -26, hipRotR: -22,
                 spine: 2, neck: 0, wristR: -35, wristL: -15 },
       ik: {
-        ankleL: { x: 68, y: 113.4, bend: -1 }, ankleR: { x: 58, y: 100, bend: -1 },
+        ankleL: { x: 68, y: 113.4, bend: 1, pole: [0, 0, -1] }, ankleR: { x: 58, y: 100, bend: -1 },
         wristR: { x: 68.5, y: 38.0, bend: -1 }, wristL: { x: 71.5, y: 35.0, bend: -1 },
       },
     },
@@ -381,19 +430,30 @@ const EAGLE_POSE = {
       joints: { forearmPronR: 64, forearmPronL: 46, hipAbdR: -28, hipRotR: -24,
                 spine: 3, neck: 1, wristR: -35, wristL: -15 },
       ik: {
-        ankleL: { x: 68, y: 113.4, bend: -1 }, ankleR: { x: 57, y: 99, bend: -1 },
+        ankleL: { x: 68, y: 113.4, bend: 1, pole: [0, 0, -1] }, ankleR: { x: 57, y: 99, bend: -1 },
         wristR: { x: 68.5, y: 40.0, bend: -1 }, wristL: { x: 71.5, y: 37.0, bend: -1 },
       },
     },
   ],
 };
 
-// Balancing on one straight leg with the bottom hand on the floor ahead of it,
-// the other leg lifted to hip height and level, and the top arm straight up, the
-// whole body stacked in one plane. What must be visible is the lifted leg
-// horizontal and clear of the floor with the standing leg straight. Front view,
-// because half moon is a frontal plane pose and the lean is carried by rolling
-// the root.
+// Standing on one straight leg with the bottom hand down on a block ahead of
+// that foot, the other leg lifted to hip height and level, and the top arm
+// straight up, the whole body stacked in one plane. What must be visible is the
+// lifted leg horizontal and clear of the floor with the standing leg straight.
+// Front view, because half moon is a frontal plane pose and the lean is carried
+// by rolling the root.
+// v6: the torso and the lifted leg were both on the SAME side of the pelvis,
+// which is not this pose at all: the body tipped away from the standing foot
+// and the raised leg went with it, so the card read as a standing side bend
+// with a leg swung out. Half moon is one long horizontal line THROUGH the
+// pelvis with the standing leg dropping vertically out of the middle of it, so
+// the root now rolls TOWARD the standing leg (rot positive, +74) and the lifted
+// leg runs out the other way. The standing leg is dead straight and vertical
+// under its own hip, which it was not before either (19 degrees of knee bend on
+// the leg the whole balance sits on). The bottom hand cannot reach the floor
+// from a straight standing leg on this body, which is why the block is there,
+// and it now lands ON the block top rather than beside it.
 const HALF_MOON_POSE = {
   view: "front",
   loop: "hold",
@@ -401,29 +461,35 @@ const HALF_MOON_POSE = {
   breath: 1.0,
   breathRate: 0.74,
   farSide: "L",
-  fit: { k: 0.9, dy: 4 },
-  feet: { R: { ang: 8, len: 0.4, w: 1.3 }, L: { ang: -70, len: 0.8, w: 1.0 } },
-  // The block top sits where the hand can actually get to. It used to be at
-  // 98, three units under a hand that was already at full arm stretch, so the
-  // mitt hovered over it in the open grip instead of lying flat on it.
-  props: [{ type: "box", x: 28, y: 92, w: 17, block: true }],
+  // Wide in both directions: the lifted toes at one end, the head and the top
+  // hand at the other, so the whole line needs the zoom.
+  fit: { k: 0.78, dy: 6 },
+  // The standing foot points down the mat, which in this view is toward the
+  // planted hand. The lifted foot is flexed, so its toes drop rather than
+  // trailing behind the shin.
+  feet: { R: { ang: 86, len: 1.0, w: 0.95 }, L: { ang: 14, len: 0.75, w: 1.05 } },
+  // The block top sits where a straight arm hanging from that shoulder actually
+  // gets to. Lower than this and the hand hovers; higher and the arm folds.
+  props: [{ type: "box", x: 91, y: 96.6, w: 15, block: true }],
   keys: [
     { // find the balance: bottom hand flat on the block, top leg level
       t: 0,
-      root: { x: 74, y: 66.8, rot: -42 },
-      joints: { spine: 0, neck: 8, shoulderR: -138, elbowR: 3, wristR: -2, wristL: 44 },
+      root: { x: 66, y: 56.1, rot: 74 },
+      joints: { spine: 0, neck: 0, hipL: 16, kneeL: 2, shoulderL: 105, elbowL: 0,
+                wristL: -2, wristR: 0 },
       ik: {
-        wristL: { x: 39.0, y: 87.7, bend: 1 },
-        ankleR: { x: 88, y: 113.4, bend: -1, tol: 1.0 }, ankleL: { x: 18, y: 71, bend: -1 },
+        ankleR: { x: 67.5, y: 113.4, bend: -1, tol: 1.0 },
+        wristR: { x: 98.2, y: 96.4, bend: 1 },
       },
     },
     { // open a degree further and press the lifted heel away
       t: 1,
-      root: { x: 74, y: 66.4, rot: -44 },
-      joints: { spine: 0, neck: 9, shoulderR: -140, elbowR: 0, wristR: 0, wristL: 44 },
+      root: { x: 66, y: 56.1, rot: 76 },
+      joints: { spine: 0, neck: -1, hipL: 18, kneeL: 1, shoulderL: 106, elbowL: 0,
+                wristL: 0, wristR: 0 },
       ik: {
-        wristL: { x: 38.9, y: 88.8, bend: 1 },
-        ankleR: { x: 88, y: 113.4, bend: -1, tol: 1.0 }, ankleL: { x: 16, y: 69, bend: -1 },
+        ankleR: { x: 67.5, y: 113.4, bend: -1, tol: 1.0 },
+        wristR: { x: 98.6, y: 97.0, bend: 1 },
       },
     },
   ],
@@ -453,7 +519,7 @@ const DANCERS_POSE = {
                 elbowL: 4, wristL: -70, wristR: -4 },
       ik: {
         ankleR: { x: 60, y: 113.4, bend: -1 },
-        wristL: { x: 42, y: 47, bend: 1 }, wristR: { x: 112, y: 46, bend: 1 },
+        wristL: { x: 42, y: 47, bend: 1 }, wristR: { x: 114.3, y: 46.5, bend: 1 },
       },
     },
     { // kick the held foot a touch higher and lengthen the front arm
@@ -463,7 +529,7 @@ const DANCERS_POSE = {
                 elbowL: 2, wristL: -70, wristR: -2 },
       ik: {
         ankleR: { x: 60, y: 113.4, bend: -1 },
-        wristL: { x: 41, y: 45, bend: 1 }, wristR: { x: 114, y: 44, bend: 1 },
+        wristL: { x: 41, y: 45, bend: 1 }, wristR: { x: 115.6, y: 44.2, bend: 1 },
       },
     },
   ],
@@ -568,6 +634,16 @@ const BOAT_POSE = {
 // which is the one camera that carries a squat AND an axial twist: the chair is
 // authored sagittally like Chair Pose, the revolve is `spineTwist`, and the
 // hands press together in front of the sternum where the twist carries them.
+// v6: the knee was two units PAST the toe, inherited from the version of Chair
+// this was cut from, so the card taught the knees-forward squat. The hips sit
+// back the same way Chair's do now and the knee lands four units behind the
+// toe, with the chest coming forward to 40 degrees to pay for it.
+// What is still NOT here: the low elbow hooked outside the far thigh, which is
+// the half of this pose that is not a squat. With the palms at the sternum the
+// elbow lands about twelve units above the thigh, and closing that needs the
+// chest folded to nearly 60 degrees, which was tried and read as a hunch rather
+// than a twist. The hands at the heart plus the rotation is what this camera
+// can carry honestly.
 const REVOLVED_CHAIR_POSE = {
   view: { yaw: 36, plane: "sagittal" },
   loop: "hold",
@@ -578,22 +654,22 @@ const REVOLVED_CHAIR_POSE = {
   keys: [
     { // sat low, palms pressed together, the low elbow hooked across the thigh
       t: 0,
-      root: { x: 58, y: 80, rot: 0 },
-      joints: { spine: 20, neck: -4, spineTwist: 44, wristR: 8, wristL: 8 },
+      root: { x: 49, y: 79.5, rot: 0 },
+      joints: { spine: 40, neck: -12, spineTwist: 44, wristR: 8, wristL: 8 },
       ik: {
         ankleR: { x: 68, y: 113.4, bend: -1 }, ankleL: { x: 64, y: 113.4, bend: -1 },
-        wristR: { rel: "chest", x: 9, y: 5, bend: 1 },
-        wristL: { rel: "chest", x: 22, y: 7, bend: 1 },
+        wristR: { rel: "chest", x: 9, y: 7, bend: 1 },
+        wristL: { rel: "chest", x: 21, y: 9, bend: 1 },
       },
     },
     { // deepen the twist and sit a touch lower
       t: 1,
-      root: { x: 57, y: 82, rot: 0 },
-      joints: { spine: 21, neck: -5, spineTwist: 48, wristR: 8, wristL: 8 },
+      root: { x: 48, y: 81, rot: 0 },
+      joints: { spine: 41, neck: -13, spineTwist: 48, wristR: 8, wristL: 8 },
       ik: {
         ankleR: { x: 68, y: 113.4, bend: -1 }, ankleL: { x: 64, y: 113.4, bend: -1 },
-        wristR: { rel: "chest", x: 9, y: 5, bend: 1 },
-        wristL: { rel: "chest", x: 22, y: 7, bend: 1 },
+        wristR: { rel: "chest", x: 9, y: 7, bend: 1 },
+        wristL: { rel: "chest", x: 21, y: 9, bend: 1 },
       },
     },
   ],
@@ -799,6 +875,13 @@ const WHEEL_POSE = {
 // closes the gap, because the more the chest opens the LOWER the shoulder
 // travels, and the hands come with it; spine -38 is as far as the hip extension
 // check allows before the thighs stop reading as vertical.
+// v6: the whole figure was kneeling four units above its own mat. The foot was
+// fully pointed at ankle -50, which on a horizontal shin puts the TOE lower
+// than the shin and made the toe the contact point, so the shins and knees
+// floated. The foot lies flatter now (-68, the top of the foot along the mat,
+// which is where it goes in this pose) and the root drops the three units that
+// buys, putting the knees and shins on the mat and the hands still on the
+// heels.
 const CAMEL_POSE = {
   view: "side",
   loop: "hold",
@@ -809,17 +892,17 @@ const CAMEL_POSE = {
   keys: [
     { // settled into the arch, hips over the knees, hands on the heels
       t: 0,
-      root: { x: 56, y: 84, rot: 0 },
+      root: { x: 56, y: 87, rot: 0 },
       joints: { spine: -38, neck: -32, hipR: 6, hipL: 7, kneeR: 99, kneeL: 100,
-                ankleR: -50, ankleL: -50, wristR: 14, wristL: 14 },
-      ik: { wristR: { x: 38, y: 96.4, bend: 1 }, wristL: { x: 35, y: 97.9, bend: 1 } },
+                ankleR: -68, ankleL: -68, wristR: 14, wristL: 14 },
+      ik: { wristR: { x: 38, y: 99.4, bend: 1 }, wristL: { x: 35, y: 100.9, bend: 1 } },
     },
     { // press the hips a touch further forward and open the chest more
       t: 1,
-      root: { x: 57, y: 84, rot: 0 },
+      root: { x: 57, y: 87, rot: 0 },
       joints: { spine: -39, neck: -34, hipR: 7, hipL: 8, kneeR: 100, kneeL: 101,
-                ankleR: -50, ankleL: -50, wristR: 14, wristL: 14 },
-      ik: { wristR: { x: 39, y: 96.8, bend: 1 }, wristL: { x: 36, y: 98.3, bend: 1 } },
+                ankleR: -68, ankleL: -68, wristR: 14, wristL: 14 },
+      ik: { wristR: { x: 39, y: 99.8, bend: 1 }, wristL: { x: 36, y: 101.3, bend: 1 } },
     },
   ],
 };
@@ -865,6 +948,14 @@ const KING_PIGEON_POSE = {
 // and spine in one long line, legs straight with the heels reaching down. What
 // must be visible is the inverted V with the hips as the highest point. Side
 // view, and the root is tipped face down.
+// v6: the arms were bent 50 degrees and the front knee 26, which is the sagging
+// version of this pose that every teacher spends the class correcting, and the
+// far foot never made it to its pin at all: the leg was too short to reach, so
+// the solver clamped it and the heel hung three units in the air. The front
+// line is now ONE line, shoulder angle 180 to the torso with the arm at 37 of
+// 37, both knees straight, and both feet pinned where the leg genuinely gets
+// to. Paying for that took the hips a little higher and the stance a little
+// longer, which is also what the pose asks for.
 const DOWNWARD_FACING_DOG = {
   view: "side",
   loop: "hold",
@@ -875,20 +966,20 @@ const DOWNWARD_FACING_DOG = {
   keys: [
     { // settled: hips high, arms and back one line, heels down
       t: 0,
-      root: { x: 56, y: 66, rot: 127 },
+      root: { x: 56, y: 62, rot: 136 },
       joints: { spine: 0, neck: -8, wristR: 40, wristL: 40 },
       ik: {
-        wristR: { x: 96, y: 113, bend: 1 }, wristL: { x: 92, y: 113, bend: 1 },
-        ankleR: { x: 34.6, y: 113.4, bend: -1 }, ankleL: { x: 30.6, y: 113.4, bend: -1 },
+        wristR: { x: 103, y: 113, bend: 1 }, wristL: { x: 99, y: 113, bend: 1 },
+        ankleR: { x: 42, y: 113.4, bend: -1 }, ankleL: { x: 46, y: 113.4, bend: -1 },
       },
     },
     { // lift the hips a touch higher and press the heels further down
       t: 1,
-      root: { x: 55, y: 63.5, rot: 129 },
+      root: { x: 55.5, y: 61, rot: 137 },
       joints: { spine: 0, neck: -8, wristR: 40, wristL: 40 },
       ik: {
-        wristR: { x: 96, y: 113, bend: 1 }, wristL: { x: 92, y: 113, bend: 1 },
-        ankleR: { x: 33.6, y: 113.4, bend: -1 }, ankleL: { x: 29.6, y: 113.4, bend: -1 },
+        wristR: { x: 103, y: 113, bend: 1 }, wristL: { x: 99, y: 113, bend: 1 },
+        ankleR: { x: 42, y: 113.4, bend: -1 }, ankleL: { x: 46, y: 113.4, bend: -1 },
       },
     },
   ],
@@ -1008,6 +1099,14 @@ const BUTTERFLY_POSE = {
 // must be visible is the long back leg on the floor with the front leg folded
 // under the hip. Side view. The torso carries a real forward fold, because the
 // figure cannot keep an upright chest over a leg stretched that far behind.
+// v6: the front knee hung fifteen units above its own mat, which is the one
+// contact this pose is about. A shin lying ACROSS the body points at a side
+// camera, and drawing it at full length in the sagittal plane threw the knee up
+// to pay for it. `hipRotR` at its limit swings the shin out of the plane so the
+// camera sees about three quarters of it, and with the thigh and the knee fold
+// re-cut around that the knee, the foot and the back leg all come down onto the
+// mat. The knee still rides three units proud: the shin cannot leave the plane
+// any further without breaking the hip rotation limit.
 const PIGEON_POSE = {
   view: "side",
   loop: "hold",
@@ -1019,16 +1118,16 @@ const PIGEON_POSE = {
   keys: [
     { // settled over the front leg, back leg long
       t: 0,
-      root: { x: 74, y: 103, rot: 0 },
-      joints: { spine: 42, neck: 16, hipR: 100, kneeR: 150, ankleR: 46,
-                hipL: -75, kneeL: 20, ankleL: -50, wristR: 20, wristL: 20 },
+      root: { x: 70, y: 106, rot: 0 },
+      joints: { spine: 44, neck: 16, hipR: 82, kneeR: 140, ankleR: 40, hipRotR: 65,
+                hipL: -78, kneeL: 4, ankleL: -78, wristR: 20, wristL: 20 },
       ik: { wristR: { x: 104, y: 112.4, bend: 1 }, wristL: { x: 100, y: 113.0, bend: 1 } },
     },
     { // breathe into the hip and let the chest travel a touch lower
       t: 1,
-      root: { x: 74, y: 103, rot: 0 },
-      joints: { spine: 45, neck: 18, hipR: 100, kneeR: 150, ankleR: 46,
-                hipL: -75, kneeL: 20, ankleL: -50, wristR: 20, wristL: 20 },
+      root: { x: 70, y: 106, rot: 0 },
+      joints: { spine: 46, neck: 18, hipR: 82, kneeR: 140, ankleR: 40, hipRotR: 65,
+                hipL: -79, kneeL: 4, ankleL: -78, wristR: 20, wristL: 20 },
       ik: { wristR: { x: 105, y: 112.6, bend: 1 }, wristL: { x: 101, y: 113.2, bend: 1 } },
     },
   ],
@@ -1082,6 +1181,11 @@ const LIZARD_POSE = {
 // the waist in line with the torso instead, which turns the pose into one long
 // diagonal from the back foot to the fingertips and gets the mass off the
 // floor without moving a single joint that the checks control.
+// v6: the whole figure hovered. A splits has the seat and both legs ON the
+// floor, and this one sat three and a half units up with the back leg four
+// clear of the mat, which is the difference between a splits and a hover over
+// one. The root drops onto the mat and both legs run level along it; the back
+// foot lies on its top (-72) rather than pointing down through the mat.
 const SPLITS = {
   view: "side",
   loop: "hold",
@@ -1093,17 +1197,17 @@ const SPLITS = {
   keys: [
     { // settled into the length, arms long in line with the torso
       t: 0,
-      root: { x: 64, y: 107, rot: 0 },
-      joints: { spine: 54, neck: -20, hipR: 86, kneeR: 2, ankleR: 20,
-                hipL: -86, kneeL: 2, ankleL: -58,
+      root: { x: 64, y: 110.5, rot: 0 },
+      joints: { spine: 54, neck: -20, hipR: 90, kneeR: 2, ankleR: 10,
+                hipL: -88, kneeL: 2, ankleL: -72,
                 shoulderR: 66, shoulderL: 62, elbowR: 6, elbowL: 8,
                 wristR: -4, wristL: -4 },
     },
     { // slide a fraction further and reach longer through the fingertips
       t: 1,
-      root: { x: 64, y: 107.4, rot: 0 },
-      joints: { spine: 55, neck: -22, hipR: 87, kneeR: 2, ankleR: 20,
-                hipL: -87, kneeL: 2, ankleL: -58,
+      root: { x: 64, y: 110.9, rot: 0 },
+      joints: { spine: 55, neck: -22, hipR: 91, kneeR: 2, ankleR: 10,
+                hipL: -89, kneeL: 2, ankleL: -72,
                 shoulderR: 72, shoulderL: 68, elbowR: 0, elbowL: 2,
                 wristR: -2, wristL: -2 },
     },
@@ -1119,6 +1223,12 @@ const SPLITS = {
 // a rest. The pelvis drops as far as the knee will go without leaving the mat
 // and the neck tucks the crown down the rest of the way. It cannot fold further
 // at the hip: 146 degrees is already almost all of the 150 the checks allow.
+// v6: it was still three units short, and the thing holding it up was the FOOT.
+// At ankle -58 the toe hangs below the line of the shin, so the toe hit the mat
+// (and went through it) while the knees and shins floated. In this pose the top
+// of the foot lies along the mat, which is ankle -80, and with the foot flat the
+// root drops the three units that were left. Knees, shins and feet are on the
+// mat now and the forehead is a finger's width off it.
 const CHILDS_POSE = {
   view: "side",
   loop: "hold",
@@ -1129,16 +1239,16 @@ const CHILDS_POSE = {
   keys: [
     { // settled, hips back toward the heels, forehead down, arms long
       t: 0,
-      root: { x: 30, y: 97.2, rot: 61 },
-      joints: { spine: 24, neck: 50, hipR: 0, hipL: 1, kneeR: 151, kneeL: 150,
-                ankleR: -58, ankleL: -58, wristR: 40, wristL: 40 },
+      root: { x: 30, y: 100, rot: 61 },
+      joints: { spine: 24, neck: 52, hipR: 0, hipL: 1, kneeR: 151, kneeL: 150,
+                ankleR: -80, ankleL: -80, wristR: 40, wristL: 40 },
       ik: { wristR: { x: 92, y: 112.6, bend: 1 }, wristL: { x: 88, y: 113.0, bend: 1 } },
     },
     { // exhale lower: the ribs melt toward the thighs and the fingers creep on
       t: 1,
-      root: { x: 30, y: 97.8, rot: 61 },
-      joints: { spine: 25, neck: 51, hipR: 0, hipL: 1, kneeR: 151, kneeL: 150,
-                ankleR: -58, ankleL: -58, wristR: 40, wristL: 40 },
+      root: { x: 30, y: 100.6, rot: 61 },
+      joints: { spine: 25, neck: 53, hipR: 0, hipL: 1, kneeR: 151, kneeL: 150,
+                ankleR: -80, ankleL: -80, wristR: 40, wristL: 40 },
       ik: { wristR: { x: 93, y: 112.8, bend: 1 }, wristL: { x: 89, y: 113.2, bend: 1 } },
     },
   ],
@@ -1178,6 +1288,9 @@ export const CAT_COW = {
 // the whole body flat on the floor. Side view, and supine means root rot is
 // NEGATIVE, which puts the head at -x and runs the legs out to +x. The only
 // motion is the breath.
+// v6: the feet stood almost straight up out of the ankles, which is a held
+// dorsiflexion and reads as somebody bracing, not resting. A relaxed supine
+// foot falls to about 45 degrees, which is ankle -40.
 const CORPSE_POSE = {
   view: "side",
   loop: "hold",
@@ -1191,14 +1304,14 @@ const CORPSE_POSE = {
       t: 0,
       root: { x: 68, y: 107.6, rot: -90 },
       joints: { spine: 0, neck: 0, hipR: 180, hipL: 178, kneeR: 2, kneeL: 3,
-                ankleR: -20, ankleL: -22, wristR: -6, wristL: -6 },
+                ankleR: -40, ankleL: -43, wristR: -6, wristL: -6 },
       ik: { wristR: { x: 74, y: 111, bend: 1 }, wristL: { x: 73, y: 110, bend: 1 } },
     },
     { // one long breath: nothing moves but the ribs
       t: 1,
       root: { x: 68, y: 108, rot: -90 },
       joints: { spine: 0, neck: 1, hipR: 181, hipL: 179, kneeR: 2, kneeL: 3,
-                ankleR: -22, ankleL: -24, wristR: -6, wristL: -6 },
+                ankleR: -42, ankleL: -45, wristR: -6, wristL: -6 },
       ik: { wristR: { x: 74, y: 111.5, bend: 1 }, wristL: { x: 73, y: 110.5, bend: 1 } },
     },
   ],

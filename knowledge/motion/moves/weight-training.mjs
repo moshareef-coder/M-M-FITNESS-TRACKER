@@ -16,6 +16,20 @@ import {
 // and merges the parts; the validator and index only ever see one MOVES map.
 import { MOVES as UPPER } from "./weight-training-upper.mjs";
 import { MOVES as LOWER } from "./weight-training-lower.mjs";
+/* NOT wired up, deliberately, and this is a decision somebody has to make.
+   weight-training-lower.mjs now exports DUMBBELL_WALKING_LUNGE and
+   DUMBBELL_BULGARIAN_SPLIT_SQUAT, because the weight training library calls
+   both of these dumbbell exercises while the animation shown is the bodyweight
+   one from calisthenics, so a user is told to fetch dumbbells and shown a
+   picture of someone with empty hands.
+
+   Mapping them here does not work. index.mjs flattens every library into one
+   lookup and the app mounts a move by NAME with no library, on the documented
+   assumption that a name in two libraries is the same object in both. Point
+   these names at the weighted moves and calisthenics gets dumbbells too, which
+   is worse. Fixing it properly means either giving the loaded versions their
+   own exercise names, which orphans anything already logged under the old ones,
+   or teaching the lookup about libraries, which is an app change. */
 
 // Feet pinned, pelvis drives the rep. Authoring a squat as hip and knee angles
 // means re-deriving both every time the depth changes; pinning the ankles means

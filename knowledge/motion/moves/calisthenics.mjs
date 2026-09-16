@@ -9,6 +9,33 @@
 
 // Plank to floor and back. The wrists are pinned so the hands stay planted
 // while the whole body rotates about the toes, which is what a push-up is.
+//
+// v3, three linked fixes, and the same three apply to every prone move in this
+// file that pins its hands to the floor.
+//
+//  - The top did not lock out. The near shoulder sat 32.8 units from a 37 unit
+//    arm, which is fifty odd degrees of elbow, and a push-up whose top is half
+//    a rep down teaches half a rep.
+//  - The far arm is what was holding the top down. In a SIDE view the rig
+//    offsets the two shoulder anchors 1.7 units each along the torso's own
+//    ANTERIOR axis, to stop the far arm hiding exactly behind the near one.
+//    For a standing figure that is a forward and backward offset and reads as
+//    depth. For a PRONE figure anterior points at the floor, so the offset
+//    becomes 3.4 units of screen HEIGHT: the far shoulder rides higher and its
+//    arm has 3.4 units further to reach, which caps how high the body can sit
+//    with both hands down. `shoulderGirdleProtL` runs along the same anterior
+//    axis, so 3.4 units of protraction on the FAR side cancels it exactly and
+//    both arms lock out together. (A push-up top really does protract, so this
+//    is at worst an honest number on the wrong side.)
+//  - The feet slid. The hips swung 12 degrees between the two keys and the
+//    ankles 12 the other way, which is not one rigid body: the toes travelled
+//    2.7 units down the floor over the rep, and on Diamond below the same
+//    pattern dragged them twelve. A prone body tips about its toes as ONE
+//    piece, and in this rig that means rot gains the tip angle, both hips lose
+//    TWICE it (rot turns the torso one way and rot+hip turns the leg the
+//    other), and the ankle gains it back so the foot keeps pointing at the
+//    floor. Both keys below are the same body at two tip angles, with the root
+//    placed so the ankle lands on the same point.
 export const PUSH_UP = {
   view: "side",
   loop: "pingpong",
@@ -17,17 +44,19 @@ export const PUSH_UP = {
   keys: [
     { // top of the rep, arms locked out, one line from heel to head
       t: 0,
-      root: { x: 69.6, y: 87.2, rot: 76.5 },
-      joints: { spine: 0, neck: -12, hipL: -153.0, hipR: -153.0, kneeL: 2, kneeR: 2,
-                ankleL: -10, ankleR: -10, wristL: 86, wristR: 86 },
-      ik: { wristR: { x: 98, y: 114.6, bend: 1 }, wristL: { x: 92, y: 114.6, bend: 1 } },
+      root: { x: 68.99, y: 84.83, rot: 73.81 },
+      joints: { spine: 0, neck: -12, hipL: -147.6, hipR: -147.6, kneeL: 2, kneeR: 2,
+                ankleL: -12.7, ankleR: -12.7, wristL: 86, wristR: 86,
+                shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 98, y: 114.6, bend: 1 }, wristL: { x: 94, y: 114.6, bend: 1 } },
     },
     { // bottom, chest just off the floor, elbows tracked back rather than flared
       t: 1,
-      root: { x: 72, y: 97.6, rot: 80 },
-      joints: { spine: 0, neck: -12, hipL: -165, hipR: -165, kneeL: 2, kneeR: 2,
-                ankleL: 2, ankleR: 2, wristL: 86, wristR: 86 },
-      ik: { wristR: { x: 98, y: 114.6, bend: 1 }, wristL: { x: 92, y: 114.6, bend: 1 } },
+      root: { x: 70.87, y: 94.11, rot: 84.25 },
+      joints: { spine: 0, neck: -12, hipL: -168.5, hipR: -168.5, kneeL: 2, kneeR: 2,
+                ankleL: -2.3, ankleR: -2.3, wristL: 86, wristR: 86,
+                shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 98, y: 114.6, bend: 1 }, wristL: { x: 94, y: 114.6, bend: 1 } },
     },
   ],
 };
@@ -64,26 +93,35 @@ const PULL_UP = {
   // The bar is nearer the camera than the figure, so at the top the head rises
   // behind it rather than through it.
   grip: { L: "closed", R: "closed" },
+  // v3: the grip went from 18 units either side of the midline to 24, and the
+  // top from root.y 51 to 49.6. Both are about where the ELBOW lands. Two bone
+  // IK puts the elbow off the shoulder to wrist axis, so when the hand sits
+  // almost directly above the shoulder that axis is vertical and the only place
+  // left for the elbow is straight out sideways, level with the bar: the old
+  // top read as a man hanging in a crucifix. Moving the hand six units wider
+  // tips the axis over, and the elbow drops below the shoulder line, which is
+  // the cue every coach gives. The hang dropped 1.4 units with it so the wider
+  // reach still leaves margin in a 37 unit arm rather than clamping at it.
   props: [{ type: "pullupBar", y: 8, x0: 24, x1: 116, front: true }],
   feet: { R: { ang: 10, len: 0.55, w: 0.95 }, L: { ang: -10, len: 0.55, w: 0.95 } },
   keys: [
     { // dead hang, arms long, feet crossed behind
       t: 0,
-      root: { x: 70, y: 74.6, rot: 0 },
+      root: { x: 70, y: 73.2, rot: 0 },
       joints: { spine: 0, neck: 0,
         hipAbdR: -34, hipAbdL: -34, ankleR: -8, ankleL: -8 },
-      ik: { wristR: { x: 88, y: 9, bend: 1 }, wristL: { x: 52, y: 9, bend: 1 },
+      ik: { wristR: { x: 94, y: 9, bend: 1 }, wristL: { x: 46, y: 9, bend: 1 },
             ankleR: { x: 66.5, y: 103, bend: 1, pole: [0, 0, -1] },
             ankleL: { x: 73.5, y: 103, bend: 1, pole: [0, 0, -1] } },
     },
     { // top, chin over the bar, elbows down and back
       t: 1,
-      root: { x: 70, y: 51, rot: 0 },
+      root: { x: 70, y: 49.6, rot: 0 },
       joints: { spine: 0, neck: 0,
         hipAbdR: -36, hipAbdL: -36, ankleR: -8, ankleL: -8 },
-      ik: { wristR: { x: 88, y: 9, bend: 1 }, wristL: { x: 52, y: 9, bend: 1 },
-            ankleR: { x: 66.5, y: 80, bend: 1, pole: [0, 0, -1] },
-            ankleL: { x: 73.5, y: 80, bend: 1, pole: [0, 0, -1] } },
+      ik: { wristR: { x: 94, y: 9, bend: 1 }, wristL: { x: 46, y: 9, bend: 1 },
+            ankleR: { x: 66.5, y: 79, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 73.5, y: 79, bend: 1, pole: [0, 0, -1] } },
     },
   ],
 };
@@ -99,22 +137,29 @@ export const WALL_PUSH_UP = {
   dur: 2.8,
   breath: 0.2,
   props: [{ type: "wall", x: 108, w: 22 }],
+  // v3: the start stood 1.9 units too close to the wall, so the "locked out"
+  // key opened with 40 degrees of elbow. Both hands are on the same wall plane
+  // now, which they have to be, and the far shoulder carries 3.4 units of
+  // protraction to cancel the rig's own near/far shoulder offset: without it
+  // the far shoulder sits 3.4 units back from the near one, its arm has that
+  // much further to reach the same wall, and it is the arm that decides how far
+  // back the body can stand.
   keys: [
     { // arms locked out, body leaning barely off vertical
       t: 0,
-      root: { x: 61, y: 62.2, rot: 10 },
-      joints: { spine: 0, neck: -5, wristR: 8, wristL: 8 },
+      root: { x: 59.1, y: 62.2, rot: 10 },
+      joints: { spine: 0, neck: -5, wristR: 8, wristL: 8, shoulderGirdleProtL: 3.4 },
       ik: {
-        wristR: { x: 102, y: 40, bend: 1 }, wristL: { x: 99, y: 42.5, bend: 1 },
+        wristR: { x: 102, y: 40, bend: 1 }, wristL: { x: 102, y: 43, bend: 1 },
         ankleR: { x: 52, y: 113.4, bend: -1 }, ankleL: { x: 55.5, y: 113.4, bend: -1 },
       },
     },
     { // chest to the wall, elbows back along the ribs, heels still down
       t: 1,
       root: { x: 67.2, y: 63.7, rot: 17 },
-      joints: { spine: 0, neck: -8, wristR: 8, wristL: 8 },
+      joints: { spine: 0, neck: -8, wristR: 8, wristL: 8, shoulderGirdleProtL: 3.4 },
       ik: {
-        wristR: { x: 102, y: 40, bend: 1 }, wristL: { x: 99, y: 42.5, bend: 1 },
+        wristR: { x: 102, y: 40, bend: 1 }, wristL: { x: 102, y: 43, bend: 1 },
         ankleR: { x: 52, y: 113.4, bend: -1 }, ankleL: { x: 55.5, y: 113.4, bend: -1 },
       },
     },
@@ -133,20 +178,27 @@ export const INCLINE_PUSH_UP = {
   breath: 0.2,
   fit: { k: 0.92, dy: 4 },
   props: [{ type: "bench", x: 68, y: 90, w: 48 }],
+  // v3: same rebuild as PUSH_UP, see the note there. The top was 49 degrees bent
+  // at the near elbow, so the rep never reached a lockout, and the far shoulder
+  // was again the thing holding the body down; 3.4 units of protraction on that
+  // side cancels the rig's prone depth offset. 36.6 of a 37 unit arm at the top,
+  // 24 at the bottom, and the feet stay on one spot on the floor.
   keys: [
     { // top, arms straight down onto the pad
       t: 0,
-      root: { x: 63.4, y: 68.9, rot: 46 },
-      joints: { spine: 0, neck: -12, hipL: -92, hipR: -92, kneeL: 2, kneeR: 2,
-                ankleL: -34, ankleR: -34, wristL: 86, wristR: 86 },
-      ik: { wristR: { x: 87.2, y: 82.9, bend: 1 }, wristL: { x: 82.2, y: 82.9, bend: 1 } },
+      root: { x: 61.56, y: 67.19, rot: 43.24 },
+      joints: { spine: 0, neck: -12, hipL: -86.5, hipR: -86.5, kneeL: 2, kneeR: 2,
+                ankleL: -36.8, ankleR: -36.8, wristL: 86, wristR: 86,
+                shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 87.2, y: 82.9, bend: 1 }, wristL: { x: 85, y: 82.9, bend: 1 } },
     },
     { // bottom, chest at the pad, elbows tracking back
       t: 1,
-      root: { x: 68.1, y: 74.4, rot: 54 },
-      joints: { spine: 0, neck: -12, hipL: -108, hipR: -108, kneeL: 2, kneeR: 2,
-                ankleL: -26, ankleR: -26, wristL: 86, wristR: 86 },
-      ik: { wristR: { x: 87.4, y: 83.2, bend: 1 }, wristL: { x: 82.4, y: 83.2, bend: 1 } },
+      root: { x: 68.92, y: 75.63, rot: 55.6 },
+      joints: { spine: 0, neck: -12, hipL: -111.2, hipR: -111.2, kneeL: 2, kneeR: 2,
+                ankleL: -24.4, ankleR: -24.4, wristL: 86, wristR: 86,
+                shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 87.2, y: 82.9, bend: 1 }, wristL: { x: 85, y: 82.9, bend: 1 } },
     },
   ],
 };
@@ -157,6 +209,14 @@ export const INCLINE_PUSH_UP = {
 // the elbows staying in. Side view. Side on the diamond shape of the hands
 // itself cannot be seen, so the hands are drawn stacked and low on the torso;
 // that placement plus the tucked elbow is the readable difference from PUSH_UP.
+// v3: rebuilt on PUSH_UP's numbers, see the long note there. Three faults, all
+// of them the same ones: the top sat 57 degrees bent at the elbow, the rep only
+// swung 26 degrees end to end (a push-up that never leaves the top), and the
+// toes hung TWELVE units clear of the floor at the top and landed on it at the
+// bottom, so the feet slid down the floor through every rep. The two keys are
+// now one rigid body at two tip angles about a fixed toe, 36.5 of a 37 unit arm
+// at the top and 24 at the bottom. The far hand moved from 87 to 89 so the far
+// arm is not the one deciding how high the body can sit.
 export const DIAMOND_PUSH_UP = {
   view: "side",
   loop: "pingpong",
@@ -165,17 +225,19 @@ export const DIAMOND_PUSH_UP = {
   keys: [
     { // top, arms locked, hands touching under the sternum
       t: 0,
-      root: { x: 69.6, y: 86.2, rot: 81.5 },
-      joints: { spine: 0, neck: -12, hipL: -163.0, hipR: -163.0, kneeL: 2, kneeR: 2,
-                ankleL: -11, ankleR: -11, wristL: 86, wristR: 86 },
-      ik: { wristR: { x: 90, y: 114.6, bend: 1 }, wristL: { x: 87, y: 114.6, bend: 1 } },
+      root: { x: 69.17, y: 85.47, rot: 74.54 },
+      joints: { spine: 0, neck: -12, hipL: -149.1, hipR: -149.1, kneeL: 2, kneeR: 2,
+                ankleL: -18, ankleR: -18, wristL: 86, wristR: 86,
+                shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 90, y: 114.6, bend: 1 }, wristL: { x: 89, y: 114.6, bend: 1 } },
     },
     { // bottom, elbows folded tight to the ribs
       t: 1,
-      root: { x: 71, y: 94, rot: 77 },
-      joints: { spine: 0, neck: -12, hipL: -154, hipR: -154, kneeL: 2, kneeR: 2,
-                ankleL: -6, ankleR: -6, wristL: 86, wristR: 86 },
-      ik: { wristR: { x: 90, y: 114.6, bend: 1 }, wristL: { x: 87, y: 114.6, bend: 1 } },
+      root: { x: 70.9, y: 94.39, rot: 84.56 },
+      joints: { spine: 0, neck: -12, hipL: -169.1, hipR: -169.1, kneeL: 2, kneeR: 2,
+                ankleL: -7.9, ankleR: -7.9, wristL: 86, wristR: 86,
+                shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 90, y: 114.6, bend: 1 }, wristL: { x: 89, y: 114.6, bend: 1 } },
     },
   ],
 };
@@ -203,23 +265,32 @@ export const DIP = {
   // at the bottom reads. It also straightens the lockout: the shoulder was 34.8
   // units from a 37 unit arm at the top and is 35.8 now, with both pins still
   // reached exactly on both bodies.
+  // v3: the rep was a partial. The top sat 29 degrees bent at the near elbow
+  // and the bottom only reached 71, where a dip goes to about 90 with the upper
+  // arm at parallel. The body drops 4.7 units further now and the top rises
+  // 0.8. The far hand moved from 70 to 74 so it is no longer the arm at full
+  // stretch deciding how high the lockout can be. The bottom was CHECKED for
+  // the thing that hurts people: at the far keyframe the shoulder is still
+  // above the elbow, so this is a dip to parallel and not the collapsed
+  // bottom position.
   props: [{ type: "dipBars", x0: 38, x1: 110, y: 70 }],
   keys: [
     { // lockout, arms straight under the shoulders, shins tucked behind
       t: 0,
-      root: { x: 73, y: 58, rot: 14 },
+      root: { x: 73, y: 57.2, rot: 14 },
       joints: { spine: 4, neck: -4, hipR: -6, hipL: -10, kneeR: 100, kneeL: 104,
                 ankleR: -20, ankleL: -20,
                 shoulderGirdleElevL: -4, shoulderGirdleElevR: -4 },
-      ik: { wristR: { x: 72, y: 68, bend: 1 }, wristL: { x: 70, y: 68.5, bend: 1 } },
+      ik: { wristR: { x: 72, y: 68, bend: 1 }, wristL: { x: 74, y: 68.5, bend: 1 } },
     },
-    { // bottom, chest down between the bars, elbows folded behind the ribs
+    { // bottom, upper arm to parallel and no further: the shoulder stays ABOVE
+      // the elbow, which is the line between a dip and the shoulder injury
       t: 1,
-      root: { x: 73, y: 64, rot: 20 },
+      root: { x: 73, y: 68.7, rot: 20 },
       joints: { spine: 6, neck: -6, hipR: -6, hipL: -10, kneeR: 100, kneeL: 104,
                 ankleR: -20, ankleL: -20,
                 shoulderGirdleElevL: -4, shoulderGirdleElevR: -4 },
-      ik: { wristR: { x: 72, y: 68, bend: 1 }, wristL: { x: 70, y: 68.5, bend: 1 } },
+      ik: { wristR: { x: 72, y: 68, bend: 1 }, wristL: { x: 74, y: 68.5, bend: 1 } },
     },
   ],
 };
@@ -230,35 +301,54 @@ export const DIP = {
 // a laterally extended arm is foreshortened to nothing, so the long arm is
 // drawn reaching out past the head instead: that keeps the one long, one bent
 // signature, which is the whole exercise.
+// v3. The old version drew the wide hand as a long arm reaching out PAST THE
+// HEAD, because side on a laterally extended arm foreshortens to nothing. That
+// device cost the exercise: with one hand 21 units forward of the shoulder and
+// both hands on the floor, the body could only sit as high as that arm allowed,
+// so the top opened at 36 and 62 degrees of elbow and neither arm was ever
+// straight.
+//
+// The hands are world space pins now (`z` is the figure's own left to right),
+// so they sit out to the SIDES where an archer puts them and the far arm is
+// genuinely straight in three dimensions while the camera foreshortens it. They
+// keep a smaller screen stagger as well, 97 and 106, purely so the far arm is
+// visible as a second limb rather than hidden exactly behind the near one; at
+// full lateral separation and no stagger the card reads as a one-arm push-up.
+//
+// The hands also slide 20 units of `z` between the keys. That is NOT a hand
+// moving: a side camera cannot see z, so on screen both stay planted. It is the
+// only way to express the body shifting sideways over the working hand, which
+// the root has no channel for, and it is what folds the near elbow to about 90
+// degrees at the bottom while the far arm stays locked at 36.4 of 37.
 export const ARCHER_PUSH_UP = {
   view: "side",
   loop: "pingpong",
   dur: 3.0,
   breath: 0.18,
-  fit: { k: 0.76, dy: 6 },
+  fit: { k: 0.9, dy: 4 },
   keys: [
-    { // hands far apart, long arm straight, body starting to shift over the bent one
+    { // top, hands wide, both arms long, body square between them
       t: 0,
-      root: { x: 70.5, y: 92, rot: 76 },
-      joints: { spine: 0, neck: -12, hipL: -152, hipR: -152, kneeL: 2, kneeR: 2,
-                ankleL: -4, ankleR: -4, wristL: 86, wristR: 86 },
-      ik: { wristR: { x: 121, y: 114.6, bend: 1 }, wristL: { x: 95, y: 114.6, bend: 1 } },
+      root: { x: 70.47, y: 86.38, rot: 72.56 },
+      joints: { spine: 0, neck: -12, hipL: -145.2, hipR: -145.2, kneeL: 2, kneeR: 2,
+                ankleL: -7.4, ankleR: -7.4, wristL: 86, wristR: 86,
+                shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 97, y: 114.6, z: 16, bend: 1 },
+            wristL: { x: 106, y: 114.6, z: -16, bend: 1 } },
     },
-    { // chest down over the bent arm while the far hand stays out long
+    { // bottom, body shifted over the near hand: that elbow folds while the far
+      // arm stays locked out and reads short because it is pointing at the lens
       t: 1,
-      root: { x: 71, y: 94.5, rot: 78.5 },
-      joints: { spine: 0, neck: -12, hipL: -157, hipR: -157, kneeL: 2, kneeR: 2,
-                ankleL: -1, ankleR: -1, wristL: 86, wristR: 86 },
-      ik: { wristR: { x: 121, y: 114.6, bend: 1 }, wristL: { x: 95, y: 114.6, bend: 1 } },
+      root: { x: 71.71, y: 92.4, rot: 79.33 },
+      joints: { spine: 0, neck: -12, hipL: -158.7, hipR: -158.7, kneeL: 2, kneeR: 2,
+                ankleL: -0.7, ankleR: -0.7, wristL: 86, wristR: 86,
+                shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 97, y: 114.6, z: -4, bend: 1 },
+            wristL: { x: 106, y: 114.6, z: -36, bend: 1 } },
     },
   ],
 };
 
-// A push-up with the hands down beside the waist and the shoulders driven out
-// in front of them, leaning the weight forward onto straight-ish arms. Must be
-// visible: the hands level with the hips, well behind the shoulders, and the
-// forward lean of the whole body. Side view, which is the only view where the
-// hand behind the shoulder can be seen at all.
 export const PSEUDO_PLANCHE_PUSH_UP = {
   view: "side",
   loop: "pingpong",
@@ -266,18 +356,24 @@ export const PSEUDO_PLANCHE_PUSH_UP = {
   breath: 0.18,
   fit: { k: 0.88, dy: 2 },
   keys: [
+    // v3: same rigid tip about the toes as PUSH_UP. The range was 28 to 53
+    // degrees of elbow, which on a card is two frames of the same picture. It
+    // runs 17 to 71 now. This one stays a PARTIAL on purpose: with the shoulders
+    // twenty five units out in front of the hands, a full depth bottom puts the
+    // chest through the floor, and a pseudo planche push-up is a short range
+    // movement in life for the same reason.
     { // top, shoulders well past the hands, arms long and slanted back
       t: 0,
-      root: { x: 69.7, y: 93.6, rot: 77 },
-      joints: { spine: 0, neck: -12, hipL: -154, hipR: -154, kneeL: 2, kneeR: 2,
-                ankleL: -3, ankleR: -3, wristL: 120, wristR: 120 },
+      root: { x: 69.68, y: 93.37, rot: 76.7 },
+      joints: { spine: 0, neck: -12, hipL: -153.4, hipR: -153.4, kneeL: 2, kneeR: 2,
+                ankleL: -3.3, ankleR: -3.3, wristL: 120, wristR: 120 },
       ik: { wristR: { x: 74, y: 114.6, bend: 1 }, wristL: { x: 78, y: 114.6, bend: 1 } },
     },
     { // bottom, chest low, shoulders still out in front of the hands
       t: 1,
-      root: { x: 71.5, y: 97, rot: 81 },
-      joints: { spine: 0, neck: -12, hipL: -162, hipR: -162, kneeL: 2, kneeR: 2,
-                ankleL: 1, ankleR: 1, wristL: 120, wristR: 120 },
+      root: { x: 71.04, y: 101.96, rot: 86.3 },
+      joints: { spine: 0, neck: -12, hipL: -172.6, hipR: -172.6, kneeL: 2, kneeR: 2,
+                ankleL: 6.3, ankleR: 6.3, wristL: 120, wristR: 120 },
       ik: { wristR: { x: 74, y: 114.6, bend: 1 }, wristL: { x: 78, y: 114.6, bend: 1 } },
     },
   ],
@@ -287,6 +383,13 @@ export const PSEUDO_PLANCHE_PUSH_UP = {
 // wide. Must be visible: a single hand on the floor carrying the body and the
 // free arm out of the way. Side view; the wide feet are lost side on, but the
 // one supporting arm is the exercise.
+// v3: the free arm was swung 200 degrees at the shoulder and folded only 75,
+// which drew it pointing straight back into the air off the shoulder, level
+// with the body: a wing, not an arm behind the back. 180 and 130 lands the hand
+// on the lower back, where a one-arm push-up carries it, and keeps the elbow
+// just clear of the back line so the arm is still visible. Tucked any lower it
+// disappears inside the torso outline and the card reads as an ordinary push-up
+// with one arm hidden behind the other.
 export const ONE_ARM_PUSH_UP = {
   view: "side",
   loop: "pingpong",
@@ -295,18 +398,18 @@ export const ONE_ARM_PUSH_UP = {
   keys: [
     { // top, supporting arm locked, free arm along the back
       t: 0,
-      root: { x: 69.6, y: 87.2, rot: 70 },
-      joints: { spine: 0, neck: -12, hipL: -140, hipR: -140, kneeL: 2, kneeR: 2,
-                ankleL: -10, ankleR: -10, wristR: 86,
-                shoulderL: -200, elbowL: 75, wristL: 10 },
+      root: { x: 69.48, y: 86.89, rot: 69.68 },
+      joints: { spine: 0, neck: -12, hipL: -139.4, hipR: -139.4, kneeL: 2, kneeR: 2,
+                ankleL: -10.3, ankleR: -10.3, wristR: 86,
+                shoulderL: -180, elbowL: 130, wristL: 10 },
       ik: { wristR: { x: 96, y: 114.6, bend: 1 } },
     },
     { // bottom, chest low over the one hand
       t: 1,
-      root: { x: 71.5, y: 94.5, rot: 78 },
-      joints: { spine: 0, neck: -12, hipL: -156, hipR: -156, kneeL: 2, kneeR: 2,
-                ankleL: -2, ankleR: -2, wristR: 86,
-                shoulderL: -212, elbowL: 78, wristL: 10 },
+      root: { x: 71.74, y: 94.54, rot: 78.47 },
+      joints: { spine: 0, neck: -12, hipL: -156.9, hipR: -156.9, kneeL: 2, kneeR: 2,
+                ankleL: -1.5, ankleR: -1.5, wristR: 86,
+                shoulderL: -184, elbowL: 128, wristL: 10 },
       ik: { wristR: { x: 96, y: 114.6, bend: 1 } },
     },
   ],
@@ -333,7 +436,7 @@ export const DEAD_HANG = {
   keys: [
     { // hanging long, shoulders open
       t: 0,
-      root: { x: 70, y: 74.6, rot: 0 },
+      root: { x: 70, y: 75.4, rot: 0 },
       joints: { spine: 0, neck: 0,
         hipAbdR: -34, hipAbdL: -34, ankleR: -8, ankleL: -8 },
       ik: { wristR: { x: 86, y: 9, bend: 1 }, wristL: { x: 54, y: 9, bend: 1 },
@@ -342,7 +445,7 @@ export const DEAD_HANG = {
     },
     { // a breath of sway, nothing more
       t: 1,
-      root: { x: 70.5, y: 75, rot: 0 },
+      root: { x: 70.5, y: 75.45, rot: 0 },
       joints: { spine: 0, neck: 0,
         hipAbdR: -33, hipAbdL: -33, ankleR: -8, ankleL: -8 },
       ik: { wristR: { x: 86, y: 9, bend: 1 }, wristL: { x: 54, y: 9, bend: 1 },
@@ -363,21 +466,26 @@ export const INVERTED_ROW = {
   dur: 3.0,
   breath: 0.2,
   fit: { k: 0.9, dy: 2 },
-  props: [{ type: "pullupBar", y: 50, x0: 6, x1: 74 }],
+  // v3: the bar and both grips sit 5 units higher. At the old height the start
+  // key, which is supposed to be a hang with the arms long, measured 31.8 units
+  // of a 37 unit arm: 61 degrees of elbow, so the "bottom" of the row was
+  // already a third of the way pulled. Raising the bar rather than dropping the
+  // body keeps the heels on the floor where they belong.
+  props: [{ type: "pullupBar", y: 45, x0: 6, x1: 74 }],
   keys: [
     { // bottom, arms straight, body hanging off the bar in one line
       t: 0,
       root: { x: 65.1, y: 93.6, rot: -70 },
       joints: { spine: 0, neck: 4, hipL: 140, hipR: 140, kneeL: 2, kneeR: 2,
                 ankleL: 0, ankleR: 0 },
-      ik: { wristR: { x: 40, y: 50, bend: 1 }, wristL: { x: 36, y: 50.5, bend: 1 } },
+      ik: { wristR: { x: 40, y: 45, bend: 1 }, wristL: { x: 37.5, y: 45.5, bend: 1 } },
     },
     { // top, chest to the bar, elbows driven down and back, body still a line
       t: 1,
       root: { x: 68.2, y: 86.8, rot: -61.8 },
       joints: { spine: 0, neck: 6, hipL: 123.6, hipR: 123.6, kneeL: 2, kneeR: 2,
                 ankleL: 0, ankleR: 0 },
-      ik: { wristR: { x: 40, y: 50, bend: 1 }, wristL: { x: 36, y: 50.5, bend: 1 } },
+      ik: { wristR: { x: 40, y: 45, bend: 1 }, wristL: { x: 37.5, y: 45.5, bend: 1 } },
     },
   ],
 };
@@ -388,7 +496,9 @@ export const INVERTED_ROW = {
 // a negative is the lowering half only.
 export const NEGATIVE_PULL_UP = {
   // The lowering half of a pull-up, so it is Pull-Up's two keys in the other
-  // order with a oneway loop: start at the top, finish hanging.
+  // order with a oneway loop: start at the top, finish hanging. It carries
+  // Pull-Up's v3 grip width for the same reason, and the two must stay in step:
+  // a negative that hangs from a different bar than the pull-up is a bug.
   view: "front",
   facing: "away",
   loop: "oneway",
@@ -401,19 +511,19 @@ export const NEGATIVE_PULL_UP = {
   keys: [
     { // start at the top, chin over the bar
       t: 0,
-      root: { x: 70, y: 51, rot: 0 },
+      root: { x: 70, y: 49.6, rot: 0 },
       joints: { spine: 0, neck: 0,
         hipAbdR: -36, hipAbdL: -36, ankleR: -8, ankleL: -8 },
-      ik: { wristR: { x: 88, y: 9, bend: 1 }, wristL: { x: 52, y: 9, bend: 1 },
-            ankleR: { x: 66.5, y: 80, bend: 1, pole: [0, 0, -1] },
-            ankleL: { x: 73.5, y: 80, bend: 1, pole: [0, 0, -1] } },
+      ik: { wristR: { x: 94, y: 9, bend: 1 }, wristL: { x: 46, y: 9, bend: 1 },
+            ankleR: { x: 66.5, y: 79, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 73.5, y: 79, bend: 1, pole: [0, 0, -1] } },
     },
     { // finish hanging, arms long
       t: 1,
-      root: { x: 70, y: 74.6, rot: 0 },
+      root: { x: 70, y: 73.2, rot: 0 },
       joints: { spine: 0, neck: 0,
         hipAbdR: -34, hipAbdL: -34, ankleR: -8, ankleL: -8 },
-      ik: { wristR: { x: 88, y: 9, bend: 1 }, wristL: { x: 52, y: 9, bend: 1 },
+      ik: { wristR: { x: 94, y: 9, bend: 1 }, wristL: { x: 46, y: 9, bend: 1 },
             ankleR: { x: 66.5, y: 103, bend: 1, pole: [0, 0, -1] },
             ankleL: { x: 73.5, y: 103, bend: 1, pole: [0, 0, -1] } },
     },
@@ -433,6 +543,14 @@ const CHIN_UP = {
   // Same back view as Pull-Up, and the two must not look alike: the grip is
   // SHOULDER WIDTH here, not wider, and the palms face the figure, so the
   // elbows finish tight to the ribs rather than flared.
+  // v3: the hands moved from 13 units either side of the midline to 19, which
+  // is still five units narrower than Pull-Up's. The reason is the same one
+  // written out there: with the hand almost directly over the shoulder the two
+  // bone solver has nowhere to put the elbow but straight out at bar height,
+  // and the old top read as a shrug with the elbows in a crucifix. A lateral
+  // elbow pole was tried first, to fold the arm forward the way a chin-up
+  // really does. It draws well and it is a lie: the shoulder passes 200 degrees
+  // of elevation and the elbow folds 178, and the validator says so.
   view: "front",
   facing: "away",
   loop: "pingpong",
@@ -448,7 +566,7 @@ const CHIN_UP = {
       root: { x: 70, y: 74.6, rot: 0 },
       joints: { spine: 0, neck: 0, forearmPronR: -74, forearmPronL: -74,
         hipAbdR: -34, hipAbdL: -34, ankleR: -8, ankleL: -8 },
-      ik: { wristR: { x: 83, y: 9, bend: 1 }, wristL: { x: 57, y: 9, bend: 1 },
+      ik: { wristR: { x: 89, y: 9, bend: 1 }, wristL: { x: 51, y: 9, bend: 1 },
             ankleR: { x: 66.5, y: 103, bend: 1, pole: [0, 0, -1] },
             ankleL: { x: 73.5, y: 103, bend: 1, pole: [0, 0, -1] } },
     },
@@ -457,7 +575,7 @@ const CHIN_UP = {
       root: { x: 70, y: 51, rot: 0 },
       joints: { spine: 0, neck: 0, forearmPronR: -74, forearmPronL: -74,
         hipAbdR: -36, hipAbdL: -36, ankleR: -8, ankleL: -8 },
-      ik: { wristR: { x: 83, y: 9, bend: 1 }, wristL: { x: 57, y: 9, bend: 1 },
+      ik: { wristR: { x: 89, y: 9, bend: 1 }, wristL: { x: 51, y: 9, bend: 1 },
             ankleR: { x: 66.5, y: 80, bend: 1, pole: [0, 0, -1] },
             ankleL: { x: 73.5, y: 80, bend: 1, pole: [0, 0, -1] } },
     },
@@ -480,25 +598,46 @@ export const ARCHER_PULL_UP = {
   // plane channel: the shins swung sideways and crossed each other, so the hang
   // read as a frog with its feet on the floor. Pinned ankles with a lateral
   // pole put the bend back in the sagittal plane, where a hanging knee belongs.
+  // v3: the whole move was one arm length short. At the hang both elbows sat 53
+  // degrees bent, so the start of an archer pull-up was already half a rep in,
+  // and at the top the chin finished six units BELOW the bar, which is not a
+  // pull-up at all. The grip is wider (86 and 28, so 58 units across against a
+  // 24 unit shoulder) because that is what lets the far arm stay long with the
+  // chin at the bar: with the old 54 unit grip the straight arm ran out of
+  // reach 20 units below it. Hang 71.1 and top 50, with the body sliding from
+  // the middle of the grip over to the working hand.
   fit: { k: 0.8, dy: 6 },
   feet: { R: { ang: 12, len: 0.55, w: 0.95 }, L: { ang: -12, len: 0.55, w: 0.95 } },
   props: [{ type: "pullupBar", y: 8, x0: 20, x1: 110 }],
   keys: [
     { // hanging wide, both arms long, feet tucked up behind
       t: 0,
-      root: { x: 62, y: 70, rot: 0 },
+      root: { x: 57, y: 71.1, rot: 0 },
       joints: { spine: 0, neck: 0, hipAbdR: -32, hipAbdL: -32, ankleR: -8, ankleL: -8 },
-      ik: { wristR: { x: 86, y: 9, bend: 1 }, wristL: { x: 32, y: 9, bend: 1 },
-            ankleR: { x: 58.5, y: 100, bend: 1, pole: [0, 0, -1] },
-            ankleL: { x: 65.5, y: 100, bend: 1, pole: [0, 0, -1] } },
+      ik: { wristR: { x: 86, y: 9, bend: 1 }, wristL: { x: 28, y: 9, bend: 1 },
+            ankleR: { x: 53.5, y: 101, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 60.5, y: 101, bend: 1, pole: [0, 0, -1] } },
+    },
+    { // halfway. The body travels on an ARC around the far hand, not on the
+      // chord between the two ends: interpolating root x and y straight from
+      // the hang to the top pulls the far shoulder 33 units from a 36 unit
+      // reach, and the long arm folds 55 degrees in the middle of the rep. One
+      // arm bent and one arm long is the whole exercise, so the middle has to
+      // hold it too.
+      t: 0.5,
+      root: { x: 68.7, y: 61, rot: 0 },
+      joints: { spine: 0, neck: 0, hipAbdR: -32, hipAbdL: -32, ankleR: -8, ankleL: -8 },
+      ik: { wristR: { x: 86, y: 9, bend: 1 }, wristL: { x: 28, y: 9, bend: 1 },
+            ankleR: { x: 65.2, y: 91, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 72.2, y: 91, bend: 1, pole: [0, 0, -1] } },
     },
     { // pulled up to the right hand, left arm still long across the bar
       t: 1,
-      root: { x: 74, y: 56, rot: 0 },
+      root: { x: 74, y: 50, rot: 0 },
       joints: { spine: 0, neck: 0, hipAbdR: -32, hipAbdL: -32, ankleR: -8, ankleL: -8 },
-      ik: { wristR: { x: 86, y: 9, bend: 1 }, wristL: { x: 32, y: 9, bend: 1 },
-            ankleR: { x: 70.5, y: 86, bend: 1, pole: [0, 0, -1] },
-            ankleL: { x: 77.5, y: 86, bend: 1, pole: [0, 0, -1] } },
+      ik: { wristR: { x: 86, y: 9, bend: 1 }, wristL: { x: 28, y: 9, bend: 1 },
+            ankleR: { x: 70.5, y: 80, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 77.5, y: 80, bend: 1, pole: [0, 0, -1] } },
     },
   ],
 };
@@ -542,9 +681,12 @@ export const MUSCLE_UP = {
                 ankleL: -20, ankleR: -20 },
       ik: { wristR: { x: 70, y: 31, bend: 1 }, wristL: { x: 65, y: 31.5, bend: 1 } },
     },
-    { // the catch, supported above the bar with the hips still below it
+    { // the catch and the press out of it: a muscle-up does not end folded in
+      // the bottom of a dip. The old last key left 132 degrees of elbow, so the
+      // card finished in the hardest position rather than on top of the bar;
+      // 7.4 units higher takes the arms out to about 95.
       t: 1,
-      root: { x: 61.3, y: 43.4, rot: 22 },
+      root: { x: 61.3, y: 36, rot: 22 },
       joints: { spine: 0, neck: -6, hipL: -24, hipR: -22, kneeL: 100, kneeR: 98,
                 ankleL: -20, ankleR: -20 },
       ik: { wristR: { x: 70, y: 31, bend: 1 }, wristL: { x: 65, y: 31.5, bend: 1 } },
@@ -567,27 +709,36 @@ export const ONE_ARM_PULL_UP = {
   // legs crossed and the feet landed on the floor. Pinned with a lateral pole.
   // The free arm was also swung fourteen degrees out and folded twenty five,
   // which reads as a wing rather than as an arm hanging out of the way.
+  // v3, two things. The rep only travelled ten units, which left the chin a
+  // head below the bar at the far keyframe: a one-arm pull-up that never
+  // finishes is a one-arm hang, and that is a different exercise. It runs the
+  // pull-up's full range now, 75.4 down to 50, which also puts a real dead hang
+  // at the bottom (the shoulder was 33 units from a 37 unit arm before, so the
+  // working elbow sat half bent at the start). The free elbow came down from 52
+  // degrees to 12: in a FRONTAL move `elbow` is the in plane channel, so every
+  // degree of it throws the forearm out sideways, and 52 drew a forearm
+  // sticking straight out from the hip.
   fit: { k: 0.8, dy: 6 },
   feet: { R: { ang: 12, len: 0.55, w: 0.95 }, L: { ang: -12, len: 0.55, w: 0.95 } },
   props: [{ type: "pullupBar", y: 8, x0: 26, x1: 114 }],
   keys: [
     { // hanging from the one arm, free arm down by the side
       t: 0,
-      root: { x: 64, y: 72, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderL: 5, elbowL: 16,
+      root: { x: 62.5, y: 75.4, rot: 0 },
+      joints: { spine: 0, neck: 0, shoulderL: 4, elbowL: 6,
                 hipAbdR: -30, hipAbdL: -30, ankleR: -8, ankleL: -8 },
       ik: { wristR: { x: 74, y: 9, bend: 1 },
-            ankleR: { x: 61, y: 102, bend: 1, pole: [0, 0, -1] },
-            ankleL: { x: 67, y: 102, bend: 1, pole: [0, 0, -1] } },
+            ankleR: { x: 59.5, y: 105, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 65.5, y: 105, bend: 1, pole: [0, 0, -1] } },
     },
     { // pulled up under the grip, free arm counterbalancing
       t: 1,
-      root: { x: 66, y: 62, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderL: 18, elbowL: 52,
+      root: { x: 64, y: 50, rot: 0 },
+      joints: { spine: 0, neck: 0, shoulderL: 10, elbowL: 12,
                 hipAbdR: -30, hipAbdL: -30, ankleR: -8, ankleL: -8 },
       ik: { wristR: { x: 74, y: 9, bend: 1 },
-            ankleR: { x: 63, y: 92, bend: 1, pole: [0, 0, -1] },
-            ankleL: { x: 69, y: 92, bend: 1, pole: [0, 0, -1] } },
+            ankleR: { x: 61, y: 80, bend: 1, pole: [0, 0, -1] },
+            ankleL: { x: 67, y: 80, bend: 1, pole: [0, 0, -1] } },
     },
   ],
 };
@@ -806,15 +957,17 @@ export const PLANK = {
       t: 0,
       root: { x: 67.2, y: 96.5, rot: 82.5 },
       joints: { spine: 0, neck: -12, hipL: -165, hipR: -165, kneeL: 2, kneeR: 2,
-                ankleL: 0, ankleR: 0, wristL: 86, wristR: 86 },
-      ik: { wristR: { x: 111, y: 114.6, bend: 1 }, wristL: { x: 106, y: 114.6, bend: 1 } },
+                ankleL: 0, ankleR: 0, wristL: 86, wristR: 86,
+                shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 111, y: 114.6, bend: 1 }, wristL: { x: 109, y: 114.6, bend: 1 } },
     },
     { // the settle a held position always has, and nothing else
       t: 1,
       root: { x: 67.4, y: 97.2, rot: 83.2 },
       joints: { spine: 0, neck: -12, hipL: -166.4, hipR: -166.4, kneeL: 2, kneeR: 2,
-                ankleL: 1, ankleR: 1, wristL: 86, wristR: 86 },
-      ik: { wristR: { x: 111, y: 114.6, bend: 1 }, wristL: { x: 106, y: 114.6, bend: 1 } },
+                ankleL: 1, ankleR: 1, wristL: 86, wristR: 86,
+                shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 111, y: 114.6, bend: 1 }, wristL: { x: 109, y: 114.6, bend: 1 } },
     },
   ],
 };
@@ -923,19 +1076,19 @@ export const TUCK_L_SIT = {
   keys: [
     { // set, arms locked behind the hips, knees to the chest, hips off the bars
       t: 0,
-      root: { x: 71.8, y: 81.6, rot: -4 },
+      root: { x: 71.8, y: 80.98, rot: -4 },
       joints: { spine: 4, neck: 0, hipL: 122, hipR: 124, kneeL: 128, kneeR: 130,
                 ankleL: -30, ankleR: -30,
                 shoulderGirdleElevL: -4, shoulderGirdleElevR: -4 },
-      ik: { wristR: { x: 60, y: 89, bend: 1 }, wristL: { x: 56, y: 89.5, bend: 1 } },
+      ik: { wristR: { x: 60, y: 89, bend: 1 }, wristL: { x: 58, y: 89.5, bend: 1 } },
     },
     { // settle
       t: 1,
-      root: { x: 71.8, y: 82, rot: -3 },
+      root: { x: 71.8, y: 81.13, rot: -3 },
       joints: { spine: 4, neck: 1, hipL: 120, hipR: 122, kneeL: 126, kneeR: 128,
                 ankleL: -30, ankleR: -30,
                 shoulderGirdleElevL: -4, shoulderGirdleElevR: -4 },
-      ik: { wristR: { x: 60, y: 89, bend: 1 }, wristL: { x: 56, y: 89.5, bend: 1 } },
+      ik: { wristR: { x: 60, y: 89, bend: 1 }, wristL: { x: 58, y: 89.5, bend: 1 } },
     },
   ],
 };
@@ -958,19 +1111,19 @@ export const L_SIT = {
   keys: [
     { // set, legs level, toes pointed, hips clear of the bars
       t: 0,
-      root: { x: 71.8, y: 81.6, rot: -2 },
+      root: { x: 71.8, y: 80.98, rot: -2 },
       joints: { spine: 2, neck: 0, hipL: 90, hipR: 92, kneeL: 2, kneeR: 2,
                 ankleL: -45, ankleR: -45,
                 shoulderGirdleElevL: -4, shoulderGirdleElevR: -4 },
-      ik: { wristR: { x: 60, y: 89, bend: 1 }, wristL: { x: 56, y: 89.5, bend: 1 } },
+      ik: { wristR: { x: 60, y: 89, bend: 1 }, wristL: { x: 58, y: 89.5, bend: 1 } },
     },
     { // settle, legs a degree lower
       t: 1,
-      root: { x: 71.8, y: 82, rot: -1 },
+      root: { x: 71.8, y: 81.13, rot: -1 },
       joints: { spine: 2, neck: 1, hipL: 87, hipR: 89, kneeL: 2, kneeR: 2,
                 ankleL: -45, ankleR: -45,
                 shoulderGirdleElevL: -4, shoulderGirdleElevR: -4 },
-      ik: { wristR: { x: 60, y: 89, bend: 1 }, wristL: { x: 56, y: 89.5, bend: 1 } },
+      ik: { wristR: { x: 60, y: 89, bend: 1 }, wristL: { x: 58, y: 89.5, bend: 1 } },
     },
   ],
 };
@@ -990,7 +1143,7 @@ export const V_SIT = {
   keys: [
     { // set, legs high, torso leaning back under them, hips clear of the bars
       t: 0,
-      root: { x: 71, y: 81.6, rot: -12 },
+      root: { x: 71, y: 80.19, rot: -12 },
       joints: { spine: -2, neck: 6, hipL: 140, hipR: 142, kneeL: 2, kneeR: 2,
                 ankleL: -45, ankleR: -45,
                 shoulderGirdleElevL: -4, shoulderGirdleElevR: -4 },
@@ -998,7 +1151,7 @@ export const V_SIT = {
     },
     { // settle
       t: 1,
-      root: { x: 70.8, y: 82, rot: -11 },
+      root: { x: 70.8, y: 80.36, rot: -11 },
       joints: { spine: -2, neck: 7, hipL: 137, hipR: 139, kneeL: 2, kneeR: 2,
                 ankleL: -45, ankleR: -45,
                 shoulderGirdleElevL: -4, shoulderGirdleElevR: -4 },
@@ -1165,17 +1318,17 @@ const PLANCHE_LEAN = {
   keys: [
     { // leaning, hands back at the hips, body flat
       t: 0,
-      root: { x: 67.9, y: 98.6, rot: 84 },
+      root: { x: 67.9, y: 98.13, rot: 84 },
       joints: { spine: 0, neck: -12, hipL: -168.0, hipR: -168.0, kneeL: 2, kneeR: 2,
                 ankleL: 0, ankleR: 0, wristL: 120, wristR: 120 },
-      ik: { wristR: { x: 66, y: 114.6, bend: 1 }, wristL: { x: 70, y: 114.6, bend: 1 } },
+      ik: { wristR: { x: 66, y: 114.6, bend: 1 }, wristL: { x: 68, y: 114.6, bend: 1 } },
     },
     { // settle, a degree further forward
       t: 1,
-      root: { x: 68.3, y: 99.1, rot: 84.5 },
+      root: { x: 68.3, y: 98.62, rot: 84.5 },
       joints: { spine: 0, neck: -12, hipL: -169.5, hipR: -169.5, kneeL: 2, kneeR: 2,
                 ankleL: 1, ankleR: 1, wristL: 120, wristR: 120 },
-      ik: { wristR: { x: 66, y: 114.6, bend: 1 }, wristL: { x: 70, y: 114.6, bend: 1 } },
+      ik: { wristR: { x: 66, y: 114.6, bend: 1 }, wristL: { x: 68, y: 114.6, bend: 1 } },
     },
   ],
 };
@@ -1197,16 +1350,18 @@ export const TUCK_PLANCHE = {
   keys: [
     { // holding, knees under the chest, hips up, nothing on the floor but the hands
       t: 0,
-      root: { x: 52, y: 86.5, rot: 81.5 },
+      root: { x: 52, y: 83.5, rot: 81.5 },
       joints: { spine: 0, neck: -12, hipL: -19.5, hipR: -19.5, kneeL: 155, kneeR: 155,
-                ankleL: -78, ankleR: -78, wristL: 110, wristR: 110 },
+                ankleL: -78, ankleR: -78, wristL: 110, wristR: 110,
+                shoulderGirdleProtL: 3.4 },
       ik: { wristR: { x: 68, y: 114.6, bend: 1 }, wristL: { x: 70, y: 114.6, bend: 1 } },
     },
     { // settle
       t: 1,
-      root: { x: 52.5, y: 87.2, rot: 82.5 },
+      root: { x: 52.5, y: 84, rot: 82.5 },
       joints: { spine: 0, neck: -12, hipL: -21.5, hipR: -21.5, kneeL: 153, kneeR: 153,
-                ankleL: -54, ankleR: -54, wristL: 110, wristR: 110 },
+                ankleL: -54, ankleR: -54, wristL: 110, wristR: 110,
+                shoulderGirdleProtL: 3.4 },
       ik: { wristR: { x: 68, y: 114.6, bend: 1 }, wristL: { x: 70, y: 114.6, bend: 1 } },
     },
   ],
@@ -1230,17 +1385,19 @@ export const FULL_PLANCHE = {
   keys: [
     { // holding, one straight line from toe to head, nothing on the floor
       t: 0,
-      root: { x: 66, y: 86.5, rot: 81.5 },
+      root: { x: 66, y: 84.4, rot: 81.5 },
       joints: { spine: 0, neck: -12, hipL: -163, hipR: -163, kneeL: 2, kneeR: 2,
-                ankleL: -78, ankleR: -78, wristL: 110, wristR: 110 },
-      ik: { wristR: { x: 80, y: 114.6, bend: 1 }, wristL: { x: 84, y: 114.6, bend: 1 } },
+                ankleL: -78, ankleR: -78, wristL: 110, wristR: 110,
+                shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 80, y: 114.6, bend: 1 }, wristL: { x: 81, y: 114.6, bend: 1 } },
     },
     { // settle
       t: 1,
-      root: { x: 66.5, y: 87.2, rot: 82.5 },
+      root: { x: 66.5, y: 84.9, rot: 82.5 },
       joints: { spine: 0, neck: -12, hipL: -165, hipR: -165, kneeL: 2, kneeR: 2,
-                ankleL: -78, ankleR: -78, wristL: 110, wristR: 110 },
-      ik: { wristR: { x: 80, y: 114.6, bend: 1 }, wristL: { x: 84, y: 114.6, bend: 1 } },
+                ankleL: -78, ankleR: -78, wristL: 110, wristR: 110,
+                shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 80, y: 114.6, bend: 1 }, wristL: { x: 81, y: 114.6, bend: 1 } },
     },
   ],
 };
@@ -1261,17 +1418,17 @@ export const FRONT_LEVER = {
   keys: [
     { // holding level, toes long
       t: 0,
-      root: { x: 51.9, y: 58.2, rot: -90 },
+      root: { x: 51.9, y: 61.28, rot: -90 },
       joints: { spine: 0, neck: 6, hipL: 180, hipR: 180, kneeL: 2, kneeR: 2,
-                ankleL: -40, ankleR: -40 },
-      ik: { wristR: { x: 25, y: 23, bend: 1 }, wristL: { x: 21, y: 23.5, bend: 1 } },
+                ankleL: -40, ankleR: -40, shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 23, y: 23, bend: 1 }, wristL: { x: 21.5, y: 23.5, bend: 1 } },
     },
     { // settle, hips a shade lower
       t: 1,
-      root: { x: 51.9, y: 59.5, rot: -87.5 },
+      root: { x: 51.9, y: 62.59, rot: -87.5 },
       joints: { spine: 0, neck: 7, hipL: 175, hipR: 175, kneeL: 2, kneeR: 2,
-                ankleL: -40, ankleR: -40 },
-      ik: { wristR: { x: 25, y: 23, bend: 1 }, wristL: { x: 21, y: 23.5, bend: 1 } },
+                ankleL: -40, ankleR: -40, shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 23, y: 23, bend: 1 }, wristL: { x: 21.5, y: 23.5, bend: 1 } },
     },
   ],
 };
@@ -1295,17 +1452,17 @@ export const TUCK_FRONT_LEVER = {
     // chest with the heels drawn in under the hips, which is the shape.
     { // holding, knees to the chest, hips level with the shoulders
       t: 0,
-      root: { x: 51.9, y: 58.2, rot: -90 },
+      root: { x: 51.9, y: 61.28, rot: -90 },
       joints: { spine: 0, neck: 6, hipL: -78.5, hipR: -78.5, kneeL: 140, kneeR: 140,
-                ankleL: -40, ankleR: -40 },
-      ik: { wristR: { x: 25, y: 23, bend: 1 }, wristL: { x: 21, y: 23.5, bend: 1 } },
+                ankleL: -40, ankleR: -40, shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 23, y: 23, bend: 1 }, wristL: { x: 21.5, y: 23.5, bend: 1 } },
     },
     { // settle
       t: 1,
-      root: { x: 51.9, y: 59.2, rot: -88 },
+      root: { x: 51.9, y: 62.33, rot: -88 },
       joints: { spine: 0, neck: 7, hipL: -76, hipR: -76, kneeL: 138, kneeR: 138,
-                ankleL: -40, ankleR: -40 },
-      ik: { wristR: { x: 25, y: 23, bend: 1 }, wristL: { x: 21, y: 23.5, bend: 1 } },
+                ankleL: -40, ankleR: -40, shoulderGirdleProtL: 3.4 },
+      ik: { wristR: { x: 23, y: 23, bend: 1 }, wristL: { x: 21.5, y: 23.5, bend: 1 } },
     },
   ],
 };
@@ -1326,6 +1483,16 @@ export const HUMAN_FLAG = {
   fit: { k: 0.86, dy: 4 },
   // A doorframe sets no grip, so the mitt stayed open and its tip ran out past
   // the far edge of the pole. Closed wraps it.
+  // v3: both hands moved apart on the pole, 95 and 35.5 against 92 and 38. A
+  // flag is a STRAIGHT ARM hold at both ends and the old spacing left the
+  // bottom arm 48 degrees bent, which is a man hanging off a pole rather than a
+  // flag; the bottom one is straight now, 19 degrees.
+  // The TOP arm is still bent, about 69 degrees, and it cannot be fixed from
+  // here. Straightening it means lifting that hand another three units, and at
+  // 33 the validator reports shoulderElev 197 against a ceiling of 196: the
+  // shoulder is already as far past overhead as the rig allows. A real flag
+  // does carry the top arm past the line of the body, so the ceiling, not the
+  // pose, is what is wrong. Written up for the lead.
   grip: { L: "closed", R: "closed" },
   props: [{ type: "doorframe", x: 112, w: 8, pole: true }],
   keys: [
@@ -1334,14 +1501,14 @@ export const HUMAN_FLAG = {
       root: { x: 70.6, y: 71.2, rot: 70 },
       joints: { spine: 0, neck: -8, hipL: -140, hipR: -140, kneeL: 2, kneeR: 2,
                 ankleL: -40, ankleR: -40 },
-      ik: { wristR: { x: 116, y: 92, bend: 1 }, wristL: { x: 116, y: 38, bend: 1 } },
+      ik: { wristR: { x: 116, y: 95, bend: 1 }, wristL: { x: 116, y: 35.5, bend: 1 } },
     },
     { // settle, the body dips a degree and holds
       t: 1,
       root: { x: 70.8, y: 72.4, rot: 72 },
       joints: { spine: 0, neck: -9, hipL: -144, hipR: -144, kneeL: 2, kneeR: 2,
                 ankleL: -40, ankleR: -40 },
-      ik: { wristR: { x: 116, y: 92, bend: 1 }, wristL: { x: 116, y: 38, bend: 1 } },
+      ik: { wristR: { x: 116, y: 95, bend: 1 }, wristL: { x: 116, y: 35.5, bend: 1 } },
     },
   ],
 };

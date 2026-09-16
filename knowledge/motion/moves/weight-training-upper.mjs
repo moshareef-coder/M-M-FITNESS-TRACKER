@@ -61,13 +61,13 @@ const DUMBBELL_BENCH_PRESS = {
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -4 },
-      ik: { wristR: { x: 55.0, y: 43.7, bend: 1 }, wristL: { x: 59.0, y: 47.2, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 55.0, y: 43.7, bend: 1 }, wristL: { x: 59.0, y: 47.2, bend: 1 }, ...stand(108, 112) },
     },
     { // bottom, bells beside the chest, elbows folded out under the hands
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 2, neck: -6 },
-      ik: { wristR: { x: 53.0, y: 61.9, bend: 1 }, wristL: { x: 57.0, y: 63.9, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 69.9, y: 67.2, bend: 1 }, wristL: { x: 68.4, y: 69.2, bend: 1 }, ...stand(108, 112) },
     },
   ],
 };
@@ -93,7 +93,7 @@ const MACHINE_CHEST_PRESS = {
       t: 0,
       root: { x: 52, y: 86, rot: -6 },
       joints: { spine: 0, neck: -2 },
-      ik: { wristR: { x: 67.7, y: 63.0, bend: 1 }, wristL: { x: 64.7, y: 65.0, bend: 1 }, ...stand(82, 78) },
+      ik: { wristR: { x: 67.6, y: 67.1, bend: 1 }, wristL: { x: 64.6, y: 69.1, bend: 1 }, ...stand(82, 78) },
     },
     { // lockout, arms long, chest still against the pad
       t: 1,
@@ -193,18 +193,25 @@ const LOW_TO_HIGH_CABLE_FLY = {
     { type: "cable", x: 14, top: 98, y0: 70, grip: "handle", to: { side: "L", point: "hand" } },
     { type: "cable", x: 14, top: 98, y0: 70, grip: "handle", to: { side: "R", point: "hand" }, front: true },
   ],
+  // Authored as shoulder ANGLES on a fixed soft elbow, not as wrist pins, for
+  // the reason written up over STRAIGHT_ARM_PULLDOWN. The old bottom pin sat 57
+  // units from a 37 unit arm, so the solver clamped it and the hand never
+  // reached the handle; worse, the chord between the two pins passed within 20
+  // units of the shoulder, so mid rep the elbow folded to 117 degrees and the
+  // card read as a curl. A fly is one fixed soft elbow swinging through an arc,
+  // which is exactly what a shoulder angle is.
   keys: [
-    { // bottom, hands low and behind the hips
+    { // bottom, hands low and behind the hips, elbow soft and staying soft
       t: 0,
       root: { x: 64, y: 61.4, rot: 2 },
-      joints: { spine: 6, neck: -4 },
-      ik: { wristR: { x: 42.5, y: 83.0, bend: 1 }, wristL: { x: 39.5, y: 85.0, bend: 1 }, ...stand(66, 61) },
+      joints: { spine: 6, neck: -4, shoulderR: -30, shoulderL: -26, elbowR: 24, elbowL: 24 },
+      ik: { ...stand(66, 61) },
     },
-    { // top, hands together out in front at eye height
+    { // top, hands swept up and in front to eye height, same soft elbow
       t: 1,
       root: { x: 64, y: 61.4, rot: 2 },
-      joints: { spine: 2, neck: -8 },
-      ik: { wristR: { x: 100.2, y: 19.0, bend: 1 }, wristL: { x: 97.2, y: 22.0, bend: 1 }, ...stand(66, 61) },
+      joints: { spine: 2, neck: -8, shoulderR: 104, shoulderL: 100, elbowR: 24, elbowL: 24 },
+      ik: { ...stand(66, 61) },
     },
   ],
 };
@@ -230,11 +237,24 @@ const INCLINE_DUMBBELL_PRESS = {
       joints: { spine: 0, neck: -6, forearmPronR: 90, forearmPronL: 90 },
       ik: { wristR: { x: 63.0, y: 34.9, bend: 1 }, wristL: { x: 66.0, y: 38.4, bend: 1 }, ...stand(110, 104) },
     },
-    { // bottom, bells beside the upper chest
+    { /* bottom, bells beside the UPPER chest, just below the collarbone, which
+         is 0.16 of the way from the shoulder joint to the hip. That is the
+         right touch point for an incline: higher than the flat bench's 0.24 and
+         well above the declines' 0.45, and clearly on the chest rather than at
+         the throat.
+
+         A harness that finds the bottom by taking the most-folded frame reads
+         0.03 here and calls it the throat. It is measuring cycle 0.36, not the
+         keyframe, and it is reading the MITT TIP, which points up along the
+         forearm mid-descent. Sweeping this target ten units down the torso does
+         not move that number at all (it still reads about 0 with the bar down
+         at the belly), so the number is not measuring this move. The bar at
+         that frame is 22 units clear in front of the collarbone, which is just
+         a bar on its way down. */
       t: 1,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 2, neck: -8, forearmPronR: 90, forearmPronL: 90 },
-      ik: { wristR: { x: 69.0, y: 56.2, bend: 1 }, wristL: { x: 72.0, y: 59.2, bend: 1 }, ...stand(110, 104) },
+      ik: { wristR: { x: 78.4, y: 65.4, bend: 1 }, wristL: { x: 75.7, y: 66.3, bend: 1 }, ...stand(110, 104) },
     },
   ],
 };
@@ -266,7 +286,7 @@ const DECLINE_DUMBBELL_PRESS = {
       t: 1,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 2, neck: 8 },
-      ik: { wristR: { x: 37.5, y: 58.2, bend: 1 }, wristL: { x: 40.5, y: 61.2, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 60.1, y: 56.9, bend: 1 }, wristL: { x: 59.4, y: 59.0, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
     },
   ],
 };
@@ -291,7 +311,7 @@ const INCLINE_BARBELL_PRESS = {
       t: 1,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 2, neck: -8 },
-      ik: { wristR: { x: 69.0, y: 56.2, bend: 1 }, wristL: { x: 71.0, y: 58.2, bend: 1 }, ...stand(110, 104) },
+      ik: { wristR: { x: 78.4, y: 65.4, bend: 1 }, wristL: { x: 75.6, y: 66.3, bend: 1 }, ...stand(110, 104) },
     },
   ],
 };
@@ -317,7 +337,7 @@ const DECLINE_BARBELL_PRESS = {
       t: 1,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 2, neck: 8 },
-      ik: { wristR: { x: 37.5, y: 58.2, bend: 1 }, wristL: { x: 39.5, y: 60.2, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 60.1, y: 56.9, bend: 1 }, wristL: { x: 59.4, y: 59.0, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
     },
   ],
 };
@@ -433,11 +453,14 @@ const SEATED_CABLE_ROW = {
   keys: [
     { // reach, torso forward, arms long, lats stretched
       t: 0,
-      root: { x: 44, y: 98, rot: 16 },
-      joints: { spine: 12, neck: -6 },
+      root: { x: 44, y: 98, rot: 26 },
+      joints: { spine: 2, neck: -6 },
       ik: {
         wristR: { x: 95.4, y: 77.4, bend: 1 }, wristL: { x: 92.4, y: 79.4, bend: 1 },
-        ankleR: { x: 80, y: FLOOR, bend: -1 }, ankleL: { x: 76, y: FLOOR, bend: -1 },
+        // up on the machine's foot plate, not flat on the floor beside it. The
+        // plate is what a seated row braces against, and a lifter with his feet
+        // on the floor next to it reads as somebody who has not set up yet.
+        ankleR: { x: 86, y: 104, bend: -1 }, ankleL: { x: 82, y: 106, bend: -1 },
       },
     },
     { // finish, sat tall, handle at the belly, elbows behind the torso
@@ -446,7 +469,10 @@ const SEATED_CABLE_ROW = {
       joints: { spine: -4, neck: -2 },
       ik: {
         wristR: { x: 61.5, y: 81.1, bend: 1 }, wristL: { x: 58.5, y: 83.1, bend: 1 },
-        ankleR: { x: 80, y: FLOOR, bend: -1 }, ankleL: { x: 76, y: FLOOR, bend: -1 },
+        // up on the machine's foot plate, not flat on the floor beside it. The
+        // plate is what a seated row braces against, and a lifter with his feet
+        // on the floor next to it reads as somebody who has not set up yet.
+        ankleR: { x: 86, y: 104, bend: -1 }, ankleL: { x: 82, y: 106, bend: -1 },
       },
     },
   ],
@@ -506,14 +532,14 @@ const STRAIGHT_ARM_PULLDOWN = {
   keys: [
     { // top, arms long and high out in front, lats stretched
       t: 0,
-      root: { x: 56, y: 61.4, rot: 4 },
-      joints: { spine: 16, neck: -10, shoulderR: 95, shoulderL: 98, elbowR: 2, elbowL: 2 },
+      root: { x: 56, y: 61.4, rot: 14 },
+      joints: { spine: 6, neck: -10, shoulderR: 95, shoulderL: 98, elbowR: 2, elbowL: 2 },
       ik: { ...stand(58, 53) },
     },
     { // finish, arms still long, bar at the front of the thighs
       t: 1,
-      root: { x: 56, y: 61.4, rot: 4 },
-      joints: { spine: 20, neck: -6, shoulderR: -15, shoulderL: -12, elbowR: 2, elbowL: 2 },
+      root: { x: 56, y: 61.4, rot: 16 },
+      joints: { spine: 8, neck: -6, shoulderR: -15, shoulderL: -12, elbowR: 2, elbowL: 2 },
       ik: { ...stand(58, 53) },
     },
   ],
@@ -561,6 +587,14 @@ const CHEST_SUPPORTED_ROW = {
 // the loaded end up into the belly. Must be visible: the bar running down to a
 // fixed point on the floor, which is the whole difference from a barbell row.
 // Side view. The bar is a `band` with no slack plus the disc at the hand end.
+//
+// The 46 degrees of lean used to be 16 of hip and 30 of spine. The torso ends
+// up at the same angle either way, but the PELVIS does not: at rot 16 it stayed
+// nearly upright under a torso folded forward, which draws the tucked pelvis
+// and kinked waist of a rounded-back row. Now 38 of hip and 8 of spine, an 8
+// degree waist kink against BARBELL_ROW's 18. Nothing else moved: rot and spine
+// sum to the same torso angle, so every pin, the chest and both legs are where
+// they were.
 const T_BAR_ROW = {
   view: "side",
   loop: "pingpong",
@@ -577,8 +611,8 @@ const T_BAR_ROW = {
   keys: [
     { // bottom, arms long, the bar hanging at the end of the arc
       t: 0,
-      root: { x: 66, y: 61.4, rot: 16 },
-      joints: { spine: 30, neck: -12 },
+      root: { x: 66, y: 61.4, rot: 38 },
+      joints: { spine: 8, neck: -12 },
       ik: {
         wristR: { x: 96.2, y: 75.9, bend: 1 }, wristL: { x: 93.2, y: 77.9, bend: 1 },
         ...stand(64, 59),
@@ -586,8 +620,8 @@ const T_BAR_ROW = {
     },
     { // top, handle into the belly, elbows behind the ribs, torso angle unchanged
       t: 1,
-      root: { x: 66, y: 61.4, rot: 16 },
-      joints: { spine: 30, neck: -12 },
+      root: { x: 66, y: 61.4, rot: 38 },
+      joints: { spine: 8, neck: -12 },
       ik: {
         wristR: { x: 88.2, y: 59.9, bend: 1 }, wristL: { x: 85.2, y: 61.9, bend: 1 },
         ...stand(64, 59),
@@ -647,26 +681,37 @@ const PENDLAY_ROW = {
   dur: 3.2,
   breath: 0.2,
   fit: { k: 0.95, dy: 4 },
-  props: [{ type: "barbell", side: "R", point: "hand", r: 11, front: true }],
+  // r 10 rather than 11: the plate is what decides how high the bar sits, and
+  // at 11 the bar was too high off the floor for a 37 unit arm to reach it
+  // straight from a horizontal back, so the near arm started the "dead stop"
+  // folded 65 degrees while the far one was nearly locked.
+  props: [{ type: "barbell", side: "R", point: "hand", r: 10, front: true }],
   keys: [
-    { // dead stop, bar resting on the plates, back truly parallel to the floor.
-      // The old pair only reached 68 degrees of hinge, so the shoulders sat
-      // above the hips and it read as an ordinary bent-over row.
+    { /* dead stop, bar resting on the plates, back truly parallel to the floor
+         and both arms hanging STRAIGHT, because a dead stop is a dead stop.
+         The old pair only reached 68 degrees of hinge, so the shoulders sat
+         above the hips and it read as an ordinary bent-over row.
+
+         The 90 degrees of lean also used to be 34 of hip and 56 of spine, a 56
+         degree kink at the waist, which is the drawn version of rowing with a
+         rounded lower back and the worst thing in this file. Now 72 and 18,
+         matching BARBELL_ROW's 18 degree kink. The torso ends up at the same
+         angle; the pelvis does not. */
       t: 0,
-      root: { x: 62, y: 64, rot: 34 },
-      joints: { spine: 56, neck: -12 },
+      root: { x: 62, y: 63, rot: 72 },
+      joints: { spine: 18, neck: -12 },
       ik: {
-        wristR: { x: 92.0, y: 97.0, bend: 1 }, wristL: { x: 89.0, y: 98.0, bend: 1 },
-        ...stand(58, 54),
+        wristR: { x: 92.0, y: 100.0, bend: 1 }, wristL: { x: 89.0, y: 96.6, bend: 1 },
+        ...stand(60, 56),
       },
     },
     { // pulled to the belly, back still horizontal
       t: 1,
-      root: { x: 62, y: 64, rot: 34 },
-      joints: { spine: 56, neck: -12 },
+      root: { x: 62, y: 63, rot: 72 },
+      joints: { spine: 18, neck: -12 },
       ik: {
-        wristR: { x: 88.0, y: 78.0, bend: 1 }, wristL: { x: 85.0, y: 79.0, bend: 1 },
-        ...stand(58, 54),
+        wristR: { x: 88.0, y: 77.0, bend: 1 }, wristL: { x: 85.0, y: 78.0, bend: 1 },
+        ...stand(60, 56),
       },
     },
   ],
@@ -901,12 +946,16 @@ const UPRIGHT_ROW = {
   breath: 0.2,
   props: [{ type: "barbell", side: "R", point: "wrist", dx: 2, dy: 1, r: 7.5, front: true }],
   keys: [
-    { // bottom, bar hanging at the thighs, arms straight
+    { /* bottom, bar hanging at the thighs, arms straight. 4 and 2 are the
+         same "arm hanging" numbers the middle keyframe uses. They were 180 and
+         177, and in this rig 0 points the arm DOWN and 180 points it straight
+         overhead, so the rep opened with the bar held above the crown of the
+         head and the whole pingpong played as a press, not a row. */
       t: 0,
       root: { x: 60, y: 61.4, rot: 2 },
       joints: {
         spine: 4, neck: 0,
-        shoulderR: 180, elbowR: 6, shoulderL: 177, elbowL: 8,
+        shoulderR: 4, elbowR: 6, shoulderL: 2, elbowL: 8,
       },
       ik: { ...stand(62, 57) },
     },
@@ -928,12 +977,20 @@ const UPRIGHT_ROW = {
       },
       ik: { ...stand(62, 57) },
     },
-    { // top, bar at the collarbone with the elbow up in front of the shoulder.
-      // The old pair finished at the chin, which put the disc over the visor.
+    { /* top, bar at the collarbone with the elbow up in front of the shoulder.
+         The old pair finished at the chin, which put the disc over the visor.
+
+         The upper arm stops at 78 degrees of elevation, which is 12 degrees
+         BELOW horizontal. That is deliberate and it is the safety line on this
+         lift: an upright row that drives the elbows above the shoulder is the
+         position that pinches the shoulder, so the drawn range stops short of
+         it rather than teaching the worst version. The neck was -20 to dodge a
+         disc that is 8 units clear of the skull anyway; a standing lifter
+         looks ahead. */
       t: 1,
       root: { x: 60, y: 61.4, rot: 2 },
       joints: {
-        spine: -2, neck: -20,
+        spine: -2, neck: -4,
         shoulderR: 78, elbowR: 124, shoulderL: 74, elbowL: 122,
       },
       ik: { ...stand(62, 57) },
@@ -944,6 +1001,10 @@ const UPRIGHT_ROW = {
 // A wide grip bar pulled explosively from below the knee to chest height as the
 // body extends from a hinge to standing tall. Must be visible: the body going
 // from bent over to fully extended while the bar stays close and climbs. Side view.
+// The start was 14 of hip carrying 34 of spine, which is a 34 degree waist kink
+// on a loaded pull off the floor: the pelvis tucked under and the back drawn
+// round. Redistributed to 40 and 8 for the same torso angle, same chest, same
+// pins. See the note on T_BAR_ROW.
 const SNATCH_GRIP_HIGH_PULL = {
   view: "side",
   loop: "pingpong",
@@ -953,8 +1014,8 @@ const SNATCH_GRIP_HIGH_PULL = {
   keys: [
     { // start, hinged over with the bar hanging at the knee, arms long
       t: 0,
-      root: { x: 62, y: 70, rot: 14 },
-      joints: { spine: 34, neck: -12 },
+      root: { x: 62, y: 70, rot: 40 },
+      joints: { spine: 8, neck: -12 },
       ik: {
         wristR: { x: 90.3, y: 86.0, bend: 1 }, wristL: { x: 87.3, y: 87.0, bend: 1 },
         ...stand(62, 58),
@@ -1324,9 +1385,31 @@ const CUBAN_PRESS = {
         shoulderR: 8, elbowR: 14, shoulderL: 6, elbowL: 16, forearmPronR: 90, forearmPronL: 90 },
       ik: { ...stand(62, 57) },
     },
-    { // elbows pulled up high, bells at the chest. Kept clear of the chin: the
-      // rig folds the forearm up from a forward upper arm, so a higher elbow
-      // here puts the bells on the face rather than under it.
+    { /* elbows pulled up high, bells at the chest. Kept clear of the chin: the
+         rig folds the forearm up from a forward upper arm, so a higher elbow
+         here puts the bells on the face rather than under it.
+
+         AUDIT NOTE, not fixed on purpose. This is not the Cuban press middle.
+         The real one has the elbows out to the SIDES at shoulder height with
+         the forearms hanging straight DOWN, and the press half of the rep is
+         the humerus rotating those forearms up; without it the card is a plain
+         dumbbell press. A forearm cannot be folded downward from a forward
+         upper arm, because elbow flexion always carries the hand toward the
+         arm's own anterior, so the hang has to come from shoulderRot and the
+         width from shoulderAbd.
+
+         Both were authored and measured, and they work: shoulderR 26,
+         shoulderAbdR 72, elbowR 92, shoulderRotR -88 (mirrored to +86 on L,
+         because shoulderRot mirrors between sides and shoulderAbd does not).
+         What they do NOT survive is this camera. Abducted straight out to the
+         side, the upper arm points at a side lens and foreshortens to nothing,
+         so the corrected middle rendered as two arms hanging at the sides,
+         which is less use than the wrong pose it replaced. Rendered again at
+         view { plane: "sagittal", yaw: 38 } it reads perfectly, but that yaw
+         swings the camera behind the figure and turns the whole card into a
+         back three quarter. That is a camera decision for the move, not a
+         tweak, and this move was handed to me as already corrected, so the
+         numbers are here and the pose is left alone. */
       t: 0.45,
       root: { x: 60, y: 61.4, rot: 2 },
       joints: {
@@ -1393,6 +1476,52 @@ const OVERHEAD_PRESS = {
 // The overhead press started with a dip and drive of the legs. Must be visible:
 // the KNEE BEND at the bottom, which is the only difference from the strict
 // press. Side view.
+// The strict standing barbell press: feet together, no dip, no layback, the bar
+// travelling from the collarbone to a straight-arm lockout on nothing but the
+// shoulders. Must be visible: the stance and the fact that NOTHING below the
+// shoulders moves, because that is the whole difference from a push press.
+// Side view, same as the other two, so the three read as one family.
+//
+// Why it exists alongside OVERHEAD_PRESS, which is the same movement pattern:
+// in a gym the two names are used for the same lift, and this library already
+// had the loose one. The split here is the one most coaching uses. Military
+// Press is strict with the feet together and a vertical torso; Overhead Press
+// is the same bar path from a hip-width stance with a little lean allowed;
+// Push Press adds the leg drive. If that distinction ever stops earning its
+// keep, this is the entry to fold back into OVERHEAD_PRESS, not the other way
+// round.
+const MILITARY_PRESS = {
+  view: "side",
+  /* Same as the other overhead presses: the near arm passes the head and is
+     the nearer thing, so it draws in front. */
+  armOverHead: true,
+  loop: "pingpong",
+  dur: 3.0,
+  breath: 0.2,
+  fit: { k: 0.84, dy: 10 },
+  props: [{ type: "barbell", side: "R", point: "hand", r: 9.5, front: true }],
+  keys: [
+    { // racked, bar at the collarbone, feet together, torso stacked upright
+      t: 0,
+      root: { x: 60, y: 61.4, rot: 0 },
+      joints: { spine: 0, neck: 0 },
+      ik: {
+        wristR: { x: 74.2, y: 41.0, bend: 1 }, wristL: { x: 71.2, y: 43.0, bend: 1 },
+        ...stand(60.5, 58.5),
+      },
+    },
+    { // lockout, arms long and straight, ribs still down and no lean back
+      t: 1,
+      root: { x: 60, y: 61.4, rot: 0 },
+      joints: { spine: 0, neck: 12 },
+      ik: {
+        wristR: { x: 54.7, y: -4.7, bend: 1 }, wristL: { x: 51.7, y: -3.2, bend: 1 },
+        ...stand(60.5, 58.5),
+      },
+    },
+  ],
+};
+
 const PUSH_PRESS = {
   view: "side",
   /* The bar passes the head on the way up and the arm is the nearer
@@ -1432,6 +1561,15 @@ const PUSH_PRESS = {
 // forearm folded up to the chest with the elbow staying pinned at the side.
 // What changes between the nine is the implement and where the elbow is braced,
 // so the pose lives here once and the variants set their own props.
+// FOUR keyframes, not two, and the two extra ones are the whole point. Two
+// wrist pins interpolate along the straight CHORD between them, and the chord
+// from a hanging hand to a hand at the chest passes close enough to the
+// shoulder that the solver swung the elbow 7 units BACKWARD to reach it: 21
+// degrees of shoulder extension in the middle of every rep, which is a curl
+// with the elbow swinging, the one thing this exercise is not allowed to teach.
+// The two middle keys put the hand where a 50 degree and a 94 degree elbow
+// actually put it with the upper arm hanging vertical, so the elbow now stays
+// inside 1.3 units for the whole rep and the shoulder inside 5 degrees.
 const standingCurlKeys = [
   { // bottom, arms long, elbows at the sides
     t: 0,
@@ -1439,6 +1577,24 @@ const standingCurlKeys = [
     joints: { spine: 2, neck: 0 },
     ik: {
       wristR: { x: 66.2, y: 68.0, bend: 1 }, wristL: { x: 63.2, y: 70.0, bend: 1 },
+      ...stand(62, 57),
+    },
+  },
+  { // a third of the way up: elbow bent about 50, upper arm still hanging
+    t: 0.3,
+    root: { x: 60, y: 61.4, rot: 2 },
+    joints: { spine: 1.5, neck: -0.5 },
+    ik: {
+      wristR: { x: 75.0, y: 62.4, bend: 1 }, wristL: { x: 72.0, y: 64.4, bend: 1 },
+      ...stand(62, 57),
+    },
+  },
+  { // forearm level, elbow bent about 94 and still directly under the shoulder
+    t: 0.62,
+    root: { x: 60, y: 61.4, rot: 2 },
+    joints: { spine: 1, neck: -1 },
+    ik: {
+      wristR: { x: 79.0, y: 51.5, bend: 1 }, wristL: { x: 76.0, y: 53.5, bend: 1 },
       ...stand(62, 57),
     },
   },
@@ -1506,10 +1662,10 @@ const BARBELL_CURL = {
 const EZ_BAR_CURL = {
   ...DUMBBELL_CURL,
   props: [{ type: "barbell", side: "R", point: "hand", r: 8, front: true }],
-  keys: [
-    { ...standingCurlKeys[0], joints: { forearmPronR: -42, forearmPronL: -42, spine: 2, neck: 0, wristR: -14, wristL: -14 } },
-    { ...standingCurlKeys[1], joints: { forearmPronR: -42, forearmPronL: -42, spine: 0, neck: -2, wristR: -14, wristL: -14 } },
-  ],
+  keys: standingCurlKeys.map((k) => ({
+    ...k,
+    joints: { ...k.joints, forearmPronR: -42, forearmPronL: -42, wristR: -14, wristL: -14 },
+  })),
 };
 
 // Seated and hinged forward with the working elbow braced against the inside of
@@ -1531,6 +1687,18 @@ const CONCENTRATION_CURL = {
       joints: { spine: 22, neck: -12, forearmPronR: -86 },
       ik: {
         wristR: { x: 86.0, y: 97.7, bend: 1 }, wristL: { x: 62.0, y: 93.7, bend: 1 },
+        ankleR: { x: 76, y: FLOOR, bend: -1 }, ankleL: { x: 70, y: FLOOR, bend: -1 },
+      },
+    },
+    { // halfway, forearm level and the elbow still jammed against the thigh.
+      // Without this the elbow slid 10.8 units mid rep, which on the one
+      // exercise whose entire point is a braced elbow is the worst place in
+      // this file for it to happen.
+      t: 0.5,
+      root: { x: 46, y: 88, rot: 18 },
+      joints: { spine: 22, neck: -12, forearmPronR: -86 },
+      ik: {
+        wristR: { x: 90.7, y: 84.8, bend: 1 }, wristL: { x: 62.0, y: 93.7, bend: 1 },
         ankleR: { x: 76, y: FLOOR, bend: -1 }, ankleL: { x: 70, y: FLOOR, bend: -1 },
       },
     },
@@ -1606,6 +1774,18 @@ const INCLINE_DUMBBELL_CURL = {
         ...stand(110, 104),
       },
     },
+    { // halfway, forearms level and the upper arms still hanging BEHIND the
+      // torso line, which is the whole reason for the incline. The two end
+      // pins alone pulled the elbow 7.9 units forward mid rep and gave that
+      // stretched position away.
+      t: 0.5,
+      root: { x: 84, y: 84, rot: -44 },
+      joints: { spine: 0, neck: -5, forearmPronR: -86, forearmPronL: -86 },
+      ik: {
+        wristR: { x: 80.0, y: 90.3, bend: 1 }, wristL: { x: 82.7, y: 90.6, bend: 1 },
+        ...stand(110, 104),
+      },
+    },
     { // top, forearms curled up, upper arms still hanging back
       t: 1,
       root: { x: 84, y: 84, rot: -44 },
@@ -1642,6 +1822,18 @@ const SPIDER_CURL = {
         ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },
       },
     },
+    { // halfway, forearms level, upper arms still hanging dead under the
+      // shoulders. The chord between the two end pins was dragging the elbow
+      // 9.5 units forward mid rep, which on a spider curl is the arm swinging
+      // off the pad.
+      t: 0.5,
+      root: { x: 46, y: 66, rot: 55 },
+      joints: { spine: 0, neck: -12, forearmPronR: -86, forearmPronL: -86 },
+      ik: {
+        wristR: { x: 83.0, y: 79.6, bend: 1 }, wristL: { x: 77.3, y: 78.5, bend: 1 },
+        ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },
+      },
+    },
     { // top, bells curled up in front of the face
       t: 1,
       root: { x: 46, y: 66, rot: 55 },
@@ -1669,12 +1861,28 @@ const TRICEPS_PUSHDOWN = {
     { type: "cable", x: 84, top: 8, y0: 44, grip: "bar", barW: 13, to: { side: "R", point: "hand" }, front: true },
   ],
   keys: [
-    { // start, forearm up at about ninety, elbow at the rib
+    { /* start, forearm up at about ninety, elbow directly under the shoulder.
+         The pin used to be at 60.3, 51.0, which put the elbow 6.4 units BEHIND
+         where the lockout puts it, so across the rep the elbow crawled forward
+         while the forearm swung. On a pushdown the still elbow is the whole
+         exercise, so the start is now placed where a 114 degree elbow lands
+         with the upper arm hanging vertical, which is the same place the
+         lockout's elbow is. */
       t: 0,
       root: { x: 46, y: 61.4, rot: 2 },
       joints: { spine: 4, neck: -4 },
       ik: {
-        wristR: { x: 60.3, y: 51.0, bend: 1 }, wristL: { x: 57.3, y: 53.0, bend: 1 },
+        wristR: { x: 65.5, y: 45.9, bend: 1 }, wristL: { x: 62.5, y: 47.9, bend: 1 },
+        ...stand(48, 43),
+      },
+    },
+    { // halfway, elbow in exactly the same place. The two end pins alone leave
+      // a chord that pulls it 5.4 units back mid rep.
+      t: 0.5,
+      root: { x: 46, y: 61.4, rot: 2 },
+      joints: { spine: 4, neck: -4 },
+      ik: {
+        wristR: { x: 64.7, y: 59.4, bend: 1 }, wristL: { x: 61.3, y: 61.3, bend: 1 },
         ...stand(48, 43),
       },
     },
@@ -1699,12 +1907,22 @@ const ROPE_PUSHDOWN = {
   ...TRICEPS_PUSHDOWN,
   props: [{ type: "cable", x: 84, top: 8, y0: 44, grip: "rope", to: { side: "R", point: "hand" }, front: true }],
   keys: [
-    { // start, forearms up, hands together on the rope
+    { // start, forearms up, hands together on the rope, elbow under the
+      // shoulder where the lockout leaves it. Same fix as Triceps Pushdown.
       t: 0,
       root: { x: 46, y: 61.4, rot: 2 },
       joints: { spine: 4, neck: -4, wristR: 0, wristL: 0 },
       ik: {
-        wristR: { x: 60.3, y: 51.0, bend: 1 }, wristL: { x: 57.3, y: 53.0, bend: 1 },
+        wristR: { x: 65.5, y: 45.9, bend: 1 }, wristL: { x: 62.5, y: 47.9, bend: 1 },
+        ...stand(48, 43),
+      },
+    },
+    { // halfway, elbow unmoved. Same reason as Triceps Pushdown.
+      t: 0.5,
+      root: { x: 46, y: 61.4, rot: 2 },
+      joints: { spine: 4, neck: -4, wristR: 13, wristL: -11 },
+      ik: {
+        wristR: { x: 66.2, y: 60.3, bend: 1 }, wristL: { x: 60.9, y: 61.5, bend: 1 },
         ...stand(48, 43),
       },
     },
@@ -1741,6 +1959,20 @@ const OVERHEAD_TRICEPS_EXTENSION = {
         ...stand(60, 55),
       },
     },
+    { /* halfway, elbow in exactly the same place with the forearm swung back
+         to horizontal. Without this key the two pins interpolate along their
+         chord and the solver has to swing the ELBOW forward 7.5 units to reach
+         it, crossing the vertical as it goes, so mid rep the upper arm was
+         travelling and the forearm was not. On this exercise that is the whole
+         failure: the elbow must stay put and only the forearm moves. */
+      t: 0.5,
+      root: { x: 58, y: 61.4, rot: 2 },
+      joints: { spine: 1, neck: 5 },
+      ik: {
+        wristR: { x: 42.0, y: 8.1, bend: 1 }, wristL: { x: 42.4, y: 7.9, bend: 1 },
+        ...stand(60, 55),
+      },
+    },
     { // lockout, arms long and a touch behind vertical, elbows in the same
       // place. Dead vertical put the whole arm over the face.
       t: 1,
@@ -1771,14 +2003,14 @@ const TRICEPS_KICKBACK = {
   keys: [
     { // start, upper arm back and level, forearm hanging straight down
       t: 0,
-      root: { x: 62, y: 61.4, rot: 14 },
-      joints: { spine: 34, neck: -12, shoulderR: -138, elbowR: 95 },
+      root: { x: 62, y: 61.4, rot: 38 },
+      joints: { spine: 10, neck: -12, shoulderR: -138, elbowR: 95 },
       ik: { wristL: { x: 98.3, y: 74.0, bend: 1 }, ...stand(60, 55) },
     },
     { // finish, forearm swung back to a straight arm, upper arm unmoved
       t: 1,
-      root: { x: 62, y: 61.4, rot: 14 },
-      joints: { spine: 34, neck: -12, shoulderR: -138, elbowR: 6 },
+      root: { x: 62, y: 61.4, rot: 38 },
+      joints: { spine: 10, neck: -12, shoulderR: -138, elbowR: 6 },
       ik: { wristL: { x: 98.3, y: 74.0, bend: 1 }, ...stand(60, 55) },
     },
   ],
@@ -1795,9 +2027,13 @@ const BENCH_DIP = {
   fit: { k: 0.94, dy: 2 },
   props: [{ type: "bench", x: 14, y: 82, w: 36 }],
   keys: [
-    { // top, arms straight, hips just off the front edge and level with it
+    { /* top, arms LOCKED OUT straight, hips just off the front edge and level
+         with it. The root was 1.2 units lower, which left the shoulder 35.5
+         from a pinned wrist on a 37 unit arm: 33 degrees of elbow still folded
+         at the end of the push, which is a rep that never finishes. The top of
+         a pushing movement is a straight arm. */
       t: 0,
-      root: { x: 57.4, y: 73.6, rot: -5 },
+      root: { x: 57.4, y: 72.4, rot: -5 },
       /* Mo: "just keep my hands faced forward." The wrist angle turns the mitt
          so the fingers point toward the feet, which is how a bench dip is
          actually held. It survives the IK: the solver decides where the wrist
@@ -1806,7 +2042,7 @@ const BENCH_DIP = {
       joints: { spine: 0, neck: -2, wristR: 150, wristL: 150 },
       ik: {
         wristR: { x: 42.0, y: 76.0, bend: 1 }, wristL: { x: 38.0, y: 76.5, bend: 1 },
-        ankleR: { x: 88, y: FLOOR, bend: -1 }, ankleL: { x: 82, y: FLOOR, bend: -1 },
+        ankleR: { x: 89, y: FLOOR, bend: -1 }, ankleL: { x: 83, y: FLOOR, bend: -1 },
       },
     },
     { // bottom, hips dropped in front of the bench, elbows folded back.
@@ -1814,11 +2050,11 @@ const BENCH_DIP = {
       // into extension than a shoulder actually does, which is also why this
       // exercise has the reputation it has.
       t: 1,
-      root: { x: 55.2, y: 86.4, rot: -7 },
+      root: { x: 55.2, y: 85.0, rot: -7 },
       joints: { spine: 0, neck: -4, wristR: 150, wristL: 150 },
       ik: {
         wristR: { x: 41.8, y: 76.0, bend: 1 }, wristL: { x: 37.8, y: 76.5, bend: 1 },
-        ankleR: { x: 88, y: FLOOR, bend: -1 }, ankleL: { x: 82, y: FLOOR, bend: -1 },
+        ankleR: { x: 89, y: FLOOR, bend: -1 }, ankleL: { x: 83, y: FLOOR, bend: -1 },
       },
     },
   ],
@@ -1844,13 +2080,23 @@ const SKULL_CRUSHER = {
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -4 },
-      ik: { wristR: { x: 55.0, y: 45.0, bend: 1 }, wristL: { x: 58.0, y: 46.0, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 55.0, y: 45.0, bend: 1 }, wristL: { x: 58.0, y: 46.0, bend: 1 }, ...stand(108, 112) },
+    },
+    { // halfway, upper arm unmoved and the forearm swung back through
+      // horizontal. Same reason as the other elbow-fixed moves: without a key
+      // on the arc the chord between the two pins pulls the elbow 4.5 units
+      // out of place mid rep, and a skull crusher with a travelling elbow is a
+      // press.
+      t: 0.5,
+      root: { x: 86, y: 82, rot: -90 },
+      joints: { spine: 0, neck: -5 },
+      ik: { wristR: { x: 45.6, y: 51.6, bend: 1 }, wristL: { x: 48.4, y: 51.3, bend: 1 }, ...stand(108, 112) },
     },
     { // bottom, elbow folded, bar swung back to just above the forehead
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -6 },
-      ik: { wristR: { x: 42.0, y: 62.0, bend: 1 }, wristL: { x: 45.0, y: 63.0, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 42.0, y: 62.0, bend: 1 }, wristL: { x: 45.0, y: 63.0, bend: 1 }, ...stand(108, 112) },
     },
   ],
 };
@@ -1874,13 +2120,13 @@ const CLOSE_GRIP_BENCH_PRESS = {
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -4 },
-      ik: { wristR: { x: 59.2, y: 43.8, bend: 1 }, wristL: { x: 60.9, y: 47.4, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 59.2, y: 43.8, bend: 1 }, wristL: { x: 60.9, y: 47.4, bend: 1 }, ...stand(108, 112) },
     },
     { // bottom, bar low on the sternum, elbows tucked toward the feet
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 2, neck: -6 },
-      ik: { wristR: { x: 60.5, y: 67.9, bend: 1 }, wristL: { x: 62.5, y: 68.9, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 72.0, y: 68.9, bend: 1 }, wristL: { x: 70.6, y: 70.6, bend: 1 }, ...stand(108, 112) },
     },
   ],
 };
@@ -1956,6 +2202,17 @@ const REVERSE_CURL = {
       joints: { spine: 2, neck: 0, wristR: 20, wristL: 20 },
       ik: {
         wristR: { x: 66.2, y: 68.0, bend: 1 }, wristL: { x: 63.2, y: 70.0, bend: 1 },
+        ...stand(62, 57),
+      },
+    },
+    { // halfway, elbow unmoved. Same chord problem as the other curls, smaller
+      // here because the range is shorter, but 4.6 units of elbow swing on a
+      // curl is still a curl with a swinging elbow.
+      t: 0.5,
+      root: { x: 60, y: 61.4, rot: 2 },
+      joints: { spine: 1, neck: -1, wristR: 22, wristL: 22 },
+      ik: {
+        wristR: { x: 76.1, y: 61.8, bend: 1 }, wristL: { x: 72.9, y: 63.5, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -2069,6 +2326,7 @@ export const MOVES = {
   "Arnold Press": ARNOLD_PRESS,
   "Cuban Press": CUBAN_PRESS,
   "Overhead Press": OVERHEAD_PRESS,
+  "Military Press": MILITARY_PRESS,
   "Push Press": PUSH_PRESS,
   "Dumbbell Curl": DUMBBELL_CURL,
   "Hammer Curl": HAMMER_CURL,

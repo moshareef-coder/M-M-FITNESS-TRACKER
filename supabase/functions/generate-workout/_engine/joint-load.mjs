@@ -157,6 +157,10 @@ export const JOINT_LOAD = Object.freeze({
   /* Standing, overhead, with a bar. Named in the brief. The lumbar spine pays
      for the last few inches of it and the wrist holds the bar back. */
   "Overhead Press": ["shoulder", "lowerback", "wrist"],
+  /* The strict version. No leg drive means the lumbar spine takes the whole
+     of the last few inches rather than sharing it, so if anything this is the
+     one to pull first on a cranky low back, not the one to keep. */
+  "Military Press": ["shoulder", "lowerback", "wrist"],
   "Push Press": ["shoulder", "lowerback", "wrist"],
 
   /* ---- weight-training: biceps ---------------------------------------- */

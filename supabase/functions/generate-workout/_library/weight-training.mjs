@@ -80,6 +80,7 @@ export const WEIGHT_TRAINING = {
         { name: "Arnold Press", primary: ["shoulders"], secondary: ["triceps"], equipment: "dumbbell", level: "intermediate" },
         { name: "Cuban Press", primary: ["shoulders"], secondary: ["traps"], equipment: "dumbbell", level: "intermediate" },
         { name: "Overhead Press", primary: ["shoulders"], secondary: ["triceps", "traps"], equipment: "barbell", level: "intermediate" },
+        { name: "Military Press", primary: ["shoulders"], secondary: ["triceps", "abs"], equipment: "barbell", level: "intermediate" },
         { name: "Push Press", primary: ["shoulders"], secondary: ["triceps", "quads"], equipment: "barbell", level: "advanced" },
       ],
     },

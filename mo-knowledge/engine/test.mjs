@@ -398,7 +398,8 @@ const EXPECTED_PATTERN = {
   ],
   verticalPush: [
     "Arnold Press", "Cuban Press", "Dumbbell Shoulder Press", "Handstand Push-Up",
-    "Machine Shoulder Press", "Overhead Press", "Push Press", "Seated Dumbbell Press",
+    "Machine Shoulder Press", "Military Press", "Overhead Press", "Push Press",
+    "Seated Dumbbell Press",
   ],
   horizontalPull: [
     "Barbell Row", "Chest-Supported Row", "Dumbbell Row", "Inverted Row", "Pendlay Row",

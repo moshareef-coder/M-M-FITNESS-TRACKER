@@ -42,14 +42,33 @@ const BARBELL_BACK_SQUAT = {
         wristL: { rel: "chest", x: -7.1, y: -3.1, bend: -1 },
       },
     },
-    { // bottom, hips back and down, thighs about parallel, chest still up
-      t: 1,
-      root: { x: 54, y: 90, rot: 14 },
-      joints: { spine: 16, neck: -10 },
+    { // half way down. The pelvis travels back faster than it drops, because a
+      // straight line between the two ends leaves the knee bulging 3 units past
+      // the toe in the middle of the rep and pulling back again. A chest offset
+      // is a world offset, so the grip is re-aimed here too for the 27 degree
+      // torso.
+      t: 0.5,
+      root: { x: 54, y: 78, rot: 13 },
+      joints: { spine: 14, neck: -7 },
       ik: {
         ...SQUAT_FEET,
-        wristR: { rel: "chest", x: -4.6, y: -6.1, bend: -1 },
-        wristL: { rel: "chest", x: -6.2, y: -5.3, bend: -1 },
+        wristR: { rel: "chest", x: -3.9, y: -5.7, bend: -1 },
+        wristL: { rel: "chest", x: -5.5, y: -4.9, bend: -1 },
+      },
+    },
+    { // bottom, hip crease just under the knee, shin about 26 degrees and the
+      // knee stopping level with the toe. The pelvis used to travel only 12
+      // units back while the knee went 13 forward, which put the knee a hand's
+      // width past the toe on a 40 degree shin: a quarter squat done on the
+      // toes. The hips go back 17 now and the torso takes 40 degrees to keep
+      // the bar over the ankle, which is what a loaded squat actually does.
+      t: 1,
+      root: { x: 49, y: 92, rot: 20 },
+      joints: { spine: 20, neck: -10 },
+      ik: {
+        ...SQUAT_FEET,
+        wristR: { rel: "chest", x: -2.5, y: -6.7, bend: -1 },
+        wristL: { rel: "chest", x: -4.1, y: -5.9, bend: -1 },
       },
     },
   ],
@@ -59,6 +78,13 @@ const BARBELL_BACK_SQUAT = {
 // upright than a back squat. Must be visible: the bar in FRONT of the neck and
 // the elbow leading it, which is the whole difference from the back squat two
 // cards away. Side view.
+// The grip used to sit 16 units out from the chest, which put the bar floating
+// in front of the sternum with the elbow hanging BELOW the shoulder: that is a
+// front raise, not a front rack. The hand now sits on the shoulder itself and
+// the elbow swings out to about 20 units in front of it, which is the only
+// thing side on that says "elbows up". The standing torso is dead vertical as
+// well, because a rack offset added to a 6 degree lean carried the bar out over
+// the toes.
 const FRONT_SQUAT = {
   view: "side",
   loop: "pingpong",
@@ -67,24 +93,43 @@ const FRONT_SQUAT = {
   fit: { k: 1.02, dy: 2 },
   props: [{ type: "barbell", side: "R", point: "wrist", dx: 0, dy: 0, r: 10, front: true }],
   keys: [
-    { // stood tall, elbows up, bar on the shoulders
+    { // stood tall, elbows up, bar on the front delts
       t: 0,
-      root: { x: 66, y: 61.4, rot: 2 },
-      joints: { spine: 4, neck: -2 },
+      root: { x: 66, y: 61.4, rot: 0 },
+      joints: { spine: 0, neck: -2 },
       ik: {
         ...SQUAT_FEET,
-        wristR: { rel: "chest", x: 16, y: -5, bend: 1 },
-        wristL: { rel: "chest", x: 13, y: -3, bend: 1 },
+        wristR: { rel: "chest", x: 7.5, y: -5, bend: 1 },
+        wristL: { rel: "chest", x: 4.5, y: -3, bend: 1 },
       },
     },
-    { // bottom, torso upright, elbows still high so the bar does not dump
-      t: 1,
-      root: { x: 54, y: 89, rot: 8 },
-      joints: { spine: 9, neck: -5 },
+    { // half way down. Same reason as the back squat: a straight line between
+      // the two ends bulges the knee past the toe in the middle, and the rack
+      // offset has to be re-aimed at every key or the bar slides back off the
+      // delts as the torso turns.
+      t: 0.5,
+      root: { x: 55, y: 78, rot: 9.5 },
+      joints: { spine: 10, neck: -3.5 },
       ik: {
         ...SQUAT_FEET,
-        wristR: { rel: "chest", x: 16, y: -5, bend: 1 },
-        wristL: { rel: "chest", x: 13, y: -3, bend: 1 },
+        wristR: { rel: "chest", x: 8.45, y: -3.1, bend: 1 },
+        wristL: { rel: "chest", x: 5.45, y: -1.1, bend: 1 },
+      },
+    },
+    { // bottom, torso 27 degrees where the back squat takes 40, hip crease
+      // level with the knee and the knee stopping at the toe. A front squat
+      // really does carry more knee travel and more dorsiflexion than a back
+      // squat; what it must not do is what this used to, which was put the knee
+      // a hand's width past the toe on a 40 degree shin.
+      // The rack offset is re-aimed for the leaned torso, because a chest
+      // offset travels in world space and would otherwise slide off the delts.
+      t: 1,
+      root: { x: 51, y: 92, rot: 13 },
+      joints: { spine: 14, neck: -5 },
+      ik: {
+        ...SQUAT_FEET,
+        wristR: { rel: "chest", x: 8.8, y: -2.0, bend: 1 },
+        wristL: { rel: "chest", x: 5.8, y: 0, bend: 1 },
       },
     },
   ],
@@ -99,27 +144,32 @@ const ZERCHER_SQUAT = {
   dur: 3.2,
   breath: 0.2,
   fit: { k: 1.02, dy: 2 },
-  props: [{ type: "barbell", side: "R", point: "elbow", dx: 7, dy: -2, r: 10, front: true }],
+  props: [{ type: "barbell", side: "R", point: "elbow", dx: 9, dy: -2, r: 10, front: true }],
   grip: { R: "fist", L: "fist" },
   keys: [
-    { // stood tall, forearms level, bar in the elbow crook
+    { // stood tall, upper arm hanging at the side, forearm up and the bar in
+      // the crook clear of the belly. The old grip swung the elbow 8 units
+      // BEHIND the torso, which parked the plate inside the abdomen.
       t: 0,
       root: { x: 66, y: 61.4, rot: 2 },
       joints: { spine: 5, neck: -3 },
       ik: {
         ...SQUAT_FEET,
-        wristR: { rel: "chest", x: 8, y: 15, bend: 1 },
-        wristL: { rel: "chest", x: 5, y: 16, bend: 1 },
+        wristR: { rel: "chest", x: 11, y: 13, bend: 1 },
+        wristL: { rel: "chest", x: 8, y: 14, bend: 1 },
       },
     },
-    { // bottom, elbows tracking inside the knees
+    { // bottom, elbows tracking inside the knees, hip crease level with the
+      // knee and the knee stopping at the toe. Same depth correction as the
+      // other two barbell squats: the old bottom put the knee 4 units past the
+      // toe on a 39 degree shin.
       t: 1,
-      root: { x: 54, y: 89, rot: 10 },
+      root: { x: 51, y: 92, rot: 12 },
       joints: { spine: 13, neck: -7 },
       ik: {
         ...SQUAT_FEET,
-        wristR: { rel: "chest", x: 8, y: 15, bend: 1 },
-        wristL: { rel: "chest", x: 5, y: 16, bend: 1 },
+        wristR: { rel: "chest", x: 13, y: 11, bend: 1 },
+        wristL: { rel: "chest", x: 10, y: 12, bend: 1 },
       },
     },
   ],
@@ -273,6 +323,86 @@ const SISSY_SQUAT = {
   ],
 };
 
+// The weight training library lists Walking Lunge and Bulgarian Split Squat as
+// DUMBBELL exercises, and both were being drawn by the bodyweight entries in
+// calisthenics.mjs, so the equipment chip said dumbbell and the picture showed
+// someone lunging empty handed. These two are the loaded versions. The
+// bodyweight originals stay exactly as they are: both are real exercises in
+// their own right.
+
+// Step a long way forward with a bell in each hand, sink until both knees are
+// bent, then stand through onto the front leg and step again. Must be visible:
+// the long step, both knees bending, and the load hanging at the sides. Side
+// view, oneway, because it travels.
+// The arms are the one thing that is NOT a copy of the bodyweight version. That
+// one swings them in opposition, which is right for walking empty handed and
+// wrong the moment there is iron in the hands: a loaded arm hangs straight down
+// and stays there. So shoulderR/L is minus the torso angle at every key, which
+// is what keeps both bells plumb under the shoulders.
+const DUMBBELL_WALKING_LUNGE = {
+  view: "side",
+  loop: "oneway",
+  dur: 3.2,
+  breath: 0.25,
+  fit: { k: 0.98, dy: 2 },
+  props: [
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.78, front: true },
+  ],
+  keys: [
+    { // standing, feet together, mid stride, bells at the hips
+      t: 0,
+      root: { x: 60, y: 61.4, rot: 2 },
+      joints: { spine: 4, neck: -2, hipL: -20, kneeL: 20, ankleL: -20,
+                shoulderR: -6, elbowR: 3, shoulderL: -6, elbowL: 4 },
+      ik: { ankleR: { x: 58, y: 113.4, bend: -1 } },
+    },
+    { // bottom of the step, front shin upright, back knee low, bells still hanging
+      t: 1,
+      root: { x: 60, y: 84, rot: 6 },
+      joints: { spine: 6, neck: -4, hipL: -27.5, kneeL: 82, ankleL: 14,
+                shoulderR: -12, elbowR: 3, shoulderL: -12, elbowL: 4 },
+      ik: { ankleR: { x: 84, y: 113.4, bend: -1 } },
+    },
+  ],
+};
+
+// Back foot up on a bench behind, a bell in each hand, the front leg taking
+// everything and the hips dropping straight down. Must be visible: the rear
+// foot raised on the bench, the front knee bending under the hip, and the load
+// hanging beside the hips rather than out in front. Side view.
+const DUMBBELL_BULGARIAN_SPLIT_SQUAT = {
+  view: "side",
+  loop: "pingpong",
+  dur: 3.0,
+  breath: 0.2,
+  fit: { k: 0.94, dy: 2 },
+  props: [
+    { type: "bench", x: 8, y: 92, w: 46 },
+    { type: "dumbbell", hold: "follow", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.78, front: true },
+  ],
+  keys: [
+    { // tall, rear instep resting on the pad behind, bells beside the hips
+      t: 0,
+      root: { x: 67, y: 70, rot: 6 },
+      joints: { spine: 5, neck: -3, hipL: -27.9, kneeL: 98.7, ankleL: -30.3,
+                shoulderR: -11, elbowR: 3, shoulderL: -11, elbowL: 4 },
+      ik: { ankleR: { x: 84, y: 113.4, bend: -1 } },
+    },
+    { // bottom, front knee over the foot, rear knee dropped toward the floor.
+      // The bodyweight version lets the forearms drift forward here; with a
+      // bell in the hand the arm has to stay plumb, so the elbow stays at 3 and
+      // the shoulder carries the torso angle.
+      t: 1,
+      root: { x: 64, y: 86, rot: 10 },
+      joints: { spine: 8, neck: -5, hipL: -55.1, kneeL: 111.6, ankleL: 5.8,
+                shoulderR: -18, elbowR: 3, shoulderL: -18, elbowL: 4 },
+      ik: { ankleR: { x: 84, y: 113.4, bend: -1 } },
+    },
+  ],
+};
+
 // ------------------------------------------------------------- hamstrings ---
 
 // A hinge is not a squat: the pelvis travels BACKWARD nearly as far as it drops,
@@ -290,7 +420,10 @@ const ROMANIAN_DEADLIFT = {
   loop: "pingpong",
   dur: 3.2,
   breath: 0.2,
-  props: [{ type: "barbell", side: "R", point: "hand", r: 9.5, front: true }],
+  // dy -4.3 puts the bar in the PALM. `point: "hand"` is the tip of the mitt,
+  // 8.6 units past the wrist, and anchored there the plate hung 4 units through
+  // the floor at the bottom of the pull.
+  props: [{ type: "barbell", side: "R", point: "hand", dy: -4.3, r: 9.5, front: true }],
   keys: [
     { // stood tall, bar at the hips
       t: 0,
@@ -324,13 +457,27 @@ const STIFF_LEG_DEADLIFT = {
       joints: { spine: 2, neck: -2, shoulderR: -4, elbowR: 2, shoulderL: -4, elbowL: 3 },
       ik: { ...SQUAT_FEET },
     },
+    { // half way. With the foot pinned and the knee locked the hip rides a
+      // circle 51.5 units from the ankle, and a straight line between the two
+      // ends cuts inside that circle: the knee bent 27 degrees in the middle of
+      // a lift whose whole point is that it does not.
+      t: 0.5,
+      root: { x: 57, y: 61.7, rot: 17 },
+      joints: { spine: 23, neck: -6, shoulderR: -40, elbowR: 2, shoulderL: -40, elbowL: 3 },
+      ik: { ...SQUAT_FEET },
+    },
     { // bottom, knees all but locked, torso past 70 degrees. The pelvis stays
       // HIGH and travels back only a little: with the feet pinned, dropping it
       // the way the Romanian one does is what bends the knee, and a knee as
       // bent as the Romanian's leaves the two moves telling the same story.
+      // The hips DO still travel: they used to stop 10 units behind the heel
+      // with the torso at 80 degrees, which put the shoulders and both bells a
+      // hand's width past the toes, out over nothing. On a locked leg the hip
+      // rides a circle 51.5 units from the ankle, so 18 back costs only 3 of
+      // height, and the bells then hang over the middle of the foot.
       t: 1,
-      root: { x: 56, y: 60.6, rot: 34 },
-      joints: { spine: 46, neck: -12, shoulderR: -80, elbowR: 2, shoulderL: -80, elbowL: 3 },
+      root: { x: 46.5, y: 64, rot: 32 },
+      joints: { spine: 43, neck: -10, shoulderR: -75, elbowR: 2, shoulderL: -75, elbowL: 3 },
       ik: { ...SQUAT_FEET },
     },
   ],
@@ -456,6 +603,12 @@ const LEG_CURL = {
 // Knees pinned on a pad with the feet anchored, body held in one line and
 // lowered forward from the KNEE, then pulled back up by the hamstrings. Must be
 // visible: the pivot at the knee with no hinge at the hip at all. Side view.
+// The ankle is -88, which lays the foot flat in line with the horizontal shin
+// so it fills the gap between the rollers and the foot plate (ghd.svg puts the
+// plate at x 8..10 and the rollers at x 20..23, a foot length apart, and the
+// foot is 12 long). At -50 it hung down and back at 40 degrees, out past the
+// bottom of the roller carriage and touching nothing, which is the pointed toe
+// the review picked up.
 const GLUTE_HAM_RAISE = {
   view: "side",
   loop: "pingpong",
@@ -469,7 +622,7 @@ const GLUTE_HAM_RAISE = {
       root: { x: 46, y: 61, rot: 0 },
       joints: {
         spine: 0, neck: -2,
-        hipR: 0, kneeR: 90, ankleR: -50, hipL: 0, kneeL: 90, ankleL: -50,
+        hipR: 0, kneeR: 90, ankleR: -88, hipL: 0, kneeL: 90, ankleL: -88,
       },
       ik: { wristR: { rel: "chest", x: 7, y: 11, bend: 1 }, wristL: { rel: "chest", x: 5, y: 13, bend: 1 } },
     },
@@ -478,7 +631,7 @@ const GLUTE_HAM_RAISE = {
       root: { x: 73, y: 88, rot: 90 },
       joints: {
         spine: 0, neck: -6,
-        hipR: -180, kneeR: 0, ankleR: -50, hipL: -180, kneeL: 0, ankleL: -50,
+        hipR: -180, kneeR: 0, ankleR: -88, hipL: -180, kneeL: 0, ankleL: -88,
       },
       ik: { wristR: { rel: "chest", x: 7, y: 11, bend: 1 }, wristL: { rel: "chest", x: 5, y: 13, bend: 1 } },
     },
@@ -588,39 +741,58 @@ const HIP_THRUST = {
 };
 
 // Wide stance with the toes turned out, hands inside the knees, torso far more
-// upright than a conventional pull. Must be visible: the width of the stance and
-// the knees pushing out over the toes, both of which the side view hides behind
-// the near leg. Front view, so the bar is drawn as the two plates you would
-// actually see from there.
+// upright than a conventional pull. Must be visible: the width of the stance,
+// the hips sitting between the heels, and the knees pushing out over the feet.
+//
+// This was a straight FRONT view and it did not work at all. In a frontal move
+// the leg IK solves in the camera plane, so a knee has nowhere to bend except
+// sideways: the rig reported hip 0 and knee 0 across the whole rep and what it
+// drew was a figure standing bolt upright, splaying its legs further apart and
+// letting two plates slide down beside it. A squat or a hinge cannot be
+// authored against a straight front camera, because the joint that has to bend
+// is pointing at the lens.
+//
+// So it is sagittal now, with the camera orbited 34 degrees. The hips and knees
+// flex for real, and the yaw is what keeps the stance width readable. The feet
+// are pinned as WORLD targets (an x, y and z with flat: false), because a plain
+// screen-space pin in a sagittal move is snapped back into the limb's own plane
+// and loses its lateral component entirely, which is how a 38 unit stance
+// becomes a 12 unit one. z 19 either side is about twice shoulder width.
+//
+// What this view still cannot give: the toes turned out. A pinned ankle draws a
+// flat foot along the PELVIS axis, and hipRot does not reach past the pin, so
+// the feet point straight ahead. The stance width and the upright torso are the
+// two things that separate a sumo from a conventional pull and both read.
 const SUMO_DEADLIFT = {
-  view: "front",
+  view: { yaw: 34, plane: "sagittal" },
   loop: "pingpong",
   dur: 3.2,
   breath: 0.2,
-  feet: { R: { ang: 26, len: 0.62, w: 1.25 }, L: { ang: 26, len: 0.62, w: 1.25 } },
-  props: [
-    { type: "barbell", side: "R", point: "hand", dx: 17, dy: 3, r: 14, front: true },
-    { type: "barbell", side: "L", point: "hand", dx: -17, dy: 3, r: 14, front: true },
-  ],
+  fit: { k: 0.96, dy: 2 },
+  props: [{ type: "barbell", side: "R", point: "hand", dy: -4.3, r: 9.5, front: true }],
   keys: [
-    { // lockout, bar at the hips
+    { // lockout, bar at the top of the thighs, knees all but straight. The
+      // pelvis stands 2 units lower than a normal standing key because a stance
+      // this wide costs height.
       t: 0,
-      root: { x: 70, y: 72, rot: 0 },
-      joints: { spine: 0, neck: 0 },
+      root: { x: 64, y: 63.4, rot: 3 },
+      joints: { spine: 3, neck: -2, shoulderR: -6, elbowR: 2, shoulderL: -6, elbowL: 3 },
       ik: {
-        ankleR: { x: 92, y: 111, bend: -1 }, ankleL: { x: 48, y: 111, bend: -1 },
-        wristR: { x: 80.2, y: 81.0, bend: 1 }, wristL: { x: 60.2, y: 81.0, bend: 1 },
+        ankleR: { x: 66, y: 113.4, z: 19, flat: false, bend: -1 },
+        ankleL: { x: 66, y: 113.4, z: -19, flat: false, bend: -1 },
       },
     },
-    { // start position, hips down, knees shoved out, arms long inside them.
-      // Nothing leans here: forward lean is invisible in the frontal plane and
-      // authoring it as spine or rot tips the figure over sideways instead.
+    { // start position, hips down between the heels, shins near vertical, torso
+      // 30 degrees off vertical where the conventional pull takes 60. The arms
+      // hang straight down inside the knees and the plate is resting on the
+      // floor: shoulderR/L is minus the torso angle, which is what keeps them
+      // vertical, and the bar rides the palm rather than the fingertips.
       t: 1,
-      root: { x: 70, y: 84, rot: 0 },
-      joints: { spine: 0, neck: 0 },
+      root: { x: 52, y: 87.5, rot: 14 },
+      joints: { spine: 16, neck: -8, shoulderR: -30, elbowR: 2, shoulderL: -30, elbowL: 3 },
       ik: {
-        ankleR: { x: 92, y: 111, bend: -1 }, ankleL: { x: 48, y: 111, bend: -1 },
-        wristR: { x: 79.6, y: 98.0, bend: 1 }, wristL: { x: 60.4, y: 98.0, bend: 1 },
+        ankleR: { x: 66, y: 113.4, z: 19, flat: false, bend: -1 },
+        ankleL: { x: 66, y: 113.4, z: -19, flat: false, bend: -1 },
       },
     },
   ],
@@ -1072,6 +1244,14 @@ const REVERSE_CRUNCH = {
 // Kneeling under a high pulley with the rope at the head, curl the ribs down
 // toward the thighs. Must be visible: the SPINE rounding rather than the hips
 // folding, and the cable coming from above. Side view.
+// The rig draws the trunk as ONE straight segment, so it cannot curl a spine:
+// every degree of `spine` reads as a hip angle. That is a limit, not a licence,
+// and the old end key spent 60 degrees of it, laying the torso flat so the
+// whole body from knee to shoulder was one diagonal plank. A real cable crunch
+// finishes with the trunk chord around 45 to 50 degrees, the hips still stacked
+// over the knees and the chin hard down. So the trunk stops at 48 and the neck
+// takes 30 of flexion on top of it, which is the part of a curl this figure CAN
+// actually show.
 const CABLE_CRUNCH = {
   view: "side",
   loop: "pingpong",
@@ -1088,14 +1268,16 @@ const CABLE_CRUNCH = {
       },
       ik: { wristR: { x: 77.0, y: 42.0, bend: 1 }, wristL: { x: 73.0, y: 44.0, bend: 1 } },
     },
-    { // crunched, spine rounded, elbows driven toward the thighs
+    { // crunched: trunk chord at 48 degrees, chin tucked hard, rope still at
+      // the head and the elbows driven down and forward. The hips have not
+      // travelled: the pelvis sits over the knees at both ends.
       t: 1,
-      root: { x: 56, y: 83.5, rot: 10 },
+      root: { x: 57, y: 83.5, rot: 10 },
       joints: {
-        spine: 60, neck: 24,
+        spine: 38, neck: 30,
         hipR: -10, kneeR: 90, ankleR: -78, hipL: -10, kneeL: 90, ankleL: -78,
       },
-      ik: { wristR: { x: 100.0, y: 64.0, bend: 1 }, wristL: { x: 96.0, y: 66.0, bend: 1 } },
+      ik: { wristR: { x: 98.5, y: 62.4, bend: 1 }, wristL: { x: 94.5, y: 64.4, bend: 1 } },
     },
   ],
 };
@@ -1247,24 +1429,31 @@ const RUSSIAN_TWIST = {
   breath: 0.25,
   fit: { k: 1.12, dy: -8 },
   props: [{ type: "mat", x: 14, w: 110 }],
+  // The pelvis sat at y 100, which left the seat and both heels six units clear
+  // of the mat: a V-sit hovering above the floor. The mat is a screen space
+  // prop drawn at GROUND - 2.4, so it cannot come up to meet the figure; the
+  // figure goes down to it. The seat drops 7 units onto the mat, both wrist
+  // pins come down by the same 7, and the hips take 8 more degrees of flexion
+  // so the feet stay ABOVE the mat where a V-sit holds them rather than being
+  // dragged through it.
   keys: [
     { // hands high on one side, chest open
       t: 0,
-      root: { x: 62, y: 100, rot: -35 },
+      root: { x: 62, y: 107, rot: -35 },
       joints: { spineTwist: 40,
         spine: 0, neck: 4,
-        hipR: 145, kneeR: 70, ankleR: -25, hipL: 143, kneeL: 72, ankleL: -25,
+        hipR: 153, kneeR: 74, ankleR: -25, hipL: 151, kneeL: 76, ankleL: -25,
       },
-      ik: { wristR: { x: 76.3, y: 73.5, bend: 1 }, wristL: { x: 72.3, y: 75.5, bend: 1 } },
+      ik: { wristR: { x: 76.3, y: 80.5, bend: 1 }, wristL: { x: 72.3, y: 82.5, bend: 1 } },
     },
     { // swung down and across toward the other hip
       t: 1,
-      root: { x: 62, y: 100, rot: -30 },
+      root: { x: 62, y: 107, rot: -30 },
       joints: { spineTwist: -28,
         spine: 0, neck: 8,
-        hipR: 140, kneeR: 66, ankleR: -25, hipL: 138, kneeL: 68, ankleL: -25,
+        hipR: 148, kneeR: 70, ankleR: -25, hipL: 146, kneeL: 72, ankleL: -25,
       },
-      ik: { wristR: { x: 66.5, y: 99.4, bend: 1 }, wristL: { x: 62.5, y: 100.4, bend: 1 } },
+      ik: { wristR: { x: 66.5, y: 106.4, bend: 1 }, wristL: { x: 62.5, y: 107.4, bend: 1 } },
     },
   ],
 };
@@ -1301,42 +1490,58 @@ const SIDE_BEND = {
 };
 
 // Stood side on to a cable with the handle at the sternum, press it out and
-// refuse to let it turn you. Must be visible: the cable pulling from the SIDE
-// while the body stays square. Front view, because side on the cable would be in
-// front of or behind the figure, which is a different exercise entirely.
-// Both hands now hold the handle at the sternum, which needs each arm to fold
-// across its own chest: front view arms pin with bend -1 to fold inward, and the
-// crossing arms draw over the torso. The press itself travels at the camera and
-// cannot be drawn, so it reads as the elbows going from tucked and wide to long.
+// refuse to let it turn you. Must be visible: the hands travelling AWAY from the
+// chest while the trunk stays square and the cable hauls from the side.
+//
+// Two views have failed at this. Side on, the press reads perfectly and the
+// cable anchor sits at the camera, so the load has no direction. Front on, the
+// anchor reads and the press travels straight at the lens: a pinned wrist IS a
+// screen position, so an arm pointing at the camera cannot foreshorten, and the
+// last version gave up and slid the hands DOWN to the navel instead, which is
+// not a press at all.
+//
+// A yawed sagittal camera gives both, the same fix Sumo Deadlift needed. The
+// press is now an in-plane arm extension, which the rig draws at full length:
+// the hands go from 15 units in front of the chest to 36, and the elbows come
+// up off the ribs. The stack sits out at screen x 18 where a lateral anchor
+// lands under a 34 degree yaw, and its coordinates were re-aimed for the turned
+// camera because a pinned prop does not orbit with it. The pulley sits BELOW
+// chest height on purpose: at chest height the cable ran dead level and landed
+// exactly along the extended arm, so the two lines merged and the load lost its
+// direction. Coming up from the hip it reads as a separate line the whole way.
+//
+// Both hands are on one handle, so the wrists are WORLD pins on the midline
+// (z about zero with flat: false) rather than screen pins, which a sagittal
+// move would otherwise snap back out to each shoulder's own z.
+//
+// root.rot and spine are ZERO at both keys and there is no spineTwist. That is
+// the exercise: the thing a Pallof press exists to resist is trunk rotation, so
+// drawing any would be drawing the failure.
 const PALLOF_PRESS = {
-  view: "front",
+  view: { yaw: 34, plane: "sagittal" },
   loop: "pingpong",
   dur: 2.8,
   breath: 0.2,
-  props: [{ type: "cable", x: 16, top: 44, y0: 52, grip: "handle", to: { side: "L", point: "hand" } }],
+  props: [{ type: "cable", x: 18, top: 58, y0: 70, grip: "handle", to: { side: "L", point: "hand" } }],
   keys: [
-    { // handle held at the sternum, elbows tucked down
+    { // handle racked at the sternum, elbows tucked down against the ribs
       t: 0,
-      root: { x: 74, y: 62, rot: 0 },
-      joints: {
-        spine: 0, neck: 0,
-        hipR: 5, hipL: 5, kneeR: 4, kneeL: 4,
-      },
+      root: { x: 66, y: 61.4, rot: 0 },
+      joints: { spine: 0, neck: 0 },
       ik: {
-        ankleR: { x: 82, y: 113.4, bend: -1 }, ankleL: { x: 68, y: 113.4, bend: -1 },
-        wristR: { x: 73.0, y: 37.0, bend: -1 }, wristL: { x: 70.0, y: 38.0, bend: -1 },
+        ankleR: { x: 68, y: 113.4, bend: -1 }, ankleL: { x: 64, y: 113.4, bend: -1 },
+        wristR: { x: 79, y: 38, z: 1.5, flat: false, bend: 1 },
+        wristL: { x: 79, y: 39, z: -1.5, flat: false, bend: 1 },
       },
     },
     { // pressed long, hands still dead centre, body refusing to rotate
       t: 1,
-      root: { x: 74, y: 62, rot: -2 },
-      joints: {
-        spine: 0, neck: 0,
-        hipR: 5, hipL: 5, kneeR: 4, kneeL: 4,
-      },
+      root: { x: 66, y: 61.4, rot: 0 },
+      joints: { spine: 0, neck: 0 },
       ik: {
-        ankleR: { x: 82, y: 113.4, bend: -1 }, ankleL: { x: 68, y: 113.4, bend: -1 },
-        wristR: { x: 71.9, y: 49.0, bend: -1 }, wristL: { x: 68.9, y: 50.0, bend: -1 },
+        ankleR: { x: 68, y: 113.4, bend: -1 }, ankleL: { x: 64, y: 113.4, bend: -1 },
+        wristR: { x: 102.4, y: 32, z: 1.5, flat: false, bend: 1 },
+        wristL: { x: 101.4, y: 33, z: -1.5, flat: false, bend: 1 },
       },
     },
   ],
@@ -1471,12 +1676,16 @@ const BIRD_DOG = {
         wristR: { x: 95, y: 113, bend: 1 }, wristL: { x: 91, y: 113, bend: 1 },
       },
     },
-    { // left arm and right leg long, both level with the back
+    { // left arm and right leg long, both level with the back. It used to reach
+      // the LEFT arm and the LEFT leg, which is the same side: a bird dog is
+      // opposite limbs, and same-side is the one thing it must not be. Side on
+      // you can only tell by the tone, so the far arm now goes out with the
+      // NEAR leg and the two read as a diagonal.
       t: 1,
       root: { x: 66, y: 84, rot: 90 },
       joints: {
         spine: 0, neck: -10, wristR: 86, wristL: 0,
-        hipR: -90, kneeR: 90, ankleR: -78, hipL: -180, kneeL: 4, ankleL: -20,
+        hipR: -180, kneeR: 4, ankleR: -20, hipL: -90, kneeL: 90, ankleL: -78,
       },
       ik: {
         wristR: { x: 95, y: 113, bend: 1 }, wristL: { x: 127.0, y: 80.0, bend: 1 },
@@ -1654,7 +1863,10 @@ const DEADLIFT = {
   loop: "pingpong",
   dur: 3.4,
   breath: 0.2,
-  props: [{ type: "barbell", side: "R", point: "hand", r: 9.5, front: true }],
+  // dy -4.3 puts the bar in the PALM. `point: "hand"` is the tip of the mitt,
+  // 8.6 units past the wrist, and anchored there the plate hung 4 units through
+  // the floor at the bottom of the pull.
+  props: [{ type: "barbell", side: "R", point: "hand", dy: -4.3, r: 9.5, front: true }],
   keys: [
     { // stood tall at lockout, bar at the hips
       t: 0,
@@ -1670,6 +1882,12 @@ const DEADLIFT = {
     },
   ],
 };
+
+// Exported but deliberately NOT in MOVES: the keys of MOVES are exact library
+// names, and "Walking Lunge" and "Bulgarian Split Squat" are currently mapped
+// to the bodyweight entries in weight-training.mjs. The lead re-points those
+// two names at these, in a file no agent here owns.
+export { DUMBBELL_WALKING_LUNGE, DUMBBELL_BULGARIAN_SPLIT_SQUAT };
 
 export const MOVES = {
   "Barbell Back Squat": BARBELL_BACK_SQUAT,

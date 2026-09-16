@@ -198,6 +198,7 @@ export const EQUIPMENT = {
   "Low-to-High Cable Fly": { kit: ["cable", "attach-handle"], setup: [] },
   "Machine Chest Press": { kit: ["chest-press"], setup: [] },
   "Machine Shoulder Press": { kit: ["shoulder-press"], setup: [] },
+  "Military Press": { kit: ["barbell"], setup: [] },
   "Mountain Pose": { kit: [], setup: [] },
   "Muscle-Up": { kit: ["pullup-bar"], setup: [] },
   "Negative Pull-Up": { kit: ["pullup-bar"], setup: [] },
