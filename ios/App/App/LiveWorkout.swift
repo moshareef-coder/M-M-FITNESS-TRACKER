@@ -57,7 +57,7 @@ public class LiveWorkout: CAPPlugin, CAPBridgedPlugin {
     /// Called on every launch and every return to the front. A card from a run
     /// that was force quit half a day ago has no owner left in the app and no
     /// way to be ended by the person looking at it.
-    @objc public static func sweepStaleActivities() {
+    public static func sweepStaleActivities() {
         guard #available(iOS 16.1, *) else { return }
         let cutoff = Date().addingTimeInterval(-staleAfter)
         let stale = WorkoutAttributes.allLive.filter { $0.attributes.startedAt < cutoff }

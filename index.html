@@ -6032,6 +6032,19 @@ function registerAuthDeepLink() {
       const hash = new URLSearchParams((parsed.hash || "").replace(/^#/, ""));
       const failed = parsed.searchParams.get("error_description") || hash.get("error_description");
       if (failed) throw new Error(failed);
+      /* A reset link and a sign-in link arrive down the same pipe and look the
+         same once the tokens are out of them. On the web supabase-js reads the
+         URL itself, sees type=recovery and raises PASSWORD_RECOVERY, which is
+         what the set-password screen listens for. Here WE read the URL and hand
+         it over as a plain setSession, so supabase-js has nothing to read and
+         fires SIGNED_IN: the app walked straight into the home screen and the
+         one screen the link existed to reach was never drawn. Nobody would have
+         caught it on the site, because on the site it works.
+
+         Claimed BEFORE setSession, because SIGNED_IN fires inside that call and
+         the handler checks this flag. */
+      const recovery = (parsed.searchParams.get("type") || hash.get("type")) === "recovery";
+      if (recovery) IN_PASSWORD_RECOVERY = true;
       /* Which of these two arrives depends on the flow supabase-js is
          configured for, and both are legitimate, so handle either. */
       const code = parsed.searchParams.get("code");
@@ -6045,8 +6058,13 @@ function registerAuthDeepLink() {
         });
         if (error) throw error;
       }
+      /* Signed in, which is not the same as having a password again. */
+      if (recovery) renderSetPasswordScreen();
     } catch (err) {
       console.error("auth deep link failed", err);
+      /* A link that failed leaves nobody mid-recovery, and leaving the flag set
+         would lock the next real sign-in out of the app. */
+      IN_PASSWORD_RECOVERY = false;
       const el = $("siMsg");
       if (el) {
         el.textContent = "Could not finish signing in. Try again.";
@@ -6094,6 +6112,30 @@ function initOnboard() {
 function isNativeApp() {
   return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function"
     && window.Capacitor.isNativePlatform());
+}
+
+/* What Apple said this person is called, on the one occasion it will say.
+   Survives a reload through localStorage, because a name Apple will not repeat
+   is not something to keep only in a variable. */
+const APPLE_NAME_KEY = "ft_apple_name";
+let APPLE_NAME = null;
+
+function captureAppleName(response) {
+  const name = [response?.givenName, response?.familyName].filter(Boolean).join(" ").trim();
+  if (!name) return;
+  APPLE_NAME = name;
+  try { localStorage.setItem(APPLE_NAME_KEY, name); } catch { /* private browsing */ }
+}
+
+/* Read once, on the way into onboarding, and cleared as it is read: it is a
+   suggestion for the name field, not a second copy of the profile. */
+function takeAppleName() {
+  let stored = null;
+  try { stored = localStorage.getItem(APPLE_NAME_KEY); } catch {}
+  const name = APPLE_NAME || stored;
+  APPLE_NAME = null;
+  try { localStorage.removeItem(APPLE_NAME_KEY); } catch {}
+  return name || null;
 }
 
 /* Apple wants the nonce it signs to be the SHA-256 of a secret we keep, and
@@ -6186,10 +6228,27 @@ function renderSignInScreen(state = {}) {
          out of the sheet, and signing in with undefined fails far less
          legibly than saying so here. */
       if (!token) throw new Error("no identity token");
+      /* The one and only time Apple will ever say who this is. givenName comes
+         back on the FIRST authorisation and never again, on any device, for the
+         life of the Apple ID: revoking the app and signing in again does not
+         bring it back. It is not in the identity token either, so Supabase
+         cannot fill it in later. Read here or lost permanently.
+
+         Caught before signInWithIdToken, because that call fires SIGNED_IN and
+         onboarding reads this on its way past. Relaying an email is the private
+         relay case, where the local part is a random string and the fallback
+         name onboarding would otherwise suggest is gibberish. */
+      captureAppleName(result.response);
       const { error } = await sb.auth.signInWithIdToken({
         provider: "apple", token, nonce: raw,
       });
       if (error) throw error;
+      /* Written to the account as well, so a reinstall on a new phone still
+         knows the name Apple will not say twice. Not worth failing over. */
+      if (APPLE_NAME) {
+        sb.auth.updateUser({ data: { full_name: APPLE_NAME } })
+          .then(({ error: e }) => { if (e) console.warn("could not keep the Apple name", e); });
+      }
       /* onAuthStateChange takes it from here, same as every other path. */
     } catch (err) {
       btn.disabled = false;
@@ -6415,7 +6474,14 @@ async function handleSignedIn(session) {
   } else {
     const draft = loadObDraft();
     if (draft) { renderOnboardStep(draft.step, draft.data); return; }
-    const suggested = session.user.user_metadata?.full_name?.split(" ")[0] || session.user.email.split("@")[0];
+    /* Apple first, because Apple's answer is the one with an expiry on it and
+       it is not in user_metadata yet: the write that puts it there is still in
+       flight when this runs. Falling through to the email is the private relay
+       case, where the local part is a random string, so a name we were actually
+       given has to beat it. */
+    const suggested = takeAppleName()?.split(" ")[0]
+      || session.user.user_metadata?.full_name?.split(" ")[0]
+      || session.user.email.split("@")[0];
     renderOnboardIntro(0, { name: suggested });
   }
 }
@@ -8759,8 +8825,96 @@ function showApp() {
     // silently and read as the app deciding for you.
   };
   renderFab();
+  registerBackGuard();
 
-  loadAll();
+  loadAll().then(reconcileNativeSurfaces);
+}
+
+/* ---------- Back ----------
+
+   Worth being honest about the size of this one. On iOS there is no hardware
+   back button, and Capacitor's backButton event is Android only, so it will
+   never fire in the build we are actually shipping. The edge-swipe that would
+   call history.back() is off in a WKWebView unless it is asked for, and it has
+   not been. On the phone this app is submitted for, none of this runs.
+
+   It is real in two other places: the PWA installed on an Android home screen,
+   where the system back is always there and there is nothing in the history to
+   absorb it, and any future Android build. Both leave the app mid-workout with
+   the session screen still up.
+
+   So this is the cheap version and deliberately not a router. One spare history
+   entry while the session screen is open, and a back that lands on it does what
+   the chevron in the corner of that screen already does: minimises to the
+   workout tab, workout still running. Nothing else in the app gets back
+   behaviour it did not have yesterday. */
+let BACK_GUARD_ARMED = false;
+
+function armBackGuard() {
+  if (BACK_GUARD_ARMED) return;
+  try { history.pushState({ unio: "session" }, ""); BACK_GUARD_ARMED = true; }
+  catch { /* no history to push onto, which is its own answer */ }
+}
+
+/* True when the gesture was ours to take. */
+function handleBackGesture() {
+  if (!document.body.classList.contains("session-open")) return false;
+  minimiseSession();
+  return true;
+}
+
+let BACK_GUARD_REGISTERED = false;
+
+function registerBackGuard() {
+  /* showApp runs again after pairing, and a second listener would minimise the
+     session twice on one gesture. */
+  if (BACK_GUARD_REGISTERED) return;
+  BACK_GUARD_REGISTERED = true;
+  window.addEventListener("popstate", () => {
+    BACK_GUARD_ARMED = false;
+    if (handleBackGesture()) armBackGuard();
+  });
+  /* Android only, and undefined on the web, so it stays a no-op in both places
+     this cannot fire. Left registered rather than platform-gated: the day there
+     is an Android build, back should already do the right thing. */
+  const app = isNativeApp() && window.Capacitor.Plugins.App;
+  if (!app) return;
+  try {
+    app.addListener("backButton", ({ canGoBack }) => {
+      if (handleBackGesture()) return;
+      /* Leaving is allowed. Closing the app from under a workout is not the
+         same thing, so it goes to the background rather than exiting. */
+      if (!canGoBack) { app.minimizeApp?.(); return; }
+      history.back();
+    });
+  } catch (err) {
+    console.warn("back button listener failed", err);
+  }
+}
+
+/* What the Lock Screen and the widget are showing, against what is actually
+   true, once per launch.
+
+   Both surfaces outlive the process that drew them, which is the whole reason
+   they need this. A force quit mid-workout leaves a Live Activity with nobody
+   holding a reference to it, and taps queued against a workout that ended
+   hours ago sit in the App Group until something collects them. Neither was
+   ever checked at startup: the drain only ran on visibilitychange, which does
+   not fire on a cold launch, and the end path guarded on a flag that a cold
+   launch resets to false.
+
+   Deliberately conservative about the card. A saved session is a workout
+   somebody may still come back to, so it keeps its card; only a launch with no
+   session anywhere, in memory or on disk, is certain enough to end one. The
+   twelve-hour native sweep covers the rest. */
+async function reconcileNativeSurfaces() {
+  if (!isNativeApp()) return;
+  try {
+    await drainLockScreenSets();
+    if (!SESSION && !loadSessionFromStorage()) await endLiveActivity();
+  } catch (err) {
+    console.error("reconciling native surfaces failed", err);
+  }
 }
 
 /* One place that guarantees the nav is reachable. */
@@ -8913,7 +9067,16 @@ function clearLocalAccountState() {
   if (isNativeApp()) {
     try { window.Capacitor.Plugins.WidgetBridge?.clear(); }
     catch (e) { console.warn("could not clear widget state", e); }
+    /* Same argument, different surface. Signing out and deleting the account
+       both only reloaded the page, and a reload does not touch the Lock Screen:
+       the card stayed up, still naming the exercise, for whoever signs in next.
+       This is the one place all three exits already pass through. */
+    try { endLiveActivity(); }
+    catch (e) { console.warn("could not end the live activity", e); }
   }
+  /* So the next account's identical numbers are not mistaken for "nothing
+     moved" and skipped. */
+  LAST_WIDGET_SNAPSHOT = null;
 }
 
 function queuedCount() { return readQueue().length; }
@@ -17220,6 +17383,7 @@ document.addEventListener("visibilitychange", () => {
 function openSessionUI() {
   document.body.classList.add("session-open");
   keepScreenAwake();
+  armBackGuard();    // something for a back gesture to land on other than the exit
   startQuipBeat();   // he talks on a clock while this screen is up
   $("sessionCard").classList.remove("hidden");
   // Last session's completion screen left this on, which would hide the clock
@@ -22314,6 +22478,42 @@ function awaitApnsToken(timeoutMs = 15000) {
   });
 }
 
+/* Which Apple gateway minted the token we just received.
+
+   This used to be the literal string "development", with a comment saying it
+   matched App.entitlements. It did match the file. The file was not what the
+   binary was signed with: a TestFlight or App Store build is signed for
+   production, APNs mints a production token, and the sender then posted it to
+   the sandbox gateway and got BadDeviceToken back. Push was dead for every
+   user who was not plugged into a cable, which is to say every user.
+
+   JavaScript cannot know this and should never have been asked to assert it.
+   The native plugin reads the aps-environment entitlement out of the signature
+   the app is actually running under, which is the same thing APNs read when it
+   decided which token to hand over. That is the only answer that cannot drift
+   from the truth.
+
+   The fallback is "production" rather than "development" on purpose. A build
+   where the plugin is missing is a build that shipped, and shipped builds are
+   production; a developer's cable install guessed wrong this way recovers on
+   the first send, because send-nudges retries the other gateway on
+   BadDeviceToken and writes the corrected value back to the row. */
+async function apnsEnvironment() {
+  const plugin = isNativeApp() && window.Capacitor.Plugins.PushEnvironment;
+  if (!plugin) {
+    console.warn("PushEnvironment plugin is missing, assuming production");
+    return "production";
+  }
+  try {
+    const { environment, source } = await plugin.get();
+    console.log(`apns environment: ${environment} (from ${source})`);
+    return environment === "development" ? "development" : "production";
+  } catch (err) {
+    console.error("could not read the apns environment", err);
+    return "production";
+  }
+}
+
 function pushSupport() {
   if (isNativeApp()) return { ok: true };
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
@@ -22381,9 +22581,7 @@ async function enablePush() {
       const { error: apnsErr } = await sb.from("apns_tokens").upsert({
         email: MY_EMAIL,
         token,
-        /* Matches aps-environment in App.entitlements. A sandbox token is
-           rejected outright by the production gateway. */
-        environment: "development",
+        environment: await apnsEnvironment(),
         failures: 0,
       }, { onConflict: "token" });
       if (apnsErr) throw apnsErr;
