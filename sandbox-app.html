@@ -260,7 +260,6 @@
   }
   .pair-req-who { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
   .pair-req-mail { font-size: 12.5px; color: var(--muted); margin-top: 2px; word-break: break-all; }
-  .pair-req-flag { font-size: 12.5px; color: var(--warn); margin-top: 8px; line-height: 1.4; }
   .pair-req-acts { display: flex; gap: 10px; margin-top: 14px; }
   .pair-req-acts button { flex: 1; width: auto; min-height: 44px; margin-top: 0; }
   .pair-req-note { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 8px 0 0; text-align: left; }
@@ -5901,7 +5900,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.1";
+const APP_VERSION = "2026.09.16.2";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -6710,9 +6709,15 @@ async function checkPartnershipThenEnter() {
   const waiting = all.filter((r) => r.status === "pending" && mine(r.inviter_email));
   if (waiting.length) { renderPairSentScreen(waiting); return; }
 
-  /* A no, said once and then done with. The week is so an answer that came
-     back while the app sat closed for a month does not open with it. */
+  /* A no, said once and then out of the way. 'declined' means exactly one
+     thing now, a person refusing a pair request, so this filter does not need
+     to be any broader: leaving a pair group and being passed over when someone
+     else was picked both write 'ended'. The row is permanent, so being read is
+     what retires the screen, and the week is the belt for a phone whose local
+     storage was wiped rather than a reason to show an old no again. */
+  const seenNo = pairNoSeen();
   const refused = all.filter((r) => r.status === "declined" && mine(r.inviter_email)
+    && !seenNo.includes(r.id)
     && r.responded_at && Date.now() - new Date(r.responded_at).getTime() < 7 * 864e5);
   if (refused.length) { renderPairRefusedScreen(refused); return; }
 
@@ -6756,20 +6761,26 @@ function renderInviteScreen(invite) {
 
    None of this is reachable until 20260915_consent_and_leak_close.sql runs. */
 
-/* Who has been turned down, and how many times. The database lets a declined
-   person redeem the same code again the next minute, so the only thing
-   standing between a user and a stranger who keeps asking is that the app says
-   out loud this is not the first time, and offers the one thing that actually
-   ends it: a new code. Kept locally on purpose, no table to add. */
-const DECLINED_PAIRS_KEY = "ft_declined_pairs";
-function declinedPairs() {
-  try { return JSON.parse(localStorage.getItem(DECLINED_PAIRS_KEY) || "{}") || {}; }
-  catch { return {}; }          // private mode, or someone else's junk in the key
+/* Which refusals I have already read. A declined row is now permanent: the
+   migration blocks the asker from asking that person again, and the same
+   trigger stops either side writing over the row, because a no you can erase
+   is a no you can ask again after. So the screen that reports it cannot close
+   it server-side, and dismissing it is a local act by definition. Keyed on the
+   row id and not the person, so a different refusal still gets its own say.
+   The list is trimmed rather than left to grow, and losing it costs nothing:
+   the seven day window in checkPartnershipThenEnter is what stops an old no
+   coming back, and typing their code again still answers with the block. */
+const PAIR_NO_SEEN_KEY = "ft_pair_no_seen";
+function pairNoSeen() {
+  try {
+    const v = JSON.parse(localStorage.getItem(PAIR_NO_SEEN_KEY) || "[]");
+    return Array.isArray(v) ? v : [];
+  } catch { return []; }        // private mode, or someone else's junk in the key
 }
-function rememberDecline(email) {
-  const seen = declinedPairs();
-  seen[email] = (seen[email] || 0) + 1;
-  try { localStorage.setItem(DECLINED_PAIRS_KEY, JSON.stringify(seen)); } catch { /* private mode */ }
+function dismissPairNo(id) {
+  const seen = pairNoSeen().filter((x) => x !== id);
+  seen.push(id);
+  try { localStorage.setItem(PAIR_NO_SEEN_KEY, JSON.stringify(seen.slice(-20))); } catch { /* private mode */ }
 }
 
 /* A stranger's profile is not readable until you accept, which is the point, so
@@ -6795,8 +6806,9 @@ async function answerPairRequest(id, accept) {
   return true;
 }
 
-/* Ending a request I sent, or clearing one that came back declined. Either
-   party may write the row; only the status moves. */
+/* Ending a request I sent that nobody has answered yet. Only that: a declined
+   row is final from the client and the trigger refuses this write on one,
+   which is the point of it. The refused screen dismisses locally instead. */
 async function endPairRow(id) {
   const { error } = await sb.from("partnerships").update({ status: "ended" }).eq("id", id);
   if (error) { console.error(error); toast("Could not do that"); return false; }
@@ -6804,24 +6816,21 @@ async function endPairRow(id) {
 }
 
 function renderPairRequestScreen(reqs) {
-  const seen = declinedPairs();
-  const repeat = reqs.some((r) => seen[String(r.inviter_email).toLowerCase()]);
   const title = reqs.length === 1
     ? `${escapeHtml(pairWho(reqs[0].inviter_email))} wants to pair with you`
     // Three is the ceiling the migration allows, so the words never run out.
     : `${["", "One", "Two", "Three"][reqs.length] || reqs.length} people want to pair with you`;
+  /* "Turns down the rest" is what this said, and it was the one sentence on
+     the screen the database disagreed with: accepting marks the others ended,
+     not declined, precisely so nobody is barred from asking again by a no you
+     never said. The copy says what the row says. */
   const sub = reqs.length === 1
-    ? "They typed your invite code. Say yes and you each see the other's workouts, weight and progress. Say no and nothing of yours is shared."
-    : "They each typed your invite code. You can have one partner, so saying yes to one turns down the rest.";
+    ? "They typed your invite code. Say yes and you each see the other's workouts, weight and progress. Say no and nothing is shared, and they cannot ask you again."
+    : "They each typed your invite code. You can only have one partner. Picking one leaves the rest unanswered rather than refused, and only a no stops someone asking you again.";
 
-  const flag = (email) => {
-    const before = seen[email] || 0;
-    const times = before === 1 ? "once" : before === 2 ? "twice" : before + " times";
-    return before ? `<div class="pair-req-flag">You said no to them ${times} before.</div>` : "";
-  };
-  const acts = (r, email) => `
+  const acts = (r) => `
     <div class="pair-req-acts">
-      <button type="button" class="btn-ghost" data-decline="${escapeHtml(r.id)}" data-email="${escapeHtml(email)}">No thanks</button>
+      <button type="button" class="btn-ghost" data-decline="${escapeHtml(r.id)}">No thanks</button>
       <button type="button" class="btn-primary" data-accept="${escapeHtml(r.id)}">Pair up</button>
     </div>`;
 
@@ -6832,16 +6841,14 @@ function renderPairRequestScreen(reqs) {
   const one = reqs.length === 1 ? String(reqs[0].inviter_email).toLowerCase() : null;
   const body = one
     ? `<div class="pair-req-mail" style="margin-bottom:2px;">${escapeHtml(one)}</div>
-       ${flag(one)}
-       ${acts(reqs[0], one)}`
+       ${acts(reqs[0])}`
     : reqs.map((r) => {
         const email = String(r.inviter_email).toLowerCase();
         return `
       <div class="pair-req">
         <div class="pair-req-who">${escapeHtml(pairWho(email))}</div>
         <div class="pair-req-mail">${escapeHtml(email)}</div>
-        ${flag(email)}
-        ${acts(r, email)}
+        ${acts(r)}
       </div>`;
       }).join("");
 
@@ -6850,9 +6857,9 @@ function renderPairRequestScreen(reqs) {
       <h1>${title}</h1>
       <p class="sub" style="margin-bottom:16px;">${sub}</p>
       ${body}
-      ${repeat ? `
+      ${reqs.length > 1 ? `
       <button type="button" class="btn-secondary" id="rotateMyCodeBtn">Change my invite code</button>
-      <p class="pair-req-note">Saying no does not stop them asking again. A new code does: the old one stops working for everyone, so anyone you meant to share it with will need the new one.</p>` : ""}
+      <p class="pair-req-note">Saying no to someone stops them asking you again. Changing your code is the wider one: if it has got about, the old one stops working for everybody who has it, including anyone you meant to give it to.</p>` : ""}
     </div>`;
   $("onboard").classList.remove("hidden");
   $("app").classList.add("hidden");
@@ -6876,7 +6883,6 @@ function renderPairRequestScreen(reqs) {
     b.onclick = async () => {
       b.disabled = true;
       if (!(await answerPairRequest(b.dataset.decline, false))) { b.disabled = false; return; }
-      rememberDecline(b.dataset.email);
       await checkPartnershipThenEnter();      // any others are still waiting
     };
   });
@@ -6952,24 +6958,37 @@ function renderPairRefusedScreen(refused) {
   const title = refused.length === 1
     ? `${escapeHtml(pairWho(refused[0].invitee_email))} said no`
     : "Nobody took you up on it";
+  /* Say the next move here rather than leaving it to be discovered by typing
+     the code again and being told off. The server answers a blocked retry with
+     one sentence and this is the same fact, ahead of the attempt: the ask
+     cannot be repeated, and the way back exists but is not theirs to take. */
+  const sub = refused.length === 1
+    ? "Nothing was shared either way. You cannot ask them again, and that is the point of it. If you both want this, they can type your code instead."
+    : "Nothing was shared either way. You cannot ask them again. If any of them change their mind they can type your code instead.";
 
   $("onboard").innerHTML = `
     <div class="ob-step">
       <h1>${title}</h1>
-      <p class="sub" style="margin-bottom:16px;">Nothing of yours was shared, and nothing of theirs.
-        You can pair with someone else whenever you like.</p>
+      <p class="sub" style="margin-bottom:16px;">${sub}</p>
       ${pairRowsHtml(refused, "")}
       <button class="btn-primary" id="refusedOkBtn">Got it</button>
+      <button class="btn-ghost" id="refusedAnotherBtn">Pair with someone else</button>
     </div>`;
   $("onboard").classList.remove("hidden");
   $("app").classList.add("hidden");
 
-  wirePairRowEnders();
+  /* Dismissal only. The row stays, because the row IS the block: the trigger
+     refuses to let the person who was refused write over it, so there is
+     nothing to end here and pretending otherwise would have been a button that
+     toasts an error. Read once, then out of the way, and typing their code
+     again still says no, so nothing here is claiming it did not happen. */
+  const dismiss = () => refused.forEach((r) => dismissPairNo(r.id));
   $("refusedOkBtn").onclick = async () => {
     $("refusedOkBtn").disabled = true;
-    for (const r of refused) await endPairRow(r.id);
+    dismiss();
     await checkPartnershipThenEnter();
   };
+  $("refusedAnotherBtn").onclick = () => { dismiss(); renderCodeScreen(); };
 }
 
 /* Who are you training with? Asked once, changeable later, and "just me" is a
@@ -10840,13 +10859,17 @@ function sharedDayStreak(asIfRested = null) {
    Order is how much each has to say: the days you both trained first, then the
    pair's completed weeks, then your own days, which is what anybody training
    alone sees instead of nothing at all. */
+/* `short` is the word the header pill appends to the count, because the pill
+   has no room for the badge's stacked label and was printing a bare "1 day"
+   two inches above a Progress tab reading 4 for the same person. Empty on your
+   own streak, which is what a flame beside your own face already means. */
 function homeStreak() {
   const together = sharedDayStreak();
-  if (together > 0) return { n: together, unit: "day", label: "Together", full: "Together streak" };
+  if (together > 0) return { n: together, unit: "day", label: "Together", full: "Together streak", short: "together" };
   const weeks = sharedWeekStreak();
-  if (weeks > 0) return { n: weeks, unit: "week", label: "Together weeks", full: "Together week streak" };
+  if (weeks > 0) return { n: weeks, unit: "week", label: "Together weeks", full: "Together week streak", short: "together" };
   const mine = computeStreak(ME);
-  if (mine > 0) return { n: mine, unit: "day", label: "Your streak", full: "Your streak" };
+  if (mine > 0) return { n: mine, unit: "day", label: "Your streak", full: "Your streak", short: "" };
   return null;
 }
 
@@ -11601,10 +11624,16 @@ async function shareRecap(r) {
 
 /* ---------- Partner sheet ---------- */
 
-/* One person's streak, and it is the same number Home shows for you. It used
-   to count rest days as streak days of their own, which meant eight rest days
-   after a single workout read "9 day streak, going now": a rest day protects a
-   streak, it cannot build one. */
+/* ONE PERSON'S DAY STREAK, and the only way any screen is allowed to ask for
+   one. Profile, Progress, the partner sheet, the recent-activity chip and the
+   coach's line all come through here to computeStreak, so the number can only
+   ever be wrong in one place. It used to count rest days as streak days of
+   their own, which meant eight rest days after a single workout read "9 day
+   streak, going now": a rest day protects a streak, it cannot build one.
+
+   Home is not one of these callers and is not meant to be. homeStreak answers
+   "how many days running have you BOTH trained", which is a different question
+   with a different answer, and every surface that prints it says "Together". */
 function currentDayStreak(name) {
   return computeStreak(name);
 }
@@ -11990,14 +12019,17 @@ function momentumCopy(paired) {
 }
 
 /* The header pill: the same streak the hero badge shows, never a second one,
-   with the concept in the label since the pill has no room to spell it out.
-   Tap for the Progress tab. */
+   and it has to SAY which streak that is. This comment already claimed it did
+   and it did not: the concept was in the aria-label only, so a sighted reader
+   got "1 day" here, "1 Together" on the badge below it and "4 day streak" on
+   Profile, three numbers with one word of explanation between them. The word
+   is in the pill now. Tap for the Progress tab. */
 function renderTopStreak() {
   const el = $("topStreak");
   if (!el) return;
   const hs = homeStreak();
   if (!hs) { el.classList.add("hidden"); return; }
-  const unit = `${hs.n} ${hs.unit}${hs.n === 1 ? "" : "s"}`;
+  const unit = `${hs.n} ${hs.unit}${hs.n === 1 ? "" : "s"}${hs.short ? ` ${hs.short}` : ""}`;
   el.setAttribute("aria-label", `${hs.full}: ${unit}`);
   el.innerHTML = `<span class="fl">${icon("flame", 18)}</span> ${unit} <span class="go">${icon("chevronRight", 16)}</span>`;
   el.classList.remove("hidden");
@@ -13407,6 +13439,18 @@ function todayEntryFor(email) {
   return ALL_ENTRIES.find((e) => e.email === email && e.entry_date === todayStr()) || null;
 }
 
+/* The row the RUNNING session banks to, which is the day it started: the same
+   date doMarkGymDayDone upserts. Deliberately not todayEntryFor with a
+   different date inside it, because "did I train today" on Home genuinely does
+   mean today and must not follow a session backwards over midnight. This is
+   for the things that belong to the workout itself, the proof photo above all:
+   without it a photo taken on the finish screen at 00:05 opened a second,
+   empty day beside the one that holds the workout. */
+function sessionEntryFor(email) {
+  const date = sessionDate();
+  return ALL_ENTRIES.find((e) => e.email === email && e.entry_date === date) || null;
+}
+
 /* uploadProof/removeProof used to always redraw #workoutContent, which sits
    BEHIND the session overlay once a workout is finished. Taking the proof
    photo from the completion screen updated the database and the toast said
@@ -13427,16 +13471,20 @@ async function uploadProof(file) {
   toast("Uploading photo…");
   try {
     const blob = await compressImage(file);
-    const path = `${MY_EMAIL}/${todayStr()}-${Date.now()}.jpg`;
+    /* The proof belongs to the workout, so it is filed under the session's day
+       and not the reader's. They are the same date unless the workout ran past
+       midnight, and that is exactly the case this is for. */
+    const date = sessionDate();
+    const path = `${MY_EMAIL}/${date}-${Date.now()}.jpg`;
     const { error: upErr } = await sb.storage.from("workout-proof")
       .upload(path, blob, { contentType: "image/jpeg", upsert: true });
     if (upErr) throw upErr;
 
-    const existing = todayEntryFor(MY_EMAIL);
+    const existing = sessionEntryFor(MY_EMAIL);
     const { error: dbErr } = await sb.from("fit_entries").upsert({
       user_name: ME,
       email: MY_EMAIL,
-      entry_date: todayStr(),
+      entry_date: date,
       proof_path: path,
       gym: existing?.gym ?? false,
       weight: existing?.weight ?? null,
@@ -13463,12 +13511,14 @@ async function uploadProof(file) {
 }
 
 async function removeProof() {
-  const entry = todayEntryFor(MY_EMAIL);
+  // Same day uploadProof filed it under, or removing it would miss.
+  const date = sessionDate();
+  const entry = sessionEntryFor(MY_EMAIL);
   if (!entry?.proof_path) return;
   if (!confirm("Delete today's proof photo? This cannot be undone.")) return;
   await sb.storage.from("workout-proof").remove([entry.proof_path]);
   delete PROOF_URL_CACHE[entry.proof_path];
-  const { error } = await sb.from("fit_entries").update({ proof_path: null }).eq("email", MY_EMAIL).eq("entry_date", todayStr());
+  const { error } = await sb.from("fit_entries").update({ proof_path: null }).eq("email", MY_EMAIL).eq("entry_date", date);
   if (error) { console.error(error); toast("Could not remove the photo"); return; }
   toast("Photo removed");
   await loadAll();
@@ -13795,21 +13845,18 @@ function renderWeightHistory() {
    person's own record (sharedDayStreak/sharedWeekStreak answer "did you BOTH
    show up", which is the wrong question when looking at just your own tab). */
 
-/* Consecutive days up to today where THIS person trained. Same shape as
-   sharedDayStreak but for one person, since Progress has a You/Partner toggle
-   and the couple-streak would show identically on both sides. */
-function personalDayStreak(name) {
-  let streak = 0;
-  const cursor = new Date(todayStr() + "T00:00:00");
-  for (let i = 0; i < 365; i++) {
-    const trained = !!entryOn(name, isoDate(cursor))?.gym;
-    if (!trained && i > 0) break;          // today gets a pass while the day is still open
-    if (trained) streak++;
-    else if (i !== 0) break;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  return streak;
-}
+/* DELETED 2026-09-16: personalDayStreak walked the days itself and read only
+   `gym`, so a logged rest day ended the chain. computeStreak has held the
+   opposite rule for as long as the info card has promised it ("a day you
+   marked as a rest day holds it; a day you skipped ends it"), and
+   sharedDayStreak was corrected to match. This one was the copy nobody went
+   back to, and in the paired fixture it put 2 on Progress beside 4 on Profile
+   for the same person on the same afternoon. Progress and Profile now both go
+   through currentDayStreak, which is computeStreak, which is the one answer.
+
+   Home is genuinely a different question, not a fourth answer: homeStreak
+   prints the days you BOTH trained, and says "Together" on the badge and now
+   on the header pill too. */
 
 /* The last N calendar weeks (oldest first), each with days trained against
    today's target. The target is applied retroactively to past weeks, the same
@@ -13832,7 +13879,7 @@ function renderConsistencyStats() {
   const name = viewingPartner ? partnerName() : ME;
   const target = weeklyGoalFor(viewingPartner ? PARTNER_EMAIL : MY_EMAIL);
   const thisWeek = gymDaysThisWeek(name);
-  const streak = personalDayStreak(name);
+  const streak = currentDayStreak(name);
   const weeks = consistencyWeeks(name, 8);
   // The current week is still open, so counting it toward "weeks hit" would
   // punish a Tuesday for not yet being a Sunday. Only finished weeks count.
@@ -14346,16 +14393,22 @@ function escapeHtml(s) {
 
 let TODAY_DONE_WORKOUTS = [];
 
+/* Both of these ask for "today", and while a session is running today is the
+   day that session started. loadAll runs after every write, logging a set
+   included, so past midnight this reloaded the wrong day, set TODAY_WORKOUT to
+   null underneath a live workout, and the finish screen died on
+   TODAY_WORKOUT.exercises with the sets already safely in the database. Same
+   value as todayStr() whenever no session is running. */
 async function loadDoneWorkouts() {
   const { data } = await sb.from("ai_workouts").select("*")
-    .eq("email", MY_EMAIL).eq("entry_date", todayStr()).eq("archived", true)
+    .eq("email", MY_EMAIL).eq("entry_date", sessionDate()).eq("archived", true)
     .order("completed_at", { ascending: false });
   TODAY_DONE_WORKOUTS = data || [];
 }
 
 async function loadTodayWorkout() {
   const { data } = await sb.from("ai_workouts").select("*")
-    .eq("email", MY_EMAIL).eq("entry_date", todayStr()).eq("archived", false)
+    .eq("email", MY_EMAIL).eq("entry_date", sessionDate()).eq("archived", false)
     .order("created_at", { ascending: false }).limit(1);
   TODAY_WORKOUT = (data || [])[0] || null;
 }
@@ -15460,8 +15513,15 @@ async function discardSession() {
   await endLive();
 }
 
+/* THE SESSION'S OWN DAY, not the day this happens to be read on. Every set is
+   written with sessionDate() and the gym day is banked with it, so a reader
+   that asks todayStr() finds nothing at all the moment a workout runs past
+   midnight. That is what printed "Workout Ended, 0 of 5 exercises" under a
+   toast announcing a new PR from the same session. Identical to todayStr()
+   whenever no session is running, which is every other caller. */
 function todaysLoggedExerciseNames() {
-  return new Set(ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME && l.entry_date === todayStr()).map((l) => l.exercise_name.toLowerCase()));
+  const date = sessionDate();
+  return new Set(ALL_EXERCISE_LOGS.filter((l) => l.user_name === ME && l.entry_date === date).map((l) => l.exercise_name.toLowerCase()));
 }
 
 function startWorkout() {
@@ -16232,12 +16292,14 @@ function celebrateSet(ei, setIdx) {
 
 /* What you actually did last time on this lift, which is the number worth
    defaulting to and the number worth showing. The plan's target is a
-   suggestion; this is evidence. Today is excluded, so mid-session sets do not
-   become their own "last time". */
+   suggestion; this is evidence. The session's own day is excluded, so
+   mid-session sets do not become their own "last time" -- and it has to be the
+   SESSION'S day rather than todayStr(), or a workout that runs past midnight
+   starts quoting the set you did twenty minutes ago back at you as history. */
 function lastTimeFor(name) {
   const key = (name || "").trim().toLowerCase();
   if (!key) return null;
-  const today = todayStr();
+  const today = sessionDate();
   let best = null;
   for (const l of ALL_EXERCISE_LOGS) {
     if (l.user_name !== ME || l.weight == null || l.duration_min) continue;
@@ -16902,10 +16964,37 @@ function tickRampSet(ei, i, rungs) {
   renderSession();
 }
 
+/* The load for one rung, worked out from the weight actually on the dial rather
+   than the one the plan was built with.
+
+   CONTRACT.md is explicit that `pct` is the fraction of the working weight the
+   rung was built from, before rounding to the plate grid. So a rung is a
+   FUNCTION of the working weight, and changing the working weight invalidates
+   the stored number. The session was printing it anyway: "This is a warm-up
+   set, 165 lb x 2" stayed on screen while two taps of + moved the target from
+   185 to 190, and nothing said which of the two numbers was the stale one.
+
+   Recomputed rather than hidden or flagged, because what to put on the bar is
+   the entire reason the line exists, and an app that tells you its own number
+   is wrong instead of correcting it has passed the work back to you. The
+   rounding mirrors load.mjs roundLoad exactly, so a weight nobody touched comes
+   back as the number the engine already sent and nothing on screen moves. */
+function rampRungLoad(rung, workingLb) {
+  const stored = Number(rung?.weight) || 0;
+  const pct = Number(rung?.pct);
+  const working = Number(workingLb);
+  // pct 0 is the empty bar whatever the working weight is, and an unknown or
+  // bodyweight working figure has nothing to take a fraction of.
+  if (!(pct > 0) || !Number.isFinite(working) || working <= 0) return stored;
+  const lb = pct * working;
+  return lb < 40 ? Math.round(lb / 2.5) * 2.5 : Math.round(lb / 5) * 5;
+}
+
 /* One rung said in the fewest words that still name a load: "the bar", because
    `weight: 0` is the empty bar or the lightest thing in the room. */
-function rampRungLabel(s) {
-  return `${Number(s.weight) > 0 ? `${s.weight} lb` : "the bar"} × ${s.reps}`;
+function rampRungLabel(s, workingLb) {
+  const lb = rampRungLoad(s, workingLb);
+  return `${lb > 0 ? `${lb} lb` : "the bar"} × ${s.reps}`;
 }
 
 /* The card half of the wake. Two things live above .sess-live and so cannot be
@@ -17001,6 +17090,9 @@ function renderSession() {
      normal case, and it renders nothing: there is no warm-up set to invent. */
   const rungs = rampSetsFor(ex);
   const rampTicks = rampTicksFor(ei, rungs, setsDone);
+  /* Every rung on screen is a fraction of THIS number, so the two can never be
+     read off the screen disagreeing with each other. See rampRungLoad. */
+  const workLb = SESSION.weights[ei];
 
   const exChanged = SESSION_LAST_EX !== ei;
   SESSION_LAST_EX = ei;
@@ -17077,8 +17169,8 @@ function renderSession() {
 
         <div class="sess-chips">
           ${rungs.map((r, i) => `<button type="button" class="sess-chip warm${i < rampTicks ? " done" : ""}${i === rampTicks ? " current" : ""}${justRamp === i ? " just-done" : ""}"
-            data-ramp="${i}" title="Warm-up, ${escapeHtml(rampRungLabel(r))}"
-            aria-label="Warm-up ${i + 1}, ${escapeHtml(rampRungLabel(r))}, ${i < rampTicks ? "done" : "not done"}">${i < rampTicks ? CHIP_TICK : icon("flame", 18)}</button>`).join("")}
+            data-ramp="${i}" title="Warm-up, ${escapeHtml(rampRungLabel(r, workLb))}"
+            aria-label="Warm-up ${i + 1}, ${escapeHtml(rampRungLabel(r, workLb))}, ${i < rampTicks ? "done" : "not done"}">${i < rampTicks ? CHIP_TICK : icon("flame", 18)}</button>`).join("")}
           ${setsDone.map((done, i) => {
             /* Only one chip is the live one. While a warm-up is still waiting,
                that is the warm-up, so the first working set does not also wear
@@ -17099,7 +17191,7 @@ function renderSession() {
             /* Said outright while you are on it. "Warm-up, the bar x 8" told
                you the load but left you to work out what kind of set it was,
                which is the same thing the W chip did. */
-            if (rampTicks < rungs.length) return `<span class="last warm">This is a warm-up set, ${escapeHtml(rampRungLabel(rungs[rampTicks]))}</span>`;
+            if (rampTicks < rungs.length) return `<span class="last warm">This is a warm-up set, ${escapeHtml(rampRungLabel(rungs[rampTicks], workLb))}</span>`;
             return lastTime
               ? `<span class="last">Last time ${lastTime.weight} lb${lastTime.reps ? ` &times; ${lastTime.reps}` : ""}</span>`
               : `<span class="last">First time on this lift</span>`;
@@ -17115,7 +17207,12 @@ function renderSession() {
 
         <div class="sess-dials">
           <div class="sess-dial">
-            <div class="sess-dial-label">Weight lb</div>
+            ${/* While a warm-up rung is still ahead of you there are two loads
+                  on this screen, and the dial is not the one you are about to
+                  lift. Saying which is which is the difference between two
+                  numbers that disagree and two numbers that mean different
+                  things. rampRungLoad keeps them arithmetically in step. */ ""}
+            <div class="sess-dial-label">${rampTicks < rungs.length ? "Working lb" : "Weight lb"}</div>
             <div class="sess-dial-ctl">
               <button type="button" class="round-btn sm" id="sessWeightMinus" aria-label="Less weight">&minus;</button>
               <input class="sess-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" max="2000" value="${SESSION.weights[ei] || 0}" />
@@ -17219,9 +17316,27 @@ function renderSession() {
     btn.onclick = () => tickRampSet(ei, parseInt(btn.dataset.ramp, 10), rungs);
   });
   if ($("addSetBtn")) $("addSetBtn").onclick = addSet;
+  /* Every rung on screen is a fraction of the working weight, so moving the
+     working weight has to move them with it. Not a renderSession: this runs on
+     every tap of + and on every keystroke in the field, and a redraw would take
+     the field out from under the thumb doing the typing. Only the two places
+     that print a load are rewritten. */
+  const refreshRampLoad = () => {
+    if (!rungs.length) return;
+    const w = SESSION.weights[ei];
+    $("sessionBody").querySelectorAll(".sess-chip.warm").forEach((c, i) => {
+      if (!rungs[i]) return;
+      const label = rampRungLabel(rungs[i], w);
+      c.title = `Warm-up, ${label}`;
+      c.setAttribute("aria-label", `Warm-up ${i + 1}, ${label}, ${i < rampTicks ? "done" : "not done"}`);
+    });
+    const line = $("sessionBody").querySelector(".sess-lastline .last.warm");
+    if (line && rungs[rampTicks]) line.textContent = `This is a warm-up set, ${rampRungLabel(rungs[rampTicks], w)}`;
+  };
   const stepWeight = (delta) => {
     SESSION.weights[ei] = Math.max(0, (parseFloat(SESSION.weights[ei]) || 0) + delta);
     $("sessWeightVal").value = SESSION.weights[ei];
+    refreshRampLoad();
     saveSessionToStorage();
   };
   const stepReps = (delta) => {
@@ -17254,6 +17369,7 @@ function renderSession() {
   $("sessWeightVal").oninput = (e) => {
     const v = parseFloat(e.target.value);
     SESSION.weights[ei] = isNaN(v) ? 0 : clampInput(e.target, v, 0, MAX_LIFT_LB);
+    refreshRampLoad();
     saveSessionToStorage();
   };
   $("sessRepsVal").oninput = (e) => {
@@ -17494,7 +17610,8 @@ async function finishWorkout() {
    record is, so this just asks which of them landed today. */
 function todaysPRLogs() {
   const { prLogIds } = personalRecords(ME);
-  const today = todayStr();
+  // The session's day, for the reason spelled out on todaysLoggedExerciseNames.
+  const today = sessionDate();
   return ALL_EXERCISE_LOGS
     .filter((l) => l.user_name === ME && l.entry_date === today && prLogIds.has(l.id));
 }
@@ -17518,8 +17635,9 @@ function todaysPRLabel() {
    under "1 of 5 exercises". */
 function planVolumeLb() {
   const names = new Set((TODAY_WORKOUT?.exercises || []).map((ex) => (ex.name || "").trim().toLowerCase()));
+  const date = sessionDate();   // the session's day, not the reader's
   return ALL_EXERCISE_LOGS
-    .filter((l) => l.email === MY_EMAIL && l.entry_date === todayStr() && names.has((l.exercise_name || "").trim().toLowerCase()))
+    .filter((l) => l.email === MY_EMAIL && l.entry_date === date && names.has((l.exercise_name || "").trim().toLowerCase()))
     .reduce((s, l) => s + (l.sets || 1) * (l.reps || 0) * (l.weight || 0), 0);
 }
 
@@ -17533,7 +17651,7 @@ async function renderSessionComplete() {
   $("sessionCard").classList.remove("lifting", "paused-screen");
   $("sessionCard").classList.add("finished");
   stopSessionTimer();
-  const proofEntry = todayEntryFor(MY_EMAIL);
+  const proofEntry = sessionEntryFor(MY_EMAIL);
   const hasProof = !!proofEntry?.proof_path;
   /* Fetched here rather than left for an <img> to resolve on its own, so the
      square either shows the real photo or the fallback icon and never a
@@ -17836,6 +17954,16 @@ function liveActivityFields() {
     /* The whole length of a rest, not what is left of this one. The Lock Screen
        button needs it to start the next rest while the app is asleep. */
     restTarget: restTargetSec(),
+    /* Rest counts up here, against the plan, the way the session screen does,
+       so the Lock Screen needs how long it has already run rather than when it
+       would end. */
+    restElapsed: SESSION.restStartedAt && !SESSION.pausedAt
+      ? Math.max(0, Math.round((Date.now() - SESSION.restStartedAt) / 1000))
+      : 0,
+    /* The same numbers loaded on the session screen. Without them the card
+       tells you to do a set and not what the set is. */
+    weight: String(SESSION.weights?.[SESSION.exerciseIndex] ?? ""),
+    reps: String(SESSION.reps?.[SESSION.exerciseIndex] ?? ex?.reps ?? ""),
     /* Stamps every Lock Screen tap with who it is for. Without it the native
        side has no way to tell this workout's taps from yesterday's, or from
        the previous account's on a shared phone. */
@@ -20965,7 +21093,11 @@ function bodyHiddenToday(name) {
   return new Set(SESSION.loggedExNames || []);
 }
 function isBodyHidden(l, hidden) {
-  return !!hidden && l.entry_date === todayStr() && hidden.has((l.exercise_name || "").trim().toLowerCase());
+  /* Against the session's day, not the reader's: the rows this is hiding were
+     written with sessionDate(), so past midnight a todayStr() comparison
+     matched none of them and the Body tab and rank XP both lit up mid-workout,
+     which is the one thing this gate exists to prevent. */
+  return !!hidden && l.entry_date === sessionDate() && hidden.has((l.exercise_name || "").trim().toLowerCase());
 }
 
 // Weighted sets per muscle group for [startStr, endStr) -- a day, a week, whatever the caller needs.
@@ -22777,7 +22909,7 @@ function progressHeadline(kind, name, email, profile, third) {
   const thisWeek = gymDaysThisWeek(name);
   const weeks = consistencyWeeks(name, 9);
   const finished = weeks.slice(0, -1);
-  const streak = personalDayStreak(name);
+  const streak = currentDayStreak(name);
   if (!entriesFor(name).some((e) => e.gym)) {
     return { value: `0/${target}`, unit: "this week", line: `${Subj} ${have} not logged a session yet.`,
       note: "One session is the entire job this week. Everything on this tab is built out of them." };

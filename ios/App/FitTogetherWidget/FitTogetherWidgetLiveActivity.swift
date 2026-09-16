@@ -19,49 +19,44 @@ private func progress(_ s: WorkoutAttributes.ContentState) -> Double {
     return min(1, Double(s.done) / Double(s.total))
 }
 
-/// The rest countdown, but only while it is still running.
+/// Rest counts UP against a plan here, matching restState() on the session
+/// screen, so this is the window to count from rather than down to.
 ///
-/// `Date.now...ends` is a fatal error when `ends` is in the past: a Swift range
-/// traps if lowerBound is greater than upperBound. A locked phone suspends the
-/// app, so nothing clears restEndsAt when the rest actually finishes, and the
-/// moment the clock passed zero this crashed the widget process and the card
-/// went blank. That is the blank card, not a layout problem.
-func liveCountdown(_ state: WorkoutAttributes.ContentState) -> ClosedRange<Date>? {
-    guard let ends = state.restEndsAt, !state.paused, ends > .now else { return nil }
-    return Date.now...ends
+/// Ranges are built forwards on purpose. `Date.now...ends` traps when ends is
+/// in the past, and that is what crashed the widget and blanked the card the
+/// moment a countdown reached zero.
+func restWindow(_ state: WorkoutAttributes.ContentState) -> ClosedRange<Date>? {
+    guard let began = state.restStartedAt, !state.paused else { return nil }
+    return began...began.addingTimeInterval(3600)
 }
 
-/// The number, what it counts, and the label under it. Three sizes reading as
-/// one block rather than two competing lines.
+/// True once the rest has run past what the plan asked for.
+func restIsDone(_ state: WorkoutAttributes.ContentState) -> Bool {
+    guard let began = state.restStartedAt else { return false }
+    return Date().timeIntervalSince(began) >= Double(state.restSeconds)
+}
+
+/// Still resting at all, which is what decides the whole card's state.
+func isResting(_ state: WorkoutAttributes.ContentState) -> Bool {
+    state.restStartedAt != nil && !state.paused
+}
+
+/// The working state: sets done, and what that number counts.
 private struct HeroNumber: View {
     let state: WorkoutAttributes.ContentState
     var size: CGFloat = 34
 
-    private var caption: String {
-        if state.paused { return "PAUSED" }
-        if state.restEndsAt != nil { return liveCountdown(state) != nil ? "UNTIL NEXT SET" : "REST DONE" }
-        return "SETS COMPLETED"
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                if let window = liveCountdown(state) {
-                    Text(timerInterval: window, countsDown: true)
-                        .font(.system(size: size, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(Unio.lime)
-                        .fixedSize()
-                } else {
-                    Text("\(state.done)")
-                        .font(.system(size: size, weight: .bold, design: .rounded))
-                        .foregroundStyle(state.restEndsAt != nil && !state.paused ? Unio.lime : Unio.ink)
-                    Text("of \(state.total)")
-                        .font(.system(size: size * 0.44, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
+                Text("\(state.done)")
+                    .font(.system(size: size, weight: .bold, design: .rounded))
+                    .foregroundStyle(Unio.ink)
+                Text("of \(state.total)")
+                    .font(.system(size: size * 0.44, weight: .semibold))
+                    .foregroundStyle(.secondary)
             }
-            Text(caption)
+            Text(state.paused ? "PAUSED" : "SETS COMPLETED")
                 .font(.system(size: 9.5, weight: .heavy))
                 .tracking(0.9)
                 .foregroundStyle(.tertiary)
@@ -90,14 +85,18 @@ private struct SetPips: View {
 
 @available(iOS 17.0, *)
 private struct LogSetButton: View {
-    // Mid-rest the same tap means "I am going again", which is what logging the
-    // next set is, so the label says the thing you are actually doing.
+    // The app's own words. Resting, the same tap means "I am going again", and
+    // the session screen calls that Start set N, so this does too.
     var resting: Bool = false
+    var label: String = "Log set"
 
     var body: some View {
         Button(intent: LogSetIntent()) {
             HStack(spacing: 5) {
-                Text(resting ? "Next set" : "Log set").font(.system(size: 13.5, weight: .bold))
+                Text(label)
+                    .font(.system(size: 13.5, weight: .bold))
+                    .lineLimit(1)
+                    .fixedSize()
                 Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold))
             }
             .padding(.horizontal, 15).padding(.vertical, 8)
@@ -173,8 +172,8 @@ struct FitTogetherWidgetLiveActivity: Widget {
             } compactTrailing: {
                 // Same trap as the Lock Screen: an expired range is fatal, and
                 // this one would take the Dynamic Island down with it.
-                if let window = liveCountdown(context.state) {
-                    Text(timerInterval: window, countsDown: true)
+                if let window = restWindow(context.state) {
+                    Text(timerInterval: window, countsDown: false)
                         .monospacedDigit()
                         .frame(maxWidth: 44)
                         .foregroundStyle(Unio.lime)
@@ -235,7 +234,7 @@ private struct CelebrationView: View {
 private struct LockScreenView: View {
     let state: WorkoutAttributes.ContentState
 
-    private var resting: Bool { liveCountdown(state) != nil }
+    private var resting: Bool { isResting(state) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -260,7 +259,12 @@ private struct LockScreenView: View {
             HStack(alignment: .center, spacing: 12) {
                 if resting { RestHero(state: state) } else { HeroNumber(state: state) }
                 Spacer(minLength: 6)
-                if #available(iOS 17.0, *) { LogSetButton(resting: resting) }
+                if #available(iOS 17.0, *) {
+                    LogSetButton(resting: resting,
+                                 label: resting
+                                    ? "Start set \(min(state.done + 1, max(state.total, 1)))"
+                                    : "Log set")
+                }
             }
 
             // A rule between him and what he says, so the line reads as speech
@@ -288,42 +292,67 @@ private struct LockScreenView: View {
 
 /// Resting, in the same shape as the working state.
 ///
-/// The count stays on screen beside the clock on purpose. Text(timerInterval:)
-/// is the one element here the app cannot redraw once the phone is locked, and
-/// when it was the only thing in this slot there was nothing left if it failed
-/// to draw: the card read as empty. Now the worst case is a card missing its
-/// clock rather than a card missing everything.
+/// It counts up against the plan, matching restState() on the session screen,
+/// rather than counting down to zero. The plan line says the same two things
+/// the app says: what the plan asked for, and that you are past it.
+///
+/// The set count stays beside the clock on purpose. Text(timerInterval:) is the
+/// one element the app cannot redraw once the phone is locked, and when it was
+/// alone in this slot there was nothing left if it failed to draw.
 private struct RestHero: View {
     let state: WorkoutAttributes.ContentState
+
+    private var planned: String { mmss(state.restSeconds) }
+
+    private func mmss(_ seconds: Int) -> String {
+        String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 11) {
             VStack(alignment: .leading, spacing: 1) {
-                if let window = liveCountdown(state) {
-                    Text(timerInterval: window, countsDown: true)
+                if let window = restWindow(state) {
+                    Text(timerInterval: window, countsDown: false)
                         .font(.system(size: 34, weight: .bold, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(Unio.lime)
+                        .foregroundStyle(restIsDone(state) ? Unio.lime : Unio.ink)
                         .lineLimit(1)
                         .frame(minWidth: 74, alignment: .leading)
                 }
-                Text("RESTING")
+                Text(restIsDone(state)
+                     ? "PAST THE \(planned) PLAN"
+                     : "PLAN SAYS \(planned)")
                     .font(.system(size: 9.5, weight: .heavy))
                     .tracking(0.9)
-                    .foregroundStyle(Unio.lime.opacity(0.75))
+                    // Both branches concrete Colors: .tertiary is a ShapeStyle
+                    // and cannot share a ternary with one.
+                    .foregroundStyle(restIsDone(state) ? Unio.lime.opacity(0.8) : Unio.ink.opacity(0.45))
+                    .lineLimit(1)
             }
 
             Capsule().fill(Unio.ink.opacity(0.18)).frame(width: 1.5, height: 26)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("\(state.done) of \(state.total)")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                Text(loadLine)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Unio.ink)
-                Text("SETS DONE")
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text("UP NEXT")
                     .font(.system(size: 9, weight: .heavy))
                     .tracking(0.8)
                     .foregroundStyle(.tertiary)
             }
         }
+    }
+
+    /// What the next set is, in the app's own shorthand. Falls back to the set
+    /// count when nothing is loaded, so the slot is never empty.
+    private var loadLine: String {
+        let w = state.weight.trimmingCharacters(in: .whitespaces)
+        let r = state.reps.trimmingCharacters(in: .whitespaces)
+        if !w.isEmpty, !r.isEmpty, w != "0" { return "\(w) lb × \(r)" }
+        if !r.isEmpty { return "\(r) reps" }
+        return "\(state.done) of \(state.total)"
     }
 }

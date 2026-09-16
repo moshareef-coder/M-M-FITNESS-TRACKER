@@ -32,6 +32,14 @@ struct WorkoutAttributes: ActivityAttributes {
         // The button runs with the app asleep and cannot ask it what is next.
         var nextExercise: String = ""
         var nextTotal: Int = 0
+        // Rest counts UP in this app, against a plan, the way it does on the
+        // session screen. An end date can only count down, so the start is what
+        // the Lock Screen needs.
+        var restStartedAt: Date? = nil
+        // What is loaded for the next set, so the card shows the same numbers
+        // the app does rather than making you open it to remember.
+        var weight: String = ""
+        var reps: String = ""
     }
 
     var startedAt: Date

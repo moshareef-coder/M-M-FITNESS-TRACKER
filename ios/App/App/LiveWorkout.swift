@@ -94,7 +94,11 @@ public class LiveWorkout: CAPPlugin, CAPBridgedPlugin {
             restSeconds: call.getInt("restTarget") ?? 90,
             quip: call.getString("quip") ?? "",
             nextExercise: call.getString("nextExercise") ?? "",
-            nextTotal: call.getInt("nextTotal") ?? 0
+            nextTotal: call.getInt("nextTotal") ?? 0,
+            // Seconds already rested, turned into the instant it began.
+            restStartedAt: (call.getDouble("restElapsed").map { Date().addingTimeInterval(-$0) }),
+            weight: call.getString("weight") ?? "",
+            reps: call.getString("reps") ?? ""
         )
     }
 
