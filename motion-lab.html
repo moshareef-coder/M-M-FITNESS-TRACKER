@@ -294,7 +294,17 @@ function buildLab() {
     state.cells.clear();
     gridEl.innerHTML = "";
     const tr = [...TRAININGS, IDLE_TAB].find((t) => t.id === state.lib);
-    for (const name of libNames(tr)) {
+    /* ?only=lat pulldown narrows the grid to what matches, so a link can land
+       on one move instead of asking somebody to find it among a hundred and
+       twenty. Substring, case-insensitive, and it falls back to the whole
+       library when nothing matches rather than showing an empty page. */
+    const only = (q.get("only") || "").trim().toLowerCase();
+    let names = libNames(tr);
+    if (only) {
+      const hit = names.filter((n) => n.toLowerCase().includes(only));
+      if (hit.length) names = hit;
+    }
+    for (const name of names) {
       const has = hasMove(name);
       const cell = document.createElement("div");
       cell.className = "cell" + (has ? "" : " dim");

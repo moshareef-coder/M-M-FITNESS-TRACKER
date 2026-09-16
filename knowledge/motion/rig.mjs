@@ -1641,6 +1641,7 @@ function anchor(spec, S) {
 export const PROP_TYPES = [
   "mat", "wall", "doorway", "doorframe", "bench", "box", "roller", "pullupBar",
   "dipBars", "machine", "cable", "band", "barbell", "dumbbell", "kettlebell",
+  "artwork",
   // The rest-time props: what the figure fiddles with between sets. Hand held
   // and drawn small, so they read as a thing in a hand and not as equipment.
   "bottle", "phone", "towel", "watch",
@@ -1785,6 +1786,7 @@ const PROPS = {
       ctx.beginPath(); ctx.arc(lx, ly, 4.2, 0, Math.PI * 2); ctx.fill();
     }
   },
+  artwork,
   cable(ctx, C, p, S) {
     const top = p.top === undefined ? 16 : p.top;
     const y0 = p.y0 === undefined ? 46 : p.y0;
@@ -1978,11 +1980,67 @@ const PROPS = {
   },
 };
 
+/* ---- artwork props: a machine supplied as a drawing ----
+ *
+ * The primitives draw a bench, a bar and a mat perfectly well, but a cable
+ * stack or a pec deck is a specific object and "a box with a pad on it" will
+ * never be the machine somebody is standing in front of. Those get an SVG
+ * authored in the rig's own 140-unit space with the floor at 118, so it drops
+ * in with no scaling and no perspective matching.
+ *
+ * ONE FILE, TWO LAYERS. The file carries a #back group and a #front group, and
+ * this splits them at load into two images so the body can sit between them:
+ * behind the knee pads, in front of the seat. That is the whole reason this is
+ * worth doing over a flat picture.
+ *
+ * Loading is async and drawing is not, so a miss draws nothing this frame and
+ * the next frame picks it up. Every move using artwork animates, so the gap is
+ * one frame; a paused render can pass onReady to be told. */
+const ARTWORK = new Map();
+
+function artworkFor(src, onReady) {
+  let rec = ARTWORK.get(src);
+  if (rec) return rec;
+  rec = { back: null, front: null, failed: false };
+  ARTWORK.set(src, rec);
+  fetch(src)
+    .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
+    .then((text) => {
+      /* Split in a detached document rather than by string surgery: a regex
+         over SVG breaks the first time a group nests. */
+      const doc = new DOMParser().parseFromString(text, "image/svg+xml");
+      for (const layer of ["back", "front"]) {
+        const copy = doc.documentElement.cloneNode(true);
+        let found = false;
+        for (const g of [...copy.querySelectorAll("g")]) {
+          if (g.parentNode !== copy) continue;             // top-level groups only
+          if (g.getAttribute("id") === layer) found = true;
+          else g.remove();
+        }
+        if (!found && layer === "front") { rec.front = null; continue; }
+        const blob = new Blob([new XMLSerializer().serializeToString(copy)], { type: "image/svg+xml" });
+        const img = new Image();
+        img.onload = () => { URL.revokeObjectURL(img.src); if (onReady) onReady(); };
+        img.src = URL.createObjectURL(blob);
+        rec[layer] = img;
+      }
+    })
+    .catch((e) => { rec.failed = true; console.warn("artwork failed:", src, e.message); });
+  return rec;
+}
+
+function artwork(ctx, C, p, S, layer) {
+  const rec = artworkFor(p.src, p.onReady);
+  const img = layer === "front" ? rec.front : rec.back;
+  if (!img || !img.complete || !img.naturalWidth) return;
+  ctx.drawImage(img, 0, 0, VB, VB);
+}
+
 function drawProps(ctx, C, list, S, layer) {
   for (const p of list || []) {
     // dip bars have a rail on each side of the body, so they draw in both
     // layers and sort out front and back themselves
-    const both = p.type === "dipBars";
+    const both = p.type === "dipBars" || p.type === "artwork";
     if (!both && (p.front ? "front" : "back") !== layer) continue;
     const fn = PROPS[p.type];
     if (fn) fn(ctx, C, p, S, layer);

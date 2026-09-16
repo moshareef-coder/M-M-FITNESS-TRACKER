@@ -5709,7 +5709,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.24";
+const APP_VERSION = "2026.09.15.25";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -16823,7 +16823,11 @@ let LIVE_ACTIVITY_ON = false;
 let LAST_LIVE_ACTIVITY = null;
 let LIVE_QUIP = "";
 let LIVE_QUIP_FOR = null;
+let LIVE_QUIP_BEAT = null;
 let LIVE_PLUGIN_WARNED = false;
+/* Refreshed whenever a line is picked, so the pool handed to the Lock Screen
+   stays in step with the bank rather than going stale at session start. */
+let LIVE_QUIP_POOL = [];
 
 function liveActivityFields() {
   const ex = TODAY_WORKOUT?.exercises?.[SESSION.exerciseIndex];
@@ -16849,6 +16853,10 @@ function liveActivityFields() {
     LIVE_QUIP = (restSeconds > 0
       ? pickQuip("rest") || pickQuip("restLong")
       : pickQuip("set") || pickQuip("nextExercise")) || "";
+    /* Short enough to read on a Lock Screen, and only a handful, because the
+       whole thing crosses into the App Group on every update. */
+    LIVE_QUIP_POOL = Array.from({ length: 6 }, () => pickQuip("rest") || pickQuip("set") || "")
+      .filter((l) => l && l.length <= 64);
   }
 
   return {
@@ -16862,7 +16870,28 @@ function liveActivityFields() {
     restTarget: restTargetSec(),
     paused: !!SESSION.pausedAt,
     quip: LIVE_QUIP,
+    /* Lines for the Lock Screen button to choose from. The bank is here and the
+       button runs in another process, so it gets a handful to work with. */
+    quipPool: LIVE_QUIP_POOL,
   };
+}
+
+/* The same heartbeat the session screen runs on, so he does not go quiet on the
+   Lock Screen while he is still talking inside the app. It can only tick while
+   the app is awake: a locked phone suspends it, and nothing short of a push can
+   change the card after that. */
+function startLiveQuipBeat() {
+  clearInterval(LIVE_QUIP_BEAT);
+  LIVE_QUIP_BEAT = setInterval(() => {
+    if (!SESSION || SESSION.finished || !LIVE_ACTIVITY_ON) return;
+    LIVE_QUIP_FOR = null;        // force the next read to pick a fresh line
+    pushLiveActivity();
+  }, QUIP_BEAT_MS);
+}
+
+function stopLiveQuipBeat() {
+  clearInterval(LIVE_QUIP_BEAT);
+  LIVE_QUIP_BEAT = null;
 }
 
 /* Sets logged from the Lock Screen. That button runs in the widget process and
@@ -16910,6 +16939,7 @@ async function pushLiveActivity() {
     if (!LIVE_ACTIVITY_ON) {
       const res = await live.start(fields);
       LIVE_ACTIVITY_ON = !!(res && res.started);
+      if (LIVE_ACTIVITY_ON) startLiveQuipBeat();
       /* A Live Activity that never appears looks identical to one that is not
          built, so say which it is rather than leaving it to guesswork. */
       if (!LIVE_ACTIVITY_ON && res && res.why) toast(res.why);
@@ -16923,6 +16953,7 @@ async function pushLiveActivity() {
 }
 
 async function endLiveActivity() {
+  stopLiveQuipBeat();
   LAST_LIVE_ACTIVITY = null;
   if (!isNativeApp() || !LIVE_ACTIVITY_ON) return;
   LIVE_ACTIVITY_ON = false;

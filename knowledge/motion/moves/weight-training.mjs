@@ -112,8 +112,11 @@ const LAT_PULLDOWN = {
   dur: 3.0,
   breath: 0.2,
   props: [
-    { type: "machine", x: 34, y: 95, w: 38, parts: ["seat", "thighPad"], padX: 62, padY: 76, padW: 22 },
-    { type: "cable", x: 96, top: 14, y0: 44, to: { side: "R", point: "hand" }, front: true },
+    /* The frame is artwork; anything that travels is still code. The cable
+       keeps the pulley, the line and the bar, and hands the stack to the
+       drawing with stack:false so the two do not both draw one. */
+    { type: "artwork", src: "/knowledge/motion/props/lat-pulldown.svg" },
+    { type: "cable", x: 96, top: 14, y0: 44, stack: false, to: { side: "R", point: "hand" }, front: true },
   ],
   keys: [
     { // arms long overhead, lats stretched
