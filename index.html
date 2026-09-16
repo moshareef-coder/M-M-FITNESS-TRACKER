@@ -6946,11 +6946,17 @@ let ALL_GOALS = [];
 const isCoachedClient = () => MY_GROUP?.kind === "coach" && MY_ROLE === "client";
 
 async function loadMyGroups() {
-  const { data } = await sb.from("group_members").select("*").is("left_at", null);
+  /* Both reads report failure rather than swallowing it. Empty and broken look
+     identical from here, and the caller uses this to decide whether somebody
+     is in a coached group, so a failed read quietly demotes a client to an
+     unpaired stranger. */
+  const { data, error } = await sb.from("group_members").select("*").is("left_at", null);
+  if (error) { console.error("could not read group members", error); return { pending: null, active: null, error }; }
   const mine = (data || []).filter((m) => m.email.toLowerCase() === MY_EMAIL);
   if (!mine.length) return { pending: null, active: null };
   const ids = mine.map((m) => m.group_id);
-  const { data: gs } = await sb.from("groups").select("*").in("id", ids);
+  const { data: gs, error: gErr } = await sb.from("groups").select("*").in("id", ids);
+  if (gErr) { console.error("could not read groups", gErr); return { pending: null, active: null, error: gErr }; }
   const groups = gs || [];
   const withGroup = mine.map((m) => ({ ...m, group: groups.find((g) => g.id === m.group_id) })).filter((m) => m.group);
   return {
@@ -6960,7 +6966,16 @@ async function loadMyGroups() {
 }
 
 async function checkPartnershipThenEnter() {
-  const { pending, active } = await loadMyGroups();
+  const { pending, active, error: groupErr } = await loadMyGroups();
+  /* Same rule as the partnership read below: a lookup that failed is not an
+     answer about who somebody trains with, and carrying on would hand a coached
+     client the setup screen. */
+  if (groupErr) {
+    SIGN_IN_HANDLED = false;
+    renderSignInScreen({ email: MY_EMAIL, tone: "bad",
+      msg: "Could not load your account. Check your connection and try again." });
+    return;
+  }
 
   // An unanswered invitation takes priority over everything else.
   if (pending) { renderInviteScreen(pending); return; }
@@ -6974,9 +6989,26 @@ async function checkPartnershipThenEnter() {
     return showApp();
   }
 
-  const { data: rows } = await sb.from("partnerships")
+  const { data: rows, error: pairErr } = await sb.from("partnerships")
     .select("*")
     .order("created_at", { ascending: false });
+  /* A failed read is not "you have no partner", and treating it as one was
+     destructive rather than merely wrong. supabase-js resolves instead of
+     throwing, so a network blip here dropped a paired person onto the "Who is
+     training with you?" setup screen with no error and no way past it. From
+     there, choosing "I coach people" inserts a real groups row for somebody who
+     is already paired, which is a change to their account caused entirely by a
+     read that failed.
+
+     Stop and say so. The same shape as the profile lookup above: when the
+     lookup itself fails, say so rather than guessing the destructive way. */
+  if (pairErr) {
+    console.error("could not read partnerships", pairErr);
+    SIGN_IN_HANDLED = false;
+    renderSignInScreen({ email: MY_EMAIL, tone: "bad",
+      msg: "Could not load your account. Check your connection and try again." });
+    return;
+  }
   const all = rows || [];
   const accepted = all.find((r) => r.status === "accepted");
 
@@ -10187,18 +10219,46 @@ async function loadAll() {
   ]);
   watchLiveSessions();
   startLiveTick();
-  ALL_REACTIONS = reactRes.data || [];
-  ALL_GOALS = goalsRes.data || [];
+
+  /* A failed read is not an empty table, and this is the one place in the app
+     where confusing the two is genuinely alarming.
+
+     supabase-js resolves rather than throwing, so every one of these eight came
+     back with an error nobody looked at and collapsed to `|| []`. The worst
+     case was reproduced: with exercise_logs failing while the writes kept
+     landing, somebody finished all five lifts and the summary told them
+     "0 of 5 exercises, 0 volume, TIME 0". Their sets were in the database. The
+     screen said they had done nothing, and the console said nothing at all.
+
+     So a failed read now keeps whatever was already in memory instead of
+     replacing it with emptiness, and says so once. Stale is a much smaller lie
+     than zero. */
+  const reads = {
+    entries: entriesRes, exerciseLogs: exLogRes, profiles: profilesRes,
+    plans: plansRes, goals: goalsRes, reactions: reactRes,
+    badges: badgesRes, swaps: swapsRes,
+  };
+  const failed = Object.entries(reads).filter(([, res]) => res && res.error);
+  for (const [what, res] of failed) console.error(`could not read ${what}`, res.error);
+  const keep = (res, current) => (res && res.error ? current : (res.data || []));
+
+  ALL_REACTIONS = keep(reactRes, ALL_REACTIONS);
+  ALL_GOALS = keep(goalsRes, ALL_GOALS);
   MY_GOAL = ALL_GOALS.find((g) => (g.email || "").toLowerCase() === MY_EMAIL) || null;
-  ALL_PLANS = plansRes.data || [];
-  ALL_ENTRIES = entriesRes.data || [];
-  ALL_EXERCISE_LOGS = exLogRes.data || [];
-  ALL_PROFILES = profilesRes.data || [];
-  ALL_MILESTONE_BADGES = badgesRes.data || [];
-  ALL_SWAPS = swapsRes.data || [];
+  ALL_PLANS = keep(plansRes, ALL_PLANS);
+  ALL_ENTRIES = keep(entriesRes, ALL_ENTRIES);
+  ALL_EXERCISE_LOGS = keep(exLogRes, ALL_EXERCISE_LOGS);
+  ALL_PROFILES = keep(profilesRes, ALL_PROFILES);
+  ALL_MILESTONE_BADGES = keep(badgesRes, ALL_MILESTONE_BADGES);
+  ALL_SWAPS = keep(swapsRes, ALL_SWAPS);
   MY_PROFILE = ALL_PROFILES.find((p) => p.email === MY_EMAIL) || MY_PROFILE;
   PARTNER_PROFILE = ALL_PROFILES.find((p) => p.email === PARTNER_EMAIL) || null;
   applyAccentColors();
+  /* Said out loud, once per failed load. Somebody looking at numbers that are
+     quietly out of date should be told, because the alternative is that they
+     believe them. Not per failed table: eight toasts is not eight times the
+     information. */
+  if (failed.length) toast("Could not refresh everything. Some numbers may be out of date.");
 
   renderAvatarPair();
   /* loadAll runs after nearly every write anywhere in the app, logging a set
@@ -25457,8 +25517,21 @@ async function commitProfile(payload, { toastText }) {
   const { error } = await sb.from("profiles")
     .upsert({ email: MY_EMAIL, user_name: ME, updated_at: new Date().toISOString(), ...payload });
   if (error) { toast("Could not save"); console.error(error); return false; }
-  const { data } = await sb.from("profiles").select("*").eq("email", MY_EMAIL).maybeSingle();
+  /* The write is what matters and it succeeded, so this still reports success.
+     But the read back can fail on its own, and when it did, MY_PROFILE stayed
+     on the old values behind a toast saying it was saved: the setting was
+     genuinely stored and the app went on showing the previous one until the
+     next full load, which reads as the save having silently not worked.
+
+     So the saved values are merged in from what we just sent, which is exactly
+     what the row now holds. */
+  const { data, error: readErr } = await sb.from("profiles")
+    .select("*").eq("email", MY_EMAIL).maybeSingle();
   if (data) MY_PROFILE = data;
+  else {
+    if (readErr) console.error("saved, but could not re-read the profile", readErr);
+    MY_PROFILE = { ...(MY_PROFILE || {}), email: MY_EMAIL, user_name: ME, ...payload };
+  }
   toast(toastText);
   return true;
 }
