@@ -90,10 +90,14 @@ private struct SetPips: View {
 
 @available(iOS 17.0, *)
 private struct LogSetButton: View {
+    // Mid-rest the same tap means "I am going again", which is what logging the
+    // next set is, so the label says the thing you are actually doing.
+    var resting: Bool = false
+
     var body: some View {
         Button(intent: LogSetIntent()) {
             HStack(spacing: 5) {
-                Text("Log set").font(.system(size: 13.5, weight: .bold))
+                Text(resting ? "Next set" : "Log set").font(.system(size: 13.5, weight: .bold))
                 Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold))
             }
             .padding(.horizontal, 15).padding(.vertical, 8)
@@ -231,10 +235,12 @@ private struct CelebrationView: View {
 private struct LockScreenView: View {
     let state: WorkoutAttributes.ContentState
 
+    private var resting: Bool { liveCountdown(state) != nil }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Him in the mark, the lift, and the set as a chip rather than loose
-            // grey text, so the row reads as three objects and not one sentence.
+            // The logo, the lift, and which lift it is. The chip carries the
+            // position because the hero already counts sets.
             HStack(spacing: 10) {
                 UnioMark(size: 24)
                 Text(state.exercise)
@@ -252,9 +258,9 @@ private struct LockScreenView: View {
             }
 
             HStack(alignment: .center, spacing: 12) {
-                HeroNumber(state: state)
+                if resting { RestHero(state: state) } else { HeroNumber(state: state) }
                 Spacer(minLength: 6)
-                if #available(iOS 17.0, *) { LogSetButton() }
+                if #available(iOS 17.0, *) { LogSetButton(resting: resting) }
             }
 
             // A rule between him and what he says, so the line reads as speech
@@ -277,5 +283,47 @@ private struct LockScreenView: View {
         }
         .padding(.horizontal, 15)
         .padding(.vertical, 12)
+    }
+}
+
+/// Resting, in the same shape as the working state.
+///
+/// The count stays on screen beside the clock on purpose. Text(timerInterval:)
+/// is the one element here the app cannot redraw once the phone is locked, and
+/// when it was the only thing in this slot there was nothing left if it failed
+/// to draw: the card read as empty. Now the worst case is a card missing its
+/// clock rather than a card missing everything.
+private struct RestHero: View {
+    let state: WorkoutAttributes.ContentState
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 11) {
+            VStack(alignment: .leading, spacing: 1) {
+                if let window = liveCountdown(state) {
+                    Text(timerInterval: window, countsDown: true)
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Unio.lime)
+                        .lineLimit(1)
+                        .frame(minWidth: 74, alignment: .leading)
+                }
+                Text("RESTING")
+                    .font(.system(size: 9.5, weight: .heavy))
+                    .tracking(0.9)
+                    .foregroundStyle(Unio.lime.opacity(0.75))
+            }
+
+            Capsule().fill(Unio.ink.opacity(0.18)).frame(width: 1.5, height: 26)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("\(state.done) of \(state.total)")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(Unio.ink)
+                Text("SETS DONE")
+                    .font(.system(size: 9, weight: .heavy))
+                    .tracking(0.8)
+                    .foregroundStyle(.tertiary)
+            }
+        }
     }
 }
