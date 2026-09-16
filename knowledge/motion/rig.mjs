@@ -2859,9 +2859,16 @@ export function drawFigure(ctx, S, C, opts = {}) {
   }
   items.push({ d: torsoD, o: 2, kind: "torso" });
   items.push({ d: Math.max(torsoD, depths.arm.L, depths.arm.R), o: 5.5, kind: "yoke" });
-  // The head goes on top of any near arm that crosses it, and stays where it
-  // was otherwise, so a hand held in front of the chest is still in front.
-  const armOnFace = crossesHead(near) ? depths.arm[near] : null;
+  /* The head goes on top of any near arm that crosses it, and stays where it
+     was otherwise, so a hand held in front of the chest is still in front.
+     `armOverHead: true` on the move turns that off and lets the near arm keep
+     whatever the depth sort gave it, which in a side view means it draws OVER
+     the head. A press lockout is the case that wants it: the arm really does
+     pass in front of the face there, and lifting the head over it draws a
+     person whose own arm disappears behind their skull. It stays opt-in
+     because the rule earns its keep everywhere else, on a hang, a handstand,
+     a prone reach, where keeping the face is the whole point. */
+  const armOnFace = (!S.armOverHead && crossesHead(near)) ? depths.arm[near] : null;
   items.push(armOnFace !== null
     ? { d: Math.max(S.head.d, armOnFace), o: 6, kind: "head" }
     : { d: S.head.d, o: 3, kind: "head" });
@@ -3004,6 +3011,7 @@ export function render(canvas, move, C, cycle, timeSec = 0, opts = {}) {
   const S = solvePose(sampled, view);
   S.farSide = move.farSide || null;
   S.facing = move.facing || "toward";
+  S.armOverHead = move.armOverHead === true;
   const props = move.props;
   drawFigure(ctx, S, C, {
     props, floor: move.floor, lit,

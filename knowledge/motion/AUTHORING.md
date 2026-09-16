@@ -224,6 +224,8 @@ stayed side on. When a limit lifts, re-test the move; do not assume.
   farSide: "L",           // front view: which side is behind. Omit for a
                           // symmetric move, which draws both sides equally.
   feet: { R: { ang, len, w }, L: {...} },  // front view feet, see below
+  armOverHead: true,      // side view: let the near arm draw OVER the head
+                          // instead of the head over it, see below
   fit: { k: 0.8, dy: 8 }, // zoom the whole scene, for moves taller than the box
   props: [...],
   keys: [...],
@@ -292,6 +294,16 @@ to palms-forward. It is gone. `forearmPron` already turns the forearm for
 real, and a dumbbell on `hold: "grip"` reads the hand's own axis, so authoring
 the pronation gives the same picture and gives it in the right units. Anything
 that spins should spin because a joint moved.
+
+**`armOverHead` decides who wins when an arm crosses the skull.** By default
+the head is drawn last over any near arm that crosses it, because that is what
+saves the face on a hang, a handstand or a prone reach. An overhead lockout is
+the exception: the arm really does pass in front of the face, and the default
+draws a person whose own arm vanishes behind their skull. Set `armOverHead:
+true` and the near arm keeps its own depth. Reach for it only where the arm is
+genuinely the nearer thing, and look at the lockout frame afterwards, because
+where the two overlap heavily the arm will cover the face instead. See
+ARNOLD_PRESS.
 
 Still-frame checks: `pose-check.html?move=Name&t=0,0.5` in a browser, or
 `node scripts/motion-shoot.mjs "Name" out.png "0,0.5" both 300` headless.

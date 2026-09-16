@@ -1165,31 +1165,37 @@ const DUMBBELL_SHOULDER_PRESS = {
 // Bells start in front of the chest with the elbows down and the palms in, then
 // rotate out and press overhead. Must be visible: the start with the elbows IN
 // FRONT of the body rather than out to the sides, which is what separates it
-// from a straight dumbbell press. Suggested view is front; neither preset
-// works here, so this is the sagittal plane seen from 30 degrees round.
+// from a straight dumbbell press, and the grip rolling over on the way up.
+// Suggested view is front; deviating to SIDE, because a front camera cannot
+// draw the racked elbows (they point at the lens and foreshorten to nothing)
+// and cannot draw a seated figure at all: the leg IK solves in the camera
+// plane, so with the hips up on a bench the knees have nowhere to bend but
+// sideways and he sits there in a butterfly stretch.
 //
-// Why not either preset. A front camera cannot draw the racked elbows (they
-// point at the lens and foreshorten to nothing) and it cannot draw a seated
-// figure at all: the leg IK solves in the camera plane, so with the hips up on
-// a bench the knees have nowhere to bend but sideways and the figure sits
-// there in a butterfly stretch. A pure side camera draws the seat correctly
-// but puts the pressing arm through the head: at lockout the near arm and the
-// skull occupy the same pixels, so either the head covers the arm (Mo: "still
-// not in front of the head") or the arm covers the face, and no lockout angle
-// between 165 and 200 separates them.
+// Side view is also the one that shows the twist hardest, now that the bells
+// are drawn on the hands instead of at a fixed angle. The handle swings from
+// dead end on at the bottom, through fully broadside halfway up as the
+// forearms pass through neutral, back to end on at lockout. A turned camera
+// shows the same roll in a narrower band; straight on side it is the whole
+// width of the bell.
 //
-// Orbiting the same authored side pose fixes both at once, the way REAR_DELT_FLY
-// already does. The legs still solve in the sagittal plane so the seat reads;
-// the 30 degrees of yaw pushes the near arm clear to one side and the far arm
-// to the other, so at lockout the two arms frame the head with the face fully
-// visible, which is the reference photo Mo sent. It also shows the racked
-// elbow's forward reach better than a flat side view did. Checked at 20 and
-// 40: at 20 the far arm still clips the skull, at 40 the near bell eclipses
-// the far one at the rack and both bells read as one.
-//
-// The palm rotation itself is not drawable on a rig with no forearm twist.
+// This move spent a while orbited 30 degrees round, because in a flat side
+// view the near arm and the head land on the same pixels at lockout and the
+// depth sort drew the head on top, so the arm looked like it went behind the
+// skull (Mo: "as if his arm went inside of him", then "still not in front of
+// the head"). The fix was not the camera and not the pose: it is
+// armOverHead, which lets the near arm keep its own depth and draw OVER the
+// head, which is what an arm in front of a face actually does. At this
+// lockout they barely overlap anyway, so the face stays readable and the arm
+// reads as passing in front of it. Leaning the arm back past vertical to dodge
+// the head, which earlier versions did at 183 and 191, is not needed and was
+// never what the movement does.
 const ARNOLD_PRESS = {
-  view: { plane: "sagittal", yaw: 30 },
+  view: "side",
+  /* The near arm draws over the head at lockout instead of the other way
+     round. See the note above: without it the pressing arm disappears behind
+     the skull. */
+  armOverHead: true,
   loop: "pingpong",
   dur: 3.2,
   breath: 0.2,
@@ -1200,31 +1206,33 @@ const ARNOLD_PRESS = {
      makes this an Arnold rather than a dumbbell press and it did not change by
      sitting down.
 
-     The bench x values are 3 lower than the side-view ones were. A prop pinned
-     to a coordinate is drawn in screen space and does not know about the
-     camera, while the figure orbits with it, so turning the camera slid the
-     seat out from under him and left the backrest standing beside his shoulder
-     instead of behind it (Mo: "the chair should be on his back"). The offset
-     puts it back where he sits. */
+     A bench pinned to a coordinate is drawn in screen space and knows nothing
+     about the camera, so these x values only line up with the figure in the
+     move's own plane. That is worth remembering before turning a camera on any
+     move that sits on something: the figure orbits, the furniture does not,
+     and the seat slides out from under him. */
   fit: { k: 0.92, dy: 6 },
   props: [
-    { type: "bench", x: 17, y: 70, w: 44, incline: -78 },
-    { type: "bench", x: 33, y: 96, w: 36 },
+    { type: "bench", x: 20, y: 70, w: 44, incline: -78 },
+    { type: "bench", x: 36, y: 96, w: 36 },
+    /* k 0.70 rather than the 0.78 these were when a bell was always a flat
+       hex. On "grip" the same bell opens out to its full length halfway up the
+       rep, and at 0.78 that length ran into the head. */
     { type: "dumbbell", hold: "grip", side: "L", point: "hand", k: 0.7, front: true },
     { type: "dumbbell", hold: "grip", side: "R", point: "hand", k: 0.7, front: true },
   ],
   keys: [
-    { // start, elbows down and forward, bells in front of the chin, palms
+    { // start, elbows down and forward, bells in front of the chest, palms
       // turned back toward the face. forearmPron is the real channel for that
       // (negative is supinated) and it is the same -86 the dumbbell curls use,
       // because this IS the top of a curl. The bells read it for free: hold
       // "grip" runs the handle along the hand's own axis, so a supinated grip
-      // points the bell across the body and it draws nearly end on.
+      // points the bell straight at a side camera and it draws end on.
       t: 0,
       root: { x: 52, y: 86, rot: -4 },
       joints: {
         spine: 2, neck: -2,
-        shoulderR: 34, elbowR: 132, shoulderL: 24, elbowL: 134,
+        shoulderR: 34, elbowR: 132, shoulderL: 31, elbowL: 130,
         forearmPronR: -86, forearmPronL: -86,
       },
       ik: { ...stand(82, 78) },
@@ -1236,12 +1244,9 @@ const ARNOLD_PRESS = {
       // to show how he twists his arm from that to chin up to the pull up
       // grip." Nothing here fakes it, the bells are just drawn on the hands.
       //
-      // The arm angle itself used to lean back PAST vertical, "over the back
-      // of the skull", to keep the face clear of the arm. That was solving the
-      // wrong problem: the near arm and the head collide in a flat side view
-      // no matter what the arm does, which is why the camera now sits 30
-      // degrees round instead. 165 is the same lockout Seated Dumbbell Press
-      // uses, and from here the two arms simply frame the head.
+      // 165 is the same lockout Seated Dumbbell Press uses. It sits forward of
+      // vertical, which is where a press actually finishes, and it is also
+      // what keeps the arm clear of most of the head on its way past.
       t: 1,
       root: { x: 52, y: 86, rot: -4 },
       joints: {
