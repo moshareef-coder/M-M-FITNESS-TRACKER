@@ -61,7 +61,7 @@ const DUMBBELL_BENCH_PRESS = {
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -4 },
-      ik: { wristR: { x: 55.0, y: 45.0, bend: 1 }, wristL: { x: 59.0, y: 47.0, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 55.0, y: 43.7, bend: 1 }, wristL: { x: 59.0, y: 47.2, bend: 1 }, ...stand(92, 96) },
     },
     { // bottom, bells beside the chest, elbows folded out under the hands
       t: 1,
@@ -99,7 +99,7 @@ const MACHINE_CHEST_PRESS = {
       t: 1,
       root: { x: 52, y: 86, rot: -4 },
       joints: { spine: -2, neck: -3 },
-      ik: { wristR: { x: 83.7, y: 57.0, bend: 1 }, wristL: { x: 80.7, y: 59.0, bend: 1 }, ...stand(82, 78) },
+      ik: { wristR: { x: 87.1, y: 57.1, bend: 1 }, wristL: { x: 83.7, y: 59.2, bend: 1 }, ...stand(82, 78) },
     },
   ],
 };
@@ -228,7 +228,7 @@ const INCLINE_DUMBBELL_PRESS = {
       t: 0,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 0, neck: -6, forearmPronR: 90, forearmPronL: 90 },
-      ik: { wristR: { x: 63.0, y: 35.5, bend: 1 }, wristL: { x: 66.0, y: 38.5, bend: 1 }, ...stand(110, 104) },
+      ik: { wristR: { x: 63.0, y: 34.9, bend: 1 }, wristL: { x: 66.0, y: 38.4, bend: 1 }, ...stand(110, 104) },
     },
     { // bottom, bells beside the upper chest
       t: 1,
@@ -260,13 +260,13 @@ const DECLINE_DUMBBELL_PRESS = {
       t: 0,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 0, neck: 6 },
-      ik: { wristR: { x: 35.3, y: 43.3, bend: 1 }, wristL: { x: 38.3, y: 46.3, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 34.7, y: 41.9, bend: 1 }, wristL: { x: 37.5, y: 44.4, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
     },
     { // bottom, bells beside the lower chest
       t: 1,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 2, neck: 8 },
-      ik: { wristR: { x: 42.2, y: 58.2, bend: 1 }, wristL: { x: 45.2, y: 61.2, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 37.5, y: 58.2, bend: 1 }, wristL: { x: 40.5, y: 61.2, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
     },
   ],
 };
@@ -285,7 +285,7 @@ const INCLINE_BARBELL_PRESS = {
       t: 0,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 0, neck: -6 },
-      ik: { wristR: { x: 63.0, y: 35.5, bend: 1 }, wristL: { x: 65.0, y: 37.5, bend: 1 }, ...stand(110, 104) },
+      ik: { wristR: { x: 63.0, y: 34.9, bend: 1 }, wristL: { x: 64.9, y: 38.2, bend: 1 }, ...stand(110, 104) },
     },
     { // bar down to the collarbone, elbows under the bar
       t: 1,
@@ -311,13 +311,13 @@ const DECLINE_BARBELL_PRESS = {
       t: 0,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 0, neck: 6 },
-      ik: { wristR: { x: 35.3, y: 43.3, bend: 1 }, wristL: { x: 37.3, y: 45.3, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 34.7, y: 41.9, bend: 1 }, wristL: { x: 37.0, y: 44.6, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
     },
     { // bar down to the lower chest, elbows under the bar
       t: 1,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 2, neck: 8 },
-      ik: { wristR: { x: 42.2, y: 58.2, bend: 1 }, wristL: { x: 44.2, y: 60.2, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 37.5, y: 58.2, bend: 1 }, wristL: { x: 39.5, y: 60.2, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
     },
   ],
 };
@@ -1359,6 +1359,10 @@ const CUBAN_PRESS = {
 // it does differently. Side view.
 const OVERHEAD_PRESS = {
   view: "side",
+  /* The bar passes the head on the way up and the arm is the nearer
+     thing, so it draws in front instead of behind the skull. That is also what
+     lets the lockout sit OVER the crown rather than parked behind it. */
+  armOverHead: true,
   loop: "pingpong",
   dur: 3.0,
   breath: 0.2,
@@ -1374,7 +1378,7 @@ const OVERHEAD_PRESS = {
         ...stand(62, 57),
       },
     },
-    { // lockout, arms long, bar just behind the crown so the face stays clear
+    { // lockout, arms long and straight, bar stacked over the crown
       t: 1,
       root: { x: 60, y: 61.4, rot: 2 },
       joints: { spine: -2, neck: 12 },
@@ -1391,6 +1395,10 @@ const OVERHEAD_PRESS = {
 // press. Side view.
 const PUSH_PRESS = {
   view: "side",
+  /* The bar passes the head on the way up and the arm is the nearer
+     thing, so it draws in front instead of behind the skull. That is also what
+     lets the lockout sit OVER the crown rather than parked behind it. */
+  armOverHead: true,
   loop: "pingpong",
   dur: 3.0,
   breath: 0.2,
@@ -1406,7 +1414,7 @@ const PUSH_PRESS = {
         ...stand(62, 57),
       },
     },
-    { // drive, legs straight and the bar punched to lockout behind the crown
+    { // drive, legs straight and the bar punched to a straight-arm lockout
       t: 1,
       root: { x: 60, y: 61.4, rot: 2 },
       joints: { spine: -2, neck: 12 },
@@ -1866,13 +1874,13 @@ const CLOSE_GRIP_BENCH_PRESS = {
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -4 },
-      ik: { wristR: { x: 59.0, y: 46.0, bend: 1 }, wristL: { x: 61.0, y: 47.0, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 59.2, y: 43.8, bend: 1 }, wristL: { x: 60.9, y: 47.4, bend: 1 }, ...stand(92, 96) },
     },
     { // bottom, bar low on the sternum, elbows tucked toward the feet
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 2, neck: -6 },
-      ik: { wristR: { x: 63.0, y: 67.9, bend: 1 }, wristL: { x: 65.0, y: 68.9, bend: 1 }, ...stand(92, 96) },
+      ik: { wristR: { x: 60.5, y: 67.9, bend: 1 }, wristL: { x: 62.5, y: 68.9, bend: 1 }, ...stand(92, 96) },
     },
   ],
 };
