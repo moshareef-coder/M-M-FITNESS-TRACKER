@@ -116,7 +116,7 @@ const LAT_PULLDOWN = {
        keeps the pulley, the line and the bar, and hands the stack to the
        drawing with stack:false so the two do not both draw one. */
     { type: "artwork", src: "/knowledge/motion/props/lat-pulldown.svg" },
-    { type: "cable", x: 96, top: 14, y0: 44, stack: false, to: { side: "R", point: "hand" }, front: true },
+    { type: "cable", x: 54, top: 16, y0: 44, stack: false, plumb: true, barW: 16, to: { side: "R", point: "hand" }, front: true },
   ],
   keys: [
     { // arms long overhead, lats stretched

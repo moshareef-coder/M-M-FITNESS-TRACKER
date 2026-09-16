@@ -1806,6 +1806,23 @@ const PROPS = {
     const h = anchor(p.to || { side: "R", point: "hand" }, S);
     if (!h) return;
     ctx.strokeStyle = C.propTop; ctx.lineWidth = 1.5;
+    /* `plumb` is how a pulldown actually hangs, and it is the default shape
+       anyone recognises: the line drops straight from the pulley and the bar
+       stays level, however the hands are angled. Mo, on a photo of the real
+       machine: "the machine is straight and then goes down with the rope and
+       then you see the handle."
+
+       Without it the line was drawn from the pulley TO the hand, so it leaned
+       across the frame, and the bar was laid along the hand's own axis, so it
+       tilted with the wrist. A cable cannot lean and a loaded bar cannot tilt:
+       both were the drawing following the body instead of gravity. */
+    if (p.plumb) {
+      ctx.beginPath(); ctx.moveTo(p.x, top); ctx.lineTo(p.x, h.y); ctx.stroke();
+      const half = (p.barW === undefined ? 15 : p.barW) / 2;
+      capsulePath(ctx, V(p.x - half, h.y), 2.4, V(p.x + half, h.y), 2.4);
+      ctx.fillStyle = C.prop; ctx.fill();
+      return;
+    }
     ctx.beginPath(); ctx.moveTo(p.x, top); ctx.lineTo(h.x, h.y); ctx.stroke();
     const k = S.sides[(p.to && p.to.side) || "R"];
     const d = norm2(k.axis.hand.x);
