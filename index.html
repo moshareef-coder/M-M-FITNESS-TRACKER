@@ -4027,6 +4027,18 @@
   /* The strength card: a body, a key under it, and one row of detail that only
      exists once a muscle has been tapped. No bars and no chart, because the
      whole point of this card is that it can be read without decoding anything. */
+  /* The strength level bar. Five segments rather than one continuous track,
+     because the levels are the information and a smooth bar hides where the
+     boundaries are. */
+  .lvl { margin: 2px 0 10px; }
+  .lvl-segs { display: flex; gap: 4px; }
+  .lvl-segs i { flex: 1; height: 7px; border-radius: 4px; background: var(--border);
+                overflow: hidden; position: relative; }
+  .lvl-segs i b { position: absolute; inset: 0 auto 0 0; background: var(--accent);
+                  border-radius: 4px; display: block; }
+  .lvl-note { font-size: 13px; color: var(--muted); margin: 7px 0 0; line-height: 1.4; }
+  .lvl-note b { color: var(--text); font-weight: 700; }
+
   .ms-key { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
             font-size: 11.5px; color: var(--muted); margin: 6px 0 2px; }
   .ms-key span { display: flex; align-items: center; gap: 6px; }
@@ -5420,6 +5432,13 @@
     <div class="card metric-card" id="cardStrength">
       <h2>Strength</h2>
       <p class="muted-note" style="margin-top:-6px" id="strengthLead"></p>
+      <!-- Five segments, one per level, filled up to where this lift sits and
+           part filled for the level it is in. The distance to the next one is
+           the motivating half: "28 lb to Advanced" is something to go and do. -->
+      <div class="lvl hidden" id="strengthLevel">
+        <div class="lvl-segs" id="strengthLevelSegs"></div>
+        <p class="lvl-note" id="strengthLevelNote"></p>
+      </div>
       <div class="chart-wrap">
         <canvas id="strengthChart"></canvas>
         <div class="str-single hidden" id="strengthSingle"></div>
@@ -14693,6 +14712,33 @@ function renderStrengthStats() {
   const picked = lifts.find((l) => l.name === STRENGTH_LIFT) || lifts[0];
   el.textContent = `${picked.name}, best ${picked.best} lb.`
     + (lifts.length > 1 ? " Tap another lift." : "");
+  renderStrengthLevel(name, picked.name);
+}
+
+/* The level, or nothing at all. A lift we cannot level honestly (a dumbbell,
+   a machine, somebody with no weigh-in) hides the whole block rather than
+   showing a bar with nothing in it, which would read as "you are a beginner"
+   when what it means is "we do not know". */
+function renderStrengthLevel(name, exerciseName) {
+  const wrap = $("strengthLevel");
+  if (!wrap) return;
+  const lv = strengthLevelFor(name, exerciseName);
+  if (!lv) { wrap.classList.add("hidden"); return; }
+  wrap.classList.remove("hidden");
+
+  $("strengthLevelSegs").innerHTML = STRENGTH_LEVELS.map((_, i) => {
+    const pct = i < lv.index ? 100 : i === lv.index ? Math.round(lv.within * 100) : 0;
+    return `<i><b style="width:${pct}%"></b></i>`;
+  }).join("");
+
+  /* One line, and the half that matters is the second one. "Intermediate" tells
+     you where you stand; "18 lb to Advanced" is the bit somebody can go and do
+     something about, which is the whole reason this is on the card. The
+     bodyweight ratio and the estimated single are both true and both detail,
+     and this tab has already learned what happens when detail goes up front. */
+  $("strengthLevelNote").innerHTML = lv.next
+    ? `<b>${escapeHtml(lv.level)}.</b> ${lv.toNext} lb to ${escapeHtml(lv.next)}.`
+    : `<b>${escapeHtml(lv.level)}.</b> Top of the scale.`;
 }
 
 let strengthChart = null;
@@ -23518,6 +23564,117 @@ function lbsPerWeek(rows) {
    a set of twenty light reps reads as a bigger single than a heavy triple. */
 function e1rm(weight, reps) {
   return weight * (1 + Math.min(Math.max(reps || 1, 1), 12) / 30);
+}
+
+/* ---------- How strong is that, actually ----------
+
+   An estimated single is a number, and a number cannot answer the question
+   people are really asking. 195 lb is a lot for one person and a warm-up for
+   another, and the difference is bodyweight, sex and age. A LEVEL answers it.
+   This is the one pattern in the category worth copying (Hevy's), and the
+   research behind it is in mo-knowledge/research/14-am-i-getting-stronger.md.
+
+   Thresholds are multiples of bodyweight to enter each level. Four numbers
+   make five levels: under the first is Beginner, and the last is Elite.
+
+   Pinned at three ends, and scripts/strength-standards-check.mjs holds it
+   there. The untrained majority must read Beginner, the median competitive
+   powerlifter must read Advanced, and the 90th percentile of competitors must
+   read Elite. The first pass failed that third check in the direction that
+   matters: it called an untrained woman benching 0.42x bodyweight
+   "Intermediate", which is the exact flattery this feature exists not to do. */
+const STRENGTH_STANDARDS = {
+  bench:    { Male: [0.60, 0.90, 1.30, 1.75], Female: [0.50, 0.70, 0.95, 1.25] },
+  squat:    { Male: [0.85, 1.30, 1.90, 2.55], Female: [0.70, 1.00, 1.40, 1.95] },
+  deadlift: { Male: [1.00, 1.55, 2.30, 3.05], Female: [0.85, 1.20, 1.70, 2.35] },
+  press:    { Male: [0.40, 0.60, 0.85, 1.15], Female: [0.28, 0.42, 0.58, 0.80] },
+  row:      { Male: [0.55, 0.80, 1.10, 1.50], Female: [0.35, 0.50, 0.72, 1.00] },
+};
+
+const STRENGTH_LEVELS = ["Beginner", "Novice", "Intermediate", "Advanced", "Elite"];
+
+/* Which lifts can honestly be levelled, and against which standard.
+
+   The factor is what this variant is worth against the base lift, so a front
+   squat at 0.85 is held to 85% of the back squat numbers rather than being
+   called weak for being a front squat.
+
+   What is deliberately NOT here matters as much as what is. Every dumbbell
+   lift is out, because the app stores one weight and cannot tell whether that
+   was per hand or the pair, and guessing would halve or double somebody's
+   level. Every machine is out too: a leg press sled weighs whatever that gym's
+   sled weighs, so the same effort reads differently in two gyms. Those lifts
+   still chart and still count toward a muscle getting stronger. They just do
+   not get a level, because we cannot work one out without making something up. */
+const LIFT_STANDARDS = {
+  "bench press":            ["bench", 1],
+  "barbell bench press":    ["bench", 1],
+  "incline barbell press":  ["bench", 0.85],
+  "decline barbell press":  ["bench", 1.05],
+  "close-grip bench press": ["bench", 0.90],
+  "barbell back squat":     ["squat", 1],
+  "back squat":             ["squat", 1],
+  "front squat":            ["squat", 0.85],
+  "deadlift":               ["deadlift", 1],
+  "sumo deadlift":          ["deadlift", 1],
+  "romanian deadlift":      ["deadlift", 0.85],
+  "stiff-leg deadlift":     ["deadlift", 0.85],
+  "overhead press":         ["press", 1],
+  "military press":         ["press", 1],
+  "push press":             ["press", 1.20],
+  "barbell row":            ["row", 1],
+  "pendlay row":            ["row", 0.95],
+};
+
+/* Strength peaks around 18 to 35 and falls away either side, so a fixed table
+   would tell a 58 year old they are a beginner for lifting what is genuinely
+   strong at 58. The thresholds move instead of the person. Shaped after the
+   masters coefficients powerlifting has used for decades: flat through the
+   peak, a slow decline to 60, steeper after. */
+function ageStrengthFactor(age) {
+  const a = Number(age);
+  if (!a || a < 10) return 1;                       // no age on file: adult scale
+  if (a < 18) return 0.86 + (a - 14) * 0.035;
+  if (a <= 35) return 1;
+  if (a <= 60) return 1 - (a - 35) * 0.0075;
+  return Math.max(0.55, 0.8125 - (a - 60) * 0.011);
+}
+
+/* The level for one person on one lift, or null when we cannot say honestly.
+   Null has three causes and all of them are real: the lift has no standard,
+   there is no bodyweight to divide by, or nothing has been logged. */
+function strengthLevelFor(name, exerciseName) {
+  const std = LIFT_STANDARDS[(exerciseName || "").trim().toLowerCase()];
+  if (!std) return null;
+  const bw = currentWeightLb(name);
+  if (!bw) return null;
+
+  const hist = liftE1rmHistory(name, exerciseName, 52);
+  if (!hist.length) return null;
+  const best = Math.max(...hist.map((h) => h.est));
+
+  const profile = profileFor(name === ME ? MY_EMAIL : PARTNER_EMAIL);
+  const sex = profile?.sex === "Female" ? "Female" : "Male";
+  const [key, factor] = std;
+  const age = ageStrengthFactor(profile?.age);
+  /* One scale, built once, so the bar and the sentence can never disagree. */
+  const cuts = STRENGTH_STANDARDS[key][sex].map((t) => t * factor * age * bw);
+
+  let idx = 0;
+  while (idx < cuts.length && best >= cuts[idx]) idx++;
+
+  const floor = idx === 0 ? 0 : cuts[idx - 1];
+  const ceil = idx < cuts.length ? cuts[idx] : null;
+  return {
+    level: STRENGTH_LEVELS[idx],
+    next: idx < cuts.length ? STRENGTH_LEVELS[idx + 1] : null,
+    toNext: ceil ? Math.max(1, Math.round(ceil - best)) : null,
+    /* How far through the current level, for the bar's part-filled segment. */
+    within: ceil && ceil > floor ? Math.min(1, (best - floor) / (ceil - floor)) : 1,
+    index: idx,
+    best: Math.round(best),
+    ratio: best / bw,
+  };
 }
 
 /* Best estimated single per DAY for one lift, so warm-up sets and a top set on
