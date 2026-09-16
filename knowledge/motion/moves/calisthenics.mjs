@@ -363,7 +363,7 @@ export const INVERTED_ROW = {
   dur: 3.0,
   breath: 0.2,
   fit: { k: 0.9, dy: 2 },
-  props: [{ type: "pullupBar", y: 50, x0: 14, x1: 74 }],
+  props: [{ type: "pullupBar", y: 50, x0: 6, x1: 74 }],
   keys: [
     { // bottom, arms straight, body hanging off the bar in one line
       t: 0,
@@ -569,7 +569,7 @@ export const ONE_ARM_PULL_UP = {
   // which reads as a wing rather than as an arm hanging out of the way.
   fit: { k: 0.8, dy: 6 },
   feet: { R: { ang: 12, len: 0.55, w: 0.95 }, L: { ang: -12, len: 0.55, w: 0.95 } },
-  props: [{ type: "pullupBar", y: 8, x0: 34, x1: 106 }],
+  props: [{ type: "pullupBar", y: 8, x0: 26, x1: 114 }],
   keys: [
     { // hanging from the one arm, free arm down by the side
       t: 0,
@@ -1257,7 +1257,7 @@ export const FRONT_LEVER = {
   breath: 1.0,
   breathRate: 0.8,
   fit: { k: 0.84, dy: 0 },
-  props: [{ type: "pullupBar", y: 22, x0: 4, x1: 64 }],
+  props: [{ type: "pullupBar", y: 22, x0: 8, x1: 64 }],
   keys: [
     { // holding level, toes long
       t: 0,
@@ -1287,7 +1287,7 @@ export const TUCK_FRONT_LEVER = {
   breath: 1.0,
   breathRate: 0.8,
   fit: { k: 0.9, dy: 0 },
-  props: [{ type: "pullupBar", y: 22, x0: 4, x1: 64 }],
+  props: [{ type: "pullupBar", y: 22, x0: 8, x1: 64 }],
   keys: [
     // The old tuck folded 140 degrees at the hip, which threw the knees past
     // the shoulders and up among the arms, and the shins then pointed back out
@@ -1327,7 +1327,7 @@ export const HUMAN_FLAG = {
   // A doorframe sets no grip, so the mitt stayed open and its tip ran out past
   // the far edge of the pole. Closed wraps it.
   grip: { L: "closed", R: "closed" },
-  props: [{ type: "doorframe", x: 112, w: 8 }],
+  props: [{ type: "doorframe", x: 112, w: 8, pole: true }],
   keys: [
     { // holding, top hand high on the pole, bottom hand pressing low
       t: 0,

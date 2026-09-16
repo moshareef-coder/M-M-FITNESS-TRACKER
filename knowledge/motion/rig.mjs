@@ -1694,6 +1694,19 @@ function chromeBar(ctx, C, a, b, r, knurl = false, far = false) {
     }
   }
 }
+// Knurl on a chrome bar: fine ticks at low alpha, so at 300 px it reads as
+// the cross-cut grip and at 160 px it fades to a slightly matte bar instead
+// of turning into moire.
+function knurl(ctx, C, a, b, r) {
+  const d = norm2(sub(b, a)), L = len2(sub(b, a)), m = upNormal(a, b);
+  ctx.save();
+  ctx.strokeStyle = C.chromeLo; ctx.lineWidth = 0.55; ctx.globalAlpha = 0.6;
+  for (let s = 0; s <= L; s += 2.6) {
+    const q = add(a, scl(d, s));
+    ctx.beginPath(); ctx.moveTo(q.x - m.x * r * 0.8, q.y - m.y * r * 0.8); ctx.lineTo(q.x + m.x * r * 0.8, q.y + m.y * r * 0.8); ctx.stroke();
+  }
+  ctx.restore();
+}
 // A pulley: a chrome wheel with a dark hub, in a bracket if the caller draws one.
 function pulleyWheel(ctx, C, x, y, r) {
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = C.chrome; ctx.fill();
@@ -1839,12 +1852,36 @@ const PROPS = {
     }
     roundRect(ctx, p.x, GROUND - 2.4, p.w, 4.4, 2.2); ctx.fill();
   },
+  /* A wall, the real thing: a flat pale plane that runs off the top of the
+     frame and stops at a skirting board on the floor. Side on it is the slab
+     the figure leans on, so the face nearest the figure carries the skirting
+     and a hairline edge; a wide one (Wall Slides, seen from the front) is the
+     face itself with the skirting running right across. Painted with the
+     theme's prop tint at low alpha, so it is a light wall on the dark card
+     and a slightly darker panel on the light one, never a steel post. */
   wall(ctx, C, p) {
-    const top = p.top === undefined ? 4 : p.top;
-    ctx.fillStyle = C.prop;
-    roundRect(ctx, p.x, top, p.w, GROUND - top, 3); ctx.fill();
-    ctx.fillStyle = C.propTop;
-    roundRect(ctx, p.x, top, 2.6, GROUND - top, 1.3); ctx.fill();
+    const top = p.top === undefined ? -4 : p.top;
+    const w = p.w, x = p.x, h = GROUND - top;
+    const wide = w > 60;
+    const faceLeft = !wide && x + w / 2 > VB / 2;
+    const sk = 4.2;
+    ctx.save();
+    ctx.globalAlpha = 0.34; ctx.fillStyle = C.prop;
+    ctx.fillRect(x, top, w, h);
+    // skirting: a strip along the floor, proud of the face by a touch
+    ctx.globalAlpha = 0.62;
+    if (wide) ctx.fillRect(x, GROUND - sk, w, sk);
+    else if (faceLeft) ctx.fillRect(x - 1.3, GROUND - sk, w + 1.3, sk);
+    else ctx.fillRect(x, GROUND - sk, w + 1.3, sk);
+    // the top edge of the skirting and the hairline where the face turns
+    ctx.globalAlpha = 0.45; ctx.fillStyle = C.propTop;
+    if (wide) ctx.fillRect(x, GROUND - sk, w, 0.8);
+    else {
+      const fx = x - 1.3;
+      ctx.fillRect(faceLeft ? fx : x, GROUND - sk, w + 1.3, 0.8);
+      ctx.fillRect(faceLeft ? x : x + w - 0.8, top, 0.8, h - sk);
+    }
+    ctx.restore();
   },
   doorway(ctx, C, p) {
     const w = p.w || 9;
@@ -1855,14 +1892,42 @@ const PROPS = {
     ctx.fillStyle = C.propTop;
     roundRect(ctx, p.x, 4, 2.2, GROUND - 4, 1.1); ctx.fill();
   },
+  /* A door frame seen from inside the room: the architrave, the jamb the
+     forearm rests on, and a hint of the door, swung open flat against the
+     wall beyond the frame with its handle at hip height. `pole: true` draws
+     a vertical rig post instead, which is what a human flag is really held
+     on: nobody flags off a door frame. */
   doorframe(ctx, C, p) {
-    const w = p.w || 8;
+    const w = p.w || 8, x = p.x;
+    if (p.pole) {
+      steelPost(ctx, C, x + w / 2, -6, GROUND, 5.2);
+      return;
+    }
+    const right = x + w / 2 > VB / 2;
+    const bx = right ? x + w : -6, bw = right ? VB - x - w + 6 : x + 6;
+    ctx.save();
+    // the wall beyond, then the open door leaf against it
+    ctx.globalAlpha = 0.34; ctx.fillStyle = C.prop;
+    ctx.fillRect(bx, -6, bw, GROUND + 6);
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(bx, -6, bw, GROUND + 6);
+    ctx.globalAlpha = 0.45; ctx.fillStyle = C.propTop;
+    ctx.fillRect(bx + 1.5, 6, Math.max(0, bw - 3), 0.7);
+    ctx.fillRect(bx + 1.5, 6, 0.7, GROUND - 12);
+    ctx.fillRect(bx + 1.5, GROUND - 6, Math.max(0, bw - 3), 0.7);
+    ctx.globalAlpha = 1;
+    // the handle, on the leaf next to the frame
+    ctx.fillStyle = C.chrome;
+    ctx.beginPath(); ctx.arc(right ? x + w + 5 : x - 5, 72, 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // architrave: the trim board, with a groove where it steps down to the jamb
     ctx.fillStyle = C.prop;
-    roundRect(ctx, p.x, -6, w, GROUND + 6, 2.6); ctx.fill();
+    roundRect(ctx, x, -6, w, GROUND + 6, 0.6); ctx.fill();
     ctx.fillStyle = C.propDark;
-    roundRect(ctx, p.x + w * 0.62, -6, w * 0.38, GROUND + 6, 1.4); ctx.fill();
+    ctx.fillRect(right ? x + w * 0.55 : x + w * 0.38, -6, 0.8, GROUND + 6);
+    // the jamb face the arm presses on: the lit inner edge of the opening
     ctx.fillStyle = C.propTop;
-    roundRect(ctx, p.x, -6, 2.2, GROUND + 6, 1.1); ctx.fill();
+    ctx.fillRect(right ? x : x + w - 2, -6, 2, GROUND + 6);
   },
   /* A gym bench, the real object: a black vinyl pad on a steel spine, legs
      with flat feet on the floor. `incline` tips the pad about its centre; past
@@ -1892,9 +1957,20 @@ const PROPS = {
     padSlab(ctx, C, A, Bp, 5.6);
   },
   /* A plyo box or a step: a dark padded block with a lighter top face and a
-     seam where the two halves of the cover meet. */
+     seam where the two halves of the cover meet. Under 20 wide (or `block:
+     true`) it is a yoga block instead: a small foam brick in the theme's prop
+     tint, shaded top and end so it reads as foam and not as a tiny plyo box. */
   box(ctx, C, p) {
     const h = GROUND - p.y;
+    if (p.block || p.w < 20) {
+      ctx.fillStyle = C.prop;
+      roundRect(ctx, p.x, p.y, p.w, h, 1.3); ctx.fill();
+      ctx.fillStyle = mix(C.prop, "#ffffff", 0.28);
+      roundRect(ctx, p.x, p.y, p.w, 2.4, 1.2); ctx.fill();
+      ctx.fillStyle = mix(C.prop, "#000000", 0.22);
+      roundRect(ctx, p.x + p.w - 2.4, p.y + 1.2, 2.4, h - 1.2, 1.1); ctx.fill();
+      return;
+    }
     ctx.fillStyle = C.pad;
     roundRect(ctx, p.x, p.y, p.w, h, 2.6); ctx.fill();
     ctx.fillStyle = C.padHi;
@@ -1905,12 +1981,24 @@ const PROPS = {
     ctx.fillStyle = C.steelLo;
     roundRect(ctx, p.x, GROUND - 2.4, p.w, 2.4, 1); ctx.fill();
   },
-  /* A foam roller seen end on, or the leg lock pads on a decline bench: a
-     black cylinder with a lighter core and a highlight across the top. */
+  /* A roller seen end on. On the floor (or `foam: true`) it is a foam roller:
+     a dense EVA cylinder with a flat moulded end and a hollow core, no axle.
+     Anywhere else it is a leg lock pad on a machine: a black vinyl cylinder
+     turning on a steel axle. */
   roller(ctx, C, p) {
     const r = p.r || 5.4;
+    const foam = p.foam || p.y + r > GROUND - 1.5;
     ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
     ctx.fillStyle = C.pad; ctx.fill();
+    if (foam) {
+      ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.8, 0, Math.PI * 2);
+      ctx.fillStyle = C.padHi; ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.24, 0, Math.PI * 2);
+      ctx.fillStyle = C.rubber; ctx.fill();
+      ctx.strokeStyle = C.padLine; ctx.lineWidth = 0.9;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r - 0.8, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+      return;
+    }
     ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.5, 0, Math.PI * 2);
     ctx.fillStyle = C.padHi; ctx.fill();
     ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.16, 0, Math.PI * 2);
@@ -1918,30 +2006,54 @@ const PROPS = {
     ctx.strokeStyle = C.padLine; ctx.lineWidth = 0.9;
     ctx.beginPath(); ctx.arc(p.x, p.y, r - 0.9, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
   },
-  /* A pull-up bar: a knurled chrome bar between two steel uprights that go up
-     out of the frame, with a bracket plate where each upright meets the bar. */
+  /* A pull-up bar on a rig: a knurled chrome bar (about 32 mm, so r 1.7 at
+     this scale) bolted between two box-section uprights that stand on the
+     floor, a mounting plate where each meets the bar. The uprights sit AT x0
+     and x1, so the bar spans past both hands and a post stays clear of an
+     arm stretched along the bar (Archer Pull-Up). A bar racked low (y past
+     36: the Inverted Row) is a barbell in a rack instead: the same uprights
+     run to the top of the frame and the bar rests in a J-cup on each. */
   pullupBar(ctx, C, p) {
     const y = p.y === undefined ? 10 : p.y;
     const x0 = p.x0 === undefined ? 30 : p.x0;
     const x1 = p.x1 === undefined ? 110 : p.x1;
-    for (const x of [x0 + 2.5, x1 - 2.5]) {
-      steelTube(ctx, C, V(x, -4), V(x, y - 1), 2.4);
+    const r = p.r || 1.7, pw = 4.6, racked = y > 36;
+    for (const x of [x0, x1]) {
+      steelPost(ctx, C, x, racked ? -6 : y - 6.5, GROUND, pw);
       ctx.fillStyle = C.steelLo;
-      roundRect(ctx, x - 4, y - 5.2, 8, 4.4, 1.2); ctx.fill();
+      if (racked) roundRect(ctx, x - pw / 2 - 1.2, y - r - 0.8, pw + 2.4, r * 2 + 3.4, 1.2);
+      else roundRect(ctx, x - pw / 2 - 0.9, y - 3.6, pw + 1.8, 7.2, 1.1);
+      ctx.fill();
     }
-    chromeBar(ctx, C, V(x0, y), V(x1, y), 2.3, true);
+    chromeBar(ctx, C, V(x0 - pw / 2, y), V(x1 + pw / 2, y), r, false);
+    knurl(ctx, C, V(x0 + pw / 2 + 1.5, y), V(x1 - pw / 2 - 1.5, y), r);
+    ctx.fillStyle = C.ironHi;
+    for (const x of [x0, x1]) { ctx.beginPath(); ctx.arc(x, y, r * 0.55, 0, Math.PI * 2); ctx.fill(); }
   },
+  /* Parallel bars. At chest height (y under 80) it is a dip station: two
+     chrome rails on box-section uprights tied together by a rail on the
+     floor. Low (y 80 or more) it is a pair of parallettes, the short round
+     tube handle on two small legs with feet that an L-sit is held on. Two
+     rails, one each side of the body: the far one dim and behind the figure,
+     the near one in front of it and a touch lower (parallax from a camera a
+     little above the rails). One rail behind the body read as a table the
+     figure was sitting on. near: false keeps only the back rail. */
   dipBars(ctx, C, p, S, layer) {
     const y = p.y === undefined ? 86 : p.y;
-    // Two rails, one each side of the body: the far one dim and behind the
-    // figure, the near one in front of it and a touch lower (parallax from a
-    // camera a little above the rails). One rail behind the body read as a
-    // table the figure was sitting on. near: false keeps only the back rail.
+    const parallette = y >= 80;
     const rail = (ry, far) => {
-      for (const x of [p.x0 + 4.5, p.x1 - 4.5]) {
-        steelPost(ctx, C, x, ry + 1, GROUND, 4.4, far);
+      if (parallette) {
+        for (const x of [p.x0 + 3.5, p.x1 - 3.5]) {
+          steelTube(ctx, C, V(x, ry + 1), V(x, GROUND - 1.5), 1.3, far);
+          steelTube(ctx, C, V(x - 4.2, GROUND - 1.4), V(x + 4.2, GROUND - 1.4), 1.4, far);
+        }
+        chromeBar(ctx, C, V(p.x0, ry), V(p.x1, ry), 1.7, false, far);
+        return;
       }
-      chromeBar(ctx, C, V(p.x0, ry), V(p.x1, ry), 2.3, false, far);
+      for (const x of [p.x0 + 4.5, p.x1 - 4.5]) steelPost(ctx, C, x, ry + 1, GROUND, 4.4, far);
+      ctx.fillStyle = far ? C.steelLo : C.steel;
+      roundRect(ctx, p.x0 + 2.5, GROUND - 3.2, p.x1 - p.x0 - 5, 3.2, 1.1); ctx.fill();
+      chromeBar(ctx, C, V(p.x0, ry), V(p.x1, ry), 2, false, far);
     };
     if (layer === "back") rail(y, true);
     else if (p.near !== false) rail(y + 1.4, false);
