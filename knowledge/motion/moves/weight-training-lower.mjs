@@ -1185,7 +1185,10 @@ const AB_WHEEL_ROLLOUT = {
   fit: { k: 0.92, dy: 2 },
   props: [
     { type: "mat", x: 10, w: 120 },
-    { type: "barbell", side: "R", point: "hand", dx: 0, dy: 2, r: 7, front: true },
+    // The wheel sits on the floor under the hands (the keys hold the wrists
+    // 17 to 20 units up, so a fixed offset can only hold it within about
+    // 1.6 units of the floor across the rep; see the equipment pass notes).
+    { type: "artwork", src: "/knowledge/motion/props/ab-wheel.svg", side: "R", point: "hand", dx: 0, dy: 10.2, k: 1, rot: 0 },
   ],
   keys: [
     { // tucked, wheel under the shoulders
