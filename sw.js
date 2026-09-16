@@ -13,7 +13,7 @@
    A deploy is still never masked: it ships a new sw.js with a new cache name,
    which drops this cache on activate, and the page reloads itself when the new
    worker takes over. */
-const CACHE = "unio-2026.09.15.28";
+const CACHE = "unio-2026.09.16.1";
 /* Version named or content named files live outside the versioned cache, so a
    deploy does not throw away the 2 MB Rive wasm and the .riv and make the next
    launch download them all over again. */

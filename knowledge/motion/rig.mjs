@@ -2526,7 +2526,11 @@ function artwork(ctx, C, p, S, layer) {
   }
   ctx.restore();
 }
-const isHeldArtwork = (p) => p.type === "artwork" && p.side !== undefined;
+/* Scenery fills the 140 box; a sprite is placed at a point and drawn at its
+   own size. Either a body joint (`side`) or a plain world point (`x`) makes
+   it a sprite. Without the second test an `x` was ignored and a 20-unit ab
+   wheel was stretched across the whole scene. */
+const isHeldArtwork = (p) => p.type === "artwork" && (p.side !== undefined || p.x !== undefined);
 
 function drawProps(ctx, C, list, S, layer) {
   for (const p of list || []) {
@@ -3005,3 +3009,206 @@ export function jointAngles(S) {
   }
   return out;
 }
+
+/* ------------------------------------------------------ equipment portraits ---
+ *
+ * A picture of the thing itself, with no figure on it: "this is what a
+ * preacher bench looks like, go and find one". It is drawn by the same code
+ * that draws the equipment inside the exercise animations, out of the same
+ * steel, pad, chrome and iron, so the machine in the popup is the machine in
+ * the picture the figure is using. A separate set of illustrations would drift
+ * from the animations the first time somebody edited one.
+ *
+ * Each portrait is a props list plus the box to crop to, in the rig's own
+ * 140-unit space. Props that hang off a joint take a plain { x, y } instead of
+ * a body part, which `anchor` already supports, so no pose is needed.
+ *
+ * The free weights are the one place a portrait is NOT the animation's own
+ * drawing: side on, a loaded barbell is a single disc, which is right in a
+ * scene and useless as a picture of a barbell. So those are drawn front on,
+ * the way you would see them on the rack you are walking to.
+ */
+function plateStack(ctx, C, x, y, r) {
+  ctx.strokeStyle = C.edge; ctx.lineWidth = 2.4; ctx.lineJoin = "round";
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = C.iron; ctx.fill();
+  ctx.strokeStyle = C.ironHi; ctx.lineWidth = r * 0.16;
+  ctx.beginPath(); ctx.arc(x, y, r * 0.62, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = r * 0.09;
+  ctx.beginPath(); ctx.arc(x, y, r * 0.88, Math.PI * 1.08, Math.PI * 1.7); ctx.stroke();
+}
+// A loaded bar seen from the front: sleeve, collars, a pair of plates a side.
+function loadedBar(ctx, C, y, half, plates = [9.5, 6.5]) {
+  chromeBar(ctx, C, V(70 - half, y), V(70 + half, y), 2.6, true);
+  for (const s of [-1, 1]) {
+    let x = 70 + s * (half - 4);
+    for (const r of plates) { plateStack(ctx, C, x, y, r); x -= s * (r * 0.42 + 2.6); }
+    ctx.fillStyle = C.chromeLo;
+    roundRect(ctx, 70 + s * (half - 2.4) - 2, y - 4, 4, 8, 1.4); ctx.fill();
+  }
+}
+const KIT_ART = {
+  // ---- the machines, which already have their own drawings ----
+  "lat-pulldown": { box: [18, 0, 100, 122], props: [{ type: "artwork", src: "/knowledge/motion/props/lat-pulldown.svg" }] },
+  "seated-row": { box: [8, 40, 128, 84], props: [{ type: "artwork", src: "/knowledge/motion/props/seated-row.svg" }] },
+  "chest-press": { box: [10, 0, 118, 124], props: [{ type: "artwork", src: "/knowledge/motion/props/chest-press.svg" }] },
+  "shoulder-press": { box: [10, 0, 118, 124], props: [{ type: "artwork", src: "/knowledge/motion/props/shoulder-press.svg" }] },
+  "pec-deck": { box: [16, 0, 108, 124], props: [{ type: "artwork", src: "/knowledge/motion/props/pec-deck.svg" }] },
+  "leg-extension": { box: [8, 24, 124, 100], props: [{ type: "artwork", src: "/knowledge/motion/props/leg-extension.svg" }] },
+  "leg-curl": { box: [0, 40, 138, 84], props: [{ type: "artwork", src: "/knowledge/motion/props/leg-curl.svg" }] },
+  "leg-press": { box: [0, 30, 138, 94], props: [{ type: "artwork", src: "/knowledge/motion/props/leg-press.svg" }, { type: "artwork", src: "/knowledge/motion/props/leg-press-sled.svg", x: 96, y: 74, k: 1 }] },
+  "hack-squat": { box: [8, 10, 124, 114], props: [{ type: "artwork", src: "/knowledge/motion/props/hack-squat.svg" }, { type: "artwork", src: "/knowledge/motion/props/hack-squat-sled.svg", x: 62, y: 62, k: 1 }] },
+  "seated-calf": { box: [10, 50, 118, 74], props: [{ type: "artwork", src: "/knowledge/motion/props/seated-calf.svg" }] },
+  "reverse-hyper": { box: [24, 40, 96, 84], props: [{ type: "artwork", src: "/knowledge/motion/props/reverse-hyper.svg" }] },
+  ghd: { box: [10, 50, 118, 74], props: [{ type: "artwork", src: "/knowledge/motion/props/ghd.svg" }] },
+  "back-extension": { box: [16, 40, 108, 84], props: [{ type: "artwork", src: "/knowledge/motion/props/back-extension.svg" }] },
+  "preacher-bench": { box: [14, 50, 108, 74], props: [{ type: "artwork", src: "/knowledge/motion/props/preacher.svg" }] },
+  landmine: { box: [8, 96, 44, 28], props: [{ type: "artwork", src: "/knowledge/motion/props/landmine.svg" }] },
+  "ab-wheel": { box: [46, 44, 48, 48], props: [{ type: "artwork", src: "/knowledge/motion/props/ab-wheel.svg", x: 70, y: 68, k: 1.6 }] },
+  "calf-block": { box: [40, 92, 60, 32], props: [{ type: "artwork", src: "/knowledge/motion/props/calf-block.svg", dx: 21 }] },
+
+  // ---- the cable stations, drawn by the cable prop itself ----
+  cable: {
+    box: [38, 0, 64, 124],
+    props: [{ type: "cable", x: 70, top: 14, y0: 46, plumb: true, grip: "bar", barW: 20, to: { x: 70, y: 74 } }],
+  },
+  "cable-crossover": {
+    box: [2, 0, 136, 124],
+    props: [
+      { type: "artwork", src: "/knowledge/motion/props/crossover-beam.svg" },
+      { type: "cable", x: 14, top: 12, y0: 46, plumb: true, grip: "handle", to: { x: 14, y: 62 } },
+      { type: "cable", x: 126, top: 12, y0: 46, plumb: true, grip: "handle", to: { x: 126, y: 62 } },
+    ],
+  },
+
+  // ---- benches and the places you stand ----
+  bench: { box: [16, 78, 108, 46], props: [{ type: "bench", x: 26, y: 96, w: 88 }] },
+  "bench-adjustable": { box: [16, 56, 108, 68], props: [{ type: "bench", x: 30, y: 92, w: 80, incline: -35 }] },
+  "pullup-bar": { box: [14, 0, 112, 124], props: [{ type: "pullupBar", y: 18, x0: 26, x1: 114 }] },
+  "dip-bars": { box: [26, 56, 88, 68], props: [{ type: "dipBars", x0: 36, x1: 104, y: 72 }] },
+  parallettes: { box: [30, 84, 80, 40], props: [{ type: "dipBars", x0: 42, x1: 98, y: 100 }] },
+  box: { box: [34, 82, 72, 42], props: [{ type: "box", x: 44, y: 92, w: 52 }] },
+  block: { box: [48, 94, 44, 30], props: [{ type: "box", x: 56, y: 102, w: 28, block: true }] },
+  wall: { box: [40, 0, 60, 124], props: [{ type: "wall", x: 56, w: 30 }] },
+  doorway: { box: [34, 0, 72, 124], props: [{ type: "doorframe", x: 62, w: 12 }] },
+  "rig-post": { box: [48, 0, 44, 124], props: [{ type: "doorframe", x: 64, w: 10, pole: true }] },
+  rack: {
+    box: [14, 0, 112, 124],
+    draw(ctx, C) {
+      for (const x of [34, 106]) {
+        steelPost(ctx, C, x, 6, GROUND, 8);
+        // the J cup the bar sits in, at shoulder height
+        ctx.fillStyle = C.steelLo;
+        roundRect(ctx, x - 9, 44, 9, 4.4, 1.6); ctx.fill();
+        roundRect(ctx, x - 9, 38, 3.4, 8, 1.4); ctx.fill();
+        // the holes that make it a rack and not two posts
+        ctx.fillStyle = C.steelLo;
+        for (let y = 16; y < GROUND - 8; y += 9) { ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill(); }
+      }
+      loadedBar(ctx, C, 42, 54);
+    },
+  },
+  "smith-machine": {
+    box: [14, 0, 112, 124],
+    draw(ctx, C) {
+      for (const x of [36, 104] ) {
+        steelPost(ctx, C, x, 6, GROUND, 7);
+        chromeBar(ctx, C, V(x + 5, 10), V(x + 5, GROUND - 6), 1.6);
+      }
+      loadedBar(ctx, C, 54, 44);
+      ctx.fillStyle = C.steelLo;
+      for (const x of [41, 109]) { roundRect(ctx, x - 4, 50, 8, 8, 2); ctx.fill(); }
+    },
+  },
+
+  // ---- what you pick up, drawn front on ----
+  barbell: { box: [4, 46, 132, 32], draw: (ctx, C) => loadedBar(ctx, C, 62, 62) },
+  "ez-bar": {
+    box: [20, 48, 100, 28],
+    draw(ctx, C) {
+      // the camber: down, up, down across the middle, which is the whole point
+      const p = [V(42, 62), V(52, 58), V(62, 66), V(78, 66), V(88, 58), V(98, 62)];
+      for (let i = 0; i < p.length - 1; i++) chromeBar(ctx, C, p[i], p[i + 1], 2.3, i === 1 || i === 3);
+      for (const s of [-1, 1]) {
+        plateStack(ctx, C, 70 + s * 32, 62, 7.5);
+        ctx.fillStyle = C.chromeLo; roundRect(ctx, 70 + s * 26 - 2, 58, 4, 8, 1.4); ctx.fill();
+      }
+    },
+  },
+  dumbbell: {
+    box: [14, 44, 112, 36],
+    draw(ctx, C) {
+      PROPS.dumbbell(ctx, C, { x: 46, y: 62, k: 0.95 }, null);
+      PROPS.dumbbell(ctx, C, { x: 94, y: 62, k: 0.95 }, null);
+    },
+  },
+  "dumbbell-one": { box: [40, 42, 60, 40], draw: (ctx, C) => PROPS.dumbbell(ctx, C, { x: 70, y: 62, k: 1.15 }, null) },
+  kettlebell: { box: [44, 38, 52, 46], draw: (ctx, C) => PROPS.kettlebell(ctx, C, { x: 70, y: 44, k: 1.25 }, null) },
+  plate: { box: [44, 36, 52, 52], draw: (ctx, C) => plateStack(ctx, C, 70, 62, 22) },
+  "dip-belt": {
+    box: [36, 26, 68, 72],
+    draw(ctx, C) {
+      // the belt, then the chain, then the plate hanging off it
+      ctx.fillStyle = C.rubber;
+      roundRect(ctx, 50, 34, 40, 9, 4); ctx.fill();
+      ctx.fillStyle = C.padHi; roundRect(ctx, 50, 34, 40, 2.6, 1.3); ctx.fill();
+      ctx.strokeStyle = C.chrome; ctx.lineWidth = 1.6;
+      for (const x of [62, 78]) { ctx.beginPath(); ctx.moveTo(x, 43); ctx.lineTo(70, 62); ctx.stroke(); }
+      plateStack(ctx, C, 70, 74, 14);
+    },
+  },
+
+  // ---- the small things ----
+  band: { box: [22, 46, 96, 40], props: [{ type: "band", rest: 96, from: { x: 34, y: 56 }, to: { x: 106, y: 56 } }] },
+  /* End on, a foam roller and a weight plate are the same dark circle. Seen
+     along its length it is unmistakably a roller, so the portrait turns it. */
+  roller: {
+    box: [28, 44, 84, 40],
+    draw(ctx, C) {
+      capsulePath(ctx, V(48, 64), 14, V(92, 64), 14);
+      ctx.fillStyle = C.pad; ctx.fill();
+      ctx.beginPath(); ctx.ellipse(48, 64, 5.5, 14, 0, 0, Math.PI * 2);
+      ctx.fillStyle = C.padHi; ctx.fill();
+      ctx.beginPath(); ctx.ellipse(48, 64, 2.2, 5.6, 0, 0, Math.PI * 2);
+      ctx.fillStyle = C.steelLo; ctx.fill();
+      ctx.strokeStyle = C.padLine; ctx.lineWidth = 1.1;
+      for (const x of [62, 76, 90]) { ctx.beginPath(); ctx.ellipse(x, 64, 4.4, 13, 0, Math.PI * 1.55, Math.PI * 2.45); ctx.stroke(); }
+    },
+  },
+  // Edge on a mat is a stripe. From above it is a mat.
+  mat: { box: [26, 30, 88, 80], props: [{ type: "mat", top: true, x: 32, y: 36, w: 76, h: 68, r: 7 }] },
+};
+
+/* Paint one piece of equipment into a canvas, cropped to its own box. Returns
+   false when nothing is known about that id, so a caller can leave the space
+   empty instead of drawing a mystery. */
+export function drawKit(canvas, id, { theme = "dark", onReady } = {}) {
+  const art = KIT_ART[id];
+  if (!canvas || !art) return false;
+  const C = palette(theme);
+  const dpr = Math.min(3, globalThis.devicePixelRatio || 1);
+  const w = canvas.clientWidth || canvas.width || 120;
+  const h = canvas.clientHeight || canvas.height || 120;
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const [bx, by, bw, bh] = art.box;
+  // Fit the box inside the canvas, centred, never upscaled past the frame.
+  const k = Math.min(w / bw, h / bh);
+  ctx.translate((w - bw * k) / 2, (h - bh * k) / 2);
+  ctx.scale(k, k);
+  ctx.translate(-bx, -by);
+  if (art.draw) art.draw(ctx, C);
+  if (art.props) {
+    // Two passes, same as a scene, so a machine's near pads land over its frame.
+    const list = art.props.map((p) => (p.type === "artwork" && onReady ? { ...p, onReady } : p));
+    drawProps(ctx, C, list, null, "back");
+    drawProps(ctx, C, list, null, "front");
+  }
+  return true;
+}
+export const KIT_ART_IDS = Object.keys(KIT_ART);

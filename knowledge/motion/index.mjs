@@ -15,7 +15,7 @@
 import { palette, render, samplePose, solvePose, jointAngles, cameraFor, litIntensity, VB, GROUND,
   PROP_TYPES, LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY,
   BODY_FEMALE, BODIES, BODY_KINDS, HAIR_KINDS, useBody, restPose, gripSides, STYLE, setStyle,
-  onArtworkReady } from "./rig.mjs";
+  onArtworkReady, drawKit, KIT_ART_IDS } from "./rig.mjs";
 import { MOVES as WEIGHT_TRAINING } from "./moves/weight-training.mjs";
 import { MOVES as YOGA } from "./moves/yoga.mjs";
 import { MOVES as PILATES } from "./moves/pilates.mjs";
@@ -25,7 +25,17 @@ import { MOVES as IDLE } from "./moves/idle.mjs";
 
 export { palette, render, samplePose, solvePose, jointAngles, cameraFor, litIntensity, VB, GROUND,
   PROP_TYPES, LOOPS, VIEWS, PRESETS, SKINS, GRIPS, MUSCLE_GROUPS, BODY,
-  BODY_FEMALE, BODIES, BODY_KINDS, HAIR_KINDS, useBody, restPose, gripSides, STYLE, setStyle };
+  BODY_FEMALE, BODIES, BODY_KINDS, HAIR_KINDS, useBody, restPose, gripSides, STYLE, setStyle,
+  drawKit, KIT_ART_IDS };
+
+/* A picture of one piece of equipment, no figure on it. Redraws itself when a
+   machine's artwork finishes loading, which is the same one-frame gap the
+   animations have and is invisible in a scene but very visible on a still. */
+export function mountKit(canvas, id, opts = {}) {
+  const paint = () => drawKit(canvas, id, { ...opts, onReady: () => drawKit(canvas, id, opts) });
+  const ok = paint();
+  return ok ? { repaint: paint, setTheme(theme) { opts = { ...opts, theme }; paint(); } } : null;
+}
 
 // Keyed by the training id used in knowledge/exercise-library/index.mjs.
 export const MOVES_BY_LIBRARY = {

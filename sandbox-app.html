@@ -661,11 +661,58 @@
      sits in the muted tone, not the ramp's stretch ink: a ramp is an
      instruction, kit is a fact about the room. */
   .ex-kit {
-    display: flex; align-items: flex-start; gap: 5px; margin-top: 3px;
+    display: inline-block; margin-top: 3px;
     font-size: 12.5px; line-height: 1.35; color: var(--muted);
+    /* Tappable, but not a button: a dotted underline says "there is more
+       here" without turning every row into a wall of controls. */
+    border-bottom: 1px dashed color-mix(in srgb, var(--muted) 45%, transparent);
+    cursor: pointer;
   }
-  .ex-kit svg { flex-shrink: 0; opacity: .65; margin-top: 2px; }
-  .ex-kit span { min-width: 0; }
+  .ex-kit:active { opacity: .6; }
+
+  /* ---------- what a piece of equipment looks like ---------- */
+  .kit-list { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 16px; }
+  .kit-item {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 16px; padding: 10px 14px 10px 10px;
+  }
+  .kit-pic { width: 100px; height: 78px; flex-shrink: 0; }
+  .kit-pic canvas { display: block; width: 100%; height: 100%; }
+  .kit-item-text { min-width: 0; }
+  .kit-item-name { font-size: 15px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.01em; }
+  .kit-item-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+  /* How to set it up once you have found it. One line, about the exercise. */
+  .kit-setup {
+    margin: 0 2px 16px; font-size: 13px; line-height: 1.4; color: var(--muted);
+  }
+  .spp-chip-tap { cursor: pointer; font-family: inherit; }
+  .spp-chip-tap:active { opacity: .6; }
+
+  /* The three second peek. It floats over the top of the stage, above the
+     figure and clear of the quip slot, and it leaves on its own. */
+  .kit-peek {
+    position: absolute; left: 12px; right: 12px; top: 8px; z-index: 4;
+    background: color-mix(in srgb, var(--panel) 92%, transparent);
+    border: 1px solid var(--border); border-radius: 16px;
+    padding: 9px 12px 10px; box-shadow: var(--shadow-lift);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    opacity: 0; transform: translateY(-10px);
+    transition: opacity .24s ease, transform .24s cubic-bezier(.22,1,.36,1);
+    pointer-events: auto; cursor: pointer;
+  }
+  .kit-peek.in { opacity: 1; transform: none; }
+  .kit-peek-k {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 6px;
+  }
+  .kit-peek-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .kit-peek-one { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .kit-peek-one span { font-size: 12.5px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kit-peek-pic { width: 52px; height: 38px; flex-shrink: 0; }
+  .kit-peek-pic canvas { display: block; width: 100%; height: 100%; }
+  @media (prefers-reduced-motion: reduce) {
+    .kit-peek { transition: opacity .01s; transform: none; }
+  }
   .ex-ramp {
     display: flex; align-items: flex-start; gap: 5px; margin-top: 3px;
     font-size: 12.5px; line-height: 1.35; color: var(--stretch-ink);
@@ -1910,12 +1957,17 @@
      Two lines at most on a phone, and it wraps rather than truncating,
      because the half that gets cut is always the useful half. */
   .sess-kit {
+    display: block; width: 100%; text-align: left; padding: 0; border: 0; background: none;
+    font-family: inherit; cursor: pointer;
     margin-top: 7px; font-size: 14px; font-weight: 600; line-height: 1.35;
     /* The stage behind this is the figure's own light ground, not the app's,
        so a --muted grey washes out on it. It takes the session's own ink at
        the same strength as the row above the title. */
     color: color-mix(in srgb, var(--sess-ink) 70%, transparent);
+    text-decoration: underline; text-decoration-style: dashed;
+    text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--sess-ink) 34%, transparent);
   }
+  .sess-kit:active { opacity: .6; }
   .sess-titlerow .sess-title { flex: 1 1 auto; min-width: 0; }
   /* Round, quiet, and the same 44px target as every other control on the
      screen. It sits on the stage gradient, so its ground is the ink colour at
@@ -5466,6 +5518,14 @@
       <p class="muted-note">The figure on the session screen says something now and then: after a record, when a rest is running long, between lifts. He is quiet most sets. Off here means never, on this phone.</p>
     </div>
     <div class="card">
+      <h2>Equipment</h2>
+      <label class="gym-toggle" id="kitPeekWrap">
+        <span>Show what you need before each exercise</span>
+        <input type="checkbox" id="kitPeekToggle" />
+      </label>
+      <p class="muted-note">When a workout moves to the next lift, a card shows the kit it needs for three seconds and then goes. The equipment is always there to tap on the plan and on the session screen, whether this is on or off.</p>
+    </div>
+    <div class="card">
       <h2>Stretching</h2>
       <label class="gym-toggle" id="skipStretchWrap">
         <span>Skip the warm-up and cool-down</span>
@@ -5832,7 +5892,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.28";
+const APP_VERSION = "2026.09.16.1";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -6639,9 +6699,13 @@ async function checkPartnershipThenEnter() {
      not already settled on training alone. An answer I am still owed, above,
      is the opposite and comes first. */
   const waiting = all.filter((r) => r.status === "pending" && mine(r.inviter_email));
+  if (waiting.length) { renderPairSentScreen(waiting); return; }
+
+  /* A no, said once and then done with. The week is so an answer that came
+     back while the app sat closed for a month does not open with it. */
   const refused = all.filter((r) => r.status === "declined" && mine(r.inviter_email)
     && r.responded_at && Date.now() - new Date(r.responded_at).getTime() < 7 * 864e5);
-  if (waiting.length || refused.length) { renderPairSentScreen(waiting, refused); return; }
+  if (refused.length) { renderPairRefusedScreen(refused); return; }
 
   renderPairingScreen();
 }
@@ -6824,7 +6888,7 @@ function renderPairRequestScreen(reqs) {
    made this look like a screen that had eaten the code. */
 /* One name in the title means a box around that same name adds nothing. The
    card is only earned once there are several rows to tell apart. */
-function pairRowsHtml(rows, action, label) {
+function pairRowsHtml(rows, label) {
   if (rows.length === 1) {
     return `<div class="pair-req-mail" style="margin-bottom:16px;">${escapeHtml(String(rows[0].invitee_email).toLowerCase())}</div>`;
   }
@@ -6832,9 +6896,9 @@ function pairRowsHtml(rows, action, label) {
       <div class="pair-req">
         <div class="pair-req-who">${escapeHtml(pairWho(r.invitee_email))}</div>
         <div class="pair-req-mail">${escapeHtml(String(r.invitee_email).toLowerCase())}</div>
-        <div class="pair-req-acts">
+        ${label ? `<div class="pair-req-acts">
           <button type="button" class="btn-ghost" data-endrow="${escapeHtml(r.id)}">${label}</button>
-        </div>
+        </div>` : ""}
       </div>`).join("");
 }
 
@@ -6859,7 +6923,7 @@ function renderPairSentScreen(waiting) {
       <h1>${title}</h1>
       <p class="sub" style="margin-bottom:16px;">They have to accept before anything is shared.
         Neither of you can see the other until they do.</p>
-      ${pairRowsHtml(waiting, "endrow", "Cancel this one")}
+      ${pairRowsHtml(waiting, "Cancel this one")}
       <button class="btn-primary" id="waitSoloBtn">Train alone for now</button>
       <button class="btn-ghost" id="waitAnotherBtn">Enter another code</button>
       ${waiting.length === 1 ? `<button type="button" class="btn-ghost" data-endrow="${escapeHtml(waiting[0].id)}">Cancel the request</button>` : ""}
@@ -6885,7 +6949,7 @@ function renderPairRefusedScreen(refused) {
       <h1>${title}</h1>
       <p class="sub" style="margin-bottom:16px;">Nothing of yours was shared, and nothing of theirs.
         You can pair with someone else whenever you like.</p>
-      ${pairRowsHtml(refused, "endrow", "Got it")}
+      ${pairRowsHtml(refused, "")}
       <button class="btn-primary" id="refusedOkBtn">Got it</button>
     </div>`;
   $("onboard").classList.remove("hidden");
@@ -16908,7 +16972,7 @@ function renderSession() {
               it is "which machine, which attachment, what angle". This is the
               one place that answers all three, because it is the one place
               where you are about to do it. */ ""}
-        ${kitFor(ex.name) ? `<div class="sess-kit">${escapeHtml(kitFor(ex.name))}</div>` : ""}
+        ${kitFor(ex.name) ? `<button type="button" class="sess-kit" data-kit-for="${escapeHtml(ex.name)}" data-kit-eyebrow="${escapeHtml(ex.name)}">${escapeHtml(kitFor(ex.name))}</button>` : ""}
       </div>
 
       <div class="sess-stage${resting ? " resting" : ""}" id="sessStage">
@@ -17051,6 +17115,10 @@ function renderSession() {
   $("sessionCard").classList.remove("paused-screen");
   if (waking) startSessionWake(); else $("sessionCard").classList.remove("waking");
   mountMotionFigures($("sessionBody"));
+  /* Once per exercise, not once per repaint: logging a set re-renders this
+     whole screen, and a card that came back after every set would be the
+     most annoying thing in the app. Resting is the wrong moment for it too. */
+  if (!resting) maybeKitPeek(ex.name); else hideKitPeek();
   /* The rest clock lives in the top bar now, so there is no bar to tick and
      nothing to paint except that one number, which the session timer already
      does every second. */
@@ -19015,7 +19083,7 @@ function renderChooseScreen() {
           <div class="spp-fact"><div class="k">Exercises</div><div class="v">${p.count}</div></div>
           ${p.kit && p.kit.length ? `<div class="spp-fact wide">
             <div class="k">What you need</div>
-            <div class="spp-chips">${p.kit.map((k) => `<span class="spp-chip${k.group === "machine" ? " spp-chip-kit" : ""}">${escapeHtml(k.label)}</span>`).join("")}</div>
+            <div class="spp-chips">${p.kit.map((k) => `<button type="button" class="spp-chip spp-chip-tap${k.group === "machine" ? " spp-chip-kit" : ""}" data-kit-for="${escapeHtml(k.uses.join("|"))}" data-kit-eyebrow="${escapeHtml(k.label)}">${escapeHtml(k.label)}</button>`).join("")}</div>
           </div>` : p.equipment ? `<div class="spp-fact wide"><div class="k">Equipment</div><div class="v">${escapeHtml(p.equipment)}</div></div>` : ""}
           <div class="spp-fact wide">
             <div class="k">Target muscles</div>
@@ -20545,7 +20613,7 @@ function renderPlanPreview() {
               bench angle matters when you are standing at the bench, not when
               you are reading the list. Bodyweight says nothing, because
               "nothing needed" is not worth a line on every row. */ ""}
-        ${!isDone && kitNamesFor(ex.name).length ? `<div class="ex-kit"><span>${escapeHtml(kitNamesFor(ex.name).join(" · "))}</span></div>` : ""}
+        ${!isDone && kitNamesFor(ex.name).length ? `<span class="ex-kit" data-kit-for="${escapeHtml(ex.name)}" data-kit-eyebrow="${escapeHtml(ex.name)}" role="button" tabindex="0">${escapeHtml(kitNamesFor(ex.name).join(" · "))}</span>` : ""}
         ${ramp ? `<div class="ex-ramp">${icon("flame", 11)}<span>Ramp ${escapeHtml(rampLoadsLine(ramp))}</span></div>` : ""}
         ${ex.note ? `<div class="ex-note">${escapeHtml(humanizeNoteDates(ex.note))}</div>` : ""}
       </button>
@@ -21202,6 +21270,131 @@ function motionLitFor(exerciseName) {
   }
   return "";
 }
+/* Equipment portraits: the same drawing code as the animations, but of the
+   kit alone, so "cable machine" can be shown rather than only named. One
+   canvas per [data-kit]; the id is a key from knowledge/equipment.mjs. */
+async function mountKitArt(root) {
+  const scope = root || document;
+  const targets = [...scope.querySelectorAll("[data-kit]:not([data-kit-done])")];
+  if (!targets.length) return;
+  const mod = await ensureMotionModule();
+  if (!mod || !mod.mountKit) return;
+  for (const el of targets) {
+    if (!el.isConnected || el.hasAttribute("data-kit-done")) continue;
+    el.setAttribute("data-kit-done", "1");
+    const canvas = document.createElement("canvas");
+    el.replaceChildren(canvas);
+    /* Portraits sit on the app's own surfaces, so unlike the session figure
+       they follow the app's theme. */
+    const ok = mod.mountKit(canvas, el.dataset.kit, { theme: el.dataset.theme || currentTheme() });
+    if (!ok) el.classList.add("kit-none");
+  }
+}
+
+/* ---------- What you need ----------
+   Tapping any piece of kit shows what it looks like. The picture is drawn by
+   the rig, not photographed, so it matches the figure using it two inches
+   above. Opened from a plan row (one exercise, with its setup notes), from
+   the plan card (the whole day), or from the peek during a session. */
+function kitCardHTML(item, { showUses = false } = {}) {
+  return `<div class="kit-item">
+    <div class="kit-pic" data-kit="${escapeHtml(item.id)}"></div>
+    <div class="kit-item-text">
+      <div class="kit-item-name">${escapeHtml(item.label)}</div>
+      ${showUses && item.uses && item.uses.length ? `<div class="kit-item-sub">${escapeHtml(item.uses.join(", "))}</div>` : ""}
+    </div>
+  </div>`;
+}
+function openKitPop(names, { title = "What you need", eyebrow = "" } = {}) {
+  const list = Array.isArray(names) ? names : [names];
+  const items = kitForDay(list);
+  if (!items.length) return;
+  /* Naming which exercises want a thing only means something when there are
+     several. Opened from one exercise, every line would repeat its name. */
+  const many = list.length > 1;
+  /* Setup is about the exercise, not about any one object ("bench on incline"
+     is not a fact about dumbbells), so it goes once, under the list. */
+  const setup = !many && EQUIPMENT ? (EQUIPMENT.kitOf(list[0]) || {}).setup || [] : [];
+  $("popCard").innerHTML = `
+    <div class="pop-body">
+      <div class="ds-top">
+        <div class="pop-who" style="color:var(--muted)">${escapeHtml((eyebrow || title).toUpperCase())}</div>
+        <button type="button" class="ds-x" id="kitX" aria-label="Close">&times;</button>
+      </div>
+      <div class="kit-list">${items.map((it) => kitCardHTML(it, { showUses: many })).join("")}</div>
+      ${setup.length ? `<p class="kit-setup">${escapeHtml(setup.join(" · "))}</p>` : ""}
+      <button type="button" class="btn-primary" id="kitOk">Got it</button>
+    </div>`;
+  $("popScrim").classList.remove("hidden");
+  mountKitArt($("popCard"));
+  const close = () => $("popScrim").classList.add("hidden");
+  $("kitX").onclick = close;
+  $("kitOk").onclick = close;
+  $("popScrim").onclick = (e) => { if (e.target === $("popScrim")) close(); };
+}
+/* Anywhere: the element only has to carry data-kit-for, a comma separated
+   list of exercise names. */
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-kit-for]");
+  if (!el) return;
+  e.preventDefault();
+  e.stopPropagation();
+  openKitPop(el.dataset.kitFor.split("|").filter(Boolean), { eyebrow: el.dataset.kitEyebrow || "What you need" });
+});
+
+/* The peek: when a session moves to the next exercise, what that exercise
+   needs slides in for three seconds and then leaves on its own. It is the
+   answer to "wait, which machine is this one" without anyone having to ask,
+   and it is the kind of thing that would be infuriating if you could not turn
+   it off, so it is a switch in Setup and a tap dismisses it early. */
+const KIT_PEEK_OFF_KEY = "ft-kit-peek-off";
+function kitPeekMuted() {
+  try { return localStorage.getItem(KIT_PEEK_OFF_KEY) === "1"; } catch { return false; }
+}
+function setKitPeekMuted(off) {
+  try { off ? localStorage.setItem(KIT_PEEK_OFF_KEY, "1") : localStorage.removeItem(KIT_PEEK_OFF_KEY); }
+  catch { /* private mode: it just shows */ }
+}
+let KIT_PEEK_TIMER = null;
+let KIT_PEEK_LAST = null;      // which exercise we last peeked at, so it shows once
+function hideKitPeek() {
+  clearTimeout(KIT_PEEK_TIMER); KIT_PEEK_TIMER = null;
+  const el = $("kitPeek");
+  if (!el) return;
+  el.classList.remove("in");
+  setTimeout(() => { if (el && !el.classList.contains("in")) el.remove(); }, 260);
+}
+function showKitPeek(name, host) {
+  if (kitPeekMuted() || !name || !host) return;
+  const items = kitForDay([name]);
+  if (!items.length) return;                       // bodyweight: nothing to fetch
+  hideKitPeek();
+  const el = document.createElement("div");
+  el.className = "kit-peek";
+  el.id = "kitPeek";
+  el.innerHTML = `
+    <div class="kit-peek-k">What you need</div>
+    <div class="kit-peek-row">
+      ${items.slice(0, 3).map((it) => `<div class="kit-peek-one">
+        <div class="kit-peek-pic" data-kit="${escapeHtml(it.id)}"></div>
+        <span>${escapeHtml(it.label)}</span>
+      </div>`).join("")}
+    </div>`;
+  el.dataset.kitFor = name;
+  host.appendChild(el);
+  mountKitArt(el);
+  requestAnimationFrame(() => el.classList.add("in"));
+  KIT_PEEK_TIMER = setTimeout(hideKitPeek, 3000);
+}
+/* Called by the session render. It fires once per exercise rather than on
+   every repaint, or logging a set would bring it back every time. */
+function maybeKitPeek(name) {
+  if (!name || name === KIT_PEEK_LAST) return;
+  KIT_PEEK_LAST = name;
+  const host = $("sessStage");
+  if (host) setTimeout(() => showKitPeek(name, host), 420);
+}
+
 async function mountMotionFigures(root) {
   const scope = root || document;
   const targets = [...scope.querySelectorAll("[data-fig]:not([data-fig-done])")];
@@ -23587,6 +23780,14 @@ function renderSetupTab() {
       setQuipsMuted(!e.target.checked);
       $("quipsWrap").classList.toggle("checked", e.target.checked);
       if (!e.target.checked) hideQuip();
+    };
+    // Same deal: a device preference, so localStorage rather than the profile.
+    $("kitPeekToggle").checked = !kitPeekMuted();
+    $("kitPeekWrap").classList.toggle("checked", !kitPeekMuted());
+    $("kitPeekToggle").onchange = (e) => {
+      setKitPeekMuted(!e.target.checked);
+      $("kitPeekWrap").classList.toggle("checked", e.target.checked);
+      if (!e.target.checked) hideKitPeek();
     };
     $("skipStretchToggle").checked = MY_PROFILE.skip_stretching === true;
     $("skipStretchWrap").classList.toggle("checked", MY_PROFILE.skip_stretching === true);

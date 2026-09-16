@@ -1,0 +1,29 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Equipment portraits</title>
+<!-- Every piece of equipment as a picture of itself, for eyes and for the
+     headless shooter. Not linked from the app. ?theme=light for the pale one. -->
+<style>
+  html { background: #0f1115; color: #cfd4dc; font: 12px/1.4 -apple-system, system-ui, sans-serif; }
+  body { margin: 0; padding: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  .cell { background: #0b0d10; border-radius: 10px; padding: 6px; }
+  .cell.light { background: #f7f8fa; }
+  .cell canvas { display: block; width: 100%; height: 130px; }
+  .cell .n { text-align: center; font-size: 11px; color: #8b93a1; padding-top: 4px; }
+  .cell.light .n { color: #55606f; }
+</style>
+<div class="grid" id="g"></div>
+<script type="module">
+  import { mountKit, KIT_ART_IDS } from "./knowledge/motion/index.mjs";
+  const q = new URLSearchParams(location.search);
+  const theme = q.get("theme") === "light" ? "light" : "dark";
+  const g = document.getElementById("g");
+  for (const id of KIT_ART_IDS) {
+    const cell = document.createElement("div");
+    cell.className = "cell" + (theme === "light" ? " light" : "");
+    cell.innerHTML = `<canvas></canvas><div class="n">${id}</div>`;
+    g.appendChild(cell);
+    mountKit(cell.querySelector("canvas"), id, { theme });
+  }
+</script>
