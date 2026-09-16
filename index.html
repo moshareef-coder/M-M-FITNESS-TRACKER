@@ -175,7 +175,7 @@
     position: fixed; inset: 0; z-index: 90;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 22px; background: var(--bg);
-    transition: opacity .42s ease, transform .42s cubic-bezier(.4,0,.2,1);
+    transition: opacity .62s ease, transform .62s cubic-bezier(.4,0,.2,1);
   }
   .boot-mark { position: relative; width: min(38vw, 150px); aspect-ratio: 1; }
   .boot-mark img {
@@ -183,17 +183,17 @@
     object-fit: contain;
   }
   /* Each arc swings in from its own side around the centre of the mark. */
-  .boot-arc-l { animation: bootArcL .78s cubic-bezier(.34,1.3,.5,1) both; }
-  .boot-arc-r { animation: bootArcR .78s cubic-bezier(.34,1.3,.5,1) both; }
-  .boot-bar   { animation: bootBar .5s ease .46s both; }
+  .boot-arc-l { animation: bootArcL 1.2s cubic-bezier(.34,1.24,.5,1) both; }
+  .boot-arc-r { animation: bootArcR 1.2s cubic-bezier(.34,1.24,.5,1) both; }
+  .boot-bar   { animation: bootBar .74s ease .72s both; }
   .boot-word {
     font-family: var(--font-display); font-weight: 800; font-size: 20px;
     letter-spacing: .22em; margin: 0; color: var(--text);
-    animation: bootWord .5s ease .58s both;
+    animation: bootWord .74s ease .94s both;
   }
   /* The hold. Added once the entrance has finished, so a slow network breathes
      rather than freezing on the last frame of an animation. */
-  #boot.waiting .boot-mark { animation: bootBreath 2.4s ease-in-out infinite; }
+  #boot.waiting .boot-mark { animation: bootBreath 3.4s ease-in-out infinite; }
   #boot.done { opacity: 0; transform: scale(1.35); pointer-events: none; }
 
   @keyframes bootArcL {
@@ -6324,11 +6324,13 @@ function dismissBoot() {
   const boot = document.getElementById("boot");
   if (!boot) return;
   /* Let the arcs finish closing even if the session resolved instantly, so the
-     mark is never caught half assembled. 780ms is the entrance. */
-  const left = Math.max(0, 820 - (Date.now() - BOOT_STARTED));
+     mark is never caught half assembled. The entrance runs to 1.68s: the word
+     starts at .94 and takes .74. A beat past that lets the finished mark be
+     looked at, which is the point of slowing it down. */
+  const left = Math.max(0, 1900 - (Date.now() - BOOT_STARTED));
   setTimeout(() => {
     boot.classList.add("done");
-    setTimeout(() => boot.remove(), 460);
+    setTimeout(() => boot.remove(), 660);
   }, left);
 }
 const BOOT_STARTED = Date.now();
@@ -6336,7 +6338,7 @@ const BOOT_STARTED = Date.now();
    sitting on a finished animation's last frame. */
 setTimeout(() => {
   if (!BOOT_DONE) document.getElementById("boot")?.classList.add("waiting");
-}, 800);
+}, 1700);
 
 function initOnboard() {
   // iOS private browsing can throw here, and this runs before first paint.
@@ -6363,15 +6365,27 @@ function initOnboard() {
   if (isNativeApp()) {
     console.log("native plugins:", Object.keys(window.Capacitor.Plugins || {}).sort().join(", "));
   }
+  /* RETURNED, not just called. handleSignedIn is async and the profile, the
+     partnership and the week's workouts all load inside it, so dropping its
+     promise let the launch screen come down the moment the session resolved,
+     a second or so before any of that landed. What you saw underneath was the
+     dashboard's own frame with every card empty, filling in one at a time.
+     Awaiting it means the launch screen is still there while that happens and
+     what it uncovers is a finished screen. */
   sb.auth.getSession().then(({ data }) => {
-    if (data.session) handleSignedIn(data.session);
-    else renderSignInScreen();
+    if (data.session) return handleSignedIn(data.session);
+    renderSignInScreen();
   }).catch((err) => {
     /* supabase-js resolves rather than throwing on a failed query, but a dead
        network rejects here, and a launch screen left up over that is a hang. */
     console.error("could not read the session", err);
     renderSignInScreen();
   }).finally(dismissBoot);
+  /* And a ceiling on that, because now something real is being waited for. A
+     query that never comes back would otherwise hold the launch screen up for
+     ever, which is the worse failure: a half painted dashboard can at least be
+     used. Long enough that it is never hit on a normal launch. */
+  setTimeout(dismissBoot, 8000);
 }
 
 /* Capacitor injects this global before the page loads, so no bundler or script
@@ -6793,8 +6807,7 @@ async function checkPartnershipThenEnter() {
     const { data: roster } = await sb.from("group_members")
       .select("email, role").eq("group_id", active.group_id).is("left_at", null);
     MY_COACH = (roster || []).find((r) => r.role === "coach" || r.role === "owner")?.email || null;
-    showApp();
-    return;
+    return showApp();
   }
 
   const { data: rows } = await sb.from("partnerships")
@@ -6808,8 +6821,7 @@ async function checkPartnershipThenEnter() {
     PARTNER_EMAIL = accepted.inviter_email.toLowerCase() === MY_EMAIL
       ? accepted.invitee_email.toLowerCase()
       : accepted.inviter_email.toLowerCase();
-    showApp();
-    return;
+    return showApp();
   }
 
   /* The consent half of pairing. After 20260915_consent_and_leak_close.sql a
@@ -6826,7 +6838,7 @@ async function checkPartnershipThenEnter() {
   const incoming = all.filter((r) => r.status === "pending" && mine(r.invitee_email));
   if (incoming.length) { renderPairRequestScreen(incoming); return; }
 
-  if (soloHeld()) { showApp(); return; }   // training alone; the seat stays open
+  if (soloHeld()) return showApp();        // training alone; the seat stays open
 
   /* My own request is my problem, not a wall: it only shows to someone who has
      not already settled on training alone. An answer I am still owed, above,
@@ -7156,8 +7168,7 @@ function renderPairingScreen() {
 async function chooseSetup(key) {
   if (key === "solo") {
     setSolo();
-    showApp();
-    return;
+    return showApp();
   }
   if (key === "pair") { renderCodeScreen(); return; }
 
@@ -9513,7 +9524,11 @@ function showApp() {
   renderFab();
   registerBackGuard();
 
-  loadAll().then(reconcileNativeSurfaces);
+  /* Returned so the launch screen can wait on it. This is the call that fills
+     every card on the dashboard, and without the promise coming back out the
+     boot path had nothing to wait for and uncovered an empty frame. Callers
+     that do not care can still ignore it. */
+  return loadAll().then(reconcileNativeSurfaces);
 }
 
 /* ---------- Back ----------
