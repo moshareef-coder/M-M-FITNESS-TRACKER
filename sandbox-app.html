@@ -4046,6 +4046,22 @@
   .ms-key .ms-dot { margin-top: 0; }
   .ms-list { margin-top: 4px; }
   .ms-list:empty { display: none; }
+  .str-more {
+    width: 100%; margin-top: 10px; padding: 10px; border: none; background: none;
+    color: var(--muted); font-size: 13.5px; font-weight: 600; cursor: pointer; text-align: center;
+  }
+  .str-more:active { color: var(--text); }
+  /* The browse list. A star sits where wk-go's chevron does on the row it is
+     borrowed from, because both mean "act on this row" and the star needs to
+     be tappable on its own, not just a label. */
+  .lft-row { position: relative; }
+  .lft-star {
+    flex-shrink: 0; width: 34px; height: 34px; border: none; background: none;
+    color: var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .lft-star.on { color: var(--accent); }
+  .lft-star.on svg { fill: currentColor; }
+  .lft-detail-chart { height: 200px; margin: 4px 0 14px; }
   .ms-row { display: flex; gap: 11px; align-items: flex-start; padding: 11px 0;
             border-bottom: 1px solid var(--border); }
   .ms-row:last-child { border-bottom: none; }
@@ -5445,6 +5461,16 @@
         <div class="str-single hidden" id="strengthSingle"></div>
       </div>
       <div class="str-list" id="strengthList"></div>
+      <button type="button" class="str-more" id="strengthAllBtn">See all lifts</button>
+    </div>
+
+    <!-- Every lift, tap one for its own page: bigger chart, the same level
+         bar, and a star to feature it. Up to five stars are what the
+         Strength card above shows instead of guessing by set count. One
+         sheet, two screens, back button between them, same shape as the
+         All workouts sheet already uses. -->
+    <div class="sheet-scrim hidden" id="liftsScrim">
+      <div class="partner-sheet" id="liftsSheet"></div>
     </div>
 
     <div class="card metric-card" id="cardVolume">
@@ -6101,6 +6127,17 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
+/* Where the public site lives: the privacy policy, the support page, and the
+   link that goes out when somebody shares a session.
+
+   One constant because it was three, and because it is going to change. The
+   app is called Unio and this says m-m-fitness-tracker, which people see when a
+   session is shared and which an App Store reviewer sees on the privacy link
+   from the sign in screen. Both of those uses need a URL that actually
+   resolves, so this stays until there is a real domain, and then it is one line
+   rather than a hunt. */
+const PUBLIC_SITE = "https://m-m-fitness-tracker.vercel.app";
+
 const SUPABASE_URL = "https://stcpiovpjismhltklfdw.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_890hsPHDiiz4-fQi7Jqd9g_a_aoHyz2";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -6973,6 +7010,49 @@ let MY_ROLE = null;
 let MY_COACH = null;
 /* The active goal: what they asked for and the date they agreed to. */
 let MY_GOAL = null;
+
+/* Whether the generator, the week planner, the progress analysis and the accent
+   colours are unlocked.
+   ASKED OF THE SERVER, never decided here. is_premium() also answers for the
+   partner, because what was sold is a pair at five a month paid by one of them,
+   so a client-side check would have to know about somebody else's purchase and
+   would be a lie the moment anybody opened a console. A paywall the client can
+   grant itself is not a paywall.
+   Defaults to false and stays false if the check fails, which is the safe
+   direction: the cost of being wrong is an unnecessary paywall somebody can
+   dismiss, not a free subscription. */
+/* OFF until there is something to buy.
+
+   The plumbing can land long before the App Store product exists, and between
+   those two moments a live paywall is not a paywall, it is the generator
+   switched off for everybody with no way to switch it back on. Including us,
+   including Mell, including an App Store reviewer, who would find the main
+   feature of the app behind a button that cannot complete a purchase and would
+   reject it for exactly that.
+
+   Turned on in the same change that ships a working product id and a price, and
+   not before. */
+const PAYWALL_ON = false;
+
+let IS_PREMIUM = false;
+
+async function refreshPremium() {
+  /* Not asked at all while the paywall is off, so a database that has not run
+     20260916_subscriptions.sql yet does not log an error on every load for a
+     question nothing is currently asking. */
+  if (!PAYWALL_ON) { IS_PREMIUM = true; return true; }
+  if (!MY_EMAIL) { IS_PREMIUM = false; return false; }
+  const { data, error } = await sb.rpc("is_premium");
+  if (error) {
+    /* Not silently false. A failed check and a genuine no look identical to
+       everything downstream, and this codebase has been bitten by exactly that
+       three times today. */
+    console.error("could not check the subscription", error);
+    return IS_PREMIUM;
+  }
+  IS_PREMIUM = data === true;
+  return IS_PREMIUM;
+}
 let ALL_GOALS = [];
 
 const isCoachedClient = () => MY_GROUP?.kind === "coach" && MY_ROLE === "client";
@@ -7364,10 +7444,21 @@ function renderPairRefusedScreen(refused) {
    group and its member row just sat orphaned forever. Pulled until a small
    group is actually recognised somewhere, rather than shipping a choice that
    quietly does nothing. */
+/* "I coach people" is pulled for the same reason, and it is the same mistake
+   one size larger. Choosing it created a real groups row and then showed a
+   screen advertising a coach dashboard on the web, which is not being built
+   until after launch. Its Copy the link button copied location.origin + /coach/,
+   which inside the app is https://localhost/coach/ and goes nowhere.
+   So it offered a feature that does not exist, on a domain belonging to another
+   product, three taps into onboarding, which is both a promise we cannot keep
+   and the thing App Review call an incomplete app.
+   Everything behind it is left alone. Coached accounts still work, clients
+   still cannot generate their own workouts, loadMyGroups still finds a group.
+   The only thing gone is the ability to start a new one before there is
+   anywhere to manage it from. */
 const SETUPS = [
   { key: "solo",  title: "Just me",            sub: "Train alone. You can add someone whenever you like.", seats: 1 },
   { key: "pair",  title: "Me and one other",   sub: "A partner you keep each other honest with.",          seats: 2 },
-  { key: "coach", title: "I coach people",     sub: "Up to 20, including you. Managed from the web.",      seats: 20 },
 ];
 
 function renderPairingScreen() {
@@ -9866,7 +9957,7 @@ async function reconcileNativeSurfaces() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim"]
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "liftsScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
   stopGenTicker();
   $("genScrim")?.classList.add("hidden");
@@ -10240,8 +10331,9 @@ async function loadAll() {
        sent logs for. Self only under RLS, so this is always just my rows. */
     sb.from("exercise_swaps").select("*").eq("email", MY_EMAIL)
       .gte("created_at", new Date(Date.now() - 90 * 86400000).toISOString()),
-    /* These five need nothing from the batch above, so they ride along with
-       it rather than queueing behind it. */
+    /* These need nothing from the batch above, so they ride along with it
+       rather than queueing behind it. */
+    refreshPremium(),
     loadLiveSessions(),
     loadClipInbox(),
     loadBodyPhotos(),
@@ -11621,6 +11713,11 @@ function renderAccentSwatches() {
       style="--sw:${a.hex}" aria-label="${escapeHtml(a.label)}"></button>`).join("");
   box.querySelectorAll("[data-accent]").forEach((b) => {
     b.onclick = async () => {
+      /* Gated on the tap, not by hiding the swatches. Somebody should be able
+         to see what they would get, because a paywall over something invisible
+         persuades nobody, and a row of colours you cannot pick is a clearer
+         offer than a row that is not there. */
+      if (!await requirePremium()) return;
       const key = b.dataset.accent === current ? null : b.dataset.accent;
       const { error } = await sb.from("profiles")
         .upsert({ email: MY_EMAIL, user_name: ME, accent_color: key, updated_at: new Date().toISOString() });
@@ -11938,7 +12035,7 @@ function closeRecap() { $("recapScrim").classList.add("hidden"); }
    because nobody taps an unfurled card. A bare image brings nobody back. So we
    send both: the picture people will actually look at, and the URL alongside it
    for anywhere that accepts one. */
-const SHARE_URL = "https://m-m-fitness-tracker.vercel.app";
+const SHARE_URL = PUBLIC_SITE;
 
 /* A canvas font string is not a CSS rule: an unavailable family falls back to
    the browser's default sans without an error, a warning or a visible clue.
@@ -13138,6 +13235,170 @@ async function reportClip(clip) {
   renderClipPill();
   toast("Reported. We will look at it within a day.");
   return true;
+}
+
+/* ---- Premium ----
+
+   One entitlement over four surfaces: the generator, the week planner, the
+   progress analysis and the accent colours. One flag rather than four, because
+   every gate is somewhere to introduce a bug and somewhere a reviewer can
+   catch us being inconsistent.
+
+   What is NOT behind it, on purpose: everything shared with a partner, manual
+   logging, and the whole of somebody's own history, weigh-ins and photos. The
+   line is that we charge for what the app computes and never for what the
+   person recorded. Locking somebody out of their own logs is the single most
+   complained about pattern in this category, and paywalling the partner loop
+   would damage the payer, since their clip would stop reaching a partner who
+   had not bought anything. */
+
+/* The pair price, paid by one of them. Raised from the five agreed on
+   2026-09-01 because five for two people is $2.50 a head against Fitbod at
+   $12.99 for one, and the gap between five and eight costs almost no
+   conversion while the gap between eight and ten does. It also leaves room
+   to go up later: 7.99 to 9.99 reads as an increase, 5 to 9.99 reads as a
+   doubling.
+   Displayed only. What is actually charged is the price on the App Store
+   product, and if the two ever disagree the store wins and we have lied on
+   a paywall, so this string and that product are changed together. */
+const PREMIUM_PRICE = "$7.99";
+
+const PREMIUM_UNLOCKS = [
+  ["Workouts made for you", "A plan every day, built around your goal and what you lifted last time."],
+  ["Plan your week", "Decide the shape of the week ahead instead of deciding every morning."],
+  ["Body impact", "Which muscles you have actually worked, and which ones you keep missing."],
+  ["The full picture", "Trends, projections and your records ranked."],
+  ["Make it yours", "Accent colours."],
+];
+
+/* The gate. Returns true when the thing may go ahead, and otherwise puts the
+   paywall up and returns false, so a call site reads as one line. */
+async function requirePremium() {
+  if (!PAYWALL_ON) return true;
+  if (IS_PREMIUM) return true;
+  /* Re-checked before refusing. The flag is refreshed on load and a purchase
+     made minutes ago on another device would otherwise be met with a paywall
+     for something already paid for, which is the worst thing a paywall can do. */
+  if (await refreshPremium()) return true;
+  await showPaywall();
+  return IS_PREMIUM;
+}
+
+/* Everything Apple require on a paywall, and they reject for the absence of any
+   one of them: what it costs, how long it lasts, that it renews itself, how to
+   stop it, a way to restore a purchase already made, and links to the terms and
+   the privacy policy. */
+function showPaywall() {
+  return new Promise((resolve) => {
+    const scrim = document.createElement("div");
+    scrim.className = "pop-scrim";
+    scrim.innerHTML = `
+      <div class="pop">
+        <div class="pop-body">
+          <div class="ds-top">
+            <div class="pop-who" style="color:var(--muted)">UNIO PREMIUM</div>
+            <button type="button" class="ds-x" data-pay="0" aria-label="Close">&times;</button>
+          </div>
+          <ul class="push-promise">
+            ${PREMIUM_UNLOCKS.map(([t, d]) => `
+              <li><b>${escapeHtml(t)}</b><span>${escapeHtml(d)}</span></li>`).join("")}
+          </ul>
+          <!-- One subscription covers both of you. Said here rather than in the
+               small print, because it is the difference between five a month
+               and two people each paying five a month. -->
+          <p class="muted-note" style="margin-top:14px;">
+            <b>${escapeHtml(PREMIUM_PRICE)} a month, and it covers both of you.</b>
+            Only one of you needs to subscribe.
+          </p>
+          <button type="button" class="btn-primary" data-pay="1" style="margin-top:14px;">Subscribe for ${escapeHtml(PREMIUM_PRICE)} a month</button>
+          <button type="button" class="btn-ghost" data-pay="restore">Restore purchase</button>
+          <button type="button" class="btn-ghost" data-pay="0">Not now</button>
+          <p class="muted-note" style="margin-top:12px;font-size:12px;">
+            Renews every month until you cancel. Cancel any time in your iPhone's
+            Settings, under your name then Subscriptions.
+            <a href="#" data-policy="terms">Terms of Use</a> and
+            <a href="#" data-policy="privacy.html">Privacy Policy</a>.
+          </p>
+        </div>
+      </div>`;
+    document.body.appendChild(scrim);
+    const close = (v) => { scrim.remove(); resolve(v); };
+    scrim.querySelectorAll("[data-pay]").forEach((b) => {
+      b.onclick = async () => {
+        const what = b.dataset.pay;
+        if (what === "0") return close(false);
+        if (what === "restore") { close(false); await restorePurchase(); return; }
+        close(false);
+        await startPurchase();
+      };
+    });
+    scrim.onclick = (e) => { if (e.target === scrim) close(false); };
+  });
+}
+
+/* Buying it, and putting it back.
+
+   RevenueCat rather than StoreKit directly: it validates the receipt off the
+   device, which is the part you cannot do safely in a web view, and it is what
+   lets a purchase made on the App Store, on Google Play or on the web all end
+   up as the same entitlement later.
+
+   The plugin is not installed until there is an API key to install it with, so
+   every path here says what is missing rather than failing quietly. A purchase
+   button that does nothing is the worst possible bug on this particular screen. */
+function purchasesPlugin() {
+  return (isNativeApp() && window.Capacitor.Plugins.Purchases) || null;
+}
+
+async function startPurchase() {
+  const rc = purchasesPlugin();
+  if (!rc) { toast("Subscriptions are not available in this build yet"); return false; }
+  try {
+    const offerings = await rc.getOfferings();
+    const pkg = offerings?.current?.availablePackages?.[0];
+    if (!pkg) { toast("Nothing to buy right now"); return false; }
+    await rc.purchasePackage({ aPackage: pkg });
+    /* The webhook is what actually grants this, so the app asks the server
+       rather than believing the device. A client that decides it is premium
+       because a purchase sheet closed can be told the same thing by anybody
+       with a console open. */
+    await refreshPremium();
+    if (IS_PREMIUM) { toast("You are in. Thank you."); rerenderAfterPremium(); }
+    else toast("Payment went through. It can take a moment to appear.");
+    return IS_PREMIUM;
+  } catch (err) {
+    /* A cancelled purchase is not an error and must not be reported as one. */
+    if (err && (err.code === "1" || /cancel/i.test(err.message || ""))) return false;
+    console.error("purchase failed", err);
+    toast("Could not complete that purchase");
+    return false;
+  }
+}
+
+/* Apple require this to exist and to work, and they test it. Somebody who
+   reinstalls, or signs in on a second device, must be able to get back what
+   they already paid for without paying again. */
+async function restorePurchase() {
+  const rc = purchasesPlugin();
+  if (!rc) { toast("Subscriptions are not available in this build yet"); return; }
+  try {
+    await rc.restorePurchases();
+    await refreshPremium();
+    toast(IS_PREMIUM ? "Restored" : "No purchase found for this Apple Account");
+    if (IS_PREMIUM) rerenderAfterPremium();
+  } catch (err) {
+    console.error("restore failed", err);
+    toast("Could not restore right now");
+  }
+}
+
+/* Whatever is on screen was drawn for somebody who had not paid. */
+function rerenderAfterPremium() {
+  try {
+    renderHome();
+    if (typeof renderSetupTab === "function") renderSetupTab();
+    if (typeof renderProgressTab === "function") renderProgressTab();
+  } catch (err) { console.warn("could not repaint after premium", err); }
 }
 
 /* Reporting a person rather than one piece of content.
@@ -14657,7 +14918,13 @@ function chartWash(ctx, hex) {
 /* Weight-based logs only (a duration-based class entry has no meaningful
    "weight lifted"), grouped by exercise, ranked by total sets logged so the
    lift you actually do most leads. */
-function topLiftsFor(name, limit = 6) {
+/* Every weighted exercise ever logged, one row per lift, unranked. "best" is
+   the estimated single (e1rm), not the heaviest plate ever loaded: those two
+   used to disagree, quietly, because this fed the card's headline off the raw
+   weight while the level bar underneath it was already reading e1RM. Same
+   lift, two different "best" numbers on the same card is not a detail, it is
+   the kind of thing that makes someone stop trusting either number. */
+function allLiftsFor(name) {
   const logs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && l.weight != null && !l.duration_min);
   const by = new Map();
   for (const l of logs) {
@@ -14665,31 +14932,64 @@ function topLiftsFor(name, limit = 6) {
     if (!key) continue;
     const row = by.get(key) || { name: l.exercise_name.trim(), sets: 0, best: 0, lastDate: "" };
     row.sets += l.sets || 1;
-    row.best = Math.max(row.best, l.weight);
+    row.best = Math.max(row.best, Math.round(e1rm(l.weight, l.reps)));
     if (l.entry_date > row.lastDate) row.lastDate = l.entry_date;
     by.set(key, row);
   }
-  return [...by.values()].sort((a, b) => b.sets - a.sets).slice(0, limit);
+  return [...by.values()];
+}
+
+function topLiftsFor(name, limit = 6) {
+  return allLiftsFor(name).sort((a, b) => b.sets - a.sets).slice(0, limit);
+}
+
+/* Up to five lifts, kept on this device the way theme and solo mode are: a
+   personal display choice, not data. Which means it only ever applies to your
+   OWN card. There is no channel to read what your partner starred on their
+   phone, so their view keeps ranking automatically, same as it always has. */
+const PINNED_LIFTS_KEY = "ft_pinned_lifts";
+const MAX_PINNED_LIFTS = 5;
+
+function getPinnedLifts() {
+  try { return JSON.parse(localStorage.getItem(PINNED_LIFTS_KEY) || "[]"); } catch { return []; }
+}
+function setPinnedLifts(list) {
+  try { localStorage.setItem(PINNED_LIFTS_KEY, JSON.stringify(list.slice(0, MAX_PINNED_LIFTS))); } catch { /* private browsing */ }
+}
+function isPinnedLift(name) {
+  const key = (name || "").toLowerCase();
+  return getPinnedLifts().some((n) => n.toLowerCase() === key);
+}
+/* Returns what happened, because the caller has three different toasts to
+   choose between and no other way to tell which one applies. */
+function togglePinnedLift(name) {
+  const list = getPinnedLifts();
+  const i = list.findIndex((n) => n.toLowerCase() === (name || "").toLowerCase());
+  if (i >= 0) { list.splice(i, 1); setPinnedLifts(list); return "removed"; }
+  if (list.length >= MAX_PINNED_LIFTS) return "full";
+  list.push(name); setPinnedLifts(list); return "added";
+}
+
+/* What the Strength card actually shows. Pins in the order they were pinned,
+   if there are any and this is your own card; otherwise the automatic
+   ranking, exactly as before. One function so the chart and the lead
+   sentence read the same list and can never drift into showing two lifts
+   for the price of one card. */
+function strengthCardLifts(name, viewingPartner) {
+  if (!viewingPartner) {
+    const pins = getPinnedLifts();
+    if (pins.length) {
+      const all = allLiftsFor(name);
+      const picked = pins.map((n) => all.find((l) => l.name.toLowerCase() === n.toLowerCase())).filter(Boolean);
+      if (picked.length) return picked;
+    }
+  }
+  return topLiftsFor(name);
 }
 
 /* Every logged weight for one exercise, oldest first, one point per DAY (the
    heaviest set that day) rather than one per set, so three warm-up sets and a
    top set on the same day do not look like four separate sessions. */
-function liftHistory(name, exerciseName, weeks = 12) {
-  const key = exerciseName.trim().toLowerCase();
-  const from = new Date(todayStr() + "T00:00:00");
-  from.setDate(from.getDate() - weeks * 7);
-  const fromStr = isoDate(from);
-  const byDate = new Map();
-  for (const l of ALL_EXERCISE_LOGS) {
-    if (l.user_name !== name || l.weight == null || l.duration_min) continue;
-    if ((l.exercise_name || "").trim().toLowerCase() !== key) continue;
-    if (l.entry_date < fromStr) continue;
-    byDate.set(l.entry_date, Math.max(byDate.get(l.entry_date) || 0, l.weight));
-  }
-  return [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([entry_date, weight]) => ({ entry_date, weight }));
-}
-
 /* The lift currently charted. Defaults to whoever is most trained, and resets
    whenever the person being viewed changes so Mell's chart does not open on a
    lift pulled from Mo's history. */
@@ -14703,8 +15003,9 @@ let STRENGTH_LIFT_FOR = null;
 function renderStrengthStats() {
   const el = $("strengthLead");
   if (!el) return;
-  const name = PROGRESS_VIEW === "partner" ? partnerName() : ME;
-  const lifts = topLiftsFor(name);
+  const viewingPartner = PROGRESS_VIEW === "partner";
+  const name = viewingPartner ? partnerName() : ME;
+  const lifts = strengthCardLifts(name, viewingPartner);
   /* The empty state under the chart already says there is nothing logged. */
   if (!lifts.length) { el.textContent = ""; return; }
   /* renderStrengthChart picks the lift, but it defers when Chart.js is still
@@ -14719,15 +15020,18 @@ function renderStrengthStats() {
 /* The level, or nothing at all. A lift we cannot level honestly (a dumbbell,
    a machine, somebody with no weigh-in) hides the whole block rather than
    showing a bar with nothing in it, which would read as "you are a beginner"
-   when what it means is "we do not know". */
-function renderStrengthLevel(name, exerciseName) {
-  const wrap = $("strengthLevel");
+   when what it means is "we do not know". Element ids are parameters, not
+   hardcoded, so the lift detail sheet can draw the same bar as the card
+   without a second copy of this to drift out of step with the first. */
+function renderStrengthLevel(name, exerciseName, ids = {}) {
+  const wrapId = ids.wrap || "strengthLevel", segsId = ids.segs || "strengthLevelSegs", noteId = ids.note || "strengthLevelNote";
+  const wrap = $(wrapId);
   if (!wrap) return;
   const lv = strengthLevelFor(name, exerciseName);
   if (!lv) { wrap.classList.add("hidden"); return; }
   wrap.classList.remove("hidden");
 
-  $("strengthLevelSegs").innerHTML = STRENGTH_LEVELS.map((_, i) => {
+  $(segsId).innerHTML = STRENGTH_LEVELS.map((_, i) => {
     const pct = i < lv.index ? 100 : i === lv.index ? Math.round(lv.within * 100) : 0;
     return `<i><b style="width:${pct}%"></b></i>`;
   }).join("");
@@ -14737,7 +15041,7 @@ function renderStrengthLevel(name, exerciseName) {
      something about, which is the whole reason this is on the card. The
      bodyweight ratio and the estimated single are both true and both detail,
      and this tab has already learned what happens when detail goes up front. */
-  $("strengthLevelNote").innerHTML = lv.next
+  $(noteId).innerHTML = lv.next
     ? `<b>${escapeHtml(lv.level)}.</b> ${lv.toNext} lb to ${escapeHtml(lv.next)}.`
     : `<b>${escapeHtml(lv.level)}.</b> Top of the scale.`;
 }
@@ -14752,7 +15056,7 @@ function renderStrengthChart() {
   const viewingPartner = PROGRESS_VIEW === "partner";
   const name = viewingPartner ? partnerName() : ME;
   const hex = cssVar(viewingPartner ? "--partner" : "--me");
-  const lifts = topLiftsFor(name);
+  const lifts = strengthCardLifts(name, viewingPartner);
 
   const card = $("cardStrength");
   if (!lifts.length) {
@@ -14776,7 +15080,11 @@ function renderStrengthChart() {
     STRENGTH_LIFT_FOR = name;
   }
 
-  const history = liftHistory(name, STRENGTH_LIFT);
+  /* Estimated single, same as the level bar below it, so a set of more reps
+     at the same weight moves this chart. It used to plot the raw heaviest
+     plate instead, which flattened exactly the kind of progress this card
+     exists to show. */
+  const history = liftE1rmHistory(name, STRENGTH_LIFT, 12).map((h) => ({ entry_date: h.entry_date, weight: Math.round(h.est) }));
   const ctx = $("strengthChart").getContext("2d");
   if (strengthChart) strengthChart.destroy();
 
@@ -14819,6 +15127,157 @@ function renderStrengthChart() {
   $("strengthList").querySelectorAll("[data-lift]").forEach((b) => {
     b.onclick = () => { STRENGTH_LIFT = b.dataset.lift; renderStrengthChart(); renderStrengthStats(); };
   });
+
+  const allBtn = $("strengthAllBtn");
+  if (allBtn) {
+    // Partner view has no pins to manage and nothing to browse that is not
+    // already ranked on the card, so the button that would manage them is
+    // simply not there rather than opening a screen that cannot do anything.
+    allBtn.classList.toggle("hidden", viewingPartner || allLiftsFor(name).length === 0);
+    allBtn.onclick = () => openLiftBrowser(name);
+  }
+}
+
+/* ---------- Browse every lift, feature up to five ----------
+   The card can only ever show a handful of lifts before it stops being a
+   card. This is the rest of them: every weighted exercise ever logged, most
+   recently trained first, each one tappable into its own page with the full
+   chart and the same level bar the card uses. The star on that page (and on
+   each row here) is the whole feature: pin up to five, and those five are
+   what the card above shows from then on, in the order they were pinned,
+   instead of guessing off set count. */
+let LIFT_BROWSE_FOR = null;
+
+function openLiftBrowser(name) {
+  LIFT_BROWSE_FOR = name;
+  renderLiftList();
+  $("liftsScrim").classList.remove("hidden");
+  $("liftsScrim").onclick = (e) => { if (e.target === $("liftsScrim")) closeLiftBrowser(); };
+}
+function closeLiftBrowser() { $("liftsScrim").classList.add("hidden"); }
+
+function renderLiftList() {
+  const name = LIFT_BROWSE_FOR;
+  const lifts = allLiftsFor(name).sort((a, b) => b.lastDate.localeCompare(a.lastDate));
+  const pins = getPinnedLifts();
+
+  $("liftsSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="lftClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">All lifts</div>
+      <div class="spacer"></div>
+    </div>
+    <p class="muted-note" style="margin:-6px 0 14px;">
+      ${lifts.length} logged. Star up to ${MAX_PINNED_LIFTS} to feature them on Strength.
+    </p>
+    ${lifts.map((l) => {
+      const on = pins.some((p) => p.toLowerCase() === l.name.toLowerCase());
+      const lv = strengthLevelFor(name, l.name);
+      return `<div class="wk-row lft-row" data-open="${escapeHtml(l.name)}">
+        <span class="wk-ico">${icon("dumbbell", 17)}</span>
+        <span class="wk-txt">
+          <span class="wk-name">${escapeHtml(l.name)}</span>
+          <span class="wk-meta">${lv ? escapeHtml(lv.level) + " · " : ""}best ${l.best} lb · ${escapeHtml(datedLabel(l.lastDate))}</span>
+        </span>
+        <button type="button" class="lft-star${on ? " on" : ""}" data-star="${escapeHtml(l.name)}" aria-label="${on ? "Remove from Strength" : "Feature on Strength"}">${icon("star", 20)}</button>
+      </div>`;
+    }).join("")}`;
+
+  $("lftClose").onclick = closeLiftBrowser;
+  $("liftsSheet").querySelectorAll("[data-open]").forEach((row) => {
+    row.onclick = (e) => { if (e.target.closest("[data-star]")) return; openLiftDetail(row.dataset.open); };
+  });
+  $("liftsSheet").querySelectorAll("[data-star]").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      pinLiftAndToast(btn.dataset.star);
+      renderLiftList();
+    };
+  });
+}
+
+/* One toast, three meanings, so tapping the star never just changes silently.
+   "Full" matters more than the other two: without it, the fifth star does
+   nothing and looks broken rather than telling you why. */
+function pinLiftAndToast(liftName) {
+  const result = togglePinnedLift(liftName);
+  if (result === "full") { toast(`Only ${MAX_PINNED_LIFTS} at a time. Remove one first.`); return; }
+  toast(result === "added" ? `Featuring ${liftName}` : `Removed ${liftName}`);
+  if (LIFT_BROWSE_FOR) { renderStrengthChart(); renderStrengthStats(); }
+}
+
+let liftDetailChart = null;
+
+function openLiftDetail(exerciseName) {
+  const name = LIFT_BROWSE_FOR;
+  const l = allLiftsFor(name).find((x) => x.name === exerciseName);
+  if (!l) return;
+  const on = isPinnedLift(exerciseName);
+
+  $("liftsSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="lftBack" aria-label="Back">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">${escapeHtml(exerciseName)}</div>
+      <button type="button" class="lft-star${on ? " on" : ""}" id="lftStarBtn" aria-label="${on ? "Remove from Strength" : "Feature on Strength"}">${icon("star", 20)}</button>
+    </div>
+    <div class="lvl hidden" id="lftLevel">
+      <div class="lvl-segs" id="lftLevelSegs"></div>
+      <p class="lvl-note" id="lftLevelNote"></p>
+    </div>
+    <div class="chart-wrap lft-detail-chart">
+      <canvas id="lftChart"></canvas>
+      <div class="str-single hidden" id="lftSingle"></div>
+    </div>
+    <p class="muted-note">Best ${l.best} lb estimated · ${l.sets} sets logged · last done ${escapeHtml(datedLabel(l.lastDate))}.</p>
+  `;
+
+  $("lftBack").onclick = renderLiftList;
+  $("lftStarBtn").onclick = () => { pinLiftAndToast(exerciseName); openLiftDetail(exerciseName); };
+
+  renderStrengthLevel(name, exerciseName, { wrap: "lftLevel", segs: "lftLevelSegs", note: "lftLevelNote" });
+
+  const draw = () => {
+    const hist = liftE1rmHistory(name, exerciseName, 52).map((h) => ({ entry_date: h.entry_date, weight: Math.round(h.est) }));
+    const ctx = $("lftChart")?.getContext("2d");
+    if (!ctx) return;
+    if (liftDetailChart) liftDetailChart.destroy();
+    const single = $("lftSingle");
+    // Same rule as the card: a lone point has nothing to draw a line
+    // between, so say the number rather than leave an empty box.
+    if (hist.length < 2) {
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      single.classList.remove("hidden");
+      single.innerHTML = hist.length
+        ? `<b>${hist[0].weight} lbs</b><span>Logged once so far</span>`
+        : `<b>Not yet</b><span>Not logged in the last 52 weeks</span>`;
+      return;
+    }
+    single.classList.add("hidden");
+    const hex = cssVar("--me");
+    liftDetailChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: hist.map((h) => h.entry_date.slice(5)),
+        datasets: [{
+          data: hist.map((h) => h.weight), borderColor: hex, borderWidth: 2.5, tension: 0.35,
+          pointRadius: hist.map((_, i) => (i === hist.length - 1 ? 4 : 0)),
+          pointBackgroundColor: hex, pointBorderColor: cssVar("--panel"), pointBorderWidth: 2,
+          fill: true, backgroundColor: chartWash(ctx, hex),
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { border: { display: false }, grid: { display: false }, ticks: { color: cssVar("--muted"), maxTicksLimit: 6, font: { size: 10 } } },
+          y: { border: { display: false }, grid: { color: cssVar("--border"), drawTicks: false }, ticks: { color: cssVar("--muted"), font: { size: 10 }, padding: 6 } },
+        },
+      },
+    });
+  };
+  if (window.Chart) draw(); else loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(draw).catch(() => {});
 }
 
 /* ---------- Volume card ----------
@@ -15765,6 +16224,10 @@ let REGEN_SEEN = { focus: null, names: [] };
    type across a rebuild that was not asking for different movements. */
 async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = null, keepFocus: wantFocus = null } = {}) {
   if (isCoachedClient()) { toast("Your coach sets your workouts"); return false; }
+  /* The paid one. Every route to a generated plan comes through here, which is
+     the reason to gate the function rather than the buttons: there are several
+     of those and a new one is one more place to forget. */
+  if (!await requirePremium()) return false;
   const keepFocus = sameAgain ? TODAY_WORKOUT?.focus || null : wantFocus || null;
   if (!sameAgain || REGEN_SEEN.focus !== keepFocus) REGEN_SEEN = { focus: keepFocus, names: [] };
   if (sameAgain) {
@@ -24811,7 +25274,7 @@ const ASK_PUSH_KEY = "ft_ask_push";
 
    Absolute, and through the in-app browser, so it opens over the app rather
    than throwing somebody out of it. */
-const POLICY_BASE = "https://m-m-fitness-tracker.vercel.app";
+const POLICY_BASE = PUBLIC_SITE;
 
 /* Delegated from the document, once, rather than wired per screen. Two of these
    links live on the sign-in screen, which is built before any tab exists and
