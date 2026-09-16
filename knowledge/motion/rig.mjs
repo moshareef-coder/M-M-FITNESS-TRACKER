@@ -1849,16 +1849,12 @@ function handHeldFrame(ctx, p, S) {
   return true;
 }
 
-/* A hexagon centred on the origin, vertex up, for the dumbbell end-on view.
-   Six sides read as "hex head" even at 20px, which a circle would not. */
-/* The bell seen from the side, drawn along local +y. `f` squashes it along
-   that axis only, which is what a handle turned away from the camera does:
-   the heads stay their full width and the whole thing gets shorter, ending at
-   the end-on hex the caller draws instead once there is nothing left to see.
-   The geometry is the old one at f = 1, so nothing about where a hand holds
-   it moved. */
-function drawBellBody(ctx, C, k, f = 1) {
-  const y = (v) => v * k * f;
+/* The bell broadside, drawn along local +y: the flat picture a `follow` or
+   `upright` grip gets, where the handle lies across the screen and nothing
+   foreshortens. A bell that turns during the rep wants drawBellTurned instead,
+   which covers this same picture at f = 1 and every angle away from it. */
+function drawBellBody(ctx, C, k) {
+  const y = (v) => v * k;
   ctx.strokeStyle = C.edge; ctx.lineWidth = 3.2; ctx.lineJoin = "round";
   const handle = () => roundRect(ctx, -2.4, y(-9), 4.8, y(18), 2.2);
   const heads = [
@@ -1869,11 +1865,10 @@ function drawBellBody(ctx, C, k, f = 1) {
   ctx.fillStyle = C.chrome; handle(); ctx.fill();
   ctx.fillStyle = C.chromeHi; roundRect(ctx, -2.4, y(-9), 1.5, y(18), 0.75); ctx.fill();
   ctx.strokeStyle = C.chromeLo; ctx.lineWidth = 0.55;
-  const step = Math.max(0.9, 1.6 * f);
-  for (let q = y(-6.4); q <= y(6.4); q += step) { ctx.beginPath(); ctx.moveTo(-2, q); ctx.lineTo(2, q); ctx.stroke(); }
+  for (let q = y(-6.4); q <= y(6.4); q += 1.6) { ctx.beginPath(); ctx.moveTo(-2, q); ctx.lineTo(2, q); ctx.stroke(); }
   ctx.fillStyle = C.chromeLo;
-  roundRect(ctx, -3.1, y(-9.4), 6.2, 1.7 * f, 0.8); ctx.fill();
-  roundRect(ctx, -3.1, y(7.7), 6.2, 1.7 * f, 0.8); ctx.fill();
+  roundRect(ctx, -3.1, y(-9.4), 6.2, 1.7, 0.8); ctx.fill();
+  roundRect(ctx, -3.1, y(7.7), 6.2, 1.7, 0.8); ctx.fill();
   ctx.fillStyle = C.iron;
   for (const sh of heads) { sh(); ctx.fill(); }
   // the lit facet and the shadowed one, which is what says "hex" side on
@@ -1885,6 +1880,87 @@ function drawBellBody(ctx, C, k, f = 1) {
   roundRect(ctx, 4.2, y(8.6), 3, y(8.4), 2); ctx.fill();
 }
 
+/* One hex head of a dumbbell, drawn the way the head actually projects when
+   the handle turns away from the camera. Two things happen at once and they
+   pull opposite ways: the hex FACE squashes along the handle by `g`, and the
+   head's own thickness smears it back out along the handle by `sweep`. End on,
+   g is 1 and sweep is 0, so it is a full hexagon. Broadside, g is 0 and sweep
+   is the whole head, so it is the rectangle the old drawing had. In between it
+   is the hexagon smeared, which is the hull of the two.
+
+   Getting this wrong is very visible: scaling the head down along the handle
+   and leaving it at that squashes it to a slab as the bell turns, and the bell
+   reads as a rubber band being pulled rather than a piece of iron rotating
+   (Mo, on exactly that: "it looks like its being stretched out"). A head never
+   gets thinner when it turns. It gets rounder. */
+function bellHeadPath(ctx, r, g, sweep) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = D(i * 60);
+    const c = Math.cos(a);
+    const along = c * r * g + (c >= 0 ? sweep : -sweep);
+    const perp = Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(perp, along); else ctx.lineTo(perp, along);
+  }
+  ctx.closePath();
+}
+
+/* The whole bell at any angle, drawn along local +y. `f` is how much of the
+   handle's length survives the projection: 1 is broadside, 0 is pointed
+   straight at the camera. Everything derives from it, so one bell covers the
+   flat side view, the end-on view and every frame of a grip rolling between
+   them, with no threshold to cross and nothing to pop. */
+function drawBellTurned(ctx, C, k, f) {
+  const g = Math.sqrt(Math.max(0, 1 - f * f));
+  const r = 8.6 * k, rb = 2.4;
+  const barHalf = 9 * k * f + rb * g;
+  const headMid = 12.8 * k * f;
+  const sweep = 4.2 * k * f;
+
+  ctx.lineJoin = "round";
+  const bar = () => roundRect(ctx, -rb, -barHalf, rb * 2, barHalf * 2, rb);
+  ctx.strokeStyle = C.edge; ctx.lineWidth = 3.2;
+  bar(); ctx.stroke();
+  ctx.fillStyle = C.chrome; bar(); ctx.fill();
+  ctx.fillStyle = C.chromeHi; roundRect(ctx, -rb, -barHalf, 1.5, barHalf * 2, 0.75); ctx.fill();
+  ctx.strokeStyle = C.chromeLo; ctx.lineWidth = 0.55;
+  const step = Math.max(0.9, 1.6 * f);
+  for (let q = -barHalf * 0.72; q <= barHalf * 0.72; q += step) {
+    ctx.beginPath(); ctx.moveTo(-2, q); ctx.lineTo(2, q); ctx.stroke();
+  }
+  if (f > 0.25) {
+    ctx.fillStyle = C.chromeLo;
+    roundRect(ctx, -3.1, -9 * k * f - 1.7 * f, 6.2, 1.7 * f, 0.8); ctx.fill();
+    roundRect(ctx, -3.1, 9 * k * f, 6.2, 1.7 * f, 0.8); ctx.fill();
+  }
+  for (const side of [-1, 1]) {
+    ctx.save();
+    ctx.translate(0, side * headMid);
+    ctx.strokeStyle = C.edge; ctx.lineWidth = 3.2;
+    bellHeadPath(ctx, r, g, sweep); ctx.stroke();
+    ctx.fillStyle = C.iron; ctx.fill();
+    // the lit facet and the shadowed one, clipped to whatever shape the head
+    // currently is, so they read the same broadside and end on
+    ctx.save();
+    bellHeadPath(ctx, r, g, sweep); ctx.clip();
+    const ext = r * g + sweep + 1;
+    ctx.fillStyle = C.ironHi; ctx.fillRect(-r, -ext, r * 0.44, ext * 2);
+    ctx.fillStyle = C.rubber; ctx.fillRect(r * 0.56, -ext, r * 0.44, ext * 2);
+    ctx.restore();
+    // the handle's end cap, which only exists to be seen once the bell is
+    // turned far enough that you are looking down the bar
+    if (g > 0.4) {
+      ctx.globalAlpha = Math.min(1, (g - 0.4) / 0.35);
+      ctx.beginPath(); ctx.arc(0, 0, Math.min(2.7, r * 0.32), 0, Math.PI * 2);
+      ctx.fillStyle = C.chrome; ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+}
+
+/* A hexagon centred on the origin, vertex up, for the dumbbell end-on view.
+   Six sides read as "hex head" even at 20px, which a circle would not. */
 function hexPath(ctx, r) {
   ctx.beginPath();
   for (let i = 0; i < 6; i++) {
@@ -2351,16 +2427,10 @@ const PROPS = {
     const k = p.k || 1;
     const hold = p.hold || "level";
     if (hold === "level") { drawDumbbellEnd(ctx, C, at, k, p.rot || 0); return; }
-    let deg = hold === "upright" ? 0 : 90;
-    let squash = 1;
-    if (hold === "follow") {
-      const side = S.sides[p.side || "R"];
-      deg = RAD2DEG(Math.atan2(side.axis.hand.y.y, side.axis.hand.y.x));
-    }
     /* hold: "grip" is the honest one: the handle runs along the hand's own
        across-the-palm axis, already projected through whatever camera the
        move uses, so the bell foreshortens by itself. Pointed at the lens that
-       axis comes back with no length and the bell is drawn end on, which is
+       axis comes back with no length and the bell draws as a hexagon, which is
        exactly what a side view of a mediolateral grip should look like and
        what every "level" bell draws today. Turn the camera, or turn the
        forearm with forearmPron, and the same axis opens out and the bell
@@ -2369,14 +2439,22 @@ const PROPS = {
        palms-to-the-face to palms-forward, and now the bell shows it. */
     if (hold === "grip") {
       const ax = S.sides[p.side || "R"].axis.hand.x;
-      squash = Math.hypot(ax.x, ax.y);
-      if (squash < 0.26) { drawDumbbellEnd(ctx, C, at, k, p.rot || 0); return; }
-      deg = RAD2DEG(Math.atan2(ax.y, ax.x)) - 90;   // the body runs along local +y
+      ctx.save();
+      ctx.translate(at.x, at.y);
+      ctx.rotate(D(RAD2DEG(Math.atan2(ax.y, ax.x)) - 90 + (p.rot || 0)));
+      drawBellTurned(ctx, C, k, Math.hypot(ax.x, ax.y));
+      ctx.restore();
+      return;
+    }
+    let deg = hold === "upright" ? 0 : 90;
+    if (hold === "follow") {
+      const side = S.sides[p.side || "R"];
+      deg = RAD2DEG(Math.atan2(side.axis.hand.y.y, side.axis.hand.y.x));
     }
     ctx.save();
     ctx.translate(at.x, at.y);
     ctx.rotate(D(deg + (p.rot || 0)));
-    drawBellBody(ctx, C, k, squash);
+    drawBellBody(ctx, C, k);
     ctx.restore();
   },
   kettlebell(ctx, C, p, S) {
