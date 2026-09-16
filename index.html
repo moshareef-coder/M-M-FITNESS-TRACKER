@@ -6638,9 +6638,13 @@ async function checkPartnershipThenEnter() {
      not already settled on training alone. An answer I am still owed, above,
      is the opposite and comes first. */
   const waiting = all.filter((r) => r.status === "pending" && mine(r.inviter_email));
+  if (waiting.length) { renderPairSentScreen(waiting); return; }
+
+  /* A no, said once and then done with. The week is so an answer that came
+     back while the app sat closed for a month does not open with it. */
   const refused = all.filter((r) => r.status === "declined" && mine(r.inviter_email)
     && r.responded_at && Date.now() - new Date(r.responded_at).getTime() < 7 * 864e5);
-  if (waiting.length || refused.length) { renderPairSentScreen(waiting, refused); return; }
+  if (refused.length) { renderPairRefusedScreen(refused); return; }
 
   renderPairingScreen();
 }
@@ -6823,7 +6827,7 @@ function renderPairRequestScreen(reqs) {
    made this look like a screen that had eaten the code. */
 /* One name in the title means a box around that same name adds nothing. The
    card is only earned once there are several rows to tell apart. */
-function pairRowsHtml(rows, action, label) {
+function pairRowsHtml(rows, label) {
   if (rows.length === 1) {
     return `<div class="pair-req-mail" style="margin-bottom:16px;">${escapeHtml(String(rows[0].invitee_email).toLowerCase())}</div>`;
   }
@@ -6831,9 +6835,9 @@ function pairRowsHtml(rows, action, label) {
       <div class="pair-req">
         <div class="pair-req-who">${escapeHtml(pairWho(r.invitee_email))}</div>
         <div class="pair-req-mail">${escapeHtml(String(r.invitee_email).toLowerCase())}</div>
-        <div class="pair-req-acts">
+        ${label ? `<div class="pair-req-acts">
           <button type="button" class="btn-ghost" data-endrow="${escapeHtml(r.id)}">${label}</button>
-        </div>
+        </div>` : ""}
       </div>`).join("");
 }
 
@@ -6858,7 +6862,7 @@ function renderPairSentScreen(waiting) {
       <h1>${title}</h1>
       <p class="sub" style="margin-bottom:16px;">They have to accept before anything is shared.
         Neither of you can see the other until they do.</p>
-      ${pairRowsHtml(waiting, "endrow", "Cancel this one")}
+      ${pairRowsHtml(waiting, "Cancel this one")}
       <button class="btn-primary" id="waitSoloBtn">Train alone for now</button>
       <button class="btn-ghost" id="waitAnotherBtn">Enter another code</button>
       ${waiting.length === 1 ? `<button type="button" class="btn-ghost" data-endrow="${escapeHtml(waiting[0].id)}">Cancel the request</button>` : ""}
@@ -6884,7 +6888,7 @@ function renderPairRefusedScreen(refused) {
       <h1>${title}</h1>
       <p class="sub" style="margin-bottom:16px;">Nothing of yours was shared, and nothing of theirs.
         You can pair with someone else whenever you like.</p>
-      ${pairRowsHtml(refused, "endrow", "Got it")}
+      ${pairRowsHtml(refused, "")}
       <button class="btn-primary" id="refusedOkBtn">Got it</button>
     </div>`;
   $("onboard").classList.remove("hidden");

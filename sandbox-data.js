@@ -26,7 +26,10 @@
   const profile = (email, name, extra = {}) => ({
     email, user_name: name, theme: "light", sex: name === "Mell" ? "Female" : "Male",
     goal: "Get stronger", challenge_target: 5, share_workout_details: true,
-    avatar_path: null, timezone: "America/Los_Angeles", invite_code: name.toUpperCase().slice(0, 6),
+    /* Six characters, padded, because a real invite code always is and the
+       code screen refuses to send anything shorter. "MO" sat in the Your code
+       panel for months looking like a bug. */
+    avatar_path: null, timezone: "America/Los_Angeles", invite_code: (name.toUpperCase() + "XXXXXX").slice(0, 6),
     bonus_xp: 0, tracked_metrics: ["weight", "prs", "trained"], ...extra,
   });
 
@@ -318,6 +321,61 @@
       },
     },
 
+    /* ---- the consent handshake ----
+       20260915_consent_and_leak_close.sql makes a redeemed code a REQUEST, with
+       the person who typed it as inviter_email and the person whose code it was
+       as invitee_email. These three are the states that direction produces, and
+       none of them can occur until that migration is applied. The stranger has
+       no profiles row on purpose: you cannot read someone's profile until you
+       accept, so an address is genuinely all the screen has to show. */
+    pairRequest: {
+      label: "Someone wants to pair with you",
+      apply: (db) => {
+        db.partnerships = [{ id: "p-in-1", inviter_email: "chris.h@sandbox", invitee_email: ME,
+          status: "pending", created_at: ago(90), responded_at: null }];
+        db.profiles = db.profiles.filter((p) => p.email === ME);
+        db.fit_entries = db.fit_entries.filter((e) => e.email === ME);
+        db.exercise_logs = db.exercise_logs.filter((e) => e.email === ME);
+        db.session_reactions = [];
+        try { localStorage.removeItem("ft_solo"); localStorage.removeItem("ft_declined_pairs"); } catch {}
+      },
+    },
+
+    pairRequests: {
+      label: "Three requests, one of them again",
+      apply: (db) => {
+        // The migration caps outstanding requests at three, so three is the
+        // widest this screen ever gets. The last one has been turned down twice
+        // already, which is the case the screen has to say out loud.
+        db.partnerships = [
+          { id: "p-in-1", inviter_email: "chris.h@sandbox", invitee_email: ME, status: "pending", created_at: ago(90), responded_at: null },
+          { id: "p-in-2", inviter_email: "dani@sandbox", invitee_email: ME, status: "pending", created_at: ago(300), responded_at: null },
+          { id: "p-in-3", inviter_email: "someone.you.blocked@sandbox", invitee_email: ME, status: "pending", created_at: ago(20), responded_at: null },
+        ];
+        db.profiles = db.profiles.filter((p) => p.email === ME);
+        db.fit_entries = db.fit_entries.filter((e) => e.email === ME);
+        db.exercise_logs = db.exercise_logs.filter((e) => e.email === ME);
+        db.session_reactions = [];
+        try {
+          localStorage.removeItem("ft_solo");
+          localStorage.setItem("ft_declined_pairs", JSON.stringify({ "someone.you.blocked@sandbox": 2 }));
+        } catch {}
+      },
+    },
+
+    pairRefused: {
+      label: "They turned you down",
+      apply: (db) => {
+        db.partnerships = [{ id: "p-no", inviter_email: ME, invitee_email: THEM,
+          status: "declined", created_at: day(-1) + "T09:00:00Z", responded_at: ago(120) }];
+        db.profiles = db.profiles.filter((p) => p.email === ME);
+        db.fit_entries = db.fit_entries.filter((e) => e.email === ME);
+        db.exercise_logs = db.exercise_logs.filter((e) => e.email === ME);
+        db.session_reactions = [];
+        try { localStorage.removeItem("ft_solo"); } catch {}
+      },
+    },
+
     pairedNoData: {
       label: "Paired, day one",
       apply: (db) => {
@@ -414,6 +472,62 @@
   const channel = () => { const ch = { on: () => ch, subscribe: () => ch, unsubscribe: () => {} }; return ch; };
   const hasProfile = () => DB.profiles.some((p) => p.email === ME);
 
+  /* The three pairing RPCs, ported from 20260915_consent_and_leak_close.sql,
+     because an accept screen whose buttons do nothing is not reviewable. Only
+     the branches the screens can reach are here, verdict shapes included: note
+     that redeem returns ok:false with pending:true, which is the whole reason
+     the client needed patching. Every other rpc still resolves to null, which
+     is what its callers already expect. */
+  const pRows = () => (DB.partnerships ??= []);
+  const party = (r, e) => low(r.inviter_email) === low(e) || low(r.invitee_email) === low(e);
+
+  function rpcRedeem(code) {
+    const tidy = String(code || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    if (tidy.length !== 6) return { ok: false, error: "Codes are 6 characters" };
+    const target = DB.profiles.find((p) => String(p.invite_code || "").toUpperCase() === tidy);
+    if (!target) return { ok: false, error: "That code does not match anyone" };
+    if (low(target.email) === low(ME)) return { ok: false, error: "That is your own code" };
+    if (pRows().some((r) => r.status === "accepted" && (party(r, ME) || party(r, target.email))))
+      return { ok: false, error: "One of you already has a partner" };
+
+    // They asked me first. Both of us have acted, so this is a pairing.
+    const theirs = pRows().find((r) => r.status === "pending"
+      && low(r.inviter_email) === low(target.email) && low(r.invitee_email) === low(ME));
+    if (theirs) {
+      theirs.status = "accepted";
+      theirs.responded_at = new Date().toISOString();
+      return { ok: true, partner_name: target.user_name, partner_email: low(target.email) };
+    }
+    if (pRows().some((r) => r.status === "pending"
+      && low(r.inviter_email) === low(ME) && low(r.invitee_email) === low(target.email)))
+      return { ok: false, pending: true, partner_name: target.user_name,
+               error: `You already asked ${target.user_name}. Waiting on them.` };
+    if (pRows().filter((r) => r.status === "pending" && low(r.inviter_email) === low(ME)).length >= 3)
+      return { ok: false, error: "You have three pair requests out already. Wait for one of them." };
+
+    pRows().push({ id: "s-" + Math.random().toString(36).slice(2, 9), inviter_email: ME,
+      invitee_email: low(target.email), status: "pending",
+      created_at: new Date().toISOString(), responded_at: null });
+    return { ok: false, pending: true, partner_name: target.user_name,
+             error: `Request sent to ${target.user_name}. They need to accept it in the app.` };
+  }
+
+  function rpcRespond(id, accept) {
+    const inv = pRows().find((r) => r.id === id && r.status === "pending" && low(r.invitee_email) === low(ME));
+    if (!inv) return { ok: false, error: "That request is no longer open" };
+    const now = new Date().toISOString();
+    if (!accept) { inv.status = "declined"; inv.responded_at = now; return { ok: true, accepted: false }; }
+    inv.status = "accepted";
+    inv.responded_at = now;
+    // Everything else they were asked stops being an open question.
+    pRows().forEach((r) => {
+      if (r.status === "pending" && r.id !== id && low(r.invitee_email) === low(ME)) {
+        r.status = "declined"; r.responded_at = now;
+      }
+    });
+    return { ok: true, accepted: true, partner_email: low(inv.inviter_email) };
+  }
+
   window.supabase = {
     createClient() {
       return {
@@ -428,7 +542,19 @@
           signOut: async () => { location.reload(); return { error: null }; },
         },
         from: builder,
-        rpc: async () => ({ data: null, error: null }),
+        rpc: async (name, args) => {
+          const a = args || {};
+          if (name === "redeem_invite_code") return { data: rpcRedeem(a.code), error: null };
+          if (name === "respond_to_pair_invite") return { data: rpcRespond(a.p_id, a.p_accept), error: null };
+          if (name === "rotate_invite_code") {
+            const me = DB.profiles.find((p) => low(p.email) === low(ME));
+            const fresh = "Q" + Math.random().toString(36).slice(2, 7).toUpperCase();
+            if (!me) return { data: { ok: false, error: "No profile yet" }, error: null };
+            me.invite_code = fresh;
+            return { data: { ok: true, invite_code: fresh }, error: null };
+          }
+          return { data: null, error: null };
+        },
         channel, removeChannel: () => {},
         functions: { invoke: async () => ({ data: null, error: { message: "not available in the sandbox" } }) },
         storage: { from: () => ({
