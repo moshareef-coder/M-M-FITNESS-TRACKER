@@ -3366,22 +3366,30 @@
      the start, and the direction he picked to fix it (an index of one-line
      rows, tap one for the real card) reuses this exact accordion rather than
      building a second one: same :not(.peek) shape, same "leave an opened row
-     alone" rule below, same one-open-at-a-time behaviour. What differs from
-     arrange mode is which line survives the fold. Arrange only needs to tell
-     "Weight trend" from "Log your weight" by title, so it keeps just the h2.
-     Browsing needs the actual answer, so idx-lead survives the fold too and
-     the row is exactly the height of two lines rather than a fixed 58px. */
+     alone" rule below, same one-open-at-a-time behaviour.
+
+     The line that survives the fold is idx-summary, not the card's own
+     idx-lead. They read differently on purpose: idx-lead is written for
+     someone already looking at the chart ("Tap a point", "Tap another
+     lift"), and a row that cannot be tapped-a-point-on-yet has no business
+     saying so. idx-summary is the short, standalone answer, computed
+     alongside idx-lead by the same stats function and shown only while
+     folded; CSS alone decides which one is on screen, so opening a row does
+     not need to restore anything, it just stops hiding what was already
+     there. Arrange mode keeps the older, shorter fold (title only): it only
+     needs to tell "Weight trend" from "Log your weight" apart, not answer
+     either one. */
   body:not(.arranging) #tab-progress .idx-card:not(.peek) {
     cursor: pointer;
   }
-  body:not(.arranging) #tab-progress .idx-card:not(.peek) > *:not(h2):not(.idx-lead) {
+  body:not(.arranging) #tab-progress .idx-card:not(.peek) > *:not(h2):not(.idx-summary) {
     display: none;
   }
   body:not(.arranging) #tab-progress .idx-card:not(.peek) > h2 {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
-  body:not(.arranging) #tab-progress .idx-card:not(.peek) > .idx-lead {
-    margin-top: 4px;
+  #tab-progress .idx-card.peek > .idx-summary {
+    display: none;
   }
   .idx-chev { display: flex; flex-shrink: 0; color: var(--muted); transition: transform .18s ease; }
   .idx-card.peek .idx-chev { transform: rotate(90deg); }
@@ -3390,6 +3398,34 @@
      before), so the chevron this adds is index-only furniture and has no
      business appearing there. */
   body.arranging .idx-chev { display: none; }
+
+  /* The short answer itself: a sentence and, on the one row where a colour
+     genuinely earns its place, a direction. --up and --down are GOOD and BAD
+     everywhere else this app uses them (the sync badge, the danger card), not
+     "the number rose" and "the number fell", so a weight going up reads as
+     --down (good) on a bulk and --up (bad) on a cut. Getting that backwards
+     would make the row lie about which way things are going. */
+  .idx-summary { font-size: 13px; color: var(--muted); margin: 0; }
+  .idx-summary b { color: var(--text); font-weight: 700; }
+  .idx-good { color: var(--down); font-weight: 700; }
+  .idx-bad { color: var(--up); font-weight: 700; }
+  /* Strength's row carries a second thing: the same five segments the open
+     card's own level bar draws, in miniature, so the shape of "close to the
+     next level" reads before anyone taps in to see the real one. */
+  .idx-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .idx-mini-lvl { display: flex; gap: 2px; width: 46px; flex-shrink: 0; }
+  .idx-mini-lvl i { flex: 1; height: 5px; border-radius: 3px; background: var(--border); display: block; overflow: hidden; }
+  .idx-mini-lvl i b { display: block; height: 100%; background: var(--accent); }
+
+  /* The row this goal is actually judged on, ringed the way the mockup
+     showed it: not a louder card, the SAME card, with a border that says
+     "this is the one the sentence above was about". Computed from the
+     headline kind, not from GOAL_CARDS order, because what belongs here is
+     literally whichever card the headline just finished talking about. */
+  #tab-progress .idx-card.idx-primary {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent) inset;
+  }
 
   /* Everything here is scoped to :not(.peek). An opened row must be left
      completely alone: the first version hid children with display:none and
@@ -5522,6 +5558,7 @@
          it lands on is still the way back into that day. -->
     <div class="card metric-card idx-card" id="cardWeight">
       <h2>Weight trend</h2>
+      <p class="idx-summary" id="weightSummary"></p>
       <p class="muted-note idx-lead" style="margin-top:-6px" id="weightLead"></p>
       <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
       <div class="wt-range" id="weightRange"></div>
@@ -5545,6 +5582,7 @@
 
     <div class="card metric-card idx-card" id="cardConsistency">
       <h2>Consistency</h2>
+      <p class="idx-summary" id="consistencySummary"></p>
       <p class="muted-note idx-lead" style="margin-top:-6px" id="consistencyLead"></p>
       <div class="chart-wrap"><canvas id="consistencyChart"></canvas></div>
       <div class="ms-list" id="consistencyDetail"></div>
@@ -5556,6 +5594,7 @@
          muscle is what asks, and the answer lands in the slot underneath. -->
     <div class="card metric-card idx-card" id="cardMuscles">
       <h2>Getting stronger</h2>
+      <p class="idx-summary" id="musclesSummary"></p>
       <p class="muted-note idx-lead" style="margin-top:-6px" id="musclesLead"></p>
       <div class="bi-figures" id="msFigures">
         <div class="bi-fig" data-view="Front"><canvas id="msFront" class="bi-canvas"></canvas></div>
@@ -5571,6 +5610,7 @@
 
     <div class="card metric-card idx-card" id="cardStrength">
       <h2>Strength</h2>
+      <p class="idx-summary idx-summary-row" id="strengthSummary"></p>
       <p class="muted-note idx-lead" style="margin-top:-6px" id="strengthLead"></p>
       <!-- Five segments, one per level, filled up to where this lift sits and
            part filled for the level it is in. The distance to the next one is
@@ -5607,6 +5647,7 @@
 
     <div class="card metric-card idx-card" id="cardVolume">
       <h2>Training volume</h2>
+      <p class="idx-summary" id="volumeSummary"></p>
       <p class="muted-note idx-lead" style="margin-top:-6px" id="volumeLead"></p>
       <div class="chart-wrap"><canvas id="volumeChart"></canvas></div>
       <div class="ms-list" id="volumeDetail"></div>
@@ -5614,6 +5655,7 @@
 
     <div class="card metric-card idx-card" id="cardPhotos">
       <h2>Body photos</h2>
+      <p class="idx-summary" id="photosSummary"></p>
       <p class="muted-note idx-lead" style="margin-top:-6px" id="photosLead"></p>
       <div class="photo-strip" id="bodyPhotoStrip"></div>
       <input type="file" id="bodyPhotoInput" accept="image/*" capture="environment" hidden />
@@ -7204,27 +7246,22 @@ let ALL_GOALS = [];
 const isCoachedClient = () => MY_GROUP?.kind === "coach" && MY_ROLE === "client";
 
 async function loadMyGroups() {
-  /* Both reads report failure rather than swallowing it. Empty and broken look
-     identical from here, and the caller uses this to decide whether somebody
-     is in a coached group, so a failed read quietly demotes a client to an
-     unpaired stranger. */
-  const { data, error } = await sb.from("group_members").select("*").is("left_at", null);
-  if (error) { console.error("could not read group members", error); return { pending: null, active: null, error }; }
-  const mine = (data || []).filter((m) => m.email.toLowerCase() === MY_EMAIL);
-  if (!mine.length) return { pending: null, active: null };
-  const ids = mine.map((m) => m.group_id);
-  const { data: gs, error: gErr } = await sb.from("groups").select("*").in("id", ids);
-  if (gErr) { console.error("could not read groups", gErr); return { pending: null, active: null, error: gErr }; }
-  const groups = gs || [];
-  const withGroup = mine.map((m) => ({ ...m, group: groups.find((g) => g.id === m.group_id) })).filter((m) => m.group);
-  return {
-    pending: withGroup.find((m) => !m.accepted_at) || null,
-    active: withGroup.find((m) => m.accepted_at && m.group.kind === "coach") || null,
-  };
+  /* Coaching is not part of this product. One person, or two.
+
+     Cut here rather than at the sixty places that ask about it. MY_GROUP,
+     MY_ROLE and MY_COACH all stay null, so isCoachedClient() is false
+     everywhere and every conditional downstream collapses to the plain path on
+     its own. Editing sixty branches by hand in a file three other sessions are
+     also editing would be the version of this that introduces a bug.
+
+     The tables are left alone. Nothing reads them, nothing writes them, and
+     dropping them would throw away the two coached accounts that already exist
+     for a feature that is coming back after launch. */
+  return { pending: null, active: null };
 }
 
 async function checkPartnershipThenEnter() {
-  const { pending, active, error: groupErr } = await loadMyGroups();
+  const { error: groupErr } = await loadMyGroups();
   /* Same rule as the partnership read below: a lookup that failed is not an
      answer about who somebody trains with, and carrying on would hand a coached
      client the setup screen. */
@@ -7235,17 +7272,9 @@ async function checkPartnershipThenEnter() {
     return;
   }
 
-  // An unanswered invitation takes priority over everything else.
-  if (pending) { renderInviteScreen(pending); return; }
-
-  if (active) {
-    MY_GROUP = active.group;
-    MY_ROLE = active.role;
-    const { data: roster } = await sb.from("group_members")
-      .select("email, role").eq("group_id", active.group_id).is("left_at", null);
-    MY_COACH = (roster || []).find((r) => r.role === "coach" || r.role === "owner")?.email || null;
-    return showApp();
-  }
+  /* Both of these were the group branches. loadMyGroups returns nothing now, so
+     they are unreachable, and an unreachable branch that still reads a table is
+     how somebody later concludes the feature is still here. */
 
   const { data: rows, error: pairErr } = await sb.from("partnerships")
     .select("*")
@@ -7631,61 +7660,15 @@ function renderPairingScreen() {
 }
 
 async function chooseSetup(key) {
-  if (key === "solo") {
-    setSolo();
-    return showApp();
-  }
+  /* Two answers, and there is no third.
+     This used to have a coaching branch that created a groups row and handed
+     somebody a web dashboard that does not exist. Coaching is not in this
+     product: it is one person, or two. */
   if (key === "pair") { renderCodeScreen(); return; }
-
-  // A coaching roster: create it, then send them where they manage it.
-  const spec = SETUPS.find((s) => s.key === key);
-  const { data, error } = await sb.from("groups").insert({
-    name: `${ME}'s clients`,
-    kind: "coach",
-    owner_email: MY_EMAIL,
-    seat_limit: spec.seats,
-  }).select().single();
-  if (error) { toast("Could not set that up"); console.error(error); return; }
-  const { error: memberErr } = await sb.from("group_members").insert({
-    group_id: data.id, email: MY_EMAIL,
-    role: "coach",
-    accepted_at: new Date().toISOString(),
-  });
-  /* Without this the user owns a group they are not a member of, which nothing
-     in the app can read, and choosing again just makes another one. */
-  if (memberErr) {
-    console.error(memberErr);
-    await sb.from("groups").delete().eq("id", data.id);
-    toast("Could not set that up");
-    return;
-  }
-  setSolo();                      // no partner wall while the roster fills up
-  renderCoachHandoff();
+  setSolo();
+  return showApp();
 }
 
-/* Coaches work from a desk, so point them there rather than pretending the
-   phone is the right place to manage twenty people. */
-function renderCoachHandoff() {
-  $("onboard").innerHTML = `
-    <div class="ob-step">
-      <h1>Your group is ready</h1>
-      <p class="sub">Add and manage your clients from the coach dashboard on a computer.
-        Keep using this app for your own training.</p>
-      <div class="ob-summary">
-        <div class="ob-row"><span>Dashboard</span><b>m-m-fitness-tracker.vercel.app/coach</b></div>
-        <div class="ob-row"><span>Seats</span><b>20, including you</b></div>
-      </div>
-      <button class="btn-primary" id="copyCoachLink">Copy the link</button>
-      <button class="btn-ghost" id="coachContinue">Continue to the app</button>
-    </div>`;
-  $("copyCoachLink").onclick = async () => {
-    try { await navigator.clipboard.writeText(location.origin + "/coach/"); toast("Link copied"); }
-    catch { toast(location.origin + "/coach/"); }
-  };
-  $("coachContinue").onclick = () => checkPartnershipThenEnter();
-}
-
-/* The invite-code exchange, now only reached by people who chose a partner. */
 function renderCodeScreen() {
   const ob = $("onboard");
   /* No invite_code exists until the profiles row does: it comes from a server
@@ -14896,8 +14879,9 @@ function renderWeightStats() {
   const rows = weighInsFor(name);
   const el = $("weightLead");
   if (!el) return;
+  const summary = $("weightSummary");
   /* The empty state below already says there is nothing here. */
-  if (!rows.length) { el.textContent = ""; return; }
+  if (!rows.length) { el.textContent = ""; if (summary) summary.textContent = ""; return; }
   const current = rows[rows.length - 1].weight;
   const delta = current - rows[0].weight;
   const goal = weightGoalFor(PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY_EMAIL);
@@ -14911,6 +14895,22 @@ function renderWeightStats() {
   el.textContent = `${current.toFixed(1)} lbs${move}.`
     + (goal ? ` Goal ${goal.target_value.toFixed(1)}.` : "")
     + (rows.length > 1 ? " Tap a point." : "");
+
+  /* The index row's own line. Short on purpose: "Tap a point" means nothing
+     to somebody who has not opened the card yet. The colour is which way
+     goal.target_value sits from here, the same "is this the right direction"
+     the scale headline already computes, not a bare "down is green" that
+     would tell a bulk it was failing every time it succeeded. */
+  if (summary) {
+    if (rows.length < 2 || Math.abs(delta) < 0.05) {
+      summary.textContent = `${current.toFixed(1)} lb`;
+    } else {
+      const wantDown = goal ? goal.target_value < (goal.start_value ?? rows[0].weight) : null;
+      const wentDown = delta < 0;
+      const cls = wantDown === null ? "" : wantDown === wentDown ? "idx-good" : "idx-bad";
+      summary.innerHTML = `${current.toFixed(1)} lb &middot; <span class="${cls}">${Math.abs(delta).toFixed(1)} ${wentDown ? "down" : "up"}</span>`;
+    }
+  }
 }
 function renderWeightRange() {
   $("weightRange").innerHTML = WEIGHT_RANGES.map(([k]) =>
@@ -15000,6 +15000,8 @@ function renderConsistencyStats() {
      number on one screen is what "too much to read" looks like. Weeks hit came
      out because the bars against the dashed line ARE weeks hit, counted. */
   el.textContent = `${thisWeek} of ${target} ${thisWeek === 1 ? "day" : "days"} this week. Tap a week.`;
+  const summary = $("consistencySummary");
+  if (summary) summary.textContent = `${thisWeek} of ${target} ${thisWeek === 1 ? "day" : "days"} this week`;
 }
 
 /* The detail slot, empty until a bar is tapped. The target line is what makes
@@ -15204,11 +15206,12 @@ let STRENGTH_LIFT_FOR = null;
 function renderStrengthStats() {
   const el = $("strengthLead");
   if (!el) return;
+  const summary = $("strengthSummary");
   const viewingPartner = PROGRESS_VIEW === "partner";
   const name = viewingPartner ? partnerName() : ME;
   const lifts = strengthCardLifts(name, viewingPartner);
   /* The empty state under the chart already says there is nothing logged. */
-  if (!lifts.length) { el.textContent = ""; return; }
+  if (!lifts.length) { el.textContent = ""; if (summary) summary.textContent = ""; return; }
   /* renderStrengthChart picks the lift, but it defers when Chart.js is still
      downloading, so read the same default it would rather than print a stale
      name or none at all. */
@@ -15216,6 +15219,27 @@ function renderStrengthStats() {
   el.textContent = `${picked.name}, best ${picked.best} lb.`
     + (lifts.length > 1 ? " Tap another lift." : "");
   renderStrengthLevel(name, picked.name);
+
+  /* The row's own line is the level, not the lift name: "Bench Press, best
+     228 lb" means something once the picker below it is on screen, and means
+     nothing folded. The dots are the same five segments the open card draws,
+     shrunk, so the shape of "how close" is visible before anyone taps in. */
+  if (summary) {
+    const lv = strengthLevelFor(name, picked.name);
+    if (!lv) {
+      /* No honest level for the currently picked lift (a dumbbell, a
+         machine), so the row falls back to the fact it does have rather
+         than going blank above a chevron. */
+      summary.innerHTML = `<span>${escapeHtml(picked.name)}, best ${picked.best} lb</span>`;
+    } else {
+      const dots = STRENGTH_LEVELS.map((_, i) => {
+        const pct = i < lv.index ? 100 : i === lv.index ? Math.round(lv.within * 100) : 0;
+        return `<i><b style="width:${pct}%"></b></i>`;
+      }).join("");
+      const text = lv.next ? `${lv.level} &middot; ${lv.toNext} lb to ${escapeHtml(lv.next)}` : `${lv.level} &middot; top of the scale`;
+      summary.innerHTML = `<span>${text}</span><span class="idx-mini-lvl">${dots}</span>`;
+    }
+  }
 }
 
 /* The level, or nothing at all. A lift we cannot level honestly (a dumbbell,
@@ -15636,6 +15660,7 @@ function volumeWeeks(name, weeks = 8) {
 function renderVolumeStats() {
   const el = $("volumeLead");
   if (!el) return;
+  const summary = $("volumeSummary");
   const name = PROGRESS_VIEW === "partner" ? partnerName() : ME;
   const weeks = volumeWeeks(name, 8);
   const thisWeek = weeks[weeks.length - 1].volume;
@@ -15643,11 +15668,20 @@ function renderVolumeStats() {
   const avg = finished.length ? finished.reduce((s, w) => s + w.volume, 0) / finished.length : 0;
   const vsAvg = avg > 0 ? Math.round(((thisWeek - avg) / avg) * 100) : null;
   /* Nothing at all is the chart's empty state to report, not this line's. */
-  if (!weeks.some((w) => w.volume > 0)) { el.textContent = ""; return; }
+  if (!weeks.some((w) => w.volume > 0)) { el.textContent = ""; if (summary) summary.textContent = ""; return; }
   const against = vsAvg == null
     ? " No finished week to compare it against yet."
     : ` ${Math.abs(vsAvg)}% ${vsAvg >= 0 ? "above" : "below"} the eight week average.`;
   el.textContent = `${fmtVolume(thisWeek)} lb this week.${against} Tap a week.`;
+
+  /* The row's own line: the number, and how it compares, with no formula
+     riding along, since "the eight week average" means nothing to someone
+     who has not opened the chart it is a caption for. */
+  if (summary) {
+    summary.innerHTML = vsAvg == null
+      ? `${fmtVolume(thisWeek)} lb this week`
+      : `${fmtVolume(thisWeek)} lb &middot; <span class="${vsAvg >= 0 ? "idx-good" : "idx-bad"}">${Math.abs(vsAvg)}% ${vsAvg >= 0 ? "more" : "less"}</span>`;
+  }
 }
 
 /* The detail slot, empty until a bar is tapped. A bar height is a shape, not a
@@ -24111,6 +24145,18 @@ async function renderBodyPhotos() {
   $("photosLead").textContent = shots.length
     ? `${shots.length} photo${shots.length === 1 ? "" : "s"}. Last one ${datedLabel(shots[0].taken_on)}.`
     : "No progress photos yet.";
+  /* No instruction to strip here (there is no "tap a point" for a photo
+     strip), so the index row says the same thing the open card does. */
+  const photosSummary = $("photosSummary");
+  if (photosSummary) {
+    /* textContent, not innerHTML: an entity like &middot; is not parsed
+       there, and would otherwise show up on screen as the literal text
+       "&middot;" rather than a dot. The middle dot character itself works
+       fine either way. */
+    photosSummary.textContent = shots.length
+      ? `${shots.length} photo${shots.length === 1 ? "" : "s"} · last ${datedLabel(shots[0].taken_on)}`
+      : "None yet";
+  }
 
   const strip = $("bodyPhotoStrip");
   if (!shots.length) {
@@ -24333,6 +24379,19 @@ function headlineKindFor(profile) {
 
    Everything left over is not deleted and not hidden behind a control: it is
    under the rule at the bottom, in PROGRESS_CARDS order, same for everyone. */
+/* Which card the headline sentence was actually about, for the ring around
+   its index row. Deliberately not derived from GOAL_CARDS: that array is an
+   ORDER (what to show and in what sequence), and the first entry in it is
+   not always the thing the headline just finished talking about, volume
+   leads with cardMuscles for a reason unrelated to what its own sentence
+   says. bulk gets two: its whole argument is that the scale and the bar have
+   to be read together, so ringing only one would misstate its own headline. */
+const HEADLINE_CARD = {
+  scale: ["cardWeight"], bulk: ["cardWeight", "cardStrength"], recomp: ["cardPhotos"],
+  lift: ["cardStrength"], volume: ["cardVolume"],
+  reps: [], endurance: ["cardConsistency"], habit: ["cardConsistency"],
+};
+
 const GOAL_CARDS = {
   scale:     ["cardWeight", "scaleCheckCard", "cardPhotos", "cardConsistency"],
   /* Putting weight on is judged on the scale and the bar together, so both
@@ -24691,6 +24750,10 @@ async function renderMuscleAnswers(name) {
   $("musclesLead").textContent = measured
     ? `${up} of ${measured} lifting more. Tap a muscle.`
     : "Nothing with a weight on it yet.";
+  /* Same fact, minus the instruction: "Tap a muscle" is only true once the
+     figure is on screen, which in the index it is not yet. */
+  const summaryEl = $("musclesSummary");
+  if (summaryEl) summaryEl.textContent = measured ? `${up} of ${measured} lifting more` : "Nothing with a weight on it yet";
   msShowMuscle(null);
 
   try {
@@ -25555,12 +25618,17 @@ function renderProgressTab() {
     ? (weightLed && !isPartner ? ["scaleCheckCard"] : [])
     : wanted.concat(rest);
   const quiet = new Set(blank ? [] : rest);
+  /* Which row(s) get the ring: whichever card the headline sentence was
+     actually about, not "first in GOAL_CARDS" (volume's own order leads with
+     cardMuscles, but a volume headline is about tonnage, not muscles). */
+  const primaryCards = blank ? [] : (HEADLINE_CARD[kind] || []);
 
   PROGRESS_CARDS.forEach((id) => {
     const el = $(id);
     if (!el) return;
     el.classList.toggle("hidden", !shown.includes(id));
     el.classList.toggle("quiet", quiet.has(id));
+    el.classList.toggle("idx-primary", primaryCards.includes(id));
   });
 
   if (blank) renderProgressEmpty(kind);
