@@ -4046,6 +4046,19 @@
   .ms-key .ms-dot { margin-top: 0; }
   .ms-list { margin-top: 4px; }
   .ms-list:empty { display: none; }
+  .goal-target-row { margin-top: 4px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .goal-target-row label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+  .goal-target-input {
+    display: flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 11px 14px;
+  }
+  .goal-target-input input {
+    flex: 1; border: none; background: none; color: var(--text); font-size: 17px; font-weight: 700;
+    font-family: inherit; -moz-appearance: textfield;
+  }
+  .goal-target-input input::-webkit-outer-spin-button, .goal-target-input input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .goal-target-input span { color: var(--muted); font-size: 13px; font-weight: 600; }
+  .goal-target-row .muted-note { margin: 8px 0 0; }
   .str-more {
     width: 100%; margin-top: 10px; padding: 10px; border: none; background: none;
     color: var(--muted); font-size: 13.5px; font-weight: 600; cursor: pointer; text-align: center;
@@ -5799,6 +5812,19 @@
       <div class="card">
         <p class="muted-note" id="goalPageNote"></p>
         <div class="goal-tile-grid" id="goalPageGrid"></div>
+        <!-- Onboarding is the only place this was ever asked, so an account
+             that changes its mind afterward had no way back in: the tile
+             would ask to gain weight and the app would judge it on tonnage
+             forever, because the one number that tells the two apart was
+             never on any screen after day one. -->
+        <div class="goal-target-row hidden" id="goalTargetRow">
+          <label for="goalTargetLb" id="goalTargetLabel">Goal weight</label>
+          <div class="goal-target-input">
+            <input type="number" id="goalTargetLb" inputmode="decimal" min="50" max="700" placeholder="lbs" />
+            <span>lbs</span>
+          </div>
+          <p class="muted-note" id="goalTargetNote"></p>
+        </div>
       </div>
     </div>
     <div class="settings-page hidden" id="page-training">
@@ -6298,7 +6324,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.9";
+const APP_VERSION = "2026.09.16.10";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -8194,7 +8220,7 @@ function renderGoalTilesStep(data = {}) {
    SAME .sheet-scrim overlay every other sheet in the app uses. The first row
    in the sheet is the plain category ("Just lose weight"), for people who do
    not want to be more specific than that. */
-function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my goals" } = {}) {
+function initGoalTiles(grid, { selected = {}, onPick, onSelect, confirmLabel = "Save my goals" } = {}) {
   const MAX_EXTRA = 2;   // the engine's cap, and it is argued for in mo-knowledge/engine/README.md
   /* A retired bubble reaches this with no tile to light, which is why such a
      profile opened the page with nothing selected and a disabled button
@@ -8317,6 +8343,10 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
         paintGrid(); paintPicks(); paintConfirm();
       };
     });
+    /* Told after every paint, not only on save, so a caller showing a field
+       that depends on which bubble is picked (the weight target row) can
+       react the moment somebody taps a tile rather than after they commit. */
+    onSelect?.(primary);
   }
 
   /* Deliberately empty. This used to print every pick back with a paragraph
@@ -8366,11 +8396,30 @@ function renderGoalPage() {
   $("goalPageNote").textContent = moved?.moved
     ? `${moved.from} is not a goal on its own any more. The closest one we still build for is ticked below, and your goal stays exactly as it is until you save.`
     : "One main goal, and up to two more you also care about. The next plan you generate is built for them.";
+  /* The one field onboarding asks and this page never did. A tile with
+     askTarget means the goal is JUDGED on a number the scale reports, and
+     that number lived on exactly one screen: the day the account was made.
+     Anybody who changed their mind afterward, or skipped it the first time,
+     had no way back in. The tile would ask to gain weight and the app would
+     judge it on tonnage forever, because the one figure that tells "getting
+     bigger" apart from "getting stronger" was never on any later screen. */
+  const targetRow = $("goalTargetRow"), targetInput = $("goalTargetLb");
+  const activeWeightGoal = weightGoalFor(MY_EMAIL);
+  targetInput.value = activeWeightGoal?.target_value ?? "";
+
   initGoalTiles($("goalPageGrid"), {
     selected: {
       bubble: MY_PROFILE?.goal_bubble || null,
       child: MY_PROFILE?.goal_child || null,
       secondary: MY_PROFILE?.goal_secondary,
+    },
+    onSelect: (primary) => {
+      const t = primary && goalTileFor(primary.bubble);
+      targetRow.classList.toggle("hidden", !t?.askTarget);
+      if (!t?.askTarget) return;
+      $("goalTargetNote").textContent = t.askTarget === "lose"
+        ? "Optional. Left blank, this still tracks the scale, just without a finish line or a projected date."
+        : "Optional, and it is the one number that tells this apart from Build muscle without it: without a target above where you are now, this reads as tonnage rather than as putting weight on.";
     },
     onPick: async ({ bubble, child, childLabel, secondary }) => {
       const tile = goalTileFor(bubble);
@@ -8399,6 +8448,26 @@ function renderGoalPage() {
         : null;
       const { error, droppedSecondary } = await upsertGoalFields(patch);
       if (error) { toast("Could not save the goal"); console.error(error); return; }
+
+      /* The weight target is a SEPARATE table (user_goals), the same one
+         onboarding writes, and it is written only when this tile actually
+         asks for one and a number was entered. Anything else stays exactly
+         as untouched as it was before this field existed: switching to a
+         goal with no target does not retire whatever weight goal was already
+         active, because this page never touched that table for any other
+         bubble and quietly starting now is not this fix's job. */
+      if (tile.askTarget) {
+        const lb = parseFloat(targetInput.value);
+        if (lb > 0) {
+          await setActiveGoal({
+            goal_key: legacy.key, goal_detail: patch.goal_detail,
+            pace: MY_GOAL?.pace || null, goal_by_date: MY_GOAL?.target_date || null,
+            days_per_week: MY_GOAL?.days_per_week || 4,
+            weight_lb: currentWeightLb(ME), goal_weight_lb: lb,
+          });
+        }
+      }
+
       await loadAll();
       toast(droppedSecondary ? "Main goal saved. The extra goals are not being stored yet." : "Goal updated");
       closeSettingsPage();
