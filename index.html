@@ -24482,7 +24482,7 @@ async function renderPushToggle() {
      what Setup claims cannot say different things. */
   const promise = $("pushPromiseNote");
   if (promise) {
-    promise.innerHTML = pushPromiseHtml(PARTNER_EMAIL ? nameFor(PARTNER_EMAIL) : "");
+    promise.innerHTML = pushPromiseHtml();
   }
   const sup = pushSupport();
   if (!sup.ok) {
@@ -24528,18 +24528,23 @@ const ASK_PUSH_KEY = "ft_ask_push";
    moment they are being careful. Every other fitness app says this plainly
    because plain is what reads as safe, and that is the correct instinct for a
    surface whose only job is to be believed. */
-function pushPromise(partnerName) {
+function pushPromise() {
+  /* "Your partner" rather than their name, always.
+     This is asked immediately after onboarding, which is before most people
+     have paired with anybody, so the name would rarely be there to use and
+     naming somebody implies they already have one. The same three lines then
+     hold for every account, paired or not, and there is no branch that can be
+     wrong. */
   return [
     "Workout reminders",
-    partnerName ? `Messages from ${partnerName}` : "Messages from your partner",
+    "Messages from your partner",
     "Goal milestones",
   ];
 }
 
 /* The same three lines, for the sheet and the Setup screen. */
-function pushPromiseHtml(partnerName) {
-  const rows = pushPromise(partnerName)
-    .map((what) => `<li>${escapeHtml(what)}</li>`).join("");
+function pushPromiseHtml() {
+  const rows = pushPromise().map((what) => `<li>${escapeHtml(what)}</li>`).join("");
   return `<p class="muted-note">Get notified about:</p>
     <ul class="push-promise">${rows}</ul>`;
 }
@@ -24572,14 +24577,13 @@ async function maybeAskForPush() {
   /* Already on, from an earlier install on this phone. Nothing to ask. */
   if (await currentPushSub()) return;
 
-  const partner = PARTNER_EMAIL ? nameFor(PARTNER_EMAIL) : "";
   const yes = await askConfirm({
     heading: "Notifications",
     /* The whole promise, not just the strongest example of it. Leading with
        the clip and stopping there would have sold this on one notification and
        then delivered several, which is how an app teaches people that its
        permission prompts are not to be believed. */
-    bodyHtml: pushPromiseHtml(partner),
+    bodyHtml: pushPromiseHtml(),
     ok: "Turn on notifications",
     cancel: "Not now",
   });
