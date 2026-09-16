@@ -19,14 +19,26 @@ private func progress(_ s: WorkoutAttributes.ContentState) -> Double {
     return min(1, Double(s.done) / Double(s.total))
 }
 
+/// The rest countdown, but only while it is still running.
+///
+/// `Date.now...ends` is a fatal error when `ends` is in the past: a Swift range
+/// traps if lowerBound is greater than upperBound. A locked phone suspends the
+/// app, so nothing clears restEndsAt when the rest actually finishes, and the
+/// moment the clock passed zero this crashed the widget process and the card
+/// went blank. That is the blank card, not a layout problem.
+func liveCountdown(_ state: WorkoutAttributes.ContentState) -> ClosedRange<Date>? {
+    guard let ends = state.restEndsAt, !state.paused, ends > .now else { return nil }
+    return Date.now...ends
+}
+
 private struct HeroNumber: View {
     let state: WorkoutAttributes.ContentState
     var size: CGFloat = 40
 
     var body: some View {
         HStack(alignment: .lastTextBaseline, spacing: 5) {
-            if let ends = state.restEndsAt, !state.paused {
-                Text(timerInterval: Date.now...ends, countsDown: true)
+            if let window = liveCountdown(state) {
+                Text(timerInterval: window, countsDown: true)
                     .font(.system(size: size, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(Unio.lime)
@@ -39,9 +51,15 @@ private struct HeroNumber: View {
                 Text("\(state.done)")
                     .font(.system(size: size, weight: .bold, design: .rounded))
                     .foregroundStyle(Unio.ink)
-                Text(state.paused ? "PAUSED" : "of \(state.total)")
-                    .font(.system(size: state.paused ? 11 : 14, weight: state.paused ? .heavy : .semibold))
-                    .foregroundStyle(.secondary)
+                /* A rest whose clock has run out is its own state: the app is
+                   asleep and cannot clear it, so without this the card silently
+                   becomes a set count and the rest looks like it never happened. */
+                Text(state.paused ? "PAUSED"
+                     : (state.restEndsAt != nil ? "GO" : "of \(state.total)"))
+                    .font(.system(size: state.paused || state.restEndsAt != nil ? 12 : 14,
+                                  weight: state.paused || state.restEndsAt != nil ? .heavy : .semibold))
+                    .tracking(state.restEndsAt != nil ? 0.8 : 0)
+                    .foregroundStyle(state.restEndsAt != nil && !state.paused ? Unio.lime : .secondary)
             }
         }
     }
@@ -140,8 +158,10 @@ struct FitTogetherWidgetLiveActivity: Widget {
             } compactLeading: {
                 UnioMark(size: 18)
             } compactTrailing: {
-                if let ends = context.state.restEndsAt, !context.state.paused {
-                    Text(timerInterval: Date.now...ends, countsDown: true)
+                // Same trap as the Lock Screen: an expired range is fatal, and
+                // this one would take the Dynamic Island down with it.
+                if let window = liveCountdown(context.state) {
+                    Text(timerInterval: window, countsDown: true)
                         .monospacedDigit()
                         .frame(maxWidth: 44)
                         .foregroundStyle(Unio.lime)
