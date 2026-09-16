@@ -4062,6 +4062,38 @@
   .lft-star.on { color: var(--accent); }
   .lft-star.on svg { fill: currentColor; }
   .lft-detail-chart { height: 200px; margin: 4px 0 14px; }
+  /* The star sits in the card corner where Add an exercise puts its tick. */
+  .lft-card { padding-right: 40px; }
+  .lft-card .lft-star { position: absolute; top: 4px; right: 4px; width: 34px; height: 34px; }
+  /* No figure sizing here on purpose. The grid's own .cb-fig rules already
+     size the canvas at 110px, and overriding only the box clipped the figure
+     straight through the exercise name underneath it. Looking like the picker
+     means using the picker's numbers, not numbers near them. */
+  /* capitalize is right for "barbell · intermediate" in the picker and wrong
+     for a unit: it turned every "228 lb" into "228 Lb". */
+  .lft-card .cb-card-meta { text-transform: none; }
+
+  /* The heaviest thing actually lifted, said once and said big. */
+  .pr-top {
+    display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline;
+    padding: 13px 14px; border: 1px solid var(--border); border-radius: 12px;
+    background: var(--panel); margin-bottom: 12px;
+  }
+  .pr-top-k { font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+  .pr-top-v { grid-row: 2; font-size: 24px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.02em; }
+  .pr-top-v em { font-style: normal; font-size: 16px; font-weight: 600; color: var(--muted); }
+  .pr-top-d { grid-column: 2; grid-row: 2; font-size: 12.5px; color: var(--muted); }
+
+  .pr-wrap { margin-bottom: 14px; }
+  .pr-head { font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 0 2px 8px; }
+  .pr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pr-cell {
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 8px; text-align: center; background: var(--panel);
+  }
+  .pr-cell b { display: block; font-size: 19px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .pr-cell b i { font-style: normal; font-size: 11.5px; font-weight: 600; color: var(--muted); margin-left: 2px; }
+  .pr-cell span { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .pr-foot { margin-top: 9px; }
   .ms-row { display: flex; gap: 11px; align-items: flex-start; padding: 11px 0;
             border-bottom: 1px solid var(--border); }
   .ms-row:last-child { border-bottom: none; }
@@ -6208,7 +6240,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.6";
+const APP_VERSION = "2026.09.16.7";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -15161,28 +15193,37 @@ function renderLiftList() {
   const lifts = allLiftsFor(name).sort((a, b) => b.lastDate.localeCompare(a.lastDate));
   const pins = getPinnedLifts();
 
+  /* Same shape as Add an exercise, on purpose: Mo, "can we have it like how
+     it is when we add an exercise, showing the animations". It is also the
+     only place in the app where a grid of exercises already works, figures
+     and all, so this borrows cb-grid and cb-card rather than growing a second
+     one to drift away from it. The tick in the corner becomes a star, because
+     here the corner action is featuring rather than adding. */
   $("liftsSheet").innerHTML = `
     <div class="ds-grip"></div>
-    <div class="scr-head">
-      <button type="button" class="scr-back" id="lftClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
-      <div class="scr-title">All lifts</div>
-      <div class="spacer"></div>
+    <div class="cb-sheet-head">
+      <div>
+        <div class="cb-sheet-title">All lifts</div>
+        <div class="cb-sheet-count">${pins.length} of ${MAX_PINNED_LIFTS} featured on Strength</div>
+      </div>
+      <button type="button" class="ds-x" id="lftClose" aria-label="Close">&times;</button>
     </div>
-    <p class="muted-note" style="margin:-6px 0 14px;">
-      ${lifts.length} logged. Star up to ${MAX_PINNED_LIFTS} to feature them on Strength.
+    <p class="muted-note" style="margin:-2px 0 12px;">
+      Tap one for its numbers. Tap its star to put it on the Strength card.
     </p>
-    ${lifts.map((l) => {
-      const on = pins.some((p) => p.toLowerCase() === l.name.toLowerCase());
-      const lv = strengthLevelFor(name, l.name);
-      return `<div class="wk-row lft-row" data-open="${escapeHtml(l.name)}">
-        <span class="wk-ico">${icon("dumbbell", 17)}</span>
-        <span class="wk-txt">
-          <span class="wk-name">${escapeHtml(l.name)}</span>
-          <span class="wk-meta">${lv ? escapeHtml(lv.level) + " · " : ""}best ${l.best} lb · ${escapeHtml(datedLabel(l.lastDate))}</span>
-        </span>
-        <button type="button" class="lft-star${on ? " on" : ""}" data-star="${escapeHtml(l.name)}" aria-label="${on ? "Remove from Strength" : "Feature on Strength"}">${icon("star", 20)}</button>
-      </div>`;
-    }).join("")}`;
+    <div class="cb-grid" id="lftGrid">
+      ${lifts.map((l, i) => {
+        const on = pins.some((p) => p.toLowerCase() === l.name.toLowerCase());
+        const lv = strengthLevelFor(name, l.name);
+        return `<div class="cb-card lft-card${on ? " picked" : ""}" data-open="${escapeHtml(l.name)}" style="--d:${Math.min(i, 12) * 22}ms">
+          <span class="cb-fig" data-fig="${escapeHtml(l.name)}"></span>
+          <span class="cb-card-name">${escapeHtml(l.name)}</span>
+          <span class="cb-card-meta">${lv ? escapeHtml(lv.level) + " · " : ""}${l.best} lb</span>
+          <button type="button" class="lft-star${on ? " on" : ""}" data-star="${escapeHtml(l.name)}"
+            aria-label="${on ? "Remove from Strength" : "Feature on Strength"}">${icon("star", 18)}</button>
+        </div>`;
+      }).join("")}
+    </div>`;
 
   $("lftClose").onclick = closeLiftBrowser;
   $("liftsSheet").querySelectorAll("[data-open]").forEach((row) => {
@@ -15195,6 +15236,7 @@ function renderLiftList() {
       renderLiftList();
     };
   });
+  mountMotionFigures($("lftGrid"));
 }
 
 /* One toast, three meanings, so tapping the star never just changes silently.
@@ -15214,6 +15256,8 @@ function openLiftDetail(exerciseName) {
   const l = allLiftsFor(name).find((x) => x.name === exerciseName);
   if (!l) return;
   const on = isPinnedLift(exerciseName);
+  const top = heaviestSet(name, exerciseName);
+  const reps = repMaxTable(name, exerciseName);
 
   $("liftsSheet").innerHTML = `
     <div class="ds-grip"></div>
@@ -15230,7 +15274,23 @@ function openLiftDetail(exerciseName) {
       <canvas id="lftChart"></canvas>
       <div class="str-single hidden" id="lftSingle"></div>
     </div>
-    <p class="muted-note">Best ${l.best} lb estimated · ${l.sets} sets logged · last done ${escapeHtml(datedLabel(l.lastDate))}.</p>
+    ${top ? `<div class="pr-top">
+      <span class="pr-top-k">Heaviest set</span>
+      <span class="pr-top-v">${top.weight} lb <em>x ${top.reps}</em></span>
+      <span class="pr-top-d">${escapeHtml(datedLabel(top.date))}</span>
+    </div>` : ""}
+    ${reps.length ? `<div class="pr-wrap">
+      <div class="pr-head">Best by reps</div>
+      <div class="pr-grid">
+        ${reps.map((r) => `<div class="pr-cell">
+          <b>${r.weight}<i>lb</i></b>
+          <span>${r.target} rep${r.target === 1 ? "" : "s"}</span>
+        </div>`).join("")}
+      </div>
+      <p class="muted-note pr-foot">Heaviest weight you have carried to that many reps. The top of this
+        list is max strength, the bottom is strength endurance, and they move separately.</p>
+    </div>` : ""}
+    <p class="muted-note">Estimated max ${l.best} lb · ${l.sets} sets logged · last done ${escapeHtml(datedLabel(l.lastDate))}.</p>
   `;
 
   $("lftBack").onclick = renderLiftList;
@@ -24090,6 +24150,37 @@ const LIFT_STANDARDS = {
   "pendlay row":            ["row", 0.95],
 };
 
+/* The bodyweight the standards table is written for. A threshold of 1.30x
+   bench means 1.30 x THIS, not 1.30 x whatever you happen to weigh. */
+const STRENGTH_REF_BW = { Male: 180, Female: 140 };
+
+/* Why this is not `multiple * bodyweight`.
+
+   Strength does not scale with bodyweight, it scales with roughly bodyweight
+   to the two thirds, because force tracks muscle cross section (an area) while
+   mass tracks volume. That is the result every serious powerlifting formula
+   exists to correct for: Wilks, DOTS and IPF Goodlift are all the same idea.
+   mo-knowledge/research/01-bodyweight.md has the working.
+
+   A flat multiple gets this wrong at both ends, and the errors are not small.
+   Holding male bench Intermediate at a flat 1.30x asks a 250 lb lifter for
+   325 lb when the equivalent achievement is 292, and lets a 130 lb lifter
+   through at 169 when the equivalent is 188. So the big lifter is told he is
+   a level below where he actually is, and the small one a level above. Both
+   of those are the feature failing at the exact thing it is for.
+
+   Height is deliberately NOT in here. The leverage disadvantage of long arms
+   on a bench press is real, but no strength standard anywhere uses height:
+   not Wilks, not DOTS, not IPF Goodlift, not Symmetric Strength, not Stronger
+   by Science. Bodyweight already carries most of it, and the leftover is
+   individual variation with no published coefficient to apply. Putting a
+   number on it would mean inventing one, which is the thing this feature
+   promised not to do. */
+function strengthThresholdLb(multiple, sex, bw) {
+  const ref = STRENGTH_REF_BW[sex] || STRENGTH_REF_BW.Male;
+  return multiple * ref * Math.pow(bw / ref, 0.67);
+}
+
 /* Strength peaks around 18 to 35 and falls away either side, so a fixed table
    would tell a 58 year old they are a beginner for lifting what is genuinely
    strong at 58. The thresholds move instead of the person. Shaped after the
@@ -24121,8 +24212,11 @@ function strengthLevelFor(name, exerciseName) {
   const sex = profile?.sex === "Female" ? "Female" : "Male";
   const [key, factor] = std;
   const age = ageStrengthFactor(profile?.age);
-  /* One scale, built once, so the bar and the sentence can never disagree. */
-  const cuts = STRENGTH_STANDARDS[key][sex].map((t) => t * factor * age * bw);
+  /* One scale, built once, so the bar and the sentence can never disagree.
+     The thresholds are multiples of a REFERENCE bodyweight, then scaled to
+     this person allometrically, which is the whole reason this is not just
+     `t * bw`. See strengthThresholdLb. */
+  const cuts = STRENGTH_STANDARDS[key][sex].map((t) => strengthThresholdLb(t, sex, bw) * factor * age);
 
   let idx = 0;
   while (idx < cuts.length && best >= cuts[idx]) idx++;
@@ -24352,6 +24446,51 @@ function msShowMuscle(group) {
       <i class="ms-dot ${st === "up" ? "up" : st === "cold" ? "cold" : "flat"}"></i>
       <span class="ms-txt"><b>${escapeHtml(s.head)}</b><span>${escapeHtml(s.sub)}</span></span>
     </div>`;
+}
+
+/* ---- Personal records, by rep count ----
+
+   Mo asked for the max PR and the PR for most reps, and then asked whether
+   those are different goals. They are, and that is exactly why this is a
+   table rather than one number: a heaviest single is max strength, a heaviest
+   set of ten is strength endurance, and they move independently. Somebody
+   chasing size cares about the middle of this table; somebody chasing a
+   number cares about the top of it.
+
+   "At least r reps" rather than "exactly r reps", because a set of 225 for 8
+   is proof you can do 225 for 5. Exact matching leaves holes in the table for
+   rep counts nobody happened to hit, which reads as never having done it. */
+const REP_MAX_BUCKETS = [1, 3, 5, 8, 10, 12];
+
+function repMaxTable(name, exerciseName) {
+  const key = (exerciseName || "").trim().toLowerCase();
+  const best = new Map(REP_MAX_BUCKETS.map((r) => [r, null]));
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== name || l.weight == null || l.duration_min) continue;
+    if ((l.exercise_name || "").trim().toLowerCase() !== key) continue;
+    const reps = l.reps || 1;
+    for (const r of REP_MAX_BUCKETS) {
+      if (reps < r) continue;
+      const cur = best.get(r);
+      if (!cur || l.weight > cur.weight) best.set(r, { weight: l.weight, reps, date: l.entry_date });
+    }
+  }
+  return REP_MAX_BUCKETS.map((r) => ({ target: r, ...(best.get(r) || {}) })).filter((x) => x.weight);
+}
+
+/* The heaviest thing actually lifted, with the reps it was lifted for. Kept
+   apart from the estimated single on purpose: one is a fact and the other is
+   a formula, and a card that shows a formula where somebody expects a fact is
+   how a number stops being believed. */
+function heaviestSet(name, exerciseName) {
+  const key = (exerciseName || "").trim().toLowerCase();
+  let top = null;
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== name || l.weight == null || l.duration_min) continue;
+    if ((l.exercise_name || "").trim().toLowerCase() !== key) continue;
+    if (!top || l.weight > top.weight) top = { weight: l.weight, reps: l.reps || 1, date: l.entry_date };
+  }
+  return top;
 }
 
 /* The same answer as a sentence. Kept next to the maths so the words and the
