@@ -43,11 +43,25 @@ const BY_EMAIL: Array<[string, string]> = [
   ["user_goals", "email"],
   ["milestone_badges", "email"],
   ["nudge_log", "email"],
-  /* Left behind, this one keeps pushing notifications to a phone whose
-     account no longer exists. */
+  /* Left behind, either of these keeps pushing notifications to a phone whose
+     account no longer exists: push_subscriptions is the web push endpoint and
+     apns_tokens is the native one the Capacitor build registers. apns_tokens
+     did not exist when this list was last touched, which is exactly the way a
+     table goes missing from here. Checked against the live table list on
+     2026-09-15: these two plus the entries below are every table in the public
+     schema that holds a row keyed to a person, and `seasons` is the only one
+     deliberately left out because it is shared reference data owned by nobody. */
   ["push_subscriptions", "email"],
+  ["apns_tokens", "email"],
   ["live_sessions", "email"],
   ["group_members", "email"],
+  /* The invite-code rate limiter's memory, added by the 2026-09-15 migration.
+     It holds this person's address against every code they ever typed. Losing
+     the lockout state with the account is fine: deleting the account is a far
+     higher price than waiting fifteen minutes, and the allowed_emails row goes
+     with it. A project that has not run that migration yet answers 404 here,
+     which del() treats as success. */
+  ["invite_code_attempts", "actor_email"],
 ];
 
 /* Answers whether the rows are actually gone, which used to be assumed.
