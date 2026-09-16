@@ -4330,13 +4330,22 @@
   .bi-grid .bi-head { position: relative; z-index: 1; }
   /* Single-line rows now that the bars are gone, so they sit closer together
      and read as one ranked list rather than five floating lines. */
-  .bi-list { display: flex; flex-direction: column; gap: 9px; }
+  /* Each row is a 44px tap target. It used to be 18.8px: one line of 12.5px
+     text, no padding, and a 9px gap doing nothing for the finger, on a control
+     that opens the whole muscle drill-down. The height comes from min-height
+     rather than padding, and the 9px gap is spent paying for it, so the list
+     grows from 130px to 220px and the column beside it is 250px of figure.
+     The card does not get taller. */
+  .bi-list { display: flex; flex-direction: column; }
   .bi-row {
-    display: block; width: 100%; text-align: left; padding: 0; border: none; background: none;
+    display: flex; align-items: center; min-height: 44px;
+    width: 100%; text-align: left; padding: 0; border: none; background: none;
     color: inherit; font: inherit; cursor: pointer; transition: transform .12s;
   }
   .bi-row:active { transform: scale(.985); }
-  .bi-row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 12.5px; }
+  .bi-row-top { flex: 1; min-width: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 12.5px; }
+  /* The "top 5 of 10" line sat on the list's gap, which is gone. */
+  .bi-row + .bi-empty { margin-top: 8px; }
   .bi-row-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bi-row-level { color: var(--muted); font-weight: 500; flex-shrink: 0; display: flex; align-items: center; gap: 2px; }
   /* No negative margin: it pushed the chevron 3px past the column edge, so
@@ -7914,7 +7923,11 @@ function focusEntriesFromAreas() {
   ranked.forEach((area, i) => {
     const plan = AREA_SPEND[i];
     if (!plan) return;
-    area.groups.slice(0, plan.take).forEach((g) => out.push([g, plan.tier]));
+    /* "quads:2", the column's own shape, not a [group, tier] pair. The pair is
+       what this returned for a while and nothing could read it: focusParseStored
+       here and parseFocus in the engine both split a string on ":", so an array
+       of arrays came back as no focus at all, in the picker and in the plan. */
+    area.groups.slice(0, plan.take).forEach((g) => out.push(`${g}:${plan.tier}`));
   });
   return out;
 }
@@ -8008,13 +8021,18 @@ function renderBodyFocusPage() {
     </div>
     <button type="button" class="btn-primary" id="focusPickSaveBtn">Save focus</button>`;
 
-  /* Seeded from whatever is stored, so reopening the page shows the ranking
-     that is actually in force rather than an empty board. */
+  /* Seeded from the saved column, so reopening the page shows the ranking that
+     is actually in force rather than an empty board. It used to seed off
+     focusPickEntries(), which reads the picker's own in-memory state: empty on
+     every fresh launch, and a list of "chest:3" strings the loop below then
+     destructured a character at a time. Whole body is seeded here too, or
+     "Everything level" came back unticked on the next visit. */
+  const { all: storedAll, picked: storedPicks } = focusParseStored(MY_PROFILE?.focus_groups);
+  FOCUS_ALL = storedAll;
   FOCUS_AREA_RANK = {};
   if (!FOCUS_ALL) {
-    const stored = focusPickEntries();
     const best = {};
-    for (const [g, t] of stored) {
+    for (const [g, t] of storedPicks) {
       const area = FOCUS_AREAS.find((a) => a.groups.includes(g));
       if (area) best[area.key] = Math.max(best[area.key] || 0, t);
     }
@@ -8043,15 +8061,27 @@ function closeBodyFocusPage() {
 }
 
 async function saveBodyFocus() {
-  const entries = FOCUS_ALL ? [] : focusEntriesFromAreas();
+  /* Whole body is the single token "all", not an empty list. Both come back to
+     the plan as the same even week, but only "all" comes back to this page as
+     "Everything level" and to the Setup row as "Whole body". An empty list is
+     how the row read "Not set" straight after somebody saved. */
+  const entries = FOCUS_ALL ? ["all"] : focusEntriesFromAreas();
   const btn = $("focusPickSaveBtn");
   btn.disabled = true;
   const ok = await saveFocusGroups(entries);
   btn.disabled = false;
   if (!ok) return;
   if (FOCUS_ALL) toast("Whole body saved. Nothing stands out, so nothing gets extra.");
+  /* Read off what was written, never off FOCUS_PICKED. The figure lights the
+     whole area you ranked; what the budget pays for is the handful of groups
+     in `entries`, and the toast naming seven muscles when four were saved was
+     the app describing a plan it had not built. */
   else toast(entries.length
-    ? "Focus saved: " + focusPickOrder().map(([g, t]) => `${BODY_GROUP_LABELS[g]} ${FOCUS_TIER_WORD[t].toLowerCase()}`).join(", ")
+    ? "Focus saved: " + entries.map((e, i) => {
+        const [g, t] = e.split(":");
+        const name = BODY_GROUP_LABELS[g] || g;
+        return `${i ? name.toLowerCase() : name} ${FOCUS_TIER_WORD[t].toLowerCase()}`;
+      }).join(", ")
     : "Focus cleared");
   closeSettingsPage();
 }
@@ -8179,12 +8209,11 @@ function focusParseStored(stored) {
 function focusOrderOf(picked) {
   return [...picked.entries()].sort((a, b) => (b[1] - a[1]) || (FOCUS_GROUP_ORDER.indexOf(a[0]) - FOCUS_GROUP_ORDER.indexOf(b[0])));
 }
-function focusPickOrder() { return focusOrderOf(FOCUS_PICKED); }
-
-function focusPickEntries() {
-  if (FOCUS_ALL) return ["all"];
-  return focusPickOrder().map(([g, t]) => `${g}:${t}`);
-}
+/* focusPickOrder()/focusPickEntries() lived here and are gone. They read
+   FOCUS_PICKED, which is the figure's paint state (the whole ranked area) and
+   not the pick: empty on a fresh launch, and wider than what the budget buys.
+   Seeding and saving both read the stored column now, through
+   focusParseStored() and focusEntriesFromAreas(). */
 
 /* The engine's own cut, mirrored so the screen can say which picks the plan
    will not get to before somebody saves them: highest tier first, and it keeps
@@ -11468,8 +11497,24 @@ function closeRecap() { $("recapScrim").classList.add("hidden"); }
    for anywhere that accepts one. */
 const SHARE_URL = "https://m-m-fitness-tracker.vercel.app";
 
-function drawRecapCard(r) {
+/* A canvas font string is not a CSS rule: an unavailable family falls back to
+   the browser's default sans without an error, a warning or a visible clue.
+   This card was set in "Sora", which index.html has not loaded since the type
+   was cut back to one family, so every workout anybody shared went out in
+   Helvetica. Name the face the app actually loads, and wait for it: on a cold
+   share the stylesheet may have landed while the font file has not. */
+const CARD_FONT = '"DM Sans", -apple-system, sans-serif';
+async function cardFontReady() {
+  try {
+    // One per WEIGHT the card draws. The size in a load() spec is ignored for
+    // matching; the weight is what picks a different file.
+    await Promise.all([800, 700, 500].map((w) => document.fonts.load(`${w} 80px "DM Sans"`)));
+  } catch { /* no Font Loading API, or offline: the fallback stack draws */ }
+}
+
+async function drawRecapCard(r) {
   const W = 1080, H = 1350;
+  await cardFontReady();
   const cv = document.createElement("canvas");
   cv.width = W; cv.height = H;
   const x = cv.getContext("2d");
@@ -11480,16 +11525,31 @@ function drawRecapCard(r) {
   x.fillStyle = g; x.fillRect(0, 0, W, H);
 
   x.fillStyle = "#a8ff00";
-  x.font = "800 34px Sora, sans-serif";
-  x.fillText("FIT TOGETHER", 80, 130);
+  x.font = `800 34px ${CARD_FONT}`;
+  x.fillText("UNIO", 80, 130);
 
   x.fillStyle = "#8b94a3";
-  x.font = "700 30px Sora, sans-serif";
+  x.font = `700 30px ${CARD_FONT}`;
   x.fillText("WORKOUT COMPLETED", 80, 260);
 
+  /* Sized to the space rather than cut to a character count. "Upper body,
+     push" is 17 characters and ran off the right edge at 84px; the old
+     slice(0, 22) could not have known that, because how wide a title is
+     depends on which letters are in it. */
   x.fillStyle = "#f4f6f8";
-  x.font = "800 84px Sora, sans-serif";
-  x.fillText(r.title.slice(0, 22), 80, 360);
+  let titleSize = 84;
+  let title = r.title;
+  x.font = `800 ${titleSize}px ${CARD_FONT}`;
+  while (titleSize > 46 && x.measureText(title).width > W - 160) {
+    titleSize -= 4;
+    x.font = `800 ${titleSize}px ${CARD_FONT}`;
+  }
+  // A title long enough to still not fit at the floor gets trimmed, visibly.
+  if (x.measureText(title).width > W - 160) {
+    while (title.length > 4 && x.measureText(title + "...").width > W - 160) title = title.slice(0, -1);
+    title += "...";
+  }
+  x.fillText(title, 80, 360);
 
   const stats = [
     [String(r.sets || 0), "SETS"],
@@ -11501,16 +11561,16 @@ function drawRecapCard(r) {
   let y = 520;
   for (const [val, label] of stats) {
     x.fillStyle = "#a8ff00";
-    x.font = "800 76px Sora, sans-serif";
+    x.font = `800 76px ${CARD_FONT}`;
     x.fillText(val, 80, y);
     x.fillStyle = "#8b94a3";
-    x.font = "700 28px Sora, sans-serif";
+    x.font = `700 28px ${CARD_FONT}`;
     x.fillText(label, 80, y + 46);
     y += 170;
   }
 
   x.fillStyle = "#8b94a3";
-  x.font = "500 30px Sora, sans-serif";
+  x.font = `500 30px ${CARD_FONT}`;
   x.fillText(SHARE_URL.replace("https://", ""), 80, H - 90);
 
   return new Promise((res) => cv.toBlob(res, "image/png"));
@@ -13970,7 +14030,7 @@ function renderStrengthChart() {
     single.classList.remove("hidden");
     single.innerHTML = history.length
       ? `<b>${history[0].weight} lbs</b><span>Logged once so far</span>`
-      : `<b>—</b><span>Not logged in the last 12 weeks</span>`;
+      : `<b>Not yet</b><span>Not logged in the last 12 weeks</span>`;
   } else {
     single.classList.add("hidden");
     const values = history.map((h) => h.weight);
@@ -14038,8 +14098,8 @@ function renderVolumeStats() {
   const vsAvg = avg > 0 ? Math.round(((thisWeek - avg) / avg) * 100) : null;
   $("volumeStats").innerHTML = `
     <div class="wt-stat"><b>${fmtVolume(thisWeek)}</b><span>This week, lb</span></div>
-    <div class="wt-stat"><b>${avg > 0 ? fmtVolume(avg) : "—"}</b><span>8-week avg</span></div>
-    <div class="wt-stat${vsAvg == null ? "" : vsAvg >= 0 ? " good" : ""}"><b>${vsAvg == null ? "—" : `${vsAvg > 0 ? "+" : ""}${vsAvg}%`}</b><span>Vs. average</span></div>`;
+    <div class="wt-stat"><b>${avg > 0 ? fmtVolume(avg) : "Not yet"}</b><span>8-week avg</span></div>
+    <div class="wt-stat${vsAvg == null ? "" : vsAvg >= 0 ? " good" : ""}"><b>${vsAvg == null ? "Not yet" : `${vsAvg > 0 ? "+" : ""}${vsAvg}%`}</b><span>Vs. average</span></div>`;
 }
 
 let volumeChart = null;
@@ -15816,12 +15876,19 @@ function jumpToExercise(idx) {
   if (idx >= TODAY_WORKOUT.exercises.length) return;
   if (SESSION.completed[idx]) return;
 
+  const name = TODAY_WORKOUT.exercises[idx].name;
   SESSION.exerciseIndex = idx;
   SESSION.restStartedAt = null;    // a new exercise is not a rest period
   stopRestTicker();
   saveSessionToStorage();
   renderSession();
-  toast(`Switched to ${TODAY_WORKOUT.exercises[idx].name}`);
+  /* Both this toast and the kit peek (renderSession -> maybeKitPeek) park
+     themselves on the same blank strip of the stage, and the peek already
+     says "you're on a new exercise" more usefully, with a picture. Firing
+     both meant the toast sat on top of the peek card mid-word. Only the one
+     that is actually going to show wins: the toast when there is no kit to
+     show (bodyweight) or the peek is switched off, the peek otherwise. */
+  if (kitPeekMuted() || !kitForDay([name]).length) toast(`Switched to ${name}`);
 }
 
 function startNextSet(setIdx) {
@@ -22516,7 +22583,7 @@ function progressHeadline(kind, name, email, profile, third) {
     const up = goal ? goal.target_value > (goal.start_value ?? first ?? 0)
       : profile?.goal_bubble === "build-muscle" || /muscle|gain/.test((profile?.goal || "").toLowerCase());
     if (!rows.length) {
-      return { value: "—", line: `${Subj} ${have} not logged a weigh-in yet.`,
+      return { value: "Not yet", line: `${Subj} ${have} not logged a weigh-in yet.`,
         note: "One number on the scale starts this. Two weeks of them and it can tell you the rate you are moving at." };
     }
     const now = rows[rows.length - 1].weight;
@@ -22563,7 +22630,7 @@ function progressHeadline(kind, name, email, profile, third) {
     const finished = weeks.slice(0, -1);
     const trained = finished.filter((w) => w.days > 0);
     if (trained.length < 2) {
-      return { value: "—", line: `${Subj} ${have} not finished two weeks of training yet.`,
+      return { value: "Not yet", line: `${Subj} ${have} not finished two weeks of training yet.`,
         note: "This goal is judged on whether the sessions keep happening, so it needs a couple of finished weeks before it can say anything." };
     }
     const recent = finished.slice(-4);
@@ -22588,7 +22655,7 @@ function progressHeadline(kind, name, email, profile, third) {
   if (kind === "lift") {
     const lifts = topLiftsFor(name, 12);
     if (!lifts.length) {
-      return { value: "—", line: `${Subj} ${have} not logged a weighted set yet.`,
+      return { value: "Not yet", line: `${Subj} ${have} not logged a weighted set yet.`,
         note: "Log one weighted exercise and this starts following what it does over the weeks." };
     }
     const want = `${profile?.goal_detail || ""} ${profile?.goal || ""}`.toLowerCase();
@@ -22596,7 +22663,7 @@ function progressHeadline(kind, name, email, profile, third) {
     const hist = liftE1rmHistory(name, picked.name);
     const lift = escapeHtml(picked.name);
     if (!hist.length) {
-      return { value: "—", line: `${Subj} ${have} not logged ${lift} in the last sixteen weeks.`,
+      return { value: "Not yet", line: `${Subj} ${have} not logged ${lift} in the last sixteen weeks.`,
         note: "The lift is in the history but not recently enough to read a direction off." };
     }
     const last = Math.round(hist[hist.length - 1].est);
@@ -22648,7 +22715,7 @@ function progressHeadline(kind, name, email, profile, third) {
     const groups = Object.entries(vols).filter(([, v]) => v > 0);
     const total = Math.round(groups.reduce((n, [, v]) => n + v, 0));
     if (!total) {
-      return { value: "—", line: `${Subj} ${have} not logged any sets in the last seven days.`,
+      return { value: "Not yet", line: `${Subj} ${have} not logged any sets in the last seven days.`,
         note: "Muscle is built by hard sets per muscle group per week, about 10 to 20 each. Log a session and this starts counting them." };
     }
     const target = BODY_IMPACT_TARGET.week;
@@ -22674,7 +22741,7 @@ function progressHeadline(kind, name, email, profile, third) {
     const label = isPull ? "pull-up" : "push-up";
     const best = bestRepsFor(name, re);
     if (!best) {
-      return { value: "—", line: `${Subj} ${have} not logged a ${label} yet.`,
+      return { value: "Not yet", line: `${Subj} ${have} not logged a ${label} yet.`,
         note: `Log a set, even an assisted one${isPull ? " on the band or the machine" : " off your knees"}. The number climbing is the whole goal, and it cannot climb from nothing.` };
     }
     const month = new Date(todayStr() + "T00:00:00");
@@ -22693,7 +22760,7 @@ function progressHeadline(kind, name, email, profile, third) {
   if (kind === "endurance") {
     const runs = runLogsFor(name, 28);
     if (!runs.length) {
-      return { value: "—", line: `${Subj} ${have} not logged a run in the last four weeks.`,
+      return { value: "Not yet", line: `${Subj} ${have} not logged a run in the last four weeks.`,
         note: "Log a run with its minutes and this starts following time on feet." };
     }
     const longest = Math.max(...runs.map((r) => r.duration_min));
@@ -24038,6 +24105,23 @@ if ("serviceWorker" in navigator) {
   });
 
   const RELOAD_KEY = "ft-reloaded-for";
+  /* How the deployed sw.js is read for its version. It matches the CACHE
+     declaration and the version's own SHAPE, and deliberately names no
+     product: the previous pattern was /fit-together-([0-9.]+)/ and went dead
+     the day the cache was renamed to "unio-", because the app was hardcoding
+     one name while bump-version.mjs and boot-check.mjs hardcoded another.
+     Dead silently, too: no match means no live version, and ensureLatestBuild
+     returns at the very next line, so a permanently broken update check is
+     indistinguishable at runtime from a permanently up-to-date app. Nobody has
+     been offered a new build since the rename.
+
+     A shape cannot be renamed, but it can still be outgrown, so the real guard
+     is not this line. scripts/boot-check.mjs lifts THIS literal out of
+     index.html by name and runs it against the real sw.js: if it ever comes
+     back empty, or disagrees with APP_VERSION, the build fails and says so.
+     Rename the cache to anything at all and nothing breaks. Change the version
+     to a shape this does not match and you find out before it ships. */
+  const SW_VERSION_RE = /CACHE\s*=\s*["'][^"']*?(\d{4}\.\d{2}\.\d{2}\.\d+)["']/;
   let lastVersionCheck = 0;
   const ensureLatestBuild = async () => {
     if (reloading || midSession() || Date.now() - lastVersionCheck < 45000) return;
@@ -24045,7 +24129,7 @@ if ("serviceWorker" in navigator) {
     let live = "";
     try {
       const text = await (await fetch("/sw.js", { cache: "no-store" })).text();
-      live = (text.match(/fit-together-([0-9.]+)/) || [])[1] || "";
+      live = (text.match(SW_VERSION_RE) || [])[1] || "";
     } catch { return; }            // offline is not a reason to do anything
     if (!live || live === APP_VERSION) return;
     /* One reload per version, so a mismatch we cannot fix can never loop. */
