@@ -220,20 +220,20 @@ const INCLINE_DUMBBELL_PRESS = {
   fit: { k: 0.95, dy: 0 },
   props: [
     { type: "bench", x: 32, y: 89, w: 72, incline: -35 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
+    { type: "dumbbell", hold: "grip", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", hold: "grip", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // lockout, arms long square to the reclined torso
       t: 0,
       root: { x: 84, y: 90, rot: -55 },
-      joints: { spine: 0, neck: -6 },
+      joints: { spine: 0, neck: -6, forearmPronR: 90, forearmPronL: 90 },
       ik: { wristR: { x: 80.5, y: 43.3, bend: 1 }, wristL: { x: 83.5, y: 46.3, bend: 1 }, ...stand(110, 104) },
     },
     { // bottom, bells beside the upper chest
       t: 1,
       root: { x: 84, y: 90, rot: -55 },
-      joints: { spine: 2, neck: -8 },
+      joints: { spine: 2, neck: -8, forearmPronR: 90, forearmPronL: 90 },
       ik: { wristR: { x: 71.6, y: 56.2, bend: 1 }, wristL: { x: 74.6, y: 59.2, bend: 1 }, ...stand(110, 104) },
     },
   ],
@@ -1043,14 +1043,14 @@ const FRONT_RAISE = {
   dur: 2.8,
   breath: 0.2,
   props: [
-    { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
+    { type: "dumbbell", hold: "grip", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", hold: "grip", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
     { // bottom, bells resting against the thighs
       t: 0,
       root: { x: 60, y: 61.4, rot: 2 },
-      joints: { spine: 2, neck: 0 },
+      joints: { spine: 2, neck: 0, forearmPronR: 90, forearmPronL: 90 },
       ik: {
         wristR: { x: 68.2, y: 67.0, bend: 1 }, wristL: { x: 65.2, y: 69.0, bend: 1 },
         ...stand(62, 57),
@@ -1059,7 +1059,7 @@ const FRONT_RAISE = {
     { // top, arm long and level, stopping at shoulder height
       t: 1,
       root: { x: 60, y: 61.4, rot: 2 },
-      joints: { spine: 0, neck: -2 },
+      joints: { spine: 0, neck: -2, forearmPronR: 90, forearmPronL: 90 },
       ik: {
         wristR: { x: 98.1, y: 27.0, bend: 1 }, wristL: { x: 95.1, y: 30.0, bend: 1 },
         ...stand(62, 57),
@@ -1073,6 +1073,11 @@ const FRONT_RAISE = {
 // to a lockout above the head. Side view.
 const MACHINE_SHOULDER_PRESS = {
   view: "side",
+  /* Same reason as ARNOLD_PRESS: the near arm sweeps up past the head and the
+     default layering hands the head the win, so the arm looked like it ran
+     behind the skull at the start. It is the nearer thing, so it draws in
+     front. */
+  armOverHead: true,
   loop: "pingpong",
   dur: 3.0,
   breath: 0.2,
@@ -1112,20 +1117,20 @@ const SEATED_DUMBBELL_PRESS = {
   props: [
     { type: "bench", x: 20, y: 70, w: 44, incline: -78 },
     { type: "bench", x: 36, y: 96, w: 36 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
+    { type: "dumbbell", hold: "grip", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", hold: "grip", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
     { // start, bells at the shoulders, elbows under the hands
       t: 0,
       root: { x: 52, y: 86, rot: -4 },
-      joints: { spine: 0, neck: -2 },
+      joints: { spine: 0, neck: -2, forearmPronR: 90, forearmPronL: 90 },
       ik: { wristR: { x: 67.8, y: 47.0, bend: 1 }, wristL: { x: 63.8, y: 50.0, bend: 1 }, ...stand(82, 78) },
     },
     { // lockout, bells nearly touching over the head
       t: 1,
       root: { x: 52, y: 86, rot: -4 },
-      joints: { spine: -2, neck: -4 },
+      joints: { spine: -2, neck: -4, forearmPronR: 90, forearmPronL: 90 },
       ik: { wristR: { x: 57.7, y: 19.0, bend: 1 }, wristL: { x: 54.7, y: 22.0, bend: 1 }, ...stand(82, 78) },
     },
   ],
@@ -1265,13 +1270,16 @@ const ARNOLD_PRESS = {
 // view, and authored with three keyframes for that reason.
 const CUBAN_PRESS = {
   view: "side",
+  /* The near arm passes the head on the way to lockout and is the nearer
+     thing, so it draws in front. See ARNOLD_PRESS. */
+  armOverHead: true,
   loop: "pingpong",
   dur: 3.6,
   breath: 0.2,
   fit: { k: 0.84, dy: 10 },
   props: [
-    { type: "dumbbell", side: "L", point: "hand", k: 0.72 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.72, front: true },
+    { type: "dumbbell", hold: "grip", side: "L", point: "hand", k: 0.72 },
+    { type: "dumbbell", hold: "grip", side: "R", point: "hand", k: 0.72, front: true },
   ],
   keys: [
     { // bells at the thighs, arms long
@@ -1279,8 +1287,7 @@ const CUBAN_PRESS = {
       root: { x: 60, y: 61.4, rot: 2 },
       joints: {
         spine: 2, neck: 0,
-        shoulderR: 8, elbowR: 14, shoulderL: 6, elbowL: 16,
-      },
+        shoulderR: 8, elbowR: 14, shoulderL: 6, elbowL: 16, forearmPronR: 90, forearmPronL: 90 },
       ik: { ...stand(62, 57) },
     },
     { // elbows pulled up high, bells at the chest. Kept clear of the chin: the
@@ -1290,18 +1297,23 @@ const CUBAN_PRESS = {
       root: { x: 60, y: 61.4, rot: 2 },
       joints: {
         spine: 0, neck: -2,
-        shoulderR: 70, elbowR: 78, shoulderL: 67, elbowL: 76,
-      },
+        shoulderR: 70, elbowR: 78, shoulderL: 67, elbowL: 76, forearmPronR: 90, forearmPronL: 90 },
       ik: { ...stand(62, 57) },
     },
-    { // rotated up and pressed to lockout, arm just past vertical so the face
-      // is not buried under it
+    { /* rotated up and pressed to lockout. This used to sit at 191 and 188,
+         leaning the arms back past vertical, with the neck cranked to -20 on
+         top, all so the head would not be buried under the near arm. That was
+         the same dodge ARNOLD_PRESS was carrying and it has the same answer:
+         armOverHead lets the arm draw where it actually is, so the press can
+         finish where a press finishes. 166 matches the other overhead
+         lockouts. The neck keeps a small forward tilt at -12, which is a head
+         looking ahead at the top of a press rather than one thrown back to get
+         out of the way, and it happens to leave the face clearest too. */
       t: 1,
       root: { x: 60, y: 61.4, rot: 2 },
       joints: {
-        spine: -2, neck: -20,
-        shoulderR: 191, elbowR: 8, shoulderL: 188, elbowL: 10,
-      },
+        spine: -2, neck: -12,
+        shoulderR: 166, elbowR: 8, shoulderL: 163, elbowL: 10, forearmPronR: 90, forearmPronL: 90 },
       ik: { ...stand(62, 57) },
     },
   ],
@@ -1468,13 +1480,13 @@ const CONCENTRATION_CURL = {
   breath: 0.2,
   props: [
     { type: "bench", x: 30, y: 96, w: 44 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.85, front: true },
+    { type: "dumbbell", hold: "grip", side: "R", point: "hand", k: 0.85, front: true },
   ],
   keys: [
     { // bottom, working arm hanging long inside the knee
       t: 0,
       root: { x: 46, y: 88, rot: 18 },
-      joints: { spine: 22, neck: -12 },
+      joints: { spine: 22, neck: -12, forearmPronR: -86 },
       ik: {
         wristR: { x: 86.0, y: 97.7, bend: 1 }, wristL: { x: 62.0, y: 93.7, bend: 1 },
         ankleR: { x: 76, y: FLOOR, bend: -1 }, ankleL: { x: 70, y: FLOOR, bend: -1 },
@@ -1483,7 +1495,7 @@ const CONCENTRATION_CURL = {
     { // top, bell curled to the shoulder, elbow never leaving the thigh
       t: 1,
       root: { x: 46, y: 88, rot: 18 },
-      joints: { spine: 22, neck: -12 },
+      joints: { spine: 22, neck: -12, forearmPronR: -86 },
       ik: {
         wristR: { x: 80.0, y: 71.7, bend: 1 }, wristL: { x: 62.0, y: 93.7, bend: 1 },
         ankleR: { x: 76, y: FLOOR, bend: -1 }, ankleL: { x: 70, y: FLOOR, bend: -1 },
@@ -1539,14 +1551,14 @@ const INCLINE_DUMBBELL_CURL = {
   fit: { k: 0.95, dy: 0 },
   props: [
     { type: "bench", x: 32, y: 81, w: 72, incline: -46 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
+    { type: "dumbbell", hold: "grip", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", hold: "grip", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
     { // bottom, arms hanging straight down behind the line of the torso
       t: 0,
       root: { x: 84, y: 84, rot: -44 },
-      joints: { spine: 0, neck: -4 },
+      joints: { spine: 0, neck: -4, forearmPronR: -86, forearmPronL: -86 },
       ik: {
         wristR: { x: 71.9, y: 97.8, bend: 1 }, wristL: { x: 74.9, y: 98.8, bend: 1 },
         ...stand(110, 104),
@@ -1555,7 +1567,7 @@ const INCLINE_DUMBBELL_CURL = {
     { // top, forearms curled up, upper arms still hanging back
       t: 1,
       root: { x: 84, y: 84, rot: -44 },
-      joints: { spine: 0, neck: -6 },
+      joints: { spine: 0, neck: -6, forearmPronR: -86, forearmPronL: -86 },
       ik: {
         wristR: { x: 79.9, y: 77.8, bend: 1 }, wristL: { x: 82.9, y: 78.8, bend: 1 },
         ...stand(110, 104),
@@ -1575,14 +1587,14 @@ const SPIDER_CURL = {
   fit: { k: 0.95, dy: 2 },
   props: [
     { type: "bench", x: 31, y: 71, w: 70, incline: 35 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.78 },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.78, front: true },
+    { type: "dumbbell", hold: "grip", side: "L", point: "hand", k: 0.78 },
+    { type: "dumbbell", hold: "grip", side: "R", point: "hand", k: 0.78, front: true },
   ],
   keys: [
     { // bottom, arms hanging dead straight under the shoulders
       t: 0,
       root: { x: 46, y: 66, rot: 55 },
-      joints: { spine: 0, neck: -12 },
+      joints: { spine: 0, neck: -12, forearmPronR: -86, forearmPronL: -86 },
       ik: {
         wristR: { x: 72.5, y: 87.3, bend: 1 }, wristL: { x: 68.5, y: 88.3, bend: 1 },
         ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },
@@ -1591,7 +1603,7 @@ const SPIDER_CURL = {
     { // top, bells curled up in front of the face
       t: 1,
       root: { x: 46, y: 66, rot: 55 },
-      joints: { spine: 0, neck: -12 },
+      joints: { spine: 0, neck: -12, forearmPronR: -86, forearmPronL: -86 },
       ik: {
         wristR: { x: 82.5, y: 64.3, bend: 1 }, wristL: { x: 78.5, y: 65.3, bend: 1 },
         ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },

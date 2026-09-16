@@ -1939,28 +1939,38 @@ function drawBellTurned(ctx, C, k, f) {
     ctx.strokeStyle = C.edge; ctx.lineWidth = 3.2;
     bellHeadPath(ctx, r, g, sweep); ctx.stroke();
     ctx.fillStyle = C.iron; ctx.fill();
-    // the lit facet and the shadowed one, clipped to whatever shape the head
-    // currently is, so they read the same broadside and end on
     ctx.save();
     bellHeadPath(ctx, r, g, sweep); ctx.clip();
+    /* Two readings of the same head, crossfaded by how far round it is: the
+       lit and shadowed side facets, which is what says "hex" when you are
+       looking at the flank of it, and the concentric ring and hub, which is
+       what says "hex" when you are looking down the bar. Each is wrong at the
+       other end, so each is worth exactly what the angle says it is. Without
+       the second one an end-on grip bell is a plain slab and does not match
+       the bells every other move in the library draws. */
     const ext = r * g + sweep + 1;
+    ctx.globalAlpha = f;
     ctx.fillStyle = C.ironHi; ctx.fillRect(-r, -ext, r * 0.44, ext * 2);
     ctx.fillStyle = C.rubber; ctx.fillRect(r * 0.56, -ext, r * 0.44, ext * 2);
+    ctx.globalAlpha = g;
+    ctx.strokeStyle = C.ironHi; ctx.lineWidth = Math.max(1, r * 0.14);
+    bellHeadPath(ctx, r * 0.6, g, sweep * 0.55); ctx.stroke();
+    ctx.globalAlpha = 1;
     ctx.restore();
-    // the handle's end cap, which only exists to be seen once the bell is
-    // turned far enough that you are looking down the bar
-    if (g > 0.4) {
-      ctx.globalAlpha = Math.min(1, (g - 0.4) / 0.35);
+    // the end cap of the handle, only there to be seen once you are looking
+    // down the bar at it
+    if (g > 0.02) {
+      ctx.globalAlpha = g;
       ctx.beginPath(); ctx.arc(0, 0, Math.min(2.7, r * 0.32), 0, Math.PI * 2);
       ctx.fillStyle = C.chrome; ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0, Math.min(1.3, r * 0.14), 0, Math.PI * 2);
+      ctx.fillStyle = C.chromeLo; ctx.fill();
       ctx.globalAlpha = 1;
     }
     ctx.restore();
   }
 }
 
-/* A hexagon centred on the origin, vertex up, for the dumbbell end-on view.
-   Six sides read as "hex head" even at 20px, which a circle would not. */
 function hexPath(ctx, r) {
   ctx.beginPath();
   for (let i = 0; i < 6; i++) {
