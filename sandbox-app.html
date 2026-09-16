@@ -4073,6 +4073,52 @@
      for a unit: it turned every "228 lb" into "228 Lb". */
   .lft-card .cb-card-meta { text-transform: none; }
 
+  .str-more-row { display: flex; gap: 8px; margin-top: 10px; }
+  .str-more-row .str-more { margin-top: 0; }
+  .str-more-row .str-more:first-child:not(.hidden) ~ .str-more { border-left: 1px solid var(--border); }
+
+  /* The strength report. Prefixed sr-, not rep-, because rep- was already
+     taken by the day report's rows and the collision was not theoretical:
+     .rep-row b { margin-left: auto } from that feature landed on this one's
+     lift names and shoved every one of them into the middle of its row. It
+     looked like a flexbox problem and was a naming problem. */
+  .sr-hero {
+    border: 1px solid var(--border); border-radius: 14px; padding: 15px 16px 14px;
+    background: var(--panel); margin-bottom: 12px;
+  }
+  .sr-hero-k { font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+  .sr-hero-v { font-size: 30px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.03em; margin: 2px 0 10px; }
+  .sr-hero .lvl { margin: 0; }
+  .sr-hero-note { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 10px 0 0; }
+
+  .sr-two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .sr-cell { border: 1px solid var(--border); border-radius: 12px; padding: 11px 12px; background: var(--panel); min-width: 0; }
+  .sr-cell-k { display: block; font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .sr-cell b { display: block; font-size: 14px; font-weight: 700; margin-top: 4px; line-height: 1.25; }
+  .sr-cell-v { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+  .sr-head { font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 18px 2px 8px; }
+  .sr-list { display: flex; flex-direction: column; gap: 8px; }
+  /* A button lays its children out in a shrink-to-fit, centred anonymous box,
+     which is why the segment bar inside one came out 216px wide and 50px tall
+     instead of full width and 7px. Making the button itself the flex column
+     hands its children normal stretch behaviour and the quirk goes away. */
+  .sr-row {
+    width: 100%; text-align: left; font: inherit; color: var(--text); cursor: pointer;
+    display: flex; flex-direction: column; align-items: stretch;
+    border: 1px solid var(--border); border-radius: 12px; padding: 11px 12px 12px; background: var(--panel);
+  }
+  .sr-row:active { transform: scale(.99); }
+  .sr-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .sr-row-top b { font-size: 14px; font-weight: 700; min-width: 0; }
+  .sr-row-top span { font-size: 12.5px; color: var(--muted); flex-shrink: 0; }
+  /* width:100% is load bearing. A button shrink-wraps its own contents, and
+     these segments are flex:1 with a zero basis and nothing inside them, so
+     without it the whole bar collapsed to 16px, the width of its four gaps,
+     and every segment rendered at zero. It looked like the bar was not there
+     at all rather than like a layout bug, which is why it survived a review. */
+  .sr-row-bar { display: flex; gap: 4px; width: 100%; }
+
   /* The heaviest thing actually lifted, said once and said big. */
   .pr-top {
     display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline;
@@ -5493,7 +5539,10 @@
         <div class="str-single hidden" id="strengthSingle"></div>
       </div>
       <div class="str-list" id="strengthList"></div>
-      <button type="button" class="str-more" id="strengthAllBtn">See all lifts</button>
+      <div class="str-more-row">
+        <button type="button" class="str-more" id="strengthReportBtn">Strength report</button>
+        <button type="button" class="str-more" id="strengthAllBtn">See all lifts</button>
+      </div>
     </div>
 
     <!-- Every lift, tap one for its own page: bigger chart, the same level
@@ -5503,6 +5552,12 @@
          All workouts sheet already uses. -->
     <div class="sheet-scrim hidden" id="liftsScrim">
       <div class="partner-sheet" id="liftsSheet"></div>
+    </div>
+
+    <!-- One page that answers "how strong am I" across everything, rather
+         than one lift at a time. -->
+    <div class="sheet-scrim hidden" id="reportScrim">
+      <div class="partner-sheet" id="reportSheet"></div>
     </div>
 
     <div class="card metric-card" id="cardVolume">
@@ -6240,7 +6295,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.7";
+const APP_VERSION = "2026.09.16.8";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -9989,7 +10044,7 @@ async function reconcileNativeSurfaces() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "liftsScrim"]
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "liftsScrim", "reportScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
   stopGenTicker();
   $("genScrim")?.classList.add("hidden");
@@ -15168,6 +15223,13 @@ function renderStrengthChart() {
     allBtn.classList.toggle("hidden", viewingPartner || allLiftsFor(name).length === 0);
     allBtn.onclick = () => openLiftBrowser(name);
   }
+  const repBtn = $("strengthReportBtn");
+  if (repBtn) {
+    // Needs two levelable lifts to have anything to average, and says nothing
+    // rather than opening a page that would have to apologise for itself.
+    repBtn.classList.toggle("hidden", !overallStrength(name));
+    repBtn.onclick = () => openStrengthReport(name);
+  }
 }
 
 /* ---------- Browse every lift, feature up to five ----------
@@ -15178,6 +15240,99 @@ function renderStrengthChart() {
    each row here) is the whole feature: pin up to five, and those five are
    what the card above shows from then on, in the order they were pinned,
    instead of guessing off set count. */
+/* ---- The strength report ----
+
+   The lift browser answers "how is my bench". This answers "how strong am I",
+   which is the question underneath it and the one nobody could ask before.
+
+   Order is deliberate: the overall first because it is the answer, then what
+   moved because that is the part somebody can act on, then the per-lift
+   breakdown because that is the working. Anything that has not moved is last
+   and unemphasised: this is a report, not a telling off. */
+function openStrengthReport(name) {
+  const o = overallStrength(name);
+  if (!o) return;
+  const moved = strengthMovement(name, 12);
+  const up = moved.filter((m) => m.gain > 0);
+  /* Both of these were printing the level and nothing else, which on a person
+     whose lifts all sit in one band read as "Strongest: Intermediate,
+     Furthest behind: Intermediate" and compared nothing. The gap to the next
+     level is what actually separates them, and it is the actionable half. */
+  const label = (lv) => (lv.next ? `${lv.level} · ${lv.toNext} lb to ${lv.next}` : `${lv.level} · top of the scale`);
+
+  const segs = (index, within) => STRENGTH_LEVELS.map((_, i) => {
+    const pct = i < index ? 100 : i === index ? Math.round(within * 100) : 0;
+    return `<i><b style="width:${pct}%"></b></i>`;
+  }).join("");
+
+  $("reportSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="cb-sheet-head">
+      <div>
+        <div class="cb-sheet-title">Strength report</div>
+        <div class="cb-sheet-count">${o.lifts.length} lift${o.lifts.length === 1 ? "" : "s"} we can measure</div>
+      </div>
+      <button type="button" class="ds-x" id="repClose" aria-label="Close">&times;</button>
+    </div>
+
+    <div class="sr-hero">
+      <div class="sr-hero-k">Overall</div>
+      <div class="sr-hero-v">${escapeHtml(o.level)}</div>
+      <div class="lvl"><div class="lvl-segs">${segs(o.index, o.within)}</div></div>
+      <p class="sr-hero-note">
+        Averaged across every lift with a standard behind it, adjusted for your
+        bodyweight, sex and age.
+      </p>
+    </div>
+
+    <div class="sr-two">
+      <div class="sr-cell">
+        <span class="sr-cell-k">Strongest</span>
+        <b>${escapeHtml(o.strongest.name)}</b>
+        <span class="sr-cell-v">${escapeHtml(label(o.strongest.lv))}</span>
+      </div>
+      <div class="sr-cell">
+        <span class="sr-cell-k">Furthest behind</span>
+        <b>${escapeHtml(o.weakest.name)}</b>
+        <span class="sr-cell-v">${escapeHtml(label(o.weakest.lv))}</span>
+      </div>
+    </div>
+
+    <div class="sr-head">Last 12 weeks</div>
+    ${up.length ? `<div class="ms-list">
+      ${up.slice(0, 3).map((m) => `<div class="ms-row">
+        <i class="ms-dot up"></i>
+        <span class="ms-txt"><b>${escapeHtml(m.name)} up ${m.gain} lb</b>
+          <span>${m.from} to ${m.to} lb estimated.</span></span>
+      </div>`).join("")}
+    </div>` : `<p class="muted-note">Nothing has moved yet over this window. That is a window,
+      not a verdict: twelve weeks is where a trend becomes readable.</p>`}
+
+    <div class="sr-head">Every lift</div>
+    <div class="sr-list">
+      ${o.lifts.map((x) => `<button type="button" class="sr-row" data-lift="${escapeHtml(x.name)}">
+        <span class="sr-row-top">
+          <b>${escapeHtml(x.name)}</b>
+          <span>${escapeHtml(x.lv.next ? `${x.lv.toNext} lb to ${x.lv.next}` : "Top of the scale")}</span>
+        </span>
+        <span class="lvl-segs sr-row-bar">${segs(x.lv.index, x.lv.within)}</span>
+      </button>`).join("")}
+    </div>
+    <p class="muted-note" style="margin-top:12px">
+      Dumbbell and machine lifts are not in here. One stored weight cannot say
+      whether it was per hand or the pair, and a gym's leg press sled weighs
+      whatever it weighs, so neither can be scored without guessing.
+    </p>`;
+
+  $("repClose").onclick = closeStrengthReport;
+  $("reportSheet").querySelectorAll("[data-lift]").forEach((b) => {
+    b.onclick = () => { closeStrengthReport(); LIFT_BROWSE_FOR = name; openLiftBrowser(name); openLiftDetail(b.dataset.lift); };
+  });
+  $("reportScrim").classList.remove("hidden");
+  $("reportScrim").onclick = (e) => { if (e.target === $("reportScrim")) closeStrengthReport(); };
+}
+function closeStrengthReport() { $("reportScrim").classList.add("hidden"); }
+
 let LIFT_BROWSE_FOR = null;
 
 function openLiftBrowser(name) {
@@ -15216,7 +15371,7 @@ function renderLiftList() {
         const on = pins.some((p) => p.toLowerCase() === l.name.toLowerCase());
         const lv = strengthLevelFor(name, l.name);
         return `<div class="cb-card lft-card${on ? " picked" : ""}" data-open="${escapeHtml(l.name)}" style="--d:${Math.min(i, 12) * 22}ms">
-          <span class="cb-fig" data-fig="${escapeHtml(l.name)}"></span>
+          <span class="cb-fig" data-fig="${escapeHtml(l.name)}" data-fig-static></span>
           <span class="cb-card-name">${escapeHtml(l.name)}</span>
           <span class="cb-card-meta">${lv ? escapeHtml(lv.level) + " · " : ""}${l.best} lb</span>
           <button type="button" class="lft-star${on ? " on" : ""}" data-star="${escapeHtml(l.name)}"
@@ -23073,7 +23228,18 @@ async function mountMotionFigures(root) {
        instruction (see mountMove). A rest antic is not: it is the character
        being cute, so with motion turned down it holds its most telling pose
        (the middle of the loop, bottle at the lips) and does not move. */
-    const still = el.hasAttribute("data-fig-still") && prefersReducedMotion();
+    /* data-fig-static is the browse grid's: a dozen figures all looping at
+       once is a dozen repaints a frame for pictures nobody is studying, and
+       it is felt on a phone. Paused is genuinely free rather than cheap: the
+       module's pump() parks the rAF entirely once no mount is playing, so a
+       page of still figures costs one paint each and then nothing.
+
+       data-fig-still is the older, different thing: hold the pose only when
+       the OS asks for less motion. A lift keeps looping there because the
+       figure IS the instruction. Here it is a thumbnail in a list, so it
+       holds still for everyone. */
+    const frozen = el.hasAttribute("data-fig-static");
+    const still = frozen || (el.hasAttribute("data-fig-still") && prefersReducedMotion());
     if (!ctl) ctl = mod.mountMove(canvas, name, {
       /* Plain figure only. Mo looked at the muscle skin and the lit working
          muscle on real moves and asked for neither: the figure shows the
@@ -23087,7 +23253,9 @@ async function mountMotionFigures(root) {
       // happened. Cards and rows leave it unset and get the neutral face.
       mood: el.dataset.mood || undefined,
       paused: still,
-      t: still ? 0.5 : undefined,
+      /* Halfway through the cycle is the turnaround, which is the pose that
+         says which lift this is: bar on the chest, not arms locked out. */
+      t: still ? Number(el.dataset.figT ?? 0.5) : undefined,
     });
     if (!ctl) { canvas.remove(); el.classList.add("fig-none"); continue; }
     el.classList.add("fig-live");
@@ -24446,6 +24614,57 @@ function msShowMuscle(group) {
       <i class="ms-dot ${st === "up" ? "up" : st === "cold" ? "cold" : "flat"}"></i>
       <span class="ms-txt"><b>${escapeHtml(s.head)}</b><span>${escapeHtml(s.sub)}</span></span>
     </div>`;
+}
+
+/* ---- One number for "how strong am I", across every lift ----
+
+   Each lift already lands on a level and a position within it, so an index of
+   2 sitting 80% of the way to Advanced is 2.8 on a continuous 0 to 4 scale.
+   Average those and you get an overall that moves smoothly instead of jumping
+   a whole level the day one lift ticks over.
+
+   Every levelable lift counts the same. Weighting the big three higher was
+   tempting and is not defensible: somebody whose training is rows and presses
+   has not earned a lower overall for it, and a powerlifting total is a rule
+   for a powerlifting meet, not for a person asking whether they are strong.
+
+   Two lifts minimum, because one lift is not an "overall", it is that lift
+   with a grander name on it. */
+function overallStrength(name) {
+  const lifts = allLiftsFor(name)
+    .map((l) => ({ name: l.name, lv: strengthLevelFor(name, l.name) }))
+    .filter((x) => x.lv);
+  if (lifts.length < 2) return null;
+
+  const score = (x) => x.lv.index + (x.lv.index < 4 ? x.lv.within : 0);
+  const mean = lifts.reduce((a, x) => a + score(x), 0) / lifts.length;
+  const idx = Math.min(4, Math.floor(mean));
+  const ranked = [...lifts].sort((a, b) => score(b) - score(a));
+
+  return {
+    level: STRENGTH_LEVELS[idx],
+    index: idx,
+    /* How far through the level the average sits, for the bar. */
+    within: idx >= 4 ? 1 : mean - idx,
+    mean,
+    lifts: ranked,
+    strongest: ranked[0],
+    weakest: ranked[ranked.length - 1],
+  };
+}
+
+/* What has actually moved, over the same window the rest of the tab uses.
+   A report that only says where you stand is a verdict; this is the half
+   that says which way you are going. */
+function strengthMovement(name, weeks = 12) {
+  const out = [];
+  for (const l of allLiftsFor(name)) {
+    const hist = liftE1rmHistory(name, l.name, weeks);
+    if (hist.length < 2) continue;
+    const from = hist[0].est, to = Math.max(...hist.map((h) => h.est));
+    out.push({ name: l.name, from: Math.round(from), to: Math.round(to), gain: Math.round(to - from) });
+  }
+  return out.sort((a, b) => b.gain - a.gain);
 }
 
 /* ---- Personal records, by rep count ----
