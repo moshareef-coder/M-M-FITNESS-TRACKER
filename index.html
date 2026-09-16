@@ -5867,12 +5867,24 @@
         <div class="scr-title">Safety</div>
         <div class="spacer"></div>
       </div>
+      <!-- Reporting has to be reachable WITHOUT a clip on screen. The flag on a
+           playing clip is the right place to report that clip, and it was the
+           only place reporting existed at all, which means somebody with a
+           problem had to wait for a video to arrive before they could say so.
+           An App Store reviewer would never see one. -->
       <div class="card" id="safetyCard">
         <h2>Report something</h2>
         <p class="muted-note" style="margin-top:-6px;">
-          Tap the flag while a clip is playing. We look at every report within a day,
-          and the person is not told who reported them. You can also email
-          <a href="mailto:mo.shareef@creativelab1.com">mo.shareef@creativelab1.com</a>.
+          We look at every report within a day, and the person is not told who
+          reported them.
+        </p>
+        <div id="reportLive" class="hidden">
+          <button type="button" class="btn-secondary" id="reportPartnerBtn">Report my partner</button>
+        </div>
+        <p class="muted-note" id="reportNoPartner">You are not paired with anyone right now.</p>
+        <p class="muted-note" style="margin-top:12px;">
+          To report one video in particular, tap the flag while it is playing. You can
+          also email <a href="mailto:mo.shareef@creativelab1.com">mo.shareef@creativelab1.com</a>.
         </p>
       </div>
       <div class="card">
@@ -13048,7 +13060,11 @@ const REPORT_REASONS = [
   ["other", "Something else"],
 ];
 
-function askReportReason(fromName) {
+/* `what` names the thing being reported, because this sheet now serves both
+   a single clip and a person, and "REPORT THIS CLIP" over a report about
+   somebody's behaviour would be telling them the wrong thing at the worst
+   possible moment. */
+function askReportReason(fromName, what = "THIS CLIP") {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "pop-scrim";
@@ -13056,7 +13072,7 @@ function askReportReason(fromName) {
       <div class="pop">
         <div class="pop-body">
           <div class="ds-top">
-            <div class="pop-who" style="color:var(--muted)">REPORT THIS CLIP</div>
+            <div class="pop-who" style="color:var(--muted)">REPORT ${escapeHtml(what)}</div>
             <button type="button" class="ds-x" data-reason="" aria-label="Close">&times;</button>
           </div>
           <p class="muted-note">We look at every report within a day. ${escapeHtml(fromName)} is not told that you reported this.</p>
@@ -13078,7 +13094,7 @@ function askReportReason(fromName) {
    report pointing at a deleted file cannot be acted on at all. */
 async function reportClip(clip) {
   const from = nameFor(clip.from_email);
-  const reason = await askReportReason(from);
+  const reason = await askReportReason(from, "THIS CLIP");
   if (!reason) return false;
 
   const mark = await sb.from("live_clips")
@@ -13102,6 +13118,37 @@ async function reportClip(clip) {
   renderClipPill();
   toast("Reported. We will look at it within a day.");
   return true;
+}
+
+/* Reporting a person rather than one piece of content.
+
+   Filed against the account, with no ref_id, because there is no single row
+   this is about: it is somebody saying this person is a problem. The queue
+   shows it the same as any other report and the same day applies.
+
+   Deliberately does NOT block as a side effect. Somebody may want it looked at
+   without ending the relationship, and deciding that for them would make
+   reporting a thing people avoid doing. The offer to block comes after, as a
+   question. */
+async function reportPartner(email) {
+  const who = nameFor(email) || "them";
+  const reason = await askReportReason(who, escapeHtml(who).toUpperCase());
+  if (!reason) return;
+  const { error } = await sb.from("content_reports").insert({
+    reporter_email: MY_EMAIL,
+    subject_email: email,
+    kind: "profile",
+    reason,
+  });
+  if (error) { console.error("report failed", error); toast("Could not send that report"); return; }
+  const alsoBlock = await askConfirm({
+    heading: "Reported",
+    body: `We will look at it within a day. ${who} is not told. Do you also want to block them?`,
+    ok: "Block them too",
+    cancel: "No, just the report",
+  });
+  if (alsoBlock) await blockPerson(email);
+  else toast("Reported");
 }
 
 /* Blocking is one server call because a block that half applies is worse than
@@ -13139,6 +13186,19 @@ async function renderSafetyCard() {
   if (paired) {
     $("blockPartnerBtn").textContent = `Block ${nameFor(PARTNER_EMAIL) || "my partner"}`;
     $("blockPartnerBtn").onclick = () => blockPerson(PARTNER_EMAIL);
+  }
+
+  /* The same paired-or-not question the Block card asks, so the two halves of
+     this page can never disagree about whether there is somebody to act on. */
+  const reportLive = $("reportLive");
+  const reportNone = $("reportNoPartner");
+  if (reportLive && reportNone) {
+    reportLive.classList.toggle("hidden", !paired);
+    reportNone.classList.toggle("hidden", paired);
+    if (paired) {
+      $("reportPartnerBtn").textContent = `Report ${nameFor(PARTNER_EMAIL) || "my partner"}`;
+      $("reportPartnerBtn").onclick = () => reportPartner(PARTNER_EMAIL);
+    }
   }
 
   const list = $("blockList");
