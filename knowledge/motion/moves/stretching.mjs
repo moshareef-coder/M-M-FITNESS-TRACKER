@@ -98,7 +98,7 @@ const FOAM_ROLLER_THORACIC_EXTENSION = {
   keys: [
     { // neutral, ribs down, upper back resting on the roller
       t: 0,
-      root: { x: 66, y: 108, rot: -62 },
+      root: { x: 66, y: 112.6, rot: -62 },
       joints: { spine: 2, neck: -22 },
       ik: {
         wristR: { x: 21.4, y: 88.5, bend: 1 }, wristL: { x: 24.4, y: 90.5, bend: 1 },
@@ -107,7 +107,7 @@ const FOAM_ROLLER_THORACIC_EXTENSION = {
     },
     { // extend over the roller, head supported so the neck follows the spine
       t: 1,
-      root: { x: 64, y: 105.5, rot: -62 },
+      root: { x: 64, y: 110.1, rot: -62 },
       joints: { spine: -8, neck: -34 },
       ik: {
         wristR: { x: 19.1, y: 92.9, bend: 1 }, wristL: { x: 22.1, y: 94.9, bend: 1 },
@@ -392,14 +392,14 @@ const PELVIC_TILTS = {
   keys: [
     { // released: a small arch under the low back
       t: 0,
-      root: { x: 76, y: 106.4, rot: -84 },
+      root: { x: 76, y: 110.5, rot: -84 },
       joints: { spine: -5, neck: 4, shoulderR: 172, shoulderL: 176, elbowR: 16, elbowL: 12,
                 wristR: -8, wristL: -8 },
       ik: { ankleR: { x: 103, y: 113.6, bend: -1 }, ankleL: { x: 98, y: 113.6, bend: -1 } },
     },
     { // tilted: tailbone tucked, low back pressed into the mat
       t: 1,
-      root: { x: 75, y: 108.2, rot: -99 },
+      root: { x: 75, y: 112.3, rot: -99 },
       joints: { spine: 6, neck: 6, shoulderR: 172, shoulderL: 176, elbowR: 16, elbowL: 12,
                 wristR: -8, wristL: -8 },
       ik: { ankleR: { x: 103, y: 113.6, bend: -1 }, ankleL: { x: 98, y: 113.6, bend: -1 } },
@@ -981,14 +981,14 @@ const QUADRUPED_WRIST_ROCKS = {
   keys: [
     { // rocked back, shoulders behind the hands
       t: 0,
-      root: { x: 48, y: 84.7, rot: 90 },
+      root: { x: 48, y: 88.1, rot: 90 },
       joints: { spine: 0, neck: -12, hipR: -90, hipL: -90, kneeR: 94, kneeL: 94,
                 ankleR: -78, ankleL: -78, wristR: 54, wristL: 54 },
       ik: { wristR: { x: 94, y: 114.6, bend: 1 }, wristL: { x: 89, y: 114.6, bend: 1 } },
     },
     { // rocked forward over the hands, wrists working
       t: 1,
-      root: { x: 56, y: 84.7, rot: 90 },
+      root: { x: 56, y: 88.1, rot: 90 },
       joints: { spine: 0, neck: -12, hipR: -90, hipL: -90, kneeR: 94, kneeL: 94,
                 ankleR: -78, ankleL: -78, wristR: 68, wristL: 68 },
       ik: { wristR: { x: 94, y: 114.6, bend: 1 }, wristL: { x: 89, y: 114.6, bend: 1 } },
@@ -1369,13 +1369,13 @@ const KNEES_TO_CHEST_STRETCH = {
   keys: [
     { // settled, knees in, back flat
       t: 0,
-      root: { x: 76, y: 106, rot: -90 },
+      root: { x: 76, y: 116, rot: -90 },
       joints: { spine: 0, neck: 6, hipR: -40, hipL: -44, kneeR: 120, kneeL: 118 },
       ik: { wristR: { x: 65.0, y: 84.0, bend: 1 }, wristL: { x: 61.0, y: 88.0, bend: 1 } },
     },
     { // drawn a touch closer on the exhale
       t: 1,
-      root: { x: 76, y: 106.6, rot: -90 },
+      root: { x: 76, y: 116.6, rot: -90 },
       joints: { spine: 2, neck: 8, hipR: -36, hipL: -40, kneeR: 124, kneeL: 122 },
       ik: { wristR: { x: 63.0, y: 81.9, bend: 1 }, wristL: { x: 59.0, y: 85.9, bend: 1 } },
     },
@@ -1456,7 +1456,7 @@ const COUCH_STRETCH = {
   keys: [
     { // settled, back shin up the wall, front shin vertical
       t: 0,
-      root: { x: 38, y: 88, rot: 6 },
+      root: { x: 38, y: 92.4, rot: 6 },
       joints: { spine: 2, neck: -2, hipL: -35, kneeL: 137, ankleL: -78 },
       ik: {
         ankleR: { x: 66, y: 113.6, bend: -1 },
@@ -1465,7 +1465,7 @@ const COUCH_STRETCH = {
     },
     { // pelvis tucks and the chest comes up a degree on the exhale
       t: 1,
-      root: { x: 39, y: 88, rot: -2 },
+      root: { x: 39, y: 92.4, rot: -2 },
       joints: { spine: 4, neck: -3, hipL: -27, kneeL: 137, ankleL: -78 },
       ik: {
         ankleR: { x: 66, y: 113.6, bend: -1 },
@@ -1568,14 +1568,14 @@ const SUPINE_HAMSTRING_STRETCH = {
   keys: [
     { // settled, working leg up, other leg heavy on the mat
       t: 0,
-      root: { x: 60, y: 106, rot: -90 },
+      root: { x: 60, y: 111.8, rot: -90 },
       joints: { spine: 0, neck: 6, hipR: -90, kneeR: 6, ankleR: 10,
                 hipL: 180, kneeL: 2, ankleL: -30 },
       ik: { wristR: { x: 47.0, y: 88.0, bend: 1 }, wristL: { x: 43.0, y: 92.0, bend: 1 } },
     },
     { // drawn a little closer on the exhale, knee still soft
       t: 1,
-      root: { x: 60, y: 106.6, rot: -90 },
+      root: { x: 60, y: 112.4, rot: -90 },
       joints: { spine: 1, neck: 7, hipR: -98, kneeR: 4, ankleR: 14,
                 hipL: 180, kneeL: 2, ankleL: -30 },
       ik: { wristR: { x: 45.0, y: 85.9, bend: 1 }, wristL: { x: 41.0, y: 89.9, bend: 1 } },
@@ -1696,14 +1696,14 @@ const HALF_KNEELING_HIP_FLEXOR_ROCK = {
   keys: [
     { // back, pelvis already tucked under
       t: 0,
-      root: { x: 58, y: 86, rot: -8 },
+      root: { x: 58, y: 90.3, rot: -8 },
       joints: { spine: 4, neck: -2, hipL: -14, kneeL: 73, ankleL: -78,
                 shoulderR: -12, elbowR: 62, shoulderL: -14, elbowL: 64 },
       ik: { ankleR: { x: 88, y: 113.6, bend: -1 } },
     },
     { // an inch forward, tuck held
       t: 1,
-      root: { x: 62, y: 86, rot: -10 },
+      root: { x: 62, y: 90.3, rot: -10 },
       joints: { spine: 5, neck: -3, hipL: -8, kneeL: 73, ankleL: -78,
                 shoulderR: -12, elbowR: 62, shoulderL: -14, elbowL: 64 },
       ik: { ankleR: { x: 88, y: 113.6, bend: -1 } },
@@ -1876,7 +1876,7 @@ const QUADRUPED_THORACIC_ROTATION = {
   keys: [
     { // elbow tucked down under the chest
       t: 0,
-      root: { x: 52, y: 84.7, rot: 90 },
+      root: { x: 52, y: 88.1, rot: 90 },
       joints: { spine: 0, neck: -12, hipR: -90, hipL: -90, kneeR: 94, kneeL: 94,
                 ankleR: -78, ankleL: -78, shoulderR: -70, elbowR: 130, wristR: -10,
                 wristL: 60 },
@@ -1884,7 +1884,7 @@ const QUADRUPED_THORACIC_ROTATION = {
     },
     { // elbow turned up and past the head, hand still behind it
       t: 1,
-      root: { x: 52, y: 84.7, rot: 90 },
+      root: { x: 52, y: 88.1, rot: 90 },
       joints: { spine: 0, neck: -12, hipR: -90, hipL: -90, kneeR: 94, kneeL: 94,
                 ankleR: -78, ankleL: -78, shoulderR: 10, elbowR: 125, wristR: -10,
                 wristL: 60 },
