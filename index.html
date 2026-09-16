@@ -7885,7 +7885,7 @@ function renderOnboardIntro(i, data) {
    aliases and never go on a button. */
 const GOAL_TILES = [
   { id: "lose-weight", legacy: "lose", askTarget: "lose", ico: "arrowDown", title: "Lose weight", sub: "and keep it off", kids: [] },
-  { id: "build-muscle", legacy: "muscle", askTarget: "gain", ico: "dumbbell", title: "Build muscle", sub: "get bigger", kids: [] },
+  { id: "build-muscle", legacy: "muscle", askTarget: "gain", ico: "dumbbell", title: "Build muscle", sub: "get bigger, put weight on", kids: [] },
   { id: "get-stronger", legacy: "stronger", ico: "bolt", title: "Get stronger", sub: "lift heavier", kids: [] },
   { id: "tone-lean-abs", legacy: "recomp", ico: "refresh", title: "Tone up", sub: "get lean, see abs", kids: [] },
   { id: "build-endurance", legacy: "consistent", ico: "run", title: "Build endurance", sub: "last longer, breathe easier", kids: [] },
@@ -24149,7 +24149,12 @@ function headlineKindFor(profile) {
     case "build-muscle": {
       const wg = weightGoalFor(profile?.email);
       if (!wg || wg.start_value == null) return "volume";
-      return wg.target_value > wg.start_value ? "scale" : "recomp";
+      /* A target ABOVE the start is somebody putting weight on deliberately,
+         and that used to land on "scale", which answers with the number on
+         its own. That is the one answer this goal cannot use: a bulk that is
+         working and a bulk that is going wrong both show a rising scale, and
+         the only thing that separates them is whether the bar rose too. */
+      return wg.target_value > wg.start_value ? "bulk" : "recomp";
     }
     case "get-stronger":  return "lift";
     case "tone-lean-abs": return "recomp";
@@ -24204,6 +24209,10 @@ function headlineKindFor(profile) {
    under the rule at the bottom, in PROGRESS_CARDS order, same for everyone. */
 const GOAL_CARDS = {
   scale:     ["cardWeight", "scaleCheckCard", "cardPhotos", "cardConsistency"],
+  /* Putting weight on is judged on the scale and the bar together, so both
+     lead, in that order. Volume sits right behind them because it is the
+     lever somebody pulls when the bar has stopped moving. */
+  bulk:      ["cardWeight", "scaleCheckCard", "cardStrength", "cardMuscles", "cardVolume", "cardConsistency"],
   recomp:    ["cardConsistency", "cardPhotos", "cardWeight", "scaleCheckCard"],
   lift:      ["cardMuscles", "cardStrength", "cardConsistency"],
   volume:    ["cardMuscles", "cardVolume", "cardStrength", "cardWeight", "scaleCheckCard", "cardConsistency"],
@@ -24775,6 +24784,77 @@ function progressHeadline(kind, name, email, profile, third) {
   const their = third ? "their" : "your";
   const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
+  /* ---- Putting weight on, on purpose ----
+
+     The only headline in here that refuses to answer with one number, because
+     one number cannot tell these two apart: the scale rises on a good bulk and
+     on a bad one alike. So it reads the scale AND the bar, and says which of
+     the two stories it is looking at.
+
+     The rate band is 0.25 to 0.5 percent of bodyweight a week, which is the
+     published lean-gain range rather than a figure picked to sound careful.
+     Gaining faster than that is repeatedly found to add fat without adding
+     muscle, so the top of the band is worth saying out loud rather than just
+     drawing a line going up and letting somebody assume it is all muscle. */
+  if (kind === "bulk") {
+    const rows = headlineWeighIns(name);
+    if (rows.length < 3) {
+      return { value: "Not yet", line: `${Subj} ${have} not logged enough weigh-ins yet.`,
+        note: "Putting weight on is judged on the rate, and a rate needs a few weigh-ins before it means anything." };
+    }
+    const first = rows[0].weight, now = rows[rows.length - 1].weight;
+    const span = daysBetween(rows[0].entry_date, rows[rows.length - 1].entry_date);
+    const weeks = Math.max(1, Math.round(span / 7));
+    const change = now - first;
+    if (span < 14) {
+      return { value: now.toFixed(1), unit: "lbs", line: `${Subj} ${are} at ${now.toFixed(1)} lbs.`,
+        note: `Two weeks is the least this can read a rate from, and ${third ? "they are" : "you are"} ${plural(span, "day")} in.` };
+    }
+    const rate = lbsPerWeek(rows) ?? 0;
+    /* The band scales with the person, because half a pound a week is a
+       different proposition at 130 lbs and at 260. */
+    const bandLow = now * 0.0025, bandHigh = now * 0.005;
+
+    /* Did the bar move over the same window the scale did? This is the half
+       that decides which story it is, and it is a join of things that already
+       exist rather than anything new being measured. */
+    const moved = strengthMovement(name, Math.max(4, weeks));
+    const gained = moved.filter((m) => m.gain > 0);
+    const best = gained[0] || null;
+    const barMoved = gained.length > 0;
+
+    const out = { value: `${change > 0 ? "+" : ""}${change.toFixed(1)}`, unit: `lbs in ${plural(weeks, "week")}` };
+
+    if (rate < 0.05) {
+      out.tone = "warn";
+      out.line = `${Subj} ${are} not putting weight on yet.`;
+      out.note = barMoved
+        ? `The scale has held while ${best.name} went up ${best.gain} lb, which is a recomp rather than a bulk. If the goal really is to get bigger, the food has to move too.`
+        : "Neither the scale nor the bar has moved. On this goal that is the one combination with nothing good in it, and it is almost always the kitchen rather than the gym.";
+      return out;
+    }
+
+    if (!barMoved) {
+      /* The uncomfortable one, and the reason this kind exists at all. */
+      out.tone = "warn";
+      out.line = `${Subj} ${are} up ${change.toFixed(1)} lbs, but ${third ? "their" : "your"} lifts have not moved.`;
+      out.note = `${plural(weeks, "week")} of gaining at about ${rate.toFixed(1)} lbs a week with nothing heavier on the bar. Weight going on while the lifts stand still is the one pattern that says this is not muscle. Worth checking the sets are actually getting harder.`;
+      return out;
+    }
+
+    if (rate > bandHigh * 1.35) {
+      out.tone = "warn";
+      out.line = `${Subj} ${are} gaining about ${rate.toFixed(1)} lbs a week, faster than muscle can be built.`;
+      out.note = `Past about ${bandHigh.toFixed(1)} lbs a week at ${now.toFixed(0)} lbs, the extra tends to arrive as fat, and gaining quicker does not build muscle quicker. ${best.name} is up ${best.gain} lb, so the training is doing its job. The food is ahead of it.`;
+      return out;
+    }
+
+    out.tone = "good";
+    out.line = `${Subj} ${are} up ${change.toFixed(1)} lbs, and the bar went with it.`;
+    out.note = `About ${rate.toFixed(1)} lbs a week, inside the ${bandLow.toFixed(1)} to ${bandHigh.toFixed(1)} band where the gain is mostly muscle rather than mostly fat. ${best.name} is up ${best.gain} lb over the same stretch, which is the half that says it worked.`;
+    return out;
+  }
+
   if (kind === "scale") {
     const rows = headlineWeighIns(name);
     const goal = weightGoalFor(email);
@@ -25217,6 +25297,11 @@ function renderProgressTab() {
      while the rest of the app was carefully hiding exactly that. */
   const sharing = !isPartner || PARTNER_PROFILE?.share_workout_details !== false;
   let kind = headlineKindFor(profile);
+  /* bulk reads the bar as well as the scale, so a partner who keeps their
+     workout detail private cannot be scored on it either. Falling back to
+     scale rather than habit, because their weigh-ins are still shared and
+     still the other half of this goal. */
+  if (!sharing && kind === "bulk") kind = "scale";
   if (!sharing && (kind === "lift" || kind === "volume" || kind === "reps")) kind = "habit";
 
   const blank = !isPartner && !entriesFor(ME).length
