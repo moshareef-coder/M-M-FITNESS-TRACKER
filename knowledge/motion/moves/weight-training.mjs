@@ -7,7 +7,7 @@
 // Bodyweight names the lifting library shares with calisthenics are authored
 // once, over there, and imported here so the same figure shows in both.
 import {
-  PUSH_UP, PULL_UP, INCLINE_PUSH_UP, INVERTED_ROW, CHIN_UP, DIAMOND_PUSH_UP, DEAD_HANG,
+  PUSH_UP, PULL_UP, INVERTED_ROW, CHIN_UP, DIAMOND_PUSH_UP, DEAD_HANG,
   WALKING_LUNGE, BULGARIAN_SPLIT_SQUAT, NORDIC_CURL, PLANK, HANGING_LEG_RAISE, SIDE_PLANK,
 } from "./calisthenics.mjs";
 // The 120 lifts are authored in two part files so two people can work on them
@@ -178,7 +178,6 @@ export const MOVES = {
   ...LOWER,
   "Push-Up": PUSH_UP,
   "Pull-Up": PULL_UP,
-  "Incline Push-Up": INCLINE_PUSH_UP,
   "Inverted Row": INVERTED_ROW,
   "Chin-Up": CHIN_UP,
   "Diamond Push-Up": DIAMOND_PUSH_UP,

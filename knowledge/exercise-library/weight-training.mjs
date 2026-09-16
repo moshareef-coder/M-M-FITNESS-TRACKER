@@ -19,7 +19,6 @@ export const WEIGHT_TRAINING = {
       label: "Chest",
       exercises: [
         { name: "Push-Up", primary: ["chest"], secondary: ["triceps", "shoulders"], equipment: "bodyweight", level: "beginner" },
-        { name: "Incline Push-Up", primary: ["chest"], secondary: ["triceps"], equipment: "bodyweight", level: "beginner" },
         { name: "Dumbbell Bench Press", primary: ["chest"], secondary: ["triceps", "shoulders"], equipment: "dumbbell", level: "beginner" },
         { name: "Machine Chest Press", primary: ["chest"], secondary: ["triceps"], equipment: "machine", level: "beginner" },
         { name: "Pec Deck", primary: ["chest"], secondary: [], equipment: "machine", level: "beginner" },
