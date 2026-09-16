@@ -228,13 +228,13 @@ const INCLINE_DUMBBELL_PRESS = {
       t: 0,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 0, neck: -6, forearmPronR: 90, forearmPronL: 90 },
-      ik: { wristR: { x: 80.5, y: 43.3, bend: 1 }, wristL: { x: 83.5, y: 46.3, bend: 1 }, ...stand(110, 104) },
+      ik: { wristR: { x: 63.0, y: 35.5, bend: 1 }, wristL: { x: 66.0, y: 38.5, bend: 1 }, ...stand(110, 104) },
     },
     { // bottom, bells beside the upper chest
       t: 1,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 2, neck: -8, forearmPronR: 90, forearmPronL: 90 },
-      ik: { wristR: { x: 71.6, y: 56.2, bend: 1 }, wristL: { x: 74.6, y: 59.2, bend: 1 }, ...stand(110, 104) },
+      ik: { wristR: { x: 69.0, y: 56.2, bend: 1 }, wristL: { x: 72.0, y: 59.2, bend: 1 }, ...stand(110, 104) },
     },
   ],
 };
@@ -285,13 +285,13 @@ const INCLINE_BARBELL_PRESS = {
       t: 0,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 0, neck: -6 },
-      ik: { wristR: { x: 80.5, y: 43.3, bend: 1 }, wristL: { x: 82.5, y: 45.3, bend: 1 }, ...stand(110, 104) },
+      ik: { wristR: { x: 63.0, y: 35.5, bend: 1 }, wristL: { x: 65.0, y: 37.5, bend: 1 }, ...stand(110, 104) },
     },
     { // bar down to the collarbone, elbows under the bar
       t: 1,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 2, neck: -8 },
-      ik: { wristR: { x: 71.6, y: 56.2, bend: 1 }, wristL: { x: 73.6, y: 58.2, bend: 1 }, ...stand(110, 104) },
+      ik: { wristR: { x: 69.0, y: 56.2, bend: 1 }, wristL: { x: 71.0, y: 58.2, bend: 1 }, ...stand(110, 104) },
     },
   ],
 };
@@ -1109,29 +1109,69 @@ const MACHINE_SHOULDER_PRESS = {
 // The same press with two dumbbells on an upright bench rather than a machine.
 // Must be visible: the near vertical back pad and two separate bells. Side view.
 const SEATED_DUMBBELL_PRESS = {
-  view: "side",
+  view: { plane: "sagittal", yaw: 30 },
   loop: "pingpong",
   dur: 3.0,
   breath: 0.2,
   fit: { k: 0.92, dy: 6 },
   props: [
-    { type: "bench", x: 20, y: 70, w: 44, incline: -78 },
-    { type: "bench", x: 36, y: 96, w: 36 },
-    { type: "dumbbell", hold: "grip", side: "L", point: "hand", k: 0.78 },
-    { type: "dumbbell", hold: "grip", side: "R", point: "hand", k: 0.78, front: true },
+    { type: "bench", x: 17, y: 70, w: 44, incline: -78 },
+    { type: "bench", x: 33, y: 96, w: 36 },
+    /* Plain "level" bells, not "grip". The grip here never changes: it is a
+       pronated press from the rack to lockout, so the handle stays across the
+       body the whole way and end on is the right picture at every frame. The
+       derived bell would be the honest tool if it rolled, but the abduction
+       that makes the rack wide also swings the hand frame under it, so a
+       derived handle drifts broadside halfway up for no reason the movement
+       gives. A fixed grip gets the fixed bell, same as every other press. */
+    { type: "dumbbell", side: "L", point: "hand", k: 0.68, front: true },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.68, front: true },
   ],
   keys: [
-    { // start, bells at the shoulders, elbows under the hands
+    { /* Racked: elbows WIDE, out at shoulder height, forearms vertical, bells
+         beside the head. This used to drive the arms with a wrist target out
+         in front of the chest, which racked them like an Arnold press instead
+         (Mo, against a reference photo: "seated dumbbell press is off to the
+         side like this, you have it slightly in front"). A wrist target cannot
+         express it: the solver works in the camera plane, so every answer it
+         can give puts the elbow forward or back, never out.
+
+         Abduction is the channel that means "out to the side", so the arms are
+         angles now rather than IK. 74 degrees of it takes the upper arm nearly
+         lateral; the press then closes that to 170 and opens the elbow, which
+         is the same path DUMBBELL_SHOULDER_PRESS walks in its front view, just
+         expressed in the channel a sagittal move has to use.
+
+         The camera is turned 30 degrees for the same reason: a flat side view
+         cannot show this rack at all. Work it out on paper and it is forced.
+         The upper arm is 20 and the forearm 17, so with nothing foreshortened
+         the only way to get the bells up to head height is to put the elbow a
+         full 20 units in front of the shoulder, which is the front rack this
+         used to draw. Abduct the arm instead and it points at the lens and
+         disappears. Turning the camera is what lets the arm be out to the side
+         AND be visible, and the legs still solve in the sagittal plane so he
+         stays sitting. The bench x values carry the matching offset, since a
+         pinned prop does not know the camera moved. */
       t: 0,
       root: { x: 52, y: 86, rot: -4 },
-      joints: { spine: 0, neck: -2, forearmPronR: 90, forearmPronL: 90 },
-      ik: { wristR: { x: 67.8, y: 47.0, bend: 1 }, wristL: { x: 63.8, y: 50.0, bend: 1 }, ...stand(82, 78) },
+      joints: {
+        spine: 0, neck: -2,
+        shoulderR: 86, shoulderAbdR: 74, elbowR: 128,
+        shoulderL: 83, shoulderAbdL: 72, elbowL: 130,
+        forearmPronR: 90, forearmPronL: 90,
+      },
+      ik: { ...stand(82, 78) },
     },
-    { // lockout, bells nearly touching over the head
+    { // lockout, arms long overhead, bells nearly touching
       t: 1,
       root: { x: 52, y: 86, rot: -4 },
-      joints: { spine: -2, neck: -4, forearmPronR: 90, forearmPronL: 90 },
-      ik: { wristR: { x: 57.7, y: 19.0, bend: 1 }, wristL: { x: 54.7, y: 22.0, bend: 1 }, ...stand(82, 78) },
+      joints: {
+        spine: -2, neck: -4,
+        shoulderR: -2, shoulderAbdR: 170, elbowR: 6,
+        shoulderL: -4, shoulderAbdL: 167, elbowL: 8,
+        forearmPronR: 90, forearmPronL: 90,
+      },
+      ik: { ...stand(82, 78) },
     },
   ],
 };
