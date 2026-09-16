@@ -136,6 +136,14 @@ begin
     if new.status = 'pending' then
       raise exception 'a partnership cannot be put back to pending';
     end if;
+    -- A no is a record of somebody's answer, and the person it was said to is
+    -- the last person who should be able to erase it. Without this the whole
+    -- block in redeem_invite_code launders in one request: get declined, write
+    -- 'ended' over the row, ask again. Only the RPCs move a declined row now,
+    -- and neither of them does.
+    if old.status = 'declined' then
+      raise exception 'a declined request is final';
+    end if;
   end if;
 
   return new;
@@ -497,6 +505,37 @@ create policy "self can remove own milestone badges" on milestone_badges
 --        cannot be turned into spamming every user with pair requests.
 --      - and rotate_invite_code(), because a code you cannot change is a
 --        credential you cannot revoke.
+--
+--    ASKING AGAIN AFTER A NO. The rate limiter counts failures, and looking up
+--    a code that really exists is not a failure, so on its own it never fires
+--    for somebody who has been turned down and simply types the same valid code
+--    again. Consent that can be demanded once a minute forever is not consent,
+--    it is a doorbell. So: a declined request blocks a fresh one.
+--
+--    The block is on the ORDERED pair, asker to refuser, and it does not
+--    expire. Permanent because a no with a timer on it is a no somebody else
+--    set the terms of. One-directional because the way back is then obvious and
+--    needs no new screen and no forgiveness button: the person who said no
+--    types the other one's code. That is consent by definition, it creates a
+--    request in the opposite direction which the first person then answers, and
+--    two mates who mis-tapped are one tap from sorted. The person who was
+--    refused never gets a lever, which is the entire point.
+--
+--    Rotating your code does NOT clear it. The two things do different jobs:
+--    the block is keyed on who somebody is, rotation is keyed on a string, and
+--    a block that a new string could reset would be a block keyed on the
+--    credential the attacker already proved they can obtain. Rotation is for
+--    cutting off everyone who holds the old code and has not asked yet.
+--
+--    A declined row does NOT count against the three-outstanding cap, and must
+--    not. That cap counts people currently on the hook to answer you; a
+--    declined row is answered. Counting it would mean three noes bar you from
+--    ever asking anyone again, and would hand any three people a way to spend
+--    your quota for you. Repeat harassment of one person is the declined block's
+--    job, breadth is the cap's job, and they are kept apart on purpose. No
+--    separate spray limit is added: every new target needs a valid code, which
+--    is already what the failure lockout above bounds.
+--
 --    Rejected: an expiring code. It breaks "text your friend your code and let
 --    them get to it tonight" with no way to re-arm it from the client, and it
 --    buys little once a hit only produces a request. Reconsider it if the app
@@ -525,7 +564,7 @@ create index if not exists invite_code_attempts_recent
   on invite_code_attempts (at desc) where not ok;
 
 comment on table invite_code_attempts is
-  'One row per redeem_invite_code() call. Feeds the lockout in that function. Trim with: delete from invite_code_attempts where at < now() - interval ''30 days''.';
+  'One row per redeem_invite_code() call. ok means the attempt got the caller somewhere: the code matched a real person AND that person had not already refused them. A valid code typed by someone who has been declined is a failure for counting purposes, so hammering a wall still walks into the lockout. Feeds the lockout in that function. Trim with: delete from invite_code_attempts where at < now() - interval ''30 days''.';
 
 
 create or replace function redeem_invite_code(code text)
@@ -540,6 +579,7 @@ declare
   guilty    int;
   pending   int;
   hit       int;
+  refused   boolean;
 begin
   if me = '' then
     return json_build_object('ok', false, 'error', 'Not signed in');
@@ -574,14 +614,35 @@ begin
 
   select email, user_name into target from profiles where invite_code = tidy;
 
+  -- Have they already turned me down? Ordered pair: my ask, their no. Their
+  -- own ask of me, if they ever make one, is a different row and is allowed.
+  select exists (
+    select 1 from partnerships
+    where status = 'declined'
+      and lower(inviter_email) = me
+      and lower(invitee_email) = lower(target.email)
+  ) into refused;
+
   insert into invite_code_attempts (actor_email, code_tried, ok)
-  values (me, tidy, target.email is not null);
+  values (me, tidy, target.email is not null and not coalesce(refused, false));
 
   if target.email is null then
     return json_build_object('ok', false, 'error', 'That code does not match anyone');
   end if;
   if lower(target.email) = me then
     return json_build_object('ok', false, 'error', 'That is your own code');
+  end if;
+
+  -- Deliberately says nothing about their answer. It cannot be a leak either
+  -- way, because the declined row is on the caller's own side of the
+  -- partnerships SELECT policy and the app already shows it to them, but a
+  -- refusal is a bad place to editorialise about somebody else's decision. It
+  -- states the one fact the caller needs, which is where the next move has to
+  -- come from.
+  if refused then
+    return json_build_object(
+      'ok', false, 'blocked', true,
+      'error', 'You have already asked them. If you both want this, they can type your code instead.');
   end if;
 
   if exists (
@@ -670,8 +731,13 @@ begin
 
   update partnerships set status = 'accepted', responded_at = now() where id = p_id;
 
-  -- Everything else they were asked stops being an open question.
-  update partnerships set status = 'declined', responded_at = now()
+  /* Everything else they were asked stops being an open question. 'ended' and
+     not 'declined', which is a correction to the first cut of this file: you
+     have one partner, so picking one person is not a refusal of the others and
+     it must not be recorded as one. Marked declined, somebody who asked you on
+     a day you happened to pair with a friend would be barred from ever asking
+     you again by a no you never said. */
+  update partnerships set status = 'ended', responded_at = now()
    where status = 'pending' and id <> p_id and lower(invitee_email) = me;
 
   return json_build_object('ok', true, 'accepted', true,
@@ -699,6 +765,74 @@ end $$;
 
 grant execute on function respond_to_pair_invite(uuid, boolean) to anon, authenticated;
 grant execute on function rotate_invite_code() to anon, authenticated;
+
+-- 'declined' has to mean one thing, or the block above blocks the wrong people.
+--
+-- Live, two other functions write it: leave_my_group() and
+-- remove_group_member() both retire the legacy pair row with
+-- `set status = 'declined'` when somebody leaves a group. That is not a
+-- refusal, it is two people who stopped training together, and it is the same
+-- event leavePartnership() in the client already records as 'ended'. Left
+-- alone, walking out of a pair group would permanently bar one of them from
+-- ever asking the other again. Both now write 'ended'. Nothing reads
+-- 'declined' except the block and the client's refused screen, and
+-- my_partner_email() and my_partnership_id() only ever look at 'accepted', so
+-- this changes no behaviour anywhere else. The bodies are otherwise byte for
+-- byte what is live today.
+
+create or replace function leave_my_group(p_group_id uuid, p_keep_history boolean default true)
+returns void language plpgsql security definer set search_path = public as $$
+declare me text;
+begin
+  me := my_email();
+  if me = '' then raise exception 'not signed in'; end if;
+
+  if not exists (select 1 from group_members m
+                 where m.group_id = p_group_id and lower(m.email) = me and m.left_at is null) then
+    raise exception 'not a member of that group';
+  end if;
+
+  update group_members set left_at = now()
+   where group_id = p_group_id and lower(email) = me and left_at is null;
+
+  -- A pair with someone gone is not a pair; retire the legacy row too.
+  update partnerships set status = 'ended'
+   where id = p_group_id
+     and (lower(inviter_email) = me or lower(invitee_email) = me);
+
+  if not p_keep_history then
+    delete from exercise_logs where lower(email) = me;
+    delete from body_photos   where lower(email) = me;
+    delete from ai_workouts   where lower(email) = me;
+    delete from fit_entries   where lower(email) = me;
+    delete from encouragements where lower(from_email) = me or lower(to_email) = me;
+  end if;
+end $$;
+
+create or replace function remove_group_member(p_group_id uuid, p_email text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (select 1 from groups g where g.id = p_group_id and lower(g.owner_email) = my_email()) then
+    raise exception 'only the owner can remove members';
+  end if;
+  if lower(p_email) = my_email() then
+    raise exception 'use leave_my_group to remove yourself';
+  end if;
+  update group_members set left_at = now()
+   where group_id = p_group_id and lower(email) = lower(p_email) and left_at is null;
+  update partnerships set status = 'ended'
+   where id = p_group_id and (lower(invitee_email) = lower(p_email) or lower(inviter_email) = lower(p_email));
+end $$;
+
+
+-- And the two 'declined' rows already in the table, both dated 2026-08-30.
+-- Neither can be a refusal of a pair request, because pair requests do not
+-- exist until this file runs. Leaving them would hand two people a permanent
+-- block that nobody ever said out loud. The cutoff is a fixed date rather than
+-- now(), so a second run of this file cannot reach a real refusal.
+update partnerships set status = 'ended'
+ where status = 'declined'
+   and created_at < timestamptz '2026-09-16 00:00:00+00';
 
 
 -- ---------------------------------------------------------------------------
@@ -914,6 +1048,42 @@ select 'hole 3: recent attempts' as check, actor_email, count(*) filter (where n
  where at > now() - interval '24 hours'
  group by actor_email order by failures desc;
 
+-- 3b. Asking again after a no. Expect the predicate in redeem_invite_code, the
+--     declined row locked against being rewritten from the client, and the
+--     other-requests sweep marking them ended rather than declined.
+select 'hole 3b: asking again after a no' as check,
+       (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public' and p.proname = 'redeem_invite_code'
+           and p.prosrc like '%status = ''declined''%'
+           and p.prosrc like '%You have already asked them%') as redeem_honours_the_no,
+       (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public' and p.proname = 'lock_partnership_parties'
+           and p.prosrc like '%a declined request is final%') as no_cannot_be_erased,
+       (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public' and p.proname = 'respond_to_pair_invite'
+           and p.prosrc like '%status = ''ended''%') as losing_out_is_not_a_refusal,
+       (select count(*) from pg_policies
+         where schemaname = 'public' and tablename = 'partnerships' and cmd = 'DELETE') as delete_policies_should_be_0,
+       (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public' and p.proname in ('leave_my_group','remove_group_member')
+           and p.prosrc like '%''declined''%') as leaving_should_not_look_like_a_no,
+       (select count(*) from partnerships
+         where status = 'declined'
+           and created_at < timestamptz '2026-09-16 00:00:00+00') as legacy_declines_should_be_0;
+
+-- Do it by hand, two accounts, and it should read like this:
+--   A types B's code          -> "Request sent to B."
+--   B says no                 -> row is 'declined'
+--   A types B's code again    -> "You have already asked them. If you both
+--                                 want this, they can type your code instead."
+--   A tries to clear the row  -> update partnerships set status='ended' is
+--                                refused: "a declined request is final"
+--   B types A's code          -> "Request sent to A." A answers. Paired.
+-- Who is currently blocked from asking whom, and when the no was said:
+select 'hole 3b: standing refusals' as check, inviter_email as asked,
+       invitee_email as said_no, responded_at
+  from partnerships where status = 'declined' order by responded_at desc nulls last;
+
 -- 4. Progress photos. Expect the row policy to be is_me and two restrictive
 --    storage policies naming the body folder.
 select 'hole 4: progress photos' as check,
@@ -946,6 +1116,12 @@ select 'all five' as check,
          where n.nspname='public' and p.proname='can_see' and p.prosrc like '%them.accepted_at is not null%') = 1 as hole_2,
        (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
          where n.nspname='public' and p.proname='redeem_invite_code' and p.prosrc like '%invite_code_attempts%') = 1 as hole_3,
+       ((select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+          where n.nspname='public' and p.proname='redeem_invite_code'
+            and p.prosrc like '%You have already asked them%') = 1
+        and (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+              where n.nspname='public' and p.proname='lock_partnership_parties'
+                and p.prosrc like '%a declined request is final%') = 1) as no_means_no,
        (select count(*) from pg_policies where schemaname='public' and tablename='body_photos'
          and cmd='SELECT' and qual like '%can_see%') = 0 as hole_4,
        (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
