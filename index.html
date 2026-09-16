@@ -24099,9 +24099,19 @@ async function renderPushToggle() {
   const sub = await currentPushSub();
   btn.disabled = false;
   btn.textContent = sub ? "Turn off reminders" : "Turn on reminders";
-  note.textContent = sub ? "On for this device." : "Off.";
+  /* The reason the last attempt failed, kept on screen rather than thrown at a
+     toast that is gone in three seconds. Turning reminders on can fail in at
+     least four different ways and every one of them used to read as "Off.",
+     which is how a phone ends up registered nowhere with nobody any the wiser.
+     Cleared the moment it works. */
+  note.textContent = sub ? "On for this device." : (PUSH_LAST_ERROR || "Off.");
+  note.style.color = !sub && PUSH_LAST_ERROR ? "var(--danger, #ff5c5c)" : "";
   btn.onclick = sub ? disablePush : enablePush;
 }
+
+/* Why the last attempt to turn reminders on did not work. Null when it has not
+   been tried, or when it worked. */
+let PUSH_LAST_ERROR = null;
 
 async function enablePush() {
   const btn = $("pushToggleBtn");
@@ -24114,8 +24124,14 @@ async function enablePush() {
   try {
     if (isNativeApp()) {
       const push = nativePush();
+      /* Named rather than assumed. If the plugin is not registered this is
+         undefined, the next line throws a TypeError, and the screen used to
+         report that as a generic failure. */
+      if (!push) throw new Error("The push plugin is missing from this build.");
       const asked = await push.requestPermissions();
-      if (asked.receive !== "granted") { toast("Reminders need permission"); return; }
+      if (asked.receive !== "granted") {
+        throw new Error("iOS refused. Settings, Notifications, Unio, Allow Notifications.");
+      }
       /* Retried here because the boot attempt runs before anyone has granted
          anything, and that is where it tends to fail. */
       await registerPushHandlers();
@@ -24126,7 +24142,8 @@ async function enablePush() {
         environment: await apnsEnvironment(),
         failures: 0,
       }, { onConflict: "token" });
-      if (apnsErr) throw apnsErr;
+      if (apnsErr) throw new Error(`Could not save the token: ${apnsErr.message}`);
+      PUSH_LAST_ERROR = null;
       toast("Reminders on");
       return;
     }
@@ -24151,9 +24168,13 @@ async function enablePush() {
       failures: 0,
     }, { onConflict: "endpoint" });
     if (error) throw error;
+    PUSH_LAST_ERROR = null;
     toast("Reminders on");
   } catch (e) {
     console.error("could not enable reminders", e);
+    /* Kept, so renderPushToggle can print it under the button. A toast is the
+       wrong surface for the only explanation anybody is going to get. */
+    PUSH_LAST_ERROR = String(e && e.message ? e.message : e).slice(0, 160);
     toast("Could not turn reminders on");
   } finally {
     btn.disabled = false;
