@@ -175,26 +175,36 @@
     position: fixed; inset: 0; z-index: 90;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 22px; background: var(--bg);
-    transition: opacity .62s ease, transform .62s cubic-bezier(.4,0,.2,1);
+    transition: opacity .72s ease;
   }
   .boot-mark { position: relative; width: min(38vw, 150px); aspect-ratio: 1; }
   .boot-mark img {
     position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: contain;
+    /* Hidden in the base rule, not only by animation-fill-mode. WebKit paints
+       a frame of the element as authored before it applies a delayed
+       animation's backwards fill, which was long enough to see the dumbbell
+       sitting inside the arcs before it was meant to exist. */
+    opacity: 0;
   }
   /* Each arc swings in from its own side around the centre of the mark. */
   .boot-arc-l { animation: bootArcL 1.2s cubic-bezier(.34,1.24,.5,1) both; }
   .boot-arc-r { animation: bootArcR 1.2s cubic-bezier(.34,1.24,.5,1) both; }
-  .boot-bar   { animation: bootBar .74s ease .72s both; }
+  /* A pop rather than a fade: it is not there, and then it is. */
+  .boot-bar   { animation: bootBar .52s cubic-bezier(.34,1.7,.64,1) .78s both; }
   .boot-word {
     font-family: var(--font-display); font-weight: 800; font-size: 20px;
     letter-spacing: .22em; margin: 0; color: var(--text);
+    opacity: 0;                              /* same reason as the mark above */
     animation: bootWord .74s ease .94s both;
   }
   /* The hold. Added once the entrance has finished, so a slow network breathes
      rather than freezing on the last frame of an animation. */
   #boot.waiting .boot-mark { animation: bootBreath 3.4s ease-in-out infinite; }
-  #boot.done { opacity: 0; transform: scale(1.35); pointer-events: none; }
+  /* The whole screen fades off the dashboard rather than opening out past the
+     edge. The scale read as the mark lunging at you, which is a lot of motion
+     to aim at somebody who has just unlocked their phone. */
+  #boot.done { opacity: 0; pointer-events: none; }
 
   @keyframes bootArcL {
     from { opacity: 0; transform: rotate(-52deg) translateX(-14%); }
@@ -205,7 +215,8 @@
     to   { opacity: 1; transform: none; }
   }
   @keyframes bootBar {
-    from { opacity: 0; transform: scale(.72); }
+    from { opacity: 0; transform: scale(.46); }
+    60%  { opacity: 1; }
     to   { opacity: 1; transform: none; }
   }
   @keyframes bootWord {
@@ -218,9 +229,12 @@
   }
   /* Asked not to move: the mark is simply there, and it still fades out. */
   @media (prefers-reduced-motion: reduce) {
-    .boot-arc-l, .boot-arc-r, .boot-bar, .boot-word { animation: none; opacity: 1; transform: none; }
+    /* .boot-mark img, not the three layer classes: the base rule that hides
+       them is class-plus-element and outranks a bare class, so overriding it
+       one class at a time left the mark invisible with nothing to animate it
+       back. */
+    .boot-mark img, .boot-word { animation: none; opacity: 1; transform: none; }
     #boot.waiting .boot-mark { animation: none; }
-    #boot.done { transform: none; }
   }
 
   html, body {
