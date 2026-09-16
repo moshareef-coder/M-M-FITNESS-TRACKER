@@ -3361,6 +3361,36 @@
      coordinate maths because nothing is transformed. */
   /* Not overflow:hidden on the body. Collapsed, the list always fits, but a
      row opened for a look is full height again and has to be scrollable. */
+  /* ---- The index, outside arrange mode ----
+     "Seven cards, all the same size" was Mo's complaint about this tab from
+     the start, and the direction he picked to fix it (an index of one-line
+     rows, tap one for the real card) reuses this exact accordion rather than
+     building a second one: same :not(.peek) shape, same "leave an opened row
+     alone" rule below, same one-open-at-a-time behaviour. What differs from
+     arrange mode is which line survives the fold. Arrange only needs to tell
+     "Weight trend" from "Log your weight" by title, so it keeps just the h2.
+     Browsing needs the actual answer, so idx-lead survives the fold too and
+     the row is exactly the height of two lines rather than a fixed 58px. */
+  body:not(.arranging) #tab-progress .idx-card:not(.peek) {
+    cursor: pointer;
+  }
+  body:not(.arranging) #tab-progress .idx-card:not(.peek) > *:not(h2):not(.idx-lead) {
+    display: none;
+  }
+  body:not(.arranging) #tab-progress .idx-card:not(.peek) > h2 {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  body:not(.arranging) #tab-progress .idx-card:not(.peek) > .idx-lead {
+    margin-top: 4px;
+  }
+  .idx-chev { display: flex; flex-shrink: 0; color: var(--muted); transition: transform .18s ease; }
+  .idx-card.peek .idx-chev { transform: rotate(90deg); }
+  /* Arrange mode's own listing shows every card BY TITLE, including ones the
+     index never collapses (Log your weight has no idx-card class, same as
+     before), so the chevron this adds is index-only furniture and has no
+     business appearing there. */
+  body.arranging .idx-chev { display: none; }
+
   /* Everything here is scoped to :not(.peek). An opened row must be left
      completely alone: the first version hid children with display:none and
      put them back on .peek with display:revert, but revert goes to the
@@ -5490,9 +5520,9 @@
          of weigh-ins were the same five numbers the line and the chart already
          carry, printed twice. Tapping a point is what asks, and the weigh-in
          it lands on is still the way back into that day. -->
-    <div class="card metric-card" id="cardWeight">
+    <div class="card metric-card idx-card" id="cardWeight">
       <h2>Weight trend</h2>
-      <p class="muted-note" style="margin-top:-6px" id="weightLead"></p>
+      <p class="muted-note idx-lead" style="margin-top:-6px" id="weightLead"></p>
       <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
       <div class="wt-range" id="weightRange"></div>
       <div class="ms-list" id="weightHistory"></div>
@@ -5513,9 +5543,9 @@
       <button type="button" class="btn-primary" id="scaleSaveBtn" style="margin-top:12px;">Save weigh-in</button>
     </div>
 
-    <div class="card metric-card" id="cardConsistency">
+    <div class="card metric-card idx-card" id="cardConsistency">
       <h2>Consistency</h2>
-      <p class="muted-note" style="margin-top:-6px" id="consistencyLead"></p>
+      <p class="muted-note idx-lead" style="margin-top:-6px" id="consistencyLead"></p>
       <div class="chart-wrap"><canvas id="consistencyChart"></canvas></div>
       <div class="ms-list" id="consistencyDetail"></div>
     </div>
@@ -5524,9 +5554,9 @@
          reading exercise. The body is the card: one line of scoreboard above
          it, the figure, and nothing else until somebody asks for it. Tapping a
          muscle is what asks, and the answer lands in the slot underneath. -->
-    <div class="card metric-card" id="cardMuscles">
+    <div class="card metric-card idx-card" id="cardMuscles">
       <h2>Getting stronger</h2>
-      <p class="muted-note" style="margin-top:-6px" id="musclesLead"></p>
+      <p class="muted-note idx-lead" style="margin-top:-6px" id="musclesLead"></p>
       <div class="bi-figures" id="msFigures">
         <div class="bi-fig" data-view="Front"><canvas id="msFront" class="bi-canvas"></canvas></div>
         <div class="bi-fig" data-view="Back"><canvas id="msBack" class="bi-canvas"></canvas></div>
@@ -5539,9 +5569,9 @@
       <div class="ms-list" id="msDetail"></div>
     </div>
 
-    <div class="card metric-card" id="cardStrength">
+    <div class="card metric-card idx-card" id="cardStrength">
       <h2>Strength</h2>
-      <p class="muted-note" style="margin-top:-6px" id="strengthLead"></p>
+      <p class="muted-note idx-lead" style="margin-top:-6px" id="strengthLead"></p>
       <!-- Five segments, one per level, filled up to where this lift sits and
            part filled for the level it is in. The distance to the next one is
            the motivating half: "28 lb to Advanced" is something to go and do. -->
@@ -5575,15 +5605,16 @@
       <div class="partner-sheet" id="reportSheet"></div>
     </div>
 
-    <div class="card metric-card" id="cardVolume">
+    <div class="card metric-card idx-card" id="cardVolume">
       <h2>Training volume</h2>
-      <p class="muted-note" style="margin-top:-6px" id="volumeLead"></p>
+      <p class="muted-note idx-lead" style="margin-top:-6px" id="volumeLead"></p>
       <div class="chart-wrap"><canvas id="volumeChart"></canvas></div>
       <div class="ms-list" id="volumeDetail"></div>
     </div>
 
-    <div class="card metric-card" id="cardPhotos">
+    <div class="card metric-card idx-card" id="cardPhotos">
       <h2>Body photos</h2>
+      <p class="muted-note idx-lead" style="margin-top:-6px" id="photosLead"></p>
       <div class="photo-strip" id="bodyPhotoStrip"></div>
       <input type="file" id="bodyPhotoInput" accept="image/*" capture="environment" hidden />
       <button type="button" class="btn-secondary" id="addBodyPhotoBtn">Add today's photo</button>
@@ -24066,10 +24097,21 @@ async function renderBodyPhotos() {
 
   $("addBodyPhotoBtn").classList.remove("hidden");
 
-  /* No standing hint line. It said "one photo a day, swipe back to see how far
-     you have come", which is the empty state's job the first time and furniture
-     every time after: the strip of your own faces IS the instruction, and the
-     button under it says the rest. */
+  /* This card is collapsible in the index now, same as every other reading
+     card, and a collapsed row with nothing on it reads as broken rather than
+     as "closed". The line used to be argued OUT of existence here on the
+     grounds that the strip of faces is instruction enough once expanded, and
+     that argument still holds for the expanded view; it just is not the same
+     question as what a folded row says before anyone has tapped it. */
+  /* loadBodyPhotos orders these newest first, so the most recent is shots[0]
+     rather than the last element. Getting this backwards would have quietly
+     shown the OLDEST photo's date as "last one", which is the kind of thing
+     nobody would notice until it told somebody their most recent photo was
+     three months old. */
+  $("photosLead").textContent = shots.length
+    ? `${shots.length} photo${shots.length === 1 ? "" : "s"}. Last one ${datedLabel(shots[0].taken_on)}.`
+    : "No progress photos yet.";
+
   const strip = $("bodyPhotoStrip");
   if (!shots.length) {
     strip.innerHTML = emptyState("camera", "No progress photos yet", "One a day. In a month you'll see the difference.");
@@ -25385,15 +25427,51 @@ function paintArrangeUI(host) {
     grip.innerHTML = icon("grip", 16);
     grip.onpointerdown = (e) => startCardDrag(e, card, host);
     card.appendChild(grip);
+    /* The index's chevron, wired in the same idempotent pass as the grip
+       above rather than a second loop, since the guard against re-adding one
+       (querySelector(".prog-grip")) already proves this card has not been
+       through this loop before. */
+    if (card.classList.contains("idx-card")) {
+      const h2 = card.querySelector(":scope > h2");
+      if (h2 && !h2.querySelector(".idx-chev")) {
+        const chev = document.createElement("span");
+        chev.className = "idx-chev";
+        chev.innerHTML = icon("chevronRight", 16);
+        h2.appendChild(chev);
+      }
+    }
     /* One open at a time, so opening a second folds the first and the list
-       never grows into a scroll you have to fight while reordering. */
+       never grows into a scroll you have to fight while reordering. The same
+       accordion runs the index in normal browsing: PROG_ARRANGING gates every
+       card, idx-card gates only the ones the index collapses (Log your
+       weight keeps neither class and this listener leaves it alone). */
     card.addEventListener("click", (e) => {
-      if (!PROG_ARRANGING || e.target.closest(".prog-grip")) return;
+      if (e.target.closest(".prog-grip")) return;
+      const indexable = !PROG_ARRANGING && card.classList.contains("idx-card");
+      if (!PROG_ARRANGING && !indexable) return;
       const wasOpen = card.classList.contains("peek");
       host.querySelectorAll(".card.peek").forEach((c) => c.classList.remove("peek"));
       if (!wasOpen) {
         card.classList.add("peek");
         card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        /* A chart or a Rive figure that mounted while its card was folded
+           sized itself against a hidden, zero-width container. Chart.js has
+           a real fix for exactly this (resize() against the box it is
+           actually in now); the muscle figure does not expose one, so it is
+           asked to paint itself again instead, which is cheap and already
+           idempotent. Arrange mode never triggers this: it never lets go of
+           a chart's true size in the first place, so there is nothing here
+           for it to repair. */
+        if (indexable) {
+          if (card.id === "cardWeight") weightChart?.resize();
+          else if (card.id === "cardConsistency") consistencyChart?.resize();
+          else if (card.id === "cardStrength") strengthChart?.resize();
+          else if (card.id === "cardVolume") volumeChart?.resize();
+          else if (card.id === "cardMuscles") {
+            const name = PROGRESS_VIEW === "partner" ? partnerName() : ME;
+            renderMuscleAnswers(name);
+          }
+        }
       }
     });
   }
