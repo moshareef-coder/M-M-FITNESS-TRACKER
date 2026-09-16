@@ -2472,9 +2472,19 @@
      boxed, and the calendar was the one thing on this tab that was not,
      which read as one long attached list rather than separate sections. */
   .cal {
-    margin-top: 20px; padding: 16px 14px 14px; border-radius: 18px;
+    margin-top: 0; padding: 16px 14px 14px; border-radius: 18px;
     border: 1px solid var(--border); background: var(--panel);
   }
+  /* The week, kept visibly apart from today's workout above it. The rule and
+     the heading do the separating; the calendar and the button below it keep
+     their own edges so the section reads as two related things rather than
+     one box with a line through it. */
+  .week-sec { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--border); }
+  .week-sec-h {
+    margin: 0 0 12px; font: 700 12px/1 inherit; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .week-sec .opt-card { margin-top: 10px; }
   .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 12px; }
   /* One pair of arrows steps months. Years live behind the title, so there is
      no second pair of nearly identical arrows to hit by mistake. */
@@ -5641,7 +5651,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.15.16";
+const APP_VERSION = "2026.09.15.17";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -17966,12 +17976,17 @@ function renderChooseScreen() {
       ? `<p class="build-q">${escapeHtml(coachName)} sets your training. Log what you did, or add something extra.</p>${actions}`
       : ""}
     ${savedWorkoutsHTML()}
-    ${/* Planning the week is a calendar job, not a "how do I build today's
-          workout" job, so it sits with the calendar rather than in the card.
-          Mo asked for it here. */ ""}
-    ${optionCard("chooseWeekBtn", "checklist", "Plan your week",
-        "Put saved workouts on the days you will do them.", false)}
-    ${workoutCalendarHTML()}`;
+    ${/* Two boxes, not one. Today's workout answers "what am I doing now" and
+          the calendar answers "what does the week look like", and Mo wants
+          them read as separate things rather than one long card. Plan your
+          week sits UNDER the calendar because it acts on the calendar: you
+          look at the week, then you fill it in. */ ""}
+    <section class="week-sec">
+      <h3 class="week-sec-h">Your week</h3>
+      ${workoutCalendarHTML()}
+      ${optionCard("chooseWeekBtn", "checklist", "Plan your week",
+          "Put saved workouts on the days you will do them.", false)}
+    </section>`;
   wireSavedWorkouts($("workoutContent"));
   wireWorkoutCalendar($("workoutContent"));
   staggerWorkoutCards();
