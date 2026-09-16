@@ -1849,6 +1849,41 @@ function handHeldFrame(ctx, p, S) {
   return true;
 }
 
+/* A hexagon centred on the origin, vertex up, for the dumbbell end-on view.
+   Six sides read as "hex head" even at 20px, which a circle would not. */
+function hexPath(ctx, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = D(-90 + i * 60);
+    const x = Math.cos(a) * r, y = Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+/* The dumbbell seen end on: cast iron, the same recipe as a loaded barbell
+   plate (outer edge, a lit inner ring, a chrome sleeve through the middle)
+   with a hexagon standing in for the disc, because that is the head shape
+   this rig's dumbbells actually have. `rot` is degrees, used by a keyframed
+   propRot (see ARNOLD_PRESS) for the one case where the grip visibly turns;
+   a hex reads as itself at any angle, which a long capsule did not. */
+function drawDumbbellEnd(ctx, C, at, k, rot) {
+  const r = 8.6 * k;
+  ctx.save();
+  ctx.translate(at.x, at.y);
+  if (rot) ctx.rotate(D(rot));
+  ctx.strokeStyle = C.edge; ctx.lineWidth = 3; ctx.lineJoin = "round";
+  hexPath(ctx, r); ctx.stroke();
+  ctx.fillStyle = C.iron; ctx.fill();
+  ctx.strokeStyle = C.ironHi; ctx.lineWidth = Math.max(1, r * 0.14);
+  hexPath(ctx, r * 0.6); ctx.stroke();
+  ctx.lineWidth = Math.max(0.8, r * 0.08);
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.86, Math.PI * 1.05, Math.PI * 1.7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 0, Math.min(2.7, r * 0.32), 0, Math.PI * 2);
+  ctx.fillStyle = C.chrome; ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, Math.min(1.3, r * 0.14), 0, Math.PI * 2);
+  ctx.fillStyle = C.chromeLo; ctx.fill();
+  ctx.restore();
+}
 const PROPS = {
   mat(ctx, C, p, S) {
     ctx.fillStyle = C.propDark;
@@ -2263,30 +2298,26 @@ const PROPS = {
     ctx.beginPath(); ctx.arc(0, 0, Math.min(1.4, r * 0.13), 0, Math.PI * 2); ctx.fillStyle = C.chromeLo; ctx.fill();
     ctx.restore();
   },
+  /* A dumbbell head, seen end on, the same way a loaded barbell is a disc and
+     not a bar drawn sideways: a hex dumbbell held for a press, a curl, a
+     raise or a shrug is gripped so the head faces the camera, not its
+     broadside. Mo: "we should be seeing a side view of the dumbbells, like
+     how we do with the barbell, because that is the way they will be
+     holding it." This is the DEFAULT now, not a special case: `level` used
+     to draw the long side lying flat, which was legible but was not what a
+     side camera actually sees, and it is what every plain press, raise, curl
+     and shrug in the library uses.
+
+     `follow` and `upright` are unchanged and still draw the long capsule:
+     `upright` is the goblet hold, stood on end and genuinely seen along its
+     length; `follow` is a hand that visibly tips the bell as the forearm
+     swings (a hammer curl, a row, a carry), where the length is the point. */
   dumbbell(ctx, C, p, S) {
     const at = anchor(p, S);
     if (!at) return;
     const k = p.k || 1;
-    /* Which way a dumbbell faces is decided by the GRIP, not by the arm.
-       The handle is always square to the forearm, but that leaves two very
-       different pictures depending on which way the fist is turned, and the
-       shape below can only ever draw the long side of the bell:
-
-         level (default)  palm down or palm up, so the handle runs across the
-                          body, straight at a side-on camera. Nearly end on,
-                          which is unreadable, so it is drawn as the long side
-                          lying flat, and it stays flat for the whole rep no
-                          matter where the arm goes: a press, a raise, a fly,
-                          a straight curl. This is the common case.
-         follow           a neutral, thumb-up grip, so the handle runs front
-                          to back and the camera sees its full length. Here
-                          the bell really does tilt with the forearm, which is
-                          the rotation you see on a hammer curl or a row.
-         upright          stood on one end and cupped, the goblet hold.
-
-       Getting this wrong is very visible: `follow` on a pressing grip tips
-       the bell over as the arm travels, which no dumbbell does. */
     const hold = p.hold || "level";
+    if (hold === "level") { drawDumbbellEnd(ctx, C, at, k, p.rot || 0); return; }
     let deg = hold === "upright" ? 0 : 90;
     if (hold === "follow") {
       const side = S.sides[p.side || "R"];
