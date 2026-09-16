@@ -1644,7 +1644,12 @@ const BENCH_DIP = {
     { // top, arms straight, hips just off the front edge and level with it
       t: 0,
       root: { x: 57.4, y: 73.6, rot: -5 },
-      joints: { spine: 0, neck: -2 },
+      /* Mo: "just keep my hands faced forward." The wrist angle turns the mitt
+         so the fingers point toward the feet, which is how a bench dip is
+         actually held. It survives the IK: the solver decides where the wrist
+         ENDS UP, and the hand frame is built from the solved forearm with this
+         angle applied on top, so the two do not fight. */
+      joints: { spine: 0, neck: -2, wristR: 150, wristL: 150 },
       ik: {
         wristR: { x: 42.0, y: 76.0, bend: 1 }, wristL: { x: 38.0, y: 76.5, bend: 1 },
         ankleR: { x: 88, y: FLOOR, bend: -1 }, ankleL: { x: 82, y: FLOOR, bend: -1 },
@@ -1656,7 +1661,7 @@ const BENCH_DIP = {
       // exercise has the reputation it has.
       t: 1,
       root: { x: 55.2, y: 86.4, rot: -7 },
-      joints: { spine: 0, neck: -4 },
+      joints: { spine: 0, neck: -4, wristR: 150, wristL: 150 },
       ik: {
         wristR: { x: 41.8, y: 76.0, bend: 1 }, wristL: { x: 37.8, y: 76.5, bend: 1 },
         ankleR: { x: 88, y: FLOOR, bend: -1 }, ankleL: { x: 82, y: FLOOR, bend: -1 },
