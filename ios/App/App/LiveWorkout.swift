@@ -98,7 +98,20 @@ public class LiveWorkout: CAPPlugin, CAPBridgedPlugin {
             // Seconds already rested, turned into the instant it began.
             restStartedAt: (call.getDouble("restElapsed").map { Date().addingTimeInterval(-$0) }),
             weight: call.getString("weight") ?? "",
-            reps: call.getString("reps") ?? ""
+            reps: call.getString("reps") ?? "",
+            // The session's own three phases, passed straight through. The card
+            // turns blue for the two stretch ones.
+            phase: call.getString("phase") ?? "lift",
+            stretchName: call.getString("stretchName") ?? "",
+            stretchSide: call.getInt("stretchSide") ?? 0,
+            stretchIndex: call.getInt("stretchIndex") ?? 0,
+            stretchCount: call.getInt("stretchCount") ?? 0,
+            // Seconds left of the hold, turned into the instant it runs out.
+            // This one really is an end date, because a hold is a fixed length
+            // counting down, which is the opposite of rest.
+            stretchEndsAt: (call.getDouble("stretchLeft").flatMap { left in
+                left > 0 ? Date().addingTimeInterval(left) : nil
+            })
         )
     }
 

@@ -17255,6 +17255,11 @@ function renderStretchPhase() {
   const i = SESSION.stretchIndex || 0;
   const move = list[i];
   if (!move) { endStretchPhase(); return; }
+  /* The Lock Screen follows the hold. renderSession() pushes the card, but a
+     hold running out advances through paintStretch and lands here without
+     going near it, so without this the card sat on the finished hold showing
+     0:00 while the screen had already moved on. */
+  pushLiveActivity();
   const isWarm = SESSION.phase === "warmup";
   const total = Math.max(1, Number(move.seconds) || 30);
   const left = Math.max(0, total - (Date.now() - (SESSION.stretchStartedAt || Date.now())) / 1000);
@@ -18435,6 +18440,46 @@ function liveActivityFields() {
     /* Lines for the Lock Screen button to choose from. The bank is here and the
        button runs in another process, so it gets a handful to work with. */
     quipPool: LIVE_QUIP_POOL,
+    /* ---- the stretch block ----
+       The card turns blue for these two the way the session screen does, so
+       which part of the session you are in reads from across the room. */
+    ...stretchLiveFields(),
+  };
+}
+
+/* What the Lock Screen needs to draw a warm-up or a cool-down.
+
+   Everything is derived from the same SESSION fields paintStretch() reads, so
+   the card and the session screen cannot disagree about which hold is up or how
+   long is left. Lifting returns the empty shape rather than nothing, because a
+   missing key leaves the previous phase on the card and the workout then
+   carries on looking blue after the warm-up ended. */
+function stretchLiveFields() {
+  const stretching = SESSION && (SESSION.phase === "warmup" || SESSION.phase === "cooldown");
+  if (!stretching) {
+    return { phase: "lift", stretchName: "", stretchSide: 0, stretchIndex: 0, stretchCount: 0, stretchLeft: 0 };
+  }
+  const list = stretchList();
+  const move = list[SESSION.stretchIndex];
+  const total = Math.max(1, Number(move?.seconds) || 30);
+  /* Seconds left, which the native side turns into an end date. A hold counts
+     DOWN against a fixed length, the opposite of rest, so an end date is the
+     honest thing here and Text(timerInterval:) then runs it with the app
+     asleep and it costs no updates. A paused session sends zero, which stops
+     the card's clock the same way it stops the screen's. */
+  const left = SESSION.pausedAt
+    ? 0
+    : Math.max(0, total - (Date.now() - (SESSION.stretchStartedAt || Date.now())) / 1000);
+  return {
+    phase: SESSION.phase,
+    stretchName: move?.name || "",
+    /* Zero means the hold has no sides at all, which is a different thing from
+       being on the first of two, and the card says so rather than claiming
+       FIRST SIDE of a hold that only has one. */
+    stretchSide: move?.perSide ? (SESSION.stretchSide || 1) : 0,
+    stretchIndex: SESSION.stretchIndex || 0,
+    stretchCount: list.length,
+    stretchLeft: Math.round(left),
   };
 }
 
@@ -18485,6 +18530,25 @@ async function drainLockScreenSets() {
     }
     if ((edits || []).length) saveSessionToStorage();
 
+    /* Stretch taps before sets, and in the order they were made. Next and skip
+       are not interchangeable and two nexts are not one skip, so unlike sets
+       these come back as a list rather than a count and are replayed in
+       sequence. Done first because a skip can end the warm-up, and a set
+       logged after that belongs to the lifting that follows it. */
+    const { actions: stretches } = await bridge.drainPendingStretches({ owner: mine });
+    for (const kind of stretches || []) {
+      if (!SESSION || SESSION.finished) break;
+      /* Guarded every iteration rather than once up front: the first skip
+         leaves the block, and replaying a second tap into the lifting phase
+         would move a stretch that is no longer on screen. */
+      if (SESSION.phase !== "warmup" && SESSION.phase !== "cooldown") break;
+      if (kind === "skip") endStretchPhase();
+      else stretchAdvance();
+    }
+    if ((stretches || []).length) {
+      console.log(`lock screen stretch drain: ${(stretches || []).join(", ")}`);
+    }
+
     /* Owner-scoped: taps queued for anyone else, or for a workout that ended
        long ago, are dropped rather than replayed as phantom sets. */
     const { count, advances, dropped } = await bridge.drainPendingSets({ owner: mine });
@@ -18510,7 +18574,7 @@ async function drainLockScreenSets() {
     /* Both replays redraw as they go, but only the screen they think is up. If
        the session was minimised while the taps happened, the workout tab behind
        it is still showing the lift you were on before them. */
-    if ((count || 0) || (advances || 0)) {
+    if ((count || 0) || (advances || 0) || (stretches || []).length) {
       if (document.body.classList.contains("session-open")) renderSession();
       else if (typeof renderWorkoutTab === "function") renderWorkoutTab();
     }
@@ -18534,8 +18598,18 @@ async function pushLiveActivity() {
   }
   const fields = liveActivityFields();
   /* A running countdown must not be resent on every redraw or it restarts from
-     full each time, so rest compares as on or off rather than as seconds. */
-  const fingerprint = JSON.stringify({ ...fields, restSeconds: fields.restSeconds > 0 });
+     full each time, so rest compares as on or off rather than as seconds.
+     A hold is the same trap and worse: stretchLeft changes every second, so
+     comparing it literally would push an update on every redraw and hand the
+     card a new end date each time, which reads as a timer that keeps jumping
+     back. What identifies a hold is which hold it is, so that is what compares:
+     the phase, its position and its side. */
+  const fingerprint = JSON.stringify({
+    ...fields,
+    restSeconds: fields.restSeconds > 0,
+    stretchLeft: fields.stretchLeft > 0,
+    stretchAt: `${fields.phase}:${fields.stretchIndex}:${fields.stretchSide}`,
+  });
   if (fingerprint === LAST_LIVE_ACTIVITY) return;
   LAST_LIVE_ACTIVITY = fingerprint;
   try {

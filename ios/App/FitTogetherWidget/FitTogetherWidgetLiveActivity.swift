@@ -41,6 +41,27 @@ func isResting(_ state: WorkoutAttributes.ContentState) -> Bool {
     state.restStartedAt != nil && !state.paused
 }
 
+/// Warming up or cooling down. The card turns blue for both, the way the
+/// session screen does, because which part of the session you are in should be
+/// legible without reading a word.
+func isStretching(_ state: WorkoutAttributes.ContentState) -> Bool {
+    state.phase == "warmup" || state.phase == "cooldown"
+}
+
+/// A hold counts DOWN against a fixed length, which is the opposite of rest, so
+/// this one really is a range ending at a date.
+///
+/// Same trap as restWindow and the reason it is a function rather than an
+/// expression at the call site: `Date.now...ends` is fatal the instant ends
+/// falls into the past, and a countdown's whole job is to reach that moment.
+/// Returning nil there lets the card draw 0:00 instead of vanishing.
+func stretchWindow(_ state: WorkoutAttributes.ContentState) -> ClosedRange<Date>? {
+    guard let ends = state.stretchEndsAt, !state.paused else { return nil }
+    let now = Date()
+    guard ends > now else { return nil }
+    return now...ends
+}
+
 /// The working state: sets done, and what that number counts.
 private struct HeroNumber: View {
     let state: WorkoutAttributes.ContentState
@@ -70,14 +91,18 @@ private struct HeroNumber: View {
 private struct SetPips: View {
     let done: Int
     let total: Int
+    /// Defaulted so every existing call site is unchanged; the stretch block
+    /// passes blue so this row changes with the rest of the card rather than
+    /// staying lime on a screen that has gone another colour.
+    var tint: Color = Unio.lime
 
     var body: some View {
         HStack(spacing: 3) {
             ForEach(0..<max(total, 1), id: \.self) { i in
                 Capsule()
-                    .fill(i < done ? Unio.lime : Unio.ink.opacity(0.16))
+                    .fill(i < done ? tint : Unio.ink.opacity(0.16))
                     .frame(height: 5)
-                    .shadow(color: i < done ? Unio.lime.opacity(0.55) : .clear, radius: 3)
+                    .shadow(color: i < done ? tint.opacity(0.55) : .clear, radius: 3)
             }
         }
     }
@@ -109,6 +134,97 @@ private struct LogSetButton: View {
     }
 }
 
+
+/// The two stretch buttons.
+///
+/// Next is the loud one and Skip is quiet, which is the right way round: moving
+/// through the block is the ordinary thing and leaving it is the exception.
+/// They are also different widths and different shapes, because these sit next
+/// to each other on a Lock Screen where a thumb arrives without the eye, and
+/// two identical capsules would be a coin toss between "next hold" and "end the
+/// warm-up".
+@available(iOS 17.0, *)
+private struct StretchButtons: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(intent: StretchIntent(action: "next")) {
+                HStack(spacing: 5) {
+                    Text("Next stretch")
+                        .font(.system(size: 13.5, weight: .bold))
+                        .lineLimit(1)
+                        .fixedSize()
+                    Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold))
+                }
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(Capsule().fill(Unio.stretch))
+                .foregroundStyle(.black)
+                .shadow(color: Unio.stretch.opacity(0.45), radius: 6)
+            }
+            .buttonStyle(.plain)
+
+            Button(intent: StretchIntent(action: "skip")) {
+                Text("Skip")
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(Capsule().stroke(Unio.ink.opacity(0.32), lineWidth: 1.2))
+                    .foregroundStyle(Unio.ink.opacity(0.75))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+/// The hold on screen, counting down.
+///
+/// Counting down rather than up, unlike rest, and that is not a style choice:
+/// a hold is a fixed length somebody is waiting out, so the useful number is
+/// how much is left. Rest is open ended and measured against a plan, so there
+/// the useful number is how long it has been.
+@available(iOS 16.1, *)
+private struct StretchHero: View {
+    let state: WorkoutAttributes.ContentState
+
+    private var sideLabel: String {
+        guard state.stretchSide > 0 else { return "" }
+        return state.stretchSide == 1 ? "FIRST SIDE" : "SECOND SIDE"
+    }
+
+    private var positionLabel: String {
+        guard state.stretchCount > 0 else { return sideLabel }
+        let position = "HOLD \(min(state.stretchIndex + 1, state.stretchCount)) OF \(state.stretchCount)"
+        return sideLabel.isEmpty ? position : "\(position) · \(sideLabel)"
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 11) {
+            VStack(alignment: .leading, spacing: 1) {
+                Group {
+                    if let window = stretchWindow(state) {
+                        Text(timerInterval: window, countsDown: true)
+                    } else {
+                        // The hold has run out and the app has not answered
+                        // yet. Zero is the truth for that second, and it is a
+                        // great deal better than an empty slot.
+                        Text("0:00")
+                    }
+                }
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(Unio.stretch)
+                .lineLimit(1)
+                .frame(minWidth: 74, alignment: .leading)
+
+                Text(positionLabel)
+                    .font(.system(size: 9.5, weight: .heavy))
+                    .tracking(0.9)
+                    .foregroundStyle(Unio.ink.opacity(0.45))
+                    .lineLimit(1)
+            }
+        }
+    }
+}
 
 /// A value with a minus and a plus either side, for the expanded island.
 ///
@@ -168,7 +284,16 @@ struct FitTogetherWidgetLiveActivity: Widget {
                     LockScreenView(state: context.state)
                 }
             }
-            .activityBackgroundTint(Color.black.opacity(0.62))
+            /* The ground changes, not just the text. This is the whole of Mo's
+               brief for the session screen ("the whole thing can light up blue,
+               so it is like, oh, it is stretching") and the Lock Screen is the
+               surface where that claim is actually worth something: you read it
+               from across the room without unlocking anything. Kept dark and
+               only tinted, because a bright card on a Lock Screen at six in the
+               morning is its own kind of rude. */
+            .activityBackgroundTint(isStretching(context.state)
+                                    ? Unio.stretch.opacity(0.22)
+                                    : Color.black.opacity(0.62))
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
@@ -231,7 +356,21 @@ struct FitTogetherWidgetLiveActivity: Widget {
             } compactTrailing: {
                 // Same trap as the Lock Screen: an expired range is fatal, and
                 // this one would take the Dynamic Island down with it.
-                if let window = restWindow(context.state) {
+                if isStretching(context.state) {
+                    // Counting down, and blue, so a glance at the island says
+                    // both how long is left and which part of the session it
+                    // belongs to.
+                    if let window = stretchWindow(context.state) {
+                        Text(timerInterval: window, countsDown: true)
+                            .monospacedDigit()
+                            .frame(maxWidth: 44)
+                            .foregroundStyle(Unio.stretch)
+                    } else {
+                        Text("0:00")
+                            .monospacedDigit()
+                            .foregroundStyle(Unio.stretch)
+                    }
+                } else if let window = restWindow(context.state) {
                     Text(timerInterval: window, countsDown: false)
                         .monospacedDigit()
                         .frame(maxWidth: 44)
@@ -294,7 +433,16 @@ private struct LockScreenView: View {
     let state: WorkoutAttributes.ContentState
 
     private var resting: Bool { isResting(state) }
+    private var stretching: Bool { isStretching(state) }
     private var liftDone: Bool { state.total > 0 && state.done >= state.total }
+
+    /// Warm-up and cool-down are the same screen with a different word. The
+    /// difference matters to the person: one is "we are starting", the other is
+    /// "we are finishing", and a card that called both Stretching would throw
+    /// away the only part of it that tells you where you are in the session.
+    private var stretchTitle: String {
+        state.phase == "cooldown" ? "Cooling down" : "Warming up"
+    }
 
     /* One place on the card, three meanings. Coming off a rest you are starting
        a set, not logging one, and the lift being finished means the only useful
@@ -317,6 +465,7 @@ private struct LockScreenView: View {
        the name comes back the moment you start it. Once a lift is finished the
        title becomes what is coming rather than what is done. */
     private var title: String {
+        if stretching { return stretchTitle }
         if liftDone && !state.nextExercise.isEmpty { return state.nextExercise }
         return resting ? "Resting" : state.exercise
     }
@@ -329,24 +478,39 @@ private struct LockScreenView: View {
                 UnioMark(size: 24)
                 Text(title)
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(resting && !liftDone ? Unio.lime : Unio.ink)
+                    .foregroundStyle(stretching ? Unio.stretch
+                                     : (resting && !liftDone ? Unio.lime : Unio.ink))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 Spacer(minLength: 6)
-                Text(state.detail)
+                // The hold's name during a stretch. It is the one thing you
+                // actually need out here, because unlike a lift there is no
+                // set count to infer it from.
+                Text(stretching ? (state.stretchName.isEmpty ? "Stretch" : state.stretchName) : state.detail)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .fixedSize()
                     .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(Capsule().fill(Unio.ink.opacity(0.10)))
+                    .background(Capsule().fill(stretching ? Unio.stretch.opacity(0.18)
+                                                          : Unio.ink.opacity(0.10)))
             }
 
             HStack(alignment: .center, spacing: 12) {
-                if resting { RestHero(state: state) } else { HeroNumber(state: state) }
+                if stretching {
+                    StretchHero(state: state)
+                } else if resting {
+                    RestHero(state: state)
+                } else {
+                    HeroNumber(state: state)
+                }
                 Spacer(minLength: 6)
                 if #available(iOS 17.0, *) {
-                    LogSetButton(resting: resting, label: buttonLabel, action: buttonAction)
+                    if stretching {
+                        StretchButtons()
+                    } else {
+                        LogSetButton(resting: resting, label: buttonLabel, action: buttonAction)
+                    }
                 }
             }
 
@@ -366,7 +530,15 @@ private struct LockScreenView: View {
                 }
             }
 
-            SetPips(done: state.done, total: state.total)
+            // Same row, counting a different thing. A stretch logs nothing, so
+            // set pips during a warm-up would be a progress bar for something
+            // not happening; these count holds instead and keep the one honest
+            // "how much of this is left" the card has.
+            if stretching {
+                SetPips(done: state.stretchIndex, total: max(state.stretchCount, 1), tint: Unio.stretch)
+            } else {
+                SetPips(done: state.done, total: state.total)
+            }
         }
         .padding(.horizontal, 15)
         .padding(.vertical, 12)

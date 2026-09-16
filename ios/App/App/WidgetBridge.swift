@@ -17,6 +17,7 @@ public class WidgetBridge: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "save", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "drainPendingSets", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "drainPendingEdits", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "drainPendingStretches", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clear", returnType: CAPPluginReturnPromise),
     ]
 
@@ -31,6 +32,8 @@ public class WidgetBridge: CAPPlugin, CAPBridgedPlugin {
     static let quipPoolKey = "quipPool"
     // Weight and rep changes made from the expanded Dynamic Island.
     static let pendingEditsKey = "pendingLoadEdits"
+    // Next hold and skip block, tapped during a warm-up or cool-down.
+    static let pendingStretchKey = "pendingStretchActions"
     // Nothing queued survives half a day. Past that the workout it belonged to
     // is over whatever else the owner says.
     static let defaultMaxAge: Double = 12 * 3600
@@ -113,6 +116,39 @@ public class WidgetBridge: CAPPlugin, CAPBridgedPlugin {
         call.resolve(["edits": edits, "dropped": queued.count - mine.count])
     }
 
+    /// Stretch taps made on the Lock Screen, in the order they happened.
+    ///
+    /// Order is the whole point here, unlike sets, where the app only needs to
+    /// know how many landed. Next, next, skip and skip, next, next are
+    /// different sessions, so these come back as a list of kinds rather than a
+    /// count, and the app replays them in sequence.
+    @objc func drainPendingStretches(_ call: CAPPluginCall) {
+        guard let defaults = UserDefaults(suiteName: WidgetBridge.appGroup) else {
+            call.resolve(["actions": [], "dropped": 0])
+            return
+        }
+        let queued = defaults.array(forKey: WidgetBridge.pendingStretchKey) as? [[String: Any]] ?? []
+        if defaults.object(forKey: WidgetBridge.pendingStretchKey) != nil {
+            defaults.removeObject(forKey: WidgetBridge.pendingStretchKey)
+        }
+        let owner = call.getString("owner") ?? ""
+        guard !owner.isEmpty else {
+            // Same rule as every other queue: an unowned tap belongs to no
+            // session, and replaying it into whatever opens next would move
+            // somebody else's workout along.
+            call.resolve(["actions": [], "dropped": queued.count])
+            return
+        }
+        let maxAge = call.getDouble("maxAgeSeconds") ?? WidgetBridge.defaultMaxAge
+        let now = Date().timeIntervalSince1970
+        let mine = queued.filter { entry in
+            guard entry["owner"] as? String == owner, let at = entry["at"] as? Double else { return false }
+            return now - at <= maxAge
+        }
+        let actions = mine.compactMap { $0["kind"] as? String }
+        call.resolve(["actions": actions, "dropped": queued.count - mine.count])
+    }
+
     /// Everything this phone holds for the account that is leaving.
     ///
     /// The snapshot outlives the account without this: the widget went on
@@ -127,7 +163,7 @@ public class WidgetBridge: CAPPlugin, CAPBridgedPlugin {
         }
         for key in [WidgetBridge.payloadKey, WidgetBridge.pendingSetsKey,
                     WidgetBridge.ownerKey, WidgetBridge.quipPoolKey,
-                    WidgetBridge.pendingEditsKey] {
+                    WidgetBridge.pendingEditsKey, WidgetBridge.pendingStretchKey] {
             defaults.removeObject(forKey: key)
         }
         // Back to the empty state, which is the right thing for a phone with

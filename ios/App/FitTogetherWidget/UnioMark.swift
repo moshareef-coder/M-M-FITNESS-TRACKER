@@ -12,6 +12,12 @@ enum Unio {
     static let partner = Color(red: 1.0, green: 0.420, blue: 0.290) // #ff6b4a
     static let lime = Color(red: 0.659, green: 1.0, blue: 0.0)      // #a8ff00
     static let ink = Color.white
+    /// Stretching, the same #2ea8ff the session screen turns. Mo's brief for
+    /// that screen was "the whole thing can light up blue, so it is like, oh,
+    /// it is stretching", and the Lock Screen is the surface that claim is
+    /// actually true of: you see it from across the room without unlocking.
+    /// The hex must match --stretch in index.html or the two surfaces drift.
+    static let stretch = Color(red: 0.180, green: 0.659, blue: 1.0)  // #2ea8ff
 }
 
 /// Degrees, clockwise, zero at twelve o'clock, which is how the mark is

@@ -40,6 +40,24 @@ struct WorkoutAttributes: ActivityAttributes {
         // the app does rather than making you open it to remember.
         var weight: String = ""
         var reps: String = ""
+
+        // ---- stretching ----
+        // "warmup", "lift" or "cooldown", the same three the session screen
+        // runs on. The card turns blue for the two stretch phases the way the
+        // session screen does, so which part of the session you are in is
+        // legible from across the room without reading a word. Defaulted so an
+        // activity started by an older build still decodes.
+        var phase: String = "lift"
+        // The hold on screen now, and which side of it. A stretch writes
+        // nothing anywhere, so these are the whole of its state.
+        var stretchName: String = ""
+        var stretchSide: Int = 0        // 0 when the hold has no sides
+        var stretchIndex: Int = 0
+        var stretchCount: Int = 0
+        // A hold counts DOWN against a fixed length, which is the opposite of
+        // rest, so this one genuinely is an end date. Text(timerInterval:)
+        // then runs it with the app asleep and it costs no updates.
+        var stretchEndsAt: Date? = nil
     }
 
     var startedAt: Date
