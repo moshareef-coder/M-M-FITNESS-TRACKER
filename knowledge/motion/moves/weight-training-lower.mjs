@@ -1524,8 +1524,8 @@ const BACK_EXTENSION = {
         hipR: -85, kneeR: 20, ankleR: -78, hipL: -85, kneeL: 20, ankleL: -78,
       },
       ik: {
-        wristR: { rel: "chest", x: 1, y: 14, bend: 1 },
-        wristL: { rel: "chest", x: -3, y: 15, bend: 1 },
+        wristR: { rel: "chest", x: -5, y: 3, bend: 1 },
+        wristL: { rel: "chest", x: 5, y: 5, bend: 1 },
       },
     },
     { // folded down over the pad, legs untouched
@@ -1536,8 +1536,8 @@ const BACK_EXTENSION = {
         hipR: -145, kneeR: 20, ankleR: -78, hipL: -145, kneeL: 20, ankleL: -78,
       },
       ik: {
-        wristR: { rel: "chest", x: -14, y: 4, bend: 1 },
-        wristL: { rel: "chest", x: -17, y: 5, bend: 1 },
+        wristR: { rel: "chest", x: -5, y: 3, bend: 1 },
+        wristL: { rel: "chest", x: 5, y: 5, bend: 1 },
       },
     },
   ],
