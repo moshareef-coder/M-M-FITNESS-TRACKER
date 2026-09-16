@@ -98,7 +98,14 @@ const PEC_DECK = {
   dur: 3.0,
   breath: 0.2,
   fit: { k: 0.96, dy: 2 },
-  props: [{ type: "machine", x: 50, y: 86, w: 40, parts: ["seat"] }],
+  props: [
+    // the pec fly / rear delt machine: seat, back pad, mast, head beam and
+    // stack are still artwork; the two swing arms are levers hung from the
+    // pivots under the head beam so they follow the hands
+    { type: "artwork", src: "/knowledge/motion/props/pec-deck.svg" },
+    { type: "lever", pivot: { x: 37, y: 8 }, to: { side: "L", point: "hand" }, r: 2.2, end: "grip" },
+    { type: "lever", pivot: { x: 103, y: 8 }, to: { side: "R", point: "hand" }, r: 2.2, end: "grip", front: true },
+  ],
   keys: [
     { // open, elbows wide out at shoulder height, forearms up on the pads
       t: 0,
@@ -815,9 +822,12 @@ const REVERSE_PEC_DECK = {
   breath: 0.2,
   fit: { k: 0.92, dy: 2 },
   props: [
-    { type: "machine", x: 50, y: 86, w: 40, parts: ["seat"] },
-    { type: "barbell", side: "L", point: "hand", r: 4 },
-    { type: "barbell", side: "R", point: "hand", r: 4, front: true },
+    // same machine as Pec Deck, the figure turned to face the pad: from
+    // behind, the pad and frame are all on the far side of the body, so the
+    // one drawing serves both moves
+    { type: "artwork", src: "/knowledge/motion/props/pec-deck.svg" },
+    { type: "lever", pivot: { x: 37, y: 8 }, to: { side: "L", point: "hand" }, r: 2.2, end: "grip" },
+    { type: "lever", pivot: { x: 103, y: 8 }, to: { side: "R", point: "hand" }, r: 2.2, end: "grip", front: true },
   ],
   keys: [
     { // start, handles together in front, elbows soft
