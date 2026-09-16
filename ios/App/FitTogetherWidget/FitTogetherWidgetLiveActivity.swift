@@ -31,36 +31,41 @@ func liveCountdown(_ state: WorkoutAttributes.ContentState) -> ClosedRange<Date>
     return Date.now...ends
 }
 
+/// The number, what it counts, and the label under it. Three sizes reading as
+/// one block rather than two competing lines.
 private struct HeroNumber: View {
     let state: WorkoutAttributes.ContentState
-    var size: CGFloat = 40
+    var size: CGFloat = 34
+
+    private var caption: String {
+        if state.paused { return "PAUSED" }
+        if state.restEndsAt != nil { return liveCountdown(state) != nil ? "UNTIL NEXT SET" : "REST DONE" }
+        return "SETS COMPLETED"
+    }
 
     var body: some View {
-        HStack(alignment: .lastTextBaseline, spacing: 5) {
-            if let window = liveCountdown(state) {
-                Text(timerInterval: window, countsDown: true)
-                    .font(.system(size: size, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(Unio.lime)
-                    .fixedSize()
-                Text("REST")
-                    .font(.system(size: 11, weight: .heavy))
-                    .tracking(0.6)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("\(state.done)")
-                    .font(.system(size: size, weight: .bold, design: .rounded))
-                    .foregroundStyle(Unio.ink)
-                /* A rest whose clock has run out is its own state: the app is
-                   asleep and cannot clear it, so without this the card silently
-                   becomes a set count and the rest looks like it never happened. */
-                Text(state.paused ? "PAUSED"
-                     : (state.restEndsAt != nil ? "GO" : "of \(state.total)"))
-                    .font(.system(size: state.paused || state.restEndsAt != nil ? 12 : 14,
-                                  weight: state.paused || state.restEndsAt != nil ? .heavy : .semibold))
-                    .tracking(state.restEndsAt != nil ? 0.8 : 0)
-                    .foregroundStyle(state.restEndsAt != nil && !state.paused ? Unio.lime : .secondary)
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                if let window = liveCountdown(state) {
+                    Text(timerInterval: window, countsDown: true)
+                        .font(.system(size: size, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Unio.lime)
+                        .fixedSize()
+                } else {
+                    Text("\(state.done)")
+                        .font(.system(size: size, weight: .bold, design: .rounded))
+                        .foregroundStyle(state.restEndsAt != nil && !state.paused ? Unio.lime : Unio.ink)
+                    Text("of \(state.total)")
+                        .font(.system(size: size * 0.44, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
             }
+            Text(caption)
+                .font(.system(size: 9.5, weight: .heavy))
+                .tracking(0.9)
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
         }
     }
 }
@@ -75,8 +80,9 @@ private struct SetPips: View {
         HStack(spacing: 3) {
             ForEach(0..<max(total, 1), id: \.self) { i in
                 Capsule()
-                    .fill(i < done ? Unio.lime : Unio.ink.opacity(0.18))
-                    .frame(height: 4)
+                    .fill(i < done ? Unio.lime : Unio.ink.opacity(0.16))
+                    .frame(height: 5)
+                    .shadow(color: i < done ? Unio.lime.opacity(0.55) : .clear, radius: 3)
             }
         }
     }
@@ -86,11 +92,14 @@ private struct SetPips: View {
 private struct LogSetButton: View {
     var body: some View {
         Button(intent: LogSetIntent()) {
-            Text("Log set")
-                .font(.system(size: 13, weight: .bold))
-                .padding(.horizontal, 14).padding(.vertical, 7)
-                .background(Capsule().fill(Unio.lime))
-                .foregroundStyle(.black)
+            HStack(spacing: 5) {
+                Text("Log set").font(.system(size: 13.5, weight: .bold))
+                Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold))
+            }
+            .padding(.horizontal, 15).padding(.vertical, 8)
+            .background(Capsule().fill(Unio.lime))
+            .foregroundStyle(.black)
+            .shadow(color: Unio.lime.opacity(0.45), radius: 6)
         }
         .buttonStyle(.plain)
     }
@@ -219,20 +228,23 @@ private struct LockScreenView: View {
     let state: WorkoutAttributes.ContentState
 
     var body: some View {
-        // Nine-point gaps and a 40-point number, so the whole card lands near
-        // 143 and nothing is cut off at the bottom.
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 9) {
-                UnioMark(size: 24)
+        VStack(alignment: .leading, spacing: 8) {
+            // Him in the mark, the lift, and the set as a chip rather than loose
+            // grey text, so the row reads as three objects and not one sentence.
+            HStack(spacing: 10) {
+                UnioBotMark(size: 24)
                 Text(state.exercise)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .lineLimit(1)
-                Spacer(minLength: 8)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: 6)
                 Text(state.detail)
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .layoutPriority(1)
+                    .fixedSize()
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(Capsule().fill(Unio.ink.opacity(0.10)))
             }
 
             HStack(alignment: .center, spacing: 12) {
@@ -241,13 +253,16 @@ private struct LockScreenView: View {
                 if #available(iOS 17.0, *) { LogSetButton() }
             }
 
-            // One line, not two. The second line was what pushed this card past
-            // the cap, and a Lock Screen glance does not read two anyway.
+            // A rule between him and what he says, so the line reads as speech
+            // rather than a caption stuck to his head.
             if !state.quip.isEmpty {
-                HStack(alignment: .center, spacing: 7) {
-                    BotFace(size: 22)
+                HStack(alignment: .center, spacing: 9) {
+                    BotFace(size: 26)
+                    Capsule()
+                        .fill(Unio.ink.opacity(0.22))
+                        .frame(width: 2, height: 17)
                     Text(state.quip)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -256,7 +271,7 @@ private struct LockScreenView: View {
 
             SetPips(done: state.done, total: state.total)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 13)
+        .padding(.horizontal, 15)
+        .padding(.vertical, 12)
     }
 }

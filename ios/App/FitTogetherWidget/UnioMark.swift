@@ -47,6 +47,33 @@ struct UnioMark: View {
     }
 }
 
+/// The two arcs with his face where the dumbbell usually sits.
+///
+/// The dumbbell says what the app is about; this says who is talking. On a card
+/// he speaks on, that is the more useful thing for the mark to carry, and it
+/// ties the header to the line at the bottom.
+struct UnioBotMark: View {
+    var size: CGFloat = 26
+    var happy: Bool = false
+
+    private var stroke: CGFloat { max(2.5, size * 0.125) }
+
+    var body: some View {
+        ZStack {
+            Arc(from: 188, to: 352)
+                .stroke(Unio.me, style: StrokeStyle(lineWidth: stroke, lineCap: .round))
+            Arc(from: 8, to: 172)
+                .stroke(Unio.partner, style: StrokeStyle(lineWidth: stroke, lineCap: .round))
+            // Scaled past the frame and clipped, so the head fills the ring
+            // instead of floating in it with its shoulders showing.
+            BotFace(size: size * 0.86, happy: happy)
+                .offset(y: size * 0.06)
+                .clipShape(Circle().inset(by: size * 0.16))
+        }
+        .frame(width: size, height: size)
+    }
+}
+
 /// The drawn fallback, for surfaces the system renders monochrome. The image
 /// would flatten to a white blob there; strokes keep the ring and the bar
 /// distinguishable.
