@@ -108,6 +108,54 @@ private struct LogSetButton: View {
     }
 }
 
+
+/// A value with a minus and a plus either side, for the expanded island.
+///
+/// Only here, never on the Lock Screen card: that card is at 147 of a 160 point
+/// budget, and four more tap targets would cost the header or his line. Opening
+/// the island is a long press, which is a decision rather than a glance.
+@available(iOS 17.0, *)
+private struct LoadStepper: View {
+    let field: String
+    let label: String
+    let value: String
+    let step: Int
+
+    var body: some View {
+        VStack(spacing: 3) {
+            HStack(spacing: 8) {
+                Button(intent: AdjustLoadIntent(field: field, delta: -step)) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 12, weight: .heavy))
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(Unio.ink.opacity(0.14)))
+                        .foregroundStyle(Unio.ink)
+                }
+                .buttonStyle(.plain)
+
+                Text(value)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Unio.ink)
+                    .frame(minWidth: 42)
+
+                Button(intent: AdjustLoadIntent(field: field, delta: step)) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .heavy))
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(Unio.ink.opacity(0.14)))
+                        .foregroundStyle(Unio.ink)
+                }
+                .buttonStyle(.plain)
+            }
+            Text(label)
+                .font(.system(size: 9, weight: .heavy))
+                .tracking(0.8)
+                .foregroundStyle(Unio.ink.opacity(0.45))
+        }
+    }
+}
+
 @available(iOS 16.1, *)
 struct FitTogetherWidgetLiveActivity: Widget {
     var body: some WidgetConfiguration {
@@ -154,7 +202,17 @@ struct FitTogetherWidgetLiveActivity: Widget {
                             Spacer(minLength: 8)
                             if #available(iOS 17.0, *), !context.state.celebrating { LogSetButton() }
                         }
-                        if !context.state.quip.isEmpty {
+                        if #available(iOS 17.0, *), !context.state.celebrating {
+                            HStack(spacing: 18) {
+                                LoadStepper(field: "weight", label: "WEIGHT",
+                                            value: context.state.weight.isEmpty ? "0" : context.state.weight,
+                                            step: 5)
+                                LoadStepper(field: "reps", label: "REPS",
+                                            value: context.state.reps.isEmpty ? "0" : context.state.reps,
+                                            step: 1)
+                                Spacer(minLength: 0)
+                            }
+                        } else if !context.state.quip.isEmpty {
                             HStack(alignment: .center, spacing: 7) {
                                 BotFace(size: 21)
                                 Text(context.state.quip)

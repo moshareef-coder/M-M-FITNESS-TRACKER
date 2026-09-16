@@ -18007,6 +18007,21 @@ async function drainLockScreenSets() {
      this path. */
   const mine = SESSION && !SESSION.finished ? (MY_EMAIL || "") : "";
   try {
+    /* Load changes from the island go first, so a set logged after a change is
+       stamped with the weight that was on screen when it was logged. Drained
+       with the same empty owner when no workout is open, which is what clears
+       the queue rather than letting it accumulate. */
+    const { edits } = await bridge.drainPendingEdits({ owner: mine });
+    for (const e of edits || []) {
+      const ei = SESSION.exerciseIndex;
+      if (e.field === "reps") {
+        SESSION.reps[ei] = String(Math.max(1, (parseInt(SESSION.reps[ei], 10) || 0) + e.delta));
+      } else {
+        SESSION.weights[ei] = String(Math.max(0, (parseFloat(SESSION.weights[ei]) || 0) + e.delta));
+      }
+    }
+    if ((edits || []).length) saveSessionToStorage();
+
     /* Owner-scoped: taps queued for anyone else, or for a workout that ended
        long ago, are dropped rather than replayed as phantom sets. */
     const { count, dropped } = await bridge.drainPendingSets({ owner: mine });

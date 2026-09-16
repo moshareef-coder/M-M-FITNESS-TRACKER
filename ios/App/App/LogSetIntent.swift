@@ -120,11 +120,7 @@ struct LogSetIntent: LiveActivityIntent {
             detail: now.detail,
             done: finishedLift ? 0 : done,
             total: finishedLift ? now.nextTotal : now.total,
-            // The rest clock starts on the first update and is left alone by the
-            // second, so the countdown does not jump back when the card settles.
-            restEndsAt: alreadyAdvanced
-                ? now.restEndsAt
-                : (rested > 0 ? Date().addingTimeInterval(Double(rested)) : nil),
+            restEndsAt: nil,
             paused: now.paused,
             restSeconds: rested,
             celebrating: celebrating,
@@ -132,7 +128,16 @@ struct LogSetIntent: LiveActivityIntent {
             // Cleared on the roll: the app sends the real next lift on its next
             // update, and guessing here would chain the whole workout blind.
             nextExercise: finishedLift ? "" : now.nextExercise,
-            nextTotal: finishedLift ? 0 : now.nextTotal
+            nextTotal: finishedLift ? 0 : now.nextTotal,
+            /* Rest begins the moment a set lands, and the card reads
+               restStartedAt now that it counts up. This was still setting
+               restEndsAt, which nothing looks at any more, so logging a set
+               started a rest the Lock Screen could not see and the card just
+               asked for the next set. Left alone on the settling update so the
+               clock does not restart when the card stops celebrating. */
+            restStartedAt: alreadyAdvanced ? now.restStartedAt : Date(),
+            weight: now.weight,
+            reps: now.reps
         )
         await activity.update(ActivityContent(state: next, staleDate: nil))
     }

@@ -16,6 +16,7 @@ public class WidgetBridge: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "save", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "drainPendingSets", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "drainPendingEdits", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clear", returnType: CAPPluginReturnPromise),
     ]
 
@@ -28,6 +29,8 @@ public class WidgetBridge: CAPPlugin, CAPBridgedPlugin {
     // Who the Lock Screen is logging for, written by LiveWorkout.
     static let ownerKey = "sessionOwner"
     static let quipPoolKey = "quipPool"
+    // Weight and rep changes made from the expanded Dynamic Island.
+    static let pendingEditsKey = "pendingLoadEdits"
     // Nothing queued survives half a day. Past that the workout it belonged to
     // is over whatever else the owner says.
     static let defaultMaxAge: Double = 12 * 3600
@@ -70,6 +73,39 @@ public class WidgetBridge: CAPPlugin, CAPBridgedPlugin {
         call.resolve(["count": mine.count, "dropped": queued.count - mine.count])
     }
 
+    /// Load changes made from the island, for the workout asking for them.
+    ///
+    /// Same two rules as the set queue: an edit is only replayed for the owner
+    /// it was stamped with, and one older than maxAgeSeconds is dropped, so a
+    /// change made yesterday cannot rewrite today's numbers. The queue is
+    /// cleared whole, matches and misses alike.
+    @objc func drainPendingEdits(_ call: CAPPluginCall) {
+        guard let defaults = UserDefaults(suiteName: WidgetBridge.appGroup) else {
+            call.resolve(["edits": [], "dropped": 0])
+            return
+        }
+        let queued = defaults.array(forKey: WidgetBridge.pendingEditsKey) as? [[String: Any]] ?? []
+        if defaults.object(forKey: WidgetBridge.pendingEditsKey) != nil {
+            defaults.removeObject(forKey: WidgetBridge.pendingEditsKey)
+        }
+        let owner = call.getString("owner") ?? ""
+        guard !owner.isEmpty else {
+            call.resolve(["edits": [], "dropped": queued.count])
+            return
+        }
+        let maxAge = call.getDouble("maxAgeSeconds") ?? WidgetBridge.defaultMaxAge
+        let now = Date().timeIntervalSince1970
+        let mine = queued.filter { entry in
+            guard entry["owner"] as? String == owner, let at = entry["at"] as? Double else { return false }
+            return now - at <= maxAge
+        }
+        let edits = mine.compactMap { entry -> [String: Any]? in
+            guard let field = entry["field"] as? String, let delta = entry["delta"] as? Int else { return nil }
+            return ["field": field, "delta": delta]
+        }
+        call.resolve(["edits": edits, "dropped": queued.count - mine.count])
+    }
+
     /// Everything this phone holds for the account that is leaving.
     ///
     /// The snapshot outlives the account without this: the widget went on
@@ -83,7 +119,8 @@ public class WidgetBridge: CAPPlugin, CAPBridgedPlugin {
             return
         }
         for key in [WidgetBridge.payloadKey, WidgetBridge.pendingSetsKey,
-                    WidgetBridge.ownerKey, WidgetBridge.quipPoolKey] {
+                    WidgetBridge.ownerKey, WidgetBridge.quipPoolKey,
+                    WidgetBridge.pendingEditsKey] {
             defaults.removeObject(forKey: key)
         }
         // Back to the empty state, which is the right thing for a phone with
