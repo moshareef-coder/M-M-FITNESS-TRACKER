@@ -5824,15 +5824,13 @@
       </div>
     <div class="card">
       <h2>Reminders</h2>
-      <!-- This screen is a promise, and Apple read it during review. It used to
-           say "only when your partner has trained and you have not", which
-           describes the one notification being removed for putting two people's
-           weeks in the same sentence. Saying less, and saying only what is
-           true today. -->
-      <p class="muted-note" style="margin-bottom:10px;">
-        Videos your partner sends you, and at most one reminder a day about your
-        own workout. Never about anybody else's.
-      </p>
+      <!-- Filled from pushPromise() at render time, the same sentence the
+           permission sheet shows. This screen is a promise and Apple read it
+           during review; it used to say "only when your partner has trained and
+           you have not", which describes the one notification being removed for
+           putting two people's weeks in the same sentence, and it stayed wrong
+           because it was a second copy nobody remembered to change. -->
+      <p class="muted-note" id="pushPromiseNote" style="margin-bottom:10px;"></p>
       <button type="button" class="btn-secondary" id="pushToggleBtn">Turn on reminders</button>
       <p class="muted-note" id="pushNote" style="margin-top:8px;"></p>
     </div>
@@ -24462,6 +24460,12 @@ async function currentPushSub() {
 async function renderPushToggle() {
   const btn = $("pushToggleBtn"), note = $("pushNote");
   if (!btn) return;
+  /* The same sentence the permission sheet showed, so what was agreed to and
+     what Setup claims cannot say different things. */
+  const promise = $("pushPromiseNote");
+  if (promise) {
+    promise.textContent = `Notifications cover ${pushPromise(PARTNER_EMAIL ? nameFor(PARTNER_EMAIL) : "")}`;
+  }
   const sup = pushSupport();
   if (!sup.ok) {
     btn.disabled = true;
@@ -24488,6 +24492,22 @@ let PUSH_LAST_ERROR = null;
 
 /* Set when onboarding finishes, spent the first time the app is on screen. */
 const ASK_PUSH_KEY = "ft_ask_push";
+
+/* What we promise to send, written once and shown in both places that promise
+   it: the sheet that asks, and the Notifications screen in Setup.
+
+   One string rather than two, because the two had already drifted. The Setup
+   screen was still promising "only when your partner has trained and you have
+   not" long after that notification was on its way out, and a promise about
+   notifications that is no longer true is the kind of thing Apple reads during
+   review. Kept deliberately whole: it covers everything the app can send
+   rather than only the example that sells it best. */
+function pushPromise(partnerName) {
+  const theirs = partnerName
+    ? `${partnerName} sending you a video mid-workout, and it plays once`
+    : "a partner sending you a video mid-workout, and it plays once";
+  return `${theirs}. Your own workout, at most one reminder a day. And the things you ask for, like reaching a goal you set. Never anything about somebody else's training.`;
+}
 
 /* The one time we ask for notifications.
 
@@ -24520,9 +24540,11 @@ async function maybeAskForPush() {
   const partner = PARTNER_EMAIL ? nameFor(PARTNER_EMAIL) : "";
   const yes = await askConfirm({
     heading: "One thing before you start",
-    body: partner
-      ? `${partner} can send you videos while you train, and they play once. Notifications are how you know one landed. Nothing else gets sent without asking you first.`
-      : "When you pair with someone, they can send you videos while you train, and they play once. Notifications are how you know one landed. Nothing else gets sent without asking you first.",
+    /* The whole promise, not just the strongest example of it. Leading with
+       the clip and stopping there would have sold this on one notification and
+       then delivered several, which is how an app teaches people that its
+       permission prompts are not to be believed. */
+    body: `Notifications cover ${pushPromise(partner)}`,
     ok: "Turn on notifications",
     cancel: "Not now",
   });
