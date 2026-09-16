@@ -4412,6 +4412,9 @@
     line-height: 1.05; font-variant-numeric: tabular-nums;
   }
   .ph-figure i { font-style: normal; font-size: 14px; font-weight: 700; color: var(--muted); }
+  /* preserveAspectRatio is none, so the drawing stretches to whatever width
+     the card is: it is a shape, not a plot, and nothing is read off an axis. */
+  .ph-spark { display: block; width: 100%; height: 34px; margin: 0 0 9px; }
   .ph-figure.good b { color: var(--accent-ink); }
   .ph-figure.warn b { color: var(--warn); }
   .ph-line { font-size: 17px; font-weight: 600; line-height: 1.45; }
@@ -25101,6 +25104,71 @@ function renderProgressEmpty(kind) {
    and the reading is recomputed on every render of this tab. */
 let PROGRESS_NOTE = null;
 
+/* ---- The picture under the answer ----
+
+   Direction B's hero: the verdict in words, then one small picture carrying
+   it. Hand drawn SVG rather than Chart.js on purpose. It is a thumbnail, not
+   an instrument: nobody reads a value off it, it never needs a tooltip, and a
+   chart library on the first thing the tab paints is a download and a canvas
+   for something that is 34 pixels tall. It is also static, which is the same
+   call the lift browser figures just got.
+
+   Which picture depends on what the goal is judged on, because a consistency
+   bar chart under "up 4.2 lbs" would be answering a different question than
+   the sentence above it. */
+function headlineSpark(kind, name) {
+  const W = 300, H = 34;
+  const line = (pts, colour, width = 2.5) => {
+    if (pts.length < 2) return "";
+    const lo = Math.min(...pts), hi = Math.max(...pts);
+    const span = hi - lo || 1;
+    const d = pts.map((v, i) => {
+      const x = (i / (pts.length - 1)) * (W - 6) + 3;
+      const y = H - 4 - ((v - lo) / span) * (H - 8);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(" ");
+    const last = d.split(" ").pop().split(",");
+    return `<polyline points="${d}" fill="none" stroke="${colour}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="${last[0]}" cy="${last[1]}" r="3.2" fill="${colour}"/>`;
+  };
+  const bars = (vals, target) => {
+    if (!vals.length) return "";
+    const hi = Math.max(target || 0, ...vals) || 1;
+    const w = (W - 6) / vals.length - 4;
+    return vals.map((v, i) => {
+      const h = Math.max(2, (v / hi) * (H - 6));
+      const x = 3 + i * ((W - 6) / vals.length);
+      const hit = target && v >= target;
+      return `<rect x="${x.toFixed(1)}" y="${(H - 3 - h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"
+        rx="3" fill="${hit ? cssVar("--accent") : cssVar("--border")}"/>`;
+    }).join("");
+  };
+  const wrap = (inner) => inner ? `<svg class="ph-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${inner}</svg>` : "";
+
+  const weights = () => headlineWeighIns(name, 120).map((r) => r.weight);
+  const topLift = () => (topLiftsFor(name, 1)[0] || {}).name || null;
+  const e1rms = () => { const l = topLift(); return l ? liftE1rmHistory(name, l, 26).map((h) => h.est) : []; };
+
+  /* Only bulk gets one, and the rule behind that is worth stating because the
+     first cut of this drew a picture for every kind and made the tab worse.
+
+     The goal's own card sits DIRECTLY under this headline, by design: scale
+     leads to Weight trend, lift leads to Strength, habit leads to Consistency.
+     So a sparkline of the same series is the identical line twice, thirty
+     pixels apart, which is the exact complaint this whole tab is being
+     rebuilt over. A picture up here has to show something no card below it
+     shows, or it is noise wearing a chart's clothes.
+
+     Bulk is the one that clears that bar. Its whole argument is that the scale
+     and the bar have to be read together, and no single card anywhere draws
+     both. Everything else waits for the cards to become rows, at which point
+     every kind earns one. */
+  if (kind === "bulk") {
+    return wrap(line(weights(), cssVar("--me")) + line(e1rms(), cssVar("--accent")));
+  }
+  return "";
+}
+
 function renderProgressHeadline(kind, name, email, profile, third, sharing) {
   const el = $("progHeadline");
   const tile = goalTileFor(profile?.goal_bubble);
@@ -25126,6 +25194,7 @@ function renderProgressHeadline(kind, name, email, profile, third, sharing) {
   el.innerHTML = `
     <div class="ph-eyebrow">${escapeHtml(eyebrow)}</div>
     <div class="ph-figure${h.tone ? " " + h.tone : ""}"><b>${h.value}</b>${h.unit ? `<i>${escapeHtml(h.unit)}</i>` : ""}</div>
+    ${headlineSpark(kind, name)}
     <div class="ph-line">${h.line}${h.note ? " " + infoDot("progressNote", "What this number is built from") : ""}</div>`;
 }
 
