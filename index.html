@@ -5406,9 +5406,9 @@
 
     <div class="card metric-card" id="cardConsistency">
       <h2>Consistency</h2>
-      <div class="wt-stats" id="consistencyStats"></div>
+      <p class="muted-note" style="margin-top:-6px" id="consistencyLead"></p>
       <div class="chart-wrap"><canvas id="consistencyChart"></canvas></div>
-      <div class="cst-caption" id="consistencyCaption"></div>
+      <div class="ms-list" id="consistencyDetail"></div>
     </div>
 
     <!-- The answer to "am I getting stronger", as a picture rather than a
@@ -14396,17 +14396,34 @@ function renderConsistencyStats() {
   const name = viewingPartner ? partnerName() : ME;
   const target = weeklyGoalFor(viewingPartner ? PARTNER_EMAIL : MY_EMAIL);
   const thisWeek = gymDaysThisWeek(name);
-  const streak = currentDayStreak(name);
+  const el = $("consistencyLead");
+  if (!el) return;
+  /* The day streak came out of this card rather than moving: Home shows it,
+     Profile shows it, and the headline at the top of this very tab says it in
+     a sentence for anybody whose goal is showing up. Three copies of one
+     number on one screen is what "too much to read" looks like. Weeks hit came
+     out because the bars against the dashed line ARE weeks hit, counted. */
+  el.textContent = `${thisWeek} of ${target} ${thisWeek === 1 ? "day" : "days"} this week. Tap a week.`;
+}
+
+/* The detail slot, empty until a bar is tapped. The target line is what makes
+   a bar mean something, so the tapped week says whether it cleared it. */
+let CST_WEEK = null;
+function renderConsistencyDetail() {
+  const el = $("consistencyDetail");
+  if (!el) return;
+  const name = PROGRESS_VIEW === "partner" ? partnerName() : ME;
   const weeks = consistencyWeeks(name, 8);
-  // The current week is still open, so counting it toward "weeks hit" would
-  // punish a Tuesday for not yet being a Sunday. Only finished weeks count.
-  const finished = weeks.slice(0, -1);
-  const hit = finished.filter((w) => w.days >= w.target).length;
-  const tone = thisWeek >= target ? " good" : "";
-  $("consistencyStats").innerHTML = `
-    <div class="wt-stat${tone}"><b>${thisWeek}/${target}</b><span>This week</span></div>
-    <div class="wt-stat"><b>${streak}</b><span>Day streak</span></div>
-    <div class="wt-stat"><b>${hit}/${finished.length}</b><span>Weeks hit</span></div>`;
+  if (CST_WEEK == null || CST_WEEK >= weeks.length) { el.innerHTML = ""; return; }
+  const w = weeks[CST_WEEK];
+  const open = CST_WEEK === weeks.length - 1;
+  const hit = w.days >= w.target;
+  const short = w.target - w.days;
+  el.innerHTML = `<div class="ms-row">
+      <i class="ms-dot ${hit ? "up" : "flat"}"></i>
+      <span class="ms-txt"><b>${w.days} of ${w.target} ${w.days === 1 ? "day" : "days"}</b><span>${
+        open ? "This week, still open." : `Week of ${escapeHtml(w.weekStart.slice(5))}. ${hit ? "Target hit." : `${short} short.`}`}</span></span>
+    </div>`;
 }
 
 let consistencyChart = null;
@@ -14420,7 +14437,6 @@ function renderConsistencyChart() {
   const name = viewingPartner ? partnerName() : ME;
   const hex = cssVar(viewingPartner ? "--partner" : "--me");
   const weeks = consistencyWeeks(name, 8);
-  const target = weeks[0]?.target || 0;
 
   const card = $("cardConsistency");
   if (!weeks.some((w) => w.days > 0)) {
@@ -14430,7 +14446,8 @@ function renderConsistencyChart() {
     ph.innerHTML = emptyState("checklist", "No weeks logged yet",
       "Train a day and the last eight weeks start filling in here.");
     if (consistencyChart) { consistencyChart.destroy(); consistencyChart = null; }
-    $("consistencyCaption").textContent = "";
+    CST_WEEK = null;
+    renderConsistencyDetail();
     return;
   }
   card.classList.remove("chart-empty");
@@ -14459,6 +14476,14 @@ function renderConsistencyChart() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
+      /* Nearest on the x axis, not the bar itself: a week with one day in it
+         is a bar a thumb cannot land on. */
+      onClick: (evt, els, chart) => {
+        const hit = chart.getElementsAtEventForMode(evt, "nearest", { intersect: false, axis: "x" }, true);
+        if (!hit.length) return;
+        CST_WEEK = CST_WEEK === hit[0].index ? null : hit[0].index;
+        renderConsistencyDetail();
+      },
       scales: {
         x: { border: { display: false }, grid: { display: false }, ticks: { color: cssVar("--muted"), font: { size: 10 } } },
         y: { border: { display: false }, beginAtZero: true, max: 7,
@@ -14467,7 +14492,7 @@ function renderConsistencyChart() {
       },
     },
   });
-  $("consistencyCaption").textContent = `Target: ${target} day${target === 1 ? "" : "s"} a week`;
+  renderConsistencyDetail();
 }
 
 /* Canvas does not understand color-mix, so a token is unpacked to rgba by
