@@ -25,32 +25,15 @@ correctly and still not deliver:
    **"Report: ..."**, and Setup, Admin, Reports shows it open.
 3. Setup, Safety, Block. You should be unpaired and they cannot re-pair.
 
-## 0. Three edge functions are running older code than main
 
-Checked the deployed versions against git on 2026-09-16. Three are stale, and
-one of them matters a lot:
+Also done later the same day: `delete-account` (was running code from 30 August,
+two commits behind, and it is the account deletion path a reviewer tests) and
+`generate-workout` were deployed, and `scripts/deploy-function.sh` no longer
+hardcodes `verify_jwt: true`, which is what killed every notification between
+03:33 and 09:00. All eight functions verified correct afterwards.
 
-- **delete-account** is live from **2026-08-30**. Four commits have landed on it
-  since, including `f291192 "Deleting your account now deletes your account"`
-  and `a10aae2 "Deleting your account can now fail out loud"`. The version
-  serving real users predates both. This is the App Store compliance path.
-- **generate-workout** is live from **2026-09-14 01:00**, seven commits behind,
-  including the whole eight-goal picker and two days of exercise library work.
-- **notify-report** was deployed ten minutes before `4fdd9be` changed it.
-
-The gate passes on main right now: 293 engine tests, demo --check, sweep exit 0
-with no FAILs and nothing KNOWN OPEN, fuzz clean, vendored engine current, boot
-check passes. So these are ready to go, they just have not gone.
-
-```
-cd ~/fit-together
-bash scripts/deploy-function.sh delete-account
-bash scripts/deploy-function.sh notify-report
-bash scripts/deploy-function.sh generate-workout
-```
-
-The script checks SB_REF against the URL index.html actually uses and refuses
-if they disagree, so it cannot ship to the wrong project.
+The App Review account is seeded and paired (`supabase/seed-app-review.sql`),
+and reporting is reachable from Setup, Safety without needing a clip on screen.
 
 ## 1. TestFlight is still serving build 6
 
@@ -71,3 +54,31 @@ RESEND_FROM="Unio <reports@creativelab1.com>"
 ```
 
 Needs a Resend account and creativelab1.com verified there.
+
+## 3. In-app purchase, built but switched off
+
+`PAYWALL_ON` in index.html is `false` and everything is unlocked. Nothing is
+gated until all four of these are done, because a live paywall with no product
+behind it is the main feature switched off for everybody, reviewer included.
+
+1. **Paid Applications Agreement** in App Store Connect, Business. Banking and
+   tax forms too. Nothing can be tested in sandbox until this is signed.
+2. **Apple Small Business Program**, same place. 15% instead of 30%. Ten
+   minutes, and the highest value form in the project.
+3. **A RevenueCat account**, then give me the public SDK key.
+4. Apply `supabase/migrations/20260916_subscriptions.sql`.
+
+Then I install `@revenuecat/purchases-capacitor@11` (v13 needs Capacitor 8, we
+are on 7), create the product, wire the webhook and flip the flag.
+
+Agreed: $7.99 a month, covering both people in a pair, paid by one of them.
+Premium is the generator, week planning, body impact, the progress analysis and
+accent colours. Free is everything shared with a partner, manual logging, and
+all of somebody's own history, weigh-ins and photos.
+
+## 4. A domain
+
+`PUBLIC_SITE` in index.html is `m-m-fitness-tracker.vercel.app`. That is what
+people see when a session is shared and what a reviewer sees on the privacy
+link from the sign in screen, inside an app called Unio. It is one constant now,
+so it is a one line change once there is a domain.
