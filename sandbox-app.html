@@ -5820,7 +5820,7 @@
         <div class="goal-target-row hidden" id="goalTargetRow">
           <label for="goalTargetLb" id="goalTargetLabel">Goal weight</label>
           <div class="goal-target-input">
-            <input type="number" id="goalTargetLb" inputmode="decimal" min="50" max="700" placeholder="lbs" />
+            <input type="number" id="goalTargetLb" inputmode="decimal" min="50" max="700" placeholder="e.g. 205" />
             <span>lbs</span>
           </div>
           <p class="muted-note" id="goalTargetNote"></p>
@@ -6324,7 +6324,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.10";
+const APP_VERSION = "2026.09.16.11";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -8473,6 +8473,18 @@ function renderGoalPage() {
       closeSettingsPage();
     },
   });
+
+  /* initGoalTiles inserts its own picks list and Save button immediately
+     after the grid, with insertAdjacentElement("afterend"), every time it
+     runs. Static markup has no say in that: wherever this row sits in the
+     HTML, those two land between the grid and it, which put Save ABOVE the
+     one field it needs somebody to have filled in first. Moving the row here,
+     after the tiles have mounted, is what actually controls where it ends up
+     rather than where it happens to be written in the file. Confirmed by
+     screenshot, not assumed: this shipped once already with Save first and
+     the field unreachable without knowing to keep scrolling past it. */
+  const confirmBtn = $("page-goal").querySelector(".goal-confirm");
+  if (confirmBtn) confirmBtn.parentElement.insertBefore(targetRow, confirmBtn);
 }
 
 /* Two columns here are behind migrations that are written and not applied, so
