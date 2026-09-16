@@ -1109,66 +1109,55 @@ const MACHINE_SHOULDER_PRESS = {
 // The same press with two dumbbells on an upright bench rather than a machine.
 // Must be visible: the near vertical back pad and two separate bells. Side view.
 const SEATED_DUMBBELL_PRESS = {
-  view: { plane: "sagittal", yaw: 30 },
+  view: "side",
+  /* The near arm passes the head on the way up and is the nearer thing, so it
+     draws in front rather than disappearing behind the skull. See
+     ARNOLD_PRESS. */
+  armOverHead: true,
   loop: "pingpong",
   dur: 3.0,
   breath: 0.2,
   fit: { k: 0.92, dy: 6 },
   props: [
-    { type: "bench", x: 17, y: 70, w: 44, incline: -78 },
-    { type: "bench", x: 33, y: 96, w: 36 },
-    /* Plain "level" bells, not "grip". The grip here never changes: it is a
-       pronated press from the rack to lockout, so the handle stays across the
-       body the whole way and end on is the right picture at every frame. The
-       derived bell would be the honest tool if it rolled, but the abduction
-       that makes the rack wide also swings the hand frame under it, so a
-       derived handle drifts broadside halfway up for no reason the movement
-       gives. A fixed grip gets the fixed bell, same as every other press. */
-    { type: "dumbbell", side: "L", point: "hand", k: 0.68, front: true },
-    { type: "dumbbell", side: "R", point: "hand", k: 0.68, front: true },
+    { type: "bench", x: 20, y: 70, w: 44, incline: -78 },
+    { type: "bench", x: 36, y: 96, w: 36 },
+    /* Plain "level" bells. The grip never changes here, it is pronated from
+       the shoulders to lockout, so end on is the right picture at every
+       frame and there is nothing for the derived bell to derive. */
+    { type: "dumbbell", side: "L", point: "hand", k: 0.72, front: true },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.72, front: true },
   ],
   keys: [
-    { /* Racked: elbows WIDE, out at shoulder height, forearms vertical, bells
-         beside the head. This used to drive the arms with a wrist target out
-         in front of the chest, which racked them like an Arnold press instead
-         (Mo, against a reference photo: "seated dumbbell press is off to the
-         side like this, you have it slightly in front"). A wrist target cannot
-         express it: the solver works in the camera plane, so every answer it
-         can give puts the elbow forward or back, never out.
+    { /* Racked at the shoulders, bells sitting just above them, then straight
+         up. Mo: "just have the dumbbells on his shoulders and going up."
 
-         Abduction is the channel that means "out to the side", so the arms are
-         angles now rather than IK. 74 degrees of it takes the upper arm nearly
-         lateral; the press then closes that to 170 and opens the elbow, which
-         is the same path DUMBBELL_SHOULDER_PRESS walks in its front view, just
-         expressed in the channel a sagittal move has to use.
-
-         The camera is turned 30 degrees for the same reason: a flat side view
-         cannot show this rack at all. Work it out on paper and it is forced.
-         The upper arm is 20 and the forearm 17, so with nothing foreshortened
-         the only way to get the bells up to head height is to put the elbow a
-         full 20 units in front of the shoulder, which is the front rack this
-         used to draw. Abduct the arm instead and it points at the lens and
-         disappears. Turning the camera is what lets the arm be out to the side
-         AND be visible, and the legs still solve in the sagittal plane so he
-         stays sitting. The bench x values carry the matching offset, since a
-         pinned prop does not know the camera moved. */
+         Angles rather than a wrist target, because a wrist target cannot put
+         the hand at the shoulder. The upper arm is 20 and the forearm 17, and
+         a solver working in the camera plane draws both at full screen length,
+         so the only way it can fold the arm that tight is to throw the elbow
+         about 20 units clear of the body, forward or back. Abduction is what a
+         real rack uses: the elbow goes OUT, toward the camera, and 52 degrees
+         of it is why the upper arm reads short here rather than swinging out
+         in front of the chest. The bells sit at shoulder height, not ear
+         height, which is where they actually rest and which keeps them off
+         his jaw. */
       t: 0,
       root: { x: 52, y: 86, rot: -4 },
       joints: {
         spine: 0, neck: -2,
-        shoulderR: 86, shoulderAbdR: 74, elbowR: 128,
-        shoulderL: 83, shoulderAbdL: 72, elbowL: 130,
+        shoulderR: 40, shoulderAbdR: 52, elbowR: 150,
+        shoulderL: 37, shoulderAbdL: 50, elbowL: 152,
         forearmPronR: 90, forearmPronL: 90,
       },
       ik: { ...stand(82, 78) },
     },
-    { // lockout, arms long overhead, bells nearly touching
+    { // lockout, arms long straight overhead, bells nearly touching
       t: 1,
       root: { x: 52, y: 86, rot: -4 },
       joints: {
         spine: -2, neck: -4,
-        shoulderR: -2, shoulderAbdR: 170, elbowR: 6,
-        shoulderL: -4, shoulderAbdL: 167, elbowL: 8,
+        shoulderR: 176, shoulderAbdR: 12, elbowR: 2,
+        shoulderL: 173, shoulderAbdL: 10, elbowL: 4,
         forearmPronR: 90, forearmPronL: 90,
       },
       ik: { ...stand(82, 78) },
