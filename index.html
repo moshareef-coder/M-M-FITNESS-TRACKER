@@ -7421,6 +7421,11 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
       bubble: primary.bubble,
       child: primary.child,
       label: kid ? kid.label : tile.title,
+      /* Null when the words for the specific are not on the tile, which since
+         the sub-goals went is always. goal_detail is a free text sentence the
+         engine matches against its alias table, and putting the bubble's own
+         title in it says nothing the bubble id did not already say. */
+      childLabel: kid ? kid.label : null,
       secondary: extras.map((e) => ({ bubble: e.bubble, child: e.child })),
     });
   };
@@ -7447,7 +7452,7 @@ function renderGoalPage() {
       child: MY_PROFILE?.goal_child || null,
       secondary: MY_PROFILE?.goal_secondary,
     },
-    onPick: async ({ bubble, child, label, secondary }) => {
+    onPick: async ({ bubble, child, childLabel, secondary }) => {
       const tile = goalTileFor(bubble);
       const legacy = GOALS.find((g) => g.key === tile.legacy);
       /* Upsert on the email key, the way every other profile write here is
@@ -7469,7 +7474,7 @@ function renderGoalPage() {
          A sentence written for a goal belongs to that goal. Changing the main
          goal clears it; keeping the same goal keeps it, so the free text
          somebody typed on the Training page is not wiped by a visit here. */
-      patch.goal_detail = child ? label
+      patch.goal_detail = childLabel ? childLabel
         : bubble === MY_PROFILE?.goal_bubble ? (MY_PROFILE?.goal_detail || null)
         : null;
       const { error, droppedSecondary } = await upsertGoalFields(patch);
@@ -8371,7 +8376,16 @@ function paintLimitsSubtitle() {
   }).catch(() => { /* the row keeps its honest fallback */ });
 }
 
+const OB_STEPS = ["name", "goal", "target", "plan"];
+
 function renderOnboardStep(step, data = {}) {
+  /* A draft is saved on every step and survives a deploy, so somebody can come
+     back to a step this build no longer has: "pace" is exactly that, as of the
+     commit that stopped asking every non-weight goal how many weeks it wanted.
+     Rendering a step that does not exist leaves an empty screen with a saved
+     draft pointing straight back at it, which nobody can get out of, so an
+     unknown step lands on a real one with their answers intact. */
+  if (!OB_STEPS.includes(step)) step = step === "pace" ? "plan" : "name";
   const ob = $("onboard");
   ob.classList.remove("hidden");
   $("app").classList.add("hidden");
