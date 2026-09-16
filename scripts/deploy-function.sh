@@ -28,6 +28,26 @@ fi
 dir="supabase/functions/$slug"
 [ -f "$dir/index.ts" ] || { echo "no $dir/index.ts"; exit 1; }
 
+# verify_jwt is per function, and it used to be hardcoded true for all of them.
+#
+# That is right for the two the app calls with a signed-in user's token, and
+# fatal for the ones pg_cron and pg_net call, which send CRON_SECRET as a bearer
+# and CRON_SECRET is not a JWT. The gateway rejects those with 401 before a line
+# of function code runs, so the function cannot log the failure, and pg_cron
+# reports success because all it knows is that the request was queued. Every
+# notification this app can send was dead from 03:33 to 09:00 on 2026-09-16
+# because one redeploy flipped four functions to true.
+#
+# So it is a list now. A function not on it verifies JWTs, which is the safe
+# default for anything reached from the app.
+case "$slug" in
+  send-nudges|notify-live-start|notify-clip|notify-report|expire-clips|expire-proofs)
+    verify_jwt=false ;;
+  *)
+    verify_jwt=true ;;
+esac
+echo "$slug: verify_jwt=$verify_jwt"
+
 args=()
 while IFS= read -r f; do
   rel="${f#$dir/}"
@@ -38,5 +58,5 @@ echo "uploading ${#args[@]} files for $slug"
 curl -sS -X POST "https://api.supabase.com/v1/projects/$SB_REF/functions/deploy?slug=$slug" \
   -H "Authorization: Bearer $SB_TOKEN" \
   -H "User-Agent: curl/8.4.0" \
-  -F "metadata={\"name\":\"$slug\",\"entrypoint_path\":\"source/index.ts\",\"verify_jwt\":true};type=application/json" \
+  -F "metadata={\"name\":\"$slug\",\"entrypoint_path\":\"source/index.ts\",\"verify_jwt\":$verify_jwt};type=application/json" \
   "${args[@]}" | python3 -c 'import json,sys; d=json.load(sys.stdin); print({k:d.get(k) for k in ("slug","version","status","message")})'
