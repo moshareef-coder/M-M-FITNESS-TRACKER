@@ -76,6 +76,39 @@
         { id: "x3", email: ME, user_name: "Mo", entry_date: day(-4), exercise_name: "Bench Press", sets: 4, reps: 8, weight: 180, created_at: day(-4) + "T08:00:00Z" },
         { id: "x4", email: THEM, user_name: "Mell", entry_date: day(0), exercise_name: "Hip Thrust", sets: 4, reps: 12, weight: 135, created_at: day(0) + "T07:00:00Z" },
         { id: "x5", email: THEM, user_name: "Mell", entry_date: day(-2), exercise_name: "Leg Press", sets: 3, reps: 12, weight: 180, created_at: day(-2) + "T07:00:00Z" },
+
+        /* Twelve weeks behind today, so anything that reads a trend has one to
+           read. Before this the fixture held eight logs across four days and no
+           lift appeared on more than one day, which meant every strength answer
+           came back "holding" and the screen looked broken when the data was.
+
+           Each lift is deliberately a different shape, because the point is that
+           the four answers are distinguishable:
+             Bench Press        the weight climbs, 165 to 195
+             Barbell Back Squat the weight never moves, the reps go 5 to 9
+             Lat Pulldown       genuinely flat, same weight same reps
+             Hanging Leg Raise  bodyweight, so there is no load to compare
+           Mell is the mirror: her lower body climbs and her pressing does not. */
+        ...[
+          ["Bench Press",       [[-84, 165, 5], [-63, 170, 5], [-42, 180, 5], [-21, 190, 5], [-7, 195, 5]]],
+          ["Barbell Back Squat",[[-84, 225, 5], [-56, 225, 6], [-35, 225, 8], [-14, 225, 9]]],
+          ["Lat Pulldown",      [[-77, 130, 10], [-49, 130, 10], [-28, 130, 10]]],
+          ["Overhead Press",    [[-70, 95, 6], [-35, 100, 6], [-14, 105, 6]]],
+          ["Hanging Leg Raise", [[-63, null, 12], [-28, null, 14], [-9, null, 15]]],
+        ].flatMap(([exercise_name, rows], li) =>
+          rows.map(([d, weight, reps], ri) => ({
+            id: `h${li}_${ri}`, email: ME, user_name: "Mo", entry_date: day(d),
+            exercise_name, sets: 3, reps, weight, created_at: day(d) + "T08:00:00Z",
+          }))),
+        ...[
+          ["Hip Thrust", [[-84, 135, 10], [-56, 155, 10], [-28, 175, 10], [-7, 185, 10]]],
+          ["Leg Press",  [[-77, 180, 12], [-42, 200, 12], [-14, 230, 12]]],
+          ["Bench Press",[[-70, 65, 8], [-35, 65, 8], [-14, 65, 8]]],
+        ].flatMap(([exercise_name, rows], li) =>
+          rows.map(([d, weight, reps], ri) => ({
+            id: `hm${li}_${ri}`, email: THEM, user_name: "Mell", entry_date: day(d),
+            exercise_name, sets: 3, reps, weight, created_at: day(d) + "T07:00:00Z",
+          }))),
       ],
       ai_workouts: [
         { id: "w1", email: ME, entry_date: day(0), archived: false, focus: "Push Day", created_at: day(0) + "T05:00:00Z", exercises: pushWorkout,

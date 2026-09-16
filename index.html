@@ -4011,6 +4011,26 @@
      right where every settings app in the category puts it, so the list can be
      read rather than opened: Goal says "Build muscle", Appearance says "Dark",
      Rest says "90 sec". A row you do not need to tap is the point. */
+  /* The strength answers: a coloured dot, a headline, the evidence under it.
+     No bars and no chart, because the whole point of this card is that it can
+     be read without decoding anything. */
+  .ms-sheet { max-height: 88vh; overflow-y: auto; }
+  .ms-key { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
+            font-size: 11.5px; color: var(--muted); margin: 6px 0 2px; }
+  .ms-key span { display: flex; align-items: center; gap: 6px; }
+  .ms-key .ms-dot { margin-top: 0; }
+  .ms-list { margin-top: 4px; }
+  .ms-row { display: flex; gap: 11px; align-items: flex-start; padding: 11px 0;
+            border-bottom: 1px solid var(--border); }
+  .ms-row:last-child { border-bottom: none; }
+  .ms-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-top: 6px; }
+  .ms-dot.up { background: var(--accent); }
+  .ms-dot.flat { background: var(--muted); }
+  .ms-dot.cold { background: var(--border); }
+  .ms-txt { flex: 1; min-width: 0; }
+  .ms-txt b { display: block; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+  .ms-txt span { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
   .set-sec {
     font-size: 11.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
     color: var(--muted); margin: 20px 4px 7px;
@@ -5376,6 +5396,38 @@
       <div class="wt-stats" id="consistencyStats"></div>
       <div class="chart-wrap"><canvas id="consistencyChart"></canvas></div>
       <div class="cst-caption" id="consistencyCaption"></div>
+    </div>
+
+    <!-- The answer to "am I getting stronger", before the charts that show the
+         working. Four lines at most, and the body behind it is one tap away. -->
+    <!-- The same figure the Body tab draws, coloured by whether the weight
+         went up rather than by how much work was done. -->
+    <div class="sheet-scrim hidden" id="msScrim">
+      <div class="partner-sheet ms-sheet" id="msSheet">
+        <div class="ds-grip"></div>
+        <div class="ps-head">
+          <h2 id="msTitle">Getting stronger</h2>
+          <button type="button" class="ds-x" id="msClose" aria-label="Close">&times;</button>
+        </div>
+        <p class="muted-note" id="msNote"></p>
+        <div class="bi-figures" id="msFigures">
+          <div class="bi-fig" data-view="Front"><canvas id="msFront" class="bi-canvas"></canvas></div>
+          <div class="bi-fig" data-view="Back"><canvas id="msBack" class="bi-canvas"></canvas></div>
+        </div>
+        <div class="ms-key">
+          <span><i class="ms-dot up"></i> Lifting more</span>
+          <span><i class="ms-dot flat"></i> Same</span>
+          <span><i class="ms-dot cold"></i> Not trained</span>
+        </div>
+        <div class="ms-list" id="msDetail"></div>
+      </div>
+    </div>
+
+    <div class="card metric-card" id="cardMuscles">
+      <h2>Getting stronger</h2>
+      <p class="muted-note" style="margin-top:-6px" id="musclesLead"></p>
+      <div class="ms-list" id="musclesList"></div>
+      <button type="button" class="btn-ghost" id="musclesOpenBtn" style="margin-top:10px;width:100%">See it on the body</button>
     </div>
 
     <div class="card metric-card" id="cardStrength">
@@ -23076,7 +23128,7 @@ function viewedEmail() { return PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY
    their goal changes. */
 const PROGRESS_CARDS = [
   "cardWeight", "scaleCheckCard", "cardConsistency",
-  "cardStrength", "cardVolume", "cardPhotos",
+  "cardMuscles", "cardStrength", "cardVolume", "cardPhotos",
 ];
 
 /* ---------- What this tab is supposed to answer ----------
@@ -23216,8 +23268,8 @@ function headlineKindFor(profile) {
 const GOAL_CARDS = {
   scale:     ["cardWeight", "scaleCheckCard", "cardPhotos", "cardConsistency"],
   recomp:    ["cardConsistency", "cardPhotos", "cardWeight", "scaleCheckCard"],
-  lift:      ["cardStrength", "cardConsistency"],
-  volume:    ["cardVolume", "cardStrength", "cardWeight", "scaleCheckCard", "cardConsistency"],
+  lift:      ["cardMuscles", "cardStrength", "cardConsistency"],
+  volume:    ["cardMuscles", "cardVolume", "cardStrength", "cardWeight", "scaleCheckCard", "cardConsistency"],
   reps:      ["cardConsistency"],
   endurance: ["cardConsistency"],
   habit:     ["cardConsistency"],
@@ -23386,6 +23438,150 @@ function muscleStrengthTrend(name, weeks = 12) {
     }
   }
   return out;
+}
+
+/* ---- The same body the rest of the app draws, coloured by strength ----
+
+   Its own pair of Rive controllers rather than the Body tab's, because those
+   are bound to that tab's canvases and are painted from volume. Sharing them
+   would mean whichever screen rendered last won, and the two screens answer
+   different questions with the same picture, which is exactly the confusion
+   this feature exists to remove.
+
+   Three colours, not a ramp. A ramp implies a quantity and there is no
+   quantity here: the weight either went up or it did not. */
+let MS_FRONT = null, MS_BACK = null, MS_SEX = null, MS_TREND = null, MS_NAME = null;
+const MS_COLOURS = {
+  up:         { r: 0x3b, g: 0xe7, b: 0x6b },
+  flat:       { r: 0x8b, g: 0x94, b: 0xa3 },
+  bodyweight: { r: 0x8b, g: 0x94, b: 0xa3 },
+  cold:       null,                            // null means leave the asset's base grey
+};
+
+async function openMuscleBody(name) {
+  MS_NAME = name || ME;
+  MS_TREND = muscleStrengthTrend(MS_NAME, 12);
+  const up = MUSCLE_GROUPS.filter((g) => MS_TREND[g].state === "up").length;
+  const measured = MUSCLE_GROUPS.filter((g) => ["up", "flat"].includes(MS_TREND[g].state)).length;
+  $("msTitle").textContent = MS_NAME === ME ? "Getting stronger" : `${MS_NAME} getting stronger`;
+  $("msNote").textContent = measured
+    ? `${up} of ${measured} measurable muscles are lifting more. Tap one.`
+    : "Nothing with a weight on it yet.";
+  $("msDetail").innerHTML = "";
+  $("msScrim").classList.remove("hidden");
+  $("msScrim").onclick = (e) => { if (e.target === $("msScrim")) closeMuscleBody(); };
+  $("msClose").onclick = closeMuscleBody;
+
+  try {
+    const mod = await ensureRiveBodyModule();
+    if ($("msScrim").classList.contains("hidden")) return;   // closed while loading
+    const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const paint = () => msPaint(mod);
+    if (!MS_FRONT || MS_SEX !== sex) {
+      MS_FRONT?.destroy(); MS_BACK?.destroy();
+      const make = (id, view) => {
+        const canvas = $(id);
+        canvas.width = Math.round(canvas.clientWidth * dpr);
+        canvas.height = Math.round(canvas.clientHeight * dpr);
+        return mod.createBodyHeatmap({
+          canvas, artboardName: `${sex}-${view}`, palette: mod.APP_HEAT_PALETTE, intensities: {},
+          onMuscleClick: (muscle) => msShowMuscle(mod.RIVE_TO_APP_GROUP[muscle]),
+          onLoad: paint,
+        });
+      };
+      MS_FRONT = make("msFront", "Front");
+      MS_BACK = make("msBack", "Back");
+      MS_SEX = sex;
+    } else {
+      paint();
+    }
+  } catch (e) {
+    /* The figure is the nice version, not the only version: the card behind it
+       already said everything in words. */
+    console.warn("strength body unavailable", e);
+    $("msNote").textContent = "The figure could not load. The list on the card has the same answers.";
+  }
+}
+
+function msPaint(mod) {
+  const on = {};
+  for (const muscle of mod.ALL_MUSCLES) {
+    const g = mod.RIVE_TO_APP_GROUP[muscle];
+    const state = g && MS_TREND[g] ? MS_TREND[g].state : "cold";
+    const c = MS_COLOURS[state];
+    on[muscle] = c ? 4 : 0;
+    if (c) {
+      const pal = { base: mod.APP_HEAT_PALETTE.base, level1: c, level2: c, level3: c, level4: c };
+      MS_FRONT?.setMusclePalette(muscle, pal);
+      MS_BACK?.setMusclePalette(muscle, pal);
+    }
+  }
+  MS_FRONT?.setIntensities(on);
+  MS_BACK?.setIntensities(on);
+}
+
+function msShowMuscle(group) {
+  if (!group || !MS_TREND?.[group]) return;
+  const s = strengthSentence(group, MS_TREND[group]);
+  $("msDetail").innerHTML = `<div class="ms-row">
+      <i class="ms-dot ${MS_TREND[group].state === "up" ? "up" : MS_TREND[group].state === "cold" ? "cold" : "flat"}"></i>
+      <span class="ms-txt"><b>${escapeHtml(s.head)}</b><span>${escapeHtml(s.sub)}</span></span>
+    </div>`;
+}
+
+function closeMuscleBody() {
+  $("msScrim").classList.add("hidden");
+}
+
+/* Four lines at most, biggest first. Naming fourteen muscles one by one is
+   the version of this that nobody reads, so the card groups them: the single
+   best gain in full, then counts for the rest. The body screen behind the
+   button is where somebody goes when they want it muscle by muscle. */
+function renderMuscleAnswers(name) {
+  const list = $("musclesList");
+  if (!list) return;
+  const t = muscleStrengthTrend(name, 12);
+  const of = (st) => MUSCLE_GROUPS.filter((g) => t[g].state === st);
+  const up = of("up").sort((a, b) => (t[b].to - t[b].from) - (t[a].to - t[a].from));
+  const flat = of("flat"), body = of("bodyweight"), cold = of("cold");
+  const label = (g) => (BODY_GROUP_LABELS[g] || g).toLowerCase();
+  const measured = up.length + flat.length;
+
+  $("musclesLead").textContent = measured
+    ? `${up.length} of ${measured} muscles you can measure are lifting more, over the last 12 weeks.`
+    : "Nothing with a weight on it yet, so there is no load to compare.";
+
+  const rows = [];
+  if (up[0]) {
+    const s = strengthSentence(up[0], t[up[0]]);
+    rows.push({ k: "up", head: s.head, sub: s.sub });
+  }
+  if (up.length > 1) {
+    rows.push({ k: "up", head: `${up.length} muscles are lifting more`,
+      sub: up.map(label).join(", ") + "." });
+  }
+  if (flat.length) {
+    rows.push({ k: "flat", head: `${flat.length} ${flat.length === 1 ? "has" : "have"} not moved`,
+      sub: `${flat.map(label).join(", ")}. Same load for weeks, so the next step is weight rather than sets.` });
+  }
+  if (body.length) {
+    rows.push({ k: "flat", head: `${body.map(label).join(" and ")} trained without load`,
+      sub: "Bodyweight work, so there is nothing here to compare week to week." });
+  }
+  if (cold.length) {
+    rows.push({ k: "cold", head: `${cold.length} not trained at all`,
+      sub: `${cold.map(label).join(", ")}. Nothing logged in 12 weeks.` });
+  }
+  if (!rows.length) rows.push({ k: "cold", head: "Nothing logged yet", sub: "Log a few weeks and this fills in." });
+
+  list.innerHTML = rows.map((r) => `<div class="ms-row">
+      <i class="ms-dot ${r.k}"></i>
+      <span class="ms-txt"><b>${escapeHtml(r.head)}</b><span>${escapeHtml(r.sub)}</span></span>
+    </div>`).join("");
+
+  const btn = $("musclesOpenBtn");
+  if (btn) btn.onclick = () => openMuscleBody(name);
 }
 
 /* The same answer as a sentence. Kept next to the maths so the words and the
@@ -23891,7 +24087,9 @@ function renderProgressTab() {
      timeline, the day sheet and the live sheet already apply. */
   const barred = new Set();
   if (isPartner) barred.add("scaleCheckCard");
-  if (!sharing) { barred.add("cardStrength"); barred.add("cardVolume"); }
+  /* This card names the lifts somebody is doing and what they load them with,
+     which is exactly what share_workout_details exists to withhold. */
+  if (!sharing) { barred.add("cardStrength"); barred.add("cardVolume"); barred.add("cardMuscles"); }
 
   const wanted = (GOAL_CARDS[kind] || GOAL_CARDS.habit).filter((c) => !barred.has(c));
   const rest = PROGRESS_CARDS.filter((c) => !barred.has(c) && !wanted.includes(c));
@@ -23913,6 +24111,7 @@ function renderProgressTab() {
 
   if (blank) renderProgressEmpty(kind);
   else renderProgressHeadline(kind, name, email, profile, isPartner, sharing);
+  if (!blank && shown.includes("cardMuscles")) renderMuscleAnswers(name);
 
   /* The goal's cards, in the goal's order, straight under the answer; then the
      rule; then everything else in PROGRESS_CARDS order. Re-ordering the nodes
