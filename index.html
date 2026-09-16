@@ -6861,6 +6861,86 @@ const GOAL_TILES = [
   { id: "consistent", legacy: "consistent", ico: "info", title: "Not sure yet", sub: "we will start somewhere sensible", kids: [] },
 ];
 
+/* ---------- What is on file that the picker no longer offers ----------
+
+   Two lists collapsed on 2026-09-15: three whole bubbles went (549f1d5) and
+   then every sub-goal under the survivors went (40938b5). Neither commit
+   touched a single stored profile, so accounts are still sitting on ids the
+   tiles above cannot render, and `goal_child` values the tiles above cannot
+   name. The engine reads both (CONTRACT.md section (a)) and honours them, so
+   they are live data, not debris.
+
+   TREE_KIDS is the goal-tree's own child list, verbatim from
+   mo-knowledge/goals/goal-tree.json plus the two bubbles the tiles invented.
+   It is deliberately NOT `tile.kids`: what the picker OFFERS and what the
+   engine ACCEPTS stopped being the same list, and using the offer list to
+   validate stored data is what silently rewrote everyone's second goal to
+   `null`. */
+const TREE_KIDS = {
+  "lose-weight": ["lose-a-number", "lose-belly", "lose-by-date", "lose-for-health", "lose-last-10", "lose-and-build"],
+  "build-muscle": ["build-overall", "build-a-part", "build-glutes", "build-skinny-fat", "build-women"],
+  "get-stronger": ["strong-a-lift", "strong-multiples", "strong-not-bigger", "strong-for-life", "strong-again"],
+  "tone-lean-abs": ["tone-part", "abs", "lean-shredded"],
+  "build-endurance": ["stamina", "run-5k", "faster-mile", "event-run", "event-hyrox", "event-ocr"],
+  "move-better": ["mobility", "flexibility", "pain", "back-postpartum"],
+  "feel-better": ["mental", "energy", "longevity", "prevent", "keep-quitting", "dont-know", "back-after-years", "start-fresh"],
+  "consistent": ["keep-quitting", "dont-know", "no-time"],
+  "do-a-thing": ["first-pullup", "first-pushup", "run-5k", "faster-mile", "flexibility", "skills"],
+  "event": ["event-run", "event-hyrox", "event-ocr", "event-test", "event-benchmark", "event-sport"],
+  "get-back": ["back-after-years", "back-postpartum", "start-fresh"],
+};
+
+/* The three retired bubbles, and the surviving goal each one becomes.
+
+   MIGRATE, DO NOT RESURRECT, and nothing is rewritten behind anyone's back.
+   Putting the three tiles back would undo a call Mo made on purpose and would
+   keep writing brand new rows on retired ids forever. So the profile on file
+   is left exactly as it is until the person opens the goal page themselves,
+   and then the page opens with the mapped goal already ticked and one sentence
+   saying which goal theirs became. Nothing is written until they press Save,
+   and the sentence is on screen before they do, which is the difference
+   between a migration and losing somebody's data.
+
+   The destinations are not invented here: 549f1d5 already re-homed these
+   children when it cut the bubbles, and this is that same routing, written
+   down. A child only survives the move when the destination bubble really
+   owns it in TREE_KIDS, because the engine drops a child that does not belong
+   to its bubble and runs the bubble default, so carrying one across would be
+   a promise the generator cannot keep. */
+const RETIRED_GOALS = {
+  /* A first pull-up and a first push-up are bodyweight strength, and
+     "Lift my bodyweight" is get-stronger's own word for that. */
+  "do-a-thing": { title: "Hit a milestone", to: ["get-stronger", "strong-multiples"] },
+  "event": { title: "Train for an event", to: ["build-endurance", null] },
+  "get-back": { title: "Get back into it", to: ["feel-better", null] },
+};
+
+/* Per-child overrides, where the child says something its bubble's default
+   destination would throw away. Running and touching your toes are not
+   strength goals whatever bubble they were filed under. */
+const RETIRED_GOAL_KIDS = {
+  "run-5k": ["build-endurance", "run-5k"],
+  "faster-mile": ["build-endurance", "faster-mile"],
+  "flexibility": ["move-better", "flexibility"],
+  "back-postpartum": ["move-better", "back-postpartum"],
+  "back-after-years": ["feel-better", "back-after-years"],
+  "start-fresh": ["feel-better", "start-fresh"],
+};
+
+/* A stored pick, as the live goal set would say it. Returns the pair
+   unchanged when the bubble is still on the tiles. */
+function migrateGoalPick(bubble, child) {
+  const retired = RETIRED_GOALS[bubble];
+  if (!retired) return { bubble, child: (TREE_KIDS[bubble] || []).includes(child) ? child : null, moved: false };
+  const [toBubble, toChild] = (child && RETIRED_GOAL_KIDS[child]) || retired.to;
+  return {
+    bubble: toBubble,
+    child: (TREE_KIDS[toBubble] || []).includes(toChild) ? toChild : null,
+    moved: true,
+    from: retired.title,
+  };
+}
+
 /* Muscle gain does NOT get a pace to choose, and that asymmetry is deliberate.
    A bigger deficit really does lose fat faster, at a cost, so offering someone
    a faster and a gentler route to a goal weight is offering a real choice.
@@ -6898,7 +6978,13 @@ function lossTimelines(currentLb, goalLb) {
   for (const o of [
     { key: "quick", pct: 0.01, note: "Fast. No room for a bad week." },
     { key: "steady", pct: 0.0075, note: "The one we would pick.", rec: true },
-    { key: "gentle", pct: 0.005, note: "Gentle. Fits around a full life." },
+    /* `easy`, not `gentle`. This key is written straight to user_goals.pace,
+       whose check constraint is ('steady','quick','easy'), and it is looked up
+       in PACE, where Gentle is `easy` as well. As `gentle` it matched neither:
+       the row would have been rejected by the real database, and the plan
+       screen silently fell back to Steady. The word on the button is still
+       Gentle; only the key has to agree with the two tables that read it. */
+    { key: "easy", pct: 0.005, note: "Gentle. Fits around a full life." },
   ]) {
     const perWeek = rate(o.pct);
     const weeks = Math.max(1, Math.round(amount / perWeek));
@@ -6927,7 +7013,11 @@ function goalTileFor(bubble) { return GOAL_TILES.find((t) => t.id === bubble) ||
    that predates the tiles. */
 function goalTileLabel(profile) {
   const t = goalTileFor(profile?.goal_bubble);
-  if (!t) return profile?.goal || "Not set";
+  /* A retired bubble is still a goal this person picked, so the row says the
+     thing they picked. The legacy fallback under it is the same flat "Stay
+     consistent" for all three of them, which tells a milestone chaser nothing
+     about their own goal. */
+  if (!t) return RETIRED_GOALS[profile?.goal_bubble]?.title || profile?.goal || "Not set";
   return goalPickLabel(profile.goal_bubble, profile.goal_child);
 }
 
@@ -6946,18 +7036,30 @@ function goalPickLabel(bubble, child) {
    column round trips as through some clients, as null from a database that
    does not have the column yet, and as junk from an older client. All four
    have to mean the same thing as an empty list, because the picker opens on
-   whatever it is handed. */
+   whatever it is handed.
+
+   What it must NOT do is quietly shrink a real answer, and it was doing that
+   twice. It validated the child against `tile.kids`, which is empty on every
+   tile since the sub-goals went, so every stored second goal came back with
+   its specific erased; and it dropped any entry on a retired bubble outright.
+   The first save from the goal page then wrote that shorter list back. Both
+   now go through migrateGoalPick, which keeps a child the engine still honours
+   and moves a retired bubble to the goal that replaced it.
+
+   Two entries under one bubble are kept apart rather than collapsed. Glutes
+   and Arms are two goals, goal-engine.mjs prices them separately, and the
+   picker has said so since 917371d. */
 function normaliseGoalSecondary(raw) {
   let v = raw;
   if (typeof v === "string") { try { v = JSON.parse(v); } catch { return []; } }
   if (!Array.isArray(v)) return [];
   const out = [];
   for (const e of v) {
-    const bubble = e && typeof e === "object" ? e.bubble : null;
+    const stored = e && typeof e === "object" ? e.bubble : null;
+    if (!goalTileFor(stored) && !RETIRED_GOALS[stored]) continue;
+    const { bubble, child } = migrateGoalPick(stored, (e && e.child) || null);
     if (!goalTileFor(bubble)) continue;
-    if (out.some((o) => o.bubble === bubble)) continue;
-    const tile = goalTileFor(bubble);
-    const child = tile.kids.some((k) => k.id === e.child) ? e.child : null;
+    if (out.some((o) => o.bubble === bubble && (o.child || null) === (child || null))) continue;
     out.push({ bubble, child });
     if (out.length === 2) break;
   }
@@ -7040,8 +7142,17 @@ function renderGoalTilesStep(data = {}) {
    not want to be more specific than that. */
 function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my goals" } = {}) {
   const MAX_EXTRA = 2;   // the engine's cap, and it is argued for in mo-knowledge/engine/README.md
-  let primary = goalTileFor(selected.bubble) ? { bubble: selected.bubble, child: selected.child || null } : null;
-  let extras = normaliseGoalSecondary(selected.secondary).filter((e) => e.bubble !== primary?.bubble);
+  /* A retired bubble reaches this with no tile to light, which is why such a
+     profile opened the page with nothing selected and a disabled button
+     reading "Pick a goal first". It opens on the goal that replaced it
+     instead; renderGoalPage says which, above the grid. */
+  const opening = selected.bubble ? migrateGoalPick(selected.bubble, selected.child || null) : null;
+  let primary = opening && goalTileFor(opening.bubble) ? { bubble: opening.bubble, child: opening.child } : null;
+  /* Only an exact duplicate of the main goal is dropped. Filtering the whole
+     bubble threw away the pair this picker exists to allow, Glutes as the main
+     goal and Arms as the extra. */
+  let extras = normaliseGoalSecondary(selected.secondary)
+    .filter((e) => !(e.bubble === primary?.bubble && (e.child || null) === (primary?.child || null)));
   let openId = null;
 
   /* The picks list and the confirm button live next to the grid rather than
@@ -7132,7 +7243,16 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
         const t = goalTileFor(b.dataset.tile);
         /* A category with nothing under it has nothing to open, so tapping it
            is the pick itself rather than a door to one row. */
-        if (!t.kids.length) { choose(t.id, null); openId = null; paintGrid(); paintPicks(); paintConfirm(); return; }
+        if (!t.kids.length) {
+          /* Whatever is already selected under this bubble, so a tap turns off
+             the pick it is showing rather than adding a second, childless one
+             next to it. A profile carrying an older sub-goal is the only way
+             the two can differ, and that tap reads as "off" to the person
+             doing it either way. */
+          const already = primary?.bubble === t.id ? primary.child
+            : (extras.find((e) => e.bubble === t.id)?.child ?? null);
+          choose(t.id, already); openId = null; paintGrid(); paintPicks(); paintConfirm(); return;
+        }
         openId = openId === b.dataset.tile ? null : b.dataset.tile;
         paintGrid();
       };
@@ -7179,7 +7299,14 @@ function initGoalTiles(grid, { selected = {}, onPick, confirmLabel = "Save my go
 /* The same tiles from Setup, writing straight to the profile. A specific from
    the sheet becomes the goal detail; "Just X" leaves whatever detail was there. */
 function renderGoalPage() {
-  $("goalPageNote").textContent = "One main goal, and up to two more you also care about. The next plan you generate is built for them.";
+  const moved = MY_PROFILE?.goal_bubble ? migrateGoalPick(MY_PROFILE.goal_bubble, MY_PROFILE.goal_child || null) : null;
+  /* Said before anything is written, not after. Someone whose goal was one of
+     the three retired bubbles is about to see a different goal ticked than the
+     one they chose, and finding that out from a toast after pressing Save is
+     how people lose things quietly. Nothing on this page writes until Save. */
+  $("goalPageNote").textContent = moved?.moved
+    ? `${moved.from} is not a goal on its own any more. The closest one we still build for is ticked below, and your goal stays exactly as it is until you save.`
+    : "One main goal, and up to two more you also care about. The next plan you generate is built for them.";
   initGoalTiles($("goalPageGrid"), {
     selected: {
       bubble: MY_PROFILE?.goal_bubble || null,
@@ -8780,6 +8907,13 @@ function clearLocalAccountState() {
       if (k.startsWith("ft_")) localStorage.removeItem(k);
     }
   } catch (e) { console.warn("could not clear local state", e); }
+  /* The App Group is not localStorage, so none of the above reaches it. Without
+     this the widget keeps drawing the previous person's name and counts after a
+     sign-out, on their home screen, for anyone who picks up the phone. */
+  if (isNativeApp()) {
+    try { window.Capacitor.Plugins.WidgetBridge?.clear(); }
+    catch (e) { console.warn("could not clear widget state", e); }
+  }
 }
 
 function queuedCount() { return readQueue().length; }
@@ -14571,6 +14705,12 @@ async function discardSession() {
   await bankCurrentExercise();
   SESSION = null;
   clearSessionStorage();
+  /* Two different functions with nearly the same name, and only one of them was
+     here. endLive() drops the presence row your partner watches; endLiveActivity()
+     takes the card off your own Lock Screen. Discarding called the first, nulled
+     SESSION, and every later path that could have ended the card checks SESSION
+     first, so the card was left with nothing in the app able to reach it. */
+  await endLiveActivity();
   await endLive();
 }
 
@@ -16925,6 +17065,10 @@ function liveActivityFields() {
     /* The whole length of a rest, not what is left of this one. The Lock Screen
        button needs it to start the next rest while the app is asleep. */
     restTarget: restTargetSec(),
+    /* Stamps every Lock Screen tap with who it is for. Without it the native
+       side has no way to tell this workout's taps from yesterday's, or from
+       the previous account's on a shared phone. */
+    owner: MY_EMAIL || "",
     paused: !!SESSION.pausedAt,
     quip: LIVE_QUIP,
     /* Lines for the Lock Screen button to choose from. The bank is here and the
@@ -16955,11 +17099,20 @@ function stopLiveQuipBeat() {
    cannot reach this code, so it leaves a count behind and the real logging
    happens here, the moment the app is in front again. */
 async function drainLockScreenSets() {
-  if (!isNativeApp() || !SESSION || SESSION.finished) return;
+  if (!isNativeApp()) return;
   const bridge = window.Capacitor.Plugins.WidgetBridge;
   if (!bridge) return;
+  /* Returning before the drain is what let the queue become a place things
+     accumulate: nothing was owed to a workout that was not open, so nothing
+     was collected, and it sat there until a workout WAS open. Draining with no
+     owner claims nothing and takes the rubbish out, which is the whole job on
+     this path. */
+  const mine = SESSION && !SESSION.finished ? (MY_EMAIL || "") : "";
   try {
-    const { count } = await bridge.drainPendingSets();
+    /* Owner-scoped: taps queued for anyone else, or for a workout that ended
+       long ago, are dropped rather than replayed as phantom sets. */
+    const { count, dropped } = await bridge.drainPendingSets({ owner: mine });
+    if (dropped) console.log(`lock screen: dropped ${dropped} stale or unowned taps`);
     for (let i = 0; i < (count || 0); i++) {
       const sets = SESSION.setsDone?.[SESSION.exerciseIndex] || [];
       const next = sets.findIndex((d) => !d);
@@ -17009,12 +17162,21 @@ async function pushLiveActivity() {
   }
 }
 
+/* Safe to call at any time, including when this page has never started one.
+   The LIVE_ACTIVITY_ON check used to stand in front of this, which meant the
+   one case that most needed ending could not be reached: a card left over from
+   a run that was force quit outlives the flag that knew about it, so on the
+   next launch the app believed there was nothing to end while the card was
+   sitting on the Lock Screen. Native ends every card it can see and resolves
+   quietly when there are none, so the flag is not worth guarding on. */
 async function endLiveActivity() {
   stopLiveQuipBeat();
   LAST_LIVE_ACTIVITY = null;
-  if (!isNativeApp() || !LIVE_ACTIVITY_ON) return;
   LIVE_ACTIVITY_ON = false;
-  try { await window.Capacitor.Plugins.LiveWorkout.end(); }
+  if (!isNativeApp()) return;
+  const live = window.Capacitor.Plugins.LiveWorkout;
+  if (!live) return;
+  try { await live.end(); }
   catch (err) { console.error("live activity end failed", err); }
 }
 

@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import UserNotifications
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,8 +8,49 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        registerNotificationCategories()
+        LiveWorkout.sweepStaleActivities()
         return true
+    }
+
+    /// The buttons on a nudge. @capacitor/push-notifications has no
+    /// registerActionTypes (that belongs to the local-notifications plugin), so
+    /// the categories named by the `category` field in each APNs payload have to
+    /// be declared here or the notification arrives with no actions at all.
+    ///
+    /// Taps still reach the web layer through pushNotificationActionPerformed,
+    /// which carries the identifier chosen below.
+    private func registerNotificationCategories() {
+        let evening = UNNotificationCategory(
+            identifier: "EVENING_NUDGE",
+            actions: [
+                UNNotificationAction(identifier: "start", title: "Start workout", options: [.foreground]),
+                // No .foreground: declining should not drag anyone into the app.
+                UNNotificationAction(identifier: "later", title: "Not today", options: []),
+            ],
+            intentIdentifiers: [],
+            options: []
+        )
+        // Your partner just started training. Cheering back is the whole
+        // point of the moment, so it is a button rather than a trip into the app.
+        let live = UNNotificationCategory(
+            identifier: "PARTNER_LIVE",
+            actions: [
+                UNNotificationAction(identifier: "cheer", title: "Send a cheer", options: []),
+                UNNotificationAction(identifier: "watch", title: "Watch", options: [.foreground]),
+            ],
+            intentIdentifiers: [],
+            options: []
+        )
+        let digest = UNNotificationCategory(
+            identifier: "COACH_DIGEST",
+            actions: [
+                UNNotificationAction(identifier: "open", title: "Open group", options: [.foreground]),
+            ],
+            intentIdentifiers: [],
+            options: []
+        )
+        UNUserNotificationCenter.current().setNotificationCategories([evening, live, digest])
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
@@ -27,6 +69,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationDidBecomeActive(_ application: UIApplication) {
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+        // A Live Activity outlives the process that started it, so a force quit
+        // leaves a card on the Lock Screen that nothing in the app was ever
+        // looking for. The web layer ends the ones it knows about; this is the
+        // backstop for the ones it cannot know about.
+        LiveWorkout.sweepStaleActivities()
     }
 
     func applicationWillTerminate(_ application: UIApplication) {

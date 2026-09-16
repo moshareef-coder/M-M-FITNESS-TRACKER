@@ -16,6 +16,10 @@ const ASSETS = [
   "privacy.html",
   "support.html",
   "manifest.webmanifest",
+  /* index.html imports this at runtime for everything the character says. On
+     the web it resolves from the repo root; left out of the bundle the import
+     throws and he has no lines at all, in the session or on the Lock Screen. */
+  "quips.mjs",
   "sw.js",
   "icon-192.png",
   "icon-512.png",
@@ -47,6 +51,24 @@ const KNOWLEDGE_FILES = [
   "knowledge/anatomy/muscle-detail.mjs",
   "knowledge/anatomy/muscle-bounds.mjs",
   "knowledge/anatomy/assets/human_anatomy_advanced_v3.0.riv",
+  /* The move rig and every animation. Left out of the bundle, the import of
+     motion/index.mjs throws at runtime and the native app shows no figure at
+     all, on any exercise. About 530 KB for the ten files below.
+
+     Deliberately not shipped from this directory: reference/ (9.6 MB of
+     source footage nothing loads), AUTHORING.md (internal authoring notes),
+     validate.mjs (a build-time tool), and body3d/ (BODY3D is false, so it is
+     never imported). */
+  "knowledge/motion/index.mjs",
+  "knowledge/motion/rig.mjs",
+  "knowledge/motion/moves/calisthenics.mjs",
+  "knowledge/motion/moves/idle.mjs",
+  "knowledge/motion/moves/pilates.mjs",
+  "knowledge/motion/moves/stretching.mjs",
+  "knowledge/motion/moves/weight-training.mjs",
+  "knowledge/motion/moves/weight-training-lower.mjs",
+  "knowledge/motion/moves/weight-training-upper.mjs",
+  "knowledge/motion/moves/yoga.mjs",
 ];
 const DIRS = ["vendor", "badges"];
 

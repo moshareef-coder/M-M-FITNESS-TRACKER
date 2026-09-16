@@ -1,10 +1,40 @@
 # iOS App Store submission checklist
 
 Security and privacy pass on the native wrapper (ios/, capacitor.config.json, scripts/sync-web.mjs,
-www/), done from source. Nothing here was verified by building or running Xcode; those items say so
-explicitly. Written 2026-09-11.
+www/), done from source. Written 2026-09-11, **updated 2026-09-15** after the first builds were
+actually produced, installed on a device and run in the Simulator.
+
+Read section 0 before anything else in here. The 11 September pass could not build, so several of
+its conclusions were guesses that turned out wrong, and one of them (the privacy policy) was
+already contradicted by section 6 of this same file a day later.
 
 No em dashes.
+
+## 0. What changed on 2026-09-15
+
+The project now builds, archives, installs on a device and runs in the Simulator. Build 17 exists.
+
+**Corrections to the 11 September pass:**
+
+- **"Privacy policy content is out of date" was wrong by the time anyone read it.** `privacy.html`
+  was rewritten on 12 September and section 6 below already said so. Section 3 was never updated to
+  match. It covers clips, photos, push, live sessions, weigh-ins and body data.
+- **"Push notifications appear to not be wired up" is fixed, not just noted.** Native APNs is
+  implemented end to end: `aps-environment` entitlement, `remote-notification` background mode, an
+  `apns_tokens` table, client registration, and an APNs sender in `send-nudges`. It is inert until
+  an APNs `.p8` key exists. See section 7.
+- **Signing, archiving and TestFlight upload are no longer unverified.** All work. `CODE_SIGN_IDENTITY`
+  was hardcoded to the legacy `"iPhone Developer"` in both Debug and Release, which forced even
+  archives to demand a Development profile; that is fixed.
+
+**New since that pass:** Sign in with Apple, a widget extension with Home and Lock Screen families,
+a workout Live Activity, screen wake lock, email and password sign-in, and an auth deep link.
+
+**The bug worth remembering:** Capacitor 7 registers plugins *only* from `packageClassList` in the
+synced `capacitor.config.json`, which it fills by scanning `node_modules`. It never scans for
+`CAPPlugin` subclasses. Any plugin living in the app target is therefore never registered, and on
+the JS side it is simply `undefined` rather than an error. `scripts/register-native-plugins.mjs`
+runs after every `cap sync` to add them back. The app now prints its plugin registry at boot.
 
 ## 1. Done
 
@@ -117,44 +147,74 @@ been copied into `www/`.
   missing files the app needs at runtime (the knowledge/mo-knowledge imports would 404 inside the
   native app even though they work fine on Vercel, since the web app still serves from the repo
   root there).
-- **Push notifications appear to not be wired up for the native iOS build at all.**
-  `supabase/migrations/20260903_push_and_nudges.sql` stores `endpoint`, `p256dh`, `auth`, which is
-  the Web Push API shape, and `sw.js` handles `push`/`notificationclick`. But `package.json` has no
-  `@capacitor/push-notifications` dependency, `Info.plist` has no `UIBackgroundModes` with
-  `remote-notification`, and there is no `.entitlements` file granting the `aps-environment`
-  capability. Web Push does not work inside a Capacitor `WKWebView` wrapper the way it does in
-  Safari; it needs the native Capacitor Push Notifications plugin talking to APNs. This is a
-  functional gap, not a security hole, but if push notifications are advertised as a feature they
-  will silently not fire in the App Store build. Worth a decision: wire up native push, or don't
-  advertise it for this platform yet.
-- **Privacy policy content is out of date.** See section 5 below for the specific gap list. This
-  blocks App Review under Guideline 5.1.1 if a reviewer checks the policy against the permission
-  strings and finds camera/microphone/photos mentioned in the plist but not the policy.
+- ~~**Push notifications appear to not be wired up.**~~ **Done on 2026-09-15.** The analysis was
+  right: Web Push does not work inside a `WKWebView`, so the wrapped app offered reminders it could
+  never deliver. Native APNs now exists alongside it (see section 7). One thing only the owner can
+  do remains: generate the APNs `.p8` key.
+- ~~**Privacy policy content is out of date.**~~ **This was already wrong when written.**
+  `privacy.html` was rewritten on 2026-09-12 against the actual schema; section 6 records that.
+  Treat section 6 as current and ignore this line, which survived only because nobody reconciled
+  the two.
+- **A reviewer cannot sign in.** Sign-up was removed from the app on 2026-09-15, so the only ways in
+  are Apple, Google, or credentials somebody already has. App Review will hit a wall. A confirmed
+  demo account exists for the Test Information form: `appreview@creativelab1.com`, password
+  `FitTogether!Review26`, verified to authenticate. Without it, rejection is close to certain.
+- **User-generated content has no report or block path.** Clips and photos move between partners,
+  which is Guideline 1.2 territory: Apple expect a way to report content and block a user. A search
+  finds `unpair` and nothing else. Enforcement is lighter for private one-to-one sharing than for a
+  public feed, and unpair is arguably blocking, but this is worth deciding deliberately rather than
+  discovering at review.
+- **EU trader status.** App Store Connect shows a Digital Services Act banner requiring trader
+  status before EU distribution. It is a form, not code, and it blocks submission.
 - **`limitsNavigationsToAppBoundDomains` is not set.** Not required (no `allowNavigation` wildcard
   exists to make it urgent), but it is a defense-in-depth option worth considering: it restricts
   the webview to domains declared in a `WKAppBoundDomains` array in `Info.plist`, so a successful
   script injection could not silently start loading content from an arbitrary origin. Adding it
   requires deciding the exact allow list (the Supabase project host, the CDN hosts, Google Fonts)
   and is a product/ops decision more than a pure code fix, so left for the owner.
-- **Bundle version.** `project.pbxproj` has `MARKETING_VERSION = 1.0` and
-  `CURRENT_PROJECT_VERSION = 1`, `CODE_SIGN_STYLE = Automatic`, no `DEVELOPMENT_TEAM` set in the
-  lines this pass could see. Signing team and provisioning are configured at archive time in Xcode,
-  cannot be verified from source. Confirm the bundle ID `com.creativelab1.fittogether` matches the
-  App Store Connect record before archiving.
+- ~~**Bundle version.**~~ **Settled.** `DEVELOPMENT_TEAM = S93Z4UM9U4`, automatic signing, and the
+  App Store Connect record exists under the bundle ID. `MARKETING_VERSION` is still `1.0`;
+  `CURRENT_PROJECT_VERSION` is 17. Give the app a real name in App Store Connect before submission:
+  the record is currently named `com.creativelab1.fittogether`, and the home screen reads
+  "Unio" from `CFBundleDisplayName` in `Info.plist`, which overrides the
+  `INFOPLIST_KEY_CFBundleDisplayName` build setting, making that setting inert.
+- **TestFlight is behind.** The only build ever uploaded is 6. Everything since is cable installs.
+  Uploading needs Organizer (signs with the owner's Apple ID) or an App Store Connect API key,
+  which is not on this machine. Creating one under Users and Access → Integrations would let this
+  be automated.
+- **iPhone only.** `TARGETED_DEVICE_FAMILY = 1`. Set on 2026-09-15 because App Store validation
+  rejects a portrait-locked iPad app: iPad requires all four orientations for multitasking. Reverse
+  it only alongside a real landscape layout.
 - **iOS deployment target is 14.0** (`ios/App/Podfile`). Acceptable minimum, but confirm it is
   still compatible with whatever Xcode/SDK version does the archive; Apple periodically requires a
   recent SDK for new submissions regardless of the app's own deployment target.
 
-## 4. Could not verify without Xcode or a device
+## 4. Verified, and still not verified
 
-- Whether a Release/Archive build is actually non-inspectable (`isInspectable` behaviour is
-  Capacitor's own default, not overridden in this project, but was not exercised on a device).
-- Whether the app actually builds and archives cleanly with the current Podfile/Pods state.
-- Code signing, provisioning profile validity, and TestFlight upload itself.
-- Whether push notifications, if left as-is, fail silently or throw at runtime on device (inferred
-  from the plugin/entitlement gap above, not observed).
-- App icon and launch screen asset completeness (all required sizes) inside `Assets.xcassets`, not
-  enumerated by this pass.
+**Verified on 2026-09-15**
+
+- Builds, archives and installs on a device. CocoaPods 1.11.3 resolves a symlinked framework with
+  bare `readlink`, which yields a relative path that rsync then resolves from the wrong directory,
+  so archiving failed until a `post_install` hook in the Podfile patched it. Fixed upstream in
+  CocoaPods 1.12.1; the hook can go when the toolchain is updated.
+- Code signing and provisioning, including automatic registration of the App Group, Push
+  Notifications and Sign in with Apple capabilities on the App ID.
+- TestFlight upload works (build 6 landed). Export compliance is now declared in `Info.plist` via
+  `ITSAppUsesNonExemptEncryption = false`, so builds stop parking in Missing Compliance.
+- The app boots in the Simulator with **no console errors**, and its plugin registry resolves
+  correctly. Two bugs were caught this way that no amount of source reading had found: `quips.mjs`
+  was never in the sync list, so every one of the 212 character lines was missing from the native
+  build; and `registerActionTypes` was being called on the push plugin, where it does not exist.
+
+**Still not verified, and needs a person holding a phone**
+
+- The Live Activity on a real Lock Screen, the Home and Lock Screen widgets, Sign in with Apple,
+  Google sign-in, and the screen wake lock. All compile and are installed; none have been seen
+  working. Reaching a workout needs a signed-in account, which the Simulator cannot do unattended.
+- Push end to end. Blocked on the APNs key rather than on testing.
+- Whether a Release build is genuinely non-inspectable. Still inferred from Capacitor's `#if DEBUG`
+  guard, never exercised.
+- App icon and launch screen asset completeness inside `Assets.xcassets`.
 
 ## 5. Privacy nutrition label (draft, for the App Store Connect privacy questionnaire)
 
@@ -247,3 +307,52 @@ checks out from source. The two things that actually block a clean submission ar
 fixes: the privacy policy content needs a human rewrite against the gap list above, and the owner
 needs to decide whether to wire up native push notifications or leave the feature unadvertised for
 iOS.
+
+## 7. The native layer, added 2026-09-15
+
+Everything here lives in the app target or the widget extension, not in a package. That matters:
+see the plugin registration note in section 0.
+
+**Plugins in use** (`packageClassList`, seven of them): SignInWithApple, KeepAwake, App, Browser,
+PushNotifications, and two written here, `LiveWorkout` and `WidgetBridge`.
+
+**Widget extension** `FitTogetherWidgetExtension`, deployment target iOS 16.1.
+
+- Home Screen small and medium: two rings, you and your partner, days against weekly target.
+- Lock Screen circular, rectangular and inline. These render **monochrome**, so the `--me` blue and
+  `--partner` coral cannot distinguish two people there; the layouts use concentric arcs and labels
+  instead. Anything relying on those two colours to tell people apart will read as one colour.
+- Data crosses from the web view through an App Group (`group.com.creativelab1.fittogether`).
+  `@capacitor/preferences` cannot do this job: its `group` option is only a key prefix on
+  `UserDefaults.standard`, which a widget process cannot read.
+- Xcode created this target without a target dependency, an embed phase or container proxies, and
+  the build still reported SUCCEEDED while producing an app with no widget inside it. Check for
+  `App.app/PlugIns/` rather than trusting the build result.
+
+**Live Activity** (iOS 16.1+, guarded, app target reaches back to 14.0)
+
+- Started on the first session render, updated on set and exercise changes, ended in
+  `finishWorkout`. Deliberately not ended in `closeSessionUI`: minimising leaves the workout
+  running and the Lock Screen is where it should still be visible.
+- The rest countdown is handed an end date, not a duration, so `Text(timerInterval:)` runs it down
+  with the app suspended. No pushes, no wake-ups.
+- The character's line is chosen when a beat happens, because a locked phone suspends the app and
+  nothing can change it mid-rest anyway.
+- `WorkoutAttributes` is `@available(iOS 16.1, *)`. Without that, an iOS 14 device could touch
+  metadata for a protocol that does not exist.
+
+**Push**
+
+- APNs tokens live in `apns_tokens`, separate from `push_subscriptions` because the Web Push shape
+  (endpoint, p256dh, auth) and an APNs device token are not the same thing.
+- `send-nudges` sends to both transports. `apnsConfigured()` returns false without the key, so the
+  APNs path is skipped entirely and web push behaves exactly as before.
+- Notification categories are registered natively in `AppDelegate`. The push plugin has no
+  `registerActionTypes`; that belongs to local-notifications.
+- Payloads carry a subtitle, a thread id for grouping, a category for buttons, and an interruption
+  level of `active`.
+
+**Owner action:** generate the APNs key at developer.apple.com → Certificates, Identifiers &
+Profiles → Keys → Apple Push Notifications service. Downloadable once. Then set `APNS_KEY_P8`,
+`APNS_KEY_ID` and `APNS_TEAM_ID` (`S93Z4UM9U4`) as Supabase secrets and deploy `send-nudges`, which
+is written but has never been deployed: there is no Deno on this machine to type check it first.

@@ -16,12 +16,17 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const html = readFileSync(join(root, "index.html"), "utf8");
 const src = html.match(/<script>([\s\S]*?)<\/script>/)[1];
-const bootSrc = src.replace(/import\("\.\/knowledge\//g, `import("${root}/knowledge/`);
+/* Every dynamic import in index.html is written relative to the repo root, but
+   this harness evals that source from scripts/, so each one has to be pointed
+   back at the root or it resolves to scripts/ and throws. */
+const bootSrc = src
+  .replace(/import\("\.\/knowledge\//g, `import("${root}/knowledge/`)
+  .replace(/import\("\.\/quips\.mjs"\)/g, `import("${root}/quips.mjs")`);
 
 const ids = [...html.matchAll(/id="([a-zA-Z0-9_-]+)"/g)].map((m) => m[1]);
 const mk = (id) => ({
   id, textContent: "", innerHTML: "", value: "", checked: false, disabled: false, title: "",
-  dataset: {}, files: [], style: { setProperty() {}, width: "" },
+  dataset: {}, files: [], style: { setProperty() {}, removeProperty() {}, width: "" },
   classList: { add() {}, remove() {}, toggle() { return false; }, contains() { return false; } },
   addEventListener() {}, removeEventListener() {},
   querySelectorAll() { return []; }, querySelector() { return mk("child"); },
@@ -43,7 +48,14 @@ function makeSandbox(data) {
     getElementById: (id) => nodes[id] || (nodes[id] = mk(id)),
     querySelectorAll: () => [], querySelector: () => null,
     createElement: () => mk("tmp"), addEventListener() {}, hidden: false,
-    documentElement: { getAttribute: () => "dark", setAttribute() {}, style: { setProperty() {} } },
+    /* preferredTextScale() probes the reader's own font size by appending a
+       span to the root and measuring it, so documentElement has to accept a
+       child the way the real one does. boot-check.mjs carries the same stub;
+       this copy was missed when that one was fixed. */
+    documentElement: {
+      getAttribute: () => "dark", setAttribute() {}, style: { setProperty() {}, removeProperty() {} },
+      appendChild() {}, removeChild() {},
+    },
     body: mk("body"),
   };
   globalThis.window = { addEventListener() {}, matchMedia: () => ({ matches: false, addEventListener() {} }) };
@@ -54,6 +66,12 @@ function makeSandbox(data) {
   globalThis.cancelAnimationFrame = () => {};
   Object.defineProperty(globalThis, "navigator", { value: { onLine: true, vibrate: () => {} }, configurable: true });
   globalThis.Chart = function () { return { destroy() {} }; };
+  /* Observers the app wires up at load. They never fire here, which is right:
+     nothing in a fake DOM mutates, resizes or scrolls into view. Ported from
+     boot-check.mjs, which grew these when a11yInit started needing them. */
+  globalThis.MutationObserver = class { observe() {} disconnect() {} takeRecords() { return []; } };
+  globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  globalThis.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} takeRecords() { return []; } };
 
   const chain = (rows = []) => {
     const p = Promise.resolve({ data: rows, error: null });
@@ -106,6 +124,31 @@ let failed = 0;
     d.setDate(d.getDate() + i);
     return d.toISOString().slice(0, 10);
   });
+
+  /* This fixture used to carry fixed August 2026 dates. It passed the day it
+     was written and then rotted silently: sharedWeekStreak() counts back from
+     whatever week today falls in, so once real time moved past that August the
+     two qualifying weeks dropped out of range and two_weeks_running could
+     never be earned. Everything is anchored to the current week now, so the
+     test means the same thing whenever it runs.
+
+     Weeks run Monday to Sunday, matching weekStartOf() in the app. */
+  const monday = (weeksAgo) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7 * weeksAgo);
+    return d.toISOString().slice(0, 10);
+  };
+  const dayIn = (weeksAgo, offset) => dates(monday(weeksAgo), offset + 1)[offset];
+
+  // The two complete weeks before this one, which is what the streak counts.
+  const WEEK_A = monday(2);          // earlier qualifying week
+  const WEEK_B = monday(1);          // the week just gone
+  const BASELINE = dayIn(3, 3);      // lifts to beat, a week before the PRs
+  const FULL_BODY_DAY = dayIn(2, 1); // every muscle group in one session
+  const PR_DAY = dayIn(2, 3);        // Mo's bench PR
+  const MEL_PR_DAY = dayIn(2, 2);    // Mel PRs the same week -> double_pr_week
+  const LONG_AGO = dayIn(36, 0);     // far enough back to clear 100 together
   const MO = "mo.shareef@creativelab1.com", MEL = "mel@x.com";
   const gymRow = (email, name, weight) => (d) => ({ email, user_name: name, entry_date: d, gym: true, weight, sessions: 1 });
 
@@ -115,38 +158,38 @@ let failed = 0;
       { email: MEL, user_name: "Mel", tracked_metrics: ["weight"], challenge_target: 4 },
     ],
     fit_entries: [
-      ...dates("2026-08-24", 4).map(gymRow(MO, "Mo", 180)),
-      ...dates("2026-08-31", 4).map(gymRow(MO, "Mo", 180)),
-      ...dates("2026-01-01", 95).map(gymRow(MEL, "Mel", 140)),   // combined with Mo, clears 100 together
-      ...dates("2026-08-24", 4).map(gymRow(MEL, "Mel", 140)),
-      ...dates("2026-08-31", 4).map(gymRow(MEL, "Mel", 140)),
+      ...dates(WEEK_A, 4).map(gymRow(MO, "Mo", 180)),
+      ...dates(WEEK_B, 4).map(gymRow(MO, "Mo", 180)),
+      ...dates(LONG_AGO, 95).map(gymRow(MEL, "Mel", 140)),   // combined with Mo, clears 100 together
+      ...dates(WEEK_A, 4).map(gymRow(MEL, "Mel", 140)),
+      ...dates(WEEK_B, 4).map(gymRow(MEL, "Mel", 140)),
     ],
     exercise_logs: [
-      { email: MO, user_name: "Mo", entry_date: "2026-08-20", exercise_name: "Barbell Bench Press", weight: 135, reps: 8, sets: 3 },
-      { email: MO, user_name: "Mo", entry_date: "2026-08-27", exercise_name: "Barbell Bench Press", weight: 185, reps: 5, sets: 3 }, // new_pr, bodyweight_bench (>=180)
+      { email: MO, user_name: "Mo", entry_date: BASELINE, exercise_name: "Barbell Bench Press", weight: 135, reps: 8, sets: 3 },
+      { email: MO, user_name: "Mo", entry_date: PR_DAY, exercise_name: "Barbell Bench Press", weight: 185, reps: 5, sets: 3 }, // new_pr, bodyweight_bench (>=180)
       // one session, every one of the 14 muscle groups -> full_body (and, for
       // the week it falls in, full_coverage too, since a week is a superset)
-      { email: MO, user_name: "Mo", entry_date: "2026-08-25", exercise_name: "Barbell Bench Press", weight: 135, reps: 8, sets: 3 },
-      { email: MO, user_name: "Mo", entry_date: "2026-08-25", exercise_name: "Overhead Press", weight: 65, reps: 8, sets: 3 },
-      { email: MO, user_name: "Mo", entry_date: "2026-08-25", exercise_name: "Shrug", weight: 90, reps: 10, sets: 3 },
-      { email: MO, user_name: "Mo", entry_date: "2026-08-25", exercise_name: "Lat Pulldown", weight: 120, reps: 10, sets: 3 },
-      { email: MO, user_name: "Mo", entry_date: "2026-08-25", exercise_name: "Romanian Deadlift", weight: 135, reps: 8, sets: 3 },
-      { email: MO, user_name: "Mo", entry_date: "2026-08-25", exercise_name: "Hammer Curl", weight: 30, reps: 10, sets: 3 },
-      { email: MO, user_name: "Mo", entry_date: "2026-08-25", exercise_name: "Tricep Pushdown", weight: 40, reps: 10, sets: 3 },
-      { email: MO, user_name: "Mo", entry_date: "2026-08-25", exercise_name: "Farmer Carry", weight: 50, reps: 10, sets: 3 },
-      { email: MO, user_name: "Mo", entry_date: "2026-08-25", exercise_name: "Plank", weight: null, duration_min: 5, sets: 1 },
-      { email: MO, user_name: "Mo", entry_date: "2026-08-25", exercise_name: "Russian Twist", weight: 20, reps: 12, sets: 3 },
-      { email: MO, user_name: "Mo", entry_date: "2026-08-25", exercise_name: "Hip Thrust", weight: 135, reps: 8, sets: 3 },
-      { email: MO, user_name: "Mo", entry_date: "2026-08-25", exercise_name: "Squat", weight: 185, reps: 5, sets: 3 },
-      { email: MO, user_name: "Mo", entry_date: "2026-08-25", exercise_name: "Leg Curl", weight: 90, reps: 10, sets: 3 },
-      { email: MO, user_name: "Mo", entry_date: "2026-08-25", exercise_name: "Calf Raise", weight: 90, reps: 12, sets: 3 },
+      { email: MO, user_name: "Mo", entry_date: FULL_BODY_DAY, exercise_name: "Barbell Bench Press", weight: 135, reps: 8, sets: 3 },
+      { email: MO, user_name: "Mo", entry_date: FULL_BODY_DAY, exercise_name: "Overhead Press", weight: 65, reps: 8, sets: 3 },
+      { email: MO, user_name: "Mo", entry_date: FULL_BODY_DAY, exercise_name: "Shrug", weight: 90, reps: 10, sets: 3 },
+      { email: MO, user_name: "Mo", entry_date: FULL_BODY_DAY, exercise_name: "Lat Pulldown", weight: 120, reps: 10, sets: 3 },
+      { email: MO, user_name: "Mo", entry_date: FULL_BODY_DAY, exercise_name: "Romanian Deadlift", weight: 135, reps: 8, sets: 3 },
+      { email: MO, user_name: "Mo", entry_date: FULL_BODY_DAY, exercise_name: "Hammer Curl", weight: 30, reps: 10, sets: 3 },
+      { email: MO, user_name: "Mo", entry_date: FULL_BODY_DAY, exercise_name: "Tricep Pushdown", weight: 40, reps: 10, sets: 3 },
+      { email: MO, user_name: "Mo", entry_date: FULL_BODY_DAY, exercise_name: "Farmer Carry", weight: 50, reps: 10, sets: 3 },
+      { email: MO, user_name: "Mo", entry_date: FULL_BODY_DAY, exercise_name: "Plank", weight: null, duration_min: 5, sets: 1 },
+      { email: MO, user_name: "Mo", entry_date: FULL_BODY_DAY, exercise_name: "Russian Twist", weight: 20, reps: 12, sets: 3 },
+      { email: MO, user_name: "Mo", entry_date: FULL_BODY_DAY, exercise_name: "Hip Thrust", weight: 135, reps: 8, sets: 3 },
+      { email: MO, user_name: "Mo", entry_date: FULL_BODY_DAY, exercise_name: "Squat", weight: 185, reps: 5, sets: 3 },
+      { email: MO, user_name: "Mo", entry_date: FULL_BODY_DAY, exercise_name: "Leg Curl", weight: 90, reps: 10, sets: 3 },
+      { email: MO, user_name: "Mo", entry_date: FULL_BODY_DAY, exercise_name: "Calf Raise", weight: 90, reps: 12, sets: 3 },
       // Mel PRs the same week as Mo -> double_pr_week
-      { email: MEL, user_name: "Mel", entry_date: "2026-08-20", exercise_name: "Squat", weight: 95, reps: 8, sets: 3 },
-      { email: MEL, user_name: "Mel", entry_date: "2026-08-26", exercise_name: "Squat", weight: 105, reps: 5, sets: 3 },
+      { email: MEL, user_name: "Mel", entry_date: BASELINE, exercise_name: "Squat", weight: 95, reps: 8, sets: 3 },
+      { email: MEL, user_name: "Mel", entry_date: MEL_PR_DAY, exercise_name: "Squat", weight: 105, reps: 5, sets: 3 },
     ],
     ai_workouts: [],
     partnerships: [{ id: "p1", inviter_email: MO, invitee_email: MEL, status: "accepted", responded_at: "2025-08-01T00:00:00Z" }],
-    body_photos: [{ id: "b1", email: MO, taken_on: "2026-08-20", path: "x/body/a.jpg" }],
+    body_photos: [{ id: "b1", email: MO, taken_on: BASELINE, path: "x/body/a.jpg" }],
     milestone_badges: [],
     encouragements: [],
   };

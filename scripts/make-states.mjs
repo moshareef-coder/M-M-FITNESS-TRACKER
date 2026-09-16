@@ -56,7 +56,10 @@ const FUNCS = [
   "sharedDaysThisWeek", "renderPact",
   "liveAgeMs", "liveStateLabel", "renderLiveCard", "renderLiveSheet",
   "classifyMuscles", "normalizeSearch", "libraryMuscles", "muscleWords", "muscleKeywordHit",
-  "bestEverFor", "bodyHiddenToday", "stopSessionTimer", "defaultTrackedMetrics",
+  /* defaultTrackedMetrics is gone on purpose: the "Customise this tab" card and
+     the tracked_metrics column went with it, because the goal now decides what
+     the progress tab shows. */
+  "bestEverFor", "bodyHiddenToday", "stopSessionTimer",
   "profileFor", "renderClipPill",
   "clipRecorderHTML", "clipViewerHTML", "clipGoneHTML", "clipSavedForLaterHTML", "clipSentHTML", "clipSendFailedHTML",
   "formatRest", "restTargetSec", "restState", "planVolumeLb", "todaysPRLogs", "todaysPRLabel", "lastTimeFor",
@@ -78,7 +81,7 @@ const FUNCS = [
      been silently drawing an incomplete render (only renderProgressTab
      itself, none of the cards it calls) since -- caught by rendering the
      gallery headless and reading what actually throws, not by inspection. */
-  "emptyState", "myTrackedMetrics", "renderScaleCheck", "renderMetricPicker", "renderLog",
+  "emptyState", "renderScaleCheck", "renderLog",
   "chartUnavailable", "chartWash", "rgbOf", "cssVar", "fmtElapsed", "previousBest",
   "bodyEmptyLine", "isBodyHidden",
   "weighInsFor", "weightRangeStart", "weightGoalFor",
@@ -113,7 +116,8 @@ const DATA = [
   grab(/\nconst BODY_RING_FILLERS = \[.*?\];\n/s, "BODY_RING_FILLERS"),
   grab(/\nconst BODY_HEAT_STOPS = \[.*?\n\];\n/s, "BODY_HEAT_STOPS"),
   grab(/\nconst COVERAGE_TARGETS = \[.*?\n\];\n/s, "COVERAGE_TARGETS"),
-  grab(/\nconst TRACK_OPTIONS = \[.*?\n\];\n/s, "TRACK_OPTIONS"),
+  /* TRACK_OPTIONS went with the metric picker: the goal decides what the
+     progress tab shows, so there is nothing left to choose between. */
 ].join("\n");
 
 /* ---- the working muscles ----
@@ -631,14 +635,14 @@ const BADGES_TREE =
     '<a class="fig-sec-label" href="#bdg-concepts">Written, not designed<span>' + badgeConceptCount + '</span></a>' +
   '</div>';
 
-const BODY = `<title>Fit Together Screen States</title>
+const BODY = `<title>Unio Screen States</title>
 ${fonts}
 <style>${style}</style>
 <style>${GALLERY_CSS}</style>
 <div class="fig">
   <aside class="fig-side">
     <div class="fig-file">
-      <b>Fit Together</b>
+      <b>Unio</b>
       <span>Screen states</span>
     </div>
     <nav class="fig-tree" id="galTree"></nav>
@@ -646,7 +650,7 @@ ${fonts}
   <main class="fig-canvas">
     <div class="gal-bar">
       <div>
-        <div class="gal-crumb" id="galCrumb">Fit Together / Screen states</div>
+        <div class="gal-crumb" id="galCrumb">Unio / Screen states</div>
         <div class="gal-title">Every screen, in the order you meet it</div>
         <p class="gal-sub">Real stylesheet, real render functions, fake data. Pages follow the journey: opening the app, planning the workout, doing it, watching them, sending and getting a clip. Every frame has a number, so "change 7" is enough to say which one.</p>
       </div>
@@ -1707,7 +1711,7 @@ const setTheme = (t) => {
     const page = best.closest(".fig-page");
     const section = best.closest(".fig-section");
     if (page && crumb) {
-      crumb.textContent = "Fit Together / " + page.querySelector(".fig-page-name").textContent +
+      crumb.textContent = "Unio / " + page.querySelector(".fig-page-name").textContent +
         (section ? " / " + section.querySelector(".fig-section-name").textContent : "");
     }
   }, { rootMargin: "-15% 0px -60% 0px", threshold: [0, 0.25, 0.6] });

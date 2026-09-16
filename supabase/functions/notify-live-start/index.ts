@@ -18,6 +18,7 @@
 // subscription and report zero sent, the same shape send-nudges answers with.
 
 import webpush from "npm:web-push@3.6.7";
+import { apnsConfigured, sendApns } from "./apns.ts";
 
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -79,7 +80,18 @@ Deno.serve(async (req) => {
   );
   if (!subsRes.ok) return json({ error: `could not read subscriptions: ${subsRes.status}` }, 500);
   const subs = await subsRes.json();
-  if (!subs.length) return json({ ok: true, sent: 0, dropped: 0, reason: "no subscription" });
+
+  /* The phone app has an APNs token and no web subscription, so a partner on
+     iOS was silently unreachable: this whole function did nothing for them. */
+  let tokens: any[] = [];
+  if (apnsConfigured()) {
+    const tokRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/apns_tokens?select=*&email=eq.${encodeURIComponent(to)}&failures=lt.5`,
+      { headers: svc },
+    );
+    if (tokRes.ok) tokens = await tokRes.json();
+  }
+  if (!subs.length && !tokens.length) return json({ ok: true, sent: 0, dropped: 0, reason: "no subscription" });
 
   webpush.setVapidDetails(CONTACT, VAPID_PUBLIC, VAPID_PRIVATE);
 
@@ -104,6 +116,41 @@ Deno.serve(async (req) => {
         await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions?id=eq.${s.id}`, {
           method: "PATCH", headers: svc,
           body: JSON.stringify({ failures: (s.failures ?? 0) + 1 }),
+        });
+      }
+    }
+  }
+
+  for (const t of tokens) {
+    try {
+      const usedEnv = await sendApns(t.token, t.environment, {
+        title,
+        // "Live now" as the subtitle, because the moment is the whole point of
+        // this notification and the body carries the detail.
+        subtitle: "Live now",
+        body: body_,
+        url: "/",
+        category: "PARTNER_LIVE",
+        threadId: "partner",
+      });
+      sent++;
+      // Repaired in place when the token belonged to the other gateway. Same
+      // reason as send-nudges: the app asserted "development" for every token
+      // it ever registered, including the production ones.
+      const fixed = usedEnv !== t.environment ? { environment: usedEnv } : {};
+      await fetch(`${SUPABASE_URL}/rest/v1/apns_tokens?id=eq.${t.id}`, {
+        method: "PATCH", headers: svc,
+        body: JSON.stringify({ last_ok_at: new Date().toISOString(), failures: 0, ...fixed }),
+      });
+    } catch (e: any) {
+      const gone = e?.status === 410 || e?.reason === "BadDeviceToken" || e?.reason === "Unregistered";
+      if (gone) {
+        dropped++;
+        await fetch(`${SUPABASE_URL}/rest/v1/apns_tokens?id=eq.${t.id}`, { method: "DELETE", headers: svc });
+      } else {
+        await fetch(`${SUPABASE_URL}/rest/v1/apns_tokens?id=eq.${t.id}`, {
+          method: "PATCH", headers: svc,
+          body: JSON.stringify({ failures: (t.failures ?? 0) + 1 }),
         });
       }
     }

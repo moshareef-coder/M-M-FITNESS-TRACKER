@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Figure render harness</title>
+<!--
+  Renders the app's own figure to a canvas so it can be captured as a still and
+  shipped into the widget. Not part of the app: it exists so the widget shows
+  the real character rather than a drawing of him.
+
+  Served over http rather than opened from disk, because Chrome refuses module
+  imports on file://.
+-->
+<style>
+  html, body { margin: 0; background: transparent; }
+  #stage { display: block; width: 720px; height: 720px; }
+</style>
+
+<canvas id="stage" width="720" height="720"></canvas>
+
+<script type="module">
+  import { mountMove } from "/knowledge/motion/index.mjs";
+
+  const params = new URLSearchParams(location.search);
+  const name = params.get("move") || "Rest: Shake-out";
+  const mood = params.get("mood") || "happy";
+  const theme = params.get("theme") || "dark";
+  // Where in the loop to freeze. The extremes of a shake-out are the readable
+  // poses; the middle is a blur of transition.
+  const at = Number(params.get("t") || 0);
+
+  const anim = mountMove(document.getElementById("stage"), name, {
+    theme, accent: "action", skin: "mannequin", mood, paused: true,
+  });
+
+  // Signals the screenshot step that there is something on the canvas.
+  window.__ready = false;
+  if (anim) {
+    if (typeof anim.seek === "function") anim.seek(at);
+    else if (typeof anim.setTime === "function") anim.setTime(at);
+    requestAnimationFrame(() => requestAnimationFrame(() => { window.__ready = true; }));
+  } else {
+    window.__error = `mountMove returned null for ${name}`;
+  }
+</script>

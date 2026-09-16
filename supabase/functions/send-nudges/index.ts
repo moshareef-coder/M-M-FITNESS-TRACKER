@@ -10,6 +10,7 @@
 // because nudge_log has a unique index doing that job rather than this code.
 
 import webpush from "npm:web-push@3.6.7";
+import { apnsConfigured, sendApns } from "./apns.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -72,9 +73,10 @@ Deno.serve(async (req) => {
 
   // Small data set, so one pass over everything beats a query per person.
   // Revisit when a single run stops fitting comfortably in memory.
-  const [profiles, subs, partnerships, members, groups] = await Promise.all([
+  const [profiles, subs, apns, partnerships, members, groups] = await Promise.all([
     q("profiles?select=email,user_name,timezone"),
     q("push_subscriptions?select=*&failures=lt.5"),
+    apnsConfigured() ? q("apns_tokens?select=*&failures=lt.5") : Promise.resolve([]),
     q("partnerships?select=inviter_email,invitee_email&status=eq.accepted"),
     q("group_members?select=email,role,group_id&left_at=is.null"),
     q("groups?select=id,owner_email,kind&kind=eq.coach"),
@@ -86,6 +88,16 @@ Deno.serve(async (req) => {
     if (!subsFor.has(k)) subsFor.set(k, []);
     subsFor.get(k)!.push(s);
   }
+
+  // Someone on the phone app has a device token and no web subscription, so
+  // both maps decide who is reachable.
+  const apnsFor = new Map<string, any[]>();
+  for (const t of apns) {
+    const k = (t.email || "").toLowerCase();
+    if (!apnsFor.has(k)) apnsFor.set(k, []);
+    apnsFor.get(k)!.push(t);
+  }
+  const reachable = (email: string) => subsFor.has(email) || apnsFor.has(email);
 
   const partnerOf = new Map<string, string>();
   for (const p of partnerships) {
@@ -119,11 +131,14 @@ Deno.serve(async (req) => {
     for (const r of rows) trained.add(`${(r.email || "").toLowerCase()}|${r.entry_date}`);
   }
 
-  const planned: { email: string; kind: string; title: string; body: string; url: string }[] = [];
+  const planned: {
+    email: string; kind: string; title: string; body: string; url: string;
+    subtitle?: string; category?: string; threadId?: string;
+  }[] = [];
 
   for (const p of profiles) {
     const me = (p.email || "").toLowerCase();
-    if (!me || !subsFor.has(me)) continue;
+    if (!me || !reachable(me)) continue;
     const { date, hour } = localParts(p.timezone);
     const didTrain = trained.has(`${me}|${date}`);
 
@@ -132,8 +147,13 @@ Deno.serve(async (req) => {
       if (partner && trained.has(`${partner}|${date}`)) {
         planned.push({
           email: me, kind: "evening",
+          // Title names the person, subtitle names the ask, body gives the out.
+          // Three sizes reading as one sentence beats two competing lines.
           title: `${nameOf.get(partner)} trained today`,
-          body: "Your turn. There is still time.",
+          subtitle: "Your turn",
+          body: "There is still time.",
+          category: "EVENING_NUDGE",
+          threadId: "partner",
           url: "/",
         });
       }
@@ -150,9 +170,12 @@ Deno.serve(async (req) => {
           planned.push({
             email: me, kind: "digest",
             title: `${did} of ${roster.length} trained yesterday`,
+            subtitle: "Your group",
             body: did === roster.length
               ? "Everyone showed up. Worth telling them."
               : `${roster.length - did} to check in on.`,
+            category: "COACH_DIGEST",
+            threadId: "coach",
             url: "/coach/",
           });
         }
@@ -176,7 +199,7 @@ Deno.serve(async (req) => {
       try {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-          JSON.stringify({ title: n.title, body: n.body, url: n.url }),
+          JSON.stringify({ title: n.title, body: n.body, url: n.url, subtitle: n.subtitle }),
         );
         sent++;
         await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions?id=eq.${s.id}`, {
@@ -196,6 +219,45 @@ Deno.serve(async (req) => {
           await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions?id=eq.${s.id}`, {
             method: "PATCH", headers: svc,
             body: JSON.stringify({ failures: (s.failures ?? 0) + 1 }),
+          });
+        }
+      }
+    }
+
+    for (const t of apnsFor.get(n.email) || []) {
+      try {
+        const usedEnv = await sendApns(t.token, t.environment, {
+          title: n.title, body: n.body, url: n.url,
+          subtitle: n.subtitle, category: n.category, threadId: n.threadId,
+        });
+        sent++;
+        // The row is repaired in place when the token turned out to belong to
+        // the other gateway. Every token the app registered while it asserted
+        // "development" is wrong, and this is what makes the next send go
+        // straight there instead of costing a round trip every time.
+        const fixed = usedEnv !== t.environment ? { environment: usedEnv } : {};
+        await fetch(`${SUPABASE_URL}/rest/v1/apns_tokens?id=eq.${t.id}`, {
+          method: "PATCH", headers: svc,
+          body: JSON.stringify({ last_ok_at: new Date().toISOString(), failures: 0, ...fixed }),
+        });
+      } catch (e: any) {
+        // Apple say BadDeviceToken or Unregistered when the app is gone from
+        // that phone. Anything else may be transient, so it is counted and the
+        // row drops out of the query after five. BadDeviceToken reaching here
+        // means BOTH gateways refused it, since sendApns tries the other one
+        // first, so it really is gone rather than mislabelled.
+        const gone = e?.status === 410
+          || e?.reason === "BadDeviceToken"
+          || e?.reason === "Unregistered";
+        if (gone) {
+          dropped++;
+          await fetch(`${SUPABASE_URL}/rest/v1/apns_tokens?id=eq.${t.id}`, {
+            method: "DELETE", headers: svc,
+          });
+        } else {
+          await fetch(`${SUPABASE_URL}/rest/v1/apns_tokens?id=eq.${t.id}`, {
+            method: "PATCH", headers: svc,
+            body: JSON.stringify({ failures: (t.failures ?? 0) + 1 }),
           });
         }
       }
