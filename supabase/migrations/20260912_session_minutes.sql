@@ -1,4 +1,4 @@
--- How long you actually have, 2026-09-12. WRITTEN, NOT APPLIED.
+-- How long you actually have, 2026-09-12. APPLIED 2026-09-15.
 --
 -- Every plan this engine has ever built was costed against a session length
 -- the GOAL chose. `sessionMin` in goal-engine.mjs is 25, 30, 40, 45, 50 or 60

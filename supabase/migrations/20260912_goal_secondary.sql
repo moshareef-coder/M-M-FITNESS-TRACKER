@@ -1,4 +1,4 @@
--- More than one goal, 2026-09-12. WRITTEN, NOT APPLIED.
+-- More than one goal, 2026-09-12. APPLIED 2026-09-15.
 --
 -- The tile picker has been single select since it landed, with a note in
 -- index.html arguing that "a plan built for two goals is a plan built for
