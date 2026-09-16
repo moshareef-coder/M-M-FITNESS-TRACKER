@@ -252,11 +252,41 @@ box, is taller than 140 units. Zoom out; never crop the head.
 ### Props
 
 Types: `mat, wall, doorway, doorframe, bench, box, roller, pullupBar, dipBars,
-machine, cable, band, barbell, dumbbell, kettlebell`.
+machine, cable, band, barbell, dumbbell, kettlebell, artwork, lever`.
 
 They either sit in the world (`{ type: "bench", x, y, w, incline }`) or attach
 to the body (`{ type: "dumbbell", side: "R", point: "hand", dx, dy, rot, k }`).
 `front: true` draws a prop over the figure instead of behind it.
+
+Equipment is drawn as the real object in the real colours: powder-coated
+steel, black vinyl pads, cast iron, chrome. Those colours are fixed in `GEAR`
+in rig.mjs and are the same in both themes, so a drawn bench and an SVG
+machine match. The `C.prop` family stays theme-aware and is for things that
+are not gym steel (a wall, a mat).
+
+**A specific machine is `artwork`**, an SVG in `knowledge/motion/props/`
+authored in the rig's own 140-unit box with the floor at 118, split into a
+`#back` group (frame, seat, stack) and a `#front` group (the pads the body
+goes behind). `{ type: "artwork", src, dx, dy, flip }` is scenery and draws
+in both layers; `{ type: "artwork", src, side, point, dx, dy, k, rot }` is a
+held sprite pinned to a joint (`rot: "forearm"` lies it along the forearm).
+Parts of a machine that MOVE cannot be in the SVG. A hinged arm is a `lever`
+(`{ type: "lever", pivot: {x, y}, to: {side, point}, end: "grip" | "pad" |
+"plate" }`), a sliding platform is a held sprite, and the line on a cable
+machine is a `cable` with `stack: false` so the artwork keeps the stack.
+Lat Pulldown in weight-training.mjs is the template.
+
+**A cable takes a `grip`**: `bar` (default, level, `barW` wide), `lat`,
+`rope` (the U with the rubber stoppers), `vbar`, `handle` (a stirrup),
+`strap` (an ankle cuff), or `none`. `plumb: true` drops the line straight
+down from the pulley and puts the grip on that line at the hand's height,
+which is how a pulldown hangs; without it the line runs pulley to hand,
+which is a row, a curl, a fly. A bar stays level either way, because a
+loaded bar cannot tilt with a wrist. Without `stack: false` the prop draws a
+whole single-column tower with the carriage at `top` and the stack from `y0`.
+
+Still-frame checks: `pose-check.html?move=Name&t=0,0.5` in a browser, or
+`node scripts/motion-shoot.mjs "Name" out.png "0,0.5" both 300` headless.
 
 Four that are not obvious:
 
