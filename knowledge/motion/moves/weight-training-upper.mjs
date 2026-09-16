@@ -562,22 +562,32 @@ const BARBELL_ROW = {
   dur: 3.0,
   breath: 0.2,
   props: [{ type: "barbell", side: "R", point: "hand", r: 9.5, front: true }],
+  /* Mo, on the gallery: "i need to be bended over a bit more, back straight."
+     It was 14 degrees of hip hinge carrying 32 of spine, which is 46 in total
+     and most of it coming from the back rounding rather than the hips folding.
+     Now 52 of hinge and 18 of spine: 70 degrees of lean against the old 46,
+     and a flatter back with it,
+     because the extra angle comes from the hip. The neck also stops craning up
+     at -12 and sits closer to in line with the spine.
+
+     Deliberately short of parallel. PENDLAY_ROW right below this is the flat,
+     parallel-to-the-floor version, and the two have to stay tellable apart. */
   keys: [
     { // bottom, bar hanging under the shoulders
       t: 0,
-      root: { x: 64, y: 61.4, rot: 14 },
-      joints: { spine: 32, neck: -12 },
+      root: { x: 64, y: 61.4, rot: 52 },
+      joints: { spine: 18, neck: -12 },
       ik: {
-        wristR: { x: 94.2, y: 75.9, bend: 1 }, wristL: { x: 91.2, y: 77.9, bend: 1 },
+        wristR: { x: 92.2, y: 88.9, bend: 1 }, wristL: { x: 89.2, y: 90.9, bend: 1 },
         ...stand(62, 57),
       },
     },
     { // top, bar at the belly, elbows past the torso
       t: 1,
-      root: { x: 64, y: 61.4, rot: 14 },
-      joints: { spine: 32, neck: -12 },
+      root: { x: 64, y: 61.4, rot: 52 },
+      joints: { spine: 18, neck: -12 },
       ik: {
-        wristR: { x: 86.2, y: 59.9, bend: 1 }, wristL: { x: 83.2, y: 61.9, bend: 1 },
+        wristR: { x: 85.2, y: 73.9, bend: 1 }, wristL: { x: 82.2, y: 75.9, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -636,10 +646,18 @@ const WEIGHTED_PULL_UP = {
 // it is drawn as a zero slack band between the two hands with a plate at each
 // end. `front` false puts the whole bar behind the figure, which is how a
 // behind-the-back hold reads.
+// Mo, on the gallery: "it looks like im holding the plates on both sides..
+// wrong. let me hold the bar." He was right and it was this: each plate was
+// drawn centred ON its hand, so the hand and the plate occupied the same spot
+// and the grip read as holding the disc. The plates sit outboard now, with the
+// hands on the bar between them, which is where a shrug is actually held.
+// The signs are opposite because dx is screen space and is NOT mirrored by
+// `side`: giving both plates the same dx slides the whole barbell sideways
+// instead of spreading it, which is what the first attempt did.
 const frontBar = (front) => ([
   { type: "band", rest: 0, from: { side: "L", point: "hand" }, to: { side: "R", point: "hand" }, front },
-  { type: "barbell", side: "L", point: "hand", r: 7, front },
-  { type: "barbell", side: "R", point: "hand", r: 7, front },
+  { type: "barbell", side: "L", point: "hand", dx: -8, r: 7, front },
+  { type: "barbell", side: "R", point: "hand", dx: 8, r: 7, front },
 ]);
 
 // Standing with a weight hanging at arm's length, lift the shoulders straight up
