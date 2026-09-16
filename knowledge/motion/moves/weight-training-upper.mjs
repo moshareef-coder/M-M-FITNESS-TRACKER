@@ -66,9 +66,12 @@ const MACHINE_CHEST_PRESS = {
   dur: 3.0,
   breath: 0.2,
   props: [
-    { type: "machine", x: 40, y: 92, w: 32, parts: ["seat", "backPad"], padH: 34 },
-    { type: "barbell", side: "L", point: "hand", r: 4.5 },
-    { type: "barbell", side: "R", point: "hand", r: 4.5, front: true },
+    /* The machine is artwork; the two press arms are levers hinged at the
+       overhead pivot behind the head, the way the real chest press hangs its
+       handles. The near arm draws over the body, the far one behind. */
+    { type: "artwork", src: "/knowledge/motion/props/chest-press.svg" },
+    { type: "lever", pivot: { x: 43, y: 14 }, to: { side: "L", point: "hand" }, r: 2.2, end: "grip" },
+    { type: "lever", pivot: { x: 43, y: 14 }, to: { side: "R", point: "hand" }, r: 2.2, end: "grip", front: true },
   ],
   keys: [
     { // start, handles level with the chest, elbows behind the torso line
@@ -1040,9 +1043,12 @@ const MACHINE_SHOULDER_PRESS = {
   breath: 0.2,
   fit: { k: 0.92, dy: 6 },
   props: [
-    { type: "machine", x: 40, y: 92, w: 32, parts: ["seat", "backPad"], padH: 34 },
-    { type: "barbell", side: "L", point: "hand", r: 4.5 },
-    { type: "barbell", side: "R", point: "hand", r: 4.5, front: true },
+    /* Artwork for the frame, tall back pad and stack; the press arms are
+       levers hinged on the upright behind the shoulders at shoulder height, handles starting
+       at shoulder height and sweeping up. Near arm over the body, far behind. */
+    { type: "artwork", src: "/knowledge/motion/props/shoulder-press.svg" },
+    { type: "lever", pivot: { x: 27, y: 58 }, to: { side: "L", point: "hand" }, r: 2.2, end: "grip" },
+    { type: "lever", pivot: { x: 27, y: 58 }, to: { side: "R", point: "hand" }, r: 2.2, end: "grip", front: true },
   ],
   keys: [
     { // start, handles level with the shoulders, elbows under the hands
