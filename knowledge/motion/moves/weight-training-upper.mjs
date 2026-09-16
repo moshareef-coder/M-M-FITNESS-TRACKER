@@ -306,8 +306,11 @@ const LANDMINE_PRESS = {
   dur: 3.0,
   breath: 0.2,
   props: [
-    { type: "band", rest: 0, from: { x: 26, y: 116 }, to: { side: "R", point: "hand" } },
-    { type: "barbell", side: "R", point: "hand", r: 8, front: true },
+    // A landmine: the bar pivots in a sleeve on a floor post behind the
+    // lifter and the loaded end is cupped at the shoulder. The bar sits on
+    // the midline, so the near leg and the near hand draw over it.
+    { type: "artwork", src: "/knowledge/motion/props/landmine.svg" },
+    { type: "lever", pivot: { x: 26, y: 112 }, to: { side: "R", point: "hand" }, r: 2.2, end: "plate", plateR: 8 },
   ],
   keys: [
     { // racked, bar end at the front of the shoulder, elbow tucked in
@@ -335,6 +338,8 @@ const WEIGHTED_DIP = {
   ...DIP,
   props: [
     ...DIP.props,
+    // dip belt: the chain drops from the belt at the waist to the plate
+    { type: "band", rest: 0, from: { side: "R", point: "hip", dx: -1, dy: -2 }, to: { side: "R", point: "hip", dx: -6, dy: 21 }, front: true },
     { type: "barbell", side: "R", point: "hip", dx: -6, dy: 28, r: 7, front: true },
   ],
 };
@@ -528,8 +533,12 @@ const T_BAR_ROW = {
   dur: 3.0,
   breath: 0.2,
   props: [
-    { type: "band", rest: 0, from: { x: 16, y: 116 }, to: { side: "R", point: "hand" } },
-    { type: "barbell", side: "R", point: "hand", r: 9, front: true },
+    // A landmine T-bar: the lifter straddles the bar with the pivot behind
+    // and the plates ahead, holding a V handle hooked under the bar just
+    // behind the plates. The near grip of the handle pokes through the fist.
+    { type: "artwork", src: "/knowledge/motion/props/landmine.svg", dx: -10 },
+    { type: "lever", pivot: { x: 16, y: 112 }, to: { side: "R", point: "hand" }, r: 2.2, end: "plate", plateR: 9, past: 6 },
+    { type: "barbell", side: "R", point: "hand", r: 2.6, front: true },
   ],
   keys: [
     { // bottom, arms long, the bar hanging at the end of the arc
@@ -636,6 +645,8 @@ const WEIGHTED_PULL_UP = {
   ...PULL_UP,
   props: [
     ...PULL_UP.props,
+    // dip belt, seen from behind: the chain shows below the crotch to the plate
+    { type: "band", rest: 0, from: { side: "R", point: "hip", dx: -5.5, dy: 4 }, to: { side: "R", point: "hip", dx: -4, dy: 9.5 }, front: true },
     { type: "barbell", side: "R", point: "hip", dx: -4, dy: 17, r: 7.5, front: true },
   ],
 };
@@ -1828,7 +1839,8 @@ const PLATE_PINCH = {
   breathRate: 0.8,
   props: [
     { type: "barbell", side: "L", point: "hand", dx: -1, dy: 6, r: 8 },
-    { type: "barbell", side: "R", point: "hand", dx: 1, dy: 6, r: 8, front: true },
+    // both plates behind the hands, so the fingers show pinching the top rim
+    { type: "barbell", side: "R", point: "hand", dx: 1, dy: 6, r: 8 },
   ],
   keys: [
     { // settle into the hold
