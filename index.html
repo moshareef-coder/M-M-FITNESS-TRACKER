@@ -1532,6 +1532,17 @@
      an underline, which is the one piece of unstyled chrome on the page. */
   .muted-note a { color: var(--accent); text-decoration: none; font-weight: 600; }
   .muted-note a:hover { text-decoration: underline; }
+  /* One open report. */
+  .report-row { padding: 12px 0; border-top: 1px solid var(--line, rgba(128,128,128,.2)); }
+  .report-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .report-why { font-weight: 700; }
+  /* The age carries the obligation, so it is the one thing that changes colour.
+     Past a day it is no longer information, it is a broken promise. */
+  .report-age { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+  .report-age.late { color: var(--danger, #ff5c5c); font-weight: 700; }
+  .report-meta { color: var(--muted); font-size: 13px; margin-top: 4px; word-break: break-word; }
+  .report-acts { display: flex; gap: 8px; margin-top: 10px; }
+  .report-acts .btn-ghost { width: auto; flex: 1 1 auto; padding: 8px 12px; font-size: 14px; }
   /* One blocked person. The address can be long and the button must not be
      pushed off the edge by it, so the name takes the slack and ellipsises. */
   .block-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
@@ -5861,6 +5872,15 @@
         <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
         <div class="scr-title">Admin</div>
         <div class="spacer"></div>
+      </div>
+      <!-- The report queue, above the XP tools rather than under them. A push
+           can be dismissed on a lock screen and an email can be deleted; this
+           is the surface that still has the report tomorrow, so it is the
+           first thing on the page that carries the obligation. -->
+      <div class="card hidden" id="reportQueueCard">
+        <h2>Reports</h2>
+        <p class="muted-note" style="margin-top:-6px;" id="reportQueueSub">Loading.</p>
+        <div id="reportQueueList"></div>
       </div>
     <div class="card hidden" id="adminCard">
       <h2>Admin</h2>
@@ -23844,6 +23864,13 @@ async function registerPushHandlers() {
         loadClipInbox().then(() => { try { openNextClip(); } catch {} });
         return;
       }
+      /* Straight into the queue. This banner exists because somebody has a day
+         to answer, and landing them on the home tab to go and find it is how a
+         day becomes a week. */
+      if (url.startsWith("/admin/reports")) {
+        try { switchTab("setup"); openSettingsPage("admin"); } catch {}
+        return;
+      }
       try { switchTab(action === "start" ? "workout" : "home"); } catch {}
     });
   } catch (err) {
@@ -24532,7 +24559,104 @@ function buildStepperRow(containerId, specs, state, onChange) {
   });
 }
 
+/* The report queue.
+
+   A push can be swiped away on a lock screen and an email can be deleted, and
+   neither of those is allowed to be the only copy of "somebody asked for help".
+   This is the surface that still has the report tomorrow morning, so this is
+   where the day we promised is actually kept.
+
+   Reading it needs no check here: the RLS policy added in 20260916_report_alert
+   only returns other people's reports to a platform admin, so a non-admin gets
+   their own and nothing else, and the card is hidden for them anyway. */
+async function renderReportQueue() {
+  const card = $("reportQueueCard");
+  const list = $("reportQueueList");
+  const sub = $("reportQueueSub");
+  if (!card || !list || !sub) return;
+  card.classList.toggle("hidden", !isAdmin());
+  if (!isAdmin()) return;
+
+  const { data, error } = await sb.from("content_reports")
+    .select("*").is("handled_at", null).order("created_at", { ascending: true });
+  if (error) {
+    /* Said out loud rather than shown as an empty queue. "No reports" and
+       "could not read reports" look identical and mean opposite things, and
+       quietly showing the reassuring one is how a queue stops being checked. */
+    console.error("could not read reports", error);
+    sub.textContent = "Could not read the queue. Do not assume it is empty.";
+    list.innerHTML = "";
+    return;
+  }
+
+  const rows = data || [];
+  if (!rows.length) {
+    sub.textContent = "Nothing open.";
+    list.innerHTML = "";
+    return;
+  }
+
+  /* Hours rather than a date, because the only thing that matters about an
+     open report is how long it has been waiting against the day we promised. */
+  const oldest = Math.floor((Date.now() - new Date(rows[0].created_at).getTime()) / 3600000);
+  sub.textContent = rows.length === 1
+    ? `1 open, waiting ${oldest}h.`
+    : `${rows.length} open, oldest waiting ${oldest}h.`;
+
+  const words = {
+    sexual: "Nudity or sexual content",
+    abuse: "Harassment or abuse",
+    violence: "Violence or threats",
+    other: "Something else",
+  };
+  list.innerHTML = rows.map((r) => {
+    const hours = Math.floor((Date.now() - new Date(r.created_at).getTime()) / 3600000);
+    return `
+      <div class="report-row">
+        <div class="report-head">
+          <span class="report-why">${escapeHtml(words[r.reason] || r.reason || "Unspecified")}</span>
+          <span class="report-age${hours >= 24 ? " late" : ""}">${hours}h</span>
+        </div>
+        <div class="report-meta">${escapeHtml(r.reporter_email)} reported a ${escapeHtml(r.kind)} from ${escapeHtml(r.subject_email)}</div>
+        ${r.evidence_path ? `<div class="report-meta"><code>${escapeHtml(r.evidence_path)}</code></div>` : ""}
+        <div class="report-acts">
+          <button type="button" class="btn-ghost" data-close-report="${r.id}" data-action="removed">Remove the clip</button>
+          <button type="button" class="btn-ghost" data-close-report="${r.id}" data-action="no_action">No action needed</button>
+        </div>
+      </div>`;
+  }).join("");
+
+  list.querySelectorAll("[data-close-report]").forEach((b) => {
+    b.onclick = () => closeReport(b.dataset.closeReport, b.dataset.action);
+  });
+}
+
+/* Closing a report is the thing that releases the held clip. expire-clips skips
+   anything reported, so without this every reported clip is kept for ever,
+   which is the opposite of what the app promises anybody about video. */
+async function closeReport(id, action) {
+  const row = (await sb.from("content_reports").select("*").eq("id", id).maybeSingle()).data;
+  if (!row) { toast("That report has gone"); renderReportQueue(); return; }
+
+  if (action === "removed" && row.evidence_path) {
+    await sb.storage.from("live-clips").remove([row.evidence_path]);
+    if (row.ref_id) await sb.from("live_clips").delete().eq("id", row.ref_id);
+  }
+  if (action === "no_action" && row.ref_id) {
+    /* Handed back to the sweeper rather than deleted here. It is somebody's
+       clip and the normal two hour rule should finish it, not a moderator. */
+    await sb.from("live_clips").update({ reported_at: null }).eq("id", row.ref_id);
+  }
+
+  const { error } = await sb.from("content_reports")
+    .update({ handled_at: new Date().toISOString(), action_taken: action }).eq("id", id);
+  if (error) { console.error("could not close the report", error); toast("Could not close that"); return; }
+  toast("Closed");
+  renderReportQueue();
+}
+
 function renderAdminPanel() {
+  renderReportQueue();
   if (!PARTNER_PROFILE) $("adminTargetChoices").querySelector('[data-v="partner"]').classList.add("hidden");
   $("adminTargetChoices").querySelectorAll(".choice-card").forEach((c) => {
     c.classList.toggle("selected", c.dataset.v === ADMIN_TARGET);

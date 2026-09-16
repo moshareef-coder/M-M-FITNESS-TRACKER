@@ -53,6 +53,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             intentIdentifiers: [],
             options: []
         )
+        // A content report. Foreground only and no quick action: nothing about
+        // a report should be answerable from a lock screen without looking at
+        // what was actually reported.
+        let report = UNNotificationCategory(
+            identifier: "CONTENT_REPORT",
+            actions: [
+                UNNotificationAction(identifier: "open", title: "Open the queue", options: [.foreground]),
+            ],
+            intentIdentifiers: [],
+            options: []
+        )
         let digest = UNNotificationCategory(
             identifier: "COACH_DIGEST",
             actions: [
@@ -61,7 +72,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             intentIdentifiers: [],
             options: []
         )
-        UNUserNotificationCenter.current().setNotificationCategories([evening, live, clip, digest])
+        UNUserNotificationCenter.current().setNotificationCategories([evening, live, clip, report, digest])
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
