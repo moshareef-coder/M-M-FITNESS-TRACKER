@@ -1136,17 +1136,22 @@ const SEATED_DUMBBELL_PRESS = {
          a solver working in the camera plane draws both at full screen length,
          so the only way it can fold the arm that tight is to throw the elbow
          about 20 units clear of the body, forward or back. Abduction is what a
-         real rack uses: the elbow goes OUT, toward the camera, and 52 degrees
+         real rack uses: the elbow goes OUT, toward the camera, and 75 degrees
          of it is why the upper arm reads short here rather than swinging out
-         in front of the chest. The bells sit at shoulder height, not ear
-         height, which is where they actually rest and which keeps them off
-         his jaw. */
+         in front of the chest.
+
+         These angles are picked so the hand lands on the SAME vertical line
+         as the lockout's, with the elbow directly under it. Mo: "just make the
+         arms straight up, and then have them come straight down from the
+         side." So the bells travel a plumb line: straight up to lockout,
+         straight back down beside the shoulders, with no drift forward or
+         back at either end. */
       t: 0,
       root: { x: 52, y: 86, rot: -4 },
       joints: {
         spine: 0, neck: -2,
-        shoulderR: 40, shoulderAbdR: 52, elbowR: 150,
-        shoulderL: 37, shoulderAbdL: 50, elbowL: 152,
+        shoulderR: 66, shoulderAbdR: 75, elbowR: 154,
+        shoulderL: 63, shoulderAbdL: 73, elbowL: 156,
         forearmPronR: 90, forearmPronL: 90,
       },
       ik: { ...stand(82, 78) },
