@@ -23613,6 +23613,15 @@ async function registerPushHandlers() {
       /* The native bundle only carries index.html, so a path like /coach/ has
          nothing to open. Route what we can and otherwise just come to front. */
       if (url.startsWith("/coach")) { try { switchTab("home"); } catch {} return; }
+      /* A clip opens. It is one notification with one thing behind it, and it
+         is spent after two watches, so landing on the home tab and leaving
+         somebody to find the pill wastes part of what they came for. The
+         inbox is reloaded first because the push very often arrives ahead of
+         the realtime row, or while the socket was asleep in the background. */
+      if (url.startsWith("/clip")) {
+        loadClipInbox().then(() => { try { openNextClip(); } catch {} });
+        return;
+      }
       try { switchTab(action === "start" ? "workout" : "home"); } catch {}
     });
   } catch (err) {

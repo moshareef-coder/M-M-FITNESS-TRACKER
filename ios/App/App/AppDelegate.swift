@@ -42,6 +42,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             intentIdentifiers: [],
             options: []
         )
+        // A clip landed. One button, because there is exactly one thing to do
+        // with a clip and it is spent after two watches, so anything else here
+        // would just be a way to waste one of them by accident.
+        let clip = UNNotificationCategory(
+            identifier: "PARTNER_CLIP",
+            actions: [
+                UNNotificationAction(identifier: "watch", title: "Watch", options: [.foreground]),
+            ],
+            intentIdentifiers: [],
+            options: []
+        )
         let digest = UNNotificationCategory(
             identifier: "COACH_DIGEST",
             actions: [
@@ -50,7 +61,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             intentIdentifiers: [],
             options: []
         )
-        UNUserNotificationCenter.current().setNotificationCategories([evening, live, digest])
+        UNUserNotificationCenter.current().setNotificationCategories([evening, live, clip, digest])
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
