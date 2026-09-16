@@ -1568,6 +1568,17 @@
   .report-meta { color: var(--muted); font-size: 13px; margin-top: 4px; word-break: break-word; }
   .report-acts { display: flex; gap: 8px; margin-top: 10px; }
   .report-acts .btn-ghost { width: auto; flex: 1 1 auto; padding: 8px 12px; font-size: 14px; }
+  /* What notifications actually carry, as three things rather than a sentence.
+     The bold half is the fact and the quiet half is him talking, so the list
+     can be read for its content in one pass and for the jokes in another. */
+  .push-promise { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+  .push-promise li { display: flex; flex-direction: column; gap: 1px; padding-left: 15px; position: relative; }
+  .push-promise li::before {
+    content: ""; position: absolute; left: 0; top: 8px;
+    width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+  }
+  .push-promise b { font-size: 15px; font-weight: 700; color: var(--text); }
+  .push-promise span { font-size: 13.5px; color: var(--muted); }
   /* One blocked person. The address can be long and the button must not be
      pushed off the edge by it, so the name takes the slack and ellipsises. */
   .block-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
@@ -4012,15 +4023,15 @@
      right where every settings app in the category puts it, so the list can be
      read rather than opened: Goal says "Build muscle", Appearance says "Dark",
      Rest says "90 sec". A row you do not need to tap is the point. */
-  /* The strength answers: a coloured dot, a headline, the evidence under it.
-     No bars and no chart, because the whole point of this card is that it can
-     be read without decoding anything. */
-  .ms-sheet { max-height: 88vh; overflow-y: auto; }
+  /* The strength card: a body, a key under it, and one row of detail that only
+     exists once a muscle has been tapped. No bars and no chart, because the
+     whole point of this card is that it can be read without decoding anything. */
   .ms-key { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
             font-size: 11.5px; color: var(--muted); margin: 6px 0 2px; }
   .ms-key span { display: flex; align-items: center; gap: 6px; }
   .ms-key .ms-dot { margin-top: 0; }
   .ms-list { margin-top: 4px; }
+  .ms-list:empty { display: none; }
   .ms-row { display: flex; gap: 11px; align-items: flex-start; padding: 11px 0;
             border-bottom: 1px solid var(--border); }
   .ms-row:last-child { border-bottom: none; }
@@ -5399,36 +5410,23 @@
       <div class="cst-caption" id="consistencyCaption"></div>
     </div>
 
-    <!-- The answer to "am I getting stronger", before the charts that show the
-         working. Four lines at most, and the body behind it is one tap away. -->
-    <!-- The same figure the Body tab draws, coloured by whether the weight
-         went up rather than by how much work was done. -->
-    <div class="sheet-scrim hidden" id="msScrim">
-      <div class="partner-sheet ms-sheet" id="msSheet">
-        <div class="ds-grip"></div>
-        <div class="ps-head">
-          <h2 id="msTitle">Getting stronger</h2>
-          <button type="button" class="ds-x" id="msClose" aria-label="Close">&times;</button>
-        </div>
-        <p class="muted-note" id="msNote"></p>
-        <div class="bi-figures" id="msFigures">
-          <div class="bi-fig" data-view="Front"><canvas id="msFront" class="bi-canvas"></canvas></div>
-          <div class="bi-fig" data-view="Back"><canvas id="msBack" class="bi-canvas"></canvas></div>
-        </div>
-        <div class="ms-key">
-          <span><i class="ms-dot up"></i> Lifting more</span>
-          <span><i class="ms-dot flat"></i> Same</span>
-          <span><i class="ms-dot cold"></i> Not trained</span>
-        </div>
-        <div class="ms-list" id="msDetail"></div>
-      </div>
-    </div>
-
+    <!-- The answer to "am I getting stronger", as a picture rather than a
+         reading exercise. The body is the card: one line of scoreboard above
+         it, the figure, and nothing else until somebody asks for it. Tapping a
+         muscle is what asks, and the answer lands in the slot underneath. -->
     <div class="card metric-card" id="cardMuscles">
       <h2>Getting stronger</h2>
       <p class="muted-note" style="margin-top:-6px" id="musclesLead"></p>
-      <div class="ms-list" id="musclesList"></div>
-      <button type="button" class="btn-ghost" id="musclesOpenBtn" style="margin-top:10px;width:100%">See it on the body</button>
+      <div class="bi-figures" id="msFigures">
+        <div class="bi-fig" data-view="Front"><canvas id="msFront" class="bi-canvas"></canvas></div>
+        <div class="bi-fig" data-view="Back"><canvas id="msBack" class="bi-canvas"></canvas></div>
+      </div>
+      <div class="ms-key">
+        <span><i class="ms-dot up"></i> Lifting more</span>
+        <span><i class="ms-dot flat"></i> Same</span>
+        <span><i class="ms-dot cold"></i> Not trained</span>
+      </div>
+      <div class="ms-list" id="msDetail"></div>
     </div>
 
     <div class="card metric-card" id="cardStrength">
@@ -5825,15 +5823,15 @@
       </div>
     <div class="card">
       <h2>Reminders</h2>
-      <!-- This screen is a promise, and Apple read it during review. It used to
-           say "only when your partner has trained and you have not", which
-           describes the one notification being removed for putting two people's
-           weeks in the same sentence. Saying less, and saying only what is
-           true today. -->
-      <p class="muted-note" style="margin-bottom:10px;">
-        Videos your partner sends you, and at most one reminder a day about your
-        own workout. Never about anybody else's.
-      </p>
+      <!-- Filled from pushPromise() at render time, the same sentence the
+           permission sheet shows. This screen is a promise and Apple read it
+           during review; it used to say "only when your partner has trained and
+           you have not", which describes the one notification being removed for
+           putting two people's weeks in the same sentence, and it stayed wrong
+           because it was a second copy nobody remembered to change. -->
+      <!-- A div, not a p: this holds a list, and a ul inside a p is closed by
+           the parser before it ever renders. -->
+      <div id="pushPromiseNote" style="margin-bottom:10px;"></div>
       <button type="button" class="btn-secondary" id="pushToggleBtn">Turn on reminders</button>
       <p class="muted-note" id="pushNote" style="margin-top:8px;"></p>
     </div>
@@ -15975,7 +15973,10 @@ function clearSessionStorage() {
    It owns its own scrim rather than sharing popCard, because a badge unlock
    landing mid-question would otherwise replace it. Resolves true only if they
    chose the action. */
-function askConfirm({ heading, body, ok, cancel = "Keep going" }) {
+/* `bodyHtml` is for the one caller that needs a list rather than a sentence.
+   Everything else still passes `body` and is still escaped; this is markup the
+   app wrote about itself, never anything a person typed. */
+function askConfirm({ heading, body, bodyHtml, ok, cancel = "Keep going" }) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "pop-scrim";
@@ -15986,7 +15987,7 @@ function askConfirm({ heading, body, ok, cancel = "Keep going" }) {
             <div class="pop-who" style="color:var(--muted)">${escapeHtml(heading.toUpperCase())}</div>
             <button type="button" class="ds-x" data-confirm="0" aria-label="Close">&times;</button>
           </div>
-          <p class="muted-note">${escapeHtml(body)}</p>
+          ${bodyHtml || `<p class="muted-note">${escapeHtml(body)}</p>`}
           <button type="button" class="btn-primary" data-confirm="1" style="margin-top:16px;">${escapeHtml(ok)}</button>
           <button type="button" class="btn-ghost" data-confirm="0">${escapeHtml(cancel)}</button>
         </div>
@@ -23475,38 +23476,36 @@ const MS_COLOURS = {
   cold:       null,                            // null means leave the asset's base grey
 };
 
-async function openMuscleBody(name) {
+/* The card paints the body as soon as Progress renders. It is not behind a
+   button any more: the picture IS the answer, and a button in front of it just
+   asks somebody to agree to see the thing they came for. */
+async function renderMuscleAnswers(name) {
+  if (!$("cardMuscles")) return;
   MS_NAME = name || ME;
   MS_TREND = muscleStrengthTrend(MS_NAME, 12);
   const up = MUSCLE_GROUPS.filter((g) => MS_TREND[g].state === "up").length;
   const measured = MUSCLE_GROUPS.filter((g) => ["up", "flat"].includes(MS_TREND[g].state)).length;
-  $("msTitle").textContent = MS_NAME === ME ? "Getting stronger" : `${MS_NAME} getting stronger`;
-  $("msNote").textContent = measured
-    ? `${up} of ${measured} measurable muscles are lifting more. Tap one.`
+
+  /* One line, and it is a scoreboard rather than a paragraph. The old version
+     named all fourteen muscles in five rows of prose, which is the version
+     nobody reads. The figure says which ones without spelling any of them. */
+  $("musclesLead").textContent = measured
+    ? `${up} of ${measured} lifting more. Tap a muscle.`
     : "Nothing with a weight on it yet.";
-  $("msDetail").innerHTML = "";
-  $("msScrim").classList.remove("hidden");
-  $("msScrim").onclick = (e) => { if (e.target === $("msScrim")) closeMuscleBody(); };
-  $("msClose").onclick = closeMuscleBody;
+  msShowMuscle(null);
 
   try {
     const mod = await ensureRiveBodyModule();
-    if ($("msScrim").classList.contains("hidden")) return;   // closed while loading
     const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
     const paint = () => msPaint(mod);
     if (!MS_FRONT || MS_SEX !== sex) {
       MS_FRONT?.destroy(); MS_BACK?.destroy();
-      const make = (id, view) => {
-        const canvas = $(id);
-        canvas.width = Math.round(canvas.clientWidth * dpr);
-        canvas.height = Math.round(canvas.clientHeight * dpr);
-        return mod.createBodyHeatmap({
-          canvas, artboardName: `${sex}-${view}`, palette: mod.APP_HEAT_PALETTE, intensities: {},
-          onMuscleClick: (muscle) => msShowMuscle(mod.RIVE_TO_APP_GROUP[muscle]),
-          onLoad: paint,
-        });
-      };
+      const make = (id, view) => mod.createBodyHeatmap({
+        canvas: $(id), artboardName: `${sex}-${view}`, palette: mod.APP_HEAT_PALETTE,
+        intensities: {},
+        onMuscleClick: (muscle) => msShowMuscle(mod.RIVE_TO_APP_GROUP[muscle]),
+        onLoad: paint,
+      });
       MS_FRONT = make("msFront", "Front");
       MS_BACK = make("msBack", "Back");
       MS_SEX = sex;
@@ -23514,10 +23513,10 @@ async function openMuscleBody(name) {
       paint();
     }
   } catch (e) {
-    /* The figure is the nice version, not the only version: the card behind it
-       already said everything in words. */
+    /* Say so rather than leaving an empty box where a body should be. */
     console.warn("strength body unavailable", e);
-    $("msNote").textContent = "The figure could not load. The list on the card has the same answers.";
+    $("msFigures").classList.add("hidden");
+    $("musclesLead").textContent = "The body figure could not load.";
   }
 }
 
@@ -23538,67 +23537,18 @@ function msPaint(mod) {
   MS_BACK?.setIntensities(on);
 }
 
+/* The detail slot. Empty until somebody taps, one muscle at a time after that,
+   because two would start rebuilding the list this card exists to replace. */
 function msShowMuscle(group) {
-  if (!group || !MS_TREND?.[group]) return;
+  const slot = $("msDetail");
+  if (!slot) return;
+  if (!group || !MS_TREND?.[group]) { slot.innerHTML = ""; return; }
   const s = strengthSentence(group, MS_TREND[group]);
-  $("msDetail").innerHTML = `<div class="ms-row">
-      <i class="ms-dot ${MS_TREND[group].state === "up" ? "up" : MS_TREND[group].state === "cold" ? "cold" : "flat"}"></i>
+  const st = MS_TREND[group].state;
+  slot.innerHTML = `<div class="ms-row">
+      <i class="ms-dot ${st === "up" ? "up" : st === "cold" ? "cold" : "flat"}"></i>
       <span class="ms-txt"><b>${escapeHtml(s.head)}</b><span>${escapeHtml(s.sub)}</span></span>
     </div>`;
-}
-
-function closeMuscleBody() {
-  $("msScrim").classList.add("hidden");
-}
-
-/* Four lines at most, biggest first. Naming fourteen muscles one by one is
-   the version of this that nobody reads, so the card groups them: the single
-   best gain in full, then counts for the rest. The body screen behind the
-   button is where somebody goes when they want it muscle by muscle. */
-function renderMuscleAnswers(name) {
-  const list = $("musclesList");
-  if (!list) return;
-  const t = muscleStrengthTrend(name, 12);
-  const of = (st) => MUSCLE_GROUPS.filter((g) => t[g].state === st);
-  const up = of("up").sort((a, b) => (t[b].to - t[b].from) - (t[a].to - t[a].from));
-  const flat = of("flat"), body = of("bodyweight"), cold = of("cold");
-  const label = (g) => (BODY_GROUP_LABELS[g] || g).toLowerCase();
-  const measured = up.length + flat.length;
-
-  $("musclesLead").textContent = measured
-    ? `${up.length} of ${measured} muscles you can measure are lifting more, over the last 12 weeks.`
-    : "Nothing with a weight on it yet, so there is no load to compare.";
-
-  const rows = [];
-  if (up[0]) {
-    const s = strengthSentence(up[0], t[up[0]]);
-    rows.push({ k: "up", head: s.head, sub: s.sub });
-  }
-  if (up.length > 1) {
-    rows.push({ k: "up", head: `${up.length} muscles are lifting more`,
-      sub: up.map(label).join(", ") + "." });
-  }
-  if (flat.length) {
-    rows.push({ k: "flat", head: `${flat.length} ${flat.length === 1 ? "has" : "have"} not moved`,
-      sub: `${flat.map(label).join(", ")}. Same load for weeks, so the next step is weight rather than sets.` });
-  }
-  if (body.length) {
-    rows.push({ k: "flat", head: `${body.map(label).join(" and ")} trained without load`,
-      sub: "Bodyweight work, so there is nothing here to compare week to week." });
-  }
-  if (cold.length) {
-    rows.push({ k: "cold", head: `${cold.length} not trained at all`,
-      sub: `${cold.map(label).join(", ")}. Nothing logged in 12 weeks.` });
-  }
-  if (!rows.length) rows.push({ k: "cold", head: "Nothing logged yet", sub: "Log a few weeks and this fills in." });
-
-  list.innerHTML = rows.map((r) => `<div class="ms-row">
-      <i class="ms-dot ${r.k}"></i>
-      <span class="ms-txt"><b>${escapeHtml(r.head)}</b><span>${escapeHtml(r.sub)}</span></span>
-    </div>`).join("");
-
-  const btn = $("musclesOpenBtn");
-  if (btn) btn.onclick = () => openMuscleBody(name);
 }
 
 /* The same answer as a sentence. Kept next to the maths so the words and the
@@ -24463,6 +24413,12 @@ async function currentPushSub() {
 async function renderPushToggle() {
   const btn = $("pushToggleBtn"), note = $("pushNote");
   if (!btn) return;
+  /* The same sentence the permission sheet showed, so what was agreed to and
+     what Setup claims cannot say different things. */
+  const promise = $("pushPromiseNote");
+  if (promise) {
+    promise.innerHTML = pushPromiseHtml(PARTNER_EMAIL ? nameFor(PARTNER_EMAIL) : "");
+  }
   const sup = pushSupport();
   if (!sup.ok) {
     btn.disabled = true;
@@ -24489,6 +24445,37 @@ let PUSH_LAST_ERROR = null;
 
 /* Set when onboarding finishes, spent the first time the app is on screen. */
 const ASK_PUSH_KEY = "ft_ask_push";
+
+/* What we promise to send, written once and shown in both places that promise
+   it: the sheet that asks, and the Notifications screen in Setup.
+
+   One string rather than two, because the two had already drifted. The Setup
+   screen was still promising "only when your partner has trained and you have
+   not" long after that notification was on its way out, and a promise about
+   notifications that is no longer true is the kind of thing Apple reads during
+   review. Kept deliberately whole: it covers everything the app can send
+   rather than only the example that sells it best. */
+function pushPromise(partnerName) {
+  const who = partnerName || "your partner";
+  /* His voice, which means the joke is always on him. quips.mjs is explicit
+     that he never jokes about your body, your lifts, a set you missed or a day
+     you skipped, so none of these are about the person reading them: the plan
+     has not moved, he checked, he will act surprised, he has opinions he is
+     keeping. He is the idiot in the scene, the way he is everywhere else. */
+  return [
+    [`A video from ${who}`, "It plays once, so I would hurry."],
+    ["A nudge about today's plan", "It is still sitting there. I have checked twice."],
+    ["A goal you set, reached", "I will act surprised."],
+  ];
+}
+
+/* The same three lines as a list, for the sheet and the Setup screen. */
+function pushPromiseHtml(partnerName) {
+  const rows = pushPromise(partnerName).map(([what, aside]) => `
+    <li><b>${escapeHtml(what)}</b><span>${escapeHtml(aside)}</span></li>`).join("");
+  return `<ul class="push-promise">${rows}</ul>
+    <p class="muted-note">Nothing about anybody else's training. I have opinions. I keep them.</p>`;
+}
 
 /* The one time we ask for notifications.
 
@@ -24521,9 +24508,11 @@ async function maybeAskForPush() {
   const partner = PARTNER_EMAIL ? nameFor(PARTNER_EMAIL) : "";
   const yes = await askConfirm({
     heading: "One thing before you start",
-    body: partner
-      ? `${partner} can send you videos while you train, and they play once. Notifications are how you know one landed. Nothing else gets sent without asking you first.`
-      : "When you pair with someone, they can send you videos while you train, and they play once. Notifications are how you know one landed. Nothing else gets sent without asking you first.",
+    /* The whole promise, not just the strongest example of it. Leading with
+       the clip and stopping there would have sold this on one notification and
+       then delivered several, which is how an app teaches people that its
+       permission prompts are not to be believed. */
+    bodyHtml: pushPromiseHtml(partner),
     ok: "Turn on notifications",
     cancel: "Not now",
   });
