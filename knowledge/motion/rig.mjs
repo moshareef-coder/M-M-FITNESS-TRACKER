@@ -1790,9 +1790,15 @@ const PROPS = {
     const y0 = p.y0 === undefined ? 46 : p.y0;
     ctx.fillStyle = C.prop;
     roundRect(ctx, p.x - 2, top, 4, y0 - top, 2); ctx.fill();
-    roundRect(ctx, p.x - 9, y0, 18, GROUND - y0, 2.6); ctx.fill();
-    ctx.fillStyle = C.propDark;
-    for (let y = y0 + 3; y < GROUND - 4; y += 6) { roundRect(ctx, p.x - 7, y, 14, 4, 1.6); ctx.fill(); }
+    /* `stack: false` leaves the plates to somebody else. A machine supplied as
+       artwork draws its own stack, and two stacks in the same place is worse
+       than none: the cable still owns the pulley, the line and the bar, which
+       are the parts that actually move. */
+    if (p.stack !== false) {
+      roundRect(ctx, p.x - 9, y0, 18, GROUND - y0, 2.6); ctx.fill();
+      ctx.fillStyle = C.propDark;
+      for (let y = y0 + 3; y < GROUND - 4; y += 6) { roundRect(ctx, p.x - 7, y, 14, 4, 1.6); ctx.fill(); }
+    }
     ctx.fillStyle = C.propTop;
     ctx.beginPath(); ctx.arc(p.x, top, 4.4, 0, Math.PI * 2); ctx.fill();
     const h = anchor(p.to || { side: "R", point: "hand" }, S);
