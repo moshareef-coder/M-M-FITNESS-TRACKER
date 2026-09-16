@@ -1375,7 +1375,10 @@
   }
   .clip-x {
     width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
-    background: rgba(0,0,0,.45); color: #fff; font-size: 21px; line-height: 1; backdrop-filter: blur(8px);
+    /* iOS wants the prefix as far back as the 14.0 deployment target, and
+       without it this is a flat panel instead of a blurred one. */
+    background: rgba(0,0,0,.45); color: #fff; font-size: 21px; line-height: 1;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
   .clip-who { color: #fff; font-size: 14px; font-weight: 700; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
   .clip-bottom {
@@ -3782,24 +3785,45 @@
   }
   .rc-actions { display: flex; gap: 10px; margin-top: 18px; }
   .rc-actions button { flex: 1; margin: 0; }
-  /* Settings: a short list of rows, each opening its own page. Eleven cards in
-     one scroll meant everything competed with everything else. */
+  /* Settings: rows grouped into named sections, each opening its own page.
+     Thirteen rows in one undifferentiated list meant everything competed with
+     everything else and the whole thing ran past the fold.
+
+     The subtitle used to describe the page you were about to open ("Weekly
+     target, rest and stretching"). It now carries the ANSWER instead, on the
+     right where every settings app in the category puts it, so the list can be
+     read rather than opened: Goal says "Build muscle", Appearance says "Dark",
+     Rest says "90 sec". A row you do not need to tap is the point. */
+  .set-sec {
+    font-size: 11.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--muted); margin: 20px 4px 7px;
+  }
+  .set-sec:first-child { margin-top: 2px; }
   .set-group { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
                background: var(--card-fill); box-shadow: var(--shadow-card); }
+  .set-group + .set-sec { margin-top: 20px; }
   .set-row {
-    width: 100%; display: flex; align-items: center; gap: 14px; text-align: left;
-    padding: 15px 16px; background: none; border: none; border-bottom: 1px solid var(--border);
-    color: var(--text); cursor: pointer;
+    width: 100%; display: flex; align-items: center; gap: 12px; text-align: left;
+    padding: 11px 14px; background: none; border: none; border-bottom: 1px solid var(--border);
+    color: var(--text); cursor: pointer; min-height: 56px;
   }
   .set-row:last-child { border-bottom: none; }
   .set-row:active { background: var(--panel-2); }
   .set-ico {
-    width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0; display: flex;
+    width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0; display: flex;
     align-items: center; justify-content: center; background: var(--panel-2); color: var(--accent-ink);
   }
-  .set-txt { flex: 1; min-width: 0; }
-  .set-title { display: block; font-size: 15.5px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.01em; }
+  .set-txt { flex: 1 1 auto; min-width: 0; }
+  .set-title { display: block; font-size: 15px; font-weight: 600; font-family: var(--font-display); letter-spacing: -.01em; }
   .set-sub { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  /* The value, right aligned. It gives up space before the title does and
+     ellipses rather than wrapping, because a focus list can name six muscles
+     and must not push the row to two lines. */
+  .set-val {
+    font-size: 13px; color: var(--muted); flex: 0 1 auto; min-width: 0; max-width: 52%;
+    text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .set-val:empty { display: none; }
   .set-go { color: var(--muted); transform: rotate(180deg); flex-shrink: 0; }
   /* Screen header for full-tab sub-screens */
   .scr-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
@@ -5149,70 +5173,103 @@
   <!-- SETUP TAB -->
   <div id="tab-setup" class="tab-panel hidden">
     <div id="setupRoot">
+      <!-- The plan. Four answers the generator reads, so they sit together and
+           each row states its own answer rather than describing its page. -->
+      <div class="set-sec">Your plan</div>
       <div class="set-group">
-        <button type="button" class="set-row" id="setRow-profile" data-page="profile">
-          <span class="set-ico" data-ico="body"></span>
-          <span class="set-txt"><span class="set-title">Profile</span><span class="set-sub">Your photo and name</span></span>
-          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
-        </button>
-        <button type="button" class="set-row" id="setRow-partner" data-page="partner">
-          <span class="set-ico" data-ico="people"></span>
-          <span class="set-txt"><span class="set-title">Partner</span><span class="set-sub">Who you train with</span></span>
-          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
-        </button>
         <button type="button" class="set-row" id="setRow-goal" data-page="goal">
-          <span class="set-ico" data-ico="medal"></span>
-          <span class="set-txt"><span class="set-title">Goal</span><span class="set-sub" id="setGoalSub">Not set</span></span>
-          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
-        </button>
-        <button type="button" class="set-row" id="setRow-training" data-page="training">
           <span class="set-ico" data-ico="target"></span>
-          <span class="set-txt"><span class="set-title">Training</span><span class="set-sub">Weekly target, rest and stretching</span></span>
-          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
-        </button>
-        <button type="button" class="set-row" id="setRow-milestones" data-page="milestones">
-          <span class="set-ico" data-ico="medal"></span>
-          <span class="set-txt"><span class="set-title">Milestones</span><span class="set-sub">Badges you have earned</span></span>
-          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
-        </button>
-        <button type="button" class="set-row" id="setRow-stats" data-page="stats">
-          <span class="set-ico" data-ico="run"></span>
-          <span class="set-txt"><span class="set-title">Your body</span><span class="set-sub">Height, age and activity level</span></span>
+          <span class="set-txt"><span class="set-title">Goal</span></span>
+          <span class="set-val" id="setGoalSub">Not set</span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
         <button type="button" class="set-row" id="setRow-focus" data-page="focus">
           <span class="set-ico" data-ico="dumbbell"></span>
-          <span class="set-txt"><span class="set-title">Focus areas</span><span class="set-sub" id="setFocusSub">Not set</span></span>
+          <span class="set-txt"><span class="set-title">Focus areas</span></span>
+          <span class="set-val" id="setFocusSub">Not set</span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
         <button type="button" class="set-row" id="setRow-limits" data-page="limits">
-          <span class="set-ico" data-ico="info"></span>
-          <span class="set-txt"><span class="set-title">Limits and injuries</span><span class="set-sub" id="setLimitsSub">Not set</span></span>
+          <span class="set-ico" data-ico="heart"></span>
+          <span class="set-txt"><span class="set-title">Limits and injuries</span></span>
+          <span class="set-val" id="setLimitsSub">Not set</span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
+        <button type="button" class="set-row" id="setRow-training" data-page="training">
+          <span class="set-ico" data-ico="clock"></span>
+          <span class="set-txt"><span class="set-title">Training</span></span>
+          <span class="set-val" id="setTrainingSub"></span>
+          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+        </button>
+      </div>
+
+      <!-- Hidden outright when there is nobody to configure. -->
+      <div class="set-sec hidden" id="setSec-partner">Partner</div>
+      <div class="set-group hidden" id="setGroup-partner">
+        <button type="button" class="set-row" id="setRow-partner" data-page="partner">
+          <span class="set-ico" data-ico="people"></span>
+          <span class="set-txt"><span class="set-title">Partner</span></span>
+          <span class="set-val" id="setPartnerSub"></span>
+          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+        </button>
+      </div>
+
+      <div class="set-sec">You</div>
+      <div class="set-group">
+        <button type="button" class="set-row" id="setRow-profile" data-page="profile">
+          <span class="set-ico" data-ico="body"></span>
+          <span class="set-txt"><span class="set-title">Profile</span></span>
+          <span class="set-val" id="setProfileSub"></span>
+          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+        </button>
+        <button type="button" class="set-row" id="setRow-stats" data-page="stats">
+          <span class="set-ico" data-ico="run"></span>
+          <span class="set-txt"><span class="set-title">Your body</span></span>
+          <span class="set-val" id="setStatsSub">Not set</span>
+          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+        </button>
+        <button type="button" class="set-row" id="setRow-milestones" data-page="milestones">
+          <span class="set-ico" data-ico="medal"></span>
+          <span class="set-txt"><span class="set-title">Milestones</span></span>
+          <span class="set-val" id="setMilestonesSub"></span>
+          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+        </button>
+      </div>
+
+      <div class="set-sec">App</div>
+      <div class="set-group">
         <button type="button" class="set-row" id="setRow-notify" data-page="notify">
           <span class="set-ico" data-ico="bell"></span>
-          <span class="set-txt"><span class="set-title">Notifications</span><span class="set-sub">Reminders and nudges</span></span>
+          <span class="set-txt"><span class="set-title">Notifications</span></span>
+          <span class="set-val" id="setNotifySub"></span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
         <button type="button" class="set-row" id="setRow-theme" data-page="theme">
           <span class="set-ico" data-ico="sunMoon"></span>
-          <span class="set-txt"><span class="set-title">Appearance</span><span class="set-sub">Light or dark</span></span>
+          <span class="set-txt"><span class="set-title">Appearance</span></span>
+          <span class="set-val" id="setThemeSub"></span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
+      </div>
+
+      <div class="set-sec">Account</div>
+      <div class="set-group">
         <button type="button" class="set-row" id="setRow-about" data-page="about">
-          <span class="set-ico" data-ico="star"></span>
-          <span class="set-txt"><span class="set-title">About</span><span class="set-sub">Version, privacy and support</span></span>
+          <span class="set-ico" data-ico="info"></span>
+          <span class="set-txt"><span class="set-title">About</span></span>
+          <span class="set-val" id="setAboutSub"></span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
         <button type="button" class="set-row" id="setRow-account" data-page="account">
           <span class="set-ico" data-ico="gear"></span>
-          <span class="set-txt"><span class="set-title">Account</span><span class="set-sub">Sign out, reset or delete</span></span>
+          <span class="set-txt"><span class="set-title">Account</span></span>
+          <span class="set-val" id="setAccountSub"></span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
         <button type="button" class="set-row hidden" id="setRow-admin" data-page="admin">
           <span class="set-ico" data-ico="lock"></span>
-          <span class="set-txt"><span class="set-title">Admin</span><span class="set-sub">Seed and inspect data</span></span>
+          <span class="set-txt"><span class="set-title">Admin</span></span>
+          <span class="set-val">Seed and inspect</span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
       </div>
@@ -22055,6 +22112,16 @@ async function registerPushHandlers() {
       /* "later" is a real answer, so it dismisses and does nothing rather than
          dragging someone into the app to close it again. */
       if (action === "later") return;
+      /* Cheering back is the entire point of "your partner just started", so
+         the button does it from the notification rather than opening the app
+         to a screen where you then have to find the button again. */
+      if (action === "cheer") {
+        if (!PARTNER_EMAIL) return;
+        sb.from("encouragements")
+          .insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "🔥" })
+          .then(({ error }) => { if (error) console.error("cheer from notification failed", error); });
+        return;
+      }
       const url = event?.notification?.data?.url || "/";
       /* The native bundle only carries index.html, so a path like /coach/ has
          nothing to open. Route what we can and otherwise just come to front. */
@@ -22296,6 +22363,7 @@ function closeSettingsPage() {
   $("setGoalSub").textContent = goalTileLabel(MY_PROFILE);
   $("setFocusSub").textContent = focusGroupsSubtitle();
   paintLimitsSubtitle();
+  paintSettingsValues();
   window.scrollTo({ top: SETUP_SCROLL });
 }
 
@@ -22322,6 +22390,84 @@ function renderRestChoices() {
       toast(`Rest set to ${restLabel(sec)}`);
     };
   });
+}
+
+/* ---------- The answers, shown on the rows themselves ----------
+   Every row on the settings root states what it is currently set to, so the
+   list can be read instead of opened one page at a time. Goal, Focus and
+   Limits already had writers of their own (setGoalSub, setFocusSub and
+   paintLimitsSubtitle) and those still own their rows; this fills in the rest.
+
+   Everything here reads state that is already in memory, so it is cheap enough
+   to run on every open and on every return from a sub page. The one exception
+   is the push subscription, which has to be asked for and therefore lands a
+   moment later than the rest. */
+function settingsValue(id, text) {
+  const el = $(id);
+  if (el) el.textContent = text || "";
+}
+
+function bodyStatsSummary() {
+  const p = MY_PROFILE;
+  if (!p) return "Not set";
+  const bits = [];
+  if (Number.isFinite(p.height_in) && p.height_in > 0) bits.push(`${Math.floor(p.height_in / 12)}'${p.height_in % 12}"`);
+  if (p.age) bits.push(`${p.age}`);
+  if (p.sex) bits.push(p.sex);
+  return bits.length ? bits.join(", ") : "Not set";
+}
+
+function trainingSummary() {
+  const shared = MY_PARTNERSHIP?.shared_weekly_goal;
+  const days = shared || MY_PROFILE?.challenge_target;
+  const mine = Number(MY_PROFILE?.rest_sec);
+  const rest = Number.isFinite(mine) && mine > 0 ? mine : DEFAULT_REST_SEC;
+  const bits = [];
+  if (days) bits.push(`${days} ${days === 1 ? "day" : "days"} a week`);
+  bits.push(restLabel(rest));
+  return bits.join(", ");
+}
+
+function paintSettingsValues() {
+  settingsValue("setTrainingSub", trainingSummary());
+  settingsValue("setStatsSub", bodyStatsSummary());
+  settingsValue("setProfileSub", ME || "");
+  settingsValue("setThemeSub",
+    (document.documentElement.getAttribute("data-theme") || "dark") === "light" ? "Light" : "Dark");
+  settingsValue("setAboutSub", APP_VERSION);
+  settingsValue("setAccountSub", MY_EMAIL || "");
+
+  const all = typeof ALL_MILESTONE_BADGES !== "undefined" ? ALL_MILESTONE_BADGES : [];
+  const total = typeof MILESTONE_BADGES !== "undefined" ? MILESTONE_BADGES.length : 0;
+  const earned = (all || []).filter((b) => b.email === MY_EMAIL).length;
+  settingsValue("setMilestonesSub", earned ? `${earned} of ${total}` : "None yet");
+
+  /* The partner section is not just empty without a partner, it is absent:
+     an empty group with a heading reads as something broken. */
+  const paired = !!PARTNER_EMAIL;
+  $("setSec-partner")?.classList.toggle("hidden", !paired);
+  $("setGroup-partner")?.classList.toggle("hidden", !paired);
+  if (paired) settingsValue("setPartnerSub", partnerName());
+
+  /* Asked rather than read, so it settles after the synchronous rows above.
+     Wrapped because pushSupport() reaches for navigator.standalone, which the
+     boot check's shimmed window does not have: an unguarded call here took the
+     whole of renderSetupTab down with it. A row with no value is the right
+     failure anyway, since "On" or "Off" would both be guesses. */
+  if (!$("setNotifySub")) return;
+  try {
+    const sup = pushSupport();
+    if (!sup.ok) { settingsValue("setNotifySub", "Unavailable"); return; }
+    settingsValue("setNotifySub", "");
+    /* No readable subscription is the same answer as no subscription, so a
+       rejection reads Off rather than leaving the row blank. A settings row
+       with nothing on the right looks unfinished rather than informative. */
+    currentPushSub()
+      .then((sub) => settingsValue("setNotifySub", sub ? "On" : "Off"))
+      .catch(() => settingsValue("setNotifySub", "Off"));
+  } catch {
+    settingsValue("setNotifySub", "Off");
+  }
 }
 
 /* ---------- How long you actually have ----------
@@ -22502,6 +22648,7 @@ function renderSetupTab() {
   renderRestChoices();
   renderPushToggle();
   renderSetupPhoto();
+  paintSettingsValues();
 
   /* Icons cannot be baked into static markup, so the rows declare which icon
      they want and it is drawn here. */
