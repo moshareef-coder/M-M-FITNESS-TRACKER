@@ -282,7 +282,7 @@ const REVOLVED_TRIANGLE = {
   breath: 1.0,
   breathRate: 0.76,
   fit: { k: 0.9, dy: 2 },
-  props: [{ type: "box", x: 73, y: 97, w: 15 }],
+  props: [{ type: "box", x: 73, y: 97, w: 15, block: true }],
   keys: [
     { // folded over the front leg, bottom hand flat on the block, top arm up
       t: 0,
@@ -406,7 +406,7 @@ const HALF_MOON_POSE = {
   // The block top sits where the hand can actually get to. It used to be at
   // 98, three units under a hand that was already at full arm stretch, so the
   // mitt hovered over it in the open grip instead of lying flat on it.
-  props: [{ type: "box", x: 28, y: 92, w: 17 }],
+  props: [{ type: "box", x: 28, y: 92, w: 17, block: true }],
   keys: [
     { // find the balance: bottom hand flat on the block, top leg level
       t: 0,

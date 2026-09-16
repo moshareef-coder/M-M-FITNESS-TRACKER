@@ -93,7 +93,7 @@ const FOAM_ROLLER_THORACIC_EXTENSION = {
   breathRate: 0.9,
   props: [
     { type: "mat", x: 12, w: 116 },
-    { type: "roller", x: 42, y: 112.6, r: 5.4 },
+    { type: "roller", x: 42, y: 112.6, r: 5.4, foam: true },
   ],
   keys: [
     { // neutral, ribs down, upper back resting on the roller
@@ -1911,7 +1911,7 @@ const FOAM_ROLLER_CHEST_OPENER = {
   breathRate: 0.75,
   props: [
     { type: "mat", x: 10, w: 118 },
-    { type: "roller", x: 58, y: 112.4, r: 5.4 },
+    { type: "roller", x: 58, y: 112.4, r: 5.4, foam: true },
   ],
   keys: [
     { // settled along the roller, arms open and heavy, hands on the mat
