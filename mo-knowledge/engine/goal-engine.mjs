@@ -311,6 +311,23 @@ export const GOAL_PARAMS = {
    lists equal, same convention as checkTreeCoverage over GOAL_PARAMS. */
 const MOBILITY_CHILDREN = ["flexibility", "mobility"];
 
+/* And the bubbles that ARE the mobility goal, with or without a child.
+ *
+ * The block was reachable only through a child id, and the picker rewrite
+ * stopped sending child ids at all: every tile in index.html has `kids: []`
+ * and every profile written since carries `goal_child: null`. So from that day
+ * the ten minute block was unreachable by anybody, and `move-better` ("mobility,
+ * flexibility, less pain") is precisely the goal that exists to get it.
+ *
+ * A bubble earns it here rather than through a synthetic child on the client,
+ * because the block is a fact about the goal and not about a second tap that no
+ * longer happens. `mobilityChild` below stays a child id so mobility.mjs needs
+ * no new argument: a bubble that earns the block resolves to "mobility", which
+ * is the block it would have got from the child of the same name. */
+const MOBILITY_BUBBLES = ["move-better"];
+const mobilityIdFor = (bubble, childUsed) =>
+  (MOBILITY_CHILDREN.includes(childUsed) ? childUsed : (MOBILITY_BUBBLES.includes(bubble) ? "mobility" : null));
+
 /* Five groups is where the 1.4x stops meaning anything: the extra volume comes
    out of a fixed weekly budget, so once most of the body is a priority the plan
    is the same plan with a longer explanation. focus.mjs caps the merged list at
@@ -481,8 +498,9 @@ export function resolveGoal(sel = {}) {
   const priority = [...(params.priority || [])];
   let cardio = params.cardio;
   /* The primary keeps the block when it is one of the two mobility children, so
-     a single goal resolves to exactly the child it always did. */
-  let mobilityChild = MOBILITY_CHILDREN.includes(childUsed) ? childUsed : null;
+     a single goal resolves to exactly the child it always did, and now also
+     when the bubble itself is the mobility goal. See MOBILITY_BUBBLES. */
+  let mobilityChild = mobilityIdFor(bubble, childUsed);
 
   const secondaryResolved = accepted.map((r) => {
     const gainedGroups = [];
@@ -501,8 +519,8 @@ export function resolveGoal(sel = {}) {
        fired. This is the same idea that can actually happen. */
     const gainedCardio = cardioLoad(r.params.cardio) > cardioLoad(cardio);
     if (gainedCardio) cardio = r.params.cardio;
-    const gainedMobility = !mobilityChild && MOBILITY_CHILDREN.includes(r.childUsed);
-    if (gainedMobility) mobilityChild = r.childUsed;
+    const gainedMobility = !mobilityChild && !!mobilityIdFor(r.bubble, r.childUsed);
+    if (gainedMobility) mobilityChild = mobilityIdFor(r.bubble, r.childUsed);
 
     const effect = [];
     if (gainedGroups.length) effect.push(`extra weekly sets for ${gainedGroups.join(", ")}`);

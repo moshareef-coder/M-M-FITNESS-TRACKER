@@ -36,6 +36,7 @@ import { BODY_AREAS, EQUIPMENT_OPTIONS, normalizeLimits, applyLimits, limitsSumm
 import { JOINTS, JOINT_LOAD, defaultJointLoad } from "./joint-load.mjs";
 import { joinPlanToActual, calibrateExercise, calibrate, stepFor, STEP_ISOLATION, STEP_COMPOUND, STEP_HEAVY } from "./calibrate.mjs";
 import { mapGoal, generateFromPayload, toWorkout, focusDayIndex, nextDayIndex } from "./adapter.mjs";
+import { clientGoals, clientGoalCases, CLIENT_FILE } from "./client-goals.mjs";
 import { buildMuscleIndex, muscleRecoveryStates, mainGroupsForDay, dayIsFresh, skipFreshDays, FRESH_HOURS, RECOVERY_HOURS, MIN_CREDIT_SETS } from "./recovery.mjs";
 
 import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
@@ -211,6 +212,119 @@ test("every bubble in GOAL_PARAMS resolves with no child and falls back to the d
       assert.equal(r.params, r.params); // resolved without throwing
     }, `bubble "${bubble}" should resolve with child undefined`);
   }
+});
+
+/* =========================================================================
+ * The goals the CLIENT can send
+ * -------------------------------------------------------------------------
+ * Everything above and below reads mo-knowledge/goals/goal-tree.json, which is
+ * the research and not the product. The picker in index.html is the product,
+ * and on 2026-09-15 they disagreed: the picker offered `build-endurance` and
+ * `move-better`, adapter.mjs validated neither, both fell through to the legacy
+ * `goal` string ("Stay consistent" for both tiles) and both resolved to the
+ * habit plan. 285 tests, a 10,421 run sweep and a fuzzer were all green, and
+ * every one of them enumerated goals from the tree, so not one of them ever
+ * built either goal. These are the tests that would have gone red on day one.
+ * ========================================================================= */
+
+test("every goal the picker offers is a bubble the adapter accepts", () => {
+  for (const t of clientGoals()) {
+    const mapped = mapGoal({ goal_bubble: t.id, goal_child: null, goal: t.legacy });
+    assert.equal(mapped.bubble, t.id,
+      `the picker offers "${t.title}" (${t.id}) and mapGoal resolved it to "${mapped.bubble}". `
+      + `An unrecognised goal_bubble falls back to the legacy goal string silently, which is how `
+      + `Build endurance and Move better both became Stay consistent in production.`);
+  }
+});
+
+test("every goal the picker offers has its own parameters, not a neighbour's", () => {
+  for (const t of clientGoals()) {
+    assert.ok(GOAL_PARAMS[t.id], `the picker offers "${t.title}" (${t.id}) and GOAL_PARAMS has no entry for it`);
+    const r = resolveGoal({ bubble: t.id });
+    assert.ok(r.params.emphasis, `${t.id} resolved without an emphasis`);
+  }
+});
+
+test("every goal the picker offers builds a plan, from the payload the app really sends", () => {
+  for (const c of clientGoalCases()) {
+    const out = generateFromPayload({
+      goal_bubble: c.goal_bubble, goal_child: c.goal_child, goal: c.legacy,
+      challenge_target: 4, current_weight: 180, sex: "Male", logs: [],
+    }, { includePlan: true });
+    assert.equal(out.meta.goals.primary.bubble, c.goal_bubble, `${c.id} resolved to a different goal`);
+    assert.ok(out.plan.week.length, `${c.id} built no week`);
+  }
+});
+
+/* The two goals the picker gained, and the numbers that say they are real
+   rather than the habit plan wearing a new label. Named explicitly, because
+   the generic tests above would pass if both simply resolved to something with
+   an emphasis, and "it resolves" is not what either goal is for. */
+test("Build endurance prescribes the endurance cardio and not the habit goal's", () => {
+  const endurance = resolveGoal({ bubble: "build-endurance" }).params;
+  const habit = resolveGoal({ bubble: "consistent" }).params;
+  assert.equal(endurance.emphasis, "endurance");
+  assert.deepEqual(endurance.cardio, { sessions: 3, minutes: 35, zone: "mixed" });
+  assert.deepEqual(habit.cardio, { sessions: 1, minutes: 20, zone: "easy" });
+});
+
+test("Move better earns the ten minute mobility block with no child id", () => {
+  /* The picker writes goal_child: null on every tile, so a block that can only
+     be reached through a child id is a block nobody can reach. */
+  const r = resolveGoal({ bubble: "move-better" });
+  assert.equal(r.childUsed, "_default");
+  assert.ok(MOBILITY_CHILDREN.includes(r.mobilityChild),
+    `move-better resolved mobilityChild ${JSON.stringify(r.mobilityChild)}, so mobilityFor will not run the long block`);
+  const day = { name: "Full body A", exercises: [{ name: "Goblet Squat", group: "quads" }], patterns: ["squat"], mainGroups: ["quads"] };
+  const withGoal = mobilityFor(day, { goalChild: r.mobilityChild });
+  const without = mobilityFor(day, { goalChild: resolveGoal({ bubble: "consistent" }).mobilityChild });
+  assert.equal(withGoal.mobilityGoal, true);
+  assert.equal(without.mobilityGoal, false);
+  assert.ok(withGoal.cooldownSeconds > without.cooldownSeconds,
+    `the mobility goal's cool-down is ${withGoal.cooldownSeconds}s against the ordinary ${without.cooldownSeconds}s`);
+});
+
+test("Move better and Build endurance as EXTRA goals are honoured, not dropped in silence", () => {
+  /* normalizeSecondaryGoals dropped both before resolveGoal ever saw them, so
+     meta.goals.ignored was empty and the contract's promise that every unused
+     extra goal is named by reason was quietly false. */
+  const r = resolveGoal({
+    bubble: "build-muscle",
+    secondary: [{ bubble: "build-endurance", child: null }, { bubble: "move-better", child: null }],
+  });
+  assert.equal(r.secondary.length, 2);
+  assert.ok(r.secondary.find((x) => x.bubble === "build-endurance")?.cardio, "the endurance extra bought no cardio");
+  assert.ok(r.secondary.find((x) => x.bubble === "move-better")?.mobility, "the mobility extra bought no block");
+  const over = mapGoal({
+    goal_bubble: "build-muscle",
+    goal_secondary: [{ bubble: "build-endurance" }, { bubble: "move-better" }, { bubble: "consistent" }],
+  });
+  assert.equal(over.secondary.length, 3, "a third extra must survive mapGoal so resolveGoal can name it");
+  const resolved = resolveGoal({ bubble: over.bubble, secondary: over.secondary });
+  assert.equal(resolved.ignoredSecondary.length, 1);
+  assert.ok(resolved.ignoredSecondary[0].why.includes("limit"));
+});
+
+test("the adapter's bubble table is the parameter table, so the two cannot drift", () => {
+  /* It was a hand written mirror of goal-tree.json with a comment promising a
+     drift check nobody wrote. This asserts the derivation instead: anything the
+     engine has parameters for is accepted, and nothing else is. */
+  for (const bubble of Object.keys(GOAL_PARAMS)) {
+    assert.equal(mapGoal({ goal_bubble: bubble }).bubble, bubble, `${bubble} has parameters and mapGoal rejected it`);
+    for (const child of Object.keys(GOAL_PARAMS[bubble])) {
+      if (child === "_default") continue;
+      assert.equal(mapGoal({ goal_bubble: bubble, goal_child: child }).child, child, `${bubble}/${child} was rejected`);
+    }
+  }
+  assert.equal(mapGoal({ goal_bubble: "mobility", goal: "Stay consistent" }).bubble, "consistent");
+});
+
+test("the picker is read from index.html, and says so when it cannot be", () => {
+  /* A gate that quietly checks nothing is worse than no gate, so the reader
+     throws rather than returning an empty list. This pins that, because a
+     silently empty list would make every test above pass. */
+  assert.ok(clientGoals().length >= 4, `only ${clientGoals().length} tiles parsed out of ${CLIENT_FILE}`);
+  assert.ok(clientGoals().every((t) => t.id && t.title), "a tile parsed with no id or no title");
 });
 
 test("get stronger asks for fewer reps and more rest than lose weight", () => {

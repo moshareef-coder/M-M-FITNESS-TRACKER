@@ -11,15 +11,37 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { buildPlan } from "./plan.mjs";
 import { GOAL_PARAMS } from "./goal-engine.mjs";
+import { clientGoals } from "./client-goals.mjs";
 import { pairPlan } from "./pair.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const TREE = JSON.parse(readFileSync(join(here, "../goals/goal-tree.json"), "utf8"));
 
-/* The research tree and the executable table are two files that describe the same
-   thing, so they will drift unless something checks. This is that something. */
+/* Three files describe the same thing, so they will drift unless something
+   checks. This is that something, and as of 2026-09-15 it checks all three.
+ *
+ * The research tree is what people say they want. GOAL_PARAMS is that made
+ * executable. index.html's picker is what a real profile can actually carry,
+ * and it was not checked here at all: `build-endurance` and `move-better` were
+ * promoted out of the tree's children into tiles of their own, GOAL_PARAMS grew
+ * entries for both, and this function reported them as two gaps because no
+ * bubble in the tree has those ids. It exited 1 for that reason from the day
+ * they landed, which is a check crying wolf about the one direction that was
+ * fine while saying nothing about the direction that was broken.
+ *
+ * So the rule is per direction now:
+ *   tree -> params    still a gap. The research says this goal exists and the
+ *                     engine has nothing for it.
+ *   params -> tree    a gap ONLY when the picker does not offer it either.
+ *                     A goal the app can send is a goal the engine is right to
+ *                     have parameters for, tree or no tree.
+ *   picker -> params  new, and the one that would have caught the live bug: a
+ *                     tile a person can tap that the engine cannot honour.
+ */
 export function checkTreeCoverage() {
   const problems = [];
+  const tiles = clientGoals();
+  const offered = new Set(tiles.map((t) => t.id));
   for (const b of TREE.bubbles) {
     const table = GOAL_PARAMS[b.id];
     if (!table) { problems.push(`bubble "${b.id}" (${b.label}) has no parameters`); continue; }
@@ -28,7 +50,16 @@ export function checkTreeCoverage() {
     }
   }
   for (const id of Object.keys(GOAL_PARAMS)) {
-    if (!TREE.bubbles.some((b) => b.id === id)) problems.push(`parameters for "${id}" but no such bubble in the tree`);
+    if (TREE.bubbles.some((b) => b.id === id)) continue;
+    if (offered.has(id)) continue;
+    problems.push(`parameters for "${id}" but no such bubble in the tree and no tile in the picker`);
+  }
+  for (const t of tiles) {
+    const table = GOAL_PARAMS[t.id];
+    if (!table) { problems.push(`the picker offers "${t.title}" (${t.id}) and the engine has no parameters for it`); continue; }
+    for (const kid of t.kids) {
+      if (!table[kid]) problems.push(`  the picker offers "${t.title} / ${kid}" and it falls back to the bubble default`);
+    }
   }
   return problems;
 }
@@ -142,7 +173,7 @@ function main() {
   const problems = checkTreeCoverage();
   console.log(problems.length
     ? `Tree coverage: ${problems.length} gaps\n${problems.join("\n")}\n`
-    : `Tree coverage: every bubble and child in goal-tree.json has parameters.\n`);
+    : `Tree coverage: every bubble and child in goal-tree.json, and every tile the picker offers, has parameters.\n`);
   if (process.argv.includes("--check")) process.exit(problems.length ? 1 : 0);
 
   for (const c of PEOPLE) {

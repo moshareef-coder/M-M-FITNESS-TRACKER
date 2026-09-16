@@ -37,6 +37,7 @@ import { generateFromPayload } from "./adapter.mjs";
 import { MUSCLE_GROUPS } from "./focus.mjs";
 import { BODY_AREAS, EQUIPMENT_OPTIONS } from "./limits.mjs";
 import { readFileSync } from "node:fs";
+import { clientGoals } from "./client-goals.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -108,9 +109,26 @@ const around = (lo, hi) => [lo - 1, lo, lo + 1, hi - 1, hi, hi + 1];
  * ------------------------------------------------------------------ */
 
 const TREE = JSON.parse(readFileSync(join(here, "../goals/goal-tree.json"), "utf8"));
-const BUBBLES = (TREE.bubbles || []).map((b) => ({ id: b.id, children: (b.children || []).map((c) => c.id) }));
+/* The research tree AND the picker, merged on the bubble id, 2026-09-15. The
+   tree alone is what live profiles from before the picker rewrite carry; the
+   picker is what every profile written since carries, and it offers two goals
+   (`build-endurance`, `move-better`) that are in no bubble of the tree. While
+   this pool was the tree alone the fuzzer generated a million payloads without
+   ever sending either, which is how both shipped resolving to the habit plan.
+   See client-goals.mjs. */
+const CLIENT_TILES = clientGoals();
+const BUBBLES = (() => {
+  const byId = new Map();
+  for (const b of TREE.bubbles || []) byId.set(b.id, { id: b.id, children: (b.children || []).map((c) => c.id) });
+  for (const t of CLIENT_TILES) {
+    const have = byId.get(t.id) || { id: t.id, children: [] };
+    for (const kid of t.kids) if (!have.children.includes(kid)) have.children.push(kid);
+    byId.set(t.id, have);
+  }
+  return [...byId.values()];
+})();
 const BUBBLE_IDS = BUBBLES.map((b) => b.id);
-const ALL_CHILDREN = BUBBLES.flatMap((b) => b.children);
+const ALL_CHILDREN = [...new Set(BUBBLES.flatMap((b) => b.children))];
 const LEGACY_GOALS = [
   "Lose weight", "Build muscle", "Get stronger",
   "Recomp (lose fat, gain muscle)", "Stay consistent",

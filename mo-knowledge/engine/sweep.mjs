@@ -31,6 +31,7 @@ import { jointLoadFor } from "./joint-load.mjs";
 import { MUSCLE_GROUPS } from "./focus.mjs";
 import { buildMuscleIndex, muscleRecoveryStates } from "./recovery.mjs";
 import { readFileSync } from "node:fs";
+import { clientGoalCases } from "./client-goals.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -52,21 +53,38 @@ const isoLocal = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).to
  * ------------------------------------------------------------------ */
 
 /* The goals are read out of the tree rather than typed here, for the same
-   reason demo.mjs --check exists: two files describing the same nine bubbles
-   drift, and a sweep that swept a stale list would be reporting on a goal set
-   nobody ships. Every bubble contributes its children plus the bubble on its
-   own, because the bubble default is a parameter set a real user can land on
-   (they tapped the tile and never picked a child) and it is the one no test
-   names. */
+   reason demo.mjs --check exists: two files describing the same bubbles drift,
+   and a sweep that swept a stale list would be reporting on a goal set nobody
+   ships. Every bubble contributes its children plus the bubble on its own,
+   because the bubble default is a parameter set a real user can land on (they
+   tapped the tile and never picked a child) and it is the one no test names.
+ *
+ * AND OUT OF THE PICKER, 2026-09-15. The tree was the only source until today,
+ * and the tree is the research rather than the product: it has nine bubbles and
+ * the picker has eight, two of which (`build-endurance`, `move-better`) exist
+ * in no bubble at all. So this sweep ran 10,421 plans without once building the
+ * two goals that were broken in production, and reported CLEAN while every user
+ * who tapped either got the habit plan. A sweep that cannot see what the app
+ * sends is measuring a different app.
+ *
+ * Both lists, de-duplicated on the pair, because both are real inputs: the tree
+ * ids are what live profiles from before the rewrite still carry, and the
+ * picker ids are what every profile written since carries. */
 function goalCases() {
   const tree = JSON.parse(readFileSync(join(here, "../goals/goal-tree.json"), "utf8"));
   const out = [];
+  const seen = new Set();
+  const add = (id, goal_bubble, goal_child) => {
+    const key = `${goal_bubble}|${goal_child ?? ""}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ id, goal_bubble, goal_child });
+  };
   for (const bubble of tree.bubbles || []) {
-    out.push({ id: `${bubble.id}/_default`, goal_bubble: bubble.id, goal_child: null });
-    for (const child of bubble.children || []) {
-      out.push({ id: `${bubble.id}/${child.id}`, goal_bubble: bubble.id, goal_child: child.id });
-    }
+    add(`${bubble.id}/_default`, bubble.id, null);
+    for (const child of bubble.children || []) add(`${bubble.id}/${child.id}`, bubble.id, child.id);
   }
+  for (const c of clientGoalCases()) add(c.id, c.goal_bubble, c.goal_child);
   return out;
 }
 
@@ -1378,7 +1396,8 @@ console.log("ENGINE SWEEP");
 console.log(`  runs              ${runs + builds}`);
 console.log(`    payload         ${runs} through generateFromPayload`);
 console.log(`    direct          ${builds} through buildPlan, which is the only way to reach calibration`);
-console.log(`  goal selections   ${GOALS.length} (9 bubbles, every child plus every bubble default)`);
+console.log(`  goal selections   ${GOALS.length} (${new Set(GOALS.map((g) => g.goal_bubble)).size} bubbles from the research tree and the picker, `
+    + `every child plus every bubble default)`);
 console.log(`  threw             ${threw}`);
 console.log(`  ledger rows       ${ratios.length}`);
 console.log("");

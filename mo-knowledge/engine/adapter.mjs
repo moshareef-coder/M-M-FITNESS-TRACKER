@@ -21,7 +21,7 @@ import { buildPlan } from "./plan.mjs";
 import { parseFocus, mergePriority, focusFreshness } from "./focus.mjs";
 import { normalizeLimits } from "./limits.mjs";
 /* Read only, for one field. See the focus block in generateFromPayload. */
-import { resolveGoal } from "./goal-engine.mjs";
+import { resolveGoal, GOAL_PARAMS } from "./goal-engine.mjs";
 import { buildMuscleIndex, muscleRecoveryStates, skipFreshDays } from "./recovery.mjs";
 import { stripMobility } from "./mobility.mjs";
 import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
@@ -58,24 +58,32 @@ const BUBBLE_FOR_GOAL = {
    witness as our substring match and we do not overrule it. */
 const OVERRIDE_BUBBLES = new Set(["do-a-thing", "event", "get-back", "feel-better"]);
 
-/* The nine bubble ids and, per bubble, the child ids under it. Hand written
-   from mo-knowledge/goals/goal-tree.json, same convention as ALIASES below
-   and for the same reason: this file has to stay Deno safe, so it cannot
-   read the JSON at runtime and mirrors it here instead. Used only to
-   validate goal_bubble/goal_child from the tile picker (see mapGoal) before
-   trusting them; the same drift-check follow up noted at ALIASES covers
-   this table too, and is not written yet. */
-const TREE_CHILDREN = {
-  "lose-weight": ["lose-a-number", "lose-belly", "lose-by-date", "lose-for-health", "lose-last-10", "lose-and-build"],
-  "build-muscle": ["build-overall", "build-a-part", "build-glutes", "build-skinny-fat", "build-women"],
-  "get-stronger": ["strong-a-lift", "strong-multiples", "strong-not-bigger", "strong-for-life", "strong-again"],
-  "tone-lean-abs": ["tone-part", "abs", "lean-shredded"],
-  "do-a-thing": ["first-pullup", "first-pushup", "run-5k", "faster-mile", "flexibility", "skills"],
-  "event": ["event-run", "event-hyrox", "event-ocr", "event-test", "event-benchmark", "event-sport"],
-  "feel-better": ["mental", "longevity", "energy", "prevent", "mobility", "pain"],
-  "get-back": ["back-after-years", "back-postpartum", "start-fresh"],
-  "consistent": ["keep-quitting", "dont-know", "no-time"],
-};
+/* Every bubble id and, per bubble, the child ids under it, DERIVED from the
+   parameter table rather than typed out beside it.
+ *
+ * It was a hand written mirror of mo-knowledge/goals/goal-tree.json until
+ * 2026-09-15, with a comment promising a drift check that was never written,
+ * and it drifted exactly as promised. The picker in index.html was rewritten
+ * to eight goals including `build-endurance` and `move-better`;
+ * goal-engine.mjs grew parameters for both; this table did not. So both failed
+ * `isValidBubble`, fell through to the legacy `goal` string, which is
+ * "Stay consistent" for both tiles, and resolved to the habit plan. Build
+ * endurance lost its 3 x 35 minute mixed cardio and got 1 x 20 easy. Move
+ * better got no mobility block, which is the whole of that goal. The
+ * onboarding confirm screen read "Built for just be consistent."
+ *
+ * Deriving it removes the class of bug rather than this instance of it: the
+ * question this table answers is "can the engine honour this tap", and
+ * GOAL_PARAMS is the only honest answer to that. A goal the engine has
+ * parameters for is now accepted by construction, and a goal it does not is
+ * refused by construction. No file to keep in step, so no drift check needed.
+ *
+ * Still Deno safe: goal-engine.mjs is already imported here and reads nothing
+ * from disk. The research tree stays the research tree, and demo.mjs
+ * `--check` is still what holds it and GOAL_PARAMS together. */
+const TREE_CHILDREN = Object.fromEntries(
+  Object.entries(GOAL_PARAMS).map(([bubble, table]) => [bubble, Object.keys(table).filter((k) => k !== "_default")]),
+);
 
 function isValidBubble(bubble) {
   return typeof bubble === "string" && Object.prototype.hasOwnProperty.call(TREE_CHILDREN, bubble);
