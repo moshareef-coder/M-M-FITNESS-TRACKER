@@ -1082,14 +1082,14 @@ const BUTTERFLY_POSE = {
       root: { x: 70, y: 100, rot: 0 },
       joints: { spine: 0, neck: 0, hipR: 66, hipL: 66, kneeR: 151, kneeL: 151,
                 wristR: 8, wristL: 8 },
-      ik: { wristR: { x: 73.0, y: 103.0, bend: 1 }, wristL: { x: 67.0, y: 103.0, bend: 1 } },
+      ik: { wristR: { x: 61, y: 113.7, bend: 1 }, wristL: { x: 76.6, y: 111.2, bend: 1 } },
     },
     { // lengthen up through the crown and let the knees settle a touch wider
       t: 1,
       root: { x: 70, y: 99.4, rot: 0 },
       joints: { spine: -1, neck: -1, hipR: 69, hipL: 69, kneeR: 153, kneeL: 153,
                 wristR: 8, wristL: 8 },
-      ik: { wristR: { x: 72.9, y: 102.0, bend: 1 }, wristL: { x: 66.9, y: 102.0, bend: 1 } },
+      ik: { wristR: { x: 62.9, y: 107.3, bend: 1 }, wristL: { x: 77.6, y: 110.7, bend: 1 } },
     },
   ],
 };

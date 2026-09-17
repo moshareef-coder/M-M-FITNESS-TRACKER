@@ -769,18 +769,18 @@ const BARBELL_ROW = {
     { // bottom, bar hanging under the shoulders
       t: 0,
       root: { x: 64, y: 61.4, rot: 52 },
-      joints: { spine: 18, neck: -12 },
+      joints: { spine: 12, neck: -12, shoulderR: 0, shoulderL: 0, shoulderAbdR: 0, shoulderAbdL: 0, hipL: 0, hipAbdL: 0 },
       ik: {
-        wristR: { x: 92.2, y: 88.9, bend: 1 }, wristL: { x: 89.2, y: 90.9, bend: 1 },
+        wristR: { x: 85.7, y: 68, bend: 1 }, wristL: { x: 86, y: 67.1, bend: 1 },
         ...stand(62, 57),
       },
     },
     { // top, bar at the belly, elbows past the torso
       t: 1,
       root: { x: 64, y: 61.4, rot: 52 },
-      joints: { spine: 18, neck: -12 },
+      joints: { spine: 7, neck: -12, shoulderR: 0, shoulderL: 0, shoulderAbdR: 0, shoulderAbdL: 0, hipL: 0, hipAbdL: 0, kneeL: 0, ankleL: 0 },
       ik: {
-        wristR: { x: 85.2, y: 73.9, bend: 1 }, wristL: { x: 82.2, y: 75.9, bend: 1 },
+        wristR: { x: 84.5, y: 80.1, bend: 1 }, wristL: { x: 83, y: 78.7, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -2149,7 +2149,7 @@ const BENCH_DIP = {
          at the end of the push, which is a rep that never finishes. The top of
          a pushing movement is a straight arm. */
       t: 0,
-      root: { x: 57.4, y: 72.4, rot: -5 },
+      root: { x: 64.3, y: 90.2, rot: -5 },
       /* Mo: "just keep my hands faced forward." The wrist angle turns the mitt
          so the fingers point toward the feet, which is how a bench dip is
          actually held. It survives the IK: the solver decides where the wrist
@@ -2157,7 +2157,7 @@ const BENCH_DIP = {
          angle applied on top, so the two do not fight. */
       joints: { spine: 0, neck: -2, wristR: 150, wristL: 150 },
       ik: {
-        wristR: { x: 42.0, y: 76.0, bend: 1 }, wristL: { x: 38.0, y: 76.5, bend: 1 },
+        wristR: { x: 45.7, y: 77.5, bend: 1 }, wristL: { x: 40.8, y: 77.9, bend: 1 },
         ankleR: { x: 89, y: FLOOR, bend: -1 }, ankleL: { x: 83, y: FLOOR, bend: -1 },
       },
     },
@@ -2166,10 +2166,10 @@ const BENCH_DIP = {
       // into extension than a shoulder actually does, which is also why this
       // exercise has the reputation it has.
       t: 1,
-      root: { x: 55.2, y: 85.0, rot: -7 },
-      joints: { spine: 0, neck: -4, wristR: 150, wristL: 150 },
+      root: { x: 59.9, y: 70.1, rot: -7 },
+      joints: { spine: 0, neck: -4, shoulderR: 0, shoulderL: 0, shoulderAbdR: 0, shoulderAbdL: 0, forearmPronR: -95, forearmPronL: -95, wristR: 150, wristL: 150 },
       ik: {
-        wristR: { x: 41.8, y: 76.0, bend: 1 }, wristL: { x: 37.8, y: 76.5, bend: 1 },
+        wristR: { x: 47.6, y: 77.1, bend: 1 }, wristL: { x: 45.8, y: 77.1, bend: 1 },
         ankleR: { x: 89, y: FLOOR, bend: -1 }, ankleL: { x: 83, y: FLOOR, bend: -1 },
       },
     },

@@ -1282,15 +1282,13 @@ const BICEPS_WALL_STRETCH = {
     { // hand planted, arm long behind
       t: 0,
       root: { x: 44, y: 61.6, rot: 0 },
-      joints: { spine: 4, neck: 2, shoulderR: -52, elbowR: 0, wristR: -42,
-                shoulderL: 4, elbowL: 8, wristL: -4 },
+      joints: { spine: 4, neck: 2, shoulderR: -52, shoulderL: -52, elbowR: 0, elbowL: 0, wristR: -42, wristL: -42 },
       ik: { ankleR: { x: 46, y: 113.6, bend: -1 }, ankleL: { x: 41, y: 113.6, bend: -1 } },
     },
     { // body turns away from the planted hand on the exhale
       t: 1,
       root: { x: 47, y: 61.8, rot: 0 },
-      joints: { spine: 6, neck: 3, shoulderR: -56, elbowR: 0, wristR: -46,
-                shoulderL: 5, elbowL: 9, wristL: -4 },
+      joints: { spine: 6, neck: 3, shoulderR: -56, shoulderL: -56, elbowR: 0, elbowL: 0, wristR: -46, wristL: -46 },
       ik: { ankleR: { x: 49, y: 113.6, bend: -1 }, ankleL: { x: 44, y: 113.6, bend: -1 } },
     },
   ],
@@ -1740,17 +1738,17 @@ const BENT_KNEE_CALF_STRETCH = {
       root: { x: 72, y: 67, rot: 0 },
       joints: { spine: 14, neck: -8 },
       ik: {
-        ankleR: { x: 94, y: 113.6, bend: -1 }, ankleL: { x: 62, y: 113.6, bend: -1 },
-        wristR: { x: 113, y: 46, bend: 1 }, wristL: { x: 113, y: 52, bend: 1 },
+        ankleR: { x: 89.7, y: 115, bend: -1 }, ankleL: { x: 47.8, y: 119.4, bend: -1 },
+        wristR: { x: 113, y: 46, bend: 1 }, wristL: { x: 106.9, y: 44.9, bend: 1 },
       },
     },
     { // sinks a little further into the back knee on the exhale
       t: 1,
       root: { x: 73, y: 69, rot: 0 },
-      joints: { spine: 15, neck: -9 },
+      joints: { spine: 14, neck: -9, hipR: 0, hipL: 0, hipAbdR: 0, hipAbdL: 0 },
       ik: {
-        ankleR: { x: 94, y: 113.6, bend: -1 }, ankleL: { x: 62, y: 113.6, bend: -1 },
-        wristR: { x: 113, y: 46, bend: 1 }, wristL: { x: 113, y: 52, bend: 1 },
+        ankleR: { x: 92.2, y: 115.2, bend: -1 }, ankleL: { x: 47.6, y: 117.7, bend: -1 },
+        wristR: { x: 113, y: 46, bend: 1 }, wristL: { x: 108.3, y: 43.7, bend: 1 },
       },
     },
   ],
@@ -1794,9 +1792,7 @@ const HIP_SWITCH_90_90 = {
       // shin trailing, right thigh carried in front with its shin across
       t: 0,
       root: { x: 70, y: 74, rot: 0 },
-      joints: { hipRotL: -40, hipRotR: 48, spine: -2, neck: 0,
-                hipL: 88, kneeL: 96, hipR: 34, kneeR: -90,
-                shoulderR: 14, elbowR: 20, shoulderL: 14, elbowL: 20 },
+      joints: { spine: -2, neck: 0, shoulderR: -52, shoulderL: 26, shoulderAbdR: 0, shoulderRotR: 95, shoulderRotL: 0, elbowR: 0, elbowL: 87, hipR: 34, hipL: 88, hipRotR: 48, hipRotL: -40, kneeR: -90, kneeL: 96 },
     },
     { // rotated through to the other side, chest still tall, the two legs
       // having traded roles

@@ -761,8 +761,8 @@ export const BODYWEIGHT_SQUAT = {
     },
     { // bottom, hips back and down, chest up, arms out for balance
       t: 1,
-      root: { x: 52, y: 89, rot: 10 },
-      joints: { spine: 12, neck: -6, shoulderR: 41, elbowR: 10, shoulderL: 38, elbowL: 14 },
+      root: { x: 51.2, y: 95.6, rot: 10 },
+      joints: { spine: 12, neck: -6, shoulderR: 66, shoulderL: 64, shoulderRotR: 0, shoulderRotL: 1, elbowR: 1, elbowL: 1 },
       ik: { ankleR: { x: 64, y: 113.4, bend: -1 }, ankleL: { x: 61, y: 113.4, bend: -1 } },
     },
   ],
