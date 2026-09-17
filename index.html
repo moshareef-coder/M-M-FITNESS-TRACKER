@@ -3914,6 +3914,10 @@
      a whole surface over the screen to send three words is the friction the
      reveal exists to remove. */
   .pact-quick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+  /* The UA rule for [hidden] is display:none at attribute specificity, which a
+     class selector setting display outranks. Without this the reveal is open
+     from the moment the card renders and the button toggles nothing. */
+  .pact-quick[hidden] { display: none; }
   .pq {
     display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
     padding: 10px 13px; border-radius: 11px; min-height: 42px;
@@ -7359,7 +7363,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.17.9";
+const APP_VERSION = "2026.09.17.10";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -14509,9 +14513,16 @@ function momentItems() {
     const mine = entryOn(ME, date);
     const theirs = entryOn(partner, date);
 
-    if (mine?.gym && theirs?.gym) {
+    /* The notice card below is a bigger version of exactly this sentence, so
+       while it is up this strip says nothing at all about today's training.
+       Two cards and a line announcing one workout is the clutter the cap was
+       supposed to prevent. */
+    const quiet = noticeUp && date === today;
+    if (quiet) {
+      /* nothing about the training itself; a cheer below is still news */
+    } else if (mine?.gym && theirs?.gym) {
       out.push({ ico: "trophy", tone: "both", text: `You both trained ${when}.` });
-    } else if (theirs?.gym && !(noticeUp && date === today)) {
+    } else if (theirs?.gym) {
       out.push({ ico: "flame", tone: "them", text: `${partner} finished ${focusOn(PARTNER_EMAIL, date) || "a workout"} ${when}.` });
     } else if (mine?.gym) {
       out.push({ ico: "flame", tone: "me", text: `You finished ${focusOn(MY_EMAIL, date) || "a workout"} ${when}.` });
