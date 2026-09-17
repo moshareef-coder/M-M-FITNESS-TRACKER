@@ -14187,6 +14187,12 @@ async function requirePremium() {
    stop it, a way to restore a purchase already made, and links to the terms and
    the privacy policy. */
 function showPaywall() {
+  /* Second chance to warm the offering, for the case where the fetch at
+     configure time failed or had not finished before this screen opened. By
+     the time somebody has read the page and reached for Subscribe it is in
+     hand. Failure is still recoverable: primeOfferings clears itself, so the
+     call inside startPurchase retries rather than inheriting the failure. */
+  primeOfferings()?.catch(() => {});
   return new Promise((resolve) => {
     /* Full screen, not a sheet. This is the one screen in the app whose whole
        job is to be looked at rather than dismissed past, and a card floating
@@ -14349,16 +14355,47 @@ async function configureRevenueCat() {
   try {
     await rc.configure({ apiKey: REVENUECAT_API_KEY, appUserID: MY_EMAIL });
     REVENUECAT_CONFIGURED = true;
+    /* Warm the offering now rather than when somebody taps Subscribe.
+       getOfferings is a round trip to RevenueCat, and asking for it inside the
+       tap handler puts that whole round trip between the tap and Apple's
+       sheet appearing, which is the part that has to feel instant. Fetched
+       here it is almost always already resolved by the time it is wanted.
+       Deliberately not awaited: nothing about signing in should wait on a
+       price list, and a failure here is recovered by the refetch in
+       startPurchase. */
+    primeOfferings()?.catch((e) => console.warn("offering prefetch failed, will retry on tap", e));
   } catch (err) {
     console.error("could not configure RevenueCat", err);
   }
+}
+
+/* The offering, fetched once and kept as the promise rather than its result,
+   so simultaneous callers share the one request instead of racing. */
+let OFFERINGS_PROMISE = null;
+
+function primeOfferings() {
+  const rc = purchasesPlugin();
+  if (!rc) return null;
+  if (!OFFERINGS_PROMISE) {
+    OFFERINGS_PROMISE = rc.getOfferings().catch((err) => {
+      /* Cleared on failure so the next attempt genuinely retries. A rejected
+         promise kept here would poison every later purchase with a stale
+         error from whenever the network happened to be bad. */
+      OFFERINGS_PROMISE = null;
+      throw err;
+    });
+  }
+  return OFFERINGS_PROMISE;
 }
 
 async function startPurchase() {
   const rc = purchasesPlugin();
   if (!rc) { toast("Subscriptions are not available in this build yet"); return false; }
   try {
-    const offerings = await rc.getOfferings();
+    /* The warmed promise, not a fresh call. On the normal path this is already
+       resolved, so the await costs a tick and Apple's sheet comes up on the tap
+       rather than after a round trip. */
+    const offerings = await primeOfferings();
     const pkg = offerings?.current?.availablePackages?.[0];
     if (!pkg) {
       /* Distinguished from a purchase that failed, because the fixes are in
