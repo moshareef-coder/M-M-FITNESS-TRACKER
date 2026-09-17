@@ -4607,27 +4607,28 @@
      chip takes an equal share of the row, capped so that one goal and More do
      not become two slabs. Taller than wide on purpose, icon over a two line
      label, so the row reads as tabs rather than pills. */
-  .goal-chips { display: flex; gap: 8px; margin: 0 0 14px; }
+  /* One line of text tabs, not a row of tiles. Mo: too many buttons at the
+     top. The icon, the second label line and the 84px card each made this
+     strip heavier than the answer underneath it, and a goal strip is
+     navigation: it should be the quietest thing on the screen, not the
+     loudest. Underline rather than a filled pill, so it cannot be mistaken
+     for the segmented control directly below it. */
+  .goal-chips {
+    display: flex; gap: 16px; margin: 0 0 16px;
+    border-bottom: 1px solid var(--border);
+  }
   .goal-chip {
-    flex: 1 1 0; min-width: 0; max-width: 112px; min-height: 84px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
-    padding: 10px 6px 9px; border-radius: 14px; cursor: pointer;
-    border: 1px solid var(--border); background: var(--panel); color: var(--muted);
-    font: inherit; font-size: 11.5px; font-weight: 700; line-height: 1.2; text-align: center;
-    position: relative; transition: border-color .15s, color .15s, background .15s;
+    flex: 0 1 auto; min-width: 0; padding: 0 0 9px; cursor: pointer;
+    background: none; border: 0; border-bottom: 2px solid transparent;
+    color: var(--muted); font: inherit; font-size: 14px; font-weight: 700;
+    letter-spacing: -.01em;
+    /* Three long titles on a 390px phone: they shrink and clip rather than
+       wrap, because a wrapped tab is a two line tab and the row grows again. */
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: color .15s, border-color .15s;
   }
-  .goal-chip svg { color: var(--muted); flex-shrink: 0; }
-  .goal-chip span { display: block; overflow-wrap: anywhere; }
-  /* The lit chip: green edge, green icon, and the label in plain text colour.
-     The label used to go green too, and three green things on one chip is a
-     badge, not a selected tab. */
-  .goal-chip.on {
-    border-color: var(--accent); color: var(--text);
-    background: color-mix(in srgb, var(--accent) 9%, var(--panel));
-    box-shadow: 0 0 0 1px var(--accent) inset;
-  }
-  .goal-chip.on svg { color: var(--accent-ink); }
-  .goal-chip:active { border-color: var(--accent); }
+  .goal-chip.on { color: var(--text); border-bottom-color: var(--accent); }
+  .goal-chip:active { color: var(--text); }
   .photo-strip { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px 12px; padding: 4px 16px 6px; }
   .photo-item { flex-shrink: 0; width: 116px; }
   .photo-item img {
@@ -5300,7 +5301,9 @@
      is already used by the lift detail sheet, on purpose: the heaviest set and
      the best-by-reps grid should read identically wherever they appear, and a
      second set of styles for the same two facts is how they start disagreeing. */
-  .lift-records { margin-bottom: 12px; }
+  .lift-records, .lift-levels { margin-bottom: 12px; }
+  .lift-levels .sr-row { background: none; border-color: var(--border); }
+  .lift-levels .sr-row.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
   .lift-records .pr-top { margin-bottom: 14px; }
   .lift-records .pr-wrap:last-child { margin-bottom: 0; }
   /* "Best ever" beside the number, only when it is. */
@@ -6102,8 +6105,8 @@
         <div class="wt-range" id="liftRange"></div>
       </div>
       <div class="card lift-records hidden" id="liftRecords"></div>
+      <div class="card lift-levels hidden" id="liftLevels"></div>
       <div class="prog-tiles end-tiles" id="liftTiles">
-        <button type="button" class="prog-tile" id="liftLevel" disabled></button>
         <button type="button" class="prog-tile" id="liftVolume" disabled></button>
         <button type="button" class="prog-tile" id="liftPRs" disabled></button>
       </div>
@@ -16141,6 +16144,7 @@ function renderLiftHero(on, profile, isPartner) {
     $("liftEmpty").textContent = "Log a weighted set and this becomes your strength line.";
     $("liftRange").innerHTML = "";
     $("liftRecords").classList.add("hidden");
+    $("liftLevels").classList.add("hidden");
     $("liftTiles").classList.add("hidden");
     $("liftActions").classList.add("hidden");
     if (liftChart) { liftChart.destroy(); liftChart = null; }
@@ -16152,9 +16156,14 @@ function renderLiftHero(on, profile, isPartner) {
   if (!lifts.some((l) => l.name === LIFT_PICK)) LIFT_PICK = lifts[0].name;
   const pick = LIFT_PICK;
 
+  /* "Barbell Back Squat" is two lines in a quarter-width chip and makes the
+     whole strip two rows tall. On a screen that is entirely about barbells the
+     word carries nothing, so the chip drops it; the level list, the records and
+     the browser all still say the full name. */
+  const chipLabel = (n) => String(n).replace(/^barbell\s+/i, "");
   $("liftChips").classList.remove("hidden");
   $("liftChips").innerHTML = lifts.map((l) =>
-    `<button type="button" class="bulk-chip${l.name === pick ? " on" : ""}" data-lift="${escapeHtml(l.name)}">${escapeHtml(l.name)}</button>`).join("");
+    `<button type="button" class="bulk-chip${l.name === pick ? " on" : ""}" data-lift="${escapeHtml(l.name)}">${escapeHtml(chipLabel(l.name))}</button>`).join("");
   $("liftChips").querySelectorAll("[data-lift]").forEach((b) => {
     b.onclick = () => { LIFT_PICK = b.dataset.lift; again(); };
   });
@@ -16271,15 +16280,47 @@ function renderLiftHero(on, profile, isPartner) {
       </div>` : "");
   }
 
-  /* The level again as a tile, because the column beside the number only
-     exists for lifts that have a standard, and the tile is about the person
-     rather than about the lift on screen. overallStrength already answers
-     "where do they stand" across every levelled lift. */
-  const overall = typeof overallStrength === "function" ? overallStrength(name) : null;
-  $("liftLevel").innerHTML = `<span class="prog-tile-ico">${icon("dumbbell", 18)}</span>
-    <span class="prog-tile-body"><span class="prog-tile-title">Strength Level</span><span class="prog-tile-val">${
-      escapeHtml(overall?.level || "Not yet")}</span><span class="prog-tile-sub">${
-      overall?.level ? "across your main lifts" : "needs a barbell lift"}</span></span>`;
+  /* ---- A level on every lift ----
+     Mo: "I need to see the level on every single workout, not just one." The
+     column beside the number only ever scored the lift the chips were on, and
+     the same list already existed inside the strength report, two taps away
+     behind a button most people will never press.
+
+     It replaces the old Strength Level tile rather than joining it. That tile
+     averaged every lift into one word, which is the opposite of the question
+     being asked here, and keeping both would have put three different levels
+     on one screen. The average still lives in the report.
+
+     Only lifts with a published standard appear. A dumbbell or a machine
+     cannot be scored without guessing what the number on it means, which
+     LIFT_STANDARDS has always said, so they are left out rather than given a
+     bar that is made up. */
+  const segs = (index, within) => STRENGTH_LEVELS.map((_, i) => {
+    const pct = i < index ? 100 : i === index ? Math.round(within * 100) : 0;
+    return `<i><b style="width:${pct}%"></b></i>`;
+  }).join("");
+  const levelled = lifts
+    .map((l) => ({ name: l.name, lv: strengthLevelFor(name, l.name) }))
+    .filter((x) => x.lv);
+  const lvlBox = $("liftLevels");
+  lvlBox.classList.toggle("hidden", !levelled.length);
+  if (levelled.length) {
+    lvlBox.innerHTML = `<div class="pr-head">Level on every lift</div>
+      <div class="sr-list">
+        ${levelled.map((x) => `<button type="button" class="sr-row${x.name === pick ? " on" : ""}" data-pick="${escapeHtml(x.name)}">
+          <span class="sr-row-top">
+            <b>${escapeHtml(x.name)} &middot; ${escapeHtml(x.lv.level)}</b>
+            <span>${escapeHtml(x.lv.next ? `${lb(x.lv.toNext)} lb to ${x.lv.next}` : "top of the scale")}</span>
+          </span>
+          <span class="lvl-segs sr-row-bar">${segs(x.lv.index, x.lv.within)}</span>
+        </button>`).join("")}
+      </div>`;
+    /* Tapping a row charts that lift, so the list is also how you move between
+       them without going back up to the chips. */
+    lvlBox.querySelectorAll("[data-pick]").forEach((b) => {
+      b.onclick = () => { LIFT_PICK = b.dataset.pick; again(); };
+    });
+  }
 
   const vw = volumeWeeks(name, 8);
   const thisWeek = vw[vw.length - 1].volume;
@@ -17223,13 +17264,18 @@ function rgbOf(hex) {
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 
+/* One flat colour under the line, not a fade. Mo: the background of the graph
+   should not change colour. A vertical gradient reads as the chart having a
+   lit top and a dark bottom, which is a second thing to interpret on a picture
+   whose only job is the shape of the line, and it made the same line look
+   different at different y positions.
+
+   `ctx` is still taken and still ignored: seven charts call this and the
+   signature is not worth churning for an argument that is now unused. */
 function chartWash(ctx, hex) {
   const rgb = rgbOf(hex);
   if (!rgb) return "transparent";
-  const g = ctx.createLinearGradient(0, 0, 0, 190);
-  g.addColorStop(0, `rgba(${rgb}, .26)`);
-  g.addColorStop(1, `rgba(${rgb}, 0)`);
-  return g;
+  return `rgba(${rgb}, .13)`;
 }
 
 /* ---------- Strength card ----------
@@ -27805,18 +27851,6 @@ function headlineSpark(kind, name) {
    somebody else's data through a goal they did not pick answers a question
    nobody asked. */
 
-/* Which two lines a chip carries. The tile titles are sentences ("Lose
-   weight", "Build endurance"); a chip is a label, so it breaks at the first
-   space and capitalises the second line. The one long title is cut to its
-   first two words: the chip is 80px wide and "and stay consistent" is three
-   more lines under it. */
-function goalChipLines(tile) {
-  const words = String(tile?.title || "").split(" ");
-  let l2 = tile?.id === "feel-better" ? (words[1] || "") : words.slice(1).join(" ");
-  if (l2) l2 = l2[0].toUpperCase() + l2.slice(1);
-  return [words[0] || "", l2];
-}
-
 /* A profile saved before the bubbles existed carries only the legacy `goal`
    string ("Lose weight"), and headlineKindFor already reads that one. The
    strip has to as well, or such an account sees its goal named in the hero
@@ -27863,15 +27897,12 @@ function renderGoalChips(profile) {
   }
   ids.length = Math.min(ids.length, 3);
 
-  const chip = (t) => {
-    const [l1, l2] = goalChipLines(t);
-    return `
+  /* The title as written, on one line. It used to be split across two lines
+     with the second word capitalised, which turned "Build endurance" into
+     "Build / Endurance" and made every tab a block. */
+  const chip = (t) => `
     <button type="button" class="goal-chip${t.id === showing ? " on" : ""}"
-      data-goal="${escapeHtml(t.id)}" aria-pressed="${t.id === showing}">
-      ${icon(t.ico, 20)}
-      <span>${escapeHtml(l1)}${l2 ? `<br>${escapeHtml(l2)}` : ""}</span>
-    </button>`;
-  };
+      data-goal="${escapeHtml(t.id)}" aria-pressed="${t.id === showing}">${escapeHtml(t.title || "")}</button>`;
   host.innerHTML = ids.map((id) => chip(goalTileFor(id))).join("");
 
   host.querySelectorAll("[data-goal]").forEach((b) => {
