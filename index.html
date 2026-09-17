@@ -1582,12 +1582,22 @@
      header, but the reveal stage is dark whatever the theme is, so the panel
      and border tokens would come back light on top of it. */
   .gen-row .wp-chip { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18); color: rgba(255,255,255,.6); }
-  /* Sheets sit at 65 and the reveal at 95, and this is the only sheet that
-     ever opens over the reveal. */
-  #swapScrim { z-index: 96; }
+  /* Sheets sit at 65 and the reveal at 95, and these two are the only sheets
+     that ever open over the reveal. */
+  #swapScrim, #swapDayScrim { z-index: 96; }
   /* An alternative's reason is a sentence, not a stat line, so it wraps
      rather than being cut off at the first ellipsis. */
-  #swapSheet .sv-row-meta { white-space: normal; overflow: visible; line-height: 1.35; }
+  #swapSheet .sv-row-meta, #swapDaySheet .sv-row-meta { white-space: normal; overflow: visible; line-height: 1.35; }
+  /* The whole-session version of the chip on a row, and quieter than it: this
+     is an offer on a finished plan, not what the screen is for. */
+  .gen-swap {
+    display: inline-flex; align-items: center; gap: 7px; margin-top: 14px;
+    padding: 9px 15px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600;
+    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.18);
+    color: rgba(255,255,255,.72); cursor: pointer;
+    animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
+  }
+  .gen-swap:active { transform: scale(.97); }
   .gen-go {
     margin-top: 18px; animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
   }
@@ -7286,6 +7296,11 @@
   <div class="sheet-scrim hidden" id="swapScrim">
     <div class="partner-sheet" id="swapSheet"></div>
   </div>
+  <!-- Swapping the whole session. Its own scrim for the same reason its
+       sibling above has one: it opens over the reveal. -->
+  <div class="sheet-scrim hidden" id="swapDayScrim">
+    <div class="partner-sheet" id="swapDaySheet"></div>
+  </div>
 
   <nav class="tabs">
     <button class="tab-btn active" data-tab="home" data-icon="home" aria-current="page">Home</button>
@@ -11650,7 +11665,7 @@ async function reconcileNativeSurfaces() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "liftsScrim", "reportScrim", "measureScrim", "cardioScrim", "csnScrim"]
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "swapDayScrim", "liftsScrim", "reportScrim", "measureScrim", "cardioScrim", "csnScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
   stopGenTicker();
   $("genScrim")?.classList.add("hidden");
@@ -18031,6 +18046,10 @@ function renderCardioStage() {
         </button>`).join("")}
       </div>
       ${a.training ? `<p class="csn-guided">${icon("wand", 15)} <span>Guided ${escapeHtml(a.label)} session, built from the ${escapeHtml(a.label)} library at your level.</span></p>` : ""}
+      ${/* The session a whole-workout swap sent them here with. Without it this
+            screen is a bare clock, and "8 rounds of 1 minute hard" is the part
+            that makes it that session rather than a run of that length. */ ""}
+      ${CARDIO_SES.note ? `<p class="csn-guided">${icon("run", 15)} <span>${escapeHtml(CARDIO_SES.note)}</span></p>` : ""}
       <div class="csn-dur">
         <div class="csn-dur-k">How long</div>
         <div class="csn-dur-row">
@@ -18059,6 +18078,10 @@ function renderCardioStage() {
       b.onclick = () => { CARDIO_SES.minutes = Number(b.dataset.preset); csnSave(); renderCardioStage(); };
     });
     $("csnGo").onclick = async () => {
+      /* The lifting day this session was swapped for stands down now, and only
+         now: see startCardioInsteadOfPlan on why opening the timer is not
+         enough to take somebody's plan away. */
+      if (CARDIO_SES.instead?.planId) await archiveSwappedPlan(CARDIO_SES.instead);
       /* Built before the clock starts, so the first move is on screen the moment
          it does. A training without a library just gets the timer. */
       CARDIO_SES.plan = a.training ? await buildGuidedPlan(a, CARDIO_SES.minutes) : null;
@@ -20215,6 +20238,9 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
             <button type="button" class="wp-chip" data-swap="${i}" aria-label="Swap ${escapeHtml(ex.name || "")}">${icon("swap", 15)}</button>
           </div>`).join("")}
       </div>
+      ${isCoachedClient() ? "" : `<button type="button" class="gen-swap" id="genSwapDayBtn" style="--d:${list.length * 70 + 60}ms">
+        ${icon("swap", 14)}<span>Swap the whole workout</span>
+      </button>`}
       ${askLimits ? `
       <div class="gen-nudge" style="--d:${list.length * 70 + 60}ms">
         <p>Anything that hurts, or gear you don't have? Tell us once and every plan will respect it.</p>
@@ -20242,6 +20268,18 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
         },
       });
     });
+    /* The sibling of the chip on every row: that one says "not this
+       movement", this one says "not this workout". It sits under the rows
+       rather than in the header because it is only worth asking once the plan
+       has been read. */
+    if ($("genSwapDayBtn")) {
+      $("genSwapDayBtn").onclick = () => openSessionSwapSheet({
+        date: swapDate,
+        current: { focus: workout.focus, exercises: workout.exercises, cardio: TODAY_WORKOUT?.cardio ?? null },
+        fromReveal: true,
+        onGo,
+      });
+    }
     if ($("genTimeBtn")) {
       $("genTimeBtn").onclick = () => openSessionBudgetSheet({
         estimate: estMin,
@@ -20476,6 +20514,362 @@ function swapCurrentExercise() {
   });
 }
 
+/* ---------- Swapping the whole session ----------
+   Swap exercise answers "not this movement". This answers "not this workout":
+   the day itself is wrong, and what somebody wants is a different session that
+   still suits them. Same sheet, same rows with a reason each, same write, same
+   toast as its sibling above, because it is the same gesture one size up.
+
+   Where the alternatives come from is the one real difference. Every exercise
+   arrives carrying its own ranked `alternatives`; a whole day carries nothing,
+   so the day alternatives are the OTHER days of this person's own week, built
+   here by running mo-knowledge/engine/adapter.mjs in the browser over the very
+   payload a generate would have posted. Deterministic, instant, free, and the
+   same plan the edge function would return. It also spends nothing against the
+   daily generate limit, which is right: they already paid for this day, and
+   putting a different one of their own week in front of them is not a second
+   generate.
+
+   The cardio alternatives come from knowledge/exercise-library/cardio.mjs, and
+   only in the modes somebody actually opted into (profiles.train_styles).
+   That column is null on every account until 20260917_onboarding_styles_and_
+   tuning.sql runs, null means the question was never asked, and never asked
+   falls back to what this app has always done: sessions of movements only. */
+
+let planEnginePromise = null;
+function ensurePlanEngine() {
+  if (!planEnginePromise) {
+    planEnginePromise = import("/mo-knowledge/engine/adapter.mjs")
+      .catch((e) => { console.warn("plan engine", e); return null; });
+  }
+  return planEnginePromise;
+}
+
+let cardioLibraryPromise = null;
+function ensureCardioLibrary() {
+  if (!cardioLibraryPromise) {
+    cardioLibraryPromise = import("/knowledge/exercise-library/cardio.mjs")
+      .catch((e) => { console.warn("cardio library", e); return null; });
+  }
+  return cardioLibraryPromise;
+}
+
+/* What they ticked on the way in, as TRAIN_STYLES entries, or null for "never
+   asked". An empty list is treated as never asked too: strict opt in cannot
+   mean "plan nothing at all", and a row that somehow holds one would otherwise
+   leave this sheet with nothing it is allowed to offer. */
+function optedTrainStyles() {
+  const ids = MY_PROFILE?.train_styles;
+  if (!Array.isArray(ids) || !ids.length) return null;
+  const picked = ids.map((id) => TRAIN_STYLES.find((t) => t.id === id)).filter(Boolean);
+  return picked.length ? picked : null;
+}
+
+/* The library's mode names for the cardio they ticked. "A sport" carries no
+   mode because we have no sessions for one, and offering a run to somebody who
+   said they play football is exactly the kind of near-miss this column exists
+   to stop. */
+function optedCardioModes() {
+  const picked = optedTrainStyles();
+  return picked
+    ? [...new Set(picked.filter((t) => t.mod === "cardio" && t.mode).map((t) => t.mode))]
+    : [];
+}
+
+/* Lifting, home work, yoga and pilates all come back from the engine as a day
+   of movements, so one question covers all four: is anything they ticked a
+   session of exercises rather than time at an effort. Never asked is yes,
+   which is what every plan this app has ever built already assumed. */
+function optedIntoBuiltSessions() {
+  const picked = optedTrainStyles();
+  return !picked || picked.some((t) => t.mod !== "cardio");
+}
+
+/* Endurance is the one goal whose tuning answer changes what a cardio session
+   should BE, so it is the only thing read out of goal_tuning here. A missing
+   column, a null, and a shape we do not recognise all land on steady work,
+   which is where most of anybody's cardio belongs anyway. */
+const CARDIO_CATEGORY_FOR_TUNING = { general: "steady", distance: "long", speed: "intervals" };
+function tunedCardioCategory() {
+  const tuning = MY_PROFILE?.goal_tuning;
+  const answer = tuning && typeof tuning === "object" && !Array.isArray(tuning) ? tuning["build-endurance"] : null;
+  return (typeof answer === "string" && CARDIO_CATEGORY_FOR_TUNING[answer]) || null;
+}
+
+/* The activity timer speaks in CARDIO_ACTS and the library speaks in modes.
+   Anything with no timer of its own lands on Other, which is a clock and a
+   minutes field, and that is honest: this app cannot coach a swim. */
+const CARDIO_ACT_FOR_MODE = {
+  running: "run", walking: "walk", hiking: "walk", cycling: "cycle",
+  rowing: "row", hiit: "hiit", swimming: "other", elliptical: "other", stairs: "other",
+};
+
+/* Up to four, and deliberately no more. This is a choice between genuinely
+   different sessions; a list of a dozen is a library, and the app already has
+   two of those one screen away. */
+async function buildSessionAlternatives(current, date) {
+  const out = [];
+  const currentFocus = (current?.focus || "").trim().toLowerCase();
+  let level = "beginner";
+
+  const engine = await ensurePlanEngine();
+  if (engine) {
+    try {
+      /* The week, built the way the generator builds it. `includePlan` is the
+         only way to see the days this person's week has other than the one
+         they are looking at. */
+      const { plan } = engine.generateFromPayload(workoutEnginePayload(), { includePlan: true });
+      const week = plan?.week || [];
+      /* Read for the cardio half below whether or not any day is offered: the
+         library filters its sessions by level, and beginner-by-default would
+         quietly hide every interval session from somebody who trains. */
+      if (plan?.level) level = plan.level;
+      if (optedIntoBuiltSessions()) {
+        /* Start from the day AFTER the one on screen, so the first offer is the
+           session that would come next rather than whichever day the week
+           happens to begin with. */
+        const at = Math.max(0, week.findIndex((d) => (d?.name || "").trim().toLowerCase() === currentFocus));
+        const seen = new Set([currentFocus]);
+        for (let n = 1; n <= week.length && out.length < 2; n++) {
+          const i = (at + n) % week.length;
+          const name = (week[i]?.name || "").trim().toLowerCase();
+          if (!name || seen.has(name)) continue;
+          seen.add(name);
+          const built = engine.toWorkout(plan, i);
+          /* A different name over the same five lifts is not a different
+             session, and a short week can produce one. */
+          if (planSignature(built.exercises) === planSignature(current?.exercises)) continue;
+          /* Setup > Training, applied here because the engine only strips the
+             day it picked itself and these are the days it did not. Same two
+             empty lists engine/mobility.mjs stripMobility leaves behind. */
+          const workout = MY_PROFILE?.skip_stretching === true
+            ? { ...built, warmup: [], cooldown: [] }
+            : built;
+          const minutes = sessionEstimateMinutes(workout.exercises, {
+            warmup: workout.warmup || [], cooldown: workout.cooldown || [], ramp: workout.rampSets || [],
+          });
+          out.push({
+            kind: "session",
+            ico: "dumbbell",
+            name: workout.focus,
+            /* The first three movements, because "Pull day" tells somebody far
+               less about whether they want it than "Deadlift, Lat Pulldown"
+               does. */
+            why: `${workout.exercises.length} exercises, about ${minutes} min. ${workout.exercises.slice(0, 3).map((e) => e.name).join(", ")}.`,
+            workout,
+          });
+        }
+      }
+    } catch (err) {
+      /* A failed build costs the day rows and nothing else: the cardio half
+         below still has something to offer, and the sheet says so. */
+      console.warn("could not build the rest of the week", err);
+    }
+  }
+
+  const modes = optedCardioModes();
+  /* Today only. A cardio swap hands over to the activity timer, and a timer is
+     a thing you start now: there is nothing to queue for Thursday. */
+  if (modes.length && date === todayStr()) {
+    const lib = await ensureCardioLibrary();
+    if (lib) {
+      const byCategory = new Map();
+      for (const s of lib.cardioFor({ modes, level })) {
+        if (!byCategory.has(s.categoryKey)) byCategory.set(s.categoryKey, []);
+        byCategory.get(s.categoryKey).push(s);
+      }
+      /* One easy session and one hard one beats two of either, so the order
+         alternates rather than walking down the library. What build-endurance
+         said it is for leads when it was asked. */
+      const wanted = [tunedCardioCategory(), "steady", "intervals", "recovery", "long", "tempo"].filter(Boolean);
+      /* Same day, same offer. Deterministic on the date rather than random, so
+         the sheet does not reshuffle itself under somebody who closed it to
+         think about it, and a different day still gets a different session. */
+      const seed = Number((date || "").replace(/-/g, "")) || 0;
+      const used = new Set();
+      for (const key of wanted) {
+        if (used.size >= 2) break;
+        const list = byCategory.get(key);
+        if (!list?.length || used.has(key)) continue;
+        used.add(key);
+        const s = list[seed % list.length];
+        out.push({
+          kind: "cardio",
+          ico: CARDIO_ACTS.find((a) => a.key === (CARDIO_ACT_FOR_MODE[s.mode] || "other"))?.ico || "run",
+          name: s.name,
+          why: `${s.minutes} min · ${s.structure || String(s.cue || "").split(". ")[0]}`,
+          session: s,
+        });
+      }
+    }
+  }
+  return out.slice(0, 4);
+}
+
+let SESSION_SWAP_CTX = null;    // { date, current, fromReveal, onGo }
+let SESSION_SWAP_ALTS = null;   // null while the week is still being built
+
+async function openSessionSwapSheet(ctx) {
+  /* Gated where generateWorkout is gated, and for the same reason. Swapping one
+     movement is free because the day was already paid for; building a different
+     session out of the engine is the paid thing, whichever module it runs in,
+     and a lapsed account could otherwise sit on one old plan and walk its whole
+     week out of this sheet. */
+  if (!await requirePremium()) return;
+  SESSION_SWAP_CTX = ctx;
+  SESSION_SWAP_ALTS = null;
+  $("swapDayScrim").classList.remove("hidden");
+  $("swapDayScrim").onclick = (e) => { if (e.target === $("swapDayScrim")) closeSessionSwapSheet(); };
+  renderSessionSwapSheet();
+  const alts = await buildSessionAlternatives(ctx.current, ctx.date);
+  // Closed, or opened again on another day, while the engine module loaded.
+  if (SESSION_SWAP_CTX !== ctx) return;
+  SESSION_SWAP_ALTS = alts;
+  renderSessionSwapSheet();
+}
+
+function closeSessionSwapSheet() {
+  SESSION_SWAP_CTX = null;
+  SESSION_SWAP_ALTS = null;
+  $("swapDayScrim").classList.add("hidden");
+  pinSheets();
+}
+
+function renderSessionSwapSheet() {
+  const ctx = SESSION_SWAP_CTX;
+  if (!ctx) return;
+  const alts = SESSION_SWAP_ALTS;
+  const title = displayFocus(ctx.current?.focus, ctx.current?.exercises) || "this workout";
+  const note = !alts
+    ? "Reading the rest of your week."
+    : alts.length
+      ? "A different session, not another version of this one. Picking one replaces the plan, including anything you added or reordered."
+      : "Nothing different enough to offer. Regenerate gives you another version of this same day.";
+  $("swapDaySheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="swdClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">Instead of ${escapeHtml(title)}</div>
+      <div class="spacer"></div>
+    </div>
+    <p class="muted-note" style="margin:-6px 0 14px;">${escapeHtml(note)}</p>
+    <div class="sv-rows">
+      ${(alts || []).map((a, i) => `<button type="button" class="sv-row" data-session-alt="${i}">
+        <span class="sv-row-ico">${icon(a.ico, 18)}</span>
+        <span class="sv-row-txt">
+          <span class="sv-row-name">${escapeHtml(a.name)}</span>
+          <span class="sv-row-meta">${escapeHtml(a.why)}</span>
+        </span>
+        <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
+      </button>`).join("")}
+    </div>`;
+  $("swdClose").onclick = closeSessionSwapSheet;
+  $("swapDaySheet").querySelectorAll("[data-session-alt]").forEach((b) => {
+    b.onclick = () => chooseSessionAlternative(Number(b.dataset.sessionAlt));
+  });
+  $("swapDaySheet").scrollTop = 0;
+}
+
+function chooseSessionAlternative(i) {
+  const ctx = SESSION_SWAP_CTX;
+  const alt = (SESSION_SWAP_ALTS || [])[i];
+  if (!ctx || !alt) return;
+  closeSessionSwapSheet();
+  if (alt.kind === "cardio") startCardioInsteadOfPlan(alt.session, ctx);
+  else applySessionSwap(alt.workout, ctx);
+}
+
+/* Written exactly the way restoreSessionBudget writes, because it is the same
+   move: ai_workouts holds one row per person per day, so the day is replaced
+   whole, and the two completion fields are cleared for the same reason every
+   other writer of this row clears them.
+
+   Nothing is recorded in exercise_swaps, on purpose. That table answers "which
+   MOVEMENT does this person quietly replace", and engine/preferences.mjs stops
+   prescribing a lift after three of them: writing five rows because somebody
+   wanted to pull instead of push would teach it that bench press is the
+   problem. So a whole session swap teaches the engine nothing today. That is
+   worth fixing with a table of its own rather than by poisoning this one. */
+async function applySessionSwap(workout, ctx) {
+  const date = ctx.date;
+  const { error } = await sb.from("ai_workouts").upsert({
+    user_name: ME, email: MY_EMAIL, entry_date: date,
+    focus: workout.focus, exercises: workout.exercises,
+    mobility: (workout.warmup?.length || workout.cooldown?.length || workout.rampSets?.length)
+      ? { warmup: workout.warmup || [], cooldown: workout.cooldown || [],
+          ramp: workout.rampSets || [], skipped: false }
+      : null,
+    /* The weekly cardio the goal asks for belongs to the goal, not to the day,
+       so it rides across the swap untouched. */
+    cardio: ctx.current?.cardio ?? null,
+    archived: false, completed_at: null, duration_sec: null,
+  }, { onConflict: "email,entry_date" });
+  if (error) { console.error("could not swap the session", error); toast("Couldn't swap that. Try again."); return; }
+
+  /* The budget snapshot belonged to a plan that no longer exists, and a "Back
+     to 45 min" offer pointing at a session they swapped away from is a trap. */
+  if (ONE_OFF_SESSION?.date === date) ONE_OFF_SESSION = null;
+
+  await loadAll();
+  if (date === todayStr()) {
+    await loadTodayWorkout();
+    FRESH_PLAN_ID = TODAY_WORKOUT?.id || null;
+    renderWorkoutTab();
+  } else {
+    renderHero();
+  }
+  toast(`Swapped to ${workout.focus}`);
+  /* Opened from the reveal, so the reveal is what redraws: the same overlay,
+     the new session landing a row at a time exactly as the first one did, with
+     its own swap chips and its own button underneath. */
+  if (ctx.fromReveal) revealGeneratedPlan(workout, null, ctx.onGo, date, [], null);
+}
+
+/* A run is not a list of sets, and this app has never pretended otherwise: the
+   activity timer is where cardio is done and exercise_logs.duration_min is
+   where it lands. So a cardio swap hands the day to that timer with the
+   library's session already dialled in, rather than writing "Easy Run, 25 min"
+   into ai_workouts.exercises where every screen that reads that column would
+   take it for one set of something.
+
+   The plan it replaces is NOT stood down here. Opening a timer is not doing the
+   session, and a day left with no plan because somebody opened this and changed
+   their mind is a worse failure than one extra tap. It steps aside when the
+   clock actually starts, in csnGo. */
+function startCardioInsteadOfPlan(s, ctx) {
+  // A session already running is the truth and outranks this; show it instead.
+  if (CARDIO_SES && CARDIO_SES.state !== "setup") { openCardioSession(); return; }
+  if (ctx.fromReveal) closeGenOverlay();
+  const planned = ctx.date === todayStr() && TODAY_WORKOUT?.id && !TODAY_WORKOUT.archived
+    ? { planId: TODAY_WORKOUT.id, focus: TODAY_WORKOUT.focus }
+    : null;
+  CARDIO_SES = {
+    state: "setup",
+    act: CARDIO_ACT_FOR_MODE[s.mode] || "other",
+    minutes: s.minutes,
+    accum: 0,
+    since: null,
+    /* What the session actually is, carried onto the setup screen. Offering
+       "Run Intervals" and then handing over a plain 25 minute clock loses the
+       entire session, which is the structure and the effort, not the length. */
+    note: `${s.name}. ${s.structure ? s.structure + ". " : ""}${s.cue || ""}`.trim(),
+    instead: planned,
+  };
+  csnSave();
+  openCardioSession();
+  toast(`Swapped to ${s.name}`);
+}
+
+/* The lifting day that a cardio session replaced, once that session is really
+   under way. Archived rather than deleted, the same as every other way a plan
+   is stood down, so the day still knows it had one. */
+async function archiveSwappedPlan(instead) {
+  const { error } = await sb.from("ai_workouts").update({ archived: true }).eq("id", instead.planId);
+  if (error) { console.error("could not stand the swapped plan down", error); return; }
+  if (TODAY_WORKOUT?.id === instead.planId) TODAY_WORKOUT = null;
+  renderWorkoutTab();
+}
+
 /* The screen that says what went wrong. It has to be the most robust thing
    here: if this throws, the user is left staring at a frozen overlay with no
    idea what happened, which is exactly what it did when it still referenced
@@ -20512,38 +20906,13 @@ function failGenOverlay(message) {
    whenever a plan is generated the ordinary way, or the focus changes. */
 let REGEN_SEEN = { focus: null, names: [] };
 
-/* `sessionMinutes` is the one-off budget for this call only (applySessionBudget)
-   and is never written to profiles.session_minutes. `wantFocus` keeps the day
-   type across a rebuild that was not asking for different movements. */
-async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = null, keepFocus: wantFocus = null } = {}) {
-  if (isCoachedClient()) { toast("Your coach sets your workouts"); return false; }
-  /* The paid one. Every route to a generated plan comes through here, which is
-     the reason to gate the function rather than the buttons: there are several
-     of those and a new one is one more place to forget. */
-  if (!await requirePremium()) return false;
-  const keepFocus = sameAgain ? TODAY_WORKOUT?.focus || null : wantFocus || null;
-  if (!sameAgain || REGEN_SEEN.focus !== keepFocus) REGEN_SEEN = { focus: keepFocus, names: [] };
-  if (sameAgain) {
-    for (const e of TODAY_WORKOUT?.exercises || []) {
-      if (!REGEN_SEEN.names.includes(e.name)) REGEN_SEEN.names.push(e.name);
-    }
-  }
-  /* Empty for a budget change, on purpose. "Give me a different one" and "give
-     me a shorter one" are different asks: avoiding what is on the plan would
-     hand back other movements when the person only ever said they had less
-     time, and it would fight the engine's own ladder, which shortens a session
-     by trimming sets off THESE lifts before it drops any of them. */
-  const avoid = sameAgain ? [...REGEN_SEEN.names] : [];
-  /* This used to be wired straight to onclick, which handed it a PointerEvent
-     as forDate. That went all the way into entry_date and came back as
-     "invalid input syntax for type date" from Postgres. Only a real date is
-     allowed through now, so a future mis-wiring cannot poison the write. */
-  const wanted = typeof forDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(forDate) ? forDate : null;
-  const target = wanted || todayStr();
-  const isToday = target === todayStr();
-  WORKOUT_MODE = null;
-  openGenOverlay(isToday ? "Generating" : "Planning");
+/* Everything the generator is told about this person, as one object.
 
+   Lifted out of generateWorkout because swapping the whole session builds its
+   alternatives by running the very same engine on the very same inputs, in the
+   browser. Two payloads assembled in two places would drift, and the sheet
+   would then offer days the real generate would never have built. */
+function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null } = {}) {
   const history = Object.entries(personalRecords(ME).best).map(([exercise_name, weight]) => ({ exercise_name, weight }));
   const recentWeight = entriesFor(ME).filter((e) => e.weight != null).slice(-1)[0]?.weight ?? null;
   const recentGymDays = gymDaysThisWeek(ME);
@@ -20582,52 +20951,93 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
       completed_at: p.completed_at,
     }));
 
+  /* No name and no email in here on purpose. The privacy policy promises
+     that nothing identifying leaves for the model, and the name did no
+     work in the prompt anyway: the plan is built from the body metrics
+     and the history below it. Keep it that way, or the policy becomes
+     a false statement the moment someone adds a field. */
+  return {
+    focus,
+    avoid,
+    goal: MY_PROFILE?.goal,
+    goal_detail: MY_PROFILE?.goal_detail,
+    sex: MY_PROFILE?.sex,
+    age: MY_PROFILE?.age,
+    height_in: MY_PROFILE?.height_in,
+    activity_level: MY_PROFILE?.activity_level,
+    current_weight: recentWeight,
+    gym_days_this_week: recentGymDays,
+    challenge_target: MY_PROFILE?.challenge_target ?? null,
+    /* How long one session should take, from Setup > Training. null on a
+       database without the column yet and on anybody who never answered,
+       and the contract says null is byte for byte "never asked".
+       A one-off budget is this same field with a different number on this
+       one call, which is all the engine needs and all it ever gets: the
+       profile column stays exactly as it was. */
+    session_minutes: Number.isFinite(sessionMinutes) ? sessionMinutes : (MY_PROFILE?.session_minutes ?? null),
+    focus_groups: MY_PROFILE?.focus_groups ?? null,
+    focus_chosen_at: MY_PROFILE?.focus_chosen_at ?? null,
+    limits: MY_PROFILE?.limits ?? null,
+    goal_bubble: MY_PROFILE?.goal_bubble ?? null,
+    goal_child: MY_PROFILE?.goal_child ?? null,
+    /* The "and also" goals. null on a database without the column yet, and
+       the contract says null, [] and nonsense all mean the same as not
+       sending it, so this line is safe before the migration runs. */
+    goal_secondary: MY_PROFILE?.goal_secondary ?? null,
+    history,
+    logs: recentLogs,
+    plans: recentPlans,
+    swaps: recentSwaps,
+    /* Setup > Training. True strips the engine's timed warm-up and
+       cool-down; the lifts underneath are byte for byte the same plan. */
+    skip_stretching: MY_PROFILE?.skip_stretching === true,
+  };
+}
+
+/* `sessionMinutes` is the one-off budget for this call only (applySessionBudget)
+   and is never written to profiles.session_minutes. `wantFocus` keeps the day
+   type across a rebuild that was not asking for different movements. */
+async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = null, keepFocus: wantFocus = null } = {}) {
+  if (isCoachedClient()) { toast("Your coach sets your workouts"); return false; }
+  /* The paid one. Every route to a generated plan comes through here, which is
+     the reason to gate the function rather than the buttons: there are several
+     of those and a new one is one more place to forget. */
+  if (!await requirePremium()) return false;
+  const keepFocus = sameAgain ? TODAY_WORKOUT?.focus || null : wantFocus || null;
+  if (!sameAgain || REGEN_SEEN.focus !== keepFocus) REGEN_SEEN = { focus: keepFocus, names: [] };
+  if (sameAgain) {
+    for (const e of TODAY_WORKOUT?.exercises || []) {
+      if (!REGEN_SEEN.names.includes(e.name)) REGEN_SEEN.names.push(e.name);
+    }
+  }
+  /* Empty for a budget change, on purpose. "Give me a different one" and "give
+     me a shorter one" are different asks: avoiding what is on the plan would
+     hand back other movements when the person only ever said they had less
+     time, and it would fight the engine's own ladder, which shortens a session
+     by trimming sets off THESE lifts before it drops any of them. */
+  const avoid = sameAgain ? [...REGEN_SEEN.names] : [];
+  /* This used to be wired straight to onclick, which handed it a PointerEvent
+     as forDate. That went all the way into entry_date and came back as
+     "invalid input syntax for type date" from Postgres. Only a real date is
+     allowed through now, so a future mis-wiring cannot poison the write. */
+  const wanted = typeof forDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(forDate) ? forDate : null;
+  const target = wanted || todayStr();
+  const isToday = target === todayStr();
+  WORKOUT_MODE = null;
+  openGenOverlay(isToday ? "Generating" : "Planning");
+
+  const payload = workoutEnginePayload({
+    focus: keepFocus || MY_PROFILE?.focus,
+    avoid,
+    sessionMinutes,
+  });
+
   try {
     const { data: { session } } = await sb.auth.getSession();
     const resp = await fetch(FUNCTION_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token },
-      /* No name and no email in here on purpose. The privacy policy promises
-         that nothing identifying leaves for the model, and the name did no
-         work in the prompt anyway: the plan is built from the body metrics
-         and the history below it. Keep it that way, or the policy becomes
-         a false statement the moment someone adds a field. */
-      body: JSON.stringify({
-        focus: keepFocus || MY_PROFILE?.focus,
-        avoid,
-        goal: MY_PROFILE?.goal,
-        goal_detail: MY_PROFILE?.goal_detail,
-        sex: MY_PROFILE?.sex,
-        age: MY_PROFILE?.age,
-        height_in: MY_PROFILE?.height_in,
-        activity_level: MY_PROFILE?.activity_level,
-        current_weight: recentWeight,
-        gym_days_this_week: recentGymDays,
-        challenge_target: MY_PROFILE?.challenge_target ?? null,
-        /* How long one session should take, from Setup > Training. null on a
-           database without the column yet and on anybody who never answered,
-           and the contract says null is byte for byte "never asked".
-           A one-off budget is this same field with a different number on this
-           one call, which is all the engine needs and all it ever gets: the
-           profile column stays exactly as it was. */
-        session_minutes: Number.isFinite(sessionMinutes) ? sessionMinutes : (MY_PROFILE?.session_minutes ?? null),
-        focus_groups: MY_PROFILE?.focus_groups ?? null,
-        focus_chosen_at: MY_PROFILE?.focus_chosen_at ?? null,
-        limits: MY_PROFILE?.limits ?? null,
-        goal_bubble: MY_PROFILE?.goal_bubble ?? null,
-        goal_child: MY_PROFILE?.goal_child ?? null,
-        /* The "and also" goals. null on a database without the column yet, and
-           the contract says null, [] and nonsense all mean the same as not
-           sending it, so this line is safe before the migration runs. */
-        goal_secondary: MY_PROFILE?.goal_secondary ?? null,
-        history,
-        logs: recentLogs,
-        plans: recentPlans,
-        swaps: recentSwaps,
-        /* Setup > Training. True strips the engine's timed warm-up and
-           cool-down; the lifts underneath are byte for byte the same plan. */
-        skip_stretching: MY_PROFILE?.skip_stretching === true,
-      }),
+      body: JSON.stringify(payload),
     });
     /* Read as text first. When the function errors it can answer with an HTML
        page or a truncated body, and resp.json() then throws a bare syntax
@@ -26696,7 +27106,8 @@ function renderPlanPreview() {
              <span class="wp-open-go">${icon("chevronRight", 16)}</span>
            </button>` : ""}
          <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume Workout" : "Begin Workout"}</button>
-         ${started || isCoachedClient() ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`}`;
+         ${started || isCoachedClient() ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>
+           <button type="button" class="btn-ghost" id="planSwapDayBtn">Swap this workout</button>`}`}`;
   mountMotionFigures($("workoutContent"));
 
   makeReorderable($("planRows"), async (order) => {
@@ -26793,6 +27204,14 @@ function renderPlanPreview() {
       });
       if (ok) generateWorkout(null, { sameAgain: true });
     };
+  }
+  /* Next to Regenerate and doing the opposite of it: Regenerate keeps the day
+     type and changes the movements, this changes the day. */
+  if ($("planSwapDayBtn")) {
+    $("planSwapDayBtn").onclick = () => openSessionSwapSheet({
+      date: TODAY_WORKOUT.entry_date || todayStr(),
+      current: TODAY_WORKOUT,
+    });
   }
   if ($("planNewBtn")) $("planNewBtn").onclick = startFreshWorkout;
 }
