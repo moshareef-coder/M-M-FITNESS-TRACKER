@@ -362,6 +362,14 @@
   .obt-flame { display: flex; gap: 3px; }
   .obt-flame i { width: 16px; height: 3px; border-radius: 999px; background: var(--heat); opacity: .55; }
   .ob-tier.on .obt-flame i { opacity: 1; }
+  /* The three estimates, side by side, so days and sessions being different
+     numbers is obvious at a glance rather than something to read for. */
+  .obt-ests { display: flex; gap: 18px; margin: 2px 0 2px; }
+  .obt-est { display: flex; flex-direction: column; gap: 1px; }
+  .obt-est b { font-size: 17px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .ob-tier.on .obt-est b { color: var(--heat); }
+  .obt-est small { font-size: 10.5px; color: var(--muted); letter-spacing: .01em; }
+  .ob-tier-note { font-size: 12px; color: var(--muted); line-height: 1.45; margin: 0 0 16px; }
   .obt-blurb { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
   .obt-speed { font-size: 12.5px; font-weight: 650; color: var(--heat); }
   /* The optional goal weight, folded away until it is wanted. */
@@ -11161,9 +11169,9 @@ const OB_ROBOT = {
   target: () => "A number is easier to aim at than a feeling. That is the only reason I ask.",
   tune: (d) => "I will remember this. It is most of what I am for.",
   styles: () => "Only what you tick. I will not sneak anything in.",
-  days: (d) => (d.days_per_week >= 6
-    ? "Six days. Bold. I will be the one reminding you to rest."
-    : d.days_per_week <= 2 ? "Two days done beats five days planned. Genuinely." : "That is a week somebody actually keeps."),
+  days: (d) => (d.intensity === "allin"
+    ? "All in. Bold. I will be the one telling you to take a day off."
+    : d.intensity === "easy" ? "Two done beats five planned. Genuinely." : "That is a week somebody actually keeps."),
   plan: () => "There it is. Your week, in writing.",
   commit: () => "This is the part where I get sincere for one second.",
 };
@@ -11665,69 +11673,69 @@ function renderOnboardStep(step, data = {}) {
      target step asks it, of the two goals that ask for a number, out of the
      amount they actually typed. */
 
-  /* Not "how many days" any more. Mo: make it how fast you want to get there,
-     ranked by intensity, and let the days fall out of the answer. That is the
-     better question, because nobody has an opinion about the number four, and
-     everybody has an opinion about how hard they want this to be.
+  /* How hard, estimated on both axes rather than promised on a date.
+     
+     The first version of this put a finish date on each tier, about thirteen
+     weeks down to about ten. That was invented. Training volume barely moves
+     the rate fat comes off, food does, so a ladder that pays you three weeks
+     for two extra sessions is selling something the training does not deliver.
+     Everything a tier claims now is something the app controls: how many days,
+     how many sessions, how many hours. All three are ranges and all three say
+     estimate, because a week is not the same every week and a number with no
+     give in it is the one people feel they have already failed.
 
-     The cards run cool to hot and the hottest one is the reddest, so the cost
-     is legible before you read a word of it. Session length lives here too
-     rather than on the plan screen: how long a session runs is part of how
-     intense a week is, and asking it separately two screens later made it read
-     like an afterthought. */
+     Days and sessions are different numbers on purpose, now that a day can
+     hold two. That is the honest way to describe how people actually train:
+     five sessions is not always five days, and somebody who stacks mobility
+     onto a lifting morning has done two of them. */
   if (step === "days") {
     const TIERS = [
-      { id: "gentle", n: 2, mins: 30, head: "Gentle", heat: 0,
-        blurb: "Two sessions of about 30 minutes. Fits around a full life, and it is genuinely enough to get stronger and hold it." },
-      { id: "steady", n: 3, mins: 45, head: "Steady", heat: 1,
-        blurb: "Three sessions of about 45 minutes. Every muscle twice most weeks. This is where progress gets reliable." },
-      { id: "committed", n: 4, mins: 45, head: "Committed", heat: 2,
-        blurb: "Four sessions of about 45 minutes. Room to split it up, and still a rest day between the hard ones." },
-      { id: "serious", n: 5, mins: 60, head: "Serious", heat: 3,
-        blurb: "Five sessions of about an hour. Works if your sleep and your food are already sorted." },
-      { id: "relentless", n: 6, mins: 60, head: "Relentless", heat: 4,
-        blurb: "Six sessions of about an hour, with easy days built in. Six hard days is how people get hurt." },
+      { id: "easy", days: [1, 2], sessions: [1, 2], mins: 30, head: "Easy does it", heat: 0,
+        blurb: "One or two a week, half an hour each. Enough to get stronger and hold it, and small enough that a bad week does not break it." },
+      { id: "steady", days: [3, 4], sessions: [3, 5], mins: 45, head: "Steady", heat: 2,
+        blurb: "Three or four days, sometimes with a short second session stacked on. This is where progress stops being luck." },
+      { id: "allin", days: [5, 6], sessions: [5, 8], mins: 50, head: "All in", heat: 4,
+        blurb: "Five or six days, and room to double up when you feel like it. Only works if your sleep and your food are already handled." },
     ];
     const chosen = data.intensity || null;
-    /* Only said for a goal with a real number to arrive at. Everything else
-       gets the hours, because "you will move better sooner" is not a claim. */
-    const speed = (t) => {
-      const cur = data.weight_lb, goal = data.goal_weight_lb;
-      const off = 7 - t.n;
-      const rest = `${off} day${off === 1 ? "" : "s"} off`;
-      const hours = `${Math.round(t.n * t.mins / 60 * 10) / 10} hours a week, ${rest}.`;
-      if (!cur || !goal || cur === goal) return hours;
-      const opts = lossTimelines(cur, goal);
-      if (!opts.length) return hours;
-      /* More training does not multiply fat loss, so the weeks move a little
-         and not a lot. Saying otherwise here would be the lie that sells. */
-      const base = (opts.find((o) => o.rec) || opts[0]).weeks;
-      const weeks = Math.max(4, Math.round(base * (1 - t.heat * 0.06)));
-      return `About ${weeks} weeks at this rate, and ${rest}.`;
+    const range = (a) => (a[0] === a[1] ? `${a[0]}` : `${a[0]} to ${a[1]}`);
+    /* Rounded, because "2.3 to 3.8 hours" is a decimal nobody asked for and it
+       reads as a measurement rather than an estimate. Halves below two hours,
+       where half an hour is a real difference, whole numbers above it, where it
+       is noise. */
+    const hours = (t) => {
+      const round = (h) => (h < 2 ? Math.round(h * 2) / 2 : Math.round(h));
+      const lo = round(t.sessions[0] * t.mins / 60);
+      const hi = round(t.sessions[1] * t.mins / 60);
+      return lo === hi ? `${lo}` : `${lo} to ${hi}`;
     };
     ob.innerHTML = `
       <div class="ob-step">
         ${obChrome("days", data)}
         <h1>How hard do you want to go?</h1>
-        <p class="sub">This sets how many days and how long each one runs. Nothing here is the right answer, and you can move it any time.</p>
+        <p class="sub">Everything here is an estimate, and all of it moves later. Pick the one you would still do in a bad week.</p>
         <div class="ob-tiers" id="tierGrid">
           ${TIERS.map((t) => `<button type="button" class="ob-tier heat-${t.heat}${chosen === t.id ? " on" : ""}" data-tier="${t.id}">
-            <span class="obt-top"><span class="obt-head">${t.head}</span><span class="obt-days">${t.n} days</span></span>
-            <span class="obt-flame" aria-hidden="true">${"".padEnd(0)}${Array.from({ length: t.heat + 1 }).map(() => `<i></i>`).join("")}</span>
+            <span class="obt-top"><span class="obt-head">${t.head}</span>
+              <span class="obt-flame" aria-hidden="true">${Array.from({ length: t.heat / 2 + 1 }).map(() => `<i></i>`).join("")}</span></span>
+            <span class="obt-ests">
+              <span class="obt-est"><b>${range(t.days)}</b><small>days a week</small></span>
+              <span class="obt-est"><b>${range(t.sessions)}</b><small>sessions</small></span>
+              <span class="obt-est"><b>${hours(t)}</b><small>hours</small></span>
+            </span>
             <span class="obt-blurb">${escapeHtml(t.blurb)}</span>
-            <span class="obt-speed">${escapeHtml(speed(t))}</span>
           </button>`).join("")}
         </div>
+        <p class="ob-tier-note">Sessions can outnumber days: a short mobility session in the morning and a lift later is two sessions on one day.</p>
         <button class="btn-primary" id="daysNext"${chosen ? "" : " disabled"}>Continue</button>
         <button class="btn-ghost" id="daysBack">Back</button>
       </div>`;
     ob.querySelectorAll("[data-tier]").forEach((b) => b.onclick = () => {
       const t = TIERS.find((x) => x.id === b.dataset.tier);
       data.intensity = t.id;
-      data.days_per_week = t.n;
-      /* Only set from the tier when they have not already chosen a length of
-         their own somewhere else, so a deliberate answer is never overwritten
-         by picking an intensity afterwards. */
+      /* The top of the range, because the plan is what we aim at and the bottom
+         of the range is what a bad week looks like rather than what to build. */
+      data.days_per_week = t.days[1];
       if (!data.session_minutes_manual) data.session_minutes = t.mins;
       ob.querySelectorAll("[data-tier]").forEach((x) => x.classList.toggle("on", x === b));
       $("daysNext").disabled = false;
