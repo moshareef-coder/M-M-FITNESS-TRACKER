@@ -4607,6 +4607,51 @@
     width: 116px; height: 155px; object-fit: cover; border-radius: 11px; display: block;
     background: var(--panel-2); border: 1px solid var(--border);
   }
+
+  /* The two doors under Weight. Each is a card in miniature: an icon in a
+     tinted square, the name, the one number, the one word under it, and a
+     chevron because both go somewhere. A grid of two, or one full-width tile
+     when Photos is off (a partner's view), rather than one tile and a hole. */
+  .prog-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+  .prog-tiles.solo { grid-template-columns: minmax(0, 1fr); }
+  /* The chevron floats in the corner rather than owning a column: at 172px a
+     tile has 78px of text once an icon, a chevron and two gutters are paid
+     for, and "Body Photos" wrapped to two lines in it. */
+  .prog-tile {
+    position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); column-gap: 10px; align-items: start;
+    min-width: 0; text-align: left; padding: 12px 24px 12px 12px; border-radius: var(--radius); cursor: pointer;
+    border: 1px solid var(--border); background: var(--card-fill); box-shadow: var(--shadow-card);
+    color: var(--text); font: inherit; transition: border-color .15s;
+  }
+  .prog-tile:active { border-color: var(--accent); }
+  .prog-tile[disabled] { cursor: default; }
+  .prog-tile-ico {
+    width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    background: var(--panel-2); color: var(--accent-ink);
+  }
+  .prog-tile-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .prog-tile-title { font-size: 12.5px; font-weight: 700; color: var(--text); line-height: 1.2; white-space: nowrap; }
+  .prog-tile-val {
+    font-size: 19px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .prog-tile-sub { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
+  .prog-tile-sub.go { color: var(--accent-ink); font-weight: 700; }
+  .prog-tile-chev { position: absolute; top: 12px; right: 9px; color: var(--muted); display: flex; }
+  .prog-tile-log {
+    grid-column: 1 / -1; padding: 14px 15px 15px; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--card-fill); box-shadow: var(--shadow-card);
+  }
+  .waist-input {
+    width: 100%; max-width: 150px; min-width: 0; text-align: right; padding: 0;
+    background: none; border: none; color: var(--text);
+    font-size: 28px; font-weight: 800; font-family: inherit; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums; -moz-appearance: textfield;
+  }
+  .waist-input::-webkit-outer-spin-button, .waist-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .waist-input:focus { outline: none; }
+  /* Arrange mode lists cards by title; these are not cards and have nothing to say there. */
+  body.arranging .prog-tiles { display: none; }
   .photo-date { font-size: 12.5px; color: var(--muted); text-align: center; margin-top: 5px; }
 
   /* Seasons */
@@ -5756,6 +5801,32 @@
       </div>
     </div>
 
+    <!-- Two doors under Weight, for a weight goal only: the tape and the
+         camera, the two other ways a cut shows up that the scale cannot see.
+         Not cards: the goal order and a saved drag order both walk past this
+         block, and renderProgTiles() keeps it pinned under Weight. Photos are
+         yours alone, so that tile goes on a partner's view, same as the card. -->
+    <div class="prog-tiles hidden" id="progTiles">
+      <button type="button" class="prog-tile" id="tileWaist"></button>
+      <button type="button" class="prog-tile" id="tilePhotos"></button>
+      <!-- The only place a waist reading is logged. Same round-button geometry
+           as the weigh-in above it, in half-inch steps, and it stays folded
+           until the tile is tapped. -->
+      <div class="prog-tile-log hidden" id="waistLogBlock">
+        <div class="wt-log-head">Today's waist</div>
+        <div class="weigh-row">
+          <button type="button" class="round-btn" id="waistMinus" aria-label="Down 0.5">&minus;</button>
+          <div class="weigh-field">
+            <input type="number" class="waist-input" id="waistInput" inputmode="decimal" step="0.5" min="0"
+                   placeholder="0.0" autocomplete="off" aria-label="Waist" />
+            <span class="weigh-unit">in</span>
+          </div>
+          <button type="button" class="round-btn" id="waistPlus" aria-label="Up 0.5">+</button>
+        </div>
+        <button type="button" class="btn-primary" id="waistSaveBtn" style="margin-top:12px;">Save</button>
+      </div>
+    </div>
+
     <div class="card metric-card idx-card" id="cardConsistency">
       <h2>Consistency</h2>
       <p class="idx-summary" id="consistencySummary"></p>
@@ -6708,6 +6779,9 @@ const ICON_PATHS = {
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.9 2.9l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V19a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.9-2.9l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H4a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.9-2.9l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.6V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.9 2.9l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.6 1H20a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.6 1Z"/>',
   target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/>',
   people: '<circle cx="9" cy="8" r="3"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><circle cx="17.5" cy="9" r="2.4"/><path d="M15.5 12.2c2.3.3 4 2 4 4.3"/>',
+  /* A tape measure: the reel, and a length pulled out with the tick marks on
+     it. The waist tile's icon, and nothing else uses it yet. */
+  tape: '<circle cx="8" cy="12" r="5"/><circle cx="8" cy="12" r="1.2" fill="currentColor" stroke="none"/><path d="M12.2 15.5H21v-3h-8"/><path d="M15 12.5v1.6M18 12.5v1.6"/>',
 };
 function icon(name, size = 18) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px">${ICON_PATHS[name] || ""}</svg>`;
@@ -24770,6 +24844,23 @@ function headlineWeighIns(name, days = HEADLINE_WEIGHT_DAYS) {
   return entriesFor(name).filter((e) => e.weight != null && e.entry_date >= fromStr);
 }
 
+/* Waist readings over the same window, so the tile under Weight and the
+   headline above it are counting the same month. `now` is the latest
+   reading, `delta` is latest minus earliest, or null with only one: one
+   reading is a number, not a direction. null with none, because the column
+   is new (20260916_waist_measurements.sql) and, until it is applied, every
+   row simply has no waist_in on it. */
+function waistTrend(name, days = HEADLINE_WEIGHT_DAYS) {
+  const from = new Date(todayStr() + "T00:00:00");
+  from.setDate(from.getDate() - days);
+  const fromStr = isoDate(from);
+  const points = entriesFor(name).filter((e) => e.waist_in != null && Number.isFinite(Number(e.waist_in)) && e.entry_date >= fromStr);
+  if (!points.length) return null;
+  const now = Number(points[points.length - 1].waist_in);
+  const delta = points.length > 1 ? now - Number(points[0].waist_in) : null;
+  return { now, delta, points };
+}
+
 function daysBetween(a, b) {
   return Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
 }
@@ -26053,6 +26144,149 @@ function setArranging(on, host) {
   applyArrangeZoom(host);
 }
 
+/* ---- The two doors under Weight: the tape and the camera ----
+
+   Shown for a weight goal only, because that is the goal a waist and a photo
+   are evidence for. Waist has had no data behind it until now: fit_entries
+   grows a nullable waist_in in 20260916_waist_measurements.sql, which is
+   written and not yet applied, so every branch below has to survive the
+   column not existing. The tile says "Add a measurement" when there is
+   nothing, the number when there is one, and the trend once there are two,
+   and never invents a line through fewer points than that. */
+
+/* Whether the stepper under the tiles is open. Per session, not stored: it
+   is a control that was tapped open, not a preference. */
+let WAIST_LOG_OPEN = false;
+
+/* Reads the waist readings as the weight headline reads weigh-ins, and
+   colours them the same way: a weight goal wants the tape going down, so on
+   this tile down is --down (good) and up is --up (bad). */
+function renderProgTiles(kind, isPartner) {
+  const host = $("progTiles");
+  if (!host) return;
+  const on = kind === "scale";
+  host.classList.toggle("hidden", !on);
+  /* Straight under Weight, wherever the reorder above just put Weight. This
+     block is not a card, so the goal order and a saved drag order both walk
+     past it, and it would otherwise drift to wherever the second card left it. */
+  const weight = $("cardWeight");
+  if (weight?.parentNode?.insertBefore && weight.nextElementSibling !== host) {
+    weight.parentNode.insertBefore(host, weight.nextSibling);
+  }
+  if (!on) return;
+
+  const name = isPartner ? partnerName() : ME;
+  const t = waistTrend(name);
+  const chev = `<span class="prog-tile-chev">${icon("chevronRight", 16)}</span>`;
+  const fmt = (n) => `${Math.abs(n) < 0.05 ? "" : n < 0 ? "-" : "+"}${Math.abs(n).toFixed(1)} in`;
+  let value = "", sub;
+  if (!t) sub = isPartner ? "No readings yet" : "Add a measurement";
+  else if (t.delta === null) { value = `${t.now.toFixed(1)} in`; sub = "first reading"; }
+  else {
+    const cls = Math.abs(t.delta) < 0.05 ? "" : t.delta < 0 ? "idx-good" : "idx-bad";
+    value = `<span class="${cls}">${fmt(t.delta)}</span>`;
+    sub = "this month";
+  }
+  const waist = $("tileWaist");
+  waist.innerHTML = `<span class="prog-tile-ico">${icon("tape", 18)}</span>
+    <span class="prog-tile-body"><span class="prog-tile-title">Waist Trend</span>${value ? `<span class="prog-tile-val">${value}</span>` : ""}<span class="prog-tile-sub">${sub}</span></span>${isPartner ? "" : chev}`;
+  /* A partner's tape is read only, same as their scale: the stepper writes to
+     YOUR row and has no business opening on their screen. */
+  waist.disabled = isPartner;
+  waist.onclick = isPartner ? null : () => { WAIST_LOG_OPEN = !WAIST_LOG_OPEN; renderProgressTab(); };
+
+  /* Photos are never shared, so on a partner's view there is no tile rather
+     than an empty one, and the tape takes the whole row. Same when the photo
+     card itself is off (a brand new account), because a door to a hidden card
+     is a dead tap. */
+  const photos = $("tilePhotos");
+  const card = $("cardPhotos");
+  const showPhotos = !isPartner && card && !card.classList.contains("hidden");
+  photos.classList.toggle("hidden", !showPhotos);
+  host.classList.toggle("solo", !showPhotos);
+  if (showPhotos) {
+    const n = BODY_PHOTOS.filter((p) => p.email === MY_EMAIL).length;
+    photos.innerHTML = `<span class="prog-tile-ico">${icon("camera", 18)}</span>
+      <span class="prog-tile-body"><span class="prog-tile-title">Body Photos</span><span class="prog-tile-val">${n} photo${n === 1 ? "" : "s"}</span><span class="prog-tile-sub go">See progress &rsaquo;</span></span>${chev}`;
+    photos.onclick = () => {
+      document.querySelectorAll("#tab-progress .card.peek").forEach((c) => c.classList.remove("peek"));
+      card.classList.add("peek");
+      primeOpenedCard(card);
+      card.scrollIntoView({ block: "start", behavior: "smooth" });
+    };
+  }
+
+  const log = $("waistLogBlock");
+  log.classList.toggle("hidden", isPartner || !WAIST_LOG_OPEN);
+  if (isPartner || !WAIST_LOG_OPEN) return;
+  const input = $("waistInput");
+  /* Opens on the last reading so a nudge starts from somewhere real; a first
+     reading starts blank, the same as a first weigh-in. */
+  if (!input.value && t) input.value = t.now.toFixed(1);
+  const nudge = (delta) => {
+    input.value = String(Math.max(0, Math.round(((parseFloat(input.value) || 0) + delta) * 10) / 10));
+  };
+  $("waistMinus").onclick = () => nudge(-0.5);
+  $("waistPlus").onclick = () => nudge(0.5);
+  $("waistSaveBtn").onclick = saveWaistEntry;
+}
+
+async function saveWaistEntry() {
+  const typed = parseFloat($("waistInput").value);
+  const waist = Number.isFinite(typed) && typed > 0 ? typed : null;
+  if (waist === null) { toast("Enter a measurement first"); return; }
+
+  const today = todayEntryFor(MY_EMAIL);
+  /* Same row the scale writes, same carried fields: an upsert replaces the
+     whole row, so today's weigh-in, proof and rest-day state ride along or
+     they are gone. When today's row already exists it is an update instead,
+     one column on the row that is there. That is safer on the real database
+     (nothing another device wrote today gets blanked) and it is the write the
+     sandbox's client actually persists: its upsert matches on the first
+     onConflict column alone and would rewrite the oldest row's date. */
+  const payload = {
+    user_name: ME,
+    email: MY_EMAIL,
+    entry_date: todayStr(),
+    waist_in: waist,
+    weight: today?.weight ?? null,
+    gym: today?.gym ?? false,
+    sessions: today?.sessions ?? 0,
+    proof_path: today?.proof_path ?? null,
+    rest_day: today?.rest_day ?? false,
+    note: today?.note ?? null,
+    workout_at: today?.workout_at ?? null,
+  };
+  const opts = { onConflict: "email,entry_date" };
+  const done = async (msg) => { WAIST_LOG_OPEN = false; toast(msg); await loadAll(); renderProgressTab(); };
+
+  if (navigator.onLine) {
+    const { error } = today
+      ? await sb.from("fit_entries").update({ waist_in: waist }).eq("email", MY_EMAIL).eq("entry_date", payload.entry_date)
+      : await sb.from("fit_entries").upsert(payload, opts);
+    if (!error) { await done("Measurement saved"); return; }
+    /* The column is behind 20260916_waist_measurements.sql. Until the owner
+       runs it every save comes back PGRST204, and "Could not find the
+       'waist_in' column" is the database talking, not something to show. */
+    if (String(error.code || "") === "PGRST204" || /waist_in/.test(String(error.message || ""))) {
+      toast("Measurements are not switched on yet");
+      return;
+    }
+    if (!isRetryable(error)) {
+      toast(`Couldn't save. ${error.message ? String(error.message).slice(0, 80) : "Please try again."}`);
+      return;
+    }
+  }
+  /* Offline, or the connection dropped: the scale's queue, the scale's job
+     shape, so it replays with everything else logged in the gym. */
+  const landed = await safeWrite("fit_entries", "upsert", payload, opts);
+  if (landed) { await done("Measurement saved"); return; }
+  applyLocally("fit_entries", payload);
+  WAIST_LOG_OPEN = false;
+  toast("Saved offline");
+  renderProgressTab();
+}
+
 function renderProgressTab() {
   const isPartner = PROGRESS_VIEW === "partner";
   // Logging weight only makes sense for yourself, hide the block inside
@@ -26181,6 +26415,7 @@ function renderProgressTab() {
   // on a brand new account where nothing is on screen at all, it says nothing.
   rule.classList.toggle("hidden", blank || !rest.length);
 
+  renderProgTiles(kind, isPartner);
   const live = new Set(shown);
   if (live.has("cardWeight")) { renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); }
   if (live.has("cardConsistency")) { renderConsistencyChart(); renderConsistencyStats(); }
