@@ -51,6 +51,13 @@
     --border: #262b34;
     --text: #f4f6f8;
     --muted: #8b94a3;
+    /* The coach's own colours. He is the same white body the figure is drawn in
+       so the two read as one character, with a dark visor so the eyes carry the
+       accent. Kept as tokens because he appears on a card, a sheet and a step
+       header, and a robot who changes shade between them is a different robot. */
+    --rb-body: #f6f5f3;
+    --rb-shade: #ddd9d4;
+    --rb-visor: #171b22;
     --accent: #a8ff00;
     --gold: #a8ff00;
     --me: #2d6bff;
@@ -116,6 +123,9 @@
     --muted: #686d7c;
     /* Green for anything that drives action, steel blue for you, coral for
        them: the Home mockup's palette, lifted straight from it. */
+    --rb-body: #eef0f4;
+    --rb-shade: #d3d8e0;
+    --rb-visor: #1d232c;
     --accent: #3be76b;
     --gold: #3be76b;
     --me: #4a8dbf;
@@ -321,21 +331,108 @@
   .ob-progress i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .35s cubic-bezier(.22,1,.36,1); }
   .ob-bot { display: flex; gap: 9px; align-items: flex-start; margin: 0 0 16px; }
   .ob-bot-face {
-    flex: none; width: 40px; height: 40px; border-radius: 12px; display: block;
+    flex: none; width: 40px; height: 40px; border-radius: 12px;
+    display: grid; place-items: center;
     background: color-mix(in srgb, var(--accent) 10%, var(--panel));
     border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
   }
+  /* He blinks about every five seconds, which is the whole of his animation.
+     Enough to read as somebody looking at you rather than an icon, little
+     enough that it never pulls the eye off the thing being answered. */
+  .rb-face { display: block; overflow: visible; }
+  .rb-eye { transform-box: fill-box; transform-origin: center; animation: rb-blink 5.4s infinite; }
+  .rb-face .rb-eye:nth-of-type(2) { animation-delay: .04s; }
+  @keyframes rb-blink {
+    0%, 92%, 100% { transform: scaleY(1); }
+    95% { transform: scaleY(.12); }
+  }
+  @media (prefers-reduced-motion: reduce) { .rb-eye { animation: none; } }
   /* Reserves two lines so the step does not reflow while he is typing. */
   .ob-bot-say { min-height: 2.9em; }
   .ob-bot-say { font-size: 13.5px; line-height: 1.45; color: var(--muted); padding-top: 4px; }
-  /* The quick answers above the goal weight field. */
-  .ob-templates { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 8px; }
-  .obt-lab { font-size: 12.5px; color: var(--muted); margin-right: 2px; }
-  .obt-chip {
-    font: inherit; font-size: 13px; font-weight: 650; padding: 6px 12px; border-radius: 999px;
-    border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer;
+  /* THE WORKOUT TAB. Four sections, each its own card, in the order the eye
+     reads them. */
+  .wkt-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .09em; color: var(--muted); margin: 0 0 6px; }
+  /* These sections sit inside #workoutCard, and `.card h2` is the app's eyebrow
+     style: 11px, uppercase, muted. Every heading on this tab was being shrunk
+     to a label by it. Restated here rather than fought with !important, and
+     kept together so the three headings cannot drift apart. */
+  .card .wkt-done h2, .card .wkt-next-words h2, .card .wkt-rest h2 {
+    text-transform: none; letter-spacing: -.02em; color: var(--text); font-weight: 800;
   }
-  .obt-chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
+
+  /* Done for today. Green because it is the one card on this tab that reports
+     rather than asks. */
+  .wkt-done {
+    background: color-mix(in srgb, var(--accent) 13%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: 18px; padding: 16px; margin: 0 0 14px; position: relative; overflow: hidden;
+  }
+  .wkt-done-head { display: flex; gap: 10px; align-items: flex-start; }
+  .wkt-done-words { flex: 1; min-width: 0; }
+  .wkt-done h2 { margin: 0 0 4px; font-size: 22px; line-height: 1.15; display: flex; align-items: center; gap: 8px; }
+  .wkt-done h2 svg { color: var(--accent); vertical-align: -3px; }
+  .wkt-done-sub { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
+  .wkt-bot { flex: none; width: 126px; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .wkt-bot-say {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 7px 9px; font-size: 11.5px; line-height: 1.35; color: var(--text); text-align: left;
+  }
+  .wkt-bot-face { flex: none; }
+  .wkt-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 14px 0 12px; }
+  .wkt-chip {
+    background: var(--panel); border-radius: 13px; padding: 11px; display: flex; align-items: center; gap: 9px; min-width: 0;
+  }
+  .wkt-chip-ico {
+    flex: none; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center;
+    background: var(--panel-2); color: var(--accent);
+  }
+  .wkt-chip-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+  .wkt-chip-body b { font-size: 13.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wkt-chip-body i { font-size: 11.5px; font-style: normal; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wkt-chip-tick {
+    flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+    border: 1.5px solid var(--accent); color: var(--accent);
+  }
+  .wkt-done-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .wkt-btn-solid, .wkt-btn-soft {
+    font: inherit; font-size: 14.5px; font-weight: 700; padding: 14px 10px; border-radius: 13px;
+    border: none; cursor: pointer; text-align: center;
+  }
+  .wkt-btn-solid { background: color-mix(in srgb, var(--accent) 78%, #063b12); color: #fff; }
+  .wkt-btn-soft { background: var(--panel); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 5px; }
+  .wkt-btn-solid:active, .wkt-btn-soft:active { transform: translateY(1px); }
+
+  /* Next workout. The words on the left, the reading on the right. */
+  .wkt-next, .wkt-rest { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 16px; margin: 0 0 14px; }
+  .wkt-next-top { display: flex; align-items: flex-start; justify-content: space-between; }
+  /* Title and sentence get the full width, the reading sits under them. At 390
+     the three-across version of this crushed "Lands on what your week has had
+     the least of" into a four word column. */
+  .wkt-next-body { display: flex; flex-direction: column; gap: 12px; }
+  .wkt-next-words { min-width: 0; }
+  .wkt-next-words h2 { margin: 0 0 5px; font-size: 24px; line-height: 1.1; }
+  .wkt-next-sub { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
+  .wkt-next-read { display: flex; align-items: center; gap: 18px; }
+  .wkt-arc { position: relative; width: 104px; height: 78px; display: grid; place-items: center; }
+  .wkt-arc svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .wkt-arc-num { position: relative; text-align: center; line-height: 1.05; }
+  .wkt-arc-num b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
+  .wkt-arc-num i { font-size: 9.5px; font-style: normal; font-weight: 700; letter-spacing: .08em; color: var(--muted); }
+  .wkt-muscles { list-style: none; margin: 0; padding: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .wkt-muscles li { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+  .wkt-muscles li.aim { color: var(--text); }
+  .wkt-tick { width: 17px; height: 17px; display: grid; place-items: center; color: var(--accent); }
+  /* An open ring, not a tick: this is the one the day is aimed at, so it is
+     the one thing on the list that has not been done. */
+  .wkt-ring { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--accent); }
+  .wkt-next-acts { margin-top: 14px; }
+
+  .wkt-rest h2 { margin: 0 0 6px; font-size: 22px; }
+  .wkt-rest p { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+
+
+
   /* Intensity, cool to hot. The heat is the information: you should be able to
      tell what a card costs before you read it. Red is earned by the top tier
      only, so it still means something when you get there. */
@@ -3161,6 +3258,37 @@
     display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px;
     font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--muted); text-align: center;
   }
+  /* THE WEEK STRIP. Seven tiles, Monday first, each carrying the day name, the
+     date and one dot for what happened. It leads the card because a week is
+     what the plan is made of: the month underneath is for looking back, and
+     answering "what is left this week" should not need a month grid read. */
+  .cal-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .cal-wday {
+    font: inherit; cursor: pointer; padding: 8px 0 7px; border-radius: 13px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    transition: transform .12s ease, background .16s ease, border-color .16s ease;
+  }
+  .cal-wday:active { transform: scale(.94); }
+  .cal-wname { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .cal-wnum { font-size: 14.5px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  /* Always drawn, so the seven tiles keep one height whatever the week held. */
+  .cal-wdot { width: 6px; height: 6px; border-radius: 50%; background: transparent; }
+  .cal-wday.done { background: color-mix(in srgb, var(--accent) 16%, var(--panel-2)); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+  .cal-wday.done .cal-wdot { background: var(--accent); }
+  .cal-wday.planned .cal-wdot { background: var(--me); }
+  .cal-wday.rest .cal-wdot { background: var(--muted); }
+  .cal-wday.today { border-color: var(--me); }
+  .cal-wday.today .cal-wname { color: var(--me); }
+  .cal-more {
+    font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--muted);
+    background: none; border: 0; padding: 10px 0 0; margin: 0;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .cal-more svg { transition: transform .2s ease; }
+  .cal-more.open svg { transform: rotate(180deg); }
+  .cal-more + .cal-head { margin-top: 10px; }
+
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
   .cal-day {
     position: relative; aspect-ratio: 1; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
@@ -7655,7 +7783,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.17.17";
+const APP_VERSION = "2026.09.17.18";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -11288,30 +11416,46 @@ function obChrome(step, data) {
   return `
     <div class="ob-progress" aria-hidden="true"><i style="width:${pct}%"></i></div>
     ${line ? `<div class="ob-bot">
-      <canvas class="ob-bot-face" id="obBotFace" width="96" height="96" aria-hidden="true"></canvas>
+      <span class="ob-bot-face" id="obBotFace">${robotFaceSVG(30)}</span>
       <span class="ob-bot-say" id="obBotSay" data-say="${escapeHtml(line)}"></span>
     </div>` : ""}`;
 }
 
-/* Mounted after the step paints, and torn down with it. One controller at a
-   time: the steps replace each other wholesale, so the previous canvas is out
-   of the document by the time this runs and mountMove's own sweep collects it. */
-let OB_BOT_CTRL = null;
+/* THE COACH'S FACE.
+ *
+ * He used to be the figure: the same procedural mannequin the exercise
+ * animations use, mounted at 40 pixels in a rounded box. At that size a whole
+ * body is a grey smudge with no eyes in it, and Mo asked for the face rather
+ * than the body, which is the right call. A talking head talks; a whole person
+ * standing in a 40 pixel box is a pictogram.
+ *
+ * Drawn here rather than in the rig because knowledge/ belongs to somebody
+ * else, and because this is a mascot, not a movement. It is one flat drawing
+ * with no state: the only thing that moves is the blink, and that is CSS.
+ *
+ * `size` is a CSS length for the box. Everything else scales off the viewBox,
+ * so he is the same drawing at 40 and at 96.
+ */
+function robotFaceSVG(size = 40, cls = "") {
+  const px = typeof size === "number" ? size + "px" : size;
+  return `<svg class="rb-face ${cls}" viewBox="0 0 64 64" width="${px}" height="${px}" aria-hidden="true" focusable="false">
+    <path class="rb-ant" d="M32 13V7" stroke="var(--rb-shade)" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+    <circle class="rb-ant-tip" cx="32" cy="5" r="2.8" fill="var(--accent)"/>
+    <rect x="3.5" y="27" width="6" height="13" rx="3" fill="var(--rb-shade)"/>
+    <rect x="54.5" y="27" width="6" height="13" rx="3" fill="var(--rb-shade)"/>
+    <rect x="9" y="12" width="46" height="41" rx="13.5" fill="var(--rb-body)"/>
+    <path d="M9 41h46v-.5a13.5 13.5 0 0 1-13.5 12.5h-19A13.5 13.5 0 0 1 9 40.5z" fill="var(--rb-shade)" opacity=".55"/>
+    <rect x="15" y="21" width="34" height="21" rx="9.5" fill="var(--rb-visor)"/>
+    <ellipse class="rb-eye" cx="25" cy="31.5" rx="3.6" ry="4.1" fill="var(--accent)"/>
+    <ellipse class="rb-eye" cx="39" cy="31.5" rx="3.6" ry="4.1" fill="var(--accent)"/>
+  </svg>`;
+}
+
 async function paintObBot() {
   const say = document.getElementById("obBotSay");
   if (say) typeOut(say, say.dataset.say || "");
-  const cv = document.getElementById("obBotFace");
-  if (!cv) return;
-  const mod = await ensureMotionModule();
-  if (!mod || !mod.mountMove || !document.body.contains(cv)) return;
-  try {
-    OB_BOT_CTRL?.destroy?.();
-    /* A rest antic rather than a lift: he is standing about waiting for you to
-       answer, which is exactly what the rest antics are for. */
-    OB_BOT_CTRL = mod.mountMove(cv, "Rest: Watch", {
-      theme: currentTheme(), accent: "action", skin: "mannequin", body: "male",
-    });
-  } catch (e) { console.error(e); }
+  /* The face is markup now, drawn with the step, so there is nothing to mount
+     and nothing to tear down. The line still types. */
 }
 
 /* He types rather than appearing, because a line that lands whole reads as a
@@ -26510,6 +26654,40 @@ function optionCard(id, ico, title, sub, primary) {
    what is planned, and the gaps, which are the interesting part. */
 let HISTORY_MONTH = 0;   // 0 is this month, negative goes back
 
+/* What one date is: trained, planned, rested, today, still to come. Both the
+   week strip and the month grid read it, because two readers of the same day
+   that disagree is a bug you only notice in a screenshot. */
+function dayState(d) {
+  const date = isoDate(d);
+  const plan = (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === date && !w.archived);
+  const entry = (ALL_ENTRIES || []).find((e) => e.email === MY_EMAIL && e.entry_date === date);
+  return {
+    date,
+    day: d.getDate(),
+    thisMonth: true,
+    isToday: date === todayStr(),
+    future: date > todayStr(),
+    done: !!plan?.completed_at || !!entry?.gym,
+    planned: !!plan && !plan.completed_at,
+    rest: !!entry?.rest_day,
+    title: plan ? displayFocus(plan.focus, plan.exercises) : null,
+  };
+}
+
+/* Monday to Sunday around today. The week is the unit the whole app plans in,
+   so it is the one the card leads with; the month is still there, one tap
+   down, for looking back. */
+function historyWeekDays() {
+  const today = new Date(todayStr() + "T00:00:00");
+  const mon = new Date(today);
+  mon.setDate(mon.getDate() - ((today.getDay() + 6) % 7));
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(mon);
+    d.setDate(d.getDate() + i);
+    return dayState(d);
+  });
+}
+
 function historyMonthDays(offset = HISTORY_MONTH) {
   const today = new Date(todayStr() + "T00:00:00");
   const first = new Date(today.getFullYear(), today.getMonth() + offset, 1);
@@ -26522,19 +26700,7 @@ function historyMonthDays(offset = HISTORY_MONTH) {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
     const date = isoDate(d);
-    const plan = (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === date && !w.archived);
-    const entry = (ALL_ENTRIES || []).find((e) => e.email === MY_EMAIL && e.entry_date === date);
-    out.push({
-      date,
-      day: d.getDate(),
-      thisMonth: d.getMonth() === first.getMonth(),
-      isToday: date === todayStr(),
-      future: date > todayStr(),
-      done: !!plan?.completed_at || !!entry?.gym,
-      planned: !!plan && !plan.completed_at,
-      rest: !!entry?.rest_day,
-      title: plan ? displayFocus(plan.focus, plan.exercises) : null,
-    });
+    out.push({ ...dayState(d), thisMonth: d.getMonth() === first.getMonth() });
   }
   // A trailing week made entirely of the next month is padding nobody needs.
   return out.slice(0, out.slice(35).every((d) => !d.thisMonth) ? 35 : 42);
@@ -26562,6 +26728,7 @@ function historyOldestOffset() {
 }
 
 let HISTORY_PICK = false;          // the month/year picker is open
+let CAL_MONTH_OPEN = false;        // the week leads; the month opens under it
 let HISTORY_PICK_YEAR = null;      // the year the picker is showing
 
 function workoutCalendarHTML() {
@@ -26575,8 +26742,26 @@ function calendarInnerHTML() {
   const days = historyMonthDays();
   const oldest = Math.min(0, historyOldestOffset());
   const dows = ["M", "T", "W", "T", "F", "S", "S"];
+  const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   return `
     <h3 class="week-sec-h">Your week</h3>
+    <div class="cal-week">
+      ${historyWeekDays().map((d, i) => `
+        <button type="button" class="cal-wday${d.done ? " done" : ""}${d.planned ? " planned" : ""}${d.rest ? " rest" : ""}${d.isToday ? " today" : ""}"
+          data-cal="${d.date}" ${d.title ? `title="${escapeHtml(d.title)}"` : ""}>
+          <span class="cal-wname">${names[i]}</span>
+          <span class="cal-wnum">${d.day}</span>
+          <i class="cal-wdot"></i>
+        </button>`).join("")}
+    </div>
+    <div class="cal-key">
+      <span><i class="k-done"></i>Trained</span>
+      <span><i class="k-plan"></i>Planned</span>
+      <span><i class="k-rest"></i>Rest</span>
+      ${infoDot("calendarKey", "What the calendar shows")}
+    </div>
+    <button type="button" class="cal-more${CAL_MONTH_OPEN ? " open" : ""}" id="calMore" aria-expanded="${CAL_MONTH_OPEN}">${CAL_MONTH_OPEN ? "Hide the month" : "See the whole month"}${icon("chevronDown", 14)}</button>
+    ${CAL_MONTH_OPEN ? `
     <div class="cal-head">
       <button type="button" class="wk-nav-btn" id="calPrev" ${HISTORY_MONTH <= oldest ? "disabled" : ""} aria-label="Previous month">${icon("chevronLeft", 16)}</button>
       <button type="button" class="cal-title${HISTORY_PICK ? " open" : ""}" id="calTitle" aria-label="Pick a month or year">${escapeHtml(historyMonthLabel())}${icon("chevronDown", 14)}</button>
@@ -26590,13 +26775,7 @@ function calendarInnerHTML() {
         <button type="button" class="cal-day${d.thisMonth ? "" : " out"}${d.done ? " done" : ""}${d.planned ? " planned" : ""}${d.rest ? " rest" : ""}${d.isToday ? " today" : ""}"
           data-cal="${d.date}"
           ${d.title ? `title="${escapeHtml(d.title)}"` : ""}>${d.day}</button>`).join("")}
-    </div>
-    <div class="cal-key">
-      <span><i class="k-done"></i>Trained</span>
-      <span><i class="k-plan"></i>Planned</span>
-      <span><i class="k-rest"></i>Rest</span>
-      ${infoDot("calendarKey", "What the calendar shows")}
-    </div>`;
+    </div>` : ""}`;
 }
 
 /* Years step with one pair of arrows, months are a tap. Months you have no
@@ -26637,6 +26816,7 @@ function wireWorkoutCalendar(root) {
   if ($("calPrev")) $("calPrev").onclick = () => go(HISTORY_MONTH - 1);
   if ($("calNext")) $("calNext").onclick = () => go(HISTORY_MONTH + 1);
   if ($("calToday")) $("calToday").onclick = () => go(0);
+  if ($("calMore")) $("calMore").onclick = () => { CAL_MONTH_OPEN = !CAL_MONTH_OPEN; if (!CAL_MONTH_OPEN) HISTORY_PICK = false; repaint(); };
   $("calTitle").onclick = () => {
     HISTORY_PICK = !HISTORY_PICK;
     HISTORY_PICK_YEAR = new Date(today.getFullYear(), today.getMonth() + HISTORY_MONTH, 1).getFullYear();
@@ -26650,7 +26830,8 @@ function wireWorkoutCalendar(root) {
   cal.querySelectorAll("[data-cal]").forEach((b) => {
     b.onclick = () => {
       const date = b.dataset.cal;
-      const day = historyMonthDays().find((d) => d.date === date);
+      const day = historyMonthDays().find((d) => d.date === date)
+        || historyWeekDays().find((d) => d.date === date);
       if (!day) return;
       // A day you trained opens what you did; a day ahead opens what you could.
       if (day.done) openRecap(MY_EMAIL, ME, date);
@@ -26786,28 +26967,129 @@ function renderChooseScreen() {
       </div>
     </div>`;
 
+  /* THE WORKOUT TAB, to Mo's drawing.
+
+     Four blocks in the order the eye reads them: what today already holds,
+     what to do next, a word about recovery, and the week. The first one only
+     exists on a day that has something on it, so an ordinary day opens on the
+     next workout rather than on an empty status card.
+
+     Everything here is fed by something that already existed. The sessions come
+     from todaySessions(), the match figure and the muscle list from the same
+     matchDetail the old card printed, the calendar from workoutCalendarHTML().
+     This is assembly, not new arithmetic, which is why the numbers agree with
+     the rest of the app. */
+  const sessions = todaySessions();
+  const doneCount = sessions.filter((x) => x.state === "done").length;
+  const allDone = sessions.length > 0 && doneCount === sessions.length;
+  const target = weeklyGoalFor(MY_EMAIL) || 5;
+
+  /* The green card at the top, only when the day is actually finished. A card
+     that says "you are done" over a day with a session still open would be the
+     app congratulating somebody for work they have not done. */
+  const doneCard = !allDone ? "" : `
+    <section class="wkt-done">
+      <div class="wkt-done-head">
+        <div class="wkt-done-words">
+          <p class="wkt-eyebrow">TRAINING COMPLETE</p>
+          <h2>You&rsquo;re done for today ${icon("check", 22)}</h2>
+          <p class="wkt-done-sub">${doneCount} session${doneCount === 1 ? "" : "s"} completed
+            &middot; 1 training day toward your week of ${target}.</p>
+        </div>
+        ${/* He says one line here and it is about recovery, not about the work,
+              because the work is finished and there is nothing left to coach. */ ""}
+        <div class="wkt-bot">
+          <span class="wkt-bot-say">Nice work. Give your body time to recover.</span>
+          ${robotFaceSVG(62, "wkt-bot-face")}
+        </div>
+      </div>
+      <div class="wkt-chips">
+        ${/* `label`, `ico` and `detail` are todaySessions' own fields. Read from
+              there rather than re-derived, so this strip and the one on the
+              plan preview cannot start disagreeing about what a session is. */ ""}
+        ${sessions.map((x) => `<div class="wkt-chip">
+          <span class="wkt-chip-ico">${icon(x.ico || "dumbbell", 17)}</span>
+          <span class="wkt-chip-body"><b>${escapeHtml(x.label || "Session")}</b>
+            <i>${escapeHtml(x.detail || "")}</i></span>
+          <span class="wkt-chip-tick">${icon("check", 13)}</span>
+        </div>`).join("")}
+      </div>
+      <div class="wkt-done-acts">
+        <button type="button" class="wkt-btn-solid" id="wktViewToday">View today&rsquo;s training</button>
+        <button type="button" class="wkt-btn-soft" id="wktTomorrow">Preview tomorrow ${icon("chevronRight", 15)}</button>
+      </div>
+    </section>`;
+
+  /* Next workout. The ring and the muscle list are two readings of one number:
+     the percentage is the average freshness, the list is which muscles it came
+     from, and an open circle marks the one the day is aimed at. Printing both
+     is what stops the figure being a score nobody can check. */
+  const aimed = (p.focus || "").toLowerCase();
+  const nextCard = `
+    <section class="wkt-next">
+      <div class="wkt-next-top">
+        <p class="wkt-eyebrow">NEXT WORKOUT</p>
+        ${infoDot("planMatch", "How the match is worked out")}
+      </div>
+      <div class="wkt-next-body">
+        <div class="wkt-next-words">
+          <h2>${escapeHtml(p.focus)}</h2>
+          <p class="wkt-next-sub">${escapeHtml(matchReading(p.match))}</p>
+        </div>
+        <div class="wkt-next-read">
+          <div class="wkt-arc">
+            ${arcGaugeSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 150)}
+            <div class="wkt-arc-num"><b>${p.match}%</b><i>MATCH</i></div>
+          </div>
+          <ul class="wkt-muscles">
+            ${(p.muscles || []).map((m) => {
+              const on = aimed.includes(m.name.toLowerCase());
+              return `<li class="${on ? "aim" : ""}">${on
+                ? `<span class="wkt-ring" aria-hidden="true"></span>`
+                : `<span class="wkt-tick" aria-hidden="true">${icon("check", 13)}</span>`}${escapeHtml(m.name)}</li>`;
+            }).join("")}
+          </ul>
+        </div>
+      </div>
+      <div class="wkt-next-acts">${actions}</div>
+    </section>`;
+
+  /* Recovery. Not a nag and not a metric: one true sentence about the half of
+     training that happens when you are not training, which is the half people
+     skip. It says nothing about THIS person's sleep because the app cannot see
+     it, and inventing a reading would be worse than saying the general thing
+     plainly. */
+  const restCard = `
+    <section class="wkt-rest">
+      <p class="wkt-eyebrow">RECOVERY</p>
+      <h2>Rest well</h2>
+      <p>Progress happens between workouts. Sleep, water and food are what let
+        the work you just did turn into anything.</p>
+    </section>`;
+
   $("workoutContent").innerHTML = `
-    <div class="scr-head">
-      <div class="scr-title">Build Next Workout</div>
-    </div>
-    ${/* What the day already holds, before what it could hold next. On a day
-          with one session and nothing done this draws nothing. */ ""}
-    ${todaySessionsHTML()}
-    ${preview}
+    ${doneCard}
     ${coached
       ? `<p class="build-q">${escapeHtml(coachName)} sets your training. Log what you did, or add something extra.</p>${actions}`
-      : ""}
+      : nextCard}
+    ${restCard}
     ${savedWorkoutsHTML()}
-    ${/* Two boxes, not one. Today's workout answers "what am I doing now" and
-          the calendar answers "what does the week look like", and Mo wants
-          them read as separate things rather than one long card. Plan your
-          week sits UNDER the calendar because it acts on the calendar: you
-          look at the week, then you fill it in. */ ""}
+    ${/* The calendar and the way to fill it in. Plan your week sits UNDER the
+          calendar because it acts on it: you look at the week, then you fill
+          it in. */ ""}
     <section class="week-sec">
       ${workoutCalendarHTML()}
       ${optionCard("chooseWeekBtn", "checklist", "Plan your week",
-          "Put saved workouts on the days you will do them.", false)}
+          "Put workouts on the days you will do them.", false)}
     </section>`;
+
+  /* His face, the same drawing onboarding shows, not the exercise figure: at
+     this size a whole body is a smudge and the point of him here is that he is
+     looking at you. */
+  if (allDone) {
+    const view = $("wktViewToday"); if (view) view.onclick = () => goWorkoutScreen(null);
+    const tom = $("wktTomorrow"); if (tom) tom.onclick = () => goWorkoutScreen("week");
+  }
   wireTodaySessions($("workoutContent"));
   wireSavedWorkouts($("workoutContent"));
   wireWorkoutCalendar($("workoutContent"));
