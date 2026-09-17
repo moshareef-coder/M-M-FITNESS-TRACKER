@@ -336,7 +336,30 @@
   .code-divider::before, .code-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
   .code-input {
     text-transform: uppercase; letter-spacing: 0.16em; font-weight: 700; font-size: 21px !important;
+    text-align: center;
   }
+  /* The placeholder carries the instruction, so it must not be shouted in the
+     same weight the typed code is: at 21px with that tracking, CODE OR LINK
+     fills the field edge to edge and reads as a value somebody already
+     entered. */
+  .code-input::placeholder { font-size: 14px !important; letter-spacing: 0.06em; font-weight: 600; opacity: .6; }
+  /* The line under a control that says what pressing it does, and doubles as
+     where that control reports back. Sits tight to the thing above it, which
+     is what makes it read as attached rather than as the next paragraph. */
+  .ob-hint {
+    font-size: 12.5px; line-height: 1.45; color: var(--muted);
+    margin: 9px 0 18px; text-align: center;
+  }
+  /* --warn is this palette's one caution hue, and the note above it is right
+     that it is the only one that cannot be read as a person. A dead invite is
+     exactly caution: nothing is broken and nothing was lost, there is just
+     nothing behind that code. */
+  .ob-hint.bad { color: var(--warn); }
+  /* Your own code, kept as one quiet line. It used to be a bordered card with
+     its own share button, which put a second way to share directly under the
+     first one. Reading it out loud is the only job it still has. */
+  .ob-mine { font-size: 13px; color: var(--muted); text-align: center; margin: 4px 0 16px; }
+  .ob-mine strong { color: var(--text); letter-spacing: 0.1em; font-weight: 800; }
   /* A pair request, incoming or outgoing. One card each, because up to three
      can be outstanding at once and two stacked requests must never read as
      one. Same panel/border as .ob-chip rather than a shadow, so dark mode
@@ -2371,6 +2394,45 @@
   /* Avatar, name, and the line writing itself. Typing is the point: a line
      that lands fully formed reads as a notification, one that arrives a
      character at a time reads as somebody talking to you. */
+  /* On the dashboard he needs a face. The session stage draws the figure above
+     the bubble so the avatar is switched off there; here there is nothing above
+     it, so a bubble on its own would be the app talking rather than him. Tokens
+     throughout, because this one sits on the dashboard among cards rather than
+     on the session's dark stage, and a fixed white block among them would read
+     as a notification. */
+  .home-quip-slot:empty { display: none; }
+  .home-quip-slot { margin: -4px 0 14px; }
+  .home-quip {
+    display: flex; align-items: flex-start; gap: 10px; width: 100%;
+    padding: 0; border: 0; background: none; font-family: inherit; text-align: left;
+    cursor: pointer; animation: quipIn .34s cubic-bezier(.22,1,.36,1) both;
+  }
+  .home-quip-av {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    color: var(--accent-ink);
+  }
+  .home-quip-bub {
+    min-width: 0; flex: 1 1 auto;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 5px 16px 16px 16px; padding: 9px 13px 10px;
+    box-shadow: var(--shadow-card);
+  }
+  .home-quip-line {
+    display: block; font-size: 13.5px; font-weight: 600; line-height: 1.38;
+    letter-spacing: -.01em; color: var(--text);
+  }
+  .home-quip-cur {
+    display: inline-block; width: 2px; height: 1em; margin-left: 1px;
+    background: var(--accent-ink); vertical-align: -2px; animation: quipCaret .9s steps(1) infinite;
+  }
+  .home-quip.done .home-quip-cur { display: none; }
+  .home-quip:active { transform: scale(.995); }
+  .home-quip.go { animation: quipOut .3s ease forwards; }
+  @media (prefers-reduced-motion: reduce) { .home-quip { animation: none; } }
+
   .sess-quip {
     display: flex; align-items: flex-end; gap: 10px;
     max-width: 100%; width: 100%; padding: 0; border: 0; background: none;
@@ -6015,6 +6077,11 @@
 
     <div class="card" id="heroCard"></div>
 
+    <!-- Mo asked for him on the dashboard, right under the card that offers
+         today's workout. Empty until he says something and empty again after,
+         so a muted account and a quiet beat both leave no gap. -->
+    <div class="home-quip-slot" id="homeQuipSlot"></div>
+
     <!-- One card where there used to be two. The week grid was already the
          right picture (a day reads DOWN its column: did we both go on
          Wednesday, or just one of us) and the timeline above it was a preview
@@ -7137,7 +7204,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.17.5";
+const APP_VERSION = "2026.09.17.6";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -7315,6 +7382,7 @@ const ICON_PATHS = {
   dumbbell: '<path d="M4 10v4M20 10v4M2 12h2M20 12h2M6 8v8M18 8v8M9 12h6"/>',
   bolt: '<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/>',
   run: '<circle cx="14" cy="4.5" r="1.8"/><path d="M9 20l3-4 2 2-1.5 3M6 12l3-2 3 1 2-3 4 1M8 9l-2 2 1 3"/>',
+  robot: '<rect x="4" y="7" width="16" height="12" rx="4"/><path d="M12 7V4M9.5 4h5"/><circle cx="9.3" cy="12.4" r="1.15" fill="currentColor" stroke="none"/><circle cx="14.7" cy="12.4" r="1.15" fill="currentColor" stroke="none"/><path d="M9.8 15.8h4.4"/>',
   walk: '<circle cx="13" cy="4.3" r="1.8"/><path d="M10 21l2.4-5.2-2-2.3 1-4.5M13 9l3 2 1.6 3M10.4 9.5 8 11l-.8 3"/>',
   bike: '<circle cx="5.5" cy="17" r="3.4"/><circle cx="18.5" cy="17" r="3.4"/><path d="M5.5 17l4-7h5l-3.5 7h7.5M13.5 10 12 6.6h-2.4M14.8 6.6h2.2"/>',
   check: '<path d="M4 12l5 5 11-11"/>',
@@ -8087,6 +8155,12 @@ async function loadMyGroups() {
 }
 
 async function checkPartnershipThenEnter() {
+  /* Before anything reads the partnership table, because a link that is waiting
+     to be claimed is about to change what that table says. Claiming needs a
+     session, which is why it happens here and not where the token was picked
+     up: the person who opened the link usually had no account at that moment. */
+  await claimHeldInviteToken();
+
   const { error: groupErr } = await loadMyGroups();
   /* Same rule as the partnership read below: a lookup that failed is not an
      answer about who somebody trains with, and carrying on would hand a coached
@@ -8501,54 +8575,44 @@ function renderCodeScreen() {
      default on insert. Say the code is not ready rather than rendering six
      dots someone might read out to their partner. */
   const myCode = MY_PROFILE?.invite_code || null;
+  /* Two situations, not five buttons.
+
+     Either you are inviting somebody or somebody invited you, and this screen
+     used to answer that with five tappable things: two green primaries
+     competing for the same eye, two different ways to share that did almost the
+     same job, and a third button for a link that the person is holding in their
+     other hand. Now it is one action and one field.
+
+     The field takes either form. Six characters is a code; anything with a
+     token in it is a link they pasted. One input that accepts both is the whole
+     reason "I was sent a link" could go: the answer to being sent a link is to
+     paste it, and there is now somewhere to paste it. */
   ob.innerHTML = `
     <div class="ob-step">
       <h1>Pair with your partner</h1>
-      <p class="sub">Send them a link. It works once, and only for them.</p>
+      <p class="sub">Unio is built for two. Send them an invite, or put in the one they sent you.</p>
 
       <button class="btn-primary" id="shareLinkBtn">Send an invite</button>
-      <button type="button" class="btn-ghost" id="pasteLinkBtn">I was sent a link</button>
+      <p class="ob-hint">They get a link and your code. It works once, and only for them.</p>
 
-      <div class="code-divider"><span>or use a code</span></div>
+      <div class="code-divider"><span>or</span></div>
 
-      <div class="code-display">
-        <div class="code-label">Your code</div>
-        <div class="code-value" id="myInviteCode">${myCode ? escapeHtml(myCode) : "Not ready yet"}</div>
-        <button type="button" class="btn-secondary" id="shareCodeBtn" style="margin-top:10px;" ${myCode ? "" : "disabled"}>Share my code</button>
-      </div>
-
-      <input id="partnerCodeInput" type="text" placeholder="Enter partner's code" maxlength="6"
+      <input id="partnerCodeInput" type="text" placeholder="CODE OR LINK"
              autocapitalize="characters" autocomplete="off" spellcheck="false" class="code-input"
              value="${escapeHtml(PENDING_INVITE || "")}" />
-      <button class="btn-primary" id="redeemCodeBtn">Pair up</button>
+      <p class="ob-hint" id="pairHint">Their six characters, or paste the whole link.</p>
+
+      ${myCode ? `<p class="ob-mine">Your code is <strong id="myInviteCode">${escapeHtml(myCode)}</strong></p>` : ""}
       <button class="btn-ghost" id="backToSetup">Back</button>
     </div>`;
 
   $("shareLinkBtn").onclick = (e) => shareInviteLink(e.currentTarget);
-  $("pasteLinkBtn").onclick = () => pasteInviteLink();
-  $("shareCodeBtn").onclick = async () => {
-    /* No profile gets a real invite_code from the client; it has to come from
-       a server-side default/trigger on insert (see owner note). Guard rather
-       than let "My code is undefined" go out over a real share sheet. */
-    const code = MY_PROFILE?.invite_code;
-    if (!code) { toast("Your code isn't ready yet"); return; }
-    /* The link carries the code so they never have to be told to find a code
-       screen and retype it, and the message says what they are joining. */
-    const text = inviteMessage({ name: ME, goalLabel: MY_PROFILE?.goal }, code);
-    try {
-      if (navigator.share) await navigator.share({ text });
-      else { await navigator.clipboard.writeText(text); toast("Invite copied"); }
-    } catch { /* they dismissed the share sheet */ }
-  };
-  $("partnerCodeInput").oninput = (e) => {
-    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  };
-  $("redeemCodeBtn").onclick = async () => {
-    const code = $("partnerCodeInput").value.trim().toUpperCase();
-    if (code.length !== 6) { toast("Codes are 6 characters"); return; }
-    $("redeemCodeBtn").disabled = true;
+
+  const hint = $("pairHint");
+  const say = (msg, bad) => { hint.textContent = msg; hint.classList.toggle("bad", !!bad); };
+
+  const redeemCode = async (code) => {
     const { data: res, error } = await sb.rpc("redeem_invite_code", { code });
-    $("redeemCodeBtn").disabled = false;
     /* Read before redeemOk, so the waiting screen is the answer rather than a
        toast on top of it. The request is out and nobody is paired, so solo is
        deliberately left alone: this is not the moment to decide they have a
@@ -8565,6 +8629,61 @@ function renderCodeScreen() {
     clearPendingInvite();
     await checkPartnershipThenEnter();
   };
+
+  /* Submitted by finishing, not by a button.
+
+     A code is exactly six characters, so the moment there are six there is
+     nothing left to decide and a Pair up button is a second thing to press for
+     a decision already made. A pasted link is the same: it is complete on
+     arrival. Both also remove the failure state the button existed to produce,
+     "Codes are 6 characters", which only ever appeared because somebody was
+     allowed to press it too early. */
+  const input = $("partnerCodeInput");
+  let working = false;
+
+  const submit = async (raw) => {
+    if (working) return;
+    const tok = inviteTokenFrom(raw);
+    const code = raw.trim().toUpperCase();
+    if (!tok && code.length !== 6) return;
+
+    working = true;
+    input.disabled = true;
+    say(tok ? "Opening that invite..." : "Pairing you up...");
+    try {
+      if (tok) {
+        holdInviteToken(tok);
+        const ok = await claimHeldInviteToken();
+        if (ok) { await checkPartnershipThenEnter(); return; }
+        say("That link is not active any more. Ask for a new one.", true);
+        input.value = "";
+        return;
+      }
+      await redeemCode(code);
+      /* Still here means redeemCode did not navigate, so it failed and has
+         already said why. Put the field back rather than leaving somebody
+         looking at a disabled box with their own typing in it. */
+      say("Their six characters, or paste the whole link.");
+      input.value = "";
+    } finally {
+      working = false;
+      input.disabled = false;
+    }
+  };
+
+  input.oninput = (e) => {
+    const raw = e.target.value;
+    /* A pasted link is left exactly as it arrived. The uppercase-and-strip
+       filter below is right for six characters and destroys a URL, which is
+       how one field can serve both only if it knows which one it is holding. */
+    if (inviteTokenFrom(raw) || /[:/.]/.test(raw)) { submit(raw); return; }
+    e.target.value = raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+    if (e.target.value.length === 6) submit(e.target.value);
+  };
+  /* Enter is still honoured for anyone on a keyboard, and for the case where
+     six characters were already in the box when the screen was drawn. */
+  input.onkeydown = (e) => { if (e.key === "Enter") submit(input.value); };
+
   $("backToSetup").onclick = () => renderPairingScreen();
 }
 
@@ -15934,6 +16053,11 @@ let HOME_PAINTED = false;   // the first paint of a session is an arrival, the r
 
 function renderHome(animate = false) {
   renderHero(animate);
+  /* Here rather than inside renderHero, because renderHero also runs on things
+     that are not somebody arriving at the dashboard (a save on another tab, a
+     widget snapshot), and a line spent while Home is hidden is a line nobody
+     hears followed by four minutes of silence when they do turn up. */
+  sayHomeQuip();
   renderPairCopy();
   renderTopStreak();
   renderLiveCard();
@@ -20834,6 +20958,68 @@ function sayQuip(key) {
   const hold = Math.min(11000, 4000 + said.length * 55);
   const rest = () => { el.classList.add("done"); QUIP_TIMER = setTimeout(hideQuip, hold); };
   typeQuip(el.querySelector(".sess-quip-txt"), said, rest);
+}
+
+/* ---- Him on the dashboard ----
+
+   Mo asked for a line from him under the card that offers today's workout. The
+   session bank and this one are the same character and the same bubble, but the
+   rules around WHEN differ completely, which is why this does not go through
+   sayQuip.
+
+   sayQuip exists inside a workout: it refuses without a SESSION, it holds a
+   thirty second floor between lines because he is talking over a set, and it
+   rolls odds so he is not relentless. None of that applies here. There is no
+   session, nothing to talk over, and a dashboard is visited rather than sat in,
+   so the only question is how often he should greet somebody arriving.
+
+   Once every few minutes, and never twice for one arrival. Opening the app,
+   going to Progress and coming back should not produce a fresh monologue, and
+   a re-render must not either: renderHero runs on plenty of things that are not
+   somebody walking up to the screen. */
+const HOME_QUIP_GAP_MS = 4 * 60 * 1000;
+let HOME_QUIP_AT = 0;
+
+function hideHomeQuip() {
+  const el = $("homeQuipSlot")?.querySelector(".home-quip");
+  if (!el) return;
+  el.classList.add("go");
+  setTimeout(() => el.remove(), 300);
+}
+
+function sayHomeQuip() {
+  const slot = $("homeQuipSlot");
+  if (!slot) return;
+  /* Muted is muted everywhere. It is one switch in Settings and it means he
+     stops talking, not that he stops talking in one place. */
+  if (quipsMuted()) { slot.replaceChildren(); return; }
+  /* Already speaking, or spoke recently: leave him be. */
+  if (slot.querySelector(".home-quip")) return;
+  if (Date.now() - HOME_QUIP_AT < HOME_QUIP_GAP_MS) return;
+
+  const line = pickQuip("home");
+  if (!line) return;                    // bank not loaded yet, or nothing applied
+  HOME_QUIP_AT = Date.now();
+
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = "home-quip";
+  el.innerHTML = `
+    <span class="home-quip-av" aria-hidden="true">${icon("robot", 19)}</span>
+    <span class="home-quip-bub">
+      <span class="home-quip-line"><span class="home-quip-txt"></span><i class="home-quip-cur"></i></span>
+    </span>`;
+  const said = decodeEntities(line);
+  /* The whole line on aria-label from the start, for the same reason the
+     session bubble does it: nobody should have to wait out an animation before
+     their screen reader will tell them what it said. */
+  el.setAttribute("aria-label", `He says: ${said}`);
+  el.onclick = () => hideHomeQuip();
+  slot.replaceChildren(el);
+  /* He stays. There is no set coming to push him off, and a line that vanishes
+     from a screen somebody is reading is worse than one that sits there. Tap
+     to dismiss, and the next arrival replaces him. */
+  typeQuip(el.querySelector(".home-quip-txt"), said, () => el.classList.add("done"));
 }
 
 function decodeEntities(str) {
