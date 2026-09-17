@@ -56,8 +56,7 @@ const FRONT_FEET = { R: { ang: 12, len: 0.4, w: 1.3 }, L: { ang: 12, len: 0.4, w
 
 // Supine on a flat bench, a dumbbell in each hand, press from beside the chest
 // to straight overhead. Must be visible: the vertical travel of the hands with
-// the elbows folding out at the bottom. Sagittal plane, camera 40 degrees
-// toward the feet; see the note above the move.
+// the elbows folding out at the bottom. Side view, sagittal.
 // Same chassis as the seeded Barbell Bench Press: root.rot -90 is supine, which
 // puts the head at -x and runs the legs out to +x.
 // The bells are the default "level": drawn end on, and FIXED for the whole rep.
@@ -71,32 +70,28 @@ const FRONT_FEET = { R: { ang: 12, len: 0.4, w: 1.3 }, L: { ang: 12, len: 0.4, w
 // and even where a lifter does go neutral the bell still does not rotate rep
 // to rep. "follow" stays right where the grip genuinely is neutral and the
 // forearm genuinely swings: hammer curls, rows, kickbacks, carries.
-/* THE THREE DUMBBELL BENCH PRESSES ARE SEEN FROM 40 DEGREES TOWARD THE FEET.
+/* ALL SEVEN BENCH PRESSES ARE SIDE ON. This was decided twice.
 
-   Not from the side. A flat side camera cannot show the one thing Mo asked
-   for on every press, the elbows going OUT at the bottom, because out is
-   straight at the lens: the upper arm foreshortens to a stub and the flare
-   reads as a missing arm. Two full attempts at faking it side on failed, and
-   his own reference photo of the position is a three quarter view from the
-   feet end. This is that view. The body stays authored in the sagittal plane,
-   so the bench, the legs and every pin are unchanged; only the camera moved,
-   and the hands are 3D world pins so the width they already had in space is
-   what the camera now shows. Both arms are visible, both bells are drawn in
-   front, and at the bottom the elbows are plainly wide of the torso.
+   A flat side camera cannot show an elbow going out to the side, because out
+   is straight at the lens, and for a while these were orbited 40 degrees
+   toward the feet so the flare would read. Mo looked at that and chose the
+   side view, against a render of this exact move at the bottom of the rep:
+   bell fixed end on above the chest, elbow hanging below the bench line,
+   forearm rising to it. That render is the target, and it is what this draws.
 
-   Pinned furniture does not orbit with the camera, so each bench and roller
-   has its x compressed toward the pivot at x=70 by cos(40) and its width
-   shrunk by the same factor, which is exactly how far the body's own screen
-   footprint shortened. Toward the feet rather than the head: the other way
-   round the arms cross the face on the way down. */
+   The elbow hangs because the bottom wrist is a 3D world pin, 20 units out to
+   the side and only a few units above the shoulder joint, which tilts the
+   circle the elbow lives on so its low point drops below the bench. See the
+   note further up the file. That geometry is camera independent; it is why
+   the side view could come back without touching a single pin. */
 const DUMBBELL_BENCH_PRESS = {
-  view: { plane: "sagittal", yaw: 40 },
+  view: "side",
   loop: "pingpong",
   dur: 3.2,
   breath: 0.25,
   props: [
-    { type: "bench", x: 36.3, y: 92, w: 59.7 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.8, front: true },
+    { type: "bench", x: 26, y: 92, w: 78 },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
     { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
@@ -298,14 +293,14 @@ const LOW_TO_HIGH_CABLE_FLY = {
 // the torso. Must be visible: the reclined torso angle, which is the only thing
 // separating this from a flat press. Side view.
 const INCLINE_DUMBBELL_PRESS = {
-  view: { plane: "sagittal", yaw: 40 },
+  view: "side",
   loop: "pingpong",
   dur: 3.2,
   breath: 0.25,
   fit: { k: 0.95, dy: 0 },
   props: [
-    { type: "bench", x: 40.9, y: 89, w: 55.2, incline: -35 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.8, front: true },
+    { type: "bench", x: 32, y: 89, w: 72, incline: -35 },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
     { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
@@ -341,16 +336,16 @@ const INCLINE_DUMBBELL_PRESS = {
 // dumbbells pressed perpendicular to the torso. Must be visible: the head being
 // LOWER than the hips. Side view.
 const DECLINE_DUMBBELL_PRESS = {
-  view: { plane: "sagittal", yaw: 40 },
+  view: "side",
   loop: "pingpong",
   dur: 3.2,
   breath: 0.25,
   fit: { k: 0.94, dy: 4 },
   props: [
-    { type: "bench", x: 40.9, y: 78, w: 58.2, incline: 25 },
-    { type: "roller", x: 105.2, y: 48, r: 5 },
-    { type: "roller", x: 105.2, y: 66, r: 5 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.8, front: true },
+    { type: "bench", x: 32, y: 78, w: 76, incline: 25 },
+    { type: "roller", x: 116, y: 48, r: 5 },
+    { type: "roller", x: 116, y: 66, r: 5 },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
     { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
@@ -375,7 +370,7 @@ const DECLINE_DUMBBELL_PRESS = {
 const INCLINE_BARBELL_PRESS = {
   ...INCLINE_DUMBBELL_PRESS,
   props: [
-    { type: "bench", x: 40.9, y: 89, w: 55.2, incline: -35 },
+    { type: "bench", x: 32, y: 89, w: 72, incline: -35 },
     { type: "barbell", side: "R", point: "hand", r: 9, front: true },
   ],
   keys: [
@@ -399,9 +394,9 @@ const INCLINE_BARBELL_PRESS = {
 const DECLINE_BARBELL_PRESS = {
   ...DECLINE_DUMBBELL_PRESS,
   props: [
-    { type: "bench", x: 40.9, y: 78, w: 58.2, incline: 25 },
-    { type: "roller", x: 105.2, y: 48, r: 5 },
-    { type: "roller", x: 105.2, y: 66, r: 5 },
+    { type: "bench", x: 32, y: 78, w: 76, incline: 25 },
+    { type: "roller", x: 116, y: 48, r: 5 },
+    { type: "roller", x: 116, y: 66, r: 5 },
     { type: "barbell", side: "R", point: "hand", r: 9, front: true },
   ],
   keys: [
@@ -2185,12 +2180,12 @@ const SKULL_CRUSHER = {
 // caveat: side on this is close to Barbell Bench Press, and the lower touch
 // point plus the tighter elbow are the whole difference.
 const CLOSE_GRIP_BENCH_PRESS = {
-  view: { plane: "sagittal", yaw: 40 },
+  view: "side",
   loop: "pingpong",
   dur: 3.2,
   breath: 0.25,
   props: [
-    { type: "bench", x: 36.3, y: 92, w: 59.7 },
+    { type: "bench", x: 26, y: 92, w: 78 },
     { type: "barbell", side: "R", point: "hand", r: 9.5, front: true },
   ],
   keys: [
