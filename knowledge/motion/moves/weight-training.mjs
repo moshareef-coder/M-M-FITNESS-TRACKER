@@ -15,6 +15,8 @@ import {
 // arms, forearms) and lower body plus core. This file keeps the shared seeds
 // and merges the parts; the validator and index only ever see one MOVES map.
 import { MOVES as UPPER } from "./weight-training-upper.mjs";
+// the elbows-out pole for a press bottom; see the note beside it over there
+import { ELBOW_OUT_R, ELBOW_OUT_L } from "./weight-training-upper.mjs";
 import { MOVES as LOWER } from "./weight-training-lower.mjs";
 /* NOT wired up, deliberately, and this is a decision somebody has to make.
    weight-training-lower.mjs now exports DUMBBELL_WALKING_LUNGE and
@@ -111,7 +113,7 @@ const BARBELL_BENCH_PRESS = {
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 2, neck: -6, wristR: 0, wristL: 0 },
       ik: {
-        wristR: { x: 69.0, y: 64.9, bend: 1 }, wristL: { x: 72.0, y: 65.9, bend: 1 },
+        wristR: { x: 69.0, y: 64.9, bend: 1, pole: ELBOW_OUT_R }, wristL: { x: 72.0, y: 65.9, bend: 1, pole: ELBOW_OUT_L },
         ankleR: { x: 108, y: 113.4, bend: -1 }, ankleL: { x: 112, y: 113.4, bend: -1 },
       },
     },
