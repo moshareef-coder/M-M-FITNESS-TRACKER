@@ -9487,10 +9487,24 @@ function renderOnboardIntro(i, data) {
    are used verbatim; the longer phrasings people actually type live there as
    aliases and never go on a button. */
 const GOAL_TILES = [
-  { id: "lose-weight", legacy: "lose", askTarget: "lose", ico: "arrowDown", title: "Lose weight", sub: "and keep it off", kids: [] },
-  { id: "build-muscle", legacy: "muscle", askTarget: "gain", ico: "dumbbell", title: "Build muscle", sub: "get bigger, put weight on", kids: [] },
+  /* `claim` is what this goal says the scale should do, and it is the reason
+     two goals can now refuse each other. Every one of these picks a different
+     progress card, and the cards disagree on purpose: the weight card treats
+     down as progress, the bulk card treats up as progress. The card is chosen
+     from the MAIN goal only, so before this, Lose weight plus Build muscle
+     drew a falling chart and Build muscle plus Lose weight drew a rising one,
+     from the same two taps in a different order, and the app never said the
+     second goal had changed nothing. Goals that make no claim about the scale
+     (strength, endurance, mobility) carry null and combine with anything. */
+  { id: "lose-weight", legacy: "lose", askTarget: "lose", claim: "down", ico: "arrowDown", title: "Lose weight", sub: "and keep it off", kids: [] },
+  /* Was "Tone up", which is the same thing said less clearly. Losing fat while
+     building muscle is one goal with one measure, not two goals fighting over
+     the chart, and naming it properly is what makes the pair unpickable. */
+  { id: "tone-lean-abs", legacy: "recomp", claim: "flat", ico: "refresh", title: "Lose fat and build muscle", sub: "same weight, different shape", kids: [] },
+  /* Was "Build muscle", which people picked meaning both "get bigger" and
+     "get leaner". Bulk up can only mean one of those, which is the point. */
+  { id: "build-muscle", legacy: "muscle", claim: "up", ico: "dumbbell", title: "Bulk up", sub: "put weight on deliberately", kids: [] },
   { id: "get-stronger", legacy: "stronger", ico: "bolt", title: "Get stronger", sub: "lift heavier", kids: [] },
-  { id: "tone-lean-abs", legacy: "recomp", ico: "refresh", title: "Tone up", sub: "get lean, see abs", kids: [] },
   { id: "build-endurance", legacy: "consistent", ico: "run", title: "Build endurance", sub: "last longer, breathe easier", kids: [] },
   { id: "move-better", legacy: "consistent", ico: "body", title: "Move better", sub: "mobility, flexibility, less pain", kids: [] },
   { id: "consistent", legacy: "consistent", ico: "info", title: "Not sure yet", sub: "we will start somewhere sensible", kids: [] },
@@ -9844,10 +9858,36 @@ function initGoalTiles(grid, { selected = {}, onPick, onSelect, confirmLabel = "
      right place to say so, after the plan is built rather than under a finger.
      Untapping the main goal still promotes the first extra rather than leaving
      extras with nothing to be extra to. */
+  /* Two goals that disagree about the scale cannot both be held. The progress
+     card is chosen from the main goal alone, so Lose weight plus Bulk up drew
+     whichever chart the first tap picked and silently ignored the other, which
+     is not a preference being overridden, it is the app measuring the opposite
+     of what somebody asked for. Rather than pick a winner quietly, the picker
+     swaps: tapping a conflicting goal makes it the main one and drops the goal
+     it contradicts, and says which. Goals with no claim about the scale
+     (strength, endurance, mobility) carry null and combine with anything. */
+  const claimOf = (bubble) => goalTileFor(bubble)?.claim || null;
+  function conflictsWith(bubble) {
+    const want = claimOf(bubble);
+    if (!want) return [];
+    const held = [primary, ...extras].filter(Boolean);
+    return held.filter((h) => claimOf(h.bubble) && claimOf(h.bubble) !== want);
+  }
   function choose(bubble, child) {
     if (isMain(bubble, child)) { primary = extras.shift() || null; return; }
     const at = extraAt(bubble, child);
     if (at >= 0) { extras.splice(at, 1); return; }
+    const clash = conflictsWith(bubble);
+    if (clash.length) {
+      const names = clash.map((c) => goalTileFor(c.bubble)?.title).filter(Boolean);
+      const drop = new Set(clash.map((c) => c.bubble));
+      if (primary && drop.has(primary.bubble)) primary = null;
+      extras = extras.filter((e) => !drop.has(e.bubble));
+      if (primary) extras.unshift({ bubble, child }); else primary = { bubble, child };
+      extras = extras.slice(0, MAX_EXTRA);
+      toast(`${names.join(" and ")} measures the opposite, so it came off.`);
+      return;
+    }
     if (!primary) { primary = { bubble, child }; return; }
     if (extras.length < MAX_EXTRA) { extras.push({ bubble, child }); return; }
     toast(`${MAX_EXTRA} extra goals is the cap. Remove one first.`);
@@ -11192,33 +11232,6 @@ function typeOut(el, text) {
    because "you will move better by March" is not a claim this app can stand
    behind. The rate comes from lossTimelines, the same table the target screen
    showed them, so the date here cannot disagree with the one they already saw. */
-/* The quick answers to "how much", drawn from what they weigh rather than
-   fixed, so somebody at 140 is not offered a 50 pound loss and somebody at 300
-   is not offered only 10. Redrawn when the current weight changes, since the
-   sensible options move with it. Typing a number and skipping both still work:
-   a goal weight is genuinely optional and the app tracks the scale either way. */
-function paintTargetTemplates(data) {
-  const row = document.getElementById("obTargetTemplates");
-  if (!row) return;
-  const cur = Number(document.getElementById("obLb")?.value) || currentWeightLb(ME) || null;
-  const gaining = goalTileFor(data.goal_bubble)?.askTarget === "gain";
-  const steps = gaining ? [5, 10, 15, 20] : [10, 20, 30, 40];
-  /* Never offer a loss that would take somebody under 90 pounds. The screen
-     already refuses an unhealthy target further down; not suggesting one in
-     the first place is better than talking them out of it afterwards. */
-  const fit = cur ? steps.filter((n) => gaining || cur - n >= 90) : [];
-  if (!cur || !fit.length) { row.innerHTML = ""; return; }
-  row.innerHTML = `<span class="obt-lab">Most people aim for</span>` + fit.map((n) =>
-    `<button type="button" class="obt-chip" data-delta="${n}">${gaining ? "+" : "-"}${n} lb</button>`).join("");
-  row.querySelectorAll("[data-delta]").forEach((b) => b.onclick = () => {
-    const box = document.getElementById("obGoalLb");
-    if (!box) return;
-    box.value = String(Math.round(gaining ? cur + Number(b.dataset.delta) : cur - Number(b.dataset.delta)));
-    box.dispatchEvent(new Event("input", { bubbles: true }));
-    row.querySelectorAll("[data-delta]").forEach((x) => x.classList.toggle("on", x === b));
-  });
-}
-
 function obTimeline(data, days) {
   const cur = data.weight_lb, goal = data.goal_weight_lb;
   if (!cur || !goal || cur === goal) return "";
@@ -11452,7 +11465,7 @@ function renderOnboardStep(step, data = {}) {
     const inv = data.height_in ? data.height_in % 12 : "";
     ob.innerHTML = `
       <div class="ob-step">
-        <h1>${lockedDown ? "How much do you want to lose?" : "Aiming for a weight?"}</h1>
+        <h1>What do you weigh right now?</h1>
         <p class="sub">${lockedDown
           ? "All of this is optional, and you can change any of it later."
           : "Plenty of people build muscle without watching the scale. Skip this if that is you."}</p>
@@ -11462,16 +11475,16 @@ function renderOnboardStep(step, data = {}) {
           <input id="obLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.weight_lb || ""}" />
         </div>
 
-        <details class="ob-fold" id="obGoalFold">
-          <summary>Is there a specific weight you want to reach?<span class="ob-fold-opt">Optional</span></summary>
-          <div class="ob-fold-in">
-            <div class="ob-templates" id="obTargetTemplates"></div>
+        ${/* The goal weight question used to live here, folded. It is gone on
+              Mo's call: it belongs on the progress chart, where somebody is
+              already looking at the line it would draw, rather than on the way
+              in before they have weighed themselves once. Nothing downstream
+              requires it, and every reader already treats a missing target as
+              "tracks the scale without a finish line", which is the behaviour
+              every new account now gets. */ ""}
         <div class="ob-row">
-          <input id="obGoalLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.goal_weight_lb || ""}" />
         </div>
 
-          </div>
-        </details>
         <label class="ob-lab">Height <span class="ob-opt">so we can check the goal is a safe one</span></label>
         <div class="ob-row">
           <input id="obFt" type="number" inputmode="numeric" min="3" max="8" placeholder="feet" value="${ftv}" />
@@ -11496,7 +11509,11 @@ function renderOnboardStep(step, data = {}) {
 
     const paint = () => {
       const cur = parseFloat($("obLb").value) || null;
-      const goalLb = parseFloat($("obGoalLb").value) || null;
+      /* No goal weight is collected on the way in any more, so this is always
+         null here and every branch below that needs one simply does not run.
+         The reads are kept rather than torn out because the same screen is
+         reachable from Setup, where a target can exist on the profile. */
+      const goalLb = null;
       const box = $("obReal"), tl = $("obTl"), next = $("targetNext");
       const hide = () => { tl.className = "ob-tl hidden"; tl.innerHTML = ""; };
       blocked = false;
@@ -11592,13 +11609,13 @@ function renderOnboardStep(step, data = {}) {
         b2.onclick = () => { picked = b2.dataset.tl; paint(); };
       });
     };
-    ["obLb", "obGoalLb", "obFt", "obIn"].forEach((id) => { $(id).oninput = paint; });
+    ["obLb", "obFt", "obIn"].forEach((id) => { const el = $(id); if (el) el.oninput = paint; });
     paint();
 
     const go = (skip) => {
       if (blocked && !skip) return;
       const cur = parseFloat($("obLb").value) || null;
-      const goalLb = skip ? null : parseFloat($("obGoalLb").value) || null;
+      const goalLb = null;
       const heightIn = readHeight();
       const losing = !!(cur && goalLb && goalLb < cur);
       const chosen = losing ? lossTimelines(cur, goalLb).find((o) => o.key === picked) : null;
@@ -11634,11 +11651,6 @@ function renderOnboardStep(step, data = {}) {
        300 is not offered only 10. Skip is already on this screen and stays
        first class: a goal weight is genuinely optional and the app tracks the
        scale either way. */
-    /* Opens itself when they already have a number, from a draft or a second
-       visit, because a folded card is a card that hides what it holds. */
-    if (data.goal_weight_lb) { const f = $("obGoalFold"); if (f) f.open = true; }
-    paintTargetTemplates(data);
-    $("obLb")?.addEventListener("input", () => paintTargetTemplates(data));
     $("targetNext").onclick = () => go(false);
     $("targetSkip").onclick = () => go(true);
     $("targetBack").onclick = () => renderOnboardStep("goal", data);
@@ -30067,9 +30079,14 @@ function headlineKindFor(profile) {
        tonnage stays the default. A target below the start is a recomp being
        run under the Build muscle tile, and the scale is the wrong lead for
        that one for the same reason it is wrong for tone-lean-abs. */
+    /* Bulk up says on the tile that the scale is meant to rise, so the card is
+       the one that reads a rising scale against the bar going up with it. It
+       used to fall back to tonnage whenever no goal weight was on file, which
+       after the goal weight question left onboarding is everybody, so the goal
+       that most needs the scale would have stopped showing it. */
     case "build-muscle": {
       const wg = weightGoalFor(profile?.email);
-      if (!wg || wg.start_value == null) return "volume";
+      if (!wg || wg.start_value == null) return "bulk";
       /* A target ABOVE the start is somebody putting weight on deliberately,
          and that used to land on "scale", which answers with the number on
          its own. That is the one answer this goal cannot use: a bulk that is
