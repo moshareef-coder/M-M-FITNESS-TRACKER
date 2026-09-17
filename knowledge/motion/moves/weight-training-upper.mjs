@@ -20,33 +20,40 @@ const pinFeet = (xr, yr, xl, yl) => ({
   ankleR: { x: xr, y: yr, bend: -1 },
   ankleL: { x: xl, y: yl, bend: -1 },
 });
-/* THE ELBOWS HANG OUT AND DOWN AT THE BOTTOM OF A BENCH PRESS.
+/* HOW THE SEVEN BENCH PRESSES MOVE, AND WHY THEY ARE ANGLES, NOT HAND PINS.
 
-   Mo, on three reference photos: "once they go down, their elbows stick out",
-   and then, when a first attempt did not read: "the elbows do not look like
-   they're sticking out". This is how the six bench presses do it now, and why
-   it took two tries.
+   Mo's frame for the bottom of a bench press, side on: the bell fixed end on
+   above the chest, the elbow hanging below the bench line, the forearm rising
+   to the bell. And his rule for the rep: "smooth, up, down, up, down, as simple
+   as a normal bench press."
 
-   A screen pin cannot do it. The elbow of a two bone arm lies on a circle
-   around the shoulder-to-hand line, and with the hand pinned straight above
-   the shoulder that line points up, so every point on the circle is level
-   with or above the shoulder: the elbow can go forward, back, or sideways,
-   but it can never hang BELOW the shoulder toward the bench. The first
-   attempt used an IK pole to push it sideways, which is real abduction and
-   drew as the arm foreshortening into the torso and vanishing.
+   Every version of these that pinned the hand and let the solver place the
+   elbow failed that rule in the middle of the rep, in three different ways. A
+   hand pin gives a two bone arm exactly two elbow positions per frame and the
+   solver picks one per frame, so as the hand descends the elbow switches
+   sides: it sat above the shoulder pointing at the head, then jumped to below
+   it in one step, passing flat across the chest on the way. Steering that with
+   an IK pole pointed the elbow straight at the camera, which side on drew the
+   whole arm as a stub. Adding a middle keyframe to fix the path put a pause in
+   the rep, because the easing runs per segment and treats every key as a stop.
 
-   In the photos the elbow hangs below the bench because the hand is also
-   well OUT to the side, which a side camera hides. So the bottom wrist is a
-   WORLD pin (flat: false, with a z) about 20 units lateral of the shoulder
-   and only a few units above the joint, where the bell actually sits beside
-   the chest. That tilts the circle, and its low point drops about 10 units
-   posterior of the shoulder with 60 degrees of flare. The pole then picks the
-   low point rather than the high one. Screen x and y stay where the bell has
-   to be; only the z changed, and the z is what the camera cannot see.
+   So the arms are driven by joint angles, two keys, the way Seated Dumbbell
+   Press already works. The top is the arm straight up on screen. The bottom is
+   the reference frame, solved numerically from it: a shoulder angle kept near
+   the top's, with the swing out and down carried by abduction, the elbow bent,
+   and the forearm brought vertical by rotation. Because every channel then
+   moves one way between two keys, the elbow can only travel one way: out and
+   down as the bell drops, back up as it rises. The halfway pose was scored in
+   the same search so the bell stays on a vertical line rather than drifting
+   toward the head. Two things are non obvious and cost a round each. The
+   bottom has to be written with the in plane shoulder near the top's value;
+   the same physical pose written with the in plane angle two hundred degrees
+   away interpolates through the head. And rotation MIRRORS between sides while
+   abduction does not, so the left arm takes the opposite rotation sign or it
+   swings to the floor.
 
-   The two sides need opposite z and opposite pole x, or both elbows go the
-   same way. The lockout keys stay as screen pins: an arm straight up is in
-   the plane already. */
+   Close-Grip Bench Press uses the same keys with no abduction and no rotation,
+   which is the tucked elbow that defines it. */
 
 // Front view feet: a foot pointing at the camera is drawn short and wide
 // rather than rotated. The same `ang` mirrors, because dirV takes the side sign.
@@ -70,20 +77,11 @@ const FRONT_FEET = { R: { ang: 12, len: 0.4, w: 1.3 }, L: { ang: 12, len: 0.4, w
 // and even where a lifter does go neutral the bell still does not rotate rep
 // to rep. "follow" stays right where the grip genuinely is neutral and the
 // forearm genuinely swings: hammer curls, rows, kickbacks, carries.
-/* ALL SEVEN BENCH PRESSES ARE SIDE ON. This was decided twice.
-
-   A flat side camera cannot show an elbow going out to the side, because out
-   is straight at the lens, and for a while these were orbited 40 degrees
-   toward the feet so the flare would read. Mo looked at that and chose the
-   side view, against a render of this exact move at the bottom of the rep:
-   bell fixed end on above the chest, elbow hanging below the bench line,
-   forearm rising to it. That render is the target, and it is what this draws.
-
-   The elbow hangs because the bottom wrist is a 3D world pin, 20 units out to
-   the side and only a few units above the shoulder joint, which tilts the
-   circle the elbow lives on so its low point drops below the bench. See the
-   note further up the file. That geometry is camera independent; it is why
-   the side view could come back without touching a single pin. */
+/* ALL SEVEN BENCH PRESSES ARE SIDE ON, and were turned to a three quarter
+   view for a while so the flared elbow would read. Mo chose the side view,
+   against a render of this exact move at the bottom of the rep. The note at
+   the top of the file says how the arms are driven; nothing about that depends
+   on the camera. */
 const DUMBBELL_BENCH_PRESS = {
   view: "side",
   loop: "pingpong",
@@ -98,26 +96,14 @@ const DUMBBELL_BENCH_PRESS = {
     { // lockout, bells nearly touching over the chest
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 0, neck: -4 },
-      ik: { wristR: { x: 55.0, y: 43.7, z: 12.2, flat: false, bend: 1 }, wristL: { x: 59.0, y: 47.2, z: -12.2, flat: false, bend: 1 }, ...stand(108, 112) },
-    },
-    { /* halfway down. The hand drops STRAIGHT first, the elbow already
-         bending out, and only drifts toward the feet in the second half. Two
-         keys alone interpolate the hand along a diagonal, which early in the
-         descent swings a nearly straight arm forward like a stiff lever, then
-         folds it in one step with the elbow jumping from above the shoulder to
-         below it. This key pins the path through the shape a press actually
-         passes through. */
-      t: 0.5,
-      root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 0, neck: -4 },
-      ik: { wristR: { x: 56.4, y: 58.5, z: 22, flat: false, bend: 1, pole: [-1, 0, 0] }, wristL: { x: 60.1, y: 61.3, z: -22, flat: false, bend: 1, pole: [1, 0, 0] }, ...stand(108, 112) },
+      joints: { spine: 0, neck: -4, shoulderR: -90, shoulderL: -90, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 0, shoulderRotL: 0 },
+      ik: { ...stand(108, 112) },
     },
     { // bottom, bells beside the chest, elbows folded out under the hands
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 2, neck: -6 },
-      ik: { wristR: { x: 64.2, y: 76.5, z: 18, flat: false, bend: 1, pole: [-1, 0, 0] }, wristL: { x: 66.2, y: 78.5, z: -18, flat: false, bend: 1, pole: [1, 0, 0] }, ...stand(108, 112) },
+      joints: { spine: 2, neck: -6, shoulderR: -132, shoulderL: -132, shoulderAbdR: 105, shoulderAbdL: 105, elbowR: 64, elbowL: 64, shoulderRotR: -90, shoulderRotL: 90 },
+      ik: { ...stand(108, 112) },
     },
   ],
 };
@@ -319,20 +305,8 @@ const INCLINE_DUMBBELL_PRESS = {
     { // lockout, arms long square to the reclined torso
       t: 0,
       root: { x: 84, y: 90, rot: -55 },
-      joints: { spine: 0, neck: -6, forearmPronR: 90, forearmPronL: 90 },
-      ik: { wristR: { x: 63.0, y: 34.9, z: 12.2, flat: false, bend: 1 }, wristL: { x: 66.0, y: 38.4, z: -12.2, flat: false, bend: 1 }, ...stand(110, 104) },
-    },
-    { /* halfway down. The hand drops STRAIGHT first, the elbow already
-         bending out, and only drifts toward the feet in the second half. Two
-         keys alone interpolate the hand along a diagonal, which early in the
-         descent swings a nearly straight arm forward like a stiff lever, then
-         folds it in one step with the elbow jumping from above the shoulder to
-         below it. This key pins the path through the shape a press actually
-         passes through. */
-      t: 0.5,
-      root: { x: 84, y: 90, rot: -55 },
-      joints: { spine: 0, neck: -6, forearmPronR: 90, forearmPronL: 90 },
-      ik: { wristR: { x: 63.8, y: 49.5, z: 22, flat: false, bend: 1, pole: [-1, 0, -0.2] }, wristL: { x: 66.7, y: 52.4, z: -22, flat: false, bend: 1, pole: [1, 0, -0.2] }, ...stand(110, 104) },
+      joints: { spine: 0, neck: -6, forearmPronR: 90, forearmPronL: 90, shoulderR: -125, shoulderL: -125, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 0, shoulderRotL: 0 },
+      ik: { ...stand(110, 104) },
     },
     { /* bottom, bells beside the UPPER chest, just below the collarbone, which
          is 0.16 of the way from the shoulder joint to the hip. That is the
@@ -350,8 +324,8 @@ const INCLINE_DUMBBELL_PRESS = {
          a bar on its way down. */
       t: 1,
       root: { x: 84, y: 90, rot: -55 },
-      joints: { spine: 2, neck: -8, forearmPronR: 90, forearmPronL: 90 },
-      ik: { wristR: { x: 68.5, y: 67.4, z: 22, flat: false, bend: 1, pole: [-1, 0, -0.2] }, wristL: { x: 70.5, y: 69.4, z: -22, flat: false, bend: 1, pole: [1, 0, -0.2] }, ...stand(110, 104) },
+      joints: { spine: 2, neck: -8, forearmPronR: 90, forearmPronL: 90, shoulderR: -145, shoulderL: -145, shoulderAbdR: 120, shoulderAbdL: 120, elbowR: 50, elbowL: 50, shoulderRotR: -90, shoulderRotL: 90 },
+      ik: { ...stand(110, 104) },
     },
   ],
 };
@@ -376,26 +350,14 @@ const DECLINE_DUMBBELL_PRESS = {
     { // lockout, bells square to the declined torso
       t: 0,
       root: { x: 78, y: 64, rot: -115 },
-      joints: { spine: 0, neck: 6 },
-      ik: { wristR: { x: 50.0, y: 37.6, z: 12.2, flat: false, bend: 1 }, wristL: { x: 52.0, y: 39.6, z: -12.2, flat: false, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
-    },
-    { /* halfway down. The hand drops STRAIGHT first, the elbow already
-         bending out, and only drifts toward the feet in the second half. Two
-         keys alone interpolate the hand along a diagonal, which early in the
-         descent swings a nearly straight arm forward like a stiff lever, then
-         folds it in one step with the elbow jumping from above the shoulder to
-         below it. This key pins the path through the shape a press actually
-         passes through. */
-      t: 0.5,
-      root: { x: 78, y: 64, rot: -115 },
-      joints: { spine: 0, neck: 6 },
-      ik: { wristR: { x: 51.4, y: 50.3, z: 12, flat: false, bend: 1, pole: [-1, 0.5, -0.2] }, wristL: { x: 53.4, y: 52.3, z: -12, flat: false, bend: 1, pole: [1, 0.5, -0.2] }, ...pinFeet(112, 58, 108, 62) },
+      joints: { spine: 0, neck: 6, shoulderR: -65, shoulderL: -65, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 0, shoulderRotL: 0 },
+      ik: { ...pinFeet(112, 58, 108, 62) },
     },
     { // bottom, bells beside the lower chest
       t: 1,
       root: { x: 78, y: 64, rot: -115 },
-      joints: { spine: 2, neck: 8 },
-      ik: { wristR: { x: 59.2, y: 65.8, z: 20, flat: false, bend: 1, pole: [-1, 0.5, -0.2] }, wristL: { x: 61.2, y: 67.8, z: -20, flat: false, bend: 1, pole: [1, 0.5, -0.2] }, ...pinFeet(112, 58, 108, 62) },
+      joints: { spine: 2, neck: 8, shoulderR: -105, shoulderL: -105, shoulderAbdR: 100, shoulderAbdL: 100, elbowR: 56, elbowL: 56, shoulderRotR: -90, shoulderRotL: 90 },
+      ik: { ...pinFeet(112, 58, 108, 62) },
     },
   ],
 };
@@ -413,26 +375,14 @@ const INCLINE_BARBELL_PRESS = {
     { // lockout above the upper chest
       t: 0,
       root: { x: 84, y: 90, rot: -55 },
-      joints: { spine: 0, neck: -6 },
-      ik: { wristR: { x: 63.0, y: 34.9, z: 12.2, flat: false, bend: 1 }, wristL: { x: 64.9, y: 38.2, z: -12.2, flat: false, bend: 1 }, ...stand(110, 104) },
-    },
-    { /* halfway down. The hand drops STRAIGHT first, the elbow already
-         bending out, and only drifts toward the feet in the second half. Two
-         keys alone interpolate the hand along a diagonal, which early in the
-         descent swings a nearly straight arm forward like a stiff lever, then
-         folds it in one step with the elbow jumping from above the shoulder to
-         below it. This key pins the path through the shape a press actually
-         passes through. */
-      t: 0.5,
-      root: { x: 84, y: 90, rot: -55 },
-      joints: { spine: 0, neck: -6 },
-      ik: { wristR: { x: 63.8, y: 49.5, z: 22, flat: false, bend: 1, pole: [-1, 0, -0.2] }, wristL: { x: 65.7, y: 52.2, z: -22, flat: false, bend: 1, pole: [1, 0, -0.2] }, ...stand(110, 104) },
+      joints: { spine: 0, neck: -6, shoulderR: -125, shoulderL: -125, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 0, shoulderRotL: 0 },
+      ik: { ...stand(110, 104) },
     },
     { // bar down to the collarbone, elbows under the bar
       t: 1,
       root: { x: 84, y: 90, rot: -55 },
-      joints: { spine: 2, neck: -8 },
-      ik: { wristR: { x: 68.5, y: 67.4, z: 22, flat: false, bend: 1, pole: [-1, 0, -0.2] }, wristL: { x: 70.5, y: 69.4, z: -22, flat: false, bend: 1, pole: [1, 0, -0.2] }, ...stand(110, 104) },
+      joints: { spine: 2, neck: -8, shoulderR: -145, shoulderL: -145, shoulderAbdR: 120, shoulderAbdL: 120, elbowR: 50, elbowL: 50, shoulderRotR: -90, shoulderRotL: 90 },
+      ik: { ...stand(110, 104) },
     },
   ],
 };
@@ -451,26 +401,14 @@ const DECLINE_BARBELL_PRESS = {
     { // lockout over the lower chest
       t: 0,
       root: { x: 78, y: 64, rot: -115 },
-      joints: { spine: 0, neck: 6 },
-      ik: { wristR: { x: 50.0, y: 37.6, z: 12.2, flat: false, bend: 1 }, wristL: { x: 52.0, y: 39.6, z: -12.2, flat: false, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
-    },
-    { /* halfway down. The hand drops STRAIGHT first, the elbow already
-         bending out, and only drifts toward the feet in the second half. Two
-         keys alone interpolate the hand along a diagonal, which early in the
-         descent swings a nearly straight arm forward like a stiff lever, then
-         folds it in one step with the elbow jumping from above the shoulder to
-         below it. This key pins the path through the shape a press actually
-         passes through. */
-      t: 0.5,
-      root: { x: 78, y: 64, rot: -115 },
-      joints: { spine: 0, neck: 6 },
-      ik: { wristR: { x: 51.4, y: 50.3, z: 12, flat: false, bend: 1, pole: [-1, 0.5, -0.2] }, wristL: { x: 53.4, y: 52.3, z: -12, flat: false, bend: 1, pole: [1, 0.5, -0.2] }, ...pinFeet(112, 58, 108, 62) },
+      joints: { spine: 0, neck: 6, shoulderR: -65, shoulderL: -65, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 0, shoulderRotL: 0 },
+      ik: { ...pinFeet(112, 58, 108, 62) },
     },
     { // bar down to the lower chest, elbows under the bar
       t: 1,
       root: { x: 78, y: 64, rot: -115 },
-      joints: { spine: 2, neck: 8 },
-      ik: { wristR: { x: 59.2, y: 65.8, z: 20, flat: false, bend: 1, pole: [-1, 0.5, -0.2] }, wristL: { x: 61.2, y: 67.8, z: -20, flat: false, bend: 1, pole: [1, 0.5, -0.2] }, ...pinFeet(112, 58, 108, 62) },
+      joints: { spine: 2, neck: 8, shoulderR: -105, shoulderL: -105, shoulderAbdR: 100, shoulderAbdL: 100, elbowR: 56, elbowL: 56, shoulderRotR: -90, shoulderRotL: 90 },
+      ik: { ...pinFeet(112, 58, 108, 62) },
     },
   ],
 };
@@ -2252,26 +2190,14 @@ const CLOSE_GRIP_BENCH_PRESS = {
     { // lockout, bar over the lower chest
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 0, neck: -4 },
-      ik: { wristR: { x: 59.2, y: 43.8, bend: 1 }, wristL: { x: 60.9, y: 47.4, bend: 1 }, ...stand(108, 112) },
-    },
-    { /* halfway down. The hand drops STRAIGHT first, the elbow already
-         bending out, and only drifts toward the feet in the second half. Two
-         keys alone interpolate the hand along a diagonal, which early in the
-         descent swings a nearly straight arm forward like a stiff lever, then
-         folds it in one step with the elbow jumping from above the shoulder to
-         below it. This key pins the path through the shape a press actually
-         passes through. */
-      t: 0.5,
-      root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 0, neck: -4 },
-      ik: { wristR: { x: 61.1, y: 55.1, bend: 1 }, wristL: { x: 62.4, y: 57.8, bend: 1 }, ...stand(108, 112) },
+      joints: { spine: 0, neck: -4, shoulderR: -90, shoulderL: -90, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 0, shoulderRotL: 0 },
+      ik: { ...stand(108, 112) },
     },
     { // bottom, bar low on the sternum, elbows tucked toward the feet
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 2, neck: -6 },
-      ik: { wristR: { x: 72.0, y: 68.9, bend: 1 }, wristL: { x: 70.6, y: 70.6, bend: 1 }, ...stand(108, 112) },
+      joints: { spine: 2, neck: -6, shoulderR: -132, shoulderL: -132, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 64, elbowL: 64, shoulderRotR: 0, shoulderRotL: 0 },
+      ik: { ...stand(108, 112) },
     },
   ],
 };
