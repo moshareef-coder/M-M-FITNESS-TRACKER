@@ -41,7 +41,7 @@ dir="supabase/functions/$slug"
 # So it is a list now. A function not on it verifies JWTs, which is the safe
 # default for anything reached from the app.
 case "$slug" in
-  send-nudges|notify-live-start|notify-clip|notify-report|expire-clips|expire-proofs)
+  send-nudges|notify-live-start|notify-clip|notify-report|expire-clips|expire-proofs|revenuecat-webhook)
     verify_jwt=false ;;
   *)
     verify_jwt=true ;;

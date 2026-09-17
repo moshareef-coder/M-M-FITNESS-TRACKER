@@ -16,6 +16,7 @@ def capacitor_pods
   pod 'CapacitorApp', :path => '../../node_modules/@capacitor/app'
   pod 'CapacitorBrowser', :path => '../../node_modules/@capacitor/browser'
   pod 'CapacitorPushNotifications', :path => '../../node_modules/@capacitor/push-notifications'
+  pod 'RevenuecatPurchasesCapacitor', :path => '../../node_modules/@revenuecat/purchases-capacitor'
 end
 
 target 'App' do
@@ -25,6 +26,17 @@ end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+
+  # RevenueCat's pods (RevenueCat, PurchasesHybridCommon) ship resource bundle
+  # targets that CocoaPods does not inherit a development team for, so a plain
+  # `pod install` leaves them needing one picked by hand in Xcode every single
+  # time this runs. Set here instead, to the same team every other target in
+  # this project already signs with, so cap sync never breaks the build again.
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['DEVELOPMENT_TEAM'] = 'S93Z4UM9U4'
+    end
+  end
 
   # CocoaPods 1.11.3 reads a symlinked framework with bare readlink, yielding a relative
   # path that rsync resolves from the wrong directory and archiving fails. Fixed in 1.12.1.
