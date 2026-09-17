@@ -218,6 +218,14 @@ for (const training of TRAININGS) {
   for (const key of Object.keys(lib)) {
     if (!known.has(key)) fail(key, `is not an exercise in the ${training.id} library (typo, or wrong file)`);
   }
+  /* A training can declare that its entries are not poses. Cardio does: a
+     session there is a duration at an effort, not a shape, so counting it as a
+     missing animation would report a gap that is not one and would sit in the
+     way of every future run of this check. */
+  if (training.posed === false) {
+    lines.push(`  ${training.id.padEnd(16)} ${String(names.length).padStart(3)} timed sessions, no poses expected`);
+    continue;
+  }
   const gaps = names.filter((n) => !lib[n]);
   authored += names.length - gaps.length;
   missing += gaps.length;
