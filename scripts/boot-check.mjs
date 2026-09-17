@@ -212,8 +212,12 @@ if (clobbered.length) {
 }
 
 /* The app's dynamic imports are written relative to index.html at the repo
-   root; inside new Function they resolve relative to this script instead. */
-const bootSrc = src.replace(/import\("\.\/knowledge\//g, 'import("../knowledge/');
+   root; inside new Function they resolve relative to this script instead.
+   This used to rewrite only ./knowledge/, so when the quip bank moved to a
+   root ./quips.mjs the check for it silently stopped running and printed its
+   own module-not-found as if that were a result. Rewrite every root-relative
+   dynamic import, not a list somebody has to remember to extend. */
+const bootSrc = src.replace(/import\("\.\//g, 'import("../');
 try {
   new Function(bootSrc + ";globalThis.__t={showApp,loadAll,renderHome,renderWorkoutTab,renderProgressTab,renderSetupTab,switchTab,renderFab,renderScaleCheck,renderBodyTab,renderAdminPanel};")();
 } catch (e) {

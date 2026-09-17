@@ -1928,20 +1928,14 @@
      workout behind it stays private. */
   /* The two scores are one unit, so a long partner name drops BOTH to the next
      line instead of stranding theirs under yours. */
-  .hero-effort { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; margin-top: 9px; font-size: 12.5px; color: var(--muted); }
-  .he-scores { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
-  .hero-effort svg { vertical-align: -2px; color: var(--accent); }
-  .hero-effort b { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--text); }
-  .hero-effort .he-you.lead b, .hero-effort .he-them.lead b { color: var(--accent-ink); }
-  /* The label is the way in: tapping it says where the number came from. */
-  .he-label {
-    display: inline-flex; align-items: center; gap: 5px; font: inherit; color: var(--muted);
-    background: none; border: none; cursor: pointer;
-    padding: 7px 8px 7px 0; margin: -7px 0; min-height: 32px;
-  }
-  .he-label .i-glyph { opacity: .75; }
-  .he-label:active { opacity: .6; }
-
+  /* Momentum, under the rings. Deliberately not an accent colour: Mo's rule is
+     that green means shared achievement or an action, and a status line is
+     neither. The only loud green left on Home is the button. */
+  .hero-mo { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 9px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+  .hm-label { font-size: 10.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); opacity: .8; }
+  .hm-bits { min-width: 0; }
+  .hm-bits b { color: var(--text); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .hm-bits i { font-style: normal; opacity: .4; margin: 0 5px; }
   /* How effort is scored, three lines and the reason it is comparable. */
   .ef-list { display: flex; flex-direction: column; gap: 11px; margin: 2px 0 14px; }
   .ef-row { display: flex; align-items: baseline; gap: 12px; font-size: 14px; line-height: 1.4; }
@@ -2428,17 +2422,37 @@
   /* 10px is what every other card on Home leaves under itself (.card). His box
      is a card, so it uses the same number rather than one of its own. */
   .home-quip-slot { margin: 0 0 10px; }
+  /* A column now, because he carries an action: the line dismisses him and the
+     action is its own control under it, and a button inside a button is not a
+     thing the platform will render. Padding is unchanged from the alignment
+     pass, so he still lines up with the cards above and below. */
   .home-quip {
-    display: flex; align-items: center; gap: 13px; width: 100%;
+    display: flex; flex-direction: column; gap: 12px; width: 100%;
     padding: 16px 15px; border-radius: var(--radius);
     background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow-card);
-    font-family: inherit; text-align: left; cursor: pointer;
     animation: quipIn .34s cubic-bezier(.22,1,.36,1) both;
   }
+  .home-quip-say {
+    display: flex; align-items: center; gap: 13px; width: 100%;
+    padding: 0; border: 0; background: none; color: inherit;
+    font-family: inherit; text-align: left; cursor: pointer;
+  }
+  /* His action is deliberately quiet. Mo's rule for this screen is that the
+     workout button is the loudest green thing on it, and a robot suggestion is
+     not allowed to compete with the thing it is suggesting. */
+  .home-quip-act {
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 11px 14px; border-radius: 12px; cursor: pointer;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    font: inherit; font-size: 14px; font-weight: 700; letter-spacing: -.01em;
+  }
+  .home-quip-act:active { filter: brightness(.92); }
+  .home-quip-act:disabled { opacity: .6; }
+  .home-quip-act .hq-go { display: inline-flex; opacity: .45; margin-right: -4px; }
   .home-quip-av {
     flex-shrink: 0; width: 52px; height: 52px; border-radius: 14px;
     display: block; object-fit: contain;
-    background: color-mix(in srgb, var(--accent) 12%, var(--panel-2));
+    background: var(--panel-2);
   }
   .home-quip-bub { min-width: 0; flex: 1 1 auto; }
   .home-quip-line {
@@ -2450,7 +2464,7 @@
     background: var(--accent-ink); vertical-align: -2px; animation: quipCaret .9s steps(1) infinite;
   }
   .home-quip.done .home-quip-cur { display: none; }
-  .home-quip:active { transform: scale(.995); }
+  .home-quip-say:active { transform: scale(.995); }
   .home-quip.go { animation: quipOut .3s ease forwards; }
   @media (prefers-reduced-motion: reduce) { .home-quip { animation: none; } }
 
@@ -3680,6 +3694,8 @@
   /* Hero: this week, together */
   .hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .hero-kicker { font-size: 11px; font-weight: 700; letter-spacing: .09em; color: var(--muted); text-transform: uppercase; }
+  /* The one place green earns itself on this card: both of you, same day. */
+  #heroCard.hero-both .hero-kicker { color: var(--accent-ink); opacity: 1; }
   .hero-title { display: flex; align-items: center; gap: 7px; margin: 4px 0 0; font-size: 21px; font-weight: 800; letter-spacing: -.03em; line-height: 1.15; white-space: nowrap; }
   .hero-title svg { color: var(--me); flex-shrink: 0; }
   .hero-sub { font-size: 14px; color: var(--muted); margin: 4px 0 0; line-height: 1.4; }
@@ -3738,8 +3754,15 @@
   .pcol-meta { min-width: 0; }
   .pcol-name { font-size: 14px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pcol-val { font-size: 21px; font-weight: 800; letter-spacing: -.03em; line-height: 1.1; font-family: var(--font-display); white-space: nowrap; }
-  .pcol-pct { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
-  .pcol-pct.pcol-live { color: var(--partner-ink); font-weight: 700; }
+  /* The third line is today. It carries the person's own colour when there is
+     something to carry, so a glance says whose side moved without reading it. */
+  .pcol-pct {
+    font-size: 12.5px; color: var(--muted); margin-top: 1px;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .pcol-pct svg { vertical-align: -2px; margin-right: 3px; }
+  .pcol.me .pcol-live, .pcol.me .pcol-done { color: var(--me-ink); font-weight: 700; }
+  .pcol.them .pcol-live, .pcol.them .pcol-done { color: var(--partner-ink); font-weight: 700; }
 
   /* Training RIGHT NOW, said on the ring itself. The live card above already
      carries the detail; this puts the same fact on the thing the eye lands on
@@ -3823,17 +3846,7 @@
   /* This week: seven columns, a dot per person per day. Filled with a tick
      when they trained, an empty ring when they did not, and today's column
      boxed with its own label. */
-  /* The deal, stated above the grid: what you each signed up for and how far
-     along the pair is. The pooled number is the only figure on Home that
-     belongs to neither of you, which is what stops it reading as a score. */
-  .pact-line { font-size: 14.5px; line-height: 1.45; color: var(--muted); margin: 2px 0 12px; }
-  .pact-line b { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
   .pact-foot { margin-top: 12px; }
-  .pact-shared {
-    display: flex; align-items: center; gap: 8px;
-    font-size: 13.5px; color: var(--muted); margin: 0 0 10px;
-  }
-  .pact-shared b { color: var(--accent-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
   .pact-act {
     width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
     padding: 13px 14px; border-radius: 13px; cursor: pointer;
@@ -6107,15 +6120,14 @@
          right picture (a day reads DOWN its column: did we both go on
          Wednesday, or just one of us) and the timeline above it was a preview
          of the sheet that "See all" already opens, so Home was carrying the
-         same feed twice. What the grid never said out loud was the deal: what
-         you each signed up for, how far along the pair is, and what is left.
-         That is the pact line above it and the shared line under it. -->
+         same feed twice. The deal itself (what you each signed up for, how far
+         along the pair is, what is left) is the Momentum line in the hero, so
+         this card is the grid and the way to reach them. -->
     <div class="card" id="weekTogetherCard">
       <div class="card-head">
         <h2 id="weekTogetherTitle">This week <button type="button" class="info-dot" data-info="weekStrip" aria-label="What the day tiles mean">i</button></h2>
         <button type="button" class="card-link ink" id="timelineAllBtn">See all <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
       </div>
-      <p class="pact-line" id="pactLine"></p>
       <div class="wk-legend" id="weekLegend"></div>
       <div class="wk" id="weekGrid"></div>
       <div class="pact-foot" id="pactFoot"></div>
@@ -7225,7 +7237,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.17.8";
+const APP_VERSION = "2026.09.17.9";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -12136,7 +12148,6 @@ function effortXPBetween(name, from, to) {
   return gymDays * 10 + exerciseCount * 5 + prCount * 25;
 }
 function todaysEffortXP(name) { return effortXPBetween(name, todayStr(), todayStr()); }
-function weekEffortXP(name) { return effortXPBetween(name, weekStartStr(), todayStr()); }
 
 /* A number people compete on has to be explainable, or it feels arbitrary and
    they stop trusting it. Three lines, the real weights from effortXPBetween
@@ -12652,7 +12663,7 @@ function homeStreak() {
    real values on the element for renderHero to flip to on the next frame.
    Yours moves first, your partner's a beat later, so two rings read as a
    sequence rather than a twitch. */
-function personRing(done, target, cls, email, name, animate = false, live = false) {
+function personRing(done, target, cls, email, name, animate = false, live = false, state = null) {
   const pct = target > 0 ? Math.max(0, Math.min(1, done / target)) : 0;
   const r = 52, stroke = 9, circ = 2 * Math.PI * r;
   const off = circ * (1 - pct);
@@ -12672,8 +12683,11 @@ function personRing(done, target, cls, email, name, animate = false, live = fals
     <div class="pcol-meta">
       <div class="pcol-name">${escapeHtml(name)}</div>
       <div class="pcol-val">${done} / ${target}</div>
-      ${live
-        ? `<div class="pcol-pct pcol-live">Training now</div>`
+      ${/* The percentage under the ring was the ring drawn again as a number.
+           This slot says what this person is doing TODAY instead, which is the
+           one thing a ring of the week cannot tell you. */ ""}
+      ${state
+        ? `<div class="pcol-pct pcol-${state.tone}">${state.ico ? icon(state.ico, 12) : ""}${escapeHtml(state.text)}</div>`
         : `<div class="pcol-pct" data-pct="${whole}" data-delay="${cls === "me" ? 0 : 150}">${animate ? 0 : whole}%</div>`}
     </div>
   </div>`;
@@ -13586,6 +13600,65 @@ async function pushWidgetSnapshot() {
   }
 }
 
+/* How long ago, the way a person would say it. "Done 24m ago" is the difference
+   between a card that reports and a card that is awake.
+
+   The units are abbreviated because of where this lands: the column beside a
+   ring is 75px wide, which is about twelve characters, and "Done 24 min ago"
+   measured 89px and arrived with an ellipsis in it. Past a day this returns
+   nothing rather than "yesterday", and the caller falls back to "Done today",
+   because an entry filed under today is today however late the clock says. */
+function agoShort(iso) {
+  if (!iso) return null;
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const min = Math.round(ms / 60000);
+  if (min < 1) return "now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.round(min / 60);
+  return hr < 24 ? `${hr}h ago` : null;
+}
+
+/* For the side of the card with nothing to report today. "Last trained Tue" is
+   the same absence as "Not started", said as a fact about them rather than as a
+   mark against them, which is the difference this app keeps trying to hold. */
+function lastTrainedLabel(who) {
+  const d = new Date(todayStr() + "T00:00:00");
+  for (let i = 1; i <= 7; i++) {
+    d.setDate(d.getDate() - 1);
+    if (entryOn(who, isoDate(d))?.gym) {
+      return i === 1 ? "Yesterday" : `Trained ${d.toLocaleDateString([], { weekday: "short" })}`;
+    }
+  }
+  return "Nothing yet";
+}
+
+/* What this person is doing today, in four words or fewer. A live session wins
+   over a banked one because the card is meant to move WHILE the workout is
+   happening, not only once it lands. Their half of that comes from the live row
+   they publish, so somebody training with details off reads as "Training now"
+   and never as a set count they did not share. */
+function todayStateFor(who, email, isMe) {
+  if (isMe && SESSION && !SESSION.finished && TODAY_WORKOUT?.exercises?.length) {
+    const total = TODAY_WORKOUT.exercises.length;
+    return { tone: "live", text: `${Math.min(SESSION.exerciseIndex || 0, total)} of ${total} done` };
+  }
+  if (!isMe && LIVE_PARTNER) {
+    const n = LIVE_PARTNER.exercise_count || 0;
+    return n > 0
+      ? { tone: "live", text: `${Math.min(LIVE_PARTNER.exercise_index || 0, n)} of ${n} done` }
+      : { tone: "live", text: "Training now" };
+  }
+  const e = todayEntryFor(email);
+  if (e?.gym) {
+    /* A tick rather than the word "Done": it says the same thing in 12px
+       instead of 30, and this column has 75 of them to spend. */
+    return { tone: "done", ico: "check", text: agoShort(e.workout_at) || "Today" };
+  }
+  if (e?.rest_day) return { tone: "rest", text: "Rest day" };
+  return { tone: "idle", text: lastTrainedLabel(who) };
+}
+
 function renderHero(animate = false) {
   const el = $("heroCard");
   pushWidgetSnapshot();
@@ -13601,10 +13674,12 @@ function renderHero(animate = false) {
 
   const hs = homeStreak();
 
-  // Head to head on effort, not on what was done: this reads the same whether
-  // or not either of you shares the specifics of a workout.
-  const myWeekXP = weekEffortXP(ME);
-  const theirWeekXP = partner ? weekEffortXP(partner) : 0;
+  /* Mo: "right now it still reads a little like a normal fitness dashboard
+     with partner information added onto it." So the card leads with what the
+     two of you are doing today, and each ring carries its own person's state. */
+  const myState = todayStateFor(ME, MY_EMAIL, true);
+  const theirState = partner ? todayStateFor(partner, PARTNER_EMAIL, false) : null;
+  const bothDone = !!partner && !!todayEntryFor(MY_EMAIL)?.gym && !!todayEntryFor(PARTNER_EMAIL)?.gym;
 
   /* Under the title: one line that says where the pair stands. When you are
      level it reads as one sentence; otherwise each of you gets your number. */
@@ -13620,10 +13695,10 @@ function renderHero(animate = false) {
     : "";
 
   const stand = `<div class="stand${partner ? "" : " solo"}">
-    ${personRing(myDays, myTarget, "me", MY_EMAIL, ME, animate)}
+    ${personRing(myDays, myTarget, "me", MY_EMAIL, ME, animate, false, myState)}
     <div class="stand-div"></div>
     ${partner ? `<div class="strow-tap" id="openPartnerBtn" role="button" tabindex="0"
-      aria-label="Open ${escapeHtml(partner)}">${personRing(theirDays, theirTarget, "them", PARTNER_EMAIL, partner, animate, !!LIVE_PARTNER)}</div>`
+      aria-label="Open ${escapeHtml(partner)}">${personRing(theirDays, theirTarget, "them", PARTNER_EMAIL, partner, animate, !!LIVE_PARTNER, theirState)}</div>`
     : `<button type="button" class="invite-slot" id="invitePartnerBtn" aria-label="Invite your partner">
         <span class="invite-ring">${icon("plus", 26)}</span>
         <span class="invite-meta"><b>Invite</b><span>Better with two.</span></span>
@@ -13700,29 +13775,50 @@ function renderHero(animate = false) {
           Number.isFinite(todayPlan.est_minutes) ? ` &middot; about ${todayPlan.est_minutes} min` : ""}` }
     : null;
 
-  /* Head to head on effort sits UNDER the rings, not above the button. It is
-     worth showing, but it is a comparison of the week and nothing about the
-     week belongs between "Push Day" and Start. */
-  const effortRow = partner && (myWeekXP > 0 || theirWeekXP > 0) ? `<div class="hero-effort">
-      <button type="button" class="he-label" id="effortInfoBtn" aria-label="How effort is scored">${icon("bolt", 13)} Effort this week <span class="i-glyph">${icon("info", 13)}</span></button>
-      <span class="he-scores">
-        <span class="he-you${myWeekXP >= theirWeekXP ? " lead" : ""}">You <b data-xp="${myWeekXP}" data-delay="380">${animate ? 0 : myWeekXP}</b><span class="sr-only"> effort points${myWeekXP > theirWeekXP ? ", ahead" : ""}</span></span>
-        <span class="he-them${theirWeekXP > myWeekXP ? " lead" : ""}">${escapeHtml(partner)} <b data-xp="${theirWeekXP}" data-delay="480">${animate ? 0 : theirWeekXP}</b><span class="sr-only"> effort points${theirWeekXP > myWeekXP ? ", ahead" : ""}</span></span>
+  /* This line used to be "Effort this week: You 80, Mell 30". Mo: "users won't
+     immediately understand what 80 means, and it makes the relationship feel
+     competitive." Both true. Every number here is one neither of you owns
+     alone, which is what stops it reading as a score. */
+  const together = myDays + theirDays;
+  const sharedDays = sharedDaysThisWeek();
+  const momentumRow = partner ? `<div class="hero-mo">
+      <span class="hm-label">Momentum</span>
+      <span class="hm-bits">
+        <b>${together}</b> workout${together === 1 ? "" : "s"} together<i>&middot;</i><b>${sharedDays}</b> shared day${sharedDays === 1 ? "" : "s"}<i>&middot;</i><b>${daysLeft}</b> day${daysLeft === 1 ? "" : "s"} left
       </span>
     </div>` : "";
+
+  /* Both of you trained today is the one state this card should drop everything
+     to say, and it is the only celebration the app allows itself: the rule the
+     pact copy already states out loud is that finishing alone does not get
+     confetti, because the person who finished alone is not the point. */
+  const clockAt = (v) => v ? new Date(v).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : null;
+  let head;
+  if (bothDone) {
+    const times = [clockAt(todayEntryFor(MY_EMAIL)?.workout_at), clockAt(todayEntryFor(PARTNER_EMAIL)?.workout_at)].filter(Boolean);
+    head = { kicker: "Today together", title: "Both of you, done.",
+             sub: times.length === 2 ? `${escapeHtml(times[0])} and ${escapeHtml(times[1])}.` : "Both of you logged it today." };
+  } else if (planToday) {
+    head = { kicker: partner ? "Today together" : "Today", title: escapeHtml(planToday.title), sub: planToday.meta };
+  } else {
+    head = { kicker: partner ? "This week together" : "This week",
+             title: partner ? "Stronger Together" : "Your week",
+             sub: `${sub} ${infoDot("weekTarget", "How the weekly target works")}` };
+  }
+  el.classList.toggle("hero-both", bothDone);
 
   el.innerHTML = `
     <div class="hero-top">
       <div>
-        <div class="hero-kicker">${planToday ? "Today" : partner ? "This week together" : "This week"}</div>
-        <h1 class="hero-title">${planToday ? escapeHtml(planToday.title) : partner ? "Stronger Together" : "Your week"}</h1>
-        <p class="hero-sub">${planToday ? planToday.meta : `${sub} ${infoDot("weekTarget", "How the weekly target works")}`}</p>
+        <div class="hero-kicker">${head.kicker}</div>
+        <h1 class="hero-title">${head.title}</h1>
+        <p class="hero-sub">${head.sub}</p>
         ${coachLine}
       </div>
       ${badge}
     </div>
     ${stand}
-    ${effortRow}
+    ${momentumRow}
     ${/* Mo: "start today's plan will be below the rings." The button used to sit
           directly under the title, which put the thing you press above the thing
           it is for. The rings and the effort line are the week; the button is
@@ -13730,6 +13826,17 @@ function renderHero(animate = false) {
           him. */ ""}
     ${cta}`;
   hydrateAvatars(el);
+
+  /* Once per day, not once per render. A celebration that fires every time the
+     home tab repaints is not a celebration, it is a bug with colour in it. */
+  if (bothDone) {
+    let seen = null;
+    try { seen = localStorage.getItem("ft-both-done-cheer"); } catch (e) { seen = null; }
+    if (seen !== todayStr()) {
+      try { localStorage.setItem("ft-both-done-cheer", todayStr()); } catch (e) { /* private mode */ }
+      setTimeout(() => confettiBurst(el, 26), 280);
+    }
+  }
 
   /* Two frames, not one: the browser has to have painted the empty ring
      before the real offset counts as a change worth transitioning. */
@@ -13744,8 +13851,6 @@ function renderHero(animate = false) {
       if (flame) countUp(flame, Number(flame.dataset.streak), { ms: 700, delay: 380 });
     }));
   }
-
-  if ($("effortInfoBtn")) $("effortInfoBtn").onclick = openEffortInfo;
 
   if ($("heroBtn")) {
     $("heroBtn").onclick = () => {
@@ -13954,51 +14059,18 @@ function sharedDaysThisWeek() {
     d <= todayStr() && !!entryOn(ME, d)?.gym && !!entryOn(partner, d)?.gym).length;
 }
 
-/* The deal, and where the two of you are inside it. Paired alone gets the
-   pooled version; on your own there is no pact to state, so it degrades to
-   your own number rather than inventing a partner. */
+/* This used to state the deal in full: "You both said 5 days. 5 of 10 done
+   between you", with "1 day you both showed up" under the grid. Momentum in the
+   hero now says all three of those numbers, and the rule this app keeps is that
+   a number gets printed once. What is left here is the one thing seven columns
+   of dots cannot do, which is reach the other person. */
 function renderPact() {
-  const line = $("pactLine");
   const foot = $("pactFoot");
-  if (!line || !foot) return;
-
-  const ws = weekStartStr();
-  const myTarget = weeklyGoalFor(MY_EMAIL) || 0;
-  const mine = gymDaysInWeek(ME, ws);
-
-  if (!PARTNER_EMAIL) {
-    line.innerHTML = myTarget
-      ? `You said <b>${myTarget}</b> days this week. <b>${mine}</b> done.`
-      : `<b>${mine}</b> ${mine === 1 ? "day" : "days"} logged this week.`;
-    foot.innerHTML = "";
-    return;
-  }
+  if (!foot) return;
+  if (!PARTNER_EMAIL) { foot.innerHTML = ""; return; }
 
   const partner = partnerName();
-  const theirTarget = weeklyGoalFor(PARTNER_EMAIL) || 0;
-  const theirs = gymDaysInWeek(partner, ws);
-  const pool = myTarget + theirTarget;
-  const done = mine + theirs;
-  const left = Math.max(0, pool - done);
-
-  /* Same target on both sides is the common case and reads better as one
-     number ("5 each") than as an addition problem. */
-  const deal = myTarget && theirTarget
-    ? (myTarget === theirTarget
-        ? `You both said <b>${myTarget}</b> days.`
-        : `You said <b>${myTarget}</b>, ${escapeHtml(partner)} said <b>${theirTarget}</b>.`)
-    : "";
-  line.innerHTML = pool
-    ? `${deal} <b>${done}</b> of <b>${pool}</b> done between you.`
-    : `<b>${done}</b> between you this week.`;
-
-  const shared = sharedDaysThisWeek();
-  const sharedLine = shared > 0
-    ? `<b>${shared}</b> ${shared === 1 ? "day" : "days"} you both showed up.`
-    : (left > 0 ? `${left} left. Either of you can take them.` : "");
-
   foot.innerHTML = `
-    ${sharedLine ? `<p class="pact-shared">${sharedLine}</p>` : ""}
     <button type="button" class="pact-act" id="pactActBtn">
       <span class="pact-av">${escapeHtml(initials(partner))}</span>
       Send ${escapeHtml(partner)} something
@@ -21017,6 +21089,97 @@ function hideHomeQuip() {
   }, 300);
 }
 
+/* One tap of encouragement. The composer is still there for anything longer;
+   this is the version for when the whole message is "go". */
+async function sendNudge(btn) {
+  if (!PARTNER_EMAIL) return;
+  btn.disabled = true;
+  const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "&#128293;" });
+  if (error) { toast("Couldn't send"); console.error(error); btn.disabled = false; return; }
+  btn.textContent = "Sent";
+  setTimeout(hideHomeQuip, 900);
+}
+
+/* Does this person reliably train on this weekday? Eight weeks back, and it
+   only counts at three, because two of anything is a coincidence. The clock
+   comes from workout_at when there is one, so "Thursday evenings" is something
+   they actually did rather than a guess dressed up as observation. */
+function weekdayHabit(who) {
+  const today = new Date(todayStr() + "T00:00:00");
+  const d = new Date(today);
+  const hours = [];
+  let hits = 0;
+  for (let i = 1; i <= 8; i++) {
+    d.setDate(d.getDate() - 7);
+    const e = entryOn(who, isoDate(d));
+    if (!e?.gym) continue;
+    hits++;
+    if (e.workout_at) hours.push(new Date(e.workout_at).getHours());
+  }
+  if (hits < 3) return null;
+  const weekday = today.toLocaleDateString([], { weekday: "long" });
+  if (!hours.length) return `${weekday}s`;
+  hours.sort((a, b) => a - b);
+  const h = hours[Math.floor(hours.length / 2)];
+  return `${weekday} ${h >= 16 ? "evenings" : h >= 11 ? "afternoons" : "mornings"}`;
+}
+
+/* Mo, on the old version: "'I have run the numbers...' feels decorative. Make
+   him react to real behaviour." So the written bank is now the fallback and
+   not the first choice. If anything true is happening between the two of you he
+   says that, and the card carries the one action that line implies.
+
+   Order is by who needs an answer soonest: somebody mid-workout, then the day,
+   then the week, then a habit. He says one thing. Returning null hands the slot
+   back to the bank, which is the right outcome on a quiet ordinary day. */
+function homeBotLine() {
+  const partner = PARTNER_EMAIL ? partnerName() : null;
+  const mineToday = !!todayEntryFor(MY_EMAIL)?.gym;
+  const theirsToday = partner ? !!todayEntryFor(PARTNER_EMAIL)?.gym : false;
+  const todayPlan = TODAY_WORKOUT && !TODAY_WORKOUT.archived && !TODAY_WORKOUT.completed_at ? TODAY_WORKOUT : null;
+  const iAmIn = !!SESSION && !SESSION.finished;
+
+  const goWorkout = () => {
+    switchTab("workout");
+    if (SESSION) { reopenSession(); return; }
+    if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
+  };
+  const start = { label: todayPlan ? "Start workout" : "Plan a workout", run: goWorkout };
+  const nudge = partner ? { label: `Nudge ${partner}`, run: sendNudge, send: true } : null;
+
+  if (partner && LIVE_PARTNER) {
+    return iAmIn
+      ? { text: `You are both training right now. Neither of you gets to stop first.` }
+      : { text: `${partner} is training right now.`, act: { label: `Watch ${partner}`, run: openLiveSheet } };
+  }
+  if (partner && mineToday && theirsToday) {
+    return { text: `Both of you, same day. That is the whole thing working.` };
+  }
+  if (partner && iAmIn && !theirsToday) {
+    return { text: `You are in one and ${partner} is not. Finish it and the streak holds.` };
+  }
+  if (partner && mineToday && !theirsToday) {
+    const gap = gymDaysThisWeek(ME) - gymDaysThisWeek(partner);
+    if (gap >= 1) return { text: `${partner} is ${gap} workout${gap === 1 ? "" : "s"} behind you this week.`, act: nudge };
+    return { text: `Done for today. ${partner} has not logged one yet.`, act: nudge };
+  }
+  if (partner && !mineToday && theirsToday) {
+    return { text: `${partner} already trained today. Your move.`, act: start };
+  }
+  if (!mineToday) {
+    const habit = weekdayHabit(ME);
+    if (habit) {
+      return { text: todayPlan
+        ? `You usually train ${habit}. ${displayFocus(todayPlan.focus, todayPlan.exercises)} is ready.`
+        : `You usually train ${habit}.`, act: start };
+    }
+    if (gymDaysThisWeek(ME) === 0) {
+      return { text: `Nothing on the board this week yet. First one is the hard one.`, act: start };
+    }
+  }
+  return null;
+}
+
 function sayHomeQuip() {
   const slot = $("homeQuipSlot");
   if (!slot) return;
@@ -21031,24 +21194,38 @@ function sayHomeQuip() {
   if (slot.querySelector(".home-quip")) return;
   if (Date.now() - HOME_QUIP_AT < HOME_QUIP_GAP_MS) return;
 
-  const line = pickQuip("home");
+  const real = homeBotLine();
+  const line = real ? real.text : pickQuip("home");
   if (!line) return;                    // bank not loaded yet, or nothing applied
+  const act = real?.act || null;
   HOME_QUIP_AT = Date.now();
 
-  const el = document.createElement("button");
-  el.type = "button";
+  /* The card was one big button that dismissed him. It cannot stay one now
+     that he carries an action, because a button inside a button is not a
+     thing: the line is the dismiss target, the action is its own control. */
+  const el = document.createElement("div");
   el.className = "home-quip";
   el.innerHTML = `
-    <img class="home-quip-av" src="/bot/bot-neutral.png" alt="" aria-hidden="true" width="52" height="52" decoding="async" />
-    <span class="home-quip-bub">
-      <span class="home-quip-line"><span class="home-quip-txt"></span><i class="home-quip-cur"></i></span>
-    </span>`;
+    <button type="button" class="home-quip-say">
+      <img class="home-quip-av" src="/bot/bot-neutral.png" alt="" aria-hidden="true" width="52" height="52" decoding="async" />
+      <span class="home-quip-bub">
+        <span class="home-quip-line"><span class="home-quip-txt"></span><i class="home-quip-cur"></i></span>
+      </span>
+    </button>
+    ${act ? `<button type="button" class="home-quip-act">${escapeHtml(act.label)}
+      <span class="hq-go">${icon("chevronRight", 17)}</span></button>` : ""}`;
   const said = decodeEntities(line);
   /* The whole line on aria-label from the start, for the same reason the
      session bubble does it: nobody should have to wait out an animation before
      their screen reader will tell them what it said. */
-  el.setAttribute("aria-label", `He says: ${said}`);
-  el.onclick = () => hideHomeQuip();
+  const say = el.querySelector(".home-quip-say");
+  say.setAttribute("aria-label", `He says: ${said}. Tap to dismiss`);
+  say.onclick = () => hideHomeQuip();
+  if (act) {
+    /* Nudge reports back inside the button it was pressed on, so nothing about
+       whether it sent has to be taken on trust. Everything else just goes. */
+    el.querySelector(".home-quip-act").onclick = (ev) => act.run(ev.currentTarget);
+  }
   slot.replaceChildren(el);
   document.getElementById("tab-home")?.classList.add("bot-between");
   /* He stays. There is no set coming to push him off, and a line that vanishes
