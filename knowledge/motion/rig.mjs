@@ -2655,7 +2655,27 @@ const ARTWORK = new Map();
 const ARTWORK_READY = new Set();
 export function onArtworkReady(fn) { ARTWORK_READY.add(fn); return () => ARTWORK_READY.delete(fn); }
 
-function artworkFor(src, onReady) {
+/* Props are authored as "/knowledge/motion/props/x.svg", which resolves against
+   the page's origin. That is right in the app, which is served from the root of
+   its host, and wrong everywhere else the rig runs: Pose Studio publishes these
+   files alongside the page rather than at the host root, so every fetch 404ed
+   and every machine, bench and wheel silently vanished. Mo filed two bugs off
+   that ("where is the ab wheel", "where is the bench it leans on") against moves
+   that were correct, which is the real cost: a review surface that lies teaches
+   you to distrust the thing being reviewed.
+
+   Resolved against this module instead. rig.mjs sits at knowledge/motion/, so
+   two levels up is whatever root the rig was served from, and the same authored
+   path now lands in both places. A src that is already relative or absolute is
+   left alone. */
+function resolveArtwork(src) {
+  if (typeof src !== "string" || !src.startsWith("/")) return src;
+  try { return new URL(".." + "/.." + src, import.meta.url).href; }
+  catch { return src; }
+}
+
+function artworkFor(rawSrc, onReady) {
+  const src = resolveArtwork(rawSrc);
   let rec = ARTWORK.get(src);
   if (rec) return rec;
   rec = { back: null, front: null, failed: false };
