@@ -1680,6 +1680,11 @@ const PUSH_PRESS = {
 // The two middle keys put the hand where a 50 degree and a 94 degree elbow
 // actually put it with the upper arm hanging vertical, so the elbow now stays
 // inside 1.3 units for the whole rep and the shoulder inside 5 degrees.
+/* The two middle keys are waypoints, not stops. They exist to bend the hand's
+   path into the arc a curl actually travels, and a plain middle keyframe makes
+   the rig ease into it and out again, which reads as the bar stopping halfway
+   up. Mo kept these on the dumbbell, hammer and cable curls and took them out
+   of the two barbell ones, which have their own keys below. */
 const standingCurlKeys = [
   { // bottom, arms long, elbows at the sides
     t: 0,
@@ -1692,6 +1697,7 @@ const standingCurlKeys = [
   },
   { // a third of the way up: elbow bent about 50, upper arm still hanging
     t: 0.3,
+    through: true,
     root: { x: 60, y: 61.4, rot: 2 },
     joints: { spine: 1.5, neck: -0.5 },
     ik: {
@@ -1701,6 +1707,7 @@ const standingCurlKeys = [
   },
   { // forearm level, elbow bent about 94 and still directly under the shoulder
     t: 0.62,
+    through: true,
     root: { x: 60, y: 61.4, rot: 2 },
     joints: { spine: 1, neck: -1 },
     ik: {
@@ -1761,6 +1768,14 @@ const CABLE_CURL = {
 const BARBELL_CURL = {
   ...DUMBBELL_CURL,
   props: [{ type: "barbell", side: "R", point: "hand", r: 9.5, front: true }],
+  // It used to borrow Dumbbell Curl's keys entirely. Mo posed it as a two key
+  // move twice over, so it now carries its own and the two curls can differ.
+  keys: [standingCurlKeys[0], standingCurlKeys[standingCurlKeys.length - 1]].map((k) => ({
+    ...k,
+    through: false,
+    t: k.t === 0 ? 0 : 1,
+    joints: { ...k.joints, forearmPronR: -86, forearmPronL: -86 },
+  })),
 };
 
 // The barbell curl on a cambered bar, which lets the wrists sit half turned in.
@@ -1772,8 +1787,13 @@ const BARBELL_CURL = {
 const EZ_BAR_CURL = {
   ...DUMBBELL_CURL,
   props: [{ type: "barbell", side: "R", point: "hand", r: 8, front: true }],
-  keys: standingCurlKeys.map((k) => ({
+  // Mo's call: the two barbell curls run end to end with no waypoints, unlike
+  // the dumbbell ones. A bar is carried in both hands on one line, so the arc
+  // the waypoints describe is not what the eye follows here.
+  keys: [standingCurlKeys[0], standingCurlKeys[standingCurlKeys.length - 1]].map((k) => ({
     ...k,
+    through: false,
+    t: k.t === 0 ? 0 : 1,
     joints: { ...k.joints, forearmPronR: -42, forearmPronL: -42, wristR: -14, wristL: -14 },
   })),
 };
@@ -1805,6 +1825,7 @@ const CONCENTRATION_CURL = {
       // exercise whose entire point is a braced elbow is the worst place in
       // this file for it to happen.
       t: 0.5,
+      through: true,
       root: { x: 46, y: 88, rot: 18 },
       joints: { spine: 22, neck: -12, forearmPronR: -86 },
       ik: {

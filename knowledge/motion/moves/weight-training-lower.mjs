@@ -841,6 +841,7 @@ const CURTSY_LUNGE = {
       // so the toe clears the floor. Without this keyframe the straight line
       // interpolation between the two ends drags the toe through the ground.
       t: 0.5,
+      through: true,
       root: { x: 73, y: 68, rot: 1 },
       joints: { spine: 3, neck: -1, shoulderR: 5, elbowR: 4, shoulderL: 5, elbowL: 4,
                 hipL: -18, kneeL: 30 },
