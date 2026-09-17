@@ -117,5 +117,47 @@ for (const [lift, bySex] of Object.entries(S)) {
   }
 }
 
+/* ---- The dumbbell and machine variants ----
+   Added once Mo settled what a logged dumbbell number means: ONE dumbbell, the
+   way people say it. That makes the factor carry the doubling, and a wrong
+   factor here is invisible by inspection, so it is pinned two ways.
+
+   First, mechanically: a variant load at its factor must read the same level as
+   the equivalent load on the base barbell lift. That is what catches the factor
+   being applied upside down, which is the failure this file exists for.
+
+   Second, against reality: a 180 lb man pressing a pair of 70s is a real thing
+   with a known feel, and it should not come back Elite. */
+const LS = new Function(`${grab(/const LIFT_STANDARDS = \{[\s\S]*?\n\};/, "LIFT_STANDARDS")} return LIFT_STANDARDS;`)();
+
+const variantLevel = (liftName, sex, liftLb, bw) => {
+  const [base, factor] = LS[liftName];
+  const cuts = S[base][sex].map((t) => thresholdLb(t, sex, bw) * factor);
+  let i = 0;
+  while (i < cuts.length && liftLb >= cuts[i]) i++;
+  return L[i];
+};
+
+for (const [name, load, bw, why] of [
+  ["dumbbell bench press", 70, 180, "a pair of 70s at 180 lb"],
+  ["dumbbell bench press", 100, 180, "a pair of 100s at 180 lb"],
+  ["dumbbell shoulder press", 50, 180, "a pair of 50s overhead at 180 lb"],
+  ["lat pulldown", 160, 180, "160 on the stack at 180 lb"],
+  ["leg press", 400, 180, "400 on the sled at 180 lb"],
+]) {
+  const [base, factor] = LS[name];
+  const equivalent = load / factor;
+  check(`${name}: ${why} reads the same as ${Math.round(equivalent)} lb of ${base}`,
+    variantLevel(name, "Male", load, bw), levelFor(base, "Male", equivalent, bw));
+}
+
+/* The reality anchors. These are judgement calls, written down so that moving a
+   factor has to argue with them rather than slip past. */
+check("a pair of 70s at 180 lb is not Elite", variantLevel("dumbbell bench press", "Male", 70, 180), "Intermediate");
+check("a pair of 30s at 180 lb is a beginner", variantLevel("dumbbell bench press", "Male", 30, 180), "Beginner");
+check("400 lb leg press at 180 lb is not Advanced", variantLevel("leg press", "Male", 400, 180), "Novice");
+check("an isolation move has no entry", LS["dumbbell curl"] ? "scored" : "unscored", "unscored");
+check("a lateral raise has no entry", LS["lateral raise"] ? "scored" : "unscored", "unscored");
+
 console.log(bad ? `\n${bad} FAILED` : "\nSTRENGTH STANDARDS PASS");
 process.exit(bad ? 1 : 0);
