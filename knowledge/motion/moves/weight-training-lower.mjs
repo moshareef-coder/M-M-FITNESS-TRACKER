@@ -1890,13 +1890,17 @@ const DEADLIFT = {
   ],
 };
 
-// Exported but deliberately NOT in MOVES: the keys of MOVES are exact library
-// names, and "Walking Lunge" and "Bulgarian Split Squat" are currently mapped
-// to the bodyweight entries in weight-training.mjs. The lead re-points those
-// two names at these, in a file no agent here owns.
+/* Mapped at last. These were written months ago and left out of MOVES because
+   the flat lookup could only hold one animation per name and the bodyweight
+   versions held both. index.mjs takes the first library to claim a name now,
+   and weight training is first, so a bare "Bulgarian Split Squat" is the one
+   with dumbbells in both hands, which is what the weight training library has
+   always said it is. Calisthenics keeps the bodyweight pair in its own map. */
 export { DUMBBELL_WALKING_LUNGE, DUMBBELL_BULGARIAN_SPLIT_SQUAT };
 
 export const MOVES = {
+  "Walking Lunge": DUMBBELL_WALKING_LUNGE,
+  "Bulgarian Split Squat": DUMBBELL_BULGARIAN_SPLIT_SQUAT,
   "Barbell Back Squat": BARBELL_BACK_SQUAT,
   "Front Squat": FRONT_SQUAT,
   "Zercher Squat": ZERCHER_SQUAT,

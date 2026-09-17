@@ -46,10 +46,29 @@ export const MOVES_BY_LIBRARY = {
   stretching: STRETCHING,
 };
 
-// One flat lookup. A name in two libraries (Push-Up, Pull-Up) is the same
-// object in both, so merge order does not matter.
+/* One flat lookup, and the FIRST library to claim a name keeps it.
+ *
+ * Fifteen names appear in two libraries and until now every one of them pointed
+ * at the same object, so merge order genuinely did not matter and this was an
+ * Object.assign. Two of them stop being the same object today: the weight
+ * training library records Bulgarian Split Squat and Walking Lunge as dumbbell
+ * exercises and calisthenics records them as bodyweight, which are different
+ * movements that happen to share a name, and the dumbbell animations for both
+ * have sat written and unmapped for months waiting for somebody to decide which
+ * one a bare name means.
+ *
+ * It means the weight training one, because that is the library the app reaches
+ * for by default and the gym meaning is the common one. Calisthenics keeps the
+ * bodyweight version in its own map, which is what MOVES_BY_LIBRARY is for and
+ * what the validator checks against, so a caller that knows which training it
+ * is in can still ask for the right one.
+ *
+ * First wins rather than last, in other words, and the order of the object
+ * below is now load bearing. */
 const ALL = {};
-for (const lib of Object.values(MOVES_BY_LIBRARY)) Object.assign(ALL, lib);
+for (const lib of Object.values(MOVES_BY_LIBRARY)) {
+  for (const [name, move] of Object.entries(lib)) if (!(name in ALL)) ALL[name] = move;
+}
 
 // The exercise names only: every count in the lab and the validator is a
 // count of library coverage, and the rest antics must not inflate it.
@@ -73,7 +92,16 @@ const ALIASES = {
   "Deadlifts": "Deadlift",
   "RDL": "Romanian Deadlift",
 };
-export const moveFor = (name) => ALL[name] || ALL[ALIASES[name]] || null;
+/* `trainingId` is optional and only matters for the two names that differ by
+   library. A caller that knows it is rendering a calisthenics day gets the
+   bodyweight Bulgarian split squat; everybody else gets the dumbbell one. */
+export const moveFor = (name, trainingId = null) => {
+  if (trainingId && MOVES_BY_LIBRARY[trainingId]) {
+    const own = MOVES_BY_LIBRARY[trainingId][name] || MOVES_BY_LIBRARY[trainingId][ALIASES[name]];
+    if (own) return own;
+  }
+  return ALL[name] || ALL[ALIASES[name]] || null;
+};
 
 // ------------------------------------------------------------ the runtime ---
 // One requestAnimationFrame loop drives every mounted canvas on the page. A

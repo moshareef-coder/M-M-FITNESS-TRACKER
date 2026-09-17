@@ -202,8 +202,12 @@ export const MOVES = {
   "Chin-Up": CHIN_UP,
   "Diamond Push-Up": DIAMOND_PUSH_UP,
   "Dead Hang": DEAD_HANG,
-  "Walking Lunge": WALKING_LUNGE,
-  "Bulgarian Split Squat": BULGARIAN_SPLIT_SQUAT,
+  /* Not the bodyweight ones. These two names are in this library as DUMBBELL
+     exercises and in calisthenics as bodyweight ones, and they used to borrow
+     the calisthenics animations here because the dumbbell versions existed and
+     were never mapped. They are mapped now, in weight-training-lower.mjs, and
+     they arrive through the ...LOWER spread above, so listing the bodyweight
+     pair again here would overwrite them right back. */
   "Nordic Curl": NORDIC_CURL,
   "Plank": PLANK,
   "Hanging Leg Raise": HANGING_LEG_RAISE,
