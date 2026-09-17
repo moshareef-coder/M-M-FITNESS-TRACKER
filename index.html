@@ -8820,9 +8820,35 @@ function renderCodeScreen() {
     <div class="ob-step">
       <h1>Pair with your partner</h1>
       <p class="sub">Unio is built for two. Send them an invite, or put in the one they sent you.</p>
+      ${pairEntryHtml(myCode)}
+      <button class="btn-ghost" id="backToSetup">Back</button>
+    </div>`;
 
+  wirePairEntry({
+    onPaired: () => checkPartnershipThenEnter(),
+    onPending: () => checkPartnershipThenEnter(),
+  });
+
+  $("backToSetup").onclick = () => renderPairingScreen();
+}
+
+/* The invite surface itself, as markup and wiring rather than as a screen,
+   because two places need the same one: this screen, and the partner step
+   inside onboarding.
+
+   They disagree about exactly one thing, which is what happens after somebody
+   pairs. This screen is the last thing before the app, so it hands over to
+   checkPartnershipThenEnter. The onboarding step still has a wizard behind it,
+   and handing over from there would walk away from the goal, the target and
+   the styles before finishOnboarding has written any of them. Everything else,
+   the one time link, the field that takes a code or a pasted link, and every
+   word on it, is the same in both and has to stay that way: two copies of this
+   drift, and the second one is where the code path quietly stops checking the
+   verdict again. */
+function pairEntryHtml(myCode) {
+  return `
       <button class="btn-primary" id="shareLinkBtn">Send an invite</button>
-      <p class="ob-hint">They get a link and your code. It works once, and only for them.</p>
+      <p class="ob-hint" id="shareHint">They get a link and your code. It works once, and only for them.</p>
 
       <div class="code-divider"><span>or</span></div>
 
@@ -8831,11 +8857,18 @@ function renderCodeScreen() {
              value="${escapeHtml(PENDING_INVITE || "")}" />
       <p class="ob-hint" id="pairHint">Their six characters, or paste the whole link.</p>
 
-      ${myCode ? `<p class="ob-mine">Your code is <strong id="myInviteCode">${escapeHtml(myCode)}</strong></p>` : ""}
-      <button class="btn-ghost" id="backToSetup">Back</button>
-    </div>`;
+      <p class="ob-mine" id="myCodeLine"${myCode ? "" : " hidden"}>Your code is <strong id="myInviteCode">${escapeHtml(myCode || "")}</strong></p>`;
+}
 
-  $("shareLinkBtn").onclick = (e) => shareInviteLink(e.currentTarget);
+/* onShared fires only when an invite actually went somewhere, so a caller can
+   say so. onPending is the consent migration's third verdict, a request sent
+   and not yet answered, which is not a pairing and must never be treated as
+   one. */
+function wirePairEntry({ onPaired, onPending, onShared }) {
+  $("shareLinkBtn").onclick = async (e) => {
+    const sent = await shareInviteLink(e.currentTarget);
+    if (sent && onShared) onShared();
+  };
 
   const hint = $("pairHint");
   const say = (msg, bad) => { hint.textContent = msg; hint.classList.toggle("bad", !!bad); };
@@ -8850,13 +8883,13 @@ function renderCodeScreen() {
        Before the consent migration `pending` is never set and this is dead. */
     if (!error && res && res.pending) {
       clearPendingInvite();
-      await checkPartnershipThenEnter();
+      await onPending(res);
       return;
     }
     if (!redeemOk(res, error)) return;
     clearSolo();
     clearPendingInvite();
-    await checkPartnershipThenEnter();
+    await onPaired(res);
   };
 
   /* Submitted by finishing, not by a button.
@@ -8883,7 +8916,10 @@ function renderCodeScreen() {
       if (tok) {
         holdInviteToken(tok);
         const ok = await claimHeldInviteToken();
-        if (ok) { await checkPartnershipThenEnter(); return; }
+        /* No argument: claiming already said the partner's name in a toast, so
+           a caller that toasted again off a name passed here would say it
+           twice. */
+        if (ok) { await onPaired(); return; }
         say("That link is not active any more. Ask for a new one.", true);
         input.value = "";
         return;
@@ -8912,8 +8948,6 @@ function renderCodeScreen() {
   /* Enter is still honoured for anyone on a keyboard, and for the case where
      six characters were already in the box when the screen was drawn. */
   input.onkeydown = (e) => { if (e.key === "Enter") submit(input.value); };
-
-  $("backToSetup").onclick = () => renderPairingScreen();
 }
 
 /* Onboarding, rebuilt to one rule: ask the goal, then TELL them the plan.
@@ -9018,6 +9052,123 @@ They asked you to keep them honest. The app does not celebrate when only one of 
 
 Nothing to install, it opens in your browser:
 ${location.origin}/?invite=${code}`;
+}
+
+/* The partner step, asked inside the wizard instead of after it.
+
+   Pairing is not new and neither is asking for it on the way in. What it was
+   not was part of onboarding: it ran once finishOnboarding had handed over, as
+   its own screen, behind a "Who is training with you?" menu, which is a
+   different app asking a different question the moment setup is over. This is
+   the same pairing, the same one time link and the same field, asked as a step
+   alongside the rest of them.
+
+   Skipping is an answer, not a snooze. soloHeld is read in exactly one place,
+   the check on the way into the app that decides whether to put the partner
+   question back on screen, so answering it here is the whole reason the old
+   pairing screen does not appear two screens later and ask again. Nothing is
+   closed off by saying no: the empty seat on Home is still a way in to pairing
+   on any day after this one.
+
+   onDone and onBack are passed in rather than hard-coded so this can sit
+   anywhere in the sequence without being rewritten. */
+function renderObPartnerStep(data = {}, { onDone, onBack } = {}) {
+  const ob = $("onboard");
+  const done = onDone || (() => renderOnboardStep("plan", data));
+  const back = onBack || (() => renderOnboardStep("styles", data));
+  const myCode = MY_PROFILE?.invite_code || null;
+
+  ob.innerHTML = `
+    <div class="ob-step">
+      <h1>Bring somebody with you</h1>
+      <p class="sub">Unio is one person plus one. They see what you log, you see what they log, and
+        the week is not done until you both are. Plenty of people do this on their own, and that
+        works too.</p>
+      ${pairEntryHtml(myCode)}
+      <button type="button" class="btn-ghost" id="obPairSolo">I am training on my own</button>
+      <button type="button" class="btn-ghost" id="obPairBack">Back</button>
+    </div>`;
+
+  /* profiles.invite_code comes from a server default on INSERT, so there is no
+     code to read out until a row exists, and this step is usually where that
+     row first gets written. finishOnboarding writes the full one afterwards.
+     The line stays hidden until the server answers rather than showing six
+     dots somebody might read down the phone. */
+  ensureProfileForInvite(data).then((code) => {
+    const line = $("myCodeLine");
+    if (!line || !code) return;          // they moved on, or there is no code yet
+    $("myInviteCode").textContent = code;
+    line.hidden = false;
+  });
+
+  /* Carrying on without a partner is the same act whichever button said it:
+     the question has been answered, and the entry check must not ask it again.
+     A person who sent an invite is not training alone, but the flag is not
+     about that, it is about whether to put the question back on screen. If
+     their invite is claimed, the partnership is read before the flag is and
+     none of this matters. */
+  const carryOn = () => { setSolo(); done(); };
+
+  /* An invite that actually went somewhere changes what this screen is for, so
+     it stops offering the way out and starts offering the way on. Without this
+     there is nothing on screen after the share sheet closes to say they are
+     finished here.
+
+     The hint says the cost of a second tap out loud. Every tap mints a fresh
+     token and revokes the last unclaimed one, which is the right behaviour and
+     also means the link already sitting in somebody's messages stops working.
+     Worth knowing before that tap rather than after it. */
+  const shared = () => {
+    const hint = $("shareHint");
+    if (hint) hint.textContent = "Invite sent. Sending another makes a new link, and the one you just sent stops working.";
+    const share = $("shareLinkBtn");
+    if (share) { share.textContent = "Send a new invite"; share.className = "btn-ghost"; }
+    const on = $("obPairSolo");
+    if (on) { on.textContent = "Continue"; on.className = "btn-primary"; }
+  };
+
+  wirePairEntry({
+    /* clearSolo rather than setSolo: they have a partner. The toast is guarded
+       because the link path has already named them in one of its own. */
+    onPaired: (res) => {
+      clearSolo();
+      if (res && res.partner_name) toast(`Paired with ${res.partner_name}`);
+      done();
+    },
+    /* A request is out and nobody is paired. Left un-answered on purpose: the
+       waiting screen on the way into the app is the honest end of this, and
+       the flag above would hide it. */
+    onPending: (res) => { toast((res && res.error) || "Request sent"); done(); },
+    onShared: shared,
+  });
+
+  $("obPairSolo").onclick = carryOn;
+  $("obPairBack").onclick = back;
+
+  /* Somebody who arrived on an invite link is already spoken for, and asking
+     them to invite a partner back is the wrong screen entirely. The token is
+     not claimed until finishOnboarding hands over, so for the whole wizard it
+     is a held string and nothing more; peek is what turns it into a name, and
+     it answers without a session for exactly this reason.
+
+     Painted after the normal step rather than instead of it, so a token that
+     is dead, spent or simply unreachable falls through to a screen that works
+     rather than leaving somebody looking at a promise nobody can keep. */
+  if (PENDING_TOKEN) {
+    sb.rpc("peek_invite_link", { p_token: PENDING_TOKEN }).then(({ data: res }) => {
+      if (!res || !res.ok || !$("obPairSolo")) return;
+      ob.innerHTML = `
+        <div class="ob-step">
+          <h1>${escapeHtml(res.name)} invited you</h1>
+          <p class="sub">You are pairing with them as soon as you finish setting up. There is nothing
+            to do here.</p>
+          <button type="button" class="btn-primary" id="obPairNext">Continue</button>
+          <button type="button" class="btn-ghost" id="obPairBack">Back</button>
+        </div>`;
+      $("obPairNext").onclick = () => { clearSolo(); done(); };
+      $("obPairBack").onclick = back;
+    }).catch(() => { /* the step that works is already on screen */ });
+  }
 }
 
 /* ---------- One time invite links ---------- */
@@ -10726,7 +10877,7 @@ function paintLimitsSubtitle() {
    them, main first. That is the whole reason it is a single step id with an
    index in the draft rather than three step names, since which pages exist and
    how many of them there are is not known until the goal step is answered. */
-const OB_STEPS = ["name", "goal", "target", "tune", "styles", "days", "plan", "commit"];
+const OB_STEPS = ["name", "goal", "target", "tune", "styles", "days", "plan", "commit", "partner"];
 
 /* What each goal asks about itself, once, after the goals are chosen.
 
@@ -11093,6 +11244,19 @@ function renderOnboardStep(step, data = {}) {
     return;
   }
 
+  if (step === "partner") {
+    /* Last screen before the account is written. An accountability partner is
+       the enforcement of the promise made on the screen before it, which is why
+       it asks here rather than earlier: "who is doing this with you" reads as a
+       different question once you have said you are doing it. Either answer,
+       invited or alone, is a finished setup and goes straight to the write. */
+    renderObPartnerStep(data, {
+      onDone: () => finishOnboardingFromDraft(data),
+      onBack: () => renderOnboardStep("commit", data),
+    });
+    return;
+  }
+
   /* The one follow-up question left in the whole picker. Every other goal goes
      straight through, because a list of sub-goals was asking people to name a
      flavour of a thing they had already named, and the engine treated most of
@@ -11383,7 +11547,7 @@ function renderOnboardStep(step, data = {}) {
     $("commitBtn").onclick = () => {
       /* Recorded, because a promise nobody kept a record of is a slogan. The
          date is what later screens can honestly say "since" about. */
-      renderOnboardStep("plan", { ...data, committed_at: new Date().toISOString() });
+      renderOnboardStep("partner", { ...data, committed_at: new Date().toISOString() });
     };
     $("commitBack").onclick = () => renderOnboardStep("plan", data);
     return;
@@ -11442,61 +11606,13 @@ function renderOnboardStep(step, data = {}) {
        returned null for every account ever created, which took the goal line,
        the Goal figure and the projection off the chart for everybody.
        Everything on the screen behind this button now reaches the write. */
-    /* Start does not finish any more, it goes to the promise. The write lives
-       behind that button instead, because asking somebody to commit AFTER
-       their account is already made is asking nothing at all. */
-    if (!data.committed_at) {
-      $("startBtn").textContent = "This is my plan";
-      $("startBtn").onclick = () => renderOnboardStep("commit", data);
-      $("backBtn").onclick = () => renderOnboardStep("days", data);
-      return;
-    }
-    $("startBtn").onclick = () => {
-      /* One row, one tap. Two taps used to retire nothing and insert twice,
-         which in production races the one-active partial unique index and in
-         the sandbox simply leaves two active goals. Disabled rather than
-         debounced so the screen says what happened. */
-      const btn = $("startBtn");
-      if (btn.disabled) return;
-      btn.disabled = true;
-      finishOnboarding({
-        name: data.name,
-        goal: g.goal,
-        goal_bubble: data.goal_bubble || null,
-        goal_child: data.goal_child || null,
-        goal_secondary: data.goal_secondary || [],
-        goal_detail: data.detail || null,
-        focus: g.focus,
-        challenge_target: days,
-        goal_key: g.key,
-        height_in: data.height_in || null,
-        /* The two numbers that turn on every goal-driven surface there is. */
-        weight_lb: data.weight_lb || null,
-        goal_weight_lb: data.goal_weight_lb || null,
-        goal_by_date: data.goal_by_date || null,
-        /* The only deadline the user ever agrees to, as they set it, not as a
-           pace chip they were never shown would have set it. */
-        pace: chosenPace ? chosenPace.key : null,
-        weeks,
-        days_per_week: days,
-        /* null unless they tapped one. The engine treats null, 0 and nonsense
-           identically to never having been asked, and that is the guarantee that
-           keeps every plan built before this question existed exactly as it was,
-           so a default must never be written here. */
-        session_minutes: Number.isFinite(data.session_minutes) ? data.session_minutes : null,
-        /* What they are willing to do, and what each goal asked for itself.
-           Every one of these is in PENDING_PROFILE_COLUMNS, so on a database
-           without the migration the write retries without them and the rest of
-           setup still lands. A plan built before these existed is untouched,
-           because the engine reads null as never asked. */
-        train_styles: Array.isArray(data.train_styles) ? data.train_styles : null,
-        committed_at: data.committed_at || null,
-        goal_tuning: goalTuningPatch(data),
-      }).then((ok) => { if (!ok) btn.disabled = false; })
-        .catch((err) => { console.error(err); btn.disabled = false; toast("Setup failed, try again"); });
-    };
-    /* One step back, to whichever screen was actually in front of this one. */
-    $("backBtn").onclick = () => renderOnboardStep("styles", data);
+    /* Start does not finish any more. The plan screen is a thing to read and
+       agree with, and the write happens two screens later, after the promise
+       and after the partner question: asking somebody to commit once their
+       account already exists is asking nothing at all. */
+    $("startBtn").textContent = "This is my plan";
+    $("startBtn").onclick = () => renderOnboardStep("commit", data);
+    $("backBtn").onclick = () => renderOnboardStep("days", data);
     return;
   }
 }
@@ -11518,6 +11634,57 @@ async function paintObSessionLengths(data) {
     });
   };
   paint();
+}
+
+/* The write, reached from the partner step, which is the last screen of the
+   run. It used to live inline behind the plan screen's Start button; it moved
+   out when the promise and the partner question landed after the plan, because
+   three screens now stand between reading the plan and having an account, and
+   the one that finishes the job should be the one that writes.
+
+   The button guard came with it. One row, one tap: two taps used to retire
+   nothing and insert twice, which in production races the one-active partial
+   unique index and in the sandbox simply leaves two active goals. */
+function finishOnboardingFromDraft(data) {
+  const g = GOALS.find((x) => x.key === data.goalKey) || GOALS[GOALS.length - 1];
+  const days = data.days_per_week || g.days;
+  if (finishOnboardingFromDraft.busy) return;
+  finishOnboardingFromDraft.busy = true;
+  finishOnboarding({
+    name: data.name,
+    goal: g.goal,
+    goal_bubble: data.goal_bubble || null,
+    goal_child: data.goal_child || null,
+    goal_secondary: data.goal_secondary || [],
+    goal_detail: data.detail || null,
+    focus: g.focus,
+    challenge_target: days,
+    goal_key: g.key,
+    height_in: data.height_in || null,
+    /* The two numbers that turn on every goal-driven surface there is. */
+    weight_lb: data.weight_lb || null,
+    goal_weight_lb: data.goal_weight_lb || null,
+    goal_by_date: data.goal_by_date || null,
+    /* The only deadline the user ever agrees to, as they set it, not as a
+       pace chip they were never shown would have set it. */
+    pace: chosenPace ? chosenPace.key : null,
+    weeks,
+    days_per_week: days,
+    /* null unless they tapped one. The engine treats null, 0 and nonsense
+       identically to never having been asked, and that is the guarantee that
+       keeps every plan built before this question existed exactly as it was,
+       so a default must never be written here. */
+    session_minutes: Number.isFinite(data.session_minutes) ? data.session_minutes : null,
+    /* What they are willing to do, and what each goal asked for itself.
+       Every one of these is in PENDING_PROFILE_COLUMNS, so on a database
+       without the migration the write retries without them and the rest of
+       setup still lands. A plan built before these existed is untouched,
+       because the engine reads null as never asked. */
+    train_styles: Array.isArray(data.train_styles) ? data.train_styles : null,
+    committed_at: data.committed_at || null,
+    goal_tuning: goalTuningPatch(data),
+  }).then((ok) => { if (!ok) finishOnboardingFromDraft.busy = false; })
+    .catch((err) => { console.error(err); finishOnboardingFromDraft.busy = false; toast("Setup failed, try again"); });
 }
 
 async function finishOnboarding(data) {

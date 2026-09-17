@@ -47,6 +47,11 @@
         note: "Eight rows, and tapping one opens its versions underneath rather than throwing a sheet over the screen. Every one is a tick, so a main goal plus up to two extras is three taps without leaving the page and everything you have picked stays visible the whole time. Tap Build muscle, then Glutes, then Move better and Loosen up, and read the picks list underneath: the main goal sets the rep ranges and the day count, an extra can only add muscle groups, a cool-down or cardio.",
         run: (w) => w.renderOnboardStep("goal", { name: "Mo" }) },
 
+      { t: "Bring somebody with you", scenario: "fresh",
+        s: "The partner step, with a real skip",
+        note: "Near the end of setup, after the workouts are picked. The same pairing that has always been here, asked as a step rather than as a separate screen once setup is over: one button that mints a one time link and hands it to the share sheet, one field that takes either their six characters or a link they pasted, and your own code underneath for the case where they have to install the app first. Training on your own is a real answer and it is the last word on the screen, not a greyed-out afterthought. Send an invite and watch the screen change: the link is spent, so it says what a second tap would cost, and the way out becomes the way on.",
+        run: (w) => w.renderOnboardStep("partner", { name: "Mo", goal_bubble: "build-muscle" }) },
+
       { t: "First look at an empty app", scenario: "fresh",
         s: "No workouts, no partner, no history",
         note: "What a stranger sees on day one. Skip past onboarding first if it is still on screen. This is the state that has never been walked properly end to end, so look hard at the empty cards.",
