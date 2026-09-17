@@ -20,31 +20,33 @@ const pinFeet = (xr, yr, xl, yl) => ({
   ankleR: { x: xr, y: yr, bend: -1 },
   ankleL: { x: xl, y: yl, bend: -1 },
 });
-/* The elbows GO OUT at the bottom of a press. That is the position, and the
-   rig will not draw it on its own: a pinned wrist rebuilds the arm frame, so
-   `shoulderAbd` is ignored the moment there is a wrist target, and the solver
-   falls back to bending the elbow in the plane of the body. What it does listen
-   to is the IK pole, which is the normal of the plane the two bones solve in.
-   Turn that into the sagittal plane and the upper arm swings laterally instead
-   of fore and aft: about 41 degrees of real abduction, which is where a press
-   actually flares, and it brings the elbow TOWARD the camera so it draws in
-   front of the ribs instead of behind them.
+/* THE ELBOWS HANG OUT AND DOWN AT THE BOTTOM OF A BENCH PRESS.
 
-   The 0.2 tilt on the pole is load bearing. A pure lateral pole gives the full
-   53 degrees and looks right in the numbers, but side on the upper arm then
-   foreshortens to almost nothing and merges into the torso: rendered at 620px
-   the arm simply disappears and the bells float. 41 keeps three quarters of
-   the arm on screen and still reads as flared.
+   Mo, on three reference photos: "once they go down, their elbows stick out",
+   and then, when a first attempt did not read: "the elbows do not look like
+   they're sticking out". This is how the six bench presses do it now, and why
+   it took two tries.
 
-   The pole is a world direction, so the two sides need OPPOSITE ones, or a
-   single pole sends one elbow out and the other across the chest. Mo, on a
-   reference photo: "once they go down, their elbows stick out."
+   A screen pin cannot do it. The elbow of a two bone arm lies on a circle
+   around the shoulder-to-hand line, and with the hand pinned straight above
+   the shoulder that line points up, so every point on the circle is level
+   with or above the shoulder: the elbow can go forward, back, or sideways,
+   but it can never hang BELOW the shoulder toward the bench. The first
+   attempt used an IK pole to push it sideways, which is real abduction and
+   drew as the arm foreshortening into the torso and vanishing.
 
-   Not every press wants it. Close-Grip Bench Press is DEFINED by tucked
-   elbows, and the Arnold's rack is elbows forward by design. Both are left
-   alone deliberately. */
-export const ELBOW_OUT_R = [-1, 0, 0.2];
-export const ELBOW_OUT_L = [1, 0, 0.2];
+   In the photos the elbow hangs below the bench because the hand is also
+   well OUT to the side, which a side camera hides. So the bottom wrist is a
+   WORLD pin (flat: false, with a z) about 20 units lateral of the shoulder
+   and only a few units above the joint, where the bell actually sits beside
+   the chest. That tilts the circle, and its low point drops about 10 units
+   posterior of the shoulder with 60 degrees of flare. The pole then picks the
+   low point rather than the high one. Screen x and y stay where the bell has
+   to be; only the z changed, and the z is what the camera cannot see.
+
+   The two sides need opposite z and opposite pole x, or both elbows go the
+   same way. The lockout keys stay as screen pins: an arm straight up is in
+   the plane already. */
 
 // Front view feet: a foot pointing at the camera is drawn short and wide
 // rather than rotated. The same `ang` mirrors, because dirV takes the side sign.
@@ -57,21 +59,17 @@ const FRONT_FEET = { R: { ang: 12, len: 0.4, w: 1.3 }, L: { ang: 12, len: 0.4, w
 // the elbows folding out at the bottom. Side view, sagittal.
 // Same chassis as the seeded Barbell Bench Press: root.rot -90 is supine, which
 // puts the head at -x and runs the legs out to +x.
-// hold: "follow" on the bells, not the default "level": a real bench press is
-// gripped neutral (thumbs toward the head), so the camera is looking down the
-// dumbbell's length, not at its broadside. Mo, against a reference photo:
-// "look at this dumbbell bench press and how the dumbbells are facing vs
-// ours."
-//
-// NOT every press: "follow" turns the bell to match the forearm's own screen
-// axis, which is the right approximation while the arm stays out in front of
-// the body, but the moment the arm goes fully overhead that same axis points
-// back at the skull, and the bell draws itself through the face. Seated
-// Dumbbell Press, Arnold Press and Cuban Press all finish overhead and went
-// back to "level" for exactly that reason; Incline Dumbbell Press lockout
-// leans back far enough to hit the same wall. Decline Dumbbell Press and
-// standing Dumbbell Shoulder Press stay "follow": checked frame by frame,
-// neither one's overhead point puts the bell anywhere near the head.
+// The bells are the default "level": drawn end on, and FIXED for the whole rep.
+// Mo, against three reference photos of flat and incline dumbbell benching:
+// "the dumbbells need to be straight... when they go down, they don't move.
+// They just go down, up, down, up." Side on to a pronated press the camera is
+// looking straight down the handle, so a hexagon is the honest picture, and
+// the grip does not turn during a press so the picture does not turn either.
+// An earlier version used "follow", which tilts the bell with the forearm, on
+// the idea that a bench press is gripped neutral. The photos say otherwise,
+// and even where a lifter does go neutral the bell still does not rotate rep
+// to rep. "follow" stays right where the grip genuinely is neutral and the
+// forearm genuinely swings: hammer curls, rows, kickbacks, carries.
 const DUMBBELL_BENCH_PRESS = {
   view: "side",
   loop: "pingpong",
@@ -79,21 +77,21 @@ const DUMBBELL_BENCH_PRESS = {
   breath: 0.25,
   props: [
     { type: "bench", x: 26, y: 92, w: 78 },
-    { type: "dumbbell", hold: "follow", side: "L", point: "hand", k: 0.8 },
-    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.8, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // lockout, bells nearly touching over the chest
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -4 },
-      ik: { wristR: { x: 55.0, y: 43.7, bend: 1 }, wristL: { x: 59.0, y: 47.2, bend: 1 }, ...stand(108, 112) },
+      ik: { wristR: { x: 55.0, y: 43.7, z: 12.2, flat: false, bend: 1 }, wristL: { x: 59.0, y: 47.2, z: -12.2, flat: false, bend: 1 }, ...stand(108, 112) },
     },
     { // bottom, bells beside the chest, elbows folded out under the hands
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 2, neck: -6 },
-      ik: { wristR: { x: 69.9, y: 67.2, bend: 1, pole: ELBOW_OUT_R }, wristL: { x: 68.4, y: 69.2, bend: 1, pole: ELBOW_OUT_L }, ...stand(108, 112) },
+      ik: { wristR: { x: 64.2, y: 76.5, z: 18, flat: false, bend: 1, pole: [-1, 0, -0.3] }, wristL: { x: 66.2, y: 78.5, z: -18, flat: false, bend: 1, pole: [1, 0, -0.3] }, ...stand(108, 112) },
     },
   ],
 };
@@ -119,7 +117,7 @@ const MACHINE_CHEST_PRESS = {
       t: 0,
       root: { x: 52, y: 86, rot: -6 },
       joints: { spine: 0, neck: -2 },
-      ik: { wristR: { x: 67.6, y: 67.1, bend: 1, pole: ELBOW_OUT_R }, wristL: { x: 64.6, y: 69.1, bend: 1, pole: ELBOW_OUT_L }, ...stand(82, 78) },
+      ik: { wristR: { x: 67.6, y: 67.1, bend: 1 }, wristL: { x: 64.6, y: 69.1, bend: 1 }, ...stand(82, 78) },
     },
     { // lockout, arms long, chest still against the pad
       t: 1,
@@ -296,7 +294,7 @@ const INCLINE_DUMBBELL_PRESS = {
       t: 0,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 0, neck: -6, forearmPronR: 90, forearmPronL: 90 },
-      ik: { wristR: { x: 63.0, y: 34.9, bend: 1 }, wristL: { x: 66.0, y: 38.4, bend: 1 }, ...stand(110, 104) },
+      ik: { wristR: { x: 63.0, y: 34.9, z: 12.2, flat: false, bend: 1 }, wristL: { x: 66.0, y: 38.4, z: -12.2, flat: false, bend: 1 }, ...stand(110, 104) },
     },
     { /* bottom, bells beside the UPPER chest, just below the collarbone, which
          is 0.16 of the way from the shoulder joint to the hip. That is the
@@ -315,7 +313,7 @@ const INCLINE_DUMBBELL_PRESS = {
       t: 1,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 2, neck: -8, forearmPronR: 90, forearmPronL: 90 },
-      ik: { wristR: { x: 78.4, y: 65.4, bend: 1, pole: ELBOW_OUT_R }, wristL: { x: 75.7, y: 66.3, bend: 1, pole: ELBOW_OUT_L }, ...stand(110, 104) },
+      ik: { wristR: { x: 68.5, y: 67.4, z: 22, flat: false, bend: 1, pole: [-1, 0, -0.3] }, wristL: { x: 70.5, y: 69.4, z: -22, flat: false, bend: 1, pole: [1, 0, -0.3] }, ...stand(110, 104) },
     },
   ],
 };
@@ -333,21 +331,21 @@ const DECLINE_DUMBBELL_PRESS = {
     { type: "bench", x: 32, y: 78, w: 76, incline: 25 },
     { type: "roller", x: 116, y: 48, r: 5 },
     { type: "roller", x: 116, y: 66, r: 5 },
-    { type: "dumbbell", hold: "follow", side: "L", point: "hand", k: 0.8 },
-    { type: "dumbbell", hold: "follow", side: "R", point: "hand", k: 0.8, front: true },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // lockout, bells square to the declined torso
       t: 0,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 0, neck: 6 },
-      ik: { wristR: { x: 34.7, y: 41.9, bend: 1 }, wristL: { x: 37.5, y: 44.4, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 50.0, y: 37.6, z: 12.2, flat: false, bend: 1 }, wristL: { x: 52.0, y: 39.6, z: -12.2, flat: false, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
     },
     { // bottom, bells beside the lower chest
       t: 1,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 2, neck: 8 },
-      ik: { wristR: { x: 60.1, y: 56.9, bend: 1, pole: ELBOW_OUT_R }, wristL: { x: 59.4, y: 59.0, bend: 1, pole: ELBOW_OUT_L }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 59.2, y: 65.8, z: 20, flat: false, bend: 1, pole: [-1, 0, 0.3] }, wristL: { x: 61.2, y: 67.8, z: -20, flat: false, bend: 1, pole: [1, 0, 0.3] }, ...pinFeet(112, 58, 108, 62) },
     },
   ],
 };
@@ -366,13 +364,13 @@ const INCLINE_BARBELL_PRESS = {
       t: 0,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 0, neck: -6 },
-      ik: { wristR: { x: 63.0, y: 34.9, bend: 1 }, wristL: { x: 64.9, y: 38.2, bend: 1 }, ...stand(110, 104) },
+      ik: { wristR: { x: 63.0, y: 34.9, z: 12.2, flat: false, bend: 1 }, wristL: { x: 64.9, y: 38.2, z: -12.2, flat: false, bend: 1 }, ...stand(110, 104) },
     },
     { // bar down to the collarbone, elbows under the bar
       t: 1,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 2, neck: -8 },
-      ik: { wristR: { x: 78.4, y: 65.4, bend: 1, pole: ELBOW_OUT_R }, wristL: { x: 75.6, y: 66.3, bend: 1, pole: ELBOW_OUT_L }, ...stand(110, 104) },
+      ik: { wristR: { x: 68.5, y: 67.4, z: 22, flat: false, bend: 1, pole: [-1, 0, -0.3] }, wristL: { x: 70.5, y: 69.4, z: -22, flat: false, bend: 1, pole: [1, 0, -0.3] }, ...stand(110, 104) },
     },
   ],
 };
@@ -392,13 +390,13 @@ const DECLINE_BARBELL_PRESS = {
       t: 0,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 0, neck: 6 },
-      ik: { wristR: { x: 34.7, y: 41.9, bend: 1 }, wristL: { x: 37.0, y: 44.6, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 50.0, y: 37.6, z: 12.2, flat: false, bend: 1 }, wristL: { x: 52.0, y: 39.6, z: -12.2, flat: false, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
     },
     { // bar down to the lower chest, elbows under the bar
       t: 1,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 2, neck: 8 },
-      ik: { wristR: { x: 60.1, y: 56.9, bend: 1, pole: ELBOW_OUT_R }, wristL: { x: 59.4, y: 59.0, bend: 1, pole: ELBOW_OUT_L }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 59.2, y: 65.8, z: 20, flat: false, bend: 1, pole: [-1, 0, 0.3] }, wristL: { x: 61.2, y: 67.8, z: -20, flat: false, bend: 1, pole: [1, 0, 0.3] }, ...pinFeet(112, 58, 108, 62) },
     },
   ],
 };
@@ -1217,7 +1215,7 @@ const MACHINE_SHOULDER_PRESS = {
       t: 0,
       root: { x: 52, y: 86, rot: -4 },
       joints: { spine: 0, neck: -2 },
-      ik: { wristR: { x: 67.8, y: 47.0, bend: 1, pole: ELBOW_OUT_R }, wristL: { x: 64.8, y: 49.0, bend: 1, pole: ELBOW_OUT_L }, ...stand(82, 78) },
+      ik: { wristR: { x: 67.8, y: 47.0, bend: 1 }, wristL: { x: 64.8, y: 49.0, bend: 1 }, ...stand(82, 78) },
     },
     { // lockout, arms long overhead, back still on the pad
       t: 1,
