@@ -4685,6 +4685,45 @@
   body.arranging .prog-tiles { display: none; }
   .photo-date { font-size: 12.5px; color: var(--muted); text-align: center; margin-top: 5px; }
 
+  /* Start beside Now. The two photos share the strip's frame (116x155, 11px
+     corners) scaled to half a card each, so the compare reads as the same
+     objects the full strip shows, just picked out. The frame is painted before
+     any URL resolves: a signed URL takes a round trip, and an <img> with no
+     src is a broken-image glyph on iOS, which reads as "my photo is gone". */
+  .cmp-card .card-head { margin-bottom: 14px; }
+  /* A two-row grid, frames on the first row and captions on the second, so
+     the disc between the photos can be centred on the frame row by the grid
+     itself. A percentage top would measure the captions too and land the
+     disc a line low, which is where the first cut of this put it. */
+  .cmp-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 12px; align-items: start; }
+  .cmp-slot { display: contents; }
+  .cmp-slot.l > * { grid-column: 1; }
+  .cmp-slot.r > * { grid-column: 2; }
+  .cmp-frame { grid-row: 1; }
+  .cmp-cap { grid-row: 2; }
+  .cmp-frame {
+    position: relative; width: 100%; aspect-ratio: 116 / 155; border-radius: 11px; overflow: hidden;
+    background: var(--panel-2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; color: var(--muted);
+  }
+  .cmp-frame img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block;
+    opacity: 0; transition: opacity .18s ease;
+  }
+  .cmp-frame img.in { opacity: 1; }
+  .cmp-cap { text-align: center; margin-top: 7px; min-width: 0; }
+  .cmp-cap b { display: block; font-size: 13.5px; font-weight: 700; color: var(--text); line-height: 1.25; }
+  .cmp-cap span { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.3; margin-top: 2px; }
+  /* Decorative, so no hit target is bought for it. */
+  .cmp-chev {
+    grid-row: 1; grid-column: 1 / -1; place-self: center; z-index: 1;
+    width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: var(--panel); border: 1px solid var(--border); color: var(--muted); box-shadow: var(--shadow-float);
+    pointer-events: none;
+  }
+  .cmp-line { font-size: 13.5px; color: var(--muted); margin: 0; line-height: 1.4; }
+  .cmp-card .btn-secondary { margin-top: 12px; }
+
   /* Seasons */
   .season-card {
     position: relative; overflow: hidden;
@@ -24682,6 +24721,77 @@ async function renderBodyPhotos() {
   strip.querySelectorAll("[data-photo]").forEach((b) => {
     b.onclick = () => deleteBodyPhoto(b.dataset.photo);
   });
+}
+
+/* The Start/Now pair on the goal screen. Oldest photo left, newest right,
+   because the question that screen asks is "is it working", and two photos
+   answer it faster than a strip of eight. Photos are yours alone, so a
+   partner's view gets nothing here, not an empty card. The host is whatever
+   the goal screen hands over; this function owns everything inside it and
+   repaints from scratch each call, so it is safe to call on every render.
+
+   The array comes newest-first from loadBodyPhotos, but the pair is picked
+   by sorting a copy rather than by trusting that order: renderBodyPhotos has
+   a paragraph about how easy that is to get backwards. */
+async function renderComparePhotos(hostEl, isPartner) {
+  if (!hostEl) return;
+  hostEl.classList.add("card", "cmp-card");
+  if (isPartner) { hostEl.classList.add("hidden"); return; }
+  hostEl.classList.remove("hidden");
+
+  const shots = BODY_PHOTOS.filter((p) => p.email === MY_EMAIL)
+    .slice().sort((a, b) => (a.taken_on < b.taken_on ? -1 : a.taken_on > b.taken_on ? 1 : 0));
+  const start = shots.length > 1 ? shots[0] : null;
+  const now = shots.length ? shots[shots.length - 1] : null;
+
+  const chevSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>';
+  const slot = (label, side, shot, hint) => `<figure class="cmp-slot ${side}">
+      <div class="cmp-frame" data-slot="${label}">${shot ? "" : icon("camera", 22)}</div>
+      <figcaption class="cmp-cap"><b>${label}</b><span>${shot ? escapeHtml(datedLabel(shot.taken_on)) : escapeHtml(hint || "")}</span></figcaption>
+    </figure>`;
+
+  hostEl.innerHTML = `<div class="card-head">
+      <h2>Progress Photos</h2>
+      ${shots.length ? `<button type="button" class="card-link ink cmp-all">See all ${chevSvg}</button>` : ""}
+    </div>` + (shots.length
+    ? `<div class="cmp-pair">
+        ${slot("Start", "l", start, "Add another to compare")}
+        <span class="cmp-chev" aria-hidden="true">${chevSvg}</span>
+        ${slot("Now", "r", now)}
+      </div>`
+    : `<p class="cmp-line">Your first photo becomes your Start.</p>
+       <button type="button" class="btn-secondary cmp-add">Add today's photo</button>`);
+
+  const all = hostEl.querySelector(".cmp-all");
+  if (all) all.onclick = () => {
+    const card = $("cardPhotos");
+    if (!card) return;
+    document.querySelectorAll("#tab-progress .card.peek").forEach((c) => c.classList.remove("peek"));
+    card.classList.remove("hidden");
+    card.classList.add("peek");
+    primeOpenedCard(card);
+    card.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+  const add = hostEl.querySelector(".cmp-add");
+  if (add) add.onclick = () => $("addBodyPhotoBtn")?.click();
+
+  /* The URLs arrive after the markup is on screen. A re-render in between
+     replaces the frames, so each one is checked to still be in the host
+     before it is given an image; an image that fails to load (an expired
+     link, or the sandbox handing back a video) leaves the frame as it was
+     rather than painting a broken glyph over it. */
+  const fill = async (label, shot) => {
+    if (!shot) return;
+    const frame = hostEl.querySelector(`.cmp-frame[data-slot="${label}"]`);
+    if (!frame) return;
+    const url = await signedProofUrl(shot.path);
+    if (!url || !hostEl.contains(frame)) return;
+    const img = new Image();
+    img.alt = `${label} photo, ${datedLabel(shot.taken_on)}`;
+    img.onload = () => { if (hostEl.contains(frame)) { frame.appendChild(img); requestAnimationFrame(() => img.classList.add("in")); } };
+    img.src = url;
+  };
+  await Promise.all([fill("Start", start), fill("Now", now)]);
 }
 
 async function deleteBodyPhoto(id) {
