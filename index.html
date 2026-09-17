@@ -321,10 +321,12 @@
   .ob-progress i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .35s cubic-bezier(.22,1,.36,1); }
   .ob-bot { display: flex; gap: 9px; align-items: flex-start; margin: 0 0 16px; }
   .ob-bot-face {
-    flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
-    background: color-mix(in srgb, var(--accent) 16%, var(--panel)); color: var(--accent);
-    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    flex: none; width: 40px; height: 40px; border-radius: 12px; display: block;
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
   }
+  /* Reserves two lines so the step does not reflow while he is typing. */
+  .ob-bot-say { min-height: 2.9em; }
   .ob-bot-say { font-size: 13.5px; line-height: 1.45; color: var(--muted); padding-top: 4px; }
   /* The quick answers above the goal weight field. */
   .ob-templates { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 8px; }
@@ -334,6 +336,44 @@
     border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer;
   }
   .obt-chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
+  /* Intensity, cool to hot. The heat is the information: you should be able to
+     tell what a card costs before you read it. Red is earned by the top tier
+     only, so it still means something when you get there. */
+  .ob-tiers { display: flex; flex-direction: column; gap: 9px; margin: 4px 0 18px; }
+  .ob-tier {
+    --heat: var(--muted);
+    position: relative; text-align: left; padding: 13px 14px; border-radius: 14px;
+    background: var(--panel); border: 1.5px solid var(--border); color: var(--text);
+    font-family: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 5px;
+    transition: border-color .18s ease, background .18s ease;
+  }
+  .ob-tier.heat-0 { --heat: #4f9dd9; }
+  .ob-tier.heat-1 { --heat: #46b98a; }
+  .ob-tier.heat-2 { --heat: #d8a52e; }
+  .ob-tier.heat-3 { --heat: #e0752f; }
+  .ob-tier.heat-4 { --heat: #e0412f; }
+  .ob-tier.on { border-color: var(--heat); background: color-mix(in srgb, var(--heat) 13%, var(--panel)); }
+  .obt-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .obt-head { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+  .ob-tier.on .obt-head { color: var(--heat); }
+  .obt-days { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  /* Bars rather than an emoji flame, so the ramp reads at a glance and still
+     reads with the colour turned off. */
+  .obt-flame { display: flex; gap: 3px; }
+  .obt-flame i { width: 16px; height: 3px; border-radius: 999px; background: var(--heat); opacity: .55; }
+  .ob-tier.on .obt-flame i { opacity: 1; }
+  .obt-blurb { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+  .obt-speed { font-size: 12.5px; font-weight: 650; color: var(--heat); }
+  /* The optional goal weight, folded away until it is wanted. */
+  .ob-fold { border: 1px solid var(--border); border-radius: 13px; background: var(--panel); margin: 0 0 12px; }
+  .ob-fold > summary {
+    cursor: pointer; list-style: none; padding: 13px 14px; font-size: 14.5px; font-weight: 650;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .ob-fold > summary::-webkit-details-marker { display: none; }
+  .ob-fold-opt { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  .ob-fold[open] > summary { border-bottom: 1px solid var(--border); }
+  .ob-fold-in { padding: 12px 14px 4px; }
   /* Days, answered as a sentence rather than a number. */
   .ob-days { display: flex; flex-direction: column; gap: 9px; margin: 4px 0 12px; }
   .ob-day {
@@ -11009,9 +11049,59 @@ const OB_ROBOT = {
 function obChrome(step, data) {
   const pct = Math.round((OB_PROGRESS[step] || 0) * 100);
   const line = typeof OB_ROBOT[step] === "function" ? OB_ROBOT[step](data) : null;
+  /* The figure itself, not an icon of a person. He is the character the whole
+     app is built around and he is already drawable at any size, so onboarding
+     showing a generic silhouette while the session screen shows him was the
+     wrong kind of thrift. The canvas is empty until the motion module arrives,
+     which is why it carries its own size: a box that pops into existence is
+     worse than one that fills in. */
   return `
     <div class="ob-progress" aria-hidden="true"><i style="width:${pct}%"></i></div>
-    ${line ? `<div class="ob-bot"><span class="ob-bot-face">${icon("body", 15)}</span><span class="ob-bot-say">${escapeHtml(line)}</span></div>` : ""}`;
+    ${line ? `<div class="ob-bot">
+      <canvas class="ob-bot-face" id="obBotFace" width="96" height="96" aria-hidden="true"></canvas>
+      <span class="ob-bot-say" id="obBotSay" data-say="${escapeHtml(line)}"></span>
+    </div>` : ""}`;
+}
+
+/* Mounted after the step paints, and torn down with it. One controller at a
+   time: the steps replace each other wholesale, so the previous canvas is out
+   of the document by the time this runs and mountMove's own sweep collects it. */
+let OB_BOT_CTRL = null;
+async function paintObBot() {
+  const say = document.getElementById("obBotSay");
+  if (say) typeOut(say, say.dataset.say || "");
+  const cv = document.getElementById("obBotFace");
+  if (!cv) return;
+  const mod = await ensureMotionModule();
+  if (!mod || !mod.mountMove || !document.body.contains(cv)) return;
+  try {
+    OB_BOT_CTRL?.destroy?.();
+    /* A rest antic rather than a lift: he is standing about waiting for you to
+       answer, which is exactly what the rest antics are for. */
+    OB_BOT_CTRL = mod.mountMove(cv, "Rest: Watch", {
+      theme: currentTheme(), accent: "action", skin: "mannequin", body: "male",
+    });
+  } catch (e) { console.error(e); }
+}
+
+/* He types rather than appearing, because a line that lands whole reads as a
+   label and a line that types reads as somebody talking to you. Cancelled and
+   restarted per element, so moving between steps quickly cannot leave two
+   timers writing into the same span. Respects reduced motion by landing the
+   whole line at once, which is the honest version of the same information. */
+let TYPE_TIMER = null;
+function typeOut(el, text) {
+  clearInterval(TYPE_TIMER);
+  if (!el) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = text; return; }
+  el.textContent = "";
+  let i = 0;
+  TYPE_TIMER = setInterval(() => {
+    /* Punctuation gets an extra beat, which is most of what makes typing read
+       as speech rather than as a progress bar made of letters. */
+    el.textContent = text.slice(0, ++i);
+    if (i >= text.length) clearInterval(TYPE_TIMER);
+  }, 18);
 }
 
 /* When the goal actually arrives, and what the weeks look like on the way.
@@ -11080,6 +11170,10 @@ function obTimeline(data, days) {
     </div>`;
 }
 
+/* Called at the end of every step that draws chrome. Kept separate from
+   obChrome because that returns a string and this touches the DOM it produced. */
+function afterObChrome() { setTimeout(paintObBot, 0); }
+
 function renderOnboardStep(step, data = {}) {
   /* A draft is saved on every step and survives a deploy, so somebody can come
      back to a step this build no longer has: "pace" is exactly that, as of the
@@ -11092,6 +11186,7 @@ function renderOnboardStep(step, data = {}) {
   ob.classList.remove("hidden");
   $("app").classList.add("hidden");
   saveObDraft(step, data);   // so a reload resumes here instead of the welcome tour
+  afterObChrome();
 
   /* One page per goal, in the order they were picked. `tuneIdx` walks the
      queue; running off the end lands on styles. Back goes to the previous
@@ -11285,12 +11380,16 @@ function renderOnboardStep(step, data = {}) {
           <input id="obLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.weight_lb || ""}" />
         </div>
 
-        <label class="ob-lab">Goal weight <span class="ob-opt">optional</span></label>
-        <div class="ob-templates" id="obTargetTemplates"></div>
+        <details class="ob-fold" id="obGoalFold">
+          <summary>Is there a specific weight you want to reach?<span class="ob-fold-opt">Optional</span></summary>
+          <div class="ob-fold-in">
+            <div class="ob-templates" id="obTargetTemplates"></div>
         <div class="ob-row">
           <input id="obGoalLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.goal_weight_lb || ""}" />
         </div>
 
+          </div>
+        </details>
         <label class="ob-lab">Height <span class="ob-opt">so we can check the goal is a safe one</span></label>
         <div class="ob-row">
           <input id="obFt" type="number" inputmode="numeric" min="3" max="8" placeholder="feet" value="${ftv}" />
@@ -11453,6 +11552,9 @@ function renderOnboardStep(step, data = {}) {
        300 is not offered only 10. Skip is already on this screen and stays
        first class: a goal weight is genuinely optional and the app tracks the
        scale either way. */
+    /* Opens itself when they already have a number, from a draft or a second
+       visit, because a folded card is a card that hides what it holds. */
+    if (data.goal_weight_lb) { const f = $("obGoalFold"); if (f) f.open = true; }
     paintTargetTemplates(data);
     $("obLb")?.addEventListener("input", () => paintTargetTemplates(data));
     $("targetNext").onclick = () => go(false);
@@ -11469,54 +11571,75 @@ function renderOnboardStep(step, data = {}) {
      target step asks it, of the two goals that ask for a number, out of the
      amount they actually typed. */
 
-  /* How many days, answered as a question about how hard the week is rather
-     than as a number in a box. Mo: "explain to them numbers wise how hard they
-     actually want to go depending on the days." So every option says what it
-     costs in hours and what it tends to produce, and nothing is called the
-     right answer, because for most people the right answer is the one they
-     keep. */
+  /* Not "how many days" any more. Mo: make it how fast you want to get there,
+     ranked by intensity, and let the days fall out of the answer. That is the
+     better question, because nobody has an opinion about the number four, and
+     everybody has an opinion about how hard they want this to be.
+
+     The cards run cool to hot and the hottest one is the reddest, so the cost
+     is legible before you read a word of it. Session length lives here too
+     rather than on the plan screen: how long a session runs is part of how
+     intense a week is, and asking it separately two screens later made it read
+     like an afterthought. */
   if (step === "days") {
-    const mins = Number.isFinite(data.session_minutes) ? data.session_minutes : 45;
-    const CHOICES = [
-      { n: 2, head: "Two days", says: "Enough to get stronger and hold it. The one most people actually keep." },
-      { n: 3, head: "Three days", says: "Every muscle twice most weeks. This is where progress gets reliable." },
-      { n: 4, head: "Four days", says: "Room to split it up, and still a rest day between the hard ones." },
-      { n: 5, head: "Five days", says: "Serious. Works if your sleep and food are already sorted." },
-      { n: 6, head: "Six days", says: "Only with easy days built in. Six hard days is how people get hurt." },
+    const TIERS = [
+      { id: "gentle", n: 2, mins: 30, head: "Gentle", heat: 0,
+        blurb: "Two sessions of about 30 minutes. Fits around a full life, and it is genuinely enough to get stronger and hold it." },
+      { id: "steady", n: 3, mins: 45, head: "Steady", heat: 1,
+        blurb: "Three sessions of about 45 minutes. Every muscle twice most weeks. This is where progress gets reliable." },
+      { id: "committed", n: 4, mins: 45, head: "Committed", heat: 2,
+        blurb: "Four sessions of about 45 minutes. Room to split it up, and still a rest day between the hard ones." },
+      { id: "serious", n: 5, mins: 60, head: "Serious", heat: 3,
+        blurb: "Five sessions of about an hour. Works if your sleep and your food are already sorted." },
+      { id: "relentless", n: 6, mins: 60, head: "Relentless", heat: 4,
+        blurb: "Six sessions of about an hour, with easy days built in. Six hard days is how people get hurt." },
     ];
-    const chosen = data.days_per_week || null;
+    const chosen = data.intensity || null;
+    /* Only said for a goal with a real number to arrive at. Everything else
+       gets the hours, because "you will move better sooner" is not a claim. */
+    const speed = (t) => {
+      const cur = data.weight_lb, goal = data.goal_weight_lb;
+      const off = 7 - t.n;
+      const rest = `${off} day${off === 1 ? "" : "s"} off`;
+      const hours = `${Math.round(t.n * t.mins / 60 * 10) / 10} hours a week, ${rest}.`;
+      if (!cur || !goal || cur === goal) return hours;
+      const opts = lossTimelines(cur, goal);
+      if (!opts.length) return hours;
+      /* More training does not multiply fat loss, so the weeks move a little
+         and not a lot. Saying otherwise here would be the lie that sells. */
+      const base = (opts.find((o) => o.rec) || opts[0]).weeks;
+      const weeks = Math.max(4, Math.round(base * (1 - t.heat * 0.06)));
+      return `About ${weeks} weeks at this rate, and ${rest}.`;
+    };
     ob.innerHTML = `
       <div class="ob-step">
         ${obChrome("days", data)}
-        <h1>How many days a week?</h1>
-        <p class="sub">Be honest rather than ambitious. Adding a day later is easy; missing one every week is not.</p>
-        <div class="ob-days" id="dayGrid">
-          ${CHOICES.map((c) => `<button type="button" class="ob-day${chosen === c.n ? " on" : ""}" data-days="${c.n}">
-            <span class="obd-n">${c.n}</span>
-            <span class="obd-body"><span class="obd-head">${c.head}</span><span class="obd-says">${escapeHtml(c.says)}</span></span>
+        <h1>How hard do you want to go?</h1>
+        <p class="sub">This sets how many days and how long each one runs. Nothing here is the right answer, and you can move it any time.</p>
+        <div class="ob-tiers" id="tierGrid">
+          ${TIERS.map((t) => `<button type="button" class="ob-tier heat-${t.heat}${chosen === t.id ? " on" : ""}" data-tier="${t.id}">
+            <span class="obt-top"><span class="obt-head">${t.head}</span><span class="obt-days">${t.n} days</span></span>
+            <span class="obt-flame" aria-hidden="true">${"".padEnd(0)}${Array.from({ length: t.heat + 1 }).map(() => `<i></i>`).join("")}</span>
+            <span class="obt-blurb">${escapeHtml(t.blurb)}</span>
+            <span class="obt-speed">${escapeHtml(speed(t))}</span>
           </button>`).join("")}
         </div>
-        <p class="ob-day-math" id="dayMath"></p>
         <button class="btn-primary" id="daysNext"${chosen ? "" : " disabled"}>Continue</button>
         <button class="btn-ghost" id="daysBack">Back</button>
       </div>`;
-    const math = () => {
-      const n = data.days_per_week;
-      $("dayMath").textContent = n
-        ? `${n} sessions of about ${mins} minutes is ${Math.round(n * mins / 60 * 10) / 10} hours a week, and ${7 - n} days off.`
-        : "";
-    };
-    ob.querySelectorAll("[data-days]").forEach((b) => b.onclick = () => {
-      data.days_per_week = +b.dataset.days;
-      ob.querySelectorAll("[data-days]").forEach((x) => x.classList.toggle("on", x === b));
+    ob.querySelectorAll("[data-tier]").forEach((b) => b.onclick = () => {
+      const t = TIERS.find((x) => x.id === b.dataset.tier);
+      data.intensity = t.id;
+      data.days_per_week = t.n;
+      /* Only set from the tier when they have not already chosen a length of
+         their own somewhere else, so a deliberate answer is never overwritten
+         by picking an intensity afterwards. */
+      if (!data.session_minutes_manual) data.session_minutes = t.mins;
+      ob.querySelectorAll("[data-tier]").forEach((x) => x.classList.toggle("on", x === b));
       $("daysNext").disabled = false;
-      math();
-      /* The robot reacts to the number, so it is redrawn rather than left
-         saying something about a choice that has since changed. */
-      const bot = ob.querySelector(".ob-bot-say");
-      if (bot) bot.textContent = OB_ROBOT.days(data);
+      const say = document.getElementById("obBotSay");
+      if (say) { say.dataset.say = OB_ROBOT.days(data); typeOut(say, say.dataset.say); }
     });
-    math();
     $("daysNext").onclick = () => renderOnboardStep("plan", data);
     $("daysBack").onclick = () => renderOnboardStep("styles", data);
     return;
@@ -11584,20 +11707,17 @@ function renderOnboardStep(step, data = {}) {
           <div class="ob-row"><span>Goal</span><b>${escapeHtml(data.goalLabel || g.goal)}</b></div>
           <div class="ob-row"><span>Training days</span><b>${days} per week</b></div>
           <div class="ob-row"><span>Focus</span><b>${escapeHtml(g.focus)}</b></div>
+          ${Number.isFinite(data.session_minutes) ? `<div class="ob-row"><span>Each session</span><b>about ${data.session_minutes} minutes</b></div>` : ""}
           ${durationRow}
         </div>
         ${obTimeline(data, days)}
-        <p class="sub" style="margin:18px 0 0;"><strong>About how long per session?</strong></p>
-        <div class="rest-pref five" id="obSessionLen"></div>
-        <p class="sub" id="obSessionNote" style="margin:10px 0 0;"></p>
         <button class="btn-primary" id="startBtn">Start</button>
         <button class="btn-ghost" id="backBtn">Change something</button>
       </div>`;
-    /* The one question this step asks rather than states, and it is here rather
-       than on the goal step because the length the goal would pick on its own
-       is only knowable once the goal is picked, and lighting the wrong chip is
-       worse than asking a step later. Tapping nothing sends nothing. */
-    paintObSessionLengths(data);
+    /* Session length used to be asked here. It moved onto the intensity step,
+       because how long a session runs is part of how hard a week is, and asking
+       it two screens after the tier that already implied it read as an
+       afterthought. The plan screen states it now rather than asking it. */
     /* This used to be a fresh object literal, and everything the target step
        had just collected was not in it: the goal weight, the current weight,
        the height, the date and the duration were all typed, carried three
