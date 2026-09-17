@@ -232,7 +232,13 @@
     fresh: {
       label: "Brand new account",
       apply: (db) => {
-        db.profiles = [];            // no profile yet, so onboarding runs
+        /* Mine goes, so onboarding runs. Hers stays, because a brand new
+           account is new to a world other people are already in: with the
+           table emptied outright there was nobody to pair with, and the
+           partner step in onboarding had no code to accept and no name to
+           put on the screen somebody sees when they arrive holding an
+           invite. */
+        db.profiles = db.profiles.filter((p) => p.email !== ME);
         db.partnerships = [];
         db.fit_entries = []; db.exercise_logs = []; db.ai_workouts = [];
         db.saved_workouts = []; db.session_reactions = []; db.user_goals = [];
@@ -461,7 +467,14 @@
         rows = list.map((p) => {
           const hit = p[on] == null ? null : (DB[table] ??= []).find((r) => low(r[on]) === low(p[on]));
           if (hit) { Object.assign(hit, p); return hit; }
-          const row = { id: "s-" + Math.random().toString(36).slice(2, 9), ...p };
+          /* profiles.invite_code is a server default on INSERT, and the partner
+             step reads it straight back out to put on screen. Without it here
+             that line stays blank in the sandbox and looks like a bug in the
+             step rather than a thing the fixture never did. */
+          const row = { id: "s-" + Math.random().toString(36).slice(2, 9),
+            ...(table === "profiles" && !p.invite_code
+              ? { invite_code: Math.random().toString(36).slice(2, 8).toUpperCase() } : {}),
+            ...p };
           DB[table].push(row);
           return row;
         });
@@ -565,6 +578,54 @@
              error: `Request sent to ${target.user_name}. They need to accept it in the app.` };
   }
 
+  /* The one time link RPCs from 20260917_invite_links.sql, ported for the same
+     reason as the three above: the partner step in onboarding leads with Send
+     an invite, and a button whose rpc resolves to null cannot be reviewed.
+
+     Tokens live in this array and nowhere else, which is all one tab needs.
+     One of them is seeded as a link THEY sent, so the other half of that step,
+     the screen somebody sees when they arrived holding an invite, is reachable
+     too: load the app with ?j=sandboxinvitefrommell1 and peek answers for it. */
+  const DEMO_TOKEN = "sandboxinvitefrommell1";
+  const LINKS = [{ token: DEMO_TOKEN, owner_email: THEM, revoked_at: null, claimed_at: null }];
+  const liveLink = (token) => LINKS.find((l) => l.token === token && !l.revoked_at && !l.claimed_at);
+
+  function rpcCreateLink() {
+    if (pRows().some((r) => r.status === "accepted" && party(r, ME)))
+      return { ok: false, error: "You already have a partner" };
+    // One live link at a time, the way the function does it: sharing twice is
+    // one invitation sent two ways, not two invitations.
+    LINKS.forEach((l) => { if (low(l.owner_email) === low(ME) && !l.claimed_at) l.revoked_at = Date.now(); });
+    const token = ("sbx" + Math.random().toString(36).slice(2)).padEnd(22, "0").slice(0, 22);
+    LINKS.push({ token, owner_email: ME, revoked_at: null, claimed_at: null });
+    return { ok: true, token };
+  }
+
+  function rpcPeekLink(token) {
+    const link = liveLink(token);
+    // One answer for every kind of no, exactly as the migration argues.
+    if (!link) return { ok: false, error: "This invite is no longer active" };
+    const owner = DB.profiles.find((p) => low(p.email) === low(link.owner_email));
+    return { ok: true, name: (owner && owner.user_name) || "Someone", code: owner && owner.invite_code };
+  }
+
+  function rpcClaimLink(token) {
+    const link = liveLink(token);
+    if (!link) return { ok: false, error: "This invite is no longer active" };
+    if (low(link.owner_email) === low(ME)) return { ok: false, error: "That is your own invite" };
+    if (pRows().some((r) => r.status === "accepted" && (party(r, ME) || party(r, link.owner_email))))
+      return { ok: false, error: "One of you already has a partner" };
+
+    link.claimed_at = Date.now();
+    link.claimed_by = ME;
+    pRows().push({ id: "s-" + Math.random().toString(36).slice(2, 9), inviter_email: low(link.owner_email),
+      invitee_email: ME, status: "accepted",
+      created_at: new Date().toISOString(), responded_at: new Date().toISOString() });
+    const owner = DB.profiles.find((p) => low(p.email) === low(link.owner_email));
+    return { ok: true, partner_name: (owner && owner.user_name) || "Your partner",
+             partner_email: low(link.owner_email) };
+  }
+
   function rpcRespond(id, accept) {
     const inv = pRows().find((r) => r.id === id && r.status === "pending" && low(r.invitee_email) === low(ME));
     if (!inv) return { ok: false, error: "That request is no longer open" };
@@ -602,6 +663,13 @@
           const a = args || {};
           if (name === "redeem_invite_code") return { data: rpcRedeem(a.code), error: null };
           if (name === "respond_to_pair_invite") return { data: rpcRespond(a.p_id, a.p_accept), error: null };
+          if (name === "create_invite_link") return { data: rpcCreateLink(), error: null };
+          if (name === "peek_invite_link") return { data: rpcPeekLink(a.p_token), error: null };
+          if (name === "claim_invite_link") return { data: rpcClaimLink(a.p_token), error: null };
+          if (name === "revoke_invite_link") {
+            LINKS.forEach((l) => { if (low(l.owner_email) === low(ME) && !l.claimed_at) l.revoked_at = Date.now(); });
+            return { data: { ok: true }, error: null };
+          }
           if (name === "rotate_invite_code") {
             const me = DB.profiles.find((p) => low(p.email) === low(ME));
             const fresh = "Q" + Math.random().toString(36).slice(2, 7).toUpperCase();
