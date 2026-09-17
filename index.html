@@ -6643,7 +6643,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.15";
+const APP_VERSION = "2026.09.16.16";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -7397,6 +7397,10 @@ async function handleSignedIn(session) {
   if (SIGN_IN_HANDLED) return;
   SIGN_IN_HANDLED = true;
   MY_EMAIL = session.user.email.toLowerCase();
+  /* Not awaited: RevenueCat configuring is not on the critical path to the
+     dashboard painting, and the identity it needs (MY_EMAIL) is already set
+     above by the time it runs. */
+  configureRevenueCat();
 
   const { data: profile, error: profileErr } = await sb.from("profiles")
     .select("*").eq("email", MY_EMAIL).maybeSingle();
@@ -13785,6 +13789,44 @@ function showPaywall() {
    button that does nothing is the worst possible bug on this particular screen. */
 function purchasesPlugin() {
   return (isNativeApp() && window.Capacitor.Plugins.Purchases) || null;
+}
+
+/* RevenueCat's public SDK key for this app, from Project Settings > API Keys
+   in the RevenueCat dashboard. Public by design: it identifies which app is
+   asking, the way a Stripe publishable key does, and it is meant to ship
+   inside the binary. It cannot grant premium by itself; only the webhook,
+   holding the service role key, can write to subscriptions. */
+const REVENUECAT_API_KEY = "appl_nEItapnUJLSHiWHgWEqoQjJjWsN";
+
+let REVENUECAT_CONFIGURED = false;
+
+/* Called once, right after MY_EMAIL is known. appUserID is set to the email
+   rather than left as RevenueCat's own anonymous id, because the webhook
+   writes subscriptions keyed by email and cannot invent a mapping between the
+   two after the fact. Every purchase, on any device this person ever signs
+   into, lands under the same row this way. */
+async function configureRevenueCat() {
+  if (REVENUECAT_CONFIGURED) return;
+  const rc = purchasesPlugin();
+  if (!rc) {
+    /* Loud rather than silent, the same reason the plugin registry logs at
+       boot: an unconfigured Purchases plugin looks exactly like a missing
+       one from every call site downstream, and this is the one place that
+       actually knows which it is. */
+    if (isNativeApp()) console.error("RevenueCat plugin is not registered in this build");
+    return;
+  }
+  if (!MY_EMAIL) return;
+  if (REVENUECAT_API_KEY.includes("PLACEHOLDER")) {
+    console.error("RevenueCat API key is a placeholder; purchases cannot work until it is set");
+    return;
+  }
+  try {
+    await rc.configure({ apiKey: REVENUECAT_API_KEY, appUserID: MY_EMAIL });
+    REVENUECAT_CONFIGURED = true;
+  } catch (err) {
+    console.error("could not configure RevenueCat", err);
+  }
 }
 
 async function startPurchase() {
