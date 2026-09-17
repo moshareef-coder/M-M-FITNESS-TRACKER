@@ -5488,6 +5488,52 @@
      a line on its own does not tell you whether it is going the right way. */
   /* The goal weight, under the chart it draws a line on. Quiet when there is
      no goal, because an empty aim is not a problem to be nagged about. */
+  /* The tracking step. A goal summary above a three by two grid of cards, each
+     with a tick that appears when it is on. */
+  .trk-goal { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; margin: 4px 0 14px; }
+  .trk-goal-top { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; }
+  .trk-goal-ico {
+    flex: none; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center;
+    background: color-mix(in srgb, var(--accent) 16%, var(--panel)); color: var(--accent);
+  }
+  .trk-goal-name { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .trk-goal-name small { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--muted); }
+  .trk-goal-name b { font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
+  .trk-goal-split { display: flex; align-items: center; gap: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .trk-goal-now { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+  .trk-goal-now small { font-size: 12px; color: var(--muted); }
+  .trk-goal-now b { font-size: 24px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .trk-goal-now b i { font-size: 14px; font-weight: 700; font-style: normal; color: var(--muted); }
+  .trk-goal-note {
+    flex: 1; display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--muted);
+    line-height: 1.3; border-left: 1px solid var(--border); padding-left: 14px;
+  }
+  .trk-goal-note svg { flex: none; color: var(--accent); }
+  .trk-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+  .trk-card {
+    position: relative; background: var(--panel); border: 1.5px solid var(--border); border-radius: 14px;
+    padding: 14px 8px 12px; cursor: pointer; font-family: inherit; color: var(--text);
+    display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; min-width: 0;
+    transition: border-color .18s ease, background .18s ease;
+  }
+  .trk-card:active { transform: scale(.985); }
+  .trk-card.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+  .trk-ico {
+    width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+    background: color-mix(in srgb, var(--accent) 14%, var(--panel-2)); color: var(--accent);
+  }
+  .trk-name { font-size: 13px; font-weight: 700; line-height: 1.2; }
+  .trk-blurb { font-size: 11px; color: var(--muted); line-height: 1.3; }
+  /* Hidden rather than absent so the card does not resize when it is ticked. */
+  .trk-tick {
+    position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border-radius: 50%;
+    display: grid; place-items: center; background: var(--accent); color: var(--accent-ink);
+    opacity: 0; transform: scale(.6); transition: opacity .15s ease, transform .15s ease;
+  }
+  .trk-card.on .trk-tick { opacity: 1; transform: scale(1); }
+  .trk-any { font-size: 12.5px; color: var(--muted); margin: 12px 0 14px; }
+  @media (prefers-reduced-motion: reduce) { .trk-card, .trk-tick { transition: none; } }
+
   /* What you are tracking. Closed it is one quiet line, because most people
      will set this once and never look at it again. */
   .track-row { margin: 0 0 10px; }
@@ -9867,8 +9913,8 @@ function renderGoalTilesStep(data = {}) {
          answer was written to a deadline nothing reads. A duration is only a
          real question when there is a number to arrive at, so it is asked on
          the target step, of the two goals that ask for one, and nowhere else. */
-      else renderOnboardStep(tuneQueue(next).length ? "tune" : "styles",
-        { ...next, detail: child ? label : null, tuneIdx: 0 });
+      else renderOnboardStep(tuneQueue(next).length ? "tune" : "track",
+        { ...next, detail: child ? label : null, tuneIdx: 0, trackIdx: 0 });
     },
   });
   $("goalBackBtn").onclick = () => renderOnboardStep("name", data);
@@ -11104,7 +11150,7 @@ function paintLimitsSubtitle() {
    them, main first. That is the whole reason it is a single step id with an
    index in the draft rather than three step names, since which pages exist and
    how many of them there are is not known until the goal step is answered. */
-const OB_STEPS = ["name", "goal", "target", "tune", "styles", "days", "plan", "commit", "partner"];
+const OB_STEPS = ["name", "goal", "target", "tune", "track", "styles", "days", "plan", "commit", "partner"];
 
 /* What each goal asks about itself, once, after the goals are chosen.
 
@@ -11161,6 +11207,14 @@ function goalTuningPatch(data) {
   return Object.keys(out).length ? out : null;
 }
 
+/* Every goal they picked, main first. Unlike the tuning queue this one has no
+   exceptions: every goal is measured by something, even if the honest answer
+   for Move better is "nothing, and skipping is fine". */
+function trackQueue(data) {
+  const ids = [data.goal_bubble, ...normaliseGoalSecondary(data.goal_secondary).map((e) => e.bubble)];
+  return [...new Set(ids.filter(Boolean))];
+}
+
 /* The goals they picked, main first, that actually have a page. */
 function tuneQueue(data) {
   const ids = [data.goal_bubble, ...normaliseGoalSecondary(data.goal_secondary).map((e) => e.bubble)];
@@ -11212,7 +11266,7 @@ function recommendedStyles(data) {
    because the steps are not evenly sized: name is a text field and the body
    picker is a real decision, and a bar that jumps in equal hops past a long
    screen and a short one reads as broken. */
-const OB_PROGRESS = { name: 0.08, goal: 0.22, target: 0.34, tune: 0.5, styles: 0.66, days: 0.78, plan: 0.9, commit: 1 };
+const OB_PROGRESS = { name: 0.07, goal: 0.18, target: 0.28, tune: 0.4, track: 0.52, styles: 0.64, days: 0.76, plan: 0.88, commit: 1 };
 
 /* He talks the whole way through. Same character as the session, same rules:
    deadpan, fond of you, never at your expense, and here he is also the only
@@ -11229,6 +11283,7 @@ const OB_ROBOT = {
   days: (d) => (d.intensity === "allin"
     ? "All in. Bold. I will be the one telling you to take a day off."
     : d.intensity === "easy" ? "Two done beats five planned. Genuinely." : "That is a week somebody actually keeps."),
+  track: () => "Pick what you want to see back. I will keep the rest quiet.",
   plan: () => "There it is. Your week, in writing.",
   commit: () => "This is the part where I get sincere for one second.",
 };
@@ -11348,6 +11403,82 @@ function renderOnboardStep(step, data = {}) {
   saveObDraft(step, data);   // so a reload resumes here instead of the welcome tour
   afterObChrome();
 
+  /* One tracking page per goal, in the order they were picked, so three goals
+     really do mean Goal 1, Goal 2, Goal 3. Each names the goal it belongs to
+     and shows what that goal is measured by, because "what do you want to
+     track" has a different answer for Lose weight than for Get stronger and
+     asking it once for all three would be asking it for none of them.
+
+     Separate from the tuning pages on purpose. Those ask what the goal MEANS,
+     where in the body and how hard; this asks what evidence you want to see
+     back. Somebody can want the scale and not care where they get stronger,
+     or the reverse. */
+  if (step === "track") {
+    const queue = trackQueue(data);
+    const i = Math.max(0, Math.min(data.trackIdx || 0, queue.length));
+    if (!queue.length || i >= queue.length) { renderOnboardStep("styles", data); return; }
+    const goalId = queue[i];
+    const tile = goalTileFor(goalId);
+    const offers = (TRACK_OFFERS[goalId] || TRACK_OFFERS.consistent)
+      .map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean);
+    /* Per goal, so going back and forward does not lose what was ticked on a
+       page you already answered. Seeded from that goal's own default. */
+    const picked = new Set(
+      (data.tracked_by_goal && data.tracked_by_goal[goalId])
+      || (TRACK_DEFAULTS[goalId] || []).filter((k) => offers.some((o) => o.key === k)));
+
+    const lb = currentWeightLb(ME);
+    ob.innerHTML = `
+      <div class="ob-step ob-step-wide">
+        ${obChrome("track", data)}
+        <div class="step-lab">Goal ${i + 1} of ${queue.length}</div>
+        <h1>Choose what you want to track</h1>
+        <p class="sub">Tap the cards that match your goal. You can change these later.</p>
+
+        <div class="trk-goal">
+          <div class="trk-goal-top">
+            <span class="trk-goal-ico">${icon("target", 20)}</span>
+            <span class="trk-goal-name"><small>YOUR GOAL</small><b>${escapeHtml(tile?.title || "")}</b></span>
+          </div>
+          <div class="trk-goal-split">
+            <span class="trk-goal-now"><small>${lb ? "Current weight" : "Starting out"}</small>
+              <b>${lb ? `${lb.toFixed(1)} <i>lb</i>` : "Day one"}</b></span>
+            <span class="trk-goal-note">${icon("trending", 18)}<span>Track your progress over time</span></span>
+          </div>
+        </div>
+
+        <div class="trk-grid" id="trkGrid">
+          ${offers.map((m) => `<button type="button" class="trk-card${picked.has(m.key) ? " on" : ""}" data-track="${m.key}">
+            <span class="trk-tick" aria-hidden="true">${icon("check", 13)}</span>
+            <span class="trk-ico">${icon(m.ico, 22)}</span>
+            <span class="trk-name">${escapeHtml(m.label)}</span>
+            <span class="trk-blurb">${escapeHtml(m.blurb)}</span>
+          </button>`).join("")}
+        </div>
+        <p class="trk-any">You can choose as many as you want.</p>
+        <button class="btn-primary" id="trkNext">Continue</button>
+        <button class="btn-ghost" id="trkSkip">Skip for now</button>
+      </div>`;
+
+    const carry = (keys) => {
+      const byGoal = { ...(data.tracked_by_goal || {}) };
+      byGoal[goalId] = keys;
+      /* The union across goals, in TRACK_ALL order, is what Progress reads.
+         Somebody holding two goals sees the evidence for both rather than the
+         evidence for whichever they answered last. */
+      const all = new Set(Object.values(byGoal).flat());
+      return { ...data, tracked_by_goal: byGoal, tracked_metrics: TRACK_ALL.map((m) => m.key).filter((k) => all.has(k)) };
+    };
+    ob.querySelectorAll("[data-track]").forEach((b) => b.onclick = () => {
+      const k = b.dataset.track;
+      picked.has(k) ? picked.delete(k) : picked.add(k);
+      b.classList.toggle("on", picked.has(k));
+    });
+    $("trkNext").onclick = () => renderOnboardStep("track", { ...carry([...picked]), trackIdx: i + 1 });
+    $("trkSkip").onclick = () => renderOnboardStep("track", { ...carry([]), trackIdx: i + 1 });
+    return;
+  }
+
   /* One page per goal, in the order they were picked. `tuneIdx` walks the
      queue; running off the end lands on styles. Back goes to the previous
      page in the queue rather than to the goal grid, or answering three goals
@@ -11355,7 +11486,7 @@ function renderOnboardStep(step, data = {}) {
   if (step === "tune") {
     const queue = tuneQueue(data);
     const i = Math.max(0, Math.min(data.tuneIdx || 0, queue.length));
-    if (!queue.length || i >= queue.length) { renderOnboardStep("styles", data); return; }
+    if (!queue.length || i >= queue.length) { renderOnboardStep("track", { ...data, trackIdx: 0 }); return; }
     const goalId = queue[i];
     const spec = GOAL_TUNE[goalId];
     const tileFor = goalTileFor(goalId);
@@ -11467,8 +11598,8 @@ function renderOnboardStep(step, data = {}) {
     note();
     $("styleNext").onclick = () => renderOnboardStep("days", { ...data, train_styles: [...picked] });
     $("styleBack").onclick = () => {
-      const q = tuneQueue(data);
-      if (q.length) renderOnboardStep("tune", { ...data, tuneIdx: q.length - 1 });
+      const q = trackQueue(data);
+      if (q.length) renderOnboardStep("track", { ...data, trackIdx: q.length - 1 });
       else renderOnboardStep(goalTileFor(data.goal_bubble)?.askTarget ? "target" : "goal", data);
     };
     return;
@@ -11687,7 +11818,7 @@ function renderOnboardStep(step, data = {}) {
       const outlook = cur && goalLb && goalLb > cur ? gainOutlook(cur, goalLb) : null;
       const weeks = chosen ? chosen.weeks : outlook ? Math.round(outlook.hi * 4.345) : null;
       const afterTarget = { ...data };
-      renderOnboardStep(tuneQueue(afterTarget).length ? "tune" : "styles", {
+      renderOnboardStep(tuneQueue(afterTarget).length ? "tune" : "track", {
         ...data,
         tuneIdx: 0,
         height_in: heightIn,
@@ -11992,6 +12123,7 @@ async function finishOnboarding(data) {
        value that means exactly what the column's default already means. */
     ...(Array.isArray(data.train_styles) && data.train_styles.length ? { train_styles: data.train_styles } : {}),
     ...(data.goal_tuning ? { goal_tuning: data.goal_tuning } : {}),
+    ...(Array.isArray(data.tracked_metrics) ? { tracked_metrics: data.tracked_metrics } : {}),
     ...(data.committed_at ? { committed_at: data.committed_at } : {}),
     goal_detail: data.goal_detail || null,
     ...(data.height_in ? { height_in: data.height_in } : {}),
@@ -30464,17 +30596,50 @@ const BULK_MEASURE_KEYS = ["chest_in", "arm_in", "thigh_in"];
    account so far, and reads as the goal's default: nothing changes for anybody
    until they touch it. */
 const TRACK_DEFAULTS = {
-  "lose-weight": ["weight", "waist_in"],
+  "lose-weight": ["weight", "waist_in", "photos"],
   /* Recomp leads with the tape, and the scale is second rather than absent:
      it is still worth seeing, it is just the wrong headline. */
-  "tone-lean-abs": ["waist_in", "hips_in", "weight"],
+  "tone-lean-abs": ["waist_in", "hips_in", "photos"],
   "build-muscle": ["weight", "chest_in", "arm_in"],
-  "get-stronger": ["weight"],
-  "build-endurance": ["weight"],
+  "get-stronger": ["lifts", "volume"],
+  "build-endurance": ["weight", "volume"],
   "move-better": [],
   "consistent": ["weight"],
 };
-const TRACK_ALL = [{ key: "weight", label: "Weight", unit: "lb" }].concat(MEASUREMENTS);
+/* Everything Progress can chart, which is more than the tape: the photo card
+   and the two workout cards are evidence somebody can choose to care about in
+   exactly the same way, and leaving them out of the picker would mean the
+   question "what do you want to track" had a smaller answer than the screen it
+   controls. `card` is the element the choice turns on or off. */
+const TRACK_ALL = [{ key: "weight", label: "Weight", unit: "lb", card: "cardWeight", ico: "scale", blurb: "See your progress over time" }]
+  .concat(MEASUREMENTS.map((m) => ({
+    ...m,
+    ico: m.key === "waist_in" ? "tape" : m.key === "arm_in" ? "dumbbell" : m.key === "thigh_in" ? "walk" : "body",
+    blurb: `Track changes in your ${m.label.toLowerCase()}`,
+  })))
+  .concat([
+    { key: "photos", label: "Body Photos", card: "cardPhotos", ico: "camera", blurb: "Visually see your progress" },
+    { key: "lifts", label: "Best Lifts", card: "cardStrength", ico: "bolt", blurb: "Watch your numbers climb" },
+    { key: "volume", label: "Weekly Volume", card: "cardVolume", ico: "trending", blurb: "How much work you put in" },
+  ]);
+
+/* What each goal offers, and in what order. Six per goal, because six fills the
+   three by two grid the screen is built on and a seventh would push Continue
+   below the fold on a small phone. The first two or three are pre-ticked: the
+   ones that goal is genuinely measured by, which is the same judgement
+   TRACK_DEFAULTS makes and is read from there rather than written twice. */
+const TRACK_OFFERS = {
+  "lose-weight": ["weight", "waist_in", "photos", "hips_in", "chest_in", "arm_in"],
+  "tone-lean-abs": ["waist_in", "hips_in", "photos", "weight", "thigh_in", "arm_in"],
+  "build-muscle": ["weight", "chest_in", "arm_in", "photos", "thigh_in", "lifts"],
+  "get-stronger": ["lifts", "volume", "weight", "photos", "arm_in", "chest_in"],
+  "build-endurance": ["weight", "volume", "photos", "waist_in", "thigh_in", "lifts"],
+  /* Move better has no number that honestly measures it, so it offers the two
+     that come closest and pre-ticks neither. Skipping is the expected answer
+     here and the screen should not imply otherwise. */
+  "move-better": ["photos", "waist_in", "weight", "lifts", "volume", "arm_in"],
+  "consistent": ["weight", "photos", "waist_in", "lifts", "volume", "arm_in"],
+};
 
 /* The keys this person wants, in the order they should appear. Falls through
    to the goal's default, then to weight, so it is never empty for somebody who
