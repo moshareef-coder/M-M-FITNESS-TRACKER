@@ -53,7 +53,19 @@
     font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
     font-weight: 700; color: var(--muted); margin: 0 0 10px;
   }
-  .fallback-note { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 12px 0 0; }
+  .fallback-note { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 14px 0 0; }
+  /* The code is the thing on this page most likely to be read off a screen and
+     typed into a phone, so it gets the size and the letter spacing rather than
+     the button next to it. */
+  .code {
+    font-size: 30px; font-weight: 800; letter-spacing: 0.16em;
+    color: var(--accent); margin: 0 0 14px; font-variant-numeric: tabular-nums;
+  }
+  .ghost {
+    width: 100%; padding: 11px 16px; border-radius: 11px;
+    background: transparent; color: var(--text); border: 1px solid var(--border);
+    font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
   .steps {
     margin: 0; padding: 0; list-style: none;
     display: flex; flex-direction: column; gap: 14px;
@@ -88,9 +100,10 @@
     <a class="cta" id="cta" href="https://apps.apple.com/app/id6812201708">Get Unio</a>
 
     <div class="fallback" id="fallback" hidden>
-      <p class="fallback-label">Your invite code</p>
-      <button type="button" class="cta" id="copyBtn" style="background:transparent;color:var(--text);border:1px solid var(--border);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;word-break:break-all;">Copy invite code</button>
-      <p class="fallback-note">The app usually picks this up on its own. If it asks, paste this in.</p>
+      <p class="fallback-label">Their code</p>
+      <div class="code" id="codeValue">------</div>
+      <button type="button" class="ghost" id="copyBtn">Copy code</button>
+      <p class="fallback-note">Write this down. After you install Unio and make an account, type it in to pair up.</p>
     </div>
 
     <ol class="steps" id="steps">
@@ -127,24 +140,23 @@
     document.getElementById("cta").textContent = "Get Unio anyway";
   }
 
-  /* The clipboard is the only channel that survives an App Store install, so
-     the copy is attempted up front and the button is the fallback for the
-     browsers that refuse it without a gesture. Failure here is not an error
-     worth showing: the code is on screen either way. */
-  function armClipboard() {
+  /* Nothing about which link was tapped survives an App Store install, so this
+     is the channel that does: six characters on screen that a person can type
+     into the app once it is open. The clipboard copy is a convenience on top,
+     not the mechanism, and a browser refusing it costs nothing because the code
+     is readable either way. */
+  function showCode(code) {
+    if (!code) return;
     var btn = document.getElementById("copyBtn");
-    var label = "unio:" + token;
-    btn.textContent = token.slice(0, 10) + "…";
+    document.getElementById("codeValue").textContent = code;
     document.getElementById("fallback").hidden = false;
-    var copy = function () {
+    btn.addEventListener("click", function () {
       if (!navigator.clipboard) return;
-      navigator.clipboard.writeText(label).then(function () {
+      navigator.clipboard.writeText(code).then(function () {
         btn.textContent = "Copied";
-        setTimeout(function () { btn.textContent = token.slice(0, 10) + "…"; }, 1600);
+        setTimeout(function () { btn.textContent = "Copy code"; }, 1600);
       }, function () {});
-    };
-    btn.addEventListener("click", copy);
-    copy();
+    });
   }
 
   if (!token) {
@@ -169,13 +181,13 @@
           '<span class="who">' + esc(res.name) + "</span> wants to train with you";
         document.getElementById("sub").textContent =
           "Unio pairs two people. You will both see the same week, and each other's workouts as they happen.";
-        armClipboard();
+        showCode(res.code);
       })
       .catch(function () {
         /* The network failed, which says nothing about the invite. Leave the
            page standing and let them install: the app can settle it properly
-           once it has a session. */
-        armClipboard();
+           once it has a session, and the link itself still works if they
+           already have Unio. */
       });
   }
 </script>

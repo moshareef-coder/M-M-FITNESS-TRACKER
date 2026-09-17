@@ -103,14 +103,21 @@ end $$;
 -- somebody who has no account yet, and a page that cannot say who invited them
 -- is a page that reads like a phishing attempt.
 --
--- It returns a display name and nothing else. Not the email, not the id, not
--- whether that person has ever logged a workout. A valid token is worth a first
--- name and that is the whole budget.
+-- It returns a display name and the owner's typed code, and nothing else. Not
+-- the email, not the id, not whether that person has ever logged a workout.
+--
+-- The code is here because of the one case a link cannot cover. A link tapped
+-- on a phone without the app goes to the App Store, and nothing about which
+-- link it was survives the install. Six characters somebody can read off the
+-- page and type into the app afterwards is the thing that does survive, and it
+-- was already meant to be shared, so showing it to somebody holding a valid
+-- token gives away nothing that was being kept.
 create or replace function peek_invite_link(p_token text)
 returns json language plpgsql security definer set search_path = public as $$
 declare
   link   invite_links;
   who    text;
+  code   text;
 begin
   select * into link from invite_links where token = p_token;
 
@@ -125,8 +132,9 @@ begin
     return json_build_object('ok', false, 'error', 'This invite is no longer active');
   end if;
 
-  select user_name into who from profiles where lower(email) = lower(link.owner_email);
-  return json_build_object('ok', true, 'name', coalesce(who, 'Someone'));
+  select user_name, invite_code into who, code
+    from profiles where lower(email) = lower(link.owner_email);
+  return json_build_object('ok', true, 'name', coalesce(who, 'Someone'), 'code', code);
 end $$;
 
 

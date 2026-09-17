@@ -8612,7 +8612,15 @@ async function shareInviteLink(btn) {
 
     const url = INVITE_LINK_BASE + res.token;
     const who = MY_PROFILE?.user_name || ME || "Someone";
-    const text = `${who} wants to train with you on Unio. This link is for you and works once.`;
+    /* The code rides along with the link rather than replacing it, because the
+       two cover different halves of the same journey. The link pairs them in
+       one tap if they already have Unio. If they do not, it sends them to the
+       App Store and nothing about which link it was survives the install, so
+       the code is what they still have in their hand afterwards. */
+    const code = MY_PROFILE?.invite_code;
+    const text = code
+      ? `${who} wants to train with you on Unio.\n\nTap the link. If you do not have the app yet it will take you to the App Store, and you can pair with the code ${code} once you are in.`
+      : `${who} wants to train with you on Unio. This link is for you and works once.`;
 
     try {
       if (navigator.share) { await navigator.share({ title: "Unio", text, url }); return true; }
