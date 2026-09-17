@@ -5486,6 +5486,27 @@
   /* Weight trend: the answer above the chart, the window under it, the
      readings below that. Same order every comparable app arrived at, because
      a line on its own does not tell you whether it is going the right way. */
+  /* The goal weight, under the chart it draws a line on. Quiet when there is
+     no goal, because an empty aim is not a problem to be nagged about. */
+  .wt-goal { margin: 10px 0 2px; }
+  .wt-goal-none { font-size: 12.5px; color: var(--muted); margin: 0; }
+  .wt-goal-set {
+    font: inherit; font-size: 13px; font-weight: 650; color: var(--muted); cursor: pointer;
+    background: none; border: 1px dashed var(--border); border-radius: 10px;
+    padding: 9px 12px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 7px;
+  }
+  .wt-goal-set:hover { color: var(--text); border-color: var(--muted); }
+  .wt-goal-has { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+  .wt-goal-num { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+  .wt-goal-num b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .wt-goal-togo { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .wt-goal-hit { color: var(--accent); font-weight: 650; }
+  .wt-goal-held .wt-goal-togo { font-style: italic; }
+  .wt-goal-edit {
+    margin-left: auto; font: inherit; font-size: 12.5px; font-weight: 650; color: var(--muted);
+    background: none; border: none; cursor: pointer; padding: 4px 2px; text-decoration: underline;
+  }
+  .wt-goal-edit:hover { color: var(--text); }
   .wt-range { display: flex; gap: 6px; margin-top: 12px; }
   .wt-pill {
     flex: 1; padding: 7px 0; border-radius: 9px; cursor: pointer; font-family: inherit; min-height: 44px;
@@ -6685,6 +6706,13 @@
         <p class="muted-note idx-lead" style="margin-top:-6px" id="weightLead"></p>
         <div class="wth-stats hidden" id="wtHeroStats"></div>
         <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
+        <!-- The goal weight, asked here rather than during setup. It left
+             onboarding because it was being asked before somebody had weighed
+             themselves once, which is the worst moment to pick a number: they
+             are guessing, and the guess is then the line every chart is drawn
+             against for months. Here they are already looking at the line it
+             would join. -->
+        <div class="wt-goal" id="weightGoalRow"></div>
         <div class="wt-range" id="weightRange"></div>
         <div class="ms-list" id="weightHistory"></div>
       </div>
@@ -17550,7 +17578,7 @@ function renderWeightStats() {
   if (!el) return;
   const summary = $("weightSummary");
   /* The empty state below already says there is nothing here. */
-  if (!rows.length) { el.textContent = ""; if (summary) summary.textContent = ""; return; }
+  if (!rows.length) { el.textContent = ""; if (summary) summary.textContent = ""; renderWeightGoalRow([]); return; }
   const current = rows[rows.length - 1].weight;
   const delta = current - rows[0].weight;
   const goal = weightGoalFor(PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY_EMAIL);
@@ -17570,6 +17598,7 @@ function renderWeightStats() {
      goal.target_value sits from here, the same "is this the right direction"
      the scale headline already computes, not a bare "down is green" that
      would tell a bulk it was failing every time it succeeded. */
+  renderWeightGoalRow(rows);
   if (summary) {
     if (rows.length < 2 || Math.abs(delta) < 0.05) {
       summary.textContent = `${current.toFixed(1)} lb`;
@@ -17581,6 +17610,116 @@ function renderWeightStats() {
     }
   }
 }
+/* The goal weight control under the chart. Three states, because the honest
+   answer is different in each: no goal and nothing logged, where there is
+   nothing to aim from and the row says so and offers nothing; no goal with
+   weigh-ins on file, where it offers to set one; and a goal, where it shows the
+   number, how far there is to go, and a way to change or clear it.
+
+   Only ever drawn for your own chart. A partner's goal is theirs to set, and an
+   edit control on somebody else's number is a bug waiting to be filed. */
+function renderWeightGoalRow(rows) {
+  const el = $("weightGoalRow");
+  if (!el) return;
+  if (PROGRESS_VIEW === "partner") { el.innerHTML = ""; return; }
+  const goal = weightGoalFor(MY_EMAIL);
+  const current = rows.length ? rows[rows.length - 1].weight : null;
+
+  /* A goal can exist and still be withheld: a loss target with no height on
+     file is recorded and not driven toward, which is deliberate everywhere
+     else in the app. This screen is the one that must not hide it. Offering
+     "Set a goal weight" over a number somebody already set would read as the
+     app having lost it, and the next thing they do is set it again. So the
+     withheld case says the number, says it is not being used, and says the one
+     thing that turns it back on. */
+    const held = !goal && (ALL_GOALS || []).find((x) =>
+      (x.email || "").toLowerCase() === (MY_EMAIL || "").toLowerCase()
+      && x.metric === "weight_lb" && x.target_value != null);
+  if (held) {
+    el.innerHTML = `
+      <div class="wt-goal-has wt-goal-held">
+        <span class="wt-goal-num">${icon("target", 15)} Goal <b>${held.target_value.toFixed(1)} lb</b></span>
+        <span class="wt-goal-togo">not being used, add your height in Setup</span>
+        <button type="button" class="wt-goal-edit" id="wtGoalEdit">Change</button>
+      </div>`;
+    $("wtGoalEdit").onclick = () => openWeightGoalEditor(current, held.target_value);
+    return;
+  }
+
+  if (!goal) {
+    el.innerHTML = current
+      ? `<button type="button" class="wt-goal-set" id="wtGoalSet">${icon("target", 15)} <span>Set a goal weight</span></button>`
+      : `<p class="wt-goal-none">Log a weigh-in and you can set a goal to aim at.</p>`;
+    const b = $("wtGoalSet");
+    if (b) b.onclick = () => openWeightGoalEditor(current);
+    return;
+  }
+
+  const target = goal.target_value;
+  const togo = current == null ? null : Math.abs(current - target);
+  const dir = current == null ? "" : target < current ? "to lose" : "to gain";
+  el.innerHTML = `
+    <div class="wt-goal-has">
+      <span class="wt-goal-num">${icon("target", 15)} Goal <b>${target.toFixed(1)} lb</b></span>
+      ${togo == null ? "" : togo < 0.05
+        ? `<span class="wt-goal-togo wt-goal-hit">reached</span>`
+        : `<span class="wt-goal-togo">${togo.toFixed(1)} lb ${dir}</span>`}
+      <button type="button" class="wt-goal-edit" id="wtGoalEdit">Change</button>
+    </div>`;
+  $("wtGoalEdit").onclick = () => openWeightGoalEditor(current, target);
+}
+
+/* One prompt, not a screen. The number is the only thing being asked, the
+   current weight is already known, and a dialog that took over the tab to ask
+   for one figure would be the reason nobody sets one. Clearing is offered in
+   the same breath, because a goal you cannot take back is a goal people avoid
+   setting in the first place. */
+async function openWeightGoalEditor(current, existing = null) {
+  const typed = prompt(
+    existing
+      ? `Goal weight in pounds. You are ${current ? current.toFixed(1) : "?"} now. Leave it empty to clear the goal.`
+      : `Goal weight in pounds. You are ${current ? current.toFixed(1) : "?"} now.`,
+    existing ? String(existing) : "");
+  if (typed === null) return;
+  const text = typed.trim();
+  if (!text) {
+    if (!existing) return;
+    await saveWeightGoal(null, current);
+    return;
+  }
+  const lb = parseFloat(text);
+  if (!Number.isFinite(lb) || lb < 50 || lb > 700) { toast("That is not a weight we can use"); return; }
+  if (current && Math.abs(lb - current) < 0.05) { toast("That is what you weigh now"); return; }
+  await saveWeightGoal(lb, current);
+}
+
+/* Written the way onboarding writes one: retire whatever is active, insert the
+   new row. Same table, same status column, so nothing downstream has to learn
+   that a goal can now arrive from a second place. Clearing retires and inserts
+   nothing, which is what "no goal" has always looked like on this table. */
+async function saveWeightGoal(lb, current) {
+  const retired = await sb.from("user_goals")
+    .update({ status: "replaced" })
+    .eq("email", MY_EMAIL).eq("status", "active");
+  if (retired.error) { console.error("could not retire the old goal", retired.error); toast("Could not save"); return; }
+  if (lb != null) {
+    const row = {
+      email: MY_EMAIL,
+      goal_key: MY_PROFILE?.goal_bubble || MY_GOAL?.goal_key || null,
+      days_per_week: MY_PROFILE?.days_per_week || 4,
+      status: "active",
+      metric: "weight_lb",
+      start_value: current ?? null,
+      target_value: lb,
+    };
+    const { error } = await sb.from("user_goals").insert(row);
+    if (error) { console.error("goal not saved", error); toast("Could not save"); return; }
+  }
+  await loadAll();
+  renderProgressTab?.();
+  toast(lb == null ? "Goal cleared" : "Goal set");
+}
+
 /* The weight goal's hero. On a scale reading this card is the whole answer,
    so it stops being a folded index row under a headline card and becomes the
    one thing at the top: goal, number, target, chart, window, and logging in
