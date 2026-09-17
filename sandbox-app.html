@@ -5297,6 +5297,13 @@
   .lift-lvl { display: flex; gap: 3px; width: 100%; margin: 3px 0 5px; }
   .lift-lvl i { flex: 1; height: 6px; border-radius: 3px; background: var(--border); display: block; overflow: hidden; }
   .lift-lvl i b { display: block; height: 100%; background: var(--accent); }
+  /* The records for the lift on screen. Every class in here already exists and
+     is already used by the lift detail sheet, on purpose: the heaviest set and
+     the best-by-reps grid should read identically wherever they appear, and a
+     second set of styles for the same two facts is how they start disagreeing. */
+  .lift-records { margin-bottom: 12px; }
+  .lift-records .pr-top { margin-bottom: 14px; }
+  .lift-records .pr-wrap:last-child { margin-bottom: 0; }
   /* "Best ever" beside the number, only when it is. */
   .lift-best {
     display: inline-flex; align-items: center; gap: 4px; margin-left: 8px;
@@ -6095,6 +6102,7 @@
         <p class="end-empty hidden" id="liftEmpty"></p>
         <div class="wt-range" id="liftRange"></div>
       </div>
+      <div class="card lift-records hidden" id="liftRecords"></div>
       <div class="prog-tiles end-tiles" id="liftTiles">
         <button type="button" class="prog-tile" id="liftLevel" disabled></button>
         <button type="button" class="prog-tile" id="liftVolume" disabled></button>
@@ -6999,7 +7007,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.26";
+const APP_VERSION = "2026.09.16.27";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -16133,6 +16141,7 @@ function renderLiftHero(on, profile, isPartner) {
     $("liftEmpty").classList.remove("hidden");
     $("liftEmpty").textContent = "Log a weighted set and this becomes your strength line.";
     $("liftRange").innerHTML = "";
+    $("liftRecords").classList.add("hidden");
     $("liftTiles").classList.add("hidden");
     $("liftActions").classList.add("hidden");
     if (liftChart) { liftChart.destroy(); liftChart = null; }
@@ -16217,6 +16226,51 @@ function renderLiftHero(on, profile, isPartner) {
   $("liftRange").querySelectorAll("[data-range]").forEach((b) => {
     b.onclick = () => { LIFT_RANGE = b.dataset.range; again(); };
   });
+
+  /* ---- The records, for the lift on screen ----
+     Mo asked for these back: the best PR in general and the best PR at the most
+     reps. Both were computed months ago and both were reachable only by opening
+     the browser and tapping a lift, which is two taps past the screen that is
+     about exactly this.
+
+     The heaviest set is a FACT and the number at the top of this screen is a
+     FORMULA. They are kept apart and labelled apart for the reason heaviestSet
+     already gives: a card that shows a formula where somebody expects a fact is
+     how a number stops being believed. So the hero says the estimated single
+     and this says what was actually on the bar.
+
+     The grid underneath is "heaviest weight carried to at least that many
+     reps". Its top is max strength and its bottom is strength endurance, and
+     they move independently, which is why it is a row of cells rather than one
+     number. The paragraph explaining that stays in the detail sheet: this
+     screen has earned its place by not making anybody read. */
+  const topSet = typeof heaviestSet === "function" ? heaviestSet(name, pick) : null;
+  /* The 1 rep bucket is "heaviest weight carried to at least one rep", which is
+     the heaviest set, which is the block directly above it. Printing the same
+     number twice on the same card is the thing Mo has pulled us up on more than
+     once, so the single is said once, big and dated, and the grid starts at
+     three. The detail sheet still shows the full table. */
+  const byReps = (typeof repMaxTable === "function" ? repMaxTable(name, pick) : [])
+    .filter((r) => !(topSet && r.target === 1));
+  const rec = $("liftRecords");
+  rec.classList.toggle("hidden", !(topSet || byReps.length));
+  if (topSet || byReps.length) {
+    rec.innerHTML =
+      (topSet ? `<div class="pr-top">
+        <span class="pr-top-k">Heaviest set</span>
+        <span class="pr-top-v">${lb(topSet.weight)} lb <em>x ${topSet.reps}</em></span>
+        <span class="pr-top-d">${escapeHtml(datedLabel(topSet.date))}</span>
+      </div>` : "") +
+      (byReps.length ? `<div class="pr-wrap">
+        <div class="pr-head">Best by reps</div>
+        <div class="pr-grid">
+          ${byReps.map((r) => `<div class="pr-cell">
+            <b>${lb(r.weight)}<i>lb</i></b>
+            <span>${r.target} rep${r.target === 1 ? "" : "s"}</span>
+          </div>`).join("")}
+        </div>
+      </div>` : "");
+  }
 
   /* The level again as a tile, because the column beside the number only
      exists for lifts that have a standard, and the tile is about the person
