@@ -100,7 +100,7 @@ const BARBELL_BENCH_PRESS = {
     { // lockout, bar over the shoulder
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 0, neck: -4, wristR: 0, wristL: 0, shoulderR: 270, shoulderL: 270, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 30, shoulderRotL: -30 },
+      joints: { spine: 0, neck: -4, wristR: 0, wristL: 0, shoulderR: 269, shoulderL: 269, shoulderAbdR: 13, shoulderAbdL: 13, elbowR: 0, elbowL: 0, shoulderRotR: -1, shoulderRotL: 1 },
       ik: {
         ankleR: { x: 108, y: 113.4, bend: -1 }, ankleL: { x: 112, y: 113.4, bend: -1 },
       },
@@ -108,7 +108,7 @@ const BARBELL_BENCH_PRESS = {
     { // halfway, a waypoint not a stop: elbow out toward the feet, bell on its line
       t: 0.5, through: true,
       root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 2, neck: -6, wristR: 0, wristL: 0, shoulderR: 205, shoulderL: 205, shoulderAbdR: 59, shoulderAbdL: 59, elbowR: 103, elbowL: 103, shoulderRotR: -10, shoulderRotL: 10 },
+      joints: { spine: 2, neck: -6, wristR: 0, wristL: 0, shoulderR: 180, shoulderL: 180, shoulderAbdR: 47, shoulderAbdL: 47, elbowR: 110, elbowL: 110, shoulderRotR: 13, shoulderRotL: -13 },
       ik: {
         ankleR: { x: 108, y: 113.4, bend: -1 }, ankleL: { x: 112, y: 113.4, bend: -1 },
       },
@@ -116,7 +116,7 @@ const BARBELL_BENCH_PRESS = {
     { // bar touching mid-chest, elbows toward the feet rather than square out
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 2, neck: -6, wristR: 0, wristL: 0, shoulderR: 113, shoulderL: 113, shoulderAbdR: 56, shoulderAbdL: 56, elbowR: 78, elbowL: 78, shoulderRotR: 60, shoulderRotL: -60 },
+      joints: { spine: 2, neck: -6, wristR: 0, wristL: 0, shoulderR: 161, shoulderL: 161, shoulderAbdR: 40, shoulderAbdL: 40, elbowR: 110, elbowL: 110, shoulderRotR: 41, shoulderRotL: -41 },
       ik: {
         ankleR: { x: 108, y: 113.4, bend: -1 }, ankleL: { x: 112, y: 113.4, bend: -1 },
       },
