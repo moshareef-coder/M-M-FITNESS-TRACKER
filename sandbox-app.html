@@ -2400,26 +2400,31 @@
      throughout, because this one sits on the dashboard among cards rather than
      on the session's dark stage, and a fixed white block among them would read
      as a notification. */
+  /* His own box, which is what Mo asked for, so the card IS the bubble. The
+     first cut had a bubble inside a card: two borders and two paddings around
+     one sentence, which is the nested card he has pulled us up on before.
+     
+     And the art is the real thing now. scripts/render-bot-web.py freezes the
+     app's own rig and crops the same head and shoulders the widget uses, so the
+     robot on the dashboard, the robot in the widget and the figure in a session
+     are one character. The hand drawn icon that was here first was a rectangle
+     with two dots, which is exactly what render-bot-faces.py says was tried in
+     SwiftUI and rejected. */
   .home-quip-slot:empty { display: none; }
-  .home-quip-slot { margin: -4px 0 14px; }
+  .home-quip-slot { margin: 0 0 14px; }
   .home-quip {
-    display: flex; align-items: flex-start; gap: 10px; width: 100%;
-    padding: 0; border: 0; background: none; font-family: inherit; text-align: left;
-    cursor: pointer; animation: quipIn .34s cubic-bezier(.22,1,.36,1) both;
+    display: flex; align-items: center; gap: 13px; width: 100%;
+    padding: 13px 15px; border-radius: var(--radius);
+    background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow-card);
+    font-family: inherit; text-align: left; cursor: pointer;
+    animation: quipIn .34s cubic-bezier(.22,1,.36,1) both;
   }
   .home-quip-av {
-    flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    background: color-mix(in srgb, var(--accent) 14%, var(--panel));
-    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-    color: var(--accent-ink);
+    flex-shrink: 0; width: 52px; height: 52px; border-radius: 14px;
+    display: block; object-fit: contain;
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel-2));
   }
-  .home-quip-bub {
-    min-width: 0; flex: 1 1 auto;
-    background: var(--panel); border: 1px solid var(--border);
-    border-radius: 5px 16px 16px 16px; padding: 9px 13px 10px;
-    box-shadow: var(--shadow-card);
-  }
+  .home-quip-bub { min-width: 0; flex: 1 1 auto; }
   .home-quip-line {
     display: block; font-size: 13.5px; font-weight: 600; line-height: 1.38;
     letter-spacing: -.01em; color: var(--text);
@@ -7204,7 +7209,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.17.6";
+const APP_VERSION = "2026.09.17.7";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -7382,7 +7387,6 @@ const ICON_PATHS = {
   dumbbell: '<path d="M4 10v4M20 10v4M2 12h2M20 12h2M6 8v8M18 8v8M9 12h6"/>',
   bolt: '<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/>',
   run: '<circle cx="14" cy="4.5" r="1.8"/><path d="M9 20l3-4 2 2-1.5 3M6 12l3-2 3 1 2-3 4 1M8 9l-2 2 1 3"/>',
-  robot: '<rect x="4" y="7" width="16" height="12" rx="4"/><path d="M12 7V4M9.5 4h5"/><circle cx="9.3" cy="12.4" r="1.15" fill="currentColor" stroke="none"/><circle cx="14.7" cy="12.4" r="1.15" fill="currentColor" stroke="none"/><path d="M9.8 15.8h4.4"/>',
   walk: '<circle cx="13" cy="4.3" r="1.8"/><path d="M10 21l2.4-5.2-2-2.3 1-4.5M13 9l3 2 1.6 3M10.4 9.5 8 11l-.8 3"/>',
   bike: '<circle cx="5.5" cy="17" r="3.4"/><circle cx="18.5" cy="17" r="3.4"/><path d="M5.5 17l4-7h5l-3.5 7h7.5M13.5 10 12 6.6h-2.4M14.8 6.6h2.2"/>',
   check: '<path d="M4 12l5 5 11-11"/>',
@@ -13701,9 +13705,14 @@ function renderHero(animate = false) {
       </div>
       ${badge}
     </div>
-    ${cta}
     ${stand}
-    ${effortRow}`;
+    ${effortRow}
+    ${/* Mo: "start today's plan will be below the rings." The button used to sit
+          directly under the title, which put the thing you press above the thing
+          it is for. The rings and the effort line are the week; the button is
+          what you do about it, so it closes the card and sits directly above
+          him. */ ""}
+    ${cta}`;
   hydrateAvatars(el);
 
   /* Two frames, not one: the browser has to have painted the empty ring
@@ -21005,7 +21014,7 @@ function sayHomeQuip() {
   el.type = "button";
   el.className = "home-quip";
   el.innerHTML = `
-    <span class="home-quip-av" aria-hidden="true">${icon("robot", 19)}</span>
+    <img class="home-quip-av" src="/bot/bot-neutral.png" alt="" aria-hidden="true" width="52" height="52" decoding="async" />
     <span class="home-quip-bub">
       <span class="home-quip-line"><span class="home-quip-txt"></span><i class="home-quip-cur"></i></span>
     </span>`;
