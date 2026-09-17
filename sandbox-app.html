@@ -5352,6 +5352,66 @@
   .lift-chip.on { background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-card); }
   .lift-chip:active { transform: scale(.97); }
   .lift-records { margin-bottom: 12px; }
+
+  /* ---- A cardio or class session ----
+     Three states on one surface. The research was unanimous on the middle one:
+     Oura's indoor run is the elapsed time and a Pause, and that is the whole
+     screen. Nothing here paints a map, because this app records no GPS, and
+     nothing here shows a heart rate, because it cannot see one. */
+  .csn-scrim {
+    position: fixed; inset: 0; z-index: 2400; background: var(--bg);
+    display: flex; flex-direction: column;
+    padding: calc(18px + env(safe-area-inset-top, 0px)) 18px calc(18px + env(safe-area-inset-bottom, 0px));
+    overscroll-behavior: contain;
+  }
+  .csn-stage { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; }
+  .csn-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+  .csn-head h2 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.02em; text-transform: none; color: var(--text); }
+  .csn-x {
+    width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+  }
+  /* The picker. Two across, so a label never has to shrink to fit. */
+  .csn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+  .csn-act {
+    display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 12px 14px;
+    border-radius: 14px; cursor: pointer; text-align: left; font: inherit;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    font-size: 15px; font-weight: 700;
+  }
+  .csn-act svg { color: var(--muted); flex-shrink: 0; }
+  .csn-act.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
+  .csn-act.on svg { color: var(--accent-ink); }
+  .csn-act:active { transform: scale(.985); }
+  /* How long. A number you can read across the room, and two ways to change it:
+     the steppers for a nudge and the presets for the usual answers. */
+  .csn-dur { text-align: center; margin-bottom: 22px; }
+  .csn-dur-k { font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+  .csn-dur-row { display: flex; align-items: center; justify-content: center; gap: 20px; margin: 8px 0 14px; }
+  .csn-dur-v { font-family: var(--font-display); font-size: 52px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .csn-dur-v i { font-style: normal; font-size: 17px; font-weight: 600; color: var(--muted); margin-left: 5px; }
+  .csn-presets { display: flex; gap: 8px; justify-content: center; }
+  .csn-preset {
+    min-height: 34px; padding: 7px 15px; border-radius: 100px; cursor: pointer; font: inherit;
+    font-size: 13px; font-weight: 700;
+    background: var(--panel-2); border: 1px solid transparent; color: var(--muted);
+  }
+  .csn-preset.on { background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-card); }
+  /* The running state. */
+  .csn-live { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+  .csn-live-k { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .csn-time {
+    font-family: var(--font-display); font-size: 68px; font-weight: 800; letter-spacing: -.035em;
+    font-variant-numeric: tabular-nums; line-height: 1.05;
+  }
+  .csn-of { font-size: 14px; color: var(--muted); }
+  .csn-bar { width: 100%; max-width: 280px; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; margin-top: 16px; }
+  .csn-bar b { display: block; height: 100%; background: var(--accent); transition: width .4s linear; }
+  .csn-paused { font-size: 13px; font-weight: 700; color: var(--up); letter-spacing: .06em; text-transform: uppercase; }
+  .csn-foot { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+  .csn-field { margin-bottom: 18px; }
+  @media (prefers-reduced-motion: reduce) { .csn-bar b { transition: none; } }
   .lift-records .pr-top { margin-bottom: 14px; }
   .lift-records .pr-wrap:last-child { margin-bottom: 0; }
   /* "Best ever" beside the number, only when it is. */
@@ -6914,6 +6974,14 @@
     <div class="gen-stage" id="genStage"></div>
   </div>
 
+  <!-- Cardio and class sessions: setup, the running timer, and the save.
+       One full screen surface for all three because the middle state needs the
+       whole screen and the other two are a beat either side of it. Filled by
+       renderCardioStage(). -->
+  <div class="csn-scrim hidden" id="csnScrim">
+    <div class="csn-stage" id="csnStage"></div>
+  </div>
+
   <div class="clip-scrim hidden" id="clipRecScrim">
     <div class="clip-stage" id="clipRecStage"></div>
   </div>
@@ -7056,7 +7124,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.17.3";
+const APP_VERSION = "2026.09.17.4";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -7082,6 +7150,59 @@ let PENDING_INVITE = (() => {
 function clearPendingInvite() {
   PENDING_INVITE = null;
   try { sessionStorage.removeItem(PENDING_INVITE_KEY); } catch { /* nothing to clear */ }
+}
+
+/* One time invite links.
+
+   The six character code above is a different thing and both are kept. A code
+   is for somebody standing next to you; a link is for somebody who is not, and
+   it is the one that survives being sent through a text message.
+
+   The token is held in localStorage rather than sessionStorage, which is the
+   whole difference in lifetime that matters here: a link is opened by somebody
+   who does not have an account yet, and signing up takes them out to a
+   confirmation email and back. sessionStorage does not survive that trip on
+   every browser, and on a fresh install there is no session to store it in
+   anyway. */
+const INVITE_LINK_BASE = `${PUBLIC_SITE}/j/`;
+const PENDING_TOKEN_KEY = "ft_pending_invite_token";
+
+/* Accepts the link, the clipboard's "unio:" form, or a bare token, because all
+   three reach this from somewhere: the address bar, the landing page's copy
+   button, and a person pasting whatever they had. */
+function inviteTokenFrom(text) {
+  const s = String(text || "").trim();
+  if (!s) return null;
+  const m = s.match(/(?:\/j\/|[?&]j=|^unio:)([A-Za-z0-9_-]{16,64})/) || s.match(/^([A-Za-z0-9_-]{22})$/);
+  return m ? m[1] : null;
+}
+
+let PENDING_TOKEN = (() => {
+  let tok = null;
+  try {
+    tok = inviteTokenFrom(location.pathname) || inviteTokenFrom(location.search);
+    if (tok) {
+      localStorage.setItem(PENDING_TOKEN_KEY, tok);
+      // Out of the address bar, so a reload or a copied URL is not a second
+      // claim attempt on a token that has already been spent.
+      history.replaceState(null, "", "/");
+    } else {
+      tok = localStorage.getItem(PENDING_TOKEN_KEY);
+    }
+  } catch { /* private mode, or no history API */ }
+  return tok;
+})();
+
+function holdInviteToken(tok) {
+  if (!tok) return false;
+  PENDING_TOKEN = tok;
+  try { localStorage.setItem(PENDING_TOKEN_KEY, tok); } catch { /* private mode */ }
+  return true;
+}
+
+function clearInviteToken() {
+  PENDING_TOKEN = null;
+  try { localStorage.removeItem(PENDING_TOKEN_KEY); } catch { /* nothing to clear */ }
 }
 
 /* Choosing to train alone is answered once and remembered, so nobody gets the
@@ -7346,6 +7467,23 @@ function registerAuthDeepLink() {
   if (!isNativeApp()) return;
   registerResumeDrain();
   window.Capacitor.Plugins.App.addListener("appUrlOpen", async ({ url }) => {
+    /* An invite link arrives down this same pipe, as a Universal Link rather
+       than the custom scheme, so it is checked before the auth prefix test
+       below sends everything that is not auth away.
+
+       Claimed here only if there is already a session. If there is not, holding
+       it is the whole job: the sign in screen is what comes next and
+       checkPartnershipThenEnter claims it on the way through. */
+    const invite = url && inviteTokenFrom(url);
+    if (invite) {
+      holdInviteToken(invite);
+      const { data } = await sb.auth.getSession();
+      if (data && data.session) {
+        await claimHeldInviteToken();
+        await checkPartnershipThenEnter();
+      }
+      return;
+    }
     if (!url || url.indexOf(AUTH_DEEP_LINK) !== 0) return;
     try { await window.Capacitor.Plugins.Browser.close(); } catch {}
     try {
@@ -8353,15 +8491,18 @@ function renderCodeScreen() {
   ob.innerHTML = `
     <div class="ob-step">
       <h1>Pair with your partner</h1>
-      <p class="sub">Share your code, or enter theirs.</p>
+      <p class="sub">Send them a link. It works once, and only for them.</p>
+
+      <button class="btn-primary" id="shareLinkBtn">Send an invite</button>
+      <button type="button" class="btn-ghost" id="pasteLinkBtn">I was sent a link</button>
+
+      <div class="code-divider"><span>or use a code</span></div>
 
       <div class="code-display">
         <div class="code-label">Your code</div>
         <div class="code-value" id="myInviteCode">${myCode ? escapeHtml(myCode) : "Not ready yet"}</div>
         <button type="button" class="btn-secondary" id="shareCodeBtn" style="margin-top:10px;" ${myCode ? "" : "disabled"}>Share my code</button>
       </div>
-
-      <div class="code-divider"><span>or</span></div>
 
       <input id="partnerCodeInput" type="text" placeholder="Enter partner's code" maxlength="6"
              autocapitalize="characters" autocomplete="off" spellcheck="false" class="code-input"
@@ -8370,6 +8511,8 @@ function renderCodeScreen() {
       <button class="btn-ghost" id="backToSetup">Back</button>
     </div>`;
 
+  $("shareLinkBtn").onclick = (e) => shareInviteLink(e.currentTarget);
+  $("pasteLinkBtn").onclick = () => pasteInviteLink();
   $("shareCodeBtn").onclick = async () => {
     /* No profile gets a real invite_code from the client; it has to come from
        a server-side default/trigger on insert (see owner note). Guard rather
@@ -8514,6 +8657,114 @@ They asked you to keep them honest. The app does not celebrate when only one of 
 
 Nothing to install, it opens in your browser:
 ${location.origin}/?invite=${code}`;
+}
+
+/* ---------- One time invite links ---------- */
+
+/* The share half. Asks the server for a fresh token, builds the link and hands
+   it to the OS share sheet, so it lands in whichever app they were going to
+   send it through anyway.
+
+   Every tap mints a new token and revokes the previous unclaimed one, which is
+   deliberate: somebody who shares twice has changed their mind about how to
+   send one invitation, not issued two, and a link they believe is dead should
+   be dead. */
+async function shareInviteLink(btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const { data: res, error } = await sb.rpc("create_invite_link");
+    /* The real reason, on screen. "You already have a partner" and "the network
+       is down" send somebody to two completely different places, and one toast
+       covering both sends them to neither. */
+    if (error) { toast(error.message || "Could not create an invite link"); return false; }
+    if (!res || !res.ok) { toast((res && res.error) || "Could not create an invite link"); return false; }
+
+    const url = INVITE_LINK_BASE + res.token;
+    const who = MY_PROFILE?.user_name || ME || "Someone";
+    /* The code rides along with the link rather than replacing it, because the
+       two cover different halves of the same journey. The link pairs them in
+       one tap if they already have Unio. If they do not, it sends them to the
+       App Store and nothing about which link it was survives the install, so
+       the code is what they still have in their hand afterwards. */
+    const code = MY_PROFILE?.invite_code;
+    const text = code
+      ? `${who} wants to train with you on Unio.\n\nTap the link. If you do not have the app yet it will take you to the App Store, and you can pair with the code ${code} once you are in.`
+      : `${who} wants to train with you on Unio. This link is for you and works once.`;
+
+    try {
+      if (navigator.share) { await navigator.share({ title: "Unio", text, url }); return true; }
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      toast("Invite link copied");
+      return true;
+    } catch {
+      /* Dismissing the share sheet throws the same way a failure does, and it
+         is not a failure. The token stays live either way, so there is nothing
+         to clean up and nothing to apologise for. */
+      return false;
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+/* The claim half. Runs on the way into the app, once there is a session.
+
+   Silent when there is no token, which is nearly every launch. Loud only when a
+   token was actually held and the server refused it, because that is somebody
+   standing there having tapped a link that did nothing. */
+async function claimHeldInviteToken() {
+  const tok = PENDING_TOKEN;
+  if (!tok) return false;
+
+  const { data: res, error } = await sb.rpc("claim_invite_link", { p_token: tok });
+
+  if (error) {
+    /* Kept, not cleared. The request never reached the server, so the invite is
+       very likely still good and dropping it here would lose it for good. */
+    console.error("could not claim invite link", error);
+    toast("Could not open that invite. Check your connection.");
+    return false;
+  }
+
+  clearInviteToken();
+
+  if (!res || !res.ok) {
+    toast((res && res.error) || "That invite is no longer active");
+    return false;
+  }
+
+  clearSolo();
+  clearPendingInvite();
+  toast(`You are paired with ${res.partner_name}`);
+  return true;
+}
+
+/* The deferred case, which is the one iOS gives no clean answer to.
+
+   A link tapped on a phone without the app installed goes to the App Store, and
+   nothing about which link it was survives the install. Universal Links solve
+   the other case and not this one. So the landing page puts the token on the
+   clipboard and this reads it back.
+
+   Behind an explicit tap on purpose. Reading the clipboard unprompted makes
+   iOS show "pasted from Safari" over an app the person has had open for two
+   seconds, which reads as the app going through their things. A button they
+   pressed makes the same paste obviously theirs. */
+async function pasteInviteLink() {
+  let text = "";
+  try {
+    text = await navigator.clipboard.readText();
+  } catch {
+    toast("Paste the link into the code box instead");
+    return false;
+  }
+  const tok = inviteTokenFrom(text);
+  if (!tok) { toast("That does not look like an invite link"); return false; }
+  holdInviteToken(tok);
+  return claimHeldInviteToken().then(async (ok) => {
+    if (ok) await checkPartnershipThenEnter();
+    return ok;
+  });
 }
 
 /* Nothing is written to the DB until Start, same as the workout builder's
@@ -10810,7 +11061,7 @@ async function reconcileNativeSurfaces() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "liftsScrim", "reportScrim", "measureScrim", "cardioScrim"]
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "liftsScrim", "reportScrim", "measureScrim", "cardioScrim", "csnScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
   stopGenTicker();
   $("genScrim")?.classList.add("hidden");
@@ -16691,6 +16942,292 @@ function goalLineChart(canvasId, series, isPartner, unit, live) {
   });
 }
 
+/* ---- A cardio or class session ----
+
+   Mo: "when you come over to the workout, you can either generate a workout or
+   you can begin cardio, and then you're going to pick either cycling or this or
+   Pilates." A third card on the choose screen opens this; generate keeps
+   meaning one thing.
+
+   The shape is what the whole category converged on and the research was
+   unanimous about the middle of it: pick the thing, say how long, press go,
+   and then the screen is the elapsed time and a way to stop. Oura's indoor run
+   is exactly that and nothing else. No map, because this app records no GPS,
+   and no heart rate, because it cannot see one. Drawing either would be a
+   picture of data that does not exist.
+
+   Time is kept as timestamps, never as a counter that gets incremented. A
+   phone sleeps, a tab is backgrounded and a setInterval stops being called;
+   anything counting ticks comes back minutes short and the person who ran for
+   half an hour is told they ran for eleven minutes. The interval here only
+   repaints.
+
+   And the whole thing is written to localStorage on every change, so closing
+   the app mid-run and coming back finds the session still going rather than
+   gone. That is the failure people never forgive. */
+const CARDIO_ACTS = [
+  { key: "run",     label: "Run",     ico: "run",      dist: true },
+  { key: "walk",    label: "Walk",    ico: "walk",     dist: true },
+  { key: "cycle",   label: "Cycle",   ico: "bike",     dist: true },
+  { key: "row",     label: "Row",     ico: "dumbbell", dist: true },
+  { key: "pilates", label: "Pilates", ico: "star",     dist: false },
+  { key: "yoga",    label: "Yoga",    ico: "heart",    dist: false },
+  { key: "hiit",    label: "HIIT",    ico: "bolt",     dist: false },
+  { key: "other",   label: "Other",   ico: "clock",    dist: false },
+];
+const CSN_KEY = "ft_cardio_session";
+const CSN_PRESETS = [15, 30, 45, 60];
+let CARDIO_SES = null;
+let csnTick = null;
+
+function csnSave() {
+  try {
+    if (CARDIO_SES) localStorage.setItem(CSN_KEY, JSON.stringify(CARDIO_SES));
+    else localStorage.removeItem(CSN_KEY);
+  } catch { /* private browsing */ }
+}
+
+/* Elapsed from timestamps. `accum` is what earlier running stretches added up
+   to, `since` is when the current one started, null while paused. */
+function csnElapsedMs() {
+  if (!CARDIO_SES) return 0;
+  const running = CARDIO_SES.since ? Date.now() - CARDIO_SES.since : 0;
+  return Math.max(0, (CARDIO_SES.accum || 0) + running);
+}
+
+function csnClock(ms) {
+  const total = Math.floor(ms / 1000);
+  const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), sec = total % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  return h ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+}
+
+function csnAct() {
+  return CARDIO_ACTS.find((a) => a.key === CARDIO_SES?.act) || CARDIO_ACTS[0];
+}
+
+function openCardioSession(state) {
+  if (!CARDIO_SES) CARDIO_SES = { state: state || "setup", act: "run", minutes: 30, accum: 0, since: null };
+  csnSave();
+  $("csnScrim").classList.remove("hidden");
+  renderCardioStage();
+  pinSheets();
+}
+
+function closeCardioSession() {
+  clearInterval(csnTick); csnTick = null;
+  $("csnScrim").classList.add("hidden");
+  pinSheets();
+}
+
+/* Leaving setup throws the session away; leaving a running one only hides it,
+   because the clock is still the truth and the person is still running. */
+function csnDismiss() {
+  if (CARDIO_SES?.state === "setup") { CARDIO_SES = null; csnSave(); }
+  closeCardioSession();
+}
+
+function renderCardioStage() {
+  const stage = $("csnStage");
+  if (!stage || !CARDIO_SES) return;
+  const a = csnAct();
+  clearInterval(csnTick); csnTick = null;
+
+  if (CARDIO_SES.state === "setup") {
+    stage.innerHTML = `
+      <div class="csn-head">
+        <h2>Start an activity</h2>
+        <button type="button" class="csn-x" id="csnX" aria-label="Close">${icon("close", 18)}</button>
+      </div>
+      <div class="csn-grid">
+        ${CARDIO_ACTS.map((x) => `<button type="button" class="csn-act${x.key === a.key ? " on" : ""}" data-act="${x.key}">
+          ${icon(x.ico, 19)}<span>${escapeHtml(x.label)}</span>
+        </button>`).join("")}
+      </div>
+      <div class="csn-dur">
+        <div class="csn-dur-k">How long</div>
+        <div class="csn-dur-row">
+          <button type="button" class="round-btn" data-step="-5" aria-label="Five minutes less">&minus;</button>
+          <div class="csn-dur-v">${CARDIO_SES.minutes}<i>min</i></div>
+          <button type="button" class="round-btn" data-step="5" aria-label="Five minutes more">+</button>
+        </div>
+        <div class="csn-presets">
+          ${CSN_PRESETS.map((m) => `<button type="button" class="csn-preset${m === CARDIO_SES.minutes ? " on" : ""}" data-preset="${m}">${m}</button>`).join("")}
+        </div>
+      </div>
+      <div class="csn-foot">
+        <button type="button" class="btn-primary" id="csnGo">${icon("play", 18)} Begin ${escapeHtml(a.label.toLowerCase())}</button>
+      </div>`;
+    $("csnX").onclick = csnDismiss;
+    stage.querySelectorAll("[data-act]").forEach((b) => {
+      b.onclick = () => { CARDIO_SES.act = b.dataset.act; csnSave(); renderCardioStage(); };
+    });
+    stage.querySelectorAll("[data-step]").forEach((b) => {
+      b.onclick = () => {
+        CARDIO_SES.minutes = Math.min(180, Math.max(5, CARDIO_SES.minutes + Number(b.dataset.step)));
+        csnSave(); renderCardioStage();
+      };
+    });
+    stage.querySelectorAll("[data-preset]").forEach((b) => {
+      b.onclick = () => { CARDIO_SES.minutes = Number(b.dataset.preset); csnSave(); renderCardioStage(); };
+    });
+    $("csnGo").onclick = () => {
+      CARDIO_SES.state = "live";
+      CARDIO_SES.since = Date.now();
+      CARDIO_SES.startedAt = new Date().toISOString();
+      CARDIO_SES.date = todayStr();
+      csnSave();
+      renderCardioStage();
+    };
+    return;
+  }
+
+  if (CARDIO_SES.state === "live") {
+    const paused = !CARDIO_SES.since;
+    stage.innerHTML = `
+      <div class="csn-head">
+        <h2>${escapeHtml(a.label)}</h2>
+        <button type="button" class="csn-x" id="csnX" aria-label="Hide">${icon("chevronLeft", 18)}</button>
+      </div>
+      <div class="csn-live">
+        <div class="csn-live-k">${paused ? "&nbsp;" : "Elapsed"}</div>
+        <div class="csn-time" id="csnTime">${csnClock(csnElapsedMs())}</div>
+        <div class="csn-of" id="csnOf"></div>
+        ${paused ? `<div class="csn-paused">Paused</div>` : ""}
+        <div class="csn-bar"><b id="csnBar" style="width:0%"></b></div>
+      </div>
+      <div class="csn-foot">
+        <button type="button" class="btn-primary" id="csnPause">${paused ? `${icon("play", 18)} Resume` : `${icon("pause", 18)} Pause`}</button>
+        <button type="button" class="btn-secondary" id="csnEnd">End</button>
+      </div>`;
+    $("csnX").onclick = closeCardioSession;
+    $("csnPause").onclick = () => {
+      if (CARDIO_SES.since) { CARDIO_SES.accum = csnElapsedMs(); CARDIO_SES.since = null; }
+      else CARDIO_SES.since = Date.now();
+      csnSave(); renderCardioStage();
+    };
+    $("csnEnd").onclick = () => {
+      CARDIO_SES.accum = csnElapsedMs();
+      CARDIO_SES.since = null;
+      CARDIO_SES.state = "done";
+      csnSave(); renderCardioStage();
+    };
+    const paint = () => {
+      const ms = csnElapsedMs();
+      const t = $("csnTime"); if (!t) { clearInterval(csnTick); csnTick = null; return; }
+      t.textContent = csnClock(ms);
+      const target = (CARDIO_SES.minutes || 0) * 60000;
+      const pct = target > 0 ? Math.min(100, (ms / target) * 100) : 0;
+      const bar = $("csnBar"); if (bar) bar.style.width = `${pct}%`;
+      const of = $("csnOf");
+      if (of) of.textContent = target > 0
+        ? (ms >= target ? `past your ${CARDIO_SES.minutes} min` : `of ${CARDIO_SES.minutes} min`)
+        : "";
+    };
+    paint();
+    if (!paused) csnTick = setInterval(paint, 500);
+    return;
+  }
+
+  /* Done. The minutes are what was actually elapsed, rounded, not what was
+     asked for at the start: somebody who set 30 and ran 22 ran 22. */
+  const mins = Math.max(1, Math.round(csnElapsedMs() / 60000));
+  stage.innerHTML = `
+    <div class="csn-head">
+      <h2>Nice work</h2>
+      <button type="button" class="csn-x" id="csnX" aria-label="Back">${icon("chevronLeft", 18)}</button>
+    </div>
+    <div class="csn-live" style="justify-content:flex-start;gap:4px">
+      <div class="csn-live-k">${escapeHtml(a.label)}</div>
+      <div class="csn-time">${mins}<i style="font-size:20px;font-weight:600;color:var(--muted);margin-left:6px;font-style:normal">min</i></div>
+    </div>
+    ${a.dist ? `<div class="csn-field">
+      <div class="wt-log-head">Distance, if you know it</div>
+      <div class="weigh-row">
+        <div class="weigh-field">
+          <input type="number" class="waist-input" id="csnMiles" inputmode="decimal" step="0.1" min="0"
+                 placeholder="0.0" autocomplete="off" aria-label="Distance in miles" value="" />
+          <span class="weigh-unit">mi</span>
+        </div>
+      </div>
+    </div>` : ""}
+    <div class="csn-foot">
+      <button type="button" class="btn-primary" id="csnSave">Save it</button>
+      <button type="button" class="btn-secondary" id="csnBin">Discard</button>
+    </div>`;
+  $("csnX").onclick = () => { CARDIO_SES.state = "live"; CARDIO_SES.since = Date.now(); csnSave(); renderCardioStage(); };
+  $("csnSave").onclick = () => saveCardioSession(mins);
+  $("csnBin").onclick = () => {
+    if (!confirm("Throw this session away?")) return;
+    CARDIO_SES = null; csnSave(); closeCardioSession();
+  };
+}
+
+async function saveCardioSession(mins) {
+  const a = csnAct();
+  const raw = a.dist ? parseFloat($("csnMiles")?.value) : NaN;
+  const miles = Number.isFinite(raw) && raw > 0 ? raw : null;
+  const payload = {
+    user_name: ME, email: MY_EMAIL, entry_date: CARDIO_SES?.date || todayStr(),
+    exercise_name: a.label, sets: 1, duration_min: mins, distance_mi: miles,
+  };
+  const btn = $("csnSave");
+  if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
+
+  let ok = false;
+  if (navigator.onLine) {
+    let { error } = await sb.from("exercise_logs").insert(payload);
+    /* distance_mi is behind 20260916_cardio_distance.sql. The minutes are the
+       session; losing them over a column that is not there yet would be the
+       worst possible trade. */
+    if (error && (String(error.code || "") === "PGRST204" || /distance_mi/.test(String(error.message || "")))) {
+      const { distance_mi, ...noDistance } = payload;
+      const retry = await sb.from("exercise_logs").insert(noDistance);
+      error = retry.error;
+      if (!error) toast("Saved. Distance is not switched on yet.");
+    }
+    ok = !error;
+    if (error && !isRetryable(error)) {
+      toast(`Couldn't save. ${error.message ? String(error.message).slice(0, 80) : "Please try again."}`);
+      if (btn) { btn.disabled = false; btn.textContent = "Save it"; }
+      return;
+    }
+  }
+  if (!ok) {
+    const landed = await safeWrite("exercise_logs", "insert", payload);
+    if (!landed) applyLocally("exercise_logs", payload);
+    ok = true;
+    toast("Saved offline");
+  }
+
+  /* A finished session is a workout day, through the one function allowed to
+     say so. A Pilates class counts toward the week the same as a lift does. */
+  if (typeof markGymDayDone === "function") await markGymDayDone();
+  CARDIO_SES = null; csnSave();
+  closeCardioSession();
+  await loadAll();
+  renderWorkoutTab();
+  if (typeof renderProgressTab === "function") renderProgressTab();
+  toast(`${a.label} logged`);
+}
+
+/* A session that was running when the app was closed. Loaded into memory and
+   NOT put on screen, which is the rule resumeSessionIfAny already sets out for
+   the strength one: a full screen overlay that appears because a tab was
+   visited traps somebody behind a thing they did not open, and it hides the
+   nav while it does it. The card on the Workout tab offers it back instead.
+
+   The clock does not need restarting, only reading: it is timestamps, so the
+   minutes kept accruing while the app was shut. */
+function restoreCardioSession() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(CSN_KEY) || "null"); } catch { return; }
+  if (!saved || saved.state === "setup") return;
+  /* Yesterday's forgotten session is not today's workout. */
+  if (saved.date && saved.date !== todayStr()) { try { localStorage.removeItem(CSN_KEY); } catch {} return; }
+  CARDIO_SES = saved;
+}
+
 /* ---- Build endurance: the cardio screen ----
 
    Run, Walk and Cycle, one at a time, over a line of weekly distance with the
@@ -16782,6 +17319,18 @@ function cardioTargetBand(buckets) {
 
 /* Minutes across ALL three activities, because the tile says cardio and not
    running: a week of cycling is not a week off. */
+/* Everything started from the activity sheet counts as cardio minutes, not
+   only the three that have a distance line. A 45 minute HIIT session or a
+   Pilates class is not a week off, and the tile says "cardio minutes" rather
+   than "running minutes". cardioActivityOf stays narrow because it decides
+   which CHIP a log belongs under, and there is no Pilates chip. */
+function countsAsCardio(exerciseName) {
+  if (cardioActivityOf(exerciseName)) return true;
+  const n = (exerciseName || "").trim().toLowerCase();
+  return typeof CARDIO_ACTS !== "undefined"
+    && CARDIO_ACTS.some((a) => a.label.toLowerCase() === n);
+}
+
 function cardioMinutesInWeek(name, weekStart) {
   const end = new Date(weekStart + "T00:00:00");
   end.setDate(end.getDate() + 7);
@@ -16790,7 +17339,7 @@ function cardioMinutesInWeek(name, weekStart) {
   for (const l of ALL_EXERCISE_LOGS) {
     if (l.user_name !== name || !l.entry_date) continue;
     if (l.entry_date < weekStart || l.entry_date >= stop) continue;
-    if (!cardioActivityOf(l.exercise_name)) continue;
+    if (!countsAsCardio(l.exercise_name)) continue;
     m += Number(l.duration_min) || 0;
   }
   return m;
@@ -22604,6 +23153,7 @@ function closeAllWorkouts() { $("allWorkoutsScrim").classList.add("hidden"); }
 function renderWorkoutTab({ respectMode = false } = {}) {
   renderFab();
   resumeSessionIfAny();          // loads a saved session, does not take over
+  restoreCardioSession();        // and the same for a run left going
   if (SESSION) FRESH_PLAN_ID = null;   // once it is being lifted it is not untouched any more
   $("workoutContent").classList.remove("hidden");
 
@@ -23357,7 +23907,17 @@ function renderChooseScreen() {
     ${optionCard("choosePlanBtn", "pencil",
         coached ? "Log a workout" : "I'll plan my own",
         coached ? "Record the session your coach set." : "Start from scratch and add your own exercises.",
-        coached)}`;
+        coached)}
+    ${/* Not everything is a lift. Mo asked for this one: pick the thing, say how
+          long, press go. It sits beside the other two rather than replacing
+          them, so "generate" keeps meaning one thing. */ ""}
+    ${/* A session left running says so, with the clock on it, because the
+          alternative is offering to start a second one on top of it. */ ""}
+    ${CARDIO_SES && CARDIO_SES.state !== "setup"
+      ? optionCard("chooseActivityBtn", "play", `Resume ${csnAct().label.toLowerCase()}`,
+          `Running for ${csnClock(csnElapsedMs())}.`, false)
+      : optionCard("chooseActivityBtn", "run", "Start an activity",
+          "Run, cycle, Pilates, and the rest.", false)}`;
 
   const preview = coached ? "" : `
     <div class="spp">
@@ -23446,6 +24006,9 @@ function renderChooseScreen() {
   if ($("chooseGenerateBtn")) $("chooseGenerateBtn").onclick = () => generateWorkout(null, { keepFocus: p.ask || null });
   if ($("chooseBeginBtn")) $("chooseBeginBtn").onclick = startWorkout;
   $("choosePlanBtn").onclick = toManual;
+  /* Guarded: a coached client has no plan buttons, so this card is not there. */
+  const actBtn = $("chooseActivityBtn");
+  if (actBtn) actBtn.onclick = () => openCardioSession();
   $("chooseWeekBtn").onclick = () => goWorkoutScreen("week");
 
   // Every recent chip opens its recap.
