@@ -25066,10 +25066,15 @@ async function loadBodyPhotos() {
 
 async function renderBodyPhotos() {
   const mine = PROGRESS_VIEW === "me";
-  // Photos are yours alone, so the partner view has no card at all rather than
-  // an empty one implying there is something to share.
-  $("cardPhotos").classList.toggle("hidden", !mine);
-  if (!mine) return;
+  /* Hiding on the partner view stays: photos are yours alone, so their view
+     has no card at all rather than an empty one implying there is something
+     to share. SHOWING is not this function's call, and used to be. On a goal
+     screen this card is hidden on purpose and a door is the only thing that
+     opens it, so un-hiding here meant that adding or deleting a photo, which
+     repaints both surfaces, made the whole Body Photos card reappear under
+     the goal screen. renderProgressTab decides which cards a screen has and
+     the doors decide the rest; this only fills the one it is given. */
+  if (!mine) { $("cardPhotos").classList.add("hidden"); return; }
   const shots = BODY_PHOTOS.filter((p) => p.email === MY_EMAIL);
 
   $("addBodyPhotoBtn").classList.remove("hidden");
