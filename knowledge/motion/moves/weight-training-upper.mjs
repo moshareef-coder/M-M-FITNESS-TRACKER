@@ -56,7 +56,8 @@ const FRONT_FEET = { R: { ang: 12, len: 0.4, w: 1.3 }, L: { ang: 12, len: 0.4, w
 
 // Supine on a flat bench, a dumbbell in each hand, press from beside the chest
 // to straight overhead. Must be visible: the vertical travel of the hands with
-// the elbows folding out at the bottom. Side view, sagittal.
+// the elbows folding out at the bottom. Sagittal plane, camera 40 degrees
+// toward the feet; see the note above the move.
 // Same chassis as the seeded Barbell Bench Press: root.rot -90 is supine, which
 // puts the head at -x and runs the legs out to +x.
 // The bells are the default "level": drawn end on, and FIXED for the whole rep.
@@ -70,14 +71,32 @@ const FRONT_FEET = { R: { ang: 12, len: 0.4, w: 1.3 }, L: { ang: 12, len: 0.4, w
 // and even where a lifter does go neutral the bell still does not rotate rep
 // to rep. "follow" stays right where the grip genuinely is neutral and the
 // forearm genuinely swings: hammer curls, rows, kickbacks, carries.
+/* THE THREE DUMBBELL BENCH PRESSES ARE SEEN FROM 40 DEGREES TOWARD THE FEET.
+
+   Not from the side. A flat side camera cannot show the one thing Mo asked
+   for on every press, the elbows going OUT at the bottom, because out is
+   straight at the lens: the upper arm foreshortens to a stub and the flare
+   reads as a missing arm. Two full attempts at faking it side on failed, and
+   his own reference photo of the position is a three quarter view from the
+   feet end. This is that view. The body stays authored in the sagittal plane,
+   so the bench, the legs and every pin are unchanged; only the camera moved,
+   and the hands are 3D world pins so the width they already had in space is
+   what the camera now shows. Both arms are visible, both bells are drawn in
+   front, and at the bottom the elbows are plainly wide of the torso.
+
+   Pinned furniture does not orbit with the camera, so each bench and roller
+   has its x compressed toward the pivot at x=70 by cos(40) and its width
+   shrunk by the same factor, which is exactly how far the body's own screen
+   footprint shortened. Toward the feet rather than the head: the other way
+   round the arms cross the face on the way down. */
 const DUMBBELL_BENCH_PRESS = {
-  view: "side",
+  view: { plane: "sagittal", yaw: 40 },
   loop: "pingpong",
   dur: 3.2,
   breath: 0.25,
   props: [
-    { type: "bench", x: 26, y: 92, w: 78 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
+    { type: "bench", x: 36.3, y: 92, w: 59.7 },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8, front: true },
     { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
@@ -279,15 +298,15 @@ const LOW_TO_HIGH_CABLE_FLY = {
 // the torso. Must be visible: the reclined torso angle, which is the only thing
 // separating this from a flat press. Side view.
 const INCLINE_DUMBBELL_PRESS = {
-  view: "side",
+  view: { plane: "sagittal", yaw: 40 },
   loop: "pingpong",
   dur: 3.2,
   breath: 0.25,
   fit: { k: 0.95, dy: 0 },
   props: [
-    { type: "bench", x: 32, y: 89, w: 72, incline: -35 },
-    { type: "dumbbell", hold: "grip", side: "L", point: "hand", k: 0.8 },
-    { type: "dumbbell", hold: "grip", side: "R", point: "hand", k: 0.8, front: true },
+    { type: "bench", x: 40.9, y: 89, w: 55.2, incline: -35 },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8, front: true },
+    { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
     { // lockout, arms long square to the reclined torso
@@ -322,16 +341,16 @@ const INCLINE_DUMBBELL_PRESS = {
 // dumbbells pressed perpendicular to the torso. Must be visible: the head being
 // LOWER than the hips. Side view.
 const DECLINE_DUMBBELL_PRESS = {
-  view: "side",
+  view: { plane: "sagittal", yaw: 40 },
   loop: "pingpong",
   dur: 3.2,
   breath: 0.25,
   fit: { k: 0.94, dy: 4 },
   props: [
-    { type: "bench", x: 32, y: 78, w: 76, incline: 25 },
-    { type: "roller", x: 116, y: 48, r: 5 },
-    { type: "roller", x: 116, y: 66, r: 5 },
-    { type: "dumbbell", side: "L", point: "hand", k: 0.8 },
+    { type: "bench", x: 40.9, y: 78, w: 58.2, incline: 25 },
+    { type: "roller", x: 105.2, y: 48, r: 5 },
+    { type: "roller", x: 105.2, y: 66, r: 5 },
+    { type: "dumbbell", side: "L", point: "hand", k: 0.8, front: true },
     { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
