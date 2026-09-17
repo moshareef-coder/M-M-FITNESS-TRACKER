@@ -5324,14 +5324,18 @@
   .lift-chip {
     flex: 0 0 auto; white-space: nowrap; min-height: 36px; padding: 8px 15px;
     border-radius: 100px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px;
     background: var(--panel-2); border: 1px solid transparent; color: var(--muted);
     font-family: inherit; font-size: 13px; font-weight: 700;
   }
+  /* Why this lift is in the strip and not some other one. Filled, because an
+     outline star reads as "tap to star" and this one is not a control: the
+     starring happens under See all lifts. */
+  .lift-star { display: flex; color: var(--accent); }
+  .lift-star svg { fill: currentColor; }
   .lift-chip.on { background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-card); }
   .lift-chip:active { transform: scale(.97); }
-  .lift-records, .lift-levels { margin-bottom: 12px; }
-  .lift-levels .sr-row { background: none; border-color: var(--border); }
-  .lift-levels .sr-row.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .lift-records { margin-bottom: 12px; }
   .lift-records .pr-top { margin-bottom: 14px; }
   .lift-records .pr-wrap:last-child { margin-bottom: 0; }
   /* "Best ever" beside the number, only when it is. */
@@ -6133,7 +6137,6 @@
         <div class="wt-range" id="liftRange"></div>
       </div>
       <div class="card lift-records hidden" id="liftRecords"></div>
-      <div class="card lift-levels hidden" id="liftLevels"></div>
       <div class="prog-tiles end-tiles" id="liftTiles">
         <button type="button" class="prog-tile" id="liftVolume" disabled></button>
         <button type="button" class="prog-tile" id="liftPRs" disabled></button>
@@ -16151,17 +16154,20 @@ function liftWeeks() {
 function liftScreenLifts(name) {
   const all = allLiftsFor(name);
   const bySets = (a, b) => b.sets - a.sets || a.name.localeCompare(b.name);
+  /* Seeded first, so a person who has never opened the browser still has five
+     starred and a strip that explains itself. */
+  if (name === ME && typeof seedPinnedLifts === "function") seedPinnedLifts(name);
   const pins = typeof getPinnedLifts === "function" ? getPinnedLifts() : [];
   if (pins.length) {
     const picked = pins
       .map((n) => all.find((l) => l.name.toLowerCase() === String(n).toLowerCase()))
       .filter(Boolean);
-    if (picked.length) return picked.slice(0, 4);
+    if (picked.length) return picked.slice(0, MAX_PINNED_LIFTS);
   }
   const levelled = (l) => !!LIFT_STANDARDS[(l.name || "").trim().toLowerCase()];
   return all.filter(levelled).sort(bySets)
     .concat(all.filter((l) => !levelled(l)).sort(bySets))
-    .slice(0, 4);
+    .slice(0, MAX_PINNED_LIFTS);
 }
 
 /* Records set in the last `days`, counted the way personalRecords counts them:
@@ -16209,7 +16215,6 @@ function renderLiftHero(on, profile, isPartner) {
     $("liftEmpty").textContent = "Log a weighted set and this becomes your strength line.";
     $("liftRange").innerHTML = "";
     $("liftRecords").classList.add("hidden");
-    $("liftLevels").classList.add("hidden");
     $("liftTiles").classList.add("hidden");
     $("liftActions").classList.add("hidden");
     if (liftChart) { liftChart.destroy(); liftChart = null; }
@@ -16229,7 +16234,9 @@ function renderLiftHero(on, profile, isPartner) {
   const shortLift = (n) => String(n).replace(/^barbell\s+/i, "");
   $("liftChips").classList.remove("hidden");
   $("liftChips").innerHTML = lifts.map((l) =>
-    `<button type="button" class="lift-chip${l.name === pick ? " on" : ""}" data-lift="${escapeHtml(l.name)}">${escapeHtml(shortLift(l.name))}</button>`).join("");
+    `<button type="button" class="lift-chip${l.name === pick ? " on" : ""}" data-lift="${escapeHtml(l.name)}">${
+      isPinnedLift(l.name) ? `<span class="lift-star">${icon("star", 12)}</span>` : ""
+    }${escapeHtml(shortLift(l.name))}</button>`).join("");
   $("liftChips").querySelectorAll("[data-lift]").forEach((b) => {
     b.onclick = () => { LIFT_PICK = b.dataset.lift; again(); };
   });
@@ -16269,9 +16276,23 @@ function renderLiftHero(on, profile, isPartner) {
     /* The level column, where the lift has a standard to be judged against.
        Where it does not (a dumbbell, a machine), the column stays empty rather
        than guessing: LIFT_STANDARDS has a paragraph about why. */
+    /* An unlevelled lift used to leave this column empty, which reads as a bug
+       rather than as an answer, and is what left Mo asking why not every lift
+       has a level. It says so now, in four words. The full reason (one stored
+       weight cannot say per hand or the pair, and a gym's machine weighs
+       whatever it weighs) stays in the lift browser, where somebody has gone
+       looking for it: seven lines of explanation beside the number pushed the
+       number itself halfway down the card. */
     const lvl = strengthLevelFor(name, pick);
     let side = "";
-    if (lvl) {
+    if (!lvl) {
+      const noStandard = !LIFT_STANDARDS[(pick || "").trim().toLowerCase()];
+      side = `<div class="wth-target">
+        <div class="wth-target-label">Level</div>
+        <div class="wth-target-val">Not scored</div>
+        <div class="wth-target-pct">${noStandard ? "Barbell lifts only" : "Needs a weigh-in first"}</div>
+      </div>`;
+    } else if (lvl) {
       side = `<div class="wth-target">
         <div class="wth-target-label">Level</div>
         <div class="wth-target-val">${escapeHtml(lvl.level)}</div>
@@ -16365,47 +16386,11 @@ function renderLiftHero(on, profile, isPartner) {
     const pct = i < index ? 100 : i === index ? Math.round(within * 100) : 0;
     return `<i><b style="width:${pct}%"></b></i>`;
   }).join("");
-  /* EVERY lift, not the four the chip strip happens to show. Mo opened this on
-     his own account and saw one row, because the list was built from the chips
-     and only one of his lifts has a published standard behind it.
-
-     A lift without a standard still gets a row and still says what it is doing;
-     it just gets its estimated single instead of a bar, because a dumbbell or a
-     machine cannot be scored without guessing what the number on it means. That
-     is a different thing from having nothing to show, and the footnote says
-     which is which once rather than on every row. */
-  const everyLift = allLiftsFor(name)
-    .map((l) => ({ name: l.name, sets: l.sets, best: l.best, lv: strengthLevelFor(name, l.name) }))
-    .sort((a, b) => (b.lv ? 1 : 0) - (a.lv ? 1 : 0)
-      || (b.lv && a.lv ? (b.lv.index + b.lv.within) - (a.lv.index + a.lv.within) : 0)
-      || b.sets - a.sets);
-  const LEVEL_LIST_MAX = 12;
-  const shownLifts = everyLift.slice(0, LEVEL_LIST_MAX);
-  const moreLifts = everyLift.length - shownLifts.length;
-  const anyUnscored = shownLifts.some((x) => !x.lv);
-  const lvlBox = $("liftLevels");
-  lvlBox.classList.toggle("hidden", !shownLifts.length);
-  if (shownLifts.length) {
-    lvlBox.innerHTML = `<div class="pr-head">Every lift</div>
-      <div class="sr-list">
-        ${shownLifts.map((x) => `<button type="button" class="sr-row${x.name === pick ? " on" : ""}" data-pick="${escapeHtml(x.name)}">
-          <span class="sr-row-top">
-            <b>${escapeHtml(shortLift(x.name))}${x.lv ? ` &middot; ${escapeHtml(x.lv.level)}` : ""}</b>
-            <span>${escapeHtml(x.lv
-              ? (x.lv.next ? `${lb(x.lv.toNext)} lb to ${x.lv.next}` : "top of the scale")
-              : `${lb(x.best)} lb best`)}</span>
-          </span>
-          ${x.lv ? `<span class="lvl-segs sr-row-bar">${segs(x.lv.index, x.lv.within)}</span>` : ""}
-        </button>`).join("")}
-      </div>
-      ${moreLifts > 0 ? `<p class="muted-note" style="margin-top:10px">${moreLifts} more under See all lifts.</p>` : ""}
-      ${anyUnscored ? `<p class="muted-note" style="margin-top:${moreLifts > 0 ? 4 : 10}px">A lift with no bar has no published standard to score it against. One stored weight cannot say whether a dumbbell was per hand or the pair, and a gym's machine weighs whatever it weighs.</p>` : ""}`;
-    /* Tapping a row charts that lift, so the list is also how you move between
-       them without going back up to the chips. */
-    lvlBox.querySelectorAll("[data-pick]").forEach((b) => {
-      b.onclick = () => { LIFT_PICK = b.dataset.pick; again(); };
-    });
-  }
+  /* There is no list of every lift here any more. Mo asked for one, saw it, and
+     cut it: with a real training history it is fifteen rows of small print
+     under the answer, and the chip strip plus See all lifts already reach every
+     one of them. The level that matters is the one for the lift on screen, and
+     that is the column beside its number. */
 
   const vw = volumeWeeks(name, 8);
   const thisWeek = vw[vw.length - 1].volume;
@@ -17410,6 +17395,36 @@ function getPinnedLifts() {
 function setPinnedLifts(list) {
   try { localStorage.setItem(PINNED_LIFTS_KEY, JSON.stringify(list.slice(0, MAX_PINNED_LIFTS))); } catch { /* private browsing */ }
 }
+/* The first five movements somebody ever logs are starred for them, once.
+   Mo: "we will always star the first 5 workouts they ever do, and then they can
+   change it." Without this the strip on Get Stronger was ranked automatically
+   and the star in the browser looked decorative, because nothing on screen ever
+   showed a star to begin with.
+
+   Seeded under its own key rather than by testing whether the list is empty:
+   empty means "never set up" on one account and "deliberately cleared every
+   one" on another, and re-seeding the second every render would make the star
+   impossible to remove. First ever means earliest logged date, ties broken by
+   the order they were written, so it is the first five things they did and not
+   the five they do most. */
+const PINNED_SEEDED_KEY = "ft_pinned_seeded";
+function seedPinnedLifts(name) {
+  try { if (localStorage.getItem(PINNED_SEEDED_KEY)) return; } catch { return; }
+  const first = new Map();
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== name || l.weight == null || l.duration_min) continue;
+    const key = (l.exercise_name || "").trim().toLowerCase();
+    if (!key) continue;
+    const at = `${l.entry_date} ${l.created_at || ""}`;
+    const seen = first.get(key);
+    if (!seen || at < seen.at) first.set(key, { name: l.exercise_name.trim(), at });
+  }
+  if (!first.size) return;
+  const order = [...first.values()].sort((a, b) => a.at.localeCompare(b.at)).slice(0, MAX_PINNED_LIFTS);
+  setPinnedLifts(order.map((x) => x.name));
+  try { localStorage.setItem(PINNED_SEEDED_KEY, "1"); } catch { /* private browsing */ }
+}
+
 function isPinnedLift(name) {
   const key = (name || "").toLowerCase();
   return getPinnedLifts().some((n) => n.toLowerCase() === key);
