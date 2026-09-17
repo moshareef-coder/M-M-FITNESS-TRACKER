@@ -375,7 +375,7 @@ const DECLINE_DUMBBELL_PRESS = {
 const INCLINE_BARBELL_PRESS = {
   ...INCLINE_DUMBBELL_PRESS,
   props: [
-    { type: "bench", x: 32, y: 89, w: 72, incline: -35 },
+    { type: "bench", x: 40.9, y: 89, w: 55.2, incline: -35 },
     { type: "barbell", side: "R", point: "hand", r: 9, front: true },
   ],
   keys: [
@@ -399,9 +399,9 @@ const INCLINE_BARBELL_PRESS = {
 const DECLINE_BARBELL_PRESS = {
   ...DECLINE_DUMBBELL_PRESS,
   props: [
-    { type: "bench", x: 32, y: 78, w: 76, incline: 25 },
-    { type: "roller", x: 116, y: 48, r: 5 },
-    { type: "roller", x: 116, y: 66, r: 5 },
+    { type: "bench", x: 40.9, y: 78, w: 58.2, incline: 25 },
+    { type: "roller", x: 105.2, y: 48, r: 5 },
+    { type: "roller", x: 105.2, y: 66, r: 5 },
     { type: "barbell", side: "R", point: "hand", r: 9, front: true },
   ],
   keys: [
@@ -2185,12 +2185,12 @@ const SKULL_CRUSHER = {
 // caveat: side on this is close to Barbell Bench Press, and the lower touch
 // point plus the tighter elbow are the whole difference.
 const CLOSE_GRIP_BENCH_PRESS = {
-  view: "side",
+  view: { plane: "sagittal", yaw: 40 },
   loop: "pingpong",
   dur: 3.2,
   breath: 0.25,
   props: [
-    { type: "bench", x: 26, y: 92, w: 78 },
+    { type: "bench", x: 36.3, y: 92, w: 59.7 },
     { type: "barbell", side: "R", point: "hand", r: 9.5, front: true },
   ],
   keys: [

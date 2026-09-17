@@ -2399,6 +2399,65 @@ const PROPS = {
     const at = p.place === "traps" ? barOnTraps(S, p) : anchor(p, S);
     if (!at) return;
     const r = p.r || 9.5;
+    /* Between two hands the bar is drawn as a bar. Side on, the camera looks
+       straight down it and the two hands land on the same pixel, so the old
+       picture, one plate end on, is exactly right and is what this still
+       draws. Turn the camera and the hands separate on screen; then the bar
+       runs from one to the other with a plate on each end, and each plate is
+       the same trick as a dumbbell head: a disc squashed along the bar by how
+       far round it is, swept by its own thickness. f is the fraction of the
+       bar's real length the screen shows, so 0 is end on and 1 is broadside.
+       Nothing is authored for this; it falls out of the hand positions, which
+       is why the six bench presses could turn their cameras without a single
+       prop changing. */
+    if (!p.place && p.side !== undefined) {
+      const pt = p.point || "hand";
+      const Lh = S.sides.L[pt], Rh = S.sides.R[pt];
+      const L3 = S.sides.L.p3[pt], R3 = S.sides.R.p3[pt];
+      if (Lh && Rh && L3 && R3) {
+        const D3 = Math.hypot(R3.x - L3.x, R3.y - L3.y, R3.z - L3.z);
+        const D2 = Math.hypot(Rh.x - Lh.x, Rh.y - Lh.y);
+        const f = D3 > 0.5 ? Math.min(1, D2 / D3) : 0;
+        if (f > 0.15) {
+          const dx = p.dx || 0, dy = p.dy || 0;
+          const g = Math.sqrt(Math.max(0, 1 - f * f));
+          const ux = (Rh.x - Lh.x) / D2, uy = (Rh.y - Lh.y) / D2;
+          const sleeve = 9 * f, t = Math.max(1.6, r * 0.26);
+          const ends = [
+            { x: Lh.x + dx - ux * sleeve, y: Lh.y + dy - uy * sleeve, d: Lh.d },
+            { x: Rh.x + dx + ux * sleeve, y: Rh.y + dy + uy * sleeve, d: Rh.d },
+          ].sort((a, b) => a.d - b.d);           // far plate first, near plate last
+          const ang = Math.atan2(uy, ux);
+          const plate = (e) => {
+            ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(ang);
+            const rx = t * f + r * g;
+            ctx.strokeStyle = C.edge; ctx.lineWidth = 3; ctx.lineJoin = "round";
+            ctx.beginPath(); ctx.ellipse(0, 0, rx, r, 0, 0, Math.PI * 2); ctx.stroke();
+            ctx.fillStyle = C.iron; ctx.fill();
+            if (r >= 6 && g > 0.25) {
+              ctx.globalAlpha = g;
+              ctx.strokeStyle = C.ironHi; ctx.lineWidth = Math.max(1, r * 0.15);
+              ctx.beginPath(); ctx.ellipse(0, 0, rx * 0.64, r * 0.64, 0, 0, Math.PI * 2); ctx.stroke();
+              ctx.beginPath(); ctx.ellipse(0, 0, Math.min(3, r * 0.3) * g, Math.min(3, r * 0.3), 0, 0, Math.PI * 2);
+              ctx.fillStyle = C.chrome; ctx.fill();
+              ctx.globalAlpha = 1;
+            }
+            ctx.restore();
+          };
+          plate(ends[0]);
+          ctx.save();
+          ctx.strokeStyle = C.edge; ctx.lineWidth = 4.4; ctx.lineCap = "round";
+          ctx.beginPath(); ctx.moveTo(ends[0].x, ends[0].y); ctx.lineTo(ends[1].x, ends[1].y); ctx.stroke();
+          ctx.strokeStyle = C.chrome; ctx.lineWidth = 2.4;
+          ctx.beginPath(); ctx.moveTo(ends[0].x, ends[0].y); ctx.lineTo(ends[1].x, ends[1].y); ctx.stroke();
+          ctx.strokeStyle = C.chromeHi; ctx.lineWidth = 0.8;
+          ctx.beginPath(); ctx.moveTo(ends[0].x, ends[0].y - 0.7); ctx.lineTo(ends[1].x, ends[1].y - 0.7); ctx.stroke();
+          ctx.restore();
+          plate(ends[1]);
+          return;
+        }
+      }
+    }
     /* A loaded bar seen end on: the outer plate, cast iron with its raised
        centre ring and a lit rim, and the chrome sleeve of the bar through the
        hub. Small radii (a machine handle, a pad) are just the disc. */

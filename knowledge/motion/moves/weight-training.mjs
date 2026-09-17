@@ -74,12 +74,12 @@ const GOBLET_SQUAT = {
 // Head goes where upV(rot) points, feet the other way, so here the head is at
 // -x and the legs run out to +x.
 const BARBELL_BENCH_PRESS = {
-  view: "side",
+  view: { plane: "sagittal", yaw: 40 },
   loop: "pingpong",
   dur: 3.2,
   breath: 0.25,
   props: [
-    { type: "bench", x: 26, y: 92, w: 78 },
+    { type: "bench", x: 36.3, y: 92, w: 59.7 },
     { type: "barbell", side: "R", point: "hand", r: 9.5, front: true },
   ],
   keys: [
