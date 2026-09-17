@@ -1594,21 +1594,44 @@
      make the screenshot too small to read.
      scroll-snap rather than a JS-driven slider: free momentum, free rubber
      banding at the ends, no per-frame code to keep in sync with a finger. */
+  /* The paywall takes the whole screen.
+
+     Deliberately theme-independent and dark, the same call .gen-scrim and the
+     clip viewer already make: the screenshots inside the cards are light
+     rectangles, and they only read as photographs of something else if the
+     thing holding them is darker than they are. On a light theme a pale card
+     on a pale ground loses that entirely.
+
+     dvh rather than vh so the bottom row is not hidden under the browser
+     chrome on the web build; vh first for anything that does not know dvh. */
+  .paywall-scrim {
+    position: fixed; inset: 0; z-index: 96; overflow-y: auto; overflow-x: hidden;
+    background: #0b0d11; color: #f4f6f8;
+    animation: genUp .46s cubic-bezier(.22,1,.36,1);
+  }
+  .paywall-scrim.leaving { animation: genDown .3s ease-in forwards; }
+  .paywall-sheet {
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; flex-direction: column;
+    padding: calc(18px + env(safe-area-inset-top, 0px)) 0 calc(16px + env(safe-area-inset-bottom, 0px));
+  }
   /* The X floats over everything rather than sharing a row with the wordmark,
      because the wordmark is centred and a shared row would have to either
      fight it for space or push it off centre. */
   .paywall-x {
-    position: absolute; top: 14px; left: 14px; width: 30px; height: 30px;
-    border-radius: 50%; border: none; background: var(--panel-2, rgba(128,128,128,.16));
-    color: var(--muted); font-size: 18px; line-height: 1; z-index: 2;
+    position: absolute; z-index: 3;
+    top: calc(12px + env(safe-area-inset-top, 0px)); left: 14px;
+    width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
+    font-size: 20px; line-height: 1; display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); color: #f4f6f8;
   }
-  .paywall-head { text-align: center; padding: 6px 36px 2px; }
-  .paywall-word { font-family: var(--font-display); font-size: 21px; letter-spacing: .01em; }
-  .paywall-word b { font-weight: 800; color: var(--text); }
-  .paywall-word span { font-weight: 500; color: var(--muted); margin-left: 2px; }
+  .paywall-head { text-align: center; padding: 2px 56px 0; }
+  .paywall-word { font-family: var(--font-display); font-size: 27px; letter-spacing: .01em; }
+  .paywall-word b { font-weight: 800; color: #fff; }
+  .paywall-word span { font-weight: 400; color: rgba(244,246,248,.62); margin-left: 3px; }
   .paywall-tagline {
-    margin-top: 3px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em;
-    color: var(--muted); text-transform: uppercase;
+    margin-top: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: .15em;
+    color: rgba(244,246,248,.45); text-transform: uppercase;
   }
   /* The peek carousel. Three cards in view, the centre one full size and the
      neighbours cut off at the edge, so a glance at the closed state already
@@ -1617,44 +1640,65 @@
      scale, because CSS alone has no clean way to say "whichever card is
      nearest centre" without scroll-driven animation support this app cannot
      assume yet on every device it ships to. */
-  .paywall-carousel { margin: 10px 0 2px; }
+  /* The carousel takes whatever height is left between the header and the
+     footer, which is most of the screen, and is the reason this is a full
+     screen view rather than a sheet: the cards are the argument. */
+  .paywall-carousel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: center; margin: 14px 0 0; }
   .paywall-carousel-track {
-    display: flex; align-items: flex-start; gap: 14px;
+    display: flex; align-items: stretch; gap: 14px;
     overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
-    scrollbar-width: none; padding: 6px 15vw 10px;
+    scrollbar-width: none; padding: 10px 16vw 14px;
   }
   .paywall-carousel-track::-webkit-scrollbar { display: none; }
   .paywall-slide {
-    flex: 0 0 auto; width: 70vw; max-width: 250px; scroll-snap-align: center;
-    border-radius: 22px; padding: 16px 16px 0; overflow: hidden;
-    background: var(--panel-2, var(--panel));
-    border: 1px solid var(--line, rgba(128,128,128,.18));
-    box-shadow: 0 14px 34px -18px rgba(0,0,0,.55);
+    flex: 0 0 auto; width: 68vw; max-width: 270px; scroll-snap-align: center;
+    border-radius: 24px; padding: 18px 18px 0; overflow: hidden;
+    background: #161a21;
+    border: 1px solid rgba(255,255,255,.09);
+    box-shadow: 0 18px 40px -20px rgba(0,0,0,.8);
     display: flex; flex-direction: column;
-    opacity: .55; transform: scale(.88); transition: opacity .2s, transform .2s;
+    opacity: .5; transform: scale(.9); transition: opacity .22s, transform .22s;
   }
   /* The centred card, found and marked by the same scroll listener that drives
      the dots, so the two can never disagree about which slide is "current". */
   .paywall-slide.on { opacity: 1; transform: scale(1); }
   .paywall-slide-icon {
-    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
-    margin-bottom: 10px;
+    width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
+    margin-bottom: 12px; flex: 0 0 auto;
   }
-  .paywall-slide-title { font-size: 15px; color: var(--text); line-height: 1.25; }
-  .paywall-slide-body { display: block; margin-top: 4px; font-size: 12.5px; color: var(--muted); line-height: 1.35; min-height: 32px; }
+  .paywall-slide-title { font-size: 16px; font-weight: 700; color: #fff; line-height: 1.25; }
+  .paywall-slide-body { display: block; margin-top: 5px; font-size: 12.5px; color: rgba(244,246,248,.6); line-height: 1.4; min-height: 34px; }
   /* The screenshot is real and stays that way: a light rectangle set into a
      dark card is a lot of contrast, which is deliberate, it is the one part
      of the card that is a photograph rather than something drawn and it
-     should read as one. Cropped rather than framed by a fixed height, so a
-     card never shows a hard cut mid-row of the real UI it is holding. */
+     should read as one. It bleeds off the bottom of the card rather than
+     being boxed, so the card reads as a window onto a screen that continues
+     past it. */
   .paywall-slide-shot {
-    margin: 12px -16px 0; border-radius: 14px 14px 0 0; overflow: hidden;
-    max-height: 190px;
+    margin: 14px -18px -1px; border-radius: 16px 16px 0 0; overflow: hidden;
+    flex: 1 1 auto; min-height: 0;
   }
-  .paywall-slide-shot img { display: block; width: 100%; height: auto; }
-  .paywall-dots { display: flex; justify-content: center; gap: 6px; margin-top: 4px; }
-  .paywall-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line, rgba(128,128,128,.3)); transition: background .15s, transform .15s; }
-  .paywall-dot.on { background: var(--accent); transform: scale(1.25); }
+  .paywall-slide-shot img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .paywall-dots { display: flex; justify-content: center; gap: 6px; margin-top: 2px; }
+  .paywall-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(244,246,248,.22); transition: background .15s, transform .15s; }
+  .paywall-dot.on { background: var(--accent); transform: scale(1.3); }
+  /* Everything that has to be readable without scrolling: the price, the
+     button, and the legal text Apple require to be on the same screen as the
+     button. */
+  .paywall-foot { flex: 0 0 auto; padding: 10px 20px 0; text-align: center; }
+  .paywall-price { margin: 0 0 12px; font-size: 14px; line-height: 1.4; }
+  .paywall-price b { display: block; color: #fff; font-weight: 700; }
+  .paywall-price span { color: rgba(244,246,248,.55); font-size: 13px; }
+  .paywall-cta { width: 100%; }
+  /* Overridden off the app's own ghost button, which is tuned for a light
+     panel and disappears on this ground. */
+  .paywall-ghost {
+    width: 100%; margin-top: 8px;
+    background: transparent; border: 1px solid rgba(255,255,255,.18); color: rgba(244,246,248,.85);
+  }
+  .paywall-fine { margin: 12px 0 0; font-size: 11px; line-height: 1.45; color: rgba(244,246,248,.42); }
+  .paywall-legal { margin: 6px 0 0; font-size: 11px; }
+  .paywall-legal a { color: var(--accent); text-decoration: none; }
   /* One blocked person. The address can be long and the button must not be
      pushed off the edge by it, so the name takes the slack and ellipsises. */
   .block-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
@@ -13840,12 +13884,18 @@ async function requirePremium() {
    the privacy policy. */
 function showPaywall() {
   return new Promise((resolve) => {
+    /* Full screen, not a sheet. This is the one screen in the app whose whole
+       job is to be looked at rather than dismissed past, and a card floating
+       on a dimmed version of whatever you were doing reads as an interruption
+       to that thing. Taking the whole screen makes it a place instead.
+       Built on the same shape as .gen-scrim, which is already the app's full
+       screen overlay: fixed inset, its own dark ground regardless of theme,
+       and the slide up it arrives on. */
     const scrim = document.createElement("div");
-    scrim.className = "pop-scrim";
+    scrim.className = "paywall-scrim";
     scrim.innerHTML = `
-      <div class="pop">
-        <div class="pop-body">
-          <button type="button" class="paywall-x" data-pay="0" aria-label="Close">&times;</button>
+      <button type="button" class="paywall-x" data-pay="0" aria-label="Close">&times;</button>
+      <div class="paywall-sheet">
           <div class="paywall-head">
             <div class="paywall-word"><b>UNIO</b> <span>PREMIUM</span></div>
             <div class="paywall-tagline">TRAIN TOGETHER. A STRONGER YOU.</div>
@@ -13873,23 +13923,30 @@ function showPaywall() {
               ${PREMIUM_UNLOCKS.map((_, i) => `<span class="paywall-dot${i === 0 ? " on" : ""}"></span>`).join("")}
             </div>
           </div>
-          <!-- One subscription covers both of you. Said here rather than in the
-               small print, because it is the difference between five a month
-               and two people each paying five a month. -->
-          <p class="muted-note" style="margin-top:14px;">
-            <b>${escapeHtml(PREMIUM_PRICE)} a month, and it covers both of you.</b>
-            Only one of you needs to subscribe.
-          </p>
-          <button type="button" class="btn-primary" data-pay="1" style="margin-top:14px;">Subscribe for ${escapeHtml(PREMIUM_PRICE)} a month</button>
-          <button type="button" class="btn-ghost" data-pay="restore">Restore purchase</button>
-          <button type="button" class="btn-ghost" data-pay="0">Not now</button>
-          <p class="muted-note" style="margin-top:12px;font-size:12px;">
-            Renews every month until you cancel. Cancel any time in your iPhone's
-            Settings, under your name then Subscriptions.
-            <a href="#" data-policy="terms">Terms of Use</a> and
-            <a href="#" data-policy="privacy.html">Privacy Policy</a>.
-          </p>
-        </div>
+          <!-- Everything below the carousel is pinned to the bottom of the
+               screen by the sheet's own layout, so the price and the button
+               sit in the same place whether the phone is a mini or a Max and
+               nobody has to scroll to find out what this costs. -->
+          <div class="paywall-foot">
+            <!-- One subscription covers both of you. Said here rather than in
+                 the small print, because it is the difference between one
+                 price and two people each paying it. -->
+            <p class="paywall-price">
+              <b>${escapeHtml(PREMIUM_PRICE)} a month, and it covers both of you.</b>
+              <span>Only one of you needs to subscribe.</span>
+            </p>
+            <button type="button" class="btn-primary paywall-cta" data-pay="1">Subscribe for ${escapeHtml(PREMIUM_PRICE)} a month</button>
+            <button type="button" class="btn-ghost paywall-ghost" data-pay="restore">Restore purchase</button>
+            <button type="button" class="btn-ghost paywall-ghost" data-pay="0">Not now</button>
+            <p class="paywall-fine">
+              Renews every month until you cancel. Cancel any time in your iPhone's
+              Settings, under your name then Subscriptions.
+            </p>
+            <p class="paywall-legal">
+              <a href="#" data-policy="terms">Terms of Use</a> and
+              <a href="#" data-policy="privacy.html">Privacy Policy</a>.
+            </p>
+          </div>
       </div>`;
     document.body.appendChild(scrim);
     /* The dots track a scroll position rather than a click handler, because
@@ -13919,7 +13976,14 @@ function showPaywall() {
       carouselTrack.addEventListener("scroll", highlight, { passive: true });
       highlight();
     }
-    const close = (v) => { scrim.remove(); resolve(v); };
+    /* Slides back down the way it came rather than vanishing, the same as
+       .gen-scrim. Resolved immediately though, not after the animation, so
+       nothing downstream is waiting on a transition to finish. */
+    const close = (v) => {
+      scrim.classList.add("leaving");
+      setTimeout(() => scrim.remove(), 300);
+      resolve(v);
+    };
     scrim.querySelectorAll("[data-pay]").forEach((b) => {
       b.onclick = async () => {
         const what = b.dataset.pay;
@@ -13929,7 +13993,8 @@ function showPaywall() {
         await startPurchase();
       };
     });
-    scrim.onclick = (e) => { if (e.target === scrim) close(false); };
+    /* No tap-outside-to-close: on a full screen there is no outside, and the
+       X is the only thing that should dismiss this. */
   });
 }
 
