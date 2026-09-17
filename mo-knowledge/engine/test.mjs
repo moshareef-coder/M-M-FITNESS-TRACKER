@@ -390,7 +390,7 @@ test("patternFor sorts exercises into the right movement pattern", () => {
  * inherit the default in silence. */
 const EXPECTED_PATTERN = {
   horizontalPush: [
-    "Archer Push-Up", "Barbell Bench Press", "Bench Dip", "Close-Grip Bench Press",
+    "Barbell Bench Press", "Bench Dip", "Close-Grip Bench Press",
     "Decline Barbell Press", "Decline Dumbbell Press", "Diamond Push-Up", "Dip",
     "Dumbbell Bench Press", "Incline Barbell Press", "Incline Dumbbell Press",
     "Incline Push-Up", "Landmine Press", "Machine Chest Press", "One-Arm Push-Up",

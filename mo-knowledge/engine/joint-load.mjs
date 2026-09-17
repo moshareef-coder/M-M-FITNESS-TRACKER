@@ -325,7 +325,6 @@ export const JOINT_LOAD = Object.freeze({
      weight-training and are tagged once, above. */
   /* Named in the brief. Deep loaded shoulder extension. */
   "Dip": ["shoulder", "elbow"],
-  "Archer Push-Up": ["wrist", "shoulder", "elbow"],
   /* Leaning forward over the hands is the most extreme loaded wrist extension
      anywhere in either library. */
   "Pseudo Planche Push-Up": ["wrist", "shoulder", "elbow"],

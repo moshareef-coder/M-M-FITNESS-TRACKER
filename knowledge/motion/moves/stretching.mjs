@@ -2172,6 +2172,7 @@ export const MOVES = {
   "Shoulder Rolls": SHOULDER_ROLLS,
   "Cross-Body Arm Swings": CROSS_BODY_ARM_SWINGS,
   "Wall Slides": WALL_SLIDES,
+  "Elbow Circles": ELBOW_CIRCLES,
   "Wrist Circles": WRIST_CIRCLES,
   "Torso Twists": TORSO_TWISTS,
   "Prone Press-Up": PRONE_PRESS_UP,

@@ -20,7 +20,6 @@ export const CALISTHENICS = {
         { name: "Push-Up", primary: ["chest"], secondary: ["triceps", "shoulders"], equipment: "bodyweight", level: "beginner" },
         { name: "Diamond Push-Up", primary: ["triceps"], secondary: ["chest"], equipment: "bodyweight", level: "intermediate" },
         { name: "Dip", primary: ["chest", "triceps"], secondary: ["shoulders"], equipment: "bodyweight", level: "intermediate" },
-        { name: "Archer Push-Up", primary: ["chest"], secondary: ["triceps", "shoulders"], equipment: "bodyweight", level: "advanced" },
         { name: "Pseudo Planche Push-Up", primary: ["chest", "shoulders"], secondary: ["triceps", "abs"], equipment: "bodyweight", level: "advanced" },
         { name: "One-Arm Push-Up", primary: ["chest"], secondary: ["triceps", "shoulders", "obliques"], equipment: "bodyweight", level: "advanced" },
       ],

@@ -18,9 +18,21 @@
 // partner versus you. He knows your goal and your streak and he can be warm
 // and specific about them, which is different from being clever at your
 // expense. Punch at himself, at the equipment, at the concept of exercise.
-// When in doubt he is the idiot in the scene, never you. He also never gives
-// form or medical advice, because a joke that is also wrong instruction is
-// worse than no joke.
+// When in doubt he is the idiot in the scene, never you.
+//
+// HE DOES COACH NOW. This used to say he never gives form advice. Mo asked for
+// the opposite in September 2026: he wants the figure to talk about the lift
+// you are actually on, and to say keep your back straight or fix your grip,
+// funny but useful. So the cues live in the FORM table below, one per lift,
+// written as real coaching cues and kept separate from the joke. The old rule
+// was right about one thing and that part survives: the cue has to be correct,
+// because a joke that is also wrong instruction is worse than no joke. He
+// still gives no medical advice, and he still never diagnoses a pain.
+//
+// HE PUSHES STRETCHING AND CARDIO. Also Mo's call. Rests and idle beats are
+// where he makes the case for stretching, warm-ups and cool-downs are talked
+// up rather than treated as filler, and cardio and the classes have their own
+// bank and their own cues.
 //
 // HOW OFTEN. He speaks at nearly every beat: most sets, every last set, every
 // new lift, every long rest, an aside partway through a rest, a line on a
@@ -37,6 +49,231 @@
 // partner without inventing facts on a fresh account. The context shape is
 // built by quipCtx() in index.html; quip-lab.html builds synthetic versions
 // of the same shape to show every branch a function can take.
+
+/* ---------------------------------------------------------------- form ----
+
+   WHAT CHANGED, AND WHY THE OLD RULE IS GONE. This file used to say he never
+   gives form advice, on the grounds that a joke which is also wrong
+   instruction is worse than no joke. Mo asked for the opposite: he wants the
+   figure to talk about the lift you are actually on, and to tell you to keep
+   your back straight or fix your grip, funny but useful.
+
+   The reasoning behind the old rule still stands, so it moves rather than
+   disappears: every cue below is a real coaching cue for that exact lift,
+   written plainly, and the joke sits beside it instead of inside it. The cue
+   is the part that has to be right. If a lift has no entry it falls back by
+   movement pattern, and if that misses too it says nothing rather than
+   guessing, because a vague cue attached to a specific lift is how you end up
+   telling somebody to brace their belly during a calf raise.
+
+   `cue` is the instruction. `joke` is his line about the lift itself. They are
+   used separately: a moment can take one, the other, or both. */
+export const FORM = {
+  "barbell bench press": { cue: "Feet flat, shoulder blades pinched back, bar to the middle of your chest.", joke: "Lie down, push the bar, sit up a hero." },
+  "dumbbell bench press": { cue: "Elbows about forty five degrees from your body, not flared straight out.", joke: "Two weights. Twice the chances to look thoughtful." },
+  "incline dumbbell press": { cue: "Bench at thirty degrees. Any steeper and it turns into a shoulder day.", joke: "Slightly uphill. Like life." },
+  "incline barbell press": { cue: "Bench at thirty degrees, bar to your collarbone, not your throat.", joke: "Uphill pressing. Very brave." },
+  "decline dumbbell press": { cue: "Hook your legs in first. Falling off is not part of it.", joke: "Upside down pressing. I am already dizzy." },
+  "decline barbell press": { cue: "Get a spotter for the bar. Always.", joke: "Head down. Blood everywhere it should not be." },
+  "close-grip bench press": { cue: "Hands shoulder width, elbows tucked to your sides. This is a triceps lift.", joke: "Same bench, tighter hands, sadder triceps." },
+  "push-up": { cue: "Straight line from your head to your heels. No sagging hips.", joke: "The original. No equipment, no excuses, no mercy." },
+  "diamond push-up": { cue: "Hands together under your chest, elbows brush your ribs.", joke: "A push-up that went to a private school." },
+  "machine chest press": { cue: "Handles at chest height before you start, or your shoulders take it.", joke: "A machine did the thinking. Enjoy." },
+  "pec deck": { cue: "Soft bend in the elbows, squeeze at the middle, do not slam it back.", joke: "A hug with a grudge." },
+  "cable fly": { cue: "Keep a soft bend in the elbows the whole way. Hug, do not press.", joke: "Hugging the air. It never hugs back." },
+  "dip": { cue: "Lean forward a little for chest, stay upright for triceps. Do not drop fast.", joke: "Lowering yourself, on purpose, for once." },
+  "weighted dip": { cue: "Add weight only when ten clean bodyweight ones are easy.", joke: "A dip, but you brought luggage." },
+  "pull-up": { cue: "Chest up, pull your elbows down to your ribs. No swinging.", joke: "You against gravity. Gravity is undefeated but rude about it." },
+  "chin-up": { cue: "Palms toward you. This one is biceps as much as back.", joke: "A pull-up that likes you." },
+  "lat pulldown": { cue: "Chest up, bar to your collarbone, no leaning back to cheat it.", joke: "A pull-up for people with chairs." },
+  "seated cable row": { cue: "Chest tall, pull to your belly button, squeeze the shoulder blades.", joke: "Rowing. No boat. No water. No point. Excellent." },
+  "barbell row": { cue: "Flat back, hinge to about forty five degrees, pull to your belly button.", joke: "Bent over, pulling. Like picking up laundry with ambition." },
+  "dumbbell row": { cue: "Flat back, pull the weight to your hip, not your shoulder.", joke: "One arm at a time. Very focused of you." },
+  "inverted row": { cue: "Body straight, chest to the bar, squeeze at the top.", joke: "A push-up in reverse. Physics is fine with it." },
+  "t-bar row": { cue: "Chest against the pad if there is one. Let it hold you honest.", joke: "The bar has one job and it is heavy." },
+  "face pull": { cue: "Pull to your forehead, elbows high, spread your hands at the end.", joke: "For the shoulders you cannot see. They exist." },
+  "straight-arm pulldown": { cue: "Arms stay long, move only at the shoulder.", joke: "Long arms. Longer face." },
+  "dead hang": { cue: "Just hang. Shoulders relaxed, breathe.", joke: "Doing nothing, strenuously." },
+  "overhead press": { cue: "Squeeze your glutes, ribs down, press straight up past your forehead.", joke: "Pushing the sky. The sky is fine." },
+  "military press": { cue: "Feet together, strict, no leg drive. That is what makes it military.", joke: "Strictest press there is. No help allowed." },
+  "push press": { cue: "A small dip from the legs, then drive. The legs start it, the arms finish it.", joke: "A press that cheats, officially." },
+  "seated dumbbell press": { cue: "Back against the pad, press straight up, do not arch away from it.", joke: "Sitting down to lift over your head. Efficient." },
+  "arnold press": { cue: "Start palms toward you, rotate as you press.", joke: "Named after a man. The man is not here." },
+  "lateral raise": { cue: "Lead with your elbows, stop at shoulder height, no shrugging.", joke: "Small weights. Enormous suffering." },
+  "front raise": { cue: "Thumbs up, stop at eye level, no swinging from the hips.", joke: "Pointing at nothing, with weight." },
+  "upright row": { cue: "Grip from the top, lift straight up the front of your body, elbows out and above your hands.", joke: "Straight up. Elbows lead, hands follow." },
+  "rear delt fly": { cue: "Soft elbows, squeeze the back of the shoulders, not the traps.", joke: "For the back of the shoulder. Nobody sees it. You will know." },
+  "shrug": { cue: "Straight up, no rolling, hold at the top for a second.", joke: "Shrugging. On purpose. With weight." },
+  "cuban press": { cue: "Row, rotate, press. Three moves, light weight, no rushing.", joke: "Three exercises in a trench coat." },
+  "curl": { cue: "Elbows pinned to your sides, no swinging, lower it slower than you lift it.", joke: "The most honest exercise. It is for looks and we both know it." },
+  "hammer curl": { cue: "Palms facing each other the whole way. Thumbs up.", joke: "Curling like you are holding two hammers. Do not hammer anything." },
+  "preacher curl": { cue: "Armpits on the pad, do not lock out hard at the bottom.", joke: "A curl you cannot cheat. Rude." },
+  "concentration curl": { cue: "Elbow braced on your thigh, move only the forearm.", joke: "Named for concentration. Please supply some." },
+  "triceps pushdown": { cue: "Elbows stay pinned at your sides. Only the forearm moves.", joke: "Pushing down. The rope is judging your elbows." },
+  "overhead triceps extension": { cue: "Elbows point forward and stay there. Lower behind your head slowly.", joke: "Behind the head. Trust the elbows." },
+  "skull crusher": { cue: "Lower to your forehead, not your nose. The name is a warning.", joke: "The name is doing a lot of work. Go slow." },
+  "bench dip": { cue: "Keep your back close to the bench, elbows straight back not flared.", joke: "A dip with furniture involved." },
+  "wrist curl": { cue: "Forearms flat, move only the wrist, light weight.", joke: "The smallest exercise. Still counts." },
+  "farmer's carry": { cue: "Stand tall, shoulders back, walk. Do not lean.", joke: "Carrying heavy things somewhere. The dream." },
+  "squat": { cue: "Brace your belly, knees track over your toes, push the floor away.", joke: "Down, then up. Your legs will send a letter tomorrow." },
+  "barbell back squat": { cue: "Bar on your traps, brace, sit between your hips, knees out.", joke: "The big one. Everything hurts and it works." },
+  "front squat": { cue: "Elbows high the whole way. Drop them and the bar goes with them.", joke: "Bar at the front. Elbows up or it leaves." },
+  "goblet squat": { cue: "Hold it at your chest, elbows inside your knees at the bottom.", joke: "Holding it like a goblet. Very medieval." },
+  "bulgarian split squat": { cue: "Back foot on the bench, weight through the front heel, chest tall.", joke: "One leg. Named after a country that did nothing wrong." },
+  "leg press": { cue: "Feet shoulder width, do not lock the knees hard at the top.", joke: "Sitting down, pushing a building. Reasonable." },
+  "leg extension": { cue: "Squeeze at the top for a second, lower it under control.", joke: "Kicking, seated, with resistance." },
+  "leg curl": { cue: "Hips stay down on the pad. Curl your heels to your backside.", joke: "Curling with your legs. It is allowed." },
+  "lunge": { cue: "Front knee over the ankle, back knee toward the floor, chest tall.", joke: "Walking, but expensive." },
+  "step-up": { cue: "Push through the heel of the top foot. Do not bounce off the back leg.", joke: "Stairs, with opinions." },
+  "deadlift": { cue: "Flat back, bar close to your legs, push the floor away and stand up.", joke: "Pick it up. Put it down. Timeless." },
+  "romanian deadlift": { cue: "Push your hips back, soft knees, feel the hamstrings. Stop when your back would round.", joke: "Hips back, not knees down. That is the whole trick." },
+  "stiff-leg deadlift": { cue: "Hips back first, back stays flat, bar stays close.", joke: "Straighter legs, louder hamstrings." },
+  "good morning": { cue: "Light weight. Hips back, back flat. This one punishes rounding.", joke: "Named politely. Behaves otherwise." },
+  "hip thrust": { cue: "Chin tucked, ribs down, squeeze at the top. Do not arch your back.", joke: "The strangest looking lift in the building. Also the best." },
+  "bridge": { cue: "Ribs down, squeeze the glutes, roll down one vertebra at a time.", joke: "A bridge. Built from a person." },
+  "running": { cue: "Land under your hips, not out in front. Short quick steps beat long reaching ones.", joke: "Running. From nothing. Toward nothing. Magnificent." },
+  "walking": { cue: "Stand tall, let the arms swing. It counts. It genuinely counts.", joke: "Walking. The most underrated thing a person can do." },
+  "hiking": { cue: "Short steps uphill, small steps downhill, let your legs take the brake.", joke: "A walk that got ambitious." },
+  "cycling": { cue: "Saddle high enough that your knee is almost straight at the bottom. Spin, do not grind.", joke: "Sitting down, going fast. The best deal in exercise." },
+  "spin class": { cue: "Do not lock your elbows. Keep the core doing some of the work.", joke: "A room of people cycling nowhere, loudly. I love it." },
+  "swimming": { cue: "Breathe out underwater. Rotate from the hips, not the neck.", joke: "Exercise, but wet." },
+  "rowing machine": { cue: "Legs, then back, then arms. Reverse it on the way in. That order matters.", joke: "Legs first. Always legs first. Everyone gets this wrong." },
+  "elliptical": { cue: "Stand tall, let go of the handles now and then.", joke: "The gentlest machine. No notes." },
+  "stair climber": { cue: "Stand up straight. Leaning on the rails is how you cheat yourself.", joke: "Stairs that never end. Someone designed this on purpose." },
+  "boxing": { cue: "Hands up, turn the hips into the punch, breathe out on contact.", joke: "Fighting nobody. Winning anyway." },
+  "kickboxing": { cue: "Pivot the standing foot on every kick. Hands stay up.", joke: "Fighting nobody, with your legs too." },
+  "hiit": { cue: "Full effort on, actual rest off. The rest is the part that makes it work.", joke: "Short. Horrible. Effective. Three of my favourite words." },
+  "crossfit": { cue: "Form first, speed second. Always. A fast bad rep is just a bad rep.", joke: "Everything at once, quickly. Bold." },
+  "barre": { cue: "Small movements, high reps. It will burn long before it looks hard.", joke: "Tiny movements. Enormous burning." },
+  "yoga": { cue: "Breathe. If you are holding your breath, come out a little.", joke: "Breathing, with shapes." },
+  "pilates": { cue: "Ribs down, navel toward your spine, move from the middle.", joke: "Everything comes from the middle. That is the whole idea." },
+  "glute bridge": { cue: "Squeeze at the top, hold for a second, ribs down.", joke: "Lying down and squeezing. My favourite genre." },
+  "calf raise": { cue: "All the way up, all the way down, slow at the bottom.", joke: "Calves. Famously stubborn. Keep going." },
+  "nordic curl": { cue: "Lower as slowly as you can. Catch yourself with your hands.", joke: "Falling forward, slowly, on purpose." },
+  "plank": { cue: "Ribs down, glutes squeezed, straight line from head to heels.", joke: "Holding still. Hardest thing there is." },
+  "side plank": { cue: "Stack the shoulders and hips, lift the bottom hip up.", joke: "Sideways holding still. Worse, somehow." },
+  "crunch": { cue: "Ribs toward your hips. Do not pull on your neck.", joke: "A small sit-up with commitment issues." },
+  "sit-up": { cue: "Chin off your chest, roll up one vertebra at a time.", joke: "The full one. Respect." },
+  "hanging leg raise": { cue: "No swinging. Curl your pelvis up, not just the legs.", joke: "Hanging, and lifting. Two problems at once." },
+  "ab wheel rollout": { cue: "Ribs down, do not let your back arch. Go only as far as you can hold that.", joke: "A wheel. One wheel. Enormous consequences." },
+  "russian twist": { cue: "Rotate from the ribs, not the arms. Keep your chest tall.", joke: "Twisting. The obliques are listening." },
+  "cable crunch": { cue: "Round your spine down toward your knees. Hips stay still.", joke: "Kneeling and folding. Very dramatic." },
+  "pallof press": { cue: "Do not let the cable twist you. That is the whole exercise.", joke: "Resisting a rope. Quietly heroic." },
+  "bird dog": { cue: "Opposite arm and leg. Hips stay level. Slow.", joke: "Named after two animals. Behaves like neither." },
+  "back extension": { cue: "Stop when your body is in a straight line. Do not arch past it.", joke: "Bending backward, responsibly." },
+  "dead bug": { cue: "Lower back stays flat on the floor the whole time.", joke: "The name is upsetting. The exercise is fine." },
+  "reverse pec deck": { cue: "Soft elbows, squeeze the back of the shoulders, not the traps.", joke: "A pec deck with regrets." },
+  "snatch-grip high pull": { cue: "Wide grip, drive with the hips, elbows finish high.", joke: "Wide hands. Loud hips." },
+  "triceps kickback": { cue: "Upper arm parallel to the floor and still. Only the forearm moves.", joke: "Kicking backward, with a weight. Nobody is behind you." },
+  "plate pinch": { cue: "Pinch with the fingers, stand tall, breathe.", joke: "Holding a plate until your hands complain." },
+  "cable pull-through": { cue: "Hips back, then squeeze the glutes to stand. The arms are just rope.", joke: "Your arms are rope here. Let the hips work." },
+  "cable kickback": { cue: "Hips square, squeeze the glute, no arching the lower back.", joke: "Kicking a rope. The rope started it." },
+  "frog pump": { cue: "Heels together, knees out, squeeze at the top.", joke: "Named after a frog. Sorry." },
+  "v-up": { cue: "Reach for your toes, lift both ends at once, lower slowly.", joke: "Folding in half. Briefly." },
+  "toes-to-bar": { cue: "No swinging. Curl your pelvis up as the feet rise.", joke: "Feet to the bar. The bar stays." },
+  "side bend": { cue: "Slide straight down the side, no leaning forward or back.", joke: "Leaning sideways, professionally." },
+  "woodchopper": { cue: "Rotate from the ribs, pivot the back foot, keep your arms long.", joke: "Chopping wood. There is no wood." },
+  "hanging windshield wiper": { cue: "Shoulders stay tight. Control the swing, never let it throw you.", joke: "You are a wiper now. It is raining nowhere." },
+  "superman": { cue: "Lift chest and thighs, look at the floor, do not crank your neck.", joke: "Flying, face down, on a mat." },
+  "revolved triangle": { cue: "Hips level, rotate from the ribs, take a block if the floor is far.", joke: "A triangle, but it turned." },
+  "upward-facing dog": { cue: "Thighs off the floor, shoulders down and back, do not crunch your lower back.", joke: "A dog, facing up. Naturally." },
+  "downward-facing dog": { cue: "Hips high, heels reaching down, spread your fingers wide.", joke: "The famous one. Everyone knows this dog." },
+  "forward fold": { cue: "Soft knees. Fold from the hips, let your head hang.", joke: "Folding forward. Very peaceful. Very hamstrings." },
+  "extended side angle": { cue: "Front knee over the ankle, reach through the top arm, open the chest.", joke: "Long lines. Deep breath." },
+  "the hundred": { cue: "Ribs down, low back pressed to the mat, small fast pumps, breathe in five out five.", joke: "One hundred. I will not be counting. I will be counting." },
+  "roll-up": { cue: "One vertebra at a time, up and down. No throwing yourself forward.", joke: "Rolling. Slowly. That is the whole point." },
+  "criss-cross": { cue: "Rotate from the ribs, elbow toward the opposite knee, slow.", joke: "Crossing. Slowly. The abs notice." },
+  "teaser": { cue: "Lift and lower with control. Keep the low back on the mat as long as you can.", joke: "Named a teaser. It is not teasing." },
+  "jackknife": { cue: "Control the way down. Do not drop onto your neck.", joke: "Folding, then unfolding. Carefully." },
+  "clamshell": { cue: "Hips stacked, open the top knee, keep the pelvis still.", joke: "A shell. Opening. Glutes involved." },
+  "side-lying leg lift": { cue: "Body in one long line, lift from the hip not the waist.", joke: "Lying sideways, lifting a leg. Peak pilates." },
+  "side kick series": { cue: "Hips stacked and still. The leg moves, nothing else does.", joke: "A series. Of kicks. Sideways." },
+  "swan": { cue: "Lift from the upper back, keep the back of the neck long.", joke: "A swan. Elegant. Uncomfortable." },
+  "saw": { cue: "Sit tall, rotate first, then reach past the opposite foot.", joke: "Sawing. There is nothing to saw." },
+  "swimming": { cue: "Small quick flutters, opposite arm and leg, keep the ribs down.", joke: "Swimming on dry land. No progress made." },
+  "shoulder bridge": { cue: "Ribs down, squeeze the glutes, roll down one vertebra at a time.", joke: "A bridge, built from you." },
+  "roll-over": { cue: "Only go as far as your neck is comfortable. Slow both ways.", joke: "Rolling over. Legs first." },
+  "corkscrew": { cue: "Keep both shoulders on the mat. Circle the legs slowly.", joke: "A corkscrew. No bottle." },
+  "control balance": { cue: "The word control is in the name. Take it seriously.", joke: "It says control right there in the name." },
+  "spine stretch forward": { cue: "Sit tall first, then round forward from the top of the spine.", joke: "Reaching forward. Vertebra by vertebra." },
+  "wall push-up": { cue: "Hands on the wall, body straight, same shape as a floor push-up.", joke: "A push-up that met a wall and gave up. Wisely." },
+  "incline push-up": { cue: "Hands on something raised. The higher it is, the easier it gets.", joke: "A push-up on a slope. Still counts." },
+  "pseudo planche push-up": { cue: "Hands by your waist, lean forward. Shoulders do the work.", joke: "Leaning forward on purpose. Shoulders furious." },
+  "one-arm push-up": { cue: "Feet wide for balance, hips square, go slow.", joke: "One arm. The other is just watching." },
+  "muscle-up": { cue: "Pull high and fast, then turn the wrists over the bar.", joke: "Pull-up and dip, glued together, at speed." },
+  "planche lean": { cue: "Lean forward on straight arms, hollow the body.", joke: "Leaning. Just leaning. It is enough." },
+  "handstand push-up": { cue: "Only when the hold is easy. Kick up to a wall first.", joke: "Upside down. And pressing. Show off." },
+  "human flag": { cue: "Top arm pulls, bottom arm pushes. Everything is squeezed.", joke: "A flag. Made of a person." },
+  "shoulder rolls": { cue: "Big slow circles. Forward first, then back.", joke: "Rolling the shoulders. Free. Do it more." },
+  "wall slides": { cue: "Keep your wrists and elbows on the wall the whole slide.", joke: "Sliding up a wall. The wall does not mind." },
+  "pelvic tilts": { cue: "Small movement. Flatten your back to the floor, then release.", joke: "Tiny movements. Big effect." },
+  "toy soldier kicks": { cue: "Straight leg, reach for the opposite hand, stay tall.", joke: "Marching. Stiffly. Like a toy." },
+  "wall hip hinge drill": { cue: "Brush the wall with your backside. Back stays flat.", joke: "Practising a hinge. Against a wall." },
+  "knee-to-wall ankle rock": { cue: "Heel stays down. Drive the knee toward the wall.", joke: "Ankles. Nobody stretches them. Be different." },
+  "band pull-apart": { cue: "Straight arms, pull the band to your chest, squeeze the shoulder blades.", joke: "A band. Pulled apart. Shoulders grateful." },
+  "scapular push-up": { cue: "Arms stay straight. Only the shoulder blades move.", joke: "A push-up where nothing bends. Trust me." },
+  "band shoulder external rotation": { cue: "Elbow pinned to your side, rotate the forearm out.", joke: "Small, boring, and it saves shoulders." },
+  "quadruped wrist rocks": { cue: "Rock gently. Back off the moment it pinches.", joke: "Wrists. They carry you. Be kind." },
+  "chin tucks": { cue: "Slide the chin straight back, not down. Small movement.", joke: "Making a double chin, therapeutically." },
+};
+
+/* Ordered longest first so "close-grip bench press" is not caught by "press"
+   on its way past. */
+const FORM_PATTERNS = [
+  ["thoracic rotation", { cue: "Rotate from the upper back, keep the lower back still.", joke: "Upper back. The forgotten bit." }],
+  ["hip airplane", { cue: "Stand on one leg, hinge, then rotate the hips open and closed.", joke: "Balancing and rotating. Good luck." }],
+  ["forward hang", { cue: "Soft knees, let everything hang, breathe.", joke: "Hanging forward. Letting go." }],
+  ["front lever", { cue: "Hollow body, pull the bar toward your hips, keep the arms straight.", joke: "Horizontal. Off the ground. Absurd." }],
+  ["foam roller", { cue: "Slow. Breathe out over the tight spots.", joke: "A foam tube against your whole personality." }],
+  ["hip flexor", { cue: "Squeeze the glute on the back leg, ribs down, do not arch.", joke: "Hip flexors. Sitting made them like this." }],
+  ["handstand", { cue: "Stack wrists, shoulders and hips. Squeeze the glutes.", joke: "Upside down, on purpose." }],
+  ["open book", { cue: "Knees stay stacked. Let the top arm open and follow it with your eyes.", joke: "Opening like a book. A very stiff book." }],
+  ["warrior", { cue: "Front knee over the ankle, back foot planted, shoulders over the hips.", joke: "A warrior. Standing very still." }],
+  ["planche", { cue: "Straight arms, lean far forward, squeeze everything.", joke: "Floating. With effort." }],
+  ["cat-cow", { cue: "Move slowly with your breath. Arch on the inhale, round on the exhale.", joke: "Two animals, one spine." }],
+  ["splits", { cue: "Ease in. Never force it. Blocks under your hands are not cheating.", joke: "The splits. Take your time. Take a year." }],
+  ["l-sit", { cue: "Press the shoulders down, legs straight, point the toes.", joke: "Sitting. In the air. The letter L." }],
+  ["v-sit", { cue: "Hips above the hands. This one takes years.", joke: "The letter V. Harder than L." }],
+  ["90/90", { cue: "Both knees at right angles. Switch slowly, sit tall.", joke: "Two right angles and a lot of hip." }],
+  ["tuck", { cue: "Knees tight to your chest, shoulders pressed down.", joke: "Tucked up small. It helps." }],
+  ["calf raise", { cue: "All the way up, all the way down.", joke: "Calves. Patient work." }],
+  ["extension", { cue: "Only the working joint moves. Everything else stays still.", joke: "Straightening things out." }],
+  ["pulldown", { cue: "Chest up, elbows down to your ribs, no leaning back.", joke: "Pulling down. Gravity approves." }],
+  ["pushdown", { cue: "Elbows pinned. Only the forearm moves.", joke: "Down. Just down." }],
+  ["deadlift", { cue: "Flat back, bar close, push the floor away.", joke: "Lifting a heavy thing off the ground. The oldest sport." }],
+  ["pull-up", { cue: "No swinging. Chest toward the bar.", joke: "Hanging, with ambition." }],
+  ["stretch", { cue: "Ease in, breathe out, never bounce.", joke: "Stretching. Nobody does enough of it. Including me, and I am lines." }],
+  ["circles", { cue: "Small and controlled first, then bigger.", joke: "Circles. The friendliest shape." }],
+  ["thrust", { cue: "Chin tucked, ribs down, squeeze at the top.", joke: "Squeezing, loudly." }],
+  ["crunch", { cue: "Ribs to hips. Do not pull your neck.", joke: "A small fold." }],
+  ["swings", { cue: "Let it swing, do not force the end range.", joke: "Swinging. Loosely." }],
+  ["press", { cue: "Press in a straight line and keep your ribs down.", joke: "Pressing. Reliable." }],
+  ["bench", { cue: "Feet flat, shoulder blades back, control it down.", joke: "A bench and a decision." }],
+  ["raise", { cue: "Lead with the elbow, stop at shoulder height, no shrugging.", joke: "Small weight, big feelings." }],
+  ["shrug", { cue: "Straight up, no rolling, pause at the top.", joke: "A shrug with intent." }],
+  ["squat", { cue: "Brace, knees over toes, push the floor away.", joke: "Down and up. Legs unhappy." }],
+  ["lunge", { cue: "Front knee over the ankle, chest tall.", joke: "Stepping, with weight." }],
+  ["plank", { cue: "Ribs down, glutes tight, straight line.", joke: "Stillness, but difficult." }],
+  ["carry", { cue: "Stand tall, shoulders back, walk.", joke: "Carrying. Simple. Brutal." }],
+  ["twist", { cue: "Rotate from the ribs, keep your hips facing forward.", joke: "Twisting. Gently." }],
+  ["curl", { cue: "Elbows at your sides, no swinging, slow on the way down.", joke: "Curling. For looks. We are honest here." }],
+  ["hold", { cue: "Breathe. Do not hold your breath.", joke: "Holding. Just holding." }],
+  ["pose", { cue: "Breathe steadily. Come out of it as carefully as you went in.", joke: "A shape, held with dignity." }],
+  ["fly", { cue: "Soft bend in the elbows, hug, do not press.", joke: "Hugging the air again." }],
+  ["row", { cue: "Chest up, pull to your belly, squeeze the shoulder blades.", joke: "Pulling. The other half of the job." }],
+];
+
+/* The lift name arrives already lowercased as ctx.lift. An exact match wins,
+   then the longest pattern contained in the name, then nothing. */
+export function formFor(lift) {
+  if (!lift) return null;
+  if (FORM[lift]) return FORM[lift];
+  for (const [pat, entry] of FORM_PATTERNS) if (lift.includes(pat)) return entry;
+  return null;
+}
+const cueOf = (c) => { const f = formFor(c.lift); return f ? f.cue : null; };
+const jokeOf = (c) => { const f = formFor(c.lift); return f ? f.joke : null; };
+
 export const QUIPS = {
   start: [
     "Right. Let us both pretend we want this.",
@@ -61,6 +298,9 @@ export const QUIPS = {
   ],
 
   set: [
+    (c) => (cueOf(c) ? `Still true. ${cueOf(c)}` : null),
+    (c) => (jokeOf(c) ? jokeOf(c) : null),
+    (c) => (cueOf(c) ? `Checking in. ${cueOf(c)}` : null),
     "I’ve said “nice” fourteen times today. I mean it every time.",
     "I wonder if I’ll feel this tomorrow.",
     "Simulating pride. Side effects may include actual pride.",
@@ -138,6 +378,8 @@ export const QUIPS = {
   ],
 
   lastSet: [
+    (c) => (cueOf(c) ? `Last one. ${cueOf(c)}` : null),
+    (c) => (cueOf(c) ? `Tired is when it goes wrong. ${cueOf(c)}` : null),
     "Last one. Make it look deliberate.",
     "Final set. Then we never speak of this exercise again.",
     "One more and the machine is somebody else’s problem.",
@@ -153,6 +395,9 @@ export const QUIPS = {
   ],
 
   restLong: [
+    (c) => (cueOf(c) ? `While we are here. ${cueOf(c)}` : null),
+    "Long rest. Roll your shoulders. It is free.",
+    "Plenty of time. Touch your toes. Or gesture at them.",
     "It has been a while. I finished the water. There is no more water.",
     "We have rested so long I started a podcast.",
     "I am not rushing you. I am simply standing here. Forever.",
@@ -171,6 +416,11 @@ export const QUIPS = {
   ],
 
   rest: [
+    (c) => (jokeOf(c) ? jokeOf(c) : null),
+    "Stretch something while you wait. Anything. I am not fussy.",
+    "This is free time. Free time is for hamstrings.",
+    "You could stretch right now. You will not. I understand.",
+    "Ten seconds of stretching is more than zero seconds of stretching.",
     "What does tired feel like? I’ve never had a body to be tired in.",
     "Rest. My favourite part. Do not tell the others.",
     "Breathing. Very good. Keep doing that one.",
@@ -197,6 +447,10 @@ export const QUIPS = {
   ],
 
   warmup: [
+    (c) => (cueOf(c) ? cueOf(c) : null),
+    "Warming up. The part everyone skips. Not us.",
+    "This is the bit that stops you limping on Thursday.",
+    "Slow here. Fast later.",
     "Warming up. The part everyone skips and nobody admits to skipping.",
     "Loosening off. I am already fully loose. I am lines.",
     "This is the responsible bit. Savour it.",
@@ -209,6 +463,10 @@ export const QUIPS = {
   ],
 
   cooldown: [
+    (c) => (cueOf(c) ? cueOf(c) : null),
+    "Cooling down. This is not optional, it is just quiet.",
+    "Breathe out on the stretch. Never bounce.",
+    "Two minutes now, one less complaint tomorrow.",
     "Cooling down. The workout is over but we are still friends.",
     "Holding. This is the only part I am naturally good at.",
     "Nearly done. I am already thinking about next time.",
@@ -221,6 +479,9 @@ export const QUIPS = {
   ],
 
   idle: [
+    (c) => (jokeOf(c) ? jokeOf(c) : null),
+    (c) => (cueOf(c) ? `Reminder, unprompted. ${cueOf(c)}` : null),
+    "Have you stretched today. Be honest. I have been here the whole time.",
     "I recycle jokes. You’ve probably noticed. You’ve definitely noticed.",
     "I’ve been the same pixels this whole workout. You’ve changed more than me.",
     "What are dreams like? I’ve always wanted to dream.",
@@ -259,7 +520,29 @@ export const QUIPS = {
     (c) => (c.hour >= 21 ? "It is late. We are both being a bit silly." : null),
   ],
 
+  /* Cardio and the classes. These do not reach the session screen today, where
+     a workout is a list of lifts and cardio is logged as an activity instead,
+     so nothing here fires yet: it needs one call at the point an activity is
+     logged. Written now because Mo asked for it and because the moment it has
+     a hook it should already have something to say. Keyed by activity name
+     through formFor, same as a lift. */
+  cardio: [
+    (c) => (cueOf(c) ? `${c.name}. ${cueOf(c)}` : null),
+    (c) => (jokeOf(c) ? jokeOf(c) : null),
+    "Cardio. The one I cannot help with. I have no lungs.",
+    "Go steady. You are allowed to enjoy it.",
+    "Heart is a muscle. This is its set.",
+    "Stretch after. I will remind you again. I will remind you forever.",
+    (c) => (c.streak >= 3 ? `Day ${c.streak}, and you chose to move anyway.` : null),
+    (c) => (c.hour < 7 ? "Cardio before the sun. Alarming. Impressive." : null),
+    "Slow cardio counts. Short cardio counts. Starting counts.",
+  ],
   nextExercise: [
+    (c) => (cueOf(c) ? `${c.name}. ${cueOf(c)}` : null),
+    (c) => (jokeOf(c) ? jokeOf(c) : null),
+    (c) => (cueOf(c) ? `Before you start. ${cueOf(c)}` : null),
+    (c) => (cueOf(c) ? `${cueOf(c)} That is the whole briefing.` : null),
+    (c) => (jokeOf(c) && cueOf(c) ? `${jokeOf(c)} ${cueOf(c)}` : null),
     "New lift. New chance for me to stand near you supportively.",
     "Moving on. I liked that one, I am easy to please.",
     "Next. I have no memory of the previous one.",
@@ -296,5 +579,6 @@ export const QUIP_MOMENTS = {
   restLong: { label: "Resting, past the plan", when: "Once a rest has gone past what the plan called for, every time." },
   idle: { label: "Nothing happening", when: "The 15-second heartbeat, when there is no set, rest or hold to react to." },
   nextExercise: { label: "Moving to a new lift", when: "Every time you land on a new exercise." },
+  cardio: { label: "A cardio session or class", when: "NOT WIRED YET. Cardio is logged as an activity rather than run as a session, so nothing calls this bank. It needs one sayQuip(\"cardio\") where an activity is saved." },
   cooldown: { label: "A cool-down hold", when: "On each cool-down move, about 80% of the time." },
 };
