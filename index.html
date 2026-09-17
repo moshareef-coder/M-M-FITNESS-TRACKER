@@ -4680,24 +4680,31 @@
   .waist-input:focus { outline: none; }
   .photo-date { font-size: 12.5px; color: var(--muted); text-align: center; margin-top: 5px; }
 
-  /* Start beside Now. The two photos share the strip's frame (116x155, 11px
-     corners) scaled to half a card each, so the compare reads as the same
-     objects the full strip shows, just picked out. The frame is painted before
-     any URL resolves: a signed URL takes a round trip, and an <img> with no
-     src is a broken-image glyph on iOS, which reads as "my photo is gone". */
-  .cmp-card .card-head { margin-bottom: 14px; }
-  /* A two-row grid, frames on the first row and captions on the second, so
-     the disc between the photos can be centred on the frame row by the grid
-     itself. A percentage top would measure the captions too and land the
-     disc a line low, which is where the first cut of this put it. */
-  .cmp-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 12px; align-items: start; }
-  .cmp-slot { display: contents; }
-  .cmp-slot.l > * { grid-column: 1; }
-  .cmp-slot.r > * { grid-column: 2; }
-  .cmp-frame { grid-row: 1; }
-  .cmp-cap { grid-row: 2; }
+  /* ---- Start beside Now ----
+     Mo's design, matched: the photos fill their frames, the label and the date
+     sit ON the photo at the bottom left over a scrim rather than in a caption
+     underneath, and the disc between them overlaps both.
+
+     Captions inside is not only what the mockup shows, it is what makes this
+     card shorter than the one it replaces, which is what let the photos move
+     to the top of the goal screen without pushing the line off it. A frame
+     with no photo yet keeps the same label in token colours, so the two
+     columns stay aligned whether one, both or neither has an image.
+
+     The frame is painted before any URL resolves: a signed URL takes a round
+     trip, and an <img> with no src is a broken-image glyph on iOS, which
+     reads as "my photo is gone". */
+  .cmp-card h2 {
+    font-size: 16px; text-transform: none; letter-spacing: -.01em;
+    color: var(--text); font-weight: 800;
+  }
+  .cmp-card .card-head { margin-bottom: 12px; }
+  .cmp-pair {
+    position: relative; display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 12px;
+  }
   .cmp-frame {
-    position: relative; width: 100%; aspect-ratio: 116 / 155; border-radius: 11px; overflow: hidden;
+    position: relative; width: 100%; aspect-ratio: 1 / 1.18; border-radius: 14px; overflow: hidden;
     background: var(--panel-2); border: 1px solid var(--border);
     display: flex; align-items: center; justify-content: center; color: var(--muted);
   }
@@ -4706,18 +4713,67 @@
     opacity: 0; transition: opacity .18s ease;
   }
   .cmp-frame img.in { opacity: 1; }
-  .cmp-cap { text-align: center; margin-top: 7px; min-width: 0; }
-  .cmp-cap b { display: block; font-size: 13.5px; font-weight: 700; color: var(--text); line-height: 1.25; }
-  .cmp-cap span { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.3; margin-top: 2px; }
+  .cmp-glyph { display: flex; }
+  .cmp-cap {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 1;
+    padding: 26px 11px 10px; display: flex; flex-direction: column; gap: 1px; text-align: left;
+  }
+  .cmp-cap b { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.2; }
+  .cmp-cap span { font-size: 12.5px; color: var(--muted); line-height: 1.25; }
+  /* The scrim exists only where there is a photo to read the label off, and it
+     is a fixed dark rather than a token: it is sitting on a photograph, not on
+     the app's background, so it has to hold in either theme. */
+  .cmp-frame.has-img .cmp-cap {
+    background: linear-gradient(to top, rgba(6,9,14,.86), rgba(6,9,14,.5) 46%, rgba(6,9,14,0));
+  }
+  .cmp-frame.has-img .cmp-cap b { color: #fff; }
+  .cmp-frame.has-img .cmp-cap span { color: rgba(255,255,255,.8); }
+  /* Today's photo, and only today's: tap to shoot it again. Yesterday's is
+     history, and history does not get edited. */
+  .cmp-retake {
+    position: absolute; top: 8px; right: 8px; z-index: 2; width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer;
+    background: rgba(6,9,14,.55); border: 1px solid rgba(255,255,255,.35); color: #fff;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  }
+  .cmp-retake:active { transform: scale(.92); }
   /* Decorative, so no hit target is bought for it. */
   .cmp-chev {
-    grid-row: 1; grid-column: 1 / -1; place-self: center; z-index: 1;
-    width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    background: var(--panel); border: 1px solid var(--border); color: var(--muted); box-shadow: var(--shadow-float);
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
+    width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text); box-shadow: var(--shadow-float);
     pointer-events: none;
   }
-  .cmp-line { font-size: 13.5px; color: var(--muted); margin: 0; line-height: 1.4; }
-  .cmp-card .btn-secondary { margin-top: 12px; }
+  /* ---- The day's row ----
+     A job, so it sits above the card's own title, and it leaves the moment the
+     job is done: Completed, a beat, then the card closes the gap behind it and
+     everything below shifts up. A row that stays on screen saying "done" for
+     the rest of the day is furniture, and this tab has been carrying too much
+     of that. max-height rather than height because the row's real height is
+     not known until it is measured, and it is measured on the way out. */
+  .cmp-today {
+    overflow: hidden; max-height: 80px; margin-bottom: 12px;
+    transition: max-height .3s ease, opacity .22s ease, margin-bottom .3s ease;
+  }
+  .cmp-today.gone { max-height: 0; opacity: 0; margin-bottom: 0; }
+  .cmp-today-add {
+    display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px;
+    padding: 10px 12px; border-radius: 12px; cursor: pointer; font: inherit; text-align: left;
+    background: var(--panel-2); border: 1px dashed var(--border); color: var(--text);
+  }
+  .cmp-today-add:active { transform: scale(.985); }
+  .cmp-today-ico, .cmp-today-go { display: flex; color: var(--muted); flex-shrink: 0; }
+  .cmp-today-text { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 700; }
+  .cmp-today-done {
+    display: flex; align-items: center; gap: 9px; min-height: 48px;
+    padding: 10px 12px; border-radius: 12px;
+    background: color-mix(in srgb, var(--accent) 14%, var(--panel)); color: var(--accent-ink);
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  .cmp-today-done b { font-size: 14.5px; font-weight: 800; }
+  @media (prefers-reduced-motion: reduce) {
+    .cmp-today { transition: none; }
+  }
 
   /* Seasons */
   .season-card {
@@ -5141,8 +5197,6 @@
      head, because the whole screen has to fit about one scroll: Mo was going
      three screens deep to read one answer. */
   #toneHero .tone-photos { margin: 0 0 12px; }
-  #toneHero .cmp-frame { aspect-ratio: 1 / 1.16; }
-  #toneHero .cmp-card .card-head { margin-bottom: 11px; }
   /* Selected is the ink, not the accent, on both strips. A lit chip, a lit
      range pill and a filled button all wearing the same green is three things
      shouting and no call to action, which is exactly what Mo saw. One filled
@@ -25072,6 +25126,12 @@ async function renderBodyPhotos() {
    The array comes newest-first from loadBodyPhotos, but the pair is picked
    by sorting a copy rather than by trusting that order: renderBodyPhotos has
    a paragraph about how easy that is to get backwards. */
+
+/* Set by a successful upload and cleared by the row that reports it, so the
+   Completed receipt survives exactly one render and then takes itself off. */
+let CMP_JUST_ADDED = false;
+let CMP_CLEAR_TIMER = null;
+
 async function renderComparePhotos(hostEl, isPartner) {
   if (!hostEl) return;
   hostEl.classList.add("card", "cmp-card");
@@ -25082,24 +25142,47 @@ async function renderComparePhotos(hostEl, isPartner) {
     .slice().sort((a, b) => (a.taken_on < b.taken_on ? -1 : a.taken_on > b.taken_on ? 1 : 0));
   const start = shots.length > 1 ? shots[0] : null;
   const now = shots.length ? shots[shots.length - 1] : null;
+  const today = todayStr();
+  const todayShot = shots.find((p) => p.taken_on === today);
 
   const chevSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>';
-  const slot = (label, side, shot, hint) => `<figure class="cmp-slot ${side}">
-      <div class="cmp-frame" data-slot="${label}">${shot ? "" : icon("camera", 22)}</div>
-      <figcaption class="cmp-cap"><b>${label}</b><span>${shot ? escapeHtml(datedLabel(shot.taken_on)) : escapeHtml(hint || "")}</span></figcaption>
-    </figure>`;
+  /* "Jul 16, 2024", the way the mockup dates them. datedLabel is the app's
+     other date and leads with the weekday, which is the right answer for a
+     workout ("Wed") and the wrong one for a photo you are comparing across
+     months. */
+  const capDate = (d) => new Date(d + "T00:00:00")
+    .toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 
-  hostEl.innerHTML = `<div class="card-head">
+  const frame = (label, shot, hint) => `<div class="cmp-frame" data-slot="${label}">
+      ${shot ? "" : `<span class="cmp-glyph">${icon("camera", 22)}</span>`}
+      <div class="cmp-cap"><b>${label}</b><span>${escapeHtml(shot ? capDate(shot.taken_on) : (hint || ""))}</span></div>
+      ${label === "Now" && shot && shot.taken_on === today
+        ? `<button type="button" class="cmp-retake" aria-label="Retake today's photo">${icon("camera", 15)}</button>`
+        : ""}
+    </div>`;
+
+  /* The day's row is the very top of the card, above its own title, because
+     it is the one thing here with a deadline. It is absent once the day is
+     done, apart from the single render that reports it. */
+  const todayRow = (todayShot && !CMP_JUST_ADDED) ? "" : `<div class="cmp-today" id="cmpToday">
+      ${CMP_JUST_ADDED
+        ? `<div class="cmp-today-done">${icon("check", 17)}<b>Completed</b></div>`
+        : `<button type="button" class="cmp-today-add">
+             <span class="cmp-today-ico">${icon("camera", 17)}</span>
+             <span class="cmp-today-text">Add today's photo</span>
+             <span class="cmp-today-go">${icon("plus", 16)}</span>
+           </button>`}
+    </div>`;
+
+  hostEl.innerHTML = todayRow + `<div class="card-head">
       <h2>Progress Photos</h2>
       ${shots.length ? `<button type="button" class="card-link ink cmp-all">See all ${chevSvg}</button>` : ""}
-    </div>` + (shots.length
-    ? `<div class="cmp-pair">
-        ${slot("Start", "l", start, "Add another to compare")}
-        <span class="cmp-chev" aria-hidden="true">${chevSvg}</span>
-        ${slot("Now", "r", now)}
-      </div>`
-    : `<p class="cmp-line">Your first photo becomes your Start.</p>
-       <button type="button" class="btn-secondary cmp-add">Add today's photo</button>`);
+    </div>
+    <div class="cmp-pair">
+      ${frame("Start", start, shots.length ? "Add another to compare" : "No photo yet")}
+      <span class="cmp-chev" aria-hidden="true">${chevSvg}</span>
+      ${frame("Now", now, "No photo yet")}
+    </div>`;
 
   const all = hostEl.querySelector(".cmp-all");
   if (all) all.onclick = () => {
@@ -25111,8 +25194,31 @@ async function renderComparePhotos(hostEl, isPartner) {
     primeOpenedCard(card);
     card.scrollIntoView({ block: "start", behavior: "smooth" });
   };
-  const add = hostEl.querySelector(".cmp-add");
-  if (add) add.onclick = () => $("addBodyPhotoBtn")?.click();
+  /* Both doors open the same picker. Retake is on today's frame only, and the
+     upsert behind it is keyed on (email, taken_on), so shooting again today
+     replaces today's row and deletes the file it replaced. There is no way to
+     reach this button on an older photo, which is the rule Mo asked for:
+     today is editable, yesterday is not. Deleting any of them is still one
+     tap away under See all. */
+  const pick = () => $("bodyPhotoInput")?.click();
+  hostEl.querySelector(".cmp-today-add")?.addEventListener("click", pick);
+  hostEl.querySelector(".cmp-retake")?.addEventListener("click", (e) => { e.stopPropagation(); pick(); });
+
+  if (CMP_JUST_ADDED) {
+    clearTimeout(CMP_CLEAR_TIMER);
+    const row = hostEl.querySelector("#cmpToday");
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    CMP_CLEAR_TIMER = setTimeout(() => {
+      CMP_JUST_ADDED = false;
+      if (!row?.isConnected) return;
+      if (still) { row.remove(); return; }
+      /* Measured on the way out: max-height has to start at a real number for
+         the transition to have anywhere to travel from. */
+      row.style.maxHeight = `${row.scrollHeight}px`;
+      requestAnimationFrame(() => row.classList.add("gone"));
+      setTimeout(() => row.remove(), 360);
+    }, still ? 700 : 1100);
+  }
 
   /* The URLs arrive after the markup is on screen. A re-render in between
      replaces the frames, so each one is checked to still be in the host
@@ -25121,16 +25227,34 @@ async function renderComparePhotos(hostEl, isPartner) {
      rather than painting a broken glyph over it. */
   const fill = async (label, shot) => {
     if (!shot) return;
-    const frame = hostEl.querySelector(`.cmp-frame[data-slot="${label}"]`);
-    if (!frame) return;
+    const frameEl = hostEl.querySelector(`.cmp-frame[data-slot="${label}"]`);
+    if (!frameEl) return;
     const url = await signedProofUrl(shot.path);
-    if (!url || !hostEl.contains(frame)) return;
+    if (!url || !hostEl.contains(frameEl)) return;
     const img = new Image();
-    img.alt = `${label} photo, ${datedLabel(shot.taken_on)}`;
-    img.onload = () => { if (hostEl.contains(frame)) { frame.appendChild(img); requestAnimationFrame(() => img.classList.add("in")); } };
+    img.alt = `${label} photo, ${capDate(shot.taken_on)}`;
+    img.onload = () => {
+      if (!hostEl.contains(frameEl)) return;
+      frameEl.insertBefore(img, frameEl.firstChild);
+      frameEl.classList.add("has-img");
+      frameEl.querySelector(".cmp-glyph")?.remove();
+      requestAnimationFrame(() => img.classList.add("in"));
+    };
     img.src = url;
   };
   await Promise.all([fill("Start", start), fill("Now", now)]);
+}
+
+/* One upload or one delete changes both places a photo shows: the strip
+   inside the Body Photos card, and the Start/Now pair on the goal screen.
+   Before this, adding a photo from the goal screen repainted the strip
+   nobody was looking at and left the pair in front of them unchanged. */
+function refreshPhotoSurfaces() {
+  renderBodyPhotos();
+  const host = $("tonePhotos");
+  if (host && !host.classList.contains("hidden") && typeof renderComparePhotos === "function") {
+    renderComparePhotos(host, false);
+  }
 }
 
 async function deleteBodyPhoto(id) {
@@ -25144,7 +25268,9 @@ async function deleteBodyPhoto(id) {
     if (error) throw error;
     toast("Photo deleted");
     await loadBodyPhotos();
-    renderBodyPhotos();
+    /* Both surfaces: deleting today's photo has to bring the day's row back on
+       the goal screen, not just shorten the strip behind it. */
+    refreshPhotoSurfaces();
   } catch (err) {
     console.error(err);
     toast("Could not delete");
@@ -25153,6 +25279,10 @@ async function deleteBodyPhoto(id) {
 
 async function uploadBodyPhoto(file) {
   $("bodyPhotoStrip").innerHTML = `<div class="proof-uploading"><span class="spinner"></span> Uploading…</div>`;
+  /* The goal screen's own row says so too, since that is the one being looked
+     at when the photo is taken from there. */
+  const row = document.getElementById("cmpToday");
+  if (row) row.innerHTML = `<div class="cmp-today-done"><span class="spinner"></span><b>Uploading…</b></div>`;
   try {
     const blob = await compressImage(file, 1000, 0.82);
     const path = `${MY_EMAIL}/body/${todayStr()}-${Date.now()}.jpg`;
@@ -25169,13 +25299,18 @@ async function uploadBodyPhoto(file) {
       await sb.storage.from("workout-proof").remove([existing.path]);
       delete PROOF_URL_CACHE[existing.path];
     }
-    toast("Photo saved");
+    /* Completed on the row says it already, and saying it twice is how a
+       confirmation stops meaning anything. The toast is for the one route
+       that has no row: the strip under See all. */
+    if (!row) toast("Photo saved");
+    CMP_JUST_ADDED = true;
     await loadBodyPhotos();
-    renderBodyPhotos();
+    refreshPhotoSurfaces();
   } catch (err) {
     console.error(err);
+    CMP_JUST_ADDED = false;
     toast("Could not upload that photo");
-    renderBodyPhotos();
+    refreshPhotoSurfaces();
   }
 }
 
@@ -26577,6 +26712,12 @@ function primeOpenedCard(card) {
   else if (card.id === "cardStrength") strengthChart?.resize();
   else if (card.id === "cardVolume") volumeChart?.resize();
   else if (card.id === "cardMuscles") renderMuscleAnswers(PROGRESS_VIEW === "partner" ? partnerName() : ME);
+  /* The strip is only drawn for a card the tab decided to show, and on a goal
+     screen this card is never one of those: it is hidden until a door opens
+     it. So every route in found an empty Body Photos card, which is also the
+     only place a photo can be deleted from. Drawing it on open is the same
+     repair the charts above get, for the same reason. */
+  else if (card.id === "cardPhotos") renderBodyPhotos();
 }
 
 /* ---- The index ----
