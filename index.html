@@ -1243,6 +1243,11 @@
     background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
   }
 
+  /* The logging block now lives inside Weight, under everything that reads
+     the chart, so a rule and a small heading mark where "looking" ends and
+     "logging" begins rather than the two running together. */
+  .wt-log { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .wt-log-head { font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
   /* Weigh-in: type it, or nudge it. Same geometry as the session's weight and
      reps rows, round button, field, round button, rather than a pair of small
      stacked buttons hanging off the end. */
@@ -1605,6 +1610,16 @@
   .clip-shutter {
     width: 74px; height: 74px; border-radius: 50%; border: 4px solid rgba(255,255,255,.85);
     background: var(--up); cursor: pointer; padding: 0; position: relative;
+    /* The ring below sits at inset:-11px, drawn OUTSIDE this button's own box,
+       and flex gap only ever measures a box's own edges, never an absolutely
+       positioned child that overflows it. That left 14px of gap trying to
+       clear an element that actually reaches 11px into it, 3px of real
+       clearance, and the ring's start point is rotated to point straight up
+       at that exact gap: the brightest part of the countdown arc, aimed
+       directly at the hint text above it, seconds into every recording. This
+       margin reserves the ring's own overflow in normal flow, so gap clears
+       what is actually there instead of what the button claims to be. */
+    margin-block: 11px;
   }
   .clip-shutter[disabled] { opacity: .5; }
   .clip-shutter.recording { background: #fff; }
@@ -3417,15 +3432,21 @@
   .idx-mini-lvl i { flex: 1; height: 5px; border-radius: 3px; background: var(--border); display: block; overflow: hidden; }
   .idx-mini-lvl i b { display: block; height: 100%; background: var(--accent); }
 
-  /* The row this goal is actually judged on, ringed the way the mockup
-     showed it: not a louder card, the SAME card, with a border that says
-     "this is the one the sentence above was about". Computed from the
-     headline kind, not from GOAL_CARDS order, because what belongs here is
-     literally whichever card the headline just finished talking about. */
+  /* The row this goal is actually judged on. A thin tinted border read as
+     decoration rather than as "this is the one that matters", which is the
+     opposite of what a CTA is for: a real accent border, a lit fill behind
+     it, and the title itself in the accent colour, so the row this goal is
+     judged on is unmistakable at a glance rather than found by looking for
+     it. Computed from the headline kind, not from GOAL_CARDS order, because
+     what belongs here is literally whichever card the headline just finished
+     talking about. */
   #tab-progress .idx-card.idx-primary {
-    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent) inset;
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+    box-shadow: 0 0 0 1.5px var(--accent) inset;
   }
+  #tab-progress .idx-card.idx-primary > h2 { color: var(--accent-ink); }
+  #tab-progress .idx-card.idx-primary .idx-chev { color: var(--accent-ink); }
 
   /* Everything here is scoped to :not(.peek). An opened row must be left
      completely alone: the first version hid children with display:none and
@@ -5556,6 +5577,11 @@
          of weigh-ins were the same five numbers the line and the chart already
          carry, printed twice. Tapping a point is what asks, and the weigh-in
          it lands on is still the way back into that day. -->
+    <!-- Logging lives inside Weight now, not beside it. Mo: the only reason to
+         log a weight is once you have opened Weight and looked at it, then log
+         it from there, not from a second card sitting next to the first one
+         asking the same question a different way. Same ids throughout, so
+         renderScaleCheck() did not have to change, only where it points. -->
     <div class="card metric-card idx-card" id="cardWeight">
       <h2>Weight trend</h2>
       <p class="idx-summary" id="weightSummary"></p>
@@ -5563,21 +5589,20 @@
       <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
       <div class="wt-range" id="weightRange"></div>
       <div class="ms-list" id="weightHistory"></div>
-    </div>
-
-    <div class="card" id="scaleCheckCard">
-      <h2>Log your weight</h2>
-      <p class="muted-note" id="scaleGoalNote" style="margin-top:-6px;"></p>
-      <div class="weigh-row">
-        <button type="button" class="round-btn" id="scaleMinus" aria-label="Down 0.5">&minus;</button>
-        <div class="weigh-field">
-          <input type="number" id="scaleWeightInput" inputmode="decimal" step="0.1" min="0"
-                 placeholder="0.0" autocomplete="off" aria-label="Weight" />
-          <span class="weigh-unit">lbs</span>
+      <div class="wt-log" id="weightLogBlock">
+        <div class="wt-log-head">Log today's weight</div>
+        <p class="muted-note" id="scaleGoalNote" style="margin-top:-4px;"></p>
+        <div class="weigh-row">
+          <button type="button" class="round-btn" id="scaleMinus" aria-label="Down 0.5">&minus;</button>
+          <div class="weigh-field">
+            <input type="number" id="scaleWeightInput" inputmode="decimal" step="0.1" min="0"
+                   placeholder="0.0" autocomplete="off" aria-label="Weight" />
+            <span class="weigh-unit">lbs</span>
+          </div>
+          <button type="button" class="round-btn" id="scalePlus" aria-label="Up 0.5">+</button>
         </div>
-        <button type="button" class="round-btn" id="scalePlus" aria-label="Up 0.5">+</button>
+        <button type="button" class="btn-primary" id="scaleSaveBtn" style="margin-top:12px;">Save weigh-in</button>
       </div>
-      <button type="button" class="btn-primary" id="scaleSaveBtn" style="margin-top:12px;">Save weigh-in</button>
     </div>
 
     <div class="card metric-card idx-card" id="cardConsistency">
@@ -14626,10 +14651,8 @@ async function removeProof() {
 
 
 function renderScaleCheck() {
-  const card = $("scaleCheckCard");
-  // Always available on Progress now, rather than a prompt that appears and vanishes.
-  card.classList.remove("hidden");
-
+  // Lives inside Weight now, so its own visibility is Weight's card visibility
+  // (handled by renderProgressTab already); nothing here to show or hide.
   const today = todayStr();
   const todayEntry = ALL_ENTRIES.find((e) => e.user_name === ME && e.entry_date === today);
   const lastWeight = entriesFor(ME).filter((e) => e.weight != null).slice(-1)[0]?.weight;
@@ -24236,7 +24259,7 @@ function viewedEmail() { return PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY
    learned where their weigh-ins are does not find them somewhere else when
    their goal changes. */
 const PROGRESS_CARDS = [
-  "cardWeight", "scaleCheckCard", "cardConsistency",
+  "cardWeight", "cardConsistency",
   "cardMuscles", "cardStrength", "cardVolume", "cardPhotos",
 ];
 
@@ -24393,14 +24416,14 @@ const HEADLINE_CARD = {
 };
 
 const GOAL_CARDS = {
-  scale:     ["cardWeight", "scaleCheckCard", "cardPhotos", "cardConsistency"],
+  scale:     ["cardWeight", "cardPhotos", "cardConsistency"],
   /* Putting weight on is judged on the scale and the bar together, so both
      lead, in that order. Volume sits right behind them because it is the
      lever somebody pulls when the bar has stopped moving. */
-  bulk:      ["cardWeight", "scaleCheckCard", "cardStrength", "cardMuscles", "cardVolume", "cardConsistency"],
-  recomp:    ["cardConsistency", "cardPhotos", "cardWeight", "scaleCheckCard"],
+  bulk:      ["cardWeight", "cardStrength", "cardMuscles", "cardVolume", "cardConsistency"],
+  recomp:    ["cardConsistency", "cardPhotos", "cardWeight"],
   lift:      ["cardMuscles", "cardStrength", "cardConsistency"],
-  volume:    ["cardMuscles", "cardVolume", "cardStrength", "cardWeight", "scaleCheckCard", "cardConsistency"],
+  volume:    ["cardMuscles", "cardVolume", "cardStrength", "cardWeight", "cardConsistency"],
   reps:      ["cardConsistency"],
   endurance: ["cardConsistency"],
   habit:     ["cardConsistency"],
@@ -25513,6 +25536,16 @@ function paintArrangeUI(host) {
       const indexable = !PROG_ARRANGING && card.classList.contains("idx-card");
       if (!PROG_ARRANGING && !indexable) return;
       const wasOpen = card.classList.contains("peek");
+      /* An open card is real content now, not a title strip: a chart, a lift
+         picker, a muscle figure, the weigh-in stepper. Every one of those
+         has its own click handler, and this listener sits on the whole card
+         and would otherwise see every one of those clicks too. Without this
+         guard, tapping a lift pill or typing into the weight field bubbled
+         up here, read as "close", and the card folded itself under whatever
+         somebody was actually trying to do. Only the header can close an
+         open card now; collapsed, the header IS the only visible thing, so
+         nothing here changes for opening one. */
+      if (wasOpen && !e.target.closest("h2")) return;
       host.querySelectorAll(".card.peek").forEach((c) => c.classList.remove("peek"));
       if (!wasOpen) {
         card.classList.add("peek");
@@ -25563,11 +25596,12 @@ function setArranging(on, host) {
 
 function renderProgressTab() {
   const isPartner = PROGRESS_VIEW === "partner";
-  // Logging weight only makes sense for yourself, hide it entirely on your
-  // partner's view instead of showing a control that would log to your own
-  // entry while you're looking at their stats.
-  if (isPartner) $("scaleCheckCard").classList.add("hidden");
-  else renderScaleCheck();
+  // Logging weight only makes sense for yourself, hide the block inside
+  // Weight entirely on your partner's view (the chart above it stays: you can
+  // still see their trend, you just cannot log to their row) instead of
+  // showing a control that would log to your own entry while looking at theirs.
+  $("weightLogBlock")?.classList.toggle("hidden", isPartner);
+  if (!isPartner) renderScaleCheck();
   $("progMeBtn").classList.toggle("active", !isPartner);
   $("progPartnerBtn").classList.toggle("active", isPartner);
   $("progPartnerBtn").textContent = PARTNER_EMAIL ? partnerName() : "Partner";
@@ -25598,12 +25632,13 @@ function renderProgressTab() {
   const blank = !isPartner && !entriesFor(ME).length
     && !ALL_EXERCISE_LOGS.some((l) => l.user_name === ME);
 
-  /* Cards nobody should be offered at all, before the goal gets a say. The
-     scale writes to YOUR row, so it has no business on a partner's screen, and
-     a partner's lift-by-lift history is theirs to give: same gate the
-     timeline, the day sheet and the live sheet already apply. */
+  /* Cards nobody should be offered at all, before the goal gets a say. A
+     partner's lift-by-lift history is theirs to give: same gate the
+     timeline, the day sheet and the live sheet already apply. The scale
+     writing to YOUR row only, on a partner's screen, is now weightLogBlock's
+     own hidden toggle above rather than a barred card, since the chart
+     around it is still theirs to show. */
   const barred = new Set();
-  if (isPartner) barred.add("scaleCheckCard");
   /* This card names the lifts somebody is doing and what they load them with,
      which is exactly what share_workout_details exists to withhold. */
   if (!sharing) { barred.add("cardStrength"); barred.add("cardVolume"); barred.add("cardMuscles"); }
@@ -25611,11 +25646,14 @@ function renderProgressTab() {
   const wanted = (GOAL_CARDS[kind] || GOAL_CARDS.habit).filter((c) => !barred.has(c));
   const rest = PROGRESS_CARDS.filter((c) => !barred.has(c) && !wanted.includes(c));
   /* On a brand new account every card is an empty card, so none of them are
-     drawn. The one exception is the weigh-in box on a weight goal, because
-     that IS the single action the empty state is pointing at. */
+     drawn. The one exception is Weight on a weight goal, because logging into
+     it IS the single action the empty state is pointing at, and it opens
+     already expanded: collapsed-by-default is the right call once there is
+     something to read, and wrong for the one card whose whole job right now
+     is being typed into. */
   const weightLed = kind === "scale" || kind === "recomp";
   const shown = blank
-    ? (weightLed && !isPartner ? ["scaleCheckCard"] : [])
+    ? (weightLed && !isPartner ? ["cardWeight"] : [])
     : wanted.concat(rest);
   const quiet = new Set(blank ? [] : rest);
   /* Which row(s) get the ring: whichever card the headline sentence was
@@ -25629,6 +25667,11 @@ function renderProgressTab() {
     el.classList.toggle("hidden", !shown.includes(id));
     el.classList.toggle("quiet", quiet.has(id));
     el.classList.toggle("idx-primary", primaryCards.includes(id));
+    /* The blank account's one card opens already expanded. Collapsed-by-
+       default is right once there is something to read; here the whole card
+       IS the empty state's call to action, and a folded row would hide the
+       weigh-in stepper behind a tap nobody has been told to make. */
+    if (blank && id === "cardWeight") el.classList.add("peek");
   });
 
   if (blank) renderProgressEmpty(kind);
