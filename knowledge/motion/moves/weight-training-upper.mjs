@@ -108,22 +108,22 @@ const DUMBBELL_BENCH_PRESS = {
     { type: "dumbbell", side: "R", point: "hand", k: 0.8, front: true },
   ],
   keys: [
-    { // lockout, bells nearly touching over the chest
+    { // lockout. These three keys are Mo's, posed by hand in Pose Studio on 2026-09-17: "that's the exact movement"
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 0, neck: -4, shoulderR: 270, shoulderL: 270, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 30, shoulderRotL: -30 },
+      joints: { spine: 0, neck: -4, shoulderR: 269, shoulderL: 269, shoulderAbdR: 13, shoulderAbdL: 13, elbowR: 0, elbowL: 0, shoulderRotR: -1, shoulderRotL: 1 },
       ik: { ...stand(108, 112) },
     },
     { // halfway, a waypoint not a stop: elbow out toward the feet, bell on its line
       t: 0.5, through: true,
       root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 2, neck: -6, shoulderR: 205, shoulderL: 205, shoulderAbdR: 59, shoulderAbdL: 59, elbowR: 103, elbowL: 103, shoulderRotR: -10, shoulderRotL: 10 },
+      joints: { spine: 2, neck: -6, shoulderR: 180, shoulderL: 180, shoulderAbdR: 47, shoulderAbdL: 47, elbowR: 110, elbowL: 110, shoulderRotR: 13, shoulderRotL: -13 },
       ik: { ...stand(108, 112) },
     },
     { // bottom, bells beside the chest, elbows folded out under the hands
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 2, neck: -6, shoulderR: 113, shoulderL: 113, shoulderAbdR: 56, shoulderAbdL: 56, elbowR: 78, elbowL: 78, shoulderRotR: 60, shoulderRotL: -60 },
+      joints: { spine: 2, neck: -6, shoulderR: 161, shoulderL: 161, shoulderAbdR: 40, shoulderAbdL: 40, elbowR: 110, elbowL: 110, shoulderRotR: 41, shoulderRotL: -41 },
       ik: { ...stand(108, 112) },
     },
   ],
