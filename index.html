@@ -335,7 +335,30 @@
   .code-divider::before, .code-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
   .code-input {
     text-transform: uppercase; letter-spacing: 0.16em; font-weight: 700; font-size: 21px !important;
+    text-align: center;
   }
+  /* The placeholder carries the instruction, so it must not be shouted in the
+     same weight the typed code is: at 21px with that tracking, CODE OR LINK
+     fills the field edge to edge and reads as a value somebody already
+     entered. */
+  .code-input::placeholder { font-size: 14px !important; letter-spacing: 0.06em; font-weight: 600; opacity: .6; }
+  /* The line under a control that says what pressing it does, and doubles as
+     where that control reports back. Sits tight to the thing above it, which
+     is what makes it read as attached rather than as the next paragraph. */
+  .ob-hint {
+    font-size: 12.5px; line-height: 1.45; color: var(--muted);
+    margin: 9px 0 18px; text-align: center;
+  }
+  /* --warn is this palette's one caution hue, and the note above it is right
+     that it is the only one that cannot be read as a person. A dead invite is
+     exactly caution: nothing is broken and nothing was lost, there is just
+     nothing behind that code. */
+  .ob-hint.bad { color: var(--warn); }
+  /* Your own code, kept as one quiet line. It used to be a bordered card with
+     its own share button, which put a second way to share directly under the
+     first one. Reading it out loud is the only job it still has. */
+  .ob-mine { font-size: 13px; color: var(--muted); text-align: center; margin: 4px 0 16px; }
+  .ob-mine strong { color: var(--text); letter-spacing: 0.1em; font-weight: 800; }
   /* A pair request, incoming or outgoing. One card each, because up to three
      can be outstanding at once and two stacked requests must never read as
      one. Same panel/border as .ob-chip rather than a shadow, so dark mode
@@ -8086,6 +8109,12 @@ async function loadMyGroups() {
 }
 
 async function checkPartnershipThenEnter() {
+  /* Before anything reads the partnership table, because a link that is waiting
+     to be claimed is about to change what that table says. Claiming needs a
+     session, which is why it happens here and not where the token was picked
+     up: the person who opened the link usually had no account at that moment. */
+  await claimHeldInviteToken();
+
   const { error: groupErr } = await loadMyGroups();
   /* Same rule as the partnership read below: a lookup that failed is not an
      answer about who somebody trains with, and carrying on would hand a coached
@@ -8500,54 +8529,44 @@ function renderCodeScreen() {
      default on insert. Say the code is not ready rather than rendering six
      dots someone might read out to their partner. */
   const myCode = MY_PROFILE?.invite_code || null;
+  /* Two situations, not five buttons.
+
+     Either you are inviting somebody or somebody invited you, and this screen
+     used to answer that with five tappable things: two green primaries
+     competing for the same eye, two different ways to share that did almost the
+     same job, and a third button for a link that the person is holding in their
+     other hand. Now it is one action and one field.
+
+     The field takes either form. Six characters is a code; anything with a
+     token in it is a link they pasted. One input that accepts both is the whole
+     reason "I was sent a link" could go: the answer to being sent a link is to
+     paste it, and there is now somewhere to paste it. */
   ob.innerHTML = `
     <div class="ob-step">
       <h1>Pair with your partner</h1>
-      <p class="sub">Send them a link. It works once, and only for them.</p>
+      <p class="sub">Unio is built for two. Send them an invite, or put in the one they sent you.</p>
 
       <button class="btn-primary" id="shareLinkBtn">Send an invite</button>
-      <button type="button" class="btn-ghost" id="pasteLinkBtn">I was sent a link</button>
+      <p class="ob-hint">They get a link and your code. It works once, and only for them.</p>
 
-      <div class="code-divider"><span>or use a code</span></div>
+      <div class="code-divider"><span>or</span></div>
 
-      <div class="code-display">
-        <div class="code-label">Your code</div>
-        <div class="code-value" id="myInviteCode">${myCode ? escapeHtml(myCode) : "Not ready yet"}</div>
-        <button type="button" class="btn-secondary" id="shareCodeBtn" style="margin-top:10px;" ${myCode ? "" : "disabled"}>Share my code</button>
-      </div>
-
-      <input id="partnerCodeInput" type="text" placeholder="Enter partner's code" maxlength="6"
+      <input id="partnerCodeInput" type="text" placeholder="CODE OR LINK"
              autocapitalize="characters" autocomplete="off" spellcheck="false" class="code-input"
              value="${escapeHtml(PENDING_INVITE || "")}" />
-      <button class="btn-primary" id="redeemCodeBtn">Pair up</button>
+      <p class="ob-hint" id="pairHint">Their six characters, or paste the whole link.</p>
+
+      ${myCode ? `<p class="ob-mine">Your code is <strong id="myInviteCode">${escapeHtml(myCode)}</strong></p>` : ""}
       <button class="btn-ghost" id="backToSetup">Back</button>
     </div>`;
 
   $("shareLinkBtn").onclick = (e) => shareInviteLink(e.currentTarget);
-  $("pasteLinkBtn").onclick = () => pasteInviteLink();
-  $("shareCodeBtn").onclick = async () => {
-    /* No profile gets a real invite_code from the client; it has to come from
-       a server-side default/trigger on insert (see owner note). Guard rather
-       than let "My code is undefined" go out over a real share sheet. */
-    const code = MY_PROFILE?.invite_code;
-    if (!code) { toast("Your code isn't ready yet"); return; }
-    /* The link carries the code so they never have to be told to find a code
-       screen and retype it, and the message says what they are joining. */
-    const text = inviteMessage({ name: ME, goalLabel: MY_PROFILE?.goal }, code);
-    try {
-      if (navigator.share) await navigator.share({ text });
-      else { await navigator.clipboard.writeText(text); toast("Invite copied"); }
-    } catch { /* they dismissed the share sheet */ }
-  };
-  $("partnerCodeInput").oninput = (e) => {
-    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  };
-  $("redeemCodeBtn").onclick = async () => {
-    const code = $("partnerCodeInput").value.trim().toUpperCase();
-    if (code.length !== 6) { toast("Codes are 6 characters"); return; }
-    $("redeemCodeBtn").disabled = true;
+
+  const hint = $("pairHint");
+  const say = (msg, bad) => { hint.textContent = msg; hint.classList.toggle("bad", !!bad); };
+
+  const redeemCode = async (code) => {
     const { data: res, error } = await sb.rpc("redeem_invite_code", { code });
-    $("redeemCodeBtn").disabled = false;
     /* Read before redeemOk, so the waiting screen is the answer rather than a
        toast on top of it. The request is out and nobody is paired, so solo is
        deliberately left alone: this is not the moment to decide they have a
@@ -8564,6 +8583,61 @@ function renderCodeScreen() {
     clearPendingInvite();
     await checkPartnershipThenEnter();
   };
+
+  /* Submitted by finishing, not by a button.
+
+     A code is exactly six characters, so the moment there are six there is
+     nothing left to decide and a Pair up button is a second thing to press for
+     a decision already made. A pasted link is the same: it is complete on
+     arrival. Both also remove the failure state the button existed to produce,
+     "Codes are 6 characters", which only ever appeared because somebody was
+     allowed to press it too early. */
+  const input = $("partnerCodeInput");
+  let working = false;
+
+  const submit = async (raw) => {
+    if (working) return;
+    const tok = inviteTokenFrom(raw);
+    const code = raw.trim().toUpperCase();
+    if (!tok && code.length !== 6) return;
+
+    working = true;
+    input.disabled = true;
+    say(tok ? "Opening that invite..." : "Pairing you up...");
+    try {
+      if (tok) {
+        holdInviteToken(tok);
+        const ok = await claimHeldInviteToken();
+        if (ok) { await checkPartnershipThenEnter(); return; }
+        say("That link is not active any more. Ask for a new one.", true);
+        input.value = "";
+        return;
+      }
+      await redeemCode(code);
+      /* Still here means redeemCode did not navigate, so it failed and has
+         already said why. Put the field back rather than leaving somebody
+         looking at a disabled box with their own typing in it. */
+      say("Their six characters, or paste the whole link.");
+      input.value = "";
+    } finally {
+      working = false;
+      input.disabled = false;
+    }
+  };
+
+  input.oninput = (e) => {
+    const raw = e.target.value;
+    /* A pasted link is left exactly as it arrived. The uppercase-and-strip
+       filter below is right for six characters and destroys a URL, which is
+       how one field can serve both only if it knows which one it is holding. */
+    if (inviteTokenFrom(raw) || /[:/.]/.test(raw)) { submit(raw); return; }
+    e.target.value = raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+    if (e.target.value.length === 6) submit(e.target.value);
+  };
+  /* Enter is still honoured for anyone on a keyboard, and for the case where
+     six characters were already in the box when the screen was drawn. */
+  input.onkeydown = (e) => { if (e.key === "Enter") submit(input.value); };
+
   $("backToSetup").onclick = () => renderPairingScreen();
 }
 
