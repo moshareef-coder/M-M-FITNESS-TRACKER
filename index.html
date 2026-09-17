@@ -5538,8 +5538,8 @@
      will set this once and never look at it again. */
   /* Right aligned above the tiles, so it sits with the cards it controls and
      takes no width from them. */
-  .track-row { display: flex; justify-content: flex-end; margin: -4px 0 6px; }
   .track-kebab {
+    margin-left: auto;
     width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
     background: none; border: 1px solid transparent; color: var(--muted); cursor: pointer;
   }
@@ -6801,13 +6801,6 @@
          Not cards: the goal order and a saved drag order both walk past this
          block, and renderProgTiles() keeps it pinned under Weight. Photos are
          yours alone, so that tile goes on a partner's view, same as the card. -->
-    <!-- What this person wants measured. A quiet three dot control rather than
-         a row of text: it is a preference somebody sets once, so it should be
-         findable next to the thing it changes and invisible the rest of the
-         time. It still lives on Progress rather than in Setup, because the
-         thought "why am I being shown the scale" happens while looking at the
-         scale, not two taps into a settings tree. -->
-    <div class="track-row" id="trackRow"></div>
     <div class="prog-tiles hidden" id="progTiles">
       <button type="button" class="prog-tile" id="tileWaist"></button>
       <button type="button" class="prog-tile" id="tilePhotos"></button>
@@ -10219,7 +10212,7 @@ function renderGoalPage() {
    a column that does not exist yet. It reports what it dropped rather than
    swallowing it, because "saved" when half of it was not saved is the kind of
    quiet lie this app does not tell. */
-const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes", "train_styles", "goal_tuning", "committed_at", "tracked_metrics"];
+const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes", "train_styles", "goal_tuning", "committed_at", "tracked_metrics", "tracked_by_goal"];
 
 async function upsertGoalFields(patch) {
   const { data, error } = await sb.from("profiles").upsert(patch).select().maybeSingle();
@@ -12119,6 +12112,7 @@ async function finishOnboarding(data) {
     ...(Array.isArray(data.train_styles) && data.train_styles.length ? { train_styles: data.train_styles } : {}),
     ...(data.goal_tuning ? { goal_tuning: data.goal_tuning } : {}),
     ...(Array.isArray(data.tracked_metrics) ? { tracked_metrics: data.tracked_metrics } : {}),
+    ...(data.tracked_by_goal ? { tracked_by_goal: data.tracked_by_goal } : {}),
     ...(data.committed_at ? { committed_at: data.committed_at } : {}),
     goal_detail: data.goal_detail || null,
     ...(data.height_in ? { height_in: data.height_in } : {}),
@@ -30641,19 +30635,39 @@ const TRACK_OFFERS = {
    has never opened the picker. Move better is the one goal whose default IS
    empty, deliberately: it has no number that honestly measures it, and the
    card that says so is better than a scale nobody asked for. */
-function trackedMetrics() {
-  const saved = MY_PROFILE?.tracked_metrics;
+/* PER GOAL, on Mo's call, and it is the right shape: the Progress tab already
+   reads through one goal at a time, and "what do you want to measure" has a
+   different answer for each of them. Somebody holding Lose weight and Get
+   stronger wants the scale on one tab and their best lifts on the other, and a
+   single global list would force one answer onto both.
+
+   profiles.tracked_by_goal is an object keyed by goal id. The older flat
+   tracked_metrics stays as the union across goals, because the onboarding
+   write and anything that just wants "does this person track their waist at
+   all" still reads it; the per goal map is what every screen reads. */
+function trackedMetrics(goalId = null) {
   const known = new Set(TRACK_ALL.map((m) => m.key));
-  if (Array.isArray(saved)) {
-    const out = saved.filter((k) => known.has(k));
-    /* An empty saved list is a real answer for Move better and nonsense for
-       everybody else, so it is honoured rather than second guessed. */
-    if (out.length || saved.length === 0) return out;
+  const bubble = goalId
+    || (PROGRESS_VIEW === "partner" ? null : PROGRESS_GOAL_LENS)
+    || MY_PROFILE?.goal_bubble
+    || "consistent";
+  const byGoal = MY_PROFILE?.tracked_by_goal;
+  if (byGoal && typeof byGoal === "object" && Array.isArray(byGoal[bubble])) {
+    /* An empty list is a real answer, not a missing one: Move better
+       legitimately tracks nothing, so it is honoured rather than filled in. */
+    return byGoal[bubble].filter((k) => known.has(k));
   }
-  const bubble = MY_PROFILE?.goal_bubble || "consistent";
+  /* Before the per goal map existed there was one flat list, and an account
+     that set one should keep seeing it rather than being silently reset to a
+     default. Only for their MAIN goal though: a flat list was never an answer
+     about the other two. */
+  const flat = MY_PROFILE?.tracked_metrics;
+  if (Array.isArray(flat) && bubble === (MY_PROFILE?.goal_bubble || "consistent")) {
+    return flat.filter((k) => known.has(k));
+  }
   return TRACK_DEFAULTS[bubble] || ["weight"];
 }
-const isTracked = (key) => trackedMetrics().includes(key);
+const isTracked = (key, goalId = null) => trackedMetrics(goalId).includes(key);
 /* Weight is a column on the same day row, so the check-in sheet can carry it
    as one more row and saveMeasurements writes it with the rest, no special
    case anywhere. */
@@ -31749,7 +31763,16 @@ function renderGoalChips(profile) {
   const chip = (t) => `
     <button type="button" class="goal-chip${t.id === showing ? " on" : ""}"
       data-goal="${escapeHtml(t.id)}" aria-pressed="${t.id === showing}">${escapeHtml(t.title || "")}</button>`;
-  host.innerHTML = ids.map((id) => chip(goalTileFor(id))).join("");
+  /* The preferences control rides at the end of the goal row, hard right, so it
+     sits with the goal it belongs to rather than floating over the cards. It
+     edits THAT goal only, which is why it cannot live anywhere else on the
+     screen: a control above the cards would look like it governed all of them.
+     Never on a partner's view, where the goals and the choices are theirs. */
+  host.innerHTML = ids.map((id) => chip(goalTileFor(id))).join("")
+    + (PROGRESS_VIEW === "partner" ? "" : `<button type="button" class="track-kebab" id="trackOpen"
+        aria-label="Change what this goal shows">${icon("more", 18)}</button>`);
+  const keb = host.querySelector("#trackOpen");
+  if (keb) keb.onclick = () => openTrackSheet(showing);
 
   host.querySelectorAll("[data-goal]").forEach((b) => {
     b.onclick = () => {
@@ -31990,24 +32013,6 @@ function renderProgTiles(kind, isPartner, opts = {}) {
 
    Only on your own view. A partner's screen shows what THEY chose to track,
    and an editor on it would be changing their mind for them. */
-function renderTrackRow() {
-  const el = $("trackRow");
-  if (!el) return;
-  /* A partner's screen follows THEIR choices, so there is nothing here to
-     change and no control to offer. */
-  if (PROGRESS_VIEW === "partner") { el.innerHTML = ""; return; }
-  const on = trackedMetrics();
-  const label = on.length
-    ? TRACK_ALL.filter((m) => on.includes(m.key)).map((m) => m.label).join(", ")
-    : "nothing yet";
-  el.innerHTML = `
-    <button type="button" class="track-kebab" id="trackOpen"
-      aria-label="Change what Progress shows" title="Showing ${escapeHtml(label)}">
-      ${icon("more", 18)}
-    </button>`;
-  $("trackOpen").onclick = openTrackSheet;
-}
-
 /* The same six-across-two cards the onboarding step uses, in a sheet. Changing
    your mind later should look like the screen where you first chose, or it
    reads as a different feature that happens to control the same thing.
@@ -32015,8 +32020,10 @@ function renderTrackRow() {
    Every trackable thing is offered here rather than the six their goal led
    with: this is the screen for somebody who has decided the default was wrong,
    so the full set is the point. */
-function openTrackSheet() {
+let TRACK_SHEET_GOAL = null;
+function openTrackSheet(goalId) {
   if (PROGRESS_VIEW === "partner") return;
+  TRACK_SHEET_GOAL = goalId || MY_PROFILE?.goal_bubble || "consistent";
   renderTrackSheet();
   $("trackScrim").classList.remove("hidden");
 }
@@ -32025,7 +32032,9 @@ function closeTrackSheet() {
   renderProgressTab?.();
 }
 function renderTrackSheet() {
-  const on = new Set(trackedMetrics());
+  const goalId = TRACK_SHEET_GOAL;
+  const tile = goalTileFor(goalId);
+  const on = new Set(trackedMetrics(goalId));
   /* Same chrome as the measurements sheet next door: grip, back chevron,
      centred title. Two sheets on one tab that open differently is the kind of
      small inconsistency people feel without being able to name. */
@@ -32033,10 +32042,10 @@ function renderTrackSheet() {
     <div class="ds-grip"></div>
     <div class="scr-head">
       <button type="button" class="scr-back" id="trackX" aria-label="Close">${icon("chevronLeft", 18)}</button>
-      <div class="scr-title">What do you want to see?</div>
+      <div class="scr-title">${escapeHtml(tile?.title || "This goal")}</div>
       <div class="spacer"></div>
     </div>
-    <p class="trk-any" style="margin:0 0 14px">Only what is ticked is charted. Everything keeps logging either way, so turning one back on shows its whole history.</p>
+    <p class="trk-any" style="margin:0 0 14px">What this goal shows you. Your other goals keep their own. Everything logs either way, so turning one back on shows its whole history.</p>
     <div class="trk-grid" id="trackSheetGrid">
       ${TRACK_ALL.map((m) => `<button type="button" class="trk-card${on.has(m.key) ? " on" : ""}" data-metric="${m.key}">
         <span class="trk-tick" aria-hidden="true">${icon("check", 13)}</span>
@@ -32053,9 +32062,18 @@ function renderTrackSheet() {
     b.classList.toggle("on", on.has(key));
     /* Kept in TRACK_ALL order rather than tap order, so the cards behind the
        sheet do not reshuffle every time somebody changes their mind. */
+    /* Kept in TRACK_ALL order rather than tap order, so the cards behind the
+       sheet do not reshuffle every time somebody changes their mind. */
     const list = TRACK_ALL.map((m) => m.key).filter((k) => on.has(k));
-    MY_PROFILE = { ...(MY_PROFILE || {}), tracked_metrics: list };
-    await saveTrackedMetrics(list);
+    const byGoal = { ...(MY_PROFILE?.tracked_by_goal || {}), [goalId]: list };
+    /* The flat column stays as the union across goals. Nothing on Progress
+       reads it any more, but the onboarding write and anything asking "does
+       this person track their waist at all" still does, and leaving it behind
+       to go stale is how two sources of truth start disagreeing. */
+    const union = new Set(Object.values(byGoal).flat());
+    const flat = TRACK_ALL.map((m) => m.key).filter((k) => union.has(k));
+    MY_PROFILE = { ...(MY_PROFILE || {}), tracked_by_goal: byGoal, tracked_metrics: flat };
+    await saveTrackedMetrics(byGoal, flat);
   });
   $("trackX").onclick = closeTrackSheet;
   $("trackDone").onclick = closeTrackSheet;
@@ -32065,10 +32083,16 @@ function renderTrackSheet() {
    this week. Without the migration the choice still works for the rest of the
    session and simply does not survive a reload, which is a better failure than
    a screen that refuses to change. */
-async function saveTrackedMetrics(list) {
-  const { error } = await sb.from("profiles")
-    .upsert({ email: MY_EMAIL, user_name: ME, tracked_metrics: list, updated_at: new Date().toISOString() });
-  if (error && String(error.message || "").includes("tracked_metrics")) return;
+async function saveTrackedMetrics(byGoal, flat) {
+  const { error } = await sb.from("profiles").upsert({
+    email: MY_EMAIL, user_name: ME,
+    tracked_by_goal: byGoal, tracked_metrics: flat,
+    updated_at: new Date().toISOString(),
+  });
+  /* Both columns are behind the same unapplied migration. Swallowed rather
+     than toasted: the choice still works for the rest of the session and a
+     failure message about a column is not a sentence anybody can act on. */
+  if (error && /tracked_by_goal|tracked_metrics/.test(String(error.message || ""))) return;
   if (error) console.error("tracked metrics not saved", error);
 }
 
@@ -32380,7 +32404,6 @@ function renderProgressTab() {
   /* photosAvailable is passed rather than read off cardPhotos's hidden class,
      because on the weight screen that card is hidden ON PURPOSE and the tile
      is meant to be its door, not to vanish with it. */
-  renderTrackRow();
   renderProgTiles(kind, isPartner, { photosAvailable: !isPartner && !blank });
   const live = new Set(shown);
   if (live.has("cardWeight")) { renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); }

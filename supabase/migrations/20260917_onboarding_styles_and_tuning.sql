@@ -36,12 +36,20 @@ alter table public.profiles
   add column if not exists train_styles text[],
   add column if not exists goal_tuning jsonb,
   add column if not exists committed_at timestamptz,
-  add column if not exists tracked_metrics text[];
+  add column if not exists tracked_metrics text[],
+  -- tracked_by_goal: the same question answered per goal, keyed by goal id,
+  -- because Progress reads through one goal at a time and "what do you want to
+  -- measure" has a different answer for each. tracked_metrics stays as the
+  -- union across goals for anything asking whether this person tracks a thing
+  -- at all.
+  add column if not exists tracked_by_goal jsonb;
 
 comment on column public.profiles.train_styles is
   'Training styles the person opted into. Null means never asked; anything absent from the list is never planned.';
 comment on column public.profiles.tracked_metrics is
   'What Progress charts for this person. Null means never chosen and falls back to the goal default; an empty array means they chose to track nothing.';
+comment on column public.profiles.tracked_by_goal is
+  'What Progress charts, per goal id. The per goal answer; tracked_metrics is the union across them.';
 comment on column public.profiles.committed_at is
   'When the person made the commitment at the end of onboarding. Null means never.';
 comment on column public.profiles.goal_tuning is
