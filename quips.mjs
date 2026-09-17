@@ -275,6 +275,45 @@ const cueOf = (c) => { const f = formFor(c.lift); return f ? f.cue : null; };
 const jokeOf = (c) => { const f = formFor(c.lift); return f ? f.joke : null; };
 
 export const QUIPS = {
+  /* The dashboard. Mo asked for him here: "the robot with a message, a funny
+     little message", right under the card that offers today's workout.
+     
+     A different beat from every other bank. Nothing is happening yet, there is
+     no set to react to and no rest to fill, so these are the lines of somebody
+     who has been standing in an empty room waiting for you to arrive. The rule
+     about what he never jokes about matters more here than anywhere, because a
+     dashboard is where a quiet week is visible: there is no line below about a
+     week going badly, only lines about a week still being open. */
+  home: [
+    "You are here. I had nothing else on.",
+    "I have been standing in this card since you closed the app.",
+    "Everything is where you left it. I checked twice.",
+    "I do not know what a dashboard is. I live in one.",
+    "Numbers up there. Me down here. We each have a role.",
+    "I rearranged nothing. You are welcome.",
+    "I have run the numbers. They are, as ever, the numbers.",
+    "Welcome back. I did not move.",
+    "These squares do not fill themselves. I have watched. Closely.",
+    "This is the part where you decide something. No pressure. Some pressure.",
+    "I have been practising looking approachable. Thoughts?",
+    "I was going to tidy up, but I have no arms and no opinions about layout.",
+    "Someone has to sit under the important card. It is me. It is my post.",
+    "I have read your week three times. It is still your week.",
+    (c) => (c.hour < 7 ? "Up early. I admire it from a great distance." : null),
+    (c) => (c.hour >= 22 ? "Late. I am nocturnal. I am also a drawing." : null),
+    (c) => (c.streak >= 3 ? `Day ${c.streak}. I have started rounding up when I mention it.` : null),
+    (c) => (c.streak >= 10 ? `${c.streak} days. I have run out of casual ways to bring this up.` : null),
+    (c) => (c.weekTarget && c.weekDone >= c.weekTarget ? "Week done. I intend to be insufferable about this." : null),
+    (c) => (c.weekTarget && c.weekDone > 0 && c.weekDone < c.weekTarget
+      ? `${c.weekDone} of ${c.weekTarget} this week. The rest are still out there somewhere.` : null),
+    (c) => (c.weekTarget && c.weekDone === 0 ? "A completely open week. Anything could happen. Statistically, something will." : null),
+    (c) => (c.partner ? `${c.partner} is on the other end of this. Somewhere. Doing something.` : null),
+    (c) => (c.goal === "stronger" ? "Getting stronger. I remain exactly as strong as a drawing." : null),
+    (c) => (c.goal === "muscle" ? "Building muscle. I have been briefed. I understand none of it." : null),
+    (c) => (c.goal === "lose" ? "Long game today. I am good at waiting. It is most of what I do." : null),
+    (c) => (c.goal === "consistent" ? "Showing up is the whole thing. You are, right now, showing up." : null),
+  ],
+
   start: [
     "Right. Let us both pretend we want this.",
     "I have stretched. I am a drawing, but I have stretched.",

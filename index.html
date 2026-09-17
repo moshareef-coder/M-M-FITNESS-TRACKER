@@ -2393,6 +2393,45 @@
   /* Avatar, name, and the line writing itself. Typing is the point: a line
      that lands fully formed reads as a notification, one that arrives a
      character at a time reads as somebody talking to you. */
+  /* On the dashboard he needs a face. The session stage draws the figure above
+     the bubble so the avatar is switched off there; here there is nothing above
+     it, so a bubble on its own would be the app talking rather than him. Tokens
+     throughout, because this one sits on the dashboard among cards rather than
+     on the session's dark stage, and a fixed white block among them would read
+     as a notification. */
+  .home-quip-slot:empty { display: none; }
+  .home-quip-slot { margin: -4px 0 14px; }
+  .home-quip {
+    display: flex; align-items: flex-start; gap: 10px; width: 100%;
+    padding: 0; border: 0; background: none; font-family: inherit; text-align: left;
+    cursor: pointer; animation: quipIn .34s cubic-bezier(.22,1,.36,1) both;
+  }
+  .home-quip-av {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    color: var(--accent-ink);
+  }
+  .home-quip-bub {
+    min-width: 0; flex: 1 1 auto;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 5px 16px 16px 16px; padding: 9px 13px 10px;
+    box-shadow: var(--shadow-card);
+  }
+  .home-quip-line {
+    display: block; font-size: 13.5px; font-weight: 600; line-height: 1.38;
+    letter-spacing: -.01em; color: var(--text);
+  }
+  .home-quip-cur {
+    display: inline-block; width: 2px; height: 1em; margin-left: 1px;
+    background: var(--accent-ink); vertical-align: -2px; animation: quipCaret .9s steps(1) infinite;
+  }
+  .home-quip.done .home-quip-cur { display: none; }
+  .home-quip:active { transform: scale(.995); }
+  .home-quip.go { animation: quipOut .3s ease forwards; }
+  @media (prefers-reduced-motion: reduce) { .home-quip { animation: none; } }
+
   .sess-quip {
     display: flex; align-items: flex-end; gap: 10px;
     max-width: 100%; width: 100%; padding: 0; border: 0; background: none;
@@ -6037,6 +6076,11 @@
 
     <div class="card" id="heroCard"></div>
 
+    <!-- Mo asked for him on the dashboard, right under the card that offers
+         today's workout. Empty until he says something and empty again after,
+         so a muted account and a quiet beat both leave no gap. -->
+    <div class="home-quip-slot" id="homeQuipSlot"></div>
+
     <!-- One card where there used to be two. The week grid was already the
          right picture (a day reads DOWN its column: did we both go on
          Wednesday, or just one of us) and the timeline above it was a preview
@@ -7337,6 +7381,7 @@ const ICON_PATHS = {
   dumbbell: '<path d="M4 10v4M20 10v4M2 12h2M20 12h2M6 8v8M18 8v8M9 12h6"/>',
   bolt: '<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/>',
   run: '<circle cx="14" cy="4.5" r="1.8"/><path d="M9 20l3-4 2 2-1.5 3M6 12l3-2 3 1 2-3 4 1M8 9l-2 2 1 3"/>',
+  robot: '<rect x="4" y="7" width="16" height="12" rx="4"/><path d="M12 7V4M9.5 4h5"/><circle cx="9.3" cy="12.4" r="1.15" fill="currentColor" stroke="none"/><circle cx="14.7" cy="12.4" r="1.15" fill="currentColor" stroke="none"/><path d="M9.8 15.8h4.4"/>',
   walk: '<circle cx="13" cy="4.3" r="1.8"/><path d="M10 21l2.4-5.2-2-2.3 1-4.5M13 9l3 2 1.6 3M10.4 9.5 8 11l-.8 3"/>',
   bike: '<circle cx="5.5" cy="17" r="3.4"/><circle cx="18.5" cy="17" r="3.4"/><path d="M5.5 17l4-7h5l-3.5 7h7.5M13.5 10 12 6.6h-2.4M14.8 6.6h2.2"/>',
   check: '<path d="M4 12l5 5 11-11"/>',
@@ -16007,6 +16052,11 @@ let HOME_PAINTED = false;   // the first paint of a session is an arrival, the r
 
 function renderHome(animate = false) {
   renderHero(animate);
+  /* Here rather than inside renderHero, because renderHero also runs on things
+     that are not somebody arriving at the dashboard (a save on another tab, a
+     widget snapshot), and a line spent while Home is hidden is a line nobody
+     hears followed by four minutes of silence when they do turn up. */
+  sayHomeQuip();
   renderPairCopy();
   renderTopStreak();
   renderLiveCard();
@@ -20907,6 +20957,68 @@ function sayQuip(key) {
   const hold = Math.min(11000, 4000 + said.length * 55);
   const rest = () => { el.classList.add("done"); QUIP_TIMER = setTimeout(hideQuip, hold); };
   typeQuip(el.querySelector(".sess-quip-txt"), said, rest);
+}
+
+/* ---- Him on the dashboard ----
+
+   Mo asked for a line from him under the card that offers today's workout. The
+   session bank and this one are the same character and the same bubble, but the
+   rules around WHEN differ completely, which is why this does not go through
+   sayQuip.
+
+   sayQuip exists inside a workout: it refuses without a SESSION, it holds a
+   thirty second floor between lines because he is talking over a set, and it
+   rolls odds so he is not relentless. None of that applies here. There is no
+   session, nothing to talk over, and a dashboard is visited rather than sat in,
+   so the only question is how often he should greet somebody arriving.
+
+   Once every few minutes, and never twice for one arrival. Opening the app,
+   going to Progress and coming back should not produce a fresh monologue, and
+   a re-render must not either: renderHero runs on plenty of things that are not
+   somebody walking up to the screen. */
+const HOME_QUIP_GAP_MS = 4 * 60 * 1000;
+let HOME_QUIP_AT = 0;
+
+function hideHomeQuip() {
+  const el = $("homeQuipSlot")?.querySelector(".home-quip");
+  if (!el) return;
+  el.classList.add("go");
+  setTimeout(() => el.remove(), 300);
+}
+
+function sayHomeQuip() {
+  const slot = $("homeQuipSlot");
+  if (!slot) return;
+  /* Muted is muted everywhere. It is one switch in Settings and it means he
+     stops talking, not that he stops talking in one place. */
+  if (quipsMuted()) { slot.replaceChildren(); return; }
+  /* Already speaking, or spoke recently: leave him be. */
+  if (slot.querySelector(".home-quip")) return;
+  if (Date.now() - HOME_QUIP_AT < HOME_QUIP_GAP_MS) return;
+
+  const line = pickQuip("home");
+  if (!line) return;                    // bank not loaded yet, or nothing applied
+  HOME_QUIP_AT = Date.now();
+
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = "home-quip";
+  el.innerHTML = `
+    <span class="home-quip-av" aria-hidden="true">${icon("robot", 19)}</span>
+    <span class="home-quip-bub">
+      <span class="home-quip-line"><span class="home-quip-txt"></span><i class="home-quip-cur"></i></span>
+    </span>`;
+  const said = decodeEntities(line);
+  /* The whole line on aria-label from the start, for the same reason the
+     session bubble does it: nobody should have to wait out an animation before
+     their screen reader will tell them what it said. */
+  el.setAttribute("aria-label", `He says: ${said}`);
+  el.onclick = () => hideHomeQuip();
+  slot.replaceChildren(el);
+  /* He stays. There is no set coming to push him off, and a line that vanishes
+     from a screen somebody is reading is worse than one that sits there. Tap
+     to dismiss, and the next arrival replaces him. */
+  typeQuip(el.querySelector(".home-quip-txt"), said, () => el.classList.add("done"));
 }
 
 function decodeEntities(str) {
