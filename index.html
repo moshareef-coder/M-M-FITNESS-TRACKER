@@ -314,6 +314,23 @@
   .obs-sub { font-size: 12.5px; color: var(--muted); line-height: 1.3; }
   /* Reserves its own height so the grid does not jump when the sentence about
      resistance training appears and disappears under it. */
+  .ob-style { position: relative; padding-top: 15px; }
+  .obs-rec {
+    position: absolute; top: -8px; left: 12px; font-size: 9.5px; font-weight: 800; letter-spacing: .06em;
+    text-transform: uppercase; padding: 2px 7px; border-radius: 999px;
+    background: var(--accent); color: var(--accent-ink);
+  }
+  /* Other is closed by default and opens itself when something inside it is
+     already ticked, so coming back to this screen never hides a choice. */
+  .ob-other { margin: 0 0 14px; }
+  .ob-other > summary {
+    cursor: pointer; list-style: none; color: var(--muted); font-size: 14px; font-weight: 650;
+    padding: 11px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel);
+  }
+  .ob-other > summary::-webkit-details-marker { display: none; }
+  .ob-other > summary::after { content: " +"; }
+  .ob-other[open] > summary::after { content: " \2212"; }
+  .ob-other[open] > summary { margin-bottom: 10px; }
   .ob-style-note { color: var(--muted); font-size: 13px; line-height: 1.45; margin: 0 0 16px; min-height: 2.9em; }
   /* The focus picker embedded in onboarding brings its own card padding from
      Setup, which would double up inside an ob-step. */
@@ -9149,7 +9166,6 @@ const GOAL_TILES = [
   { id: "tone-lean-abs", legacy: "recomp", ico: "refresh", title: "Tone up", sub: "get lean, see abs", kids: [] },
   { id: "build-endurance", legacy: "consistent", ico: "run", title: "Build endurance", sub: "last longer, breathe easier", kids: [] },
   { id: "move-better", legacy: "consistent", ico: "body", title: "Move better", sub: "mobility, flexibility, less pain", kids: [] },
-  { id: "feel-better", legacy: "consistent", ico: "heart", title: "Feel better and stay consistent", sub: "energy, sleep, actually sticking to it", kids: [] },
   { id: "consistent", legacy: "consistent", ico: "info", title: "Not sure yet", sub: "we will start somewhere sensible", kids: [] },
 ];
 
@@ -9204,7 +9220,13 @@ const RETIRED_GOALS = {
      "Lift my bodyweight" is get-stronger's own word for that. */
   "do-a-thing": { title: "Hit a milestone", to: ["get-stronger", "strong-multiples"] },
   "event": { title: "Train for an event", to: ["build-endurance", null] },
-  "get-back": { title: "Get back into it", to: ["feel-better", null] },
+  "get-back": { title: "Get back into it", to: ["consistent", null] },
+  /* Retired 2026-09-17 on Mo's call: "we are a workout app". Sleep, energy and
+     mood are real, and none of them is something this app programs for, so the
+     tile promised something the plan never delivered. It lands on "Not sure
+     yet", which shares its legacy key, so every profile that held it keeps the
+     exact plan it already had and only the words on the tile change. */
+  "feel-better": { title: "Feel better and stay consistent", to: ["consistent", null] },
 };
 
 /* Per-child overrides, where the child says something its bubble's default
@@ -9215,8 +9237,8 @@ const RETIRED_GOAL_KIDS = {
   "faster-mile": ["build-endurance", "faster-mile"],
   "flexibility": ["move-better", "flexibility"],
   "back-postpartum": ["move-better", "back-postpartum"],
-  "back-after-years": ["feel-better", "back-after-years"],
-  "start-fresh": ["feel-better", "start-fresh"],
+  "back-after-years": ["consistent", "back-after-years"],
+  "start-fresh": ["consistent", "start-fresh"],
 };
 
 /* A stored pick, as the live goal set would say it. Returns the pair
@@ -10693,15 +10715,6 @@ const GOAL_TUNE = {
   "move-better": { kind: "sore", field: "tune_move",
     title: "Where does it bother you most?",
     sub: "Tap anywhere stiff or sore and the mobility work builds around it. This is not medical advice, and if something actually hurts, see someone about it." },
-  "feel-better": { kind: "choice", field: "tune_feel",
-    title: "What would you most like to change?",
-    sub: "It changes what we nudge you about, not what we program.",
-    options: [
-      { id: "energy", label: "More energy", sub: "Through the day" },
-      { id: "sleep", label: "Sleeping better", sub: "" },
-      { id: "stress", label: "Less stress", sub: "" },
-      { id: "habit", label: "Just turning up", sub: "Consistency above all" },
-    ] },
 };
 
 /* Every tuning answer on the draft, as one object keyed by goal. One column
@@ -10738,7 +10751,41 @@ const TRAIN_STYLES = [
   { id: "walking", label: "Walking", sub: "It counts, and it adds up", mod: "cardio", mode: "walking" },
   { id: "pilates", label: "Pilates", sub: "Core, control, mat work", mod: "flow" },
   { id: "yoga", label: "Yoga", sub: "Mobility and breath", mod: "flow" },
+  /* Behind "Other", because seven tiles is a glance and twelve is a form. These
+     are real and the cardio library has sessions for the first three; they are
+     just not what most people are picking on the way in. */
+  { id: "swimming", label: "Swimming", sub: "Pool laps", mod: "cardio", mode: "swimming", other: true },
+  { id: "rowing", label: "Rowing", sub: "Erg or water", mod: "cardio", mode: "rowing", other: true },
+  { id: "classes", label: "HIIT and classes", sub: "Circuits, boxing, barre", mod: "cardio", mode: "hiit", other: true },
+  { id: "hiking", label: "Hiking", sub: "Hills and trails", mod: "cardio", mode: "hiking", other: true },
+  { id: "sports", label: "A sport", sub: "Football, tennis, climbing", mod: "cardio", other: true },
 ];
+
+/* What we put forward before they have said anything, per goal, and never
+   fewer than two: one recommendation reads as a rule, three or more reads as
+   us picking for them. The union across their goals is what gets ticked, so
+   somebody holding Get stronger and Move better opens with lifting AND yoga
+   rather than whichever goal happened to be first.
+
+   Move better recommends yoga and pilates, in that order, because mobility is
+   what yoga is for. Every weight-shaped goal recommends a resistance style
+   first: it is the one thing the plan genuinely needs and the one thing strict
+   opt in lets somebody remove without noticing. */
+const STYLE_RECS = {
+  "lose-weight": ["walking", "lifting"],
+  "build-muscle": ["lifting", "home"],
+  "get-stronger": ["lifting", "home"],
+  "tone-lean-abs": ["lifting", "pilates"],
+  "build-endurance": ["running", "cycling"],
+  "move-better": ["yoga", "pilates"],
+  "consistent": ["walking", "home"],
+};
+function recommendedStyles(data) {
+  const ids = [data.goal_bubble, ...normaliseGoalSecondary(data.goal_secondary).map((e) => e.bubble)];
+  const out = [];
+  for (const id of ids) for (const sId of (STYLE_RECS[id] || [])) if (!out.includes(sId)) out.push(sId);
+  return out.length ? out : ["walking", "home"];
+}
 
 function renderOnboardStep(step, data = {}) {
   /* A draft is saved on every step and survives a deploy, so somebody can come
@@ -10825,17 +10872,31 @@ function renderOnboardStep(step, data = {}) {
   /* What they are willing to do. Strict opt in: nothing unticked is ever
      planned, and there is no floor putting resistance training back. */
   if (step === "styles") {
-    const picked = new Set(data.train_styles || TRAIN_STYLES.map((t) => t.id));
+    /* Opens on the recommendations rather than on everything. Ticking all seven
+       by default made the screen decorative: nobody unticks a full board, so
+       every plan came out identical and the question was theatre. Opening on
+       two or three that follow from their goals is a suggestion they can
+       actually disagree with. */
+    const recs = recommendedStyles(data);
+    const picked = new Set(data.train_styles || recs);
+    const others = TRAIN_STYLES.filter((t) => t.other);
+    const openOther = others.some((t) => picked.has(t.id));
+    const card = (t) => `<button type="button" class="ob-style${picked.has(t.id) ? " on" : ""}" data-style="${t.id}">
+        ${recs.includes(t.id) ? `<span class="obs-rec">Recommended</span>` : ""}
+        <span class="obs-label">${escapeHtml(t.label)}</span>
+        <span class="obs-sub">${escapeHtml(t.sub)}</span>
+      </button>`;
     ob.innerHTML = `
       <div class="ob-step">
-        <h1>What do you want to do?</h1>
-        <p class="sub">Pick everything you are up for. We only ever plan what you pick here.</p>
+        <h1>Pick your workouts</h1>
+        <p class="sub">We have ticked what suits your goals. Change any of it. We only ever plan what is ticked here.</p>
         <div class="ob-styles" id="styleGrid">
-          ${TRAIN_STYLES.map((t) => `<button type="button" class="ob-style${picked.has(t.id) ? " on" : ""}" data-style="${t.id}">
-            <span class="obs-label">${escapeHtml(t.label)}</span>
-            <span class="obs-sub">${escapeHtml(t.sub)}</span>
-          </button>`).join("")}
+          ${TRAIN_STYLES.filter((t) => !t.other).map(card).join("")}
         </div>
+        <details class="ob-other"${openOther ? " open" : ""}>
+          <summary>Other</summary>
+          <div class="ob-styles">${others.map(card).join("")}</div>
+        </details>
         <p class="ob-style-note" id="styleNote"></p>
         <button type="button" class="btn-primary" id="styleNext">Continue</button>
         <button type="button" class="btn-ghost" id="styleBack">Back</button>
