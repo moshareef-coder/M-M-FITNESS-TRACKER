@@ -26112,6 +26112,14 @@ function paintArrangeUI(host) {
          nothing here changes for opening one. */
       if (wasOpen && !e.target.closest("h2")) return;
       host.querySelectorAll(".card.peek").forEach((c) => c.classList.remove("peek"));
+      /* On the weight screen the photos card only exists while it is open;
+         the Body Photos tile is how it opens. Folding it hides it again, so
+         the screen goes back to being the mockup and not the mockup plus a
+         stray "Body Photos / None yet" row under the tile that says the same. */
+      if (card.id === "cardPhotos" && wasOpen && $("cardWeight")?.classList.contains("wt-hero")) {
+        card.classList.add("hidden");
+        return;
+      }
       if (!wasOpen) {
         card.classList.add("peek");
         card.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -26161,7 +26169,7 @@ let WAIST_LOG_OPEN = false;
 /* Reads the waist readings as the weight headline reads weigh-ins, and
    colours them the same way: a weight goal wants the tape going down, so on
    this tile down is --down (good) and up is --up (bad). */
-function renderProgTiles(kind, isPartner) {
+function renderProgTiles(kind, isPartner, opts = {}) {
   const host = $("progTiles");
   if (!host) return;
   const on = kind === "scale";
@@ -26201,7 +26209,11 @@ function renderProgTiles(kind, isPartner) {
      is a dead tap. */
   const photos = $("tilePhotos");
   const card = $("cardPhotos");
-  const showPhotos = !isPartner && card && !card.classList.contains("hidden");
+  /* On the weight screen the photos card is hidden by design and this tile is
+     its door, so "is the card visible" is the wrong test there: the caller
+     says whether photos exist to be shown at all (yours, not a blank
+     account), and the card's own hidden class only decides elsewhere. */
+  const showPhotos = opts.photosAvailable ?? (!isPartner && card && !card.classList.contains("hidden"));
   photos.classList.toggle("hidden", !showPhotos);
   host.classList.toggle("solo", !showPhotos);
   if (showPhotos) {
@@ -26210,6 +26222,9 @@ function renderProgTiles(kind, isPartner) {
       <span class="prog-tile-body"><span class="prog-tile-title">Body Photos</span><span class="prog-tile-val">${n} photo${n === 1 ? "" : "s"}</span><span class="prog-tile-sub go">See progress &rsaquo;</span></span>${chev}`;
     photos.onclick = () => {
       document.querySelectorAll("#tab-progress .card.peek").forEach((c) => c.classList.remove("peek"));
+      /* The door opens the card, so it is un-hidden here; folding it again
+         puts it back (see the accordion), so the screen returns to the mockup. */
+      card.classList.remove("hidden");
       card.classList.add("peek");
       primeOpenedCard(card);
       card.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -26354,10 +26369,18 @@ function renderProgressTab() {
      something to read, and wrong for the one card whose whole job right now
      is being typed into. */
   const weightLed = kind === "scale" || kind === "recomp";
+  /* The weight screen is the mockup and nothing under it. Mo: "I want it to
+     look exactly like this... remove everything that's not in this." So when
+     Weight is the hero, it is the ONLY card: no folded rows under the tiles,
+     no "everything else" section. Every other reading is one chip-tap away,
+     which is what the strip at the top is for. Photos stay in the DOM,
+     hidden, because the Body Photos tile is their door. */
+  const weightScreen = !blank && kind === "scale";
   const shown = blank
     ? (weightLed && !isPartner ? ["cardWeight"] : [])
+    : weightScreen ? ["cardWeight"]
     : wanted.concat(rest);
-  const quiet = new Set(blank ? [] : rest);
+  const quiet = new Set(blank || weightScreen ? [] : rest);
   /* Which row(s) get the ring: whichever card the headline sentence was
      actually about, not "first in GOAL_CARDS" (volume's own order leads with
      cardMuscles, but a volume headline is about tonnage, not muscles). */
@@ -26413,9 +26436,12 @@ function renderProgressTab() {
   }
   // The rule is a label for what follows it, so with nothing following it, and
   // on a brand new account where nothing is on screen at all, it says nothing.
-  rule.classList.toggle("hidden", blank || !rest.length);
+  rule.classList.toggle("hidden", blank || !rest.length || weightScreen);
 
-  renderProgTiles(kind, isPartner);
+  /* photosAvailable is passed rather than read off cardPhotos's hidden class,
+     because on the weight screen that card is hidden ON PURPOSE and the tile
+     is meant to be its door, not to vanish with it. */
+  renderProgTiles(kind, isPartner, { photosAvailable: !isPartner && !blank });
   const live = new Set(shown);
   if (live.has("cardWeight")) { renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); }
   if (live.has("cardConsistency")) { renderConsistencyChart(); renderConsistencyStats(); }
