@@ -26,13 +26,22 @@
 -- rather than a boolean, because the only thing worth saying about it later is
 -- "since March", and a flag cannot say that. Null means they never made one,
 -- which is every account created before this screen existed.
+-- tracked_metrics: which measurements this person wants Progress to chart, from
+-- weight, waist_in, hips_in, chest_in, thigh_in, arm_in. Null means never
+-- chosen and reads as the goal's own default, which is what every account has
+-- today. An EMPTY list is a real answer and not the same as null: a mobility
+-- goal legitimately tracks no number at all, and the app honours that rather
+-- than falling back to the scale.
 alter table public.profiles
   add column if not exists train_styles text[],
   add column if not exists goal_tuning jsonb,
-  add column if not exists committed_at timestamptz;
+  add column if not exists committed_at timestamptz,
+  add column if not exists tracked_metrics text[];
 
 comment on column public.profiles.train_styles is
   'Training styles the person opted into. Null means never asked; anything absent from the list is never planned.';
+comment on column public.profiles.tracked_metrics is
+  'What Progress charts for this person. Null means never chosen and falls back to the goal default; an empty array means they chose to track nothing.';
 comment on column public.profiles.committed_at is
   'When the person made the commitment at the end of onboarding. Null means never.';
 comment on column public.profiles.goal_tuning is
