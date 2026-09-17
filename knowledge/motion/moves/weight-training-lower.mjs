@@ -48,6 +48,7 @@ const BARBELL_BACK_SQUAT = {
       // is a world offset, so the grip is re-aimed here too for the 27 degree
       // torso.
       t: 0.5,
+      through: true,
       root: { x: 54, y: 78, rot: 13 },
       joints: { spine: 14, neck: -7 },
       ik: {
@@ -108,6 +109,7 @@ const FRONT_SQUAT = {
       // offset has to be re-aimed at every key or the bar slides back off the
       // delts as the torso turns.
       t: 0.5,
+      through: true,
       root: { x: 55, y: 78, rot: 9.5 },
       joints: { spine: 10, neck: -3.5 },
       ik: {
@@ -454,7 +456,7 @@ const STIFF_LEG_DEADLIFT = {
     { // stood tall, bells at the front of the thighs
       t: 0,
       root: { x: 66, y: 61.4, rot: 2 },
-      joints: { spine: 2, neck: -2, shoulderR: -4, elbowR: 2, shoulderL: -4, elbowL: 3 },
+      joints: { spine: 2, neck: -2, shoulderR: -4, shoulderL: -4, elbowR: 2, elbowL: 2 },
       ik: { ...SQUAT_FEET },
     },
     { // half way. With the foot pinned and the knee locked the hip rides a
@@ -462,9 +464,10 @@ const STIFF_LEG_DEADLIFT = {
       // ends cuts inside that circle: the knee bent 27 degrees in the middle of
       // a lift whose whole point is that it does not.
       t: 0.5,
+      through: true,
       root: { x: 57, y: 61.7, rot: 17 },
-      joints: { spine: 23, neck: -6, shoulderR: -40, elbowR: 2, shoulderL: -40, elbowL: 3 },
-      ik: { ...SQUAT_FEET },
+      joints: { spine: 23, neck: -6, shoulderR: -40, shoulderL: -40, elbowR: 2, elbowL: 2 },
+      ik: { ...SQUAT_FEET, ankleR: { x: 66, y: 113.4, bend: -1, pole: [0.156, -0.891, 0.426] } },
     },
     { // bottom, knees all but locked, torso past 70 degrees. The pelvis stays
       // HIGH and travels back only a little: with the feet pinned, dropping it
@@ -476,9 +479,9 @@ const STIFF_LEG_DEADLIFT = {
       // rides a circle 51.5 units from the ankle, so 18 back costs only 3 of
       // height, and the bells then hang over the middle of the foot.
       t: 1,
-      root: { x: 46.5, y: 64, rot: 32 },
-      joints: { spine: 43, neck: -10, shoulderR: -75, elbowR: 2, shoulderL: -75, elbowL: 3 },
-      ik: { ...SQUAT_FEET },
+      root: { x: 53.3, y: 63.5, rot: 32 },
+      joints: { spine: 43, neck: -10, shoulderR: -75, shoulderL: -75, elbowR: 2, elbowL: 2 },
+      ik: { ...SQUAT_FEET, ankleR: { x: 66, y: 113.4, bend: -1, pole: [-0.164, -0.665, 0.728] }, ankleL: { x: 62, y: 113.4, bend: -1, pole: [-0.13, -0.688, 0.714] } },
     },
   ],
 };
@@ -543,6 +546,7 @@ const GOOD_MORNING = {
       // keyframes it interpolates in a straight line while the torso swings
       // through 70 degrees, and the hands drift off the bar in the middle.
       t: 0.5,
+      through: true,
       root: { x: 58, y: 62.7, rot: 16.5 },
       joints: { spine: 25, neck: -12 },
       ik: {

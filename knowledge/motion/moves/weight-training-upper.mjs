@@ -1496,9 +1496,7 @@ const CUBAN_PRESS = {
     { // bells at the thighs, arms long
       t: 0,
       root: { x: 60, y: 61.4, rot: 2 },
-      joints: {
-        spine: 2, neck: 0,
-        shoulderR: 8, elbowR: 14, shoulderL: 6, elbowL: 16, forearmPronR: 90, forearmPronL: 90 },
+      joints: { spine: 2, neck: 0, shoulderR: 33, shoulderL: 33, shoulderRotR: 0, shoulderRotL: 0, elbowR: 5, elbowL: 5, forearmPronR: 90, forearmPronL: 90 },
       ik: { ...stand(62, 57) },
     },
     { /* elbows pulled up high, bells at the chest. Kept clear of the chin: the
@@ -1528,9 +1526,7 @@ const CUBAN_PRESS = {
          numbers are here and the pose is left alone. */
       t: 0.45,
       root: { x: 60, y: 61.4, rot: 2 },
-      joints: {
-        spine: 0, neck: -2,
-        shoulderR: 70, elbowR: 78, shoulderL: 67, elbowL: 76, forearmPronR: 90, forearmPronL: 90 },
+      joints: { spine: 0, neck: -2, shoulderR: 94, shoulderL: 94, shoulderRotR: 1, shoulderRotL: -1, elbowR: 95, elbowL: 95, forearmPronR: 90, forearmPronL: 90 },
       ik: { ...stand(62, 57) },
     },
     { /* rotated up and pressed to lockout. This used to sit at 191 and 188,
@@ -1544,9 +1540,7 @@ const CUBAN_PRESS = {
          out of the way, and it happens to leave the face clearest too. */
       t: 1,
       root: { x: 60, y: 61.4, rot: 2 },
-      joints: {
-        spine: -2, neck: -12,
-        shoulderR: 166, elbowR: 8, shoulderL: 163, elbowL: 10, forearmPronR: 90, forearmPronL: 90 },
+      joints: { spine: -2, neck: -12, shoulderR: 166, shoulderL: 166, elbowR: 8, elbowL: 8, forearmPronR: 90, forearmPronL: 90 },
       ik: { ...stand(62, 57) },
     },
   ],
@@ -1895,6 +1889,7 @@ const INCLINE_DUMBBELL_CURL = {
       // pins alone pulled the elbow 7.9 units forward mid rep and gave that
       // stretched position away.
       t: 0.5,
+      through: true,
       root: { x: 84, y: 84, rot: -44 },
       joints: { spine: 0, neck: -5, forearmPronR: -86, forearmPronL: -86 },
       ik: {
@@ -1907,7 +1902,7 @@ const INCLINE_DUMBBELL_CURL = {
       root: { x: 84, y: 84, rot: -44 },
       joints: { spine: 0, neck: -6, forearmPronR: -86, forearmPronL: -86 },
       ik: {
-        wristR: { x: 79.9, y: 77.8, bend: 1 }, wristL: { x: 82.9, y: 78.8, bend: 1 },
+        wristR: { x: 80.1, y: 73.6, bend: 1 }, wristL: { x: 81.6, y: 73.2, bend: 1 },
         ...stand(110, 104),
       },
     },
@@ -1932,10 +1927,10 @@ const SPIDER_CURL = {
     { // bottom, arms hanging dead straight under the shoulders
       t: 0,
       root: { x: 46, y: 66, rot: 55 },
-      joints: { spine: 0, neck: -12, forearmPronR: -86, forearmPronL: -86 },
+      joints: { spine: 6, neck: -12, forearmPronR: -86, forearmPronL: -86 },
       ik: {
-        wristR: { x: 72.5, y: 87.3, bend: 1 }, wristL: { x: 68.5, y: 88.3, bend: 1 },
-        ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },
+        wristR: { x: 72.5, y: 87.3, bend: 1 }, wristL: { x: 72.9, y: 88.5, bend: 1 },
+        ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: 113.4, bend: -1, pole: [-0.022, -0.754, 0.657] },
       },
     },
     { // halfway, forearms level, upper arms still hanging dead under the
@@ -1943,8 +1938,9 @@ const SPIDER_CURL = {
       // 9.5 units forward mid rep, which on a spider curl is the arm swinging
       // off the pad.
       t: 0.5,
+      through: true,
       root: { x: 46, y: 66, rot: 55 },
-      joints: { spine: 0, neck: -12, forearmPronR: -86, forearmPronL: -86 },
+      joints: { spine: 7, neck: -12, forearmPronR: -86, forearmPronL: -86 },
       ik: {
         wristR: { x: 83.0, y: 79.6, bend: 1 }, wristL: { x: 77.3, y: 78.5, bend: 1 },
         ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },
@@ -1953,7 +1949,7 @@ const SPIDER_CURL = {
     { // top, bells curled up in front of the face
       t: 1,
       root: { x: 46, y: 66, rot: 55 },
-      joints: { spine: 0, neck: -12, forearmPronR: -86, forearmPronL: -86 },
+      joints: { spine: 4, neck: -12, forearmPronR: -86, forearmPronL: -86 },
       ik: {
         wristR: { x: 82.5, y: 64.3, bend: 1 }, wristL: { x: 78.5, y: 65.3, bend: 1 },
         ankleR: { x: 38, y: FLOOR, bend: -1 }, ankleL: { x: 33, y: FLOOR, bend: -1 },
@@ -1985,8 +1981,8 @@ const TRICEPS_PUSHDOWN = {
          with the upper arm hanging vertical, which is the same place the
          lockout's elbow is. */
       t: 0,
-      root: { x: 46, y: 61.4, rot: 2 },
-      joints: { spine: 4, neck: -4 },
+      root: { x: 37.8, y: 63, rot: 2 },
+      joints: { spine: 21, neck: -4 },
       ik: {
         wristR: { x: 65.5, y: 45.9, bend: 1 }, wristL: { x: 62.5, y: 47.9, bend: 1 },
         ...stand(48, 43),
@@ -1995,17 +1991,18 @@ const TRICEPS_PUSHDOWN = {
     { // halfway, elbow in exactly the same place. The two end pins alone leave
       // a chord that pulls it 5.4 units back mid rep.
       t: 0.5,
-      root: { x: 46, y: 61.4, rot: 2 },
-      joints: { spine: 4, neck: -4 },
+      through: true,
+      root: { x: 37.8, y: 61.2, rot: 2 },
+      joints: { spine: 21, neck: -4 },
       ik: {
-        wristR: { x: 64.7, y: 59.4, bend: 1 }, wristL: { x: 61.3, y: 61.3, bend: 1 },
+        wristR: { x: 64.7, y: 59.4, bend: 1, pole: [0.267, 0.799, 0.538] }, wristL: { x: 61.3, y: 61.3, bend: 1 },
         ...stand(48, 43),
       },
     },
     { // lockout, arm straight down, elbow unmoved
       t: 1,
-      root: { x: 46, y: 61.4, rot: 2 },
-      joints: { spine: 4, neck: -4 },
+      root: { x: 39.3, y: 61.9, rot: 2 },
+      joints: { spine: 21, neck: -4 },
       ik: {
         wristR: { x: 54.3, y: 68.0, bend: 1 }, wristL: { x: 51.3, y: 70.0, bend: 1 },
         ...stand(48, 43),
@@ -2035,6 +2032,7 @@ const ROPE_PUSHDOWN = {
     },
     { // halfway, elbow unmoved. Same reason as Triceps Pushdown.
       t: 0.5,
+      through: true,
       root: { x: 46, y: 61.4, rot: 2 },
       joints: { spine: 4, neck: -4, wristR: 13, wristL: -11 },
       ik: {
@@ -2071,7 +2069,7 @@ const OVERHEAD_TRICEPS_EXTENSION = {
       root: { x: 58, y: 61.4, rot: 2 },
       joints: { spine: 2, neck: -2 },
       ik: {
-        wristR: { x: 50.2, y: 25.0, bend: 1 }, wristL: { x: 47.2, y: 22.0, bend: 1 },
+        wristR: { x: 49.9, y: 17.1, bend: 1 }, wristL: { x: 50, y: 17.2, bend: 1 },
         ...stand(60, 55),
       },
     },
@@ -2082,10 +2080,11 @@ const OVERHEAD_TRICEPS_EXTENSION = {
          travelling and the forearm was not. On this exercise that is the whole
          failure: the elbow must stay put and only the forearm moves. */
       t: 0.5,
+      through: true,
       root: { x: 58, y: 61.4, rot: 2 },
       joints: { spine: 1, neck: 5 },
       ik: {
-        wristR: { x: 42.0, y: 8.1, bend: 1 }, wristL: { x: 42.4, y: 7.9, bend: 1 },
+        wristR: { x: 50.2, y: 13, bend: 1 }, wristL: { x: 49.8, y: 12.6, bend: 1 },
         ...stand(60, 55),
       },
     },
@@ -2204,6 +2203,7 @@ const SKULL_CRUSHER = {
       // out of place mid rep, and a skull crusher with a travelling elbow is a
       // press.
       t: 0.5,
+      through: true,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -5 },
       ik: { wristR: { x: 45.6, y: 51.6, bend: 1 }, wristL: { x: 48.4, y: 51.3, bend: 1 }, ...stand(108, 112) },
@@ -2320,10 +2320,10 @@ const REVERSE_CURL = {
   keys: [
     { // bottom, arms long, knuckles forward
       t: 0,
-      root: { x: 60, y: 61.4, rot: 2 },
-      joints: { spine: 2, neck: 0, wristR: 20, wristL: 20 },
+      root: { x: 60, y: 61.4, rot: 0 },
+      joints: { spine: -5, neck: 0, spineTwist: 0, torsoRoll: 0, wristR: 20, wristL: 20 },
       ik: {
-        wristR: { x: 66.2, y: 68.0, bend: 1 }, wristL: { x: 63.2, y: 70.0, bend: 1 },
+        wristR: { x: 66.2, y: 68, bend: 1, pole: [0.024, 0.235, 0.972] }, wristL: { x: 65.5, y: 67.1, bend: 1 },
         ...stand(62, 57),
       },
     },
@@ -2331,6 +2331,7 @@ const REVERSE_CURL = {
       // here because the range is shorter, but 4.6 units of elbow swing on a
       // curl is still a curl with a swinging elbow.
       t: 0.5,
+      through: true,
       root: { x: 60, y: 61.4, rot: 2 },
       joints: { spine: 1, neck: -1, wristR: 22, wristL: 22 },
       ik: {
