@@ -154,8 +154,11 @@ const PEC_DECK = {
     { // open, elbows wide out at shoulder height, forearms up on the pads
       t: 0,
       root: { x: 70, y: 80, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 95, shoulderL: 95, elbowR: 90, elbowL: 90 },
-      ik: { ...stand(86, 54) },
+      joints: {
+        spine: 0, neck: 0, shoulderR: 95, shoulderL: 95, elbowR: 90, elbowL: 90,
+        hipR: 24, hipL: 24, hipAbdR: 64, hipAbdL: 64, hipRotR: -50, hipRotL: -50, kneeR: 40, kneeL: 40,
+      },
+      ik: {},
     },
     { // squeezed: the elbows travel in to meet in front of the chest with the
       // forearms still up. The fold is turned by shoulderRot rather than by
@@ -164,9 +167,11 @@ const PEC_DECK = {
       // dead straight arms, which is a different exercise.
       t: 1,
       root: { x: 70, y: 80, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 17, shoulderL: 17, elbowR: 96, elbowL: 96,
+      joints: {
+        spine: 0, neck: 0, shoulderR: 17, shoulderL: 17, elbowR: 96, elbowL: 96,
+        hipR: 24, hipL: 24, hipAbdR: 64, hipAbdL: 64, hipRotR: -50, hipRotL: -50, kneeR: 40, kneeL: 40,
                 shoulderRotR: -95, shoulderRotL: -95 },
-      ik: { ...stand(86, 54) },
+      ik: {},
     },
   ],
 };
