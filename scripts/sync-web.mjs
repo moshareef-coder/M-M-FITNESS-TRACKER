@@ -28,6 +28,15 @@ const ASSETS = [
   "logo/unio-left.png",
   "logo/unio-right.png",
   "logo/unio-bar.png",
+  /* The paywall carousel's five screens, one real capture per premium
+     feature. <img> src the same as the logo layers above, so left out of the
+     bundle the paywall would show five broken image icons instead of what
+     somebody is being asked to pay for. */
+  "paywall/01-generated-workout.jpg",
+  "paywall/02-week-plan.jpg",
+  "paywall/03-body-impact.jpg",
+  "paywall/04-progress-records.jpg",
+  "paywall/05-accent-colors.jpg",
   "icon-192.png",
   "icon-512.png",
   "icon-maskable-512.png",

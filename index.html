@@ -1588,6 +1588,38 @@
     content: ""; position: absolute; left: 0; top: 8px;
     width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
   }
+  /* The paywall carousel. One real screenshot per feature, swiped rather than
+     scrolled with a bar, because a phone-sized card is the one thing this
+     content should always be shown at: shrinking it to fit a list item would
+     make the screenshot too small to read.
+     scroll-snap rather than a JS-driven slider: free momentum, free rubber
+     banding at the ends, no per-frame code to keep in sync with a finger. */
+  .paywall-carousel { margin: 4px -20px 6px; }
+  .paywall-carousel-track {
+    display: flex; gap: 12px; overflow-x: auto; padding: 0 20px 4px;
+    scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .paywall-carousel-track::-webkit-scrollbar { display: none; }
+  .paywall-slide {
+    flex: 0 0 auto; width: min(72vw, 260px); scroll-snap-align: center;
+    border-radius: 16px; overflow: hidden; background: var(--panel-2, var(--panel));
+    border: 1px solid var(--line, rgba(128,128,128,.18));
+  }
+  .paywall-slide img {
+    display: block; width: 100%; aspect-ratio: 9 / 16; object-fit: cover;
+    /* The screenshot's own top, where the app's real status bar and header
+       already sit, so the card is not doubling up a crop line against
+       whatever the phone's own notch is doing. */
+    object-position: top;
+    background: var(--panel-2, var(--panel));
+  }
+  .paywall-slide-caption { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 2px; }
+  .paywall-slide-caption b { font-size: 13.5px; color: var(--text); }
+  .paywall-slide-caption span { font-size: 12px; color: var(--muted); line-height: 1.3; }
+  .paywall-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+  .paywall-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line, rgba(128,128,128,.3)); transition: background .15s, transform .15s; }
+  .paywall-dot.on { background: var(--accent); transform: scale(1.25); }
   /* One blocked person. The address can be long and the button must not be
      pushed off the edge by it, so the name takes the slack and ellipsises. */
   .block-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
@@ -13704,12 +13736,17 @@ async function reportClip(clip) {
    a paywall, so this string and that product are changed together. */
 const PREMIUM_PRICE = "$7.99";
 
+/* One real screenshot per feature, captured from the app itself rather than
+   drawn, because a carousel showing something the app does not actually do is
+   Guideline 2.3, misleading metadata, and it is also just a lie to whoever is
+   about to pay based on it. Re-capture with the sandbox and CDP if any of
+   these five screens changes shape. */
 const PREMIUM_UNLOCKS = [
-  ["Workouts made for you", "A plan every day, built around your goal and what you lifted last time."],
-  ["Plan your week", "Decide the shape of the week ahead instead of deciding every morning."],
-  ["Body impact", "Which muscles you have actually worked, and which ones you keep missing."],
-  ["The full picture", "Trends, projections and your records ranked."],
-  ["Make it yours", "Accent colours."],
+  ["paywall/01-generated-workout.jpg", "Workouts made for you", "A plan every day, built around your goal and what you lifted last time."],
+  ["paywall/02-week-plan.jpg", "Plan your week", "Decide the shape of the week ahead instead of deciding every morning."],
+  ["paywall/03-body-impact.jpg", "Body impact", "Which muscles you have actually worked, and which ones you keep missing."],
+  ["paywall/04-progress-records.jpg", "The full picture", "Trends, projections and your records ranked."],
+  ["paywall/05-accent-colors.jpg", "Make it yours", "Accent colours."],
 ];
 
 /* The gate. Returns true when the thing may go ahead, and otherwise puts the
@@ -13740,10 +13777,24 @@ function showPaywall() {
             <div class="pop-who" style="color:var(--muted)">UNIO PREMIUM</div>
             <button type="button" class="ds-x" data-pay="0" aria-label="Close">&times;</button>
           </div>
-          <ul class="push-promise">
-            ${PREMIUM_UNLOCKS.map(([t, d]) => `
-              <li><b>${escapeHtml(t)}</b><span>${escapeHtml(d)}</span></li>`).join("")}
-          </ul>
+          <!-- Swipe through what it actually looks like before reading a word
+               about it. People buy what they can picture themselves using, and
+               a bullet list only describes; this shows the real screen. -->
+          <div class="paywall-carousel" id="paywallCarousel">
+            <div class="paywall-carousel-track" id="paywallCarouselTrack">
+              ${PREMIUM_UNLOCKS.map(([img, t, d]) => `
+                <div class="paywall-slide">
+                  <img src="${img}" alt="${escapeHtml(t)}" loading="lazy" />
+                  <div class="paywall-slide-caption">
+                    <b>${escapeHtml(t)}</b>
+                    <span>${escapeHtml(d)}</span>
+                  </div>
+                </div>`).join("")}
+            </div>
+            <div class="paywall-dots" id="paywallDots">
+              ${PREMIUM_UNLOCKS.map((_, i) => `<span class="paywall-dot${i === 0 ? " on" : ""}"></span>`).join("")}
+            </div>
+          </div>
           <!-- One subscription covers both of you. Said here rather than in the
                small print, because it is the difference between five a month
                and two people each paying five a month. -->
@@ -13763,6 +13814,21 @@ function showPaywall() {
         </div>
       </div>`;
     document.body.appendChild(scrim);
+    /* The dots track a scroll position rather than a click handler, because
+       the track scrolls by touch and by the arrow-key/trackpad affordances a
+       horizontal overflow gets for free, and both need to land on the same
+       dot. Read off which slide is nearest centre rather than exact card
+       width math, so a device where the card is not quite the width the CSS
+       asked for still lights up the right dot. */
+    const carouselTrack = scrim.querySelector("#paywallCarouselTrack");
+    const dots = scrim.querySelectorAll(".paywall-dot");
+    if (carouselTrack && dots.length) {
+      carouselTrack.addEventListener("scroll", () => {
+        const slideWidth = carouselTrack.firstElementChild?.offsetWidth || 1;
+        const i = Math.round(carouselTrack.scrollLeft / slideWidth);
+        dots.forEach((d, di) => d.classList.toggle("on", di === i));
+      }, { passive: true });
+    }
     const close = (v) => { scrim.remove(); resolve(v); };
     scrim.querySelectorAll("[data-pay]").forEach((b) => {
       b.onclick = async () => {
