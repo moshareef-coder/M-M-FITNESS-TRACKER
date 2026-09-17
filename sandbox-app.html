@@ -4265,11 +4265,19 @@
      at all rather than like a layout bug, which is why it survived a review. */
   .sr-row-bar { display: flex; gap: 4px; width: 100%; }
 
-  /* The heaviest thing actually lifted, said once and said big. */
+  /* The heaviest thing actually lifted, said once and said big.
+
+     No border, no fill, no corner radius on any of this. Mo: "these look like
+     buttons even though they're not." They did, because a hairline box with a
+     12px radius and a panel fill IS this app's button, and these are readouts
+     nobody can press. They also put a card inside a card, which doubles the
+     padding on the one screen already fighting for height. A rule and some
+     whitespace separate them now, the same language the Level column beside
+     the big number already uses. */
   .pr-top {
     display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline;
-    padding: 13px 14px; border: 1px solid var(--border); border-radius: 12px;
-    background: var(--panel); margin-bottom: 12px;
+    padding: 0 0 14px; margin-bottom: 14px;
+    border-bottom: 1px solid var(--border);
   }
   .pr-top-k { font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
   .pr-top-v { grid-row: 2; font-size: 24px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.02em; }
@@ -4277,11 +4285,12 @@
   .pr-top-d { grid-column: 2; grid-row: 2; font-size: 12.5px; color: var(--muted); }
 
   .pr-wrap { margin-bottom: 14px; }
-  .pr-head { font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 0 2px 8px; }
-  .pr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .pr-cell {
-    border: 1px solid var(--border); border-radius: 12px; padding: 10px 8px; text-align: center; background: var(--panel);
-  }
+  .pr-head { font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+  .pr-grid { display: grid; grid-template-columns: repeat(3, 1fr); row-gap: 16px; }
+  /* A thin rule between the cells in a row, and none at the start of one, so
+     three numbers read as one row of figures rather than three chips. */
+  .pr-cell { padding: 0 8px; text-align: center; border-left: 1px solid var(--border); }
+  .pr-cell:nth-child(3n + 1) { border-left: 0; padding-left: 0; }
   .pr-cell b { display: block; font-size: 19px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
   .pr-cell b i { font-style: normal; font-size: 11.5px; font-weight: 600; color: var(--muted); margin-left: 2px; }
   .pr-cell span { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
@@ -5154,7 +5163,7 @@
   }
   #cardWeight.wt-hero .wth-card {
     position: relative; overflow: hidden; margin-bottom: 10px;
-    background: color-mix(in srgb, var(--me) 10%, var(--panel)); box-shadow: var(--shadow-lift);
+    background: var(--panel); box-shadow: var(--shadow-lift);
   }
   .wth-head { position: relative; padding-right: 100px; }
   .wth-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
@@ -5235,7 +5244,7 @@
      being set again slightly differently here. */
   #toneHero .tone-card, .goal-screen .end-card {
     position: relative; overflow: hidden; margin-bottom: 10px;
-    background: color-mix(in srgb, var(--me) 10%, var(--panel));
+    background: var(--panel);
     border: 1px solid var(--border);
     border-radius: var(--radius); padding: 16px 15px; box-shadow: var(--shadow-lift);
   }
@@ -5302,6 +5311,25 @@
      is already used by the lift detail sheet, on purpose: the heaviest set and
      the best-by-reps grid should read identically wherever they appear, and a
      second set of styles for the same two facts is how they start disagreeing. */
+  /* Lift names are not four short words like Waist and Hips, so this strip is
+     not a segmented control. Four equal shares of 390px turned "Overhead Press"
+     into a clipped label, which is what Mo saw. Each chip is its own width now
+     and the row scrolls sideways under the thumb, bleeding to the screen edges
+     so it reads as more-to-the-right rather than as a cut off word. Scoped to
+     the strip, so the page itself never scrolls. */
+  .lift-chips {
+    display: flex; gap: 8px; margin: 0 -16px 12px; padding: 0 16px 2px;
+    overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .lift-chips::-webkit-scrollbar { display: none; }
+  .lift-chip {
+    flex: 0 0 auto; white-space: nowrap; min-height: 36px; padding: 8px 15px;
+    border-radius: 100px; cursor: pointer;
+    background: var(--panel-2); border: 1px solid transparent; color: var(--muted);
+    font-family: inherit; font-size: 13px; font-weight: 700;
+  }
+  .lift-chip.on { background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-card); }
+  .lift-chip:active { transform: scale(.97); }
   .lift-records, .lift-levels { margin-bottom: 12px; }
   .lift-levels .sr-row { background: none; border-color: var(--border); }
   .lift-levels .sr-row.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
@@ -6098,7 +6126,7 @@
       <div class="end-head">
         <div class="wth-title" id="liftTitle">Get stronger</div>
       </div>
-      <div class="bulk-chips hidden" id="liftChips"></div>
+      <div class="lift-chips hidden" id="liftChips"></div>
       <div class="end-card">
         <div class="wth-stats" id="liftStats"></div>
         <div class="chart-wrap"><canvas id="liftChart"></canvas></div>
@@ -7010,7 +7038,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.28";
+const APP_VERSION = "2026.09.16.29";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -16157,14 +16185,15 @@ function renderLiftHero(on, profile, isPartner) {
   if (!lifts.some((l) => l.name === LIFT_PICK)) LIFT_PICK = lifts[0].name;
   const pick = LIFT_PICK;
 
-  /* "Barbell Back Squat" is two lines in a quarter-width chip and makes the
-     whole strip two rows tall. On a screen that is entirely about barbells the
-     word carries nothing, so the chip drops it; the level list, the records and
-     the browser all still say the full name. */
-  const chipLabel = (n) => String(n).replace(/^barbell\s+/i, "");
+  /* "Barbell Back Squat" is two lines in a quarter-width chip and two lines
+     again beside a level in the list below. On a screen that is entirely about
+     barbells the word carries nothing, so both drop it. The records and the
+     lift browser still say the full name, and data-lift carries it here, so
+     nothing is looked up by the shortened string. */
+  const shortLift = (n) => String(n).replace(/^barbell\s+/i, "");
   $("liftChips").classList.remove("hidden");
   $("liftChips").innerHTML = lifts.map((l) =>
-    `<button type="button" class="bulk-chip${l.name === pick ? " on" : ""}" data-lift="${escapeHtml(l.name)}">${escapeHtml(chipLabel(l.name))}</button>`).join("");
+    `<button type="button" class="lift-chip${l.name === pick ? " on" : ""}" data-lift="${escapeHtml(l.name)}">${escapeHtml(shortLift(l.name))}</button>`).join("");
   $("liftChips").querySelectorAll("[data-lift]").forEach((b) => {
     b.onclick = () => { LIFT_PICK = b.dataset.lift; again(); };
   });
@@ -16300,22 +16329,41 @@ function renderLiftHero(on, profile, isPartner) {
     const pct = i < index ? 100 : i === index ? Math.round(within * 100) : 0;
     return `<i><b style="width:${pct}%"></b></i>`;
   }).join("");
-  const levelled = lifts
-    .map((l) => ({ name: l.name, lv: strengthLevelFor(name, l.name) }))
-    .filter((x) => x.lv);
+  /* EVERY lift, not the four the chip strip happens to show. Mo opened this on
+     his own account and saw one row, because the list was built from the chips
+     and only one of his lifts has a published standard behind it.
+
+     A lift without a standard still gets a row and still says what it is doing;
+     it just gets its estimated single instead of a bar, because a dumbbell or a
+     machine cannot be scored without guessing what the number on it means. That
+     is a different thing from having nothing to show, and the footnote says
+     which is which once rather than on every row. */
+  const everyLift = allLiftsFor(name)
+    .map((l) => ({ name: l.name, sets: l.sets, best: l.best, lv: strengthLevelFor(name, l.name) }))
+    .sort((a, b) => (b.lv ? 1 : 0) - (a.lv ? 1 : 0)
+      || (b.lv && a.lv ? (b.lv.index + b.lv.within) - (a.lv.index + a.lv.within) : 0)
+      || b.sets - a.sets);
+  const LEVEL_LIST_MAX = 12;
+  const shownLifts = everyLift.slice(0, LEVEL_LIST_MAX);
+  const moreLifts = everyLift.length - shownLifts.length;
+  const anyUnscored = shownLifts.some((x) => !x.lv);
   const lvlBox = $("liftLevels");
-  lvlBox.classList.toggle("hidden", !levelled.length);
-  if (levelled.length) {
-    lvlBox.innerHTML = `<div class="pr-head">Level on every lift</div>
+  lvlBox.classList.toggle("hidden", !shownLifts.length);
+  if (shownLifts.length) {
+    lvlBox.innerHTML = `<div class="pr-head">Every lift</div>
       <div class="sr-list">
-        ${levelled.map((x) => `<button type="button" class="sr-row${x.name === pick ? " on" : ""}" data-pick="${escapeHtml(x.name)}">
+        ${shownLifts.map((x) => `<button type="button" class="sr-row${x.name === pick ? " on" : ""}" data-pick="${escapeHtml(x.name)}">
           <span class="sr-row-top">
-            <b>${escapeHtml(x.name)} &middot; ${escapeHtml(x.lv.level)}</b>
-            <span>${escapeHtml(x.lv.next ? `${lb(x.lv.toNext)} lb to ${x.lv.next}` : "top of the scale")}</span>
+            <b>${escapeHtml(shortLift(x.name))}${x.lv ? ` &middot; ${escapeHtml(x.lv.level)}` : ""}</b>
+            <span>${escapeHtml(x.lv
+              ? (x.lv.next ? `${lb(x.lv.toNext)} lb to ${x.lv.next}` : "top of the scale")
+              : `${lb(x.best)} lb best`)}</span>
           </span>
-          <span class="lvl-segs sr-row-bar">${segs(x.lv.index, x.lv.within)}</span>
+          ${x.lv ? `<span class="lvl-segs sr-row-bar">${segs(x.lv.index, x.lv.within)}</span>` : ""}
         </button>`).join("")}
-      </div>`;
+      </div>
+      ${moreLifts > 0 ? `<p class="muted-note" style="margin-top:10px">${moreLifts} more under See all lifts.</p>` : ""}
+      ${anyUnscored ? `<p class="muted-note" style="margin-top:${moreLifts > 0 ? 4 : 10}px">A lift with no bar has no published standard to score it against. One stored weight cannot say whether a dumbbell was per hand or the pair, and a gym's machine weighs whatever it weighs.</p>` : ""}`;
     /* Tapping a row charts that lift, so the list is also how you move between
        them without going back up to the chips. */
     lvlBox.querySelectorAll("[data-pick]").forEach((b) => {
@@ -17265,18 +17313,18 @@ function rgbOf(hex) {
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 
-/* One flat colour under the line, not a fade. Mo: the background of the graph
-   should not change colour. A vertical gradient reads as the chart having a
-   lit top and a dark bottom, which is a second thing to interpret on a picture
-   whose only job is the shape of the line, and it made the same line look
-   different at different y positions.
+/* Nothing under the line at all. This started as a vertical gradient, became a
+   flat tint when Mo said the background should not change colour, and is now
+   transparent because a tint is still a coloured background: the line is the
+   picture, and everything painted under it is another thing to look past. The
+   card behind it is a plain panel for the same reason, the blue wash it used to
+   carry read as a grain of purple in dark mode, where --me is #2d6bff.
 
-   `ctx` is still taken and still ignored: seven charts call this and the
-   signature is not worth churning for an argument that is now unused. */
+   Kept as a function rather than deleted: seven charts call it, and this is the
+   one place to change if a fill is ever wanted back. `ctx` and `hex` are both
+   ignored now and the signature stays so none of those seven have to move. */
 function chartWash(ctx, hex) {
-  const rgb = rgbOf(hex);
-  if (!rgb) return "transparent";
-  return `rgba(${rgb}, .13)`;
+  return "transparent";
 }
 
 /* ---------- Strength card ----------
