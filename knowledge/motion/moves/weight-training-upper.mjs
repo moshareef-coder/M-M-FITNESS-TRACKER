@@ -1199,7 +1199,7 @@ const CABLE_LATERAL_RAISE = {
     { // bottom, working hand in front of the far thigh, cable slack taken up
       t: 0,
       root: { x: 70, y: 61.4, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 2, shoulderL: 6, elbowR: 6, elbowL: 10 },
+      joints: { spine: 0, neck: 0, shoulderR: -30, shoulderL: 6, shoulderRotR: -1, elbowR: 0, elbowL: 10 },
       ik: { ...stand(78, 62) },
     },
     { // top, working arm level with the shoulder, the other hanging quiet

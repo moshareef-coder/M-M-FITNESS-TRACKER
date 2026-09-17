@@ -197,6 +197,7 @@ const SHOULDER_ROLLS = {
     },
     { // shrugged up, tall through the body
       t: 0.5,
+      through: true,
       root: { x: 66, y: 61.6, rot: 0 },
       joints: { spine: 0, neck: 0, shoulderR: 3, shoulderL: 2, elbowR: 8, elbowL: 7,
                 shoulderGirdleElevR: 9, shoulderGirdleElevL: 9 },
@@ -512,6 +513,7 @@ const LEG_SWINGS = {
     },
     { // hanging through neutral
       t: 0.5,
+      through: true,
       root: { x: 66, y: 61.6, rot: 0 },
       joints: { spine: 0, neck: 0, hipR: 2, kneeR: 4, ankleR: 2,
                 shoulderR: 12, elbowR: 16, shoulderL: 10, elbowL: 18 },
@@ -548,6 +550,7 @@ const LATERAL_LEG_SWINGS = {
     },
     { // hanging through neutral
       t: 0.5,
+      through: true,
       root: { x: 66, y: 61.6, rot: 0 },
       joints: { spine: 0, neck: 0, hipR: 6, kneeR: 22, shoulderR: 34, shoulderL: 36,
                 elbowR: 14, elbowL: 14 },
@@ -701,6 +704,7 @@ const WALKING_LUNGE_WITH_TWIST = {
     { // mid stride, weight travelling forward, the back knee already folding so
       // the tucked toe stays on the floor instead of ploughing through it
       t: 0.45,
+      through: true,
       root: { x: 60, y: 68, rot: 1 },
       joints: { spineTwist: 0, spine: 2, neck: -1, hipL: -6, kneeL: 68, ankleL: -18,
                 shoulderR: 40, shoulderL: 36, elbowR: 56, elbowL: 60 },
@@ -709,6 +713,7 @@ const WALKING_LUNGE_WITH_TWIST = {
     { // landed in the lunge: front shin vertical, back knee low over a tucked
       // toe, hands together in front of the chest
       t: 0.6,
+      through: true,
       root: { x: 68, y: 80, rot: 2 },
       joints: { spineTwist: 0, spine: 2, neck: -2, hipL: 0, kneeL: 90, ankleL: -26,
                 shoulderR: 40, shoulderL: 36, elbowR: 68, elbowL: 72 },
@@ -774,6 +779,7 @@ const SQUAT_TO_STAND = {
     },
     { // bottom of the squat, heels down, chest lifted
       t: 0.5,
+      through: true,
       root: { x: 51, y: 90, rot: 15 },
       joints: { spine: 15, neck: -12 },
       ik: {
@@ -2166,12 +2172,10 @@ export const MOVES = {
   "Shoulder Rolls": SHOULDER_ROLLS,
   "Cross-Body Arm Swings": CROSS_BODY_ARM_SWINGS,
   "Wall Slides": WALL_SLIDES,
-  "Elbow Circles": ELBOW_CIRCLES,
   "Wrist Circles": WRIST_CIRCLES,
   "Torso Twists": TORSO_TWISTS,
   "Prone Press-Up": PRONE_PRESS_UP,
   "Pelvic Tilts": PELVIC_TILTS,
-  "Hip Circles": HIP_CIRCLES,
   "Leg Swings": LEG_SWINGS,
   "Lateral Leg Swings": LATERAL_LEG_SWINGS,
   "Toy Soldier Kicks": TOY_SOLDIER_KICKS,
@@ -2181,7 +2185,6 @@ export const MOVES = {
   "Wall Hip Hinge Drill": WALL_HIP_HINGE_DRILL,
   "Squat to Stand": SQUAT_TO_STAND,
   "Knee-to-Wall Ankle Rock": KNEE_TO_WALL_ANKLE_ROCK,
-  "Inchworm Walkout": INCHWORM_WALKOUT,
   "Straight-Arm Band Pulldown": STRAIGHT_ARM_BAND_PULLDOWN,
   "Prone Y Raise": PRONE_Y_RAISE,
   "Scapular Push-Up": SCAPULAR_PUSH_UP,
@@ -2219,3 +2222,8 @@ export const MOVES = {
   "Prone Scorpion Stretch": PRONE_SCORPION_STRETCH,
   "Standing Forward Hang": STANDING_FORWARD_HANG,
 };
+
+/* Archived on Mo's call, 2026-09-17: Boomerang, Elbow Circles, Hip Circles,
+   Inchworm Walkout and Archer Push-Up are unmapped rather than deleted. The
+   poses above still build, so putting one back is restoring its one line in
+   the table and its entry in the exercise library. */

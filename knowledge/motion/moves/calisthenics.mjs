@@ -669,6 +669,7 @@ export const MUSCLE_UP = {
     },
     { // shoulders level with the bar, still behind it
       t: 0.45,
+      through: true,
       root: { x: 56.3, y: 60, rot: 0 },
       joints: { spine: 0, neck: -4, hipL: -2, hipR: 0, kneeL: 100, kneeR: 98,
                 ankleL: -20, ankleR: -20 },
@@ -676,6 +677,7 @@ export const MUSCLE_UP = {
     },
     { // shoulders above the bar, torso pitching forward over it
       t: 0.75,
+      through: true,
       root: { x: 56.7, y: 47.1, rot: 12 },
       joints: { spine: 0, neck: -4, hipL: -14, hipR: -12, kneeL: 100, kneeR: 98,
                 ankleL: -20, ankleR: -20 },
@@ -1179,14 +1181,14 @@ export const HANGING_LEG_RAISE = {
   keys: [
     { // hanging, legs down and still
       t: 0,
-      root: { x: 70, y: 72.6, rot: 0 },
-      joints: { spine: 2, neck: 0, hipL: -10, hipR: -8, kneeL: 76, kneeR: 72,
-                ankleL: -24, ankleR: -24 },
-      ik: { wristR: { x: 70, y: 6.3, bend: 1 }, wristL: { x: 65, y: 6.3, bend: 1 } },
+      root: { x: 70, y: 72.6, rot: -4 },
+      joints: { spine: 2, neck: 0, torsoRoll: 1, hipR: -8, hipL: -10, kneeR: 72, kneeL: 76, ankleR: -24, ankleL: -24 },
+      ik: { wristR: { x: 92.8, y: 5.1, bend: 1 }, wristL: { x: 65, y: 6.3, bend: 1 } },
     },
     { // knees come up first, which is the only path that does not sweep the
       // feet through the floor, and is what a real leg raise looks like anyway
       t: 0.5,
+      through: true,
       root: { x: 70, y: 72.8, rot: -2 },
       joints: { spine: 3, neck: 1, hipL: 50, hipR: 52, kneeL: 118, kneeR: 120,
                 ankleL: -25, ankleR: -25 },
@@ -1519,7 +1521,6 @@ export const MOVES = {
   "Push-Up": PUSH_UP,
   "Diamond Push-Up": DIAMOND_PUSH_UP,
   "Dip": DIP,
-  "Archer Push-Up": ARCHER_PUSH_UP,
   "Pseudo Planche Push-Up": PSEUDO_PLANCHE_PUSH_UP,
   "One-Arm Push-Up": ONE_ARM_PUSH_UP,
   "Dead Hang": DEAD_HANG,
@@ -1554,3 +1555,8 @@ export const MOVES = {
   "Full Planche": FULL_PLANCHE,
   "Human Flag": HUMAN_FLAG,
 };
+
+/* Archived on Mo's call, 2026-09-17: Boomerang, Elbow Circles, Hip Circles,
+   Inchworm Walkout and Archer Push-Up are unmapped rather than deleted. The
+   poses above still build, so putting one back is restoring its one line in
+   the table and its entry in the exercise library. */

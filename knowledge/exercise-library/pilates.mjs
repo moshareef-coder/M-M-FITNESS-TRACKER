@@ -56,7 +56,6 @@ export const PILATES = {
         { name: "Shoulder Bridge", primary: ["glutes"], secondary: ["hamstrings", "abs"], level: "beginner" },
         { name: "Roll-Over", primary: ["abs"], secondary: ["hamstrings"], level: "intermediate" },
         { name: "Corkscrew", primary: ["abs"], secondary: ["obliques"], level: "advanced" },
-        { name: "Boomerang", primary: ["abs"], secondary: ["glutes", "shoulders"], level: "advanced" },
         { name: "Control Balance", primary: ["abs"], secondary: ["hamstrings", "shoulders"], level: "advanced" },
       ],
     },

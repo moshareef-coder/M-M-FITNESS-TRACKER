@@ -138,6 +138,7 @@ const DOUBLE_LEG_STRETCH = {
     },
     { // hands leaving the shins, knees starting to travel away
       t: 0.25,
+      through: true,
       root: { x: 72, y: 108, rot: -90 },
       joints: { spine: 20, neck: 38, hipR: 271, hipL: 268, kneeR: 90, kneeL: 87,
                 ankleR: -35, ankleL: -33 },
@@ -145,6 +146,7 @@ const DOUBLE_LEG_STRETCH = {
     },
     { // mid, hands circling up past the chest as the legs lengthen
       t: 0.5,
+      through: true,
       root: { x: 72, y: 108, rot: -90 },
       joints: { spine: 20, neck: 38, hipR: 255, hipL: 252, kneeR: 40, kneeL: 38,
                 ankleR: -40, ankleL: -38 },
@@ -152,6 +154,7 @@ const DOUBLE_LEG_STRETCH = {
     },
     { // hands passing the ears, legs nearly long
       t: 0.75,
+      through: true,
       root: { x: 72, y: 108, rot: -90 },
       joints: { spine: 20, neck: 38, hipR: 239, hipL: 236, kneeR: 22, kneeL: 21,
                 ankleR: -44, ankleL: -42 },
@@ -248,6 +251,7 @@ const ROLL_UP = {
     { // head and chest peeled off the mat, pelvis flat and untouched, arms
       // coming off the mat to reach down the body
       t: 0.25,
+      through: true,
       root: { x: 78, y: 106, rot: -90 },
       joints: { spine: 34, neck: 38, hipR: 181, hipL: 179.5, kneeR: 3, kneeL: 3,
                 ankleR: 4, ankleL: 4 },
@@ -255,6 +259,7 @@ const ROLL_UP = {
     },
     { // the middle of the roll: deepest C curve, the pelvis only now tipping
       t: 0.5,
+      through: true,
       root: { x: 78, y: 105, rot: -68 },
       joints: { spine: 42, neck: 34, hipR: 159, hipL: 157.5, kneeR: 3, kneeL: 3,
                 ankleR: 4, ankleL: 4 },
@@ -262,6 +267,7 @@ const ROLL_UP = {
     },
     { // up over the sit bones, still round, hands over the shins
       t: 0.75,
+      through: true,
       root: { x: 78, y: 106, rot: -28 },
       joints: { spine: 38, neck: 26, hipR: 119, hipL: 117.5, kneeR: 3, kneeL: 3,
                 ankleR: 4, ankleL: 4 },
@@ -357,6 +363,7 @@ const TEASER = {
       // 145 degree sweep and the chord passes eleven units from the shoulder,
       // which folds the elbow to 148 degrees in the middle of the roll.
       t: 0.25,
+      through: true,
       root: { x: 70, y: 108, rot: -76 },
       joints: { spine: 5, neck: 10, hipR: 210, hipL: 207, kneeR: 4, kneeL: 4,
                 ankleR: -46, ankleL: -44 },
@@ -364,6 +371,7 @@ const TEASER = {
     },
     { // half way up, arms swung past the ears, spine peeling off the mat
       t: 0.5,
+      through: true,
       root: { x: 70, y: 108, rot: -62 },
       joints: { spine: 6, neck: 14, hipR: 202, hipL: 199, kneeR: 4, kneeL: 4,
                 ankleR: -46, ankleL: -44 },
@@ -418,6 +426,7 @@ const JACKKNIFE = {
     },
     { // the pass: hips twenty units off the mat, feet carried past the head
       t: 0.45,
+      through: true,
       root: { x: 80, y: 86, rot: -128 },
       joints: { spine: 0, neck: 38, hipR: 390, hipL: 388, kneeR: 6, kneeL: 6,
                 ankleR: -40, ankleL: -38, shoulderR: 219, shoulderL: 222,
@@ -616,6 +625,7 @@ const LEG_CIRCLES = {
     },
     { // through vertical
       t: 0.5,
+      through: true,
       root: { x: 64, y: 106, rot: -90 },
       joints: { spine: 0, neck: 0, shoulderR: 168, shoulderL: 171, elbowR: 4, elbowL: 4,
                 hipR: 270, kneeR: 3, ankleR: -50, hipL: 180, kneeL: 3, ankleL: -20 },
@@ -810,6 +820,7 @@ const ROLL_OVER = {
     },
     { // through vertical, hips just leaving the mat
       t: 0.45,
+      through: true,
       root: { x: 76, y: 102, rot: -100 },
       joints: { spine: 0, neck: 20, shoulderR: 190, shoulderL: 193, elbowR: 5, elbowL: 5,
                 hipR: 286, hipL: 284, kneeR: 4, kneeL: 4, ankleR: -44, ankleL: -42 },
@@ -843,6 +854,7 @@ const CORKSCREW = {
     },
     { // through vertical
       t: 0.5,
+      through: true,
       root: { x: 64, y: 106, rot: -90 },
       joints: { spine: 0, neck: 0, shoulderR: 168, shoulderL: 171, elbowR: 4, elbowL: 4,
                 hipR: 270, hipL: 268, kneeR: 3, kneeL: 3, ankleR: -48, ankleL: -46 },
@@ -853,8 +865,7 @@ const CORKSCREW = {
       // instead of resting on it.
       t: 1,
       root: { x: 64, y: 101, rot: -98 },
-      joints: { spine: 0, neck: 8, shoulderR: 184, shoulderL: 187, elbowR: 4, elbowL: 4,
-                hipR: 306, hipL: 304, kneeR: 3, kneeL: 3, ankleR: -48, ankleL: -46 },
+      joints: { spine: 0, neck: 8, shoulderR: 184, shoulderL: 187, elbowR: 4, elbowL: 4, hipR: 331, hipL: 329, kneeR: 0, kneeL: 0, ankleR: -48, ankleL: -46 },
     },
   ],
 };
@@ -1008,6 +1019,10 @@ export const MOVES = {
   "Shoulder Bridge": SHOULDER_BRIDGE,
   "Roll-Over": ROLL_OVER,
   "Corkscrew": CORKSCREW,
-  "Boomerang": BOOMERANG,
   "Control Balance": CONTROL_BALANCE,
 };
+
+/* Archived on Mo's call, 2026-09-17: Boomerang, Elbow Circles, Hip Circles,
+   Inchworm Walkout and Archer Push-Up are unmapped rather than deleted. The
+   poses above still build, so putting one back is restoring its one line in
+   the table and its entry in the exercise library. */

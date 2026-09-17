@@ -659,7 +659,7 @@ const CABLE_PULL_THROUGH = {
       joints: { spine: 3, neck: -2 },
       ik: {
         ...SQUAT_FEET,
-        wristR: { x: 70.2, y: 69.0, bend: 1 }, wristL: { x: 66.2, y: 70.0, bend: 1 },
+        wristR: { x: 76.8, y: 76.1, bend: 1 }, wristL: { x: 78.3, y: 74.6, bend: 1 },
       },
     },
     { // hinged back, hands reaching between the legs toward the stack
@@ -668,7 +668,7 @@ const CABLE_PULL_THROUGH = {
       joints: { spine: 36, neck: -14 },
       ik: {
         ...SQUAT_FEET,
-        wristR: { x: 72.6, y: 84.6, bend: 1 }, wristL: { x: 68.6, y: 85.6, bend: 1 },
+        wristR: { x: 58.2, y: 89.6, bend: 1 }, wristL: { x: 55.9, y: 91.5, bend: 1 },
       },
     },
   ],
@@ -1347,6 +1347,7 @@ const TOES_TO_BAR = {
     },
     { // knees driven up bent, so the feet never sweep down through the floor
       t: 0.25,
+      through: true,
       root: { x: 70.5, y: 72.5, rot: -4 },
       joints: {
         spine: 0, neck: -2,
@@ -1356,6 +1357,7 @@ const TOES_TO_BAR = {
     },
     { // knees up first, tucked, which is also how the rep actually goes
       t: 0.5,
+      through: true,
       root: { x: 71, y: 72, rot: -8 },
       joints: {
         spine: 0, neck: -4,
