@@ -22,11 +22,18 @@
 -- index.html carries both in PENDING_PROFILE_COLUMNS so setup still completes
 -- on a database where this has not been applied.
 
+-- committed_at: when they made the promise at the end of onboarding. A date
+-- rather than a boolean, because the only thing worth saying about it later is
+-- "since March", and a flag cannot say that. Null means they never made one,
+-- which is every account created before this screen existed.
 alter table public.profiles
   add column if not exists train_styles text[],
-  add column if not exists goal_tuning jsonb;
+  add column if not exists goal_tuning jsonb,
+  add column if not exists committed_at timestamptz;
 
 comment on column public.profiles.train_styles is
   'Training styles the person opted into. Null means never asked; anything absent from the list is never planned.';
+comment on column public.profiles.committed_at is
+  'When the person made the commitment at the end of onboarding. Null means never.';
 comment on column public.profiles.goal_tuning is
   'Per goal follow-up answers, keyed by goal id. Choice goals store a string, body goals store {areas, all}.';

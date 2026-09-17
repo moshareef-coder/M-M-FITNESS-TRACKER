@@ -314,6 +314,60 @@
   .obs-sub { font-size: 12.5px; color: var(--muted); line-height: 1.3; }
   /* Reserves its own height so the grid does not jump when the sentence about
      resistance training appears and disappears under it. */
+  /* Progress and the robot ride at the top of every step. The bar is thin and
+     quiet on purpose: it answers "how much longer" without becoming the thing
+     you look at. */
+  .ob-progress { height: 3px; border-radius: 999px; background: var(--border); margin: 0 0 16px; overflow: hidden; }
+  .ob-progress i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .35s cubic-bezier(.22,1,.36,1); }
+  .ob-bot { display: flex; gap: 9px; align-items: flex-start; margin: 0 0 16px; }
+  .ob-bot-face {
+    flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+    background: color-mix(in srgb, var(--accent) 16%, var(--panel)); color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  .ob-bot-say { font-size: 13.5px; line-height: 1.45; color: var(--muted); padding-top: 4px; }
+  /* The quick answers above the goal weight field. */
+  .ob-templates { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 8px; }
+  .obt-lab { font-size: 12.5px; color: var(--muted); margin-right: 2px; }
+  .obt-chip {
+    font: inherit; font-size: 13px; font-weight: 650; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer;
+  }
+  .obt-chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
+  /* Days, answered as a sentence rather than a number. */
+  .ob-days { display: flex; flex-direction: column; gap: 9px; margin: 4px 0 12px; }
+  .ob-day {
+    display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 13px 14px;
+    border-radius: 14px; background: var(--panel); border: 1.5px solid var(--border);
+    color: var(--text); font-family: inherit; cursor: pointer;
+    transition: border-color .18s ease, background .18s ease;
+  }
+  .ob-day.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+  .obd-n { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+    background: var(--panel-2); font-size: 15px; font-weight: 800; }
+  .ob-day.on .obd-n { background: var(--accent); color: var(--accent-ink); }
+  .obd-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .obd-head { font-size: 15px; font-weight: 650; }
+  .obd-says { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+  /* Reserves its height so the list does not jump when the arithmetic appears. */
+  .ob-day-math { font-size: 13px; color: var(--muted); margin: 0 0 16px; min-height: 2.6em; line-height: 1.4; }
+  /* The timeline on the plan screen. Marks, not a line, because a smooth line
+     promises a smoothness weight loss does not have. */
+  .ob-timeline { border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin: 16px 0 0; background: var(--panel); }
+  .ob-tl-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .ob-tl-head span { font-size: 12.5px; color: var(--muted); }
+  .ob-tl-head b { font-size: 14.5px; }
+  .ob-tl-marks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .ob-tl-mark { display: flex; flex-direction: column; gap: 2px; padding-top: 10px; border-top: 2px solid var(--border); }
+  .ob-tl-mark:last-child { border-top-color: var(--accent); }
+  .ob-tl-mark b { font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .ob-tl-mark span { font-size: 11px; color: var(--muted); }
+  .ob-tl-note { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 12px 0 0; }
+  /* The promise. Deliberately plain: a list of three sentences, no seals, no
+     signature line, nothing that pretends to be a contract. */
+  .ob-commit { display: flex; flex-direction: column; gap: 11px; margin: 18px 0; }
+  .ob-commit-row { display: flex; gap: 10px; align-items: flex-start; font-size: 14.5px; line-height: 1.45; }
+  .ob-commit-row svg { flex: none; color: var(--accent); margin-top: 2px; }
   .ob-style { position: relative; padding-top: 15px; }
   .obs-rec {
     position: absolute; top: -8px; left: 12px; font-size: 9.5px; font-weight: 800; letter-spacing: .06em;
@@ -9746,7 +9800,7 @@ function renderGoalPage() {
    a column that does not exist yet. It reports what it dropped rather than
    swallowing it, because "saved" when half of it was not saved is the kind of
    quiet lie this app does not tell. */
-const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes", "train_styles", "goal_tuning"];
+const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes", "train_styles", "goal_tuning", "committed_at"];
 
 async function upsertGoalFields(patch) {
   const { data, error } = await sb.from("profiles").upsert(patch).select().maybeSingle();
@@ -10672,7 +10726,7 @@ function paintLimitsSubtitle() {
    them, main first. That is the whole reason it is a single step id with an
    index in the draft rather than three step names, since which pages exist and
    how many of them there are is not known until the goal step is answered. */
-const OB_STEPS = ["name", "goal", "target", "tune", "styles", "plan"];
+const OB_STEPS = ["name", "goal", "target", "tune", "styles", "days", "plan", "commit"];
 
 /* What each goal asks about itself, once, after the goals are chosen.
 
@@ -10687,14 +10741,11 @@ const OB_STEPS = ["name", "goal", "target", "tune", "styles", "plan"];
      choice  a short list of chips
    `field` is where the answer lands on the draft. */
 const GOAL_TUNE = {
-  "lose-weight": { kind: "choice", field: "tune_lose",
-    title: "How do you want to go about it?",
-    sub: "This sets how hard the cardio leans, nothing else.",
-    options: [
-      { id: "steady", label: "Steady and sustainable", sub: "Most of the work easy" },
-      { id: "mixed", label: "A bit of everything", sub: "Some easy, some hard" },
-      { id: "hard", label: "Push me", sub: "Intervals and hills" },
-    ] },
+  /* Lose weight used to ask "how do you want to go about it" here, three chips
+     for how hard the cardio should lean. Mo cut it: how hard a week is comes
+     out of how many days you train, which the days step now asks and explains
+     in numbers, so the chips were asking the same question worse and a screen
+     earlier than the answer was knowable. */
   "build-muscle": { kind: "focus", field: "tune_muscle",
     title: "What do you want to grow most?",
     sub: "Tap to rank them. First gets the most work, last gets none of the extra." },
@@ -10751,14 +10802,6 @@ const TRAIN_STYLES = [
   { id: "walking", label: "Walking", sub: "It counts, and it adds up", mod: "cardio", mode: "walking" },
   { id: "pilates", label: "Pilates", sub: "Core, control, mat work", mod: "flow" },
   { id: "yoga", label: "Yoga", sub: "Mobility and breath", mod: "flow" },
-  /* Behind "Other", because seven tiles is a glance and twelve is a form. These
-     are real and the cardio library has sessions for the first three; they are
-     just not what most people are picking on the way in. */
-  { id: "swimming", label: "Swimming", sub: "Pool laps", mod: "cardio", mode: "swimming", other: true },
-  { id: "rowing", label: "Rowing", sub: "Erg or water", mod: "cardio", mode: "rowing", other: true },
-  { id: "classes", label: "HIIT and classes", sub: "Circuits, boxing, barre", mod: "cardio", mode: "hiit", other: true },
-  { id: "hiking", label: "Hiking", sub: "Hills and trails", mod: "cardio", mode: "hiking", other: true },
-  { id: "sports", label: "A sport", sub: "Football, tennis, climbing", mod: "cardio", other: true },
 ];
 
 /* What we put forward before they have said anything, per goal, and never
@@ -10785,6 +10828,105 @@ function recommendedStyles(data) {
   const out = [];
   for (const id of ids) for (const sId of (STYLE_RECS[id] || [])) if (!out.includes(sId)) out.push(sId);
   return out.length ? out : ["walking", "home"];
+}
+
+/* How many training days each step is worth on the bar. Not evenly spaced,
+   because the steps are not evenly sized: name is a text field and the body
+   picker is a real decision, and a bar that jumps in equal hops past a long
+   screen and a short one reads as broken. */
+const OB_PROGRESS = { name: 0.08, goal: 0.22, target: 0.34, tune: 0.5, styles: 0.66, days: 0.78, plan: 0.9, commit: 1 };
+
+/* He talks the whole way through. Same character as the session, same rules:
+   deadpan, fond of you, never at your expense, and here he is also the only
+   thing on screen that knows what you just answered. Functions return null
+   when they have nothing true to say, exactly as quips.mjs does it. */
+const OB_ROBOT = {
+  name: () => "I am going to be here for all of this. I hope that is alright.",
+  goal: (d) => (d.goal_secondary || []).length
+    ? "Three of them. Ambitious. I respect it and I am slightly worried."
+    : "Pick what you actually want, not what sounds impressive.",
+  target: () => "A number is easier to aim at than a feeling. That is the only reason I ask.",
+  tune: (d) => "I will remember this. It is most of what I am for.",
+  styles: () => "Only what you tick. I will not sneak anything in.",
+  days: (d) => (d.days_per_week >= 6
+    ? "Six days. Bold. I will be the one reminding you to rest."
+    : d.days_per_week <= 2 ? "Two days done beats five days planned. Genuinely." : "That is a week somebody actually keeps."),
+  plan: () => "There it is. Your week, in writing.",
+  commit: () => "This is the part where I get sincere for one second.",
+};
+
+function obChrome(step, data) {
+  const pct = Math.round((OB_PROGRESS[step] || 0) * 100);
+  const line = typeof OB_ROBOT[step] === "function" ? OB_ROBOT[step](data) : null;
+  return `
+    <div class="ob-progress" aria-hidden="true"><i style="width:${pct}%"></i></div>
+    ${line ? `<div class="ob-bot"><span class="ob-bot-face">${icon("body", 15)}</span><span class="ob-bot-say">${escapeHtml(line)}</span></div>` : ""}`;
+}
+
+/* When the goal actually arrives, and what the weeks look like on the way.
+   Only drawn when there is a real number to arrive at: a weight goal with both
+   ends filled in. Everything else gets nothing rather than a made up date,
+   because "you will move better by March" is not a claim this app can stand
+   behind. The rate comes from lossTimelines, the same table the target screen
+   showed them, so the date here cannot disagree with the one they already saw. */
+/* The quick answers to "how much", drawn from what they weigh rather than
+   fixed, so somebody at 140 is not offered a 50 pound loss and somebody at 300
+   is not offered only 10. Redrawn when the current weight changes, since the
+   sensible options move with it. Typing a number and skipping both still work:
+   a goal weight is genuinely optional and the app tracks the scale either way. */
+function paintTargetTemplates(data) {
+  const row = document.getElementById("obTargetTemplates");
+  if (!row) return;
+  const cur = Number(document.getElementById("obLb")?.value) || currentWeightLb(ME) || null;
+  const gaining = goalTileFor(data.goal_bubble)?.askTarget === "gain";
+  const steps = gaining ? [5, 10, 15, 20] : [10, 20, 30, 40];
+  /* Never offer a loss that would take somebody under 90 pounds. The screen
+     already refuses an unhealthy target further down; not suggesting one in
+     the first place is better than talking them out of it afterwards. */
+  const fit = cur ? steps.filter((n) => gaining || cur - n >= 90) : [];
+  if (!cur || !fit.length) { row.innerHTML = ""; return; }
+  row.innerHTML = `<span class="obt-lab">Most people aim for</span>` + fit.map((n) =>
+    `<button type="button" class="obt-chip" data-delta="${n}">${gaining ? "+" : "-"}${n} lb</button>`).join("");
+  row.querySelectorAll("[data-delta]").forEach((b) => b.onclick = () => {
+    const box = document.getElementById("obGoalLb");
+    if (!box) return;
+    box.value = String(Math.round(gaining ? cur + Number(b.dataset.delta) : cur - Number(b.dataset.delta)));
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+    row.querySelectorAll("[data-delta]").forEach((x) => x.classList.toggle("on", x === b));
+  });
+}
+
+function obTimeline(data, days) {
+  const cur = data.weight_lb, goal = data.goal_weight_lb;
+  if (!cur || !goal || cur === goal) return "";
+  const losing = goal < cur;
+  const amount = Math.abs(cur - goal);
+  const opts = losing ? lossTimelines(cur, goal) : [];
+  const weeks = Number.isFinite(data.weeks) && data.weeks > 0
+    ? data.weeks
+    : (opts.find((o) => o.key === data.pace) || opts.find((o) => o.rec) || opts[0])?.weeks;
+  if (!weeks) return "";
+  const when = new Date(Date.now() + weeks * 604800000);
+  const month = when.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const perWeek = (amount / weeks);
+  /* Four marks, not a continuous line: a smooth line implies a smoothness
+     weight loss does not have, and people read a jagged real week against a
+     straight drawn line as failure. */
+  const marks = [0.25, 0.5, 0.75, 1].map((f) => {
+    const w = Math.round(weeks * f);
+    const lb = Math.round(cur + (losing ? -1 : 1) * amount * f);
+    return `<div class="ob-tl-mark"><b>${lb} lb</b><span>${w} week${w === 1 ? "" : "s"}</span></div>`;
+  }).join("");
+  return `
+    <div class="ob-timeline">
+      <div class="ob-tl-head">
+        <span>Where this gets you</span>
+        <b>${month}</b>
+      </div>
+      <div class="ob-tl-marks">${marks}</div>
+      <p class="ob-tl-note">About ${perWeek.toFixed(1)} lb a week across ${days} training days, which is the rate that tends to stick.
+        Miss a week and the date moves, nothing else breaks.</p>
+    </div>`;
 }
 
 function renderOnboardStep(step, data = {}) {
@@ -10917,7 +11059,7 @@ function renderOnboardStep(step, data = {}) {
       note();
     });
     note();
-    $("styleNext").onclick = () => renderOnboardStep("plan", { ...data, train_styles: [...picked] });
+    $("styleNext").onclick = () => renderOnboardStep("days", { ...data, train_styles: [...picked] });
     $("styleBack").onclick = () => {
       const q = tuneQueue(data);
       if (q.length) renderOnboardStep("tune", { ...data, tuneIdx: q.length - 1 });
@@ -10980,6 +11122,7 @@ function renderOnboardStep(step, data = {}) {
         </div>
 
         <label class="ob-lab">Goal weight <span class="ob-opt">optional</span></label>
+        <div class="ob-templates" id="obTargetTemplates"></div>
         <div class="ob-row">
           <input id="obGoalLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.goal_weight_lb || ""}" />
         </div>
@@ -11139,6 +11282,15 @@ function renderOnboardStep(step, data = {}) {
         pace: chosen ? chosen.key : null,
       });
     };
+    /* Templates, because "how much" is a question almost everybody answers with
+       a round number, and typing 20 into a numeric keypad on a phone is four
+       taps and a dismissed keyboard. Derived from what they weigh rather than
+       fixed, so somebody at 140 is not offered a 50 pound loss and somebody at
+       300 is not offered only 10. Skip is already on this screen and stays
+       first class: a goal weight is genuinely optional and the app tracks the
+       scale either way. */
+    paintTargetTemplates(data);
+    $("obLb")?.addEventListener("input", () => paintTargetTemplates(data));
     $("targetNext").onclick = () => go(false);
     $("targetSkip").onclick = () => go(true);
     $("targetBack").onclick = () => renderOnboardStep("goal", data);
@@ -11153,6 +11305,90 @@ function renderOnboardStep(step, data = {}) {
      target step asks it, of the two goals that ask for a number, out of the
      amount they actually typed. */
 
+  /* How many days, answered as a question about how hard the week is rather
+     than as a number in a box. Mo: "explain to them numbers wise how hard they
+     actually want to go depending on the days." So every option says what it
+     costs in hours and what it tends to produce, and nothing is called the
+     right answer, because for most people the right answer is the one they
+     keep. */
+  if (step === "days") {
+    const mins = Number.isFinite(data.session_minutes) ? data.session_minutes : 45;
+    const CHOICES = [
+      { n: 2, head: "Two days", says: "Enough to get stronger and hold it. The one most people actually keep." },
+      { n: 3, head: "Three days", says: "Every muscle twice most weeks. This is where progress gets reliable." },
+      { n: 4, head: "Four days", says: "Room to split it up, and still a rest day between the hard ones." },
+      { n: 5, head: "Five days", says: "Serious. Works if your sleep and food are already sorted." },
+      { n: 6, head: "Six days", says: "Only with easy days built in. Six hard days is how people get hurt." },
+    ];
+    const chosen = data.days_per_week || null;
+    ob.innerHTML = `
+      <div class="ob-step">
+        ${obChrome("days", data)}
+        <h1>How many days a week?</h1>
+        <p class="sub">Be honest rather than ambitious. Adding a day later is easy; missing one every week is not.</p>
+        <div class="ob-days" id="dayGrid">
+          ${CHOICES.map((c) => `<button type="button" class="ob-day${chosen === c.n ? " on" : ""}" data-days="${c.n}">
+            <span class="obd-n">${c.n}</span>
+            <span class="obd-body"><span class="obd-head">${c.head}</span><span class="obd-says">${escapeHtml(c.says)}</span></span>
+          </button>`).join("")}
+        </div>
+        <p class="ob-day-math" id="dayMath"></p>
+        <button class="btn-primary" id="daysNext"${chosen ? "" : " disabled"}>Continue</button>
+        <button class="btn-ghost" id="daysBack">Back</button>
+      </div>`;
+    const math = () => {
+      const n = data.days_per_week;
+      $("dayMath").textContent = n
+        ? `${n} sessions of about ${mins} minutes is ${Math.round(n * mins / 60 * 10) / 10} hours a week, and ${7 - n} days off.`
+        : "";
+    };
+    ob.querySelectorAll("[data-days]").forEach((b) => b.onclick = () => {
+      data.days_per_week = +b.dataset.days;
+      ob.querySelectorAll("[data-days]").forEach((x) => x.classList.toggle("on", x === b));
+      $("daysNext").disabled = false;
+      math();
+      /* The robot reacts to the number, so it is redrawn rather than left
+         saying something about a choice that has since changed. */
+      const bot = ob.querySelector(".ob-bot-say");
+      if (bot) bot.textContent = OB_ROBOT.days(data);
+    });
+    math();
+    $("daysNext").onclick = () => renderOnboardStep("plan", data);
+    $("daysBack").onclick = () => renderOnboardStep("styles", data);
+    return;
+  }
+
+  /* The last screen before money, and the only one that asks for something
+     other than information. Mo wanted it to sell the plan honestly: "I need
+     you to commit to me, this is a serious plan, we are committing to this
+     together." It is a promise to themselves with us as the witness, so the
+     button says what it means and nothing here claims a result. */
+  if (step === "commit") {
+    const n = data.days_per_week || 3;
+    ob.innerHTML = `
+      <div class="ob-step">
+        ${obChrome("commit", data)}
+        <h1>${escapeHtml(data.name || "Right")}, this only works if you turn up.</h1>
+        <p class="sub">The plan is good. It is built for what you told me, and I will carry the thinking so you only have to do the work.
+          But ${n} days a week is a promise you are making to yourself, and I cannot make it for you.</p>
+        <div class="ob-commit">
+          <div class="ob-commit-row">${icon("check", 16)}<span>I will show up ${n} days a week, even the days I do not feel like it.</span></div>
+          <div class="ob-commit-row">${icon("check", 16)}<span>I will tell you when it is too much, instead of quietly stopping.</span></div>
+          <div class="ob-commit-row">${icon("check", 16)}<span>I am allowed to have a bad week without it being over.</span></div>
+        </div>
+        <p class="sub">Nothing here is a contract. It is just easier to keep a promise you have actually made.</p>
+        <button class="btn-primary" id="commitBtn">I am committing to this</button>
+        <button class="btn-ghost" id="commitBack">Let me change something first</button>
+      </div>`;
+    $("commitBtn").onclick = () => {
+      /* Recorded, because a promise nobody kept a record of is a slogan. The
+         date is what later screens can honestly say "since" about. */
+      renderOnboardStep("plan", { ...data, committed_at: new Date().toISOString() });
+    };
+    $("commitBack").onclick = () => renderOnboardStep("plan", data);
+    return;
+  }
+
   if (step === "plan") {
     const g = GOALS.find((x) => x.key === data.goalKey) || GOALS[GOALS.length - 1];
     /* Both of these come from what the person did on the previous screen, and
@@ -11162,7 +11398,10 @@ function renderOnboardStep(step, data = {}) {
        weeks on the very next screen. */
     const chosenPace = PACE.find((x) => x.key === data.pace) || null;
     const weeks = Number.isFinite(data.weeks) && data.weeks > 0 ? data.weeks : null;
-    const days = g.days;
+    /* The number they picked on the days step. g.days is the goal's own
+       default and stays as the fallback, for a draft saved before that step
+       existed and for the swap path that reaches this screen sideways. */
+    const days = data.days_per_week || g.days;
     const durationRow = chosenPace && weeks
       ? `<div class="ob-row"><span>Pace</span><b>${escapeHtml(chosenPace.label)}, ${escapeHtml(durationLabel(weeks))}</b></div>`
       : weeks
@@ -11172,6 +11411,7 @@ function renderOnboardStep(step, data = {}) {
         : "";
     ob.innerHTML = `
       <div class="ob-step">
+        ${obChrome("plan", data)}
         <div class="ob-kicker">YOUR PLAN</div>
         <h1>${days} days a week${chosenPace && weeks ? `, for ${escapeHtml(durationLabel(weeks))}` : ""}</h1>
         <p class="sub">Built for <strong>${escapeHtml(g.label.toLowerCase())}</strong>${data.detail ? `, ${escapeHtml(data.detail.toLowerCase())}` : ""}.
@@ -11182,6 +11422,7 @@ function renderOnboardStep(step, data = {}) {
           <div class="ob-row"><span>Focus</span><b>${escapeHtml(g.focus)}</b></div>
           ${durationRow}
         </div>
+        ${obTimeline(data, days)}
         <p class="sub" style="margin:18px 0 0;"><strong>About how long per session?</strong></p>
         <div class="rest-pref five" id="obSessionLen"></div>
         <p class="sub" id="obSessionNote" style="margin:10px 0 0;"></p>
@@ -11201,6 +11442,15 @@ function renderOnboardStep(step, data = {}) {
        returned null for every account ever created, which took the goal line,
        the Goal figure and the projection off the chart for everybody.
        Everything on the screen behind this button now reaches the write. */
+    /* Start does not finish any more, it goes to the promise. The write lives
+       behind that button instead, because asking somebody to commit AFTER
+       their account is already made is asking nothing at all. */
+    if (!data.committed_at) {
+      $("startBtn").textContent = "This is my plan";
+      $("startBtn").onclick = () => renderOnboardStep("commit", data);
+      $("backBtn").onclick = () => renderOnboardStep("days", data);
+      return;
+    }
     $("startBtn").onclick = () => {
       /* One row, one tap. Two taps used to retire nothing and insert twice,
          which in production races the one-active partial unique index and in
@@ -11240,6 +11490,7 @@ function renderOnboardStep(step, data = {}) {
            setup still lands. A plan built before these existed is untouched,
            because the engine reads null as never asked. */
         train_styles: Array.isArray(data.train_styles) ? data.train_styles : null,
+        committed_at: data.committed_at || null,
         goal_tuning: goalTuningPatch(data),
       }).then((ok) => { if (!ok) btn.disabled = false; })
         .catch((err) => { console.error(err); btn.disabled = false; toast("Setup failed, try again"); });
@@ -11299,6 +11550,7 @@ async function finishOnboarding(data) {
        value that means exactly what the column's default already means. */
     ...(Array.isArray(data.train_styles) && data.train_styles.length ? { train_styles: data.train_styles } : {}),
     ...(data.goal_tuning ? { goal_tuning: data.goal_tuning } : {}),
+    ...(data.committed_at ? { committed_at: data.committed_at } : {}),
     goal_detail: data.goal_detail || null,
     ...(data.height_in ? { height_in: data.height_in } : {}),
     challenge_target: data.challenge_target || 4,
@@ -11306,6 +11558,11 @@ async function finishOnboarding(data) {
   });
   if (error) { toast("Setup failed, try again"); console.error(error); return false; }
   if (droppedSecondary && (data.goal_secondary || []).length) toast("Your extra goals are not being stored yet.");
+  /* Straight from the promise into the plans, and only for somebody who has
+     just made one. An account restored from a draft, or any other path into
+     this function, lands in the app as it always did: showing the paywall to
+     somebody who did not just commit is a different and worse product. */
+  if (data.committed_at) setTimeout(() => { try { showPaywall(); } catch (e) { console.error(e); } }, 400);
   if (droppedSession) toast("Your session length is not being stored yet.");
   MY_PROFILE = saved;
   clearObDraft();
