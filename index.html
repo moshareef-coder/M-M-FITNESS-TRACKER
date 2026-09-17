@@ -5408,6 +5408,19 @@
   .csn-bar { width: 100%; max-width: 280px; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; margin-top: 16px; }
   .csn-bar b { display: block; height: 100%; background: var(--accent); transition: width .4s linear; }
   .csn-paused { font-size: 13px; font-weight: 700; color: var(--up); letter-spacing: .06em; text-transform: uppercase; }
+  /* A guided session says where you are before it says how long is left, because
+     the move is the instruction and the clock is only its deadline. */
+  .csn-round { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .csn-move {
+    font-family: var(--font-display); font-size: 30px; font-weight: 800; letter-spacing: -.02em;
+    text-align: center; margin: 4px 0 14px; line-height: 1.15; text-wrap: balance;
+  }
+  .csn-next { font-size: 13.5px; color: var(--muted); margin-top: 10px; }
+  .csn-guided {
+    display: flex; align-items: flex-start; gap: 9px; margin: -10px 0 20px;
+    font-size: 13px; line-height: 1.45; color: var(--muted);
+  }
+  .csn-guided svg { flex-shrink: 0; margin-top: 2px; color: var(--accent-ink); }
   .csn-foot { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
   .csn-field { margin-bottom: 18px; }
   @media (prefers-reduced-motion: reduce) { .csn-bar b { transition: none; } }
@@ -16964,16 +16977,60 @@ function goalLineChart(canvasId, series, isPartner, unit, live) {
    And the whole thing is written to localStorage on every change, so closing
    the app mid-run and coming back finds the session still going rather than
    gone. That is the failure people never forgive. */
+/* `training` names a library in knowledge/exercise-library. The four without one
+   are timed and nothing more, which is honest: this app cannot tell you how to
+   run. The two with one get a real session built out of their own moves. */
 const CARDIO_ACTS = [
   { key: "run",     label: "Run",     ico: "run",      dist: true },
   { key: "walk",    label: "Walk",    ico: "walk",     dist: true },
   { key: "cycle",   label: "Cycle",   ico: "bike",     dist: true },
   { key: "row",     label: "Row",     ico: "dumbbell", dist: true },
-  { key: "pilates", label: "Pilates", ico: "star",     dist: false },
-  { key: "yoga",    label: "Yoga",    ico: "heart",    dist: false },
+  { key: "pilates", label: "Pilates", ico: "star",     dist: false, training: "pilates" },
+  { key: "yoga",    label: "Yoga",    ico: "heart",    dist: false, training: "yoga" },
   { key: "hiit",    label: "HIIT",    ico: "bolt",     dist: false },
   { key: "other",   label: "Other",   ico: "clock",    dist: false },
 ];
+
+/* The session builder lives in the engine so the gate can test it, and is pulled
+   in the first time somebody picks a training that has one. */
+let sessionEnginePromise = null;
+function ensureSessionEngine() {
+  if (!sessionEnginePromise) {
+    sessionEnginePromise = import("/mo-knowledge/engine/activity-session.mjs")
+      .catch((e) => { console.warn("activity session engine", e); return null; });
+  }
+  return sessionEnginePromise;
+}
+
+/* What somebody actually does, which is the only preference signal this app gets
+   for free. Mo: "if I prioritize Pilates, when I generate a workout it's
+   obviously gonna be Pilates." Prioritising IS doing, so the picker opens on
+   whatever has been done most lately rather than on a question nobody wants to
+   answer. Ninety days, matching preferences.mjs, because older than that is a
+   person they may no longer be. */
+function activityCounts(name, days = 90) {
+  const from = new Date(todayStr() + "T00:00:00");
+  from.setDate(from.getDate() - days);
+  const fromStr = isoDate(from);
+  const counts = {};
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== name || !l.entry_date || l.entry_date < fromStr) continue;
+    const n = (l.exercise_name || "").trim().toLowerCase();
+    const a = CARDIO_ACTS.find((x) => x.label.toLowerCase() === n);
+    if (a) counts[a.key] = (counts[a.key] || 0) + 1;
+  }
+  return counts;
+}
+
+/* The list, most-done first, ties keeping the written order so a brand new
+   account still reads Run, Walk, Cycle rather than something arbitrary. */
+function activitiesByHabit(name) {
+  const counts = activityCounts(name);
+  return CARDIO_ACTS
+    .map((a, i) => ({ a, i, n: counts[a.key] || 0 }))
+    .sort((x, y) => y.n - x.n || x.i - y.i)
+    .map((x) => x.a);
+}
 const CSN_KEY = "ft_cardio_session";
 const CSN_PRESETS = [15, 30, 45, 60];
 let CARDIO_SES = null;
@@ -17005,8 +17062,73 @@ function csnAct() {
   return CARDIO_ACTS.find((a) => a.key === CARDIO_SES?.act) || CARDIO_ACTS[0];
 }
 
+/* One session of a training that has a library. Level comes from how many of
+   these they have already done, never from a question. */
+async function buildGuidedPlan(act, minutes) {
+  const engine = await ensureSessionEngine();
+  const lib = (typeof EXERCISE_TRAININGS !== "undefined" ? EXERCISE_TRAININGS : null) || [];
+  const training = lib.find((t) => t.id === act.training);
+  if (!engine?.buildActivitySession || !training) return null;
+  const done = activityCounts(ME, 365)[act.key] || 0;
+  const built = engine.buildActivitySession(training, {
+    minutes,
+    level: engine.levelFromSessions(done),
+    styleKey: (training.styles || [])[0]?.key || null,
+    /* The date, so today's session is the same session all day and a different
+       one tomorrow. Deterministic, which is the rest of the engine's rule. */
+    seed: todayStr(),
+  });
+  return built?.ok ? built : null;
+}
+
+/* Which move the clock is on. Derived from elapsed rather than tracked with its
+   own timer, so it survives a backgrounded tab for the same reason the clock
+   does: there is only ever one source of truth and it is the timestamps. */
+function csnMoveAt(ms) {
+  const plan = CARDIO_SES?.plan;
+  if (!plan?.moves?.length) return null;
+  const sec = ms / 1000;
+  let acc = 0;
+  for (let i = 0; i < plan.moves.length; i++) {
+    const m = plan.moves[i];
+    const cost = m.seconds * (m.perSide ? 2 : 1);
+    if (sec < acc + cost) {
+      return { i, move: m, left: Math.max(0, Math.ceil(acc + cost - sec)), next: plan.moves[i + 1] || null };
+    }
+    acc += cost;
+  }
+  return { i: plan.moves.length, move: null, left: 0, next: null, done: true };
+}
+
+function paintGuidedMove(ms) {
+  const plan = CARDIO_SES?.plan;
+  if (!plan) return;
+  const at = csnMoveAt(ms);
+  const roundEl = $("csnRound"), moveEl = $("csnMove"), nextEl = $("csnNext"), timeEl = $("csnTime"), ofEl = $("csnOf");
+  if (!moveEl) return;
+  if (!at || at.done) {
+    if (roundEl) roundEl.textContent = "";
+    moveEl.textContent = "Sequence done";
+    if (nextEl) nextEl.textContent = "End it whenever you are ready.";
+    return;
+  }
+  if (roundEl) roundEl.textContent = plan.rounds > 1
+    ? `Round ${at.move.round} of ${plan.rounds} · ${at.move.categoryLabel}`
+    : at.move.categoryLabel;
+  moveEl.textContent = at.move.name;
+  /* The big number becomes the move's countdown, because that is the number
+     somebody holding a plank actually wants. The overall elapsed moves to the
+     line under it, which is where a class clock belongs. */
+  if (timeEl) timeEl.textContent = csnClock(at.left * 1000);
+  if (ofEl) ofEl.textContent = `${csnClock(ms)} of ${CARDIO_SES.minutes} min`;
+  if (nextEl) nextEl.textContent = at.next ? `Next: ${at.next.name}` : "Last one";
+}
+
 function openCardioSession(state) {
-  if (!CARDIO_SES) CARDIO_SES = { state: state || "setup", act: "run", minutes: 30, accum: 0, since: null };
+  if (!CARDIO_SES) {
+    const first = activitiesByHabit(ME)[0] || CARDIO_ACTS[0];
+    CARDIO_SES = { state: state || "setup", act: first.key, minutes: 30, accum: 0, since: null };
+  }
   csnSave();
   $("csnScrim").classList.remove("hidden");
   renderCardioStage();
@@ -17039,10 +17161,11 @@ function renderCardioStage() {
         <button type="button" class="csn-x" id="csnX" aria-label="Close">${icon("close", 18)}</button>
       </div>
       <div class="csn-grid">
-        ${CARDIO_ACTS.map((x) => `<button type="button" class="csn-act${x.key === a.key ? " on" : ""}" data-act="${x.key}">
+        ${activitiesByHabit(ME).map((x) => `<button type="button" class="csn-act${x.key === a.key ? " on" : ""}" data-act="${x.key}">
           ${icon(x.ico, 19)}<span>${escapeHtml(x.label)}</span>
         </button>`).join("")}
       </div>
+      ${a.training ? `<p class="csn-guided">${icon("wand", 15)} <span>Guided ${escapeHtml(a.label)} session, built from the ${escapeHtml(a.label)} library at your level.</span></p>` : ""}
       <div class="csn-dur">
         <div class="csn-dur-k">How long</div>
         <div class="csn-dur-row">
@@ -17070,7 +17193,10 @@ function renderCardioStage() {
     stage.querySelectorAll("[data-preset]").forEach((b) => {
       b.onclick = () => { CARDIO_SES.minutes = Number(b.dataset.preset); csnSave(); renderCardioStage(); };
     });
-    $("csnGo").onclick = () => {
+    $("csnGo").onclick = async () => {
+      /* Built before the clock starts, so the first move is on screen the moment
+         it does. A training without a library just gets the timer. */
+      CARDIO_SES.plan = a.training ? await buildGuidedPlan(a, CARDIO_SES.minutes) : null;
       CARDIO_SES.state = "live";
       CARDIO_SES.since = Date.now();
       CARDIO_SES.startedAt = new Date().toISOString();
@@ -17089,9 +17215,12 @@ function renderCardioStage() {
         <button type="button" class="csn-x" id="csnX" aria-label="Hide">${icon("chevronLeft", 18)}</button>
       </div>
       <div class="csn-live">
-        <div class="csn-live-k">${paused ? "&nbsp;" : "Elapsed"}</div>
+        ${CARDIO_SES.plan ? `<div class="csn-round" id="csnRound"></div>
+        <div class="csn-move" id="csnMove"></div>` : ""}
+        <div class="csn-live-k">${paused ? "&nbsp;" : CARDIO_SES.plan ? "This move" : "Elapsed"}</div>
         <div class="csn-time" id="csnTime">${csnClock(csnElapsedMs())}</div>
         <div class="csn-of" id="csnOf"></div>
+        ${CARDIO_SES.plan ? `<div class="csn-next" id="csnNext"></div>` : ""}
         ${paused ? `<div class="csn-paused">Paused</div>` : ""}
         <div class="csn-bar"><b id="csnBar" style="width:0%"></b></div>
       </div>
@@ -17115,13 +17244,16 @@ function renderCardioStage() {
       const ms = csnElapsedMs();
       const t = $("csnTime"); if (!t) { clearInterval(csnTick); csnTick = null; return; }
       t.textContent = csnClock(ms);
+      paintGuidedMove(ms);
       const target = (CARDIO_SES.minutes || 0) * 60000;
       const pct = target > 0 ? Math.min(100, (ms / target) * 100) : 0;
       const bar = $("csnBar"); if (bar) bar.style.width = `${pct}%`;
-      const of = $("csnOf");
-      if (of) of.textContent = target > 0
-        ? (ms >= target ? `past your ${CARDIO_SES.minutes} min` : `of ${CARDIO_SES.minutes} min`)
-        : "";
+      if (!CARDIO_SES.plan) {
+        const of = $("csnOf");
+        if (of) of.textContent = target > 0
+          ? (ms >= target ? `past your ${CARDIO_SES.minutes} min` : `of ${CARDIO_SES.minutes} min`)
+          : "";
+      }
     };
     paint();
     if (!paused) csnTick = setInterval(paint, 500);
