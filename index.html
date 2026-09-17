@@ -1594,30 +1594,65 @@
      make the screenshot too small to read.
      scroll-snap rather than a JS-driven slider: free momentum, free rubber
      banding at the ends, no per-frame code to keep in sync with a finger. */
-  .paywall-carousel { margin: 4px -20px 6px; }
+  /* The X floats over everything rather than sharing a row with the wordmark,
+     because the wordmark is centred and a shared row would have to either
+     fight it for space or push it off centre. */
+  .paywall-x {
+    position: absolute; top: 14px; left: 14px; width: 30px; height: 30px;
+    border-radius: 50%; border: none; background: var(--panel-2, rgba(128,128,128,.16));
+    color: var(--muted); font-size: 18px; line-height: 1; z-index: 2;
+  }
+  .paywall-head { text-align: center; padding: 6px 36px 2px; }
+  .paywall-word { font-family: var(--font-display); font-size: 21px; letter-spacing: .01em; }
+  .paywall-word b { font-weight: 800; color: var(--text); }
+  .paywall-word span { font-weight: 500; color: var(--muted); margin-left: 2px; }
+  .paywall-tagline {
+    margin-top: 3px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em;
+    color: var(--muted); text-transform: uppercase;
+  }
+  /* The peek carousel. Three cards in view, the centre one full size and the
+     neighbours cut off at the edge, so a glance at the closed state already
+     says "there is more either side" without anyone having to be told to
+     swipe. scroll-snap does the settling; a scroll listener drives the
+     scale, because CSS alone has no clean way to say "whichever card is
+     nearest centre" without scroll-driven animation support this app cannot
+     assume yet on every device it ships to. */
+  .paywall-carousel { margin: 10px 0 2px; }
   .paywall-carousel-track {
-    display: flex; gap: 12px; overflow-x: auto; padding: 0 20px 4px;
-    scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    display: flex; align-items: flex-start; gap: 14px;
+    overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; padding: 6px 15vw 10px;
   }
   .paywall-carousel-track::-webkit-scrollbar { display: none; }
   .paywall-slide {
-    flex: 0 0 auto; width: min(72vw, 260px); scroll-snap-align: center;
-    border-radius: 16px; overflow: hidden; background: var(--panel-2, var(--panel));
-    border: 1px solid var(--line, rgba(128,128,128,.18));
-  }
-  .paywall-slide img {
-    display: block; width: 100%; aspect-ratio: 9 / 16; object-fit: cover;
-    /* The screenshot's own top, where the app's real status bar and header
-       already sit, so the card is not doubling up a crop line against
-       whatever the phone's own notch is doing. */
-    object-position: top;
+    flex: 0 0 auto; width: 70vw; max-width: 250px; scroll-snap-align: center;
+    border-radius: 22px; padding: 16px 16px 0; overflow: hidden;
     background: var(--panel-2, var(--panel));
+    border: 1px solid var(--line, rgba(128,128,128,.18));
+    box-shadow: 0 14px 34px -18px rgba(0,0,0,.55);
+    display: flex; flex-direction: column;
+    opacity: .55; transform: scale(.88); transition: opacity .2s, transform .2s;
   }
-  .paywall-slide-caption { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 2px; }
-  .paywall-slide-caption b { font-size: 13.5px; color: var(--text); }
-  .paywall-slide-caption span { font-size: 12px; color: var(--muted); line-height: 1.3; }
-  .paywall-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+  /* The centred card, found and marked by the same scroll listener that drives
+     the dots, so the two can never disagree about which slide is "current". */
+  .paywall-slide.on { opacity: 1; transform: scale(1); }
+  .paywall-slide-icon {
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    margin-bottom: 10px;
+  }
+  .paywall-slide-title { font-size: 15px; color: var(--text); line-height: 1.25; }
+  .paywall-slide-body { display: block; margin-top: 4px; font-size: 12.5px; color: var(--muted); line-height: 1.35; min-height: 32px; }
+  /* The screenshot is real and stays that way: a light rectangle set into a
+     dark card is a lot of contrast, which is deliberate, it is the one part
+     of the card that is a photograph rather than something drawn and it
+     should read as one. Cropped rather than framed by a fixed height, so a
+     card never shows a hard cut mid-row of the real UI it is holding. */
+  .paywall-slide-shot {
+    margin: 12px -16px 0; border-radius: 14px 14px 0 0; overflow: hidden;
+    max-height: 190px;
+  }
+  .paywall-slide-shot img { display: block; width: 100%; height: auto; }
+  .paywall-dots { display: flex; justify-content: center; gap: 6px; margin-top: 4px; }
   .paywall-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line, rgba(128,128,128,.3)); transition: background .15s, transform .15s; }
   .paywall-dot.on { background: var(--accent); transform: scale(1.25); }
   /* One blocked person. The address can be long and the button must not be
@@ -13844,13 +13879,23 @@ const PREMIUM_PRICE = "$7.99";
    drawn, because a carousel showing something the app does not actually do is
    Guideline 2.3, misleading metadata, and it is also just a lie to whoever is
    about to pay based on it. Re-capture with the sandbox and CDP if any of
-   these five screens changes shape. */
+   these five screens changes shape.
+
+   Icon, colour and headline are read out here rather than baked into the
+   image, so the card can be redrawn in either theme and at any width without
+   ever touching a screenshot: only the photo has to be real, everything
+   drawn around it is free to be exactly what the app already draws elsewhere. */
 const PREMIUM_UNLOCKS = [
-  ["paywall/01-generated-workout.jpg", "Workouts made for you", "A plan every day, built around your goal and what you lifted last time."],
-  ["paywall/02-week-plan.jpg", "Plan your week", "Decide the shape of the week ahead instead of deciding every morning."],
-  ["paywall/03-body-impact.jpg", "Body impact", "Which muscles you have actually worked, and which ones you keep missing."],
-  ["paywall/04-progress-records.jpg", "The full picture", "Trends, projections and your records ranked."],
-  ["paywall/05-accent-colors.jpg", "Make it yours", "Accent colours."],
+  ["paywall/01-generated-workout.jpg", "dumbbell", "var(--accent)",
+   "Workouts made for you", "A plan every day, built around your goal and what you lifted last time."],
+  ["paywall/02-week-plan.jpg", "checklist", "var(--me)",
+   "Plan your week together", "Map out the week with your partner and stay in sync."],
+  ["paywall/03-body-impact.jpg", "body", "var(--partner)",
+   "Body impact", "Which muscles you have actually worked, and which ones you keep missing."],
+  ["paywall/04-progress-records.jpg", "trending", "#2dd4bf",
+   "Track the progress that matters", "Trends, projections and your records ranked."],
+  ["paywall/05-accent-colors.jpg", "sunMoon", "var(--accent)",
+   "Make it yours", "Accent colours, picked by you."],
 ];
 
 /* The gate. Returns true when the thing may go ahead, and otherwise puts the
@@ -13877,22 +13922,28 @@ function showPaywall() {
     scrim.innerHTML = `
       <div class="pop">
         <div class="pop-body">
-          <div class="ds-top">
-            <div class="pop-who" style="color:var(--muted)">UNIO PREMIUM</div>
-            <button type="button" class="ds-x" data-pay="0" aria-label="Close">&times;</button>
+          <button type="button" class="paywall-x" data-pay="0" aria-label="Close">&times;</button>
+          <div class="paywall-head">
+            <div class="paywall-word"><b>UNIO</b> <span>PREMIUM</span></div>
+            <div class="paywall-tagline">TRAIN TOGETHER. A STRONGER YOU.</div>
           </div>
           <!-- Swipe through what it actually looks like before reading a word
                about it. People buy what they can picture themselves using, and
-               a bullet list only describes; this shows the real screen. -->
+               a bullet list only describes; this shows the real screen.
+               Each card carries its own icon, headline and copy the way the
+               rest of the app already draws a feature, and the screenshot
+               beneath it is the one thing that has to be a photograph rather
+               than anything drawn: showing something the app does not
+               actually do is Guideline 2.3, and it is also a lie to whoever
+               pays based on it. -->
           <div class="paywall-carousel" id="paywallCarousel">
             <div class="paywall-carousel-track" id="paywallCarouselTrack">
-              ${PREMIUM_UNLOCKS.map(([img, t, d]) => `
+              ${PREMIUM_UNLOCKS.map(([img, ico, tint, t, d]) => `
                 <div class="paywall-slide">
-                  <img src="${img}" alt="${escapeHtml(t)}" loading="lazy" />
-                  <div class="paywall-slide-caption">
-                    <b>${escapeHtml(t)}</b>
-                    <span>${escapeHtml(d)}</span>
-                  </div>
+                  <div class="paywall-slide-icon" style="background:color-mix(in srgb, ${tint} 22%, transparent); color:${tint}">${icon(ico, 20)}</div>
+                  <b class="paywall-slide-title">${escapeHtml(t)}</b>
+                  <span class="paywall-slide-body">${escapeHtml(d)}</span>
+                  <div class="paywall-slide-shot"><img src="${img}" alt="${escapeHtml(t)}" loading="lazy" /></div>
                 </div>`).join("")}
             </div>
             <div class="paywall-dots" id="paywallDots">
@@ -13926,12 +13977,24 @@ function showPaywall() {
        asked for still lights up the right dot. */
     const carouselTrack = scrim.querySelector("#paywallCarouselTrack");
     const dots = scrim.querySelectorAll(".paywall-dot");
+    const slides = scrim.querySelectorAll(".paywall-slide");
     if (carouselTrack && dots.length) {
-      carouselTrack.addEventListener("scroll", () => {
-        const slideWidth = carouselTrack.firstElementChild?.offsetWidth || 1;
-        const i = Math.round(carouselTrack.scrollLeft / slideWidth);
+      /* The distance between two snapped positions is the card plus the gap
+         beside it, not the card alone. Using card width by itself was fine for
+         slide index 0 and drifted by one gap's worth on every slide after,
+         which is the kind of bug that only shows up once there is a third
+         card to be wrong about. */
+      const step = () => {
+        const style = getComputedStyle(carouselTrack);
+        return (carouselTrack.firstElementChild?.offsetWidth || 1) + (parseFloat(style.columnGap || style.gap) || 0);
+      };
+      const highlight = () => {
+        const i = Math.round(carouselTrack.scrollLeft / step());
         dots.forEach((d, di) => d.classList.toggle("on", di === i));
-      }, { passive: true });
+        slides.forEach((s, si) => s.classList.toggle("on", si === i));
+      };
+      carouselTrack.addEventListener("scroll", highlight, { passive: true });
+      highlight();
     }
     const close = (v) => { scrim.remove(); resolve(v); };
     scrim.querySelectorAll("[data-pay]").forEach((b) => {
