@@ -5256,8 +5256,23 @@
   .tone-empty { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
   .tone-photos:empty { display: none; }
   .tone-actions, .end-actions { margin-bottom: 10px; }
+  /* One green in this app, and it is the workout button in the toolbar.
+     Mo: "the main CTA should always be the green workout." A goal screen's own
+     action sits directly above that toolbar, so a full width accent block here
+     was a second thing with the same shout, on a screen that already has the
+     FAB glowing at the bottom of it. This is solid and neutral instead: still
+     unmistakably the one thing to press on this screen, no longer competing
+     with the one thing to press in the app. The accent, the gradient and the
+     glow all come off; the geometry does not, so it still reads as a button. */
   .tone-actions .btn-primary, .end-actions .btn-primary {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    box-shadow: none;
+  }
+  .tone-actions .btn-primary:active, .end-actions .btn-primary:active {
+    background: color-mix(in srgb, var(--text) 8%, var(--panel-2));
   }
 
   /* ---- Build endurance (renderEnduranceHero) ----
@@ -11401,7 +11416,9 @@ function personalRecords(name) {
   let prCount = 0;
   const prLogIds = new Set();
   for (const log of logs) {
-    const key = (log.exercise_name || "").trim().toLowerCase();
+    /* Folded too, or "Lat Pulldown" and "Lat pulldowns" each keep their own
+       best and every other session sets a record on one of them. */
+    const key = liftKey(log.exercise_name);
     const prev = best[key];
     if (prev != null && log.weight > prev) { prCount++; prLogIds.add(log.id); }
     if (prev == null || log.weight > prev) best[key] = log.weight;
@@ -16160,7 +16177,7 @@ function liftScreenLifts(name) {
   const pins = typeof getPinnedLifts === "function" ? getPinnedLifts() : [];
   if (pins.length) {
     const picked = pins
-      .map((n) => all.find((l) => l.name.toLowerCase() === String(n).toLowerCase()))
+      .map((n) => all.find((l) => liftKey(l.name) === liftKey(n)))
       .filter(Boolean);
     if (picked.length) return picked.slice(0, MAX_PINNED_LIFTS);
   }
@@ -17363,17 +17380,63 @@ function chartWash(ctx, hex) {
    weight while the level bar underneath it was already reading e1RM. Same
    lift, two different "best" numbers on the same card is not a detail, it is
    the kind of thing that makes someone stop trusting either number. */
+/* ---- One lift, however it was typed ----
+   Exercise names are free text, so a real history carries "Lat Pulldown" and
+   "Lat pulldowns", "Leg Extension" and "Leg Extensions", "Back Extension" and
+   "Back Extensions" as four separate lifts with four separate histories, four
+   charts that each stop halfway and no level on any of the plurals. Mo asked
+   for them folded.
+
+   Case and spacing, then the plural on the LAST word only, which is the one
+   people vary. Three guards, each of them a real name in his own logs:
+
+     "Bench Press" must not become "Bench Pre", so a word ending in ss is left
+     alone entirely.
+     "Presses" has to lose "es" rather than "s", so an es ending is stripped
+     whole when the stem ends in a sibilant.
+     "Triceps Pushdown" is untouched because only the last word is considered,
+     and "Rows" is safe to shorten because a three letter stem still reads.
+
+   Folding happens on READ, never on the row. The typed name is what the person
+   wrote and what the day sheet shows back to them; this only decides what
+   counts as the same lift when a history is assembled. Session time lookups
+   (what is hidden, what was swapped, what you lifted last) deliberately keep
+   exact matching: folding two names together mid workout would hide the wrong
+   row, and that is a worse failure than a split chart. */
+function liftKey(name) {
+  const s = String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (!s) return "";
+  const cut = s.lastIndexOf(" ");
+  const head = cut < 0 ? "" : s.slice(0, cut + 1);
+  let last = cut < 0 ? s : s.slice(cut + 1);
+  if (!/ss$/.test(last)) {
+    if (/(s|x|z|ch|sh)es$/.test(last)) last = last.slice(0, -2);
+    else if (/s$/.test(last) && last.length > 3) last = last.slice(0, -1);
+  }
+  return head + last;
+}
+
 function allLiftsFor(name) {
   const logs = ALL_EXERCISE_LOGS.filter((l) => l.user_name === name && l.weight != null && !l.duration_min);
   const by = new Map();
   for (const l of logs) {
-    const key = (l.exercise_name || "").trim().toLowerCase();
+    const key = liftKey(l.exercise_name);
     if (!key) continue;
-    const row = by.get(key) || { name: l.exercise_name.trim(), sets: 0, best: 0, lastDate: "" };
+    const row = by.get(key) || { name: "", sets: 0, best: 0, lastDate: "", spellings: new Map() };
     row.sets += l.sets || 1;
     row.best = Math.max(row.best, Math.round(e1rm(l.weight, l.reps)));
     if (l.entry_date > row.lastDate) row.lastDate = l.entry_date;
+    const spelt = (l.exercise_name || "").trim();
+    if (spelt) row.spellings.set(spelt, (row.spellings.get(spelt) || 0) + 1);
     by.set(key, row);
+  }
+  /* Which of the merged spellings to show: the one used most, ties broken
+     alphabetically so the label cannot flicker between renders. Picking the
+     first seen would have shown a typo from months ago as the lift's name. */
+  for (const row of by.values()) {
+    const ranked = [...row.spellings.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    row.name = ranked.length ? ranked[0][0] : "";
+    delete row.spellings;
   }
   return [...by.values()];
 }
@@ -17413,7 +17476,7 @@ function seedPinnedLifts(name) {
   const first = new Map();
   for (const l of ALL_EXERCISE_LOGS) {
     if (l.user_name !== name || l.weight == null || l.duration_min) continue;
-    const key = (l.exercise_name || "").trim().toLowerCase();
+    const key = liftKey(l.exercise_name);
     if (!key) continue;
     const at = `${l.entry_date} ${l.created_at || ""}`;
     const seen = first.get(key);
@@ -17426,14 +17489,14 @@ function seedPinnedLifts(name) {
 }
 
 function isPinnedLift(name) {
-  const key = (name || "").toLowerCase();
-  return getPinnedLifts().some((n) => n.toLowerCase() === key);
+  const key = liftKey(name);
+  return getPinnedLifts().some((n) => liftKey(n) === key);
 }
 /* Returns what happened, because the caller has three different toasts to
    choose between and no other way to tell which one applies. */
 function togglePinnedLift(name) {
   const list = getPinnedLifts();
-  const i = list.findIndex((n) => n.toLowerCase() === (name || "").toLowerCase());
+  const i = list.findIndex((n) => liftKey(n) === liftKey(name));
   if (i >= 0) { list.splice(i, 1); setPinnedLifts(list); return "removed"; }
   if (list.length >= MAX_PINNED_LIFTS) return "full";
   list.push(name); setPinnedLifts(list); return "added";
@@ -17449,7 +17512,7 @@ function strengthCardLifts(name, viewingPartner) {
     const pins = getPinnedLifts();
     if (pins.length) {
       const all = allLiftsFor(name);
-      const picked = pins.map((n) => all.find((l) => l.name.toLowerCase() === n.toLowerCase())).filter(Boolean);
+      const picked = pins.map((n) => all.find((l) => liftKey(l.name) === liftKey(n))).filter(Boolean);
       if (picked.length) return picked;
     }
   }
@@ -27189,7 +27252,7 @@ function ageStrengthFactor(age) {
    Null has three causes and all of them are real: the lift has no standard,
    there is no bodyweight to divide by, or nothing has been logged. */
 function strengthLevelFor(name, exerciseName) {
-  const std = LIFT_STANDARDS[(exerciseName || "").trim().toLowerCase()];
+  const std = LIFT_STANDARDS[liftKey(exerciseName)];
   if (!std) return null;
   const bw = currentWeightLb(name);
   if (!bw) return null;
@@ -27230,14 +27293,14 @@ function strengthLevelFor(name, exerciseName) {
    the estimate rather than the raw load: a person who took their bench from
    5 reps to 9 at the same weight got stronger, and the raw load says flat. */
 function liftE1rmHistory(name, exerciseName, weeks = 16) {
-  const key = (exerciseName || "").trim().toLowerCase();
+  const key = liftKey(exerciseName);
   const from = new Date(todayStr() + "T00:00:00");
   from.setDate(from.getDate() - weeks * 7);
   const fromStr = isoDate(from);
   const byDate = new Map();
   for (const l of ALL_EXERCISE_LOGS) {
     if (l.user_name !== name || l.weight == null || l.duration_min) continue;
-    if ((l.exercise_name || "").trim().toLowerCase() !== key) continue;
+    if (liftKey(l.exercise_name) !== key) continue;
     if (l.entry_date < fromStr) continue;
     byDate.set(l.entry_date, Math.max(byDate.get(l.entry_date) || 0, e1rm(l.weight, l.reps)));
   }
@@ -27508,11 +27571,11 @@ function strengthMovement(name, weeks = 12) {
 const REP_MAX_BUCKETS = [1, 3, 5, 8, 10, 12];
 
 function repMaxTable(name, exerciseName) {
-  const key = (exerciseName || "").trim().toLowerCase();
+  const key = liftKey(exerciseName);
   const best = new Map(REP_MAX_BUCKETS.map((r) => [r, null]));
   for (const l of ALL_EXERCISE_LOGS) {
     if (l.user_name !== name || l.weight == null || l.duration_min) continue;
-    if ((l.exercise_name || "").trim().toLowerCase() !== key) continue;
+    if (liftKey(l.exercise_name) !== key) continue;
     const reps = l.reps || 1;
     for (const r of REP_MAX_BUCKETS) {
       if (reps < r) continue;
@@ -27528,11 +27591,11 @@ function repMaxTable(name, exerciseName) {
    a formula, and a card that shows a formula where somebody expects a fact is
    how a number stops being believed. */
 function heaviestSet(name, exerciseName) {
-  const key = (exerciseName || "").trim().toLowerCase();
+  const key = liftKey(exerciseName);
   let top = null;
   for (const l of ALL_EXERCISE_LOGS) {
     if (l.user_name !== name || l.weight == null || l.duration_min) continue;
-    if ((l.exercise_name || "").trim().toLowerCase() !== key) continue;
+    if (liftKey(l.exercise_name) !== key) continue;
     if (!top || l.weight > top.weight) top = { weight: l.weight, reps: l.reps || 1, date: l.entry_date };
   }
   return top;
