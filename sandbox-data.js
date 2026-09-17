@@ -288,6 +288,27 @@
       },
     },
 
+    /* A day already holding one session, with the next still to do. Mo: "one
+       session for yoga in the morning, one session to work out." The yoga is a
+       finished activity (an exercise_logs row with minutes on it, which is all
+       an activity ever is) and the push day is the untouched plan beside it, so
+       the workout tab has to show two sessions and the weekly ring has to still
+       read one day. The fit_entries row carries sessions: 1 because only the
+       yoga has been banked so far. */
+    twoSessions: {
+      label: "Two sessions today",
+      apply: (db) => {
+        db.exercise_logs = db.exercise_logs.filter((e) => e.email !== ME || e.entry_date !== day(0));
+        db.exercise_logs.push({
+          id: "yoga1", email: ME, user_name: "Mo", entry_date: day(0),
+          exercise_name: "Yoga", sets: 1, duration_min: 35, created_at: day(0) + "T07:10:00Z",
+        });
+        db.fit_entries = db.fit_entries.filter((e) => e.email !== ME || e.entry_date !== day(0));
+        db.fit_entries.push({ id: "e2s", email: ME, user_name: "Mo", entry_date: day(0),
+          weight: 189.2, gym: true, sessions: 1, workout_at: day(0) + "T07:45:00Z" });
+      },
+    },
+
     livePrivate: {
       label: "Partner keeps it private",
       apply: (db) => {
@@ -463,9 +484,17 @@
            email and its fixture rows carry no id, so the old "id" default
            matched undefined to undefined and always hit row zero: right by
            accident for one user, wrong the moment there are two. */
-        const on = (opts && opts.onConflict ? opts.onConflict : (list[0]?.id != null ? "id" : table === "profiles" ? "email" : "id")).split(",")[0].trim();
+        /* And every column of the conflict target, not just the first. Taking
+           only "email" off "email,entry_date" meant every ai_workouts upsert
+           matched whichever row this person happened to own first, so saving
+           tomorrow's plan overwrote today's and the sandbox showed a day
+           losing a workout that production keeps. A composite key has to be
+           composite or it is testing a different database. */
+        const on = (opts && opts.onConflict ? opts.onConflict : (list[0]?.id != null ? "id" : table === "profiles" ? "email" : "id"))
+          .split(",").map((c) => c.trim()).filter(Boolean);
         rows = list.map((p) => {
-          const hit = p[on] == null ? null : (DB[table] ??= []).find((r) => low(r[on]) === low(p[on]));
+          const keyed = on.every((c) => p[c] != null);
+          const hit = !keyed ? null : (DB[table] ??= []).find((r) => on.every((c) => low(r[c]) === low(p[c])));
           if (hit) { Object.assign(hit, p); return hit; }
           /* profiles.invite_code is a server default on INSERT, and the partner
              step reads it straight back out to put on screen. Without it here

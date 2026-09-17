@@ -5753,7 +5753,67 @@
     font-size: 13px; line-height: 1.45; color: var(--muted);
   }
   .csn-guided svg { flex-shrink: 0; margin-top: 2px; color: var(--accent-ink); }
+  /* The lifting card is a kind, not an activity, so it takes its own line
+     rather than sitting half width beside Other. */
+  .csn-act-wide { grid-column: 1 / -1; }
   .csn-foot { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+  /* ---- The day's sessions ----
+     A day that holds two is the point, so the list is a list and not a badge
+     on one card: each session says what it is, how much of it there is, and
+     whether it is done, and the row you can still act on is the only one that
+     is a button. */
+  .tsl { margin: 0 0 18px; }
+  .tsl-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .tsl-head h3 {
+    margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .tsl-n {
+    min-width: 19px; height: 19px; padding: 0 5px; border-radius: 100px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--panel-2); color: var(--muted);
+    font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
+  }
+  .tsl-rows { display: flex; flex-direction: column; gap: 8px; }
+  .tsl-row {
+    display: flex; align-items: center; gap: 11px; width: 100%; min-height: 58px;
+    padding: 11px 13px; border-radius: 14px; text-align: left; font: inherit;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+  }
+  button.tsl-row { cursor: pointer; }
+  button.tsl-row:active { transform: scale(.99); }
+  .tsl-ico {
+    width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--panel-2); color: var(--muted);
+  }
+  .tsl-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .tsl-txt b {
+    font-size: 15px; font-weight: 700; letter-spacing: -.01em;
+    /* Two sessions and a long focus name still has to fit a 390 wide phone. */
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .tsl-txt i { font-style: normal; font-size: 12.5px; color: var(--muted); }
+  .tsl-state {
+    flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  /* Done is stated once, quietly. The session that is still open is the one
+     worth looking at, so it keeps the full colour. */
+  .tsl-done { opacity: .72; }
+  .tsl-done .tsl-state { color: var(--accent-ink); }
+  .tsl-running .tsl-ico, .tsl-running .tsl-state { color: var(--accent-ink); }
+  .tsl-running { border-color: var(--accent); }
+  .tsl-add {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    width: 100%; min-height: 44px; margin-top: 10px; padding: 10px 14px;
+    border-radius: 13px; cursor: pointer; font: inherit;
+    font-size: 14px; font-weight: 700; color: var(--muted);
+    background: none; border: 1px dashed var(--border);
+  }
+  .tsl-add:active { transform: scale(.99); }
+  .tsl-note { margin: 9px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
   .csn-field { margin-bottom: 18px; }
   @media (prefers-reduced-motion: reduce) { .csn-bar b { transition: none; } }
   .lift-records .pr-top { margin-bottom: 14px; }
@@ -18389,14 +18449,19 @@ function goalLineChart(canvasId, series, isPartner, unit, live) {
 /* `training` names a library in knowledge/exercise-library. The four without one
    are timed and nothing more, which is honest: this app cannot tell you how to
    run. The two with one get a real session built out of their own moves. */
+/* `training` names a library of MOVES, which buildActivitySession turns into a
+   sequence with a clock on each piece. `cardio` names a mode in cardio.mjs,
+   where an entry is a whole session rather than a move, so it gets a named
+   prescription instead of a sequence. The two are exclusive on purpose: an
+   activity is one or the other, and `other` is honestly neither. */
 const CARDIO_ACTS = [
-  { key: "run",     label: "Run",     ico: "run",      dist: true },
-  { key: "walk",    label: "Walk",    ico: "walk",     dist: true },
-  { key: "cycle",   label: "Cycle",   ico: "bike",     dist: true },
-  { key: "row",     label: "Row",     ico: "dumbbell", dist: true },
+  { key: "run",     label: "Run",     ico: "run",      dist: true,  cardio: "running" },
+  { key: "walk",    label: "Walk",    ico: "walk",     dist: true,  cardio: "walking" },
+  { key: "cycle",   label: "Cycle",   ico: "bike",     dist: true,  cardio: "cycling" },
+  { key: "row",     label: "Row",     ico: "dumbbell", dist: true,  cardio: "rowing" },
   { key: "pilates", label: "Pilates", ico: "star",     dist: false, training: "pilates" },
   { key: "yoga",    label: "Yoga",    ico: "heart",    dist: false, training: "yoga" },
-  { key: "hiit",    label: "HIIT",    ico: "bolt",     dist: false },
+  { key: "hiit",    label: "HIIT",    ico: "bolt",     dist: false, cardio: "hiit" },
   { key: "other",   label: "Other",   ico: "clock",    dist: false },
 ];
 
@@ -18490,6 +18555,69 @@ async function buildGuidedPlan(act, minutes) {
   return built?.ok ? built : null;
 }
 
+/* Cardio is the one library whose entries are whole SESSIONS rather than moves.
+   "Easy Run" is twenty five minutes at an effort, not a thing you do eight of,
+   which is why buildActivitySession answers not-duration for it and is right
+   to: slicing cardio into forty five second pieces and repeating them in rounds
+   would describe something nobody does. What a cardio session wants instead is
+   the prescription. Which one, how hard, and what that effort feels like in
+   words, because we cannot measure a heart rate and a zone number nobody can
+   verify is worse than a sentence they can act on. */
+let cardioLibPromise = null;
+function ensureCardioLibrary() {
+  if (!cardioLibPromise) {
+    cardioLibPromise = import("./knowledge/exercise-library/cardio.mjs")
+      .catch((e) => { console.warn("cardio library", e); return null; });
+  }
+  return cardioLibPromise;
+}
+
+/* Same seed rule the session engine keeps: the day plus the activity, so today
+   asks the same question all day and gets the same answer, and tomorrow gets a
+   different one. */
+function cardioSeedIndex(str, n) {
+  let h = 2166136261 >>> 0;
+  const t = String(str || "");
+  for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return n > 0 ? h % n : 0;
+}
+
+async function buildCardioCard(act, minutes) {
+  if (!act?.cardio) return null;
+  const [lib, engine] = await Promise.all([ensureCardioLibrary(), ensureSessionEngine()]);
+  if (!lib?.cardioFor) return null;
+  /* Mileage, the same blunt input the move libraries use, because there is no
+     test of cardio fitness in this app either. */
+  const done = activityCounts(ME, 365)[act.key] || 0;
+  const level = engine?.levelFromSessions ? engine.levelFromSessions(done) : "beginner";
+  const pool = lib.cardioFor({ modes: [act.cardio], level });
+  if (!pool.length) return null;
+  /* Closest to the length actually asked for. Somebody with twenty minutes is
+     not handed a long run, and the library says in its own minutes what each
+     session is meant to be. */
+  const want = Number(minutes) || 30;
+  const gap = (e) => Math.abs((Number(e.minutes) || want) - want);
+  const best = Math.min(...pool.map(gap));
+  const near = pool.filter((e) => gap(e) === best);
+  const pick = near[cardioSeedIndex(`${todayStr()}|${act.key}|${want}`, near.length)];
+  return {
+    name: pick.name, effort: pick.effort, cue: pick.cue,
+    structure: pick.structure, minutes: pick.minutes, level,
+  };
+}
+
+/* Effort is a 1 to 10 rating of perceived exertion, which is the scale the
+   library prescribes on. Printed as it is written rather than converted into a
+   heart rate we would be inventing.
+
+   The library's own minutes are deliberately NOT on this line. They are what
+   picked the session, but the clock under it is counting toward the length the
+   person said they had, and two different numbers of minutes on one screen read
+   as a contradiction rather than as two facts. */
+function cardioEffortLine(card) {
+  return `Effort ${card.effort} of 10`;
+}
+
 /* Which move the clock is on. Derived from elapsed rather than tracked with its
    own timer, so it survives a backgrounded tab for the same reason the clock
    does: there is only ever one source of truth and it is the timestamps. */
@@ -18533,9 +18661,13 @@ function paintGuidedMove(ms) {
   if (nextEl) nextEl.textContent = at.next ? `Next: ${at.next.name}` : "Last one";
 }
 
-function openCardioSession(state) {
+/* `act` opens the picker already on a kind, which is what adding a second
+   session to a day does: you have chosen yoga before you have chosen to open
+   this sheet. A session already running ignores it, because the clock running
+   is a stronger fact than anything a button said. */
+function openCardioSession(state, act) {
   if (!CARDIO_SES) {
-    const first = activitiesByHabit(ME)[0] || CARDIO_ACTS[0];
+    const first = (act && CARDIO_ACTS.find((a) => a.key === act)) || activitiesByHabit(ME)[0] || CARDIO_ACTS[0];
     CARDIO_SES = { state: state || "setup", act: first.key, minutes: 30, accum: 0, since: null };
   }
   csnSave();
@@ -18566,15 +18698,26 @@ function renderCardioStage() {
   if (CARDIO_SES.state === "setup") {
     stage.innerHTML = `
       <div class="csn-head">
-        <h2>Start an activity</h2>
+        <h2>${todaySessions().length ? "Add a session" : "Start an activity"}</h2>
         <button type="button" class="csn-x" id="csnX" aria-label="Close">${icon("close", 18)}</button>
       </div>
       <div class="csn-grid">
         ${activitiesByHabit(ME).map((x) => `<button type="button" class="csn-act${x.key === a.key ? " on" : ""}" data-act="${x.key}">
           ${icon(x.ico, 19)}<span>${escapeHtml(x.label)}</span>
         </button>`).join("")}
+        ${/* A lift is the one kind of session this sheet cannot run, because it
+              is a plan and not a clock. It is still a kind, and a day that
+              already holds a yoga class most often wants this one next, so it
+              is offered here and hands off to the screen that builds plans. */ ""}
+        <button type="button" class="csn-act csn-act-wide" id="csnLift">
+          ${icon("dumbbell", 19)}<span>${TODAY_WORKOUT && !TODAY_WORKOUT.archived ? "Open today\u2019s workout" : "Lifting workout"}</span>
+        </button>
       </div>
-      ${a.training ? `<p class="csn-guided">${icon("wand", 15)} <span>Guided ${escapeHtml(a.label)} session, built from the ${escapeHtml(a.label)} library at your level.</span></p>` : ""}
+      ${a.training
+        ? `<p class="csn-guided">${icon("wand", 15)} <span>Guided ${escapeHtml(a.label)} session, built from the ${escapeHtml(a.label)} library at your level.</span></p>`
+        : a.cardio
+        ? `<p class="csn-guided">${icon("wand", 15)} <span>A named ${escapeHtml(a.label.toLowerCase())} session from the cardio library, picked for how long you have.</span></p>`
+        : ""}
       <div class="csn-dur">
         <div class="csn-dur-k">How long</div>
         <div class="csn-dur-row">
@@ -18590,6 +18733,9 @@ function renderCardioStage() {
         <button type="button" class="btn-primary" id="csnGo">${icon("play", 18)} Begin ${escapeHtml(a.label.toLowerCase())}</button>
       </div>`;
     $("csnX").onclick = csnDismiss;
+    /* Leaves the sheet rather than starting anything: nothing here can build a
+       plan, and the choose screen is where that lives. */
+    $("csnLift").onclick = () => { csnDismiss(); switchTab("workout"); goWorkoutScreen("choose"); };
     stage.querySelectorAll("[data-act]").forEach((b) => {
       b.onclick = () => { CARDIO_SES.act = b.dataset.act; csnSave(); renderCardioStage(); };
     });
@@ -18606,6 +18752,10 @@ function renderCardioStage() {
       /* Built before the clock starts, so the first move is on screen the moment
          it does. A training without a library just gets the timer. */
       CARDIO_SES.plan = a.training ? await buildGuidedPlan(a, CARDIO_SES.minutes) : null;
+      /* The other half of "a training without a library just gets the timer":
+         cardio has a library now, so a run arrives with a name and an effort
+         instead of a stopwatch and a hope. */
+      CARDIO_SES.card = a.training ? null : await buildCardioCard(a, CARDIO_SES.minutes);
       CARDIO_SES.state = "live";
       CARDIO_SES.since = Date.now();
       CARDIO_SES.startedAt = new Date().toISOString();
@@ -18624,12 +18774,18 @@ function renderCardioStage() {
         <button type="button" class="csn-x" id="csnX" aria-label="Hide">${icon("chevronLeft", 18)}</button>
       </div>
       <div class="csn-live">
+        ${/* A sequence moves, so its lines are painted every tick. A cardio
+              session does not: it is one effort held for the whole thing, so
+              the name and the cue are written once and stay put. */ ""}
         ${CARDIO_SES.plan ? `<div class="csn-round" id="csnRound"></div>
-        <div class="csn-move" id="csnMove"></div>` : ""}
+        <div class="csn-move" id="csnMove"></div>`
+          : CARDIO_SES.card ? `<div class="csn-round">${escapeHtml(cardioEffortLine(CARDIO_SES.card))}</div>
+        <div class="csn-move">${escapeHtml(CARDIO_SES.card.name)}</div>` : ""}
         <div class="csn-live-k">${paused ? "&nbsp;" : CARDIO_SES.plan ? "This move" : "Elapsed"}</div>
         <div class="csn-time" id="csnTime">${csnClock(csnElapsedMs())}</div>
         <div class="csn-of" id="csnOf"></div>
-        ${CARDIO_SES.plan ? `<div class="csn-next" id="csnNext"></div>` : ""}
+        ${CARDIO_SES.plan ? `<div class="csn-next" id="csnNext"></div>`
+          : CARDIO_SES.card ? `<div class="csn-next">${escapeHtml(CARDIO_SES.card.structure || CARDIO_SES.card.cue || "")}</div>` : ""}
         ${paused ? `<div class="csn-paused">Paused</div>` : ""}
         <div class="csn-bar"><b id="csnBar" style="width:0%"></b></div>
       </div>
@@ -20452,6 +20608,155 @@ async function loadTodayWorkout() {
     .eq("email", MY_EMAIL).eq("entry_date", sessionDate()).eq("archived", false)
     .order("created_at", { ascending: false }).limit(1);
   TODAY_WORKOUT = (data || [])[0] || null;
+}
+
+/* ---------- A day holds more than one session ----------
+
+   Mo: "maybe they're feeling bad or they hurt, but they still want to go hard
+   in the gym. They can have like two sessions in one day, one's for yoga, one's
+   for this. One session for yoga in the morning, one session to work out."
+
+   None of this is new storage. The day already carried as many sessions as it
+   liked, in two separate places, and what was missing was a screen that said
+   so:
+
+     a LIFTING PLAN is an ai_workouts row. Open while `archived` is false,
+     finished once sessionDone archives it with a completed_at on it.
+     An ACTIVITY, the yoga class or the run, never touches ai_workouts at all.
+     It writes one exercise_logs row carrying duration_min and calls
+     markGymDayDone, the same one function a lift goes through.
+
+   Which is why finishing the morning yoga cannot mark the evening lift done:
+   they are different rows in different tables and neither reads the other.
+   Both land on the same fit_entries day row, whose `sessions` counter has been
+   incrementing to 2 all along.
+
+   AND THE WEEKLY RING DOES NOT DOUBLE COUNT, because gymDaysInWeek counts
+   DISTINCT entry_dates, not rows and not sessions. challenge_target is a
+   number of days per week and always was. Two sessions on a Tuesday is one
+   Tuesday. Measured rather than assumed: see the verification note in
+   todaySessionsHTML, which is where the app now says it out loud.
+
+   THE ONE THING A DAY STILL CANNOT HOLD IS TWO LIFTING PLANS. ai_workouts is
+   unique on (email, entry_date), which is what every upsert in this file
+   conflicts on, so generating a second plan overwrites the first even when the
+   first was finished. The sets and the gym day survive in exercise_logs and
+   fit_entries; the plan row does not, so this list loses the earlier card.
+   supabase/migrations/20260917_ai_workouts_slot.sql is the fix and is written,
+   not applied. Until somebody runs it the honest answer is that lifting twice
+   in a day works and only remembers the second plan. */
+function todaySessions() {
+  const date = sessionDate();
+  const out = [];
+
+  /* Lifting plans finished today. loadDoneWorkouts has fetched these since long
+     before this list existed and nothing read them until now. */
+  for (const w of TODAY_DONE_WORKOUTS) {
+    const n = (w.exercises || []).length;
+    const mins = w.duration_sec ? Math.max(1, Math.round(w.duration_sec / 60)) : 0;
+    out.push({
+      key: `plan:${w.id}`, ico: "dumbbell", state: "done",
+      label: displayFocus(w.focus, w.exercises),
+      detail: `${n} exercise${n === 1 ? "" : "s"}${mins ? ` \u00b7 ${mins} min` : ""}`,
+      at: w.completed_at || w.created_at || "",
+    });
+  }
+
+  /* Activities finished today. countsAsCardio is the same test the cardio
+     minutes tile uses, so the two screens cannot disagree about what an
+     activity is. */
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.email !== MY_EMAIL || l.entry_date !== date) continue;
+    if (!l.duration_min || !countsAsCardio(l.exercise_name)) continue;
+    const name = (l.exercise_name || "").trim();
+    const act = CARDIO_ACTS.find((x) => x.label.toLowerCase() === name.toLowerCase());
+    out.push({
+      key: `log:${l.id}`, ico: act?.ico || "run", state: "done",
+      label: name,
+      detail: `${l.duration_min} min${l.distance_mi ? ` \u00b7 ${l.distance_mi} mi` : ""}`,
+      at: l.created_at || "",
+    });
+  }
+
+  out.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+
+  /* What has not happened yet goes after the record of what has. An activity
+     on the clock first, because it is the one with a number moving on it. */
+  if (CARDIO_SES && CARDIO_SES.state !== "setup" && (!CARDIO_SES.date || CARDIO_SES.date === date)) {
+    const a = csnAct();
+    out.push({
+      key: "activity:live", ico: a.ico, state: "running", label: a.label,
+      detail: `Running for ${csnClock(csnElapsedMs())}`, tap: "activity",
+    });
+  }
+  if (TODAY_WORKOUT && !TODAY_WORKOUT.archived) {
+    const live = !!SESSION && !SESSION.finished && SESSION.workoutId === TODAY_WORKOUT.id;
+    /* Finished but not yet archived, which is where a plan sits between the
+       last rep and leaving the completion screen. The hero reads it the same
+       way, on completed_at rather than on archived, and two screens disagreeing
+       about whether today's workout is done is exactly the thing this list
+       exists to stop. */
+    const over = !live && !!TODAY_WORKOUT.completed_at;
+    const n = (TODAY_WORKOUT.exercises || []).length;
+    const mins = TODAY_WORKOUT.duration_sec ? Math.max(1, Math.round(TODAY_WORKOUT.duration_sec / 60)) : 0;
+    out.push({
+      key: `plan:${TODAY_WORKOUT.id}`, ico: "dumbbell",
+      state: live ? "running" : over ? "done" : "open",
+      label: displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises),
+      detail: live ? "In progress"
+        : `${n} exercise${n === 1 ? "" : "s"}${over && mins ? ` \u00b7 ${mins} min` : ""}`,
+      tap: "plan",
+    });
+  }
+  return out;
+}
+
+/* The day, above whatever screen the workout tab is showing. It is not drawn on
+   an empty day: with nothing done and nothing planned the choose screen IS the
+   list, and a heading over one empty row is furniture. */
+function todaySessionsHTML() {
+  const list = todaySessions();
+  if (!list.length) return "";
+  const stateWord = { done: "Done", running: "Live", open: "Ready" };
+  return `
+    <section class="tsl">
+      <div class="tsl-head">
+        <h3>Today&rsquo;s sessions</h3>
+        <span class="tsl-n">${list.length}</span>
+      </div>
+      <div class="tsl-rows">
+        ${list.map((sn) => `
+          <${sn.tap ? `button type="button"` : "div"} class="tsl-row tsl-${sn.state}"${sn.tap ? ` data-session-open="${sn.tap}"` : ""}>
+            <span class="tsl-ico">${icon(sn.ico, 17)}</span>
+            <span class="tsl-txt"><b>${escapeHtml(sn.label)}</b><i>${escapeHtml(sn.detail)}</i></span>
+            <span class="tsl-state">${sn.state === "done" ? icon("check", 14) : escapeHtml(stateWord[sn.state])}</span>
+          </${sn.tap ? "button" : "div"}>`).join("")}
+      </div>
+      <button type="button" class="tsl-add" id="tslAddBtn">${icon("plus", 15)} Add another session</button>
+      ${/* Two sessions is not two days, and somebody looking at two rows under
+            one heading is entitled to wonder. gymDaysInWeek counts distinct
+            dates, so the ring cannot move twice for one Tuesday, and this is
+            the app saying that rather than the reader having to trust it. */ ""}
+      ${list.length > 1 ? `<p class="tsl-note">${list.length} sessions, one training day toward your week of ${weeklyGoalFor(MY_EMAIL)}.</p>` : ""}
+    </section>`;
+}
+
+function wireTodaySessions(root) {
+  if (!root) return;
+  root.querySelectorAll("[data-session-open]").forEach((b) => {
+    b.onclick = () => {
+      if (b.dataset.sessionOpen === "activity") { openCardioSession(); return; }
+      /* The plan's own screen, which is where starting it, customizing it and
+         reading it already live. */
+      if (SESSION && !SESSION.finished) { reopenSession(); return; }
+      goWorkoutScreen(null);
+    };
+  });
+  const add = root.querySelector("#tslAddBtn");
+  /* "What kind" is a question the activity sheet already asks, with eight
+     answers and a length on the other side of it, so this opens that rather
+     than standing a second picker beside it. */
+  if (add) add.onclick = () => openCardioSession();
 }
 
 /* Generates for today by default, or any date, so tomorrow can be planned ahead. */
@@ -25686,6 +25991,9 @@ function renderChooseScreen() {
     <div class="scr-head">
       <div class="scr-title">Build Next Workout</div>
     </div>
+    ${/* What the day already holds, before what it could hold next. On a day
+          with one session and nothing done this draws nothing. */ ""}
+    ${todaySessionsHTML()}
     ${preview}
     ${coached
       ? `<p class="build-q">${escapeHtml(coachName)} sets your training. Log what you did, or add something extra.</p>${actions}`
@@ -25701,6 +26009,7 @@ function renderChooseScreen() {
       ${optionCard("chooseWeekBtn", "checklist", "Plan your week",
           "Put saved workouts on the days you will do them.", false)}
     </section>`;
+  wireTodaySessions($("workoutContent"));
   wireSavedWorkouts($("workoutContent"));
   wireWorkoutCalendar($("workoutContent"));
   staggerWorkoutCards();
@@ -27218,8 +27527,13 @@ function renderPlanPreview() {
     </div>`;
   }).join("");
 
+  /* Only once the day holds more than this plan. On an ordinary one-session day
+     the plan IS the day and a list of one above it says nothing. */
+  const dayList = todaySessions().length > 1 ? todaySessionsHTML() : "";
+
   $("workoutContent").innerHTML = `
     ${backBar("Back", () => goWorkoutScreen("choose", { back: true }))}
+    ${dayList}
     <div class="workout-progress-row">
       <span>Progress</span>
       <span class="workout-progress-count">${doneCount}/${total}</span>
@@ -27241,6 +27555,7 @@ function renderPlanPreview() {
            </button>` : ""}
          <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume Workout" : "Begin Workout"}</button>
          ${started || isCoachedClient() ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`}`;
+  wireTodaySessions($("workoutContent"));
   mountMotionFigures($("workoutContent"));
 
   makeReorderable($("planRows"), async (order) => {
