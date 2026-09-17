@@ -5131,6 +5131,50 @@
   #cardWeight.wt-hero .chart-wrap { height: 176px; }
   #cardWeight.wt-hero .wt-pill { border-radius: 100px; min-height: 36px; padding: 8px 0; }
   #cardWeight.wt-hero .wt-log { margin-top: 14px; padding-top: 14px; }
+
+  /* ---- The tone hero (renderToneHero) ----
+     The recomp goal's screen, the same shape as the weight hero above but led
+     by the tape rather than the scale: a title, the four measurement chips,
+     one card with the number, the start column and the line, then the photos,
+     the two tiles and the two ways in. Colour is all tokens, so one layout
+     holds in both themes. Not a card, so arrange mode does not list it, same
+     as the tiles under Weight. */
+  body.arranging #toneHero { display: none; }
+  .tone-head { margin: 2px 0 12px; }
+  .tone-head .wth-title { margin-top: 0; }
+  .tone-chips { display: flex; gap: 8px; margin-bottom: 12px; }
+  .tone-chip {
+    flex: 1; min-width: 0; min-height: 36px; padding: 8px 0; border-radius: 100px; cursor: pointer;
+    background: var(--panel-2); border: 1px solid transparent; color: var(--muted);
+    font-family: inherit; font-size: 12.5px; font-weight: 700;
+  }
+  .tone-chip.on { background: var(--accent); color: var(--on-accent); }
+  .tone-chip:active { transform: scale(.97); }
+  #toneHero .tone-card {
+    position: relative; overflow: hidden; margin-bottom: 10px;
+    background: color-mix(in srgb, var(--me) 10%, var(--panel)); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 15px; box-shadow: var(--shadow-lift);
+  }
+  #toneHero .wth-stats { margin-top: 0; }
+  #toneHero .wth-now-fig { margin-top: 6px; }
+  /* No readings is a state, not a number: it is set in the display face at the
+     title size so the card still has a head, but never at the number size. */
+  .tone-none { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin-top: 6px; }
+  #toneHero .chart-wrap { height: 176px; margin-top: 14px; }
+  .tone-empty { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
+  #toneHero .wt-pill { border-radius: 100px; min-height: 36px; padding: 8px 0; }
+  .tone-photos { margin-bottom: 10px; }
+  .tone-photos:empty { display: none; }
+  /* "Workout Consistency" does not fit on one line beside an icon in a half
+     width tile, so these two titles may wrap where the tiles under Weight may
+     not; the grid keeps the pair the same height. */
+  .tone-tiles .prog-tile-title { white-space: normal; }
+  .tone-tiles .prog-tile[disabled] { cursor: default; }
+  .tone-tiles .prog-tile[disabled]:active { border-color: var(--border); }
+  .tone-actions { margin-bottom: 10px; }
+  .tone-actions .btn-primary, .tone-actions .btn-secondary {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  }
   .wt-logrow {
     display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; margin: 0;
     background: none; border: 0; color: inherit; font-family: inherit; text-align: left; cursor: pointer;
@@ -5816,6 +5860,35 @@
     <div class="goal-lens-note hidden" id="progLensNote"></div>
 
     <div class="card" id="progHeadline"></div>
+
+    <!-- The Tone Up screen (renderToneHero), for the recomp goal only. Not a
+         card: the goal order and a saved drag order both walk past it, and it
+         is pinned straight under the headline card it stands in for. Strength
+         and Body photos stay in the DOM hidden while this is up; the Strength
+         tile and the Add photos button are their doors, the same way the
+         Body Photos tile is Photos' door under the weight hero. -->
+    <div class="tone-screen hidden" id="toneHero">
+      <div class="tone-head">
+        <div class="wth-title" id="toneTitle">Tone up</div>
+        <div class="wth-sub">Track your measurements, body photos, consistency, and strength.</div>
+      </div>
+      <div class="tone-chips" id="toneChips"></div>
+      <div class="tone-card">
+        <div class="wth-stats" id="toneStats"></div>
+        <div class="chart-wrap"><canvas id="toneChart"></canvas></div>
+        <p class="tone-empty hidden" id="toneEmpty">Log a measurement to start the line.</p>
+        <div class="wt-range" id="toneRange"></div>
+      </div>
+      <div class="tone-photos" id="tonePhotos"></div>
+      <div class="prog-tiles tone-tiles" id="toneTiles">
+        <button type="button" class="prog-tile" id="toneConsistency" disabled></button>
+        <button type="button" class="prog-tile" id="toneStrength"></button>
+      </div>
+      <div class="tone-actions" id="toneActions">
+        <button type="button" class="btn-primary" id="toneLogBtn"></button>
+        <button type="button" class="btn-secondary" id="tonePhotoBtn"></button>
+      </div>
+    </div>
 
 
     <!-- Same shape as Getting stronger: one line, then the picture, then
@@ -6841,6 +6914,7 @@ const ICON_PATHS = {
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.9 2.9l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V19a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.9-2.9l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H4a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.9-2.9l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.6V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.9 2.9l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.6 1H20a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.6 1Z"/>',
   target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/>',
   people: '<circle cx="9" cy="8" r="3"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><circle cx="17.5" cy="9" r="2.4"/><path d="M15.5 12.2c2.3.3 4 2 4 4.3"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>',
   /* A tape measure: the reel, and a length pulled out with the tick marks on
      it. The waist tile's icon, and nothing else uses it yet. */
   tape: '<circle cx="8" cy="12" r="5"/><circle cx="8" cy="12" r="1.2" fill="currentColor" stroke="none"/><path d="M12.2 15.5H21v-3h-8"/><path d="M15 12.5v1.6M18 12.5v1.6"/>',
@@ -15404,6 +15478,266 @@ function renderWeightHero(on, profile, isPartner) {
     renderWeightHero(true, profile, isPartner);
     if (WT_LOG_OPEN) log.scrollIntoView({ block: "nearest", behavior: "smooth" });
   };
+}
+
+/* ---- The Tone Up screen ----
+   What renderWeightHero is to a weight goal, this is to recomp: for
+   kind === "recomp" this block is the whole tab and every card stands down.
+   The claim of the goal is that the scale barely moves, so it leads with the
+   tape instead: one measurement at a time (the chips), its number, where it
+   started in the window, and the line. Photos, this week's consistency and a
+   one word strength verdict sit under it, then the two ways in. Strength and
+   Photos stay in the DOM hidden as doors (the tile, the Add button) and fold
+   back to hidden, the way Photos does under the weight hero.
+
+   No readings is drawn as no readings. The number, the delta, the start
+   column and the line each appear only when there is a reading to stand
+   behind them; nothing here is ever filled in with a placeholder figure.
+   The tape data is measurementSeries / measurementSummary and the compare
+   card is renderComparePhotos; each is looked up rather than assumed so this
+   screen degrades to its empty state, not a throw, on a build without one. */
+const TONE_RANGES = [["1M", 4], ["3M", 13], ["6M", 26], ["1Y", 52]];
+let TONE_MEASURE = "waist_in";
+let TONE_RANGE = "3M";
+let toneChart = null;
+
+function toneWeeks() {
+  return (TONE_RANGES.find(([k]) => k === TONE_RANGE) || TONE_RANGES[1])[1];
+}
+
+/* One word for the bar over the window, judged only on lifts that have a
+   standard (LIFT_STANDARDS): a dumbbell or a machine number cannot be read
+   honestly, so it cannot be read here either. Two pounds either way is e1rm
+   rounding, not a direction, so it is Maintained rather than Up or Slipping. */
+function toneStrengthState(name, weeks) {
+  const moves = strengthMovement(name, weeks)
+    .filter((m) => LIFT_STANDARDS[(m.name || "").trim().toLowerCase()]);
+  if (!moves.length) return "No lifts logged";
+  if (moves.some((m) => m.gain < -2)) return "Slipping";
+  if (moves.some((m) => m.gain > 2)) return "Up";
+  return "Maintained";
+}
+
+/* The doors. A door opens its card (un-hidden, expanded) under the screen
+   and any other open door goes back to hidden, so the screen never grows a
+   second folded row; folding the card by its header hides it again (the
+   accordion in paintArrangeUI). Strength is drawn on open rather than with
+   the tab, because renderProgressTab only draws the cards it shows. */
+function openToneDoor(id) {
+  const card = $(id);
+  if (!card) return;
+  document.querySelectorAll("#tab-progress .card.peek").forEach((c) => {
+    c.classList.remove("peek");
+    if (c.id === "cardPhotos" || c.id === "cardStrength") c.classList.add("hidden");
+  });
+  card.classList.remove("hidden");
+  card.classList.add("peek");
+  if (id === "cardStrength") { renderStrengthChart(); renderStrengthStats(); }
+  primeOpenedCard(card);
+  card.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+function renderToneHero(on, profile, isPartner) {
+  const el = $("toneHero");
+  if (!el) return;
+  el.classList.toggle("hidden", !on);
+  if (!on) {
+    if (toneChart) { toneChart.destroy(); toneChart = null; }
+    return;
+  }
+  /* The headline card stands down, as under the weight hero: this is the
+     answer. It also sits directly under where the headline was, whatever the
+     reorder just did to the hidden cards, so a door opens under the screen
+     and not over it. */
+  const head = $("progHeadline");
+  head?.classList.add("hidden");
+  if (head?.parentNode && head.nextSibling !== el) head.parentNode.insertBefore(el, head.nextSibling);
+
+  const name = isPartner ? partnerName() : ME;
+  const email = isPartner ? PARTNER_EMAIL : MY_EMAIL;
+  /* Same gate the Strength card itself is behind: a partner who keeps their
+     workout detail private is not scored on it here either. */
+  const sharing = !isPartner || PARTNER_PROFILE?.share_workout_details !== false;
+  const weeks = toneWeeks();
+  const measures = typeof MEASUREMENTS !== "undefined" ? MEASUREMENTS : [];
+  const measure = measures.find((m) => m.key === TONE_MEASURE) || measures[0] || { key: TONE_MEASURE, label: "Waist" };
+  TONE_MEASURE = measure.key;
+  const again = () => renderToneHero(true, profile, isPartner);
+
+  $("toneTitle").textContent = goalTileFor("tone-lean-abs")?.title || "Tone up";
+
+  /* One measurement at a time. Selected is the accent, the same language as
+     the range pills under the chart. */
+  const chips = $("toneChips");
+  chips.innerHTML = measures.map((m) =>
+    `<button type="button" class="tone-chip${m.key === measure.key ? " on" : ""}" data-key="${escapeHtml(m.key)}">${escapeHtml(m.label)}</button>`).join("");
+  chips.querySelectorAll("[data-key]").forEach((b) => {
+    b.onclick = () => { TONE_MEASURE = b.dataset.key; again(); };
+  });
+
+  const series = typeof measurementSeries === "function" ? (measurementSeries(name, measure.key, weeks) || []) : [];
+  const sum = typeof measurementSummary === "function" ? measurementSummary(name, measure.key, weeks) : null;
+  const inch = (v) => Number(v).toFixed(1);
+  const stats = $("toneStats");
+  if (!series.length || sum?.now == null) {
+    stats.innerHTML = `<div class="wth-now">
+      <div class="wth-eyebrow">${escapeHtml(measure.label)}</div>
+      <div class="tone-none">No readings yet</div>
+    </div>`;
+  } else {
+    /* The delta is over the readings actually in the window, so it says the
+       weeks between the first and the last of them rather than the size of
+       the window: "in 13 weeks" over a line that started 8 weeks ago would be
+       a claim about five weeks nobody measured. Down is good on this goal
+       (idx-good is the down colour everywhere on the tab). */
+    const many = series.length >= 2;
+    const span = many ? Math.max(1, Math.round(daysBetween(series[0].entry_date, series[series.length - 1].entry_date) / 7)) : 0;
+    const d = sum.delta;
+    let delta = "";
+    if (many) {
+      const flat = Math.abs(d) < 0.05;
+      const cls = flat ? "" : d < 0 ? "idx-good" : "idx-bad";
+      const sign = flat ? "" : d < 0 ? "-" : "+";
+      delta = `<div class="wth-now-delta ${cls}">${sign}${inch(Math.abs(d))} in in ${span} week${span === 1 ? "" : "s"}</div>`;
+    }
+    /* The start column only once there is a start to compare against. The
+       bar is the percent itself, not a percent of some target this goal does
+       not carry: 5% down is a short bar because 5% is a short way. */
+    let start = "";
+    if (many && sum.start != null) {
+      const pct = Number(sum.pctDown) || 0;
+      const fill = Math.min(100, Math.max(0, pct));
+      start = `<div class="wth-target">
+        <div class="wth-target-label">Start</div>
+        <div class="wth-target-val">${inch(sum.start)} in</div>
+        <div class="wth-bar"><b style="width:${fill}%"></b></div>
+        <div class="wth-target-pct">${Math.abs(pct) % 1 ? Math.abs(pct).toFixed(1) : Math.round(Math.abs(pct))}% ${pct < 0 ? "up" : "down"}</div>
+      </div>`;
+    }
+    stats.innerHTML = `<div class="wth-now">
+      <div class="wth-eyebrow">${escapeHtml(measure.label)}</div>
+      <div class="wth-now-fig"><b>${inch(sum.now)}</b><i>in</i></div>
+      ${delta}
+    </div>${start}`;
+  }
+
+  el.querySelector(".chart-wrap").classList.toggle("hidden", !series.length);
+  $("toneEmpty").classList.toggle("hidden", !!series.length);
+  if (toneChart) { toneChart.destroy(); toneChart = null; }
+  if (series.length) renderToneChart(series, isPartner);
+
+  $("toneRange").innerHTML = TONE_RANGES.map(([k]) =>
+    `<button type="button" class="wt-pill${k === TONE_RANGE ? " on" : ""}" data-range="${k}">${k}</button>`).join("");
+  $("toneRange").querySelectorAll("[data-range]").forEach((b) => {
+    b.onclick = () => { TONE_RANGE = b.dataset.range; again(); };
+  });
+
+  /* Photos are never shared, so a partner's screen has no photos card rather
+     than an empty one. */
+  const photos = $("tonePhotos");
+  const showPhotos = !isPartner && typeof renderComparePhotos === "function";
+  photos.classList.toggle("hidden", !showPhotos);
+  if (showPhotos) renderComparePhotos(photos, isPartner);
+  else photos.innerHTML = "";
+
+  const days = gymDaysThisWeek(name), goal = weeklyGoalFor(email);
+  $("toneConsistency").innerHTML = `<span class="prog-tile-ico">${icon("calendar", 18)}</span>
+    <span class="prog-tile-body"><span class="prog-tile-title">Workout Consistency</span><span class="prog-tile-val">${days} of ${goal}</span><span class="prog-tile-sub">workouts this week</span></span>`;
+  const strength = $("toneStrength");
+  strength.classList.toggle("hidden", !sharing);
+  $("toneTiles").classList.toggle("solo", !sharing);
+  if (sharing) {
+    strength.innerHTML = `<span class="prog-tile-ico">${icon("dumbbell", 18)}</span>
+      <span class="prog-tile-body"><span class="prog-tile-title">Strength Checklist</span><span class="prog-tile-val">${toneStrengthState(name, weeks)}</span><span class="prog-tile-sub">across major lifts</span></span><span class="prog-tile-chev">${icon("chevronRight", 16)}</span>`;
+    strength.onclick = () => openToneDoor("cardStrength");
+  }
+
+  /* Yours only: the tape sheet and the camera both write to your row. The
+     camera is the photos card's own input, which is hidden with the card,
+     so the button here presses that one rather than growing a second. */
+  const acts = $("toneActions");
+  acts.classList.toggle("hidden", isPartner);
+  if (!isPartner) {
+    const logBtn = $("toneLogBtn"), photoBtn = $("tonePhotoBtn");
+    if (!logBtn.querySelector("svg")) logBtn.innerHTML = `${icon("tape", 18)} Log measurements`;
+    if (!photoBtn.querySelector("svg")) photoBtn.innerHTML = `${icon("camera", 18)} Add body photos`;
+    logBtn.onclick = () => { if (typeof openMeasurementsSheet === "function") openMeasurementsSheet(); };
+    photoBtn.onclick = () => $("addBodyPhotoBtn")?.click();
+  }
+}
+
+/* The weight hero's chart, drawn for the tape: a dot on every reading, the
+   last one a ring with its value in a chip over it, the grid, the action
+   colour for the line (the partner colour on their screen). Its own canvas
+   and instance, so the weight chart and this one never fight over a context. */
+function renderToneChart(series, isPartner) {
+  const canvas = $("toneChart");
+  if (!canvas) return;
+  if (!window.Chart) {
+    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+      .then(() => { if (!$("toneHero")?.classList.contains("hidden")) renderToneChart(series, isPartner); })
+      .catch(() => chartUnavailable("toneChart"));
+    return;
+  }
+  const ctx = canvas.getContext("2d");
+  if (toneChart) toneChart.destroy();
+  const values = series.map((p) => Number(p.value));
+  const last = values.length - 1;
+  const line = cssVar(isPartner ? "--partner" : "--accent");
+  const panel = cssVar("--panel");
+  const dots = values.length <= 40;
+  const sizes = values.map((_, i) => (i === last ? 5 : dots ? 3 : 0));
+  const lastChip = {
+    id: "toneLastChip",
+    afterDatasetsDraw(chart) {
+      const pt = chart.getDatasetMeta(0).data[last];
+      if (!pt) return;
+      const c = chart.ctx;
+      const text = `${values[last].toFixed(1)} in`;
+      c.save();
+      c.font = `700 12px ${cssVar("--font-body") || "sans-serif"}`;
+      c.textBaseline = "middle";
+      const w = Math.ceil(c.measureText(text).width) + 16, h = 24, r = 7;
+      const x = Math.min(Math.max(pt.x - w / 2, 2), chart.width - w - 2);
+      const y = pt.y - h - 11;
+      c.fillStyle = cssVar("--text");
+      c.beginPath();
+      c.roundRect(x, y, w, h, r);
+      c.fill();
+      c.beginPath();
+      c.moveTo(pt.x - 5, y + h); c.lineTo(pt.x + 5, y + h); c.lineTo(pt.x, y + h + 5);
+      c.fill();
+      c.fillStyle = panel;
+      c.textAlign = "center";
+      c.fillText(text, x + w / 2, y + h / 2 + 0.5);
+      c.restore();
+    },
+  };
+  toneChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: series.map((p) => shortDate(p.entry_date)),
+      datasets: [{
+        data: values, borderColor: line, borderWidth: 2.5, spanGaps: true, tension: 0.3,
+        pointRadius: sizes, pointHoverRadius: sizes,
+        pointBackgroundColor: values.map((_, i) => (i === last ? panel : line)),
+        pointBorderColor: line, pointBorderWidth: values.map((_, i) => (i === last ? 2.5 : 0)),
+        fill: true, backgroundColor: chartWash(ctx, line),
+      }],
+    },
+    plugins: [lastChip],
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 34, right: 8 } },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: {
+        x: { border: { display: false }, grid: { display: true, color: cssVar("--border"), drawTicks: false },
+             ticks: { color: cssVar("--muted"), maxTicksLimit: 5, maxRotation: 0, font: { size: 11 } } },
+        y: { border: { display: false }, grid: { color: cssVar("--border"), drawTicks: false },
+             ticks: { color: cssVar("--muted"), maxTicksLimit: 4, font: { size: 11 }, padding: 6 } },
+      },
+    },
+  });
 }
 
 function renderWeightRange() {
@@ -26378,7 +26712,10 @@ function paintArrangeUI(host) {
          the Body Photos tile is how it opens. Folding it hides it again, so
          the screen goes back to being the mockup and not the mockup plus a
          stray "Body Photos / None yet" row under the tile that says the same. */
-      if (card.id === "cardPhotos" && wasOpen && $("cardWeight")?.classList.contains("wt-hero")) {
+      const toneUp = !$("toneHero")?.classList.contains("hidden");
+      const door = (card.id === "cardPhotos" && ($("cardWeight")?.classList.contains("wt-hero") || toneUp))
+        || (card.id === "cardStrength" && toneUp);
+      if (door && wasOpen) {
         card.classList.add("hidden");
         return;
       }
@@ -26709,11 +27046,15 @@ function renderProgressTab() {
      which is what the strip at the top is for. Photos stay in the DOM,
      hidden, because the Body Photos tile is their door. */
   const weightScreen = !blank && kind === "scale";
+  /* Tone Up is the same deal with its own block (renderToneHero): nothing
+     under it, Strength and Photos hidden as doors. */
+  const toneScreen = !blank && kind === "recomp";
   const shown = blank
     ? (weightLed && !isPartner ? ["cardWeight"] : [])
     : weightScreen ? ["cardWeight"]
+    : toneScreen ? []
     : wanted.concat(rest);
-  const quiet = new Set(blank || weightScreen ? [] : rest);
+  const quiet = new Set(blank || weightScreen || toneScreen ? [] : rest);
   /* Which row(s) get the ring: whichever card the headline sentence was
      actually about, not "first in GOAL_CARDS" (volume's own order leads with
      cardMuscles, but a volume headline is about tonnage, not muscles). */
@@ -26769,7 +27110,9 @@ function renderProgressTab() {
   }
   // The rule is a label for what follows it, so with nothing following it, and
   // on a brand new account where nothing is on screen at all, it says nothing.
-  rule.classList.toggle("hidden", blank || !rest.length || weightScreen);
+  rule.classList.toggle("hidden", blank || !rest.length || weightScreen || toneScreen);
+  /* After the reorder, so the block can pin itself under the headline card. */
+  renderToneHero(toneScreen, lensProfile, isPartner);
 
   /* photosAvailable is passed rather than read off cardPhotos's hidden class,
      because on the weight screen that card is hidden ON PURPOSE and the tile
