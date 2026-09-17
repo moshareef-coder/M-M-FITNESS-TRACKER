@@ -100,7 +100,15 @@ const BARBELL_BENCH_PRESS = {
     { // lockout, bar over the shoulder
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 0, neck: -4, wristR: 0, wristL: 0, shoulderR: 90, shoulderL: 90, shoulderAbdR: 180, shoulderAbdL: 180, elbowR: 0, elbowL: 0, shoulderRotR: 0, shoulderRotL: 0 },
+      joints: { spine: 0, neck: -4, wristR: 0, wristL: 0, shoulderR: 270, shoulderL: 270, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 30, shoulderRotL: -30 },
+      ik: {
+        ankleR: { x: 108, y: 113.4, bend: -1 }, ankleL: { x: 112, y: 113.4, bend: -1 },
+      },
+    },
+    { // halfway, a waypoint not a stop: elbow out toward the feet, bell on its line
+      t: 0.5, through: true,
+      root: { x: 86, y: 82, rot: -90 },
+      joints: { spine: 2, neck: -6, wristR: 0, wristL: 0, shoulderR: 205, shoulderL: 205, shoulderAbdR: 59, shoulderAbdL: 59, elbowR: 103, elbowL: 103, shoulderRotR: -10, shoulderRotL: 10 },
       ik: {
         ankleR: { x: 108, y: 113.4, bend: -1 }, ankleL: { x: 112, y: 113.4, bend: -1 },
       },

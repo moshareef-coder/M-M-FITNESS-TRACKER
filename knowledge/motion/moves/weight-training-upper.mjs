@@ -37,30 +37,38 @@ const pinFeet = (xr, yr, xl, yl) => ({
    whole arm as a stub. Adding a middle keyframe to fix the path put a pause in
    the rep, because the easing runs per segment and treats every key as a stop.
 
-   So the arms are driven by joint angles, two keys, the way Seated Dumbbell
-   Press already works. The bottom is Mo's frame copied exactly, solved
-   numerically to within half a unit at elbow and wrist: the elbow ten units
-   below the shoulder toward the bench and five toward the feet, the wrist
-   eight toward the feet and a shade above, the forearm vertical. The top is
-   the arm straight up on screen.
+   So the arms are driven by joint angles, the way Seated Dumbbell Press
+   already works. The bottom is Mo's frame copied exactly, solved numerically
+   to within half a unit at elbow and wrist: the elbow ten units below the
+   shoulder toward the bench and five toward the feet, the wrist eight toward
+   the feet and a shade above, the forearm vertical. The top is the arm
+   straight up on screen.
 
-   The one non obvious thing, which cost a round of "his shoulder is going
-   inside him": the top is written FLIPPED. An arm straight up can be written
-   as in plane -90 with no abduction, or as in plane +90 (pointing into the
-   bench) rotated 180 degrees out of plane, and both draw the same pixel. The
-   exact bottom needs in plane angles near +90 plus about 56 of abduction and
-   60 of rotation. Written from the -90 top, that bottom interpolated the
-   upper arm through the head. Written from the flipped +90 top, abduction
-   sweeps 180 to 56 and the in plane angle barely moves, so the elbow travels
-   one way, out and down as the bell drops and back up as it rises, and the
-   halfway wrist sits on the vertical line under the top. The first attempt
-   at a two key version searched from the -90 top and settled for an elbow
-   four units below the shoulder to keep the middle clean; that is the pose
-   Mo rejected. Rotation MIRRORS between sides while abduction does not, so
-   the left arm takes the opposite rotation sign or it swings to the floor.
+   Two things about the path between them, each of which cost a round.
 
-   Close-Grip Bench Press uses the same keys with no abduction and no rotation,
-   which is the tucked elbow that defines it. */
+   The elbow must break toward the FEET on the way down, never toward the
+   head, and the upper arm must never point at the camera (side on that draws
+   the shoulder sinking into the chest). Abduction in this rig scales the
+   whole in plane arm direction by cos(abd) and puts the rest toward the
+   camera, so a sweep of abduction through 90 always passes through the
+   camera, and a lerp of the in plane angle from straight up (-90) to the
+   bottom (113) passes 0, which is the head. The top is therefore written one
+   full turn round, 270 instead of -90: the same pixel, but the lerp to 113
+   now sweeps past 180, which is the feet.
+
+   Two keys alone still overswung, the elbow going seventeen units toward the
+   feet and back, so there is a halfway key marked `through: true`. The rig
+   treats that as a waypoint, easing across the whole span rather than
+   stopping on it, which is what a plain middle keyframe used to do and why
+   the presses were held to two keys before. The waypoint was searched so the
+   bell drops on the two key timing and stays on its vertical line while the
+   elbow goes out toward the feet and down. Rotation MIRRORS between sides
+   while abduction does not, so the left arm takes the opposite rotation sign
+   or it swings to the floor.
+
+   Close-Grip Bench Press is two keys from the same top, with the elbow kept
+   to forty of abduction so it tucks toward the feet under the bar, which is
+   the elbow that defines it. */
 
 // Front view feet: a foot pointing at the camera is drawn short and wide
 // rather than rotated. The same `ang` mirrors, because dirV takes the side sign.
@@ -103,7 +111,13 @@ const DUMBBELL_BENCH_PRESS = {
     { // lockout, bells nearly touching over the chest
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 0, neck: -4, shoulderR: 90, shoulderL: 90, shoulderAbdR: 180, shoulderAbdL: 180, elbowR: 0, elbowL: 0, shoulderRotR: 0, shoulderRotL: 0 },
+      joints: { spine: 0, neck: -4, shoulderR: 270, shoulderL: 270, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 30, shoulderRotL: -30 },
+      ik: { ...stand(108, 112) },
+    },
+    { // halfway, a waypoint not a stop: elbow out toward the feet, bell on its line
+      t: 0.5, through: true,
+      root: { x: 86, y: 82, rot: -90 },
+      joints: { spine: 2, neck: -6, shoulderR: 205, shoulderL: 205, shoulderAbdR: 59, shoulderAbdL: 59, elbowR: 103, elbowL: 103, shoulderRotR: -10, shoulderRotL: 10 },
       ik: { ...stand(108, 112) },
     },
     { // bottom, bells beside the chest, elbows folded out under the hands
@@ -312,7 +326,13 @@ const INCLINE_DUMBBELL_PRESS = {
     { // lockout, arms long square to the reclined torso
       t: 0,
       root: { x: 84, y: 90, rot: -55 },
-      joints: { spine: 0, neck: -6, forearmPronR: 90, forearmPronL: 90, shoulderR: 55, shoulderL: 55, shoulderAbdR: 180, shoulderAbdL: 180, elbowR: 0, elbowL: 0, shoulderRotR: 0, shoulderRotL: 0 },
+      joints: { spine: 0, neck: -6, forearmPronR: 90, forearmPronL: 90, shoulderR: 235, shoulderL: 235, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 90, shoulderRotL: -90 },
+      ik: { ...stand(110, 104) },
+    },
+    { // halfway, a waypoint not a stop: elbow out toward the feet, bell on its line
+      t: 0.5, through: true,
+      root: { x: 84, y: 90, rot: -55 },
+      joints: { spine: 2, neck: -8, forearmPronR: 90, forearmPronL: 90, shoulderR: 215, shoulderL: 215, shoulderAbdR: 63, shoulderAbdL: 63, elbowR: 14, elbowL: 14, shoulderRotR: 50, shoulderRotL: -50 },
       ik: { ...stand(110, 104) },
     },
     { /* bottom, bells beside the UPPER chest, just below the collarbone, which
@@ -357,7 +377,13 @@ const DECLINE_DUMBBELL_PRESS = {
     { // lockout, bells square to the declined torso
       t: 0,
       root: { x: 78, y: 64, rot: -115 },
-      joints: { spine: 0, neck: 6, shoulderR: 115, shoulderL: 115, shoulderAbdR: 180, shoulderAbdL: 180, elbowR: 0, elbowL: 0, shoulderRotR: 0, shoulderRotL: 0 },
+      joints: { spine: 0, neck: 6, shoulderR: 295, shoulderL: 295, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 30, shoulderRotL: -30 },
+      ik: { ...pinFeet(112, 58, 108, 62) },
+    },
+    { // halfway, a waypoint not a stop: elbow out toward the feet, bell on its line
+      t: 0.5, through: true,
+      root: { x: 78, y: 64, rot: -115 },
+      joints: { spine: 2, neck: 8, shoulderR: 255, shoulderL: 255, shoulderAbdR: 66, shoulderAbdL: 66, elbowR: 57, elbowL: 57, shoulderRotR: 0, shoulderRotL: 0 },
       ik: { ...pinFeet(112, 58, 108, 62) },
     },
     { // bottom, bells beside the lower chest
@@ -382,7 +408,13 @@ const INCLINE_BARBELL_PRESS = {
     { // lockout above the upper chest
       t: 0,
       root: { x: 84, y: 90, rot: -55 },
-      joints: { spine: 0, neck: -6, shoulderR: 55, shoulderL: 55, shoulderAbdR: 180, shoulderAbdL: 180, elbowR: 0, elbowL: 0, shoulderRotR: 0, shoulderRotL: 0 },
+      joints: { spine: 0, neck: -6, shoulderR: 235, shoulderL: 235, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 90, shoulderRotL: -90 },
+      ik: { ...stand(110, 104) },
+    },
+    { // halfway, a waypoint not a stop: elbow out toward the feet, bell on its line
+      t: 0.5, through: true,
+      root: { x: 84, y: 90, rot: -55 },
+      joints: { spine: 2, neck: -8, shoulderR: 215, shoulderL: 215, shoulderAbdR: 63, shoulderAbdL: 63, elbowR: 14, elbowL: 14, shoulderRotR: 50, shoulderRotL: -50 },
       ik: { ...stand(110, 104) },
     },
     { // bar down to the collarbone, elbows under the bar
@@ -408,7 +440,13 @@ const DECLINE_BARBELL_PRESS = {
     { // lockout over the lower chest
       t: 0,
       root: { x: 78, y: 64, rot: -115 },
-      joints: { spine: 0, neck: 6, shoulderR: 115, shoulderL: 115, shoulderAbdR: 180, shoulderAbdL: 180, elbowR: 0, elbowL: 0, shoulderRotR: 0, shoulderRotL: 0 },
+      joints: { spine: 0, neck: 6, shoulderR: 295, shoulderL: 295, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 30, shoulderRotL: -30 },
+      ik: { ...pinFeet(112, 58, 108, 62) },
+    },
+    { // halfway, a waypoint not a stop: elbow out toward the feet, bell on its line
+      t: 0.5, through: true,
+      root: { x: 78, y: 64, rot: -115 },
+      joints: { spine: 2, neck: 8, shoulderR: 255, shoulderL: 255, shoulderAbdR: 66, shoulderAbdL: 66, elbowR: 57, elbowL: 57, shoulderRotR: 0, shoulderRotL: 0 },
       ik: { ...pinFeet(112, 58, 108, 62) },
     },
     { // bar down to the lower chest, elbows under the bar
@@ -2197,13 +2235,13 @@ const CLOSE_GRIP_BENCH_PRESS = {
     { // lockout, bar over the lower chest
       t: 0,
       root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 0, neck: -4, shoulderR: 90, shoulderL: 90, shoulderAbdR: 180, shoulderAbdL: 180, elbowR: 0, elbowL: 0, shoulderRotR: 0, shoulderRotL: 0 },
+      joints: { spine: 0, neck: -4, shoulderR: 270, shoulderL: 270, shoulderAbdR: 0, shoulderAbdL: 0, elbowR: 0, elbowL: 0, shoulderRotR: 60, shoulderRotL: -60 },
       ik: { ...stand(108, 112) },
     },
     { // bottom, bar low on the sternum, elbows tucked toward the feet
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
-      joints: { spine: 2, neck: -6, shoulderR: 113, shoulderL: 113, shoulderAbdR: 180, shoulderAbdL: 180, elbowR: 78, elbowL: 78, shoulderRotR: 0, shoulderRotL: 0 },
+      joints: { spine: 2, neck: -6, shoulderR: 125, shoulderL: 125, shoulderAbdR: 40, shoulderAbdL: 40, elbowR: 150, elbowL: 150, shoulderRotR: 15, shoulderRotL: -15 },
       ik: { ...stand(108, 112) },
     },
   ],

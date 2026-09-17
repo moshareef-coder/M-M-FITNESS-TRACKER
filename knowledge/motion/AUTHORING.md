@@ -204,6 +204,17 @@ knees wide and the limbs pile up. The Russian twist was tried in the front view
 with the new cross-body arms, and the arms worked while the legs did not, so it
 stayed side on. When a limit lifts, re-test the move; do not assume.
 
+### Waypoints: `through: true`
+
+Easing runs per keyframe segment, so a plain middle keyframe is a stop: the
+figure decelerates into it and accelerates out, and a rep with one reads as a
+pause. A key marked `through: true` is a waypoint instead. The ease runs from
+the nearest plain key before it to the nearest plain key after it, and the
+eased time picks the segment, so the figure passes the waypoint at speed. Use
+it when a straight lerp between two poses takes a limb through the wrong
+place (the bench presses use one so the elbow goes out toward the feet rather
+than through the camera) and the rep still has to read as up, down, up, down.
+
 ### Loop style by kind
 
 | kind | loop | breath | why |
