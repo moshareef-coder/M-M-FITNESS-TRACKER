@@ -1721,20 +1721,35 @@
   .clip-shutter {
     width: 74px; height: 74px; border-radius: 50%; border: 4px solid rgba(255,255,255,.85);
     background: var(--up); cursor: pointer; padding: 0; position: relative;
-    /* The ring below sits at inset:-11px, drawn OUTSIDE this button's own box,
-       and flex gap only ever measures a box's own edges, never an absolutely
-       positioned child that overflows it. That left 14px of gap trying to
-       clear an element that actually reaches 11px into it, 3px of real
-       clearance, and the ring's start point is rotated to point straight up
-       at that exact gap: the brightest part of the countdown arc, aimed
-       directly at the hint text above it, seconds into every recording. This
-       margin reserves the ring's own overflow in normal flow, so gap clears
-       what is actually there instead of what the button claims to be. */
+    /* The ring below is drawn OUTSIDE this button's own box, reaching 11px
+       past it on every side, and flex gap only ever measures a box's own
+       edges, never an absolutely positioned child that overflows it. That
+       left 14px of gap trying to clear an element that actually reaches 11px
+       into it, 3px of real clearance, and the ring's start point is rotated
+       to point straight up at that exact gap: the brightest part of the
+       countdown arc, aimed directly at the hint text above it, seconds into
+       every recording. This margin reserves the ring's own overflow in normal
+       flow, so gap clears what is actually there instead of what the button
+       claims to be. */
     margin-block: 11px;
   }
   .clip-shutter[disabled] { opacity: .5; }
   .clip-shutter.recording { background: #fff; }
-  .clip-ring { position: absolute; inset: -11px; transform: rotate(-90deg); pointer-events: none; }
+  /* The ring is sized in pixels rather than stretched by inset:-11px, because
+     an <svg> is a REPLACED element: a browser sizes it from its own intrinsic
+     dimensions and then drops one of the over-constrained insets, instead of
+     stretching it between all four the way it would a div. The box came out
+     neither 96px nor centred, so the arc drew at the wrong radius and off the
+     button's axis, and the bottom of the countdown cut straight across the
+     white disc. 96px square at a 96 unit viewBox also means one SVG unit is
+     exactly one pixel, so the numbers below are the geometry you see: the
+     shutter's white disc ends at radius 37, the stroke covers 42 to 46, and
+     the 5px of daylight between them is a real gap rather than a rounding
+     error. Centring by translate keeps it honest if either size changes. */
+  .clip-ring {
+    position: absolute; top: 50%; left: 50%; width: 96px; height: 96px;
+    transform: translate(-50%, -50%) rotate(-90deg); pointer-events: none;
+  }
   .clip-ring circle { fill: none; stroke: var(--up); stroke-width: 4; stroke-linecap: round; }
   .clip-count { color: #fff; font-size: 15.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
   /* How much of it is left, for the one time it plays. */
@@ -6953,7 +6968,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.23";
+const APP_VERSION = "2026.09.16.24";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -13566,7 +13581,7 @@ function clipRecorderHTML(name) {
     <div class="clip-bottom" id="clipControls">
       <div class="clip-hint" id="clipHint">Up to ${CLIP_SECONDS} seconds. Tap again to stop early.</div>
       <button type="button" class="clip-shutter" id="clipShutter" aria-label="Record">
-        <svg class="clip-ring" viewBox="0 0 96 96"><circle id="clipRing" cx="48" cy="48" r="46" stroke-dasharray="289" stroke-dashoffset="289"/></svg>
+        <svg class="clip-ring" viewBox="0 0 96 96"><circle id="clipRing" cx="48" cy="48" r="44" stroke-dasharray="276.46" stroke-dashoffset="276.46"/></svg>
       </button>
       <div class="clip-note">Not saved anywhere. They get two watches and it is gone.</div>
     </div>`;
@@ -13736,7 +13751,10 @@ function startClipRecording(toEmail) {
   shutter.onclick = stop;
 
   const started = Date.now();
-  const CIRC = 289;
+  /* 2 pi r for the r=44 ring in the markup. It lives in both places, so a
+     radius changed in one and not the other shows up as a countdown that
+     never reaches the top or laps early. */
+  const CIRC = 276.46;
   const hint = $("clipHint");
   clipTimer = setInterval(() => {
     const ms = Date.now() - started;
