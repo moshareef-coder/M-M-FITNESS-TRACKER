@@ -5536,29 +5536,15 @@
 
   /* What you are tracking. Closed it is one quiet line, because most people
      will set this once and never look at it again. */
-  .track-row { margin: 0 0 10px; }
-  .track-summary {
-    width: 100%; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 13px;
-    color: var(--muted); background: var(--panel); border: 1px solid var(--border);
-    border-radius: 12px; padding: 10px 13px; cursor: pointer; text-align: left;
+  /* Right aligned above the tiles, so it sits with the cards it controls and
+     takes no width from them. */
+  .track-row { display: flex; justify-content: flex-end; margin: -4px 0 6px; }
+  .track-kebab {
+    width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+    background: none; border: 1px solid transparent; color: var(--muted); cursor: pointer;
   }
-  .track-summary b { color: var(--text); font-weight: 650; }
-  .track-summary:hover { border-color: var(--muted); }
-  .track-change { margin-left: auto; font-weight: 650; text-decoration: underline; }
-  .track-open { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
-  .track-lead { margin: 0 0 10px; font-size: 14.5px; font-weight: 650; }
-  .track-chips { display: flex; flex-wrap: wrap; gap: 7px; }
-  .track-chip {
-    font: inherit; font-size: 13px; font-weight: 600; padding: 7px 13px; border-radius: 999px;
-    border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer;
-  }
-  .track-chip.on { border-color: var(--accent); color: var(--text);
-    background: color-mix(in srgb, var(--accent) 14%, transparent); }
-  .track-note { margin: 11px 0 12px; font-size: 12px; color: var(--muted); line-height: 1.45; }
-  .track-done {
-    font: inherit; font-size: 13.5px; font-weight: 700; width: 100%; padding: 10px;
-    border-radius: 11px; border: none; background: var(--accent); color: var(--accent-ink); cursor: pointer;
-  }
+  .track-kebab:hover { background: var(--panel); border-color: var(--border); color: var(--text); }
+  .track-kebab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .wt-goal { margin: 10px 0 2px; }
   .wt-goal-none { font-size: 12.5px; color: var(--muted); margin: 0; }
   .wt-goal-set {
@@ -6815,9 +6801,12 @@
          Not cards: the goal order and a saved drag order both walk past this
          block, and renderProgTiles() keeps it pinned under Weight. Photos are
          yours alone, so that tile goes on a partner's view, same as the card. -->
-    <!-- What this person wants measured. Above the tiles rather than buried in
-         Setup, because the question "why am I being shown the scale" occurs to
-         somebody while they are looking at the scale. -->
+    <!-- What this person wants measured. A quiet three dot control rather than
+         a row of text: it is a preference somebody sets once, so it should be
+         findable next to the thing it changes and invisible the rest of the
+         time. It still lives on Progress rather than in Setup, because the
+         thought "why am I being shown the scale" happens while looking at the
+         scale, not two taps into a settings tree. -->
     <div class="track-row" id="trackRow"></div>
     <div class="prog-tiles hidden" id="progTiles">
       <button type="button" class="prog-tile" id="tileWaist"></button>
@@ -6895,6 +6884,12 @@
          Filled by renderMeasurementsSheet(). -->
     <div class="sheet-scrim hidden" id="measureScrim">
       <div class="partner-sheet" id="measureSheet"></div>
+    </div>
+
+    <!-- What Progress shows. Same cards as the onboarding step, so changing
+         your mind later looks like the screen where you first chose. -->
+    <div class="sheet-scrim hidden" id="trackScrim">
+      <div class="partner-sheet" id="trackSheet"></div>
     </div>
 
     <!-- One run, walk or ride: what it was, how far, how long. Opened by Build
@@ -31995,48 +31990,75 @@ function renderProgTiles(kind, isPartner, opts = {}) {
 
    Only on your own view. A partner's screen shows what THEY chose to track,
    and an editor on it would be changing their mind for them. */
-let TRACK_OPEN = false;
 function renderTrackRow() {
   const el = $("trackRow");
   if (!el) return;
+  /* A partner's screen follows THEIR choices, so there is nothing here to
+     change and no control to offer. */
   if (PROGRESS_VIEW === "partner") { el.innerHTML = ""; return; }
   const on = trackedMetrics();
   const label = on.length
     ? TRACK_ALL.filter((m) => on.includes(m.key)).map((m) => m.label).join(", ")
     : "nothing yet";
-
-  if (!TRACK_OPEN) {
-    el.innerHTML = `<button type="button" class="track-summary" id="trackOpen">
-      ${icon("tape", 15)} <span>Tracking <b>${escapeHtml(label)}</b></span>
-      <span class="track-change">Change</span></button>`;
-    $("trackOpen").onclick = () => { TRACK_OPEN = true; renderTrackRow(); };
-    return;
-  }
-
   el.innerHTML = `
-    <div class="track-open">
-      <p class="track-lead">What do you want to measure?</p>
-      <div class="track-chips">
-        ${TRACK_ALL.map((m) => `<button type="button" class="track-chip${on.includes(m.key) ? " on" : ""}" data-metric="${m.key}">${escapeHtml(m.label)}</button>`).join("")}
-      </div>
-      <p class="track-note">${on.length
-        ? "Only what is ticked is charted. The rest still logs, so turning one back on shows its whole history."
-        : "Nothing ticked. That is a real answer for a mobility goal, and Progress will just show what you have done."}</p>
-      <button type="button" class="track-done" id="trackDone">Done</button>
-    </div>`;
-  el.querySelectorAll("[data-metric]").forEach((b) => b.onclick = async () => {
+    <button type="button" class="track-kebab" id="trackOpen"
+      aria-label="Change what Progress shows" title="Showing ${escapeHtml(label)}">
+      ${icon("more", 18)}
+    </button>`;
+  $("trackOpen").onclick = openTrackSheet;
+}
+
+/* The same six-across-two cards the onboarding step uses, in a sheet. Changing
+   your mind later should look like the screen where you first chose, or it
+   reads as a different feature that happens to control the same thing.
+
+   Every trackable thing is offered here rather than the six their goal led
+   with: this is the screen for somebody who has decided the default was wrong,
+   so the full set is the point. */
+function openTrackSheet() {
+  if (PROGRESS_VIEW === "partner") return;
+  renderTrackSheet();
+  $("trackScrim").classList.remove("hidden");
+}
+function closeTrackSheet() {
+  $("trackScrim").classList.add("hidden");
+  renderProgressTab?.();
+}
+function renderTrackSheet() {
+  const on = new Set(trackedMetrics());
+  /* Same chrome as the measurements sheet next door: grip, back chevron,
+     centred title. Two sheets on one tab that open differently is the kind of
+     small inconsistency people feel without being able to name. */
+  $("trackSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="trackX" aria-label="Close">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">What do you want to see?</div>
+      <div class="spacer"></div>
+    </div>
+    <p class="trk-any" style="margin:0 0 14px">Only what is ticked is charted. Everything keeps logging either way, so turning one back on shows its whole history.</p>
+    <div class="trk-grid" id="trackSheetGrid">
+      ${TRACK_ALL.map((m) => `<button type="button" class="trk-card${on.has(m.key) ? " on" : ""}" data-metric="${m.key}">
+        <span class="trk-tick" aria-hidden="true">${icon("check", 13)}</span>
+        <span class="trk-ico">${icon(m.ico, 22)}</span>
+        <span class="trk-name">${escapeHtml(m.label)}</span>
+        <span class="trk-blurb">${escapeHtml(m.blurb)}</span>
+      </button>`).join("")}
+    </div>
+    <button type="button" class="btn-primary" id="trackDone" style="margin-top:16px">Done</button>`;
+
+  $("trackSheetGrid").querySelectorAll("[data-metric]").forEach((b) => b.onclick = async () => {
     const key = b.dataset.metric;
-    const next = new Set(trackedMetrics());
-    next.has(key) ? next.delete(key) : next.add(key);
-    /* Kept in TRACK_ALL's order rather than tap order, so the cards do not
-       reshuffle themselves every time somebody changes their mind. */
-    const list = TRACK_ALL.map((m) => m.key).filter((k) => next.has(k));
+    on.has(key) ? on.delete(key) : on.add(key);
+    b.classList.toggle("on", on.has(key));
+    /* Kept in TRACK_ALL order rather than tap order, so the cards behind the
+       sheet do not reshuffle every time somebody changes their mind. */
+    const list = TRACK_ALL.map((m) => m.key).filter((k) => on.has(k));
     MY_PROFILE = { ...(MY_PROFILE || {}), tracked_metrics: list };
-    renderTrackRow();
-    renderProgressTab?.();
     await saveTrackedMetrics(list);
   });
-  $("trackDone").onclick = () => { TRACK_OPEN = false; renderTrackRow(); };
+  $("trackX").onclick = closeTrackSheet;
+  $("trackDone").onclick = closeTrackSheet;
 }
 
 /* Behind the pending column guard, like every other column onboarding added
