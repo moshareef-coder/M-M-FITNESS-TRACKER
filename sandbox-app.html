@@ -5208,25 +5208,25 @@
      accent block is allowed on this screen and it is the button at the end;
      everything that only has to say "this one" says it with a raised white
      tile on a sunken track, the way a segmented control does. */
-  .tone-chips, .end-chips, #toneHero .wt-range, #endHero .wt-range {
+  .tone-chips, .end-chips, .bulk-chips, .goal-screen .wt-range {
     display: flex; gap: 6px; padding: 4px; border-radius: 12px; background: var(--panel-2);
   }
-  .tone-chips, .end-chips { margin: 0 0 12px; }
-  #toneHero .wt-range, #endHero .wt-range { margin-top: 12px; }
-  .tone-chip, .end-chip, #toneHero .wt-pill, #endHero .wt-pill {
+  .tone-chips, .end-chips, .bulk-chips { margin: 0 0 12px; }
+  .goal-screen .wt-range { margin-top: 12px; }
+  .tone-chip, .end-chip, .bulk-chip, .goal-screen .wt-pill {
     flex: 1; min-width: 0; min-height: 34px; padding: 7px 0; border-radius: 9px; cursor: pointer;
     background: none; border: 1px solid transparent; color: var(--muted);
     font-family: inherit; font-size: 12.5px; font-weight: 700;
   }
-  .tone-chip.on, .end-chip.on, #toneHero .wt-pill.on, #endHero .wt-pill.on {
+  .tone-chip.on, .end-chip.on, .bulk-chip.on, .goal-screen .wt-pill.on {
     background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-card);
   }
-  .tone-chip:active, .end-chip:active { transform: scale(.97); }
+  .tone-chip:active, .end-chip:active, .bulk-chip:active { transform: scale(.97); }
   /* Plain panel, not the blue wash the weight hero's card wears. Blue was a
      third hue on a screen that already had green and grey, and the card is
      not competing for attention here: the photo above it and the button below
      it are. */
-  #toneHero .tone-card, #endHero .end-card {
+  #toneHero .tone-card, .goal-screen .end-card {
     position: relative; overflow: hidden; margin-bottom: 12px;
     background: var(--panel); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 15px 15px 13px; box-shadow: var(--shadow-card);
@@ -5236,7 +5236,7 @@
   /* No readings is a state, not a number: it is set in the display face at the
      title size so the card still has a head, but never at the number size. */
   .tone-none { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin-top: 6px; }
-  #toneHero .chart-wrap, #endHero .chart-wrap { height: 152px; margin-top: 12px; }
+  #toneHero .chart-wrap, .goal-screen .chart-wrap { height: 152px; margin-top: 12px; }
   .tone-empty { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
   .tone-photos:empty { display: none; }
   .tone-actions, .end-actions { margin-bottom: 10px; }
@@ -5255,8 +5255,10 @@
      are not cardio at all. */
   .end-head { margin: 2px 0 12px; }
   .end-head .wth-title { margin-top: 0; }
-  #endHero .wth-stats { margin-top: 0; }
-  #endHero .wth-now-fig { margin-top: 6px; }
+  .goal-screen .wth-stats { margin-top: 0; }
+  .goal-screen .wth-now-fig { margin-top: 6px; }
+  .goal-screen .tone-photos { margin: 0 0 12px; }
+  .goal-screen .cmp-frame { aspect-ratio: 1 / 1.18; }
   .end-none { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin-top: 6px; }
   .end-empty { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
   /* The runs themselves, without a map. The app records no GPS, so a route
@@ -5990,7 +5992,7 @@
          tile and the second button: the tiles answered questions this screen
          is not asking, and "Add body photos" was a second call to action for
          something the photos card at the top already offers. -->
-    <div class="tone-screen hidden" id="toneHero">
+    <div class="tone-screen goal-screen hidden" id="toneHero">
       <div class="tone-head">
         <div class="wth-title" id="toneTitle">Tone up</div>
       </div>
@@ -6013,7 +6015,7 @@
          distance_mi (20260916_cardio_distance.sql); minutes and consistency
          work without it, so the screen degrades to "no distance yet" rather
          than to a flat line at zero. -->
-    <div class="end-screen hidden" id="endHero">
+    <div class="end-screen goal-screen hidden" id="endHero">
       <div class="end-head">
         <div class="wth-title" id="endTitle">Build endurance</div>
       </div>
@@ -6032,6 +6034,29 @@
       </div>
       <div class="end-actions" id="endActions">
         <button type="button" class="btn-primary" id="endLogBtn"></button>
+      </div>
+    </div>
+
+    <!-- The Build Muscle screen (renderBulkHero), for the build-muscle goal
+         whether or not it carries a goal weight. Weight, Chest, Arms, Thighs
+         over one chart, the same photo pair Tone Up uses, and one check-in
+         that writes all four. chest_in is added by
+         20260916_chest_measurement.sql; the other three have existed for a
+         while. -->
+    <div class="bulk-screen goal-screen hidden" id="bulkHero">
+      <div class="end-head">
+        <div class="wth-title" id="bulkTitle">Build muscle</div>
+      </div>
+      <div class="bulk-chips" id="bulkChips"></div>
+      <div class="end-card">
+        <div class="wth-stats" id="bulkStats"></div>
+        <div class="chart-wrap"><canvas id="bulkChart"></canvas></div>
+        <p class="end-empty hidden" id="bulkEmpty"></p>
+        <div class="wt-range" id="bulkRange"></div>
+      </div>
+      <div class="tone-photos" id="bulkPhotos"></div>
+      <div class="end-actions" id="bulkActions">
+        <button type="button" class="btn-primary" id="bulkLogBtn"></button>
       </div>
     </div>
 
@@ -6929,7 +6954,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.22";
+const APP_VERSION = "2026.09.16.23";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -15746,7 +15771,8 @@ function renderToneHero(on, profile, isPartner) {
 
   const name = isPartner ? partnerName() : ME;
   const weeks = toneWeeks();
-  const measures = typeof MEASUREMENTS !== "undefined" ? MEASUREMENTS : [];
+  const measures = (typeof MEASUREMENTS !== "undefined" ? MEASUREMENTS : [])
+    .filter((m) => TONE_MEASURE_KEYS.includes(m.key));
   const measure = measures.find((m) => m.key === TONE_MEASURE) || measures[0] || { key: TONE_MEASURE, label: "Waist" };
   TONE_MEASURE = measure.key;
   const again = () => renderToneHero(true, profile, isPartner);
@@ -15891,6 +15917,244 @@ function renderToneChart(series, isPartner) {
     },
   };
   toneChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: series.map((p) => shortDate(p.entry_date)),
+      datasets: [{
+        data: values, borderColor: line, borderWidth: 2.5, spanGaps: true, tension: 0.3,
+        pointRadius: sizes, pointHoverRadius: sizes,
+        pointBackgroundColor: values.map((_, i) => (i === last ? panel : line)),
+        pointBorderColor: line, pointBorderWidth: values.map((_, i) => (i === last ? 2.5 : 0)),
+        fill: true, backgroundColor: chartWash(ctx, line),
+      }],
+    },
+    plugins: [lastChip],
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 34, right: 8 } },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: {
+        x: { border: { display: false }, grid: { display: true, color: cssVar("--border"), drawTicks: false },
+             ticks: { color: cssVar("--muted"), maxTicksLimit: 5, maxRotation: 0, font: { size: 11 } } },
+        y: { border: { display: false }, grid: { color: cssVar("--border"), drawTicks: false },
+             ticks: { color: cssVar("--muted"), maxTicksLimit: 4, font: { size: 11 }, padding: 6 } },
+      },
+    },
+  });
+}
+
+/* ---- Build muscle: weight and the parts that grow ----
+
+   Mo's fourth goal screen, and the simplest of them on purpose: "being able to
+   see that you're building muscle" is one line per metric and nothing else.
+
+   Weight, Chest, Arms, Thighs. No Protein Adherence, no Calorie Surplus, no
+   Measurement Growth tile, all three cut: the app logs no food at all, so two
+   of them could only have invented their numbers, and the third is the chart
+   the chips already draw, printed again as a word.
+
+   Up is good on every one of these, which is the opposite of Tone Up reading
+   the same columns. That is the goal talking, not the tape.
+
+   chest_in is added by 20260916_chest_measurement.sql. Until it runs the Chest
+   chip has no readings and says so, the same way the others do before a first
+   measurement. */
+const BULK_RANGES = TONE_RANGES;
+let BULK_METRIC = "weight";
+let BULK_RANGE = "3M";
+let bulkChart = null;
+
+function bulkWeeks() {
+  return (BULK_RANGES.find(([k]) => k === BULK_RANGE) || BULK_RANGES[1])[1];
+}
+
+/* The chips: the scale first, then the three that are supposed to grow. */
+function bulkMetrics() {
+  return [{ key: "weight", label: "Weight", unit: "lb" }]
+    .concat(BULK_MEASURE_KEYS
+      .map((k) => MEASUREMENTS.find((m) => m.key === k))
+      .filter(Boolean));
+}
+
+function renderBulkHero(on, profile, isPartner) {
+  const el = $("bulkHero");
+  if (!el) return;
+  el.classList.toggle("hidden", !on);
+  if (!on) {
+    if (bulkChart) { bulkChart.destroy(); bulkChart = null; }
+    return;
+  }
+  const head = $("progHeadline");
+  head?.classList.add("hidden");
+  if (head?.parentNode && head.nextSibling !== el) head.parentNode.insertBefore(el, head.nextSibling);
+
+  const name = isPartner ? partnerName() : ME;
+  const email = isPartner ? PARTNER_EMAIL : MY_EMAIL;
+  const weeks = bulkWeeks();
+  const metrics = bulkMetrics();
+  const m = metrics.find((x) => x.key === BULK_METRIC) || metrics[0];
+  BULK_METRIC = m.key;
+  const again = () => renderBulkHero(true, profile, isPartner);
+  const num = (v) => (Math.round(v * 10) / 10).toFixed(1);
+
+  $("bulkTitle").textContent = goalTileFor("build-muscle")?.title || "Build muscle";
+
+  $("bulkChips").innerHTML = metrics.map((x) =>
+    `<button type="button" class="bulk-chip${x.key === m.key ? " on" : ""}" data-metric="${escapeHtml(x.key)}">${escapeHtml(x.label)}</button>`).join("");
+  $("bulkChips").querySelectorAll("[data-metric]").forEach((b) => {
+    b.onclick = () => { BULK_METRIC = b.dataset.metric; again(); };
+  });
+
+  /* measurementSeries reads whatever column it is handed off the day row, and
+     weight is a column on that same row, so the scale needs no separate path
+     through any of this. */
+  const series = typeof measurementSeries === "function" ? (measurementSeries(name, m.key, weeks) || []) : [];
+  const sum = typeof measurementSummary === "function" ? measurementSummary(name, m.key, weeks) : null;
+  const stats = $("bulkStats");
+
+  if (!series.length || sum?.now == null) {
+    stats.innerHTML = `<div class="wth-now">
+      <div class="wth-eyebrow">${escapeHtml(m.label)}</div>
+      <div class="end-none">No readings yet</div>
+    </div>`;
+  } else {
+    const many = series.length >= 2;
+    const span = many ? Math.max(1, Math.round(daysBetween(series[0].entry_date, series[series.length - 1].entry_date) / 7)) : 0;
+    const d = sum.delta;
+    let delta = "";
+    if (many) {
+      const flat = Math.abs(d) < 0.05;
+      const weeksWord = `${span} week${span === 1 ? "" : "s"}`;
+      /* Gaining is the point here, so up is the good colour. The same column
+         read on Tone Up gets the opposite treatment, which is correct: a
+         growing arm and a growing waist are different news. */
+      delta = flat
+        ? `<div class="wth-now-delta">Level over ${weeksWord}</div>`
+        : `<div class="wth-now-delta ${d > 0 ? "idx-good" : "idx-bad"}">${d > 0 ? "+" : "-"}${num(Math.abs(d))} ${escapeHtml(m.unit)} in ${weeksWord}</div>`;
+    }
+
+    /* The scale has a real target when one was set, and the bar is the way
+       from where they started to it. The tape has no target to aim at, so it
+       shows where it started instead, which is what Tone Up does with the
+       same columns. */
+    let side = "";
+    const goal = m.key === "weight" ? weightGoalFor(email) : null;
+    if (goal && goal.start_value != null && goal.target_value != null && goal.target_value !== goal.start_value) {
+      const pct = ((sum.now - goal.start_value) / (goal.target_value - goal.start_value)) * 100;
+      const fill = Math.min(100, Math.max(0, pct));
+      side = `<div class="wth-target">
+        <div class="wth-target-label">Target</div>
+        <div class="wth-target-val">${num(goal.target_value)} lb</div>
+        <div class="wth-bar"><b style="width:${fill}%"></b></div>
+        <div class="wth-target-pct">${Math.round(Math.max(0, pct))}% of the way</div>
+      </div>`;
+    } else if (many && sum.start != null) {
+      /* pctDown is positive when the number FELL, which is the Tone Up
+         reading. Here the sign is flipped at the point of use rather than in
+         the shared function, so one summary keeps serving both screens. */
+      const up = -(Number(sum.pctDown) || 0);
+      side = `<div class="wth-target">
+        <div class="wth-target-label">Start</div>
+        <div class="wth-target-val">${num(sum.start)} ${escapeHtml(m.unit)}</div>
+        <div class="wth-bar"><b style="width:${Math.min(100, Math.max(0, up))}%"></b></div>
+        <div class="wth-target-pct">${Math.abs(up) % 1 ? Math.abs(up).toFixed(1) : Math.round(Math.abs(up))}% ${up < 0 ? "down" : "up"}</div>
+      </div>`;
+    }
+
+    stats.innerHTML = `<div class="wth-now">
+      <div class="wth-eyebrow">${escapeHtml(m.label)}</div>
+      <div class="wth-now-fig"><b>${num(sum.now)}</b><i>${escapeHtml(m.unit)}</i></div>
+      ${delta}
+    </div>${side}`;
+  }
+
+  el.querySelector(".chart-wrap").classList.toggle("hidden", !series.length);
+  $("bulkEmpty").classList.toggle("hidden", !!series.length);
+  $("bulkEmpty").textContent = m.key === "weight"
+    ? "Log a check-in to start the line."
+    : `Measure your ${m.label.toLowerCase()} to start the line.`;
+  if (bulkChart) { bulkChart.destroy(); bulkChart = null; }
+  if (series.length) bulkChart = goalLineChart("bulkChart", series, isPartner, m.unit, () => bulkChart);
+
+  $("bulkRange").innerHTML = BULK_RANGES.map(([k]) =>
+    `<button type="button" class="wt-pill${k === BULK_RANGE ? " on" : ""}" data-range="${k}">${k}</button>`).join("");
+  $("bulkRange").querySelectorAll("[data-range]").forEach((b) => {
+    b.onclick = () => { BULK_RANGE = b.dataset.range; again(); };
+  });
+
+  /* The same pair Tone Up shows, same rules: yours only, no See all. */
+  const photos = $("bulkPhotos");
+  const showPhotos = !isPartner && typeof renderComparePhotos === "function";
+  photos.classList.toggle("hidden", !showPhotos);
+  if (showPhotos) renderComparePhotos(photos, isPartner);
+  else photos.innerHTML = "";
+
+  /* One button, and it opens the sheet that writes every number on this
+     screen, the scale included. */
+  const acts = $("bulkActions");
+  acts.classList.toggle("hidden", isPartner);
+  if (!isPartner) {
+    const btn = $("bulkLogBtn");
+    if (!btn.querySelector("svg")) btn.innerHTML = `${icon("plus", 18)} Log check-in`;
+    btn.onclick = () => {
+      if (typeof openMeasurementsSheet === "function") {
+        openMeasurementsSheet({ rows: CHECKIN_ROWS, title: "Log check-in" });
+      }
+    };
+  }
+}
+
+/* The line every goal screen draws: a dot per reading, the last one a ring
+   with its value in a chip over it. Pulled out of renderToneChart when the
+   third copy of it was about to be written; the tone and endurance charts
+   keep their own for now because each carries a unit and a shape of its own,
+   and this one takes both as arguments. `live` hands back the current
+   instance so the chip plugin can find it after a re-render. */
+function goalLineChart(canvasId, series, isPartner, unit, live) {
+  const canvas = $(canvasId);
+  if (!canvas) return null;
+  if (!window.Chart) {
+    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+      .then(() => { if (!$("bulkHero")?.classList.contains("hidden")) renderProgressTab(); })
+      .catch(() => chartUnavailable(canvasId));
+    return null;
+  }
+  const ctx = canvas.getContext("2d");
+  const old = live?.();
+  if (old) old.destroy();
+  const values = series.map((p) => Number(p.value));
+  const last = values.length - 1;
+  const line = cssVar(isPartner ? "--partner" : "--accent");
+  const panel = cssVar("--panel");
+  const dots = values.length <= 40;
+  const sizes = values.map((_, i) => (i === last ? 5 : dots ? 3 : 0));
+  const lastChip = {
+    id: `${canvasId}Chip`,
+    afterDatasetsDraw(chart) {
+      const pt = chart.getDatasetMeta(0).data[last];
+      if (!pt) return;
+      const c = chart.ctx;
+      const text = `${values[last].toFixed(1)} ${unit}`;
+      c.save();
+      c.font = `700 12px ${cssVar("--font-body") || "sans-serif"}`;
+      c.textBaseline = "middle";
+      const w = Math.ceil(c.measureText(text).width) + 16, h = 24, r = 7;
+      const x = Math.min(Math.max(pt.x - w / 2, 2), chart.width - w - 2);
+      const y = pt.y - h - 11;
+      c.fillStyle = cssVar("--text");
+      c.beginPath();
+      c.roundRect(x, y, w, h, r);
+      c.fill();
+      c.beginPath();
+      c.moveTo(pt.x - 5, y + h); c.lineTo(pt.x + 5, y + h); c.lineTo(pt.x, y + h + 5);
+      c.fill();
+      c.fillStyle = panel;
+      c.textAlign = "center";
+      c.fillText(text, x + w / 2, y + h / 2 + 0.5);
+      c.restore();
+    },
+  };
+  return new Chart(ctx, {
     type: "line",
     data: {
       labels: series.map((p) => shortDate(p.entry_date)),
@@ -25854,9 +26118,13 @@ async function renderComparePhotos(hostEl, isPartner) {
    nobody was looking at and left the pair in front of them unchanged. */
 function refreshPhotoSurfaces() {
   renderBodyPhotos();
-  const host = $("tonePhotos");
-  if (host && !host.classList.contains("hidden") && typeof renderComparePhotos === "function") {
-    renderComparePhotos(host, false);
+  if (typeof renderComparePhotos !== "function") return;
+  /* Every goal screen that shows the pair, not just the one that had it
+     first: Build Muscle carries the same card, and a photo added there has to
+     appear there. */
+  for (const id of ["tonePhotos", "bulkPhotos"]) {
+    const host = $(id);
+    if (host && !host.classList.contains("hidden")) renderComparePhotos(host, false);
   }
 }
 
@@ -26142,11 +26410,23 @@ function headlineWeighIns(name, days = HEADLINE_WEIGHT_DAYS) {
    four, the app is imperial everywhere else. One value per measurement, not
    per side: thighs and arms are whichever side you always use. */
 const MEASUREMENTS = [
-  { key: "waist_in", label: "Waist" },
-  { key: "hips_in", label: "Hips" },
-  { key: "thigh_in", label: "Thighs" },
-  { key: "arm_in", label: "Arms" },
+  { key: "waist_in", label: "Waist", unit: "in" },
+  { key: "hips_in", label: "Hips", unit: "in" },
+  { key: "chest_in", label: "Chest", unit: "in" },
+  { key: "thigh_in", label: "Thighs", unit: "in" },
+  { key: "arm_in", label: "Arms", unit: "in" },
 ];
+/* One sheet logs all of them; the screens just lead with different ones. Tone
+   Up asks about the tape around the middle, Build Muscle about the parts that
+   are supposed to grow, and a chest belongs to the second question only, which
+   is why it did not exist until that screen did. */
+const TONE_MEASURE_KEYS = ["waist_in", "hips_in", "thigh_in", "arm_in"];
+const BULK_MEASURE_KEYS = ["chest_in", "arm_in", "thigh_in"];
+/* Weight is a column on the same day row, so the check-in sheet can carry it
+   as one more row and saveMeasurements writes it with the rest, no special
+   case anywhere. */
+const CHECKIN_ROWS = [{ key: "weight", label: "Weight", unit: "lb" }]
+  .concat(MEASUREMENTS.filter((m) => m.key !== "hips_in"));
 
 /* The readings of one measurement from `days` ago to today, ascending, one
    point per day. The day row is unique per (email, entry_date) on the
@@ -27363,7 +27643,8 @@ function paintProgIndex(host) {
          mockup and not the mockup plus a stray "Body Photos / None yet" row
          under it saying the same thing twice. */
       const goalScreen = $("cardWeight")?.classList.contains("wt-hero")
-        || !$("toneHero")?.classList.contains("hidden");
+        || !$("toneHero")?.classList.contains("hidden")
+        || !$("bulkHero")?.classList.contains("hidden");
       if (wasOpen && goalScreen && card.id === "cardPhotos") {
         card.classList.add("hidden");
         return;
@@ -27464,12 +27745,19 @@ function renderProgTiles(kind, isPartner, opts = {}) {
    fresh reading today or the chart grows flat points nobody took. Writes to
    MY row only, whichever view Progress is on. */
 let MEAS_TOUCHED = new Set();
+/* Which rows this opening of the sheet is for. Tone Up logs the tape, Build
+   Muscle logs a check-in that leads with the scale; they are the same sheet
+   writing the same day row, so the only difference is the list and the title. */
+let MEAS_ROWS = null;
+let MEAS_TITLE = "Log measurements";
 
-function openMeasurementsSheet() {
+function openMeasurementsSheet(opts = {}) {
   /* The partner view is read only end to end; refusing to open here is the
      backstop for any door that forgets to hide itself on that view. */
   if (PROGRESS_VIEW === "partner") return;
   MEAS_TOUCHED = new Set();
+  MEAS_ROWS = opts.rows || MEASUREMENTS;
+  MEAS_TITLE = opts.title || "Log measurements";
   renderMeasurementsSheet();
   $("measureScrim").classList.remove("hidden");
   $("measureScrim").onclick = (e) => { if (e.target === $("measureScrim")) closeMeasurementsSheet(); };
@@ -27490,11 +27778,11 @@ function renderMeasurementsSheet() {
     <div class="ds-grip"></div>
     <div class="scr-head">
       <button type="button" class="scr-back" id="measClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
-      <div class="scr-title">Log measurements</div>
+      <div class="scr-title">${escapeHtml(MEAS_TITLE)}</div>
       <div class="spacer"></div>
     </div>
-    <p class="muted-note" style="margin:-6px 0 14px;">Inches, taken today. Only the ones you change are saved.</p>
-    ${MEASUREMENTS.map((m) => {
+    <p class="muted-note" style="margin:-6px 0 14px;">Taken today. Only the ones you change are saved.</p>
+    ${(MEAS_ROWS || MEASUREMENTS).map((m) => {
       const last = lastMeasurement(m.key);
       return `<div class="meas-item" data-key="${m.key}">
         <div class="wt-log-head">${m.label}</div>
@@ -27504,7 +27792,7 @@ function renderMeasurementsSheet() {
             <input type="number" class="waist-input" inputmode="decimal" step="0.5" min="0"
                    placeholder="0.0" autocomplete="off" aria-label="${m.label}"
                    value="${last === null ? "" : last.toFixed(1)}" />
-            <span class="weigh-unit">in</span>
+            <span class="weigh-unit">${escapeHtml(m.unit || "in")}</span>
           </div>
           <button type="button" class="round-btn" data-nudge="0.5" aria-label="${m.label} up 0.5">+</button>
         </div>
@@ -27532,7 +27820,7 @@ async function saveMeasurements() {
   /* The patch is the touched rows and nothing else. A touched row that was
      then emptied is a mistake to point at, not a null to write. */
   const patch = {};
-  for (const m of MEASUREMENTS) {
+  for (const m of (MEAS_ROWS || MEASUREMENTS)) {
     if (!MEAS_TOUCHED.has(m.key)) continue;
     const typed = parseFloat($("measureSheet").querySelector(`[data-key="${m.key}"] input`)?.value);
     if (!Number.isFinite(typed) || typed <= 0) { toast(`Enter a ${m.label.toLowerCase()} measurement first`); return; }
@@ -27667,12 +27955,17 @@ function renderProgressTab() {
   const toneScreen = !blank && kind === "recomp";
   /* And Build Endurance, the third of them (renderEnduranceHero). */
   const endScreen = !blank && kind === "endurance";
+  /* Build Muscle, whichever way the goal was set up: "bulk" is the one with a
+     weight target above the start, "volume" the one without, and both are the
+     same goal wearing the same screen. */
+  const bulkScreen = !blank && (kind === "bulk" || kind === "volume");
+  const own = toneScreen || endScreen || bulkScreen;
   const shown = blank
     ? (weightLed && !isPartner ? ["cardWeight"] : [])
     : weightScreen ? ["cardWeight"]
-    : toneScreen || endScreen ? []
+    : own ? []
     : wanted.concat(rest);
-  const quiet = new Set(blank || weightScreen || toneScreen || endScreen ? [] : rest);
+  const quiet = new Set(blank || weightScreen || own ? [] : rest);
   /* Which row(s) get the ring: whichever card the headline sentence was
      actually about, not "first in GOAL_CARDS" (volume's own order leads with
      cardMuscles, but a volume headline is about tonnage, not muscles). */
@@ -27716,10 +28009,11 @@ function renderProgressTab() {
   }
   // The rule is a label for what follows it, so with nothing following it, and
   // on a brand new account where nothing is on screen at all, it says nothing.
-  rule.classList.toggle("hidden", blank || !rest.length || weightScreen || toneScreen || endScreen);
+  rule.classList.toggle("hidden", blank || !rest.length || weightScreen || own);
   /* After the reorder, so each block can pin itself under the headline card. */
   renderToneHero(toneScreen, lensProfile, isPartner);
   renderEnduranceHero(endScreen, lensProfile, isPartner);
+  renderBulkHero(bulkScreen, lensProfile, isPartner);
 
   /* photosAvailable is passed rather than read off cardPhotos's hidden class,
      because on the weight screen that card is hidden ON PURPOSE and the tile
