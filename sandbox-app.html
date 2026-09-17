@@ -5292,6 +5292,19 @@
   .end-tiles .prog-tile[disabled] { cursor: default; }
   .end-tiles .prog-tile[disabled]:active { border-color: var(--border); }
   .end-tiles .prog-tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  /* The five segment level bar, borrowed from the index row so the same
+     ladder is drawn the same way wherever it appears. */
+  .lift-lvl { display: flex; gap: 3px; width: 100%; margin: 3px 0 5px; }
+  .lift-lvl i { flex: 1; height: 6px; border-radius: 3px; background: var(--border); display: block; overflow: hidden; }
+  .lift-lvl i b { display: block; height: 100%; background: var(--accent); }
+  /* "Best ever" beside the number, only when it is. */
+  .lift-best {
+    display: inline-flex; align-items: center; gap: 4px; margin-left: 8px;
+    font-size: 11.5px; font-weight: 700; color: var(--accent-ink);
+    /* One line beside the number or it pushes the whole card down a row. */
+    white-space: nowrap; align-self: center;
+  }
+  .lift-best svg { flex-shrink: 0; }
   /* Logging a run: the activity, then how far, then how long. */
   .cardio-acts { display: flex; gap: 6px; padding: 4px; border-radius: 12px; background: var(--panel-2); margin-bottom: 16px; }
   .cardio-act {
@@ -6063,6 +6076,32 @@
       <div class="tone-photos" id="bulkPhotos"></div>
       <div class="end-actions" id="bulkActions">
         <button type="button" class="btn-primary" id="bulkLogBtn"></button>
+      </div>
+    </div>
+
+    <!-- The Get Stronger screen (renderLiftHero). One lift at a time over its
+         estimated single, the level it puts you at, the volume behind it and
+         the records it has set, then the way into every lift you have ever
+         logged. No body photos here (Mo) and no mobility score (there is no
+         range of motion in this app to score). -->
+    <div class="lift-screen goal-screen hidden" id="liftHero">
+      <div class="end-head">
+        <div class="wth-title" id="liftTitle">Get stronger</div>
+      </div>
+      <div class="bulk-chips hidden" id="liftChips"></div>
+      <div class="end-card">
+        <div class="wth-stats" id="liftStats"></div>
+        <div class="chart-wrap"><canvas id="liftChart"></canvas></div>
+        <p class="end-empty hidden" id="liftEmpty"></p>
+        <div class="wt-range" id="liftRange"></div>
+      </div>
+      <div class="prog-tiles end-tiles" id="liftTiles">
+        <button type="button" class="prog-tile" id="liftLevel" disabled></button>
+        <button type="button" class="prog-tile" id="liftVolume" disabled></button>
+        <button type="button" class="prog-tile" id="liftPRs" disabled></button>
+      </div>
+      <div class="end-actions" id="liftActions">
+        <button type="button" class="btn-primary" id="liftAllBtn"></button>
       </div>
     </div>
 
@@ -6960,7 +6999,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.25";
+const APP_VERSION = "2026.09.16.26";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -15999,6 +16038,226 @@ function renderToneChart(series, isPartner) {
   });
 }
 
+/* ---- Get stronger: one lift at a time ----
+
+   Mo sent two mockups for this goal and asked which was applicable. The answer
+   is the second one: a goal screen shaped like the four already built, with
+   the lifts as chips over one line. The first was the old dashboard shape,
+   with You/Partner/Together tabs that came off the tab weeks ago and an
+   "Everything else you track" index that the goal screens replaced.
+
+   Three things on that first mockup are not here and are not coming. Body
+   photos, because Mo said so and because they answer a different goal's
+   question. A Mobility score, because this app cannot see range of motion:
+   headlineKindFor already refuses to invent one for the Move better goal and
+   inventing one here would be the same lie in a smaller box. And an Endurance
+   readout, which is a whole screen of its own now.
+
+   Everything here is already computed somewhere: liftE1rmHistory draws the
+   line, strengthLevelFor puts a level on it, volumeWeeks has the tonnage and
+   personalRecords knows what beat what. This screen is assembly, not new
+   arithmetic, which is why the numbers on it agree with the cards they came
+   from. */
+const LIFT_RANGES = TONE_RANGES;
+let LIFT_PICK = null;
+let LIFT_RANGE = "3M";
+let liftChart = null;
+
+function liftWeeks() {
+  return (LIFT_RANGES.find(([k]) => k === LIFT_RANGE) || LIFT_RANGES[1])[1];
+}
+
+/* The chips. Starred lifts win, because somebody who went into the browser and
+   picked five has already answered this question; the star was only wired to
+   the Strength card, which this screen replaces on that goal, so it would
+   otherwise have quietly stopped doing anything. Failing that, lifts with a
+   published standard lead (those are the ones that can carry a level) and
+   within each group the one trained most often comes first. */
+function liftScreenLifts(name) {
+  const all = allLiftsFor(name);
+  const bySets = (a, b) => b.sets - a.sets || a.name.localeCompare(b.name);
+  const pins = typeof getPinnedLifts === "function" ? getPinnedLifts() : [];
+  if (pins.length) {
+    const picked = pins
+      .map((n) => all.find((l) => l.name.toLowerCase() === String(n).toLowerCase()))
+      .filter(Boolean);
+    if (picked.length) return picked.slice(0, 4);
+  }
+  const levelled = (l) => !!LIFT_STANDARDS[(l.name || "").trim().toLowerCase()];
+  return all.filter(levelled).sort(bySets)
+    .concat(all.filter((l) => !levelled(l)).sort(bySets))
+    .slice(0, 4);
+}
+
+/* Records set in the last `days`, counted the way personalRecords counts them:
+   a weight that BEAT one already lifted for that exercise, never a first log
+   and never a tie. */
+function recentPRCount(name, days = 30) {
+  const { prLogIds } = personalRecords(name);
+  const from = new Date(todayStr() + "T00:00:00");
+  from.setDate(from.getDate() - days);
+  const fromStr = isoDate(from);
+  return ALL_EXERCISE_LOGS.filter((l) =>
+    l.user_name === name && prLogIds.has(l.id) && l.entry_date >= fromStr).length;
+}
+
+function renderLiftHero(on, profile, isPartner) {
+  const el = $("liftHero");
+  if (!el) return;
+  el.classList.toggle("hidden", !on);
+  if (!on) {
+    if (liftChart) { liftChart.destroy(); liftChart = null; }
+    return;
+  }
+  const head = $("progHeadline");
+  head?.classList.add("hidden");
+  if (head?.parentNode && head.nextSibling !== el) head.parentNode.insertBefore(el, head.nextSibling);
+
+  const name = isPartner ? partnerName() : ME;
+  const weeks = liftWeeks();
+  const lifts = liftScreenLifts(name);
+  const again = () => renderLiftHero(true, profile, isPartner);
+  const lb = (v) => Math.round(v).toLocaleString();
+
+  $("liftTitle").textContent = goalTileFor("get-stronger")?.title || "Get stronger";
+
+  /* Nothing weighted logged at all: there is no lift to pick, no line to draw
+     and no browser worth opening, so the screen says that once and stops. */
+  if (!lifts.length) {
+    $("liftChips").classList.add("hidden");
+    $("liftStats").innerHTML = `<div class="wth-now">
+      <div class="wth-eyebrow">Lifts</div>
+      <div class="end-none">Nothing logged yet</div>
+    </div>`;
+    el.querySelector(".chart-wrap").classList.add("hidden");
+    $("liftEmpty").classList.remove("hidden");
+    $("liftEmpty").textContent = "Log a weighted set and this becomes your strength line.";
+    $("liftRange").innerHTML = "";
+    $("liftTiles").classList.add("hidden");
+    $("liftActions").classList.add("hidden");
+    if (liftChart) { liftChart.destroy(); liftChart = null; }
+    return;
+  }
+  $("liftTiles").classList.remove("hidden");
+  $("liftActions").classList.toggle("hidden", isPartner);
+
+  if (!lifts.some((l) => l.name === LIFT_PICK)) LIFT_PICK = lifts[0].name;
+  const pick = LIFT_PICK;
+
+  $("liftChips").classList.remove("hidden");
+  $("liftChips").innerHTML = lifts.map((l) =>
+    `<button type="button" class="bulk-chip${l.name === pick ? " on" : ""}" data-lift="${escapeHtml(l.name)}">${escapeHtml(l.name)}</button>`).join("");
+  $("liftChips").querySelectorAll("[data-lift]").forEach((b) => {
+    b.onclick = () => { LIFT_PICK = b.dataset.lift; again(); };
+  });
+
+  const hist = liftE1rmHistory(name, pick, weeks);
+  const series = hist.map((h) => ({ entry_date: h.entry_date, value: Math.round(h.est) }));
+  const stats = $("liftStats");
+
+  if (!series.length) {
+    stats.innerHTML = `<div class="wth-now">
+      <div class="wth-eyebrow">${escapeHtml(pick)}</div>
+      <div class="end-none">Nothing in this window</div>
+    </div>`;
+  } else {
+    const best = Math.max(...series.map((x) => x.value));
+    /* "Best ever" is only true against every log, not against the window, so
+       it is checked over a year rather than over the 1M the pills happen to
+       be on. A badge that appears whenever you zoom in is not a badge. */
+    const allTime = liftE1rmHistory(name, pick, 520);
+    const ever = allTime.length ? Math.round(Math.max(...allTime.map((h) => h.est))) : best;
+    const isBest = best >= ever;
+
+    const first = series[0].value;
+    const span = series.length >= 2
+      ? Math.max(1, Math.round(daysBetween(series[0].entry_date, series[series.length - 1].entry_date) / 7))
+      : 0;
+    const d = best - first;
+    let delta = "";
+    if (span >= 1) {
+      const flat = Math.abs(d) < 1;
+      const weeksWord = `${span} week${span === 1 ? "" : "s"}`;
+      delta = flat
+        ? `<div class="wth-now-delta">Level over ${weeksWord}</div>`
+        : `<div class="wth-now-delta ${d > 0 ? "idx-good" : "idx-bad"}">${d > 0 ? "+" : "-"}${lb(Math.abs(d))} lb in ${weeksWord}</div>`;
+    }
+
+    /* The level column, where the lift has a standard to be judged against.
+       Where it does not (a dumbbell, a machine), the column stays empty rather
+       than guessing: LIFT_STANDARDS has a paragraph about why. */
+    const lvl = strengthLevelFor(name, pick);
+    let side = "";
+    if (lvl) {
+      side = `<div class="wth-target">
+        <div class="wth-target-label">Level</div>
+        <div class="wth-target-val">${escapeHtml(lvl.level)}</div>
+        <div class="lift-lvl">${STRENGTH_LEVELS.map((_, i) =>
+          `<i><b style="width:${i < lvl.index ? 100 : i === lvl.index ? Math.round(lvl.within * 100) : 0}%"></b></i>`).join("")}</div>
+        <div class="wth-target-pct">${lvl.next ? `${lb(lvl.toNext)} lb to ${escapeHtml(lvl.next)}` : "top of the scale"}</div>
+      </div>`;
+    }
+
+    stats.innerHTML = `<div class="wth-now">
+      <div class="wth-eyebrow">${escapeHtml(pick)}</div>
+      <div class="wth-now-fig"><b>${lb(best)}</b><i>lb</i>${
+        isBest ? `<span class="lift-best">${icon("trophy", 14)} best ever</span>` : ""}</div>
+      ${delta}
+    </div>${side}`;
+  }
+
+  el.querySelector(".chart-wrap").classList.toggle("hidden", !series.length);
+  $("liftEmpty").classList.toggle("hidden", !!series.length);
+  $("liftEmpty").textContent = `No ${pick.toLowerCase()} in this window.`;
+  if (liftChart) { liftChart.destroy(); liftChart = null; }
+  if (series.length) liftChart = goalLineChart("liftChart", series, isPartner, "lb", () => liftChart);
+
+  $("liftRange").innerHTML = LIFT_RANGES.map(([k]) =>
+    `<button type="button" class="wt-pill${k === LIFT_RANGE ? " on" : ""}" data-range="${k}">${k}</button>`).join("");
+  $("liftRange").querySelectorAll("[data-range]").forEach((b) => {
+    b.onclick = () => { LIFT_RANGE = b.dataset.range; again(); };
+  });
+
+  /* The level again as a tile, because the column beside the number only
+     exists for lifts that have a standard, and the tile is about the person
+     rather than about the lift on screen. overallStrength already answers
+     "where do they stand" across every levelled lift. */
+  const overall = typeof overallStrength === "function" ? overallStrength(name) : null;
+  $("liftLevel").innerHTML = `<span class="prog-tile-ico">${icon("dumbbell", 18)}</span>
+    <span class="prog-tile-body"><span class="prog-tile-title">Strength Level</span><span class="prog-tile-val">${
+      escapeHtml(overall?.level || "Not yet")}</span><span class="prog-tile-sub">${
+      overall?.level ? "across your main lifts" : "needs a barbell lift"}</span></span>`;
+
+  const vw = volumeWeeks(name, 8);
+  const thisWeek = vw[vw.length - 1].volume;
+  const done = vw.slice(0, -1).filter((w) => w.volume > 0);
+  const avg = done.length ? done.reduce((sum, w) => sum + w.volume, 0) / done.length : 0;
+  /* Scaled to how far into the week it is, the same correction the cardio
+     minutes tile carries. Against whole weeks a Tuesday is down seventy
+     percent and a Sunday is level, which says nothing about the training and
+     everything about the day somebody opened the app. */
+  const elapsed = Math.min(7, Math.max(1, daysBetween(weekStartStr(), todayStr()) + 1));
+  const expected = avg * (elapsed / 7);
+  const vs = expected > 0 ? Math.round(((thisWeek - expected) / expected) * 100) : null;
+  $("liftVolume").innerHTML = `<span class="prog-tile-ico">${icon("bolt", 18)}</span>
+    <span class="prog-tile-body"><span class="prog-tile-title">Weekly Volume</span><span class="prog-tile-val">${fmtVolume(thisWeek)} lb</span><span class="prog-tile-sub">${
+      vs == null ? "first week to compare" : `${vs >= 0 ? "+" : ""}${vs}% on your 8 week average, so far`}</span></span>`;
+
+  const prs = recentPRCount(name, 30);
+  $("liftPRs").innerHTML = `<span class="prog-tile-ico">${icon("trophy", 18)}</span>
+    <span class="prog-tile-body"><span class="prog-tile-title">Recent PRs</span><span class="prog-tile-val">${prs}</span><span class="prog-tile-sub">${
+      prs ? "in the last 30 days" : "beat a weight to set one"}</span></span>`;
+
+  /* What Mo asked for by name: every lift, and what each one is doing. The
+     browser already exists, it was just only reachable from a card this screen
+     replaces. */
+  if (!isPartner) {
+    const btn = $("liftAllBtn");
+    if (!btn.querySelector("svg")) btn.innerHTML = `${icon("dumbbell", 18)} See all lifts`;
+    btn.onclick = () => { if (typeof openLiftBrowser === "function") openLiftBrowser(name); };
+  }
+}
+
 /* ---- Build muscle: weight and the parts that grow ----
 
    Mo's fourth goal screen, and the simplest of them on purpose: "being able to
@@ -16181,7 +16440,10 @@ function goalLineChart(canvasId, series, isPartner, unit, live) {
   if (!canvas) return null;
   if (!window.Chart) {
     loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
-      .then(() => { if (!$("bulkHero")?.classList.contains("hidden")) renderProgressTab(); })
+      /* Whichever goal screen asked for it: the tab redraws and whoever is on
+         screen gets their line. Checking one screen's id here meant the other
+         two silently never came back from a cold library load. */
+      .then(() => { if (!$("tab-progress")?.classList.contains("hidden")) renderProgressTab(); })
       .catch(() => chartUnavailable(canvasId));
     return null;
   }
@@ -17302,12 +17564,12 @@ function renderLiftList() {
     <div class="cb-sheet-head">
       <div>
         <div class="cb-sheet-title">All lifts</div>
-        <div class="cb-sheet-count">${pins.length} of ${MAX_PINNED_LIFTS} featured on Strength</div>
+        <div class="cb-sheet-count">${pins.length} of ${MAX_PINNED_LIFTS} featured</div>
       </div>
       <button type="button" class="ds-x" id="lftClose" aria-label="Close">&times;</button>
     </div>
     <p class="muted-note" style="margin:-2px 0 12px;">
-      Tap one for its numbers. Tap its star to put it on the Strength card.
+      Tap one for its numbers. Tap its star to feature it at the top.
     </p>
     <div class="cb-grid" id="lftGrid">
       ${lifts.map((l, i) => {
@@ -28018,7 +28280,11 @@ function renderProgressTab() {
      weight target above the start, "volume" the one without, and both are the
      same goal wearing the same screen. */
   const bulkScreen = !blank && (kind === "bulk" || kind === "volume");
-  const own = toneScreen || endScreen || bulkScreen;
+  /* Get Stronger, the fifth and last of them. Barred on a partner who keeps
+     their workout detail private, the same gate the Strength card is behind:
+     this screen IS that card's contents. */
+  const liftScreen = !blank && kind === "lift" && sharing;
+  const own = toneScreen || endScreen || bulkScreen || liftScreen;
   const shown = blank
     ? (weightLed && !isPartner ? ["cardWeight"] : [])
     : weightScreen ? ["cardWeight"]
@@ -28073,6 +28339,7 @@ function renderProgressTab() {
   renderToneHero(toneScreen, lensProfile, isPartner);
   renderEnduranceHero(endScreen, lensProfile, isPartner);
   renderBulkHero(bulkScreen, lensProfile, isPartner);
+  renderLiftHero(liftScreen, lensProfile, isPartner);
 
   /* photosAvailable is passed rather than read off cardPhotos's hidden class,
      because on the weight screen that card is hidden ON PURPOSE and the tile
