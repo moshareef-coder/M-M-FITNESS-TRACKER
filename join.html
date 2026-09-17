@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Train together on Unio</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0d11;
+    --panel: #14171d;
+    --border: #262b34;
+    --text: #f4f6f8;
+    --muted: #8b94a3;
+    --accent: #a8ff00;
+    --partner: #ff6b4a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+    padding: 24px calc(20px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+  }
+  .card { width: 100%; max-width: 420px; text-align: center; }
+  .logo {
+    width: 56px; height: 56px; margin: 0 auto 26px; display: block;
+  }
+  h1 {
+    font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15;
+    margin: 0 0 12px; text-wrap: balance;
+  }
+  h1 .who { color: var(--partner); }
+  .sub { color: var(--muted); font-size: 15.5px; line-height: 1.5; margin: 0 0 30px; }
+  .cta {
+    display: block; width: 100%; padding: 16px 20px; border-radius: 14px;
+    background: var(--accent); color: #0b0d11; text-decoration: none;
+    font-size: 16px; font-weight: 700; border: 0; cursor: pointer;
+    font-family: inherit;
+  }
+  .cta:active { transform: scale(0.985); }
+  /* The code block only matters on the path where the link could not carry the
+     invite through an App Store install, so it stays quiet until then. */
+  .fallback {
+    margin-top: 26px; padding: 18px; border: 1px solid var(--border);
+    border-radius: 14px; background: var(--panel);
+  }
+  .fallback-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    font-weight: 700; color: var(--muted); margin: 0 0 10px;
+  }
+  .fallback-note { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 12px 0 0; }
+  .steps {
+    margin: 0; padding: 0; list-style: none;
+    display: flex; flex-direction: column; gap: 14px;
+    text-align: left; margin-top: 30px;
+  }
+  .steps li { display: flex; gap: 13px; align-items: flex-start; font-size: 14.5px; line-height: 1.45; }
+  .steps .n {
+    flex: none; width: 23px; height: 23px; border-radius: 50%;
+    background: var(--panel); border: 1px solid var(--border);
+    font-size: 12px; font-weight: 700; color: var(--muted);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .foot { margin-top: 34px; font-size: 12.5px; color: var(--muted); }
+  .foot a { color: var(--muted); }
+  .dead h1 { font-size: 24px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .card { animation: rise .35s ease-out both; }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+  }
+</style>
+</head>
+<body>
+  <div class="card" id="card">
+    <!-- Rendered server-agnostic: the page paints a neutral resting state and
+         the name drops in once peek_invite_link answers. No spinner, because
+         the wait is one request and a spinner that flashes for 200ms reads as
+         a fault. -->
+    <img class="logo" src="/icon-192.png" alt="" width="56" height="56" />
+    <h1 id="headline">You have been invited to train together</h1>
+    <p class="sub" id="sub">Unio is for two people. One partner, shared weeks, and both of you can see whether the other actually turned up.</p>
+
+    <a class="cta" id="cta" href="https://apps.apple.com/app/id6812201708">Get Unio</a>
+
+    <div class="fallback" id="fallback" hidden>
+      <p class="fallback-label">Your invite code</p>
+      <button type="button" class="cta" id="copyBtn" style="background:transparent;color:var(--text);border:1px solid var(--border);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;word-break:break-all;">Copy invite code</button>
+      <p class="fallback-note">The app usually picks this up on its own. If it asks, paste this in.</p>
+    </div>
+
+    <ol class="steps" id="steps">
+      <li><span class="n">1</span><span>Install Unio from the App Store.</span></li>
+      <li><span class="n">2</span><span>Open it and make an account. It takes a minute.</span></li>
+      <li><span class="n">3</span><span>The invite will be waiting for you.</span></li>
+    </ol>
+
+    <p class="foot">
+      <a href="/privacy.html">Privacy</a> &nbsp;&middot;&nbsp; <a href="/support.html">Support</a>
+    </p>
+  </div>
+
+<script>
+  var SUPABASE_URL = "https://stcpiovpjismhltklfdw.supabase.co";
+  var SUPABASE_ANON_KEY = "sb_publishable_890hsPHDiiz4-fQi7Jqd9g_a_aoHyz2";
+
+  /* The token is the last path segment. This page is only ever reached through
+     the /j/:token rewrite, so anything else is somebody typing the URL. */
+  var token = decodeURIComponent((location.pathname.split("/").filter(Boolean).pop() || ""));
+
+  var esc = function (s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  };
+
+  function dead(msg) {
+    document.getElementById("card").className = "card dead";
+    document.getElementById("headline").textContent = "This invite is no longer active";
+    document.getElementById("sub").textContent = msg;
+    document.getElementById("fallback").hidden = true;
+    document.getElementById("steps").hidden = true;
+    document.getElementById("cta").textContent = "Get Unio anyway";
+  }
+
+  /* The clipboard is the only channel that survives an App Store install, so
+     the copy is attempted up front and the button is the fallback for the
+     browsers that refuse it without a gesture. Failure here is not an error
+     worth showing: the code is on screen either way. */
+  function armClipboard() {
+    var btn = document.getElementById("copyBtn");
+    var label = "unio:" + token;
+    btn.textContent = token.slice(0, 10) + "…";
+    document.getElementById("fallback").hidden = false;
+    var copy = function () {
+      if (!navigator.clipboard) return;
+      navigator.clipboard.writeText(label).then(function () {
+        btn.textContent = "Copied";
+        setTimeout(function () { btn.textContent = token.slice(0, 10) + "…"; }, 1600);
+      }, function () {});
+    };
+    btn.addEventListener("click", copy);
+    copy();
+  }
+
+  if (!token) {
+    dead("That link is missing its code. Ask for a new one.");
+  } else {
+    fetch(SUPABASE_URL + "/rest/v1/rpc/peek_invite_link", {
+      method: "POST",
+      headers: {
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ p_token: token })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!res || !res.ok) {
+          dead((res && res.error) || "Ask them to send you a new one.");
+          return;
+        }
+        document.getElementById("headline").innerHTML =
+          '<span class="who">' + esc(res.name) + "</span> wants to train with you";
+        document.getElementById("sub").textContent =
+          "Unio pairs two people. You will both see the same week, and each other's workouts as they happen.";
+        armClipboard();
+      })
+      .catch(function () {
+        /* The network failed, which says nothing about the invite. Leave the
+           page standing and let them install: the app can settle it properly
+           once it has a session. */
+        armClipboard();
+      });
+  }
+</script>
+</body>
+</html>

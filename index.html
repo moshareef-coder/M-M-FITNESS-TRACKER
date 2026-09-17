@@ -7083,6 +7083,59 @@ function clearPendingInvite() {
   try { sessionStorage.removeItem(PENDING_INVITE_KEY); } catch { /* nothing to clear */ }
 }
 
+/* One time invite links.
+
+   The six character code above is a different thing and both are kept. A code
+   is for somebody standing next to you; a link is for somebody who is not, and
+   it is the one that survives being sent through a text message.
+
+   The token is held in localStorage rather than sessionStorage, which is the
+   whole difference in lifetime that matters here: a link is opened by somebody
+   who does not have an account yet, and signing up takes them out to a
+   confirmation email and back. sessionStorage does not survive that trip on
+   every browser, and on a fresh install there is no session to store it in
+   anyway. */
+const INVITE_LINK_BASE = `${PUBLIC_SITE}/j/`;
+const PENDING_TOKEN_KEY = "ft_pending_invite_token";
+
+/* Accepts the link, the clipboard's "unio:" form, or a bare token, because all
+   three reach this from somewhere: the address bar, the landing page's copy
+   button, and a person pasting whatever they had. */
+function inviteTokenFrom(text) {
+  const s = String(text || "").trim();
+  if (!s) return null;
+  const m = s.match(/(?:\/j\/|[?&]j=|^unio:)([A-Za-z0-9_-]{16,64})/) || s.match(/^([A-Za-z0-9_-]{22})$/);
+  return m ? m[1] : null;
+}
+
+let PENDING_TOKEN = (() => {
+  let tok = null;
+  try {
+    tok = inviteTokenFrom(location.pathname) || inviteTokenFrom(location.search);
+    if (tok) {
+      localStorage.setItem(PENDING_TOKEN_KEY, tok);
+      // Out of the address bar, so a reload or a copied URL is not a second
+      // claim attempt on a token that has already been spent.
+      history.replaceState(null, "", "/");
+    } else {
+      tok = localStorage.getItem(PENDING_TOKEN_KEY);
+    }
+  } catch { /* private mode, or no history API */ }
+  return tok;
+})();
+
+function holdInviteToken(tok) {
+  if (!tok) return false;
+  PENDING_TOKEN = tok;
+  try { localStorage.setItem(PENDING_TOKEN_KEY, tok); } catch { /* private mode */ }
+  return true;
+}
+
+function clearInviteToken() {
+  PENDING_TOKEN = null;
+  try { localStorage.removeItem(PENDING_TOKEN_KEY); } catch { /* nothing to clear */ }
+}
+
 /* Choosing to train alone is answered once and remembered, so nobody gets the
    partner question put back in front of them on a later launch. Wrapped in
    try/catch because localStorage throws outright in iOS private browsing, and
@@ -7345,6 +7398,23 @@ function registerAuthDeepLink() {
   if (!isNativeApp()) return;
   registerResumeDrain();
   window.Capacitor.Plugins.App.addListener("appUrlOpen", async ({ url }) => {
+    /* An invite link arrives down this same pipe, as a Universal Link rather
+       than the custom scheme, so it is checked before the auth prefix test
+       below sends everything that is not auth away.
+
+       Claimed here only if there is already a session. If there is not, holding
+       it is the whole job: the sign in screen is what comes next and
+       checkPartnershipThenEnter claims it on the way through. */
+    const invite = url && inviteTokenFrom(url);
+    if (invite) {
+      holdInviteToken(invite);
+      const { data } = await sb.auth.getSession();
+      if (data && data.session) {
+        await claimHeldInviteToken();
+        await checkPartnershipThenEnter();
+      }
+      return;
+    }
     if (!url || url.indexOf(AUTH_DEEP_LINK) !== 0) return;
     try { await window.Capacitor.Plugins.Browser.close(); } catch {}
     try {
@@ -8352,15 +8422,18 @@ function renderCodeScreen() {
   ob.innerHTML = `
     <div class="ob-step">
       <h1>Pair with your partner</h1>
-      <p class="sub">Share your code, or enter theirs.</p>
+      <p class="sub">Send them a link. It works once, and only for them.</p>
+
+      <button class="btn-primary" id="shareLinkBtn">Send an invite</button>
+      <button type="button" class="btn-ghost" id="pasteLinkBtn">I was sent a link</button>
+
+      <div class="code-divider"><span>or use a code</span></div>
 
       <div class="code-display">
         <div class="code-label">Your code</div>
         <div class="code-value" id="myInviteCode">${myCode ? escapeHtml(myCode) : "Not ready yet"}</div>
         <button type="button" class="btn-secondary" id="shareCodeBtn" style="margin-top:10px;" ${myCode ? "" : "disabled"}>Share my code</button>
       </div>
-
-      <div class="code-divider"><span>or</span></div>
 
       <input id="partnerCodeInput" type="text" placeholder="Enter partner's code" maxlength="6"
              autocapitalize="characters" autocomplete="off" spellcheck="false" class="code-input"
@@ -8369,6 +8442,8 @@ function renderCodeScreen() {
       <button class="btn-ghost" id="backToSetup">Back</button>
     </div>`;
 
+  $("shareLinkBtn").onclick = (e) => shareInviteLink(e.currentTarget);
+  $("pasteLinkBtn").onclick = () => pasteInviteLink();
   $("shareCodeBtn").onclick = async () => {
     /* No profile gets a real invite_code from the client; it has to come from
        a server-side default/trigger on insert (see owner note). Guard rather
@@ -8513,6 +8588,106 @@ They asked you to keep them honest. The app does not celebrate when only one of 
 
 Nothing to install, it opens in your browser:
 ${location.origin}/?invite=${code}`;
+}
+
+/* ---------- One time invite links ---------- */
+
+/* The share half. Asks the server for a fresh token, builds the link and hands
+   it to the OS share sheet, so it lands in whichever app they were going to
+   send it through anyway.
+
+   Every tap mints a new token and revokes the previous unclaimed one, which is
+   deliberate: somebody who shares twice has changed their mind about how to
+   send one invitation, not issued two, and a link they believe is dead should
+   be dead. */
+async function shareInviteLink(btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const { data: res, error } = await sb.rpc("create_invite_link");
+    /* The real reason, on screen. "You already have a partner" and "the network
+       is down" send somebody to two completely different places, and one toast
+       covering both sends them to neither. */
+    if (error) { toast(error.message || "Could not create an invite link"); return false; }
+    if (!res || !res.ok) { toast((res && res.error) || "Could not create an invite link"); return false; }
+
+    const url = INVITE_LINK_BASE + res.token;
+    const who = MY_PROFILE?.user_name || ME || "Someone";
+    const text = `${who} wants to train with you on Unio. This link is for you and works once.`;
+
+    try {
+      if (navigator.share) { await navigator.share({ title: "Unio", text, url }); return true; }
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      toast("Invite link copied");
+      return true;
+    } catch {
+      /* Dismissing the share sheet throws the same way a failure does, and it
+         is not a failure. The token stays live either way, so there is nothing
+         to clean up and nothing to apologise for. */
+      return false;
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+/* The claim half. Runs on the way into the app, once there is a session.
+
+   Silent when there is no token, which is nearly every launch. Loud only when a
+   token was actually held and the server refused it, because that is somebody
+   standing there having tapped a link that did nothing. */
+async function claimHeldInviteToken() {
+  const tok = PENDING_TOKEN;
+  if (!tok) return false;
+
+  const { data: res, error } = await sb.rpc("claim_invite_link", { p_token: tok });
+
+  if (error) {
+    /* Kept, not cleared. The request never reached the server, so the invite is
+       very likely still good and dropping it here would lose it for good. */
+    console.error("could not claim invite link", error);
+    toast("Could not open that invite. Check your connection.");
+    return false;
+  }
+
+  clearInviteToken();
+
+  if (!res || !res.ok) {
+    toast((res && res.error) || "That invite is no longer active");
+    return false;
+  }
+
+  clearSolo();
+  clearPendingInvite();
+  toast(`You are paired with ${res.partner_name}`);
+  return true;
+}
+
+/* The deferred case, which is the one iOS gives no clean answer to.
+
+   A link tapped on a phone without the app installed goes to the App Store, and
+   nothing about which link it was survives the install. Universal Links solve
+   the other case and not this one. So the landing page puts the token on the
+   clipboard and this reads it back.
+
+   Behind an explicit tap on purpose. Reading the clipboard unprompted makes
+   iOS show "pasted from Safari" over an app the person has had open for two
+   seconds, which reads as the app going through their things. A button they
+   pressed makes the same paste obviously theirs. */
+async function pasteInviteLink() {
+  let text = "";
+  try {
+    text = await navigator.clipboard.readText();
+  } catch {
+    toast("Paste the link into the code box instead");
+    return false;
+  }
+  const tok = inviteTokenFrom(text);
+  if (!tok) { toast("That does not look like an invite link"); return false; }
+  holdInviteToken(tok);
+  return claimHeldInviteToken().then(async (ok) => {
+    if (ok) await checkPartnershipThenEnter();
+    return ok;
+  });
 }
 
 /* Nothing is written to the DB until Start, same as the workout builder's
