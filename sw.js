@@ -38,7 +38,7 @@ const CODE = [/^\/knowledge\//, /^\/mo-knowledge\//];   // the engine and its ch
    policy. They revalidate like the shell rather than living in ASSETS, which
    activate never clears, so a change reaches an installed user on the next
    launch instead of never. */
-const REVALIDATE = [...CODE, /^\/badges\//, /^\/(privacy|support|states)\.html$/];
+const REVALIDATE = [...CODE, /^\/badges\//, /^\/bot\//, /^\/(privacy|support|states)\.html$/];
 const isShell = (url) => url.pathname === "/" || url.pathname === "/index.html";
 const matches = (list, url) => list.some((re) => re.test(url.pathname));
 
