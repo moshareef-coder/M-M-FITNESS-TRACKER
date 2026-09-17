@@ -1595,30 +1595,65 @@
      make the screenshot too small to read.
      scroll-snap rather than a JS-driven slider: free momentum, free rubber
      banding at the ends, no per-frame code to keep in sync with a finger. */
-  .paywall-carousel { margin: 4px -20px 6px; }
+  /* The X floats over everything rather than sharing a row with the wordmark,
+     because the wordmark is centred and a shared row would have to either
+     fight it for space or push it off centre. */
+  .paywall-x {
+    position: absolute; top: 14px; left: 14px; width: 30px; height: 30px;
+    border-radius: 50%; border: none; background: var(--panel-2, rgba(128,128,128,.16));
+    color: var(--muted); font-size: 18px; line-height: 1; z-index: 2;
+  }
+  .paywall-head { text-align: center; padding: 6px 36px 2px; }
+  .paywall-word { font-family: var(--font-display); font-size: 21px; letter-spacing: .01em; }
+  .paywall-word b { font-weight: 800; color: var(--text); }
+  .paywall-word span { font-weight: 500; color: var(--muted); margin-left: 2px; }
+  .paywall-tagline {
+    margin-top: 3px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em;
+    color: var(--muted); text-transform: uppercase;
+  }
+  /* The peek carousel. Three cards in view, the centre one full size and the
+     neighbours cut off at the edge, so a glance at the closed state already
+     says "there is more either side" without anyone having to be told to
+     swipe. scroll-snap does the settling; a scroll listener drives the
+     scale, because CSS alone has no clean way to say "whichever card is
+     nearest centre" without scroll-driven animation support this app cannot
+     assume yet on every device it ships to. */
+  .paywall-carousel { margin: 10px 0 2px; }
   .paywall-carousel-track {
-    display: flex; gap: 12px; overflow-x: auto; padding: 0 20px 4px;
-    scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    display: flex; align-items: flex-start; gap: 14px;
+    overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; padding: 6px 15vw 10px;
   }
   .paywall-carousel-track::-webkit-scrollbar { display: none; }
   .paywall-slide {
-    flex: 0 0 auto; width: min(72vw, 260px); scroll-snap-align: center;
-    border-radius: 16px; overflow: hidden; background: var(--panel-2, var(--panel));
-    border: 1px solid var(--line, rgba(128,128,128,.18));
-  }
-  .paywall-slide img {
-    display: block; width: 100%; aspect-ratio: 9 / 16; object-fit: cover;
-    /* The screenshot's own top, where the app's real status bar and header
-       already sit, so the card is not doubling up a crop line against
-       whatever the phone's own notch is doing. */
-    object-position: top;
+    flex: 0 0 auto; width: 70vw; max-width: 250px; scroll-snap-align: center;
+    border-radius: 22px; padding: 16px 16px 0; overflow: hidden;
     background: var(--panel-2, var(--panel));
+    border: 1px solid var(--line, rgba(128,128,128,.18));
+    box-shadow: 0 14px 34px -18px rgba(0,0,0,.55);
+    display: flex; flex-direction: column;
+    opacity: .55; transform: scale(.88); transition: opacity .2s, transform .2s;
   }
-  .paywall-slide-caption { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 2px; }
-  .paywall-slide-caption b { font-size: 13.5px; color: var(--text); }
-  .paywall-slide-caption span { font-size: 12px; color: var(--muted); line-height: 1.3; }
-  .paywall-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+  /* The centred card, found and marked by the same scroll listener that drives
+     the dots, so the two can never disagree about which slide is "current". */
+  .paywall-slide.on { opacity: 1; transform: scale(1); }
+  .paywall-slide-icon {
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    margin-bottom: 10px;
+  }
+  .paywall-slide-title { font-size: 15px; color: var(--text); line-height: 1.25; }
+  .paywall-slide-body { display: block; margin-top: 4px; font-size: 12.5px; color: var(--muted); line-height: 1.35; min-height: 32px; }
+  /* The screenshot is real and stays that way: a light rectangle set into a
+     dark card is a lot of contrast, which is deliberate, it is the one part
+     of the card that is a photograph rather than something drawn and it
+     should read as one. Cropped rather than framed by a fixed height, so a
+     card never shows a hard cut mid-row of the real UI it is holding. */
+  .paywall-slide-shot {
+    margin: 12px -16px 0; border-radius: 14px 14px 0 0; overflow: hidden;
+    max-height: 190px;
+  }
+  .paywall-slide-shot img { display: block; width: 100%; height: auto; }
+  .paywall-dots { display: flex; justify-content: center; gap: 6px; margin-top: 4px; }
   .paywall-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line, rgba(128,128,128,.3)); transition: background .15s, transform .15s; }
   .paywall-dot.on { background: var(--accent); transform: scale(1.25); }
   /* One blocked person. The address can be long and the button must not be
@@ -3391,25 +3426,7 @@
   /* The ring sits outside the colour rather than on it, so a dark swatch and a
      bright one show selection the same way. */
   .pf-sw.on { border-color: var(--bg); box-shadow: 0 0 0 2.5px var(--sw); }
-  /* Rearranging the Progress tab */
-  .prog-arrange { display: flex; justify-content: flex-end; margin: 0 0 10px; }
-  .prog-arrange button { background: none; border: 1px solid var(--border); color: var(--muted);
-    font: 600 12.5px/1 inherit; padding: 8px 12px; border-radius: 100px; cursor: pointer; }
-  .prog-arrange button.on { background: var(--accent); color: var(--bg); border-color: var(--accent); }
-  /* NOT touch-action:none on the card. That was the first version and it made
-     the page unscrollable on a phone the instant Rearrange was switched on:
-     the finger had nothing left to scroll with, because every card was
-     swallowing the gesture. Only the grip takes the touch, so the rest of the
-     card scrolls the page exactly as it always did. */
-  /* Collapsed to titles, not zoomed out. The first version scaled the whole
-     tab down to fit and hit its 28% floor without fitting, at which point
-     nothing on screen was legible anyway. Reordering only needs to know which
-     card is which, so each one folds to its heading: seven cards at a
-     readable size fit a phone with room to spare, and the drag needs no
-     coordinate maths because nothing is transformed. */
-  /* Not overflow:hidden on the body. Collapsed, the list always fits, but a
-     row opened for a look is full height again and has to be scrollable. */
-  /* ---- The index, outside arrange mode ----
+  /* ---- The index ----
      "Seven cards, all the same size" was Mo's complaint about this tab from
      the start, and the direction he picked to fix it (an index of one-line
      rows, tap one for the real card) reuses this exact accordion rather than
@@ -3424,16 +3441,14 @@
      alongside idx-lead by the same stats function and shown only while
      folded; CSS alone decides which one is on screen, so opening a row does
      not need to restore anything, it just stops hiding what was already
-     there. Arrange mode keeps the older, shorter fold (title only): it only
-     needs to tell "Weight trend" from "Log your weight" apart, not answer
-     either one. */
-  body:not(.arranging) #tab-progress .idx-card:not(.peek) {
+     there. */
+  #tab-progress .idx-card:not(.peek) {
     cursor: pointer;
   }
-  body:not(.arranging) #tab-progress .idx-card:not(.peek) > *:not(h2):not(.idx-summary) {
+  #tab-progress .idx-card:not(.peek) > *:not(h2):not(.idx-summary) {
     display: none;
   }
-  body:not(.arranging) #tab-progress .idx-card:not(.peek) > h2 {
+  #tab-progress .idx-card:not(.peek) > h2 {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
   #tab-progress .idx-card.peek > .idx-summary {
@@ -3441,12 +3456,6 @@
   }
   .idx-chev { display: flex; flex-shrink: 0; color: var(--muted); transition: transform .18s ease; }
   .idx-card.peek .idx-chev { transform: rotate(90deg); }
-  /* Arrange mode's own listing shows every card BY TITLE, including ones the
-     index never collapses (Log your weight has no idx-card class, same as
-     before), so the chevron this adds is index-only furniture and has no
-     business appearing there. */
-  body.arranging .idx-chev { display: none; }
-
   /* The short answer itself: a sentence and, on the one row where a colour
      genuinely earns its place, a direction. --up and --down are GOOD and BAD
      everywhere else this app uses them (the sync badge, the danger card), not
@@ -3481,60 +3490,6 @@
   #tab-progress .idx-card.idx-primary > h2 { color: var(--accent-ink); }
   #tab-progress .idx-card.idx-primary .idx-chev { color: var(--accent-ink); }
 
-  /* Everything here is scoped to :not(.peek). An opened row must be left
-     completely alone: the first version hid children with display:none and
-     put them back on .peek with display:revert, but revert goes to the
-     BROWSER default rather than to the app's own rule, so .wt-stats came back
-     as block and the START/NOW/CHANGE/GOAL row stacked into a column. Never
-     touching an opened card means there is nothing to restore. */
-  body.arranging .card:not(.peek) {
-    position: relative; max-height: 58px; overflow: hidden;
-    padding-top: 16px; padding-bottom: 16px; margin-bottom: 8px;
-    display: flex; align-items: center; cursor: pointer;
-  }
-  body.arranging .card:not(.peek) > * { display: none; }
-  body.arranging .card:not(.peek) > h2,
-  body.arranging .card:not(.peek) > h3 { display: block; margin: 0; font-size: 15px; }
-  body.arranging .card:not(.peek) > .prog-grip { display: grid; }
-  body.arranging #progHeadline { display: none; }
-  body.arranging .prog-grip { display: grid; }
-
-  /* Opened for a look. A title alone is not always enough to tell "Weight
-     trend" from "Log your weight", so any row can be tapped to show what it
-     actually is, and tapped again to fold back. */
-  body.arranging .card.peek {
-    position: relative; outline: 2px solid var(--accent); outline-offset: 2px;
-  }
-  body.arranging .card:not(.peek)::before {
-    content: "tap to see"; position: absolute; right: 58px; top: 50%;
-    transform: translateY(-50%); font-size: 11px; color: var(--muted); opacity: .75;
-  }
-  /* Sits ON the tab bar rather than above it. z-index has to beat .tabs AND
-     the FAB, which is raised with a negative margin and poked through the
-     first version of this bar as a green dome. The tab bar is hidden outright
-     while arranging: it navigates away from a job that is half done, and this
-     is the only thing the bottom of the screen should offer here. */
-  body.arranging .tabs { display: none; }
-  .prog-bar {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 2000;
-    display: flex; gap: 12px; justify-content: space-between; align-items: center;
-    padding: 14px 18px calc(16px + env(safe-area-inset-bottom, 0px));
-    background: var(--panel); border-top: 1px solid var(--border);
-    box-shadow: 0 -8px 24px rgba(0,0,0,.18);
-  }
-  .prog-bar span { color: var(--muted); font-size: 13px; line-height: 1.35; flex: 1; }
-  .prog-bar button {
-    flex: 0 0 auto; padding: 13px 26px; border-radius: 100px; border: 0;
-    background: var(--accent); color: var(--bg); font: 700 15px/1 inherit; cursor: pointer;
-  }
-  body.arranging .card::after { content: ""; position: absolute; inset: 0; border-radius: inherit;
-    border: 1.5px dashed var(--border); pointer-events: none; }
-  body.arranging .card .prog-grip { display: grid; }
-  .prog-grip { display: none; position: absolute; top: 8px; right: 8px; z-index: 3;
-    width: 38px; height: 38px; place-items: center; border-radius: 9px; touch-action: none;
-    background: var(--panel-2); color: var(--muted); cursor: grab; }
-  .card.dragging { z-index: 5; box-shadow: 0 12px 34px rgba(0,0,0,.4); transition: none !important; }
-  body.arranging .card:not(.dragging) { transition: transform .18s cubic-bezier(.2,.8,.3,1); }
   .ob-inline { background: none; border: 0; padding: 0; font: inherit; color: var(--accent);
                text-decoration: underline; cursor: pointer; }
   #onboard .btn-primary:disabled { opacity: .45; pointer-events: none; }
@@ -4587,8 +4542,6 @@
   .prog-rule i { flex: 1; height: 1px; background: var(--border); }
 
   /* Progress controls */
-  .person-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
-  .person-toggle .tab-pill { flex: 1; padding: 9px 14px; font-size: 14px; }
 
   /* The goal strip: YOUR goals, not the menu. The main goal, the extras from
      Setup (two at most), then More, which is the door to the page that
@@ -4682,8 +4635,6 @@
   }
   .waist-input::-webkit-outer-spin-button, .waist-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .waist-input:focus { outline: none; }
-  /* Arrange mode lists cards by title; these are not cards and have nothing to say there. */
-  body.arranging .prog-tiles { display: none; }
   .photo-date { font-size: 12.5px; color: var(--muted); text-align: center; margin-top: 5px; }
 
   /* Start beside Now. The two photos share the strip's frame (116x155, 11px
@@ -5085,15 +5036,14 @@
      chart, the window, then logging in its own card with the stepper folded
      under the plus. Colour is all tokens, so one layout holds in both themes.
      Only ever on while the card is NOT an index row (idx-card comes off as
-     wt-hero goes on), so none of the fold rules compete with these. Arrange
-     mode is left alone: there the card is a title strip like every other. */
-  body:not(.arranging) #cardWeight.wt-hero {
+     wt-hero goes on), so none of the fold rules compete with these. */
+  #cardWeight.wt-hero {
     background: none; border: 0; padding: 0; box-shadow: none; border-radius: 0;
   }
-  body:not(.arranging) #cardWeight.wt-hero > h2,
-  body:not(.arranging) #cardWeight.wt-hero > .idx-summary,
-  body:not(.arranging) #cardWeight.wt-hero .idx-lead,
-  body:not(.arranging) #cardWeight.wt-hero .wt-log-head { display: none; }
+  #cardWeight.wt-hero > h2,
+  #cardWeight.wt-hero > .idx-summary,
+  #cardWeight.wt-hero .idx-lead,
+  #cardWeight.wt-hero .wt-log-head { display: none; }
   #cardWeight.wt-hero .wth-card,
   #cardWeight.wt-hero .wt-logcard {
     background: var(--card-fill); border: 1px solid var(--border); border-radius: var(--radius);
@@ -5140,41 +5090,56 @@
      the two tiles and the two ways in. Colour is all tokens, so one layout
      holds in both themes. Not a card, so arrange mode does not list it, same
      as the tiles under Weight. */
-  body.arranging #toneHero { display: none; }
   .tone-head { margin: 2px 0 12px; }
   .tone-head .wth-title { margin-top: 0; }
-  .tone-chips { display: flex; gap: 8px; margin-bottom: 12px; }
-  .tone-chip {
-    flex: 1; min-width: 0; min-height: 36px; padding: 8px 0; border-radius: 100px; cursor: pointer;
-    background: var(--panel-2); border: 1px solid transparent; color: var(--muted);
+  /* The photos lead. They are the evidence this goal is actually about, and
+     two pictures answer "is it working" in a glance where a number has to be
+     compared first. Shorter frames than the strip's 116x155, and a tighter
+     head, because the whole screen has to fit about one scroll: Mo was going
+     three screens deep to read one answer. */
+  #toneHero .tone-photos { margin: 0 0 12px; }
+  #toneHero .cmp-frame { aspect-ratio: 1 / 1.16; }
+  #toneHero .cmp-card .card-head { margin-bottom: 11px; }
+  /* Selected is the ink, not the accent, on both strips. A lit chip, a lit
+     range pill and a filled button all wearing the same green is three things
+     shouting and no call to action, which is exactly what Mo saw. One filled
+     accent block is allowed on this screen and it is the button at the end;
+     everything that only has to say "this one" says it with a raised white
+     tile on a sunken track, the way a segmented control does. */
+  .tone-chips, #toneHero .wt-range {
+    display: flex; gap: 6px; padding: 4px; border-radius: 12px; background: var(--panel-2);
+  }
+  .tone-chips { margin: 0 0 12px; }
+  #toneHero .wt-range { margin-top: 12px; }
+  .tone-chip, #toneHero .wt-pill {
+    flex: 1; min-width: 0; min-height: 34px; padding: 7px 0; border-radius: 9px; cursor: pointer;
+    background: none; border: 1px solid transparent; color: var(--muted);
     font-family: inherit; font-size: 12.5px; font-weight: 700;
   }
-  .tone-chip.on { background: var(--accent); color: var(--on-accent); }
+  .tone-chip.on, #toneHero .wt-pill.on {
+    background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-card);
+  }
   .tone-chip:active { transform: scale(.97); }
+  /* Plain panel, not the blue wash the weight hero's card wears. Blue was a
+     third hue on a screen that already had green and grey, and the card is
+     not competing for attention here: the photo above it and the button below
+     it are. */
   #toneHero .tone-card {
-    position: relative; overflow: hidden; margin-bottom: 10px;
-    background: color-mix(in srgb, var(--me) 10%, var(--panel)); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 16px 15px; box-shadow: var(--shadow-lift);
+    position: relative; overflow: hidden; margin-bottom: 12px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 15px 15px 13px; box-shadow: var(--shadow-card);
   }
   #toneHero .wth-stats { margin-top: 0; }
   #toneHero .wth-now-fig { margin-top: 6px; }
   /* No readings is a state, not a number: it is set in the display face at the
      title size so the card still has a head, but never at the number size. */
   .tone-none { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin-top: 6px; }
-  #toneHero .chart-wrap { height: 176px; margin-top: 14px; }
+  #toneHero .chart-wrap { height: 152px; margin-top: 12px; }
   .tone-empty { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
-  #toneHero .wt-pill { border-radius: 100px; min-height: 36px; padding: 8px 0; }
-  .tone-photos { margin-bottom: 10px; }
   .tone-photos:empty { display: none; }
-  /* "Workout Consistency" does not fit on one line beside an icon in a half
-     width tile, so these two titles may wrap where the tiles under Weight may
-     not; the grid keeps the pair the same height. */
-  .tone-tiles .prog-tile-title { white-space: normal; }
-  .tone-tiles .prog-tile[disabled] { cursor: default; }
-  .tone-tiles .prog-tile[disabled]:active { border-color: var(--border); }
   .tone-actions { margin-bottom: 10px; }
-  .tone-actions .btn-primary, .tone-actions .btn-secondary {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  .tone-actions .btn-primary {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
   }
   .wt-logrow {
     display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; margin: 0;
@@ -5847,11 +5812,12 @@
 
   <!-- PROGRESS TAB -->
   <div id="tab-progress" class="tab-panel hidden">
-    <div class="person-toggle">
-      <button type="button" class="tab-pill active" id="progMeBtn">You</button>
-      <button type="button" class="tab-pill" id="progPartnerBtn">Partner</button>
-    </div>
-
+    <!-- No You/Partner toggle here for now. Mo cut it: this tab answers one
+         question about one person, and a pair of pills above the goal strip
+         made two rows of tabs stacked on each other before a single number.
+         Their progress is still on the Home timeline and the day sheet, and
+         every isPartner branch below still works, so putting it back is one
+         element and one listener. -->
     <!-- A lens, not a setter. Tapping a chip shows you what this tab looks
          like judged on that goal; it does NOT rewrite your profile, because a
          row of tabs that silently changes what you are training for is a trap.
@@ -5863,16 +5829,20 @@
     <div class="card" id="progHeadline"></div>
 
     <!-- The Tone Up screen (renderToneHero), for the recomp goal only. Not a
-         card: the goal order and a saved drag order both walk past it, and it
-         is pinned straight under the headline card it stands in for. Strength
-         and Body photos stay in the DOM hidden while this is up; the Strength
-         tile and the Add photos button are their doors, the same way the
-         Body Photos tile is Photos' door under the weight hero. -->
+         card: the goal order walks past it, and it is pinned straight under
+         the headline card it stands in for. Body photos stay in the DOM
+         hidden while this is up; the card at the top is their door.
+
+         Photo, tape, line, one button, in that order, and nothing else. Mo cut
+         the subtitle, the Workout Consistency tile, the Strength Checklist
+         tile and the second button: the tiles answered questions this screen
+         is not asking, and "Add body photos" was a second call to action for
+         something the photos card at the top already offers. -->
     <div class="tone-screen hidden" id="toneHero">
       <div class="tone-head">
         <div class="wth-title" id="toneTitle">Tone up</div>
-        <div class="wth-sub">Track your measurements, body photos, consistency, and strength.</div>
       </div>
+      <div class="tone-photos" id="tonePhotos"></div>
       <div class="tone-chips" id="toneChips"></div>
       <div class="tone-card">
         <div class="wth-stats" id="toneStats"></div>
@@ -5880,14 +5850,8 @@
         <p class="tone-empty hidden" id="toneEmpty">Log a measurement to start the line.</p>
         <div class="wt-range" id="toneRange"></div>
       </div>
-      <div class="tone-photos" id="tonePhotos"></div>
-      <div class="prog-tiles tone-tiles" id="toneTiles">
-        <button type="button" class="prog-tile" id="toneConsistency" disabled></button>
-        <button type="button" class="prog-tile" id="toneStrength"></button>
-      </div>
       <div class="tone-actions" id="toneActions">
         <button type="button" class="btn-primary" id="toneLogBtn"></button>
-        <button type="button" class="btn-secondary" id="tonePhotoBtn"></button>
       </div>
     </div>
 
@@ -6779,7 +6743,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.17";
+const APP_VERSION = "2026.09.16.18";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -10353,12 +10317,6 @@ function showApp() {
     openSettingsPage("partner");
   });
 
-  $("progMeBtn").addEventListener("click", () => { PROGRESS_VIEW = "me"; renderProgressTab(); });
-  $("progPartnerBtn").addEventListener("click", () => {
-    if (!PARTNER_EMAIL) return;
-    PROGRESS_VIEW = "partner";
-    renderProgressTab();
-  });
   $("addBodyPhotoBtn").addEventListener("click", () => $("bodyPhotoInput").click());
   $("bodyPhotoInput").addEventListener("change", (e) => {
     const f = e.target.files?.[0];
@@ -13845,13 +13803,23 @@ const PREMIUM_PRICE = "$7.99";
    drawn, because a carousel showing something the app does not actually do is
    Guideline 2.3, misleading metadata, and it is also just a lie to whoever is
    about to pay based on it. Re-capture with the sandbox and CDP if any of
-   these five screens changes shape. */
+   these five screens changes shape.
+
+   Icon, colour and headline are read out here rather than baked into the
+   image, so the card can be redrawn in either theme and at any width without
+   ever touching a screenshot: only the photo has to be real, everything
+   drawn around it is free to be exactly what the app already draws elsewhere. */
 const PREMIUM_UNLOCKS = [
-  ["paywall/01-generated-workout.jpg", "Workouts made for you", "A plan every day, built around your goal and what you lifted last time."],
-  ["paywall/02-week-plan.jpg", "Plan your week", "Decide the shape of the week ahead instead of deciding every morning."],
-  ["paywall/03-body-impact.jpg", "Body impact", "Which muscles you have actually worked, and which ones you keep missing."],
-  ["paywall/04-progress-records.jpg", "The full picture", "Trends, projections and your records ranked."],
-  ["paywall/05-accent-colors.jpg", "Make it yours", "Accent colours."],
+  ["paywall/01-generated-workout.jpg", "dumbbell", "var(--accent)",
+   "Workouts made for you", "A plan every day, built around your goal and what you lifted last time."],
+  ["paywall/02-week-plan.jpg", "checklist", "var(--me)",
+   "Plan your week together", "Map out the week with your partner and stay in sync."],
+  ["paywall/03-body-impact.jpg", "body", "var(--partner)",
+   "Body impact", "Which muscles you have actually worked, and which ones you keep missing."],
+  ["paywall/04-progress-records.jpg", "trending", "#2dd4bf",
+   "Track the progress that matters", "Trends, projections and your records ranked."],
+  ["paywall/05-accent-colors.jpg", "sunMoon", "var(--accent)",
+   "Make it yours", "Accent colours, picked by you."],
 ];
 
 /* The gate. Returns true when the thing may go ahead, and otherwise puts the
@@ -13878,22 +13846,28 @@ function showPaywall() {
     scrim.innerHTML = `
       <div class="pop">
         <div class="pop-body">
-          <div class="ds-top">
-            <div class="pop-who" style="color:var(--muted)">UNIO PREMIUM</div>
-            <button type="button" class="ds-x" data-pay="0" aria-label="Close">&times;</button>
+          <button type="button" class="paywall-x" data-pay="0" aria-label="Close">&times;</button>
+          <div class="paywall-head">
+            <div class="paywall-word"><b>UNIO</b> <span>PREMIUM</span></div>
+            <div class="paywall-tagline">TRAIN TOGETHER. A STRONGER YOU.</div>
           </div>
           <!-- Swipe through what it actually looks like before reading a word
                about it. People buy what they can picture themselves using, and
-               a bullet list only describes; this shows the real screen. -->
+               a bullet list only describes; this shows the real screen.
+               Each card carries its own icon, headline and copy the way the
+               rest of the app already draws a feature, and the screenshot
+               beneath it is the one thing that has to be a photograph rather
+               than anything drawn: showing something the app does not
+               actually do is Guideline 2.3, and it is also a lie to whoever
+               pays based on it. -->
           <div class="paywall-carousel" id="paywallCarousel">
             <div class="paywall-carousel-track" id="paywallCarouselTrack">
-              ${PREMIUM_UNLOCKS.map(([img, t, d]) => `
+              ${PREMIUM_UNLOCKS.map(([img, ico, tint, t, d]) => `
                 <div class="paywall-slide">
-                  <img src="${img}" alt="${escapeHtml(t)}" loading="lazy" />
-                  <div class="paywall-slide-caption">
-                    <b>${escapeHtml(t)}</b>
-                    <span>${escapeHtml(d)}</span>
-                  </div>
+                  <div class="paywall-slide-icon" style="background:color-mix(in srgb, ${tint} 22%, transparent); color:${tint}">${icon(ico, 20)}</div>
+                  <b class="paywall-slide-title">${escapeHtml(t)}</b>
+                  <span class="paywall-slide-body">${escapeHtml(d)}</span>
+                  <div class="paywall-slide-shot"><img src="${img}" alt="${escapeHtml(t)}" loading="lazy" /></div>
                 </div>`).join("")}
             </div>
             <div class="paywall-dots" id="paywallDots">
@@ -13927,12 +13901,24 @@ function showPaywall() {
        asked for still lights up the right dot. */
     const carouselTrack = scrim.querySelector("#paywallCarouselTrack");
     const dots = scrim.querySelectorAll(".paywall-dot");
+    const slides = scrim.querySelectorAll(".paywall-slide");
     if (carouselTrack && dots.length) {
-      carouselTrack.addEventListener("scroll", () => {
-        const slideWidth = carouselTrack.firstElementChild?.offsetWidth || 1;
-        const i = Math.round(carouselTrack.scrollLeft / slideWidth);
+      /* The distance between two snapped positions is the card plus the gap
+         beside it, not the card alone. Using card width by itself was fine for
+         slide index 0 and drifted by one gap's worth on every slide after,
+         which is the kind of bug that only shows up once there is a third
+         card to be wrong about. */
+      const step = () => {
+        const style = getComputedStyle(carouselTrack);
+        return (carouselTrack.firstElementChild?.offsetWidth || 1) + (parseFloat(style.columnGap || style.gap) || 0);
+      };
+      const highlight = () => {
+        const i = Math.round(carouselTrack.scrollLeft / step());
         dots.forEach((d, di) => d.classList.toggle("on", di === i));
-      }, { passive: true });
+        slides.forEach((s, si) => s.classList.toggle("on", si === i));
+      };
+      carouselTrack.addEventListener("scroll", highlight, { passive: true });
+      highlight();
     }
     const close = (v) => { scrim.remove(); resolve(v); };
     scrim.querySelectorAll("[data-pay]").forEach((b) => {
@@ -15506,38 +15492,6 @@ function toneWeeks() {
   return (TONE_RANGES.find(([k]) => k === TONE_RANGE) || TONE_RANGES[1])[1];
 }
 
-/* One word for the bar over the window, judged only on lifts that have a
-   standard (LIFT_STANDARDS): a dumbbell or a machine number cannot be read
-   honestly, so it cannot be read here either. Two pounds either way is e1rm
-   rounding, not a direction, so it is Maintained rather than Up or Slipping. */
-function toneStrengthState(name, weeks) {
-  const moves = strengthMovement(name, weeks)
-    .filter((m) => LIFT_STANDARDS[(m.name || "").trim().toLowerCase()]);
-  if (!moves.length) return "No lifts logged";
-  if (moves.some((m) => m.gain < -2)) return "Slipping";
-  if (moves.some((m) => m.gain > 2)) return "Up";
-  return "Maintained";
-}
-
-/* The doors. A door opens its card (un-hidden, expanded) under the screen
-   and any other open door goes back to hidden, so the screen never grows a
-   second folded row; folding the card by its header hides it again (the
-   accordion in paintArrangeUI). Strength is drawn on open rather than with
-   the tab, because renderProgressTab only draws the cards it shows. */
-function openToneDoor(id) {
-  const card = $(id);
-  if (!card) return;
-  document.querySelectorAll("#tab-progress .card.peek").forEach((c) => {
-    c.classList.remove("peek");
-    if (c.id === "cardPhotos" || c.id === "cardStrength") c.classList.add("hidden");
-  });
-  card.classList.remove("hidden");
-  card.classList.add("peek");
-  if (id === "cardStrength") { renderStrengthChart(); renderStrengthStats(); }
-  primeOpenedCard(card);
-  card.scrollIntoView({ block: "start", behavior: "smooth" });
-}
-
 function renderToneHero(on, profile, isPartner) {
   const el = $("toneHero");
   if (!el) return;
@@ -15555,10 +15509,6 @@ function renderToneHero(on, profile, isPartner) {
   if (head?.parentNode && head.nextSibling !== el) head.parentNode.insertBefore(el, head.nextSibling);
 
   const name = isPartner ? partnerName() : ME;
-  const email = isPartner ? PARTNER_EMAIL : MY_EMAIL;
-  /* Same gate the Strength card itself is behind: a partner who keeps their
-     workout detail private is not scored on it here either. */
-  const sharing = !isPartner || PARTNER_PROFILE?.share_workout_details !== false;
   const weeks = toneWeeks();
   const measures = typeof MEASUREMENTS !== "undefined" ? MEASUREMENTS : [];
   const measure = measures.find((m) => m.key === TONE_MEASURE) || measures[0] || { key: TONE_MEASURE, label: "Waist" };
@@ -15567,8 +15517,8 @@ function renderToneHero(on, profile, isPartner) {
 
   $("toneTitle").textContent = goalTileFor("tone-lean-abs")?.title || "Tone up";
 
-  /* One measurement at a time. Selected is the accent, the same language as
-     the range pills under the chart. */
+  /* One measurement at a time, and the same language as the range pills under
+     the chart: the selected one is a raised tile, not a green one. */
   const chips = $("toneChips");
   chips.innerHTML = measures.map((m) =>
     `<button type="button" class="tone-chip${m.key === measure.key ? " on" : ""}" data-key="${escapeHtml(m.key)}">${escapeHtml(m.label)}</button>`).join("");
@@ -15641,29 +15591,19 @@ function renderToneHero(on, profile, isPartner) {
   if (showPhotos) renderComparePhotos(photos, isPartner);
   else photos.innerHTML = "";
 
-  const days = gymDaysThisWeek(name), goal = weeklyGoalFor(email);
-  $("toneConsistency").innerHTML = `<span class="prog-tile-ico">${icon("calendar", 18)}</span>
-    <span class="prog-tile-body"><span class="prog-tile-title">Workout Consistency</span><span class="prog-tile-val">${days} of ${goal}</span><span class="prog-tile-sub">workouts this week</span></span>`;
-  const strength = $("toneStrength");
-  strength.classList.toggle("hidden", !sharing);
-  $("toneTiles").classList.toggle("solo", !sharing);
-  if (sharing) {
-    strength.innerHTML = `<span class="prog-tile-ico">${icon("dumbbell", 18)}</span>
-      <span class="prog-tile-body"><span class="prog-tile-title">Strength Checklist</span><span class="prog-tile-val">${toneStrengthState(name, weeks)}</span><span class="prog-tile-sub">across major lifts</span></span><span class="prog-tile-chev">${icon("chevronRight", 16)}</span>`;
-    strength.onclick = () => openToneDoor("cardStrength");
-  }
-
-  /* Yours only: the tape sheet and the camera both write to your row. The
-     camera is the photos card's own input, which is hidden with the card,
-     so the button here presses that one rather than growing a second. */
+  /* One call to action, and it is the tape, because the tape is the only
+     thing on this screen you cannot already do from something else on it.
+     Adding a photo lives in the photos card at the top: with no photos yet it
+     offers the camera itself, and with photos it offers See all, which opens
+     the card that holds the camera. A second green button down here was the
+     same door a second time, and two of them meant neither read as THE
+     action. */
   const acts = $("toneActions");
   acts.classList.toggle("hidden", isPartner);
   if (!isPartner) {
-    const logBtn = $("toneLogBtn"), photoBtn = $("tonePhotoBtn");
+    const logBtn = $("toneLogBtn");
     if (!logBtn.querySelector("svg")) logBtn.innerHTML = `${icon("tape", 18)} Log measurements`;
-    if (!photoBtn.querySelector("svg")) photoBtn.innerHTML = `${icon("camera", 18)} Add body photos`;
     logBtn.onclick = () => { if (typeof openMeasurementsSheet === "function") openMeasurementsSheet(); };
-    photoBtn.onclick = () => $("addBodyPhotoBtn")?.click();
   }
 }
 
@@ -25178,6 +25118,9 @@ async function uploadBodyPhoto(file) {
 /* ---------- Progress tab ---------- */
 
 /* Whose data the Progress tab is currently showing. */
+/* Nothing sets this to "partner" any more: the toggle that did came off the
+   tab. The branches that read it are left alone rather than deleted, because
+   "for now" was the word and they are what a restored toggle would need. */
 let PROGRESS_VIEW = "me";
 function viewedName() { return PROGRESS_VIEW === "partner" ? partnerName() : ME; }
 function viewedEmail() { return PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY_EMAIL; }
@@ -26448,8 +26391,14 @@ function renderGoalChips(profile) {
     if (!ids.includes(s.bubble)) ids.push(s.bubble);
   }
   /* A lens left up on a goal that has since come off the profile still has
-     to be on screen, or the tab is lit by a chip nobody can see to clear. */
-  if (showing && goalTileFor(showing) && !ids.includes(showing)) ids.push(showing);
+     to be on screen, or the tab is lit by a chip nobody can see to clear. It
+     takes the last slot rather than a fourth one: one, two or three goals is
+     the whole range, so a fourth chip cannot appear by any route. */
+  if (showing && goalTileFor(showing) && !ids.includes(showing)) {
+    if (ids.length >= 3) ids.length = 2;
+    ids.push(showing);
+  }
+  ids.length = Math.min(ids.length, 3);
 
   const chip = (t) => {
     const [l1, l2] = goalChipLines(t);
@@ -26460,11 +26409,7 @@ function renderGoalChips(profile) {
       <span>${escapeHtml(l1)}${l2 ? `<br>${escapeHtml(l2)}` : ""}</span>
     </button>`;
   };
-  host.innerHTML = ids.map((id) => chip(goalTileFor(id))).join("") + `
-    <button type="button" class="goal-chip goal-chip-more" id="progGoalMore" aria-label="More goals">
-      ${icon("more", 20)}
-      <span>More</span>
-    </button>`;
+  host.innerHTML = ids.map((id) => chip(goalTileFor(id))).join("");
 
   host.querySelectorAll("[data-goal]").forEach((b) => {
     b.onclick = () => {
@@ -26475,10 +26420,11 @@ function renderGoalChips(profile) {
       renderProgressTab();
     };
   });
-  /* More is not a lens, it is the way to the page that changes the goals.
-     Setup first so the page has a tab under it to come back to. */
-  $("progGoalMore").onclick = () => { switchTab("setup"); openSettingsPage("goal"); };
-
+  /* No More chip. Mo: you have one, two or three goals and the strip shows
+     them; a fourth thing shaped exactly like a goal that is really a link to
+     Setup was the tab teaching people to tap a goal to go somewhere else.
+     Setup is still where goals change, reached the way every other setting is.
+     */
   /* Said once, under the strip, whenever this is not your own goal. Without
      it the tab is quietly answering a different question than the one your
      profile asked, and the only clue is which chip is lit. */
@@ -26551,92 +26497,6 @@ function renderProgressHeadline(kind, name, email, profile, third, sharing) {
   };
 }
 
-/* ---- Rearranging the Progress tab ----
-   Mo asked to be able to drag the cards into the order he wants. The order is
-   per device rather than per account, on the same reasoning as the quiet
-   switch: it is about the phone in your hand, and it needs no schema for it.
-
-   Stored as a list of card ids. Anything not in the list keeps its goal-given
-   position, so a saved order made before a card existed does not hide the new
-   card, it just does not have an opinion about where it goes. */
-const PROG_ORDER_KEY = "ft-progress-order";
-function progOrder() {
-  try { return JSON.parse(localStorage.getItem(PROG_ORDER_KEY) || "[]"); } catch { return []; }
-}
-function saveProgOrder(ids) {
-  try { localStorage.setItem(PROG_ORDER_KEY, JSON.stringify(ids)); } catch { /* private mode */ }
-}
-let PROG_ARRANGING = false;
-
-/* Pointer events, not HTML5 drag-and-drop: the latter does not fire on touch
-   at all, and this is a phone app first. One handler covers mouse and finger. */
-function startCardDrag(e, card, host) {
-  if (!PROG_ARRANGING) return;
-  e.preventDefault();
-  card.classList.add("dragging");
-  card.setPointerCapture?.(e.pointerId);
-  /* Re-based on every swap rather than measured from the original press, so a
-     long drag past several cards does not accumulate an offset and run away
-     from the finger. */
-  let anchorY = e.clientY;
-
-  const onMove = (ev) => {
-    const dy = ev.clientY - anchorY;
-    card.style.transform = `translateY(${dy}px)`;
-    const mid = card.getBoundingClientRect().top + card.offsetHeight / 2;
-    for (const other of host.querySelectorAll(".card:not(.hidden)")) {
-      if (other === card) continue;
-      const r = other.getBoundingClientRect();
-      /* Swap once the dragged card's middle passes a neighbour's middle, so
-         the list parts around it instead of jumping when two edges touch. */
-      if (mid > r.top && mid < r.bottom) {
-        /* FLIP, so the cards being displaced slide rather than teleport.
-           insertBefore is instant and unanimatable on its own: measure where
-           everything was, move it, then put each card back where it started
-           with a transform and release that to zero on the next frame. */
-        const was = new Map();
-        for (const c of host.querySelectorAll(".card:not(.hidden)")) {
-          was.set(c, c.getBoundingClientRect().top);
-        }
-        host.insertBefore(card, dy > 0 ? other.nextSibling : other);
-        card.style.transform = "";
-        for (const [c, top] of was) {
-          if (c === card) continue;
-          const delta = top - c.getBoundingClientRect().top;
-          if (!delta) continue;
-          c.style.transition = "none";
-          c.style.transform = `translateY(${delta}px)`;
-          requestAnimationFrame(() => {
-            c.style.transition = "transform .18s cubic-bezier(.2,.8,.3,1)";
-            c.style.transform = "";
-          });
-        }
-        anchorY = ev.clientY;
-        return;
-      }
-    }
-  };
-  const onUp = () => {
-    card.classList.remove("dragging");
-    card.style.transform = "";
-    for (const c of host.querySelectorAll(".card")) { c.style.transition = ""; c.style.transform = ""; }
-    document.removeEventListener("pointermove", onMove);
-    document.removeEventListener("pointerup", onUp);
-    document.removeEventListener("pointercancel", onUp);
-    saveProgOrder([...host.querySelectorAll(".card")].map((c) => c.id).filter((id) => id && id !== "progHeadline"));
-  };
-  document.addEventListener("pointermove", onMove, { passive: false });
-  document.addEventListener("pointerup", onUp);
-  document.addEventListener("pointercancel", onUp);
-}
-
-/* Collapsed, everything fits, so put the list at the top where it starts. */
-function applyArrangeZoom(host) {
-  if (!PROG_ARRANGING) return;
-  const first = host.querySelector(".card:not(#progHeadline)");
-  if (first) window.scrollTo(0, Math.max(0, first.getBoundingClientRect().top + window.scrollY - 70));
-}
-
 /* A chart or a Rive figure that mounted while its card was folded sized itself
    against a hidden, zero-width container, so it comes back as a sliver or as
    nothing. Chart.js has a real answer for exactly this (resize() against the
@@ -26655,101 +26515,58 @@ function primeOpenedCard(card) {
   else if (card.id === "cardMuscles") renderMuscleAnswers(PROGRESS_VIEW === "partner" ? partnerName() : ME);
 }
 
-function paintArrangeUI(host) {
-  /* The toggle lives in the tab when idle and becomes a fixed bar across the
-     bottom while arranging, where a thumb actually is. */
-  let toggle = host.querySelector(".prog-arrange");
-  if (!toggle) {
-    toggle = document.createElement("div");
-    toggle.className = "prog-arrange";
-    toggle.innerHTML = '<button type="button" id="progArrangeBtn">Rearrange</button>';
-    host.insertBefore(toggle, host.firstChild);
-    toggle.querySelector("button").onclick = () => setArranging(true, host);
-  }
-  toggle.classList.toggle("hidden", PROG_ARRANGING);
+/* ---- The index ----
+   Every card folds to its heading and a one line summary; tap one to open the
+   real card, one open at a time. The chevron and the click are wired here in
+   one idempotent pass rather than inside each card's own render, so a card
+   re-rendered mid-session cannot lose them.
 
-  for (const card of host.querySelectorAll(".card")) {
-    if (card.id === "progHeadline" || card.querySelector(".prog-grip")) continue;
-    const grip = document.createElement("div");
-    grip.className = "prog-grip";
-    grip.innerHTML = icon("grip", 16);
-    grip.onpointerdown = (e) => startCardDrag(e, card, host);
-    card.appendChild(grip);
-    /* The index's chevron, wired in the same idempotent pass as the grip
-       above rather than a second loop, since the guard against re-adding one
-       (querySelector(".prog-grip")) already proves this card has not been
-       through this loop before. */
-    if (card.classList.contains("idx-card")) {
-      const h2 = card.querySelector(":scope > h2");
-      if (h2 && !h2.querySelector(".idx-chev")) {
-        const chev = document.createElement("span");
-        chev.className = "idx-chev";
-        chev.innerHTML = icon("chevronRight", 16);
-        h2.appendChild(chev);
-      }
+   This used to paint Rearrange mode too: a grip on every card, a drag, and a
+   per-device saved order. Mo cut that feature outright. It was a second way
+   to organise a tab whose whole point is that it is already organised, by the
+   goal you picked, without being asked. */
+function paintProgIndex(host) {
+  for (const card of host.querySelectorAll(".idx-card")) {
+    if (card.dataset.indexed) continue;
+    card.dataset.indexed = "1";
+    const h2 = card.querySelector(":scope > h2");
+    if (h2 && !h2.querySelector(".idx-chev")) {
+      const chev = document.createElement("span");
+      chev.className = "idx-chev";
+      chev.innerHTML = icon("chevronRight", 16);
+      h2.appendChild(chev);
     }
-    /* One open at a time, so opening a second folds the first and the list
-       never grows into a scroll you have to fight while reordering. The same
-       accordion runs the index in normal browsing: PROG_ARRANGING gates every
-       card, idx-card gates only the ones the index collapses (Log your
-       weight keeps neither class and this listener leaves it alone). */
     card.addEventListener("click", (e) => {
-      if (e.target.closest(".prog-grip")) return;
-      const indexable = !PROG_ARRANGING && card.classList.contains("idx-card");
-      if (!PROG_ARRANGING && !indexable) return;
       const wasOpen = card.classList.contains("peek");
-      /* An open card is real content now, not a title strip: a chart, a lift
-         picker, a muscle figure, the weigh-in stepper. Every one of those
-         has its own click handler, and this listener sits on the whole card
-         and would otherwise see every one of those clicks too. Without this
-         guard, tapping a lift pill or typing into the weight field bubbled
-         up here, read as "close", and the card folded itself under whatever
-         somebody was actually trying to do. Only the header can close an
-         open card now; collapsed, the header IS the only visible thing, so
-         nothing here changes for opening one. */
+      /* An open card is real content, not a title strip: a chart, a lift
+         picker, a muscle figure, the weigh-in stepper. Every one of those has
+         its own click handler, and this listener sits on the whole card and
+         would otherwise see every one of those clicks too. Without this
+         guard, tapping a lift pill or typing into the weight field bubbled up
+         here, read as "close", and the card folded itself under whatever
+         somebody was actually trying to do. Only the header can close an open
+         card; collapsed, the header IS the only visible thing, so nothing
+         here changes for opening one. */
       if (wasOpen && !e.target.closest("h2")) return;
       host.querySelectorAll(".card.peek").forEach((c) => c.classList.remove("peek"));
-      /* On the weight screen the photos card only exists while it is open;
-         the Body Photos tile is how it opens. Folding it hides it again, so
-         the screen goes back to being the mockup and not the mockup plus a
-         stray "Body Photos / None yet" row under the tile that says the same. */
-      const toneUp = !$("toneHero")?.classList.contains("hidden");
-      const door = (card.id === "cardPhotos" && ($("cardWeight")?.classList.contains("wt-hero") || toneUp))
-        || (card.id === "cardStrength" && toneUp);
-      if (door && wasOpen) {
+      /* On a goal screen the photos card only exists while it is open, and
+         the Progress Photos card at the top of the screen is what opens it.
+         Folding it hides it again, so the screen goes back to being the
+         mockup and not the mockup plus a stray "Body Photos / None yet" row
+         under it saying the same thing twice. */
+      const goalScreen = $("cardWeight")?.classList.contains("wt-hero")
+        || !$("toneHero")?.classList.contains("hidden");
+      if (wasOpen && goalScreen && card.id === "cardPhotos") {
         card.classList.add("hidden");
         return;
       }
       if (!wasOpen) {
         card.classList.add("peek");
         card.scrollIntoView({ block: "nearest", behavior: "smooth" });
-        /* Arrange mode never needs this: it never lets go of a chart's true
-           size in the first place, so there is nothing for it to repair. */
-        if (indexable) primeOpenedCard(card);
+        primeOpenedCard(card);
       }
     });
   }
-}
-
-function setArranging(on, host) {
-  PROG_ARRANGING = on;
-  document.body.classList.toggle("arranging", on);
-  let bar = document.getElementById("progBar");
-  if (on) {
-    if (!bar) {
-      bar = document.createElement("div");
-      bar.id = "progBar";
-      bar.className = "prog-bar";
-      bar.innerHTML = '<span>Tap a row to see it, drag the handle to move it</span><button type="button">Save</button>';
-      document.body.appendChild(bar);
-      bar.querySelector("button").onclick = () => setArranging(false, host);
-    }
-    bar.classList.remove("hidden");
-  } else if (bar) {
-    bar.remove();
-  }
-  paintArrangeUI(host);
-  applyArrangeZoom(host);
 }
 
 /* ---- The two doors under Weight: the tape and the camera ----
@@ -26981,16 +26798,6 @@ function renderProgressTab() {
   // showing a control that would log to your own entry while looking at theirs.
   $("weightLogBlock")?.classList.toggle("hidden", isPartner);
   if (!isPartner) renderScaleCheck();
-  $("progMeBtn").classList.toggle("active", !isPartner);
-  $("progPartnerBtn").classList.toggle("active", isPartner);
-  $("progPartnerBtn").textContent = PARTNER_EMAIL ? partnerName() : "Partner";
-  /* `.tab-pill` has no disabled style of its own, and without one the pill
-     looks tappable and simply does nothing when you are training alone. */
-  const soloed = !PARTNER_EMAIL;
-  $("progPartnerBtn").disabled = soloed;
-  $("progPartnerBtn").style.opacity = soloed ? "0.45" : "";
-  $("progPartnerBtn").style.cursor = soloed ? "not-allowed" : "";
-  $("progPartnerBtn").title = soloed ? "Pair up to see their progress here" : "";
 
   const name = isPartner ? partnerName() : ME;
   const email = isPartner ? PARTNER_EMAIL : MY_EMAIL;
@@ -27092,19 +26899,7 @@ function renderProgressTab() {
   if (host?.insertBefore) {
     let after = $("progHeadline");
     for (const id of wanted) { const el = $(id); if (el) { host.insertBefore(el, after.nextSibling); after = el; } }
-    /* A saved order wins over the goal's order, because someone who dragged a
-       card there meant it. Cards it has no opinion about keep the place the
-       goal gave them. */
-    const custom = progOrder();
-    if (custom.length) {
-      let prev = $("progHeadline");
-      for (const id of custom) {
-        const el = $(id);
-        if (el && !el.classList.contains("hidden")) { host.insertBefore(el, prev.nextSibling); prev = el; }
-      }
-    }
-    paintArrangeUI(host);
-    applyArrangeZoom(host);
+    paintProgIndex(host);
     host.insertBefore(rule, after.nextSibling);
     after = rule;
     for (const id of rest) { const el = $(id); if (el) { host.insertBefore(el, after.nextSibling); after = el; } }
