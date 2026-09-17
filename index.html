@@ -11699,21 +11699,17 @@ function renderOnboardStep(step, data = {}) {
     ];
     const chosen = data.intensity || null;
     const range = (a) => (a[0] === a[1] ? `${a[0]}` : `${a[0]} to ${a[1]}`);
-    /* Rounded, because "2.3 to 3.8 hours" is a decimal nobody asked for and it
-       reads as a measurement rather than an estimate. Halves below two hours,
-       where half an hour is a real difference, whole numbers above it, where it
-       is noise. */
-    const hours = (t) => {
-      const round = (h) => (h < 2 ? Math.round(h * 2) / 2 : Math.round(h));
-      const lo = round(t.sessions[0] * t.mins / 60);
-      const hi = round(t.sessions[1] * t.mins / 60);
-      return lo === hi ? `${lo}` : `${lo} to ${hi}`;
-    };
+    /* The third estimate is how long one session runs, not how many hours the
+       week adds up to. Mo: the hours total does not mean anything to anybody.
+       He is right, and it is worse than meaningless, it is the only number here
+       that has to be done in your head before it tells you anything. How long
+       tonight will take is the thing somebody is actually deciding about, and
+       it is the number they can check against an evening. */
     ob.innerHTML = `
       <div class="ob-step">
         ${obChrome("days", data)}
         <h1>How hard do you want to go?</h1>
-        <p class="sub">Everything here is an estimate, and all of it moves later. Pick the one you would still do in a bad week.</p>
+        <p class="sub">Roughly what each one asks of you. All of it moves later, so pick the one you would still do in a bad week.</p>
         <div class="ob-tiers" id="tierGrid">
           ${TIERS.map((t) => `<button type="button" class="ob-tier heat-${t.heat}${chosen === t.id ? " on" : ""}" data-tier="${t.id}">
             <span class="obt-top"><span class="obt-head">${t.head}</span>
@@ -11721,7 +11717,7 @@ function renderOnboardStep(step, data = {}) {
             <span class="obt-ests">
               <span class="obt-est"><b>${range(t.days)}</b><small>days a week</small></span>
               <span class="obt-est"><b>${range(t.sessions)}</b><small>sessions</small></span>
-              <span class="obt-est"><b>${hours(t)}</b><small>hours</small></span>
+              <span class="obt-est"><b>${t.mins} min</b><small>per session</small></span>
             </span>
             <span class="obt-blurb">${escapeHtml(t.blurb)}</span>
           </button>`).join("")}
