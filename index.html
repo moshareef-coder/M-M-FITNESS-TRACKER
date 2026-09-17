@@ -4557,36 +4557,40 @@
   .person-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
   .person-toggle .tab-pill { flex: 1; padding: 9px 14px; font-size: 14px; }
 
-  /* The goal lens. Scrolls sideways rather than wrapping, because eight goals
-     wrapped to three rows is a menu, and this is meant to read as a strip you
-     flick through. Bleeds to the screen edges so the last chip is visibly cut
-     off: that is the only honest affordance for "there is more this way". */
-  .goal-chips {
-    display: flex; gap: 8px; overflow-x: auto; margin: 0 -18px 14px; padding: 2px 18px 4px;
-    scrollbar-width: none; -webkit-overflow-scrolling: touch;
-  }
-  .goal-chips::-webkit-scrollbar { display: none; }
+  /* The goal strip: YOUR goals, not the menu. The main goal, the extras from
+     Setup (two at most), then More, which is the door to the page that
+     changes them. Four chips at most, so it no longer scrolls or bleeds: each
+     chip takes an equal share of the row, capped so that one goal and More do
+     not become two slabs. Taller than wide on purpose, icon over a two line
+     label, so the row reads as tabs rather than pills. */
+  .goal-chips { display: flex; gap: 8px; margin: 0 0 14px; }
   .goal-chip {
-    flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 5px;
-    min-width: 72px; padding: 9px 11px 8px; border-radius: 14px; cursor: pointer;
+    flex: 1 1 0; min-width: 0; max-width: 112px; min-height: 84px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+    padding: 10px 6px 9px; border-radius: 14px; cursor: pointer;
     border: 1px solid var(--border); background: var(--panel); color: var(--muted);
     font: inherit; font-size: 11.5px; font-weight: 700; line-height: 1.2; text-align: center;
     position: relative; transition: border-color .15s, color .15s, background .15s;
   }
-  .goal-chip svg { color: var(--muted); }
+  .goal-chip svg { color: var(--muted); flex-shrink: 0; }
+  .goal-chip span { display: block; overflow-wrap: anywhere; }
+  /* The lit chip: green edge, green icon, and the label in plain text colour.
+     The label used to go green too, and three green things on one chip is a
+     badge, not a selected tab. */
   .goal-chip.on {
-    border-color: var(--accent); color: var(--accent-ink);
+    border-color: var(--accent); color: var(--text);
     background: color-mix(in srgb, var(--accent) 9%, var(--panel));
     box-shadow: 0 0 0 1px var(--accent) inset;
   }
   .goal-chip.on svg { color: var(--accent-ink); }
   /* Your actual goal, whichever chip is being looked at. A dot rather than a
-     word, because the row is already carrying eight labels. */
+     word, because the chip is already carrying two lines. */
   .goal-chip.mine::after {
     content: ""; position: absolute; top: 6px; right: 7px; width: 6px; height: 6px;
     border-radius: 50%; background: var(--accent);
   }
   .goal-chip.on.mine::after { background: var(--accent-ink); }
+  .goal-chip:active { border-color: var(--accent); }
   /* Looking at a goal that is not yours: say so once, quietly, with the way back. */
   .goal-lens-note {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -25696,13 +25700,41 @@ function headlineSpark(kind, name) {
   return "";
 }
 
-/* The goal strip. Your own goal first and dotted, then the rest in the order
-   the picker offers them, so the row reads as "yours, and what else there is"
-   rather than a menu you have to find yourself in.
+/* The goal strip: the goals YOU have, as tabs. Your main goal first and
+   dotted, then the extras Setup let you add (two at most), then More, which
+   is the door to the goal page. It used to list all eight tiles, which made
+   the top of Progress a menu of things you had not picked; Mo: "at the top
+   tabs it will show the 3 goals they have and they can click on them to see
+   their progress specifically for that."
 
    Hidden on a partner's view: their goal is theirs, and a lens that re-reads
    somebody else's data through a goal they did not pick answers a question
    nobody asked. */
+
+/* Which two lines a chip carries. The tile titles are sentences ("Lose
+   weight", "Build endurance"); a chip is a label, so it breaks at the first
+   space and capitalises the second line. The one long title is cut to its
+   first two words: the chip is 80px wide and "and stay consistent" is three
+   more lines under it. */
+function goalChipLines(tile) {
+  const words = String(tile?.title || "").split(" ");
+  let l2 = tile?.id === "feel-better" ? (words[1] || "") : words.slice(1).join(" ");
+  if (l2) l2 = l2[0].toUpperCase() + l2.slice(1);
+  return [words[0] || "", l2];
+}
+
+/* A profile saved before the bubbles existed carries only the legacy `goal`
+   string ("Lose weight"), and headlineKindFor already reads that one. The
+   strip has to as well, or such an account sees its goal named in the hero
+   and a strip above it holding nothing but More. Spelled out per key rather
+   than searched by tile.legacy, because four tiles share "consistent" and the
+   first of them is Build endurance. */
+function legacyGoalBubble(goalText) {
+  const key = GOALS.find((g) => g.goal === goalText || g.label === goalText)?.key;
+  return { lose: "lose-weight", muscle: "build-muscle", stronger: "get-stronger",
+           recomp: "tone-lean-abs", consistent: "consistent" }[key] || null;
+}
+
 function renderGoalChips(profile) {
   const host = $("progGoalChips");
   if (!host) return;
@@ -25714,16 +25746,37 @@ function renderGoalChips(profile) {
      migrate one returns something for a goal nobody picked. */
   const mine = profile?.goal_bubble
     ? (migrateGoalPick(profile.goal_bubble, profile.goal_child || null)?.bubble || profile.goal_bubble)
-    : null;
+    : legacyGoalBubble(profile?.goal);
   const showing = PROGRESS_GOAL_LENS || mine;
-  const ordered = [...GOAL_TILES].sort((a, b) => (b.id === mine ? 1 : 0) - (a.id === mine ? 1 : 0));
 
-  host.innerHTML = ordered.map((t) => `
+  /* Yours, and only yours. normaliseGoalSecondary already migrates retired
+     ids, drops ones the tiles cannot draw and stops at two; the column behind
+     it is still unapplied on the live database (PENDING_PROFILE_COLUMNS), so
+     on most accounts it is missing or null, the list comes back empty, and
+     the strip is one chip and More. Nothing in here may depend on it. */
+  const ids = [];
+  if (goalTileFor(mine)) ids.push(mine);
+  for (const s of normaliseGoalSecondary(profile?.goal_secondary)) {
+    if (!ids.includes(s.bubble)) ids.push(s.bubble);
+  }
+  /* A lens left up on a goal that has since come off the profile still has
+     to be on screen, or the tab is lit by a chip nobody can see to clear. */
+  if (showing && goalTileFor(showing) && !ids.includes(showing)) ids.push(showing);
+
+  const chip = (t) => {
+    const [l1, l2] = goalChipLines(t);
+    return `
     <button type="button" class="goal-chip${t.id === showing ? " on" : ""}${t.id === mine ? " mine" : ""}"
       data-goal="${escapeHtml(t.id)}" aria-pressed="${t.id === showing}">
-      ${icon(t.ico, 19)}
-      <span>${escapeHtml(t.title)}</span>
-    </button>`).join("");
+      ${icon(t.ico, 20)}
+      <span>${escapeHtml(l1)}${l2 ? `<br>${escapeHtml(l2)}` : ""}</span>
+    </button>`;
+  };
+  host.innerHTML = ids.map((id) => chip(goalTileFor(id))).join("") + `
+    <button type="button" class="goal-chip goal-chip-more" id="progGoalMore" aria-label="More goals">
+      ${icon("more", 20)}
+      <span>More</span>
+    </button>`;
 
   host.querySelectorAll("[data-goal]").forEach((b) => {
     b.onclick = () => {
@@ -25734,6 +25787,9 @@ function renderGoalChips(profile) {
       renderProgressTab();
     };
   });
+  /* More is not a lens, it is the way to the page that changes the goals.
+     Setup first so the page has a tab under it to come back to. */
+  $("progGoalMore").onclick = () => { switchTab("setup"); openSettingsPage("goal"); };
 
   /* Said once, under the strip, whenever this is not your own goal. Without
      it the tab is quietly answering a different question than the one your
