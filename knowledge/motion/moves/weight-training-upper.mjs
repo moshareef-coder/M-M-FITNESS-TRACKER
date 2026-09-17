@@ -192,16 +192,46 @@ const CABLE_FLY = {
     { type: "cable", x: 130, top: 10, y0: 44, grip: "handle", to: { side: "R", point: "hand" }, front: true },
   ],
   keys: [
-    { // open, arms wide at shoulder height, chest stretched
+    { // open, arms wide at shoulder height and a little forward of the body,
+      // chest stretched, elbows soft and fixed for the whole rep
       t: 0,
       root: { x: 70, y: 61.4, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 86, shoulderL: 86, elbowR: 22, elbowL: 22 },
+      joints: {
+        spine: 0, neck: 0,
+        shoulderR: 88, shoulderL: 88, shoulderAbdR: 10, shoulderAbdL: 10,
+        shoulderRotR: -20, shoulderRotL: -20, elbowR: 22, elbowL: 22,
+      },
       ik: { ...stand(78, 62) },
     },
-    { // closed, hands crossing in front of the hips, elbows still soft
+    { /* Closed: the hands meet IN FRONT OF THE CHEST, arms forward, like going
+         in for a hug. Mo: "his arms should be facing as if he was going in for
+         a hug... both arms are forward. Hugging." This used to finish at
+         shoulder -12, which points the arms DOWN and slightly behind the body,
+         so the near hand ended up level with the hip and read as being behind
+         his backside. That is a low crossover, not a chest fly.
+
+         Getting the hands to the midline in a FRONT view takes three channels,
+         not one. shoulderAbd swings the arm forward at the camera, which
+         foreshortens it. The in-plane shoulder angle brings it across the
+         body. And shoulderRot turns the elbow's own swing plane, which is the
+         only thing that decides whether the forearm folds inward toward the
+         midline or outward away from it; without it the hands stay 30 units
+         apart no matter what the other two do.
+
+         The exact numbers are a balance, not an optimum. Pushed all the way
+         the hands meet at the midline, which is correct and unreadable: both
+         arm segments end up pointed straight at the lens and the arms vanish
+         into the torso, leaving two handles floating at the chest. These land
+         the hands 9 units apart at chest height with the ELBOWS still outside
+         them, which is the shape of a hug, and keep enough upper arm on screen
+         to see. */
       t: 1,
       root: { x: 70, y: 62, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: -12, shoulderL: -12, elbowR: 28, elbowL: 28 },
+      joints: {
+        spine: 0, neck: 0,
+        shoulderR: -28, shoulderL: -28, shoulderAbdR: 55, shoulderAbdL: 55,
+        shoulderRotR: -95, shoulderRotL: -95, elbowR: 30, elbowL: 30,
+      },
       ik: { ...stand(78, 62) },
     },
   ],
