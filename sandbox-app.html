@@ -1589,6 +1589,38 @@
     content: ""; position: absolute; left: 0; top: 8px;
     width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
   }
+  /* The paywall carousel. One real screenshot per feature, swiped rather than
+     scrolled with a bar, because a phone-sized card is the one thing this
+     content should always be shown at: shrinking it to fit a list item would
+     make the screenshot too small to read.
+     scroll-snap rather than a JS-driven slider: free momentum, free rubber
+     banding at the ends, no per-frame code to keep in sync with a finger. */
+  .paywall-carousel { margin: 4px -20px 6px; }
+  .paywall-carousel-track {
+    display: flex; gap: 12px; overflow-x: auto; padding: 0 20px 4px;
+    scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .paywall-carousel-track::-webkit-scrollbar { display: none; }
+  .paywall-slide {
+    flex: 0 0 auto; width: min(72vw, 260px); scroll-snap-align: center;
+    border-radius: 16px; overflow: hidden; background: var(--panel-2, var(--panel));
+    border: 1px solid var(--line, rgba(128,128,128,.18));
+  }
+  .paywall-slide img {
+    display: block; width: 100%; aspect-ratio: 9 / 16; object-fit: cover;
+    /* The screenshot's own top, where the app's real status bar and header
+       already sit, so the card is not doubling up a crop line against
+       whatever the phone's own notch is doing. */
+    object-position: top;
+    background: var(--panel-2, var(--panel));
+  }
+  .paywall-slide-caption { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 2px; }
+  .paywall-slide-caption b { font-size: 13.5px; color: var(--text); }
+  .paywall-slide-caption span { font-size: 12px; color: var(--muted); line-height: 1.3; }
+  .paywall-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+  .paywall-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line, rgba(128,128,128,.3)); transition: background .15s, transform .15s; }
+  .paywall-dot.on { background: var(--accent); transform: scale(1.25); }
   /* One blocked person. The address can be long and the button must not be
      pushed off the edge by it, so the name takes the slack and ellipsises. */
   .block-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
@@ -4639,10 +4671,9 @@
   .prog-tile-sub { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
   .prog-tile-sub.go { color: var(--accent-ink); font-weight: 700; }
   .prog-tile-chev { position: absolute; top: 12px; right: 9px; color: var(--muted); display: flex; }
-  .prog-tile-log {
-    grid-column: 1 / -1; padding: 14px 15px 15px; border-radius: var(--radius);
-    border: 1px solid var(--border); background: var(--card-fill); box-shadow: var(--shadow-card);
-  }
+  /* Four steppers stacked in the measurements sheet, each the weigh-in's
+     geometry (round button, field, round button) under its own small label. */
+  .meas-item + .meas-item { margin-top: 18px; }
   .waist-input {
     width: 100%; max-width: 150px; min-width: 0; text-align: right; padding: 0;
     background: none; border: none; color: var(--text);
@@ -4654,6 +4685,45 @@
   /* Arrange mode lists cards by title; these are not cards and have nothing to say there. */
   body.arranging .prog-tiles { display: none; }
   .photo-date { font-size: 12.5px; color: var(--muted); text-align: center; margin-top: 5px; }
+
+  /* Start beside Now. The two photos share the strip's frame (116x155, 11px
+     corners) scaled to half a card each, so the compare reads as the same
+     objects the full strip shows, just picked out. The frame is painted before
+     any URL resolves: a signed URL takes a round trip, and an <img> with no
+     src is a broken-image glyph on iOS, which reads as "my photo is gone". */
+  .cmp-card .card-head { margin-bottom: 14px; }
+  /* A two-row grid, frames on the first row and captions on the second, so
+     the disc between the photos can be centred on the frame row by the grid
+     itself. A percentage top would measure the captions too and land the
+     disc a line low, which is where the first cut of this put it. */
+  .cmp-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 12px; align-items: start; }
+  .cmp-slot { display: contents; }
+  .cmp-slot.l > * { grid-column: 1; }
+  .cmp-slot.r > * { grid-column: 2; }
+  .cmp-frame { grid-row: 1; }
+  .cmp-cap { grid-row: 2; }
+  .cmp-frame {
+    position: relative; width: 100%; aspect-ratio: 116 / 155; border-radius: 11px; overflow: hidden;
+    background: var(--panel-2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; color: var(--muted);
+  }
+  .cmp-frame img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block;
+    opacity: 0; transition: opacity .18s ease;
+  }
+  .cmp-frame img.in { opacity: 1; }
+  .cmp-cap { text-align: center; margin-top: 7px; min-width: 0; }
+  .cmp-cap b { display: block; font-size: 13.5px; font-weight: 700; color: var(--text); line-height: 1.25; }
+  .cmp-cap span { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.3; margin-top: 2px; }
+  /* Decorative, so no hit target is bought for it. */
+  .cmp-chev {
+    grid-row: 1; grid-column: 1 / -1; place-self: center; z-index: 1;
+    width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: var(--panel); border: 1px solid var(--border); color: var(--muted); box-shadow: var(--shadow-float);
+    pointer-events: none;
+  }
+  .cmp-line { font-size: 13.5px; color: var(--muted); margin: 0; line-height: 1.4; }
+  .cmp-card .btn-secondary { margin-top: 12px; }
 
   /* Seasons */
   .season-card {
@@ -5062,6 +5132,50 @@
   #cardWeight.wt-hero .chart-wrap { height: 176px; }
   #cardWeight.wt-hero .wt-pill { border-radius: 100px; min-height: 36px; padding: 8px 0; }
   #cardWeight.wt-hero .wt-log { margin-top: 14px; padding-top: 14px; }
+
+  /* ---- The tone hero (renderToneHero) ----
+     The recomp goal's screen, the same shape as the weight hero above but led
+     by the tape rather than the scale: a title, the four measurement chips,
+     one card with the number, the start column and the line, then the photos,
+     the two tiles and the two ways in. Colour is all tokens, so one layout
+     holds in both themes. Not a card, so arrange mode does not list it, same
+     as the tiles under Weight. */
+  body.arranging #toneHero { display: none; }
+  .tone-head { margin: 2px 0 12px; }
+  .tone-head .wth-title { margin-top: 0; }
+  .tone-chips { display: flex; gap: 8px; margin-bottom: 12px; }
+  .tone-chip {
+    flex: 1; min-width: 0; min-height: 36px; padding: 8px 0; border-radius: 100px; cursor: pointer;
+    background: var(--panel-2); border: 1px solid transparent; color: var(--muted);
+    font-family: inherit; font-size: 12.5px; font-weight: 700;
+  }
+  .tone-chip.on { background: var(--accent); color: var(--on-accent); }
+  .tone-chip:active { transform: scale(.97); }
+  #toneHero .tone-card {
+    position: relative; overflow: hidden; margin-bottom: 10px;
+    background: color-mix(in srgb, var(--me) 10%, var(--panel)); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 15px; box-shadow: var(--shadow-lift);
+  }
+  #toneHero .wth-stats { margin-top: 0; }
+  #toneHero .wth-now-fig { margin-top: 6px; }
+  /* No readings is a state, not a number: it is set in the display face at the
+     title size so the card still has a head, but never at the number size. */
+  .tone-none { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin-top: 6px; }
+  #toneHero .chart-wrap { height: 176px; margin-top: 14px; }
+  .tone-empty { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
+  #toneHero .wt-pill { border-radius: 100px; min-height: 36px; padding: 8px 0; }
+  .tone-photos { margin-bottom: 10px; }
+  .tone-photos:empty { display: none; }
+  /* "Workout Consistency" does not fit on one line beside an icon in a half
+     width tile, so these two titles may wrap where the tiles under Weight may
+     not; the grid keeps the pair the same height. */
+  .tone-tiles .prog-tile-title { white-space: normal; }
+  .tone-tiles .prog-tile[disabled] { cursor: default; }
+  .tone-tiles .prog-tile[disabled]:active { border-color: var(--border); }
+  .tone-actions { margin-bottom: 10px; }
+  .tone-actions .btn-primary, .tone-actions .btn-secondary {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  }
   .wt-logrow {
     display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; margin: 0;
     background: none; border: 0; color: inherit; font-family: inherit; text-align: left; cursor: pointer;
@@ -5748,6 +5862,35 @@
 
     <div class="card" id="progHeadline"></div>
 
+    <!-- The Tone Up screen (renderToneHero), for the recomp goal only. Not a
+         card: the goal order and a saved drag order both walk past it, and it
+         is pinned straight under the headline card it stands in for. Strength
+         and Body photos stay in the DOM hidden while this is up; the Strength
+         tile and the Add photos button are their doors, the same way the
+         Body Photos tile is Photos' door under the weight hero. -->
+    <div class="tone-screen hidden" id="toneHero">
+      <div class="tone-head">
+        <div class="wth-title" id="toneTitle">Tone up</div>
+        <div class="wth-sub">Track your measurements, body photos, consistency, and strength.</div>
+      </div>
+      <div class="tone-chips" id="toneChips"></div>
+      <div class="tone-card">
+        <div class="wth-stats" id="toneStats"></div>
+        <div class="chart-wrap"><canvas id="toneChart"></canvas></div>
+        <p class="tone-empty hidden" id="toneEmpty">Log a measurement to start the line.</p>
+        <div class="wt-range" id="toneRange"></div>
+      </div>
+      <div class="tone-photos" id="tonePhotos"></div>
+      <div class="prog-tiles tone-tiles" id="toneTiles">
+        <button type="button" class="prog-tile" id="toneConsistency" disabled></button>
+        <button type="button" class="prog-tile" id="toneStrength"></button>
+      </div>
+      <div class="tone-actions" id="toneActions">
+        <button type="button" class="btn-primary" id="toneLogBtn"></button>
+        <button type="button" class="btn-secondary" id="tonePhotoBtn"></button>
+      </div>
+    </div>
+
 
     <!-- Same shape as Getting stronger: one line, then the picture, then
          nothing until somebody asks. The four stat tiles and the standing list
@@ -5810,22 +5953,6 @@
     <div class="prog-tiles hidden" id="progTiles">
       <button type="button" class="prog-tile" id="tileWaist"></button>
       <button type="button" class="prog-tile" id="tilePhotos"></button>
-      <!-- The only place a waist reading is logged. Same round-button geometry
-           as the weigh-in above it, in half-inch steps, and it stays folded
-           until the tile is tapped. -->
-      <div class="prog-tile-log hidden" id="waistLogBlock">
-        <div class="wt-log-head">Today's waist</div>
-        <div class="weigh-row">
-          <button type="button" class="round-btn" id="waistMinus" aria-label="Down 0.5">&minus;</button>
-          <div class="weigh-field">
-            <input type="number" class="waist-input" id="waistInput" inputmode="decimal" step="0.5" min="0"
-                   placeholder="0.0" autocomplete="off" aria-label="Waist" />
-            <span class="weigh-unit">in</span>
-          </div>
-          <button type="button" class="round-btn" id="waistPlus" aria-label="Up 0.5">+</button>
-        </div>
-        <button type="button" class="btn-primary" id="waistSaveBtn" style="margin-top:12px;">Save</button>
-      </div>
     </div>
 
     <div class="card metric-card idx-card" id="cardConsistency">
@@ -5891,6 +6018,14 @@
          than one lift at a time. -->
     <div class="sheet-scrim hidden" id="reportScrim">
       <div class="partner-sheet" id="reportSheet"></div>
+    </div>
+
+    <!-- The one place a tape measurement is logged. Waist, hips, thighs and
+         arms in one sheet, opened by the Waist Trend tile and by Tone Up's
+         Log measurements button, so the two doors lead to the same room.
+         Filled by renderMeasurementsSheet(). -->
+    <div class="sheet-scrim hidden" id="measureScrim">
+      <div class="partner-sheet" id="measureSheet"></div>
     </div>
 
     <div class="card metric-card idx-card" id="cardVolume">
@@ -6644,7 +6779,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.16";
+const APP_VERSION = "2026.09.16.17";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -6780,6 +6915,7 @@ const ICON_PATHS = {
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.9 2.9l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V19a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.9-2.9l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H4a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.9-2.9l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.6V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.9 2.9l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.6 1H20a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.6 1Z"/>',
   target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/>',
   people: '<circle cx="9" cy="8" r="3"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><circle cx="17.5" cy="9" r="2.4"/><path d="M15.5 12.2c2.3.3 4 2 4 4.3"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>',
   /* A tape measure: the reel, and a length pulled out with the tick marks on
      it. The waist tile's icon, and nothing else uses it yet. */
   tape: '<circle cx="8" cy="12" r="5"/><circle cx="8" cy="12" r="1.2" fill="currentColor" stroke="none"/><path d="M12.2 15.5H21v-3h-8"/><path d="M15 12.5v1.6M18 12.5v1.6"/>',
@@ -10397,7 +10533,7 @@ async function reconcileNativeSurfaces() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "liftsScrim", "reportScrim"]
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "liftsScrim", "reportScrim", "measureScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
   stopGenTicker();
   $("genScrim")?.classList.add("hidden");
@@ -13705,12 +13841,17 @@ async function reportClip(clip) {
    a paywall, so this string and that product are changed together. */
 const PREMIUM_PRICE = "$7.99";
 
+/* One real screenshot per feature, captured from the app itself rather than
+   drawn, because a carousel showing something the app does not actually do is
+   Guideline 2.3, misleading metadata, and it is also just a lie to whoever is
+   about to pay based on it. Re-capture with the sandbox and CDP if any of
+   these five screens changes shape. */
 const PREMIUM_UNLOCKS = [
-  ["Workouts made for you", "A plan every day, built around your goal and what you lifted last time."],
-  ["Plan your week", "Decide the shape of the week ahead instead of deciding every morning."],
-  ["Body impact", "Which muscles you have actually worked, and which ones you keep missing."],
-  ["The full picture", "Trends, projections and your records ranked."],
-  ["Make it yours", "Accent colours."],
+  ["paywall/01-generated-workout.jpg", "Workouts made for you", "A plan every day, built around your goal and what you lifted last time."],
+  ["paywall/02-week-plan.jpg", "Plan your week", "Decide the shape of the week ahead instead of deciding every morning."],
+  ["paywall/03-body-impact.jpg", "Body impact", "Which muscles you have actually worked, and which ones you keep missing."],
+  ["paywall/04-progress-records.jpg", "The full picture", "Trends, projections and your records ranked."],
+  ["paywall/05-accent-colors.jpg", "Make it yours", "Accent colours."],
 ];
 
 /* The gate. Returns true when the thing may go ahead, and otherwise puts the
@@ -13741,10 +13882,24 @@ function showPaywall() {
             <div class="pop-who" style="color:var(--muted)">UNIO PREMIUM</div>
             <button type="button" class="ds-x" data-pay="0" aria-label="Close">&times;</button>
           </div>
-          <ul class="push-promise">
-            ${PREMIUM_UNLOCKS.map(([t, d]) => `
-              <li><b>${escapeHtml(t)}</b><span>${escapeHtml(d)}</span></li>`).join("")}
-          </ul>
+          <!-- Swipe through what it actually looks like before reading a word
+               about it. People buy what they can picture themselves using, and
+               a bullet list only describes; this shows the real screen. -->
+          <div class="paywall-carousel" id="paywallCarousel">
+            <div class="paywall-carousel-track" id="paywallCarouselTrack">
+              ${PREMIUM_UNLOCKS.map(([img, t, d]) => `
+                <div class="paywall-slide">
+                  <img src="${img}" alt="${escapeHtml(t)}" loading="lazy" />
+                  <div class="paywall-slide-caption">
+                    <b>${escapeHtml(t)}</b>
+                    <span>${escapeHtml(d)}</span>
+                  </div>
+                </div>`).join("")}
+            </div>
+            <div class="paywall-dots" id="paywallDots">
+              ${PREMIUM_UNLOCKS.map((_, i) => `<span class="paywall-dot${i === 0 ? " on" : ""}"></span>`).join("")}
+            </div>
+          </div>
           <!-- One subscription covers both of you. Said here rather than in the
                small print, because it is the difference between five a month
                and two people each paying five a month. -->
@@ -13764,6 +13919,21 @@ function showPaywall() {
         </div>
       </div>`;
     document.body.appendChild(scrim);
+    /* The dots track a scroll position rather than a click handler, because
+       the track scrolls by touch and by the arrow-key/trackpad affordances a
+       horizontal overflow gets for free, and both need to land on the same
+       dot. Read off which slide is nearest centre rather than exact card
+       width math, so a device where the card is not quite the width the CSS
+       asked for still lights up the right dot. */
+    const carouselTrack = scrim.querySelector("#paywallCarouselTrack");
+    const dots = scrim.querySelectorAll(".paywall-dot");
+    if (carouselTrack && dots.length) {
+      carouselTrack.addEventListener("scroll", () => {
+        const slideWidth = carouselTrack.firstElementChild?.offsetWidth || 1;
+        const i = Math.round(carouselTrack.scrollLeft / slideWidth);
+        dots.forEach((d, di) => d.classList.toggle("on", di === i));
+      }, { passive: true });
+    }
     const close = (v) => { scrim.remove(); resolve(v); };
     scrim.querySelectorAll("[data-pay]").forEach((b) => {
       b.onclick = async () => {
@@ -15309,6 +15479,266 @@ function renderWeightHero(on, profile, isPartner) {
     renderWeightHero(true, profile, isPartner);
     if (WT_LOG_OPEN) log.scrollIntoView({ block: "nearest", behavior: "smooth" });
   };
+}
+
+/* ---- The Tone Up screen ----
+   What renderWeightHero is to a weight goal, this is to recomp: for
+   kind === "recomp" this block is the whole tab and every card stands down.
+   The claim of the goal is that the scale barely moves, so it leads with the
+   tape instead: one measurement at a time (the chips), its number, where it
+   started in the window, and the line. Photos, this week's consistency and a
+   one word strength verdict sit under it, then the two ways in. Strength and
+   Photos stay in the DOM hidden as doors (the tile, the Add button) and fold
+   back to hidden, the way Photos does under the weight hero.
+
+   No readings is drawn as no readings. The number, the delta, the start
+   column and the line each appear only when there is a reading to stand
+   behind them; nothing here is ever filled in with a placeholder figure.
+   The tape data is measurementSeries / measurementSummary and the compare
+   card is renderComparePhotos; each is looked up rather than assumed so this
+   screen degrades to its empty state, not a throw, on a build without one. */
+const TONE_RANGES = [["1M", 4], ["3M", 13], ["6M", 26], ["1Y", 52]];
+let TONE_MEASURE = "waist_in";
+let TONE_RANGE = "3M";
+let toneChart = null;
+
+function toneWeeks() {
+  return (TONE_RANGES.find(([k]) => k === TONE_RANGE) || TONE_RANGES[1])[1];
+}
+
+/* One word for the bar over the window, judged only on lifts that have a
+   standard (LIFT_STANDARDS): a dumbbell or a machine number cannot be read
+   honestly, so it cannot be read here either. Two pounds either way is e1rm
+   rounding, not a direction, so it is Maintained rather than Up or Slipping. */
+function toneStrengthState(name, weeks) {
+  const moves = strengthMovement(name, weeks)
+    .filter((m) => LIFT_STANDARDS[(m.name || "").trim().toLowerCase()]);
+  if (!moves.length) return "No lifts logged";
+  if (moves.some((m) => m.gain < -2)) return "Slipping";
+  if (moves.some((m) => m.gain > 2)) return "Up";
+  return "Maintained";
+}
+
+/* The doors. A door opens its card (un-hidden, expanded) under the screen
+   and any other open door goes back to hidden, so the screen never grows a
+   second folded row; folding the card by its header hides it again (the
+   accordion in paintArrangeUI). Strength is drawn on open rather than with
+   the tab, because renderProgressTab only draws the cards it shows. */
+function openToneDoor(id) {
+  const card = $(id);
+  if (!card) return;
+  document.querySelectorAll("#tab-progress .card.peek").forEach((c) => {
+    c.classList.remove("peek");
+    if (c.id === "cardPhotos" || c.id === "cardStrength") c.classList.add("hidden");
+  });
+  card.classList.remove("hidden");
+  card.classList.add("peek");
+  if (id === "cardStrength") { renderStrengthChart(); renderStrengthStats(); }
+  primeOpenedCard(card);
+  card.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+function renderToneHero(on, profile, isPartner) {
+  const el = $("toneHero");
+  if (!el) return;
+  el.classList.toggle("hidden", !on);
+  if (!on) {
+    if (toneChart) { toneChart.destroy(); toneChart = null; }
+    return;
+  }
+  /* The headline card stands down, as under the weight hero: this is the
+     answer. It also sits directly under where the headline was, whatever the
+     reorder just did to the hidden cards, so a door opens under the screen
+     and not over it. */
+  const head = $("progHeadline");
+  head?.classList.add("hidden");
+  if (head?.parentNode && head.nextSibling !== el) head.parentNode.insertBefore(el, head.nextSibling);
+
+  const name = isPartner ? partnerName() : ME;
+  const email = isPartner ? PARTNER_EMAIL : MY_EMAIL;
+  /* Same gate the Strength card itself is behind: a partner who keeps their
+     workout detail private is not scored on it here either. */
+  const sharing = !isPartner || PARTNER_PROFILE?.share_workout_details !== false;
+  const weeks = toneWeeks();
+  const measures = typeof MEASUREMENTS !== "undefined" ? MEASUREMENTS : [];
+  const measure = measures.find((m) => m.key === TONE_MEASURE) || measures[0] || { key: TONE_MEASURE, label: "Waist" };
+  TONE_MEASURE = measure.key;
+  const again = () => renderToneHero(true, profile, isPartner);
+
+  $("toneTitle").textContent = goalTileFor("tone-lean-abs")?.title || "Tone up";
+
+  /* One measurement at a time. Selected is the accent, the same language as
+     the range pills under the chart. */
+  const chips = $("toneChips");
+  chips.innerHTML = measures.map((m) =>
+    `<button type="button" class="tone-chip${m.key === measure.key ? " on" : ""}" data-key="${escapeHtml(m.key)}">${escapeHtml(m.label)}</button>`).join("");
+  chips.querySelectorAll("[data-key]").forEach((b) => {
+    b.onclick = () => { TONE_MEASURE = b.dataset.key; again(); };
+  });
+
+  const series = typeof measurementSeries === "function" ? (measurementSeries(name, measure.key, weeks) || []) : [];
+  const sum = typeof measurementSummary === "function" ? measurementSummary(name, measure.key, weeks) : null;
+  const inch = (v) => Number(v).toFixed(1);
+  const stats = $("toneStats");
+  if (!series.length || sum?.now == null) {
+    stats.innerHTML = `<div class="wth-now">
+      <div class="wth-eyebrow">${escapeHtml(measure.label)}</div>
+      <div class="tone-none">No readings yet</div>
+    </div>`;
+  } else {
+    /* The delta is over the readings actually in the window, so it says the
+       weeks between the first and the last of them rather than the size of
+       the window: "in 13 weeks" over a line that started 8 weeks ago would be
+       a claim about five weeks nobody measured. Down is good on this goal
+       (idx-good is the down colour everywhere on the tab). */
+    const many = series.length >= 2;
+    const span = many ? Math.max(1, Math.round(daysBetween(series[0].entry_date, series[series.length - 1].entry_date) / 7)) : 0;
+    const d = sum.delta;
+    let delta = "";
+    if (many) {
+      const flat = Math.abs(d) < 0.05;
+      const cls = flat ? "" : d < 0 ? "idx-good" : "idx-bad";
+      const sign = flat ? "" : d < 0 ? "-" : "+";
+      delta = `<div class="wth-now-delta ${cls}">${sign}${inch(Math.abs(d))} in in ${span} week${span === 1 ? "" : "s"}</div>`;
+    }
+    /* The start column only once there is a start to compare against. The
+       bar is the percent itself, not a percent of some target this goal does
+       not carry: 5% down is a short bar because 5% is a short way. */
+    let start = "";
+    if (many && sum.start != null) {
+      const pct = Number(sum.pctDown) || 0;
+      const fill = Math.min(100, Math.max(0, pct));
+      start = `<div class="wth-target">
+        <div class="wth-target-label">Start</div>
+        <div class="wth-target-val">${inch(sum.start)} in</div>
+        <div class="wth-bar"><b style="width:${fill}%"></b></div>
+        <div class="wth-target-pct">${Math.abs(pct) % 1 ? Math.abs(pct).toFixed(1) : Math.round(Math.abs(pct))}% ${pct < 0 ? "up" : "down"}</div>
+      </div>`;
+    }
+    stats.innerHTML = `<div class="wth-now">
+      <div class="wth-eyebrow">${escapeHtml(measure.label)}</div>
+      <div class="wth-now-fig"><b>${inch(sum.now)}</b><i>in</i></div>
+      ${delta}
+    </div>${start}`;
+  }
+
+  el.querySelector(".chart-wrap").classList.toggle("hidden", !series.length);
+  $("toneEmpty").classList.toggle("hidden", !!series.length);
+  if (toneChart) { toneChart.destroy(); toneChart = null; }
+  if (series.length) renderToneChart(series, isPartner);
+
+  $("toneRange").innerHTML = TONE_RANGES.map(([k]) =>
+    `<button type="button" class="wt-pill${k === TONE_RANGE ? " on" : ""}" data-range="${k}">${k}</button>`).join("");
+  $("toneRange").querySelectorAll("[data-range]").forEach((b) => {
+    b.onclick = () => { TONE_RANGE = b.dataset.range; again(); };
+  });
+
+  /* Photos are never shared, so a partner's screen has no photos card rather
+     than an empty one. */
+  const photos = $("tonePhotos");
+  const showPhotos = !isPartner && typeof renderComparePhotos === "function";
+  photos.classList.toggle("hidden", !showPhotos);
+  if (showPhotos) renderComparePhotos(photos, isPartner);
+  else photos.innerHTML = "";
+
+  const days = gymDaysThisWeek(name), goal = weeklyGoalFor(email);
+  $("toneConsistency").innerHTML = `<span class="prog-tile-ico">${icon("calendar", 18)}</span>
+    <span class="prog-tile-body"><span class="prog-tile-title">Workout Consistency</span><span class="prog-tile-val">${days} of ${goal}</span><span class="prog-tile-sub">workouts this week</span></span>`;
+  const strength = $("toneStrength");
+  strength.classList.toggle("hidden", !sharing);
+  $("toneTiles").classList.toggle("solo", !sharing);
+  if (sharing) {
+    strength.innerHTML = `<span class="prog-tile-ico">${icon("dumbbell", 18)}</span>
+      <span class="prog-tile-body"><span class="prog-tile-title">Strength Checklist</span><span class="prog-tile-val">${toneStrengthState(name, weeks)}</span><span class="prog-tile-sub">across major lifts</span></span><span class="prog-tile-chev">${icon("chevronRight", 16)}</span>`;
+    strength.onclick = () => openToneDoor("cardStrength");
+  }
+
+  /* Yours only: the tape sheet and the camera both write to your row. The
+     camera is the photos card's own input, which is hidden with the card,
+     so the button here presses that one rather than growing a second. */
+  const acts = $("toneActions");
+  acts.classList.toggle("hidden", isPartner);
+  if (!isPartner) {
+    const logBtn = $("toneLogBtn"), photoBtn = $("tonePhotoBtn");
+    if (!logBtn.querySelector("svg")) logBtn.innerHTML = `${icon("tape", 18)} Log measurements`;
+    if (!photoBtn.querySelector("svg")) photoBtn.innerHTML = `${icon("camera", 18)} Add body photos`;
+    logBtn.onclick = () => { if (typeof openMeasurementsSheet === "function") openMeasurementsSheet(); };
+    photoBtn.onclick = () => $("addBodyPhotoBtn")?.click();
+  }
+}
+
+/* The weight hero's chart, drawn for the tape: a dot on every reading, the
+   last one a ring with its value in a chip over it, the grid, the action
+   colour for the line (the partner colour on their screen). Its own canvas
+   and instance, so the weight chart and this one never fight over a context. */
+function renderToneChart(series, isPartner) {
+  const canvas = $("toneChart");
+  if (!canvas) return;
+  if (!window.Chart) {
+    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+      .then(() => { if (!$("toneHero")?.classList.contains("hidden")) renderToneChart(series, isPartner); })
+      .catch(() => chartUnavailable("toneChart"));
+    return;
+  }
+  const ctx = canvas.getContext("2d");
+  if (toneChart) toneChart.destroy();
+  const values = series.map((p) => Number(p.value));
+  const last = values.length - 1;
+  const line = cssVar(isPartner ? "--partner" : "--accent");
+  const panel = cssVar("--panel");
+  const dots = values.length <= 40;
+  const sizes = values.map((_, i) => (i === last ? 5 : dots ? 3 : 0));
+  const lastChip = {
+    id: "toneLastChip",
+    afterDatasetsDraw(chart) {
+      const pt = chart.getDatasetMeta(0).data[last];
+      if (!pt) return;
+      const c = chart.ctx;
+      const text = `${values[last].toFixed(1)} in`;
+      c.save();
+      c.font = `700 12px ${cssVar("--font-body") || "sans-serif"}`;
+      c.textBaseline = "middle";
+      const w = Math.ceil(c.measureText(text).width) + 16, h = 24, r = 7;
+      const x = Math.min(Math.max(pt.x - w / 2, 2), chart.width - w - 2);
+      const y = pt.y - h - 11;
+      c.fillStyle = cssVar("--text");
+      c.beginPath();
+      c.roundRect(x, y, w, h, r);
+      c.fill();
+      c.beginPath();
+      c.moveTo(pt.x - 5, y + h); c.lineTo(pt.x + 5, y + h); c.lineTo(pt.x, y + h + 5);
+      c.fill();
+      c.fillStyle = panel;
+      c.textAlign = "center";
+      c.fillText(text, x + w / 2, y + h / 2 + 0.5);
+      c.restore();
+    },
+  };
+  toneChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: series.map((p) => shortDate(p.entry_date)),
+      datasets: [{
+        data: values, borderColor: line, borderWidth: 2.5, spanGaps: true, tension: 0.3,
+        pointRadius: sizes, pointHoverRadius: sizes,
+        pointBackgroundColor: values.map((_, i) => (i === last ? panel : line)),
+        pointBorderColor: line, pointBorderWidth: values.map((_, i) => (i === last ? 2.5 : 0)),
+        fill: true, backgroundColor: chartWash(ctx, line),
+      }],
+    },
+    plugins: [lastChip],
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 34, right: 8 } },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: {
+        x: { border: { display: false }, grid: { display: true, color: cssVar("--border"), drawTicks: false },
+             ticks: { color: cssVar("--muted"), maxTicksLimit: 5, maxRotation: 0, font: { size: 11 } } },
+        y: { border: { display: false }, grid: { color: cssVar("--border"), drawTicks: false },
+             ticks: { color: cssVar("--muted"), maxTicksLimit: 4, font: { size: 11 }, padding: 6 } },
+      },
+    },
+  });
 }
 
 function renderWeightRange() {
@@ -24628,6 +25058,77 @@ async function renderBodyPhotos() {
   });
 }
 
+/* The Start/Now pair on the goal screen. Oldest photo left, newest right,
+   because the question that screen asks is "is it working", and two photos
+   answer it faster than a strip of eight. Photos are yours alone, so a
+   partner's view gets nothing here, not an empty card. The host is whatever
+   the goal screen hands over; this function owns everything inside it and
+   repaints from scratch each call, so it is safe to call on every render.
+
+   The array comes newest-first from loadBodyPhotos, but the pair is picked
+   by sorting a copy rather than by trusting that order: renderBodyPhotos has
+   a paragraph about how easy that is to get backwards. */
+async function renderComparePhotos(hostEl, isPartner) {
+  if (!hostEl) return;
+  hostEl.classList.add("card", "cmp-card");
+  if (isPartner) { hostEl.classList.add("hidden"); return; }
+  hostEl.classList.remove("hidden");
+
+  const shots = BODY_PHOTOS.filter((p) => p.email === MY_EMAIL)
+    .slice().sort((a, b) => (a.taken_on < b.taken_on ? -1 : a.taken_on > b.taken_on ? 1 : 0));
+  const start = shots.length > 1 ? shots[0] : null;
+  const now = shots.length ? shots[shots.length - 1] : null;
+
+  const chevSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>';
+  const slot = (label, side, shot, hint) => `<figure class="cmp-slot ${side}">
+      <div class="cmp-frame" data-slot="${label}">${shot ? "" : icon("camera", 22)}</div>
+      <figcaption class="cmp-cap"><b>${label}</b><span>${shot ? escapeHtml(datedLabel(shot.taken_on)) : escapeHtml(hint || "")}</span></figcaption>
+    </figure>`;
+
+  hostEl.innerHTML = `<div class="card-head">
+      <h2>Progress Photos</h2>
+      ${shots.length ? `<button type="button" class="card-link ink cmp-all">See all ${chevSvg}</button>` : ""}
+    </div>` + (shots.length
+    ? `<div class="cmp-pair">
+        ${slot("Start", "l", start, "Add another to compare")}
+        <span class="cmp-chev" aria-hidden="true">${chevSvg}</span>
+        ${slot("Now", "r", now)}
+      </div>`
+    : `<p class="cmp-line">Your first photo becomes your Start.</p>
+       <button type="button" class="btn-secondary cmp-add">Add today's photo</button>`);
+
+  const all = hostEl.querySelector(".cmp-all");
+  if (all) all.onclick = () => {
+    const card = $("cardPhotos");
+    if (!card) return;
+    document.querySelectorAll("#tab-progress .card.peek").forEach((c) => c.classList.remove("peek"));
+    card.classList.remove("hidden");
+    card.classList.add("peek");
+    primeOpenedCard(card);
+    card.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+  const add = hostEl.querySelector(".cmp-add");
+  if (add) add.onclick = () => $("addBodyPhotoBtn")?.click();
+
+  /* The URLs arrive after the markup is on screen. A re-render in between
+     replaces the frames, so each one is checked to still be in the host
+     before it is given an image; an image that fails to load (an expired
+     link, or the sandbox handing back a video) leaves the frame as it was
+     rather than painting a broken glyph over it. */
+  const fill = async (label, shot) => {
+    if (!shot) return;
+    const frame = hostEl.querySelector(`.cmp-frame[data-slot="${label}"]`);
+    if (!frame) return;
+    const url = await signedProofUrl(shot.path);
+    if (!url || !hostEl.contains(frame)) return;
+    const img = new Image();
+    img.alt = `${label} photo, ${datedLabel(shot.taken_on)}`;
+    img.onload = () => { if (hostEl.contains(frame)) { frame.appendChild(img); requestAnimationFrame(() => img.classList.add("in")); } };
+    img.src = url;
+  };
+  await Promise.all([fill("Start", start), fill("Now", now)]);
+}
+
 async function deleteBodyPhoto(id) {
   const shot = BODY_PHOTOS.find((p) => p.id === id && p.email === MY_EMAIL);
   if (!shot) return;
@@ -24887,20 +25388,73 @@ function headlineWeighIns(name, days = HEADLINE_WEIGHT_DAYS) {
   return entriesFor(name).filter((e) => e.weight != null && e.entry_date >= fromStr);
 }
 
-/* Waist readings over the same window, so the tile under Weight and the
-   headline above it are counting the same month. `now` is the latest
-   reading, `delta` is latest minus earliest, or null with only one: one
-   reading is a number, not a direction. null with none, because the column
-   is new (20260916_waist_measurements.sql) and, until it is applied, every
-   row simply has no waist_in on it. */
-function waistTrend(name, days = HEADLINE_WEIGHT_DAYS) {
+/* ---- Tape measurements: waist, hips, thighs, arms ----
+
+   Four columns on the day row (waist_in in 20260916_waist_measurements.sql,
+   the other three in 20260916_body_measurements.sql, neither applied yet),
+   read here as one thing so the Waist Trend tile, the Tone Up hero and the
+   logging sheet cannot disagree about what a reading is. Inches for all
+   four, the app is imperial everywhere else. One value per measurement, not
+   per side: thighs and arms are whichever side you always use. */
+const MEASUREMENTS = [
+  { key: "waist_in", label: "Waist" },
+  { key: "hips_in", label: "Hips" },
+  { key: "thigh_in", label: "Thighs" },
+  { key: "arm_in", label: "Arms" },
+];
+
+/* The readings of one measurement from `days` ago to today, ascending, one
+   point per day. The day row is unique per (email, entry_date) on the
+   database, so a second point on a day can only come from the offline queue
+   replaying over a local copy; the later one wins, which is the value that
+   was saved last. Rows without that column, or with junk in it, are simply
+   not readings: until the migrations run every row has no column at all. */
+function measurementRows(name, key, days) {
   const from = new Date(todayStr() + "T00:00:00");
   from.setDate(from.getDate() - days);
   const fromStr = isoDate(from);
-  const points = entriesFor(name).filter((e) => e.waist_in != null && Number.isFinite(Number(e.waist_in)) && e.entry_date >= fromStr);
+  const byDay = new Map();
+  for (const e of entriesFor(name)) {
+    if (e.entry_date < fromStr || e[key] == null) continue;
+    const value = Number(e[key]);
+    if (!Number.isFinite(value)) continue;
+    byDay.set(e.entry_date, { entry_date: e.entry_date, value });
+  }
+  return [...byDay.values()];
+}
+
+/* The chart's series: [{ entry_date, value }] over the last N weeks. Weeks
+   rather than days because the Tone Up range pills think in weeks. */
+function measurementSeries(name, key, weeks) {
+  return measurementRows(name, key, weeks * 7);
+}
+
+/* The headline over that chart. `start` is the first reading in the window,
+   not the first ever, so a 4 week and a 12 week view each measure their own
+   window. pctDown is positive when the tape is going down (a Tone Up goal
+   wants that) and negative when it is not, one decimal. With one reading
+   delta and pctDown are 0, not null: the caller decides whether one point is
+   worth a headline (points.length says so), and 0 cannot render as "null%".
+   null with no reading at all. */
+function measurementSummary(name, key, weeks) {
+  const points = measurementSeries(name, key, weeks);
   if (!points.length) return null;
-  const now = Number(points[points.length - 1].waist_in);
-  const delta = points.length > 1 ? now - Number(points[0].waist_in) : null;
+  const now = points[points.length - 1].value;
+  const start = points[0].value;
+  const delta = Math.round((now - start) * 10) / 10;
+  const pctDown = start > 0 ? Math.round(((start - now) / start) * 1000) / 10 : 0;
+  return { now, start, delta, pctDown, points };
+}
+
+/* Waist readings over the same window as the weight headline, so the tile
+   under Weight and the number above it are counting the same month. `now`
+   is the latest reading, `delta` is latest minus earliest, or null with only
+   one: one reading is a number, not a direction. null with none. */
+function waistTrend(name, days = HEADLINE_WEIGHT_DAYS) {
+  const points = measurementRows(name, "waist_in", days);
+  if (!points.length) return null;
+  const now = points[points.length - 1].value;
+  const delta = points.length > 1 ? now - points[0].value : null;
   return { now, delta, points };
 }
 
@@ -26159,7 +26713,10 @@ function paintArrangeUI(host) {
          the Body Photos tile is how it opens. Folding it hides it again, so
          the screen goes back to being the mockup and not the mockup plus a
          stray "Body Photos / None yet" row under the tile that says the same. */
-      if (card.id === "cardPhotos" && wasOpen && $("cardWeight")?.classList.contains("wt-hero")) {
+      const toneUp = !$("toneHero")?.classList.contains("hidden");
+      const door = (card.id === "cardPhotos" && ($("cardWeight")?.classList.contains("wt-hero") || toneUp))
+        || (card.id === "cardStrength" && toneUp);
+      if (door && wasOpen) {
         card.classList.add("hidden");
         return;
       }
@@ -26205,10 +26762,6 @@ function setArranging(on, host) {
    nothing, the number when there is one, and the trend once there are two,
    and never invents a line through fewer points than that. */
 
-/* Whether the stepper under the tiles is open. Per session, not stored: it
-   is a control that was tapped open, not a preference. */
-let WAIST_LOG_OPEN = false;
-
 /* Reads the waist readings as the weight headline reads weigh-ins, and
    colours them the same way: a weight goal wants the tape going down, so on
    this tile down is --down (good) and up is --up (bad). */
@@ -26241,10 +26794,10 @@ function renderProgTiles(kind, isPartner, opts = {}) {
   const waist = $("tileWaist");
   waist.innerHTML = `<span class="prog-tile-ico">${icon("tape", 18)}</span>
     <span class="prog-tile-body"><span class="prog-tile-title">Waist Trend</span>${value ? `<span class="prog-tile-val">${value}</span>` : ""}<span class="prog-tile-sub">${sub}</span></span>${isPartner ? "" : chev}`;
-  /* A partner's tape is read only, same as their scale: the stepper writes to
+  /* A partner's tape is read only, same as their scale: the sheet writes to
      YOUR row and has no business opening on their screen. */
   waist.disabled = isPartner;
-  waist.onclick = isPartner ? null : () => { WAIST_LOG_OPEN = !WAIST_LOG_OPEN; renderProgressTab(); };
+  waist.onclick = isPartner ? null : () => openMeasurementsSheet();
 
   /* Photos are never shared, so on a partner's view there is no tile rather
      than an empty one, and the tape takes the whole row. Same when the photo
@@ -26273,40 +26826,108 @@ function renderProgTiles(kind, isPartner, opts = {}) {
       card.scrollIntoView({ block: "start", behavior: "smooth" });
     };
   }
-
-  const log = $("waistLogBlock");
-  log.classList.toggle("hidden", isPartner || !WAIST_LOG_OPEN);
-  if (isPartner || !WAIST_LOG_OPEN) return;
-  const input = $("waistInput");
-  /* Opens on the last reading so a nudge starts from somewhere real; a first
-     reading starts blank, the same as a first weigh-in. */
-  if (!input.value && t) input.value = t.now.toFixed(1);
-  const nudge = (delta) => {
-    input.value = String(Math.max(0, Math.round(((parseFloat(input.value) || 0) + delta) * 10) / 10));
-  };
-  $("waistMinus").onclick = () => nudge(-0.5);
-  $("waistPlus").onclick = () => nudge(0.5);
-  $("waistSaveBtn").onclick = saveWaistEntry;
 }
 
-async function saveWaistEntry() {
-  const typed = parseFloat($("waistInput").value);
-  const waist = Number.isFinite(typed) && typed > 0 ? typed : null;
-  if (waist === null) { toast("Enter a measurement first"); return; }
+/* ---- Logging measurements: one sheet for all four ----
+
+   Opened by the Waist Trend tile and by Tone Up's Log measurements button.
+   Every row starts on that measurement's last reading (any date, not just
+   this month) so a nudge starts from somewhere real, and a first reading
+   starts blank, like a first weigh-in. Only the rows you touched are saved:
+   the others stay whatever today's row already says, which is usually null,
+   and a prefilled value that was never touched must not be re-logged as a
+   fresh reading today or the chart grows flat points nobody took. Writes to
+   MY row only, whichever view Progress is on. */
+let MEAS_TOUCHED = new Set();
+
+function openMeasurementsSheet() {
+  /* The partner view is read only end to end; refusing to open here is the
+     backstop for any door that forgets to hide itself on that view. */
+  if (PROGRESS_VIEW === "partner") return;
+  MEAS_TOUCHED = new Set();
+  renderMeasurementsSheet();
+  $("measureScrim").classList.remove("hidden");
+  $("measureScrim").onclick = (e) => { if (e.target === $("measureScrim")) closeMeasurementsSheet(); };
+}
+
+function closeMeasurementsSheet() {
+  $("measureScrim").classList.add("hidden");
+  pinSheets();
+}
+
+function lastMeasurement(key) {
+  const rows = entriesFor(ME).filter((e) => e[key] != null && Number.isFinite(Number(e[key])));
+  return rows.length ? Number(rows[rows.length - 1][key]) : null;
+}
+
+function renderMeasurementsSheet() {
+  $("measureSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="measClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">Log measurements</div>
+      <div class="spacer"></div>
+    </div>
+    <p class="muted-note" style="margin:-6px 0 14px;">Inches, taken today. Only the ones you change are saved.</p>
+    ${MEASUREMENTS.map((m) => {
+      const last = lastMeasurement(m.key);
+      return `<div class="meas-item" data-key="${m.key}">
+        <div class="wt-log-head">${m.label}</div>
+        <div class="weigh-row">
+          <button type="button" class="round-btn" data-nudge="-0.5" aria-label="${m.label} down 0.5">&minus;</button>
+          <div class="weigh-field">
+            <input type="number" class="waist-input" inputmode="decimal" step="0.5" min="0"
+                   placeholder="0.0" autocomplete="off" aria-label="${m.label}"
+                   value="${last === null ? "" : last.toFixed(1)}" />
+            <span class="weigh-unit">in</span>
+          </div>
+          <button type="button" class="round-btn" data-nudge="0.5" aria-label="${m.label} up 0.5">+</button>
+        </div>
+      </div>`;
+    }).join("")}
+    <button type="button" class="btn-primary" id="measSaveBtn" style="margin-top:18px;">Save</button>`;
+
+  $("measClose").onclick = closeMeasurementsSheet;
+  $("measureSheet").querySelectorAll(".meas-item").forEach((item) => {
+    const key = item.dataset.key;
+    const input = item.querySelector("input");
+    input.oninput = () => MEAS_TOUCHED.add(key);
+    item.querySelectorAll("[data-nudge]").forEach((b) => {
+      b.onclick = () => {
+        const delta = Number(b.dataset.nudge);
+        input.value = String(Math.max(0, Math.round(((parseFloat(input.value) || 0) + delta) * 10) / 10));
+        MEAS_TOUCHED.add(key);
+      };
+    });
+  });
+  $("measSaveBtn").onclick = saveMeasurements;
+}
+
+async function saveMeasurements() {
+  /* The patch is the touched rows and nothing else. A touched row that was
+     then emptied is a mistake to point at, not a null to write. */
+  const patch = {};
+  for (const m of MEASUREMENTS) {
+    if (!MEAS_TOUCHED.has(m.key)) continue;
+    const typed = parseFloat($("measureSheet").querySelector(`[data-key="${m.key}"] input`)?.value);
+    if (!Number.isFinite(typed) || typed <= 0) { toast(`Enter a ${m.label.toLowerCase()} measurement first`); return; }
+    patch[m.key] = typed;
+  }
+  if (!Object.keys(patch).length) { toast("Nothing changed"); return; }
 
   const today = todayEntryFor(MY_EMAIL);
   /* Same row the scale writes, same carried fields: an upsert replaces the
      whole row, so today's weigh-in, proof and rest-day state ride along or
      they are gone. When today's row already exists it is an update instead,
-     one column on the row that is there. That is safer on the real database
-     (nothing another device wrote today gets blanked) and it is the write the
-     sandbox's client actually persists: its upsert matches on the first
-     onConflict column alone and would rewrite the oldest row's date. */
+     the touched columns on the row that is there. That is safer on the real
+     database (nothing another device wrote today gets blanked) and it is the
+     write the sandbox's client actually persists: its upsert matches on the
+     first onConflict column alone and would rewrite the oldest row's date. */
   const payload = {
     user_name: ME,
     email: MY_EMAIL,
     entry_date: todayStr(),
-    waist_in: waist,
+    ...patch,
     weight: today?.weight ?? null,
     gym: today?.gym ?? false,
     sessions: today?.sessions ?? 0,
@@ -26316,17 +26937,24 @@ async function saveWaistEntry() {
     workout_at: today?.workout_at ?? null,
   };
   const opts = { onConflict: "email,entry_date" };
-  const done = async (msg) => { WAIST_LOG_OPEN = false; toast(msg); await loadAll(); renderProgressTab(); };
+  const done = async (msg) => {
+    closeMeasurementsSheet();
+    toast(msg);
+    await loadAll();
+    if (typeof renderProgressTab === "function") renderProgressTab();
+  };
 
   if (navigator.onLine) {
     const { error } = today
-      ? await sb.from("fit_entries").update({ waist_in: waist }).eq("email", MY_EMAIL).eq("entry_date", payload.entry_date)
+      ? await sb.from("fit_entries").update(patch).eq("email", MY_EMAIL).eq("entry_date", payload.entry_date)
       : await sb.from("fit_entries").upsert(payload, opts);
-    if (!error) { await done("Measurement saved"); return; }
-    /* The column is behind 20260916_waist_measurements.sql. Until the owner
-       runs it every save comes back PGRST204, and "Could not find the
-       'waist_in' column" is the database talking, not something to show. */
-    if (String(error.code || "") === "PGRST204" || /waist_in/.test(String(error.message || ""))) {
+    if (!error) { await done("Measurements saved"); return; }
+    /* The columns are behind 20260916_waist_measurements.sql and
+       20260916_body_measurements.sql. Until the owner runs them every save
+       comes back PGRST204, and "Could not find the 'hips_in' column" is the
+       database talking, not something to show. */
+    const missing = new RegExp(MEASUREMENTS.map((m) => m.key).join("|"));
+    if (String(error.code || "") === "PGRST204" || missing.test(String(error.message || ""))) {
       toast("Measurements are not switched on yet");
       return;
     }
@@ -26338,9 +26966,9 @@ async function saveWaistEntry() {
   /* Offline, or the connection dropped: the scale's queue, the scale's job
      shape, so it replays with everything else logged in the gym. */
   const landed = await safeWrite("fit_entries", "upsert", payload, opts);
-  if (landed) { await done("Measurement saved"); return; }
+  if (landed) { await done("Measurements saved"); return; }
   applyLocally("fit_entries", payload);
-  WAIST_LOG_OPEN = false;
+  closeMeasurementsSheet();
   toast("Saved offline");
   renderProgressTab();
 }
@@ -26419,11 +27047,15 @@ function renderProgressTab() {
      which is what the strip at the top is for. Photos stay in the DOM,
      hidden, because the Body Photos tile is their door. */
   const weightScreen = !blank && kind === "scale";
+  /* Tone Up is the same deal with its own block (renderToneHero): nothing
+     under it, Strength and Photos hidden as doors. */
+  const toneScreen = !blank && kind === "recomp";
   const shown = blank
     ? (weightLed && !isPartner ? ["cardWeight"] : [])
     : weightScreen ? ["cardWeight"]
+    : toneScreen ? []
     : wanted.concat(rest);
-  const quiet = new Set(blank || weightScreen ? [] : rest);
+  const quiet = new Set(blank || weightScreen || toneScreen ? [] : rest);
   /* Which row(s) get the ring: whichever card the headline sentence was
      actually about, not "first in GOAL_CARDS" (volume's own order leads with
      cardMuscles, but a volume headline is about tonnage, not muscles). */
@@ -26479,7 +27111,9 @@ function renderProgressTab() {
   }
   // The rule is a label for what follows it, so with nothing following it, and
   // on a brand new account where nothing is on screen at all, it says nothing.
-  rule.classList.toggle("hidden", blank || !rest.length || weightScreen);
+  rule.classList.toggle("hidden", blank || !rest.length || weightScreen || toneScreen);
+  /* After the reorder, so the block can pin itself under the headline card. */
+  renderToneHero(toneScreen, lensProfile, isPartner);
 
   /* photosAvailable is passed rather than read off cardPhotos's hidden class,
      because on the weight screen that card is hidden ON PURPOSE and the tile
@@ -27984,6 +28618,7 @@ const A11Y_SHEETS = {
   cropScrim: "Move and scale",
   savedScrim: "Saved workouts",
   swapScrim: "Swap exercise",
+  measureScrim: "Log measurements",
 };
 const A11Y_TITLE_SEL = ".scr-title, .pop-who, .ps-label, .cb-sheet-title, .ds-date, .sv-title, h1, h2, h3";
 const A11Y_FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
