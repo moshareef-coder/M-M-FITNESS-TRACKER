@@ -101,11 +101,23 @@ const DUMBBELL_BENCH_PRESS = {
       joints: { spine: 0, neck: -4 },
       ik: { wristR: { x: 55.0, y: 43.7, z: 12.2, flat: false, bend: 1 }, wristL: { x: 59.0, y: 47.2, z: -12.2, flat: false, bend: 1 }, ...stand(108, 112) },
     },
+    { /* halfway down. The hand drops STRAIGHT first, the elbow already
+         bending out, and only drifts toward the feet in the second half. Two
+         keys alone interpolate the hand along a diagonal, which early in the
+         descent swings a nearly straight arm forward like a stiff lever, then
+         folds it in one step with the elbow jumping from above the shoulder to
+         below it. This key pins the path through the shape a press actually
+         passes through. */
+      t: 0.5,
+      root: { x: 86, y: 82, rot: -90 },
+      joints: { spine: 0, neck: -4 },
+      ik: { wristR: { x: 56.4, y: 58.5, z: 22, flat: false, bend: 1, pole: [-1, 0, 0] }, wristL: { x: 60.1, y: 61.3, z: -22, flat: false, bend: 1, pole: [1, 0, 0] }, ...stand(108, 112) },
+    },
     { // bottom, bells beside the chest, elbows folded out under the hands
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 2, neck: -6 },
-      ik: { wristR: { x: 64.2, y: 76.5, z: 18, flat: false, bend: 1, pole: [-1, 0, -0.3] }, wristL: { x: 66.2, y: 78.5, z: -18, flat: false, bend: 1, pole: [1, 0, -0.3] }, ...stand(108, 112) },
+      ik: { wristR: { x: 64.2, y: 76.5, z: 18, flat: false, bend: 1, pole: [-1, 0, 0] }, wristL: { x: 66.2, y: 78.5, z: -18, flat: false, bend: 1, pole: [1, 0, 0] }, ...stand(108, 112) },
     },
   ],
 };
@@ -310,6 +322,18 @@ const INCLINE_DUMBBELL_PRESS = {
       joints: { spine: 0, neck: -6, forearmPronR: 90, forearmPronL: 90 },
       ik: { wristR: { x: 63.0, y: 34.9, z: 12.2, flat: false, bend: 1 }, wristL: { x: 66.0, y: 38.4, z: -12.2, flat: false, bend: 1 }, ...stand(110, 104) },
     },
+    { /* halfway down. The hand drops STRAIGHT first, the elbow already
+         bending out, and only drifts toward the feet in the second half. Two
+         keys alone interpolate the hand along a diagonal, which early in the
+         descent swings a nearly straight arm forward like a stiff lever, then
+         folds it in one step with the elbow jumping from above the shoulder to
+         below it. This key pins the path through the shape a press actually
+         passes through. */
+      t: 0.5,
+      root: { x: 84, y: 90, rot: -55 },
+      joints: { spine: 0, neck: -6, forearmPronR: 90, forearmPronL: 90 },
+      ik: { wristR: { x: 63.8, y: 49.5, z: 22, flat: false, bend: 1, pole: [-1, 0, -0.2] }, wristL: { x: 66.7, y: 52.4, z: -22, flat: false, bend: 1, pole: [1, 0, -0.2] }, ...stand(110, 104) },
+    },
     { /* bottom, bells beside the UPPER chest, just below the collarbone, which
          is 0.16 of the way from the shoulder joint to the hip. That is the
          right touch point for an incline: higher than the flat bench's 0.24 and
@@ -327,7 +351,7 @@ const INCLINE_DUMBBELL_PRESS = {
       t: 1,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 2, neck: -8, forearmPronR: 90, forearmPronL: 90 },
-      ik: { wristR: { x: 68.5, y: 67.4, z: 22, flat: false, bend: 1, pole: [-1, 0, -0.3] }, wristL: { x: 70.5, y: 69.4, z: -22, flat: false, bend: 1, pole: [1, 0, -0.3] }, ...stand(110, 104) },
+      ik: { wristR: { x: 68.5, y: 67.4, z: 22, flat: false, bend: 1, pole: [-1, 0, -0.2] }, wristL: { x: 70.5, y: 69.4, z: -22, flat: false, bend: 1, pole: [1, 0, -0.2] }, ...stand(110, 104) },
     },
   ],
 };
@@ -355,11 +379,23 @@ const DECLINE_DUMBBELL_PRESS = {
       joints: { spine: 0, neck: 6 },
       ik: { wristR: { x: 50.0, y: 37.6, z: 12.2, flat: false, bend: 1 }, wristL: { x: 52.0, y: 39.6, z: -12.2, flat: false, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
     },
+    { /* halfway down. The hand drops STRAIGHT first, the elbow already
+         bending out, and only drifts toward the feet in the second half. Two
+         keys alone interpolate the hand along a diagonal, which early in the
+         descent swings a nearly straight arm forward like a stiff lever, then
+         folds it in one step with the elbow jumping from above the shoulder to
+         below it. This key pins the path through the shape a press actually
+         passes through. */
+      t: 0.5,
+      root: { x: 78, y: 64, rot: -115 },
+      joints: { spine: 0, neck: 6 },
+      ik: { wristR: { x: 51.4, y: 50.3, z: 12, flat: false, bend: 1, pole: [-1, 0.5, -0.2] }, wristL: { x: 53.4, y: 52.3, z: -12, flat: false, bend: 1, pole: [1, 0.5, -0.2] }, ...pinFeet(112, 58, 108, 62) },
+    },
     { // bottom, bells beside the lower chest
       t: 1,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 2, neck: 8 },
-      ik: { wristR: { x: 59.2, y: 65.8, z: 20, flat: false, bend: 1, pole: [-1, 0, 0.3] }, wristL: { x: 61.2, y: 67.8, z: -20, flat: false, bend: 1, pole: [1, 0, 0.3] }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 59.2, y: 65.8, z: 20, flat: false, bend: 1, pole: [-1, 0.5, -0.2] }, wristL: { x: 61.2, y: 67.8, z: -20, flat: false, bend: 1, pole: [1, 0.5, -0.2] }, ...pinFeet(112, 58, 108, 62) },
     },
   ],
 };
@@ -380,11 +416,23 @@ const INCLINE_BARBELL_PRESS = {
       joints: { spine: 0, neck: -6 },
       ik: { wristR: { x: 63.0, y: 34.9, z: 12.2, flat: false, bend: 1 }, wristL: { x: 64.9, y: 38.2, z: -12.2, flat: false, bend: 1 }, ...stand(110, 104) },
     },
+    { /* halfway down. The hand drops STRAIGHT first, the elbow already
+         bending out, and only drifts toward the feet in the second half. Two
+         keys alone interpolate the hand along a diagonal, which early in the
+         descent swings a nearly straight arm forward like a stiff lever, then
+         folds it in one step with the elbow jumping from above the shoulder to
+         below it. This key pins the path through the shape a press actually
+         passes through. */
+      t: 0.5,
+      root: { x: 84, y: 90, rot: -55 },
+      joints: { spine: 0, neck: -6 },
+      ik: { wristR: { x: 63.8, y: 49.5, z: 22, flat: false, bend: 1, pole: [-1, 0, -0.2] }, wristL: { x: 65.7, y: 52.2, z: -22, flat: false, bend: 1, pole: [1, 0, -0.2] }, ...stand(110, 104) },
+    },
     { // bar down to the collarbone, elbows under the bar
       t: 1,
       root: { x: 84, y: 90, rot: -55 },
       joints: { spine: 2, neck: -8 },
-      ik: { wristR: { x: 68.5, y: 67.4, z: 22, flat: false, bend: 1, pole: [-1, 0, -0.3] }, wristL: { x: 70.5, y: 69.4, z: -22, flat: false, bend: 1, pole: [1, 0, -0.3] }, ...stand(110, 104) },
+      ik: { wristR: { x: 68.5, y: 67.4, z: 22, flat: false, bend: 1, pole: [-1, 0, -0.2] }, wristL: { x: 70.5, y: 69.4, z: -22, flat: false, bend: 1, pole: [1, 0, -0.2] }, ...stand(110, 104) },
     },
   ],
 };
@@ -406,11 +454,23 @@ const DECLINE_BARBELL_PRESS = {
       joints: { spine: 0, neck: 6 },
       ik: { wristR: { x: 50.0, y: 37.6, z: 12.2, flat: false, bend: 1 }, wristL: { x: 52.0, y: 39.6, z: -12.2, flat: false, bend: 1 }, ...pinFeet(112, 58, 108, 62) },
     },
+    { /* halfway down. The hand drops STRAIGHT first, the elbow already
+         bending out, and only drifts toward the feet in the second half. Two
+         keys alone interpolate the hand along a diagonal, which early in the
+         descent swings a nearly straight arm forward like a stiff lever, then
+         folds it in one step with the elbow jumping from above the shoulder to
+         below it. This key pins the path through the shape a press actually
+         passes through. */
+      t: 0.5,
+      root: { x: 78, y: 64, rot: -115 },
+      joints: { spine: 0, neck: 6 },
+      ik: { wristR: { x: 51.4, y: 50.3, z: 12, flat: false, bend: 1, pole: [-1, 0.5, -0.2] }, wristL: { x: 53.4, y: 52.3, z: -12, flat: false, bend: 1, pole: [1, 0.5, -0.2] }, ...pinFeet(112, 58, 108, 62) },
+    },
     { // bar down to the lower chest, elbows under the bar
       t: 1,
       root: { x: 78, y: 64, rot: -115 },
       joints: { spine: 2, neck: 8 },
-      ik: { wristR: { x: 59.2, y: 65.8, z: 20, flat: false, bend: 1, pole: [-1, 0, 0.3] }, wristL: { x: 61.2, y: 67.8, z: -20, flat: false, bend: 1, pole: [1, 0, 0.3] }, ...pinFeet(112, 58, 108, 62) },
+      ik: { wristR: { x: 59.2, y: 65.8, z: 20, flat: false, bend: 1, pole: [-1, 0.5, -0.2] }, wristL: { x: 61.2, y: 67.8, z: -20, flat: false, bend: 1, pole: [1, 0.5, -0.2] }, ...pinFeet(112, 58, 108, 62) },
     },
   ],
 };
@@ -2194,6 +2254,18 @@ const CLOSE_GRIP_BENCH_PRESS = {
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 0, neck: -4 },
       ik: { wristR: { x: 59.2, y: 43.8, bend: 1 }, wristL: { x: 60.9, y: 47.4, bend: 1 }, ...stand(108, 112) },
+    },
+    { /* halfway down. The hand drops STRAIGHT first, the elbow already
+         bending out, and only drifts toward the feet in the second half. Two
+         keys alone interpolate the hand along a diagonal, which early in the
+         descent swings a nearly straight arm forward like a stiff lever, then
+         folds it in one step with the elbow jumping from above the shoulder to
+         below it. This key pins the path through the shape a press actually
+         passes through. */
+      t: 0.5,
+      root: { x: 86, y: 82, rot: -90 },
+      joints: { spine: 0, neck: -4 },
+      ik: { wristR: { x: 61.1, y: 55.1, bend: 1 }, wristL: { x: 62.4, y: 57.8, bend: 1 }, ...stand(108, 112) },
     },
     { // bottom, bar low on the sternum, elbows tucked toward the feet
       t: 1,

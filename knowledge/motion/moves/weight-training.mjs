@@ -106,12 +106,27 @@ const BARBELL_BENCH_PRESS = {
         ankleR: { x: 108, y: 113.4, bend: -1 }, ankleL: { x: 112, y: 113.4, bend: -1 },
       },
     },
+    { /* halfway down. The hand drops STRAIGHT first, the elbow already
+         bending out, and only drifts toward the feet in the second half. Two
+         keys alone interpolate the hand along a diagonal, which early in the
+         descent swings a nearly straight arm forward like a stiff lever, then
+         folds it in one step with the elbow jumping from above the shoulder to
+         below it. This key pins the path through the shape a press actually
+         passes through. */
+      t: 0.5,
+      root: { x: 86, y: 82, rot: -90 },
+      joints: { spine: 0, neck: -4, wristR: 0, wristL: 0 },
+      ik: {
+        wristR: { x: 58.9, y: 58.1, z: 22, flat: false, bend: 1, pole: [-1, 0, -0.2] }, wristL: { x: 61.8, y: 59.5, z: -22, flat: false, bend: 1, pole: [1, 0, -0.2] },
+        ankleR: { x: 108, y: 113.4, bend: -1 }, ankleL: { x: 112, y: 113.4, bend: -1 },
+      },
+    },
     { // bar touching mid-chest, elbows toward the feet rather than square out
       t: 1,
       root: { x: 86, y: 82, rot: -90 },
       joints: { spine: 2, neck: -6, wristR: 0, wristL: 0 },
       ik: {
-        wristR: { x: 64.2, y: 76.5, z: 18, flat: false, bend: 1, pole: [-1, 0, -0.3] }, wristL: { x: 66.2, y: 78.5, z: -18, flat: false, bend: 1, pole: [1, 0, -0.3] },
+        wristR: { x: 64.2, y: 76.5, z: 18, flat: false, bend: 1, pole: [-1, 0, -0.2] }, wristL: { x: 66.2, y: 78.5, z: -18, flat: false, bend: 1, pole: [1, 0, -0.2] },
         ankleR: { x: 108, y: 113.4, bend: -1 }, ankleL: { x: 112, y: 113.4, bend: -1 },
       },
     },
