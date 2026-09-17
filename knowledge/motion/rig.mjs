@@ -3093,18 +3093,29 @@ export function samplePose(move, cycle, timeSec = 0) {
 
   let i = 0;
   while (i < kfs.length - 2 && u > kfs[i + 1].t) i++;
-  const a = kfs[i], b = kfs[Math.min(i + 1, kfs.length - 1)];
-  const span = Math.max(0.0001, b.t - a.t);
+
   // A key marked `through: true` is a waypoint, not a stop. The ease runs from
-  // the nearest plain key before it to the nearest plain key after it, and the
-  // eased time picks the segment, so the figure passes the waypoint at full
-  // speed instead of settling on it. Without this every middle keyframe read
-  // as a pause in the rep, which is what kept the bench presses on two keys.
+  // the nearest plain key before it to the nearest plain key after it, so the
+  // figure passes the waypoint at full speed instead of settling on it.
+  // Without this every middle keyframe read as a pause in the rep, which is
+  // what kept the bench presses on two keys.
+  //
+  // The eased time has to choose the segment as well as the position within
+  // it. The first version of this picked the segment from the RAW time and
+  // then eased across the whole span, and the two disagree: at raw 0.35 of a
+  // curl keyed at 0, 0.3, 0.62, 1 the eased time is 0.17, which is behind the
+  // segment that was chosen, so the blend clamped and the figure froze on the
+  // keyframe. Three key moves hid it, because easeInOut is symmetric about
+  // the midpoint and lands back in the segment it started in.
   let A = i, Cc = Math.min(i + 1, kfs.length - 1);
   while (A > 0 && kfs[A].through) A--;
   while (Cc < kfs.length - 1 && kfs[Cc].through) Cc++;
   const wide = Math.max(0.0001, kfs[Cc].t - kfs[A].t);
   const tt = kfs[A].t + easeInOut(clamp((u - kfs[A].t) / wide, 0, 1)) * wide;
+  let j = A;
+  while (j < Cc - 1 && tt > kfs[j + 1].t) j++;
+  const a = kfs[j], b = kfs[Math.min(j + 1, kfs.length - 1)];
+  const span = Math.max(0.0001, b.t - a.t);
   const w = clamp((tt - a.t) / span, 0, 1);
 
   const jointKeys = new Set();
