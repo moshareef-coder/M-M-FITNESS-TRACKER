@@ -4519,6 +4519,13 @@
   .ph-figure.good b { color: var(--accent-ink); }
   .ph-figure.warn b { color: var(--warn); }
   .ph-line { font-size: 17px; font-weight: 600; line-height: 1.45; }
+  /* The headline as a door. The chevron sits at the top right rather than
+     beside the line, because the line wraps to two and three lines and a
+     chevron chasing the end of it lands somewhere different every render. */
+  #progHeadline.ph-door { position: relative; cursor: pointer; padding-right: 40px; }
+  #progHeadline.ph-door:active { transform: scale(.995); }
+  .ph-go { position: absolute; top: 16px; right: 14px; display: flex; color: var(--muted); }
+  #progHeadline:not(.ph-door) .ph-go { display: none; }
   /* Three tiers of surface, so the tab reads as composed rather than as a
      stack of identical rectangles. The answer is lit like the Home hero, the
      cards the goal asked for carry the ordinary card shadow, and everything
@@ -4550,6 +4557,47 @@
   /* Progress controls */
   .person-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
   .person-toggle .tab-pill { flex: 1; padding: 9px 14px; font-size: 14px; }
+
+  /* The goal lens. Scrolls sideways rather than wrapping, because eight goals
+     wrapped to three rows is a menu, and this is meant to read as a strip you
+     flick through. Bleeds to the screen edges so the last chip is visibly cut
+     off: that is the only honest affordance for "there is more this way". */
+  .goal-chips {
+    display: flex; gap: 8px; overflow-x: auto; margin: 0 -18px 14px; padding: 2px 18px 4px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .goal-chips::-webkit-scrollbar { display: none; }
+  .goal-chip {
+    flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 5px;
+    min-width: 72px; padding: 9px 11px 8px; border-radius: 14px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+    font: inherit; font-size: 11.5px; font-weight: 700; line-height: 1.2; text-align: center;
+    position: relative; transition: border-color .15s, color .15s, background .15s;
+  }
+  .goal-chip svg { color: var(--muted); }
+  .goal-chip.on {
+    border-color: var(--accent); color: var(--accent-ink);
+    background: color-mix(in srgb, var(--accent) 9%, var(--panel));
+    box-shadow: 0 0 0 1px var(--accent) inset;
+  }
+  .goal-chip.on svg { color: var(--accent-ink); }
+  /* Your actual goal, whichever chip is being looked at. A dot rather than a
+     word, because the row is already carrying eight labels. */
+  .goal-chip.mine::after {
+    content: ""; position: absolute; top: 6px; right: 7px; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--accent);
+  }
+  .goal-chip.on.mine::after { background: var(--accent-ink); }
+  /* Looking at a goal that is not yours: say so once, quietly, with the way back. */
+  .goal-lens-note {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-size: 12.5px; color: var(--muted); margin: -6px 0 12px; padding: 9px 12px;
+    border-radius: 11px; background: var(--panel-2);
+  }
+  .goal-lens-note button {
+    border: none; background: none; color: var(--accent-ink); font: inherit;
+    font-weight: 700; cursor: pointer; padding: 0; flex-shrink: 0;
+  }
   .photo-strip { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px 12px; padding: 4px 16px 6px; }
   .photo-item { flex-shrink: 0; width: 116px; }
   .photo-item img {
@@ -5570,6 +5618,14 @@
       <button type="button" class="tab-pill" id="progPartnerBtn">Partner</button>
     </div>
 
+    <!-- A lens, not a setter. Tapping a chip shows you what this tab looks
+         like judged on that goal; it does NOT rewrite your profile, because a
+         row of tabs that silently changes what you are training for is a trap.
+         Your own goal carries the dot, and Setup is still the only place that
+         changes it. -->
+    <div class="goal-chips" id="progGoalChips"></div>
+    <div class="goal-lens-note hidden" id="progLensNote"></div>
+
     <div class="card" id="progHeadline"></div>
 
 
@@ -6422,7 +6478,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.14";
+const APP_VERSION = "2026.09.16.15";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -24254,6 +24310,17 @@ let PROGRESS_VIEW = "me";
 function viewedName() { return PROGRESS_VIEW === "partner" ? partnerName() : ME; }
 function viewedEmail() { return PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY_EMAIL; }
 
+/* Which goal this tab is being READ THROUGH, which is not the same thing as
+   which goal somebody has. Null means "whatever mine actually is", and that is
+   the resting state; a bubble id here means they are looking at this tab as if
+   that were the goal, to see what it would tell them.
+
+   Deliberately not persisted and deliberately not written to the profile.
+   Tapping a tab must never quietly change what somebody is training for, and
+   it must not still be changed tomorrow because they went for a look once.
+   Setup is the only place a goal changes, and it still is. */
+let PROGRESS_GOAL_LENS = null;
+
 /* Every card this tab owns, in ONE fixed order. Whatever the goal does not ask
    for falls through to the section under the rule in exactly this sequence, so
    the bottom of the tab is the same shape for everybody and a person who
@@ -25379,12 +25446,69 @@ function headlineSpark(kind, name) {
   return "";
 }
 
+/* The goal strip. Your own goal first and dotted, then the rest in the order
+   the picker offers them, so the row reads as "yours, and what else there is"
+   rather than a menu you have to find yourself in.
+
+   Hidden on a partner's view: their goal is theirs, and a lens that re-reads
+   somebody else's data through a goal they did not pick answers a question
+   nobody asked. */
+function renderGoalChips(profile) {
+  const host = $("progGoalChips");
+  if (!host) return;
+  if (PROGRESS_VIEW === "partner") { host.classList.add("hidden"); return; }
+  host.classList.remove("hidden");
+
+  /* migrateGoalPick is not given an empty bubble: a retired id needs
+     translating, but "no goal at all" is not a retired id and asking it to
+     migrate one returns something for a goal nobody picked. */
+  const mine = profile?.goal_bubble
+    ? (migrateGoalPick(profile.goal_bubble, profile.goal_child || null)?.bubble || profile.goal_bubble)
+    : null;
+  const showing = PROGRESS_GOAL_LENS || mine;
+  const ordered = [...GOAL_TILES].sort((a, b) => (b.id === mine ? 1 : 0) - (a.id === mine ? 1 : 0));
+
+  host.innerHTML = ordered.map((t) => `
+    <button type="button" class="goal-chip${t.id === showing ? " on" : ""}${t.id === mine ? " mine" : ""}"
+      data-goal="${escapeHtml(t.id)}" aria-pressed="${t.id === showing}">
+      ${icon(t.ico, 19)}
+      <span>${escapeHtml(t.title)}</span>
+    </button>`).join("");
+
+  host.querySelectorAll("[data-goal]").forEach((b) => {
+    b.onclick = () => {
+      /* Tapping your own goal is how you get back, so it clears the lens
+         rather than setting one to the same value: the note below has to
+         disappear, and "no lens" is the only state that means it. */
+      PROGRESS_GOAL_LENS = b.dataset.goal === mine ? null : b.dataset.goal;
+      renderProgressTab();
+    };
+  });
+
+  /* Said once, under the strip, whenever this is not your own goal. Without
+     it the tab is quietly answering a different question than the one your
+     profile asked, and the only clue is which chip is lit. */
+  const note = $("progLensNote");
+  if (!note) return;
+  const lensTile = PROGRESS_GOAL_LENS ? goalTileFor(PROGRESS_GOAL_LENS) : null;
+  note.classList.toggle("hidden", !lensTile);
+  if (lensTile) {
+    note.innerHTML = `<span>Looking at this as <b>${escapeHtml(lensTile.title)}</b>. Your goal has not changed.</span>
+      <button type="button" id="progLensBack">${mine ? "Back to mine" : "Clear"}</button>`;
+    $("progLensBack").onclick = () => { PROGRESS_GOAL_LENS = null; renderProgressTab(); };
+  }
+}
+
 function renderProgressHeadline(kind, name, email, profile, third, sharing) {
   const el = $("progHeadline");
   const tile = goalTileFor(profile?.goal_bubble);
   const goalText = tile ? goalTileLabel(profile) : (profile?.goal || null);
+  /* "Your goal" is only true when it is. Under a lens this is somebody
+     else's goal being tried on, and saying "your goal" over it is a small
+     lie the strip above cannot undo on its own. */
   const eyebrow = third
     ? goalText ? `${name}: ${goalText}` : `${name}'s progress`
+    : PROGRESS_GOAL_LENS ? `Viewing as: ${goalText || "another goal"}`
     : goalText ? `Your goal: ${goalText}` : "Where you are";
   const h = progressHeadline(kind, name, email, profile, third);
   /* The note is a paragraph, and a paragraph is what Mo said there is too much
@@ -25406,6 +25530,31 @@ function renderProgressHeadline(kind, name, email, profile, third, sharing) {
     <div class="ph-figure${h.tone ? " " + h.tone : ""}"><b>${h.value}</b>${h.unit ? `<i>${escapeHtml(h.unit)}</i>` : ""}</div>
     ${headlineSpark(kind, name)}
     <div class="ph-line">${h.line}${h.note ? " " + infoDot("progressNote", "What this number is built from") : ""}</div>`;
+
+  /* The hero is a door, not a dead end. It states the answer and the card it
+     was built from is one tap away, opened and scrolled to, rather than
+     somewhere further down for somebody to go find. The chevron is only drawn
+     when there is actually somewhere to go: a habit goal's answer comes from
+     Consistency, but a blank account's comes from nothing yet. */
+  const target = (HEADLINE_CARD[kind] || [])[0];
+  const targetEl = target ? $(target) : null;
+  const canOpen = targetEl && !targetEl.classList.contains("hidden");
+  el.classList.toggle("ph-door", !!canOpen);
+  if (!canOpen) { el.onclick = null; return; }
+  if (!el.querySelector(".ph-go")) {
+    const go = document.createElement("span");
+    go.className = "ph-go";
+    go.innerHTML = icon("chevronRight", 18);
+    el.appendChild(go);
+  }
+  el.onclick = (e) => {
+    /* The info dot inside the line has its own job. */
+    if (e.target.closest(".info-dot")) return;
+    document.querySelectorAll("#tab-progress .card.peek").forEach((c) => c.classList.remove("peek"));
+    targetEl.classList.add("peek");
+    primeOpenedCard(targetEl);
+    targetEl.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
 }
 
 /* ---- Rearranging the Progress tab ----
@@ -25494,6 +25643,24 @@ function applyArrangeZoom(host) {
   if (first) window.scrollTo(0, Math.max(0, first.getBoundingClientRect().top + window.scrollY - 70));
 }
 
+/* A chart or a Rive figure that mounted while its card was folded sized itself
+   against a hidden, zero-width container, so it comes back as a sliver or as
+   nothing. Chart.js has a real answer for exactly this (resize() against the
+   box it is actually in now); the muscle figure exposes no equivalent, so it
+   is asked to paint itself again, which is cheap and already idempotent.
+
+   One function because two things now open a card: tapping its row, and
+   tapping the headline that was built from it. A second copy of this list is
+   how one of those two ends up with a chart nobody fixed. */
+function primeOpenedCard(card) {
+  if (!card) return;
+  if (card.id === "cardWeight") weightChart?.resize();
+  else if (card.id === "cardConsistency") consistencyChart?.resize();
+  else if (card.id === "cardStrength") strengthChart?.resize();
+  else if (card.id === "cardVolume") volumeChart?.resize();
+  else if (card.id === "cardMuscles") renderMuscleAnswers(PROGRESS_VIEW === "partner" ? partnerName() : ME);
+}
+
 function paintArrangeUI(host) {
   /* The toggle lives in the tab when idle and becomes a fixed bar across the
      bottom while arranging, where a thumb actually is. */
@@ -25551,24 +25718,9 @@ function paintArrangeUI(host) {
       if (!wasOpen) {
         card.classList.add("peek");
         card.scrollIntoView({ block: "nearest", behavior: "smooth" });
-        /* A chart or a Rive figure that mounted while its card was folded
-           sized itself against a hidden, zero-width container. Chart.js has
-           a real fix for exactly this (resize() against the box it is
-           actually in now); the muscle figure does not expose one, so it is
-           asked to paint itself again instead, which is cheap and already
-           idempotent. Arrange mode never triggers this: it never lets go of
-           a chart's true size in the first place, so there is nothing here
-           for it to repair. */
-        if (indexable) {
-          if (card.id === "cardWeight") weightChart?.resize();
-          else if (card.id === "cardConsistency") consistencyChart?.resize();
-          else if (card.id === "cardStrength") strengthChart?.resize();
-          else if (card.id === "cardVolume") volumeChart?.resize();
-          else if (card.id === "cardMuscles") {
-            const name = PROGRESS_VIEW === "partner" ? partnerName() : ME;
-            renderMuscleAnswers(name);
-          }
-        }
+        /* Arrange mode never needs this: it never lets go of a chart's true
+           size in the first place, so there is nothing for it to repair. */
+        if (indexable) primeOpenedCard(card);
       }
     });
   }
@@ -25622,7 +25774,16 @@ function renderProgressTab() {
      did not: the Strength card listed every lift and load they had ever done
      while the rest of the app was carefully hiding exactly that. */
   const sharing = !isPartner || PARTNER_PROFILE?.share_workout_details !== false;
-  let kind = headlineKindFor(profile);
+  /* The lens, if one is up. headlineKindFor reads a profile, so it is handed a
+     COPY carrying the looked-at bubble rather than the real one: every
+     downstream rule (which card leads, which gets the ring, what the sentence
+     says) then follows from the same one place it always did, and nothing had
+     to learn about lenses. The real profile is untouched. */
+  const lensProfile = PROGRESS_GOAL_LENS && !isPartner
+    ? { ...profile, goal_bubble: PROGRESS_GOAL_LENS, goal_child: null }
+    : profile;
+  renderGoalChips(profile);
+  let kind = headlineKindFor(lensProfile);
   /* bulk reads the bar as well as the scale, so a partner who keeps their
      workout detail private cannot be scored on it either. Falling back to
      scale rather than habit, because their weigh-ins are still shared and
@@ -25676,7 +25837,9 @@ function renderProgressTab() {
   });
 
   if (blank) renderProgressEmpty(kind);
-  else renderProgressHeadline(kind, name, email, profile, isPartner, sharing);
+  /* lensProfile, so the eyebrow names the goal actually being read through
+     rather than saying "Your goal: Lose weight" over a Get stronger answer. */
+  else renderProgressHeadline(kind, name, email, lensProfile, isPartner, sharing);
   if (!blank && shown.includes("cardMuscles")) renderMuscleAnswers(name);
 
   /* The goal's cards, in the goal's order, straight under the answer; then the
