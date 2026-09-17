@@ -143,6 +143,24 @@
             ],
             skipped: false,
           } },
+        /* Two more days already planned, because a week with one workout on it
+           cannot show what Plan your week is for: rearranging the days. A gap
+           between them is deliberate too, so a drag has an empty day to cross
+           and to land on. */
+        { id: "w2", email: ME, entry_date: day(1), archived: false, focus: "Pull Day", created_at: day(0) + "T05:00:00Z",
+          exercises: [
+            { name: "Lat Pulldown", sets: 4, reps: 10, targetWeight: 130 },
+            { name: "Seated Cable Row", sets: 3, reps: 12, targetWeight: 120 },
+            { name: "Face Pull", sets: 3, reps: 15, targetWeight: 40 },
+            { name: "Barbell Curl", sets: 3, reps: 10, targetWeight: 60 },
+          ] },
+        { id: "w3", email: ME, entry_date: day(3), archived: false, focus: "Leg Day", created_at: day(0) + "T05:00:00Z",
+          exercises: [
+            { name: "Barbell Back Squat", sets: 4, reps: 6, targetWeight: 245 },
+            { name: "Romanian Deadlift", sets: 3, reps: 10, targetWeight: 185 },
+            { name: "Leg Press", sets: 3, reps: 12, targetWeight: 300 },
+            { name: "Standing Calf Raise", sets: 4, reps: 15, targetWeight: 120 },
+          ] },
       ],
       saved_workouts: [
         { id: "s1", email: ME, name: "Full body reset", focus: "Full body", created_at: day(-6) + "T10:00:00Z",

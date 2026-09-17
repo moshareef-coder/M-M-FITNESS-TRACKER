@@ -3111,13 +3111,20 @@
   .dp-way-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .dp-way-txt b { font-size: 14px; font-weight: 700; }
   .dp-way-txt i { font-size: 12.5px; font-style: normal; color: var(--muted); }
+  /* A row rather than one big button: a drag handle and the two arrows next to
+     it are buttons of their own, and a button cannot live inside a button. */
   .wk-plan-day {
-    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font: inherit; cursor: pointer;
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; font: inherit;
     padding: 12px 13px; border-radius: 14px; background: var(--panel); border: 1px solid var(--border); color: var(--text);
   }
-  .wk-plan-day:active { opacity: .75; }
+  .wk-plan-tap {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; cursor: pointer;
+    padding: 0; background: none; border: none; font: inherit; color: inherit; text-align: left;
+  }
+  .wk-plan-tap:active { opacity: .75; }
+  .wk-plan-tap:disabled { cursor: default; }
   .wk-plan-day.has { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
-  .wk-plan-when { flex-shrink: 0; width: 74px; display: flex; flex-direction: column; }
+  .wk-plan-when { flex-shrink: 0; width: 60px; display: flex; flex-direction: column; }
   .wk-plan-when b { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .wk-plan-when i { font-size: 21px; font-weight: 800; font-style: normal; letter-spacing: -.02em; }
   .wk-plan-what { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -24387,8 +24394,13 @@ function renderWorkoutTab({ respectMode = false } = {}) {
    HTML5 drag-and-drop does not fire on touch, so this uses Pointer Events.
    The dragged row follows the finger; when it passes a neighbour's midpoint the
    two swap in the DOM immediately and the drag baseline resets, so the list
-   reorders under your finger rather than only on release. */
-function makeReorderable(container, onDrop) {
+   reorders under your finger rather than only on release.
+
+   onMove, when it is given, runs after every one of those swaps. A list whose
+   rows carry something that belongs to the slot rather than to the row, the way
+   the week planner's dates do, has to repaint that on the way rather than only
+   at the end. */
+function makeReorderable(container, onDrop, onMove) {
   if (!container) return;
   let drag = null;
 
@@ -24403,7 +24415,17 @@ function makeReorderable(container, onDrop) {
     const order = rowsIn().map((r) => parseInt(r.dataset.idx, 10));
     const moved = order.some((v, i) => v !== i);
     drag = null;
-    if (moved) onDrop(order);
+    if (!moved) return;
+    /* A drag must never end as a tap. The click a release leaves behind is hit
+       tested wherever the finger stopped, which is a different row from the one
+       the drag started on, and it opens that row. Same fix and the same reason
+       as the sheet drag further down: swallow clicks on a short timer rather
+       than as a one-shot, because a drag often leaves no click at all and a
+       listener still sitting there would eat the next real one. */
+    const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+    document.addEventListener("click", swallow, true);
+    setTimeout(() => document.removeEventListener("click", swallow, true), 320);
+    onDrop(order);
   };
 
   container.querySelectorAll("[data-grip]").forEach((grip) => {
@@ -24442,6 +24464,7 @@ function makeReorderable(container, onDrop) {
           container.insertBefore(drag.row, prev);
           drag.startY = e.clientY;
           drag.row.style.transform = "";
+          if (onMove) onMove();
           return;
         }
       }
@@ -24452,6 +24475,7 @@ function makeReorderable(container, onDrop) {
           container.insertBefore(next, drag.row);
           drag.startY = e.clientY;
           drag.row.style.transform = "";
+          if (onMove) onMove();
         }
       }
     });
@@ -25293,12 +25317,19 @@ function planWeekDays(offset = WEEK_OFFSET) {
     d.setDate(d.getDate() + i);
     const date = isoDate(d);
     const existing = (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === date && !w.archived);
+    /* A finished workout is archived rather than deleted, so the day still holds
+       a row and the (email, entry_date) index still counts it. Nothing may be
+       moved onto such a day, which is why it is reported separately from the
+       plan the screen actually draws. */
+    const spoken = (ALL_PLANS || []).some((w) => w.email === MY_EMAIL && w.entry_date === date);
     out.push({
       date,
       label: d.toLocaleDateString([], { weekday: "short" }),
       day: d.getDate(),
       isToday: date === today,
       past: date < today,
+      plan: existing || null,
+      trained: !existing && spoken,
       taken: existing ? displayFocus(existing.focus, existing.exercises) : null,
       done: !!existing?.completed_at,
     });
@@ -25438,6 +25469,38 @@ function renderWeekPlanner() {
   $("workoutFocusRow").textContent = "";
   const days = planWeekDays();
 
+  /* Which days a workout is allowed to sit on. A day already trained is not one
+     of them: the sets are logged against that date, and a plan that slid off it
+     would be rewriting what happened. A day with a session running on it is out
+     for the same reason. Everything from there forward can be shuffled, which is
+     the whole of the ask: when you plan the week you should be able to drag the
+     days into the order that suits you. */
+  const movable = days.filter((d) => !d.past && !d.done && !d.trained && !(SESSION && d.isToday));
+  const slots = movable.map((d) => d.date);
+  const canReorder = movable.length > 1 && movable.some((d) => d.plan);
+
+  let slot = -1;
+  const dayRow = (d) => {
+    const inPlay = movable.includes(d);
+    const at = inPlay ? ++slot : -1;
+    // Only a day with something on it can be picked up; an empty day is a place
+    // to land, and dragging emptiness around means nothing.
+    const handles = canReorder && inPlay && !!d.plan;
+    return `
+      <div class="wk-plan-day${d.taken ? " has" : ""}${d.past ? " past" : ""}${d.isToday ? " now" : ""}${inPlay ? " draggable" : ""}"${inPlay ? ` data-idx="${at}"` : ""}>
+        ${handles ? `<button type="button" class="grip" data-grip aria-label="Drag ${escapeHtml(d.taken)} to another day">${icon("grip", 16)}</button>` : ""}
+        <button type="button" class="wk-plan-tap" data-plan-day="${d.date}" ${d.past ? "disabled" : ""}>
+          <span class="wk-plan-when"><b>${escapeHtml(d.isToday ? "Today" : d.label)}</b><i>${d.day}</i></span>
+          <span class="wk-plan-what">${d.taken ? escapeHtml(d.taken) : d.past ? "Already past" : "Nothing planned"}</span>
+          ${handles ? "" : `<span class="wk-plan-go">${d.done ? icon("check", 16) : d.past ? "" : icon("chevronRight", 16)}</span>`}
+        </button>
+        ${handles ? `<span class="row-actions">
+          <button type="button" class="row-btn" data-day-move="${at}" data-dir="-1" ${at === 0 ? "disabled" : ""} aria-label="Move ${escapeHtml(d.taken)} a day earlier">${icon("arrowUp", 13)}</button>
+          <button type="button" class="row-btn" data-day-move="${at}" data-dir="1" ${at === movable.length - 1 ? "disabled" : ""} aria-label="Move ${escapeHtml(d.taken)} a day later">${icon("arrowDown", 13)}</button>
+        </span>` : ""}
+      </div>`;
+  };
+
   $("workoutContent").innerHTML = `
     ${backBar("Back", () => goWorkoutScreen("choose", { back: true, before: () => { WEEK_OFFSET = 0; } }))}
     <div class="wk-nav">
@@ -25445,22 +25508,125 @@ function renderWeekPlanner() {
       <div class="wk-nav-label">${escapeHtml(planWeekLabel())}</div>
       <button type="button" class="wk-nav-btn" id="wkNext" aria-label="Next week">${icon("chevronRight", 16)}</button>
     </div>
-    <p class="muted-note">Tap a day to put a workout on it. You can generate one, build your own, or use something you saved.</p>
-    <div class="wk-plan">
-      ${days.map((d) => `
-        <button type="button" class="wk-plan-day${d.taken ? " has" : ""}${d.past ? " past" : ""}${d.isToday ? " now" : ""}"
-          data-plan-day="${d.date}" ${d.past ? "disabled" : ""}>
-          <span class="wk-plan-when"><b>${escapeHtml(d.isToday ? "Today" : d.label)}</b><i>${d.day}</i></span>
-          <span class="wk-plan-what">${d.taken ? escapeHtml(d.taken) : d.past ? "Already past" : "Nothing planned"}</span>
-          <span class="wk-plan-go">${d.done ? icon("check", 16) : d.past ? "" : icon("chevronRight", 16)}</span>
-        </button>`).join("")}
-    </div>`;
+    <p class="muted-note">Tap a day to put a workout on it. You can generate one, build your own, or use something you saved.${canReorder ? " Drag a planned day by its handle, or nudge it with the arrows." : ""}</p>
+    <div class="wk-plan reorder-list" id="wkPlanList">${days.map(dayRow).join("")}</div>`;
 
   if ($("wkPrev")) $("wkPrev").onclick = () => { if (WEEK_OFFSET > 0) { WEEK_OFFSET--; renderWeekPlanner(); } };
   $("wkNext").onclick = () => { WEEK_OFFSET++; renderWeekPlanner(); };
   $("workoutContent").querySelectorAll("[data-plan-day]").forEach((b) => {
     b.onclick = () => openDayPlanner(b.dataset.planDay);
   });
+
+  if (!canReorder) return;
+
+  /* The date belongs to the slot, not to the row that is in it: slot one is
+     always Monday. Repainting the dates after every swap is what makes the row
+     under your finger read as the day it is about to land on rather than the
+     day it came from, and it keeps the rest of the week in calendar order while
+     it moves around them. */
+  const repaintDates = () => {
+    [...$("wkPlanList").querySelectorAll(".draggable")].forEach((row, i) => {
+      const d = movable[i];
+      if (!d) return;
+      const when = row.querySelector(".wk-plan-when");
+      if (when) when.innerHTML = `<b>${escapeHtml(d.isToday ? "Today" : d.label)}</b><i>${d.day}</i>`;
+      const tap = row.querySelector("[data-plan-day]");
+      if (tap) tap.dataset.planDay = d.date;
+      row.classList.toggle("now", d.isToday);
+    });
+  };
+
+  const applyOrder = async (order) => {
+    const moved = order.map((from, to) => ({ plan: movable[from].plan, date: slots[to] }));
+    const ok = await applyWeekOrder(moved);
+    await loadAll();
+    await loadTodayWorkout();
+    renderWeekPlanner();
+    toast(ok ? "Week rearranged" : "Couldn't move that. Try again.");
+  };
+
+  makeReorderable($("wkPlanList"), applyOrder, repaintDates);
+
+  /* Dragging is not available to everybody, and a week is not worth re-planning
+     from scratch because a thumb cannot hold a row steady. One step at a time is
+     enough: the arrows swap a day with its neighbour, which composes into any
+     order you want. */
+  $("wkPlanList").querySelectorAll("[data-day-move]").forEach((b) => {
+    b.onclick = () => {
+      const at = Number(b.dataset.dayMove);
+      const to = at + Number(b.dataset.dir);
+      if (to < 0 || to >= movable.length) return;
+      const order = movable.map((_, i) => i);
+      order[at] = to;
+      order[to] = at;
+      applyOrder(order);
+    };
+  });
+}
+
+/* Moving a workout to another day is a rewrite of ai_workouts.entry_date, and
+   that table has a unique index on (email, entry_date). So two days that swap
+   cannot both be written in any order that works on its own: whichever goes
+   first lands on a day the other has not left yet and the database refuses it.
+   The writes are therefore ordered so that each one lands on a day that is
+   empty at the moment it runs, and a straight rotation, where every day in the
+   ring is occupied, borrows a free day past the end of the week to open it up.
+
+   The park is a real day rather than a sentinel on purpose: if the follow-up
+   write never happens, the workout has to land somewhere the user can see it
+   and drag it back, not somewhere only a query would find it. */
+async function applyWeekOrder(assignments) {
+  const moves = assignments.filter((m) => m.plan && m.plan.entry_date !== m.date);
+  if (!moves.length) return true;
+
+  // Archived rows count: a finished workout still holds its day in the index.
+  const taken = new Set((ALL_PLANS || []).filter((w) => w.email === MY_EMAIL).map((w) => w.entry_date));
+  const now = new Map(moves.map((m) => [m.plan.id, m.plan.entry_date]));
+  const queue = moves.slice();
+  const writes = [];
+
+  let guard = queue.length * 2 + 2;
+  while (queue.length && guard-- > 0) {
+    const i = queue.findIndex((m) => !taken.has(m.date));
+    if (i < 0) {
+      const park = sparePlanDay(taken);
+      if (!park) { console.error("no free day to break the rotation through"); return false; }
+      const m = queue[0];
+      writes.push({ id: m.plan.id, entry_date: park });
+      taken.delete(now.get(m.plan.id));
+      taken.add(park);
+      now.set(m.plan.id, park);
+      continue;
+    }
+    const [m] = queue.splice(i, 1);
+    writes.push({ id: m.plan.id, entry_date: m.date });
+    taken.delete(now.get(m.plan.id));
+    taken.add(m.date);
+    now.set(m.plan.id, m.date);
+  }
+  if (queue.length) { console.error("could not order the week's moves", moves); return false; }
+
+  for (const w of writes) {
+    const { error } = await sb.from("ai_workouts").update({ entry_date: w.entry_date }).eq("id", w.id);
+    // Stopping here leaves the week half moved, which is why the caller reloads
+    // and redraws either way: what the screen shows is then what is stored.
+    if (error) { console.error("could not move a planned workout", error); return false; }
+  }
+  return true;
+}
+
+/* A day nobody has a row on, looked for from just past the planned week so a
+   workout parked there for the length of one write is never mistaken for a
+   past day. */
+function sparePlanDay(taken) {
+  const start = planWeekStart();
+  for (let i = 7; i < 120; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    const iso = isoDate(d);
+    if (!taken.has(iso)) return iso;
+  }
+  return null;
 }
 
 function openDayPlanner(date) {
