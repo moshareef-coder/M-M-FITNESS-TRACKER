@@ -484,6 +484,21 @@
     border-top-left-radius: 0; border-top-right-radius: 0;
     border-top: 1px solid var(--border); margin-top: 0;
   }
+  /* Unless he is sitting between them, which is where Mo asked for him. The
+     merge above is a seam: the hero gives up its bottom edge because the week
+     card continues it, and the week card gives up its top edge because the hero
+     already drew one. Put a third card in that seam and both halves are left
+     mid-sentence, which is what the 0px butt joint and the squared-off corners
+     were. Three cards then, properly finished, evenly spaced. Toggled from
+     sayHomeQuip rather than with :has, so it behaves the same everywhere. */
+  #tab-home.home-one.bot-between #heroCard {
+    border-bottom-left-radius: var(--radius); border-bottom-right-radius: var(--radius);
+    border-bottom: 1px solid var(--border); box-shadow: var(--shadow-lift);
+    margin-bottom: 10px; padding-bottom: 15px;
+  }
+  #tab-home.home-one.bot-between #weekTogetherCard {
+    border-top-left-radius: var(--radius); border-top-right-radius: var(--radius);
+  }
   /* The grid is the second half of a card now, not a card of its own, so it
      drops the heading that used to name it. */
   #tab-home.home-one #weekTogetherCard .card-head h2 { font-size: 11px; font-weight: 700;
@@ -2411,10 +2426,12 @@
      with two dots, which is exactly what render-bot-faces.py says was tried in
      SwiftUI and rejected. */
   .home-quip-slot:empty { display: none; }
-  .home-quip-slot { margin: 0 0 14px; }
+  /* 10px is what every other card on Home leaves under itself (.card). His box
+     is a card, so it uses the same number rather than one of its own. */
+  .home-quip-slot { margin: 0 0 10px; }
   .home-quip {
     display: flex; align-items: center; gap: 13px; width: 100%;
-    padding: 13px 15px; border-radius: var(--radius);
+    padding: 16px 15px; border-radius: var(--radius);
     background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow-card);
     font-family: inherit; text-align: left; cursor: pointer;
     animation: quipIn .34s cubic-bezier(.22,1,.36,1) both;
@@ -7209,7 +7226,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.17.7";
+const APP_VERSION = "2026.09.17.8";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -20993,7 +21010,12 @@ function hideHomeQuip() {
   const el = $("homeQuipSlot")?.querySelector(".home-quip");
   if (!el) return;
   el.classList.add("go");
-  setTimeout(() => el.remove(), 300);
+  /* The seam closes again as he leaves, so dismissing him puts Home back to the
+     one merged block it is without him rather than leaving two half cards. */
+  setTimeout(() => {
+    el.remove();
+    document.getElementById("tab-home")?.classList.remove("bot-between");
+  }, 300);
 }
 
 function sayHomeQuip() {
@@ -21001,7 +21023,11 @@ function sayHomeQuip() {
   if (!slot) return;
   /* Muted is muted everywhere. It is one switch in Settings and it means he
      stops talking, not that he stops talking in one place. */
-  if (quipsMuted()) { slot.replaceChildren(); return; }
+  if (quipsMuted()) {
+    slot.replaceChildren();
+    document.getElementById("tab-home")?.classList.remove("bot-between");
+    return;
+  }
   /* Already speaking, or spoke recently: leave him be. */
   if (slot.querySelector(".home-quip")) return;
   if (Date.now() - HOME_QUIP_AT < HOME_QUIP_GAP_MS) return;
@@ -21025,6 +21051,7 @@ function sayHomeQuip() {
   el.setAttribute("aria-label", `He says: ${said}`);
   el.onclick = () => hideHomeQuip();
   slot.replaceChildren(el);
+  document.getElementById("tab-home")?.classList.add("bot-between");
   /* He stays. There is no set coming to push him off, and a line that vanishes
      from a screen somebody is reading is worse than one that sits there. Tap
      to dismiss, and the next arrival replaces him. */
