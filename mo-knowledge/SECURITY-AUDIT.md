@@ -8,6 +8,24 @@ Scope: Postgres and RLS, storage, edge functions, auth configuration, project
 configuration, and a sample of the client. **Not** a penetration test, and not
 an exhaustive read of 28,000 lines of `index.html`.
 
+## Update, later the same day
+
+Everything below still describes what was found. What has since been fixed:
+
+- 20260915_consent_and_leak_close.sql was applied, which the audit missed was
+  sitting written and unrun. It closed **3** (invite codes now raise a request
+  the owner answers, plus a rate limit), **6** (body photos out of the shared
+  read policy) and removed the client INSERT policy on partnerships.
+- The cron secret was rotated into vault, and 20260917_cron_secret_addendum.sql
+  moved the last two functions off the literal, closing **7**. Verified: zero
+  functions and zero cron jobs carry the old value.
+- 20260917_invite_links.sql landed, which replaces the guessable six character
+  code as the main route in with a 128 bit single use link.
+
+Still open: **1** (SSL enforcement, open CIDR), **2** (password length, breach
+check), **4** (captcha), **5** (PITR), **8** and **9**. The advisor still
+returns zero errors.
+
 ## Verdict
 
 The data layer is in good shape. Supabase's own security advisor returns **zero
