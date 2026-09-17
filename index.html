@@ -4728,15 +4728,19 @@
   }
   .cmp-frame.has-img .cmp-cap b { color: #fff; }
   .cmp-frame.has-img .cmp-cap span { color: rgba(255,255,255,.8); }
-  /* Today's photo, and only today's: tap to shoot it again. Yesterday's is
-     history, and history does not get edited. */
-  .cmp-retake {
-    position: absolute; top: 8px; right: 8px; z-index: 2; width: 30px; height: 30px;
-    display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer;
+  /* The controls on a photo. Delete on any of them, because with See all gone
+     this card is the only place a photo can be removed from; retake on today's
+     only, because today is still being taken and yesterday is history. They
+     sit on the picture, so the fill and the hairline are fixed darks rather
+     than tokens: a photograph is not the app's background in either theme. */
+  .cmp-acts { position: absolute; top: 8px; right: 8px; z-index: 2; display: flex; gap: 6px; }
+  .cmp-act {
+    width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; cursor: pointer; padding: 0;
     background: rgba(6,9,14,.55); border: 1px solid rgba(255,255,255,.35); color: #fff;
     -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
   }
-  .cmp-retake:active { transform: scale(.92); }
+  .cmp-act:active { transform: scale(.92); }
   /* Decorative, so no hit target is bought for it. */
   .cmp-chev {
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
@@ -25140,8 +25144,14 @@ async function renderComparePhotos(hostEl, isPartner) {
 
   const shots = BODY_PHOTOS.filter((p) => p.email === MY_EMAIL)
     .slice().sort((a, b) => (a.taken_on < b.taken_on ? -1 : a.taken_on > b.taken_on ? 1 : 0));
-  const start = shots.length > 1 ? shots[0] : null;
-  const now = shots.length ? shots[shots.length - 1] : null;
+  /* The first photo you ever take is Start and it stays Start. It used to fill
+     Now instead, on the reasoning that one photo is the most recent one, which
+     is true and useless: Start is the thing a later photo gets compared
+     against, so the first one has to land there or the comparison never has a
+     left hand side. Now stays empty until a photo from a different day exists,
+     and says so. */
+  const start = shots.length ? shots[0] : null;
+  const now = shots.length > 1 ? shots[shots.length - 1] : null;
   const today = todayStr();
   const todayShot = shots.find((p) => p.taken_on === today);
 
@@ -25153,12 +25163,21 @@ async function renderComparePhotos(hostEl, isPartner) {
   const capDate = (d) => new Date(d + "T00:00:00")
     .toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 
+  /* What the empty Now slot should say depends on whether a second photo is
+     even possible yet. On the day you take your first one it is not, so it
+     says so rather than asking for something the card would refuse. */
+  const nowHint = !shots.length ? "Then tomorrow"
+    : start && start.taken_on === today ? "Do yours tomorrow"
+    : "Today's goes here";
+
   const frame = (label, shot, hint) => `<div class="cmp-frame" data-slot="${label}">
       ${shot ? "" : `<span class="cmp-glyph">${icon("camera", 22)}</span>`}
       <div class="cmp-cap"><b>${label}</b><span>${escapeHtml(shot ? capDate(shot.taken_on) : (hint || ""))}</span></div>
-      ${label === "Now" && shot && shot.taken_on === today
-        ? `<button type="button" class="cmp-retake" aria-label="Retake today's photo">${icon("camera", 15)}</button>`
-        : ""}
+      ${shot ? `<div class="cmp-acts">
+        ${shot.taken_on === today
+          ? `<button type="button" class="cmp-act" data-retake="1" aria-label="Retake today's photo">${icon("camera", 15)}</button>` : ""}
+        <button type="button" class="cmp-act" data-del="${escapeHtml(shot.id)}" aria-label="Delete this photo">${icon("trash", 15)}</button>
+      </div>` : ""}
     </div>`;
 
   /* The day's row is the very top of the card, above its own title, because
@@ -25174,35 +25193,30 @@ async function renderComparePhotos(hostEl, isPartner) {
            </button>`}
     </div>`;
 
+  /* No See all. Mo: two pictures is the whole feature, and a link to a strip
+     of every photo ever taken was a third thing on a card that answers one
+     question. The strip card still exists for the goals that show it as an
+     index row; nothing on this screen points at it any more. */
   hostEl.innerHTML = todayRow + `<div class="card-head">
       <h2>Progress Photos</h2>
-      ${shots.length ? `<button type="button" class="card-link ink cmp-all">See all ${chevSvg}</button>` : ""}
     </div>
     <div class="cmp-pair">
-      ${frame("Start", start, shots.length ? "Add another to compare" : "No photo yet")}
+      ${frame("Start", start, "Your first photo")}
       <span class="cmp-chev" aria-hidden="true">${chevSvg}</span>
-      ${frame("Now", now, "No photo yet")}
+      ${frame("Now", now, nowHint)}
     </div>`;
 
-  const all = hostEl.querySelector(".cmp-all");
-  if (all) all.onclick = () => {
-    const card = $("cardPhotos");
-    if (!card) return;
-    document.querySelectorAll("#tab-progress .card.peek").forEach((c) => c.classList.remove("peek"));
-    card.classList.remove("hidden");
-    card.classList.add("peek");
-    primeOpenedCard(card);
-    card.scrollIntoView({ block: "start", behavior: "smooth" });
-  };
-  /* Both doors open the same picker. Retake is on today's frame only, and the
-     upsert behind it is keyed on (email, taken_on), so shooting again today
-     replaces today's row and deletes the file it replaced. There is no way to
-     reach this button on an older photo, which is the rule Mo asked for:
-     today is editable, yesterday is not. Deleting any of them is still one
-     tap away under See all. */
+  /* Every door opens the same picker. The upsert behind it is keyed on
+     (email, taken_on), so shooting again today replaces today's row and
+     removes the file it replaced. */
   const pick = () => $("bodyPhotoInput")?.click();
   hostEl.querySelector(".cmp-today-add")?.addEventListener("click", pick);
-  hostEl.querySelector(".cmp-retake")?.addEventListener("click", (e) => { e.stopPropagation(); pick(); });
+  hostEl.querySelectorAll("[data-retake]").forEach((b) => {
+    b.addEventListener("click", (e) => { e.stopPropagation(); pick(); });
+  });
+  hostEl.querySelectorAll("[data-del]").forEach((b) => {
+    b.addEventListener("click", (e) => { e.stopPropagation(); deleteBodyPhoto(b.dataset.del); });
+  });
 
   if (CMP_JUST_ADDED) {
     clearTimeout(CMP_CLEAR_TIMER);
