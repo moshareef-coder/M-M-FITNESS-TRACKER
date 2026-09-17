@@ -19,6 +19,7 @@
  * alias table below is hand written rather than loaded from goal-tree.json.
  */
 import { buildPlan } from "./plan.mjs";
+import { readStyles, mergeStyleLimits } from "./styles.mjs";
 import { parseFocus, mergePriority, focusFreshness } from "./focus.mjs";
 import { normalizeLimits } from "./limits.mjs";
 /* Read only, for one field. See the focus block in generateFromPayload. */
@@ -969,6 +970,25 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
        history. */
     const limits = normalizeLimits(payload.limits);
 
+    step = "styles";
+    /* What they agreed to do, from profiles.train_styles. Strict opt in: a
+       style left unticked is never planned and there is no floor putting
+       resistance training back, which is the product decision and not a
+       default anybody should quietly reinstate here.
+
+       Until this existed the column reached this file and stopped. Onboarding
+       asked the question, the plan screen repeated the answer back, and the
+       engine built the same lifting week either way, which is the worst kind
+       of setting: one the app collects, confirms, and ignores.
+
+       "At home" without "Lifting" is not a different kind of training, it is
+       the same training with fewer implements, so it folds into the equipment
+       limit rather than opening a second path through the builder. A limit set
+       by hand on the limits sheet survives the merge, because both are the
+       same claim: the plan cannot use that thing. */
+    const styles = readStyles(payload.train_styles);
+    const planLimits = styles.asked ? mergeStyleLimits(limits, styles) : limits;
+
     step = "buildPlan";
     const plan = buildPlan({
       goal,
@@ -1002,7 +1022,7 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
       swaps,
       today,
       priorityOverride: merged.tiers,
-      limits,
+      limits: planLimits,
       /* "Give me a different one." The app sends the exercises already on the
          plan so a regenerate of the same day comes back genuinely different
          rather than identical, which is what a deterministic engine otherwise
@@ -1058,6 +1078,27 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
       ...(includePlan ? { plan } : {}),
       meta: {
         level: plan.level,
+        /* What train_styles changed, so a screen can say it rather than the
+           person having to infer it from a week that came back lighter than
+           they expected. `honoured` false is the one case worth showing: they
+           asked for no resistance training and this is a lifting plan, which
+           is the engine admitting it cannot build the week they asked for on
+           its own and needs the caller to fill the days from the cardio and
+           flow libraries. */
+        styles: {
+          /* Always an object, never null, like every other key under meta. The
+             question "were they asked" is answered by `asked` rather than by
+             the key's own absence, so a reader never has to tell null apart
+             from a missing key to know whether to trust the rest of it. */
+          asked: styles.asked,
+          picked: styles.styles,
+          resistance: styles.resistance,
+          honoured: !styles.asked || styles.resistance,
+          equipmentMissing: styles.equipmentMissing,
+          cardioModes: styles.cardioModes,
+          flowTrainings: styles.flowTrainings,
+          note: styles.note,
+        },
         /* Which parameter set really ran, "_default" included. A plan that came
            out of the bubble default rather than the child we matched is a
            different plan, and support cannot tell the two apart from the

@@ -18610,6 +18610,37 @@ function ensureCardioLibrary() {
   return cardioLibPromise;
 }
 
+/* The day a week with no resistance training in it should have been. Built from
+   the cardio library when they ticked a cardio style, from yoga or pilates when
+   they did not, and null when neither is available, in which case the lifting
+   day the engine returned stands and the note on the plan screen is the only
+   thing that changes. Returning null rather than an empty day is deliberate:
+   the worst outcome here is somebody opening a session that has nothing in it.
+
+   Seeded by date so the same day asked twice comes back the same, which is the
+   rule every other picker in this file follows. */
+async function cardioDayForStyles(st) {
+  const mod = await ensureCardioLibrary();
+  if (!mod) return null;
+  const level = (MY_PROFILE?.level || "beginner");
+  const modes = Array.isArray(st.cardioModes) ? st.cardioModes : [];
+  if (modes.length) {
+    const picks = mod.cardioFor({ modes, level });
+    if (!picks.length) return null;
+    const seed = Number(todayISO().replace(/-/g, "")) || 0;
+    const s = picks[seed % picks.length];
+    return {
+      focus: s.name,
+      cardio: { name: s.name, minutes: s.minutes, effort: s.effort, cue: s.cue, structure: s.structure || null },
+      /* Sets and reps is the contract for this field and a run has neither, so
+         it stays empty and the session is carried in `cardio`. Writing "Easy
+         Run" in here would be logged as a set and would light the heat map. */
+      exercises: [],
+    };
+  }
+  return null;
+}
+
 /* Same seed rule the session engine keeps: the day plus the activity, so today
    asks the same question all day and gets the same answer, and tomorrow gets a
    different one. */
@@ -21855,6 +21886,10 @@ function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null 
        the contract says null, [] and nonsense all mean the same as not
        sending it, so this line is safe before the migration runs. */
     goal_secondary: MY_PROFILE?.goal_secondary ?? null,
+    /* What they agreed to do on the way in. The engine treats null as never
+       asked and builds exactly the plan it built before this column existed,
+       which is what every account made before onboarding asked gets. */
+    train_styles: MY_PROFILE?.train_styles ?? null,
     history,
     logs: recentLogs,
     plans: recentPlans,
@@ -21944,6 +21979,24 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
        so long. Said out loud, once, and only when it is actually true. */
     if (keepFocus && data.meta?.focusHonoured === false && data.workout.focus !== keepFocus) {
       toast(`No ${keepFocus.toLowerCase()} in your week, so this is ${data.workout.focus}`);
+    }
+
+    /* Somebody who ticked no resistance style still gets a lifting week out of
+       the engine, because a lifting week is the only thing it knows how to
+       build. It says so rather than pretending: meta.styles.honoured comes back
+       false, and filling the day from the libraries the app already has is the
+       app's job, not the engine's.
+
+       This is the line that finally makes the styles question mean something.
+       Before it, onboarding asked what you were willing to do, the plan screen
+       read it back to you, and the generator built five lifts regardless. */
+    const st = data.meta?.styles || null;
+    if (st && st.honoured === false) {
+      const swapped = await cardioDayForStyles(st);
+      if (swapped) {
+        data.workout = swapped;
+        if (st.note) toast(st.note.split(".")[0] + ".");
+      }
     }
 
     /* data.honest is not written here: ai_workouts has no column for it, and

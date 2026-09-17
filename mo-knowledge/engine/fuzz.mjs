@@ -486,6 +486,7 @@ function badValues(v, path = "", out = [], seen = new Set()) {
 const META_KEYS = new Set([
   "level", "childUsed", "goals", "confidence", "days", "dayName", "focusHonoured",
   "focus", "limits", "stretching", "session", "source", "goalSource", "logsSource", "missing",
+  "styles",
 ]);
 /* Documented in the contract's prose and missing from its table. Warned, not
    failed: the key is deliberate and it is the TABLE that is behind, which is a
@@ -497,6 +498,7 @@ const META_SUBKEYS = {
   limits: ["hurts", "missing", "excludedCount"],
   stretching: ["included", "warmupMinutes", "cooldownMinutes", "mobilityGoal", "why"],
   session: ["budgetMinutes", "source", "asked", "goalMinutes", "estimatedMinutes", "rampMinutes", "fits", "restCompressed"],
+  styles: ["asked", "picked", "resistance", "honoured", "equipmentMissing", "cardioModes", "flowTrainings", "note"],
 };
 const WORKOUT_KEYS = new Set(["focus", "exercises", "warmup", "cooldown", "rampSets"]);
 const RAMP_KEYS = new Set(["exercise", "group", "sets", "seconds"]);
