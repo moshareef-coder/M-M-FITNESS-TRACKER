@@ -7041,7 +7041,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.17.1";
+const APP_VERSION = "2026.09.17.2";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -16291,7 +16291,7 @@ function renderLiftHero(on, profile, isPartner) {
       side = `<div class="wth-target">
         <div class="wth-target-label">Level</div>
         <div class="wth-target-val">Not scored</div>
-        <div class="wth-target-pct">${noStandard ? "Barbell lifts only" : "Needs a weigh-in first"}</div>
+        <div class="wth-target-pct">${noStandard ? "No standard for this move" : "Needs a weigh-in first"}</div>
       </div>`;
     } else if (lvl) {
       side = `<div class="wth-target">
@@ -17724,9 +17724,12 @@ function openStrengthReport(name) {
       </button>`).join("")}
     </div>
     <p class="muted-note" style="margin-top:12px">
-      Dumbbell and machine lifts are not in here. One stored weight cannot say
-      whether it was per hand or the pair, and a gym's leg press sled weighs
-      whatever it weighs, so neither can be scored without guessing.
+      Compound lifts get a level: the barbell ones, plus the dumbbell and
+      machine versions of them. A dumbbell is scored as ONE dumbbell, the way
+      people say it, so log the 70 and not the 140. Isolation moves like curls
+      and raises have no bodyweight standard behind them, so they chart and set
+      records but carry no level. Machine levels are the roughest of the three,
+      because a sled has its own carriage weight and its own angle.
     </p>`;
 
   $("repClose").onclick = closeStrengthReport;
@@ -27071,12 +27074,21 @@ const STRENGTH_LEVELS = ["Beginner", "Novice", "Intermediate", "Advanced", "Elit
    called weak for being a front squat.
 
    What is deliberately NOT here matters as much as what is. Every dumbbell
-   lift is out, because the app stores one weight and cannot tell whether that
-   was per hand or the pair, and guessing would halve or double somebody's
-   level. Every machine is out too: a leg press sled weighs whatever that gym's
-   sled weighs, so the same effort reads differently in two gyms. Those lifts
-   still chart and still count toward a muscle getting stronger. They just do
-   not get a level, because we cannot work one out without making something up. */
+   lift used to be out, because the app stores one weight and could not tell
+   whether that was per hand or the pair. Mo settled which it is, so they are in
+   now, with the doubling folded into the factor. Machines are in too, and are
+   the least trustworthy entries here for the reason given beside them.
+
+   What is still out is isolation: a curl, a lateral raise, a leg extension, a
+   calf raise. Not because the number is ambiguous but because there is no
+   bodyweight standard to score one against. Nobody publishes what a lateral
+   raise "should" be at 180 lb, and scoring it against the press standard would
+   be inventing a ladder rather than reading one. Those lifts still chart, still
+   show their gain, still set records. They just carry no level.
+
+   A factor is "what you would move on THIS movement over what you would move on
+   the base barbell one", so a number below 1 lowers the bar and a number above
+   it raises the bar. */
 const LIFT_STANDARDS = {
   "bench press":            ["bench", 1],
   "barbell bench press":    ["bench", 1],
@@ -27095,6 +27107,38 @@ const LIFT_STANDARDS = {
   "push press":             ["press", 1.20],
   "barbell row":            ["row", 1],
   "pendlay row":            ["row", 0.95],
+
+  /* ---- Dumbbells, scored as ONE dumbbell ----
+     This is what unblocked them. Mo settled the convention: "log them as just
+     70, because how people count it is the dumbbell itself, not both." That is
+     the ordinary gym reading and it is now the app's, which means the stored
+     number finally has one meaning instead of two.
+
+     So the factor carries the doubling. A dumbbell bench with both arms moves
+     about 0.80 of a barbell bench in total, and half of that total is what
+     gets logged, so one dumbbell at 0.40 of the barbell threshold is the same
+     achievement. Anybody logging the pair instead will read about a level and
+     a half high, which is the one thing this convention has to hold. */
+  "dumbbell bench press":   ["bench", 0.40],
+  "incline dumbbell press": ["bench", 0.34],
+  "dumbbell shoulder press":["press", 0.40],
+  "seated dumbbell press":  ["press", 0.40],
+  "dumbbell row":           ["row", 0.48],
+
+  /* ---- Machines ----
+     Mo: "machines you can just do that too." In they go, and they are the
+     loosest of the three by some way: a plate loaded sled has its own carriage
+     weight and its own angle, so the same effort reads differently in two
+     gyms. Stack machines (pulldown, cable row, chest press) are much closer to
+     honest than leg press and hack squat, which are the two to distrust.
+     Nothing here is peer reviewed; these are the ratios lifters and coaches
+     publish, the same footing as the gym-goer end of STRENGTH_STANDARDS. */
+  "machine chest press":    ["bench", 0.90],
+  "machine shoulder press": ["press", 0.90],
+  "lat pulldown":           ["row", 0.95],
+  "seated cable row":       ["row", 1.00],
+  "leg press":              ["squat", 2.20],
+  "hack squat":             ["squat", 1.20],
 };
 
 /* The bodyweight the standards table is written for. A threshold of 1.30x
