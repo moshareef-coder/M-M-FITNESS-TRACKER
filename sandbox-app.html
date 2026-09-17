@@ -4558,36 +4558,40 @@
   .person-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
   .person-toggle .tab-pill { flex: 1; padding: 9px 14px; font-size: 14px; }
 
-  /* The goal lens. Scrolls sideways rather than wrapping, because eight goals
-     wrapped to three rows is a menu, and this is meant to read as a strip you
-     flick through. Bleeds to the screen edges so the last chip is visibly cut
-     off: that is the only honest affordance for "there is more this way". */
-  .goal-chips {
-    display: flex; gap: 8px; overflow-x: auto; margin: 0 -18px 14px; padding: 2px 18px 4px;
-    scrollbar-width: none; -webkit-overflow-scrolling: touch;
-  }
-  .goal-chips::-webkit-scrollbar { display: none; }
+  /* The goal strip: YOUR goals, not the menu. The main goal, the extras from
+     Setup (two at most), then More, which is the door to the page that
+     changes them. Four chips at most, so it no longer scrolls or bleeds: each
+     chip takes an equal share of the row, capped so that one goal and More do
+     not become two slabs. Taller than wide on purpose, icon over a two line
+     label, so the row reads as tabs rather than pills. */
+  .goal-chips { display: flex; gap: 8px; margin: 0 0 14px; }
   .goal-chip {
-    flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 5px;
-    min-width: 72px; padding: 9px 11px 8px; border-radius: 14px; cursor: pointer;
+    flex: 1 1 0; min-width: 0; max-width: 112px; min-height: 84px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+    padding: 10px 6px 9px; border-radius: 14px; cursor: pointer;
     border: 1px solid var(--border); background: var(--panel); color: var(--muted);
     font: inherit; font-size: 11.5px; font-weight: 700; line-height: 1.2; text-align: center;
     position: relative; transition: border-color .15s, color .15s, background .15s;
   }
-  .goal-chip svg { color: var(--muted); }
+  .goal-chip svg { color: var(--muted); flex-shrink: 0; }
+  .goal-chip span { display: block; overflow-wrap: anywhere; }
+  /* The lit chip: green edge, green icon, and the label in plain text colour.
+     The label used to go green too, and three green things on one chip is a
+     badge, not a selected tab. */
   .goal-chip.on {
-    border-color: var(--accent); color: var(--accent-ink);
+    border-color: var(--accent); color: var(--text);
     background: color-mix(in srgb, var(--accent) 9%, var(--panel));
     box-shadow: 0 0 0 1px var(--accent) inset;
   }
   .goal-chip.on svg { color: var(--accent-ink); }
   /* Your actual goal, whichever chip is being looked at. A dot rather than a
-     word, because the row is already carrying eight labels. */
+     word, because the chip is already carrying two lines. */
   .goal-chip.mine::after {
     content: ""; position: absolute; top: 6px; right: 7px; width: 6px; height: 6px;
     border-radius: 50%; background: var(--accent);
   }
   .goal-chip.on.mine::after { background: var(--accent-ink); }
+  .goal-chip:active { border-color: var(--accent); }
   /* Looking at a goal that is not yours: say so once, quietly, with the way back. */
   .goal-lens-note {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -4604,6 +4608,51 @@
     width: 116px; height: 155px; object-fit: cover; border-radius: 11px; display: block;
     background: var(--panel-2); border: 1px solid var(--border);
   }
+
+  /* The two doors under Weight. Each is a card in miniature: an icon in a
+     tinted square, the name, the one number, the one word under it, and a
+     chevron because both go somewhere. A grid of two, or one full-width tile
+     when Photos is off (a partner's view), rather than one tile and a hole. */
+  .prog-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+  .prog-tiles.solo { grid-template-columns: minmax(0, 1fr); }
+  /* The chevron floats in the corner rather than owning a column: at 172px a
+     tile has 78px of text once an icon, a chevron and two gutters are paid
+     for, and "Body Photos" wrapped to two lines in it. */
+  .prog-tile {
+    position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); column-gap: 10px; align-items: start;
+    min-width: 0; text-align: left; padding: 12px 24px 12px 12px; border-radius: var(--radius); cursor: pointer;
+    border: 1px solid var(--border); background: var(--card-fill); box-shadow: var(--shadow-card);
+    color: var(--text); font: inherit; transition: border-color .15s;
+  }
+  .prog-tile:active { border-color: var(--accent); }
+  .prog-tile[disabled] { cursor: default; }
+  .prog-tile-ico {
+    width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    background: var(--panel-2); color: var(--accent-ink);
+  }
+  .prog-tile-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .prog-tile-title { font-size: 12.5px; font-weight: 700; color: var(--text); line-height: 1.2; white-space: nowrap; }
+  .prog-tile-val {
+    font-size: 19px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .prog-tile-sub { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
+  .prog-tile-sub.go { color: var(--accent-ink); font-weight: 700; }
+  .prog-tile-chev { position: absolute; top: 12px; right: 9px; color: var(--muted); display: flex; }
+  .prog-tile-log {
+    grid-column: 1 / -1; padding: 14px 15px 15px; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--card-fill); box-shadow: var(--shadow-card);
+  }
+  .waist-input {
+    width: 100%; max-width: 150px; min-width: 0; text-align: right; padding: 0;
+    background: none; border: none; color: var(--text);
+    font-size: 28px; font-weight: 800; font-family: inherit; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums; -moz-appearance: textfield;
+  }
+  .waist-input::-webkit-outer-spin-button, .waist-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .waist-input:focus { outline: none; }
+  /* Arrange mode lists cards by title; these are not cards and have nothing to say there. */
+  body.arranging .prog-tiles { display: none; }
   .photo-date { font-size: 12.5px; color: var(--muted); text-align: center; margin-top: 5px; }
 
   /* Seasons */
@@ -4959,6 +5008,77 @@
      different languages to say "this one". */
   .wt-pill.on { background: var(--accent); color: var(--on-accent); }
   .wt-pill:active { transform: scale(.97); }
+
+  /* ---- The weight hero (renderWeightHero) ----
+     Mo's mockup for a weight goal, matched shape for shape: the goal at the
+     top with the mountain, the number and the target side by side, the
+     chart, the window, then logging in its own card with the stepper folded
+     under the plus. Colour is all tokens, so one layout holds in both themes.
+     Only ever on while the card is NOT an index row (idx-card comes off as
+     wt-hero goes on), so none of the fold rules compete with these. Arrange
+     mode is left alone: there the card is a title strip like every other. */
+  body:not(.arranging) #cardWeight.wt-hero {
+    background: none; border: 0; padding: 0; box-shadow: none; border-radius: 0;
+  }
+  body:not(.arranging) #cardWeight.wt-hero > h2,
+  body:not(.arranging) #cardWeight.wt-hero > .idx-summary,
+  body:not(.arranging) #cardWeight.wt-hero .idx-lead,
+  body:not(.arranging) #cardWeight.wt-hero .wt-log-head { display: none; }
+  #cardWeight.wt-hero .wth-card,
+  #cardWeight.wt-hero .wt-logcard {
+    background: var(--card-fill); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 15px; box-shadow: var(--shadow-card);
+  }
+  #cardWeight.wt-hero .wth-card {
+    position: relative; overflow: hidden; margin-bottom: 10px;
+    background: color-mix(in srgb, var(--me) 10%, var(--panel)); box-shadow: var(--shadow-lift);
+  }
+  .wth-head { position: relative; padding-right: 100px; }
+  .wth-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+  .wth-title { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin-top: 4px; }
+  .wth-sub { font-size: 14px; color: var(--muted); margin-top: 3px; }
+  /* Decoration, not data: a silhouette in the text colour at a whisper, so it
+     reads as the same thing on white and on graphite. */
+  .wth-mtn { position: absolute; top: -8px; right: -6px; width: 108px; height: 68px; pointer-events: none; }
+  .wth-mtn .m1 { fill: color-mix(in srgb, var(--text) 13%, transparent); }
+  .wth-mtn .m2 { fill: color-mix(in srgb, var(--text) 8%, transparent); }
+  .wth-mtn .snow { fill: color-mix(in srgb, var(--text) 30%, transparent); }
+  .wth-stats { display: flex; align-items: stretch; gap: 14px; margin: 18px 0 0; }
+  .wth-now { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+  .wth-now-fig { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+  /* The one number this tab exists for, so it is the one size off the scale. */
+  .wth-now-fig b { font-family: var(--font-display); font-size: 40px; font-weight: 800; letter-spacing: -.035em; line-height: 1; }
+  .wth-now-fig i { font-style: normal; font-size: 17px; font-weight: 700; }
+  .wth-now-delta { font-size: 14px; font-weight: 600; margin-top: 8px; }
+  .wth-target {
+    flex: 0 0 44%; border-left: 1px solid var(--border); padding-left: 14px;
+    display: flex; flex-direction: column; justify-content: center; gap: 6px;
+  }
+  .wth-target-label { font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+  .wth-target-val { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .wth-bar { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--text) 12%, transparent); overflow: hidden; }
+  .wth-bar b { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+  .wth-target-pct { font-size: 12.5px; color: var(--muted); }
+  #cardWeight.wt-hero .chart-wrap { height: 176px; }
+  #cardWeight.wt-hero .wt-pill { border-radius: 100px; min-height: 36px; padding: 8px 0; }
+  #cardWeight.wt-hero .wt-log { margin-top: 14px; padding-top: 14px; }
+  .wt-logrow {
+    display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; margin: 0;
+    background: none; border: 0; color: inherit; font-family: inherit; text-align: left; cursor: pointer;
+  }
+  .wt-logrow:active { transform: scale(.985); }
+  .wt-logrow-ico {
+    width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--me) 16%, var(--panel-2)); color: var(--me-ink);
+  }
+  .wt-logrow-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .wt-logrow-text b { font-size: 15.5px; font-weight: 700; }
+  .wt-logrow-text i { font-style: normal; font-size: 12.5px; color: var(--muted); }
+  .wt-logrow-plus {
+    width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    background: var(--accent); color: var(--on-accent); box-shadow: var(--glow-accent); transition: transform .18s ease;
+  }
+  .wt-logrow.on .wt-logrow-plus { transform: rotate(45deg); }
 
   /* One weigh-in, the one that was tapped on the chart above. It was a list of
      these and it is a single row now, still a button, because reading a weight
@@ -5639,13 +5759,32 @@
          it from there, not from a second card sitting next to the first one
          asking the same question a different way. Same ids throughout, so
          renderScaleCheck() did not have to change, only where it points. -->
+    <!-- On a weight goal this card IS the answer, so it stops being a folded
+         index row and becomes the hero (renderWeightHero): the goal at the
+         top, the number and the target under it, the chart, the window, and
+         logging in its own card underneath. The two wrappers are what let one
+         set of ids serve both shapes: folded, they are inert divs the index
+         hides like any other child; as the hero, the card sheds its chrome
+         and each wrapper wears it instead. Every id is unchanged, so the
+         stepper, the chart and the range pills did not have to learn which
+         shape they are in. -->
     <div class="card metric-card idx-card" id="cardWeight">
       <h2>Weight trend</h2>
       <p class="idx-summary" id="weightSummary"></p>
-      <p class="muted-note idx-lead" style="margin-top:-6px" id="weightLead"></p>
-      <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
-      <div class="wt-range" id="weightRange"></div>
-      <div class="ms-list" id="weightHistory"></div>
+      <div class="wth-card">
+        <div class="wth-head hidden" id="wtHeroHead"></div>
+        <p class="muted-note idx-lead" style="margin-top:-6px" id="weightLead"></p>
+        <div class="wth-stats hidden" id="wtHeroStats"></div>
+        <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
+        <div class="wt-range" id="weightRange"></div>
+        <div class="ms-list" id="weightHistory"></div>
+      </div>
+      <div class="wt-logcard">
+      <button type="button" class="wt-logrow hidden" id="wtLogRow" aria-expanded="false" aria-controls="weightLogBlock">
+        <span class="wt-logrow-ico" aria-hidden="true"></span>
+        <span class="wt-logrow-text"><b>Log today's weigh-in</b><i>Track your progress</i></span>
+        <span class="wt-logrow-plus" aria-hidden="true"></span>
+      </button>
       <div class="wt-log" id="weightLogBlock">
         <div class="wt-log-head">Log today's weight</div>
         <p class="muted-note" id="scaleGoalNote" style="margin-top:-4px;"></p>
@@ -5659,6 +5798,33 @@
           <button type="button" class="round-btn" id="scalePlus" aria-label="Up 0.5">+</button>
         </div>
         <button type="button" class="btn-primary" id="scaleSaveBtn" style="margin-top:12px;">Save weigh-in</button>
+      </div>
+      </div>
+    </div>
+
+    <!-- Two doors under Weight, for a weight goal only: the tape and the
+         camera, the two other ways a cut shows up that the scale cannot see.
+         Not cards: the goal order and a saved drag order both walk past this
+         block, and renderProgTiles() keeps it pinned under Weight. Photos are
+         yours alone, so that tile goes on a partner's view, same as the card. -->
+    <div class="prog-tiles hidden" id="progTiles">
+      <button type="button" class="prog-tile" id="tileWaist"></button>
+      <button type="button" class="prog-tile" id="tilePhotos"></button>
+      <!-- The only place a waist reading is logged. Same round-button geometry
+           as the weigh-in above it, in half-inch steps, and it stays folded
+           until the tile is tapped. -->
+      <div class="prog-tile-log hidden" id="waistLogBlock">
+        <div class="wt-log-head">Today's waist</div>
+        <div class="weigh-row">
+          <button type="button" class="round-btn" id="waistMinus" aria-label="Down 0.5">&minus;</button>
+          <div class="weigh-field">
+            <input type="number" class="waist-input" id="waistInput" inputmode="decimal" step="0.5" min="0"
+                   placeholder="0.0" autocomplete="off" aria-label="Waist" />
+            <span class="weigh-unit">in</span>
+          </div>
+          <button type="button" class="round-btn" id="waistPlus" aria-label="Up 0.5">+</button>
+        </div>
+        <button type="button" class="btn-primary" id="waistSaveBtn" style="margin-top:12px;">Save</button>
       </div>
     </div>
 
@@ -6478,7 +6644,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.16.15";
+const APP_VERSION = "2026.09.16.16";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -6592,6 +6758,7 @@ const ICON_PATHS = {
   body: '<circle cx="12" cy="4.5" r="2.2"/><path d="M8.5 8h7l1.5 5-2 .6V20h-3v-4h-1v4h-3v-6.4l-2-.6z"/>',
   play: '<path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none"/>',
   camera: '<path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4z"/><circle cx="12" cy="13" r="3.5"/>',
+  scale: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7.5 12a4.5 4.5 0 0 1 9 0"/><path d="M12 12l2-2.5"/>',
   flag: '<path d="M4 21V4.5S6 3 9 4.5s6 1.5 6 1.5v9s-3 1.5-6 0-5-.5-5-.5"/>',
   trophy: '<path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a2 2 0 0 0 0 4h1M16 5h3a2 2 0 0 1 0 4h-1"/><path d="M12 12v3M9 20h6M9.5 15.5h5l.5 4.5h-6l.5-4.5Z"/>',
   star: '<path d="M12 3l2.5 5.6 6.1.6-4.6 4.1 1.3 6-5.3-3.1L6.7 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z"/>',
@@ -6613,6 +6780,9 @@ const ICON_PATHS = {
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.9 2.9l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V19a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.9-2.9l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H4a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.9-2.9l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.6V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.9 2.9l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.6 1H20a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.6 1Z"/>',
   target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/>',
   people: '<circle cx="9" cy="8" r="3"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><circle cx="17.5" cy="9" r="2.4"/><path d="M15.5 12.2c2.3.3 4 2 4 4.3"/>',
+  /* A tape measure: the reel, and a length pulled out with the tick marks on
+     it. The waist tile's icon, and nothing else uses it yet. */
+  tape: '<circle cx="8" cy="12" r="5"/><circle cx="8" cy="12" r="1.2" fill="currentColor" stroke="none"/><path d="M12.2 15.5H21v-3h-8"/><path d="M15 12.5v1.6M18 12.5v1.6"/>',
 };
 function icon(name, size = 18) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px">${ICON_PATHS[name] || ""}</svg>`;
@@ -7228,6 +7398,10 @@ async function handleSignedIn(session) {
   if (SIGN_IN_HANDLED) return;
   SIGN_IN_HANDLED = true;
   MY_EMAIL = session.user.email.toLowerCase();
+  /* Not awaited: RevenueCat configuring is not on the critical path to the
+     dashboard painting, and the identity it needs (MY_EMAIL) is already set
+     above by the time it runs. */
+  configureRevenueCat();
 
   const { data: profile, error: profileErr } = await sb.from("profiles")
     .select("*").eq("email", MY_EMAIL).maybeSingle();
@@ -10720,6 +10894,8 @@ async function saveScaleEntry() {
     applyLocally("fit_entries", payload);
     toast("Saved offline");
   }
+  /* The hero's stepper folds back under its plus once the number is in. */
+  WT_LOG_OPEN = false;
   renderProgressTab();
 }
 
@@ -13616,6 +13792,44 @@ function purchasesPlugin() {
   return (isNativeApp() && window.Capacitor.Plugins.Purchases) || null;
 }
 
+/* RevenueCat's public SDK key for this app, from Project Settings > API Keys
+   in the RevenueCat dashboard. Public by design: it identifies which app is
+   asking, the way a Stripe publishable key does, and it is meant to ship
+   inside the binary. It cannot grant premium by itself; only the webhook,
+   holding the service role key, can write to subscriptions. */
+const REVENUECAT_API_KEY = "appl_nEItapnUJLSHiWHgWEqoQjJjWsN";
+
+let REVENUECAT_CONFIGURED = false;
+
+/* Called once, right after MY_EMAIL is known. appUserID is set to the email
+   rather than left as RevenueCat's own anonymous id, because the webhook
+   writes subscriptions keyed by email and cannot invent a mapping between the
+   two after the fact. Every purchase, on any device this person ever signs
+   into, lands under the same row this way. */
+async function configureRevenueCat() {
+  if (REVENUECAT_CONFIGURED) return;
+  const rc = purchasesPlugin();
+  if (!rc) {
+    /* Loud rather than silent, the same reason the plugin registry logs at
+       boot: an unconfigured Purchases plugin looks exactly like a missing
+       one from every call site downstream, and this is the one place that
+       actually knows which it is. */
+    if (isNativeApp()) console.error("RevenueCat plugin is not registered in this build");
+    return;
+  }
+  if (!MY_EMAIL) return;
+  if (REVENUECAT_API_KEY.includes("PLACEHOLDER")) {
+    console.error("RevenueCat API key is a placeholder; purchases cannot work until it is set");
+    return;
+  }
+  try {
+    await rc.configure({ apiKey: REVENUECAT_API_KEY, appUserID: MY_EMAIL });
+    REVENUECAT_CONFIGURED = true;
+  } catch (err) {
+    console.error("could not configure RevenueCat", err);
+  }
+}
+
 async function startPurchase() {
   const rc = purchasesPlugin();
   if (!rc) { toast("Subscriptions are not available in this build yet"); return false; }
@@ -14887,7 +15101,7 @@ function staggerHomeCards() {
 /* How far back the trend looks. A chart of every weigh-in you have ever done
    answers a different question from "how is this month going", and without
    this the line just kept getting flatter as the history grew. */
-const WEIGHT_RANGES = [["1W", 7], ["1M", 30], ["3M", 90], ["6M", 180], ["All", null]];
+const WEIGHT_RANGES = [["1W", 7], ["1M", 30], ["3M", 90], ["6M", 180], ["1Y", 365]];
 let PROGRESS_RANGE = "1M";
 
 function weightRangeStart() {
@@ -14968,7 +15182,7 @@ function renderWeightStats() {
   /* The window the pills below are actually showing, said in words, so the
      number and the range agree without anybody reading the pill. */
   const span = { "1W": "this week", "1M": "this month", "3M": "in three months",
-                 "6M": "in six months", All: "so far" }[PROGRESS_RANGE] || "so far";
+                 "6M": "in six months", "1Y": "this year" }[PROGRESS_RANGE] || "so far";
   const move = rows.length < 2 || Math.abs(delta) < 0.05
     ? ""
     : `, ${Math.abs(delta).toFixed(1)} ${delta < 0 ? "down" : "up"} ${span}`;
@@ -14992,6 +15206,111 @@ function renderWeightStats() {
     }
   }
 }
+/* The weight goal's hero. On a scale reading this card is the whole answer,
+   so it stops being a folded index row under a headline card and becomes the
+   one thing at the top: goal, number, target, chart, window, and logging in
+   its own card underneath with the stepper folded under the plus. Everything
+   it prints is a number the headline or renderWeightStats already computed,
+   read from the same functions, so the two can never disagree: the change is
+   the headline's own thirty day window (headlineWeighIns), not the range
+   pill, because an answer that moves when somebody taps "1W" is not one.
+
+   Off, it puts the index row back exactly as it was: idx-card on, wt-hero
+   off, the headline card shown. No other kind is touched. */
+let WT_LOG_OPEN = false;
+function renderWeightHero(on, profile, isPartner) {
+  const card = $("cardWeight");
+  const head = $("wtHeroHead"), stats = $("wtHeroStats"), row = $("wtLogRow"), log = $("weightLogBlock");
+  if (!card || !head || !stats || !row || !log) return;
+  card.classList.toggle("wt-hero", on);
+  card.classList.toggle("idx-card", !on);
+  $("progHeadline")?.classList.toggle("hidden", on);
+  head.classList.toggle("hidden", !on);
+  /* A partner's screen has nothing to log, so the whole logging card goes,
+     not just its insides: an empty card is a question nobody asked. */
+  card.querySelector(".wt-logcard")?.classList.toggle("hidden", isPartner);
+  if (!on) {
+    stats.classList.add("hidden");
+    row.classList.add("hidden");
+    log.classList.toggle("hidden", isPartner);
+    return;
+  }
+  card.classList.remove("peek");
+  const name = isPartner ? partnerName() : ME;
+  const email = isPartner ? PARTNER_EMAIL : MY_EMAIL;
+  const tile = goalTileFor(profile?.goal_bubble);
+  /* "Your goal" only when it is. A partner's is theirs, and under the lens it
+     is a goal being tried on, which the strip above says in the same words. */
+  const eyebrow = isPartner ? `${name}'s goal` : PROGRESS_GOAL_LENS ? "Viewing as" : "Your goal";
+  head.innerHTML = `
+    <div class="wth-eyebrow">${escapeHtml(eyebrow)}</div>
+    <div class="wth-title">${escapeHtml(tile?.title || profile?.goal || "Weight")}</div>
+    ${tile?.sub ? `<div class="wth-sub">${escapeHtml(tile.sub)}</div>` : ""}
+    <svg class="wth-mtn" viewBox="0 0 108 68" aria-hidden="true">
+      <path class="m2" d="M22 68 52 22l16 20 12-14 28 40Z"/>
+      <path class="m1" d="M0 68 30 20l14 18L62 6l26 44 10-12 10 14V68Z"/>
+      <path class="snow" d="M62 6l7 14-4-3-3 4-3-4-4 3Z"/>
+      <path class="snow" d="M30 20l5 10-3-2-2 3-2-3-3 2Z"/>
+    </svg>`;
+
+  /* Where they are is the latest weigh-in on file; the change is the
+     headline's thirty day window, so a stale last reading still shows a
+     number, just without a month it can honestly compare against. */
+  const all = entriesFor(name).filter((e) => e.weight != null);
+  const now = all.length ? all[all.length - 1].weight : null;
+  stats.classList.toggle("hidden", now == null);
+  if (now != null) {
+    const rows = headlineWeighIns(name);
+    const d = rows.length >= 2 ? rows[rows.length - 1].weight - rows[0].weight : 0;
+    const delta = rows.length >= 2 && Math.abs(d) >= 0.05
+      ? `${Math.abs(d).toFixed(1)} lb ${d < 0 ? "down" : "up"} this month` : "";
+    const lb = (v) => Number.isInteger(v) ? String(v) : v.toFixed(1);
+    /* No target on file, no target column. Inventing one would be worse than
+       the empty space. Percent is the distance covered from the start toward
+       the target, held to 0..100 so an overshoot or a slip past the start
+       does not draw a bar that runs off its own track. */
+    const goal = weightGoalFor(email);
+    let target = "";
+    if (goal) {
+      const start = goal.start_value ?? all[0].weight;
+      const span = start - goal.target_value;
+      const pct = Math.abs(span) < 0.05
+        ? (Math.abs(now - goal.target_value) < 0.05 ? 100 : 0)
+        : Math.round(Math.min(100, Math.max(0, ((start - now) / span) * 100)));
+      target = `
+      <div class="wth-target">
+        <div class="wth-target-label">Target</div>
+        <div class="wth-target-val">${lb(goal.target_value)} lb</div>
+        <div class="wth-bar"><b style="width:${pct}%"></b></div>
+        <div class="wth-target-pct">${pct}% there</div>
+      </div>`;
+    }
+    stats.innerHTML = `
+      <div class="wth-now">
+        <div class="wth-now-fig"><b>${now.toFixed(1)}</b><i>lb</i></div>
+        ${delta ? `<div class="wth-now-delta">${delta}</div>` : ""}
+      </div>${target}`;
+  }
+
+  /* The log row. Yours only: a partner's screen keeps the chart and loses the
+     stepper, same as before. The plus opens the stepper that was always here
+     (same ids, renderScaleCheck untouched) and turns into a cross while it is. */
+  row.classList.toggle("hidden", isPartner);
+  if (!row.querySelector("svg")) {
+    row.querySelector(".wt-logrow-ico").innerHTML = icon("scale", 20);
+    row.querySelector(".wt-logrow-plus").innerHTML = icon("plus", 20);
+  }
+  const open = WT_LOG_OPEN && !isPartner;
+  row.classList.toggle("on", open);
+  row.setAttribute("aria-expanded", String(open));
+  log.classList.toggle("hidden", isPartner || !open);
+  row.onclick = () => {
+    WT_LOG_OPEN = !WT_LOG_OPEN;
+    renderWeightHero(true, profile, isPartner);
+    if (WT_LOG_OPEN) log.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  };
+}
+
 function renderWeightRange() {
   $("weightRange").innerHTML = WEIGHT_RANGES.map(([k]) =>
     `<button type="button" class="wt-pill${k === PROGRESS_RANGE ? " on" : ""}" data-range="${k}">${k}</button>`).join("");
@@ -15011,7 +15330,7 @@ function renderWeightRange() {
    rather than the last three, and the row is still the way back into that day.
 
    Held as an index into the window, so changing the range clears it: point
-   four of "1M" is not point four of "All". */
+   four of "1M" is not point four of "1Y". */
 let WT_POINT = null;
 function renderWeightHistory() {
   const el = $("weightHistory");
@@ -15880,19 +16199,34 @@ function renderWeightChart() {
   const ctx = $("weightChart").getContext("2d");
   if (weightChart) weightChart.destroy();
 
-  // Only the last point is drawn, because a dot on every reading is noise and
-  // where you are NOW is the thing worth marking.
+  /* Two drawings of the same line. As the index row's card, only the last
+     point is drawn, because a dot on every reading is noise and where you
+     are NOW is the thing worth marking. As the hero (renderWeightHero, the
+     weight goal's mockup) every reading gets a dot, the last one is a ring
+     with its value in a chip over it, the grid is a grid, and the line is the
+     action colour, which is what the mockup shows and what "this is the
+     number you are working on" looks like. The dots go back to none past
+     forty readings (a year of daily weigh-ins is a caterpillar otherwise);
+     the ring and the chip stay. */
+  const hero = card.classList.contains("wt-hero");
   const values = rows.map((e) => e.weight);
-  const pointSizes = values.map((_, i) => (i === values.length - 1 ? 4 : 0));
+  const last = values.length - 1;
+  const line = hero && !viewingPartner ? cssVar("--accent") : hex;
+  const dots = hero && values.length <= 40;
+  const pointSizes = values.map((_, i) => (i === last ? (hero ? 5 : 4) : dots ? 3 : 0));
+  const panel = cssVar("--panel");
 
   const datasets = [{
-    label: name, data: values, borderColor: hex, borderWidth: 2.5, spanGaps: true, tension: 0.35,
-    pointRadius: pointSizes, pointBackgroundColor: hex, pointBorderColor: cssVar("--panel"), pointBorderWidth: 2,
-    fill: true, backgroundColor: chartWash(ctx, hex),
+    label: name, data: values, borderColor: line, borderWidth: 2.5, spanGaps: true, tension: hero ? 0.3 : 0.35,
+    pointRadius: pointSizes, pointHoverRadius: pointSizes,
+    pointBackgroundColor: hero ? values.map((_, i) => (i === last ? panel : line)) : line,
+    pointBorderColor: hero ? line : panel, pointBorderWidth: hero ? values.map((_, i) => (i === last ? 2.5 : 0)) : 2,
+    fill: true, backgroundColor: chartWash(ctx, line),
   }];
   /* The target as a dashed rule across the chart. Without it the line is just
-     a shape; with it you can see the gap you are actually closing. */
-  if (goal) {
+     a shape; with it you can see the gap you are actually closing. The hero
+     says the target in its own column instead, so there it stays off. */
+  if (goal && !hero) {
     datasets.push({
       label: "Goal", data: values.map(() => goal.target_value),
       borderColor: cssVar("--muted"), borderWidth: 1.5, borderDash: [5, 4],
@@ -15900,15 +16234,50 @@ function renderWeightChart() {
     });
   }
 
+  /* The chip over the last point: the value, in the text colour with the
+     panel colour on it, so it is the one thing on the chart that inverts
+     with the theme the way a label should. Clamped to the canvas rather than
+     the plot, since the last point sits on the plot's right edge. */
+  const lastChip = {
+    id: "wtLastChip",
+    afterDatasetsDraw(chart) {
+      const pt = chart.getDatasetMeta(0).data[last];
+      if (!pt || !hero) return;
+      const c = chart.ctx;
+      const text = `${values[last].toFixed(1)} lb`;
+      c.save();
+      c.font = `700 12px ${cssVar("--font-body") || "sans-serif"}`;
+      c.textBaseline = "middle";
+      const w = Math.ceil(c.measureText(text).width) + 16, h = 24, r = 7;
+      const x = Math.min(Math.max(pt.x - w / 2, 2), chart.width - w - 2);
+      const y = pt.y - h - 11;
+      c.fillStyle = cssVar("--text");
+      c.beginPath();
+      c.roundRect(x, y, w, h, r);
+      c.fill();
+      c.beginPath();
+      c.moveTo(pt.x - 5, y + h); c.lineTo(pt.x + 5, y + h); c.lineTo(pt.x, y + h + 5);
+      c.fill();
+      c.fillStyle = panel;
+      c.textAlign = "center";
+      c.fillText(text, x + w / 2, y + h / 2 + 0.5);
+      c.restore();
+    },
+  };
+
   weightChart = new Chart(ctx, {
     type: "line",
     data: {
-      labels: allDates.map((d) => d.slice(5)),
+      labels: hero ? allDates.map(shortDate) : allDates.map((d) => d.slice(5)),
       datasets,
     },
+    plugins: [lastChip],
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      /* Room over the plot for the chip, and a hair on the right so the ring
+         on the last point is not cut in half by the canvas edge. */
+      layout: hero ? { padding: { top: 34, right: 8 } } : undefined,
+      plugins: { legend: { display: false }, tooltip: { enabled: !hero } },
       /* Nearest on the x axis without needing to hit the dot: only the last
          point is drawn, so anything stricter would be a target nobody can
          land on with a thumb. */
@@ -15921,8 +16290,10 @@ function renderWeightChart() {
       /* No vertical rules and no box: horizontal lines are the only ones that
          help you read a weight off the axis. */
       scales: {
-        x: { border: { display: false }, grid: { display: false }, ticks: { color: cssVar("--muted"), maxTicksLimit: 5, font: { size: 10 } } },
-        y: { border: { display: false }, grid: { color: cssVar("--border"), drawTicks: false }, ticks: { color: cssVar("--muted"), maxTicksLimit: 5, font: { size: 10 }, padding: 6 } },
+        x: { border: { display: false }, grid: { display: hero, color: cssVar("--border"), drawTicks: false },
+             ticks: { color: cssVar("--muted"), maxTicksLimit: 5, maxRotation: 0, font: { size: hero ? 11 : 10 } } },
+        y: { border: { display: false }, grid: { color: cssVar("--border"), drawTicks: false },
+             ticks: { color: cssVar("--muted"), maxTicksLimit: hero ? 4 : 5, font: { size: hero ? 11 : 10 }, padding: 6 } },
       },
     },
   });
@@ -24516,6 +24887,23 @@ function headlineWeighIns(name, days = HEADLINE_WEIGHT_DAYS) {
   return entriesFor(name).filter((e) => e.weight != null && e.entry_date >= fromStr);
 }
 
+/* Waist readings over the same window, so the tile under Weight and the
+   headline above it are counting the same month. `now` is the latest
+   reading, `delta` is latest minus earliest, or null with only one: one
+   reading is a number, not a direction. null with none, because the column
+   is new (20260916_waist_measurements.sql) and, until it is applied, every
+   row simply has no waist_in on it. */
+function waistTrend(name, days = HEADLINE_WEIGHT_DAYS) {
+  const from = new Date(todayStr() + "T00:00:00");
+  from.setDate(from.getDate() - days);
+  const fromStr = isoDate(from);
+  const points = entriesFor(name).filter((e) => e.waist_in != null && Number.isFinite(Number(e.waist_in)) && e.entry_date >= fromStr);
+  if (!points.length) return null;
+  const now = Number(points[points.length - 1].waist_in);
+  const delta = points.length > 1 ? now - Number(points[0].waist_in) : null;
+  return { now, delta, points };
+}
+
 function daysBetween(a, b) {
   return Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
 }
@@ -25446,13 +25834,41 @@ function headlineSpark(kind, name) {
   return "";
 }
 
-/* The goal strip. Your own goal first and dotted, then the rest in the order
-   the picker offers them, so the row reads as "yours, and what else there is"
-   rather than a menu you have to find yourself in.
+/* The goal strip: the goals YOU have, as tabs. Your main goal first and
+   dotted, then the extras Setup let you add (two at most), then More, which
+   is the door to the goal page. It used to list all eight tiles, which made
+   the top of Progress a menu of things you had not picked; Mo: "at the top
+   tabs it will show the 3 goals they have and they can click on them to see
+   their progress specifically for that."
 
    Hidden on a partner's view: their goal is theirs, and a lens that re-reads
    somebody else's data through a goal they did not pick answers a question
    nobody asked. */
+
+/* Which two lines a chip carries. The tile titles are sentences ("Lose
+   weight", "Build endurance"); a chip is a label, so it breaks at the first
+   space and capitalises the second line. The one long title is cut to its
+   first two words: the chip is 80px wide and "and stay consistent" is three
+   more lines under it. */
+function goalChipLines(tile) {
+  const words = String(tile?.title || "").split(" ");
+  let l2 = tile?.id === "feel-better" ? (words[1] || "") : words.slice(1).join(" ");
+  if (l2) l2 = l2[0].toUpperCase() + l2.slice(1);
+  return [words[0] || "", l2];
+}
+
+/* A profile saved before the bubbles existed carries only the legacy `goal`
+   string ("Lose weight"), and headlineKindFor already reads that one. The
+   strip has to as well, or such an account sees its goal named in the hero
+   and a strip above it holding nothing but More. Spelled out per key rather
+   than searched by tile.legacy, because four tiles share "consistent" and the
+   first of them is Build endurance. */
+function legacyGoalBubble(goalText) {
+  const key = GOALS.find((g) => g.goal === goalText || g.label === goalText)?.key;
+  return { lose: "lose-weight", muscle: "build-muscle", stronger: "get-stronger",
+           recomp: "tone-lean-abs", consistent: "consistent" }[key] || null;
+}
+
 function renderGoalChips(profile) {
   const host = $("progGoalChips");
   if (!host) return;
@@ -25464,16 +25880,37 @@ function renderGoalChips(profile) {
      migrate one returns something for a goal nobody picked. */
   const mine = profile?.goal_bubble
     ? (migrateGoalPick(profile.goal_bubble, profile.goal_child || null)?.bubble || profile.goal_bubble)
-    : null;
+    : legacyGoalBubble(profile?.goal);
   const showing = PROGRESS_GOAL_LENS || mine;
-  const ordered = [...GOAL_TILES].sort((a, b) => (b.id === mine ? 1 : 0) - (a.id === mine ? 1 : 0));
 
-  host.innerHTML = ordered.map((t) => `
+  /* Yours, and only yours. normaliseGoalSecondary already migrates retired
+     ids, drops ones the tiles cannot draw and stops at two; the column behind
+     it is still unapplied on the live database (PENDING_PROFILE_COLUMNS), so
+     on most accounts it is missing or null, the list comes back empty, and
+     the strip is one chip and More. Nothing in here may depend on it. */
+  const ids = [];
+  if (goalTileFor(mine)) ids.push(mine);
+  for (const s of normaliseGoalSecondary(profile?.goal_secondary)) {
+    if (!ids.includes(s.bubble)) ids.push(s.bubble);
+  }
+  /* A lens left up on a goal that has since come off the profile still has
+     to be on screen, or the tab is lit by a chip nobody can see to clear. */
+  if (showing && goalTileFor(showing) && !ids.includes(showing)) ids.push(showing);
+
+  const chip = (t) => {
+    const [l1, l2] = goalChipLines(t);
+    return `
     <button type="button" class="goal-chip${t.id === showing ? " on" : ""}${t.id === mine ? " mine" : ""}"
       data-goal="${escapeHtml(t.id)}" aria-pressed="${t.id === showing}">
-      ${icon(t.ico, 19)}
-      <span>${escapeHtml(t.title)}</span>
-    </button>`).join("");
+      ${icon(t.ico, 20)}
+      <span>${escapeHtml(l1)}${l2 ? `<br>${escapeHtml(l2)}` : ""}</span>
+    </button>`;
+  };
+  host.innerHTML = ids.map((id) => chip(goalTileFor(id))).join("") + `
+    <button type="button" class="goal-chip goal-chip-more" id="progGoalMore" aria-label="More goals">
+      ${icon("more", 20)}
+      <span>More</span>
+    </button>`;
 
   host.querySelectorAll("[data-goal]").forEach((b) => {
     b.onclick = () => {
@@ -25484,6 +25921,9 @@ function renderGoalChips(profile) {
       renderProgressTab();
     };
   });
+  /* More is not a lens, it is the way to the page that changes the goals.
+     Setup first so the page has a tab under it to come back to. */
+  $("progGoalMore").onclick = () => { switchTab("setup"); openSettingsPage("goal"); };
 
   /* Said once, under the strip, whenever this is not your own goal. Without
      it the tab is quietly answering a different question than the one your
@@ -25715,6 +26155,14 @@ function paintArrangeUI(host) {
          nothing here changes for opening one. */
       if (wasOpen && !e.target.closest("h2")) return;
       host.querySelectorAll(".card.peek").forEach((c) => c.classList.remove("peek"));
+      /* On the weight screen the photos card only exists while it is open;
+         the Body Photos tile is how it opens. Folding it hides it again, so
+         the screen goes back to being the mockup and not the mockup plus a
+         stray "Body Photos / None yet" row under the tile that says the same. */
+      if (card.id === "cardPhotos" && wasOpen && $("cardWeight")?.classList.contains("wt-hero")) {
+        card.classList.add("hidden");
+        return;
+      }
       if (!wasOpen) {
         card.classList.add("peek");
         card.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -25745,6 +26193,156 @@ function setArranging(on, host) {
   }
   paintArrangeUI(host);
   applyArrangeZoom(host);
+}
+
+/* ---- The two doors under Weight: the tape and the camera ----
+
+   Shown for a weight goal only, because that is the goal a waist and a photo
+   are evidence for. Waist has had no data behind it until now: fit_entries
+   grows a nullable waist_in in 20260916_waist_measurements.sql, which is
+   written and not yet applied, so every branch below has to survive the
+   column not existing. The tile says "Add a measurement" when there is
+   nothing, the number when there is one, and the trend once there are two,
+   and never invents a line through fewer points than that. */
+
+/* Whether the stepper under the tiles is open. Per session, not stored: it
+   is a control that was tapped open, not a preference. */
+let WAIST_LOG_OPEN = false;
+
+/* Reads the waist readings as the weight headline reads weigh-ins, and
+   colours them the same way: a weight goal wants the tape going down, so on
+   this tile down is --down (good) and up is --up (bad). */
+function renderProgTiles(kind, isPartner, opts = {}) {
+  const host = $("progTiles");
+  if (!host) return;
+  const on = kind === "scale";
+  host.classList.toggle("hidden", !on);
+  /* Straight under Weight, wherever the reorder above just put Weight. This
+     block is not a card, so the goal order and a saved drag order both walk
+     past it, and it would otherwise drift to wherever the second card left it. */
+  const weight = $("cardWeight");
+  if (weight?.parentNode?.insertBefore && weight.nextElementSibling !== host) {
+    weight.parentNode.insertBefore(host, weight.nextSibling);
+  }
+  if (!on) return;
+
+  const name = isPartner ? partnerName() : ME;
+  const t = waistTrend(name);
+  const chev = `<span class="prog-tile-chev">${icon("chevronRight", 16)}</span>`;
+  const fmt = (n) => `${Math.abs(n) < 0.05 ? "" : n < 0 ? "-" : "+"}${Math.abs(n).toFixed(1)} in`;
+  let value = "", sub;
+  if (!t) sub = isPartner ? "No readings yet" : "Add a measurement";
+  else if (t.delta === null) { value = `${t.now.toFixed(1)} in`; sub = "first reading"; }
+  else {
+    const cls = Math.abs(t.delta) < 0.05 ? "" : t.delta < 0 ? "idx-good" : "idx-bad";
+    value = `<span class="${cls}">${fmt(t.delta)}</span>`;
+    sub = "this month";
+  }
+  const waist = $("tileWaist");
+  waist.innerHTML = `<span class="prog-tile-ico">${icon("tape", 18)}</span>
+    <span class="prog-tile-body"><span class="prog-tile-title">Waist Trend</span>${value ? `<span class="prog-tile-val">${value}</span>` : ""}<span class="prog-tile-sub">${sub}</span></span>${isPartner ? "" : chev}`;
+  /* A partner's tape is read only, same as their scale: the stepper writes to
+     YOUR row and has no business opening on their screen. */
+  waist.disabled = isPartner;
+  waist.onclick = isPartner ? null : () => { WAIST_LOG_OPEN = !WAIST_LOG_OPEN; renderProgressTab(); };
+
+  /* Photos are never shared, so on a partner's view there is no tile rather
+     than an empty one, and the tape takes the whole row. Same when the photo
+     card itself is off (a brand new account), because a door to a hidden card
+     is a dead tap. */
+  const photos = $("tilePhotos");
+  const card = $("cardPhotos");
+  /* On the weight screen the photos card is hidden by design and this tile is
+     its door, so "is the card visible" is the wrong test there: the caller
+     says whether photos exist to be shown at all (yours, not a blank
+     account), and the card's own hidden class only decides elsewhere. */
+  const showPhotos = opts.photosAvailable ?? (!isPartner && card && !card.classList.contains("hidden"));
+  photos.classList.toggle("hidden", !showPhotos);
+  host.classList.toggle("solo", !showPhotos);
+  if (showPhotos) {
+    const n = BODY_PHOTOS.filter((p) => p.email === MY_EMAIL).length;
+    photos.innerHTML = `<span class="prog-tile-ico">${icon("camera", 18)}</span>
+      <span class="prog-tile-body"><span class="prog-tile-title">Body Photos</span><span class="prog-tile-val">${n} photo${n === 1 ? "" : "s"}</span><span class="prog-tile-sub go">See progress &rsaquo;</span></span>${chev}`;
+    photos.onclick = () => {
+      document.querySelectorAll("#tab-progress .card.peek").forEach((c) => c.classList.remove("peek"));
+      /* The door opens the card, so it is un-hidden here; folding it again
+         puts it back (see the accordion), so the screen returns to the mockup. */
+      card.classList.remove("hidden");
+      card.classList.add("peek");
+      primeOpenedCard(card);
+      card.scrollIntoView({ block: "start", behavior: "smooth" });
+    };
+  }
+
+  const log = $("waistLogBlock");
+  log.classList.toggle("hidden", isPartner || !WAIST_LOG_OPEN);
+  if (isPartner || !WAIST_LOG_OPEN) return;
+  const input = $("waistInput");
+  /* Opens on the last reading so a nudge starts from somewhere real; a first
+     reading starts blank, the same as a first weigh-in. */
+  if (!input.value && t) input.value = t.now.toFixed(1);
+  const nudge = (delta) => {
+    input.value = String(Math.max(0, Math.round(((parseFloat(input.value) || 0) + delta) * 10) / 10));
+  };
+  $("waistMinus").onclick = () => nudge(-0.5);
+  $("waistPlus").onclick = () => nudge(0.5);
+  $("waistSaveBtn").onclick = saveWaistEntry;
+}
+
+async function saveWaistEntry() {
+  const typed = parseFloat($("waistInput").value);
+  const waist = Number.isFinite(typed) && typed > 0 ? typed : null;
+  if (waist === null) { toast("Enter a measurement first"); return; }
+
+  const today = todayEntryFor(MY_EMAIL);
+  /* Same row the scale writes, same carried fields: an upsert replaces the
+     whole row, so today's weigh-in, proof and rest-day state ride along or
+     they are gone. When today's row already exists it is an update instead,
+     one column on the row that is there. That is safer on the real database
+     (nothing another device wrote today gets blanked) and it is the write the
+     sandbox's client actually persists: its upsert matches on the first
+     onConflict column alone and would rewrite the oldest row's date. */
+  const payload = {
+    user_name: ME,
+    email: MY_EMAIL,
+    entry_date: todayStr(),
+    waist_in: waist,
+    weight: today?.weight ?? null,
+    gym: today?.gym ?? false,
+    sessions: today?.sessions ?? 0,
+    proof_path: today?.proof_path ?? null,
+    rest_day: today?.rest_day ?? false,
+    note: today?.note ?? null,
+    workout_at: today?.workout_at ?? null,
+  };
+  const opts = { onConflict: "email,entry_date" };
+  const done = async (msg) => { WAIST_LOG_OPEN = false; toast(msg); await loadAll(); renderProgressTab(); };
+
+  if (navigator.onLine) {
+    const { error } = today
+      ? await sb.from("fit_entries").update({ waist_in: waist }).eq("email", MY_EMAIL).eq("entry_date", payload.entry_date)
+      : await sb.from("fit_entries").upsert(payload, opts);
+    if (!error) { await done("Measurement saved"); return; }
+    /* The column is behind 20260916_waist_measurements.sql. Until the owner
+       runs it every save comes back PGRST204, and "Could not find the
+       'waist_in' column" is the database talking, not something to show. */
+    if (String(error.code || "") === "PGRST204" || /waist_in/.test(String(error.message || ""))) {
+      toast("Measurements are not switched on yet");
+      return;
+    }
+    if (!isRetryable(error)) {
+      toast(`Couldn't save. ${error.message ? String(error.message).slice(0, 80) : "Please try again."}`);
+      return;
+    }
+  }
+  /* Offline, or the connection dropped: the scale's queue, the scale's job
+     shape, so it replays with everything else logged in the gym. */
+  const landed = await safeWrite("fit_entries", "upsert", payload, opts);
+  if (landed) { await done("Measurement saved"); return; }
+  applyLocally("fit_entries", payload);
+  WAIST_LOG_OPEN = false;
+  toast("Saved offline");
+  renderProgressTab();
 }
 
 function renderProgressTab() {
@@ -25814,10 +26412,18 @@ function renderProgressTab() {
      something to read, and wrong for the one card whose whole job right now
      is being typed into. */
   const weightLed = kind === "scale" || kind === "recomp";
+  /* The weight screen is the mockup and nothing under it. Mo: "I want it to
+     look exactly like this... remove everything that's not in this." So when
+     Weight is the hero, it is the ONLY card: no folded rows under the tiles,
+     no "everything else" section. Every other reading is one chip-tap away,
+     which is what the strip at the top is for. Photos stay in the DOM,
+     hidden, because the Body Photos tile is their door. */
+  const weightScreen = !blank && kind === "scale";
   const shown = blank
     ? (weightLed && !isPartner ? ["cardWeight"] : [])
+    : weightScreen ? ["cardWeight"]
     : wanted.concat(rest);
-  const quiet = new Set(blank ? [] : rest);
+  const quiet = new Set(blank || weightScreen ? [] : rest);
   /* Which row(s) get the ring: whichever card the headline sentence was
      actually about, not "first in GOAL_CARDS" (volume's own order leads with
      cardMuscles, but a volume headline is about tonnage, not muscles). */
@@ -25840,6 +26446,9 @@ function renderProgressTab() {
   /* lensProfile, so the eyebrow names the goal actually being read through
      rather than saying "Your goal: Lose weight" over a Get stronger answer. */
   else renderProgressHeadline(kind, name, email, lensProfile, isPartner, sharing);
+  /* On a weight goal the answer and the chart are one card, and the headline
+     card above it stands down. Every other kind keeps what it had. */
+  renderWeightHero(!blank && kind === "scale", lensProfile, isPartner);
   if (!blank && shown.includes("cardMuscles")) renderMuscleAnswers(name);
 
   /* The goal's cards, in the goal's order, straight under the answer; then the
@@ -25870,8 +26479,12 @@ function renderProgressTab() {
   }
   // The rule is a label for what follows it, so with nothing following it, and
   // on a brand new account where nothing is on screen at all, it says nothing.
-  rule.classList.toggle("hidden", blank || !rest.length);
+  rule.classList.toggle("hidden", blank || !rest.length || weightScreen);
 
+  /* photosAvailable is passed rather than read off cardPhotos's hidden class,
+     because on the weight screen that card is hidden ON PURPOSE and the tile
+     is meant to be its door, not to vanish with it. */
+  renderProgTiles(kind, isPartner, { photosAvailable: !isPartner && !blank });
   const live = new Set(shown);
   if (live.has("cardWeight")) { renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); }
   if (live.has("cardConsistency")) { renderConsistencyChart(); renderConsistencyStats(); }
