@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-title" content="Unio" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Caveat:wght@500&display=swap" rel="stylesheet">
 <!-- Only Supabase blocks: nothing can be shown until we know who is signed in.
      Chart.js is the progress chart and the Rive runtime is the body figure;
      both are fetched when the screen that needs them is opened, which keeps
@@ -57,7 +57,11 @@
        header, and a robot who changes shade between them is a different robot. */
     --rb-body: #f6f5f3;
     --rb-shade: #ddd9d4;
+    --rb-line: #c9c4bd;
     --rb-visor: #171b22;
+    /* Planned days on the week strip. Purple on purpose: blue is already you
+       and green is already done, so a third state needs a third hue. */
+    --plan: #a78bfa;
     --accent: #a8ff00;
     --gold: #a8ff00;
     --me: #2d6bff;
@@ -123,9 +127,11 @@
     --muted: #686d7c;
     /* Green for anything that drives action, steel blue for you, coral for
        them: the Home mockup's palette, lifted straight from it. */
-    --rb-body: #eef0f4;
+    --rb-body: #ffffff;
     --rb-shade: #d3d8e0;
+    --rb-line: #1d232c;
     --rb-visor: #1d232c;
+    --plan: #8b5cf6;
     --accent: #3be76b;
     --gold: #3be76b;
     --me: #4a8dbf;
@@ -341,7 +347,7 @@
      enough that it never pulls the eye off the thing being answered. */
   .rb-face { display: block; overflow: visible; }
   .rb-eye { transform-box: fill-box; transform-origin: center; animation: rb-blink 5.4s infinite; }
-  .rb-face .rb-eye:nth-of-type(2) { animation-delay: .04s; }
+  .rb-face .rb-eye + .rb-eye { animation-delay: .04s; }
   @keyframes rb-blink {
     0%, 92%, 100% { transform: scaleY(1); }
     95% { transform: scaleY(.12); }
@@ -350,88 +356,163 @@
   /* Reserves two lines so the step does not reflow while he is typing. */
   .ob-bot-say { min-height: 2.9em; }
   .ob-bot-say { font-size: 13.5px; line-height: 1.45; color: var(--muted); padding-top: 4px; }
-  /* THE WORKOUT TAB. Four sections, each its own card, in the order the eye
-     reads them. */
-  .wkt-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .09em; color: var(--muted); margin: 0 0 6px; }
-  /* These sections sit inside #workoutCard, and `.card h2` is the app's eyebrow
-     style: 11px, uppercase, muted. Every heading on this tab was being shrunk
-     to a label by it. Restated here rather than fought with !important, and
-     kept together so the three headings cannot drift apart. */
-  .card .wkt-done h2, .card .wkt-next-words h2, .card .wkt-rest h2 {
-    text-transform: none; letter-spacing: -.02em; color: var(--text); font-weight: 800;
+  /* THE WORKOUT TAB, to Mo's drawing. Four cards on the page ground, not
+     one card holding four sections: the screen is a stack of things, and a
+     border around the whole stack made it read as one long form. */
+  #workoutCard.wkt-flat { background: none; border: 0; box-shadow: none; padding: 0; }
+  #workoutCard.wkt-flat #workoutFocusRow { display: none; }
+  .wkt-eyebrow {
+    font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 4px;
   }
-
-  /* Done for today. Green because it is the one card on this tab that reports
-     rather than asks. */
+  /* These sit inside #workoutCard, and `.card h2` is the app's eyebrow style,
+     11px uppercase and muted. Every title on the tab was being shrunk to a
+     caption by it. Restated for the three, together, so they cannot drift. */
+  .card .wkt-done h2, .card .wkt-next h2, .card .wkt-rest h2 {
+    text-transform: none; letter-spacing: -.025em; color: var(--text); font-weight: 800;
+    font-size: 25px; line-height: 1.1; margin: 0; font-family: var(--font-display);
+  }
+  .wkt-done, .wkt-next, .wkt-rest, .wkt-week {
+    border-radius: 20px; padding: 16px; margin: 0 0 12px; position: relative;
+    background: var(--card-fill); border: 1px solid var(--border); box-shadow: var(--shadow-card);
+  }
+  /* The one green card. It reports; the others ask. */
   .wkt-done {
-    background: color-mix(in srgb, var(--accent) 13%, var(--panel));
-    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-    border-radius: 18px; padding: 16px; margin: 0 0 14px; position: relative; overflow: hidden;
+    background: color-mix(in srgb, var(--accent) 9%, var(--panel));
+    border-color: color-mix(in srgb, var(--accent) 22%, var(--border));
+    overflow: hidden;
   }
-  .wkt-done-head { display: flex; gap: 10px; align-items: flex-start; }
-  .wkt-done-words { flex: 1; min-width: 0; }
-  .wkt-done h2 { margin: 0 0 4px; font-size: 22px; line-height: 1.15; display: flex; align-items: center; gap: 8px; }
-  .wkt-done h2 svg { color: var(--accent); vertical-align: -3px; }
-  .wkt-done-sub { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
-  .wkt-bot { flex: none; width: 126px; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  /* The top row is the eyebrow and, in the corner, him with his line. The
+     title takes the next row at full width, less the sliver he hangs over.
+     Measured: at 390 wide "You're done for today" beside his bubble fits at
+     14px and no larger, so they are not on one row; this is the layout that
+     keeps the title a title. */
+  .wkt-done-top { position: relative; min-height: 44px; }
+  .wkt-done .wkt-eyebrow { white-space: nowrap; }
+  .wkt-done h2 { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 21px; letter-spacing: -.03em; padding-right: 36px; margin-top: 2px; }
+  .wkt-badge svg { width: 13px; height: 13px; }
+  .wkt-badge {
+    width: 22px; height: 22px; border-radius: 50%; background: var(--accent-ink); color: var(--bg);
+    display: inline-grid; place-items: center; flex: none;
+  }
+  .wkt-done-sub { margin: 4px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
+  /* He leans in from the corner with his line beside him, and the card's own
+     padding is what he overlaps, so nothing that matters sits under him. */
+  .wkt-bot { position: absolute; top: -6px; right: -22px; display: flex; align-items: flex-start; gap: 3px; }
   .wkt-bot-say {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-    padding: 7px 9px; font-size: 11.5px; line-height: 1.35; color: var(--text); text-align: left;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 11px;
+    padding: 6px 8px; font-size: 10px; line-height: 1.3; color: var(--text); width: 132px;
+    margin-top: 2px;
   }
-  .wkt-bot-face { flex: none; }
-  .wkt-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 14px 0 12px; }
+  .wkt-bot-face { flex: none; width: 56px; height: auto; }
+  .wkt-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0 12px; }
   .wkt-chip {
-    background: var(--panel); border-radius: 13px; padding: 11px; display: flex; align-items: center; gap: 9px; min-width: 0;
+    background: var(--panel); border-radius: 14px; padding: 12px; display: flex; align-items: center; gap: 10px; min-width: 0;
   }
   .wkt-chip-ico {
-    flex: none; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center;
-    background: var(--panel-2); color: var(--accent);
+    flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
+    background: var(--panel-2); color: var(--accent-ink);
   }
-  .wkt-chip-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
-  .wkt-chip-body b { font-size: 13.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .wkt-chip-body i { font-size: 11.5px; font-style: normal; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .wkt-chip-tick {
-    flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
-    border: 1.5px solid var(--accent); color: var(--accent);
-  }
-  .wkt-done-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .wkt-chip-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+  .wkt-chip-body b { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wkt-chip-body i { font-size: 12.5px; font-style: normal; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wkt-chip-ring { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.75px solid var(--accent-ink); }
+  .wkt-chip-ring.open { border-color: var(--border); }
+  .wkt-done-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .wkt-btn-solid, .wkt-btn-soft {
-    font: inherit; font-size: 14.5px; font-weight: 700; padding: 14px 10px; border-radius: 13px;
-    border: none; cursor: pointer; text-align: center;
+    font: inherit; font-size: 14px; font-weight: 700; height: 46px; padding: 0 8px; border-radius: 12px; min-width: 0;
+    letter-spacing: -.01em;
+    border: none; cursor: pointer; white-space: nowrap;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    transition: transform .12s ease, filter .12s ease;
   }
-  .wkt-btn-solid { background: color-mix(in srgb, var(--accent) 78%, #063b12); color: #fff; }
-  .wkt-btn-soft { background: var(--panel); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 5px; }
-  .wkt-btn-solid:active, .wkt-btn-soft:active { transform: translateY(1px); }
+  .wkt-btn-solid { background: var(--accent-ink); color: var(--bg); }
+  .wkt-btn-soft { background: var(--panel-2); color: var(--text); }
+  .wkt-btn-solid:active, .wkt-btn-soft:active { transform: translateY(1px); filter: brightness(.96); }
+  .wkt-btn-solid.sm, .wkt-btn-soft.sm { font-size: 13px; height: 36px; padding: 0 12px; border-radius: 10px; }
 
-  /* Next workout. The words on the left, the reading on the right. */
-  .wkt-next, .wkt-rest { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 16px; margin: 0 0 14px; }
-  .wkt-next-top { display: flex; align-items: flex-start; justify-content: space-between; }
-  /* Title and sentence get the full width, the reading sits under them. At 390
-     the three-across version of this crushed "Lands on what your week has had
-     the least of" into a four word column. */
-  .wkt-next-body { display: flex; flex-direction: column; gap: 12px; }
-  .wkt-next-words { min-width: 0; }
-  .wkt-next-words h2 { margin: 0 0 5px; font-size: 24px; line-height: 1.1; }
-  .wkt-next-sub { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
-  .wkt-next-read { display: flex; align-items: center; gap: 18px; }
-  .wkt-arc { position: relative; width: 104px; height: 78px; display: grid; place-items: center; }
+  /* Next workout: words and buttons on the left, the ring beside them, the
+     muscles it was read from down the right. */
+  .wkt-next-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 2px; }
+  .wkt-next-top .info-dot { margin: -2px -2px 0 0; }
+  .wkt-next-grid {
+    display: grid; column-gap: 8px; row-gap: 12px; align-items: start;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: "words arc list" "acts acts acts";
+  }
+  .wkt-next-words { grid-area: words; min-width: 0; }
+  .wkt-next-sub { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
+  .wkt-arc { grid-area: arc; position: relative; width: 92px; height: 70px; align-self: center; }
   .wkt-arc svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .wkt-arc-num { position: relative; text-align: center; line-height: 1.05; }
-  .wkt-arc-num b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
-  .wkt-arc-num i { font-size: 9.5px; font-style: normal; font-weight: 700; letter-spacing: .08em; color: var(--muted); }
-  .wkt-muscles { list-style: none; margin: 0; padding: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
-  .wkt-muscles li { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; white-space: nowrap; }
-  .wkt-muscles li.aim { color: var(--text); }
-  .wkt-tick { width: 17px; height: 17px; display: grid; place-items: center; color: var(--accent); }
-  /* An open ring, not a tick: this is the one the day is aimed at, so it is
-     the one thing on the list that has not been done. */
-  .wkt-ring { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--accent); }
-  .wkt-next-acts { margin-top: 14px; }
+  /* The gauge's centre sits below the middle of its box, since the gap is at
+     the bottom, so the number is pinned to it rather than to the box. */
+  .wkt-arc-num { position: absolute; left: 0; right: 0; top: 60%; transform: translateY(-50%); text-align: center; line-height: 1; }
+  .wkt-arc-num b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -.03em; color: var(--accent-ink); }
+  .wkt-arc-num i { display: block; margin-top: 3px; font-size: 9px; font-style: normal; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
+  .wkt-muscles { grid-area: list; align-self: center; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+  .wkt-muscles li { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; white-space: nowrap; color: var(--text); }
+  .wkt-tick { width: 14px; height: 14px; display: grid; place-items: center; color: var(--accent-ink); }
+  /* An open ring, not a tick: the one the day is aimed at is the one not done. */
+  .wkt-ring { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--accent-ink); flex: none; }
+  .wkt-next-acts { grid-area: acts; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .wkt-next-acts .wkt-more { flex-basis: 100%; }
+  .wkt-more {
+    font: inherit; font-size: 12.5px; font-weight: 600; color: var(--muted); background: none; border: 0;
+    padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 3px;
+  }
 
-  .wkt-rest h2 { margin: 0 0 6px; font-size: 22px; }
-  .wkt-rest p { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+  /* Recovery: the words, and a horizon to rest your eyes on. */
+  .wkt-rest { overflow: hidden; min-height: 120px; }
+  .wkt-rest h2 { display: flex; align-items: center; gap: 8px; }
+  .wkt-rest h2 svg { color: var(--accent-ink); }
+  .wkt-rest-words { position: relative; z-index: 1; max-width: 64%; }
+  .wkt-rest p { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .wkt-scene { position: absolute; inset: 0 0 0 auto; width: 58%; pointer-events: none; }
+  .wkt-scene svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .wkt-scene-words {
+    position: absolute; right: 16px; top: 14px; text-align: center;
+    font-family: "Caveat", "Segoe Script", "Bradley Hand", cursive; font-weight: 500; font-size: 19px; line-height: 1.02;
+    color: color-mix(in srgb, var(--text) 62%, var(--muted)); transform: rotate(-4deg); letter-spacing: .01em;
+  }
 
-
+  /* Your week. The strip leads; the month, one tap down, is for looking back. */
+  .wkt-week .cal { padding: 0; border: 0; background: none; box-shadow: none; }
+  .wkt-week-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 12px; }
+  .wkt-week-h { margin: 0; font: 700 14px/1 var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); flex: none; }
+  .wkt-week-head .cal-head { margin: 0; flex: 1; justify-content: flex-end; gap: 2px; }
+  .wkt-week-head .cal-title { flex: 0 1 auto; font-size: 14.5px; white-space: nowrap; padding: 6px 2px; }
+  .wkt-week-head .wk-nav-btn { width: 32px; height: 32px; }
+  .cal-wdows { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
+  .cal-wdows span { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: center; }
+  .cal-wdows span.today { color: var(--accent-ink); }
+  .cal-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .cal-wday {
+    font: inherit; cursor: pointer; padding: 11px 0 9px; border-radius: 12px;
+    background: var(--panel-2); border: 1.5px solid transparent; color: var(--text);
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    transition: transform .12s ease, background .16s ease, border-color .16s ease;
+  }
+  .cal-wday:active { transform: scale(.94); }
+  .cal-wnum { font-size: 16px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  /* One row of dots, one per person with something that day, and always
+     drawn so the seven tiles keep one height whatever the week held. */
+  .cal-wdots { display: flex; gap: 3px; height: 6px; }
+  .cal-wdots i { width: 6px; height: 6px; border-radius: 50%; display: block; }
+  .cal-wdots .d-me { background: var(--me); }
+  .cal-wdots .d-them { background: var(--partner); }
+  .cal-wdots .d-rest { background: var(--muted); }
+  .cal-wday.done { background: color-mix(in srgb, var(--accent) 16%, var(--panel-2)); }
+  .cal-wday.planned { background: color-mix(in srgb, var(--plan) 14%, var(--panel-2)); }
+  .cal-wday.today { border-color: var(--accent-ink); background: var(--panel); }
+  .cal-wday.today.done { background: color-mix(in srgb, var(--accent) 16%, var(--panel)); }
+  .wkt-week .cal-key { margin-top: 12px; }
+  .wkt-week .cal-key .k-plan { background: var(--plan); }
+  .wkt-week .cal-key i { width: 8px; height: 8px; }
+  .wkt-week .cal-key span { font-size: 12.5px; }
+  .cal-month-wrap { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .wkt-plan.opt-card { border-radius: 20px; padding: 16px; margin-bottom: 12px; }
+  .wkt-plan .opt-title { font-size: 16.5px; }
+  .wkt-plan .opt-sub { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* Intensity, cool to hot. The heat is the information: you should be able to
      tell what a card costs before you read it. Red is earned by the top tier
@@ -3236,18 +3317,6 @@
   .cal-title:active { background: var(--panel-2); }
   .cal-title svg { color: var(--muted); transition: transform .18s; }
   .cal-title.open svg { transform: rotate(180deg); }
-  .cal-pick { padding: 10px 8px 12px; border-radius: 14px; background: var(--panel-2); border: 1px solid var(--border); margin-bottom: 12px; }
-  .cal-pick-year { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-  .cal-pick-year b { font-size: 17px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-  .cal-months { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-  .cal-month {
-    font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; padding: 9px 0; border-radius: 10px;
-    background: var(--panel); border: 1px solid var(--border); color: var(--text);
-  }
-  .cal-month:active { opacity: .7; }
-  .cal-month:disabled { opacity: .3; cursor: default; }
-  .cal-month.on { background: var(--accent); border-color: transparent; color: var(--on-accent); }
-  .cal-month.now { border-color: var(--me); }
   .cal-today {
     display: block; width: 100%; margin: 0 0 12px; padding: 8px; border-radius: 10px; cursor: pointer;
     font: inherit; font-size: 12.5px; font-weight: 600;
@@ -3280,20 +3349,12 @@
   .cal-wday.rest .cal-wdot { background: var(--muted); }
   .cal-wday.today { border-color: var(--me); }
   .cal-wday.today .cal-wname { color: var(--me); }
-  .cal-more {
-    font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--muted);
-    background: none; border: 0; padding: 10px 0 0; margin: 0;
-    display: inline-flex; align-items: center; gap: 4px;
-  }
-  .cal-more svg { transition: transform .2s ease; }
-  .cal-more.open svg { transform: rotate(180deg); }
-  .cal-more + .cal-head { margin-top: 10px; }
 
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
   .cal-day {
     position: relative; aspect-ratio: 1; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
     /* One shade in from the card's own background now that the card has one,
-       the same relationship .cal-pick and .cal-today already had to it. */
+       the same relationship .cal-today already had to it. */
     border-radius: 11px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
     display: flex; align-items: center; justify-content: center;
   }
@@ -7783,7 +7844,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.17.18";
+const APP_VERSION = "2026.09.17.19";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -7957,6 +8018,8 @@ const ICON_PATHS = {
   trending: '<path d="M3 17 9 11l4 4 8-8"/><path d="M17 7h4v4"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16"/><path d="M3 21v-5h5"/>',
   pencil: `<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>`,
+  arrowRight: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  leaf: '<path d="M4 20c0-8 4-14 16-16-1 12-6 16-13 16"/><path d="M4 20c3-5 7-8 11-10"/>',
   checklist: '<path d="M4 6h2M4 12h2M4 18h2"/><rect x="9" y="4" width="11" height="4" rx="1"/><rect x="9" y="10" width="11" height="4" rx="1"/><rect x="9" y="16" width="11" height="4" rx="1"/>',
   dumbbell: '<path d="M4 10v4M20 10v4M2 12h2M20 12h2M6 8v8M18 8v8M9 12h6"/>',
   bolt: '<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/>',
@@ -11436,18 +11499,47 @@ function obChrome(step, data) {
  * `size` is a CSS length for the box. Everything else scales off the viewBox,
  * so he is the same drawing at 40 and at 96.
  */
-function robotFaceSVG(size = 40, cls = "") {
+/* The horizon on the recovery card. Three ridges and a soft sky, fading to
+   the card on the left so the words have somewhere to sit. Drawn rather than
+   photographed: it is the same hill for everybody and it costs no bytes. */
+function restSceneSVG() {
+  return `<svg viewBox="0 0 220 140" preserveAspectRatio="xMaxYMid slice">
+    <defs>
+      <linearGradient id="rsSky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="var(--panel)"/>
+        <stop offset="1" stop-color="color-mix(in srgb, var(--muted) 22%, var(--panel))"/>
+      </linearGradient>
+      <linearGradient id="rsFade" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#fff" stop-opacity="0"/>
+        <stop offset=".45" stop-color="#fff" stop-opacity="1"/>
+      </linearGradient>
+      <mask id="rsMask"><rect width="220" height="140" fill="url(#rsFade)"/></mask>
+    </defs>
+    <g mask="url(#rsMask)">
+      <rect width="220" height="140" fill="url(#rsSky)"/>
+      <path d="M0 110 L40 78 L70 96 L110 58 L150 92 L185 70 L220 90 V140 H0z" fill="color-mix(in srgb, var(--muted) 34%, var(--panel))"/>
+      <path d="M0 122 L30 104 L64 118 L96 96 L130 116 L170 100 L220 118 V140 H0z" fill="color-mix(in srgb, var(--muted) 52%, var(--panel))"/>
+      <path d="M0 134 L50 124 L100 132 L150 122 L220 130 V140 H0z" fill="color-mix(in srgb, var(--muted) 66%, var(--panel))"/>
+    </g>
+  </svg>`;
+}
+
+function robotFaceSVG(size = 40, cls = "", { bust = false } = {}) {
   const px = typeof size === "number" ? size + "px" : size;
-  return `<svg class="rb-face ${cls}" viewBox="0 0 64 64" width="${px}" height="${px}" aria-hidden="true" focusable="false">
-    <path class="rb-ant" d="M32 13V7" stroke="var(--rb-shade)" stroke-width="2.6" stroke-linecap="round" fill="none"/>
-    <circle class="rb-ant-tip" cx="32" cy="5" r="2.8" fill="var(--accent)"/>
-    <rect x="3.5" y="27" width="6" height="13" rx="3" fill="var(--rb-shade)"/>
-    <rect x="54.5" y="27" width="6" height="13" rx="3" fill="var(--rb-shade)"/>
-    <rect x="9" y="12" width="46" height="41" rx="13.5" fill="var(--rb-body)"/>
-    <path d="M9 41h46v-.5a13.5 13.5 0 0 1-13.5 12.5h-19A13.5 13.5 0 0 1 9 40.5z" fill="var(--rb-shade)" opacity=".55"/>
+  /* Shoulders only where there is room for them. On the done card he leans
+     into frame from the corner, the way Mo drew him; beside a line of
+     onboarding copy he is a face and nothing else. */
+  const h = bust ? 78 : 64;
+  return `<svg class="rb-face ${cls}" viewBox="0 0 64 ${h}" width="${px}" height="${typeof size === "number" ? Math.round(size * h / 64) + "px" : px}" aria-hidden="true" focusable="false">
+    ${bust ? `<path d="M22 53h20v6c9 1 15 5 17 12H5c2-7 8-11 17-12z" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round"/>` : ""}
+    <path d="M32 13V7" stroke="var(--rb-line)" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+    <circle cx="32" cy="5" r="2.8" fill="var(--accent)"/>
+    <rect x="3.5" y="27" width="6" height="13" rx="3" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.4"/>
+    <rect x="54.5" y="27" width="6" height="13" rx="3" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.4"/>
+    <rect x="9" y="12" width="46" height="41" rx="13.5" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6"/>
     <rect x="15" y="21" width="34" height="21" rx="9.5" fill="var(--rb-visor)"/>
-    <ellipse class="rb-eye" cx="25" cy="31.5" rx="3.6" ry="4.1" fill="var(--accent)"/>
-    <ellipse class="rb-eye" cx="39" cy="31.5" rx="3.6" ry="4.1" fill="var(--accent)"/>
+    <path class="rb-eye" d="M20.5 29.5l9.5-1.5v5.5l-9.5 1.5z" fill="var(--accent)"/>
+    <path class="rb-eye" d="M43.5 29.5l-9.5-1.5v5.5l9.5 1.5z" fill="var(--accent)"/>
   </svg>`;
 }
 
@@ -26104,6 +26196,9 @@ function renderWorkoutTab({ respectMode = false } = {}) {
   restoreCardioSession();        // and the same for a run left going
   if (SESSION) FRESH_PLAN_ID = null;   // once it is being lifted it is not untouched any more
   $("workoutContent").classList.remove("hidden");
+  /* Only the choose screen lays its cards on the page ground; every other
+     screen on this tab still lives inside the card. */
+  $("workoutCard").classList.remove("wkt-flat");
 
   /* A workout already underway. Coming back to one is the same moment as
      pausing it, so it gets the same screen rather than a card offering Resume
@@ -26628,7 +26723,8 @@ function staggerWorkoutCards() {
   /* Only top-level pieces. The build options live inside the Smart Plan card
      now, and giving them their own rise inside a card that is itself rising
      compounds the two transforms and wobbles. */
-  const parts = [...$("workoutContent").querySelectorAll(".spp, .opt-card, .sv-saved, .cal")]
+  const parts = [...$("workoutContent").querySelectorAll(".spp, .opt-card, .sv-saved, .cal, .wkt-done, .wkt-next, .wkt-rest, .wkt-week")]
+    .filter((el) => !el.closest(".wkt-week") || el.classList.contains("wkt-week"))
     .filter((el) => !el.closest(".spp-actions"));
   parts.forEach((el, i) => {
     el.classList.remove("h-rise");
@@ -26657,10 +26753,10 @@ let HISTORY_MONTH = 0;   // 0 is this month, negative goes back
 /* What one date is: trained, planned, rested, today, still to come. Both the
    week strip and the month grid read it, because two readers of the same day
    that disagree is a bug you only notice in a screenshot. */
-function dayState(d) {
+function dayState(d, email = MY_EMAIL) {
   const date = isoDate(d);
-  const plan = (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === date && !w.archived);
-  const entry = (ALL_ENTRIES || []).find((e) => e.email === MY_EMAIL && e.entry_date === date);
+  const plan = (ALL_PLANS || []).find((w) => w.email === email && w.entry_date === date && !w.archived);
+  const entry = (ALL_ENTRIES || []).find((e) => e.email === email && e.entry_date === date);
   return {
     date,
     day: d.getDate(),
@@ -26674,18 +26770,31 @@ function dayState(d) {
   };
 }
 
-/* Monday to Sunday around today. The week is the unit the whole app plans in,
-   so it is the one the card leads with; the month is still there, one tap
-   down, for looking back. */
-function historyWeekDays() {
+/* Monday to Sunday, `offset` weeks from the one holding today. The week is
+   the unit the whole app plans in, so it is the one the card leads with; the
+   month is still there, one tap down, for looking back. Each day carries the
+   partner's reading too, so the strip can show who did what. */
+function historyWeekDays(offset = HISTORY_WEEK) {
   const today = new Date(todayStr() + "T00:00:00");
   const mon = new Date(today);
-  mon.setDate(mon.getDate() - ((today.getDay() + 6) % 7));
+  mon.setDate(mon.getDate() - ((today.getDay() + 6) % 7) + offset * 7);
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(mon);
     d.setDate(d.getDate() + i);
-    return dayState(d);
+    const mine = dayState(d);
+    const theirs = PARTNER_EMAIL ? dayState(d, PARTNER_EMAIL) : null;
+    return { ...mine, them: theirs ? (theirs.done || theirs.planned) : false };
   });
+}
+
+/* The month the strip's week mostly falls in, as an offset from this month,
+   so the grid under the strip opens on the right page. Thursday decides a
+   week that straddles two months, the ISO way. */
+function weekMonthOffset(offset = HISTORY_WEEK) {
+  const today = new Date(todayStr() + "T00:00:00");
+  const thu = new Date(today);
+  thu.setDate(thu.getDate() - ((today.getDay() + 6) % 7) + 3 + offset * 7);
+  return (thu.getFullYear() - today.getFullYear()) * 12 + (thu.getMonth() - today.getMonth());
 }
 
 function historyMonthDays(offset = HISTORY_MONTH) {
@@ -26727,9 +26836,8 @@ function historyOldestOffset() {
   return (first.getFullYear() - today.getFullYear()) * 12 + (first.getMonth() - today.getMonth());
 }
 
-let HISTORY_PICK = false;          // the month/year picker is open
 let CAL_MONTH_OPEN = false;        // the week leads; the month opens under it
-let HISTORY_PICK_YEAR = null;      // the year the picker is showing
+let HISTORY_WEEK = 0;              // 0 is this week, negative goes back
 
 function workoutCalendarHTML() {
   return `<div class="cal">${calendarInnerHTML()}</div>`;
@@ -26739,19 +26847,31 @@ function workoutCalendarHTML() {
    instead of rebuilding the whole tab. That is what makes it instant, and it
    keeps the page the same height, so nothing pinned to the viewport jumps. */
 function calendarInnerHTML() {
-  const days = historyMonthDays();
   const oldest = Math.min(0, historyOldestOffset());
-  const dows = ["M", "T", "W", "T", "F", "S", "S"];
+  const week = historyWeekDays();
   const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const monthOff = weekMonthOffset();
+  const dows = ["M", "T", "W", "T", "F", "S", "S"];
+  /* One pair of arrows, and they step weeks: this is a week strip. The title
+     names the month that week sits in, and tapping it opens that month. The
+     oldest week you can reach is the first one with anything in it. */
+  const oldestWeek = Math.floor((oldest * 30.5) / 7) - 1;
   return `
-    <h3 class="week-sec-h">Your week</h3>
+    <div class="wkt-week-head">
+      <h3 class="wkt-week-h">Your week</h3>
+      <div class="cal-head">
+        <button type="button" class="wk-nav-btn" id="calPrev" ${HISTORY_WEEK <= oldestWeek ? "disabled" : ""} aria-label="Previous week">${icon("chevronLeft", 16)}</button>
+        <button type="button" class="cal-title${CAL_MONTH_OPEN ? " open" : ""}" id="calTitle" aria-expanded="${CAL_MONTH_OPEN}" aria-label="Show the whole month">${escapeHtml(historyMonthLabel(monthOff))}${icon("chevronDown", 14)}</button>
+        <button type="button" class="wk-nav-btn" id="calNext" ${HISTORY_WEEK >= 0 ? "disabled" : ""} aria-label="Next week">${icon("chevronRight", 16)}</button>
+      </div>
+    </div>
+    <div class="cal-wdows">${week.map((d, i) => `<span class="${d.isToday ? "today" : ""}">${names[i]}</span>`).join("")}</div>
     <div class="cal-week">
-      ${historyWeekDays().map((d, i) => `
+      ${week.map((d) => `
         <button type="button" class="cal-wday${d.done ? " done" : ""}${d.planned ? " planned" : ""}${d.rest ? " rest" : ""}${d.isToday ? " today" : ""}"
           data-cal="${d.date}" ${d.title ? `title="${escapeHtml(d.title)}"` : ""}>
-          <span class="cal-wname">${names[i]}</span>
           <span class="cal-wnum">${d.day}</span>
-          <i class="cal-wdot"></i>
+          <span class="cal-wdots">${d.done || d.planned ? `<i class="d-me"></i>` : ""}${d.them ? `<i class="d-them"></i>` : ""}${d.rest && !d.done && !d.planned ? `<i class="d-rest"></i>` : ""}</span>
         </button>`).join("")}
     </div>
     <div class="cal-key">
@@ -26760,78 +26880,33 @@ function calendarInnerHTML() {
       <span><i class="k-rest"></i>Rest</span>
       ${infoDot("calendarKey", "What the calendar shows")}
     </div>
-    <button type="button" class="cal-more${CAL_MONTH_OPEN ? " open" : ""}" id="calMore" aria-expanded="${CAL_MONTH_OPEN}">${CAL_MONTH_OPEN ? "Hide the month" : "See the whole month"}${icon("chevronDown", 14)}</button>
-    ${CAL_MONTH_OPEN ? `
-    <div class="cal-head">
-      <button type="button" class="wk-nav-btn" id="calPrev" ${HISTORY_MONTH <= oldest ? "disabled" : ""} aria-label="Previous month">${icon("chevronLeft", 16)}</button>
-      <button type="button" class="cal-title${HISTORY_PICK ? " open" : ""}" id="calTitle" aria-label="Pick a month or year">${escapeHtml(historyMonthLabel())}${icon("chevronDown", 14)}</button>
-      <button type="button" class="wk-nav-btn" id="calNext" ${HISTORY_MONTH >= 0 ? "disabled" : ""} aria-label="Next month">${icon("chevronRight", 16)}</button>
-    </div>
-    ${HISTORY_PICK ? calendarPickerHTML(oldest) : ""}
-    ${HISTORY_MONTH !== 0 && !HISTORY_PICK ? `<button type="button" class="cal-today" id="calToday">Back to this month</button>` : ""}
+    ${CAL_MONTH_OPEN ? `<div class="cal-month-wrap">
+    ${HISTORY_MONTH !== monthOff ? `<button type="button" class="cal-today" id="calToday">Back to ${escapeHtml(historyMonthLabel(monthOff))}</button>` : ""}
     <div class="cal-dows">${dows.map((d) => `<span>${d}</span>`).join("")}</div>
     <div class="cal-grid">
-      ${days.map((d) => `
+      ${historyMonthDays().map((d) => `
         <button type="button" class="cal-day${d.thisMonth ? "" : " out"}${d.done ? " done" : ""}${d.planned ? " planned" : ""}${d.rest ? " rest" : ""}${d.isToday ? " today" : ""}"
           data-cal="${d.date}"
           ${d.title ? `title="${escapeHtml(d.title)}"` : ""}>${d.day}</button>`).join("")}
-    </div>` : ""}`;
-}
-
-/* Years step with one pair of arrows, months are a tap. Months you have no
-   history for, and months that have not happened, are shown but not pressable,
-   so the grid keeps its shape from year to year. */
-function calendarPickerHTML(oldest) {
-  const today = new Date(todayStr() + "T00:00:00");
-  const year = HISTORY_PICK_YEAR;
-  const offsetOf = (m) => (year - today.getFullYear()) * 12 + (m - today.getMonth());
-  const oldestYear = today.getFullYear() + Math.floor(oldest / 12);
-  const viewing = new Date(today.getFullYear(), today.getMonth() + HISTORY_MONTH, 1);
-  const names = Array.from({ length: 12 }, (_, m) => new Date(2000, m, 1).toLocaleDateString([], { month: "short" }));
-  return `<div class="cal-pick">
-    <div class="cal-pick-year">
-      <button type="button" class="wk-nav-btn" id="calYearPrev" ${year <= oldestYear ? "disabled" : ""} aria-label="Previous year">${icon("chevronLeft", 16)}</button>
-      <b>${year}</b>
-      <button type="button" class="wk-nav-btn" id="calYearNext" ${year >= today.getFullYear() ? "disabled" : ""} aria-label="Next year">${icon("chevronRight", 16)}</button>
-    </div>
-    <div class="cal-months">
-      ${names.map((n, m) => {
-        const off = offsetOf(m);
-        const ok = off <= 0 && off >= oldest;
-        const on = year === viewing.getFullYear() && m === viewing.getMonth();
-        const now = year === today.getFullYear() && m === today.getMonth();
-        return `<button type="button" class="cal-month${on ? " on" : ""}${now ? " now" : ""}" data-month="${off}" ${ok ? "" : "disabled"}>${n}</button>`;
-      }).join("")}
-    </div>
-  </div>`;
+    </div></div>` : ""}`;
 }
 
 function wireWorkoutCalendar(root) {
   const cal = root.querySelector(".cal");
   if (!cal) return;
-  const oldest = Math.min(0, historyOldestOffset());
-  const today = new Date(todayStr() + "T00:00:00");
   const repaint = () => { cal.innerHTML = calendarInnerHTML(); wireWorkoutCalendar(root); };
-  const go = (to) => { HISTORY_MONTH = Math.max(oldest, Math.min(0, to)); HISTORY_PICK = false; repaint(); };
-  if ($("calPrev")) $("calPrev").onclick = () => go(HISTORY_MONTH - 1);
-  if ($("calNext")) $("calNext").onclick = () => go(HISTORY_MONTH + 1);
-  if ($("calToday")) $("calToday").onclick = () => go(0);
-  if ($("calMore")) $("calMore").onclick = () => { CAL_MONTH_OPEN = !CAL_MONTH_OPEN; if (!CAL_MONTH_OPEN) HISTORY_PICK = false; repaint(); };
-  $("calTitle").onclick = () => {
-    HISTORY_PICK = !HISTORY_PICK;
-    HISTORY_PICK_YEAR = new Date(today.getFullYear(), today.getMonth() + HISTORY_MONTH, 1).getFullYear();
-    repaint();
-  };
-  if ($("calYearPrev")) $("calYearPrev").onclick = () => { HISTORY_PICK_YEAR--; repaint(); };
-  if ($("calYearNext")) $("calYearNext").onclick = () => { HISTORY_PICK_YEAR++; repaint(); };
-  cal.querySelectorAll("[data-month]").forEach((b) => {
-    b.onclick = () => go(parseInt(b.dataset.month, 10));
-  });
+  /* Stepping the week carries the month with it, so the grid, when open, is
+     always the month the strip is showing. */
+  const go = (to) => { HISTORY_WEEK = Math.min(0, to); HISTORY_MONTH = weekMonthOffset(); repaint(); };
+  if ($("calPrev")) $("calPrev").onclick = () => go(HISTORY_WEEK - 1);
+  if ($("calNext")) $("calNext").onclick = () => go(HISTORY_WEEK + 1);
+  if ($("calTitle")) $("calTitle").onclick = () => { CAL_MONTH_OPEN = !CAL_MONTH_OPEN; HISTORY_MONTH = weekMonthOffset(); repaint(); };
+  if ($("calToday")) $("calToday").onclick = () => { HISTORY_MONTH = weekMonthOffset(); repaint(); };
   cal.querySelectorAll("[data-cal]").forEach((b) => {
     b.onclick = () => {
       const date = b.dataset.cal;
-      const day = historyMonthDays().find((d) => d.date === date)
-        || historyWeekDays().find((d) => d.date === date);
+      const day = historyWeekDays().find((d) => d.date === date)
+        || historyMonthDays().find((d) => d.date === date);
       if (!day) return;
       // A day you trained opens what you did; a day ahead opens what you could.
       if (day.done) openRecap(MY_EMAIL, ME, date);
@@ -26884,6 +26959,7 @@ function renderChooseScreen() {
   // and the preview, so this screen owns the top of the card outright.
   $("workoutCardTitle").textContent = "";
   $("workoutFocusRow").textContent = "";
+  $("workoutCard").classList.add("wkt-flat");
 
   /* Mo: the ways to build a workout belong inside the Smart Plan card, with
      the first thing you would do in the middle of it and the rest directly
@@ -26989,82 +27065,97 @@ function renderChooseScreen() {
      app congratulating somebody for work they have not done. */
   const doneCard = !allDone ? "" : `
     <section class="wkt-done">
-      <div class="wkt-done-head">
-        <div class="wkt-done-words">
-          <p class="wkt-eyebrow">TRAINING COMPLETE</p>
-          <h2>You&rsquo;re done for today ${icon("check", 22)}</h2>
-          <p class="wkt-done-sub">${doneCount} session${doneCount === 1 ? "" : "s"} completed
-            &middot; 1 training day toward your week of ${target}.</p>
-        </div>
+      <div class="wkt-done-top">
+        <p class="wkt-eyebrow">Training complete</p>
         ${/* He says one line here and it is about recovery, not about the work,
               because the work is finished and there is nothing left to coach. */ ""}
         <div class="wkt-bot">
-          <span class="wkt-bot-say">Nice work. Give your body time to recover.</span>
-          ${robotFaceSVG(62, "wkt-bot-face")}
+          <span class="wkt-bot-say">Nice work! Give your body time to recover.</span>
+          ${robotFaceSVG(56, "wkt-bot-face", { bust: true })}
         </div>
       </div>
+      <h2>You&rsquo;re done for today <span class="wkt-badge">${icon("check", 14)}</span></h2>
+      <p class="wkt-done-sub">${doneCount} session${doneCount === 1 ? "" : "s"} completed
+        &bull; 1 training day toward your week of ${target}.</p>
       <div class="wkt-chips">
         ${/* `label`, `ico` and `detail` are todaySessions' own fields. Read from
               there rather than re-derived, so this strip and the one on the
               plan preview cannot start disagreeing about what a session is. */ ""}
         ${sessions.map((x) => `<div class="wkt-chip">
-          <span class="wkt-chip-ico">${icon(x.ico || "dumbbell", 17)}</span>
+          <span class="wkt-chip-ico">${icon(x.ico || "dumbbell", 20)}</span>
           <span class="wkt-chip-body"><b>${escapeHtml(x.label || "Session")}</b>
             <i>${escapeHtml(x.detail || "")}</i></span>
-          <span class="wkt-chip-tick">${icon("check", 13)}</span>
+          <span class="wkt-chip-ring${x.state === "done" ? "" : " open"}" aria-hidden="true"></span>
         </div>`).join("")}
       </div>
       <div class="wkt-done-acts">
         <button type="button" class="wkt-btn-solid" id="wktViewToday">View today&rsquo;s training</button>
-        <button type="button" class="wkt-btn-soft" id="wktTomorrow">Preview tomorrow ${icon("chevronRight", 15)}</button>
+        <button type="button" class="wkt-btn-soft" id="wktTomorrow">Preview tomorrow ${icon("arrowRight", 16)}</button>
       </div>
     </section>`;
 
   /* Next workout. The ring and the muscle list are two readings of one number:
      the percentage is the average freshness, the list is which muscles it came
      from, and an open circle marks the one the day is aimed at. Printing both
-     is what stops the figure being a score nobody can check. */
+     is what stops the figure being a score nobody can check.
+
+     Two buttons, not three cards. The third door, an activity on the clock,
+     is a line under them: it has to stay reachable from here because on an
+     empty day this screen is where it lives, but it is not what most people
+     open this tab to do. */
   const aimed = (p.focus || "").toLowerCase();
   const nextCard = `
     <section class="wkt-next">
       <div class="wkt-next-top">
-        <p class="wkt-eyebrow">NEXT WORKOUT</p>
+        <p class="wkt-eyebrow">Next workout</p>
         ${infoDot("planMatch", "How the match is worked out")}
       </div>
-      <div class="wkt-next-body">
+      <div class="wkt-next-grid">
         <div class="wkt-next-words">
           <h2>${escapeHtml(p.focus)}</h2>
           <p class="wkt-next-sub">${escapeHtml(matchReading(p.match))}</p>
         </div>
-        <div class="wkt-next-read">
-          <div class="wkt-arc">
-            ${arcGaugeSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 150)}
-            <div class="wkt-arc-num"><b>${p.match}%</b><i>MATCH</i></div>
-          </div>
-          <ul class="wkt-muscles">
-            ${(p.muscles || []).map((m) => {
-              const on = aimed.includes(m.name.toLowerCase());
-              return `<li class="${on ? "aim" : ""}">${on
-                ? `<span class="wkt-ring" aria-hidden="true"></span>`
-                : `<span class="wkt-tick" aria-hidden="true">${icon("check", 13)}</span>`}${escapeHtml(m.name)}</li>`;
-            }).join("")}
-          </ul>
+        <div class="wkt-arc">
+          ${arcGaugeSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 96)}
+          <div class="wkt-arc-num"><b>${p.match}%</b><i>MATCH</i></div>
+        </div>
+        <ul class="wkt-muscles">
+          ${(p.muscles || []).map((m) => {
+            const on = aimed.includes(m.name.toLowerCase());
+            return `<li>${on
+              ? `<span class="wkt-ring" aria-hidden="true"></span>`
+              : `<span class="wkt-tick" aria-hidden="true">${icon("check", 14)}</span>`}${escapeHtml(m.name)}</li>`;
+          }).join("")}
+        </ul>
+        <div class="wkt-next-acts">
+          ${p.real
+            ? `<button type="button" class="wkt-btn-solid sm" id="chooseBeginBtn">${partway ? "Resume workout" : "Begin workout"}</button>`
+            : `<button type="button" class="wkt-btn-solid sm" id="chooseGenerateBtn">Generate workout</button>`}
+          <button type="button" class="wkt-btn-soft sm" id="choosePlanBtn">Plan my own</button>
+          ${CARDIO_SES && CARDIO_SES.state !== "setup"
+            ? `<button type="button" class="wkt-more" id="chooseActivityBtn">Resume ${escapeHtml(csnAct().label.toLowerCase())}, ${csnClock(csnElapsedMs())} ${icon("chevronRight", 13)}</button>`
+            : `<button type="button" class="wkt-more" id="chooseActivityBtn">or start an activity ${icon("chevronRight", 13)}</button>`}
         </div>
       </div>
-      <div class="wkt-next-acts">${actions}</div>
     </section>`;
 
   /* Recovery. Not a nag and not a metric: one true sentence about the half of
      training that happens when you are not training, which is the half people
      skip. It says nothing about THIS person's sleep because the app cannot see
      it, and inventing a reading would be worse than saying the general thing
-     plainly. */
+     plainly. The horizon on the right is drawn, not a photo: a photo would be
+     somebody else's mountain. */
   const restCard = `
     <section class="wkt-rest">
-      <p class="wkt-eyebrow">RECOVERY</p>
-      <h2>Rest well</h2>
-      <p>Progress happens between workouts. Sleep, water and food are what let
-        the work you just did turn into anything.</p>
+      <div class="wkt-rest-words">
+        <p class="wkt-eyebrow">Recovery</p>
+        <h2>Rest well ${icon("leaf", 22)}</h2>
+        <p>Progress happens between workouts. Good sleep, hydration and nutrition keep you${PARTNER_EMAIL ? " both" : ""} moving forward.</p>
+      </div>
+      <div class="wkt-scene" aria-hidden="true">
+        ${restSceneSVG()}
+        <div class="wkt-scene-words">Same<br>Goals<br>Brighter<br>Days<br><span style="font-size:15px">&#9825;</span></div>
+      </div>
     </section>`;
 
   $("workoutContent").innerHTML = `
@@ -27073,15 +27164,15 @@ function renderChooseScreen() {
       ? `<p class="build-q">${escapeHtml(coachName)} sets your training. Log what you did, or add something extra.</p>${actions}`
       : nextCard}
     ${restCard}
-    ${savedWorkoutsHTML()}
-    ${/* The calendar and the way to fill it in. Plan your week sits UNDER the
+    ${/* The week, then the way to fill it in. Plan your week sits UNDER the
           calendar because it acts on it: you look at the week, then you fill
           it in. */ ""}
-    <section class="week-sec">
+    <section class="wkt-week">
       ${workoutCalendarHTML()}
-      ${optionCard("chooseWeekBtn", "checklist", "Plan your week",
-          "Put workouts on the days you will do them.", false)}
-    </section>`;
+    </section>
+    ${optionCard("chooseWeekBtn", "calendar", "Plan your week",
+        "Put workouts on the days you’ll do them.", false).replace('class="opt-card ', 'class="opt-card wkt-plan ')}
+    ${savedWorkoutsHTML()}`;
 
   /* His face, the same drawing onboarding shows, not the exercise figure: at
      this size a whole body is a smudge and the point of him here is that he is
@@ -27112,7 +27203,7 @@ function renderChooseScreen() {
      string, in the vocabulary adapter.mjs can parse (SUGGESTABLE_DAYS). */
   if ($("chooseGenerateBtn")) $("chooseGenerateBtn").onclick = () => generateWorkout(null, { keepFocus: p.ask || null });
   if ($("chooseBeginBtn")) $("chooseBeginBtn").onclick = startWorkout;
-  $("choosePlanBtn").onclick = toManual;
+  if ($("choosePlanBtn")) $("choosePlanBtn").onclick = toManual;
   /* Guarded: a coached client has no plan buttons, so this card is not there. */
   const actBtn = $("chooseActivityBtn");
   if (actBtn) actBtn.onclick = () => openCardioSession();
