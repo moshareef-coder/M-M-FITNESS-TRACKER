@@ -4670,10 +4670,9 @@
   .prog-tile-sub { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
   .prog-tile-sub.go { color: var(--accent-ink); font-weight: 700; }
   .prog-tile-chev { position: absolute; top: 12px; right: 9px; color: var(--muted); display: flex; }
-  .prog-tile-log {
-    grid-column: 1 / -1; padding: 14px 15px 15px; border-radius: var(--radius);
-    border: 1px solid var(--border); background: var(--card-fill); box-shadow: var(--shadow-card);
-  }
+  /* Four steppers stacked in the measurements sheet, each the weigh-in's
+     geometry (round button, field, round button) under its own small label. */
+  .meas-item + .meas-item { margin-top: 18px; }
   .waist-input {
     width: 100%; max-width: 150px; min-width: 0; text-align: right; padding: 0;
     background: none; border: none; color: var(--text);
@@ -5841,22 +5840,6 @@
     <div class="prog-tiles hidden" id="progTiles">
       <button type="button" class="prog-tile" id="tileWaist"></button>
       <button type="button" class="prog-tile" id="tilePhotos"></button>
-      <!-- The only place a waist reading is logged. Same round-button geometry
-           as the weigh-in above it, in half-inch steps, and it stays folded
-           until the tile is tapped. -->
-      <div class="prog-tile-log hidden" id="waistLogBlock">
-        <div class="wt-log-head">Today's waist</div>
-        <div class="weigh-row">
-          <button type="button" class="round-btn" id="waistMinus" aria-label="Down 0.5">&minus;</button>
-          <div class="weigh-field">
-            <input type="number" class="waist-input" id="waistInput" inputmode="decimal" step="0.5" min="0"
-                   placeholder="0.0" autocomplete="off" aria-label="Waist" />
-            <span class="weigh-unit">in</span>
-          </div>
-          <button type="button" class="round-btn" id="waistPlus" aria-label="Up 0.5">+</button>
-        </div>
-        <button type="button" class="btn-primary" id="waistSaveBtn" style="margin-top:12px;">Save</button>
-      </div>
     </div>
 
     <div class="card metric-card idx-card" id="cardConsistency">
@@ -5922,6 +5905,14 @@
          than one lift at a time. -->
     <div class="sheet-scrim hidden" id="reportScrim">
       <div class="partner-sheet" id="reportSheet"></div>
+    </div>
+
+    <!-- The one place a tape measurement is logged. Waist, hips, thighs and
+         arms in one sheet, opened by the Waist Trend tile and by Tone Up's
+         Log measurements button, so the two doors lead to the same room.
+         Filled by renderMeasurementsSheet(). -->
+    <div class="sheet-scrim hidden" id="measureScrim">
+      <div class="partner-sheet" id="measureSheet"></div>
     </div>
 
     <div class="card metric-card idx-card" id="cardVolume">
@@ -10428,7 +10419,7 @@ async function reconcileNativeSurfaces() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "liftsScrim", "reportScrim"]
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "liftsScrim", "reportScrim", "measureScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
   stopGenTicker();
   $("genScrim")?.classList.add("hidden");
@@ -24952,20 +24943,73 @@ function headlineWeighIns(name, days = HEADLINE_WEIGHT_DAYS) {
   return entriesFor(name).filter((e) => e.weight != null && e.entry_date >= fromStr);
 }
 
-/* Waist readings over the same window, so the tile under Weight and the
-   headline above it are counting the same month. `now` is the latest
-   reading, `delta` is latest minus earliest, or null with only one: one
-   reading is a number, not a direction. null with none, because the column
-   is new (20260916_waist_measurements.sql) and, until it is applied, every
-   row simply has no waist_in on it. */
-function waistTrend(name, days = HEADLINE_WEIGHT_DAYS) {
+/* ---- Tape measurements: waist, hips, thighs, arms ----
+
+   Four columns on the day row (waist_in in 20260916_waist_measurements.sql,
+   the other three in 20260916_body_measurements.sql, neither applied yet),
+   read here as one thing so the Waist Trend tile, the Tone Up hero and the
+   logging sheet cannot disagree about what a reading is. Inches for all
+   four, the app is imperial everywhere else. One value per measurement, not
+   per side: thighs and arms are whichever side you always use. */
+const MEASUREMENTS = [
+  { key: "waist_in", label: "Waist" },
+  { key: "hips_in", label: "Hips" },
+  { key: "thigh_in", label: "Thighs" },
+  { key: "arm_in", label: "Arms" },
+];
+
+/* The readings of one measurement from `days` ago to today, ascending, one
+   point per day. The day row is unique per (email, entry_date) on the
+   database, so a second point on a day can only come from the offline queue
+   replaying over a local copy; the later one wins, which is the value that
+   was saved last. Rows without that column, or with junk in it, are simply
+   not readings: until the migrations run every row has no column at all. */
+function measurementRows(name, key, days) {
   const from = new Date(todayStr() + "T00:00:00");
   from.setDate(from.getDate() - days);
   const fromStr = isoDate(from);
-  const points = entriesFor(name).filter((e) => e.waist_in != null && Number.isFinite(Number(e.waist_in)) && e.entry_date >= fromStr);
+  const byDay = new Map();
+  for (const e of entriesFor(name)) {
+    if (e.entry_date < fromStr || e[key] == null) continue;
+    const value = Number(e[key]);
+    if (!Number.isFinite(value)) continue;
+    byDay.set(e.entry_date, { entry_date: e.entry_date, value });
+  }
+  return [...byDay.values()];
+}
+
+/* The chart's series: [{ entry_date, value }] over the last N weeks. Weeks
+   rather than days because the Tone Up range pills think in weeks. */
+function measurementSeries(name, key, weeks) {
+  return measurementRows(name, key, weeks * 7);
+}
+
+/* The headline over that chart. `start` is the first reading in the window,
+   not the first ever, so a 4 week and a 12 week view each measure their own
+   window. pctDown is positive when the tape is going down (a Tone Up goal
+   wants that) and negative when it is not, one decimal. With one reading
+   delta and pctDown are 0, not null: the caller decides whether one point is
+   worth a headline (points.length says so), and 0 cannot render as "null%".
+   null with no reading at all. */
+function measurementSummary(name, key, weeks) {
+  const points = measurementSeries(name, key, weeks);
   if (!points.length) return null;
-  const now = Number(points[points.length - 1].waist_in);
-  const delta = points.length > 1 ? now - Number(points[0].waist_in) : null;
+  const now = points[points.length - 1].value;
+  const start = points[0].value;
+  const delta = Math.round((now - start) * 10) / 10;
+  const pctDown = start > 0 ? Math.round(((start - now) / start) * 1000) / 10 : 0;
+  return { now, start, delta, pctDown, points };
+}
+
+/* Waist readings over the same window as the weight headline, so the tile
+   under Weight and the number above it are counting the same month. `now`
+   is the latest reading, `delta` is latest minus earliest, or null with only
+   one: one reading is a number, not a direction. null with none. */
+function waistTrend(name, days = HEADLINE_WEIGHT_DAYS) {
+  const points = measurementRows(name, "waist_in", days);
+  if (!points.length) return null;
+  const now = points[points.length - 1].value;
+  const delta = points.length > 1 ? now - points[0].value : null;
   return { now, delta, points };
 }
 
@@ -26306,10 +26350,10 @@ function renderProgTiles(kind, isPartner, opts = {}) {
   const waist = $("tileWaist");
   waist.innerHTML = `<span class="prog-tile-ico">${icon("tape", 18)}</span>
     <span class="prog-tile-body"><span class="prog-tile-title">Waist Trend</span>${value ? `<span class="prog-tile-val">${value}</span>` : ""}<span class="prog-tile-sub">${sub}</span></span>${isPartner ? "" : chev}`;
-  /* A partner's tape is read only, same as their scale: the stepper writes to
+  /* A partner's tape is read only, same as their scale: the sheet writes to
      YOUR row and has no business opening on their screen. */
   waist.disabled = isPartner;
-  waist.onclick = isPartner ? null : () => { WAIST_LOG_OPEN = !WAIST_LOG_OPEN; renderProgressTab(); };
+  waist.onclick = isPartner ? null : () => openMeasurementsSheet();
 
   /* Photos are never shared, so on a partner's view there is no tile rather
      than an empty one, and the tape takes the whole row. Same when the photo
@@ -26338,40 +26382,108 @@ function renderProgTiles(kind, isPartner, opts = {}) {
       card.scrollIntoView({ block: "start", behavior: "smooth" });
     };
   }
-
-  const log = $("waistLogBlock");
-  log.classList.toggle("hidden", isPartner || !WAIST_LOG_OPEN);
-  if (isPartner || !WAIST_LOG_OPEN) return;
-  const input = $("waistInput");
-  /* Opens on the last reading so a nudge starts from somewhere real; a first
-     reading starts blank, the same as a first weigh-in. */
-  if (!input.value && t) input.value = t.now.toFixed(1);
-  const nudge = (delta) => {
-    input.value = String(Math.max(0, Math.round(((parseFloat(input.value) || 0) + delta) * 10) / 10));
-  };
-  $("waistMinus").onclick = () => nudge(-0.5);
-  $("waistPlus").onclick = () => nudge(0.5);
-  $("waistSaveBtn").onclick = saveWaistEntry;
 }
 
-async function saveWaistEntry() {
-  const typed = parseFloat($("waistInput").value);
-  const waist = Number.isFinite(typed) && typed > 0 ? typed : null;
-  if (waist === null) { toast("Enter a measurement first"); return; }
+/* ---- Logging measurements: one sheet for all four ----
+
+   Opened by the Waist Trend tile and by Tone Up's Log measurements button.
+   Every row starts on that measurement's last reading (any date, not just
+   this month) so a nudge starts from somewhere real, and a first reading
+   starts blank, like a first weigh-in. Only the rows you touched are saved:
+   the others stay whatever today's row already says, which is usually null,
+   and a prefilled value that was never touched must not be re-logged as a
+   fresh reading today or the chart grows flat points nobody took. Writes to
+   MY row only, whichever view Progress is on. */
+let MEAS_TOUCHED = new Set();
+
+function openMeasurementsSheet() {
+  /* The partner view is read only end to end; refusing to open here is the
+     backstop for any door that forgets to hide itself on that view. */
+  if (PROGRESS_VIEW === "partner") return;
+  MEAS_TOUCHED = new Set();
+  renderMeasurementsSheet();
+  $("measureScrim").classList.remove("hidden");
+  $("measureScrim").onclick = (e) => { if (e.target === $("measureScrim")) closeMeasurementsSheet(); };
+}
+
+function closeMeasurementsSheet() {
+  $("measureScrim").classList.add("hidden");
+  pinSheets();
+}
+
+function lastMeasurement(key) {
+  const rows = entriesFor(ME).filter((e) => e[key] != null && Number.isFinite(Number(e[key])));
+  return rows.length ? Number(rows[rows.length - 1][key]) : null;
+}
+
+function renderMeasurementsSheet() {
+  $("measureSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="measClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">Log measurements</div>
+      <div class="spacer"></div>
+    </div>
+    <p class="muted-note" style="margin:-6px 0 14px;">Inches, taken today. Only the ones you change are saved.</p>
+    ${MEASUREMENTS.map((m) => {
+      const last = lastMeasurement(m.key);
+      return `<div class="meas-item" data-key="${m.key}">
+        <div class="wt-log-head">${m.label}</div>
+        <div class="weigh-row">
+          <button type="button" class="round-btn" data-nudge="-0.5" aria-label="${m.label} down 0.5">&minus;</button>
+          <div class="weigh-field">
+            <input type="number" class="waist-input" inputmode="decimal" step="0.5" min="0"
+                   placeholder="0.0" autocomplete="off" aria-label="${m.label}"
+                   value="${last === null ? "" : last.toFixed(1)}" />
+            <span class="weigh-unit">in</span>
+          </div>
+          <button type="button" class="round-btn" data-nudge="0.5" aria-label="${m.label} up 0.5">+</button>
+        </div>
+      </div>`;
+    }).join("")}
+    <button type="button" class="btn-primary" id="measSaveBtn" style="margin-top:18px;">Save</button>`;
+
+  $("measClose").onclick = closeMeasurementsSheet;
+  $("measureSheet").querySelectorAll(".meas-item").forEach((item) => {
+    const key = item.dataset.key;
+    const input = item.querySelector("input");
+    input.oninput = () => MEAS_TOUCHED.add(key);
+    item.querySelectorAll("[data-nudge]").forEach((b) => {
+      b.onclick = () => {
+        const delta = Number(b.dataset.nudge);
+        input.value = String(Math.max(0, Math.round(((parseFloat(input.value) || 0) + delta) * 10) / 10));
+        MEAS_TOUCHED.add(key);
+      };
+    });
+  });
+  $("measSaveBtn").onclick = saveMeasurements;
+}
+
+async function saveMeasurements() {
+  /* The patch is the touched rows and nothing else. A touched row that was
+     then emptied is a mistake to point at, not a null to write. */
+  const patch = {};
+  for (const m of MEASUREMENTS) {
+    if (!MEAS_TOUCHED.has(m.key)) continue;
+    const typed = parseFloat($("measureSheet").querySelector(`[data-key="${m.key}"] input`)?.value);
+    if (!Number.isFinite(typed) || typed <= 0) { toast(`Enter a ${m.label.toLowerCase()} measurement first`); return; }
+    patch[m.key] = typed;
+  }
+  if (!Object.keys(patch).length) { toast("Nothing changed"); return; }
 
   const today = todayEntryFor(MY_EMAIL);
   /* Same row the scale writes, same carried fields: an upsert replaces the
      whole row, so today's weigh-in, proof and rest-day state ride along or
      they are gone. When today's row already exists it is an update instead,
-     one column on the row that is there. That is safer on the real database
-     (nothing another device wrote today gets blanked) and it is the write the
-     sandbox's client actually persists: its upsert matches on the first
-     onConflict column alone and would rewrite the oldest row's date. */
+     the touched columns on the row that is there. That is safer on the real
+     database (nothing another device wrote today gets blanked) and it is the
+     write the sandbox's client actually persists: its upsert matches on the
+     first onConflict column alone and would rewrite the oldest row's date. */
   const payload = {
     user_name: ME,
     email: MY_EMAIL,
     entry_date: todayStr(),
-    waist_in: waist,
+    ...patch,
     weight: today?.weight ?? null,
     gym: today?.gym ?? false,
     sessions: today?.sessions ?? 0,
@@ -26381,17 +26493,24 @@ async function saveWaistEntry() {
     workout_at: today?.workout_at ?? null,
   };
   const opts = { onConflict: "email,entry_date" };
-  const done = async (msg) => { WAIST_LOG_OPEN = false; toast(msg); await loadAll(); renderProgressTab(); };
+  const done = async (msg) => {
+    closeMeasurementsSheet();
+    toast(msg);
+    await loadAll();
+    if (typeof renderProgressTab === "function") renderProgressTab();
+  };
 
   if (navigator.onLine) {
     const { error } = today
-      ? await sb.from("fit_entries").update({ waist_in: waist }).eq("email", MY_EMAIL).eq("entry_date", payload.entry_date)
+      ? await sb.from("fit_entries").update(patch).eq("email", MY_EMAIL).eq("entry_date", payload.entry_date)
       : await sb.from("fit_entries").upsert(payload, opts);
-    if (!error) { await done("Measurement saved"); return; }
-    /* The column is behind 20260916_waist_measurements.sql. Until the owner
-       runs it every save comes back PGRST204, and "Could not find the
-       'waist_in' column" is the database talking, not something to show. */
-    if (String(error.code || "") === "PGRST204" || /waist_in/.test(String(error.message || ""))) {
+    if (!error) { await done("Measurements saved"); return; }
+    /* The columns are behind 20260916_waist_measurements.sql and
+       20260916_body_measurements.sql. Until the owner runs them every save
+       comes back PGRST204, and "Could not find the 'hips_in' column" is the
+       database talking, not something to show. */
+    const missing = new RegExp(MEASUREMENTS.map((m) => m.key).join("|"));
+    if (String(error.code || "") === "PGRST204" || missing.test(String(error.message || ""))) {
       toast("Measurements are not switched on yet");
       return;
     }
@@ -26403,9 +26522,9 @@ async function saveWaistEntry() {
   /* Offline, or the connection dropped: the scale's queue, the scale's job
      shape, so it replays with everything else logged in the gym. */
   const landed = await safeWrite("fit_entries", "upsert", payload, opts);
-  if (landed) { await done("Measurement saved"); return; }
+  if (landed) { await done("Measurements saved"); return; }
   applyLocally("fit_entries", payload);
-  WAIST_LOG_OPEN = false;
+  closeMeasurementsSheet();
   toast("Saved offline");
   renderProgressTab();
 }
@@ -28049,6 +28168,7 @@ const A11Y_SHEETS = {
   cropScrim: "Move and scale",
   savedScrim: "Saved workouts",
   swapScrim: "Swap exercise",
+  measureScrim: "Log measurements",
 };
 const A11Y_TITLE_SEL = ".scr-title, .pop-who, .ps-label, .cb-sheet-title, .ds-date, .sv-title, h1, h2, h3";
 const A11Y_FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
