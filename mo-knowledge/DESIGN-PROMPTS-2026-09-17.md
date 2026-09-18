@@ -29,6 +29,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -40,7 +41,7 @@ Top: UNIO wordmark, small.
 Title (28, bold, tight): What should we call you?
 Under it (14, muted): Not your account name. What you want to hear when you're done.
 One text field, large, rounded 12, placeholder: Your name
-Primary button: Continue
+Primary button: That's me
 Nothing else. Lots of air. The keyboard is up, so the button sits just above it.
 ```
 
@@ -65,6 +66,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -100,6 +102,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -109,7 +112,7 @@ SCREEN: Intro, page two of two. Progress bar at 30%.
 The robot, same size as page one, but now flanked by two empty avatar rings: a blue ring (#4a8dbf) on his left, a coral ring (#f37c62) on his right, each 56px, each with a faint plus inside. He is between them.
 His line, typed out in the bubble:
 "You won't be alone. There are three of us: you, your partner, and me. Invite them and I'll watch you both. Or it's just me and you. That works too. Your partner's included in your package."
-Primary button: Continue
+Primary button: Bring them on
 Nothing about price on this screen. Nothing about how to invite. Just the idea.
 ```
 
@@ -134,6 +137,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -155,7 +159,7 @@ Not sure yet
 No descriptions under the labels. No backgrounds on the rows except the states:
 State 1, the main goal: "Get stronger" is selected as the MAIN goal: deep green border, pale green fill, and a small pill at its right edge that says MAIN.
 State 2, an extra: "Move better" is also selected: green border only, small pill at its right edge that says ALSO.
-Primary button at the bottom: Continue
+Primary button at the bottom: That's the goal
 ```
 
 ### About you
@@ -179,6 +183,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -194,7 +199,7 @@ Then two labelled fields:
 Label (11, uppercase, muted): HEIGHT. Two fields side by side, placeholders: feet | inches
 Label: WEIGHT. One field, placeholder: pounds
 Under the weight field (12.5, muted): I use this for your starting loads. It stays private.
-Primary button: Continue
+Primary button: Looks like me
 ```
 
 ### Get stronger where?
@@ -218,6 +223,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -230,7 +236,7 @@ The figure: a flat white full-body figure, thin dark outline, soft grey shading,
 It is divided into five big tappable regions, drawn as soft shaded zones, not muscle groups: Arms and shoulders, Chest, Back, Legs, Core. Draw the FRONT view. "Chest" and "Core" are selected: those two zones are tinted pale green with a deep green outline.
 Under the figure: a small segmented control, two options, Front | Back, with Front active. Small, muted, secondary. (In the app, tapping the Back zone flips the figure to the back view by itself; the control is only for looking.)
 Under that, a row of chips listing the selection in words, each chip with a small green tick: Chest, Core.
-Primary button: Continue
+Primary button: Those ones
 Second frame, please, as a separate image: the same screen after tapping Back: the BACK view of the same figure, mid-flip if you like, with "Back" tinted and the chip row reading: Chest, Core, Back.
 ```
 
@@ -255,6 +261,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -272,7 +279,7 @@ Walking (icon: walker)
 Yoga (icon: a person seated cross-legged, simple)
 Pilates (icon: a reformer, simple)
 "With equipment", "Running" and "Yoga" are selected: green border, pale green fill, green tick. "Yoga" and "Pilates" each carry a tiny pill at the right of the label that says RECOMMENDED (Pilates is recommended because the person said Female on the previous screen).
-Primary button: Continue
+Primary button: On to the fun stuff
 ```
 
 ### How hard do you want to go?
@@ -296,6 +303,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -309,7 +317,7 @@ Steady (heat: green #46b98a)
 All in (heat: amber #d8a52e. NOT red. Red makes people not want to do it.)
 No subtext on the tiles. "Steady" is selected: its tile has a pale green fill and it has EXPANDED to show one compact detail line under the label (14, muted): "3 to 4 days a week, about 45 minutes" and a second line (12.5): "Sessions can outnumber days. A short mobility session and a lift is two sessions on one day."
 Under the tiles, the robot face small with his reactive line (14, muted), typed out: "That is a week somebody actually keeps."
-Primary button: Continue
+Primary button: Show me the plan
 ```
 
 ### Your plan
@@ -333,6 +341,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -373,6 +382,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -382,13 +392,14 @@ SCREEN: Hire me. Progress bar at 95%. This is the payment screen and it must not
 The robot, large, upper third, looking at the viewer.
 His line in the bubble (15.5), typed out:
 "That's your plan. Hire me as your personal trainer and I'll do the rest."
-Under him, a plain list, five rows, each with a small deep-green tick at the left (15.5):
-I'll generate every workout
-I'll track your progress and your lifts
-I'll keep your progress photos
-I'll follow up with you
-Same for your partner. They're included.
-Then one line, bold, 17: $7.99 a month. Your partner included.
+Under him, eyebrow (11, uppercase): YOUR PERSONAL TRAINER, then title (28): Hire me.
+Then THE SAME summary card as the plan screen (white, radius 14, hairline border, rows with a muted label left and a bold value right, hairline dividers), laid out like a bill:
+Every workout, generated | (green tick)
+Your progress and lifts, tracked | (green tick)
+Your progress photos, kept | (green tick)
+Me, following up | (green tick)
+Your partner | Included
+And a total row, separated by a heavier top rule, both sides bold, the value at 21: A month | $7.99
 Primary button: Hire me, $7.99 a month
 Secondary button (grey fill): Skip, I'll look around first
 Fine print at the very bottom (12.5, muted, centered): Renews every month until you cancel. Cancel any time in Settings under Subscriptions. Restore purchase · Terms · Privacy
@@ -416,6 +427,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -456,6 +468,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -490,6 +503,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -525,6 +539,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -556,6 +571,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -588,6 +604,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -621,6 +638,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT
@@ -660,6 +678,7 @@ Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell 
 Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
 
 RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
 No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
 
 OUTPUT

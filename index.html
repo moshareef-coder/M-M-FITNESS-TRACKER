@@ -654,7 +654,13 @@
      plan and none of them is worth a row of its own on the screen that has to
      read as one week. */
   .ob-plan-extras { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 10px 0 18px; text-align: left; }
-  .ob-hire-price { font-size: 15px; line-height: 1.45; margin: 2px 0 18px; }
+  /* The hire screen is a bill: the plan's own summary card, what he does row
+     by row, and the total at the bottom the way a bill ends. */
+  .ob-bill { margin: 18px 0 18px; }
+  .ob-bill .ob-row b { color: var(--accent-ink); display: inline-flex; align-items: center; }
+  .ob-bill .ob-total { border-top: 2px solid var(--text); margin-top: 2px; padding-top: 14px; }
+  .ob-bill .ob-total span { font-weight: 700; color: var(--text); }
+  .ob-bill .ob-total b { font-size: 21px; letter-spacing: -.02em; color: var(--text); }
   /* The focus picker embedded in onboarding brings its own card padding from
      Setup, which would double up inside an ob-step. */
   .card-bare { background: none; border: none; padding: 0; }
@@ -8081,7 +8087,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.18.1";
+const APP_VERSION = "2026.09.18.2";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -9676,10 +9682,12 @@ const ONBOARD_INTRO = [
   {
     h: "Hi. I'm Unio.",
     say: "I'm your personal trainer now. I'll build a plan that's yours, and I'll stay on you until it's done.",
+    btn: "Let's go",
   },
   {
     h: "There are three of us.",
     say: "You, your partner, and me. Invite them and I'll watch you both. Or it's just me and you. That works too. Your partner's included in your package.",
+    btn: "Bring them on",
   },
 ];
 
@@ -9797,7 +9805,7 @@ function renderObPartnerStep(data = {}, { onDone, onBack } = {}) {
     const share = $("shareLinkBtn");
     if (share) { share.textContent = "Send a new invite"; share.className = "btn-ghost"; }
     const on = $("obPairSolo");
-    if (on) { on.textContent = "Continue"; on.className = "btn-primary"; }
+    if (on) { on.textContent = "Invite's out. Let's go"; on.className = "btn-primary"; }
   };
 
   wirePairEntry({
@@ -9835,7 +9843,7 @@ function renderObPartnerStep(data = {}, { onDone, onBack } = {}) {
           <h1>${escapeHtml(res.name)} invited you</h1>
           <p class="sub">You are pairing with them as soon as you finish setting up. There is nothing
             to do here.</p>
-          <button type="button" class="btn-primary" id="obPairNext">Continue</button>
+          <button type="button" class="btn-primary" id="obPairNext">Good, let's go</button>
           <button type="button" class="btn-ghost" id="obPairBack">Back</button>
         </div>`;
       $("obPairNext").onclick = () => { clearSolo(); done(); };
@@ -10008,7 +10016,7 @@ function renderOnboardIntro(i, data) {
       </div>
       <div class="si-sheet intro-sheet">
         <div class="intro-dots">${ONBOARD_INTRO.map((_, di) => `<span class="${di === i ? "on" : ""}"></span>`).join("")}</div>
-        <button type="button" class="btn-primary" id="introNext">Continue</button>
+        <button type="button" class="btn-primary" id="introNext">${escapeHtml(step.btn)}</button>
       </div>
     </div>`;
   /* Same typing as every other step of his. The id is the one paintObBot
@@ -10364,7 +10372,7 @@ function renderGoalTilesStep(data = {}) {
        on the Setup copy of this picker, where somebody is changing a decision
        rather than making one for the first time. */
     plain: true,
-    confirmLabel: "Continue",
+    confirmLabel: "That's the goal",
     selected: { bubble: data.goal_bubble || null, child: data.goal_child || null, secondary: data.goal_secondary },
     onPick: ({ bubble, child, label, secondary }) => {
       const tile = goalTileFor(bubble);
@@ -12421,7 +12429,7 @@ function renderOnboardStep(step, data = {}) {
         <div class="ob-row">
           <input id="obLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.weight_lb || ""}" />
         </div>
-        <button class="btn-primary" id="aboutNext">Continue</button>
+        <button class="btn-primary" id="aboutNext">Looks like me</button>
         <button class="btn-ghost" id="aboutBack">Back</button>
       </div>`;
     ob.querySelectorAll("[data-sex]").forEach((b) => b.onclick = () => {
@@ -12486,7 +12494,7 @@ function renderOnboardStep(step, data = {}) {
               ${o.sub ? `<span class="occ-sub">${escapeHtml(o.sub)}</span>` : ""}
             </button>`).join("")}
           </div>
-          <button type="button" class="btn-primary" id="tuneNext"${chosen ? "" : " disabled"}>Continue</button>
+          <button type="button" class="btn-primary" id="tuneNext"${chosen ? "" : " disabled"}>That one</button>
           <button type="button" class="btn-ghost" id="tuneBack">Back</button>
         </div>`;
       let pick = chosen;
@@ -12515,7 +12523,7 @@ function renderOnboardStep(step, data = {}) {
         <h1>${escapeHtml(spec.title)}</h1>
         <p class="sub">${escapeHtml(spec.sub)}</p>
         <div id="bodyPickRoot">${bodyRegionPickerHTML({ sex: data.sex, selected: picked, sore: spec.kind === "sore" })}</div>
-        <button type="button" class="btn-primary" id="tuneNext">Continue</button>
+        <button type="button" class="btn-primary" id="tuneNext">Those ones</button>
         <button type="button" class="btn-ghost" id="tuneBack">Back</button>
       </div>`;
     /* Read off the picker's own callback rather than out of the DOM on the way
@@ -12565,7 +12573,7 @@ function renderOnboardStep(step, data = {}) {
           <div class="ob-styles">${others.map(card).join("")}</div>
         </details>
         <p class="ob-style-note" id="styleNote"></p>
-        <button type="button" class="btn-primary" id="styleNext">Continue</button>
+        <button type="button" class="btn-primary" id="styleNext">On to the fun stuff</button>
         <button type="button" class="btn-ghost" id="styleBack">Back</button>
       </div>`;
     const note = () => {
@@ -12600,7 +12608,7 @@ function renderOnboardStep(step, data = {}) {
         <p class="sub">This is what the people training with you will see.</p>
         <input id="nameInput" type="text" placeholder="Your name" value="${escapeHtml(data.name || "")}"
                autocomplete="given-name" maxlength="24" />
-        <button class="btn-primary" id="nextBtn">Continue</button>
+        <button class="btn-primary" id="nextBtn">That's me</button>
       </div>`;
     const go = () => {
       const name = $("nameInput").value.trim();
@@ -12708,7 +12716,7 @@ function renderOnboardStep(step, data = {}) {
             <span class="obt-detail"${chosen === t.id ? "" : " hidden"}>${escapeHtml(t.detail)}</span>
           </button>`).join("")}
         </div>
-        <button class="btn-primary" id="daysNext"${chosen ? "" : " disabled"}>Continue</button>
+        <button class="btn-primary" id="daysNext"${chosen ? "" : " disabled"}>Show me the plan</button>
         <button class="btn-ghost" id="daysBack">Back</button>
       </div>`;
     ob.querySelectorAll("[data-tier]").forEach((b) => b.onclick = () => {
@@ -12766,7 +12774,7 @@ function renderOnboardStep(step, data = {}) {
           <div class="ob-commit-row">${icon("check", 16)}<span>I will say when it is too much, instead of quietly stopping.</span></div>
           <div class="ob-commit-row">${icon("check", 16)}<span>I am allowed a bad week without it being over.</span></div>
         </div>
-        <button class="btn-primary" id="commitBtn">I am committing to this</button>
+        <button class="btn-primary" id="commitBtn">I'm committing to this</button>
         <button class="btn-ghost" id="commitBack">Let me change something</button>
       </div>`;
     $("commitBtn").onclick = () => {
@@ -12862,15 +12870,16 @@ function renderOnboardStep(step, data = {}) {
     ob.innerHTML = `
       <div class="ob-step">
         ${obChrome("hire", data)}
+        <div class="ob-kicker">YOUR PERSONAL TRAINER</div>
         <h1>Hire me.</h1>
-        <div class="ob-commit">
-          <div class="ob-commit-row">${icon("check", 16)}<span>I'll generate every workout.</span></div>
-          <div class="ob-commit-row">${icon("check", 16)}<span>I'll track your progress and your lifts.</span></div>
-          <div class="ob-commit-row">${icon("check", 16)}<span>I'll keep your progress photos.</span></div>
-          <div class="ob-commit-row">${icon("check", 16)}<span>I'll follow up with you.</span></div>
-          <div class="ob-commit-row">${icon("check", 16)}<span>Same for your partner. They're included.</span></div>
+        <div class="ob-summary ob-bill">
+          <div class="ob-row"><span>Every workout, generated</span><b>${icon("check", 16)}</b></div>
+          <div class="ob-row"><span>Your progress and lifts, tracked</span><b>${icon("check", 16)}</b></div>
+          <div class="ob-row"><span>Your progress photos, kept</span><b>${icon("check", 16)}</b></div>
+          <div class="ob-row"><span>Me, following up</span><b>${icon("check", 16)}</b></div>
+          <div class="ob-row"><span>Your partner</span><b>Included</b></div>
+          <div class="ob-row ob-total"><span>A month</span><b>${escapeHtml(PREMIUM_PRICE)}</b></div>
         </div>
-        <p class="ob-hire-price"><b>${escapeHtml(PREMIUM_PRICE)} a month. Your partner included.</b></p>
         <button class="btn-primary" id="hireBtn">Hire me, ${escapeHtml(PREMIUM_PRICE)} a month</button>
         <button class="btn-secondary" id="hireSkip">Skip, I'll look around first</button>
       </div>`;
