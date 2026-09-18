@@ -711,6 +711,15 @@
     border: 1.5px solid var(--border); transition: transform .12s ease, border-color .12s ease, background .12s ease; }
   .bp-chip:active { transform: scale(.97); }
   .bp-chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
+  /* "Where does it hurt" is the same picker asking the opposite question, and
+     tinting a sore knee the same green as a muscle you want more of reads as
+     "good, do more of this". Amber says what amber means. */
+  .bp.sore {
+    --bp-pick: color-mix(in srgb, var(--warn) 52%, var(--rb-body));
+    --bp-pick-shade: color-mix(in srgb, var(--warn) 62%, var(--rb-shade));
+  }
+  .bp.sore .bp-chip.on { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, var(--panel)); }
+  .bp.sore .bp-tick { color: var(--warn); }
   /* The tick is in the flow rather than placed on top, so a chip grows by its
      width when it is picked and the whole row visibly changes shape. */
   .bp-tick { width: 0; overflow: hidden; flex: none; color: var(--accent-ink);
@@ -11190,7 +11199,7 @@ function bodyRegionPickerHTML(opts = {}) {
      does and what stops each limb looking separately lit, and an object bounding
      box gradient is simply not painted onto a shape with no width, which is how
      a perfectly vertical neck came out solid black. */
-  return `<div class="bp" data-sex="${sexKey}" data-view="front" data-selected="${selected.join(",")}">
+  return `<div class="bp${opts.sore ? " sore" : ""}" data-sex="${sexKey}" data-view="front" data-selected="${selected.join(",")}">
       <svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs>
         <linearGradient id="bpBodyGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="200" y2="0">
           <stop offset="0" stop-color="var(--bp-body)"/>
@@ -12505,7 +12514,7 @@ function renderOnboardStep(step, data = {}) {
         ${eyebrow}
         <h1>${escapeHtml(spec.title)}</h1>
         <p class="sub">${escapeHtml(spec.sub)}</p>
-        <div id="bodyPickRoot">${bodyRegionPickerHTML({ sex: data.sex, selected: picked })}</div>
+        <div id="bodyPickRoot">${bodyRegionPickerHTML({ sex: data.sex, selected: picked, sore })}</div>
         <button type="button" class="btn-primary" id="tuneNext">Continue</button>
         <button type="button" class="btn-ghost" id="tuneBack">Back</button>
       </div>`;
@@ -12873,7 +12882,9 @@ function renderOnboardStep(step, data = {}) {
          report here and nothing to decide: whatever happened, the next screen
          is the same one. Wrapped anyway, because a throw from here would leave
          somebody on a dead button with their whole setup behind it. */
-      try { await startPurchase(); } catch (err) { console.error(err); }
+      /* startHire is the paywall's own CTA: one purchase path, and it never
+         throws, so a cancelled sheet lands on the next screen like a skip. */
+      await startHire();
       /* They may have moved on while Apple's sheet was up. */
       if (!$("hireBtn")) return;
       renderOnboardStep("commit", data);
@@ -13020,6 +13031,16 @@ async function finishOnboarding(data) {
      before they have promised anything. Putting it back would ask the same
      person for the same money twice in ten seconds. */
   MY_PROFILE = saved;
+  /* The body picker's answer, in the column the engine actually reads.
+     Onboarding wrote goal_tuning and only goal_tuning, and
+     workoutEnginePayload reads focus_groups, so on every fresh account the
+     regions somebody just tapped never reached the plan; Setup's picker was
+     the only writer. Same writer, same shape ("all" is one token). Main goal
+     only, which is the only goal that gets the page now. */
+  const tune = data.goal_tuning?.[data.goal_bubble];
+  if (tune && (tune.all || (tune.areas || []).length)) {
+    await saveFocusGroups(tune.all ? ["all"] : tune.areas);
+  }
   clearObDraft();
   /* The weight they just typed, logged as what it is: a weigh-in. It is the
      start of the chart, it is the start_value the projection measures against,
