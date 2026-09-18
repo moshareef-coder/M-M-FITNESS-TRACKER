@@ -1,7 +1,7 @@
 /* Copies the deployable web assets into www/ for the native wrapper.
    The web app itself still ships from the repo root on Vercel; www/ exists
    only so Capacitor has a self-contained bundle to embed in the app. */
-import { mkdirSync, copyFileSync, cpSync, rmSync, existsSync, readFileSync } from "node:fs";
+import { readdirSync, mkdirSync, copyFileSync, cpSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -50,15 +50,19 @@ const ASSETS = [
    (verified against every import()/fetch() of a knowledge or mo-knowledge
    path in index.html) instead of recursing whole directories. vendor/ and
    badges/ hold nothing but binary assets, so those two still copy whole. */
+/* The whole engine, minus its own test and research tools. adapter.mjs pulls
+   in plan, styles, focus, limits, goal-engine, recovery and mobility, and plan
+   pulls in more; a hand-kept list of the leaves was exactly what left the
+   native build without a generator. Listing the directory cannot miss one. */
+const ENGINE_TOOLS = new Set(["test.mjs", "sweep.mjs", "fuzz.mjs", "demo.mjs", "bakeoff.mjs"]);
+const ENGINE_FILES = readdirSync(join(root, "mo-knowledge/engine"))
+  .filter((f) => f.endsWith(".mjs") && !f.endsWith(".test.mjs") && !ENGINE_TOOLS.has(f))
+  .map((f) => "mo-knowledge/engine/" + f);
 const KNOWLEDGE_FILES = [
-  "mo-knowledge/engine/limits.mjs",
-  "mo-knowledge/engine/joint-load.mjs",
-  "mo-knowledge/engine/load.mjs",
+  ...ENGINE_FILES,
   /* The Recovery screen's stretch picks, and focus.mjs because mobility.mjs
      imports MUSCLE_GROUPS from it. Lazy, like every other engine import here,
      so a build without them looks perfect until somebody taps Rest well. */
-  "mo-knowledge/engine/mobility.mjs",
-  "mo-knowledge/engine/focus.mjs",
   "knowledge/formulas/tdee.mjs",
   "knowledge/formulas/calorie-math.mjs",
   /* The calorie target per goal, which the Recovery screen reads. */
@@ -155,7 +159,13 @@ const NOT_SHIPPED = new Set([
   "knowledge/motion/body3d/mount.mjs",
 ]);
 const html = readFileSync(join(root, "index.html"), "utf8");
-const imported = [...html.matchAll(/import\("\.\/([^"]+)"\)/g)].map((m) => m[1]);
+/* Both spellings index.html uses: "./knowledge/..." and the root-relative
+   "/mo-knowledge/engine/..." that the engine imports use. The check used to
+   read only the first, which is how four engine modules the app imports at
+   runtime (adapter, goal-engine, activity-session, alternatives) were reported
+   "all present" while absent from the bundle: generate, the goal maths, the
+   yoga builder and the no-equipment switch all threw on the phone. */
+const imported = [...html.matchAll(/import\("(?:\.\/|\/)((?:mo-)?knowledge\/[^"]+)"\)/g)].map((m) => m[1]);
 const missing = [...new Set(imported)]
   .filter((rel) => !NOT_SHIPPED.has(rel) && !existsSync(join(out, rel)));
 
