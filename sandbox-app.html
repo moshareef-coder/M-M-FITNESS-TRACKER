@@ -335,6 +335,7 @@
   }
   .ob-style:active { transform: scale(.99); }
   .ob-style.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+  .obs-ico { display: block; color: var(--accent); margin-bottom: 3px; }
   .obs-label { font-size: 15px; font-weight: 650; }
   .obs-sub { font-size: 12.5px; color: var(--muted); line-height: 1.3; }
   /* Reserves its own height so the grid does not jump when the sentence about
@@ -450,6 +451,16 @@
     grid-template-areas: "words arc list" "acts acts acts";
   }
   .wkt-next-words { grid-area: words; min-width: 0; }
+  /* Not hired: the ring and the muscle list are the reading he does for you,
+     so they are the two things that go, and the pitch takes the row they were
+     sharing. The title, the card and the buttons under it are untouched,
+     because planning and logging a workout are free and this card is still
+     where you do them. */
+  .wkt-next-hire { grid-area: pitch; }
+  .wkt-next.not-hired .wkt-next-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "words" "pitch" "acts";
+  }
   .wkt-next-sub { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
   .wkt-arc { grid-area: arc; position: relative; width: 92px; height: 70px; align-self: center; }
   .wkt-arc svg { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -523,9 +534,13 @@
   .wkt-plan .opt-title { font-size: 16.5px; }
   .wkt-plan .opt-sub { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  /* Intensity, cool to hot. The heat is the information: you should be able to
-     tell what a card costs before you read it. Red is earned by the top tier
-     only, so it still means something when you get there. */
+  /* Intensity, cool to warm. The heat is the information: you should be able
+     to tell what a card costs before you read it.
+
+     It used to end in red, and Mo's reaction to his own top tier is the reason
+     it does not any more: "the last one makes me feel stressed, I do not want
+     to do it." A colour that talks somebody out of the hardest option is not a
+     warning, it is a leak, so the ladder stops at orange. */
   .ob-tiers { display: flex; flex-direction: column; gap: 9px; margin: 4px 0 18px; }
   .ob-tier {
     --heat: var(--muted);
@@ -538,7 +553,6 @@
   .ob-tier.heat-1 { --heat: #46b98a; }
   .ob-tier.heat-2 { --heat: #d8a52e; }
   .ob-tier.heat-3 { --heat: #e0752f; }
-  .ob-tier.heat-4 { --heat: #e0412f; }
   .ob-tier.on { border-color: var(--heat); background: color-mix(in srgb, var(--heat) 13%, var(--panel)); }
   .obt-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
   .obt-head { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
@@ -549,15 +563,15 @@
   .obt-flame { display: flex; gap: 3px; }
   .obt-flame i { width: 16px; height: 3px; border-radius: 999px; background: var(--heat); opacity: .55; }
   .ob-tier.on .obt-flame i { opacity: 1; }
-  /* The three estimates, side by side, so days and sessions being different
-     numbers is obvious at a glance rather than something to read for. */
-  .obt-ests { display: flex; gap: 18px; margin: 2px 0 2px; }
-  .obt-est { display: flex; flex-direction: column; gap: 1px; }
-  .obt-est b { font-size: 17px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
-  .ob-tier.on .obt-est b { color: var(--heat); }
-  .obt-est small { font-size: 10.5px; color: var(--muted); letter-spacing: .01em; }
-  .ob-tier-note { font-size: 12px; color: var(--muted); line-height: 1.45; margin: 0 0 16px; }
-  .obt-blurb { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+  /* The three estimates side by side, and the paragraph under them, went with
+     the tile they were on: the detail line below is all three tiers say now,
+     and only the one that was tapped says it. */
+  /* Hidden until the tile is tapped, which is the whole point of it: the
+     numbers belong to the tier somebody is considering, not to all three at
+     once. Uses [hidden] rather than a class so the button reads correctly to
+     a screen reader with nothing extra to keep in step. */
+  .obt-detail { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  .obt-detail[hidden] { display: none; }
   .obt-speed { font-size: 12.5px; font-weight: 650; color: var(--heat); }
   /* The optional goal weight, folded away until it is wanted. */
   .ob-fold { border: 1px solid var(--border); border-radius: 13px; background: var(--panel); margin: 0 0 12px; }
@@ -604,10 +618,13 @@
   .ob-commit-row { display: flex; gap: 10px; align-items: flex-start; font-size: 14.5px; line-height: 1.45; }
   .ob-commit-row svg { flex: none; color: var(--accent); margin-top: 2px; }
   .ob-style { position: relative; padding-top: 15px; }
+  /* var(--bg) for the text, the same pairing .goal-row-badge uses. It was
+     --accent-ink, which in dark mode IS --accent, so the pill was a blank
+     green lozenge with the word inside it painted its own background colour. */
   .obs-rec {
     position: absolute; top: -8px; left: 12px; font-size: 9.5px; font-weight: 800; letter-spacing: .06em;
     text-transform: uppercase; padding: 2px 7px; border-radius: 999px;
-    background: var(--accent); color: var(--accent-ink);
+    background: var(--accent); color: var(--bg);
   }
   /* Other is closed by default and opens itself when something inside it is
      already ticked, so coming back to this screen never hides a choice. */
@@ -621,10 +638,100 @@
   .ob-other[open] > summary::after { content: " \2212"; }
   .ob-other[open] > summary { margin-bottom: 10px; }
   .ob-style-note { color: var(--muted); font-size: 13px; line-height: 1.45; margin: 0 0 16px; min-height: 2.9em; }
+  /* About you. Three tiles in a row rather than a dropdown: there are three
+     answers, and a select is a menu you have to open before you find that out.
+     They wrap rather than shrink, because "Rather not say" is the longest of
+     the three and it is not the one to make hard to read. */
+  .ob-sexes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0 18px; }
+  .ob-sex {
+    padding: 14px 6px; border-radius: 14px; background: var(--panel);
+    border: 1.5px solid var(--border); color: var(--text); font-family: inherit;
+    font-size: 14px; font-weight: 650; line-height: 1.25; cursor: pointer;
+    transition: border-color .18s ease, background .18s ease;
+  }
+  .ob-sex:active { transform: scale(.99); }
+  .ob-sex.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+  /* The extra goals, said once and quietly. They change three things in the
+     plan and none of them is worth a row of its own on the screen that has to
+     read as one week. */
+  .ob-plan-extras { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 10px 0 18px; text-align: left; }
+  .ob-hire-price { font-size: 15px; line-height: 1.45; margin: 2px 0 18px; }
   /* The focus picker embedded in onboarding brings its own card padding from
      Setup, which would double up inside an ob-step. */
   .card-bare { background: none; border: none; padding: 0; }
-  .ob-focus-root { margin: 4px 0 18px; }
+  /* ---------- Body region picker ----------
+     The onboarding tune step's figure. Five regions, front and back, and the
+     figure turns itself around when somebody picks a region that lives on the
+     other side of it. Mo, 2026-09-17: "I don't swipe. The app swipes for me
+     based on what I pick."
+
+     The body is drawn twice, once in the line colour and once in the fill, the
+     same two pass trick knowledge/motion/rig.mjs uses, so where two regions
+     meet there is a seam and where a region meets itself there is not.
+     --bp-line is deliberately NOT --rb-line: that token is the robot's soft
+     grey edge, and the figure's own outline is one dark line in both themes,
+     which is the look Mo signed off on for the rig. */
+  .bp { --bp-line: #1c1f26; --bp-body: var(--rb-body); --bp-shade: var(--rb-shade);
+    --bp-pick: color-mix(in srgb, var(--accent) 52%, var(--rb-body));
+    --bp-pick-shade: color-mix(in srgb, var(--accent) 62%, var(--rb-shade));
+    width: 100%; }
+  /* perspective on the stage and not on the face, or the two faces turn around
+     different vanishing points and the figure appears to swell as it flips. */
+  .bp-stage { position: relative; width: 100%; max-width: 208px; aspect-ratio: 200 / 412;
+    margin: 2px auto 12px; perspective: 900px; }
+  .bp-flip { position: absolute; inset: 0; transform-style: preserve-3d;
+    transition: transform .42s cubic-bezier(.4, 0, .2, 1); }
+  .bp[data-view="back"] .bp-flip { transform: rotateY(180deg); }
+  .bp-face { position: absolute; inset: 0; backface-visibility: hidden; }
+  .bp-face.bp-back { transform: rotateY(180deg); }
+  /* A face turned away is not painted, but leaving it hit testable is one
+     browser quirk away from a tap on the front landing on the back. */
+  .bp[data-view="front"] .bp-back, .bp[data-view="back"] .bp-front { pointer-events: none; }
+  .bp-svg { width: 100%; height: 100%; display: block; }
+  .bp-ink { fill: var(--bp-line); stroke: var(--bp-line); stroke-linejoin: round; stroke-linecap: round; }
+  .bp-fill { fill: url(#bpBodyGrad); stroke: url(#bpBodyGrad); stroke-linejoin: round; stroke-linecap: round; }
+  .bp-r.on .bp-fill { fill: url(#bpPickGrad); stroke: url(#bpPickGrad); }
+  .bp-hit { fill: #000; fill-opacity: 0; stroke: #000; stroke-opacity: 0;
+    stroke-linejoin: round; stroke-linecap: round; cursor: pointer; }
+  .bp-r { transition: opacity .15s ease; }
+  /* The tap flash. A region that is already on has nowhere brighter to go, so
+     the whole group dips instead, which reads in either state. */
+  .bp-r.tapped { opacity: .55; }
+
+  .bp-seg { display: flex; gap: 4px; padding: 3px; margin: 0 auto 14px; width: fit-content;
+    border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border); }
+  .bp-seg-btn { border: none; background: none; color: var(--muted); cursor: pointer;
+    font-family: inherit; font-size: 12.5px; font-weight: 700; letter-spacing: .01em;
+    padding: 6px 16px; border-radius: 999px; transition: background .15s ease, color .15s ease; }
+  .bp-seg-btn.on { background: var(--panel); color: var(--text); box-shadow: var(--shadow-float); }
+
+  .bp-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 0 0 12px; }
+  .bp-chip { display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+    font-family: inherit; font-size: 14.5px; font-weight: 700; letter-spacing: -.01em;
+    padding: 11px 15px; border-radius: 999px; background: var(--panel); color: var(--text);
+    border: 1.5px solid var(--border); transition: transform .12s ease, border-color .12s ease, background .12s ease; }
+  .bp-chip:active { transform: scale(.97); }
+  .bp-chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
+  /* "Where does it hurt" is the same picker asking the opposite question, and
+     tinting a sore knee the same green as a muscle you want more of reads as
+     "good, do more of this". Amber says what amber means. */
+  .bp.sore {
+    --bp-pick: color-mix(in srgb, var(--warn) 52%, var(--rb-body));
+    --bp-pick-shade: color-mix(in srgb, var(--warn) 62%, var(--rb-shade));
+  }
+  .bp.sore .bp-chip.on { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, var(--panel)); }
+  .bp.sore .bp-tick { color: var(--warn); }
+  /* The tick is in the flow rather than placed on top, so a chip grows by its
+     width when it is picked and the whole row visibly changes shape. */
+  .bp-tick { width: 0; overflow: hidden; flex: none; color: var(--accent-ink);
+    transition: width .14s ease; display: inline-flex; }
+  .bp-chip.on .bp-tick { width: 14px; }
+  .bp-note { color: var(--muted); font-size: 13.5px; line-height: 1.45; margin: 0 0 16px;
+    min-height: 2.9em; text-align: center; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bp-flip, .bp-chip, .bp-tick, .bp-r, .bp-seg-btn { transition: none; }
+  }
   .ob-step { width: 100%; max-width: 420px; margin-block: auto; display: flex; flex-direction: column; align-items: stretch; text-align: left; }
   #onboard h1 { font-size: 28px; letter-spacing: -.025em; line-height: 1.15; margin: 0 0 8px; }
   #onboard p.sub { color: var(--muted); margin: 0 0 4px; font-size: 15.5px; line-height: 1.5; }
@@ -2018,14 +2125,24 @@
     font-size: 20px; line-height: 1; display: flex; align-items: center; justify-content: center;
     background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); color: #f4f6f8;
   }
-  .paywall-head { text-align: center; padding: 2px 56px 0; }
+  .paywall-head { text-align: center; padding: 2px 20px 0; }
   .paywall-word { font-family: var(--font-display); font-size: 27px; letter-spacing: .01em; }
   .paywall-word b { font-weight: 800; color: #fff; }
-  .paywall-word span { font-weight: 400; color: rgba(244,246,248,.62); margin-left: 3px; }
-  .paywall-tagline {
-    margin-top: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: .15em;
-    color: rgba(244,246,248,.45); text-transform: uppercase;
+  /* Under the name rather than beside it. "UNIO PERSONAL TRAINER" on one line
+     at 27px is wider than a phone, and the two halves are not the same weight
+     of fact anyway: the app has a name, and this is what you are hiring. */
+  .paywall-word span {
+    display: block; margin-top: 3px; font-weight: 700; font-size: 11px; letter-spacing: .18em;
+    color: rgba(244,246,248,.62); text-transform: uppercase;
   }
+  /* He says the offer himself, in his own voice and at reading size, because
+     the sentence people are actually deciding on is this one and it should not
+     be set in tracked-out capitals like a slogan. */
+  .paywall-say {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin: 12px 0 0; font-size: 15px; font-weight: 700; line-height: 1.35; color: #fff;
+  }
+  .paywall-say-face { flex: none; width: 40px; height: auto; }
   /* The peek carousel. Three cards in view, the centre one full size and the
      neighbours cut off at the edge, so a glance at the closed state already
      says "there is more either side" without anyone having to be told to
@@ -2041,6 +2158,13 @@
     display: flex; align-items: stretch; gap: 14px;
     overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
     scrollbar-width: none; padding: 10px 16vw 14px;
+    /* The cards take the height that is left rather than the height the
+       screenshot happens to be. Without this the track sized itself to the
+       image and pushed the price, the button and the legal text off the bottom
+       of a small phone, which is the one thing this screen may never do: the
+       whole footer is what Apple check for. The shot absorbs the difference,
+       cropped, which is what object-fit: cover is already doing. */
+    flex: 1 1 auto; min-height: 0;
   }
   .paywall-carousel-track::-webkit-scrollbar { display: none; }
   .paywall-slide {
@@ -2049,7 +2173,7 @@
     background: #161a21;
     border: 1px solid rgba(255,255,255,.09);
     box-shadow: 0 18px 40px -20px rgba(0,0,0,.8);
-    display: flex; flex-direction: column;
+    display: flex; flex-direction: column; min-height: 0;
     opacity: .5; transform: scale(.9); transition: opacity .22s, transform .22s;
   }
   /* The centred card, found and marked by the same scroll listener that drives
@@ -2070,6 +2194,13 @@
   .paywall-slide-shot {
     margin: 14px -18px -1px; border-radius: 16px 16px 0 0; overflow: hidden;
     flex: 1 1 auto; min-height: 0;
+    /* Tied to the screen rather than to the picture. A flex column only shrinks
+       a child when the column itself has a height, and this one is a min-height
+       so it grows instead: the card sized itself to the screenshot and pushed
+       the price, the button and the legal line off the bottom. Capped here, the
+       shot crops (object-fit: cover, from the top) and the footer stays on the
+       screen, which is the part Apple check for. */
+    max-height: 22vh;
   }
   .paywall-slide-shot img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
   .paywall-dots { display: flex; justify-content: center; gap: 6px; margin-top: 2px; }
@@ -2092,6 +2223,63 @@
   .paywall-fine { margin: 12px 0 0; font-size: 11px; line-height: 1.45; color: rgba(244,246,248,.42); }
   .paywall-legal { margin: 6px 0 0; font-size: 11px; }
   .paywall-legal a { color: var(--accent); text-decoration: none; }
+
+  /* ---- The hire pitch, in place ----
+     Wherever a paid surface is reached by somebody who has not hired him, this
+     is what stands where the thing itself would have been: his face, one line
+     about what THIS screen would do, and the one button. It is deliberately
+     not a card sitting inside the card it lands in. It is standing in for
+     content, and a boxed advert inside a box reads as an advert, which is the
+     one thing that makes somebody scroll past without reading it. */
+  .hire-pitch { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 2px 0; }
+  .hire-pitch-face { flex: none; width: 46px; height: auto; }
+  .hire-pitch-words { min-width: 0; flex: 1 1 auto; }
+  .hire-pitch-line {
+    display: block; font-size: 13.5px; font-weight: 600; line-height: 1.38;
+    letter-spacing: -.01em; color: var(--text);
+  }
+  /* Loud enough to be the thing you press and quiet enough not to outshout the
+     green Begin button on the same screen: the accent fill, at button-in-a-card
+     size rather than full page-action size. */
+  .hire-pitch-btn {
+    margin-top: 10px; width: 100%; padding: 10px 14px; border-radius: 12px; border: none;
+    background: var(--accent); color: var(--on-accent); cursor: pointer;
+    font-family: var(--font-display); font-size: 14px; font-weight: 700; letter-spacing: -.01em;
+  }
+  .hire-pitch-btn:active { transform: scale(.985); }
+  /* A chart card with the pitch in it instead of the chart. The goal head
+     stays visible because it is the person's own goal, not a reading we are
+     charging for, and a screen that keeps its title with one block swapped out
+     is still their screen; a blank card is a bug with a price on it. */
+  .hire-locked > *:not(.hire-pitch-slot):not(.wth-head) { display: none !important; }
+  /* Clear of the head's mountain, which is absolutely placed and hangs a few
+     pixels below the words it sits beside. */
+  .hire-pitch-slot.under-head { margin-top: 18px; }
+  /* On the workout card he is not allowed to outshout Begin workout. Mo's rule
+     for that screen is that the green start button is the loudest thing on it,
+     and a suggestion competing with the thing it is suggesting is how the
+     start button stops being pressed. Everywhere else the pitch IS the only
+     action on its card, so it keeps the accent. */
+  .wkt-next .hire-pitch-btn {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  }
+
+  /* ---- Bring your partner, on Home ----
+     Onboarding stopped asking for a partner, so this is where the ask lives
+     now. A card rather than the small seat in the hero, because the seat is a
+     thing you find and this is a thing you are offered; the seat stays exactly
+     as it was underneath as the quiet permanent way in. */
+  .home-hire { display: flex; flex-direction: column; gap: 12px; }
+  .home-hire-top { display: flex; align-items: center; gap: 13px; }
+  .home-hire-face { flex: none; width: 52px; height: auto; }
+  .home-hire-line {
+    min-width: 0; flex: 1 1 auto; font-size: 13.5px; font-weight: 600; line-height: 1.38;
+    letter-spacing: -.01em; color: var(--text);
+  }
+  /* Side by side, so "Not now" is as easy to reach as the invite. A skip that
+     takes a second tap to find is not a skip. */
+  .home-hire-acts { display: flex; gap: 8px; }
+  .home-hire-acts > button { margin-top: 0; font-size: 14.5px; padding: 12px 14px; }
   /* One blocked person. The address can be long and the button must not be
      pushed off the edge by it, so the name takes the slack and ellipsises. */
   .block-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
@@ -2805,7 +2993,7 @@
   .home-quip-act:disabled { opacity: .6; }
   .home-quip-act .hq-go { display: inline-flex; opacity: .45; margin-right: -4px; }
   .home-quip-av {
-    flex-shrink: 0; width: 52px; height: 52px; border-radius: 14px;
+    flex-shrink: 0; width: 52px; height: 52px; border-radius: 14px; overflow: visible;
     display: block; object-fit: contain;
     background: var(--panel-2);
   }
@@ -3573,7 +3761,7 @@
   }
   .si-tag { font-size: 15.5px; color: var(--muted); margin: 8px 0 0; max-width: 26ch; line-height: 1.45; }
 
-  /* The three-screen "what this is about" intro, before the name/goal wizard */
+  /* The two-page introduction, after the name and before the first question */
   .intro-top {
     flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
     padding: calc(16px + env(safe-area-inset-top)) 16px 0;
@@ -3593,6 +3781,12 @@
   .intro-dots { display: flex; justify-content: center; gap: 7px; margin-bottom: 20px; }
   .intro-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--border); transition: background .2s, width .2s; }
   .intro-dots span.on { background: var(--accent); width: 20px; border-radius: 9px; }
+  /* Unio is the picture on these two pages rather than the pair of rings,
+     because the pages are him introducing himself. The line under him types,
+     so it reserves its height: a hero that grows a line at a time shoves the
+     heading up the screen while somebody is reading it. */
+  .intro-bot { display: block; }
+  .intro-say { min-height: 7.3em; max-width: 30ch; }
   .si-sheet {
     flex: 0 0 auto; display: flex; flex-direction: column;
     padding: 24px 24px calc(28px + env(safe-area-inset-bottom));
@@ -3909,6 +4103,15 @@
                   border-radius: 10px; background: var(--panel-2); color: var(--accent); }
   .goal-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .goal-row-title { font-weight: 650; font-size: 15px; line-height: 1.25; }
+  /* Onboarding's copy of the same list: the labels, bigger, and nothing else.
+     No panel behind a row and no border around one, so a background on this
+     screen means exactly one thing, which is that you chose it. Setup keeps
+     the full version, where somebody is changing a decision rather than making
+     one for the first time. */
+  .goal-tile-grid.plain .goal-row-wrap { border-color: transparent; background: none; }
+  .goal-tile-grid.plain .goal-row-wrap.open { border-color: var(--border); background: var(--panel); }
+  .goal-tile-grid.plain .goal-row { padding: 15px 14px; }
+  .goal-tile-grid.plain .goal-row-title { font-size: 16.5px; font-weight: 700; }
   .goal-row-sub { font-size: 12.5px; color: var(--muted); line-height: 1.3; }
   .goal-row-chev { flex: none; color: var(--muted); display: grid; place-items: center; }
   .goal-row-badge { flex: none; font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
@@ -6712,6 +6915,14 @@
          so a muted account and a quiet beat both leave no gap. -->
     <div class="home-quip-slot" id="homeQuipSlot"></div>
 
+    <!-- Bring your partner. Onboarding stopped asking (a person wants to see
+         the app before they drag somebody into it), so the ask lives here,
+         near the top, where it is offered rather than hunted for. Skippable
+         for the session and back on the next launch: it is an invitation, and
+         an invitation you cannot put down is a nag. Never drawn for somebody
+         who is already paired, coached, or waiting on an answer. -->
+    <div class="card home-hire hidden" id="homePartnerCard"></div>
+
     <!-- One card where there used to be two. The week grid was already the
          right picture (a day reads DOWN its column: did we both go on
          Wednesday, or just one of us) and the timeline above it was a preview
@@ -6828,6 +7039,13 @@
     <div class="goal-chips" id="progGoalChips"></div>
 
     <div class="card" id="progHeadline"></div>
+
+    <!-- His pitch, for an account that has not hired him: tracking and the
+         charts are the paid half of this tab. It lives here in the markup and
+         lockProgressForHire() moves it into whichever goal screen is up, so
+         there is one node with one set of handlers rather than one built and
+         thrown away on every repaint. -->
+    <div class="card hidden" id="progHirePitch"></div>
 
     <!-- The Tone Up screen (renderToneHero), for the recomp goal only. Not a
          card: the goal order walks past it, and it is pinned straight under
@@ -7198,6 +7416,17 @@
 
       <div class="set-sec">Account</div>
       <div class="set-group">
+        <!-- What you are paying, said in the words the paywall says it in, and
+             in the place a person and an App Review reader both go looking for
+             it. It is also the only way back to Restore once somebody IS
+             subscribed, since the paywall never opens for them again. No
+             data-page: it opens the offer or the terms, not a settings page. -->
+        <button type="button" class="set-row" id="setRow-hire">
+          <span class="set-ico" data-ico="star"></span>
+          <span class="set-txt"><span class="set-title">Personal trainer</span></span>
+          <span class="set-val" id="setHireSub"></span>
+          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+        </button>
         <button type="button" class="set-row" id="setRow-about" data-page="about">
           <span class="set-ico" data-ico="info"></span>
           <span class="set-txt"><span class="set-title">About</span></span>
@@ -7853,7 +8082,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.17.21";
+const APP_VERSION = "2026.09.18.1";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -8029,6 +8258,12 @@ const ICON_PATHS = {
   pencil: `<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>`,
   arrowRight: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   leaf: '<path d="M4 20c0-8 4-14 16-16-1 12-6 16-13 16"/><path d="M4 20c3-5 7-8 11-10"/>',
+  /* A mat, from above. Pilates was the one style on the picker with no honest
+     icon in the set: a dumbbell is the opposite of it and the leaf is already
+     yoga's. Drawn flat rather than rolled, because a roll at this size is a
+     rectangle with a circle stuck to it and reads as a battery. Three lines
+     rather than two for the same reason: two is a phone. */
+  mat: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M6.5 7.5h11M6.5 12h11M6.5 16.5h11"/>',
   checklist: '<path d="M4 6h2M4 12h2M4 18h2"/><rect x="9" y="4" width="11" height="4" rx="1"/><rect x="9" y="10" width="11" height="4" rx="1"/><rect x="9" y="16" width="11" height="4" rx="1"/>',
   dumbbell: '<path d="M4 10v4M20 10v4M2 12h2M20 12h2M6 8v8M18 8v8M9 12h6"/>',
   bolt: '<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/>',
@@ -8724,13 +8959,23 @@ async function handleSignedIn(session) {
     const suggested = takeAppleName()?.split(" ")[0]
       || session.user.user_metadata?.full_name?.split(" ")[0]
       || session.user.email.split("@")[0];
-    renderOnboardIntro(0, { name: suggested });
+    /* The name first, then the introduction. Somebody who signed in with
+       Google may not want the name on that account anywhere near this app,
+       and asking before he starts talking is the one moment it is not an
+       interruption. */
+    renderOnboardStep("name", { name: suggested });
   }
 }
 
 const ADMIN_EMAIL = "mo.shareef@creativelab1.com";
 let PARTNER_EMAIL = null;
 let MY_PARTNERSHIP = null;
+/* A pair request of mine that nobody has answered yet. Set where the
+   partnerships table is actually read, because somebody who has settled on
+   training alone walks past the waiting screen and lands on Home with the
+   request still out: Home's partner card has to know not to ask them to send
+   a second one. */
+let PAIR_REQUEST_OUT = false;
 /* Coaching context. A client under a coach has no partner and cannot generate
    their own workouts; that is the coach's job and the reason they pay. */
 let MY_GROUP = null;
@@ -8868,6 +9113,10 @@ async function checkPartnershipThenEnter() {
      'declined' partnership, so every branch below finds an empty list and this
      function behaves exactly as it did before. */
   const mine = (v) => String(v || "").toLowerCase() === MY_EMAIL;
+  /* Read once, here, where the rows are. Either direction counts: a request I
+     sent and a request I have been sent are both "an answer is owed", and
+     neither is a moment to be asked to invite somebody. */
+  PAIR_REQUEST_OUT = all.some((r) => r.status === "pending" && (mine(r.inviter_email) || mine(r.invitee_email)));
   const incoming = all.filter((r) => r.status === "pending" && mine(r.invitee_email));
   if (incoming.length) { renderPairRequestScreen(incoming); return; }
 
@@ -9409,28 +9658,29 @@ function obChips(items, selected, attr) {
   }).join("")}</div>`;
 }
 
-/* The three-screen "what this is" intro, run once for brand-new sign-ups
-   only, before a single question is asked. Modeled on how Klima and Mercury
-   pace their intro carousels: one statement per screen, a skip that always
-   works, dots that show there are exactly three of these and no more.
-   The point of writing this at all: the 5-step wizard right after it (name,
-   goal, detail, pace, plan) never once mentions a partner, on an app called
-   Unio. This is where that gets said, first, before anything else. */
+/* Two pages, after the name and before the first question.
+
+   It was three pages of app copy about accountability, shown before anything
+   at all was asked. Mo moved it behind the name step and handed it to Unio:
+   the app has a personal trainer in it, and the first thing a new person meets
+   should be him saying hello rather than a brochure about the product. Page
+   one is who he is, page two is who else is coming.
+
+   Nothing here says what it costs. The ask has its own screen now, after the
+   plan exists and is worth paying for, so a price on page one would be a
+   stranger asking for money before he has done anything.
+
+   `say` is the spoken half and it types, the way his lines do on every other
+   step. Written for the ear: short sentences, no parentheses, nothing that
+   only works as text. */
 const ONBOARD_INTRO = [
   {
-    ring: "both",
-    h: "You're not doing this alone.",
-    sub: "The moment they log a workout, you'll know: a photo, a note, right on your home screen.",
+    h: "Hi. I'm Unio.",
+    say: "I'm your personal trainer now. I'll build a plan that's yours, and I'll stay on you until it's done.",
   },
   {
-    ring: "me",
-    h: "The week isn't done until you both are.",
-    sub: "Hit your goal solo and the app doesn't celebrate. It nudges you to go check on them instead.",
-  },
-  {
-    ring: "partner",
-    h: "Show up for them. They'll show up for you.",
-    sub: "That's the whole app. Everything else is just the tools to make it easy.",
+    h: "There are three of us.",
+    say: "You, your partner, and me. Invite them and I'll watch you both. Or it's just me and you. That works too. Your partner's included in your package.",
   },
 ];
 
@@ -9736,43 +9986,43 @@ function clearObDraft() {
   try { localStorage.removeItem(obDraftKey()); } catch { /* nothing to clear */ }
 }
 
+/* Reached through renderOnboardStep("intro"), never called straight from a
+   button, so the page number lands in the draft with everything else and a
+   reload comes back to the page they were on. */
 function renderOnboardIntro(i, data) {
   const ob = $("onboard");
   ob.classList.remove("hidden");
   $("app").classList.add("hidden");
   const step = ONBOARD_INTRO[i];
-  const strokeMe = step.ring === "partner" ? "var(--border)" : "var(--me)";
-  const strokePartner = step.ring === "me" ? "var(--border)" : "var(--partner)";
+  const go = (n) => renderOnboardStep("intro", { ...data, introIdx: n });
 
   ob.innerHTML = `
     <div class="si-screen intro-screen">
       <div class="intro-top">
-        ${i > 0 ? `<button type="button" class="intro-back" id="introBack" aria-label="Back">${icon("chevronLeft", 20)}</button>` : "<span></span>"}
-        <button type="button" class="intro-skip" id="introSkip">Skip</button>
+        <button type="button" class="intro-back" id="introBack" aria-label="Back">${icon("chevronLeft", 20)}</button>
+        ${i === 0 ? `<button type="button" class="intro-skip" id="introSkip">Skip</button>` : "<span></span>"}
       </div>
       <div class="si-hero intro-hero">
-        <svg class="si-rings" viewBox="0 0 200 120" aria-hidden="true">
-          <defs><filter id="siGlow2" x="-60%" y="-60%" width="220%" height="220%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/>
-            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter></defs>
-          <circle cx="78" cy="60" r="38" fill="none" stroke="${strokeMe}" stroke-width="9" filter="url(#siGlow2)"/>
-          <circle cx="122" cy="60" r="38" fill="none" stroke="${strokePartner}" stroke-width="9" filter="url(#siGlow2)"/>
-        </svg>
+        <span class="intro-bot">${robotFaceSVG(96, "", { bust: true })}</span>
         <h1 class="si-word intro-h">${escapeHtml(step.h)}</h1>
-        <p class="si-tag">${escapeHtml(step.sub)}</p>
+        <p class="si-tag intro-say" id="obBotSay" data-say="${escapeHtml(step.say)}"></p>
       </div>
       <div class="si-sheet intro-sheet">
         <div class="intro-dots">${ONBOARD_INTRO.map((_, di) => `<span class="${di === i ? "on" : ""}"></span>`).join("")}</div>
-        <button type="button" class="btn-primary" id="introNext">${i === ONBOARD_INTRO.length - 1 ? "Let's set you up" : "Continue"}</button>
+        <button type="button" class="btn-primary" id="introNext">Continue</button>
       </div>
     </div>`;
+  /* Same typing as every other step of his. The id is the one paintObBot
+     looks for, so he talks here without this page knowing how he does it. */
+  afterObChrome();
 
-  $("introSkip").onclick = () => renderOnboardStep("name", data);
-  if (i > 0) $("introBack").onclick = () => renderOnboardIntro(i - 1, data);
+  /* Skipping the introduction is not skipping the setup, so both the skip and
+     the last Continue land on the same next question. */
+  if ($("introSkip")) $("introSkip").onclick = () => renderOnboardStep("goal", data);
+  $("introBack").onclick = () => (i === 0 ? renderOnboardStep("name", data) : go(i - 1));
   $("introNext").onclick = () => {
-    if (i === ONBOARD_INTRO.length - 1) renderOnboardStep("name", data);
-    else renderOnboardIntro(i + 1, data);
+    if (i === ONBOARD_INTRO.length - 1) renderOnboardStep("goal", data);
+    else go(i + 1);
   };
 }
 
@@ -9919,7 +10169,12 @@ function migrateGoalPick(bubble, child) {
    GAIN_RATE_PER_MONTH's beginner band, from goal-engine.mjs: 1 to 1.5% of
    bodyweight a month. Beginner because that is who is standing in onboarding,
    and it is the fastest band, so the number we show is the optimistic end and
-   the truth cannot be slower than we implied. */
+   the truth cannot be slower than we implied.
+
+   Nothing calls this today. Its one caller was the target step, and the goal
+   weight question it answered came off the way in. Kept rather than deleted
+   because it is the answer to a question that is coming back, on the progress
+   chart, and the reasoning above is the expensive half of it. */
 function gainOutlook(currentLb, goalLb) {
   const amount = (goalLb || 0) - (currentLb || 0);
   if (!currentLb || !goalLb || amount <= 0) return null;
@@ -10096,36 +10351,40 @@ function renderGoalTilesStep(data = {}) {
   $("app").classList.add("hidden");
   ob.innerHTML = `
     <div class="ob-step">
-      <h1>What do you want?</h1>
+      ${obChrome("goal", data)}
+      <h1>What is your goal?</h1>
       <p class="sub">Pick as many as you like. The first one is your main goal.</p>
-      <div class="goal-tile-grid" id="goalTileGrid"></div>
+      <div class="goal-tile-grid plain" id="goalTileGrid"></div>
       <button type="button" class="btn-ghost" id="goalBackBtn">Back</button>
     </div>`;
   initGoalTiles($("goalTileGrid"), {
+    /* `plain` is onboarding's version of the same list: the labels, big and
+       tappable, and nothing else. Mo wants the first real question in the app
+       to be a set of words you tap, not nine bordered cards each carrying a
+       line of explanation. The sub lines and the panel behind every row stay
+       on the Setup copy of this picker, where somebody is changing a decision
+       rather than making one for the first time. */
+    plain: true,
     confirmLabel: "Continue",
     selected: { bubble: data.goal_bubble || null, child: data.goal_child || null, secondary: data.goal_secondary },
     onPick: ({ bubble, child, label, secondary }) => {
       const tile = goalTileFor(bubble);
       const next = { ...data, goalKey: tile.legacy, goal_bubble: bubble, goal_child: child, goalLabel: label, goal_secondary: secondary };
-      if (tile.askTarget) renderOnboardStep("target", next);
-      /* Straight to the plan. The step that used to sit here asked "how fast?"
-         and offered 12, 8 or 16 weeks, of goals that have no weeks in them:
-         there is no such thing as getting to Move better quicker, and the
-         answer was written to a deadline nothing reads. A duration is only a
-         real question when there is a number to arrive at, so it is asked on
-         the target step, of the two goals that ask for one, and nowhere else. */
-      else renderOnboardStep(tuneQueue(next).length ? "tune" : "track",
-        { ...next, detail: child ? label : null, tuneIdx: 0, trackIdx: 0 });
+      /* Everybody goes to About. The goal weight screen that used to stand
+         between here and the rest of the run has nothing left to ask, and the
+         height and weight it collected are asked of everybody now rather than
+         of the two goals that wanted a target. */
+      renderOnboardStep("about", { ...next, detail: child ? label : null, tuneIdx: 0 });
     },
   });
-  $("goalBackBtn").onclick = () => renderOnboardStep("name", data);
+  $("goalBackBtn").onclick = () => renderOnboardStep("intro", { ...data, introIdx: ONBOARD_INTRO.length - 1 });
 }
 
 /* Nine tiles, always visible, no scrolling to find them. Tapping one opens the
    SAME .sheet-scrim overlay every other sheet in the app uses. The first row
    in the sheet is the plain category ("Just lose weight"), for people who do
    not want to be more specific than that. */
-function initGoalTiles(grid, { selected = {}, onPick, onSelect, confirmLabel = "Save my goals" } = {}) {
+function initGoalTiles(grid, { selected = {}, onPick, onSelect, confirmLabel = "Save my goals", plain = false } = {}) {
   const MAX_EXTRA = 2;   // the engine's cap, and it is argued for in mo-knowledge/engine/README.md
   /* A retired bubble reaches this with no tile to light, which is why such a
      profile opened the page with nothing selected and a disabled button
@@ -10213,7 +10472,7 @@ function initGoalTiles(grid, { selected = {}, onPick, onSelect, confirmLabel = "
      meant three round trips during which you could not see what you had
      already chosen. Inline, the whole selection stays on one page. */
   function paintGrid() {
-    grid.className = "goal-tile-grid";
+    grid.className = plain ? "goal-tile-grid plain" : "goal-tile-grid";
     grid.innerHTML = GOAL_TILES.map((t) => {
       const main = primary?.bubble === t.id;
       const alsoCount = extras.filter((e) => e.bubble === t.id).length;
@@ -10238,7 +10497,7 @@ function initGoalTiles(grid, { selected = {}, onPick, onSelect, confirmLabel = "
           <span class="goal-row-ico">${icon(t.ico, 19)}</span>
           <span class="goal-row-text">
             <span class="goal-row-title">${escapeHtml(t.title)}</span>
-            <span class="goal-row-sub">${escapeHtml(t.sub)}</span>
+            ${plain ? "" : `<span class="goal-row-sub">${escapeHtml(t.sub)}</span>`}
           </span>
           ${badge}
           <span class="goal-row-chev">${t.kids.length
@@ -10653,6 +10912,392 @@ function closeBodyFocusPage() {
   FOCUS_PICK_BACK_CTRL?.destroy(); FOCUS_PICK_BACK_CTRL = null;
   FOCUS_FIGURE_REPAINT = null;
   $("focusPickRoot").innerHTML = "";
+}
+
+/* ---------- Body region picker ----------------------------------------------
+
+   The picker the onboarding tune step asks its one body question with, after
+   Mo's 2026-09-17 meeting cut the muscle-level detail out of setup: "big
+   regions, not muscles. I don't want to see too much detail." Five regions, a
+   figure that shows the front first and turns itself around when somebody picks
+   something that lives on its back, and no ranking anywhere on screen.
+
+   It is a SECOND picker on purpose and the one above is not going anywhere.
+   Setup's Focus areas still owns the fourteen groups, the three tiers and the
+   Rive figure, because somebody who has trained for a month and opens Focus
+   areas is not the person answering their fourth ever question. The one thing
+   the two share is the column they write: bodyRegionFocusEntries() below spends
+   the engine's same nine units and emits the same "quads:3" strings, so nothing
+   downstream can tell which screen an answer came from.
+
+   Drawn as inline SVG rather than by mounting knowledge/motion/rig.mjs. The rig
+   draws a posed person onto a canvas; this needs five separately tintable
+   shapes that flip on their own, on a step that otherwise never asks for a
+   WebGL context. Same character family by hand instead: the flat white body,
+   one dark outline, a soft grey far side, and no striations, because an anatomy
+   chart is exactly the detail that got cut.
+
+   The two exported names are a contract with the onboarding sequence:
+     bodyRegionPickerHTML({ sex, selected })   -> markup string
+     wireBodyRegionPicker(root, { sex, onChange })
+*/
+
+/* Region to muscle groups, in the order the plan should reach for them, biggest
+   and most trainable first, because the spend below takes the front of each
+   list. `views` is which side of the figure the region can be seen on, and it
+   is what makes the figure turn itself around: a tap on something this person
+   cannot currently see means the figure is facing the wrong way. */
+const BODY_REGIONS = Object.freeze([
+  { id: "arms",  label: "Arms and shoulders", say: "your arms and shoulders",
+    groups: ["shoulders", "biceps", "triceps", "forearms"], views: ["front", "back"] },
+  { id: "chest", label: "Chest", say: "your chest",
+    groups: ["chest"], views: ["front"] },
+  { id: "back",  label: "Back", say: "your back",
+    groups: ["lats", "traps", "lowerback"], views: ["back"] },
+  /* Glutes ride with legs rather than with core. They are trained on leg day,
+     and "legs" is the word somebody points at their own hip and says. */
+  { id: "legs",  label: "Legs", say: "your legs",
+    groups: ["quads", "hamstrings", "glutes", "calves"], views: ["front", "back"] },
+  { id: "core",  label: "Core", say: "your core",
+    groups: ["abs", "obliques"], views: ["front"] },
+]);
+const BODY_REGION_IDS = BODY_REGIONS.map((r) => r.id);
+const bodyRegionFor = (id) => BODY_REGIONS.find((r) => r.id === id) || null;
+
+/* How much of each picked region actually gets written, keyed by how many
+   regions were picked. Every row costs nine units or fewer against the engine's
+   FOCUS_BUDGET, which is the whole reason this table exists: five regions is
+   fourteen muscle groups, and fourteen groups asked for at once is a request
+   focus.mjs answers by silently dropping the tail.
+
+   Setup's picker solves the same arithmetic with AREA_SPEND, which pays out by
+   RANK: first area hardest, fourth nothing. That cannot be used here, because
+   this screen has no ranking on it. Ordering these by the order they happened
+   to be tapped would be a priority nobody can see and nobody can correct, which
+   is the kind of quiet decision this codebase is supposed to say out loud. So
+   picked regions are equals, and what moves instead is how deep into each one
+   the budget reaches. The tier numbers are the engine's own: 3 main, 2
+   secondary, 1 light, same as FOCUS_TIERS. */
+const BODY_REGION_SPEND = Object.freeze({
+  1: [3, 3, 2],   // one region, so go three groups deep into it: 3 + 3 + 2 = 8
+  2: [3, 1],      // the lead group of each, hard, and the next one as a nudge: 8
+  3: [3],         // the lead group of each, hard: 9, the budget exactly
+  4: [2],         // four leads, one tier down, because four mains do not fit: 8
+});
+
+/* All five regions is every muscle group there is, which is the thing the
+   column already has a word for. "all" is one stored token and not fourteen
+   rows, and it is what makes Setup's picker come back reading "Whole body"
+   rather than a list, so five taps here and "Everything level" there land on
+   the same answer. See focusParseStored(). */
+function bodyRegionsAreWholeBody(ids) {
+  return BODY_REGION_IDS.every((id) => ids.includes(id));
+}
+
+/* The picked regions in the column's own shape, "quads:3" and the rest. Returns
+   an empty list for the whole body, which is the same pair goalTuningPatch()
+   already stores for "Everything level": an empty areas list carried by the
+   all flag beside it. */
+function bodyRegionFocusEntries(ids) {
+  const picked = BODY_REGIONS.filter((r) => ids.includes(r.id));
+  if (!picked.length || bodyRegionsAreWholeBody(ids)) return [];
+  const tiers = BODY_REGION_SPEND[picked.length] || BODY_REGION_SPEND[4];
+  const out = [];
+  for (const region of picked) {
+    tiers.forEach((tier, i) => {
+      const group = region.groups[i];
+      if (group) out.push(`${group}:${tier}`);
+    });
+  }
+  return out;
+}
+
+/* The way back in, so somebody who taps Back and then Continue sees what they
+   already answered rather than an empty body. Exact for the set of regions,
+   which is all this screen shows: which groups inside a region the budget paid
+   for is not something it ever put on screen. */
+function bodyRegionsFromEntries(entries, all) {
+  if (all) return [...BODY_REGION_IDS];
+  const { picked } = focusParseStored(Array.isArray(entries) ? entries : []);
+  const ids = [];
+  for (const region of BODY_REGIONS) {
+    if (region.groups.some((g) => picked.has(g))) ids.push(region.id);
+  }
+  return ids;
+}
+
+/* Half widths out from the centre line and the stroke widths of the limbs, in
+   the figure's own 200 by 412 units. Same arrangement as BODY / BODY_FEMALE in
+   knowledge/motion/rig.mjs: one skeleton, and the sexes differ only in width,
+   so every landmark in BODY_PICK_Y is shared and no pose is drawn twice. The
+   female figure is narrower at the shoulder and the waist and wider at the hip;
+   there is no hair on either, which is the product figure Mo asked for. */
+const BODY_PICK_GEO = Object.freeze({
+  male: { sh: 56, ch: 37, wa: 31, hp: 35, arm: 21, fore: 17, neck: 21, headX: 19, headY: 22,
+    thighOut: 36, thighIn: 7, kneeOut: 26, kneeIn: 11, calfOut: 28, calfIn: 12,
+    ankleOut: 19, ankleIn: 9, footR: 11 },
+  female: { sh: 47, ch: 32, wa: 25, hp: 37, arm: 17, fore: 14, neck: 17, headX: 18, headY: 21,
+    thighOut: 36, thighIn: 7, kneeOut: 24, kneeIn: 11, calfOut: 25, calfIn: 12,
+    ankleOut: 17, ankleIn: 9, footR: 10 },
+});
+const BODY_PICK_Y = Object.freeze({
+  headCy: 36, neckTop: 52, sho: 80, pit: 110, chestBot: 156, waist: 180, hip: 216,
+  elbow: 182, hand: 264, crotch: 250, knee: 318, ankle: 378, foot: 388,
+});
+
+/* Every shape the figure is made of, per region, for one view. Three kinds:
+   `d` is a filled path, `seg` is a stroked capsule (a limb: a round capped line
+   is exactly what a limb segment is, and it is how the rig draws one), and
+   `ell` is an ellipse. Each one gets drawn three times, in the line colour,
+   then the fill, then once more invisibly as the tap target. */
+function bodyPickShapes(sexKey, view) {
+  const g = BODY_PICK_GEO[sexKey] || BODY_PICK_GEO.male;
+  const Y = BODY_PICK_Y, cx = 100;
+  const x = (v) => (cx + v).toFixed(1);
+  /* The torso half width where the chest stops, read off the line the ribs
+     already taper along rather than guessed, so the seam between chest and core
+     sits on the silhouette instead of cutting across it. */
+  const wcb = (g.ch + 3) + ((g.wa - (g.ch + 3)) * (Y.chestBot - Y.pit)) / (Y.waist - Y.pit);
+  const shoulderLine = `M ${x(-(g.sh - 8))},${Y.sho}
+    C ${x(-(g.sh - 26))},${Y.sho - 7} ${x(-15)},${Y.sho - 11} ${x(0)},${Y.sho - 11}
+    C ${x(15)},${Y.sho - 11} ${x(g.sh - 26)},${Y.sho - 7} ${x(g.sh - 8)},${Y.sho}
+    Q ${x(g.sh - 1)},${Y.sho + 16} ${x(g.ch + 3)},${Y.pit}`;
+  const ribsUpLeft = `L ${x(-(g.ch + 3))},${Y.pit}
+    Q ${x(-(g.sh - 1))},${Y.sho + 16} ${x(-(g.sh - 8))},${Y.sho} Z`;
+  const bellyDownRight = `Q ${x(g.wa + 2)},${Y.waist - 8} ${x(g.wa)},${Y.waist}
+    Q ${x(g.hp - 1)},${Y.hip - 11} ${x(g.hp)},${Y.hip}`;
+  const bellyUpLeft = `Q ${x(0)},${Y.hip + 7} ${x(-g.hp)},${Y.hip}
+    Q ${x(-(g.hp - 1))},${Y.hip - 11} ${x(-g.wa)},${Y.waist}
+    Q ${x(-(g.wa + 2))},${Y.waist - 8} ${x(-wcb)},${Y.chestBot}`;
+  /* The seam between chest and core dips in the middle rather than running
+     straight across, or it reads as a belt drawn on the figure instead of the
+     bottom of a ribcage. The hip edge below does the same thing. */
+  const ribEdge = (to) => `Q ${x(0)},${Y.chestBot + 9} ${x(to)},${Y.chestBot}`;
+
+  const chest = `${shoulderLine} L ${x(wcb)},${Y.chestBot} ${ribEdge(-wcb)} ${ribsUpLeft}`;
+  const core = `M ${x(-wcb)},${Y.chestBot} ${ribEdge(wcb)} ${bellyDownRight} ${bellyUpLeft} Z`;
+  const torso = `${shoulderLine} L ${x(wcb)},${Y.chestBot} ${bellyDownRight} ${bellyUpLeft} ${ribsUpLeft}`;
+
+  /* One leg, mirrored. The top edge is a flat line at the hip because the torso
+     is drawn over it, so nobody ever sees it. */
+  const leg = (s) => `M ${x(s * g.hp)},${Y.hip}
+    C ${x(s * g.thighOut)},${Y.hip + 26} ${x(s * g.thighOut)},${Y.hip + 50} ${x(s * (g.thighOut - 2))},${Y.hip + 72}
+    C ${x(s * (g.kneeOut + 1))},${Y.knee - 18} ${x(s * g.kneeOut)},${Y.knee - 6} ${x(s * g.kneeOut)},${Y.knee}
+    C ${x(s * g.calfOut)},${Y.knee + 18} ${x(s * (g.calfOut - 2))},${Y.ankle - 26} ${x(s * g.ankleOut)},${Y.ankle}
+    L ${x(s * g.ankleIn)},${Y.ankle}
+    C ${x(s * (g.ankleIn + 2))},${Y.ankle - 24} ${x(s * g.calfIn)},${Y.knee + 22} ${x(s * g.kneeIn)},${Y.knee}
+    C ${x(s * g.kneeIn)},${Y.knee - 26} ${x(s * g.thighIn)},${Y.crotch + 20} ${x(s * 3)},${Y.crotch}
+    L ${x(s * 3)},${Y.hip} Z`;
+
+  /* A deltoid cap over the joint, then the two limb segments. The cap is the
+     one thing that stops an arm reading as a sausage pinned to a box, and it is
+     why the arm carries the shoulders in this picker's name. */
+  const arm = (s) => [
+    { ell: [s * (g.sh - 7), Y.sho + 10, (g.arm + 5) / 2, (g.arm + 10) / 2] },
+    { seg: [[s * (g.sh - 6), Y.sho + 14], [s * (g.sh + 1), Y.elbow]], w: g.arm },
+    { seg: [[s * (g.sh + 1), Y.elbow], [s * (g.sh + 5), Y.hand]], w: g.fore },
+  ];
+  const footY = (s) => ({ ell: [s * ((g.ankleOut + g.ankleIn) / 2), Y.foot, g.footR, 8] });
+  const shape = (o) => (o.seg
+    ? { ...o, seg: o.seg.map(([px, py]) => [Number(x(px)), py]) }
+    : o.ell
+      ? { ell: [Number(x(o.ell[0])), o.ell[1], o.ell[2], o.ell[3]] }
+      : o);
+
+  const legs = [{ d: leg(1) }, { d: leg(-1) }, footY(1), footY(-1)].map(shape);
+  const arms = [...arm(1), ...arm(-1)].map(shape);
+  const neutral = [
+    { seg: [[cx, Y.neckTop], [cx, Y.sho + 4]], w: g.neck },
+    { ell: [cx, Y.headCy, g.headX, g.headY] },
+  ];
+  /* Drawing order is the whole silhouette: legs first so the hips sit over
+     them, the torso next, the arms over the shoulder line, and the head last so
+     it covers the top of the neck. The neck goes first of all, behind
+     everything, or its lower end pokes through the collarbone. */
+  /* One line down the middle of the back, and nothing else on it. Without it a
+     back is a blank sheet the size of the whole torso and the two views read as
+     the same picture; with more than it, the figure starts being an anatomy
+     chart, which is the thing that got cut. */
+  const spine = { seg: [[cx, Y.sho + 14], [cx, Y.hip - 10]], w: 1.6, inkOnly: true };
+  return view === "back"
+    ? { order: ["legs", "back", "arms"], neck: [neutral[0]], head: [neutral[1]],
+        regions: { legs, back: [{ d: torso }, spine], arms } }
+    : { order: ["legs", "core", "chest", "arms"], neck: [neutral[0]], head: [neutral[1]],
+        regions: { legs, core: [{ d: core }], chest: [{ d: chest }], arms } };
+}
+
+/* One shape, three passes. `mode` is the pass: "ink" lays the outline down
+   wider than the fill, "fill" covers all but the rim of it, and "hit" is the
+   same geometry again with no paint and a fat stroke, because a pointer aimed
+   at a forearm should not have to land inside seventeen pixels of it. A shape
+   marked inkOnly is a seam drawn inside a region rather than around it, so it
+   skips the other two: filling over it would erase it. */
+function bodyPickShapeSvg(s, mode) {
+  if (s.inkOnly && mode !== "ink") return "";
+  const cls = mode === "ink" ? "bp-ink" : mode === "fill" ? "bp-fill" : "bp-hit";
+  const grow = s.inkOnly ? 0 : mode === "ink" ? 3 : mode === "hit" ? 12 : 0;
+  const pe = mode === "hit" ? ` pointer-events="all"` : ` pointer-events="none"`;
+  if (s.seg) {
+    const pts = s.seg.map(([px, py]) => `${px},${py}`).join(" ");
+    return `<polyline class="${cls}" points="${pts}" fill="none" stroke-width="${s.w + grow}"${pe}/>`;
+  }
+  if (s.ell) {
+    const [ecx, ecy, rx, ry] = s.ell;
+    return `<ellipse class="${cls}" cx="${ecx}" cy="${ecy}" rx="${rx + grow / 2}" ry="${ry + grow / 2}" stroke="none"${pe}/>`;
+  }
+  return `<path class="${cls}" d="${s.d}" stroke-width="${grow}"${pe}/>`;
+}
+
+/* Outline every shape, then fill every shape, then lay the inside seams over
+   the top. Doing it in that order and not shape by shape is what makes a region
+   read as one piece: where two of its own shapes overlap, a later fill wipes the
+   outline between them, and a deltoid stops looking bolted to an arm. The seams
+   have to come after the fills or they would be painted over. */
+function bodyPickGroupSvg(id, shapes, selected) {
+  const region = bodyRegionFor(id);
+  const on = selected.includes(id) ? " on" : "";
+  const body = shapes.filter((s) => !s.inkOnly);
+  const pass = (list, mode) => list.map((s) => bodyPickShapeSvg(s, mode)).join("");
+  return `<g class="bp-r${on}" data-region="${id}" data-label="${escapeHtml(region ? region.label : id)}" role="presentation">
+      ${pass(body, "ink")}${pass(body, "fill")}
+      ${pass(shapes.filter((s) => s.inkOnly), "ink")}
+      ${pass(body, "hit")}
+    </g>`;
+}
+
+function bodyPickFigureSvg(sexKey, view, selected) {
+  const f = bodyPickShapes(sexKey, view);
+  const plain = (shapes) => shapes.map((s) =>
+    bodyPickShapeSvg(s, "ink")).join("") + shapes.map((s) => bodyPickShapeSvg(s, "fill")).join("");
+  /* aria-hidden because the chips underneath carry the same five choices with
+     real button semantics. A screen reader announcing a body twice, once as
+     shapes and once as names, is worse than one that reads the names. */
+  return `<svg class="bp-svg" viewBox="0 0 200 412" aria-hidden="true" focusable="false">
+      ${plain(f.neck)}
+      ${f.order.map((id) => bodyPickGroupSvg(id, f.regions[id], selected)).join("")}
+      ${plain(f.head)}
+    </svg>`;
+}
+
+/* "male" unless they said female. Rather not say gets the male figure, which is
+   Mo's call on the About you screen: a figure everybody recognises beats asking
+   the question twice. Written to survive whatever the draft holds, because the
+   profile column has always spelled it "Female" with a capital. */
+function bodyPickSex(sex) {
+  return String(sex ?? "").trim().toLowerCase().startsWith("f") ? "female" : "male";
+}
+
+/* The markup. `selected` is region ids; anything unrecognised is dropped rather
+   than trusted, because this is seeded off a stored answer. */
+function bodyRegionPickerHTML(opts = {}) {
+  const sexKey = bodyPickSex(opts.sex);
+  const selected = (Array.isArray(opts.selected) ? opts.selected : []).filter((id) => BODY_REGION_IDS.includes(id));
+  const chip = (r) => `<button type="button" class="bp-chip${selected.includes(r.id) ? " on" : ""}"
+      data-region="${r.id}" aria-pressed="${selected.includes(r.id)}">
+      <span class="bp-tick" aria-hidden="true">${icon("check", 14)}</span>${escapeHtml(r.label)}</button>`;
+  /* One defs block for both faces. userSpaceOnUse and not the default, for two
+     reasons: it lights the whole figure from one side, which is what the rig
+     does and what stops each limb looking separately lit, and an object bounding
+     box gradient is simply not painted onto a shape with no width, which is how
+     a perfectly vertical neck came out solid black. */
+  return `<div class="bp${opts.sore ? " sore" : ""}" data-sex="${sexKey}" data-view="front" data-selected="${selected.join(",")}">
+      <svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs>
+        <linearGradient id="bpBodyGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="200" y2="0">
+          <stop offset="0" stop-color="var(--bp-body)"/>
+          <stop offset="0.5" stop-color="var(--bp-body)"/>
+          <stop offset="1" stop-color="var(--bp-shade)"/>
+        </linearGradient>
+        <linearGradient id="bpPickGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="200" y2="0">
+          <stop offset="0" stop-color="var(--bp-pick)"/>
+          <stop offset="0.5" stop-color="var(--bp-pick)"/>
+          <stop offset="1" stop-color="var(--bp-pick-shade)"/>
+        </linearGradient>
+      </defs></svg>
+      <div class="bp-stage">
+        <div class="bp-flip">
+          <div class="bp-face bp-front">${bodyPickFigureSvg(sexKey, "front", selected)}</div>
+          <div class="bp-face bp-back">${bodyPickFigureSvg(sexKey, "back", selected)}</div>
+        </div>
+      </div>
+      <div class="bp-seg" role="group" aria-label="Which side of the body">
+        <button type="button" class="bp-seg-btn on" data-view="front">Front</button>
+        <button type="button" class="bp-seg-btn" data-view="back">Back</button>
+      </div>
+      <div class="bp-chips">${BODY_REGIONS.map(chip).join("")}</div>
+      <p class="bp-note" aria-live="polite"></p>
+    </div>`;
+}
+
+/* What the picker says out loud. Written for the ear, because every one of
+   these lines is going through a voice later: short, no brackets, nothing that
+   only works as text. */
+function bodyPickNote(ids) {
+  if (!ids.length) return "Tap the body, or tap a name. Pick as many as you like.";
+  if (bodyRegionsAreWholeBody(ids)) return "You picked everything. Nothing stands out, so nothing gets extra.";
+  const said = BODY_REGIONS.filter((r) => ids.includes(r.id)).map((r) => r.say);
+  /* "Your arms and shoulders and your chest" is two ands in a row, which trips
+     over itself read aloud. A comma before the last one fixes it, and it is
+     only needed when a region's own name already has an and inside it. */
+  const last = said.some((t) => t.includes(" and ")) ? ", and " : " and ";
+  const list = said.length === 1 ? said[0] : said.slice(0, -1).join(", ") + last + said[said.length - 1];
+  return "You picked " + list + ".";
+}
+
+/* Wires a painted picker. `onChange` gets the region ids, in the body's own
+   order and not tap order, because tap order is not something this screen shows
+   and handing it out would invite somebody downstream to treat it as a ranking.
+   Returns a read function for anybody who would rather ask than listen. */
+function wireBodyRegionPicker(root, opts = {}) {
+  const wrap = root ? root.querySelector(".bp") : null;
+  if (!wrap) return () => [];
+  const sexKey = bodyPickSex(opts.sex ?? wrap.dataset.sex);
+  wrap.dataset.sex = sexKey;
+  const selected = new Set((wrap.dataset.selected || "").split(",").filter(Boolean));
+  const ordered = () => BODY_REGION_IDS.filter((id) => selected.has(id));
+  const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const setView = (view) => {
+    wrap.dataset.view = view;
+    wrap.querySelectorAll(".bp-seg-btn").forEach((b) => b.classList.toggle("on", b.dataset.view === view));
+  };
+  const paint = () => {
+    const ids = ordered();
+    wrap.dataset.selected = ids.join(",");
+    wrap.querySelectorAll(".bp-r").forEach((g) => g.classList.toggle("on", selected.has(g.dataset.region)));
+    wrap.querySelectorAll(".bp-chip").forEach((b) => {
+      const on = selected.has(b.dataset.region);
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    wrap.querySelector(".bp-note").textContent = bodyPickNote(ids);
+    opts.onChange?.(ids);
+  };
+
+  const toggle = (id, fromChip) => {
+    const region = bodyRegionFor(id);
+    if (!region) return;
+    selected.has(id) ? selected.delete(id) : selected.add(id);
+    /* The whole point of the screen. Picking something that is not on the side
+       they are looking at turns the figure around for them, so nobody has to
+       work out that a back exists. Only ever on the way IN: turning the figure
+       around because somebody just switched a region OFF would be the app
+       arguing with them. */
+    if (fromChip && selected.has(id) && !region.views.includes(wrap.dataset.view)) {
+      setView(region.views[0]);
+    }
+    paint();
+    if (reduced) return;
+    const g = wrap.querySelector(`.bp-face.bp-${wrap.dataset.view} .bp-r[data-region="${id}"]`);
+    /* A tap on a chip should be visible on the figure too, and on a region that
+       just flipped into view the flash is what points at it. */
+    if (g) { g.classList.add("tapped"); setTimeout(() => g.classList.remove("tapped"), 150); }
+  };
+
+  wrap.querySelectorAll(".bp-seg-btn").forEach((b) => { b.onclick = () => setView(b.dataset.view); });
+  wrap.querySelectorAll(".bp-chip").forEach((b) => { b.onclick = () => toggle(b.dataset.region, true); });
+  wrap.querySelectorAll(".bp-r").forEach((g) => { g.onclick = () => toggle(g.dataset.region, false); });
+  paint();
+  return ordered;
 }
 
 async function saveBodyFocus() {
@@ -11347,11 +11992,25 @@ function paintLimitsSubtitle() {
   }).catch(() => { /* the row keeps its honest fallback */ });
 }
 
-/* "tune" repeats: one page per goal they picked, in the order they picked
-   them, main first. That is the whole reason it is a single step id with an
-   index in the draft rather than three step names, since which pages exist and
-   how many of them there are is not known until the goal step is answered. */
-const OB_STEPS = ["name", "goal", "target", "tune", "track", "styles", "days", "plan", "commit", "partner"];
+/* The order, as Mo laid it out on 2026-09-17.
+
+   Four things moved. The name is first, before Unio says anything, because a
+   Google account carries a full legal name and plenty of people do not want it
+   in here. "intro" is a step id like any other so the page number rides in the
+   draft. "about" is new and holds the three things the figure and the
+   recommendations need. "hire" comes before the promise, because asking for
+   money after somebody has committed is a trick.
+
+   Two came out. "track" was a page per goal asking what to measure, which is a
+   question nobody has an answer to on day one; Progress asks it on the day it
+   matters and the goal defaults cover until then. "partner" came out because
+   people want to look around the app before inviting anybody, so Home asks
+   instead and the intro is where onboarding mentions it.
+
+   "tune" still repeats in the draft through tuneIdx, though the queue is one
+   page long now. The machinery is left as it is: which pages exist is still
+   not known until the goal step is answered. */
+const OB_STEPS = ["name", "intro", "goal", "about", "tune", "styles", "days", "plan", "hire", "commit"];
 
 /* What each goal asks about itself, once, after the goals are chosen.
 
@@ -11373,13 +12032,13 @@ const GOAL_TUNE = {
      earlier than the answer was knowable. */
   "build-muscle": { kind: "focus", field: "tune_muscle",
     title: "What do you want to grow most?",
-    sub: "Tap to rank them. First gets the most work, last gets none of the extra." },
+    sub: "Pick as many as you like. The figure turns around on its own." },
   "get-stronger": { kind: "focus", field: "tune_stronger",
     title: "Stronger where?",
-    sub: "Tap to rank them. First gets the most work, last gets none of the extra." },
+    sub: "Pick as many as you like. The figure turns around on its own." },
   "tone-lean-abs": { kind: "focus", field: "tune_tone",
     title: "Where do you want it to show first?",
-    sub: "Tap to rank them. First gets the most work, last gets none of the extra." },
+    sub: "Pick as many as you like. The figure turns around on its own." },
   "build-endurance": { kind: "choice", field: "tune_endurance",
     title: "Endurance for what?",
     sub: "We will build the cardio around it.",
@@ -11408,18 +12067,22 @@ function goalTuningPatch(data) {
   return Object.keys(out).length ? out : null;
 }
 
-/* Every goal they picked, main first. Unlike the tuning queue this one has no
-   exceptions: every goal is measured by something, even if the honest answer
-   for Move better is "nothing, and skipping is fine". */
-function trackQueue(data) {
-  const ids = [data.goal_bubble, ...normaliseGoalSecondary(data.goal_secondary).map((e) => e.bubble)];
-  return [...new Set(ids.filter(Boolean))];
-}
+/* The main goal, if it has a page, and nothing else.
 
-/* The goals they picked, main first, that actually have a page. */
+   It used to be every goal they picked, which meant three body pickers in a
+   row for anybody who took the app up on three goals. Mo: "all for your three
+   goals, this is too much in the beginning." The main goal is the one that
+   sets the plan anyway; an extra goal only adds muscle groups, a cool-down or
+   some cardio, and none of those three needed the question asked twice.
+
+   Still a queue rather than a boolean because the tune step walks it by index
+   and because whether there is a page at all depends on which goal was
+   picked. TRACK_OFFERS, TRACK_DEFAULTS and tracked_by_goal are untouched by
+   any of this: Progress still reads them, and a profile with no
+   tracked_metrics means the goal's own default, which is what onboarding now
+   leaves behind. */
 function tuneQueue(data) {
-  const ids = [data.goal_bubble, ...normaliseGoalSecondary(data.goal_secondary).map((e) => e.bubble)];
-  return [...new Set(ids.filter(Boolean))].filter((id) => GOAL_TUNE[id]);
+  return [data.goal_bubble].filter((id) => id && GOAL_TUNE[id]);
 }
 
 /* Strict opt in, on Mo's call: a style they did not tick is never planned.
@@ -11428,13 +12091,19 @@ function tuneQueue(data) {
    picks sessions inside the cardio library, and `equip` narrows what the
    selector may reach for. */
 const TRAIN_STYLES = [
-  { id: "lifting", label: "Lifting", sub: "Barbells, dumbbells, machines", mod: "weight-training" },
-  { id: "home", label: "At home", sub: "Bodyweight, a mat, maybe bands", mod: "weight-training", equip: "bodyweight" },
-  { id: "running", label: "Running", sub: "Outside or treadmill", mod: "cardio", mode: "running" },
-  { id: "cycling", label: "Cycling", sub: "Road, trainer or spin", mod: "cardio", mode: "cycling" },
-  { id: "walking", label: "Walking", sub: "It counts, and it adds up", mod: "cardio", mode: "walking" },
-  { id: "pilates", label: "Pilates", sub: "Core, control, mat work", mod: "flow" },
-  { id: "yoga", label: "Yoga", sub: "Mobility and breath", mod: "flow" },
+  /* "Lifting" and "At home" were the labels until Mo pointed out that nobody
+     can tell which one a home gym is. The question people can actually answer
+     is whether there is equipment in the room, so that is the question now. A
+     label is all that changed: `id` is what the engine reads, styles.mjs keys
+     off these exact strings, and renaming one would silently reshape every
+     plan already on file. */
+  { id: "lifting", label: "With equipment", sub: "Barbells, dumbbells, machines", ico: "dumbbell", mod: "weight-training" },
+  { id: "home", label: "Without equipment", sub: "Bodyweight, a mat, maybe bands", ico: "body", mod: "weight-training", equip: "bodyweight" },
+  { id: "running", label: "Running", sub: "Outside or treadmill", ico: "run", mod: "cardio", mode: "running" },
+  { id: "cycling", label: "Cycling", sub: "Road, trainer or spin", ico: "bike", mod: "cardio", mode: "cycling" },
+  { id: "walking", label: "Walking", sub: "It counts, and it adds up", ico: "walk", mod: "cardio", mode: "walking" },
+  { id: "pilates", label: "Pilates", sub: "Core, control, mat work", ico: "mat", mod: "flow" },
+  { id: "yoga", label: "Yoga", sub: "Mobility and breath", ico: "leaf", mod: "flow" },
 ];
 
 /* What we put forward before they have said anything, per goal, and never
@@ -11456,36 +12125,60 @@ const STYLE_RECS = {
   "move-better": ["yoga", "pilates"],
   "consistent": ["walking", "home"],
 };
+/* Pilates is put forward for women and never for a man.
+
+   Mo's call, and it is about who takes the suggestion rather than about who
+   the class is for: a man who wants Pilates ticks it himself off the same
+   grid, and a man who does not want it should not have to untick it. Yoga is
+   recommended for mobility exactly as before, for everybody.
+
+   "Rather not say" is treated as not a woman here, which is the same thing the
+   figure does with it. That is the cost of not asking: the app cannot
+   recommend on something it was not told, so it recommends nothing on it.
+
+   A man whose only Pilates-bearing goal is the recommendation's second half
+   opens with one tick rather than the usual two. That is the honest outcome of
+   dropping a suggestion, and it beats inventing a replacement style to keep
+   the count up. */
 function recommendedStyles(data) {
   const ids = [data.goal_bubble, ...normaliseGoalSecondary(data.goal_secondary).map((e) => e.bubble)];
   const out = [];
   for (const id of ids) for (const sId of (STYLE_RECS[id] || [])) if (!out.includes(sId)) out.push(sId);
-  return out.length ? out : ["walking", "home"];
+  const kept = out.filter((sId) => sId !== "pilates" || data.sex === "Female");
+  return kept.length ? kept : ["walking", "home"];
 }
 
 /* How many training days each step is worth on the bar. Not evenly spaced,
    because the steps are not evenly sized: name is a text field and the body
    picker is a real decision, and a bar that jumps in equal hops past a long
    screen and a short one reads as broken. */
-const OB_PROGRESS = { name: 0.07, goal: 0.18, target: 0.28, tune: 0.4, track: 0.52, styles: 0.64, days: 0.76, plan: 0.88, commit: 1 };
+const OB_PROGRESS = { name: 0.05, intro: 0.1, goal: 0.22, about: 0.34, tune: 0.46, styles: 0.58, days: 0.7, plan: 0.82, hire: 0.92, commit: 1 };
 
 /* He talks the whole way through. Same character as the session, same rules:
    deadpan, fond of you, never at your expense, and here he is also the only
    thing on screen that knows what you just answered. Functions return null
    when they have nothing true to say, exactly as quips.mjs does it. */
 const OB_ROBOT = {
-  name: () => "I am going to be here for all of this. I hope that is alright.",
+  /* No line on the name screen: he has not introduced himself yet, that is
+     the next screen's whole job. */
+  name: () => null,
   goal: (d) => (d.goal_secondary || []).length
-    ? "Three of them. Ambitious. I respect it and I am slightly worried."
-    : "Pick what you actually want, not what sounds impressive.",
-  target: () => "A number is easier to aim at than a feeling. That is the only reason I ask.",
-  tune: (d) => "I will remember this. It is most of what I am for.",
-  styles: () => "Only what you tick. I will not sneak anything in.",
+    ? "Three of them. Ambitious. I respect it and I'm slightly worried."
+    : "Let's plan your goal. Don't worry about your partner. They'll get a link, and I'll help them build their own.",
+  /* The figure on the body picker, the progress photos and the Pilates
+     suggestion all come out of this one screen, so he says what it is for
+     rather than asking three personal questions and explaining nothing. */
+  about: () => "So the figure on screen looks like you, and so the numbers mean something.",
+  tune: (d) => "I'll remember this. It's most of what I'm for.",
+  styles: () => "Only what you tick. I won't sneak anything in.",
   days: (d) => (d.intensity === "allin"
-    ? "All in. Bold. I will be the one telling you to take a day off."
+    ? "All in. Bold. I'll be the one telling you to take a day off."
     : d.intensity === "easy" ? "Two done beats five planned. Genuinely." : "That is a week somebody actually keeps."),
-  track: () => "Pick what you want to see back. I will keep the rest quiet.",
-  plan: () => "There it is. Your week, in writing.",
+  /* All that is left of the tracking step. It was a page per goal asking what
+     to measure before anybody had measured anything; this is the promise that
+     the question still exists, on the screen where it gets answered. */
+  plan: () => "There it is. Your week, in writing. You can track whatever you want in Progress. I'll show you later.",
+  hire: () => "That's your plan. Hire me as your personal trainer and I'll do the rest.",
   commit: () => "This is the part where I get sincere for one second.",
 };
 
@@ -11631,114 +12324,146 @@ function obTimeline(data, days) {
     </div>`;
 }
 
+/* The training week, as a range, never as a single number. Six days a week is
+   not what we ask for in a week where somebody is beaten up, and the app
+   suggests rest of its own accord, so printing "6" is printing a promise we go
+   back on by Thursday. The pair comes off the tier they tapped on the intensity
+   step; a draft saved before that existed falls back to the day below the
+   number it has.
+
+   Here rather than inside the plan step because the promise on the commit
+   screen is the same week said back to them, and the two saying different
+   numbers is exactly the sort of thing nobody notices until a user does. */
+function obDaysText(data, days) {
+  const span = Array.isArray(data.days_range) && data.days_range.length === 2
+    ? data.days_range
+    : [Math.max(1, days - 1), days];
+  return span[0] === span[1] ? `${span[1]} days a week` : `${span[0]} to ${span[1]} days a week`;
+}
+
 /* Called at the end of every step that draws chrome. Kept separate from
    obChrome because that returns a string and this touches the DOM it produced. */
 function afterObChrome() { setTimeout(paintObBot, 0); }
 
+/* Where a draft saved by an older build lands. Keyed by the id that build
+   wrote, valued at the step standing in the same place in this one. */
+/* target went when height and weight moved to the about step and the goal
+   weight moved to the chart: nothing was left on it to ask. */
+const OB_RETIRED_STEPS = { pace: "plan", track: "styles", partner: "commit", target: "about" };
+
 function renderOnboardStep(step, data = {}) {
   /* A draft is saved on every step and survives a deploy, so somebody can come
      back to a step this build no longer has: "pace" is exactly that, as of the
-     commit that stopped asking every non-weight goal how many weeks it wanted.
-     Rendering a step that does not exist leaves an empty screen with a saved
-     draft pointing straight back at it, which nobody can get out of, so an
-     unknown step lands on a real one with their answers intact. */
-  if (!OB_STEPS.includes(step)) step = step === "pace" ? "plan" : "name";
+     commit that stopped asking every non-weight goal how many weeks it wanted,
+     and "track" and "partner" are that as of 2026-09-17. Rendering a step that
+     does not exist leaves an empty screen with a saved draft pointing straight
+     back at it, which nobody can get out of, so an unknown step lands on a real
+     one with their answers intact.
+
+     Each retired id lands on the step that took its place in the run rather
+     than at the beginning, because somebody who was nine screens in should not
+     have to type their name again to get back to where they were. */
+  if (!OB_STEPS.includes(step)) step = OB_RETIRED_STEPS[step] || "name";
   const ob = $("onboard");
   ob.classList.remove("hidden");
   $("app").classList.add("hidden");
   saveObDraft(step, data);   // so a reload resumes here instead of the welcome tour
   afterObChrome();
 
-  /* One tracking page per goal, in the order they were picked, so three goals
-     really do mean Goal 1, Goal 2, Goal 3. Each names the goal it belongs to
-     and shows what that goal is measured by, because "what do you want to
-     track" has a different answer for Lose weight than for Get stronger and
-     asking it once for all three would be asking it for none of them.
+  /* The introduction is two full-bleed pages with a layout of their own rather
+     than the ob-step shell, so the step id exists only to put them in the
+     sequence and in the draft. `introIdx` is which of the two. */
+  if (step === "intro") { renderOnboardIntro(Math.min(data.introIdx || 0, ONBOARD_INTRO.length - 1), data); return; }
 
-     Separate from the tuning pages on purpose. Those ask what the goal MEANS,
-     where in the body and how hard; this asks what evidence you want to see
-     back. Somebody can want the scale and not care where they get stronger,
-     or the reverse. */
-  if (step === "track") {
-    const queue = trackQueue(data);
-    const i = Math.max(0, Math.min(data.trackIdx || 0, queue.length));
-    if (!queue.length || i >= queue.length) { renderOnboardStep("styles", data); return; }
-    const goalId = queue[i];
-    const tile = goalTileFor(goalId);
-    const offers = (TRACK_OFFERS[goalId] || TRACK_OFFERS.consistent)
-      .map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean);
-    /* Per goal, so going back and forward does not lose what was ticked on a
-       page you already answered. Seeded from that goal's own default. */
-    const picked = new Set(
-      (data.tracked_by_goal && data.tracked_by_goal[goalId])
-      || (TRACK_DEFAULTS[goalId] || []).filter((k) => offers.some((o) => o.key === k)));
+  /* About you: the three things the rest of the app cannot draw or recommend
+     without, asked once, on their own screen.
 
-    const lb = currentWeightLb(ME);
+     "Choose what you want to track" used to stand here, a page per goal. It is
+     gone. Nobody knows what evidence they want back before they have collected
+     any, and three of those pages in a row was the interrogation this app keeps
+     promising not to be. Progress asks on the day somebody opens it, off the
+     same TRACK_OFFERS table, and until then a null tracked_metrics means the
+     goal's own default, which is exactly what it always meant.
+
+     Height and weight moved here from the goal weight screen, where they were
+     asked only of the two goals that want a target. Every other account
+     reached the engine with no bodyweight on file at all, so every starting
+     load was a guess. Everybody is asked now and skipping is still free.
+
+     "Rather not say" is a tile, not an "other". It is stored as nothing,
+     because that is what it is, and the figure falls back to the same drawing
+     an unanswered profile has always got. */
+  if (step === "about") {
+    const SEX_TILES = [
+      { id: "Male", label: "Male" },
+      { id: "Female", label: "Female" },
+      { id: "none", label: "Rather not say" },
+    ];
+    /* `sex` alone cannot tell "they said no" from "they were never asked",
+       and those two want different behaviour from a draft that is reopened,
+       so the draft carries the fact of the answer next to the answer. It is
+       draft state only and never reaches the profile. */
+    let sexPick = data.sex_asked ? (data.sex || "none") : null;
+    const ftv = data.height_in ? Math.floor(data.height_in / 12) : "";
+    const inv = data.height_in ? data.height_in % 12 : "";
     ob.innerHTML = `
-      <div class="ob-step ob-step-wide">
-        ${obChrome("track", data)}
-        <div class="step-lab">Goal ${i + 1} of ${queue.length}</div>
-        <h1>Choose what you want to track</h1>
-        <p class="sub">Tap the cards that match your goal. You can change these later.</p>
-
-        <div class="trk-goal">
-          <div class="trk-goal-top">
-            <span class="trk-goal-ico">${icon("target", 20)}</span>
-            <span class="trk-goal-name"><small>YOUR GOAL</small><b>${escapeHtml(tile?.title || "")}</b></span>
-          </div>
-          <div class="trk-goal-split">
-            <span class="trk-goal-now"><small>${lb ? "Current weight" : "Starting out"}</small>
-              <b>${lb ? `${lb.toFixed(1)} <i>lb</i>` : "Day one"}</b></span>
-            <span class="trk-goal-note">${icon("trending", 18)}<span>Track your progress over time</span></span>
-          </div>
+      <div class="ob-step">
+        ${obChrome("about", data)}
+        <h1>About you</h1>
+        <div class="ob-sexes" id="sexGrid">
+          ${SEX_TILES.map((s) => `<button type="button" class="ob-sex${sexPick === s.id ? " on" : ""}" data-sex="${s.id}">${escapeHtml(s.label)}</button>`).join("")}
         </div>
-
-        <div class="trk-grid" id="trkGrid">
-          ${offers.map((m) => `<button type="button" class="trk-card${picked.has(m.key) ? " on" : ""}" data-track="${m.key}">
-            <span class="trk-tick" aria-hidden="true">${icon("check", 13)}</span>
-            <span class="trk-ico">${icon(m.ico, 22)}</span>
-            <span class="trk-name">${escapeHtml(m.label)}</span>
-            <span class="trk-blurb">${escapeHtml(m.blurb)}</span>
-          </button>`).join("")}
+        <label class="ob-lab">Height</label>
+        <div class="ob-row">
+          <input id="obFt" type="number" inputmode="numeric" min="3" max="8" placeholder="feet" value="${ftv}" />
+          <input id="obIn" type="number" inputmode="numeric" min="0" max="11" placeholder="inches" value="${inv}" />
         </div>
-        <p class="trk-any">You can choose as many as you want.</p>
-        <button class="btn-primary" id="trkNext">Continue</button>
-        <button class="btn-ghost" id="trkSkip">Skip for now</button>
+        <label class="ob-lab">Weight <span class="ob-opt">it sets your starting loads</span></label>
+        <div class="ob-row">
+          <input id="obLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.weight_lb || ""}" />
+        </div>
+        <button class="btn-primary" id="aboutNext">Continue</button>
+        <button class="btn-ghost" id="aboutBack">Back</button>
       </div>`;
-
-    const carry = (keys) => {
-      const byGoal = { ...(data.tracked_by_goal || {}) };
-      byGoal[goalId] = keys;
-      /* The union across goals, in TRACK_ALL order, is what Progress reads.
-         Somebody holding two goals sees the evidence for both rather than the
-         evidence for whichever they answered last. */
-      const all = new Set(Object.values(byGoal).flat());
-      return { ...data, tracked_by_goal: byGoal, tracked_metrics: TRACK_ALL.map((m) => m.key).filter((k) => all.has(k)) };
-    };
-    ob.querySelectorAll("[data-track]").forEach((b) => b.onclick = () => {
-      const k = b.dataset.track;
-      picked.has(k) ? picked.delete(k) : picked.add(k);
-      b.classList.toggle("on", picked.has(k));
+    ob.querySelectorAll("[data-sex]").forEach((b) => b.onclick = () => {
+      sexPick = b.dataset.sex;
+      ob.querySelectorAll("[data-sex]").forEach((x) => x.classList.toggle("on", x === b));
     });
-    $("trkNext").onclick = () => renderOnboardStep("track", { ...carry([...picked]), trackIdx: i + 1 });
-    $("trkSkip").onclick = () => renderOnboardStep("track", { ...carry([]), trackIdx: i + 1 });
+    const readHeight = () => {
+      const f = parseInt($("obFt").value, 10) || 0;
+      const i = parseInt($("obIn").value, 10) || 0;
+      return f || i ? f * 12 + i : null;
+    };
+    /* Nothing here is required. Continue is never disabled, because every one
+       of these three is a personal question and a wizard that will not let you
+       past one is the app deciding it is owed an answer. */
+    $("aboutNext").onclick = () => {
+      const next = {
+        ...data,
+        height_in: readHeight(),
+        weight_lb: parseFloat($("obLb").value) || null,
+        ...(sexPick ? { sex: sexPick === "none" ? null : sexPick, sex_asked: true } : {}),
+      };
+      renderOnboardStep(tuneQueue(next).length ? "tune" : "styles", { ...next, tuneIdx: 0 });
+    };
+    $("aboutBack").onclick = () => renderOnboardStep("goal", data);
     return;
   }
 
-  /* One page per goal, in the order they were picked. `tuneIdx` walks the
-     queue; running off the end lands on styles. Back goes to the previous
-     page in the queue rather than to the goal grid, or answering three goals
-     would mean losing all three to one mis-tap. */
+  /* The main goal's own follow-up question, and only the main goal's. The
+     queue is one page long now, walked by `tuneIdx` exactly as it was when it
+     could be three, because that is what makes running off the end and
+     stepping back work without special cases. */
   if (step === "tune") {
     const queue = tuneQueue(data);
     const i = Math.max(0, Math.min(data.tuneIdx || 0, queue.length));
-    if (!queue.length || i >= queue.length) { renderOnboardStep("track", { ...data, trackIdx: 0 }); return; }
+    if (!queue.length || i >= queue.length) { renderOnboardStep("styles", data); return; }
     const goalId = queue[i];
     const spec = GOAL_TUNE[goalId];
     const tileFor = goalTileFor(goalId);
     const onNext = (patch) => renderOnboardStep("tune", { ...data, ...patch, tuneIdx: i + 1 });
     const back = () => i === 0
-      ? renderOnboardStep(goalTileFor(data.goal_bubble)?.askTarget ? "target" : "goal", data)
+      ? renderOnboardStep("about", data)
       : renderOnboardStep("tune", { ...data, tuneIdx: i - 1 });
 
     /* Named so somebody answering three pages can see which goal each one is
@@ -11752,6 +12477,7 @@ function renderOnboardStep(step, data = {}) {
       const chosen = data[spec.field] || null;
       ob.innerHTML = `
         <div class="ob-step">
+          ${obChrome("tune", data)}
           ${eyebrow}
           <h1>${escapeHtml(spec.title)}</h1>
           <p class="sub">${escapeHtml(spec.sub)}</p>
@@ -11775,22 +12501,34 @@ function renderOnboardStep(step, data = {}) {
       return;
     }
 
-    /* focus and sore are the SAME picker asking opposite questions. It is the
-       one from Setup, figure and all, rather than a second one built here:
-       two pickers for one concept is how they drift apart. */
-    const sore = spec.kind === "sore";
+    /* focus and sore are the SAME picker asking opposite questions, and since
+       2026-09-17 that picker is the five region body, not Setup's fourteen
+       muscle map. Mo cut the detail here and nowhere else: "big regions, not
+       muscles, this is too much in the beginning". Setup still gets the muscles
+       and the tiers, and bodyRegionFocusEntries() writes the same column in the
+       same shape, so the two screens still cannot disagree about what was
+       asked for, only about how much of it they show. */
+    const picked = bodyRegionsFromEntries(data[spec.field], data[spec.field + "_all"]);
     ob.innerHTML = `
       <div class="ob-step ob-step-wide">
+        ${obChrome("tune", data)}
         ${eyebrow}
         <h1>${escapeHtml(spec.title)}</h1>
         <p class="sub">${escapeHtml(spec.sub)}</p>
-        <div id="focusPickRoot" class="ob-focus-root"></div>
+        <div id="bodyPickRoot">${bodyRegionPickerHTML({ sex: data.sex, selected: picked, sore: spec.kind === "sore" })}</div>
         <button type="button" class="btn-primary" id="tuneNext">Continue</button>
         <button type="button" class="btn-ghost" id="tuneBack">Back</button>
       </div>`;
-    renderBodyFocusPage({ embedded: true, sore });
-    $("tuneNext").onclick = () => onNext({ [spec.field]: focusEntriesFromAreas(), [spec.field + "_all"]: FOCUS_ALL });
-    $("tuneBack").onclick = () => { closeBodyFocusPage(); back(); };
+    /* Read off the picker's own callback rather than out of the DOM on the way
+       past, because the figure is the only thing that knows that all five
+       regions is the whole body and not four picks and a leftover. */
+    let regions = picked;
+    wireBodyRegionPicker($("bodyPickRoot"), { sex: data.sex, onChange: (ids) => { regions = ids; } });
+    $("tuneNext").onclick = () => onNext({
+      [spec.field]: bodyRegionFocusEntries(regions),
+      [spec.field + "_all"]: bodyRegionsAreWholeBody(regions),
+    });
+    $("tuneBack").onclick = back;
     return;
   }
 
@@ -11806,13 +12544,18 @@ function renderOnboardStep(step, data = {}) {
     const picked = new Set(data.train_styles || recs);
     const others = TRAIN_STYLES.filter((t) => t.other);
     const openOther = others.some((t) => picked.has(t.id));
+    /* An icon on every one of them. Seven text-only cards read as a form; the
+       same seven with a picture on each read as a menu, and this is the one
+       screen in the run where somebody is choosing rather than answering. */
     const card = (t) => `<button type="button" class="ob-style${picked.has(t.id) ? " on" : ""}" data-style="${t.id}">
         ${recs.includes(t.id) ? `<span class="obs-rec">Recommended</span>` : ""}
+        <span class="obs-ico">${icon(t.ico, 20)}</span>
         <span class="obs-label">${escapeHtml(t.label)}</span>
         <span class="obs-sub">${escapeHtml(t.sub)}</span>
       </button>`;
     ob.innerHTML = `
       <div class="ob-step">
+        ${obChrome("styles", data)}
         <h1>Pick your workouts</h1>
         <p class="sub">We have ticked what suits your goals. Change any of it. We only ever plan what is ticked here.</p>
         <div class="ob-styles" id="styleGrid">
@@ -11844,9 +12587,9 @@ function renderOnboardStep(step, data = {}) {
     note();
     $("styleNext").onclick = () => renderOnboardStep("days", { ...data, train_styles: [...picked] });
     $("styleBack").onclick = () => {
-      const q = trackQueue(data);
-      if (q.length) renderOnboardStep("track", { ...data, trackIdx: q.length - 1 });
-      else renderOnboardStep(goalTileFor(data.goal_bubble)?.askTarget ? "target" : "goal", data);
+      const q = tuneQueue(data);
+      if (q.length) renderOnboardStep("tune", { ...data, tuneIdx: q.length - 1 });
+      else renderOnboardStep("about", data);
     };
     return;
   }
@@ -11863,7 +12606,7 @@ function renderOnboardStep(step, data = {}) {
     const go = () => {
       const name = $("nameInput").value.trim();
       if (!name) { toast("Enter a name"); return; }
-      renderOnboardStep("goal", { ...data, name });
+      renderOnboardStep("intro", { ...data, name, introIdx: 0 });
     };
     $("nextBtn").onclick = go;
     $("nameInput").onkeydown = (e) => { if (e.key === "Enter") go(); };
@@ -11876,228 +12619,33 @@ function renderOnboardStep(step, data = {}) {
     return;
   }
 
-  if (step === "partner") {
-    /* Last screen before the account is written. An accountability partner is
-       the enforcement of the promise made on the screen before it, which is why
-       it asks here rather than earlier: "who is doing this with you" reads as a
-       different question once you have said you are doing it. Either answer,
-       invited or alone, is a finished setup and goes straight to the write. */
-    renderObPartnerStep(data, {
-      onDone: () => finishOnboardingFromDraft(data),
-      onBack: () => renderOnboardStep("commit", data),
-    });
-    return;
-  }
+  /* "Bring somebody with you" used to be the last screen of the run, and it is
+     not a screen any more. Mo, on 2026-09-17: "I want to discover the app
+     before I invite my partner." Asking for somebody else's phone number
+     before a person has seen a single workout is asking at the worst possible
+     moment, and the answer it mostly got was the way out.
 
-  /* The one follow-up question left in the whole picker. Every other goal goes
-     straight through, because a list of sub-goals was asking people to name a
-     flavour of a thing they had already named, and the engine treated most of
-     those answers identically anyway. A weight is different: it is a number
-     only they know, it changes the plan, and it turns on the chart's goal line
-     and the projection.
+     Onboarding still says it, once, on the second intro page, which is where a
+     promise about who this app is for belongs. The ask itself moved to Home,
+     where it can be skipped for a session and come back quietly on a day when
+     it means something. renderObPartnerStep and the whole invite path below it
+     are untouched and still reachable from there. */
 
-     DIRECTION IS ASYMMETRIC, on purpose. Picking "lose weight" and then typing
-     a heavier target is a contradiction and gets stopped. Picking "build
-     muscle" and typing a LIGHTER one is not: that is a recomp, it is what a
-     lot of people actually mean, and it is allowed. So the tile constrains
-     downward-only; it never forces upward. */
-  if (step === "target") {
-    const lockedDown = goalTileFor(data.goal_bubble)?.askTarget === "lose";
-    const ftv = data.height_in ? Math.floor(data.height_in / 12) : "";
-    const inv = data.height_in ? data.height_in % 12 : "";
-    ob.innerHTML = `
-      <div class="ob-step">
-        <h1>What do you weigh right now?</h1>
-        <p class="sub">${lockedDown
-          ? "All of this is optional, and you can change any of it later."
-          : "Plenty of people build muscle without watching the scale. Skip this if that is you."}</p>
+  /* The target step, which no longer has anything of its own to ask.
 
-        <label class="ob-lab">Right now</label>
-        <div class="ob-row">
-          <input id="obLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.weight_lb || ""}" />
-        </div>
+     It asked two things: a goal weight, and the current weight and height that
+     goal weight had to be checked against. The goal weight came off on Mo's
+     call before this rewrite, on the argument that it belongs on the progress
+     chart where somebody is already looking at the line it would draw. The
+     other two moved to the about step on 2026-09-17, where everybody is asked
+     them rather than only the two goals that want a target.
 
-        ${/* The goal weight question used to live here, folded. It is gone on
-              Mo's call: it belongs on the progress chart, where somebody is
-              already looking at the line it would draw, rather than on the way
-              in before they have weighed themselves once. Nothing downstream
-              requires it, and every reader already treats a missing target as
-              "tracks the scale without a finish line", which is the behaviour
-              every new account now gets. */ ""}
-        <div class="ob-row">
-        </div>
-
-        <label class="ob-lab">Height <span class="ob-opt">so we can check the goal is a safe one</span></label>
-        <div class="ob-row">
-          <input id="obFt" type="number" inputmode="numeric" min="3" max="8" placeholder="feet" value="${ftv}" />
-          <input id="obIn" type="number" inputmode="numeric" min="0" max="11" placeholder="inches" value="${inv}" />
-        </div>
-
-        <div id="obReal" class="ob-real hidden"></div>
-        <div id="obTl" class="ob-tl hidden"></div>
-
-        <button class="btn-primary" id="targetNext">Continue</button>
-        <button class="btn-ghost" id="targetSkip">I do not have a number</button>
-        <button class="btn-ghost" id="targetBack">Back</button>
-      </div>`;
-
-    const readHeight = () => {
-      const f = parseInt($("obFt").value, 10) || 0;
-      const i = parseInt($("obIn").value, 10) || 0;
-      return f || i ? f * 12 + i : null;
-    };
-    let picked = data.pace || "steady";
-    let blocked = false;
-
-    const paint = () => {
-      const cur = parseFloat($("obLb").value) || null;
-      /* No goal weight is collected on the way in any more, so this is always
-         null here and every branch below that needs one simply does not run.
-         The reads are kept rather than torn out because the same screen is
-         reachable from Setup, where a target can exist on the profile. */
-      const goalLb = null;
-      const box = $("obReal"), tl = $("obTl"), next = $("targetNext");
-      const hide = () => { tl.className = "ob-tl hidden"; tl.innerHTML = ""; };
-      blocked = false;
-
-      /* Contradiction first, before anything tries to compute a plan from a
-         pair of numbers that do not agree with the goal above them. Not
-         enforced by clamping the field: people type a number left to right, so
-         a clamp fires on the "1" of 175 and fights the keyboard. */
-      if (lockedDown && cur && goalLb && goalLb >= cur) {
-        blocked = true;
-        box.className = "ob-real warn";
-        box.innerHTML = `Your goal is to lose weight, and ${escapeHtml(String(goalLb))} is
-          ${goalLb === cur ? "the same as what you weigh now" : "more than you weigh now"}.
-          Set a lower number, or <button type="button" class="ob-inline" id="obSwap">switch to Build muscle</button>
-          if gaining is what you meant.`;
-        hide();
-        next.disabled = true;
-        $("obSwap").onclick = () => renderOnboardStep("target", {
-          ...data, goal_bubble: "build-muscle", goalKey: "muscle", goalLabel: "Build muscle",
-          weight_lb: cur, goal_weight_lb: goalLb, height_in: readHeight(),
-        });
-        return;
-      }
-      next.disabled = false;
-
-      /* Direction comes from the numbers, not the tile. Build muscle with a
-         lighter target is a recomp and is allowed to say so. */
-      if (cur && goalLb && goalLb > cur) {
-        hide();
-        const g = gainOutlook(cur, goalLb);
-        box.className = "ob-real";
-        box.innerHTML = `Putting on ${g.amount.toFixed(0)} pounds of real size usually takes
-          <b>${g.lo} to ${g.hi} months</b>. Muscle does not come faster than that no matter how the training
-          is arranged, so we will not pretend it can. Eating harder than that adds fat, not muscle.`;
-        return;
-      }
-      if (cur && goalLb && goalLb === cur) {
-        hide();
-        box.className = "ob-real";
-        box.innerHTML = `Same weight, different shape. That is a real goal and a slow one:
-          the scale will not move much, so judge it by the lifts and the mirror rather than by weighing in.`;
-        return;
-      }
-
-      const heightIn = readHeight();
-      const floor = healthyFloorLb(heightIn);
-      /* The floor was skippable, and skipping it was one blank field away: no
-         height, no BMI, no warning, full coaching toward any number at all.
-         A floor with a bypass that obvious is not a floor.
-
-         It is not fixed by inventing a height. There is no honest number to
-         assume, and a clinical line drawn through a guess is worse than no
-         line. So the app says the true thing instead: without a height it
-         cannot check the target, and it will not project toward a target it
-         could not check. weightGoalWithheld enforces exactly this downstream,
-         so the sentence is a promise the app keeps.
-
-         Only for a loss. A target above what they weigh now cannot be
-         underweight, so a gain keeps its projection with no height on file. */
-      const needHeight = !!(cur && goalLb && goalLb < cur && !heightIn);
-      if (needHeight) {
-        box.className = "ob-real care";
-        box.innerHTML = `<b>Add your height and we will check this is a safe target.</b>
-          Without it we will still log every weigh-in, but we will not draw the goal line or project a date
-          toward ${escapeHtml(String(goalLb))} pounds, because we have no way to tell whether getting there
-          is a good idea.`;
-        /* Advisory, not a gate. The durations under it are true whatever the
-           height is, and hiding the only content on the screen to make a point
-           would be the app sulking. */
-      }
-      if (goalLb && floor && goalLb < floor) {
-        box.className = "ob-real care";
-        box.innerHTML = `<b>We will track it, but we will not coach toward it.</b>
-          ${escapeHtml(String(goalLb))} pounds is below a healthy weight for your height. Keep the number if
-          you want and we will carry on logging what you weigh, but the app will not set a target, project a
-          date, or build a plan aimed at getting you there. If this is something you are working through, a
-          doctor is the right person to have alongside you.`;
-        hide();
-        return;
-      }
-      if (!needHeight) { box.className = "ob-real hidden"; box.innerHTML = ""; }
-
-      const opts = lossTimelines(cur, goalLb);
-      if (!opts.length) { hide(); return; }
-      if (!opts.some((o) => o.key === picked)) picked = (opts.find((o) => o.rec) || opts[0]).key;
-      tl.className = "ob-tl";
-      tl.innerHTML = `<label class="ob-lab">How long</label>` + opts.map((o) => `
-        <button type="button" class="ob-pace ${o.key === picked ? "on" : ""}" data-tl="${o.key}">
-          <span class="ob-pace-top"><strong>${escapeHtml(o.label)}</strong><span>about ${o.perWeek.toFixed(1)} lb a week</span></span>
-          <span class="ob-pace-note">${escapeHtml(o.note)}</span>
-        </button>`).join("");
-      tl.querySelectorAll("[data-tl]").forEach((b2) => {
-        b2.onclick = () => { picked = b2.dataset.tl; paint(); };
-      });
-    };
-    ["obLb", "obFt", "obIn"].forEach((id) => { const el = $(id); if (el) el.oninput = paint; });
-    paint();
-
-    const go = (skip) => {
-      if (blocked && !skip) return;
-      const cur = parseFloat($("obLb").value) || null;
-      const goalLb = null;
-      const heightIn = readHeight();
-      const losing = !!(cur && goalLb && goalLb < cur);
-      const chosen = losing ? lossTimelines(cur, goalLb).find((o) => o.key === picked) : null;
-      const outlook = cur && goalLb && goalLb > cur ? gainOutlook(cur, goalLb) : null;
-      const weeks = chosen ? chosen.weeks : outlook ? Math.round(outlook.hi * 4.345) : null;
-      const afterTarget = { ...data };
-      renderOnboardStep(tuneQueue(afterTarget).length ? "tune" : "track", {
-        ...data,
-        tuneIdx: 0,
-        height_in: heightIn,
-        weight_lb: cur,
-        goal_weight_lb: goalLb,
-        goal_by_date: weeks ? isoDate(new Date(Date.now() + weeks * 604800000)) : null,
-        weeks,
-        /* Null when they chose nothing, and that stays null all the way to the
-           row. It used to default to "steady", which put a pace on the plan
-           screen and in the database that nobody had agreed to, and read
-           identically to one they had. A gaining goal has a duration and no
-           pace, because the rate is not theirs to pick.
-
-           goal_withhold was computed here and read by nothing. It is gone
-           rather than wired up: weightGoalWithheld already derives the same
-           answer from target_value and height_in, both already on file, and a
-           derived answer corrects itself when somebody fixes their height
-           later where a stored flag would go stale. */
-        pace: chosen ? chosen.key : null,
-      });
-    };
-    /* Templates, because "how much" is a question almost everybody answers with
-       a round number, and typing 20 into a numeric keypad on a phone is four
-       taps and a dismissed keyboard. Derived from what they weigh rather than
-       fixed, so somebody at 140 is not offered a 50 pound loss and somebody at
-       300 is not offered only 10. Skip is already on this screen and stays
-       first class: a goal weight is genuinely optional and the app tracks the
-       scale either way. */
-    $("targetNext").onclick = () => go(false);
-    $("targetSkip").onclick = () => go(true);
-    $("targetBack").onclick = () => renderOnboardStep("goal", data);
-    return;
-  }
+     So the id stays in OB_STEPS, because drafts saved by the last build point
+     straight at it and a step that does not resolve is a screen nobody can get
+     out of, and it hands over to the screen that took its questions. It is not
+     a screen any more. If the goal weight question comes back it cannot come
+     back here: checking a target needs the current weight, and that is now
+     asked one step later. */
 
   /* The "How fast?" step used to sit here, between the goal and the plan. It
      offered Steady, Quicker and Gentle at 12, 8 and 16 weeks, and it was asked
@@ -12113,50 +12661,54 @@ function renderOnboardStep(step, data = {}) {
      weeks down to about ten. That was invented. Training volume barely moves
      the rate fat comes off, food does, so a ladder that pays you three weeks
      for two extra sessions is selling something the training does not deliver.
-     Everything a tier claims now is something the app controls: how many days,
-     how many sessions, how many hours. All three are ranges and all three say
-     estimate, because a week is not the same every week and a number with no
-     give in it is the one people feel they have already failed.
+     Everything a tier claims is something the app controls: how many days and
+     how long one of them takes. Both are ranges and both say about, because a
+     week is not the same every week and a number with no give in it is the one
+     people feel they have already failed.
 
-     Days and sessions are different numbers on purpose, now that a day can
-     hold two. That is the honest way to describe how people actually train:
-     five sessions is not always five days, and somebody who stacks mobility
-     onto a lifting morning has done two of them. */
+     Days and sessions are still different numbers, now that a day can hold
+     two, and the detail line says so where it is true. That is the honest way
+     to describe how people actually train: five sessions is not always five
+     days, and somebody who stacks mobility onto a lifting morning has done two
+     of them. */
   if (step === "days") {
+    /* Three words and nothing else on the face of a tile. The detail is true
+       and it is wanted, but it was all on screen at once: three headings,
+       three sets of three numbers and three paragraphs, which is a page to
+       read rather than a question to answer. Tapping one opens its own line
+       underneath it, so the numbers arrive for the tier somebody is actually
+       considering. Mo: "details behind the tile."
+
+       The sessions estimate went into that line rather than staying a column
+       of its own. Days and sessions being different numbers is true and worth
+       saying once you care; it is not worth a heading on a tile you have not
+       chosen.
+
+       Heat stops at orange. The top tier used to be red and Mo said it plainly:
+       "the last one makes me feel stressed, I do not want to do it." A colour
+       that talks somebody out of the hardest option is not a warning, it is a
+       leak. */
     const TIERS = [
-      { id: "easy", days: [1, 2], sessions: [1, 2], mins: 30, head: "Easy does it", heat: 0,
-        blurb: "One or two a week, half an hour each. Enough to get stronger and hold it, and small enough that a bad week does not break it." },
-      { id: "steady", days: [3, 4], sessions: [3, 5], mins: 45, head: "Steady", heat: 2,
-        blurb: "Three or four days, sometimes with a short second session stacked on. This is where progress stops being luck." },
-      { id: "allin", days: [5, 6], sessions: [5, 8], mins: 50, head: "All in", heat: 4,
-        blurb: "Five or six days, and room to double up when you feel like it. Only works if your sleep and your food are already handled." },
+      { id: "easy", days: [1, 2], mins: 30, head: "Easy", heat: 0,
+        detail: "1 to 2 days a week, about 30 minutes." },
+      { id: "steady", days: [3, 4], mins: 45, head: "Steady", heat: 2,
+        detail: "3 to 4 days a week, about 45 minutes. Sometimes a short second session on the same day." },
+      { id: "allin", days: [5, 6], mins: 60, head: "All in", heat: 3,
+        detail: "5 to 6 days a week, about 60 minutes. Room to double up on a day when you feel like it." },
     ];
     const chosen = data.intensity || null;
-    const range = (a) => (a[0] === a[1] ? `${a[0]}` : `${a[0]} to ${a[1]}`);
-    /* The third estimate is how long one session runs, not how many hours the
-       week adds up to. Mo: the hours total does not mean anything to anybody.
-       He is right, and it is worse than meaningless, it is the only number here
-       that has to be done in your head before it tells you anything. How long
-       tonight will take is the thing somebody is actually deciding about, and
-       it is the number they can check against an evening. */
     ob.innerHTML = `
       <div class="ob-step">
         ${obChrome("days", data)}
         <h1>How hard do you want to go?</h1>
-        <p class="sub">Roughly what each one asks of you. All of it moves later, so pick the one you would still do in a bad week.</p>
+        <p class="sub">Pick the one you would still do in a bad week. All of it moves later.</p>
         <div class="ob-tiers" id="tierGrid">
           ${TIERS.map((t) => `<button type="button" class="ob-tier heat-${t.heat}${chosen === t.id ? " on" : ""}" data-tier="${t.id}">
             <span class="obt-top"><span class="obt-head">${t.head}</span>
               <span class="obt-flame" aria-hidden="true">${Array.from({ length: t.heat / 2 + 1 }).map(() => `<i></i>`).join("")}</span></span>
-            <span class="obt-ests">
-              <span class="obt-est"><b>${range(t.days)}</b><small>days a week</small></span>
-              <span class="obt-est"><b>${range(t.sessions)}</b><small>sessions</small></span>
-              <span class="obt-est"><b>${t.mins} min</b><small>per session</small></span>
-            </span>
-            <span class="obt-blurb">${escapeHtml(t.blurb)}</span>
+            <span class="obt-detail"${chosen === t.id ? "" : " hidden"}>${escapeHtml(t.detail)}</span>
           </button>`).join("")}
         </div>
-        <p class="ob-tier-note">Sessions can outnumber days: a short mobility session in the morning and a lift later is two sessions on one day.</p>
         <button class="btn-primary" id="daysNext"${chosen ? "" : " disabled"}>Continue</button>
         <button class="btn-ghost" id="daysBack">Back</button>
       </div>`;
@@ -12164,10 +12716,20 @@ function renderOnboardStep(step, data = {}) {
       const t = TIERS.find((x) => x.id === b.dataset.tier);
       data.intensity = t.id;
       /* The top of the range, because the plan is what we aim at and the bottom
-         of the range is what a bad week looks like rather than what to build. */
+         of the range is what a bad week looks like rather than what to build.
+         The pair is kept as well, because the plan screen says the range out
+         loud rather than the single number: rest gets suggested, so promising
+         six is promising something we will talk them out of. */
       data.days_per_week = t.days[1];
+      data.days_range = t.days;
       if (!data.session_minutes_manual) data.session_minutes = t.mins;
-      ob.querySelectorAll("[data-tier]").forEach((x) => x.classList.toggle("on", x === b));
+      ob.querySelectorAll("[data-tier]").forEach((x) => {
+        x.classList.toggle("on", x === b);
+        /* One open at a time. Two tiers with their numbers showing is the wall
+           of text this screen just came out of. */
+        const d = x.querySelector(".obt-detail");
+        if (d) d.hidden = x !== b;
+      });
       $("daysNext").disabled = false;
       const say = document.getElementById("obBotSay");
       if (say) { say.dataset.say = OB_ROBOT.days(data); typeOut(say, say.dataset.say); }
@@ -12177,32 +12739,41 @@ function renderOnboardStep(step, data = {}) {
     return;
   }
 
-  /* The last screen before money, and the only one that asks for something
-     other than information. Mo wanted it to sell the plan honestly: "I need
-     you to commit to me, this is a serious plan, we are committing to this
-     together." It is a promise to themselves with us as the witness, so the
-     button says what it means and nothing here claims a result. */
+  /* The last screen of the run, and the only one that asks for something other
+     than information. Mo wanted it to sell the plan honestly: "I need you to
+     commit to me, this is a serious plan, we are committing to this together."
+     It is a promise to themselves with us as the witness, so the button says
+     what it means and nothing here claims a result.
+
+     Briefed on 2026-09-17. It had a paragraph over the promises and a
+     paragraph under them, and the three lines in the middle are the whole
+     screen: a page of preamble around a promise makes it read like terms and
+     conditions, which is the one thing it is not.
+
+     It also writes now. The partner step used to stand behind it and finish
+     the job; with that gone, the screen that takes the promise is the screen
+     that creates the account. */
   if (step === "commit") {
-    const n = data.days_per_week || 3;
+    /* The same words the plan screen used, not the top of the range on its
+       own. A plan that says 5 to 6 and a promise that says 6 are two different
+       weeks, and the one somebody agreed to is the one they read first. */
+    const week = obDaysText(data, data.days_per_week || 3);
     ob.innerHTML = `
       <div class="ob-step">
         ${obChrome("commit", data)}
         <h1>${escapeHtml(data.name || "Right")}, this only works if you turn up.</h1>
-        <p class="sub">The plan is good. It is built for what you told me, and I will carry the thinking so you only have to do the work.
-          But ${n} days a week is a promise you are making to yourself, and I cannot make it for you.</p>
         <div class="ob-commit">
-          <div class="ob-commit-row">${icon("check", 16)}<span>I will show up ${n} days a week, even the days I do not feel like it.</span></div>
-          <div class="ob-commit-row">${icon("check", 16)}<span>I will tell you when it is too much, instead of quietly stopping.</span></div>
-          <div class="ob-commit-row">${icon("check", 16)}<span>I am allowed to have a bad week without it being over.</span></div>
+          <div class="ob-commit-row">${icon("check", 16)}<span>I will show up ${escapeHtml(week)}, even the days I do not feel like it.</span></div>
+          <div class="ob-commit-row">${icon("check", 16)}<span>I will say when it is too much, instead of quietly stopping.</span></div>
+          <div class="ob-commit-row">${icon("check", 16)}<span>I am allowed a bad week without it being over.</span></div>
         </div>
-        <p class="sub">Nothing here is a contract. It is just easier to keep a promise you have actually made.</p>
         <button class="btn-primary" id="commitBtn">I am committing to this</button>
-        <button class="btn-ghost" id="commitBack">Let me change something first</button>
+        <button class="btn-ghost" id="commitBack">Let me change something</button>
       </div>`;
     $("commitBtn").onclick = () => {
       /* Recorded, because a promise nobody kept a record of is a slogan. The
          date is what later screens can honestly say "since" about. */
-      renderOnboardStep("partner", { ...data, committed_at: new Date().toISOString() });
+      finishOnboardingFromDraft({ ...data, committed_at: new Date().toISOString() });
     };
     $("commitBack").onclick = () => renderOnboardStep("plan", data);
     return;
@@ -12228,22 +12799,30 @@ function renderOnboardStep(step, data = {}) {
            rate muscle arrives at. Saying "about" is the honest half of that. */
         ? `<div class="ob-row"><span>Timeline</span><b>about ${escapeHtml(durationLabel(weeks))}</b></div>`
         : "";
+    const daysText = obDaysText(data, days);
+    /* The words a person used, not the words the engine uses. "Recomp" and
+       "Focus: Upper" were both on this screen and neither means anything to
+       anybody reading their own plan for the first time. GOALS.label is the
+       plain English version of the same thing: "lose fat and build muscle". */
+    const goalText = data.goalLabel || g.label;
+    const extras = normaliseGoalSecondary(data.goal_secondary)
+      .map((e) => goalPickLabel(e.bubble, e.child)).filter(Boolean);
     ob.innerHTML = `
       <div class="ob-step">
         ${obChrome("plan", data)}
         <div class="ob-kicker">YOUR PLAN</div>
-        <h1>${days} days a week${chosenPace && weeks ? `, for ${escapeHtml(durationLabel(weeks))}` : ""}</h1>
+        <h1>${escapeHtml(daysText)}${chosenPace && weeks ? `, for ${escapeHtml(durationLabel(weeks))}` : ""}</h1>
         <p class="sub">Built for <strong>${escapeHtml(g.label.toLowerCase())}</strong>${data.detail ? `, ${escapeHtml(data.detail.toLowerCase())}` : ""}.
           We will pick each session for you. Change any of it later in Setup.</p>
         <div class="ob-summary">
-          <div class="ob-row"><span>Goal</span><b>${escapeHtml(data.goalLabel || g.goal)}</b></div>
-          <div class="ob-row"><span>Training days</span><b>${days} per week</b></div>
-          <div class="ob-row"><span>Focus</span><b>${escapeHtml(g.focus)}</b></div>
+          <div class="ob-row"><span>Goal</span><b>${escapeHtml(goalText)}</b></div>
+          <div class="ob-row"><span>Training days</span><b>${escapeHtml(daysText)}</b></div>
           ${Number.isFinite(data.session_minutes) ? `<div class="ob-row"><span>Each session</span><b>about ${data.session_minutes} minutes</b></div>` : ""}
           ${durationRow}
         </div>
+        ${extras.length ? `<p class="ob-plan-extras">Also working on ${escapeHtml(extras.join(" and ").toLowerCase())}.</p>` : ""}
         ${obTimeline(data, days)}
-        <button class="btn-primary" id="startBtn">Start</button>
+        <button class="btn-primary" id="startBtn">This is my plan</button>
         <button class="btn-ghost" id="backBtn">Change something</button>
       </div>`;
     /* Session length used to be asked here. It moved onto the intensity step,
@@ -12259,12 +12838,59 @@ function renderOnboardStep(step, data = {}) {
        the Goal figure and the projection off the chart for everybody.
        Everything on the screen behind this button now reaches the write. */
     /* Start does not finish any more. The plan screen is a thing to read and
-       agree with, and the write happens two screens later, after the promise
-       and after the partner question: asking somebody to commit once their
-       account already exists is asking nothing at all. */
-    $("startBtn").textContent = "This is my plan";
-    $("startBtn").onclick = () => renderOnboardStep("commit", data);
+       agree with, and the write happens two screens later, after the price has
+       been said out loud and after the promise: asking somebody to commit once
+       their account already exists is asking nothing at all. */
+    $("startBtn").onclick = () => renderOnboardStep("hire", data);
     $("backBtn").onclick = () => renderOnboardStep("days", data);
+    return;
+  }
+
+  /* The price, said before the promise rather than after it.
+
+     It used to fire on the way out: finishOnboarding put the paywall up half a
+     second after the account was written, which is a person being asked for
+     money by a screen they did not open, immediately after promising to turn
+     up. Mo: "do not surprise anyone with a price after they have committed."
+     So it is a step, in the sequence, with the plan they just read still
+     behind it, and the way past it is a real button rather than a close box.
+
+     Both outcomes continue. Paying and skipping are the same next screen,
+     because the promise is asked of everybody and because a purchase that
+     fails must never be the thing standing between somebody and their
+     account. */
+  if (step === "hire") {
+    ob.innerHTML = `
+      <div class="ob-step">
+        ${obChrome("hire", data)}
+        <h1>Hire me.</h1>
+        <div class="ob-commit">
+          <div class="ob-commit-row">${icon("check", 16)}<span>I'll generate every workout.</span></div>
+          <div class="ob-commit-row">${icon("check", 16)}<span>I'll track your progress and your lifts.</span></div>
+          <div class="ob-commit-row">${icon("check", 16)}<span>I'll keep your progress photos.</span></div>
+          <div class="ob-commit-row">${icon("check", 16)}<span>I'll follow up with you.</span></div>
+          <div class="ob-commit-row">${icon("check", 16)}<span>Same for your partner. They're included.</span></div>
+        </div>
+        <p class="ob-hire-price"><b>${escapeHtml(PREMIUM_PRICE)} a month. Your partner included.</b></p>
+        <button class="btn-primary" id="hireBtn">Hire me, ${escapeHtml(PREMIUM_PRICE)} a month</button>
+        <button class="btn-secondary" id="hireSkip">Skip, I'll look around first</button>
+      </div>`;
+    $("hireBtn").onclick = async () => {
+      const btn = $("hireBtn");
+      btn.disabled = true;
+      /* The same call the paywall's own Subscribe runs. startPurchase reports
+         its own failures and swallows a cancellation, so there is nothing to
+         report here and nothing to decide: whatever happened, the next screen
+         is the same one. Wrapped anyway, because a throw from here would leave
+         somebody on a dead button with their whole setup behind it. */
+      /* startHire is the paywall's own CTA: one purchase path, and it never
+         throws, so a cancelled sheet lands on the next screen like a skip. */
+      await startHire();
+      /* They may have moved on while Apple's sheet was up. */
+      if (!$("hireBtn")) return;
+      renderOnboardStep("commit", data);
+    };
+    $("hireSkip").onclick = () => renderOnboardStep("commit", data);
     return;
   }
 }
@@ -12313,6 +12939,12 @@ function finishOnboardingFromDraft(data) {
     challenge_target: days,
     goal_key: g.key,
     height_in: data.height_in || null,
+    /* Undefined when the about step was never answered, which must not
+       overwrite a sex already on the profile. Declining is stored as the
+       literal "Rather not say", because that is what Setup's own select
+       writes, and one column should not hold two spellings of the same
+       answer. */
+    sex: data.sex_asked ? (data.sex || "Rather not say") : undefined,
     /* The two numbers that turn on every goal-driven surface there is. */
     weight_lb: data.weight_lb || null,
     goal_weight_lb: data.goal_weight_lb || null,
@@ -12382,18 +13014,34 @@ async function finishOnboarding(data) {
     ...(data.committed_at ? { committed_at: data.committed_at } : {}),
     goal_detail: data.goal_detail || null,
     ...(data.height_in ? { height_in: data.height_in } : {}),
+    /* Sent only when the about step was actually answered: undefined here
+       means never asked, and a fresh account that skipped the screen should
+       not have anything written over whatever a later Setup visit puts there.
+       The column exists, so this is not in PENDING_PROFILE_COLUMNS. */
+    ...(data.sex === undefined ? {} : { sex: data.sex }),
     challenge_target: data.challenge_target || 4,
     updated_at: new Date().toISOString(),
   });
   if (error) { toast("Setup failed, try again"); console.error(error); return false; }
   if (droppedSecondary && (data.goal_secondary || []).length) toast("Your extra goals are not being stored yet.");
-  /* Straight from the promise into the plans, and only for somebody who has
-     just made one. An account restored from a draft, or any other path into
-     this function, lands in the app as it always did: showing the paywall to
-     somebody who did not just commit is a different and worse product. */
-  if (data.committed_at) setTimeout(() => { try { showPaywall(); } catch (e) { console.error(e); } }, 400);
   if (droppedSession) toast("Your session length is not being stored yet.");
+  /* No paywall on the way out, and this is where one used to open: half a
+     second after the write, for anybody who had just committed. That was the
+     only place onboarding ever said a price. The hire step says it now, two
+     screens earlier, while the plan is still the thing on their mind and
+     before they have promised anything. Putting it back would ask the same
+     person for the same money twice in ten seconds. */
   MY_PROFILE = saved;
+  /* The body picker's answer, in the column the engine actually reads.
+     Onboarding wrote goal_tuning and only goal_tuning, and
+     workoutEnginePayload reads focus_groups, so on every fresh account the
+     regions somebody just tapped never reached the plan; Setup's picker was
+     the only writer. Same writer, same shape ("all" is one token). Main goal
+     only, which is the only goal that gets the page now. */
+  const tune = data.goal_tuning?.[data.goal_bubble];
+  if (tune && (tune.all || (tune.areas || []).length)) {
+    await saveFocusGroups(tune.all ? ["all"] : tune.areas);
+  }
   clearObDraft();
   /* The weight they just typed, logged as what it is: a weigh-in. It is the
      start of the chart, it is the start_value the projection measures against,
@@ -12415,6 +13063,18 @@ async function finishOnboarding(data) {
      a permission sheet would put it in front of a screen the person has not
      seen yet. The flag is spent the first time the app itself is on screen. */
   try { localStorage.setItem(ASK_PUSH_KEY, "1"); } catch { /* private browsing */ }
+  /* Nobody asked them about a partner, so nobody may be asked again on the way
+     in. The partner step used to set this when somebody chose to carry on
+     alone, and taking the step out without setting it dropped every brand new
+     account onto "Who is training with you?", which is the full screen version
+     of the question Mo had just removed from the run.
+
+     It is not a claim that they train alone. soloHeld decides one thing, and it
+     is whether to put that screen up on launch; the prompt on Home is what asks
+     now, and it asks the people this flag is set for, which is all of them.
+     Somebody who arrived holding an invite link has it cleared a moment later
+     by the claim inside checkPartnershipThenEnter. */
+  setSolo();
   await checkPartnershipThenEnter();
   return true;
 }
@@ -12562,7 +13222,7 @@ function showApp() {
     openSettingsPage("partner");
   });
 
-  $("addBodyPhotoBtn").addEventListener("click", () => $("bodyPhotoInput").click());
+  $("addBodyPhotoBtn").addEventListener("click", () => pickBodyPhoto());
   $("bodyPhotoInput").addEventListener("change", (e) => {
     const f = e.target.files?.[0];
     e.target.value = "";
@@ -13157,6 +13817,15 @@ async function loadAll() {
   MY_PROFILE = ALL_PROFILES.find((p) => p.email === MY_EMAIL) || MY_PROFILE;
   PARTNER_PROFILE = ALL_PROFILES.find((p) => p.email === PARTNER_EMAIL) || null;
   applyAccentColors();
+  /* Was only ever called from inside renderWorkoutTab, so a reload landing on
+     Home (the default tab) left SESSION null until the workout tab was opened
+     once: the hero ring read "Not started" over a workout that was genuinely
+     paused mid-set, and the CTA under it offered "Start Today's Workout"
+     instead of a way back in. TODAY_WORKOUT is loaded by the Promise.all
+     above, so this is the earliest point a saved session can be checked
+     against it. Harmless to call again from renderWorkoutTab later, it no-ops
+     once SESSION is set. */
+  resumeSessionIfAny();
   /* Said out loud, once per failed load. Somebody looking at numbers that are
      quietly out of date should be told, because the alternative is that they
      believe them. Not per failed table: eight toasts is not eight times the
@@ -15382,6 +16051,57 @@ function renderHero(animate = false) {
   }
 }
 
+/* Skipping the partner card. sessionStorage rather than localStorage on
+   purpose: Mo's rule is that it comes back, quietly, on the next launch. A
+   "no" today is about today, and the whole point of taking it out of
+   onboarding was that people say yes to this later than they are asked. */
+const PARTNER_CARD_SKIP_KEY = "ft_partner_card_skipped";
+function partnerCardSkipped() {
+  try { return sessionStorage.getItem(PARTNER_CARD_SKIP_KEY) === "1"; } catch { return false; }
+}
+function skipPartnerCard() {
+  try { sessionStorage.setItem(PARTNER_CARD_SKIP_KEY, "1"); } catch { /* private mode */ }
+}
+
+/* The ask itself. He says it, because "bring your partner" is a thing a
+   trainer says to you and not a feature announcement, and because the line has
+   to work read aloud later.
+
+   It sits above the empty seat in the hero rather than replacing it. The seat
+   is the permanent quiet way in, findable on any day by somebody who decided
+   on their own; this is the one that speaks first, once, and can be put down.
+   Two of them shouting would be worse than either. */
+function renderPartnerInviteCard() {
+  const el = $("homePartnerCard");
+  if (!el) return;
+  /* An answer already given, in any direction: paired, coached, or a request
+     already out. A request waiting has its own screen and its own words, and
+     asking again underneath them would read as the app having lost track. */
+  const show = !PARTNER_EMAIL && !isCoachedClient() && !PAIR_REQUEST_OUT && !partnerCardSkipped();
+  el.classList.toggle("hidden", !show);
+  if (!show) { el.replaceChildren(); return; }
+  el.innerHTML = `
+    <div class="home-hire-top">
+      ${robotFaceSVG(52, "home-hire-face")}
+      <span class="home-hire-line">Bring your partner. They&rsquo;re included in your package. I&rsquo;ll watch you both.</span>
+    </div>
+    <div class="home-hire-acts">
+      <button type="button" class="btn-primary" id="homePartnerInviteBtn">Send an invite</button>
+      <button type="button" class="btn-ghost" id="homePartnerSkipBtn">Not now</button>
+    </div>`;
+  $("homePartnerInviteBtn").onclick = async (e) => {
+    const sent = await shareInviteLink(e.currentTarget);
+    /* Already paired, on a device that had not caught up. The card is wrong
+       rather than the tap, so it goes and the reload puts the truth back. */
+    if (sent === "paired") { toast("You already have a partner"); skipPartnerCard(); renderPartnerInviteCard(); await loadAll(); return; }
+    /* An invitation that actually went somewhere is an answer for today. It
+       comes back next launch if nobody accepted, which is the same rule as
+       the skip and for the same reason. */
+    if (sent) { skipPartnerCard(); renderPartnerInviteCard(); }
+  };
+  $("homePartnerSkipBtn").onclick = () => { skipPartnerCard(); renderPartnerInviteCard(); };
+}
+
 /* Everything on Home that is written for two people, in one place. Training
    alone is a supported way to use this app, not a broken version of it, and
    the words have to say so: "Stronger Together" over a single ring, above a
@@ -16270,7 +16990,16 @@ async function reportClip(clip) {
    doubling.
    Displayed only. What is actually charged is the price on the App Store
    product, and if the two ever disagree the store wins and we have lied on
-   a paywall, so this string and that product are changed together. */
+   a paywall, so this string and that product are changed together.
+
+   Every identifier around here says premium and every word on the screen says
+   personal trainer, and that is on purpose rather than a rename half done.
+   IS_PREMIUM, requirePremium, the RevenueCat entitlement "premium", the
+   subscriptions table and the App Store product unio_premium_monthly are all
+   configured against that word in places this file cannot reach, and renaming
+   them here would only make the code disagree with the store. The product is
+   what the robot is: you hire him. "Premium" is being kept back for a tier
+   above this one, which is the other reason not to spend the word now. */
 const PREMIUM_PRICE = "$7.99";
 
 /* One real screenshot per feature, captured from the app itself rather than
@@ -16285,15 +17014,15 @@ const PREMIUM_PRICE = "$7.99";
    drawn around it is free to be exactly what the app already draws elsewhere. */
 const PREMIUM_UNLOCKS = [
   ["paywall/01-generated-workout.jpg", "dumbbell", "var(--accent)",
-   "Workouts made for you", "A plan every day, built around your goal and what you lifted last time."],
+   "I'll build your workouts", "A session a day, made around your goal and what you lifted last time."],
   ["paywall/02-week-plan.jpg", "checklist", "var(--me)",
-   "Plan your week together", "Map out the week with your partner and stay in sync."],
+   "I'll plan your week", "Your week mapped out with your partner, so you both know what is coming."],
   ["paywall/03-body-impact.jpg", "body", "var(--partner)",
-   "Body impact", "Which muscles you have actually worked, and which ones you keep missing."],
+   "I'll say what to train next", "Which muscles you have actually worked, and the ones you keep missing."],
   ["paywall/04-progress-records.jpg", "trending", "#2dd4bf",
-   "Track the progress that matters", "Trends, projections and your records ranked."],
+   "I'll track your progress", "Your trends, your projections and your records, kept up to date."],
   ["paywall/05-accent-colors.jpg", "sunMoon", "var(--accent)",
-   "Make it yours", "Accent colours, picked by you."],
+   "I'll make it yours", "Accent colours, picked by you."],
 ];
 
 /* The gate. Returns true when the thing may go ahead, and otherwise puts the
@@ -16307,6 +17036,55 @@ async function requirePremium() {
   if (await refreshPremium()) return true;
   await showPaywall();
   return IS_PREMIUM;
+}
+
+/* The same question requirePremium asks, for a surface that has to DRAW itself
+   differently rather than stop and put a screen up. Read this rather than
+   IS_PREMIUM on its own: with the paywall switched off everybody is in, and a
+   card that checked the flag alone would pitch at people in a build that has
+   no store behind it. */
+function hired() {
+  return !PAYWALL_ON || IS_PREMIUM;
+}
+
+/* One sentence per place he stands in, written here rather than at the five
+   call sites, so the pitch cannot start saying five different things about the
+   same seven ninety nine. Each one says what HE would do on THIS screen, which
+   is the only reason the sentence is different at all. */
+const HIRE_PITCH_LINES = {
+  next: "Hire me and I'll pick your next workout and build it for you.",
+  progress: "Hire me and I'll track all of this for you, and show you the line.",
+  generic: "Hire me as your personal trainer and I'll take this from here.",
+};
+
+/* The pitch, in place. Everywhere a paid surface is reached by somebody who
+   has not hired him, this is what sits where the readings would have been:
+   his face, the one line for that screen, and the button. Every copy of it
+   comes from here, so the price is read from PREMIUM_PRICE once and there is
+   no second wording to forget to update. */
+function hirePitchHTML(context) {
+  const line = HIRE_PITCH_LINES[context] || HIRE_PITCH_LINES.generic;
+  return `<div class="hire-pitch">
+    ${robotFaceSVG(46, "hire-pitch-face")}
+    <div class="hire-pitch-words">
+      <span class="hire-pitch-line">${escapeHtml(line)}</span>
+      <button type="button" class="hire-pitch-btn" data-hire="1">Hire me, ${escapeHtml(PREMIUM_PRICE)} a month</button>
+    </div>
+  </div>`;
+}
+
+/* Bound where the pitch is inserted rather than delegated off the document,
+   because every other card in this app wires its own buttons and a lone
+   global listener is the thing nobody finds when this stops working. */
+function wireHirePitch(root) {
+  (root || document).querySelectorAll("[data-hire]").forEach((b) => {
+    b.onclick = async () => {
+      /* Disabled for the round trip, because the store sheet takes a moment to
+         arrive and a button that looks untouched invites a second tap. */
+      b.disabled = true;
+      try { await startHire(); } finally { b.disabled = false; }
+    };
+  });
 }
 
 /* Everything Apple require on a paywall, and they reject for the absence of any
@@ -16334,8 +17112,11 @@ function showPaywall() {
       <button type="button" class="paywall-x" data-pay="0" aria-label="Close">&times;</button>
       <div class="paywall-sheet">
           <div class="paywall-head">
-            <div class="paywall-word"><b>UNIO</b> <span>PREMIUM</span></div>
-            <div class="paywall-tagline">TRAIN TOGETHER. A STRONGER YOU.</div>
+            <div class="paywall-word"><b>UNIO</b> <span>Personal trainer</span></div>
+            <div class="paywall-say">
+              ${robotFaceSVG(40, "paywall-say-face")}
+              <span>Hire me as your personal trainer.</span>
+            </div>
           </div>
           <!-- Swipe through what it actually looks like before reading a word
                about it. People buy what they can picture themselves using, and
@@ -16365,14 +17146,15 @@ function showPaywall() {
                sit in the same place whether the phone is a mini or a Max and
                nobody has to scroll to find out what this costs. -->
           <div class="paywall-foot">
-            <!-- One subscription covers both of you. Said here rather than in
-                 the small print, because it is the difference between one
-                 price and two people each paying it. -->
+            <!-- The job and the price, in that order, in one place. One
+                 subscription covers both of you and it is said here rather
+                 than in the small print, because it is the difference between
+                 one price and two people each paying it. -->
             <p class="paywall-price">
-              <b>${escapeHtml(PREMIUM_PRICE)} a month, and it covers both of you.</b>
-              <span>Only one of you needs to subscribe.</span>
+              <b>${escapeHtml(PREMIUM_PRICE)} a month, your partner included.</b>
+              <span>I&rsquo;ll generate your workouts, track your progress, keep your progress photos and follow up with you both.</span>
             </p>
-            <button type="button" class="btn-primary paywall-cta" data-pay="1">Subscribe for ${escapeHtml(PREMIUM_PRICE)} a month</button>
+            <button type="button" class="btn-primary paywall-cta" data-pay="1">Hire me, ${escapeHtml(PREMIUM_PRICE)} a month</button>
             <button type="button" class="btn-ghost paywall-ghost" data-pay="restore">Restore purchase</button>
             <button type="button" class="btn-ghost paywall-ghost" data-pay="0">Not now</button>
             <p class="paywall-fine">
@@ -16427,7 +17209,10 @@ function showPaywall() {
         if (what === "0") return close(false);
         if (what === "restore") { close(false); await restorePurchase(); return; }
         close(false);
-        await startPurchase();
+        /* startHire, not startPurchase: the button on this screen and the
+           button on onboarding's hire step have to be the same purchase, and
+           the one place that says so is the function they both call. */
+        await startHire();
       };
     });
     /* No tap-outside-to-close: on a full screen there is no outside, and the
@@ -16566,6 +17351,44 @@ async function startPurchase() {
   }
 }
 
+/* Hiring him. The one entry point: the paywall's own button, every in-place
+   pitch, and onboarding's hire step all come through here, so there is one
+   purchase path rather than four that drift apart.
+
+   It never throws and it never leaves a caller hanging. Onboarding advances
+   on the boolean, so a rejected promise here would strand somebody on a step
+   with a dead button, which is a worse outcome than not selling to them.
+
+   True only when the server says so afterwards. startPurchase already asks
+   rather than believing the device, and this reads the same flag rather than
+   the fact that a sheet closed. */
+let HIRE_OFF_DEVICE_SAID = false;
+async function startHire() {
+  try {
+    if (hired()) return true;
+    /* The sandbox, the website, and any build without the plugin. Said once a
+       session: somebody looking around the web version will press this on more
+       than one screen, and being told the same thing four times reads as the
+       app being broken rather than as an answer. */
+    if (!purchasesPlugin()) {
+      if (!HIRE_OFF_DEVICE_SAID) {
+        HIRE_OFF_DEVICE_SAID = true;
+        toast("Hiring me happens in the iPhone app.");
+      }
+      return false;
+    }
+    await startPurchase();
+    return IS_PREMIUM === true;
+  } catch (err) {
+    /* startPurchase handles its own failures and says what went wrong. Anything
+       that still reaches here is a bug on the way in, not a payment problem, so
+       it is logged and answered as "not bought" rather than thrown at a caller
+       who is mid-step. */
+    console.error("could not start the hire", err);
+    return false;
+  }
+}
+
 /* Apple require this to exist and to work, and they test it. Somebody who
    reinstalls, or signs in on a second device, must be able to get back what
    they already paid for without paying again. */
@@ -16583,12 +17406,16 @@ async function restorePurchase() {
   }
 }
 
-/* Whatever is on screen was drawn for somebody who had not paid. */
+/* Whatever is on screen was drawn for somebody who had not paid. The workout
+   tab is in here now because the next workout card is one of those surfaces:
+   buying from the pitch inside it and being left looking at the pitch is the
+   one outcome a paid screen must never have. */
 function rerenderAfterPremium() {
   try {
     renderHome();
     if (typeof renderSetupTab === "function") renderSetupTab();
     if (typeof renderProgressTab === "function") renderProgressTab();
+    if (typeof renderWorkoutTab === "function") renderWorkoutTab();
   } catch (err) { console.warn("could not repaint after premium", err); }
 }
 
@@ -17884,6 +18711,7 @@ function renderHome(animate = false) {
      hears followed by four minutes of silence when they do turn up. */
   sayHomeQuip();
   renderPairCopy();
+  renderPartnerInviteCard();
   renderTopStreak();
   renderLiveCard();
   const openBtn = $("openPartnerBtn");
@@ -18400,6 +19228,10 @@ function renderToneHero(on, profile, isPartner) {
 function renderToneChart(series, isPartner) {
   const canvas = $("toneChart");
   if (!canvas) return;
+  /* Not hired, no line. The card it would draw into is showing his pitch
+     instead, so this would be 70 KB of Chart.js fetched to paint a canvas
+     nobody can see. */
+  if (!hired()) return;
   if (!window.Chart) {
     loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
       .then(() => { if (!$("toneHero")?.classList.contains("hidden")) renderToneChart(series, isPartner); })
@@ -18953,6 +19785,10 @@ function renderBulkHero(on, profile, isPartner) {
 function goalLineChart(canvasId, series, isPartner, unit, live) {
   const canvas = $(canvasId);
   if (!canvas) return null;
+  /* Not hired, no line. The card it would draw into is showing his pitch
+     instead, so this would be 70 KB of Chart.js fetched to paint a canvas
+     nobody can see. */
+  if (!hired()) return null;
   if (!window.Chart) {
     loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
       /* Whichever goal screen asked for it: the tab redraws and whoever is on
@@ -19864,6 +20700,10 @@ function renderEnduranceHero(on, profile, isPartner) {
 function renderEnduranceChart(buckets, isPartner) {
   const canvas = $("endChart");
   if (!canvas) return;
+  /* Not hired, no line. The card it would draw into is showing his pitch
+     instead, so this would be 70 KB of Chart.js fetched to paint a canvas
+     nobody can see. */
+  if (!hired()) return;
   if (!window.Chart) {
     loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
       .then(() => { if (!$("endHero")?.classList.contains("hidden")) renderEnduranceChart(buckets, isPartner); })
@@ -20982,6 +21822,10 @@ function renderVolumeChart() {
 }
 
 function renderWeightChart() {
+  /* Not hired, no line. The card it would draw into is showing his pitch
+     instead, so this would be 70 KB of Chart.js fetched to paint a canvas
+     nobody can see. */
+  if (!hired()) return;
   /* Chart.js is 70 KB and only this card uses it, so it arrives with the card
      rather than with the app. */
   if (!window.Chart) {
@@ -21980,6 +22824,177 @@ function swapCurrentExercise() {
       renderSession();
     },
   });
+}
+
+/* ---------- No equipment today ----------
+   Mo, mo-knowledge/FLOW-DECISIONS-2026-09-17.md, "Do not lock me in the
+   workout": "Open rules, not endpoints." Somebody who cannot get to the gym
+   should not have to leave the session to fix that. This is swapCurrentExercise
+   above, run over every exercise still ahead instead of just the one on
+   screen, and it reuses the same ranked matcher a single swap would use if the
+   engine had already attached alternatives to this plan (it has not: see the
+   note on ensurePlanEngine below). Already logged sets are the record of what
+   actually happened, so they are never touched. */
+
+let altMatcherPromise = null;
+function ensureAlternativesMatcher() {
+  if (!altMatcherPromise) {
+    altMatcherPromise = import("/mo-knowledge/engine/alternatives.mjs")
+      .catch((e) => { console.warn("alternatives matcher", e); return null; });
+  }
+  return altMatcherPromise;
+}
+
+/* Lifting days are drawn from weight-training and calisthenics, the two
+   trainings joint-load.mjs tags as one coverage set (see its own comment on
+   that). Yoga, pilates, stretching and cardio are different disciplines with
+   no sets and reps, so a bodyweight stand-in never comes from them. */
+function strengthLibraryPool() {
+  return EXERCISE_TRAININGS
+    .filter((t) => t.id === "weight-training" || t.id === "calisthenics")
+    .flatMap((t) => t.categories.flatMap((c) => c.exercises));
+}
+
+/* A plan's exercise name is usually the library's own, but a hand-typed one
+   ("bench press") or an already-swapped one can differ by case or punctuation,
+   which is the same gap searchExerciseCatalog exists to close. Returns null
+   for a name the library has never heard of, which this feature treats as
+   "cannot tell what it needs" and leaves alone rather than guessing. */
+function findStrengthLibraryExercise(name) {
+  const pool = strengthLibraryPool();
+  const exact = pool.find((e) => e.name === name);
+  if (exact) return exact;
+  /* "Bench Press" on a plan and "Barbell Bench Press" in the library is the
+     exact problem kitFor/kitNamesFor already solve for the kit line on this
+     same screen, with the same barbell-means-the-unqualified-one rule a gym
+     uses. Reused rather than re-solved. */
+  const canon = EQUIPMENT ? EQUIPMENT.resolveName(name) : null;
+  if (canon) {
+    const hit = pool.find((e) => e.name === canon);
+    if (hit) return hit;
+  }
+  const key = normalizeSearch(name);
+  return key ? pool.find((e) => normalizeSearch(e.name) === key) || null : null;
+}
+
+/* Mo's own words for what needs switching: "barbell, cable, machine or
+   dumbbell". A band, a bench or a mat is furniture a bodyweight move can still
+   want, not the reason somebody cannot finish this at home. */
+const NO_GYM_EQUIPMENT = new Set(["barbell", "cable", "machine", "dumbbell"]);
+
+/* "Already logged" means a set is actually in the log, not that every set is.
+   SESSION.completed[i] only flips once the last of them lands, so a plan with
+   one of three sets ticked on a lift is not "completed" and this rule would
+   otherwise rename the exercise out from under a set that is already sitting
+   in exercise_logs against the old name, and reset its own checkmarks along
+   with it. */
+function sessionExerciseTouched(i) {
+  return !!SESSION.completed[i] || !!(SESSION.setsDone[i] || []).some(Boolean);
+}
+
+/* One tap, from the session or the paused screen. Every remaining exercise
+   that needs kit gets the best bodyweight match for the same primary muscle;
+   an exercise the matcher cannot place for is kept, on purpose, rather than
+   handed a worse substitute just to say something changed. */
+async function switchRemainderToBodyweight() {
+  if (!SESSION || SESSION.finished || !TODAY_WORKOUT?.exercises?.length) return null;
+  if (!EXERCISE_TRAININGS.length) { toast("Still loading the exercise library. Try again in a moment."); return null; }
+  const mod = await ensureAlternativesMatcher();
+  if (!mod) { toast("Couldn't reach the exercise library. Try again."); return null; }
+
+  const pool = strengthLibraryPool();
+  const level = MY_PROFILE?.level || "beginner";
+  // Seeded with every name already on the plan so two switched exercises
+  // never land on the same bodyweight movement, the same guard scoreAlternatives
+  // gives a single swap's "Search all exercises" list for free.
+  const usedNames = new Set(TODAY_WORKOUT.exercises.map((e) => e.name));
+  const date = TODAY_WORKOUT.entry_date || todayStr();
+  const currentIdx = SESSION.exerciseIndex;
+
+  let switched = 0;
+  let noAlt = 0;
+  let touchedCurrent = false;
+  const swapRows = [];
+
+  TODAY_WORKOUT.exercises.forEach((ex, i) => {
+    if (sessionExerciseTouched(i)) return;   // a set is already logged against this name
+    const libEx = findStrengthLibraryExercise(ex.name);
+    if (!libEx || !NO_GYM_EQUIPMENT.has(libEx.equipment)) return;
+
+    const alts = mod.scoreAlternatives({
+      exercise: libEx, pool, level, equipment: ["bodyweight"],
+      exclude: [...usedNames], count: 1,
+    });
+    if (!alts.length) { noAlt++; return; }
+
+    const chosen = alts[0];
+    const planned = ex.name;
+    /* Same reasoning applySwap uses: sets and reps are the dose the engine
+       chose for the slot and stay, the load cannot carry over from a
+       different movement, and what they last did on the new one beats a
+       guess. */
+    const last = lastLoggedWeight(chosen.name);
+    ex.name = chosen.name;
+    ex.targetWeight = last ?? 0;
+    ex.note = last == null ? "Pick a weight with two reps left in you" : `Last time you did ${last} lb`;
+
+    // Same reset swapCurrentExercise's `after` does: a movement just picked
+    // has had nothing done on it yet.
+    const sets = ex.sets || 3;
+    SESSION.setsDone[i] = new Array(sets).fill(false);
+    SESSION.setWeights[i] = new Array(sets).fill(null);
+    SESSION.weights[i] = ex.targetWeight ?? "";
+    SESSION.reps[i] = ex.reps ?? "";
+
+    usedNames.add(chosen.name);
+    swapRows.push({ email: MY_EMAIL, entry_date: date, planned_exercise: planned, chosen_exercise: chosen.name, source: "no-equipment" });
+    switched++;
+    if (i === currentIdx) touchedCurrent = true;
+  });
+
+  if (!switched) {
+    toast(noAlt ? "No bodyweight version for what's left" : "Nothing left needs equipment");
+    return { switched: 0, noAlt };
+  }
+
+  if (touchedCurrent) {
+    SESSION.restStartedAt = null;   // the exercise you were resting for is not the one on screen any more
+    stopRestTicker();
+    SESSION_LAST_EX = null;
+  }
+  saveSessionToStorage();
+
+  // Mirrored into ALL_SWAPS the same way applySwap does, so the next generate
+  // sees these without waiting on the next loadAll.
+  await safeWrite("exercise_swaps", "insert", swapRows);
+  ALL_SWAPS.push(...swapRows.map((r) => ({ ...r, created_at: new Date().toISOString() })));
+  /* Same upsert key and same shape applySwap writes with: the saved plan has
+     to move with the screen, or a reload puts the equipment lifts straight
+     back in front of them. */
+  await safeWrite("ai_workouts", "upsert", {
+    user_name: ME, email: MY_EMAIL, entry_date: date,
+    focus: TODAY_WORKOUT.focus, exercises: TODAY_WORKOUT.exercises,
+  }, { onConflict: "email,entry_date" });
+
+  toast(`${switched} exercise${switched === 1 ? "" : "s"} switched to bodyweight`
+    + (noAlt ? `, ${noAlt} kept, no bodyweight version` : ""));
+  return { switched, noAlt };
+}
+
+/* Redraws wherever this was called from, by who called it rather than by
+   guessing from SESSION state: the exercise-actions menu only opens off the
+   live lift screen, so no `overlay` argument means that screen. `overlay:
+   true` is the paused sheet inside the session overlay (renderPausedSheet's
+   own callers only reach it while genuinely paused). `overlay: false` is the
+   same screen embedded on the workout tab, which can be showing "In
+   progress" rather than "Paused" (minimiseSession does not pause the clock),
+   so it goes through renderWorkoutTab rather than assuming either. */
+async function noEquipmentToday({ overlay } = {}) {
+  const res = await switchRemainderToBodyweight();
+  if (!res?.switched) return;
+  if (overlay === false) renderWorkoutTab();
+  else if (overlay === true) renderPausedSheet();
+  else renderSession();
 }
 
 /* ---------- Swapping the whole session ----------
@@ -23747,7 +24762,10 @@ function sayHomeQuip() {
   el.className = "home-quip";
   el.innerHTML = `
     <button type="button" class="home-quip-say">
-      <img class="home-quip-av" src="/bot/bot-neutral.png" alt="" aria-hidden="true" width="52" height="52" decoding="async" />
+      ${/* His face, the same drawing as everywhere else he appears. The PNG
+            this replaced was the old figure's head, the one Mo asked to be
+            rid of, and two robots on one Home screen is one too many. */ ""}
+      ${robotFaceSVG(52, "home-quip-av")}
       <span class="home-quip-bub">
         <span class="home-quip-line"><span class="home-quip-txt"></span><i class="home-quip-cur"></i></span>
       </span>
@@ -25089,12 +26107,25 @@ function wireSessionSheet() {
 /* Everything you can do TO this exercise, behind its name. The three things
    that used to be chips on the title line: swap it, skip it, and who can see
    it. Each one is the handler that was already behind the chip. */
+/* Whether anything still ahead is worth the tap: same equipment check
+   switchRemainderToBodyweight runs, kept synchronous (no matcher call, no
+   network) because this only decides whether to grey out a menu row. */
+function remainderNeedsEquipmentSwitch() {
+  if (!SESSION || !TODAY_WORKOUT?.exercises?.length || !EXERCISE_TRAININGS.length) return false;
+  return TODAY_WORKOUT.exercises.some((ex, i) => {
+    if (sessionExerciseTouched(i)) return false;
+    const lib = findStrengthLibraryExercise(ex.name);
+    return !!lib && NO_GYM_EQUIPMENT.has(lib.equipment);
+  });
+}
+
 function openExerciseActions() {
   if (!SESSION || SESSION.finished) return;
   const ei = SESSION.exerciseIndex;
   const ex = TODAY_WORKOUT?.exercises?.[ei];
   if (!ex) return;
   const nextIdx = TODAY_WORKOUT.exercises.findIndex((x, i) => i !== ei && !SESSION.completed[i]);
+  const canGoBodyweight = remainderNeedsEquipmentSwitch();
 
   const scrim = document.createElement("div");
   scrim.className = "pop-scrim";
@@ -25116,6 +26147,12 @@ function openExerciseActions() {
               ? "Nothing else left to move to"
               : `Move on to ${escapeHtml(TODAY_WORKOUT.exercises[nextIdx].name)}, come back any time`}</i></span>
           </button>
+          <button type="button" class="sess-act" data-act="noequip"${canGoBodyweight ? "" : " disabled"}>
+            <span class="sess-act-ico">${icon("body", 18)}</span>
+            <span>No equipment today<i>${canGoBodyweight
+              ? "Switch what's left of this workout to bodyweight"
+              : "Nothing left needs a barbell, cable, machine or dumbbell"}</i></span>
+          </button>
           ${PARTNER_EMAIL ? `<button type="button" class="sess-act" data-act="privacy">
             <span class="sess-act-ico">${icon(workoutPrivacyLocked() ? "lock" : "people", 18)}</span>
             <span>Who can see this<i>${escapeHtml(privacySummary())}</i></span>
@@ -25132,6 +26169,7 @@ function openExerciseActions() {
       close();
       if (act === "swap") swapCurrentExercise();
       else if (act === "skip" && nextIdx !== -1) jumpToExercise(nextIdx);
+      else if (act === "noequip" && canGoBodyweight) noEquipmentToday();
       else if (act === "privacy") openWorkoutPrivacy();
     };
   });
@@ -25939,10 +26977,17 @@ function pausedScreenHTML({ overlay }) {
       ? `${escapeHtml(ex.name)}${currentSet >= 0 ? ` &middot; set ${currentSet + 1} of ${setsDone.length}` : ""}`
       : "";
 
+  /* Same check the exercise-actions menu uses to grey its own row. Left off
+     the paused screen entirely rather than shown disabled: there is no room
+     here for the "nothing needs it" line that makes a disabled row make
+     sense, and it reappears the moment something ahead actually needs kit. */
+  const canGoBodyweight = remainderNeedsEquipmentSwitch();
+
   return `
     <div class="pz${overlay ? "" : " pz-inline"}">
       <div class="pz-top">
         <button type="button" class="pz-min" id="pzHome" aria-label="Home, the workout keeps running">${icon("home", 22)}</button>
+        ${canGoBodyweight ? `<button type="button" class="pz-min" id="pzKit" aria-label="No equipment today. Switch what's left to bodyweight">${icon("body", 22)}</button>` : ""}
       </div>
 
       <div class="pz-mid">
@@ -26025,6 +27070,7 @@ function wirePausedScreen({ overlay }) {
      nothing. That was "the buttons don't work on this page". */
   const q = (id) => root.querySelector("#" + id);
   q("pzHome").onclick = goHomeFromSession;
+  if (q("pzKit")) q("pzKit").onclick = () => noEquipmentToday({ overlay });
   q("pzResume").onclick = () => resumeFromPaused({ overlay, root });
   mountMotionFigures(root);
   renderPausedLive(root);
@@ -27134,17 +28180,26 @@ function renderChooseScreen() {
      empty day this screen is where it lives, but it is not what most people
      open this tab to do. */
   const aimed = (p.focus || "").toLowerCase();
+  /* The match and the muscle list ARE "what to train next", which is one of
+     the things he is hired for. The card stays, with its title and both
+     buttons, and his pitch sits where the reading would have been: a free
+     account can still plan a workout and begin one from here, which is what
+     the free tier promises. */
+  const hiredHere = hired();
   const nextCard = `
-    <section class="wkt-next">
+    <section class="wkt-next${hiredHere ? "" : " not-hired"}">
       <div class="wkt-next-top">
         <p class="wkt-eyebrow">Next workout</p>
-        ${infoDot("planMatch", "How the match is worked out")}
+        ${/* The dot explains how the match is worked out, so with no match on
+              screen it explains nothing. */ ""}
+        ${hiredHere ? infoDot("planMatch", "How the match is worked out") : ""}
       </div>
       <div class="wkt-next-grid">
         <div class="wkt-next-words">
           <h2>${escapeHtml(p.focus)}</h2>
-          <p class="wkt-next-sub">${escapeHtml(matchReading(p.match))}</p>
+          ${hiredHere ? `<p class="wkt-next-sub">${escapeHtml(matchReading(p.match))}</p>` : ""}
         </div>
+        ${!hiredHere ? `<div class="wkt-next-hire">${hirePitchHTML("next")}</div>` : `
         <div class="wkt-arc">
           ${arcGaugeSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 96)}
           <div class="wkt-arc-num"><b>${p.match}%</b><i>MATCH</i></div>
@@ -27156,7 +28211,7 @@ function renderChooseScreen() {
               ? `<span class="wkt-ring" aria-hidden="true"></span>`
               : `<span class="wkt-tick" aria-hidden="true">${icon("check", 14)}</span>`}${escapeHtml(m.name)}</li>`;
           }).join("")}
-        </ul>
+        </ul>`}
         <div class="wkt-next-acts">
           ${p.real
             ? `<button type="button" class="wkt-btn-solid sm" id="chooseBeginBtn">${partway ? "Resume workout" : "Begin workout"}</button>`
@@ -27214,6 +28269,7 @@ function renderChooseScreen() {
   wireTodaySessions($("workoutContent"));
   wireSavedWorkouts($("workoutContent"));
   wireWorkoutCalendar($("workoutContent"));
+  wireHirePitch($("workoutContent"));
   staggerWorkoutCards();
 
   const toManual = () => goWorkoutScreen("manual", {
@@ -30604,7 +31660,7 @@ async function renderComparePhotos(hostEl, isPartner) {
   /* Every door opens the same picker. The upsert behind it is keyed on
      (email, taken_on), so shooting again today replaces today's row and
      removes the file it replaced. */
-  const pick = () => $("bodyPhotoInput")?.click();
+  const pick = () => pickBodyPhoto();
   hostEl.querySelector(".cmp-today-add")?.addEventListener("click", pick);
   hostEl.querySelectorAll("[data-retake]").forEach((b) => {
     b.addEventListener("click", (e) => { e.stopPropagation(); pick(); });
@@ -30688,6 +31744,19 @@ async function deleteBodyPhoto(id) {
     console.error(err);
     toast("Could not delete");
   }
+}
+
+/* Every door into the camera, behind the one gate.
+
+   Keeping the photos is part of what he is hired for, and it is also the only
+   thing in this app that costs real money per person per month: every photo is
+   a file we store for as long as they keep it. Gated on the tap rather than by
+   taking the button away, the same call the accent swatches make, so somebody
+   can see what they would get. Photos already taken are never locked away from
+   the person who took them. */
+async function pickBodyPhoto() {
+  if (!await requirePremium()) return;
+  $("bodyPhotoInput")?.click();
 }
 
 async function uploadBodyPhoto(file) {
@@ -32808,12 +33877,75 @@ function renderProgressTab() {
      because on the weight screen that card is hidden ON PURPOSE and the tile
      is meant to be its door, not to vanish with it. */
   renderProgTiles(kind, isPartner, { photosAvailable: !isPartner && !blank });
-  const live = new Set(shown);
+  /* After every screen has drawn itself, because this takes readings away
+     rather than deciding which ones there were: the goal, the head and the
+     shape of the tab are the same whether or not he has been hired, and one
+     block inside it is his pitch instead of a chart. */
+  lockProgressForHire();
+  const live = new Set(hired() ? shown : []);
   if (live.has("cardWeight")) { renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); }
   if (live.has("cardConsistency")) { renderConsistencyChart(); renderConsistencyStats(); }
   if (live.has("cardStrength")) { renderStrengthChart(); renderStrengthStats(); }
   if (live.has("cardVolume")) { renderVolumeChart(); renderVolumeStats(); }
   if (live.has("cardPhotos")) renderBodyPhotos();
+}
+
+/* Progress, for somebody who has not hired him yet.
+
+   Tracking and the charts are the paid half of this tab, so on a free account
+   the readings stand down and the pitch stands where they were. What does NOT
+   go is the goal, the head, and the fact that this is still their tab: a goal
+   screen with its title and one card saying what he would do with it is an
+   offer, and an empty tab is a bug. It is never a modal either. Nobody opening
+   Progress asked to be sold to, and a screen that has to be dismissed before
+   it can be read is how a paywall turns into the reason somebody deletes an
+   app.
+
+   One pitch, not one per card. It lands inside the chart card of whichever
+   goal screen is up, and where there is no goal screen every reading card
+   stands down and it stands in for the lot. */
+function lockProgressForHire() {
+  const host = $("tab-progress");
+  if (!host) return;
+  /* Whatever was locked last time, whether or not anything is locked now: a
+     purchase mid-session has to leave the tab exactly as it found it. */
+  host.querySelectorAll(".hire-locked").forEach((el) => el.classList.remove("hire-locked"));
+  const box = $("progHirePitch");
+  if (!box) return;
+  if (hired()) { box.classList.add("hidden"); box.replaceChildren(); return; }
+  box.classList.remove("hidden");
+  box.innerHTML = hirePitchHTML("progress");
+
+  const screen = [...host.querySelectorAll(".goal-screen")].find((el) => !el.classList.contains("hidden"));
+  const weightScreenOn = $("cardWeight")?.classList.contains("wt-hero");
+  const chartCard = screen?.querySelector(".tone-card, .end-card")
+    || (weightScreenOn ? $("cardWeight")?.querySelector(".wth-card") : null);
+
+  if (chartCard) {
+    /* Inside a card already, so it is not one itself. The head stays drawn
+       (.hire-locked keeps .wth-head) and everything else in the card, the
+       number, the line, the window pills, stands down. */
+    /* The slot class is what .hire-locked keeps on screen while it stands the
+       rest of the card down, so it is not optional decoration. */
+    box.className = "hire-pitch-slot";
+    chartCard.classList.add("hire-locked");
+    /* Straight under the goal head where there is one (the weight screen keeps
+       its head inside this card), so he is answering the goal rather than
+       floating under a mountain drawing that overhangs it. */
+    const head = chartCard.querySelector(".wth-head");
+    if (head) { box.classList.add("under-head"); chartCard.insertBefore(box, head.nextSibling); }
+    else chartCard.appendChild(box);
+  } else {
+    /* No goal screen: the index of reading cards is what this tab would have
+       been, so all of it stands down and the pitch is the card. */
+    PROGRESS_CARDS.forEach((id) => $(id)?.classList.add("hidden"));
+    $("progRuleElse")?.classList.add("hidden");
+    box.className = "card hire-pitch-slot";
+    const after = $("progHeadline");
+    if (after?.parentNode === host) host.insertBefore(box, after.nextSibling);
+    else host.appendChild(box);
+  }
+  wireHirePitch(box);
 }
 
 /* ---------- Couple tab ---------- */
@@ -33760,6 +34892,25 @@ function renderSetupTab() {
   document.querySelectorAll("[data-setback]").forEach((b) => {
     b.onclick = closeSettingsPage;
   });
+  /* The trainer row. Hired reads as a fact about the account; not hired reads
+     as the offer it is, and tapping it is the offer. */
+  if ($("setRow-hire")) {
+    $("setHireSub").textContent = hired() ? "Hired" : "Not hired";
+    $("setRow-hire").onclick = async () => {
+      if (!hired()) { await showPaywall(); renderSetupTab(); return; }
+      /* Everything Apple want a subscriber to be able to find after they have
+         paid: what it costs, that it renews, where to stop it, and the way to
+         get it back on another device. */
+      const restore = await askConfirm({
+        heading: "Your personal trainer",
+        body: `${PREMIUM_PRICE} a month, your partner included. It renews every month until you cancel. `
+          + `Cancel any time in your iPhone's Settings, under your name then Subscriptions.`,
+        ok: "Restore purchase",
+        cancel: "Close",
+      });
+      if (restore) await restorePurchase();
+    };
+  }
   // The Admin row only exists for accounts that have the panel.
   $("setRow-admin").classList.toggle("hidden", $("adminCard").classList.contains("hidden"));
   $("setupEmail").textContent = MY_EMAIL || "";
