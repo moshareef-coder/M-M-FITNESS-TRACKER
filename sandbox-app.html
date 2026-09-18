@@ -8088,7 +8088,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.18.2";
+const APP_VERSION = "2026.09.18.3";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -12868,38 +12868,36 @@ function renderOnboardStep(step, data = {}) {
      fails must never be the thing standing between somebody and their
      account. */
   if (step === "hire") {
+    /* The offer is the paywall itself, the full screen with the carousel of
+       what he does, opened here as a step of onboarding rather than a
+       lookalike drawn beside it. Mo: "put it in the onboarding flow". One
+       screen for one offer, so what the paywall says and what onboarding
+       says can never drift. Whatever happens on it, hired, skipped, or the
+       X, the next screen is the commitment: the promise is asked of
+       everybody, paid or not. The step underneath is one line, seen for the
+       300ms the paywall takes to slide away and by anybody who arrives here
+       on Back from the commit screen. */
     ob.innerHTML = `
       <div class="ob-step">
         ${obChrome("hire", data)}
         <div class="ob-kicker">YOUR PERSONAL TRAINER</div>
-        <h1>Hire me.</h1>
-        <div class="ob-summary ob-bill">
-          <div class="ob-row"><span>Every workout, generated</span><b>${icon("check", 16)}</b></div>
-          <div class="ob-row"><span>Your progress and lifts, tracked</span><b>${icon("check", 16)}</b></div>
-          <div class="ob-row"><span>Your progress photos, kept</span><b>${icon("check", 16)}</b></div>
-          <div class="ob-row"><span>Me, following up</span><b>${icon("check", 16)}</b></div>
-          <div class="ob-row"><span>Your partner</span><b>Included</b></div>
-          <div class="ob-row ob-total"><span>A month</span><b>${escapeHtml(PREMIUM_PRICE)}</b></div>
-        </div>
-        <button class="btn-primary" id="hireBtn">Hire me, ${escapeHtml(PREMIUM_PRICE)} a month</button>
-        <button class="btn-secondary" id="hireSkip">Skip, I'll look around first</button>
+        <h1>One more thing.</h1>
+        <button class="btn-primary" id="hireOpen">Show me the offer</button>
+        <button class="btn-ghost" id="hireSkip">Skip, I'll look around first</button>
       </div>`;
-    $("hireBtn").onclick = async () => {
-      const btn = $("hireBtn");
-      btn.disabled = true;
-      /* The same call the paywall's own Subscribe runs. startPurchase reports
-         its own failures and swallows a cancellation, so there is nothing to
-         report here and nothing to decide: whatever happened, the next screen
-         is the same one. Wrapped anyway, because a throw from here would leave
-         somebody on a dead button with their whole setup behind it. */
-      /* startHire is the paywall's own CTA: one purchase path, and it never
-         throws, so a cancelled sheet lands on the next screen like a skip. */
-      await startHire();
-      /* They may have moved on while Apple's sheet was up. */
-      if (!$("hireBtn")) return;
+    const offer = async () => {
+      if (offer.busy) return;
+      offer.busy = true;
+      try { await showPaywall({ skipLabel: "Skip, I'll look around first" }); }
+      catch (err) { console.error(err); }
+      offer.busy = false;
+      if (!$("hireOpen")) return;   // they moved on while it was up
       renderOnboardStep("commit", data);
     };
+    $("hireOpen").onclick = offer;
     $("hireSkip").onclick = () => renderOnboardStep("commit", data);
+    /* Opened on arrival, not on a tap: the step is the offer. */
+    setTimeout(offer, 60);
     return;
   }
 }
@@ -17100,7 +17098,10 @@ function wireHirePitch(root) {
    one of them: what it costs, how long it lasts, that it renews itself, how to
    stop it, a way to restore a purchase already made, and links to the terms and
    the privacy policy. */
-function showPaywall() {
+/* `skipLabel` is what the way out says. In the app it is "Not now"; in
+   onboarding, where this screen IS the hire step, Mo wanted it to say what
+   skipping means there: "Skip, I'll look around first". */
+function showPaywall({ skipLabel = "Not now" } = {}) {
   /* Second chance to warm the offering, for the case where the fetch at
      configure time failed or had not finished before this screen opened. By
      the time somebody has read the page and reached for Subscribe it is in
@@ -17165,7 +17166,7 @@ function showPaywall() {
             </p>
             <button type="button" class="btn-primary paywall-cta" data-pay="1">Hire me, ${escapeHtml(PREMIUM_PRICE)} a month</button>
             <button type="button" class="btn-ghost paywall-ghost" data-pay="restore">Restore purchase</button>
-            <button type="button" class="btn-ghost paywall-ghost" data-pay="0">Not now</button>
+            <button type="button" class="btn-ghost paywall-ghost" data-pay="0">${escapeHtml(skipLabel)}</button>
             <p class="paywall-fine">
               Renews every month until you cancel. Cancel any time in your iPhone's
               Settings, under your name then Subscriptions.
