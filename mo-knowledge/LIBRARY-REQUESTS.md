@@ -214,3 +214,37 @@ own code, which cost both slot eligibility and starting load: an incline barbell
 press was priced at 17.5 lb instead of 65. That was ours and it is fixed. Cable
 Pull-Through and Back Extension were among them, which is why the beginner hinge
 is partly solved already without any change here.
+
+## 8. The Rive body never stops rendering (2026-09-18)
+
+**Measured:** the Body tab runs at **7 fps** on a 4x throttled phone profile,
+worst frame 236ms, and a CPU profile of the tab sitting perfectly still is 88%
+"(program)", which is the Rive WASM runtime. It is the same on a build from
+before this week, so this is long standing rather than new. Two canvases,
+89x250 CSS each, 178x500 backing at DPR 2 and 267x750 on a real iPhone at DPR 3.
+
+**Why:** `createBodyHeatmap` mounts with `autoplay: true` and a state machine,
+so the runtime advances and repaints every frame forever. The body is a still
+picture: once the palette and intensities are applied and the focus tween has
+finished, nothing changes until the person taps a muscle or the heat map is
+rebuilt.
+
+**Asked for**, either one is enough:
+
+1. Expose `pause()` and `play()` on the object `createBodyHeatmap` returns, so
+   the app can stop a body that is not being interacted with. The app already
+   knows when the tab is hidden and when a tween has landed.
+2. Or have the module park itself: stop the state machine a frame after the
+   last change, and wake it on `setPalette`, `setMusclePalette`, `focus`,
+   `resize` and a pointer event. This is the better version, because every
+   caller gets it without having to remember.
+
+A third, smaller one, worth having either way:
+`r.resizeDrawingSurfaceToCanvas()` takes an optional device pixel ratio in the
+current runtime. Passing `Math.min(2, devicePixelRatio)` would cut the fill
+cost by more than half on a 3x phone, on a drawing that is flat colour with no
+fine detail.
+
+**Not worked around in the app**, because the app cannot reach the Rive
+instance and the only lever from here would be lying about `devicePixelRatio`
+globally.
