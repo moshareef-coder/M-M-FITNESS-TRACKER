@@ -148,6 +148,35 @@ matrix. That is a deliberate refusal rather than a gap, and it is written down i
 
 ---
 
+## 7. A run cycle for the motion rig  (added 2026-09-18, from the Activity screen)
+
+`knowledge/motion` has a pose or a loop for every exercise this app prescribes,
+and it has nothing for running, cycling, rowing, stepping or the elliptical.
+That is consistent with `cardio.mjs` setting `posed: false`, and the reason
+given there is right: an Easy Run is twenty five minutes at an effort, there is
+no single frame that is it, and drawing one per session would produce twenty
+seven near-identical pictures of a figure running.
+
+But the activity screen now has a session on a clock with nothing on it, and the
+screen whose entire subject is movement was the one screen with a still figure
+on it. So the robot on the running screen is drawn in `index.html`, in CSS and
+SVG, off the same `robotFaceSVG` bust the rest of the app uses, with legs, arms,
+a bobbing torso and a ground line going past. It is ours and it is deliberately
+crude.
+
+What the library could give instead, and what `cardio.mjs`'s own comment already
+proposes: **a handful of looping modes rather than a move per exercise.** Run,
+ride, row, step, glide. One loop each, shared across every session in that mode,
+which is five loops covering all twenty seven cardio sessions rather than
+twenty seven poses. That is the shape the cardio library says it wants, and it
+is the piece that would let the running screen use the real rig like every other
+session screen in the app does.
+
+Until then the hand drawn robot stands, and it is marked in the code as the
+honest stand-in that it is.
+
+---
+
 ## What we fixed on our side instead, so it is not requested twice
 
 Nineteen exercises were being classified as the wrong movement pattern by our
