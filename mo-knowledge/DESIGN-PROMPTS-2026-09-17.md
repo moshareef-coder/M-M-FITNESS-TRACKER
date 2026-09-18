@@ -362,7 +362,7 @@ Ghost button under it: Change something
 ```
 
 ### Hire me
-The payment screen, before the commitment, so nobody is surprised by a price after promising.
+The payment screen, before the commitment. It is the app's full-screen offer itself, opened as a step, with the skip worded for onboarding.
 
 ```
 You are a senior mobile product designer. Design ONE screen of Unio, an iPhone fitness app for two people who train together, coached by a robot personal trainer named Unio. Produce a high-fidelity mockup at 390 x 844 (iPhone 15), light theme first. When I ask, do the same screen in dark theme.
@@ -388,22 +388,17 @@ No emojis. No stock photos. No illustrations of people; the only character is th
 OUTPUT
 The mockup image. Then a five-line list of the components you used, top to bottom, so I can hand it to a developer.
 
-SCREEN: Hire me. Progress bar at 95%. This is the payment screen and it must not feel like a paywall. It feels like the robot making his offer.
-The robot, large, upper third, looking at the viewer.
-His line in the bubble (15.5), typed out:
-"That's your plan. Hire me as your personal trainer and I'll do the rest."
-Under him, eyebrow (11, uppercase): YOUR PERSONAL TRAINER, then title (28): Hire me.
-Then THE SAME summary card as the plan screen (white, radius 14, hairline border, rows with a muted label left and a bold value right, hairline dividers), laid out like a bill:
-Every workout, generated | (green tick)
-Your progress and lifts, tracked | (green tick)
-Your progress photos, kept | (green tick)
-Me, following up | (green tick)
-Your partner | Included
-And a total row, separated by a heavier top rule, both sides bold, the value at 21: A month | $7.99
+SCREEN: Hire me. This is the same full-screen offer as the in-app one (see the last prompt in this set), opened as onboarding step 9 of 10, so design it as that screen with these differences and nothing else:
+The whole screen, no tab bar. Top left a small close x. Top center the wordmark UNIO and under it, letter-spaced (11, muted): YOUR PERSONAL TRAINER.
+The robot face, 40px, with his line beside it (17, bold): "Hire me as your personal trainer."
+A horizontal carousel of five cards, one visible and the next peeking at the right edge, each with a small icon tile, a title (17), one line (14, muted) and a real-looking phone screenshot in a rounded frame. Titles in order: I'll build your workouts · I'll plan your week · I'll say what to train next · I'll track your progress · I'll make it yours. Five dots under the carousel.
+Pinned to the bottom, always visible:
+Price line (15.5, bold): $7.99 a month, your partner included.  Under it (14, muted): I'll generate your workouts, track your progress, keep your progress photos and follow up with you both.
 Primary button: Hire me, $7.99 a month
-Secondary button (grey fill): Skip, I'll look around first
-Fine print at the very bottom (12.5, muted, centered): Renews every month until you cancel. Cancel any time in Settings under Subscriptions. Restore purchase · Terms · Privacy
-Do not use the word Premium anywhere.
+Ghost: Restore purchase
+Ghost, and this is the onboarding difference: Skip, I'll look around first
+Fine print (12.5, muted): Renews every month until you cancel. Cancel any time in your iPhone's Settings, under your name then Subscriptions. Terms of Use and Privacy Policy.
+Do not use the word Premium anywhere. Dark ground on this screen in BOTH themes: it is the one screen in the app with its own dark ground.
 ```
 
 ### This only works if you turn up.
