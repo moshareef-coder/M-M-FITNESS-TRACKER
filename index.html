@@ -13156,6 +13156,15 @@ async function loadAll() {
   MY_PROFILE = ALL_PROFILES.find((p) => p.email === MY_EMAIL) || MY_PROFILE;
   PARTNER_PROFILE = ALL_PROFILES.find((p) => p.email === PARTNER_EMAIL) || null;
   applyAccentColors();
+  /* Was only ever called from inside renderWorkoutTab, so a reload landing on
+     Home (the default tab) left SESSION null until the workout tab was opened
+     once: the hero ring read "Not started" over a workout that was genuinely
+     paused mid-set, and the CTA under it offered "Start Today's Workout"
+     instead of a way back in. TODAY_WORKOUT is loaded by the Promise.all
+     above, so this is the earliest point a saved session can be checked
+     against it. Harmless to call again from renderWorkoutTab later, it no-ops
+     once SESSION is set. */
+  resumeSessionIfAny();
   /* Said out loud, once per failed load. Somebody looking at numbers that are
      quietly out of date should be told, because the alternative is that they
      believe them. Not per failed table: eight toasts is not eight times the
@@ -21981,6 +21990,177 @@ function swapCurrentExercise() {
   });
 }
 
+/* ---------- No equipment today ----------
+   Mo, mo-knowledge/FLOW-DECISIONS-2026-09-17.md, "Do not lock me in the
+   workout": "Open rules, not endpoints." Somebody who cannot get to the gym
+   should not have to leave the session to fix that. This is swapCurrentExercise
+   above, run over every exercise still ahead instead of just the one on
+   screen, and it reuses the same ranked matcher a single swap would use if the
+   engine had already attached alternatives to this plan (it has not: see the
+   note on ensurePlanEngine below). Already logged sets are the record of what
+   actually happened, so they are never touched. */
+
+let altMatcherPromise = null;
+function ensureAlternativesMatcher() {
+  if (!altMatcherPromise) {
+    altMatcherPromise = import("/mo-knowledge/engine/alternatives.mjs")
+      .catch((e) => { console.warn("alternatives matcher", e); return null; });
+  }
+  return altMatcherPromise;
+}
+
+/* Lifting days are drawn from weight-training and calisthenics, the two
+   trainings joint-load.mjs tags as one coverage set (see its own comment on
+   that). Yoga, pilates, stretching and cardio are different disciplines with
+   no sets and reps, so a bodyweight stand-in never comes from them. */
+function strengthLibraryPool() {
+  return EXERCISE_TRAININGS
+    .filter((t) => t.id === "weight-training" || t.id === "calisthenics")
+    .flatMap((t) => t.categories.flatMap((c) => c.exercises));
+}
+
+/* A plan's exercise name is usually the library's own, but a hand-typed one
+   ("bench press") or an already-swapped one can differ by case or punctuation,
+   which is the same gap searchExerciseCatalog exists to close. Returns null
+   for a name the library has never heard of, which this feature treats as
+   "cannot tell what it needs" and leaves alone rather than guessing. */
+function findStrengthLibraryExercise(name) {
+  const pool = strengthLibraryPool();
+  const exact = pool.find((e) => e.name === name);
+  if (exact) return exact;
+  /* "Bench Press" on a plan and "Barbell Bench Press" in the library is the
+     exact problem kitFor/kitNamesFor already solve for the kit line on this
+     same screen, with the same barbell-means-the-unqualified-one rule a gym
+     uses. Reused rather than re-solved. */
+  const canon = EQUIPMENT ? EQUIPMENT.resolveName(name) : null;
+  if (canon) {
+    const hit = pool.find((e) => e.name === canon);
+    if (hit) return hit;
+  }
+  const key = normalizeSearch(name);
+  return key ? pool.find((e) => normalizeSearch(e.name) === key) || null : null;
+}
+
+/* Mo's own words for what needs switching: "barbell, cable, machine or
+   dumbbell". A band, a bench or a mat is furniture a bodyweight move can still
+   want, not the reason somebody cannot finish this at home. */
+const NO_GYM_EQUIPMENT = new Set(["barbell", "cable", "machine", "dumbbell"]);
+
+/* "Already logged" means a set is actually in the log, not that every set is.
+   SESSION.completed[i] only flips once the last of them lands, so a plan with
+   one of three sets ticked on a lift is not "completed" and this rule would
+   otherwise rename the exercise out from under a set that is already sitting
+   in exercise_logs against the old name, and reset its own checkmarks along
+   with it. */
+function sessionExerciseTouched(i) {
+  return !!SESSION.completed[i] || !!(SESSION.setsDone[i] || []).some(Boolean);
+}
+
+/* One tap, from the session or the paused screen. Every remaining exercise
+   that needs kit gets the best bodyweight match for the same primary muscle;
+   an exercise the matcher cannot place for is kept, on purpose, rather than
+   handed a worse substitute just to say something changed. */
+async function switchRemainderToBodyweight() {
+  if (!SESSION || SESSION.finished || !TODAY_WORKOUT?.exercises?.length) return null;
+  if (!EXERCISE_TRAININGS.length) { toast("Still loading the exercise library. Try again in a moment."); return null; }
+  const mod = await ensureAlternativesMatcher();
+  if (!mod) { toast("Couldn't reach the exercise library. Try again."); return null; }
+
+  const pool = strengthLibraryPool();
+  const level = MY_PROFILE?.level || "beginner";
+  // Seeded with every name already on the plan so two switched exercises
+  // never land on the same bodyweight movement, the same guard scoreAlternatives
+  // gives a single swap's "Search all exercises" list for free.
+  const usedNames = new Set(TODAY_WORKOUT.exercises.map((e) => e.name));
+  const date = TODAY_WORKOUT.entry_date || todayStr();
+  const currentIdx = SESSION.exerciseIndex;
+
+  let switched = 0;
+  let noAlt = 0;
+  let touchedCurrent = false;
+  const swapRows = [];
+
+  TODAY_WORKOUT.exercises.forEach((ex, i) => {
+    if (sessionExerciseTouched(i)) return;   // a set is already logged against this name
+    const libEx = findStrengthLibraryExercise(ex.name);
+    if (!libEx || !NO_GYM_EQUIPMENT.has(libEx.equipment)) return;
+
+    const alts = mod.scoreAlternatives({
+      exercise: libEx, pool, level, equipment: ["bodyweight"],
+      exclude: [...usedNames], count: 1,
+    });
+    if (!alts.length) { noAlt++; return; }
+
+    const chosen = alts[0];
+    const planned = ex.name;
+    /* Same reasoning applySwap uses: sets and reps are the dose the engine
+       chose for the slot and stay, the load cannot carry over from a
+       different movement, and what they last did on the new one beats a
+       guess. */
+    const last = lastLoggedWeight(chosen.name);
+    ex.name = chosen.name;
+    ex.targetWeight = last ?? 0;
+    ex.note = last == null ? "Pick a weight with two reps left in you" : `Last time you did ${last} lb`;
+
+    // Same reset swapCurrentExercise's `after` does: a movement just picked
+    // has had nothing done on it yet.
+    const sets = ex.sets || 3;
+    SESSION.setsDone[i] = new Array(sets).fill(false);
+    SESSION.setWeights[i] = new Array(sets).fill(null);
+    SESSION.weights[i] = ex.targetWeight ?? "";
+    SESSION.reps[i] = ex.reps ?? "";
+
+    usedNames.add(chosen.name);
+    swapRows.push({ email: MY_EMAIL, entry_date: date, planned_exercise: planned, chosen_exercise: chosen.name, source: "no-equipment" });
+    switched++;
+    if (i === currentIdx) touchedCurrent = true;
+  });
+
+  if (!switched) {
+    toast(noAlt ? "No bodyweight version for what's left" : "Nothing left needs equipment");
+    return { switched: 0, noAlt };
+  }
+
+  if (touchedCurrent) {
+    SESSION.restStartedAt = null;   // the exercise you were resting for is not the one on screen any more
+    stopRestTicker();
+    SESSION_LAST_EX = null;
+  }
+  saveSessionToStorage();
+
+  // Mirrored into ALL_SWAPS the same way applySwap does, so the next generate
+  // sees these without waiting on the next loadAll.
+  await safeWrite("exercise_swaps", "insert", swapRows);
+  ALL_SWAPS.push(...swapRows.map((r) => ({ ...r, created_at: new Date().toISOString() })));
+  /* Same upsert key and same shape applySwap writes with: the saved plan has
+     to move with the screen, or a reload puts the equipment lifts straight
+     back in front of them. */
+  await safeWrite("ai_workouts", "upsert", {
+    user_name: ME, email: MY_EMAIL, entry_date: date,
+    focus: TODAY_WORKOUT.focus, exercises: TODAY_WORKOUT.exercises,
+  }, { onConflict: "email,entry_date" });
+
+  toast(`${switched} exercise${switched === 1 ? "" : "s"} switched to bodyweight`
+    + (noAlt ? `, ${noAlt} kept, no bodyweight version` : ""));
+  return { switched, noAlt };
+}
+
+/* Redraws wherever this was called from, by who called it rather than by
+   guessing from SESSION state: the exercise-actions menu only opens off the
+   live lift screen, so no `overlay` argument means that screen. `overlay:
+   true` is the paused sheet inside the session overlay (renderPausedSheet's
+   own callers only reach it while genuinely paused). `overlay: false` is the
+   same screen embedded on the workout tab, which can be showing "In
+   progress" rather than "Paused" (minimiseSession does not pause the clock),
+   so it goes through renderWorkoutTab rather than assuming either. */
+async function noEquipmentToday({ overlay } = {}) {
+  const res = await switchRemainderToBodyweight();
+  if (!res?.switched) return;
+  if (overlay === false) renderWorkoutTab();
+  else if (overlay === true) renderPausedSheet();
+  else renderSession();
+}
+
 /* ---------- Swapping the whole session ----------
    Swap exercise answers "not this movement". This answers "not this workout":
    the day itself is wrong, and what somebody wants is a different session that
@@ -25088,12 +25268,25 @@ function wireSessionSheet() {
 /* Everything you can do TO this exercise, behind its name. The three things
    that used to be chips on the title line: swap it, skip it, and who can see
    it. Each one is the handler that was already behind the chip. */
+/* Whether anything still ahead is worth the tap: same equipment check
+   switchRemainderToBodyweight runs, kept synchronous (no matcher call, no
+   network) because this only decides whether to grey out a menu row. */
+function remainderNeedsEquipmentSwitch() {
+  if (!SESSION || !TODAY_WORKOUT?.exercises?.length || !EXERCISE_TRAININGS.length) return false;
+  return TODAY_WORKOUT.exercises.some((ex, i) => {
+    if (sessionExerciseTouched(i)) return false;
+    const lib = findStrengthLibraryExercise(ex.name);
+    return !!lib && NO_GYM_EQUIPMENT.has(lib.equipment);
+  });
+}
+
 function openExerciseActions() {
   if (!SESSION || SESSION.finished) return;
   const ei = SESSION.exerciseIndex;
   const ex = TODAY_WORKOUT?.exercises?.[ei];
   if (!ex) return;
   const nextIdx = TODAY_WORKOUT.exercises.findIndex((x, i) => i !== ei && !SESSION.completed[i]);
+  const canGoBodyweight = remainderNeedsEquipmentSwitch();
 
   const scrim = document.createElement("div");
   scrim.className = "pop-scrim";
@@ -25115,6 +25308,12 @@ function openExerciseActions() {
               ? "Nothing else left to move to"
               : `Move on to ${escapeHtml(TODAY_WORKOUT.exercises[nextIdx].name)}, come back any time`}</i></span>
           </button>
+          <button type="button" class="sess-act" data-act="noequip"${canGoBodyweight ? "" : " disabled"}>
+            <span class="sess-act-ico">${icon("body", 18)}</span>
+            <span>No equipment today<i>${canGoBodyweight
+              ? "Switch what's left of this workout to bodyweight"
+              : "Nothing left needs a barbell, cable, machine or dumbbell"}</i></span>
+          </button>
           ${PARTNER_EMAIL ? `<button type="button" class="sess-act" data-act="privacy">
             <span class="sess-act-ico">${icon(workoutPrivacyLocked() ? "lock" : "people", 18)}</span>
             <span>Who can see this<i>${escapeHtml(privacySummary())}</i></span>
@@ -25131,6 +25330,7 @@ function openExerciseActions() {
       close();
       if (act === "swap") swapCurrentExercise();
       else if (act === "skip" && nextIdx !== -1) jumpToExercise(nextIdx);
+      else if (act === "noequip" && canGoBodyweight) noEquipmentToday();
       else if (act === "privacy") openWorkoutPrivacy();
     };
   });
@@ -25938,10 +26138,17 @@ function pausedScreenHTML({ overlay }) {
       ? `${escapeHtml(ex.name)}${currentSet >= 0 ? ` &middot; set ${currentSet + 1} of ${setsDone.length}` : ""}`
       : "";
 
+  /* Same check the exercise-actions menu uses to grey its own row. Left off
+     the paused screen entirely rather than shown disabled: there is no room
+     here for the "nothing needs it" line that makes a disabled row make
+     sense, and it reappears the moment something ahead actually needs kit. */
+  const canGoBodyweight = remainderNeedsEquipmentSwitch();
+
   return `
     <div class="pz${overlay ? "" : " pz-inline"}">
       <div class="pz-top">
         <button type="button" class="pz-min" id="pzHome" aria-label="Home, the workout keeps running">${icon("home", 22)}</button>
+        ${canGoBodyweight ? `<button type="button" class="pz-min" id="pzKit" aria-label="No equipment today. Switch what's left to bodyweight">${icon("body", 22)}</button>` : ""}
       </div>
 
       <div class="pz-mid">
@@ -26024,6 +26231,7 @@ function wirePausedScreen({ overlay }) {
      nothing. That was "the buttons don't work on this page". */
   const q = (id) => root.querySelector("#" + id);
   q("pzHome").onclick = goHomeFromSession;
+  if (q("pzKit")) q("pzKit").onclick = () => noEquipmentToday({ overlay });
   q("pzResume").onclick = () => resumeFromPaused({ overlay, root });
   mountMotionFigures(root);
   renderPausedLive(root);
