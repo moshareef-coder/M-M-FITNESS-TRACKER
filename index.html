@@ -7464,6 +7464,12 @@
           <span class="set-val" id="setNotifySub"></span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
+        <button type="button" class="set-row" id="setRow-sound" data-page="sound">
+          <span class="set-ico" data-ico="speaker"></span>
+          <span class="set-txt"><span class="set-title">Sound</span></span>
+          <span class="set-val" id="setSoundSub"></span>
+          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+        </button>
         <button type="button" class="set-row" id="setRow-theme" data-page="theme">
           <span class="set-ico" data-ico="sunMoon"></span>
           <span class="set-txt"><span class="set-title">Appearance</span></span>
@@ -7786,6 +7792,27 @@
       <div id="pushPromiseNote" style="margin-bottom:10px;"></div>
       <button type="button" class="btn-secondary" id="pushToggleBtn">Turn on reminders</button>
       <p class="muted-note" id="pushNote" style="margin-top:8px;"></p>
+    </div>
+    </div>
+    <div class="settings-page hidden" id="page-sound">
+      <div class="scr-head">
+        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+        <div class="scr-title">Sound</div>
+        <div class="spacer"></div>
+      </div>
+    <div class="card">
+      <h2>Unio out loud</h2>
+      <label class="gym-toggle" id="voiceWrap">
+        <span>Unio talks</span>
+        <input type="checkbox" id="voiceToggle" />
+      </label>
+      <p class="muted-note">He reads his own lines aloud: the greeting on Home, what he says between your sets, the introduction when you set up. Nothing else is read out, and he never reads a message from your partner.</p>
+      <label class="gym-toggle" id="sfxWrap" style="margin-top:12px;">
+        <span>Sounds</span>
+        <input type="checkbox" id="sfxToggle" />
+      </label>
+      <p class="muted-note">Short tones for the things you do: a set logged, a rest up, a workout finished, a record.</p>
+      <p class="muted-note">Both are set on this phone rather than on your account, so a second device keeps its own answer.</p>
     </div>
     </div>
     <div class="settings-page hidden" id="page-theme">
@@ -8332,6 +8359,7 @@ const ICON_PATHS = {
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
   lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0"/>',
+  speaker: '<path d="M11 5 6.5 9H3v6h3.5L11 19V5Z"/><path d="M15.4 9.6a3.4 3.4 0 0 1 0 4.8"/><path d="M18 7a7 7 0 0 1 0 10"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   minus: '<path d="M5 12h14"/>',
   home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/>',
@@ -12284,6 +12312,11 @@ let TYPE_TIMER = null;
 function typeOut(el, text) {
   clearInterval(TYPE_TIMER);
   if (!el) return;
+  /* He says it as it STARTS typing, so the words and the voice are one event
+     rather than a caption arriving after a performance. Keyed on the element's
+     id, which is obBotSay on every screen of onboarding, so a step that
+     repaints without changing its line does not make him say it twice. */
+  voice.say(text, { from: el.id || "obBot" });
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = text; return; }
   el.textContent = "";
   let i = 0;
@@ -17123,6 +17156,12 @@ function hirePitchHTML(context) {
    because every other card in this app wires its own buttons and a lone
    global listener is the thing nobody finds when this stops working. */
 function wireHirePitch(root) {
+  /* Said as well as written, and at most once every few minutes: the pitch is
+     drawn by renderers that run on their own schedule, and a trainer who asks
+     for money every time a card repaints is not charming, he is a machine in a
+     train station. */
+  const pitchLine = (root || document).querySelector(".hire-pitch-line");
+  if (pitchLine) voice.say(pitchLine.textContent, { from: "hirePitch", gap: 4 * 60 * 1000 });
   (root || document).querySelectorAll("[data-hire]").forEach((b) => {
     b.onclick = async () => {
       /* Disabled for the round trip, because the store sheet takes a moment to
@@ -17217,6 +17256,11 @@ function showPaywall({ skipLabel = "Not now" } = {}) {
           </div>
       </div>`;
     document.body.appendChild(scrim);
+    /* The one line on this screen that is him rather than the app, so it is
+       the only one read out. Everything else here is a price and the legal
+       copy Apple require, and a robot reading terms of use aloud is a
+       different product. */
+    voice.say("Hire me as your personal trainer.", { from: "paywall", gap: 120000 });
     /* The dots track a scroll position rather than a click handler, because
        the track scrolls by touch and by the arrow-key/trackpad affordances a
        horizontal overflow gets for free, and both need to land on the same
@@ -20272,6 +20316,9 @@ function renderCardioStage() {
       b.onclick = () => { CARDIO_SES.minutes = Number(b.dataset.preset); csnSave(); renderCardioStage(); };
     });
     $("csnGo").onclick = async () => {
+      /* The same tick a set gets: something has started, and it is marked here
+         rather than after the awaits below go and build the plan. */
+      sfx.play("set");
       /* The lifting day this session was swapped for stands down now, and only
          now: see startCardioInsteadOfPlan on why opening the timer is not
          enough to take somebody's plan away. */
@@ -20327,6 +20374,9 @@ function renderCardioStage() {
       csnSave(); renderCardioStage();
     };
     $("csnEnd").onclick = () => {
+      /* Ending a run is finishing a session, so it gets the session's sound
+         rather than one of its own. */
+      sfx.play("finish");
       CARDIO_SES.accum = csnElapsedMs();
       CARDIO_SES.since = null;
       CARDIO_SES.state = "done";
@@ -24468,6 +24518,9 @@ function paintRest() {
   if (s.ready && REST_BUZZED_AT !== SESSION.restStartedAt) {
     REST_BUZZED_AT = SESSION.restStartedAt;
     buzz([18, 60, 18]);
+    /* The chime carries the same message as the buzz for a phone sitting on a
+       bench rather than in a hand, which is where it usually is by now. */
+    sfx.play("restEnd");
   }
   /* Standing about well past the plan is the moment he has the most to say,
      and it is once per rest however long you stay: the buzz already marks
@@ -24507,6 +24560,295 @@ function stopRestTicker() {
 function buzz(pattern) {
   try { navigator.vibrate?.(pattern); } catch { /* unsupported, nothing to do */ }
 }
+
+/* ---- Unio out loud ----
+
+   Every line he says was written to be read aloud and until now nobody could
+   hear one. Two halves, deliberately separate: the VOICE reads his words, the
+   EFFECTS mark what the app just did. Somebody who wants the ticks without a
+   robot talking at them in a busy gym is the normal case, not the exception,
+   so they are two switches. Both live on the phone rather than on the account,
+   the same as the coach's mute above: sound is a fact about where you are
+   standing, not about who you are.
+
+   speechSynthesis rather than a plugin. It is in Safari, in Chrome and in
+   WKWebView, so the iOS shell gets this without package.json growing a
+   dependency for something the runtime already has. Nothing in here throws
+   when the API is missing; it goes quiet, which is the right failure for a
+   feature nobody should be able to depend on.
+
+   No audio files. Five effects built out of oscillators, because a binary
+   asset is a thing to host, cache, version and ship, and a tick is four lines
+   of maths. */
+
+const VOICE_OFF_KEY = "ft-voice-off";
+const SFX_OFF_KEY = "ft-sfx-off";
+
+/* Absence means on. Both start on for a new phone, because a feature nobody
+   discovers is a feature nobody has, and the switch to turn him off is two
+   taps away in Setup. */
+function voiceOff() {
+  try { return localStorage.getItem(VOICE_OFF_KEY) === "1"; } catch { return false; }
+}
+function setVoiceOff(off) {
+  try { off ? localStorage.setItem(VOICE_OFF_KEY, "1") : localStorage.removeItem(VOICE_OFF_KEY); }
+  catch { /* private mode: it stays on for this run and that is fine */ }
+  if (off) voiceStop();
+}
+function sfxOff() {
+  try { return localStorage.getItem(SFX_OFF_KEY) === "1"; } catch { return false; }
+}
+function setSfxOff(off) {
+  try { off ? localStorage.setItem(SFX_OFF_KEY, "1") : localStorage.removeItem(SFX_OFF_KEY); }
+  catch { /* same */ }
+}
+
+/* iOS will not start audio nobody asked for, and neither will Chrome: the
+   first note and the first spoken line have to happen inside a gesture or they
+   are dropped with no error at all. So the first touch anywhere arms both
+   halves, on capture so it lands before the button's own handler runs.
+
+   This is also what keeps him quiet on page load without a rule about it. A
+   line typing on a screen nobody has touched yet cannot make a sound, whatever
+   called it, so a reload that lands mid-onboarding is silent and the first
+   thing he says out loud is the intro, after the tap on the name screen. */
+let AUDIO_ARMED = false;
+function armAudio() {
+  if (AUDIO_ARMED) return;
+  AUDIO_ARMED = true;
+  /* Built inside the gesture rather than at the first tick. A context created
+     later starts suspended and the sound that created it is the one that gets
+     lost. */
+  sfxContext();
+}
+["pointerdown", "touchend", "keydown"].forEach((ev) => {
+  document.addEventListener(ev, armAudio, { capture: true, once: true, passive: true });
+});
+
+/* ---- His voice ----
+
+   Deterministic, and it has to be. "Whatever getVoices hands back first" is a
+   different robot on every machine and on a Mac it is frequently Albert, who
+   sounds like a 1984 answering machine. Named preferences first, then the best
+   remaining English voice that is not one of the novelty voices Apple has
+   shipped for forty years, then whatever English there is.
+
+   Local voices win ties over network ones. A cloud voice is often smoother and
+   it is also useless in a basement gym, and a line that arrives four seconds
+   after the set it was about is worse than a slightly flatter one on time. */
+const VOICE_WANTED = [
+  "Samantha", "Ava", "Allison", "Susan",                 // en-US, Apple, natural
+  "Daniel", "Serena", "Kate",                            // en-GB, Apple
+  "Google US English", "Google UK English Male",         // Chrome
+  "Microsoft Aria Online (Natural) - English (United States)",
+];
+
+/* The macOS joke voices. They are real entries in getVoices with real en-US
+   lang tags, so nothing but a list keeps one of them out of the job. */
+const VOICE_NOVELTY = new Set([
+  "Albert", "Bad News", "Bahh", "Bells", "Boing", "Bubbles", "Cellos",
+  "Deranged", "Good News", "Hysterical", "Jester", "Junior", "Kathy",
+  "Organ", "Princess", "Ralph", "Superstar", "Trinoids", "Whisper",
+  "Wobble", "Zarvox", "Fred", "Agnes", "Victoria", "Bruce", "Vicki",
+]);
+
+/* Confident and dry, which is a pitch question more than a rate one. Below 1
+   is where a voice stops sounding delighted with itself; 0.92 is as low as the
+   Apple voices go before they start sounding tired. The rate is a hair over
+   default so he reads a line as somebody who already knew it rather than
+   somebody being careful, and the volume sits under 1 so he is a voice in the
+   room and not an announcement. */
+const VOICE_RATE = 1.02;
+const VOICE_PITCH = 0.92;
+const VOICE_VOLUME = 0.95;
+
+/* Him saying the same words from the same place again within twenty seconds is
+   a repaint, not a second thought. renderHero and the onboarding chrome both
+   run on plenty of things that are not somebody arriving at a screen. */
+const VOICE_REPEAT_MS = 20000;
+
+let VOICE_PICKED = null;
+let VOICE_HOOKED = false;
+const VOICE_SAID = new Map();   // where he spoke from -> the words and when
+
+function voiceApi() {
+  try { return typeof speechSynthesis === "undefined" ? null : speechSynthesis; }
+  catch { return null; }
+}
+
+function voiceRank(v) {
+  const lang = (v.lang || "").replace("_", "-");
+  const byLang = lang === "en-US" ? 0 : lang === "en-GB" ? 1 : 2;
+  return byLang * 2 + (v.localService === false ? 1 : 0);
+}
+
+function pickVoice(list) {
+  const english = (list || []).filter((v) => /^en([-_]|$)/i.test(v.lang || ""));
+  if (!english.length) return null;
+  for (const want of VOICE_WANTED) {
+    const hit = english.find((v) => v.name === want);
+    if (hit) return hit;
+  }
+  const usable = english
+    .filter((v) => !VOICE_NOVELTY.has(v.name || ""))
+    /* Name breaks the tie rather than list order, so two phones with the same
+       voices installed pick the same one and a bug reported on one of them is
+       reproducible on the other. */
+    .sort((a, b) => voiceRank(a) - voiceRank(b) || (a.name || "").localeCompare(b.name || ""));
+  return usable[0] || english[0];
+}
+
+/* Safari and Chrome both hand back an empty list on the first ask and fill it
+   in a moment later, so the choice is made once and remembered, and the list
+   arriving late is hooked rather than polled. A line spoken before it lands
+   goes out in the browser default; every one after it is him. */
+function voiceChoice() {
+  if (VOICE_PICKED) return VOICE_PICKED;
+  const synth = voiceApi();
+  if (!synth || typeof synth.getVoices !== "function") return null;
+  const list = synth.getVoices() || [];
+  if (!list.length) {
+    if (!VOICE_HOOKED) {
+      VOICE_HOOKED = true;
+      try {
+        synth.addEventListener("voiceschanged", () => {
+          VOICE_PICKED = pickVoice(synth.getVoices() || []);
+        });
+      } catch { /* no event, no second chance, the default will do */ }
+    }
+    return null;
+  }
+  VOICE_PICKED = pickVoice(list);
+  return VOICE_PICKED;
+}
+
+function voiceStop() {
+  try { voiceApi()?.cancel(); } catch { /* nothing was speaking */ }
+}
+
+/* `from` is where the line is being spoken from, which is what the repeat
+   guard is keyed on together with the words. `interrupt` cancels whatever he
+   is part way through; without it a line arriving while he is talking is
+   DROPPED rather than queued, because a backlog of lines about sets you
+   finished a minute ago is the thing that makes a talking app unbearable. */
+function voiceSay(text, { interrupt = true, from = "", gap = VOICE_REPEAT_MS } = {}) {
+  if (!AUDIO_ARMED || voiceOff()) return;
+  const synth = voiceApi();
+  if (!synth || typeof SpeechSynthesisUtterance === "undefined") return;
+  const line = String(text || "").replace(/\s+/g, " ").trim();
+  if (!line) return;
+
+  const seen = VOICE_SAID.get(from);
+  if (seen && seen.line === line && Date.now() - seen.at < gap) return;
+  VOICE_SAID.set(from, { line, at: Date.now() });
+
+  if (interrupt) voiceStop();
+  else if (synth.speaking || synth.pending) return;
+
+  const u = new SpeechSynthesisUtterance(line);
+  const v = voiceChoice();
+  if (v) { u.voice = v; u.lang = v.lang; }
+  u.rate = VOICE_RATE;
+  u.pitch = VOICE_PITCH;
+  u.volume = VOICE_VOLUME;
+  /* cancel() and speak() in the same turn is the one thing WebKit will not do:
+     the new utterance joins the queue the cancel is still draining and is
+     thrown away without an error to show for it. One tick of the event loop
+     between them is the entire fix, and it has to be a real timer rather than
+     a microtask. */
+  setTimeout(() => {
+    try { synth.speak(u); } catch { /* the device took the voice away */ }
+  }, interrupt ? 60 : 0);
+}
+
+const voice = { say: voiceSay, stop: voiceStop };
+
+/* ---- The effects ----
+
+   Five, all under 400ms, all distinct from each other by shape rather than by
+   timbre: one note, two notes up, three notes up, a struck pair and a low tap.
+   Somebody can tell those apart with the phone in a pocket, which is the whole
+   job. */
+let SFX_CTX = null;
+function sfxContext() {
+  if (SFX_CTX) {
+    /* iOS suspends the context whenever the app goes to the background or a
+       call arrives, and it comes back suspended. Every sound asks. */
+    if (SFX_CTX.state === "suspended") { try { SFX_CTX.resume(); } catch { /* it will not */ } }
+    return SFX_CTX;
+  }
+  const Ctor = typeof AudioContext !== "undefined" ? AudioContext
+    : typeof webkitAudioContext !== "undefined" ? webkitAudioContext : null;
+  if (!Ctor) return null;
+  try { SFX_CTX = new Ctor(); } catch { return null; }
+  return SFX_CTX;
+}
+
+/* One note: a shape, where it starts, where it ends up, how long it rings and
+   how loud. A 6ms attack rather than none, because a square edge on the front
+   of a note is a click, and five clicks a set is what makes an app sound
+   cheap. Exponential ramps rather than linear, because that is what the ear
+   hears as a note decaying rather than as a volume slider moving. */
+function sfxNote(ctx, at, n) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const secs = n.ms / 1000;
+  osc.type = n.type || "triangle";
+  osc.frequency.setValueAtTime(n.hz, at);
+  if (n.hz2) osc.frequency.exponentialRampToValueAtTime(n.hz2, at + secs);
+  gain.gain.setValueAtTime(0.0001, at);
+  gain.gain.exponentialRampToValueAtTime(n.peak, at + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + secs);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(at);
+  osc.stop(at + secs + 0.02);
+}
+
+const SFX_KIT = {
+  /* Logged. One note, high and short: the sound of a thing landing, not of a
+     thing being celebrated. It happens forty times a workout. */
+  set: [{ at: 0, hz: 880, ms: 90, peak: 0.16 }],
+  /* A rest clock started. Deliberately the quietest thing in here and low
+     enough to sit underneath the tick it always follows. It is information. */
+  restStart: [{ at: 0, hz: 330, ms: 70, peak: 0.05, type: "sine" }],
+  /* Rest is up. A fifth, rung rather than struck, and the longest of the five,
+     because this is the one that arrives while somebody is standing about not
+     looking at the phone. */
+  restEnd: [
+    { at: 0, hz: 784, ms: 300, peak: 0.10, type: "sine" },
+    { at: 0.02, hz: 1175, ms: 320, peak: 0.07, type: "sine" },
+  ],
+  /* Done. Two notes up a fourth. Finished, not triumphant: most workouts are
+     not a record, and a fanfare every time devalues the one that is. */
+  finish: [
+    { at: 0, hz: 587, ms: 130, peak: 0.15 },
+    { at: 0.12, hz: 880, ms: 240, peak: 0.16 },
+  ],
+  /* A record. Three notes up a major triad and the last one rings on. This is
+     the only sound in the app allowed to sound pleased with itself. */
+  pr: [
+    { at: 0, hz: 659, ms: 100, peak: 0.15 },
+    { at: 0.09, hz: 831, ms: 100, peak: 0.15 },
+    { at: 0.18, hz: 988, ms: 200, peak: 0.17 },
+  ],
+};
+
+/* `delay` is in seconds and is scheduled on the audio clock rather than with a
+   timer, so a pair of sounds meant to land 200ms apart actually do, on a phone
+   busy re-rendering a session screen. */
+function sfxPlay(name, delay = 0) {
+  if (!AUDIO_ARMED || sfxOff()) return;
+  const kit = SFX_KIT[name];
+  if (!kit) return;
+  const ctx = sfxContext();
+  if (!ctx) return;
+  try {
+    const t0 = ctx.currentTime + delay + 0.01;
+    for (const n of kit) sfxNote(ctx, t0 + n.at, n);
+  } catch { /* the device took the audio away mid-set, nothing to be done */ }
+}
+
+const sfx = { play: sfxPlay };
 
 /* Rest between sets is recorded, not just displayed: it is the honest signal
    that a workout took real time, which is what makes a partner's log credible. */
@@ -25066,6 +25408,11 @@ function decodeEntities(str) {
    system to stop animating things. */
 function typeQuip(target, line, done) {
   if (!target) { done(); return; }
+  /* Both bubbles come through here, the one in a session and the one on Home,
+     and both are him talking. Above the reduced motion branch on purpose: a
+     person who turned animation off still gets the line read out. Keyed on the
+     class because neither bubble has an id, they are built fresh every time. */
+  voice.say(line, { from: target.className || "quip" });
   if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
     target.textContent = line;
     done();
@@ -25150,6 +25497,9 @@ function celebrateSet(ei, setIdx) {
     ? `Set ${setIdx + 1} logged: ${w} lb × ${reps}`
     : `Set ${setIdx + 1} logged: ${reps} reps`);
   const wasPR = maybeAnnouncePR(ex.name, w);
+  /* One sound per set, never two: a record IS the set landing, so the flourish
+     takes the tick's place rather than piling on top of it. */
+  sfx.play(wasPR ? "pr" : "set");
   /* He does not talk over the record pop, which is its own celebration and
      already owns the top of the screen for a moment. The PR line waits for it
      to retract. */
@@ -25320,6 +25670,11 @@ function toggleSet(setIdx) {
     SESSION.setWeights[ei][setIdx] = isNaN(w) ? null : w;
     SESSION.restStartedAt = Date.now();   // rest begins the moment a set lands
     SESSION.restAntic = pickRestAntic();  // and the figure picks what to do with it
+    /* This one always lands on the heels of the set tick, because logging a set
+       IS how a rest starts here: there is no separate "begin resting" tap. Held
+       back a fifth of a second so the two read as two beats, "logged, clock
+       running", instead of one muddy noise. */
+    sfx.play("restStart", 0.22);
   } else {
     SESSION.setWeights[ei][setIdx] = null;
     SESSION.restStartedAt = null;
@@ -26475,6 +26830,9 @@ async function doMarkGymDayDone() {
 async function finishWorkout() {
   if (!SESSION || SESSION.finished) return;   // already banked
   SESSION.finished = true;
+  /* On the tap, not after the writes below. The sound is about what the person
+     just did; whether a row landed is a different question with its own toast. */
+  sfx.play("finish");
   /* Not in closeSessionUI: minimising leaves the workout running, and the Lock
      Screen is exactly where it should still be visible. */
   endLiveActivity();
@@ -35178,6 +35536,16 @@ function trainingSummary() {
   return bits.join(", ");
 }
 
+/* Four states rather than On and Off, because two switches under one row have
+   four answers and "On" for a phone that is only ticking is a small lie. */
+function soundSummary() {
+  const talks = !voiceOff();
+  const tones = !sfxOff();
+  if (talks && tones) return "On";
+  if (!talks && !tones) return "Off";
+  return talks ? "Voice only" : "Sounds only";
+}
+
 function paintSettingsValues() {
   /* The Goal row's only writer used to be closeSettingsPage, so the row read
      "Not set" from the moment the tab opened until you had been into a subpage
@@ -35189,6 +35557,7 @@ function paintSettingsValues() {
   settingsValue("setProfileSub", ME || "");
   settingsValue("setThemeSub",
     (document.documentElement.getAttribute("data-theme") || "dark") === "light" ? "Light" : "Dark");
+  settingsValue("setSoundSub", soundSummary());
   settingsValue("setAboutSub", APP_VERSION);
   settingsValue("setAccountSub", MY_EMAIL || "");
 
@@ -35416,6 +35785,35 @@ function renderSetupTab() {
   document.querySelectorAll("[data-setback]").forEach((b) => {
     b.onclick = closeSettingsPage;
   });
+
+  /* Sound. Device preferences, so they are read off localStorage the way the
+     coach's mute is, and wired outside the MY_PROFILE block below: somebody
+     who wants him to stop talking should not have to wait on a network round
+     trip for permission to say so.
+
+     Each switch proves itself on the way on rather than promising in copy that
+     it works. Turning one off proves itself by the silence. */
+  if ($("voiceToggle")) {
+    $("voiceToggle").checked = !voiceOff();
+    $("voiceWrap").classList.toggle("checked", !voiceOff());
+    $("voiceToggle").onchange = (e) => {
+      setVoiceOff(!e.target.checked);
+      $("voiceWrap").classList.toggle("checked", e.target.checked);
+      // gap 0: this one is a demonstration, so it repeats as often as it is asked to.
+      if (e.target.checked) voice.say("Loud and clear.", { from: "soundSetting", gap: 0 });
+      settingsValue("setSoundSub", soundSummary());
+    };
+  }
+  if ($("sfxToggle")) {
+    $("sfxToggle").checked = !sfxOff();
+    $("sfxWrap").classList.toggle("checked", !sfxOff());
+    $("sfxToggle").onchange = (e) => {
+      setSfxOff(!e.target.checked);
+      $("sfxWrap").classList.toggle("checked", e.target.checked);
+      if (e.target.checked) sfx.play("set");
+      settingsValue("setSoundSub", soundSummary());
+    };
+  }
   /* The trainer row. Hired reads as a fact about the account; not hired reads
      as the offer it is, and tapping it is the offer. */
   if ($("setRow-hire")) {
