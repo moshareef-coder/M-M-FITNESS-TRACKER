@@ -547,6 +547,45 @@ Identical to the free version except card two: eyebrow NEXT WORKOUT, title (24) 
 Everything else as the free version.
 ```
 
+### Progress: what do you want to track?
+The first thing a new account sees, right after onboarding. One page per goal, the metrics that make sense for that goal, six tiles.
+
+```
+You are a senior mobile product designer. Design ONE screen of Unio, an iPhone fitness app for two people who train together, coached by a robot personal trainer named Unio. Produce a high-fidelity mockup at 390 x 844 (iPhone 15), light theme first. When I ask, do the same screen in dark theme.
+
+THE PRODUCT IN ONE BREATH
+Unio is not a workout generator. It is about your goals and about having a partner. Unio the robot is your personal trainer: he builds your plan, tracks you, and watches you and your partner. He is funny, dry, confident and motivational. He never lectures. Everything he says is short and works read aloud.
+
+THE ROBOT (draw him exactly like this every time)
+A small white robot bust, flat vector, thin dark outline, no gradients, no shading tricks. Rounded-square head with soft corners. A dark charcoal visor band across the eyes holding two angular lime-green eyes, slightly slanted, like someone concentrating. A short antenna on top with a small green tip. Small rounded ear pods. White shoulders. Friendly, never cutesy, never a toy. When he "speaks" his line sits in a plain white rounded speech bubble with a thin border, or as a line of text next to his face, typed out.
+
+DESIGN SYSTEM (use these exactly)
+Font: DM Sans only. Type steps: 11 (uppercase eyebrow, letter-spaced), 12.5 (meta), 14 (secondary), 15.5 (body and button labels), 17 (card title), 21 (headline), 24 (one big figure), 28 (screen title). Nothing in between.
+Light theme: page #f5f7fa, card #ffffff, sunken #eef1f5, border #e4e8ee, text #111318, muted #686d7c, accent green #3be76b, deep green for filled buttons and green text #0f7a38, you (blue) #4a8dbf, partner (coral) #f37c62, planned (purple) #8b5cf6.
+Dark theme: page #0b0d11, card #14171d, sunken #1b1f26, border #262b34, text #f4f6f8, muted #8b94a3, accent lime #a8ff00 (with dark text on it), you #2d6bff, partner #ff6b4a. In dark, depth comes from the lighter card surface, not shadows.
+Shape: cards radius 20, padding 16, hairline border, barely-there shadow. Buttons: full width, 46 tall, radius 12, label 15.5 bold. Primary button is deep green fill with white text (light) or lime fill with dark text (dark). Secondary is the sunken grey fill with dark text. Ghost is text only.
+Page: 18px side gutters, header 44 tall with the UNIO wordmark (a small barbell mark then the word).
+Robot lines type out like someone talking. Onboarding screens carry a 3px progress bar at the top.
+
+RULES
+No button in the whole app says "Continue". Every primary button says what pressing it means, in the robot's voice, and the brief gives the exact label.
+No emojis. No stock photos. No illustrations of people; the only character is the robot and, where stated, a flat white body figure. No gradients on backgrounds. No subtext under tiles unless the brief says so: bold things that are easy to tap. Copy must be exactly as written in the brief, do not rewrite it. One screen, no scrolling unless the brief allows it. Show the iPhone status bar and, where the brief says "in the app", the bottom tab bar: Home, Body, a raised green circular dumbbell button in the middle, Progress, Setup.
+
+OUTPUT
+The mockup image. Then a five-line list of the components you used, top to bottom, so I can hand it to a developer.
+
+SCREEN: Progress tab, first open after onboarding, tab bar showing with Progress active. Light theme. This is a full-screen setup page inside the tab, one per goal the person holds; draw GOAL 1.
+Eyebrow (11, uppercase, letter-spaced, muted): GOAL 1 OF 2
+Title (28): Lose weight
+Robot face small at the left with his line (14, muted), typed out: "Pick what you want to see back. I'll keep the rest quiet."
+A 3 by 2 grid of six tiles, each 100 tall, radius 14, hairline border: a 24px line icon at the top, the label (15.5 bold), a blurb (12.5, muted, two lines max). Selected tiles: deep green border, pale green fill, a small tick in the top right corner.
+Tiles, in order: Weight (scale icon, "See your progress over time") SELECTED · Waist (tape icon, "Track changes in your waist") SELECTED · Body Photos (camera icon, "Visually see your progress") SELECTED · Hips (body icon, "Track changes in your hips") · Chest (body icon) · Arms (dumbbell icon).
+Under the grid (12.5, muted, centered): You can change this any time from the dots on your goal.
+Primary button: Track those
+Ghost button: Skip this one
+Second frame, as a separate image: GOAL 2 OF 2, title "Get stronger", the same layout with these six tiles: Best Lifts (bolt icon, "Watch your numbers climb") SELECTED · Weekly Volume (trending icon, "How much work you put in") SELECTED · Workouts a week (calendar icon, "How often you actually show up") SELECTED · Body Photos · Weight · Cardio sessions (runner icon). No tape measurements on this one: get stronger is not measured with a tape.
+```
+
 ### Progress on a free account
 The goal header renders, then the chart area is the robot's offer, in place. Not a blank, not a popup.
 

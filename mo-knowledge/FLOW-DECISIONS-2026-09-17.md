@@ -177,3 +177,16 @@ OPEN: a $4.99 code for the first fifty. Marketing, later.
 ## Voice
 Every robot line will be spoken later. Write for the ear: short sentences, no
 parentheses, nothing that only makes sense as text.
+
+## Added 2026-09-18: Progress is where tracking gets set up
+
+- Onboarding ends on the Progress tab, not Home, for a brand new account.
+- The "what do you want to track" pages live there, one per goal held, Goal 1
+  then 2 then 3, the six-tile grid. At the end: not hired, the offer; hired, the
+  chosen cards apply, empty until there is data.
+- What a goal may track has to make sense. Tape measurements (waist, hips,
+  chest, thighs, arms) only for lose weight, lose fat and build muscle, bulk
+  up. Get stronger measures lifts and work, never the tape. Move better counts
+  sessions: stretching, yoga, Pilates, walking, per week. Endurance counts
+  running, cycling and walking sessions, minutes and distance. "The sessions
+  themselves."
