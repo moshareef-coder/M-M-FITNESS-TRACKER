@@ -7321,6 +7321,58 @@
       <div class="ms-list" id="volumeDetail"></div>
     </div>
 
+    <!-- The weekly session cards. Five cards of one shape, all drawn by
+         renderWeekCard off one count of what was finished, because three of
+         the seven goals are measured in sessions and this tab had no way to
+         show one: Get stronger was being offered a tape measure and Move
+         better was being offered nothing at all.
+
+         They are the same geometry as Training volume above, on purpose. A
+         count and a tonnage are the same shape of answer, and a person who
+         has learned to read one bar chart on this tab should not have to
+         learn a second. Shown only when the tracking picker asks for them,
+         which is what makes them different from every other card here. -->
+
+    <div class="card metric-card idx-card" id="cardCardioWk">
+      <h2>Cardio sessions</h2>
+      <p class="idx-summary" id="cardioWkSummary"></p>
+      <p class="muted-note idx-lead" style="margin-top:-6px" id="cardioWkLead"></p>
+      <div class="chart-wrap"><canvas id="cardioWkChart"></canvas></div>
+      <div class="ms-list" id="cardioWkDetail"></div>
+    </div>
+
+    <div class="card metric-card idx-card" id="cardCardioMin">
+      <h2>Cardio minutes</h2>
+      <p class="idx-summary" id="cardioMinSummary"></p>
+      <p class="muted-note idx-lead" style="margin-top:-6px" id="cardioMinLead"></p>
+      <div class="chart-wrap"><canvas id="cardioMinChart"></canvas></div>
+      <div class="ms-list" id="cardioMinDetail"></div>
+    </div>
+
+    <div class="card metric-card idx-card" id="cardDistanceWk">
+      <h2>Distance</h2>
+      <p class="idx-summary" id="distanceWkSummary"></p>
+      <p class="muted-note idx-lead" style="margin-top:-6px" id="distanceWkLead"></p>
+      <div class="chart-wrap"><canvas id="distanceWkChart"></canvas></div>
+      <div class="ms-list" id="distanceWkDetail"></div>
+    </div>
+
+    <div class="card metric-card idx-card" id="cardMobilityWk">
+      <h2>Mobility sessions</h2>
+      <p class="idx-summary" id="mobilityWkSummary"></p>
+      <p class="muted-note idx-lead" style="margin-top:-6px" id="mobilityWkLead"></p>
+      <div class="chart-wrap"><canvas id="mobilityWkChart"></canvas></div>
+      <div class="ms-list" id="mobilityWkDetail"></div>
+    </div>
+
+    <div class="card metric-card idx-card" id="cardWalkWk">
+      <h2>Walks</h2>
+      <p class="idx-summary" id="walkWkSummary"></p>
+      <p class="muted-note idx-lead" style="margin-top:-6px" id="walkWkLead"></p>
+      <div class="chart-wrap"><canvas id="walkWkChart"></canvas></div>
+      <div class="ms-list" id="walkWkDetail"></div>
+    </div>
+
     <div class="card metric-card idx-card" id="cardPhotos">
       <h2>Body photos</h2>
       <p class="idx-summary" id="photosSummary"></p>
@@ -20488,13 +20540,15 @@ function cardioTargetBand(buckets) {
   return { lo: prev, hi: prev * 1.1 };
 }
 
-/* Minutes across ALL three activities, because the tile says cardio and not
-   running: a week of cycling is not a week off. */
-/* Everything started from the activity sheet counts as cardio minutes, not
-   only the three that have a distance line. A 45 minute HIIT session or a
-   Pilates class is not a week off, and the tile says "cardio minutes" rather
-   than "running minutes". cardioActivityOf stays narrow because it decides
-   which CHIP a log belongs under, and there is no Pilates chip. */
+/* Minutes across ALL the cardio activities, because the tile says cardio and
+   not running: a week of cycling is not a week off, and neither is a week of
+   rowing or HIIT. */
+/* Yoga and Pilates used to be in this number, on the grounds that a Pilates
+   class is not a week off either. True, and it now has its own card
+   (mobility_wk) with its own count, so leaving it in here would be one class
+   answering two questions on one screen and inflating the endurance one.
+   sessionLogsInWeek is the single place that decides what a session is, so
+   this tile and those cards cannot drift apart. */
 function countsAsCardio(exerciseName) {
   if (cardioActivityOf(exerciseName)) return true;
   const n = (exerciseName || "").trim().toLowerCase();
@@ -20503,17 +20557,8 @@ function countsAsCardio(exerciseName) {
 }
 
 function cardioMinutesInWeek(name, weekStart) {
-  const end = new Date(weekStart + "T00:00:00");
-  end.setDate(end.getDate() + 7);
-  const stop = isoDate(end);
-  let m = 0;
-  for (const l of ALL_EXERCISE_LOGS) {
-    if (l.user_name !== name || !l.entry_date) continue;
-    if (l.entry_date < weekStart || l.entry_date >= stop) continue;
-    if (!countsAsCardio(l.exercise_name)) continue;
-    m += Number(l.duration_min) || 0;
-  }
-  return m;
+  return sessionLogsInWeek(name, weekStart, "cardio")
+    .reduce((m, l) => m + (Number(l.duration_min) || 0), 0);
 }
 
 /* Pace only means something with both halves. Cyclists read speed and runners
@@ -21816,6 +21861,227 @@ function renderVolumeChart() {
     },
   });
   renderVolumeDetail();
+}
+
+/* ---------- The weekly session cards ----------
+
+   Five cards, one shape, one renderer: how many this week, the eight weeks
+   behind it in bars, and the definition of the number underneath. They exist
+   because three of the seven goals are measured in sessions and this tab could
+   not show one. Mo: "Move better should be how many stretching sessions, yoga
+   sessions they've done in the week, walking. Endurance is running, cycling,
+   walking sessions. The sessions themselves."
+
+   Bars and not a line, for the same reason Consistency and Volume are bars: a
+   line between two weeks claims the days in between held a value, and a week
+   with no run is a zero that really happened. */
+
+/* Which activity a logged row IS, and the one place that decides. CARDIO_ACTS
+   already carries the split: `cardio` names a mode in cardio.mjs (a run, a
+   ride, a walk, a row, a HIIT block) and `training` names a library of moves
+   (yoga, Pilates). That is the same line Mo drew out loud between endurance
+   and moving better, so it is read off the table that already has it rather
+   than copied into a second list beside it to drift.
+
+   Two ways in, because there are two ways a row gets written: picked from the
+   activity sheet, which writes the label verbatim, or typed as an exercise,
+   where "treadmill walk" and "spin class" are what people actually enter. */
+function sessionActOf(exerciseName) {
+  const n = (exerciseName || "").trim().toLowerCase();
+  if (!n) return null;
+  const exact = CARDIO_ACTS.find((a) => a.label.toLowerCase() === n);
+  if (exact) return exact;
+  const typed = cardioActivityOf(exerciseName);
+  return typed ? CARDIO_ACTS.find((a) => a.key === typed) || null : null;
+}
+
+/* Deliberately narrower than countsAsCardio, which answers a different
+   question. That one is asked "was this a week off", and a Pilates class was
+   not, so it says yes to everything with a clock on it. These cards are asked
+   "how many cardio sessions", with a Mobility card sitting next to them
+   counting the yoga, and one session landing on both charts would be the same
+   session counted twice on one screen. Other has neither a cardio mode nor a
+   library, and is honestly neither. */
+const SESSION_KINDS = {
+  cardio: (a) => !!a.cardio,
+  mobility: (a) => !!a.training,
+  walk: (a) => a.key === "walk",
+};
+
+function sessionLogsInWeek(name, weekStart, kind) {
+  const end = new Date(weekStart + "T00:00:00");
+  end.setDate(end.getDate() + 7);
+  const stop = isoDate(end);
+  const is = SESSION_KINDS[kind];
+  return ALL_EXERCISE_LOGS.filter((l) => {
+    if (l.user_name !== name || !l.entry_date) return false;
+    if (l.entry_date < weekStart || l.entry_date >= stop) return false;
+    /* A session is something that took time or covered ground. A row with
+       neither is a set of a lift that happens to share a name with one. */
+    if (!(Number(l.duration_min) > 0 || Number(l.distance_mi) > 0)) return false;
+    const a = sessionActOf(l.exercise_name);
+    return !!a && is(a);
+  });
+}
+
+/* Eight weeks of them, oldest first, empty weeks kept. A week with no session
+   is a real zero on a count chart, and dropping it would draw a shape that
+   pretends a month off never happened. Weeks run Monday to Sunday, same as
+   volumeWeeks and consistencyWeeks either side of it. */
+function sessionWeeks(name, kind, weeks = 8) {
+  const out = [];
+  const cursor = new Date(weekStartStr() + "T00:00:00");
+  for (let i = 0; i < weeks; i++) {
+    const ws = isoDate(cursor);
+    const logs = sessionLogsInWeek(name, ws, kind);
+    out.unshift({
+      weekStart: ws,
+      count: logs.length,
+      minutes: logs.reduce((n, l) => n + (Number(l.duration_min) || 0), 0),
+      miles: logs.reduce((n, l) => n + (Number(l.distance_mi) || 0), 0),
+    });
+    cursor.setDate(cursor.getDate() - 7);
+  }
+  return out;
+}
+
+const weekPlural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/* One row per card: which sessions it counts, which number it reads off them,
+   and the sentence that says what the number is. Everything else is shared. */
+const WEEK_CARDS = [
+  { key: "cardio_wk", card: "cardCardioWk", id: "cardioWk", kind: "cardio", ico: "run",
+    value: (w) => w.count, fmt: (n) => weekPlural(n, "session"),
+    what: "Runs, rides, rows and HIIT. One finished session counted once." },
+  { key: "cardio_min", card: "cardCardioMin", id: "cardioMin", kind: "cardio", ico: "clock",
+    value: (w) => w.minutes, fmt: (n) => `${Math.round(n)} min`,
+    what: "Minutes on the clock across every run, ride, row and HIIT block." },
+  /* Miles reads null on every row until 20260916_cardio_distance.sql is run,
+     so this card spends its first week honestly empty rather than drawing a
+     flat line at zero and calling it a trend. Same admission the endurance
+     screen makes. */
+  { key: "distance_wk", card: "cardDistanceWk", id: "distanceWk", kind: "cardio", ico: "flag",
+    value: (w) => w.miles, fmt: (n) => `${Number(n).toFixed(1)} mi`,
+    what: "Miles logged on runs, rides and walks.",
+    emptyHint: "Log a run with a distance on it and the last eight weeks fill in here." },
+  /* Yoga and Pilates, and nothing else, because nothing else is recorded. The
+     warm-up and cool-down the engine writes ride on ai_workouts.mobility and
+     are never logged as sessions, by design, so counting "stretching sessions"
+     here would mean counting workouts and calling them stretches. */
+  { key: "mobility_wk", card: "cardMobilityWk", id: "mobilityWk", kind: "mobility", ico: "mat",
+    value: (w) => w.count, fmt: (n) => weekPlural(n, "session"),
+    what: "Yoga and Pilates sessions. A warm-up inside a workout is not one of these." },
+  { key: "walk_wk", card: "cardWalkWk", id: "walkWk", kind: "walk", ico: "walk",
+    value: (w) => w.count, fmt: (n) => weekPlural(n, "walk"),
+    what: "Every walk you finished, however short." },
+];
+const WEEK_CARD_IDS = new Set(WEEK_CARDS.map((c) => c.card));
+/* The session cards plus Consistency, which is the card `workouts_wk` points
+   at. These are the ones Progress will show UNDER a goal screen when somebody
+   ticked them, and the reason the line falls here is that no goal screen
+   contains any of them: the lift screen already carries the volume behind the
+   lift, the tone and bulk screens already carry the photo pair and the tape,
+   the weight screen already has its two tiles. Putting those on again under
+   the hero would be the same number printed twice; a count of sessions is
+   nowhere else on the screen. */
+const PICKED_CARDS = new Set([...WEEK_CARD_IDS, "cardConsistency"]);
+
+/* One chart instance per card, kept so a re-render replaces its own chart and
+   not somebody else's, and so primeOpenedCard can resize the right one. */
+let weekCharts = {};
+/* Which bar is open, per card. Null is the resting state: a bar height is a
+   shape, and the tap is how you read a number off it. */
+let weekCardBar = {};
+
+function renderWeekCardDetail(spec, weeks) {
+  const el = $(spec.id + "Detail");
+  if (!el) return;
+  const i = weekCardBar[spec.card];
+  if (i == null || i >= weeks.length) { el.innerHTML = ""; return; }
+  const w = weeks[i];
+  const open = i === weeks.length - 1;
+  el.innerHTML = `<div class="ms-row">
+      <span class="ms-txt"><b>${escapeHtml(spec.fmt(spec.value(w)))}</b><span>${
+        open ? "This week, still open." : `Week of ${escapeHtml(w.weekStart.slice(5))}.`} ${escapeHtml(spec.what)}</span></span>
+    </div>`;
+}
+
+function renderWeekCard(spec) {
+  const card = $(spec.card);
+  if (!card) return;
+  if (!window.Chart) {
+    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+      .then(() => renderWeekCard(spec)).catch(() => chartUnavailable(spec.id + "Chart"));
+    return;
+  }
+  const viewingPartner = PROGRESS_VIEW === "partner";
+  const name = viewingPartner ? partnerName() : ME;
+  const hex = cssVar(viewingPartner ? "--partner" : "--me");
+  const weeks = sessionWeeks(name, spec.kind, 8);
+  const values = weeks.map(spec.value);
+  const summary = $(spec.id + "Summary");
+  const lead = $(spec.id + "Lead");
+
+  /* Nothing yet is a sentence, not a chart of zeroes. */
+  if (!values.some((v) => v > 0)) {
+    card.classList.add("chart-empty");
+    if (summary) summary.textContent = "Nothing logged yet";
+    if (lead) lead.textContent = "";
+    let ph = $(spec.id + "Empty");
+    if (!ph) { ph = document.createElement("div"); ph.id = spec.id + "Empty"; card.appendChild(ph); }
+    ph.innerHTML = emptyState(spec.ico, "Nothing logged yet",
+      spec.emptyHint || "Your first session shows up here.");
+    if (weekCharts[spec.card]) { weekCharts[spec.card].destroy(); delete weekCharts[spec.card]; }
+    weekCardBar[spec.card] = null;
+    renderWeekCardDetail(spec, weeks);
+    return;
+  }
+  card.classList.remove("chart-empty");
+  $(spec.id + "Empty")?.remove();
+
+  const now = values[values.length - 1];
+  /* Against the weeks that are finished, not against all eight: this week is
+     three days old on a Wednesday, and comparing it to full weeks would tell
+     everybody they were falling behind every Monday morning. */
+  const done = values.slice(0, -1).filter((v) => v > 0);
+  const avg = done.length ? done.reduce((a, b) => a + b, 0) / done.length : 0;
+  if (summary) summary.textContent = `${spec.fmt(now)} this week`;
+  if (lead) {
+    lead.textContent = `${spec.fmt(now)} this week. ${
+      done.length ? `${spec.fmt(Math.round(avg * 10) / 10)} a week before this one.` : "No finished week to compare it against yet."} Tap a week.`;
+  }
+
+  const ctx = $(spec.id + "Chart").getContext("2d");
+  if (weekCharts[spec.card]) weekCharts[spec.card].destroy();
+  weekCharts[spec.card] = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: weeks.map((w) => w.weekStart.slice(5)),
+      datasets: [{ label: spec.key, data: values, backgroundColor: hex, borderRadius: 4, maxBarThickness: 26 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      /* Nearest on the x axis, the same tap Volume takes: a one session week
+         is a two pixel target if you have to hit the bar itself. */
+      onClick: (evt, els, chart) => {
+        const hit = chart.getElementsAtEventForMode(evt, "nearest", { intersect: false, axis: "x" }, true);
+        if (!hit.length) return;
+        weekCardBar[spec.card] = weekCardBar[spec.card] === hit[0].index ? null : hit[0].index;
+        renderWeekCardDetail(spec, weeks);
+      },
+      scales: {
+        x: { border: { display: false }, grid: { display: false }, ticks: { color: cssVar("--muted"), font: { size: 10 } } },
+        y: { border: { display: false }, beginAtZero: true,
+             grid: { color: cssVar("--border"), drawTicks: false },
+             /* Sessions and walks have no halves, and neither do whole minutes
+                or a tenth of a mile at this scale, so one tick rule covers all
+                five rather than each card carrying its own. */
+             ticks: { color: cssVar("--muted"), font: { size: 10 }, padding: 6, precision: 0 } },
+      },
+    },
+  });
+  renderWeekCardDetail(spec, weeks);
 }
 
 function renderWeightChart() {
@@ -31822,6 +32088,12 @@ let PROGRESS_GOAL_LENS = null;
 const PROGRESS_CARDS = [
   "cardWeight", "cardConsistency",
   "cardMuscles", "cardStrength", "cardVolume", "cardPhotos",
+  /* The weekly session cards are in this list so the visibility pass reaches
+     them, and they are taken back out of "everything else" below. A card
+     somebody ticked by name in the tracking picker is not leftovers, and a
+     card they did not tick is not leftovers either: it is a question they
+     answered no to. */
+  "cardCardioWk", "cardCardioMin", "cardDistanceWk", "cardMobilityWk", "cardWalkWk",
 ];
 
 /* ---------- What this tab is supposed to answer ----------
@@ -32059,16 +32331,32 @@ const TRACK_DEFAULTS = {
      it is still worth seeing, it is just the wrong headline. */
   "tone-lean-abs": ["waist_in", "hips_in", "photos"],
   "build-muscle": ["weight", "chest_in", "arm_in"],
-  "get-stronger": ["lifts", "volume"],
-  "build-endurance": ["weight", "volume"],
-  "move-better": [],
-  "consistent": ["weight"],
+  /* Nothing from the tape here, ever. Mo, looking at this exact screen: "if
+     I'm on Get stronger I shouldn't have to measure my waist." A tape reading
+     is evidence about fat; this goal is measured by what the bar weighs, how
+     much of it got moved, and whether the sessions happened. */
+  "get-stronger": ["lifts", "volume", "workouts_wk"],
+  /* "Endurance is running, cycling, walking sessions. The sessions
+     themselves." Distance is offered next to these two and deliberately not
+     pre-ticked: exercise_logs.distance_mi is behind
+     20260916_cardio_distance.sql, so until the owner runs that every reading
+     is null and a pre-ticked Miles card would be an empty card on day one. */
+  "build-endurance": ["cardio_wk", "cardio_min"],
+  /* Move better used to default to nothing at all, on the grounds that this
+     app cannot see range of motion. That is true and it was the wrong
+     conclusion, because it CAN see whether somebody stretched: "how many
+     stretching sessions, yoga sessions they've done in the week, walking". */
+  "move-better": ["mobility_wk", "walk_wk"],
+  /* Not sure yet. Showing up and the scale, the two readings that still mean
+     something before somebody has decided what they are training for. */
+  "consistent": ["workouts_wk", "weight"],
 };
-/* Everything Progress can chart, which is more than the tape: the photo card
-   and the two workout cards are evidence somebody can choose to care about in
-   exactly the same way, and leaving them out of the picker would mean the
-   question "what do you want to track" had a smaller answer than the screen it
-   controls. `card` is the element the choice turns on or off. */
+/* Everything Progress can chart, which is more than the tape: the photo card,
+   the two workout cards and the weekly session counts are evidence somebody
+   can choose to care about in exactly the same way, and leaving them out of
+   the picker would mean the question "what do you want to track" had a smaller
+   answer than the screen it controls. `card` is the element the choice turns on
+   or off. */
 const TRACK_ALL = [{ key: "weight", label: "Weight", unit: "lb", card: "cardWeight", ico: "scale", blurb: "See your progress over time" }]
   .concat(MEASUREMENTS.map((m) => ({
     ...m,
@@ -32079,31 +32367,57 @@ const TRACK_ALL = [{ key: "weight", label: "Weight", unit: "lb", card: "cardWeig
     { key: "photos", label: "Body Photos", card: "cardPhotos", ico: "camera", blurb: "Visually see your progress" },
     { key: "lifts", label: "Best Lifts", card: "cardStrength", ico: "bolt", blurb: "Watch your numbers climb" },
     { key: "volume", label: "Weekly Volume", card: "cardVolume", ico: "trending", blurb: "How much work you put in" },
+    /* The sessions themselves, which is the half of this list that was missing
+       and the half three of the goals are actually measured by. Workouts a week
+       is Consistency, the card that already counts training days against the
+       weekly target, rather than a second card counting the same days a second
+       way: two cards on one tab disagreeing about how many times you trained is
+       exactly the kind of thing that makes a screen feel untrustworthy. */
+    { key: "workouts_wk", label: "Workouts a week", card: "cardConsistency", ico: "checklist", blurb: "Days you trained, week by week" },
+    { key: "cardio_wk", label: "Cardio sessions", card: "cardCardioWk", ico: "run", blurb: "Runs, rides and walks, counted weekly" },
+    { key: "cardio_min", label: "Cardio minutes", card: "cardCardioMin", ico: "clock", blurb: "How long you spent moving" },
+    { key: "distance_wk", label: "Distance", unit: "mi", card: "cardDistanceWk", ico: "flag", blurb: "Miles covered each week" },
+    /* Not "stretching, yoga and Pilates", which is what this tile wanted to
+       say: a warm-up and a cool-down ride on ai_workouts.mobility and are
+       never logged as anything, by design (20260910_ai_workouts_mobility.sql
+       says so in as many words), so there is no stretching session to count.
+       Yoga and Pilates are real finished sessions with minutes on them, and
+       the tile says only what the card can actually show. */
+    { key: "mobility_wk", label: "Mobility sessions", card: "cardMobilityWk", ico: "mat", blurb: "Yoga and Pilates, counted weekly" },
+    { key: "walk_wk", label: "Walks", card: "cardWalkWk", ico: "walk", blurb: "Walking sessions each week" },
   ]);
 
 /* What each goal offers, and in what order. Six per goal, because six fills the
    three by two grid the screen is built on and a seventh would push Continue
    below the fold on a small phone. The first two or three are pre-ticked: the
    ones that goal is genuinely measured by, which is the same judgement
-   TRACK_DEFAULTS makes and is read from there rather than written twice. */
+   TRACK_DEFAULTS makes and is read from there rather than written twice.
+
+   The rule this table was rewritten to obey: a goal offers only what measures
+   it. The tape (waist, hips, chest, thighs, arms) is evidence about fat and
+   size, so it appears on the three goals about fat and size and nowhere else.
+   Get stronger gets the bar. Endurance and Move better get the sessions. */
 const TRACK_OFFERS = {
-  "lose-weight": ["weight", "waist_in", "photos", "hips_in", "chest_in", "arm_in"],
-  "tone-lean-abs": ["waist_in", "hips_in", "photos", "weight", "thigh_in", "arm_in"],
-  "build-muscle": ["weight", "chest_in", "arm_in", "photos", "thigh_in", "lifts"],
-  "get-stronger": ["lifts", "volume", "weight", "photos", "arm_in", "chest_in"],
-  "build-endurance": ["weight", "volume", "photos", "waist_in", "thigh_in", "lifts"],
-  /* Move better has no number that honestly measures it, so it offers the two
-     that come closest and pre-ticks neither. Skipping is the expected answer
-     here and the screen should not imply otherwise. */
-  "move-better": ["photos", "waist_in", "weight", "lifts", "volume", "arm_in"],
-  "consistent": ["weight", "photos", "waist_in", "lifts", "volume", "arm_in"],
+  "lose-weight": ["weight", "waist_in", "photos", "hips_in", "workouts_wk", "cardio_wk"],
+  "tone-lean-abs": ["waist_in", "hips_in", "photos", "weight", "arm_in", "workouts_wk"],
+  "build-muscle": ["weight", "chest_in", "arm_in", "photos", "volume", "lifts"],
+  /* Weight is offered and not pre-ticked: somebody adding size wants to see
+     it, somebody holding a weight class needs it, and neither of them is what
+     this goal is measured by. */
+  "get-stronger": ["lifts", "volume", "workouts_wk", "photos", "weight", "cardio_wk"],
+  "build-endurance": ["cardio_wk", "cardio_min", "distance_wk", "weight", "photos", "volume"],
+  /* No tape and no scale in this one at all. Neither answers the question
+     "am I moving better", and offering them here is what made the old screen
+     read as a form somebody had to fill in rather than a choice. */
+  "move-better": ["mobility_wk", "walk_wk", "cardio_wk", "photos", "workouts_wk", "cardio_min"],
+  "consistent": ["workouts_wk", "weight", "photos", "volume", "cardio_wk", "mobility_wk"],
 };
 
 /* The keys this person wants, in the order they should appear. Falls through
    to the goal's default, then to weight, so it is never empty for somebody who
-   has never opened the picker. Move better is the one goal whose default IS
-   empty, deliberately: it has no number that honestly measures it, and the
-   card that says so is better than a scale nobody asked for. */
+   has never opened the picker. An empty list is still a real answer and is
+   still honoured: turning everything off is a thing somebody is allowed to
+   say, even though no goal ships that way any more. */
 /* PER GOAL, on Mo's call, and it is the right shape: the Progress tab already
    reads through one goal at a time, and "what do you want to measure" has a
    different answer for each of them. Somebody holding Lose weight and Get
@@ -32122,8 +32436,8 @@ function trackedMetrics(goalId = null) {
     || "consistent";
   const byGoal = MY_PROFILE?.tracked_by_goal;
   if (byGoal && typeof byGoal === "object" && Array.isArray(byGoal[bubble])) {
-    /* An empty list is a real answer, not a missing one: Move better
-       legitimately tracks nothing, so it is honoured rather than filled in. */
+    /* An empty list is a real answer, not a missing one: somebody who turned
+       every tile off meant it, so it is honoured rather than filled in. */
     return byGoal[bubble].filter((k) => known.has(k));
   }
   /* Before the per goal map existed there was one flat list, and an account
@@ -33338,6 +33652,7 @@ function primeOpenedCard(card) {
   else if (card.id === "cardStrength") strengthChart?.resize();
   else if (card.id === "cardVolume") volumeChart?.resize();
   else if (card.id === "cardMuscles") renderMuscleAnswers(PROGRESS_VIEW === "partner" ? partnerName() : ME);
+  else if (weekCharts[card.id]) weekCharts[card.id].resize();
   /* The strip is only drawn for a card the tab decided to show, and on a goal
      screen this card is never one of those: it is hidden until a door opens
      it. So every route in found an empty Body Photos card, which is also the
@@ -33943,7 +34258,13 @@ function renderProgressTab() {
      left, which is the same answer Move better gets and for the same reason.
      Your own view only; a partner's screen follows THEIR choices. */
   if (PROGRESS_VIEW !== "partner" && !isTracked("weight") && (kind === "scale" || kind === "bulk")) {
-    kind = trackedMetrics().length ? "recomp" : "habit";
+    /* "Still tracks a tape measurement", which is what the paragraph above
+       says and what the test used to get wrong: it asked whether they track
+       ANYTHING, and the recomp screen is built around inches. Now that a goal
+       can be tracked purely in sessions, somebody who turned the scale off and
+       counts their walks was being handed a Waist screen they never asked
+       for. */
+    kind = MEASUREMENTS.some((m) => isTracked(m.key)) ? "recomp" : "habit";
   }
 
   const blank = !isPartner && !entriesFor(ME).length
@@ -33961,7 +34282,21 @@ function renderProgressTab() {
   if (!sharing) { barred.add("cardStrength"); barred.add("cardVolume"); barred.add("cardMuscles"); }
 
   const wanted = (GOAL_CARDS[kind] || GOAL_CARDS.habit).filter((c) => !barred.has(c));
-  const rest = PROGRESS_CARDS.filter((c) => !barred.has(c) && !wanted.includes(c));
+  /* The cards somebody asked for by name. The picker is the only thing that
+     decides these: they are not in any goal's card order and they are not in
+     "everything else you have logged" either, so ticking Mobility sessions is
+     the whole of why that card is on the screen, and not ticking Distance is
+     the whole of why it is not.
+
+     They also survive the goal screens below, which otherwise stand alone.
+     That is the one place this disagrees with "the hero and nothing under it",
+     and it has to: a person on Get stronger who ticked Workouts a week has to
+     be able to find it, or the question was decoration. The hero is still the
+     answer; these sit underneath it, in the order the picker stores them. */
+  const chosenCards = (isPartner ? [] : trackedMetrics())
+    .map((k) => TRACK_ALL.find((m) => m.key === k)?.card)
+    .filter((c, i, all) => c && PICKED_CARDS.has(c) && !barred.has(c) && all.indexOf(c) === i);
+  const rest = PROGRESS_CARDS.filter((c) => !barred.has(c) && !wanted.includes(c) && !WEEK_CARD_IDS.has(c));
   /* On a brand new account every card is an empty card, so none of them are
      drawn. The one exception is Weight on a weight goal, because logging into
      it IS the single action the empty state is pointing at, and it opens
@@ -33996,11 +34331,19 @@ function renderProgressTab() {
      actually stop being shown it, including on the screen their goal would
      otherwise lead with. The tape and photo tiles below stand in as the door. */
   const wantsWeight = isPartner || isTracked("weight");
-  const shown = (blank
+  const shownRaw = (blank
     ? (weightLed && !isPartner ? ["cardWeight"] : [])
     : weightScreen ? ["cardWeight"]
     : own ? []
-    : wanted.concat(rest)).filter((id) => id !== "cardWeight" || wantsWeight);
+    : wanted.concat(rest)).filter((id) => id !== "cardWeight" || wantsWeight)
+    /* Even on a brand new account, where every card is an empty card and the
+       rule is that none of them are drawn. These are the exception for the
+       same reason Weight is the exception on a weight goal: somebody has just
+       answered the question "what do you want to track", and an empty card
+       naming what it will hold is a promise, where nothing at all reads as
+       the answer having been thrown away. */
+    .concat(chosenCards);
+  const shown = [...new Set(shownRaw)];
   const quiet = new Set(blank || weightScreen || own ? [] : rest);
   /* Which row(s) get the ring: whichever card the headline sentence was
      actually about, not "first in GOAL_CARDS" (volume's own order leads with
@@ -34037,7 +34380,8 @@ function renderProgressTab() {
   const rule = $("progRuleElse");
   if (host?.insertBefore) {
     let after = $("progHeadline");
-    for (const id of wanted) { const el = $(id); if (el) { host.insertBefore(el, after.nextSibling); after = el; } }
+    const ordered = wanted.concat(chosenCards.filter((c) => !wanted.includes(c)));
+    for (const id of ordered) { const el = $(id); if (el) { host.insertBefore(el, after.nextSibling); after = el; } }
     paintProgIndex(host);
     host.insertBefore(rule, after.nextSibling);
     after = rule;
@@ -34067,6 +34411,7 @@ function renderProgressTab() {
   if (live.has("cardStrength")) { renderStrengthChart(); renderStrengthStats(); }
   if (live.has("cardVolume")) { renderVolumeChart(); renderVolumeStats(); }
   if (live.has("cardPhotos")) renderBodyPhotos();
+  for (const spec of WEEK_CARDS) if (live.has(spec.card)) renderWeekCard(spec);
 }
 
 /* Progress, for somebody who has not hired him yet.
