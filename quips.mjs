@@ -517,6 +517,25 @@ export const QUIPS = {
     (c) => (c.streak >= 2 ? `That is ${c.streak} days. I am keeping count so you do not have to.` : null),
   ],
 
+  /* A stretch run on its own, from Recovery, with no workout under it. It
+     needs its own bank because every cool-down line above assumes one: "the
+     workout is over", "you have earned the boring part", "victory lap". Said
+     on a rest day to somebody who has not trained, those are the app telling
+     them something that did not happen. Same voice, no workout in it. */
+  stretch: [
+    (c) => (cueOf(c) ? cueOf(c) : null),
+    "Stretching on purpose. Look at you.",
+    "Breathe out on the stretch. Never bounce.",
+    "This counts. Nobody logs it, but it counts.",
+    "Two minutes now, one less complaint tomorrow.",
+    "Holding still. The one thing I am naturally good at.",
+    "No weights, no reps, no rush.",
+    "Nothing to beat here. Just the hold.",
+    "I like this part. It is the part where nothing hurts.",
+    "Stretching. I will be doing an approximation of this.",
+    (c) => (c.hour >= 21 ? "Good time for this. The day is nearly filed away." : null),
+  ],
+
   idle: [
     (c) => (jokeOf(c) ? jokeOf(c) : null),
     (c) => (cueOf(c) ? `Reminder, unprompted. ${cueOf(c)}` : null),
@@ -620,4 +639,5 @@ export const QUIP_MOMENTS = {
   nextExercise: { label: "Moving to a new lift", when: "Every time you land on a new exercise." },
   cardio: { label: "A cardio session or class", when: "NOT WIRED YET. Cardio is logged as an activity rather than run as a session, so nothing calls this bank. It needs one sayQuip(\"cardio\") where an activity is saved." },
   cooldown: { label: "A cool-down hold", when: "On each cool-down move, about 80% of the time." },
+  stretch: { label: "A stretch on its own", when: "On each hold of a stretch started from the Recovery screen, about 80% of the time. Never inside a workout: the warm-up and cool-down banks own those." },
 };

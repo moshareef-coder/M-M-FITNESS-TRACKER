@@ -129,7 +129,37 @@ matrix. That is a deliberate refusal rather than a gap, and it is written down i
 
 ---
 
-## 6. Smaller data problems
+## 6. Two numbers `formulas/` does not have: protein and water
+
+**Asked for 2026-09-18, by the Recovery screen in `index.html`.**
+
+`formulas/` answers every question that screen asks except two. `tdee.mjs`
+gives maintenance calories, `goal-timeline.mjs` turns those into a daily target
+for a goal, and `calorie-math.mjs` estimates burn. Nothing anywhere states a
+protein target or a fluid target, so both are computed in `index.html` with
+their sources in a comment beside them, which is the wrong place for a formula:
+it cannot be tested by the gate and it will drift from the rest of this folder.
+
+What we used, and would rather import:
+
+- **Protein, grams per pound of body weight, by direction of the goal.** 1.0 in
+  a deficit, 0.9 building, 0.8 otherwise. Sources: ISSN position stand on
+  protein and exercise (Jager et al. 2017), 1.4 to 2.0 g/kg/day; Morton et al.
+  2018, no further gain past about 2.2 g/kg; Helms et al. 2014, the top of the
+  range while cutting, since that is what protects lean mass.
+- **Water, ounces per pound of body weight, plus a training day's sweat.** 0.6
+  oz per lb, plus 16 oz on a day with a session. Sources: US National Academies
+  adequate intake (2005), 3.7 L a day for men and 2.7 L for women including
+  food; ACSM position stand on exercise and fluid replacement (2007), losses of
+  roughly 0.4 to 1.2 L an hour of exercise.
+
+Both would sit naturally in a `formulas/nutrition.mjs` next to the other two,
+taking the same profile shape `calculateTDEE` already takes. If they land there
+we will delete our copies the same day.
+
+---
+
+## 7. Smaller data problems
 
 - **Weighted Dip is tagged `equipment: "bodyweight"`,** so it appears on
   bodyweight-only weeks. Found by the fuzzer.
