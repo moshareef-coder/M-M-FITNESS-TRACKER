@@ -203,7 +203,7 @@ Primary button: Looks like me
 ```
 
 ### Get stronger where?
-Full body, front first, big regions, the figure flips to the back on its own when you tap Back.
+The app's own muscle figure, front and back side by side, five big regions, the muscles in a picked region light up on both.
 
 ```
 You are a senior mobile product designer. Design ONE screen of Unio, an iPhone fitness app for two people who train together, coached by a robot personal trainer named Unio. Produce a high-fidelity mockup at 390 x 844 (iPhone 15), light theme first. When I ask, do the same screen in dark theme.
@@ -230,14 +230,16 @@ OUTPUT
 The mockup image. Then a five-line list of the components you used, top to bottom, so I can hand it to a developer.
 
 SCREEN: Body picker. Progress bar at 60%. Only shown for the main goal.
-Title (28): Get stronger where?
-Under it (14, muted): Tap anywhere. More than one is fine.
-The figure: a flat white full-body figure, thin dark outline, soft grey shading, no muscle detail, no face, standing, arms slightly out. FEMALE figure on this mockup. About 380px tall, centered.
-It is divided into five big tappable regions, drawn as soft shaded zones, not muscle groups: Arms and shoulders, Chest, Back, Legs, Core. Draw the FRONT view. "Chest" and "Core" are selected: those two zones are tinted pale green with a deep green outline.
-Under the figure: a small segmented control, two options, Front | Back, with Front active. Small, muted, secondary. (In the app, tapping the Back zone flips the figure to the back view by itself; the control is only for looking.)
-Under that, a row of chips listing the selection in words, each chip with a small green tick: Chest, Core.
+Robot face small at top left with his line (14, muted): "I'll remember this. It's most of what I'm for."
+Title (28): Stronger where?
+Under it (14, muted): Pick as many as you like. Front and back are both there.
+The figure: the app's existing anatomy body, TWO of them side by side, front on the left and back on the right, each about 170 wide and 316 tall. A pale grey-blue silhouette with every muscle group drawn as a distinct dark charcoal shape with thin light seams between the muscles, no face, standing, arms slightly out. MALE on this mockup. This is a precise, clean anatomy illustration, flat, no gradients.
+Regions are five: Arms and shoulders, Chest, Back, Legs, Core. "Back" and "Legs" are selected: every muscle in those regions is tinted the accent green on BOTH figures (traps and lats and lower back on the back figure, the top of the traps on the front, all of the legs on both), every other muscle stays charcoal.
+Under the figures, a row of five pill chips, wrapping to two rows: Arms and shoulders, Chest, Back, Legs, Core. "Back" and "Legs" have a green tick and a pale green fill. Tapping a chip or tapping a muscle on either figure does the same thing.
+Under the chips (14, muted, centered): You picked your back and your legs.
 Primary button: Those ones
-Second frame, please, as a separate image: the same screen after tapping Back: the BACK view of the same figure, mid-flip if you like, with "Back" tinted and the chip row reading: Chest, Core, Back.
+Ghost button: Back
+Second frame, as a separate image: the same screen for the "Move better" goal, title "Where does it bother you?", with Legs selected and tinted AMBER (#d8a52e) instead of green, everything else the same.
 ```
 
 ### Pick your workouts
