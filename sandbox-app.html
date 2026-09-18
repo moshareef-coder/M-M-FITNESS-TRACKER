@@ -7853,7 +7853,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.17.20";
+const APP_VERSION = "2026.09.17.21";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -9288,6 +9288,9 @@ function pairEntryHtml(myCode) {
 function wirePairEntry({ onPaired, onPending, onShared }) {
   $("shareLinkBtn").onclick = async (e) => {
     const sent = await shareInviteLink(e.currentTarget);
+    /* onPaired already clears solo and finishes the step; nothing extra to do
+       here beyond saying why the button just changed nothing on screen. */
+    if (sent === "paired") { toast("You already have a partner"); await onPaired(); return; }
     if (sent && onShared) onShared();
   };
 
@@ -9610,6 +9613,16 @@ async function shareInviteLink(btn) {
        is down" send somebody to two completely different places, and one toast
        covering both sends them to neither. */
     if (error) { toast(error.message || "Could not create an invite link"); return false; }
+    /* "You already have a partner" is not a failure to report and wait out,
+       it is the answer to a different question than the one this screen
+       assumed. It only reaches a brand new signup when the partnerships row
+       survived something that wiped the profile, and until today it left
+       exactly that account stuck: the invite button says no, typing a code
+       is the wrong direction, and "I am training on my own" would be a lie
+       about somebody who is not. Reported to the caller as its own outcome
+       so the screen can do what the rest of the app already does with an
+       existing partnership, which is treat it as one. */
+    if (res && res.ok === false && res.error === "You already have a partner") return "paired";
     if (!res || !res.ok) { toast((res && res.error) || "Could not create an invite link"); return false; }
 
     const url = INVITE_LINK_BASE + res.token;
@@ -12305,9 +12318,17 @@ function finishOnboardingFromDraft(data) {
     goal_weight_lb: data.goal_weight_lb || null,
     goal_by_date: data.goal_by_date || null,
     /* The only deadline the user ever agrees to, as they set it, not as a
-       pace chip they were never shown would have set it. */
-    pace: chosenPace ? chosenPace.key : null,
-    weeks,
+       pace chip they were never shown would have set it. chosenPace and weeks
+       used to be read bare here, which does not exist in this function's own
+       scope: those names are locals of the "plan" step's render closure, two
+       screens back by the time this runs. Every account finishing onboarding
+       hit this ReferenceError, on every path off the partner step, Mo's
+       "I am training on my own" included, silently: nothing here catches it,
+       so the tap did nothing and the same screen stayed on screen. Read off
+       data instead, which is exactly what setActiveGoal already does with
+       pace a few lines below in this same file. */
+    pace: data.pace || null,
+    weeks: Number.isFinite(data.weeks) && data.weeks > 0 ? data.weeks : null,
     days_per_week: days,
     /* null unless they tapped one. The engine treats null, 0 and nonsense
        identically to never having been asked, and that is the guarantee that
