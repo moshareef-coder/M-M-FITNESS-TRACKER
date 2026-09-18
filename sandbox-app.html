@@ -666,50 +666,36 @@
      Setup, which would double up inside an ob-step. */
   .card-bare { background: none; border: none; padding: 0; }
   /* ---------- Body region picker ----------
-     The onboarding tune step's figure. Five regions, front and back, and the
-     figure turns itself around when somebody picks a region that lives on the
-     other side of it. Mo, 2026-09-17: "I don't swipe. The app swipes for me
-     based on what I pick."
+     The onboarding tune step's figure. Five regions, and the figure is the
+     app's own body: the Rive anatomy artboards, front and back side by side,
+     the same two canvases Setup's Focus areas and the Body tab already draw.
+     Mo, 2026-09-18, looking at a hand drawn mannequin that did the same job:
+     "for the body picks, make sure it matches our body, this one".
 
-     The body is drawn twice, once in the line colour and once in the fill, the
-     same two pass trick knowledge/motion/rig.mjs uses, so where two regions
-     meet there is a seam and where a region meets itself there is not.
-     --bp-line is deliberately NOT --rb-line: that token is the robot's soft
-     grey edge, and the figure's own outline is one dark line in both themes,
-     which is the look Mo signed off on for the rig. */
-  .bp { --bp-line: #1c1f26; --bp-body: var(--rb-body); --bp-shade: var(--rb-shade);
-    --bp-pick: color-mix(in srgb, var(--accent) 52%, var(--rb-body));
-    --bp-pick-shade: color-mix(in srgb, var(--accent) 62%, var(--rb-shade));
-    width: 100%; }
-  /* perspective on the stage and not on the face, or the two faces turn around
-     different vanishing points and the figure appears to swell as it flips. */
-  .bp-stage { position: relative; width: 100%; max-width: 208px; aspect-ratio: 200 / 412;
-    margin: 2px auto 12px; perspective: 900px; }
-  .bp-flip { position: absolute; inset: 0; transform-style: preserve-3d;
-    transition: transform .42s cubic-bezier(.4, 0, .2, 1); }
-  .bp[data-view="back"] .bp-flip { transform: rotateY(180deg); }
-  .bp-face { position: absolute; inset: 0; backface-visibility: hidden; }
-  .bp-face.bp-back { transform: rotateY(180deg); }
-  /* A face turned away is not painted, but leaving it hit testable is one
-     browser quirk away from a tap on the front landing on the back. */
-  .bp[data-view="front"] .bp-back, .bp[data-view="back"] .bp-front { pointer-events: none; }
-  .bp-svg { width: 100%; height: 100%; display: block; }
-  .bp-ink { fill: var(--bp-line); stroke: var(--bp-line); stroke-linejoin: round; stroke-linecap: round; }
-  .bp-fill { fill: url(#bpBodyGrad); stroke: url(#bpBodyGrad); stroke-linejoin: round; stroke-linecap: round; }
-  .bp-r.on .bp-fill { fill: url(#bpPickGrad); stroke: url(#bpPickGrad); }
-  .bp-hit { fill: #000; fill-opacity: 0; stroke: #000; stroke-opacity: 0;
-    stroke-linejoin: round; stroke-linecap: round; cursor: pointer; }
-  .bp-r { transition: opacity .15s ease; }
-  /* The tap flash. A region that is already on has nowhere brighter to go, so
-     the whole group dips instead, which reads in either state. */
-  .bp-r.tapped { opacity: .55; }
+     .bi-figures / .bi-fig / .bi-canvas are Body Impact's own classes and are
+     reused verbatim rather than copied. That is not tidiness: every Rive
+     instance on the page shares one WebGL2 render target, and two canvases of
+     different sizes make it resize twice a frame and blank one of them. One
+     rule for every pair of figures in the app is what stops that happening.
 
-  .bp-seg { display: flex; gap: 4px; padding: 3px; margin: 0 auto 14px; width: fit-content;
-    border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border); }
-  .bp-seg-btn { border: none; background: none; color: var(--muted); cursor: pointer;
-    font-family: inherit; font-size: 12.5px; font-weight: 700; letter-spacing: .01em;
-    padding: 6px 16px; border-radius: 999px; transition: background .15s ease, color .15s ease; }
-  .bp-seg-btn.on { background: var(--panel); color: var(--text); box-shadow: var(--shadow-float); }
+     Both views are on screen at once, so there is nothing to turn and no
+     Front/Back control. The picker that shipped yesterday had a figure that
+     flipped itself; with the real body there is no side you cannot see. */
+  /* The one tint, read back off this element by bodyPickTintRgb so the chips
+     and the WebGL figure cannot end up on different greens. Sore does not take
+     --warn: that token is deepened on light so it works as chip text on white,
+     and the deepened mustard painted over a whole quadricep reads as dirt
+     rather than as caution. The figure keeps one amber in both themes, the same
+     reasoning the unlit charcoal carries in initBodyRegionFigures: the artboard
+     draws the same pale silhouette on a dark panel as on a light one, so what
+     is painted inside it should not change either. */
+  .bp { width: 100%; --bp-tint: var(--accent); }
+  .bp.sore { --bp-tint: #f0b429; }
+  /* Taller than Body Impact's, because this screen is the figure rather than a
+     panel beside a list of rings, and the negative top margin there exists to
+     pull the figures under a heading this step does not have. */
+  .bp .bi-figures { margin-top: 2px; margin-bottom: 10px; }
+  .bp .bi-canvas { height: 316px; cursor: pointer; }
 
   .bp-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 0 0 12px; }
   .bp-chip { display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
@@ -720,12 +706,9 @@
   .bp-chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
   /* "Where does it hurt" is the same picker asking the opposite question, and
      tinting a sore knee the same green as a muscle you want more of reads as
-     "good, do more of this". Amber says what amber means. */
-  .bp.sore {
-    --bp-pick: color-mix(in srgb, var(--warn) 52%, var(--rb-body));
-    --bp-pick-shade: color-mix(in srgb, var(--warn) 62%, var(--rb-shade));
-  }
-  .bp.sore .bp-chip.on { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, var(--panel)); }
+     "good, do more of this". Amber says what amber means. The figure reads the
+     same two tokens back off the stylesheet, in bodyPickTintRgb. */
+  .bp.sore .bp-chip.on { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, var(--panel)); }
   .bp.sore .bp-tick { color: var(--warn); }
   /* The tick is in the flow rather than placed on top, so a chip grows by its
      width when it is picked and the whole row visibly changes shape. */
@@ -736,7 +719,10 @@
     min-height: 2.9em; text-align: center; }
 
   @media (prefers-reduced-motion: reduce) {
-    .bp-flip, .bp-chip, .bp-tick, .bp-r, .bp-seg-btn { transition: none; }
+    .bp-chip, .bp-tick { transition: none; }
+  }
+  @media (max-width: 380px) {
+    .bp .bi-canvas { height: 290px; }
   }
   .ob-step { width: 100%; max-width: 420px; margin-block: auto; display: flex; flex-direction: column; align-items: stretch; text-align: left; }
   #onboard h1 { font-size: 28px; letter-spacing: -.025em; line-height: 1.15; margin: 0 0 8px; }
@@ -8088,7 +8074,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.18.3";
+const APP_VERSION = "2026.09.18.4";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -10926,48 +10912,43 @@ function closeBodyFocusPage() {
 
    The picker the onboarding tune step asks its one body question with, after
    Mo's 2026-09-17 meeting cut the muscle-level detail out of setup: "big
-   regions, not muscles. I don't want to see too much detail." Five regions, a
-   figure that shows the front first and turns itself around when somebody picks
-   something that lives on its back, and no ranking anywhere on screen.
+   regions, not muscles. I don't want to see too much detail." Five regions on
+   the app's own body, front and back at once, and no ranking anywhere on it.
 
-   It is a SECOND picker on purpose and the one above is not going anywhere.
-   Setup's Focus areas still owns the fourteen groups, the three tiers and the
-   Rive figure, because somebody who has trained for a month and opens Focus
-   areas is not the person answering their fourth ever question. The one thing
-   the two share is the column they write: bodyRegionFocusEntries() below spends
-   the engine's same nine units and emits the same "quads:3" strings, so nothing
-   downstream can tell which screen an answer came from.
+   It is a SECOND picker on purpose and Setup's Focus areas is not going
+   anywhere. That one still owns the fourteen muscle groups and the three tiers,
+   because somebody who has trained for a month and opens Focus areas is not the
+   person answering their fourth ever question. What the two now share is the
+   body they draw and the column they write: bodyRegionFocusEntries() below
+   spends the engine's same nine units and emits the same "quads:3" strings, so
+   nothing downstream can tell which screen an answer came from.
 
-   Drawn as inline SVG rather than by mounting knowledge/motion/rig.mjs. The rig
-   draws a posed person onto a canvas; this needs five separately tintable
-   shapes that flip on their own, on a step that otherwise never asks for a
-   WebGL context. Same character family by hand instead: the flat white body,
-   one dark outline, a soft grey far side, and no striations, because an anatomy
-   chart is exactly the detail that got cut.
+   The difference between them is only how much is on screen. Focus areas asks
+   for fourteen muscles and a ranking; this asks for five regions, and the same
+   figure answers both.
 
    The two exported names are a contract with the onboarding sequence:
-     bodyRegionPickerHTML({ sex, selected })   -> markup string
+     bodyRegionPickerHTML({ sex, selected, sore })   -> markup string
      wireBodyRegionPicker(root, { sex, onChange })
 */
 
 /* Region to muscle groups, in the order the plan should reach for them, biggest
    and most trainable first, because the spend below takes the front of each
-   list. `views` is which side of the figure the region can be seen on, and it
-   is what makes the figure turn itself around: a tap on something this person
-   cannot currently see means the figure is facing the wrong way. */
+   list. Every one of the app's fourteen groups is in exactly one region, which
+   is what lets a tap anywhere on the figure always mean something. */
 const BODY_REGIONS = Object.freeze([
   { id: "arms",  label: "Arms and shoulders", say: "your arms and shoulders",
-    groups: ["shoulders", "biceps", "triceps", "forearms"], views: ["front", "back"] },
+    groups: ["shoulders", "biceps", "triceps", "forearms"] },
   { id: "chest", label: "Chest", say: "your chest",
-    groups: ["chest"], views: ["front"] },
+    groups: ["chest"] },
   { id: "back",  label: "Back", say: "your back",
-    groups: ["lats", "traps", "lowerback"], views: ["back"] },
+    groups: ["lats", "traps", "lowerback"] },
   /* Glutes ride with legs rather than with core. They are trained on leg day,
      and "legs" is the word somebody points at their own hip and says. */
   { id: "legs",  label: "Legs", say: "your legs",
-    groups: ["quads", "hamstrings", "glutes", "calves"], views: ["front", "back"] },
+    groups: ["quads", "hamstrings", "glutes", "calves"] },
   { id: "core",  label: "Core", say: "your core",
-    groups: ["abs", "obliques"], views: ["front"] },
+    groups: ["abs", "obliques"] },
 ]);
 const BODY_REGION_IDS = BODY_REGIONS.map((r) => r.id);
 const bodyRegionFor = (id) => BODY_REGIONS.find((r) => r.id === id) || null;
@@ -11034,157 +11015,53 @@ function bodyRegionsFromEntries(entries, all) {
   return ids;
 }
 
-/* Half widths out from the centre line and the stroke widths of the limbs, in
-   the figure's own 200 by 412 units. Same arrangement as BODY / BODY_FEMALE in
-   knowledge/motion/rig.mjs: one skeleton, and the sexes differ only in width,
-   so every landmark in BODY_PICK_Y is shared and no pose is drawn twice. The
-   female figure is narrower at the shoulder and the waist and wider at the hip;
-   there is no hair on either, which is the product figure Mo asked for. */
-const BODY_PICK_GEO = Object.freeze({
-  male: { sh: 56, ch: 37, wa: 31, hp: 35, arm: 21, fore: 17, neck: 21, headX: 19, headY: 22,
-    thighOut: 36, thighIn: 7, kneeOut: 26, kneeIn: 11, calfOut: 28, calfIn: 12,
-    ankleOut: 19, ankleIn: 9, footR: 11 },
-  female: { sh: 47, ch: 32, wa: 25, hp: 37, arm: 17, fore: 14, neck: 17, headX: 18, headY: 21,
-    thighOut: 36, thighIn: 7, kneeOut: 24, kneeIn: 11, calfOut: 25, calfIn: 12,
-    ankleOut: 17, ankleIn: 9, footR: 10 },
-});
-const BODY_PICK_Y = Object.freeze({
-  headCy: 36, neckTop: 52, sho: 80, pit: 110, chestBot: 156, waist: 180, hip: 216,
-  elbow: 182, hand: 264, crotch: 250, knee: 318, ankle: 378, foot: 388,
-});
+/* The figures. Two Rive artboards side by side, front and back, the same body
+   Setup's Focus areas and the Body tab draw, mounted the same way
+   initBodyFocusRive mounts them.
 
-/* Every shape the figure is made of, per region, for one view. Three kinds:
-   `d` is a filled path, `seg` is a stroked capsule (a limb: a round capped line
-   is exactly what a limb segment is, and it is how the rig draws one), and
-   `ell` is an ellipse. Each one gets drawn three times, in the line colour,
-   then the fill, then once more invisibly as the tap target. */
-function bodyPickShapes(sexKey, view) {
-  const g = BODY_PICK_GEO[sexKey] || BODY_PICK_GEO.male;
-  const Y = BODY_PICK_Y, cx = 100;
-  const x = (v) => (cx + v).toFixed(1);
-  /* The torso half width where the chest stops, read off the line the ribs
-     already taper along rather than guessed, so the seam between chest and core
-     sits on the silhouette instead of cutting across it. */
-  const wcb = (g.ch + 3) + ((g.wa - (g.ch + 3)) * (Y.chestBot - Y.pit)) / (Y.waist - Y.pit);
-  const shoulderLine = `M ${x(-(g.sh - 8))},${Y.sho}
-    C ${x(-(g.sh - 26))},${Y.sho - 7} ${x(-15)},${Y.sho - 11} ${x(0)},${Y.sho - 11}
-    C ${x(15)},${Y.sho - 11} ${x(g.sh - 26)},${Y.sho - 7} ${x(g.sh - 8)},${Y.sho}
-    Q ${x(g.sh - 1)},${Y.sho + 16} ${x(g.ch + 3)},${Y.pit}`;
-  const ribsUpLeft = `L ${x(-(g.ch + 3))},${Y.pit}
-    Q ${x(-(g.sh - 1))},${Y.sho + 16} ${x(-(g.sh - 8))},${Y.sho} Z`;
-  const bellyDownRight = `Q ${x(g.wa + 2)},${Y.waist - 8} ${x(g.wa)},${Y.waist}
-    Q ${x(g.hp - 1)},${Y.hip - 11} ${x(g.hp)},${Y.hip}`;
-  const bellyUpLeft = `Q ${x(0)},${Y.hip + 7} ${x(-g.hp)},${Y.hip}
-    Q ${x(-(g.hp - 1))},${Y.hip - 11} ${x(-g.wa)},${Y.waist}
-    Q ${x(-(g.wa + 2))},${Y.waist - 8} ${x(-wcb)},${Y.chestBot}`;
-  /* The seam between chest and core dips in the middle rather than running
-     straight across, or it reads as a belt drawn on the figure instead of the
-     bottom of a ribcage. The hip edge below does the same thing. */
-  const ribEdge = (to) => `Q ${x(0)},${Y.chestBot + 9} ${x(to)},${Y.chestBot}`;
+   The picker that shipped yesterday drew its own mannequin as inline SVG and
+   turned it around when somebody picked something on the back. Mo looked at it
+   and said "for the body picks, make sure it matches our body, this one", with
+   a picture of these two artboards. He is right, and the drawn one is gone:
+   this app has exactly one body and a second one in onboarding would be the
+   first thing a new account sees, right before it stops being the body they
+   see everywhere else. The flip went with it, because with both views on
+   screen there is no side you cannot already see.
 
-  const chest = `${shoulderLine} L ${x(wcb)},${Y.chestBot} ${ribEdge(-wcb)} ${ribsUpLeft}`;
-  const core = `M ${x(-wcb)},${Y.chestBot} ${ribEdge(wcb)} ${bellyDownRight} ${bellyUpLeft} Z`;
-  const torso = `${shoulderLine} L ${x(wcb)},${Y.chestBot} ${bellyDownRight} ${bellyUpLeft} ${ribsUpLeft}`;
+   Own generation counter, the same shape initBodyFocusRive uses and for the
+   same reason: these canvases are new DOM nodes on every render of the step, so
+   a controller from an earlier visit is bound to an element that no longer
+   exists and has to be torn down, never reused. The counter is what stops a
+   second, faster visit racing a first one still loading the (cached, but still
+   async) Rive module. */
+let BODY_PICK_FRONT_CTRL = null, BODY_PICK_BACK_CTRL = null, BODY_PICK_GEN = 0;
+let BODY_PICK_REPAINT = null;
 
-  /* One leg, mirrored. The top edge is a flat line at the hip because the torso
-     is drawn over it, so nobody ever sees it. */
-  const leg = (s) => `M ${x(s * g.hp)},${Y.hip}
-    C ${x(s * g.thighOut)},${Y.hip + 26} ${x(s * g.thighOut)},${Y.hip + 50} ${x(s * (g.thighOut - 2))},${Y.hip + 72}
-    C ${x(s * (g.kneeOut + 1))},${Y.knee - 18} ${x(s * g.kneeOut)},${Y.knee - 6} ${x(s * g.kneeOut)},${Y.knee}
-    C ${x(s * g.calfOut)},${Y.knee + 18} ${x(s * (g.calfOut - 2))},${Y.ankle - 26} ${x(s * g.ankleOut)},${Y.ankle}
-    L ${x(s * g.ankleIn)},${Y.ankle}
-    C ${x(s * (g.ankleIn + 2))},${Y.ankle - 24} ${x(s * g.calfIn)},${Y.knee + 22} ${x(s * g.kneeIn)},${Y.knee}
-    C ${x(s * g.kneeIn)},${Y.knee - 26} ${x(s * g.thighIn)},${Y.crotch + 20} ${x(s * 3)},${Y.crotch}
-    L ${x(s * 3)},${Y.hip} Z`;
-
-  /* A deltoid cap over the joint, then the two limb segments. The cap is the
-     one thing that stops an arm reading as a sausage pinned to a box, and it is
-     why the arm carries the shoulders in this picker's name. */
-  const arm = (s) => [
-    { ell: [s * (g.sh - 7), Y.sho + 10, (g.arm + 5) / 2, (g.arm + 10) / 2] },
-    { seg: [[s * (g.sh - 6), Y.sho + 14], [s * (g.sh + 1), Y.elbow]], w: g.arm },
-    { seg: [[s * (g.sh + 1), Y.elbow], [s * (g.sh + 5), Y.hand]], w: g.fore },
-  ];
-  const footY = (s) => ({ ell: [s * ((g.ankleOut + g.ankleIn) / 2), Y.foot, g.footR, 8] });
-  const shape = (o) => (o.seg
-    ? { ...o, seg: o.seg.map(([px, py]) => [Number(x(px)), py]) }
-    : o.ell
-      ? { ell: [Number(x(o.ell[0])), o.ell[1], o.ell[2], o.ell[3]] }
-      : o);
-
-  const legs = [{ d: leg(1) }, { d: leg(-1) }, footY(1), footY(-1)].map(shape);
-  const arms = [...arm(1), ...arm(-1)].map(shape);
-  const neutral = [
-    { seg: [[cx, Y.neckTop], [cx, Y.sho + 4]], w: g.neck },
-    { ell: [cx, Y.headCy, g.headX, g.headY] },
-  ];
-  /* Drawing order is the whole silhouette: legs first so the hips sit over
-     them, the torso next, the arms over the shoulder line, and the head last so
-     it covers the top of the neck. The neck goes first of all, behind
-     everything, or its lower end pokes through the collarbone. */
-  /* One line down the middle of the back, and nothing else on it. Without it a
-     back is a blank sheet the size of the whole torso and the two views read as
-     the same picture; with more than it, the figure starts being an anatomy
-     chart, which is the thing that got cut. */
-  const spine = { seg: [[cx, Y.sho + 14], [cx, Y.hip - 10]], w: 1.6, inkOnly: true };
-  return view === "back"
-    ? { order: ["legs", "back", "arms"], neck: [neutral[0]], head: [neutral[1]],
-        regions: { legs, back: [{ d: torso }, spine], arms } }
-    : { order: ["legs", "core", "chest", "arms"], neck: [neutral[0]], head: [neutral[1]],
-        regions: { legs, core: [{ d: core }], chest: [{ d: chest }], arms } };
+/* Torn down rather than left drawing, for the reason closeBodyFocusPage gives:
+   every Rive instance on the page shares one WebGL2 context with Body Impact's
+   own figures, so two of them still running behind a step nobody is on costs
+   frames on every other screen. The tune step calls this on both of its ways
+   out, which are its only two. */
+function closeBodyRegionPicker() {
+  BODY_PICK_GEN++;
+  BODY_PICK_FRONT_CTRL?.destroy(); BODY_PICK_FRONT_CTRL = null;
+  BODY_PICK_BACK_CTRL?.destroy(); BODY_PICK_BACK_CTRL = null;
+  BODY_PICK_REPAINT = null;
 }
 
-/* One shape, three passes. `mode` is the pass: "ink" lays the outline down
-   wider than the fill, "fill" covers all but the rim of it, and "hit" is the
-   same geometry again with no paint and a fat stroke, because a pointer aimed
-   at a forearm should not have to land inside seventeen pixels of it. A shape
-   marked inkOnly is a seam drawn inside a region rather than around it, so it
-   skips the other two: filling over it would erase it. */
-function bodyPickShapeSvg(s, mode) {
-  if (s.inkOnly && mode !== "ink") return "";
-  const cls = mode === "ink" ? "bp-ink" : mode === "fill" ? "bp-fill" : "bp-hit";
-  const grow = s.inkOnly ? 0 : mode === "ink" ? 3 : mode === "hit" ? 12 : 0;
-  const pe = mode === "hit" ? ` pointer-events="all"` : ` pointer-events="none"`;
-  if (s.seg) {
-    const pts = s.seg.map(([px, py]) => `${px},${py}`).join(" ");
-    return `<polyline class="${cls}" points="${pts}" fill="none" stroke-width="${s.w + grow}"${pe}/>`;
-  }
-  if (s.ell) {
-    const [ecx, ecy, rx, ry] = s.ell;
-    return `<ellipse class="${cls}" cx="${ecx}" cy="${ecy}" rx="${rx + grow / 2}" ry="${ry + grow / 2}" stroke="none"${pe}/>`;
-  }
-  return `<path class="${cls}" d="${s.d}" stroke-width="${grow}"${pe}/>`;
-}
-
-/* Outline every shape, then fill every shape, then lay the inside seams over
-   the top. Doing it in that order and not shape by shape is what makes a region
-   read as one piece: where two of its own shapes overlap, a later fill wipes the
-   outline between them, and a deltoid stops looking bolted to an arm. The seams
-   have to come after the fills or they would be painted over. */
-function bodyPickGroupSvg(id, shapes, selected) {
-  const region = bodyRegionFor(id);
-  const on = selected.includes(id) ? " on" : "";
-  const body = shapes.filter((s) => !s.inkOnly);
-  const pass = (list, mode) => list.map((s) => bodyPickShapeSvg(s, mode)).join("");
-  return `<g class="bp-r${on}" data-region="${id}" data-label="${escapeHtml(region ? region.label : id)}" role="presentation">
-      ${pass(body, "ink")}${pass(body, "fill")}
-      ${pass(shapes.filter((s) => s.inkOnly), "ink")}
-      ${pass(body, "hit")}
-    </g>`;
-}
-
-function bodyPickFigureSvg(sexKey, view, selected) {
-  const f = bodyPickShapes(sexKey, view);
-  const plain = (shapes) => shapes.map((s) =>
-    bodyPickShapeSvg(s, "ink")).join("") + shapes.map((s) => bodyPickShapeSvg(s, "fill")).join("");
-  /* aria-hidden because the chips underneath carry the same five choices with
-     real button semantics. A screen reader announcing a body twice, once as
-     shapes and once as names, is worse than one that reads the names. */
-  return `<svg class="bp-svg" viewBox="0 0 200 412" aria-hidden="true" focusable="false">
-      ${plain(f.neck)}
-      ${f.order.map((id) => bodyPickGroupSvg(id, f.regions[id], selected)).join("")}
-      ${plain(f.head)}
-    </svg>`;
+/* The tint, read off the picker element rather than written twice, the same way
+   focusTierRgb reads the tier hues off the stylesheet: the figure is WebGL and
+   cannot resolve a CSS variable itself, but it can be handed the value the
+   chips are already using, so a palette change moves both. Read off the element
+   and not off :root, because --bp-tint is where the sore question swaps it.
+   Fallbacks are the dark theme's own values, which is what comes back during a
+   theme swap before the new sheet has computed. */
+function bodyPickTintRgb(el, sore) {
+  const raw = el ? getComputedStyle(el).getPropertyValue("--bp-tint").trim() : "";
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(raw)
+    || /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(cssVar(sore ? "--warn" : "--accent"));
+  if (m) return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
+  return sore ? { r: 0xf0, g: 0xb4, b: 0x29 } : { r: 0xa8, g: 0xff, b: 0x00 };
 }
 
 /* "male" unless they said female. Rather not say gets the male figure, which is
@@ -11195,6 +11072,88 @@ function bodyPickSex(sex) {
   return String(sex ?? "").trim().toLowerCase().startsWith("f") ? "female" : "male";
 }
 
+/* Which region a muscle group belongs to. Every one of the app's fourteen
+   groups is in exactly one region, which is what makes a tap on the figure
+   always mean something: the Rive click hands back a group, and this is the
+   whole distance between that and a pick. */
+function bodyRegionIdForGroup(group) {
+  return BODY_REGIONS.find((r) => r.groups.includes(group))?.id || null;
+}
+
+/* Mounts both artboards and keeps them painted. `o.isRegionOn` is read on every
+   repaint rather than passed as a list, so the figure never holds its own copy
+   of the selection and cannot fall behind the chips. */
+async function initBodyRegionFigures(wrap, o) {
+  BODY_PICK_FRONT_CTRL?.destroy(); BODY_PICK_FRONT_CTRL = null;
+  BODY_PICK_BACK_CTRL?.destroy(); BODY_PICK_BACK_CTRL = null;
+  BODY_PICK_REPAINT = null;
+  const gen = ++BODY_PICK_GEN;
+
+  let mod;
+  try {
+    mod = await ensureRiveBodyModule();
+  } catch (e) {
+    /* The chips still work without it, so this is a worse screen and not a
+       broken one. Saying so beats a silent blank rectangle. */
+    console.error("body picker: figure failed to load", e);
+    return;
+  }
+  if (gen !== BODY_PICK_GEN) return;                 // a newer visit took over
+  const front = wrap.querySelector(".bp-fig-front");
+  const back = wrap.querySelector(".bp-fig-back");
+  if (!front || !back || !front.isConnected) return; // navigated away while loading
+
+  const sex = o.sexKey === "female" ? "Female" : "Male";
+  const make = (canvas, view) => mod.createBodyHeatmap({
+    canvas,
+    artboardName: `${sex}-${view}`,
+    intensities: {},
+    /* A per muscle palette needs the view model, which does not exist until the
+       figure has loaded, so the first paint happens here and not straight after
+       this call. */
+    onLoad: () => BODY_PICK_REPAINT?.(),
+    /* A tap anywhere on a muscle picks the REGION it belongs to, so a tap on
+       one bicep lights both arms and both shoulders. The regions are the
+       question; the body is the other way of reaching them. Rive's own hit
+       testing hands back the muscle, so there is nothing here to hit test. */
+    onMuscleClick: (muscle, group) => o.onGroupTap(group),
+  });
+  BODY_PICK_FRONT_CTRL = make(front, "Front");
+  BODY_PICK_BACK_CTRL = make(back, "Back");
+
+  /* One unlit colour for both themes, because the FIGURE does not change with
+     the theme: the artboard draws the same pale silhouette on a dark panel as
+     on a light one, so the muscles inside it should not change either. The
+     module's own base is the near charcoal Mo picked for Focus areas, and it is
+     what makes a muscle read as a muscle against the pale body. */
+  BODY_PICK_REPAINT = () => {
+    const base = mod.APP_HEAT_PALETTE.base;
+    const rgb = bodyPickTintRgb(wrap, o.sore);
+    const lit = { base, level1: rgb, level2: rgb, level3: rgb, level4: rgb };
+    const dim = { base, level1: base, level2: base, level3: base, level4: base };
+    const on = {};
+    for (const m of mod.ALL_MUSCLES) on[m] = 0;
+    /* EVERY group is repainted, not only the picked ones. Painting just the
+       picked set leaves a deselected muscle wearing the palette it had while it
+       was picked, and with its intensity back at zero that renders black. The
+       focus page hit this and the fix is the same: put an unpicked group
+       explicitly back to base. */
+    for (const region of BODY_REGIONS) {
+      const pal = o.isRegionOn(region.id) ? lit : dim;
+      for (const g of region.groups) {
+        for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) {
+          BODY_PICK_FRONT_CTRL?.setMusclePalette(m, pal);
+          BODY_PICK_BACK_CTRL?.setMusclePalette(m, pal);
+          if (pal === lit) on[m] = 4;
+        }
+      }
+    }
+    BODY_PICK_FRONT_CTRL?.setIntensities(on);
+    BODY_PICK_BACK_CTRL?.setIntensities(on);
+  };
+  BODY_PICK_REPAINT();
+}
+
 /* The markup. `selected` is region ids; anything unrecognised is dropped rather
    than trusted, because this is seeded off a stored answer. */
 function bodyRegionPickerHTML(opts = {}) {
@@ -11203,33 +11162,20 @@ function bodyRegionPickerHTML(opts = {}) {
   const chip = (r) => `<button type="button" class="bp-chip${selected.includes(r.id) ? " on" : ""}"
       data-region="${r.id}" aria-pressed="${selected.includes(r.id)}">
       <span class="bp-tick" aria-hidden="true">${icon("check", 14)}</span>${escapeHtml(r.label)}</button>`;
-  /* One defs block for both faces. userSpaceOnUse and not the default, for two
-     reasons: it lights the whole figure from one side, which is what the rig
-     does and what stops each limb looking separately lit, and an object bounding
-     box gradient is simply not painted onto a shape with no width, which is how
-     a perfectly vertical neck came out solid black. */
-  return `<div class="bp${opts.sore ? " sore" : ""}" data-sex="${sexKey}" data-view="front" data-selected="${selected.join(",")}">
-      <svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs>
-        <linearGradient id="bpBodyGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="200" y2="0">
-          <stop offset="0" stop-color="var(--bp-body)"/>
-          <stop offset="0.5" stop-color="var(--bp-body)"/>
-          <stop offset="1" stop-color="var(--bp-shade)"/>
-        </linearGradient>
-        <linearGradient id="bpPickGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="200" y2="0">
-          <stop offset="0" stop-color="var(--bp-pick)"/>
-          <stop offset="0.5" stop-color="var(--bp-pick)"/>
-          <stop offset="1" stop-color="var(--bp-pick-shade)"/>
-        </linearGradient>
-      </defs></svg>
-      <div class="bp-stage">
-        <div class="bp-flip">
-          <div class="bp-face bp-front">${bodyPickFigureSvg(sexKey, "front", selected)}</div>
-          <div class="bp-face bp-back">${bodyPickFigureSvg(sexKey, "back", selected)}</div>
-        </div>
-      </div>
-      <div class="bp-seg" role="group" aria-label="Which side of the body">
-        <button type="button" class="bp-seg-btn on" data-view="front">Front</button>
-        <button type="button" class="bp-seg-btn" data-view="back">Back</button>
+  /* Body Impact's own figure markup, class for class, because the canvases have
+     to stay the same pixel size as each other and the rule that guarantees that
+     lives with those classes. The canvases carry a class rather than an id so
+     two pickers on one page could never collide over one; ids here are Body
+     Impact's habit and not a requirement.
+
+     aria-hidden on the pair: the chips underneath are the same five choices
+     with real button semantics, and a screen reader reading a body twice, once
+     as an unlabelled canvas and once as names, is worse than one that reads the
+     names. */
+  return `<div class="bp${opts.sore ? " sore" : ""}" data-sex="${sexKey}" data-selected="${selected.join(",")}">
+      <div class="bi-figures" aria-hidden="true">
+        <div class="bi-fig" data-view="Front"><canvas class="bi-canvas bp-fig-front"></canvas></div>
+        <div class="bi-fig" data-view="Back"><canvas class="bi-canvas bp-fig-back"></canvas></div>
       </div>
       <div class="bp-chips">${BODY_REGIONS.map(chip).join("")}</div>
       <p class="bp-note" aria-live="polite"></p>
@@ -11240,7 +11186,7 @@ function bodyRegionPickerHTML(opts = {}) {
    these lines is going through a voice later: short, no brackets, nothing that
    only works as text. */
 function bodyPickNote(ids) {
-  if (!ids.length) return "Tap the body, or tap a name. Pick as many as you like.";
+  if (!ids.length) return "Tap a muscle on either body, or tap a name below.";
   if (bodyRegionsAreWholeBody(ids)) return "You picked everything. Nothing stands out, so nothing gets extra.";
   const said = BODY_REGIONS.filter((r) => ids.includes(r.id)).map((r) => r.say);
   /* "Your arms and shoulders and your chest" is two ands in a row, which trips
@@ -11260,51 +11206,41 @@ function wireBodyRegionPicker(root, opts = {}) {
   if (!wrap) return () => [];
   const sexKey = bodyPickSex(opts.sex ?? wrap.dataset.sex);
   wrap.dataset.sex = sexKey;
+  /* Read off the markup rather than the options, because the tune step already
+     told bodyRegionPickerHTML which question this is and a second answer here
+     could only ever disagree with the chips it painted. */
+  const sore = wrap.classList.contains("sore");
   const selected = new Set((wrap.dataset.selected || "").split(",").filter(Boolean));
   const ordered = () => BODY_REGION_IDS.filter((id) => selected.has(id));
-  const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  const setView = (view) => {
-    wrap.dataset.view = view;
-    wrap.querySelectorAll(".bp-seg-btn").forEach((b) => b.classList.toggle("on", b.dataset.view === view));
-  };
   const paint = () => {
     const ids = ordered();
     wrap.dataset.selected = ids.join(",");
-    wrap.querySelectorAll(".bp-r").forEach((g) => g.classList.toggle("on", selected.has(g.dataset.region)));
     wrap.querySelectorAll(".bp-chip").forEach((b) => {
       const on = selected.has(b.dataset.region);
       b.classList.toggle("on", on);
       b.setAttribute("aria-pressed", String(on));
     });
     wrap.querySelector(".bp-note").textContent = bodyPickNote(ids);
+    BODY_PICK_REPAINT?.();
     opts.onChange?.(ids);
   };
-
-  const toggle = (id, fromChip) => {
-    const region = bodyRegionFor(id);
-    if (!region) return;
+  const toggle = (id) => {
+    if (!bodyRegionFor(id)) return;
     selected.has(id) ? selected.delete(id) : selected.add(id);
-    /* The whole point of the screen. Picking something that is not on the side
-       they are looking at turns the figure around for them, so nobody has to
-       work out that a back exists. Only ever on the way IN: turning the figure
-       around because somebody just switched a region OFF would be the app
-       arguing with them. */
-    if (fromChip && selected.has(id) && !region.views.includes(wrap.dataset.view)) {
-      setView(region.views[0]);
-    }
     paint();
-    if (reduced) return;
-    const g = wrap.querySelector(`.bp-face.bp-${wrap.dataset.view} .bp-r[data-region="${id}"]`);
-    /* A tap on a chip should be visible on the figure too, and on a region that
-       just flipped into view the flash is what points at it. */
-    if (g) { g.classList.add("tapped"); setTimeout(() => g.classList.remove("tapped"), 150); }
   };
 
-  wrap.querySelectorAll(".bp-seg-btn").forEach((b) => { b.onclick = () => setView(b.dataset.view); });
-  wrap.querySelectorAll(".bp-chip").forEach((b) => { b.onclick = () => toggle(b.dataset.region, true); });
-  wrap.querySelectorAll(".bp-r").forEach((g) => { g.onclick = () => toggle(g.dataset.region, false); });
+  wrap.querySelectorAll(".bp-chip").forEach((b) => { b.onclick = () => toggle(b.dataset.region); });
   paint();
+  /* Mounted after the first paint, not before it: the chips and the sentence
+     are the answer to the question and they must be right on the frame the step
+     appears, while the figure is a (cached, but still async) module away. */
+  initBodyRegionFigures(wrap, {
+    sexKey, sore,
+    isRegionOn: (id) => selected.has(id),
+    onGroupTap: (group) => { const id = bodyRegionIdForGroup(group); if (id) toggle(id); },
+  });
   return ordered;
 }
 
@@ -12040,13 +11976,13 @@ const GOAL_TUNE = {
      earlier than the answer was knowable. */
   "build-muscle": { kind: "focus", field: "tune_muscle",
     title: "What do you want to grow most?",
-    sub: "Pick as many as you like. The figure turns around on its own." },
+    sub: "Pick as many as you like. Front and back are both there." },
   "get-stronger": { kind: "focus", field: "tune_stronger",
     title: "Stronger where?",
-    sub: "Pick as many as you like. The figure turns around on its own." },
+    sub: "Pick as many as you like. Front and back are both there." },
   "tone-lean-abs": { kind: "focus", field: "tune_tone",
     title: "Where do you want it to show first?",
-    sub: "Pick as many as you like. The figure turns around on its own." },
+    sub: "Pick as many as you like. Front and back are both there." },
   "build-endurance": { kind: "choice", field: "tune_endurance",
     title: "Endurance for what?",
     sub: "We will build the cardio around it.",
@@ -12532,11 +12468,14 @@ function renderOnboardStep(step, data = {}) {
        regions is the whole body and not four picks and a leftover. */
     let regions = picked;
     wireBodyRegionPicker($("bodyPickRoot"), { sex: data.sex, onChange: (ids) => { regions = ids; } });
-    $("tuneNext").onclick = () => onNext({
-      [spec.field]: bodyRegionFocusEntries(regions),
-      [spec.field + "_all"]: bodyRegionsAreWholeBody(regions),
-    });
-    $("tuneBack").onclick = back;
+    $("tuneNext").onclick = () => {
+      closeBodyRegionPicker();
+      onNext({
+        [spec.field]: bodyRegionFocusEntries(regions),
+        [spec.field + "_all"]: bodyRegionsAreWholeBody(regions),
+      });
+    };
+    $("tuneBack").onclick = () => { closeBodyRegionPicker(); back(); };
     return;
   }
 
