@@ -9538,12 +9538,12 @@ function obChips(items, selected, attr) {
    only works as text. */
 const ONBOARD_INTRO = [
   {
-    h: "Hello. I am Unio.",
-    say: "I am your personal trainer from here on. I will build you a workout plan that is yours and nobody else's.",
+    h: "Hi. I'm Unio.",
+    say: "I'm your personal trainer now. I'll build a plan that's yours, and I'll stay on you until it's done.",
   },
   {
     h: "There are three of us.",
-    say: "Me, you, and your partner. Invite them and I will track you both. Your partner is included in your package. Or it is just me and you. That works too.",
+    say: "You, your partner, and me. Invite them and I'll watch you both. Or it's just me and you. That works too. Your partner's included in your package.",
   },
 ];
 
@@ -11873,7 +11873,7 @@ function paintLimitsSubtitle() {
    "tune" still repeats in the draft through tuneIdx, though the queue is one
    page long now. The machinery is left as it is: which pages exist is still
    not known until the goal step is answered. */
-const OB_STEPS = ["name", "intro", "goal", "target", "about", "tune", "styles", "days", "plan", "hire", "commit"];
+const OB_STEPS = ["name", "intro", "goal", "about", "tune", "styles", "days", "plan", "hire", "commit"];
 
 /* What each goal asks about itself, once, after the goals are chosen.
 
@@ -12015,32 +12015,33 @@ function recommendedStyles(data) {
    because the steps are not evenly sized: name is a text field and the body
    picker is a real decision, and a bar that jumps in equal hops past a long
    screen and a short one reads as broken. */
-const OB_PROGRESS = { name: 0.05, intro: 0.1, goal: 0.22, target: 0.3, about: 0.36, tune: 0.48, styles: 0.6, days: 0.72, plan: 0.84, hire: 0.92, commit: 1 };
+const OB_PROGRESS = { name: 0.05, intro: 0.1, goal: 0.22, about: 0.34, tune: 0.46, styles: 0.58, days: 0.7, plan: 0.82, hire: 0.92, commit: 1 };
 
 /* He talks the whole way through. Same character as the session, same rules:
    deadpan, fond of you, never at your expense, and here he is also the only
    thing on screen that knows what you just answered. Functions return null
    when they have nothing true to say, exactly as quips.mjs does it. */
 const OB_ROBOT = {
-  name: () => "I am going to be here for all of this. I hope that is alright.",
+  /* No line on the name screen: he has not introduced himself yet, that is
+     the next screen's whole job. */
+  name: () => null,
   goal: (d) => (d.goal_secondary || []).length
-    ? "Three of them. Ambitious. I respect it and I am slightly worried."
-    : "Your goal first. Do not worry about your partner. They get their own link and I help them build theirs.",
-  target: () => "A number is easier to aim at than a feeling. That is the only reason I ask.",
+    ? "Three of them. Ambitious. I respect it and I'm slightly worried."
+    : "Let's plan your goal. Don't worry about your partner. They'll get a link, and I'll help them build their own.",
   /* The figure on the body picker, the progress photos and the Pilates
      suggestion all come out of this one screen, so he says what it is for
      rather than asking three personal questions and explaining nothing. */
-  about: () => "I draw your figure from this. I would like it to look like you.",
-  tune: (d) => "I will remember this. It is most of what I am for.",
-  styles: () => "Only what you tick. I will not sneak anything in.",
+  about: () => "So the figure on screen looks like you, and so the numbers mean something.",
+  tune: (d) => "I'll remember this. It's most of what I'm for.",
+  styles: () => "Only what you tick. I won't sneak anything in.",
   days: (d) => (d.intensity === "allin"
-    ? "All in. Bold. I will be the one telling you to take a day off."
+    ? "All in. Bold. I'll be the one telling you to take a day off."
     : d.intensity === "easy" ? "Two done beats five planned. Genuinely." : "That is a week somebody actually keeps."),
   /* All that is left of the tracking step. It was a page per goal asking what
      to measure before anybody had measured anything; this is the promise that
      the question still exists, on the screen where it gets answered. */
-  plan: () => "There it is. Your week, in writing. You can track whatever you want in Progress. I will show you later.",
-  hire: () => "That is the plan. Now the part where I ask for something.",
+  plan: () => "There it is. Your week, in writing. You can track whatever you want in Progress. I'll show you later.",
+  hire: () => "That's your plan. Hire me as your personal trainer and I'll do the rest.",
   commit: () => "This is the part where I get sincere for one second.",
 };
 
@@ -12209,7 +12210,9 @@ function afterObChrome() { setTimeout(paintObBot, 0); }
 
 /* Where a draft saved by an older build lands. Keyed by the id that build
    wrote, valued at the step standing in the same place in this one. */
-const OB_RETIRED_STEPS = { pace: "plan", track: "styles", partner: "commit" };
+/* target went when height and weight moved to the about step and the goal
+   weight moved to the chart: nothing was left on it to ask. */
+const OB_RETIRED_STEPS = { pace: "plan", track: "styles", partner: "commit", target: "about" };
 
 function renderOnboardStep(step, data = {}) {
   /* A draft is saved on every step and survives a deploy, so somebody can come
@@ -12506,7 +12509,6 @@ function renderOnboardStep(step, data = {}) {
      a screen any more. If the goal weight question comes back it cannot come
      back here: checking a target needs the current weight, and that is now
      asked one step later. */
-  if (step === "target") { renderOnboardStep("about", data); return; }
 
   /* The "How fast?" step used to sit here, between the goal and the plan. It
      offered Steady, Quicker and Gentle at 12, 8 and 16 weeks, and it was asked
@@ -12724,16 +12726,17 @@ function renderOnboardStep(step, data = {}) {
     ob.innerHTML = `
       <div class="ob-step">
         ${obChrome("hire", data)}
-        <h1>Hire me as your personal trainer.</h1>
+        <h1>Hire me.</h1>
         <div class="ob-commit">
-          <div class="ob-commit-row">${icon("check", 16)}<span>I generate your workouts, every session.</span></div>
-          <div class="ob-commit-row">${icon("check", 16)}<span>I track your progress and keep your progress photos.</span></div>
-          <div class="ob-commit-row">${icon("check", 16)}<span>I follow up with you when you go quiet.</span></div>
-          <div class="ob-commit-row">${icon("check", 16)}<span>I do all of it for your partner too.</span></div>
+          <div class="ob-commit-row">${icon("check", 16)}<span>I'll generate every workout.</span></div>
+          <div class="ob-commit-row">${icon("check", 16)}<span>I'll track your progress and your lifts.</span></div>
+          <div class="ob-commit-row">${icon("check", 16)}<span>I'll keep your progress photos.</span></div>
+          <div class="ob-commit-row">${icon("check", 16)}<span>I'll follow up with you.</span></div>
+          <div class="ob-commit-row">${icon("check", 16)}<span>Same for your partner. They're included.</span></div>
         </div>
-        <p class="ob-hire-price"><b>${escapeHtml(PREMIUM_PRICE)} a month, your partner included.</b></p>
+        <p class="ob-hire-price"><b>${escapeHtml(PREMIUM_PRICE)} a month. Your partner included.</b></p>
         <button class="btn-primary" id="hireBtn">Hire me, ${escapeHtml(PREMIUM_PRICE)} a month</button>
-        <button class="btn-ghost" id="hireSkip">Skip, I will look around first</button>
+        <button class="btn-secondary" id="hireSkip">Skip, I'll look around first</button>
       </div>`;
     $("hireBtn").onclick = async () => {
       const btn = $("hireBtn");
@@ -12797,10 +12800,12 @@ function finishOnboardingFromDraft(data) {
     challenge_target: days,
     goal_key: g.key,
     height_in: data.height_in || null,
-    /* Undefined when the about step was never answered, which is not the same
-       as "Rather not say" and must not overwrite a sex already on the profile.
-       finishOnboarding only sends the field when it is one of the two. */
-    sex: data.sex_asked ? (data.sex || null) : undefined,
+    /* Undefined when the about step was never answered, which must not
+       overwrite a sex already on the profile. Declining is stored as the
+       literal "Rather not say", because that is what Setup's own select
+       writes, and one column should not hold two spellings of the same
+       answer. */
+    sex: data.sex_asked ? (data.sex || "Rather not say") : undefined,
     /* The two numbers that turn on every goal-driven surface there is. */
     weight_lb: data.weight_lb || null,
     goal_weight_lb: data.goal_weight_lb || null,
@@ -12870,13 +12875,10 @@ async function finishOnboarding(data) {
     ...(data.committed_at ? { committed_at: data.committed_at } : {}),
     goal_detail: data.goal_detail || null,
     ...(data.height_in ? { height_in: data.height_in } : {}),
-    /* Written as null for "Rather not say", because declining is an answer and
-       the column already holds exactly that for anybody who left Setup's own
-       field blank. Sent only when the about step was actually answered:
-       undefined here means never asked, and a fresh account that skipped the
-       screen should not have a null written over whatever a later Setup visit
-       puts there. The column exists, so this is not in
-       PENDING_PROFILE_COLUMNS. */
+    /* Sent only when the about step was actually answered: undefined here
+       means never asked, and a fresh account that skipped the screen should
+       not have anything written over whatever a later Setup visit puts there.
+       The column exists, so this is not in PENDING_PROFILE_COLUMNS. */
     ...(data.sex === undefined ? {} : { sex: data.sex }),
     challenge_target: data.challenge_target || 4,
     updated_at: new Date().toISOString(),
