@@ -118,6 +118,43 @@
             id: `hm${li}_${ri}`, email: THEM, user_name: "Mell", entry_date: day(d),
             exercise_name, sets: 3, reps, weight, created_at: day(d) + "T07:00:00Z",
           }))),
+
+        /* Activities, eight weeks of them, because the Progress tab now counts
+           sessions and there was nothing here to count. An activity is an
+           exercise_logs row with minutes on it and no weight, which is all one
+           has ever been; the distance rides along on the three that have one,
+           so the Distance card has something to draw once
+           20260916_cardio_distance.sql is run.
+
+           Deliberately uneven, and deliberately a mix: two weeks with no run
+           at all, so a zero week is on the chart and the empty bar can be
+           looked at, and yoga on weeks the running stopped, so the Mobility
+           card and the Cardio card cannot be telling the same story with
+           different labels. */
+        ...[
+          ["Run",     [[-2, 32, 3.1], [-9, 29, 2.8], [-12, 35, 3.4], [-16, 30, 3.0], [-23, 28, 2.6], [-26, 31, 3.0], [-44, 27, 2.5], [-51, 26, 2.4]]],
+          ["Walk",    [[-1, 42, 2.1], [-4, 38, 1.9], [-11, 45, 2.3], [-18, 40, 2.0], [-25, 44, 2.2], [-32, 36, 1.8], [-39, 41, 2.1], [-46, 39, 2.0]]],
+          ["Cycle",   [[-6, 55, 12.4], [-20, 48, 10.8], [-34, 52, 11.6]]],
+          ["Yoga",    [[-3, 35, null], [-10, 40, null], [-17, 35, null], [-30, 45, null], [-37, 40, null], [-52, 35, null]]],
+          ["Pilates", [[-7, 45, null], [-21, 50, null], [-38, 45, null]]],
+          ["HIIT",    [[-13, 22, null], [-41, 20, null]]],
+        ].flatMap(([exercise_name, rows], ai) =>
+          rows.map(([d, duration_min, distance_mi], ri) => ({
+            id: `act${ai}_${ri}`, email: ME, user_name: "Mo", entry_date: day(d),
+            exercise_name, sets: 1, reps: null, weight: null,
+            duration_min, distance_mi, created_at: day(d) + "T06:30:00Z",
+          }))),
+        /* Mell walks and does Pilates and does not run, so a partner's screen
+           is a different shape from mine rather than a copy of it. */
+        ...[
+          ["Walk",    [[-2, 50, 2.5], [-8, 46, 2.3], [-15, 48, 2.4], [-29, 44, 2.2]]],
+          ["Pilates", [[-5, 50, null], [-12, 45, null], [-19, 50, null], [-33, 45, null]]],
+        ].flatMap(([exercise_name, rows], ai) =>
+          rows.map(([d, duration_min, distance_mi], ri) => ({
+            id: `mact${ai}_${ri}`, email: THEM, user_name: "Mell", entry_date: day(d),
+            exercise_name, sets: 1, reps: null, weight: null,
+            duration_min, distance_mi, created_at: day(d) + "T06:15:00Z",
+          }))),
       ],
       ai_workouts: [
         { id: "w1", email: ME, entry_date: day(0), archived: false, focus: "Push Day", created_at: day(0) + "T05:00:00Z", exercises: pushWorkout,
