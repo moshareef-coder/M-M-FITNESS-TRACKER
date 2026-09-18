@@ -59,6 +59,57 @@ and `scrollWidth === clientWidth === 390` in both themes.
 Report every sweep WARN delta with an explanation. A number that moves without a
 reason is what the sweep exists to catch.
 
+## Where the app actually comes from
+
+`index.html` is the only source. The website, the sandbox and the iOS app are
+three copies of it, and two of them go stale without saying so.
+
+**The website is the source, served directly.** `vercel.json` sets
+`outputDirectory: "."`, so a push to `main` IS the website. Nothing is built and
+nothing can drift.
+
+**The sandbox is generated.** `node scripts/make-sandbox.mjs` bakes `index.html`
+into `sandbox-app.html` on fake data. Stale until regenerated. Affects nothing
+else.
+
+**The app is three hops away:**
+
+```
+index.html
+  -> node scripts/sync-web.mjs     writes www/, and CHECKS runtime imports
+  -> npx cap sync ios              copies www/, never reads index.html
+  -> node scripts/register-native-plugins.mjs
+  -> xcodebuild archive / export / altool --upload-app
+```
+
+**`cap sync` does not read `index.html`.** It copies `www/`. Skip `sync-web` and
+you get a build that compiles, installs, runs, and is silently days old. This
+shipped a day-old bundle to a real phone on 2026-09-17 and cost an afternoon of
+"the app looks outdated".
+
+`sync-web` also prints which runtime imports are missing from the bundle. Those
+imports are lazy, so the app throws only when somebody opens that feature: a
+build missing one looks perfect until a real person taps it. Read that output.
+
+**Verify rather than trust**, one command:
+
+```
+diff <(shasum -a 256 index.html | cut -d' ' -f1) \
+     <(shasum -a 256 ios/App/App/public/index.html | cut -d' ' -f1)
+```
+
+And after exporting, read the version back out of the `.ipa` itself, not out of
+the tree it was built from.
+
+**A cable install outranks TestFlight on the device.** `devicectl device install`
+replaces the TestFlight copy, and iOS will not prompt to update over it. If a
+tester reports an old-looking app, ask what they installed last before assuming
+the build is wrong.
+
+**Build numbers:** `CURRENT_PROJECT_VERSION` appears four times in
+`project.pbxproj`, app and widget. Move all four together or App Store Connect
+rejects the pair. It is separate from `APP_VERSION`, which is the web version.
+
 ## Version bumping
 
 `APP_VERSION` in `index.html` and `CACHE` in `sw.js` are one version and must move
