@@ -13,6 +13,15 @@
 (function () {
   const qs = new URLSearchParams(location.search);
   const SCENARIO = qs.get("scenario") || "paired";
+  /* Paid and unpaid are a second axis, not a scenario of their own: whether
+     the account can reach the generator, the week planner, the progress
+     analysis and the accent colours is a question that applies to Mo just as
+     much whether he is paired or alone. Before this the fake is_premium rpc
+     below fell through to `{ data: null }` unconditionally, which reads as
+     false, so the sandbox could never actually show what a paying account
+     sees. Default is paid: most of what gets reviewed here is the product,
+     not the paywall, and the paywall itself is one click away on ?paid=0. */
+  const PAID = qs.get("paid") !== "0";
 
   /* Local date, exactly the way the app computes todayStr(). Using
      toISOString() straight was a whole day out after 5pm Pacific, which
@@ -474,7 +483,7 @@
   const DB = baseWorld();
   (SCENARIOS[SCENARIO] || SCENARIOS.paired).apply(DB);
 
-  window.__SANDBOX = { scenario: SCENARIO, scenarios: SCENARIOS, db: DB, me: ME, them: THEM };
+  window.__SANDBOX = { scenario: SCENARIO, scenarios: SCENARIOS, db: DB, me: ME, them: THEM, paid: PAID };
 
   /* ---- the stand-in client ---- */
   /* Clones carry their index into the table, so an update() can land on the
@@ -724,6 +733,7 @@
             me.invite_code = fresh;
             return { data: { ok: true, invite_code: fresh }, error: null };
           }
+          if (name === "is_premium") return { data: PAID, error: null };
           return { data: null, error: null };
         },
         channel, removeChannel: () => {},

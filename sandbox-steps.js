@@ -398,6 +398,12 @@
   /* ---------- driving the phone ---------- */
   let current = 0;
   let loaded = "signedout";   // matches the src in sandbox.html, so step one does not reload
+  /* Paid is orthogonal to the scenario and sits outside the journey's own
+     state, so switching steps or scenarios never resets it: whichever world
+     Mo is looking at, he is looking at it as the billing state he last
+     picked. The iframe's own src is the source of truth for what the app
+     read on this load; this just remembers what to ask for on the next one. */
+  let paid = true;
 
   /* The app boots asynchronously. Wait for it to have put something on screen
      rather than guessing at a delay, or half the steps fire into an empty DOM. */
@@ -424,7 +430,7 @@
     device.classList.add("loading");
     return new Promise((resolve) => {
       frame.onload = () => { frame.onload = null; ready(frame.contentWindow).then(resolve); };
-      frame.src = `/sandbox-app.html?scenario=${encodeURIComponent(scenario)}`;
+      frame.src = `/sandbox-app.html?scenario=${encodeURIComponent(scenario)}&paid=${paid ? "1" : "0"}`;
       loaded = scenario;
     });
   }
@@ -579,6 +585,15 @@
   $("prevBtn").onclick = () => go(current - 1);
   $("nextBtn").onclick = () => go(current + 1);
   $("reloadBtn").onclick = () => go(current, { force: true });
+  function setPaid(next) {
+    if (next === paid) return;
+    paid = next;
+    $("billPaid").setAttribute("aria-pressed", String(paid));
+    $("billUnpaid").setAttribute("aria-pressed", String(!paid));
+    go(current, { force: true });   // the flag only takes effect on a fresh load
+  }
+  $("billPaid").onclick = () => setPaid(true);
+  $("billUnpaid").onclick = () => setPaid(false);
   $("openBtn").onclick = () => window.open(frame.src, "_blank", "noopener");
   $("darkBtn").onclick = () => {
     const w = frame.contentWindow;
