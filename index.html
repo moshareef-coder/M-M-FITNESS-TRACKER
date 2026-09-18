@@ -261,11 +261,19 @@
     #boot.waiting .boot-mark { animation: none; }
   }
 
-  html, body {
-    margin: 0; padding: 0;
-    /* Rubber-band drag is what makes a wrapped app read as a web page. */
+  /* Rubber-band drag is what makes a wrapped app read as a web page, so the
+     viewport gets overscroll-behavior: none. On html ONLY. With overflow-x
+     hidden on body as well, body becomes a scroll container of its own with
+     nothing to scroll, and "none" on it then stops a finger's scroll chaining
+     up to the page: every touch and wheel scroll on every screen died, while
+     window.scrollTo still worked, which is why no headless check caught it.
+     Mo caught it. */
+  html {
     overflow-x: hidden;
     overscroll-behavior: none;
+  }
+  html, body {
+    margin: 0; padding: 0;
     background: var(--bg);
     background-image: var(--page-wash);
     background-attachment: fixed;
@@ -7844,7 +7852,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.17.19";
+const APP_VERSION = "2026.09.17.20";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
