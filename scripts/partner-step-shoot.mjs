@@ -1,4 +1,6 @@
-// Drive the partner step in the sandbox over CDP and shoot it at 390px.
+// Drive the partner step in the sandbox over CDP and shoot it at 390px. It is
+// not a step in onboarding any more, it is the screen behind the partner prompt
+// on Home, so this calls renderObPartnerStep straight rather than a step id.
 //
 //   node scripts/partner-step-shoot.mjs out-dir
 //
@@ -58,7 +60,7 @@ try {
   await wait(200);
   await ev(`document.getElementById("nameInput").value = "Mo"; document.getElementById("nextBtn").click()`);
   await wait(400);
-  await ev(`renderOnboardStep("partner", { name: "Mo", goal_bubble: "build-muscle", goalLabel: "Build muscle", train_styles: ["lifting"] })`);
+  await ev(`renderObPartnerStep({ name: "Mo", goal_bubble: "build-muscle", goalLabel: "Build muscle", train_styles: ["lifting"] })`);
   await wait(900);
   console.log("step ids:", await ev(`["shareLinkBtn","partnerCodeInput","obPairSolo","obPairBack","myCodeLine"].map(i=>i+"="+!!document.getElementById(i)).join(" ")`));
   console.log("my code line:", await ev(`(document.getElementById("myCodeLine")||{}).hidden`), await ev(`(document.getElementById("myInviteCode")||{}).textContent`));
@@ -86,7 +88,7 @@ try {
 
   // 4. Skipping straight past, from a clean load.
   await go();
-  await ev(`renderOnboardStep("partner", { name: "Mo", goal_bubble: "lose-weight", goalLabel: "Lose weight" })`);
+  await ev(`renderObPartnerStep({ name: "Mo", goal_bubble: "lose-weight", goalLabel: "Lose weight" })`);
   await wait(800);
   await ev(`document.getElementById("obPairSolo").click()`);
   await wait(900);
@@ -95,7 +97,7 @@ try {
   // 5. Pairing by typing their six characters.
   await go();
   await ev(`clearSolo()`);
-  await ev(`renderOnboardStep("partner", { name: "Mo", goal_bubble: "build-muscle" })`);
+  await ev(`renderObPartnerStep({ name: "Mo", goal_bubble: "build-muscle" })`);
   await wait(800);
   const theirCode = await ev(`(__SANDBOX.db.profiles.find(p=>p.email==="mell@sandbox")||{}).invite_code`);
   console.log("their code:", theirCode);
@@ -107,7 +109,7 @@ try {
   //     ends in a partnership rather than a request.
   await go();
   await ev(`clearSolo()`);
-  await ev(`renderOnboardStep("partner", { name: "Mo", goal_bubble: "build-muscle" })`);
+  await ev(`renderObPartnerStep({ name: "Mo", goal_bubble: "build-muscle" })`);
   await wait(800);
   await ev(`(() => { const i = document.getElementById("partnerCodeInput"); i.value = "https://x/j/sandboxinvitefrommell1"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
   await wait(1400);
@@ -116,7 +118,7 @@ try {
   // 6. Arriving holding somebody else's link: the step should stop asking them
   //    to invite anyone and say who invited them instead.
   await go("&j=sandboxinvitefrommell1");
-  await ev(`renderOnboardStep("partner", { name: "Mo", goal_bubble: "build-muscle" })`);
+  await ev(`renderObPartnerStep({ name: "Mo", goal_bubble: "build-muscle" })`);
   await wait(1200);
   console.log("invited heading:", await ev(`(document.querySelector("#onboard h1")||{}).textContent`));
   await shot("partner-step-invited");
