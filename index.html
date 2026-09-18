@@ -450,6 +450,16 @@
     grid-template-areas: "words arc list" "acts acts acts";
   }
   .wkt-next-words { grid-area: words; min-width: 0; }
+  /* Not hired: the ring and the muscle list are the reading he does for you,
+     so they are the two things that go, and the pitch takes the row they were
+     sharing. The title, the card and the buttons under it are untouched,
+     because planning and logging a workout are free and this card is still
+     where you do them. */
+  .wkt-next-hire { grid-area: pitch; }
+  .wkt-next.not-hired .wkt-next-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "words" "pitch" "acts";
+  }
   .wkt-next-sub { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
   .wkt-arc { grid-area: arc; position: relative; width: 92px; height: 70px; align-self: center; }
   .wkt-arc svg { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -2105,14 +2115,24 @@
     font-size: 20px; line-height: 1; display: flex; align-items: center; justify-content: center;
     background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); color: #f4f6f8;
   }
-  .paywall-head { text-align: center; padding: 2px 56px 0; }
+  .paywall-head { text-align: center; padding: 2px 20px 0; }
   .paywall-word { font-family: var(--font-display); font-size: 27px; letter-spacing: .01em; }
   .paywall-word b { font-weight: 800; color: #fff; }
-  .paywall-word span { font-weight: 400; color: rgba(244,246,248,.62); margin-left: 3px; }
-  .paywall-tagline {
-    margin-top: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: .15em;
-    color: rgba(244,246,248,.45); text-transform: uppercase;
+  /* Under the name rather than beside it. "UNIO PERSONAL TRAINER" on one line
+     at 27px is wider than a phone, and the two halves are not the same weight
+     of fact anyway: the app has a name, and this is what you are hiring. */
+  .paywall-word span {
+    display: block; margin-top: 3px; font-weight: 700; font-size: 11px; letter-spacing: .18em;
+    color: rgba(244,246,248,.62); text-transform: uppercase;
   }
+  /* He says the offer himself, in his own voice and at reading size, because
+     the sentence people are actually deciding on is this one and it should not
+     be set in tracked-out capitals like a slogan. */
+  .paywall-say {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin: 12px 0 0; font-size: 15px; font-weight: 700; line-height: 1.35; color: #fff;
+  }
+  .paywall-say-face { flex: none; width: 40px; height: auto; }
   /* The peek carousel. Three cards in view, the centre one full size and the
      neighbours cut off at the edge, so a glance at the closed state already
      says "there is more either side" without anyone having to be told to
@@ -2128,6 +2148,13 @@
     display: flex; align-items: stretch; gap: 14px;
     overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
     scrollbar-width: none; padding: 10px 16vw 14px;
+    /* The cards take the height that is left rather than the height the
+       screenshot happens to be. Without this the track sized itself to the
+       image and pushed the price, the button and the legal text off the bottom
+       of a small phone, which is the one thing this screen may never do: the
+       whole footer is what Apple check for. The shot absorbs the difference,
+       cropped, which is what object-fit: cover is already doing. */
+    flex: 1 1 auto; min-height: 0;
   }
   .paywall-carousel-track::-webkit-scrollbar { display: none; }
   .paywall-slide {
@@ -2136,7 +2163,7 @@
     background: #161a21;
     border: 1px solid rgba(255,255,255,.09);
     box-shadow: 0 18px 40px -20px rgba(0,0,0,.8);
-    display: flex; flex-direction: column;
+    display: flex; flex-direction: column; min-height: 0;
     opacity: .5; transform: scale(.9); transition: opacity .22s, transform .22s;
   }
   /* The centred card, found and marked by the same scroll listener that drives
@@ -2157,6 +2184,13 @@
   .paywall-slide-shot {
     margin: 14px -18px -1px; border-radius: 16px 16px 0 0; overflow: hidden;
     flex: 1 1 auto; min-height: 0;
+    /* Tied to the screen rather than to the picture. A flex column only shrinks
+       a child when the column itself has a height, and this one is a min-height
+       so it grows instead: the card sized itself to the screenshot and pushed
+       the price, the button and the legal line off the bottom. Capped here, the
+       shot crops (object-fit: cover, from the top) and the footer stays on the
+       screen, which is the part Apple check for. */
+    max-height: 22vh;
   }
   .paywall-slide-shot img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
   .paywall-dots { display: flex; justify-content: center; gap: 6px; margin-top: 2px; }
@@ -2179,6 +2213,63 @@
   .paywall-fine { margin: 12px 0 0; font-size: 11px; line-height: 1.45; color: rgba(244,246,248,.42); }
   .paywall-legal { margin: 6px 0 0; font-size: 11px; }
   .paywall-legal a { color: var(--accent); text-decoration: none; }
+
+  /* ---- The hire pitch, in place ----
+     Wherever a paid surface is reached by somebody who has not hired him, this
+     is what stands where the thing itself would have been: his face, one line
+     about what THIS screen would do, and the one button. It is deliberately
+     not a card sitting inside the card it lands in. It is standing in for
+     content, and a boxed advert inside a box reads as an advert, which is the
+     one thing that makes somebody scroll past without reading it. */
+  .hire-pitch { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 2px 0; }
+  .hire-pitch-face { flex: none; width: 46px; height: auto; }
+  .hire-pitch-words { min-width: 0; flex: 1 1 auto; }
+  .hire-pitch-line {
+    display: block; font-size: 13.5px; font-weight: 600; line-height: 1.38;
+    letter-spacing: -.01em; color: var(--text);
+  }
+  /* Loud enough to be the thing you press and quiet enough not to outshout the
+     green Begin button on the same screen: the accent fill, at button-in-a-card
+     size rather than full page-action size. */
+  .hire-pitch-btn {
+    margin-top: 10px; width: 100%; padding: 10px 14px; border-radius: 12px; border: none;
+    background: var(--accent); color: var(--on-accent); cursor: pointer;
+    font-family: var(--font-display); font-size: 14px; font-weight: 700; letter-spacing: -.01em;
+  }
+  .hire-pitch-btn:active { transform: scale(.985); }
+  /* A chart card with the pitch in it instead of the chart. The goal head
+     stays visible because it is the person's own goal, not a reading we are
+     charging for, and a screen that keeps its title with one block swapped out
+     is still their screen; a blank card is a bug with a price on it. */
+  .hire-locked > *:not(.hire-pitch-slot):not(.wth-head) { display: none !important; }
+  /* Clear of the head's mountain, which is absolutely placed and hangs a few
+     pixels below the words it sits beside. */
+  .hire-pitch-slot.under-head { margin-top: 18px; }
+  /* On the workout card he is not allowed to outshout Begin workout. Mo's rule
+     for that screen is that the green start button is the loudest thing on it,
+     and a suggestion competing with the thing it is suggesting is how the
+     start button stops being pressed. Everywhere else the pitch IS the only
+     action on its card, so it keeps the accent. */
+  .wkt-next .hire-pitch-btn {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  }
+
+  /* ---- Bring your partner, on Home ----
+     Onboarding stopped asking for a partner, so this is where the ask lives
+     now. A card rather than the small seat in the hero, because the seat is a
+     thing you find and this is a thing you are offered; the seat stays exactly
+     as it was underneath as the quiet permanent way in. */
+  .home-hire { display: flex; flex-direction: column; gap: 12px; }
+  .home-hire-top { display: flex; align-items: center; gap: 13px; }
+  .home-hire-face { flex: none; width: 52px; height: auto; }
+  .home-hire-line {
+    min-width: 0; flex: 1 1 auto; font-size: 13.5px; font-weight: 600; line-height: 1.38;
+    letter-spacing: -.01em; color: var(--text);
+  }
+  /* Side by side, so "Not now" is as easy to reach as the invite. A skip that
+     takes a second tap to find is not a skip. */
+  .home-hire-acts { display: flex; gap: 8px; }
+  .home-hire-acts > button { margin-top: 0; font-size: 14.5px; padding: 12px 14px; }
   /* One blocked person. The address can be long and the button must not be
      pushed off the edge by it, so the name takes the slack and ellipsises. */
   .block-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
@@ -6814,6 +6905,14 @@
          so a muted account and a quiet beat both leave no gap. -->
     <div class="home-quip-slot" id="homeQuipSlot"></div>
 
+    <!-- Bring your partner. Onboarding stopped asking (a person wants to see
+         the app before they drag somebody into it), so the ask lives here,
+         near the top, where it is offered rather than hunted for. Skippable
+         for the session and back on the next launch: it is an invitation, and
+         an invitation you cannot put down is a nag. Never drawn for somebody
+         who is already paired, coached, or waiting on an answer. -->
+    <div class="card home-hire hidden" id="homePartnerCard"></div>
+
     <!-- One card where there used to be two. The week grid was already the
          right picture (a day reads DOWN its column: did we both go on
          Wednesday, or just one of us) and the timeline above it was a preview
@@ -6930,6 +7029,13 @@
     <div class="goal-chips" id="progGoalChips"></div>
 
     <div class="card" id="progHeadline"></div>
+
+    <!-- His pitch, for an account that has not hired him: tracking and the
+         charts are the paid half of this tab. It lives here in the markup and
+         lockProgressForHire() moves it into whichever goal screen is up, so
+         there is one node with one set of handlers rather than one built and
+         thrown away on every repaint. -->
+    <div class="card hidden" id="progHirePitch"></div>
 
     <!-- The Tone Up screen (renderToneHero), for the recomp goal only. Not a
          card: the goal order walks past it, and it is pinned straight under
@@ -7300,6 +7406,17 @@
 
       <div class="set-sec">Account</div>
       <div class="set-group">
+        <!-- What you are paying, said in the words the paywall says it in, and
+             in the place a person and an App Review reader both go looking for
+             it. It is also the only way back to Restore once somebody IS
+             subscribed, since the paywall never opens for them again. No
+             data-page: it opens the offer or the terms, not a settings page. -->
+        <button type="button" class="set-row" id="setRow-hire">
+          <span class="set-ico" data-ico="star"></span>
+          <span class="set-txt"><span class="set-title">Personal trainer</span></span>
+          <span class="set-val" id="setHireSub"></span>
+          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+        </button>
         <button type="button" class="set-row" id="setRow-about" data-page="about">
           <span class="set-ico" data-ico="info"></span>
           <span class="set-txt"><span class="set-title">About</span></span>
@@ -8843,6 +8960,12 @@ async function handleSignedIn(session) {
 const ADMIN_EMAIL = "mo.shareef@creativelab1.com";
 let PARTNER_EMAIL = null;
 let MY_PARTNERSHIP = null;
+/* A pair request of mine that nobody has answered yet. Set where the
+   partnerships table is actually read, because somebody who has settled on
+   training alone walks past the waiting screen and lands on Home with the
+   request still out: Home's partner card has to know not to ask them to send
+   a second one. */
+let PAIR_REQUEST_OUT = false;
 /* Coaching context. A client under a coach has no partner and cannot generate
    their own workouts; that is the coach's job and the reason they pay. */
 let MY_GROUP = null;
@@ -8980,6 +9103,10 @@ async function checkPartnershipThenEnter() {
      'declined' partnership, so every branch below finds an empty list and this
      function behaves exactly as it did before. */
   const mine = (v) => String(v || "").toLowerCase() === MY_EMAIL;
+  /* Read once, here, where the rows are. Either direction counts: a request I
+     sent and a request I have been sent are both "an answer is owed", and
+     neither is a moment to be asked to invite somebody. */
+  PAIR_REQUEST_OUT = all.some((r) => r.status === "pending" && (mine(r.inviter_email) || mine(r.invitee_email)));
   const incoming = all.filter((r) => r.status === "pending" && mine(r.invitee_email));
   if (incoming.length) { renderPairRequestScreen(incoming); return; }
 
@@ -13073,7 +13200,7 @@ function showApp() {
     openSettingsPage("partner");
   });
 
-  $("addBodyPhotoBtn").addEventListener("click", () => $("bodyPhotoInput").click());
+  $("addBodyPhotoBtn").addEventListener("click", () => pickBodyPhoto());
   $("bodyPhotoInput").addEventListener("change", (e) => {
     const f = e.target.files?.[0];
     e.target.value = "";
@@ -15902,6 +16029,57 @@ function renderHero(animate = false) {
   }
 }
 
+/* Skipping the partner card. sessionStorage rather than localStorage on
+   purpose: Mo's rule is that it comes back, quietly, on the next launch. A
+   "no" today is about today, and the whole point of taking it out of
+   onboarding was that people say yes to this later than they are asked. */
+const PARTNER_CARD_SKIP_KEY = "ft_partner_card_skipped";
+function partnerCardSkipped() {
+  try { return sessionStorage.getItem(PARTNER_CARD_SKIP_KEY) === "1"; } catch { return false; }
+}
+function skipPartnerCard() {
+  try { sessionStorage.setItem(PARTNER_CARD_SKIP_KEY, "1"); } catch { /* private mode */ }
+}
+
+/* The ask itself. He says it, because "bring your partner" is a thing a
+   trainer says to you and not a feature announcement, and because the line has
+   to work read aloud later.
+
+   It sits above the empty seat in the hero rather than replacing it. The seat
+   is the permanent quiet way in, findable on any day by somebody who decided
+   on their own; this is the one that speaks first, once, and can be put down.
+   Two of them shouting would be worse than either. */
+function renderPartnerInviteCard() {
+  const el = $("homePartnerCard");
+  if (!el) return;
+  /* An answer already given, in any direction: paired, coached, or a request
+     already out. A request waiting has its own screen and its own words, and
+     asking again underneath them would read as the app having lost track. */
+  const show = !PARTNER_EMAIL && !isCoachedClient() && !PAIR_REQUEST_OUT && !partnerCardSkipped();
+  el.classList.toggle("hidden", !show);
+  if (!show) { el.replaceChildren(); return; }
+  el.innerHTML = `
+    <div class="home-hire-top">
+      ${robotFaceSVG(52, "home-hire-face")}
+      <span class="home-hire-line">Bring your partner. They&rsquo;re included in your package. I&rsquo;ll watch you both.</span>
+    </div>
+    <div class="home-hire-acts">
+      <button type="button" class="btn-primary" id="homePartnerInviteBtn">Send an invite</button>
+      <button type="button" class="btn-ghost" id="homePartnerSkipBtn">Not now</button>
+    </div>`;
+  $("homePartnerInviteBtn").onclick = async (e) => {
+    const sent = await shareInviteLink(e.currentTarget);
+    /* Already paired, on a device that had not caught up. The card is wrong
+       rather than the tap, so it goes and the reload puts the truth back. */
+    if (sent === "paired") { toast("You already have a partner"); skipPartnerCard(); renderPartnerInviteCard(); await loadAll(); return; }
+    /* An invitation that actually went somewhere is an answer for today. It
+       comes back next launch if nobody accepted, which is the same rule as
+       the skip and for the same reason. */
+    if (sent) { skipPartnerCard(); renderPartnerInviteCard(); }
+  };
+  $("homePartnerSkipBtn").onclick = () => { skipPartnerCard(); renderPartnerInviteCard(); };
+}
+
 /* Everything on Home that is written for two people, in one place. Training
    alone is a supported way to use this app, not a broken version of it, and
    the words have to say so: "Stronger Together" over a single ring, above a
@@ -16790,7 +16968,16 @@ async function reportClip(clip) {
    doubling.
    Displayed only. What is actually charged is the price on the App Store
    product, and if the two ever disagree the store wins and we have lied on
-   a paywall, so this string and that product are changed together. */
+   a paywall, so this string and that product are changed together.
+
+   Every identifier around here says premium and every word on the screen says
+   personal trainer, and that is on purpose rather than a rename half done.
+   IS_PREMIUM, requirePremium, the RevenueCat entitlement "premium", the
+   subscriptions table and the App Store product unio_premium_monthly are all
+   configured against that word in places this file cannot reach, and renaming
+   them here would only make the code disagree with the store. The product is
+   what the robot is: you hire him. "Premium" is being kept back for a tier
+   above this one, which is the other reason not to spend the word now. */
 const PREMIUM_PRICE = "$7.99";
 
 /* One real screenshot per feature, captured from the app itself rather than
@@ -16805,15 +16992,15 @@ const PREMIUM_PRICE = "$7.99";
    drawn around it is free to be exactly what the app already draws elsewhere. */
 const PREMIUM_UNLOCKS = [
   ["paywall/01-generated-workout.jpg", "dumbbell", "var(--accent)",
-   "Workouts made for you", "A plan every day, built around your goal and what you lifted last time."],
+   "I'll build your workouts", "A session a day, made around your goal and what you lifted last time."],
   ["paywall/02-week-plan.jpg", "checklist", "var(--me)",
-   "Plan your week together", "Map out the week with your partner and stay in sync."],
+   "I'll plan your week", "Your week mapped out with your partner, so you both know what is coming."],
   ["paywall/03-body-impact.jpg", "body", "var(--partner)",
-   "Body impact", "Which muscles you have actually worked, and which ones you keep missing."],
+   "I'll say what to train next", "Which muscles you have actually worked, and the ones you keep missing."],
   ["paywall/04-progress-records.jpg", "trending", "#2dd4bf",
-   "Track the progress that matters", "Trends, projections and your records ranked."],
+   "I'll track your progress", "Your trends, your projections and your records, kept up to date."],
   ["paywall/05-accent-colors.jpg", "sunMoon", "var(--accent)",
-   "Make it yours", "Accent colours, picked by you."],
+   "I'll make it yours", "Accent colours, picked by you."],
 ];
 
 /* The gate. Returns true when the thing may go ahead, and otherwise puts the
@@ -16827,6 +17014,55 @@ async function requirePremium() {
   if (await refreshPremium()) return true;
   await showPaywall();
   return IS_PREMIUM;
+}
+
+/* The same question requirePremium asks, for a surface that has to DRAW itself
+   differently rather than stop and put a screen up. Read this rather than
+   IS_PREMIUM on its own: with the paywall switched off everybody is in, and a
+   card that checked the flag alone would pitch at people in a build that has
+   no store behind it. */
+function hired() {
+  return !PAYWALL_ON || IS_PREMIUM;
+}
+
+/* One sentence per place he stands in, written here rather than at the five
+   call sites, so the pitch cannot start saying five different things about the
+   same seven ninety nine. Each one says what HE would do on THIS screen, which
+   is the only reason the sentence is different at all. */
+const HIRE_PITCH_LINES = {
+  next: "Hire me and I'll pick your next workout and build it for you.",
+  progress: "Hire me and I'll track all of this for you, and show you the line.",
+  generic: "Hire me as your personal trainer and I'll take this from here.",
+};
+
+/* The pitch, in place. Everywhere a paid surface is reached by somebody who
+   has not hired him, this is what sits where the readings would have been:
+   his face, the one line for that screen, and the button. Every copy of it
+   comes from here, so the price is read from PREMIUM_PRICE once and there is
+   no second wording to forget to update. */
+function hirePitchHTML(context) {
+  const line = HIRE_PITCH_LINES[context] || HIRE_PITCH_LINES.generic;
+  return `<div class="hire-pitch">
+    ${robotFaceSVG(46, "hire-pitch-face")}
+    <div class="hire-pitch-words">
+      <span class="hire-pitch-line">${escapeHtml(line)}</span>
+      <button type="button" class="hire-pitch-btn" data-hire="1">Hire me, ${escapeHtml(PREMIUM_PRICE)} a month</button>
+    </div>
+  </div>`;
+}
+
+/* Bound where the pitch is inserted rather than delegated off the document,
+   because every other card in this app wires its own buttons and a lone
+   global listener is the thing nobody finds when this stops working. */
+function wireHirePitch(root) {
+  (root || document).querySelectorAll("[data-hire]").forEach((b) => {
+    b.onclick = async () => {
+      /* Disabled for the round trip, because the store sheet takes a moment to
+         arrive and a button that looks untouched invites a second tap. */
+      b.disabled = true;
+      try { await startHire(); } finally { b.disabled = false; }
+    };
+  });
 }
 
 /* Everything Apple require on a paywall, and they reject for the absence of any
@@ -16854,8 +17090,11 @@ function showPaywall() {
       <button type="button" class="paywall-x" data-pay="0" aria-label="Close">&times;</button>
       <div class="paywall-sheet">
           <div class="paywall-head">
-            <div class="paywall-word"><b>UNIO</b> <span>PREMIUM</span></div>
-            <div class="paywall-tagline">TRAIN TOGETHER. A STRONGER YOU.</div>
+            <div class="paywall-word"><b>UNIO</b> <span>Personal trainer</span></div>
+            <div class="paywall-say">
+              ${robotFaceSVG(40, "paywall-say-face")}
+              <span>Hire me as your personal trainer.</span>
+            </div>
           </div>
           <!-- Swipe through what it actually looks like before reading a word
                about it. People buy what they can picture themselves using, and
@@ -16885,14 +17124,15 @@ function showPaywall() {
                sit in the same place whether the phone is a mini or a Max and
                nobody has to scroll to find out what this costs. -->
           <div class="paywall-foot">
-            <!-- One subscription covers both of you. Said here rather than in
-                 the small print, because it is the difference between one
-                 price and two people each paying it. -->
+            <!-- The job and the price, in that order, in one place. One
+                 subscription covers both of you and it is said here rather
+                 than in the small print, because it is the difference between
+                 one price and two people each paying it. -->
             <p class="paywall-price">
-              <b>${escapeHtml(PREMIUM_PRICE)} a month, and it covers both of you.</b>
-              <span>Only one of you needs to subscribe.</span>
+              <b>${escapeHtml(PREMIUM_PRICE)} a month, your partner included.</b>
+              <span>I&rsquo;ll generate your workouts, track your progress, keep your progress photos and follow up with you both.</span>
             </p>
-            <button type="button" class="btn-primary paywall-cta" data-pay="1">Subscribe for ${escapeHtml(PREMIUM_PRICE)} a month</button>
+            <button type="button" class="btn-primary paywall-cta" data-pay="1">Hire me, ${escapeHtml(PREMIUM_PRICE)} a month</button>
             <button type="button" class="btn-ghost paywall-ghost" data-pay="restore">Restore purchase</button>
             <button type="button" class="btn-ghost paywall-ghost" data-pay="0">Not now</button>
             <p class="paywall-fine">
@@ -16947,7 +17187,10 @@ function showPaywall() {
         if (what === "0") return close(false);
         if (what === "restore") { close(false); await restorePurchase(); return; }
         close(false);
-        await startPurchase();
+        /* startHire, not startPurchase: the button on this screen and the
+           button on onboarding's hire step have to be the same purchase, and
+           the one place that says so is the function they both call. */
+        await startHire();
       };
     });
     /* No tap-outside-to-close: on a full screen there is no outside, and the
@@ -17086,6 +17329,44 @@ async function startPurchase() {
   }
 }
 
+/* Hiring him. The one entry point: the paywall's own button, every in-place
+   pitch, and onboarding's hire step all come through here, so there is one
+   purchase path rather than four that drift apart.
+
+   It never throws and it never leaves a caller hanging. Onboarding advances
+   on the boolean, so a rejected promise here would strand somebody on a step
+   with a dead button, which is a worse outcome than not selling to them.
+
+   True only when the server says so afterwards. startPurchase already asks
+   rather than believing the device, and this reads the same flag rather than
+   the fact that a sheet closed. */
+let HIRE_OFF_DEVICE_SAID = false;
+async function startHire() {
+  try {
+    if (hired()) return true;
+    /* The sandbox, the website, and any build without the plugin. Said once a
+       session: somebody looking around the web version will press this on more
+       than one screen, and being told the same thing four times reads as the
+       app being broken rather than as an answer. */
+    if (!purchasesPlugin()) {
+      if (!HIRE_OFF_DEVICE_SAID) {
+        HIRE_OFF_DEVICE_SAID = true;
+        toast("Hiring me happens in the iPhone app.");
+      }
+      return false;
+    }
+    await startPurchase();
+    return IS_PREMIUM === true;
+  } catch (err) {
+    /* startPurchase handles its own failures and says what went wrong. Anything
+       that still reaches here is a bug on the way in, not a payment problem, so
+       it is logged and answered as "not bought" rather than thrown at a caller
+       who is mid-step. */
+    console.error("could not start the hire", err);
+    return false;
+  }
+}
+
 /* Apple require this to exist and to work, and they test it. Somebody who
    reinstalls, or signs in on a second device, must be able to get back what
    they already paid for without paying again. */
@@ -17103,12 +17384,16 @@ async function restorePurchase() {
   }
 }
 
-/* Whatever is on screen was drawn for somebody who had not paid. */
+/* Whatever is on screen was drawn for somebody who had not paid. The workout
+   tab is in here now because the next workout card is one of those surfaces:
+   buying from the pitch inside it and being left looking at the pitch is the
+   one outcome a paid screen must never have. */
 function rerenderAfterPremium() {
   try {
     renderHome();
     if (typeof renderSetupTab === "function") renderSetupTab();
     if (typeof renderProgressTab === "function") renderProgressTab();
+    if (typeof renderWorkoutTab === "function") renderWorkoutTab();
   } catch (err) { console.warn("could not repaint after premium", err); }
 }
 
@@ -18404,6 +18689,7 @@ function renderHome(animate = false) {
      hears followed by four minutes of silence when they do turn up. */
   sayHomeQuip();
   renderPairCopy();
+  renderPartnerInviteCard();
   renderTopStreak();
   renderLiveCard();
   const openBtn = $("openPartnerBtn");
@@ -18920,6 +19206,10 @@ function renderToneHero(on, profile, isPartner) {
 function renderToneChart(series, isPartner) {
   const canvas = $("toneChart");
   if (!canvas) return;
+  /* Not hired, no line. The card it would draw into is showing his pitch
+     instead, so this would be 70 KB of Chart.js fetched to paint a canvas
+     nobody can see. */
+  if (!hired()) return;
   if (!window.Chart) {
     loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
       .then(() => { if (!$("toneHero")?.classList.contains("hidden")) renderToneChart(series, isPartner); })
@@ -19473,6 +19763,10 @@ function renderBulkHero(on, profile, isPartner) {
 function goalLineChart(canvasId, series, isPartner, unit, live) {
   const canvas = $(canvasId);
   if (!canvas) return null;
+  /* Not hired, no line. The card it would draw into is showing his pitch
+     instead, so this would be 70 KB of Chart.js fetched to paint a canvas
+     nobody can see. */
+  if (!hired()) return null;
   if (!window.Chart) {
     loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
       /* Whichever goal screen asked for it: the tab redraws and whoever is on
@@ -20384,6 +20678,10 @@ function renderEnduranceHero(on, profile, isPartner) {
 function renderEnduranceChart(buckets, isPartner) {
   const canvas = $("endChart");
   if (!canvas) return;
+  /* Not hired, no line. The card it would draw into is showing his pitch
+     instead, so this would be 70 KB of Chart.js fetched to paint a canvas
+     nobody can see. */
+  if (!hired()) return;
   if (!window.Chart) {
     loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
       .then(() => { if (!$("endHero")?.classList.contains("hidden")) renderEnduranceChart(buckets, isPartner); })
@@ -21502,6 +21800,10 @@ function renderVolumeChart() {
 }
 
 function renderWeightChart() {
+  /* Not hired, no line. The card it would draw into is showing his pitch
+     instead, so this would be 70 KB of Chart.js fetched to paint a canvas
+     nobody can see. */
+  if (!hired()) return;
   /* Chart.js is 70 KB and only this card uses it, so it arrives with the card
      rather than with the app. */
   if (!window.Chart) {
@@ -27853,17 +28155,26 @@ function renderChooseScreen() {
      empty day this screen is where it lives, but it is not what most people
      open this tab to do. */
   const aimed = (p.focus || "").toLowerCase();
+  /* The match and the muscle list ARE "what to train next", which is one of
+     the things he is hired for. The card stays, with its title and both
+     buttons, and his pitch sits where the reading would have been: a free
+     account can still plan a workout and begin one from here, which is what
+     the free tier promises. */
+  const hiredHere = hired();
   const nextCard = `
-    <section class="wkt-next">
+    <section class="wkt-next${hiredHere ? "" : " not-hired"}">
       <div class="wkt-next-top">
         <p class="wkt-eyebrow">Next workout</p>
-        ${infoDot("planMatch", "How the match is worked out")}
+        ${/* The dot explains how the match is worked out, so with no match on
+              screen it explains nothing. */ ""}
+        ${hiredHere ? infoDot("planMatch", "How the match is worked out") : ""}
       </div>
       <div class="wkt-next-grid">
         <div class="wkt-next-words">
           <h2>${escapeHtml(p.focus)}</h2>
-          <p class="wkt-next-sub">${escapeHtml(matchReading(p.match))}</p>
+          ${hiredHere ? `<p class="wkt-next-sub">${escapeHtml(matchReading(p.match))}</p>` : ""}
         </div>
+        ${!hiredHere ? `<div class="wkt-next-hire">${hirePitchHTML("next")}</div>` : `
         <div class="wkt-arc">
           ${arcGaugeSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 96)}
           <div class="wkt-arc-num"><b>${p.match}%</b><i>MATCH</i></div>
@@ -27875,7 +28186,7 @@ function renderChooseScreen() {
               ? `<span class="wkt-ring" aria-hidden="true"></span>`
               : `<span class="wkt-tick" aria-hidden="true">${icon("check", 14)}</span>`}${escapeHtml(m.name)}</li>`;
           }).join("")}
-        </ul>
+        </ul>`}
         <div class="wkt-next-acts">
           ${p.real
             ? `<button type="button" class="wkt-btn-solid sm" id="chooseBeginBtn">${partway ? "Resume workout" : "Begin workout"}</button>`
@@ -27933,6 +28244,7 @@ function renderChooseScreen() {
   wireTodaySessions($("workoutContent"));
   wireSavedWorkouts($("workoutContent"));
   wireWorkoutCalendar($("workoutContent"));
+  wireHirePitch($("workoutContent"));
   staggerWorkoutCards();
 
   const toManual = () => goWorkoutScreen("manual", {
@@ -31323,7 +31635,7 @@ async function renderComparePhotos(hostEl, isPartner) {
   /* Every door opens the same picker. The upsert behind it is keyed on
      (email, taken_on), so shooting again today replaces today's row and
      removes the file it replaced. */
-  const pick = () => $("bodyPhotoInput")?.click();
+  const pick = () => pickBodyPhoto();
   hostEl.querySelector(".cmp-today-add")?.addEventListener("click", pick);
   hostEl.querySelectorAll("[data-retake]").forEach((b) => {
     b.addEventListener("click", (e) => { e.stopPropagation(); pick(); });
@@ -31407,6 +31719,19 @@ async function deleteBodyPhoto(id) {
     console.error(err);
     toast("Could not delete");
   }
+}
+
+/* Every door into the camera, behind the one gate.
+
+   Keeping the photos is part of what he is hired for, and it is also the only
+   thing in this app that costs real money per person per month: every photo is
+   a file we store for as long as they keep it. Gated on the tap rather than by
+   taking the button away, the same call the accent swatches make, so somebody
+   can see what they would get. Photos already taken are never locked away from
+   the person who took them. */
+async function pickBodyPhoto() {
+  if (!await requirePremium()) return;
+  $("bodyPhotoInput")?.click();
 }
 
 async function uploadBodyPhoto(file) {
@@ -33527,12 +33852,75 @@ function renderProgressTab() {
      because on the weight screen that card is hidden ON PURPOSE and the tile
      is meant to be its door, not to vanish with it. */
   renderProgTiles(kind, isPartner, { photosAvailable: !isPartner && !blank });
-  const live = new Set(shown);
+  /* After every screen has drawn itself, because this takes readings away
+     rather than deciding which ones there were: the goal, the head and the
+     shape of the tab are the same whether or not he has been hired, and one
+     block inside it is his pitch instead of a chart. */
+  lockProgressForHire();
+  const live = new Set(hired() ? shown : []);
   if (live.has("cardWeight")) { renderWeightChart(); renderWeightStats(); renderWeightRange(); renderWeightHistory(); }
   if (live.has("cardConsistency")) { renderConsistencyChart(); renderConsistencyStats(); }
   if (live.has("cardStrength")) { renderStrengthChart(); renderStrengthStats(); }
   if (live.has("cardVolume")) { renderVolumeChart(); renderVolumeStats(); }
   if (live.has("cardPhotos")) renderBodyPhotos();
+}
+
+/* Progress, for somebody who has not hired him yet.
+
+   Tracking and the charts are the paid half of this tab, so on a free account
+   the readings stand down and the pitch stands where they were. What does NOT
+   go is the goal, the head, and the fact that this is still their tab: a goal
+   screen with its title and one card saying what he would do with it is an
+   offer, and an empty tab is a bug. It is never a modal either. Nobody opening
+   Progress asked to be sold to, and a screen that has to be dismissed before
+   it can be read is how a paywall turns into the reason somebody deletes an
+   app.
+
+   One pitch, not one per card. It lands inside the chart card of whichever
+   goal screen is up, and where there is no goal screen every reading card
+   stands down and it stands in for the lot. */
+function lockProgressForHire() {
+  const host = $("tab-progress");
+  if (!host) return;
+  /* Whatever was locked last time, whether or not anything is locked now: a
+     purchase mid-session has to leave the tab exactly as it found it. */
+  host.querySelectorAll(".hire-locked").forEach((el) => el.classList.remove("hire-locked"));
+  const box = $("progHirePitch");
+  if (!box) return;
+  if (hired()) { box.classList.add("hidden"); box.replaceChildren(); return; }
+  box.classList.remove("hidden");
+  box.innerHTML = hirePitchHTML("progress");
+
+  const screen = [...host.querySelectorAll(".goal-screen")].find((el) => !el.classList.contains("hidden"));
+  const weightScreenOn = $("cardWeight")?.classList.contains("wt-hero");
+  const chartCard = screen?.querySelector(".tone-card, .end-card")
+    || (weightScreenOn ? $("cardWeight")?.querySelector(".wth-card") : null);
+
+  if (chartCard) {
+    /* Inside a card already, so it is not one itself. The head stays drawn
+       (.hire-locked keeps .wth-head) and everything else in the card, the
+       number, the line, the window pills, stands down. */
+    /* The slot class is what .hire-locked keeps on screen while it stands the
+       rest of the card down, so it is not optional decoration. */
+    box.className = "hire-pitch-slot";
+    chartCard.classList.add("hire-locked");
+    /* Straight under the goal head where there is one (the weight screen keeps
+       its head inside this card), so he is answering the goal rather than
+       floating under a mountain drawing that overhangs it. */
+    const head = chartCard.querySelector(".wth-head");
+    if (head) { box.classList.add("under-head"); chartCard.insertBefore(box, head.nextSibling); }
+    else chartCard.appendChild(box);
+  } else {
+    /* No goal screen: the index of reading cards is what this tab would have
+       been, so all of it stands down and the pitch is the card. */
+    PROGRESS_CARDS.forEach((id) => $(id)?.classList.add("hidden"));
+    $("progRuleElse")?.classList.add("hidden");
+    box.className = "card hire-pitch-slot";
+    const after = $("progHeadline");
+    if (after?.parentNode === host) host.insertBefore(box, after.nextSibling);
+    else host.appendChild(box);
+  }
+  wireHirePitch(box);
 }
 
 /* ---------- Couple tab ---------- */
@@ -34479,6 +34867,25 @@ function renderSetupTab() {
   document.querySelectorAll("[data-setback]").forEach((b) => {
     b.onclick = closeSettingsPage;
   });
+  /* The trainer row. Hired reads as a fact about the account; not hired reads
+     as the offer it is, and tapping it is the offer. */
+  if ($("setRow-hire")) {
+    $("setHireSub").textContent = hired() ? "Hired" : "Not hired";
+    $("setRow-hire").onclick = async () => {
+      if (!hired()) { await showPaywall(); renderSetupTab(); return; }
+      /* Everything Apple want a subscriber to be able to find after they have
+         paid: what it costs, that it renews, where to stop it, and the way to
+         get it back on another device. */
+      const restore = await askConfirm({
+        heading: "Your personal trainer",
+        body: `${PREMIUM_PRICE} a month, your partner included. It renews every month until you cancel. `
+          + `Cancel any time in your iPhone's Settings, under your name then Subscriptions.`,
+        ok: "Restore purchase",
+        cancel: "Close",
+      });
+      if (restore) await restorePurchase();
+    };
+  }
   // The Admin row only exists for accounts that have the panel.
   $("setRow-admin").classList.toggle("hidden", $("adminCard").classList.contains("hidden"));
   $("setupEmail").textContent = MY_EMAIL || "";
