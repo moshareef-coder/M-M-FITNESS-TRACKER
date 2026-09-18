@@ -39,6 +39,13 @@
        code screen refuses to send anything shorter. "MO" sat in the Your code
        panel for months looking like a bug. */
     avatar_path: null, timezone: "America/Los_Angeles", invite_code: (name.toUpperCase() + "XXXXXX").slice(0, 6),
+    /* A body, because the calorie maths refuses without one and the Recovery
+       screen is the first screen that asks for it. Without these three the
+       sandbox could only ever show the "I need your height" case, which is the
+       one state a fixture does not need to be permanently stuck in.
+       soloNoData still reaches it: it clears the weigh-ins, and no weight
+       means no TDEE however tall somebody is. */
+    height_in: name === "Mell" ? 65 : 70, age: name === "Mell" ? 31 : 34, activity_level: "Moderate",
     bonus_xp: 0, tracked_metrics: ["weight", "prs", "trained"], ...extra,
   });
 

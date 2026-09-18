@@ -54,8 +54,15 @@ const KNOWLEDGE_FILES = [
   "mo-knowledge/engine/limits.mjs",
   "mo-knowledge/engine/joint-load.mjs",
   "mo-knowledge/engine/load.mjs",
+  /* The Recovery screen's stretch picks, and focus.mjs because mobility.mjs
+     imports MUSCLE_GROUPS from it. Lazy, like every other engine import here,
+     so a build without them looks perfect until somebody taps Rest well. */
+  "mo-knowledge/engine/mobility.mjs",
+  "mo-knowledge/engine/focus.mjs",
   "knowledge/formulas/tdee.mjs",
   "knowledge/formulas/calorie-math.mjs",
+  /* The calorie target per goal, which the Recovery screen reads. */
+  "knowledge/formulas/goal-timeline.mjs",
   "knowledge/formulas/strength-math.mjs",
   "knowledge/equipment.mjs",
   "knowledge/exercise-library/index.mjs",
