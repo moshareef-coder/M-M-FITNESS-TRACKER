@@ -5925,6 +5925,16 @@
   .trk-card.on .trk-tick { opacity: 1; transform: scale(1); }
   .trk-any { font-size: 12.5px; color: var(--muted); margin: 12px 0 14px; }
   @media (prefers-reduced-motion: reduce) { .trk-card, .trk-tick { transition: none; } }
+  /* The first run of the tracking questions, which is a screen rather than a
+     card: it stands in front of the whole tab the way a settings page stands in
+     front of Setup, because it is asking the question the tab behind it is
+     about to answer. One rule hides the tab's own contents, so nothing on
+     Progress has to learn that this run exists. */
+  #tab-progress.trk-running > :not(#trackSetup) { display: none; }
+  .trk-run { padding: 4px 0 12px; }
+  .trk-run-lab { font-size: 11px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 6px; }
+  .trk-run h2 { font-size: 27px; font-weight: 800; letter-spacing: -.025em; line-height: 1.15; margin: 0 0 12px; }
+  .trk-run .btn-primary { margin-top: 4px; }
 
   /* What you are tracking. Closed it is one quiet line, because most people
      will set this once and never look at it again. */
@@ -7027,6 +7037,11 @@
          row of tabs that silently changes what you are training for is a trap.
          Your own goal carries the dot, and Setup is still the only place that
          changes it. -->
+    <!-- The tracking questions, asked once, before this tab has anything to
+         show. Empty and hidden the rest of the time: it is the same tab, with
+         its own contents stood down by .trk-running while the run is up. -->
+    <div class="trk-run hidden" id="trackSetup"></div>
+
     <div class="goal-chips" id="progGoalChips"></div>
 
     <div class="card" id="progHeadline"></div>
@@ -12829,11 +12844,16 @@ function renderOnboardStep(step, data = {}) {
       try { await showPaywall({ skipLabel: "Skip, I'll look around first" }); }
       catch (err) { console.error(err); }
       offer.busy = false;
+      /* Remembered, because the same offer is made again at the end of the
+         tracking run on Progress a couple of minutes from now. Somebody who has
+         just said no to this screen gets his one line in place there instead of
+         this screen a second time. */
+      if (!hired()) noteHireSkipped();
       if (!$("hireOpen")) return;   // they moved on while it was up
       renderOnboardStep("commit", data);
     };
     $("hireOpen").onclick = offer;
-    $("hireSkip").onclick = () => renderOnboardStep("commit", data);
+    $("hireSkip").onclick = () => { noteHireSkipped(); renderOnboardStep("commit", data); };
     /* Opened on arrival, not on a tap: the step is the offer. */
     setTimeout(offer, 60);
     return;
@@ -12923,6 +12943,9 @@ function finishOnboardingFromDraft(data) {
   }).then((ok) => { if (!ok) finishOnboardingFromDraft.busy = false; })
     .catch((err) => { console.error(err); finishOnboardingFromDraft.busy = false; toast("Setup failed, try again"); });
 }
+
+/* Spent by showApp the first time it paints. See finishOnboarding. */
+let LAND_ON_PROGRESS = false;
 
 async function finishOnboarding(data) {
   ME = data.name;
@@ -13020,6 +13043,13 @@ async function finishOnboarding(data) {
      Somebody who arrived holding an invite link has it cleared a moment later
      by the claim inside checkPartnershipThenEnter. */
   setSolo();
+  /* Onboarding ends on Progress, on Mo's call: the tracking questions came out
+     of the run and live there now, so the last screen of setup hands over to
+     the screen that finishes it. One shot, spent by the first render, and
+     module state rather than a column or localStorage because it is true for
+     the next two seconds of this page and for nothing else. A returning account
+     never sets it and still lands on Home. */
+  LAND_ON_PROGRESS = true;
   await checkPartnershipThenEnter();
   return true;
 }
@@ -13237,6 +13267,11 @@ function showApp() {
      boot path had nothing to wait for and uncovered an empty frame. Callers
      that do not care can still ignore it. */
   return loadAll().then(reconcileNativeSurfaces).then(() => {
+    /* A signup that finished seconds ago opens on Progress instead of Home,
+       because the tracking questions are waiting there. After loadAll, not
+       before: the tab reads the profile to decide whether to ask at all, and
+       the profile is what loadAll went to fetch. */
+    if (LAND_ON_PROGRESS) { LAND_ON_PROGRESS = false; switchTab("progress"); }
     /* After the dashboard is painted, not before. The sheet is asking for
        something on behalf of a screen the person should be able to see behind
        it, and it is deliberately outside the awaited chain so a slow permission
@@ -16990,6 +17025,20 @@ async function requirePremium() {
    no store behind it. */
 function hired() {
   return !PAYWALL_ON || IS_PREMIUM;
+}
+
+/* Whether the offer has already been turned down in this sitting. Set by the
+   hire step in onboarding, read at the end of the tracking run on Progress,
+   which is the only other place that would put the full screen up unasked.
+   sessionStorage rather than a column or localStorage on purpose: it is a fact
+   about the last two minutes, not about the account, and tomorrow's launch is
+   entitled to make the offer again. */
+const HIRE_SKIPPED_KEY = "ft_hire_skipped";
+function noteHireSkipped() {
+  try { sessionStorage.setItem(HIRE_SKIPPED_KEY, "1"); } catch { /* private browsing */ }
+}
+function hireSkippedThisSession() {
+  try { return sessionStorage.getItem(HIRE_SKIPPED_KEY) === "1"; } catch { return false; }
 }
 
 /* One sentence per place he stands in, written here rather than at the five
@@ -33428,12 +33477,206 @@ function renderProgTiles(kind, isPartner, opts = {}) {
   }
 }
 
+/* ---- The tiles, one renderer ----
+
+   The first run below and the preferences sheet under the three dots are the
+   same six-across-two cards asking the same question, so they are one function.
+   They were two copies for an afternoon and the copies had already drifted:
+   changing your mind later has to look like the screen where you first chose,
+   or it reads as a different feature that happens to control the same thing. */
+function trackTilesHTML(metrics, on) {
+  return metrics.map((m) => `<button type="button" class="trk-card${on.has(m.key) ? " on" : ""}" data-metric="${m.key}">
+    <span class="trk-tick" aria-hidden="true">${icon("check", 13)}</span>
+    <span class="trk-ico">${icon(m.ico, 22)}</span>
+    <span class="trk-name">${escapeHtml(m.label)}</span>
+    <span class="trk-blurb">${escapeHtml(m.blurb)}</span>
+  </button>`).join("");
+}
+
+/* `on` is the live set both callers hold, so the caller that saves on every tap
+   and the caller that saves on the way out are reading the same thing. */
+function wireTrackTiles(root, on, after) {
+  root.querySelectorAll("[data-metric]").forEach((b) => b.onclick = () => {
+    const key = b.dataset.metric;
+    on.has(key) ? on.delete(key) : on.add(key);
+    b.classList.toggle("on", on.has(key));
+    after?.(on);
+  });
+}
+
+/* The writer, also one. It keeps the per goal map and the flat union across
+   goals together, which is the whole reason it may not be done twice in two
+   places: the flat column is still read by anything asking "does this person
+   track their waist at all", and a second writer is how two sources of truth
+   start disagreeing.
+
+   Kept in TRACK_ALL order rather than tap order, so the cards behind the screen
+   do not reshuffle every time somebody changes their mind. */
+async function saveTrackedForGoal(goalId, keys) {
+  const want = new Set(keys);
+  const list = TRACK_ALL.map((m) => m.key).filter((k) => want.has(k));
+  const byGoal = { ...(MY_PROFILE?.tracked_by_goal || {}), [goalId]: list };
+  const union = new Set(Object.values(byGoal).flat());
+  const flat = TRACK_ALL.map((m) => m.key).filter((k) => union.has(k));
+  MY_PROFILE = { ...(MY_PROFILE || {}), tracked_by_goal: byGoal, tracked_metrics: flat };
+  await saveTrackedMetrics(byGoal, flat);
+}
+
+/* ---- The tracking questions, asked once, on the tab that answers them ----
+
+   They were a step in onboarding until 2026-09-17, one page per goal. Mo took
+   them out of the run, "too much in the beginning", and put them here: the
+   first time somebody opens Progress, before the tab has a single reading in
+   it, it asks what each goal is measured by. Same pages, same order, main goal
+   first, on the screen the answer is about.
+
+   profiles.tracked_by_goal is the signal rather than a flag of its own. A map
+   means the question was answered, whatever the answer was, so skipping every
+   page settles it as firmly as ticking every tile: a skip writes an empty list,
+   and an empty list is a real answer everywhere else in this file. */
+let TRACK_RUN = null;
+
+/* Their goals, main first, read the way renderGoalChips reads them. A goal the
+   tiles cannot draw is dropped rather than asked about, because its page would
+   have nothing to put in the title. */
+function trackSetupQueue() {
+  const p = MY_PROFILE;
+  const mine = p?.goal_bubble
+    ? (migrateGoalPick(p.goal_bubble, p.goal_child || null)?.bubble || p.goal_bubble)
+    : legacyGoalBubble(p?.goal);
+  const ids = [];
+  if (goalTileFor(mine)) ids.push(mine);
+  for (const s of normaliseGoalSecondary(p?.goal_secondary)) {
+    if (!ids.includes(s.bubble) && goalTileFor(s.bubble)) ids.push(s.bubble);
+  }
+  return ids.slice(0, 3);
+}
+
+/* Never on a partner's view: their choices are theirs, and the writer above
+   only ever writes MY row, so a run opened while looking at them would be
+   asking one person a question and answering it as the other.
+
+   Never on an account that has already answered, and that includes the accounts
+   that answered the old flat question before the per goal map existed. The
+   brief says tracked_by_goal alone decides it; that would re-ask everybody who
+   answered under the old shape, the sandbox fixture included, and asking a
+   question again because the column changed is the app forgetting a
+   conversation it had. */
+function trackSetupNeeded() {
+  if (PROGRESS_VIEW === "partner") return false;
+  if (!MY_PROFILE) return false;
+  const byGoal = MY_PROFILE.tracked_by_goal;
+  if (byGoal && typeof byGoal === "object" && Object.keys(byGoal).length) return false;
+  if (Array.isArray(MY_PROFILE.tracked_metrics) && MY_PROFILE.tracked_metrics.length) return false;
+  return trackSetupQueue().length > 0;
+}
+
+/* He says it differently on each page, because three identical lines in a row
+   read as a form. The last one is the one that matters: this is asked once and
+   he should say so. */
+function trackRunSay(i, total) {
+  if (i === 0) return "Told you I would show you. Pick what I should watch for this one.";
+  return i === total - 1
+    ? "Last one, then I will stop asking."
+    : "Next goal, same question. What am I watching here?";
+}
+
+function renderTrackSetupPage() {
+  const host = $("trackSetup");
+  const tab = $("tab-progress");
+  if (!host || !tab || !TRACK_RUN) return;
+  const { queue, i } = TRACK_RUN;
+  if (i >= queue.length) { endTrackSetup(); return; }
+  const goalId = queue[i];
+  const tile = goalTileFor(goalId);
+  const offers = (TRACK_OFFERS[goalId] || TRACK_OFFERS.consistent)
+    .map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean);
+  /* Pre-ticked from that goal's own defaults, and from whatever is already
+     saved for it if somebody walks the run twice: the tiles open on the answer
+     they last gave rather than resetting to ours. */
+  const saved = (MY_PROFILE?.tracked_by_goal || {})[goalId];
+  const on = new Set((Array.isArray(saved) ? saved : (TRACK_DEFAULTS[goalId] || []))
+    .filter((k) => offers.some((o) => o.key === k)));
+  const say = trackRunSay(i, queue.length);
+
+  tab.classList.add("trk-running");
+  host.classList.remove("hidden");
+  host.innerHTML = `
+    <div class="trk-run-lab">Goal ${i + 1} of ${queue.length}</div>
+    <h2>${escapeHtml(tile?.title || "This goal")}</h2>
+    <div class="ob-bot">
+      <span class="ob-bot-face">${robotFaceSVG(30)}</span>
+      <span class="ob-bot-say" id="trkRunSay"></span>
+    </div>
+    <div class="trk-grid" id="trkRunGrid">${trackTilesHTML(offers, on)}</div>
+    <p class="trk-any">Pick as many as you want. Everything logs either way, so turning one on later shows its whole history.</p>
+    <button type="button" class="btn-primary" id="trkRunNext"></button>
+    <button type="button" class="btn-ghost" id="trkRunSkip">Skip this one</button>`;
+  /* He types here for the same reason he types in onboarding: a line that lands
+     whole reads as a label, and this run is the rest of that conversation. */
+  typeOut($("trkRunSay"), say);
+  /* The button says what pressing it does, and with nothing ticked that is not
+     "track these". Nothing ticked is a real answer, Move better's own default,
+     so the button stays live and says the true thing instead, and the ghost
+     under it goes: two ways to say "nothing here" stacked on each other is the
+     screen asking the same question twice. */
+  const paintNext = () => {
+    $("trkRunNext").textContent = on.size ? "Track these" : "Track nothing for this one";
+    $("trkRunSkip").hidden = !on.size;
+  };
+  wireTrackTiles($("trkRunGrid"), on, paintNext);
+  paintNext();
+  $("trkRunNext").onclick = () => advanceTrackSetup(goalId, [...on]);
+  $("trkRunSkip").onclick = () => advanceTrackSetup(goalId, []);
+  window.scrollTo({ top: 0 });
+}
+
+async function advanceTrackSetup(goalId, keys) {
+  /* The write is a round trip and the page does not change until it comes
+     back, so a button that still looks untouched invites a second tap, and that
+     tap would answer the next goal with this goal's tiles. */
+  const next = $("trkRunNext");
+  const skip = $("trkRunSkip");
+  if (next) next.disabled = true;
+  if (skip) skip.disabled = true;
+  await saveTrackedForGoal(goalId, keys);
+  if (!TRACK_RUN) return;              // they left and something else ended the run
+  TRACK_RUN.i += 1;
+  if (TRACK_RUN.i >= TRACK_RUN.queue.length) endTrackSetup();
+  else renderTrackSetupPage();
+}
+
+/* The last page hands the tab back. Progress paints first and the offer opens
+   over it, so what stands behind the price is their own screen with their own
+   choices on it rather than a dimmed blank.
+
+   Mo asked for the price at the end of this run: "at the end, if they are not
+   paid, it asks them to pay". Onboarding already asked, minutes ago, which
+   means a person who skipped there would be asked twice in one sitting. So the
+   full screen is only for somebody who has NOT already turned it down in this
+   session; everybody else gets his one line in place, which lockProgressForHire
+   has already put on the tab. Once per session either way. */
+async function endTrackSetup() {
+  TRACK_RUN = null;
+  const host = $("trackSetup");
+  if (host) { host.classList.add("hidden"); host.replaceChildren(); }
+  $("tab-progress")?.classList.remove("trk-running");
+  renderProgressTab();
+  if (hired() || hireSkippedThisSession() || endTrackSetup.asked) return;
+  endTrackSetup.asked = true;
+  try { await showPaywall({ skipLabel: "Skip, I'll look around first" }); }
+  catch (err) { console.error(err); }
+  /* Whatever they answered changes what this tab may show, so it is drawn
+     again rather than left as it was under the screen. */
+  renderProgressTab();
+}
+
 /* The tracking picker. Closed it is one line naming what is on, which is the
    only state most people ever see; open it is a row of chips.
 
    Only on your own view. A partner's screen shows what THEY chose to track,
    and an editor on it would be changing their mind for them. */
-/* The same six-across-two cards the onboarding step uses, in a sheet. Changing
+/* The same six-across-two cards the first run uses, in a sheet. Changing
    your mind later should look like the screen where you first chose, or it
    reads as a different feature that happens to control the same thing.
 
@@ -33466,35 +33709,14 @@ function renderTrackSheet() {
       <div class="spacer"></div>
     </div>
     <p class="trk-any" style="margin:0 0 14px">What this goal shows you. Your other goals keep their own. Everything logs either way, so turning one back on shows its whole history.</p>
-    <div class="trk-grid" id="trackSheetGrid">
-      ${TRACK_ALL.map((m) => `<button type="button" class="trk-card${on.has(m.key) ? " on" : ""}" data-metric="${m.key}">
-        <span class="trk-tick" aria-hidden="true">${icon("check", 13)}</span>
-        <span class="trk-ico">${icon(m.ico, 22)}</span>
-        <span class="trk-name">${escapeHtml(m.label)}</span>
-        <span class="trk-blurb">${escapeHtml(m.blurb)}</span>
-      </button>`).join("")}
-    </div>
+    <div class="trk-grid" id="trackSheetGrid">${trackTilesHTML(TRACK_ALL, on)}</div>
     <button type="button" class="btn-primary" id="trackDone" style="margin-top:16px">Done</button>`;
 
-  $("trackSheetGrid").querySelectorAll("[data-metric]").forEach((b) => b.onclick = async () => {
-    const key = b.dataset.metric;
-    on.has(key) ? on.delete(key) : on.add(key);
-    b.classList.toggle("on", on.has(key));
-    /* Kept in TRACK_ALL order rather than tap order, so the cards behind the
-       sheet do not reshuffle every time somebody changes their mind. */
-    /* Kept in TRACK_ALL order rather than tap order, so the cards behind the
-       sheet do not reshuffle every time somebody changes their mind. */
-    const list = TRACK_ALL.map((m) => m.key).filter((k) => on.has(k));
-    const byGoal = { ...(MY_PROFILE?.tracked_by_goal || {}), [goalId]: list };
-    /* The flat column stays as the union across goals. Nothing on Progress
-       reads it any more, but the onboarding write and anything asking "does
-       this person track their waist at all" still does, and leaving it behind
-       to go stale is how two sources of truth start disagreeing. */
-    const union = new Set(Object.values(byGoal).flat());
-    const flat = TRACK_ALL.map((m) => m.key).filter((k) => union.has(k));
-    MY_PROFILE = { ...(MY_PROFILE || {}), tracked_by_goal: byGoal, tracked_metrics: flat };
-    await saveTrackedMetrics(byGoal, flat);
-  });
+  /* Saved on every tap rather than on the way out, which is what this sheet has
+     always done: nobody expects to have to confirm a preference. Through the
+     same writer the first run uses, so the map and the flat union cannot end up
+     disagreeing depending on which screen somebody used. */
+  wireTrackTiles($("trackSheetGrid"), on, (live) => saveTrackedForGoal(goalId, [...live]));
   $("trackX").onclick = closeTrackSheet;
   $("trackDone").onclick = closeTrackSheet;
 }
@@ -33669,6 +33891,15 @@ async function saveMeasurements() {
 }
 
 function renderProgressTab() {
+  /* Before anything else this tab does. On a first open with nothing answered
+     the run IS this tab, and every card below it would be drawn against choices
+     that have not been made yet. Never over a partner's view, where the goals
+     and the answers are theirs; a run left waiting simply resumes when the view
+     comes back to me. */
+  if (PROGRESS_VIEW !== "partner") {
+    if (!TRACK_RUN && trackSetupNeeded()) TRACK_RUN = { queue: trackSetupQueue(), i: 0 };
+    if (TRACK_RUN) { renderTrackSetupPage(); return; }
+  }
   const isPartner = PROGRESS_VIEW === "partner";
   // Logging weight only makes sense for yourself, hide the block inside
   // Weight entirely on your partner's view (the chart above it stays: you can
