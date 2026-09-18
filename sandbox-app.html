@@ -3580,6 +3580,24 @@
   .cal-title:active { background: var(--panel-2); }
   .cal-title svg { color: var(--muted); transition: transform .18s; }
   .cal-title.open svg { transform: rotate(180deg); }
+  /* On the planner the month leads, so it opens already showing the grid and
+     carries a little more air under it than it does as a footnote on the tab. */
+  .wk-plan-month { margin-bottom: 14px; }
+  .wk-plan-month .cal { padding: 0; border: 0; background: none; box-shadow: none; }
+  .cal-pick { padding: 10px 8px 12px; border-radius: 14px; background: var(--panel-2); border: 1px solid var(--border); margin-bottom: 12px; }
+  .cal-pick-year { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .cal-pick-year b { font-size: 17px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .cal-months { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .cal-month {
+    font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; padding: 9px 0; border-radius: 10px;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+  }
+  .cal-month:active { opacity: .7; }
+  .cal-month:disabled { opacity: .3; cursor: default; }
+  .cal-month.on { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+  .cal-month.now { border-color: var(--me); }
+  .cal-month-wrap .cal-head { margin-top: 12px; }
+  .cal-month-only .cal-head { margin-top: 0; }
   .cal-today {
     display: block; width: 100%; margin: 0 0 12px; padding: 8px; border-radius: 10px; cursor: pointer;
     font: inherit; font-size: 12.5px; font-weight: 600;
@@ -4557,13 +4575,17 @@
   .wk-legend i.them { background: var(--partner); }
   /* The bleed cancels .wk-col padding exactly, so the tiles line up with the
      card text rather than sitting a pixel to its left. */
-  .wk { display: grid; grid-template-columns: repeat(7, 1fr); margin: 4px -4px 0; }
-  .wk-col { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 5px 2.5px 6px; border-radius: 11px; border: 1.5px solid transparent; }
-  .wk-col.today { border-color: color-mix(in srgb, var(--me) 45%, var(--panel)); background: color-mix(in srgb, var(--me) 7%, transparent); }
-  .wk-d { font-size: 12.5px; font-weight: 600; color: var(--muted); line-height: 1; margin-bottom: 2px; text-align: center; }
-  .wk-col.today .wk-d { color: var(--text); }
-  .wk-today { position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--me-ink); }
-  .wk:has(.wk-today) { margin-bottom: 16px; }
+  .wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin: 8px 0 0; }
+  .wk-col {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px;
+    padding: 8px 2px 9px; border-radius: 12px; border: 1.5px solid transparent; background: var(--panel-2);
+  }
+  .wk-col.done { background: color-mix(in srgb, var(--accent) 16%, var(--panel-2)); }
+  .wk-col.today { border-color: var(--accent-ink); background: var(--panel); }
+  .wk-col.today.done { background: color-mix(in srgb, var(--accent) 16%, var(--panel)); }
+  .wk-d { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); line-height: 1; text-align: center; }
+  .wk-col.today .wk-d { color: var(--accent-ink); }
+  .wk-num { font-size: 15px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; color: var(--text); }
   /* The day tile. A proof photo when there is one, because seeing the two of
      you actually there is the point; a solid tick when there is not. */
   .dot {
@@ -8419,7 +8441,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.18.7";
+const APP_VERSION = "2026.09.18.8";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -16770,16 +16792,27 @@ async function renderWeekStrips(animate = false) {
   $("weekLegend").innerHTML = `<span><i class="me"></i>${escapeHtml(ME)}</span>`
     + (partner ? `<span><i class="them"></i>${escapeHtml(partner)}</span>` : "");
 
+  /* Mo liked the tile the workout tab's strip uses and asked for it here: the
+     day named, the date under it, the tile itself tinted when the day was
+     trained and ringed when it is today. What does NOT change is what sits
+     inside it. The workout tab draws one flat dot per person because it is a
+     calendar; this grid's dots are the proof photo, the word rest and the
+     weight somebody logged, and a day reads DOWN its column, which is the
+     whole point of the card. So it is the tile shape around Home's own
+     contents, not the workout tab's tile. */
   const grid = $("weekGrid");
+  const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const cols = await Promise.all(currentWeekDates().map(async (date, i) => {
     const isToday = date === today;
+    const trained = !!entryOn(ME, date)?.gym;
+    const num = Number(date.slice(8, 10));
     const mine = await dotHTML(ME, MY_EMAIL, date, "me");
     const theirs = partner ? await dotHTML(partner, PARTNER_EMAIL, date, "them") : "";
-    return `<div class="wk-col${isToday ? " today" : ""}${animate ? " h-rise" : ""}" style="--d:${140 + i * 45}ms">
-      <span class="wk-d">${DAY_LETTERS[i]}</span>
+    return `<div class="wk-col${isToday ? " today" : ""}${trained ? " done" : ""}${animate ? " h-rise" : ""}" style="--d:${140 + i * 45}ms">
+      <span class="wk-d">${names[i]}</span>
+      <span class="wk-num">${num}</span>
       ${mine}
       ${theirs}
-      ${isToday ? `<span class="wk-today">Today</span>` : ""}
     </div>`;
   }));
   grid.innerHTML = cols.join("");
@@ -29339,16 +29372,22 @@ function historyOldestOffset() {
 }
 
 let CAL_MONTH_OPEN = false;        // the week leads; the month opens under it
+let HISTORY_PICK = false;          // the month and year picker is open
+let HISTORY_PICK_YEAR = null;      // the year the picker is showing
 let HISTORY_WEEK = 0;              // 0 is this week, negative goes back
 
-function workoutCalendarHTML() {
-  return `<div class="cal">${calendarInnerHTML()}</div>`;
+/* `monthOnly` is the planner's: there the month IS the screen, and the week
+   strip above it would be the same seven days a third time, under the week
+   the rows below already list. */
+function workoutCalendarHTML(opts = {}) {
+  return `<div class="cal${opts.monthOnly ? " cal-month-only" : ""}">${calendarInnerHTML(opts)}</div>`;
 }
 
 /* Everything inside .cal, so a month change can swap the contents in place
    instead of rebuilding the whole tab. That is what makes it instant, and it
    keeps the page the same height, so nothing pinned to the viewport jumps. */
-function calendarInnerHTML() {
+function calendarInnerHTML(opts = {}) {
+  const monthOnly = !!opts.monthOnly;
   const oldest = Math.min(0, historyOldestOffset());
   const week = historyWeekDays();
   const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -29358,6 +29397,29 @@ function calendarInnerHTML() {
      names the month that week sits in, and tapping it opens that month. The
      oldest week you can reach is the first one with anything in it. */
   const oldestWeek = Math.floor((oldest * 30.5) / 7) - 1;
+  const key = `
+    <div class="cal-key">
+      <span><i class="k-done"></i>Trained</span>
+      <span><i class="k-plan"></i>Planned</span>
+      <span><i class="k-rest"></i>Rest</span>
+      ${infoDot("calendarKey", "What the calendar shows")}
+    </div>`;
+  const month = `
+    <div class="cal-head">
+      <button type="button" class="wk-nav-btn" id="calMonPrev" ${HISTORY_MONTH <= oldest ? "disabled" : ""} aria-label="Previous month">${icon("chevronLeft", 16)}</button>
+      <button type="button" class="cal-title${HISTORY_PICK ? " open" : ""}" id="calMonTitle" aria-label="Pick a month or a year">${escapeHtml(historyMonthLabel(HISTORY_MONTH))}${icon("chevronDown", 14)}</button>
+      <button type="button" class="wk-nav-btn" id="calMonNext" ${HISTORY_MONTH >= 0 ? "disabled" : ""} aria-label="Next month">${icon("chevronRight", 16)}</button>
+    </div>
+    ${HISTORY_PICK ? calendarPickerHTML(oldest) : ""}
+    ${HISTORY_MONTH !== monthOff ? `<button type="button" class="cal-today" id="calToday">Back to ${escapeHtml(historyMonthLabel(monthOff))}</button>` : ""}
+    <div class="cal-dows">${dows.map((d) => `<span>${d}</span>`).join("")}</div>
+    <div class="cal-grid">
+      ${historyMonthDays().map((d) => `
+        <button type="button" class="cal-day${d.thisMonth ? "" : " out"}${d.done ? " done" : ""}${d.planned ? " planned" : ""}${d.rest ? " rest" : ""}${d.isToday ? " today" : ""}"
+          data-cal="${d.date}"
+          ${d.title ? `title="${escapeHtml(d.title)}"` : ""}>${d.day}</button>`).join("")}
+    </div>`;
+  if (monthOnly) return month + key;
   return `
     <div class="wkt-week-head">
       <h3 class="wkt-week-h">Your week</h3>
@@ -29376,21 +29438,38 @@ function calendarInnerHTML() {
           <span class="cal-wdots">${d.done || d.planned ? `<i class="d-me"></i>` : ""}${d.them ? `<i class="d-them"></i>` : ""}${d.rest && !d.done && !d.planned ? `<i class="d-rest"></i>` : ""}</span>
         </button>`).join("")}
     </div>
-    <div class="cal-key">
-      <span><i class="k-done"></i>Trained</span>
-      <span><i class="k-plan"></i>Planned</span>
-      <span><i class="k-rest"></i>Rest</span>
-      ${infoDot("calendarKey", "What the calendar shows")}
+    ${key}
+    ${CAL_MONTH_OPEN ? `<div class="cal-month-wrap">${month}</div>` : ""}`;
+}
+
+/* Sifting through months and years, which the week strip on its own cannot
+   do: it steps a week at a time, and getting to last March that way is forty
+   taps. Years step with one pair of arrows, months are a tap. Months with no
+   history, and months that have not happened, are shown but not pressable, so
+   the grid keeps its shape from year to year. */
+function calendarPickerHTML(oldest) {
+  const today = new Date(todayStr() + "T00:00:00");
+  const year = HISTORY_PICK_YEAR;
+  const offsetOf = (m) => (year - today.getFullYear()) * 12 + (m - today.getMonth());
+  const oldestYear = today.getFullYear() + Math.floor(oldest / 12);
+  const viewing = new Date(today.getFullYear(), today.getMonth() + HISTORY_MONTH, 1);
+  const names = Array.from({ length: 12 }, (_, m) => new Date(2000, m, 1).toLocaleDateString([], { month: "short" }));
+  return `<div class="cal-pick">
+    <div class="cal-pick-year">
+      <button type="button" class="wk-nav-btn" id="calYearPrev" ${year <= oldestYear ? "disabled" : ""} aria-label="Previous year">${icon("chevronLeft", 16)}</button>
+      <b>${year}</b>
+      <button type="button" class="wk-nav-btn" id="calYearNext" ${year >= today.getFullYear() ? "disabled" : ""} aria-label="Next year">${icon("chevronRight", 16)}</button>
     </div>
-    ${CAL_MONTH_OPEN ? `<div class="cal-month-wrap">
-    ${HISTORY_MONTH !== monthOff ? `<button type="button" class="cal-today" id="calToday">Back to ${escapeHtml(historyMonthLabel(monthOff))}</button>` : ""}
-    <div class="cal-dows">${dows.map((d) => `<span>${d}</span>`).join("")}</div>
-    <div class="cal-grid">
-      ${historyMonthDays().map((d) => `
-        <button type="button" class="cal-day${d.thisMonth ? "" : " out"}${d.done ? " done" : ""}${d.planned ? " planned" : ""}${d.rest ? " rest" : ""}${d.isToday ? " today" : ""}"
-          data-cal="${d.date}"
-          ${d.title ? `title="${escapeHtml(d.title)}"` : ""}>${d.day}</button>`).join("")}
-    </div></div>` : ""}`;
+    <div class="cal-months">
+      ${names.map((n, m) => {
+        const off = offsetOf(m);
+        const ok = off <= 0 && off >= oldest;
+        const on = year === viewing.getFullYear() && m === viewing.getMonth();
+        const now = year === today.getFullYear() && m === today.getMonth();
+        return `<button type="button" class="cal-month${on ? " on" : ""}${now ? " now" : ""}" data-month="${off}" ${ok ? "" : "disabled"}>${n}</button>`;
+      }).join("")}
+    </div>
+  </div>`;
 }
 
 function wireWorkoutCalendar(root) {
@@ -29402,8 +29481,24 @@ function wireWorkoutCalendar(root) {
   const go = (to) => { HISTORY_WEEK = Math.min(0, to); HISTORY_MONTH = weekMonthOffset(); repaint(); };
   if ($("calPrev")) $("calPrev").onclick = () => go(HISTORY_WEEK - 1);
   if ($("calNext")) $("calNext").onclick = () => go(HISTORY_WEEK + 1);
-  if ($("calTitle")) $("calTitle").onclick = () => { CAL_MONTH_OPEN = !CAL_MONTH_OPEN; HISTORY_MONTH = weekMonthOffset(); repaint(); };
-  if ($("calToday")) $("calToday").onclick = () => { HISTORY_MONTH = weekMonthOffset(); repaint(); };
+  if ($("calTitle")) $("calTitle").onclick = () => { CAL_MONTH_OPEN = !CAL_MONTH_OPEN; HISTORY_PICK = false; HISTORY_MONTH = weekMonthOffset(); repaint(); };
+  /* Inside the month, the arrows step months rather than weeks and the title
+     opens the year picker. HISTORY_WEEK is left where it is: the strip above
+     still shows the week you came from until you tap a day. */
+  if ($("calMonPrev")) $("calMonPrev").onclick = () => { HISTORY_MONTH = Math.max(Math.min(0, historyOldestOffset()), HISTORY_MONTH - 1); HISTORY_PICK = false; repaint(); };
+  if ($("calMonNext")) $("calMonNext").onclick = () => { HISTORY_MONTH = Math.min(0, HISTORY_MONTH + 1); HISTORY_PICK = false; repaint(); };
+  if ($("calMonTitle")) $("calMonTitle").onclick = () => {
+    HISTORY_PICK = !HISTORY_PICK;
+    const today = new Date(todayStr() + "T00:00:00");
+    HISTORY_PICK_YEAR = new Date(today.getFullYear(), today.getMonth() + HISTORY_MONTH, 1).getFullYear();
+    repaint();
+  };
+  if ($("calYearPrev")) $("calYearPrev").onclick = () => { HISTORY_PICK_YEAR--; repaint(); };
+  if ($("calYearNext")) $("calYearNext").onclick = () => { HISTORY_PICK_YEAR++; repaint(); };
+  cal.querySelectorAll("[data-month]").forEach((b) => {
+    b.onclick = () => { HISTORY_MONTH = parseInt(b.dataset.month, 10); HISTORY_PICK = false; repaint(); };
+  });
+  if ($("calToday")) $("calToday").onclick = () => { HISTORY_MONTH = weekMonthOffset(); HISTORY_PICK = false; repaint(); };
   cal.querySelectorAll("[data-cal]").forEach((b) => {
     b.onclick = () => {
       const date = b.dataset.cal;
@@ -30466,6 +30561,10 @@ async function mountSavedFigures(exs) {
    saving and scheduling were the same act, so you could not just keep a
    workout for later without deciding when to do it. */
 function renderWeekPlanner() {
+  /* The month is the reason this screen exists for Mo, so it is open on
+     arrival here even though it is closed on the workout tab, where the week
+     strip is the answer and the month is the follow-up question. */
+  CAL_MONTH_OPEN = true;
   $("workoutCardTitle").textContent = "Plan your week";
   $("workoutFocusRow").textContent = "";
   const days = planWeekDays();
@@ -30509,9 +30608,18 @@ function renderWeekPlanner() {
       <div class="wk-nav-label">${escapeHtml(planWeekLabel())}</div>
       <button type="button" class="wk-nav-btn" id="wkNext" aria-label="Next week">${icon("chevronRight", 16)}</button>
     </div>
+    ${/* Mo: "people like to see when they have gone in full view, and I
+          personally liked seeing the days in the whole month". The month is
+          the history and the overview; the seven rows under it are this week,
+          which is the only week you can reorder, because dragging a day is
+          moving a plan and there are no plans on a month you have not reached.
+          One calendar component, the same one the workout tab draws, so a day
+          means the same thing on both. */ ""}
+    <div class="wk-plan-month">${workoutCalendarHTML({ monthOnly: true })}</div>
     <p class="muted-note">Tap a day to put a workout on it. You can generate one, build your own, or use something you saved.${canReorder ? " Drag a planned day by its handle, or nudge it with the arrows." : ""}</p>
     <div class="wk-plan reorder-list" id="wkPlanList">${days.map(dayRow).join("")}</div>`;
 
+  wireWorkoutCalendar($("workoutContent"));
   if ($("wkPrev")) $("wkPrev").onclick = () => { if (WEEK_OFFSET > 0) { WEEK_OFFSET--; renderWeekPlanner(); } };
   $("wkNext").onclick = () => { WEEK_OFFSET++; renderWeekPlanner(); };
   $("workoutContent").querySelectorAll("[data-plan-day]").forEach((b) => {
