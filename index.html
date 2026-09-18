@@ -56,9 +56,9 @@
        accent. Kept as tokens because he appears on a card, a sheet and a step
        header, and a robot who changes shade between them is a different robot. */
     --rb-body: #f6f5f3;
-    --rb-shade: #ddd9d4;
-    --rb-line: #c9c4bd;
-    --rb-visor: #171b22;
+    --rb-shade: #dfe1e0;
+    --rb-line: #1a1f26;
+    --rb-visor: #262a30;
     /* Planned days on the week strip. Purple on purpose: blue is already you
        and green is already done, so a third state needs a third hue. */
     --plan: #a78bfa;
@@ -128,9 +128,9 @@
     /* Green for anything that drives action, steel blue for you, coral for
        them: the Home mockup's palette, lifted straight from it. */
     --rb-body: #ffffff;
-    --rb-shade: #d3d8e0;
-    --rb-line: #1d232c;
-    --rb-visor: #1d232c;
+    --rb-shade: #dde2df;
+    --rb-line: #101418;
+    --rb-visor: #222327;
     --plan: #8b5cf6;
     --accent: #3be76b;
     --gold: #3be76b;
@@ -354,7 +354,9 @@
   /* He blinks about every five seconds, which is the whole of his animation.
      Enough to read as somebody looking at you rather than an icon, little
      enough that it never pulls the eye off the thing being answered. */
-  .rb-face { display: block; overflow: visible; }
+  /* Clipped, not visible: his shoulders are drawn past the bottom of the box so
+     the viewBox cuts him at the chest the way Mo's mockup does. */
+  .rb-face { display: block; overflow: hidden; }
   .rb-eye { transform-box: fill-box; transform-origin: center; animation: rb-blink 5.4s infinite; }
   .rb-face .rb-eye + .rb-eye { animation-delay: .04s; }
   @keyframes rb-blink {
@@ -407,10 +409,13 @@
   .wkt-done-sub { margin: 4px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
   /* He leans in from the corner with his line beside him, and the card's own
      padding is what he overlaps, so nothing that matters sits under him. */
-  .wkt-bot { position: absolute; top: -6px; right: -22px; display: flex; align-items: flex-start; gap: 3px; }
+  /* Flush with the card's outer edge rather than past it. He is a whole bust
+     now, the width of the drawing Mo made, and hanging him over the corner
+     sawed his far arm off against the card's own overflow. */
+  .wkt-bot { position: absolute; top: -6px; right: -16px; display: flex; align-items: flex-start; gap: 3px; }
   .wkt-bot-say {
     background: var(--panel); border: 1px solid var(--border); border-radius: 11px;
-    padding: 6px 8px; font-size: 10px; line-height: 1.3; color: var(--text); width: 132px;
+    padding: 6px 8px; font-size: 10px; line-height: 1.3; color: var(--text); width: 126px;
     margin-top: 2px;
   }
   .wkt-bot-face { flex: none; width: 56px; height: auto; }
@@ -3857,7 +3862,9 @@
      because the pages are him introducing himself. The line under him types,
      so it reserves its height: a hero that grows a line at a time shoves the
      heading up the screen while somebody is reading it. */
-  .intro-bot { display: block; }
+  /* The mockup cuts him off at the chest, so the bust ends on a flat edge.
+     It reads as a crop with air under it and as a severed robot without. */
+  .intro-bot { display: block; margin-bottom: 10px; }
   .intro-say { min-height: 7.3em; max-width: 30ch; }
   .si-sheet {
     flex: 0 0 auto; display: flex; flex-direction: column;
@@ -10321,7 +10328,7 @@ function renderOnboardIntro(i, data) {
         ${i === 0 ? `<button type="button" class="intro-skip" id="introSkip">Skip</button>` : "<span></span>"}
       </div>
       <div class="si-hero intro-hero">
-        <span class="intro-bot">${robotFaceSVG(96, "", { bust: true })}</span>
+        <span class="intro-bot">${robotFaceSVG(144, "", { bust: true })}</span>
         <h1 class="si-word intro-h">${escapeHtml(step.h)}</h1>
         <p class="si-tag intro-say" id="obBotSay" data-say="${escapeHtml(step.say)}"></p>
       </div>
@@ -12507,22 +12514,42 @@ function restSceneSVG() {
   </svg>`;
 }
 
+/* Unio, traced off the robot in Mo's Home mockup. bot/unio-face-ref.png is that
+   crop, keyed off the card, so anybody can lay this over it and check. He is an
+   egg shaped white head with a flat crown, a soft charcoal visor set low in it,
+   an ear pod each side, and two green eyes that slant down toward the middle. He
+   has no antenna: the mockup does not draw one, and the one we used to draw made
+   him somebody else.
+
+   One coordinate system for both variants, laid out around a centre of 48 so the
+   shoulders have room, and shifted left for the head only box. Every number is
+   the crop's own, scaled by 0.742 to put his head at 46 units wide. The eyes are
+   the single place this is deliberately not the crop: the mockup sets them about
+   a unit left of the head's centre, and copying that reads as a squint. */
 function robotFaceSVG(size = 40, cls = "", { bust = false } = {}) {
+  const vw = bust ? 96 : 64, vh = bust ? 80 : 64;
   const px = typeof size === "number" ? size + "px" : size;
-  /* Shoulders only where there is room for them. On the done card he leans
-     into frame from the corner, the way Mo drew him; beside a line of
-     onboarding copy he is a face and nothing else. */
-  const h = bust ? 78 : 64;
-  return `<svg class="rb-face ${cls}" viewBox="0 0 64 ${h}" width="${px}" height="${typeof size === "number" ? Math.round(size * h / 64) + "px" : px}" aria-hidden="true" focusable="false">
-    ${bust ? `<path d="M22 53h20v6c9 1 15 5 17 12H5c2-7 8-11 17-12z" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round"/>` : ""}
-    <path d="M32 13V7" stroke="var(--rb-line)" stroke-width="2.2" stroke-linecap="round" fill="none"/>
-    <circle cx="32" cy="5" r="2.8" fill="var(--accent)"/>
-    <rect x="3.5" y="27" width="6" height="13" rx="3" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.4"/>
-    <rect x="54.5" y="27" width="6" height="13" rx="3" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.4"/>
-    <rect x="9" y="12" width="46" height="41" rx="13.5" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6"/>
-    <rect x="15" y="21" width="34" height="21" rx="9.5" fill="var(--rb-visor)"/>
-    <path class="rb-eye" d="M20.5 29.5l9.5-1.5v5.5l-9.5 1.5z" fill="var(--accent)"/>
-    <path class="rb-eye" d="M43.5 29.5l-9.5-1.5v5.5l9.5 1.5z" fill="var(--accent)"/>
+  const h = typeof size === "number" ? Math.round(size * vh / vw) + "px" : px;
+  /* Shoulders only where there is room for them. On the done card he leans into
+     frame from the corner, the way Mo drew him; beside a line of onboarding copy
+     he is a face and nothing else. Torso first, then an arm over each side of
+     it, which is what puts the seam on his shoulders. All three run past the
+     bottom of the box on purpose, so the viewBox cuts him at the chest the way
+     the mockup does rather than drawing a hem across him. */
+  const body = bust ? `
+      <path d="M48 53C41 53 35.5 53.8 31.6 55.2 28.5 56.2 24 58.4 21.6 59.7 19 61.1 16.6 62.8 15.4 64.8V88H80.6V64.8C79.4 62.8 77 61.1 74.4 59.7 72 58.4 67.5 56.2 64.4 55.2 60.5 53.8 55 53 48 53z" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M31 50.5C32.2 55.4 34.4 58.6 37.2 60.2 40.4 61.4 44 61.6 48 61.6 52 61.6 55.6 61.4 58.8 60.2 61.6 58.6 63.8 55.4 65 50.5z" fill="var(--rb-shade)" opacity=".42"/>
+      <path d="M16.6 65C13.2 65 10.3 65.8 8.4 67 6.6 68.2 5.4 70 4.7 72.2 4 74.4 3.4 77 3 88H21C21 78 20.4 71.5 18.6 68 18 66.4 17.4 65.5 16.6 65z" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M79.4 65C82.8 65 85.7 65.8 87.6 67 89.4 68.2 90.6 70 91.3 72.2 92 74.4 92.6 77 93 88H75C75 78 75.6 71.5 77.4 68 78 66.4 78.6 65.5 79.4 65z" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round"/>` : "";
+  return `<svg class="rb-face ${cls}" viewBox="0 0 ${vw} ${vh}" width="${px}" height="${h}" aria-hidden="true" focusable="false">
+    <g transform="translate(${bust ? 0 : -16} ${bust ? 0 : 1.3})">${body}
+      <rect x="22.4" y="25.2" width="10" height="16.3" rx="4.6" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.5"/>
+      <rect x="63.6" y="25.2" width="10" height="16.3" rx="4.6" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.5"/>
+      <path d="M48 4.8C44.5 4.8 39.8 5.4 36.5 7 32 9.7 25.5 15 25.5 27 25.5 34.5 26.5 40 28.4 44.6 30.6 50 33.6 53.4 37 55.2 40.2 56.4 44 56.6 48 56.6 52 56.6 55.8 56.4 59 55.2 62.4 53.4 65.4 50 67.6 44.6 69.5 40 70.5 34.5 70.5 27 70.5 15 64 9.7 59.5 7 56.2 5.4 51.5 4.8 48 4.8z" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round"/>
+      <rect x="31.7" y="25.1" width="32.6" height="19.3" rx="4.5" fill="var(--rb-visor)"/>
+      <path class="rb-eye" d="M35.8 32.4 38.4 32.9 42.5 35.1 40.9 36.3 38.2 34.6 35.8 34.6z" fill="var(--accent)" stroke="var(--accent)" stroke-width=".55" stroke-linejoin="round"/>
+      <path class="rb-eye" d="M60.2 32.4 57.6 32.9 53.5 35.1 55.1 36.3 57.8 34.6 60.2 34.6z" fill="var(--accent)" stroke="var(--accent)" stroke-width=".55" stroke-linejoin="round"/>
+    </g>
   </svg>`;
 }
 
