@@ -64,6 +64,11 @@ const KNOWLEDGE_FILES = [
   "knowledge/exercise-library/pilates.mjs",
   "knowledge/exercise-library/calisthenics.mjs",
   "knowledge/exercise-library/stretching.mjs",
+  /* Imported lazily at index.html:19140 for the cardio modes and the swap
+     alternatives. Lazy is exactly why it was missed: nothing throws until
+     somebody opens cardio, so a build without it looks fine right up until a
+     real person taps the thing. */
+  "knowledge/exercise-library/cardio.mjs",
   "knowledge/anatomy/rive-body.mjs",
   "knowledge/anatomy/muscle-detail.mjs",
   "knowledge/anatomy/muscle-bounds.mjs",
