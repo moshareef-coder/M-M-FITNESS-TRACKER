@@ -57,9 +57,9 @@
        accent. Kept as tokens because he appears on a card, a sheet and a step
        header, and a robot who changes shade between them is a different robot. */
     --rb-body: #f6f5f3;
-    --rb-shade: #ddd9d4;
-    --rb-line: #c9c4bd;
-    --rb-visor: #171b22;
+    --rb-shade: #dfe1e0;
+    --rb-line: #1a1f26;
+    --rb-visor: #262a30;
     /* Planned days on the week strip. Purple on purpose: blue is already you
        and green is already done, so a third state needs a third hue. */
     --plan: #a78bfa;
@@ -129,9 +129,9 @@
     /* Green for anything that drives action, steel blue for you, coral for
        them: the Home mockup's palette, lifted straight from it. */
     --rb-body: #ffffff;
-    --rb-shade: #d3d8e0;
-    --rb-line: #1d232c;
-    --rb-visor: #1d232c;
+    --rb-shade: #dde2df;
+    --rb-line: #101418;
+    --rb-visor: #222327;
     --plan: #8b5cf6;
     --accent: #3be76b;
     --gold: #3be76b;
@@ -355,7 +355,9 @@
   /* He blinks about every five seconds, which is the whole of his animation.
      Enough to read as somebody looking at you rather than an icon, little
      enough that it never pulls the eye off the thing being answered. */
-  .rb-face { display: block; overflow: visible; }
+  /* Clipped, not visible: his shoulders are drawn past the bottom of the box so
+     the viewBox cuts him at the chest the way Mo's mockup does. */
+  .rb-face { display: block; overflow: hidden; }
   .rb-eye { transform-box: fill-box; transform-origin: center; animation: rb-blink 5.4s infinite; }
   .rb-face .rb-eye + .rb-eye { animation-delay: .04s; }
   @keyframes rb-blink {
@@ -408,10 +410,13 @@
   .wkt-done-sub { margin: 4px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
   /* He leans in from the corner with his line beside him, and the card's own
      padding is what he overlaps, so nothing that matters sits under him. */
-  .wkt-bot { position: absolute; top: -6px; right: -22px; display: flex; align-items: flex-start; gap: 3px; }
+  /* Flush with the card's outer edge rather than past it. He is a whole bust
+     now, the width of the drawing Mo made, and hanging him over the corner
+     sawed his far arm off against the card's own overflow. */
+  .wkt-bot { position: absolute; top: -6px; right: -16px; display: flex; align-items: flex-start; gap: 3px; }
   .wkt-bot-say {
     background: var(--panel); border: 1px solid var(--border); border-radius: 11px;
-    padding: 6px 8px; font-size: 10px; line-height: 1.3; color: var(--text); width: 132px;
+    padding: 6px 8px; font-size: 10px; line-height: 1.3; color: var(--text); width: 126px;
     margin-top: 2px;
   }
   .wkt-bot-face { flex: none; width: 56px; height: auto; }
@@ -494,6 +499,87 @@
     font-family: "Caveat", "Segoe Script", "Bradley Hand", cursive; font-weight: 500; font-size: 19px; line-height: 1.02;
     color: color-mix(in srgb, var(--text) 62%, var(--muted)); transform: rotate(-4deg); letter-spacing: .01em;
   }
+
+  /* The card opens a screen now, so it has to read as pressable: the whole
+     card is the button, a chevron says there is somewhere to go, and the press
+     is the same scale every other tappable card on this tab uses. Written as
+     button.wkt-rest so the shared card rule above still sets the shape. */
+  button.wkt-rest {
+    display: block; width: 100%; text-align: left; font: inherit; color: var(--text);
+    cursor: pointer; transition: transform .12s ease, border-color .16s ease;
+  }
+  button.wkt-rest:active {
+    transform: scale(.985);
+    border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  }
+  /* The chevron sits over the drawn horizon, so it carries its own chip:
+     against the ridges a bare stroke was almost invisible, which is the one
+     thing the affordance cannot be. */
+  .wkt-rest-go {
+    position: absolute; right: 12px; bottom: 12px; z-index: 1; color: var(--text);
+    width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow-card);
+  }
+
+  /* ---------- The Recovery screen ----------
+     The same stack of cards the tab is built from, so walking into it feels
+     like the tab going deeper rather than a different app. Nothing here is
+     behind the paywall (see renderRecoveryScreen), so nothing here needs a
+     pitch slot the way the next-workout card does. */
+  .rcv-card {
+    border-radius: 20px; padding: 16px; margin: 0 0 12px; position: relative;
+    background: var(--card-fill); border: 1px solid var(--border); box-shadow: var(--shadow-card);
+  }
+  .card .rcv-card h2 {
+    text-transform: none; letter-spacing: -.025em; color: var(--text); font-weight: 800;
+    font-size: 25px; line-height: 1.1; margin: 0; font-family: var(--font-display);
+  }
+  /* He leans in under the title with his line beside him, the same face
+     onboarding uses, because this whole screen is him talking. */
+  .rcv-bot { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; }
+  .rcv-bot-face { flex: none; width: 60px; height: auto; }
+  /* Two lines held open, so the card does not grow while he is typing. */
+  .rcv-say {
+    flex: 1; min-width: 0; margin: 4px 0 0; min-height: 2.9em;
+    font-size: 13.5px; line-height: 1.45; color: var(--text);
+  }
+  .rcv-head { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
+  .rcv-head h3 { flex: 1; margin: 0; font-size: 15.5px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.02em; }
+  .rcv-ico { color: var(--accent-ink); display: flex; flex: none; }
+  .rcv-line { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+  /* What the number assumes, and that it is a starting point. Smaller than the
+     copy above it on purpose: it is the footnote, and it is never optional. */
+  .rcv-note { margin: 10px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+
+  /* Two big figures side by side. They stay side by side at 390: the whole
+     point of a figure is that it is read, not parsed. */
+  .rcv-figs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .rcv-figs.one { grid-template-columns: 1fr; }
+  .rcv-fig { background: var(--panel); border-radius: 14px; padding: 12px; min-width: 0; }
+  .rcv-fig b {
+    display: block; font-family: var(--font-display); font-weight: 800; font-size: 26px;
+    line-height: 1; letter-spacing: -.03em; color: var(--text);
+  }
+  .rcv-fig b i { font-size: 13px; font-style: normal; font-weight: 700; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
+  .rcv-fig u { display: block; margin-top: 7px; text-decoration: none; font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+
+  /* The holds he picked, with how long each one runs. */
+  .rcv-moves { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .rcv-moves li { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .rcv-move-n {
+    flex: none; width: 46px; height: 30px; border-radius: 9px; background: var(--panel-2);
+    color: var(--stretch-ink); display: grid; place-items: center;
+    font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+  }
+  .rcv-move-t { min-width: 0; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rcv-move-t span { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+
+  /* The honest reading of the week: one row per true thing, no bars. */
+  .rcv-week { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .rcv-week li { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.4; color: var(--text); }
+  .rcv-week li i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-ink); margin-top: 6px; }
+  .rcv-week li.quiet i { background: color-mix(in srgb, var(--muted) 60%, transparent); }
+  .rcv-week li b { font-weight: 700; }
 
   /* Your week. The strip leads; the month, one tap down, is for looking back. */
   .wkt-week .cal { padding: 0; border: 0; background: none; box-shadow: none; }
@@ -3777,7 +3863,9 @@
      because the pages are him introducing himself. The line under him types,
      so it reserves its height: a hero that grows a line at a time shoves the
      heading up the screen while somebody is reading it. */
-  .intro-bot { display: block; }
+  /* The mockup cuts him off at the chest, so the bust ends on a flat edge.
+     It reads as a crop with air under it and as a severed robot without. */
+  .intro-bot { display: block; margin-bottom: 10px; }
   .intro-say { min-height: 7.3em; max-width: 30ch; }
   .si-sheet {
     flex: 0 0 auto; display: flex; flex-direction: column;
@@ -6263,6 +6351,141 @@
      rather than sitting half width beside Other. */
   .csn-act-wide { grid-column: 1 / -1; }
   .csn-foot { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+  /* ---- The activity screen ----
+     The same card the workout tab opens on, rebuilt here rather than shared,
+     because .wkt-next lives on a tab background and this one lives on a full
+     screen sheet: the two want different padding and a different ring. What is
+     shared is the shape, which is the part Mo asked to be the same. */
+  .act-hero {
+    display: grid; grid-template-columns: 1fr auto;
+    grid-template-areas: "words face" "seg seg" "dur dur" "acts acts";
+    align-items: start; gap: 12px 10px;
+    padding: 16px; margin-bottom: 16px; border-radius: 20px;
+    background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow-card);
+  }
+  .act-hero-words { grid-area: words; min-width: 0; }
+  .act-hero-face { grid-area: face; align-self: center; }
+  .act-eyebrow {
+    margin: 0 0 3px; font-size: 11px; font-weight: 800; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--accent-ink);
+  }
+  .act-hero h3 {
+    margin: 0; font-family: var(--font-display); font-size: 24px; font-weight: 800;
+    letter-spacing: -.025em; line-height: 1.08; text-wrap: balance;
+  }
+  .act-why { margin: 7px 0 0; font-size: 13.5px; line-height: 1.45; color: var(--muted); }
+  .act-knob-seg { grid-area: seg; }
+  .act-knob-dur { grid-area: dur; text-align: center; }
+  .act-knob .csn-dur-k { text-align: center; margin-bottom: 7px; }
+  /* Three answers, one row, the middle one lit. Same lozenge as .csn-preset so
+     the sheet has one selected-chip look rather than two. */
+  .act-seg { display: flex; gap: 6px; padding: 4px; border-radius: 13px; background: var(--panel-2); }
+  .act-seg button {
+    flex: 1; min-height: 38px; border-radius: 10px; cursor: pointer; font: inherit;
+    font-size: 13.5px; font-weight: 700; color: var(--muted);
+    background: none; border: 1px solid transparent;
+  }
+  .act-seg button.on { background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-card); }
+  .act-seg-note { margin: 7px 0 0; text-align: center; font-size: 12px; line-height: 1.4; color: var(--muted); }
+  /* The stepper is the sheet's own, one size down: inside a card it does not
+     need to be the biggest number on the screen, because the session's name is. */
+  .act-knob-dur .csn-dur-row { gap: 16px; margin: 6px 0 10px; }
+  .act-knob-dur .csn-dur-v { font-size: 36px; }
+  .act-knob-dur .csn-dur-v i { font-size: 14px; }
+  .act-hero-acts { grid-area: acts; display: flex; flex-direction: column; gap: 9px; }
+  .act-hero-acts .btn-primary, .act-hero-acts .btn-secondary { margin: 0; }
+  .act-q { margin: 4px 0 12px; font-size: 16px; font-weight: 800; letter-spacing: -.01em; }
+  .act-group {
+    margin: 14px 0 8px; font-size: 11px; font-weight: 800; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .act-styles { margin: 0; }
+  /* One row rather than half of one: lifting is a kind, not an activity, and it
+     leaves this sheet instead of starting anything on it. */
+  .act-lift { width: 100%; margin-top: 12px; flex-direction: row; align-items: center; gap: 10px; }
+  .act-lift .obs-ico { margin: 0; }
+  /* What the generated session is, in three numbers, because a name and a cue
+     are not enough to decide with. */
+  .act-facts { grid-area: seg; display: flex; gap: 8px; }
+  .act-fact {
+    flex: 1; min-width: 0; padding: 10px 8px; border-radius: 13px; text-align: center;
+    background: var(--panel-2);
+  }
+  .act-fact span { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .act-fact b { display: block; margin-top: 3px; font-size: 16px; font-weight: 800; }
+  .act-moves { display: flex; flex-direction: column; gap: 8px; }
+  .act-move { display: flex; align-items: center; gap: 11px; }
+  .act-move-n {
+    width: 24px; height: 24px; flex: none; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--panel-2); color: var(--muted); font-size: 12px; font-weight: 800;
+  }
+  .act-move-b { min-width: 0; display: flex; flex-direction: column; }
+  .act-move-b b { font-size: 14.5px; font-weight: 650; }
+  .act-move-b i { font-style: normal; font-size: 12.5px; color: var(--muted); }
+  .act-move-more { margin: 2px 0 0 35px; font-size: 12.5px; color: var(--muted); }
+
+  /* ---- Him, running ----
+     Sized under the clock rather than at the lifting stage's 360px: that screen
+     is the figure and a rep counter, this one is the figure and a 68px clock, a
+     progress bar and two buttons, and 360px here pushes the End button off a
+     small phone. */
+  .csn-figure { width: min(200px, 54vw); margin: 2px 0 4px; }
+  .rbr { position: relative; }
+  .rbr-svg { display: block; width: 100%; height: auto; }
+  .rbr-label {
+    display: block; margin-top: 2px; text-align: center;
+    font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+  }
+  /* A limb is a white bone with a dark outline, the same way the body is drawn,
+     so it is two strokes of the same path rather than one. */
+  .rbr-out, .rbr-in { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .rbr-out { stroke: var(--rb-line); stroke-width: 7.5; }
+  .rbr-in { stroke: var(--rb-body); stroke-width: 4.6; }
+  .rbr-ground { stroke: var(--rb-line); stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: 14 11; opacity: .5; }
+  .rbr-speed line { stroke: var(--accent); stroke-width: 2.6; stroke-linecap: round; opacity: 0; }
+  .rbr-face { overflow: visible; }
+  /* The base transform IS the stride, so with every animation switched off he
+     is still a picture of somebody running. transform-box is stated rather than
+     left to the initial value, because the origin has to be read in viewBox
+     units and an implementation that defaults the other way puts his legs on
+     backwards. */
+  .rbr-leg, .rbr-arm { transform-box: view-box; }
+  .rbr-leg { transform-origin: 85px 79px; }
+  .rbr-arm-a { transform-origin: 72px 64px; }
+  .rbr-arm-b { transform-origin: 98px 64px; }
+  .rbr-leg-a { transform: rotate(24deg); }
+  .rbr-leg-b { transform: rotate(-24deg); }
+  .rbr-arm-a { transform: rotate(-26deg); }
+  .rbr-arm-b { transform: rotate(26deg); }
+  .rbr-bob { transform-box: view-box; transform-origin: 85px 72px; }
+  @keyframes rbrLegA { 0%, 100% { transform: rotate(24deg); } 50% { transform: rotate(-24deg); } }
+  @keyframes rbrLegB { 0%, 100% { transform: rotate(-24deg); } 50% { transform: rotate(24deg); } }
+  @keyframes rbrArmA { 0%, 100% { transform: rotate(-26deg); } 50% { transform: rotate(26deg); } }
+  @keyframes rbrArmB { 0%, 100% { transform: rotate(26deg); } 50% { transform: rotate(-26deg); } }
+  @keyframes rbrBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+  @keyframes rbrGround { to { stroke-dashoffset: -28px; } }
+  @keyframes rbrSpeed {
+    0% { opacity: 0; transform: translateX(16px); }
+    35% { opacity: .5; }
+    100% { opacity: 0; transform: translateX(-12px); }
+  }
+  .rbr-leg-a { animation: rbrLegA .62s ease-in-out infinite; }
+  .rbr-leg-b { animation: rbrLegB .62s ease-in-out infinite; }
+  .rbr-arm-a { animation: rbrArmA .62s ease-in-out infinite; }
+  .rbr-arm-b { animation: rbrArmB .62s ease-in-out infinite; }
+  .rbr-bob { animation: rbrBob .31s ease-in-out infinite; }
+  .rbr-ground { animation: rbrGround .4s linear infinite; }
+  .rbr-speed line { transform-box: view-box; animation: rbrSpeed .62s linear infinite; }
+  .rbr-s2 { animation-delay: .2s; }
+  .rbr-s3 { animation-delay: .4s; }
+  /* Paused means he stops, not that he keeps running over a stopped clock. */
+  .csn-figure.paused .rbr * { animation-play-state: paused; }
+  .csn-figure.paused .rbr-speed line { opacity: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .rbr-leg, .rbr-arm, .rbr-bob, .rbr-ground, .rbr-speed line { animation: none; }
+    .rbr-speed line { opacity: .4; }
+  }
   /* ---- The day's sessions ----
      A day that holds two is the point, so the list is a list and not a badge
      on one card: each session says what it is, how much of it there is, and
@@ -7465,6 +7688,12 @@
           <span class="set-val" id="setNotifySub"></span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
+        <button type="button" class="set-row" id="setRow-sound" data-page="sound">
+          <span class="set-ico" data-ico="speaker"></span>
+          <span class="set-txt"><span class="set-title">Sound</span></span>
+          <span class="set-val" id="setSoundSub"></span>
+          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
+        </button>
         <button type="button" class="set-row" id="setRow-theme" data-page="theme">
           <span class="set-ico" data-ico="sunMoon"></span>
           <span class="set-txt"><span class="set-title">Appearance</span></span>
@@ -7789,6 +8018,27 @@
       <p class="muted-note" id="pushNote" style="margin-top:8px;"></p>
     </div>
     </div>
+    <div class="settings-page hidden" id="page-sound">
+      <div class="scr-head">
+        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+        <div class="scr-title">Sound</div>
+        <div class="spacer"></div>
+      </div>
+    <div class="card">
+      <h2>Unio out loud</h2>
+      <label class="gym-toggle" id="voiceWrap">
+        <span>Unio talks</span>
+        <input type="checkbox" id="voiceToggle" />
+      </label>
+      <p class="muted-note">He reads his own lines aloud: the greeting on Home, what he says between your sets, the introduction when you set up. Nothing else is read out, and he never reads a message from your partner.</p>
+      <label class="gym-toggle" id="sfxWrap" style="margin-top:12px;">
+        <span>Sounds</span>
+        <input type="checkbox" id="sfxToggle" />
+      </label>
+      <p class="muted-note">Short tones for the things you do: a set logged, a rest up, a workout finished, a record.</p>
+      <p class="muted-note">Both are set on this phone rather than on your account, so a second device keeps its own answer.</p>
+    </div>
+    </div>
     <div class="settings-page hidden" id="page-theme">
       <div class="scr-head">
         <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
@@ -8085,15 +8335,24 @@ let EXERCISE_TRAININGS = [];
    The figure on the card and the kit named beside it are the same fact, so
    the machine in the picture is the machine in the list. */
 let EQUIPMENT = null;
-(async () => {
-  const [tdee, cal, strength, library, equipment] = await Promise.all([
+/* Held rather than dropped, because the Recovery screen is the first thing in
+   the app that cannot draw itself without these numbers. Every other caller
+   guards on FIT_MATH being empty; that screen waits for it instead, which is
+   the difference between a blank card and a card that arrives a beat late. */
+const FIT_MATH_READY = (async () => {
+  const [tdee, cal, goalTime, strength, library, equipment] = await Promise.all([
     import("./knowledge/formulas/tdee.mjs"),
     import("./knowledge/formulas/calorie-math.mjs"),
+    /* The calorie TARGET per goal, which is a different question from the
+       calorie BURN in calorie-math.mjs and lives in its own file: a deficit
+       capped at a share of TDEE with a floor under it, so a goal can never
+       ask somebody to eat less than the library is willing to recommend. */
+    import("./knowledge/formulas/goal-timeline.mjs"),
     import("./knowledge/formulas/strength-math.mjs"),
     import("./knowledge/exercise-library/index.mjs"),
     import("./knowledge/equipment.mjs").catch((e) => { console.error("equipment", e); return null; }),
   ]);
-  FIT_MATH = { ...tdee, ...cal, ...strength };
+  FIT_MATH = { ...tdee, ...cal, ...goalTime, ...strength };
   EXERCISE_TRAININGS = library.TRAININGS;
   EQUIPMENT = equipment;
   /* It lands a beat after the first paint, and the workout tab is the screen
@@ -8102,7 +8361,7 @@ let EQUIPMENT = null;
   if (equipment && !document.getElementById("tab-workout")?.classList.contains("hidden")) {
     try { renderWorkoutTab({ respectMode: true }); } catch {}
   }
-})();
+})().catch((e) => console.error("fit math modules", e));
 
 /* The kit for one exercise, biggest thing first: "Cable machine, rope
    attachment, pulley at the top". Empty string until the table lands, and for
@@ -8141,7 +8400,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.18.5";
+const APP_VERSION = "2026.09.18.6";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -8333,6 +8592,7 @@ const ICON_PATHS = {
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
   lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0"/>',
+  speaker: '<path d="M11 5 6.5 9H3v6h3.5L11 19V5Z"/><path d="M15.4 9.6a3.4 3.4 0 0 1 0 4.8"/><path d="M18 7a7 7 0 0 1 0 10"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   minus: '<path d="M5 12h14"/>',
   home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/>',
@@ -8341,6 +8601,11 @@ const ICON_PATHS = {
   target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/>',
   people: '<circle cx="9" cy="8" r="3"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><circle cx="17.5" cy="9" r="2.4"/><path d="M15.5 12.2c2.3.3 4 2 4 4.3"/>',
   calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>',
+  /* Water and sleep, for the Recovery screen. The droplet is one closed path
+     so it takes a fill the way the flame does; the moon is a crescent cut the
+     same way every other single-path icon here is drawn. */
+  droplet: '<path d="M12 3.3c3.2 3.4 5.5 6.2 5.5 9.1a5.5 5.5 0 0 1-11 0c0-2.9 2.3-5.7 5.5-9.1Z"/>',
+  moon: '<path d="M20 14.2A8.2 8.2 0 0 1 9.8 4 8.2 8.2 0 1 0 20 14.2Z"/>',
   /* A tape measure: the reel, and a length pulled out with the tick marks on
      it. The waist tile's icon, and nothing else uses it yet. */
   tape: '<circle cx="8" cy="12" r="5"/><circle cx="8" cy="12" r="1.2" fill="currentColor" stroke="none"/><path d="M12.2 15.5H21v-3h-8"/><path d="M15 12.5v1.6M18 12.5v1.6"/>',
@@ -10064,7 +10329,7 @@ function renderOnboardIntro(i, data) {
         ${i === 0 ? `<button type="button" class="intro-skip" id="introSkip">Skip</button>` : "<span></span>"}
       </div>
       <div class="si-hero intro-hero">
-        <span class="intro-bot">${robotFaceSVG(96, "", { bust: true })}</span>
+        <span class="intro-bot">${robotFaceSVG(144, "", { bust: true })}</span>
         <h1 class="si-word intro-h">${escapeHtml(step.h)}</h1>
         <p class="si-tag intro-say" id="obBotSay" data-say="${escapeHtml(step.say)}"></p>
       </div>
@@ -12250,22 +12515,42 @@ function restSceneSVG() {
   </svg>`;
 }
 
+/* Unio, traced off the robot in Mo's Home mockup. bot/unio-face-ref.png is that
+   crop, keyed off the card, so anybody can lay this over it and check. He is an
+   egg shaped white head with a flat crown, a soft charcoal visor set low in it,
+   an ear pod each side, and two green eyes that slant down toward the middle. He
+   has no antenna: the mockup does not draw one, and the one we used to draw made
+   him somebody else.
+
+   One coordinate system for both variants, laid out around a centre of 48 so the
+   shoulders have room, and shifted left for the head only box. Every number is
+   the crop's own, scaled by 0.742 to put his head at 46 units wide. The eyes are
+   the single place this is deliberately not the crop: the mockup sets them about
+   a unit left of the head's centre, and copying that reads as a squint. */
 function robotFaceSVG(size = 40, cls = "", { bust = false } = {}) {
+  const vw = bust ? 96 : 64, vh = bust ? 80 : 64;
   const px = typeof size === "number" ? size + "px" : size;
-  /* Shoulders only where there is room for them. On the done card he leans
-     into frame from the corner, the way Mo drew him; beside a line of
-     onboarding copy he is a face and nothing else. */
-  const h = bust ? 78 : 64;
-  return `<svg class="rb-face ${cls}" viewBox="0 0 64 ${h}" width="${px}" height="${typeof size === "number" ? Math.round(size * h / 64) + "px" : px}" aria-hidden="true" focusable="false">
-    ${bust ? `<path d="M22 53h20v6c9 1 15 5 17 12H5c2-7 8-11 17-12z" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round"/>` : ""}
-    <path d="M32 13V7" stroke="var(--rb-line)" stroke-width="2.2" stroke-linecap="round" fill="none"/>
-    <circle cx="32" cy="5" r="2.8" fill="var(--accent)"/>
-    <rect x="3.5" y="27" width="6" height="13" rx="3" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.4"/>
-    <rect x="54.5" y="27" width="6" height="13" rx="3" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.4"/>
-    <rect x="9" y="12" width="46" height="41" rx="13.5" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6"/>
-    <rect x="15" y="21" width="34" height="21" rx="9.5" fill="var(--rb-visor)"/>
-    <path class="rb-eye" d="M20.5 29.5l9.5-1.5v5.5l-9.5 1.5z" fill="var(--accent)"/>
-    <path class="rb-eye" d="M43.5 29.5l-9.5-1.5v5.5l9.5 1.5z" fill="var(--accent)"/>
+  const h = typeof size === "number" ? Math.round(size * vh / vw) + "px" : px;
+  /* Shoulders only where there is room for them. On the done card he leans into
+     frame from the corner, the way Mo drew him; beside a line of onboarding copy
+     he is a face and nothing else. Torso first, then an arm over each side of
+     it, which is what puts the seam on his shoulders. All three run past the
+     bottom of the box on purpose, so the viewBox cuts him at the chest the way
+     the mockup does rather than drawing a hem across him. */
+  const body = bust ? `
+      <path d="M48 53C41 53 35.5 53.8 31.6 55.2 28.5 56.2 24 58.4 21.6 59.7 19 61.1 16.6 62.8 15.4 64.8V88H80.6V64.8C79.4 62.8 77 61.1 74.4 59.7 72 58.4 67.5 56.2 64.4 55.2 60.5 53.8 55 53 48 53z" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M31 50.5C32.2 55.4 34.4 58.6 37.2 60.2 40.4 61.4 44 61.6 48 61.6 52 61.6 55.6 61.4 58.8 60.2 61.6 58.6 63.8 55.4 65 50.5z" fill="var(--rb-shade)" opacity=".42"/>
+      <path d="M16.6 65C13.2 65 10.3 65.8 8.4 67 6.6 68.2 5.4 70 4.7 72.2 4 74.4 3.4 77 3 88H21C21 78 20.4 71.5 18.6 68 18 66.4 17.4 65.5 16.6 65z" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M79.4 65C82.8 65 85.7 65.8 87.6 67 89.4 68.2 90.6 70 91.3 72.2 92 74.4 92.6 77 93 88H75C75 78 75.6 71.5 77.4 68 78 66.4 78.6 65.5 79.4 65z" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round"/>` : "";
+  return `<svg class="rb-face ${cls}" viewBox="0 0 ${vw} ${vh}" width="${px}" height="${h}" aria-hidden="true" focusable="false">
+    <g transform="translate(${bust ? 0 : -16} ${bust ? 0 : 1.3})">${body}
+      <rect x="22.4" y="25.2" width="10" height="16.3" rx="4.6" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.5"/>
+      <rect x="63.6" y="25.2" width="10" height="16.3" rx="4.6" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.5"/>
+      <path d="M48 4.8C44.5 4.8 39.8 5.4 36.5 7 32 9.7 25.5 15 25.5 27 25.5 34.5 26.5 40 28.4 44.6 30.6 50 33.6 53.4 37 55.2 40.2 56.4 44 56.6 48 56.6 52 56.6 55.8 56.4 59 55.2 62.4 53.4 65.4 50 67.6 44.6 69.5 40 70.5 34.5 70.5 27 70.5 15 64 9.7 59.5 7 56.2 5.4 51.5 4.8 48 4.8z" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round"/>
+      <rect x="31.7" y="25.1" width="32.6" height="19.3" rx="4.5" fill="var(--rb-visor)"/>
+      <path class="rb-eye" d="M35.8 32.4 38.4 32.9 42.5 35.1 40.9 36.3 38.2 34.6 35.8 34.6z" fill="var(--accent)" stroke="var(--accent)" stroke-width=".55" stroke-linejoin="round"/>
+      <path class="rb-eye" d="M60.2 32.4 57.6 32.9 53.5 35.1 55.1 36.3 57.8 34.6 60.2 34.6z" fill="var(--accent)" stroke="var(--accent)" stroke-width=".55" stroke-linejoin="round"/>
+    </g>
   </svg>`;
 }
 
@@ -12285,6 +12570,11 @@ let TYPE_TIMER = null;
 function typeOut(el, text) {
   clearInterval(TYPE_TIMER);
   if (!el) return;
+  /* He says it as it STARTS typing, so the words and the voice are one event
+     rather than a caption arriving after a performance. Keyed on the element's
+     id, which is obBotSay on every screen of onboarding, so a step that
+     repaints without changing its line does not make him say it twice. */
+  voice.say(text, { from: el.id || "obBot" });
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = text; return; }
   el.textContent = "";
   let i = 0;
@@ -17124,6 +17414,12 @@ function hirePitchHTML(context) {
    because every other card in this app wires its own buttons and a lone
    global listener is the thing nobody finds when this stops working. */
 function wireHirePitch(root) {
+  /* Said as well as written, and at most once every few minutes: the pitch is
+     drawn by renderers that run on their own schedule, and a trainer who asks
+     for money every time a card repaints is not charming, he is a machine in a
+     train station. */
+  const pitchLine = (root || document).querySelector(".hire-pitch-line");
+  if (pitchLine) voice.say(pitchLine.textContent, { from: "hirePitch", gap: 4 * 60 * 1000 });
   (root || document).querySelectorAll("[data-hire]").forEach((b) => {
     b.onclick = async () => {
       /* Disabled for the round trip, because the store sheet takes a moment to
@@ -17218,6 +17514,11 @@ function showPaywall({ skipLabel = "Not now" } = {}) {
           </div>
       </div>`;
     document.body.appendChild(scrim);
+    /* The one line on this screen that is him rather than the app, so it is
+       the only one read out. Everything else here is a price and the legal
+       copy Apple require, and a robot reading terms of use aloud is a
+       different product. */
+    voice.say("Hire me as your personal trainer.", { from: "paywall", gap: 120000 });
     /* The dots track a scroll position rather than a click handler, because
        the track scrolls by touch and by the arrow-key/trackpad affordances a
        horizontal overflow gets for free, and both need to land on the same
@@ -19941,15 +20242,63 @@ function goalLineChart(canvasId, series, isPartner, unit, live) {
    where an entry is a whole session rather than a move, so it gets a named
    prescription instead of a sequence. The two are exclusive on purpose: an
    activity is one or the other, and `other` is honestly neither. */
+/* `venue` says where the thing happens, and it is not decoration: the library
+   marks every session `indoor` true or false, so a machine and the outdoors are
+   two different pools of the same mode. Cycling outside is Easy Ride and Long
+   Ride; cycling in a gym is Easy Spin and Bike Intervals. Without this the bike
+   machine would offer somebody a ninety minute road ride.
+
+   `label` is what gets written to exercise_logs.exercise_name, so it is the one
+   field here that must never be reworded casually: Progress reads history back
+   by that string. `title` is what the screen says when it wants to be plainer
+   than the log ("Run outside"), and `alias` carries a label this app used to
+   write, so old rows keep counting. Rowing was logged as "Row" until the
+   machines arrived and it took its full name. */
 const CARDIO_ACTS = [
-  { key: "run",     label: "Run",     ico: "run",      dist: true,  cardio: "running" },
-  { key: "walk",    label: "Walk",    ico: "walk",     dist: true,  cardio: "walking" },
-  { key: "cycle",   label: "Cycle",   ico: "bike",     dist: true,  cardio: "cycling" },
-  { key: "row",     label: "Row",     ico: "dumbbell", dist: true,  cardio: "rowing" },
-  { key: "pilates", label: "Pilates", ico: "star",     dist: false, training: "pilates" },
-  { key: "yoga",    label: "Yoga",    ico: "heart",    dist: false, training: "yoga" },
-  { key: "hiit",    label: "HIIT",    ico: "bolt",     dist: false, cardio: "hiit" },
-  { key: "other",   label: "Other",   ico: "clock",    dist: false },
+  { key: "run",        label: "Run",           title: "Run outside",   ico: "run",      dist: true,  cardio: "running",    venue: "outdoor" },
+  { key: "walk",       label: "Walk",                                  ico: "walk",     dist: true,  cardio: "walking",    venue: "outdoor" },
+  { key: "cycle",      label: "Cycle",         title: "Cycle outside", ico: "bike",     dist: true,  cardio: "cycling",    venue: "outdoor" },
+  { key: "treadmill",  label: "Treadmill",   short: "Treadmill",       ico: "run",      dist: true,  cardio: "running",    venue: "gym" },
+  { key: "stairs",     label: "Stair master", short: "Stairs",         ico: "trending", dist: false, cardio: "stairs",     venue: "gym" },
+  { key: "bikemachine",label: "Bike machine", short: "Bike",           ico: "bike",     dist: true,  cardio: "cycling",    venue: "gym" },
+  { key: "row",        label: "Rowing machine", short: "Rower",        ico: "dumbbell", dist: true,  cardio: "rowing",     venue: "gym", alias: ["row"] },
+  { key: "elliptical", label: "Elliptical",  short: "Elliptical",      ico: "refresh",  dist: false, cardio: "elliptical", venue: "gym" },
+  { key: "yoga",       label: "Yoga",                                  ico: "heart",    dist: false, training: "yoga" },
+  { key: "pilates",    label: "Pilates",                               ico: "star",     dist: false, training: "pilates" },
+  { key: "hiit",       label: "HIIT",                                  ico: "bolt",     dist: false, cardio: "hiit" },
+  { key: "other",      label: "Other",                                 ico: "clock",    dist: false },
+];
+
+/* What the screen calls it, which is not always what the log calls it. */
+function actTitle(a) { return a?.title || a?.label || ""; }
+
+/* One logged name back to the activity that wrote it. Every reader of a logged
+   name goes through here rather than comparing labels itself, because the alias
+   list is the only thing keeping rows written under an older name counted. */
+function actForExerciseName(exerciseName) {
+  const n = (exerciseName || "").trim().toLowerCase();
+  if (!n) return null;
+  return CARDIO_ACTS.find((a) => a.label.toLowerCase() === n
+    || (a.alias || []).some((x) => x.toLowerCase() === n)) || null;
+}
+
+/* What the Generate button calls the thing. "Build my run" and "Build my
+   treadmill session" both read like him saying it out loud; "Build my cycle"
+   does not, which is why this is a written list and not label.toLowerCase(). */
+const ACT_NOUN = {
+  run: "run", walk: "walk", cycle: "ride", treadmill: "treadmill session",
+  stairs: "stair session", bikemachine: "bike session", row: "row",
+  elliptical: "elliptical session", yoga: "yoga session",
+  pilates: "Pilates session", hiit: "HIIT session", other: "session",
+};
+function actNoun(a) { return ACT_NOUN[a?.key] || "session"; }
+
+/* The three shelves the picker is laid out on. Outside, in a gym, and the
+   classes, which belong to neither: a mat is not a venue. */
+const ACT_GROUPS = [
+  { venue: "outdoor", head: "Outside" },
+  { venue: "gym", head: "In the gym" },
+  { venue: null, head: "Classes and the rest" },
 ];
 
 /* The session builder lives in the engine so the gate can test it, and is pulled
@@ -19976,8 +20325,7 @@ function activityCounts(name, days = 90) {
   const counts = {};
   for (const l of ALL_EXERCISE_LOGS) {
     if (l.user_name !== name || !l.entry_date || l.entry_date < fromStr) continue;
-    const n = (l.exercise_name || "").trim().toLowerCase();
-    const a = CARDIO_ACTS.find((x) => x.label.toLowerCase() === n);
+    const a = actForExerciseName(l.exercise_name);
     if (a) counts[a.key] = (counts[a.key] || 0) + 1;
   }
   return counts;
@@ -20021,6 +20369,15 @@ function csnClock(ms) {
 
 function csnAct() {
   return CARDIO_ACTS.find((a) => a.key === CARDIO_SES?.act) || CARDIO_ACTS[0];
+}
+
+/* Is there a clock on it. Setup and reveal are both a person deciding, and
+   neither is a session: offering to "resume" something nobody has started, or
+   drawing it on Home as a live row, is the app telling them they are running
+   when they are still choosing. Asked through here rather than compared to a
+   state name at four call sites, which is how reveal would have been missed. */
+function csnRunning() {
+  return !!CARDIO_SES && CARDIO_SES.state !== "setup" && CARDIO_SES.state !== "reveal";
 }
 
 /* One session of a training that has a library. Level comes from how many of
@@ -20100,7 +20457,120 @@ function cardioSeedIndex(str, n) {
   return n > 0 ? h % n : 0;
 }
 
-async function buildCardioCard(act, minutes) {
+/* How hard, which is the one preference this screen takes.
+
+   It is deliberately not a length. The library already says how long each of
+   its sessions is meant to be, and overriding that with a number somebody spun
+   a stepper to is how a twenty minute interval session becomes a fifty minute
+   one nobody can hold. So the preference picks WHICH session, ordered by the
+   library's own effort rating, and the session brings its minutes with it.
+
+   Three answers rather than a slider, and the same three words the intensity
+   step already uses, so a person meets this vocabulary once. */
+const ACT_PREFS = [
+  { key: "easy", label: "Easy" },
+  { key: "steady", label: "Steady" },
+  { key: "hard", label: "Hard" },
+];
+
+/* Where the preference starts before anybody touches it. The tier somebody
+   tapped on the intensity step is NOT stored: finishOnboardingFromDraft writes
+   days_per_week and session_minutes and nothing else, so `intensity` exists only
+   inside that screen's own draft. The tier is read back out of the day count it
+   set, which is lossless in the direction that matters: 1 to 2 was Easy, 3 to 4
+   Steady, 5 to 6 All in. Session length is the fallback for an account from
+   before the tiers existed, and Steady for one that answered neither. */
+function defaultActivityPref() {
+  const days = Number(MY_PROFILE?.days_per_week ?? MY_GOAL?.days_per_week);
+  if (Number.isFinite(days) && days > 0) return days <= 2 ? "easy" : days <= 4 ? "steady" : "hard";
+  const mins = Number(MY_PROFILE?.session_minutes);
+  if (Number.isFinite(mins) && mins > 0) return mins <= 30 ? "easy" : mins <= 45 ? "steady" : "hard";
+  return "steady";
+}
+
+/* The library's sessions for one activity, and an honest word about anything
+   that had to be relaxed to find them.
+
+   cardioFor falls back to everything rather than returning nothing, which is
+   the right call for a week planner and the wrong one here: ask it for stairs
+   at beginner level and it answers with Easy Run, because the only stair
+   session in the library is an intermediate one. So the mode filter is applied
+   again on this side, and a pool that empties says so on screen rather than
+   handing somebody a run while they are standing on a stair master.
+
+   Two relaxations, in order, each of them reported:
+     - the level, because one session a step above you beats no session,
+     - the venue, because there is no indoor run in the library at all and a
+       treadmill still wants the run sessions.
+   And then there is the third answer, which is that the library has nothing for
+   this machine. That is printed too. A made up session would be worse. */
+/* Hard reaches one level past where the logs put somebody, and only Hard.
+
+   The library hands back everything at or BELOW a level, which means a
+   beginner's running pool is exactly one session, Easy Run, and a three way
+   choice that returns the same session three times is not a choice. Somebody
+   who taps Hard has asked for a step up in so many words, so they get one:
+   beginner reaches intermediate, which is Tempo Run and Run Intervals, not
+   Sprint Intervals. Two levels is never reached, because "harder than I
+   usually go" is not "flat out with no warm up", and Easy and Steady never
+   reach at all. The session says on the reveal that it is above your level. */
+const ACT_LEVEL_UP = { beginner: "intermediate", intermediate: "advanced", advanced: "advanced" };
+
+function cardioPoolFor(lib, act, level, prefKey) {
+  if (prefKey === "hard") level = ACT_LEVEL_UP[level] || level;
+  if (!lib?.cardioFor || !act?.cardio) return { pool: [], note: null };
+  const named = actTitle(act).toLowerCase();
+  const byMode = (lvl) => lib.cardioFor({ modes: [act.cardio], level: lvl })
+    .filter((e) => e.mode === act.cardio);
+  let note = null;
+  let pool = byMode(level);
+  if (!pool.length) {
+    pool = byMode("advanced");
+    if (pool.length) note = `The library has no ${named} session at your level yet, so this one is a step up.`;
+  }
+  if (!pool.length) {
+    return { pool: [], note: `The library has no ${named} session yet. Start the clock and I'll count the minutes.` };
+  }
+  if (act.venue) {
+    const wantIndoor = act.venue === "gym";
+    const fit = pool.filter((e) => !!e.indoor === wantIndoor);
+    if (fit.length) pool = fit;
+    else if (wantIndoor) note = note || `Every ${act.cardio} session in the library is written for outside. The effort and the structure are the same on a machine.`;
+  }
+  return { pool, note };
+}
+
+/* Which one of them, given how hard they said.
+
+   Ordered by the library's own effort with minutes breaking a tie, then cut
+   into three bands so Easy takes from the bottom and Hard from the top. A pool
+   of one gives the same session whatever the segment says, and that is the
+   truth rather than a bug: there is one stair session in the library.
+
+   Seeded on the date and the preference, the same rule every other picker in
+   this file keeps, so today asked twice comes back the same and moving the
+   segment actually moves the session rather than reshuffling one band. */
+function pickCardioSession(pool, prefKey, actKey) {
+  if (!pool.length) return null;
+  const sorted = [...pool].sort((a, b) =>
+    (a.effort || 0) - (b.effort || 0)
+    || (a.minutes || 0) - (b.minutes || 0)
+    || String(a.name).localeCompare(String(b.name)));
+  const third = Math.max(1, Math.round(sorted.length / 3));
+  const band = prefKey === "easy" ? sorted.slice(0, third)
+    : prefKey === "hard" ? sorted.slice(-third)
+    : sorted.slice(third, Math.max(third + 1, sorted.length - third));
+  const from = band.length ? band : sorted;
+  return from[cardioSeedIndex(`${todayStr()}|${actKey}|${prefKey}`, from.length)];
+}
+
+/* What the library holds for an activity, cached per activity for the life of
+   the screen, so the picker can print the honest note under a machine BEFORE
+   somebody presses Generate and finds out. Keyed by activity and level; cleared
+   when the sheet closes, because a level can move between sessions. */
+let ACT_LIB_NOTES = {};
+
+async function buildCardioCard(act, prefKey) {
   if (!act?.cardio) return null;
   const [lib, engine] = await Promise.all([ensureCardioLibrary(), ensureSessionEngine()]);
   if (!lib?.cardioFor) return null;
@@ -20108,20 +20578,180 @@ async function buildCardioCard(act, minutes) {
      test of cardio fitness in this app either. */
   const done = activityCounts(ME, 365)[act.key] || 0;
   const level = engine?.levelFromSessions ? engine.levelFromSessions(done) : "beginner";
-  const pool = lib.cardioFor({ modes: [act.cardio], level });
-  if (!pool.length) return null;
-  /* Closest to the length actually asked for. Somebody with twenty minutes is
-     not handed a long run, and the library says in its own minutes what each
-     session is meant to be. */
-  const want = Number(minutes) || 30;
-  const gap = (e) => Math.abs((Number(e.minutes) || want) - want);
-  const best = Math.min(...pool.map(gap));
-  const near = pool.filter((e) => gap(e) === best);
-  const pick = near[cardioSeedIndex(`${todayStr()}|${act.key}|${want}`, near.length)];
+  const pref = prefKey || defaultActivityPref();
+  const { pool, note } = cardioPoolFor(lib, act, level, pref);
+  ACT_LIB_NOTES[act.key] = note || "";
+  const pick = pickCardioSession(pool, pref, act.key);
+  /* Nothing in the library rather than null, so the caller can say which
+     machine came up empty instead of showing a generic failure. */
+  if (!pick) return { missing: true, note, level };
+  /* Said out loud when the session is above where the logs put them, because it
+     is the one thing about this pick a person could be caught out by. */
+  const stretch = pick.level !== level
+    ? `This one is an ${pick.level} session and your logs put you at ${level}. You asked for hard.`
+    : null;
   return {
     name: pick.name, effort: pick.effort, cue: pick.cue,
-    structure: pick.structure, minutes: pick.minutes, level,
+    structure: pick.structure, minutes: pick.minutes,
+    level: pick.level || level, note: note || stretch,
   };
+}
+
+/* The note for one activity, read for the picker rather than for a session, so
+   the screen can be honest about a machine before it is chosen. Fills the cache
+   and repaints once, because render is synchronous and this is not. */
+async function loadActivityNote(act) {
+  if (!act?.cardio || ACT_LIB_NOTES[act.key] !== undefined) return;
+  ACT_LIB_NOTES[act.key] = "";
+  const [lib, engine] = await Promise.all([ensureCardioLibrary(), ensureSessionEngine()]);
+  if (!lib?.cardioFor) return;
+  const done = activityCounts(ME, 365)[act.key] || 0;
+  const level = engine?.levelFromSessions ? engine.levelFromSessions(done) : "beginner";
+  const { note } = cardioPoolFor(lib, act, level);
+  ACT_LIB_NOTES[act.key] = note || "";
+  /* Only if they are still looking at the same activity on the same screen. */
+  if (CARDIO_SES?.state === "setup" && CARDIO_SES.act === act.key) renderCardioStage();
+}
+
+/* ---- What he puts forward before anybody taps anything ----
+
+   One small pure function, and deliberately NOT in the engine. The engine is
+   tested against whole plans and whole weeks; this is a suggestion on one
+   screen, and it has to stay readable and arguable by whoever changes it next.
+
+   Every rule and the reason it exists:
+
+     build-endurance   run, cycle      endurance is built by holding an effort
+                                       for a long time, and running and cycling
+                                       are the two modes the library carries the
+                                       most sessions in.
+     lose-weight       walk, run       walking first, on purpose. It is the one
+                                       that actually gets done, and minutes
+                                       somebody repeats beat minutes that look
+                                       better on a screen.
+     move-better       yoga, pilates   mobility is what those two are for. Same
+                                       rule recommendedStyles already follows one
+                                       tab over, so the two cannot disagree.
+     tone-lean-abs     pilates, walk   the lifting half of that goal belongs to
+                                       the workout tab. What is left for this
+                                       screen is control work and easy minutes.
+     build-muscle      walk            cardio is not what those goals are for,
+     get-stronger      walk            and a hard run costs the leg day. Easy
+                                       minutes that do not eat recovery is the
+                                       honest recommendation, not a hard one.
+     consistent        walk            the lowest bar in the building.
+
+   Then what they ticked narrows it, because a stated preference outranks a
+   rule: somebody who ticked only cycling gets cycling even on a goal whose rule
+   says walk. Where the ticks and the rule share nothing the ticks win outright
+   rather than being blended, since a rule nobody asked for should not push a
+   run at a person who told us they cycle. */
+const ACT_RECS = {
+  "build-endurance": ["run", "cycle"],
+  "lose-weight": ["walk", "run"],
+  "move-better": ["yoga", "pilates"],
+  "tone-lean-abs": ["pilates", "walk"],
+  "build-muscle": ["walk"],
+  "get-stronger": ["walk"],
+  "consistent": ["walk"],
+};
+
+/* A ticked style names either a cardio mode or a mat class, and both are an
+   activity on this screen. With equipment and without name neither, which is
+   right: those are the workout tab's, not this one's. */
+const ACT_FOR_STYLE = { running: "run", cycling: "cycle", walking: "walk", yoga: "yoga", pilates: "pilates" };
+
+/* The goal as an id. profiles.goal_bubble is what every other screen reads, and
+   an account from before the tiles carried ids has only the title string, so
+   the titles are matched back through GOAL_TILES. Neither means "consistent",
+   which is what that goal already says out loud: we start somewhere sensible. */
+function activityGoalId(profile) {
+  const id = profile?.goal_bubble;
+  if (id && ACT_RECS[id]) return id;
+  const title = String(profile?.goal || "").trim().toLowerCase();
+  const tile = GOAL_TILES.find((t) => String(t.title).toLowerCase() === title);
+  return tile && ACT_RECS[tile.id] ? tile.id : "consistent";
+}
+
+function recommendedActivities(profile) {
+  const fromGoal = ACT_RECS[activityGoalId(profile)] || ACT_RECS.consistent;
+  const ticked = (Array.isArray(profile?.train_styles) ? profile.train_styles : [])
+    .map((id) => ACT_FOR_STYLE[id]).filter(Boolean);
+  const shared = fromGoal.filter((k) => ticked.includes(k));
+  const keys = !ticked.length ? fromGoal : (shared.length ? shared : ticked);
+  return keys.slice(0, 2).map((k) => CARDIO_ACTS.find((a) => a.key === k)).filter(Boolean);
+}
+
+/* His one line about it, which is the reason and not a slogan. Written for the
+   ear, because every one of his lines is going to be spoken. */
+function activityWhy(act, profile, isRec) {
+  if (!isRec) {
+    return act.cardio || act.training
+      ? "Your pick. I'll build it from the library and count the minutes."
+      : "I have nothing written for this one, so it is a clock and an honest count.";
+  }
+  const goal = activityGoalId(profile);
+  const ticked = (Array.isArray(profile?.train_styles) ? profile.train_styles : [])
+    .map((id) => ACT_FOR_STYLE[id]).filter(Boolean);
+  /* The tick is the stronger reason when it is the reason, because it is the
+     thing they told us rather than the thing we worked out. */
+  if (ticked.length && !(ACT_RECS[goal] || []).includes(act.key)) {
+    return `You told me this is what you do, so this is what I put first.`;
+  }
+  const lines = {
+    "build-endurance": "You want endurance. This is the work that builds it.",
+    "lose-weight": "Easy minutes, often. That is what moves the weight.",
+    "move-better": "You want to move better. This is the one that does it.",
+    "tone-lean-abs": "Control work, next to the lifting. That is the shape of that goal.",
+    "build-muscle": "Easy, so it does not eat the recovery your lifting needs.",
+    "get-stronger": "Easy, so it does not eat the recovery your lifting needs.",
+    "consistent": "It counts. It genuinely counts, and it is the easiest one to keep.",
+  };
+  return lines[goal] || lines.consistent;
+}
+
+/* ---- Him, running ----
+
+   The rig in knowledge/motion draws every exercise in this app and it has no
+   run cycle. It belongs to a collaborator and is read only, so there is nothing
+   there to pose. Rather than stand a still figure on the one screen whose whole
+   subject is movement, this is him drawn here: the bust robotFaceSVG already
+   returns, nested rather than copied so there stays exactly one drawing of his
+   face in this file, with legs and arms under it and the ground going past. A
+   request for a real run cycle is in mo-knowledge/LIBRARY-REQUESTS.md.
+
+   The animation is CSS on classes and not a timer, so it costs nothing while
+   the clock beside it is being repainted twice a second. Pausing freezes it
+   where it stands, which is what pausing looks like. prefers-reduced-motion
+   turns every keyframe off and leaves the base transform, and the base
+   transform IS a stride: the still pose is a picture of somebody running, not
+   a picture of somebody standing. */
+function robotRunningSVG(label = "") {
+  /* Twice, because a limb here is a white bone with a dark outline, the same
+     way the body is drawn, and one stroke cannot be both. */
+  const limb = (d) => `<path class="rbr-out" d="${d}"/><path class="rbr-in" d="${d}"/>`;
+  /* The bust is 64 by 78 in its own viewBox and it is nested, not copied, so the
+     translate is what puts its hips at 85,79 and every limb coordinate below is
+     measured off that one point. Move the translate and the legs come off. */
+  return `<div class="rbr" aria-hidden="true">
+    <svg class="rbr-svg" viewBox="0 0 170 150" preserveAspectRatio="xMidYMax meet">
+      <g class="rbr-speed">
+        <line class="rbr-s1" x1="4" y1="30" x2="38" y2="30"/>
+        <line class="rbr-s2" x1="10" y1="50" x2="36" y2="50"/>
+        <line class="rbr-s3" x1="2" y1="70" x2="32" y2="70"/>
+      </g>
+      <g class="rbr-bob">
+        ${/* The far side of him first, so the near arm and leg draw on top. */ ""}
+        <g class="rbr-arm rbr-arm-b">${limb("M98 64 110 79 101 91")}</g>
+        <g class="rbr-leg rbr-leg-b">${limb("M85 79 98 105 94 129")}${limb("M94 129 105 131")}</g>
+        <g class="rbr-torso" transform="translate(53 8)">${robotFaceSVG(64, "rbr-face", { bust: true })}</g>
+        <g class="rbr-leg rbr-leg-a">${limb("M85 79 72 105 78 129")}${limb("M78 129 89 131")}</g>
+        <g class="rbr-arm rbr-arm-a">${limb("M72 64 60 79 69 91")}</g>
+      </g>
+      <line class="rbr-ground" x1="-30" y1="139" x2="230" y2="139"/>
+    </svg>
+    ${label ? `<span class="rbr-label">${escapeHtml(label)}</span>` : ""}
+  </div>`;
 }
 
 /* Effort is a 1 to 10 rating of perceived exertion, which is the scale the
@@ -20185,8 +20815,20 @@ function paintGuidedMove(ms) {
    is a stronger fact than anything a button said. */
 function openCardioSession(state, act) {
   if (!CARDIO_SES) {
-    const first = (act && CARDIO_ACTS.find((a) => a.key === act)) || activitiesByHabit(ME)[0] || CARDIO_ACTS[0];
-    CARDIO_SES = { state: state || "setup", act: first.key, minutes: 30, accum: 0, since: null };
+    /* Habit outranks the recommendation, and only where there is habit. What
+       somebody actually does is a fact and what we recommend is an argument, so
+       a person who has run nine times opens on Run. A brand new account has no
+       facts, and opening it on the written order rather than on the goal it was
+       just asked about is the app forgetting the conversation it just had. */
+    const done = activityCounts(ME);
+    const habit = activitiesByHabit(ME);
+    const first = (act && CARDIO_ACTS.find((a) => a.key === act))
+      || (Object.keys(done).length ? habit[0] : recommendedActivities(MY_PROFILE)[0])
+      || habit[0] || CARDIO_ACTS[0];
+    CARDIO_SES = {
+      state: state || "setup", act: first.key, minutes: 30,
+      pref: defaultActivityPref(), accum: 0, since: null,
+    };
   }
   csnSave();
   $("csnScrim").classList.remove("hidden");
@@ -20196,15 +20838,67 @@ function openCardioSession(state, act) {
 
 function closeCardioSession() {
   clearInterval(csnTick); csnTick = null;
+  ACT_LIB_NOTES = {};   // a level can move between sessions, so the notes are not kept
   $("csnScrim").classList.add("hidden");
   pinSheets();
 }
 
 /* Leaving setup throws the session away; leaving a running one only hides it,
-   because the clock is still the truth and the person is still running. */
+   because the clock is still the truth and the person is still running. A
+   reveal is setup with a session drawn on it, so it goes the same way. */
 function csnDismiss() {
-  if (CARDIO_SES?.state === "setup") { CARDIO_SES = null; csnSave(); }
+  if (CARDIO_SES?.state === "setup" || CARDIO_SES?.state === "reveal") { CARDIO_SES = null; csnSave(); }
   closeCardioSession();
+}
+
+/* Everything between "this is the session" and the clock running, in one place,
+   because there are three doors into it now: the plain timer, a generated
+   session, and a whole workout swapped for a cardio one. */
+async function csnStart() {
+  /* The lifting day this session was swapped for stands down now, and only now:
+     see startCardioInsteadOfPlan on why opening a timer is not enough to take
+     somebody's plan away. */
+  if (CARDIO_SES.instead?.planId) await archiveSwappedPlan(CARDIO_SES.instead);
+  CARDIO_SES.state = "live";
+  CARDIO_SES.since = Date.now();
+  CARDIO_SES.startedAt = new Date().toISOString();
+  CARDIO_SES.date = todayStr();
+  csnSave();
+  renderCardioStage();
+}
+
+/* Gated exactly where generateWorkout is gated, and for the same reason:
+   building a session out of a library is the thing he is hired for. Picking an
+   activity and starting a clock is not, and stays free. */
+async function csnGenerate() {
+  const a = csnAct();
+  if (!await requirePremium()) return;
+  /* Re-read after the await: the paywall is a whole screen and a person can
+     close this sheet behind it. */
+  if (!CARDIO_SES || CARDIO_SES.state !== "setup" || CARDIO_SES.act !== a.key) return;
+  const btn = $("csnGen");
+  if (btn) { btn.disabled = true; btn.textContent = "Building it\u2026"; }
+  const pref = CARDIO_SES.pref || defaultActivityPref();
+  const plan = a.training ? await buildGuidedPlan(a, CARDIO_SES.minutes) : null;
+  const card = a.training ? null : await buildCardioCard(a, pref);
+  if (!CARDIO_SES || CARDIO_SES.state !== "setup" || CARDIO_SES.act !== a.key) return;
+  if (!plan && (!card || card.missing)) {
+    /* Says which one came up empty rather than "something went wrong", because
+       the person is standing in front of that machine. */
+    ACT_LIB_NOTES[a.key] = card?.note
+      || `I have nothing built for ${actTitle(a).toLowerCase()} yet. Start the clock and I'll count the minutes.`;
+    renderCardioStage();
+    return;
+  }
+  CARDIO_SES.pref = pref;
+  CARDIO_SES.plan = plan;
+  CARDIO_SES.card = card;
+  /* The session's own length wins over the stepper. The library wrote 25 minutes
+     on an interval run because that is what the intervals add up to. */
+  CARDIO_SES.minutes = Number(plan?.minutes || card?.minutes) || CARDIO_SES.minutes;
+  CARDIO_SES.state = "reveal";
+  csnSave();
+  renderCardioStage();
 }
 
 function renderCardioStage() {
@@ -20214,54 +20908,93 @@ function renderCardioStage() {
   clearInterval(csnTick); csnTick = null;
 
   if (CARDIO_SES.state === "setup") {
+    const recs = recommendedActivities(MY_PROFILE);
+    const isRec = recs.some((r) => r.key === a.key);
+    const pref = CARDIO_SES.pref || defaultActivityPref();
+    /* Anything with a library behind it can be generated. Other cannot, and
+       that is the honest state of it: a clock and a minutes field. */
+    const canGenerate = !!(a.cardio || a.training);
+    const libNote = a.cardio ? (ACT_LIB_NOTES[a.key] || "") : "";
     stage.innerHTML = `
       <div class="csn-head">
         <h2>${todaySessions().length ? "Add a session" : "Start an activity"}</h2>
         <button type="button" class="csn-x" id="csnX" aria-label="Close">${icon("close", 18)}</button>
       </div>
-      <div class="csn-grid">
-        ${activitiesByHabit(ME).map((x) => `<button type="button" class="csn-act${x.key === a.key ? " on" : ""}" data-act="${x.key}">
-          ${icon(x.ico, 19)}<span>${escapeHtml(x.label)}</span>
-        </button>`).join("")}
-        ${/* A lift is the one kind of session this sheet cannot run, because it
-              is a plan and not a clock. It is still a kind, and a day that
-              already holds a yoga class most often wants this one next, so it
-              is offered here and hands off to the screen that builds plans. */ ""}
-        <button type="button" class="csn-act csn-act-wide" id="csnLift">
-          ${icon("dumbbell", 19)}<span>${TODAY_WORKOUT && !TODAY_WORKOUT.archived ? "Open today\u2019s workout" : "Lifting workout"}</span>
-        </button>
-      </div>
-      ${a.training
-        ? `<p class="csn-guided">${icon("wand", 15)} <span>Guided ${escapeHtml(a.label)} session, built from the ${escapeHtml(a.label)} library at your level.</span></p>`
-        : a.cardio
-        ? `<p class="csn-guided">${icon("wand", 15)} <span>A named ${escapeHtml(a.label.toLowerCase())} session from the cardio library, picked for how long you have.</span></p>`
-        : ""}
-      ${/* The named session a whole-workout swap sent them here with, which is
-            more specific than the line above: "8 rounds of 1 minute hard" is
-            what makes this that session rather than a run of that length. Both
-            can show, because one says where the session came from and the other
-            says what it actually is. */ ""}
+      ${/* The same card the workout tab opens on, and for the same reason. An
+            eyebrow, what it is, one line about why, his face, and the two
+            things you can do about it. Choosing a run and choosing a lift is
+            the same decision made about different work, so it is the same
+            card. The knobs sit inside it rather than under the list, because
+            they belong to THIS session and not to the menu. */ ""}
+      <section class="act-hero">
+        <div class="act-hero-words">
+          <p class="act-eyebrow">${isRec ? "Recommended for you" : "Your pick"}</p>
+          <h3>${escapeHtml(actTitle(a))}</h3>
+          <p class="act-why">${escapeHtml(activityWhy(a, MY_PROFILE, isRec))}</p>
+        </div>
+        <div class="act-hero-face">${robotFaceSVG(56, "", { bust: true })}</div>
+        ${canGenerate ? `
+        <div class="act-knob act-knob-seg">
+          <div class="csn-dur-k">How hard</div>
+          <div class="act-seg" role="group" aria-label="How hard">
+            ${ACT_PREFS.map((p) => `<button type="button" class="${p.key === pref ? "on" : ""}" data-pref="${p.key}">${p.label}</button>`).join("")}
+          </div>
+          <p class="act-seg-note">${a.training
+            ? "Sets how long I build the class for."
+            : "Picks the session. The session brings its own minutes."}</p>
+        </div>` : ""}
+        <div class="act-knob act-knob-dur">
+          <div class="csn-dur-k">How long</div>
+          <div class="csn-dur-row">
+            <button type="button" class="round-btn" data-step="-5" aria-label="Five minutes less">&minus;</button>
+            <div class="csn-dur-v">${CARDIO_SES.minutes}<i>min</i></div>
+            <button type="button" class="round-btn" data-step="5" aria-label="Five minutes more">+</button>
+          </div>
+          <div class="csn-presets">
+            ${CSN_PRESETS.map((m) => `<button type="button" class="csn-preset${m === CARDIO_SES.minutes ? " on" : ""}" data-preset="${m}">${m}</button>`).join("")}
+          </div>
+        </div>
+        <div class="act-hero-acts">
+          ${canGenerate ? `<button type="button" class="btn-primary" id="csnGen">${icon("wand", 17)} Build my ${escapeHtml(actNoun(a))}</button>` : ""}
+          <button type="button" class="btn-secondary" id="csnGo">${icon("play", 17)} Just start the clock</button>
+        </div>
+      </section>
+      ${/* What the library actually has for this one, said before anybody presses
+            anything. A machine with no session in it says so here rather than
+            after a generate that came back with a run. */ ""}
+      ${libNote ? `<p class="csn-guided">${icon("info", 15)} <span>${escapeHtml(libNote)}</span></p>` : ""}
       ${CARDIO_SES.note ? `<p class="csn-guided">${icon("run", 15)} <span>${escapeHtml(CARDIO_SES.note)}</span></p>` : ""}
-      <div class="csn-dur">
-        <div class="csn-dur-k">How long</div>
-        <div class="csn-dur-row">
-          <button type="button" class="round-btn" data-step="-5" aria-label="Five minutes less">&minus;</button>
-          <div class="csn-dur-v">${CARDIO_SES.minutes}<i>min</i></div>
-          <button type="button" class="round-btn" data-step="5" aria-label="Five minutes more">+</button>
-        </div>
-        <div class="csn-presets">
-          ${CSN_PRESETS.map((m) => `<button type="button" class="csn-preset${m === CARDIO_SES.minutes ? " on" : ""}" data-preset="${m}">${m}</button>`).join("")}
-        </div>
-      </div>
-      <div class="csn-foot">
-        <button type="button" class="btn-primary" id="csnGo">${icon("play", 18)} Begin ${escapeHtml(a.label.toLowerCase())}</button>
-      </div>`;
+      <p class="act-q">What do you want to do?</p>
+      ${ACT_GROUPS.map((g) => {
+        const list = CARDIO_ACTS.filter((x) => (x.venue || null) === g.venue);
+        if (!list.length) return "";
+        return `
+          <p class="act-group">${escapeHtml(g.head)}</p>
+          <div class="ob-styles act-styles">
+            ${list.map((x) => `<button type="button" class="ob-style${x.key === a.key ? " on" : ""}" data-act="${x.key}">
+              ${recs.some((r) => r.key === x.key) ? `<span class="obs-rec">Recommended</span>` : ""}
+              <span class="obs-ico">${icon(x.ico, 20)}</span>
+              <span class="obs-label">${escapeHtml(actTitle(x))}</span>
+            </button>`).join("")}
+          </div>`;
+      }).join("")}
+      ${/* A lift is the one kind of session this sheet cannot run, because it
+            is a plan and not a clock. It is still a kind, and a day that
+            already holds a yoga class most often wants this one next, so it
+            is offered here and hands off to the screen that builds plans. */ ""}
+      <button type="button" class="ob-style act-lift" id="csnLift">
+        <span class="obs-ico">${icon("dumbbell", 20)}</span>
+        <span class="obs-label">${TODAY_WORKOUT && !TODAY_WORKOUT.archived ? "Open today’s workout" : "Lifting workout"}</span>
+      </button>`;
     $("csnX").onclick = csnDismiss;
     /* Leaves the sheet rather than starting anything: nothing here can build a
        plan, and the choose screen is where that lives. */
     $("csnLift").onclick = () => { csnDismiss(); switchTab("workout"); goWorkoutScreen("choose"); };
     stage.querySelectorAll("[data-act]").forEach((b) => {
       b.onclick = () => { CARDIO_SES.act = b.dataset.act; csnSave(); renderCardioStage(); };
+    });
+    stage.querySelectorAll("[data-pref]").forEach((b) => {
+      b.onclick = () => { CARDIO_SES.pref = b.dataset.pref; csnSave(); renderCardioStage(); };
     });
     stage.querySelectorAll("[data-step]").forEach((b) => {
       b.onclick = () => {
@@ -20272,25 +21005,75 @@ function renderCardioStage() {
     stage.querySelectorAll("[data-preset]").forEach((b) => {
       b.onclick = () => { CARDIO_SES.minutes = Number(b.dataset.preset); csnSave(); renderCardioStage(); };
     });
+    if ($("csnGen")) $("csnGen").onclick = csnGenerate;
+    /* The free door. A clock and nothing else, which is what it says, and the
+       reason it does not quietly build a session first: the generated one is
+       what he is hired for. */
     $("csnGo").onclick = async () => {
-      /* The lifting day this session was swapped for stands down now, and only
-         now: see startCardioInsteadOfPlan on why opening the timer is not
-         enough to take somebody's plan away. */
-      if (CARDIO_SES.instead?.planId) await archiveSwappedPlan(CARDIO_SES.instead);
-      /* Built before the clock starts, so the first move is on screen the moment
-         it does. A training without a library just gets the timer. */
-      CARDIO_SES.plan = a.training ? await buildGuidedPlan(a, CARDIO_SES.minutes) : null;
-      /* The other half of "a training without a library just gets the timer":
-         cardio has a library now, so a run arrives with a name and an effort
-         instead of a stopwatch and a hope. */
-      CARDIO_SES.card = a.training ? null : await buildCardioCard(a, CARDIO_SES.minutes);
-      CARDIO_SES.state = "live";
-      CARDIO_SES.since = Date.now();
-      CARDIO_SES.startedAt = new Date().toISOString();
-      CARDIO_SES.date = todayStr();
-      csnSave();
-      renderCardioStage();
+      /* The same tick a set gets: something has started. */
+      sfx.play("set");
+      CARDIO_SES.plan = null;
+      CARDIO_SES.card = null;
+      await csnStart();
     };
+    /* The honest word about this machine arrives after the library loads, so it
+       is asked for here and paints itself when it lands. */
+    loadActivityNote(a);
+    return;
+  }
+
+  /* The session, before the clock. Same card as the picker, because it is the
+     same card: an eyebrow, what it is, the line about it, and the buttons. What
+     changes is that the title is now the library's own name for the session
+     rather than the name of the activity, which is the whole point of having
+     generated one. */
+  if (CARDIO_SES.state === "reveal") {
+    const card = CARDIO_SES.card, plan = CARDIO_SES.plan;
+    const name = card?.name
+      || (plan ? `${plan.label}${plan.style?.label ? `, ${plan.style.label}` : ""}` : actTitle(a));
+    const structure = card
+      ? (card.structure || `${card.minutes} min, held at one effort`)
+      : plan
+        ? `${plan.moves.length} moves${plan.rounds > 1 ? `, ${plan.rounds} rounds` : ""}`
+        : "";
+    const cue = card?.cue || (plan?.notes || [])[0] || "";
+    const named = (v) => { const t = String(v || ""); return t ? t[0].toUpperCase() + t.slice(1) : ""; };
+    const facts = card
+      ? [["Minutes", `${card.minutes}`], ["Effort", `${card.effort} of 10`], ["Level", named(card.level)]]
+      : [["Minutes", `${plan.minutes}`], ["Moves", `${plan.moves.length}`], ["Level", named(plan.level)]];
+    stage.innerHTML = `
+      <div class="csn-head">
+        <h2>Your session</h2>
+        <button type="button" class="csn-x" id="csnX" aria-label="Back">${icon("chevronLeft", 18)}</button>
+      </div>
+      <section class="act-hero">
+        <div class="act-hero-words">
+          <p class="act-eyebrow">${escapeHtml(actTitle(a))}</p>
+          <h3>${escapeHtml(name)}</h3>
+          ${structure ? `<p class="act-why">${escapeHtml(structure)}</p>` : ""}
+        </div>
+        <div class="act-hero-face">${robotFaceSVG(56, "", { bust: true })}</div>
+        <div class="act-facts">
+          ${facts.filter(([, v]) => v).map(([k, v]) => `<div class="act-fact"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join("")}
+        </div>
+        <div class="act-hero-acts">
+          <button type="button" class="btn-primary" id="csnRevealGo">${icon("play", 17)} Start it</button>
+          <button type="button" class="btn-secondary" id="csnRevealBack">Something else</button>
+        </div>
+      </section>
+      ${cue ? `<p class="csn-guided">${icon("wand", 15)} <span>${escapeHtml(cue)}</span></p>` : ""}
+      ${card?.note ? `<p class="csn-guided">${icon("info", 15)} <span>${escapeHtml(card.note)}</span></p>` : ""}
+      ${plan ? `<div class="act-moves">
+        ${plan.moves.slice(0, 8).map((m, i) => `<div class="act-move">
+          <span class="act-move-n">${i + 1}</span>
+          <span class="act-move-b"><b>${escapeHtml(m.name)}</b><i>${m.seconds}s${m.perSide ? " a side" : ""}</i></span>
+        </div>`).join("")}
+        ${plan.moves.length > 8 ? `<p class="act-move-more">and ${plan.moves.length - 8} more</p>` : ""}
+      </div>` : ""}`;
+    const back = () => { CARDIO_SES.state = "setup"; csnSave(); renderCardioStage(); };
+    $("csnX").onclick = back;
+    $("csnRevealBack").onclick = back;
+    $("csnRevealGo").onclick = csnStart;
     return;
   }
 
@@ -20309,6 +21092,13 @@ function renderCardioStage() {
         <div class="csn-move" id="csnMove"></div>`
           : CARDIO_SES.card ? `<div class="csn-round">${escapeHtml(cardioEffortLine(CARDIO_SES.card))}</div>
         <div class="csn-move">${escapeHtml(CARDIO_SES.card.name)}</div>` : ""}
+        ${/* He runs while the clock runs and freezes when it stops. Not on a
+              guided class: a running robot over a held plank would be a
+              picture of the wrong movement, and this app's own rule is that a
+              pretty pose of the wrong thing is a failure. The machines get the
+              same run with the machine's name under him, which is honest about
+              what it is: there is no stair cycle and no rowing cycle either. */ ""}
+        ${a.training ? "" : `<div class="csn-figure${paused ? " paused" : ""}">${robotRunningSVG(a.short || "")}</div>`}
         <div class="csn-live-k">${paused ? "&nbsp;" : CARDIO_SES.plan ? "This move" : "Elapsed"}</div>
         <div class="csn-time" id="csnTime">${csnClock(csnElapsedMs())}</div>
         <div class="csn-of" id="csnOf"></div>
@@ -20328,6 +21118,9 @@ function renderCardioStage() {
       csnSave(); renderCardioStage();
     };
     $("csnEnd").onclick = () => {
+      /* Ending a run is finishing a session, so it gets the session's sound
+         rather than one of its own. */
+      sfx.play("finish");
       CARDIO_SES.accum = csnElapsedMs();
       CARDIO_SES.since = null;
       CARDIO_SES.state = "done";
@@ -20446,7 +21239,7 @@ async function saveCardioSession(mins) {
 function restoreCardioSession() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(CSN_KEY) || "null"); } catch { return; }
-  if (!saved || saved.state === "setup") return;
+  if (!saved || saved.state === "setup" || saved.state === "reveal") return;
   /* Yesterday's forgotten session is not today's workout. */
   if (saved.date && saved.date !== todayStr()) { try { localStorage.removeItem(CSN_KEY); } catch {} return; }
   CARDIO_SES = saved;
@@ -20552,9 +21345,9 @@ function cardioTargetBand(buckets) {
    this tile and those cards cannot drift apart. */
 function countsAsCardio(exerciseName) {
   if (cardioActivityOf(exerciseName)) return true;
-  const n = (exerciseName || "").trim().toLowerCase();
-  return typeof CARDIO_ACTS !== "undefined"
-    && CARDIO_ACTS.some((a) => a.label.toLowerCase() === n);
+  /* Through actForExerciseName rather than over the labels, so a row written
+     as "Row" before the rowing machine took its full name still counts. */
+  return typeof CARDIO_ACTS !== "undefined" && !!actForExerciseName(exerciseName);
 }
 
 function cardioMinutesInWeek(name, weekStart) {
@@ -22419,7 +23212,7 @@ function todaySessions() {
     if (l.email !== MY_EMAIL || l.entry_date !== date) continue;
     if (!l.duration_min || !countsAsCardio(l.exercise_name)) continue;
     const name = (l.exercise_name || "").trim();
-    const act = CARDIO_ACTS.find((x) => x.label.toLowerCase() === name.toLowerCase());
+    const act = actForExerciseName(name);
     out.push({
       key: `log:${l.id}`, ico: act?.ico || "run", state: "done",
       label: name,
@@ -22432,7 +23225,7 @@ function todaySessions() {
 
   /* What has not happened yet goes after the record of what has. An activity
      on the clock first, because it is the one with a number moving on it. */
-  if (CARDIO_SES && CARDIO_SES.state !== "setup" && (!CARDIO_SES.date || CARDIO_SES.date === date)) {
+  if (csnRunning() && (!CARDIO_SES.date || CARDIO_SES.date === date)) {
     const a = csnAct();
     out.push({
       key: "activity:live", ico: a.ico, state: "running", label: a.label,
@@ -23345,7 +24138,12 @@ function tunedCardioCategory() {
    minutes field, and that is honest: this app cannot coach a swim. */
 const CARDIO_ACT_FOR_MODE = {
   running: "run", walking: "walk", hiking: "walk", cycling: "cycle",
-  rowing: "row", hiit: "hiit", swimming: "other", elliptical: "other", stairs: "other",
+  /* Elliptical and stairs used to land on Other, because there was no activity
+     for either and a clock was the honest answer. The machines gave them one,
+     so a swap to Stair Intervals now opens the stair master rather than a
+     stopwatch with no idea what it is timing. Swimming still lands on Other,
+     because this app still cannot coach a swim. */
+  rowing: "row", hiit: "hiit", swimming: "other", elliptical: "elliptical", stairs: "stairs",
 };
 
 /* Up to four, and deliberately no more. This is a choice between genuinely
@@ -23582,21 +24380,26 @@ async function applySessionSwap(workout, ctx) {
    clock actually starts, in csnGo. */
 function startCardioInsteadOfPlan(s, ctx) {
   // A session already running is the truth and outranks this; show it instead.
-  if (CARDIO_SES && CARDIO_SES.state !== "setup") { openCardioSession(); return; }
+  if (csnRunning()) { openCardioSession(); return; }
   if (ctx.fromReveal) closeGenOverlay();
   const planned = ctx.date === todayStr() && TODAY_WORKOUT?.id && !TODAY_WORKOUT.archived
     ? { planId: TODAY_WORKOUT.id, focus: TODAY_WORKOUT.focus }
     : null;
   CARDIO_SES = {
-    state: "setup",
+    /* Straight to the reveal, carrying the session itself rather than a
+       sentence about it. Offering "Run Intervals" and then handing over a plain
+       25 minute clock loses the whole session, which is the structure and the
+       effort and not the length; and it used to be worse than that, because the
+       setup screen rebuilt a card by closeness to the minutes and could hand
+       back a different session than the one the sheet offered. Now what was
+       offered is what starts. */
+    state: "reveal",
     act: CARDIO_ACT_FOR_MODE[s.mode] || "other",
     minutes: s.minutes,
+    pref: defaultActivityPref(),
     accum: 0,
     since: null,
-    /* What the session actually is, carried onto the setup screen. Offering
-       "Run Intervals" and then handing over a plain 25 minute clock loses the
-       entire session, which is the structure and the effort, not the length. */
-    note: `${s.name}. ${s.structure ? s.structure + ". " : ""}${s.cue || ""}`.trim(),
+    card: { name: s.name, effort: s.effort, cue: s.cue, structure: s.structure, minutes: s.minutes, level: s.level || "" },
     instead: planned,
   };
   csnSave();
@@ -24108,6 +24911,10 @@ async function endLive() {
 
 function saveSessionToStorage() {
   if (!SESSION) return;
+  /* A standalone stretch is not something to come back to. It writes no rows
+     and banks no day, and a stored copy would only give resumeSessionIfAny
+     something to offer as an unfinished workout. */
+  if (SESSION.standaloneStretch) return;
   // A banked workout is not something to come back to. Writing it here is what
   // made the tab offer "Resume" for a workout that was already finished.
   if (SESSION.finished) { clearSessionStorage(); return; }
@@ -24469,6 +25276,9 @@ function paintRest() {
   if (s.ready && REST_BUZZED_AT !== SESSION.restStartedAt) {
     REST_BUZZED_AT = SESSION.restStartedAt;
     buzz([18, 60, 18]);
+    /* The chime carries the same message as the buzz for a phone sitting on a
+       bench rather than in a hand, which is where it usually is by now. */
+    sfx.play("restEnd");
   }
   /* Standing about well past the plan is the moment he has the most to say,
      and it is once per rest however long you stay: the buzz already marks
@@ -24508,6 +25318,295 @@ function stopRestTicker() {
 function buzz(pattern) {
   try { navigator.vibrate?.(pattern); } catch { /* unsupported, nothing to do */ }
 }
+
+/* ---- Unio out loud ----
+
+   Every line he says was written to be read aloud and until now nobody could
+   hear one. Two halves, deliberately separate: the VOICE reads his words, the
+   EFFECTS mark what the app just did. Somebody who wants the ticks without a
+   robot talking at them in a busy gym is the normal case, not the exception,
+   so they are two switches. Both live on the phone rather than on the account,
+   the same as the coach's mute above: sound is a fact about where you are
+   standing, not about who you are.
+
+   speechSynthesis rather than a plugin. It is in Safari, in Chrome and in
+   WKWebView, so the iOS shell gets this without package.json growing a
+   dependency for something the runtime already has. Nothing in here throws
+   when the API is missing; it goes quiet, which is the right failure for a
+   feature nobody should be able to depend on.
+
+   No audio files. Five effects built out of oscillators, because a binary
+   asset is a thing to host, cache, version and ship, and a tick is four lines
+   of maths. */
+
+const VOICE_OFF_KEY = "ft-voice-off";
+const SFX_OFF_KEY = "ft-sfx-off";
+
+/* Absence means on. Both start on for a new phone, because a feature nobody
+   discovers is a feature nobody has, and the switch to turn him off is two
+   taps away in Setup. */
+function voiceOff() {
+  try { return localStorage.getItem(VOICE_OFF_KEY) === "1"; } catch { return false; }
+}
+function setVoiceOff(off) {
+  try { off ? localStorage.setItem(VOICE_OFF_KEY, "1") : localStorage.removeItem(VOICE_OFF_KEY); }
+  catch { /* private mode: it stays on for this run and that is fine */ }
+  if (off) voiceStop();
+}
+function sfxOff() {
+  try { return localStorage.getItem(SFX_OFF_KEY) === "1"; } catch { return false; }
+}
+function setSfxOff(off) {
+  try { off ? localStorage.setItem(SFX_OFF_KEY, "1") : localStorage.removeItem(SFX_OFF_KEY); }
+  catch { /* same */ }
+}
+
+/* iOS will not start audio nobody asked for, and neither will Chrome: the
+   first note and the first spoken line have to happen inside a gesture or they
+   are dropped with no error at all. So the first touch anywhere arms both
+   halves, on capture so it lands before the button's own handler runs.
+
+   This is also what keeps him quiet on page load without a rule about it. A
+   line typing on a screen nobody has touched yet cannot make a sound, whatever
+   called it, so a reload that lands mid-onboarding is silent and the first
+   thing he says out loud is the intro, after the tap on the name screen. */
+let AUDIO_ARMED = false;
+function armAudio() {
+  if (AUDIO_ARMED) return;
+  AUDIO_ARMED = true;
+  /* Built inside the gesture rather than at the first tick. A context created
+     later starts suspended and the sound that created it is the one that gets
+     lost. */
+  sfxContext();
+}
+["pointerdown", "touchend", "keydown"].forEach((ev) => {
+  document.addEventListener(ev, armAudio, { capture: true, once: true, passive: true });
+});
+
+/* ---- His voice ----
+
+   Deterministic, and it has to be. "Whatever getVoices hands back first" is a
+   different robot on every machine and on a Mac it is frequently Albert, who
+   sounds like a 1984 answering machine. Named preferences first, then the best
+   remaining English voice that is not one of the novelty voices Apple has
+   shipped for forty years, then whatever English there is.
+
+   Local voices win ties over network ones. A cloud voice is often smoother and
+   it is also useless in a basement gym, and a line that arrives four seconds
+   after the set it was about is worse than a slightly flatter one on time. */
+const VOICE_WANTED = [
+  "Samantha", "Ava", "Allison", "Susan",                 // en-US, Apple, natural
+  "Daniel", "Serena", "Kate",                            // en-GB, Apple
+  "Google US English", "Google UK English Male",         // Chrome
+  "Microsoft Aria Online (Natural) - English (United States)",
+];
+
+/* The macOS joke voices. They are real entries in getVoices with real en-US
+   lang tags, so nothing but a list keeps one of them out of the job. */
+const VOICE_NOVELTY = new Set([
+  "Albert", "Bad News", "Bahh", "Bells", "Boing", "Bubbles", "Cellos",
+  "Deranged", "Good News", "Hysterical", "Jester", "Junior", "Kathy",
+  "Organ", "Princess", "Ralph", "Superstar", "Trinoids", "Whisper",
+  "Wobble", "Zarvox", "Fred", "Agnes", "Victoria", "Bruce", "Vicki",
+]);
+
+/* Confident and dry, which is a pitch question more than a rate one. Below 1
+   is where a voice stops sounding delighted with itself; 0.92 is as low as the
+   Apple voices go before they start sounding tired. The rate is a hair over
+   default so he reads a line as somebody who already knew it rather than
+   somebody being careful, and the volume sits under 1 so he is a voice in the
+   room and not an announcement. */
+const VOICE_RATE = 1.02;
+const VOICE_PITCH = 0.92;
+const VOICE_VOLUME = 0.95;
+
+/* Him saying the same words from the same place again within twenty seconds is
+   a repaint, not a second thought. renderHero and the onboarding chrome both
+   run on plenty of things that are not somebody arriving at a screen. */
+const VOICE_REPEAT_MS = 20000;
+
+let VOICE_PICKED = null;
+let VOICE_HOOKED = false;
+const VOICE_SAID = new Map();   // where he spoke from -> the words and when
+
+function voiceApi() {
+  try { return typeof speechSynthesis === "undefined" ? null : speechSynthesis; }
+  catch { return null; }
+}
+
+function voiceRank(v) {
+  const lang = (v.lang || "").replace("_", "-");
+  const byLang = lang === "en-US" ? 0 : lang === "en-GB" ? 1 : 2;
+  return byLang * 2 + (v.localService === false ? 1 : 0);
+}
+
+function pickVoice(list) {
+  const english = (list || []).filter((v) => /^en([-_]|$)/i.test(v.lang || ""));
+  if (!english.length) return null;
+  for (const want of VOICE_WANTED) {
+    const hit = english.find((v) => v.name === want);
+    if (hit) return hit;
+  }
+  const usable = english
+    .filter((v) => !VOICE_NOVELTY.has(v.name || ""))
+    /* Name breaks the tie rather than list order, so two phones with the same
+       voices installed pick the same one and a bug reported on one of them is
+       reproducible on the other. */
+    .sort((a, b) => voiceRank(a) - voiceRank(b) || (a.name || "").localeCompare(b.name || ""));
+  return usable[0] || english[0];
+}
+
+/* Safari and Chrome both hand back an empty list on the first ask and fill it
+   in a moment later, so the choice is made once and remembered, and the list
+   arriving late is hooked rather than polled. A line spoken before it lands
+   goes out in the browser default; every one after it is him. */
+function voiceChoice() {
+  if (VOICE_PICKED) return VOICE_PICKED;
+  const synth = voiceApi();
+  if (!synth || typeof synth.getVoices !== "function") return null;
+  const list = synth.getVoices() || [];
+  if (!list.length) {
+    if (!VOICE_HOOKED) {
+      VOICE_HOOKED = true;
+      try {
+        synth.addEventListener("voiceschanged", () => {
+          VOICE_PICKED = pickVoice(synth.getVoices() || []);
+        });
+      } catch { /* no event, no second chance, the default will do */ }
+    }
+    return null;
+  }
+  VOICE_PICKED = pickVoice(list);
+  return VOICE_PICKED;
+}
+
+function voiceStop() {
+  try { voiceApi()?.cancel(); } catch { /* nothing was speaking */ }
+}
+
+/* `from` is where the line is being spoken from, which is what the repeat
+   guard is keyed on together with the words. `interrupt` cancels whatever he
+   is part way through; without it a line arriving while he is talking is
+   DROPPED rather than queued, because a backlog of lines about sets you
+   finished a minute ago is the thing that makes a talking app unbearable. */
+function voiceSay(text, { interrupt = true, from = "", gap = VOICE_REPEAT_MS } = {}) {
+  if (!AUDIO_ARMED || voiceOff()) return;
+  const synth = voiceApi();
+  if (!synth || typeof SpeechSynthesisUtterance === "undefined") return;
+  const line = String(text || "").replace(/\s+/g, " ").trim();
+  if (!line) return;
+
+  const seen = VOICE_SAID.get(from);
+  if (seen && seen.line === line && Date.now() - seen.at < gap) return;
+  VOICE_SAID.set(from, { line, at: Date.now() });
+
+  if (interrupt) voiceStop();
+  else if (synth.speaking || synth.pending) return;
+
+  const u = new SpeechSynthesisUtterance(line);
+  const v = voiceChoice();
+  if (v) { u.voice = v; u.lang = v.lang; }
+  u.rate = VOICE_RATE;
+  u.pitch = VOICE_PITCH;
+  u.volume = VOICE_VOLUME;
+  /* cancel() and speak() in the same turn is the one thing WebKit will not do:
+     the new utterance joins the queue the cancel is still draining and is
+     thrown away without an error to show for it. One tick of the event loop
+     between them is the entire fix, and it has to be a real timer rather than
+     a microtask. */
+  setTimeout(() => {
+    try { synth.speak(u); } catch { /* the device took the voice away */ }
+  }, interrupt ? 60 : 0);
+}
+
+const voice = { say: voiceSay, stop: voiceStop };
+
+/* ---- The effects ----
+
+   Five, all under 400ms, all distinct from each other by shape rather than by
+   timbre: one note, two notes up, three notes up, a struck pair and a low tap.
+   Somebody can tell those apart with the phone in a pocket, which is the whole
+   job. */
+let SFX_CTX = null;
+function sfxContext() {
+  if (SFX_CTX) {
+    /* iOS suspends the context whenever the app goes to the background or a
+       call arrives, and it comes back suspended. Every sound asks. */
+    if (SFX_CTX.state === "suspended") { try { SFX_CTX.resume(); } catch { /* it will not */ } }
+    return SFX_CTX;
+  }
+  const Ctor = typeof AudioContext !== "undefined" ? AudioContext
+    : typeof webkitAudioContext !== "undefined" ? webkitAudioContext : null;
+  if (!Ctor) return null;
+  try { SFX_CTX = new Ctor(); } catch { return null; }
+  return SFX_CTX;
+}
+
+/* One note: a shape, where it starts, where it ends up, how long it rings and
+   how loud. A 6ms attack rather than none, because a square edge on the front
+   of a note is a click, and five clicks a set is what makes an app sound
+   cheap. Exponential ramps rather than linear, because that is what the ear
+   hears as a note decaying rather than as a volume slider moving. */
+function sfxNote(ctx, at, n) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const secs = n.ms / 1000;
+  osc.type = n.type || "triangle";
+  osc.frequency.setValueAtTime(n.hz, at);
+  if (n.hz2) osc.frequency.exponentialRampToValueAtTime(n.hz2, at + secs);
+  gain.gain.setValueAtTime(0.0001, at);
+  gain.gain.exponentialRampToValueAtTime(n.peak, at + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + secs);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(at);
+  osc.stop(at + secs + 0.02);
+}
+
+const SFX_KIT = {
+  /* Logged. One note, high and short: the sound of a thing landing, not of a
+     thing being celebrated. It happens forty times a workout. */
+  set: [{ at: 0, hz: 880, ms: 90, peak: 0.16 }],
+  /* A rest clock started. Deliberately the quietest thing in here and low
+     enough to sit underneath the tick it always follows. It is information. */
+  restStart: [{ at: 0, hz: 330, ms: 70, peak: 0.05, type: "sine" }],
+  /* Rest is up. A fifth, rung rather than struck, and the longest of the five,
+     because this is the one that arrives while somebody is standing about not
+     looking at the phone. */
+  restEnd: [
+    { at: 0, hz: 784, ms: 300, peak: 0.10, type: "sine" },
+    { at: 0.02, hz: 1175, ms: 320, peak: 0.07, type: "sine" },
+  ],
+  /* Done. Two notes up a fourth. Finished, not triumphant: most workouts are
+     not a record, and a fanfare every time devalues the one that is. */
+  finish: [
+    { at: 0, hz: 587, ms: 130, peak: 0.15 },
+    { at: 0.12, hz: 880, ms: 240, peak: 0.16 },
+  ],
+  /* A record. Three notes up a major triad and the last one rings on. This is
+     the only sound in the app allowed to sound pleased with itself. */
+  pr: [
+    { at: 0, hz: 659, ms: 100, peak: 0.15 },
+    { at: 0.09, hz: 831, ms: 100, peak: 0.15 },
+    { at: 0.18, hz: 988, ms: 200, peak: 0.17 },
+  ],
+};
+
+/* `delay` is in seconds and is scheduled on the audio clock rather than with a
+   timer, so a pair of sounds meant to land 200ms apart actually do, on a phone
+   busy re-rendering a session screen. */
+function sfxPlay(name, delay = 0) {
+  if (!AUDIO_ARMED || sfxOff()) return;
+  const kit = SFX_KIT[name];
+  if (!kit) return;
+  const ctx = sfxContext();
+  if (!ctx) return;
+  try {
+    const t0 = ctx.currentTime + delay + 0.01;
+    for (const n of kit) sfxNote(ctx, t0 + n.at, n);
+  } catch { /* the device took the audio away mid-set, nothing to be done */ }
+}
+
+const sfx = { play: sfxPlay };
 
 /* Rest between sets is recorded, not just displayed: it is the honest signal
    that a workout took real time, which is what makes a partner's log credible. */
@@ -24793,7 +25892,7 @@ function pickQuip(key) {
    Everything else is odds, and the odds are high: Mo asked for a lot more of
    him, so the quiet beats are the exception now rather than the rule. */
 const QUIP_ALWAYS = new Set(["pr", "start"]);
-const QUIP_ODDS = { set: 0.92, lastSet: 1, restLong: 1, nextExercise: 1, rest: 0.75, warmup: 0.8, cooldown: 0.8, idle: 1 };
+const QUIP_ODDS = { set: 0.92, lastSet: 1, restLong: 1, nextExercise: 1, rest: 0.75, warmup: 0.8, cooldown: 0.8, stretch: 0.8, idle: 1 };
 /* Thirty seconds between any two lines, up from nine. Nine was set when the
    ask was "a lot more often" and it turned out to be too much: he was
    commenting on a rest that had barely started. Mo, on his phone: space them
@@ -25067,6 +26166,11 @@ function decodeEntities(str) {
    system to stop animating things. */
 function typeQuip(target, line, done) {
   if (!target) { done(); return; }
+  /* Both bubbles come through here, the one in a session and the one on Home,
+     and both are him talking. Above the reduced motion branch on purpose: a
+     person who turned animation off still gets the line read out. Keyed on the
+     class because neither bubble has an id, they are built fresh every time. */
+  voice.say(line, { from: target.className || "quip" });
   if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
     target.textContent = line;
     done();
@@ -25108,7 +26212,7 @@ function startQuipBeat() {
     // Something he said recently still counts as him having spoken.
     if (Date.now() - QUIP_LAST_AT < QUIP_BEAT_MS - 500) return;
     if (SESSION.phase === "warmup") sayQuip("warmup");
-    else if (SESSION.phase === "cooldown") sayQuip("cooldown");
+    else if (SESSION.phase === "cooldown") sayQuip(SESSION.standaloneStretch ? "stretch" : "cooldown");
     else if (SESSION.restStartedAt) sayQuip("rest");
     else sayQuip("idle");
   }, 2500);
@@ -25151,6 +26255,9 @@ function celebrateSet(ei, setIdx) {
     ? `Set ${setIdx + 1} logged: ${w} lb × ${reps}`
     : `Set ${setIdx + 1} logged: ${reps} reps`);
   const wasPR = maybeAnnouncePR(ex.name, w);
+  /* One sound per set, never two: a record IS the set landing, so the flourish
+     takes the tick's place rather than piling on top of it. */
+  sfx.play(wasPR ? "pr" : "set");
   /* He does not talk over the record pop, which is its own celebration and
      already owns the top of the screen for a moment. The PR line waits for it
      to retract. */
@@ -25321,6 +26428,11 @@ function toggleSet(setIdx) {
     SESSION.setWeights[ei][setIdx] = isNaN(w) ? null : w;
     SESSION.restStartedAt = Date.now();   // rest begins the moment a set lands
     SESSION.restAntic = pickRestAntic();  // and the figure picks what to do with it
+    /* This one always lands on the heels of the set tick, because logging a set
+       IS how a rest starts here: there is no separate "begin resting" tap. Held
+       back a fifth of a second so the two read as two beats, "logged, clock
+       running", instead of one muddy noise. */
+    sfx.play("restStart", 0.22);
   } else {
     SESSION.setWeights[ei][setIdx] = null;
     SESSION.restStartedAt = null;
@@ -25521,8 +26633,13 @@ async function logExerciseSilent(name, weight, reps, sets) {
 let STRETCH_TICKER = null;
 
 function stretchList() {
+  if (!SESSION) return [];
+  /* A stretch started from Recovery carries its own block, because there may
+     be no plan today to read one off. Everything downstream of here is the
+     same code the cool-down runs. */
+  if (SESSION.standaloneStretch) return SESSION.standaloneStretch;
   const mob = planMobility();
-  if (!mob || !SESSION) return [];
+  if (!mob) return [];
   return SESSION.phase === "warmup" ? mob.warmup : SESSION.phase === "cooldown" ? mob.cooldown : [];
 }
 
@@ -25582,6 +26699,9 @@ function jumpToStretch(n) {
 
 function endStretchPhase() {
   if (!SESSION) return;
+  /* Nothing to bank and no workout to complete: a stretch on its own ends by
+     handing the screen back to Recovery. */
+  if (SESSION.standaloneStretch) { endStretchSession(); toast("Stretch done"); return; }
   stopStretchTicker();
   /* Leaving the block leaves its colour behind too. Only renderSession used to
      clear this, and the cool-down branch below never reaches it, so a workout
@@ -25614,7 +26734,10 @@ async function skipStretchPhase() {
   /* Per block. One shared `skipped` flag meant tapping Skip warm-up quietly
      cancelled the cool-down as well, an hour before it was due, and the
      workout ended straight at the summary with no stretching ever offered. */
-  if (was === "warmup" || was === "cooldown") await setStretchSkipped(true, was);
+  /* Only a plan can have a block skipped for the day. A standalone stretch has
+     no plan behind it, and writing this flag would quietly cancel the
+     cool-down on a workout this person has not started yet. */
+  if (!SESSION?.standaloneStretch && (was === "warmup" || was === "cooldown")) await setStretchSkipped(true, was);
   endStretchPhase();
   if (was === "warmup") toast("Warm-up skipped today");
 }
@@ -25669,6 +26792,11 @@ function renderStretchPhase() {
      0:00 while the screen had already moved on. */
   pushLiveActivity();
   const isWarm = SESSION.phase === "warmup";
+  /* The same screen, run on its own from Recovery rather than at the end of a
+     workout. Only the words change: there is no lifting on either side of it,
+     so nothing may say "cool-down", "finish workout" or "your lifts are
+     banked", all of which would be talking about a workout that never ran. */
+  const solo = !!SESSION.standaloneStretch;
   const total = Math.max(1, Number(move.seconds) || 30);
   const left = Math.max(0, total - (Date.now() - (SESSION.stretchStartedAt || Date.now())) / 1000);
   const next = list[i + 1];
@@ -25708,7 +26836,7 @@ function renderStretchPhase() {
           ${list.map((_, n) => `<i class="${n < i ? "done" : n === i ? "now" : ""}"></i>`).join("")}
         </div>
         <div class="sess-where">
-          <span>${isWarm ? "Warm-up" : "Cool-down"} ${i + 1} of ${list.length}</span>
+          <span>${solo ? "Stretch" : isWarm ? "Warm-up" : "Cool-down"} ${i + 1} of ${list.length}</span>
           <span>About ${leftMin} min left</span>
         </div>
         <!-- The name is not a button here: a stretch has nothing to swap or
@@ -25748,10 +26876,10 @@ function renderStretchPhase() {
         ${move.cue ? `<p class="stretch-cue">${escapeHtml(move.cue)}</p>` : ""}
 
         <div class="sess-cta">
-          <button type="button" class="btn-big btn-primary" id="stretchNext">${lastHold ? (isWarm ? "Start lifting" : "Finish workout") : "Next"}</button>
+          <button type="button" class="btn-big btn-primary" id="stretchNext">${lastHold ? (solo ? "That&rsquo;s me done" : isWarm ? "Start lifting" : "Finish workout") : "Next"}</button>
         </div>
-        <button type="button" class="stretch-skip" id="stretchSkipAll">${isWarm ? "Skip warm-up" : "Skip cool-down"}</button>
-        ${isWarm ? "" : `<p class="stretch-note">Your lifts are banked. This is the part that makes tomorrow easier.</p>`}
+        <button type="button" class="stretch-skip" id="stretchSkipAll">${solo ? "Stop here" : isWarm ? "Skip warm-up" : "Skip cool-down"}</button>
+        ${isWarm ? "" : `<p class="stretch-note">${solo ? "Nothing to log and nothing to finish. This is the part that makes tomorrow easier." : "Your lifts are banked. This is the part that makes tomorrow easier."}</p>`}
 
         ${remaining.length ? `<div class="upnext">
           <div class="upnext-label">Up next</div>
@@ -25779,7 +26907,10 @@ function renderStretchPhase() {
      is what prompts him rather than every repaint of the countdown. */
   if (QUIP_STRETCH_AT !== `${SESSION.phase}-${SESSION.stretchIndex}`) {
     QUIP_STRETCH_AT = `${SESSION.phase}-${SESSION.stretchIndex}`;
-    setTimeout(() => sayQuip(isWarm ? "warmup" : "cooldown"), 700);
+    /* The cool-down bank talks about the workout that just ended, so a stretch
+       with no workout behind it gets its own. Same voice, nothing in it that
+       assumes anybody trained today. */
+    setTimeout(() => sayQuip(solo ? "stretch" : isWarm ? "warmup" : "cooldown"), 700);
   }
   mountMotionFigures($("sessionBody"));
   tickTimer();
@@ -26476,6 +27607,9 @@ async function doMarkGymDayDone() {
 async function finishWorkout() {
   if (!SESSION || SESSION.finished) return;   // already banked
   SESSION.finished = true;
+  /* On the tap, not after the writes below. The sound is about what the person
+     just did; whether a row landed is a different question with its own toast. */
+  sfx.play("finish");
   /* Not in closeSessionUI: minimising leaves the workout running, and the Lock
      Screen is exactly where it should still be visible. */
   endLiveActivity();
@@ -27125,6 +28259,10 @@ function openSessionUI() {
   $("sessionPauseBtn").innerHTML = icon("pause", 18);
   $("sessionPauseBtn").onclick = async () => {
     if (!SESSION || SESSION.finished) return;
+    /* Pause or end is a question about a workout. A stretch has one answer, so
+       it is not asked: this stops the paused screen, which talks about sets
+       and holding to end a workout, standing in front of a stretch. */
+    if (SESSION.standaloneStretch) { endStretchSession(); return; }
     if (SESSION.pausedAt) { togglePause(); return; }   // the play icon just resumes
     const choice = await askPauseOrEnd();
     if (choice === "pause") togglePause();
@@ -27143,6 +28281,9 @@ function minimiseSession() {
   // On a finished workout the chevron is the way out, so it means the same as
   // Done rather than re-presenting a banked workout as in progress.
   if (SESSION?.finished) { sessionDone(); return; }
+  /* Same for a stretch: there is no clock worth keeping alive underneath and
+     no paused screen that would make sense for it, so the chevron ends it. */
+  if (SESSION?.standaloneStretch) { endStretchSession(); return; }
   // The clock really does keep counting, which is what the label promises.
   // Banking the elapsed time protects it if the tab is killed; pausing it
   // silently is what made Resume take two taps.
@@ -27583,6 +28724,8 @@ function renderWorkoutTab({ respectMode = false } = {}) {
     renderManualBuildScreen();
   } else if (WORKOUT_MODE === "week") {
     renderWeekPlanner();
+  } else if (WORKOUT_MODE === "recovery") {
+    renderRecoveryScreen();
   } else {
     /* Build Next Workout is the tab, not a screen behind a button. The old
        "Go again / Begin Workout" step was a waiting room: it asked you to
@@ -28331,7 +29474,7 @@ function renderChooseScreen() {
           them, so "generate" keeps meaning one thing. */ ""}
     ${/* A session left running says so, with the clock on it, because the
           alternative is offering to start a second one on top of it. */ ""}
-    ${CARDIO_SES && CARDIO_SES.state !== "setup"
+    ${csnRunning()
       ? optionCard("chooseActivityBtn", "play", `Resume ${csnAct().label.toLowerCase()}`,
           `Running for ${csnClock(csnElapsedMs())}.`, false)
       : optionCard("chooseActivityBtn", "run", "Start an activity",
@@ -28481,31 +29624,34 @@ function renderChooseScreen() {
             ? `<button type="button" class="wkt-btn-solid sm" id="chooseBeginBtn">${partway ? "Resume workout" : "Begin workout"}</button>`
             : `<button type="button" class="wkt-btn-solid sm" id="chooseGenerateBtn">Generate workout</button>`}
           <button type="button" class="wkt-btn-soft sm" id="choosePlanBtn">Plan my own</button>
-          ${CARDIO_SES && CARDIO_SES.state !== "setup"
+          ${csnRunning()
             ? `<button type="button" class="wkt-more" id="chooseActivityBtn">Resume ${escapeHtml(csnAct().label.toLowerCase())}, ${csnClock(csnElapsedMs())} ${icon("chevronRight", 13)}</button>`
             : `<button type="button" class="wkt-more" id="chooseActivityBtn">or start an activity ${icon("chevronRight", 13)}</button>`}
         </div>
       </div>
     </section>`;
 
-  /* Recovery. Not a nag and not a metric: one true sentence about the half of
-     training that happens when you are not training, which is the half people
-     skip. It says nothing about THIS person's sleep because the app cannot see
-     it, and inventing a reading would be worse than saying the general thing
-     plainly. The horizon on the right is drawn, not a photo: a photo would be
-     somebody else's mountain. */
+  /* Recovery. One true sentence about the half of training that happens when
+     you are not training, which is the half people skip, and now a door:
+     Mo asked for the card to do something, so it opens the screen that picks
+     stretches for what was trained and works out the food, water and sleep
+     behind the sentence (renderRecoveryScreen). It still says nothing about
+     THIS person's sleep, because the app cannot see it and inventing a reading
+     would be worse than saying the general thing plainly. The horizon on the
+     right is drawn, not a photo: a photo would be somebody else's mountain. */
   const restCard = `
-    <section class="wkt-rest">
+    <button type="button" class="wkt-rest" id="wktRestBtn">
       <div class="wkt-rest-words">
         <p class="wkt-eyebrow">Recovery</p>
         <h2>Rest well ${icon("leaf", 22)}</h2>
-        <p>Progress happens between workouts. Good sleep, hydration and nutrition keep you${PARTNER_EMAIL ? " both" : ""} moving forward.</p>
+        <p>Progress happens between workouts. Here is what to stretch, eat and drink today.</p>
       </div>
+      <span class="wkt-rest-go" aria-hidden="true">${icon("chevronRight", 18)}</span>
       <div class="wkt-scene" aria-hidden="true">
         ${restSceneSVG()}
         <div class="wkt-scene-words">Same<br>Goals<br>Brighter<br>Days<br><span style="font-size:15px">&#9825;</span></div>
       </div>
-    </section>`;
+    </button>`;
 
   $("workoutContent").innerHTML = `
     ${doneCard}
@@ -28558,11 +29704,496 @@ function renderChooseScreen() {
   const actBtn = $("chooseActivityBtn");
   if (actBtn) actBtn.onclick = () => openCardioSession();
   $("chooseWeekBtn").onclick = () => goWorkoutScreen("week");
+  /* The card said the words and then could not do anything about them. It now
+     opens the screen that can: the stretches for what was trained, and the
+     numbers behind eat, drink and sleep. */
+  $("wktRestBtn").onclick = () => goWorkoutScreen("recovery");
 
   // Every recent chip opens its recap.
   $("workoutContent").querySelectorAll("[data-recap]").forEach((b) => {
     b.onclick = () => openRecap(MY_EMAIL, ME, b.dataset.recap);
   });
+}
+
+/* ---------- The Recovery screen ----------
+
+   Mo, 2026-09-18: the Rest well card should do something. "They can go do some
+   stretching, or get recommendations on food intake to help them reach their
+   goals faster: protein, calories, water, and overall recovery."
+
+   So this screen is the half of training that happens when you are not
+   training, said in numbers about THIS person rather than in general advice
+   anybody could have written: the stretches come from what they actually
+   trained today, and the calories come off their own TDEE and their own goal.
+
+   ALL OF IT IS FREE, deliberately, and there is no hire-me slot anywhere on
+   it. What is paid is what the app COMPUTES for training: the generated
+   workout, the match reading, progress tracking, the photos. This is advice,
+   and charging for "drink water and go to bed" would be the app at its worst.
+
+   Nothing here claims a result. Not "lose two pounds a week", not "recover
+   faster": every line says what supports the goal, because that is the only
+   thing the numbers underneath can honestly stand behind. */
+
+/* The cool-down picker, which is the piece of the engine that already knows
+   how to choose holds for the muscles a session worked. Reused rather than
+   copied: a second pass at "pick two stretches for legs" would drift from the
+   one the session runs, and then the app would recommend one thing at the end
+   of a workout and a different thing an hour later. */
+let mobilityEnginePromise = null;
+function ensureMobilityEngine() {
+  if (!mobilityEnginePromise) {
+    mobilityEnginePromise = import("/mo-knowledge/engine/mobility.mjs")
+      .catch((e) => { console.warn("mobility engine", e); return null; });
+  }
+  return mobilityEnginePromise;
+}
+
+/* Three holds is the block, so the budget is what three of the library's
+   longer statics cost: they run 30 to 40 seconds and most are per side, which
+   moveSeconds doubles. Short enough to actually do standing in a gym. */
+const RECOVERY_STRETCH_SECONDS = 180;
+const RECOVERY_MAX_STRETCHES = 3;
+
+/* What today's training touched, biggest first. The same per-group volume the
+   Body tab reads, so the stretches and the heat map can never disagree about
+   what was trained. */
+function recoveryGroupsToday() {
+  const [start, end] = bodyPeriodRange("today");
+  const vol = computeMuscleVolumeBetween(ME, start, end);
+  return MUSCLE_GROUPS.filter((g) => (vol[g] || 0) > 0).sort((a, b) => (vol[b] || 0) - (vol[a] || 0));
+}
+
+/* The holds themselves. A day with nothing logged still gets a block: with no
+   groups asked for, pickBlock ranks by level and length, which is a perfectly
+   good general stretch and better than an empty card. */
+async function recoveryStretches() {
+  const mob = await ensureMobilityEngine();
+  if (!mob) return null;
+  const groups = recoveryGroupsToday();
+  const lim = MY_PROFILE?.limits && typeof MY_PROFILE.limits === "object" ? MY_PROFILE.limits : {};
+  return mob.pickBlock({
+    kind: "static",
+    groups,
+    budgetSec: RECOVERY_STRETCH_SECONDS,
+    /* A hold that loads a joint they said hurts is the same mistake as a lift
+       that does, and the library tags for it. Passed through rather than
+       ignored, exactly as the session's own cool-down passes it. */
+    hurts: Array.isArray(lim.hurts) ? lim.hurts : [],
+    missing: Array.isArray(lim.missing) ? lim.missing : [],
+    maxMoves: RECOVERY_MAX_STRETCHES,
+    /* Stop once what was trained is covered, the same rule the cool-down uses:
+       filling the last seconds means reaching for a muscle the day never
+       touched. With nothing trained there is nothing to cover, so it fills. */
+    stopAtCoverage: groups.length > 0,
+  });
+}
+
+/* ---- The numbers ----
+
+   Every figure below is either the library's or is computed here with its
+   source named, because a number on a screen nobody can check is a number
+   nobody should trust. The two computed here are protein and water, and both
+   are filed in mo-knowledge/LIBRARY-REQUESTS.md so they can move into
+   knowledge/formulas/ where the rest of this maths lives. */
+
+/* Protein, grams per pound of body weight, by what the goal is doing.
+
+   Source: the ISSN position stand on protein and exercise (Jager et al. 2017),
+   1.4 to 2.0 g/kg/day for anybody training, which is 0.64 to 0.91 g per lb;
+   Morton et al. 2018 (meta-analysis, 49 studies) finds no further gain past
+   about 2.2 g/kg, which is 1.0 g per lb. Helms et al. 2014 recommends the top
+   of the range while in a deficit, since protein is what stops a cut taking
+   muscle along with the fat. Hence: a cut gets 1.0, a build gets 0.9, and
+   everything else 0.8, all inside the range the research supports. */
+const PROTEIN_G_PER_LB = { down: 1.0, flat: 1.0, up: 0.9, none: 0.8 };
+
+/* Water, ounces per pound of body weight. The US National Academies' adequate
+   intake (2005) is 3.7 L a day for men and 2.7 L for women including what food
+   carries, which lands near 0.5 oz per lb for an average adult; the range
+   commonly taught is 0.5 to 0.7. This uses 0.6, the middle, and adds a
+   training day's sweat on top: ACSM's 2007 position stand on exercise and
+   fluid replacement puts losses at roughly 0.4 to 1.2 L an hour, so one
+   session is worth about 16 oz. */
+const WATER_OZ_PER_LB = 0.6;
+const WATER_OZ_PER_SESSION = 16;
+
+/* Sleep. National Sleep Foundation consensus (Hirshkowitz et al. 2015): 7 to 9
+   hours for adults 18 to 64. A range and not a personal number, because the
+   app cannot see anybody's sleep and inventing a reading would be worse than
+   saying the general thing plainly. */
+const SLEEP_RANGE = "7 to 9";
+
+/* Which way this person's goal is pushing the scale, in the vocabulary
+   goal-timeline.mjs speaks. Read from the goal tile's own `claim`, the field
+   that already decides which progress card leads, so the calorie number and
+   the weight chart can never disagree about which way is forward. */
+/* The goal tile this account is actually on. goal_bubble is the modern field
+   and is read first, but plenty of accounts predate it and carry only the
+   title string in profiles.goal and the legacy key on the goal row, and both
+   of those still name a tile. Without this fallback the screen quietly fed
+   maintenance calories to somebody whose whole goal is losing weight, which is
+   the one case where the number being wrong is the point. */
+function recoveryGoalTile() {
+  const byBubble = goalTileFor(MY_PROFILE?.goal_bubble);
+  if (byBubble) return byBubble;
+  const title = String(MY_PROFILE?.goal || "").trim().toLowerCase();
+  const legacy = String(MY_GOAL?.goal_key || "").trim().toLowerCase();
+  return GOAL_TILES.find((t) => t.title.toLowerCase() === title)
+    || (legacy ? GOAL_TILES.find((t) => t.legacy === legacy) : null)
+    || null;
+}
+
+function recoveryDirection() {
+  const claim = recoveryGoalTile()?.claim || null;
+  if (claim === "down") return "lose";
+  if (claim === "up") return "gain";
+  return null;
+}
+
+/* Did anything happen today. A logged gym day counts even when the exercises
+   on it carry no muscles the classifier recognises. */
+function trainedTodayForRecovery() {
+  return !!todayEntryFor(MY_EMAIL)?.gym || recoveryGroupsToday().length > 0;
+}
+
+/* Everything the two food cards need, or a list of what is missing. Nothing is
+   guessed: the formulas refuse without a body, and so does this. */
+function recoveryFuel() {
+  /* The weigh-in first, the onboarding answer second: currentWeightLb is what
+     every other calorie estimate in the app reads, and a number from the scale
+     this week beats a number typed months ago. */
+  const weightLb = currentWeightLb(ME) ?? MY_PROFILE?.weight_lb ?? null;
+  const height_in = MY_PROFILE?.height_in || null;
+  const age = MY_PROFILE?.age || null;
+  const missing = [];
+  if (!weightLb) missing.push("your weight");
+  if (!height_in) missing.push("your height");
+  /* Mifflin-St Jeor carries age as a term and calculateBMR returns null
+     without it, so it is as required as the other two. The brief named only
+     weight and height; the formula disagrees, and the formula does the work. */
+  if (!age) missing.push("your age");
+
+  const claim = recoveryGoalTile()?.claim || "none";
+  const out = {
+    weightLb, height_in, age, missing,
+    direction: recoveryDirection(), tdee: null, calories: null, protein: null, water: null,
+    assumedActivity: !MY_PROFILE?.activity_level, capped: false,
+  };
+
+  /* Water and protein need a body weight and nothing else, so somebody with no
+     height on file still gets two of the four numbers rather than a screen of
+     apologies. Rounded to something a person can aim at: a glass, and five
+     grams. */
+  if (weightLb) {
+    out.water = Math.round((weightLb * WATER_OZ_PER_LB + (trainedTodayForRecovery() ? WATER_OZ_PER_SESSION : 0)) / 4) * 4;
+    out.protein = Math.round((weightLb * (PROTEIN_G_PER_LB[claim] ?? PROTEIN_G_PER_LB.none)) / 5) * 5;
+  }
+  if (missing.length || !FIT_MATH.calculateTDEE) return out;
+
+  out.tdee = FIT_MATH.calculateTDEE({
+    sex: MY_PROFILE?.sex, age, height_in, weightLb,
+    // The library's own default when nobody has answered, named here rather
+    // than left implicit so the card can say which one it used.
+    activity_level: MY_PROFILE?.activity_level || "Moderate",
+  });
+  if (!out.tdee) return out;
+
+  if (!out.direction) { out.calories = out.tdee; return out; }
+  /* estimateGoalTimeline wants something to aim at before it will answer, and
+     what is used here is only its daily target, never its timeline: a date is
+     the goal screen's business. A real remaining change is passed where there
+     is one so the maths is this person's; where there is none the ten pounds
+     is nominal and changes nothing this screen prints, because the daily
+     target does not depend on how far away the target is. */
+  const target = MY_GOAL?.metric === "weight_lb" ? Number(MY_GOAL.target_value) : null;
+  const change = target ? Math.abs(target - weightLb) : 0;
+  const t = FIT_MATH.estimateGoalTimeline({
+    currentWeightLb: weightLb,
+    targetChangeLb: change || 10,
+    direction: out.direction,
+    tdee: out.tdee,
+  });
+  out.calories = t ? t.dailyCalorieTarget : out.tdee;
+  out.capped = !!(t && t.wasCapped);
+  return out;
+}
+
+/* Days trained back to back, ending today or yesterday.
+
+   Deliberately NOT computeStreak, which answers a different question: a streak
+   counts days trained with rest days holding the chain, so eight days with two
+   rest days in the middle reads as a streak of six and says nothing about
+   whether a day off is owed. This counts consecutive days with training on
+   them and stops at the first day without, which is the number this card is
+   about. */
+function trainedDaysInARow(name) {
+  const gym = new Set(entriesFor(name).filter((e) => e.gym).map((e) => e.entry_date));
+  const cursor = new Date(todayStr() + "T00:00:00");
+  if (!gym.has(todayStr())) cursor.setDate(cursor.getDate() - 1);
+  let n = 0;
+  while (gym.has(isoDate(cursor))) { n++; cursor.setDate(cursor.getDate() - 1); }
+  return n;
+}
+
+/* When the app says a day off is due.
+
+   Three is where it starts saying something, and the reason is the engine's
+   own arithmetic rather than a round number: recovery.mjs holds a trained
+   muscle for RECOVERY_HOURS, 48, and the Body tab keeps the same figure in
+   BODY_RECOVERY_HOURS. By the third straight day, whatever was trained on day
+   one has been trained through two of those windows. It is a suggestion in his
+   voice and never a block: this app has always let somebody train anyway. */
+const RECOVERY_DAYS_BEFORE_REST = 3;
+
+/* Whether this screen has already waited once for the formula modules. See
+   renderRecoveryScreen: without it a failed import turns one repaint into an
+   endless chain of them. */
+let RECOVERY_WAITED_FOR_MATH = false;
+
+/* "Chest, shoulders and triceps", with the last comma left off the way a
+   person says it out loud. */
+function listWords(words) {
+  const list = (words || []).filter(Boolean);
+  if (list.length <= 1) return list[0] || "";
+  return `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`;
+}
+
+function renderRecoveryScreen() {
+  $("workoutCardTitle").textContent = "";
+  $("workoutFocusRow").textContent = "";
+  $("workoutCard").classList.add("wkt-flat");
+
+  const trained = trainedTodayForRecovery();
+  const resting = !!todayEntryFor(MY_EMAIL)?.rest_day;
+  /* One line for today, and which one depends on what they actually did: the
+     same sentence read on a day you trained and a day you did nothing is
+     wrong on one of them. Written for the ear, because voice is coming. */
+  const say = trained
+    ? "You trained today. What you do now is what makes it count."
+    : resting
+      ? "Rest day. This is not you skipping something. This is the day working."
+      : "Quiet day so far. Stretch, eat, drink, sleep. That is still training.";
+
+  const fuel = recoveryFuel();
+  const inARow = trainedDaysInARow(ME);
+  const restDue = inARow >= RECOVERY_DAYS_BEFORE_REST;
+
+  /* What the calorie number is for, one sentence, his voice. Never a promise
+     about the scale: "so what comes off stays off" describes the number,
+     "lose 2 lb a week" would be a claim this screen cannot stand behind. */
+  const calLine = fuel.direction === "lose"
+    ? "A little under what you burn, so what comes off stays off."
+    : fuel.direction === "gain"
+      ? "A little over what you burn, so what goes on is mostly muscle."
+      : "About what you burn in a day. Nothing to cut, nothing to force.";
+
+  const heightWords = fuel.height_in ? `${Math.floor(fuel.height_in / 12)} ft ${fuel.height_in % 12} in` : "";
+  const activityWords = (MY_PROFILE?.activity_level || "Moderate").toLowerCase();
+  /* Setup owns these four numbers (saveBodyStats), so the card that needs them
+     points at the screen that takes them rather than guessing a body. */
+  const setupLink = `<button type="button" class="wkt-btn-soft sm" data-rcv-setup="1">Take me where I can tell you</button>`;
+
+  const eatCard = `
+    <section class="rcv-card">
+      <div class="rcv-head"><span class="rcv-ico">${icon("flame", 18)}</span><h3>Eat for your goal</h3></div>
+      ${!fuel.calories ? (fuel.missing.length ? `
+        <p class="rcv-line">I need ${escapeHtml(listWords(fuel.missing))} before I can work this out. Without ${fuel.missing.length > 1 ? "them" : "it"} I would be guessing, and I am not going to guess about what you eat.</p>
+        <div style="margin-top:12px;">${setupLink}</div>
+      ` : `${/* Nothing is missing, the formulas simply have not landed yet. The
+               repaint is scheduled below, so this line is measured in
+               milliseconds and still beats an empty card. */ ""}
+        <p class="rcv-line">Working that out. One moment.</p>
+      `) : `
+        <div class="rcv-figs">
+          <div class="rcv-fig">
+            <b>${fuel.calories.toLocaleString()}<i>cal</i></b>
+            <u>${escapeHtml(calLine)}</u>
+          </div>
+          <div class="rcv-fig">
+            <b>${fuel.protein}<i>g</i></b>
+            <u>Protein, spread across the day. This is what the training gets built from.</u>
+          </div>
+        </div>
+        <p class="rcv-note">Worked out from ${Math.round(fuel.weightLb)} lb, ${escapeHtml(heightWords)} and ${escapeHtml(activityWords)} activity${fuel.assumedActivity ? ", which I assumed because you have not told me" : ""}.${fuel.capped ? " The cut is held to a fifth of what you burn, which is as fast as I will push it." : ""} A place to start and adjust from, not medical advice.</p>
+      `}
+    </section>`;
+
+  const drinkCard = `
+    <section class="rcv-card">
+      <div class="rcv-head"><span class="rcv-ico">${icon("droplet", 18)}</span><h3>Drink</h3></div>
+      ${fuel.water ? `
+        <div class="rcv-figs one">
+          <div class="rcv-fig">
+            <b>${fuel.water}<i>oz</i></b>
+            <u>${trained ? "Higher than usual, because you trained today. Thirst turns up late." : "Half of it before lunch and you will not be chasing it at bedtime."}</u>
+          </div>
+        </div>
+        <p class="rcv-note">About ${WATER_OZ_PER_LB} oz per pound of body weight${trained ? `, plus ${WATER_OZ_PER_SESSION} oz for today's session` : ""}. Roughly ${Math.round(fuel.water / 8)} glasses.</p>
+      ` : `${/* No second button: water goes missing exactly when the weight
+                 does, so the card above is already asking for it, and two
+                 identical buttons stacked read as a bug rather than an
+                 invitation. */ ""}
+        <p class="rcv-line">This one only needs your weight, which I have asked for just above.</p>`}
+    </section>`;
+
+  /* The honest reading of the week, from the same entries the calendar draws.
+     It says what is true and stops: no bar, no score, nothing to close. */
+  const weekRows = [
+    inARow > 0
+      ? `<li><i></i><span>You have trained <b>${inARow} day${inARow === 1 ? "" : "s"} in a row</b>.</span></li>`
+      : `<li class="quiet"><i></i><span>Nothing logged yet today.</span></li>`,
+    restDue
+      ? `<li><i></i><span>A day off is due. Take it on purpose and it costs you nothing: a rest day holds your streak.</span></li>`
+      /* Not on a day already being rested: the row under this one says so,
+         and telling somebody no day off is needed while they take one is the
+         app talking over itself. */
+      : inARow > 0 && !resting
+        ? `<li class="quiet"><i></i><span>No day off needed yet. I will tell you when one is.</span></li>`
+        : "",
+    resting ? `<li class="quiet"><i></i><span>Today is marked as a rest day. Streak kept.</span></li>` : "",
+  ].filter(Boolean).join("");
+
+  const sleepCard = `
+    <section class="rcv-card">
+      <div class="rcv-head"><span class="rcv-ico">${icon("moon", 18)}</span><h3>Sleep and rest</h3></div>
+      <div class="rcv-figs one">
+        <div class="rcv-fig">
+          <b>${SLEEP_RANGE}<i>hrs</i></b>
+          <u>Nothing else on this screen works without this one. Sleep is where the training lands.</u>
+        </div>
+      </div>
+      <ul class="rcv-week">${weekRows}</ul>
+      <p class="rcv-note">The range is the National Sleep Foundation's for adults. It is not a reading of your sleep: the app cannot see that.</p>
+    </section>`;
+
+  $("workoutContent").innerHTML = `
+    ${backBar("Back", () => goWorkoutScreen("choose", { back: true }))}
+    <section class="rcv-card">
+      <p class="wkt-eyebrow">Recovery</p>
+      <h2>Rest well</h2>
+      <div class="rcv-bot">
+        ${robotFaceSVG(60, "rcv-bot-face", { bust: true })}
+        <p class="rcv-say" id="rcvSay"></p>
+      </div>
+    </section>
+    <section class="rcv-card" id="rcvStretch">
+      <div class="rcv-head"><span class="rcv-ico">${icon("body", 18)}</span><h3>Stretch</h3></div>
+      <div id="rcvStretchBody"><p class="rcv-line">Picking the right ones for today...</p></div>
+    </section>
+    ${eatCard}
+    ${drinkCard}
+    ${sleepCard}`;
+
+  typeOut($("rcvSay"), say);
+  /* Opened before the formula modules landed, which is only possible in the
+     first moment after boot. They arrive, then the card is drawn again with
+     the numbers in it rather than sitting empty until the next navigation.
+
+     Once only, and that is not a nicety: the promise resolves whether or not
+     the imports actually worked, so a failed import would have this schedule a
+     repaint that finds nothing, schedules another, and spins the tab forever.
+     Measured, by breaking it on purpose in the sandbox. */
+  if (!fuel.calories && !fuel.missing.length && !RECOVERY_WAITED_FOR_MATH) {
+    RECOVERY_WAITED_FOR_MATH = true;
+    FIT_MATH_READY.then(() => { if (WORKOUT_MODE === "recovery") renderRecoveryScreen(); });
+  }
+  $("workoutContent").querySelectorAll("[data-rcv-setup]").forEach((b) => {
+    b.onclick = () => { switchTab("setup"); openSettingsPage("stats"); };
+  });
+
+  /* The holds land a beat later, because the picker is an engine module and
+     the import is lazy. Guarded on the screen still being the one open: a fast
+     tap back to the choose screen must not have its markup written over. */
+  recoveryStretches().then((moves) => {
+    if (WORKOUT_MODE !== "recovery") return;
+    const body = $("rcvStretchBody");
+    if (!body) return;
+    if (!moves || !moves.length) {
+      /* Say it rather than hide it. The screen is still worth reading without
+         this card, and a silent empty box would read as a bug. */
+      body.innerHTML = `<p class="rcv-line">I could not read the stretch library just now. The rest of this screen still stands.</p>`;
+      return;
+    }
+    const named = recoveryGroupsToday().slice(0, 2).map((g) => (BODY_GROUP_LABELS[g] || g).toLowerCase());
+    const lead = named.length
+      ? `For what you trained today: ${listWords(named)}.`
+      : "Nothing logged today, so these are the ones worth doing on any day.";
+    body.innerHTML = `
+      <p class="rcv-line" style="margin-bottom:12px;">${escapeHtml(lead)}</p>
+      <ul class="rcv-moves">
+        ${moves.map((m) => `<li>
+          <span class="rcv-move-n">${Math.max(1, Number(m.seconds) || 30)}s</span>
+          <span class="rcv-move-t">${escapeHtml(m.name)}
+            <span>${m.perSide ? "Each side" : "Hold"}${m.group ? ` &middot; ${escapeHtml(BODY_GROUP_LABELS[m.group] || m.group)}` : ""}</span>
+          </span>
+        </li>`).join("")}
+      </ul>
+      <button type="button" class="wkt-btn-solid sm" id="rcvStretchBtn">Stretch with me, ${Math.max(1, Math.round(stretchBlockSeconds(moves) / 60))} min</button>`;
+    $("rcvStretchBtn").onclick = () => startStretchSession(moves);
+  });
+
+  staggerWorkoutCards();
+}
+
+/* A stretch on its own, with no workout under it.
+
+   The player is the session's cool-down screen, unchanged: the same stage, the
+   same blue, the same countdown, the same Up next rail. What is different is
+   that SESSION carries the block itself (`standaloneStretch`) instead of
+   reading it off today's plan, and that is the flag every shared path checks
+   to know this is not a workout: nothing is saved to resume, nothing is
+   banked, nothing is written to the plan's skip flags, and ending it comes
+   back here rather than to a completion screen.
+
+   A stretch writes no rows at all, which is the library's own rule
+   (mobility.mjs: "it is not volume"), so there is nothing to record and
+   nothing for the Body tab or recovery to see. */
+function startStretchSession(moves) {
+  if (!moves || !moves.length) return;
+  /* One session at a time. A workout already open owns the screen, and it owns
+     the clock: offering a second one on top of it is how you end up with two
+     things both believing they are the session. */
+  if (SESSION) { toast("Finish the workout you have going first"); return; }
+  SESSION = {
+    standaloneStretch: moves,
+    phase: "cooldown",
+    date: todayStr(),
+    startedAt: Date.now(),
+    elapsedMs: 0,
+    pausedAt: null,
+    /* The lift screen's fields, empty. Every shared reader guards with
+       optional chaining, and an empty array is the honest answer to "which
+       sets are done": none, there are none. */
+    exerciseIndex: 0,
+    setsDone: [],
+    setWeights: [],
+    weights: [],
+    reps: [],
+    completed: [],
+    stretchIndex: 0,
+    stretchSide: 1,
+    stretchStartedAt: Date.now(),
+  };
+  QUIP_RECENT = {}; QUIP_LAST_AT = 0;
+  openSessionUI();
+  /* A pause glyph would be a promise this screen cannot keep: there is nothing
+     to come back to, so the same button ends the stretch and is drawn as what
+     it does. openSessionUI redraws it as a pause on the next real workout. */
+  $("sessionPauseBtn").innerHTML = icon("close", 18);
+  $("workoutContent").classList.add("hidden");
+  renderStretchPhase();
+}
+
+/* The way out, from the end of the last hold, from Stop, and from the chevron.
+   Puts the tab back exactly where it was, which is the Recovery screen. */
+function endStretchSession() {
+  stopStretchTicker();
+  SESSION = null;
+  $("sessionCard").classList.remove("stretching");
+  closeSessionUI();
+  $("workoutContent").classList.remove("hidden");
+  renderWorkoutTab({ respectMode: true });
 }
 
 /* ---- Saved workouts ----
@@ -35179,6 +36810,16 @@ function trainingSummary() {
   return bits.join(", ");
 }
 
+/* Four states rather than On and Off, because two switches under one row have
+   four answers and "On" for a phone that is only ticking is a small lie. */
+function soundSummary() {
+  const talks = !voiceOff();
+  const tones = !sfxOff();
+  if (talks && tones) return "On";
+  if (!talks && !tones) return "Off";
+  return talks ? "Voice only" : "Sounds only";
+}
+
 function paintSettingsValues() {
   /* The Goal row's only writer used to be closeSettingsPage, so the row read
      "Not set" from the moment the tab opened until you had been into a subpage
@@ -35190,6 +36831,7 @@ function paintSettingsValues() {
   settingsValue("setProfileSub", ME || "");
   settingsValue("setThemeSub",
     (document.documentElement.getAttribute("data-theme") || "dark") === "light" ? "Light" : "Dark");
+  settingsValue("setSoundSub", soundSummary());
   settingsValue("setAboutSub", APP_VERSION);
   settingsValue("setAccountSub", MY_EMAIL || "");
 
@@ -35417,6 +37059,35 @@ function renderSetupTab() {
   document.querySelectorAll("[data-setback]").forEach((b) => {
     b.onclick = closeSettingsPage;
   });
+
+  /* Sound. Device preferences, so they are read off localStorage the way the
+     coach's mute is, and wired outside the MY_PROFILE block below: somebody
+     who wants him to stop talking should not have to wait on a network round
+     trip for permission to say so.
+
+     Each switch proves itself on the way on rather than promising in copy that
+     it works. Turning one off proves itself by the silence. */
+  if ($("voiceToggle")) {
+    $("voiceToggle").checked = !voiceOff();
+    $("voiceWrap").classList.toggle("checked", !voiceOff());
+    $("voiceToggle").onchange = (e) => {
+      setVoiceOff(!e.target.checked);
+      $("voiceWrap").classList.toggle("checked", e.target.checked);
+      // gap 0: this one is a demonstration, so it repeats as often as it is asked to.
+      if (e.target.checked) voice.say("Loud and clear.", { from: "soundSetting", gap: 0 });
+      settingsValue("setSoundSub", soundSummary());
+    };
+  }
+  if ($("sfxToggle")) {
+    $("sfxToggle").checked = !sfxOff();
+    $("sfxWrap").classList.toggle("checked", !sfxOff());
+    $("sfxToggle").onchange = (e) => {
+      setSfxOff(!e.target.checked);
+      $("sfxWrap").classList.toggle("checked", e.target.checked);
+      if (e.target.checked) sfx.play("set");
+      settingsValue("setSoundSub", soundSummary());
+    };
+  }
   /* The trainer row. Hired reads as a fact about the account; not hired reads
      as the offer it is, and tapping it is the offer. */
   if ($("setRow-hire")) {
