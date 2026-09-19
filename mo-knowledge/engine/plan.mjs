@@ -70,6 +70,11 @@ const VOLUME_BAND = {
   calves: { mev: 8, mav: 15 },
   abs: { mev: 8, mav: 12 },
   obliques: { mev: 8, mav: 12 },
+  /* No row in volume-landmarks.md. Direct lower back work only exists in the
+     week when somebody marks it (LOWERBACK_SLOT), and the hamstrings/glutes
+     row is the smallest neighbour of a hinge-shaped muscle, so it stands in.
+     A guess, stated as one, and it had no row at all until 2026-09-19. */
+  lowerback: { mev: 6, mav: 13 },
 };
 
 /* Traps and forearms have no row in volume-landmarks.md, the same gap
@@ -119,6 +124,111 @@ export function volumeDial({ days = 3, effectiveSessions = 0 } = {}) {
   const byHistory = clamp01((Number(effectiveSessions) || 0) / VOLUME_DIAL_SESSIONS);
   return byHistory * (VOLUME_DIAL_HISTORY_SHARE + (1 - VOLUME_DIAL_HISTORY_SHARE) * byDays);
 }
+/* The most hard sets one session may carry while somebody has little history.
+ *
+ * The dial above is per muscle and it does its job: with zero logs every group
+ * sits at MEV. What nothing read was the TOTAL. A week is slot count times the
+ * two-set floor, and then the fill pass spends whatever the clock has left, and
+ * a first-ever session carries no ramp and no known load, so the clock has
+ * more left than a trained person's day does. Measured 2026-09-19: build
+ * muscle, four days, 45 minutes, zero logs came to 72 hard sets and the same
+ * person at six months to 59; tone-lean-abs with six days asked came to 104,
+ * biggest day 27. Per muscle every one of those weeks was inside MEV..MRV.
+ *
+ * research/09: "The first two weeks decide it. Someone whose first session
+ * goes badly, too hard, too long, an exercise they could not perform, is
+ * disproportionately likely to be gone." That is an adherence argument and it
+ * is about the session as a whole, which is why this is a cap on the day and
+ * not a third term in the dial. Fourteen is the usual coaching ceiling for a
+ * novice session (14 to 16; research/09 quotes no number and says so), and it
+ * climbs to twenty across the first nine effective sessions, three weeks at
+ * three a week, after which the dial and the clock are back in charge. It
+ * reads `effectiveSessions`, the same count the dial reads, so a long break
+ * puts somebody back under it: research/02 has connective tissue lagging
+ * muscle on the way back, which is the same first-fortnight problem. */
+const NOVICE_SESSION_SETS = [14, 20];
+const NOVICE_RAMP_SESSIONS = 9;
+export function noviceSessionCap(effectiveSessions = 0) {
+  const s = Math.max(0, Number(effectiveSessions) || 0);
+  if (s >= NOVICE_RAMP_SESSIONS) return Infinity;
+  const [from, to] = NOVICE_SESSION_SETS;
+  return Math.round(from + (to - from) * (s / NOVICE_RAMP_SESSIONS));
+}
+
+/* And the bottom of the dial itself, for the same person over the same nine
+   sessions. The cap above can only take back what sits on top of each
+   muscle's target, and at the bottom of the dial the target is MEV, so on a
+   five day split of MEV-per-muscle the cap has nothing to take and a first
+   ever week still came to 83 hard sets against 71 for the same person six
+   months in. That number is not the fill pass and it is not rounding: it is
+   the landmark table's MEV column added up across fourteen muscles, and the
+   table says of itself that "beginners need less to grow" (the column is for
+   an intermediate trainee). So the band's floor is scaled for somebody with
+   no history: four fifths of MEV at zero sessions, MEV by the ninth. The
+   same `effectiveSessions` the dial reads, so a long break brings it back.
+
+   Four fifths and not less, measured: at 0.7 the small bands (hamstrings,
+   MEV 6) fall under the two-sets-a-slot floor on every split, the floor
+   swallows the +1 a focus tier guarantees, and the four colours came back as
+   the same week in 56% of cells against a tested minimum of 40%. At 0.8 they
+   are distinct in 73% and the first ever week is no bigger than the trained
+   one on both audited inputs. */
+const NOVICE_MEV_SCALE = 0.8;
+export function noviceScale(effectiveSessions = 0) {
+  const s = Math.max(0, Number(effectiveSessions) || 0);
+  return NOVICE_MEV_SCALE + (1 - NOVICE_MEV_SCALE) * Math.min(1, s / NOVICE_RAMP_SESSIONS);
+}
+
+/* The deload: every sixth trained week, counted off the plans history.
+ *
+ * periodization-deloads.md: "most trainees training hard need a deload roughly
+ * every 4-8 weeks even without an obvious trigger, because fatigue accumulates
+ * even when it isn't consciously felt", and one week is enough. Six is the
+ * middle of that range and it is the number the engine has promised since the
+ * sentence was written. The week is built at DELOAD_SETS_FACTOR of the sets
+ * and DELOAD_LOAD_FACTOR of the loads: that file wants the volume cut and the
+ * intensity kept "close to normal (RPE 5-6) rather than gutting the weight",
+ * which two thirds and nine tenths are.
+ *
+ * "Weeks in a row" is counted off `plans` rows carrying `completed_at`, one
+ * calendar week at a time back from the week being built, stopping at the
+ * first week with nothing completed in it, because a week off IS a deload and
+ * nobody needs a second one for having taken it. A row marked `deload: true`
+ * stops the count too, so a client that stores the mark gets "weeks since the
+ * last deload" and a client that does not gets the same answer whenever the
+ * history is unbroken, which is the only case the two differ in. The week
+ * being built is never counted: a mid-week rebuild has to give the same
+ * answer on Thursday as it did on Monday. */
+const DELOAD_EVERY_WEEKS = 6;
+const DELOAD_SETS_FACTOR = 2 / 3;
+const DELOAD_LOAD_FACTOR = 0.9;
+const WEEK_MS = 7 * 86400000;
+const mondayOf = (d) => {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+};
+export function trainedWeeksBefore(plans = [], today = new Date()) {
+  const thisMonday = mondayOf(new Date(today));
+  const weeks = new Map();
+  for (const p of Array.isArray(plans) ? plans : []) {
+    if (!p || typeof p !== "object" || !p.completed_at) continue;
+    const [y, m, d] = String(p.entry_date || p.completed_at).slice(0, 10).split("-").map(Number);
+    if (!y || !m || !d) continue;
+    const k = Math.round((thisMonday - mondayOf(new Date(y, m - 1, d))) / WEEK_MS);
+    if (k <= 0) continue;
+    const row = weeks.get(k) || { deload: false };
+    if (p.deload === true) row.deload = true;
+    weeks.set(k, row);
+  }
+  let n = 0;
+  for (let k = 1; weeks.has(k); k++) {
+    if (weeks.get(k).deload) break;
+    n++;
+  }
+  return n;
+}
+
 /* The multiplier a prioritised group earns, by focus tier: 1.75 red, 1.4
    yellow, 1.2 green, and 1.0 for everything else. Tier 0 is "not a priority" and is the
    only entry this file invents; the other three, and the reasoning for the 0.2
@@ -145,13 +255,35 @@ const PRIORITY_MULTIPLIER = { 0: 1, ...TIER_MULTIPLIER };
    moved no set count and no warning total. What it changes is the largest
    number the ledger can carry, which was 28 and is now the muscle's own MRV.
    The table's rows are the groups it names, so "Back (lats/rows)" is lats and
-   "Abs/core" covers abs and obliques. Traps and forearms have no row and are
-   left uncapped rather than given an invented number; every split in this file
-   touches them once a week, so the frequency cap below is what binds on them. */
+   "Abs/core" covers abs and obliques.
+
+   Traps, forearms and lower back have no row in the table. They were left
+   uncapped (`?? Infinity`) rather than given an invented number, on the
+   argument that the frequency cap binds on them anyway. The boundary audit of
+   2026-09-19 counted that as a ceiling the engine happens to be saved from by
+   an unrelated limit, which is the same complaint this table was built to
+   answer, so each now carries the SMALLEST NEIGHBOURING ROW, stated as a
+   guess: traps the shoulders row (24, under the 25 of back), forearms the
+   biceps row (22, the same row VOLUME_BAND_DEFAULT already stands them on),
+   lower back the hamstrings/glutes row (18). None of the three moves a set
+   today, and that is measured rather than hoped.
+
+   "Hamstrings/glutes" is ONE row in the table, MRV 18 for the pair, and this
+   table read it as 18 each, so the two could ask for 36 between them. Same
+   error as the abs/obliques 20+20 fixed the week before. The pair shares the
+   row now: see MRV_PAIR and `mrvFor` in buildPlan, which split the one number
+   between the two halves in proportion to what each is asking for. */
 const WEEKLY_MRV = {
   chest: 22, lats: 25, shoulders: 24, quads: 20, hamstrings: 18,
   glutes: 18, biceps: 22, triceps: 20, calves: 22, abs: 20, obliques: 20,
+  traps: 24, forearms: 22, lowerback: 18,
 };
+/* Groups that are one row in the research and two in the app's taxonomy, and
+   which, unlike abs/obliques, cannot be folded into one ledger row: a hinge
+   slot and a lunge slot are different movements on different days and the
+   split's whole lower body is built out of the difference. So the ceiling is
+   shared and the counting is not. Each entry names its partner. */
+const MRV_PAIR = Object.freeze({ hamstrings: "glutes", glutes: "hamstrings" });
 
 /* Core is ONE row in the ledger, because it is one row in the research.
  *
@@ -290,7 +422,38 @@ const WARMUP_MIN = Math.round(WARMUP_SECONDS / 60);
    cool-down when the clock is theirs, nothing when the clock is the goal's.
    One rule, two honest readings of what the number means. */
 const COOLDOWN_MIN = Math.round(COOLDOWN_SECONDS / 60);
-const TIME_TOLERANCE = 1.15;
+/* How far over the clock a day may run and still be called "about" the number
+   they asked for, in minutes. It was a ratio, 1.15, on the argument that a set
+   is indivisible and trimming a session for one minute is worse than the
+   minute. The audit of 2026-09-19 measured what that came to across 1,100 runs
+   with a stated clock: 69% of days landed five or more minutes over the ask,
+   and 47% of those said `fits: true`, because 15% of 60 is nine minutes and
+   the app then printed "About 52 min" over a 45 that the engine had passed.
+   Three minutes is about one set with its rest, which is the indivisible thing
+   the ratio was protecting, and it is the same three at 20 and at 90: a
+   person who asked for 45 calls 48 "about 45" and does not call 52 that. */
+const TIME_TOLERANCE_MIN = 3;
+/* The goal's own session length keeps the ratio. `P.sessionMin` is not a
+   number anybody said out loud, it is goal-engine.mjs's estimate of the
+   warm-up plus the ramp plus the sets, derived before the honest costing and
+   never re-derived since (CONTRACT.md, `session.estimatedMinutes`), and every
+   plan built without a stated clock is costed against it. Holding it to three
+   minutes would trim a fifth off every default week to meet a number that was
+   never a promise to a person. `toleranceMin` on the day carries whichever
+   applies. */
+const GOAL_TIME_TOLERANCE = 1.15;
+/* Feeler sets, for a lift with no weight on the card. The first session of an
+   unknown load starts with the instruction "work up to a weight you could stop
+   two reps short of", and working up is one or two light sets that the estimate
+   never costed: 3 to 7 minutes on the first session, exactly when a person
+   decides whether the app told them the truth. Two sets of about thirty seconds
+   with a short rest between. Costed off `loadBasis`, so a bodyweight lift (no
+   load to find) and a lift with a number on it (nothing to feel for) pay
+   nothing. index.html's mirror does not yet know this term; `meta.session
+   .feelerMinutes` carries it so a screen can. */
+const FEELER_SETS = 2;
+const FEELER_SET_SECONDS = 40;
+const FEELER_REST_SECONDS = 30;
 
 /* The three numbers the person's own clock needs, and none of them are read
    unless they gave one. See the budget block in `buildPlan`.
@@ -315,7 +478,7 @@ const TIME_TOLERANCE = 1.15;
    a set and becomes conditioning. Rest is the LAST lever on purpose, because it
    is the only one that changes what a set is worth rather than how many there
    are, and it is the only one that has to say out loud what it did. */
-const SESSION_MIN_FLOOR = 15;
+const SESSION_MIN_FLOOR = 25;
 const SESSION_MIN_CEILING = 120;
 const MAIN_SETS_FLOOR = 3;
 const REST_FLOOR_FACTOR = 0.6;
@@ -435,11 +598,14 @@ export function setWorkSeconds(reps) {
   const r = Math.min(REPS_COSTED_MAX, Math.max(1, Math.round(Number(reps) || 0) || 1));
   return SET_SETUP_SECONDS + REP_SECONDS * r;
 }
+export function feelerSeconds(e) {
+  return e?.loadBasis === "unknown" ? FEELER_SETS * (FEELER_SET_SECONDS + FEELER_REST_SECONDS) : 0;
+}
 export function exerciseSeconds(e) {
   const sets = Math.max(0, Math.round(Number(e?.sets) || 0));
   if (!sets) return 0;
   const rest = Math.max(0, Number(e.restSec) || 0);
-  return sets * (setWorkSeconds(e.reps) + LOG_SECONDS) + (sets - 1) * rest + TRANSITION_SECONDS;
+  return sets * (setWorkSeconds(e.reps) + LOG_SECONDS) + (sets - 1) * rest + TRANSITION_SECONDS + feelerSeconds(e);
 }
 export function sessionSeconds(exercises) {
   return (exercises || []).reduce((t, e) => t + exerciseSeconds(e), 0);
@@ -452,7 +618,7 @@ export function estimateMinutes(exercises, prepMinutes = WARMUP_MIN) {
    reserve travels with the budget it belongs to: see COOLDOWN_MIN for why a
    stated clock reserves the cool-down and the goal's own does not. */
 function overClock(estimate, day) {
-  return estimate + (day?.clockReserve ?? 0) > (day?.minutes ?? 0) * TIME_TOLERANCE;
+  return estimate + (day?.clockReserve ?? 0) > (day?.minutes ?? 0) + (day?.toleranceMin ?? TIME_TOLERANCE_MIN);
 }
 
 /* The ramp for one lift, or null when there is nothing to ramp.
@@ -644,7 +810,11 @@ function addSecondMainRamps(week, roleOf) {
 
 /* What the week asks for, before any session has to hold it. */
 function weeklyWant({ base, tier, ceiling = Infinity }) {
-  const plain = Math.round(base);
+  /* The plain ask is capped too. It never needed to be while every ceiling was
+     a whole row of its own, because no band's top reaches an MRV; a shared row
+     (MRV_PAIR) hands each half a ceiling the band CAN reach, and an unfocused
+     ask that ignored it put the pair back at 26 against the 18 the row says. */
+  const plain = Math.round(Math.min(base, ceiling));
   /* The +1 guarantee is a floor and not a bonus, so it is the same +1 at every
      tier. A group somebody marked green has to come back with more sets than an
      identical group they did not mark, or the colour was decoration; how much
@@ -1156,6 +1326,48 @@ export function buildPlan({
      it did before this existed. */
   const preferences = learnPreferences({ swaps, plans, logs, today });
 
+  /* ---- the progression rule and the deload schedule, decided up front ----
+     Which progression rule, from the bar rather than from a label. research/04
+     names this as the signal that actually defines the transition: "if someone
+     is still adding weight to a movement almost every session, they are by
+     definition still in the phase where linear progression works, whatever
+     their session count says". So the switch to double progression happens only
+     where we have MEASURED that linear has stopped working, and the default in
+     the absence of evidence is linear, which is also the conservative answer
+     and the one a day one plan needs.
+
+     A scheduled deload is for somebody who is accumulating fatigue faster than
+     they are clearing it, and the visible sign of that is loading having stopped
+     working. Prescribing one to somebody the bar says is still climbing reads as
+     the app deciding they are tired, which is the same paternalism the level
+     ladder was doing. Same two measured facts as the progression rule, so the
+     two can never disagree about what phase somebody is in.
+
+     Both used to be decided at the very end, after the week was built, and the
+     deload was a sentence: "every sixth week, about two thirds of the sets",
+     and nothing anywhere reduced a week. Ten perfect weeks replayed gave a
+     sixth week identical to the fifth. So the decision moves up here, where
+     the build can read it, and `deloadWeek` is what it reads: see
+     DELOAD_EVERY_WEEKS for how the week is counted and the cut after the
+     back-off for what it does. */
+  const measuredEnough = trainingAge.confidence === "medium" || trainingAge.confidence === "high";
+  const linearStillWorks = trainingAge.stillLinear || !measuredEnough;
+  const progression = linearStillWorks
+    ? { rule: "linear", detail: "Hit every rep on every set and the weight goes up next time. That keeps working for months and there is no reason to be cleverer than it while it does." }
+    : { rule: "double", detail: "Work up to the top of the rep range on every set, then add weight and drop back to the bottom." };
+  const trainedWeeks = trainedWeeksBefore(plans, today);
+  const deloadWeek = !linearStillWorks && trainedWeeks > 0 && trainedWeeks % DELOAD_EVERY_WEEKS === 0;
+  const deload = !linearStillWorks
+    ? {
+      everyWeeks: DELOAD_EVERY_WEEKS,
+      detail: `Every ${DELOAD_EVERY_WEEKS === 6 ? "sixth" : `${DELOAD_EVERY_WEEKS}th`} week, same exercises, about two thirds of the sets and a tenth off the weights.`,
+      /* Whether THIS week is the one, and the count that decided it, so a
+         screen can say "week 4 of 6" and history can carry the mark. */
+      week: deloadWeek,
+      trainedWeeks,
+    }
+    : null;
+
   /* The muscle gain rate is the one thing downstream that was keyed on a level.
      It reads two measured numbers instead now; see GAIN_RATE in
      goal-engine.mjs. */
@@ -1395,9 +1607,24 @@ export function buildPlan({
      per muscle and a measured dial saying where in it this week sits. See
      VOLUME_BAND and volumeDial. */
   const dial = volumeDial({ days, effectiveSessions: trainingAge.effectiveSessions });
+  const novice = noviceScale(trainingAge.effectiveSessions);
   const baseSetsFor = (group) => {
     const band = VOLUME_BAND[group] || VOLUME_BAND_DEFAULT;
-    return (band.mev + dial * (band.mav - band.mev)) * P.setsFactor;
+    return (band.mev + dial * (band.mav - band.mev)) * novice * P.setsFactor;
+  };
+  /* The weekly ceiling for one group. Its own MRV row, except where the row is
+     shared with a partner (MRV_PAIR): then the row is split between the two in
+     proportion to what each half is asking for before any cap, so a red focus
+     on glutes buys glutes the larger share of the 18 rather than 18 of its own
+     on top of 18 for hamstrings. Read wherever `WEEKLY_MRV[group]` used to be. */
+  const rawAskFor = (group) => baseSetsFor(group) * PRIORITY_MULTIPLIER[tierFor(group)];
+  const mrvFor = (group) => {
+    const own = WEEKLY_MRV[group] ?? Infinity;
+    const partner = MRV_PAIR[group];
+    if (!partner || !Number.isFinite(own)) return own;
+    const mine = rawAskFor(group);
+    const theirs = rawAskFor(partner);
+    return mine + theirs > 0 ? own * (mine / (mine + theirs)) : own / 2;
   };
 
   /* ---- pass 2: selection, the whole week before any set count ---- */
@@ -1597,13 +1824,11 @@ export function buildPlan({
   const askedMinutes = Number.isFinite(rawAsked) && rawAsked > 0
     ? Math.min(SESSION_MIN_CEILING, Math.max(SESSION_MIN_FLOOR, Math.round(rawAsked)))
     : null;
-  if (askedMinutes !== null && askedMinutes !== Math.round(rawAsked)) {
-    dayNotes.push(askedMinutes === SESSION_MIN_FLOOR
-      ? `You asked for ${Math.round(rawAsked)} minutes a session. There is no session that short: four movements at `
-        + `two sets and the shortest rest worth calling rest is about 25 minutes once the warm-up and cool-down are in, so the plan `
-        + `is built for ${askedMinutes} and tells you when a day still runs over.`
-      : `You asked for ${Math.round(rawAsked)} minutes a session. The plan is built for ${askedMinutes}, because past `
-        + `that the limit stops being the clock and starts being what a week can recover from.`);
+  /* The floor case is said per day with the over-budget list below, where the
+     sentence can carry the day's real number and `fits` goes false with it. */
+  if (askedMinutes !== null && askedMinutes !== Math.round(rawAsked) && askedMinutes !== SESSION_MIN_FLOOR) {
+    dayNotes.push(`You asked for ${Math.round(rawAsked)} minutes a session. The plan is built for ${askedMinutes}, because past `
+      + `that the limit stops being the clock and starts being what a week can recover from.`);
   }
   const sessionBudgetMin = askedMinutes ?? P.sessionMin;
 
@@ -1653,7 +1878,7 @@ export function buildPlan({
     if (!weekVolume.has(group)) {
       weekVolume.set(group, weeklySets({
         base: baseSetsFor(group), tier: tierFor(group),
-        ceiling: WEEKLY_MRV[group] ?? Infinity,
+        ceiling: mrvFor(group),
         fullSlots: fullHits[group] || 1, shortSlots: shortHits[group] || 0,
       }));
     }
@@ -1736,7 +1961,12 @@ export function buildPlan({
       /* Five minutes of cool-down are charged against a clock somebody named
          and against nothing else, because `P.sessionMin` never contained them.
          See COOLDOWN_MIN. */
-      clockReserve: askedMinutes === null ? 0 : COOLDOWN_MIN,
+      clockReserve: askedMinutes === null ? 0 : COOLDOWN_MIN,   // re-read off the built block below
+      /* Three minutes over a clock a person named; the old fifteen percent
+         over the goal's own estimate. See TIME_TOLERANCE_MIN. */
+      toleranceMin: askedMinutes === null
+        ? Math.round(sessionBudgetMin * (GOAL_TIME_TOLERANCE - 1))
+        : TIME_TOLERANCE_MIN,
       /* Filled in below, once the sets have stopped moving. Declared here so the
          key is on every day whatever the trimming does. */
       estimatedMinutes: null,
@@ -1786,7 +2016,7 @@ export function buildPlan({
      8.96 about a week that had asked for 9. It is kept separate from the target
      below because the two mean different things and the ledger reports both. */
   const wantedFor = (group) =>
-    weeklyWant({ base: baseSetsFor(group), tier: tierFor(group), ceiling: WEEKLY_MRV[group] ?? Infinity });
+    weeklyWant({ base: baseSetsFor(group), tier: tierFor(group), ceiling: mrvFor(group) });
 
   /* What this week could spend on a group if every one of its exercises ran at
      the top of the clamp. A group the split touches once cannot be handed more
@@ -1928,6 +2158,41 @@ export function buildPlan({
     for (const r of d.rampSets) ramped.push({ day: d.name, exercise: r.exercise, sets: r.sets.length, seconds: r.seconds });
   }
 
+  /* ---- the blocks are costed at what they are built to, not what they are budgeted at ----
+     The warm-up is budgeted at six minutes and built to between six and seven;
+     the cool-down is budgeted at five and built to between five and six,
+     because a block fills to its budget and then finishes the move it is on.
+     The app costs the built seconds, so a day this file called 46 printed as
+     52 and `fits` said true. So the blocks are picked here, once, off the day
+     as selected, and every trim below reserves what they really run to. They
+     are picked again at the end, when the day is final, and the estimate is
+     re-read off that final pick; the two differ by a move at most, because a
+     trim only ever removes an accessory and the block covers what is left. */
+  const pickBlocks = (d) => mobilityFor(d, {
+    hurts: limitsUsed.hurts, missing: limitsUsed.missing, goalChild: resolved.mobilityChild,
+    longCooldown: !!d.longCooldown,
+  });
+  const costBlocks = (d) => {
+    const rampSec = d.rampSets.reduce((t, r) => t + r.seconds, 0);
+    /* `prepMinutes` stays the BUDGETED warm-up plus the ramp, because the
+       ledger invariant in sweep.mjs (`age-broke-the-prep-ledger`) and the
+       adapter's age rebuild both define it that way. What the block overshoots
+       its budget by (five to fifty seconds; it finishes the move it is on) is
+       reserved against a clock a person named instead, beside the cool-down,
+       so the app's number is still what `fits` was judged on. */
+    d.prepMinutes = prepMinutesFor(d);
+    const cooldownSec = d.mobility.cooldownSeconds || COOLDOWN_SECONDS;
+    const warmupOver = Math.max(0, (d.mobility.warmupSeconds || 0) - (d.mobility.warmupBudgetSeconds || 0));
+    d.cooldownMinutes = Math.round(cooldownSec / 60);
+    /* Inside the clock only when the clock is theirs: see COOLDOWN_MIN for why
+       the goal's own number never contained it. */
+    d.clockReserve = askedMinutes === null ? 0 : Math.round((cooldownSec + warmupOver) / 60);
+  };
+  for (const d of week) {
+    d.mobility = pickBlocks(d);
+    costBlocks(d);
+  }
+
   /* Said once for the week, because a ramp is now normal rather than something
      spare minutes bought, and because it is new on every existing plan: the
      first thing a person will notice is sets on their card that are not work.
@@ -1944,6 +2209,13 @@ export function buildPlan({
 
   const timeTrimmed = [];
   const restCompressed = [];
+  /* See noviceSessionCap. Which days it touched, for the one sentence below. */
+  const sessionSetCap = noviceSessionCap(trainingAge.effectiveSessions);
+  const noviceCapped = new Set();
+  /* Sets the clock took off, across the week, for the one sentence about the
+     dial and the clock below the ledger. */
+  let clockCutSets = 0;
+  const daySets = (d) => d.exercises.reduce((t, e) => t + e.sets, 0);
   const lastIndex = (list, ok) => { for (let i = list.length - 1; i >= 0; i--) if (ok(list[i], i)) return i; return -1; };
   for (const d of week) {
     let estimate = estimateMinutes(d.exercises, d.prepMinutes);
@@ -1952,6 +2224,7 @@ export function buildPlan({
       const shave = lastIndex(d.exercises, (e) => roleOf.get(e) === "accessory" && !e.priority && e.sets > SHORT_DAY_SETS);
       if (shave >= 0) {
         d.exercises[shave].sets -= 1;
+        clockCutSets += 1;
         estimate = estimateMinutes(d.exercises, d.prepMinutes);
         continue;
       }
@@ -2002,6 +2275,7 @@ export function buildPlan({
         }
         if (pick < 0) break;
         d.exercises[pick].sets -= 1;
+        clockCutSets += 1;
         estimate = estimateMinutes(d.exercises, d.prepMinutes);
       }
       enforcePriorityFloor(d.exercises);
@@ -2034,6 +2308,46 @@ export function buildPlan({
            hand some of this back and cannot do it from two summary numbers. */
         if (to < from) restCompressed.push({ day: d.name, fromSec: from, toSec: to, factor, startFactor: factor, before: restBefore, d });
       }
+    }
+
+    /* ---- the novice cap, on the day's total rather than on any one lift ----
+       See noviceSessionCap. Largest first and one set at a time, the same even
+       haircut the clock's main lever uses, so the emphasis the week built
+       survives; a main stops at MAIN_SETS_FLOOR and an accessory at two. Runs
+       after the clock so the cap is measured on the day as it will be handed
+       over, and before the fill pass, which reads the same cap and will not
+       climb back over it. */
+    if (Number.isFinite(sessionSetCap)) {
+      /* Two things it never takes, because two guarantees stand above it. A
+         focused lift keeps every set: a colour that bought nothing is the one
+         silence this file is not allowed to ship, and a cap that ate the focus
+         would ship it on day one, exactly when the tap is most believed. And a
+         group at or under its weekly target keeps its sets: the target is that
+         muscle's MEV for somebody with no history, and a set under MEV is not a
+         gentler week, it is a week that does nothing for that muscle. So what
+         the cap takes back is what the rounding and the clock's top-up put on
+         top of those two, which is where the audit's 72 sets came from, and on
+         a two or three day week of full body days it usually has nothing to
+         take at all. Largest first, one set at a time, accessories before
+         mains at a tie. */
+      const floorOf = (e) => (roleOf.get(e) === "main" ? MAIN_SETS_FLOOR : SHORT_DAY_SETS);
+      while (daySets(d) > sessionSetCap) {
+        const totals = plannedByGroup();
+        let pick = -1;
+        for (let i = 0; i < d.exercises.length; i++) {
+          const e = d.exercises[i];
+          if (e.focusTier || e.sets <= floorOf(e)) continue;
+          const key = ledgerGroup(e.group);
+          if ((totals[key] || 0) - 1 < weeklyTargetFor(key)) continue;
+          if (pick < 0 || e.sets > d.exercises[pick].sets
+            || (e.sets === d.exercises[pick].sets && roleOf.get(e) === "accessory" && roleOf.get(d.exercises[pick]) === "main")) pick = i;
+        }
+        if (pick < 0) break;
+        d.exercises[pick].sets -= 1;
+        noviceCapped.add(d.name);
+      }
+      enforcePriorityFloor(d.exercises);
+      estimate = estimateMinutes(d.exercises, d.prepMinutes);
     }
 
     d.estimatedMinutes = estimate;
@@ -2079,11 +2393,14 @@ export function buildPlan({
         const totals = plannedByGroup();
         let best = null;
         let bestGap = 0;
+        /* The novice cap holds here too, or the minutes would buy back what
+           it just took. Counted as a bind so the sentence is said. */
+        if (daySets(d) >= sessionSetCap) { noviceCapped.add(d.name); break; }
         for (const e of d.exercises) {
           if (e.sets >= MAX_SETS_PER_SESSION) continue;
           if (!e.focusTier && e.sets + 1 > floorCeiling) continue;
           const key = ledgerGroup(e.group);
-          const ceiling = Math.min(weeklyTargetFor(key) + VOLUME_SLACK, WEEKLY_MRV[key] ?? Infinity);
+          const ceiling = Math.min(weeklyTargetFor(key) + VOLUME_SLACK, mrvFor(key));
           const gap = ceiling - (totals[key] || 0);
           if (gap < 1) continue;
           if (!best || gap > bestGap) { best = e; bestGap = gap; }
@@ -2129,6 +2446,30 @@ export function buildPlan({
       enforcePriorityFloor(d.exercises);
       d.estimatedMinutes = estimateMinutes(d.exercises, d.prepMinutes);
     }
+  }
+
+  /* ---- the deload week, built rather than promised ----
+     After the back-off for the same reason the back-off is after everything
+     else: a lighter week has to be the last word, or the fill pass hands back
+     what it took. Two thirds of the sets on every lift, a tenth off every load
+     that has one, floors kept (two sets is the smallest prescription there is,
+     and a main lift is a main lift). knowledge/principles/periodization-deloads.md
+     asks for the volume cut and for the load to stay close to normal, "RPE
+     5-6 rather than gutting the weight", which a tenth off is. The surplus
+     pass below still runs, so the minutes a lighter week frees can repay a
+     compressed rest, which is the right thing for a deload to buy. */
+  if (deloadWeek) {
+    for (const d of week) {
+      for (const e of d.exercises) {
+        e.sets = Math.max(SHORT_DAY_SETS, Math.round(e.sets * DELOAD_SETS_FACTOR));
+        if (e.weight > 0) e.weight = roundLoad(e.weight * DELOAD_LOAD_FACTOR);
+      }
+      enforcePriorityFloor(d.exercises);
+      d.estimatedMinutes = estimateMinutes(d.exercises, d.prepMinutes);
+    }
+    dayNotes.push(`This is a deload week. You have trained ${trainedWeeks} weeks in a row, so this one is about two thirds `
+      + `of the sets and a tenth off the weights, same exercises. That is fatigue clearing, not progress stopping: `
+      + `next week goes back up.`);
   }
 
   /* Now that the minutes have stopped moving, the second main can have its rung
@@ -2236,7 +2577,7 @@ export function buildPlan({
          this pass, so five minutes is what the clock can know here. Reserved
          because the person named how long they are in the gym, not how long the
          middle of it is, and unlike the repayment above these are additions. */
-      const cooldownMin = Math.round(COOLDOWN_SECONDS / 60);
+      const cooldownMin = d.cooldownMinutes;
       /* `estimatedMinutes` already carries the ramp, because `prepMinutes` is
          inside it, so there is nothing to subtract for it here. */
       const spare = () => d.minutes - d.estimatedMinutes - cooldownMin - (d.longCooldown ? 5 : 0);
@@ -2255,6 +2596,17 @@ export function buildPlan({
      decision on every day and three copies of it is a scold. Entries the fill
      pass paid back in full drop out: rest that is back where the goal wanted it
      is not a cost to report. */
+  /* The novice cap, said once. It has to say three things: the number, that it
+     is deliberate, and that it goes away, because a person who reads a smaller
+     week than a friend's with no reason attached reads it as the app thinking
+     less of them. research/09's early-wins argument in plain words. */
+  if (noviceCapped.size) {
+    const left = Math.max(0, NOVICE_RAMP_SESSIONS - Math.round(trainingAge.effectiveSessions || 0));
+    dayNotes.push(`Each session is held to about ${sessionSetCap} hard sets for now. A first week bigger than a trained one is `
+      + `how people get sore, miss the second week and stop, so the total is capped while the logs are thin. `
+      + `It climbs with every session you log and is gone after about ${left} more.`);
+  }
+
   const restStillShort = restCompressed.filter((r) => !r.repaid);
   if (restStillShort.length) {
     const worst = restStillShort.reduce((a, b) => (b.toSec / b.fromSec < a.toSec / a.fromSec ? b : a));
@@ -2276,7 +2628,17 @@ export function buildPlan({
      answer is the same on every day it fired. */
   const cools = timeBought.filter((t) => t.bought === "cooldown");
   if (cools.length) {
-    dayNotes.push(`You asked for ${askedMinutes} minutes and the training itself needs less than that. The extra did not `
+    /* `timeBought` is per day and this sentence used to be per week, so a four
+       day build-muscle week at 60 that ran 69, 68, 60 and 54 printed "the
+       training itself needs less than that" off the one day it was true of.
+       It is said of the whole week only when it is true of every full day, and
+       otherwise it names the days. */
+    const fullDays = week.filter((d) => !d.short).length;
+    const names = cools.map((c) => c.day);
+    const where = cools.length >= fullDays
+      ? `You asked for ${askedMinutes} minutes and the training itself needs less than that.`
+      : `On ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`} the training itself needs less than the ${askedMinutes} minutes you asked for.`;
+    dayNotes.push(`${where} The extra did not `
       + `become more hard sets, because more than this is past what your week recovers from. It bought a ten minute `
       + `stretching block after instead of five, which is the one thing more of reliably gives you something: range of `
       + `motion over weeks. It does not count as a set and it is not logged.`);
@@ -2294,7 +2656,7 @@ export function buildPlan({
      where the two are added. And the old closing advice, "spend the rest on a
      longer warm-up", is gone: research/13 says a longer warm-up costs
      performance, so the engine should not have been recommending one. */
-  const longestDay = week.reduce((m, d) => Math.max(m, d.estimatedMinutes + COOLDOWN_MIN), 0);
+  const longestDay = week.reduce((m, d) => Math.max(m, d.estimatedMinutes + d.cooldownMinutes), 0);
   if (askedMinutes !== null && askedMinutes > P.sessionMin && longestDay < askedMinutes * 0.8) {
     dayNotes.push(`You have ${askedMinutes} minutes and the longest day here needs about ${longestDay}. That is not the `
       + `plan being lazy: more sets than this is past what a week recovers from, and volume you cannot `
@@ -2319,11 +2681,41 @@ export function buildPlan({
      What is left over is the floor of the engine itself, four movements at
      three sets and the shortest rest it will prescribe, and the honest thing to
      say is that the budget is smaller than any real session of this goal. */
+  /* ---- warm-up and cool-down, picked again now that the day is final ----
+     The provisional pick above costed the trims; this one is what the person
+     gets, and the estimate is re-read off it so `estimatedMinutes` and
+     `totalMinutes` are the built blocks and not the budgeted ones. It runs
+     BEFORE the over-budget list, because `fits` has to be judged on the same
+     numbers the app will print. Nothing here feeds the volume ledger or
+     recovery: a stretch is not a set. See engine/mobility.mjs. */
+  for (const d of week) {
+    d.mobility = pickBlocks(d);
+    costBlocks(d);
+    d.estimatedMinutes = estimateMinutes(d.exercises, d.prepMinutes);
+    /* The ramp is already inside `estimatedMinutes` by way of `prepMinutes`, so
+       it must not be added again here. Only the cool-down sits on top. */
+    d.totalMinutes = d.estimatedMinutes + d.cooldownMinutes;
+  }
+
+  /* An ask under the floor is refused out loud rather than built for a bigger
+     number with a note claiming it fits. The clamp used to say "about 25
+     minutes" and the smallest day the engine builds is not 25; measured on
+     49,720 days with a stated clock, a 20 came back as 30 every time. So the
+     floor is the smallest day the engine really builds, and every full day of
+     a plan built above what was asked is listed here with `fits` false. */
+  const clampedUp = askedMinutes !== null && Number.isFinite(rawAsked) && Math.round(rawAsked) < askedMinutes;
   const overBudget = week
-    .filter((d) => overClock(d.estimatedMinutes, d))
+    .filter((d) => overClock(d.estimatedMinutes, d) || (clampedUp && !d.short))
     .map((d) => ({
-      day: d.name, estimatedMinutes: d.estimatedMinutes, totalMinutes: d.estimatedMinutes + COOLDOWN_MIN, budget: d.minutes,
-      why: askedMinutes === null
+      day: d.name, estimatedMinutes: d.estimatedMinutes, totalMinutes: d.totalMinutes, budget: d.minutes,
+      why: clampedUp
+        ? `You asked for ${Math.round(rawAsked)} minutes. There is no session that short: four movements at two sets and the `
+          + `shortest rest worth calling rest is about ${SESSION_MIN_FLOOR} once the warm-up and cool-down are in, so ${d.name} `
+          + `is built for ${SESSION_MIN_FLOOR} and comes to about ${d.totalMinutes}`
+          + (overClock(d.estimatedMinutes, d)
+            ? `, and that is after the sets came down and the rest with them. Give it the extra or pick a goal with shorter rests.`
+            : `.`)
+        : askedMinutes === null
         /* "you asked for" is wrong on this branch and always was: `askedMinutes`
            is null here, so the number is the goal's own, not theirs. It went
            unnoticed while every goal length was a round 45 or 60; the ramp made
@@ -2334,7 +2726,7 @@ export function buildPlan({
            See COOLDOWN_MIN. `totalMinutes` above still carries the whole visit
            for a screen that wants it. */
         ? `${d.name} comes to about ${d.estimatedMinutes} minutes against the ${d.minutes} this goal is built around. Everything left on it is a main lift, so the time goes to the rest between sets.`
-        : `${d.name} still comes to about ${d.estimatedMinutes + COOLDOWN_MIN} minutes with the cool-down, against the ${d.minutes} you asked for, and that is `
+        : `${d.name} still comes to about ${d.totalMinutes} minutes with the cool-down, against the ${d.minutes} you asked for, and that is `
           + `after the sets came down and the rest with them. This goal cannot honestly be done in ${d.minutes} minutes: `
           + `give it the extra or pick a goal with shorter rests.`,
     }));
@@ -2456,6 +2848,19 @@ export function buildPlan({
     });
   }
 
+  /* The true thing about volume on a short clock, said once. `volumeDial`
+     climbs from 0 to 0.75 across thirty weeks of logs, and on a 30 or 45
+     minute clock the sets never move with it because the clock is full: the
+     dial asks, the clock takes the sets straight back off, and the person
+     sees a week that never grows and no reason. So when the clock took sets
+     off AND the ledger is still under target somewhere, the plan says which
+     of the two levers they hold. One sentence, once. */
+  if (askedMinutes !== null && clockCutSets > 0 && volumeUnder.length) {
+    dayNotes.push(`Your week asks for more hard sets than ${askedMinutes} minutes a session holds, so ${clockCutSets} `
+      + `came off to fit the clock. More sets need more time on the clock or another day in the week; the plan `
+      + `cannot add them inside the minutes you gave it.`);
+  }
+
   /* The other half of the same honesty, and it was missing. The trim above only
      moves accessories and never goes below two sets, so an excess made entirely
      of main work, or of accessories already sitting on the floor of two, comes
@@ -2531,52 +2936,16 @@ export function buildPlan({
   for (const r of plateauPlan.responses) if (r.say) dayNotes.push(r.say);
   if (plateauPlan.summary.say) dayNotes.push(plateauPlan.summary.say);
 
-  /* ---- warm-up and cool-down, after the time pass so the day is final ----
-     The five warm-up minutes have been inside estimateMinutes since the first
-     run with nothing in them; the warm-up block fills them. The cool-down is
-     new and sits on top, so a day carries both numbers and totalMinutes is the
-     honest one for somebody deciding whether they have time. Nothing here
-     feeds the volume ledger or recovery: a stretch is not a set. See
-     engine/mobility.mjs for the reasoning and the research. */
-  for (const d of week) {
-    /* `mobilityChild` is the primary's own child whenever that child is one of
-       the two mobility ones, so this is what it always was, and it is a
-       secondary goal's child only when the primary had no claim on the block.
-       "Build muscle and touch my toes" is the case it exists for. */
-    d.mobility = mobilityFor(d, {
-      hurts: limitsUsed.hurts, missing: limitsUsed.missing, goalChild: resolved.mobilityChild,
-      /* Set by the fill pass above, and only there: a longer block is something
-         a stated session length bought, never a default. */
-      longCooldown: !!d.longCooldown,
-    });
-    /* The ramp is already inside `estimatedMinutes` by way of `prepMinutes`, so
-       it must not be added again here. Only the cool-down sits on top. */
-    d.totalMinutes = d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60);
-  }
+  /* The warm-up and cool-down used to be picked here, after the time pass.
+     They are picked twice now, once before the trims so the clock can cost
+     them and once before the over-budget list so `fits` is judged on the
+     built blocks: see `pickBlocks`. `mobilityChild` is the primary's own child
+     whenever that child is one of the two mobility ones, and a secondary
+     goal's child only when the primary had no claim on the block: "Build
+     muscle and touch my toes" is the case it exists for. */
 
-  /* Which progression rule, from the bar rather than from a label. research/04
-     names this as the signal that actually defines the transition: "if someone
-     is still adding weight to a movement almost every session, they are by
-     definition still in the phase where linear progression works, whatever
-     their session count says". So the switch to double progression happens only
-     where we have MEASURED that linear has stopped working, and the default in
-     the absence of evidence is linear, which is also the conservative answer
-     and the one a day one plan needs. */
-  const measuredEnough = trainingAge.confidence === "medium" || trainingAge.confidence === "high";
-  const linearStillWorks = trainingAge.stillLinear || !measuredEnough;
-  const progression = linearStillWorks
-    ? { rule: "linear", detail: "Hit every rep on every set and the weight goes up next time. That keeps working for months and there is no reason to be cleverer than it while it does." }
-    : { rule: "double", detail: "Work up to the top of the rep range on every set, then add weight and drop back to the bottom." };
-
-  /* A scheduled deload is for somebody who is accumulating fatigue faster than
-     they are clearing it, and the visible sign of that is loading having stopped
-     working. Prescribing one to somebody the bar says is still climbing reads as
-     the app deciding they are tired, which is the same paternalism the level
-     ladder was doing. Same two measured facts as the progression rule, so the
-     two can never disagree about what phase somebody is in. */
-  const deload = !linearStillWorks
-    ? { everyWeeks: 6, detail: "Every sixth week, same exercises, about two thirds of the sets." }
-    : null;
+  /* `progression` and `deload` are decided at the top of the build now, so
+     the deload week could be built rather than described. */
 
   return {
     goal: resolved, honest: resolved.timeline, trainingAge,

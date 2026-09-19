@@ -511,6 +511,9 @@ const META_KEYS = new Set([
   "experience", "volumeDial", "childUsed", "goals", "confidence", "days", "dayName", "focusHonoured",
   "focus", "limits", "stretching", "session", "source", "goalSource", "logsSource", "missing",
   "styles", "age",
+  /* 2026-09-19: the talkative half of the plan, CONTRACT.md rows `deload`,
+     `progression` and `volume`. */
+  "deload", "progression", "volume",
 ]);
 /* Documented in the contract's prose and missing from its table. Warned, not
    failed: the key is deliberate and it is the TABLE that is behind, which is a
@@ -524,7 +527,11 @@ const META_SUBKEYS = {
   limits: ["hurts", "missing", "excludedCount"],
   age: ["years", "known", "rampCaution", "rampApplied", "warmupCaution", "warmupApplied", "note"],
   stretching: ["included", "warmupMinutes", "cooldownMinutes", "mobilityGoal", "why"],
-  session: ["budgetMinutes", "source", "asked", "goalMinutes", "estimatedMinutes", "rampMinutes", "fits", "restCompressed"],
+  session: ["budgetMinutes", "source", "asked", "goalMinutes", "estimatedMinutes", "rampMinutes", "feelerMinutes", "fits", "restCompressed"],
+  /* `deload` is not here: it is null for somebody still on linear
+     progression, and this table is walked as objects only. */
+  progression: ["rule", "detail"],
+  volume: ["byGroup", "under", "frequencyCapped"],
   styles: ["asked", "picked", "resistance", "honoured", "equipmentMissing", "cardioModes", "flowTrainings", "note"],
 };
 const WORKOUT_KEYS = new Set(["focus", "exercises", "warmup", "cooldown", "rampSets", "cardio", "flow"]);

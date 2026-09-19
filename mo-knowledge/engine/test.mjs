@@ -21,7 +21,7 @@ import { dirname, join } from "node:path";
 import { deriveTrainingAge, observedCapacity, THRESHOLDS, detectPlateau, earnedMovements, EARNED_DAYS } from "./training-age.mjs";
 import { resolveGoal, GOAL_PARAMS, MAX_SECONDARY_GOALS, MOVEMENT_CLASSES, barredMovements, movementCautionNotes } from "./goal-engine.mjs";
 import { sizeCeiling1RM, prescribeLoad, patternFor, variantFactor, roundLoad } from "./load.mjs";
-import { buildPlan, estimateMinutes, sessionSeconds } from "./plan.mjs";
+import { buildPlan, estimateMinutes, sessionSeconds, noviceSessionCap, feelerSeconds, trainedWeeksBefore } from "./plan.mjs";
 import { conjunctiveWeek, chooseComparison, sharedSchedule, relativeScore, PRODUCTIVE_GAP } from "./pair.mjs";
 
 import { normalizeFocus, parseFocus, mergePriority, focusFreshness, MUSCLE_GROUPS, TIERS, TIER_COST, FOCUS_BUDGET } from "./focus.mjs";
@@ -671,6 +671,78 @@ test("an ordinary guess from a similar lift is not capped and does not gain a ca
   });
   assert.equal(r.capped, false);
   assert.doesNotMatch(r.note, /held here/);
+});
+
+/* The audit of 2026-09-19. Every hinge was filed under one pattern ratio, so a
+   logged Deadlift 3x8 at 315 prescribed a Romanian Deadlift at 300, a Good
+   Morning at 300 and a Cable Pull-Through at 240, all under "a similar lift".
+   Three rows behind the guess so the size ceiling does not bind and the ratio
+   table is the only thing under test; every bound is in pounds off the
+   prescription against the coaching range the table was built from. */
+const threeRowsOf = (name, weight) =>
+  [3, 6, 9].map((n) => ({ entry_date: day(-n), exercise_name: name, weight, reps: 8, sets: 3 }));
+const guessFrom = (logs, name, bodyWeightLb = 180) =>
+  prescribeLoad({ exercise: { name, equipment: "barbell" }, reps: 8, bodyWeightLb, sex: "Male", logs });
+
+test("a hinge is priced as its own movement and never as the deadlift it was guessed from", () => {
+  const logs = threeRowsOf("Deadlift", 315);
+  const bounds = {
+    "Romanian Deadlift": [0.6, 0.8], "Stiff-Leg Deadlift": [0.6, 0.8], "Good Morning": [0.3, 0.45],
+    "Cable Pull-Through": [0.2, 0.4], "Hip Thrust": [0.85, 1.2], "Back Extension": [0.05, 0.25],
+    "Kettlebell Swing": [0.15, 0.35], "Single-Leg Romanian Deadlift": [0.2, 0.4],
+  };
+  for (const [name, [lo, hi]] of Object.entries(bounds)) {
+    const r = guessFrom(logs, name);
+    assert.equal(r.basis, "a similar lift", `${name} was not guessed from the deadlift`);
+    assert.equal(r.capped, false, `${name} hit the ceiling, so the ratio was not what priced it`);
+    assert.ok(r.weight <= 315 * hi && r.weight >= 315 * lo, `${name} from a 315 deadlift came to ${r.weight}`);
+  }
+});
+
+test("from a heavier deadlift the ceiling holds every hinge under its own ratio", () => {
+  const logs = threeRowsOf("Deadlift", 405);
+  const ratio = { "Romanian Deadlift": 0.8, "Good Morning": 0.45, "Cable Pull-Through": 0.4, "Hip Thrust": 1.2, "Back Extension": 0.25 };
+  for (const [name, hi] of Object.entries(ratio)) {
+    const r = guessFrom(logs, name);
+    assert.ok(r.weight <= 405 * hi, `${name} from a 405 deadlift came to ${r.weight}`);
+  }
+  /* And the ceiling is a movement's ceiling: the Good Morning is held well
+     under the 365 a deadlift-shaped ceiling used to hand back. */
+  assert.ok(guessFrom(logs, "Good Morning").weight <= 160);
+});
+
+test("the other families carry their own ratios too", () => {
+  const front = guessFrom(threeRowsOf("Barbell Back Squat", 315), "Front Squat");
+  assert.ok(front.weight <= 315 * 0.8 && front.weight >= 315 * 0.6, `front squat from a 315 squat came to ${front.weight}`);
+  const landmine = guessFrom(threeRowsOf("Barbell Bench Press", 225), "Landmine Press");
+  assert.ok(landmine.weight <= 225 * 0.5, `landmine press from a 225 bench came to ${landmine.weight}`);
+  const upright = guessFrom(threeRowsOf("Barbell Row", 185), "Upright Row");
+  assert.ok(upright.weight <= 185 * 0.5, `upright row from a 185 row came to ${upright.weight}`);
+  const supported = guessFrom(threeRowsOf("Barbell Row", 185), "Chest-Supported Row");
+  assert.ok(supported.weight <= 185 * 0.8, `chest-supported row from a 185 row came to ${supported.weight}`);
+});
+
+test("single joint work is only ever priced from its own family", () => {
+  /* A leg curl and a lateral raise are both "isolation" to patternFor, and one
+     used to price the other. */
+  const fromLegCurl = guessFrom(threeRowsOf("Leg Curl", 120), "Lateral Raise");
+  assert.equal(fromLegCurl.basis, "unknown");
+  assert.equal(fromLegCurl.weight, null);
+  const hammer = guessFrom(threeRowsOf("Dumbbell Curl", 35), "Hammer Curl");
+  assert.equal(hammer.basis, "a similar lift");
+  assert.ok(hammer.weight >= 25 && hammer.weight <= 40, `hammer curl from a 35 curl came to ${hammer.weight}`);
+});
+
+test("the typo rail knows a good morning is not a deadlift", () => {
+  const one = (name, weight) => [{ entry_date: day(-4), exercise_name: name, weight, reps: 8 }];
+  const gm = prescribeLoad({ exercise: { name: "Good Morning", equipment: "barbell" }, reps: 8, bodyWeightLb: 180, sex: "Male", logs: one("Good Morning", 600) });
+  assert.equal(gm.capped, true);
+  assert.ok(gm.weight <= 180 * 2, `a 600 lb good morning row was handed back as ${gm.weight}`);
+  /* The same row on the deadlift itself is under the four-times rail and is
+     handed straight back: the rail tightens per movement and never loosens. */
+  const dl = prescribeLoad({ exercise: { name: "Deadlift", equipment: "barbell" }, reps: 8, bodyWeightLb: 180, sex: "Male", logs: one("Deadlift", 600) });
+  assert.equal(dl.weight, 600);
+  assert.equal(dl.capped, false);
 });
 
 /* CONTRACT.md: targetWeight is a number the app does arithmetic on, 0 means
@@ -3117,6 +3189,82 @@ test("the MRV ceiling never takes back the set a focus tier guarantees", () => {
   }
 });
 
+/* Boundary audit of 2026-09-19. "Hamstrings/glutes" is one row in
+   volume-landmarks.md (MRV 18) and the engine gave each half 18, so the pair
+   could ask for 36: the abs/obliques 20+20 error again. The pair now shares
+   the row. The bound allows the +1 a focus tier guarantees on each half,
+   because that guarantee sits outside every ceiling on purpose. */
+test("hamstrings and glutes share the one MRV row the research gives them", () => {
+  const today = new Date("2026-09-10T12:00:00");
+  for (const days of [3, 4, 5]) {
+    for (const focus of [null, ["glutes:3"], ["hamstrings:3", "glutes:3"]]) {
+      const out = generateFromPayload(
+        { goal_bubble: "build-muscle", challenge_target: days, current_weight: 195, sex: "Male", logs: longHistory(78), ...(focus ? { focus_groups: focus } : {}) },
+        { today, includePlan: true },
+      );
+      const v = out.plan.weeklyVolume;
+      const asked = (v.hamstrings?.wanted ?? 0) + (v.glutes?.wanted ?? 0);
+      const allowed = 18 + (focus ? focus.length : 0);
+      assert.ok(asked <= allowed, `${days}d focus ${JSON.stringify(focus)}: the pair asks for ${asked} against a shared MRV of 18`);
+    }
+  }
+});
+
+/* Traps, forearms and lower back had no MRV row and were uncapped. Each now
+   carries its smallest neighbouring row, and a red focus on a five day week is
+   the one ask big enough to reach two of them. */
+test("traps, forearms and lower back have a weekly ceiling", () => {
+  const today = new Date("2026-09-10T12:00:00");
+  const rows = { forearms: 22, lowerback: 18, traps: 24 };
+  for (const [group, mrv] of Object.entries(rows)) {
+    const out = generateFromPayload(
+      { goal_bubble: "build-muscle", challenge_target: 5, current_weight: 195, sex: "Male", logs: longHistory(78), focus_groups: [`${group}:3`] },
+      { today, includePlan: true },
+    );
+    const v = out.plan.weeklyVolume[group];
+    assert.ok(v, `${group} is not trained on a five day week with a red focus on it`);
+    assert.ok(v.wanted <= mrv, `${group} asks for ${v.wanted} against a ceiling of ${mrv}`);
+  }
+});
+
+/* Safety audit of 2026-09-19. Zero logs, build muscle, four days, 45 minutes
+   came to 72 hard sets and the same person at six months to 59; tone-lean-abs
+   with six days asked came to 104, biggest day 27. Per muscle every week was
+   inside MEV..MRV; nothing read the total. research/09: the first two weeks
+   decide whether anybody is still here in twelve. */
+const weekSets = (plan) => plan.week.reduce((t, d) => t + d.exercises.reduce((s, e) => s + e.sets, 0), 0);
+const biggestDay = (plan) => Math.max(...plan.week.map((d) => d.exercises.reduce((s, e) => s + e.sets, 0)));
+
+test("a first ever week is never bigger than the trained week for the same inputs", () => {
+  const person = { bodyWeightLb: 180, sex: "Male", daysAsked: 4, sessionMinutes: 45 };
+  const first = buildPlan({ goal: { bubble: "build-muscle" }, person, logs: [] });
+  const trained = buildPlan({ goal: { bubble: "build-muscle" }, person, logs: longHistory(26) });
+  assert.ok(weekSets(first) <= weekSets(trained), `first week ${weekSets(first)} sets, trained week ${weekSets(trained)}`);
+  /* 14 is the cap and the floors (a main at three, an accessory at two) may
+     hold a day one or two over it; 16 is the top of the coaching range. */
+  assert.ok(biggestDay(first) <= 16, `biggest first-week day is ${biggestDay(first)} sets`);
+  assert.ok(!trained.dayNotes.some((n) => /held to about \d+ hard sets/.test(n)), "the cap is never spoken to somebody it does not apply to");
+});
+
+test("six days of tone-lean-abs with no history is not 104 sets", () => {
+  const person = { bodyWeightLb: 180, sex: "Male", daysAsked: 6 };
+  const first = buildPlan({ goal: { bubble: "tone-lean-abs" }, person, logs: [] });
+  const trained = buildPlan({ goal: { bubble: "tone-lean-abs" }, person, logs: longHistory(26) });
+  assert.ok(weekSets(first) <= weekSets(trained), `first week ${weekSets(first)} sets, trained week ${weekSets(trained)}`);
+  /* Five days of MEV-per-muscle is about 17 sets a day whatever the cap says,
+     because a set under MEV does nothing for the muscle it came off. So the
+     bound on the day is the trained day, and the 14 to 16 is asserted where
+     it can hold, above with a clock. */
+  assert.ok(biggestDay(first) <= biggestDay(trained), `biggest first-week day is ${biggestDay(first)} sets, trained ${biggestDay(trained)}`);
+});
+
+test("the novice cap climbs across the first three weeks and then leaves", () => {
+  assert.equal(noviceSessionCap(0), 14);
+  assert.ok(noviceSessionCap(4) > 14 && noviceSessionCap(4) < 20);
+  assert.equal(noviceSessionCap(9), Infinity);
+  assert.equal(noviceSessionCap(200), Infinity);
+});
+
 /* ------------------------------------------------------------------ *
  * A goal never prescribes what its own note warns against
  * ------------------------------------------------------------------ */
@@ -3433,9 +3581,15 @@ test("a session length outside the clamp is clamped and the clamp is spoken", ()
     goal: { bubble: "build-muscle" },
     person: { daysAsked: 3, bodyWeightLb: 180, sex: "Male", sessionMinutes: 5 },
   });
-  assert.equal(tiny.sessionBudget.minutes, 15);
+  /* 25 since 2026-09-19: the floor is the smallest full day the engine really
+     builds (four movements at two sets, the shortest rest, warm-up and
+     cool-down), measured, and not the 15 the slider used to be allowed to send.
+     The sentence is per day now and rides in `volumeNotes.overBudget`, so
+     `fits` goes false with it. */
+  assert.equal(tiny.sessionBudget.minutes, 25);
   assert.equal(tiny.sessionBudget.asked, 5);
   assert.ok(tiny.dayNotes.some((n) => /There is no session that short/.test(n)));
+  assert.ok(tiny.volumeNotes.overBudget.length, "a plan built above what was asked lists its days as not fitting");
   const huge = buildPlan({
     goal: { bubble: "build-muscle" },
     person: { daysAsked: 3, bodyWeightLb: 180, sex: "Male", sessionMinutes: 600 },
@@ -3569,6 +3723,9 @@ test("a ramp is inside the session estimate, never bolted on after it", () => {
       ? Math.round((RAMPED_WARMUP_SECONDS + rampSec) / 60)
       : Math.round(WARMUP_SECONDS / 60);
     assert.equal(d.prepMinutes, expected, `${d.name} reserves what it spends`);
+    /* What the built block runs over its budget is reserved against a stated
+       clock beside the cool-down (plan.mjs `costBlocks`), never lost. */
+    assert.ok(d.mobility.warmupSeconds >= (rampSec ? RAMPED_WARMUP_SECONDS : WARMUP_SECONDS), `${d.name}: the block is under its budget`);
     /* The exported costing rather than a copy of it, so a change to what a set
        costs is made in one place; the worked example on REP_SECONDS in plan.mjs
        is where a reader checks the arithmetic itself. */
@@ -3646,8 +3803,12 @@ test("a shorter budget that later gets lighter gives the rest back and says so",
   /* 35 rather than 30 since the costing of 2026-09-14: at 30 the honest clock
      leaves a backed-off strength day of four mains no room at all, so there is
      nothing to repay into. At 35 the back-off frees enough to hand three of the
-     four days their full rest back, which is the mechanism under test. */
-  const person = { daysAsked: 4, bodyWeightLb: 180, sex: "Male", sessionMinutes: 35 };
+     four days their full rest back, which is the mechanism under test.
+     40 since 2026-09-19, when the clock started reserving the built cool-down
+     and allowing three minutes over rather than fifteen percent: at 35 the
+     same backed-off day now repays to 0.8 of the interval and stops, and at
+     40 three of the four days get the whole of it back. */
+  const person = { daysAsked: 4, bodyWeightLb: 180, sex: "Male", sessionMinutes: 40 };
   /* A week the calibration backs off: everything prescribed, much less logged.
      The back-off takes sets off AFTER the clock compressed the rest, which is
      the only way a day can be both in debt and roomy at the same moment. */
@@ -4120,6 +4281,11 @@ const corePlan = (daysAsked, priorityOverride = null) => buildPlan({
   person: { daysAsked, bodyWeightLb: 180, sex: "male" },
   logs: [], priorityOverride,
 });
+/* The floor a day one week is held to. Somebody with no logs sits at four
+   fifths of MEV on purpose since 2026-09-19 (plan.mjs noviceScale, the
+   landmark table's own caveat that beginners need less to grow), so the split
+   is asked for that rather than for the intermediate column's 8. */
+const CORE_FLOOR_DAY_ONE = Math.round(8 * 0.8);
 
 test("every split trains core, whatever the day count called the day", () => {
   /* Measured on HEAD before the slot was widened: a three day week got 9 abs
@@ -4128,7 +4294,7 @@ test("every split trains core, whatever the day count called the day", () => {
      day count. */
   for (const days of [2, 3, 4, 5]) {
     const plan = corePlan(days);
-    assert.ok(coreSets(plan) >= 8, `a ${days} day week gets ${coreSets(plan)} core sets, under the MEV-to-MAV floor in knowledge/principles/volume-landmarks.md`);
+    assert.ok(coreSets(plan) >= CORE_FLOOR_DAY_ONE, `a ${days} day week gets ${coreSets(plan)} core sets, under the MEV-to-MAV floor in knowledge/principles/volume-landmarks.md`);
     assert.ok(setsOf(plan, "abs") > 0, `a ${days} day week never trains abs`);
   }
 });
@@ -4908,4 +5074,220 @@ test("the capacity read is the rhythm they are actually keeping", () => {
   });
   assert.ok(lapsed.sessionsPerWeek < 2, `a three week gap still read as ${lapsed.sessionsPerWeek} a week`);
   assert.ok(lapsed.sessionsPerWeek > 1, `and it is not zero either: ${lapsed.sessionsPerWeek}`);
+});
+
+/* =========================================================================
+ * The clock, 2026-09-19: the number on the card is the number on the app
+ * ========================================================================= */
+
+/* What the app prints: the lifting, the built warm-up, the ramp and the built
+   cool-down, in real seconds. index.html's `sessionEstimateMinutes` is this
+   arithmetic (minus the feeler term, see `meta.session.feelerMinutes`). */
+const appMinutes = (d) => {
+  const ramp = (d.rampSets || []).reduce((t, r) => t + r.seconds, 0);
+  return Math.round((sessionSeconds(d.exercises) + d.mobility.warmupSeconds + ramp + d.mobility.cooldownSeconds) / 60);
+};
+
+test("fits is true only when the whole visit is about the number they asked for", () => {
+  /* Across 1,100 runs with a stated clock, 69% of days landed five or more
+     minutes over the ask and 47% of those said fits: true. Three minutes is
+     "about"; one more for the rounding between two sums. */
+  let fitting = 0;
+  for (const bubble of ["build-muscle", "get-stronger", "lose-weight", "tone-lean-abs"]) {
+    for (const days of [3, 4]) {
+      for (const logs of [[], longHistory(26)]) {
+        for (const clock of [30, 45, 60]) {
+          const plan = buildPlan({ goal: { bubble }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: days, sessionMinutes: clock }, logs });
+          for (const d of plan.week) {
+            if (d.short) continue;
+            const fits = !plan.volumeNotes.overBudget.some((o) => o.day === d.name);
+            if (!fits) continue;
+            fitting++;
+            assert.ok(appMinutes(d) <= clock + 4,
+              `${bubble} ${days}d ${logs.length ? "trained" : "day one"} at ${clock}: ${d.name} says it fits and the app would print ${appMinutes(d)}`);
+            assert.equal(d.totalMinutes, d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60));
+          }
+        }
+      }
+    }
+  }
+  assert.ok(fitting > 20, `only ${fitting} days fit at all, which means the clock is now impossible rather than honest`);
+});
+
+test("a 20 minute ask is refused out loud rather than built for 25 and called a fit", () => {
+  const plan = buildPlan({
+    goal: { bubble: "build-muscle" },
+    person: { daysAsked: 3, bodyWeightLb: 180, sex: "Male", sessionMinutes: 20 },
+    logs: longHistory(26),
+  });
+  assert.equal(plan.sessionBudget.minutes, 25);
+  assert.equal(plan.sessionBudget.asked, 20);
+  const full = plan.week.filter((d) => !d.short);
+  for (const d of full) {
+    const row = plan.volumeNotes.overBudget.find((o) => o.day === d.name);
+    assert.ok(row, `${d.name} was built for 25 against a 20 and not listed as not fitting`);
+    assert.match(row.why, /There is no session that short/);
+    assert.match(row.why, /You asked for 20/);
+  }
+  const out = generateFromPayload({
+    goal_bubble: "build-muscle", challenge_target: 3, current_weight: 180, sex: "Male", logs: longHistory(26), session_minutes: 20,
+  }, { today: VOLUME_TODAY });
+  assert.equal(out.meta.session.fits, false);
+  assert.equal(out.meta.session.asked, 20);
+});
+
+test("feeler sets are costed on a lift that has no weight yet", () => {
+  assert.ok(feelerSeconds({ loadBasis: "unknown" }) >= 90, "two light sets and their rests is minutes, not seconds");
+  assert.equal(feelerSeconds({ loadBasis: "bodyweight" }), 0);
+  assert.equal(feelerSeconds({ loadBasis: "your last session" }), 0);
+  assert.equal(feelerSeconds({}), 0);
+  /* Day one: a couple of lifts a day carry no number, and the minutes spent
+     finding one are on the estimate and on the response. */
+  const out = generateFromPayload({
+    goal_bubble: "build-muscle", challenge_target: 4, current_weight: 180, sex: "Male", logs: [],
+  }, { today: VOLUME_TODAY, includePlan: true });
+  assert.ok(out.meta.session.feelerMinutes >= 2, `day one carries ${out.meta.session.feelerMinutes} feeler minutes`);
+  const d = out.plan.week[0];
+  const withoutFeelers = Math.round(d.prepMinutes + d.exercises.reduce((t, e) => t + exerciseSecondsWithout(e), 0) / 60);
+  assert.ok(d.estimatedMinutes > withoutFeelers, "the estimate is not the same number with the feelers taken out");
+});
+/* The costing without the feeler term, so the test above can measure it. */
+const exerciseSecondsWithout = (e) => sessionSeconds([{ ...e, loadBasis: "bodyweight" }]);
+
+test("the needs-less-than-that sentence is per day, or true of every day", () => {
+  /* Build muscle, four days at 60, ran 69, 68, 60 and 54 with the note
+     printed off the one day it was true of. */
+  for (const clock of [60, 90]) {
+    const plan = buildPlan({
+      goal: { bubble: "build-muscle" },
+      person: { daysAsked: 4, bodyWeightLb: 180, sex: "Male", sessionMinutes: clock },
+      logs: longHistory(78),
+    });
+    const note = plan.dayNotes.find((n) => /the training itself needs less than/.test(n));
+    if (!note) continue;
+    const bought = (plan.volumeNotes.timeBought || []).filter((t) => t.bought === "cooldown").length;
+    const fullDays = plan.week.filter((d) => !d.short).length;
+    if (bought >= fullDays) assert.match(note, /^You asked for/);
+    else assert.match(note, /^On .* the training itself needs less/, `${bought} of ${fullDays} days bought the block and the note says: ${note}`);
+  }
+});
+
+test("when the clock takes sets the dial wanted, the plan says which lever they hold", () => {
+  const plan = buildPlan({
+    goal: { bubble: "build-muscle" },
+    person: { daysAsked: 4, bodyWeightLb: 180, sex: "Male", sessionMinutes: 30 },
+    logs: longHistory(78),
+  });
+  assert.ok(plan.volumeNotes.under.length, "a trained four day week at 30 minutes is under target somewhere");
+  assert.ok(plan.dayNotes.some((n) => /More sets need more time on the clock or another day/.test(n)),
+    plan.dayNotes.join(" | "));
+  /* Said once, not per day. */
+  assert.equal(plan.dayNotes.filter((n) => /More sets need more time on the clock/.test(n)).length, 1);
+});
+
+/* =========================================================================
+ * The deload, built rather than promised
+ * ========================================================================= */
+
+/* Completed plans on Monday, Wednesday and Friday of each of the `weeks`
+   calendar weeks before `today`. */
+const trainedWeeksOfPlans = (weeks, today) => {
+  const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const out = [];
+  for (let w = 1; w <= weeks; w++) {
+    for (const off of [0, 2, 4]) {
+      const d = new Date(monday); d.setDate(d.getDate() - w * 7 + off);
+      const iso = new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+      out.push({ entry_date: iso, completed_at: iso, exercises: [] });
+    }
+  }
+  return out;
+};
+
+test("trained weeks are counted off the plans history, back to the first week off", () => {
+  const today = new Date(2026, 8, 17, 12);
+  assert.equal(trainedWeeksBefore([], today), 0);
+  assert.equal(trainedWeeksBefore(trainedWeeksOfPlans(6, today), today), 6);
+  /* A week with nothing completed ends the run. */
+  const gap = trainedWeeksOfPlans(6, today).filter((p) => !trainedWeeksOfPlans(3, today).some((q) => q.entry_date === p.entry_date) || true);
+  const withGap = trainedWeeksOfPlans(6, today).filter((p) => {
+    const inWeekThree = trainedWeeksOfPlans(3, today).slice(6).some((q) => q.entry_date === p.entry_date);
+    return !inWeekThree;
+  });
+  assert.equal(trainedWeeksBefore(withGap, today), 2, `${gap.length} rows with week three missing`);
+  /* A row marked as a deload ends it too. */
+  const marked = trainedWeeksOfPlans(6, today).map((p, i) => (i >= 12 && i < 15 ? { ...p, deload: true } : p));
+  assert.equal(trainedWeeksBefore(marked, today), 4);
+  /* Rows without completed_at are not evidence, and the current week is not counted. */
+  const unfinished = trainedWeeksOfPlans(6, today).map((p) => ({ entry_date: p.entry_date, exercises: [] }));
+  assert.equal(trainedWeeksBefore(unfinished, today), 0);
+});
+
+test("a ten week replay builds week seven lighter and says so, and week eight is back", () => {
+  const today = new Date(2026, 8, 17, 12);
+  const daysAgo = (n) => { const d = new Date(today.getTime() - n * 86400000); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+  /* Past linear progression, so a deload is on the schedule at all. */
+  const logs = Array.from({ length: 70 }, (_, i) => ({ entry_date: daysAgo(1 + (69 - i) * 2), exercise_name: "Bench Press", weight: 135 + Math.min(i, 20) * 5, reps: 8 }));
+  const build = (weeks) => buildPlan({
+    goal: { bubble: "get-stronger" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 3 },
+    logs, plans: trainedWeeksOfPlans(weeks, today), today,
+  });
+  const sets = (plan) => plan.week.reduce((t, d) => t + d.exercises.reduce((s, e) => s + e.sets, 0), 0);
+  const loadOf = (plan, name) => plan.week.flatMap((d) => d.exercises).find((e) => e.name === name)?.weight ?? null;
+
+  const week6 = build(5);
+  const week7 = build(6);
+  const week8 = build(7);
+  assert.ok(week6.deload && week6.deload.week === false, JSON.stringify(week6.deload));
+  assert.equal(week7.deload.week, true);
+  assert.equal(week7.deload.trainedWeeks, 6);
+  assert.equal(week8.deload.week, false);
+
+  const ratio = sets(week7) / sets(week6);
+  assert.ok(ratio >= 0.55 && ratio <= 0.8, `week seven is ${sets(week7)} sets against ${sets(week6)} the week before (${ratio.toFixed(2)})`);
+  assert.equal(sets(week8), sets(week6), "week eight is the full week again");
+  for (const d of week6.week) {
+    for (const e of d.exercises) {
+      if (!(e.weight > 0)) continue;
+      const lighter = loadOf(week7, e.name);
+      if (lighter == null) continue;
+      assert.ok(lighter <= e.weight * 0.92 && lighter >= e.weight * 0.85, `${e.name}: ${e.weight} became ${lighter} on the deload week`);
+      assert.equal(loadOf(week8, e.name), e.weight, `${e.name} is back to ${e.weight} the week after`);
+    }
+  }
+  assert.ok(week7.dayNotes.some((n) => /deload week/.test(n) && /next week goes back up/i.test(n)), week7.dayNotes.join(" | "));
+  assert.ok(!week8.dayNotes.some((n) => /deload week/.test(n)));
+  /* Somebody still on linear progression is never deloaded, however many
+     weeks in a row they have trained. */
+  const still = buildPlan({
+    goal: { bubble: "get-stronger" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 3 },
+    logs: [], plans: trainedWeeksOfPlans(6, today), today,
+  });
+  assert.equal(still.deload, null);
+});
+
+/* =========================================================================
+ * The talkative half, on the response
+ * ========================================================================= */
+
+test("the response carries the deload, the progression and the ledger", () => {
+  const out = generateFromPayload({
+    goal_bubble: "build-muscle", challenge_target: 4, current_weight: 180, sex: "Male", logs: longHistory(26),
+  }, { today: VOLUME_TODAY, includePlan: true });
+  assert.deepEqual(out.meta.progression, out.plan.progression);
+  assert.deepEqual(out.meta.deload, out.plan.deload);
+  assert.deepEqual(out.meta.volume, {
+    byGroup: out.plan.weeklyVolume, under: out.plan.volumeNotes.under, frequencyCapped: out.plan.volumeNotes.frequencyCapped,
+  });
+  assert.ok(Object.keys(out.meta.volume.byGroup).length > 5, "the ledger is not empty");
+  assert.equal(typeof out.meta.session.feelerMinutes, "number");
+  /* Day one: linear, no deload, and the keys are still there. */
+  const first = generateFromPayload({ goal_bubble: "build-muscle", challenge_target: 4, current_weight: 180, sex: "Male", logs: [] }, { today: VOLUME_TODAY });
+  assert.equal(first.meta.deload, null);
+  assert.equal(first.meta.progression.rule, "linear");
+  assert.ok(Array.isArray(first.meta.volume.under));
+  /* Nothing in `workout` or `notes` changed shape for it. */
+  assert.ok(Array.isArray(first.notes));
+  assert.ok(!("deload" in first.workout) && !("progression" in first.workout) && !("volume" in first.workout));
 });
