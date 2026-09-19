@@ -218,10 +218,12 @@ let startingWeight = { ours: null, jawa: null }; // person 0, no history
 
 console.log("=".repeat(78));
 console.log("ASYMMETRY, stated once: Jawa's buildWeekPlan takes level as an argument.");
-console.log("Ours measures it from logged history (deriveTrainingAge) and never asks.");
-console.log("Every JAWA call below is handed the level OUR engine measured for that");
-console.log("person. That is a real difference in what each function needs to run,");
-console.log("not a tie engineered in either direction.");
+console.log("Ours has no such concept at all any more. It reads what somebody has");
+console.log("actually done, movement by movement, and there is no word to hand over.");
+console.log("So each JAWA call below is given the level her function needs, derived");
+console.log("from the same session count ours measures, purely so that it can run.");
+console.log("That is a real difference in what each function needs, not a tie");
+console.log("engineered in either direction.");
 console.log("=".repeat(78));
 
 PEOPLE.forEach((c, idx) => {
@@ -232,7 +234,11 @@ PEOPLE.forEach((c, idx) => {
   const ourSc = scorecard(ourDays);
   addTotals(totals.OURS, ourSc);
 
-  const measuredLevel = ourPlan.level;
+  /* Jawa's function needs a word and ours no longer has one to give it. This is
+     the old ladder, reconstructed here and nowhere else, purely so her side has
+     the argument its signature requires. Nothing on our side reads it. */
+  const n = ourPlan.trainingAge.effectiveSessions;
+  const measuredLevel = n < 20 ? "beginner" : n < 60 ? "novice" : n < 200 ? "intermediate" : "advanced";
   const goalForJawa = jawaGoalFor(c.goal.bubble);
   console.log(`  goal bubble "${c.goal.bubble}" -> Jawa goal string "${goalForJawa}"`
     + ` | level told to Jawa: ${measuredLevel} (measured, not asked)`

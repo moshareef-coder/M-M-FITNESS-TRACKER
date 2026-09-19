@@ -18,9 +18,9 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-import { deriveTrainingAge, observedCapacity, THRESHOLDS, detectPlateau } from "./training-age.mjs";
+import { deriveTrainingAge, observedCapacity, THRESHOLDS, detectPlateau, earnedMovements, EARNED_DAYS } from "./training-age.mjs";
 import { resolveGoal, GOAL_PARAMS, MAX_SECONDARY_GOALS, MOVEMENT_CLASSES, barredMovements, movementCautionNotes } from "./goal-engine.mjs";
-import { coldStart1RM, prescribeLoad, patternFor, variantFactor, roundLoad } from "./load.mjs";
+import { sizeCeiling1RM, prescribeLoad, patternFor, variantFactor, roundLoad } from "./load.mjs";
 import { buildPlan, estimateMinutes, sessionSeconds } from "./plan.mjs";
 import { conjunctiveWeek, chooseComparison, sharedSchedule, relativeScore, PRODUCTIVE_GAP } from "./pair.mjs";
 
@@ -110,22 +110,29 @@ const historyWithGap = ({ before, after, gapDays, endedDaysAgo = 1, step = 3 }) 
  * training-age.mjs
  * ========================================================================= */
 
-test("empty logs give beginner level, no confidence, and a one entry why", () => {
+/* No `level` is asserted anywhere below, and there is nothing left to assert:
+   the beginner / novice / intermediate / advanced ladder is gone. What these
+   check instead is that the measured numbers it was a lossy summary of are the
+   ones being published. */
+test("empty logs give no confidence, no sessions and a one entry why", () => {
   const r = deriveTrainingAge({ logs: [] });
-  assert.equal(r.level, "beginner");
+  assert.equal(r.level, undefined, "the training level must not come back");
   assert.equal(r.confidence, "none");
+  assert.equal(r.effectiveSessions, 0);
   assert.equal(r.why.length, 1);
 });
 
-test("six sessions is a beginner with low confidence", () => {
+test("six sessions is low confidence and counted", () => {
   const r = deriveTrainingAge({ logs: history({ n: 6 }) });
-  assert.equal(r.level, "beginner");
   assert.equal(r.confidence, "low");
+  assert.equal(r.effectiveSessions, 6);
 });
 
-test("twenty five sessions spread every three days ending yesterday is a novice", () => {
+test("twenty five sessions are counted as twenty five, with no verdict attached", () => {
   const r = deriveTrainingAge({ logs: history({ n: 25 }) });
-  assert.equal(r.level, "novice");
+  assert.equal(r.effectiveSessions, 25);
+  assert.equal(r.confidence, "medium");
+  assert.equal(r.level, undefined);
 });
 
 test("ninety sessions with a hundred day gap thirty sessions from the end resets to those thirty", () => {
@@ -140,11 +147,38 @@ test("last session forty days ago counts as returning", () => {
   assert.equal(r.returning, true);
 });
 
-test("seventy sessions climbing every session stays linear and is held at novice", () => {
+test("seventy sessions climbing every session reads as still linear", () => {
   const r = deriveTrainingAge({ logs: climbingEverySession(70) });
   assert.equal(r.stillLinear, true);
-  assert.notEqual(r.level, "intermediate");
-  assert.notEqual(r.level, "advanced");
+});
+
+/* =========================================================================
+ * Earned access. The replacement for the level gate, and the thing the whole
+ * change turns on.
+ * ========================================================================= */
+
+test("one logged day does not earn a movement and two do", () => {
+  const rows = (dates) => dates.map((d) => ({ entry_date: d, exercise_name: "Barbell Snatch", weight: 95, reps: 3 }));
+  assert.equal(earnedMovements({ logs: rows(["2026-09-01"]) }).has("barbell snatch"), false);
+  assert.equal(earnedMovements({ logs: rows(["2026-09-01", "2026-09-04"]) }).has("barbell snatch"), true);
+  assert.equal(EARNED_DAYS, 2);
+});
+
+test("three rows on one afternoon are one day, not three", () => {
+  const logs = [1, 2, 3].map(() => ({ entry_date: "2026-09-01", exercise_name: "Muscle-Up", weight: 0, reps: 1 }));
+  assert.equal(earnedMovements({ logs }).has("muscle-up"), false);
+});
+
+test("picking a movement by hand earns it the first time", () => {
+  const swaps = [{ entry_date: "2026-09-01", planned_exercise: "Push-Up", chosen_exercise: "Weighted Dip", source: "searched" }];
+  assert.equal(earnedMovements({ logs: [], swaps }).has("weighted dip"), true);
+});
+
+test("earning one movement earns nothing else", () => {
+  const logs = ["2026-09-01", "2026-09-04"].map((d) => ({ entry_date: d, exercise_name: "Deadlift", weight: 225, reps: 5 }));
+  const earned = earnedMovements({ logs });
+  assert.equal(earned.size, 1);
+  assert.equal(earned.has("romanian deadlift"), false);
 });
 
 test("observedCapacity is null under eight sessions and a number past it", () => {
@@ -180,7 +214,7 @@ test("lose a number, twenty pounds at 190 with no date, is honest and gives a ta
 
 test("build overall muscle, twenty pounds at 150 for a beginner, takes at least thirty weeks", () => {
   const r = resolveGoal({
-    bubble: "build-muscle", child: "build-overall", amountLb: 20, bodyWeightLb: 150, level: "beginner",
+    bubble: "build-muscle", child: "build-overall", amountLb: 20, bodyWeightLb: 150,
   });
   assert.ok(r.timeline.weeksNeeded >= 30, `weeksNeeded was ${r.timeline.weeksNeeded}`);
 });
@@ -209,7 +243,7 @@ test("an unknown bubble throws", () => {
 test("every bubble in GOAL_PARAMS resolves with no child and falls back to the default", () => {
   for (const bubble of Object.keys(GOAL_PARAMS)) {
     assert.doesNotThrow(() => {
-      const r = resolveGoal({ bubble, child: undefined, bodyWeightLb: 180, sex: "Male", level: "beginner" });
+      const r = resolveGoal({ bubble, child: undefined, bodyWeightLb: 180, sex: "Male" });
       assert.equal(r.params, r.params); // resolved without throwing
     }, `bubble "${bubble}" should resolve with child undefined`);
   }
@@ -343,8 +377,8 @@ test("allometric scaling gives a heavy beginner less than linear and a light one
   const exercise = { name: "Bench Press" };
   const linear265 = 127 * (265 / 180);
   const linear140 = 127 * (140 / 180);
-  const heavy = coldStart1RM({ exercise, bodyWeightLb: 265, sex: "Male", level: "beginner" });
-  const light = coldStart1RM({ exercise, bodyWeightLb: 140, sex: "Male", level: "beginner" });
+  const heavy = sizeCeiling1RM({ exercise, bodyWeightLb: 265, sex: "Male" });
+  const light = sizeCeiling1RM({ exercise, bodyWeightLb: 140, sex: "Male" });
   assert.ok(heavy < linear265, `${heavy} should be under linear ${linear265}`);
   assert.ok(light > linear140, `${light} should be over linear ${linear140}`);
 });
@@ -352,10 +386,10 @@ test("allometric scaling gives a heavy beginner less than linear and a light one
 test("the squat to bench ratio is wider for women than for men at reference weights", () => {
   const squatEx = { name: "Barbell Back Squat" };
   const benchEx = { name: "Bench Press" };
-  const maleRatio = coldStart1RM({ exercise: squatEx, bodyWeightLb: 180, sex: "Male", level: "beginner" })
-    / coldStart1RM({ exercise: benchEx, bodyWeightLb: 180, sex: "Male", level: "beginner" });
-  const femaleRatio = coldStart1RM({ exercise: squatEx, bodyWeightLb: 140, sex: "Female", level: "beginner" })
-    / coldStart1RM({ exercise: benchEx, bodyWeightLb: 140, sex: "Female", level: "beginner" });
+  const maleRatio = sizeCeiling1RM({ exercise: squatEx, bodyWeightLb: 180, sex: "Male" })
+    / sizeCeiling1RM({ exercise: benchEx, bodyWeightLb: 180, sex: "Male" });
+  const femaleRatio = sizeCeiling1RM({ exercise: squatEx, bodyWeightLb: 140, sex: "Female" })
+    / sizeCeiling1RM({ exercise: benchEx, bodyWeightLb: 140, sex: "Female" });
   assert.ok(femaleRatio > maleRatio, `female ratio ${femaleRatio} should exceed male ratio ${maleRatio}`);
 });
 
@@ -500,14 +534,19 @@ test("NAME_PATTERN keeps the specific line ahead of the broad one whose word it 
    which told a 180 lb beginner to incline press about a fifth of what he should.
    Asserted as a relationship to the flat press rather than as a number, since
    the reference standards move and the relationship is the claim. */
+/* Asserted on sizeCeiling1RM rather than on prescribeLoad now, because nothing
+   is prescribed from size any more. The ratio table still exists and still has
+   to be right: it is what stops an extrapolation from somebody's own logs coming
+   back as an 870 lb leg press, and a table that prices an incline press as a
+   curl would make that rail nonsense in the other direction. */
 test("an incline press is priced against the bench, not against a curl", () => {
-  const person = { reps: 8, bodyWeightLb: 180, sex: "Male", level: "beginner", logs: [] };
-  const flat = prescribeLoad({ exercise: { name: "Dumbbell Bench Press", equipment: "dumbbell" }, ...person });
-  const incline = prescribeLoad({ exercise: { name: "Incline Dumbbell Press", equipment: "dumbbell" }, ...person });
-  const curl = prescribeLoad({ exercise: { name: "Dumbbell Curl", equipment: "dumbbell" }, ...person });
-  assert.ok(incline.weight > curl.weight * 2, `incline ${incline.weight} vs curl ${curl.weight}`);
-  assert.ok(incline.weight >= flat.weight * 0.7, `incline ${incline.weight} vs flat ${flat.weight}`);
-  assert.ok(incline.weight <= flat.weight, `incline ${incline.weight} should not exceed flat ${flat.weight}`);
+  const person = { bodyWeightLb: 180, sex: "Male" };
+  const flat = sizeCeiling1RM({ exercise: { name: "Dumbbell Bench Press", equipment: "dumbbell" }, ...person });
+  const incline = sizeCeiling1RM({ exercise: { name: "Incline Dumbbell Press", equipment: "dumbbell" }, ...person });
+  const curl = sizeCeiling1RM({ exercise: { name: "Dumbbell Curl", equipment: "dumbbell" }, ...person });
+  assert.ok(incline > curl * 2, `incline ${incline} vs curl ${curl}`);
+  assert.ok(incline >= flat * 0.7, `incline ${incline} vs flat ${flat}`);
+  assert.ok(incline <= flat, `incline ${incline} should not exceed flat ${flat}`);
 });
 
 /* The README listed "no hinge a beginner can be given" as a known limit of the
@@ -559,17 +598,44 @@ test("prescribeLoad starts light, roughly 0.55x, when the lifter is returning", 
   assert.ok(Math.abs(ratio - 0.55) < 0.08, `ratio was ${ratio}`);
 });
 
-test("cold start loads for a 265 lb male beginner stay conservative", () => {
-  const squat = prescribeLoad({
-    exercise: { name: "Goblet Squat", equipment: "dumbbell" }, reps: 8,
-    bodyWeightLb: 265, sex: "Male", level: "beginner", logs: [],
-  });
-  const raise = prescribeLoad({
-    exercise: { name: "Lateral Raise", equipment: "dumbbell" }, reps: 8,
-    bodyWeightLb: 265, sex: "Male", level: "beginner", logs: [],
-  });
-  assert.ok(squat.weight < 80, `goblet squat cold start was ${squat.weight}`);
-  assert.ok(raise.weight < 30, `lateral raise cold start was ${raise.weight}`);
+/* The change this file exists to pin. There is no cold start any more: a person
+   with nothing on the record is given the reps and an instruction, and no
+   number at all. The old version of this test asserted the guess was small
+   ("under 80 lb on a goblet squat"), which was the engine grading its own
+   homework: a guess nobody can check is not made acceptable by being a low one,
+   and the same code told a woman who had not filled in her sex to pull 110 lb. */
+test("nothing on the record means no weight, whatever we know about their size", () => {
+  for (const sex of ["Male", "Female", null]) {
+    for (const bw of [120, 180, 265]) {
+      for (const name of ["Goblet Squat", "Lateral Raise", "Cable Pull-Through", "Barbell Bench Press"]) {
+        const r = prescribeLoad({
+          exercise: { name, equipment: "dumbbell" }, reps: 8, bodyWeightLb: bw, sex, logs: [],
+        });
+        assert.equal(r.weight, null, `${name} for a ${bw} lb ${sex} came back with ${r.weight}`);
+        assert.equal(r.basis, "unknown");
+      }
+    }
+  }
+});
+
+/* The bug removing the guess removed, kept as a test so it cannot come back in
+   another form. `sex` is optional on the profile, the guess defaulted to the
+   male reference table, and a woman who skipped it was handed a man's numbers
+   on every lift in her week. The same two people now get the same card. */
+test("a missing sex costs nobody a heavier prescription, because there is no prescription", () => {
+  const ex = { name: "Barbell Bench Press", equipment: "barbell" };
+  const stated = prescribeLoad({ exercise: ex, reps: 8, bodyWeightLb: 140, sex: "Female", logs: [] });
+  const blank = prescribeLoad({ exercise: ex, reps: 8, bodyWeightLb: 140, sex: null, logs: [] });
+  assert.deepEqual(stated, blank);
+});
+
+/* And what they get instead has to be worth reading, because a blank where a
+   number was is the cost this change pays. Three things: what to do, how to
+   know when they have it, and that they will not be asked again. */
+test("the first session says what to do instead of a number", () => {
+  const r = prescribeLoad({ exercise: { name: "Goblet Squat", equipment: "dumbbell" }, reps: 8, bodyWeightLb: 180, sex: "Male", logs: [] });
+  assert.match(r.note, /two reps short/i);
+  assert.match(r.note, /your number/i);
 });
 
 /* The fuzz run of 2026-09-12: one logged Goblet Squat at 200 lb turned into an
@@ -581,7 +647,7 @@ test("a load extrapolated from one row of a different lift is capped, and says s
   const logs = [{ entry_date: day(-4), exercise_name: "Goblet Squat", weight: 200, reps: 10 }];
   const r = prescribeLoad({
     exercise: { name: "Leg Press", equipment: "machine" }, reps: 10,
-    bodyWeightLb: 180, sex: "Male", level: "beginner", logs,
+    bodyWeightLb: 180, sex: "Male", logs,
   });
   assert.equal(r.capped, true);
   assert.ok(r.weight < 500, `capped leg press was ${r.weight}`);
@@ -590,7 +656,7 @@ test("a load extrapolated from one row of a different lift is capped, and says s
 
 test("three rows behind a guess buy it more room than one row does", () => {
   const at = (name, weight, d) => ({ entry_date: day(d), exercise_name: name, weight, reps: 10 });
-  const person = { exercise: { name: "Leg Press", equipment: "machine" }, reps: 10, bodyWeightLb: 180, sex: "Male", level: "beginner" };
+  const person = { exercise: { name: "Leg Press", equipment: "machine" }, reps: 10, bodyWeightLb: 180, sex: "Male" };
   const one = prescribeLoad({ ...person, logs: [at("Goblet Squat", 200, -4)] });
   const three = prescribeLoad({ ...person, logs: [at("Goblet Squat", 200, -4), at("Goblet Squat", 200, -7), at("Goblet Squat", 200, -10)] });
   assert.equal(one.capped, true);
@@ -601,7 +667,7 @@ test("an ordinary guess from a similar lift is not capped and does not gain a ca
   const logs = [{ entry_date: day(-4), exercise_name: "Goblet Squat", weight: 50, reps: 10 }];
   const r = prescribeLoad({
     exercise: { name: "Barbell Back Squat", equipment: "barbell" }, reps: 10,
-    bodyWeightLb: 180, sex: "Male", level: "beginner", logs,
+    bodyWeightLb: 180, sex: "Male", logs,
   });
   assert.equal(r.capped, false);
   assert.doesNotMatch(r.note, /held here/);
@@ -618,7 +684,7 @@ test("a nonsense log weight can never put a non-finite number into the plan", ()
     for (const name of ["Leg Press", "Goblet Squat"]) {
       const r = prescribeLoad({
         exercise: { name, equipment: "machine" }, reps: 10,
-        bodyWeightLb: 180, sex: "Male", level: "beginner", logs,
+        bodyWeightLb: 180, sex: "Male", logs,
       });
       const targetWeight = JSON.parse(JSON.stringify({ targetWeight: r.weight ?? 0 })).targetWeight;
       assert.equal(typeof targetWeight, "number", `${name} from ${weight} gave ${targetWeight}`);
@@ -639,10 +705,11 @@ test("a mistyped four figure log row never becomes a four figure prescription", 
     const logs = [{ entry_date: day(-4), exercise_name: "Front Squat", weight, reps: 8 }];
     const r = prescribeLoad({
       exercise: { name: "Front Squat", equipment: "barbell" }, reps: 8,
-      bodyWeightLb: 165, sex: "Male", level: "novice", logs,
+      bodyWeightLb: 165, sex: "Male", logs,
     });
-    /* Four times bodyweight at novice is the rail, and it is a rail rather than
-       a prescription: the note has to say so or the number is a lie. */
+    /* Four times bodyweight is the rail, one number for everybody now that
+       there is no training level to key it on, and it is a rail rather than a
+       prescription: the note has to say so or the number is a lie. */
     assert.ok(r.weight <= 165 * 4, `${weight} lb logged gave ${r.weight}`);
     assert.equal(r.capped, true);
     assert.match(r.note, /ceiling, not a prescription/);
@@ -652,10 +719,10 @@ test("a mistyped four figure log row never becomes a four figure prescription", 
 test("the ceiling on a measured row is the person's size, not one flat number", () => {
   const logs = [{ entry_date: day(-4), exercise_name: "Leg Press", weight: 9000, reps: 8 }];
   const ex = { exercise: { name: "Leg Press", equipment: "machine" }, reps: 8, sex: "Male", logs };
-  const small = prescribeLoad({ ...ex, bodyWeightLb: 120, level: "beginner" });
-  const big = prescribeLoad({ ...ex, bodyWeightLb: 240, level: "advanced" });
-  assert.ok(small.weight <= 120 * 3, `120 lb beginner got ${small.weight}`);
-  assert.ok(big.weight <= 240 * 6, `240 lb advanced got ${big.weight}`);
+  const small = prescribeLoad({ ...ex, bodyWeightLb: 120 });
+  const big = prescribeLoad({ ...ex, bodyWeightLb: 240 });
+  assert.ok(small.weight <= 120 * 4, `the 120 lb lifter got ${small.weight}`);
+  assert.ok(big.weight <= 240 * 4, `the 240 lb lifter got ${big.weight}`);
   assert.ok(big.weight > small.weight, `${big.weight} should beat ${small.weight}`);
 });
 
@@ -663,7 +730,7 @@ test("a real lifter's own logged weight is handed straight back, rail or no rail
   const logs = [{ entry_date: day(-4), exercise_name: "Barbell Back Squat", weight: 315, reps: 5 }];
   const r = prescribeLoad({
     exercise: { name: "Barbell Back Squat", equipment: "barbell" }, reps: 5,
-    bodyWeightLb: 180, sex: "Male", level: "intermediate", logs,
+    bodyWeightLb: 180, sex: "Male", logs,
   });
   assert.equal(r.weight, 315);
   assert.equal(r.capped, false);
@@ -678,7 +745,7 @@ test("a bodyweight nobody has cannot become a starting weight", () => {
   for (const bodyWeightLb of [1e308, 1e-9, -200, "heavy", NaN, 40000]) {
     const r = prescribeLoad({
       exercise: { name: "Goblet Squat", equipment: "dumbbell" }, reps: 8,
-      bodyWeightLb, sex: "Male", level: "beginner", logs: [],
+      bodyWeightLb, sex: "Male", logs: [],
     });
     assert.equal(r.weight, null, `${bodyWeightLb} lb gave ${r.weight}`);
     assert.equal(r.basis, "unknown");
@@ -688,7 +755,7 @@ test("a bodyweight nobody has cannot become a starting weight", () => {
 test("the heaviest bodyweight the payload bound accepts still gets a liftable number", () => {
   const r = prescribeLoad({
     exercise: { name: "Leg Press", equipment: "machine" }, reps: 3,
-    bodyWeightLb: 1500, sex: "Male", level: "advanced", logs: [],
+    bodyWeightLb: 1500, sex: "Male", logs: [],
   });
   assert.ok(r.weight <= 1200, `1500 lb advanced got ${r.weight}`);
 });
@@ -737,6 +804,108 @@ test("a beginner with three days gets a full body split", () => {
   for (const d of plan.week) assert.ok(d.name.startsWith("Full body"), `day was named "${d.name}"`);
 });
 
+/* =========================================================================
+ * Earned access, end to end through a built week
+ * ========================================================================= */
+
+test("a movement nobody has done and nobody asked for never appears", () => {
+  const plan = buildPlan({
+    goal: { bubble: "build-muscle", child: "build-overall" },
+    person: { bodyWeightLb: 180, sex: "Male", daysAsked: 5 }, logs: [],
+  });
+  const byName = new Map(LIBRARY_POOL.map((e) => [e.name, e]));
+  for (const d of plan.week) {
+    for (const e of d.exercises) {
+      const lib = byName.get(e.name);
+      if (!lib) continue;
+      assert.notEqual(lib.level, "advanced", `${e.name} is advanced and was never earned`);
+    }
+  }
+});
+
+test("doing a harder movement twice puts it back in the week", () => {
+  /* Muscle-Up is advanced calisthenics, so nothing in the default pool can
+     reach it. Two logged days of it, and it is a candidate again. The claim is
+     about the POOL rather than about this one slot, so it is asserted as "the
+     week can now contain it" against "the week could not before". */
+  const days = [day(-3), day(-6)];
+  const logs = days.map((d) => ({ entry_date: d, exercise_name: "Muscle-Up", sets: 3, reps: 3, weight: 0 }));
+  const earned = earnedMovements({ logs });
+  assert.equal(earned.has("muscle-up"), true);
+
+  const one = earnedMovements({ logs: [logs[0]] });
+  assert.equal(one.has("muscle-up"), false, "one day is not enough");
+});
+
+test("a week built from a long history is made of the lifts in that history", () => {
+  const names = ["Barbell Bench Press", "Barbell Back Squat", "Barbell Row", "Overhead Press"];
+  const logs = [];
+  for (let i = 0; i < 30; i++) {
+    for (const name of names) {
+      logs.push({ entry_date: day(-2 - i * 3), exercise_name: name, sets: 3, reps: 5, weight: 185 });
+    }
+  }
+  const plan = buildPlan({
+    goal: { bubble: "get-stronger", child: "strong-a-lift" },
+    person: { bodyWeightLb: 190, sex: "Male", daysAsked: 4 }, logs,
+  });
+  const inWeek = new Set(plan.week.flatMap((d) => d.exercises.map((e) => e.name)));
+  const hit = names.filter((n) => inWeek.has(n)).length;
+  assert.ok(hit >= 3, `only ${hit} of their own four lifts came back: ${[...inWeek].join(", ")}`);
+  /* And those lifts carry a weight off the record rather than a guess. */
+  for (const d of plan.week) {
+    for (const e of d.exercises) {
+      if (!names.includes(e.name)) continue;
+      assert.ok(e.weight > 0, `${e.name} came back with no weight despite thirty sessions of it`);
+      assert.equal(e.loadBasis, "your last session");
+    }
+  }
+});
+
+test("a brand new person gets no invented weight anywhere in the week", () => {
+  for (const sex of ["Male", "Female", null]) {
+    const plan = buildPlan({
+      goal: { bubble: "build-muscle", child: "build-overall" },
+      person: { bodyWeightLb: 180, sex, daysAsked: 4 }, logs: [],
+    });
+    for (const d of plan.week) {
+      for (const e of d.exercises) {
+        assert.equal(e.weight, null, `${e.name} was prescribed ${e.weight} lb with nothing on the record`);
+        assert.ok(e.loadBasis === "unknown" || e.loadBasis === "bodyweight", `${e.name} basis ${e.loadBasis}`);
+        /* And the day is still a session: sets, reps and rest are all there. */
+        assert.ok(e.sets >= 2 && e.reps >= 1 && e.restSec > 0);
+      }
+    }
+  }
+});
+
+test("the week a woman who never stated her sex gets is the week a man her size gets", () => {
+  const week = (sex) => buildPlan({
+    goal: { bubble: "build-muscle", child: "build-overall" },
+    person: { bodyWeightLb: 140, sex, daysAsked: 4 }, logs: [],
+  }).week.map((d) => d.exercises.map((e) => [e.name, e.sets, e.reps, e.weight]));
+  assert.deepEqual(week(null), week("Female"));
+  assert.deepEqual(week(null), week("Male"));
+});
+
+/* An entry_date the calendar cannot place used to make every span NaN, and
+   JSON.stringify writes NaN as null, so the answer changed meaning on its way
+   over the wire. Found by fuzzing 40,014 cases once meta.experience started
+   publishing these numbers; the wrong number was there before and nothing
+   downstream read it. */
+test("a date nothing can parse never puts a NaN in the measured numbers", () => {
+  const logs = [
+    { entry_date: "2026-13-45", exercise_name: "Bench Press", sets: 3, reps: 8, weight: 135 },
+    { entry_date: "not a date", exercise_name: "Bench Press", sets: 3, reps: 8, weight: 135 },
+  ];
+  const r = deriveTrainingAge({ logs });
+  for (const k of ["sessions", "effectiveSessions", "sessionsPerWeek", "weeksTraining"]) {
+    assert.ok(Number.isFinite(r[k]), `${k} is ${r[k]}`);
+  }
+  assert.equal(typeof r.returning, "boolean");
+  assert.equal(JSON.parse(JSON.stringify(r)).weeksTraining, r.weeksTraining);
+});
+
 test("a beginner with four days gets an upper lower split", () => {
   /* "consistent" caps out at three days, so this needs a goal whose maxDays
      actually allows four, or the day count gets clamped before the split
@@ -746,12 +915,24 @@ test("a beginner with four days gets an upper lower split", () => {
   assert.deepEqual(names, ["Upper body A", "Lower body A", "Upper body B", "Lower body B"]);
 });
 
-test("an intermediate with three days gets a push pull legs split", () => {
-  const logs = climbThenPlateau(70, 20);
-  const plan = buildPlan({ goal: { bubble: "consistent", child: "keep-quitting" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 3 }, logs });
-  assert.equal(plan.level, "intermediate");
-  const names = plan.week.map((d) => d.name);
-  assert.deepEqual(names, ["Push day", "Pull day", "Leg day"]);
+/* Three days is full body for everybody now, and five is where Push / Pull /
+   Legs lives. The split used to branch on the training level at three days:
+   full body for a beginner or a novice, Push / Pull / Legs above that. In
+   production that branch never fired, because the client sends 90 days of logs
+   and the intermediate rung started at 60 sessions. So this test asserted a week
+   nobody was ever given, and what it asserts now is that the day count alone
+   decides, which is what volume-landmarks.md ties a split to. */
+test("three days is a full body week however much history there is behind it", () => {
+  const seasoned = buildPlan({ goal: { bubble: "consistent", child: "keep-quitting" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 3 }, logs: climbThenPlateau(70, 20) });
+  const dayOne = buildPlan({ goal: { bubble: "consistent", child: "keep-quitting" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 3 }, logs: [] });
+  const names = ["Full body A", "Full body B", "Full body C"];
+  assert.deepEqual(seasoned.week.map((d) => d.name), names);
+  assert.deepEqual(dayOne.week.map((d) => d.name), names);
+});
+
+test("a five day week is push pull legs and an upper lower on top", () => {
+  const plan = buildPlan({ goal: { bubble: "build-muscle", child: "build-overall" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 5 }, logs: [] });
+  assert.deepEqual(plan.week.map((d) => d.name), ["Push day", "Pull day", "Leg day", "Upper body", "Lower body"]);
 });
 
 test("a beginner's lower or full body days always carry a hinge movement", () => {
@@ -1048,7 +1229,7 @@ test("focusFreshness flags a pick older than sixty days as stale", () => {
 const BARBELL_BENCH = WEIGHT_EXERCISES.find((e) => e.name === "Barbell Bench Press");
 
 test("scoreAlternatives for a barbell exercise returns ranked, same primary group entries", () => {
-  const results = scoreAlternatives({ exercise: BARBELL_BENCH, pool: WEIGHT_EXERCISES, level: "intermediate", count: 20 });
+  const results = scoreAlternatives({ exercise: BARBELL_BENCH, pool: WEIGHT_EXERCISES, count: 20 });
   assert.ok(results.length > 1);
   const byName = new Map(WEIGHT_EXERCISES.map((e) => [e.name, e]));
   for (const r of results) {
@@ -1321,38 +1502,38 @@ test("one loud signal is never the thing that gets capped", () => {
 
 test("plateau response waits under four weeks flat", () => {
   const plateau = { lifts: [{ name: "Bench Press", sessions: 6, weeksFlat: 2, weightLb: 135 }] };
-  const r = planPlateauResponse({ plateau, level: "intermediate" });
+  const r = planPlateauResponse({ plateau, stillLinear: false, confidence: "high" });
   assert.equal(r.responses[0].action, "wait");
 });
 
 test("plateau response waits for a beginner under eight weeks flat", () => {
   const plateau = { lifts: [{ name: "Bench Press", sessions: 5, weeksFlat: 6, weightLb: 95 }] };
-  const r = planPlateauResponse({ plateau, level: "beginner" });
+  const r = planPlateauResponse({ plateau, stillLinear: true, confidence: "high" });
   assert.equal(r.responses[0].action, "wait");
 });
 
 test("plateau response deloads the lift when calibration says too heavy for it", () => {
   const plateau = { lifts: [{ name: "Squat", sessions: 10, weeksFlat: 10, weightLb: 225 }] };
   const calibration = { byExercise: { squat: { verdict: "too-heavy" } }, overall: null };
-  const r = planPlateauResponse({ plateau, level: "intermediate", calibration });
+  const r = planPlateauResponse({ plateau, stillLinear: false, confidence: "high", calibration });
   assert.equal(r.responses[0].action, "deload-lift");
 });
 
 test("plateau response uses the rep range for a strength goal with a short stall", () => {
   const plateau = { lifts: [{ name: "Deadlift", sessions: 8, weeksFlat: PLATEAU_RESPONSE.shortStallWeeks - 1, weightLb: 275 }] };
-  const r = planPlateauResponse({ plateau, level: "intermediate", goal: { bubble: "get-stronger" } });
+  const r = planPlateauResponse({ plateau, stillLinear: false, confidence: "high", goal: { bubble: "get-stronger" } });
   assert.equal(r.responses[0].action, "rep-range");
 });
 
 test("plateau response rotates otherwise", () => {
   const plateau = { lifts: [{ name: "Leg Press", sessions: 10, weeksFlat: PLATEAU_RESPONSE.rotateFromWeeks, weightLb: 400 }] };
-  const r = planPlateauResponse({ plateau, level: "intermediate" });
+  const r = planPlateauResponse({ plateau, stillLinear: false, confidence: "high" });
   assert.equal(r.responses[0].action, "rotate");
 });
 
 test("plateau response cuts volume in the summary for three or more stalls", () => {
   const plateau = { lifts: ["Bench Press", "Squat", "Row"].map((name) => ({ name, sessions: 10, weeksFlat: 10, weightLb: 200 })) };
-  const r = planPlateauResponse({ plateau, level: "intermediate" });
+  const r = planPlateauResponse({ plateau, stillLinear: false, confidence: "high" });
   assert.equal(r.summary.action, "volume-cut");
   assert.ok(r.summary.say);
 });
@@ -1360,7 +1541,7 @@ test("plateau response cuts volume in the summary for three or more stalls", () 
 test("volume-cut is not emitted when calibration overall is back-off", () => {
   const plateau = { lifts: ["Bench Press", "Squat", "Row"].map((name) => ({ name, sessions: 10, weeksFlat: 10, weightLb: 200 })) };
   const calibration = { byExercise: {}, overall: "back-off" };
-  const r = planPlateauResponse({ plateau, level: "intermediate", calibration });
+  const r = planPlateauResponse({ plateau, stillLinear: false, confidence: "high", calibration });
   assert.notEqual(r.summary.action, "volume-cut");
 });
 
@@ -1369,7 +1550,7 @@ test("every plateau response has a non empty say", () => {
     { name: "Bench Press", sessions: 10, weeksFlat: PLATEAU_RESPONSE.rotateFromWeeks, weightLb: 200 },
     { name: "Squat", sessions: 10, weeksFlat: PLATEAU_RESPONSE.shortStallWeeks - 1, weightLb: 300 },
   ] };
-  const r = planPlateauResponse({ plateau, level: "intermediate", goal: { bubble: "get-stronger" } });
+  const r = planPlateauResponse({ plateau, stillLinear: false, confidence: "high", goal: { bubble: "get-stronger" } });
   assert.ok(r.responses.length > 0);
   for (const resp of r.responses) assert.ok(typeof resp.say === "string" && resp.say.length > 0);
 });
@@ -1666,7 +1847,7 @@ test("toWorkout emits the full exercise shape with a numeric targetWeight, zero 
 test("generateFromPayload never throws on an empty payload or a junk goal", () => {
   const r1 = generateFromPayload({});
   assert.ok(r1.workout.exercises.length >= 3 && r1.workout.exercises.length <= 6);
-  for (const key of ["level", "confidence", "days", "dayName", "source", "goalSource", "focus", "limits"]) {
+  for (const key of ["experience", "confidence", "days", "dayName", "source", "goalSource", "focus", "limits"]) {
     assert.ok(Object.prototype.hasOwnProperty.call(r1.meta, key), `meta missing ${key}`);
   }
   const r2 = generateFromPayload({ goal: "some junk goal that matches nothing at all" });
@@ -1715,9 +1896,9 @@ test("a bodyweight of almost nothing gives a plan instead of an invalid date", (
   assert.ok(r.workout.exercises.every((e) => Number.isFinite(e.targetWeight)));
 });
 
-/* Same rows, one level down, because deriveTrainingAge reads them first and is
-   what actually threw. The level is the assertion: an unreadable row must not
-   promote or demote anybody. */
+/* Same rows, one layer down, because deriveTrainingAge reads them first and is
+   what actually threw. An unreadable row must change no measured number it is
+   not genuinely part of. */
 test("deriveTrainingAge reads past a row it cannot use", () => {
   const usable = Array.from({ length: 8 }, (_, i) => ({
     entry_date: `2026-08-${String(10 + i).padStart(2, "0")}`, exercise_name: "Barbell Bench Press", weight: 135, sets: 3, reps: 8,
@@ -1727,20 +1908,21 @@ test("deriveTrainingAge reads past a row it cannot use", () => {
     logs: [...usable, null, undefined, 42, "a row", { entry_date: 20260901, exercise_name: 7, weight: 100 }],
     today: new Date(2026, 8, 10),
   });
-  assert.equal(dirty.level, clean.level);
   assert.equal(dirty.sessions, clean.sessions + 1);   // the numeric date is a real day, once it is text
+  assert.equal(dirty.effectiveSessions, clean.effectiveSessions + 1);
+  assert.equal(dirty.stillLinear, clean.stillLinear);
   assert.equal(typeof dirty.plateau.stalled, "boolean");
 });
 
 test("focusDayIndex picks a push day when one exists and falls back to -1 otherwise", () => {
-  const logs = climbThenPlateau(70, 20);
-  const withPush = buildPlan({ goal: { bubble: "consistent", child: "keep-quitting" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 3 }, logs });
+  const withPush = buildPlan({ goal: { bubble: "build-muscle", child: "build-overall" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 5 }, logs: [] });
   const pushIndex = focusDayIndex(withPush, "push", { from: 0 });
   assert.ok(pushIndex >= 0);
   assert.ok(withPush.week[pushIndex].name.toLowerCase().includes("push"));
 
-  const beginner = buildPlan({ goal: { bubble: "consistent", child: "keep-quitting" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 3 }, logs: [] });
-  const noPush = focusDayIndex(beginner, "push", { from: 1 });
+  /* A three day week is full body, so there is no push day to find. */
+  const fullBody = buildPlan({ goal: { bubble: "consistent", child: "keep-quitting" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 3 }, logs: [] });
+  const noPush = focusDayIndex(fullBody, "push", { from: 1 });
   assert.equal(noPush, -1);
 });
 
@@ -1785,7 +1967,7 @@ test("avoidNote names the exercise and how it was avoided, and leaves the door o
 
 test("applyRotateFallback falls back to rep-range when rotation had nowhere to go", () => {
   const plateau = { lifts: [{ name: "Leg Press", sessions: 10, weeksFlat: PLATEAU_RESPONSE.rotateFromWeeks, weightLb: 400 }] };
-  const result = planPlateauResponse({ plateau, level: "intermediate" });
+  const result = planPlateauResponse({ plateau, stillLinear: false, confidence: "high" });
   assert.equal(result.responses[0].action, "rotate");
   const fallenBack = applyRotateFallback(result, ["Leg Press"], { plateau });
   assert.equal(fallenBack.responses[0].action, "rep-range");
@@ -1794,7 +1976,7 @@ test("applyRotateFallback falls back to rep-range when rotation had nowhere to g
 
 test("applyRotateFallback is a no-op when nothing named was actually rotating", () => {
   const plateau = { lifts: [{ name: "Bench Press", sessions: 6, weeksFlat: 2, weightLb: 135 }] };
-  const result = planPlateauResponse({ plateau, level: "intermediate" });
+  const result = planPlateauResponse({ plateau, stillLinear: false, confidence: "high" });
   const unchanged = applyRotateFallback(result, ["Some Other Lift"], { plateau });
   assert.equal(unchanged.responses[0].action, result.responses[0].action);
 });
@@ -1960,11 +2142,11 @@ test("nextDayIndex will not hand back yesterday's Push day just because the rota
     { entry_date: day(-1), exercise_name: "Machine Shoulder Press", sets: 3, reps: 10, weight: 60 },
   ];
   const logs = [...history, ...yesterday];
-  const plan = buildPlan({ goal: { bubble: "get-stronger", child: "strong-a-lift" }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 3 }, logs });
-  assert.equal(plan.week.map((d) => d.name).join(","), "Push day,Pull day,Leg day");
-  // The last completed plan was Leg day, so naive rotation wraps to Push,
+  const plan = buildPlan({ goal: { bubble: "build-muscle", child: "build-overall" }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 5 }, logs });
+  assert.equal(plan.week.map((d) => d.name).join(","), "Push day,Pull day,Leg day,Upper body,Lower body");
+  // The last completed plan was the last day, so naive rotation wraps to Push,
   // which is exactly the muscle group a real session hit yesterday.
-  const plans = [{ entry_date: day(-1), focus: "Leg day", completed_at: day(-1) + "T18:00:00Z", exercises: [] }];
+  const plans = [{ entry_date: day(-1), focus: "Lower body", completed_at: day(-1) + "T18:00:00Z", exercises: [] }];
   /* Fixed clock, same reason as the recovery test above: twelve hours after
      yesterday's session, inside the fresh window whatever time it is now. */
   const noon = new Date(Date.parse(day(-1) + "T18:00:00") + 12 * 3600000);
@@ -1984,8 +2166,8 @@ test("nextDayIndex returns to Push day once the fresh window has genuinely passe
     { entry_date: day(-1), exercise_name: "Machine Shoulder Press", sets: 3, reps: 10, weight: 60 },
   ];
   const logs = [...history, ...yesterday];
-  const plan = buildPlan({ goal: { bubble: "get-stronger", child: "strong-a-lift" }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 3 }, logs });
-  const plans = [{ entry_date: day(-1), focus: "Leg day", completed_at: day(-1) + "T18:00:00Z", exercises: [] }];
+  const plan = buildPlan({ goal: { bubble: "build-muscle", child: "build-overall" }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 5 }, logs });
+  const plans = [{ entry_date: day(-1), focus: "Lower body", completed_at: day(-1) + "T18:00:00Z", exercises: [] }];
   const later = new Date(Date.now() + (RECOVERY_HOURS + 2) * 3600000);
   const idx = nextDayIndex(plan, { logs, plans, today: later });
   assert.equal(plan.week[idx].name, "Push day");
@@ -2054,7 +2236,7 @@ test("moveSeconds doubles a per side stretch and leaves a two sided one alone", 
 });
 
 test("pickBlock draws only from the kind asked for and covers the groups it was given", () => {
-  const block = pickBlock({ kind: "dynamic", groups: ["quads", "hamstrings", "glutes"], budgetSec: WARMUP_SECONDS, level: "novice" });
+  const block = pickBlock({ kind: "dynamic", groups: ["quads", "hamstrings", "glutes"], budgetSec: WARMUP_SECONDS });
   assert.ok(block.length >= MIN_MOVES && block.length <= MAX_MOVES);
   for (const m of block) assert.equal(m.kind, "dynamic");
   const byName = new Map(STRETCH_ALL.map((e) => [e.name, e]));
@@ -2063,8 +2245,8 @@ test("pickBlock draws only from the kind asked for and covers the groups it was 
 });
 
 test("pickBlock respects the budget once the floor is met, and is deterministic", () => {
-  const a = pickBlock({ kind: "static", groups: ["chest", "lats", "shoulders", "biceps", "triceps"], budgetSec: COOLDOWN_SECONDS, level: "intermediate" });
-  const b = pickBlock({ kind: "static", groups: ["chest", "lats", "shoulders", "biceps", "triceps"], budgetSec: COOLDOWN_SECONDS, level: "intermediate" });
+  const a = pickBlock({ kind: "static", groups: ["chest", "lats", "shoulders", "biceps", "triceps"], budgetSec: COOLDOWN_SECONDS });
+  const b = pickBlock({ kind: "static", groups: ["chest", "lats", "shoulders", "biceps", "triceps"], budgetSec: COOLDOWN_SECONDS });
   assert.deepEqual(a, b);
   const spent = a.reduce((t, m) => t + moveSeconds(m), 0);
   /* The floor may overshoot, everything past it may not. */
@@ -2076,7 +2258,7 @@ test("a joint that hurts removes every stretch the library says to avoid for it"
   const risky = STRETCH_ALL.filter((e) => (e.avoidIf || []).includes("knee")).map((e) => e.name);
   assert.ok(risky.length > 0, "the library marks at least one stretch as hard on a knee");
   for (const kind of ["dynamic", "static", "mobility"]) {
-    const block = pickBlock({ kind, groups: MUSCLE_GROUPS, budgetSec: 3600, hurts: ["knee"], level: "advanced" });
+    const block = pickBlock({ kind, groups: MUSCLE_GROUPS, budgetSec: 3600, hurts: ["knee"] });
     for (const m of block) assert.ok(!risky.includes(m.name), `${m.name} should have been avoided`);
   }
 });
@@ -2189,10 +2371,13 @@ test("every day plan.mjs builds says which movement patterns it is made of", () 
 });
 
 test("a push day and a leg day do not get the same warm-up any more", () => {
-  const plan = buildPlan({ goal: { bubble: "get-stronger", child: null }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 3 }, logs: manySessions(80) });
-  const names = plan.week.map((d) => d.name);
+  /* Five days rather than three, because three is a full body week now for
+     everybody and this test is about what a push day's warm-up does that a leg
+     day's does not. */
+  const plan = buildPlan({ goal: { bubble: "build-muscle", child: "build-overall" }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 5 }, logs: manySessions(80) });
+  const names = plan.week.slice(0, 3).map((d) => d.name);
   assert.deepEqual(names, ["Push day", "Pull day", "Leg day"], "the fixture really is a push/pull/legs split");
-  const [push, pull, legs] = plan.week.map((d) => d.mobility.warmup.map((m) => m.name));
+  const [push, pull, legs] = plan.week.slice(0, 3).map((d) => d.mobility.warmup.map((m) => m.name));
   const overlap = (a, b) => a.filter((n) => b.includes(n)).length;
   assert.ok(overlap(push, legs) <= 1, `push and legs share ${overlap(push, legs)} warm-up moves: ${push.join(", ")} vs ${legs.join(", ")}`);
   assert.ok(overlap(pull, legs) <= 2, `pull and legs share ${overlap(pull, legs)}`);
@@ -2205,7 +2390,7 @@ test("a push day and a leg day do not get the same warm-up any more", () => {
 });
 
 test("a leg day warm-up is not filled with arm moves once its own patterns are covered", () => {
-  const plan = buildPlan({ goal: { bubble: "get-stronger", child: null }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 3 }, logs: manySessions(80) });
+  const plan = buildPlan({ goal: { bubble: "build-muscle", child: "build-overall" }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 5 }, logs: manySessions(80) });
   const legs = plan.week.find((d) => d.name === "Leg day");
   const UPPER_ONLY = ["verticalPush", "horizontalPush", "verticalPull", "horizontalPull"];
   for (const m of legs.mobility.warmup) {
@@ -2612,23 +2797,31 @@ test("a weekly target never asks for more sets than the split can physically del
 
 test("a group the split touches once a week says so instead of reporting a shortfall", () => {
   const today = new Date("2026-09-10T12:00:00");
+  /* Five days rather than three. Three days is a full body week now, which hits
+     every group three times and caps nobody, and that is the fix working rather
+     than the test being satisfied: the shortfall this note exists to explain is
+     a frequency problem, and a full body week does not have one. */
   const out = generateFromPayload(
-    { goal_bubble: "build-muscle", challenge_target: 3, current_weight: 195, sex: "Male", logs: longHistory(78) },
+    { goal_bubble: "build-muscle", challenge_target: 5, current_weight: 195, sex: "Male", logs: longHistory(78) },
     { today, includePlan: true },
   );
-  assert.equal(out.meta.level, "advanced", "the history reaches the level the finding is about");
+  assert.ok(out.meta.experience.sessions >= 40, "the history reaches the volume the finding is about");
   const capped = out.plan.volumeNotes.frequencyCapped;
-  assert.ok(capped.length, "the three day split caps somebody");
-  const tri = capped.find((c) => c.group === "triceps");
-  assert.ok(tri, "triceps is one of them on Push/Pull/Legs");
-  assert.equal(tri.sessions, 1, "and it is trained once");
-  assert.ok(tri.wanted > tri.target, `the level wanted ${tri.wanted} and the week aims at ${tri.target}`);
+  assert.ok(capped.length, "the five day split caps somebody");
+  /* Whichever group it is rather than a named one. Which muscles land here moved
+     when the volume base stopped being one number for all fourteen: a group now
+     carries its own MEV and its own mid-MAV, so the gap between what the week
+     asks for and what the split can deliver opens in different places. The
+     finding is the shape, not the muscle. */
+  const tri = capped.find((c) => c.sessions === 1);
+  assert.ok(tri, `something is trained once a week: ${capped.map((c) => `${c.group}:${c.sessions}`).join(" ")}`);
+  assert.ok(tri.wanted > tri.target, `the week wanted ${tri.wanted} and aims at ${tri.target}`);
   /* The ledger carries both numbers, so nothing downstream has to guess which
      of the two it is looking at. */
-  assert.equal(out.plan.weeklyVolume.triceps.target, tri.target);
-  assert.equal(out.plan.weeklyVolume.triceps.wanted, tri.wanted);
+  assert.equal(out.plan.weeklyVolume[tri.group].target, tri.target);
+  assert.equal(out.plan.weeklyVolume[tri.group].wanted, tri.wanted);
   /* And it reaches the person rather than only the ledger. */
-  assert.ok(out.notes.some((n) => /top out below what your level/.test(n)), "a dayNote says it out loud");
+  assert.ok(out.notes.some((n) => /top out below what the week/.test(n)), "a dayNote says it out loud");
   /* A capped group is not also reported as a shortfall the week could have
      closed: that was the double-counting the finding is about. The one way a
      group can honestly be both is the clock: since the costing of 2026-09-14
@@ -2849,10 +3042,29 @@ test("no day prescribes the same exercise twice", () => {
 });
 
 test("a slot dropped to avoid a repeat says so rather than shipping a shorter day", () => {
+  /* The fixture moved and the finding did not. The original was an "advanced"
+     lifter, whose pool included every advanced calisthenics row; there is no
+     such person any more, and a bodyweight-only week with a sore wrist now runs
+     its accessory slots out of movements entirely rather than running them down
+     to one repeat.
+   *
+     What still reaches the dedupe path is earned access putting the harder rows
+     back: somebody who has actually done Dips, Push-Ups and Pull-Ups gets them,
+     the push day's chest and triceps slots both want a Dip, and the choice
+     between a short day and the same lift twice on one card is the one this note
+     exists to make visible. Which is the case the 50,017 run found in the first
+     place, arrived at by the route that can still produce it. */
+  const day3 = (n) => day(-1 - n * 3);
+  const bodyweightHistory = [];
+  for (let i = 0; i < 40; i++) {
+    for (const name of ["Dip", "Push-Up", "Pull-Up"]) {
+      bodyweightHistory.push({ entry_date: day3(i), exercise_name: name, sets: 3, reps: 8, weight: 0 });
+    }
+  }
   const plan = buildPlan({
     goal: { bubble: "build-muscle", child: "build-overall" },
-    person: { daysAsked: 3, bodyWeightLb: 170, sex: "Male" },
-    logs: longHistory(78), limits: { hurts: ["wrist"], missing: ["none"] },
+    person: { daysAsked: 4, bodyWeightLb: 170, sex: "Male" },
+    logs: bodyweightHistory, limits: { hurts: ["wrist"], missing: ["none"] },
   });
   const said = plan.dayNotes.filter((n) => /is a slot short/.test(n));
   assert.ok(said.length, "the day that lost a slot is named");
@@ -3346,27 +3558,32 @@ test("every cardio mode a beginner can be given builds its own session", async (
   }
 });
 
-test("a mode with nothing at their level is refused, not quietly substituted", async () => {
-  /* Swimming and Classes are both ticks on the onboarding sheet and the cardio
-     library's only swim and only HIIT session are tagged intermediate, so there
-     is nothing to give a beginner who picks either. `cardioFor` answers a mode
-     it cannot serve with everything else at that level, so unfiltered a
-     beginner who ticked Swimming got an Easy Spin on a stationary bike under a
-     note reading "this week is cardio only, because that is what you picked".
-     See mo-knowledge/LIBRARY-REQUESTS.md: the real answer is a beginner
-     session in each of those two modes, and until there is one, saying we
-     could not build it beats building something else and using their word for
-     it. */
+test("a mode somebody ticked is built for them, and never substituted for another", async () => {
+  /* Swimming and Classes are ticks on the onboarding sheet, and the library's
+     only swim and only HIIT session are both tagged intermediate. Under the old
+     person-level gate that meant a brand new user who ticked Swimming was told
+     the week could not be built, and before the refusal note existed they were
+     handed an Easy Spin on a stationary bike under their own word "swimming".
+     The mode is a stated choice, so it is honoured with no history behind it.
+     What is still refused is a mode the library does not know at all. */
   for (const style of ["swimming", "classes"]) {
-    const beginner = await generateFromPayload(stylePayload([style]));
-    assert.equal(beginner.meta.styles.honoured, false, `${style} has nothing at beginner level`);
-    assert.ok(!beginner.workout.cardio, `${style} must not come back as some other mode`);
-    assert.match(beginner.meta.styles.note, /^This is a lifting session/);
+    const out = await generateFromPayload(stylePayload([style]));
+    assert.equal(out.meta.styles.honoured, true, `${style} is a mode the library has`);
+    assert.ok(out.workout.cardio, `${style} came back without a session`);
+    assert.equal(out.workout.exercises.length, 0, `${style} came back as lifting`);
   }
 
-  /* And once they have earned the level, the same tick builds the session. */
+  /* Somebody with a long history gets the same session, because nothing about
+     the choice depends on how long they have trained. */
   const swimmer = await generateFromPayload(stylePayload(["swimming"], { logs: manySessions(80) }));
-  assert.equal(swimmer.workout.cardio?.mode, "swimming", "an intermediate swimmer gets their swim");
+  assert.equal(swimmer.workout.cardio?.mode, "swimming");
+
+  /* And the hardest tier stays out, because a mode is not a difficulty: nobody
+     ticked a box asking for Sprint Intervals. */
+  for (const logs of [[], manySessions(80)]) {
+    const runner = await generateFromPayload(stylePayload(["running"], { logs }));
+    assert.notEqual(runner.workout.cardio?.name, "Sprint Intervals");
+  }
 });
 
 test("a cardio day respects the session length they gave us", async () => {
@@ -3432,7 +3649,7 @@ test("cardioSessionFor builds nothing rather than something wrong", () => {
   assert.equal(cardioSessionFor(readStyles(["yoga"]), {}), null, "a flow week has no cardio session in it");
   assert.equal(cardioSessionFor(readStyles(["sports"]), {}), null, "and neither has a mode the library cannot name");
   assert.equal(cardioSessionFor(readStyles(null), {}), null, "never asked means never overridden");
-  const run = cardioSessionFor(readStyles(["running"]), { level: "beginner", today: new Date("2026-09-18") });
+  const run = cardioSessionFor(readStyles(["running"]), { today: new Date("2026-09-18") });
   assert.deepEqual(run.exercises, [], "a run is never a list of sets");
   assert.deepEqual([run.warmup, run.cooldown], [[], []], "and never carries a lifting day's mobility");
 });

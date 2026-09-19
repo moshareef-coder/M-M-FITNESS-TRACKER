@@ -24,15 +24,49 @@ const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
    slower week, wrong-high costs muscle and adherence. */
 export const LOSS_RATE = { lowPct: 0.005, midPct: 0.0075, highPct: 0.01, floorLb: 0.5, ceilLb: 2 };
 
-/* Rate of muscle gain by training age, as a fraction of bodyweight per month.
-   The McDonald and Aragon models, which are coaching convention rather than
-   trial data, and are cited that way in sources.md. */
-export const GAIN_RATE_PER_MONTH = {
-  beginner: { lo: 0.010, hi: 0.015 },
-  novice: { lo: 0.0075, hi: 0.0125 },
-  intermediate: { lo: 0.005, hi: 0.010 },
-  advanced: { lo: 0.0025, hi: 0.005 },
+/* Rate of muscle gain, as a fraction of bodyweight per month. The McDonald and
+   Aragon models, which are coaching convention rather than trial data, and are
+   cited that way in sources.md.
+ *
+ * It was four rungs keyed on a training level. It is two ends and a slide now,
+ * and the reason is not tidiness: the level is gone, and it could not have
+ * carried this anyway. Those models are stated in YEARS of training, and the
+ * client sends 90 days of logs, so nothing this engine can see distinguishes
+ * somebody's second year from their fifth. Claiming "advanced" off 90 days was
+ * the timeline promising a number the data could not support, in the one place
+ * in the engine that turns into a date on a screen.
+ *
+ * So: `fresh` is McDonald's first year and `trained` is his third, and the two
+ * ends are as far apart as 90 days of evidence can honestly reach. Where
+ * somebody sits between them is `gainRateFor` below. */
+export const GAIN_RATE = {
+  fresh: { lo: 0.010, hi: 0.015 },
+  trained: { lo: 0.005, hi: 0.010 },
 };
+
+/* How far along that slide, from two measured numbers and no label.
+ *
+ * research/04: "if someone is still adding weight to a movement almost every
+ * session, they are by definition still in the phase where linear progression
+ * works, whatever their session count says". Newbie gains and linear
+ * progression are the same phenomenon described twice, so when the bar says
+ * loading is still working, the rate holds at the fresh end however many
+ * sessions there are. That is the same argument the old code made when it held
+ * a high session count back at novice, kept and moved off the label.
+ *
+ * Otherwise it slides on effective sessions, reaching the trained end at 60,
+ * which is roughly four days a week for the whole 90 day window the client
+ * sends: the most training this engine can ever actually see. */
+const GAIN_RATE_SESSIONS = 60;
+export function gainRateFor({ effectiveSessions = 0, stillLinear = false } = {}) {
+  const t = stillLinear
+    ? 0
+    : Math.max(0, Math.min(1, (Number(effectiveSessions) || 0) / GAIN_RATE_SESSIONS));
+  return {
+    lo: GAIN_RATE.fresh.lo + t * (GAIN_RATE.trained.lo - GAIN_RATE.fresh.lo),
+    hi: GAIN_RATE.fresh.hi + t * (GAIN_RATE.trained.hi - GAIN_RATE.fresh.hi),
+  };
+}
 
 /* Body fat where abs generally show. research/11, InBody and BodySpec. Used only
    when a body fat estimate is actually supplied; we do not invent one. */
@@ -366,7 +400,7 @@ function weeksBetween(from, to) {
 }
 
 /* The whole point. What is actually reachable, said plainly, with the date. */
-function weightTimeline({ bubble, amountLb, byDate, bodyWeightLb: given, level, today }) {
+function weightTimeline({ bubble, amountLb, byDate, bodyWeightLb: given, effectiveSessions, stillLinear, today }) {
   /* The same window load.mjs believes a bodyweight lives in, for the same
      reason and so the two cannot disagree. A current_weight of 1e-9 is not a
      very light person, and it used to reach the arithmetic below, drive the
@@ -378,7 +412,7 @@ function weightTimeline({ bubble, amountLb, byDate, bodyWeightLb: given, level, 
   const gaining = bubble === "build-muscle";
   let perWeek;
   if (gaining) {
-    const r = GAIN_RATE_PER_MONTH[level] || GAIN_RATE_PER_MONTH.beginner;
+    const r = gainRateFor({ effectiveSessions, stillLinear });
     perWeek = (bodyWeightLb * (r.lo + r.hi) / 2) / WEEKS_PER_MONTH;
   } else {
     perWeek = clamp(bodyWeightLb * LOSS_RATE.midPct, LOSS_RATE.floorLb, LOSS_RATE.ceilLb);
@@ -453,7 +487,7 @@ function absTimeline({ bodyFatPct, sex, bodyWeightLb, today }) {
 }
 
 /**
- * @param {object} sel  { bubble, child, secondary?, amountLb?, byDate?, bodyWeightLb?, bodyFatPct?, sex?, level?, today? }
+ * @param {object} sel  { bubble, child, secondary?, amountLb?, byDate?, bodyWeightLb?, bodyFatPct?, sex?, effectiveSessions?, stillLinear?, today? }
  *                      `secondary` is an optional array of { bubble, child },
  *                      the "and also" goals. Absent, empty or full of nonsense
  *                      is the single goal path, unchanged.
@@ -461,7 +495,7 @@ function absTimeline({ bodyFatPct, sex, bodyWeightLb, today }) {
 export function resolveGoal(sel = {}) {
   const {
     bubble, child, secondary = [], amountLb = null, byDate = null, bodyWeightLb = null,
-    bodyFatPct = null, sex = null, level = "beginner", today = new Date(),
+    bodyFatPct = null, sex = null, effectiveSessions = 0, stillLinear = false, today = new Date(),
   } = sel;
 
   const table = GOAL_PARAMS[bubble];
@@ -539,7 +573,7 @@ export function resolveGoal(sel = {}) {
   if (child === "abs") {
     timeline = absTimeline({ bodyFatPct, sex, bodyWeightLb, today });
   } else if (bubble === "lose-weight" || bubble === "build-muscle") {
-    timeline = weightTimeline({ bubble, amountLb, byDate, bodyWeightLb, level, today });
+    timeline = weightTimeline({ bubble, amountLb, byDate, bodyWeightLb, effectiveSessions, stillLinear, today });
   } else if (KNOWN_PROGRAMMES[child]) {
     const k = KNOWN_PROGRAMMES[child];
     timeline = { weeks: k.weeks, known: true, message: k.note };

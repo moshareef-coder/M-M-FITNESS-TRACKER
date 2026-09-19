@@ -2,8 +2,8 @@
 /* The plan builder. Four passes, in the order research/05 argues for, and each
  * one after the first can be skipped when its input is missing:
  *
- *   1 STRUCTURE    goal + days + derived level  ->  split, day names, sets, reps, rest
- *   2 SELECTION    + bodyweight, level, equipment ->  which exercises, and a swap for each
+ *   1 STRUCTURE    goal + days                   ->  split, day names, sets, reps, rest
+ *   2 SELECTION    + what they have earned, kit   ->  which exercises, and a swap for each
  *   3 LOAD         + bodyweight, sex, then logs   ->  a starting weight
  *   4 PROGRESSION  + logs, adherence, layoffs     ->  how the next session differs
  *
@@ -19,7 +19,7 @@
  */
 import { TRAININGS } from "../_library/index.mjs";
 import { resolveGoal, barredMovements, movementCautionNotes } from "./goal-engine.mjs";
-import { deriveTrainingAge, observedCapacity } from "./training-age.mjs";
+import { deriveTrainingAge, observedCapacity, earnedMovements } from "./training-age.mjs";
 import { prescribeLoad, patternFor, roundLoad } from "./load.mjs";
 import { calibrate } from "./calibrate.mjs";
 import { learnPreferences, applyPreferences, avoidNote, openWeekBudget, heldBackNote, actedOn } from "./preferences.mjs";
@@ -34,10 +34,92 @@ const WEIGHTS = TRAININGS.find((t) => t.id === "weight-training");
 const CALIS = TRAININGS.find((t) => t.id === "calisthenics");
 
 /* Weekly hard sets per muscle group, before the goal's factor and any priority.
-   From knowledge/principles/volume-landmarks.md, deliberately at the low end for
-   beginners: research/09 says the first weeks decide retention, and nobody ever
-   quit because week one was too easy. */
-const BASE_WEEKLY_SETS = { beginner: 8, novice: 10, intermediate: 14, advanced: 16 };
+ *
+ * This was one number for all fourteen groups, keyed on a training level:
+ * `{ beginner: 8, novice: 10, intermediate: 14, advanced: 16 }`. Both halves of
+ * that were wrong.
+ *
+ * One number cannot be right for fourteen muscles.
+ * knowledge/principles/volume-landmarks.md carries a separate MEV per group, and
+ * they are not close: back is 10 and biceps is 6. So the beginner's flat 8
+ * prescribed biceps two sets over the minimum that does anything and back two
+ * sets under it, out of the same constant, and neither error was visible
+ * anywhere because the constant had nothing to be compared against.
+ *
+ * And the key was a label on a person. The bands below are per group, and where
+ * somebody sits inside their band is a measured quantity rather than a name: see
+ * `volumeDial`. That distinction is the whole of this change. A dial reads what
+ * happened; a tier decides who you are.
+ *
+ * `mev` is that file's MEV column. `mav` is the middle of its MAV range, which
+ * is where it says somebody "training hard 4-6 days a week with a real history"
+ * belongs. Abs is the one row not taken literally: the landmark's MEV for core
+ * is 0, which is true (nobody needs direct ab work to hold what they have) and
+ * useless as the bottom of a dial, because every split in this file carries a
+ * core slot and a target of 0 would have the ledger complaining about it every
+ * week. Its band starts at the bottom of its MAV range instead, 8, which is also
+ * exactly what core got before this change. */
+const VOLUME_BAND = {
+  chest: { mev: 8, mav: 16 },
+  lats: { mev: 10, mav: 18 },
+  shoulders: { mev: 8, mav: 16 },
+  quads: { mev: 8, mav: 15 },
+  hamstrings: { mev: 6, mav: 13 },
+  glutes: { mev: 6, mav: 13 },
+  biceps: { mev: 6, mav: 14 },
+  triceps: { mev: 6, mav: 13 },
+  calves: { mev: 8, mav: 15 },
+  abs: { mev: 8, mav: 12 },
+  obliques: { mev: 8, mav: 12 },
+};
+
+/* Traps and forearms have no row in volume-landmarks.md, the same gap
+   WEEKLY_MRV below already names. The biceps row stands in for them rather than
+   a number being invented: they are small muscles trained by one isolation slot
+   a week, which is what that row describes. Every split in this file touches
+   them once, so the frequency cap is what really binds on them and the band is
+   nearly decorative. */
+const VOLUME_BAND_DEFAULT = { mev: 6, mav: 13 };
+
+/* Where between MEV and mid-MAV this person's week sits, 0 to 1.
+ *
+ * volume-landmarks.md states the rule in two sentences and both of them are
+ * about things we can count rather than things we would have to decide:
+ *
+ *   "A new trainee or someone training 2-3 days/week should sit near
+ *    MEV-to-low-MAV per muscle."
+ *   "Someone training hard 4-6 days/week with a real history can run
+ *    mid-to-high MAV."
+ *
+ * Days per week is the first term and it is an input the plan already has. A
+ * real history is the second, and `effectiveSessions` is what training-age.mjs
+ * measures it as: sessions since the last long break, so somebody who keeps
+ * restarting does not accumulate credit for it. Forty is the line, and it is
+ * not a new number: it is already the point where `deriveTrainingAge` calls its
+ * own confidence "high", and reusing a threshold beats inventing one.
+ *
+ * They are not averaged and they are not both required, because the two
+ * sentences are not symmetric. A real history is worth HALF the band on its own:
+ * that is sentence one, which puts somebody training three days a week at
+ * MEV-to-low-MAV rather than at MEV, and the band's midpoint is about where low
+ * MAV falls. The second half is bought by training four or five days, which is
+ * sentence two. So a fortnight of five day weeks is still near MEV, because five
+ * days a week in somebody's first fortnight is an intention rather than a
+ * history and there is no history to multiply; and forty sessions of a three day
+ * week sits at the middle of the band, which is a real history of a three day
+ * week getting exactly what that file says it should.
+ *
+ * Neither term is a claim about the person. They are a count of days and a count
+ * of sessions. */
+const VOLUME_DIAL_DAYS = [3, 5];
+const VOLUME_DIAL_SESSIONS = 40;
+const VOLUME_DIAL_HISTORY_SHARE = 0.5;
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+export function volumeDial({ days = 3, effectiveSessions = 0 } = {}) {
+  const byDays = clamp01((days - VOLUME_DIAL_DAYS[0]) / (VOLUME_DIAL_DAYS[1] - VOLUME_DIAL_DAYS[0]));
+  const byHistory = clamp01((Number(effectiveSessions) || 0) / VOLUME_DIAL_SESSIONS);
+  return byHistory * (VOLUME_DIAL_HISTORY_SHARE + (1 - VOLUME_DIAL_HISTORY_SHARE) * byDays);
+}
 /* The multiplier a prioritised group earns, by focus tier: 1.75 red, 1.4
    yellow, 1.2 green, and 1.0 for everything else. Tier 0 is "not a priority" and is the
    only entry this file invents; the other three, and the reasoning for the 0.2
@@ -668,18 +750,30 @@ const SLOTS = {
    Exported so the one day case can be tested at all: every goal in the tree has
    a minDays of 2 or 3 today, so buildPlan cannot currently reach it, and a fix
    nothing can call is a fix nobody can trust. */
-export function splitFor(days, level) {
-  const young = level === "beginner" || level === "novice";
-  /* One day a week is its own answer, not the two day answer with a day cut off.
-     Slicing the pair down to one left somebody with a week called "Full body A"
-     and no B anywhere, which reads as the app having lost a day. */
+export function splitFor(days) {
+  /* The day count decides the split and nothing else does.
+   *
+   * It used to also read the training level, at one day count: three days went
+   * to full body for a beginner or a novice and to Push / Pull / Legs for
+   * anybody past that. Two reasons that is gone and only the second is about
+   * this change. The first is arithmetic: the client sends 90 days of logs and
+   * the intermediate rung started at 60 sessions, so in production essentially
+   * every three day week already came back full body and the branch was dead
+   * code wearing a decision. The second is that the decision was not a good one
+   * even where it fired. volume-landmarks.md ties the split to frequency, not to
+   * a person: three sessions a week is where frequency per muscle is the thing
+   * worth buying, and three full body days buy every group three exposures where
+   * Push / Pull / Legs buys one each. That argument does not change when
+   * somebody has trained for two years.
+   *
+   * What is genuinely lost is somebody experienced who WANTS Push / Pull / Legs
+   * on three days. They cannot have it, and they could not really have it before
+   * either, because the tier that granted it was unreachable. The honest answer
+   * is a control they can press rather than a label we infer, and there is no
+   * such control today. Named here rather than papered over. */
   if (days <= 1) return [["Full body", "fullBody"]];
   if (days <= 2) return [["Full body A", "fullBody"], ["Full body B", "fullBody"]];
-  if (days === 3) {
-    return young
-      ? [["Full body A", "fullBody"], ["Full body B", "fullBody"], ["Full body C", "fullBody"]]
-      : [["Push day", "push"], ["Pull day", "pull"], ["Leg day", "legs"]];
-  }
+  if (days === 3) return [["Full body A", "fullBody"], ["Full body B", "fullBody"], ["Full body C", "fullBody"]];
   if (days === 4) return [["Upper body A", "upper"], ["Lower body A", "lower"], ["Upper body B", "upper"], ["Lower body B", "lower"]];
   return [["Push day", "push"], ["Pull day", "pull"], ["Leg day", "legs"], ["Upper body", "upper"], ["Lower body", "lower"]];
 }
@@ -701,7 +795,40 @@ function slotsForDay(key, isShort) {
   return mains.concat(rest);
 }
 
-const LEVEL_RANK = { beginner: 0, novice: 1, intermediate: 2, advanced: 3 };
+/* How hard a MOVEMENT is. This is the library's own `level` field, which is
+   Jawa's data and a perfectly good property of a barbell snatch. What is gone is
+   comparing it against a property of the PERSON. Nothing in this file asks how
+   advanced somebody is any more; it asks what they have done.
+   "novice" is here only because the old person-level vocabulary could leak into
+   a caller; no library row carries it. */
+const MOVEMENT_RANK = { beginner: 0, novice: 0, intermediate: 1, advanced: 2 };
+
+/* The pool anybody may be handed on day one, with no history and nothing asked.
+ *
+ * Beginner-tagged movements everywhere, plus intermediate ones on a MAIN slot
+ * only. That asymmetry is not new and it is not about the person: a main slot is
+ * a movement pattern the week needs filled, and the library's beginner rows
+ * cannot always fill one. Every deadlift, Romanian deadlift and hip thrust is
+ * tagged intermediate or above, so a beginner-only main pool leaves a week with
+ * no posterior chain work at all, which is the missing-hinge bug in
+ * engine/README.md. An accessory always has a beginner-tagged option, so it does
+ * not need the reach.
+ *
+ * Advanced is never in here. A movement tagged advanced appears in somebody's
+ * week only when they have earned it by doing it or asked for it by name, which
+ * is the owner's rule: "if they don't personally select them then we shouldn't
+ * ever have them, unless they select them once or twice and they finish up the
+ * workouts".
+ *
+ * Measured: for a person with no logs this produces exactly the pool the old
+ * LEVEL_RANK ceiling produced, because the old ceiling for a beginner was rank
+ * + 2 on a main and rank + 1 on an accessory, off a rank of 0. So the day one
+ * week is unchanged by this half of the change, which is the property worth
+ * having: nothing got easier or harder for the person who has told us nothing. */
+const DEFAULT_POOL_MAX = { main: MOVEMENT_RANK.intermediate, accessory: MOVEMENT_RANK.beginner };
+const inDefaultPool = (ex, role) =>
+  (MOVEMENT_RANK[ex.level] ?? MOVEMENT_RANK.advanced)
+    <= (role === "main" ? DEFAULT_POOL_MAX.main : DEFAULT_POOL_MAX.accessory);
 
 /* How far a movement can be loaded, as a ranking penalty rather than a filter.
    Only a strength emphasis reads it, and only on a main slot. A beginner who
@@ -713,26 +840,32 @@ const LEVEL_RANK = { beginner: 0, novice: 1, intermediate: 2, advanced: 3 };
    Barbell and machine load in small steps and keep going, so they cost nothing.
    Dumbbells and cables load in coarser steps and run out at whatever the rack
    holds, so they cost a little. Bodyweight cannot be loaded at all, so it costs
-   3, which is enough to lose to a lift two levels away (2 plus the 0.5 for
-   being above the user) and never enough to outrank the -100 for something they
-   already lift. Every other emphasis keeps the conservative tie break it had. */
+   3, which is enough to lose to the hardest movement in the pool (2, the top of
+   MOVEMENT_RANK) and never enough to outrank the -100 for something they already
+   lift. Every other emphasis keeps the conservative tie break it had. */
 const LOAD_PENALTY = { barbell: 0, machine: 0, bodyweight: 3 };
 const loadPenalty = (ex) => LOAD_PENALTY[ex.equipment] ?? 1;
 
-/* A main slot is a movement pattern somebody needs, so it reaches one level
-   higher than an accessory would. Without that a beginner gets no hinge at all:
-   every deadlift, Romanian deadlift and hip thrust in the library is tagged
-   intermediate or above, which is defensible on technique and leaves a beginner
-   with no posterior chain work, which is worse. See engine/README.md. */
-function candidates({ groups, pattern, level, equipment, role = "accessory", historyNames = [], preferences = null, prefBudget = null, exclude = null, emphasis = null, barred = null }) {
-  const ceiling = (LEVEL_RANK[level] ?? 0) + (role === "main" ? 2 : 1);
+/* Which movements may fill a slot, and in what order.
+ *
+ * Eligibility is earned, not granted. Three ways a movement may appear:
+ * it is in the safe default pool (see inDefaultPool), or this person has logged
+ * it on two separate days, or they went and picked it by name. `earned` is that
+ * second and third set, built once per plan in training-age.mjs. A harder
+ * movement nobody has done and nobody has asked for simply never turns up.
+ *
+ * What is gone is the ceiling: `(LEVEL_RANK[level] ?? 0) + (role === "main" ? 2 : 1)`,
+ * a number on the person added to a number on the slot and compared against a
+ * number on the movement. */
+function candidates({ groups, pattern, equipment, role = "accessory", earned = null, historyNames = [], preferences = null, prefBudget = null, exclude = null, emphasis = null, barred = null }) {
+  const isEarned = (ex) => Boolean(earned && earned.has(ex.name.toLowerCase()));
   const match = (needPattern) => {
     const pool = [];
     for (const lib of [WEIGHTS, CALIS]) {
       for (const cat of lib.categories) {
         for (const ex of cat.exercises) {
           if (!(ex.primary || []).some((g) => groups.includes(g))) continue;
-          if ((LEVEL_RANK[ex.level] ?? 0) > ceiling) continue;
+          if (!inDefaultPool(ex, role) && !isEarned(ex)) continue;
           if (equipment && !equipment.includes(ex.equipment)) continue;
           /* The goal's own "not these". This is the one exclusion in the file
              with no fallback and it sits here, inside the pool build, rather
@@ -753,27 +886,33 @@ function candidates({ groups, pattern, level, equipment, role = "accessory", his
        sort before bench press. Three things decide it, in order:
          1. Something he already lifts. Familiar beats theoretically optimal, and
             it is the only way the load can come from history rather than a guess.
-         2. Level as close to his as possible without going over, so a beginner
-            gets the safe version and an intermediate does not get the baby one.
+            It is also what keeps an experienced lifter's week made of his own
+            lifts now that nothing else knows he is experienced.
+         2. How hard the movement is, simplest first. This used to be distance
+            from the user's own level, which meant an experienced lifter was
+            steered away from the easy version. That protection is now the -100
+            above doing its job: somebody who benches has logged a bench press,
+            so the bench press is what wins the slot. For a movement they have
+            never touched, the simpler one is the right answer whoever they are,
+            and it is research/05's rule with nothing in front of it.
          3. On a main slot for a strength goal, how far the thing can be loaded,
             because a main lift you cannot add weight to is not a strength plan.
             See LOAD_PENALTY. It is a term and not a filter on purpose: where the
-            library has nothing loadable at this level the bodyweight movement
-            still wins its slot rather than the slot going empty.
-         4. research/05, the conservative tie break: lower level wins a draw. */
+            library has nothing loadable the bodyweight movement still wins its
+            slot rather than the slot going empty. */
     const known = new Set(historyNames);
-    const rank = LEVEL_RANK[level] ?? 0;
     const wantsLoad = emphasis === "strength" && role === "main";
     return pool
       .map((e) => {
-        const lv = LEVEL_RANK[e.level] ?? 0;
+        const lv = MOVEMENT_RANK[e.level] ?? MOVEMENT_RANK.advanced;
         return {
           e,
-          score: (known.has(e.name.toLowerCase()) ? -100 : 0) + Math.abs(rank - lv) + (lv > rank ? 0.5 : 0)
+          score: (known.has(e.name.toLowerCase()) ? -100 : 0) + lv
             + (wantsLoad ? loadPenalty(e) : 0),
         };
       })
-      .sort((x, y) => x.score - y.score || (LEVEL_RANK[x.e.level] ?? 0) - (LEVEL_RANK[y.e.level] ?? 0))
+      .sort((x, y) => x.score - y.score
+        || (MOVEMENT_RANK[x.e.level] ?? 2) - (MOVEMENT_RANK[y.e.level] ?? 2))
       .map((x) => x.e);
   };
 
@@ -820,7 +959,10 @@ export function buildPlan({
 
   /* ---- who they are, measured not asked ---- */
   const trainingAge = deriveTrainingAge({ logs, today });
-  const level = trainingAge.level;
+  /* And what they have earned, which is the only thing that decides whether a
+     harder movement may appear in the week. Built once for the plan: what
+     somebody has done is a fact about them, not about a Tuesday. */
+  const earned = earnedMovements({ logs, swaps });
 
   /* research/07: what was prescribed and what was logged are two tables that
      never meet, and joining them is the effort rating nobody will ever type in.
@@ -835,7 +977,13 @@ export function buildPlan({
      it did before this existed. */
   const preferences = learnPreferences({ swaps, plans, logs, today });
 
-  const resolved = resolveGoal({ ...goal, bodyWeightLb, sex, level, today });
+  /* The muscle gain rate is the one thing downstream that was keyed on a level.
+     It reads two measured numbers instead now; see GAIN_RATE in
+     goal-engine.mjs. */
+  const resolved = resolveGoal({
+    ...goal, bodyWeightLb, sex, today,
+    effectiveSessions: trainingAge.effectiveSessions, stillLinear: trainingAge.stillLinear,
+  });
   const P = resolved.params;
 
   /* ---- pass 1: structure ---- */
@@ -919,7 +1067,12 @@ export function buildPlan({
      reach selection or it is only a sentence, so the call sits above pass 2 and
      the result is spoken further down with the rest of pass 4. */
   let plateauPlan = planPlateauResponse({
-    plateau: trainingAge.plateau, level, calibration, goal: resolved,
+    plateau: trainingAge.plateau,
+    /* Was `level === "beginner"`. The question that branch was really asking is
+       whether session to session loading is still working, and that is measured
+       rather than labelled: see planPlateauResponse. */
+    stillLinear: trainingAge.stillLinear, confidence: trainingAge.confidence,
+    calibration, goal: resolved,
   });
   const rotateOut = new Set(
     plateauPlan.responses.filter((r) => r.action === "rotate").map((r) => r.exercise.toLowerCase()),
@@ -1004,14 +1157,21 @@ export function buildPlan({
      same card. Same shape, different cause, so a different sentence. */
   const dedupeEmpty = [];
 
-  const split = splitFor(days, level).slice(0, days);
+  const split = splitFor(days).slice(0, days);
   /* One lever, pulled once. A systemic volume cut is the same 0.85 that
      calibration's back-off already runs through `setsFor`, so it reuses that
      flag rather than adding a second multiplier beside it. plateau-response.mjs
      will not return volume-cut at all when calibration has already backed off,
      so these two can never both be true, and the week can never be cut twice. */
   const backOff = calibration.overall === "back-off" || plateauPlan.summary.action === "volume-cut";
-  const baseSets = BASE_WEEKLY_SETS[level] * P.setsFactor;
+  /* Was one number for every muscle, keyed on the training level. Now a band
+     per muscle and a measured dial saying where in it this week sits. See
+     VOLUME_BAND and volumeDial. */
+  const dial = volumeDial({ days, effectiveSessions: trainingAge.effectiveSessions });
+  const baseSetsFor = (group) => {
+    const band = VOLUME_BAND[group] || VOLUME_BAND_DEFAULT;
+    return (band.mev + dial * (band.mav - band.mev)) * P.setsFactor;
+  };
 
   /* ---- pass 2: selection, the whole week before any set count ---- */
   /* Two passes rather than one, because the divisor in pass 3 has to be the
@@ -1050,7 +1210,7 @@ export function buildPlan({
     let taken = 0;
     const picks = slots.map((slot) => {
       if (isShort && slot.role !== "main" && taken >= SHORT_DAY_MIN) return null;
-      const args = { ...slot, level, equipment: kit, role: slot.role, historyNames, preferences, prefBudget, exclude: excludeOut, emphasis: P.emphasis };
+      const args = { ...slot, earned, equipment: kit, role: slot.role, historyNames, preferences, prefBudget, exclude: excludeOut, emphasis: P.emphasis };
       const pool = candidates({ ...args, barred: goalBarred });
       if (!pool.length) {
         /* Empty for want of equipment is an old and quiet case, handled by
@@ -1104,7 +1264,7 @@ export function buildPlan({
          how a swap could be materially easier or harder than the lift it stood
          in for. Now ranked by nearest stimulus, in alternatives.mjs. */
       const ranked = scoreAlternatives({
-        exercise: pick, pool, level, equipment: kit, exclude: [...usedToday], count: 4,
+        exercise: pick, pool, earned, equipment: kit, exclude: [...usedToday], count: 4,
       });
       const swap = ranked.find((a) => !swapsThisWeek.has(a.name)) || ranked[0] || null;
       if (swap) swapsThisWeek.add(swap.name);
@@ -1125,7 +1285,7 @@ export function buildPlan({
      empty core slots on one day is still one thing that happened to that day. */
   for (const day of [...new Set(cautionEmpty.map((c) => c.day))]) {
     const groups = [...new Set(cautionEmpty.filter((c) => c.day === day).map((c) => c.groups))].join(", ");
-    dayNotes.push(`${day} has no ${groups} exercise in it. At your level and with the equipment you have, `
+    dayNotes.push(`${day} has no ${groups} exercise in it. Out of the movements open to you and the equipment you have, `
       + `everything the library offers for that slot is the kind of movement this goal points away from, so `
       + `the slot is left out rather than filled with one of those. The work that would fill it is planks `
       + `and side planks, or a Pallof Press if you have a cable machine.`);
@@ -1267,7 +1427,7 @@ export function buildPlan({
       const priority = tier > 0;
       const isMain = slot.role === "main";
       const full = setsFor({
-        base: baseSets, hitCount: hits[group] || 1, tier,
+        base: baseSetsFor(group), hitCount: hits[group] || 1, tier,
         ceiling: WEEKLY_MRV[group] ?? Infinity,
       });
       /* A short day is the session they were least likely to make, so it stays
@@ -1277,7 +1437,7 @@ export function buildPlan({
       const reps = isMain ? repRange[0] : repRange[1];
 
       const load = prescribeLoad({
-        exercise: pick, reps, bodyWeightLb, sex, level, logs, returning: trainingAge.returning,
+        exercise: pick, reps, bodyWeightLb, sex, logs, returning: trainingAge.returning,
         calibration: calibration.byExercise,
       });
       /* load.mjs caps a guess that extrapolated past what the person's size and
@@ -1307,7 +1467,7 @@ export function buildPlan({
         focusTier: tier,
         /* Said out loud rather than hidden: this slot wanted a movement pattern
            the library could not supply at this level. */
-        note: offPattern ? `Standing in for a ${slot.pattern} movement; the library has none at this level.` : null,
+        note: offPattern ? `Standing in for a ${slot.pattern} movement; the library has none you can use here.` : null,
       };
       roleOf.set(exercise, slot.role);
       return exercise;
@@ -1367,7 +1527,7 @@ export function buildPlan({
      `setsFor`. It is kept separate from the target below because the two mean
      different things now and the ledger reports both. */
   const wantedFor = (group) =>
-    Math.min(baseSets * PRIORITY_MULTIPLIER[tierFor(group)], WEEKLY_MRV[group] ?? Infinity);
+    Math.min(baseSetsFor(group) * PRIORITY_MULTIPLIER[tierFor(group)], WEEKLY_MRV[group] ?? Infinity);
 
   /* What this week could spend on a group if every one of its exercises ran at
      the top of the clamp. A group the split touches once cannot be handed more
@@ -1866,7 +2026,7 @@ export function buildPlan({
   const longestDay = week.reduce((m, d) => Math.max(m, d.estimatedMinutes + COOLDOWN_MIN), 0);
   if (askedMinutes !== null && askedMinutes > P.sessionMin && longestDay < askedMinutes * 0.8) {
     dayNotes.push(`You have ${askedMinutes} minutes and the longest day here needs about ${longestDay}. That is not the `
-      + `plan being lazy: more sets than this is past what your level recovers from in a week, and volume you cannot `
+      + `plan being lazy: more sets than this is past what a week recovers from, and volume you cannot `
       + `recover from is not training. Everything that could be bought without costing you recovery already has been. `
       + `Spend what is left on a walk, or take it back.`);
   }
@@ -1955,15 +2115,15 @@ export function buildPlan({
     frequencyCapped.push({
       group, wanted: +wanted.toFixed(1), target: +deliverable.toFixed(1), sessions,
       why: `${group} gets ${sessions === 1 ? "one session" : `${sessions} sessions`} a week on this split, which tops out at `
-        + `${deliverable} sets. Your level asks for ${+wanted.toFixed(1)}, so the week aims at ${deliverable} and the rest `
+        + `${deliverable} sets. This week asks for ${+wanted.toFixed(1)}, so it aims at ${deliverable} and the rest `
         + `needs another training day rather than more sets in the one you have.`,
     });
   }
   if (frequencyCapped.length) {
     const names = frequencyCapped.map((f) => f.group);
     const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-    dayNotes.push(`This split trains ${list} once or twice a week, so their weekly sets top out below what your `
-      + `level would otherwise ask for. That is the split talking, not the effort: more of those muscles means `
+    dayNotes.push(`This split trains ${list} once or twice a week, so their weekly sets top out below what `
+      + `the week would otherwise ask for. That is the split talking, not the effort: more of those muscles means `
       + `another day in the week, not more sets in the days you have.`);
   }
 
@@ -2057,7 +2217,7 @@ export function buildPlan({
        secondary goal's child only when the primary had no claim on the block.
        "Build muscle and touch my toes" is the case it exists for. */
     d.mobility = mobilityFor(d, {
-      level, hurts: limitsUsed.hurts, missing: limitsUsed.missing, goalChild: resolved.mobilityChild,
+      hurts: limitsUsed.hurts, missing: limitsUsed.missing, goalChild: resolved.mobilityChild,
       /* Set by the fill pass above, and only there: a longer block is something
          a stated session length bought, never a default. */
       longCooldown: !!d.longCooldown,
@@ -2067,18 +2227,41 @@ export function buildPlan({
     d.totalMinutes = d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60);
   }
 
-  const progression = level === "beginner" || level === "novice"
+  /* Which progression rule, from the bar rather than from a label. research/04
+     names this as the signal that actually defines the transition: "if someone
+     is still adding weight to a movement almost every session, they are by
+     definition still in the phase where linear progression works, whatever
+     their session count says". So the switch to double progression happens only
+     where we have MEASURED that linear has stopped working, and the default in
+     the absence of evidence is linear, which is also the conservative answer
+     and the one a day one plan needs. */
+  const measuredEnough = trainingAge.confidence === "medium" || trainingAge.confidence === "high";
+  const linearStillWorks = trainingAge.stillLinear || !measuredEnough;
+  const progression = linearStillWorks
     ? { rule: "linear", detail: "Hit every rep on every set and the weight goes up next time. That keeps working for months and there is no reason to be cleverer than it while it does." }
     : { rule: "double", detail: "Work up to the top of the rep range on every set, then add weight and drop back to the bottom." };
 
-  /* research: beginners rarely need a planned deload, and giving them one they
-     have not earned reads as the app deciding they are tired. */
-  const deload = LEVEL_RANK[level] >= 2
+  /* A scheduled deload is for somebody who is accumulating fatigue faster than
+     they are clearing it, and the visible sign of that is loading having stopped
+     working. Prescribing one to somebody the bar says is still climbing reads as
+     the app deciding they are tired, which is the same paternalism the level
+     ladder was doing. Same two measured facts as the progression rule, so the
+     two can never disagree about what phase somebody is in. */
+  const deload = !linearStillWorks
     ? { everyWeeks: 6, detail: "Every sixth week, same exercises, about two thirds of the sets." }
     : null;
 
   return {
-    goal: resolved, honest: resolved.timeline, level, trainingAge,
+    goal: resolved, honest: resolved.timeline, trainingAge,
+    /* What decided the week's volume, published because a ledger nobody can
+       explain is a ledger nobody trusts. `dial` is 0 to 1 between each muscle's
+       MEV and the middle of its MAV range; the two numbers under it are what
+       produced it. */
+    volumeDial: { value: +dial.toFixed(2), days, effectiveSessions: trainingAge.effectiveSessions },
+    /* How many movements this person has earned beyond the safe default pool.
+       The count rather than the list: the list is long and the interesting
+       question is whether it is growing. */
+    earnedMovements: earned.size,
     preferences: {
       avoid: preferences.avoid, prefer: preferences.prefer,
       equipmentBias: preferences.equipmentBias, confidence: preferences.confidence,

@@ -134,7 +134,8 @@ const PEOPLE = [
 
 function printPlan(p) {
   const t = p.trainingAge;
-  console.log(`  level ${p.level} (${t.confidence} confidence, ${t.effectiveSessions} sessions)`
+  console.log(`  ${t.effectiveSessions} sessions (${t.confidence} confidence), `
+    + `${p.earnedMovements} movements earned, volume dial ${p.volumeDial.value}`
     + ` | ${p.days} days, ${p.restDays} rest | ${p.progression.rule} progression`
     + (p.deload ? `, deload every ${p.deload.everyWeeks}w` : ""));
   if (p.honest?.message) console.log(`\n  "${p.honest.message}"`);

@@ -504,7 +504,7 @@ function badValues(v, path = "", out = [], seen = new Set()) {
  * is how a private field becomes a public one by accident.
  */
 const META_KEYS = new Set([
-  "level", "childUsed", "goals", "confidence", "days", "dayName", "focusHonoured",
+  "experience", "volumeDial", "childUsed", "goals", "confidence", "days", "dayName", "focusHonoured",
   "focus", "limits", "stretching", "session", "source", "goalSource", "logsSource", "missing",
   "styles",
 ]);
@@ -513,6 +513,8 @@ const META_KEYS = new Set([
    documentation bug rather than a leak. See the finding note. */
 const META_KEYS_UNDOCUMENTED = new Set(["cardio"]);
 const META_SUBKEYS = {
+  experience: ["sessions", "sessionsPerWeek", "weeksTraining", "stillLinear", "returning", "earnedMovements"],
+  volumeDial: ["value", "days", "effectiveSessions"],
   goals: ["primary", "secondary", "ignored"],
   focus: ["requested", "requestedTiers", "applied", "tiers", "why", "stale"],
   limits: ["hurts", "missing", "excludedCount"],
@@ -524,18 +526,23 @@ const WORKOUT_KEYS = new Set(["focus", "exercises", "warmup", "cooldown", "rampS
 const CARDIO_KEYS = new Set(["name", "mode", "minutes", "effort", "cue", "structure"]);
 const RAMP_KEYS = new Set(["exercise", "group", "sets", "seconds"]);
 const RAMP_SET_KEYS = new Set(["weight", "reps", "restSec", "pct", "cue"]);
-const EXERCISE_KEYS = new Set(["name", "sets", "reps", "targetWeight", "note", "swap", "alternatives", "restSec"]);
-const LEVELS = new Set(["beginner", "novice", "intermediate", "advanced"]);
+const EXERCISE_KEYS = new Set(["name", "sets", "reps", "targetWeight", "loadBasis", "note", "swap", "alternatives", "restSec"]);
+/* What a `targetWeight` of 0 is allowed to mean. "your size" is deliberately not
+   in here: it was the cold start basis and there is no cold start any more, so a
+   row carrying it would be an old prescription path finding its way back. */
+const LOAD_BASES = new Set(["bodyweight", "unknown", "your last session", "a similar lift"]);
 const CONFIDENCES = new Set(["none", "low", "medium", "high"]);
 const GROUP_SET = new Set(MUSCLE_GROUPS);
 
 /* What a targetWeight may be, as a multiple of bodyweight. Not a strength
    standard, a sanity rail: the question is only "would a person reading this
-   card think the app was broken", and a beginner told to put three times their
-   own bodyweight on a bar would. Where no bodyweight was given the engine
-   omits loads entirely, so 200 lb is a stand-in that only ever makes the rail
-   looser. */
-const WEIGHT_MULT = { beginner: 3, novice: 4, intermediate: 5, advanced: 6 };
+   card think the app was broken", and somebody told to put four times their own
+   bodyweight on a bar would. Where no bodyweight was given the engine omits
+   loads entirely, so 200 lb is a stand-in that only ever makes the rail looser.
+   One number now rather than four by training level, matching
+   TYPO_BODYWEIGHT_MULTIPLE in load.mjs, which this has to agree with or the
+   fuzz is testing a rail the engine does not have. */
+const WEIGHT_MULT = 4;
 const ABSOLUTE_WEIGHT_CAP = 1200;
 
 /* ------------------------------------------------------------------ *
@@ -654,8 +661,7 @@ function checkResult(ctx, out, payload) {
 
   const bwRaw = Number(payload && payload.current_weight);
   const bw = Number.isFinite(bwRaw) && bwRaw >= 40 && bwRaw <= 1500 ? bwRaw : 200;
-  const level = out.meta && out.meta.level;
-  const cap = Math.min(ABSOLUTE_WEIGHT_CAP, Math.max(200, bw * (WEIGHT_MULT[level] || 6)));
+  const cap = Math.min(ABSOLUTE_WEIGHT_CAP, Math.max(200, bw * WEIGHT_MULT));
 
   const seen = new Set();
   for (const e of w.exercises) {
@@ -668,7 +674,14 @@ function checkResult(ctx, out, payload) {
     if (typeof e.targetWeight !== "number" || !Number.isFinite(e.targetWeight) || e.targetWeight < 0) {
       fail("target-weight-type", ctx, `${e.name} targetWeight ${stable(e.targetWeight)}`);
     } else if (e.targetWeight > cap) {
-      fail("target-weight-absurd", ctx, `${e.name} ${e.targetWeight} lb for a ${level} at ${bw} lb`);
+      fail("target-weight-absurd", ctx, `${e.name} ${e.targetWeight} lb at ${bw} lb`);
+    }
+    /* Which of the two things a zero means. The contract now distinguishes them
+       and the app renders them differently, so a row that says nothing is a row
+       the card cannot caption. */
+    if (!LOAD_BASES.has(e.loadBasis)) fail("load-basis", ctx, `${e.name} loadBasis ${stable(e.loadBasis)}`);
+    if (e.targetWeight > 0 && (e.loadBasis === "bodyweight" || e.loadBasis === "unknown")) {
+      fail("load-basis", ctx, `${e.name} carries ${e.targetWeight} lb under basis ${e.loadBasis}`);
     }
     /* The contract says restSec is the number the session was costed with and
        that the app's own default is the fallback when it is absent, so null is
@@ -721,7 +734,15 @@ function checkResult(ctx, out, payload) {
     if (!obj || typeof obj !== "object") { fail("meta-shape", ctx, `meta.${parent} is ${stable(obj)}`); continue; }
     for (const k of Object.keys(obj)) if (!allowed.includes(k)) fail("meta-extra-key", ctx, `${parent}.${k}`);
   }
-  if (!LEVELS.has(meta.level)) fail("meta-level", ctx, stable(meta.level));
+  if ("level" in meta) fail("meta-level-resurrected", ctx, stable(meta.level));
+  const xp = meta.experience;
+  if (!xp || !Number.isFinite(xp.sessions) || xp.sessions < 0
+      || !Number.isFinite(xp.earnedMovements) || xp.earnedMovements < 0
+      || typeof xp.stillLinear !== "boolean" || typeof xp.returning !== "boolean") {
+    fail("meta-experience", ctx, stable(xp));
+  }
+  const dial = meta.volumeDial;
+  if (!dial || !(dial.value >= 0 && dial.value <= 1)) fail("meta-volume-dial", ctx, stable(dial));
   if (!CONFIDENCES.has(meta.confidence)) fail("meta-confidence", ctx, stable(meta.confidence));
   if (!Number.isInteger(meta.days) || meta.days < 2 || meta.days > 6) fail("meta-days", ctx, stable(meta.days));
   if (meta.dayName !== w.focus) fail("meta-day-name", ctx, `${stable(meta.dayName)} against ${stable(w.focus)}`);
@@ -976,7 +997,7 @@ if (args.case) {
       const out = generateFromPayload(payload, { today: TODAY, includePlan: true });
       console.log(`\n[${channel}] ok: ${out.workout.focus}, ${out.workout.exercises.length} exercises`);
       console.log(JSON.stringify(out.workout.exercises.map((e) => ({ name: e.name, sets: e.sets, reps: e.reps, w: e.targetWeight, rest: e.restSec })), null, 1));
-      console.log(`[${channel}] meta.level=${out.meta.level} days=${out.meta.days} keys=${Object.keys(out.meta).join(",")}`);
+      console.log(`[${channel}] sessions=${out.meta.experience?.sessions} days=${out.meta.days} keys=${Object.keys(out.meta).join(",")}`);
     } catch (err) {
       console.log(`\n[${channel}] THREW: ${(err && err.message) || err}`);
     }

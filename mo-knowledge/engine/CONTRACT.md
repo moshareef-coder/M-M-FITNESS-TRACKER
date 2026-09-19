@@ -41,7 +41,7 @@ somebody on day zero who has answered nothing, and it does.
 | `focus_groups` | text[] | engine | the body map pick, now with a priority tier on each entry. `"chest:3"` is red, `"chest:2"` yellow, `"chest:1"` green, and a bare `"chest"` with no tier is yellow, which is what every pick saved before 2026-09-12 means. Muscle group keys or the finer piece keys the zoomed view uses; both are flattened to the app's fourteen groups. The single entry `"all"` is "select my whole body" and expands to every group at green. A jsonb object, `{"chest":3}`, is accepted too, so the column can become jsonb later without the engine changing |
 | `focus_chosen_at` | timestamptz | engine | when that pick was made. Older than 60 days comes back as `meta.focus.stale` |
 | `limits` | jsonb or JSON string | engine | **new.** What hurts and what they do not own. Shape in section (c) |
-| `history` | array | engine | the old flattened map of best lifts, `{ exercise_name, weight }`, no dates. Used for loads and never for experience level |
+| `history` | array | engine | the old flattened map of best lifts, `{ exercise_name, weight }`, no dates. Used for loads only. With no dates it can neither measure a training history nor earn a movement, so a payload carrying only `history` gets the default pool |
 | `logs` | array | engine | real sessions, `{ entry_date, exercise_name, weight, reps, sets }`. Beats `history` whenever there is any |
 | `plans` | array | engine | completed plans, `{ entry_date, focus, exercises, completed_at }`. Joined against `logs` to calibrate. **Live as of 2026-09-12**: this row has described the join since it was written and the adapter was not passing the column, so until that date every verdict came back `unknown` and nothing behind one ever ran. Only rows carrying `completed_at` are evidence; a plan that was generated and never finished is ignored on purpose. A row that is not an object is dropped, and a row whose `exercises` is not a list keeps its dates and loses the list, so the rotation still sees the session and the join has nothing to join |
 | `swaps` | array | engine | `exercise_swaps` rows, `{ entry_date, planned_exercise, chosen_exercise }`. What somebody reached for instead. **Live as of the same date and for the same reason.** With `plans`, it feeds `preferences.mjs`: two occurrences inside 90 days sink a movement to the bottom of its pool, three take it out of the plan and the plan says so by name. It reorders the candidates for a slot and nothing else. It never changes a set count, a rep range, a load or the split, and it never leaves a slot empty |
@@ -64,7 +64,8 @@ inside it are dropped in silence.
         name: "Machine Chest Press",
         sets: 5,
         reps: 3,
-        targetWeight: 140,              // pounds. 0 means bodyweight or unknown, never a string
+        targetWeight: 140,              // pounds. 0 means "no weight on this card", never a string. WHICH kind of no weight is loadBasis
+        loadBasis: "a similar lift",    // new 2026-09-18. "your last session" | "a similar lift" | "bodyweight" | "unknown". See below
         note: "Guessed from a similar lift you logged",
         swap: "Dumbbell Bench Press",   // string or null
         alternatives: [                 // up to three, ranked by nearest stimulus
@@ -227,16 +228,65 @@ library genuinely cannot fill the day, which today means a bodyweight only week
 (there is no bodyweight biceps-primary movement in the library at all, so a
 bodyweight only pull day honestly has no curl in it).
 
+### No training level, and no weight we have not been told, 2026-09-18
+
+Two changes, one principle: the plan only claims what it actually knows.
+
+**`meta.level` is gone.** It was `beginner` / `novice` / `intermediate` /
+`advanced`, and it decided which exercises a person was allowed to be shown. A
+client reading it should read `meta.experience` instead, which is the
+measurement the label was a lossy summary of. The label could not work anyway:
+the app sends 90 days of logs and the ladder started at 20 / 60 / 200 sessions,
+so four days a week for thirteen straight weeks came to 51 sessions and still
+read as novice, and "advanced" was arithmetically unreachable in production.
+
+What decides which exercises appear is now **earned access**, per movement:
+
+- a **default pool** anybody starts with, with no history and nothing asked:
+  every movement the library tags `beginner`, plus `intermediate` ones on a main
+  slot, because the library has no beginner-tagged hinge and a week with no
+  posterior chain work is worse than one intermediate movement;
+- **plus anything they have logged on two separate days**;
+- **plus anything they picked by hand**, once, through the swap sheet.
+
+A movement tagged `advanced` never appears unless one of the last two is true.
+The set only grows, and it grows one movement at a time: two sessions of a
+Barbell Deadlift earn the Barbell Deadlift and nothing else.
+
+**And `targetWeight: 0` now needs reading with `loadBasis`.** It always had two
+meanings, and they were the same on screen because the second was rare: the
+engine used to invent a starting weight from bodyweight and sex for anybody with
+no history, so almost nobody ever saw "we do not know". That guess is gone. It
+was wrong often enough to matter (`sex` is optional, so a woman who skipped it
+got the male reference and every lift came out 2.0x to 2.8x heavy) and a wrong
+number is worse than no number for the person most likely to trust it.
+
+So a new user's first week comes back with `targetWeight: 0` on nearly every
+lift, and the card must say which kind of zero it is:
+
+| `loadBasis` | `targetWeight` | what the card should say |
+|---|---|---|
+| `"your last session"` | > 0 | the weight, as now |
+| `"a similar lift"` | > 0 | the weight, as now |
+| `"bodyweight"` | 0 | no weight. Nothing to add: the progression is the variation |
+| `"unknown"` | 0 | no weight, and the `note` beside it, which tells them to find one and says it will be used from then on |
+
+`note` already carries the right sentence in both zero cases, so a client that
+only renders `note` is correct today and always was. `loadBasis` exists so a
+client can render the two differently: an "unknown" row is an invitation to put
+a number in and a "bodyweight" row is not.
+
 `meta`, every key:
 
 | key | type | what |
 |---|---|---|
-| `level` | text | `beginner` / `novice` / `intermediate` / `advanced`, measured from logs, never asked |
+| `experience` | object | **new 2026-09-18, and it REPLACES `level`.** `{ sessions, sessionsPerWeek, weeksTraining, stillLinear, returning, earnedMovements }`, every one of them counted rather than judged. `sessions` is training days since the last long break, `earnedMovements` is how many movements this person has earned the right to be prescribed beyond the safe default pool. There is no beginner / intermediate / advanced anywhere in this response any more: see "No training level" below |
+| `volumeDial` | object | **new 2026-09-18.** `{ value, days, effectiveSessions }`. `value` is 0 to 1, where the week's volume sat between each muscle's MEV and the middle of its MAV range, and the two numbers under it are what put it there |
 | `childUsed` | text or null | which goal-tree child's parameters really ran, `"_default"` included |
 | `goals.primary` | object | **new.** `{ bubble, child, childUsed }`. The goal that set every parameter |
 | `goals.secondary` | object[] | **new.** One entry per honoured extra goal, in the order they were sent: `{ bubble, child, childUsed, priority: text[], cardio: bool, mobility: bool, effect: text[] }`. `effect` is plain sentences and an **empty `effect` means that goal changed nothing**, which the screen should show rather than hide |
 | `goals.ignored` | object[] | **new.** `{ bubble, child, why }` for every extra goal that was not used at all: unknown, a repeat of one already picked, or past the limit of two |
-| `confidence` | text | how much the level is worth: `none` / `low` / `medium` / `high` |
+| `confidence` | text | how much the measured history is worth: `none` / `low` / `medium` / `high` |
 | `days` | number | days in the week the plan was built for |
 | `dayName` | text | the day that came back, same string as `workout.focus` |
 | `focusHonoured` | bool | whether `payload.focus` picked the day, or the rotation did |
@@ -385,10 +435,10 @@ One line each, so a screen can say what an answer buys.
 | `gym_days_this_week` | the day count when nobody chose one |
 | `current_weight` | starting loads, scaled allometrically. Without it every weight is omitted rather than guessed |
 | `sex` | which column of pattern ratios sets those loads |
-| `logs` | experience level, starting loads from real history, plateau detection, and how many days a week they actually manage |
+| `logs` | which movements have been earned, starting loads from real history, plateau detection, the volume dial, and how many days a week they actually manage |
 | `plans` | joined with logs to calibrate: hit every set and every rep twice running and the bar goes up one step, at most 10% and at most 10 lb; came up short and the bar comes down by the same step and the whole week gives up a set on every lift, and it says so. Also decides whether a flat lift is a real stall (nothing to fix if you are beating the plan on it) and, with `logs`, which movements you were given and never logged |
 | `swaps` | with `plans`, reorders which exercise fills a slot. Nothing else: same slots, same sets, same reps, same loads |
-| `history` | starting loads only. It has no dates, so it can never set an experience level |
+| `history` | starting loads only. It has no dates, so it can neither measure a training history nor earn a movement |
 | `focus` | which day of the rotation comes back |
 | `focus_groups` | a weekly sets multiplier per group, by tier: 1.75x red, 1.4x yellow, 1.2x green. Merged with the goal's own priority list, which enters at yellow and acts as a floor, so a tap never buys a group less than no tap would. Capped by an emphasis budget rather than by a count, and what did not fit is named in `meta.focus.why`. Every group at one tier is not a focus and comes back as none, with a sentence in `notes` saying so. The weekly ask is capped at the group's MRV from `knowledge/principles/volume-landmarks.md`, so a red focus on an advanced lifter asks for that muscle's ceiling rather than 16 x 1.75 = 28; the cap moves no set count today, since the per-session clamp already binds first |
 | `focus_chosen_at` | reports staleness past 60 days. Nothing acts on it yet |

@@ -78,17 +78,15 @@ export const PLATEAU_RESPONSE = {
   /* A strength stall this short gets the rep range first, because the lift
      itself is usually fine and the range has run out of room. */
   shortStallWeeks: 6,
-  /* A beginner has to be flat for this long, on this many sessions of the lift,
-     before anything happens at all. Two guards rather than one, because a
-     beginner's week to week noise is enormous and their honest answer is almost
-     always "linear progression is still working, keep going". plan.mjs takes the
-     same line about scheduled deloads: giving somebody one they have not earned
-     reads as the app deciding they are tired. These stand in for training age
-     confidence, which this function is not given: a beginner is under 20
-     effective sessions by definition, so their confidence is never better than
-     medium and usually low. */
-  beginnerMinWeeksFlat: 8,
-  beginnerMinSessions: 6,
+  /* While session to session loading is still working, a lift has to be flat for
+     this long, on this many sessions of it, before anything happens at all. Two
+     guards rather than one, because week to week noise is enormous at that stage
+     and the honest answer is almost always "linear progression is still working,
+     keep going". plan.mjs takes the same line about scheduled deloads off the
+     same measurement: giving somebody a deload the bar says they have not earned
+     reads as the app deciding they are tired. */
+  linearMinWeeksFlat: 8,
+  linearMinSessions: 6,
   /* One lift dropped to this for a week and built back. periodization-deloads:
      cut the stress, keep the movement, one week is enough. */
   deloadLiftFactor: 0.85,
@@ -160,10 +158,11 @@ function sayFor({ action, lift, goal, reason = null, blocked = false }) {
         + `everything it asks. The weight goes up next session, so this one is already `
         + `sorting itself out.`;
     }
-    if (reason === "beginner") {
-      return `${lift.name} has been at ${at} for ${dur}. Nothing about it changes yet. This `
-        + `early on, a lift that has not moved is usually about how many sessions went in `
-        + `rather than about the plan, and the simple version keeps working for a while yet.`;
+    if (reason === "still-linear") {
+      return `${lift.name} has been at ${at} for ${dur}. Nothing about it changes yet. Weight `
+        + `is still going up on your other lifts, so a flat one is usually about how many `
+        + `sessions went in rather than about the plan, and the simple version keeps working `
+        + `for a while yet.`;
     }
     return `${lift.name} has been at ${at} for ${dur}. That is a rough patch rather than a `
       + `plateau, so nothing about it changes yet. Lifts sit still for a few weeks and then `
@@ -177,7 +176,7 @@ function sayFor({ action, lift, goal, reason = null, blocked = false }) {
   }
   if (action === "rep-range") {
     const change = blocked
-      ? "There is nothing else at your level to put in its place, so the lift stays and the reps change"
+      ? "There is nothing else in your pool to put in its place, so the lift stays and the reps change"
       : "The lift stays and the reps change";
     return `${flat}. ${change}: ${range(shift.to)} for this block`
       + `${shift.from ? ` instead of ${range(shift.from)}` : ""}. `
@@ -194,10 +193,10 @@ function detailFor({ action, lift, goal, reason = null }) {
   const shift = repShiftFor(goal);
   if (action === "wait") {
     if (reason === "already-climbing") return "calibrate.mjs already reads this as too easy and adds load next session. Nothing to add here.";
-    if (reason === "beginner") {
-      return `Beginner, flat ${lift.weeksFlat} weeks across ${lift.sessions} sessions of it, under `
-        + `the ${PLATEAU_RESPONSE.beginnerMinWeeksFlat} weeks and ${PLATEAU_RESPONSE.beginnerMinSessions} `
-        + `sessions a beginner has to clear before this responds. No change.`;
+    if (reason === "still-linear") {
+      return `Loading still works elsewhere. Flat ${lift.weeksFlat} weeks across ${lift.sessions} `
+        + `sessions of it, under the ${PLATEAU_RESPONSE.linearMinWeeksFlat} weeks and `
+        + `${PLATEAU_RESPONSE.linearMinSessions} sessions this clears first. No change.`;
     }
     return `Flat ${lift.weeksFlat} weeks, under the ${PLATEAU_RESPONSE.minWeeksFlat} where this responds. No change.`;
   }
@@ -218,7 +217,6 @@ function detailFor({ action, lift, goal, reason = null }) {
  *
  * @param {{
  *   plateau: { stalled?: boolean, lifts?: Array<{name:string,sessions:number,weeksFlat:number,weightLb:number}> },
- *   level: string,
  *   calibration?: object|null,
  *   goal?: object|null,
  * }} input
@@ -228,7 +226,18 @@ function detailFor({ action, lift, goal, reason = null }) {
  *   why: string[],
  * }}
  */
-export function planPlateauResponse({ plateau, level = "beginner", calibration = null, goal = null } = {}) {
+export function planPlateauResponse({ plateau, stillLinear = false, confidence = "none", calibration = null, goal = null } = {}) {
+  /* This used to take `level` and branch on `level === "beginner"`. The sentence
+     under that branch says what it was really asking: "a beginner is on linear
+     progression by definition". That is a claim about the bar and it is
+     measured, so it is read off the measurement now. `stillLinear` is
+     training-age.mjs seeing weight go up on most tracked lifts; a low
+     `confidence` is not having enough sessions to say either way, which is the
+     day one case and needs the same answer for the same reason. Nothing about
+     this is a lower standard for a "beginner": it is the honest version of what
+     the branch already believed. */
+  const linearStillWorks = stillLinear
+    || !(confidence === "medium" || confidence === "high");
   const why = [];
   const lifts = (plateau && Array.isArray(plateau.lifts) ? plateau.lifts : []).filter((l) => l && l.name);
   const { byExercise, overall } = calibrationOf(calibration);
@@ -256,16 +265,17 @@ export function planPlateauResponse({ plateau, level = "beginner", calibration =
       return { lift, action: "wait", reason: "short" };
     }
 
-    if (level === "beginner"
-        && (lift.weeksFlat < PLATEAU_RESPONSE.beginnerMinWeeksFlat
-            || lift.sessions < PLATEAU_RESPONSE.beginnerMinSessions)) {
-      why.push(`${lift.name}: a beginner, ${lift.weeksFlat} weeks flat across ${lift.sessions} `
-        + `sessions of it, under the ${PLATEAU_RESPONSE.beginnerMinWeeksFlat} weeks and `
-        + `${PLATEAU_RESPONSE.beginnerMinSessions} sessions this asks of a beginner. Wait. At `
-        + `this stage linear progression is still the answer far more often than a stall is `
-        + `real, most flat spots are attendance rather than adaptation, and telling a beginner `
-        + `they have plateaued is a good way to make them believe it.`);
-      return { lift, action: "wait", reason: "beginner" };
+    if (linearStillWorks
+        && (lift.weeksFlat < PLATEAU_RESPONSE.linearMinWeeksFlat
+            || lift.sessions < PLATEAU_RESPONSE.linearMinSessions)) {
+      why.push(`${lift.name}: ${lift.weeksFlat} weeks flat across ${lift.sessions} sessions of `
+        + `it, under the ${PLATEAU_RESPONSE.linearMinWeeksFlat} weeks and `
+        + `${PLATEAU_RESPONSE.linearMinSessions} sessions this asks for while weight is still `
+        + `going up elsewhere. Wait. While session to session loading is still working, linear `
+        + `progression is the answer far more often than a stall is real, most flat spots are `
+        + `attendance rather than adaptation, and telling somebody they have plateaued is a `
+        + `good way to make them believe it.`);
+      return { lift, action: "wait", reason: "still-linear" };
     }
 
     if (verdict === "too-easy") {
@@ -431,7 +441,7 @@ export function applyRotateFallback(result, names = [], { goal = null, plateau =
     responses,
     summary: result.summary,
     why: [...result.why, `Rotation was not possible for ${blocked.size} lift(s): excluding `
-      + `them left a slot with no pool at this level and equipment. Fell back to the rep range, `
+      + `them left a slot with no pool at this equipment. Fell back to the rep range, `
       + `because dropping the slot would leave a hole in the week and silently putting the lift `
       + `back would be the app saying one thing and doing another.`],
   };

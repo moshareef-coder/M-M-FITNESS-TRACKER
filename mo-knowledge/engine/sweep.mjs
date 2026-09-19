@@ -265,7 +265,13 @@ for (const t of TRAININGS) {
 const lookup = (name) => BY_NAME.get(String(name || "").trim().toLowerCase()) || [];
 const MUSCLE_INDEX = buildMuscleIndex(TRAININGS);
 const GROUP_SET = new Set(MUSCLE_GROUPS);
-const LEVEL_RANK = { beginner: 0, novice: 1, intermediate: 2, advanced: 3 };
+/* There is no training level to rank any more. What takes its place in this file
+   is the volume dial, which is the one number the week's volume is now read off,
+   and it is bucketed for reporting rather than compared for monotonicity: the
+   monotonic claim moved to earned movements, which is the thing a longer past is
+   supposed to buy. */
+const dialBucket = (v) => (v <= 0 ? "MEV" : v >= 1 ? "mid-MAV" : "between");
+const DIAL_BUCKETS = ["MEV", "between", "mid-MAV"];
 
 /* ------------------------------------------------------------------ *
  * The invariants, run over one result
@@ -274,7 +280,7 @@ const LEVEL_RANK = { beginner: 0, novice: 1, intermediate: 2, advanced: 3 };
 /* Every ratio the ledger produced, so the distribution can be reported by
    level and day count rather than as one number that hides which corner of the
    space is short. */
-const ratios = [];   // { level, days, group, ratio }
+const ratios = [];   // { dial, days, group, ratio }
 
 function checkOne(input, out) {
   const w = out.workout;
@@ -302,8 +308,21 @@ function checkOne(input, out) {
   if (!Array.isArray(out.meta?.missing) || out.meta.missing.some((m) => typeof m !== "string")) {
     fail("meta-missing-type", input, JSON.stringify(out.meta?.missing));
   }
-  if (!LEVEL_RANK.hasOwnProperty(out.meta?.level)) {
-    fail("level-value", input, `level ${JSON.stringify(out.meta?.level)}`);
+  /* `meta.level` is gone and must stay gone: a caller finding it there again
+     would be finding a label the engine no longer has any way to justify. What
+     has to be present instead is the measurement it was a summary of. */
+  if ("level" in (out.meta || {})) {
+    fail("level-resurrected", input, `meta.level is ${JSON.stringify(out.meta.level)}`);
+  }
+  const xp = out.meta?.experience;
+  if (!xp || !Number.isFinite(xp.sessions) || xp.sessions < 0
+      || !Number.isFinite(xp.earnedMovements) || xp.earnedMovements < 0
+      || typeof xp.stillLinear !== "boolean") {
+    fail("experience-shape", input, JSON.stringify(xp));
+  }
+  const dial = out.meta?.volumeDial;
+  if (!dial || !(dial.value >= 0 && dial.value <= 1)) {
+    fail("volume-dial-range", input, JSON.stringify(dial));
   }
 
   /* ---- focus, the body map half ---- */
@@ -313,7 +332,7 @@ function checkOne(input, out) {
   }
 
   if (!out.plan) return;
-  checkPlan(input, out.plan, out.meta?.level);
+  checkPlan(input, out.plan);
 }
 
 /* The week half, split out of `checkOne` so the blocks that drive `buildPlan`
@@ -321,7 +340,7 @@ function checkOne(input, out) {
    buildPlan through the adapter, so a calibrated week cannot be produced from a
    payload at all; see block G. Nothing in here reads `workout` or `meta`, which
    is why the split was possible without changing a single check. */
-function checkPlan(input, plan, level) {
+function checkPlan(input, plan) {
   /* Not one of the named invariants, but it is the same claim one level down.
      The SLOTS comment in plan.mjs says two slots can never quietly land on the
      same muscle group, which is the first complaint in the brief (two shrugs in
@@ -363,7 +382,7 @@ function checkPlan(input, plan, level) {
     if (!Number.isInteger(d.estimatedMinutes) || d.estimatedMinutes <= 0) {
       fail("estimated-minutes", input, `${d.name} estimatedMinutes ${JSON.stringify(d.estimatedMinutes)}`);
     } else if (d.estimatedMinutes > d.minutes * 1.15) {
-      warn("over-time-budget", input, `${d.name} ${d.estimatedMinutes} min against ${d.minutes} (${level})`);
+      warn("over-time-budget", input, `${d.name} ${d.estimatedMinutes} min against ${d.minutes} (dial ${plan.volumeDial?.value})`);
     }
     for (const e of d.exercises) {
       seenWeek.set(e.name, (seenWeek.get(e.name) || 0) + 1);
@@ -435,7 +454,7 @@ function checkPlan(input, plan, level) {
     if (!(row.wanted >= row.target)) {
       fail("volume-ledger", input, `${group} wanted ${JSON.stringify(row.wanted)} under target ${row.target}`);
     }
-    if (row.target > 0) ratios.push({ level, days: plan.days, group, ratio: row.sets / row.target });
+    if (row.target > 0) ratios.push({ dial: dialBucket(plan.volumeDial?.value ?? 0), days: plan.days, group, ratio: row.sets / row.target });
   }
 }
 
@@ -498,22 +517,25 @@ for (let gi = 0; gi < GOALS.length; gi++) {
       const bodyWeight = WEIGHTS_LB[(rr + 1) % WEIGHTS_LB.length];
       const focusCase = FOCUS_CASES[(rr + 2) % FOCUS_CASES.length];
       rr++;
-      const cellLevels = [];
+      const cellEarned = [];
       for (const history of HISTORY) {
         const cell = { goal: GOALS[gi], days, history, limitCase: LIMIT_CASES[li], sex, bodyWeight, focusCase };
         const out = run(cell);
         if (!out) continue;
         checkOne(tag(cell), out);
-        cellLevels.push({ history: history.id, level: out.meta.level, cell });
+        cellEarned.push({ history: history.id, earned: out.meta.experience.earnedMovements, cell });
       }
-      /* Level is measured from the logs and nothing else, so a longer past can
-         never make somebody less experienced. An inversion here is either the
-         threshold table or the still-linear pull-back reaching somewhere it
-         should not. */
-      for (let i = 1; i < cellLevels.length; i++) {
-        const a = cellLevels[i - 1], b = cellLevels[i];
-        if (LEVEL_RANK[b.level] < LEVEL_RANK[a.level]) {
-          fail("level-monotone", tag(b.cell), `${a.history}=${a.level} then ${b.history}=${b.level}`);
+      /* This was `level-monotone`: a longer past could never make somebody read
+         as less experienced. The claim moved with the model. What a longer past
+         buys now is movements, and the four histories in one cell are the same
+         person with more behind them (see the round robin note above), so the
+         set of movements they have earned can only ever grow. An inversion here
+         means `earnedMovements` is reading something other than what was done,
+         which is the whole of what this change rests on. */
+      for (let i = 1; i < cellEarned.length; i++) {
+        const a = cellEarned[i - 1], b = cellEarned[i];
+        if (b.earned < a.earned) {
+          fail("earned-monotone", tag(b.cell), `${a.history}=${a.earned} then ${b.history}=${b.earned}`);
         }
       }
       blockA.push({ goal: GOALS[gi], days, limitCase: LIMIT_CASES[li], sex, bodyWeight, focusCase });
@@ -905,7 +927,7 @@ for (let gi = 0; gi < GOALS.length; gi++) {
       }
     });
   }
-  if (last) checkPlan(input, last, last.level);
+  if (last) checkPlan(input, last);
 
   /* The instrument checking itself, which is the lesson of this whole exercise.
      If a refactor ever stops the replay feeding calibration, every check below
@@ -1033,7 +1055,7 @@ for (const g of GOALS) {
     const ctl = build(input, { goal, person: CAL_PERSON, logs, today: TODAY });
     const trt = build(input, { goal, person: CAL_PERSON, logs, plans, today: TODAY });
     if (!ctl || !trt) continue;
-    checkPlan(input, trt, trt.level);
+    checkPlan(input, trt);
 
     /* Recomputed here rather than read off the plan, which only carries the
        summary. Same reasoning as the volume ceiling: the sweep needs its own
@@ -1143,7 +1165,7 @@ for (const g of GOALS) {
     }
     const trt = build(input, { goal, person: CAL_PERSON, logs, today: TODAY });
     if (!trt) continue;
-    checkPlan(input, trt, trt.level);
+    checkPlan(input, trt);
 
     const responses = trt.plateau?.responses || [];
     const summary = trt.plateau?.summary || { action: "none" };
@@ -1367,7 +1389,7 @@ const UNDER = 0.8;
 const OVER = 1.25;
 
 function distribution() {
-  const byLevel = new Map();
+  const byDial = new Map();
   const byDays = new Map();
   const add = (map, key, r) => {
     let row = map.get(key);
@@ -1378,11 +1400,11 @@ function distribution() {
   };
   const crossed = new Map();
   for (const r of ratios) {
-    add(byLevel, r.level, r.ratio);
+    add(byDial, r.dial, r.ratio);
     add(byDays, r.days, r.ratio);
-    add(crossed, `${r.level}|${r.days}`, r.ratio);
+    add(crossed, `${r.dial}|${r.days}`, r.ratio);
   }
-  return { byLevel, byDays, crossed };
+  return { byDial, byDays, crossed };
 }
 
 function pct(n, of) { return of ? `${(100 * n / of).toFixed(1)}%` : "-"; }
@@ -1425,13 +1447,13 @@ for (const [inv, r] of warning.sort((a, b) => b[1].warns - a[1].warns)) {
 }
 console.log("");
 
-const { byLevel, byDays, crossed } = distribution();
+const { byDial, byDays, crossed } = distribution();
 console.log("WEEKLY VOLUME, sets against target");
-console.log("  level         groups    under 0.8    over 1.25");
-for (const level of ["beginner", "novice", "intermediate", "advanced"]) {
-  const row = byLevel.get(level);
+console.log("  volume dial   groups    under 0.8    over 1.25");
+for (const bucket of DIAL_BUCKETS) {
+  const row = byDial.get(bucket);
   if (!row) continue;
-  console.log(`  ${level.padEnd(14)}${String(row.n).padStart(6)}${pct(row.under, row.n).padStart(13)}${pct(row.over, row.n).padStart(13)}`);
+  console.log(`  ${bucket.padEnd(14)}${String(row.n).padStart(6)}${pct(row.under, row.n).padStart(13)}${pct(row.over, row.n).padStart(13)}`);
 }
 console.log("  days          groups    under 0.8    over 1.25");
 for (const days of DAY_COUNTS) {
@@ -1443,12 +1465,12 @@ for (const days of DAY_COUNTS) {
    Lower week hits every group twice and divides the weekly target by two, so it
    lands short in a way a three day week does not, and averaging the two hides
    the corner that is actually wrong. */
-console.log("  level x days   groups    under 0.8    over 1.25");
-for (const level of ["beginner", "novice", "intermediate", "advanced"]) {
+console.log("  dial x days    groups    under 0.8    over 1.25");
+for (const bucket of DIAL_BUCKETS) {
   for (const days of DAY_COUNTS) {
-    const row = crossed.get(`${level}|${days}`);
+    const row = crossed.get(`${bucket}|${days}`);
     if (!row) continue;
-    console.log(`  ${`${level.slice(0, 5)} ${days}d`.padEnd(15)}${String(row.n).padStart(5)}${pct(row.under, row.n).padStart(13)}${pct(row.over, row.n).padStart(13)}`);
+    console.log(`  ${`${bucket.slice(0, 7)} ${days}d`.padEnd(15)}${String(row.n).padStart(5)}${pct(row.under, row.n).padStart(13)}${pct(row.over, row.n).padStart(13)}`);
   }
 }
 console.log("");

@@ -189,18 +189,34 @@ export function refusalNote(cardio, flow) {
    Seeded by the date, so the same day asked twice is the same session and
    tomorrow is a different one. Same rule the rest of the engine follows: a
    generator that reshuffles on every call cannot be reviewed or tested. */
-export function cardioSessionFor(styles, { level = "beginner", today = new Date(), minutes = null } = {}) {
+export function cardioSessionFor(styles, { today = new Date(), minutes = null } = {}) {
   const modes = styles?.cardioModes || [];
   if (!modes.length) return null;
-  /* Filtered again on the way out, and this is not belt and braces. `cardioFor`
-     answers with everything at the person's level rather than nothing when a
-     mode has no session they can do, which is the right call for a week planner
-     choosing among several modes and the wrong one here: the library's only
-     swim is tagged intermediate, so a beginner who ticked Swimming was handed
-     an Easy Spin on a stationary bike, under a note saying the week was cardio
-     only "because that is what you picked". Better to say we could not build it
-     than to build something they did not ask for and put their own words on it. */
-  const all = cardioFor({ modes, level }).filter((s) => modes.includes(s.mode));
+  /* We used to tell `cardioFor` how advanced the PERSON was, and that is gone
+     with the training level. What it is told instead is a property of the
+     request: they ticked this mode by name, so everything in it short of the
+     hardest tier is open to them.
+   *
+     The reason it is not simply "beginner" is a measured one. The library's only
+     swim is tagged intermediate ("Easy Swim"), and so is the only HIIT session,
+     the only jump rope session and the only stairs session. A beginner gate
+     therefore answered four of the modes on the onboarding sheet with nothing at
+     all, and somebody who ticked Swimming got told we could not build their
+     week. Refusing to build the thing a person asked for, because of a
+     difficulty tag on the only row that could have served it, is the same
+     paternalism this whole change removes.
+   *
+     Advanced stays out, and that line is drawn where the request stops. They
+     named a mode, not a difficulty. Sprint Intervals and a Threshold Row are the
+     two rows behind it, and nothing anybody ticked says they want either.
+
+     Filtered again on the way out, and this is not belt and braces. `cardioFor`
+     answers a mode it cannot serve with everything else it has, which is the
+     right call for a week planner choosing among several modes and the wrong one
+     here: it is how somebody who ticked Swimming was handed an Easy Spin on a
+     stationary bike under a note saying the week was cardio only "because that
+     is what you picked". */
+  const all = cardioFor({ modes, level: "intermediate" }).filter((s) => modes.includes(s.mode));
   if (!all.length) return null;
   /* The clock they gave us, applied the same way plan.mjs applies it to a
      lifting day. The library runs from a 20 minute row to a 60 minute walk, so

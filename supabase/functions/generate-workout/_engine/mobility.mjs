@@ -113,16 +113,23 @@ export function moveSeconds(entry) {
    or a doorway is not equipment. A roller, a band and a bench are. */
 const FREE_KIT = new Set(["none", "wall", "doorway", undefined, null, ""]);
 
-function eligible(entry, { hurts, level, bodyweightOnly }) {
+function eligible(entry, { hurts, bodyweightOnly }) {
   if (!entry || !entry.name) return false;
   /* A stretch that loads a joint they said hurts is the same mistake as a lift
      that does, only slower. avoidIf is the library's own word on that. */
   for (const j of entry.avoidIf || []) if (hurts.includes(j)) return false;
   if (bodyweightOnly && !FREE_KIT.has(entry.equipment)) return false;
-  /* One level above theirs is fine on a stretch: nothing here is loaded. Two
-     above is a movement that needs a floor teacher, not a cue. */
-  const rank = LEVEL_RANK[level] ?? 0;
-  return (LEVEL_RANK[entry.level] ?? 0) <= rank + 1;
+  /* Nothing tagged advanced, and nothing else is filtered.
+   *
+   * This used to be "one rank above the USER's level is fine, because nothing
+   * here is loaded", which is two claims: a safe pool, and a person to size it
+   * against. The person is gone with the training level, and the safe pool is
+   * all the claim ever needed. It comes out the same for everybody who could
+   * really reach this code: a beginner allowed rank 0 + 1 and a novice rank
+   * 1 + 1, and with no library row tagged novice both of those are exactly
+   * "beginner and intermediate stretches". So this is byte for byte what
+   * every production user already got. */
+  return (LEVEL_RANK[entry.level] ?? 0) <= LEVEL_RANK.intermediate;
 }
 
 const toMove = (e) => ({
@@ -155,14 +162,14 @@ const toMove = (e) => ({
  *    what matters is what was worked, not what is next, and static entries
  *    carry no `prepares` at all.
  *
- * Then the level nearest theirs, then the shorter move, then the name, so two
+ * Then the simpler move, then the shorter one, then the name, so two
  * runs with the same input give the same block. The budget is filled toward,
  * not merely respected: once everything is covered it keeps adding the next
  * best move until the minutes are used or `maxMoves` is reached. A pool with
  * nothing for the target still yields a block: a warm-up for a day the library
  * does not describe well is better than no warm-up.
  */
-export function pickBlock({ kind, groups = [], patterns = [], budgetSec, hurts = [], missing = [], level = "beginner", exclude = null, pools = null, maxMoves = MAX_MOVES, stopAtCoverage = false, minSec = 0 }) {
+export function pickBlock({ kind, groups = [], patterns = [], budgetSec, hurts = [], missing = [], exclude = null, pools = null, maxMoves = MAX_MOVES, stopAtCoverage = false, minSec = 0 }) {
   const want = new Set((groups || []).filter((g) => GROUPS.has(g)));
   const bodyweightOnly = (missing || []).includes("none");
   const source = pools || [poolFor(kind)];
@@ -172,14 +179,17 @@ export function pickBlock({ kind, groups = [], patterns = [], budgetSec, hurts =
     for (const e of pool) {
       const key = String(e.name).toLowerCase();
       if (seen.has(key) || (exclude && exclude.has(key))) continue;
-      if (!eligible(e, { hurts, level, bodyweightOnly })) continue;
+      if (!eligible(e, { hurts, bodyweightOnly })) continue;
       seen.add(key);
       candidates.push(e);
     }
   }
   if (!candidates.length) return [];
 
-  const rank = LEVEL_RANK[level] ?? 0;
+  /* Ties break toward the simpler move, which is the same conservative rule
+     research/05 gives everywhere else and no longer needs a lifter to compare
+     against: rank 0 is "prefer a beginner-tagged stretch". */
+  const rank = 0;
   const wantPatterns = new Set(patterns || []);
   const covered = new Set();
   const coveredPatterns = new Set();
@@ -289,7 +299,6 @@ const total = (moves) => moves.reduce((t, m) => t + moveSeconds(m), 0);
  * The two blocks for one day of the week.
  *
  * @param day        a plan.mjs week day: needs `mainGroups` and `exercises[].group`
- * @param level      the training age level
  * @param hurts      limits.hurts, validated joint keys
  * @param goalChild  plan.goal.childUsed, so the two mobility children get their block
  */
@@ -298,7 +307,7 @@ const total = (moves) => moves.reduce((t, m) => t + moveSeconds(m), 0);
    costing performance (McGowan 2015 on fatigue, Behm 2016 on shelf life, Oliva
    2026 on peak force) and a long cool-down costing nothing (Van Hooren 2018)
    while buying the one outcome stretching reliably produces. */
-export function mobilityFor(day, { level = "beginner", hurts = [], missing = [], goalChild = null, longCooldown = false } = {}) {
+export function mobilityFor(day, { hurts = [], missing = [], goalChild = null, longCooldown = false } = {}) {
   const lib = library();
   if (!lib) {
     return { warmup: [], cooldown: [], warmupSeconds: 0, cooldownSeconds: 0, mobilityGoal: false,
@@ -329,17 +338,17 @@ export function mobilityFor(day, { level = "beginner", hurts = [], missing = [],
   /* Both blocks fill to their own budget now. The ramped warm up keeps its
      shorter budget on purpose: the ramp sets are the rest of the potentiation
      and plan.mjs reserves exactly these seconds in the session estimate. */
-  const warmup = pickBlock({ kind: "dynamic", groups: mainGroups, patterns, budgetSec: warmupSec, hurts, missing, level, minSec: warmupSec });
+  const warmup = pickBlock({ kind: "dynamic", groups: mainGroups, patterns, budgetSec: warmupSec, hurts, missing, minSec: warmupSec });
   const longBlock = mobilityGoal || longCooldown;
   const cooldown = longBlock
     ? pickBlock({
-        kind: "mobility", groups: worked, budgetSec: MOBILITY_GOAL_SECONDS, hurts, missing, level,
+        kind: "mobility", groups: worked, budgetSec: MOBILITY_GOAL_SECONDS, hurts, missing,
         /* Mobility moves first, then static holds for whatever those left out.
            The order of the pools is the preference; coverage still decides. */
         pools: [poolFor("mobility"), poolFor("static")],
         maxMoves: MAX_MOBILITY_MOVES,
       })
-    : pickBlock({ kind: "static", groups: worked, budgetSec: COOLDOWN_SECONDS, hurts, missing, level, stopAtCoverage: true, minSec: COOLDOWN_SECONDS });
+    : pickBlock({ kind: "static", groups: worked, budgetSec: COOLDOWN_SECONDS, hurts, missing, stopAtCoverage: true, minSec: COOLDOWN_SECONDS });
 
   const why = [];
   if ((missing || []).includes("none")) {
@@ -418,13 +427,13 @@ export const MOVEMENT_POOLS = Object.freeze(["mobility", "static", "dynamic"]);
    A session wants the opposite: long holds, the daily-mobility and static sets
    leading, dynamic only as a short opening, and the clock actually filled. */
 export function movementSession({
-  minutes = 30, level = "beginner", hurts = [], missing = [], groups = null,
+  minutes = 30, hurts = [], missing = [], groups = null,
 } = {}) {
   const lib = library();
   if (!lib) return { exercises: [], seconds: 0, why: ["No stretching library in this build."] };
 
   const bodyweightOnly = (missing || []).includes("none");
-  const ok = (e) => eligible(e, { hurts, level, bodyweightOnly });
+  const ok = (e) => eligible(e, { hurts, bodyweightOnly });
   const pick = (kind) => poolFor(kind).filter(ok);
 
   const budget = Math.max(300, Math.round(minutes * 60));

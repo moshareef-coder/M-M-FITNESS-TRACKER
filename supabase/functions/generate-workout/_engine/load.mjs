@@ -193,8 +193,39 @@ export function humanBodyWeight(bodyWeightLb) {
   return n;
 }
 
-/* No history at all. Bodyweight, sex and level, scaled properly. */
-export function coldStart1RM({ exercise, bodyWeightLb, sex = "Male", level = "beginner" }) {
+/* What somebody this size could PLAUSIBLY be lifting, at the top of the range.
+ *
+ * This used to be `coldStart1RM` and it used to end up on a card. It does not
+ * any more, and that is the change: a person with no logs was being told to
+ * pull 110 lb on a Cable Pull-Through under a note reading "deliberately light,
+ * log what you do", which is the app admitting it is guessing and printing the
+ * guess anyway. Worse, the guess was keyed on `sex`, which is optional, so a
+ * woman who never filled it in got the male reference and every lift in her
+ * week came out 2.0x to 2.8x too heavy. Removing the guess removes that whole
+ * class of bug rather than patching one end of it.
+ *
+ * It survives for one job, and the job is the opposite of prescribing. When the
+ * engine extrapolates a load from a DIFFERENT movement in somebody's own logs,
+ * the ratio arithmetic can run away: one logged 200 lb Goblet Squat produced an
+ * 870 lb Leg Press. `sanityCeiling` needs some idea of the size of a person to
+ * catch that, and this is the only thing in the file that has one. A number that
+ * can only ever lower a figure derived from the user's own logged work is not a
+ * claim about how strong they are; it is a claim that 870 lb is nobody.
+ *
+ * It takes no training level, and the rung it stands on instead is the bottom
+ * one. Two reasons, and they agree. research/05 decides the direction whenever
+ * this engine is unsure, and what this bounds is a guess rather than a
+ * measurement: wrong-low costs one easy set, wrong-high costs the session. And
+ * it is what every real user was already getting, because the level ladder
+ * started at 20 sessions of 90 days of logs and essentially nobody in production
+ * ever left the bottom rung, so this is the rail as it actually ran rather than
+ * a new one.
+ *
+ * A missing `sex` no longer costs anybody anything either, which is the other
+ * half of the bug being removed: defaulting to the male reference can now only
+ * make a ceiling looser, and a ceiling that fails to bind is a ceiling that
+ * changed nothing. */
+export function sizeCeiling1RM({ exercise, bodyWeightLb, sex = "Male" }) {
   const female = String(sex).toLowerCase().startsWith("f");
   const ref = female ? REF.female : REF.male;
   const pattern = patternFor(exercise);
@@ -203,7 +234,7 @@ export function coldStart1RM({ exercise, bodyWeightLb, sex = "Male", level = "be
   const bw = humanBodyWeight(bodyWeightLb);
   if (!bw) return null;                          // research/05: never guess, just omit it
 
-  const benchAtRef = ref.bench[level] || ref.bench.beginner;
+  const benchAtRef = ref.bench.beginner;
   const scaled = benchAtRef * Math.pow(bw / ref.bw, ALLOMETRIC_EXPONENT);
   return scaled * ratio * variantFactor(exercise, pattern);
 }
@@ -351,9 +382,16 @@ const NO_HUMAN_LB = 1200;
  * told to put three times their own bodyweight on a bar has been told something
  * useless whether or not a row somewhere says so.
  *
- * It is a multiple by LEVEL because a training history is what earns the
- * headroom, and level here is derived from logged sessions rather than claimed. */
-const BODYWEIGHT_MULTIPLE = { beginner: 3, novice: 4, intermediate: 5, advanced: 6 };
+ * It used to be a multiple by LEVEL, 3 for a beginner rising to 6 for an
+ * advanced lifter. That went with the level, and it went without much of a
+ * fight: the rail's job is to catch a typo, not to model a lifter, and a rail
+ * that decides how strong somebody is allowed to be is doing the second thing.
+ * Four is the one number now. It is looser than the 3 nearly every real user
+ * got, because in production almost nobody could ever climb off the bottom
+ * rung, and tighter than the 6 the top rung gave, which nobody in production
+ * could reach at all. A 180 lb person would have to have logged 720 lb on one
+ * movement before it says a word. */
+const TYPO_BODYWEIGHT_MULTIPLE = 4;
 
 /* When we were never told a bodyweight, the rail still has to exist, because the
    history path hands out loads with or without one. A 200 lb person is the
@@ -369,12 +407,11 @@ const ASSUMED_BW_LB = 200;
  * could plausibly be doing, while a guess is bounded by what this module itself
  * would have prescribed from size alone, times how many rows are behind the
  * guess. One row of a different movement is a rumour; three rows is a pattern. */
-function sanityCeiling({ exercise, reps, bodyWeightLb, sex, level, trust = null }) {
+function sanityCeiling({ exercise, reps, bodyWeightLb, sex, trust = null }) {
   const bw = humanBodyWeight(bodyWeightLb) ?? ASSUMED_BW_LB;
-  const multiple = BODYWEIGHT_MULTIPLE[level] ?? BODYWEIGHT_MULTIPLE.advanced;
-  let ceiling = Math.min(NO_HUMAN_LB, bw * multiple);
+  let ceiling = Math.min(NO_HUMAN_LB, bw * TYPO_BODYWEIGHT_MULTIPLE);
   if (trust != null) {
-    const oneRM = coldStart1RM({ exercise, bodyWeightLb, sex, level });
+    const oneRM = sizeCeiling1RM({ exercise, bodyWeightLb, sex });
     const sizeBased = oneRM ? workingFrom1RM(oneRM, reps ?? 8) : null;
     if (sizeBased) ceiling = Math.min(ceiling, sizeBased * trust);
   }
@@ -393,7 +430,18 @@ const trustFor = (rows = 1) =>
  * this behaves exactly as it always has, which matters: the join only exists
  * for people who have finished a planned session.
  */
-export function prescribeLoad({ exercise, reps, bodyWeightLb, sex, level, logs = [], returning = false, calibration = null }) {
+/* The one sentence a person gets in place of a number they were never owed.
+   Three things have to be in it and nothing else: what to do today, how to know
+   when they have got it, and that this is the last time they will be asked.
+   research/05's conservative rule said out loud rather than performed: two reps
+   in reserve is the engine's own RIR everywhere else in this file, so the number
+   they arrive at is the number the next prescription is built from, and saying
+   so is what makes the first session feel like the start of something rather
+   than a blank. */
+const FIRST_TIME_NOTE =
+  "First time on this one: work up to a weight you could stop two reps short of. That becomes your number.";
+
+export function prescribeLoad({ exercise, reps, bodyWeightLb, sex, logs = [], returning = false, calibration = null }) {
   if (exercise?.equipment === "bodyweight") {
     return { weight: null, basis: "bodyweight", note: "Bodyweight. The progression is the variation, not the load." };
   }
@@ -432,7 +480,7 @@ export function prescribeLoad({ exercise, reps, bodyWeightLb, sex, level, logs =
          passes the second, and it has to be clamped rather than quietly become
          a null. */
       const ceiling = sanityCeiling({
-        exercise, reps, bodyWeightLb, sex, level,
+        exercise, reps, bodyWeightLb, sex,
         trust: hist.source === "pattern" ? trustFor(hist.rows) : null,
       });
       if (!(weight <= ceiling)) {
@@ -454,30 +502,26 @@ export function prescribeLoad({ exercise, reps, bodyWeightLb, sex, level, logs =
     };
   }
 
-  const oneRM = coldStart1RM({ exercise, bodyWeightLb, sex, level });
-  if (!oneRM) {
-    return { weight: null, basis: "unknown", note: "Pick a weight you could do a couple more reps with. We will learn it from what you log." };
-  }
-  const working = workingFrom1RM(oneRM, reps);
-  /* Deliberately under, not over. research/05: wrong-low costs one easy set,
-     wrong-high costs a failed session and possibly the user. */
-  /* Calibration reaches this branch too, and the case that needs it is the
-     skipped one: an exercise nobody has ever logged has no history to read, so
-     without this the swap line would never be said out loud. */
-  const cold = applyCalibration(working * 0.9,
-    "A starting guess from your bodyweight. Deliberately light. Log what you actually do and the next one will be right.",
-    calibration, exercise);
-  /* The same rail over the guess from size, which sounds circular and is not:
-     the allometric curve keeps climbing past the top of the bodyweight window,
-     so at the heaviest weight the payload bound will accept it asks an advanced
-     lifter for a four figure leg press off no evidence at all. One ceiling for
-     every number that leaves this module is also simply easier to reason about
-     than one ceiling for the paths somebody remembered. */
-  const ceiling = sanityCeiling({ exercise, reps, bodyWeightLb, sex, level });
-  const held = cold.weight != null && !(cold.weight <= ceiling);
-  return {
-    weight: roundLoad(held ? ceiling : cold.weight),
-    basis: "your size",
-    note: cold.note,
-  };
+  /* Nothing logged, and nothing honest to say about the number. There used to be
+     a third path here: scale a reference bench by bodyweight and sex, take 90%
+     of the working set, print it, and attach a note admitting it was a guess.
+     That is the shape of the whole problem. The note said "deliberately light"
+     while the card said 110 lb to somebody who had never trained, and a number
+     on a card is read where a note under it is not.
+
+     So the number is simply absent, and what takes its place is the rest of the
+     prescription, which was never a guess: the sets, the reps, the rest, and one
+     instruction. `basis: "unknown"` is a path this function already had, for the
+     people whose bodyweight was missing, and the app already renders it: a
+     targetWeight of 0 draws no load on the card and the note goes under the
+     lift. So this is not a new state for a client to learn, it is an old state
+     arriving far more often, which is why `loadBasis` now leaves the adapter
+     as well: a card has to be able to tell "you carry yourself" from "go and
+     find out".
+
+     Calibration still reaches this branch, because an exercise nobody has ever
+     logged has no history to read and the twice-skipped swap line has to be
+     able to be said. */
+  const said = applyCalibration(null, FIRST_TIME_NOTE, calibration, exercise);
+  return { weight: null, basis: "unknown", note: said.note };
 }

@@ -718,10 +718,15 @@ const MIN_EXERCISES = 3;
 /* The engine's loadNote explains itself in a sentence or two, which is right in
    the demo output and too long for a line under an exercise name on a phone.
    These are the same statements, short enough to read mid set. */
+/* `"your size"` is gone from this table because the basis is gone from the
+   engine. It was the cold start: a weight scaled off bodyweight and sex, printed
+   on the card under a cue admitting it was a guess. A person with no history now
+   gets `unknown` instead, which is a state this table and the app already had,
+   and the cue is the one thing they are owed in place of the number: what to do
+   today, and that it will not be asked again. */
 const LOAD_CUE = {
   bodyweight: "Bodyweight, progression is the variation",
-  "your size": "Deliberately light, log what you do",
-  unknown: "Pick a weight with two reps left in you",
+  unknown: "Find your weight today, we use it from here",
   "your last session": "What you did last time, or a little more",
   "a similar lift": "Guessed from a similar lift you logged",
 };
@@ -781,6 +786,16 @@ export function toWorkout(plan, dayIndex = 0) {
     /* null means bodyweight or "we do not know", and the app's contract for
        both is 0. Never a string: the app does arithmetic on this. */
     targetWeight: e.weight ?? 0,
+    /* Which of the two things a `targetWeight` of 0 means. The contract has
+       always allowed 0 for both "this is bodyweight work" and "we do not know",
+       and until now they were genuinely the same on screen because the second
+       case was rare: the engine invented a number for almost everybody. Now the
+       second case is every new user's whole first week, and "no weight because
+       you carry yourself" and "no weight because you are about to find it" are
+       different instructions. `"bodyweight"`, `"unknown"`, `"your last session"`
+       or `"a similar lift"`; additive, and the five keys beside it are
+       unchanged, so a client that ignores it behaves exactly as it did. */
+    loadBasis: e.loadBasis ?? "unknown",
     note: cueFor(e),
     /* Additive, and the five keys above are untouched. The engine has always
        computed a swap for every exercise and this function threw it away, so
@@ -1069,7 +1084,7 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
        refusal sentence says so in words rather than leaving it to a flag. */
     const styleSession = styles.asked && !styles.resistance
       ? cardioSessionFor(styles, {
-        level: plan.level, today,
+        today,
         /* The same clock the lifting week was built to, so a person who said
            thirty minutes is not handed an hour long walk. */
         minutes: plan.week[dayIndex]?.minutes ?? plan.sessionBudget?.minutes ?? null,
@@ -1080,7 +1095,7 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
 
     const missing = [...(plan.missing || [])];
     if (logsSource === "history") {
-      missing.push("dated sessions, so the loads come from your best lifts and the experience level does not");
+      missing.push("dated sessions, so the loads come from your best lifts and nothing can say how long you have been training");
     }
 
     return {
@@ -1112,7 +1127,28 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
          showing both can never show a week the day did not come out of. */
       ...(includePlan ? { plan } : {}),
       meta: {
-        level: plan.level,
+        /* `level` was here and is gone. It was a beginner / novice / intermediate
+           / advanced label, it decided which exercises somebody was allowed to be
+           shown, and in production nobody could ever leave the bottom of it: the
+           client sends 90 days of logs and the ladder started at 20 / 60 / 200
+           sessions. What replaces it is the measurement it was a lossy summary
+           of. A caller that wants to say something about experience should say
+           it in these numbers, which can be checked, rather than in a word that
+           cannot. */
+        experience: {
+          sessions: plan.trainingAge?.effectiveSessions ?? 0,
+          sessionsPerWeek: plan.trainingAge?.sessionsPerWeek ?? 0,
+          weeksTraining: plan.trainingAge?.weeksTraining ?? 0,
+          stillLinear: !!plan.trainingAge?.stillLinear,
+          returning: !!plan.trainingAge?.returning,
+          /* How many movements this person has earned the right to be
+             prescribed, over and above the safe default pool. The one number
+             that says whether the week is opening up. */
+          earnedMovements: plan.earnedMovements ?? 0,
+        },
+        /* Where the week's volume sat between each muscle's MEV and the middle
+           of its MAV range, and the two measured numbers that put it there. */
+        volumeDial: plan.volumeDial ?? null,
         /* What train_styles changed, so a screen can say it rather than the
            person having to infer it from a week that came back lighter than
            they expected. `honoured` false is the one case worth showing: they

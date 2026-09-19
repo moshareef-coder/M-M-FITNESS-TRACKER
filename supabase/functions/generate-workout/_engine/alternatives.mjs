@@ -22,11 +22,12 @@
  */
 import { patternFor } from "./load.mjs";
 
-/* Same four tier scale plan.mjs uses. The library only ever tags beginner,
-   intermediate or advanced, but a derived training age can come back "novice",
-   so the user's level needs the middle rung the library does not have. */
-const LEVEL_RANK = { beginner: 0, novice: 1, intermediate: 2, advanced: 3 };
-const rankOf = (lvl) => LEVEL_RANK[lvl] ?? 0;
+/* How hard a MOVEMENT is, the same scale plan.mjs reads. It is the library's own
+   field and a property of the exercise. What used to be here as well was a rank
+   for the USER, on the same scale, so the two could be subtracted. That is gone
+   with the training level: see plan.mjs, MOVEMENT_RANK. */
+const MOVEMENT_RANK = { beginner: 0, novice: 0, intermediate: 1, advanced: 2 };
+const rankOf = (lvl) => MOVEMENT_RANK[lvl] ?? MOVEMENT_RANK.advanced;
 
 /* The scoring rule, highest weight first. Weights are spaced so that the order
    of the terms is the order of their authority: no amount of level or equipment
@@ -34,8 +35,8 @@ const rankOf = (lvl) => LEVEL_RANK[lvl] ?? 0;
 
      +3  x how much of the original's secondary work it reproduces (0 to 3)
      +2  same movement pattern
-     -1  per level step away from the user
-     -1  extra if it is HARDER than the user, so ties break toward the easier one
+     -1  per step HARDER than the lift it is replacing, 0 for easier
+     +1.5 they have already done this one
      +0.5 same equipment as the original
 
    Every term is bounded by its own weight, so the ORDER of the terms is their
@@ -55,12 +56,21 @@ const rankOf = (lvl) => LEVEL_RANK[lvl] ?? 0;
    decide that one, correctly. An original with no secondary muscles listed
    scores 0 here for everyone, because the term carries no information then.
 
-   Level distance is measured from the user rather than from the original
-   (Jawa measures from the original) because the original was already chosen
-   against the user's level, and the failure we care about is handing somebody a
-   movement above their technique. Symmetric distance would rate an advanced
-   variant and an easier variant equally; the -1 asymmetry says it should not. */
-export const SCORE_WEIGHTS = { secondary: 3, pattern: 2, levelStep: -1, harder: -1, sameEquipment: 0.5 };
+   Difficulty is now measured from the ORIGINAL rather than from the user, which
+   is where Jawa measures it from and where it always belonged. The old rule
+   subtracted a rank on the exercise from a rank on the person, and the person
+   half of that no longer exists: there is no beginner, intermediate or advanced
+   user here any more. What survives is the part that was doing the work anyway,
+   which is asymmetry. A swap harder than the lift it replaces is a swap somebody
+   may not be able to do; a swap easier than it is always available to them. So
+   harder costs and easier is free, and a draw goes to the simpler movement.
+
+   `earned` is the replacement for the term that knew who the lifter was, and it
+   knows something better: whether they have actually done this movement. Worth
+   1.5, which can beat a pattern match but never a full secondary-muscle
+   coverage, because a movement they have done is a strong hint and not a reason
+   to hand back something that trains the wrong thing. */
+export const SCORE_WEIGHTS = { secondary: 3, pattern: 2, harderStep: -1, earned: 1.5, sameEquipment: 0.5 };
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 
@@ -77,6 +87,10 @@ function equipmentAllowed(ex, equipment) {
    a log line. Reason first (why it is the same), caveat second (what changes),
    never more than two clauses. */
 function whyFor({ ex, original, overlap, samePattern, levelDelta }) {
+  /* `levelDelta` is now measured against the lift being replaced rather than
+     against the lifter, which is what these three sentences always claimed to
+     be describing: "easier version of the same movement" is a statement about
+     two exercises. */
   const lead = levelDelta < 0
     ? (samePattern ? "Easier version of the same movement" : "Easier, and works the same muscle")
     : levelDelta > 0
@@ -104,21 +118,28 @@ function whyFor({ ex, original, overlap, samePattern, levelDelta }) {
  *
  * @param {object}   opts.exercise   the library entry being replaced
  * @param {object[]} opts.pool       library entries to choose from
- * @param {string}   opts.level      the USER's level (may be "novice")
+ * @param {Set<string>|null} opts.earned  lowercased names this person has done
  * @param {string[]|null} opts.equipment  what they have, or null for everything
  * @param {string[]} opts.exclude    names already spoken for today
  * @param {number}   opts.count      how many to return
  * @returns {Array<{name,equipment,level,score,why}>} best first
  */
+/* Eligibility is deliberately NOT applied here, and that is not an oversight.
+   plan.mjs will not PRESCRIBE a movement somebody has not earned; this is the
+   list they choose from, and choosing from it is exactly the explicit selection
+   that earns a movement in the first place. Narrowing a menu to the things
+   somebody has already picked is how an app stops being able to offer anybody
+   anything new. */
 export function scoreAlternatives({
-  exercise, pool = [], level = "beginner", equipment = null, exclude = [], count = 4,
+  exercise, pool = [], earned = null, equipment = null, exclude = [], count = 4,
 } = {}) {
   if (!exercise) return [];
   const original = exercise;
   const originalPrimary = arr(original.primary);
   const originalSecondary = new Set(arr(original.secondary));
   const originalPattern = patternFor(original);
-  const userRank = rankOf(level);
+  const originalRank = rankOf(original.level);
+  const hasDone = (name) => Boolean(earned && earned.has(String(name).toLowerCase()));
   const blocked = new Set([original.name, ...arr(exclude)]);
 
   /* By name, not an array. Fourteen names in this library exist in two
@@ -138,12 +159,12 @@ export function scoreAlternatives({
     const overlap = originalSecondary.size ? shared / originalSecondary.size : 0;
     const samePattern = patternFor(ex) === originalPattern;
     const exRank = rankOf(ex.level);
-    const levelDelta = exRank - userRank;
+    const levelDelta = exRank - originalRank;
 
     const score = overlap * SCORE_WEIGHTS.secondary
       + (samePattern ? SCORE_WEIGHTS.pattern : 0)
-      + Math.abs(levelDelta) * SCORE_WEIGHTS.levelStep
-      + (levelDelta > 0 ? SCORE_WEIGHTS.harder : 0)
+      + Math.max(0, levelDelta) * SCORE_WEIGHTS.harderStep
+      + (hasDone(ex.name) ? SCORE_WEIGHTS.earned : 0)
       + (ex.equipment === original.equipment ? SCORE_WEIGHTS.sameEquipment : 0);
 
     const row = {
@@ -160,8 +181,8 @@ export function scoreAlternatives({
 
   const scored = [...byName.values()];
 
-  /* research/05's conservative tie break: a draw goes to the lower level. Name
-     last so the same inputs always produce the same list. */
+  /* research/05's conservative tie break: a draw goes to the simpler movement.
+     Name last so the same inputs always produce the same list. */
   scored.sort((a, b) => b.score - a.score || a._rank - b._rank || a.name.localeCompare(b.name));
   return scored.slice(0, Math.max(0, count)).map(({ _rank, ...rest }) => rest);
 }

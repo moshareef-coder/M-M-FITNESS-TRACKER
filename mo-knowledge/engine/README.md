@@ -1859,3 +1859,248 @@ of the clamp and a real prescription rather than a ledger artifact. Traps and
 forearms have no row in the source table and are left uncapped rather than given
 an invented number; every split here touches them once a week, so the frequency
 cap is what binds on them anyway.
+
+## There is no beginner, intermediate or advanced, 2026-09-18
+
+Mo: "I never liked the whole beginner, intermediate and advanced. Let's remove
+that, I don't like that at all. And for any advanced workouts, if they don't
+personally select them then we shouldn't ever have them, unless they select them
+once or twice and they finish up the workouts, and then we can have a system
+where we can generate them these advanced workouts. But it really depends on what
+they have done.
+
+And I don't want to necessarily push them towards a weight on their workouts,
+because you don't know what their weights are, how much they lift, because we
+don't have that on the record. After we have that on the record then we kind of
+understand how they lift."
+
+Both halves are the same principle and it is already this folder's stated one
+(research/07): **the app may only claim what it actually knows.** The engine
+broke it twice.
+
+### The tier could not work, and the arithmetic says so
+
+`deriveTrainingAge` ranked people at 20 / 60 / 200 effective sessions. The client
+sends 90 days of logs (`index.html`, `logsFrom`). Ninety days is 12.9 weeks, so
+four sessions a week for the entire window is 51 sessions and still reads novice;
+"intermediate" needs 4.7 sessions a week sustained for thirteen straight weeks;
+and "advanced" needs 200 sessions inside 90 days, which is not a training
+programme, it is a contradiction. Verified rather than repeated: the sweep's
+three top rungs were only ever reachable because `sweep.mjs` synthesises 18
+months of logs and hands them over whole, which no client does.
+
+So a system was deciding what people were allowed to be shown, using a word that
+in production had exactly one value.
+
+### Job 1: exercises are earned
+
+`level` gated eligibility through a ceiling: `(LEVEL_RANK[level] ?? 0) + (main ? 2 : 1)`,
+a number on the PERSON added to a number on the SLOT and compared against a
+number on the MOVEMENT. The movement half is fine and stays; it is Jawa's data
+and it is a true fact about a barbell snatch. The person half is gone.
+
+Three ways a movement may now appear:
+
+| | rule | why that size |
+|---|---|---|
+| **default pool** | every `beginner` row, plus `intermediate` on a MAIN slot | measured: this is byte for byte the pool the old ceiling gave somebody with no logs, so day one did not move. The main-slot reach is the missing-hinge fix, not a statement about the person: every deadlift, RDL and hip thrust is tagged intermediate, and a week with no posterior chain work is worse than one intermediate movement |
+| **earned** | logged on 2 separate days | `preferences.mjs` already answers the same question in the other direction with the same number: `SOFT_AT = 2` is where a repeat stops being a busy machine and becomes a pattern. One day is a try, a friend's gym or a mis-tap. Mo said "once or twice"; two is the cautious end of that, and research/05 says which end to be cautious at |
+| **chosen** | picked by hand once, via `exercise_swaps.chosen_exercise` | a person who asks for a movement gets it. Asking twice for permission to have what you asked for is the paternalism being removed |
+
+`advanced` is reachable only through the last two. And earning does not
+generalise: two sessions of a Barbell Deadlift earn the Barbell Deadlift and
+nothing else. Letting one earned movement unlock its neighbours would be
+inventing the claim this change removes, and the library carries no
+difficulty ladder within a pattern that could support it (LIBRARY-REQUESTS.md).
+
+**The ranking term changed with the filter.** It was distance from the user's
+level, which protected an experienced lifter from being handed the baby version.
+That protection is now the `-100` for something they already lift doing the job:
+somebody who benches has logged a bench press. For a movement nobody has
+touched, the simpler one is right whoever they are, which is research/05 with
+nothing in front of it.
+
+**`splitFor` stopped reading level too.** It branched at one day count: three
+days went full body for a beginner or novice and Push / Pull / Legs above that.
+Dead code in production by the arithmetic above, and not a good decision where it
+did fire: volume-landmarks.md ties the split to FREQUENCY, and three full body
+days buy every group three exposures where PPL buys one each. Days per week is
+the whole answer now. What is genuinely lost is an experienced lifter who WANTS
+PPL on three days; the honest fix is a control they can press, and there is not
+one. Named rather than papered over.
+
+### Job 2: no weight until there is one on the record
+
+A person with zero logs was being prescribed:
+
+```
+Goblet Squat          40 lb    "Deliberately light, log what you do"
+Cable Pull-Through   110 lb    "Deliberately light, log what you do"
+```
+
+The note admits it is a guess and the number goes out anyway. And the guess was
+keyed on `sex`, which is optional, so a woman who never filled it in got the male
+reference table and every lift in her week came out 2.0x to 2.8x heavy.
+
+`coldStart1RM` is gone as a prescription. What a new person gets instead is the
+sets, the reps, the rest, the ramp where there is one, and one sentence:
+
+> First time on this one: work up to a weight you could stop two reps short of.
+> That becomes your number.
+
+Three things in it on purpose: what to do today, how to know when they have it,
+and that this is the last time they will be asked. Two reps in reserve is the
+engine's own RIR everywhere else, so the number they arrive at really is the one
+the next prescription is built from.
+
+**One caller genuinely needed the size estimate and it says why.** `sanityCeiling`
+bounds a load EXTRAPOLATED from a different movement in the person's own logs,
+and without some idea of the size of a person, one logged 200 lb Goblet Squat
+comes back as an 870 lb Leg Press. So the function survives as `sizeCeiling1RM`,
+used by nothing else, and it can only ever lower a number that came out of the
+user's own history. A ceiling is not a claim about how strong somebody is; it is
+a claim that 870 lb is nobody. It stands on the bottom reference rung, which is
+both the conservative choice for bounding a guess and what every production user
+was already getting. A missing `sex` can now only make a ceiling looser, which is
+the harmless direction, so that bug is closed rather than moved.
+
+The typo rail beside it, `BODYWEIGHT_MULTIPLE`, was 3 / 4 / 5 / 6 by level and is
+a flat 4. Looser than the 3 nearly everybody really got and tighter than the 6
+nobody could reach.
+
+**The contract grew a word for it.** `targetWeight: 0` always meant two things,
+and they were indistinguishable on screen because the second was rare: the engine
+invented a number for almost everybody, so "we do not know" barely happened. It
+is now every new user's whole first week. `toWorkout` emits `loadBasis`
+(`"your last session"` / `"a similar lift"` / `"bodyweight"` / `"unknown"`)
+alongside the five keys it always emitted. Additive: a client that renders only
+`note` is correct today and always was, because `note` already carries the right
+sentence in both cases.
+
+### Job 3: what replaced the volume base
+
+`BASE_WEEKLY_SETS` was `{ beginner: 8, novice: 10, intermediate: 14, advanced: 16 }`,
+one number for all fourteen muscle groups, keyed on the label. Both halves wrong.
+volume-landmarks.md carries a separate MEV per group and they are not close: back
+10, chest 8, biceps 6. So a beginner's flat 8 was two sets over MEV on biceps and
+two under it on back, out of the same constant, and nothing could see it because
+the constant had nothing to be compared against.
+
+`VOLUME_BAND` is now per group, `mev` straight off that table and `mav` the middle
+of its MAV range. Where somebody sits in the band is `volumeDial`, 0 to 1, from
+the file's own two sentences:
+
+> "A new trainee or someone training 2-3 days/week should sit near MEV-to-low-MAV per muscle."
+> "Someone training hard 4-6 days/week with a real history can run mid-to-high MAV."
+
+`byHistory` reaches 1 at 40 effective sessions, which is already the line
+`deriveTrainingAge` calls high confidence, so it is a reused threshold rather than
+a new one. `byDays` reaches 1 at five days. They combine as
+`byHistory * (0.5 + 0.5 * byDays)`: a real history is worth half the band on its
+own, which is sentence one, and the other half is bought by training four or five
+days, which is sentence two. A fortnight of five day weeks is still near MEV,
+because five days a week in somebody's first fortnight is an intention and there
+is no history to multiply.
+
+**This is not the tier wearing a new hat**, and the difference is not cosmetic. It
+is a continuous measured quantity used as a dial, with no thresholds and no name,
+and it decides how many sets a muscle gets. It is never compared against anything
+to decide what somebody is allowed to be shown. The owner objected to the label
+and to the gate; this is neither.
+
+Abs is the one row not taken literally. The landmark's MEV for core is 0, which is
+true and useless as the bottom of a dial, since every split here carries a core
+slot. Its band starts at the bottom of its MAV range, 8, which is also exactly
+what core got before. Traps and forearms have no row at all and borrow the biceps
+one, which is the shape of what they are: a small muscle trained by one isolation
+slot a week.
+
+### Everything else that was reading `level`, and what it reads now
+
+| reader | was | now |
+|---|---|---|
+| `progression` | beginner or novice means linear | `stillLinear`, or not enough sessions to say. research/04 names this as the signal that actually defines the transition, and it is read off the bar |
+| `deload` | rank >= 2 | the same two facts, so the two can never disagree about what phase somebody is in. A scheduled deload for somebody the bar says is still climbing is the app deciding they are tired |
+| `planPlateauResponse` | `level === "beginner"` | `stillLinear`, which is what that branch's own comment said it was asking ("a beginner is on linear progression by definition") |
+| `GAIN_RATE_PER_MONTH` | four rungs | two ends and a slide on `effectiveSessions`, holding at the fresh end while loading still works. The four-rung version was stated in YEARS and fed by 90 days, in the one place in the engine that becomes a date on a screen |
+| `mobilityFor` | one rank above theirs | nothing tagged advanced. Byte for byte what every production user already got, since beginner + 1 and novice + 1 both come to "beginner and intermediate stretches" |
+| `scoreAlternatives` | level distance from the USER | distance from the ORIGINAL, asymmetric so harder costs and easier is free, plus +1.5 for a movement they have done. Eligibility is deliberately NOT applied here: this is the menu, and choosing from it is what earns a movement |
+| `cardioSessionFor` | the person's level | `intermediate`, a property of the request rather than of the person. The library's only swim, only HIIT, only jump rope and only stairs session are all tagged intermediate, so a beginner gate answered four of the onboarding sheet's own ticks with nothing at all. Advanced stays out: they named a mode, not a difficulty |
+
+### Sweep deltas
+
+Same 10,820 runs, FAILs none and KNOWN OPEN none before and after.
+
+| WARN | before | after | why |
+|---|---|---|---|
+| same-group-twice-in-day | 20489 | 14768 | three day weeks are full body, whose five slots name five different groups, where Push / Pull / Legs doubles up on lats by design |
+| duplicate-in-week | 9526 | 12776 | **+3250, the real cost.** Three full body days repeat movements across the week that a PPL split spread out, and the accessory pool for somebody with no history is beginner-only. Both are the change working: the same lift three times a week at 2 sets is the frequency argument, not an accident |
+| excluded-prescribed | 12767 | 11001 | a narrower default pool reaches for fewer movements a limit had excluded |
+| hurt-joint-prescribed | 12767 | 11001 | same cause, same rows |
+| over-time-budget | 3270 | 1931 | full body days at MEV are shorter than PPL days at a flat 14 |
+| days-clamped | 3357 | 3357 | unchanged |
+| calibration-changed-selection | 216 | 216 | unchanged |
+| focus-group-not-in-split | 118 | 118 | unchanged |
+| unknown-secondary-goal | 54 | 54 | unchanged |
+| tiers-indistinguishable | 46 | 27 | per-group bands are not all multiples of the same constant, so the [2, 6] clamp collapses fewer tier pairs onto one number. The tiers got more distinguishable, which is what that counter is for |
+| level-value / level-monotone | FAIL | gone | replaced by `experience-shape`, `volume-dial-range`, `level-resurrected` and `earned-monotone` |
+
+`earned-monotone` is the replacement for `level-monotone` and it is a better
+invariant: the four histories in a sweep cell are the same person with a longer
+past, and what a longer past buys is movements, so the earned set can only grow.
+
+The volume table is reported by dial bucket rather than by level. The old
+`intermediate` and `advanced` rows read 36.6% and 33.0% of groups under 0.8 of
+target; the new `between` and `mid-MAV` rows read 15.4% and 23.0%, because a
+per-group target is reachable where a flat 14 divided by a split that hits
+triceps once was not.
+
+### What a new person sees
+
+A 265 lb man, no logs, four days. Every lift carries sets, reps, rest and a
+sentence; four of the twenty-two carry a weight and none of them is invented.
+
+```
+Upper body A
+  Push-Up                3x8    bodyweight   Bodyweight, progression is the variation
+  Lat Pulldown           2x8    --           Find your weight today, we use it from here
+  Machine Shoulder Press 3x8    --           Find your weight today, we use it from here
+  Inverted Row           2x15   bodyweight   Bodyweight, progression is the variation
+  Dumbbell Curl          3x15   --           Find your weight today, we use it from here
+  Triceps Pushdown       3x15   --           Find your weight today, we use it from here
+```
+
+That is less than they had on day one, and it is the trade this change makes on
+purpose. A wrong number is worse than none for the person most likely to believe
+it, and the number was wrong by a factor of two to three for every woman who had
+not filled in her sex.
+
+### Three things left open, said out loud
+
+**A three day week cannot be Push / Pull / Legs any more, for anybody.** The
+level branch that used to grant it was unreachable in production, so nothing was
+really taken away, but the honest answer to "I have three days and I want PPL"
+is a control on a screen, and there is not one. It is a product decision rather
+than an engine one.
+
+**`activity-session.mjs` still has a level, and it is a different kind.**
+`levelFromSessions` buckets somebody by how many yoga or pilates sessions they
+have done in that discipline, which is earned-by-doing rather than self-report,
+so it is not the thing the owner objected to. It is inconsistent in vocabulary
+with everything above, and making it per-move would need pose-level logging that
+does not exist: a yoga session is one row, not one row per pose. Left alone
+rather than guessed at.
+
+**`duplicate-in-week` rose by 3,250 in the sweep and nothing acts on it.** Three
+full body days at two sets repeat movements a Push / Pull / Legs week spread
+out, and for somebody with no history the accessory pool is beginner-only. Both
+are this change working as designed, and both are also the reason that counter
+exists, so whether a full body week should rotate its accessories harder is a
+real question the ledger does not get to answer.
+
+**`meta.experience.earnedMovements` is a count nobody renders yet.** It is the
+number that says whether somebody's week is opening up, which is the thing this
+change promises and the thing worth showing them. Recording it before anything
+reads it is the one place research/07's second rule ("never observe something we
+will not use") is being stretched, and it is stretched deliberately: it comes out
+of `logs` that are already in the payload, so nothing new is collected.
