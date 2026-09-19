@@ -110,18 +110,33 @@ export function pickCircuitCategories({ level, weeklyVolumeByCategory = {} }) {
 export const REP_RANGES = {
   strength: [3, 6],
   hypertrophy: [6, 15],
+  recomp: [6, 15], // same rep range as hypertrophy -- shared training structure, see below
   general: [8, 12],
 };
 
 export function normalizeGoal(goal) {
   const g = (goal || "").toLowerCase();
-  // "strong" as the stem catches both "strength" and the app's actual button text "Get
-  // stronger" -- the previous "strength"-only check silently missed "stronger" (no shared
-  // substring), so every real user picking Get Stronger was landing on the general/circuit
-  // bucket instead of a strength program. Confirmed against index.html's live goal strings.
+  // Checked before "muscle" below -- "Recomp (lose fat, gain muscle)" contains "muscle" and
+  // would otherwise silently fall into the hypertrophy bucket. That's actually fine for
+  // TRAINING structure (recomp wants the same hypertrophy-biased split, see
+  // recomp-training.md), which is why this accidentally "worked" until now -- but it would be
+  // a real bug the moment calorie logic gets wired to goal, since recomp needs a small
+  // deficit, not build-muscle's surplus. Kept as its own explicit bucket so that distinction
+  // is visible and correct by design rather than by accident. See isHypertrophyStyle() below
+  // for where recomp and hypertrophy should still be treated the same (training structure).
+  if (g.includes("recomp")) return "recomp";
   if (g.includes("strong")) return "strength";
   if (g.includes("muscle") || g.includes("hypertrophy") || g.includes("gain")) return "hypertrophy";
   return "general"; // fat loss / general fitness / unspecified
+}
+
+// Recomp and hypertrophy share identical TRAINING structure (whole-body, hypertrophy-biased
+// split) -- they differ only in calorie direction, which goal-timeline.mjs handles separately.
+// Every exercise-selection decision below should use this, not a direct "=== hypertrophy"
+// check, so recomp gets the same correct split/volume/day-naming treatment build-muscle does.
+export function isHypertrophyStyle(goal) {
+  const n = normalizeGoal(goal);
+  return n === "hypertrophy" || n === "recomp";
 }
 
 /** Sets per exercise today. Beginners get less per movement -- they're doing more total
@@ -132,7 +147,7 @@ export function normalizeGoal(goal) {
  *  targets -- one exercise at the generic 3 sets would leave most muscles under their own
  *  MEV floor. */
 export function setsPerExercise(level, goal = null) {
-  if (goal && normalizeGoal(goal) === "hypertrophy") {
+  if (goal && isHypertrophyStyle(goal)) {
     return { beginner: 4, intermediate: 4, advanced: 5 }[level] ?? 4;
   }
   return { beginner: 3, intermediate: 3, advanced: 4 }[level] ?? 3;
@@ -405,7 +420,7 @@ export function buildWeightTrainingPlan({
   focusCategoryCount = 2, exercisesPerCategory = 2, dayIndex = 0, isDeloadWeek = false,
 }) {
   const isCircuit = sessionStyleForGoal(goal) === "circuit";
-  const isHypertrophy = normalizeGoal(goal) === "hypertrophy";
+  const isHypertrophy = isHypertrophyStyle(goal);
   const isStrength = normalizeGoal(goal) === "strength";
   // Strength reuses the same movement-pattern full-coverage picker as circuit sessions --
   // pickFocusCategories had the identical skipped-categories bug here (8 of 14 groups, never
