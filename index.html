@@ -491,6 +491,12 @@
   /* The card places its arc on a grid; here it is a flex item on the right. */
   .plan-ov .wkt-arc { grid-area: auto; justify-self: auto; flex: none; width: 136px; height: 104px; }
   .plan-ov .wkt-arc-num b { font-size: 32px; }
+  /* The day the numbers say to skip. It stands in the card's place rather
+     than on top of it: the ordinary grid is still in the DOM, wired, one class
+     away, which is what Work out anyway takes off. */
+  .wkt-next-grid.hid { display: none; }
+  .wkt-rest-rec h2 { margin-bottom: 6px; }
+  .wkt-rest-rec .wkt-btn-soft { margin-top: 14px; }
   .wkt-next-acts { grid-area: acts; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .wkt-next-acts .wkt-more { flex-basis: 100%; }
   .wkt-more {
@@ -1719,6 +1725,12 @@
   .session-overlay.paused-screen { padding: 0; overflow: hidden; }
   .session-overlay.paused-screen .session-bar,
   .session-overlay.paused-screen .session-progress-track { display: none; }
+  /* A paused activity is the same screen in a different container, so the
+     activity scrim gives up its padding and its scroll exactly the way the
+     session overlay does. Without this the .pz inside it is padded twice and
+     a 100dvh screen sits inside a box already 36px shorter than the phone. */
+  .csn-scrim.act-paused { padding: 0; }
+  .csn-scrim.act-paused .csn-stage { overflow: hidden; }
   .pz {
     min-height: 100dvh; display: flex; flex-direction: column;
     padding: calc(14px + env(safe-area-inset-top, 0px)) 18px calc(20px + env(safe-area-inset-bottom, 0px));
@@ -2786,7 +2798,12 @@
      The lift and the two timed blocks share it: the paused sheet and the
      wrap-up still scroll, which is why the class is added and removed per
      render. */
-  .session-overlay.lifting {
+  /* The activity session (yoga, Pilates, a run) is this same screen wearing
+     different content, so it is listed on every rule here rather than given a
+     palette of its own. Mo: "all of our UI should follow the same exact
+     format, it's just the content on there that's different." Two copies of
+     these tokens would have drifted apart by the second change. */
+  .session-overlay.lifting, .csn-scrim.act-live {
     display: flex; flex-direction: column;
     overflow: hidden; padding: 0;
     /* The stage. Dark at the very top so the clock and the title read white,
@@ -2804,7 +2821,8 @@
     --sess-key-press: rgba(255,255,255,.22);
     background: var(--sess-stage) no-repeat top / 100% 68%, var(--bg);
   }
-  html[data-theme="light"] .session-overlay.lifting {
+  html[data-theme="light"] .session-overlay.lifting,
+  html[data-theme="light"] .csn-scrim.act-live {
     --sess-ink: #111318;
     /* Ends deeper than the sheet it runs into, or a white sheet on a white
        stage has nothing but its hairline to say it is a separate thing. */
@@ -2821,13 +2839,14 @@
      with the mode too, the way the old wash did on the scrolling version.
      The lift's greys with the stretch hue mixed in, so the figure still stands
      on a light stage and the sheet is still near-black, just cooler. */
-  .session-overlay.lifting.stretching {
+  .session-overlay.lifting.stretching, .csn-scrim.act-live.stretching {
     --sess-stage: linear-gradient(180deg, #2a3949 0%, #9ab6cf 26%, #dfebf6 50%, #dbe8f4 70%, #98b4cc 88%, #62809b 100%);
     --sess-sheet: linear-gradient(180deg, #1b2a3a 0%, #0d161f 58%, #0a1119 100%);
     --sess-key: rgba(160,205,255,.16);
     --sess-key-press: rgba(160,205,255,.28);
   }
-  html[data-theme="light"] .session-overlay.lifting.stretching {
+  html[data-theme="light"] .session-overlay.lifting.stretching,
+  html[data-theme="light"] .csn-scrim.act-live.stretching {
     --sess-stage: linear-gradient(180deg, #d5e5f2 0%, #e9f2f9 26%, #ffffff 50%, #f6fafd 70%, #d3e3f0 88%, #b5cde2 100%);
     --sess-sheet: linear-gradient(180deg, #ffffff 0%, #f7fbfe 100%);
     --sess-key: rgba(11,127,199,.09);
@@ -2868,19 +2887,26 @@
   .stretch-note { margin: 2px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--muted); text-align: center; }
   /* The top bar rides on the stage, so it takes the stage's ink rather than
      the app's, and the two round buttons become ghosts on it. */
-  .session-overlay.lifting .session-bar {
+  .session-overlay.lifting .session-bar, .csn-scrim.act-live .session-bar {
     flex-shrink: 0; margin: 0; color: var(--sess-ink);
     padding: calc(12px + env(safe-area-inset-top, 0px)) 18px 0;
   }
   .session-overlay.lifting .session-pause,
-  .session-overlay.lifting .session-min {
+  .session-overlay.lifting .session-min,
+  .csn-scrim.act-live .session-pause,
+  .csn-scrim.act-live .session-min {
     width: 44px; height: 44px; border: 0; color: var(--sess-ink); background: var(--sess-key);
   }
   .session-overlay.lifting .session-pause:active,
-  .session-overlay.lifting .session-min:active { background: var(--sess-key-press); }
-  .session-overlay.lifting .session-clock { color: var(--sess-ink); }
-  .session-overlay.lifting .session-clock:active { background: var(--sess-key); }
-  .session-overlay.lifting .session-timer { font-size: 32px; }
+  .session-overlay.lifting .session-min:active,
+  .csn-scrim.act-live .session-pause:active,
+  .csn-scrim.act-live .session-min:active { background: var(--sess-key-press); }
+  .session-overlay.lifting .session-clock,
+  .csn-scrim.act-live .session-clock { color: var(--sess-ink); }
+  .session-overlay.lifting .session-clock:active,
+  .csn-scrim.act-live .session-clock:active { background: var(--sess-key); }
+  .session-overlay.lifting .session-timer,
+  .csn-scrim.act-live .session-timer { font-size: 32px; }
 
   /* The body is the middle of the column, so it has to stretch: without this
      it is content-height and the sheet floats up under the title. */
@@ -3006,6 +3032,10 @@
     color: #8f959d; opacity: .28; pointer-events: none;
   }
   .sess-stage:has(.fig-live) .sess-stage-none { display: none; }
+  /* Same rule, the other stand-in: the running robot is what a cardio stage
+     shows while its mode has no authored gait, so a mounted figure takes the
+     stage off him. */
+  .sess-stage:has(.fig-live) .csn-figure { display: none; }
   .sess-fig.sess-fig-stage canvas {
     width: auto; height: min(360px, 88vw, 100%); max-width: 88vw; aspect-ratio: 1 / 1;
   }
@@ -6397,30 +6427,49 @@
     background: var(--panel-2); border: 1px solid transparent; color: var(--muted);
   }
   .csn-preset.on { background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-card); }
-  /* The running state. */
+  /* What the save screen still uses: the minutes, big, and nothing else. The
+     running state's own styles went when it became the lift screen. */
   .csn-live { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
   .csn-live-k { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
   .csn-time {
     font-family: var(--font-display); font-size: 68px; font-weight: 800; letter-spacing: -.035em;
     font-variant-numeric: tabular-nums; line-height: 1.05;
   }
-  .csn-of { font-size: 14px; color: var(--muted); }
-  .csn-bar { width: 100%; max-width: 280px; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; margin-top: 16px; }
-  .csn-bar b { display: block; height: 100%; background: var(--accent); transition: width .4s linear; }
-  .csn-paused { font-size: 13px; font-weight: 700; color: var(--up); letter-spacing: .06em; text-transform: uppercase; }
-  /* A guided session says where you are before it says how long is left, because
-     the move is the instruction and the clock is only its deadline. */
-  .csn-round { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-  .csn-move {
-    font-family: var(--font-display); font-size: 30px; font-weight: 800; letter-spacing: -.02em;
-    text-align: center; margin: 4px 0 14px; line-height: 1.15; text-wrap: balance;
-  }
-  .csn-next { font-size: 13.5px; color: var(--muted); margin-top: 10px; }
   .csn-guided {
     display: flex; align-items: flex-start; gap: 9px; margin: -10px 0 20px;
     font-size: 13px; line-height: 1.45; color: var(--muted);
   }
   .csn-guided svg { flex-shrink: 0; margin-top: 2px; color: var(--accent-ink); }
+
+  /* ---- The live session: the lift screen, with an activity in it ----
+     Mo asked for one format everywhere: the time at the top, the progress,
+     the figure, him talking, then the hold timer or whatever there is to log.
+     That screen already exists (.sess-live, and the stretch block that reuses
+     it), so this is the same markup with the same classes, and only the three
+     things that differ live here. */
+  .csn-scrim.act-live .csn-stage { overflow: hidden; }
+  /* Held, not warmed up: the lastline's other modifier is the warm-up blue and
+     this is not that. Same colour the old paused line carried. */
+  .sess-lastline .last.held { color: var(--up); font-weight: 700; }
+  /* His lines on the lift are written to fit two rows. These come out of the
+     library, so they can be any length, and a clamp ends them with an ellipsis
+     rather than slicing a word in half. */
+  .csn-scrim.act-live .sess-quip-line {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  /* One continuous segment rather than one pip per move. A run is a single
+     effort held for half an hour, so ten pips would be inventing structure
+     the session does not have; a class has real moves and keeps its pips. */
+  .sess-segs.cont {
+    height: 4px; border-radius: 100px; overflow: hidden;
+    background: color-mix(in srgb, var(--sess-ink) 24%, transparent);
+  }
+  .sess-segs.cont i { flex: none; height: 100%; border-radius: 0; transition: width .5s linear; }
+  /* Him running is the cardio stage's whole figure, so it takes the room a
+     mounted move would take rather than the 200px it had under a clock. Its
+     label sits on the light stage in both themes, so it cannot keep --muted. */
+  .sess-stage-main .csn-figure { width: min(300px, 74vw); margin: 0; }
+  .sess-stage-main .rbr-label { color: rgba(17,19,24,.55); }
   /* The lifting card is a kind, not an activity, so it takes its own line
      rather than sitting half width beside Other. */
   .csn-act-wide { grid-column: 1 / -1; }
@@ -6474,10 +6523,6 @@
     text-transform: uppercase; color: var(--muted);
   }
   .act-styles { margin: 0; }
-  /* One row rather than half of one: lifting is a kind, not an activity, and it
-     leaves this sheet instead of starting anything on it. */
-  .act-lift { width: 100%; margin-top: 12px; flex-direction: row; align-items: center; gap: 10px; }
-  .act-lift .obs-ico { margin: 0; }
   /* What the generated session is, in three numbers, because a name and a cue
      are not enough to decide with. */
   .act-facts { grid-area: seg; display: flex; gap: 8px; }
@@ -6494,10 +6539,19 @@
     display: flex; align-items: center; justify-content: center;
     background: var(--panel-2); color: var(--muted); font-size: 12px; font-weight: 800;
   }
-  .act-move-b { min-width: 0; display: flex; flex-direction: column; }
+  /* Takes the width so the swap chip sits hard right, the way it does on a
+     lifting row. Without a flex the chip floats up against the name. */
+  .act-move-b { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .act-move-b b { font-size: 14.5px; font-weight: 650; }
   .act-move-b i { font-style: normal; font-size: 12.5px; color: var(--muted); }
+  /* Still the reveal card's line, which cuts at eight on purpose: that screen is
+     read standing on a mat with the clock about to start. The plan screen no
+     longer uses it. */
   .act-move-more { margin: 2px 0 0 35px; font-size: 12.5px; color: var(--muted); }
+  /* What the list IS, said above it: a sequence of thirteen under a class that
+     runs forty minutes is only honest with the repeat next to it. */
+  .act-seq-note { margin: 0 0 10px; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+  .act-seq-note b { color: var(--fg); font-weight: 700; }
 
   /* ---- Him, running ----
      Sized under the clock rather than at the lifting stage's 360px: that screen
@@ -6618,7 +6672,7 @@
   .tsl-add:active { transform: scale(.99); }
   .tsl-note { margin: 9px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
   .csn-field { margin-bottom: 18px; }
-  @media (prefers-reduced-motion: reduce) { .csn-bar b { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .sess-segs.cont i, .rest-fill { transition: none; } }
   .lift-records .pr-top { margin-bottom: 14px; }
   .lift-records .pr-wrap:last-child { margin-bottom: 0; }
   /* "Best ever" beside the number, only when it is. */
@@ -8543,7 +8597,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.19.24";
+const APP_VERSION = "2026.09.19.27";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -14087,8 +14141,11 @@ function showApp() {
 
   $("fabStart").onclick = () => {
     switchTab("workout");
-    // Mid-session, the button just takes you back to it.
+    // Mid-session, the button just takes you back to it. An activity on the
+    // clock is a session too, and reads the same way: this button cannot start
+    // a second one on top of one that is already open.
     if (SESSION) { reopenSession(); return; }
+    if (csnRunning()) { openCardioSession(); return; }
     if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
     // A plan already exists: switchTab above already rendered its overview,
     // with its own Begin Workout button. Starting it from here instead would
@@ -14143,8 +14200,15 @@ function armBackGuard() {
   catch { /* no history to push onto, which is its own answer */ }
 }
 
-/* True when the gesture was ours to take. */
+/* True when the gesture was ours to take. An activity screen is the same
+   situation as the lifting one and gets the same answer: back minimises it and
+   the session carries on, rather than dropping somebody out of a run. */
 function handleBackGesture() {
+  if (csnRunning() && !$("csnScrim").classList.contains("hidden")) {
+    closeCardioSession();
+    renderWorkoutTab();
+    return true;
+  }
   if (!document.body.classList.contains("session-open")) return false;
   minimiseSession();
   return true;
@@ -14217,6 +14281,13 @@ function closeAllOverlays() {
     .forEach((id) => $(id)?.classList.add("hidden"));
   stopGenTicker();
   $("genScrim")?.classList.add("hidden");
+  /* The activity clock is deliberately NOT stopped here, which is where it
+     parts company with the lift below. A lifting clock only counts while its
+     ticker is alive, so closing the screen has to bank it; an activity clock
+     is two timestamps counting real time, and somebody who switched tabs
+     halfway through a run is still running. Stamped as seen instead, which is
+     all the restore on the next launch needs. */
+  if (CARDIO_SES) csnSave();
   const sess = $("sessionCard");
   if (sess && !sess.classList.contains("hidden")) {
     // Bank the time rather than losing it, then stand the session down.
@@ -17210,6 +17281,7 @@ function renderHero(animate = false) {
       if (trainedToday && !todayPlan) { generateWorkout(tomorrow); return; }
       switchTab("workout");
       if (SESSION) { reopenSession(); return; }
+      if (csnRunning()) { openCardioSession(); return; }
       if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
       // Same reasoning as the FAB above: a plan already showing its own
       // overview does not also need this button to start it a second way.
@@ -21257,6 +21329,10 @@ let csnTick = null;
 
 function csnSave() {
   try {
+    /* When the app was last known to be awake with this session on it, which
+       is the cardio half of the lift's `bankedAt`. It is written here rather
+       than tracked, so every save is also a heartbeat. */
+    if (CARDIO_SES) CARDIO_SES.seenAt = Date.now();
     if (CARDIO_SES) localStorage.setItem(CSN_KEY, JSON.stringify(CARDIO_SES));
     else localStorage.removeItem(CSN_KEY);
   } catch { /* private browsing */ }
@@ -21288,6 +21364,16 @@ function csnAct() {
    state name at four call sites, which is how reveal would have been missed. */
 function csnRunning() {
   return !!CARDIO_SES && CARDIO_SES.state !== "setup" && CARDIO_SES.state !== "reveal";
+}
+
+/* Is anything open. Mo: "if I pause, I pause and it's still gonna have me do
+   that workout, and the only way I can go back and generate a new workout or
+   do anything is if I end that workout." That rule is about training, not
+   about lifting, so everywhere it is enforced asks this rather than asking
+   about SESSION and leaving a run to walk through the same door. Paused counts:
+   a paused session is an open one, which is the entire point of it. */
+function sessionOpen() {
+  return (!!SESSION && !SESSION.finished) || csnRunning();
 }
 
 /* One session of a training that has a library. Level comes from how many of
@@ -21760,35 +21846,75 @@ function csnMoveAt(ms) {
   return { i: plan.moves.length, move: null, left: 0, next: null, done: true };
 }
 
-function paintGuidedMove(ms) {
-  const plan = CARDIO_SES?.plan;
-  if (!plan) return;
-  const at = csnMoveAt(ms);
-  const roundEl = $("csnRound"), moveEl = $("csnMove"), nextEl = $("csnNext"), timeEl = $("csnTime"), ofEl = $("csnOf");
-  if (!moveEl) return;
-  if (!at || at.done) {
-    if (roundEl) roundEl.textContent = "";
-    moveEl.textContent = "Sequence done";
-    if (nextEl) nextEl.textContent = "End it whenever you are ready.";
-    return;
-  }
-  if (roundEl) roundEl.textContent = plan.rounds > 1
-    ? `Round ${at.move.round} of ${plan.rounds} · ${at.move.categoryLabel}`
-    : at.move.categoryLabel;
-  moveEl.textContent = at.move.name;
-  /* The big number becomes the move's countdown, because that is the number
-     somebody holding a plank actually wants. The overall elapsed moves to the
-     line under it, which is where a class clock belongs. */
-  if (timeEl) timeEl.textContent = csnClock(at.left * 1000);
-  if (ofEl) ofEl.textContent = `${csnClock(ms)} of ${CARDIO_SES.minutes} min`;
-  if (nextEl) nextEl.textContent = at.next ? `Next: ${at.next.name}` : "Last one";
+/* How far through the whole session, as a fraction, for the one continuous
+   segment at the top. A class counts its moves; a run counts the minutes it
+   was asked for, because that is all the structure it has. */
+function csnSessionPct(ms) {
+  const target = (CARDIO_SES?.minutes || 0) * 60000;
+  return target > 0 ? Math.min(100, (ms / target) * 100) : 0;
 }
+
+/* Everything on the live screen that changes twice a second, and nothing that
+   does not: the two clocks and the two fills. When the class moves on to the
+   next pose the whole screen is rebuilt instead, because the figure, the name
+   and the Up next rail all change with it and none of them can be patched.
+   CSN_LIVE_AT is what that render was drawn for, so the rebuild happens once
+   per move rather than once per tick. */
+function paintActivityLive() {
+  const ms = csnElapsedMs();
+  const timer = $("csnTimer");
+  if (!timer) return false;                       // the screen went away under us
+  timer.textContent = csnClock(ms);
+
+  const seg = $("csnSegFill");
+  if (seg) seg.style.width = `${csnSessionPct(ms).toFixed(1)}%`;
+
+  const big = $("csnBigClock"), fill = $("csnFill"), left = $("csnLeft");
+  const plan = CARDIO_SES?.plan;
+  if (plan) {
+    const at = csnMoveAt(ms);
+    const key = at?.done ? "done" : at?.i;
+    if (key !== CSN_LIVE_AT) { renderCardioStage(); return false; }
+    const cost = at?.move ? at.move.seconds * (at.move.perSide ? CSN_PER_SIDE : 1) : 0;
+    if (big) big.textContent = csnClock((at?.left || 0) * 1000);
+    if (fill) fill.style.width = cost ? `${Math.max(0, Math.min(100, ((cost - at.left) / cost) * 100)).toFixed(1)}%` : "0%";
+  } else {
+    if (big) big.textContent = csnClock(ms);
+  }
+  if (left) left.textContent = csnLeftLine(ms);
+  return true;
+}
+
+/* A per-side move is written once and done twice, so its slot on the clock is
+   twice its seconds. Named because three places have to agree about it. */
+const CSN_PER_SIDE = 2;
+
+/* The right half of the "Exercise 3 of 8 / Chest and back" line, which on this
+   screen is how much of the session is still ahead. Counted off the minutes
+   asked for, and honest once they are gone rather than sticking at zero. */
+function csnLeftLine(ms) {
+  const target = (CARDIO_SES?.minutes || 0) * 60000;
+  if (target <= 0) return "";
+  if (ms >= target) return `Past your ${CARDIO_SES.minutes} min`;
+  return `About ${Math.max(1, Math.round((target - ms) / 60000))} min left`;
+}
+
+/* The move the live screen was last drawn for, or "done", or null for anything
+   without moves. Read by the painter to decide when to rebuild. */
+let CSN_LIVE_AT = null;
 
 /* `act` opens the picker already on a kind, which is what adding a second
    session to a day does: you have chosen yoga before you have chosen to open
    this sheet. A session already running ignores it, because the clock running
    is a stronger fact than anything a button said. */
 function openCardioSession(state, act) {
+  /* The other half of Mo's rule, in the one place every way into an activity
+     passes through: a lifting session already open owns the clock, so this
+     hands the person back to it rather than standing a second session beside
+     it. Gated here rather than on the buttons because there are six of them
+     (the FAB, Home, the choose screen, today's list, Add another session, and
+     a planned activity) and a seventh is one more place to forget. */
+  if (SESSION && !SESSION.finished) { switchTab("workout"); reopenSession(); return; }
   if (!CARDIO_SES) {
     /* Habit outranks the recommendation, and only where there is habit. What
        somebody actually does is a fact and what we recommend is an argument, so
@@ -21808,6 +21934,7 @@ function openCardioSession(state, act) {
   csnSave();
   $("csnScrim").classList.remove("hidden");
   renderCardioStage();
+  armBackGuard();    // so a back gesture minimises the session, see registerBackGuard
   pinSheets();
 }
 
@@ -21815,6 +21942,11 @@ function closeCardioSession() {
   clearInterval(csnTick); csnTick = null;
   ACT_LIB_NOTES = {};   // a level can move between sessions, so the notes are not kept
   $("csnScrim").classList.add("hidden");
+  $("csnScrim").classList.remove("act-live", "act-paused");
+  /* Stamps the session as seen just now. The clock does not need it, but the
+     restore on the next launch does: see restoreCardioSession on what a long
+     gap with nothing in between is allowed to conclude. */
+  csnSave();
   pinSheets();
 }
 
@@ -21876,11 +22008,247 @@ async function csnGenerate() {
   renderCardioStage();
 }
 
+/* ---- The live session: the lift screen, with an activity in it ----
+
+   Mo, on the Pilates and running screens: "all of our UI should follow the
+   same exact format, the time at the top, the progress, and then the
+   animation, the guy talking, and then the timer for how long they're
+   holding, or if they need to log a weight or a rep set." So this builds the
+   markup renderSession and the stretch block already build, class for class,
+   rather than a second layout that would have to be kept in step by hand.
+   Only what goes in the slots is decided here.
+
+   Three things come through it:
+
+   A generated class (yoga, Pilates) has moves, and every one of them is drawn:
+   knowledge/motion covers all 37 yoga poses and all 22 Pilates moves, so the
+   stage mounts the pose by name exactly as the stretch screen does.
+
+   A cardio session (a run, a ride, the machines) has no moves and no drawn
+   animation anywhere in this app, so the stage holds him running instead. It
+   is the honest stand-in rather than a lifting figure borrowed for a run: see
+   robotRunningSVG, and mo-knowledge/LIBRARY-REQUESTS.md for the real run cycle
+   that will replace it. THE SLOT IS `stageFigure` BELOW: the day the library
+   has a run, that branch becomes the same data-fig mount the class uses.
+
+   A bare clock is cardio with nothing written on it, and takes the same shape.
+
+   What replaces the weight and rep dials is the hold block the stretch screen
+   already uses: a timed move has nothing to log, it has a number counting
+   down, and that number sits in the slot the dials sit in so the sheet keeps
+   its shape. The difference between the two is what is inside the frame, which
+   is what Mo asked for. */
+function renderActivityLive(a, stage) {
+  const plan = CARDIO_SES.plan, card = CARDIO_SES.card;
+  const paused = !CARDIO_SES.since;
+  const ms = csnElapsedMs();
+  const at = plan ? csnMoveAt(ms) : null;
+  const done = !!(plan && at?.done);
+  const move = at && !done ? at.move : null;
+  CSN_LIVE_AT = plan ? (done ? "done" : at.i) : null;
+
+  const moveCost = move ? move.seconds * (move.perSide ? CSN_PER_SIDE : 1) : 0;
+  /* Mo: "I don't want you to say like tempo run or anything, just have it be
+     run. Walk, cycling, stairs. I don't need easy spin, bike intervals,
+     recovery." So a cardio session is titled by what he is doing and not by
+     which row of the library picked the numbers. The numbers stay: the effort
+     is still on the line above and the structure still under the title, which
+     is what makes it that session rather than a stopwatch. A class keeps the
+     pose name, because the pose is what is on the screen and it is the
+     instruction. */
+  const title = move ? move.name : done ? "Sequence done" : actTitle(a);
+  /* The left half of the lift's "Exercise 3 of 8" line. A run has no moves to
+     count, so it says how hard instead, which is the one number it does have. */
+  const where = plan
+    ? (done ? `All ${plan.moves.length} moves` : `Move ${at.i + 1} of ${plan.moves.length}`)
+    /* Nothing was built for this one, so there is no position to be in and no
+       effort to hold. Saying so beats repeating the title back. */
+    : card ? cardioEffortLine(card) : "Just the clock";
+  const sub = move
+    ? [`${move.seconds}s${move.perSide ? " a side" : ""}`, move.categoryLabel].filter(Boolean).join(" · ")
+    : done ? "That is the whole class"
+      : card ? (card.structure || `${card.minutes} min, held at one effort`)
+        : `${CARDIO_SES.minutes} min`;
+  /* His line. sayQuip cannot be used here (it refuses without a lifting
+     SESSION and types on a timer this screen does not own), so the bubble is
+     written straight into the same slot, already finished. The move's own cue
+     first, because that is the instruction for what is on screen. */
+  const said = move?.cue
+    || (done ? "That is the class. End it whenever you are ready."
+      : (plan?.notes || [])[0] || card?.cue || "");
+  const remaining = plan && !done ? plan.moves.map((m, n) => ({ m, n })).filter(({ n }) => n > at.i) : [];
+
+  const stageFigure = plan
+    ? `<div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(move?.name || (done ? "Rest: Towel" : ""))}" data-theme="light" ${paused || done ? "data-fig-static" : ""}></div>
+       <div class="sess-stage-none" aria-hidden="true">${icon(a.ico || "heart", 72)}</div>`
+    /* A cardio session is drawn the same way a pose is, now that there is
+       something to draw: knowledge/motion/moves/cardio.mjs carries a run, a
+       walk, a ride and the stepmill, keyed by the library's own session names,
+       so `data-fig="Easy Run"` mounts the gait exactly as `data-fig="Tree
+       Pose"` mounts the pose.
+
+       Twenty of the twenty seven sessions have one. The other seven (rowing,
+       swimming, the elliptical, HIIT, the rope) still have nothing honest to
+       draw, so he keeps running for those, and which of the two shows is
+       decided by the mount rather than by a list kept here: mountMotionFigures
+       marks a name it cannot draw with `fig-none` and leaves `fig-live` on one
+       it can, so the CSS beside .sess-stage-none hides whichever is wrong.
+       Nothing in this file has to know which modes are covered, which is what
+       stops this going stale the day a rower is authored. */
+    : `<div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(card?.name || "")}" data-theme="light" ${paused ? "data-fig-static" : ""}></div>
+       <div class="csn-figure${paused ? " paused" : ""}">${robotRunningSVG(a.short || a.label || "")}</div>`;
+
+  stage.innerHTML = `
+    <div class="session-bar">
+      <!-- The same chevron the lift minimises with, because it does the same
+           thing: the clock keeps running and the session is still yours. -->
+      <button type="button" class="session-min" id="csnX" aria-label="Back, without ending the session">${icon("chevronDown", 20)}</button>
+      <!-- The same clock in the same place as the lift's: the whole session,
+           counting up, whatever the move under it is doing. -->
+      <div class="session-clock"><span class="rec-dot"></span><span class="session-timer${paused ? " paused" : ""}" id="csnTimer">${csnClock(ms)}</span></div>
+      <button type="button" class="session-pause" id="csnPause" aria-label="${paused ? "Resume" : "Pause"}">${icon(paused ? "play" : "pause", 20)}</button>
+    </div>
+    <div class="sess-live ex-in">
+      <div class="sess-view">
+        <div class="sess-top">
+          ${plan
+            ? `<div class="sess-segs">${plan.moves.map((_, n) => `<i class="${done || n < at.i ? "done" : n === at.i ? "now" : ""}"></i>`).join("")}</div>`
+            /* One continuous segment: a run is one effort held for half an
+               hour, and a row of pips would be inventing moves it does not
+               have. */
+            : `<div class="sess-segs cont"><i class="fill done" id="csnSegFill" style="width:${csnSessionPct(ms).toFixed(1)}%"></i></div>`}
+          <div class="sess-where">
+            <span>${escapeHtml(where)}</span>
+            <span id="csnLeft">${escapeHtml(csnLeftLine(ms))}</span>
+          </div>
+          <!-- Not a button: there is nothing to swap or skip inside a session
+               somebody is already running, and a word that does nothing must
+               not look pressable. Same rule the stretch screen follows. -->
+          <div class="sess-titlerow"><h2 class="sess-title">${escapeHtml(title)}</h2></div>
+          ${sub ? `<div class="stretch-sub">${escapeHtml(sub)}</div>` : ""}
+        </div>
+
+        <div class="sess-stage" id="csnSessStage">
+          <div class="sess-quip-slot" id="csnQuipSlot">
+            ${said ? `<div class="sess-quip done">
+              <span class="sess-quip-bub">
+                <span class="sess-quip-who">Coach</span>
+                <span class="sess-quip-line">${escapeHtml(said)}</span>
+              </span>
+            </div>` : ""}
+          </div>
+          <div class="sess-stage-main">${stageFigure}</div>
+        </div>
+      </div>
+
+      <div class="sess-sheet${SESSION_SHEET_OPEN ? " open" : ""}" id="csnSheet">
+        <button type="button" class="sess-grab" id="csnGrab" aria-expanded="${SESSION_SHEET_OPEN ? "true" : "false"}"
+          aria-label="${SESSION_SHEET_OPEN ? "Hide what is up next" : "Show what is up next"}"><i></i></button>
+
+        <!-- Where the lift keeps its weight and rep dials. There is nothing to
+             log in a pose, so the same slot holds the number that IS the
+             instruction: how long you are in it, and how far through. -->
+        <div class="stretch-hold">
+          <div class="sess-lastline">
+            <span class="last${paused ? " held" : ""}">${paused ? "Paused" : plan ? (done ? "Done" : `Hold${move?.perSide ? ", both sides" : ""}`) : "Elapsed"}</span>
+            <span class="beat">${plan
+              ? (done ? "Nothing left" : at.next ? `Next: ${escapeHtml(at.next.name)}` : "Last one")
+              : CARDIO_SES.minutes ? `of ${CARDIO_SES.minutes} min` : ""}</span>
+          </div>
+          <div class="stretch-clock" id="csnBigClock" aria-live="off">${csnClock(plan ? (at?.left || 0) * 1000 : ms)}</div>
+          ${/* The track under the clock is the MOVE's, and only a class has
+                one. A run's progress is the single segment at the top of the
+                screen, and drawing the same fraction twice on one screen says
+                they are two different facts. */ ""}
+          ${plan ? `<div class="rest-track"><div class="rest-fill" id="csnFill" style="width:${
+            moveCost ? Math.max(0, Math.min(100, ((moveCost - at.left) / moveCost) * 100)).toFixed(1) : "0"
+          }%"></div></div>` : ""}
+        </div>
+
+        <div class="sess-cta">
+          <!-- Pause is in the top bar, where the lift keeps it, so the one
+               button down here is the one thing left to decide: whether you
+               are finished. It does not throw anything away, it opens the
+               save. -->
+          <button type="button" class="btn-big btn-primary" id="csnEnd">${done ? "Finish the class" : `Finish ${escapeHtml(actNoun(a))}`}</button>
+        </div>
+
+        ${remaining.length ? `<div class="upnext">
+          <div class="upnext-label">Up next</div>
+          <div class="upnext-rail">
+            ${remaining.map(({ m }) => `<div class="upnext-card">
+              <span class="upnext-fig" data-fig="${escapeHtml(m.name || "")}" data-fig-static></span>
+              <span class="upnext-text">
+                <span class="upnext-name">${escapeHtml(m.name || "")}</span>
+                <span class="upnext-meta">${m.seconds}s${m.perSide ? " a side" : ""}</span>
+              </span>
+            </div>`).join("")}
+          </div>
+        </div>` : ""}
+      </div>
+    </div>`;
+
+  $("csnX").onclick = closeCardioSession;
+  /* Pausing hands the screen over to the paused screen, which is the lift's
+     paused screen: renderCardioStage sends a live session with no `since` on
+     it there, so all this has to do is stop the clock. */
+  $("csnPause").onclick = () => {
+    if (CARDIO_SES.since) { CARDIO_SES.accum = csnElapsedMs(); CARDIO_SES.since = null; }
+    else CARDIO_SES.since = Date.now();
+    csnSave(); renderCardioStage();
+  };
+  $("csnEnd").onclick = () => endActivityNow({ overlay: true });
+  /* The sheet's own handle and drag, the lift's exact one, told which nodes to
+     work on: this screen cannot use the ids because a paused lifting session
+     may still be holding its own #sessSheet in the document. */
+  wireSessionSheet($("csnSheet"), $("csnGrab"));
+  mountMotionFigures(stage);
+  if (!paused) csnTick = setInterval(paintActivityLive, 500);
+}
+
+/* Ending an activity, from both of the two controls that do it: Finish on the
+   live screen, and Hold to end workout on the paused screen. One function
+   because it is one thing, and because "end" has to mean the same thing
+   whichever screen it was pressed on. Nothing is thrown away: the clock stops
+   and the save screen comes up with the minutes on it.
+
+   From the workout tab the stage is not on screen yet, so it is opened first,
+   the same way the lift reopens its overlay to draw the wrap-up into. */
+function endActivityNow({ overlay }) {
+  if (!CARDIO_SES) return;
+  /* Ending a session is finishing one, so it gets the session's sound rather
+     than one of its own. */
+  sfx.play("finish");
+  CARDIO_SES.accum = csnElapsedMs();
+  CARDIO_SES.since = null;
+  CARDIO_SES.state = "done";
+  csnSave();
+  if (!overlay) { openCardioSession(); return; }   // which renders the stage itself
+  renderCardioStage();
+}
+
+/* A paused activity, drawn as the lift's paused screen because it IS the
+   lift's paused screen. Mo: "it should match exactly how it looks on the
+   lifting page". */
+function renderActivityPaused(stage) {
+  stage.innerHTML = pausedScreenHTML({ overlay: true });
+  wirePausedScreen({ overlay: true, root: stage });
+}
+
 function renderCardioStage() {
   const stage = $("csnStage");
   if (!stage || !CARDIO_SES) return;
   const a = csnAct();
   clearInterval(csnTick); csnTick = null;
+  /* Only the running session wears the lift screen's stage and sheet. Setup,
+     the reveal and the save are still documents on the app's own ground, and
+     a scrim left in the stage's palette would paint a grey gradient behind a
+     scrolling list of activities. */
+  const livePaused = CARDIO_SES.state === "live" && !CARDIO_SES.since;
+  $("csnScrim").classList.toggle("act-live", CARDIO_SES.state === "live" && !livePaused);
+  /* The paused screen brings its own ground, exactly as it does over the
+     lifting card, so the session palette comes off it while it is up. */
+  $("csnScrim").classList.toggle("act-paused", livePaused);
 
   if (CARDIO_SES.state === "setup") {
     const recs = recommendedActivities(MY_PROFILE);
@@ -21956,18 +22324,14 @@ function renderCardioStage() {
             </button>`).join("")}
           </div>`;
       }).join("")}
-      ${/* A lift is the one kind of session this sheet cannot run, because it
-            is a plan and not a clock. It is still a kind, and a day that
-            already holds a yoga class most often wants this one next, so it
-            is offered here and hands off to the screen that builds plans. */ ""}
-      <button type="button" class="ob-style act-lift" id="csnLift">
-        <span class="obs-ico">${icon("dumbbell", 20)}</span>
-        <span class="obs-label">${TODAY_WORKOUT && !TODAY_WORKOUT.archived ? "Open today’s workout" : "Lifting workout"}</span>
-      </button>`;
+      ${/* A lift used to be offered at the bottom of this sheet, handing off
+            to the screen that builds plans. Mo, 2026-09-19: "I don't like how
+            when I start an activity I see lifting workout, that shouldn't be
+            there." He is right now that Plan my own asks lifting or activity
+            before anything opens: whoever is looking at this sheet answered
+            that question one screen ago, so the tile was the app asking twice
+            and calling the second one a different kind of session. */ ""}`;
     $("csnX").onclick = csnDismiss;
-    /* Leaves the sheet rather than starting anything: nothing here can build a
-       plan, and the choose screen is where that lives. */
-    $("csnLift").onclick = () => { csnDismiss(); switchTab("workout"); goWorkoutScreen("choose"); };
     stage.querySelectorAll("[data-act]").forEach((b) => {
       b.onclick = () => { CARDIO_SES.act = b.dataset.act; csnSave(); renderCardioStage(); };
     });
@@ -22061,71 +22425,8 @@ function renderCardioStage() {
   }
 
   if (CARDIO_SES.state === "live") {
-    const paused = !CARDIO_SES.since;
-    stage.innerHTML = `
-      <div class="csn-head">
-        <h2>${escapeHtml(a.label)}</h2>
-        <button type="button" class="csn-x" id="csnX" aria-label="Hide">${icon("chevronLeft", 18)}</button>
-      </div>
-      <div class="csn-live">
-        ${/* A sequence moves, so its lines are painted every tick. A cardio
-              session does not: it is one effort held for the whole thing, so
-              the name and the cue are written once and stay put. */ ""}
-        ${CARDIO_SES.plan ? `<div class="csn-round" id="csnRound"></div>
-        <div class="csn-move" id="csnMove"></div>`
-          : CARDIO_SES.card ? `<div class="csn-round">${escapeHtml(cardioEffortLine(CARDIO_SES.card))}</div>
-        <div class="csn-move">${escapeHtml(CARDIO_SES.card.name)}</div>` : ""}
-        ${/* He runs while the clock runs and freezes when it stops. Not on a
-              guided class: a running robot over a held plank would be a
-              picture of the wrong movement, and this app's own rule is that a
-              pretty pose of the wrong thing is a failure. The machines get the
-              same run with the machine's name under him, which is honest about
-              what it is: there is no stair cycle and no rowing cycle either. */ ""}
-        ${a.training ? "" : `<div class="csn-figure${paused ? " paused" : ""}">${robotRunningSVG(a.short || "")}</div>`}
-        <div class="csn-live-k">${paused ? "&nbsp;" : CARDIO_SES.plan ? "This move" : "Elapsed"}</div>
-        <div class="csn-time" id="csnTime">${csnClock(csnElapsedMs())}</div>
-        <div class="csn-of" id="csnOf"></div>
-        ${CARDIO_SES.plan ? `<div class="csn-next" id="csnNext"></div>`
-          : CARDIO_SES.card ? `<div class="csn-next">${escapeHtml(CARDIO_SES.card.structure || CARDIO_SES.card.cue || "")}</div>` : ""}
-        ${paused ? `<div class="csn-paused">Paused</div>` : ""}
-        <div class="csn-bar"><b id="csnBar" style="width:0%"></b></div>
-      </div>
-      <div class="csn-foot">
-        <button type="button" class="btn-primary" id="csnPause">${paused ? `${icon("play", 18)} Resume` : `${icon("pause", 18)} Pause`}</button>
-        <button type="button" class="btn-secondary" id="csnEnd">End</button>
-      </div>`;
-    $("csnX").onclick = closeCardioSession;
-    $("csnPause").onclick = () => {
-      if (CARDIO_SES.since) { CARDIO_SES.accum = csnElapsedMs(); CARDIO_SES.since = null; }
-      else CARDIO_SES.since = Date.now();
-      csnSave(); renderCardioStage();
-    };
-    $("csnEnd").onclick = () => {
-      /* Ending a run is finishing a session, so it gets the session's sound
-         rather than one of its own. */
-      sfx.play("finish");
-      CARDIO_SES.accum = csnElapsedMs();
-      CARDIO_SES.since = null;
-      CARDIO_SES.state = "done";
-      csnSave(); renderCardioStage();
-    };
-    const paint = () => {
-      const ms = csnElapsedMs();
-      const t = $("csnTime"); if (!t) { clearInterval(csnTick); csnTick = null; return; }
-      t.textContent = csnClock(ms);
-      paintGuidedMove(ms);
-      const target = (CARDIO_SES.minutes || 0) * 60000;
-      const pct = target > 0 ? Math.min(100, (ms / target) * 100) : 0;
-      const bar = $("csnBar"); if (bar) bar.style.width = `${pct}%`;
-      if (!CARDIO_SES.plan) {
-        const of = $("csnOf");
-        if (of) of.textContent = target > 0
-          ? (ms >= target ? `past your ${CARDIO_SES.minutes} min` : `of ${CARDIO_SES.minutes} min`)
-          : "";
-      }
-    };
-    paint();
-    if (!paused) csnTick = setInterval(paint, 500);
+    if (livePaused) { renderActivityPaused(stage); return; }
+    renderActivityLive(a, stage);
     return;
   }
 
@@ -22278,12 +22579,36 @@ async function saveCardioSession(mins) {
    The clock does not need restarting, only reading: it is timestamps, so the
    minutes kept accruing while the app was shut. */
 function restoreCardioSession() {
+  /* What is in memory outranks what is on disk, the same rule
+     resumeSessionIfAny opens with. This runs on every draw of the workout tab,
+     and without it a paused session that had just been resumed could be
+     overwritten by the copy saved before it. */
+  if (CARDIO_SES) return;
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(CSN_KEY) || "null"); } catch { return; }
   if (!saved || saved.state === "setup" || saved.state === "reveal") return;
   /* Yesterday's forgotten session is not today's workout. */
   if (saved.date && saved.date !== todayStr()) { try { localStorage.removeItem(CSN_KEY); } catch {} return; }
   CARDIO_SES = saved;
+  /* The lift's opinion about a long absence, applied to a stopwatch: past the
+     grace they walked away, so it comes back PAUSED and is resumed on purpose
+     rather than found already counting.
+
+     Where this deliberately does NOT follow the lift is the number. The lift
+     throws away everything since its last bank, because its clock only counts
+     while the app is awake. A cardio clock is two timestamps counting real
+     time, and a phone in a pocket during a forty minute run cannot be told
+     apart from a session somebody forgot: truncating would delete
+     training that really happened. So every accrued second is kept and the
+     person decides what it was worth on the save screen. */
+  if (CARDIO_SES.since) {
+    const away = Date.now() - (CARDIO_SES.seenAt || CARDIO_SES.since);
+    if (away > RESUME_GRACE_MS) {
+      CARDIO_SES.accum = csnElapsedMs();
+      CARDIO_SES.since = null;
+      csnSave();
+    }
+  }
 }
 
 /* ---- Build endurance: the cardio screen ----
@@ -24556,8 +24881,10 @@ function wireTodaySessions(root) {
     b.onclick = () => {
       if (b.dataset.sessionOpen === "activity") { openCardioSession(); return; }
       /* The plan's own screen, which is where starting it, customizing it and
-         reading it already live. */
+         reading it already live. Unless something is already open, in which
+         case both kinds of row lead back to the thing on the clock. */
       if (SESSION && !SESSION.finished) { reopenSession(); return; }
+      if (csnRunning()) { openCardioSession(); return; }
       goWorkoutScreen(null);
     };
   });
@@ -25830,8 +26157,11 @@ function startCardioInsteadOfPlan(s, ctx) {
     planActivityOnDay(ctx.date, s.name, { session: s });
     return;
   }
-  // A session already running is the truth and outranks this; show it instead.
-  if (csnRunning()) { openCardioSession(); return; }
+  // A session already running is the truth and outranks this; show it instead,
+  // and a lifting one outranks it the same way. Asked before anything is built
+  // rather than left to openCardioSession, so a redirected press does not leave
+  // a half made session behind it.
+  if (sessionOpen()) { openCardioSession(); return; }
   const planned = ctx.date === todayStr() && TODAY_WORKOUT?.id && !TODAY_WORKOUT.archived
     ? { planId: TODAY_WORKOUT.id, focus: TODAY_WORKOUT.focus }
     : null;
@@ -26153,6 +26483,19 @@ function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null,
    and redraws once at the end, and reads the answer off the return value. */
 async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = null, keepFocus: wantFocus = null, limits = null, focusGroups = null, quiet = false, avoidNames = null } = {}) {
   if (isCoachedClient()) { toast("Your coach sets your workouts"); return false; }
+  /* Mo: "the only way I can go back and generate a new workout or do anything
+     is if I end that workout." The workout tab already stands in front of
+     every button that reaches this, but generating is also reachable from Home
+     and from the week planner, and a rule that holds on one screen and not the
+     next is worse than no rule. So it is said once, here, where every route to
+     a generated plan already had to come through. */
+  if (sessionOpen()) {
+    /* Silent for the week builder, which passes quiet and calls this once per
+       day: one toast per day for one press is the app shouting. It is stopped
+       at its own button instead, with one sentence. */
+    if (!quiet) toast("Finish the workout you have going first");
+    return false;
+  }
   /* The paid one. Every route to a generated plan comes through here, which is
      the reason to gate the function rather than the buttons: there are several
      of those and a new one is one more place to forget. */
@@ -27775,6 +28118,7 @@ function homeBotLine() {
   const goWorkout = () => {
     switchTab("workout");
     if (SESSION) { reopenSession(); return; }
+    if (csnRunning()) { openCardioSession(); return; }
     if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
   };
   const start = { label: todayPlan ? "Start workout" : "Plan a workout", run: goWorkout };
@@ -28594,7 +28938,12 @@ function renderStretchPhase() {
           <button type="button" class="btn-big btn-primary" id="stretchNext">${lastHold ? (solo ? "That&rsquo;s me done" : isWarm ? "Start lifting" : "Finish workout") : "Next"}</button>
         </div>
         <button type="button" class="stretch-skip" id="stretchSkipAll">${solo ? "Stop here" : isWarm ? "Skip warm-up" : "Skip cool-down"}</button>
-        ${isWarm ? "" : `<p class="stretch-note">${solo ? "Nothing to log and nothing to finish. This is the part that makes tomorrow easier." : "Your lifts are banked. This is the part that makes tomorrow easier."}</p>`}
+        ${/* Mo asked for "nothing to log and nothing to finish, this is the
+              part that makes tomorrow easier" gone, so it is. What survives is
+              the half of it that answered a question somebody actually has
+              standing in a cool-down: did my sets save. A stretch on its own
+              has no sets behind it, so it says nothing at all. */ ""}
+        ${isWarm || solo ? "" : `<p class="stretch-note">Your lifts are banked.</p>`}
 
         ${remaining.length ? `<div class="upnext">
           <div class="upnext-label">Up next</div>
@@ -29130,9 +29479,12 @@ function renderSession() {
 /* The handle: a tap toggles, and a drag does the obvious thing in either
    direction. The sheet does not float over the content when it opens, it takes
    room from the stage, so nothing is ever hidden behind it. */
-function wireSessionSheet() {
-  const sheet = $("sessSheet");
-  const grab = $("sessGrab");
+/* The nodes are arguments now rather than two ids read in here: the activity
+   session builds this same sheet, and a paused lifting session can still be
+   holding its own #sessSheet in the document while it does. */
+function wireSessionSheet(sheetEl, grabEl) {
+  const sheet = sheetEl || $("sessSheet");
+  const grab = grabEl || $("sessGrab");
   if (!sheet || !grab) return;
   const set = (open) => {
     // One short tick when it actually snaps, so the sheet answers the thumb
@@ -30164,7 +30516,22 @@ function renderPausedSheet() {
    coming back looks like, which used to be a flat card offering Resume and
    Discard. `overlay` is the only difference: in the session there is a chevron
    to back out of, on the tab you are already out. */
-function pausedScreenHTML({ overlay }) {
+/* What the paused screen is about, for whichever session is open.
+
+   Mo, on an activity: "if I pause a workout, in anything, it should match
+   exactly how it looks on the lifting page". So there is one paused screen and
+   not two, and the only thing that differs between a lift and a run is what
+   these six fields say. Anything a run genuinely does not have comes back
+   empty and the markup below drops that line rather than inventing one.
+
+   Returns null when nothing is open, which is the caller's cue not to draw. */
+function pausedFacts() {
+  if (SESSION) return liftPausedFacts();
+  if (csnRunning()) return activityPausedFacts();
+  return null;
+}
+
+function liftPausedFacts() {
   const ei = SESSION.exerciseIndex;
   const ex = TODAY_WORKOUT?.exercises?.[ei];
   const stretching = SESSION.phase === "warmup" || SESSION.phase === "cooldown";
@@ -30190,19 +30557,63 @@ function pausedScreenHTML({ overlay }) {
      sense, and it reappears the moment something ahead actually needs kit. */
   const canGoBodyweight = remainderNeedsEquipmentSwitch();
 
+  return { paused: !!SESSION.pausedAt, clock: fmtElapsed(sessionElapsed()), where, figName, canGoBodyweight };
+}
+
+/* The same six facts, read off the activity clock.
+
+   Three of them are simply different words for the same thing. `where` is the
+   lift's "Bench Press, set 3 of 4": a class answers it the same way, with the
+   pose and which move of how many, and a run has no moves to count so it says
+   what it does have, which is how much of the length it was set is left. A
+   bare clock nobody set a length on says nothing at all rather than a made up
+   number, and the line disappears.
+
+   Two of them a run does not have and this is where the lift's screen does not
+   fit. `canGoBodyweight` is about equipment the rest of a plan needs and there
+   is no such thing on a run, so it is always false and the kit button is not
+   drawn. And a cardio figure is mounted by the LIBRARY's session name, which
+   is a key into knowledge/motion and not a label: it is never printed, so the
+   rule about not naming a run "Tempo Run" does not reach it. Seven of the
+   twenty seven sessions have nothing drawn for them, and those get no figure
+   here, the same as a lift with no move to draw. */
+function activityPausedFacts() {
+  const a = csnAct();
+  const ms = csnElapsedMs();
+  const plan = CARDIO_SES.plan;
+  const at = plan ? csnMoveAt(ms) : null;
+  const move = at && !at.done ? at.move : null;
+  const left = csnLeftLine(ms);
+  const where = plan
+    ? (at?.done
+        ? `All ${plan.moves.length} moves`
+        : `${escapeHtml(move?.name || "")} &middot; Move ${at.i + 1} of ${plan.moves.length}`)
+    : `${escapeHtml(actTitle(a))}${left ? ` &middot; ${escapeHtml(left)}` : ""}`;
+  return {
+    paused: !CARDIO_SES.since,
+    clock: csnClock(ms),
+    where,
+    figName: plan ? (move?.name || "") : (CARDIO_SES.card?.name || ""),
+    canGoBodyweight: false,
+  };
+}
+
+function pausedScreenHTML({ overlay }) {
+  const f = pausedFacts();
+  if (!f) return "";
   return `
     <div class="pz${overlay ? "" : " pz-inline"}">
       <div class="pz-top">
         <button type="button" class="pz-min" id="pzHome" aria-label="Home, the workout keeps running">${icon("home", 22)}</button>
-        ${canGoBodyweight ? `<button type="button" class="pz-min" id="pzKit" aria-label="No equipment today. Switch what's left to bodyweight">${icon("body", 22)}</button>` : ""}
+        ${f.canGoBodyweight ? `<button type="button" class="pz-min" id="pzKit" aria-label="No equipment today. Switch what's left to bodyweight">${icon("body", 22)}</button>` : ""}
       </div>
 
       <div class="pz-mid">
-        <div class="pz-eyebrow">${SESSION.pausedAt ? "Paused" : "In progress"}</div>
-        <div class="pz-clock" id="pzClock">${fmtElapsed(sessionElapsed())}</div>
-        ${where ? `<div class="pz-where">${where}</div>` : ""}
+        <div class="pz-eyebrow">${f.paused ? "Paused" : "In progress"}</div>
+        <div class="pz-clock" id="pzClock">${f.clock}</div>
+        ${f.where ? `<div class="pz-where">${f.where}</div>` : ""}
         <div class="pz-stage">
-          ${figName ? `<div class="sess-fig pz-fig" data-fig="${escapeHtml(figName)}" data-mood="sleepy"></div>` : ""}
+          ${f.figName ? `<div class="sess-fig pz-fig" data-fig="${escapeHtml(f.figName)}" data-mood="sleepy"></div>` : ""}
           <button type="button" class="pz-play" id="pzResume" aria-label="Resume workout">${icon("play", 40)}</button>
         </div>
       </div>
@@ -30227,10 +30638,10 @@ function startPausedClock() {
     // both copies, when both exist: a clock left frozen on the hidden one
     // would be wrong the moment it was uncovered
     const els = document.querySelectorAll(".pz-clock");
-    if (!els.length || !SESSION) { clearInterval(PZ_TICKER); PZ_TICKER = null; return; }
-    if (SESSION.pausedAt) return;
-    const t = fmtElapsed(sessionElapsed());
-    for (const el of els) el.textContent = t;
+    const f = els.length ? pausedFacts() : null;
+    if (!f) { clearInterval(PZ_TICKER); PZ_TICKER = null; return; }
+    if (f.paused) return;
+    for (const el of els) el.textContent = f.clock;
   }, 1000);
 }
 
@@ -30249,6 +30660,17 @@ function startPausedClock() {
 const PZ_ZOOM_MS = 285;
 function resumeFromPaused({ overlay, root }) {
   const go = () => {
+    /* An activity goes back through its own screen, for the same reason the
+       lift goes back through the overlay: from the tab the stage is not on
+       screen yet, so it is opened first and then the clock is started into it.
+       There is no wake to arm, because the activity screen has no entrance
+       animation to park. */
+    if (!SESSION) {
+      if (!overlay) openCardioSession();
+      if (CARDIO_SES && !CARDIO_SES.since) { CARDIO_SES.since = Date.now(); csnSave(); }
+      renderCardioStage();
+      return;
+    }
     SESSION_WAKE = true;
     if (overlay) togglePause();
     else {
@@ -30267,8 +30689,11 @@ function resumeFromPaused({ overlay, root }) {
   setTimeout(go, PZ_ZOOM_MS);
 }
 
-function wirePausedScreen({ overlay }) {
-  const root = overlay ? $("sessionBody") : $("workoutContent");
+/* `root` is passed only by the activity, whose overlay is its own scrim rather
+   than the lifting session card. Everything below is scoped to it either way,
+   so the third copy of these ids changes nothing about the rule. */
+function wirePausedScreen({ overlay, root: given }) {
+  const root = given || (overlay ? $("sessionBody") : $("workoutContent"));
   /* Every lookup is scoped to THIS copy. The screen exists twice whenever the
      session is reopened after going Home: once on the workout tab underneath
      and once in the overlay on top, with the same ids in both. A bare
@@ -30276,7 +30701,7 @@ function wirePausedScreen({ overlay }) {
      tab copy, so the buttons the user could actually see were wired to
      nothing. That was "the buttons don't work on this page". */
   const q = (id) => root.querySelector("#" + id);
-  q("pzHome").onclick = goHomeFromSession;
+  q("pzHome").onclick = () => (SESSION ? goHomeFromSession() : goHomeFromActivity());
   if (q("pzKit")) q("pzKit").onclick = () => noEquipmentToday({ overlay });
   q("pzResume").onclick = () => resumeFromPaused({ overlay, root });
   mountMotionFigures(root);
@@ -30293,6 +30718,20 @@ function goHomeFromSession() {
   stopSessionTimer();
   closeSessionUI();
   $("workoutContent").classList.remove("hidden");
+  renderWorkoutTab();
+  switchTab("home");
+}
+
+/* The same door out of a paused activity. The clock is not touched: it is two
+   timestamps rather than a ticker, so closing the screen it was drawn on
+   cannot lose a second of it, and a session that was still running when Home
+   was pressed is still running underneath exactly as a lift is. The workout
+   tab is redrawn first so the screen behind Home is the one this session
+   belongs on, not the choose screen it had before. */
+function goHomeFromActivity() {
+  if (!csnRunning()) return;
+  csnSave();
+  closeCardioSession();
   renderWorkoutTab();
   switchTab("home");
 }
@@ -30358,6 +30797,10 @@ function wireHoldToEnd({ overlay, root }) {
       done = true;
       buzz([30, 40, 30]);
       txt.textContent = "Ending";
+      /* An activity ends into its own save screen, which is the same moment as
+         the lift's wrap-up: the clock stops, nothing is thrown away, and what
+         was done is in front of you to keep. */
+      if (!SESSION) { endActivityNow({ overlay }); return; }
       /* The wrap-up draws into the session overlay, so from the tab it has to
          be open first, the same way the play button gets back in. */
       if (!overlay) reopenSession();
@@ -30370,7 +30813,9 @@ function wireHoldToEnd({ overlay, root }) {
 function renderFab() {
   const fab = $("fabStart");
   if (!fab) return;
-  const running = !!SESSION;
+  // A run on the clock is as much "in progress" as a lift is, and the button
+  // that would start another one has to say so.
+  const running = !!SESSION || csnRunning();
   fab.classList.toggle("in-progress", running);
   fab.innerHTML = icon(running ? "play" : "dumbbell", 26);
   fab.setAttribute("aria-label", running ? "Resume your workout" : "Start a workout");
@@ -30492,6 +30937,21 @@ function renderWorkoutTab({ respectMode = false } = {}) {
   if (SESSION && TODAY_WORKOUT) {
     /* The screen says Paused itself, in the right place, and names the
        exercise: the card's own heading and focus line only repeated it. */
+    $("workoutCardTitle").textContent = "";
+    $("workoutFocusRow").textContent = "";
+    $("workoutContent").innerHTML = pausedScreenHTML({ overlay: false });
+    wirePausedScreen({ overlay: false });
+    return;
+  }
+
+  /* An activity underway owns this tab the same way, which is the whole of
+     Mo's rule: "if I pause, I pause and it's still gonna have me do that
+     workout, and the only way I can go back and generate a new workout or do
+     anything is if I end that workout." Generating, planning and starting
+     something else all live on the screens this branch stands in front of, so
+     one branch closes every one of those doors at once rather than a guard on
+     each of them going stale the next time a button is added. */
+  if (csnRunning()) {
     $("workoutCardTitle").textContent = "";
     $("workoutFocusRow").textContent = "";
     $("workoutContent").innerHTML = pausedScreenHTML({ overlay: false });
@@ -31015,6 +31475,14 @@ function matchReading(pct) {
    against, and the day it was last trained. Nothing here is a new opinion
    about the workout. */
 let MATCH_NOTE = null;
+/* The day somebody has already tapped past the rest recommendation on, so the
+   card does not put it back. Kept against a date rather than as a plain
+   boolean because it is an answer about one day's proposal: tomorrow is a new
+   question and gets asked again. It is not a render-local flag because
+   refreshEngineNextDay repaints this whole screen a beat after it paints, and
+   a flag living on the render would slide the recommendation back over a card
+   somebody had already moved past. */
+let REST_OK_FOR = null;
 function matchNoteFor(p) {
   const all = p.all || [];
   if (!all.length) return null;
@@ -31630,10 +32098,10 @@ function renderChooseScreen() {
      because a percentage with nothing attached to it is a number nobody can
      argue with.
 
-     Two buttons, not three cards. The third door, an activity on the clock,
-     is a line under them: it has to stay reachable from here because on an
-     empty day this screen is where it lives, but it is not what most people
-     open this tab to do. */
+     Two buttons, and now only two: generate one, or plan your own. An
+     activity is not a third door on this card any more, it is one of the two
+     answers behind Plan my own, which is where somebody is already being
+     asked what they want. */
   /* Which day this card is about. Today until today is done, then tomorrow.
      A plan already sitting on tomorrow is shown rather than offered again:
      the button becomes the way to look at it. */
@@ -31647,16 +32115,47 @@ function renderChooseScreen() {
      account can still plan a workout and begin one from here, which is what
      the free tier promises. */
   const hiredHere = hired();
+  /* Mo, 2026-09-19: "if a match is very low for a workout can we start
+     recommending rest, recommending taking a rest day, and then they can have
+     the option to work out anyway."
+
+     Very low is under 45, which is not a new number: it is where freshTone
+     already turns this card's own ring red. A second threshold would put a
+     card saying rest next to a ring the app had decided was only amber, on the
+     same screen, and one of the two would be lying.
+
+     Only on a proposal. A plan that already exists is a decision somebody made
+     and talking them out of it is a larger conversation than a card.
+
+     Only when hired, too. The reading this is built from is the reading a free
+     account does not get, and what the rest state would cover on a free card
+     is the pitch for buying it: recommending rest in place of a number we are
+     not showing is advice nobody can check. */
+  const worstMuscle = (p.all || [])[(p.all || []).length - 1] || null;
+  const restAdvised = hiredHere && !p.real && p.match != null && p.match < 45
+    && REST_OK_FOR !== nextDate;
+  const restRec = !restAdvised ? "" : `
+    <div class="wkt-rest-rec">
+      <h2>${allDone ? "Make tomorrow a rest day" : "Take today off"}</h2>
+      <p class="wkt-next-sub">${worstMuscle
+        ? `I would rest this one: ${escapeHtml(worstMuscle.name.toLowerCase())} is down to ${worstMuscle.fresh}% of the room it has this week, and the best day I can build you still only reads ${p.match}%.`
+        : `I would rest this one: the best day I can build you still only reads ${p.match}%, so most of it is work you have already done this week.`}</p>
+      ${/* Quiet, and it is the only button here. Rest is the recommendation;
+            this is the way past it, not the encouraged path, and it says what
+            pressing it means rather than "Continue". */ ""}
+      <button type="button" class="wkt-btn-soft sm" id="chooseAnywayBtn">Work out anyway</button>
+    </div>`;
   const nextCard = `
     <section class="wkt-next${hiredHere ? "" : " not-hired"}">
       <div class="wkt-next-top">
-        <p class="wkt-eyebrow">${allDone ? "Tomorrow" : "Next workout"}</p>
+        <p class="wkt-eyebrow" id="wktNextEyebrow">${restAdvised ? "Rest day" : allDone ? "Tomorrow" : "Next workout"}</p>
         ${/* The dot explains how the match is worked out, so with no match on
               screen it explains nothing. A cardio day has no match: see
               planFromToday on why that is null rather than a number. */ ""}
         ${hiredHere && p.match != null ? infoDot("planMatch", "How the match is worked out") : ""}
       </div>
-      <div class="wkt-next-grid">
+      ${restRec}
+      <div class="wkt-next-grid${restAdvised ? " hid" : ""}">
         <div class="wkt-next-words">
           <h2>${escapeHtml(p.focus)}</h2>
           ${hiredHere && p.match != null ? `<p class="wkt-next-sub">${escapeHtml(matchReading(p.match))}</p>` : ""}
@@ -31682,14 +32181,17 @@ function renderChooseScreen() {
               ? `<button type="button" class="wkt-btn-solid sm" id="chooseSeeTomorrow">See tomorrow&rsquo;s plan</button>`
               : `<button type="button" class="wkt-btn-solid sm" id="chooseGenerateBtn">${allDone ? "Generate tomorrow&rsquo;s" : "Generate workout"}</button>`}
           ${tomorrowPlan ? "" : `<button type="button" class="wkt-btn-soft sm" id="choosePlanBtn">Plan my own</button>`}
-          ${/* Taken off this card on one note and put back on the next: "let's
-                put the activity back." It earns the room. On a day with no
-                lifting plan this is the only one-tap way into a run or a class
-                from this tab, and for somebody whose training styles are yoga
-                and cardio it is the way they train, not a detour from it. */ ""}
+          ${/* Two doors, not three. Mo, 2026-09-19: "we're gonna have the plan
+                my own and generate workout, and then when it's the plan my own
+                you could pick an activity through there." So the invitation to
+                start an activity is gone from here and asked one level down,
+                inside Plan my own, where the question is being asked anyway.
+                What stays is the way back into a session already running. That
+                is not an offer, it is the only door out of something paused,
+                and a card that hides it is a card that starts a second one. */ ""}
           ${csnRunning()
             ? `<button type="button" class="wkt-more" id="chooseActivityBtn">Resume ${escapeHtml(csnAct().label.toLowerCase())}, ${csnClock(csnElapsedMs())} ${icon("chevronRight", 13)}</button>`
-            : `<button type="button" class="wkt-more" id="chooseActivityBtn">or start an activity ${icon("chevronRight", 13)}</button>`}
+            : ""}
         </div>
         ${/* The muscle caption is gone too: "remove trains triceps, chest,
               traps, shoulders, we can see it when we generate the workout."
@@ -31802,8 +32304,24 @@ function renderChooseScreen() {
      preview, not two. */
   if ($("chooseBeginBtn")) $("chooseBeginBtn").onclick = () => goWorkoutScreen(null);
   /* Planning your own for a day that is not today is the day planner's job,
-     not the manual builder's: the builder writes to today. */
-  if ($("choosePlanBtn")) $("choosePlanBtn").onclick = () => (allDone ? openDayPlanner(nextDate) : toManual());
+     not the manual builder's: the builder writes to today. That planner asks
+     lifting or activity already, which is the same question openPlanKind asks
+     for today, so both branches now fork the same way. */
+  if ($("choosePlanBtn")) $("choosePlanBtn").onclick = () => (allDone ? openDayPlanner(nextDate) : openPlanKind(toManual));
+  /* Past the recommendation rather than around it. The ordinary card is
+     already rendered and already wired underneath, so this only uncovers it:
+     same screen, same buttons, nothing navigated and nothing rebuilt. */
+  if ($("chooseAnywayBtn")) $("chooseAnywayBtn").onclick = () => {
+    REST_OK_FOR = nextDate;
+    const card = $("workoutContent").querySelector(".wkt-next");
+    if (!card) return;
+    card.querySelector(".wkt-rest-rec")?.remove();
+    card.querySelector(".wkt-next-grid")?.classList.remove("hid");
+    // The eyebrow belongs to whatever the card is showing, and what it is
+    // showing now is the next workout again.
+    const brow = $("wktNextEyebrow");
+    if (brow) brow.textContent = allDone ? "Tomorrow" : "Next workout";
+  };
   /* Guarded: a coached client has no plan buttons, so this card is not there. */
   const actBtn = $("chooseActivityBtn");
   if (actBtn) actBtn.onclick = () => openCardioSession();
@@ -32614,6 +33132,8 @@ function startStretchSession(moves) {
      the clock: offering a second one on top of it is how you end up with two
      things both believing they are the session. */
   if (SESSION) { toast("Finish the workout you have going first"); return; }
+  // And a run or a class on the clock is a session by the same argument.
+  if (csnRunning()) { toast("Finish the workout you have going first"); openCardioSession(); return; }
   SESSION = {
     standaloneStretch: moves,
     phase: "cooldown",
@@ -32728,7 +33248,7 @@ function renderWeekPlanner() {
      for the same reason. Everything from there forward can be shuffled, which is
      the whole of the ask: when you plan the week you should be able to drag the
      days into the order that suits you. */
-  const movable = days.filter((d) => !d.past && !d.done && !d.trained && !(SESSION && d.isToday));
+  const movable = days.filter((d) => !d.past && !d.done && !d.trained && !(sessionOpen() && d.isToday));
   const slots = movable.map((d) => d.date);
   const canReorder = movable.length > 1 && movable.some((d) => d.plan);
 
@@ -32867,7 +33387,7 @@ function weekGenLabel() { return weekGenNext() ? "Generate next week" : "Generat
 function weekGenDays() {
   const next = weekGenNext();
   return planWeekDays(next ? 1 : 0)
-    .filter((d) => !d.past && !d.done && !d.trained && !(SESSION && d.isToday));
+    .filter((d) => !d.past && !d.done && !d.trained && !(sessionOpen() && d.isToday));
 }
 
 /* How many sessions the week still owes them. days_per_week is the number they
@@ -33022,6 +33542,9 @@ let WEEK_GEN_RUNNING = false;
 async function generateTheWeek() {
   if (WEEK_GEN_RUNNING) return;
   if (isCoachedClient()) { toast("Your coach sets your workouts"); return; }
+  // Planning days is still deciding what to train, and nothing gets decided
+  // while a session is open. Said once here, not once per day it would write.
+  if (sessionOpen()) { toast("Finish the workout you have going first"); return; }
   /* Gated once, here, rather than day by day inside generateWorkout: the
      paywall belongs to the press, and putting it up four times for one button
      would be the app asking to be paid per day. */
@@ -33230,6 +33753,51 @@ function sparePlanDay(taken) {
     if (!taken.has(iso)) return iso;
   }
   return null;
+}
+
+/* "What would you like to plan?" Mo, 2026-09-19: "when they plan their own
+   they should ask them like what would you like to plan, and then it could
+   show the activity and it could show weightlifting." Plan my own went
+   straight into the manual builder, which only knows how to build a lift, so
+   an activity had to be offered somewhere else on the card, and the card ended
+   up with three doors to two decisions.
+
+   Deliberately the same two tiles openDayPlanner shows for a future day, same
+   classes and same wording, because it is the same question. A second shape
+   for it would read as a different feature.
+
+   Today's activity opens the session itself rather than a plan to do later,
+   which is what openActivityInstead already does for today: on the day, the
+   clock is the point. */
+function openPlanKind(onWeights) {
+  const scrim = document.createElement("div");
+  scrim.className = "pop-scrim";
+  scrim.innerHTML = `
+    <div class="pop">
+      <div class="pop-body">
+        <div class="ds-top">
+          <div><div class="pop-who" style="color:var(--muted)">TODAY</div>
+            <div class="sv-name">What would you like to plan?</div></div>
+          <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
+        </div>
+        <div class="dp-ways">
+          <button type="button" class="dp-way" id="pkLift">
+            <span class="dp-way-ico">${icon("pencil", 18)}</span>
+            <span class="dp-way-txt"><b>Weightlifting</b><i>Pick the exercises yourself.</i></span>
+          </button>
+          <button type="button" class="dp-way" id="pkAct">
+            <span class="dp-way-ico">${icon("run", 18)}</span>
+            <span class="dp-way-txt"><b>Activity</b><i>A run, a ride, yoga, Pilates.</i></span>
+          </button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+  const close = () => scrim.remove();
+  scrim.querySelectorAll("[data-close]").forEach((b) => { b.onclick = close; });
+  scrim.onclick = (e) => { if (e.target === scrim) close(); };
+  scrim.querySelector("#pkLift").onclick = () => { close(); onWeights(); };
+  scrim.querySelector("#pkAct").onclick = () => { close(); openCardioSession(); };
 }
 
 /* Putting something on an empty day: generate one, build one, or do an
@@ -33685,8 +34253,11 @@ function startPlannedActivity(plan) {
   const s = planActivitySession(plan);
   if (!s) return;
   if ((plan.entry_date || todayStr()) !== todayStr()) { toast("That one is for another day"); return; }
-  // A session already running is the truth and outranks this; show it instead.
-  if (csnRunning()) { openCardioSession(); return; }
+  // A session already running is the truth and outranks this; show it instead,
+  // and a lifting one outranks it the same way. Asked before anything is built
+  // rather than left to openCardioSession, so a redirected press does not leave
+  // a half made session behind it.
+  if (sessionOpen()) { openCardioSession(); return; }
   sfx.play("set");
   const act = s.kind === "flow"
     ? CARDIO_ACTS.find((a) => a.training === s.flow.training)
@@ -33723,6 +34294,18 @@ function startPlannedActivity(plan) {
   openCardioSession();
 }
 
+/* The class itself, once. `moves` is the whole clock: the sequence, then the
+   sequence again, numbered by `round`. Round one is the full set of moves the
+   class contains, because fillRounds spends against a budget that only ever
+   shrinks, so a move too long for round one is too long for every round after
+   it. A row written before the round number existed carries none, and that row
+   IS its own sequence. */
+function flowSequence(f) {
+  const moves = Array.isArray(f?.moves) ? f.moves : [];
+  const first = moves.filter((m) => (Number(m.round) || 1) === 1);
+  return first.length ? first : moves;
+}
+
 /* What an activity day looks like on the plan screen, and the only thing that
    draws one. A run and a class are the same kind of day, so they print through
    one function rather than each card inventing its own way of saying what a day
@@ -33732,14 +34315,32 @@ function startPlannedActivity(plan) {
    to pace it, through cardioPlanHTML. A class says the moves instead, because
    that is what a class IS: "Yoga, on the clock" is a word and a timer, and
    somebody reading the day before they start it wants to know what is in it.
-   Eight and a count, the same cut the session's own reveal card makes, because
-   a forty move vinyasa is three rounds of the same thing and the first round is
-   the news. */
-function activityDayHTML(s, { eyebrow = "Today’s session", head = true } = {}) {
+
+   EVERY move, since Mo's note of 2026-09-19: "I look at Pilates and it says
+   'and 32 more'. I want to be able to see every single workout." It used to cut
+   at eight and print a count, and a forty move vinyasa hid thirty two of them
+   behind a line nothing would open.
+
+   Every move, ONCE. A forty move class is thirteen moves run three times, and
+   the thirteen are the class: printing the list three times would be forty rows
+   of which twenty seven are a rerun, which is a longer way of saying the same
+   thing rather than a fuller one. Nothing is hidden by it either, because a
+   move that is not in round one is not in the class at all: fillRounds spends a
+   budget that only shrinks, so round one holds everything that ever fits. The
+   repeat is said in words above the list, and where the bell stops the last
+   round early it says where. */
+function activityDayHTML(s, { eyebrow = "Today’s session", head = true, swap = false } = {}) {
   if (!s) return "";
   if (s.kind === "cardio") return cardioPlanHTML(s.card, { eyebrow, head });
   const f = s.flow;
   const moves = Array.isArray(f.moves) ? f.moves : [];
+  const seq = flowSequence(f);
+  const rounds = Number(f.rounds) || 1;
+  /* The bell can land mid sequence, and fillRounds allows it. Saying where the
+     last round stops is the difference between a list you can follow to the end
+     and a list that quietly does not match the clock. */
+  const last = rounds > 1 ? moves.filter((m) => (Number(m.round) || 1) === rounds) : [];
+  const stopsAt = last.length && last.length < seq.length ? last[last.length - 1].name : null;
   const act = CARDIO_ACTS.find((a) => a.training === f.training);
   return `
     ${head ? `<div class="cdy-head">
@@ -33749,20 +34350,236 @@ function activityDayHTML(s, { eyebrow = "Today’s session", head = true } = {})
     </div>` : ""}
     <div class="act-facts" style="margin:4px 0 14px;">
       <div class="act-fact"><span>Minutes</span><b>${Number(f.minutes) || 0}</b></div>
-      <div class="act-fact"><span>Moves</span><b>${moves.length}</b></div>
-      ${f.rounds > 1 ? `<div class="act-fact"><span>Rounds</span><b>${f.rounds}</b></div>` : ""}
+      ${/* The sequence, not the forty, because the list under this is the
+            sequence and two different counts for one class is the card
+            arguing with itself. The Rounds fact beside it is the other half. */ ""}
+      <div class="act-fact"><span>Moves</span><b>${seq.length}</b></div>
+      ${rounds > 1 ? `<div class="act-fact"><span>Rounds</span><b>${rounds}</b></div>` : ""}
     </div>
     <div class="act-moves">
-      ${moves.slice(0, 8).map((m, i) => `<div class="act-move">
+      ${rounds > 1 ? `<p class="act-seq-note">All ${seq.length} moves, in order. <b>The class runs the sequence ${rounds} times.</b>${stopsAt ? ` The last round stops after ${escapeHtml(stopsAt)}.` : ""}</p>` : ""}
+      ${seq.map((m, i) => `<div class="act-move">
         <span class="act-move-n">${i + 1}</span>
         <span class="act-move-b"><b>${escapeHtml(m.name)}</b><i>${Number(m.seconds) || 0}s${m.perSide ? " a side" : ""}${m.category ? ` &middot; ${escapeHtml(m.category)}` : ""}</i></span>
+        ${swap ? `<button type="button" class="wp-chip" data-flow-swap="${i}" aria-label="Replace ${escapeHtml(m.name)}">${icon("swap", 15)}</button>` : ""}
       </div>`).join("")}
-      ${moves.length > 8 ? `<p class="act-move-more">and ${moves.length - 8} more</p>` : ""}
     </div>
     ${/* The session engine says out loud that the sequence repeats and how
           little unique work there was to repeat. It is the most useful line on
           the card and it is the one an app would be tempted to hide. */ ""}
     ${(f.notes || []).map((n) => `<p class="ef-note">${escapeHtml(n)}</p>`).join("")}`;
+}
+
+/* ---------- Replacing a move in a class ----------
+   Mo, 2026-09-19, in the same note that asked to see the whole class: "And then
+   of course be able to replace it." A lifting plan has had this since the
+   overview screen learned openSwapSheet, and a yoga day sitting beside it with
+   no way to get rid of a pose is the two halves of one app disagreeing about
+   whether a plan is yours.
+
+   The same sheet furniture, the same rows, the same chip on the row, because
+   these are two ways of saying the same thing and they should not look like two
+   features. What is NOT shared is the sheet's brain: the lifting one ranks the
+   engine's `alternatives` by the job a lift does, seeds a weight off the log and
+   records the swap in exercise_swaps so preferences.mjs can stop prescribing
+   that lift. None of that is true of a pose. There is no load, nothing in the
+   yoga library carries alternatives, and writing "Warrior II" into the table
+   that teaches the LIFTING engine what to stop prescribing would be feeding it
+   a movement it can never program.
+
+   THE POOL is the pool the session builder itself would have drawn from:
+   movesAtOrBelow on the same training at the class's own level. Moves already
+   in the sequence are out, since a class with a pose in it twice is not a
+   replacement. What it opens on is the same category as the move being
+   replaced, because the sequence is built one move per category and swapping a
+   backbend for a core move quietly rebalances a class nobody asked to
+   rebalance. Everything else at that level is one tap below, under a row that
+   says so.
+
+   AND THE LEVEL ABOVE, which the brief for this said not to offer and which
+   the libraries settle: Yoga holds eighteen beginner moves and a thirty minute
+   beginner class uses all eighteen, so "at or below your level, minus what is
+   already in the class" is EMPTY for exactly the person most likely to want a
+   pose out of their class. A sheet that opens on "nothing to offer" is not a
+   replace control. So the harder moves are here, last, behind their own
+   heading, saying what they are. The level cap is a rule about what this app
+   PRESCRIBES unasked, which is a different act from what somebody picks for
+   themselves with the word "harder" in front of them. */
+let FLOW_SWAP = null;      // { plan, index, pool, after }
+let FLOW_SWAP_ALL = false;
+
+async function openFlowSwapSheet({ plan, index, after }) {
+  const f = plan?.cardio?.flow;
+  const move = flowSequence(f)[index];
+  if (!move) return;
+  const engine = await ensureSessionEngine();
+  const training = (EXERCISE_TRAININGS || []).find((t) => t.id === f.training);
+  if (!engine?.movesAtOrBelow || !training) {
+    /* Said rather than swallowed: the library and the engine both arrive by
+       dynamic import after first paint, and a chip that does nothing is worse
+       than one that explains itself. */
+    toast("Still loading the move library. Try again in a moment.");
+    return;
+  }
+  const taken = new Set(flowSequence(f).map((m) => m.name));
+  const atLevel = engine.movesAtOrBelow(training, f.level || "beginner")
+    .filter((m) => !taken.has(m.name));
+  const atLevelNames = new Set(atLevel.map((m) => m.name));
+  /* "advanced" is the top of the engine's ladder, so this is the whole library
+     minus what the class already holds minus what was already allowed. */
+  const harder = engine.movesAtOrBelow(training, "advanced")
+    .filter((m) => !taken.has(m.name) && !atLevelNames.has(m.name))
+    .map((m) => ({ ...m, harder: true }));
+  const pool = [...atLevel, ...harder];
+  if (!pool.length) {
+    toast(`Every ${training.label} move there is is already in this one.`);
+    return;
+  }
+  FLOW_SWAP = { plan, index, pool, after };
+  FLOW_SWAP_ALL = false;
+  $("swapScrim").classList.remove("hidden");
+  $("swapScrim").onclick = (e) => { if (e.target === $("swapScrim")) closeFlowSwapSheet(); };
+  renderFlowSwapSheet();
+}
+
+function closeFlowSwapSheet() {
+  FLOW_SWAP = null;
+  FLOW_SWAP_ALL = false;
+  $("swapScrim").classList.add("hidden");
+  pinSheets();
+}
+
+function flowSwapRowHTML(m) {
+  return `<button type="button" class="sv-row" data-flow-pick="${escapeHtml(m.name)}">
+    <span class="sv-row-ico">${icon("swap", 18)}</span>
+    <span class="sv-row-txt">
+      <span class="sv-row-name">${escapeHtml(m.name)}</span>
+      <span class="sv-row-meta">${escapeHtml([m.categoryLabel || m.category, m.level, `${Number(m.seconds) || 0}s${m.perSide ? " a side" : ""}`].filter(Boolean).join(" · "))}</span>
+    </span>
+    <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
+  </button>`;
+}
+
+function renderFlowSwapSheet() {
+  if (!FLOW_SWAP) return;
+  const { plan, index, pool } = FLOW_SWAP;
+  const move = flowSequence(plan?.cardio?.flow)[index];
+  if (!move) { closeFlowSwapSheet(); return; }
+  const rounds = Number(plan.cardio.flow.rounds) || 1;
+  const atLevel = pool.filter((m) => !m.harder);
+  /* What the sheet opens on. The same part of the class, at the level the class
+     was built at, and only when there is nothing left at that level do the
+     harder ones come to the top: then they are the whole offer, and hiding them
+     would be a sheet that says no.
+
+     Matched on the LABEL, because that is what a saved move carries: styles.mjs
+     writes `category: m.categoryLabel` into the row and drops the key, so
+     comparing keys here matched nothing and every sheet opened on the whole
+     library. */
+  const part = String(move.category || move.categoryLabel || "").toLowerCase();
+  const opens = (atLevel.length ? atLevel : pool)
+    .filter((m) => String(m.categoryLabel || m.category || "").toLowerCase() === part);
+  const near = FLOW_SWAP_ALL ? [] : opens.slice(0, 3);
+  const shownNames = new Set(near.map((m) => m.name));
+  const restLevel = atLevel.filter((m) => !shownNames.has(m.name));
+  const restHard = pool.filter((m) => m.harder && !shownNames.has(m.name));
+  /* The library's own words for this part of the class ("Standing poses",
+     "Core & abs"), which is what the row under it says too. */
+  const partWord = escapeHtml(move.category || move.categoryLabel || "The same part of the class");
+  $("swapSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="fswClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">Replace ${escapeHtml(move.name)}</div>
+      <div class="spacer"></div>
+    </div>
+    <p class="muted-note" style="margin:-6px 0 14px;">${!atLevel.length
+      ? `Every move at your level is already in this class, so these are a step up from it.`
+      : near.length ? `${partWord}, at your level.`
+      : "Everything this class could hold instead."}${rounds > 1 ? " It changes in every round." : ""}</p>
+    ${near.length ? `<div class="sv-rows">
+      ${near.map(flowSwapRowHTML).join("")}
+      ${restLevel.length + restHard.length ? `<button type="button" class="sv-row" id="fswAllRow">
+        <span class="sv-row-ico">${icon("plus", 18)}</span>
+        <span class="sv-row-txt">
+          <span class="sv-row-name">Show every move</span>
+          <span class="sv-row-meta">All ${pool.length} this class could hold, not just these</span>
+        </span>
+        <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
+      </button>` : ""}
+    </div>` : ""}
+    ${restLevel.length && !near.length ? `<div class="sv-rows">${restLevel.map(flowSwapRowHTML).join("")}</div>` : ""}
+    ${restHard.length && !near.length ? `${/* The heading only where there is something above it to tell it apart
+             from. With nothing at the class's level left, these ARE the offer
+             and the line at the top has already said so. */ ""}
+    ${near.length || restLevel.length ? `<p class="muted-note" style="margin:14px 0 8px;">Harder than this class was built for. Nothing is stopping you, but it is your call rather than the app's.</p>` : ""}
+    <div class="sv-rows">${restHard.map(flowSwapRowHTML).join("")}</div>` : ""}`;
+
+  $("fswClose").onclick = closeFlowSwapSheet;
+  if ($("fswAllRow")) $("fswAllRow").onclick = () => { FLOW_SWAP_ALL = true; renderFlowSwapSheet(); };
+  $("swapSheet").querySelectorAll("[data-flow-pick]").forEach((b) => {
+    b.onclick = () => applyFlowSwap(pool.find((m) => m.name === b.dataset.flowPick));
+  });
+  $("swapSheet").scrollTop = 0;
+}
+
+async function applyFlowSwap(pick) {
+  const ctx = FLOW_SWAP;
+  if (!ctx || !pick) return;
+  const { plan, index } = ctx;
+  const f = plan?.cardio?.flow;
+  const move = flowSequence(f)[index];
+  if (!move) { closeFlowSwapSheet(); return; }
+  const engine = await ensureSessionEngine();
+
+  /* Every round, matched by name. The sequence IS the class and round two is
+     the same thirteen moves again: replacing the pose in round one only would
+     leave the one they just took out waiting for them twice more. */
+  const perSide = engine?.PER_SIDE_MULTIPLIER || 2;
+  const moves = (f.moves || []).map((m) => (m.name === move.name
+    /* Written in the shape styles.mjs writes a flow move in, field for field,
+       and no wider: the library entry also carries `primary` and `secondary`
+       muscle lists that a plan row deliberately does not, because a pose
+       sitting in a row with muscles on it is one refactor away from being
+       counted as trained volume. */
+    ? {
+        name: pick.name,
+        seconds: pick.seconds,
+        perSide: !!pick.perSide,
+        round: Number(m.round) || 1,
+        category: pick.categoryLabel || pick.category || null,
+        cue: pick.cue || null,
+      }
+    : m));
+  /* The prescribed `minutes` is what the clock counts and it does not move: the
+     class is still the forty minutes that was asked for. `seconds` is what the
+     moves actually add up to, so it is recomputed rather than left describing a
+     move that is no longer in here. */
+  const seconds = moves.reduce((n, m) => n + (Number(m.seconds) || 0) * (m.perSide ? perSide : 1), 0);
+  plan.cardio = { ...plan.cardio, flow: { ...f, moves, seconds } };
+
+  const after = ctx.after;
+  closeFlowSwapSheet();
+  after?.();
+  toast(`Swapped to ${pick.name}`);
+  await saveActivityFlow(plan);
+}
+
+/* The class has to survive leaving the screen, and the only copy of it is the
+   `cardio` column: loadTodayWorkout re-reads ai_workouts on the next loadAll
+   and would put the move back. Same shape savePlanExercises has for the lifting
+   half, including reloading on a failure rather than leaving the screen showing
+   an edit the server never took. */
+async function saveActivityFlow(plan) {
+  if (!plan?.id) return false;
+  const { error } = await sb.from("ai_workouts").update({ cardio: plan.cardio }).eq("id", plan.id);
+  if (error) {
+    console.error("class edit not saved", error);
+    toast("Couldn't save that change");
+    await loadAll();
+    return false;
+  }
+  return true;
 }
 
 /* A day that has just been written, put into ALL_PLANS without going back to
@@ -34725,7 +35542,7 @@ async function applySessionBudget(minutes) {
   if (!TODAY_WORKOUT?.exercises?.length) return;
   /* Belt and braces against a caller that got its hands on this while a session
      is open. Mid-session is the third case and it is not this control. */
-  if (SESSION) return;
+  if (sessionOpen()) return;
   const date = TODAY_WORKOUT.entry_date || todayStr();
   /* The snapshot is the ORIGINAL session, not the previous one. Shorten twice
      and "back to" still means the plan the day started with, which is the thing
@@ -35141,6 +35958,13 @@ function renderPlanPreview(opts) {
           headings over a blank. */ ""}
     ${activityDay ? activityDayHTML(actSession, {
       eyebrow: review ? `Planned for ${planDayWord(date)}` : "Today’s session",
+      /* The chip on every move, on the screen where the day is still being
+         decided. Not once the day is done, for the reason a logged lift has no
+         swap: there is nothing left to replace. Not while the clock is running
+         on it either, because the session screen is working off the move list
+         it started with and changing it underneath would put somebody in a pose
+         the app is no longer counting. */
+      swap: actSession?.kind === "flow" && !finished && !actLive,
     }) : ""}
     ${activityDay && !actSession ? `<p class="ef-note">No lifts on this one. It is ${escapeHtml(displayFocus(plan.focus, exercises))}, on the clock.</p>` : ""}
     ${/* Three lines and a fold. The lines are already in order, so what shows
@@ -35216,6 +36040,18 @@ function renderPlanPreview(opts) {
       index: Number(btn.dataset.planSwap),
       date: plan.entry_date || todayStr(),
       focus: plan.focus,
+      after: () => rerenderPlanScreen(),
+    });
+  });
+
+  /* The class's own half of the same offer. It writes the `cardio` column
+     rather than `exercises`, which is the only real difference: a class day has
+     no exercises by contract and its session lives in the column the plan
+     screen already reads it out of. */
+  $("workoutContent").querySelectorAll("[data-flow-swap]").forEach((btn) => {
+    btn.onclick = () => openFlowSwapSheet({
+      plan,
+      index: Number(btn.dataset.flowSwap),
       after: () => rerenderPlanScreen(),
     });
   });
