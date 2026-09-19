@@ -21,6 +21,10 @@ four unrelated commit messages, so the reasoning for a change is now in a commit
 about something else. A commit message is how the next person learns why; sweeping
 somebody else's hunks into yours destroys that even when the code survives.
 
+**`git commit --only <file>` is as unsafe as `git add`.** It re-stages the whole
+working copy of that file, so it sweeps in whatever else is mid-edit. An agent hit
+this on 2026-09-18 and caught it only by reading the diff afterwards.
+
 **Never `git stash`.** Three agents hit collisions with it on this shared tree.
 For a baseline use `git archive HEAD | tar -x -C <scratch dir>` and work there.
 
