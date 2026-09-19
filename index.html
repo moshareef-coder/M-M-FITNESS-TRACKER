@@ -12805,9 +12805,23 @@ function wireTrainStylePicker(root, picked, onChange) {
    the way quips.mjs does it, so the line is worth reading when it appears. */
 function trainStyleNote(picked) {
   if (!picked.length) return "Pick at least one.";
-  const has = (k) => picked.some((id) => TRAIN_STYLES.find((t) => t.id === id)?.mod === k);
-  return has("weight-training") ? ""
-    : "No resistance training. That is your call, and worth knowing: two sessions a week is what keeps weight loss taking fat rather than muscle.";
+  const of = (k) => picked.map((id) => TRAIN_STYLES.find((t) => t.id === id)).filter((t) => t?.mod === k);
+  if (!of("weight-training").length) {
+    return "No resistance training. That is your call, and worth knowing: two sessions a week is what keeps weight loss taking fat rather than muscle.";
+  }
+  /* What a second style next to lifting actually buys, said here because the
+     cards cannot: a single generated session is the lifting day whatever
+     else is ticked (measured byte-identical on 2026-09-19), and the run or
+     the class arrives only through the week builder, which gives cardio one
+     day and a class one day (weekGenKinds). Two cardio styles still share
+     the one day, so they are listed with "or". */
+  const names = (list) => list.map((t) => t.label.toLowerCase()).join(" or ");
+  const parts = [];
+  if (of("cardio").length) parts.push(`one day of ${names(of("cardio"))}`);
+  if (of("flow").length) parts.push(`one day of ${names(of("flow"))}`);
+  return parts.length
+    ? `Lifting is the backbone. Generate the week and it gets ${parts.join(" and ")}. A single session on its own is still a lifting day.`
+    : "";
 }
 
 /* How many training days each step is worth on the bar. Not evenly spaced,
@@ -13097,15 +13111,25 @@ function renderOnboardStep(step, data = {}) {
       <div class="ob-step">
         ${obChrome("about", data)}
         <h1>About you</h1>
+        ${/* Measured with the about step's other two: the first plan is byte
+              identical for Male and Female. What sex does is draw the figure
+              and decide what gets put forward (Pilates), so that is what it
+              says. */ ""}
+        <p class="sub">This draws your figure and shapes the suggestions. The first plan is the same either way.</p>
         <div class="ob-sexes" id="sexGrid">
           ${SEX_TILES.map((s) => `<button type="button" class="ob-sex${sexPick === s.id ? " on" : ""}" data-sex="${s.id}">${escapeHtml(s.label)}</button>`).join("")}
         </div>
-        <label class="ob-lab">Height</label>
+        <label class="ob-lab">Height <span class="ob-opt">for the healthy-weight line and the calorie estimate, not the training</span></label>
         <div class="ob-row">
           <input id="obFt" type="number" inputmode="numeric" min="3" max="8" placeholder="feet" value="${ftv}" />
           <input id="obIn" type="number" inputmode="numeric" min="0" max="11" placeholder="inches" value="${inv}" />
         </div>
-        <label class="ob-lab">Weight <span class="ob-opt">it sets your starting loads</span></label>
+        ${/* Said "it sets your starting loads". Measured on 2026-09-19: on day
+              one 130 lb and 260 lb build byte-identical plans, and once there
+              are logs the number only caps what gets extrapolated from them.
+              Loads come from what somebody lifts. What the number does on day
+              one is start the chart. */ ""}
+        <label class="ob-lab">Weight <span class="ob-opt">your first weigh-in. Loads come from what you log; this only caps them</span></label>
         <div class="ob-row">
           <input id="obLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.weight_lb || ""}" />
         </div>
