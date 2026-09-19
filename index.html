@@ -604,6 +604,20 @@
   .wkt-week .cal-key i { width: 8px; height: 8px; }
   .wkt-week .cal-key span { font-size: 12.5px; }
   .cal-month-wrap { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  /* Under the strip, because it acts on the strip: you look at the week, then
+     you fill it in. One green button, full width, with the quiet way in to
+     doing it by hand under it. */
+  .wkt-week-gen { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .wkt-week-gen .wkt-btn-solid { width: 100%; }
+  /* The builder, one row per day, ticking over as they land. */
+  .wg-rows { display: flex; flex-direction: column; gap: 6px; margin: 14px 0 4px; }
+  .wg-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--border); }
+  .wg-row.at { border-color: var(--accent-ink); }
+  .wg-row.failed { border-color: var(--partner); }
+  .wg-day { flex: none; width: 74px; font-size: 13px; font-weight: 700; }
+  .wg-what { flex: 1; min-width: 0; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wg-state { flex: none; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); display: inline-flex; align-items: center; }
+  .wg-row.done .wg-state { color: var(--accent-ink); }
   .wkt-plan.opt-card { border-radius: 20px; padding: 16px; margin-bottom: 12px; }
   .wkt-plan .opt-title { font-size: 16.5px; }
   .wkt-plan .opt-sub { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2060,6 +2074,12 @@
     animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
   }
   .gen-swap:active { transform: scale(.97); }
+  /* Mo: "through there you can have the option to swap it with an activity or
+     choose a focus to work on". Three pills in a row rather than three more
+     full width buttons: the plan is the screen, and these are what you can do
+     about it, so they stay the size of the one that was already here. */
+  .gen-doors { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .gen-doors .gen-swap { margin-top: 0; }
   .gen-go {
     margin-top: 18px; animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
   }
@@ -3693,6 +3713,20 @@
   .dp-way-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .dp-way-txt b { font-size: 14px; font-weight: 700; }
   .dp-way-txt i { font-size: 12.5px; font-style: normal; color: var(--muted); }
+  /* The plan the day already holds, above the doors. A planner that would not
+     say what is on the day was asking you to change something you could not
+     read. It scrolls rather than grows, because .pop is centred: a ten lift
+     day would otherwise run off both ends of the screen at once. */
+  .dp-plan {
+    max-height: 32vh; overflow-y: auto; margin: 12px 0 0;
+    border-radius: 14px; background: var(--panel-2); border: 1px solid var(--border);
+  }
+  .dp-ex { display: flex; align-items: center; gap: 10px; padding: 9px 12px; }
+  .dp-ex + .dp-ex { border-top: 1px solid var(--border); }
+  .dp-ex-n { width: 16px; flex: none; font-size: 11.5px; color: var(--muted); }
+  .dp-ex-name { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dp-ex-dose { flex: none; font-size: 12.5px; color: var(--muted); }
+  .dp-heading { margin: 16px 0 0; font: 700 11px/1 var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
   /* A row rather than one big button: a drag handle and the two arrows next to
      it are buttons of their own, and a button cannot live inside a button. */
   .wk-plan-day {
@@ -20476,7 +20510,7 @@ function ensureCardioLibrary() {
 
    Seeded by date so the same day asked twice comes back the same, which is the
    rule every other picker in this file follows. */
-async function cardioDayForStyles(st) {
+async function cardioDayForStyles(st, forDate) {
   const mod = await ensureCardioLibrary();
   if (!mod) return null;
   const level = (MY_PROFILE?.level || "beginner");
@@ -20484,7 +20518,10 @@ async function cardioDayForStyles(st) {
   if (modes.length) {
     const picks = mod.cardioFor({ modes, level });
     if (!picks.length) return null;
-    const seed = Number(todayISO().replace(/-/g, "")) || 0;
+    /* The day being built, not the day it is being built ON. Generating a
+       whole week from one button used to seed every day off today and hand
+       back the same run seven times. */
+    const seed = Number(String(forDate || todayISO()).replace(/-/g, "")) || 0;
     const s = picks[seed % picks.length];
     return {
       focus: s.name,
@@ -23658,9 +23695,24 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
             <button type="button" class="wp-chip" data-swap="${i}" aria-label="Swap ${escapeHtml(ex.name || "")}">${icon("swap", 15)}</button>
           </div>`).join("")}
       </div>
-      ${isCoachedClient() ? "" : `<button type="button" class="gen-swap" id="genSwapDayBtn" style="--d:${list.length * 70 + 60}ms">
-        ${icon("swap", 14)}<span>Swap the whole workout</span>
-      </button>`}
+      ${isCoachedClient() ? "" : `<div class="gen-doors" style="--d:${list.length * 70 + 60}ms; animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);">
+        <button type="button" class="gen-swap" id="genSwapDayBtn">
+          ${icon("swap", 14)}<span>Swap the whole workout</span>
+        </button>
+        <button type="button" class="gen-swap" id="genActBtn">
+          ${icon("run", 14)}<span>Swap for an activity</span>
+        </button>
+        <button type="button" class="gen-swap" id="genFocusBtn">
+          ${icon("body", 14)}<span>Focus on something</span>
+        </button>
+        ${/* Regenerate keeps the day type and changes the movements, which is a
+              different ask from all three above. Today only: sameAgain reads
+              TODAY_WORKOUT, and for a day queued ahead that row is a different
+              day's plan. */ ""}
+        ${forToday ? `<button type="button" class="gen-swap" id="genAgainBtn">
+          ${icon("refresh", 14)}<span>Give me another one</span>
+        </button>` : ""}
+      </div>`}
       ${askLimits ? `
       <div class="gen-nudge" style="--d:${list.length * 70 + 60}ms">
         <p>Anything that hurts, or gear you don't have? Tell us once and every plan will respect it.</p>
@@ -23699,6 +23751,26 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
         fromReveal: true,
         onGo,
       });
+    }
+    /* The other two doors off the plan, both of them about THIS day. The
+       overlay closes first, the way the time and limits buttons already do:
+       the plan is saved by the time this screen exists, so nothing is lost by
+       leaving it, and a regenerate opens this same overlay again from the top
+       anyway. */
+    if ($("genActBtn")) {
+      $("genActBtn").onclick = () => {
+        closeGenOverlay();
+        openActivityInstead(swapDate, forToday ? "today" : target.toLocaleDateString(undefined, { weekday: "long" }));
+      };
+    }
+    if ($("genFocusBtn")) {
+      $("genFocusBtn").onclick = () => {
+        closeGenOverlay();
+        openPlanFocusSheet(swapDate, forToday ? "today" : target.toLocaleDateString(undefined, { weekday: "long" }));
+      };
+    }
+    if ($("genAgainBtn")) {
+      $("genAgainBtn").onclick = () => { closeGenOverlay(); generateWorkout(null, { sameAgain: true }); };
     }
     if ($("genTimeBtn")) {
       $("genTimeBtn").onclick = () => openSessionBudgetSheet({
@@ -24430,6 +24502,17 @@ async function applySessionSwap(workout, ctx) {
    their mind is a worse failure than one extra tap. It steps aside when the
    clock actually starts, in csnGo. */
 function startCardioInsteadOfPlan(s, ctx) {
+  /* A day that has not arrived cannot be started, only planned. The swap sheet
+     opens on a future day from the reveal and from the day planner, and this
+     used to put a clock on screen and start counting: somebody swapping
+     Thursday for a run at Tuesday lunchtime was told they were running. The
+     day is written as an activity day instead, and the clock is there on
+     Thursday when they are. */
+  if (ctx?.date && ctx.date !== todayStr()) {
+    if (ctx.fromReveal) closeGenOverlay();
+    planActivityOnDay(ctx.date, s.name);
+    return;
+  }
   // A session already running is the truth and outranks this; show it instead.
   if (csnRunning()) { openCardioSession(); return; }
   if (ctx.fromReveal) closeGenOverlay();
@@ -24504,13 +24587,18 @@ function failGenOverlay(message) {
    whenever a plan is generated the ordinary way, or the focus changes. */
 let REGEN_SEEN = { focus: null, names: [] };
 
+/* The last plan the generator handed back, whatever day it was for. The week
+   builder reads it to name the day it just built without reloading the table
+   between days. */
+let LAST_GEN_WORKOUT = null;
+
 /* Everything the generator is told about this person, as one object.
 
    Lifted out of generateWorkout because swapping the whole session builds its
    alternatives by running the very same engine on the very same inputs, in the
    browser. Two payloads assembled in two places would drift, and the sheet
    would then offer days the real generate would never have built. */
-function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null } = {}) {
+function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null, limits = null, focusGroups = null } = {}) {
   const history = Object.entries(personalRecords(ME).best).map(([exercise_name, weight]) => ({ exercise_name, weight }));
   const recentWeight = entriesFor(ME).filter((e) => e.weight != null).slice(-1)[0]?.weight ?? null;
   const recentGymDays = gymDaysThisWeek(ME);
@@ -24573,9 +24661,14 @@ function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null 
        one call, which is all the engine needs and all it ever gets: the
        profile column stays exactly as it was. */
     session_minutes: Number.isFinite(sessionMinutes) ? sessionMinutes : (MY_PROFILE?.session_minutes ?? null),
-    focus_groups: MY_PROFILE?.focus_groups ?? null,
-    focus_chosen_at: MY_PROFILE?.focus_chosen_at ?? null,
-    limits: MY_PROFILE?.limits ?? null,
+    /* The stored answer, unless this one call was handed a different one.
+       A one-off never reaches profiles: see openPlanLimitsSheet and the focus
+       door on the reveal. Stamped as chosen now when it is overridden, because
+       the engine ages a focus off focus_chosen_at and a pick made ten seconds
+       ago inheriting last spring's date would read as stale. */
+    focus_groups: focusGroups ?? MY_PROFILE?.focus_groups ?? null,
+    focus_chosen_at: focusGroups ? new Date().toISOString() : (MY_PROFILE?.focus_chosen_at ?? null),
+    limits: limits ?? MY_PROFILE?.limits ?? null,
     goal_bubble: MY_PROFILE?.goal_bubble ?? null,
     goal_child: MY_PROFILE?.goal_child ?? null,
     /* The "and also" goals. null on a database without the column yet, and
@@ -24598,8 +24691,17 @@ function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null 
 
 /* `sessionMinutes` is the one-off budget for this call only (applySessionBudget)
    and is never written to profiles.session_minutes. `wantFocus` keeps the day
-   type across a rebuild that was not asking for different movements. */
-async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = null, keepFocus: wantFocus = null } = {}) {
+   type across a rebuild that was not asking for different movements.
+   `limits` and `focusGroups` are the same idea for the other two columns: the
+   day planner and the reveal can rebuild ONE day around a constraint without
+   the profile ever hearing about it.
+
+   `quiet` is for the week builder. It does everything except talk: no
+   generating overlay, no reveal, no toast, no reload and no repaint, because
+   seven of those in a row is seven overlays over one button press and seven
+   round trips fetching a week that is still being written. The caller reloads
+   and redraws once at the end, and reads the answer off the return value. */
+async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = null, keepFocus: wantFocus = null, limits = null, focusGroups = null, quiet = false, avoidNames = null } = {}) {
   if (isCoachedClient()) { toast("Your coach sets your workouts"); return false; }
   /* The paid one. Every route to a generated plan comes through here, which is
      the reason to gate the function rather than the buttons: there are several
@@ -24617,7 +24719,10 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
      hand back other movements when the person only ever said they had less
      time, and it would fight the engine's own ladder, which shortens a session
      by trimming sets off THESE lifts before it drops any of them. */
-  const avoid = sameAgain ? [...REGEN_SEEN.names] : [];
+  /* `avoidNames` is the week builder's: everything it has already put on this
+     week, so two days of the same type do not come back as one workout typed
+     twice. Same field, same meaning, a different reason for filling it. */
+  const avoid = sameAgain ? [...REGEN_SEEN.names] : (Array.isArray(avoidNames) ? avoidNames : []);
   /* This used to be wired straight to onclick, which handed it a PointerEvent
      as forDate. That went all the way into entry_date and came back as
      "invalid input syntax for type date" from Postgres. Only a real date is
@@ -24625,13 +24730,17 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
   const wanted = typeof forDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(forDate) ? forDate : null;
   const target = wanted || todayStr();
   const isToday = target === todayStr();
-  WORKOUT_MODE = null;
-  openGenOverlay(isToday ? "Generating" : "Planning");
+  if (!quiet) {
+    WORKOUT_MODE = null;
+    openGenOverlay(isToday ? "Generating" : "Planning");
+  }
 
   const payload = workoutEnginePayload({
     focus: keepFocus || MY_PROFILE?.focus,
     avoid,
     sessionMinutes,
+    limits,
+    focusGroups,
   });
 
   try {
@@ -24653,6 +24762,7 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
       throw new Error(`The coach sent back something unreadable (HTTP ${resp.status}): ${snippet}`);
     }
     if (resp.status === 429) {
+      if (quiet) { console.warn("generateWorkout: rate limited", data.error); return false; }
       failGenOverlay(data.error || "You have hit today's limit on new workouts. Try again tomorrow.");
       isToday ? renderWorkoutTab() : renderHero();
       return false;
@@ -24673,7 +24783,7 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
        it to find. It used to happen silently, which is how the suggestion card
        and the button under it got away with recommending different sessions for
        so long. Said out loud, once, and only when it is actually true. */
-    if (keepFocus && data.meta?.focusHonoured === false && data.workout.focus !== keepFocus) {
+    if (!quiet && keepFocus && data.meta?.focusHonoured === false && data.workout.focus !== keepFocus) {
       toast(`No ${keepFocus.toLowerCase()} in your week, so this is ${data.workout.focus}`);
     }
 
@@ -24688,10 +24798,10 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
        read it back to you, and the generator built five lifts regardless. */
     const st = data.meta?.styles || null;
     if (st && st.honoured === false) {
-      const swapped = await cardioDayForStyles(st);
+      const swapped = await cardioDayForStyles(st, target);
       if (swapped) {
         data.workout = swapped;
-        if (st.note) toast(st.note.split(".")[0] + ".");
+        if (!quiet && st.note) toast(st.note.split(".")[0] + ".");
       }
     }
 
@@ -24736,6 +24846,11 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
     // explicitly is what turns that into a real, visible failure instead.
     if (saveErr) throw new Error(`Save failed: ${saveErr.message}`);
 
+    /* The week builder does its own reload once every day is written, so a
+       quiet call stops at the row it saved. LAST_GEN_WORKOUT is how it reads
+       back what landed without going to the database for it. */
+    LAST_GEN_WORKOUT = data.workout;
+    if (quiet) { rememberPlannedDay(target, data.workout.focus, data.workout.exercises); return true; }
     await loadAll();
     if (isToday) {
       await loadTodayWorkout();
@@ -24751,6 +24866,7 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
     return true;
   } catch (err) {
     console.error("generateWorkout failed:", err);
+    if (quiet) return false;
     // Showing the real reason (not a generic line) is what makes the NEXT failure
     // self-diagnosing instead of another silent "try again and hope" report.
     failGenOverlay(err.message || String(err));
@@ -29545,6 +29661,13 @@ function goWorkoutScreen(mode, { back = false, before } = {}) {
 }
 
 function renderChooseScreen() {
+  /* The month belongs to the planner, which opens it on the way in and nobody
+     ever closed it again. So arriving here after a visit there found the week
+     strip already sitting under a whole month, with the chevron pointing up on
+     a screen you had only just opened. Here the week IS the answer and the
+     month is the follow-up question, so this screen states what it wants
+     rather than inheriting whatever the last screen left behind. */
+  CAL_MONTH_OPEN = false;
   // A coached client does not generate their own plan. That is what the coach
   // is paid for, so the option is not offered rather than offered and refused.
   const coached = isCoachedClient();
@@ -29786,24 +29909,37 @@ function renderChooseScreen() {
       ? `<p class="build-q">${escapeHtml(coachName)} sets your training. Log what you did, or add something extra.</p>${actions}`
       : nextCard}
     ${restCard}
-    ${/* The week, then the way to fill it in. Plan your week sits UNDER the
-          calendar because it acts on it: you look at the week, then you fill
-          it in. */ ""}
+    ${/* The week, then the way to fill it in, inside the same section because
+          the button acts on the strip above it: you look at the week, then you
+          fill it in.
+
+          Mo, 2026-09-18: Saved workouts and the Plan your week card come off
+          this screen. Both were cards competing with the green button for the
+          same tap, and neither is what somebody opens this tab to do. Saved
+          workouts now lives on the planner, which is the screen about putting
+          something on a day; the planner itself is a quiet line under the
+          green button rather than a card beside it. */ ""}
     <section class="wkt-week">
       ${workoutCalendarHTML()}
-    </section>
-    ${optionCard("chooseWeekBtn", "calendar", "Plan your week",
-        "Put workouts on the days you’ll do them.", false).replace('class="opt-card ', 'class="opt-card wkt-plan ')}
-    ${savedWorkoutsHTML()}`;
+      ${coached ? "" : `<div class="wkt-week-gen">
+        <button type="button" class="wkt-btn-solid" id="wktGenWeekBtn">${escapeHtml(weekGenLabel())}</button>
+        <button type="button" class="wkt-more" id="wktPlanWeekBtn">or plan the week yourself ${icon("chevronRight", 13)}</button>
+      </div>`}
+    </section>`;
 
   /* His face, the same drawing onboarding shows, not the exercise figure: at
      this size a whole body is a smudge and the point of him here is that he is
      looking at you. */
   if (allDone) {
-    const view = $("wktViewToday"); if (view) view.onclick = () => goWorkoutScreen(null);
+    /* It called goWorkoutScreen(null), which lands back on this same screen, so
+       the one button on a finished day did nothing you could see. The recap is
+       what the calendar opens for a day you trained, and it already reads the
+       whole day rather than one session: every exercise, every set, the loads
+       and the records, however many sessions went into it. */
+    const view = $("wktViewToday");
+    if (view) view.onclick = () => openRecap(MY_EMAIL, ME, sessionDate());
   }
   wireTodaySessions($("workoutContent"));
-  wireSavedWorkouts($("workoutContent"));
   wireWorkoutCalendar($("workoutContent"));
   wireHirePitch($("workoutContent"));
   staggerWorkoutCards();
@@ -29834,7 +29970,8 @@ function renderChooseScreen() {
   /* Guarded: a coached client has no plan buttons, so this card is not there. */
   const actBtn = $("chooseActivityBtn");
   if (actBtn) actBtn.onclick = () => openCardioSession();
-  $("chooseWeekBtn").onclick = () => goWorkoutScreen("week");
+  if ($("wktGenWeekBtn")) $("wktGenWeekBtn").onclick = generateTheWeek;
+  if ($("wktPlanWeekBtn")) $("wktPlanWeekBtn").onclick = () => goWorkoutScreen("week");
   /* The card said the words and then could not do anything about them. It now
      opens the screen that can: the stretches for what was trained, and the
      numbers behind eat, drink and sleep. */
@@ -30734,9 +30871,17 @@ function renderWeekPlanner() {
           means the same thing on both. */ ""}
     <div class="wk-plan-month">${workoutCalendarHTML({ monthOnly: true })}</div>
     <p class="muted-note">Tap a day to put a workout on it. You can generate one, build your own, or use something you saved.${canReorder ? " Drag a planned day by its handle, or nudge it with the arrows." : ""}</p>
-    <div class="wk-plan reorder-list" id="wkPlanList">${days.map(dayRow).join("")}</div>`;
+    <div class="wk-plan reorder-list" id="wkPlanList">${days.map(dayRow).join("")}</div>
+    ${/* Saved workouts moved here off the workout tab, where it was a card
+          competing with the green button. This is the screen about putting
+          something on a day, and the note above already says one of the ways
+          is something you saved, so this is where the list belongs. It is the
+          only door into browsing, renaming and deleting them: the day planner
+          can still schedule one, but nothing else can open one. */ ""}
+    ${savedWorkoutsHTML()}`;
 
   wireWorkoutCalendar($("workoutContent"));
+  wireSavedWorkouts($("workoutContent"));
   if ($("wkPrev")) $("wkPrev").onclick = () => { if (WEEK_OFFSET > 0) { WEEK_OFFSET--; renderWeekPlanner(); } };
   $("wkNext").onclick = () => { WEEK_OFFSET++; renderWeekPlanner(); };
   $("workoutContent").querySelectorAll("[data-plan-day]").forEach((b) => {
@@ -30788,6 +30933,329 @@ function renderWeekPlanner() {
       applyOrder(order);
     };
   });
+}
+
+/* ---- Generating the week ----
+
+   Mo, 2026-09-18: "Remove saved workouts, and Plan your week. Instead you can
+   have a Generate your week, with morning or evening stretches, yoga,
+   weightlifting etc based on what they want. Have that be in the Your week
+   section with the calendar. If you're on Sunday it would say Generate next
+   week, if you're mid week it would say Generate rest of week."
+
+   One button, under the strip it acts on. What it builds is the plan they
+   already agreed to: days_per_week sessions, spread across the days that are
+   left, in the styles they ticked. Nothing here invents a week somebody did
+   not ask for, and nothing here quietly turns a week of runs into a week of
+   lifting: readStyles is the same answer the generator reads, and if the only
+   thing ticked was running then the week is runs.
+
+   Days already trained are never touched, because the sets are logged against
+   them. Days already planned are only replaced if somebody says so. */
+
+let weekStylesPromise = null;
+function ensureStylesModule() {
+  if (!weekStylesPromise) {
+    weekStylesPromise = import("/mo-knowledge/engine/styles.mjs")
+      .catch((e) => { console.warn("styles module", e); return null; });
+  }
+  return weekStylesPromise;
+}
+
+/* Sunday is the end of the week, so there is no rest of it to fill: that day
+   the button is about the week that starts tomorrow. Every other day it is
+   about the days this week has left, today included. */
+function weekGenNext() { return new Date(todayStr() + "T00:00:00").getDay() === 0; }
+function weekGenLabel() { return weekGenNext() ? "Generate next week" : "Generate rest of week"; }
+
+/* The days this button may write on, in order. A day that has been trained is
+   out: a plan sliding onto it would be rewriting what happened. Today is in,
+   unless a session is already running on it, because "the rest of the week"
+   starts now and an empty Tuesday afternoon is still a Tuesday. */
+function weekGenDays() {
+  const next = weekGenNext();
+  return planWeekDays(next ? 1 : 0)
+    .filter((d) => !d.past && !d.done && !d.trained && !(SESSION && d.isToday));
+}
+
+/* How many sessions the week still owes them. days_per_week is the number they
+   chose on the plan screen; what is already done this week comes off it, so
+   pressing this on Thursday of a four day week after two sessions builds two
+   days and not four. Next week owes the whole number. */
+function weekGenTarget(days) {
+  const perWeek = Number(MY_PROFILE?.days_per_week ?? MY_GOAL?.days_per_week) || weeklyGoalFor(MY_EMAIL) || 4;
+  if (weekGenNext()) return Math.min(perWeek, days.length);
+  const week = planWeekDays(0);
+  const already = week.filter((d) => d.done || d.trained).length;
+  return Math.max(0, Math.min(perWeek - already, days.length));
+}
+
+/* Spread rather than stack: three sessions across five open days is Monday,
+   Wednesday, Friday, not Monday, Tuesday, Wednesday and then nothing. Evenly
+   spaced from the front, which is also what the day rows in the planner end up
+   looking like once somebody has dragged them about. */
+function spreadOver(list, n) {
+  if (n <= 0 || !list.length) return [];
+  if (n >= list.length) return [...list];
+  const step = list.length / n;
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(list[Math.min(list.length - 1, Math.floor(i * step))]);
+  return out;
+}
+
+/* What each chosen day should be, from what they ticked and nothing else.
+
+   Lifting is the backbone when it is ticked, because that is what a plan of
+   N days a week means to somebody who ticked it. A cardio style and a flow
+   style each take at most ONE of those days, off the end, and never the last
+   lifting day: "I also do yoga" is a yoga session in the week, not half a week
+   of yoga. With no resistance ticked there is no backbone to protect, so the
+   week alternates through whatever they did tick.
+
+   Returns one entry per day: { kind: "lift" | "cardio" | "flow", training } */
+function weekGenKinds(count, st) {
+  const cardio = !!st && st.asked && st.cardio && (st.cardioModes || []).length;
+  const flows = (st && st.asked && (st.flowTrainings || [])) || [];
+  const lift = !st || !st.asked || st.resistance;
+  const out = [];
+  if (lift) {
+    for (let i = 0; i < count; i++) out.push({ kind: "lift" });
+    let at = count - 1;
+    if (flows.length && at > 0) out[at--] = { kind: "flow", training: flows[0] };
+    if (cardio && at > 0) out[at--] = { kind: "cardio" };
+    return out;
+  }
+  /* No lifting at all. Alternate through what is there, so a week of running
+     and yoga is not four runs and then a yoga day at the end. */
+  const ring = [];
+  if (cardio) ring.push({ kind: "cardio" });
+  for (const t of flows) ring.push({ kind: "flow", training: t });
+  if (!ring.length) return [];
+  for (let i = 0; i < count; i++) out.push({ ...ring[i % ring.length] });
+  return out;
+}
+
+/* A flow day is a name on a day, not a sequence in the plan row. The moves are
+   built by the activity sheet on the morning somebody does it, off the level
+   they are at by then, and they must never land in `exercises`: a yoga pose in
+   that column is logged as a set and lights the heat map. */
+const FLOW_LABEL = { yoga: "Yoga", pilates: "Pilates" };
+
+async function weekGenBuildDay(date, kind, st, opts = {}) {
+  if (kind.kind === "lift") {
+    const ok = await generateWorkout(date, { quiet: true, keepFocus: opts.keepFocus || null, avoidNames: opts.avoidNames || [] });
+    return ok ? { ok: true, what: displayFocus(LAST_GEN_WORKOUT?.focus, LAST_GEN_WORKOUT?.exercises) || "Workout" } : { ok: false };
+  }
+  if (kind.kind === "flow") {
+    const name = FLOW_LABEL[kind.training] || "Mobility";
+    return (await planActivityOnDay(date, name, { quiet: true })) ? { ok: true, what: name } : { ok: false };
+  }
+  /* Cardio, from the library, by the same call the generator makes when the
+     styles leave it nothing to lift: one named session rather than "do some
+     cardio", seeded off the day so the week is not the same run five times. */
+  const day = await cardioDayForStyles(st, date);
+  const name = day?.focus || "Cardio";
+  return (await planActivityOnDay(date, name, { quiet: true })) ? { ok: true, what: name } : { ok: false };
+}
+
+/* What to ask for on the next lifting day of a run.
+
+   The first day is the engine's own choice, taken off the rotation, because it
+   is the one day this button is building for right now and the rotation is the
+   right answer to that. Every day after it says "not that one again", in the
+   only vocabulary the engine reads: SUGGESTABLE_DAYS is the five day names
+   adapter.mjs can parse, and anything outside them is dropped in silence.
+
+   It has to be asked. nextDayIndex walks the rotation forward past any day
+   whose muscles are still fresh, and freshness is read off LOGS, which do not
+   move while a week is being planned: every day of the run sees the same
+   session finished this morning and lands on the same answer. Measured, three
+   Lower body days in a row. Asking is the app's half of that, and when the ask
+   does not fit the person's week the engine ignores it and the rotation stands,
+   which is exactly what should happen to a three day full body week.
+
+   Returns null when all five have been used, which is the honest "I have
+   nothing left to ask for". */
+function weekGenNextFocus(built) {
+  const used = new Set(built.map((f) => engineDayFor(f)).filter(Boolean));
+  return SUGGESTABLE_DAYS.map((d) => d.name).find((n) => !used.has(n)) || null;
+}
+
+/* Three answers, because there are three: build over what is planned, leave
+   those days alone and fill the empty ones, or go away. askConfirm only has
+   two and the X on it means no, which here would have to mean one of the two
+   real answers. */
+function askAboutPlannedDays(names) {
+  return new Promise((resolve) => {
+    const scrim = document.createElement("div");
+    scrim.className = "pop-scrim";
+    scrim.innerHTML = `
+      <div class="pop">
+        <div class="pop-body">
+          <div class="ds-top">
+            <div class="pop-who" style="color:var(--muted)">SOME DAYS ARE TAKEN</div>
+            <button type="button" class="ds-x" data-choice="" aria-label="Close">&times;</button>
+          </div>
+          <p class="muted-note">${escapeHtml(names)} already ${names.includes(" and ") ? "have workouts" : "has a workout"} on ${names.includes(" and ") ? "them" : "it"}. I can build over ${names.includes(" and ") ? "them" : "it"}, or leave ${names.includes(" and ") ? "them" : "it"} and fill the empty days.</p>
+          <button type="button" class="btn-primary" data-choice="replace" style="margin-top:16px;">Build over them</button>
+          <button type="button" class="btn-ghost" data-choice="keep">Leave those alone</button>
+        </div>
+      </div>`;
+    document.body.appendChild(scrim);
+    scrim.querySelectorAll("[data-choice]").forEach((b) => {
+      b.onclick = () => { scrim.remove(); resolve(b.dataset.choice || null); };
+    });
+    scrim.onclick = (e) => { if (e.target === scrim) { scrim.remove(); resolve(null); } };
+  });
+}
+
+let WEEK_GEN_RUNNING = false;
+
+async function generateTheWeek() {
+  if (WEEK_GEN_RUNNING) return;
+  if (isCoachedClient()) { toast("Your coach sets your workouts"); return; }
+  /* Gated once, here, rather than day by day inside generateWorkout: the
+     paywall belongs to the press, and putting it up four times for one button
+     would be the app asking to be paid per day. */
+  if (!await requirePremium()) return;
+
+  const open = weekGenDays();
+  if (!open.length) { toast("Nothing left in this week to fill"); return; }
+  let want = weekGenTarget(open);
+  if (!want) { toast(`Your ${Number(MY_PROFILE?.days_per_week ?? MY_GOAL?.days_per_week) || weeklyGoalFor(MY_EMAIL)} days are already in this week`); return; }
+
+  /* A day somebody planned by hand is theirs, so it is not written over
+     without being asked about. Leaving them alone means they still count: the
+     week owes N sessions, and one already sitting there is one of them. */
+  let candidates = open;
+  const taken = open.filter((d) => d.plan);
+  if (taken.length) {
+    const names = taken.map((d) => (d.isToday ? "Today" : d.label)).join(taken.length === 2 ? " and " : ", ");
+    const answer = await askAboutPlannedDays(names);
+    if (!answer) return;
+    if (answer === "keep") {
+      candidates = open.filter((d) => !d.plan);
+      want = Math.max(0, want - taken.length);
+      if (!want) { toast("Your week is already full"); return; }
+    }
+  }
+
+  const days = spreadOver(candidates, want);
+  if (!days.length) { toast("No empty days left this week"); return; }
+
+  const st = await ensureStylesModule().then((mod) => (mod?.readStyles ? mod.readStyles(MY_PROFILE?.train_styles) : null));
+  const kinds = weekGenKinds(days.length, st);
+  if (!kinds.length) { toast("Nothing ticked in your workouts, so there is nothing to build"); return; }
+
+  WEEK_GEN_RUNNING = true;
+  const rows = days.map((d, i) => ({
+    date: d.date,
+    name: d.isToday ? "Today" : d.date === shiftDate(todayStr(), 1) ? "Tomorrow" : d.label,
+    long: new Date(d.date + "T00:00:00").toLocaleDateString([], { weekday: "long" }),
+    kind: kinds[i],
+    state: "waiting",
+    what: "",
+  }));
+  const ui = openWeekGenCard(rows);
+  /* What this run has already built: the day types, so the next ask is for a
+     different one, and the movements, so two days of the same type are not the
+     same workout twice. */
+  const builtFocus = [];
+  const seenNames = [];
+  try {
+    for (const row of rows) {
+      row.state = "at";
+      ui.paint(`Building ${row.long}...`);
+      const out = await weekGenBuildDay(row.date, row.kind, st, {
+        keepFocus: builtFocus.length ? weekGenNextFocus(builtFocus) : null,
+        avoidNames: seenNames,
+      });
+      row.state = out.ok ? "done" : "failed";
+      row.what = out.ok ? out.what : "Didn't build";
+      if (out.ok && row.kind.kind === "lift" && LAST_GEN_WORKOUT) {
+        builtFocus.push(LAST_GEN_WORKOUT.focus);
+        for (const ex of LAST_GEN_WORKOUT.exercises || []) {
+          if (ex?.name && !seenNames.includes(ex.name)) seenNames.push(ex.name);
+        }
+      }
+      ui.paint(`Building ${row.long}...`);
+    }
+  } finally {
+    WEEK_GEN_RUNNING = false;
+  }
+
+  await loadAll();
+  await loadTodayWorkout();
+  renderHero();
+  renderWorkoutTab();
+
+  const built = rows.filter((r) => r.state === "done");
+  const failed = rows.filter((r) => r.state === "failed");
+  /* Said out loud rather than swallowed. A week that came back three days out
+     of four is still a good week, and somebody who is not told which day is
+     missing will find out on Thursday morning. */
+  ui.finish(
+    built.length
+      ? `${built.length} day${built.length === 1 ? "" : "s"} ${built.length === 1 ? "is" : "are"} on your week.`
+      : "Nothing landed.",
+    failed.length ? `${failed.map((r) => r.long).join(", ")} wouldn't build. Try ${failed.length === 1 ? "that one" : "those"} from the day itself.` : "",
+  );
+}
+
+/* The progress card. One row per day, ticking over as they land, because a
+   week takes several seconds per day and a spinner would say nothing about
+   which day it was on. */
+function openWeekGenCard(rows) {
+  const scrim = document.createElement("div");
+  scrim.className = "pop-scrim";
+  scrim.innerHTML = `
+    <div class="pop">
+      <div class="pop-body">
+        <div class="ds-top">
+          <div><div class="pop-who" style="color:var(--muted)">YOUR WEEK</div>
+            <div class="sv-name" id="wgSay">Building...</div></div>
+        </div>
+        <div class="wg-rows" id="wgRows"></div>
+        <div id="wgFoot"></div>
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+  const state = { done: "Done", at: "Building", waiting: "Waiting", failed: "Failed" };
+  const paint = (say) => {
+    const el = scrim.querySelector("#wgSay");
+    if (el && say) el.textContent = say;
+    scrim.querySelector("#wgRows").innerHTML = rows.map((r) => `
+      <div class="wg-row ${r.state}">
+        <span class="wg-day">${escapeHtml(r.name)}</span>
+        <span class="wg-what">${escapeHtml(r.what || weekGenKindWord(r.kind))}</span>
+        <span class="wg-state">${r.state === "done" ? icon("check", 14) : escapeHtml(state[r.state] || "")}</span>
+      </div>`).join("");
+  };
+  paint("Building...");
+  return {
+    paint,
+    finish(headline, note) {
+      const el = scrim.querySelector("#wgSay");
+      if (el) el.textContent = headline;
+      paint(null);
+      scrim.querySelector("#wgFoot").innerHTML = `
+        ${note ? `<p class="muted-note" style="margin-top:12px;">${escapeHtml(note)}</p>` : ""}
+        <button type="button" class="btn-primary" id="wgSeeBtn" style="margin-top:14px;">Show me the week</button>
+        <button type="button" class="btn-ghost" id="wgCloseBtn">I'll look later</button>`;
+      const close = () => scrim.remove();
+      scrim.querySelector("#wgCloseBtn").onclick = close;
+      scrim.querySelector("#wgSeeBtn").onclick = () => { close(); goWorkoutScreen("week"); };
+      scrim.onclick = (e) => { if (e.target === scrim) close(); };
+    },
+  };
+}
+
+/* What a day is going to be, before it is built and has a name of its own. */
+function weekGenKindWord(kind) {
+  if (!kind) return "";
+  if (kind.kind === "flow") return FLOW_LABEL[kind.training] || "Mobility";
+  if (kind.kind === "cardio") return "Cardio";
+  return "Workout";
 }
 
 /* Moving a workout to another day is a rewrite of ai_workouts.entry_date, and
@@ -30855,31 +31323,87 @@ function sparePlanDay(taken) {
   return null;
 }
 
+/* The day, and what you can do about it. Mo, 2026-09-18: "See tomorrow's plan
+   should open tomorrow's plan. And inside that it can be asked to swap it or
+   add limitations such as only wanting body weight, or only weights, or
+   anything you don't have. You also can have the option to do an activity
+   instead through there."
+
+   So a day that already holds a plan opens with the plan on it, in full, and
+   three doors under it. A day that holds nothing keeps the three ways of
+   filling it, which is what this sheet has always been. */
 function openDayPlanner(date) {
   const existing = (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === date && !w.archived);
   const d = new Date(date + "T00:00:00");
-  const label = date === todayStr() ? "Today" : d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
+  const today = todayStr();
+  const label = date === today ? "Today" : d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
+  /* What he calls the day out loud, which is not what the header prints:
+     "Rebuild Thursday" reads better than "Rebuild Thu, Sep 24", and the two
+     days everybody actually plans have names of their own. */
+  const dayWord = date === today ? "today"
+    : date === shiftDate(today, 1) ? "tomorrow"
+    : d.toLocaleDateString([], { weekday: "long" });
   const close = () => $("popScrim").classList.add("hidden");
+  const exercises = existing?.exercises || [];
+  const done = !!existing?.completed_at;
+  /* A planned activity is a real plan with no lifts in it: the name is in
+     `focus` and `exercises` is empty, which is the shape the generator already
+     writes for a week with no resistance training in it. */
+  const activityDay = !!existing && !exercises.length;
+
+  const planBlock = !existing || done ? "" : exercises.length
+    ? `<div class="dp-plan">
+        ${exercises.map((ex, i) => `<div class="dp-ex">
+          <span class="dp-ex-n">${i + 1}</span>
+          <span class="dp-ex-name">${escapeHtml(ex.name || "")}</span>
+          <span class="dp-ex-dose">${ex.sets || 3}&times;${ex.reps || 10}</span>
+        </div>`).join("")}
+      </div>`
+    : `<p class="ef-note">No lifts on this one. It is ${escapeHtml(displayFocus(existing.focus, exercises))}, on the clock.</p>`;
 
   $("popCard").innerHTML = `
     <div class="pop-body">
       <div class="ds-top">
         <div><div class="pop-who" style="color:var(--muted)">${escapeHtml(label.toUpperCase())}</div>
-          <div class="sv-name">${existing ? escapeHtml(displayFocus(existing.focus, existing.exercises)) : "Nothing planned"}</div></div>
+          <div class="sv-name">${existing ? escapeHtml(displayFocus(existing.focus, exercises)) : "Nothing planned"}</div></div>
         <button type="button" class="ds-x" id="dpX" aria-label="Close">&times;</button>
       </div>
-      ${existing?.completed_at ? `<p class="ef-note">This one is already done. Putting something else here does not change what you logged.</p>` : ""}
-      <div class="dp-ways">
-        ${isCoachedClient() ? "" : `<button type="button" class="dp-way" id="dpGen">
-          <span class="dp-way-ico">${icon("wand", 18)}</span>
-          <span class="dp-way-txt"><b>Generate one</b><i>Built around your goals and history.</i></span>
-        </button>`}
-        <button type="button" class="dp-way" id="dpOwn">
-          <span class="dp-way-ico">${icon("pencil", 18)}</span>
-          <span class="dp-way-txt"><b>Plan my own</b><i>Pick the exercises yourself.</i></span>
-        </button>
-      </div>
-      ${SAVED_WORKOUTS.length ? `
+      ${done ? `<p class="ef-note">This one is already done. Putting something else here does not change what you logged.</p>` : ""}
+      ${planBlock}
+      ${existing && !done ? `
+        ${/* Three doors, in the order somebody reaches for them: a different
+              session, the same session around a limit, or not a workout at
+              all. Each one acts on THIS day and nothing else. */ ""}
+        <p class="dp-heading">Change it</p>
+        <div class="dp-ways">
+          ${isCoachedClient() ? "" : `<button type="button" class="dp-way" id="dpSwap">
+            <span class="dp-way-ico">${icon("swap", 18)}</span>
+            <span class="dp-way-txt"><b>Swap the whole workout</b><i>A different session, not another version of this one.</i></span>
+          </button>`}
+          ${isCoachedClient() || activityDay ? "" : `<button type="button" class="dp-way" id="dpLimits">
+            <span class="dp-way-ico">${icon("body", 18)}</span>
+            <span class="dp-way-txt"><b>Tell me what you have</b><i>Bodyweight only, free weights only, or tick what is missing.</i></span>
+          </button>`}
+          <button type="button" class="dp-way" id="dpAct">
+            <span class="dp-way-ico">${icon("run", 18)}</span>
+            <span class="dp-way-txt"><b>Do an activity instead</b><i>A run, a ride, yoga, Pilates.</i></span>
+          </button>
+        </div>` : `
+        <div class="dp-ways">
+          ${isCoachedClient() ? "" : `<button type="button" class="dp-way" id="dpGen">
+            <span class="dp-way-ico">${icon("wand", 18)}</span>
+            <span class="dp-way-txt"><b>Generate one</b><i>Built around your goals and history.</i></span>
+          </button>`}
+          <button type="button" class="dp-way" id="dpOwn">
+            <span class="dp-way-ico">${icon("pencil", 18)}</span>
+            <span class="dp-way-txt"><b>Plan my own</b><i>Pick the exercises yourself.</i></span>
+          </button>
+          <button type="button" class="dp-way" id="dpAct">
+            <span class="dp-way-ico">${icon("run", 18)}</span>
+            <span class="dp-way-txt"><b>Do an activity instead</b><i>A run, a ride, yoga, Pilates.</i></span>
+          </button>
+        </div>`}
+      ${SAVED_WORKOUTS.length && (!existing || done) ? `
         <div class="sv-head">Or use a saved one</div>
         <div class="sv-cards">
           ${SAVED_WORKOUTS.map((w) => `
@@ -30888,7 +31412,7 @@ function openDayPlanner(date) {
               <span class="sv-card-meta">${(w.exercises || []).length} exercises</span>
             </button>`).join("")}
         </div>` : ""}
-      ${existing && !existing.completed_at ? `<button type="button" class="btn-ghost" id="dpClear">Clear this day</button>` : ""}
+      ${existing && !done ? `<button type="button" class="btn-ghost" id="dpClear">Clear this day</button>` : ""}
     </div>`;
   $("popScrim").classList.remove("hidden");
   $("popScrim").onclick = (e) => { if (e.target === $("popScrim")) close(); };
@@ -30897,13 +31421,21 @@ function openDayPlanner(date) {
   /* Both builders already take a date; they just were never asked for one from
      here. PLAN_FOR_DATE is what carries "the day you tapped" through them. */
   if ($("dpGen")) $("dpGen").onclick = () => { close(); generateWorkout(date); };
-  $("dpOwn").onclick = () => {
+  if ($("dpOwn")) $("dpOwn").onclick = () => {
     close();
     PLAN_FOR_DATE = date;
     MANUAL_DRAFT = [];
     saveDraft();
     goWorkoutScreen("manual");
   };
+  /* The same sheet the reveal and the plan screen open, pointed at this day. A
+     second way of building alternatives would drift from that one. */
+  if ($("dpSwap")) $("dpSwap").onclick = () => {
+    close();
+    openSessionSwapSheet({ date, current: existing });
+  };
+  if ($("dpLimits")) $("dpLimits").onclick = () => { close(); openPlanLimitsSheet(date, dayWord); };
+  if ($("dpAct")) $("dpAct").onclick = () => { close(); openActivityInstead(date, dayWord); };
   $("popCard").querySelectorAll("[data-put]").forEach((b) => {
     const w = SAVED_WORKOUTS.find((x) => x.id === b.dataset.put);
     b.onclick = () => scheduleSavedWorkout(w, [date]);
@@ -30912,7 +31444,7 @@ function openDayPlanner(date) {
     $("dpClear").onclick = async () => {
       const ok = await askConfirm({
         heading: "Clear this day",
-        body: `${displayFocus(existing.focus, existing.exercises)} is removed from ${label}. Anything you have already logged is kept.`,
+        body: `${displayFocus(existing.focus, exercises)} is removed from ${label}. Anything you have already logged is kept.`,
         ok: "Clear it",
       });
       if (!ok) return;
@@ -30925,6 +31457,286 @@ function openDayPlanner(date) {
       toast("Day cleared");
     };
   }
+}
+
+/* ---- Limits for one plan ----
+
+   Mo: "inside that it can be asked to swap it or add limitations such as only
+   wanting body weight, or only weights, or anything you don't have."
+
+   THIS DAY ONLY. profiles.limits is the standing answer, set in Setup, and it
+   is not touched here: a hotel room on Thursday is not a change of mind about
+   the gym. What is sent is the profile's own limits with this day's missing
+   kit added to them, never subtracted, because a one-off can only ever make
+   the plan more careful than the standing answer already is.
+
+   The chips are the engine's own EQUIPMENT_OPTIONS, in its order, for the
+   reason limits.mjs gives: an option the library cannot filter on is a promise
+   the plan quietly breaks. The two presets above them are Mo's words mapped
+   onto that same list and nothing more. */
+async function openPlanLimitsSheet(date, dayWord) {
+  let lists;
+  try {
+    lists = await ensureLimitsLists();
+  } catch (e) {
+    console.error("limits: the engine's lists failed to load", e);
+    toast("Couldn't load the kit list");
+    return;
+  }
+  const { EQUIPMENT_OPTIONS } = lists;
+  const picked = new Set();
+
+  const scrim = document.createElement("div");
+  scrim.className = "pop-scrim";
+  scrim.innerHTML = `
+    <div class="pop">
+      <div class="pop-body">
+        <div class="ds-top">
+          <div class="pop-who" style="color:var(--muted)">JUST FOR ${escapeHtml(dayWord.toUpperCase())}</div>
+          <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
+        </div>
+        <p class="muted-note">Tell me what you have ${escapeHtml(dayWord)} and I will build around it. Your usual answer, in Setup then Limits, is not touched.</p>
+        <div class="dp-ways">
+          <button type="button" class="dp-way" data-preset="none">
+            <span class="dp-way-ico">${icon("body", 18)}</span>
+            <span class="dp-way-txt"><b>Bodyweight only</b><i>Nothing but you and the floor.</i></span>
+          </button>
+          <button type="button" class="dp-way" data-preset="free">
+            <span class="dp-way-ico">${icon("dumbbell", 18)}</span>
+            <span class="dp-way-txt"><b>Free weights only</b><i>No machines, no cables.</i></span>
+          </button>
+        </div>
+        <p class="dp-heading">Or tick what is missing</p>
+        <div class="limit-chips" id="dpLimitChips">
+          ${EQUIPMENT_OPTIONS.map((o) => `<button type="button" class="limit-chip" data-kit="${escapeHtml(o.key)}" aria-pressed="false"><b>${escapeHtml(o.label)}</b></button>`).join("")}
+        </div>
+        <p class="muted-note" id="dpLimitSay" aria-live="polite" style="margin-top:10px;">Nothing ticked. Pick what you are missing.</p>
+        <button type="button" class="btn-primary" id="dpLimitGo" style="margin-top:14px;" disabled>Rebuild ${escapeHtml(dayWord)} around that</button>
+        <button type="button" class="btn-ghost" data-close>Leave it as it is</button>
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+  const close = () => scrim.remove();
+  scrim.querySelectorAll("[data-close]").forEach((b) => { b.onclick = close; });
+  scrim.onclick = (e) => { if (e.target === scrim) close(); };
+
+  const paint = () => {
+    scrim.querySelectorAll("[data-kit]").forEach((b) => {
+      const on = picked.has(b.dataset.kit);
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    const said = EQUIPMENT_OPTIONS.filter((o) => picked.has(o.key));
+    /* The hint is what the chip actually costs, which is the whole reason
+       limits.mjs carries one. Said back, rather than only ticked. */
+    scrim.querySelector("#dpLimitSay").textContent = said.length
+      ? said.map((o) => `${o.label}: ${o.hint}.`).join(" ")
+      : "Nothing ticked. Pick what you are missing.";
+    scrim.querySelector("#dpLimitGo").disabled = !picked.size;
+  };
+  scrim.querySelectorAll("[data-kit]").forEach((b) => {
+    b.onclick = () => {
+      const key = b.dataset.kit;
+      /* `none` means bodyweight only, so it is not a sixth implement you can
+         hold alongside the others: limits.mjs says it overrides them, and a
+         chip row that let both stand would be showing a state the engine
+         collapses the moment it reads it. */
+      if (picked.has(key)) picked.delete(key);
+      else if (key === "none") { picked.clear(); picked.add("none"); }
+      else { picked.delete("none"); picked.add(key); }
+      paint();
+    };
+  });
+  scrim.querySelectorAll("[data-preset]").forEach((b) => {
+    b.onclick = () => {
+      picked.clear();
+      if (b.dataset.preset === "none") picked.add("none");
+      else { picked.add("machine"); picked.add("cable"); }
+      paint();
+    };
+  });
+  scrim.querySelector("#dpLimitGo").onclick = () => {
+    close();
+    generateWorkout(date, { limits: limitsWithMissing([...picked]) });
+  };
+  paint();
+}
+
+/* ---- A focus for one plan ----
+
+   Mo: "you can have the option to swap it with an activity or choose a focus
+   to work on for body. Basically anything on there, and it will regenerate
+   based on what you want. But of course we have our suggestion when it
+   generates."
+
+   The same five regions the onboarding body step asks about, and the same
+   sentence said back, so a region means one thing in this app. What it is NOT
+   is bodyRegionPickerHTML: that markup brings two Rive artboards with it, and
+   this opens off a screen that already has one running, on a question that is
+   five words and five chips. The chips and the line are the answer; the body
+   is how you answer it when you have never been asked before.
+
+   THIS DAY ONLY, like the limits sheet beside it. profiles.focus_groups is
+   set in Setup and is not touched here: wanting arms on Thursday is not a
+   change of plan for the next three months. */
+function openPlanFocusSheet(date, dayWord) {
+  const picked = new Set();
+  const scrim = document.createElement("div");
+  scrim.className = "pop-scrim";
+  scrim.innerHTML = `
+    <div class="pop">
+      <div class="pop-body">
+        <div class="ds-top">
+          <div class="pop-who" style="color:var(--muted)">JUST FOR ${escapeHtml(dayWord.toUpperCase())}</div>
+          <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
+        </div>
+        <p class="muted-note">What do you want this one aimed at? I will still build a whole session, it just leans your way.</p>
+        <div class="bp-chips" style="margin-top:14px;">
+          ${BODY_REGIONS.map((r) => `<button type="button" class="bp-chip" data-region="${r.id}" aria-pressed="false">
+            <span class="bp-tick" aria-hidden="true">${icon("check", 14)}</span>${escapeHtml(r.label)}</button>`).join("")}
+        </div>
+        <p class="muted-note" id="dpFocusSay" aria-live="polite">Tap what you want worked.</p>
+        <button type="button" class="btn-primary" id="dpFocusGo" style="margin-top:14px;" disabled>Rebuild ${escapeHtml(dayWord)} around that</button>
+        <button type="button" class="btn-ghost" data-close>Leave it as it is</button>
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+  const close = () => scrim.remove();
+  scrim.querySelectorAll("[data-close]").forEach((b) => { b.onclick = close; });
+  scrim.onclick = (e) => { if (e.target === scrim) close(); };
+
+  /* The body's own order, never tap order: tap order is a ranking this screen
+     does not show and cannot be corrected, which is the kind of quiet decision
+     the picker's own comment says not to make. */
+  const ordered = () => BODY_REGION_IDS.filter((id) => picked.has(id));
+  const paint = () => {
+    const ids = ordered();
+    scrim.querySelectorAll("[data-region]").forEach((b) => {
+      const on = picked.has(b.dataset.region);
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    scrim.querySelector("#dpFocusSay").textContent = ids.length ? bodyPickNote(ids) : "Tap what you want worked.";
+    scrim.querySelector("#dpFocusGo").disabled = !ids.length;
+  };
+  scrim.querySelectorAll("[data-region]").forEach((b) => {
+    b.onclick = () => {
+      const id = b.dataset.region;
+      picked.has(id) ? picked.delete(id) : picked.add(id);
+      paint();
+    };
+  });
+  scrim.querySelector("#dpFocusGo").onclick = () => {
+    const ids = ordered();
+    close();
+    /* The same spend the onboarding step writes, in the same "quads:3" shape,
+       so the engine cannot tell which screen an answer came from. Everything
+       ticked is the whole body, which spends nothing on anybody: it comes back
+       an empty list and the plan is the ordinary one. */
+    generateWorkout(date, { focusGroups: bodyRegionFocusEntries(ids) });
+  };
+  paint();
+}
+
+/* The standing limits with more missing kit folded in. Same move as the
+   engine's own mergeStyleLimits, and for the same reason: a missing implement
+   stays missing whichever answer said so, and neither answer may un-say the
+   other's. */
+function limitsWithMissing(keys) {
+  const base = MY_PROFILE?.limits && typeof MY_PROFILE.limits === "object" ? MY_PROFILE.limits : {};
+  const missing = new Set([...(Array.isArray(base.missing) ? base.missing : []), ...keys]);
+  return { ...base, missing: [...missing] };
+}
+
+/* ---- An activity instead of the plan ----
+
+   Today, an activity is a thing you start, so this opens the clock. Any other
+   day it is a thing you plan, and there is no clock to open: the day is
+   written as an activity day and the session itself gets built out of the
+   library on the morning somebody actually does it. Which is also why only the
+   named activities are offered and "Other" is not: "Other" is a bare timer,
+   and a Thursday that says Other tells nobody anything. */
+function openActivityInstead(date, dayWord) {
+  if (date === todayStr()) { openCardioSession(); return; }
+  const acts = CARDIO_ACTS.filter((a) => a.key !== "other");
+  const scrim = document.createElement("div");
+  scrim.className = "pop-scrim";
+  scrim.innerHTML = `
+    <div class="pop">
+      <div class="pop-body">
+        <div class="ds-top">
+          <div class="pop-who" style="color:var(--muted)">INSTEAD OF LIFTING</div>
+          <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
+        </div>
+        <p class="muted-note">Pick what you are doing ${escapeHtml(dayWord)}. I will build the session itself on the day, so it fits how the week has gone.</p>
+        <div class="sv-rows">
+          ${acts.map((a) => `<button type="button" class="sv-row" data-act="${escapeHtml(a.key)}">
+            <span class="sv-row-ico">${icon(a.ico, 18)}</span>
+            <span class="sv-row-txt"><span class="sv-row-name">${escapeHtml(actTitle(a))}</span></span>
+            <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
+          </button>`).join("")}
+        </div>
+        <button type="button" class="btn-ghost" data-close>Keep the workout</button>
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+  const close = () => scrim.remove();
+  scrim.querySelectorAll("[data-close]").forEach((b) => { b.onclick = close; });
+  scrim.onclick = (e) => { if (e.target === scrim) close(); };
+  scrim.querySelectorAll("[data-act]").forEach((b) => {
+    b.onclick = () => {
+      const a = acts.find((x) => x.key === b.dataset.act);
+      close();
+      if (a) planActivityOnDay(date, a.label);
+    };
+  });
+}
+
+/* A day that has just been written, put into ALL_PLANS without going back to
+   the database for it.
+
+   This is not a convenience. workoutEnginePayload sends the last thirty days
+   of plans, and that is how the engine knows which day of the week it is
+   building: ask it four times in a row off an unchanged list and it answers
+   the same day four times. Measured in the sandbox, which built Lower body
+   three days running until this existed. The real rows are reloaded once at
+   the end of the run, and they overwrite these. */
+function rememberPlannedDay(date, focus, exercises) {
+  const row = {
+    user_name: ME, email: MY_EMAIL, entry_date: date,
+    focus, exercises: exercises || [], archived: false, completed_at: null,
+  };
+  ALL_PLANS = [...(ALL_PLANS || []).filter((w) => !(w.email === MY_EMAIL && w.entry_date === date)), row];
+}
+
+/* An activity day, written the way the generator already writes one for a week
+   with no resistance training in it: the name in `focus` and `exercises` left
+   empty. It must stay empty. Everything that iterates that column treats an
+   entry as sets of a lift, so "Run" in there would be logged as a set and
+   would light the heat map. */
+async function planActivityOnDay(date, name, { quiet = false } = {}) {
+  const { error } = await sb.from("ai_workouts").upsert({
+    user_name: ME, email: MY_EMAIL, entry_date: date,
+    focus: name, exercises: [], mobility: null,
+    archived: false, completed_at: null, duration_sec: null,
+  }, { onConflict: "email,entry_date" });
+  /* supabase-js resolves rather than throws, so this is the only place the
+     failure exists. Said out loud: a day that silently did not save is a day
+     somebody finds out about on the morning of. */
+  if (error) {
+    console.error("could not plan the activity", error);
+    if (!quiet) toast("Couldn't put that on the day");
+    return false;
+  }
+  /* The week builder writes several of these in a row and reloads once at the
+     end, so a quiet call stops at the row it saved. */
+  if (quiet) { rememberPlannedDay(date, name, []); return true; }
+  await loadAll();
+  if (date === todayStr()) await loadTodayWorkout();
+  renderHero();
+  renderWorkoutTab();
+  toast(`${name} is on ${datedLabel(date)}`);
+  return true;
 }
 
 /* What a workout is mostly about. groupsHitFor lists groups top to bottom of
