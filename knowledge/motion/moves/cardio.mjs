@@ -40,13 +40,13 @@
  * a FLAT foot welded to the floor and half of this stride is in the air. The
  * float is the root rising, not the feet being placed.
  *
- * `oneway` rather than `pingpong`: a stride is a cycle, not an out and back.
- * Ping-pong would run the figure backwards through the stride every other
- * cycle, which is a moonwalk. t=1 is authored identical to t=0 so the snap back
- * lands on the same frame and the loop is seamless. The two mid keys are
- * waypoints (`through`), so the figure passes through the drive and the float
- * at speed instead of stopping to pose at each one, which is what made the
- * first pass read as four separate lunges.
+ * `cycle` rather than `oneway`, and that loop mode was added for this. A stride
+ * never reverses and never rests: ping-pong would walk the figure backwards
+ * every other stride, and oneway stands perfectly still for the last 18 per
+ * cent of every cycle while it waits to reset, which is exactly what Mo saw.
+ * "He goes one, two, and then he stops. Can we just have it go on forever?"
+ * `cycle` runs the clock straight through at one speed with no easing, and
+ * t=1 is authored identical to t=0 so the wrap lands on the same frame.
  *
  * `dur` 0.75 is a real cadence, about 160 steps a minute. The rest of this
  * folder runs 2.6 to 3.4 because a rep is slow; a stride is not, and slowing it
@@ -54,7 +54,7 @@
  */
 export const RUN = {
   view: "side",
-  loop: "oneway",
+  loop: "cycle",
   dur: 0.75,
   breath: 0.15,
   fit: { k: 0.98, dy: 2 },
@@ -71,7 +71,6 @@ export const RUN = {
     },
     { // drive and toe-off: the stance leg extends behind, the left knee comes through, the body is at its highest
       t: 0.25,
-      through: true,
       root: { x: 62, y: 57, rot: 7 },
       joints: {
         spine: 7, neck: -10,
@@ -92,7 +91,6 @@ export const RUN = {
     },
     { // the second drive and float, mirrored
       t: 0.75,
-      through: true,
       root: { x: 62, y: 57, rot: 7 },
       joints: {
         spine: 7, neck: -10,
@@ -131,7 +129,7 @@ export const RUN = {
  */
 export const WALK = {
   view: "side",
-  loop: "oneway",
+  loop: "cycle",
   dur: 1.25,
   breath: 0.3,
   fit: { k: 0.98, dy: 2 },
@@ -148,7 +146,6 @@ export const WALK = {
     },
     { // mid-stance: the body passes over a straight right leg, the left swings through underneath
       t: 0.25,
-      through: true,
       root: { x: 62, y: 60.5, rot: 2 },
       joints: {
         spine: 3, neck: -5,
@@ -169,7 +166,6 @@ export const WALK = {
     },
     { // mid-stance over the left
       t: 0.75,
-      through: true,
       root: { x: 62, y: 60.5, rot: 2 },
       joints: {
         spine: 3, neck: -5,
@@ -232,7 +228,6 @@ const cycleKeys = (phase) => [0, 0.25, 0.5, 0.75, 1].map((t) => {
   const R = pedal(a), L = pedal(a + 180);        // cranks are opposed, always
   return {
     t,
-    ...(t === 0.25 || t === 0.75 ? { through: true } : {}),
     root: { x: 58, y: 50, rot: 14 },
     joints: { spine: 16, neck: -30 },
     ik: {
@@ -246,7 +241,7 @@ const cycleKeys = (phase) => [0, 0.25, 0.5, 0.75, 1].map((t) => {
 
 export const CYCLE_INDOOR = {
   view: "side",
-  loop: "oneway",
+  loop: "cycle",
   dur: 1.1,
   breath: 0.2,
   flatFeet: false,
@@ -298,7 +293,7 @@ const stairKeys = (rightHigh) => {
 
 export const STAIRS = {
   view: "side",
-  loop: "oneway",
+  loop: "cycle",
   dur: 1.4,
   breath: 0.3,
   fit: { k: 0.98, dy: 2 },

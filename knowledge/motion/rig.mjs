@@ -3065,7 +3065,16 @@ export function drawFigure(ctx, S, C, opts = {}) {
 
 // ------------------------------------------------------------- animation ----
 const easeInOut = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
-export const LOOPS = ["pingpong", "hold", "oneway"];
+/* `cycle` added 2026-09-19 for locomotion, which none of the other three can
+   express. A gait is not a rep and it is not a drill: it never reverses, it
+   never rests, and it has no far end to ease into. Ping-pong walks a runner
+   backwards every other stride, hold oscillates, and oneway spends the last
+   18 per cent of every cycle standing perfectly still while it waits to reset,
+   which is what a run authored on it looked like: two strides and a freeze.
+   Mo, watching one: "he goes one, two, and then he stops. Can we just have it
+   go on forever?" This is that. Constant speed, no easing, the last keyframe
+   meeting the first. */
+export const LOOPS = ["pingpong", "hold", "oneway", "cycle"];
 
 function lerpObj(a, b, u, keys) {
   const o = {};
@@ -3110,6 +3119,29 @@ export function samplePose(move, cycle, timeSec = 0) {
   if (move.loop === "pingpong") u = cycle < 0.5 ? cycle * 2 : 2 - cycle * 2;
   else if (move.loop === "hold") u = 0.5 - 0.5 * Math.cos(cycle * Math.PI * 2);
   else if (move.loop === "oneway") u = Math.min(1, cycle / 0.82);
+  /* A gait runs at one speed and never stops, so the clock maps straight
+     through and the easing below is skipped entirely: eased time is what puts
+     a hesitation into the middle of a stride, and a stride has no far end to
+     settle on. Every key is effectively a waypoint. */
+  else if (move.loop === "cycle") {
+    let i = 0;
+    while (i < kfs.length - 2 && u > kfs[i + 1].t) i++;
+    const a = kfs[i], b = kfs[Math.min(i + 1, kfs.length - 1)];
+    const span = Math.max(0.0001, b.t - a.t);
+    const w = clamp((u - a.t) / span, 0, 1);
+    const jk = new Set();
+    for (const k of kfs) for (const key of Object.keys(k.joints || {})) jk.add(key);
+    return {
+      root: lerpObj(a.root || {}, b.root || {}, w, ["x", "y", "rot"]),
+      joints: lerpObj(a.joints || {}, b.joints || {}, w, [...jk]),
+      ik: lerpIk(a.ik, b.ik, w),
+      feet: move.feet,
+      farSide: move.farSide,
+      facing: move.facing,
+      flatFeet: move.flatFeet,
+      breath: Math.sin(timeSec * (move.breathRate || 1.15)) * (move.breath === undefined ? 0.35 : move.breath),
+    };
+  }
 
   let i = 0;
   while (i < kfs.length - 2 && u > kfs[i + 1].t) i++;
