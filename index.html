@@ -4854,6 +4854,15 @@
   }
   .pop-body { padding: 17px; }
   .pop-body.compose { padding: 16px; }
+  /* What a destructive confirm is actually going to remove, one item a line so
+     it is counted rather than skimmed. A sentence with five commas in it is
+     read as "yes yes fine"; a list is read. */
+  .del-list {
+    margin: 10px 0 12px; padding: 0 0 0 18px;
+    font-size: 12.5px; line-height: 1.55; color: var(--text);
+  }
+  .del-list li { margin: 0 0 5px; }
+  .del-list li::marker { color: var(--up); }
   .quote { font-size: 15.5px; line-height: 1.5; font-style: italic; margin: 0 0 14px; }
   .quote::before { content: "\201C"; } .quote::after { content: "\201D"; }
 
@@ -7117,6 +7126,10 @@
     transition: transform .12s ease, background .12s ease;
   }
   .btn-ghost:active { transform: scale(.985); background: var(--panel-2); }
+  /* A destructive ghost. Same geometry as every other button, coloured so the
+     one that removes real data does not read the same as the one beside it
+     that only opens a sheet. */
+  .btn-ghost.danger { color: var(--up); border-color: color-mix(in srgb, var(--up) 32%, var(--border)); }
   /* The finish screen is the payoff, not a receipt. Ring fills to full, the
      numbers land under it, and the last line is the pair, because a workout
      here is half of a shared week rather than a solo total. */
@@ -16233,9 +16246,24 @@ function openRecap(email, name, date) {
 
     ${mine && PARTNER_EMAIL ? `<div class="rc-actions">
         <button type="button" class="btn-primary" id="rcTell">Share to ${escapeHtml(partnerName())}</button>
-      </div>` : ""}`;
+      </div>` : ""}
+
+    ${/* The other half of "maybe by accident I didn't do it". A finished day
+          archives its plan, so the workout tab's own delete is gone by then and
+          this sheet is where somebody looks at a session they did not do. Today
+          only: undoing a day further back changes a streak this app cannot
+          recompute honestly on the spot, and the day sheet's "Delete this day"
+          is already the door for that. */ ""}
+    ${mine && date === todayStr()
+      ? `<button type="button" class="btn-ghost danger" id="rcDeleteToday">Delete today&rsquo;s workout</button>`
+      : ""}`;
 
   $("rcClose").onclick = closeRecap;
+  if ($("rcDeleteToday")) {
+    $("rcDeleteToday").onclick = async () => {
+      if (await deleteTodaysTraining()) { closeRecap(); refreshCurrentTab(); }
+    };
+  }
   if ($("rcTell")) $("rcTell").onclick = () => { closeRecap(); openNoteComposer("congratulate"); };
   if ($("rcShare")) $("rcShare").onclick = () => shareRecap(r);
   $("recapScrim").classList.remove("hidden");
@@ -23649,6 +23677,206 @@ async function confirmDeleteDay(date) {
   } catch (err) {
     console.error(err);
     toast("Could not delete");
+    return false;
+  }
+}
+
+/* ---------- Taking today back ----------
+
+   Mo, 2026-09-19: "I need an option to delete today's workout, because maybe
+   by accident I didn't do it."
+
+   WHAT DELETE MEANS. Today's training, whole. A day's training lives in three
+   places and they are read against each other everywhere: the plan row in
+   ai_workouts, the sets and minutes in exercise_logs, and the gym day in
+   fit_entries that the streak, the week count, the partner's timeline and the
+   widget are all counted off. Removing any one of them and leaving the others
+   is the app disagreeing with itself, which is the state this whole change
+   exists to end, so there is no half of this to offer.
+
+   WHAT IT LEAVES. The weigh-in, because standing on the scales is not a
+   workout and losing it is the thing "delete this day" already gets wrong. The
+   rest-day flag, for the same reason. Badges already earned, which have no
+   DELETE policy anyway (see resetMyData). Everything on every other day.
+
+   WHY IT IS NOT confirmDeleteDay. That one deletes the fit_entries row
+   outright, weigh-in included, and does not stand down a session or a clock
+   that is running. It stays where it is, on the day sheet, as the broader
+   "delete this day". This is the narrower, today-shaped thing Mo asked for,
+   and it is reachable where he actually is: on the plan and on the recap. */
+function todaysTrainingFacts() {
+  const date = todayStr();
+  const logs = ALL_EXERCISE_LOGS.filter((l) => l.email === MY_EMAIL && l.entry_date === date);
+  const plans = (ALL_PLANS || []).filter((w) => w.email === MY_EMAIL && w.entry_date === date);
+  const entry = ALL_ENTRIES.find((e) => e.email === MY_EMAIL && e.entry_date === date) || null;
+  /* Split the way recapFor splits them, through the same countsAsCardio, so a
+     28 minute run is counted as minutes and not as one set of something. */
+  const acts = logs.filter((l) => l.duration_min && countsAsCardio(l.exercise_name));
+  const lifts = logs.filter((l) => !acts.includes(l));
+  return {
+    date, logs, plans, entry, acts, lifts,
+    sets: lifts.reduce((s, l) => s + (l.sets || 1), 0),
+    minutes: acts.reduce((s, l) => s + (l.duration_min || 0), 0),
+    banked: !!entry?.gym,
+    // Nothing to take back is not an error, it is a button that should not
+    // have been drawn. Every caller checks this before offering.
+    anything: !!(logs.length || plans.length || entry?.gym),
+  };
+}
+
+/* The sentences the sheet is built from, in the order somebody would count
+   them off: what was recorded, what it is holding up, and what survives. */
+function todaysTrainingBits(f) {
+  const goes = [];
+  if (f.sets) goes.push(`${f.sets} set${f.sets === 1 ? "" : "s"} across ${f.lifts.length} exercise${f.lifts.length === 1 ? "" : "s"}`);
+  else if (f.lifts.length) goes.push(`${f.lifts.length} logged exercise${f.lifts.length === 1 ? "" : "s"}`);
+  if (f.minutes) goes.push(`${f.minutes} minute${f.minutes === 1 ? "" : "s"} of ${f.acts.length === 1 ? (f.acts[0].exercise_name || "activity").toLowerCase() : "activity"}`);
+  for (const p of f.plans) goes.push(`today’s ${displayFocus(p.focus, p.exercises).toLowerCase()} plan`);
+  if (f.banked) {
+    const streak = computeStreak(ME);
+    goes.push(streak > 1
+      ? `today’s gym day, which is holding a ${streak} day streak`
+      : "today’s gym day");
+    const days = gymDaysThisWeek(ME);
+    const target = weeklyGoalFor(MY_EMAIL);
+    if (target) goes.push(`one week day: ${days} of ${target} becomes ${Math.max(0, days - 1)} of ${target}`);
+  }
+  if (f.entry?.proof_path) goes.push("the proof photo");
+  if (f.entry?.note) goes.push("the note you left");
+
+  const stays = [];
+  if (f.entry?.weight != null) stays.push(`your ${f.entry.weight} lb weigh-in`);
+  if (f.entry?.rest_day) stays.push("the rest day");
+  stays.push("every other day, and the badges you have earned");
+  return { goes, stays };
+}
+
+/* Two stages, and no typing. Deleting an account makes you type DELETE because
+   it is the end of everything and there is no second chance at it; this is one
+   day, and anybody reaching for it is reaching for it on purpose. But a single
+   tap is not enough either, because this destroys sets that were really
+   lifted, so the facts are read first and then confirmed again. */
+function confirmDeleteTodaysTraining(f) {
+  const { goes, stays } = todaysTrainingBits(f);
+  const live = (!!SESSION && !SESSION.finished) || csnRunning();
+  return new Promise((resolve) => {
+    const scrim = document.createElement("div");
+    scrim.className = "pop-scrim";
+    const stage1 = `
+      <p class="muted-note">This says today did not happen. It removes:</p>
+      <ul class="del-list">${goes.map((g) => `<li>${escapeHtml(g)}</li>`).join("")}</ul>
+      <p class="muted-note">${escapeHtml(`Kept: ${stays.join(", ")}.`)}</p>
+      ${live ? `<p class="muted-note">The session you have open right now ends with it, and nothing from it is saved.</p>` : ""}
+      ${PARTNER_EMAIL ? `<p class="muted-note">${escapeHtml(partnerName())} sees it disappear from your week.</p>` : ""}
+      <button type="button" class="btn-danger" data-del="ask" style="margin-top:16px;">Delete today&rsquo;s workout</button>
+      <button type="button" class="btn-ghost" data-del="0">Keep it</button>`;
+    const stage2 = `
+      <p class="muted-note">Last check. There is no undo, and nothing here can be got back once it is gone.</p>
+      <button type="button" class="btn-danger" data-del="1" style="margin-top:16px;">Yes, delete it</button>
+      <button type="button" class="btn-ghost" data-del="0">Cancel</button>`;
+    const draw = (body) => {
+      scrim.innerHTML = `
+        <div class="pop">
+          <div class="pop-body">
+            <div class="ds-top">
+              <div class="pop-who" style="color:var(--muted)">DELETE TODAY&rsquo;S WORKOUT</div>
+              <button type="button" class="ds-x" data-del="0" aria-label="Close">&times;</button>
+            </div>
+            ${body}
+          </div>
+        </div>`;
+      scrim.querySelectorAll("[data-del]").forEach((b) => {
+        b.onclick = () => {
+          if (b.dataset.del === "ask") { draw(stage2); return; }
+          scrim.remove();
+          resolve(b.dataset.del === "1");
+        };
+      });
+    };
+    draw(stage1);
+    document.body.appendChild(scrim);
+    scrim.onclick = (e) => { if (e.target === scrim) { scrim.remove(); resolve(false); } };
+  });
+}
+
+/* Everything in memory that believes a workout is happening. Run BEFORE the
+   deletes, not after: a live presence row keeps telling the partner you are
+   training, a Live Activity keeps the card on your own Lock Screen, and a
+   cardio clock that is still running would write the day back the moment it
+   is saved. discardSession is deliberately not reused, because it banks the
+   set you are standing on first, and writing rows into a table this function
+   is about to empty is work done twice and undone once. */
+async function standDownEverythingRunning() {
+  if (SESSION) {
+    SESSION = null;
+    clearSessionStorage();
+    stopSessionTimer();
+    await endLiveActivity();
+    await endLive();
+    closeSessionUI();
+    $("workoutContent").classList.remove("hidden");
+  }
+  if (CARDIO_SES) {
+    CARDIO_SES = null;
+    csnSave();
+    closeCardioSession();
+  }
+}
+
+/* Asks, then does it. Resolves true only if the day actually went, so a caller
+   holding a sheet open knows whether to close it. */
+async function deleteTodaysTraining() {
+  const f = todaysTrainingFacts();
+  if (!f.anything) { toast("Nothing logged today"); return false; }
+  if (!await confirmDeleteTodaysTraining(f)) return false;
+
+  try {
+    await standDownEverythingRunning();
+    if (f.entry?.proof_path) {
+      await sb.storage.from("workout-proof").remove([f.entry.proof_path]);
+      delete PROOF_URL_CACHE[f.entry.proof_path];
+    }
+    /* supabase-js resolves with { error } instead of throwing, so a catch
+       around these sees nothing and the day reads as deleted whatever
+       happened. Raise the first one instead. */
+    for (const t of ["exercise_logs", "ai_workouts"]) {
+      const { error } = await sb.from(t).delete().eq("email", MY_EMAIL).eq("entry_date", f.date);
+      if (error) throw error;
+    }
+    /* The fit_entries row is emptied rather than deleted when it is carrying
+       something that is not a workout. A weigh-in belongs to the scales and a
+       rest day belongs to the streak; taking either of them because a workout
+       was deleted is this feature quietly doing a second thing nobody asked
+       for. With nothing left on it the row goes, so the day reads as blank
+       everywhere rather than as a row full of falses. */
+    const keep = f.entry && (f.entry.weight != null || f.entry.rest_day);
+    if (keep) {
+      const { error } = await sb.from("fit_entries")
+        .update({ gym: false, sessions: 0, workout_at: null, proof_path: null, note: null })
+        .eq("email", MY_EMAIL).eq("entry_date", f.date);
+      if (error) throw error;
+    } else if (f.entry) {
+      const { error } = await sb.from("fit_entries").delete()
+        .eq("email", MY_EMAIL).eq("entry_date", f.date);
+      if (error) throw error;
+    }
+
+    TODAY_WORKOUT = null;
+    TODAY_DONE_WORKOUTS = [];
+    WORKOUT_MODE = "choose";
+    FRESH_PLAN_ID = null;
+    PLAN_VIEW_DATE = null;
+    await loadAll();
+    await reconcileNativeSurfaces();   // the widget and the Lock Screen agree too
+    toast("Today deleted");
+    return true;
+  } catch (err) {
+    console.error("could not delete today", err);
+    /* Deliberately not "nothing was changed": these are three writes and the
+       first may well have landed. Saying what is actually known beats a
+       reassurance that can be false. */
+    toast("Couldn't finish deleting today. Open the day and check what is left.");
+    await loadAll();
     return false;
   }
 }
@@ -34090,6 +34318,16 @@ function renderPlanPreview(opts) {
      reviewing another day: those sessions are today's. */
   const dayList = !review && todaySessions().length > 1 ? todaySessionsHTML() : "";
 
+  /* "Maybe by accident I didn't do it." The way out, at the bottom of the
+     screen that is about today, under everything that offers to do today: it
+     is the last thing you reach for, not the first. Never on a review of
+     another day, which has Clear this day for the plan and the day sheet for
+     what was logged; and never when the day holds nothing yet, where a button
+     to delete nothing is furniture. */
+  const delToday = !review && todaysTrainingFacts().anything
+    ? `<button type="button" class="btn-ghost danger" id="planDeleteTodayBtn">Delete today&rsquo;s workout</button>`
+    : "";
+
   /* The three doors, in the order somebody reaches for them: a different
      session, the same session around a limit, or not a workout at all. Each
      one acts on THIS day and nothing else. They are the day planner's own
@@ -34195,7 +34433,8 @@ function renderPlanPreview(opts) {
                is a lifting workout over the top of the activity they chose.
                Swap this workout is that offer, and it is honest about it. */ ""}
            ${runSession && !cardioMinutes(runSession) ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}
-           <button type="button" class="btn-ghost" id="planSwapDayBtn">Swap this workout</button>`}`}`;
+           <button type="button" class="btn-ghost" id="planSwapDayBtn">Swap this workout</button>`}`}
+    ${delToday}`;
   wireTodaySessions($("workoutContent"));
   mountMotionFigures($("workoutContent"));
 
@@ -34304,6 +34543,14 @@ function renderPlanPreview(opts) {
     });
   }
   if ($("planNewBtn")) $("planNewBtn").onclick = startFreshWorkout;
+  /* Lands on the choose screen rather than redrawing this one: with today
+     deleted there is no plan left for this screen to be about, and
+     renderPlanPreview with a null plan bounces there anyway. */
+  if ($("planDeleteTodayBtn")) {
+    $("planDeleteTodayBtn").onclick = async () => {
+      if (await deleteTodaysTraining()) goWorkoutScreen("choose", { back: true });
+    };
+  }
 
   /* The three review doors. Each one hands the day to the sheet that already
      does that job, so there is one way to swap a session, one way to say what
