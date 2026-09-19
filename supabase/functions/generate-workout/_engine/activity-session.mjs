@@ -63,8 +63,13 @@ function levelRank(level) {
 
 /* Everything at or below the level asked for. A beginner is not shown a Teaser;
  * an advanced practitioner still gets the basics, because they are the session's
- * opening and leaving them out would build a class with no beginning. */
-function movesAtOrBelow(training, level) {
+ * opening and leaving them out would build a class with no beginning.
+ *
+ * Exported since 2026-09-19 because the plan screen offers to replace a move in
+ * a class it has already built, and the pool it offers has to be the pool this
+ * file would have picked from. A second level ladder written in the app would
+ * be a second opinion about who is allowed a Teaser. */
+export function movesAtOrBelow(training, level) {
   const cap = levelRank(level);
   const out = [];
   for (const cat of training.categories || []) {

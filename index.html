@@ -6526,10 +6526,19 @@
     display: flex; align-items: center; justify-content: center;
     background: var(--panel-2); color: var(--muted); font-size: 12px; font-weight: 800;
   }
-  .act-move-b { min-width: 0; display: flex; flex-direction: column; }
+  /* Takes the width so the swap chip sits hard right, the way it does on a
+     lifting row. Without a flex the chip floats up against the name. */
+  .act-move-b { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .act-move-b b { font-size: 14.5px; font-weight: 650; }
   .act-move-b i { font-style: normal; font-size: 12.5px; color: var(--muted); }
+  /* Still the reveal card's line, which cuts at eight on purpose: that screen is
+     read standing on a mat with the clock about to start. The plan screen no
+     longer uses it. */
   .act-move-more { margin: 2px 0 0 35px; font-size: 12.5px; color: var(--muted); }
+  /* What the list IS, said above it: a sequence of thirteen under a class that
+     runs forty minutes is only honest with the repeat next to it. */
+  .act-seq-note { margin: 0 0 10px; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+  .act-seq-note b { color: var(--fg); font-weight: 700; }
 
   /* ---- Him, running ----
      Sized under the clock rather than at the lifting stage's 360px: that screen
@@ -33465,6 +33474,18 @@ function startPlannedActivity(plan) {
   openCardioSession();
 }
 
+/* The class itself, once. `moves` is the whole clock: the sequence, then the
+   sequence again, numbered by `round`. Round one is the full set of moves the
+   class contains, because fillRounds spends against a budget that only ever
+   shrinks, so a move too long for round one is too long for every round after
+   it. A row written before the round number existed carries none, and that row
+   IS its own sequence. */
+function flowSequence(f) {
+  const moves = Array.isArray(f?.moves) ? f.moves : [];
+  const first = moves.filter((m) => (Number(m.round) || 1) === 1);
+  return first.length ? first : moves;
+}
+
 /* What an activity day looks like on the plan screen, and the only thing that
    draws one. A run and a class are the same kind of day, so they print through
    one function rather than each card inventing its own way of saying what a day
@@ -33474,14 +33495,32 @@ function startPlannedActivity(plan) {
    to pace it, through cardioPlanHTML. A class says the moves instead, because
    that is what a class IS: "Yoga, on the clock" is a word and a timer, and
    somebody reading the day before they start it wants to know what is in it.
-   Eight and a count, the same cut the session's own reveal card makes, because
-   a forty move vinyasa is three rounds of the same thing and the first round is
-   the news. */
-function activityDayHTML(s, { eyebrow = "Today’s session", head = true } = {}) {
+
+   EVERY move, since Mo's note of 2026-09-19: "I look at Pilates and it says
+   'and 32 more'. I want to be able to see every single workout." It used to cut
+   at eight and print a count, and a forty move vinyasa hid thirty two of them
+   behind a line nothing would open.
+
+   Every move, ONCE. A forty move class is thirteen moves run three times, and
+   the thirteen are the class: printing the list three times would be forty rows
+   of which twenty seven are a rerun, which is a longer way of saying the same
+   thing rather than a fuller one. Nothing is hidden by it either, because a
+   move that is not in round one is not in the class at all: fillRounds spends a
+   budget that only shrinks, so round one holds everything that ever fits. The
+   repeat is said in words above the list, and where the bell stops the last
+   round early it says where. */
+function activityDayHTML(s, { eyebrow = "Today’s session", head = true, swap = false } = {}) {
   if (!s) return "";
   if (s.kind === "cardio") return cardioPlanHTML(s.card, { eyebrow, head });
   const f = s.flow;
   const moves = Array.isArray(f.moves) ? f.moves : [];
+  const seq = flowSequence(f);
+  const rounds = Number(f.rounds) || 1;
+  /* The bell can land mid sequence, and fillRounds allows it. Saying where the
+     last round stops is the difference between a list you can follow to the end
+     and a list that quietly does not match the clock. */
+  const last = rounds > 1 ? moves.filter((m) => (Number(m.round) || 1) === rounds) : [];
+  const stopsAt = last.length && last.length < seq.length ? last[last.length - 1].name : null;
   const act = CARDIO_ACTS.find((a) => a.training === f.training);
   return `
     ${head ? `<div class="cdy-head">
@@ -33491,20 +33530,236 @@ function activityDayHTML(s, { eyebrow = "Today’s session", head = true } = {})
     </div>` : ""}
     <div class="act-facts" style="margin:4px 0 14px;">
       <div class="act-fact"><span>Minutes</span><b>${Number(f.minutes) || 0}</b></div>
-      <div class="act-fact"><span>Moves</span><b>${moves.length}</b></div>
-      ${f.rounds > 1 ? `<div class="act-fact"><span>Rounds</span><b>${f.rounds}</b></div>` : ""}
+      ${/* The sequence, not the forty, because the list under this is the
+            sequence and two different counts for one class is the card
+            arguing with itself. The Rounds fact beside it is the other half. */ ""}
+      <div class="act-fact"><span>Moves</span><b>${seq.length}</b></div>
+      ${rounds > 1 ? `<div class="act-fact"><span>Rounds</span><b>${rounds}</b></div>` : ""}
     </div>
     <div class="act-moves">
-      ${moves.slice(0, 8).map((m, i) => `<div class="act-move">
+      ${rounds > 1 ? `<p class="act-seq-note">All ${seq.length} moves, in order. <b>The class runs the sequence ${rounds} times.</b>${stopsAt ? ` The last round stops after ${escapeHtml(stopsAt)}.` : ""}</p>` : ""}
+      ${seq.map((m, i) => `<div class="act-move">
         <span class="act-move-n">${i + 1}</span>
         <span class="act-move-b"><b>${escapeHtml(m.name)}</b><i>${Number(m.seconds) || 0}s${m.perSide ? " a side" : ""}${m.category ? ` &middot; ${escapeHtml(m.category)}` : ""}</i></span>
+        ${swap ? `<button type="button" class="wp-chip" data-flow-swap="${i}" aria-label="Replace ${escapeHtml(m.name)}">${icon("swap", 15)}</button>` : ""}
       </div>`).join("")}
-      ${moves.length > 8 ? `<p class="act-move-more">and ${moves.length - 8} more</p>` : ""}
     </div>
     ${/* The session engine says out loud that the sequence repeats and how
           little unique work there was to repeat. It is the most useful line on
           the card and it is the one an app would be tempted to hide. */ ""}
     ${(f.notes || []).map((n) => `<p class="ef-note">${escapeHtml(n)}</p>`).join("")}`;
+}
+
+/* ---------- Replacing a move in a class ----------
+   Mo, 2026-09-19, in the same note that asked to see the whole class: "And then
+   of course be able to replace it." A lifting plan has had this since the
+   overview screen learned openSwapSheet, and a yoga day sitting beside it with
+   no way to get rid of a pose is the two halves of one app disagreeing about
+   whether a plan is yours.
+
+   The same sheet furniture, the same rows, the same chip on the row, because
+   these are two ways of saying the same thing and they should not look like two
+   features. What is NOT shared is the sheet's brain: the lifting one ranks the
+   engine's `alternatives` by the job a lift does, seeds a weight off the log and
+   records the swap in exercise_swaps so preferences.mjs can stop prescribing
+   that lift. None of that is true of a pose. There is no load, nothing in the
+   yoga library carries alternatives, and writing "Warrior II" into the table
+   that teaches the LIFTING engine what to stop prescribing would be feeding it
+   a movement it can never program.
+
+   THE POOL is the pool the session builder itself would have drawn from:
+   movesAtOrBelow on the same training at the class's own level. Moves already
+   in the sequence are out, since a class with a pose in it twice is not a
+   replacement. What it opens on is the same category as the move being
+   replaced, because the sequence is built one move per category and swapping a
+   backbend for a core move quietly rebalances a class nobody asked to
+   rebalance. Everything else at that level is one tap below, under a row that
+   says so.
+
+   AND THE LEVEL ABOVE, which the brief for this said not to offer and which
+   the libraries settle: Yoga holds eighteen beginner moves and a thirty minute
+   beginner class uses all eighteen, so "at or below your level, minus what is
+   already in the class" is EMPTY for exactly the person most likely to want a
+   pose out of their class. A sheet that opens on "nothing to offer" is not a
+   replace control. So the harder moves are here, last, behind their own
+   heading, saying what they are. The level cap is a rule about what this app
+   PRESCRIBES unasked, which is a different act from what somebody picks for
+   themselves with the word "harder" in front of them. */
+let FLOW_SWAP = null;      // { plan, index, pool, after }
+let FLOW_SWAP_ALL = false;
+
+async function openFlowSwapSheet({ plan, index, after }) {
+  const f = plan?.cardio?.flow;
+  const move = flowSequence(f)[index];
+  if (!move) return;
+  const engine = await ensureSessionEngine();
+  const training = (EXERCISE_TRAININGS || []).find((t) => t.id === f.training);
+  if (!engine?.movesAtOrBelow || !training) {
+    /* Said rather than swallowed: the library and the engine both arrive by
+       dynamic import after first paint, and a chip that does nothing is worse
+       than one that explains itself. */
+    toast("Still loading the move library. Try again in a moment.");
+    return;
+  }
+  const taken = new Set(flowSequence(f).map((m) => m.name));
+  const atLevel = engine.movesAtOrBelow(training, f.level || "beginner")
+    .filter((m) => !taken.has(m.name));
+  const atLevelNames = new Set(atLevel.map((m) => m.name));
+  /* "advanced" is the top of the engine's ladder, so this is the whole library
+     minus what the class already holds minus what was already allowed. */
+  const harder = engine.movesAtOrBelow(training, "advanced")
+    .filter((m) => !taken.has(m.name) && !atLevelNames.has(m.name))
+    .map((m) => ({ ...m, harder: true }));
+  const pool = [...atLevel, ...harder];
+  if (!pool.length) {
+    toast(`Every ${training.label} move there is is already in this one.`);
+    return;
+  }
+  FLOW_SWAP = { plan, index, pool, after };
+  FLOW_SWAP_ALL = false;
+  $("swapScrim").classList.remove("hidden");
+  $("swapScrim").onclick = (e) => { if (e.target === $("swapScrim")) closeFlowSwapSheet(); };
+  renderFlowSwapSheet();
+}
+
+function closeFlowSwapSheet() {
+  FLOW_SWAP = null;
+  FLOW_SWAP_ALL = false;
+  $("swapScrim").classList.add("hidden");
+  pinSheets();
+}
+
+function flowSwapRowHTML(m) {
+  return `<button type="button" class="sv-row" data-flow-pick="${escapeHtml(m.name)}">
+    <span class="sv-row-ico">${icon("swap", 18)}</span>
+    <span class="sv-row-txt">
+      <span class="sv-row-name">${escapeHtml(m.name)}</span>
+      <span class="sv-row-meta">${escapeHtml([m.categoryLabel || m.category, m.level, `${Number(m.seconds) || 0}s${m.perSide ? " a side" : ""}`].filter(Boolean).join(" · "))}</span>
+    </span>
+    <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
+  </button>`;
+}
+
+function renderFlowSwapSheet() {
+  if (!FLOW_SWAP) return;
+  const { plan, index, pool } = FLOW_SWAP;
+  const move = flowSequence(plan?.cardio?.flow)[index];
+  if (!move) { closeFlowSwapSheet(); return; }
+  const rounds = Number(plan.cardio.flow.rounds) || 1;
+  const atLevel = pool.filter((m) => !m.harder);
+  /* What the sheet opens on. The same part of the class, at the level the class
+     was built at, and only when there is nothing left at that level do the
+     harder ones come to the top: then they are the whole offer, and hiding them
+     would be a sheet that says no.
+
+     Matched on the LABEL, because that is what a saved move carries: styles.mjs
+     writes `category: m.categoryLabel` into the row and drops the key, so
+     comparing keys here matched nothing and every sheet opened on the whole
+     library. */
+  const part = String(move.category || move.categoryLabel || "").toLowerCase();
+  const opens = (atLevel.length ? atLevel : pool)
+    .filter((m) => String(m.categoryLabel || m.category || "").toLowerCase() === part);
+  const near = FLOW_SWAP_ALL ? [] : opens.slice(0, 3);
+  const shownNames = new Set(near.map((m) => m.name));
+  const restLevel = atLevel.filter((m) => !shownNames.has(m.name));
+  const restHard = pool.filter((m) => m.harder && !shownNames.has(m.name));
+  /* The library's own words for this part of the class ("Standing poses",
+     "Core & abs"), which is what the row under it says too. */
+  const partWord = escapeHtml(move.category || move.categoryLabel || "The same part of the class");
+  $("swapSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="fswClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">Replace ${escapeHtml(move.name)}</div>
+      <div class="spacer"></div>
+    </div>
+    <p class="muted-note" style="margin:-6px 0 14px;">${!atLevel.length
+      ? `Every move at your level is already in this class, so these are a step up from it.`
+      : near.length ? `${partWord}, at your level.`
+      : "Everything this class could hold instead."}${rounds > 1 ? " It changes in every round." : ""}</p>
+    ${near.length ? `<div class="sv-rows">
+      ${near.map(flowSwapRowHTML).join("")}
+      ${restLevel.length + restHard.length ? `<button type="button" class="sv-row" id="fswAllRow">
+        <span class="sv-row-ico">${icon("plus", 18)}</span>
+        <span class="sv-row-txt">
+          <span class="sv-row-name">Show every move</span>
+          <span class="sv-row-meta">All ${pool.length} this class could hold, not just these</span>
+        </span>
+        <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
+      </button>` : ""}
+    </div>` : ""}
+    ${restLevel.length && !near.length ? `<div class="sv-rows">${restLevel.map(flowSwapRowHTML).join("")}</div>` : ""}
+    ${restHard.length && !near.length ? `${/* The heading only where there is something above it to tell it apart
+             from. With nothing at the class's level left, these ARE the offer
+             and the line at the top has already said so. */ ""}
+    ${near.length || restLevel.length ? `<p class="muted-note" style="margin:14px 0 8px;">Harder than this class was built for. Nothing is stopping you, but it is your call rather than the app's.</p>` : ""}
+    <div class="sv-rows">${restHard.map(flowSwapRowHTML).join("")}</div>` : ""}`;
+
+  $("fswClose").onclick = closeFlowSwapSheet;
+  if ($("fswAllRow")) $("fswAllRow").onclick = () => { FLOW_SWAP_ALL = true; renderFlowSwapSheet(); };
+  $("swapSheet").querySelectorAll("[data-flow-pick]").forEach((b) => {
+    b.onclick = () => applyFlowSwap(pool.find((m) => m.name === b.dataset.flowPick));
+  });
+  $("swapSheet").scrollTop = 0;
+}
+
+async function applyFlowSwap(pick) {
+  const ctx = FLOW_SWAP;
+  if (!ctx || !pick) return;
+  const { plan, index } = ctx;
+  const f = plan?.cardio?.flow;
+  const move = flowSequence(f)[index];
+  if (!move) { closeFlowSwapSheet(); return; }
+  const engine = await ensureSessionEngine();
+
+  /* Every round, matched by name. The sequence IS the class and round two is
+     the same thirteen moves again: replacing the pose in round one only would
+     leave the one they just took out waiting for them twice more. */
+  const perSide = engine?.PER_SIDE_MULTIPLIER || 2;
+  const moves = (f.moves || []).map((m) => (m.name === move.name
+    /* Written in the shape styles.mjs writes a flow move in, field for field,
+       and no wider: the library entry also carries `primary` and `secondary`
+       muscle lists that a plan row deliberately does not, because a pose
+       sitting in a row with muscles on it is one refactor away from being
+       counted as trained volume. */
+    ? {
+        name: pick.name,
+        seconds: pick.seconds,
+        perSide: !!pick.perSide,
+        round: Number(m.round) || 1,
+        category: pick.categoryLabel || pick.category || null,
+        cue: pick.cue || null,
+      }
+    : m));
+  /* The prescribed `minutes` is what the clock counts and it does not move: the
+     class is still the forty minutes that was asked for. `seconds` is what the
+     moves actually add up to, so it is recomputed rather than left describing a
+     move that is no longer in here. */
+  const seconds = moves.reduce((n, m) => n + (Number(m.seconds) || 0) * (m.perSide ? perSide : 1), 0);
+  plan.cardio = { ...plan.cardio, flow: { ...f, moves, seconds } };
+
+  const after = ctx.after;
+  closeFlowSwapSheet();
+  after?.();
+  toast(`Swapped to ${pick.name}`);
+  await saveActivityFlow(plan);
+}
+
+/* The class has to survive leaving the screen, and the only copy of it is the
+   `cardio` column: loadTodayWorkout re-reads ai_workouts on the next loadAll
+   and would put the move back. Same shape savePlanExercises has for the lifting
+   half, including reloading on a failure rather than leaving the screen showing
+   an edit the server never took. */
+async function saveActivityFlow(plan) {
+  if (!plan?.id) return false;
+  const { error } = await sb.from("ai_workouts").update({ cardio: plan.cardio }).eq("id", plan.id);
+  if (error) {
+    console.error("class edit not saved", error);
+    toast("Couldn't save that change");
+    await loadAll();
+    return false;
+  }
+  return true;
 }
 
 /* A day that has just been written, put into ALL_PLANS without going back to
@@ -34868,6 +35123,13 @@ function renderPlanPreview(opts) {
           headings over a blank. */ ""}
     ${activityDay ? activityDayHTML(actSession, {
       eyebrow: review ? `Planned for ${planDayWord(date)}` : "Today’s session",
+      /* The chip on every move, on the screen where the day is still being
+         decided. Not once the day is done, for the reason a logged lift has no
+         swap: there is nothing left to replace. Not while the clock is running
+         on it either, because the session screen is working off the move list
+         it started with and changing it underneath would put somebody in a pose
+         the app is no longer counting. */
+      swap: actSession?.kind === "flow" && !finished && !actLive,
     }) : ""}
     ${activityDay && !actSession ? `<p class="ef-note">No lifts on this one. It is ${escapeHtml(displayFocus(plan.focus, exercises))}, on the clock.</p>` : ""}
     ${(justMade?.warnings || []).map((n) => `<p class="ef-note">${escapeHtml(n)}</p>`).join("")}
@@ -34936,6 +35198,18 @@ function renderPlanPreview(opts) {
       index: Number(btn.dataset.planSwap),
       date: plan.entry_date || todayStr(),
       focus: plan.focus,
+      after: () => rerenderPlanScreen(),
+    });
+  });
+
+  /* The class's own half of the same offer. It writes the `cardio` column
+     rather than `exercises`, which is the only real difference: a class day has
+     no exercises by contract and its session lives in the column the plan
+     screen already reads it out of. */
+  $("workoutContent").querySelectorAll("[data-flow-swap]").forEach((btn) => {
+    btn.onclick = () => openFlowSwapSheet({
+      plan,
+      index: Number(btn.dataset.flowSwap),
       after: () => rerenderPlanScreen(),
     });
   });
