@@ -80,7 +80,7 @@ def rrect(cx, cy, w, h, r, fill, extra=""):
 # and that is what read as "shadows all over".
 # Mo picked the middle of three shine levels by looking at them side by side,
 # which is the only sensible way to settle a word like "glossy".
-def gloss_defs(sheen=0.50, glow=0.75, plate="#2b3036"):
+def gloss_defs(sheen=0.50, glow=0.75, plate="#23272b"):
     """The glossy palette. One light, up and slightly left, and everything obeys
     it: gradients are in user space, not per shape, or each arc lights itself and
     the two halves disagree about where the sun is.
