@@ -21,6 +21,7 @@ import { MOVES as YOGA } from "./moves/yoga.mjs";
 import { MOVES as PILATES } from "./moves/pilates.mjs";
 import { MOVES as CALISTHENICS } from "./moves/calisthenics.mjs";
 import { MOVES as STRETCHING } from "./moves/stretching.mjs";
+import { MOVES as CARDIO } from "./moves/cardio.mjs";
 import { MOVES as IDLE } from "./moves/idle.mjs";
 
 export { palette, render, samplePose, solvePose, jointAngles, cameraFor, litIntensity, VB, GROUND,
@@ -44,6 +45,7 @@ export const MOVES_BY_LIBRARY = {
   pilates: PILATES,
   calisthenics: CALISTHENICS,
   stretching: STRETCHING,
+  cardio: CARDIO,
 };
 
 /* One flat lookup, and the FIRST library to claim a name keeps it.
