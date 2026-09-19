@@ -4979,9 +4979,50 @@
     border: 1.5px solid color-mix(in srgb, var(--accent) 55%, transparent);
     color: var(--accent-ink);
   }
+  /* An activity row opens now, so it is a button, and a button brought its own
+     type ramp, padding and centred text with it. Everything here is undoing
+     that: the row's geometry is .rc-ex and must stay identical to the lift
+     above it, or the list develops a step halfway down. */
+  .rc-ex-tap {
+    width: 100%; margin: 0; background: none; border: none; border-bottom: 1px solid var(--border);
+    font: inherit; color: inherit; text-align: left; cursor: pointer;
+    border-radius: 0; -webkit-tap-highlight-color: transparent;
+  }
+  .rc-ex-tap:last-child { border-bottom: none; }
+  /* Inside the list's own padding rather than outside it: a wash that runs to
+     the card's border would sit on top of the hairline it shares with the row
+     below. */
+  .rc-ex-tap:active { background: color-mix(in srgb, var(--text) 7%, transparent); }
+  .rc-ex-go { color: var(--muted); display: flex; flex-shrink: 0; margin-right: -4px; }
+  /* Planned and never logged. --up is the palette's own red for text, the one
+     the trend arrows and .idx-bad already use, and it is tuned separately for
+     each theme; --up-fill is the deeper one for white text on a solid button,
+     which this is not. --warn would be wrong here: amber means caution, and a
+     lift you did not do is not a warning about anything. */
+  .rc-ex-miss .rc-ex-name { color: var(--up); }
+  .rc-ex-miss .rc-ex-num2 { color: var(--up); opacity: .75; }
+  .rc-ex-miss .rc-n { border-color: color-mix(in srgb, var(--up) 55%, transparent); color: var(--up); }
+  .rc-miss {
+    font-size: 11px; font-weight: 800; letter-spacing: .06em; padding: 2px 6px; border-radius: 9px;
+    background: color-mix(in srgb, var(--up) 18%, transparent); color: var(--up); margin-left: 6px;
+    white-space: nowrap;
+  }
+  .rc-head-miss { font-size: 12.5px; font-weight: 700; color: var(--up); }
+  /* The same circle, wearing the palette's red instead of the accent, for the
+     one case where the sheet has nothing to congratulate anybody for. */
+  .rc-tick-none { border-color: var(--up); color: var(--up); box-shadow: none; }
+  .rc-kicker-none { color: var(--up); }
   /* Activities follow the exercises, so the second heading needs the air the
      first one gets from the block above it. */
   .rc-list + .rc-ex-head { margin-top: 16px; }
+  /* What the activity log does not hold. Body copy rather than an empty state,
+     because it is an answer to "what was in it" and not a blank slot. */
+  .ad-gap {
+    border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; background: var(--panel);
+    font-size: 13.5px; line-height: 1.5; color: var(--muted);
+  }
+  .ad-gap p { margin: 0 0 9px; }
+  .ad-gap p:last-child { margin-bottom: 0; }
   .rc-ex-num { font-size: 12.5px; font-weight: 700; font-family: var(--font-display); text-align: right; white-space: nowrap; }
   .rc-pr {
     font-size: 11px; font-weight: 800; letter-spacing: .06em; padding: 2px 6px; border-radius: 9px;
@@ -8342,6 +8383,13 @@
   </div>
   <div class="sheet-scrim hidden" id="nextWorkoutScrim">
     <div class="partner-sheet" id="nextWorkoutSheet"></div>
+  </div>
+  <!-- One activity out of the recap. Its own scrim rather than redrawing the
+       recap's, and after it in the document so it paints over it: every sheet
+       here shares one z-index, and closing this has to put the day back the way
+       it was rather than rebuild it. -->
+  <div class="sheet-scrim hidden" id="actDetailScrim">
+    <div class="partner-sheet" id="actDetailSheet"></div>
   </div>
   <div class="sheet-scrim hidden" id="partnerSheetScrim">
     <div class="partner-sheet" id="partnerSheet"></div>
@@ -13951,7 +13999,7 @@ async function reconcileNativeSurfaces() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "swapDayScrim", "liftsScrim", "reportScrim", "measureScrim", "cardioScrim", "csnScrim"]
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "actDetailScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "swapDayScrim", "liftsScrim", "reportScrim", "measureScrim", "cardioScrim", "csnScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
   stopGenTicker();
   $("genScrim")?.classList.add("hidden");
@@ -15818,6 +15866,27 @@ function recapFor(email, name, date) {
   const minutes = logs.reduce((s, l) => s + (l.duration_min || 0), 0);
   const seconds = plans.reduce((s, w) => s + (w.duration_sec || 0), 0);
 
+  /* Mo: "if there's things I haven't completed then mark it as red as not
+     complete". A lift that was planned and never logged used to leave no trace
+     at all here, because this sheet is built out of exercise_logs and a set
+     nobody did writes no row: a leg day ended two exercises early read back as
+     a clean four exercise workout. The plan row is still on the date, with its
+     exercises intact, so the difference between the two is the honest answer.
+
+     Matched on the name because that is exactly what logExerciseSilent writes,
+     taken straight off the plan, and a swapped exercise is renamed on the plan
+     before anything is logged against it, so the two sides stay in step.
+
+     Only a plan that was actually STARTED counts, meaning it was finished or at
+     least one of its exercises is in the log. A lifting day swapped for a run
+     is archived with all of its exercises still on it and nothing logged, and
+     reading that as six missed lifts would call a deliberate swap a failure. */
+  const liftNames = new Set(lifts.map((l) => (l.exercise_name || "").trim().toLowerCase()));
+  const trained = plans.find((w) => (w.exercises || []).length
+    && (w.completed_at || (w.exercises || []).some((ex) => liftNames.has((ex.name || "").trim().toLowerCase()))));
+  const missed = (trained?.exercises || [])
+    .filter((ex) => ex?.name && !liftNames.has(String(ex.name).trim().toLowerCase()));
+
   const { prLogIds } = personalRecords(name);
   return {
     date,
@@ -15828,7 +15897,7 @@ function recapFor(email, name, date) {
     title: lifts.length || !activities.length
       ? displayFocus(plans.find((w) => w.focus)?.focus, logs.map((l) => l.exercise_name))
       : activities.length === 1 ? activities[0].exercise_name : "Activity day",
-    logs, lifts, activities, sets, volume, minutes, seconds,
+    logs, lifts, activities, missed, sets, volume, minutes, seconds,
     exercises: lifts.length,
     note: entry?.note || null,
     /* The same record personalRecords means, so the tag here and the banner
@@ -15996,6 +16065,12 @@ function openRecap(email, name, date) {
      is training and this is where the day is read back, but it cannot call
      itself a completed workout or print sets it does not have. */
   const onlyActivities = !r.lifts.length && r.activities.length > 0;
+  /* A day where the workout was opened, finished, and nothing was logged in
+     between. It is a real state: End writes completed_at whether or not a set
+     was ticked. The sheet used to greet it with a green tick and "WORKOUT
+     COMPLETED" over two dashes, which is the opposite of what happened, and
+     now that the missed lifts are listed it would sit above a page of red. */
+  const nothingDone = sharing && !r.lifts.length && !r.activities.length && r.missed.length > 0;
 
   /* Volume and calories only appear when they are real: a bodyweight session
      has no tonnage, and calories need a logged bodyweight to mean anything. */
@@ -16016,17 +16091,43 @@ function openRecap(email, name, date) {
     </div>`;
   };
 
+  /* Planned, never logged. It sits in the same list as the work that happened,
+     under it, so the whole workout can be read in one go instead of as two
+     lists to reconcile. The numbers carry on from the logged rows rather than
+     restarting or quoting the plan's own positions: this list is ordered by
+     what was logged and then by what was not, and a number that claimed to be
+     the plan's position would contradict the row above it the moment somebody
+     did their exercises out of order. Sets and reps are what was ASKED for,
+     which is the only figure a lift nobody did can honestly carry. */
+  const missRow = (ex, i) => {
+    const target = ex.sets != null || ex.reps != null
+      ? `${ex.sets ?? "-"}×${ex.reps ?? "-"}`
+      : "";
+    return `<div class="rc-ex rc-ex-miss">
+      <span class="rc-n">${r.lifts.length + i + 1}</span>
+      <span class="rc-ex-name">${escapeHtml(ex.name)}<span class="rc-miss">NOT DONE</span></span>
+      <span class="rc-ex-num2">${escapeHtml(target)}</span>
+    </div>`;
+  };
+
   /* An activity carries its own icon rather than a position number, because it
      is not the third thing in a list of sets: it is the class or the run that
      also happened. Distance only when there is one, the same way the session
-     list writes it, and from the same two columns. */
+     list writes it, and from the same two columns.
+
+     A button, because Mo pressed one of these expecting it to open and it was a
+     dead line of text: "I should be able to ... press on it and it would open,
+     instead of it being like the workout." A tap rather than the swipe he also
+     offered, because every other row in this app opens on a tap, and because
+     the shared sheet gesture already owns a finger that moves on this panel. */
   const actRow = (l) => {
     const act = actForExerciseName((l.exercise_name || "").trim());
-    return `<div class="rc-ex">
+    return `<button type="button" class="rc-ex rc-ex-tap" data-act-log="${escapeHtml(String(l.id))}">
       <span class="rc-act-ico">${icon(act?.ico || "run", 15)}</span>
       <span class="rc-ex-name">${escapeHtml((l.exercise_name || "").trim())}</span>
       <span class="rc-ex-num2">${escapeHtml(`${l.duration_min} min`)}${l.distance_mi ? `<i>${escapeHtml(`${l.distance_mi} mi`)}</i>` : ""}</span>
-    </div>`;
+      <span class="rc-ex-go">${icon("chevronRight", 15)}</span>
+    </button>`;
   };
 
   $("recapSheet").innerHTML = `
@@ -16039,9 +16140,9 @@ function openRecap(email, name, date) {
     </div>
 
     <div class="rc-head">
-      <div class="rc-tick">${icon("check", 22)}</div>
+      <div class="rc-tick${nothingDone ? " rc-tick-none" : ""}">${icon(nothingDone ? "close" : "check", 22)}</div>
       <div>
-        <div class="rc-kicker">${sharing && onlyActivities ? "ACTIVITY COMPLETED" : "WORKOUT COMPLETED"}</div>
+        <div class="rc-kicker${nothingDone ? " rc-kicker-none" : ""}">${nothingDone ? "NOTHING LOGGED" : sharing && onlyActivities ? "ACTIVITY COMPLETED" : "WORKOUT COMPLETED"}</div>
         <div class="rc-title">${escapeHtml(sharing ? r.title : "Workout")}</div>
         <div class="rc-when">${escapeHtml(when)}</div>
       </div>
@@ -16078,11 +16179,16 @@ function openRecap(email, name, date) {
         </div>
       </div>` : ""}
 
+    ${/* The missed lifts sit in the same list as the logged ones rather than in
+          a block of their own: it is one workout, and a person reading back a
+          leg day wants the shape of it, not two lists to reconcile. The count
+          goes in the heading, where the sheet already puts a right-hand note. */ ""}
     ${!sharing
       ? `<p class="lw-private-note">${escapeHtml(name)} keeps workout details private. Their effort score is always shared.</p>`
-      : r.lifts.length ? `
-      <div class="rc-ex-head"><h4>Exercises</h4></div>
-      <div class="rc-list">${r.lifts.map(exRow).join("")}</div>`
+      : r.lifts.length || r.missed.length ? `
+      <div class="rc-ex-head"><h4>Exercises</h4>${r.missed.length
+        ? `<span class="rc-head-miss">${r.missed.length} not done</span>` : ""}</div>
+      <div class="rc-list">${r.lifts.map(exRow).join("")}${r.missed.map(missRow).join("")}</div>`
       : r.activities.length ? ""
       : `<div class="ps-empty">No exercises were logged for this one.</div>`}
 
@@ -16104,11 +16210,135 @@ function openRecap(email, name, date) {
   $("rcClose").onclick = closeRecap;
   if ($("rcTell")) $("rcTell").onclick = () => { closeRecap(); openNoteComposer("congratulate"); };
   if ($("rcShare")) $("rcShare").onclick = () => shareRecap(r);
+  /* Over the recap rather than instead of it: closing the activity puts the day
+     back exactly as it was, which is what pressing a row in a list should do. */
+  $("recapSheet").querySelectorAll("[data-act-log]").forEach((b) => {
+    b.onclick = () => openActivityDetail(b.dataset.actLog);
+  });
   $("recapScrim").classList.remove("hidden");
   $("recapScrim").onclick = (ev) => { if (ev.target === $("recapScrim")) closeRecap(); };
 }
 
 function closeRecap() { $("recapScrim").classList.add("hidden"); }
+
+/* ---------- One activity, opened out of the recap ----------
+
+   What this sheet can honestly say is decided by what saveCardioSession wrote,
+   and that is the activity's name, the minutes that actually elapsed, and a
+   distance if the activity has one. The session itself, the class the library
+   built and the moves it held, is thrown away the moment the timer closes:
+   CARDIO_SES.plan lives in memory and in one localStorage key, and both are
+   cleared on save. So nothing in the log can say which moves a past yoga class
+   contained, and nothing can say which of them were reached.
+
+   It would be close to recoverable, and that is the trap. buildGuidedPlan is
+   deterministic and seeded on the date, so re-running it for a past day gives a
+   session back. It gives back the session that WOULD be built for that day at
+   today's level for the length that was asked for, and neither of those two is
+   in the log: the level moves as sessions accumulate, and what is stored is the
+   minutes that elapsed, not the minutes that were requested. A person who
+   stopped a thirty minute class at eighteen would be shown an eighteen minute
+   class they never did. So this sheet says what is missing instead of drawing
+   it, the same way dayNotes and meta.missing say what they could not answer.
+
+   Storing it properly is one column: exercise_logs.session jsonb, written from
+   CARDIO_SES.plan or .card in saveCardioSession alongside the minutes, plus
+   whichever move the clock had reached when End was pressed. */
+
+/* Minutes and a distance are arithmetic, so a pace is a fact about this row and
+   not an estimate. Only where the activity has a distance at all. */
+function activityPace(l) {
+  if (!l?.distance_mi || !l?.duration_min) return null;
+  const perMile = l.duration_min / l.distance_mi;
+  const m = Math.floor(perMile);
+  const s = Math.round((perMile - m) * 60);
+  return `${s === 60 ? m + 1 : m}:${String(s === 60 ? 0 : s).padStart(2, "0")}`;
+}
+
+/* ACTIVITY_METS is keyed by the library's own names for these things, which are
+   not the labels this app logs: it says "Running" where a row says "Run", and
+   it has one entry for a run outdoors and on a treadmill because the legs do
+   not know the difference. Written out rather than derived from act.cardio so
+   that adding an activity with no honest MET behind it fails to a blank number
+   instead of quietly borrowing somebody else's. */
+const ACT_MET_NAME = {
+  run: "Running", treadmill: "Running", walk: "Walking",
+  cycle: "Cycling", bikemachine: "Cycling", stairs: "Stair climber",
+  row: "Rowing machine", elliptical: "Elliptical",
+  yoga: "Yoga", pilates: "Pilates", hiit: "HIIT",
+};
+
+function activityCalories(name, act, minutes) {
+  const key = ACT_MET_NAME[act?.key];
+  const lb = currentWeightLb(name);
+  if (!key || !lb || !minutes || !FIT_MATH.estimateActivityCalories) return null;
+  return FIT_MATH.estimateActivityCalories(key, minutes, lb) || null;
+}
+
+function openActivityDetail(logId) {
+  const l = ALL_EXERCISE_LOGS.find((x) => String(x.id) === String(logId));
+  if (!l) return;
+  const nm = (l.exercise_name || "").trim();
+  const act = actForExerciseName(nm);
+  const kcal = activityCalories(l.user_name, act, l.duration_min);
+  const pace = activityPace(l);
+  const at = l.created_at ? new Date(l.created_at) : null;
+  const when = [relDayLabel(l.entry_date), at && !isNaN(at)
+    ? at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : null]
+    .filter(Boolean).join(" · ");
+
+  /* Only the numbers that are real. A distance column reading a dash on a yoga
+     class is the sheet shrugging, which is exactly what the recap's own stat
+     row was fixed for. Three to a row, the recap's grid: a run has all four of
+     these and four labels at this width wrap into each other, so the estimate
+     drops to a second row and the facts keep the first. A yoga class has two
+     and they sit side by side rather than one to a line. */
+  const facts = [
+    recapStat(String(l.duration_min || 0), "MINUTES"),
+    l.distance_mi ? recapStat(String(l.distance_mi), "DISTANCE", "mi") : null,
+    pace ? recapStat(pace, "PACE", "/mi") : null,
+    kcal ? recapStat(String(kcal), "EST. CALORIES") : null,
+  ].filter(Boolean);
+  const rows = facts.length > 3 ? [facts.slice(0, 3), facts.slice(3)] : [facts];
+
+  $("actDetailSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="adClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">Activity</div>
+      <div class="spacer"></div>
+    </div>
+
+    <div class="rc-head">
+      <div class="rc-tick">${icon(act?.ico || "run", 22)}</div>
+      <div>
+        ${/* LOGGED, not COMPLETED. Nothing in the row says whether the session
+              that was saved is the session that was started: the minutes are
+              what elapsed before End was pressed, and a class cut short saves
+              exactly like one finished. The recap is allowed its "COMPLETED"
+              because a lifting day has a plan to be measured against. */ ""}
+        <div class="rc-kicker">ACTIVITY LOGGED</div>
+        <div class="rc-title">${escapeHtml(act ? actTitle(act) : nm)}</div>
+        <div class="rc-when">${escapeHtml(when)}</div>
+      </div>
+    </div>
+
+    ${rows.map((row) => `<div class="rc-stats" style="grid-template-columns:repeat(${row.length},1fr);">${row.join("")}</div>`).join("")}
+
+    <div class="rc-ex-head"><h4>What was in it</h4></div>
+    <div class="ad-gap">
+      <p>Nothing, and that is the honest answer rather than an empty screen. Unio writes down the activity${l.distance_mi ? ", the minutes and the distance" : " and the minutes"} when you save a session, and has never written down anything else.</p>
+      <p>${act?.training
+        ? "So the class itself, which moves it held and how far through them you got, is gone: it is built when you start it and thrown away when you save it. Rebuilding it now would be a guess, so it is not drawn."
+        : "So how the session was paced, and whether you finished the one you set out to do, was never recorded, and there is nothing here to mark off."}</p>
+    </div>`;
+
+  $("adClose").onclick = closeActivityDetail;
+  $("actDetailScrim").classList.remove("hidden");
+  $("actDetailScrim").onclick = (ev) => { if (ev.target === $("actDetailScrim")) closeActivityDetail(); };
+}
+
+function closeActivityDetail() { $("actDetailScrim").classList.add("hidden"); }
 
 /* Sharing: an image, with the link carried in the share text.
    A bare link dies where fitness actually gets shared, Stories and WhatsApp,
@@ -39650,6 +39880,7 @@ const A11Y_SHEETS = {
   liveScrim: "Live session",
   allWorkoutsScrim: "All workouts",
   recapScrim: "Workout recap",
+  actDetailScrim: "Activity",
   nextWorkoutScrim: "Next workout",
   partnerSheetScrim: "Partner",
   daySheetScrim: "Day",
