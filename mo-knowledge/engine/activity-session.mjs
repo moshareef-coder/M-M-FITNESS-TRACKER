@@ -254,7 +254,7 @@ export function buildActivitySession(training, {
   /* First, because the app's reveal prints the first note and this is the one
      that changes what the class is. */
   if (excluded.length) {
-    notes.push(`Left out because you said your ${hurtSay} hurts: ${listOut(excluded.map((e) => e.name))}.`);
+    notes.push(`Left out because you said your ${hurtSay} ${hurts.length === 1 ? "hurts" : "hurt"}: ${listOut(excluded.map((e) => e.name))}.`);
   }
 
   const rand = rng(`${training.id}|${level}|${styleKey || ""}|${seed}`);
@@ -270,7 +270,7 @@ export function buildActivitySession(training, {
      repeat. A person who can see the library is small can judge the session. */
   if (rounds > 1) {
     notes.push(excluded.length
-      ? `${rounds} rounds of the same sequence. ${training.label} has about ${Math.round(uniqueSeconds / 60)} min of moves at this level with the ${excluded.length} that load your ${hurtSay} left out, and a class repeats them.`
+      ? `${rounds} rounds of the same sequence. ${training.label} has about ${Math.round(uniqueSeconds / 60)} min of moves at this level with the ${excluded.length} that load${excluded.length === 1 ? "s" : ""} your ${hurtSay} left out, and a class repeats them.`
       : `${rounds} rounds of the same sequence. ${training.label} has about ${Math.round(uniqueSeconds / 60)} min of moves at this level, and a class repeats them.`);
   }
   /* The gap is reported rather than padded out with a move nobody chose. */

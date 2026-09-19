@@ -174,7 +174,9 @@ test("neck and lower back: no inversion, no deep backbend, no loaded flexion, an
         assert.ok(!j.includes("neck") && !j.includes("lowerback"), `${t.id} ${level}: ${m.name} loads ${j.join("+")}`);
       }
       /* Said, first, by name: the reveal prints the first note. */
-      assert.ok(/^Left out because you said your neck and lower back hurts?: /.test(s.notes[0]), s.notes[0]);
+      assert.ok(/^Left out because you said your neck and lower back hurt: /.test(s.notes[0]), s.notes[0]);
+      const one = buildActivitySession(t, { minutes: 30, level, seed: "2026-09-19", limits: { hurts: ["neck"] } });
+      if (one.excluded.length) assert.ok(/^Left out because you said your neck hurts: /.test(one.notes[0]), one.notes[0]);
       for (const e of s.excluded) assert.ok(s.notes[0].includes(e.name), `${e.name} left out silently`);
       assert.ok(s.excluded.length > 0, `${t.id} ${level}: nothing was excluded, the table is not being read`);
     }
