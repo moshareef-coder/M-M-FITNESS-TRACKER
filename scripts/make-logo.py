@@ -78,40 +78,54 @@ def rrect(cx, cy, w, h, r, fill, extra=""):
 # Every one of these is lit from the same place, up and slightly left, which is
 # the thing the old raster never managed: it had a different answer per element
 # and that is what read as "shadows all over".
-GLOSS = """
-<linearGradient id="bl" gradientUnits="userSpaceOnUse" x1="180" y1="110" x2="830" y2="920">
-  <stop offset="0" stop-color="#4f83ff"/><stop offset="0.38" stop-color="#2d6bff"/><stop offset="1" stop-color="#0a37ad"/>
+# Mo picked the middle of three shine levels by looking at them side by side,
+# which is the only sensible way to settle a word like "glossy".
+def gloss_defs(sheen=0.50, glow=0.75):
+    """The glossy palette. One light, up and slightly left, and everything obeys
+    it: gradients are in user space, not per shape, or each arc lights itself and
+    the two halves disagree about where the sun is.
+
+    The colour is carried by the fill and the light by a thin specular. Spreading
+    the highlight across the tube instead is what turned a saturated blue milky
+    on the first attempt.
+    """
+    return f"""
+<linearGradient id="bl" gradientUnits="userSpaceOnUse" x1="200" y1="120" x2="820" y2="900">
+  <stop offset="0" stop-color="#3d7cff"/><stop offset="0.35" stop-color="#0a5bff"/><stop offset="1" stop-color="#0030b4"/>
 </linearGradient>
-<linearGradient id="or" gradientUnits="userSpaceOnUse" x1="180" y1="110" x2="830" y2="920">
-  <stop offset="0" stop-color="#ff8f75"/><stop offset="0.38" stop-color="#ff6b4a"/><stop offset="1" stop-color="#c8330f"/>
+<linearGradient id="or" gradientUnits="userSpaceOnUse" x1="200" y1="120" x2="820" y2="900">
+  <stop offset="0" stop-color="#ff8055"/><stop offset="0.35" stop-color="#ff5228"/><stop offset="1" stop-color="#bd2a04"/>
 </linearGradient>
-<linearGradient id="sheen" gradientUnits="userSpaceOnUse" x1="200" y1="90" x2="700" y2="720">
-  <stop offset="0" stop-color="#ffffff" stop-opacity="0.62"/>
-  <stop offset="0.32" stop-color="#ffffff" stop-opacity="0.10"/>
+<linearGradient id="sheen" gradientUnits="userSpaceOnUse" x1="230" y1="110" x2="660" y2="680">
+  <stop offset="0" stop-color="#ffffff" stop-opacity="{sheen}"/>
+  <stop offset="0.3" stop-color="#ffffff" stop-opacity="{sheen * 0.14:.3f}"/>
   <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
 </linearGradient>
-<linearGradient id="pl" gradientUnits="userSpaceOnUse" x1="330" y1="300" x2="700" y2="730">
-  <stop offset="0" stop-color="#78848d"/><stop offset="0.5" stop-color="#48525a"/><stop offset="1" stop-color="#262c32"/>
+<linearGradient id="pl" gradientUnits="userSpaceOnUse" x1="340" y1="300" x2="690" y2="740">
+  <stop offset="0" stop-color="#3a4046"/><stop offset="0.45" stop-color="#191d21"/><stop offset="1" stop-color="#07090b"/>
 </linearGradient>
 <linearGradient id="plTop" x1="0" y1="0" x2="0" y2="1">
-  <stop offset="0" stop-color="#ffffff" stop-opacity="0.40"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+  <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
 </linearGradient>
-<linearGradient id="pd" x1="0" y1="0" x2="0.3" y2="1">
-  <stop offset="0" stop-color="#eaffc0"/><stop offset="0.22" stop-color="#ccff63"/>
-  <stop offset="0.6" stop-color="#a8ff00"/><stop offset="1" stop-color="#63ad00"/>
+<linearGradient id="pd" x1="0" y1="0" x2="0.28" y2="1">
+  <stop offset="0" stop-color="#ddff8a"/><stop offset="0.2" stop-color="#bcff3d"/>
+  <stop offset="0.58" stop-color="#a8ff00"/><stop offset="1" stop-color="#6cc400"/>
 </linearGradient>
 <linearGradient id="pdTop" x1="0" y1="0" x2="0" y2="1">
-  <stop offset="0" stop-color="#ffffff" stop-opacity="0.8"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+  <stop offset="0" stop-color="#ffffff" stop-opacity="0.7"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
 </linearGradient>
 <filter id="glow" x="-70%" y="-70%" width="240%" height="240%">
-  <feGaussianBlur stdDeviation="20" result="g"/>
-  <feComponentTransfer in="g"><feFuncA type="linear" slope="0.8"/></feComponentTransfer>
+  <feGaussianBlur stdDeviation="18" result="g"/>
+  <feComponentTransfer in="g"><feFuncA type="linear" slope="{glow}"/></feComponentTransfer>
 </filter>
-<filter id="soft"><feGaussianBlur stdDeviation="6"/></filter>
+<filter id="soft"><feGaussianBlur stdDeviation="5"/></filter>
 <filter id="cast" x="-25%" y="-25%" width="150%" height="160%">
-  <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#0a1a2e" flood-opacity="0.20"/>
+  <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#0a1420" flood-opacity="0.20"/>
 </filter>
 """
+
+
+GLOSS_TUNE = {}
 
 
 def build(style, only=None):
@@ -124,7 +138,7 @@ def build(style, only=None):
     gloss = style == "gloss"
     defs = []
     if gloss:
-        defs.append(GLOSS)
+        defs.append(gloss_defs(**(GLOSS_TUNE or {})))
     if depth:
         # One light, from above and slightly left, and one shadow under the
         # whole mark. The old artwork had a different answer per element.
@@ -207,6 +221,15 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for style in ("flat", "depth", "gloss"):
         (OUT / f"unio-mark-{style}.svg").write_text(build(style))
+    # Three amounts of shine, so the call can be made by looking rather than by
+    # arguing about the word "glossy".
+    global GLOSS_TUNE
+    for tag, tune in (("low", {"sheen": 0.34, "glow": 0.55}),
+                      ("mid", {"sheen": 0.50, "glow": 0.75}),
+                      ("high", {"sheen": 0.66, "glow": 0.95})):
+        GLOSS_TUNE = tune
+        (OUT / f"unio-mark-g{tag}.svg").write_text(build("gloss"))
+    GLOSS_TUNE = {}
     # The boot layers take the glossy build: they are shown at 150px on a phone,
     # which is nowhere near the size where gloss turns to mud.
     for layer in ("left", "right", "bar"):
