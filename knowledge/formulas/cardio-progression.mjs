@@ -96,3 +96,83 @@ export function buildCardioPlan({ currentContinuousRunSeconds = 0, targetContinu
   }
   return weeks;
 }
+
+// ---------------------------------------------------------------------------
+// "Going faster" (the build-endurance tune question's "speed" option): interval work layered
+// ON TOP of an easy-run base, not a separate system. Research is consistent across sources:
+// even for a pure speed goal, most weekly running volume should stay easy -- one hard session a
+// week for beginners, one to two for intermediate/advanced, never the majority of the week.
+// See ../principles/build-endurance-training.md.
+// ---------------------------------------------------------------------------
+
+// A classic, widely-cited study found 4x4-minute intervals at 90-95% max HR improved VO2max by
+// ~7.2% over the training period. Beginners start far short of that: 6x30s-1min hard efforts
+// with generous easy recovery is the standard beginner entry point across sources checked.
+export const SPEED_SESSIONS_PER_WEEK = 1; // the ONE hard day; the rest of the week's cardio stays easy
+export const SPEED_GROWTH_PER_WEEK = 0.15; // more conservative than the distance case's 50% --
+  // high-intensity work is more taxing and more injury-prone than easy continuous running, so
+  // this progresses slower on purpose, not by oversight.
+
+/**
+ * Builds one week's interval session. No HR data assumed available, so intensity is described
+ * by effort (RPE / "comfortably hard" to "hard") rather than a %HRmax number the app can't
+ * actually verify without a wearable -- a target the app can't check is worse than an honest
+ * effort-based instruction.
+ * level: "beginner" | "intermediate" | "advanced" -- from experience-tiers.md, NOT specific to
+ *   running experience, but a reasonable proxy in the absence of a running-specific history.
+ */
+export function buildSpeedWeek({ weekIndex, level = "beginner" }) {
+  const isRecoveryWeek = weekIndex > 0 && weekIndex % RECOVERY_WEEK_EVERY_N_WEEKS === 0;
+  const growthFactor = isRecoveryWeek ? 0 : Math.min(weekIndex, 8) * SPEED_GROWTH_PER_WEEK; // caps growth after week 8 -- linear growth forever isn't realistic for interval volume either
+
+  if (level === "beginner") {
+    // 6x30s hard, generous recovery -- the standard beginner entry point. Rounds grow slowly;
+    // interval duration itself does not, since going both longer AND more frequent at once is
+    // exactly the kind of double-progression that causes overuse injury.
+    const rounds = Math.min(10, Math.round(6 * (1 + growthFactor)));
+    return { intervalSeconds: 30, recoverySeconds: 90, rounds, effort: "hard, not all-out", isRecoveryWeek, sessionsThisWeek: SPEED_SESSIONS_PER_WEEK };
+  }
+  if (level === "intermediate") {
+    // Tempo/"cruise interval" format -- less neurologically taxing than short VO2max intervals,
+    // so sustainable more often. 3x10min at "comfortably hard" with 2min jog recovery.
+    const rounds = Math.min(5, Math.round(3 * (1 + growthFactor)));
+    return { intervalSeconds: 600, recoverySeconds: 120, rounds, effort: "comfortably hard, sustainable pace", isRecoveryWeek, sessionsThisWeek: SPEED_SESSIONS_PER_WEEK };
+  }
+  // Advanced: classic 4x4min hard effort, 3min easy recovery -- the specific structure behind
+  // the cited 7.2% VO2max improvement.
+  const rounds = Math.min(6, Math.round(4 * (1 + growthFactor)));
+  return { intervalSeconds: 240, recoverySeconds: 180, rounds, effort: "hard, 90-95% effort", isRecoveryWeek, sessionsThisWeek: SPEED_SESSIONS_PER_WEEK };
+}
+
+// ---------------------------------------------------------------------------
+// "Everyday stamina" (the build-endurance tune question's "general" option): a time/frequency
+// target using whatever activity the person likes, not a continuous-running-duration to build
+// toward the way "distance" is. No graduation point -- this is a standing weekly habit, not a
+// program with an end state. See ../principles/build-endurance-training.md.
+// ---------------------------------------------------------------------------
+
+// ACSM, CDC, AHA, and ACC all converge on the same target: 150 min/week moderate intensity OR
+// 75 min/week vigorous. Near-unanimous across every major body checked -- this isn't one
+// source's opinion.
+export const GENERAL_TARGET_MODERATE_MINUTES_PER_WEEK = 150;
+export const GENERAL_TARGET_VIGOROUS_MINUTES_PER_WEEK = 75;
+export const GENERAL_RAMP_WEEKS = 6; // AHA explicitly recommends ramping up gradually rather
+  // than starting a previously sedentary person straight at the full target
+
+/**
+ * currentWeeklyMinutes: what they're already doing (0 for a true beginner).
+ * intensity: "moderate" | "vigorous" -- moderate = can talk but not sing; vigorous = can't
+ *   hold a conversation. This is the actual practical marker every source uses, deliberately
+ *   not a %HRmax number the app has no way to verify.
+ */
+export function buildGeneralEnduranceWeek({ weekIndex, currentWeeklyMinutes = 0, intensity = "moderate" }) {
+  const target = intensity === "vigorous" ? GENERAL_TARGET_VIGOROUS_MINUTES_PER_WEEK : GENERAL_TARGET_MODERATE_MINUTES_PER_WEEK;
+  if (currentWeeklyMinutes >= target) {
+    return { weeklyMinutes: target, sessionsThisWeek: 5, minutesPerSession: Math.round(target / 5), isAtTarget: true, intensity };
+  }
+  const rampProgress = Math.min(1, (weekIndex + 1) / GENERAL_RAMP_WEEKS);
+  const weeklyMinutes = Math.round(Math.max(currentWeeklyMinutes, 60) + (target - Math.max(currentWeeklyMinutes, 60)) * rampProgress);
+  const sessionsThisWeek = 5; // spread across the week, matching "30 min x 5 days" -- easier to
+    // sustain than fewer, longer sessions, and matches how the guideline itself is phrased
+  return { weeklyMinutes, sessionsThisWeek, minutesPerSession: Math.round(weeklyMinutes / sessionsThisWeek), isAtTarget: false, intensity };
+}
