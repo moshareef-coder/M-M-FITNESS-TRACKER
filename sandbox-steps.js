@@ -113,10 +113,10 @@
         note: "Tap any day to plan it. Planned days feed the week strip on home and the auto-schedule.",
         run: (w) => { w.switchTab("workout"); w.goWorkoutScreen("week"); } },
 
-      { t: "Saved workouts", scenario: "paired",
-        s: "Two saved, openable",
-        note: "The list that used to be called a loadout. Tap one to see its exercises, tap an exercise for the detail. Nothing here says loadout any more.",
-        run: (w) => { w.switchTab("workout"); w.openSavedList(); } },
+      { t: "Tomorrow's plan", scenario: "twoSessions",
+        s: "The same screen as before a workout, in review",
+        note: "Today is done, so the card is about tomorrow. See tomorrow's plan opens tomorrow's rows in full: the figures, the sets and reps, the swap arrow on each row, the grips and Add exercise, all writing to tomorrow. No Begin and no timer, and under the list the three doors, swap the whole workout, tell me what you have, do an activity instead.",
+        run: (w) => { w.switchTab("workout"); w.openPlanReview(w.shiftDate(w.todayStr(), 1)); } },
 
       { t: "Warm-up first", scenario: "paired",
         s: "Two timed moves before the first set",
@@ -456,7 +456,7 @@
          step that actually wants a session calls startWorkout() itself
          right after, which makes a fresh one unconditionally, so clearing
          here costs those steps nothing. */
-      try { win.closeAllOverlays?.(); win.closeSettingsPage?.(); win.closeSavedSheet?.(); } catch {}
+      try { win.closeAllOverlays?.(); win.closeSettingsPage?.(); } catch {}
       /* discardSession is async: it banks the current exercise first and only
          then nulls the session. Fired and not awaited, that null landed AFTER
          the next step's startWorkout(), so every session step revisited in the
