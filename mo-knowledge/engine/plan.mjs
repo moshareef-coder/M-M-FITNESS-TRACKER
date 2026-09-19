@@ -2439,8 +2439,14 @@ export function buildPlan({
      slot unfillable, and a note claiming it is gone when it is still on the
      card would be worse than no note. */
   const inWeek = new Set(week.flatMap((d) => d.exercises.map((e) => String(e.name).toLowerCase())));
+  /* A soft avoid speaks too, since 2026-09-19. It only sinks a lift down its
+     pool, but a pool with anything else in it puts something else on top, so
+     at two swaps the movement was leaving the card with nothing said, and the
+     third swap the hard sentence waited for could never happen on a lift
+     nobody could see. An avoid only exists because the lift was on a card
+     inside the window, so absent from this week is the thing to explain. */
   for (const a of preferences.avoid) {
-    if (a.strength === "hard" && !inWeek.has(a.name.toLowerCase())) dayNotes.push(avoidNote(a));
+    if (!inWeek.has(a.name.toLowerCase())) dayNotes.push(avoidNote(a));
   }
 
   /* And the other half of the same promise. A hard avoid that is still on the

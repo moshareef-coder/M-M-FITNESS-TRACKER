@@ -194,7 +194,7 @@ export function earnedMovements({ logs = [], swaps = [] } = {}) {
  * window, and names the lifts. A plan can act on a name; it cannot act on a ratio.
  *
  * @param {{ logs?: Array, today?: Date, weeks?: number }} input
- * @returns {{ stalled: boolean, lifts: Array<{name:string,sessions:number,weeksFlat:number,weightLb:number}>, why: string[] }}
+ * @returns {{ stalled: boolean, lifts: Array<{name:string,sessions:number,sessionsFlat:number,weeksFlat:number,weightLb:number}>, why: string[] }}
  */
 export function detectPlateau({ logs = [], today = new Date(), weeks = THRESHOLDS.recentWeeks } = {}) {
   const why = [];
@@ -247,8 +247,15 @@ export function detectPlateau({ logs = [], today = new Date(), weeks = THRESHOLD
       if (w > runningBest) { runningBest = w; lastPr = d; }
     }
     const weeksFlat = Math.max(0, Math.round((parse(iso(today)) - parse(lastPr)) / DAY / 7));
+    /* And how many times they have done it since, across the whole flat stretch. `sessions`
+       above is the window count, and on a lift scheduled once a week six of those means
+       perfect attendance and no rotation; one week out and the count could never reach
+       the six plateau-response.mjs asks for, so a Lat Pulldown flat for sixteen weeks was
+       answered twice and waited on the rest. Sessions since the last PR is the number
+       "how many sessions of it while flat" actually means. */
+    const sessionsFlat = all.filter(([d]) => d > lastPr).length;
 
-    lifts.push({ name: rec.name, sessions: window.length, weeksFlat, weightLb: best });
+    lifts.push({ name: rec.name, sessions: window.length, sessionsFlat, weeksFlat, weightLb: best });
   }
 
   lifts.sort((a, b) => b.weeksFlat - a.weeksFlat || b.sessions - a.sessions);

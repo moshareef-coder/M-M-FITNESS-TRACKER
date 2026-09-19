@@ -1268,6 +1268,38 @@ test("scoreAlternatives dedupes results by name when the pool has the same name 
  * preferences.mjs
  * ========================================================================= */
 
+/* CONTRACT.md promised two swaps sink a movement and three remove it with a
+   note. Measured on 2026-09-19: the sink took it off the card at two, because a
+   pool with anything else in it puts something else on top, and nothing was
+   said, because only a hard avoid spoke. The third swap could then never
+   happen. Nobody loses a movement without being told, at either count. */
+const swapsAwayFrom = (name, n) => Array.from({ length: n }, (_, i) => ({
+  entry_date: day(-(2 + i * 4)), planned_exercise: name, chosen_exercise: "Dumbbell Bench Press",
+}));
+const firstLiftOf = (args) => buildPlan(args).week[0].exercises[0].name;
+
+test(`${SOFT_AT} swaps away from a lift that then leaves the card are said out loud`, () => {
+  const args = { goal: { bubble: "build-muscle" }, person: { bodyWeightLb: 175, sex: "Male", daysAsked: 4 }, logs: history({ n: 12 }) };
+  const target = firstLiftOf(args);
+  const plan = buildPlan({ ...args, swaps: swapsAwayFrom(target, SOFT_AT) });
+  const inWeek = plan.week.some((d) => d.exercises.some((e) => e.name === target));
+  assert.equal(inWeek, false, `${target} is still in the week, so this test is not exercising the sink`);
+  const note = plan.dayNotes.find((n) => n.includes(target));
+  assert.ok(note, `nothing said about ${target}: ${plan.dayNotes.join(" | ")}`);
+  assert.match(note, /bottom of its list/);
+  assert.match(note, /comes back/);
+});
+
+test(`${HARD_AT} swaps away from a lift remove it and say so`, () => {
+  const args = { goal: { bubble: "build-muscle" }, person: { bodyWeightLb: 175, sex: "Male", daysAsked: 4 }, logs: history({ n: 12 }) };
+  const target = firstLiftOf(args);
+  const plan = buildPlan({ ...args, swaps: swapsAwayFrom(target, HARD_AT) });
+  assert.equal(plan.week.some((d) => d.exercises.some((e) => e.name === target)), false);
+  const note = plan.dayNotes.find((n) => n.includes(target));
+  assert.ok(note, `nothing said about ${target}: ${plan.dayNotes.join(" | ")}`);
+  assert.match(note, /so it is not in here/);
+});
+
 test(`${HARD_AT} swaps away from one exercise is a hard avoid`, () => {
   const swaps = [day(-5), day(-15), day(-25)].map((d) => ({
     entry_date: d, planned_exercise: "Overhead Press", chosen_exercise: "Dumbbell Shoulder Press",
@@ -1523,6 +1555,51 @@ test("plateau response uses the rep range for a strength goal with a short stall
   const plateau = { lifts: [{ name: "Deadlift", sessions: 8, weeksFlat: PLATEAU_RESPONSE.shortStallWeeks - 1, weightLb: 275 }] };
   const r = planPlateauResponse({ plateau, stillLinear: false, confidence: "high", goal: { bubble: "get-stronger" } });
   assert.equal(r.responses[0].action, "rep-range");
+});
+
+test("one stuck lift on a strength goal gets the rep range while the other lifts still climb", () => {
+  /* The audit's unreachable answer. Loading still works elsewhere, so the
+     still-linear wait used to swallow this, and the only person who got past
+     that wait was stalled everywhere and got the volume cut instead. */
+  const plateau = { lifts: [{ name: "Lat Pulldown", sessions: 8, weeksFlat: 5, weightLb: 95 }] };
+  const r = planPlateauResponse({ plateau, stillLinear: true, confidence: "high", goal: { bubble: "get-stronger" } });
+  assert.equal(r.responses[0].action, "rep-range", r.why.join(" | "));
+  /* Not with too few sessions of it, which is the attendance case the wait exists for. */
+  const thin = { lifts: [{ name: "Lat Pulldown", sessions: 4, weeksFlat: 5, weightLb: 95 }] };
+  assert.equal(planPlateauResponse({ plateau: thin, stillLinear: true, confidence: "high", goal: { bubble: "get-stronger" } }).responses[0].action, "wait");
+  /* And three of them at once is still the whole week, not three rep ranges. */
+  const three = { lifts: ["Bench Press", "Squat", "Row"].map((name) => ({ name, sessions: 8, weeksFlat: 5, weightLb: 200 })) };
+  assert.equal(planPlateauResponse({ plateau: three, stillLinear: true, confidence: "high", goal: { bubble: "get-stronger" } }).summary.action, "volume-cut");
+});
+
+test("a lift done once a week is not attendance once it has been flat for eight weeks", () => {
+  /* Six sessions inside a six week window is perfect attendance on a once a
+     week lift, and one rotation week put it out of reach for good: the audit's
+     Lat Pulldown, stuck sixteen weeks and answered twice. Sessions since the
+     last PR is the count that says how much of it they have done while flat. */
+  const logs = [];
+  for (let i = 0; i < 12; i++) {
+    logs.push({ entry_date: day(-(1 + i * 7)), exercise_name: "Lat Pulldown", sets: 3, reps: 8, weight: i >= 9 ? 90 : 95 });
+    logs.push({ entry_date: day(-(1 + i * 7)), exercise_name: "Bench Press", sets: 3, reps: 8, weight: 200 - i * 5 });
+  }
+  /* One week of the last six missing, so the window holds five. */
+  const thinned = logs.filter((l) => !(l.exercise_name === "Lat Pulldown" && l.entry_date === day(-(1 + 2 * 7))));
+  const plateau = detectPlateau({ logs: thinned });
+  const lift = plateau.lifts.find((l) => l.name === "Lat Pulldown");
+  assert.ok(lift, plateau.why.join(" | "));
+  assert.equal(lift.sessions, 5);
+  assert.equal(lift.sessionsFlat, 7, "eight weekly sessions since the PR, one of them missed");
+  const r = planPlateauResponse({ plateau, stillLinear: true, confidence: "high" });
+  assert.notEqual(r.responses.find((x) => x.exercise === "Lat Pulldown").action, "wait", r.why.join(" | "));
+});
+
+test("a lift calibrate has called too easy for eight weeks stops being told it is sorting itself out", () => {
+  const plateau = { lifts: [{ name: "Lat Pulldown", sessions: 12, weeksFlat: PLATEAU_RESPONSE.rotateFromWeeks + 1, weightLb: 95 }] };
+  const calibration = { byExercise: { "lat pulldown": { verdict: "too-easy" } }, overall: null };
+  const r = planPlateauResponse({ plateau, stillLinear: false, confidence: "high", calibration });
+  assert.notEqual(r.responses[0].action, "wait", r.why.join(" | "));
+  const young = { lifts: [{ name: "Lat Pulldown", sessions: 12, weeksFlat: 5, weightLb: 95 }] };
+  assert.equal(planPlateauResponse({ plateau: young, stillLinear: false, confidence: "high", calibration }).responses[0].action, "wait");
 });
 
 test("plateau response rotates otherwise", () => {

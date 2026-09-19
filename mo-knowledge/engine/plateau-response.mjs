@@ -76,8 +76,13 @@ export const PLATEAU_RESPONSE = {
      firmly, because whatever they are doing has had long enough to work. */
   rotateFromWeeks: 8,
   /* A strength stall this short gets the rep range first, because the lift
-     itself is usually fine and the range has run out of room. */
-  shortStallWeeks: 6,
+     itself is usually fine and the range has run out of room. Eight rather
+     than six since 2026-09-19, and eight on purpose: the rep range is
+     prescribed "for this block", the block starts at minWeeksFlat, and at six
+     the block was two weeks long before rotation took the lift anyway. Set
+     equal to rotateFromWeeks, so the ladder on a strength goal reads reps
+     first, then rotate, with no gap between them. */
+  shortStallWeeks: 8,
   /* While session to session loading is still working, a lift has to be flat for
      this long, on this many sessions of it, before anything happens at all. Two
      guards rather than one, because week to week noise is enormous at that stage
@@ -275,9 +280,27 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
       return { lift, action: "wait", reason: "short" };
     }
 
+    /* The rep range answer on a strength goal, decided here rather than below
+       the still-linear wait where it sat until 2026-09-19. Down there it was
+       unreachable in practice: it fired 0 times in 94 replayed weeks, because
+       the only person who got past the wait was stalled everywhere, and that
+       person trips the systemic cut instead. The wait's own argument is that
+       a flat lift while loading still works elsewhere is usually attendance,
+       and the sessions gate is the answer to that: six sessions of the lift
+       inside the window is not attendance. A verdict still comes first below,
+       because calibrate.mjs adding load or taking it off is already a change
+       and the rep range on top of it is two levers at once. */
+    const strengthShort = isStrengthGoal(goal) && lift.weeksFlat < PLATEAU_RESPONSE.shortStallWeeks;
+    /* Sessions of the lift while it has been flat, or in the window when the
+       plateau came from somewhere that does not count the former. The window
+       count alone made the gate unreachable for a lift done once a week: see
+       sessionsFlat in training-age.mjs. */
+    const ofIt = Math.max(Number(lift.sessions) || 0, Number(lift.sessionsFlat) || 0);
+    const enoughOfIt = ofIt >= PLATEAU_RESPONSE.linearMinSessions;
+
     if (linearStillWorks
-        && (lift.weeksFlat < PLATEAU_RESPONSE.linearMinWeeksFlat
-            || lift.sessions < PLATEAU_RESPONSE.linearMinSessions)) {
+        && (lift.weeksFlat < PLATEAU_RESPONSE.linearMinWeeksFlat || !enoughOfIt)
+        && !(strengthShort && enoughOfIt)) {
       why.push(`${lift.name}: ${lift.weeksFlat} weeks flat across ${lift.sessions} sessions of `
         + `it, under the ${PLATEAU_RESPONSE.linearMinWeeksFlat} weeks and `
         + `${PLATEAU_RESPONSE.linearMinSessions} sessions this asks for while weight is still `
@@ -288,7 +311,12 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
       return { lift, action: "wait", reason: "still-linear" };
     }
 
-    if (verdict === "too-easy") {
+    /* Only while the promise is young. calibrate.mjs reads the last two
+       sessions; a lift it has called too easy for eight weeks is a lift that
+       goes up next session and comes back down the one after, and "this one
+       is already sorting itself out" said of that for two months is the app
+       not paying attention. Past rotateFromWeeks the bar has had its chance. */
+    if (verdict === "too-easy" && lift.weeksFlat < PLATEAU_RESPONSE.rotateFromWeeks) {
       why.push(`${lift.name}: stalled, but calibrate.mjs already reads it as too easy and adds `
         + `load next session. Wait, because that is the stall breaking on its own and a second `
         + `response would be the same fix applied twice.`);
@@ -315,7 +343,7 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
       return { lift, action: "deload-lift" };
     }
 
-    if (isStrengthGoal(goal) && lift.weeksFlat < PLATEAU_RESPONSE.shortStallWeeks) {
+    if (strengthShort) {
       why.push(`${lift.name}: ${lift.weeksFlat} weeks flat on a strength goal, which is a short `
         + `stall on a lift they came here for. Change the rep range first. `
         + `progressive-overload.md counts more reps at the same weight as overload, and it is `
