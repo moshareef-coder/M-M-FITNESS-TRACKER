@@ -154,6 +154,37 @@ const WEEKLY_MRV = {
   glutes: 18, biceps: 22, triceps: 20, calves: 22, abs: 20, obliques: 20,
 };
 
+/* Core is ONE row in the ledger, because it is one row in the research.
+ *
+ * knowledge/principles/volume-landmarks.md carries a single "Abs/core" line and
+ * no oblique line anywhere, and WEEKLY_MRV above has always read that one row
+ * for both halves. Everything else still counted them as two: two weekly
+ * targets, two totals, two ceilings, and a focus tier that bought one half.
+ *
+ * What that came to for a person, measured on a four day build-muscle week
+ * before this change: obliques carried a target of 8 weekly sets and received
+ * 0, every week, on every split, because the core slot's pool is ranked and
+ * every abs-tagged movement outranks every oblique-tagged one. A target nothing
+ * will ever satisfy is the same lie as a focus tier that adds no sets. It also
+ * ran the wrong way on the ceiling: 20 sets of abs plus 20 of obliques is 40
+ * against an "Abs/core" MRV of 20, so two half-fed rows could not even enforce
+ * the one number the research states.
+ *
+ * So the COUNTING folds and the taxonomy does not. An exercise keeps its own
+ * `group`, and obliques stays one of the app's fourteen: the body figure, the
+ * heat map, recovery, the joint tags and the library's own tagging all read
+ * those keys, and renaming or removing one silently breaks a screen
+ * (knowledge/CLAUDE.md says so in as many words). What folds is which row the
+ * ledger adds a set to, which target it is held to, which MRV caps it, and
+ * whose focus tier it answers to. A tap on obliques now buys core rather than
+ * buying the half of core the library never fills.
+ *
+ * What this cannot fix is which MOVEMENTS fill the slot. Rotation and
+ * anti-rotation work is still outranked by planks and crunches, which is the
+ * loss recorded at SLOTS below and is a selection question, not a ledger one. */
+const LEDGER_GROUP = Object.freeze({ obliques: "abs" });
+const ledgerGroup = (g) => LEDGER_GROUP[g] || g;
+
 /* A short day is fewer sets and less time, not half a session. It used to hand
    back the main slots alone, which is two exercises on a push or a pull day, and
    PLAN.md's contract with the app says 4 to 6. So the accessories fill back up
@@ -791,6 +822,67 @@ const SLOTS = {
   ],
 };
 
+/* The one slot that is not always there, and the reasoning for that.
+ *
+ * No slot in SLOTS named `lowerback`, so the group was unreachable: marking it
+ * on the body map added zero sets on every goal, every split and every day
+ * count, and `volumeNotes.focusUntrained` reports lower back as 100% of its own
+ * column for exactly that reason. It is not a fringe pick either. The picker's
+ * Back region is `["lats", "traps", "lowerback"]` and a lone Back pick spends
+ * eight units down that list, so lower back comes out at the middle tier for
+ * anybody who taps Back and nothing else. The goal tree asks for it too: the
+ * `pain` child of Feel better and Get back into it prioritises
+ * `["abs", "glutes", "lowerback"]` and writes bird dog into its own notes, and
+ * Bird Dog has been sitting in the library unreachable the whole time.
+ *
+ * WHY IT IS CONDITIONAL. An unconditional slot changes what a day is made of
+ * for every person in the app, days before launch, to buy a muscle almost
+ * nobody names. Gated on the tier, the blast radius is exactly the people who
+ * asked: the tap, or a goal whose own parameters name the group. Everybody else
+ * gets the week they got yesterday, byte for byte, which is a property that can
+ * be measured rather than hoped for. It is also the smaller thing to undo.
+ *
+ * WHICH DAYS. The lower-body templates, and only those. The erectors are the
+ * muscle the hinge already loads, so the direct work belongs on the day that
+ * hinges rather than on a push or a pull day where it would be the only thing
+ * on the card below the waist. `upper` and `push` and `pull` are untouched, so
+ * nobody's arm work is displaced to make room: on a five day week the slot
+ * lands on Leg day and Lower body, and on four days on both Lower body days.
+ * The full body templates carry it too, because on two and three day weeks
+ * those are the only days there are.
+ *
+ * WHAT IT COSTS. It goes last in the accessory order, which is where the two
+ * time levers reach first, and it is a priority accessory by construction (the
+ * slot only exists when the group has a tier), so the trim shaves the calf and
+ * core work beside it before it shaves this. That is the honest statement of
+ * what gives: on a long lower day, a set or two of calves or core. A short day
+ * never reaches it at all, because the short day floor stops at four exercises
+ * and the mains plus the lunge and calf slots already fill those.
+ *
+ * `isolation` is the pattern, and it was `core` first and measured worse. In
+ * SLOTS, `isolation` is not a movement pattern at all, it is how this table
+ * says "a single-group accessory", which is exactly what this slot is and what
+ * the calf, bicep and forearm slots beside it already are. Naming a real
+ * pattern narrows the pool to movements `patternFor` agrees with, and the six
+ * lowerback-primary rows in the library fall under five different patterns:
+ * Bird Dog and Superman are core, Back Extension and Deadlift are hinge,
+ * Suitcase Carry is a carry and Reverse Hyperextension is isolation. Asking for
+ * core left a three day week two movements for three days, so it prescribed
+ * Bird Dog twice (+78 duplicate-in-week in the sweep). `isolation` skips the
+ * pattern filter, which puts all three beginner bodyweight rows in the pool and
+ * keeps `offPattern` quiet about a back extension that is technically a hinge. */
+const LOWERBACK_SLOT = Object.freeze({ pattern: "isolation", groups: ["lowerback"], role: "accessory" });
+const LOWERBACK_DAYS = new Set(["fullBody", "legs", "lower"]);
+
+/* The day's slots before the short-day floor is applied. One place, because
+   three things read the template (selection, the preference budget's slot
+   count, and the day's `allPatterns`) and a conditional slot two of them cannot
+   see is a slot that would quietly exist in one of them and not the others. */
+function templateFor(key, { lowerBack = false } = {}) {
+  const all = SLOTS[key];
+  return lowerBack && LOWERBACK_DAYS.has(key) ? [...all, LOWERBACK_SLOT] : all;
+}
+
 /* Names, because "there is no Push day or Legs, just a list" is complaint 4.
    Exported so the one day case can be tested at all: every goal in the tree has
    a minDays of 2 or 3 today, so buildPlan cannot currently reach it, and a fix
@@ -826,8 +918,8 @@ export function splitFor(days) {
 /* Which slots a day actually runs. A short day keeps every main movement and
    then takes accessories in order until it reaches four, because two exercises
    is not a session the app is allowed to hand back. */
-function slotsForDay(key, isShort) {
-  const all = SLOTS[key];
+function slotsForDay(key, isShort, opts) {
+  const all = templateFor(key, opts);
   if (!isShort) return all;
   /* Mains first, then every accessory in order, and the cap is applied by the
      caller on PICKS rather than here on slots. Slicing the slots to four meant
@@ -1206,6 +1298,40 @@ export function buildPlan({
      same card. Same shape, different cause, so a different sentence. */
   const dedupeEmpty = [];
 
+  /* Which groups are pushed, and by how much. `priorityOverride` arrives from
+     engine/focus.mjs as a tier map, `{ chest: 3, calves: 1 }`, and is also
+     still accepted as the bare group list it used to be: the goal tree's own
+     `P.priority` is one of those, and so is every caller written before tiers
+     existed. A bare list is read at the middle tier, which is the flat 1.4x
+     that list has always earned. Null means nobody merged anything and the goal
+     decides, which is every call that existed before focus.mjs landed.
+
+     It sat inside pass 3 until the lower back slot landed, because until then a
+     priority only ever changed how many sets a movement got. It now also
+     decides whether one slot exists at all, and a slot has to be known before
+     selection runs. Nothing else moved with it: it reads `P` and
+     `priorityOverride` and nothing pass 2 produces. */
+  const tierMap = toTierMap(priorityOverride ?? P.priority);
+  /* Read through the ledger's keys, so a tier on either half of core answers
+     for the pair. `tierMap` itself keeps both entries untouched, because
+     `focusUntrained` below still has to report on the group somebody actually
+     named rather than on the row it was counted in. */
+  const ledgerTiers = {};
+  for (const [g, t] of Object.entries(tierMap)) {
+    const k = ledgerGroup(g);
+    ledgerTiers[k] = Math.max(ledgerTiers[k] || 0, t);
+  }
+  const tierFor = (group) => ledgerTiers[ledgerGroup(group)] || 0;
+  /* The goal's half of that map, kept apart so the week can tell a group
+     somebody tapped from a group the goal named. Only the first is a control a
+     person pressed, and only a control that did nothing has to apologise for
+     it: see `focusUntrained` at the end of pass 3. */
+  const goalTiers = toTierMap(P.priority);
+  const isPriority = (group) => tierFor(group) > 0;
+
+  /* The one slot in the table that is not always there. See LOWERBACK_SLOT. */
+  const slotOpts = { lowerBack: tierFor("lowerback") > 0 };
+
   const split = splitFor(days).slice(0, days);
   /* One lever, pulled once. A systemic volume cut is the same 0.85 that
      calibration's back-off already runs through `setsFor`, so it reuses that
@@ -1243,14 +1369,14 @@ export function buildPlan({
      before the first pick and spent as the week is built, so it is the same one
      counter for all of pass 2. See openWeekBudget. */
   const prefSlots = split.reduce(
-    (n, [, key], i) => n + slotsForDay(key, shortFrom != null && i >= shortFrom).length, 0,
+    (n, [, key], i) => n + slotsForDay(key, shortFrom != null && i >= shortFrom, slotOpts).length, 0,
   );
   const prefBudget = openWeekBudget(preferences, { slots: prefSlots });
 
   const selected = split.map(([name, key], dayIndex) => {
     const isShort = shortFrom != null && dayIndex >= shortFrom;
     const usedToday = new Set();
-    const slots = slotsForDay(key, isShort);
+    const slots = slotsForDay(key, isShort, slotOpts);
 
     /* The short day floor, counted on what was actually filled. Every main
        slot still runs; accessories are taken in order until the day has
@@ -1370,7 +1496,11 @@ export function buildPlan({
     const bag = day.isShort ? shortHits : fullHits;
     for (const { slot, pick } of day.picks) {
       const g = groupFor(slot, pick);
-      if (g) bag[g] = (bag[g] || 0) + 1;
+      /* Counted in the ledger's keys, so an abs slot and an oblique slot in one
+         week are two exposures of core and not one each of two muscles. Spread
+         across two rows they handed out two weekly budgets for the muscle
+         volume-landmarks.md gives one. */
+      if (g) bag[ledgerGroup(g)] = (bag[ledgerGroup(g)] || 0) + 1;
     }
   }
 
@@ -1381,21 +1511,6 @@ export function buildPlan({
      kept beside the week in a map keyed by the exercise object rather than
      added to it as a field nothing outside this file would read. */
   const roleOf = new Map();
-  /* Which groups are pushed, and by how much. `priorityOverride` arrives from
-     engine/focus.mjs as a tier map, `{ chest: 3, calves: 1 }`, and is also
-     still accepted as the bare group list it used to be: the goal tree's own
-     `P.priority` is one of those, and so is every caller written before tiers
-     existed. A bare list is read at the middle tier, which is the flat 1.4x
-     that list has always earned. Null means nobody merged anything and the goal
-     decides, which is every call that existed before focus.mjs landed. */
-  const tierMap = toTierMap(priorityOverride ?? P.priority);
-  const tierFor = (group) => tierMap[group] || 0;
-  /* The goal's half of that map, kept apart so the week can tell a group
-     somebody tapped from a group the goal named. Only the first is a control a
-     person pressed, and only a control that did nothing has to apologise for
-     it: see `focusUntrained` at the end of pass 3. */
-  const goalTiers = toTierMap(P.priority);
-  const isPriority = (group) => tierFor(group) > 0;
 
   /* ---- how long they actually have ----
      `P.sessionMin` is the goal's answer to this and it is a considered number:
@@ -1481,7 +1596,8 @@ export function buildPlan({
      (largest) share. */
   const weekVolume = new Map();
   const taken = new Map();
-  const volumeFor = (group) => {
+  const volumeFor = (rawGroup) => {
+    const group = ledgerGroup(rawGroup);
     if (!weekVolume.has(group)) {
       weekVolume.set(group, weeklySets({
         base: baseSetsFor(group), tier: tierFor(group),
@@ -1509,9 +1625,14 @@ export function buildPlan({
       let sets;
       if (isShort) sets = SHORT_DAY_SETS;
       else {
-        const i = taken.get(group) || 0;
-        taken.set(group, i + 1);
-        sets = volumeFor(group).setsAt(i);
+        /* Indexed by the ledger's key for the same reason the hit counts are:
+           the week's core sets are cut once and handed out in order, so an abs
+           slot and an oblique slot take the first and second share of ONE
+           answer rather than each taking the whole of a separate one. */
+        const key = ledgerGroup(group);
+        const i = taken.get(key) || 0;
+        taken.set(key, i + 1);
+        sets = volumeFor(key).setsAt(i);
       }
       const repRange = repRangeFor.get(pick.name.toLowerCase()) || P.repRange;
       const reps = isMain ? repRange[0] : repRange[1];
@@ -1583,7 +1704,11 @@ export function buildPlan({
          warm-up that prepares the accessories and not the main lift has the
          priority backwards. */
       mainPatterns: [...new Set(SLOTS[key].filter((s) => s.role === "main").map((s) => s.pattern))],
-      allPatterns: [...new Set(SLOTS[key].map((s) => s.pattern))],
+      /* Off the same template selection ran, conditional slot included, so
+         engine/mobility.mjs prepares for the movements that are really on the
+         card. mainGroups and mainPatterns read SLOTS directly because the
+         conditional slot is an accessory and can never be in either. */
+      allPatterns: [...new Set(templateFor(key, slotOpts).map((s) => s.pattern))],
       exercises,
     };
   });
@@ -1624,7 +1749,7 @@ export function buildPlan({
     let cap = 0;
     for (const d of week) {
       for (const e of d.exercises) {
-        if (e.group === group) cap += d.short ? SHORT_DAY_SETS : MAX_SETS_PER_SESSION;
+        if (ledgerGroup(e.group) === group) cap += d.short ? SHORT_DAY_SETS : MAX_SETS_PER_SESSION;
       }
     }
     return cap;
@@ -1656,7 +1781,10 @@ export function buildPlan({
   const weeklyTargetFor = (group) => Math.min(wantedFor(group), deliverableFor(group));
   const plannedByGroup = () => {
     const totals = {};
-    for (const d of week) for (const e of d.exercises) totals[e.group] = (totals[e.group] || 0) + e.sets;
+    for (const d of week) for (const e of d.exercises) {
+      const k = ledgerGroup(e.group);
+      totals[k] = (totals[k] || 0) + e.sets;
+    }
     return totals;
   };
   const volumeTrimmed = [];
@@ -1672,7 +1800,7 @@ export function buildPlan({
     for (let i = week.length - 1; i >= 0 && excess >= 1; i--) {
       for (const e of week[i].exercises) {
         if (excess < 1) break;
-        if (e.group !== group || roleOf.get(e) !== "accessory") continue;
+        if (ledgerGroup(e.group) !== group || roleOf.get(e) !== "accessory") continue;
         while (e.sets > 2 && excess >= 1) { e.sets -= 1; excess -= 1; }
       }
     }
@@ -1902,8 +2030,9 @@ export function buildPlan({
         for (const e of d.exercises) {
           if (e.sets >= MAX_SETS_PER_SESSION) continue;
           if (!e.focusTier && e.sets + 1 > floorCeiling) continue;
-          const ceiling = Math.min(weeklyTargetFor(e.group) + VOLUME_SLACK, WEEKLY_MRV[e.group] ?? Infinity);
-          const gap = ceiling - (totals[e.group] || 0);
+          const key = ledgerGroup(e.group);
+          const ceiling = Math.min(weeklyTargetFor(key) + VOLUME_SLACK, WEEKLY_MRV[key] ?? Infinity);
+          const gap = ceiling - (totals[key] || 0);
           if (gap < 1) continue;
           if (!best || gap > bestGap) { best = e; bestGap = gap; }
         }
@@ -2193,7 +2322,7 @@ export function buildPlan({
     const wanted = wantedFor(group);
     const deliverable = deliverableFor(group);
     if (deliverable >= wanted - VOLUME_SLACK) continue;
-    const sessions = week.reduce((n, d) => n + d.exercises.filter((e) => e.group === group).length, 0);
+    const sessions = week.reduce((n, d) => n + d.exercises.filter((e) => ledgerGroup(e.group) === group).length, 0);
     frequencyCapped.push({
       group, wanted: +wanted.toFixed(1), target: +deliverable.toFixed(1), sessions,
       why: `${group} gets ${sessions === 1 ? "one session" : `${sessions} sessions`} a week on this split, which tops out at `
@@ -2221,7 +2350,10 @@ export function buildPlan({
      so the plan says which groups the tap could not reach and what would reach
      them. */
   const focusUntrained = Object.keys(tierMap)
-    .filter((g) => !(finalTotals[g] > 0))
+    /* Through the ledger, so a tap on obliques is not reported as untrained on a
+       week whose core slots were filled from the abs half. It bought core; core
+       is what the research has a row for. */
+    .filter((g) => !(finalTotals[ledgerGroup(g)] > 0))
     .map((group) => ({
       group, tier: tierFor(group),
       /* Whose ask it was. The goal's own list is a parameter and the body map is
@@ -2256,7 +2388,7 @@ export function buildPlan({
   for (const [group, planned] of Object.entries(finalTotals)) {
     const target = weeklyTargetFor(group);
     if (planned >= target - VOLUME_SLACK) continue;
-    const room = week.some((d) => d.exercises.some((e) => e.group === group && roleOf.get(e) === "accessory" && e.sets < MAX_SETS_PER_SESSION));
+    const room = week.some((d) => d.exercises.some((e) => ledgerGroup(e.group) === group && roleOf.get(e) === "accessory" && e.sets < MAX_SETS_PER_SESSION));
     if (!room) continue;
     volumeUnder.push({
       group, target: +target.toFixed(1), planned,
@@ -2281,7 +2413,7 @@ export function buildPlan({
   for (const [group, planned] of Object.entries(finalTotals)) {
     const target = weeklyTargetFor(group);
     if (planned - target <= VOLUME_SLACK) continue;
-    const accessories = week.flatMap((d) => d.exercises.filter((e) => e.group === group && roleOf.get(e) === "accessory"));
+    const accessories = week.flatMap((d) => d.exercises.filter((e) => ledgerGroup(e.group) === group && roleOf.get(e) === "accessory"));
     volumeOver.push({
       group, target: +target.toFixed(1), planned,
       why: accessories.length

@@ -421,6 +421,50 @@ export function mergePriority({ goalPriority = [], userFocus = [], revealed = nu
   if (fromGoal.length) why.push(`Your goal also puts ${listOut(fromGoal)} ahead of the rest of the week.`);
   if (!priority.length && !notes.length) why.push("No group is being pushed ahead of the others this week, so volume is spread evenly.");
 
+  /* The other end of the budget, and the one nobody was saying out loud.
+   *
+   * Picking Chest spends 3 units of 9. Chest is one muscle group, a group tops
+   * out at the red tier, and there is no fourth colour, so six units have
+   * nowhere to go. The same is true of any pick that is entirely red: Arms
+   * alone is biceps and triceps at red, which is 6 of 9.
+   *
+   * The leftover is NOT lost volume, and the temptation is to treat it as if it
+   * were. Measured, a lone red chest pick already receives every set the
+   * emphasis system can give it: on a build-muscle week chest goes 8 sets with
+   * no pick to 14 with red, and 14 is exactly `weeklyVolume.chest.wanted`, so
+   * the ask is met in full. On the four day split it lands on 12 instead of 14,
+   * and the 2 that are missing are the split's own frequency cap, which
+   * `volumeNotes.frequencyCapped` already reports and which no amount of budget
+   * can buy: more sets of chest there needs another chest slot, not a bigger
+   * multiplier. Spending the leftover on the muscles that press with chest was
+   * considered and is wrong for a reason the screens settle, and it is written
+   * down in index.html beside `focusSpendRegions`: both pickers read a stored
+   * pick back by asking which region each group belongs to, so writing
+   * `triceps:2` would have a Chest pick return as "Chest and Arms" on the next
+   * visit, handing somebody a choice they never made.
+   *
+   * So what is left is honestly nothing to buy, and the only wrong answer is
+   * silence, because the picker shows nine cells and a person who spends three
+   * of them is entitled to know why the other six did not change their week.
+   * The one thing the leftover CAN buy is a second group, and that is what the
+   * sentence says.
+   *
+   * It fires only when every group they picked is already red and nothing was
+   * dropped for want of budget, which is the only shape where the budget is
+   * genuinely unspendable rather than merely unspent. A pick with a yellow or a
+   * green in it has somewhere obvious to put the rest and needs no sentence. */
+  const allRed = mine.kept.length > 0 && mine.kept.every((g) => tiers[g] === TIERS.main);
+  if (allRed && !mine.dropped.length && mine.left > 0) {
+    const one = mine.kept.length === 1;
+    const say = `${listOut(mine.kept)} ${plural(mine.kept, "is", "are")} marked red, which is the top tier, so `
+      + `${plural(mine.kept, "it is", "they are")} already being asked for as hard as this app can ask. `
+      + `There is no stronger colour to spend the rest of your emphasis on${one ? "" : " either"}, and it does not `
+      + `sit unused as extra sets: the only thing left to spend it on is another group. `
+      + `${one ? "One red muscle is a real focus, and it is a smaller one than the picker's nine cells suggest." : "Marking one more group is what the rest of the picker buys."}`;
+    why.push(say);
+    notes.push(say);
+  }
+
   const missed = [...mine.dropped, ...goal.filter((g) => !tiers[g])].filter((g, i, a) => a.indexOf(g) === i);
   if (missed.length) why.push(`${listOut(missed)} ${plural(missed, "was", "were")} in line and did not fit. `
     + `A focus is a share of one week's volume, and past about ${MAX_PRIORITY} groups the extra stops being extra.`);

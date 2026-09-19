@@ -441,9 +441,20 @@ function checkPlan(input, plan) {
      construction. Finding 1 of the 2026-09-10 audit is the reason: a target
      above this number is one the split was never going to reach, and it used to
      be three quarters of every intermediate and advanced row. */
+  /* The ledger counts abs and obliques as one row, because
+     knowledge/principles/volume-landmarks.md has one row, "Abs/core", and no
+     oblique row anywhere. Mirrored here rather than imported for the same
+     reason the 6 and the 2 above are: this sum is supposed to be an independent
+     reading of the research file, and importing the engine's own table would
+     have it agree by construction. If the two ever disagree, this line and
+     LEDGER_GROUP in plan.mjs are where to look. */
+  const LEDGER_ROW = { obliques: "abs" };
   const deliverable = {};
   for (const d of plan.week || []) {
-    for (const e of d.exercises) deliverable[e.group] = (deliverable[e.group] || 0) + (d.short ? 2 : 6);
+    for (const e of d.exercises) {
+      const row = LEDGER_ROW[e.group] || e.group;
+      deliverable[row] = (deliverable[row] || 0) + (d.short ? 2 : 6);
+    }
   }
   for (const [group, row] of Object.entries(plan.weeklyVolume || {})) {
     if (!(row.sets >= 0)) fail("volume-ledger", input, `${group} sets ${JSON.stringify(row.sets)}`);
@@ -674,6 +685,48 @@ for (const goal of GOALS) {
           fail("whole-body-unexplained", wholeInput, "no note said the pick changed nothing");
         }
       }
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * The one conditional slot, both ways round
+ * ------------------------------------------------------------------ *
+ * `LOWERBACK_SLOT` in plan.mjs only exists when somebody named the group, which
+ * makes two claims that have to hold across every goal rather than on the one
+ * case a test picks: naming it buys real sets, and NOT naming it leaves the week
+ * exactly as it was. The second is the one worth sweeping. A conditional slot
+ * that leaks into a week nobody asked it for would be a change to every plan in
+ * the app, and it would not show up as a FAIL anywhere else in this file.
+ *
+ * Fixed runs per goal rather than a new dimension on the matrix, for the same
+ * reason the tier ladder above is: the WARN counts are read as deltas and a new
+ * axis moves all of them. */
+for (const goal of GOALS) {
+  for (const days of [3, 5]) {
+    const base = {
+      goal, days, history: HISTORY[0], limitCase: LIMIT_CASES[0], sex: "Male", bodyWeight: 180,
+      focusCase: FOCUS_CASES[0],
+    };
+    const asked = run({ ...base, focusCase: { id: "lowerback", groups: ["lowerback:3"] } });
+    const not = run(base);
+    if (!asked || !not) continue;
+    const lbSets = (out) => (out.plan?.week || []).reduce((n, d) =>
+      n + d.exercises.filter((e) => e.group === "lowerback").reduce((m, e) => m + e.sets, 0), 0);
+    const input = tag({ ...base, focusCase: { id: "lowerback" }, note: "lower-back-slot" });
+    checkOne(input, asked);
+    /* A goal that bars braced core can still reach the slot: every one of Bird
+       Dog, Superman and Back Extension is outside MOVEMENT_CLASSES. If one ever
+       is not, this is where it shows up as zero. */
+    if (!(lbSets(asked) > 0)) fail("lower-back-asked-and-untrained", input, "marked red and got no lower back work");
+    /* And the half that protects everybody else. The goal's own priority may
+       legitimately name lowerback (the `pain` child does), so the baseline is
+       allowed to carry it; what is not allowed is a week whose focus and whose
+       goal both say nothing about it growing the slot anyway. */
+    const goalWantsIt = (not.meta?.focus?.applied || []).includes("lowerback");
+    if (!goalWantsIt && lbSets(not) > 0) {
+      fail("lower-back-slot-leaked", tag({ ...base, note: "lower-back-slot" }),
+        `${lbSets(not)} sets of lower back in a week nobody asked for it`);
     }
   }
 }

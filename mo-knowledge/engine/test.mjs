@@ -4085,35 +4085,154 @@ test("a colour that bought nothing is a colour the plan explains", () => {
 });
 
 test("a focus the split cannot train says so instead of doing nothing quietly", () => {
-  /* Lower back is the honest failure here and it is not a volume one. No slot in
-     SLOTS names `lowerback`, so no multiplier can reach it: marking it red adds
-     nothing, and it added nothing silently, which is the part that was fixable
-     without redesigning what a day is made of. The library has a whole lowerback
-     category and twenty movements with it as the primary, so the week that
-     trains it is a week with a slot for it, and that is a change to the split
-     rather than to the ledger. Written down here so it stays a known gap rather
-     than becoming a surprise.
-
-     If somebody gives lower back a slot, this test goes red on the first line
-     and that is the signal to delete it. */
-  const out = generateFromPayload({
-    goal_bubble: "build-muscle", challenge_target: 3, current_weight: 180, sex: "Male",
-    logs: [], focus_groups: ["lowerback:3"],
-  }, { today: VOLUME_TODAY, includePlan: true });
-  assert.equal(out.plan.weeklyVolume.lowerback, undefined, "lower back now has a slot; delete this test and check the ladder instead");
-  const untrained = out.plan.volumeNotes.focusUntrained;
-  assert.ok(untrained.some((u) => u.group === "lowerback" && u.asked), JSON.stringify(untrained));
-  assert.ok(out.plan.dayNotes.some((n) => n.includes("lowerback") && n.includes("bought nothing")),
-    out.plan.dayNotes.join(" | "));
-
-  /* And the same sentence for the ordinary version of it: biceps on a three day
-     week, which is three full body days and has no isolation slot at all. */
+  /* Lower back used to be the headline case here: no slot in SLOTS named it, so
+     marking it red added nothing on every goal and every split, and it added
+     nothing silently. It has a slot now (see LOWERBACK_SLOT), so what is left is
+     the ordinary version of the same failure: biceps on a three day week, which
+     is three full body days and carries no isolation slot at all. A focus cannot
+     add a movement the split does not have, and the plan has to say so. */
   const arms = generateFromPayload({
     goal_bubble: "build-muscle", challenge_target: 3, current_weight: 180, sex: "Male",
     logs: [], focus_groups: ["biceps:3"],
   }, { today: VOLUME_TODAY, includePlan: true });
+  const untrained = arms.plan.volumeNotes.focusUntrained;
+  assert.ok(untrained.some((u) => u.group === "biceps" && u.asked), JSON.stringify(untrained));
   assert.ok(arms.plan.dayNotes.some((n) => n.includes("biceps") && n.includes("bought nothing")),
     arms.plan.dayNotes.join(" | "));
+});
+
+/* ---- the lower back slot ----
+ *
+ * Counted in sets, because sets are what a person does. A test on the slot
+ * table would pass whether or not anything reached a card.
+ */
+const lowerBackSets = (plan) => plan.week.reduce((n, d) =>
+  n + d.exercises.filter((e) => e.group === "lowerback").reduce((m, e) => m + e.sets, 0), 0);
+const lbPlan = (daysAsked, focus) => generateFromPayload({
+  goal_bubble: "build-muscle", challenge_target: daysAsked, current_weight: 180, sex: "Male",
+  logs: [], ...(focus ? { focus_groups: focus } : {}),
+}, { today: VOLUME_TODAY, includePlan: true }).plan;
+
+test("marking lower back buys lower back, on every day count", () => {
+  /* Measured on HEAD before the slot existed: 0 sets at every tier, every goal,
+     every split. The picker's Back region spends a lone pick down
+     ["lats", "traps", "lowerback"], so this is a colour real people can already
+     reach, not a hypothetical one. */
+  for (const days of [2, 3, 4, 5]) {
+    assert.equal(lowerBackSets(lbPlan(days, null)), 0, `a ${days} day week trains lower back without being asked`);
+    const asked = lbPlan(days, ["lowerback:2"]);
+    assert.ok(lowerBackSets(asked) >= 6,
+      `a ${days} day week marked for lower back got ${lowerBackSets(asked)} sets`);
+    assert.ok(asked.weeklyVolume.lowerback, `a ${days} day week has no lower back row in the ledger`);
+    /* And the tier still means something once the slot is there. */
+    assert.ok(lowerBackSets(lbPlan(days, ["lowerback:3"])) > lowerBackSets(asked),
+      `a ${days} day week: red bought no more lower back than yellow`);
+  }
+});
+
+test("the lower back slot lands on the days that hinge, and on no others", () => {
+  /* The erectors are the muscle the hinge already loads, so the direct work
+     belongs beside it. A push, pull or upper day getting a back extension would
+     be the only thing below the waist on that card, and it would displace arm
+     work to get there. */
+  for (const days of [4, 5]) {
+    const plan = lbPlan(days, ["lowerback:3"]);
+    for (const d of plan.week) {
+      const has = d.exercises.some((e) => e.group === "lowerback");
+      const lower = /Lower|Leg|Full body/.test(d.name);
+      assert.equal(has, lower, `${days} day week: ${d.name} ${has ? "has" : "has no"} lower back work`);
+    }
+    /* Nobody's arm work was deleted to make room: the upper days are untouched. */
+    const without = lbPlan(days, null);
+    const armSets = (p) => p.week.reduce((n, d) => n + d.exercises
+      .filter((e) => e.group === "biceps" || e.group === "triceps").reduce((m, e) => m + e.sets, 0), 0);
+    assert.equal(armSets(plan), armSets(without), `${days} day week: the lower back slot cost arm sets`);
+  }
+});
+
+test("a week nobody asked lower back for is the week it always was", () => {
+  /* The slot is conditional so that the blast radius is exactly the people who
+     asked. Everybody else gets the same card, which is a property worth
+     asserting rather than hoping for days before a launch. */
+  const rows = (p) => p.week.map((d) => d.exercises.map((e) => `${e.name}:${e.sets}x${e.reps}`).join("|")).join("//");
+  for (const days of [2, 3, 4, 5]) {
+    const plain = lbPlan(days, null);
+    for (const focus of [["chest:3"], ["glutes:3"], ["biceps:3", "triceps:3"]]) {
+      const other = lbPlan(days, focus);
+      assert.ok(!other.week.some((d) => d.exercises.some((e) => e.group === "lowerback")),
+        `${days} day week with ${focus.join(",")} grew a lower back slot`);
+    }
+    assert.ok(rows(plain).length > 0);
+  }
+});
+
+test("the goal that writes bird dog into its own notes can finally prescribe it", () => {
+  /* goal-tree.json's `pain` child prioritises ["abs", "glutes", "lowerback"] and
+     names bird dog in its plan. Bird Dog has been in the library the whole time
+     and was unreachable, because no slot named the group. That is the same class
+     of bug as the goal that prescribed the movement its own note warned against,
+     and it is now closed for the goal as well as for the tap. */
+  for (const bubble of ["feel-better", "move-better"]) {
+    const plan = generateFromPayload({
+      goal_bubble: bubble, goal_child: "pain", challenge_target: 3, current_weight: 180, sex: "Male", logs: [],
+    }, { today: VOLUME_TODAY, includePlan: true }).plan;
+    assert.ok(lowerBackSets(plan) > 0, `${bubble}/pain still gets no lower back work`);
+  }
+});
+
+/* ---- core is one row in the ledger ---- */
+
+test("core has one weekly target, not two half-fed ones", () => {
+  /* knowledge/principles/volume-landmarks.md carries a single "Abs/core" row and
+     no oblique row anywhere. Two rows meant a person could be shown an oblique
+     target of 8 sets that no movement in the pool would ever satisfy, and it
+     meant abs at MRV plus obliques at MRV was 40 against a stated ceiling of 20. */
+  for (const days of [2, 3, 4, 5]) {
+    for (const focus of [null, ["abs:3"], ["obliques:3"]]) {
+      const plan = lbPlan(days, focus);
+      assert.equal(plan.weeklyVolume.obliques, undefined,
+        `a ${days} day week still carries a separate obliques target`);
+      assert.ok(plan.weeklyVolume.abs, `a ${days} day week has no core row at all`);
+      const real = plan.week.reduce((n, d) => n + d.exercises
+        .filter((e) => e.group === "abs" || e.group === "obliques").reduce((m, e) => m + e.sets, 0), 0);
+      assert.equal(plan.weeklyVolume.abs.sets, real,
+        `a ${days} day week's core row does not count the oblique work beside it`);
+      assert.ok(real <= 20, `a ${days} day week prescribes ${real} core sets against an Abs/core MRV of 20`);
+    }
+  }
+});
+
+test("a point spent on obliques buys core, the same as a point spent on abs", () => {
+  /* The owner's instruction, and the research agrees with it: "we can sort of
+     count it as abs". Before this, the core slot's pool was ranked and every
+     abs-tagged movement outranked every oblique one, so an obliques tap asked
+     for volume in a group the week was never going to train. */
+  for (const days of [2, 3, 4, 5]) {
+    const core = (p) => p.weeklyVolume.abs.sets;
+    const plain = core(lbPlan(days, null));
+    assert.equal(core(lbPlan(days, ["obliques:2"])), core(lbPlan(days, ["abs:2"])),
+      `a ${days} day week: obliques and abs do not buy the same core`);
+    assert.ok(core(lbPlan(days, ["obliques:2"])) > plain,
+      `a ${days} day week: asking for obliques bought nothing`);
+  }
+});
+
+test("a pick that is all red says what the rest of the budget cannot buy", () => {
+  /* Picking Chest spends 3 of the 9 units the picker shows. The other 6 are not
+     lost volume: red is the top tier, chest already receives every set the
+     multiplier can ask for, and the only thing left to spend on is a second
+     group. Silence there is the picker showing nine cells and changing three. */
+  const out = generateFromPayload({
+    goal_bubble: "build-muscle", challenge_target: 4, current_weight: 180, sex: "Male",
+    logs: [], focus_groups: ["chest:3"],
+  }, { today: VOLUME_TODAY, includePlan: true });
+  assert.ok(out.notes.some((n) => n.includes("chest") && n.includes("top tier")), out.notes.join(" | "));
+  /* And it does not fire when the budget really was spent. */
+  const spent = generateFromPayload({
+    goal_bubble: "build-muscle", challenge_target: 4, current_weight: 180, sex: "Male",
+    logs: [], focus_groups: ["chest:3", "lats:3", "shoulders:3"],
+  }, { today: VOLUME_TODAY, includePlan: true });
+  assert.ok(!spent.notes.some((n) => n.includes("top tier")), spent.notes.join(" | "));
 });
 
 test("a person who keeps turning up never gets a smaller week for it", () => {

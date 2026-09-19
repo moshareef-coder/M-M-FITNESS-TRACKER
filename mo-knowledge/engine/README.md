@@ -2235,3 +2235,169 @@ targetWeight / note`. It is not a plan.mjs hunk, it is a new field plus a screen
 that shows it, and research/02's own hedge ("make the 60 year old move fast is
 the kind of advice that needs to be right") says it should not be smuggled in as
 a coaching cue by whoever happens to be editing the adapter.
+
+## Three things a control could not buy, 2026-09-19
+
+Three separate silences, all of the same shape: a control the app collects,
+confirms, and then cannot act on. One is closed by a new slot, one by counting
+two rows as one, and the third turns out not to be a defect at all and is now
+said out loud instead.
+
+### Lower back could not be trained at all (`LOWERBACK_SLOT`)
+
+No slot in `SLOTS` named `lowerback`, so no multiplier could reach it. Marking
+it red added **zero** sets, on every goal, every split and every day count, and
+`volumeNotes.focusUntrained` has been reporting lower back as 100% of its own
+column for exactly that reason. It is not a fringe pick: `FOCUS_REGIONS` in
+index.html spends a lone Back pick down `["lats", "traps", "lowerback"]`, so
+lower back comes out at the middle tier for anybody who taps Back and nothing
+else, and the goal tree asks for it too. The `pain` child of Feel better,
+Move better and Get back into it prioritises `["abs", "glutes", "lowerback"]`
+and writes bird dog into its own plan, and Bird Dog has been sitting in
+`knowledge/exercise-library/` unreachable the whole time. That is the same class
+of bug as the goal that prescribed the movement its own note warned against.
+
+**It is conditional, and that is the decision.** The slot exists only when the
+group has a tier, from the tap or from the goal's own parameters. An
+unconditional lower back slot changes what a day is made of for every person in
+the app to buy a muscle almost nobody names; gated, the blast radius is exactly
+the people who asked, which is a property that can be measured rather than
+hoped for, and it is the smaller thing to undo. Measured across 2,720 plans
+where nobody named lower back or core: **144 changed, and every one of them is
+`pain` or `back-postpartum`**, the two children whose own parameters name these
+groups. Nothing else in the app moved.
+
+**Which days, and what gives.** `fullBody`, `legs` and `lower`, last in the
+accessory order. The erectors are the muscle the hinge already loads, so the
+direct work belongs on the day that hinges; a push or pull day would put it on a
+card with nothing else below the waist and would displace arm work to get there.
+Measured on a four and a five day week with lower back red: **arm sets are
+identical to the week without it**, asserted by a test. What actually gives is
+the clock. Over the 1,020 plans where somebody names lower back, the week gains
+**+8.6% hard sets and about 10 minutes**, and 26 more days come out over their
+budget; the slot is a priority accessory by construction, so the two time levers
+shave the calf and core work beside it first.
+
+**The pattern is `isolation`, and it was `core` first and measured worse.** In
+`SLOTS`, `isolation` is not a movement pattern, it is this table's word for a
+single-group accessory, which is what the calf, bicep and forearm slots beside
+it already are. The six lowerback-primary rows in the library fall under five
+different patterns (`patternFor` calls Bird Dog and Superman core, Back
+Extension and Deadlift hinge, Suitcase Carry a carry, Reverse Hyperextension
+isolation), so naming a real pattern left a three day week two movements for
+three days and it prescribed Bird Dog twice. Sweep: **+78 duplicate-in-week**
+with `core`, **+22** with `isolation`.
+
+**One thing that was checked and is not new.** A lower back focus at the middle
+tier can take sets off the hinge beside it, because `enforcePriorityFloor` caps
+every unfocused lift on a day at the smallest set count among the focused ones.
+That is the existing rule, not something this slot introduced: on the engine as
+it stood, a four day build-muscle week with `glutes:3` already moved hamstrings
+from 6 sets to 4 and quads from 8 to 7. The number is in `weeklyVolume` either
+way. What is missing is a **sentence**: `VOLUME_SLACK` is 2, so hamstrings at 4
+against a target of 6 does not clear `volumeNotes.under` and nothing says out
+loud that the focus is what took them. That silence predates this change, fires
+today for anybody focusing glutes or quads, and is left open deliberately rather
+than fixed days before a launch, because the honest fix is probably to the floor
+rather than to the note.
+
+### Obliques bought nothing (`LEDGER_GROUP`)
+
+The core slot takes `["abs", "obliques"]` and the pool is ranked, so every
+abs-tagged movement outranks every oblique one and the slot fills from the abs
+half every time. Obliques still carried a weekly target of its own. Measured on
+a four day build-muscle week: **a target of 8 sets and a delivery of 0, every
+week, on every split**, and a point spent on obliques bought nothing at all. A
+target no movement will ever satisfy is the same lie as a focus tier that adds
+no sets.
+
+`knowledge/principles/volume-landmarks.md` has **one row for the pair**,
+`Abs/core`, and no oblique row anywhere, and `WEEKLY_MRV` has always read that
+one row for both halves. So two rows were never what the research said, and they
+ran the wrong way on the ceiling as well: abs at MRV plus obliques at MRV is 40
+sets against a stated ceiling of 20.
+
+So the **counting** folds and the taxonomy does not. `LEDGER_GROUP` maps
+obliques onto abs for one purpose: which row the ledger adds a set to, which
+target it is held to, which MRV caps it, and whose focus tier it answers to. An
+exercise keeps its own `group` and obliques stays one of the app's fourteen,
+because those keys are read by the body figure, the heat map, recovery, the
+joint tags and the library's own tagging, and renaming one silently breaks a
+screen. After: **one core row**, a tap on obliques buys exactly what a tap on
+abs buys (8 core sets to 11 at the middle tier), and no week can be prescribed
+more than the 20 the research allows. The sweep lost 1,588 ledger rows, which is
+the phantom oblique row disappearing, and five days that used to run over budget
+now fit, because the goals that prioritise core were being handed two budgets
+for it.
+
+What this does **not** fix is which movements fill the slot. Rotation and
+anti-rotation work is still outranked by planks and crunches. That is a
+selection question and it is recorded at `SLOTS`.
+
+### Picking Chest spends 3 points of 9, and that is not a defect
+
+Every other region spends 8. Chest is one muscle group, it tops out at the red
+tier, and six units have nowhere to go. The instinct is to treat the leftover as
+lost volume. **Measured, it is not.** A lone red chest pick on a build-muscle
+week takes chest from 8 weekly sets to 14, and 14 is exactly
+`weeklyVolume.chest.wanted`: the ask is met in full. Across three goals and
+three day counts the ladder reads 8 / 10 / 11 / 14 for none, green, yellow and
+red, and the only cases that fall short are the four day split, where chest gets
+12 instead of 14 because it appears twice and a slot holds six sets. That gap is
+the **frequency cap**, which `volumeNotes.frequencyCapped` already reports and
+which no amount of emphasis budget can buy: more chest there needs another chest
+slot, not a bigger multiplier.
+
+A second chest slot on a push day was the other candidate and it is the wrong
+trade. The four day split has no push day at all, so it would have to land on an
+upper day, where it would be a third chest movement displacing arm work, for a
+group that is already receiving 100% of what it asked for on three of the four
+splits. Spending the leftover on triceps and shoulders is wrong for a reason the
+screens settle and index.html already writes down beside `focusSpendRegions`:
+both pickers read a stored pick back by asking which region each group belongs
+to, so writing `triceps:2` would have a Chest pick come back as "Chest and Arms"
+on the next visit.
+
+So the answer is the first option, done properly: **accept the 3 points and stop
+anything claiming otherwise.** `mergePriority` now says it. When every group in
+the user's own pick is at the top tier and nothing was dropped for want of
+budget, one sentence goes into `why` and into `notes`, which is the channel the
+app already renders: these groups are already being asked for as hard as this
+app can ask, there is no stronger colour, and the only thing left to spend the
+rest on is another group. It fires on a lone Chest pick and on a lone Arms pick
+(biceps and triceps at red, 6 of 9) and it deliberately does not fire on a pick
+with a yellow or a green in it, which has somewhere obvious to put the rest.
+
+### Sweep deltas, and one number in the brief that is not a number this repo produces
+
+Engine changes alone, same 11,480 runs, before and after:
+
+| WARN | before | after | why |
+|---|---|---|---|
+| duplicate-in-week | 13230 | 13252 | **+22.** All 22 are `feel-better/pain` with a lower back limit, where `joint-load.mjs` leaves Bird Dog as the only lower back movement that does not load the joint they named, so it repeats across days. That is the right movement repeating rather than a wrong one appearing |
+| over-time-budget | 2002 | 2007 | **+5, and it is two movements.** 76 new, all `pain`, which gained a slot and the minutes for it; 71 gone, all goals that prioritise core (`back-postpartum`, `lose-belly`, `tone-lean-abs/abs`, `first-pushup`), whose days got shorter when the double core budget folded into one |
+| calibration-changed-selection | 216 | 217 | +1, one `feel-better/pain` week where a Side Plank moved, a knock-on of the new slot changing which core movement is still unused |
+| ledger rows | 73828 | 72240 | -1588, the phantom obliques row |
+| same-group-twice-in-day | 15300 | 15300 | unchanged |
+| excluded-prescribed | 11094 | 11094 | unchanged |
+| hurt-joint-prescribed | 11094 | 11094 | unchanged |
+| days-clamped | 3497 | 3497 | unchanged |
+| focus-group-not-in-split | 118 | 118 | unchanged |
+| unknown-secondary-goal | 54 | 54 | unchanged |
+| tiers-indistinguishable | 26 | 26 | unchanged |
+
+FAILs none and KNOWN OPEN none, before and after. `sweep.mjs` grew a block of
+its own for the conditional slot: naming lower back has to buy sets on every
+goal, and a week where neither the tap nor the goal names it has to come back
+without the slot. That block adds 216 runs and therefore adds to several WARN
+counts; the table above is measured with it removed, so the deltas are the
+engine's and not the instrument's.
+
+**The four-way focus ladder is 35.0%, not 63.8%, and it was 35.0% before this
+change too.** The comment in `sweep.mjs` says 63.8% "measured over 1,424 goal x
+days x group cells" and the sweep counts 206 cells, so that number was measured
+on a harness that is not in this repo. Checked by running the sweep at
+`ed29c5f`, the commit that claims it: **72/206, 35.0%, identical**. It has not
+regressed here and it has not regressed since. The 63.8% should be re-measured
+or the sentence corrected, because a target nobody can reproduce is the same
+problem as a target nothing can reach.
