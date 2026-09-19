@@ -15038,7 +15038,7 @@ const INFO_TOPICS = {
   muscleLevels: () => ({
     eyebrow: "Low, medium, high",
     paras: [
-      "The word beside each muscle is how much work it got against a full dose. A dose is about eight hard sets in a day, or fourteen across a week.",
+      "The word beside each muscle is how much work it got against a full dose. A full dose is what your own plan asks of that muscle: its sets for the week, or on Today, its biggest single session. A muscle your plan has no number for is measured against about eight hard sets in a day, or fourteen across a week.",
       "High is three quarters of that dose or more, medium is at least four tenths of it, low is everything under. Across a week that puts high from about ten and a half sets and low at anything up to five and a half.",
       "Helping muscles count for half. A row trains your lats and helps your biceps, so the biceps level moves at half speed.",
     ],
@@ -35212,6 +35212,107 @@ const BODY_GROUP_LABELS = {
 // hypertrophy range); anything past that is capped at 100% rather than shown
 // as 140%, which would read as a mistake.
 const BODY_IMPACT_TARGET = { today: 8, week: 14, lastweek: 14 };
+
+/* The fallback, and only that, since 2026-09-19. The engine's own weekly
+   targets over 14,580 generated weeks run 2 to 18 sets a group and 96.5% of
+   them sit under 14, so a tab holding everybody to 14 told a person who had
+   followed their plan to the set that most of their body was on "Medium", and
+   named as furthest behind the groups the plan never programs at all: traps,
+   forearms, lower back, and obliques, which the engine folds into the core
+   count. Twice a week, to somebody doing everything right.
+
+   So the dose a muscle is measured against is the engine's target for THIS
+   person's week, read off the same plan the "what to train next" card builds,
+   and the constant above is what a muscle the plan has no number for, or a
+   tab opened before the engine could be reached, is measured against. `week`
+   is the sets the plan actually gives the group across the week; `session` is
+   the most it gives in any one day, which is what "a full session" means for
+   the Today tab on this plan rather than in general. Keyed so a re-render can
+   tell whether the numbers moved. Mine only: the partner's plan is not here.
+
+   The plan's SETS, not the ledger's `target`, on purpose. The engine holds a
+   week to its target give or take two, and over the same 14,580 weeks the
+   plan it built lands more than two under on 9.3% of group-weeks, with
+   nowhere to put the rest (its own volumeNotes.under). Measured against the
+   target, a person who did every set of that plan would still be told they
+   were behind on that group, which is the engine's shortfall being billed to
+   them. What the plan asked for is the only number a person can be behind. */
+let BODY_PLAN_TARGETS = null;   // { week: { group: sets }, session: { group: sets }, key }
+
+/* plan.mjs LEDGER_GROUP, mirrored: obliques are counted as core. The engine's
+   ledger has one row for the core and the app's tagging has two, and holding
+   obliques to a target of their own is how a plank-heavy week read as
+   neglecting them. The taxonomy stays fourteen (the figure and the library
+   both read those keys); only the COUNTING folds. */
+const BODY_LEDGER_GROUP = { obliques: "abs" };
+const bodyLedgerGroup = (g) => BODY_LEDGER_GROUP[g] || g;
+
+/* The per-group volumes with the fold applied. Both keys carry the folded
+   total, so a reader that indexes by "obliques" (the figure's oblique pieces)
+   sees the core's number rather than a half of it. */
+function bodyLedgerVolumes(volumes) {
+  const out = { ...volumes };
+  for (const [from, to] of Object.entries(BODY_LEDGER_GROUP)) {
+    out[to] = (volumes[to] || 0) + (volumes[from] || 0);
+    out[from] = out[to];
+  }
+  return out;
+}
+
+/* The engine's number for a group over a period, or null when it gave none.
+   Null is a real answer: it is what "the plan never trains this" looks like,
+   and a group with a null here is never called behind. */
+function bodyTargetFor(group, period) {
+  const t = BODY_PLAN_TARGETS;
+  if (!t) return null;
+  const v = (period === "today" ? t.session : t.week)[bodyLedgerGroup(group)];
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+function bodyDoseFor(group, period) {
+  return bodyTargetFor(group, period) ?? BODY_IMPACT_TARGET[period];
+}
+
+/* Reads the targets off a built plan. `meta.volume.byGroup` first, which is
+   the ledger the engine is starting to publish on the response itself, and
+   `plan.weeklyVolume` otherwise, which is the same table one level down when
+   the plan was asked for. Returns whether anything moved. */
+function bodyRememberPlanTargets(built) {
+  const byGroup = built?.meta?.volume?.byGroup;
+  const ledger = byGroup && typeof byGroup === "object" ? byGroup : built?.plan?.weeklyVolume;
+  if (!ledger || typeof ledger !== "object") return false;
+  const week = {}, session = {};
+  for (const [g, v] of Object.entries(ledger)) {
+    /* A group the ledger wanted and the week holds no sets of is not a
+       target: the plan never asks for it, so nothing can be behind on it. */
+    if (Number.isFinite(v?.sets) && v.sets > 0) week[bodyLedgerGroup(g)] = v.sets;
+  }
+  for (const d of built?.plan?.week || []) {
+    const day = {};
+    for (const e of d?.exercises || []) {
+      if (!e?.group || !Number.isFinite(e.sets)) continue;
+      const g = bodyLedgerGroup(e.group);
+      day[g] = (day[g] || 0) + e.sets;
+    }
+    for (const [g, n] of Object.entries(day)) session[g] = Math.max(session[g] || 0, n);
+  }
+  const key = JSON.stringify([week, session]);
+  const changed = key !== BODY_PLAN_TARGETS?.key;
+  BODY_PLAN_TARGETS = { week, session, key };
+  return changed;
+}
+
+/* For a screen that needs the targets without the rest of the Body reading:
+   the Progress tab's volume headline. Same payload, same build. */
+async function bodyEnsurePlanTargets() {
+  const engine = await ensurePlanEngine();
+  if (!engine) return false;
+  try {
+    return bodyRememberPlanTargets(engine.generateFromPayload(workoutEnginePayload(), { includePlan: true }));
+  } catch (err) {
+    console.warn("body targets: the generator could not answer", err);
+    return false;
+  }
+}
 /* These three are recovery.mjs FRESH_HOURS, RECOVERY_HOURS and MIN_CREDIT_SETS,
    and they are `let` rather than `const` because ensureRecoveryEngine
    overwrites them with the engine's own numbers the first time this tab reads
@@ -35237,7 +35338,8 @@ let BODY_MIN_CREDIT_SETS = 2;
 
 // Untrained groups fill the ring row so it is always five wide. Big movers
 // first: an empty chest ring is a more useful nudge than an empty forearms one.
-const BODY_RING_FILLERS = ["chest", "lats", "quads", "shoulders", "abs", "hamstrings", "glutes", "biceps", "triceps", "calves", "traps", "lowerback", "obliques", "forearms"];
+// No obliques: they are counted inside Core, so an Obliques ring could never fill.
+const BODY_RING_FILLERS = ["chest", "lats", "quads", "shoulders", "abs", "hamstrings", "glutes", "biceps", "triceps", "calves", "traps", "lowerback", "forearms"];
 
 let BODY_PERIOD = null;        // null until first render, then "today" | "week" | "lastweek"
 let BODY_LAST_KEY = null;      // what was last drawn, so a silent refresh does not replay animations
@@ -35268,11 +35370,29 @@ function bodyPeriodWord(period) {
 }
 
 function bodyImpactRank(volumes, period) {
-  const target = BODY_IMPACT_TARGET[period];
+  const ledger = bodyLedgerVolumes(volumes);
   return MUSCLE_GROUPS
-    .map((g) => ({ key: g, label: BODY_GROUP_LABELS[g], sets: volumes[g] || 0, pct: Math.min(1, (volumes[g] || 0) / target) }))
+    .filter((g) => bodyLedgerGroup(g) === g)   // obliques ride inside Core
+    .map((g) => {
+      const sets = ledger[g] || 0;
+      const target = bodyTargetFor(g, period);
+      return { key: g, label: BODY_GROUP_LABELS[g], sets, target, pct: Math.min(1, sets / (target ?? BODY_IMPACT_TARGET[period])) };
+    })
     .filter((m) => m.sets > 0)
     .sort((a, b) => b.sets - a.sets);
+}
+
+/* The groups the plan asked for and the week did not deliver, by the engine's
+   own slack: plan.mjs holds a group to its target give or take VOLUME_SLACK,
+   two sets, and this uses the same two so the two ledgers agree on what
+   "behind" means. Never a group the plan gave no number to. */
+function bodyGroupsBehind(volumes, period = "week") {
+  if (!BODY_PLAN_TARGETS) return [];
+  const ledger = bodyLedgerVolumes(volumes);
+  return Object.keys(BODY_PLAN_TARGETS.week)
+    .map((g) => ({ key: g, label: BODY_GROUP_LABELS[g] || g, sets: ledger[g] || 0, target: bodyTargetFor(g, period) }))
+    .filter((m) => m.target && m.sets < m.target - 2)
+    .sort((a, b) => (b.target - b.sets) - (a.target - a.sets));
 }
 
 function bodyImpactLevel(pct) {
@@ -35329,7 +35449,7 @@ function renderBodyTab(animate = false) {
   const [start, end] = bodyPeriodRange(BODY_PERIOD);
   const volumes = computeMuscleVolumeBetween(ME, start, end);
   const ranked = bodyImpactRank(volumes, BODY_PERIOD);
-  const key = `${ME}|${BODY_PERIOD}|${JSON.stringify(volumes)}`;
+  const key = `${ME}|${BODY_PERIOD}|${JSON.stringify(volumes)}|${BODY_PLAN_TARGETS?.key || ""}`;
   if (key !== BODY_LAST_KEY) animate = true;
   BODY_LAST_KEY = key;
 
@@ -35778,8 +35898,7 @@ async function renderBodyDiagram(animate) {
      cool rather than flattening everything to one colour. */
   const [start, end] = bodyPeriodRange(BODY_PERIOD);
   const { volumes } = computeMuscleDetailBetween(ME, start, end);
-  const groupVolumes = computeMuscleVolumeBetween(ME, start, end);
-  const dose = BODY_IMPACT_TARGET[BODY_PERIOD];
+  const groupVolumes = bodyLedgerVolumes(computeMuscleVolumeBetween(ME, start, end));
 
   const peak = {};
   for (const muscle of mod.ALL_MUSCLES) {
@@ -35796,7 +35915,7 @@ async function renderBodyDiagram(animate) {
   BODY_MUSCLE_COLOR = {};
   for (const muscle of mod.ALL_MUSCLES) {
     const g = mod.RIVE_TO_APP_GROUP[muscle];
-    const groupPct = g ? Math.min(1, (groupVolumes[g] || 0) / dose) : 0;
+    const groupPct = g ? Math.min(1, (groupVolumes[g] || 0) / bodyDoseFor(g, BODY_PERIOD)) : 0;
     // No per-piece detail for this group's work: colour the whole group alike
     // rather than leaving it dark while its ring says otherwise.
     const share = !g ? 0 : peak[g] > 0 ? (volumes[muscle] || 0) / peak[g] : 1;
@@ -36135,12 +36254,15 @@ function renderBodyDetail() {
   const { detail, bounds } = BODY_DETAIL;
   const [start, end] = bodyPeriodRange(BODY_PERIOD);
   const { volumes, hitBy } = computeMuscleDetailBetween(ME, start, end);
-  const target = BODY_IMPACT_TARGET[BODY_PERIOD];
+  const piece = detail.MUSCLE_PIECES[f.muscle];
+  /* Every piece and head on this screen belongs to the tapped muscle's group,
+     so one dose serves all of them: the engine's for that group, or the
+     fallback when the plan has no number for it. */
+  const target = bodyDoseFor(piece.group, BODY_PERIOD);
   const pctOf = (k) => Math.min(1, (volumes[k] || 0) / target);
   // Untouched pieces stay neutral rather than showing the level-1 yellow for 0%.
   const heatOf = (k) => ((volumes[k] || 0) > 0 ? bodyHeatColor(pctOf(k)) : "var(--muted)");
   const word = bodyPeriodWord(BODY_PERIOD);
-  const piece = detail.MUSCLE_PIECES[f.muscle];
   const groupLabel = BODY_GROUP_LABELS[piece.group] || piece.group;
   const pct = pctOf(f.muscle);
   const sets = volumes[f.muscle] || 0;
@@ -36412,6 +36534,11 @@ async function bodyNextReading() {
     today: new Date(),
   });
 
+  /* The same build feeds the rings: the targets the figure and the list are
+     measured against come off this plan, so the two cards on this tab can
+     never be reading different weeks. */
+  const targetsChanged = bodyRememberPlanTargets(built);
+
   const week = built.plan?.week || [];
   const dayName = built.meta?.dayName || built.workout?.focus || "";
   const dayIndex = week.findIndex((d) => d?.name === dayName);
@@ -36435,6 +36562,7 @@ async function bodyNextReading() {
        were tapped: meta.focus.why explains any gap between the two. */
     marked: built.meta?.focus?.applied || [],
     markedWhy: built.meta?.focus?.why || [],
+    targetsChanged,
     planFocus: leftOnPlan.length ? displayFocus(TODAY_WORKOUT.focus, planned.map((e) => e.name)) : null,
     planLeft: leftOnPlan.length,
     planPartway: planned.length > 0 && leftOnPlan.length > 0 && leftOnPlan.length < planned.length,
@@ -36551,6 +36679,21 @@ function bodyNextEngineAnswer(r) {
 
 async function renderBodyNext(animate) {
   const reading = await bodyNextReading();
+  /* The list, rings and figure painted before the engine answered, against
+     the fallback dose. Redrawn once, without the animation, now that the
+     plan's own numbers are in: the first Body visit of a sitting, and after
+     a goal or day-count change moves the targets. Not through renderBodyTab,
+     which would call back into here. */
+  if (reading?.targetsChanged && !document.getElementById("tab-body").classList.contains("hidden")) {
+    const [start, end] = bodyPeriodRange(BODY_PERIOD);
+    const volumes = computeMuscleVolumeBetween(ME, start, end);
+    const ranked = bodyImpactRank(volumes, BODY_PERIOD);
+    BODY_LAST_KEY = `${ME}|${BODY_PERIOD}|${JSON.stringify(volumes)}|${BODY_PLAN_TARGETS?.key || ""}`;
+    renderBodyList(ranked, false);
+    renderBodyRings(ranked, false);
+    renderBodyDiagram(false);
+    if (BODY_FOCUS) renderBodyDetail();
+  }
   const areas = reading ? reading.areas : bodyAreaStates();
   const trained = areas.filter((a) => a.lastDate);
   const ready = areas.filter((a) => a.state === "ready");
@@ -38305,27 +38448,51 @@ function progressHeadline(kind, name, email, profile, third) {
     const end = new Date(); end.setDate(end.getDate() + 1);
     const start = new Date(); start.setDate(start.getDate() - 7);
     const vols = computeMuscleVolumeBetween(name, isoDate(start), isoDate(end));
-    const groups = Object.entries(vols).filter(([, v]) => v > 0);
+    /* Obliques counted inside core, the way the engine's ledger and the Body
+       tab both count them; the total is unchanged by the fold. */
+    const groups = Object.entries(bodyLedgerVolumes(vols)).filter(([g, v]) => v > 0 && bodyLedgerGroup(g) === g);
     const total = Math.round(groups.reduce((n, [, v]) => n + v, 0));
     if (!total) {
       return { value: "Not yet", line: `${Subj} ${have} not logged any sets in the last seven days.`,
         note: "Muscle is built by hard sets per muscle group per week, about 10 to 20 each. Log a session and this starts counting them." };
     }
+    const out = { value: String(total), unit: "hard sets this week" };
+    /* Against the plan's own numbers when they are mine and known, which is
+       the same ledger the Body tab draws its rings from. It used to hold every
+       group to 14 and name the two furthest under it, which on a plan followed
+       to the set meant naming obliques, traps and lower back: groups the
+       engine either folds into core or never programs. A person doing
+       everything right was told twice a week what they were neglecting. */
+    const targets = !third ? BODY_PLAN_TARGETS?.week : null;
+    if (!targets && !third) {
+      /* Not built yet this sitting (the Body tab builds it on a visit). Ask,
+         and redraw this tab once if the answer changes what the line says. */
+      bodyEnsurePlanTargets().then((changed) => {
+        if (changed && !document.getElementById("tab-progress")?.classList.contains("hidden")) renderProgressTab();
+      });
+    }
+    if (targets) {
+      const onPlan = Object.keys(targets);
+      const behind = bodyGroupsBehind(vols, "week");
+      const done = onPlan.length - behind.length;
+      const names = behind.slice(0, 2).map((b) => b.label);
+      out.line = `${done} of ${onPlan.length} muscle groups on your plan got their week's sets.`;
+      if (!behind.length) {
+        out.tone = "good";
+        out.note = "Every group your plan asks for got its sets this week. Total weight moved is on its own card below; it is a good number to watch and a poor one to be judged by.";
+      } else {
+        out.note = `${names.join(" and ")} ${names.length === 1 ? "is" : "are"} furthest behind what your plan asks. The plan's targets are the 10 to 20 hard sets a week that build size, sized to your week.`;
+      }
+      return out;
+    }
+    /* No plan to measure against: the partner's week, or the engine could not
+       be reached. The count against the general range still stands; naming
+       a group as behind does not, since there is no number to be behind. */
     const target = BODY_IMPACT_TARGET.week;
     const inRange = groups.filter(([, v]) => v >= target * 0.7).length;
-    const short = groups.filter(([, v]) => v > 0 && v < target * 0.7)
-      .sort((a, b) => a[1] - b[1]).slice(0, 2).map(([g]) => g);
-    const out = { value: String(total), unit: "hard sets this week" };
-    if (inRange >= 5) {
-      out.tone = "good";
-      out.line = `${inRange} muscle groups got a full week's work.`;
-      out.note = "About 10 to 20 hard sets a week per muscle is the range that builds size. Total weight moved is on its own card below; it is a good number to watch and a poor one to be judged by.";
-    } else {
-      out.line = `${inRange} muscle ${inRange === 1 ? "group" : "groups"} got a full week's work.`;
-      out.note = short.length
-        ? `${short.join(" and ")} ${short.length === 1 ? "is" : "are"} furthest behind. About 10 to 20 hard sets a week per muscle is what builds size.`
-        : "About 10 to 20 hard sets a week per muscle is what builds size.";
-    }
+    out.line = `${inRange} muscle ${inRange === 1 ? "group" : "groups"} got about ten sets or more.`;
+    if (inRange >= 5) out.tone = "good";
+    out.note = "About 10 to 20 hard sets a week per muscle is the range that builds size. Total weight moved is on its own card below; it is a good number to watch and a poor one to be judged by.";
     return out;
   }
   if (kind === "reps") {
