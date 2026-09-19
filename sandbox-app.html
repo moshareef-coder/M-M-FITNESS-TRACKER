@@ -8458,7 +8458,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.18.18";
+const APP_VERSION = "2026.09.18.19";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -30139,9 +30139,22 @@ function renderChooseScreen() {
 
   /* With a plan already made, the first thing you want is to start it, not to
      make another one. Some of it logged already means you are partway in, so
-     it says so rather than offering to begin something you have begun. */
+     it says so rather than offering to begin something you have begun.
+
+     Only TODAY can be partway through, which this now says out loud. It used
+     to lean on p.real meaning "today has a plan", and that stopped being true
+     the moment planPreview learned to read whichever day the card is about:
+     on a finished day the card reads TOMORROW, so p.real could be true about
+     tomorrow's plan while today's own row was already gone, and reaching
+     through a null TODAY_WORKOUT for its exercises threw on the way into the
+     tab. That is a blank workout screen for anybody who finished their
+     session and had tomorrow already planned, which shipped in .17 and is the
+     exact state Mo hit. The optional chaining is the belt to this brace: the
+     button reading `partway` is gated on the same !allDone, so the only
+     question left here is today's, and today's plan is allowed to be absent. */
   const loggedNow = p.real ? todaysLoggedExerciseNames() : null;
-  const partway = p.real && (TODAY_WORKOUT.exercises || []).some((ex) => loggedNow.has(ex.name.toLowerCase()));
+  const partway = p.real && !allDone
+    && (TODAY_WORKOUT?.exercises || []).some((ex) => loggedNow.has(ex.name.toLowerCase()));
   const actions = `
     ${coached ? "" : p.real
       /* Plain apostrophe, not an entity: optionCard escapes its text, so a
