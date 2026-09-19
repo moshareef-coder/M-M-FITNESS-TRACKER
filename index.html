@@ -4189,6 +4189,11 @@
   .goal-tile-grid.plain .goal-row { padding: 15px 14px; }
   .goal-tile-grid.plain .goal-row-title { font-size: 16.5px; font-weight: 700; }
   .goal-row-sub { font-size: 12.5px; color: var(--muted); line-height: 1.3; }
+  /* What an extra goal adds, under its row, indented to the title (14px pad,
+     34px icon, 12px gap). `flat` is the engine saying it adds nothing, which
+     is the one line here that is a warning. */
+  .goal-row-effect { display: block; padding: 0 14px 12px 60px; font-size: 12.5px; line-height: 1.35; color: var(--muted); }
+  .goal-row-effect.flat { color: var(--warn); }
   .goal-row-chev { flex: none; color: var(--muted); display: grid; place-items: center; }
   .goal-row-badge { flex: none; font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
                     padding: 3px 8px; border-radius: 100px; background: var(--accent); color: var(--bg); }
@@ -10978,9 +10983,11 @@ function initGoalTiles(grid, { selected = {}, onPick, onSelect, confirmLabel = "
             ? icon(isOpen ? "chevronDown" : "chevronRight", 17)
             : `<span class="goal-row-tick${main || alsoCount ? " on" : ""}">${main || alsoCount ? icon("check", 14) : ""}</span>`}</span>
         </button>
+        ${alsoCount ? `<span class="goal-row-effect" data-effect="${t.id}"></span>` : ""}
         ${kids}
       </div>`;
     }).join("");
+    paintEffects();
 
     grid.querySelectorAll("[data-tile]").forEach((b) => {
       b.onclick = () => {
@@ -11025,6 +11032,43 @@ function initGoalTiles(grid, { selected = {}, onPick, onSelect, confirmLabel = "
   function paintConfirm() {
     confirmEl.disabled = !primary;
     confirmEl.textContent = primary ? confirmLabel : "Pick a goal first";
+  }
+
+  /* What each extra goal will add to the plan, under its row, the moment it
+     is tapped. Measured across every pickable pair on 2026-09-19: 20 of 36
+     change nothing at all, and the 16 that do change only the weekly cardio
+     and the cool-down, never a lift. goalOutcomeFor could say so, but only
+     after a plan had been built and the picker reopened, which is never
+     during onboarding. resolveGoal is the exact function buildPlan asks, and
+     it is pure, so its answer is the plan's answer and can be given now.
+     Nothing here stops the pick: it is the person's to keep. */
+  let effectGen = 0;
+  async function paintEffects() {
+    const gen = ++effectGen;
+    if (!primary || !extras.length) return;
+    const mod = await ensureGoalEngine();
+    if (gen !== effectGen || !mod) return;
+    let r;
+    try { r = mod.resolveGoal({ bubble: primary.bubble, child: primary.child, secondary: extras }); }
+    catch (e) { console.warn("goal effect", e); return; }
+    const main = goalTileFor(primary.bubble)?.title || "your main goal";
+    const same = (a, b) => a && b && a.bubble === b.bubble && (a.child || null) === (b.child || null);
+    const lines = {};
+    for (const e of extras) {
+      const hit = (r.secondary || []).find((s) => same(s, e));
+      const dropped = (r.ignoredSecondary || []).find((s) => same(s, e));
+      const effect = hit ? hit.effect.filter((s) => typeof s === "string" && s.trim()) : [];
+      const text = dropped ? `Not used: ${dropped.why}.`
+        : effect.length ? `Adds ${effect.join(", and ")}.`
+        : `Changes nothing alongside ${main}.`;
+      (lines[e.bubble] ??= []).push({ text, flat: !effect.length });
+    }
+    for (const [bubble, list] of Object.entries(lines)) {
+      const el = grid.querySelector(`[data-effect="${bubble}"]`);
+      if (!el) continue;
+      el.textContent = list.map((l) => l.text).join(" ");
+      el.classList.toggle("flat", list.every((l) => l.flat));
+    }
   }
 
   confirmEl.onclick = () => {
