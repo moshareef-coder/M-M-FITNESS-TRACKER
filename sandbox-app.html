@@ -442,10 +442,15 @@
      the thumb is. */
   .wkt-next-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 2px; }
   .wkt-next-top .info-dot { margin: -2px -2px 0 0; }
+  /* Words left, figure right, buttons across the bottom. Mo, on the ring
+     sitting centred on its own row: "I don't like how the percentage match is
+     directly in the middle, put that to the right, make it big." Beside the
+     title rather than under it, which is also where the plan overview puts it,
+     so the two screens that carry this number now carry it the same way. */
   .wkt-next-grid {
-    display: grid; column-gap: 8px; row-gap: 12px; align-items: start;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "words" "arc" "acts" "line";
+    display: grid; column-gap: 10px; row-gap: 12px; align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "words arc" "acts acts";
   }
   .wkt-next-words { grid-area: words; min-width: 0; }
   /* Not hired: the ring and the muscle list are the reading he does for you,
@@ -455,6 +460,7 @@
      where you do them. */
   .wkt-next-hire { grid-area: pitch; }
   .wkt-next.not-hired .wkt-next-grid {
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "words" "pitch" "acts";
   }
   .wkt-next-sub { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
@@ -462,7 +468,7 @@
      Sized and pressed like the other cards on this tab rather than like a
      control: it is the number that is tappable, not a widget around it. */
   .wkt-arc {
-    grid-area: arc; position: relative; width: 120px; height: 92px; justify-self: center;
+    grid-area: arc; position: relative; width: 136px; height: 104px; justify-self: end;
     margin: 2px 0; padding: 0; border: 0; background: none; cursor: pointer;
     transition: transform .12s ease;
   }
@@ -471,11 +477,8 @@
   /* The gauge's centre sits below the middle of its box, since the gap is at
      the bottom, so the number is pinned to it rather than to the box. */
   .wkt-arc-num { position: absolute; left: 0; right: 0; top: 60%; transform: translateY(-50%); text-align: center; line-height: 1; }
-  .wkt-arc-num b { display: block; font-size: 28px; font-weight: 800; letter-spacing: -.03em; color: var(--accent-ink); }
+  .wkt-arc-num b { display: block; font-size: 32px; font-weight: 800; letter-spacing: -.03em; color: var(--accent-ink); }
   .wkt-arc-num i { display: block; margin-top: 4px; font-size: 9px; font-style: normal; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
-  /* The caption under the buttons, where the ticked column used to be a third
-     thing competing with the ring. */
-  .wkt-next-line { grid-area: line; margin: 0; font-size: 12.5px; font-weight: 500; color: var(--muted); line-height: 1.4; }
   /* The overview at the top of a day being reviewed. Mo, looking at the card
      and then at this screen: "plan overview, I like the percentage match on
      the right side and very big." Same figure, same sheet behind it, a size
@@ -1438,10 +1441,6 @@
   }
   .ex-ramp svg { flex-shrink: 0; opacity: .8; margin-top: 2px; }
   .ex-ramp span { min-width: 0; }
-  .gen-row-ramp {
-    display: block; margin-top: 2px; font-size: 11px; line-height: 1.35;
-    color: var(--stretch-ink); font-variant-numeric: tabular-nums;
-  }
 
   .ramp-fold {
     border: 1px solid color-mix(in srgb, var(--stretch) 26%, var(--border));
@@ -1495,18 +1494,57 @@
   .ex-body.ex-tap:not(:disabled):active { opacity: .6; }
   .ex-body.ex-tap .ex-target svg { opacity: .5; vertical-align: -1px; margin-left: 2px; }
 
-  .cardio-note {
-    display: flex; gap: 11px; align-items: flex-start; margin: 10px 0 2px;
-    padding: 11px 13px; border-radius: 14px;
-    background: var(--panel-2); border: 1px dashed var(--border);
+  /* ---- The day that is a run ----
+     A cardio day is one thing for a length of time at an effort, not a list of
+     sets, so it does not get the list: a headline, the two numbers, and the
+     coaching. Flat on the plan card, because the plan card is already a card
+     and nothing here is a second one. */
+  .cdy-head { margin: 2px 0 14px; }
+  .cdy-kind {
+    display: flex; align-items: center; gap: 6px; margin: 0;
+    font-size: 11px; font-weight: 800; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--accent-ink);
   }
-  .cardio-note-ico {
+  /* Two classes deep on purpose: `.card h2` is this app's eyebrow style, 11px
+     and uppercase, and it was shrinking the session's own name to a caption.
+     The three cards on this tab restate themselves the same way, above. */
+  .cdy-head .cdy-name {
+    margin: 6px 0 0; font-family: var(--font-display); font-size: 28px; font-weight: 800;
+    letter-spacing: -.03em; line-height: 1.06; text-transform: none; color: var(--text);
+    text-wrap: balance;
+  }
+  .cdy-sub { margin: 7px 0 0; font-size: 14px; line-height: 1.45; color: var(--muted); }
+  .cdy-facts { display: flex; gap: 8px; margin: 0 0 12px; }
+  /* Centred down the tile as well as across it: the effort tile carries a
+     third line and the time tile does not, and a number floating at the top of
+     its own box beside one that fills reads as a layout accident. */
+  .cdy-fact {
+    flex: 1; min-width: 0; padding: 11px 10px; border-radius: 12px;
+    display: flex; flex-direction: column; justify-content: center;
+    text-align: center; background: var(--panel-2);
+  }
+  .cdy-fact span {
+    display: block; font-size: 11px; font-weight: 800; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .cdy-fact b { display: block; margin-top: 4px; font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+  .cdy-fact i { display: block; margin-top: 2px; font-style: normal; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cdy-block {
+    display: flex; gap: 11px; align-items: flex-start; margin: 0 0 10px;
+    padding: 12px 13px; border-radius: 14px; background: var(--panel-2);
+  }
+  .cdy-block-ico {
     width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink);
   }
-  .cardio-note b { display: block; font-size: 13.5px; font-weight: 650; letter-spacing: -.01em; }
-  .cardio-note i { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+  .cdy-block > div { min-width: 0; }
+  .cdy-block b {
+    display: block; font-size: 11px; font-weight: 800; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .cdy-block i { display: block; font-style: normal; font-size: 14px; line-height: 1.45; margin-top: 3px; }
+  .cdy-note { margin: 12px 0 14px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 
   .workout-progress-row.stretch-row { color: var(--stretch-ink); font-weight: 700; }
   .workout-progress-row.stretch-row .link-btn { color: var(--stretch-ink); }
@@ -1571,6 +1609,18 @@
   .rest-pref button:active { transform: scale(.96); }
   .rest-pref button.on { background: var(--accent); border-color: transparent; color: var(--on-accent); }
 
+  /* The onboarding styles grid, on the Training page. The tiles keep their own
+     geometry; only the surface changes, because --panel is #fff in light mode
+     and that is the card's own fill, so inside a card the seven tiles read as
+     one flat block with hairlines drawn across it. --panel-2 is what every
+     other control in Setup sits on, lighter than the card in dark mode and a
+     shade darker in light, which is the same step the rest buttons above take. */
+  .set-styles .ob-styles { margin: 12px 0 0; }
+  .set-styles .ob-style { background: var(--panel-2); }
+  .set-styles .ob-style.on { background: color-mix(in srgb, var(--accent) 14%, var(--panel-2)); }
+  .set-styles .ob-other { margin: 12px 0 0; }
+  .set-styles .ob-other > summary { background: var(--panel-2); }
+
   /* Grid, not space-between: "Weight (lb)" is a wider label than "Reps", so
      with flex the two control groups started at different places and the minus
      buttons did not line up down the screen. */
@@ -1611,6 +1661,10 @@
   /* The ring is dropped because it boxes the big number awkwardly, so the
      border has to carry the focus signal instead of nothing carrying it. */
   .sess-input:focus { outline: none; border-color: var(--accent); }
+  /* An empty weight field is a real state, not a missing one: the engine says
+     it has not been told. A question mark says that in the space a number
+     would take, where "0" would have claimed an answer. */
+  .sess-input::placeholder { color: var(--muted); opacity: .55; }
 
   .btn-outline {
     background: var(--panel); border: 1px solid var(--border); color: var(--text);
@@ -2056,14 +2110,6 @@
     position: relative; width: 100%; max-width: 420px; text-align: center;
     display: flex; flex-direction: column; justify-content: space-between; height: 100%;
   }
-  .gen-scrim.done .gen-stage { justify-content: center; }
-  /* A reveal can be taller than the screen: a day that could not be made to fit
-     the time you have says so in full, and the sentences saying it were being
-     squashed into each other by a stage pinned to exactly one screen. Only on
-     .done, so the generating animation above it keeps its fixed chamber. */
-  .gen-scrim.done { overflow-y: auto; }
-  .gen-scrim.done .gen-stage { height: auto; }
-  .gen-scrim.done .gen-step { flex-shrink: 0; }
   .gen-head { padding-top: 6px; }
   .gen-word-wrap { position: relative; display: inline-block; }
   .gen-word {
@@ -2077,94 +2123,25 @@
     margin-top: 18px; font-size: 12.5px; font-weight: 800; letter-spacing: .14em;
     color: rgba(255,255,255,.45); font-variant-numeric: tabular-nums;
   }
-  /* The reveal: the plan arrives one row at a time. */
-  .gen-done-head { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-  .gen-focus { font-size: 24px; font-weight: 800; letter-spacing: -.03em; margin: 4px 0 16px; }
-  .gen-rows { display: flex; flex-direction: column; gap: 8px; text-align: left; }
-  .gen-row {
-    display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px;
-    background: rgba(255,255,255,.06); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
-    animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
+  /* The failure screen's two lines. Everything else that lived here drew the
+     reveal, which is gone: see revealGeneratedPlan. The stage is always dark,
+     whatever the theme is, hence the fixed white rather than a token. */
+  .gen-focus {
+    font-size: 24px; font-weight: 800; letter-spacing: -.03em; margin: 4px 0 16px;
+    color: #f4f6f8;
   }
-  @keyframes genRow { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
-  .gen-row-n {
-    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    font-size: 12.5px; font-weight: 800; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent);
-  }
-  .gen-row-b { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .gen-row-name { font-size: 15.5px; font-weight: 700; color: #f4f6f8; }
-  .gen-row-t { font-size: 12.5px; color: rgba(255,255,255,.55); }
-  /* The swap control on a plan row is the same chip as the one in the session
-     header, but the reveal stage is dark whatever the theme is, so the panel
-     and border tokens would come back light on top of it. */
-  .gen-row .wp-chip { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18); color: rgba(255,255,255,.6); }
-  /* Sheets sit at 65 and the reveal at 95, and these two are the only sheets
-     that ever open over the reveal. */
+  /* Sheets sit at 65 and the generating overlay at 95, and these two are the
+     only sheets that can still be open while it is on screen. */
   #swapScrim, #swapDayScrim { z-index: 96; }
   /* An alternative's reason is a sentence, not a stat line, so it wraps
-     rather than being cut off at the first ellipsis. */
-  #swapSheet .sv-row-meta, #swapDaySheet .sv-row-meta { white-space: normal; overflow: visible; line-height: 1.35; }
-  /* The whole-session version of the chip on a row, and quieter than it: this
-     is an offer on a finished plan, not what the screen is for. */
-  .gen-swap {
-    display: inline-flex; align-items: center; gap: 7px; margin-top: 14px;
-    padding: 9px 15px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600;
-    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.18);
-    color: rgba(255,255,255,.72); cursor: pointer;
-    animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
-  }
-  .gen-swap:active { transform: scale(.97); }
-  /* Mo: "through there you can have the option to swap it with an activity or
-     choose a focus to work on". Three pills in a row rather than three more
-     full width buttons: the plan is the screen, and these are what you can do
-     about it, so they stay the size of the one that was already here. */
-  .gen-doors { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-  .gen-doors .gen-swap { margin-top: 0; }
-  .gen-go {
-    margin-top: 18px; animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
-  }
-  /* The only place limits are ever offered unprompted, and it arrives after the
-     plan rather than before it. Deliberately quieter than everything above it:
-     it is an aside on a finished plan, not a step in the way of one. The stage
-     is always dark, hence the fixed whites rather than the theme tokens. */
-  .gen-nudge {
-    display: flex; align-items: center; gap: 12px; text-align: left;
-    margin-top: 14px; padding: 12px 14px; border-radius: 14px;
-    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.14);
-    animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
-  }
-  .gen-nudge p { margin: 0; flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.45; color: rgba(255,255,255,.62); }
-  .gen-nudge button {
-    flex-shrink: 0; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
-    padding: 9px 14px; border-radius: 100px; min-height: 38px;
-    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); color: #f4f6f8;
-  }
-  .gen-nudge button:active { transform: scale(.97); }
-  /* The reveal is the plan, not the chamber, so the figure and grid fade back
-     and the rows sit on the dark ground rather than on top of a body. */
-  .gen-scrim.done .gen-holo { opacity: .12; transition: opacity .5s ease; }
-  .gen-scrim.done .gen-grid { opacity: .35; transition: opacity .5s ease; }
-  .gen-scrim.done .gen-done-head { color: rgba(255,255,255,.6); }
-  .gen-scrim.done .gen-focus { color: #f4f6f8; }
-  /* White on purpose, in both themes. This used to be the accent with
-     --accent-ink for the label, and on the dark palette --accent-ink IS the
-     accent, so the label was lime on lime and the button read as an empty
-     bar. Fixed colours rather than tokens because the stage is always dark,
-     and white is the one thing guaranteed to stand off it whatever the accent
-     is. Everything else on this screen is a row or a chip, so the only solid
-     white block is the way out. */
-  .gen-scrim.done .gen-go {
-    background: #fff; color: #0b0d11; border: none;
-    box-shadow: 0 10px 26px rgba(0,0,0,.35);
-  }
-  .gen-scrim.done .gen-go:active { background: #dfe3e8; box-shadow: none; }
-  /* The global ring is the accent, and a white button already carries the
-     brightest thing on the stage, so the ring is white too and sits off it. */
-  .gen-scrim.done .gen-go:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+     rather than being cut off at the first ellipsis. Same for the muscles a
+     day trains: a list cut off at "lats, trap..." is the app hiding half its
+     answer to "what is this day". */
+  #swapSheet .sv-row-meta, #swapDaySheet .sv-row-meta,
+  .day-pick .sv-row-meta { white-space: normal; overflow: visible; line-height: 1.35; }
   .gen-err { font-size: 14px; color: rgba(255,255,255,.66); line-height: 1.5; margin: 12px 0 18px; }
-  .gen-scrim:not(.done) .gen-focus { color: #f4f6f8; }
   @media (prefers-reduced-motion: reduce) {
-    .gen-scrim, .gen-scrim.leaving, .gen-row, .gen-go, .gen-grid, .gen-nudge { animation: none; }
+    .gen-scrim, .gen-scrim.leaving, .gen-grid { animation: none; }
     /* The word cycle is stopped in JS too: fast swapping text is exactly what
        this preference is asking us not to do. */
   }
@@ -3273,6 +3250,9 @@
   }
   .sess-lastline .last { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sess-lastline .last.warm { color: var(--stretch-ink); font-weight: 700; }
+  /* The one sentence asking for a number, so it wraps instead of ellipsising:
+     the half that gets cut is the half that says we will keep the number. */
+  .sess-lastline .last.ask { color: var(--accent-ink); font-weight: 700; white-space: normal; overflow: visible; }
   .sess-lastline .beat { color: var(--accent-ink); font-weight: 700; flex-shrink: 0; }
 
   /* Weight and reps, one cluster each, thumb-sized keys either side of a
@@ -4677,9 +4657,6 @@
     animation: fadeIn .2s ease;
   }
   @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-  /* Above the generating overlay, which is the one thing in the app that sits
-     higher than a sheet. */
-  .pop-scrim.over-gen { z-index: 96; }
   .pop {
     width: 100%; max-width: 400px; background: var(--panel); border-radius: 22px; overflow: hidden;
     border: 1px solid var(--border); box-shadow: var(--shadow-lift);
@@ -4979,9 +4956,50 @@
     border: 1.5px solid color-mix(in srgb, var(--accent) 55%, transparent);
     color: var(--accent-ink);
   }
+  /* An activity row opens now, so it is a button, and a button brought its own
+     type ramp, padding and centred text with it. Everything here is undoing
+     that: the row's geometry is .rc-ex and must stay identical to the lift
+     above it, or the list develops a step halfway down. */
+  .rc-ex-tap {
+    width: 100%; margin: 0; background: none; border: none; border-bottom: 1px solid var(--border);
+    font: inherit; color: inherit; text-align: left; cursor: pointer;
+    border-radius: 0; -webkit-tap-highlight-color: transparent;
+  }
+  .rc-ex-tap:last-child { border-bottom: none; }
+  /* Inside the list's own padding rather than outside it: a wash that runs to
+     the card's border would sit on top of the hairline it shares with the row
+     below. */
+  .rc-ex-tap:active { background: color-mix(in srgb, var(--text) 7%, transparent); }
+  .rc-ex-go { color: var(--muted); display: flex; flex-shrink: 0; margin-right: -4px; }
+  /* Planned and never logged. --up is the palette's own red for text, the one
+     the trend arrows and .idx-bad already use, and it is tuned separately for
+     each theme; --up-fill is the deeper one for white text on a solid button,
+     which this is not. --warn would be wrong here: amber means caution, and a
+     lift you did not do is not a warning about anything. */
+  .rc-ex-miss .rc-ex-name { color: var(--up); }
+  .rc-ex-miss .rc-ex-num2 { color: var(--up); opacity: .75; }
+  .rc-ex-miss .rc-n { border-color: color-mix(in srgb, var(--up) 55%, transparent); color: var(--up); }
+  .rc-miss {
+    font-size: 11px; font-weight: 800; letter-spacing: .06em; padding: 2px 6px; border-radius: 9px;
+    background: color-mix(in srgb, var(--up) 18%, transparent); color: var(--up); margin-left: 6px;
+    white-space: nowrap;
+  }
+  .rc-head-miss { font-size: 12.5px; font-weight: 700; color: var(--up); }
+  /* The same circle, wearing the palette's red instead of the accent, for the
+     one case where the sheet has nothing to congratulate anybody for. */
+  .rc-tick-none { border-color: var(--up); color: var(--up); box-shadow: none; }
+  .rc-kicker-none { color: var(--up); }
   /* Activities follow the exercises, so the second heading needs the air the
      first one gets from the block above it. */
   .rc-list + .rc-ex-head { margin-top: 16px; }
+  /* What the activity log does not hold. Body copy rather than an empty state,
+     because it is an answer to "what was in it" and not a blank slot. */
+  .ad-gap {
+    border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; background: var(--panel);
+    font-size: 13.5px; line-height: 1.5; color: var(--muted);
+  }
+  .ad-gap p { margin: 0 0 9px; }
+  .ad-gap p:last-child { margin-bottom: 0; }
   .rc-ex-num { font-size: 12.5px; font-weight: 700; font-family: var(--font-display); text-align: right; white-space: nowrap; }
   .rc-pr {
     font-size: 11px; font-weight: 800; letter-spacing: .06em; padding: 2px 6px; border-radius: 9px;
@@ -6606,7 +6624,6 @@
   }
   .cardio-act.on { background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-card); }
   .cardio-field { margin-bottom: 14px; }
-  .cardio-note { display: block; }
   .wt-logrow {
     display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; margin: 0;
     background: none; border: 0; color: inherit; font-family: inherit; text-align: left; cursor: pointer;
@@ -6794,6 +6811,14 @@
   .exercise-row .ex-body { flex: 1; min-width: 0; }
   .exercise-row .ex-name { font-weight: 600; font-size: 15.5px; }
   .exercise-row .ex-target { font-size: 12.5px; color: var(--muted); }
+  /* "Bodyweight" is a fact about the movement and stays in the muted voice
+     beside the sets and reps. "Pick your weight" is a question being asked
+     once, so it is the one thing on the row wearing the accent, which is the
+     colour this app paints everything that wants a tap. The two states must
+     not look alike: one is settled forever, the other disappears the moment a
+     number exists. nowrap so a narrow row breaks BEFORE the phrase rather than
+     through the middle of it: "8 reps · Pick / your weight" reads as a glitch. */
+  .ex-ask { color: var(--accent-ink); font-weight: 700; white-space: nowrap; }
   .exercise-row .ex-note { font-size: 12.5px; color: var(--muted); margin-top: 2px; font-style: italic; }
   .exercise-row .stepper-btn { width: 30px; height: 30px; }
   .add-ex-form { margin: 12px 0; padding: 12px; background: var(--panel-2); border-radius: 10px; }
@@ -7951,6 +7976,17 @@
       <p class="muted-note" style="margin-top:-6px;">Optional. Anything the goal above does not say on its own.</p>
       <textarea id="setupGoalDetail" placeholder="e.g. training for a wedding in June, prefer 4 days/week"></textarea>
     </div>
+    <!-- Asked on the way in and then never again: somebody who joined a gym,
+         stopped going, or took up running was planned for the answer they gave
+         on the day they signed up, forever. Same seven cards as onboarding,
+         same column, and it saves with the button at the bottom of this page
+         because nothing here writes until Save. -->
+    <div class="card">
+      <h2>What you actually do</h2>
+      <p class="muted-note" style="margin-top:-6px;">We only ever plan what is ticked. Change it whenever what you do changes.</p>
+      <div class="set-styles" id="setupStyleGrid"></div>
+      <p class="muted-note" id="setupStyleNote"></p>
+    </div>
     <div class="card">
       <h2>Weekly goal</h2>
       <label class="gym-toggle" id="sharedGoalToggleWrap">
@@ -8344,6 +8380,13 @@
   <div class="sheet-scrim hidden" id="nextWorkoutScrim">
     <div class="partner-sheet" id="nextWorkoutSheet"></div>
   </div>
+  <!-- One activity out of the recap. Its own scrim rather than redrawing the
+       recap's, and after it in the document so it paints over it: every sheet
+       here shares one z-index, and closing this has to put the day back the way
+       it was rather than rebuild it. -->
+  <div class="sheet-scrim hidden" id="actDetailScrim">
+    <div class="partner-sheet" id="actDetailSheet"></div>
+  </div>
   <div class="sheet-scrim hidden" id="partnerSheetScrim">
     <div class="partner-sheet" id="partnerSheet"></div>
   </div>
@@ -8357,13 +8400,13 @@
     <div class="partner-sheet" id="cropSheet"></div>
   </div>
   <!-- Swapping an exercise. Its own scrim rather than the picker's, because
-       this is the one sheet that has to open over the reveal overlay, and the
-       reveal sits above every other sheet in the app. -->
+       this is the one sheet that has to open over the generating overlay, and
+       that sits above every other sheet in the app. -->
   <div class="sheet-scrim hidden" id="swapScrim">
     <div class="partner-sheet" id="swapSheet"></div>
   </div>
   <!-- Swapping the whole session. Its own scrim for the same reason its
-       sibling above has one: it opens over the reveal. -->
+       sibling above has one. -->
   <div class="sheet-scrim hidden" id="swapDayScrim">
     <div class="partner-sheet" id="swapDaySheet"></div>
   </div>
@@ -8470,7 +8513,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.18.20";
+const APP_VERSION = "2026.09.19.21";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -11110,6 +11153,10 @@ async function upsertGoalFields(patch) {
   return {
     data: retry.data, error: retry.error,
     droppedSecondary: dropped("goal_secondary"), droppedSession: dropped("session_minutes"),
+    /* Same idea, for the Training page's styles picker: the write went through
+       without the column, so the caller has to say so rather than report a
+       save that did not happen. */
+    droppedStyles: dropped("train_styles"),
   };
 }
 
@@ -11190,47 +11237,21 @@ function focusSpendDown(groups, units, maxTier = FOCUS_TIERS.main) {
   return { pairs, left };
 }
 
-/* The same units spread ACROSS a list instead of down it: a unit to each group
-   in turn, so two units on a two group half buy both at the lightest tier
-   rather than one at the middle.
-
-   That is not a style choice, it is what the engine measures. The plan's core
-   slot names ONE group and which one depends on the split: the full body and
-   legs templates fill it from abs, the upper/lower template fills it from
-   obliques (SLOTS in mo-knowledge/engine/plan.mjs). So a core focus spent deep
-   on abs lands on a group a four day week never trains, and the week comes back
-   with LESS core work than picking nothing at all: measured on a four day
-   build-muscle week, abs:2 gives 2 weekly core sets against a baseline of 5,
-   while abs:1 plus obliques:1 gives 10. Spread across both, it lands whatever
-   the split. The real fix is one line per template in plan.mjs, widening that
-   slot to ["abs", "obliques"] the way the traps slot was already widened, and
-   this picker should stop compensating the day that lands. */
-function focusSpendAcross(groups, units) {
-  const tier = new Map(groups.map((g) => [g, 0]));
-  let left = Math.max(0, units);
-  while (left > 0) {
-    const lowest = Math.min(...groups.map((g) => tier.get(g)));
-    const g = groups.find((x) => tier.get(x) === lowest && tier.get(x) < FOCUS_TIERS.main);
-    if (!g) break;
-    tier.set(g, tier.get(g) + 1);
-    left -= 1;
-  }
-  return { pairs: [...tier].filter(([, t]) => t > 0), left };
-}
-
 /* What one region buys for a given number of budget units, keeping the promise
    its label makes. A region named after two things spends about a quarter of
-   what it was given on the second half, never less than one unit per group in
-   that half so a named half is never bought as a coin flip, and never so much
-   that the half the name leads with stops leading.
+   what it was given on the second half, never less than a unit for each group
+   in that half so a named half is never bought as a token, and never so much
+   that the half the name leads with stops leading. What that share buys is
+   spent down the same ladder as everything else: as deep as it reaches on the
+   first group, then on to the next.
 
-   The floor is why "Legs and core" with three units buys quads, abs and
-   obliques at a unit each rather than quads at two and abs at one. Measured, the
-   second of those is worse than not picking at all: the legs take the volume,
-   the single core unit lands on a group half the splits never train, and core
-   comes back at 2 weekly sets against a baseline of 5. A name that promises two
-   things and delivers less of the second one than silence would is the bug this
-   whole commit is about, one level down.
+   The floor is what keeps the core half worth buying once a second region is
+   picked. A quarter of three or four units rounds to one, and one unit of core
+   is barely more than silence. Measured through the engine on a build-muscle
+   week, weekly core sets against a baseline of 10 for no pick at all: "Legs and
+   core" alongside one other region lands 13, 12 and 12 on three, four and five
+   day weeks with the floor, and 12, 11 and 11 without it. A name that promises
+   two things has to buy enough of the second one to be worth reading.
 
    Two units is the one case where the floor cannot be paid, because the lead
    half must keep a unit. That is a second-ranked area on Setup and nowhere
@@ -11245,7 +11266,7 @@ function focusRegionSpend(region, units) {
   const first = focusSpendDown(region.lead, units - share);
   /* The lead half's own leftover goes here rather than being binned: a one
      group lead (Chest) hands its whole allowance on. */
-  const second = focusSpendAcross(region.also, share + first.left);
+  const second = focusSpendDown(region.also, share + first.left);
   return { pairs: [...first.pairs, ...second.pairs], left: second.left };
 }
 
@@ -12653,6 +12674,62 @@ function recommendedStyles(data) {
   return kept.length ? kept : ["walking", "home"];
 }
 
+/* ---- The styles picker. ONE picker, two screens -----------------------------
+   Onboarding asks this on the way in and Setup > Training asks it forever
+   after, and it is the same seven options with the same copy going into the
+   same column. The focus regions were written out twice and had drifted by the
+   second day, so the same button bought a different muscle depending on which
+   screen answered it. That is not happening again here: the markup, the
+   toggling and the sentence underneath are written once and both screens call
+   them.
+
+   `recs` only decorates. Nothing in here ticks anything on its own: what is
+   ticked is what the caller passed, because Setup must never paint a
+   suggestion as if it were the stored answer. */
+function trainStylePickerHTML(picked, recs = []) {
+  const on = new Set(picked);
+  const card = (t) => `<button type="button" class="ob-style${on.has(t.id) ? " on" : ""}" data-style="${t.id}" aria-pressed="${on.has(t.id)}">
+      ${recs.includes(t.id) ? `<span class="obs-rec">Recommended</span>` : ""}
+      <span class="obs-ico">${icon(t.ico, 20)}</span>
+      <span class="obs-label">${escapeHtml(t.label)}</span>
+      <span class="obs-sub">${escapeHtml(t.sub)}</span>
+    </button>`;
+  const others = TRAIN_STYLES.filter((t) => t.other);
+  /* Other is closed by default and opens itself when something inside it is
+     already ticked, so reopening this never hides a choice. It is not drawn at
+     all while nothing is behind it: every style is on the main board today, and
+     an empty drawer is a promise of more that is not there. */
+  return `<div class="ob-styles">${TRAIN_STYLES.filter((t) => !t.other).map(card).join("")}</div>
+    ${others.length ? `<details class="ob-other"${others.some((t) => on.has(t.id)) ? " open" : ""}>
+      <summary>Other</summary>
+      <div class="ob-styles">${others.map(card).join("")}</div>
+    </details>` : ""}`;
+}
+
+/* `onChange` is handed the new list and a veto: return false and the tap is
+   taken back, tick and all. Setup uses it to hold the line at one ticked, and
+   onboarding never vetoes anything. */
+function wireTrainStylePicker(root, picked, onChange) {
+  const on = new Set(picked);
+  root.querySelectorAll("[data-style]").forEach((b) => b.onclick = () => {
+    const id = b.dataset.style;
+    const was = on.has(id);
+    was ? on.delete(id) : on.add(id);
+    if (onChange([...on], id) === false) { was ? on.add(id) : on.delete(id); return; }
+    b.classList.toggle("on", on.has(id));
+    b.setAttribute("aria-pressed", String(on.has(id)));
+  });
+}
+
+/* The sentence under the grid. Says nothing when there is nothing true to say,
+   the way quips.mjs does it, so the line is worth reading when it appears. */
+function trainStyleNote(picked) {
+  if (!picked.length) return "Pick at least one.";
+  const has = (k) => picked.some((id) => TRAIN_STYLES.find((t) => t.id === id)?.mod === k);
+  return has("weight-training") ? ""
+    : "No resistance training. That is your call, and worth knowing: two sessions a week is what keeps weight loss taking fat rather than muscle.";
+}
+
 /* How many training days each step is worth on the bar. Not evenly spaced,
    because the steps are not evenly sized: name is a text field and the body
    picker is a real decision, and a bar that jumps in equal hops past a long
@@ -13078,51 +13155,28 @@ function renderOnboardStep(step, data = {}) {
        two or three that follow from their goals is a suggestion they can
        actually disagree with. */
     const recs = recommendedStyles(data);
-    const picked = new Set(data.train_styles || recs);
-    const others = TRAIN_STYLES.filter((t) => t.other);
-    const openOther = others.some((t) => picked.has(t.id));
     /* An icon on every one of them. Seven text-only cards read as a form; the
        same seven with a picture on each read as a menu, and this is the one
-       screen in the run where somebody is choosing rather than answering. */
-    const card = (t) => `<button type="button" class="ob-style${picked.has(t.id) ? " on" : ""}" data-style="${t.id}">
-        ${recs.includes(t.id) ? `<span class="obs-rec">Recommended</span>` : ""}
-        <span class="obs-ico">${icon(t.ico, 20)}</span>
-        <span class="obs-label">${escapeHtml(t.label)}</span>
-        <span class="obs-sub">${escapeHtml(t.sub)}</span>
-      </button>`;
+       screen in the run where somebody is choosing rather than answering.
+       The grid itself is trainStylePickerHTML, shared with Setup > Training. */
+    let picked = [...new Set(data.train_styles || recs)];
     ob.innerHTML = `
       <div class="ob-step">
         ${obChrome("styles", data)}
         <h1>Pick your workouts</h1>
         <p class="sub">We have ticked what suits your goals. Change any of it. We only ever plan what is ticked here.</p>
-        <div class="ob-styles" id="styleGrid">
-          ${TRAIN_STYLES.filter((t) => !t.other).map(card).join("")}
-        </div>
-        <details class="ob-other"${openOther ? " open" : ""}>
-          <summary>Other</summary>
-          <div class="ob-styles">${others.map(card).join("")}</div>
-        </details>
+        ${trainStylePickerHTML(picked, recs)}
         <p class="ob-style-note" id="styleNote"></p>
         <button type="button" class="btn-primary" id="styleNext">On to the fun stuff</button>
         <button type="button" class="btn-ghost" id="styleBack">Back</button>
       </div>`;
     const note = () => {
-      const has = (k) => [...picked].some((id) => TRAIN_STYLES.find((t) => t.id === id)?.mod === k);
-      $("styleNote").textContent = !picked.size
-        ? "Pick at least one."
-        : !has("weight-training")
-          ? "No resistance training. That is your call, and worth knowing: two sessions a week is what keeps weight loss taking fat rather than muscle."
-          : "";
-      $("styleNext").disabled = !picked.size;
+      $("styleNote").textContent = trainStyleNote(picked);
+      $("styleNext").disabled = !picked.length;
     };
-    ob.querySelectorAll("[data-style]").forEach((b) => b.onclick = () => {
-      const id = b.dataset.style;
-      picked.has(id) ? picked.delete(id) : picked.add(id);
-      b.classList.toggle("on", picked.has(id));
-      note();
-    });
+    wireTrainStylePicker(ob, picked, (ids) => { picked = ids; note(); });
     note();
-    $("styleNext").onclick = () => renderOnboardStep("days", { ...data, train_styles: [...picked] });
+    $("styleNext").onclick = () => renderOnboardStep("days", { ...data, train_styles: picked });
     $("styleBack").onclick = () => {
       const q = tuneQueue(data);
       if (q.length) renderOnboardStep("tune", { ...data, tuneIdx: q.length - 1 });
@@ -13952,7 +14006,7 @@ async function reconcileNativeSurfaces() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "swapDayScrim", "liftsScrim", "reportScrim", "measureScrim", "cardioScrim", "csnScrim"]
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "actDetailScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "swapDayScrim", "liftsScrim", "reportScrim", "measureScrim", "cardioScrim", "csnScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
   stopGenTicker();
   $("genScrim")?.classList.add("hidden");
@@ -15819,6 +15873,27 @@ function recapFor(email, name, date) {
   const minutes = logs.reduce((s, l) => s + (l.duration_min || 0), 0);
   const seconds = plans.reduce((s, w) => s + (w.duration_sec || 0), 0);
 
+  /* Mo: "if there's things I haven't completed then mark it as red as not
+     complete". A lift that was planned and never logged used to leave no trace
+     at all here, because this sheet is built out of exercise_logs and a set
+     nobody did writes no row: a leg day ended two exercises early read back as
+     a clean four exercise workout. The plan row is still on the date, with its
+     exercises intact, so the difference between the two is the honest answer.
+
+     Matched on the name because that is exactly what logExerciseSilent writes,
+     taken straight off the plan, and a swapped exercise is renamed on the plan
+     before anything is logged against it, so the two sides stay in step.
+
+     Only a plan that was actually STARTED counts, meaning it was finished or at
+     least one of its exercises is in the log. A lifting day swapped for a run
+     is archived with all of its exercises still on it and nothing logged, and
+     reading that as six missed lifts would call a deliberate swap a failure. */
+  const liftNames = new Set(lifts.map((l) => (l.exercise_name || "").trim().toLowerCase()));
+  const trained = plans.find((w) => (w.exercises || []).length
+    && (w.completed_at || (w.exercises || []).some((ex) => liftNames.has((ex.name || "").trim().toLowerCase()))));
+  const missed = (trained?.exercises || [])
+    .filter((ex) => ex?.name && !liftNames.has(String(ex.name).trim().toLowerCase()));
+
   const { prLogIds } = personalRecords(name);
   return {
     date,
@@ -15829,7 +15904,7 @@ function recapFor(email, name, date) {
     title: lifts.length || !activities.length
       ? displayFocus(plans.find((w) => w.focus)?.focus, logs.map((l) => l.exercise_name))
       : activities.length === 1 ? activities[0].exercise_name : "Activity day",
-    logs, lifts, activities, sets, volume, minutes, seconds,
+    logs, lifts, activities, missed, sets, volume, minutes, seconds,
     exercises: lifts.length,
     note: entry?.note || null,
     /* The same record personalRecords means, so the tag here and the banner
@@ -15923,7 +15998,12 @@ function openNextWorkoutReview(plan) {
     .toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 
   const exRow = (ex, i) => {
-    const load = ex.targetWeight != null && ex.targetWeight !== "" ? `@ ${ex.targetWeight} lb` : "";
+    /* This read `targetWeight != null`, so a lift the engine could not put a
+       number on printed "@ 0 lb" here: a weight nobody chose, stated as the
+       plan. The three answers are a number, a settled bodyweight, or an ask. */
+    const load = Number(ex.targetWeight) > 0 ? `@ ${ex.targetWeight} lb`
+      : loadIsBodyweight(ex) ? "bodyweight"
+      : loadAsk(ex) ? "pick a weight" : "";
     return `<div class="rc-ex">
       <span class="rc-n">${i + 1}</span>
       <span class="rc-ex-name">${escapeHtml(ex.name)}</span>
@@ -15940,7 +16020,9 @@ function openNextWorkoutReview(plan) {
     </div>
 
     <div class="rc-head">
-      <div class="rc-tick" style="border-color:var(--border);color:var(--muted);box-shadow:none;">${icon("dumbbell", 20)}</div>
+      ${/* A dumbbell over a queued yoga class is the sheet calling it a lifting
+            day in the one place it cannot take the word back. */ ""}
+      <div class="rc-tick" style="border-color:var(--border);color:var(--muted);box-shadow:none;">${icon(cardioSessionOf(plan) ? (cardioActFor(cardioSessionOf(plan))?.ico || "run") : "dumbbell", 20)}</div>
       <div>
         <div class="rc-kicker">QUEUED FOR TOMORROW</div>
         <div class="rc-title">${escapeHtml(title)}</div>
@@ -15948,10 +16030,14 @@ function openNextWorkoutReview(plan) {
       </div>
     </div>
 
+    ${/* A queued run has no exercises by contract, and "nothing planned yet"
+          over a session the engine built is the sheet failing to read it. */ ""}
     ${exercises.length
       ? `<div class="rc-ex-head"><h4>Exercises</h4></div>
          <div class="rc-list">${exercises.map(exRow).join("")}</div>`
-      : `<div class="ps-empty">Nothing planned yet for this one.</div>`}
+      : planActivitySession(plan)
+        ? activityDayHTML(planActivitySession(plan), { head: false })
+        : `<div class="ps-empty">Nothing planned yet for this one.</div>`}
 
     <div class="rc-actions">
       <button type="button" class="btn-ghost" id="nwClear">Clear this workout</button>
@@ -15963,8 +16049,11 @@ function openNextWorkoutReview(plan) {
     const { error } = await sb.from("ai_workouts").delete().eq("id", plan.id);
     if (error) { console.error(error); toast("Couldn't clear that workout"); return; }
     closeNextWorkoutReview();
-    await loadAll();
-    renderHero();
+    /* Through the same door as every other way a day empties. It used to
+       reload and redraw Home only, so the workout tab behind this sheet kept
+       the plan on its week strip and the generator's cached next day was still
+       the one this row had just decided, until a tab switch put it right. */
+    await planChangedOn(plan.entry_date);
   };
   $("nextWorkoutScrim").classList.remove("hidden");
   $("nextWorkoutScrim").onclick = (ev) => { if (ev.target === $("nextWorkoutScrim")) closeNextWorkoutReview(); };
@@ -15997,6 +16086,12 @@ function openRecap(email, name, date) {
      is training and this is where the day is read back, but it cannot call
      itself a completed workout or print sets it does not have. */
   const onlyActivities = !r.lifts.length && r.activities.length > 0;
+  /* A day where the workout was opened, finished, and nothing was logged in
+     between. It is a real state: End writes completed_at whether or not a set
+     was ticked. The sheet used to greet it with a green tick and "WORKOUT
+     COMPLETED" over two dashes, which is the opposite of what happened, and
+     now that the missed lifts are listed it would sit above a page of red. */
+  const nothingDone = sharing && !r.lifts.length && !r.activities.length && r.missed.length > 0;
 
   /* Volume and calories only appear when they are real: a bodyweight session
      has no tonnage, and calories need a logged bodyweight to mean anything. */
@@ -16017,17 +16112,43 @@ function openRecap(email, name, date) {
     </div>`;
   };
 
+  /* Planned, never logged. It sits in the same list as the work that happened,
+     under it, so the whole workout can be read in one go instead of as two
+     lists to reconcile. The numbers carry on from the logged rows rather than
+     restarting or quoting the plan's own positions: this list is ordered by
+     what was logged and then by what was not, and a number that claimed to be
+     the plan's position would contradict the row above it the moment somebody
+     did their exercises out of order. Sets and reps are what was ASKED for,
+     which is the only figure a lift nobody did can honestly carry. */
+  const missRow = (ex, i) => {
+    const target = ex.sets != null || ex.reps != null
+      ? `${ex.sets ?? "-"}×${ex.reps ?? "-"}`
+      : "";
+    return `<div class="rc-ex rc-ex-miss">
+      <span class="rc-n">${r.lifts.length + i + 1}</span>
+      <span class="rc-ex-name">${escapeHtml(ex.name)}<span class="rc-miss">NOT DONE</span></span>
+      <span class="rc-ex-num2">${escapeHtml(target)}</span>
+    </div>`;
+  };
+
   /* An activity carries its own icon rather than a position number, because it
      is not the third thing in a list of sets: it is the class or the run that
      also happened. Distance only when there is one, the same way the session
-     list writes it, and from the same two columns. */
+     list writes it, and from the same two columns.
+
+     A button, because Mo pressed one of these expecting it to open and it was a
+     dead line of text: "I should be able to ... press on it and it would open,
+     instead of it being like the workout." A tap rather than the swipe he also
+     offered, because every other row in this app opens on a tap, and because
+     the shared sheet gesture already owns a finger that moves on this panel. */
   const actRow = (l) => {
     const act = actForExerciseName((l.exercise_name || "").trim());
-    return `<div class="rc-ex">
+    return `<button type="button" class="rc-ex rc-ex-tap" data-act-log="${escapeHtml(String(l.id))}">
       <span class="rc-act-ico">${icon(act?.ico || "run", 15)}</span>
       <span class="rc-ex-name">${escapeHtml((l.exercise_name || "").trim())}</span>
       <span class="rc-ex-num2">${escapeHtml(`${l.duration_min} min`)}${l.distance_mi ? `<i>${escapeHtml(`${l.distance_mi} mi`)}</i>` : ""}</span>
-    </div>`;
+      <span class="rc-ex-go">${icon("chevronRight", 15)}</span>
+    </button>`;
   };
 
   $("recapSheet").innerHTML = `
@@ -16040,9 +16161,9 @@ function openRecap(email, name, date) {
     </div>
 
     <div class="rc-head">
-      <div class="rc-tick">${icon("check", 22)}</div>
+      <div class="rc-tick${nothingDone ? " rc-tick-none" : ""}">${icon(nothingDone ? "close" : "check", 22)}</div>
       <div>
-        <div class="rc-kicker">${sharing && onlyActivities ? "ACTIVITY COMPLETED" : "WORKOUT COMPLETED"}</div>
+        <div class="rc-kicker${nothingDone ? " rc-kicker-none" : ""}">${nothingDone ? "NOTHING LOGGED" : sharing && onlyActivities ? "ACTIVITY COMPLETED" : "WORKOUT COMPLETED"}</div>
         <div class="rc-title">${escapeHtml(sharing ? r.title : "Workout")}</div>
         <div class="rc-when">${escapeHtml(when)}</div>
       </div>
@@ -16079,11 +16200,16 @@ function openRecap(email, name, date) {
         </div>
       </div>` : ""}
 
+    ${/* The missed lifts sit in the same list as the logged ones rather than in
+          a block of their own: it is one workout, and a person reading back a
+          leg day wants the shape of it, not two lists to reconcile. The count
+          goes in the heading, where the sheet already puts a right-hand note. */ ""}
     ${!sharing
       ? `<p class="lw-private-note">${escapeHtml(name)} keeps workout details private. Their effort score is always shared.</p>`
-      : r.lifts.length ? `
-      <div class="rc-ex-head"><h4>Exercises</h4></div>
-      <div class="rc-list">${r.lifts.map(exRow).join("")}</div>`
+      : r.lifts.length || r.missed.length ? `
+      <div class="rc-ex-head"><h4>Exercises</h4>${r.missed.length
+        ? `<span class="rc-head-miss">${r.missed.length} not done</span>` : ""}</div>
+      <div class="rc-list">${r.lifts.map(exRow).join("")}${r.missed.map(missRow).join("")}</div>`
       : r.activities.length ? ""
       : `<div class="ps-empty">No exercises were logged for this one.</div>`}
 
@@ -16105,11 +16231,178 @@ function openRecap(email, name, date) {
   $("rcClose").onclick = closeRecap;
   if ($("rcTell")) $("rcTell").onclick = () => { closeRecap(); openNoteComposer("congratulate"); };
   if ($("rcShare")) $("rcShare").onclick = () => shareRecap(r);
+  /* Over the recap rather than instead of it: closing the activity puts the day
+     back exactly as it was, which is what pressing a row in a list should do. */
+  $("recapSheet").querySelectorAll("[data-act-log]").forEach((b) => {
+    b.onclick = () => openActivityDetail(b.dataset.actLog);
+  });
   $("recapScrim").classList.remove("hidden");
   $("recapScrim").onclick = (ev) => { if (ev.target === $("recapScrim")) closeRecap(); };
 }
 
 function closeRecap() { $("recapScrim").classList.add("hidden"); }
+
+/* ---------- One activity, opened out of the recap ----------
+
+   What this sheet can honestly say is decided by what saveCardioSession wrote,
+   and that is the activity's name, the minutes that actually elapsed, and a
+   distance if the activity has one. The session itself, the class the library
+   built and the moves it held, is thrown away the moment the timer closes:
+   CARDIO_SES.plan lives in memory and in one localStorage key, and both are
+   cleared on save. So nothing in the log can say which moves a past yoga class
+   contained, and nothing can say which of them were reached.
+
+   It would be close to recoverable, and that is the trap. buildGuidedPlan is
+   deterministic and seeded on the date, so re-running it for a past day gives a
+   session back. It gives back the session that WOULD be built for that day at
+   today's level for the length that was asked for, and neither of those two is
+   in the log: the level moves as sessions accumulate, and what is stored is the
+   minutes that elapsed, not the minutes that were requested. A person who
+   stopped a thirty minute class at eighteen would be shown an eighteen minute
+   class they never did. So this sheet says what is missing instead of drawing
+   it, the same way dayNotes and meta.missing say what they could not answer.
+
+   Storing it properly is one column: exercise_logs.session jsonb, written from
+   CARDIO_SES.plan or .card in saveCardioSession alongside the minutes, plus
+   whichever move the clock had reached when End was pressed. */
+
+/* PostgREST answers a write to a column that does not exist with PGRST204 and
+   names the column in the message ("Could not find the 'session' column of
+   'exercise_logs' in the schema cache"). Reading the name back out is what
+   lets a save drop exactly what the database is missing and keep the rest,
+   rather than guessing which of two pending columns was the problem. */
+function missingColumnName(error) {
+  if (!error) return null;
+  const msg = String(error.message || "");
+  if (String(error.code || "") !== "PGRST204" && !/column/i.test(msg)) return null;
+  const m = msg.match(/'([a-z_]+)' column/i) || msg.match(/column "([a-z_]+)"/i);
+  return m ? m[1] : null;
+}
+
+/* Minutes and a distance are arithmetic, so a pace is a fact about this row and
+   not an estimate. Only where the activity has a distance at all. */
+function activityPace(l) {
+  if (!l?.distance_mi || !l?.duration_min) return null;
+  const perMile = l.duration_min / l.distance_mi;
+  const m = Math.floor(perMile);
+  const s = Math.round((perMile - m) * 60);
+  return `${s === 60 ? m + 1 : m}:${String(s === 60 ? 0 : s).padStart(2, "0")}`;
+}
+
+/* ACTIVITY_METS is keyed by the library's own names for these things, which are
+   not the labels this app logs: it says "Running" where a row says "Run", and
+   it has one entry for a run outdoors and on a treadmill because the legs do
+   not know the difference. Written out rather than derived from act.cardio so
+   that adding an activity with no honest MET behind it fails to a blank number
+   instead of quietly borrowing somebody else's. */
+const ACT_MET_NAME = {
+  run: "Running", treadmill: "Running", walk: "Walking",
+  cycle: "Cycling", bikemachine: "Cycling", stairs: "Stair climber",
+  row: "Rowing machine", elliptical: "Elliptical",
+  yoga: "Yoga", pilates: "Pilates", hiit: "HIIT",
+};
+
+function activityCalories(name, act, minutes) {
+  const key = ACT_MET_NAME[act?.key];
+  const lb = currentWeightLb(name);
+  if (!key || !lb || !minutes || !FIT_MATH.estimateActivityCalories) return null;
+  return FIT_MATH.estimateActivityCalories(key, minutes, lb) || null;
+}
+
+function openActivityDetail(logId) {
+  const l = ALL_EXERCISE_LOGS.find((x) => String(x.id) === String(logId));
+  if (!l) return;
+  const nm = (l.exercise_name || "").trim();
+  const act = actForExerciseName(nm);
+  const kcal = activityCalories(l.user_name, act, l.duration_min);
+  const pace = activityPace(l);
+  const at = l.created_at ? new Date(l.created_at) : null;
+  const when = [relDayLabel(l.entry_date), at && !isNaN(at)
+    ? at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : null]
+    .filter(Boolean).join(" · ");
+  /* What the session held, if the row kept it. Written by
+     activitySessionRecord since 2026-09-19 and null for everything before
+     that, and for a session somebody ran off the bare clock, which has no
+     list to keep. Parsed defensively because a jsonb column comes back as
+     whatever was put in it and this screen is not the place to find out. */
+  let held = null;
+  try { held = typeof l.session === "string" ? JSON.parse(l.session) : (l.session || null); }
+  catch (e) { held = null; }
+
+  /* Only the numbers that are real. A distance column reading a dash on a yoga
+     class is the sheet shrugging, which is exactly what the recap's own stat
+     row was fixed for. Three to a row, the recap's grid: a run has all four of
+     these and four labels at this width wrap into each other, so the estimate
+     drops to a second row and the facts keep the first. A yoga class has two
+     and they sit side by side rather than one to a line. */
+  const facts = [
+    recapStat(String(l.duration_min || 0), "MINUTES"),
+    l.distance_mi ? recapStat(String(l.distance_mi), "DISTANCE", "mi") : null,
+    pace ? recapStat(pace, "PACE", "/mi") : null,
+    kcal ? recapStat(String(kcal), "EST. CALORIES") : null,
+  ].filter(Boolean);
+  const rows = facts.length > 3 ? [facts.slice(0, 3), facts.slice(3)] : [facts];
+
+  $("actDetailSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="adClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">Activity</div>
+      <div class="spacer"></div>
+    </div>
+
+    <div class="rc-head">
+      <div class="rc-tick">${icon(act?.ico || "run", 22)}</div>
+      <div>
+        ${/* LOGGED, not COMPLETED. Nothing in the row says whether the session
+              that was saved is the session that was started: the minutes are
+              what elapsed before End was pressed, and a class cut short saves
+              exactly like one finished. The recap is allowed its "COMPLETED"
+              because a lifting day has a plan to be measured against. */ ""}
+        <div class="rc-kicker">ACTIVITY LOGGED</div>
+        <div class="rc-title">${escapeHtml(act ? actTitle(act) : nm)}</div>
+        <div class="rc-when">${escapeHtml(when)}</div>
+      </div>
+    </div>
+
+    ${rows.map((row) => `<div class="rc-stats" style="grid-template-columns:repeat(${row.length},1fr);">${row.join("")}</div>`).join("")}
+
+    <div class="rc-ex-head"><h4>What was in it</h4>${
+      held?.moves?.length && held.reached != null && held.reached < held.moves.length
+        ? `<span class="rc-head-miss">Got to ${held.reached} of ${held.moves.length}</span>` : ""}</div>
+    ${held?.moves?.length ? `<div class="rc-list">${held.moves.map((m, i) => {
+        /* Past whichever move the clock had reached is not "skipped", it is
+           "never got there", and it reads in the same red as a lift that was
+           never logged because it is the same fact: it was on the session and
+           it did not happen. */
+        const missed = held.reached != null && i >= held.reached;
+        return `<div class="rc-ex${missed ? " rc-ex-miss" : ""}">
+          <span class="rc-n">${i + 1}</span>
+          <span class="rc-ex-name">${escapeHtml(m.name)}${missed ? `<span class="rc-miss">NOT REACHED</span>` : ""}</span>
+          <span class="rc-ex-num2">${Math.round((m.sec || 0) * (m.perSide ? 2 : 1))}s</span>
+        </div>`;
+      }).join("")}</div>`
+      : held?.card ? `<div class="ad-gap">
+          <p><b>${escapeHtml(held.card.name || actTitle(act))}</b>${held.card.effort ? `, ${escapeHtml(String(held.card.effort).toLowerCase())}` : ""}.</p>
+          ${held.card.structure ? `<p>${escapeHtml(held.card.structure)}</p>` : ""}
+        </div>`
+      : `<div class="ad-gap">
+      ${/* Everything logged before 20260919_activity_session_content.sql, and
+            every session somebody started from the bare clock. Saying so is
+            the same habit as dayNotes and meta.missing: the app reports what
+            it cannot answer rather than drawing something it guessed. */ ""}
+      <p>Not recorded. Sessions saved before this was built kept the activity${l.distance_mi ? ", the minutes and the distance" : " and the minutes"} and nothing else, so there is nothing here to mark off.</p>
+      <p>${act?.training
+        ? "New classes keep their moves, so the next one will show what it held and how far through it you got."
+        : "A session started straight from the clock has no list to keep, only the time on it."}</p>
+    </div>`}`;
+
+  $("adClose").onclick = closeActivityDetail;
+  $("actDetailScrim").classList.remove("hidden");
+  $("actDetailScrim").onclick = (ev) => { if (ev.target === $("actDetailScrim")) closeActivityDetail(); };
+}
+
+function closeActivityDetail() { $("actDetailScrim").classList.add("hidden"); }
 
 /* Sharing: an image, with the link carried in the share text.
    A bare link dies where fitness actually gets shared, Stories and WhatsApp,
@@ -16517,7 +16810,10 @@ function renderHero(animate = false) {
   const tomorrow = isoDate(d);
   const planned = (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === tomorrow && !w.archived);
 
-  const ctaBtn = (label) => `<button type="button" class="btn-cta" id="heroBtn">${icon("dumbbell", 22)} ${label}
+  /* The icon is an argument because not every day is a lifting day: a dumbbell
+     over "Start Today's Workout" on a day somebody planned as Yoga is the one
+     control on Home insisting it is a lifting day. */
+  const ctaBtn = (label, ico = "dumbbell") => `<button type="button" class="btn-cta" id="heroBtn">${icon(ico, 22)} ${label}
     <span class="go">${icon("chevronRight", 22)}</span></button>`;
   const heroLine = (text, ico = "check") => `<p class="hero-planned">${icon(ico, 14)} ${escapeHtml(text)}</p>`;
 
@@ -16542,8 +16838,13 @@ function renderHero(animate = false) {
   let cta;
   if (todayPlan) {
     /* The focus is the card title now, so the line under it would be the
-       third place on one screen saying the same words. */
-    cta = ctaBtn(trainedToday ? "Start Today's Plan" : "Start Today's Workout");
+       third place on one screen saying the same words. A day that is a run or
+       a class says session, in its own icon: this button starts a clock, not a
+       list of sets. */
+    const run = cardioSessionOf(todayPlan);
+    cta = run
+      ? ctaBtn("Start Today's Session", cardioActFor(run)?.ico || "run")
+      : ctaBtn(trainedToday ? "Start Today's Plan" : "Start Today's Workout");
   } else if (restToday) {
     cta = heroLine("Rest day. Back at it tomorrow.") + ctaBtn("Train Anyway");
   } else if (!trainedToday) {
@@ -16576,10 +16877,16 @@ function renderHero(animate = false) {
 
      With nothing to do (rest day, coached, everything already done) the week
      framing comes back, because then the week IS the subject. */
+  /* A run has no exercises by contract, so it says what it does have: the
+     minutes and the effort. "0 exercises" was the card describing a day it
+     could not read. */
+  const todayRun = cardioSessionOf(todayPlan);
   const planToday = todayPlan
     ? { title: displayFocus(todayPlan.focus, todayPlan.exercises),
-        meta: `${(todayPlan.exercises || []).length} exercises${
-          Number.isFinite(todayPlan.est_minutes) ? ` &middot; about ${todayPlan.est_minutes} min` : ""}` }
+        meta: todayRun
+          ? cardioSaid(todayRun)
+          : `${(todayPlan.exercises || []).length} exercises${
+            Number.isFinite(todayPlan.est_minutes) ? ` &middot; about ${todayPlan.est_minutes} min` : ""}` }
     : null;
 
   /* This line used to be "Effort this week: You 80, Mell 30". Mo: "users won't
@@ -20796,7 +21103,12 @@ async function cardioDayForStyles(st, forDate) {
     const s = picks[seed % picks.length];
     return {
       focus: s.name,
-      cardio: { name: s.name, minutes: s.minutes, effort: s.effort, cue: s.cue, structure: s.structure || null },
+      /* `mode` rides along because it is what says WHICH activity this is:
+         the screen picks the icon off it and the timer logs under that
+         activity's name, so without it a planned run is saved as "Other" and
+         never reaches the running line on Progress. The engine's own cardio
+         day carries it for the same reason (CONTRACT.md, workout.cardio). */
+      cardio: { name: s.name, mode: s.mode, minutes: s.minutes, effort: s.effort, cue: s.cue, structure: s.structure || null },
       /* Sets and reps is the contract for this field and a run has neither, so
          it stays empty and the session is carried in `cardio`. Writing "Easy
          Run" in here would be logged as a set and would light the heat map. */
@@ -21276,7 +21588,10 @@ function renderCardioStage() {
     const libNote = a.cardio ? (ACT_LIB_NOTES[a.key] || "") : "";
     stage.innerHTML = `
       <div class="csn-head">
-        <h2>${todaySessions().length ? "Add a session" : "Start an activity"}</h2>
+        ${/* "Add a session" is for a day that already has one. Arriving here
+              off a planned activity is not adding anything: it IS that day's
+              session, still choosing how long it runs for. */ ""}
+        <h2>${CARDIO_SES.fromPlan ? "Today’s session" : todaySessions().length ? "Add a session" : "Start an activity"}</h2>
         <button type="button" class="csn-x" id="csnX" aria-label="Close">${icon("close", 18)}</button>
       </div>
       ${/* The same card the workout tab opens on, and for the same reason. An
@@ -21539,6 +21854,36 @@ function renderCardioStage() {
   };
 }
 
+/* What the session actually held, captured here because this is the last
+   moment it exists: CARDIO_SES is nulled and csnSave clears its localStorage
+   key moments after this row is written. Nothing can rebuild it afterwards,
+   and the near miss is the trap: buildGuidedPlan is deterministic and seeded
+   on the date, but it is keyed on TODAY's level and on the minutes ASKED for,
+   and the row keeps neither, so a replay would draw a class nobody did.
+   See 20260919_activity_session_content.sql for the column this fills.
+
+   `reached` is the move the clock had got to, which is the only completion
+   signal that exists at all: the live screen reads the current move out of
+   elapsed milliseconds and never ticks one off. So it supports "you got to
+   move 7 of 12" and not "you completed 7", and the recap says the first. */
+function activitySessionRecord(mins) {
+  const s = CARDIO_SES;
+  const plan = s?.plan, card = s?.card;
+  if (!plan && !card) return null;   // a bare clock, which is a real way to train
+  const moves = (plan?.moves || []).map((m) => ({
+    name: m.name, sec: m.seconds, ...(m.perSide ? { perSide: true } : {}),
+  }));
+  const at = moves.length ? csnMoveAt(csnElapsedMs()) : null;
+  return {
+    kind: s.act || null,
+    asked_min: Number(s.minutes) || Number(mins) || null,
+    ...(moves.length ? { moves, reached: at?.done ? moves.length : (at?.i ?? null) } : {}),
+    /* A cardio session is a prescription rather than a list of moves, so what
+       is worth keeping is which one and how hard. */
+    ...(card && !plan ? { card: { name: card.name, effort: card.effort, structure: card.structure } } : {}),
+  };
+}
+
 async function saveCardioSession(mins) {
   const a = csnAct();
   const raw = a.dist ? parseFloat($("csnMiles")?.value) : NaN;
@@ -21546,6 +21891,7 @@ async function saveCardioSession(mins) {
   const payload = {
     user_name: ME, email: MY_EMAIL, entry_date: CARDIO_SES?.date || todayStr(),
     exercise_name: a.label, sets: 1, duration_min: mins, distance_mi: miles,
+    session: activitySessionRecord(mins),
   };
   const btn = $("csnSave");
   if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
@@ -21553,14 +21899,20 @@ async function saveCardioSession(mins) {
   let ok = false;
   if (navigator.onLine) {
     let { error } = await sb.from("exercise_logs").insert(payload);
-    /* distance_mi is behind 20260916_cardio_distance.sql. The minutes are the
-       session; losing them over a column that is not there yet would be the
-       worst possible trade. */
-    if (error && (String(error.code || "") === "PGRST204" || /distance_mi/.test(String(error.message || "")))) {
-      const { distance_mi, ...noDistance } = payload;
-      const retry = await sb.from("exercise_logs").insert(noDistance);
+    /* distance_mi is behind 20260916_cardio_distance.sql and session is behind
+       20260919_activity_session_content.sql, so either can be absent on a
+       database that has not run them. The minutes ARE the session; losing them
+       over a column that is not there yet would be the worst possible trade.
+       So a missing column is dropped by name and the insert tried again, twice
+       at most because there are two of them and a third round would mean the
+       error is saying something else. */
+    for (let i = 0; i < 2 && error && missingColumnName(error); i++) {
+      const dropped = missingColumnName(error);
+      if (!(dropped in payload)) break;
+      delete payload[dropped];
+      const retry = await sb.from("exercise_logs").insert(payload);
       error = retry.error;
-      if (!error) toast("Saved. Distance is not switched on yet.");
+      if (!error && dropped === "distance_mi") toast("Saved. Distance is not switched on yet.");
     }
     ok = !error;
     if (error && !isRetryable(error)) {
@@ -21579,6 +21931,27 @@ async function saveCardioSession(mins) {
   /* A finished session is a workout day, through the one function allowed to
      say so. A Pilates class counts toward the week the same as a lift does. */
   if (typeof markGymDayDone === "function") await markGymDayDone();
+
+  /* The plan this session WAS, when it came off one (startPlannedActivity). Closed
+     off exactly the way a lifting day is closed off: the minutes actually run
+     on the row, completed_at set, and the row archived so the tab comes back
+     to the choose screen rather than offering the same run again.
+
+     completed_at is what the Together timeline pairs the day with, so without
+     this the run reaches a partner as "Workout" with no name and no minutes
+     even though the log beside it says thirty. Not fatal if it fails: the
+     session itself is already saved and the day is already banked, so this
+     says so and leaves them alone. */
+  const fromPlan = CARDIO_SES?.fromPlan || null;
+  if (fromPlan?.planId) {
+    const { error } = await sb.from("ai_workouts").update({
+      completed_at: new Date().toISOString(),
+      duration_sec: mins * 60,
+      archived: true,
+    }).eq("id", fromPlan.planId);
+    if (error) { console.error("could not close off the cardio day", error); toast("Couldn't close off today's plan"); }
+    else if (TODAY_WORKOUT?.id === fromPlan.planId) TODAY_WORKOUT = null;
+  }
   CARDIO_SES = null; csnSave();
   closeCardioSession();
   await loadAll();
@@ -23554,6 +23927,10 @@ function todaySessions() {
   /* Lifting plans finished today. loadDoneWorkouts has fetched these since long
      before this list existed and nothing read them until now. */
   for (const w of TODAY_DONE_WORKOUTS) {
+    /* A finished cardio day is already in this list as the activity it wrote
+       to exercise_logs, with the minutes actually run on it. Its plan row is
+       the same session a second time, under "0 exercises". */
+    if (cardioSessionOf(w)) continue;
     const n = (w.exercises || []).length;
     const mins = w.duration_sec ? Math.max(1, Math.round(w.duration_sec / 60)) : 0;
     out.push({
@@ -23588,10 +23965,20 @@ function todaySessions() {
     const a = csnAct();
     out.push({
       key: "activity:live", ico: a.ico, state: "running", label: a.label,
-      detail: `Running for ${csnClock(csnElapsedMs())}`, tap: "activity",
+      /* Not "Running for": this clock times a yoga class and a rowing machine
+         as often as a run, and a day planned by hand as Yoga now arrives here
+         by the front door. The elapsed time says the same thing without
+         naming somebody else's sport. */
+      detail: `${csnClock(csnElapsedMs())} so far`, tap: "activity",
     });
   }
-  if (TODAY_WORKOUT && !TODAY_WORKOUT.archived) {
+  /* A run off the plan is in this list already, as the clock above: the plan
+     row would be the same session a second time, one of them saying Ready
+     while the other counts. */
+  const runningThisPlan = csnRunning() && CARDIO_SES?.fromPlan?.planId
+    && TODAY_WORKOUT?.id === CARDIO_SES.fromPlan.planId;
+  if (TODAY_WORKOUT && !TODAY_WORKOUT.archived && !runningThisPlan) {
+    const run = cardioSessionOf(TODAY_WORKOUT);
     const live = !!SESSION && !SESSION.finished && SESSION.workoutId === TODAY_WORKOUT.id;
     /* Finished but not yet archived, which is where a plan sits between the
        last rep and leaving the completion screen. The hero reads it the same
@@ -23602,10 +23989,13 @@ function todaySessions() {
     const n = (TODAY_WORKOUT.exercises || []).length;
     const mins = TODAY_WORKOUT.duration_sec ? Math.max(1, Math.round(TODAY_WORKOUT.duration_sec / 60)) : 0;
     out.push({
-      key: `plan:${TODAY_WORKOUT.id}`, ico: "dumbbell",
+      key: `plan:${TODAY_WORKOUT.id}`, ico: run ? (cardioActFor(run)?.ico || "run") : "dumbbell",
       state: live ? "running" : over ? "done" : "open",
       label: displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises),
       detail: live ? "In progress"
+        /* A run counts nothing out of anything: how long and how hard is the
+           whole of it, and "0 exercises" is what it said before. */
+        : run ? cardioSaid(run)
         : `${n} exercise${n === 1 ? "" : "s"}${over && mins ? ` \u00b7 ${mins} min` : ""}`,
       tap: "plan",
     });
@@ -23865,212 +24255,40 @@ function closeGenOverlay() {
   setTimeout(() => { scrim.classList.add("hidden"); scrim.classList.remove("leaving"); }, 300);
 }
 
-/* The payoff: the plan lands a row at a time. Quick, 70ms apart, so five
-   exercises are all in within half a second.
+/* revealGeneratedPlan lived here: the reveal screen, where a finished plan
+   landed a row at a time with three pills under it (Swap the whole workout,
+   Swap for an activity, Focus on something) and a Let's go button.
 
-   The rows are the screen. Until 2026-09-14 this sheet also carried the
-   generator's pace sentence (`honest`), the session-clock sentence off
-   meta.session, up to a dozen lines of `notes` and a warm-up count, and on a
-   phone the plan started below the fold, under paragraphs nobody read before
-   tapping the button. Mo asked for the explanation to go. `honest` and
-   `session` still arrive because the callers and the engine contract have not
-   changed, and `session` still sets the estimate on the tappable clock. */
-function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], session = null) {
-  if (genCancelled) return;   // they left; the workout is saved either way
-  stopGenTicker();
-  paintGen(100);
-  const list = (workout.exercises || []).slice(0, 8);
-  /* The one kind of note that stays: a warning, not an explanation. The
-     softened sentence for a slot that kept a movement loading a joint they
-     said hurts, and the clinician line for the pain and postpartum goals.
-     Neither is stored anywhere and neither reaches another screen, so dropping
-     them here would make the engine's defence for prescribing a movement
-     someone said hurts ("the plan says so out loud") false again. Matched on
-     the engine's own phrases, so a rewording there costs a line and never a
-     plan. */
-  const warnings = (Array.isArray(notes) ? notes : [])
+   Mo, 2026-09-18: "I don't want to generate a workout and be able to see those
+   options. The second it generates, it takes me to that page." It was a second,
+   smaller copy of the plan screen, standing between somebody and the real one,
+   and every option on it exists on the plan screen as a door. So a generate now
+   walks straight to the plan (showPlanScreen) and this is gone.
+
+   Two things it carried that the row cannot, and they went with it rather than
+   being lost: the engine's plan level warnings and the one unprompted offer to
+   record limits both ride on JUST_GENERATED and print on the plan screen.
+   The generating animation above it is untouched: what went is the summary at
+   the end, not the build. */
+
+/* The plan that was just made, and the two things about it that ai_workouts
+   has no column for. Cleared by nothing: it is replaced by the next generate
+   and it dies with the sitting, which is exactly how long both of these are
+   worth saying.
+
+   `warnings` is the engine's plan level notes, filtered to the ones that are a
+   warning rather than an explanation. Mo had the explanations taken off the
+   reveal in September and they are not coming back; these two are different,
+   because they are the app admitting out loud that it has prescribed a movement
+   somebody said hurts, or that a goal needs a clinician. With the reveal gone
+   this is the only thing keeping that admission true. */
+let JUST_GENERATED = null;   // { date, warnings: [] }
+
+/* Matched on the engine's own phrases, so a rewording there costs a line and
+   never a plan. */
+function planWarnings(notes) {
+  return (Array.isArray(notes) ? notes : [])
     .filter((n) => typeof n === "string" && /stop if it hurts|clinician/i.test(n));
-  /* The whole visit, from the same function the plan card uses. The engine's
-     `estimatedMinutes` leaves the cool-down out by contract, so it is not
-     printed here: a plan that says 39 on the reveal and 45 on the card is the
-     app disagreeing with itself. The blocks are the engine's fresh answer,
-     since the stored row is not what is on screen yet. */
-  const revealBlocks = { warmup: workout.warmup || [], cooldown: workout.cooldown || [], ramp: workout.rampSets || [] };
-  const estMin = sessionEstimateMinutes(workout.exercises, revealBlocks);
-  /* When this reveal is the answer to "how long do you have", say what the
-     answer did. ONE_OFF_SESSION is set before the generate runs and stamped
-     with `made` after it, and this paints on a timer, so either state can be
-     the one it sees: unstamped, or stamped with this very plan. */
-  const forDay = planDate || todayStr();
-  const oneOff = ONE_OFF_SESSION?.date === forDay
-    && (!ONE_OFF_SESSION.made || ONE_OFF_SESSION.made === planSignature(workout.exercises))
-    ? ONE_OFF_SESSION : null;
-  const changeLine = oneOff
-    ? budgetChangeLine(oneOff.from, { exercises: workout.exercises, minutes: estMin }, { restCompressed: session?.restCompressed === true })
-    : "";
-  const ramps = workout.rampSets || [];
-  /* The one unprompted offer, and it is here rather than in onboarding because
-     a limit is a constraint on how a goal gets trained for, not a goal: asking
-     up front turns "what do you want" into "what is wrong with you" and can
-     block somebody from ever getting a plan. By here the plan exists, so the
-     answer can only make it safer. null means never asked, so an empty answer
-     is written whether they take the offer or dismiss it, and this line is
-     therefore shown exactly once in the life of an account. */
-  const askLimits = MY_PROFILE?.limits == null;
-  // A swap is recorded against the day the plan is for, not the day it was read.
-  const swapDate = planDate || todayStr();
-  setTimeout(() => {
-    $("genScrim").classList.add("done");
-    /* "Your workout" and "Let's go" over a plan for tomorrow read as starting
-       now. Say which day it is for, the way the Review Next Workout sheet
-       does, and label the button for what it actually does. */
-    const forToday = !planDate || planDate === todayStr();
-    const target = new Date((planDate || todayStr()) + "T00:00:00");
-    const forDate = target.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
-    const dayAfter = new Date(todayStr() + "T00:00:00");
-    dayAfter.setDate(dayAfter.getDate() + 1);
-    /* The estimate is tappable here too, because this is the moment the
-       question gets asked: the plan and the clock are on screen together.
-       Today only, since a day queued ahead has no "today" to be a one-off
-       about, and the card it lands on carries the same control anyway. */
-    const canRebudget = forToday && !SESSION && !isCoachedClient() && !!estMin;
-    const head = forToday
-      ? "Your workout"
-      : `Queued for ${planDate === isoDate(dayAfter) ? "tomorrow" : target.toLocaleDateString(undefined, { weekday: "long" })}`;
-    $("genStage").innerHTML = `
-      <div class="gen-done-head">${escapeHtml(head)}</div>
-      <div class="gen-focus">${escapeHtml(displayFocus(workout.focus, workout.exercises) || "Ready")}</div>
-      ${forToday ? "" : `<p class="gen-step" style="margin:0 0 14px;">${escapeHtml(forDate)}</p>`}
-      ${canRebudget ? `<div class="plan-time-row">
-        <button type="button" class="plan-time" id="genTimeBtn" aria-label="About ${estMin} minutes. Change how long you have today.">
-          ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
-        </button>
-      </div>` : ""}
-      ${changeLine ? `<p class="plan-time-change" id="genTimeChange">${escapeHtml(changeLine)}</p>` : ""}
-      ${warnings.map((n) => `<p class="gen-step" style="margin:0 0 10px;">${escapeHtml(n)}</p>`).join("")}
-      <div class="gen-rows" id="genRows">
-        ${list.map((ex, i) => `
-          <div class="gen-row" data-ex="${i}" style="--d:${i * 70}ms">
-            <span class="gen-row-n">${i + 1}</span>
-            <span class="gen-row-b">
-              <span class="gen-row-name">${escapeHtml(ex.name || "")}</span>
-              <span class="gen-row-t">${ex.sets || 3} sets · ${ex.reps || 10} reps</span>
-              ${(() => {
-                /* Which lifts have a ramp, and the loads, in one line under the
-                   row. The count and the sentence are above; this is the part
-                   somebody actually needs at the rack. */
-                const r = rampForExercise(ramps, ex.name);
-                return r ? `<span class="gen-row-ramp">Ramp ${escapeHtml(rampLoadsLine(r))}</span>` : "";
-              })()}
-            </span>
-            <button type="button" class="wp-chip" data-swap="${i}" aria-label="Swap ${escapeHtml(ex.name || "")}">${icon("swap", 15)}</button>
-          </div>`).join("")}
-      </div>
-      ${isCoachedClient() ? "" : `<div class="gen-doors" style="--d:${list.length * 70 + 60}ms; animation: genRow .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);">
-        <button type="button" class="gen-swap" id="genSwapDayBtn">
-          ${icon("swap", 14)}<span>Swap the whole workout</span>
-        </button>
-        <button type="button" class="gen-swap" id="genActBtn">
-          ${icon("run", 14)}<span>Swap for an activity</span>
-        </button>
-        <button type="button" class="gen-swap" id="genFocusBtn">
-          ${icon("body", 14)}<span>Focus on something</span>
-        </button>
-        ${/* Regenerate keeps the day type and changes the movements, which is a
-              different ask from all three above. Today only: sameAgain reads
-              TODAY_WORKOUT, and for a day queued ahead that row is a different
-              day's plan. */ ""}
-        ${forToday ? `<button type="button" class="gen-swap" id="genAgainBtn">
-          ${icon("refresh", 14)}<span>Give me another one</span>
-        </button>` : ""}
-      </div>`}
-      ${askLimits ? `
-      <div class="gen-nudge" style="--d:${list.length * 70 + 60}ms">
-        <p>Anything that hurts, or gear you don't have? Tell us once and every plan will respect it.</p>
-        <button type="button" id="genLimitsBtn">Tell us</button>
-      </div>` : ""}
-      <button type="button" class="btn-primary gen-go" id="genGoBtn" style="--d:${list.length * 70 + 120}ms">${forToday ? "Let's go" : "Save it"}</button>`;
-    /* Only the row that changed is repainted afterwards, so swapping one
-       exercise does not make the other four replay their arrival. */
-    $("genStage").querySelectorAll("[data-swap]").forEach((b) => {
-      b.onclick = () => openSwapSheet({
-        list: () => workout.exercises || [],
-        index: Number(b.dataset.swap),
-        date: swapDate,
-        focus: workout.focus,
-        reload: true,
-        after: (i, ex) => {
-          const row = $("genRows")?.querySelector(`[data-ex="${i}"]`);
-          if (!row) return;
-          row.querySelector(".gen-row-name").textContent = ex.name;
-          row.querySelector(".gen-row-t").textContent = `${ex.sets || 3} sets · ${ex.reps || 10} reps`;
-          /* The ramp was built from the weight of the lift that just left, so it
-             goes with it rather than sitting under a movement it was never for. */
-          row.querySelector(".gen-row-ramp")?.remove();
-          row.querySelector("[data-swap]")?.setAttribute("aria-label", `Swap ${ex.name}`);
-        },
-      });
-    });
-    /* The sibling of the chip on every row: that one says "not this
-       movement", this one says "not this workout". It sits under the rows
-       rather than in the header because it is only worth asking once the plan
-       has been read. */
-    if ($("genSwapDayBtn")) {
-      $("genSwapDayBtn").onclick = () => openSessionSwapSheet({
-        date: swapDate,
-        current: { focus: workout.focus, exercises: workout.exercises, cardio: TODAY_WORKOUT?.cardio ?? null },
-        fromReveal: true,
-        onGo,
-      });
-    }
-    /* The other two doors off the plan, both of them about THIS day. The
-       overlay closes first, the way the time and limits buttons already do:
-       the plan is saved by the time this screen exists, so nothing is lost by
-       leaving it, and a regenerate opens this same overlay again from the top
-       anyway. */
-    if ($("genActBtn")) {
-      $("genActBtn").onclick = () => {
-        closeGenOverlay();
-        openActivityInstead(swapDate, forToday ? "today" : target.toLocaleDateString(undefined, { weekday: "long" }));
-      };
-    }
-    if ($("genFocusBtn")) {
-      $("genFocusBtn").onclick = () => {
-        closeGenOverlay();
-        openPlanFocusSheet(swapDate, forToday ? "today" : target.toLocaleDateString(undefined, { weekday: "long" }));
-      };
-    }
-    if ($("genAgainBtn")) {
-      $("genAgainBtn").onclick = () => { closeGenOverlay(); generateWorkout(null, { sameAgain: true }); };
-    }
-    if ($("genTimeBtn")) {
-      $("genTimeBtn").onclick = () => openSessionBudgetSheet({
-        estimate: estMin,
-        current: Number(session?.budgetMinutes) || null,
-        overReveal: true,
-        /* The overlay closes first: applySessionBudget runs a generate, and
-           that opens this same overlay again from the top. */
-        onPick: (m) => { closeGenOverlay(); applySessionBudget(m); },
-      });
-    }
-    $("genGoBtn").onclick = () => {
-      // Dismissing the offer is itself an answer, and recording it is what keeps
-      // "offered once" true rather than "offered after every single plan".
-      if (askLimits) saveLimits(emptyLimits(), { quiet: true }).catch((e) => console.error(e));
-      closeGenOverlay();
-      onGo?.();
-    };
-    if ($("genLimitsBtn")) {
-      $("genLimitsBtn").onclick = () => {
-        closeGenOverlay();
-        switchTab("setup");
-        openSettingsPage("limits");
-        // After openSettingsPage, which renders the page: Skip there should now
-        // record the answer rather than leaving it null.
-        LIMITS_ASKED_AFTER_PLAN = true;
-      };
-    }
-  }, 420);
 }
 
 /* ---------- Swapping an exercise ----------
@@ -24081,7 +24299,7 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
    stops prescribing a lift once it has been swapped away from three times,
    opens on an empty table.
 
-   One sheet serves both places a swap can happen, the reveal and the session,
+   One sheet serves both places a swap can happen, the plan and the session,
    so the alternatives, the search and the recording exist once. The caller
    says what to change and what to redraw afterwards. */
 let SWAP_CTX = null;      // { list, index, date, focus, after, reload }
@@ -24188,6 +24406,53 @@ function renderSwapResults() {
   });
 }
 
+/* ---------- Which kind of "no weight" a row is ----------
+   `targetWeight: 0` has always meant two different things and the app printed
+   both the same, which was survivable only while the second was rare: the
+   engine used to invent a starting load from bodyweight and sex, so almost
+   nobody ever saw "we have not been told". That guess is gone (engine
+   CONTRACT.md, "No training level, and no weight we have not been told",
+   2026-09-18) and a brand new person's whole first week now comes back at 0,
+   so the difference is the first thing they ever read.
+
+   `loadBasis` is the engine's answer: "bodyweight" is settled, a Push-Up has
+   no weight and never will, and "unknown" is a question being asked once. A
+   row carrying NO basis is a plan saved before the field existed or an
+   exercise somebody added by hand and dialled to 0, and neither of those is
+   the engine asking for a number, so only the word itself opens the
+   invitation. A real weight wins over both, because a basis left behind on a
+   row somebody has since put a number on must not keep asking. */
+function loadAsk(ex) {
+  return !(Number(ex?.targetWeight) > 0) && ex?.loadBasis === "unknown";
+}
+
+function loadIsBodyweight(ex) {
+  return !(Number(ex?.targetWeight) > 0) && ex?.loadBasis === "bodyweight";
+}
+
+/* The load half of a "3 sets x 8 reps" line, as its own segment so the three
+   answers sit in one column down the card: a number, a settled fact, or an
+   ask. The ask is the only thing on the row wearing the accent, because the
+   accent is what this app paints things that want a tap. */
+function loadSegmentHTML(ex, sep = " · ") {
+  if (Number(ex?.targetWeight) > 0) return `${sep}${ex.targetWeight} lb`;
+  if (loadIsBodyweight(ex)) return `${sep}Bodyweight`;
+  if (loadAsk(ex)) return `${sep}<b class="ex-ask">Pick your weight</b>`;
+  return "";
+}
+
+/* What the session's weight field opens at. A real target opens at itself, a
+   bodyweight row opens at 0 because there is nothing to add, and a row the
+   engine could not put a number on opens EMPTY: "0 lb" beside a Cable
+   Pull-Through is a number the app made up, which is the exact thing the
+   engine stopped doing. What they last actually lifted still beats an empty
+   field, for the case where the app holds a log the engine was not sent. */
+function plannedStartWeight(ex) {
+  if (Number(ex?.targetWeight) > 0) return ex.targetWeight;
+  if (loadAsk(ex)) return lastTimeFor(ex?.name)?.weight ?? "";
+  return ex?.targetWeight ?? lastTimeFor(ex?.name)?.weight ?? "";
+}
+
 /* The last weight actually put on a movement. previousBest() answers a
    different question, the heaviest ever, because it feeds the record line. A
    starting load wants the most recent one instead. */
@@ -24222,6 +24487,16 @@ async function applySwap(chosen, source) {
   ex.name = chosen;
   ex.targetWeight = last ?? 0;
   ex.note = last == null ? "Pick a weight with two reps left in you" : `Last time you did ${last} lb`;
+  /* The row keeps speaking the engine's `loadBasis` vocabulary after a swap,
+     or every screen that reads it would fall back to "no basis, say nothing"
+     and a swapped-in lift would be the one row on the card that never asks for
+     a number. A movement the library says needs no equipment is settled, not a
+     question: asking somebody what they load a Push-Up with is the mistake this
+     whole distinction exists to avoid. */
+  const chosenKit = findStrengthLibraryExercise(chosen);
+  ex.loadBasis = last != null ? "your last session"
+    : BODYWEIGHT_EQUIPMENT.has(chosenKit?.equipment) ? "bodyweight"
+    : "unknown";
 
   const idx = ctx.index;
   const exercises = ctx.list?.() || [];
@@ -24265,7 +24540,7 @@ function swapCurrentExercise() {
       const sets = ex.sets || 3;
       SESSION.setsDone[i] = new Array(sets).fill(false);
       SESSION.setWeights[i] = new Array(sets).fill(null);
-      SESSION.weights[i] = ex.targetWeight ?? "";
+      SESSION.weights[i] = plannedStartWeight(ex);
       SESSION.reps[i] = ex.reps ?? "";
       SESSION.completed[i] = false;
       SESSION.restStartedAt = null;   // a different exercise is not a rest period
@@ -24333,6 +24608,12 @@ function findStrengthLibraryExercise(name) {
    want, not the reason somebody cannot finish this at home. */
 const NO_GYM_EQUIPMENT = new Set(["barbell", "cable", "machine", "dumbbell"]);
 
+/* The library's own words for a movement that carries no external load, so a
+   swap can decide whether a missing weight is settled or a question. Listed
+   rather than inferred from NO_GYM_EQUIPMENT's complement: a band, a wall and
+   a foam roller are none of them a gym and none of them a weight you pick. */
+const BODYWEIGHT_EQUIPMENT = new Set(["bodyweight", "none", "wall", "doorway", "bench", "foam roller"]);
+
 /* "Already logged" means a set is actually in the log, not that every set is.
    SESSION.completed[i] only flips once the last of them lands, so a plan with
    one of three sets ticked on a lift is not "completed" and this rule would
@@ -24388,13 +24669,17 @@ async function switchRemainderToBodyweight() {
     ex.name = chosen.name;
     ex.targetWeight = last ?? 0;
     ex.note = last == null ? "Pick a weight with two reps left in you" : `Last time you did ${last} lb`;
+    /* Everything this door swaps in was filtered to `equipment: ["bodyweight"]`
+       above, so the zero is settled rather than a question. Same reason
+       applySwap sets it: a row with no basis says nothing on any screen. */
+    ex.loadBasis = last != null ? "your last session" : "bodyweight";
 
     // Same reset swapCurrentExercise's `after` does: a movement just picked
     // has had nothing done on it yet.
     const sets = ex.sets || 3;
     SESSION.setsDone[i] = new Array(sets).fill(false);
     SESSION.setWeights[i] = new Array(sets).fill(null);
-    SESSION.weights[i] = ex.targetWeight ?? "";
+    SESSION.weights[i] = plannedStartWeight(ex);
     SESSION.reps[i] = ex.reps ?? "";
 
     usedNames.add(chosen.name);
@@ -24484,13 +24769,17 @@ let ENGINE_NEXT_DAY = null;
 /* EVERY WAY A DAY'S PLAN CHANGES ENDS HERE.
 
    Mo: "when I swap a workout then go back to the workout page, it should be
-   updated for the smart workout overview." Four doors lead to a swap, the
-   whole-session sheet from the plan screen, the same sheet from the reveal,
-   the day planner's Swap the whole workout, and swapping a lift for an
-   activity, and each one used to decide for itself what to reload and what to
-   redraw. A swap onto a day that is not today reloaded the tables and then
-   redrew the home tab, so the week strip and the next-workout card sitting
-   behind the sheet kept the day that had just been replaced.
+   updated for the smart workout overview." Many doors lead to a day being
+   rewritten or emptied: generating one, the whole-session sheet, the review
+   screen's Clear this day, Home's Clear this workout, saving a plan by hand,
+   putting a session budget back, swapping a lift for an activity, and
+   finishing or standing down today's own plan. Each one used to decide for
+   itself what to reload and what to redraw. A swap onto a day that is not
+   today reloaded the tables and then redrew the home tab, so the week strip
+   and the next-workout card sitting behind the sheet kept the day that had
+   just been replaced; and Mo, 2026-09-18, on clearing a day: "I don't have to
+   go on another tab, go back, and then finally be able to see generate workout
+   and for it to be updated. That's a bug." Every one of them ends here now.
 
    ENGINE_NEXT_DAY is dropped here too. It is the generator's answer to "which
    day next", cached, and it was asked before this write: on a day with no plan
@@ -24612,12 +24901,21 @@ async function buildSessionAlternatives(current, date) {
       /* The week, built the way the generator builds it. `includePlan` is the
          only way to see the days this person's week has other than the one
          they are looking at. */
-      const { plan } = engine.generateFromPayload(workoutEnginePayload(), { includePlan: true });
+      const { plan, meta } = engine.generateFromPayload(workoutEnginePayload(), { includePlan: true });
       const week = plan?.week || [];
       /* Read for the cardio half below whether or not any day is offered: the
          library filters its sessions by level, and beginner-by-default would
-         quietly hide every interval session from somebody who trains. */
-      if (plan?.level) level = plan.level;
+         quietly hide every interval session from somebody who trains.
+
+         `plan.level` went with `meta.level` on 2026-09-18: there is no training
+         level in the engine's answer any more, so this read had gone silently
+         undefined and every cardio swap sheet was offering beginner sessions
+         to everybody. The cardio library still ranks by a level, so the count
+         the label used to summarise is turned into one here, with the same
+         ladder activity-session.mjs already uses for every other library
+         rather than a second one invented on this screen. */
+      const sessionEngine = await ensureSessionEngine();
+      level = sessionEngine?.levelFromSessions?.(meta?.experience?.sessions || 0) || level;
       if (optedIntoBuiltSessions()) {
         /* Start from the day AFTER the one on screen, so the first offer is the
            session that would come next rather than whichever day the week
@@ -24700,7 +24998,7 @@ async function buildSessionAlternatives(current, date) {
   return out.slice(0, 4);
 }
 
-let SESSION_SWAP_CTX = null;    // { date, current, fromReveal, onGo }
+let SESSION_SWAP_CTX = null;    // { date, current }
 let SESSION_SWAP_ALTS = null;   // null while the week is still being built
 
 async function openSessionSwapSheet(ctx) {
@@ -24794,8 +25092,15 @@ async function applySessionSwap(workout, ctx) {
           ramp: workout.rampSets || [], skipped: false }
       : null,
     /* The weekly cardio the goal asks for belongs to the goal, not to the day,
-       so it rides across the swap untouched. */
-    cardio: ctx.current?.cardio ?? null,
+       so it rides across the swap. THIS day's own session does not: the day it
+       described has just been swapped away for a list of lifts. Left on the
+       row it was a run sitting under five exercises, and deleting those five
+       turned the day back into a run nobody planned, which is the one way an
+       emptied lifting plan could ever be read as an activity. */
+    cardio: (() => {
+      const { session, ...weekly } = ctx.current?.cardio || {};
+      return Object.keys(weekly).length ? weekly : null;
+    })(),
     archived: false, completed_at: null, duration_sec: null,
   }, { onConflict: "email,entry_date" });
   if (error) { console.error("could not swap the session", error); toast("Couldn't swap that. Try again."); return; }
@@ -24811,10 +25116,10 @@ async function applySessionSwap(workout, ctx) {
     then: () => { if (date === sessionDate()) FRESH_PLAN_ID = TODAY_WORKOUT?.id || null; },
   });
   toast(`Swapped to ${workout.focus}`);
-  /* Opened from the reveal, so the reveal is what redraws: the same overlay,
-     the new session landing a row at a time exactly as the first one did, with
-     its own swap chips and its own button underneath. */
-  if (ctx.fromReveal) revealGeneratedPlan(workout, null, ctx.onGo, date, [], null);
+  /* Nothing to redraw here any more. This sheet used to be reachable from the
+     reveal screen as well as from the plan, and the reveal had to be replayed
+     on the new session; planChangedOn above repaints whichever plan screen is
+     actually underneath. */
 }
 
 /* A run is not a list of sets, and this app has never pretended otherwise: the
@@ -24830,19 +25135,19 @@ async function applySessionSwap(workout, ctx) {
    clock actually starts, in csnGo. */
 function startCardioInsteadOfPlan(s, ctx) {
   /* A day that has not arrived cannot be started, only planned. The swap sheet
-     opens on a future day from the reveal and from the day planner, and this
-     used to put a clock on screen and start counting: somebody swapping
-     Thursday for a run at Tuesday lunchtime was told they were running. The
-     day is written as an activity day instead, and the clock is there on
-     Thursday when they are. */
+     opens on a future day from the day planner, and this used to put a clock on
+     screen and start counting: somebody swapping Thursday for a run at Tuesday
+     lunchtime was told they were running. The day is written as an activity day
+     instead, and the clock is there on Thursday when they are. */
   if (ctx?.date && ctx.date !== todayStr()) {
-    if (ctx.fromReveal) closeGenOverlay();
-    planActivityOnDay(ctx.date, s.name);
+    /* The library's whole session, not only its name. Thursday knows how long
+       it is, how hard, and how to pace it, the same as a generated day does,
+       because this IS one: the sheet picked it out of the same library. */
+    planActivityOnDay(ctx.date, s.name, { session: s });
     return;
   }
   // A session already running is the truth and outranks this; show it instead.
   if (csnRunning()) { openCardioSession(); return; }
-  if (ctx.fromReveal) closeGenOverlay();
   const planned = ctx.date === todayStr() && TODAY_WORKOUT?.id && !TODAY_WORKOUT.archived
     ? { planId: TODAY_WORKOUT.id, focus: TODAY_WORKOUT.focus }
     : null;
@@ -24880,6 +25185,129 @@ async function archiveSwappedPlan(instead) {
      just archived, so the week strip kept a dot on a day whose lift had been
      stood down. */
   await planChangedOn(sessionDate());
+}
+
+/* ---- Any day that is a session rather than a list of lifts ----
+
+   A view of `planActivitySession`, which is the one function in this app that
+   decides a day is not a lifting day. A named view and NOT a second reading:
+   everything here comes out of that call, so the two can never drift into
+   disagreeing about what a day is. The app spent a day fixing two focus
+   pickers that had drifted apart; this is that lesson kept.
+
+   Both kinds come back in the one card shape the small helpers below
+   understand: a name, which activity it is, how long, and how hard where
+   anybody said. A class has no effort, no cue and no intervals, so it says
+   less in the same words rather than having a second set of readers written
+   for it. Where a caller can do better than a card, it calls
+   planActivitySession itself and gets the moves. */
+function cardioSessionOf(plan) {
+  const s = planActivitySession(plan);
+  if (!s) return null;
+  if (s.kind === "cardio") return s.card;
+  const f = s.flow;
+  const act = CARDIO_ACTS.find((a) => a.training === f.training);
+  return { name: f.label || f.training, act: act?.key || "other", mode: null, minutes: f.minutes };
+}
+
+/* `act` is what the picker picked, and it is kept because it says more than a
+   mode does: yoga and Pilates have no cardio mode at all, so a day planned as
+   Pilates came back through the mode table as Other, a bare clock. */
+function cardioActFor(session) {
+  const picked = session?.act ? CARDIO_ACTS.find((a) => a.key === session.act) : null;
+  return picked
+    || CARDIO_ACTS.find((a) => a.key === (CARDIO_ACT_FOR_MODE[session?.mode] || "other"))
+    || null;
+}
+
+/* How long the session says it is, or null when nobody has said yet. A day
+   planned by hand carries a name and nothing else: the length is chosen on the
+   clock, and rounding an absent number up to "1 min" is the screen inventing
+   the session rather than reading it. */
+function cardioMinutes(s) {
+  const m = Number(s?.minutes);
+  return m > 0 ? Math.max(1, Math.round(m)) : null;
+}
+
+/* The session in the one line a card has room for. Everything that prints it
+   goes through here so the day that knows less says less, in the same words,
+   rather than each card inventing its own way of saying nothing. */
+function cardioSaid(s) {
+  const mins = cardioMinutes(s);
+  const word = Number(s?.effort) > 0 ? effortWord(s.effort).toLowerCase() : "";
+  if (mins && word) return `${mins} min · ${word}`;
+  if (mins) return `${mins} min`;
+  return "You set the length";
+}
+
+/* Effort arrives as a 1 to 10 rating of perceived exertion, which is the scale
+   knowledge/exercise-library/cardio.mjs prescribes on, and a digit is not
+   something anybody can pace by. These are the library's own words, read off
+   what its cues say at each level: a 4 is the Easy Run that says "conversational",
+   a 7 is the Tempo Run that says "comfortably hard", a 9 is the sprint session
+   that says "flat out means flat out". The number goes on screen beside the
+   word rather than instead of it, because the number is what the library
+   prescribed and the word is what a person can act on. */
+function effortWord(n) {
+  const e = Number(n) || 0;
+  if (e <= 2) return "Very easy";
+  if (e <= 4) return "Easy";
+  if (e <= 6) return "Steady";
+  if (e <= 7) return "Comfortably hard";
+  if (e <= 8) return "Hard";
+  return "Flat out";
+}
+
+/* The session, said the way a session should be said: what it is, how long,
+   how hard in words, how it breaks up, and how to pace it. No progress bar and
+   no set counter, because there is nothing to tick.
+
+   `head` is off on the reveal, where the overlay has already put the name in
+   40px type directly above this. */
+function cardioPlanHTML(s, { head = true, eyebrow = "Today’s session" } = {}) {
+  const act = cardioActFor(s);
+  const mins = cardioMinutes(s);
+  const effort = Number(s.effort) > 0 ? Number(s.effort) : null;
+  const word = effort ? effortWord(effort) : "";
+  /* A day planned by hand knows its name and nothing else, and every heading
+     below this one is switched off rather than printed over a blank. What is
+     left is true: this is the activity, and the length is a thing you choose
+     when you start it. An empty "How to pace it" would be the screen claiming
+     coaching it does not have. */
+  const sub = mins && word ? `${mins} minutes, ${word.toLowerCase()}.`
+    : mins ? `${mins} minutes.`
+    : "You planned this one. Pick how long when you start it.";
+  return `
+    ${head ? `<div class="cdy-head">
+      <p class="cdy-kind">${icon(act?.ico || "run", 14)} ${escapeHtml(eyebrow)}</p>
+      <h2 class="cdy-name">${escapeHtml(s.name)}</h2>
+      <p class="cdy-sub">${escapeHtml(sub)}</p>
+    </div>` : ""}
+    ${/* Without its own heading and with nothing to put in the tiles there is
+          no block left at all, and a sheet that prints its title and then a
+          gap has told nobody what the day is. The sentence stands in. */ ""}
+    ${!head && !mins && !effort && !s.structure && !s.cue ? `<p class="cdy-note">${escapeHtml(sub)}</p>` : ""}
+    ${mins || effort ? `<div class="cdy-facts">
+      ${mins ? `<div class="cdy-fact"><span>Time</span><b>${mins} min</b></div>` : ""}
+      ${/* Both: the number is what the library prescribed and the word is what
+            anybody can actually pace by. The word leads in the line above,
+            where it has the room to be a sentence. */ ""}
+      ${effort ? `<div class="cdy-fact"><span>Effort</span><b>${effort} of 10</b><i>${escapeHtml(word)}</i></div>` : ""}
+    </div>` : ""}
+    ${/* Intervals, before the start rather than discovered mid-run. The
+          library writes this as plain words, so it is printed as it stands. */ ""}
+    ${s.structure ? `<div class="cdy-block">
+      <span class="cdy-block-ico">${icon("trending", 15)}</span>
+      <div><b>How it breaks up</b><i>${escapeHtml(s.structure)}</i></div>
+    </div>` : ""}
+    ${s.cue ? `<div class="cdy-block">
+      <span class="cdy-block-ico">${icon("wand", 15)}</span>
+      <div><b>How to pace it</b><i>${escapeHtml(s.cue)}</i></div>
+    </div>` : ""}
+    ${/* The engine's own sentence about why this week is cardio, carried on the
+          session by generateWorkout. Its words, not ours: this is the engine's
+          decision and it is the one that has to explain it. */ ""}
+    ${s.note ? `<p class="cdy-note">${escapeHtml(s.note)}</p>` : ""}`;
 }
 
 /* The screen that says what went wrong. It has to be the most robust thing
@@ -24929,7 +25357,7 @@ let LAST_GEN_WORKOUT = null;
    alternatives by running the very same engine on the very same inputs, in the
    browser. Two payloads assembled in two places would drift, and the sheet
    would then offer days the real generate would never have built. */
-function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null, limits = null, focusGroups = null } = {}) {
+function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null, limits = null, focusGroups = null, forDate = null } = {}) {
   const history = Object.entries(personalRecords(ME).best).map(([exercise_name, weight]) => ({ exercise_name, weight }));
   const recentWeight = entriesFor(ME).filter((e) => e.weight != null).slice(-1)[0]?.weight ?? null;
   const recentGymDays = gymDaysThisWeek(ME);
@@ -24993,8 +25421,8 @@ function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null,
        profile column stays exactly as it was. */
     session_minutes: Number.isFinite(sessionMinutes) ? sessionMinutes : (MY_PROFILE?.session_minutes ?? null),
     /* The stored answer, unless this one call was handed a different one.
-       A one-off never reaches profiles: see openPlanLimitsSheet and the focus
-       door on the reveal. Stamped as chosen now when it is overridden, because
+       A one-off never reaches profiles: see openPlanLimitsSheet and the plan
+       screen's focus door. Stamped as chosen now when it is overridden, because
        the engine ages a focus off focus_chosen_at and a pick made ten seconds
        ago inheriting last spring's date would read as stale. */
     focus_groups: focusGroups ?? MY_PROFILE?.focus_groups ?? null,
@@ -25010,6 +25438,12 @@ function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null,
        asked and builds exactly the plan it built before this column existed,
        which is what every account made before onboarding asked gets. */
     train_styles: MY_PROFILE?.train_styles ?? null,
+    /* Which day this plan is FOR, which is not always today. The engine seeds
+       the run or the class it builds for a no-lifting week off a date, and
+       without this it seeds off the moment of the call: planning Thursday and
+       Friday in one sitting handed back the same run twice. Only that seed
+       reads it. */
+    for_date: forDate || todayStr(),
     history,
     logs: recentLogs,
     plans: recentPlans,
@@ -25024,11 +25458,12 @@ function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null,
    and is never written to profiles.session_minutes. `wantFocus` keeps the day
    type across a rebuild that was not asking for different movements.
    `limits` and `focusGroups` are the same idea for the other two columns: the
-   day planner and the reveal can rebuild ONE day around a constraint without
-   the profile ever hearing about it.
+   plan screen's doors can rebuild ONE day around a constraint without the
+   profile ever hearing about it.
 
    `quiet` is for the week builder. It does everything except talk: no
-   generating overlay, no reveal, no toast, no reload and no repaint, because
+   generating overlay, no walk to the plan, no toast, no reload and no repaint,
+   because
    seven of those in a row is seven overlays over one button press and seven
    round trips fetching a week that is still being written. The caller reloads
    and redraws once at the end, and reads the answer off the return value. */
@@ -25072,6 +25507,9 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
     sessionMinutes,
     limits,
     focusGroups,
+    /* Already validated above: a real ISO day or today. The engine seeds the
+       session it builds for a no-lifting week off it. */
+    forDate: target,
   });
 
   try {
@@ -25099,7 +25537,13 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
       return false;
     }
     if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
-    if (!data.workout?.exercises?.length) throw new Error("Coach returned an empty workout");
+    /* A cardio or yoga day HAS no exercises and that is its contract, not a
+       failure: the session is carried in `workout.cardio` or `workout.flow`,
+       and neither a run nor a pose has sets to put in this column. Guarding on
+       the array alone rejected the one answer the styles question exists to
+       produce, so somebody who ticked only Running got "Coach returned an
+       empty workout" instead of their run. */
+    if (!data.workout?.exercises?.length && !data.workout?.cardio && !data.workout?.flow) throw new Error("Coach returned an empty workout");
 
     /* meta.goals is the engine's read-back of what each extra goal actually
        bought, and an empty `effect` means it bought nothing. It names ids, not
@@ -25118,27 +25562,35 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
       toast(`No ${keepFocus.toLowerCase()} in your week, so this is ${data.workout.focus}`);
     }
 
-    /* Somebody who ticked no resistance style still gets a lifting week out of
-       the engine, because a lifting week is the only thing it knows how to
-       build. It says so rather than pretending: meta.styles.honoured comes back
-       false, and filling the day from the libraries the app already has is the
-       app's job, not the engine's.
+    /* The engine builds the cardio day itself now, so there is nothing left
+       here to swap: `workout.cardio` is the session and `exercises` is empty
+       by contract. All this has to do is say the sentence out loud, because
+       the reveal keeps only the clinician warnings out of `notes` and this one
+       would otherwise be a fact nobody sees.
 
-       This is the line that finally makes the styles question mean something.
-       Before it, onboarding asked what you were willing to do, the plan screen
-       read it back to you, and the generator built five lifts regardless. */
+       The client used to substitute its own day whenever the engine said it
+       could not honour the pick, and that is exactly why it goes: cardioFor
+       falls back to the whole library rather than returning nothing, so a
+       beginner who ticked Swimming was handed an Easy Spin on a bike under
+       their own words. The engine refuses instead of substituting, and a
+       refusal somebody can read beats a bike ride they never asked for.
+
+       One sentence either way. `st.note` is the engine's own: what they are
+       holding when the cardio week was built, and what could not be done when
+       it was not. */
     const st = data.meta?.styles || null;
-    if (st && st.honoured === false) {
-      const swapped = await cardioDayForStyles(st, target);
-      if (swapped) {
-        data.workout = swapped;
-        if (!quiet && st.note) toast(st.note.split(".")[0] + ".");
-      }
-    }
+    if (!quiet && st && st.asked && !st.resistance && st.note) toast(st.note.split(".")[0] + ".");
+    /* And the whole sentence rides on the session itself, so the screen can
+       say it after the toast has gone and after a reload. `notes` has no
+       column to live in and a toast lasts four seconds, which between them
+       made the engine's reason for a cardio week a thing nobody ever read.
+       Its own words: this is the engine's decision to explain. */
+    if (data.workout?.cardio && st?.note) data.workout.cardio.note = st.note;
 
     /* data.honest is not written here: ai_workouts has no column for it, and
-       migrations are owned elsewhere. It lives as long as the reveal sheet
-       does, which is where the sentence is worth reading anyway. */
+       migrations are owned elsewhere. Nothing reads it since the reveal screen
+       that printed it went; the engine still sends it, so it is still taken
+       off the response rather than quietly dropped. */
     const { error: saveErr } = await sb.from("ai_workouts").upsert({
       user_name: ME,
       email: MY_EMAIL,
@@ -25167,8 +25619,35 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
          is an ordinary Saturday. */
       /* Weekly cardio the goal asks for, written on the plan because that is
          the screen somebody reads to know what they are meant to do. Advisory:
-         never a set, never logged, never in `exercises`. */
-      cardio: data.meta?.cardio || null,
+         never a set, never logged, never in `exercises`.
+
+         Two different cardios live in this one column and they tell themselves
+         apart by their own keys. `sessions`/`minutes`/`zone` is the weekly
+         prescription, which belongs to the goal and is true of every day of the
+         week. `session` is THIS day, on the days the day itself is a run: name,
+         minutes, effort and cue, the things that make it a session rather than
+         the word "cardio". Until now only the first was written, so the engine
+         built somebody a 25 minute Easy Run with a pace cue and the row came
+         back from the database with none of it.
+
+         One column rather than two because a new one needs a migration that has
+         not been run, and supabase rejects the whole upsert on an unknown
+         column: the save would fail and somebody would lose the plan, to store
+         a field nothing reads yet. The weekly half is written and no longer
+         read: the note that printed it came off the plan screen on Mo's note
+         of 2026-09-19, and `session` is the half the screen still uses. */
+      /* And since 2026-09-19 a third shape, `flow`, for the day that is a yoga
+         or Pilates class: the moves, their seconds and the rounds. It rides in
+         this column rather than in `mobility` because this is where the app
+         already looks for "the session this day is", and `mobility` has a
+         reader that rebuilds the object key by key and would drop it on the
+         next Skip stretching. The column's name is now the weakest thing about
+         it, and 20260919_ai_workouts_flow_session.sql says so out loud. */
+      cardio: (data.meta?.cardio || data.workout.cardio || data.workout.flow)
+        ? { ...(data.meta?.cardio || {}),
+            ...(data.workout.cardio ? { session: data.workout.cardio } : {}),
+            ...(data.workout.flow ? { flow: data.workout.flow } : {}) }
+        : null,
       completed_at: null,
       duration_sec: null,
     }, { onConflict: "email,entry_date" });
@@ -25182,15 +25661,28 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
        back what landed without going to the database for it. */
     LAST_GEN_WORKOUT = data.workout;
     if (quiet) { rememberPlannedDay(target, data.workout.focus, data.workout.exercises); return true; }
-    await loadAll();
-    if (isToday) {
-      await loadTodayWorkout();
-      FRESH_PLAN_ID = TODAY_WORKOUT?.id || null;
-      renderWorkoutTab();
-      revealGeneratedPlan(data.workout, data.honest, () => switchTab("workout"), target, data.notes, data.meta?.session);
-    } else {
-      renderHero();
-      revealGeneratedPlan(data.workout, data.honest, () => toast("Tomorrow is planned"), target, data.notes, data.meta?.session);
+    /* The two things the plan screen cannot read off the row, kept for exactly
+       as long as this sitting: see JUST_GENERATED. */
+    JUST_GENERATED = { date: target, warnings: planWarnings(data.notes) };
+    /* Through the one door every plan change goes through. It drops the
+       generator's cached next day, which this write has just made wrong, and
+       repaints Home as well as this tab: generating for Thursday used to
+       reload and redraw Home only, so the workout tab underneath kept
+       Thursday's old session on the week strip. */
+    await planChangedOn(target, {
+      then: () => { if (isToday) FRESH_PLAN_ID = TODAY_WORKOUT?.id || null; },
+    });
+    /* Mo, 2026-09-18: "I don't want to generate a workout and be able to see
+       those options. The second it generates, it takes me to that page." The
+       page is the plan itself, where the rows, the swaps and the doors already
+       live, so a finished generate walks straight there rather than stopping at
+       a summary of the plan with three pills under it. Not while the overlay is
+       cancelled: they left, and landing them on a screen they did not ask for
+       would be the app following them out. */
+    if (!genCancelled) {
+      paintGen(100);   // the last frame is a finished bar, not one caught mid sweep
+      closeGenOverlay();
+      showPlanScreen(target);
     }
     /* Answered, so a caller that has to undo something on failure can tell the
        two apart. Nothing else reads it. */
@@ -25521,6 +26013,11 @@ function todaysLoggedExerciseNames() {
 
 function startWorkout() {
   if (!TODAY_WORKOUT) return;
+  /* A run or a class is not a list of sets, and this screen opens on an
+     exercise. Every Begin in the app comes through here, so the one branch
+     covers the plan card, the workout tab's card and the FAB rather than three
+     call sites each remembering. */
+  if (planActivitySession(TODAY_WORKOUT)) { startPlannedActivity(TODAY_WORKOUT); return; }
   /* Remove every exercise and Begin Workout used to land straight on
      "Workout Complete, 0 of 0 exercises" with confetti, because an empty plan
      is neither started nor finished by the counts and startWorkout read
@@ -25544,8 +26041,10 @@ function startWorkout() {
     // Weight is recorded per set, because it commonly climbs across an exercise.
     setWeights: TODAY_WORKOUT.exercises.map((ex) => new Array(ex.sets || 3).fill(null)),
     // What you lifted last time beats what the plan guessed, because it is
-    // the one number that is evidence rather than a suggestion.
-    weights: TODAY_WORKOUT.exercises.map((ex) => ex.targetWeight ?? lastTimeFor(ex.name)?.weight ?? ""),
+    // the one number that is evidence rather than a suggestion. And a row the
+    // engine could not put a number on opens empty rather than at 0: see
+    // plannedStartWeight.
+    weights: TODAY_WORKOUT.exercises.map((ex) => plannedStartWeight(ex)),
     reps: TODAY_WORKOUT.exercises.map((ex) => ex.reps ?? ""),
     completed: TODAY_WORKOUT.exercises.map((ex) => loggedAlready.has(ex.name.toLowerCase())),
   };
@@ -27597,6 +28096,15 @@ function renderSession() {
   /* Every rung on screen is a fraction of THIS number, so the two can never be
      read off the screen disagreeing with each other. See rampRungLoad. */
   const workLb = SESSION.weights[ei];
+  /* An empty string is a real state here now and it has to survive `|| 0`: a
+     row the engine could not put a number on opens with nothing in the field,
+     because this is the screen where somebody is standing at the rack and a
+     prefilled 0 is the app answering a question it just said it could not. */
+  const weightField = SESSION.weights[ei] === "" || SESSION.weights[ei] == null ? "" : (SESSION.weights[ei] || 0);
+  /* The engine's own sentence, shown where "First time on this lift" goes,
+     because it is the same slot answering the same question and the engine
+     wrote the words for the decision it made. */
+  const askLoad = loadAsk(ex) && !lastTime;
 
   const exChanged = SESSION_LAST_EX !== ei;
   SESSION_LAST_EX = ei;
@@ -27696,9 +28204,13 @@ function renderSession() {
                you the load but left you to work out what kind of set it was,
                which is the same thing the W chip did. */
             if (rampTicks < rungs.length) return `<span class="last warm">This is a warm-up set, ${escapeHtml(rampRungLabel(rungs[rampTicks], workLb))}</span>`;
-            return lastTime
-              ? `<span class="last">Last time ${lastTime.weight} lb${lastTime.reps ? ` &times; ${lastTime.reps}` : ""}</span>`
-              : `<span class="last">First time on this lift</span>`;
+            if (lastTime) return `<span class="last">Last time ${lastTime.weight} lb${lastTime.reps ? ` &times; ${lastTime.reps}` : ""}</span>`;
+            /* "First time on this lift" is true and says nothing about what to
+               do next. When the engine has told us it does not know the load,
+               its own sentence goes here instead: pick one today, and it is
+               the number every plan after this one is built from. */
+            if (askLoad && ex.note) return `<span class="last ask">${escapeHtml(humanizeNoteDates(ex.note))}</span>`;
+            return `<span class="last">First time on this lift</span>`;
           })()}
           ${/* The record line is about the working set, so it stands down while a
                 warm-up is still the live thing. It was also what squeezed the
@@ -27719,7 +28231,7 @@ function renderSession() {
             <div class="sess-dial-label">${rampTicks < rungs.length ? "Working lb" : "Weight lb"}</div>
             <div class="sess-dial-ctl">
               <button type="button" class="round-btn sm" id="sessWeightMinus" aria-label="Less weight">&minus;</button>
-              <input class="sess-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" max="2000" value="${SESSION.weights[ei] || 0}" />
+              <input class="sess-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" max="2000" placeholder="?" aria-label="${askLoad ? "Weight in pounds, not set yet" : "Weight in pounds"}" value="${weightField}" />
               <button type="button" class="round-btn sm" id="sessWeightPlus" aria-label="More weight">+</button>
             </div>
           </div>
@@ -27872,7 +28384,10 @@ function renderSession() {
   };
   $("sessWeightVal").oninput = (e) => {
     const v = parseFloat(e.target.value);
-    SESSION.weights[ei] = isNaN(v) ? 0 : clampInput(e.target, v, 0, MAX_LIFT_LB);
+    /* Clearing the field on a lift we were never told the weight of goes back
+       to not knowing, rather than to 0. Emptying it anywhere else still means
+       0, which is what the blur rule below was written for. */
+    SESSION.weights[ei] = isNaN(v) ? (loadAsk(ex) ? "" : 0) : clampInput(e.target, v, 0, MAX_LIFT_LB);
     refreshRampLoad();
     saveSessionToStorage();
   };
@@ -27882,8 +28397,13 @@ function renderSession() {
     saveSessionToStorage();
   };
   // An emptied field logged 0 while showing nothing, so put the real number
-  // back the moment they leave it.
-  $("sessWeightVal").onblur = (e) => { e.target.value = SESSION.weights[ei] || 0; };
+  // back the moment they leave it. Unless there is no real number: a lift we
+  // have not been told the weight of stays blank and shows its placeholder,
+  // and logs null rather than a 0 nobody lifted.
+  $("sessWeightVal").onblur = (e) => {
+    const w = SESSION.weights[ei];
+    e.target.value = w === "" || w == null ? "" : (w || 0);
+  };
   $("sessRepsVal").onblur = (e) => { e.target.value = SESSION.reps[ei] || 0; };
   $("nextExBtn").onclick = finishExerciseAndAdvance;
   // Ending lives behind the pause button now (askPauseOrEnd).
@@ -28299,8 +28819,10 @@ async function sessionDone() {
   WORKOUT_MODE = null;
   closeSessionUI();
   $("workoutContent").classList.remove("hidden");
-  await loadAll();
-  renderWorkoutTab();
+  /* Same door as every other way a day's plan changes: the day just lost its
+     plan, so the generator's cached next day is wrong and Home is as stale as
+     this tab. */
+  await planChangedOn(sessionDate());
 }
 
 let WORKOUT_MODE = null; // null | "choose" | "manual" | "week" | "recovery" | "review" | "activity"
@@ -29089,8 +29611,10 @@ async function startFreshWorkout() {
   TODAY_WORKOUT = null;
   FRESH_PLAN_ID = null;
   WORKOUT_MODE = "choose";
-  await loadAll();
-  renderWorkoutTab({ respectMode: true });
+  /* Standing today's plan down empties the day, so it leaves the same way every
+     other emptying does: the cached "which day next" is dropped and Home is
+     repainted too, rather than only this tab. */
+  await planChangedOn(sessionDate());
 }
 
 /* Days you trained, most recent first, each opening its own recap. Dated
@@ -29456,8 +29980,9 @@ function planLiftingSeconds(list) {
 }
 /* The timed blocks a plan carries, in seconds, honouring today's skips. Takes
    either shape the app has for them: the stored ai_workouts.mobility row
-   (planMobility) or the engine's fresh answer at the reveal, where the ramp is
-   still called rampSets. Per side doubles, the same way the session runs it. */
+   (planMobility) or the engine's fresh answer straight off a generate, where
+   the ramp is still called rampSets. Per side doubles, the same way the session
+   runs it. */
 function planBlocksSeconds(mobility) {
   if (!mobility || typeof mobility !== "object") return { warmup: 0, ramp: 0, cooldown: 0 };
   const skippedAll = !!mobility.skipped;
@@ -29550,6 +30075,24 @@ function planFromToday(date = todayStr()) {
      naming today's already-finished session under a "Tomorrow" eyebrow. */
   const src = date === todayStr() ? TODAY_WORKOUT : planForDate(date);
   const list = src?.exercises || [];
+  /* A run is a real plan with no lifts on it. Answering null for it told the
+     card there was nothing planned, so the tab offered to generate a workout
+     over the top of one somebody already had.
+
+     `match` is null rather than a number: the figure is how much room the
+     week has left in the MUSCLES a session trains, and a run trains none that
+     this scores. A 99% on it would be an invented reading, and every screen
+     that prints the figure is written to skip it when it is not there. */
+  const run = cardioSessionOf(src);
+  if (run) {
+    return {
+      real: true, cardio: run, focus: displayFocus(src.focus, list),
+      match: null, muscles: [], all: [], peak: 0, peakName: null,
+      duration: cardioMinutes(run) ? `${cardioMinutes(run)} min` : null,
+      equipment: null, kit: [], targets: [], count: 0,
+      done: gymDaysThisWeek(ME), target: weeklyGoalFor(MY_EMAIL) || 4,
+    };
+  }
   if (!list.length) return null;
 
   const names = list.map((e) => (e.name || "").toLowerCase());
@@ -30327,17 +30870,21 @@ function renderChooseScreen() {
       <div class="wkt-next-top">
         <p class="wkt-eyebrow">${allDone ? "Tomorrow" : "Next workout"}</p>
         ${/* The dot explains how the match is worked out, so with no match on
-              screen it explains nothing. */ ""}
-        ${hiredHere ? infoDot("planMatch", "How the match is worked out") : ""}
+              screen it explains nothing. A cardio day has no match: see
+              planFromToday on why that is null rather than a number. */ ""}
+        ${hiredHere && p.match != null ? infoDot("planMatch", "How the match is worked out") : ""}
       </div>
       <div class="wkt-next-grid">
         <div class="wkt-next-words">
           <h2>${escapeHtml(p.focus)}</h2>
-          ${hiredHere ? `<p class="wkt-next-sub">${escapeHtml(matchReading(p.match))}</p>` : ""}
+          ${hiredHere && p.match != null ? `<p class="wkt-next-sub">${escapeHtml(matchReading(p.match))}</p>` : ""}
+          ${/* What the reading would have said, for the one day it cannot be
+                read: how long and how hard, which is the whole of a run. */ ""}
+          ${p.cardio ? `<p class="wkt-next-sub">${escapeHtml(cardioSaid(p.cardio))}</p>` : ""}
         </div>
-        ${!hiredHere ? `<div class="wkt-next-hire">${hirePitchHTML("next")}</div>` : `
+        ${!hiredHere ? `<div class="wkt-next-hire">${hirePitchHTML("next")}</div>` : p.match == null ? "" : `
         <button type="button" class="wkt-arc" data-info="planMatchWhy" aria-label="Why this is a ${p.match}% match">
-          ${arcGaugeSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 120)}
+          ${arcGaugeSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 136)}
           <div class="wkt-arc-num"><b>${p.match}%</b><i>MATCH</i></div>
         </button>`}
         <div class="wkt-next-acts">
@@ -30353,16 +30900,19 @@ function renderChooseScreen() {
               ? `<button type="button" class="wkt-btn-solid sm" id="chooseSeeTomorrow">See tomorrow&rsquo;s plan</button>`
               : `<button type="button" class="wkt-btn-solid sm" id="chooseGenerateBtn">${allDone ? "Generate tomorrow&rsquo;s" : "Generate workout"}</button>`}
           ${tomorrowPlan ? "" : `<button type="button" class="wkt-btn-soft sm" id="choosePlanBtn">Plan my own</button>`}
+          ${/* Taken off this card on one note and put back on the next: "let's
+                put the activity back." It earns the room. On a day with no
+                lifting plan this is the only one-tap way into a run or a class
+                from this tab, and for somebody whose training styles are yoga
+                and cardio it is the way they train, not a detour from it. */ ""}
           ${csnRunning()
             ? `<button type="button" class="wkt-more" id="chooseActivityBtn">Resume ${escapeHtml(csnAct().label.toLowerCase())}, ${csnClock(csnElapsedMs())} ${icon("chevronRight", 13)}</button>`
             : `<button type="button" class="wkt-more" id="chooseActivityBtn">or start an activity ${icon("chevronRight", 13)}</button>`}
         </div>
-        ${/* Where the ticked column went. One line, under the buttons, saying
-              what the figure above was read from. It is a caption, not a
-              choice, so it is the last thing on the card and the quietest. */ ""}
-        ${hiredHere && (p.muscles || []).length
-          ? `<p class="wkt-next-line">Trains ${escapeHtml(p.muscles.map((m) => m.name.toLowerCase()).join(", "))}</p>`
-          : ""}
+        ${/* The muscle caption is gone too: "remove trains triceps, chest,
+              traps, shoulders, we can see it when we generate the workout."
+              The muscles are on the plan itself and in the sheet behind the
+              ring, which is where somebody asking the question already looks. */ ""}
       </div>
     </section>`;
 
@@ -31598,7 +32148,11 @@ async function weekGenBuildDay(date, kind, st, opts = {}) {
      cardio", seeded off the day so the week is not the same run five times. */
   const day = await cardioDayForStyles(st, date);
   const name = day?.focus || "Cardio";
-  return (await planActivityOnDay(date, name, { quiet: true })) ? { ok: true, what: name } : { ok: false };
+  /* The session itself, not just its name. The minutes, the effort and the cue
+     are the difference between a day that says "Easy Run" and one somebody can
+     actually go and run. */
+  return (await planActivityOnDay(date, name, { quiet: true, session: day?.cardio || null }))
+    ? { ok: true, what: name } : { ok: false };
 }
 
 /* What to ask for on the next lifting day of a run.
@@ -31949,10 +32503,12 @@ function openDayPlanner(date) {
    reason limits.mjs gives: an option the library cannot filter on is a promise
    the plan quietly breaks. The two presets above them are Mo's words mapped
    onto that same list and nothing more. */
-/* `after` runs once the rebuild has landed. A generate takes the workout tab
-   back to today on its way through, so the screen that opened this from
-   another day is the one that has to ask for that day back. */
-async function openPlanLimitsSheet(date, dayWord, { after = null } = {}) {
+/* No callback for where to go afterwards. It used to take one, because a
+   generate landed on the reveal and then dropped the tab back on today, so the
+   screen that opened this from another day had to ask for that day back.
+   A generate now lands on the plan screen for the day it built, which is where
+   that callback was pointing anyway. */
+async function openPlanLimitsSheet(date, dayWord) {
   let lists;
   try {
     lists = await ensureLimitsLists();
@@ -32035,13 +32591,73 @@ async function openPlanLimitsSheet(date, dayWord, { after = null } = {}) {
   });
   scrim.querySelector("#dpLimitGo").onclick = () => {
     close();
-    /* supabase-js and the generator both answer rather than throw, so this is
-       a result to check: only a rebuild that actually landed is worth taking
-       the caller back to. */
-    generateWorkout(date, { limits: limitsWithMissing([...picked]) })
-      .then((ok) => { if (ok) after?.(); });
+    generateWorkout(date, { limits: limitsWithMissing([...picked]) });
   };
   paint();
+}
+
+/* ---- A different day for one plan ----
+
+   Mo, 2026-09-18: "give me pull day or leg day". The whole-workout swap used to
+   be a sheet that read the rest of the week and offered up to two sessions out
+   of it, which is a good answer to "what would you build instead" and no answer
+   at all to "give me a leg day": it can come back with nothing, it is gated on
+   having opted into built sessions, and it never names the day you are asking
+   for. So this sheet asks the question he asked, in the only vocabulary the
+   engine reads.
+
+   SUGGESTABLE_DAYS is that vocabulary, read rather than retyped: adapter.mjs
+   matches a requested focus through five patterns and drops anything else
+   without a word, so a sixth day invented here would come back as whatever the
+   rotation felt like with nothing on screen admitting it.
+
+   THIS DAY ONLY, like the two sheets below it. The day you want on Thursday is
+   not a change of split. */
+function openPlanDaySheet(date, dayWord, current) {
+  /* The day already on the row is not an offer: asking for the day you have
+     rebuilds the same session under a different name. engineDayFor is how the
+     engine itself reads a focus string, so "Push Day" off the row and
+     "Push day" in the list are matched the way the generator matches them. */
+  const now = engineDayFor(current?.focus);
+  const days = SUGGESTABLE_DAYS.filter((d) => d.name !== now);
+  const pretty = { lowerback: "lower back", abs: "core" };
+  const scrim = document.createElement("div");
+  scrim.className = "pop-scrim";
+  scrim.innerHTML = `
+    <div class="pop">
+      <div class="pop-body">
+        <div class="ds-top">
+          <div class="pop-who" style="color:var(--muted)">JUST FOR ${escapeHtml(dayWord.toUpperCase())}</div>
+          <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
+        </div>
+        <p class="muted-note">Which day do you want instead? I will build the whole session around it.</p>
+        <div class="sv-rows day-pick">
+          ${days.map((d) => `<button type="button" class="sv-row" data-day="${escapeHtml(d.name)}">
+            <span class="sv-row-ico">${icon("dumbbell", 18)}</span>
+            <span class="sv-row-txt">
+              <span class="sv-row-name">${escapeHtml(d.name)}</span>
+              <span class="sv-row-meta">${escapeHtml(d.muscles.map((m) => pretty[m] || m).join(", "))}</span>
+            </span>
+            <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
+          </button>`).join("")}
+        </div>
+        <button type="button" class="btn-ghost" data-close>Leave it as it is</button>
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+  const close = () => scrim.remove();
+  scrim.querySelectorAll("[data-close]").forEach((b) => { b.onclick = close; });
+  scrim.onclick = (e) => { if (e.target === scrim) close(); };
+  scrim.querySelectorAll("[data-day]").forEach((b) => {
+    b.onclick = () => {
+      close();
+      /* The same rebuild the limits and focus sheets run, and it lands back on
+         the plan screen for this day by itself. A week with no such day in it
+         says so out loud in generateWorkout rather than quietly handing back
+         something else. */
+      generateWorkout(date, { keepFocus: b.dataset.day });
+    };
+  });
 }
 
 /* ---- A focus for one plan ----
@@ -32169,9 +32785,172 @@ function openActivityInstead(date, dayWord) {
     b.onclick = () => {
       const a = acts.find((x) => x.key === b.dataset.act);
       close();
-      if (a) planActivityOnDay(date, a.label);
+      /* The activity itself, not only its label: the day is read back off this
+         to know it is an activity at all, and to open on the right clock. */
+      if (a) planActivityOnDay(date, a.label, { act: a });
     };
   });
+}
+
+/* THE one function that decides a day is not a lifting day.
+
+   There is exactly one, and that is the point. Two sessions built this in
+   parallel and each grew its own reader; two readers of one column is the bug
+   this codebase already paid a day for on the focus pickers, where the same
+   button bought a different muscle depending on the screen. Every screen,
+   button and clock that asks "is this a class, a run, or a workout" asks here.
+
+   Two shapes in one column, told apart by their own keys, which is how
+   ai_workouts.cardio has worked since the weekly prescription and the run
+   started sharing it. `session` is a cardio session out of the library: a
+   name, minutes, an effort and a cue. `flow` is a yoga or Pilates class: the
+   moves with their seconds and their rounds. The weekly `sessions`/`minutes`
+   half belongs to the goal and is true of every day alike, so it is not a
+   session and is not returned here.
+
+   EMPTINESS IS NOT THE SIGNAL, in either direction. A lifting plan somebody
+   stripped the last lift off is empty too, and it is a lifting day they have
+   emptied rather than a class: it still says Push Day, it still has no
+   session, and it keeps its bar, its Add exercise and its "add an exercise
+   first". So a day with lifts on it is never an activity day, and a day
+   without them is one only on something a person deliberately did:
+
+     `cardio.flow`     a built class, moves and all.
+     `cardio.session`  the day's own session, written under that key by every
+                       door that plans one: the generator, the week builder, a
+                       swap to a run, and the activity picker. No lifting
+                       writer ever writes it. They write null, or the weekly
+                       prescription (`sessions`, `minutes`, `zone`), which has
+                       no `name` and is about the week rather than the day.
+     a bare `cardio`   the engine's own `workout.cardio`, handed in before
+                       there is a row to read it off. It always carries
+                       minutes.
+     `focus`           exactly one of this app's own activity labels, which is
+                       what the picker wrote before the column carried a
+                       session, so days already in somebody's database still
+                       read correctly. A lifting plan's focus is a body part,
+                       from the engine ("Push Day", "Upper body") or from
+                       deriveFocus ("Chest & Back"), and never "Run" or "Yoga".
+
+   That last one is a day planned BY HAND, and it knows a name and nothing
+   else. It still comes back, with `card.minutes` absent, because the screen
+   and the clock both have something honest to say about a day like that: the
+   length is chosen when you start it.
+
+   Null on every lifting day, and the caller must go on reading `exercises` for
+   those: this is the day that was planned INSTEAD of a lifting day, not an
+   extra thing hanging off one. */
+function planActivitySession(plan) {
+  if (!plan || (plan.exercises || []).length) return null;
+  const c = plan.cardio;
+  if (c && typeof c === "object") {
+    if (c.flow && Array.isArray(c.flow.moves) && c.flow.moves.length) return { kind: "flow", flow: c.flow };
+    if (c.session && c.session.name) return { kind: "cardio", card: c.session };
+    if (!c.session && c.name && Number(c.minutes) > 0) return { kind: "cardio", card: c };
+  }
+  const a = plan.focus ? actForExerciseName(plan.focus) : null;
+  return a ? { kind: "cardio", card: { name: a.label, act: a.key, mode: a.cardio || null } } : null;
+}
+
+/* THE one way a planned non-lifting day gets started, whichever kind it is.
+   Today only: a day that has not arrived cannot be started, only read, which is
+   the rule startCardioInsteadOfPlan already sets out for a swap.
+
+   The activity timer is this app's clock and already knows how to pause, to
+   survive the app being closed mid-session, to write exercise_logs and to call
+   markGymDayDone. So the planned session is handed straight to it rather than
+   standing a second clock beside it, and the lifting session screen is not
+   involved at any point: it opens on an exercise, and there is not one.
+
+   `instead` is deliberately NOT set. That field stands a LIFTING plan down
+   once a swap really gets under way, and here the plan IS the session:
+   archiving it would take the day off the week for doing it. `fromPlan` is set
+   for the opposite reason, and it is what makes finishing COUNT: saveCardioSession
+   closes the row off with the minutes actually run, sets completed_at and
+   archives it, so the day reaches the streak, the week count and the partner's
+   timeline as itself rather than as a bare "Workout". */
+function startPlannedActivity(plan) {
+  const s = planActivitySession(plan);
+  if (!s) return;
+  if ((plan.entry_date || todayStr()) !== todayStr()) { toast("That one is for another day"); return; }
+  // A session already running is the truth and outranks this; show it instead.
+  if (csnRunning()) { openCardioSession(); return; }
+  sfx.play("set");
+  const act = s.kind === "flow"
+    ? CARDIO_ACTS.find((a) => a.training === s.flow.training)
+    : cardioActFor(s.card);
+  /* A day planned by hand is the one that does not know its own length, and
+     that is the whole difference here: there is no number to count down to, so
+     the clock is not started on one nobody chose. */
+  const mins = s.kind === "flow" ? Number(s.flow.minutes) || 0 : cardioMinutes(s.card);
+  CARDIO_SES = {
+    /* Straight to the reveal carrying the session itself, for the same reason
+       a swap does: what was planned is what starts. The setup screen would
+       rebuild a session from the minutes and could hand back a different one
+       than the plan screen just showed. A day with no length of its own opens
+       on setup instead, already on the right activity, where the minutes are
+       picked the way they are picked for any other activity and the offer to
+       build the session properly is sitting there too. */
+    state: mins ? "reveal" : "setup",
+    act: act?.key || "other",
+    minutes: mins || 30,
+    pref: defaultActivityPref(),
+    accum: 0,
+    since: null,
+    /* The engine's `flow` block is the shape buildGuidedPlan returns, field for
+       field, which is not a coincidence: both come out of
+       engine/activity-session.mjs. */
+    plan: s.kind === "flow" ? s.flow : null,
+    card: s.kind === "cardio" && mins ? s.card : null,
+    instead: null,
+    /* Rides through the reveal AND the setup screen, so however that screen is
+       left, finishing still closes this day off. */
+    fromPlan: { planId: plan.id, focus: plan.focus || (s.kind === "flow" ? s.flow.label : s.card.name) },
+  };
+  csnSave();
+  openCardioSession();
+}
+
+/* What an activity day looks like on the plan screen, and the only thing that
+   draws one. A run and a class are the same kind of day, so they print through
+   one function rather than each card inventing its own way of saying what a day
+   with no sets in it is.
+
+   A run says what it is, how long, how hard in words, how it breaks up and how
+   to pace it, through cardioPlanHTML. A class says the moves instead, because
+   that is what a class IS: "Yoga, on the clock" is a word and a timer, and
+   somebody reading the day before they start it wants to know what is in it.
+   Eight and a count, the same cut the session's own reveal card makes, because
+   a forty move vinyasa is three rounds of the same thing and the first round is
+   the news. */
+function activityDayHTML(s, { eyebrow = "Today’s session", head = true } = {}) {
+  if (!s) return "";
+  if (s.kind === "cardio") return cardioPlanHTML(s.card, { eyebrow, head });
+  const f = s.flow;
+  const moves = Array.isArray(f.moves) ? f.moves : [];
+  const act = CARDIO_ACTS.find((a) => a.training === f.training);
+  return `
+    ${head ? `<div class="cdy-head">
+      <p class="cdy-kind">${icon(act?.ico || "heart", 14)} ${escapeHtml(eyebrow)}</p>
+      <h2 class="cdy-name">${escapeHtml(f.label || f.training || "Your class")}</h2>
+      ${f.style?.label ? `<p class="cdy-sub">${escapeHtml(f.style.label)}, ${Number(f.minutes) || 0} minutes.</p>` : `<p class="cdy-sub">${Number(f.minutes) || 0} minutes.</p>`}
+    </div>` : ""}
+    <div class="act-facts" style="margin:4px 0 14px;">
+      <div class="act-fact"><span>Minutes</span><b>${Number(f.minutes) || 0}</b></div>
+      <div class="act-fact"><span>Moves</span><b>${moves.length}</b></div>
+      ${f.rounds > 1 ? `<div class="act-fact"><span>Rounds</span><b>${f.rounds}</b></div>` : ""}
+    </div>
+    <div class="act-moves">
+      ${moves.slice(0, 8).map((m, i) => `<div class="act-move">
+        <span class="act-move-n">${i + 1}</span>
+        <span class="act-move-b"><b>${escapeHtml(m.name)}</b><i>${Number(m.seconds) || 0}s${m.perSide ? " a side" : ""}${m.category ? ` &middot; ${escapeHtml(m.category)}` : ""}</i></span>
+      </div>`).join("")}
+      ${moves.length > 8 ? `<p class="act-move-more">and ${moves.length - 8} more</p>` : ""}
+    </div>
+    ${/* The session engine says out loud that the sequence repeats and how
+          little unique work there was to repeat. It is the most useful line on
+          the card and it is the one an app would be tempted to hide. */ ""}
+    ${(f.notes || []).map((n) => `<p class="ef-note">${escapeHtml(n)}</p>`).join("")}`;
 }
 
 /* A day that has just been written, put into ALL_PLANS without going back to
@@ -32196,10 +32975,26 @@ function rememberPlannedDay(date, focus, exercises) {
    empty. It must stay empty. Everything that iterates that column treats an
    entry as sets of a lift, so "Run" in there would be logged as a set and
    would light the heat map. */
-async function planActivityOnDay(date, name, { quiet = false } = {}) {
+/* `session` is the cardio library's own session for the day, when the caller
+   has one: the week builder asks the engine for a named run and used to write
+   only its name, so Wednesday's row said "Easy Run" and could not say how
+   long, how hard or how to pace it. Written in the same shape generateWorkout
+   writes, so both doors into a cardio day produce the same row and one screen
+   reads both.
+
+   With no session there is still a session: the name, and which activity it
+   is. That is the whole of what somebody who picked Yoga off the picker told
+   us, and writing it down is what makes the day readable as an activity
+   afterwards rather than as a lifting plan with nothing in it. `act` is kept
+   as well as the mode because yoga and Pilates have no cardio mode, and a day
+   that came back through the mode table as Other is a bare clock. */
+async function planActivityOnDay(date, name, { quiet = false, session = null, act = null } = {}) {
+  const own = session
+    || { name, act: act?.key || null, mode: act?.cardio || null };
   const { error } = await sb.from("ai_workouts").upsert({
     user_name: ME, email: MY_EMAIL, entry_date: date,
     focus: name, exercises: [], mobility: null,
+    cardio: { session: own },
     archived: false, completed_at: null, duration_sec: null,
   }, { onConflict: "email,entry_date" });
   /* supabase-js resolves rather than throws, so this is the only place the
@@ -32565,6 +33360,10 @@ function cbAdd(name, sets, reps, weight = 0) {
 function cbDose(ex) {
   const bits = [`${ex.sets} sets × ${ex.reps} reps`];
   if (Number(ex.targetWeight) > 0) bits.push(`${ex.targetWeight} lbs`);
+  /* Plan rows reach this list too, and one the engine could not weigh used to
+     look identical to a push-up. Plain text: the caller escapes this. */
+  else if (loadIsBodyweight(ex)) bits.push("Bodyweight");
+  else if (loadAsk(ex)) bits.push("Pick your weight");
   return bits.join(" · ");
 }
 
@@ -32806,10 +33605,14 @@ async function saveManualWorkout() {
   PLAN_FOR_DATE = null;
   WORKOUT_MODE = forToday ? null : "week";
   clearDraft();
-  await loadAll();
-  await loadTodayWorkout();
-  if (forToday) FRESH_PLAN_ID = TODAY_WORKOUT?.id || null;
-  renderWorkoutTab({ respectMode: true });
+  /* Through the one door every plan change goes through. Writing a day by hand
+     is as much a rewrite of it as generating one, and this used to reload and
+     redraw this tab alone: Home kept the old day on its card, and the
+     generator's cached answer for "which day next" was still the one it gave
+     before this row existed. */
+  await planChangedOn(target, {
+    then: () => { if (forToday) FRESH_PLAN_ID = TODAY_WORKOUT?.id || null; },
+  });
   toast(forToday ? "Workout plan saved" : "Added to that day");
 }
 
@@ -32864,9 +33667,9 @@ function planMobility(plan = TODAY_WORKOUT) {
    many.
 
    Trimmed here rather than at the session because this is the single door
-   every screen reads a ramp through, so the plan, the reveal and the session
-   cannot end up quoting different ladders. Nothing is invented: the rungs are
-   the engine's own, this only decides how many of them are worth your time. */
+   every screen reads a ramp through, so the plan and the session cannot end up
+   quoting different ladders. Nothing is invented: the rungs are the engine's
+   own, this only decides how many of them are worth your time. */
 const RAMP_COMPOUND = /squat|deadlift|bench|overhead press|shoulder press|military|row\b|pull.?up|chin.?up|dip\b|clean|snatch|thrust|lunge|leg press|front press|push press/i;
 const RAMP_ISOLATION = /curl|pushdown|extension|raise|fly|flye|shrug|calf|crunch|kickback|pull.?over|face pull|lateral/i;
 
@@ -32917,33 +33720,6 @@ function rampLoadsLine(ramp) {
   return (ramp?.sets || [])
     .map((s) => `${Number(s.weight) > 0 ? s.weight : "bar"} × ${s.reps}`)
     .join(" · ");
-}
-
-/* The cardio the goal asks for, said in words rather than as a row you could
-   mistake for a lift. It is a weekly number, so it is phrased weekly and sits
-   under the session as advice, not as a sixth exercise: the engine has always
-   prescribed this (plan.cardio) and until today never told anybody. A goal
-   that asks for none renders nothing at all. */
-const CARDIO_ZONE_WORDS = {
-  easy: "easy pace, you can still hold a conversation",
-  moderate: "moderate, breathing hard but steady",
-  hard: "hard intervals",
-  /* The endurance goal emits "mixed" and this table had no words for it, so
-     the card printed "mixed." as a sentence. */
-  mixed: "mix it up, one easy session, one with hard intervals, one longer and steady",
-};
-function cardioNoteHTML(finished, plan = TODAY_WORKOUT) {
-  const c = plan?.cardio;
-  if (finished || !c || !c.sessions) return "";
-  const zone = CARDIO_ZONE_WORDS[c.zone] || c.zone || "";
-  return `
-    <div class="cardio-note">
-      <span class="cardio-note-ico">${icon("run", 15)}</span>
-      <div>
-        <b>${c.sessions}x ${c.minutes} min of cardio this week</b>
-        <i>Run, bike or incline walk. ${escapeHtml(zone)}. Separate from this session, on a day that suits you.</i>
-      </div>
-    </div>`;
 }
 
 /* Which fold is open, remembered while the tab is alive so opening the
@@ -33071,10 +33847,9 @@ async function savePlanExercises() {
    row left in the database under a 30 minute session is somebody punished with
    lighter weights for having been busy on a Tuesday. */
 let ONE_OFF_SESSION = null;   // { date, minutes, made, changed, from: { minutes, focus, exercises, mobility, cardio } }
-/* meta.session from the last generate, whoever asked for it. generateWorkout
-   hands the reveal its copy directly; this is for applySessionBudget, which
-   only gets a boolean back and needs the engine's `restCompressed` to describe
-   the change honestly. */
+/* meta.session from the last generate, whoever asked for it. This is for
+   applySessionBudget, which only gets a boolean back and needs the engine's
+   `restCompressed` to describe the change honestly. */
 let LAST_GEN_SESSION = null;
 
 /* Enough of a plan to tell whether it is still the one the budget change made.
@@ -33086,14 +33861,14 @@ const planSignature = (list) => (list || []).map((e) => `${e?.name}:${e?.sets}x$
 /* The five lengths are the ones Setup uses, on purpose: two controls that mean
    the same thing should not offer different numbers. `current` is what we know
    this day was built for, and it only lights a chip. */
-function openSessionBudgetSheet({ estimate, current, onPick, overReveal = false }) {
+function openSessionBudgetSheet({ estimate, current, onPick }) {
   const lit = SESSION_LENGTHS.includes(current) ? current : nearestSessionLength(estimate);
   const scrim = document.createElement("div");
-  /* The reveal is a full screen overlay above everything else, so a sheet
-     opened from it has to sit above that rather than behind it. Dismissing it
-     leaves the reveal exactly where it was, which is why this is not "close the
-     reveal first". */
-  scrim.className = overReveal ? "pop-scrim over-gen" : "pop-scrim";
+  /* `overReveal` was an option here, which put this sheet above the generating
+     overlay because the reveal screen offered the clock and sat higher than any
+     sheet. The reveal is gone and the only screen that offers the clock is the
+     plan, which is an ordinary screen. */
+  scrim.className = "pop-scrim";
   scrim.innerHTML = `
     <div class="pop">
       <div class="pop-body">
@@ -33187,10 +33962,11 @@ async function restoreSessionBudget() {
   }, { onConflict: "email,entry_date" });
   if (error) { console.error("could not put the original plan back", error); toast("Couldn't put that back. Try again."); return; }
   ONE_OFF_SESSION = null;
-  await loadAll();
-  await loadTodayWorkout();
-  FRESH_PLAN_ID = TODAY_WORKOUT?.id || null;
-  renderWorkoutTab();
+  /* Putting the old session back rewrites the day, so it goes through the same
+     door the swap that replaced it went through. */
+  await planChangedOn(snap.date, {
+    then: () => { FRESH_PLAN_ID = TODAY_WORKOUT?.id || null; },
+  });
   toast("Your original session is back");
 }
 
@@ -33230,12 +34006,6 @@ function planDayWord(date) {
   return new Date(date + "T00:00:00").toLocaleDateString([], { weekday: "long" });
 }
 
-/* Enough of a row to tell whether a sheet has rewritten the day underneath
-   this screen: what it is, and what is on it. */
-function planRowSignature(w) {
-  return w ? `${w.focus}|${planSignature(w.exercises)}` : "";
-}
-
 /* Which day the plan screen is currently showing: null is today, which is what
    it is about unless it says otherwise. Everything that edits a plan from that
    screen (the picker, the sets dials, reorder, remove, the stretch skip) goes
@@ -33263,21 +34033,22 @@ function openPlanReview(date) {
   goWorkoutScreen("review");
 }
 
-/* The whole-session swap writes the day and then tells the hero about it,
-   because until this screen existed nothing else on the tab could be showing a
-   day other than today. This screen sits underneath that sheet while the write
-   happens, so it watches its own row and repaints when the row changes rather
-   than reaching into the sheet for a callback it does not have. Gives up after
-   a few seconds: a swap that never landed has already said so in a toast. */
-function watchReviewedDay(date, was) {
-  let tries = 0;
-  const tick = () => {
-    if (WORKOUT_MODE !== "review" || PLAN_VIEW_DATE !== date) return;
-    if (planRowSignature(planForDate(date)) !== was) { renderPlanPreview({ date, review: true }); return; }
-    if (++tries < 20) setTimeout(tick, 300);
-  };
-  setTimeout(tick, 300);
+/* Where a finished generate lands, and the only place that decides which of
+   the two plan screens a day gets: today has one you can begin, any other day
+   has the same screen in review. The tab is switched to first because a
+   generate can be started from the week planner and from the calendar, and
+   both of those can be reached with another tab in front. */
+function showPlanScreen(date) {
+  if ($("tab-workout")?.classList.contains("hidden")) switchTab("workout");
+  if (date === sessionDate()) goWorkoutScreen(null);
+  else openPlanReview(date);
 }
+
+/* watchReviewedDay lived here. It polled this screen's own row for a few
+   seconds because the session swap sheet opened over the review screen and had
+   no callback to give it. The swap sheet is no longer one of this screen's
+   doors, and every door that is left rebuilds through generateWorkout, which
+   lands back here by itself, so there is nothing to watch for. */
 
 /* The plan screen, for today and for any other day.
 
@@ -33315,7 +34086,13 @@ function renderPlanPreview(opts) {
   // Reviewing another day says which day, because that is the one thing this
   // screen cannot get across any other way.
   $("workoutCardTitle").textContent = review ? planDayLabel(date) : "";
-  $("workoutFocusRow").textContent = `Focus: ${displayFocus(plan.focus, plan.exercises)}`;
+  /* A run or a class carries its own name in 28px a few lines down, so
+     "Focus: Tempo Run" above it is the screen saying the same thing twice.
+     Through the one detector, so a yoga day is as quiet here as a run: reading
+     the cardio half alone is how "Focus: Yoga" ended up sitting on top of
+     "TODAY'S SESSION / Yoga" the first time these two screens met. */
+  $("workoutFocusRow").textContent = planActivitySession(plan)
+    ? "" : `Focus: ${displayFocus(plan.focus, plan.exercises)}`;
 
   const exercises = plan.exercises || [];
   /* A day that has not arrived has nothing logged against it, so nothing on it
@@ -33328,15 +34105,57 @@ function renderPlanPreview(opts) {
   /* A planned activity is a real plan with no lifts in it: the name is in
      `focus` and `exercises` is empty, which is the shape the generator already
      writes for a week with no resistance training in it. There is no list to
-     show and nothing to add to it. */
-  const activityDay = review && !total;
+     show and nothing to add to it.
+
+     Today counts as one too, but only when the row really carries a session.
+     "No exercises" on its own is also what a plan looks like after somebody
+     removes the last lift off it, and that day is a lifting day they have
+     emptied rather than a class. */
+  const actSession = planActivitySession(plan);
+  const activityDay = (review || !!actSession) && !total;
+  /* The cardio half of the same reading, for the handful of places below that
+     have something to say about a run in particular. Off the one call above,
+     never a second look at the row. */
+  const runSession = actSession?.kind === "cardio" ? actSession.card : null;
+  /* This very session, already on the clock: minimising the timer lands back
+     here, and a Start button over a run that is thirteen minutes in is the
+     screen contradicting the clock behind it. */
+  const actLive = !!actSession && csnRunning() && CARDIO_SES?.fromPlan?.planId === plan.id;
+  const actNounWord = actSession?.kind === "flow"
+    ? "session"
+    : actNoun(cardioActFor(runSession));
+
+  /* Everything the reveal screen used to carry into this moment, now that this
+     screen IS the moment. Keyed by the day, so a warning about Thursday's plan
+     is not printed over Saturday's. */
+  const planDate = plan.entry_date || todayStr();
+  const justMade = JUST_GENERATED?.date === planDate ? JUST_GENERATED : null;
+  /* The one unprompted offer in the app, and it is here rather than in
+     onboarding because a limit is a constraint on how a goal gets trained for,
+     not a goal: asking up front turns "what do you want" into "what is wrong
+     with you" and can block somebody from ever getting a plan. By here the plan
+     exists, so the answer can only make it safer. null means never asked. Only
+     on a plan that was just built, because that is the moment it is about. */
+  /* Never on a day with no lifts on it. "Anything that hurts, or gear you
+     don't have" is a question about how a LIFTING day gets built, and asking
+     it under a yoga class is the app not reading its own screen. It comes
+     round again on the next day that has lifts on it. */
+  const askLimits = !!justMade && !isCoachedClient() && MY_PROFILE?.limits == null && !activityDay;
 
   /* A plan made moments ago is untouched even when it happens to name something
      already logged this morning, so it keeps its grips, its remove buttons and
      Regenerate. Without this a regenerated plan could arrive locked. */
   const fresh = !review && !!FRESH_PLAN_ID && FRESH_PLAN_ID === plan.id;
   const started = doneCount > 0 && !fresh;
-  const finished = doneCount >= total && total > 0 && !fresh;
+  /* An activity day is finished when the row says it is, because there are no
+     exercises to count it out of. saveCardioSession writes completed_at and
+     archives the row, so this is the window between the two and the state a
+     finished day reads back in. */
+  const finished = (doneCount >= total && total > 0 && !fresh) || (!!actSession && !!plan.completed_at);
+  /* A day somebody planned by hand knows a name and nothing else, which is the
+     one thing Regenerate cannot honour: there is nothing to run a second time,
+     and what it would build is a lifting workout over the activity they chose. */
+  const handPlanned = actSession?.kind === "cardio" && !cardioMinutes(actSession.card);
 
   /* The estimate, tappable. Gone the moment a session is open, whether or not a
      set has been ticked: from there only what is LEFT of the day can be
@@ -33378,7 +34197,7 @@ function renderPlanPreview(opts) {
       <div class="ex-icon"${isDone ? "" : ` data-fig="${escapeHtml(ex.name)}" data-fig-static`}>${doneMark}</div>
       <button type="button" class="ex-body ex-tap" data-plan-edit="${i}"${isDone ? " disabled" : ""}>
         <div class="ex-name">${escapeHtml(ex.name)}</div>
-        <div class="ex-target">${ex.sets} sets · ${ex.reps} reps${Number(ex.targetWeight) > 0 ? ` · ${ex.targetWeight} lb` : ""}${isDone ? "" : ` ${icon("pencil", 11)}`}</div>
+        <div class="ex-target">${ex.sets} sets · ${ex.reps} reps${loadSegmentHTML(ex)}${isDone ? "" : ` ${icon("pencil", 11)}`}</div>
         ${/* What to walk to. Only the things to fetch, no setup detail: the
               bench angle matters when you are standing at the bench, not when
               you are reading the list. Bodyweight says nothing, because
@@ -33397,20 +34216,35 @@ function renderPlanPreview(opts) {
      reviewing another day: those sessions are today's. */
   const dayList = !review && todaySessions().length > 1 ? todaySessionsHTML() : "";
 
-  /* The three doors, in the order somebody reaches for them: a different
-     session, the same session around a limit, or not a workout at all. Each
-     one acts on THIS day and nothing else. They are the day planner's own
-     markup because they are the day planner's own buttons: Mo asked for that
-     sheet's job to happen here, on the plan, rather than on a summary of it. */
+  /* The doors, in the order somebody reaches for them: a different day, the
+     same day leaning somewhere, the same day around a limit, or not a workout
+     at all. Each one acts on THIS day and nothing else. They are the day
+     planner's own markup because they are the day planner's own buttons: Mo
+     asked for that sheet's job to happen here, on the plan, rather than on a
+     summary of it.
+
+     "Swap the whole workout" used to sit above them and opened the session
+     swap sheet. Mo, 2026-09-18: "I told you, don't have the swap the whole
+     workout. And give me pull day or leg day. I told you when you press swap
+     the whole workout, it would take you to tell me what you have, or focus on
+     this, or do an activity instead." It was a door to a door: swapping the
+     whole workout IS this list, so the list is what is here and the button
+     that led to it is gone. What it opened is still reachable where it makes
+     sense, on today's own plan screen, where "Swap this workout" offers the
+     engine's read of the rest of the week rather than a menu of day names. */
   const reviewActions = !review ? "" : `
     <p class="dp-heading">Change it</p>
     <div class="dp-ways">
-      ${isCoachedClient() ? "" : `<button type="button" class="dp-way" id="planReviewSwap">
+      ${isCoachedClient() ? "" : `<button type="button" class="dp-way" id="planReviewDay">
         <span class="dp-way-ico">${icon("swap", 18)}</span>
-        <span class="dp-way-txt"><b>Swap the whole workout</b><i>A different session, not another version of this one.</i></span>
+        <span class="dp-way-txt"><b>Give me a different day</b><i>Push day, Pull day, legs, upper body or full body.</i></span>
+      </button>`}
+      ${isCoachedClient() || activityDay ? "" : `<button type="button" class="dp-way" id="planReviewFocus">
+        <span class="dp-way-ico">${icon("body", 18)}</span>
+        <span class="dp-way-txt"><b>Aim it at a body part</b><i>Lean this one toward arms, chest, legs, whatever you pick.</i></span>
       </button>`}
       ${isCoachedClient() || activityDay ? "" : `<button type="button" class="dp-way" id="planReviewLimits">
-        <span class="dp-way-ico">${icon("body", 18)}</span>
+        <span class="dp-way-ico">${icon("dumbbell", 18)}</span>
         <span class="dp-way-txt"><b>Tell me what you have</b><i>Bodyweight only, free weights only, or tick what is missing.</i></span>
       </button>`}
       <button type="button" class="dp-way" id="planReviewAct">
@@ -33454,23 +34288,59 @@ function renderPlanPreview(opts) {
     ${backBar("Back", () => goWorkoutScreen("choose", { back: true }))}
     ${dayList}
     ${overview}
-    ${review ? "" : `
+    ${/* Not on an activity day: "0/0" over a class is a progress bar for a
+          list that does not exist, and the clock is what measures this one. */ ""}
+    ${review || activityDay ? "" : `
     <div class="workout-progress-row">
       <span>Progress</span>
       <span class="workout-progress-count">${doneCount}/${total}</span>
     </div>
     <div class="workout-progress-track"><div class="workout-progress-fill" style="width:${total ? (doneCount / total) * 100 : 0}%"></div></div>`}
     ${timeRow}
-    ${activityDay ? `<p class="ef-note">No lifts on this one. It is ${escapeHtml(displayFocus(plan.focus, exercises))}, on the clock.</p>` : ""}
+    ${/* What the session actually is, through the one function that draws a
+          day with no sets in it, run or class alike. A day the generator built
+          carries the whole thing on the row; one somebody planned by hand
+          carries only the name, and it says that rather than printing empty
+          headings over a blank. */ ""}
+    ${activityDay ? activityDayHTML(actSession, {
+      eyebrow: review ? `Planned for ${planDayWord(date)}` : "Today’s session",
+    }) : ""}
+    ${activityDay && !actSession ? `<p class="ef-note">No lifts on this one. It is ${escapeHtml(displayFocus(plan.focus, exercises))}, on the clock.</p>` : ""}
+    ${(justMade?.warnings || []).map((n) => `<p class="ef-note">${escapeHtml(n)}</p>`).join("")}
     ${stretchBlockHTML("warmup", finished, plan)}
     <div class="reorder-list" id="planRows">${rows}</div>
     ${stretchBlockHTML("cooldown", finished, plan)}
-    ${cardioNoteHTML(finished, plan)}
     ${finished || activityDay ? "" : `<button type="button" class="btn-ghost" id="planAddExToggleBtn">+ Add exercise</button>`}
+    ${askLimits ? `
+    <p class="ef-note">Anything that hurts, or gear you don&rsquo;t have? Tell me once and every plan after this one will respect it.</p>
+    <button type="button" class="btn-ghost" id="planLimitsAskBtn">Tell me what to work around</button>
+    <button type="button" class="btn-ghost" id="planLimitsNoneBtn">Nothing to work around</button>` : ""}
     ${review ? reviewActions : finished
       ? `<p class="muted-note" style="text-align:center;margin:14px 0 10px;">${icon("check", 14)} Workout complete.</p>
          <button type="button" class="btn-primary" id="planNewBtn">Start new workout</button>`
-      : `${PARTNER_EMAIL ? `<button type="button" class="wp-open" id="planPrivacyBtn">
+      : activityDay
+      ? `${/* An activity day is started by the clock, not by the set logger.
+              Without this the one button on the screen was "Start today's
+              plan", which answered "Add an exercise first": the app refusing
+              to start the session it had just prescribed.
+
+              A clock already running on this plan is a stronger fact than any
+              button, so the button says what it will actually do. */ ""}
+         <button type="button" class="btn-primary" id="planStartActBtn" style="margin-top:12px;">${actLive
+           ? `${icon("play", 17)} Back to your ${escapeHtml(actNounWord)}, ${csnClock(csnElapsedMs())}`
+           : `${icon("play", 17)} Start ${escapeHtml(displayFocus(plan.focus, exercises).toLowerCase())}`}</button>
+         ${started || isCoachedClient() ? "" : `${/* Regenerate offers to build
+               this day again, and a day somebody planned by hand was not built:
+               there is nothing to run a second time, and what it would produce
+               is a lifting workout over the top of the activity they chose.
+               Swap this workout is that offer, and it is honest about it. */ ""}
+           ${handPlanned ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}
+           <button type="button" class="btn-ghost" id="planSwapDayBtn">Swap this workout</button>`}`
+      : `${/* Who can see it is a question about the live lifting session, which
+               hides an exercise name and a set count. An activity has neither:
+               what a watcher sees of it is the minutes, and those are not
+               negotiable per session, so this whole branch is off on one. */ ""}
+         ${PARTNER_EMAIL ? `<button type="button" class="wp-open" id="planPrivacyBtn">
              <span class="wp-open-ico">${icon(workoutPrivacyLocked() ? "lock" : "people", 16)}</span>
              <span class="wp-open-txt"><b>Advanced</b><i>${escapeHtml(privacySummary())}</i></span>
              <span class="wp-open-go">${icon("chevronRight", 16)}</span>
@@ -33491,7 +34361,7 @@ function renderPlanPreview(opts) {
      happens, and until now the only way to change an exercise here was to
      delete it outright and type a replacement from scratch, or start the
      workout and discover the swap sheet already exists one screen later.
-     Same sheet the reveal and the session use, same three ranked
+     Same sheet the session uses, same three ranked
      alternatives with a reason, same search. A logged exercise has no swap:
      there is nothing left to replace. The sheet writes the row for the date it
      is handed, so on a review it changes that day and only that day. */
@@ -33564,6 +34434,7 @@ function renderPlanPreview(opts) {
   // These three are mutually exclusive depending on how far the workout got.
   if ($("planPrivacyBtn")) $("planPrivacyBtn").onclick = openWorkoutPrivacy;
   if ($("planStartBtn")) $("planStartBtn").onclick = startWorkout;
+  if ($("planStartActBtn")) $("planStartActBtn").onclick = () => startPlannedActivity(plan);
   /* Regenerate overwrites today's row outright, so it says what goes with it.
      There is no undo once the new plan is written. */
   if ($("planRegenBtn")) {
@@ -33587,19 +34458,45 @@ function renderPlanPreview(opts) {
   }
   if ($("planNewBtn")) $("planNewBtn").onclick = startFreshWorkout;
 
-  /* The three review doors. Each one hands the day to the sheet that already
-     does that job, so there is one way to swap a session, one way to say what
-     kit you have, and one way to put an activity on a day. */
-  if ($("planReviewSwap")) {
-    $("planReviewSwap").onclick = () => {
-      openSessionSwapSheet({ date, current: plan });
-      watchReviewedDay(date, planRowSignature(plan));
+  /* The limits offer, which the reveal screen used to make and dismiss for
+     you: tapping Let's go there quietly wrote the empty answer, which is how
+     "offered once" stayed true. Nothing on this screen can stand in for that,
+     so the dismissal is its own button and says what it means. Either tap
+     writes the row, which is what stops this being asked after every plan;
+     walking away without answering leaves the question open, and it is asked
+     again the next time a plan is built. That is the honest version. */
+  if ($("planLimitsAskBtn")) {
+    $("planLimitsAskBtn").onclick = () => {
+      switchTab("setup");
+      openSettingsPage("limits");
+      // After openSettingsPage, which renders the page: Skip there should now
+      // record the answer rather than leaving it null.
+      LIMITS_ASKED_AFTER_PLAN = true;
     };
   }
-  /* The limits sheet runs a generate, and a generate takes the tab back to
-     today; `after` is how this screen returns to the day it just rebuilt. */
+  if ($("planLimitsNoneBtn")) {
+    $("planLimitsNoneBtn").onclick = async () => {
+      /* saveLimits answers rather than throws. An unchecked failure here is a
+         question that looks answered and comes back tomorrow. */
+      const ok = await saveLimits(emptyLimits(), { quiet: true });
+      if (ok === false) { toast("Couldn't save that. Try again."); return; }
+      rerenderPlanScreen();
+    };
+  }
+
+  /* The review doors. Each one hands the day to the sheet that already does
+     that job, so there is one way to pick a day, one way to lean it somewhere,
+     one way to say what kit you have, and one way to put an activity on a day.
+     Every one of them rebuilds through generateWorkout, which now lands back on
+     this screen by itself, so none of them carries a callback for that. */
+  if ($("planReviewDay")) {
+    $("planReviewDay").onclick = () => openPlanDaySheet(date, planDayWord(date), plan);
+  }
+  if ($("planReviewFocus")) {
+    $("planReviewFocus").onclick = () => openPlanFocusSheet(date, planDayWord(date));
+  }
   if ($("planReviewLimits")) {
-    $("planReviewLimits").onclick = () => openPlanLimitsSheet(date, planDayWord(date), { after: () => openPlanReview(date) });
+    $("planReviewLimits").onclick = () => openPlanLimitsSheet(date, planDayWord(date));
   }
   if ($("planReviewAct")) $("planReviewAct").onclick = () => openActivityInstead(date, planDayWord(date));
   if ($("planReviewClear")) {
@@ -33614,9 +34511,21 @@ function renderPlanPreview(opts) {
          nobody checked is a day that looks cleared and comes back tomorrow. */
       const { error } = await sb.from("ai_workouts").delete().eq("id", plan.id);
       if (error) { toast("Couldn't clear it"); console.error(error); return; }
-      await loadAll();
-      await loadTodayWorkout();
-      goWorkoutScreen("choose", { back: true });
+      /* Mo, 2026-09-18: "when I press clear the day I want to go back to that
+         page, and I don't have to go on another tab, go back, and then finally
+         be able to see generate workout and for it to be updated."
+
+         Through the one door every plan change goes through, rather than round
+         it. This used to reload the tables and then walk to the choose screen
+         itself, which left ENGINE_NEXT_DAY holding the generator's answer from
+         before the day was emptied and never told Home anything had happened:
+         the card could still be naming the day that had just been deleted, and
+         only a tab switch, which reloads, put it right. planChangedOn drops
+         that cache, reloads, repaints Home and repaints this tab. The repaint
+         lands back on this very screen, finds nothing on the day, and stands
+         itself down to the choose screen (see the top of renderPlanPreview),
+         so one reload and one paint end with the day already showing empty. */
+      await planChangedOn(date);
       toast("Day cleared");
     };
   }
@@ -38731,6 +39640,9 @@ function openSettingsPage(key) {
     $("setupGoalSub").textContent = goalTileLabel(MY_PROFILE);
     // Same reason: what the goal suggests moves when the goal does.
     renderSessionLengthPage();
+    // And the same again: this one paints the stored answer, so an edit that
+    // was abandoned by leaving the page must not still be sitting here.
+    renderTrainStylesPage();
   }
   if (key === "focus") renderBodyFocusPage();
   if (key === "limits") renderLimitsPage();
@@ -38973,6 +39885,71 @@ async function renderSessionLengthPage() {
       toast(minutes === null ? "Your goal picks the length again" : `Sessions set to about ${minutes} minutes`);
     },
   });
+}
+
+/* What the picker on Setup > Training is holding, which until Save is not what
+   the profile holds. Null while the page has never been opened. */
+let SETUP_STYLES = null;
+
+/* Setup > Training, the same seven cards onboarding asks on the way in.
+
+   It is the one answer on the account that shapes what gets built and could
+   never be changed: somebody who ticked "With equipment" on the day they
+   signed up and then joined a gym, or stopped going, or took up running, was
+   planned for that answer forever.
+
+   Unlike the rest length and the session length above it, this does not save
+   on the tap. A tap here is half a thought: going from lifting to running is
+   an untick and a tick, and an untick that saves on its own would have to
+   write the empty list in between, which is the one value this column must
+   never hold. So it saves with the button at the bottom of the page, the way
+   everything else on it does. */
+function renderTrainStylesPage() {
+  const el = $("setupStyleGrid");
+  if (!el) return;
+  const stored = Array.isArray(MY_PROFILE?.train_styles) ? MY_PROFILE.train_styles : null;
+  SETUP_STYLES = (stored || []).filter((id) => TRAIN_STYLES.some((t) => t.id === id));
+  /* The recommendations are drawn as badges and tick nothing. Onboarding opens
+     on them because it is asking for a first answer; this page is showing an
+     answer that already exists, and pre-ticking a suggestion here would paint a
+     plan the engine is not building. */
+  el.innerHTML = trainStylePickerHTML(SETUP_STYLES, recommendedStyles(MY_PROFILE || {}));
+  const note = () => { $("setupStyleNote").textContent = trainStyleSetupNote(SETUP_STYLES, stored); };
+  wireTrainStylePicker(el, SETUP_STYLES, (ids) => {
+    /* Nothing ticked is refused rather than saved, and this is not tidiness.
+       styles.mjs reads an empty list the same way it reads null, which is
+       "never asked", so an account that deliberately unticked everything would
+       get MORE than it asked for: the engine would go back to building
+       whatever it likes. Unticking the last one is the only tap on this screen
+       that would do the opposite of what it looks like, so it does not happen. */
+    if (!ids.length) {
+      $("setupStyleNote").textContent = "Keep at least one ticked. Nothing ticked would not mean nothing planned, it would mean we go back to building whatever we like, which is not what you are asking for.";
+      return false;
+    }
+    SETUP_STYLES = ids;
+    note();
+  });
+  note();
+}
+
+/* Said before anything is written, the way the goal page says what a goal
+   change is worth before Save rather than after. */
+function trainStyleSetupNote(picked, stored) {
+  if (!picked.length) {
+    return stored === null
+      ? "You have never answered this, so your plans are built on what your goal suggests. Tick what you actually do and the next one is built on that."
+      : "Pick at least one.";
+  }
+  return trainStyleNote(picked) || "The next plan you generate is built on this.";
+}
+
+/* What actually goes in the column. Anything the grid cannot draw is carried
+   through untouched: styles.mjs knows keys this app does not offer yet
+   (swimming, rowing), and a screen must not delete what it cannot show. */
+function trainStylesToSave() {
+  const stored = Array.isArray(MY_PROFILE?.train_styles) ? MY_PROFILE.train_styles : [];
+  const unseen = stored.filter((id) => !TRAIN_STYLES.some((t) => t.id === id));
+  return [...(SETUP_STYLES || []), ...unseen];
 }
 
 function renderSetupTab() {
@@ -39465,6 +40442,8 @@ async function saveTrainingPrefs() {
   }, { toastText: "Training saved" });
   if (!ok) return;
 
+  await saveTrainStyles();
+
   if (MY_PARTNERSHIP) {
     const sharedOn = $("sharedGoalToggle").checked;
     const sharedVal = sharedOn ? clampNum($("setupSharedGoal").value, 1, 7, 4) : null;
@@ -39475,6 +40454,55 @@ async function saveTrainingPrefs() {
     else MY_PARTNERSHIP.shared_weekly_goal = sharedVal;
   }
   renderHome();
+}
+
+/* What they actually do, saved with the rest of the page but in its own write.
+   Through upsertGoalFields rather than commitProfile for the reason the session
+   length goes the same way: train_styles is in PENDING_PROFILE_COLUMNS, and on
+   a database without the migration a write that names it comes back PGRST204
+   and takes the whole row with it, the goal note and the weekly target along
+   with it.
+
+   Only written when the answer actually changed, so a Save that was about the
+   weekly target does not restamp this and does not say anything about the plan
+   when nothing about the plan moved. */
+async function saveTrainStyles() {
+  if (!Array.isArray(SETUP_STYLES)) return;          // the page was never opened
+  const next = trainStylesToSave();
+  const before = Array.isArray(MY_PROFILE?.train_styles) ? MY_PROFILE.train_styles : null;
+  const same = before && before.length === next.length && next.every((id) => before.includes(id));
+  /* Empty is never written. See the refusal in renderTrainStylesPage: the
+     engine reads it as never asked, which is the opposite of what it means. */
+  if (same || !next.length) return;
+
+  const { error, droppedStyles } = await upsertGoalFields({
+    email: MY_EMAIL, user_name: ME, train_styles: next,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) { toast("Could not save what you do"); console.error(error); return; }
+  if (droppedStyles) {
+    /* Not saved, so nothing here pretends it was, and the grid goes back to
+       what the database actually holds. */
+    $("setupStyleNote").textContent = "What you do is not being stored yet, so this part has not been saved.";
+    renderTrainStylesPage();
+    return;
+  }
+  if (MY_PROFILE) MY_PROFILE.train_styles = next;
+
+  /* Nothing is regenerated here, and that is the decision rather than an
+     omission. A plan built on the old answer may be one somebody is part way
+     through, and the single control that overwrites today's row, Regenerate on
+     the Workout tab, already asks first and already takes itself off the screen
+     once a set has been logged. Rebuilding from a settings save would have to
+     either duplicate that confirm or skip it, and skipping it is how a
+     half-finished session gets thrown away by a settings change.
+
+     So this does what the goal page does: says plainly what the change is worth
+     and leaves the plan alone. The difference from the goal page is that this
+     one names today's workout, because that is the plan in their hand. */
+  $("setupStyleNote").textContent = TODAY_WORKOUT && !TODAY_WORKOUT.archived
+    ? "Saved. Today's workout was built on your old answer and is left exactly as it is. Regenerate it on the Workout tab to use this, or it lands with your next plan."
+    : "Saved. The next plan you generate is built on this.";
 }
 
 /* Setup > Your body. Owns the four numbers the calorie and load maths reads,
@@ -39651,6 +40679,7 @@ const A11Y_SHEETS = {
   liveScrim: "Live session",
   allWorkoutsScrim: "All workouts",
   recapScrim: "Workout recap",
+  actDetailScrim: "Activity",
   nextWorkoutScrim: "Next workout",
   partnerSheetScrim: "Partner",
   daySheetScrim: "Day",

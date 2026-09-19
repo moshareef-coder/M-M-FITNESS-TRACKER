@@ -523,8 +523,10 @@ const META_SUBKEYS = {
   session: ["budgetMinutes", "source", "asked", "goalMinutes", "estimatedMinutes", "rampMinutes", "fits", "restCompressed"],
   styles: ["asked", "picked", "resistance", "honoured", "equipmentMissing", "cardioModes", "flowTrainings", "note"],
 };
-const WORKOUT_KEYS = new Set(["focus", "exercises", "warmup", "cooldown", "rampSets", "cardio"]);
+const WORKOUT_KEYS = new Set(["focus", "exercises", "warmup", "cooldown", "rampSets", "cardio", "flow"]);
 const CARDIO_KEYS = new Set(["name", "mode", "minutes", "effort", "cue", "structure"]);
+const FLOW_KEYS = new Set(["training", "label", "style", "level", "minutes", "seconds", "rounds", "moves", "notes"]);
+const FLOW_MOVE_KEYS = new Set(["name", "seconds", "perSide", "round", "category", "cue"]);
 const RAMP_KEYS = new Set(["exercise", "group", "sets", "seconds"]);
 const RAMP_SET_KEYS = new Set(["weight", "reps", "restSec", "pct", "cue"]);
 const EXERCISE_KEYS = new Set(["name", "sets", "reps", "targetWeight", "loadBasis", "note", "swap", "alternatives", "restSec"]);
@@ -601,13 +603,41 @@ function checkResult(ctx, out, payload) {
   for (const k of Object.keys(w)) if (!WORKOUT_KEYS.has(k)) fail("workout-extra-key", ctx, k);
   if (typeof w.focus !== "string" || !w.focus.trim()) fail("workout-shape", ctx, `focus ${stable(w.focus)}`);
   if (!Array.isArray(w.exercises)) { fail("workout-shape", ctx, "exercises is not an array"); return; }
-  /* The one workout with no exercises in it, and it is the answer rather than
-     an exception: somebody whose train_styles hold no resistance style gets the
-     cardio session they asked for (engine/styles.mjs), and a run has no sets.
-     The rule that matters is the opposite one, that the run never appears in
-     `exercises`, because anything in that array is logged as a set, calibrated
-     against, and painted on the Body tab. */
-  if (w.cardio) {
+  /* The two workouts with no exercises in them, and they are the answer rather
+     than an exception: somebody whose train_styles hold no resistance style
+     gets the cardio session or the mat class they asked for
+     (engine/styles.mjs), and neither has sets. The rule that matters is the
+     opposite one, that the session never appears in `exercises`, because
+     anything in that array is logged as a set, calibrated against, and painted
+     on the Body tab. */
+  if (w.flow) {
+    if (w.exercises.length) fail("flow-day-has-sets", ctx, `${w.focus} put ${w.exercises.length} rows in exercises`);
+    if (w.cardio) fail("flow-day-also-cardio", ctx, `${w.focus} came back as both`);
+    if (typeof w.flow !== "object") { fail("workout-shape", ctx, `flow is ${typeof w.flow}`); return; }
+    for (const k of Object.keys(w.flow)) if (!FLOW_KEYS.has(k)) fail("flow-extra-key", ctx, k);
+    if (w.flow.training !== "yoga" && w.flow.training !== "pilates") fail("flow-shape", ctx, `training ${stable(w.flow.training)}`);
+    if (typeof w.flow.label !== "string" || !w.flow.label.trim()) fail("flow-shape", ctx, `label ${stable(w.flow.label)}`);
+    if (!(w.flow.minutes > 0)) fail("flow-shape", ctx, `minutes ${stable(w.flow.minutes)}`);
+    if (!(w.flow.rounds >= 1)) fail("flow-shape", ctx, `rounds ${stable(w.flow.rounds)}`);
+    if (!Array.isArray(w.flow.moves) || !w.flow.moves.length) fail("flow-shape", ctx, "no moves");
+    else {
+      /* The session's own arithmetic. A class whose moves do not add up to the
+         seconds it claims is one a clock cannot run, and the clock is the whole
+         session here the way the bar is on a lifting day. */
+      let spent = 0;
+      for (const m of w.flow.moves) {
+        if (!m || typeof m !== "object") { fail("flow-move-shape", ctx, `move is ${typeof m}`); continue; }
+        for (const k of Object.keys(m)) if (!FLOW_MOVE_KEYS.has(k)) fail("flow-move-extra-key", ctx, k);
+        if (typeof m.name !== "string" || !m.name.trim()) fail("flow-move-shape", ctx, `name ${stable(m.name)}`);
+        if (!(m.seconds > 0)) fail("flow-move-shape", ctx, `${m.name} runs ${stable(m.seconds)}s`);
+        if (!(m.round >= 1 && m.round <= w.flow.rounds)) fail("flow-move-shape", ctx, `${m.name} in round ${stable(m.round)} of ${stable(w.flow.rounds)}`);
+        spent += Number(m.seconds) * (m.perSide ? 2 : 1);
+      }
+      if (spent !== w.flow.seconds) fail("flow-seconds", ctx, `moves come to ${spent}s, session says ${stable(w.flow.seconds)}s`);
+      if (w.flow.seconds > w.flow.minutes * 60) fail("flow-seconds", ctx, `${w.flow.seconds}s of moves in a ${w.flow.minutes} min class`);
+    }
+    if (out.meta?.styles?.honoured !== true) fail("flow-day-not-honoured", ctx, `${w.focus} came back with honoured ${stable(out.meta?.styles?.honoured)}`);
+  } else if (w.cardio) {
     if (w.exercises.length) fail("cardio-day-has-sets", ctx, `${w.focus} put ${w.exercises.length} rows in exercises`);
     if (typeof w.cardio !== "object") { fail("workout-shape", ctx, `cardio is ${typeof w.cardio}`); return; }
     for (const k of Object.keys(w.cardio)) if (!CARDIO_KEYS.has(k)) fail("cardio-extra-key", ctx, k);
