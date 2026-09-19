@@ -2063,7 +2063,13 @@ export function buildPlan({
       ...(prefBudget ? {
         budget: {
           cap: prefBudget.cap, slots: prefBudget.slots,
-          acted: [...prefBudget.active].filter((k) => k !== " equipment").map((k) => prefBudget.nameOf.get(k) || k),
+          acted: [...prefBudget.active].filter((k) => /* The escape, not the byte: preferences.mjs keys the equipment skew
+             with a NUL prefix so no exercise name can collide with it, and
+             this has to match. Written as a literal NUL it was invisible in
+             every editor, survived nothing that re-encodes a file, and made
+             plan.mjs the one source file that is not plain text. Same
+             string, bytes anyone can read. */
+          k !== "\u0000equipment").map((k) => prefBudget.nameOf.get(k) || k),
           held: [...prefBudget.held.values()].map((h) => h.name),
         },
       } : {}),
