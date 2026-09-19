@@ -406,6 +406,36 @@
       },
     },
 
+    /* An activity somebody planned BY HAND, which is the activity picker's own
+       row and not the engine's. The whole of it is a name and which activity
+       it is: no minutes, no effort, no cue, because nobody wrote any. That is
+       the day the session screen has to degrade honestly on, and it is the
+       shape planActivityOnDay writes, copied field for field.
+
+       Two of them, because they are two different screens: today's is the one
+       with Begin on it, and the one two days out opens in review. The week
+       is left alone deliberately, so the lifting day sitting on tomorrow is
+       one tap away on the same fixture. */
+    handActivity: {
+      label: "Activity planned by hand",
+      apply: (db) => {
+        const byHand = (date, id, focus, act, mode) => ({
+          id, email: ME, user_name: "Mo", entry_date: date, archived: false,
+          focus, exercises: [], mobility: null,
+          cardio: { session: { name: focus, act, mode } },
+          created_at: day(0) + "T05:00:00Z", completed_at: null, duration_sec: null,
+        });
+        db.ai_workouts = db.ai_workouts.filter((w) => w.email !== ME || (w.entry_date !== day(0) && w.entry_date !== day(2)));
+        db.ai_workouts.push(byHand(day(0), "wh1", "Yoga", "yoga", null));
+        db.ai_workouts.push(byHand(day(2), "wh2", "Rowing machine", "row", "rowing"));
+        /* Today cleared of both the log and the entry, the way the runner
+           fixture clears them, so starting and finishing this one is a streak
+           and a week count actually moving rather than a number already there. */
+        db.exercise_logs = db.exercise_logs.filter((e) => e.email !== ME || e.entry_date !== day(0));
+        db.fit_entries = db.fit_entries.filter((e) => e.email !== ME || e.entry_date !== day(0));
+      },
+    },
+
     livePrivate: {
       label: "Partner keeps it private",
       apply: (db) => {
