@@ -191,6 +191,125 @@ export const WALK = {
   ],
 };
 
+/* Pedalling, side on, seated on an upright bike.
+ *
+ * What the real movement looks like: the hips stay still on the saddle, the
+ * feet run a circle around the bottom bracket, and the legs do everything.
+ * The library's own cue for Bike Intervals is "keep the hips still", and for
+ * Easy Ride "saddle high enough that your knee is almost straight at the
+ * bottom", so those two are what the picture has to prove.
+ *
+ * The one thing that MUST be visible: the feet on a CIRCLE. A cyclist drawn as
+ * alternating knee bends is a person doing seated marches in the air. The feet
+ * are therefore pinned with IK to points on the crank circle and the legs solve
+ * to follow, which is also how a real leg works on a pedal: the foot is on the
+ * pedal, the pedal decides where it goes.
+ *
+ * `flatFeet: false` because a pinned ankle otherwise welds the sole flat to the
+ * floor, which is right for a squat and wrong here: on a pedal the ankle rolls
+ * through the stroke, toe down over the top and heel dropping at the bottom.
+ *
+ * The crank arms are NOT in the bike drawing. They rotate, and a moving part
+ * cannot live in an SVG; each one is a `lever` from the bottom bracket to that
+ * ankle, which draws the arm and puts a pedal on the end of it.
+ *
+ * Geometry, so the next person can move the bike without re-deriving the rider:
+ * bottom bracket (70, 96), crank radius 10, saddle carries the pelvis at
+ * (60, 51). Pelvis to the bottom of the stroke is 55.9 units against a leg of
+ * 56.6, which is the "almost straight" the cue asks for, and to the top of the
+ * stroke is 36.4, which is the deep bend at the top.
+ */
+const CRANK = { x: 70, y: 96, r: 10 };
+const pedal = (deg) => ({
+  x: CRANK.x + CRANK.r * Math.cos((deg * Math.PI) / 180),
+  y: CRANK.y - CRANK.r * Math.sin((deg * Math.PI) / 180),
+});
+/* One rider, two bikes. The frame is the only difference between a spin studio
+   and a road ride, and the body does the same thing on both, so the pose is
+   authored once and the prop swapped under it. */
+const cycleKeys = (phase) => [0, 0.25, 0.5, 0.75, 1].map((t) => {
+  const a = phase - t * 360;                     // the right foot's angle on the circle
+  const R = pedal(a), L = pedal(a + 180);        // cranks are opposed, always
+  return {
+    t,
+    ...(t === 0.25 || t === 0.75 ? { through: true } : {}),
+    root: { x: 58, y: 50, rot: 14 },
+    joints: { spine: 16, neck: -30 },
+    ik: {
+      ankleR: { x: R.x, y: R.y, bend: -1, flat: false },
+      ankleL: { x: L.x, y: L.y, bend: -1, flat: false },
+      wristR: { x: 88, y: 53, bend: 1 },
+      wristL: { x: 88, y: 53, bend: 1 },
+    },
+  };
+});
+
+export const CYCLE_INDOOR = {
+  view: "side",
+  loop: "oneway",
+  dur: 1.1,
+  breath: 0.2,
+  flatFeet: false,
+  fit: { k: 0.98, dy: 2 },
+  props: [
+    { type: "artwork", src: "/knowledge/motion/props/spin-bike.svg" },
+    { type: "lever", pivot: { x: CRANK.x, y: CRANK.y }, to: { side: "R", point: "ankle" }, end: "pad", padW: 9, padT: 3, r: 1.9 },
+    { type: "lever", pivot: { x: CRANK.x, y: CRANK.y }, to: { side: "L", point: "ankle" }, end: "pad", padW: 9, padT: 3, r: 1.9 },
+  ],
+  keys: cycleKeys(90),
+};
+
+/* Climbing a stepmill, side on.
+ *
+ * What the real movement looks like: the stairs come down and the climber
+ * stays at one height, driving one knee up onto the next tread while the other
+ * leg straightens under them, hands resting on the rails rather than hanging
+ * from them.
+ *
+ * The one thing that MUST be visible: the rider stands UPRIGHT and the weight
+ * is on the legs. The library's cue for Stair Intervals is "stand upright,
+ * leaning on the rails takes the legs out of it entirely", so a figure hanging
+ * off its arms would be drawing the mistake the cue exists to prevent. The
+ * hands rest on the side rail beside the hips, which is where a stepmill
+ * rail actually is: arms nearly straight at the sides, not reaching forward
+ * and not hanging off anything. Targets further forward than this are past the
+ * arm's reach, the IK gives up, and the figure stands there with its arms
+ * dangling, which is how the first pass looked.
+ *
+ * The feet are pinned to the two treads the machine drawing puts at y=96 and
+ * y=108, and they swap. The root barely moves, which is the whole difference
+ * between a stepmill and a staircase: on a staircase you rise, here the stairs
+ * fall away underneath you.
+ */
+const STEP_HI = 96, STEP_LO = 108;
+const stairKeys = (rightHigh) => {
+  const hi = rightHigh ? "R" : "L", lo = rightHigh ? "L" : "R";
+  return {
+    root: { x: 66, y: 54.5, rot: 4 },
+    joints: { spine: 5, neck: -7 },
+    ik: {
+      ["ankle" + hi]: { x: 73, y: STEP_HI, bend: -1 },
+      ["ankle" + lo]: { x: 67, y: STEP_LO, bend: -1 },
+      wristR: { x: 75, y: 59, bend: 1 },
+      wristL: { x: 70, y: 59.5, bend: 1 },
+    },
+  };
+};
+
+export const STAIRS = {
+  view: "side",
+  loop: "oneway",
+  dur: 1.4,
+  breath: 0.3,
+  fit: { k: 0.98, dy: 2 },
+  props: [{ type: "artwork", src: "/knowledge/motion/props/stair-climber.svg" }],
+  keys: [
+    { t: 0, ...stairKeys(true) },
+    { t: 0.5, ...stairKeys(false) },
+    { t: 1, ...stairKeys(true) },
+  ],
+};
+
 /* Keyed by SESSION name, every running session pointing at the one gait.
  *
  * The obvious shape was one move called "Run" plus a line each in index.mjs
@@ -209,6 +328,13 @@ export const WALK = {
  * ergometer drawn before they can be honest, and a swimmer cannot be drawn
  * standing on a floor at all. */
 export const MOVES = {
+  "Stair Intervals": STAIRS,
+  "Easy Ride": CYCLE_INDOOR,
+  "Long Ride": CYCLE_INDOOR,
+  "Easy Spin": CYCLE_INDOOR,
+  "Bike Intervals": CYCLE_INDOOR,
+  "Tempo Ride": CYCLE_INDOOR,
+  "Recovery Spin": CYCLE_INDOOR,
   "Easy Run": RUN,
   "Run Intervals": RUN,
   "Hill Repeats": RUN,
