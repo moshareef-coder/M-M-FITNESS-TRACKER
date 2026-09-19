@@ -83,6 +83,22 @@ test("it opens on the easier work", () => {
   for (let i = 1; i < first.length; i++) assert.ok(first[i] >= first[i - 1], "difficulty went backwards");
 });
 
+test("a class is shaped like the discipline, whatever the seed", () => {
+  /* The category order is the library's, not the seed's. It was the seed's
+     until 2026-09-19, so a vinyasa could open on a restorative pose and finish
+     on a standing one, which is not a yoga class. The seed still decides which
+     moves inside a category come first, so two days are different sessions. */
+  const first = (seed) => buildActivitySession(yoga, { minutes: 30, level: "beginner", seed })
+    .moves.find((m) => m.round === 1).category;
+  const cats = new Set(["monday", "tuesday", "wednesday", "thursday"].map(first));
+  assert.equal(cats.size, 1, `a yoga class opened on ${[...cats].join(" or ")} depending on the day`);
+  assert.equal([...cats][0], yoga.categories[0].key, "and it opens where the library opens");
+
+  const names = (seed) => buildActivitySession(yoga, { minutes: 30, level: "beginner", seed })
+    .moves.map((m) => m.name).join("|");
+  assert.notEqual(names("monday"), names("tuesday"), "every day the same class is not a week");
+});
+
 test("same seed, same session; different seed, still a valid session", () => {
   const a = buildActivitySession(yoga, { minutes: 30, level: "intermediate", seed: "monday" });
   const b = buildActivitySession(yoga, { minutes: 30, level: "intermediate", seed: "monday" });

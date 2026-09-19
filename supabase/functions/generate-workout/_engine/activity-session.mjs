@@ -1,3 +1,4 @@
+/* VENDORED by scripts/vendor-engine.mjs from mo-knowledge/engine/activity-session.mjs. Do not edit here. */
 /* A real session for the trainings that have a move library but no generator.
  *
  * Yoga, Pilates and Stretching all ship a full library in

@@ -37,7 +37,7 @@ import { JOINTS, JOINT_LOAD, defaultJointLoad } from "./joint-load.mjs";
 import { joinPlanToActual, calibrateExercise, calibrate, stepFor, STEP_ISOLATION, STEP_COMPOUND, STEP_HEAVY } from "./calibrate.mjs";
 import { mapGoal, generateFromPayload, toWorkout, focusDayIndex, nextDayIndex } from "./adapter.mjs";
 import { clientGoals, clientGoalCases, CLIENT_FILE } from "./client-goals.mjs";
-import { readStyles, normalizeStyles, cardioSessionFor, mergeStyleLimits } from "./styles.mjs";
+import { readStyles, normalizeStyles, cardioSessionFor, flowSessionFor, styleDayFor, mergeStyleLimits, FLOW_MINUTES_DEFAULT, FLOW_MINUTES_MAX } from "./styles.mjs";
 import { buildMuscleIndex, muscleRecoveryStates, mainGroupsForDay, dayIsFresh, skipFreshDays, FRESH_HOURS, RECOVERY_HOURS, MIN_CREDIT_SETS } from "./recovery.mjs";
 
 import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
@@ -3606,17 +3606,194 @@ test("the same day asked twice is the same session", async () => {
   assert.equal(a.workout.focus, b.workout.focus);
 });
 
-test("a week we cannot build says so in a sentence, and does not claim otherwise", async () => {
-  /* Yoga and Pilates are a move list with no sets, and the workout shape this
-     engine returns has nowhere honest to put one. So the lifting day stands,
-     which is the OLD behaviour, and the difference is that the response now
-     says what it is instead of attaching a note claiming the week is mobility
-     work only. That note is what somebody who ticked Yoga used to be shown
-     over five barbell lifts. */
-  for (const styles of [["yoga"], ["pilates"], ["yoga", "pilates"]]) {
+test("somebody who ticked only Yoga gets a yoga class, not five lifts", async () => {
+  /* The bug this replaces, in full, because it ran for a day and it is the one
+     Mo asked about: a person who ticked Yoga and nothing else was handed a
+     lifting day under a note reading "this is a lifting session, not the
+     mobility work week you picked: mobility work is not something this plan
+     can build for you yet". The moves were in knowledge/exercise-library the
+     whole time and activity-session.mjs could already build the class. Only
+     the shape of this response was missing, so only the shape changed. */
+  for (const [styles, training, label] of [[["yoga"], "yoga", "Yoga"], [["pilates"], "pilates", "Pilates"]]) {
+    const out = await generateFromPayload(stylePayload(styles));
+    assert.equal(out.workout.exercises.length, 0, `${label} has no sets, so nothing goes in exercises`);
+    assert.ok(out.workout.flow, "the session itself comes back");
+    assert.equal(out.workout.flow.training, training);
+    assert.equal(out.workout.focus, label, "and the day is named the way the app's activity table names it");
+    assert.ok(out.workout.flow.moves.length > 4, "a class is a list of moves, not a word and a clock");
+    assert.ok(out.workout.flow.moves.every((m) => m.seconds > 0 && m.name), "every move has a name and a length");
+    /* Measured, not predicted: the week that came back really is theirs. */
+    assert.equal(out.meta.styles.honoured, true);
+    assert.equal(out.meta.styles.resistance, false);
+    assert.match(out.meta.styles.note, /^This week is mobility work only/,
+      "the sentence about a week with no lifting in it, now attached to a week that exists");
+    assert.ok(out.notes.includes(out.meta.styles.note), "it reaches the caller's notes, not only meta");
+    assert.equal(out.meta.session.estimatedMinutes, out.workout.flow.minutes,
+      "the day is costed at the class's length, not the lifting day's");
+    assert.equal(out.meta.stretching.warmupMinutes, 0, "a mobility session is its own warm-up");
+    assert.deepEqual([out.workout.warmup, out.workout.cooldown], [[], []]);
+  }
+});
+
+test("a flow day runs for a defensible length, and for theirs when they gave us one", async () => {
+  /* Nobody is standing in front of the clock when a week is planned, so the
+     default is the number the app's own activity sheet opens on. A stated
+     session length outranks it, because that is the person answering the
+     question the default exists to guess at. */
+  const plain = await generateFromPayload(stylePayload(["yoga"]));
+  assert.equal(plain.workout.flow.minutes, FLOW_MINUTES_DEFAULT);
+
+  for (const minutes of [20, 45, 60]) {
+    const out = await generateFromPayload(stylePayload(["yoga"], { session_minutes: minutes }));
+    assert.equal(out.workout.flow.minutes, minutes, `asked for ${minutes} and got ${out.workout.flow.minutes}`);
+    assert.ok(out.workout.flow.seconds <= minutes * 60, "and the moves fit inside it");
+  }
+
+  /* Past an hour we build the hour and say so, rather than running one short
+     sequence eight times and calling it a two hour class. */
+  const long = await generateFromPayload(stylePayload(["yoga"], { session_minutes: 120 }));
+  assert.equal(long.workout.flow.minutes, FLOW_MINUTES_MAX);
+  assert.ok(long.workout.flow.notes.some((n) => /You asked for 120 minute sessions/.test(n)),
+    "and the number they asked for is said out loud");
+});
+
+test("a flow day says out loud that the sequence repeats", async () => {
+  /* The libraries are small: yoga holds about fourteen minutes of unique
+     beginner work and Pilates about eight, so a thirty minute class is the
+     same sequence coming round again. That is what a mat class is, and the
+     round number and the note are how somebody can tell the difference between
+     a class that repeats and a generator that lost count. */
+  const out = await generateFromPayload(stylePayload(["pilates"]));
+  assert.ok(out.workout.flow.rounds > 1, "thirty minutes of Pilates cannot be thirty unique minutes");
+  assert.ok(out.workout.flow.notes.some((n) => /rounds of the same sequence/.test(n)));
+  const rounds = new Set(out.workout.flow.moves.map((m) => m.round));
+  assert.equal(rounds.size, out.workout.flow.rounds, "every round the header claims has moves in it");
+});
+
+test("the same day asked twice is the same class, and tomorrow is a different one", async () => {
+  const a = await generateFromPayload(stylePayload(["yoga"]), { today: new Date("2026-09-18T07:00:00") });
+  const b = await generateFromPayload(stylePayload(["yoga"]), { today: new Date("2026-09-18T21:00:00") });
+  const c = await generateFromPayload(stylePayload(["yoga"]), { today: new Date("2026-09-25T07:00:00") });
+  assert.deepEqual(a.workout.flow.moves, b.workout.flow.moves, "a day that reshuffles cannot be reviewed");
+  assert.notDeepEqual(a.workout.flow.moves, c.workout.flow.moves, "and a week of identical days is not a week");
+});
+
+test("a class is built for the mat mileage they have, not for how much they lift", async () => {
+  /* Lifting mileage is a lifting training age. An advanced deadlifter who has
+     never been on a mat is a beginner here, and the only honest input is how
+     many of these they have done, which the app writes into exercise_logs
+     under the activity's own label.
+
+     Measured against `meta.experience` and not `meta.level`, which is gone: a
+     `notEqual(undefined, "beginner")` passes while asserting nothing, and this
+     test exists precisely to catch a lifting number leaking onto the mat. */
+  const lifter = await generateFromPayload(stylePayload(["yoga"], { logs: manySessions(80) }));
+  assert.ok(lifter.meta.experience.sessions >= 20, "the lifting mileage really is substantial");
+  assert.equal(lifter.workout.flow.level, "beginner", "and it buys nothing on a mat");
+
+  const yogi = await generateFromPayload(stylePayload(["yoga"], {
+    logs: Array.from({ length: 30 }, (_, i) => ({ entry_date: day(-i - 1), exercise_name: "Yoga", sets: 1 })),
+  }));
+  assert.equal(yogi.workout.flow.level, "advanced", "thirty classes is mileage and it counts");
+});
+
+test("a week with two kinds of day in it alternates rather than picking a favourite", async () => {
+  /* Somebody who ticked Running and Yoga meant both. Answering with a run
+     every time would be the column being half ignored, which is the bug this
+     whole module exists to fix one level up. */
+  const kinds = new Set();
+  for (const d of ["2026-09-18", "2026-09-19", "2026-09-20", "2026-09-21"]) {
+    const out = await generateFromPayload(stylePayload(["running", "yoga"]), { today: new Date(d + "T09:00:00") });
+    assert.equal(out.meta.styles.honoured, true, `${d} came back as a lifting day`);
+    kinds.add(out.workout.flow ? "flow" : "cardio");
+  }
+  assert.deepEqual([...kinds].sort(), ["cardio", "flow"], "four days should hold both kinds");
+});
+
+test("a day we replaced does not carry the dropped day's sentences", async () => {
+  /* The plan's own notes are all about the lifting day: the ramp-up sets on a
+     Goblet Squat, the rest that came down to fit the clock, what a bad knee
+     cost. Printed over a yoga class or a run they are the response describing
+     a session it did not hand over. Measured on the session length note,
+     because it is the one that is easy to provoke. */
+  const lifting = await generateFromPayload(stylePayload(["lifting"], { session_minutes: 5 }));
+  assert.ok(lifting.notes.some((n) => /There is no session that short/.test(n)),
+    "the lifting week does say it, and must go on saying it");
+
+  for (const styles of [["yoga"], ["running"]]) {
+    const out = await generateFromPayload(stylePayload(styles, { session_minutes: 5 }));
+    assert.equal(out.meta.styles.honoured, true);
+    assert.ok(!out.notes.some((n) => /There is no session that short/.test(n)),
+      `${styles[0]} was handed a sentence about the lifting day it never got`);
+    assert.ok(out.notes.includes(out.meta.styles.note), "the sentence about THIS day still arrives");
+  }
+});
+
+test("a week planned in one sitting is not the same day five times", async () => {
+  /* The seed is the day being BUILT. Without `for_date` it is the moment of
+     the call, so planning Thursday, Friday and Saturday on Wednesday night
+     turned the ring not at all and handed back the same run three times. The
+     app hit this on its own side first and fixed it the same way. */
+  const kinds = [];
+  const runs = new Set();
+  for (const d of ["2026-09-19", "2026-09-20", "2026-09-21", "2026-09-22"]) {
+    const out = await generateFromPayload(stylePayload(["running", "yoga"], { for_date: d }),
+      { today: new Date("2026-09-18T20:00:00") });
+    kinds.push(out.workout.flow ? "flow" : "cardio");
+    if (out.workout.cardio) runs.add(out.workout.focus);
+  }
+  assert.deepEqual([...new Set(kinds)].sort(), ["cardio", "flow"], `four nights came back as ${kinds.join(", ")}`);
+
+  /* And a junk one changes nothing, which is what every client that predates
+     the field sends. */
+  const noDate = await generateFromPayload(stylePayload(["yoga"]), { today: new Date("2026-09-18T20:00:00") });
+  for (const bad of [null, "", "tomorrow", "2026-13-40", 20260919, {}]) {
+    const out = await generateFromPayload(stylePayload(["yoga"], { for_date: bad }), { today: new Date("2026-09-18T20:00:00") });
+    assert.deepEqual(out.workout.flow.moves, noDate.workout.flow.moves, `for_date ${JSON.stringify(bad)} moved the day`);
+  }
+});
+
+test("a kind we cannot build falls through to one we can, rather than to a refusal", async () => {
+  /* When one kind in the ring comes back null, the honest answer is the other
+     kind they also asked for and not the lifting day they did not.
+
+     Driven through styleDayFor with a mode the cardio library does not know,
+     rather than through a payload, and that is a note about the merge rather
+     than about the ring. Swimming used to be the natural payload for this,
+     because the only swim is tagged intermediate and the library was asked at
+     beginner level; it builds now, and every mode on the onboarding sheet
+     builds with it. So no tick a real person can make reaches this branch
+     today. The branch stays, because it is what makes the ring safe when a
+     library changes under it, and this is the only way left to exercise it. */
+  const day = styleDayFor({ cardioModes: ["underwater basket weaving"], flowTrainings: ["yoga"] },
+    { today: new Date("2026-09-19T09:00:00") });
+  assert.ok(day, "a kind that cannot be built must not take the whole ring down with it");
+  assert.equal(day.flow?.training, "yoga");
+  assert.equal(day.exercises.length, 0);
+
+  /* And the ring still refuses when NOTHING in it can be built. */
+  assert.equal(styleDayFor({ cardioModes: ["underwater basket weaving"], flowTrainings: [] },
+    { today: new Date("2026-09-19T09:00:00") }), null);
+});
+
+test("a week we cannot build still says so in a sentence, and does not claim otherwise", async () => {
+  /* What is left after yoga and Pilates: a tick that names no session in any
+     library we have. The lifting day stands, which is the old behaviour, and
+     the response says what it is rather than attaching a note claiming the
+     week is cardio only over five barbell lifts.
+
+     Sports alone, and it really is alone now. Swimming and Classes were here
+     too, because the cardio library was asked at beginner level and the only
+     swim and the only HIIT session are both tagged intermediate. Refusing to
+     build the mode somebody ticked, over a difficulty tag on the one row that
+     could have served it, was the paternalism the level work removed: the
+     library is asked on the strength of the mode now, so both build. Sports is
+     the one tick that names no mode at all, and it stays refused. */
+  for (const styles of [["sports"]]) {
     const out = await generateFromPayload(stylePayload(styles));
     assert.ok(out.workout.exercises.length >= 4, "the lifting day is still what we have to offer");
-    assert.equal(out.meta.styles.honoured, false, "and the response does not pretend otherwise");
+    assert.ok(!out.workout.flow && !out.workout.cardio, "and nothing is invented to cover it");
+    assert.equal(out.meta.styles.honoured, false, "the response does not pretend otherwise");
     assert.match(out.meta.styles.note, /^This is a lifting session/, "the first clause says what they are holding");
     assert.ok(!/^This week is/.test(out.meta.styles.note), "never the sentence for a week that has no lifting in it");
     assert.ok(out.notes.includes(out.meta.styles.note), "and it reaches the notes a caller renders");
@@ -3652,6 +3829,18 @@ test("cardioSessionFor builds nothing rather than something wrong", () => {
   const run = cardioSessionFor(readStyles(["running"]), { today: new Date("2026-09-18") });
   assert.deepEqual(run.exercises, [], "a run is never a list of sets");
   assert.deepEqual([run.warmup, run.cooldown], [[], []], "and never carries a lifting day's mobility");
+});
+
+test("a flow session is never a list of sets either", () => {
+  const cls = flowSessionFor(readStyles(["yoga"]), { today: new Date("2026-09-18") });
+  assert.deepEqual(cls.exercises, [], "a pose in exercises is a logged set and a lit muscle");
+  assert.deepEqual([cls.warmup, cls.cooldown], [[], []], "and a yoga class does not need a stretch block bolted on");
+  assert.equal(cls.flow.moves.every((m) => !("primary" in m) && !("secondary" in m)), true,
+    "the library's muscle lists stay out of the response, because nothing renders them and something would count them");
+  assert.equal(flowSessionFor(readStyles(["running"]), {}), null, "a cardio week has no class in it");
+  assert.equal(flowSessionFor(readStyles(null), {}), null, "never asked means never overridden");
+  assert.equal(styleDayFor(readStyles(["sports"]), {}), null, "and a tick no library can name still comes back empty handed");
+  assert.equal(styleDayFor(readStyles(null), {}), null);
 });
 
 /* ---- how much core work a split actually buys ----
