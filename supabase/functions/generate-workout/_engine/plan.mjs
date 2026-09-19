@@ -984,7 +984,7 @@ export function buildPlan({
   goal, person = {}, logs: rawLogs = [], plans = [], swaps = [], equipment = null, today = new Date(), priorityOverride = null,
   limits = null, avoid = [],
 } = {}) {
-  const { bodyWeightLb = null, sex = null, daysAsked = null, sessionMinutes = null } = person;
+  const { bodyWeightLb = null, sex = null, daysAsked = null, sessionMinutes = null, ageCaution = 0 } = person;
 
   /* A log row is an object or it is not a row. Eight passes in this file, plus
      load.mjs, training-age.mjs, calibrate.mjs and preferences.mjs, read fields
@@ -1013,7 +1013,11 @@ export function buildPlan({
      never meet, and joining them is the effort rating nobody will ever type in.
      Empty `plans` gives an empty map and every pass below behaves as it always
      did, which is the day one plan. */
-  const calibration = calibrate({ plans, logs });
+  /* age.mjs decides this from the person's age; absent reads as the careful
+     ramp rather than the young one, which is the opposite shape to the sex
+     default that gave a woman a man's weights. It was written, tested and
+     dark until this line. */
+  const calibration = calibrate({ plans, logs, ageCaution });
 
   /* research/07 again, the half of it nothing read until now: swaps taken and
      exercises quietly abandoned. Learned once for the whole week, because a
@@ -1514,7 +1518,7 @@ export function buildPlan({
 
       const load = prescribeLoad({
         exercise: pick, reps, bodyWeightLb, sex, logs, returning: trainingAge.returning,
-        calibration: calibration.byExercise,
+        calibration: calibration.byExercise, ageCaution,
       });
       /* load.mjs caps a guess that extrapolated past what the person's size and
          level can support: one logged 200 lb Goblet Squat was producing an 870

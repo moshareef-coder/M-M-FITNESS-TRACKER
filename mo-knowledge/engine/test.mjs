@@ -3912,15 +3912,19 @@ test("a 25, a 45, a 60 and a 75 year old do not get the same week any more", () 
   }
 });
 
-test("meta says what the age did, including the part that is not wired up yet", () => {
+test("meta says what the age did, and the ramp really is applied now", () => {
   const out = generateFromPayload({ goal_bubble: "get-stronger", challenge_target: 3, age: 62 }, { today: new Date("2026-09-18T12:00:00Z") });
   assert.equal(out.meta.age.years, 62);
   assert.equal(out.meta.age.known, true);
   assert.ok(out.meta.age.rampCaution > 0.8);
-  /* False on purpose and it must stay honest: plan.mjs does not read
-     `person.ageCaution` yet, so the increment and the restart are written,
-     tested and dark. Flip this the same commit that adds the three forwards. */
-  assert.equal(out.meta.age.rampApplied, false);
+  /* This was false on purpose while the dial was computed and unread, with a
+     note telling whoever added the three forwards in plan.mjs to flip it. They
+     went in on 2026-09-18, so it is true, and the assertion below is what makes
+     it a claim rather than a hope: a 62 year old's increment is smaller than a
+     25 year old's on the same lift, measured off the plan rather than the flag. */
+  assert.equal(out.meta.age.rampApplied, true);
+  const younger = generateFromPayload({ goal_bubble: "get-stronger", challenge_target: 3, age: 25 }, { today: new Date("2026-09-18T12:00:00Z") });
+  assert.equal(younger.meta.age.rampApplied, false, "no caution to apply at 25, so nothing was applied");
   const blank = generateFromPayload({ goal_bubble: "get-stronger", challenge_target: 3 }, { today: new Date("2026-09-18T12:00:00Z") });
   assert.equal(blank.meta.age.known, false);
   assert.equal(blank.meta.age.rampCaution, 1);

@@ -1382,14 +1382,17 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
            `years` is the profile's own field coming back to the client that
            sent it, and it is here because support reads `meta` and "why is this
            person's squat going up 5 lb and mine 10" is otherwise unanswerable
-           from the response. `rampApplied` is false today and that is the
-           honest value: the dial is computed, sent to buildPlan and not read
-           there yet. See the comment on `ageCaution` in the person block. */
+           from the response. `rampApplied` was false while the dial was
+           computed, sent to buildPlan and not read there; plan.mjs reads it
+           now, at the person destructure, the calibrate call and the
+           prescribeLoad call, so it is true whenever there is a caution to
+           apply. A test asserted the false, which is what forced this to be
+           flipped deliberately rather than forgotten. */
         age: {
           years: ageYears,
           known: ageYears != null,
           rampCaution,
-          rampApplied: false,
+          rampApplied: rampCaution > 0,
           warmupCaution,
           warmupApplied: warmupCaution > 0 && !styleSession && !skipStretching
             && (dayBuilt?.mobility?.warmupBudgetSeconds ?? 0) > (dayBuilt?.rampSets?.length ? RAMPED_WARMUP_SECONDS : WARMUP_SECONDS),
