@@ -862,6 +862,18 @@ function logsFromHistory(history, today) {
  *                          which is what engine-lab.html exists to show.
  * @returns {{ workout: object, honest: string|null, meta: object, plan?: object }}
  */
+/* `for_date`, the day a plan is being written onto, as a Date. Strict: an ISO
+   day and nothing else, because the only thing this is allowed to do is move a
+   seed, and a half parsed string that lands on the wrong day would make the
+   same day asked twice come back different. Anything else is null and the
+   caller falls back to today, which is what every client that has never heard
+   of this field sends. */
+function styleDayDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const d = new Date(`${value}T12:00:00`);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
 export function generateFromPayload(rawPayload = {}, { today = new Date(), includePlan = false } = {}) {
   let step = "start";
   try {
@@ -1077,9 +1089,19 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
        flow day comes back as `workout.flow`, the same road `workout.cardio`
        travels, and the only weeks still refused are the ones nothing can be
        built for. */
+    /* The day being BUILT, not the day it is being built on.
+       `today` is when the call happened, and the session pickers are seeded
+       off a date: seeded off this one, planning Thursday and Friday in one
+       sitting hands back the same run twice and never turns the cardio/flow
+       ring. The app already learned this the hard way on its own side
+       (cardioDayForStyles in index.html) and fixed it the same way. Only the
+       seed moves. Every other use of `today` in this function is genuinely
+       about now: how old a focus is, how fresh a muscle is, what to calibrate
+       against. */
+    const forDate = styleDayDate(payload.for_date) || today;
     const styleSession = styles.asked && !styles.resistance
       ? styleDayFor(styles, {
-        level: plan.level, today, logs,
+        level: plan.level, today: forDate, logs,
         /* The same clock the lifting week was built to, so a person who said
            thirty minutes is not handed an hour long walk. */
         minutes: plan.week[dayIndex]?.minutes ?? plan.sessionBudget?.minutes ?? null,

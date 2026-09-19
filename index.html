@@ -24949,7 +24949,7 @@ let LAST_GEN_WORKOUT = null;
    alternatives by running the very same engine on the very same inputs, in the
    browser. Two payloads assembled in two places would drift, and the sheet
    would then offer days the real generate would never have built. */
-function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null, limits = null, focusGroups = null } = {}) {
+function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null, limits = null, focusGroups = null, forDate = null } = {}) {
   const history = Object.entries(personalRecords(ME).best).map(([exercise_name, weight]) => ({ exercise_name, weight }));
   const recentWeight = entriesFor(ME).filter((e) => e.weight != null).slice(-1)[0]?.weight ?? null;
   const recentGymDays = gymDaysThisWeek(ME);
@@ -25030,6 +25030,12 @@ function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null,
        asked and builds exactly the plan it built before this column existed,
        which is what every account made before onboarding asked gets. */
     train_styles: MY_PROFILE?.train_styles ?? null,
+    /* Which day this plan is FOR, which is not always today. The engine seeds
+       the run or the class it builds for a no-lifting week off a date, and
+       without this it seeds off the moment of the call: planning Thursday and
+       Friday in one sitting handed back the same run twice. Only that seed
+       reads it. */
+    for_date: forDate || todayStr(),
     history,
     logs: recentLogs,
     plans: recentPlans,
@@ -25093,6 +25099,9 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
     sessionMinutes,
     limits,
     focusGroups,
+    /* Already validated above: a real ISO day or today. The engine seeds the
+       session it builds for a no-lifting week off it. */
+    forDate: target,
   });
 
   try {

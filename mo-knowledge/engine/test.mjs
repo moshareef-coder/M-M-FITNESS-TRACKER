@@ -3508,6 +3508,30 @@ test("a day we replaced does not carry the dropped day's sentences", async () =>
   }
 });
 
+test("a week planned in one sitting is not the same day five times", async () => {
+  /* The seed is the day being BUILT. Without `for_date` it is the moment of
+     the call, so planning Thursday, Friday and Saturday on Wednesday night
+     turned the ring not at all and handed back the same run three times. The
+     app hit this on its own side first and fixed it the same way. */
+  const kinds = [];
+  const runs = new Set();
+  for (const d of ["2026-09-19", "2026-09-20", "2026-09-21", "2026-09-22"]) {
+    const out = await generateFromPayload(stylePayload(["running", "yoga"], { for_date: d }),
+      { today: new Date("2026-09-18T20:00:00") });
+    kinds.push(out.workout.flow ? "flow" : "cardio");
+    if (out.workout.cardio) runs.add(out.workout.focus);
+  }
+  assert.deepEqual([...new Set(kinds)].sort(), ["cardio", "flow"], `four nights came back as ${kinds.join(", ")}`);
+
+  /* And a junk one changes nothing, which is what every client that predates
+     the field sends. */
+  const noDate = await generateFromPayload(stylePayload(["yoga"]), { today: new Date("2026-09-18T20:00:00") });
+  for (const bad of [null, "", "tomorrow", "2026-13-40", 20260919, {}]) {
+    const out = await generateFromPayload(stylePayload(["yoga"], { for_date: bad }), { today: new Date("2026-09-18T20:00:00") });
+    assert.deepEqual(out.workout.flow.moves, noDate.workout.flow.moves, `for_date ${JSON.stringify(bad)} moved the day`);
+  }
+});
+
 test("a kind we cannot build falls through to one we can, rather than to a refusal", async () => {
   /* The cardio library's only swim is tagged intermediate, so a beginner who
      ticked Swimming has nothing to be given. If they also ticked Yoga then the
