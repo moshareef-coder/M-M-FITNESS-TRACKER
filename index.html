@@ -15662,8 +15662,12 @@ function estCalories(name, seconds, minutes) {
   return Math.round(5.0 * (lb / 2.205) * hours);
 }
 
-function recapStat(value, label, cls = "") {
-  return `<div class="rc-stat ${cls}"><b>${escapeHtml(String(value))}</b><span>${escapeHtml(label)}</span></div>`;
+/* unit is trusted markup-free text rendered small and muted beside the number,
+   not folded into value: value goes through escapeHtml, and a tag baked into
+   value would print as literal text instead of rendering, which is what sent
+   "9500 <small>lb</small>" to the screen instead of "9,500 lb". */
+function recapStat(value, label, unit = "", cls = "") {
+  return `<div class="rc-stat ${cls}"><b>${escapeHtml(String(value))}${unit ? `<small>${escapeHtml(unit)}</small>` : ""}</b><span>${escapeHtml(label)}</span></div>`;
 }
 
 /* A plan for a day that has not happened yet: no logs, no time, no PRs, just
@@ -15747,7 +15751,7 @@ function openRecap(email, name, date) {
   /* Volume and calories only appear when they are real: a bodyweight session
      has no tonnage, and calories need a logged bodyweight to mean anything. */
   const secondRow = [
-    sharing && r.volume > 0 ? recapStat(`${Math.round(r.volume).toLocaleString()}<small>lb</small>`, "TOTAL VOLUME") : null,
+    sharing && r.volume > 0 ? recapStat(Math.round(r.volume).toLocaleString(), "TOTAL VOLUME", "lb") : null,
     kcal ? recapStat(String(kcal), "EST. CALORIES") : null,
   ].filter(Boolean);
 
@@ -16602,7 +16606,7 @@ async function renderPartnerNotice() {
   // them, not compose a message. Full congratulate flow stays one tap away.
   $("noticeReact").onclick = async () => {
     $("noticeReact").disabled = true;
-    const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "🔥" });
+    const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "Let's go!" });
     if (error) { toast("Couldn't send"); console.error(error); $("noticeReact").disabled = false; return; }
     $("noticeReact").classList.add("sent");
     setTimeout(dismiss, 500);
@@ -19026,7 +19030,7 @@ async function renderEncouragementBanner() {
 }
 
 const ENCOURAGEMENT_PRESETS = [
-  "You've got this! 💪",
+  "You've got this!",
   "So proud of you, keep going.",
   "Don't skip today, let's go!",
   "Beast mode, let's push.",
@@ -26063,7 +26067,7 @@ function hideHomeQuip() {
 async function sendNudge(btn) {
   if (!PARTNER_EMAIL) return;
   btn.disabled = true;
-  const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "&#128293;" });
+  const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "Let's go!" });
   if (error) { toast("Couldn't send"); console.error(error); btn.disabled = false; return; }
   btn.textContent = "Sent";
   setTimeout(hideHomeQuip, 900);
@@ -35681,12 +35685,16 @@ function renderProgTiles(kind, isPartner, opts = {}) {
    They were two copies for an afternoon and the copies had already drifted:
    changing your mind later has to look like the screen where you first chose,
    or it reads as a different feature that happens to control the same thing. */
-function trackTilesHTML(metrics, on) {
+/* keptSet marks a tile that is on but is no longer one of this goal's own
+   offers: it still has to render (a saved choice does not vanish because the
+   offer list under it changed), but it says so instead of pretending it was
+   asked for the same way the other five were. */
+function trackTilesHTML(metrics, on, keptSet) {
   return metrics.map((m) => `<button type="button" class="trk-card${on.has(m.key) ? " on" : ""}" data-metric="${m.key}">
     <span class="trk-tick" aria-hidden="true">${icon("check", 13)}</span>
     <span class="trk-ico">${icon(m.ico, 22)}</span>
     <span class="trk-name">${escapeHtml(m.label)}</span>
-    <span class="trk-blurb">${escapeHtml(m.blurb)}</span>
+    <span class="trk-blurb">${keptSet?.has(m.key) ? "Kept, you chose it earlier" : escapeHtml(m.blurb)}</span>
   </button>`).join("");
 }
 
@@ -35877,9 +35885,13 @@ async function endTrackSetup() {
    your mind later should look like the screen where you first chose, or it
    reads as a different feature that happens to control the same thing.
 
-   Every trackable thing is offered here rather than the six their goal led
-   with: this is the screen for somebody who has decided the default was wrong,
-   so the full set is the point. */
+   This used to offer TRACK_ALL, on the idea that this is the screen for
+   somebody who decided the default was wrong so the full set is the point.
+   That is the bug: Get stronger offering mobility sessions, walks and waist
+   or hip tape is that full set doing exactly what it was built to do, and
+   Mo does not want it. A goal is measured by what it is measured by; the
+   preferences sheet offers the same six TRACK_OFFERS the first run asked
+   about and nothing else. */
 let TRACK_SHEET_GOAL = null;
 function openTrackSheet(goalId) {
   if (PROGRESS_VIEW === "partner") return;
@@ -35895,6 +35907,15 @@ function renderTrackSheet() {
   const goalId = TRACK_SHEET_GOAL;
   const tile = goalTileFor(goalId);
   const on = new Set(trackedMetrics(goalId));
+  /* This goal's own six, same table the first run reads. Anything already on
+     that fell out of the list stays in the grid, marked kept, rather than
+     disappearing: turning the offers into a per-goal set must not read as
+     silently un-tracking something somebody chose on purpose. */
+  const offerKeys = TRACK_OFFERS[goalId] || TRACK_OFFERS.consistent;
+  const offers = offerKeys.map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean);
+  const kept = TRACK_ALL.filter((m) => on.has(m.key) && !offerKeys.includes(m.key));
+  const shown = [...offers, ...kept];
+  const keptSet = new Set(kept.map((m) => m.key));
   /* Same chrome as the measurements sheet next door: grip, back chevron,
      centred title. Two sheets on one tab that open differently is the kind of
      small inconsistency people feel without being able to name. */
@@ -35906,7 +35927,7 @@ function renderTrackSheet() {
       <div class="spacer"></div>
     </div>
     <p class="trk-any" style="margin:0 0 14px">What this goal shows you. Your other goals keep their own. Everything logs either way, so turning one back on shows its whole history.</p>
-    <div class="trk-grid" id="trackSheetGrid">${trackTilesHTML(TRACK_ALL, on)}</div>
+    <div class="trk-grid" id="trackSheetGrid">${trackTilesHTML(shown, on, keptSet)}</div>
     <button type="button" class="btn-primary" id="trackDone" style="margin-top:16px">Done</button>`;
 
   /* Saved on every tap rather than on the way out, which is what this sheet has
@@ -36501,7 +36522,7 @@ async function registerPushHandlers() {
       if (action === "cheer") {
         if (!PARTNER_EMAIL) return;
         sb.from("encouragements")
-          .insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "🔥" })
+          .insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "Let's go!" })
           .then(({ error }) => { if (error) console.error("cheer from notification failed", error); });
         return;
       }
