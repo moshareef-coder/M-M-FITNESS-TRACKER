@@ -14396,11 +14396,21 @@ async function deleteMyAccount() {
    workouts. Seven waits stacked end to end, and since loadAll runs after
    almost every write, that latency was on every action, not just startup. */
 async function loadAll() {
-  const [entriesRes, exLogRes, profilesRes, plansRes, goalsRes, reactRes, badgesRes, swapsRes] = await Promise.all([
+  const [entriesRes, exLogRes, profilesRes, plansRes, theirPlansRes, goalsRes, reactRes, badgesRes, swapsRes] = await Promise.all([
     sb.from("fit_entries").select("*").order("entry_date", { ascending: true }),
     sb.from("exercise_logs").select("*").order("entry_date", { ascending: true }),
     sb.from("profiles").select("*"),
-    sb.from("ai_workouts").select("*").order("entry_date", { ascending: false }).limit(60),
+    /* Mine and everybody else's as two reads, each with its own ceiling. One
+       read with one limit of 60 over every row RLS let through meant the cut
+       fell on the pair together: a couple both training five or six days a
+       week is eleven rows a week between them, so my own thirty day window,
+       which workoutEnginePayload sends the engine to calibrate against, ran
+       out at about five weeks of the two of us and went dark for me on the
+       days my partner had planned more. The ceiling is now 60 of my own rows,
+       which at one row a day (the upsert key is email plus date) is two
+       months of daily training, and 60 of theirs on the same terms. */
+    sb.from("ai_workouts").select("*").eq("email", MY_EMAIL).order("entry_date", { ascending: false }).limit(60),
+    sb.from("ai_workouts").select("*").neq("email", MY_EMAIL).order("entry_date", { ascending: false }).limit(60),
     /* Goals are readable by partner and coach, so this returns theirs too. */
     sb.from("user_goals").select("*").eq("status", "active"),
     sb.from("session_reactions").select("*").order("created_at", { ascending: false }),
@@ -14436,7 +14446,7 @@ async function loadAll() {
      than zero. */
   const reads = {
     entries: entriesRes, exerciseLogs: exLogRes, profiles: profilesRes,
-    plans: plansRes, goals: goalsRes, reactions: reactRes,
+    plans: plansRes, theirPlans: theirPlansRes, goals: goalsRes, reactions: reactRes,
     badges: badgesRes, swaps: swapsRes,
   };
   const failed = Object.entries(reads).filter(([, res]) => res && res.error);
@@ -14446,7 +14456,14 @@ async function loadAll() {
   ALL_REACTIONS = keep(reactRes, ALL_REACTIONS);
   ALL_GOALS = keep(goalsRes, ALL_GOALS);
   MY_GOAL = ALL_GOALS.find((g) => (g.email || "").toLowerCase() === MY_EMAIL) || null;
-  ALL_PLANS = keep(plansRes, ALL_PLANS);
+  /* Two reads, one list, and a failure on either side keeps that side's rows
+     from last time rather than dropping them: the partner's calendar going
+     blank because MY read failed would be the same stale-versus-zero mistake
+     as above, one table over. */
+  ALL_PLANS = [
+    ...keep(plansRes, (ALL_PLANS || []).filter((w) => w.email === MY_EMAIL)),
+    ...keep(theirPlansRes, (ALL_PLANS || []).filter((w) => w.email !== MY_EMAIL)),
+  ];
   ALL_ENTRIES = keep(entriesRes, ALL_ENTRIES);
   ALL_EXERCISE_LOGS = keep(exLogRes, ALL_EXERCISE_LOGS);
   ALL_PROFILES = keep(profilesRes, ALL_PROFILES);
