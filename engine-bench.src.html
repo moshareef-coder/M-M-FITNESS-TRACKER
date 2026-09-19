@@ -1,0 +1,429 @@
+<meta charset="utf-8" />
+<title>Unio Onboarding Bench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#f5f7fa; --panel:#fff; --sunk:#eef1f5; --line:#e4e8ee;
+    --ink:#111318; --mut:#686d7c; --go:#0f7a38; --go-soft:#e6f6ec;
+    --warn:#9a6400; --warn-soft:#fff4dc; --bad:#c2452f; --bad-soft:#fdecea;
+  }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme=light]){
+    --bg:#0b0d11; --panel:#14171d; --sunk:#1b1f26; --line:#262b34;
+    --ink:#f4f6f8; --mut:#8b94a3; --go:#a8ff00; --go-soft:#1c2a12;
+    --warn:#d8a52e; --warn-soft:#2a2410; --bad:#ff6b4a; --bad-soft:#2d1410;
+  }}
+  :root[data-theme=dark]{
+    --bg:#0b0d11; --panel:#14171d; --sunk:#1b1f26; --line:#262b34;
+    --ink:#f4f6f8; --mut:#8b94a3; --go:#a8ff00; --go-soft:#1c2a12;
+    --warn:#d8a52e; --warn-soft:#2a2410; --bad:#ff6b4a; --bad-soft:#2d1410;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:"DM Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+       font-size:15.5px;line-height:1.5;padding-inline:18px;padding-block:26px 80px}
+  .wrap{max-width:760px;margin-inline:auto;display:flex;flex-direction:column;gap:0}
+  h1{font-size:28px;letter-spacing:-.02em;margin:0 0 4px;text-wrap:balance}
+  .lede{color:var(--mut);margin:0 0 6px;max-width:62ch}
+  .rule{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:26px 0 10px}
+
+  /* The run is a numbered sequence because onboarding IS a sequence: the
+     number is the step's position in OB_STEPS, not decoration. */
+  ol.run{list-style:none;margin:0;padding:0;counter-reset:step}
+  ol.run>li{position:relative;padding:0 0 14px 40px;border-left:2px solid var(--line);margin-left:13px}
+  ol.run>li:last-child{border-left-color:transparent;padding-bottom:0}
+  ol.run>li::before{counter-increment:step;content:counter(step);position:absolute;left:-15px;top:-2px;
+       width:28px;height:28px;border-radius:50%;background:var(--sunk);color:var(--mut);border:1px solid var(--line);
+       display:grid;place-items:center;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums}
+  ol.run>li.asks::before{background:var(--go);color:var(--bg);border-color:transparent}
+  .step-id{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+  .step-q{font-size:17px;font-weight:700;margin:1px 0 2px;text-wrap:balance}
+  .step-sub{font-size:13.5px;color:var(--mut);margin:0 0 9px;max-width:58ch}
+  .lands{font-size:12px;color:var(--mut);margin-top:7px}
+  .lands code{background:var(--sunk);border-radius:5px;padding:1px 6px;font-size:11.5px}
+
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font:inherit;font-size:13px;font-weight:650;padding:8px 12px;min-height:36px;border-radius:999px;
+        border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+  .chip.on{border-color:var(--go);background:var(--go-soft);color:var(--go)}
+  .chip:active{transform:translateY(1px)}
+  .chip:focus-visible{outline:2px solid var(--go);outline-offset:2px}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px}
+  .tile{font:inherit;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid var(--line);
+        background:var(--panel);color:var(--ink);cursor:pointer;display:block}
+  .tile.on{border-color:var(--go);background:var(--go-soft)}
+  .tile:active{transform:translateY(1px)}
+  .tile:focus-visible{outline:2px solid var(--go);outline-offset:2px}
+  .tile b{display:block;font-size:14.5px}
+  .tile span{display:block;font-size:12px;color:var(--mut);margin-top:1px}
+  .tile.on span{color:var(--go)}
+  .nums{display:flex;gap:7px;flex-wrap:wrap}
+  .nums label{flex:1 1 90px;min-width:0}
+  .nums b{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin-bottom:4px}
+  input[type=number],input[type=text]{font:inherit;font-size:15px;width:100%;padding:9px 11px;border-radius:10px;
+        border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+  input:focus-visible{outline:2px solid var(--go);outline-offset:1px}
+  .quiet{padding:9px 12px;border-radius:10px;background:var(--sunk);font-size:13.5px;color:var(--mut)}
+
+  .day{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--panel);margin-bottom:8px}
+  .day h3{margin:0;font-size:16.5px}
+  .day .meta{font-size:12.5px;color:var(--mut);margin:1px 0 8px}
+  .ex{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+  .ex:last-child{border-bottom:0}
+  .ex i{font-style:normal;color:var(--mut);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .note{border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--mut);margin-bottom:8px}
+  .note b{color:var(--ink)}
+  .err{background:var(--bad-soft);color:var(--bad);border-radius:12px;padding:12px 14px}
+  .pay{background:var(--sunk);border-radius:12px;padding:12px 14px;font-size:12.5px;
+       font-variant-numeric:tabular-nums;overflow-x:auto;white-space:pre;margin:0}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <h1>Onboarding Bench</h1>
+  <p class="lede">The ten real onboarding steps, asking exactly what the app asks, wired to the real engine. Every answer below lands in the field named under it, and the week at the bottom is what those answers actually build.</p>
+  <div id="boot" class="note">Loading the engine.</div>
+  <div id="app" hidden>
+    <div class="rule">The run</div>
+    <ol class="run" id="run"></ol>
+    <div class="rule">What reaches the engine</div>
+    <pre class="pay" id="payload"></pre>
+    <div class="rule">The week it builds</div>
+    <div id="week"></div>
+    <div class="rule">What it says for itself</div>
+    <div id="honest"></div>
+  </div>
+</div>
+
+<script type="module">
+/*__ENGINE_BUNDLE__*/
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+let engine = null;
+
+/* Every table below is copied from index.html rather than invented, so a
+   question that is dead here is dead in the product. Sources are named. */
+
+// GOAL_TILES, index.html ~10417. `claim` is what the goal says the scale does.
+const GOALS = [
+  { id:"lose-weight",     title:"Lose weight",              claim:"down" },
+  { id:"tone-lean-abs",   title:"Lose fat and build muscle",claim:"flat" },
+  { id:"build-muscle",    title:"Bulk up",                  claim:"up"   },
+  { id:"get-stronger",    title:"Get stronger",             claim:null   },
+  { id:"build-endurance", title:"Build endurance",          claim:null   },
+  { id:"move-better",     title:"Move better",              claim:null   },
+  { id:"consistent",      title:"Not sure yet",             claim:null   },
+];
+
+// GOAL_TUNE, index.html ~12343. A goal with no entry gets no page at all.
+const TUNE = {
+  "build-muscle":   { kind:"focus", field:"tune_muscle",   title:"What do you want to grow most?", sub:"Pick as many as you like. Front and back are both there." },
+  "get-stronger":   { kind:"focus", field:"tune_stronger", title:"Stronger where?",                sub:"Pick as many as you like. Front and back are both there." },
+  "tone-lean-abs":  { kind:"focus", field:"tune_tone",     title:"Where do you want it to show first?", sub:"Pick as many as you like. Front and back are both there." },
+  "build-endurance":{ kind:"choice",field:"tune_endurance",title:"Endurance for what?", sub:"We will build the cardio around it.",
+    options:[{id:"general",label:"Everyday stamina",sub:"Stairs, walks, keeping up"},
+             {id:"distance",label:"Going further",sub:"Longer runs or rides"},
+             {id:"speed",label:"Going faster",sub:"Intervals and tempo work"}] },
+  "move-better":    { kind:"sore",  field:"tune_move",     title:"Where does it bother you most?",
+    sub:"Tap anywhere stiff or sore and the mobility work builds around it. This is not medical advice, and if something actually hurts, see someone about it." },
+};
+
+/* BODY_REGIONS, index.html ~11338. The tune step asks for FOUR regions, not
+   fourteen muscles. Setup's Focus areas screen is the one that asks for all
+   fourteen and a ranking; this one asks the short question and the same figure
+   answers both. The four are Setup's own four, legs and core together, because
+   core is not a day anybody trains. */
+const REGIONS = [
+  { id:"arms",     label:"Arms and shoulders", groups:["shoulders","biceps","triceps","forearms"] },
+  { id:"chest",    label:"Chest",              groups:["chest"] },
+  { id:"back",     label:"Back",               groups:["lats","traps","lowerback"] },
+  { id:"legscore", label:"Legs and core",      groups:["quads","hamstrings","glutes","abs","obliques","calves"] },
+];
+/* BODY_REGION_SPEND, index.html ~11373. Nobody ranks anything: how many
+   regions you pick decides how deep the nine unit budget goes into each. There
+   is no row for four, because four regions is every region and that is the
+   whole body, which spends nothing. */
+const SPEND = { 1:[3,3,2], 2:[3,1], 3:[3] };
+function regionEntries(ids) {
+  const picked = REGIONS.filter((r) => ids.includes(r.id));
+  if (!picked.length || picked.length === REGIONS.length) return [];   // all four is "whole body"
+  const tiers = SPEND[picked.length] || [1];
+  const out = [];
+  for (const r of picked) tiers.forEach((t, i) => { if (r.groups[i]) out.push(r.groups[i] + ":" + t); });
+  return out;
+}
+
+// The styles step, index.html ~12881.
+const STYLES = [
+  { id:"lifting", label:"With equipment",    sub:"Barbells, dumbbells, machines" },
+  { id:"home",    label:"Without equipment", sub:"Bodyweight, a mat, maybe bands" },
+  { id:"running", label:"Running",           sub:"Outside or treadmill" },
+  { id:"cycling", label:"Cycling",           sub:"Road, trainer or spin" },
+  { id:"walking", label:"Walking",           sub:"It counts, and it adds up" },
+  { id:"yoga",    label:"Yoga",              sub:"Mobility and breath" },
+  { id:"pilates", label:"Pilates",           sub:"Core, control, mat work" },
+];
+
+// TIERS, index.html ~13035. days_per_week takes the TOP of the range.
+const TIERS = [
+  { id:"easy",   head:"Easy",    days:[1,2], mins:30, detail:"1 to 2 days a week, about 30 minutes." },
+  { id:"steady", head:"Steady",  days:[3,4], mins:45, detail:"3 to 4 days a week, about 45 minutes. Sometimes a short second session on the same day." },
+  { id:"allin",  head:"All in",  days:[5,6], mins:60, detail:"5 to 6 days a week, about 60 minutes. Room to double up on a day when you feel like it." },
+];
+
+const SEXES = [{id:"Male",label:"Male"},{id:"Female",label:"Female"},{id:"none",label:"Rather not say"}];
+
+// Draft state, same shape onboarding carries.
+const D = {
+  name:"Mo", goal_bubble:"get-stronger", sex:"Male", height_in:70, weight_lb:180,
+  goal_weight_lb:null, weeks:null, tune:{}, tuneChoice:null,
+  train_styles:new Set(["lifting"]), intensity:"steady",
+};
+
+const tierOf = () => TIERS.find((t) => t.id === D.intensity) || TIERS[1];
+const goalOf = () => GOALS.find((g) => g.id === D.goal_bubble) || GOALS[0];
+
+/* finishOnboarding, index.html ~13282 and ~13392: goal_tuning is written, and
+   the MAIN goal's body-picker answer is then saved again as focus_groups,
+   which is the column the engine actually reads. */
+function payload() {
+  const t = tierOf();
+  const spec = TUNE[D.goal_bubble];
+  const ids = [...(D.tune[D.goal_bubble] || [])];
+  const areas = regionEntries(ids);
+  const whole = ids.length === REGIONS.length;
+  const goal_tuning = spec
+    ? { [D.goal_bubble]: spec.kind === "choice" ? D.tuneChoice : { areas, all: whole } }
+    : null;
+  return {
+    goal_bubble: D.goal_bubble,
+    goal_secondary: [],
+    sex: D.sex === "none" ? null : D.sex,
+    current_weight: D.weight_lb,
+    height_in: D.height_in,
+    challenge_target: t.days[1],
+    session_minutes: t.mins,
+    /* finishOnboarding saves ["all"] for the whole body and the entries
+       otherwise, which is the one token Setup's picker reads back as
+       "Whole body" rather than a list of fourteen. */
+    focus_groups: spec && spec.kind !== "choice" ? (whole ? ["all"] : areas) : [],
+    train_styles: [...D.train_styles],
+    goal_tuning,
+    limits: { hurts: [], missing: [] },
+    /* A brand new account has logged nothing, and onboarding never asks for
+       training history, so there is none to send. That is why the level below
+       reads beginner: it is the truth about day one, not a missing control. */
+    logs: [],
+  };
+}
+
+/* The whole week, the way a person accumulates it: each finished day is fed
+   back as a completed plan so the rotation and the calibration both advance. */
+function buildWeek() {
+  const base = payload();
+  const days = base.challenge_target;
+  const today = new Date();
+  const plans = []; const out = [];
+  for (let i = 0; i < days; i++) {
+    let r;
+    try { r = engine.generateFromPayload({ ...base, plans }); }
+    catch (e) { return { out, error: e }; }
+    const d = new Date(today); d.setDate(d.getDate() + i);
+    const date = d.toISOString().slice(0, 10);
+    out.push(r);
+    plans.push({ entry_date:date, focus:r.workout.focus, exercises:r.workout.exercises, completed_at:date + "T12:00:00Z" });
+  }
+  return { out };
+}
+
+function chips(items, isOn, onTap, label) {
+  const row = document.createElement("div");
+  row.className = "chips";
+  for (const it of items) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip" + (isOn(it) ? " on" : "");
+    b.textContent = label(it);
+    b.onclick = () => { onTap(it); render(); };
+    row.appendChild(b);
+  }
+  return row;
+}
+function tiles(items, isOn, onTap) {
+  const row = document.createElement("div");
+  row.className = "tiles";
+  for (const it of items) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tile" + (isOn(it) ? " on" : "");
+    b.innerHTML = `<b>${esc(it.label || it.head || it.title)}</b>${it.sub || it.detail ? `<span>${esc(it.sub || it.detail)}</span>` : ""}`;
+    b.onclick = () => { onTap(it); render(); };
+    row.appendChild(b);
+  }
+  return row;
+}
+
+function step(id, question, sub, body, lands, asks = true) {
+  const li = document.createElement("li");
+  if (asks) li.className = "asks";
+  li.innerHTML = `<div class="step-id">${esc(id)}</div><div class="step-q">${esc(question)}</div>` +
+                 (sub ? `<p class="step-sub">${esc(sub)}</p>` : "");
+  if (body) li.appendChild(body);
+  if (lands) {
+    const p = document.createElement("div");
+    p.className = "lands";
+    p.innerHTML = lands;
+    li.appendChild(p);
+  }
+  return li;
+}
+
+function renderRun() {
+  const run = $("run");
+  run.innerHTML = "";
+  const spec = TUNE[D.goal_bubble];
+
+  // 1 name
+  const nameBox = document.createElement("div");
+  nameBox.className = "nums";
+  nameBox.innerHTML = `<label><b>Name</b><input type="text" id="obName" value="${esc(D.name)}" /></label>`;
+  run.appendChild(step("name", "What should we call you?", "Pre-filled from Apple or Google when it can be.", nameBox,
+    `Lands on <code>profiles.user_name</code>. The engine never receives it.`));
+
+  // 2 intro
+  run.appendChild(step("intro", "Two welcome pages", "Skippable. Nothing is collected.", null, "", false));
+
+  // 3 goal
+  const goalBody = document.createElement("div");
+  goalBody.appendChild(tiles(GOALS, (g) => g.id === D.goal_bubble, (g) => {
+    D.goal_bubble = g.id; D.tuneChoice = null;
+  }));
+  const g = goalOf();
+  if (g.claim === "down" || g.claim === "up") {
+    const w = document.createElement("div");
+    w.className = "nums";
+    w.style.marginTop = "8px";
+    w.innerHTML = `<label><b>Goal weight, lb</b><input type="number" id="obGoalW" value="${D.goal_weight_lb ?? ""}" placeholder="${g.claim === "down" ? "lower" : "higher"}" /></label>` +
+                  `<label><b>Over, weeks</b><input type="number" id="obWeeks" value="${D.weeks ?? ""}" placeholder="e.g. 30" /></label>`;
+    goalBody.appendChild(w);
+  }
+  run.appendChild(step("goal", "What do you want out of this?",
+    "Eight tiles, one pick. Only a weight goal gets a follow-up question; the sub-goals were dropped.",
+    goalBody, `Lands on <code>goal_bubble</code>${g.claim === "down" || g.claim === "up" ? `, <code>goal_weight_lb</code>, <code>weeks</code>` : ""}.`));
+
+  // 4 about
+  const about = document.createElement("div");
+  about.appendChild(chips(SEXES, (s) => s.id === D.sex, (s) => { D.sex = s.id; }, (s) => s.label));
+  const nums = document.createElement("div");
+  nums.className = "nums";
+  nums.style.marginTop = "8px";
+  nums.innerHTML = `<label><b>Height ft</b><input type="number" id="obFt" min="3" max="8" value="${Math.floor(D.height_in/12)}" /></label>` +
+                   `<label><b>Height in</b><input type="number" id="obIn" min="0" max="11" value="${D.height_in%12}" /></label>` +
+                   `<label><b>Weight lb</b><input type="number" id="obLb" min="60" max="600" value="${D.weight_lb}" /></label>`;
+  about.appendChild(nums);
+  run.appendChild(step("about", "About you", "The three things nothing else can work without.", about,
+    `Lands on <code>sex</code>, <code>height_in</code>, and a first weigh-in that becomes <code>current_weight</code>.`));
+
+  // 5 tune
+  if (!spec) {
+    run.appendChild(step("tune", "No page for this goal",
+      `"${g.title}" has nothing worth asking about itself, so this step does not exist and the run is one screen shorter.`,
+      null, "", false));
+  } else if (spec.kind === "choice") {
+    run.appendChild(step("tune", spec.title, spec.sub,
+      tiles(spec.options, (o) => o.id === D.tuneChoice, (o) => { D.tuneChoice = o.id; }),
+      `Lands on <code>goal_tuning["${esc(D.goal_bubble)}"]</code>, read back for the cardio category.`));
+  } else {
+    const picked = D.tune[D.goal_bubble] || (D.tune[D.goal_bubble] = new Set());
+    const body = document.createElement("div");
+    body.appendChild(tiles(REGIONS, (r) => picked.has(r.id), (r) => {
+      picked.has(r.id) ? picked.delete(r.id) : picked.add(r.id);
+    }));
+    const ids = [...picked];
+    const hint = document.createElement("div");
+    hint.className = "quiet";
+    hint.style.marginTop = "8px";
+    hint.textContent = spec.kind === "sore"
+      ? "Four regions, tap what applies. This is the same picker the other goals use, asking the opposite question, and the answer still lands in focus_groups, which means train this more."
+      : ids.length === REGIONS.length
+        ? "All four is the whole body, which stores as one token rather than fourteen rows."
+        : ids.length
+          ? `${ids.length} picked, so the budget goes ${(SPEND[ids.length] || [1]).join(" then ")} deep into each. Nobody ranks anything.`
+          : "Nothing picked. The goal decides on its own.";
+    body.appendChild(hint);
+    run.appendChild(step("tune", spec.title, spec.sub, body,
+      `Lands on <code>goal_tuning</code>, then saved again as <code>focus_groups</code>: <code>${esc(JSON.stringify(ids.length === REGIONS.length ? ["all"] : regionEntries(ids)))}</code>`));
+  }
+
+  // 6 styles
+  run.appendChild(step("styles", "What will you actually do?", "Pick everything that applies.",
+    tiles(STYLES, (s) => D.train_styles.has(s.id), (s) => {
+      D.train_styles.has(s.id) ? D.train_styles.delete(s.id) : D.train_styles.add(s.id);
+    }), `Lands on <code>train_styles</code>.`));
+
+  // 7 days
+  run.appendChild(step("days", "How hard do you want to go?", "Pick the one you would still do in a bad week.",
+    tiles(TIERS, (t) => t.id === D.intensity, (t) => { D.intensity = t.id; }),
+    `Lands on <code>challenge_target</code> (the TOP of the range, ${tierOf().days[1]}) and <code>session_minutes</code> (${tierOf().mins}).`));
+
+  // 8 plan, 9 hire, 10 commit
+  const t = tierOf();
+  const sum = document.createElement("div");
+  sum.className = "quiet";
+  sum.textContent = `${g.title} . ${t.days[0]} to ${t.days[1]} days a week . about ${t.mins} minutes` +
+    (D.goal_weight_lb && D.weeks ? ` . to ${D.goal_weight_lb} lb over ${D.weeks} weeks` : "");
+  run.appendChild(step("plan", "Here is the plan", "Read back, nothing new is asked.", sum, "", false));
+  run.appendChild(step("hire", "One more thing.", "The coaching offer. Skippable.", null, "", false));
+  run.appendChild(step("commit", `${D.name || "Right"}, this only works if you turn up.`,
+    "A promise with the app as witness. Nothing here claims a result.", null,
+    `Lands on <code>committed_at</code>.`, false));
+
+  // live inputs
+  const bind = (id, fn) => { const el = $(id); if (el) el.oninput = () => { fn(el.value); renderOut(); }; };
+  bind("obName", (v) => { D.name = v; });
+  bind("obGoalW", (v) => { D.goal_weight_lb = v === "" ? null : +v; });
+  bind("obWeeks", (v) => { D.weeks = v === "" ? null : +v; });
+  bind("obFt", (v) => { D.height_in = (+v || 0) * 12 + (D.height_in % 12); });
+  bind("obIn", (v) => { D.height_in = Math.floor(D.height_in / 12) * 12 + (+v || 0); });
+  bind("obLb", (v) => { D.weight_lb = +v || 0; });
+}
+
+function renderOut() {
+  $("payload").textContent = JSON.stringify(payload(), null, 2);
+  const { out, error } = buildWeek();
+  if (error) {
+    $("week").innerHTML = `<div class="err"><b>The engine threw.</b><br>${esc(error.message || error)}</div>`;
+    $("honest").innerHTML = "";
+    return;
+  }
+  const m0 = out[0]?.meta || {};
+  $("week").innerHTML =
+    `<div class="note">Read as <b>${esc(m0.level || "?")}</b>, confidence <b>${esc(m0.confidence || "?")}</b>. A brand new account has logged nothing, so this is day one for everybody.</div>` +
+    out.map((r, i) => {
+      const m = r.meta || {};
+      const ex = r.workout.exercises || [];
+      return `<div class="day"><h3>Day ${i + 1}: ${esc(r.workout.focus)}</h3>
+        <div class="meta">${ex.length} lifts . about ${m.session?.estimatedMinutes ?? "?"} min${m.session?.fits === false ? " . over the budget" : ""}</div>
+        ${ex.map((e) => `<div class="ex"><span>${esc(e.name)}</span><i>${e.sets}x${e.reps}${e.targetWeight ? " . " + e.targetWeight + " lb" : ""}</i></div>`).join("")}
+      </div>`;
+    }).join("");
+  const notes = (out[0]?.notes || []).slice();
+  if (out[0]?.honest) notes.unshift(out[0].honest);
+  $("honest").innerHTML = notes.length
+    ? notes.map((n) => `<div class="note">${esc(typeof n === "string" ? n : JSON.stringify(n))}</div>`).join("")
+    : `<div class="note">It had nothing to flag for this person.</div>`;
+}
+
+function render() { renderRun(); renderOut(); }
+
+/* The engine is inlined above by scripts/make-bench.mjs, so this page is one
+   self-contained file. A relative import would need the 22 module files
+   published beside it, which a single file publish cannot do. */
+try {
+  engine = ENGINE;
+  $("boot").hidden = true; $("app").hidden = false;
+  render();
+} catch (e) {
+  $("boot").innerHTML = `<div class="err"><b>The engine did not load.</b><br>${esc(e.message)}</div>`;
+}
+</script>
