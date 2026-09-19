@@ -23,7 +23,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // or the boot screen reframes itself.
 const JOBS = [
   ["unio-mark-flat", 1024], ["unio-mark-flat", 512], ["unio-mark-flat", 180],
-  ["unio-mark-depth", 1024],
+  ["unio-mark-depth", 1024], ["unio-mark-gloss", 1024], ["unio-mark-gloss", 180],
   ["unio-left", 853], ["unio-right", 853], ["unio-bar", 853],
 ];
 

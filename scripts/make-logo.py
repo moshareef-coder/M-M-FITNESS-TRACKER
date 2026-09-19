@@ -74,6 +74,46 @@ def rrect(cx, cy, w, h, r, fill, extra=""):
             f'rx="{r:.2f}" fill="{fill}"{extra}/>')
 
 
+# The glossy treatment, in one place so it can be tuned without hunting.
+# Every one of these is lit from the same place, up and slightly left, which is
+# the thing the old raster never managed: it had a different answer per element
+# and that is what read as "shadows all over".
+GLOSS = """
+<linearGradient id="bl" gradientUnits="userSpaceOnUse" x1="180" y1="110" x2="830" y2="920">
+  <stop offset="0" stop-color="#4f83ff"/><stop offset="0.38" stop-color="#2d6bff"/><stop offset="1" stop-color="#0a37ad"/>
+</linearGradient>
+<linearGradient id="or" gradientUnits="userSpaceOnUse" x1="180" y1="110" x2="830" y2="920">
+  <stop offset="0" stop-color="#ff8f75"/><stop offset="0.38" stop-color="#ff6b4a"/><stop offset="1" stop-color="#c8330f"/>
+</linearGradient>
+<linearGradient id="sheen" gradientUnits="userSpaceOnUse" x1="200" y1="90" x2="700" y2="720">
+  <stop offset="0" stop-color="#ffffff" stop-opacity="0.62"/>
+  <stop offset="0.32" stop-color="#ffffff" stop-opacity="0.10"/>
+  <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="pl" gradientUnits="userSpaceOnUse" x1="330" y1="300" x2="700" y2="730">
+  <stop offset="0" stop-color="#78848d"/><stop offset="0.5" stop-color="#48525a"/><stop offset="1" stop-color="#262c32"/>
+</linearGradient>
+<linearGradient id="plTop" x1="0" y1="0" x2="0" y2="1">
+  <stop offset="0" stop-color="#ffffff" stop-opacity="0.40"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="pd" x1="0" y1="0" x2="0.3" y2="1">
+  <stop offset="0" stop-color="#eaffc0"/><stop offset="0.22" stop-color="#ccff63"/>
+  <stop offset="0.6" stop-color="#a8ff00"/><stop offset="1" stop-color="#63ad00"/>
+</linearGradient>
+<linearGradient id="pdTop" x1="0" y1="0" x2="0" y2="1">
+  <stop offset="0" stop-color="#ffffff" stop-opacity="0.8"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+</linearGradient>
+<filter id="glow" x="-70%" y="-70%" width="240%" height="240%">
+  <feGaussianBlur stdDeviation="20" result="g"/>
+  <feComponentTransfer in="g"><feFuncA type="linear" slope="0.8"/></feComponentTransfer>
+</filter>
+<filter id="soft"><feGaussianBlur stdDeviation="6"/></filter>
+<filter id="cast" x="-25%" y="-25%" width="150%" height="160%">
+  <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#0a1a2e" flood-opacity="0.20"/>
+</filter>
+"""
+
+
 def build(style, only=None):
     """only: None for the whole mark, or "left" / "right" / "bar" for one layer.
 
@@ -81,7 +121,10 @@ def build(style, only=None):
     emitted on the same 1024 canvas and stay in register when stacked.
     """
     depth = style == "depth"
+    gloss = style == "gloss"
     defs = []
+    if gloss:
+        defs.append(GLOSS)
     if depth:
         # One light, from above and slightly left, and one shadow under the
         # whole mark. The old artwork had a different answer per element.
@@ -96,11 +139,11 @@ def build(style, only=None):
             '<stop offset="0" stop-color="#a5ff45"/><stop offset="1" stop-color="#6fdf10"/></linearGradient>'
             '<filter id="sh" x="-20%" y="-20%" width="140%" height="140%">'
             '<feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0b1417" flood-opacity="0.18"/></filter>')
-    blue = "url(#gb)" if depth else BLUE
-    orange = "url(#go)" if depth else ORANGE
-    plate = "url(#gp)" if depth else PLATE
-    pad = "url(#gg)" if depth else PAD
-    shadow = ' filter="url(#sh)"' if depth else ""
+    blue = "url(#bl)" if gloss else "url(#gb)" if depth else BLUE
+    orange = "url(#or)" if gloss else "url(#go)" if depth else ORANGE
+    plate = "url(#pl)" if gloss else "url(#gp)" if depth else PLATE
+    pad = "url(#pd)" if gloss else "url(#gg)" if depth else PAD
+    shadow = ' filter="url(#cast)"' if gloss else ' filter="url(#sh)"' if depth else ""
 
     parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">']
     if defs:
@@ -109,12 +152,27 @@ def build(style, only=None):
     want = lambda k: only is None or only == k
     # The two arcs. Round caps, so they read as two separate strokes meeting
     # rather than one ring with notches cut out of it.
+    def tube(a0, a1, sweep, fill):
+        """One arc, and on a glossy build the specular running along it.
+
+        The highlight is a narrower arc drawn just inside the centreline, which
+        is where the light catches a round tube. Blurred, because a hard white
+        line on a curve reads as a second ring rather than as a sheen."""
+        out = [f'<path d="{arc(a0, a1, sweep)}" fill="none" stroke="{fill}" '
+               f'stroke-width="{STROKE:.2f}" stroke-linecap="round"/>']
+        if gloss:
+            rin = R - STROKE * 0.27
+            x0, y0 = C + rin * math.sin(math.radians(a0)), C - rin * math.cos(math.radians(a0))
+            x1, y1 = C + rin * math.sin(math.radians(a1)), C - rin * math.cos(math.radians(a1))
+            out.append(f'<path d="M {x0:.2f} {y0:.2f} A {rin:.2f} {rin:.2f} 0 0 {sweep} {x1:.2f} {y1:.2f}" '
+                       f'fill="none" stroke="url(#sheen)" stroke-width="{STROKE * 0.17:.2f}" '
+                       f'stroke-linecap="round" filter="url(#soft)"/>')
+        return out
+
     if want("left"):
-        parts.append(f'<path d="{arc(360 - GAP, 180 + GAP, 0)}" fill="none" stroke="{blue}" '
-                     f'stroke-width="{STROKE:.2f}" stroke-linecap="round"/>')
+        parts += tube(360 - GAP, 180 + GAP, 0, blue)
     if want("right"):
-        parts.append(f'<path d="{arc(GAP, 180 - GAP, 1)}" fill="none" stroke="{orange}" '
-                     f'stroke-width="{STROKE:.2f}" stroke-linecap="round"/>')
+        parts += tube(GAP, 180 - GAP, 1, orange)
     if not want("bar"):
         parts.append("</g></svg>")
         return "\n".join(parts)
@@ -126,18 +184,33 @@ def build(style, only=None):
         parts.append(rrect(C + sgn * OUTER_X, C, OUTER_W, OUTER_H, OUTER_R, plate))
     parts.append(rrect(C, C, 2 * PLATE_X, BAR_H, BAR_R, plate))
     for sgn in (-1, 1):
-        parts.append(rrect(C + sgn * PLATE_X, C, PLATE_W, PLATE_H, PLATE_R, plate))
-        parts.append(rrect(C + sgn * PLATE_X, C, PAD_W, PAD_H, PAD_W / 2, pad))
+        px = C + sgn * PLATE_X
+        parts.append(rrect(px, C, PLATE_W, PLATE_H, PLATE_R, plate))
+        if gloss:
+            # A lit top face on the plate, inset so it does not touch the edge.
+            parts.append(rrect(px, C - PLATE_H * 0.29, PLATE_W * 0.80, PLATE_H * 0.36,
+                               PLATE_R * 0.7, "url(#plTop)"))
+        if gloss:
+            # The pad glows before it is drawn, so the lime reads as lit rather
+            # than painted on. This is the one place the mark is allowed to shout.
+            parts.append(rrect(px, C, PAD_W, PAD_H, PAD_W / 2, PAD,
+                               ' filter="url(#glow)" opacity="0.9"'))
+        parts.append(rrect(px, C, PAD_W, PAD_H, PAD_W / 2, pad))
+        if gloss:
+            parts.append(rrect(px, C - PAD_H * 0.27, PAD_W * 0.56, PAD_H * 0.38,
+                               PAD_W * 0.28, "url(#pdTop)"))
     parts.append("</g></svg>")
     return "\n".join(parts)
 
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    for style in ("flat", "depth"):
+    for style in ("flat", "depth", "gloss"):
         (OUT / f"unio-mark-{style}.svg").write_text(build(style))
+    # The boot layers take the glossy build: they are shown at 150px on a phone,
+    # which is nowhere near the size where gloss turns to mud.
     for layer in ("left", "right", "bar"):
-        (OUT / f"unio-{layer}.svg").write_text(build("flat", layer))
+        (OUT / f"unio-{layer}.svg").write_text(build("gloss", layer))
     print("wrote", len(list(OUT.glob("*.svg"))), "svgs in", OUT)
 
 
