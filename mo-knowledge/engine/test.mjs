@@ -33,7 +33,7 @@ import {
 } from "./preferences.mjs";
 import { planPlateauResponse, applyRotateFallback, PLATEAU_RESPONSE } from "./plateau-response.mjs";
 import { BODY_AREAS, EQUIPMENT_OPTIONS, normalizeLimits, applyLimits, limitsSummary, softenedNote } from "./limits.mjs";
-import { JOINTS, JOINT_LOAD, defaultJointLoad } from "./joint-load.mjs";
+import { JOINTS, JOINT_LOAD, defaultJointLoad, jointLoadFor } from "./joint-load.mjs";
 import { joinPlanToActual, calibrateExercise, calibrate, stepFor, STEP_ISOLATION, STEP_COMPOUND, STEP_HEAVY } from "./calibrate.mjs";
 import { mapGoal, generateFromPayload, toWorkout, focusDayIndex, nextDayIndex } from "./adapter.mjs";
 import { clientGoals, clientGoalCases, CLIENT_FILE } from "./client-goals.mjs";
@@ -2261,6 +2261,28 @@ test("a joint that hurts removes every stretch the library says to avoid for it"
     const block = pickBlock({ kind, groups: MUSCLE_GROUPS, budgetSec: 3600, hurts: ["knee"] });
     for (const m of block) assert.ok(!risky.includes(m.name), `${m.name} should have been avoided`);
   }
+});
+
+test("a bad knee loses every stretch that is a squat or a lunge, whether the library tagged it or not", () => {
+  /* Squat to Stand carries avoidIf ["lowerback"] and nothing about the knee,
+     and it is a full-depth squat on every rep. The safety audit of 2026-09-19
+     found it in a bad knee's warm-up. POSE_LOAD in joint-load.mjs fills the 27
+     stretching rows the library left untagged, and this pins the union. */
+  const kneeLoads = (name) => jointLoadFor(STRETCH_ALL.find((e) => e.name === name), { training: "stretching" }).joints.includes("knee");
+  assert.ok(kneeLoads("Squat to Stand"), "the table no longer says Squat to Stand loads the knee");
+  for (const kind of ["dynamic", "static", "mobility"]) {
+    const block = pickBlock({ kind, groups: MUSCLE_GROUPS, budgetSec: 3600, hurts: ["knee"] });
+    for (const m of block) assert.ok(!kneeLoads(m.name), `${m.name} handed to a bad knee`);
+  }
+  const legDay = { name: "Lower body", mainGroups: ["quads", "hamstrings"], exercises: [{ group: "quads" }, { group: "hamstrings" }, { group: "glutes" }], mainPatterns: ["squat", "hinge"], allPatterns: ["squat", "hinge", "lunge"] };
+  const r = mobilityFor(legDay, { hurts: ["knee"] });
+  for (const m of [...r.warmup, ...r.cooldown]) assert.ok(!kneeLoads(m.name), `${m.name} in a bad knee's leg day`);
+  assert.ok(!r.warmup.some((m) => m.name === "Squat to Stand"));
+  assert.ok(r.warmup.length >= MIN_MOVES && r.cooldown.length >= MIN_MOVES, "the day still gets both blocks");
+  /* And the count it says out loud is the count it actually dropped. */
+  const said = r.why.find((w) => /left out for the knee/.test(w));
+  const dropped = STRETCH_ALL.filter((e) => kneeLoads(e.name)).length;
+  assert.ok(said && said.startsWith(`${dropped} stretch`), `${said} against ${dropped}`);
 });
 
 test("mobilityFor gives a normal day a dynamic warm-up and a static cool-down for what it worked", () => {
