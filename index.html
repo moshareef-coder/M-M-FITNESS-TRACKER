@@ -8756,6 +8756,22 @@ function isoDate(d) {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
+/* toLocaleDateString builds a whole Intl.DateTimeFormat on every call, and
+   that construction, not the formatting, is what costs. Measured on a 4x
+   throttled profile: the twenty relDayLabel calls one paired Home render makes
+   took 22.4ms before this and 0.5ms after, for the same strings.
+
+   The formatter is keyed by its options and by the locale the browser would
+   have picked anyway, so the same call returns the same string it always did.
+   Kept next to the other date helpers because every caller of it is one. */
+const DATE_FMT_CACHE = new Map();
+function dateFmt(opts, locale) {
+  const key = (locale ?? "") + "|" + JSON.stringify(opts);
+  let f = DATE_FMT_CACHE.get(key);
+  if (!f) { f = new Intl.DateTimeFormat(locale ?? undefined, opts); DATE_FMT_CACHE.set(key, f); }
+  return f;
+}
+
 /* Calendar arithmetic, not 86,400,000 ms: on the day clocks go back, local
    midnight plus a fixed day lands at 23:00 of the same date. */
 function shiftDate(dateStr, days) {
@@ -13848,6 +13864,10 @@ function switchTab(tab) {
   closeAllOverlays();
   document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== "tab-" + tab));
+  /* Before anything else renders: the figures cannot be paused, only removed,
+     and leaving them up is what made every other tab slow. See
+     destroyBodyFigures. */
+  if (tab !== "body") { bodyResetFocus(); destroyBodyFigures(); }
   if (tab === "home") renderHome(true);
   if (tab === "progress") renderProgressTab();
   if (tab === "body") { bodyResetFocus(); renderBodyTab(true); }
@@ -15982,7 +16002,7 @@ function relDayLabel(date) {
      walks the six most recent gym days, which can be weeks apart, and two
      different Mondays read identically. */
   if (date < shiftDate(today, -6)) return datedLabel(date);
-  return new Date(date + "T00:00:00").toLocaleDateString(undefined, { weekday: "long" });
+  return dateFmt({ weekday: "long" }).format(new Date(date + "T00:00:00"));
 }
 
 function dayVolumeLb(email, date) {
@@ -16170,7 +16190,7 @@ function lastTrainedLabel(who) {
   for (let i = 1; i <= 7; i++) {
     d.setDate(d.getDate() - 1);
     if (entryOn(who, isoDate(d))?.gym) {
-      return i === 1 ? "Yesterday" : `Trained ${d.toLocaleDateString([], { weekday: "short" })}`;
+      return i === 1 ? "Yesterday" : `Trained ${dateFmt({ weekday: "short" }).format(d)}`;
     }
   }
   return "Nothing yet";
@@ -16335,7 +16355,7 @@ function renderHero(animate = false) {
      to say, and it is the only celebration the app allows itself: the rule the
      pact copy already states out loud is that finishing alone does not get
      confetti, because the person who finished alone is not the point. */
-  const clockAt = (v) => v ? new Date(v).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : null;
+  const clockAt = (v) => v ? dateFmt({ hour: "numeric", minute: "2-digit" }).format(new Date(v)) : null;
   let head;
   if (bothDone) {
     const times = [clockAt(todayEntryFor(MY_EMAIL)?.workout_at), clockAt(todayEntryFor(PARTNER_EMAIL)?.workout_at)].filter(Boolean);
@@ -16621,16 +16641,33 @@ function entryOn(name, date) {
   return entriesFor(name).find((e) => e.entry_date === date) || null;
 }
 
+/* The half of signedProofUrl that can answer now. A miss is not a failure
+   here: the caller paints the tile without the photo and fillWeekProofs comes
+   back with it. */
+function cachedProofUrl(path) {
+  const hit = path ? PROOF_URL_CACHE[path] : null;
+  return hit && typeof hit === "object" && hit.at + PROOF_URL_TTL > Date.now() ? hit.url : null;
+}
+
 /* One person's dot for one day. A filled dot with a tick means they trained;
    rest days and weigh-ins still open, because they are days you can correct. */
-async function dotHTML(name, email, date, cls) {
+function dotHTML(name, email, date, cls) {
   const e = entryOn(name, date);
   const who = `data-day="${date}" data-who="${escapeHtml(email || "")}"`;
   const label = `aria-label="${escapeHtml(name)}, ${relDayLabel(date)}"`;
   if (e?.gym) {
-    const url = e.proof_path ? await signedProofUrl(e.proof_path) : null;
+    /* Signing a proof link is a network round trip, and a paired week has up
+       to fourteen of them. Awaiting them held the entire grid behind the
+       slowest one: measured at 4x throttle against a 120ms round trip, the
+       columns appeared at 342 to 414ms, against 76ms once they stopped
+       waiting, and a gym's signal is worse than 120ms far more often than it
+       is better. So the tile paints now, carrying the tick it shows when
+       there is no photo anyway, and the photo is dropped in when its link
+       lands, at about 170 to 190ms. */
+    const url = cachedProofUrl(e.proof_path);
+    const pending = e.proof_path && !url ? ` data-proof="${escapeHtml(e.proof_path)}"` : "";
     const inner = url ? `<img src="${url}" alt="" loading="lazy" />` : icon("check", 16);
-    return `<button type="button" class="dot on ${cls}" ${who} ${label}>${inner}</button>`;
+    return `<button type="button" class="dot on ${cls}" ${who} ${label}${pending}>${inner}</button>`;
   }
   if (e?.rest_day) return `<button type="button" class="dot rest" ${who} ${label}>rest</button>`;
   if (e?.weight != null) return `<button type="button" class="dot wt" ${who} ${label}>${escapeHtml(String(e.weight))}</button>`;
@@ -16783,7 +16820,7 @@ function renderMoments() {
   el.onclick = () => openTimelineSheet();
 }
 
-async function renderWeekStrips(animate = false) {
+function renderWeekStrips(animate = false) {
   const today = todayStr();
   const partner = PARTNER_EMAIL ? partnerName() : null;
 
@@ -16801,20 +16838,21 @@ async function renderWeekStrips(animate = false) {
      contents, not the workout tab's tile. */
   const grid = $("weekGrid");
   const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const cols = await Promise.all(currentWeekDates().map(async (date, i) => {
+  const cols = currentWeekDates().map((date, i) => {
     const isToday = date === today;
     const trained = !!entryOn(ME, date)?.gym;
     const num = Number(date.slice(8, 10));
-    const mine = await dotHTML(ME, MY_EMAIL, date, "me");
-    const theirs = partner ? await dotHTML(partner, PARTNER_EMAIL, date, "them") : "";
+    const mine = dotHTML(ME, MY_EMAIL, date, "me");
+    const theirs = partner ? dotHTML(partner, PARTNER_EMAIL, date, "them") : "";
     return `<div class="wk-col${isToday ? " today" : ""}${trained ? " done" : ""}${animate ? " h-rise" : ""}" style="--d:${140 + i * 45}ms">
       <span class="wk-d">${names[i]}</span>
       <span class="wk-num">${num}</span>
       ${mine}
       ${theirs}
     </div>`;
-  }));
+  });
   grid.innerHTML = cols.join("");
+  fillWeekProofs(grid);
   grid.querySelectorAll("[data-day]").forEach((b) => {
     /* Mo: "The calendar becomes the history of the relationship instead of just
        a checkbox grid." So a tap on the grid answers "what happened that day
@@ -16822,6 +16860,23 @@ async function renderWeekStrips(animate = false) {
        own there is no between, so it opens your day directly. */
     b.onclick = () => (PARTNER_EMAIL ? openBothDaySheet(b.dataset.day) : openDaySheet(MY_EMAIL, b.dataset.day));
   });
+}
+
+/* The photos, once the grid is already on screen. Each tile is filled on its
+   own link rather than all of them together, so one slow signature does not
+   hold back the other six, and a tile whose link never comes keeps the tick it
+   is already showing rather than turning into a hole. Tiles are checked for
+   still being in the document because a re-render can replace the grid
+   underneath a request that is still in flight. */
+function fillWeekProofs(grid) {
+  for (const btn of grid.querySelectorAll("[data-proof]")) {
+    const path = btn.dataset.proof;
+    signedProofUrl(path).then((url) => {
+      if (!url || !btn.isConnected) return;
+      btn.removeAttribute("data-proof");
+      btn.innerHTML = `<img src="${url}" alt="" loading="lazy" />`;
+    }).catch((e) => console.warn("could not sign a week proof photo", e));
+  }
 }
 
 
@@ -19095,7 +19150,7 @@ function relativeDay(dateStr) {
   if (days === 1) return "yesterday";
   if (days < 7) return `${days} days ago`;
   if (days < 14) return "last week";
-  return new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return dateFmt({ month: "short", day: "numeric" }).format(new Date(dateStr + "T00:00:00"));
 }
 
 
@@ -19139,9 +19194,15 @@ function renderHome(animate = false) {
 function staggerHomeCards() {
   const cards = [...document.querySelectorAll("#tab-home > .card, #tab-home > #heroCard, #tab-home > #liveCard")]
     .filter((el) => !el.classList.contains("hidden"));
+  /* One forced layout for the whole set rather than one per card. The read is
+     what makes the animation replayable, and it is also what costs: reading a
+     layout property mid loop makes the browser lay out the page again for
+     every card, measured at about 16ms each on a 4x throttled profile. Taking
+     the class off all of them first means one read settles the lot, and the
+     cards still animate exactly as before. */
+  cards.forEach((el) => el.classList.remove("h-rise"));
+  void document.body.offsetWidth;
   cards.forEach((el, i) => {
-    el.classList.remove("h-rise");
-    void el.offsetWidth;
     el.style.setProperty("--d", `${i * 70}ms`);
     el.classList.add("h-rise");
   });
@@ -28660,8 +28721,7 @@ function prevWorkoutDays() {
 }
 
 function datedLabel(d) {
-  return new Date(d + "T00:00:00")
-    .toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  return dateFmt({ weekday: "short", month: "short", day: "numeric" }).format(new Date(d + "T00:00:00"));
 }
 
 /* The generator dates its coaching notes in ISO ("You lifted 130 on
@@ -29452,7 +29512,7 @@ function calendarPickerHTML(oldest) {
   const offsetOf = (m) => (year - today.getFullYear()) * 12 + (m - today.getMonth());
   const oldestYear = today.getFullYear() + Math.floor(oldest / 12);
   const viewing = new Date(today.getFullYear(), today.getMonth() + HISTORY_MONTH, 1);
-  const names = Array.from({ length: 12 }, (_, m) => new Date(2000, m, 1).toLocaleDateString([], { month: "short" }));
+  const names = Array.from({ length: 12 }, (_, m) => dateFmt({ month: "short" }).format(new Date(2000, m, 1)));
   return `<div class="cal-pick">
     <div class="cal-pick-year">
       <button type="button" class="wk-nav-btn" id="calYearPrev" ${year <= oldestYear ? "disabled" : ""} aria-label="Previous year">${icon("chevronLeft", 16)}</button>
@@ -30537,7 +30597,7 @@ function planWeekDays(offset = WEEK_OFFSET) {
     const spoken = (ALL_PLANS || []).some((w) => w.email === MY_EMAIL && w.entry_date === date);
     out.push({
       date,
-      label: d.toLocaleDateString([], { weekday: "short" }),
+      label: dateFmt({ weekday: "short" }).format(d),
       day: d.getDate(),
       isToday: date === today,
       past: date < today,
@@ -30556,7 +30616,7 @@ function planWeekLabel(offset = WEEK_OFFSET) {
   const start = planWeekStart(offset);
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
-  const fmt = (d) => d.toLocaleDateString([], { month: "short", day: "numeric" });
+  const fmt = (d) => dateFmt({ month: "short", day: "numeric" }).format(d);
   return `${fmt(start)} to ${fmt(end)}`;
 }
 
@@ -32952,7 +33012,15 @@ function retintMotionFigures() {
 
 function ensureRiveBodyModule() {
   if (!riveBodyPromise) {
-    riveBodyPromise = ensureRiveRuntime().then(() => import("./knowledge/anatomy/rive-body.mjs"));
+    /* These used to run one after the other, and the second does not need the
+       first: rive-body.mjs only reads window.rive inside createBodyHeatmap,
+       which is long after both have landed. Fetched in sequence the module was
+       370ms of dead time on a cold 1.6Mbps profile, waiting on a script it has
+       no opinion about. */
+    riveBodyPromise = Promise.all([
+      ensureRiveRuntime(),
+      import("./knowledge/anatomy/rive-body.mjs"),
+    ]).then(([, mod]) => mod);
   }
   return riveBodyPromise;
 }
@@ -33003,6 +33071,11 @@ async function renderBodyDiagram(animate) {
   BODY_HEAT_PALETTE = mod.APP_HEAT_PALETTE;
   BODY_ALL_MUSCLES = mod.ALL_MUSCLES;
 
+  /* A tab switch away can land between the awaits above and the mount below,
+     and a figure created after that is one nobody asked for and nobody tears
+     down: it draws behind whatever screen won. */
+  if (document.getElementById("tab-body").classList.contains("hidden")) return;
+
   if (!riveFrontCtrl || riveLoadedSex !== sex) {
     if (BODY_FOCUS) bodyClearFocusUI();
     riveFrontCtrl?.destroy();
@@ -33011,7 +33084,7 @@ async function renderBodyDiagram(animate) {
       canvas: $(id), artboardName: `${sex}-${view}`, palette: mod.APP_HEAT_PALETTE,
       intensities: {},
       onMuscleClick: (muscle, group, tap) => bodyFocusMuscle(muscle, view, tap ? (tap.x < 0.5 ? "left" : "right") : null),
-      onLoad: () => { bodyPaintPalettes(); bodyRampFigures(target, animate); },
+      onLoad: (r) => { bodyCapPixelRatio(r); bodyPaintPalettes(); bodyRampFigures(target, animate); },
       onFrame: () => { if (BODY_FOCUS?.view === view) bodyPositionCallouts(); },
     });
     riveFrontCtrl = make("bodyDiagramFront", "Front");
@@ -33021,6 +33094,52 @@ async function renderBodyDiagram(animate) {
     bodyPaintPalettes();
     bodyRampFigures(target, animate);
   }
+}
+
+/* Two figures at a phone's real pixel ratio is four times the fill of one, and
+   a 3x screen is 2.25 times a 2x one for a drawing nobody is looking at closely
+   enough to count pixels. Rive sizes its drawing surface from
+   devicePixelRatio unless it is handed one, and createBodyHeatmap passes the
+   runtime instance to onLoad, so this is the one place the app can say so.
+
+   It only holds until the module's own ResizeObserver fires, which calls
+   resizeDrawingSurfaceToCanvas() with no argument and puts the full ratio
+   back. That is a rotation or the focus fold, not the common case, and the
+   module is knowledge/ so we cannot fix it here: request 8 in
+   mo-knowledge/LIBRARY-REQUESTS.md is still the real answer. */
+function bodyCapPixelRatio(r) {
+  try { r?.resizeDrawingSurfaceToCanvas?.(Math.min(2, window.devicePixelRatio || 1)); }
+  catch (e) { console.warn("could not cap the figure's pixel ratio", e); }
+}
+
+/* Leaving the tab takes the figures with it.
+
+   Rive has no pause we can reach, so a mounted figure repaints for as long as
+   it exists whether or not anybody can see it. Measured on a 4x throttled
+   profile: with the two Body figures alive, Home and Setup burn between 300ms
+   and a full second of script every three seconds, doing nothing but redrawing
+   a canvas nobody can see. Destroyed, both sit at zero.
+
+   This is the same trade closeBodyRegionPicker already makes for onboarding's
+   picker, and for the same stated reason. What it costs is a rebuild on the
+   way back in, and that is cheap: the runtime, the wasm and the .riv are all
+   still cached, so the returning figure was sized within 1 to 3ms. The
+   expensive visit is the first one in a session, and that one is unchanged. */
+function destroyBodyFigures() {
+  if (!riveFrontCtrl && !riveBackCtrl) return;
+  try { riveFrontCtrl?.destroy(); } catch (e) { console.warn("front figure teardown", e); }
+  try { riveBackCtrl?.destroy(); } catch (e) { console.warn("back figure teardown", e); }
+  riveFrontCtrl = null;
+  riveBackCtrl = null;
+  /* cleanup() drops the renderer but leaves the canvas holding its drawing
+     buffer, which on a 3x phone is two 534x1500 surfaces of GPU memory for a
+     tab nobody is on. The module measures the canvas by its CSS size, so
+     zeroing the backing store costs the next mount nothing. */
+  for (const c of document.querySelectorAll("#biFigures canvas")) { c.width = 0; c.height = 0; }
+  /* The next visit builds fresh controllers, so the sex that was loaded into
+     the ones just thrown away must not make it look like there is nothing to
+     do. */
+  riveLoadedSex = null;
 }
 
 /* Every muscle painted with its own colour. Muscles with no work keep the
@@ -33597,7 +33716,7 @@ async function renderBodyShare() {
   const partner = partnerName();
   const mine = todayEntryFor(MY_EMAIL);
   const seenAt = mine?.gym && mine.seen_by_partner_at ? new Date(mine.seen_by_partner_at) : null;
-  const fmt = (d) => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const fmt = (d) => dateFmt({ hour: "numeric", minute: "2-digit" }).format(d);
 
   let title, sub, state;
   if (seenAt) { title = `${partner} saw your workout`; sub = fmt(seenAt); state = "on"; }
@@ -34971,7 +35090,7 @@ function runLogsFor(name, days) {
 }
 
 function shortDate(d) {
-  return new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return dateFmt({ month: "short", day: "numeric" }).format(new Date(d + "T00:00:00"));
 }
 
 /* One headline. `third` is the partner view, where everything is said about
