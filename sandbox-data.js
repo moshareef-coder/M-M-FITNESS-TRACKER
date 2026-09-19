@@ -387,6 +387,25 @@
       },
     },
 
+    /* Somebody who only runs. train_styles with no resistance style in it is
+       what makes the engine build a cardio day instead of a lifting one
+       (mo-knowledge/engine/CONTRACT.md, `workout.cardio`), and that day is a
+       different screen: a session on a clock rather than a list of sets. Today
+       is cleared of both the plan and the entry so the whole path is walkable
+       from here, generate, read it, start it, finish it. */
+    runner: {
+      label: "Runs, does not lift",
+      apply: (db) => {
+        db.profiles = db.profiles.map((p) => p.email === ME
+          ? { ...p, train_styles: ["running"], goal: "Lose weight" } : p);
+        /* Every plan of mine, not just today's: a queued Pull Day on somebody
+           who does not lift is the fixture contradicting its own premise. */
+        db.ai_workouts = db.ai_workouts.filter((w) => w.email !== ME);
+        db.exercise_logs = db.exercise_logs.filter((e) => e.email !== ME || e.entry_date !== day(0));
+        db.fit_entries = db.fit_entries.filter((e) => e.email !== ME || e.entry_date !== day(0));
+      },
+    },
+
     livePrivate: {
       label: "Partner keeps it private",
       apply: (db) => {
