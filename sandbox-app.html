@@ -476,6 +476,18 @@
   /* The caption under the buttons, where the ticked column used to be a third
      thing competing with the ring. */
   .wkt-next-line { grid-area: line; margin: 0; font-size: 12.5px; font-weight: 500; color: var(--muted); line-height: 1.4; }
+  /* The overview at the top of a day being reviewed. Mo, looking at the card
+     and then at this screen: "plan overview, I like the percentage match on
+     the right side and very big." Same figure, same sheet behind it, a size
+     up from the card's because here it is the only thing on its row rather
+     than one of four. */
+  .plan-ov { display: flex; align-items: center; gap: 14px; margin: 2px 0 16px; }
+  .plan-ov-words { flex: 1; min-width: 0; }
+  .plan-ov-sub { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .plan-ov-line { margin: 7px 0 0; font-size: 12.5px; font-weight: 500; color: var(--muted); line-height: 1.4; }
+  /* The card places its arc on a grid; here it is a flex item on the right. */
+  .plan-ov .wkt-arc { grid-area: auto; justify-self: auto; flex: none; width: 136px; height: 104px; }
+  .plan-ov .wkt-arc-num b { font-size: 32px; }
   .wkt-next-acts { grid-area: acts; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .wkt-next-acts .wkt-more { flex-basis: 100%; }
   .wkt-more {
@@ -8458,7 +8470,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.18.19";
+const APP_VERSION = "2026.09.18.20";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -33413,9 +33425,35 @@ function renderPlanPreview(opts) {
     <button type="button" class="btn-ghost" id="planReviewClear">Clear this day</button>
     <button type="button" class="btn-ghost" id="planReviewBack">Back to the workout tab</button>`;
 
+  /* The match figure for the day being reviewed, the same reading and the same
+     sheet as the workout tab's card, so the number somebody tapped through to
+     get here is the number waiting for them when they arrive.
+
+     Only for a day with lifts on it: an activity day trains nothing this
+     scores, and planPreview would answer for an activity day with its
+     proposal for some other session entirely, which would be a figure about
+     a workout that is not on this screen. Behind hired() like the card's, for
+     the same reason: the reading is the thing being sold. */
+  const ovP = review && !activityDay && hired() ? planPreview(date) : null;
+  if (ovP?.real) MATCH_NOTE = matchNoteFor(ovP);
+  const overview = ovP?.real ? `
+    <div class="plan-ov">
+      <div class="plan-ov-words">
+        <p class="plan-ov-sub">${escapeHtml(matchReading(ovP.match))}</p>
+        ${(ovP.muscles || []).length
+          ? `<p class="plan-ov-line">Trains ${escapeHtml(ovP.muscles.map((m) => m.name.toLowerCase()).join(", "))}</p>`
+          : ""}
+      </div>
+      <button type="button" class="wkt-arc" data-info="planMatchWhy" aria-label="Why this is a ${ovP.match}% match">
+        ${arcGaugeSVG(Math.max(0, Math.min(100, ovP.match)) / 100, freshTone(ovP.match), 136)}
+        <div class="wkt-arc-num"><b>${ovP.match}%</b><i>MATCH</i></div>
+      </button>
+    </div>` : "";
+
   $("workoutContent").innerHTML = `
     ${backBar("Back", () => goWorkoutScreen("choose", { back: true }))}
     ${dayList}
+    ${overview}
     ${review ? "" : `
     <div class="workout-progress-row">
       <span>Progress</span>
