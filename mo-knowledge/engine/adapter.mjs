@@ -17,7 +17,7 @@
  * Deno safe: no node: imports, no dependencies, no file reads. Which is why the
  * alias table below is hand written rather than loaded from goal-tree.json.
  */
-import { buildPlan, estimateMinutes } from "./plan.mjs";
+import { buildPlan, estimateMinutes, feelerSeconds } from "./plan.mjs";
 import { readStyles, mergeStyleLimits, styleDayFor } from "./styles.mjs";
 import { parseFocus, mergePriority, focusFreshness } from "./focus.mjs";
 import { normalizeLimits } from "./limits.mjs";
@@ -1132,7 +1132,9 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
            block actually reserved. Rounded once at the end for the same reason
            it is there: rounding the ramp and the block separately hands the day
            a minute it never spends. */
-        d.prepMinutes = Math.round((d.mobility.warmupBudgetSeconds + rampSec) / 60);
+        /* The BUILT block, as plan.mjs costs it since 2026-09-19, not the
+           budget it was asked for. */
+        d.prepMinutes = Math.round((d.mobility.warmupSeconds + rampSec) / 60);
         d.estimatedMinutes = estimateMinutes(d.exercises, d.prepMinutes);
         d.totalMinutes = d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60);
       }
@@ -1213,7 +1215,10 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
            which is a number about sets and rest and says nothing about how
            long anybody wants to be on a mat. Null hands the decision to
            styles.mjs, which has a default and a reason for it. */
-        askedMinutes: plan.sessionBudget?.source === "asked" ? plan.sessionBudget.minutes : null,
+        /* The number they typed, not the lifting floor it was clamped to: a
+           twenty minute yoga class is a class, and the 25 minute floor is a
+           statement about four lifts with rests between them. */
+        askedMinutes: plan.sessionBudget?.source === "asked" ? (plan.sessionBudget.asked ?? plan.sessionBudget.minutes) : null,
       })
       : null;
     const workout = styleSession || liftWorkout;
@@ -1289,6 +1294,19 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
         /* Where the week's volume sat between each muscle's MEV and the middle
            of its MAV range, and the two measured numbers that put it there. */
         volumeDial: plan.volumeDial ?? null,
+        /* The talkative half of the plan, which the adapter dropped until
+           2026-09-19: the deload schedule (and whether THIS week is the one),
+           the progression rule, and the ledger with the two gaps it reports.
+           `frequencyCapped` and `under` are the objects; their sentences
+           already travel in `notes`. Always present, null or empty where the
+           plan has nothing to say, like every other key here. */
+        deload: plan.deload ?? null,
+        progression: plan.progression ?? null,
+        volume: {
+          byGroup: plan.weeklyVolume ?? {},
+          under: plan.volumeNotes?.under ?? [],
+          frequencyCapped: plan.volumeNotes?.frequencyCapped ?? [],
+        },
         /* What train_styles changed, so a screen can say it rather than the
            person having to infer it from a week that came back lighter than
            they expected. `honoured` false is the one case worth showing: they
@@ -1420,6 +1438,13 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
              nothing else" is a contract with a test behind it, and a
              convenience field is not worth spending it. */
           rampMinutes: styleSession ? 0 : (dayBuilt?.rampMinutes ?? 0),
+          /* What the feeler sets cost on a day with lifts that carry no
+             weight yet (plan.mjs FEELER_SETS). A component of
+             `estimatedMinutes`, like `rampMinutes`, never an addition to it;
+             here so a screen can name it, because index.html's own mirror of
+             the costing does not know this term yet and would otherwise print
+             a first session a few minutes short. */
+          feelerMinutes: styleSession ? 0 : Math.round((dayBuilt?.exercises || []).reduce((t, e) => t + feelerSeconds(e), 0) / 60),
           /* On a cardio day the question is whether the RUN fits the clock, not
              whether the lifting day that was dropped did. The library's
              sessions run from a 20 minute row to a 60 minute walk, so the
