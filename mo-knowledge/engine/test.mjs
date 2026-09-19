@@ -2947,6 +2947,44 @@ test("the MRV ceiling never takes back the set a focus tier guarantees", () => {
   }
 });
 
+/* Boundary audit of 2026-09-19. "Hamstrings/glutes" is one row in
+   volume-landmarks.md (MRV 18) and the engine gave each half 18, so the pair
+   could ask for 36: the abs/obliques 20+20 error again. The pair now shares
+   the row. The bound allows the +1 a focus tier guarantees on each half,
+   because that guarantee sits outside every ceiling on purpose. */
+test("hamstrings and glutes share the one MRV row the research gives them", () => {
+  const today = new Date("2026-09-10T12:00:00");
+  for (const days of [3, 4, 5]) {
+    for (const focus of [null, ["glutes:3"], ["hamstrings:3", "glutes:3"]]) {
+      const out = generateFromPayload(
+        { goal_bubble: "build-muscle", challenge_target: days, current_weight: 195, sex: "Male", logs: longHistory(78), ...(focus ? { focus_groups: focus } : {}) },
+        { today, includePlan: true },
+      );
+      const v = out.plan.weeklyVolume;
+      const asked = (v.hamstrings?.wanted ?? 0) + (v.glutes?.wanted ?? 0);
+      const allowed = 18 + (focus ? focus.length : 0);
+      assert.ok(asked <= allowed, `${days}d focus ${JSON.stringify(focus)}: the pair asks for ${asked} against a shared MRV of 18`);
+    }
+  }
+});
+
+/* Traps, forearms and lower back had no MRV row and were uncapped. Each now
+   carries its smallest neighbouring row, and a red focus on a five day week is
+   the one ask big enough to reach two of them. */
+test("traps, forearms and lower back have a weekly ceiling", () => {
+  const today = new Date("2026-09-10T12:00:00");
+  const rows = { forearms: 22, lowerback: 18, traps: 24 };
+  for (const [group, mrv] of Object.entries(rows)) {
+    const out = generateFromPayload(
+      { goal_bubble: "build-muscle", challenge_target: 5, current_weight: 195, sex: "Male", logs: longHistory(78), focus_groups: [`${group}:3`] },
+      { today, includePlan: true },
+    );
+    const v = out.plan.weeklyVolume[group];
+    assert.ok(v, `${group} is not trained on a five day week with a red focus on it`);
+    assert.ok(v.wanted <= mrv, `${group} asks for ${v.wanted} against a ceiling of ${mrv}`);
+  }
+});
+
 /* ------------------------------------------------------------------ *
  * A goal never prescribes what its own note warns against
  * ------------------------------------------------------------------ */

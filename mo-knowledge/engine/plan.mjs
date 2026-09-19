@@ -70,6 +70,11 @@ const VOLUME_BAND = {
   calves: { mev: 8, mav: 15 },
   abs: { mev: 8, mav: 12 },
   obliques: { mev: 8, mav: 12 },
+  /* No row in volume-landmarks.md. Direct lower back work only exists in the
+     week when somebody marks it (LOWERBACK_SLOT), and the hamstrings/glutes
+     row is the smallest neighbour of a hinge-shaped muscle, so it stands in.
+     A guess, stated as one, and it had no row at all until 2026-09-19. */
+  lowerback: { mev: 6, mav: 13 },
 };
 
 /* Traps and forearms have no row in volume-landmarks.md, the same gap
@@ -145,13 +150,35 @@ const PRIORITY_MULTIPLIER = { 0: 1, ...TIER_MULTIPLIER };
    moved no set count and no warning total. What it changes is the largest
    number the ledger can carry, which was 28 and is now the muscle's own MRV.
    The table's rows are the groups it names, so "Back (lats/rows)" is lats and
-   "Abs/core" covers abs and obliques. Traps and forearms have no row and are
-   left uncapped rather than given an invented number; every split in this file
-   touches them once a week, so the frequency cap below is what binds on them. */
+   "Abs/core" covers abs and obliques.
+
+   Traps, forearms and lower back have no row in the table. They were left
+   uncapped (`?? Infinity`) rather than given an invented number, on the
+   argument that the frequency cap binds on them anyway. The boundary audit of
+   2026-09-19 counted that as a ceiling the engine happens to be saved from by
+   an unrelated limit, which is the same complaint this table was built to
+   answer, so each now carries the SMALLEST NEIGHBOURING ROW, stated as a
+   guess: traps the shoulders row (24, under the 25 of back), forearms the
+   biceps row (22, the same row VOLUME_BAND_DEFAULT already stands them on),
+   lower back the hamstrings/glutes row (18). None of the three moves a set
+   today, and that is measured rather than hoped.
+
+   "Hamstrings/glutes" is ONE row in the table, MRV 18 for the pair, and this
+   table read it as 18 each, so the two could ask for 36 between them. Same
+   error as the abs/obliques 20+20 fixed the week before. The pair shares the
+   row now: see MRV_PAIR and `mrvFor` in buildPlan, which split the one number
+   between the two halves in proportion to what each is asking for. */
 const WEEKLY_MRV = {
   chest: 22, lats: 25, shoulders: 24, quads: 20, hamstrings: 18,
   glutes: 18, biceps: 22, triceps: 20, calves: 22, abs: 20, obliques: 20,
+  traps: 24, forearms: 22, lowerback: 18,
 };
+/* Groups that are one row in the research and two in the app's taxonomy, and
+   which, unlike abs/obliques, cannot be folded into one ledger row: a hinge
+   slot and a lunge slot are different movements on different days and the
+   split's whole lower body is built out of the difference. So the ceiling is
+   shared and the counting is not. Each entry names its partner. */
+const MRV_PAIR = Object.freeze({ hamstrings: "glutes", glutes: "hamstrings" });
 
 /* Core is ONE row in the ledger, because it is one row in the research.
  *
@@ -644,7 +671,11 @@ function addSecondMainRamps(week, roleOf) {
 
 /* What the week asks for, before any session has to hold it. */
 function weeklyWant({ base, tier, ceiling = Infinity }) {
-  const plain = Math.round(base);
+  /* The plain ask is capped too. It never needed to be while every ceiling was
+     a whole row of its own, because no band's top reaches an MRV; a shared row
+     (MRV_PAIR) hands each half a ceiling the band CAN reach, and an unfocused
+     ask that ignored it put the pair back at 26 against the 18 the row says. */
+  const plain = Math.round(Math.min(base, ceiling));
   /* The +1 guarantee is a floor and not a bonus, so it is the same +1 at every
      tier. A group somebody marked green has to come back with more sets than an
      identical group they did not mark, or the colour was decoration; how much
@@ -1346,6 +1377,20 @@ export function buildPlan({
     const band = VOLUME_BAND[group] || VOLUME_BAND_DEFAULT;
     return (band.mev + dial * (band.mav - band.mev)) * P.setsFactor;
   };
+  /* The weekly ceiling for one group. Its own MRV row, except where the row is
+     shared with a partner (MRV_PAIR): then the row is split between the two in
+     proportion to what each half is asking for before any cap, so a red focus
+     on glutes buys glutes the larger share of the 18 rather than 18 of its own
+     on top of 18 for hamstrings. Read wherever `WEEKLY_MRV[group]` used to be. */
+  const rawAskFor = (group) => baseSetsFor(group) * PRIORITY_MULTIPLIER[tierFor(group)];
+  const mrvFor = (group) => {
+    const own = WEEKLY_MRV[group] ?? Infinity;
+    const partner = MRV_PAIR[group];
+    if (!partner || !Number.isFinite(own)) return own;
+    const mine = rawAskFor(group);
+    const theirs = rawAskFor(partner);
+    return mine + theirs > 0 ? own * (mine / (mine + theirs)) : own / 2;
+  };
 
   /* ---- pass 2: selection, the whole week before any set count ---- */
   /* Two passes rather than one, because the divisor in pass 3 has to be the
@@ -1600,7 +1645,7 @@ export function buildPlan({
     if (!weekVolume.has(group)) {
       weekVolume.set(group, weeklySets({
         base: baseSetsFor(group), tier: tierFor(group),
-        ceiling: WEEKLY_MRV[group] ?? Infinity,
+        ceiling: mrvFor(group),
         fullSlots: fullHits[group] || 1, shortSlots: shortHits[group] || 0,
       }));
     }
@@ -1733,7 +1778,7 @@ export function buildPlan({
      8.96 about a week that had asked for 9. It is kept separate from the target
      below because the two mean different things and the ledger reports both. */
   const wantedFor = (group) =>
-    weeklyWant({ base: baseSetsFor(group), tier: tierFor(group), ceiling: WEEKLY_MRV[group] ?? Infinity });
+    weeklyWant({ base: baseSetsFor(group), tier: tierFor(group), ceiling: mrvFor(group) });
 
   /* What this week could spend on a group if every one of its exercises ran at
      the top of the clamp. A group the split touches once cannot be handed more
@@ -2030,7 +2075,7 @@ export function buildPlan({
           if (e.sets >= MAX_SETS_PER_SESSION) continue;
           if (!e.focusTier && e.sets + 1 > floorCeiling) continue;
           const key = ledgerGroup(e.group);
-          const ceiling = Math.min(weeklyTargetFor(key) + VOLUME_SLACK, WEEKLY_MRV[key] ?? Infinity);
+          const ceiling = Math.min(weeklyTargetFor(key) + VOLUME_SLACK, mrvFor(key));
           const gap = ceiling - (totals[key] || 0);
           if (gap < 1) continue;
           if (!best || gap > bestGap) { best = e; bestGap = gap; }
