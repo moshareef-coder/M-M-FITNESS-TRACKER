@@ -1654,6 +1654,46 @@ test("joinPlanToActual skips plans with no completed_at", () => {
   assert.equal(rows.length, 0);
 });
 
+/* The app writes one exercise_logs row per distinct weight, so a session that
+   climbed or dropped mid-exercise is two or three rows on one date. Until
+   2026-09-19 the join kept the first row and threw the rest away, and a person
+   who worked UP to 150 on a 4x8 at 140 read as two sets done of four: too
+   heavy, bar comes down. Three ladder shapes, one prescription. */
+const ladderJoin = (rows) => {
+  const dates = [day(-1), day(-4)];
+  const plans = dates.map((d) => ({
+    entry_date: d, completed_at: `${d}T18:00:00Z`,
+    exercises: [{ name: "Bench Press", sets: 4, reps: 8, targetWeight: 140 }],
+  }));
+  const logs = dates.flatMap((d) => rows.map((r) => ({ entry_date: d, exercise_name: "Bench Press", reps: 8, ...r })));
+  return { joined: joinPlanToActual({ plans, logs }), verdict: calibrate({ plans, logs }).byExercise["bench press"] };
+};
+
+test("a climbing ladder joins as every set done, at the top weight, and reads too-easy", () => {
+  const { joined, verdict } = ladderJoin([{ sets: 2, weight: 140 }, { sets: 2, weight: 150 }]);
+  assert.equal(joined.length, 2);
+  assert.deepEqual(joined[0].actual, { sets: 4, reps: 8, weight: 150, weightLow: 140 });
+  assert.equal(verdict.verdict, "too-easy", verdict.why);
+  /* Measured against 150, the row load.mjs will pick as the base, not 140. */
+  assert.equal(Math.round(150 * verdict.nextLoadFactor), 155);
+});
+
+test("a flat ladder joins to the same answer as one row", () => {
+  const two = ladderJoin([{ sets: 2, weight: 140 }, { sets: 2, weight: 140 }]);
+  const one = ladderJoin([{ sets: 4, weight: 140 }]);
+  assert.deepEqual(two.joined[0].actual, one.joined[0].actual);
+  assert.equal(two.verdict.verdict, "too-easy");
+});
+
+test("a ladder that dropped below the target mid-exercise still reads as a struggle", () => {
+  /* Two sets at 150 and then two at 130 against a 140 target: the top weight
+     beat the plan and the lightest row fell under it, and it is the lightest
+     row that says the weight came down. */
+  const { joined, verdict } = ladderJoin([{ sets: 2, weight: 150 }, { sets: 2, weight: 130 }]);
+  assert.equal(joined[0].actual.weightLow, 130);
+  assert.equal(verdict.verdict, "too-heavy", verdict.why);
+});
+
 /* Asserted in pounds, never as a factor. The bug this replaces was a 1.025
    multiplier that a factor assertion passed happily while no curl in the product
    ever got heavier, so these check the weight a person is handed. */
