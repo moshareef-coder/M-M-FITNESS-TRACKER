@@ -1634,6 +1634,18 @@
   .rest-pref button:active { transform: scale(.96); }
   .rest-pref button.on { background: var(--accent); border-color: transparent; color: var(--on-accent); }
 
+  /* The onboarding styles grid, on the Training page. The tiles keep their own
+     geometry; only the surface changes, because --panel is #fff in light mode
+     and that is the card's own fill, so inside a card the seven tiles read as
+     one flat block with hairlines drawn across it. --panel-2 is what every
+     other control in Setup sits on, lighter than the card in dark mode and a
+     shade darker in light, which is the same step the rest buttons above take. */
+  .set-styles .ob-styles { margin: 12px 0 0; }
+  .set-styles .ob-style { background: var(--panel-2); }
+  .set-styles .ob-style.on { background: color-mix(in srgb, var(--accent) 14%, var(--panel-2)); }
+  .set-styles .ob-other { margin: 12px 0 0; }
+  .set-styles .ob-other > summary { background: var(--panel-2); }
+
   /* Grid, not space-between: "Weight (lb)" is a wider label than "Reps", so
      with flex the two control groups started at different places and the minus
      buttons did not line up down the screen. */
@@ -8032,6 +8044,17 @@
       <p class="muted-note" style="margin-top:-6px;">Optional. Anything the goal above does not say on its own.</p>
       <textarea id="setupGoalDetail" placeholder="e.g. training for a wedding in June, prefer 4 days/week"></textarea>
     </div>
+    <!-- Asked on the way in and then never again: somebody who joined a gym,
+         stopped going, or took up running was planned for the answer they gave
+         on the day they signed up, forever. Same seven cards as onboarding,
+         same column, and it saves with the button at the bottom of this page
+         because nothing here writes until Save. -->
+    <div class="card">
+      <h2>What you actually do</h2>
+      <p class="muted-note" style="margin-top:-6px;">We only ever plan what is ticked. Change it whenever what you do changes.</p>
+      <div class="set-styles" id="setupStyleGrid"></div>
+      <p class="muted-note" id="setupStyleNote"></p>
+    </div>
     <div class="card">
       <h2>Weekly goal</h2>
       <label class="gym-toggle" id="sharedGoalToggleWrap">
@@ -11191,6 +11214,10 @@ async function upsertGoalFields(patch) {
   return {
     data: retry.data, error: retry.error,
     droppedSecondary: dropped("goal_secondary"), droppedSession: dropped("session_minutes"),
+    /* Same idea, for the Training page's styles picker: the write went through
+       without the column, so the caller has to say so rather than report a
+       save that did not happen. */
+    droppedStyles: dropped("train_styles"),
   };
 }
 
@@ -12708,6 +12735,62 @@ function recommendedStyles(data) {
   return kept.length ? kept : ["walking", "home"];
 }
 
+/* ---- The styles picker. ONE picker, two screens -----------------------------
+   Onboarding asks this on the way in and Setup > Training asks it forever
+   after, and it is the same seven options with the same copy going into the
+   same column. The focus regions were written out twice and had drifted by the
+   second day, so the same button bought a different muscle depending on which
+   screen answered it. That is not happening again here: the markup, the
+   toggling and the sentence underneath are written once and both screens call
+   them.
+
+   `recs` only decorates. Nothing in here ticks anything on its own: what is
+   ticked is what the caller passed, because Setup must never paint a
+   suggestion as if it were the stored answer. */
+function trainStylePickerHTML(picked, recs = []) {
+  const on = new Set(picked);
+  const card = (t) => `<button type="button" class="ob-style${on.has(t.id) ? " on" : ""}" data-style="${t.id}" aria-pressed="${on.has(t.id)}">
+      ${recs.includes(t.id) ? `<span class="obs-rec">Recommended</span>` : ""}
+      <span class="obs-ico">${icon(t.ico, 20)}</span>
+      <span class="obs-label">${escapeHtml(t.label)}</span>
+      <span class="obs-sub">${escapeHtml(t.sub)}</span>
+    </button>`;
+  const others = TRAIN_STYLES.filter((t) => t.other);
+  /* Other is closed by default and opens itself when something inside it is
+     already ticked, so reopening this never hides a choice. It is not drawn at
+     all while nothing is behind it: every style is on the main board today, and
+     an empty drawer is a promise of more that is not there. */
+  return `<div class="ob-styles">${TRAIN_STYLES.filter((t) => !t.other).map(card).join("")}</div>
+    ${others.length ? `<details class="ob-other"${others.some((t) => on.has(t.id)) ? " open" : ""}>
+      <summary>Other</summary>
+      <div class="ob-styles">${others.map(card).join("")}</div>
+    </details>` : ""}`;
+}
+
+/* `onChange` is handed the new list and a veto: return false and the tap is
+   taken back, tick and all. Setup uses it to hold the line at one ticked, and
+   onboarding never vetoes anything. */
+function wireTrainStylePicker(root, picked, onChange) {
+  const on = new Set(picked);
+  root.querySelectorAll("[data-style]").forEach((b) => b.onclick = () => {
+    const id = b.dataset.style;
+    const was = on.has(id);
+    was ? on.delete(id) : on.add(id);
+    if (onChange([...on], id) === false) { was ? on.add(id) : on.delete(id); return; }
+    b.classList.toggle("on", on.has(id));
+    b.setAttribute("aria-pressed", String(on.has(id)));
+  });
+}
+
+/* The sentence under the grid. Says nothing when there is nothing true to say,
+   the way quips.mjs does it, so the line is worth reading when it appears. */
+function trainStyleNote(picked) {
+  if (!picked.length) return "Pick at least one.";
+  const has = (k) => picked.some((id) => TRAIN_STYLES.find((t) => t.id === id)?.mod === k);
+  return has("weight-training") ? ""
+    : "No resistance training. That is your call, and worth knowing: two sessions a week is what keeps weight loss taking fat rather than muscle.";
+}
+
 /* How many training days each step is worth on the bar. Not evenly spaced,
    because the steps are not evenly sized: name is a text field and the body
    picker is a real decision, and a bar that jumps in equal hops past a long
@@ -13133,51 +13216,28 @@ function renderOnboardStep(step, data = {}) {
        two or three that follow from their goals is a suggestion they can
        actually disagree with. */
     const recs = recommendedStyles(data);
-    const picked = new Set(data.train_styles || recs);
-    const others = TRAIN_STYLES.filter((t) => t.other);
-    const openOther = others.some((t) => picked.has(t.id));
     /* An icon on every one of them. Seven text-only cards read as a form; the
        same seven with a picture on each read as a menu, and this is the one
-       screen in the run where somebody is choosing rather than answering. */
-    const card = (t) => `<button type="button" class="ob-style${picked.has(t.id) ? " on" : ""}" data-style="${t.id}">
-        ${recs.includes(t.id) ? `<span class="obs-rec">Recommended</span>` : ""}
-        <span class="obs-ico">${icon(t.ico, 20)}</span>
-        <span class="obs-label">${escapeHtml(t.label)}</span>
-        <span class="obs-sub">${escapeHtml(t.sub)}</span>
-      </button>`;
+       screen in the run where somebody is choosing rather than answering.
+       The grid itself is trainStylePickerHTML, shared with Setup > Training. */
+    let picked = [...new Set(data.train_styles || recs)];
     ob.innerHTML = `
       <div class="ob-step">
         ${obChrome("styles", data)}
         <h1>Pick your workouts</h1>
         <p class="sub">We have ticked what suits your goals. Change any of it. We only ever plan what is ticked here.</p>
-        <div class="ob-styles" id="styleGrid">
-          ${TRAIN_STYLES.filter((t) => !t.other).map(card).join("")}
-        </div>
-        <details class="ob-other"${openOther ? " open" : ""}>
-          <summary>Other</summary>
-          <div class="ob-styles">${others.map(card).join("")}</div>
-        </details>
+        ${trainStylePickerHTML(picked, recs)}
         <p class="ob-style-note" id="styleNote"></p>
         <button type="button" class="btn-primary" id="styleNext">On to the fun stuff</button>
         <button type="button" class="btn-ghost" id="styleBack">Back</button>
       </div>`;
     const note = () => {
-      const has = (k) => [...picked].some((id) => TRAIN_STYLES.find((t) => t.id === id)?.mod === k);
-      $("styleNote").textContent = !picked.size
-        ? "Pick at least one."
-        : !has("weight-training")
-          ? "No resistance training. That is your call, and worth knowing: two sessions a week is what keeps weight loss taking fat rather than muscle."
-          : "";
-      $("styleNext").disabled = !picked.size;
+      $("styleNote").textContent = trainStyleNote(picked);
+      $("styleNext").disabled = !picked.length;
     };
-    ob.querySelectorAll("[data-style]").forEach((b) => b.onclick = () => {
-      const id = b.dataset.style;
-      picked.has(id) ? picked.delete(id) : picked.add(id);
-      b.classList.toggle("on", picked.has(id));
-      note();
-    });
+    wireTrainStylePicker(ob, picked, (ids) => { picked = ids; note(); });
     note();
-    $("styleNext").onclick = () => renderOnboardStep("days", { ...data, train_styles: [...picked] });
+    $("styleNext").onclick = () => renderOnboardStep("days", { ...data, train_styles: picked });
     $("styleBack").onclick = () => {
       const q = tuneQueue(data);
       if (q.length) renderOnboardStep("tune", { ...data, tuneIdx: q.length - 1 });
@@ -39168,6 +39228,9 @@ function openSettingsPage(key) {
     $("setupGoalSub").textContent = goalTileLabel(MY_PROFILE);
     // Same reason: what the goal suggests moves when the goal does.
     renderSessionLengthPage();
+    // And the same again: this one paints the stored answer, so an edit that
+    // was abandoned by leaving the page must not still be sitting here.
+    renderTrainStylesPage();
   }
   if (key === "focus") renderBodyFocusPage();
   if (key === "limits") renderLimitsPage();
@@ -39410,6 +39473,71 @@ async function renderSessionLengthPage() {
       toast(minutes === null ? "Your goal picks the length again" : `Sessions set to about ${minutes} minutes`);
     },
   });
+}
+
+/* What the picker on Setup > Training is holding, which until Save is not what
+   the profile holds. Null while the page has never been opened. */
+let SETUP_STYLES = null;
+
+/* Setup > Training, the same seven cards onboarding asks on the way in.
+
+   It is the one answer on the account that shapes what gets built and could
+   never be changed: somebody who ticked "With equipment" on the day they
+   signed up and then joined a gym, or stopped going, or took up running, was
+   planned for that answer forever.
+
+   Unlike the rest length and the session length above it, this does not save
+   on the tap. A tap here is half a thought: going from lifting to running is
+   an untick and a tick, and an untick that saves on its own would have to
+   write the empty list in between, which is the one value this column must
+   never hold. So it saves with the button at the bottom of the page, the way
+   everything else on it does. */
+function renderTrainStylesPage() {
+  const el = $("setupStyleGrid");
+  if (!el) return;
+  const stored = Array.isArray(MY_PROFILE?.train_styles) ? MY_PROFILE.train_styles : null;
+  SETUP_STYLES = (stored || []).filter((id) => TRAIN_STYLES.some((t) => t.id === id));
+  /* The recommendations are drawn as badges and tick nothing. Onboarding opens
+     on them because it is asking for a first answer; this page is showing an
+     answer that already exists, and pre-ticking a suggestion here would paint a
+     plan the engine is not building. */
+  el.innerHTML = trainStylePickerHTML(SETUP_STYLES, recommendedStyles(MY_PROFILE || {}));
+  const note = () => { $("setupStyleNote").textContent = trainStyleSetupNote(SETUP_STYLES, stored); };
+  wireTrainStylePicker(el, SETUP_STYLES, (ids) => {
+    /* Nothing ticked is refused rather than saved, and this is not tidiness.
+       styles.mjs reads an empty list the same way it reads null, which is
+       "never asked", so an account that deliberately unticked everything would
+       get MORE than it asked for: the engine would go back to building
+       whatever it likes. Unticking the last one is the only tap on this screen
+       that would do the opposite of what it looks like, so it does not happen. */
+    if (!ids.length) {
+      $("setupStyleNote").textContent = "Keep at least one ticked. Nothing ticked would not mean nothing planned, it would mean we go back to building whatever we like, which is not what you are asking for.";
+      return false;
+    }
+    SETUP_STYLES = ids;
+    note();
+  });
+  note();
+}
+
+/* Said before anything is written, the way the goal page says what a goal
+   change is worth before Save rather than after. */
+function trainStyleSetupNote(picked, stored) {
+  if (!picked.length) {
+    return stored === null
+      ? "You have never answered this, so your plans are built on what your goal suggests. Tick what you actually do and the next one is built on that."
+      : "Pick at least one.";
+  }
+  return trainStyleNote(picked) || "The next plan you generate is built on this.";
+}
+
+/* What actually goes in the column. Anything the grid cannot draw is carried
+   through untouched: styles.mjs knows keys this app does not offer yet
+   (swimming, rowing), and a screen must not delete what it cannot show. */
+function trainStylesToSave() {
+  const stored = Array.isArray(MY_PROFILE?.train_styles) ? MY_PROFILE.train_styles : [];
+  const unseen = stored.filter((id) => !TRAIN_STYLES.some((t) => t.id === id));
+  return [...(SETUP_STYLES || []), ...unseen];
 }
 
 function renderSetupTab() {
@@ -39902,6 +40030,8 @@ async function saveTrainingPrefs() {
   }, { toastText: "Training saved" });
   if (!ok) return;
 
+  await saveTrainStyles();
+
   if (MY_PARTNERSHIP) {
     const sharedOn = $("sharedGoalToggle").checked;
     const sharedVal = sharedOn ? clampNum($("setupSharedGoal").value, 1, 7, 4) : null;
@@ -39912,6 +40042,55 @@ async function saveTrainingPrefs() {
     else MY_PARTNERSHIP.shared_weekly_goal = sharedVal;
   }
   renderHome();
+}
+
+/* What they actually do, saved with the rest of the page but in its own write.
+   Through upsertGoalFields rather than commitProfile for the reason the session
+   length goes the same way: train_styles is in PENDING_PROFILE_COLUMNS, and on
+   a database without the migration a write that names it comes back PGRST204
+   and takes the whole row with it, the goal note and the weekly target along
+   with it.
+
+   Only written when the answer actually changed, so a Save that was about the
+   weekly target does not restamp this and does not say anything about the plan
+   when nothing about the plan moved. */
+async function saveTrainStyles() {
+  if (!Array.isArray(SETUP_STYLES)) return;          // the page was never opened
+  const next = trainStylesToSave();
+  const before = Array.isArray(MY_PROFILE?.train_styles) ? MY_PROFILE.train_styles : null;
+  const same = before && before.length === next.length && next.every((id) => before.includes(id));
+  /* Empty is never written. See the refusal in renderTrainStylesPage: the
+     engine reads it as never asked, which is the opposite of what it means. */
+  if (same || !next.length) return;
+
+  const { error, droppedStyles } = await upsertGoalFields({
+    email: MY_EMAIL, user_name: ME, train_styles: next,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) { toast("Could not save what you do"); console.error(error); return; }
+  if (droppedStyles) {
+    /* Not saved, so nothing here pretends it was, and the grid goes back to
+       what the database actually holds. */
+    $("setupStyleNote").textContent = "What you do is not being stored yet, so this part has not been saved.";
+    renderTrainStylesPage();
+    return;
+  }
+  if (MY_PROFILE) MY_PROFILE.train_styles = next;
+
+  /* Nothing is regenerated here, and that is the decision rather than an
+     omission. A plan built on the old answer may be one somebody is part way
+     through, and the single control that overwrites today's row, Regenerate on
+     the Workout tab, already asks first and already takes itself off the screen
+     once a set has been logged. Rebuilding from a settings save would have to
+     either duplicate that confirm or skip it, and skipping it is how a
+     half-finished session gets thrown away by a settings change.
+
+     So this does what the goal page does: says plainly what the change is worth
+     and leaves the plan alone. The difference from the goal page is that this
+     one names today's workout, because that is the plan in their hand. */
+  $("setupStyleNote").textContent = TODAY_WORKOUT && !TODAY_WORKOUT.archived
+    ? "Saved. Today's workout was built on your old answer and is left exactly as it is. Regenerate it on the Workout tab to use this, or it lands with your next plan."
+    : "Saved. The next plan you generate is built on this.";
 }
 
 /* Setup > Your body. Owns the four numbers the calorie and load maths reads,
