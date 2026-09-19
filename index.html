@@ -491,6 +491,12 @@
   /* The card places its arc on a grid; here it is a flex item on the right. */
   .plan-ov .wkt-arc { grid-area: auto; justify-self: auto; flex: none; width: 136px; height: 104px; }
   .plan-ov .wkt-arc-num b { font-size: 32px; }
+  /* The day the numbers say to skip. It stands in the card's place rather
+     than on top of it: the ordinary grid is still in the DOM, wired, one class
+     away, which is what Work out anyway takes off. */
+  .wkt-next-grid.hid { display: none; }
+  .wkt-rest-rec h2 { margin-bottom: 6px; }
+  .wkt-rest-rec .wkt-btn-soft { margin-top: 14px; }
   .wkt-next-acts { grid-area: acts; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .wkt-next-acts .wkt-more { flex-basis: 100%; }
   .wkt-more {
@@ -6512,10 +6518,6 @@
     text-transform: uppercase; color: var(--muted);
   }
   .act-styles { margin: 0; }
-  /* One row rather than half of one: lifting is a kind, not an activity, and it
-     leaves this sheet instead of starting anything on it. */
-  .act-lift { width: 100%; margin-top: 12px; flex-direction: row; align-items: center; gap: 10px; }
-  .act-lift .obs-ico { margin: 0; }
   /* What the generated session is, in three numbers, because a name and a cue
      are not enough to decide with. */
   .act-facts { grid-area: seg; display: flex; gap: 8px; }
@@ -22067,18 +22069,14 @@ function renderCardioStage() {
             </button>`).join("")}
           </div>`;
       }).join("")}
-      ${/* A lift is the one kind of session this sheet cannot run, because it
-            is a plan and not a clock. It is still a kind, and a day that
-            already holds a yoga class most often wants this one next, so it
-            is offered here and hands off to the screen that builds plans. */ ""}
-      <button type="button" class="ob-style act-lift" id="csnLift">
-        <span class="obs-ico">${icon("dumbbell", 20)}</span>
-        <span class="obs-label">${TODAY_WORKOUT && !TODAY_WORKOUT.archived ? "Open today’s workout" : "Lifting workout"}</span>
-      </button>`;
+      ${/* A lift used to be offered at the bottom of this sheet, handing off
+            to the screen that builds plans. Mo, 2026-09-19: "I don't like how
+            when I start an activity I see lifting workout, that shouldn't be
+            there." He is right now that Plan my own asks lifting or activity
+            before anything opens: whoever is looking at this sheet answered
+            that question one screen ago, so the tile was the app asking twice
+            and calling the second one a different kind of session. */ ""}`;
     $("csnX").onclick = csnDismiss;
-    /* Leaves the sheet rather than starting anything: nothing here can build a
-       plan, and the choose screen is where that lives. */
-    $("csnLift").onclick = () => { csnDismiss(); switchTab("workout"); goWorkoutScreen("choose"); };
     stage.querySelectorAll("[data-act]").forEach((b) => {
       b.onclick = () => { CARDIO_SES.act = b.dataset.act; csnSave(); renderCardioStage(); };
     });
@@ -31020,6 +31018,14 @@ function matchReading(pct) {
    against, and the day it was last trained. Nothing here is a new opinion
    about the workout. */
 let MATCH_NOTE = null;
+/* The day somebody has already tapped past the rest recommendation on, so the
+   card does not put it back. Kept against a date rather than as a plain
+   boolean because it is an answer about one day's proposal: tomorrow is a new
+   question and gets asked again. It is not a render-local flag because
+   refreshEngineNextDay repaints this whole screen a beat after it paints, and
+   a flag living on the render would slide the recommendation back over a card
+   somebody had already moved past. */
+let REST_OK_FOR = null;
 function matchNoteFor(p) {
   const all = p.all || [];
   if (!all.length) return null;
@@ -31635,10 +31641,10 @@ function renderChooseScreen() {
      because a percentage with nothing attached to it is a number nobody can
      argue with.
 
-     Two buttons, not three cards. The third door, an activity on the clock,
-     is a line under them: it has to stay reachable from here because on an
-     empty day this screen is where it lives, but it is not what most people
-     open this tab to do. */
+     Two buttons, and now only two: generate one, or plan your own. An
+     activity is not a third door on this card any more, it is one of the two
+     answers behind Plan my own, which is where somebody is already being
+     asked what they want. */
   /* Which day this card is about. Today until today is done, then tomorrow.
      A plan already sitting on tomorrow is shown rather than offered again:
      the button becomes the way to look at it. */
@@ -31652,16 +31658,47 @@ function renderChooseScreen() {
      account can still plan a workout and begin one from here, which is what
      the free tier promises. */
   const hiredHere = hired();
+  /* Mo, 2026-09-19: "if a match is very low for a workout can we start
+     recommending rest, recommending taking a rest day, and then they can have
+     the option to work out anyway."
+
+     Very low is under 45, which is not a new number: it is where freshTone
+     already turns this card's own ring red. A second threshold would put a
+     card saying rest next to a ring the app had decided was only amber, on the
+     same screen, and one of the two would be lying.
+
+     Only on a proposal. A plan that already exists is a decision somebody made
+     and talking them out of it is a larger conversation than a card.
+
+     Only when hired, too. The reading this is built from is the reading a free
+     account does not get, and what the rest state would cover on a free card
+     is the pitch for buying it: recommending rest in place of a number we are
+     not showing is advice nobody can check. */
+  const worstMuscle = (p.all || [])[(p.all || []).length - 1] || null;
+  const restAdvised = hiredHere && !p.real && p.match != null && p.match < 45
+    && REST_OK_FOR !== nextDate;
+  const restRec = !restAdvised ? "" : `
+    <div class="wkt-rest-rec">
+      <h2>${allDone ? "Make tomorrow a rest day" : "Take today off"}</h2>
+      <p class="wkt-next-sub">${worstMuscle
+        ? `I would rest this one: ${escapeHtml(worstMuscle.name.toLowerCase())} is down to ${worstMuscle.fresh}% of the room it has this week, and the best day I can build you still only reads ${p.match}%.`
+        : `I would rest this one: the best day I can build you still only reads ${p.match}%, so most of it is work you have already done this week.`}</p>
+      ${/* Quiet, and it is the only button here. Rest is the recommendation;
+            this is the way past it, not the encouraged path, and it says what
+            pressing it means rather than "Continue". */ ""}
+      <button type="button" class="wkt-btn-soft sm" id="chooseAnywayBtn">Work out anyway</button>
+    </div>`;
   const nextCard = `
     <section class="wkt-next${hiredHere ? "" : " not-hired"}">
       <div class="wkt-next-top">
-        <p class="wkt-eyebrow">${allDone ? "Tomorrow" : "Next workout"}</p>
+        <p class="wkt-eyebrow" id="wktNextEyebrow">${restAdvised ? "Rest day" : allDone ? "Tomorrow" : "Next workout"}</p>
         ${/* The dot explains how the match is worked out, so with no match on
               screen it explains nothing. A cardio day has no match: see
               planFromToday on why that is null rather than a number. */ ""}
         ${hiredHere && p.match != null ? infoDot("planMatch", "How the match is worked out") : ""}
       </div>
-      <div class="wkt-next-grid">
+      ${restRec}
+      <div class="wkt-next-grid${restAdvised ? " hid" : ""}">
         <div class="wkt-next-words">
           <h2>${escapeHtml(p.focus)}</h2>
           ${hiredHere && p.match != null ? `<p class="wkt-next-sub">${escapeHtml(matchReading(p.match))}</p>` : ""}
@@ -31687,14 +31724,17 @@ function renderChooseScreen() {
               ? `<button type="button" class="wkt-btn-solid sm" id="chooseSeeTomorrow">See tomorrow&rsquo;s plan</button>`
               : `<button type="button" class="wkt-btn-solid sm" id="chooseGenerateBtn">${allDone ? "Generate tomorrow&rsquo;s" : "Generate workout"}</button>`}
           ${tomorrowPlan ? "" : `<button type="button" class="wkt-btn-soft sm" id="choosePlanBtn">Plan my own</button>`}
-          ${/* Taken off this card on one note and put back on the next: "let's
-                put the activity back." It earns the room. On a day with no
-                lifting plan this is the only one-tap way into a run or a class
-                from this tab, and for somebody whose training styles are yoga
-                and cardio it is the way they train, not a detour from it. */ ""}
+          ${/* Two doors, not three. Mo, 2026-09-19: "we're gonna have the plan
+                my own and generate workout, and then when it's the plan my own
+                you could pick an activity through there." So the invitation to
+                start an activity is gone from here and asked one level down,
+                inside Plan my own, where the question is being asked anyway.
+                What stays is the way back into a session already running. That
+                is not an offer, it is the only door out of something paused,
+                and a card that hides it is a card that starts a second one. */ ""}
           ${csnRunning()
             ? `<button type="button" class="wkt-more" id="chooseActivityBtn">Resume ${escapeHtml(csnAct().label.toLowerCase())}, ${csnClock(csnElapsedMs())} ${icon("chevronRight", 13)}</button>`
-            : `<button type="button" class="wkt-more" id="chooseActivityBtn">or start an activity ${icon("chevronRight", 13)}</button>`}
+            : ""}
         </div>
         ${/* The muscle caption is gone too: "remove trains triceps, chest,
               traps, shoulders, we can see it when we generate the workout."
@@ -31807,8 +31847,24 @@ function renderChooseScreen() {
      preview, not two. */
   if ($("chooseBeginBtn")) $("chooseBeginBtn").onclick = () => goWorkoutScreen(null);
   /* Planning your own for a day that is not today is the day planner's job,
-     not the manual builder's: the builder writes to today. */
-  if ($("choosePlanBtn")) $("choosePlanBtn").onclick = () => (allDone ? openDayPlanner(nextDate) : toManual());
+     not the manual builder's: the builder writes to today. That planner asks
+     lifting or activity already, which is the same question openPlanKind asks
+     for today, so both branches now fork the same way. */
+  if ($("choosePlanBtn")) $("choosePlanBtn").onclick = () => (allDone ? openDayPlanner(nextDate) : openPlanKind(toManual));
+  /* Past the recommendation rather than around it. The ordinary card is
+     already rendered and already wired underneath, so this only uncovers it:
+     same screen, same buttons, nothing navigated and nothing rebuilt. */
+  if ($("chooseAnywayBtn")) $("chooseAnywayBtn").onclick = () => {
+    REST_OK_FOR = nextDate;
+    const card = $("workoutContent").querySelector(".wkt-next");
+    if (!card) return;
+    card.querySelector(".wkt-rest-rec")?.remove();
+    card.querySelector(".wkt-next-grid")?.classList.remove("hid");
+    // The eyebrow belongs to whatever the card is showing, and what it is
+    // showing now is the next workout again.
+    const brow = $("wktNextEyebrow");
+    if (brow) brow.textContent = allDone ? "Tomorrow" : "Next workout";
+  };
   /* Guarded: a coached client has no plan buttons, so this card is not there. */
   const actBtn = $("chooseActivityBtn");
   if (actBtn) actBtn.onclick = () => openCardioSession();
@@ -33227,6 +33283,51 @@ function sparePlanDay(taken) {
     if (!taken.has(iso)) return iso;
   }
   return null;
+}
+
+/* "What would you like to plan?" Mo, 2026-09-19: "when they plan their own
+   they should ask them like what would you like to plan, and then it could
+   show the activity and it could show weightlifting." Plan my own went
+   straight into the manual builder, which only knows how to build a lift, so
+   an activity had to be offered somewhere else on the card, and the card ended
+   up with three doors to two decisions.
+
+   Deliberately the same two tiles openDayPlanner shows for a future day, same
+   classes and same wording, because it is the same question. A second shape
+   for it would read as a different feature.
+
+   Today's activity opens the session itself rather than a plan to do later,
+   which is what openActivityInstead already does for today: on the day, the
+   clock is the point. */
+function openPlanKind(onWeights) {
+  const scrim = document.createElement("div");
+  scrim.className = "pop-scrim";
+  scrim.innerHTML = `
+    <div class="pop">
+      <div class="pop-body">
+        <div class="ds-top">
+          <div><div class="pop-who" style="color:var(--muted)">TODAY</div>
+            <div class="sv-name">What would you like to plan?</div></div>
+          <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
+        </div>
+        <div class="dp-ways">
+          <button type="button" class="dp-way" id="pkLift">
+            <span class="dp-way-ico">${icon("pencil", 18)}</span>
+            <span class="dp-way-txt"><b>Weightlifting</b><i>Pick the exercises yourself.</i></span>
+          </button>
+          <button type="button" class="dp-way" id="pkAct">
+            <span class="dp-way-ico">${icon("run", 18)}</span>
+            <span class="dp-way-txt"><b>Activity</b><i>A run, a ride, yoga, Pilates.</i></span>
+          </button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+  const close = () => scrim.remove();
+  scrim.querySelectorAll("[data-close]").forEach((b) => { b.onclick = close; });
+  scrim.onclick = (e) => { if (e.target === scrim) close(); };
+  scrim.querySelector("#pkLift").onclick = () => { close(); onWeights(); };
+  scrim.querySelector("#pkAct").onclick = () => { close(); openCardioSession(); };
 }
 
 /* Putting something on an empty day: generate one, build one, or do an
