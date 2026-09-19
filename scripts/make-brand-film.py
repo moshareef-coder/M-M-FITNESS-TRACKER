@@ -19,7 +19,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 FIG = ROOT / "brand/film/figure"
@@ -47,19 +47,24 @@ MOVE_DUR = 6.4
 #
 # Down fast, up slower, the way an eye actually moves, and the whole thing is
 # over in a quarter of a second with almost none of it spent shut.
-BLINKS = [(1.55, 0.09, 0.17), (3.30, 0.09, 0.17)]   # (start, closing, opening)
+BLINKS = [(1.40, 0.09, 0.17), (3.05, 0.09, 0.17), (4.45, 0.08, 0.15)]
 EYES_OPEN_AT = 1.0           # a face clock nowhere near the rig's own blink
 # He changes expression behind closed lids, which is how it is done by hand and
 # why the mood switch does not read as a cut.
-HAPPY_FROM = 3.39
+HAPPY_FROM = 3.14
 
-FIG_UNTIL = 5.6              # the figure is on screen until here
-LINES = [
-    (1.60, 3.05, "Most fitness apps are built"),
-    (1.60, 3.05, "for one person."),
-    (3.45, 5.30, "We are building one"),
-    (3.45, 5.30, "for two."),
-]
+FIG_UNTIL = 5.3              # the figure is on screen until here
+# No copy. Mo is adding his own, so the film is picture only and every second
+# has to be carried by movement instead of by a sentence.
+LINES = []
+
+# The mark does not swing in any more, it draws itself on: both arcs start at
+# the top and race round to meet at the bottom. That is the same gesture as the
+# progress rings on the dashboard filling up, which makes the logo assemble the
+# way the product works rather than the way a logo usually appears.
+DRAW_FROM, DRAW_TO = 5.10, 6.35
+BAR_FROM, BAR_TO = 6.30, 6.78
+SWEEP_FROM, SWEEP_TO = 7.05, 7.85     # a specular band crossing the finished mark
 
 SFPRO = "/System/Library/Fonts/SFNS.ttf"
 
@@ -73,7 +78,7 @@ SFPRO = "/System/Library/Fonts/SFNS.ttf"
 PAD_BLEED = 8
 BAR_PX = 853
 # When the mark blinks, and which pads. (start, length, left, right)
-MARK_BLINKS = [(6.80, 0.20, 1, 1), (7.45, 0.26, 0, 1)]
+MARK_BLINKS = [(6.92, 0.20, 1, 1), (7.62, 0.26, 0, 1)]
 # The figure is rendered far larger than it is shown, because the shot is a
 # portrait and the rig draws a whole standing body: at 1080 his head is about a
 # hundred pixels tall, and cropping to it means upscaling the one part of the
@@ -102,6 +107,55 @@ def pad_close(t):
             out[0] = max(out[0], shut * l)
             out[1] = max(out[1], shut * r)
     return out
+
+
+# Where the mark's arcs start and finish, clockwise from twelve o'clock, and the
+# 2.4 degrees of clear air either side of the join. Has to agree with
+# scripts/make-logo.py, which is where the artwork is drawn.
+ARC_GAP = 2.4
+
+
+def arc_reveal(layer, side, p):
+    """One arc, drawn on from the top by fraction p.
+
+    A wedge from the centre is used as a mask rather than anything cleverer: the
+    arc is a ring around that centre, so a pie slice cuts it at exactly the angle
+    wanted and the artwork's own antialiasing survives.
+    """
+    if p >= 0.999:
+        return layer
+    if p <= 0.001:
+        return None
+    w, h = layer.size
+    mask = Image.new("L", (w, h), 0)
+    d = ImageDraw.Draw(mask)
+    span = 180 - 2 * ARC_GAP
+    # PIL measures from three o'clock; the artwork is measured from twelve.
+    if side == "left":
+        end = 270 - ARC_GAP
+        d.pieslice([-w, -h, w * 2, h * 2], end - span * p, end, fill=255)
+    else:
+        start = -90 + ARC_GAP
+        d.pieslice([-w, -h, w * 2, h * 2], start, start + span * p, fill=255)
+    out = layer.copy()
+    out.putalpha(ImageChops.multiply(out.getchannel("A"), mask))
+    return out
+
+
+def light_sweep(size, p, width=0.26):
+    """A diagonal specular band crossing the mark once."""
+    w, h = size
+    band = Image.new("L", (w, h), 0)
+    d = ImageDraw.Draw(band)
+    # Travels from beyond the top-left corner to beyond the bottom-right.
+    span = w * 2.4
+    x = -w * 0.7 + span * p
+    bw = w * width
+    for i in range(int(bw)):
+        k = i / bw
+        v = int(255 * (1 - abs(k - 0.5) * 2) ** 1.6)
+        d.line([(x + i, -h), (x + i - h * 1.6, h * 2)], fill=v)
+    return band.filter(ImageFilter.GaussianBlur(w * 0.02))
 
 
 def pad_boxes(bar):
@@ -314,7 +368,7 @@ def main():
     cx = (x0 + x1) // 2
     half = int(body * 0.30)
     crop = (cx - half, max(0, y0 - int(body * 0.02)), cx + half, y0 + int(body * 0.40))
-    fw = 900
+    fw = 940
     fh = int(fw * (crop[3] - crop[1]) / (crop[2] - crop[0]))
 
     arcL = Image.open(ROOT / "brand/unio-left.png").convert("RGBA")
@@ -324,14 +378,10 @@ def main():
     # once, so the closed edges get the same antialiasing as the artwork.
     bar_src = Image.open(ROOT / "brand/unio-bar.png").convert("RGBA")
     bar_pads = pad_boxes(bar_src)
-    mark = 660
+    mark = 730
     arcL = arcL.resize((mark, mark), Image.LANCZOS)
     arcR = arcR.resize((mark, mark), Image.LANCZOS)
-    mx, my = (W - mark) // 2, 300
-
-    f_body = font(54)
-    f_name = font(92, "Bold")
-    f_sub = font(33)
+    mx, my = (W - mark) // 2, (H - mark) // 2
 
     COMP.mkdir(parents=True, exist_ok=True)
     for old in COMP.glob("*.png"):
@@ -358,38 +408,43 @@ def main():
                 src = Image.open(figs[i]).convert("RGBA")
                 src = blink_eyes(src, eye_close(t), eye_boxes(src))
                 im = src.crop(crop).resize((w2, h2), Image.LANCZOS)
-                frame.alpha_composite(fade(im, a), ((W - w2) // 2, 250 - (h2 - fh) // 2))
-
-        # ---- the copy ----
-        y = 1010
-        for j, (a0, a1, text) in enumerate(LINES):
-            row = j % 2
-            a = ramp(t, a0, a0 + 0.45) * (1 - ramp(t, a1, a1 + 0.35))
-            if a > 0.01:
-                rise = int(18 * (1 - ramp(t, a0, a0 + 0.45)))
-                d = ImageDraw.Draw(frame)
-                centred(d, y + row * 74 + rise, text, f_body, INK, a)
+                frame.alpha_composite(fade(im, a), ((W - w2) // 2, (H - fh) // 2 - (h2 - fh) // 2))
 
         # ---- the mark assembling ----
-        lo = ramp(t, 5.55, 6.35)
-        if lo > 0.01:
-            for img, sign in ((arcL, -1), (arcR, 1)):
-                ang = sign * 52 * (1 - lo)
-                off = int(sign * mark * 0.14 * (1 - lo))
-                piece = img.rotate(-ang, resample=Image.BICUBIC, center=(mark / 2, mark / 2))
-                frame.alpha_composite(fade(piece, lo), (mx + off, my))
-            bo = clamp01((t - 6.05) / 0.45)
+        draw_p = ease_out(clamp01((t - DRAW_FROM) / (DRAW_TO - DRAW_FROM)))
+        if draw_p > 0.001:
+            layer = Image.new("RGBA", (mark, mark), (0, 0, 0, 0))
+            for img, side in ((arcL, "left"), (arcR, "right")):
+                piece = arc_reveal(img, side, draw_p)
+                if piece is not None:
+                    layer.alpha_composite(piece)
+
+            bo = clamp01((t - BAR_FROM) / (BAR_TO - BAR_FROM))
             if bo > 0.01:
-                s = 0.46 + 0.54 * ease_out_back(bo)
-                bw = int(mark * s)
+                sc = 0.5 + 0.5 * ease_out_back(bo)
+                bw = max(2, int(mark * sc))
                 b = blink_bar(bar_src, pad_close(t), bar_pads).resize((bw, bw), Image.LANCZOS)
-                frame.alpha_composite(fade(b, min(1.0, bo * 1.6)),
-                                      (mx + (mark - bw) // 2, my + (mark - bw) // 2))
-            d = ImageDraw.Draw(frame)
-            na = ramp(t, 6.45, 6.95)
-            centred(d, my + mark + 74, "UNIO", f_name, INK, na, track=13)
-            centred(d, my + mark + 200, "Train together. Coming soon.", f_sub, MUTED,
-                    ramp(t, 6.75, 7.25))
+                layer.alpha_composite(fade(b, min(1.0, bo * 2.0)), ((mark - bw) // 2, (mark - bw) // 2))
+
+            sp = clamp01((t - SWEEP_FROM) / (SWEEP_TO - SWEEP_FROM))
+            if 0.001 < sp < 0.999:
+                # Clipped to the mark's own alpha, so the light runs across the
+                # artwork instead of across the white behind it.
+                shine = Image.new("RGBA", (mark, mark), (255, 255, 255, 255))
+                band = light_sweep((mark, mark), sp)
+                shine.putalpha(ImageChops.multiply(
+                    ImageChops.multiply(band, layer.getchannel("A")),
+                    Image.new("L", (mark, mark), 120)))
+                layer.alpha_composite(shine)
+
+            # The whole mark takes the knock when the dumbbell lands, which is
+            # what sells it as one object rather than a picture being built.
+            knock = 0.0
+            if BAR_TO - 0.12 <= t < BAR_TO + 0.34:
+                knock = math.sin(math.pi * (t - (BAR_TO - 0.12)) / 0.46) * 0.022
+            ms = int(mark * (1 + knock))
+            frame.alpha_composite(layer.resize((ms, ms), Image.LANCZOS),
+                                  (mx - (ms - mark) // 2, my - (ms - mark) // 2))
 
         frame.convert("RGB").save(COMP / f"c{i:04d}.png")
 
