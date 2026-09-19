@@ -88,7 +88,9 @@ function linearProgress(logs) {
   const byExercise = new Map();
   for (const l of logs) {
     const k = norm(l.exercise_name);
-    if (l.weight == null || !k) continue;
+    /* A row with no load on it is not evidence about loading. See the same
+       rule in detectPlateau below for why 0 is skipped along with null. */
+    if (!(Number(l.weight) > 0) || !k) continue;
     if (!byExercise.has(k)) byExercise.set(k, []);
     byExercise.get(k).push({ date: rowDate(l), weight: Number(l.weight) });
   }
@@ -199,16 +201,27 @@ export function detectPlateau({ logs = [], today = new Date(), weeks = THRESHOLD
   const cutoff = new Date(parse(iso(today)) - weeks * 7 * DAY);
 
   /* Per exercise, the best weight on each training day, oldest first. A day is the unit
-     because that is what a session is everywhere else in this file. */
+     because that is what a session is everywhere else in this file.
+
+     Only rows with a load on them. The app writes `weight: null` for a push-up and 0
+     when somebody types 0, and until 2026-09-19 the 0 got through: Push-Up, Plank,
+     Inverted Row, Glute Bridge and Crunch all read as "has not gone up in N weeks, still
+     at 0 lb", four of them at once tripped the systemic volume cut, and a person who had
+     hit every rep of everything lost 15% of their week for it. A bodyweight movement
+     cannot stall at a weight because it has none; its progression is the variation and
+     the reps (load.mjs says so on every bodyweight card), and the plan prescribes the
+     reps, so a logged rep count that never climbs is the plan reflected back rather than
+     a stall. Rep progress is not tracked here on purpose: the day the plan raises reps
+     on bodyweight work is the day there is something to measure. */
   const byExercise = new Map();
   for (const l of usableRows(logs)) {
     const k = norm(l.exercise_name);
     const date = rowDate(l);
     if (l.weight == null || !k || !date) continue;
+    const w = Number(l.weight);
+    if (!(w > 0)) continue;
     if (!byExercise.has(k)) byExercise.set(k, { name: String(l.exercise_name).trim(), days: new Map() });
     const rec = byExercise.get(k);
-    const w = Number(l.weight);
-    if (!Number.isFinite(w)) continue;
     rec.days.set(date, Math.max(w, rec.days.get(date) ?? -Infinity));
   }
 

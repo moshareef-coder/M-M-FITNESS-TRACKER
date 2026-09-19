@@ -814,6 +814,13 @@ export function toWorkout(plan, dayIndex = 0) {
        minute plan delivered in 45. Additive; the app's own timer stays the
        fallback when the field is absent. */
     restSec: e.restSec ?? null,
+    /* Present only on a week the plateau answer cut the sets, and absent
+       otherwise rather than false, so every plan built before it existed is
+       the object it was. The app stores `exercises` verbatim into
+       ai_workouts, which makes this the engine's memory of its own last
+       answer: plateau-response.mjs reads it back to keep "the sets come down
+       for seven days, and then they go back up" true. */
+    ...(e.volumeCut ? { volumeCut: true } : {}),
   }));
 
   /* Additive, like swap and alternatives above: the five keys the app has

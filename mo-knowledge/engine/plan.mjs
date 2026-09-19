@@ -23,7 +23,7 @@ import { prescribeLoad, patternFor, roundLoad } from "./load.mjs";
 import { calibrate } from "./calibrate.mjs";
 import { learnPreferences, applyPreferences, avoidNote, openWeekBudget, heldBackNote, actedOn } from "./preferences.mjs";
 import { scoreAlternatives } from "./alternatives.mjs";
-import { planPlateauResponse, applyRotateFallback, repShiftFor } from "./plateau-response.mjs";
+import { planPlateauResponse, applyRotateFallback, repShiftFor, cutTakenRecently } from "./plateau-response.mjs";
 import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary, softenedNote } from "./limits.mjs";
 import { mainGroupsForDay } from "./recovery.mjs";
 import { TIER_MULTIPLIER, TIERS } from "./focus.mjs";
@@ -1213,6 +1213,9 @@ export function buildPlan({
        rather than labelled: see planPlateauResponse. */
     stillLinear: trainingAge.stillLinear, confidence: trainingAge.confidence,
     calibration, goal: resolved,
+    /* A lighter week handed out inside the last block is spent: the sets go
+       back up and the per lift answers run. See cutTakenRecently. */
+    cutTaken: cutTakenRecently({ plans, today }),
   });
   const rotateOut = new Set(
     plateauPlan.responses.filter((r) => r.action === "rotate").map((r) => r.exercise.toLowerCase()),
@@ -2063,8 +2066,16 @@ export function buildPlan({
      NOT do is give the freed minutes back to the top-up above: those minutes
      are the back-off. */
   if (backOff) {
+    /* The plateau cut marks every lift it eased, and the adapter carries the
+       mark into the saved plan, so next week's build can see the cut was
+       taken and let the sets back up. Calibration's back-off is not marked:
+       it reacts to last session and is not the promise being kept here. */
+    const cutWeek = plateauPlan.summary.action === "volume-cut";
     for (const d of week) {
-      for (const e of d.exercises) e.sets = easeSets(e.sets, roleOf.get(e) === "main");
+      for (const e of d.exercises) {
+        e.sets = easeSets(e.sets, roleOf.get(e) === "main");
+        if (cutWeek) e.volumeCut = true;
+      }
       enforcePriorityFloor(d.exercises);
       d.estimatedMinutes = estimateMinutes(d.exercises, d.prepMinutes);
     }

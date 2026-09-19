@@ -92,6 +92,16 @@ export const PLATEAU_RESPONSE = {
   deloadLiftFactor: 0.85,
   /* Stalls at or above this count stop being about any one exercise. */
   systemicLifts: 3,
+  /* How long a volume cut stays spent. The cut defers every per lift answer,
+     so the stall it reacts to cannot resolve during the cut week, and until
+     2026-09-19 that meant it fired again the next week, and the next: a
+     replay measured it still cutting on week 14. The note promises "the sets
+     come down for seven days, and then they go back up", so a cut inside this
+     window blocks another and the per lift answers run instead. Four weeks,
+     the same block minWeeksFlat is measured in: if three lifts are still flat
+     a block after a lighter week AND their own answers, that is new evidence
+     of fatigue rather than the same evidence read twice. */
+  cutSpentDays: 28,
   /* How many lifts get a response out loud. A week that changes six things
      teaches nothing, and six notes on one plan is a wall of text nobody reads.
      Everything else stays visible in `trainingAge.plateau.lifts`. */
@@ -226,7 +236,7 @@ function detailFor({ action, lift, goal, reason = null }) {
  *   why: string[],
  * }}
  */
-export function planPlateauResponse({ plateau, stillLinear = false, confidence = "none", calibration = null, goal = null } = {}) {
+export function planPlateauResponse({ plateau, stillLinear = false, confidence = "none", calibration = null, goal = null, cutTaken = false } = {}) {
   /* This used to take `level` and branch on `level === "beginner"`. The sentence
      under that branch says what it was really asking: "a beginner is on linear
      progression by definition". That is a claim about the bar and it is
@@ -285,6 +295,17 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
       return { lift, action: "wait", reason: "already-climbing" };
     }
 
+    if (verdict === "too-heavy" && !(lift.weightLb > 0)) {
+      /* Cannot happen off detectPlateau any more, which skips loadless rows,
+         but this function is exported and takes any list. "It goes lighter
+         this week" said of a lift with nothing to go lighter by is the app
+         being wrong out loud, so a struggling loadless movement changes
+         rather than lightens. */
+      why.push(`${lift.name}: flat ${lift.weeksFlat} weeks and calibrate.mjs says too heavy, but there `
+        + `is no load on it to take off. Rotate it: the variation is the lever on bodyweight work.`);
+      return { lift, action: "rotate" };
+    }
+
     if (verdict === "too-heavy") {
       why.push(`${lift.name}: flat ${lift.weeksFlat} weeks AND calibrate.mjs says too heavy, so `
         + `they are grinding it rather than coasting. Deload the lift, not the week: `
@@ -323,7 +344,21 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
   };
 
   if (acting.length >= PLATEAU_RESPONSE.systemicLifts) {
-    if (overall === "back-off") {
+    if (cutTaken) {
+      summary = {
+        action: "none",
+        lifts: acting.length,
+        detail: `${acting.length} lifts still stalled after the lighter week. The cut has been `
+          + `taken inside the last ${PLATEAU_RESPONSE.cutSpentDays} days, so the per lift answers `
+          + `run now rather than a second lighter week.`,
+        say: null,
+      };
+      why.push(`${acting.length} stalled lifts would earn a volume cut, and one has already been `
+        + `handed out inside the last ${PLATEAU_RESPONSE.cutSpentDays} days. The note promised the `
+        + `sets come back after seven days, and the stall cannot have resolved during a week that `
+        + `deferred every answer to it, so a second cut here is the same evidence read twice. The `
+        + `per lift answers run instead.`);
+    } else if (overall === "back-off") {
       summary = {
         action: "none",
         lifts: acting.length,
@@ -403,6 +438,33 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
   }));
 
   return { responses, summary, why };
+}
+
+/**
+ * Whether a volume cut has been handed out recently, read off the plans the
+ * app saved. Every exercise on a cut week carries `volumeCut: true` on its way
+ * through the adapter, and `ai_workouts.exercises` is stored verbatim, so this
+ * is the one place the engine can see its own last answer without a table. A
+ * plan that was generated and never trained still counts: the cut was
+ * prescribed, and prescribing it again a week later is the thing the promise
+ * forbids. Rows are read the way calibrate.mjs reads them, a row that is not
+ * a row says nothing.
+ *
+ * @param {{ plans?: Array, today?: Date, withinDays?: number }} input
+ * @returns {boolean}
+ */
+export function cutTakenRecently({ plans = [], today = new Date(), withinDays = PLATEAU_RESPONSE.cutSpentDays } = {}) {
+  const now = today instanceof Date ? today.getTime() : Date.parse(today);
+  if (!Number.isFinite(now)) return false;
+  for (const p of (Array.isArray(plans) ? plans : [])) {
+    if (!p || typeof p !== "object" || !Array.isArray(p.exercises)) continue;
+    if (!p.exercises.some((e) => e && typeof e === "object" && e.volumeCut === true)) continue;
+    const at = Date.parse(`${String(p.entry_date)}T12:00:00Z`);
+    if (!Number.isFinite(at)) continue;
+    const days = (now - at) / 86400000;
+    if (days >= 0 && days < withinDays) return true;
+  }
+  return false;
 }
 
 /**

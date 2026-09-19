@@ -275,7 +275,15 @@ three lifts during a lighter week hands somebody a week they do not recognise an
 leaves nothing attributable afterwards. `periodization-deloads.md` describes a
 deload as the same exercises with fewer sets, and `progressive-overload.md` says
 pick one lever. The diagnosis survives in each response's `detail`; only the
-action waits, and the summary speaks for the week.
+action waits, and the summary speaks for the week. And the cut is spent once it
+is taken: a stall cannot resolve during a week that deferred every answer to it,
+so until 2026-09-19 the cut fired again the next week and every week after, still
+running on week 14 of a replay. Every lift on a cut week now carries `volumeCut`
+into the saved plan, `cutTakenRecently` reads it back off `plans`, and inside
+`cutSpentDays` (28, one block) a second cut is refused and the per lift answers run
+instead. Bodyweight movements are not stall candidates at all any more: a push-up
+at 0 lb "has not gone up" by construction, and four of them at once used to trip
+the systemic cut on somebody who had hit every rep of everything.
 
 **`wait` has three different sentences.** "Too soon to tell", "you are a beginner
 and this is attendance" and "you are about to add weight anyway" are different

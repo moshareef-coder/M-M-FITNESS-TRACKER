@@ -74,7 +74,8 @@ inside it are dropped in silence.
           { name: "Incline Push-Up",      why: "Same movement, same supporting muscles, no equipment needed" },
           { name: "Push-Up",              why: "Same movement, same supporting muscles, no equipment needed" }
         ],
-        restSec: 180                    // new. The rest this lift was budgeted at, the number the session estimate was costed with. Seed the rest timer from it; the app's own default stays the fallback when absent
+        restSec: 180,                   // new. The rest this lift was budgeted at, the number the session estimate was costed with. Seed the rest timer from it; the app's own default stays the fallback when absent
+        volumeCut: true                 // new 2026-09-19, and only present on a week the plateau answer cut the sets. Store it with the rest of the row: the engine reads it back off `plans` so a lighter week is followed by a normal one
       }
     ],
     warmup: [                           // new. Dynamic moves before the first set. Timed, never logged as sets
