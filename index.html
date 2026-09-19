@@ -13431,54 +13431,92 @@ function renderOnboardStep(step, data = {}) {
        "the last one makes me feel stressed, I do not want to do it." A colour
        that talks somebody out of the hardest option is not a warning, it is a
        leak. */
-    const TIERS = [
-      { id: "easy", days: [1, 2], mins: 30, head: "Easy", heat: 0,
-        detail: "1 to 2 days a week, about 30 minutes." },
-      { id: "steady", days: [3, 4], mins: 45, head: "Steady", heat: 2,
-        detail: "3 to 4 days a week, about 45 minutes. Sometimes a short second session on the same day." },
-      { id: "allin", days: [5, 6], mins: 60, head: "All in", heat: 3,
-        detail: "5 to 6 days a week, about 60 minutes. Room to double up on a day when you feel like it." },
+    /* The tiers used to be fixed at 1 to 2, 3 to 4 and 5 to 6 days for every
+       goal, and wrote the top of each range. Measured on 2026-09-19 across
+       all seven goals: 8 of 21 tile-by-goal combinations built a week outside
+       the range on the tile, because plan.mjs clamps the ask to the goal's own
+       minDays..maxDays. All in never built six for any goal, Easy built three
+       for five of the seven, and the commit screen then had people promising
+       "5 to 6 days a week" for a week that was going to be four.
+
+       So the rungs come off the goal's own range now, read from the engine,
+       and each one is a single number rather than a span: it is the number
+       the engine builds, and the commit screen repeats it. A goal whose range
+       is only two wide gets two rungs, because a third would have to repeat
+       a number under a bigger word. */
+    const LADDER = [
+      { id: "easy", head: "Easy", heat: 0, mins: 30 },
+      { id: "steady", head: "Steady", heat: 2, mins: 45 },
+      { id: "allin", head: "All in", heat: 3, mins: 60 },
     ];
-    const chosen = data.intensity || null;
+    const tiersFor = ([lo, hi]) => {
+      const counts = [lo, Math.round((lo + hi) / 2), hi];
+      const seen = new Set();
+      return LADDER.map((r, i) => ({ ...r, days: counts[i] })).filter((t) => {
+        if (seen.has(t.days)) return false;
+        seen.add(t.days);
+        return true;
+      }).map((t) => ({
+        ...t,
+        detail: `${t.days} days a week, about ${t.mins} minutes.`
+          + (t.days === hi && lo !== hi ? " The most this goal builds: past it, the recovery between sessions is what gives." : ""),
+      }));
+    };
     ob.innerHTML = `
       <div class="ob-step">
         ${obChrome("days", data)}
         <h1>How hard do you want to go?</h1>
         <p class="sub">Pick the one you would still do in a bad week. All of it moves later.</p>
-        <div class="ob-tiers" id="tierGrid">
-          ${TIERS.map((t) => `<button type="button" class="ob-tier heat-${t.heat}${chosen === t.id ? " on" : ""}" data-tier="${t.id}">
+        <div class="ob-tiers" id="tierGrid"><p class="muted-note">Working out what this goal needs...</p></div>
+        <button class="btn-primary" id="daysNext" disabled>Show me the plan</button>
+        <button class="btn-ghost" id="daysBack">Back</button>
+      </div>`;
+    $("daysNext").onclick = () => renderOnboardStep("plan", data);
+    $("daysBack").onclick = () => renderOnboardStep("styles", data);
+    goalDayRange(data).then((range) => {
+      if (!$("tierGrid")) return;   // navigated on before the engine arrived
+      /* No engine, no promise: the plan step falls back to the goal's legacy
+         day count, which the engine will still clamp, and the tile that would
+         have said a number nobody checked is not drawn. */
+      if (!range) {
+        $("tierGrid").innerHTML = `<p class="muted-note">Could not load this goal's range. We will start it at a sensible week and you can change it in Setup.</p>`;
+        data.intensity = null; data.days_per_week = null; data.days_range = null;
+        $("daysNext").disabled = false;
+        return;
+      }
+      const TIERS = tiersFor(range);
+      /* A draft's pick survives only if the rung still exists for this goal,
+         and its number is re-read off the rung rather than trusted from the
+         draft, because the draft may have been saved by the fixed tiers. */
+      const kept = TIERS.find((t) => t.id === data.intensity) || null;
+      const apply = (t) => {
+        data.intensity = t.id;
+        data.days_per_week = t.days;
+        data.days_range = [t.days, t.days];
+        if (!data.session_minutes_manual) data.session_minutes = t.mins;
+      };
+      if (kept) apply(kept); else { data.intensity = null; data.days_per_week = null; data.days_range = null; }
+      const chosen = data.intensity;
+      $("tierGrid").innerHTML = TIERS.map((t) => `<button type="button" class="ob-tier heat-${t.heat}${chosen === t.id ? " on" : ""}" data-tier="${t.id}">
             <span class="obt-top"><span class="obt-head">${t.head}</span>
               <span class="obt-flame" aria-hidden="true">${Array.from({ length: t.heat / 2 + 1 }).map(() => `<i></i>`).join("")}</span></span>
             <span class="obt-detail"${chosen === t.id ? "" : " hidden"}>${escapeHtml(t.detail)}</span>
-          </button>`).join("")}
-        </div>
-        <button class="btn-primary" id="daysNext"${chosen ? "" : " disabled"}>Show me the plan</button>
-        <button class="btn-ghost" id="daysBack">Back</button>
-      </div>`;
-    ob.querySelectorAll("[data-tier]").forEach((b) => b.onclick = () => {
-      const t = TIERS.find((x) => x.id === b.dataset.tier);
-      data.intensity = t.id;
-      /* The top of the range, because the plan is what we aim at and the bottom
-         of the range is what a bad week looks like rather than what to build.
-         The pair is kept as well, because the plan screen says the range out
-         loud rather than the single number: rest gets suggested, so promising
-         six is promising something we will talk them out of. */
-      data.days_per_week = t.days[1];
-      data.days_range = t.days;
-      if (!data.session_minutes_manual) data.session_minutes = t.mins;
-      ob.querySelectorAll("[data-tier]").forEach((x) => {
-        x.classList.toggle("on", x === b);
-        /* One open at a time. Two tiers with their numbers showing is the wall
-           of text this screen just came out of. */
-        const d = x.querySelector(".obt-detail");
-        if (d) d.hidden = x !== b;
+          </button>`).join("");
+      $("daysNext").disabled = !chosen;
+      ob.querySelectorAll("[data-tier]").forEach((b) => b.onclick = () => {
+        apply(TIERS.find((x) => x.id === b.dataset.tier));
+        ob.querySelectorAll("[data-tier]").forEach((x) => {
+          x.classList.toggle("on", x === b);
+          /* One open at a time. Two tiers with their numbers showing is the wall
+             of text this screen just came out of. */
+          const d = x.querySelector(".obt-detail");
+          if (d) d.hidden = x !== b;
+        });
+        $("daysNext").disabled = false;
+        const say = document.getElementById("obBotSay");
+        if (say) { say.dataset.say = OB_ROBOT.days(data); typeOut(say, say.dataset.say); }
       });
-      $("daysNext").disabled = false;
-      const say = document.getElementById("obBotSay");
-      if (say) { say.dataset.say = OB_ROBOT.days(data); typeOut(say, say.dataset.say); }
     });
-    $("daysNext").onclick = () => renderOnboardStep("plan", data);
-    $("daysBack").onclick = () => renderOnboardStep("styles", data);
     return;
   }
 
@@ -25277,6 +25315,37 @@ function ensurePlanEngine() {
   return planEnginePromise;
 }
 
+/* The goal table on its own, for the two screens that need an answer about a
+   goal before any plan exists: the days step, which has to promise the week
+   buildPlan will actually build, and the goal picker, which says what a
+   second goal adds the moment it is tapped. goal-engine.mjs is a table of
+   numbers plus resolveGoal, which is pure, so this is cheap to import and
+   cheaper than mirroring the table here and watching the two drift. */
+let goalEnginePromise = null;
+function ensureGoalEngine() {
+  if (!goalEnginePromise) {
+    goalEnginePromise = import("/mo-knowledge/engine/goal-engine.mjs")
+      .catch((e) => { console.warn("goal engine", e); return null; });
+  }
+  return goalEnginePromise;
+}
+
+/* [min, max] days a week the engine builds for a goal set, off resolveGoal's
+   own dayRange, so what a screen promises is what plan.mjs clamps to. A
+   retired bubble is routed the way the picker routes it. Null when the engine
+   cannot answer, so a caller can say so rather than guess. */
+async function goalDayRange({ bubble, child = null, secondary = null } = {}) {
+  if (!bubble) return null;
+  const mod = await ensureGoalEngine();
+  if (!mod) return null;
+  try {
+    const pick = migrateGoalPick(bubble, child || null);
+    const r = mod.resolveGoal({ bubble: pick.bubble, child: pick.child, secondary: normaliseGoalSecondary(secondary) });
+    const range = r?.dayRange;
+    return Array.isArray(range) && range.length === 2 && range.every(Number.isFinite) ? range : null;
+  } catch (e) { console.warn("goal day range", e); return null; }
+}
+
 /* The cardio library loader lives further up this file. Two features landed in
    the same week both needing it and both wrote their own; this is the one that
    went, because the other uses a relative specifier and this one used an
@@ -32637,8 +32706,20 @@ function weekGenDays() {
    chose on the plan screen; what is already done this week comes off it, so
    pressing this on Thursday of a four day week after two sessions builds two
    days and not four. Next week owes the whole number. */
-function weekGenTarget(days) {
-  const perWeek = Number(MY_PROFILE?.days_per_week ?? MY_GOAL?.days_per_week) || weeklyGoalFor(MY_EMAIL) || 4;
+/* The number they chose, held inside the days the engine builds for their
+   goal. This used to read the raw profile number, so a profile saying 6 laid
+   down six sessions while the engine built a three day rotation and the
+   week was the same three days twice. Same clamp plan.mjs applies, read off
+   the same table, so the two cannot disagree. */
+async function weekGenPerWeek() {
+  const chosen = Number(MY_PROFILE?.days_per_week ?? MY_GOAL?.days_per_week) || weeklyGoalFor(MY_EMAIL) || 4;
+  const range = await goalDayRange({
+    bubble: MY_PROFILE?.goal_bubble, child: MY_PROFILE?.goal_child, secondary: MY_PROFILE?.goal_secondary,
+  });
+  return range ? Math.min(range[1], Math.max(range[0], chosen)) : chosen;
+}
+
+function weekGenTarget(days, perWeek) {
   if (weekGenNext()) return Math.min(perWeek, days.length);
   const week = planWeekDays(0);
   const already = week.filter((d) => d.done || d.trained).length;
@@ -32780,8 +32861,9 @@ async function generateTheWeek() {
 
   const open = weekGenDays();
   if (!open.length) { toast("Nothing left in this week to fill"); return; }
-  let want = weekGenTarget(open);
-  if (!want) { toast(`Your ${Number(MY_PROFILE?.days_per_week ?? MY_GOAL?.days_per_week) || weeklyGoalFor(MY_EMAIL)} days are already in this week`); return; }
+  const perWeek = await weekGenPerWeek();
+  let want = weekGenTarget(open, perWeek);
+  if (!want) { toast(`Your ${perWeek} days are already in this week`); return; }
 
   /* A day somebody planned by hand is theirs, so it is not written over
      without being asked about. Leaving them alone means they still count: the
