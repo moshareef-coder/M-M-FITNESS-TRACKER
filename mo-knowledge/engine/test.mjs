@@ -2745,15 +2745,15 @@ test("the two cautioned goals say what they leave out and whose call it is", () 
 test("a slot the bar empties is named rather than filled with the barred movement", () => {
   /* Cable only at beginner level is the case where it really happens: every abs
      movement the library offers on a cable is a crunch, and the Pallof Press
-     that would fill the obliques slot is intermediate. The slot goes, and the
-     day says so. */
+     that would fill the same core slot from the oblique side is intermediate.
+     The slot goes, and the day says so. */
   const plan = buildPlan({
     goal: { bubble: "feel-better", child: "pain" },
     person: { daysAsked: 3, bodyWeightLb: 160 }, equipment: ["cable"],
   });
   const names = plan.week.flatMap((d) => d.exercises.map((e) => e.name.toLowerCase()));
   assert.ok(!names.includes("cable crunch"), "the barred movement did not come back as the fallback");
-  assert.ok(plan.dayNotes.some((n) => /has no abs exercise in it/.test(n)), "the missing slot is said out loud");
+  assert.ok(plan.dayNotes.some((n) => /has no abs or obliques exercise in it/.test(n)), "the missing slot is said out loud");
   assert.ok(plan.dayNotes.some((n) => /Pallof Press/.test(n)), "and what would have filled it");
 });
 
@@ -3301,4 +3301,62 @@ test("the one goal whose session length did not move, and why", () => {
       `a session length of ${before} became ${now} and that changes the chip the app suggests`);
   }
   assert.ok(WAS, "kept so the mapping above reads as a table rather than a list");
+});
+
+
+/* ---- how much core work a split actually buys ----
+ *
+ * The core slot named one muscle group and which one depended on the template,
+ * so how much core somebody got was settled by whether their day count produced
+ * a Leg day or a Lower day. Counted in sets, because sets are what a person
+ * does; a test on the slot table would have passed either way.
+ */
+
+const coreSets = (plan) => plan.week.reduce((n, d) =>
+  n + d.exercises.filter((e) => e.group === "abs" || e.group === "obliques").reduce((m, e) => m + e.sets, 0), 0);
+const setsOf = (plan, group) => plan.week.reduce((n, d) =>
+  n + d.exercises.filter((e) => e.group === group).reduce((m, e) => m + e.sets, 0), 0);
+const corePlan = (daysAsked, priorityOverride = null) => buildPlan({
+  goal: { bubble: "build-muscle" },
+  person: { daysAsked, bodyWeightLb: 180, sex: "male" },
+  logs: [], priorityOverride,
+});
+
+test("every split trains core, whatever the day count called the day", () => {
+  /* Measured on HEAD before the slot was widened: a three day week got 9 abs
+     sets and no obliques, a four day week got 8 oblique sets and no abs, and a
+     five day week 6 of each. The muscle a person trained was decided by their
+     day count. */
+  for (const days of [2, 3, 4, 5]) {
+    const plan = corePlan(days);
+    assert.ok(coreSets(plan) >= 8, `a ${days} day week gets ${coreSets(plan)} core sets, under the MEV-to-MAV floor in knowledge/principles/volume-landmarks.md`);
+    assert.ok(setsOf(plan, "abs") > 0, `a ${days} day week never trains abs`);
+  }
+});
+
+test("a focus on core buys core on the four day split too", () => {
+  /* The bug this is here for: the four day split filled its core slot from
+     obliques, so a focus spent on abs asked for volume in a group the week
+     never trained and bought exactly nothing. 8 core sets with the focus and 8
+     without, measured, which is why index.html's focus picker carries a hedge
+     splitting its points across both groups. That hedge can come out. */
+  for (const days of [3, 4]) {
+    const plain = coreSets(corePlan(days));
+    const focused = coreSets(corePlan(days, { abs: 2 }));
+    assert.ok(focused > plain,
+      `a ${days} day week: asking for core bought ${focused} sets against ${plain} without asking`);
+  }
+});
+
+test("asking for core on a four day split beats splitting the ask in two", () => {
+  /* The measurement behind the recommendation to index.html. Spending the
+     region's core allowance down onto abs is now at least as good as spreading
+     it across abs and obliques on every split, and strictly better on four and
+     five days. Spread, a "Legs and core" pick used to come back with LESS core
+     than picking nothing at all. */
+  for (const days of [3, 4, 5]) {
+    const across = coreSets(corePlan(days, { quads: 3, hamstrings: 1, abs: 1, obliques: 1 }));
+    const down = coreSets(corePlan(days, { quads: 3, hamstrings: 1, abs: 2 }));
+    assert.ok(down >= across, `a ${days} day week: spending down bought ${down} sets, spreading bought ${across}`);
+  }
 });
