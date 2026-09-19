@@ -35,7 +35,11 @@ WHITE = (255, 255, 255, 255)
 INK = (17, 19, 24, 255)
 MUTED = (110, 116, 128, 255)
 
-MOVE = "UNIO Wave"        # authored in brand/film-harness.html off Mountain Pose
+# He stands. The wave is authored and working in brand/film-harness.html as
+# "UNIO Wave" if it is ever wanted, but Mo looked at both and preferred him
+# still: the film is calm and a wave was the one thing in it asking for
+# attention.
+MOVE = "Mountain Pose"
 MOVE_DUR = 6.4
 # The blink is drawn here, not asked of the rig.
 #
@@ -502,9 +506,8 @@ def shot_list():
     for f in range(int(FIG_UNTIL * FPS)):
         t = f / FPS
         shots.append({
-            # The wave is authored to play once over the figure's whole time on
-            # screen, so the cycle is that fraction rather than a loop of a pose.
-            "cycle": round(min(0.999, t / FIG_UNTIL), 6),
+            # A standing hold, so the cycle is just the pose breathing.
+            "cycle": round((0.10 + t / MOVE_DUR) % 1, 6),
             "face": EYES_OPEN_AT,
             "mood": MOOD,
         })
