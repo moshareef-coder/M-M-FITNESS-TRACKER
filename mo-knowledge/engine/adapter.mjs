@@ -1172,10 +1172,10 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
        So the session is built here, from the same libraries the caller would
        have used, and the lifting day is dropped. `honoured` is then a
        measurement and not a wish: true when the response really is the week
-       they asked for. Where it cannot be built (see styleDayFor: a Sports-only
-       week, which names no session in any library we have, or a library that
-       comes back empty) the lifting day stands, `honoured` stays false, and the
-       refusal sentence says so in words rather than leaving it to a flag.
+       they asked for. Where it cannot be built (see styleDayFor: a library
+       that comes back empty, which no tick on the seven style sheet reaches
+       today) the lifting day stands, `honoured` stays false, and the refusal
+       sentence says so in words rather than leaving it to a flag.
 
        A yoga-only week used to land in that second case and it no longer does.
        It came back as a lifting day under a note reading "mobility work is not

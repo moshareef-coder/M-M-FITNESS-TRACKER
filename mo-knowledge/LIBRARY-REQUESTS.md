@@ -253,6 +253,11 @@ globally.
 
 ## 9. Two onboarding ticks have no beginner session in `cardio.mjs` (2026-09-18)
 
+**Withdrawn 2026-09-19.** Swimming and Classes are no longer ticks: Mo cut the
+styles to lifting, home, running, cycling, walking, yoga and Pilates, on the
+grounds that every removed style was a place the engine had to refuse. Nothing
+below is asked for any more; it is kept as the record of why.
+
 Onboarding offers twelve training styles and `styles.mjs` maps each cardio one
 onto a `mode` in `knowledge/exercise-library/cardio.mjs`. From 2026-09-18 the
 engine builds the day itself for somebody who ticked no resistance style, out of
@@ -325,6 +330,13 @@ class than the person deserves.
 ---
 
 ## 11. Five cardio modes have exactly one session each (2026-09-19)
+
+**Withdrawn the same day.** The five thin modes, and rowing and the elliptical
+with them, are no longer offered anywhere: the styles sheet is down to running,
+cycling and walking on the cardio side, and the activity sheet builds library
+sessions for those three only (the stair master, the rower, the elliptical and
+HIIT are a clock now). Nothing below is asked for; the table stays because it
+is the measurement the decision was made on.
 
 The level gate came off the app's three cardio pickers today. Until then the
 plan generator asked `cardio.mjs` for `MY_PROFILE.level`, a column that does not

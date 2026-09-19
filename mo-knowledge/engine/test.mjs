@@ -37,7 +37,7 @@ import { JOINTS, JOINT_LOAD, defaultJointLoad } from "./joint-load.mjs";
 import { joinPlanToActual, calibrateExercise, calibrate, stepFor, STEP_ISOLATION, STEP_COMPOUND, STEP_HEAVY } from "./calibrate.mjs";
 import { mapGoal, generateFromPayload, toWorkout, focusDayIndex, nextDayIndex } from "./adapter.mjs";
 import { clientGoals, clientGoalCases, CLIENT_FILE } from "./client-goals.mjs";
-import { readStyles, normalizeStyles, cardioSessionFor, flowSessionFor, styleDayFor, mergeStyleLimits, FLOW_MINUTES_DEFAULT, FLOW_MINUTES_MAX } from "./styles.mjs";
+import { STYLE_KEYS, readStyles, normalizeStyles, cardioSessionFor, flowSessionFor, styleDayFor, mergeStyleLimits, refusalNote, FLOW_MINUTES_DEFAULT, FLOW_MINUTES_MAX } from "./styles.mjs";
 import { buildMuscleIndex, muscleRecoveryStates, mainGroupsForDay, dayIsFresh, skipFreshDays, FRESH_HOURS, RECOVERY_HOURS, MIN_CREDIT_SETS } from "./recovery.mjs";
 
 import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
@@ -3551,32 +3551,28 @@ test("somebody who ticked only Running gets a run, not a lifting day", async () 
 });
 
 test("every cardio mode a beginner can be given builds its own session", async () => {
-  for (const [style, mode] of [["running", "running"], ["cycling", "cycling"], ["walking", "walking"], ["rowing", "rowing"], ["hiking", "hiking"]]) {
+  for (const [style, mode] of [["running", "running"], ["cycling", "cycling"], ["walking", "walking"]]) {
     const out = await generateFromPayload(stylePayload([style]));
     assert.equal(out.workout.exercises.length, 0, `${style} came back as lifting`);
     assert.equal(out.workout.cardio.mode, mode, `${style} should plan ${mode}`);
   }
 });
 
-test("a mode somebody ticked is built for them, and never substituted for another", async () => {
-  /* Swimming and Classes are ticks on the onboarding sheet, and the library's
-     only swim and only HIIT session are both tagged intermediate. Under the old
-     person-level gate that meant a brand new user who ticked Swimming was told
-     the week could not be built, and before the refusal note existed they were
-     handed an Easy Spin on a stationary bike under their own word "swimming".
-     The mode is a stated choice, so it is honoured with no history behind it.
-     What is still refused is a mode the library does not know at all. */
-  for (const style of ["swimming", "classes"]) {
-    const out = await generateFromPayload(stylePayload([style]));
-    assert.equal(out.meta.styles.honoured, true, `${style} is a mode the library has`);
-    assert.ok(out.workout.cardio, `${style} came back without a session`);
-    assert.equal(out.workout.exercises.length, 0, `${style} came back as lifting`);
-  }
-
-  /* Somebody with a long history gets the same session, because nothing about
-     the choice depends on how long they have trained. */
-  const swimmer = await generateFromPayload(stylePayload(["swimming"], { logs: manySessions(80) }));
-  assert.equal(swimmer.workout.cardio?.mode, "swimming");
+test("the seven styles, and nothing the sheet no longer offers is ever built", async () => {
+  /* Until the morning of 2026-09-19 this test asserted that Swimming and
+     Classes built a session, because the library's only swim and only HIIT row
+     are tagged intermediate and a person-level gate had been refusing them.
+     That afternoon Mo cut the sheet to seven styles, on the grounds that every
+     one of the five removed had been a place the engine had to say "cannot
+     build". So the assertion is now the opposite one: those words are not in
+     the vocabulary, the engine offers no mode for them, and a stored one reads
+     as noise. */
+  assert.deepEqual([...STYLE_KEYS], ["lifting", "home", "running", "cycling", "walking", "pilates", "yoga"]);
+  assert.deepEqual(readStyles([...STYLE_KEYS]).cardioModes, ["running", "cycling", "walking"],
+    "the only cardio modes the engine can ever ask the library for");
+  assert.deepEqual(readStyles([...STYLE_KEYS]).flowTrainings, ["pilates", "yoga"]);
+  assert.equal(normalizeStyles(["swimming", "rowing", "classes", "hiking", "sports"]), null,
+    "a list holding only removed styles is a list of nothing recognisable");
 
   /* And the hardest tier stays out, because a mode is not a difficulty: nobody
      ticked a box asking for Sprint Intervals. */
@@ -3584,6 +3580,36 @@ test("a mode somebody ticked is built for them, and never substituted for anothe
     const runner = await generateFromPayload(stylePayload(["running"], { logs }));
     assert.notEqual(runner.workout.cardio?.name, "Sprint Intervals");
   }
+});
+
+test("a removed style already on file is ignored, and breaks nobody's plan", async () => {
+  /* Profiles saved while the twelve style sheet was live can hold any of the
+     five removed words, and production is not rewritten on a product decision.
+     The contract already says what a list of nothing recognisable means: never
+     asked. So a swimmer-only profile keeps the full plan it would have had
+     before the column existed, and a removed word beside a kept one is dropped
+     without touching the kept one. Every case is driven through the payload,
+     because the adapter is what production runs. */
+  const swimmer = await generateFromPayload(stylePayload(["swimming"]));
+  assert.equal(swimmer.meta.styles.asked, false, "only removed words is the same as never asked");
+  assert.deepEqual(swimmer.meta.styles.picked, []);
+  assert.ok(swimmer.workout.exercises.length >= 4, "and never asked still lifts");
+  assert.equal(swimmer.meta.styles.honoured, true);
+  assert.equal(swimmer.meta.styles.note, null, "no sentence about a week they cannot see the reason for");
+
+  const mixed = await generateFromPayload(stylePayload(["swimming", "yoga"]));
+  assert.deepEqual(mixed.meta.styles.picked, ["yoga"], "the removed word is gone, the kept one stands");
+  assert.equal(mixed.workout.flow?.training, "yoga", "and the week is the yoga week they still asked for");
+  assert.equal(mixed.workout.exercises.length, 0);
+
+  const lifter = await generateFromPayload(stylePayload(["rowing", "lifting", "sports"]));
+  assert.deepEqual(lifter.meta.styles.picked, ["lifting"]);
+  assert.deepEqual(lifter.meta.styles.equipmentMissing, [], "a removed cardio word narrows no equipment");
+  assert.ok(lifter.workout.exercises.length >= 4);
+
+  const csv = await generateFromPayload(stylePayload("classes,hiking, Running"));
+  assert.deepEqual(csv.meta.styles.picked, ["running"], "the CSV shape drops them the same way");
+  assert.equal(csv.workout.cardio?.mode, "running");
 });
 
 test("a cardio day respects the session length they gave us", async () => {
@@ -3760,11 +3786,12 @@ test("a kind we cannot build falls through to one we can, rather than to a refus
      Driven through styleDayFor with a mode the cardio library does not know,
      rather than through a payload, and that is a note about the merge rather
      than about the ring. Swimming used to be the natural payload for this,
-     because the only swim is tagged intermediate and the library was asked at
-     beginner level; it builds now, and every mode on the onboarding sheet
-     builds with it. So no tick a real person can make reaches this branch
-     today. The branch stays, because it is what makes the ring safe when a
-     library changes under it, and this is the only way left to exercise it. */
+     first because the library was asked at beginner level and the only swim
+     is intermediate, and then not at all once the ceiling moved; since
+     2026-09-19 it is not a tick, and every mode on the seven style sheet
+     builds. So no tick a real person can make reaches this branch today. The
+     branch stays, because it is what makes the ring safe when a library
+     changes under it, and this is the only way left to exercise it. */
   const day = styleDayFor({ cardioModes: ["underwater basket weaving"], flowTrainings: ["yoga"] },
     { today: new Date("2026-09-19T09:00:00") });
   assert.ok(day, "a kind that cannot be built must not take the whole ring down with it");
@@ -3776,39 +3803,30 @@ test("a kind we cannot build falls through to one we can, rather than to a refus
     { today: new Date("2026-09-19T09:00:00") }), null);
 });
 
-test("a week we cannot build still says so in a sentence, and does not claim otherwise", async () => {
-  /* What is left after yoga and Pilates: a tick that names no session in any
-     library we have. The lifting day stands, which is the old behaviour, and
-     the response says what it is rather than attaching a note claiming the
-     week is cardio only over five barbell lifts.
+test("the refusal sentence still says what they are holding, and no tick reaches it", async () => {
+  /* Until 2026-09-19 this was driven through a payload of ["sports"], the one
+     tick that named no session in any library, and it asserted the lifting day
+     stood under a sentence beginning "This is a lifting session". Sports is not
+     a tick any more, and with the seven that are left every cardio mode and
+     both flow libraries build, so no payload reaches the refusal today. That
+     is the point of the cut, and it is asserted here as the thing a person
+     would notice: every non-lifting pick on the sheet comes back honoured.
 
-     Sports alone, and it really is alone now. Swimming and Classes were here
-     too, because the cardio library was asked at beginner level and the only
-     swim and the only HIIT session are both tagged intermediate. Refusing to
-     build the mode somebody ticked, over a difficulty tag on the one row that
-     could have served it, was the paternalism the level work removed: the
-     library is asked on the strength of the mode now, so both build. Sports is
-     the one tick that names no mode at all, and it stays refused. */
-  for (const styles of [["sports"]]) {
+     The sentence itself is still tested, because the library can change under
+     the engine and the day it does the refusal is what stands between somebody
+     and five barbell lifts under a note claiming the week is cardio only. */
+  for (const styles of [["running"], ["cycling"], ["walking"], ["yoga"], ["pilates"], ["running", "yoga"]]) {
     const out = await generateFromPayload(stylePayload(styles));
-    assert.ok(out.workout.exercises.length >= 4, "the lifting day is still what we have to offer");
-    assert.ok(!out.workout.flow && !out.workout.cardio, "and nothing is invented to cover it");
-    assert.equal(out.meta.styles.honoured, false, "the response does not pretend otherwise");
-    assert.match(out.meta.styles.note, /^This is a lifting session/, "the first clause says what they are holding");
-    assert.ok(!/^This week is/.test(out.meta.styles.note), "never the sentence for a week that has no lifting in it");
-    assert.ok(out.notes.includes(out.meta.styles.note), "and it reaches the notes a caller renders");
+    assert.equal(out.meta.styles.honoured, true, `${JSON.stringify(styles)} should build`);
+    assert.ok(out.workout.cardio || out.workout.flow, `${JSON.stringify(styles)} came back without a session`);
+    assert.equal(out.workout.exercises.length, 0, `${JSON.stringify(styles)} came back as lifting`);
+    assert.match(out.meta.styles.note, /^This week is/, "the sentence for a week with no lifting in it");
   }
-});
-
-test("a mode the cardio library does not know is refused rather than guessed at", async () => {
-  /* "Sports" is a real tick on the onboarding sheet and there is no such thing
-     as a sports session in the library. `cardioFor` answers a modeless ask with
-     everything it has, so building from it would hand a five a side player an
-     Easy Run and call it their choice. */
-  const out = await generateFromPayload(stylePayload(["sports"]));
-  assert.ok(out.workout.exercises.length >= 4);
-  assert.equal(out.meta.styles.honoured, false);
-  assert.match(out.meta.styles.note, /^This is a lifting session/);
+  for (const [cardio, flow] of [[true, false], [false, true], [true, true]]) {
+    const note = refusalNote(cardio, flow);
+    assert.match(note, /^This is a lifting session/, "the first clause says what they are holding");
+    assert.ok(!/^This week is/.test(note), "never the sentence for a week that has no lifting in it");
+  }
 });
 
 test("ticking a resistance style leaves the week exactly as it was", async () => {
@@ -3824,7 +3842,7 @@ test("ticking a resistance style leaves the week exactly as it was", async () =>
 
 test("cardioSessionFor builds nothing rather than something wrong", () => {
   assert.equal(cardioSessionFor(readStyles(["yoga"]), {}), null, "a flow week has no cardio session in it");
-  assert.equal(cardioSessionFor(readStyles(["sports"]), {}), null, "and neither has a mode the library cannot name");
+  assert.equal(cardioSessionFor(readStyles(["sports"]), {}), null, "and a removed style is not a cardio week, it is never asked");
   assert.equal(cardioSessionFor(readStyles(null), {}), null, "never asked means never overridden");
   const run = cardioSessionFor(readStyles(["running"]), { today: new Date("2026-09-18") });
   assert.deepEqual(run.exercises, [], "a run is never a list of sets");
@@ -3839,7 +3857,7 @@ test("a flow session is never a list of sets either", () => {
     "the library's muscle lists stay out of the response, because nothing renders them and something would count them");
   assert.equal(flowSessionFor(readStyles(["running"]), {}), null, "a cardio week has no class in it");
   assert.equal(flowSessionFor(readStyles(null), {}), null, "never asked means never overridden");
-  assert.equal(styleDayFor(readStyles(["sports"]), {}), null, "and a tick no library can name still comes back empty handed");
+  assert.equal(styleDayFor(readStyles(["sports"]), {}), null, "and a removed style on file plans no day of its own");
   assert.equal(styleDayFor(readStyles(null), {}), null);
 });
 
