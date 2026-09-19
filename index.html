@@ -421,7 +421,7 @@
   .wkt-chip-body i { font-size: 12.5px; font-style: normal; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .wkt-chip-ring { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.75px solid var(--accent-ink); }
   .wkt-chip-ring.open { border-color: var(--border); }
-  .wkt-done-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .wkt-done-acts { display: grid; grid-template-columns: 1fr; gap: 10px; }
   .wkt-btn-solid, .wkt-btn-soft {
     font: inherit; font-size: 14px; font-weight: 700; height: 46px; padding: 0 8px; border-radius: 12px; min-width: 0;
     letter-spacing: -.01em;
@@ -8440,7 +8440,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.18.8";
+const APP_VERSION = "2026.09.18.9";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -29685,8 +29685,13 @@ function renderChooseScreen() {
         </div>`).join("")}
       </div>
       <div class="wkt-done-acts">
-        <button type="button" class="wkt-btn-solid" id="wktViewToday">View today&rsquo;s training</button>
-        <button type="button" class="wkt-btn-soft" id="wktTomorrow">Preview tomorrow ${icon("arrowRight", 16)}</button>
+        ${/* One CTA on this page, and it is not this one. Looking back at a
+              session you have finished is a review, not the next thing to do,
+              so it is the quiet button; the green one lives on the card below,
+              which is now about tomorrow. "Preview tomorrow" went with it:
+              that card IS tomorrow now, so the button pointed at something
+              already on screen. */ ""}
+        <button type="button" class="wkt-btn-soft" id="wktViewToday">View today&rsquo;s training</button>
       </div>
     </section>`;
 
@@ -29700,6 +29705,13 @@ function renderChooseScreen() {
      empty day this screen is where it lives, but it is not what most people
      open this tab to do. */
   const aimed = (p.focus || "").toLowerCase();
+  /* Which day this card is about. Today until today is done, then tomorrow.
+     A plan already sitting on tomorrow is shown rather than offered again:
+     the button becomes the way to look at it. */
+  const nextDate = allDone ? shiftDate(todayStr(), 1) : todayStr();
+  const tomorrowPlan = allDone
+    ? (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === nextDate && !w.archived)
+    : null;
   /* The match and the muscle list ARE "what to train next", which is one of
      the things he is hired for. The card stays, with its title and both
      buttons, and his pitch sits where the reading would have been: a free
@@ -29709,7 +29721,7 @@ function renderChooseScreen() {
   const nextCard = `
     <section class="wkt-next${hiredHere ? "" : " not-hired"}">
       <div class="wkt-next-top">
-        <p class="wkt-eyebrow">Next workout</p>
+        <p class="wkt-eyebrow">${allDone ? "Tomorrow" : "Next workout"}</p>
         ${/* The dot explains how the match is worked out, so with no match on
               screen it explains nothing. */ ""}
         ${hiredHere ? infoDot("planMatch", "How the match is worked out") : ""}
@@ -29735,8 +29747,10 @@ function renderChooseScreen() {
         <div class="wkt-next-acts">
           ${p.real
             ? `<button type="button" class="wkt-btn-solid sm" id="chooseBeginBtn">${partway ? "Resume workout" : "Begin workout"}</button>`
-            : `<button type="button" class="wkt-btn-solid sm" id="chooseGenerateBtn">Generate workout</button>`}
-          <button type="button" class="wkt-btn-soft sm" id="choosePlanBtn">Plan my own</button>
+            : tomorrowPlan
+              ? `<button type="button" class="wkt-btn-solid sm" id="chooseSeeTomorrow">See tomorrow&rsquo;s plan</button>`
+              : `<button type="button" class="wkt-btn-solid sm" id="chooseGenerateBtn">${allDone ? "Generate tomorrow&rsquo;s" : "Generate workout"}</button>`}
+          ${tomorrowPlan ? "" : `<button type="button" class="wkt-btn-soft sm" id="choosePlanBtn">Plan my own</button>`}
           ${csnRunning()
             ? `<button type="button" class="wkt-more" id="chooseActivityBtn">Resume ${escapeHtml(csnAct().label.toLowerCase())}, ${csnClock(csnElapsedMs())} ${icon("chevronRight", 13)}</button>`
             : `<button type="button" class="wkt-more" id="chooseActivityBtn">or start an activity ${icon("chevronRight", 13)}</button>`}
@@ -29787,7 +29801,6 @@ function renderChooseScreen() {
      looking at you. */
   if (allDone) {
     const view = $("wktViewToday"); if (view) view.onclick = () => goWorkoutScreen(null);
-    const tom = $("wktTomorrow"); if (tom) tom.onclick = () => goWorkoutScreen("week");
   }
   wireTodaySessions($("workoutContent"));
   wireSavedWorkouts($("workoutContent"));
@@ -29810,9 +29823,14 @@ function renderChooseScreen() {
      the card could say one thing and the plan come back another with no sign
      anywhere that they had ever been related. p.ask is the card's own focus
      string, in the vocabulary adapter.mjs can parse (SUGGESTABLE_DAYS). */
-  if ($("chooseGenerateBtn")) $("chooseGenerateBtn").onclick = () => generateWorkout(null, { keepFocus: p.ask || null });
+  /* Generating for tomorrow rather than today once today is done: the same
+     function, handed the date it already knows how to take. */
+  if ($("chooseGenerateBtn")) $("chooseGenerateBtn").onclick = () => generateWorkout(allDone ? nextDate : null, { keepFocus: p.ask || null });
+  if ($("chooseSeeTomorrow")) $("chooseSeeTomorrow").onclick = () => openDayPlanner(nextDate);
   if ($("chooseBeginBtn")) $("chooseBeginBtn").onclick = startWorkout;
-  if ($("choosePlanBtn")) $("choosePlanBtn").onclick = toManual;
+  /* Planning your own for a day that is not today is the day planner's job,
+     not the manual builder's: the builder writes to today. */
+  if ($("choosePlanBtn")) $("choosePlanBtn").onclick = () => (allDone ? openDayPlanner(nextDate) : toManual());
   /* Guarded: a coached client has no plan buttons, so this card is not there. */
   const actBtn = $("chooseActivityBtn");
   if (actBtn) actBtn.onclick = () => openCardioSession();
@@ -30064,6 +30082,26 @@ const RECOVERY_DAYS_BEFORE_REST = 3;
    endless chain of them. */
 let RECOVERY_WAITED_FOR_MATH = false;
 
+/* What to call a stretch right now. Mo: "depending on what time of day it is
+   we can have something, so for the morning we can have like morning stretch,
+   on their timeline, their current time, and if it is at night it could be a
+   late night stretch."
+
+   Read off the device clock, which is the person's own: the app has no idea
+   what timezone their profile is in and does not need one for this. The bands
+   are the ordinary English ones rather than an even split, because five in the
+   morning is not morning to anybody and eleven at night is not evening.
+
+   `label` names the session, `greet` is the robot opening his mouth. */
+function timeOfDay(now = new Date()) {
+  const h = now.getHours();
+  if (h < 5) return { key: "late", label: "Late night stretch", greet: "Still up." };
+  if (h < 12) return { key: "morning", label: "Morning stretch", greet: "Morning." };
+  if (h < 17) return { key: "afternoon", label: "Afternoon stretch", greet: "Afternoon." };
+  if (h < 22) return { key: "evening", label: "Evening stretch", greet: "Evening." };
+  return { key: "late", label: "Late night stretch", greet: "Still up." };
+}
+
 /* "Chest, shoulders and triceps", with the last comma left off the way a
    person says it out loud. */
 function listWords(words) {
@@ -30083,7 +30121,7 @@ function renderRecoveryScreen() {
      same sentence read on a day you trained and a day you did nothing is
      wrong on one of them. Written for the ear, because voice is coming. */
   const say = trained
-    ? "You trained today. What you do now is what makes it count."
+    ? `${timeOfDay().greet} You trained today. What you do now is what makes it count.`
     : resting
       ? "Rest day. This is not you skipping something. This is the day working."
       : "Quiet day so far. Stretch, eat, drink, sleep. That is still training.";
@@ -30191,7 +30229,7 @@ function renderRecoveryScreen() {
       </div>
     </section>
     <section class="rcv-card" id="rcvStretch">
-      <div class="rcv-head"><span class="rcv-ico">${icon("body", 18)}</span><h3>Stretch</h3></div>
+      <div class="rcv-head"><span class="rcv-ico">${icon("body", 18)}</span><h3>${escapeHtml(timeOfDay().label)}</h3></div>
       <div id="rcvStretchBody"><p class="rcv-line">Picking the right ones for today...</p></div>
     </section>
     ${eatCard}
@@ -30242,7 +30280,7 @@ function renderRecoveryScreen() {
           </span>
         </li>`).join("")}
       </ul>
-      <button type="button" class="wkt-btn-solid sm" id="rcvStretchBtn">Stretch with me, ${Math.max(1, Math.round(stretchBlockSeconds(moves) / 60))} min</button>`;
+      <button type="button" class="wkt-btn-solid sm" id="rcvStretchBtn">${escapeHtml(timeOfDay().label)}, ${Math.max(1, Math.round(stretchBlockSeconds(moves) / 60))} min</button>`;
     $("rcvStretchBtn").onclick = () => startStretchSession(moves);
   });
 
