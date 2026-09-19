@@ -6739,6 +6739,13 @@
     display: flex; align-items: center; justify-content: center; gap: 6px;
     margin: 10px 0 0; font-size: 13.5px; font-weight: 600; color: var(--accent-ink);
   }
+  /* The session that recorded nothing says so here, in the muted voice the
+     rest of this screen keeps for facts about the day rather than in an alert
+     colour: ending a workout early is a real and fine outcome. */
+  .sc-nothing {
+    margin: 10px auto 0; max-width: 30ch;
+    font-size: 12.5px; line-height: 1.5; color: var(--muted);
+  }
 
   /* The little square Mo asked for: proof the photo landed, still on screen
      after the toast that said the same thing has faded. */
@@ -23668,10 +23675,18 @@ let TODAY_DONE_WORKOUTS = [];
    TODAY_WORKOUT.exercises with the sets already safely in the database. Same
    value as todayStr() whenever no session is running. */
 async function loadDoneWorkouts() {
+  /* Archived is not finished. A plan is stood down for several reasons that
+     are not "you did it": a swap to a run, a regenerate, Start new workout,
+     and, before 2026-09-19, an open-then-close that recorded nothing. This
+     list is what today's session rows and `trainedToday` are read off, so
+     completed_at is the test rather than the flag, and the rows that bug
+     already wrote stop reading as workouts without anybody cleaning them up. */
   const { data } = await sb.from("ai_workouts").select("*")
     .eq("email", MY_EMAIL).eq("entry_date", sessionDate()).eq("archived", true)
     .order("completed_at", { ascending: false });
-  TODAY_DONE_WORKOUTS = data || [];
+  /* Filtered here rather than in the query, because the same test has to hold
+     on rows applyLocally wrote while offline, which never went near postgrest. */
+  TODAY_DONE_WORKOUTS = (data || []).filter((w) => !!w.completed_at);
 }
 
 async function loadTodayWorkout() {
@@ -28630,6 +28645,30 @@ async function doMarkGymDayDone() {
   if (!landed) applyLocally("fit_entries", payload);
 }
 
+/* Mo, 2026-09-19: "if I didn't complete at least one set, it shouldn't mark it
+   as workout complete." The gym day already knew that. The PLAN did not, so an
+   open-then-close stamped completed_at on a day fit_entries never counted, and
+   every screen that reads one of those two disagreed with every screen that
+   reads the other.
+
+   One rule, and it is about EVIDENCE rather than about sets: a run has no sets
+   at all, and its finish path writes the exercise_logs row carrying the minutes
+   before it banks anything, so the row is what says it happened. Asking "was a
+   set ticked" would call a 28 minute run an empty session.
+
+   Two ways evidence can exist. This sitting wrote some, which is what
+   loggedExNames records; or the lifts on this plan were already logged earlier
+   today and this sitting only reopened the finished thing, which is still a
+   finished plan even though nothing was written just now. */
+function sessionRecordedAnything() {
+  if (SESSION?.loggedExNames?.length) return true;
+  const names = (TODAY_WORKOUT?.exercises || [])
+    .map((ex) => (ex.name || "").trim().toLowerCase()).filter(Boolean);
+  if (!names.length) return false;
+  const logged = todaysLoggedExerciseNames();   // the session's day, not the reader's
+  return names.some((n) => logged.has(n));
+}
+
 /* Finishing a workout is an ACTION and must happen exactly once. Showing the
    completion screen is a RENDER and may happen any number of times: reopening
    a finished plan, ending from the pause sheet, a re-render. Keeping the write
@@ -28647,7 +28686,13 @@ async function finishWorkout() {
 
   // Persist how long it took and how long the rests were. Without this the
   // workout leaves no record beyond the exercise rows.
-  if (TODAY_WORKOUT?.id) {
+  /* Gated on the same evidence the gym day is gated on. A plan stamped
+     completed_at is what the recap's clock, the Together timeline, the history
+     grid, the day planner and today's session list all read as "this happened",
+     so stamping it on a session that recorded nothing is the app telling five
+     screens a thing fit_entries knows is not true. */
+  const recorded = sessionRecordedAnything();
+  if (TODAY_WORKOUT?.id && recorded) {
     const { error } = await sb.from("ai_workouts").update({
       duration_sec: Math.round(sessionElapsed() / 1000),
       completed_at: new Date().toISOString(),
@@ -28702,6 +28747,9 @@ function planVolumeLb() {
 
 async function renderSessionComplete() {
   await finishWorkout();
+  /* The same test finishWorkout banked on, asked again so the screen and the
+     database cannot say different things about the same session. */
+  const recorded = sessionRecordedAnything();
   const loggedNow = todaysLoggedExerciseNames();
   const total = TODAY_WORKOUT.exercises.length;
   const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
@@ -28747,10 +28795,26 @@ async function renderSessionComplete() {
             stroke-dasharray="${scCirc.toFixed(2)}" stroke-dashoffset="${scCirc.toFixed(2)}"
             data-off="${(scCirc * (1 - ringPct)).toFixed(2)}"/>
         </svg>
-        <div class="sc-ring-mid">${icon("check", 38)}</div>
+        ${/* A tick is a claim. Over "Nothing Logged" it is the same screen
+              disagreeing with its own heading, which is the whole class of bug
+              this screen was fixed for, so the session that recorded nothing
+              gets the clock instead: time passed, nothing was written down. */ ""}
+        ${/* A tick is a claim. Over "Nothing Logged" it is the same screen
+              disagreeing with its own heading, which is the whole class of bug
+              this screen was fixed for. A dash is the honest glyph for nothing
+              recorded, and not a cross: ending a workout early is a real and
+              fine outcome, not a failure. (Not the clock, whose circle fills
+              solid at this size against the ring's own colour.) */ ""}
+        <div class="sc-ring-mid">${icon(recorded ? "check" : "minus", 38)}</div>
       </div>
-      <h3>${full ? "Workout Complete" : "Workout Ended"}</h3>
+      <h3>${full ? "Workout Complete" : recorded ? "Workout Ended" : "Nothing Logged"}</h3>
       <p>${escapeHtml(displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises))} · ${doneCount} of ${total} exercises</p>
+      ${/* Said out loud rather than left to be inferred from a number. With no
+            set recorded nothing anywhere counts this: not the day, not the
+            streak, not the week, not the plan. The screen used to print the
+            same ring and the same week line over it, which is how somebody
+            ends up believing they banked a workout they did not do. */ ""}
+      ${recorded ? "" : `<p class="sc-nothing">No sets recorded, so this one does not count. Your plan is still there when you are.</p>`}
       <div class="sc-stats">
         <div class="sc-stat"><b>${durLabel}</b><span>Time</span></div>
         ${volume > 0
@@ -28780,6 +28844,11 @@ async function renderSessionComplete() {
                <button type="button" class="link-btn" id="sessionProofChangeBtn">Change photo</button>
              </div>
            </div>`
+        /* Nothing to prove. Offering to "lock this in" directly under a line
+           saying this one does not count is the screen arguing with itself,
+           and a proof photo on a day fit_entries never banked would be the
+           one thing on the partner's timeline claiming a workout happened. */
+        : !recorded ? ""
         : `<p class="muted-note">One last thing: snap a photo to lock this in.</p>
            <button type="button" class="btn-primary" id="sessionProofBtn">Take proof photo</button>`}
       ${PARTNER_EMAIL ? `<button type="button" class="btn-secondary" id="sessionNoteBtn">Say something to ${escapeHtml(partnerName())}</button>` : ""}
@@ -28803,10 +28872,13 @@ async function renderSessionComplete() {
     }, 420);
   }
 
-  if (!hasProof) {
-    $("sessionProofBtn").onclick = () => $("proofInput").click();
-  } else {
+  /* Guarded rather than assumed: the proof offer is not drawn at all on a
+     session that recorded nothing, and reaching through a null for onclick
+     there would take the whole wrap-up screen down with it. */
+  if (hasProof) {
     $("sessionProofChangeBtn").onclick = () => $("proofInput").click();
+  } else if ($("sessionProofBtn")) {
+    $("sessionProofBtn").onclick = () => $("proofInput").click();
   }
   if (PARTNER_EMAIL) $("sessionNoteBtn").onclick = () => openNoteComposer("workout");
   $("sessionDoneBtn").onclick = sessionDone;
@@ -28821,7 +28893,14 @@ async function sessionDone() {
   clearSessionStorage();
   // Clear today's plan so the next workout starts fresh rather than
   // reopening the one that was just finished.
-  if (TODAY_WORKOUT?.id) {
+  /* Only a plan that actually finished is stood down. Opening a session and
+     closing it without recording anything leaves completed_at null (see
+     finishWorkout), and archiving THAT would take today's plan away over a
+     workout that did not happen: the day would have no plan, no gym row and
+     nothing to show for it, which is worse than the wrong-completed bug it
+     came from. An untouched plan is still today's plan, so it stays open and
+     the tab offers it again. */
+  if (TODAY_WORKOUT?.id && (TODAY_WORKOUT.completed_at || sessionRecordedAnything())) {
     // Unchecked, a failed archive left the finished plan to reopen tomorrow
     // with nothing said about it.
     const { error } = await sb.from("ai_workouts").update({ archived: true }).eq("id", TODAY_WORKOUT.id);
@@ -31888,7 +31967,10 @@ function planWeekDays(offset = WEEK_OFFSET) {
        a row and the (email, entry_date) index still counts it. Nothing may be
        moved onto such a day, which is why it is reported separately from the
        plan the screen actually draws. */
-    const spoken = (ALL_PLANS || []).some((w) => w.email === MY_EMAIL && w.entry_date === date);
+    /* Archived is not finished: see loadDoneWorkouts. A plan stood down
+       without a completed_at is a day nothing happened on, and reading it as
+       "trained" locked a blank day against ever being planned again. */
+    const spoken = (ALL_PLANS || []).some((w) => w.email === MY_EMAIL && w.entry_date === date && w.completed_at);
     out.push({
       date,
       label: dateFmt({ weekday: "short" }).format(d),
