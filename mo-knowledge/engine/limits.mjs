@@ -202,7 +202,17 @@ const listOut = (a) => a.length === 1 ? a[0] : `${a.slice(0, -1).join(", ")} and
 /* What the plan says out loud. One sentence per painful joint and one for the
    equipment, in plain words, because a plan that quietly removed half the
    movements somebody expected reads as the app being broken. Same argument as
-   focus.mjs's `why` array and preferences.mjs's `avoidNote`. */
+   focus.mjs's `why` array and preferences.mjs's `avoidNote`.
+
+   These are the REASSURANCE lines and they are only printed when they are
+   true. Until 2026-09-19 they were printed for every named joint, one line
+   above a second note admitting which of that joint's movements were still in
+   the week, and the pair read as a contradiction because it was one: "Nothing
+   that loads a bad shoulder is in here" over "Machine Shoulder Press and
+   Seated Dumbbell Press are still in this week". Measured false in 55.7% of
+   weeks with any limit and in every single week with a bad knee, since every
+   quads movement in the library loads the knee. limitsSummary now takes the
+   blocked list and says one truthful thing per joint. */
 const HURT_SENTENCE = {
   shoulder: "Nothing that loads a bad shoulder is in here, so overhead pressing and dips are out and chest supported work is in.",
   elbow: "Nothing that loads a bad elbow is in here, so skull crushers and weighted chin-ups are out and cable and machine work is in.",
@@ -214,10 +224,32 @@ const HURT_SENTENCE = {
   ankle: "Nothing that loads a bad ankle is in here, so calf raises and split squats are out and seated and supported work is in.",
 };
 
-export function limitsSummary(limits) {
+/* The other sentence, for a joint the week could not fully spare. It names
+   every kept movement that loads the joint, because the person is about to
+   do them and the name is the warning. "stop if it hurts" is load bearing:
+   the app's warning filter (planWarnings in index.html) keys on that phrase
+   to tell this sentence from an explanation, so rewording it costs a line
+   there too. */
+function stillInSentence(joint, names) {
+  const one = names.length === 1;
+  return `Most of what loads a bad ${LABEL[joint] || joint} is out. ${listOut(names)} ${one ? "is" : "are"} still in `
+    + `because nothing else fills ${one ? "that slot" : "those slots"}: go light, stop if it hurts, `
+    + `swap ${one ? "it" : "them"} out if ${one ? "it does" : "they do"} not settle.`;
+}
+
+/* `blocked` is the plan's own list of movements that were ruled out and kept
+   anyway, names or library rows, and it decides which of the two sentences a
+   joint gets. Called with nothing it assumes nothing was kept, which is only
+   right for a caller with no week to check against. */
+export function limitsSummary(limits, { blocked = [], jointLoad = JOINT_LOAD } = {}) {
   const lim = limits && Array.isArray(limits.hurts) ? limits : normalizeLimits(limits);
   const out = [];
-  for (const j of lim.hurts) if (HURT_SENTENCE[j]) out.push(HURT_SENTENCE[j]);
+  const kept = (blocked || []).map((b) => (typeof b === "string" ? { name: b } : b)).filter((b) => b && b.name);
+  for (const j of lim.hurts) {
+    if (!HURT_SENTENCE[j]) continue;
+    const still = kept.filter((b) => jointLoadFor(b, { table: jointLoad }).joints.includes(j)).map((b) => b.name);
+    out.push(still.length ? stillInSentence(j, [...new Set(still)]) : HURT_SENTENCE[j]);
+  }
 
   if (lim.missing.includes("none")) {
     out.push("You said you have no equipment, so every exercise in this week is bodyweight.");
@@ -229,13 +261,3 @@ export function limitsSummary(limits) {
   return out;
 }
 
-/* The other half of the honesty. A slot the library could not fill any other
-   way keeps a movement that still loads a joint they named, and saying so is
-   the difference between a plan that is honest about a compromise and one that
-   made the promise and broke it. Mirrors the rotate-blocked note in plan.mjs. */
-export function softenedNote(names = []) {
-  if (!names.length) return null;
-  return `${listOut(names)} ${names.length === 1 ? "is" : "are"} still in this week. `
-    + `The library has nothing else that fills that slot, so go light, stop if it hurts, and swap it out `
-    + `if it does not settle.`;
-}

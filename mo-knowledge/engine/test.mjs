@@ -32,7 +32,7 @@ import {
   SOFT_AT, HARD_AT, MAX_WEEK_SHARE, MIN_WEEK_MOVES,
 } from "./preferences.mjs";
 import { planPlateauResponse, applyRotateFallback, PLATEAU_RESPONSE } from "./plateau-response.mjs";
-import { BODY_AREAS, EQUIPMENT_OPTIONS, normalizeLimits, applyLimits, limitsSummary, softenedNote } from "./limits.mjs";
+import { BODY_AREAS, EQUIPMENT_OPTIONS, normalizeLimits, applyLimits, limitsSummary } from "./limits.mjs";
 import { JOINTS, JOINT_LOAD, defaultJointLoad, jointLoadFor } from "./joint-load.mjs";
 import { joinPlanToActual, calibrateExercise, calibrate, stepFor, STEP_ISOLATION, STEP_COMPOUND, STEP_HEAVY } from "./calibrate.mjs";
 import { mapGoal, generateFromPayload, toWorkout, focusDayIndex, nextDayIndex } from "./adapter.mjs";
@@ -1990,10 +1990,74 @@ test("limitsSummary explains a hurt joint and a missing equipment answer in plai
   assert.ok(bodyweightOnly.some((s) => s.toLowerCase().includes("bodyweight")));
 });
 
-test("softenedNote is null with nothing softened and names what was kept otherwise", () => {
-  assert.equal(softenedNote([]), null);
-  const note = softenedNote(["Overhead Press"]);
-  assert.ok(note.includes("Overhead Press"));
+/* The injury note and the week under it must agree. Measured 2026-09-19: the
+   reassurance line was printed for every named joint regardless, one line
+   above the note listing that joint's movements still in the week, false in
+   55.7% of weeks with any limit and in 100% of weeks with a bad knee. */
+const ALL_JOINTS = BODY_AREAS.map((a) => a.key);
+const labelOf = (j) => BODY_AREAS.find((a) => a.key === j).label.toLowerCase();
+const reassures = (line, j) => line.startsWith(`Nothing that loads a bad ${labelOf(j)}`);
+const admits = (line, j) => line.startsWith(`Most of what loads a bad ${labelOf(j)} is out.`) && /stop if it hurts/.test(line);
+/* One movement per joint that the table says loads it, to play the kept one. */
+const LOADS_ONLY = {
+  shoulder: "Machine Shoulder Press", elbow: "Skull Crusher", wrist: "Plate Pinch", neck: "Dumbbell Shrug",
+  lowerback: "Back Extension", hip: "Hip Thrust", knee: "Leg Extension", ankle: "Seated Calf Raise",
+};
+
+test("limitsSummary reassures only when nothing kept loads that joint, every joint on its own", () => {
+  for (const j of ALL_JOINTS) {
+    assert.deepEqual(JOINT_LOAD[LOADS_ONLY[j]], [j], `${LOADS_ONLY[j]} should load ${j} alone`);
+    const clean = limitsSummary({ hurts: [j], missing: [] }, { blocked: [] });
+    assert.equal(clean.length, 1);
+    assert.ok(reassures(clean[0], j), clean[0]);
+    const kept = limitsSummary({ hurts: [j], missing: [] }, { blocked: [LOADS_ONLY[j]] });
+    assert.equal(kept.length, 1);
+    assert.ok(admits(kept[0], j), kept[0]);
+    assert.ok(kept[0].includes(LOADS_ONLY[j]), "the kept movement is named");
+    assert.ok(!reassures(kept[0], j), "no reassurance over a movement that loads it");
+  }
+});
+
+test("limitsSummary, joints in pairs: each joint gets its own truthful sentence and every kept name is in one", () => {
+  for (let a = 0; a < ALL_JOINTS.length; a++) {
+    for (let b = a + 1; b < ALL_JOINTS.length; b++) {
+      const [ja, jb] = [ALL_JOINTS[a], ALL_JOINTS[b]];
+      /* Only ja's movement kept: ja admits it, jb is reassured. */
+      const one = limitsSummary({ hurts: [ja, jb], missing: [] }, { blocked: [LOADS_ONLY[ja]] });
+      assert.equal(one.length, 2);
+      assert.ok(admits(one[0], ja) && one[0].includes(LOADS_ONLY[ja]), one[0]);
+      assert.ok(reassures(one[1], jb), one[1]);
+      /* Both kept: both admit, each names its own. */
+      const both = limitsSummary({ hurts: [ja, jb], missing: [] }, { blocked: [LOADS_ONLY[ja], LOADS_ONLY[jb]] });
+      assert.ok(admits(both[0], ja) && both[0].includes(LOADS_ONLY[ja]) && !both[0].includes(LOADS_ONLY[jb]), both[0]);
+      assert.ok(admits(both[1], jb) && both[1].includes(LOADS_ONLY[jb]) && !both[1].includes(LOADS_ONLY[ja]), both[1]);
+      /* A movement that loads both is named under both. */
+      const shared = Object.entries(JOINT_LOAD).find(([, js]) => js.includes(ja) && js.includes(jb));
+      if (shared) {
+        const twice = limitsSummary({ hurts: [ja, jb], missing: [] }, { blocked: [shared[0]] });
+        assert.ok(twice.every((line) => line.includes(shared[0])), twice.join(" | "));
+      }
+    }
+  }
+});
+
+test("a built week never says nothing loads a joint while prescribing something that does", () => {
+  for (const hurts of [["knee"], ["shoulder"], ["knee", "lowerback"], ["hip", "ankle"]]) {
+    const plan = buildPlan({ goal: { bubble: "build-muscle", child: null }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 4 }, logs: [], limits: { hurts, missing: [] } });
+    const inWeek = plan.week.flatMap((d) => d.exercises.map((e) => e.name));
+    for (const j of hurts) {
+      const loading = inWeek.filter((n) => JOINT_LOAD[n]?.includes(j));
+      const line = plan.dayNotes.find((n) => reassures(n, j) || admits(n, j));
+      assert.ok(line, `no limit sentence for ${j}`);
+      if (loading.length) {
+        assert.ok(admits(line, j), `${line} over ${loading.join(", ")}`);
+        for (const n of loading) assert.ok(line.includes(n), `${n} loads the ${j} and the sentence does not name it`);
+      } else {
+        assert.ok(reassures(line, j), line);
+      }
+    }
+    for (const n of plan.limits.blocked) assert.ok(plan.dayNotes.some((line) => admits(line, hurts.find((j) => JOINT_LOAD[n]?.includes(j))) && line.includes(n)), `${n} blocked and unnamed`);
+  }
 });
 
 test("nextDayIndex starts the week at zero with nothing to go on", () => {

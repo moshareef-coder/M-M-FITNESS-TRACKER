@@ -24,7 +24,7 @@ import { calibrate } from "./calibrate.mjs";
 import { learnPreferences, applyPreferences, avoidNote, openWeekBudget, heldBackNote, actedOn } from "./preferences.mjs";
 import { scoreAlternatives } from "./alternatives.mjs";
 import { planPlateauResponse, applyRotateFallback, repShiftFor } from "./plateau-response.mjs";
-import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary, softenedNote } from "./limits.mjs";
+import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary } from "./limits.mjs";
 import { mainGroupsForDay } from "./recovery.mjs";
 import { TIER_MULTIPLIER, TIERS } from "./focus.mjs";
 import { mobilityFor, COOLDOWN_SECONDS, WARMUP_SECONDS, RAMPED_WARMUP_SECONDS } from "./mobility.mjs";
@@ -1252,8 +1252,8 @@ export function buildPlan({
   const limitsRun = applyLimits({ pool: libraryPool, limits: limitsUsed });
   const limitExcluded = limitsRun.excluded.filter((e) => e.excluded !== false);
   const limitOut = new Set(limitExcluded.map((e) => e.name.toLowerCase()));
-  const limitNotes = limitsSummary(limitsUsed);
-  for (const say of limitNotes) dayNotes.push(say);
+  /* The sentences about the limits are written after pass 3, once the week
+     exists, because which sentence a joint gets depends on what was kept. */
 
   const kitAllowed = allowedEquipment(limitsUsed);
   const kit = kitAllowed
@@ -2442,12 +2442,16 @@ export function buildPlan({
 
   /* Same argument, for the limits. A slot the library could fill no other way
      kept a movement that still loads a joint they named, and the person has to
-     be told rather than left to find out under a bar. */
+     be told rather than left to find out under a bar. One sentence per joint,
+     and which sentence depends on this list: reassurance for a joint nothing
+     kept loads, the names and "go light, stop if it hurts" for the rest. The
+     two used to be printed independently, reassurance first, and contradicted
+     each other in every week with a bad knee. */
   const limitBlocked = [...new Set(
     week.flatMap((d) => d.exercises.map((e) => e.name)).filter((n) => limitOut.has(n.toLowerCase())),
   )];
-  const blockedSay = softenedNote(limitBlocked);
-  if (blockedSay) dayNotes.push(blockedSay);
+  const limitNotes = limitsSummary(limitsUsed, { blocked: limitBlocked });
+  for (const say of limitNotes) dayNotes.push(say);
 
   /* ---- pass 4: progression ---- */
   /* The plateau answer, spoken. A rotation the library could not afford becomes
