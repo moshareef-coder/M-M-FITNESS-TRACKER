@@ -161,7 +161,7 @@ const toMove = (e) => ({
  * nothing for the target still yields a block: a warm-up for a day the library
  * does not describe well is better than no warm-up.
  */
-export function pickBlock({ kind, groups = [], patterns = [], budgetSec, hurts = [], missing = [], level = "beginner", exclude = null, pools = null, maxMoves = MAX_MOVES, stopAtCoverage = false }) {
+export function pickBlock({ kind, groups = [], patterns = [], budgetSec, hurts = [], missing = [], level = "beginner", exclude = null, pools = null, maxMoves = MAX_MOVES, stopAtCoverage = false, minSec = 0 }) {
   const want = new Set((groups || []).filter((g) => GROUPS.has(g)));
   const bodyweightOnly = (missing || []).includes("none");
   const source = pools || [poolFor(kind)];
@@ -246,6 +246,31 @@ export function pickBlock({ kind, groups = [], patterns = [], budgetSec, hurts =
     for (const p of best.prepares || []) coveredPatterns.add(p);
     left.delete(best.name);
   }
+  /* The floor. Mo, 2026-09-18: "all stretches should always be five minutes
+     minimum." Everything above stops early for good reasons (coverage
+     reached, budget spent, enough moves), and the sum of those good reasons
+     was a cool-down of ninety seconds on a pull day: the constants said five
+     minutes and the block said two. So once the reasoned block is done, if
+     it is short of the floor it is topped up one move at a time with the
+     best remaining candidate, coverage and ceiling set aside, because at
+     that point the question is not "what does today need" but "is this a
+     stretch or a gesture". Capped so a library with only long holds cannot
+     run away. */
+  const floorCap = maxMoves + 4;
+  while (minSec > 0 && spent < minSec && left.size && picks.length < floorCap) {
+    let best = null, bestKey = null;
+    for (const e of candidates) {
+      if (!left.has(e.name)) continue;
+      const fresh = (e.primary || []).filter((g) => want.has(g) && !covered.has(g)).length;
+      const key = [-fresh, Math.abs(rank - (LEVEL_RANK[e.level] ?? 0)), -moveSeconds(e), e.name];
+      if (!best || compare(key, bestKey) < 0) { best = e; bestKey = key; }
+    }
+    if (!best) break;
+    picks.push(toMove(best));
+    spent += moveSeconds(best);
+    for (const g of best.primary || []) covered.add(g);
+    left.delete(best.name);
+  }
   return picks;
 }
 
@@ -300,7 +325,10 @@ export function mobilityFor(day, { level = "beginner", hurts = [], missing = [],
      exactly these seconds inside the session estimate, so the two agree. */
   const ramped = Array.isArray(day?.rampSets) && day.rampSets.length > 0;
   const warmupSec = ramped ? RAMPED_WARMUP_SECONDS : WARMUP_SECONDS;
-  const warmup = pickBlock({ kind: "dynamic", groups: mainGroups, patterns, budgetSec: warmupSec, hurts, missing, level });
+  /* Both blocks fill to their own budget now. The ramped warm up keeps its
+     shorter budget on purpose: the ramp sets are the rest of the potentiation
+     and plan.mjs reserves exactly these seconds in the session estimate. */
+  const warmup = pickBlock({ kind: "dynamic", groups: mainGroups, patterns, budgetSec: warmupSec, hurts, missing, level, minSec: warmupSec });
   const longBlock = mobilityGoal || longCooldown;
   const cooldown = longBlock
     ? pickBlock({
@@ -310,7 +338,7 @@ export function mobilityFor(day, { level = "beginner", hurts = [], missing = [],
         pools: [poolFor("mobility"), poolFor("static")],
         maxMoves: MAX_MOBILITY_MOVES,
       })
-    : pickBlock({ kind: "static", groups: worked, budgetSec: COOLDOWN_SECONDS, hurts, missing, level, stopAtCoverage: true });
+    : pickBlock({ kind: "static", groups: worked, budgetSec: COOLDOWN_SECONDS, hurts, missing, level, stopAtCoverage: true, minSec: COOLDOWN_SECONDS });
 
   const why = [];
   if ((missing || []).includes("none")) {
