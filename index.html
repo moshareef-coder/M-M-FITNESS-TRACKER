@@ -25029,7 +25029,12 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
       return false;
     }
     if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
-    if (!data.workout?.exercises?.length) throw new Error("Coach returned an empty workout");
+    /* A cardio day HAS no exercises and that is its contract, not a failure:
+       the session is carried in `workout.cardio` and a run has no sets to put
+       in this column. Guarding on the array alone rejected the one answer the
+       styles question exists to produce, so somebody who ticked only Running
+       got "Coach returned an empty workout" instead of their run. */
+    if (!data.workout?.exercises?.length && !data.workout?.cardio) throw new Error("Coach returned an empty workout");
 
     /* meta.goals is the engine's read-back of what each extra goal actually
        bought, and an empty `effect` means it bought nothing. It names ids, not
@@ -25048,23 +25053,24 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
       toast(`No ${keepFocus.toLowerCase()} in your week, so this is ${data.workout.focus}`);
     }
 
-    /* Somebody who ticked no resistance style still gets a lifting week out of
-       the engine, because a lifting week is the only thing it knows how to
-       build. It says so rather than pretending: meta.styles.honoured comes back
-       false, and filling the day from the libraries the app already has is the
-       app's job, not the engine's.
+    /* The engine builds the cardio day itself now, so there is nothing left
+       here to swap: `workout.cardio` is the session and `exercises` is empty
+       by contract. All this has to do is say the sentence out loud, because
+       the reveal keeps only the clinician warnings out of `notes` and this one
+       would otherwise be a fact nobody sees.
 
-       This is the line that finally makes the styles question mean something.
-       Before it, onboarding asked what you were willing to do, the plan screen
-       read it back to you, and the generator built five lifts regardless. */
+       The client used to substitute its own day whenever the engine said it
+       could not honour the pick, and that is exactly why it goes: cardioFor
+       falls back to the whole library rather than returning nothing, so a
+       beginner who ticked Swimming was handed an Easy Spin on a bike under
+       their own words. The engine refuses instead of substituting, and a
+       refusal somebody can read beats a bike ride they never asked for.
+
+       One sentence either way. `st.note` is the engine's own: what they are
+       holding when the cardio week was built, and what could not be done when
+       it was not. */
     const st = data.meta?.styles || null;
-    if (st && st.honoured === false) {
-      const swapped = await cardioDayForStyles(st, target);
-      if (swapped) {
-        data.workout = swapped;
-        if (!quiet && st.note) toast(st.note.split(".")[0] + ".");
-      }
-    }
+    if (!quiet && st && st.asked && !st.resistance && st.note) toast(st.note.split(".")[0] + ".");
 
     /* data.honest is not written here: ai_workouts has no column for it, and
        migrations are owned elsewhere. It lives as long as the reveal sheet
@@ -25097,8 +25103,25 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
          is an ordinary Saturday. */
       /* Weekly cardio the goal asks for, written on the plan because that is
          the screen somebody reads to know what they are meant to do. Advisory:
-         never a set, never logged, never in `exercises`. */
-      cardio: data.meta?.cardio || null,
+         never a set, never logged, never in `exercises`.
+
+         Two different cardios live in this one column and they tell themselves
+         apart by their own keys. `sessions`/`minutes`/`zone` is the weekly
+         prescription, which belongs to the goal and is true of every day of the
+         week. `session` is THIS day, on the days the day itself is a run: name,
+         minutes, effort and cue, the things that make it a session rather than
+         the word "cardio". Until now only the first was written, so the engine
+         built somebody a 25 minute Easy Run with a pace cue and the row came
+         back from the database with none of it.
+
+         One column rather than two because a new one needs a migration that has
+         not been run, and supabase rejects the whole upsert on an unknown
+         column: the save would fail and somebody would lose the plan, to store
+         a field nothing reads yet. cardioNoteHTML gates on `sessions`, so a
+         run-only row still correctly prints no weekly advice. */
+      cardio: (data.meta?.cardio || data.workout.cardio)
+        ? { ...(data.meta?.cardio || {}), ...(data.workout.cardio ? { session: data.workout.cardio } : {}) }
+        : null,
       completed_at: null,
       duration_sec: null,
     }, { onConflict: "email,entry_date" });
