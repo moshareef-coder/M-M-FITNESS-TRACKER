@@ -39,6 +39,9 @@ const OUT = arg("out", join(ROOT, "brand/film/frames"));
 const SIZE = Number(arg("size", 1080));
 const MOVE = arg("move", "Mountain Pose");
 const THEME = arg("theme", "light");
+// A whole run wears one face; there is no need for this to vary shot to shot,
+// so it is a flag rather than a field threaded through every shot object.
+const FACE = arg("face", null);
 
 /* Fresh port and profile per run: a fixed profile leaves a SingletonLock behind
    when a run is killed, and the next Chrome waits on a browser that is never
@@ -75,7 +78,16 @@ try {
   ws = new WebSocket(target.webSocketDebuggerUrl);
   let id = 0;
   const pending = new Map();
-  await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
+  /* With a timeout. Chrome can come up, answer /json/new, and then never
+     complete the socket handshake, and an open with no deadline waits for it
+     forever: one run sat here for 48 minutes with a live Chrome and no frames.
+     Every other call in this file has a deadline; this was the one that did
+     not. */
+  await new Promise((r, j) => {
+    const bell = setTimeout(() => j(new Error("Chrome accepted the target but never opened the socket")), 20000);
+    ws.onopen = () => { clearTimeout(bell); r(); };
+    ws.onerror = (e) => { clearTimeout(bell); j(e); };
+  });
   ws.onmessage = (m) => {
     const x = JSON.parse(m.data);
     if (x.id && pending.has(x.id)) { pending.get(x.id)(x); pending.delete(x.id); }
@@ -118,7 +130,8 @@ try {
   for (let f = 0; f < SHOTS.length; f++) {
     const s = SHOTS[f];
     await ev(`window.__draw(${JSON.stringify(MOVE)}, ${s.cycle}, ${s.face}, `
-      + `{theme: ${JSON.stringify(THEME)}, mood: ${JSON.stringify(s.mood || "neutral")}})`, `draw ${f}`);
+      + `{theme: ${JSON.stringify(THEME)}, mood: ${JSON.stringify(s.mood || "neutral")}`
+      + (FACE ? `, faceStyle: ${JSON.stringify(FACE)}` : "") + `})`, `draw ${f}`);
     const len = await ev("window.__b = window.__png(), window.__b.length", `size ${f}`);
     let b64 = "";
     for (let o = 0; o < len; o += CH) b64 += await ev(`window.__b.slice(${o}, ${o + CH})`, `chunk ${f}`);

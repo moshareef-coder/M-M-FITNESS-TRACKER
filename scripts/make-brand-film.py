@@ -65,6 +65,16 @@ MOOD = "neutral"
 GLOW_LEN = 0.55
 
 FIG_UNTIL = 6.4              # the figure is on screen until here
+FIG_MOUTH = ROOT / "brand/film/figure-mouth"
+# How much wider his face wears the mark than the bare pad-to-pad span, so it
+# reads as features on a face rather than a sticker cut flush to its own edges.
+FACE_MARK_PAD = 1.0
+# Mo, after seeing hand-drawn eyes: "I think the transition will be much
+# cleaner" with the actual mark on his face. He is right: a shape that merely
+# resembles the mark is a dissolve between two different drawings; the mark
+# itself is a zoom on one drawing.
+EYE_NARROW = 0.86
+EYE_RAISE = 0.22
 # Full body, not a portrait. Mo: "in the beginning we should just show his whole
 # body." A 9:16 frame is the right shape for a standing figure anyway.
 FIG_SCALE = 0.62             # of the frame height, head to feet
@@ -77,10 +87,12 @@ FIG_TOP = 0.10               # where his head starts, as a fraction of the frame
 # like an advert for it.
 # He has a name now. The app's bubble still says Coach; this is the film.
 BOT_NAME = "UNIO"
-SAY = "Who am I training with you today?"
-SAY_FROM = 1.05              # the bubble arrives
-SAY_TYPED = 2.75             # the last character lands
-SAY_UNTIL = 5.95             # it starts leaving
+# Mo: change the question, and add a second line once the wording lands.
+# (text, arrives, last character lands, starts leaving)
+SAYS = [
+    ("Who will be joining us today?", 1.00, 2.60, 3.50),
+    ("Let's begin.",                  3.85, 4.35, 5.60),
+]
 # No copy. Mo is adding his own, so the film is picture only and every second
 # has to be carried by movement instead of by a sentence.
 LINES = []
@@ -501,6 +513,83 @@ def blink_eyes(im, close, boxes):
     return out
 
 
+def unio_face(base, bud, close, bar_src, bar_pads):
+    """His face: a bare head, the mark itself where the eyes go, and the
+    mouth lifted off a second, ordinary render of him.
+
+    Position and scale are measured off the ordinary (buddy-faced) pass, so the
+    mark rides his head as it sways with his breathing rather than sitting
+    still while he moves underneath it. Blinking reuses blink_bar(), the exact
+    function the end-card mark uses on itself, so his face and the logo close
+    their eyes the same way because it is the same code doing it.
+    """
+    bb = bud.getbbox()
+    if not bb or bar_src is None or not bar_pads:
+        return base
+    h = bb[3] - bb[1]
+    r, g, b, a = bud.split()
+    hot = lambda ch, t, inv=False: ch.point(lambda v: (255 if v < t else 0) if inv else (255 if v > t else 0))
+    dark = ImageChops.multiply(ImageChops.multiply(hot(r, 70, True), hot(g, 80, True)),
+                               ImageChops.multiply(hot(b, 95, True), hot(a, 150)))
+    lime = ImageChops.multiply(ImageChops.multiply(hot(ImageChops.subtract(g, r), 40),
+                                                   hot(ImageChops.subtract(g, b), 40)), hot(a, 60))
+    # The visor is the widest dark band on the head. Scanning the whole figure
+    # finds his shoulders instead, so this stops at the jaw.
+    rows = [(y, sum(1 for v in dark.crop((bb[0], y, bb[2], y + 1)).getdata() if v > 128))
+            for y in range(bb[1], bb[1] + int(h * 0.13))]
+    widest = max(c for _, c in rows) or 1
+    band = [y for y, c in rows if c > widest * 0.6]
+    if not band:
+        return base
+    vb = band[-1]
+
+    lr = [sum(1 for v in lime.crop((bb[0], y, bb[2], y + 1)).getdata() if v > 128) for y in range(bb[1], vb + 1)]
+    if not any(lr):
+        return base
+    top = next(i for i, v in enumerate(lr) if v > 0)
+    end = next((i for i in range(top, len(lr)) if lr[i] == 0), len(lr))
+    ey0, ey1 = bb[1] + top, bb[1] + end
+    ex = lime.crop((bb[0], ey0, bb[2], ey1)).getbbox()
+    if not ex:
+        return base
+    x0, x1 = bb[0] + ex[0], bb[0] + ex[2]
+    ecx, ecy = (x0 + x1) / 2, (ey0 + ey1) / 2
+    eh = ey1 - ey0
+
+    # Scale the real mark so ITS pad pair spans the width his drawn eyes used
+    # to occupy. Both spans are outer edge to outer edge.
+    bar_span = bar_pads[1][2] - bar_pads[0][0]
+    # x1-x0 is already the full outer-edge-to-outer-edge span of the eye pair,
+    # directly comparable to bar_span (left pad's outer edge to right pad's).
+    # An earlier version multiplied this by 2 on top of that, which is why his
+    # first render wore the mark like a pair of headphones twice the width of
+    # his head.
+    target_span = (x1 - x0) * FACE_MARK_PAD
+    scale = target_span / bar_span
+    mw, mh = max(1, int(bar_src.width * scale)), max(1, int(bar_src.height * scale))
+
+    lit = blink_bar(bar_src, [close, close], bar_pads)
+    mk = lit.resize((mw, mh), Image.LANCZOS)
+    # Vertical placement keys off where the PADS land in the resized mark, not
+    # its bounding box, so the eyes sit at eye height however much plate frames
+    # them above and below.
+    pad_cy = (bar_pads[0][1] + bar_pads[0][3]) / 2 * scale
+    mx = int(ecx - mw / 2)
+    my = int(ecy - eh * EYE_RAISE - pad_cy)
+
+    out = base.copy()
+    out.alpha_composite(mk, (mx, my))
+    # The mouth and the chin light, taken as their own pixels rather than as a
+    # rectangle, so nothing of the visor above them comes with it.
+    cut = Image.new("L", bud.size, 0)
+    ImageDraw.Draw(cut).rectangle([0, vb + 6, bud.width, bb[1] + int(h * 0.135)], fill=255)
+    mouth = bud.copy()
+    mouth.putalpha(ImageChops.multiply(bud.getchannel("A"),
+                                       ImageChops.multiply(ImageChops.lighter(dark, lime), cut)))
+    out.alpha_composite(mouth)
+    return out
+
+
 def shot_list():
     shots = []
     for f in range(int(FIG_UNTIL * FPS)):
@@ -517,12 +606,20 @@ def shot_list():
 def render_figure(shots):
     tmp = Path("/tmp/unio-shots.json")
     tmp.write_text(json.dumps(shots))
-    print(f"rendering {len(shots)} figure frames, this takes a few minutes")
-    subprocess.run([
-        "node", str(ROOT / "scripts/render-bot-film.mjs"),
-        "--shots", str(tmp), "--out", str(FIG), "--size", str(RENDER),
-        "--move", MOVE, "--theme", "light",
-    ], check=True)
+    if not FIG.exists() or len(list(FIG.glob("f*.png"))) < len(shots):
+        print(f"rendering {len(shots)} bare-head frames")
+        subprocess.run([
+            "node", str(ROOT / "scripts/render-bot-film.mjs"),
+            "--shots", str(tmp), "--out", str(FIG), "--size", str(RENDER),
+            "--move", MOVE, "--theme", "light", "--face", "none",
+        ], check=True)
+    if not FIG_MOUTH.exists() or len(list(FIG_MOUTH.glob("f*.png"))) < len(shots):
+        print(f"rendering {len(shots)} ordinary-face frames, for the mouth")
+        subprocess.run([
+            "node", str(ROOT / "scripts/render-bot-film.mjs"),
+            "--shots", str(tmp), "--out", str(FIG_MOUTH), "--size", str(RENDER),
+            "--move", MOVE, "--theme", "light",
+        ], check=True)
 
 
 def font(size, weight="Regular"):
@@ -562,10 +659,10 @@ def fade(im, a):
 
 def main():
     shots = shot_list()
-    if not FIG.exists() or len(list(FIG.glob("f*.png"))) < len(shots):
-        render_figure(shots)
+    render_figure(shots)
     figs = sorted(FIG.glob("f*.png"))
-    if not figs:
+    mouths = sorted(FIG_MOUTH.glob("f*.png"))
+    if not figs or len(mouths) < len(figs):
         sys.exit("no figure frames")
 
     # Whole body, placed rather than cropped. The bounding box includes the soft
@@ -603,7 +700,7 @@ def main():
     # factor to be right: at 1.75 this line came out 1216px wide in a 1080 frame
     # and was clipped at both ends. Now any line Mo writes fits or is made to.
     BUB_MAX = W - 2 * 46
-    natural = bubble(SAY, len(SAY), False, (f_who, f_line)).width if SAY else 1
+    natural = max(bubble(t, len(t), False, (f_who, f_line)).width for t, *_ in SAYS)
     bub_fit = min(1.0, BUB_MAX / natural)
 
     COMP.mkdir(parents=True, exist_ok=True)
@@ -630,8 +727,9 @@ def main():
                 w2, h2 = int(fw * sc), int(fh * sc)
                 src = Image.open(figs[i]).convert("RGBA")
                 src = neutral_floor(src, y0, body)
+                src = unio_face(src, Image.open(mouths[i]).convert("RGBA"),
+                                eye_close(t), bar_src, bar_pads)
                 boxes = eye_boxes(src)
-                src = blink_eyes(src, eye_close(t), boxes)
                 src = glow_eyes(src, boxes, eye_flare(t))
                 im = src.resize((w2, h2), Image.LANCZOS)
                 # Scaling about the centre of where he already sits, so the push
@@ -640,17 +738,19 @@ def main():
                                       (f_left - (w2 - fw) // 2, f_top - (h2 - fh) // 2))
 
         # ---- he speaks ----
-        if SAY and SAY_FROM <= t < SAY_UNTIL + 0.45:
-            grow = ease_out(clamp01((t - SAY_FROM) / 0.30))
-            gone = ramp(t, SAY_UNTIL, SAY_UNTIL + 0.45)
+        for text, s_from, s_typed, s_until in SAYS:
+            if not (s_from <= t < s_until + 0.45):
+                continue
+            grow = ease_out(clamp01((t - s_from) / 0.30))
+            gone = ramp(t, s_until, s_until + 0.45)
             ba = grow * (1 - gone)
             if ba > 0.01:
-                typed = clamp01((t - SAY_FROM - 0.18) / max(0.01, SAY_TYPED - SAY_FROM - 0.18))
-                shown = int(len(SAY) * typed)
+                typed = clamp01((t - s_from - 0.18) / max(0.01, s_typed - s_from - 0.18))
+                shown = int(len(text) * typed)
                 # The caret blinks while he types and goes the moment he stops,
                 # which is exactly what typeQuip does in the app.
-                caret = shown < len(SAY) and int(t * 2.2) % 2 == 0
-                bub = bubble(SAY, shown, caret, (f_who, f_line))
+                caret = shown < len(text) and int(t * 2.2) % 2 == 0
+                bub = bubble(text, shown, caret, (f_who, f_line))
                 # It arrives from slightly below and small, like the app's quipIn.
                 sc = (0.94 + 0.06 * grow) * bub_fit
                 bw, bh = int(bub.width * sc), int(bub.height * sc)
@@ -659,6 +759,7 @@ def main():
                 by = bub_y + int(14 * (1 - grow))
                 frame.alpha_composite(fade(soft_shadow(b, 12, 10, 0.28), ba), (bx, by))
                 frame.alpha_composite(fade(b, ba), (bx, by))
+            break
 
         # ---- the mark assembling ----
         draw_p = smooth((t - DRAW_FROM) / (DRAW_TO - DRAW_FROM))
