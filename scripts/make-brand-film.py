@@ -35,7 +35,7 @@ WHITE = (255, 255, 255, 255)
 INK = (17, 19, 24, 255)
 MUTED = (110, 116, 128, 255)
 
-MOVE = "Mountain Pose"
+MOVE = "UNIO Wave"        # authored in brand/film-harness.html off Mountain Pose
 MOVE_DUR = 6.4
 # The blink is drawn here, not asked of the rig.
 #
@@ -47,7 +47,9 @@ MOVE_DUR = 6.4
 #
 # Down fast, up slower, the way an eye actually moves, and the whole thing is
 # over in a quarter of a second with almost none of it spent shut.
-BLINKS = [(1.35, 0.09, 0.17), (2.90, 0.09, 0.17), (4.25, 0.08, 0.16), (5.45, 0.09, 0.17)]
+# Two, not four. Mo: "he's blinking too much, just a couple blinks in the
+# beginning." One as he arrives and one as the wave comes down.
+BLINKS = [(0.85, 0.09, 0.17), (3.55, 0.09, 0.17)]
 EYES_OPEN_AT = 1.0           # a face clock nowhere near the rig's own blink
 # He keeps one face for the whole film. The rig's happy eyes are an upward arc
 # and the neutral ones are vertical bars, and there is no shape in between, so
@@ -89,6 +91,7 @@ SWEEP_FROM, SWEEP_TO = 8.55, 9.45     # a specular band crossing the finished ma
 
 # The end card. Set under the mark once it has finished assembling, in the app's
 # own face, with the space above it left clear for anything Mo lays over the top.
+END_NAME = "UNIO"
 END_LINE = "Train together."
 END_FROM = 8.85
 
@@ -499,7 +502,9 @@ def shot_list():
     for f in range(int(FIG_UNTIL * FPS)):
         t = f / FPS
         shots.append({
-            "cycle": round((0.10 + t / MOVE_DUR) % 1, 6),
+            # The wave is authored to play once over the figure's whole time on
+            # screen, so the cycle is that fraction rather than a loop of a pose.
+            "cycle": round(min(0.999, t / FIG_UNTIL), 6),
             "face": EYES_OPEN_AT,
             "mood": MOOD,
         })
@@ -586,7 +591,8 @@ def main():
     arcR = arcR.resize((mark, mark), Image.LANCZOS)
     mx, my = (W - mark) // 2, (H - mark) // 2
 
-    f_end = font(74, "Semibold")
+    f_name = font(104, "Bold")
+    f_end = font(50, "Medium")
     f_who = font(int(10 * K), "Heavy")
     f_line = font(int(14 * K), "Semibold")
     bub_y = int(H * 0.795)
@@ -691,7 +697,11 @@ def main():
             if ea > 0.01:
                 d = ImageDraw.Draw(frame)
                 rise = int(16 * (1 - ea))
-                centred(d, my + mark + int(104) + rise, END_LINE, f_end, INK, ea)
+                centred(d, my + mark + 86 + rise, END_NAME, f_name, INK, ea, track=12)
+                # The tagline follows a beat later, so the name lands first.
+                la = ramp(t, END_FROM + 0.30, END_FROM + 0.85)
+                if la > 0.01:
+                    centred(d, my + mark + 196 + int(14 * (1 - la)), END_LINE, f_end, MUTED, la)
 
         frame.convert("RGB").save(COMP / f"c{i:04d}.png")
 
