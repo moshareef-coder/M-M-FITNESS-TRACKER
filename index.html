@@ -11162,54 +11162,186 @@ async function upsertGoalFields(patch) {
    so many groups at once (see focusKept below), and when a pick falls past
    that the page says so in one plain sentence, naming the groups, with no
    arithmetic in it. */
-/* ---- Focus by area, ranked ----
-   Mo wanted the picker down to four things you can put in order rather than
-   fourteen muscles you tap individually: legs, arms, chest, back, ranked 1st
-   to 4th, or everything level when nothing in particular matters.
+/* ---- The four focus regions. ONE table, two views --------------------------
+   Two screens ask this question. Setup's Focus areas ranks these four 1st to
+   4th; onboarding's tune step toggles them on and off, and the day-focus sheet
+   borrows them too. They were written out twice, once here and once as
+   BODY_REGIONS, and the two copies had already drifted by the second day: one
+   led its arms with biceps and the other with shoulders, so the same button
+   bought a different muscle depending on which screen answered it, into one
+   column nothing downstream can tell the screens apart in. The labels had
+   drifted as well. So there is one table now and the other name is a view of
+   it, and the drift cannot come back.
 
-   Each area lists its muscle groups in the order the engine should reach for
-   them, biggest and most trainable first. Shoulders and core are deliberately
-   NOT here: they belong to no area anyone would call legs, arms, chest or
-   back, and putting them under "arms" would train the wrong thing. They are
-   Grouped the way Mo trains rather than the way an anatomy chart splits
-   things: shoulders go with arms because that is the day they get trained on,
-   and core rides with legs for the same reason. Every one of the fourteen
-   muscle groups now belongs to exactly one area, so nothing is unreachable. */
-const FOCUS_AREAS = [
-  { key: "armsdelts", label: "Arms & Shoulders", groups: ["biceps", "triceps", "shoulders", "forearms"] },
-  { key: "legscore",  label: "Legs & Core",      groups: ["quads", "hamstrings", "glutes", "abs", "obliques", "calves"] },
-  { key: "chest",     label: "Chest",            groups: ["chest"] },
-  { key: "back",      label: "Back",             groups: ["lats", "traps", "lowerback"] },
-];
+   A region names one thing or two, and the name is a promise. `lead` is the
+   half the name leads with, `also` is the other half, and focusRegionSpend
+   below buys BOTH whenever it has more than a single unit to spend. That is
+   the other half of the fix: "Legs and core" used to be six groups in one flat
+   list paid for from the front, the budget never reached past the third, and
+   the core half of the button was decoration in every combination there is.
+
+   Inside each list the groups are in the order the budget should reach for
+   them, biggest and most trainable first. Shoulders ride with arms and core
+   rides with legs because those are the days Mo trains them on, not because an
+   anatomy chart splits them that way. Every one of the app's fourteen groups is
+   in exactly one region, which is what lets a tap anywhere on the figure always
+   mean something. */
+const FOCUS_REGIONS = Object.freeze([
+  { id: "arms",  label: "Arms and shoulders", say: "your arms and shoulders",
+    lead: ["biceps", "triceps", "forearms"], also: ["shoulders"] },
+  { id: "chest", label: "Chest", say: "your chest",
+    lead: ["chest"], also: [] },
+  { id: "back",  label: "Back", say: "your back",
+    lead: ["lats", "traps", "lowerback"], also: [] },
+  { id: "legscore", label: "Legs and core", say: "your legs and core",
+    lead: ["quads", "hamstrings", "glutes", "calves"], also: ["abs", "obliques"] },
+].map((r) => Object.freeze({
+  ...r,
+  lead: Object.freeze(r.lead), also: Object.freeze(r.also),
+  /* Every group in the region, both halves, for the figure and for the chip
+     subtitles. Nothing outside the spend should care which half a group is in. */
+  groups: Object.freeze([...r.lead, ...r.also]),
+})));
 const FOCUS_RANK_WORD = ["", "1st", "2nd", "3rd", "4th"];
 
 let FOCUS_AREA_RANK = {};
 
-/* A ranking spent against the engine's own budget, which is 9 points with a
-   top-tier group costing 3, the next 2 and the lightest 1. Two groups from the
-   first area, one from the second, one from the third comes to exactly 9, so
-   the ranking lands whole instead of being silently trimmed by spend().
-   Fourth gets nothing, which is what fourth means. */
-const AREA_SPEND = [
-  { tier: 3, take: 2 },
-  { tier: 2, take: 1 },
-  { tier: 1, take: 1 },
-];
+/* The tier ladder, spent down a list of groups: as much as the budget can
+   afford on the first, then the next, stopping at tier 3 because that is the
+   ceiling for any one group. `left` is what could not be spent, which is a real
+   answer and not an error: Chest is one muscle group and cannot take more than
+   three units however many it is handed. */
+function focusSpendDown(groups, units, maxTier = FOCUS_TIERS.main) {
+  const pairs = [];
+  let left = Math.max(0, units);
+  for (const g of groups) {
+    if (left <= 0) break;
+    const tier = Math.min(maxTier, left);
+    pairs.push([g, tier]);
+    left -= tier;
+  }
+  return { pairs, left };
+}
+
+/* The same units spread ACROSS a list instead of down it: a unit to each group
+   in turn, so two units on a two group half buy both at the lightest tier
+   rather than one at the middle.
+
+   That is not a style choice, it is what the engine measures. The plan's core
+   slot names ONE group and which one depends on the split: the full body and
+   legs templates fill it from abs, the upper/lower template fills it from
+   obliques (SLOTS in mo-knowledge/engine/plan.mjs). So a core focus spent deep
+   on abs lands on a group a four day week never trains, and the week comes back
+   with LESS core work than picking nothing at all: measured on a four day
+   build-muscle week, abs:2 gives 2 weekly core sets against a baseline of 5,
+   while abs:1 plus obliques:1 gives 10. Spread across both, it lands whatever
+   the split. The real fix is one line per template in plan.mjs, widening that
+   slot to ["abs", "obliques"] the way the traps slot was already widened, and
+   this picker should stop compensating the day that lands. */
+function focusSpendAcross(groups, units) {
+  const tier = new Map(groups.map((g) => [g, 0]));
+  let left = Math.max(0, units);
+  while (left > 0) {
+    const lowest = Math.min(...groups.map((g) => tier.get(g)));
+    const g = groups.find((x) => tier.get(x) === lowest && tier.get(x) < FOCUS_TIERS.main);
+    if (!g) break;
+    tier.set(g, tier.get(g) + 1);
+    left -= 1;
+  }
+  return { pairs: [...tier].filter(([, t]) => t > 0), left };
+}
+
+/* What one region buys for a given number of budget units, keeping the promise
+   its label makes. A region named after two things spends about a quarter of
+   what it was given on the second half, never less than one unit per group in
+   that half so a named half is never bought as a coin flip, and never so much
+   that the half the name leads with stops leading.
+
+   The floor is why "Legs and core" with three units buys quads, abs and
+   obliques at a unit each rather than quads at two and abs at one. Measured, the
+   second of those is worse than not picking at all: the legs take the volume,
+   the single core unit lands on a group half the splits never train, and core
+   comes back at 2 weekly sets against a baseline of 5. A name that promises two
+   things and delivers less of the second one than silence would is the bug this
+   whole commit is about, one level down.
+
+   Two units is the one case where the floor cannot be paid, because the lead
+   half must keep a unit. That is a second-ranked area on Setup and nowhere
+   else. Paying for it would mean taking units off the first-ranked area, which
+   would change what Back and Chest buy at the top of a ranking, and those two
+   name one thing and must land exactly where they land today. */
+function focusRegionSpend(region, units) {
+  if (!region || units <= 0) return { pairs: [], left: Math.max(0, units) };
+  const share = region.also.length && units >= 2
+    ? Math.min(Math.max(region.also.length, Math.round(units / 4)), units - 1)
+    : 0;
+  const first = focusSpendDown(region.lead, units - share);
+  /* The lead half's own leftover goes here rather than being binned: a one
+     group lead (Chest) hands its whole allowance on. */
+  const second = focusSpendAcross(region.also, share + first.left);
+  return { pairs: [...first.pairs, ...second.pairs], left: second.left };
+}
+
+/* Several regions at once, and the units one of them cannot spend handed to
+   another one the person actually picked.
+
+   Chest is the whole reason the handing exists. It is one muscle group, it tops
+   out at tier 3, and before this the other units of a chest pick were binned:
+   picking Chest spent 3 of the 9 while every other pick spent 8. The other
+   candidate was to spend the remainder on the muscles that press with it,
+   triceps and shoulders, and that one is wrong for a reason the screens
+   settle: both pickers read their answer back out of the column by asking which
+   region each stored group belongs to, so a Chest pick that wrote triceps would
+   come back as Chest AND Arms on the next visit, on both screens. Writing
+   muscles nobody tapped is the same class of bug as the one this commit is
+   fixing. Inside the person's own picks it is safe, so that is where the
+   leftover goes, one unit at a time until nobody can take another. */
+function focusSpendRegions(regions, units) {
+  const allowance = regions.map((r, i) => Math.max(0, units[i] || 0));
+  const run = () => regions.map((r, i) => focusRegionSpend(r, allowance[i]));
+  /* Bounded by the budget rather than by `while`, because a spend table edited
+     later must not be able to hang the picker. */
+  for (let move = 0; move < FOCUS_BUDGET_UNITS; move++) {
+    const spends = run();
+    const donor = spends.findIndex((s) => s.left > 0);
+    if (donor < 0) break;
+    const taker = spends.findIndex((s, i) => i !== donor && allowance[i] > 0 && s.left === 0
+      && focusRegionSpend(regions[i], allowance[i] + 1).left === 0);
+    if (taker < 0) break;                       // nobody left who can use it
+    allowance[donor] -= 1;
+    allowance[taker] += 1;
+  }
+  const pairs = [];
+  for (const s of run()) pairs.push(...s.pairs);
+  return pairs;
+}
+
+/* One entry per group, highest tier wins, in the column's own "quads:3" shape.
+   Not a [group, tier] pair: focusParseStored here and parseFocus in the engine
+   both split a string on ":", so an array of arrays came back as no focus at
+   all, in the picker and in the plan. The dedupe is cheap insurance rather than
+   a live case today, and it can only ever lower the total: two rows for one
+   group would spend the budget twice and the engine would read one of them. */
+function focusEntriesOf(pairs) {
+  const best = new Map();
+  for (const [g, t] of pairs) best.set(g, Math.max(best.get(g) || 0, t));
+  return [...best].map(([g, t]) => `${g}:${t}`);
+}
+
+/* Setup's view: a ranking, spent against the engine's own budget of 9 units
+   where a top-tier group costs 3, the next 2 and the lightest 1. Six units to
+   the first area, two to the second, one to the third is exactly nine, so the
+   ranking lands whole instead of being silently trimmed by spend(). Fourth gets
+   nothing, which is what fourth means, and the units an unranked area would
+   have had are not handed out either: not ranking something is ranking it
+   last. */
+const AREA_RANK_UNITS = [6, 2, 1];
 function focusEntriesFromAreas() {
-  const ranked = FOCUS_AREAS
-    .filter((a) => FOCUS_AREA_RANK[a.key])
-    .sort((a, b) => FOCUS_AREA_RANK[a.key] - FOCUS_AREA_RANK[b.key]);
-  const out = [];
-  ranked.forEach((area, i) => {
-    const plan = AREA_SPEND[i];
-    if (!plan) return;
-    /* "quads:2", the column's own shape, not a [group, tier] pair. The pair is
-       what this returned for a while and nothing could read it: focusParseStored
-       here and parseFocus in the engine both split a string on ":", so an array
-       of arrays came back as no focus at all, in the picker and in the plan. */
-    area.groups.slice(0, plan.take).forEach((g) => out.push(`${g}:${plan.tier}`));
-  });
-  return out;
+  const ranked = FOCUS_REGIONS
+    .filter((r) => FOCUS_AREA_RANK[r.id])
+    .sort((a, b) => FOCUS_AREA_RANK[a.id] - FOCUS_AREA_RANK[b.id])
+    .slice(0, AREA_RANK_UNITS.length);
+  return focusEntriesOf(focusSpendRegions(ranked, ranked.map((r, i) => AREA_RANK_UNITS[i])));
 }
 
 /* The figure already paints every group in FOCUS_PICKED, so the ranking is
@@ -11223,8 +11355,8 @@ function syncPickedFromAreas() {
   /* FOCUS_ALL is read straight off the global by the repaint, which paints the
      whole body green from it, so there is deliberately nothing to mirror here. */
   if (FOCUS_ALL) return;
-  for (const area of FOCUS_AREAS) {
-    const tier = AREA_RANK_TIER[FOCUS_AREA_RANK[area.key]];
+  for (const area of FOCUS_REGIONS) {
+    const tier = AREA_RANK_TIER[FOCUS_AREA_RANK[area.id]];
     if (!tier) continue;
     for (const g of area.groups) FOCUS_PICKED.set(g, tier);
   }
@@ -11247,7 +11379,7 @@ function focusAreaTap(key) {
     }
   } else {
     const used = Object.keys(FOCUS_AREA_RANK).length;
-    if (used >= FOCUS_AREAS.length) return;
+    if (used >= FOCUS_REGIONS.length) return;
     FOCUS_AREA_RANK[key] = used + 1;
   }
   paintFocusAreas();
@@ -11257,10 +11389,10 @@ function paintFocusAreas() {
   const grid = $("focusAreaGrid");
   if (!grid) return;
   const anyRanked = Object.keys(FOCUS_AREA_RANK).length > 0;
-  grid.innerHTML = FOCUS_AREAS.map((a) => {
-    const r = FOCUS_AREA_RANK[a.key] || 0;
+  grid.innerHTML = FOCUS_REGIONS.map((a) => {
+    const r = FOCUS_AREA_RANK[a.id] || 0;
     const cls = FOCUS_ALL ? "level" : r ? "r" + r : "none";
-    return `<button type="button" class="fa-card ${cls}" data-area="${a.key}">
+    return `<button type="button" class="fa-card ${cls}" data-area="${a.id}">
       <span class="fa-rank">${FOCUS_ALL ? "Even" : r ? FOCUS_RANK_WORD[r] : ""}</span>
       <span class="fa-label">${escapeHtml(a.label)}</span>
       <span class="fa-sub">${a.groups.map((g) => BODY_GROUP_LABELS[g]).join(", ")}</span>
@@ -11283,15 +11415,15 @@ function paintFocusAreas() {
       ? "Tap wherever bothers you most. Tap more to rank what comes after it."
       : "Tap an area to make it first. Tap more to rank them after it.";
   } else if (FOCUS_SORE) {
-    const order = FOCUS_AREAS.filter((a) => FOCUS_AREA_RANK[a.key])
-      .sort((a, b) => FOCUS_AREA_RANK[a.key] - FOCUS_AREA_RANK[b.key]);
+    const order = FOCUS_REGIONS.filter((a) => FOCUS_AREA_RANK[a.id])
+      .sort((a, b) => FOCUS_AREA_RANK[a.id] - FOCUS_AREA_RANK[b.id]);
     note.textContent = "Your mobility work will concentrate on " + order.map((a) => a.label.toLowerCase()).join(", then ") + ".";
   } else {
-    const order = FOCUS_AREAS.filter((a) => FOCUS_AREA_RANK[a.key])
-      .sort((a, b) => FOCUS_AREA_RANK[a.key] - FOCUS_AREA_RANK[b.key]);
+    const order = FOCUS_REGIONS.filter((a) => FOCUS_AREA_RANK[a.id])
+      .sort((a, b) => FOCUS_AREA_RANK[a.id] - FOCUS_AREA_RANK[b.id]);
     const said = order.map((a, i) => {
-      const plan = AREA_SPEND[i];
-      return plan ? `${a.label.toLowerCase()} ${i === 0 ? "hardest" : i === 1 ? "next" : "a little"}` : `${a.label.toLowerCase()} not at all`;
+      const units = AREA_RANK_UNITS[i];
+      return units ? `${a.label.toLowerCase()} ${i === 0 ? "hardest" : i === 1 ? "next" : "a little"}` : `${a.label.toLowerCase()} not at all`;
     });
     note.textContent = "Your weeks will push " + said.join(", ") + ".";
   }
@@ -11331,8 +11463,8 @@ function renderBodyFocusPage(opts = {}) {
   if (!FOCUS_ALL) {
     const best = {};
     for (const [g, t] of storedPicks) {
-      const area = FOCUS_AREAS.find((a) => a.groups.includes(g));
-      if (area) best[area.key] = Math.max(best[area.key] || 0, t);
+      const area = FOCUS_REGIONS.find((a) => a.groups.includes(g));
+      if (area) best[area.id] = Math.max(best[area.id] || 0, t);
     }
     Object.entries(best).sort((a, b) => b[1] - a[1]).forEach(([k], i) => { FOCUS_AREA_RANK[k] = i + 1; });
   }
@@ -11366,74 +11498,53 @@ function closeBodyFocusPage() {
    regions, not muscles. I don't want to see too much detail." Four regions on
    the app's own body, front and back at once, and no ranking anywhere on it.
 
-   It is a SECOND picker on purpose and Setup's Focus areas is not going
-   anywhere. That one still owns the fourteen muscle groups and the three tiers,
-   because somebody who has trained for a month and opens Focus areas is not the
-   person answering their fourth ever question. What the two now share is the
-   body they draw and the column they write: bodyRegionFocusEntries() below
-   spends the engine's same nine units and emits the same "quads:3" strings, so
-   nothing downstream can tell which screen an answer came from.
+   It is a SECOND VIEW and not a second table. Setup's Focus areas is not going
+   anywhere: it still asks for a ranking, because somebody who has trained for a
+   month and opens Focus areas is not the person answering their fourth ever
+   question. But the four regions, their labels, their muscle groups and the
+   order the budget reaches for them all live in FOCUS_REGIONS now, above, and
+   this screen reads them from there. They used to be written out twice and the
+   two copies drifted inside two days.
 
-   The difference between them is only how much is on screen. Focus areas asks
-   for fourteen muscles and a ranking; this asks for four regions, and the same
-   figure answers both.
-
-   Those four are FOCUS_AREAS's four, one for one, since 2026-09-18. This
-   shipped with five, legs and core apart, and the app then asked the same
-   question twice and got two different answers into one column: five regions
-   here, four ranked areas there, and nothing downstream able to tell which
-   screen had answered. Core lost, because nobody trains core as a day. It
-   rides with legs here for the same reason it does in FOCUS_AREAS, whose
-   comment makes the argument at more length.
+   The difference between the screens is how much is on screen and how the
+   budget is handed out: a ranking pays 6, 2 and 1 units by position, and this
+   one has no ranking on it, so it pays every picked region the same. Both
+   spend the engine's same nine units through focusRegionSpend() and emit the
+   same "quads:3" strings, so nothing downstream can tell which screen an
+   answer came from.
 
    The two exported names are a contract with the onboarding sequence:
      bodyRegionPickerHTML({ sex, selected, sore })   -> markup string
      wireBodyRegionPicker(root, { sex, onChange })
 */
 
-/* Region to muscle groups, in the order the plan should reach for them, biggest
-   and most trainable first, because the spend below takes the front of each
-   list. Every one of the app's fourteen groups is in exactly one region, which
-   is what lets a tap anywhere on the figure always mean something. */
-const BODY_REGIONS = Object.freeze([
-  { id: "arms",  label: "Arms and shoulders", say: "your arms and shoulders",
-    groups: ["shoulders", "biceps", "triceps", "forearms"] },
-  { id: "chest", label: "Chest", say: "your chest",
-    groups: ["chest"] },
-  { id: "back",  label: "Back", say: "your back",
-    groups: ["lats", "traps", "lowerback"] },
-  /* Same six groups in the same order as FOCUS_AREAS's legscore, deliberately,
-     because the spend below pays from the front of this list and Setup's
-     AREA_SPEND pays from the front of that one. Two orders would mean the two
-     screens buying different muscles out of the same answer. Quads, hamstrings
-     and glutes lead because they are the three the budget can actually reach;
-     abs and obliques sit behind them, which is what "core rides with legs"
-     costs and is worth saying out loud. Calves are last for the reason they
-     are last everywhere. */
-  { id: "legscore", label: "Legs and core", say: "your legs and core",
-    groups: ["quads", "hamstrings", "glutes", "abs", "obliques", "calves"] },
-]);
+/* The onboarding view of the one table. Same rows, same order, no copy. */
+const BODY_REGIONS = FOCUS_REGIONS;
 const BODY_REGION_IDS = BODY_REGIONS.map((r) => r.id);
 const bodyRegionFor = (id) => BODY_REGIONS.find((r) => r.id === id) || null;
 
-/* How much of each picked region actually gets written, keyed by how many
-   regions were picked. Every row costs nine units or fewer against the engine's
+/* How many budget units each picked region gets, keyed by how many regions were
+   picked. Every row totals nine units or fewer against the engine's
    FOCUS_BUDGET, which is the whole reason this table exists: all four regions
    is fourteen muscle groups, and fourteen groups asked for at once is a request
    focus.mjs answers by silently dropping the tail.
 
-   Setup's picker solves the same arithmetic with AREA_SPEND, which pays out by
-   RANK: first area hardest, fourth nothing. That cannot be used here, because
-   this screen has no ranking on it. Ordering these by the order they happened
-   to be tapped would be a priority nobody can see and nobody can correct, which
-   is the kind of quiet decision this codebase is supposed to say out loud. So
-   picked regions are equals, and what moves instead is how deep into each one
-   the budget reaches. The tier numbers are the engine's own: 3 main, 2
-   secondary, 1 light, same as FOCUS_TIERS. */
-const BODY_REGION_SPEND = Object.freeze({
-  1: [3, 3, 2],   // one region, so go three groups deep into it: 3 + 3 + 2 = 8
-  2: [3, 1],      // the lead group of each, hard, and the next one as a nudge: 8
-  3: [3],         // the lead group of each, hard: 9, the budget exactly
+   Setup's picker hands its nine out by RANK, first area hardest. That cannot be
+   used here, because this screen has no ranking on it. Ordering these by the
+   order they happened to be tapped would be a priority nobody can see and
+   nobody can correct, which is the kind of quiet decision this codebase is
+   supposed to say out loud. So picked regions are equals, and what moves
+   instead is how deep into each one the budget reaches.
+
+   What each region then does with its units is focusRegionSpend's business, not
+   this table's. That is the fix of 2026-09-18: this used to hand out TIERS,
+   [3, 3, 2] paid down the front of one flat group list, so "Legs and core" with
+   eight units bought quads, hamstrings and glutes and the core half of the
+   button was decoration. */
+const BODY_REGION_UNITS = Object.freeze({
+  1: 8,   // one region, deep: three groups of it, 3 + 3 + 2
+  2: 4,   // four each: the lead half hard, the other half nudged
+  3: 3,   // three each, which is the budget exactly
   /* There is no row 4. Four regions is every region there is, which
      bodyRegionFocusEntries answers as the whole body before it ever reaches
      this table. A row here for a count that cannot arrive is a rule nobody
@@ -11463,19 +11574,12 @@ function bodyRegionFocusEntries(ids) {
   if (!picked.length || bodyRegionsAreWholeBody(ids)) return [];
   /* The fallback is unreachable while there are four regions and all four is
      the whole body, so picked.length is only ever 1, 2 or 3 by the time it is
-     read. It pays one light group per region rather than the deepest row,
-     because the only way to arrive here is a region added without a spend row
-     for it, and the safe answer to a count this table did not plan for is the
-     one that cannot overrun the budget whatever the count turns out to be. */
-  const tiers = BODY_REGION_SPEND[picked.length] || [1];
-  const out = [];
-  for (const region of picked) {
-    tiers.forEach((tier, i) => {
-      const group = region.groups[i];
-      if (group) out.push(`${group}:${tier}`);
-    });
-  }
-  return out;
+     read. It pays one unit per region rather than the deepest row, because the
+     only way to arrive here is a region added without a row for it, and the
+     safe answer to a count this table did not plan for is the one that cannot
+     overrun the budget whatever the count turns out to be. */
+  const units = BODY_REGION_UNITS[picked.length] || 1;
+  return focusEntriesOf(focusSpendRegions(picked, picked.map(() => units)));
 }
 
 /* The way back in, so somebody who taps Back and then Continue sees what they
@@ -11975,8 +12079,8 @@ async function initBodyFocusRive() {
      bicep lights both arms rather than that one head. Which is the point: the
      picker is areas now, and the body is the other way of reaching them. */
   function tapGroup(group) {
-    const area = FOCUS_AREAS.find((a) => a.groups.includes(group));
-    if (area) focusAreaTap(area.key);
+    const area = FOCUS_REGIONS.find((a) => a.groups.includes(group));
+    if (area) focusAreaTap(area.id);
   }
   function make(id, view) {
     return mod.createBodyHeatmap({
@@ -12033,7 +12137,7 @@ async function initBodyFocusRive() {
        picked set left a deselected muscle wearing the palette it had when it
        was ranked, and with its intensity dropped to zero that rendered black.
        A group with no rank is explicitly put back to base. */
-    for (const area of FOCUS_AREAS) {
+    for (const area of FOCUS_REGIONS) {
       const tier = FOCUS_PICKED.get(area.groups[0]);
       for (const g of area.groups) {
         if (FOCUS_ALL) {

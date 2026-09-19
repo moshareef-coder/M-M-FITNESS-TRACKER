@@ -128,29 +128,70 @@ const TUNE = {
     sub:"Tap anywhere stiff or sore and the mobility work builds around it. This is not medical advice, and if something actually hurts, see someone about it." },
 };
 
-/* BODY_REGIONS, index.html ~11338. The tune step asks for FOUR regions, not
-   fourteen muscles. Setup's Focus areas screen is the one that asks for all
-   fourteen and a ranking; this one asks the short question and the same figure
-   answers both. The four are Setup's own four, legs and core together, because
-   core is not a day anybody trains. */
+/* FOCUS_REGIONS, index.html ~11170. ONE table for both pickers: Setup's Focus
+   areas ranks these four, the tune step toggles them. `lead` is the half the
+   name leads with and `also` is the other half, because the label is a promise:
+   "Legs and core" has to buy core. It used to be one flat list paid from the
+   front, and the budget never reached past the third group, so core was never
+   bought at all. */
 const REGIONS = [
-  { id:"arms",     label:"Arms and shoulders", groups:["shoulders","biceps","triceps","forearms"] },
-  { id:"chest",    label:"Chest",              groups:["chest"] },
-  { id:"back",     label:"Back",               groups:["lats","traps","lowerback"] },
-  { id:"legscore", label:"Legs and core",      groups:["quads","hamstrings","glutes","abs","obliques","calves"] },
-];
-/* BODY_REGION_SPEND, index.html ~11373. Nobody ranks anything: how many
-   regions you pick decides how deep the nine unit budget goes into each. There
-   is no row for four, because four regions is every region and that is the
-   whole body, which spends nothing. */
-const SPEND = { 1:[3,3,2], 2:[3,1], 3:[3] };
+  { id:"arms",     label:"Arms and shoulders", lead:["biceps","triceps","forearms"], also:["shoulders"] },
+  { id:"chest",    label:"Chest",              lead:["chest"], also:[] },
+  { id:"back",     label:"Back",               lead:["lats","traps","lowerback"], also:[] },
+  { id:"legscore", label:"Legs and core",      lead:["quads","hamstrings","glutes","calves"], also:["abs","obliques"] },
+].map((r) => ({ ...r, groups:[...r.lead, ...r.also] }));
+/* BODY_REGION_UNITS, index.html ~11500. Nobody ranks anything here: how many
+   regions you pick decides how many of the nine budget units each one gets.
+   There is no row for four, because four regions is every region and that is
+   the whole body, which spends nothing. */
+const UNITS = { 1:8, 2:4, 3:3 };
+/* focusSpendDown / focusSpendAcross / focusRegionSpend, index.html ~11215. The
+   lead half is spent DOWN its list, deepest first; the other half is spread
+   ACROSS its groups, because the engine's core slot names abs on some splits
+   and obliques on others, so a core focus spent deep on one of them lands on a
+   group half the weeks never train. */
+function spendDown(groups, units) {
+  const pairs = []; let left = units;
+  for (const g of groups) { if (left <= 0) break; const t = Math.min(3, left); pairs.push([g, t]); left -= t; }
+  return { pairs, left };
+}
+function spendAcross(groups, units) {
+  const tier = new Map(groups.map((g) => [g, 0])); let left = units;
+  while (left > 0) {
+    const low = Math.min(...groups.map((g) => tier.get(g)));
+    const g = groups.find((x) => tier.get(x) === low && tier.get(x) < 3);
+    if (!g) break;
+    tier.set(g, tier.get(g) + 1); left -= 1;
+  }
+  return { pairs:[...tier].filter(([, t]) => t > 0), left };
+}
+function regionSpend(region, units) {
+  if (!region || units <= 0) return { pairs:[], left:Math.max(0, units) };
+  const share = region.also.length && units >= 2
+    ? Math.min(Math.max(region.also.length, Math.round(units / 4)), units - 1) : 0;
+  const first = spendDown(region.lead, units - share);
+  const second = spendAcross(region.also, share + first.left);
+  return { pairs:[...first.pairs, ...second.pairs], left:second.left };
+}
 function regionEntries(ids) {
   const picked = REGIONS.filter((r) => ids.includes(r.id));
   if (!picked.length || picked.length === REGIONS.length) return [];   // all four is "whole body"
-  const tiers = SPEND[picked.length] || [1];
-  const out = [];
-  for (const r of picked) tiers.forEach((t, i) => { if (r.groups[i]) out.push(r.groups[i] + ":" + t); });
-  return out;
+  const allowance = picked.map(() => UNITS[picked.length] || 1);
+  /* Units a region cannot spend go to another region the person picked, never
+     to muscles nobody named: Chest is one group, tops out at tier 3, and the
+     rest of its allowance used to be binned. */
+  const run = () => picked.map((r, i) => regionSpend(r, allowance[i]));
+  for (let move = 0; move < 9; move++) {
+    const s = run();
+    const donor = s.findIndex((x) => x.left > 0);
+    if (donor < 0) break;
+    const taker = s.findIndex((x, i) => i !== donor && x.left === 0 && regionSpend(picked[i], allowance[i] + 1).left === 0);
+    if (taker < 0) break;
+    allowance[donor] -= 1; allowance[taker] += 1;
+  }
+  const best = new Map();
+  for (const s of run()) for (const [g, t] of s.pairs) best.set(g, Math.max(best.get(g) || 0, t));
+  return [...best].map(([g, t]) => g + ":" + t);
 }
 
 // The styles step, index.html ~12881.
@@ -348,7 +389,7 @@ function renderRun() {
       : ids.length === REGIONS.length
         ? "All four is the whole body, which stores as one token rather than fourteen rows."
         : ids.length
-          ? `${ids.length} picked, so the budget goes ${(SPEND[ids.length] || [1]).join(" then ")} deep into each. Nobody ranks anything.`
+          ? `${ids.length} picked, so each one gets ${UNITS[ids.length] || 1} of the nine budget units and spends them on both halves of its own name. Nobody ranks anything.`
           : "Nothing picked. The goal decides on its own.";
     body.appendChild(hint);
     run.appendChild(step("tune", spec.title, spec.sub, body,
