@@ -248,3 +248,37 @@ fine detail.
 **Not worked around in the app**, because the app cannot reach the Rive
 instance and the only lever from here would be lying about `devicePixelRatio`
 globally.
+
+---
+
+## 9. Two onboarding ticks have no beginner session in `cardio.mjs` (2026-09-18)
+
+Onboarding offers twelve training styles and `styles.mjs` maps each cardio one
+onto a `mode` in `knowledge/exercise-library/cardio.mjs`. From 2026-09-18 the
+engine builds the day itself for somebody who ticked no resistance style, out of
+that library, so a mode with nothing the person can do is now a week we have to
+refuse.
+
+At beginner level the library offers running, cycling, walking, hiking, rowing
+and elliptical. It offers nothing for:
+
+- **swimming**, whose only row is `Easy Swim`, tagged intermediate
+- **hiit**, which is what the `classes` tick maps to, and whose rows are all
+  tagged intermediate
+
+So a beginner who ticks Swimming, or Classes, gets a lifting session and a
+sentence saying we could not build their week.
+
+**Asked for:** one beginner row in each mode. A beginner swim is laps with rest
+(something like 8 x 50m easy with 30 seconds between), and a beginner HIIT
+session is a low-skill circuit with a long work-to-rest ratio rather than the
+20/10 shape the intermediate rows use.
+
+**Why we did not work around it:** `cardioFor` falls back to every session at
+the person's level when the mode it was asked for has none, which is right for a
+week planner choosing among several modes and wrong for one mode asked for by
+name. Unfiltered it handed a beginner who ticked Swimming an Easy Spin on a
+stationary bike, under a note reading "this week is cardio only, because that is
+what you picked". `cardioSessionFor` in `engine/styles.mjs` now filters the
+result back down to the modes that were asked for and refuses when nothing is
+left, which is honest and is still one fewer person getting the week they chose.

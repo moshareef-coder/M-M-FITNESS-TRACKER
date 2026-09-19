@@ -18,7 +18,7 @@
  * alias table below is hand written rather than loaded from goal-tree.json.
  */
 import { buildPlan } from "./plan.mjs";
-import { readStyles, mergeStyleLimits } from "./styles.mjs";
+import { readStyles, mergeStyleLimits, cardioSessionFor } from "./styles.mjs";
 import { parseFocus, mergePriority, focusFreshness } from "./focus.mjs";
 import { normalizeLimits } from "./limits.mjs";
 /* Read only, for one field. See the focus block in generateFromPayload. */
@@ -1048,7 +1048,35 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
     const skipStretching = payload.skip_stretching === true || payload.stretching === false;
     const dayBuilt = plan.week[dayIndex] || plan.week[0];
     const mob = dayBuilt?.mobility || { warmup: [], cooldown: [], warmupSeconds: 0, cooldownSeconds: 0, mobilityGoal: false, why: [] };
-    const workout = skipStretching ? stripMobility(rawWorkout) : rawWorkout;
+    const liftWorkout = skipStretching ? stripMobility(rawWorkout) : rawWorkout;
+
+    step = "styleSession";
+    /* The day somebody who ticked no resistance style should actually get.
+       Everything above this line built a lifting week, because that is the only
+       week buildPlan knows how to build, and until 2026-09-18 that week was
+       what came back: a person who ticked only Running was handed Push-Up, Lat
+       Pulldown and a Machine Shoulder Press, under a `meta.styles.note` reading
+       "this week is cardio only". The flag said the plan was not what they
+       asked for, the note said it was, and the only thing that saved anybody
+       was a caller remembering to throw the day away and build its own.
+
+       So the session is built here, from the same library the caller would have
+       used, and the lifting day is dropped. `honoured` is then a measurement
+       and not a wish: true when the response really is the week they asked for.
+       Where it cannot be built (see cardioSessionFor: a mode the library does
+       not know, or a yoga-only week, which needs a move list this shape has
+       nowhere to put) the lifting day stands, `honoured` stays false, and the
+       refusal sentence says so in words rather than leaving it to a flag. */
+    const styleSession = styles.asked && !styles.resistance
+      ? cardioSessionFor(styles, {
+        level: plan.level, today,
+        /* The same clock the lifting week was built to, so a person who said
+           thirty minutes is not handed an hour long walk. */
+        minutes: plan.week[dayIndex]?.minutes ?? plan.sessionBudget?.minutes ?? null,
+      })
+      : null;
+    const workout = styleSession || liftWorkout;
+    const stylesHonoured = !styles.asked || styles.resistance || !!styleSession;
 
     const missing = [...(plan.missing || [])];
     if (logsSource === "history") {
@@ -1071,7 +1099,15 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
          only channel into it and a tier map has nowhere to carry a sentence,
          and the plan genuinely does not know a flattened whole-body pick from
          no pick at all, which is the point of the sentence. */
-      notes: [...(Array.isArray(plan.dayNotes) ? plan.dayNotes : []), ...merged.notes],
+      /* The styles sentence rides in here rather than only in `meta`, because
+         `notes` is the channel a caller already renders and a fact nobody
+         renders is a fact nobody has. Whichever of the two is true of THIS
+         response: what they are holding when we honoured the choice, and what
+         we could not do when we did not. */
+      notes: [
+        ...(Array.isArray(plan.dayNotes) ? plan.dayNotes : []), ...merged.notes,
+        ...(styles.asked && !styles.resistance ? [stylesHonoured ? styles.note : styles.refusal] : []),
+      ],
       /* Same object the day was cut from, not a second build of it, so a lab
          showing both can never show a week the day did not come out of. */
       ...(includePlan ? { plan } : {}),
@@ -1092,11 +1128,15 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
           asked: styles.asked,
           picked: styles.styles,
           resistance: styles.resistance,
-          honoured: !styles.asked || styles.resistance,
+          honoured: stylesHonoured,
           equipmentMissing: styles.equipmentMissing,
           cardioModes: styles.cardioModes,
           flowTrainings: styles.flowTrainings,
-          note: styles.note,
+          /* One sentence, and it is the one that is true of this response.
+             `note` when the week really has no lifting in it, `refusal` when it
+             does and we are saying so. A caller that shows `note` blindly used
+             to print "this week is cardio only" over a page of barbell rows. */
+          note: styles.asked && !styles.resistance ? (stylesHonoured ? styles.note : styles.refusal) : styles.note,
         },
         /* Which parameter set really ran, "_default" included. A plan that came
            out of the bubble default rather than the child we matched is a
@@ -1183,7 +1223,12 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
           source: plan.sessionBudget?.source ?? "goal",
           asked: plan.sessionBudget?.asked ?? null,
           goalMinutes: plan.sessionBudget?.goalMinutes ?? null,
-          estimatedMinutes: dayBuilt?.estimatedMinutes ?? null,
+          /* A cardio day carries its own length, out of the library, and the
+             lifting day's estimate would be a number for a session nobody is
+             doing: 45 minutes printed over a 25 minute run. `budgetMinutes`
+             above is left alone on purpose, it is the clock the WEEK was built
+             to and that is still true. */
+          estimatedMinutes: styleSession ? styleSession.cardio.minutes : (dayBuilt?.estimatedMinutes ?? null),
           /* What the ramp-up sets cost, so a screen can print the whole visit
              without summing `workout.rampSets` itself. Zero on every day that
              did not buy any, which is every day of every plan built without a
@@ -1198,8 +1243,17 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
              `skip_stretching` moves. "Stretching off changes the two blocks and
              nothing else" is a contract with a test behind it, and a
              convenience field is not worth spending it. */
-          rampMinutes: dayBuilt?.rampMinutes ?? 0,
-          fits: !(plan.volumeNotes?.overBudget || []).some((o) => o.day === (dayBuilt?.name)),
+          rampMinutes: styleSession ? 0 : (dayBuilt?.rampMinutes ?? 0),
+          /* On a cardio day the question is whether the RUN fits the clock, not
+             whether the lifting day that was dropped did. The library's
+             sessions run from a 20 minute row to a 60 minute walk, so the
+             answer is not always yes. */
+          fits: styleSession
+            ? (() => {
+              const budget = plan.week[dayIndex]?.minutes ?? plan.sessionBudget?.minutes ?? null;
+              return budget == null || styleSession.cardio.minutes <= budget;
+            })()
+            : !(plan.volumeNotes?.overBudget || []).some((o) => o.day === (dayBuilt?.name)),
           /* Repaid entries do not count. The fill pass can hand the minutes back
              on a lighter week, and a screen showing "your rest was cut" beside a
              card printing the full interval is the app contradicting itself. */
@@ -1209,13 +1263,22 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
         /* The warm-up and cool-down in three numbers and a reason, so the
            reveal can say "plus five minutes after" without reading the arrays,
            and so support can tell a skipped block from an empty library. */
-        stretching: {
-          included: !skipStretching,
-          warmupMinutes: skipStretching ? 0 : Math.round(mob.warmupSeconds / 60),
-          cooldownMinutes: skipStretching ? 0 : Math.round(mob.cooldownSeconds / 60),
-          mobilityGoal: !!mob.mobilityGoal,
-          why: skipStretching ? ["Skipped: stretching is turned off on this profile."] : mob.why,
-        },
+        /* Zeroed on a cardio day rather than reported off the lifting day that
+           was dropped. The arrays on that workout are empty (see
+           cardioSessionFor on why a bench press warm-up must not ride along on
+           a run), and a meta block claiming five minutes of prep the response
+           does not contain is the same contradiction this whole change is
+           about, one field down. */
+        stretching: styleSession
+          ? { included: false, warmupMinutes: 0, cooldownMinutes: 0, mobilityGoal: false,
+              why: ["This is a cardio session and it comes with its own warm-up in the cue."] }
+          : {
+            included: !skipStretching,
+            warmupMinutes: skipStretching ? 0 : Math.round(mob.warmupSeconds / 60),
+            cooldownMinutes: skipStretching ? 0 : Math.round(mob.cooldownSeconds / 60),
+            mobilityGoal: !!mob.mobilityGoal,
+            why: skipStretching ? ["Skipped: stretching is turned off on this profile."] : mob.why,
+          },
         /* Whether the bubble came from an explicit tile tap or from parsing
            the five legacy strings and free text. Support cannot tell the two
            apart from the workout alone, same reason childUsed exists above. */

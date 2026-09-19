@@ -589,14 +589,38 @@ function enforcePriorityFloor(exercises) {
 
 /* A day is a list of slots. Each slot names a movement pattern and the muscle
    groups that satisfy it, so two slots can never quietly land on the same group,
-   which is the bug the brief complains about first (two shrugs in a row). */
+   which is the bug the brief complains about first (two shrugs in a row).
+
+   The core slot named ONE group until 2026-09-18, and which one depended on the
+   template: fullBody and legs filled it from abs, lower from obliques. So how
+   much core somebody got, and which half of it, was settled by whether their
+   day count happened to produce a Leg day or a Lower day, which is not a
+   training decision. knowledge/principles/volume-landmarks.md carries a single
+   row, "Abs/core", for the pair, and WEEKLY_MRV above already reads that one
+   row for both, so the budget was always one budget and only this table
+   pretended otherwise. Measured on a four day build-muscle week before the
+   change: abs got 0 sets all week, and a focus pick on abs bought nothing at
+   all, 8 core sets with it and 8 without.
+
+   WHAT IT COSTS, said out loud. The pool is ranked by level and familiarity
+   with library order as the tie break, and every abs movement sits above every
+   oblique one, so a week now takes its core work from the abs half and the
+   rotation, anti-rotation and side-flexion movements (all tagged obliques) stop
+   appearing. research/13 treats those as three different asks, so that is a
+   real loss and not a tidy-up. Spreading the slot across both halves was tried
+   and measured worse: each group carries its own weekly target, so alternating
+   them hands out two budgets for one muscle (a four day week went from 8 core
+   sets to 12) and puts every core slot back at the per-session clamp, where a
+   focus pick buys nothing again. The honest fix is one core group in the
+   ledger, which is a taxonomy change reaching recovery, the joint tags and the
+   body figure, and is not this change. */
 const SLOTS = {
   fullBody: [
     { pattern: "squat", groups: ["quads"], role: "main" },
     { pattern: "horizontalPush", groups: ["chest"], role: "main" },
     { pattern: "horizontalPull", groups: ["lats"], role: "main" },
     { pattern: "hinge", groups: ["hamstrings", "glutes"], role: "main" },
-    { pattern: "core", groups: ["abs"], role: "accessory" },
+    { pattern: "core", groups: ["abs", "obliques"], role: "accessory" },
   ],
   push: [
     { pattern: "horizontalPush", groups: ["chest"], role: "main" },
@@ -617,7 +641,7 @@ const SLOTS = {
     { pattern: "hinge", groups: ["hamstrings"], role: "main" },
     { pattern: "lunge", groups: ["glutes"], role: "accessory" },
     { pattern: "isolation", groups: ["calves"], role: "accessory" },
-    { pattern: "core", groups: ["abs"], role: "accessory" },
+    { pattern: "core", groups: ["abs", "obliques"], role: "accessory" },
   ],
   upper: [
     { pattern: "horizontalPush", groups: ["chest"], role: "main" },
@@ -635,7 +659,7 @@ const SLOTS = {
     { pattern: "hinge", groups: ["hamstrings", "glutes"], role: "main" },
     { pattern: "lunge", groups: ["glutes"], role: "accessory" },
     { pattern: "isolation", groups: ["calves"], role: "accessory" },
-    { pattern: "core", groups: ["obliques"], role: "accessory" },
+    { pattern: "core", groups: ["abs", "obliques"], role: "accessory" },
   ],
 };
 
@@ -1038,7 +1062,11 @@ export function buildPlan({
            its length is read, and a week that spent a move on a slot it did not
            fill would be charged for nothing. */
         if (goalBarred.size && candidates({ ...args, prefBudget: null }).length) {
-          cautionEmpty.push({ day: name, groups: slot.groups.join(" and ") });
+          /* "abs or obliques", not "abs and obliques": the groups on a slot are
+             alternatives that satisfy it, and one exercise fills it. Read as
+             "and" back when the core slot named one group and nobody noticed
+             the difference. */
+          cautionEmpty.push({ day: name, groups: slot.groups.join(" or ") });
         }
         return null;
       }
@@ -1057,7 +1085,7 @@ export function buildPlan({
       const pick = pool.find((e) => !usedToday.has(e.name) && (usedThisWeek.get(e.name) || 0) === 0)
         || pool.find((e) => !usedToday.has(e.name))
         || null;
-      if (!pick) { dedupeEmpty.push({ day: name, groups: slot.groups.join(" and ") }); return null; }
+      if (!pick) { dedupeEmpty.push({ day: name, groups: slot.groups.join(" or ") }); return null; }
       /* A rotated lift that got picked anyway means excluding it would have left
          this slot with nothing. Recorded now, answered after selection. */
       if (rotateOut.has(pick.name.toLowerCase())) rotateBlocked.add(pick.name);

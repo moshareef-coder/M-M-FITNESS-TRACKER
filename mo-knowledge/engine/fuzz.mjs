@@ -36,6 +36,7 @@ import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
 import { generateFromPayload } from "./adapter.mjs";
 import { MUSCLE_GROUPS } from "./focus.mjs";
 import { BODY_AREAS, EQUIPMENT_OPTIONS } from "./limits.mjs";
+import { STYLE_KEYS } from "./styles.mjs";
 import { readFileSync } from "node:fs";
 import { clientGoals } from "./client-goals.mjs";
 import { fileURLToPath } from "node:url";
@@ -367,6 +368,25 @@ function makePayload(seed) {
      ones it obviously suits. */
   if (r.chance(0.3)) p.skip_stretching = real ? r.chance(0.5) : r.pick([true, false, "true", "false", 1, 0, null, {}]);
   if (r.chance(0.15)) p.stretching = r.pick([true, false, "false", 0, null]);
+  /* What they agreed to do. The realistic side deliberately includes the three
+     shapes that behave differently rather than a random subset: a resistance
+     style (the week nothing changes for), no resistance style at all (the week
+     that comes back as a run), and a flow-only pick (the week we have to refuse
+     out loud). The junk side is about normalizeStyles: a text[] column arrives
+     as a CSV through some clients, and a list of nothing recognisable has to
+     read as "never asked" rather than emptying somebody's plan. */
+  if (r.chance(0.3)) {
+    p.train_styles = real
+      ? r.pick([
+        [r.pick(["lifting", "home"])],
+        ["lifting", r.pick(STYLE_KEYS)],
+        [r.pick(["running", "cycling", "walking", "swimming", "rowing", "hiking", "classes", "sports"])],
+        [r.pick(["yoga", "pilates"])],
+        ["walking", "yoga"],
+        STYLE_KEYS.slice(),
+      ])
+      : r.pick([[], ["Running", " YOGA "], "running,walking", "", ["nonsense"], [null, 3, {}], {}, 7, junk(r), STYLE_KEYS.concat(STYLE_KEYS)]);
+  }
   if (r.chance(0.2)) p.avoid = real ? [r.pick(LIB_NAMES)] : r.pick([[r.pick(LIB_NAMES)], LIB_NAMES.slice(0, 200), junk(r), [null, 3, {}]]);
 
   if (real) return { payload: p, real };
@@ -500,7 +520,8 @@ const META_SUBKEYS = {
   session: ["budgetMinutes", "source", "asked", "goalMinutes", "estimatedMinutes", "rampMinutes", "fits", "restCompressed"],
   styles: ["asked", "picked", "resistance", "honoured", "equipmentMissing", "cardioModes", "flowTrainings", "note"],
 };
-const WORKOUT_KEYS = new Set(["focus", "exercises", "warmup", "cooldown", "rampSets"]);
+const WORKOUT_KEYS = new Set(["focus", "exercises", "warmup", "cooldown", "rampSets", "cardio"]);
+const CARDIO_KEYS = new Set(["name", "mode", "minutes", "effort", "cue", "structure"]);
 const RAMP_KEYS = new Set(["exercise", "group", "sets", "seconds"]);
 const RAMP_SET_KEYS = new Set(["weight", "reps", "restSec", "pct", "cue"]);
 const EXERCISE_KEYS = new Set(["name", "sets", "reps", "targetWeight", "note", "swap", "alternatives", "restSec"]);
@@ -572,11 +593,33 @@ function checkResult(ctx, out, payload) {
   for (const k of Object.keys(w)) if (!WORKOUT_KEYS.has(k)) fail("workout-extra-key", ctx, k);
   if (typeof w.focus !== "string" || !w.focus.trim()) fail("workout-shape", ctx, `focus ${stable(w.focus)}`);
   if (!Array.isArray(w.exercises)) { fail("workout-shape", ctx, "exercises is not an array"); return; }
-  if (w.exercises.length === 0) { fail("zero-exercises", ctx, `${w.focus} came back empty`); return; }
-  /* The contract's own floor and ceiling: "three to six exercises", three only
-     when the library genuinely cannot fill the day. */
-  if (w.exercises.length < 3) fail("exercise-count", ctx, `${w.exercises.length} on ${w.focus}`);
-  if (w.exercises.length > 6) fail("exercise-count", ctx, `${w.exercises.length} on ${w.focus}`);
+  /* The one workout with no exercises in it, and it is the answer rather than
+     an exception: somebody whose train_styles hold no resistance style gets the
+     cardio session they asked for (engine/styles.mjs), and a run has no sets.
+     The rule that matters is the opposite one, that the run never appears in
+     `exercises`, because anything in that array is logged as a set, calibrated
+     against, and painted on the Body tab. */
+  if (w.cardio) {
+    if (w.exercises.length) fail("cardio-day-has-sets", ctx, `${w.focus} put ${w.exercises.length} rows in exercises`);
+    if (typeof w.cardio !== "object") { fail("workout-shape", ctx, `cardio is ${typeof w.cardio}`); return; }
+    for (const k of Object.keys(w.cardio)) if (!CARDIO_KEYS.has(k)) fail("cardio-extra-key", ctx, k);
+    if (typeof w.cardio.name !== "string" || !w.cardio.name.trim()) fail("cardio-shape", ctx, `name ${stable(w.cardio.name)}`);
+    if (!(w.cardio.minutes > 0)) fail("cardio-shape", ctx, `minutes ${stable(w.cardio.minutes)}`);
+    if (!(w.cardio.effort >= 1 && w.cardio.effort <= 10)) fail("cardio-shape", ctx, `effort ${stable(w.cardio.effort)}`);
+    if (typeof w.cardio.cue !== "string" || !w.cardio.cue.trim()) fail("cardio-shape", ctx, `cue ${stable(w.cardio.cue)}`);
+    if (out.meta?.styles?.honoured !== true) fail("cardio-day-not-honoured", ctx, `${w.focus} came back with honoured ${stable(out.meta?.styles?.honoured)}`);
+  } else {
+    if (w.exercises.length === 0) { fail("zero-exercises", ctx, `${w.focus} came back empty`); return; }
+    /* The contract's own floor and ceiling: "three to six exercises", three only
+       when the library genuinely cannot fill the day. */
+    if (w.exercises.length < 3) fail("exercise-count", ctx, `${w.exercises.length} on ${w.focus}`);
+    if (w.exercises.length > 6) fail("exercise-count", ctx, `${w.exercises.length} on ${w.focus}`);
+  }
+  /* Everything below runs on a cardio day too, and on purpose: the first cut of
+     this returned here instead, which quietly took the meta block, the notes
+     and the honest line out of the fuzz for every cardio case. The loops below
+     walk `exercises`, which is empty, so they cost nothing and check nothing,
+     and the checks that matter for that day are the ones after them. */
 
   /* Ramp-up sets. The contract's promise about them is the one worth fuzzing:
      they are warm-up sets of a lift already on the card, at less than its

@@ -11153,47 +11153,21 @@ function focusSpendDown(groups, units, maxTier = FOCUS_TIERS.main) {
   return { pairs, left };
 }
 
-/* The same units spread ACROSS a list instead of down it: a unit to each group
-   in turn, so two units on a two group half buy both at the lightest tier
-   rather than one at the middle.
-
-   That is not a style choice, it is what the engine measures. The plan's core
-   slot names ONE group and which one depends on the split: the full body and
-   legs templates fill it from abs, the upper/lower template fills it from
-   obliques (SLOTS in mo-knowledge/engine/plan.mjs). So a core focus spent deep
-   on abs lands on a group a four day week never trains, and the week comes back
-   with LESS core work than picking nothing at all: measured on a four day
-   build-muscle week, abs:2 gives 2 weekly core sets against a baseline of 5,
-   while abs:1 plus obliques:1 gives 10. Spread across both, it lands whatever
-   the split. The real fix is one line per template in plan.mjs, widening that
-   slot to ["abs", "obliques"] the way the traps slot was already widened, and
-   this picker should stop compensating the day that lands. */
-function focusSpendAcross(groups, units) {
-  const tier = new Map(groups.map((g) => [g, 0]));
-  let left = Math.max(0, units);
-  while (left > 0) {
-    const lowest = Math.min(...groups.map((g) => tier.get(g)));
-    const g = groups.find((x) => tier.get(x) === lowest && tier.get(x) < FOCUS_TIERS.main);
-    if (!g) break;
-    tier.set(g, tier.get(g) + 1);
-    left -= 1;
-  }
-  return { pairs: [...tier].filter(([, t]) => t > 0), left };
-}
-
 /* What one region buys for a given number of budget units, keeping the promise
    its label makes. A region named after two things spends about a quarter of
-   what it was given on the second half, never less than one unit per group in
-   that half so a named half is never bought as a coin flip, and never so much
-   that the half the name leads with stops leading.
+   what it was given on the second half, never less than a unit for each group
+   in that half so a named half is never bought as a token, and never so much
+   that the half the name leads with stops leading. What that share buys is
+   spent down the same ladder as everything else: as deep as it reaches on the
+   first group, then on to the next.
 
-   The floor is why "Legs and core" with three units buys quads, abs and
-   obliques at a unit each rather than quads at two and abs at one. Measured, the
-   second of those is worse than not picking at all: the legs take the volume,
-   the single core unit lands on a group half the splits never train, and core
-   comes back at 2 weekly sets against a baseline of 5. A name that promises two
-   things and delivers less of the second one than silence would is the bug this
-   whole commit is about, one level down.
+   The floor is what keeps the core half worth buying once a second region is
+   picked. A quarter of three or four units rounds to one, and one unit of core
+   is barely more than silence. Measured through the engine on a build-muscle
+   week, weekly core sets against a baseline of 10 for no pick at all: "Legs and
+   core" alongside one other region lands 13, 12 and 12 on three, four and five
+   day weeks with the floor, and 12, 11 and 11 without it. A name that promises
+   two things has to buy enough of the second one to be worth reading.
 
    Two units is the one case where the floor cannot be paid, because the lead
    half must keep a unit. That is a second-ranked area on Setup and nowhere
@@ -11208,7 +11182,7 @@ function focusRegionSpend(region, units) {
   const first = focusSpendDown(region.lead, units - share);
   /* The lead half's own leftover goes here rather than being binned: a one
      group lead (Chest) hands its whole allowance on. */
-  const second = focusSpendAcross(region.also, share + first.left);
+  const second = focusSpendDown(region.also, share + first.left);
   return { pairs: [...first.pairs, ...second.pairs], left: second.left };
 }
 
@@ -25157,7 +25131,12 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
       return false;
     }
     if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
-    if (!data.workout?.exercises?.length) throw new Error("Coach returned an empty workout");
+    /* A cardio day HAS no exercises and that is its contract, not a failure:
+       the session is carried in `workout.cardio` and a run has no sets to put
+       in this column. Guarding on the array alone rejected the one answer the
+       styles question exists to produce, so somebody who ticked only Running
+       got "Coach returned an empty workout" instead of their run. */
+    if (!data.workout?.exercises?.length && !data.workout?.cardio) throw new Error("Coach returned an empty workout");
 
     /* meta.goals is the engine's read-back of what each extra goal actually
        bought, and an empty `effect` means it bought nothing. It names ids, not
@@ -25176,23 +25155,24 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
       toast(`No ${keepFocus.toLowerCase()} in your week, so this is ${data.workout.focus}`);
     }
 
-    /* Somebody who ticked no resistance style still gets a lifting week out of
-       the engine, because a lifting week is the only thing it knows how to
-       build. It says so rather than pretending: meta.styles.honoured comes back
-       false, and filling the day from the libraries the app already has is the
-       app's job, not the engine's.
+    /* The engine builds the cardio day itself now, so there is nothing left
+       here to swap: `workout.cardio` is the session and `exercises` is empty
+       by contract. All this has to do is say the sentence out loud, because
+       the reveal keeps only the clinician warnings out of `notes` and this one
+       would otherwise be a fact nobody sees.
 
-       This is the line that finally makes the styles question mean something.
-       Before it, onboarding asked what you were willing to do, the plan screen
-       read it back to you, and the generator built five lifts regardless. */
+       The client used to substitute its own day whenever the engine said it
+       could not honour the pick, and that is exactly why it goes: cardioFor
+       falls back to the whole library rather than returning nothing, so a
+       beginner who ticked Swimming was handed an Easy Spin on a bike under
+       their own words. The engine refuses instead of substituting, and a
+       refusal somebody can read beats a bike ride they never asked for.
+
+       One sentence either way. `st.note` is the engine's own: what they are
+       holding when the cardio week was built, and what could not be done when
+       it was not. */
     const st = data.meta?.styles || null;
-    if (st && st.honoured === false) {
-      const swapped = await cardioDayForStyles(st, target);
-      if (swapped) {
-        data.workout = swapped;
-        if (!quiet && st.note) toast(st.note.split(".")[0] + ".");
-      }
-    }
+    if (!quiet && st && st.asked && !st.resistance && st.note) toast(st.note.split(".")[0] + ".");
 
     /* data.honest is not written here: ai_workouts has no column for it, and
        migrations are owned elsewhere. Nothing reads it since the reveal screen
@@ -25226,8 +25206,25 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
          is an ordinary Saturday. */
       /* Weekly cardio the goal asks for, written on the plan because that is
          the screen somebody reads to know what they are meant to do. Advisory:
-         never a set, never logged, never in `exercises`. */
-      cardio: data.meta?.cardio || null,
+         never a set, never logged, never in `exercises`.
+
+         Two different cardios live in this one column and they tell themselves
+         apart by their own keys. `sessions`/`minutes`/`zone` is the weekly
+         prescription, which belongs to the goal and is true of every day of the
+         week. `session` is THIS day, on the days the day itself is a run: name,
+         minutes, effort and cue, the things that make it a session rather than
+         the word "cardio". Until now only the first was written, so the engine
+         built somebody a 25 minute Easy Run with a pace cue and the row came
+         back from the database with none of it.
+
+         One column rather than two because a new one needs a migration that has
+         not been run, and supabase rejects the whole upsert on an unknown
+         column: the save would fail and somebody would lose the plan, to store
+         a field nothing reads yet. cardioNoteHTML gates on `sessions`, so a
+         run-only row still correctly prints no weekly advice. */
+      cardio: (data.meta?.cardio || data.workout.cardio)
+        ? { ...(data.meta?.cardio || {}), ...(data.workout.cardio ? { session: data.workout.cardio } : {}) }
+        : null,
       completed_at: null,
       duration_sec: null,
     }, { onConflict: "email,entry_date" });

@@ -36,8 +36,12 @@ mkdirSync(LIB_OUT, { recursive: true });
 let count = 0;
 for (const f of ENGINE_FILES) {
   let src = readFileSync(join(ENGINE_SRC, f), "utf8");
-  /* The one import that leaves the engine directory. */
-  src = src.replace(/["']\.\.\/\.\.\/knowledge\/exercise-library\/index\.mjs["']/g, '"../_library/index.mjs"');
+  /* The imports that leave the engine directory. Any file in the library, not
+     just index.mjs: styles.mjs reaches cardio.mjs directly, because the cardio
+     session builder needs `cardioFor` and index.mjs re-exports only the
+     trainings list. The whole library directory is copied below either way, so
+     this is a path rewrite and never a question of what is present. */
+  src = src.replace(/["']\.\.\/\.\.\/knowledge\/exercise-library\/([A-Za-z0-9_-]+)\.mjs["']/g, '"../_library/$1.mjs"');
   if (/^\s*import\b[^\n]*["']node:/m.test(src)) throw new Error(`${f} imports node:, it cannot run in the function`);
   writeFileSync(join(ENGINE_OUT, f), `/* VENDORED by scripts/vendor-engine.mjs from mo-knowledge/engine/${f}. Do not edit here. */\n` + src);
   count++;

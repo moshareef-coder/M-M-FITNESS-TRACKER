@@ -26,9 +26,9 @@ FIG = ROOT / "brand/film/figure"
 COMP = ROOT / "brand/film/comp"
 OUT = ROOT / "brand/film/unio-announce.mp4"
 
-W, H = 1080, 1350
+W, H = 1080, 1920            # 9:16
 FPS = 30
-SECONDS = 8.0
+SECONDS = 10.0
 N = int(SECONDS * FPS)
 
 WHITE = (255, 255, 255, 255)
@@ -47,13 +47,34 @@ MOVE_DUR = 6.4
 #
 # Down fast, up slower, the way an eye actually moves, and the whole thing is
 # over in a quarter of a second with almost none of it spent shut.
-BLINKS = [(1.40, 0.09, 0.17), (3.05, 0.09, 0.17), (4.45, 0.08, 0.15)]
+BLINKS = [(1.35, 0.09, 0.17), (2.90, 0.09, 0.17), (4.25, 0.08, 0.16), (5.45, 0.09, 0.17)]
 EYES_OPEN_AT = 1.0           # a face clock nowhere near the rig's own blink
-# He changes expression behind closed lids, which is how it is done by hand and
-# why the mood switch does not read as a cut.
-HAPPY_FROM = 3.14
+# He keeps one face for the whole film. The rig's happy eyes are an upward arc
+# and the neutral ones are vertical bars, and there is no shape in between, so
+# switching read as a glitch however it was timed. Mo: "remove the upside down
+# U, just keep him blinking the whole time."
+MOOD = "neutral"
+# Coming out of a blink the eyes flare, which is the moment Mo picked out of the
+# Higgsfield pass and wanted in the source rather than bolted on afterwards.
+GLOW_LEN = 0.55
 
-FIG_UNTIL = 5.3              # the figure is on screen until here
+FIG_UNTIL = 6.4              # the figure is on screen until here
+# Full body, not a portrait. Mo: "in the beginning we should just show his whole
+# body." A 9:16 frame is the right shape for a standing figure anyway.
+FIG_SCALE = 0.62             # of the frame height, head to feet
+FIG_TOP = 0.10               # where his head starts, as a fraction of the frame
+
+# He speaks, in the app's own bubble. Not a caption: the same white bubble with
+# the notch on the corner nearest him, the same small COACH label, and the same
+# green caret typing the line out a character at a time. Copying the app's own
+# furniture is the cheapest way for a film to look like the product rather than
+# like an advert for it.
+# He has a name now. The app's bubble still says Coach; this is the film.
+BOT_NAME = "UNIO"
+SAY = "Who am I training with you today?"
+SAY_FROM = 1.05              # the bubble arrives
+SAY_TYPED = 2.75             # the last character lands
+SAY_UNTIL = 5.95             # it starts leaving
 # No copy. Mo is adding his own, so the film is picture only and every second
 # has to be carried by movement instead of by a sentence.
 LINES = []
@@ -62,9 +83,14 @@ LINES = []
 # the top and race round to meet at the bottom. That is the same gesture as the
 # progress rings on the dashboard filling up, which makes the logo assemble the
 # way the product works rather than the way a logo usually appears.
-DRAW_FROM, DRAW_TO = 5.10, 6.35
-BAR_FROM, BAR_TO = 6.30, 6.78
-SWEEP_FROM, SWEEP_TO = 7.05, 7.85     # a specular band crossing the finished mark
+DRAW_FROM, DRAW_TO = 6.20, 7.75
+BAR_FROM, BAR_TO = 7.68, 8.24
+SWEEP_FROM, SWEEP_TO = 8.55, 9.45     # a specular band crossing the finished mark
+
+# The end card. Set under the mark once it has finished assembling, in the app's
+# own face, with the space above it left clear for anything Mo lays over the top.
+END_LINE = "Train together."
+END_FROM = 8.85
 
 SFPRO = "/System/Library/Fonts/SFNS.ttf"
 
@@ -78,7 +104,7 @@ SFPRO = "/System/Library/Fonts/SFNS.ttf"
 PAD_BLEED = 8
 BAR_PX = 853
 # When the mark blinks, and which pads. (start, length, left, right)
-MARK_BLINKS = [(6.92, 0.20, 1, 1), (7.62, 0.26, 0, 1)]
+MARK_BLINKS = [(8.42, 0.20, 1, 1), (9.20, 0.26, 0, 1)]
 # The figure is rendered far larger than it is shown, because the shot is a
 # portrait and the rig draws a whole standing body: at 1080 his head is about a
 # hundred pixels tall, and cropping to it means upscaling the one part of the
@@ -89,6 +115,18 @@ RENDER = 2160
 
 def ease_out(t):
     return 1 - (1 - t) ** 3
+
+
+def smooth(t):
+    """Ease in and out, symmetrically.
+
+    The draw-on used ease_out, which is most of its travel in the first third
+    and then a long crawl. On a stroke that is racing round a circle that does
+    not read as easing, it reads as the animation giving up, so the sweep gets a
+    curve that accelerates and decelerates by the same amount.
+    """
+    t = clamp01(t)
+    return t * t * (3 - 2 * t)
 
 
 def ease_out_back(t, k=1.70158):
@@ -113,30 +151,60 @@ def pad_close(t):
 # 2.4 degrees of clear air either side of the join. Has to agree with
 # scripts/make-logo.py, which is where the artwork is drawn.
 ARC_GAP = 2.4
+# The stroke has round caps, and a cap bulges half a stroke-width PAST the end of
+# the path it sits on. A wedge mask cut at exactly the end angle therefore slices
+# through the middle of that cap and leaves a square end, which snaps to round
+# the instant the reveal completes. Mo saw it: "it stops here and then it
+# glitches and connects." Padding the wedge by the cap's own angular size at both
+# ends means the caps are never cut and there is nothing to snap to.
+# asin((stroke/2) / R) in degrees, with a little margin.
+ARC_CAP = math.degrees(math.asin((116.39 / 2) / 441.81)) + 1.2
 
 
 def arc_reveal(layer, side, p):
     """One arc, drawn on from the top by fraction p.
 
-    A wedge from the centre is used as a mask rather than anything cleverer: the
-    arc is a ring around that centre, so a pie slice cuts it at exactly the angle
-    wanted and the artwork's own antialiasing survives.
+    A pie wedge from the centre does the cutting, because the arc is a ring
+    around that same centre. Two things it cannot do on its own, both of which
+    were visible on screen:
+
+    The leading end. A wedge only ever cuts a straight radial line, so the end
+    that is growing is a chevron for the entire reveal and then snaps round the
+    instant it finishes. The fix is to union a circle the width of the stroke
+    onto the mask at the leading end, which uncovers a round end out of the
+    artwork that is already there.
+
+    The edge quality. PIL fills shapes without antialiasing, so the cut is a
+    stair and it crawls frame to frame. The mask is built at SS times size and
+    scaled down, which is the cheapest antialiasing there is.
     """
     if p >= 0.999:
         return layer
     if p <= 0.001:
         return None
     w, h = layer.size
-    mask = Image.new("L", (w, h), 0)
+    SS = 4
+    W2, H2 = w * SS, h * SS
+    mask = Image.new("L", (W2, H2), 0)
     d = ImageDraw.Draw(mask)
     span = 180 - 2 * ARC_GAP
     # PIL measures from three o'clock; the artwork is measured from twelve.
     if side == "left":
-        end = 270 - ARC_GAP
-        d.pieslice([-w, -h, w * 2, h * 2], end - span * p, end, fill=255)
+        edge = (270 - ARC_GAP) - span * p
+        d.pieslice([-W2, -H2, W2 * 2, H2 * 2], edge - ARC_CAP, 270 - ARC_GAP + ARC_CAP, fill=255)
     else:
-        start = -90 + ARC_GAP
-        d.pieslice([-w, -h, w * 2, h * 2], start, start + span * p, fill=255)
+        edge = (-90 + ARC_GAP) + span * p
+        d.pieslice([-W2, -H2, W2 * 2, H2 * 2], -90 + ARC_GAP - ARC_CAP, edge + ARC_CAP, fill=255)
+
+    # The round end, placed on the ring's centreline at the angle just reached.
+    k = W2 / 1024.0
+    r_ring, r_cap = 441.81 * k, (116.39 / 2) * k
+    cx, cy = W2 / 2, H2 / 2
+    ex = cx + r_ring * math.cos(math.radians(edge))
+    ey = cy + r_ring * math.sin(math.radians(edge))
+    d.ellipse([ex - r_cap, ey - r_cap, ex + r_cap, ey + r_cap], fill=255)
+
+    mask = mask.resize((w, h), Image.LANCZOS)
     out = layer.copy()
     out.putalpha(ImageChops.multiply(out.getchannel("A"), mask))
     return out
@@ -156,6 +224,110 @@ def light_sweep(size, p, width=0.26):
         v = int(255 * (1 - abs(k - 0.5) * 2) ** 1.6)
         d.line([(x + i, -h), (x + i - h * 1.6, h * 2)], fill=v)
     return band.filter(ImageFilter.GaussianBlur(w * 0.02))
+
+
+# The app's bubble, measured off its CSS and scaled up for the frame. Values in
+# index.html: white fill, a 10% ink hairline, radius 5px on the corner nearest
+# him and 16px elsewhere, a soft low shadow, a 10px uppercase COACH label at
+# .11em tracking in #8b94a3, the line at 14px/600 in #111318, and a 2px green
+# caret. The film is 2.77x the app's 390px width, so everything here is that.
+# The app draws this at 390px wide, and reproducing it at exactly that scale is
+# technically faithful and practically useless: in a video it is a stamp under a
+# full-height figure. Everything in the bubble is enlarged by BUB_SCALE so it
+# reads at arm's length on a phone.
+BUB_SCALE = 1.75
+K = (1080 / 390) * BUB_SCALE
+BUB_FILL = (255, 255, 255, 255)
+BUB_EDGE = (17, 19, 24, 26)
+BUB_LABEL = (139, 148, 163, 255)
+BUB_INK = (17, 19, 24, 255)
+BUB_CARET = (26, 163, 74, 255)
+
+
+def bubble(text, shown, caret_on, fonts):
+    """The bubble at its natural size, with `shown` characters typed."""
+    f_who, f_line = fonts
+    pad_x, pad_y = int(13 * K), int(10 * K)
+    probe = ImageDraw.Draw(Image.new("RGBA", (8, 8)))
+    tw = max(probe.textlength(text, font=f_line), probe.textlength(BOT_NAME, font=f_who))
+    caret_w = int(2 * K)
+    w = int(tw) + pad_x * 2 + caret_w + int(3 * K)
+    line_h = int(f_line.size * 1.34)
+    who_h = int(f_who.size * 1.5)
+    h = pad_y * 2 + who_h + line_h
+
+    im = Image.new("RGBA", (w + int(20 * K), h + int(20 * K)), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    box = [int(4 * K), int(2 * K), int(4 * K) + w, int(2 * K) + h]
+    # The notch is the top-left corner, because the bubble hangs below him and a
+    # tail pointing down would read as the floor talking.
+    d.rounded_rectangle(box, radius=int(16 * K), fill=BUB_FILL, outline=BUB_EDGE, width=max(1, int(K)))
+    d.rounded_rectangle([box[0], box[1], box[0] + int(30 * K), box[1] + int(30 * K)],
+                        radius=int(5 * K), fill=BUB_FILL)
+
+    tx, ty = box[0] + pad_x, box[1] + pad_y
+    # Tracked out by hand: Pillow has no letter-spacing.
+    lx = tx
+    for ch in BOT_NAME:
+        d.text((lx, ty), ch, font=f_who, fill=BUB_LABEL)
+        lx += probe.textlength(ch, font=f_who) + 1.1 * K * 1.0
+    ly = ty + who_h
+    said = text[:shown]
+    d.text((tx, ly), said, font=f_line, fill=BUB_INK)
+    if caret_on:
+        cx = tx + probe.textlength(said, font=f_line) + int(2 * K)
+        d.rectangle([cx, ly + int(2 * K), cx + caret_w, ly + int(f_line.size * 1.0)], fill=BUB_CARET)
+    return im
+
+
+def neutral_floor(im, y0, body):
+    """The rig's ground shadow is drawn in the accent lime.
+
+    Under the figure in the app that is a deliberate tint. Scaled into a 9:16
+    frame it becomes a hard green line running edge to edge under his feet,
+    which reads as a stray stroke rather than as a shadow, so it is recoloured
+    to a neutral. Only the strip below his knees is touched, which keeps his
+    eyes, the other lime thing on screen, out of it.
+    """
+    top = int(y0 + body * 0.86)
+    box = (0, top, im.width, im.height)
+    strip = im.crop(box)
+    r, g, b, a = strip.split()
+    hot = lambda ch, t: ch.point(lambda v: 255 if v > t else 0)
+    mask = ImageChops.multiply(hot(ImageChops.subtract(g, r), 25), hot(ImageChops.subtract(g, b), 25))
+    grey = Image.new("RGBA", strip.size, (74, 80, 88, 0))
+    grey.putalpha(a)
+    lit = Image.composite(grey, strip, mask)
+
+    # The shadow is wider than the frame, so its soft ends are cropped off and
+    # what is left is a straight rule under his feet. Fading it toward the edges
+    # gives it back an end, inside the frame, where it can be seen.
+    w = strip.width
+    ramp_px = w * 0.22
+    fall = Image.new("L", (w, 1), 0)
+    fp = fall.load()
+    for x in range(w):
+        e = min(x, w - 1 - x)
+        fp[x, 0] = 255 if e > ramp_px else int(255 * (e / ramp_px) ** 1.4)
+    fall = fall.resize(strip.size)
+    # Only the shadow fades; his feet keep their own alpha.
+    faded = ImageChops.multiply(lit.getchannel("A"), fall)
+    lit.putalpha(Image.composite(faded, lit.getchannel("A"), mask))
+
+    out = im.copy()
+    out.paste(lit, box)
+    return out
+
+
+def soft_shadow(im, blur, dy, opacity):
+    """The bubble's own drop shadow, from its alpha."""
+    w, h = im.size
+    sh = Image.new("RGBA", (w, h + dy), (0, 0, 0, 0))
+    a = im.getchannel("A").point(lambda v: int(v * opacity))
+    tint = Image.new("RGBA", (w, h), (11, 13, 17, 0))
+    tint.putalpha(a)
+    sh.alpha_composite(tint, (0, dy))
+    return sh.filter(ImageFilter.GaussianBlur(blur))
 
 
 def pad_boxes(bar):
@@ -223,6 +395,37 @@ def eye_close(t):
         if at + dn <= t < at + dn + up:
             return 1 - ease_out((t - at - dn) / up)
     return 0.0
+
+
+def eye_flare(t):
+    """How lit his eyes are, 0 to 1. Rises as the lids open and decays after."""
+    out = 0.0
+    for at, dn, up in BLINKS:
+        start = at + dn
+        if start <= t < start + GLOW_LEN:
+            k = (t - start) / GLOW_LEN
+            # up fast with the lids, then a slow falloff
+            out = max(out, (min(1.0, k / 0.28) if k < 0.28 else (1 - (k - 0.28) / 0.72) ** 1.5))
+    return out
+
+
+def glow_eyes(im, boxes, amount):
+    """A lime bloom over the eyes, drawn from their own shape and blurred."""
+    if amount < 0.02 or not boxes:
+        return im
+    w, h = im.size
+    lay = Image.new("L", (w, h), 0)
+    d = ImageDraw.Draw(lay)
+    for x0, y0, x1, y1 in boxes:
+        pad = (y1 - y0) * 0.16
+        d.rounded_rectangle([x0 - pad, y0 - pad, x1 + pad, y1 + pad],
+                            radius=(x1 - x0) / 2 + pad, fill=255)
+    lay = lay.filter(ImageFilter.GaussianBlur((boxes[0][3] - boxes[0][1]) * 0.42))
+    glow = Image.new("RGBA", (w, h), (168, 255, 0, 0))
+    glow.putalpha(lay.point(lambda v: int(v * 0.85 * amount)))
+    out = im.copy()
+    out.alpha_composite(glow)
+    return out
 
 
 def eye_boxes(im):
@@ -298,7 +501,7 @@ def shot_list():
         shots.append({
             "cycle": round((0.10 + t / MOVE_DUR) % 1, 6),
             "face": EYES_OPEN_AT,
-            "mood": "happy" if t >= HAPPY_FROM else "neutral",
+            "mood": MOOD,
         })
     return shots
 
@@ -357,19 +560,19 @@ def main():
     if not figs:
         sys.exit("no figure frames")
 
-    # Portrait crop, measured off the figure's own bounding box so a change to
-    # the pose cannot silently reframe him. Framed on his centre line rather
-    # than on the bounding box, because Mountain Pose puts the arms out and the
-    # box is then much wider than the subject: cropping to it is what made the
-    # first cut a small person in a large white room.
+    # Whole body, placed rather than cropped. The bounding box includes the soft
+    # floor shadow, which is far wider than he is, so the scale is taken from his
+    # HEIGHT and the horizontal centre from his torso: sizing off the box would
+    # shrink him to fit a shadow.
     probe = Image.open(figs[0]).convert("RGBA")
     x0, y0, x1, y1 = probe.getbbox()
     body = y1 - y0
-    cx = (x0 + x1) // 2
-    half = int(body * 0.30)
-    crop = (cx - half, max(0, y0 - int(body * 0.02)), cx + half, y0 + int(body * 0.40))
-    fw = 940
-    fh = int(fw * (crop[3] - crop[1]) / (crop[2] - crop[0]))
+    fscale = (H * FIG_SCALE) / body
+    fw = int(probe.width * fscale)
+    fh = int(probe.height * fscale)
+    # Where the whole scaled canvas has to sit for his head to land on FIG_TOP.
+    f_left = (W - fw) // 2
+    f_top = int(H * FIG_TOP) - int(y0 * fscale)
 
     arcL = Image.open(ROOT / "brand/unio-left.png").convert("RGBA")
     arcR = Image.open(ROOT / "brand/unio-right.png").convert("RGBA")
@@ -382,6 +585,17 @@ def main():
     arcL = arcL.resize((mark, mark), Image.LANCZOS)
     arcR = arcR.resize((mark, mark), Image.LANCZOS)
     mx, my = (W - mark) // 2, (H - mark) // 2
+
+    f_end = font(74, "Semibold")
+    f_who = font(int(10 * K), "Heavy")
+    f_line = font(int(14 * K), "Semibold")
+    bub_y = int(H * 0.795)
+    # Measured at full length and shrunk to fit, rather than trusting a scale
+    # factor to be right: at 1.75 this line came out 1216px wide in a 1080 frame
+    # and was clipped at both ends. Now any line Mo writes fits or is made to.
+    BUB_MAX = W - 2 * 46
+    natural = bubble(SAY, len(SAY), False, (f_who, f_line)).width if SAY else 1
+    bub_fit = min(1.0, BUB_MAX / natural)
 
     COMP.mkdir(parents=True, exist_ok=True)
     for old in COMP.glob("*.png"):
@@ -401,17 +615,44 @@ def main():
                 # closer for the rest of the shot. The push is small enough that
                 # nobody sees it happening and the shot still refuses to sit
                 # still, which is the difference between calm and dead.
-                settle = 1.035 - 0.035 * ease_out(clamp01(t / 0.70))
-                push = 1.0 + 0.045 * clamp01(t / FIG_UNTIL)
+                settle = 1.030 - 0.030 * ease_out(clamp01(t / 0.70))
+                push = 1.0 + 0.030 * clamp01(t / FIG_UNTIL)
                 sc = settle * push
                 w2, h2 = int(fw * sc), int(fh * sc)
                 src = Image.open(figs[i]).convert("RGBA")
-                src = blink_eyes(src, eye_close(t), eye_boxes(src))
-                im = src.crop(crop).resize((w2, h2), Image.LANCZOS)
-                frame.alpha_composite(fade(im, a), ((W - w2) // 2, (H - fh) // 2 - (h2 - fh) // 2))
+                src = neutral_floor(src, y0, body)
+                boxes = eye_boxes(src)
+                src = blink_eyes(src, eye_close(t), boxes)
+                src = glow_eyes(src, boxes, eye_flare(t))
+                im = src.resize((w2, h2), Image.LANCZOS)
+                # Scaling about the centre of where he already sits, so the push
+                # does not walk him across the frame.
+                frame.alpha_composite(fade(im, a),
+                                      (f_left - (w2 - fw) // 2, f_top - (h2 - fh) // 2))
+
+        # ---- he speaks ----
+        if SAY and SAY_FROM <= t < SAY_UNTIL + 0.45:
+            grow = ease_out(clamp01((t - SAY_FROM) / 0.30))
+            gone = ramp(t, SAY_UNTIL, SAY_UNTIL + 0.45)
+            ba = grow * (1 - gone)
+            if ba > 0.01:
+                typed = clamp01((t - SAY_FROM - 0.18) / max(0.01, SAY_TYPED - SAY_FROM - 0.18))
+                shown = int(len(SAY) * typed)
+                # The caret blinks while he types and goes the moment he stops,
+                # which is exactly what typeQuip does in the app.
+                caret = shown < len(SAY) and int(t * 2.2) % 2 == 0
+                bub = bubble(SAY, shown, caret, (f_who, f_line))
+                # It arrives from slightly below and small, like the app's quipIn.
+                sc = (0.94 + 0.06 * grow) * bub_fit
+                bw, bh = int(bub.width * sc), int(bub.height * sc)
+                b = bub.resize((bw, bh), Image.LANCZOS)
+                bx = (W - bw) // 2
+                by = bub_y + int(14 * (1 - grow))
+                frame.alpha_composite(fade(soft_shadow(b, 12, 10, 0.28), ba), (bx, by))
+                frame.alpha_composite(fade(b, ba), (bx, by))
 
         # ---- the mark assembling ----
-        draw_p = ease_out(clamp01((t - DRAW_FROM) / (DRAW_TO - DRAW_FROM)))
+        draw_p = smooth((t - DRAW_FROM) / (DRAW_TO - DRAW_FROM))
         if draw_p > 0.001:
             layer = Image.new("RGBA", (mark, mark), (0, 0, 0, 0))
             for img, side in ((arcL, "left"), (arcR, "right")):
@@ -445,6 +686,12 @@ def main():
             ms = int(mark * (1 + knock))
             frame.alpha_composite(layer.resize((ms, ms), Image.LANCZOS),
                                   (mx - (ms - mark) // 2, my - (ms - mark) // 2))
+
+            ea = ramp(t, END_FROM, END_FROM + 0.55)
+            if ea > 0.01:
+                d = ImageDraw.Draw(frame)
+                rise = int(16 * (1 - ea))
+                centred(d, my + mark + int(104) + rise, END_LINE, f_end, INK, ea)
 
         frame.convert("RGB").save(COMP / f"c{i:04d}.png")
 
