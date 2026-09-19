@@ -543,6 +543,17 @@ export function avoidNote(entry) {
     : entry.reason === "both"
       ? `You have swapped out of or skipped ${entry.name} ${times(entry.count)}`
       : `You have swapped out of ${entry.name} ${times(entry.count)}`;
+  /* A soft avoid only sinks a lift down its pool, and a pool with anything
+     else in it puts something else on top, so at SOFT_AT the movement is off
+     the card in practice. That is the contract working, and until 2026-09-19
+     it was silent: only the hard sentence below spoke, and the third swap
+     that would have earned it could never happen on a lift nobody could see.
+     The sentence says what actually happened, one step down and not out. */
+  if (entry.strength === "soft") {
+    return `${entry.name} is not in here this week. ${how}, which is enough to move it to the `
+      + `bottom of its list and not enough to take it out: twice can still be two bad evenings. `
+      + `Say the word and it comes back.`;
+  }
   const head = entry.reason === "skipped" ? `${entry.name} is not in here. ${how}.` : `${how}, so it is not in here.`;
   return `${head} Say the word and it comes back.`;
 }

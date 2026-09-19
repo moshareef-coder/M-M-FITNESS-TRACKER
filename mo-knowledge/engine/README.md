@@ -247,10 +247,10 @@ The decision, per stalled lift, top to bottom, first match wins:
 | when | action | why that one |
 |---|---|---|
 | flat under 4 weeks | `wait` | a fortnight is a fortnight. research/09: a plan that reacts to noise teaches people to distrust every change it makes |
-| beginner, under 8 weeks flat or under 6 sessions of the lift | `wait` | a beginner is on linear progression by definition. Same argument this file already makes about withholding a scheduled deload from a beginner |
-| calibrate says `too-easy` | `wait` | calibrate is already adding load next session. The stall is breaking itself and a second response is the same fix twice |
-| calibrate says `too-heavy` | `deload-lift` | they are grinding. `periodization-deloads.md` names missed reps on a previously solid lift as a trigger, and one week as enough. Never also rotated: the load is already coming down |
-| strength goal, under 6 weeks flat | `rep-range` | `progressive-overload.md` counts more reps at the same weight as overload, and it is the cheapest lever that does not take away the lift they came here for |
+| loading still works elsewhere, under 8 weeks flat or under 6 sessions of the lift | `wait` | while linear progression is working a flat lift is usually attendance rather than adaptation. Same argument this file already makes about withholding a scheduled deload. Except on a strength goal with 6 or more sessions of the lift in the window, which falls through to the verdicts and the rep range below: six sessions is not attendance, and until 2026-09-19 this wait made the rep range unreachable (0 firings in 94 replayed weeks) |
+| calibrate says `too-easy`, under 8 weeks flat | `wait` | calibrate is already adding load next session. The stall is breaking itself and a second response is the same fix twice. Past 8 weeks the bar has had its chance: a lift called too easy every fortnight for two months goes up and comes back down, and waiting on it is not paying attention |
+| calibrate says `too-heavy` | `deload-lift` | they are grinding. `periodization-deloads.md` names missed reps on a previously solid lift as a trigger, and one week as enough. Never also rotated: the load is already coming down. A loadless movement is rotated instead, because there is nothing to go lighter by |
+| strength goal, under 8 weeks flat | `rep-range` | `progressive-overload.md` counts more reps at the same weight as overload, and it is the cheapest lever that does not take away the lift they came here for. Eight weeks so the block is a block: at six it was two weeks of reps before rotation took the lift anyway |
 | anything else | `rotate` | the same file: chasing 5 lb a week runs out of road, and rotating which lever moves is what keeps a plan working |
 | 3 or more lifts acting at once | `volume-cut`, in `summary` | that is fatigue rather than three exercise problems. Systemic, so it never appears on one exercise |
 
@@ -275,7 +275,15 @@ three lifts during a lighter week hands somebody a week they do not recognise an
 leaves nothing attributable afterwards. `periodization-deloads.md` describes a
 deload as the same exercises with fewer sets, and `progressive-overload.md` says
 pick one lever. The diagnosis survives in each response's `detail`; only the
-action waits, and the summary speaks for the week.
+action waits, and the summary speaks for the week. And the cut is spent once it
+is taken: a stall cannot resolve during a week that deferred every answer to it,
+so until 2026-09-19 the cut fired again the next week and every week after, still
+running on week 14 of a replay. Every lift on a cut week now carries `volumeCut`
+into the saved plan, `cutTakenRecently` reads it back off `plans`, and inside
+`cutSpentDays` (28, one block) a second cut is refused and the per lift answers run
+instead. Bodyweight movements are not stall candidates at all any more: a push-up
+at 0 lb "has not gone up" by construction, and four of them at once used to trip
+the systemic cut on somebody who had hit every rep of everything.
 
 **`wait` has three different sentences.** "Too soon to tell", "you are a beginner
 and this is attendance" and "you are about to add weight anyway" are different

@@ -77,8 +77,13 @@ export const PLATEAU_RESPONSE = {
      firmly, because whatever they are doing has had long enough to work. */
   rotateFromWeeks: 8,
   /* A strength stall this short gets the rep range first, because the lift
-     itself is usually fine and the range has run out of room. */
-  shortStallWeeks: 6,
+     itself is usually fine and the range has run out of room. Eight rather
+     than six since 2026-09-19, and eight on purpose: the rep range is
+     prescribed "for this block", the block starts at minWeeksFlat, and at six
+     the block was two weeks long before rotation took the lift anyway. Set
+     equal to rotateFromWeeks, so the ladder on a strength goal reads reps
+     first, then rotate, with no gap between them. */
+  shortStallWeeks: 8,
   /* While session to session loading is still working, a lift has to be flat for
      this long, on this many sessions of it, before anything happens at all. Two
      guards rather than one, because week to week noise is enormous at that stage
@@ -93,6 +98,16 @@ export const PLATEAU_RESPONSE = {
   deloadLiftFactor: 0.85,
   /* Stalls at or above this count stop being about any one exercise. */
   systemicLifts: 3,
+  /* How long a volume cut stays spent. The cut defers every per lift answer,
+     so the stall it reacts to cannot resolve during the cut week, and until
+     2026-09-19 that meant it fired again the next week, and the next: a
+     replay measured it still cutting on week 14. The note promises "the sets
+     come down for seven days, and then they go back up", so a cut inside this
+     window blocks another and the per lift answers run instead. Four weeks,
+     the same block minWeeksFlat is measured in: if three lifts are still flat
+     a block after a lighter week AND their own answers, that is new evidence
+     of fatigue rather than the same evidence read twice. */
+  cutSpentDays: 28,
   /* How many lifts get a response out loud. A week that changes six things
      teaches nothing, and six notes on one plan is a wall of text nobody reads.
      Everything else stays visible in `trainingAge.plateau.lifts`. */
@@ -227,7 +242,7 @@ function detailFor({ action, lift, goal, reason = null }) {
  *   why: string[],
  * }}
  */
-export function planPlateauResponse({ plateau, stillLinear = false, confidence = "none", calibration = null, goal = null } = {}) {
+export function planPlateauResponse({ plateau, stillLinear = false, confidence = "none", calibration = null, goal = null, cutTaken = false } = {}) {
   /* This used to take `level` and branch on `level === "beginner"`. The sentence
      under that branch says what it was really asking: "a beginner is on linear
      progression by definition". That is a claim about the bar and it is
@@ -266,9 +281,27 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
       return { lift, action: "wait", reason: "short" };
     }
 
+    /* The rep range answer on a strength goal, decided here rather than below
+       the still-linear wait where it sat until 2026-09-19. Down there it was
+       unreachable in practice: it fired 0 times in 94 replayed weeks, because
+       the only person who got past the wait was stalled everywhere, and that
+       person trips the systemic cut instead. The wait's own argument is that
+       a flat lift while loading still works elsewhere is usually attendance,
+       and the sessions gate is the answer to that: six sessions of the lift
+       inside the window is not attendance. A verdict still comes first below,
+       because calibrate.mjs adding load or taking it off is already a change
+       and the rep range on top of it is two levers at once. */
+    const strengthShort = isStrengthGoal(goal) && lift.weeksFlat < PLATEAU_RESPONSE.shortStallWeeks;
+    /* Sessions of the lift while it has been flat, or in the window when the
+       plateau came from somewhere that does not count the former. The window
+       count alone made the gate unreachable for a lift done once a week: see
+       sessionsFlat in training-age.mjs. */
+    const ofIt = Math.max(Number(lift.sessions) || 0, Number(lift.sessionsFlat) || 0);
+    const enoughOfIt = ofIt >= PLATEAU_RESPONSE.linearMinSessions;
+
     if (linearStillWorks
-        && (lift.weeksFlat < PLATEAU_RESPONSE.linearMinWeeksFlat
-            || lift.sessions < PLATEAU_RESPONSE.linearMinSessions)) {
+        && (lift.weeksFlat < PLATEAU_RESPONSE.linearMinWeeksFlat || !enoughOfIt)
+        && !(strengthShort && enoughOfIt)) {
       why.push(`${lift.name}: ${lift.weeksFlat} weeks flat across ${lift.sessions} sessions of `
         + `it, under the ${PLATEAU_RESPONSE.linearMinWeeksFlat} weeks and `
         + `${PLATEAU_RESPONSE.linearMinSessions} sessions this asks for while weight is still `
@@ -279,11 +312,27 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
       return { lift, action: "wait", reason: "still-linear" };
     }
 
-    if (verdict === "too-easy") {
+    /* Only while the promise is young. calibrate.mjs reads the last two
+       sessions; a lift it has called too easy for eight weeks is a lift that
+       goes up next session and comes back down the one after, and "this one
+       is already sorting itself out" said of that for two months is the app
+       not paying attention. Past rotateFromWeeks the bar has had its chance. */
+    if (verdict === "too-easy" && lift.weeksFlat < PLATEAU_RESPONSE.rotateFromWeeks) {
       why.push(`${lift.name}: stalled, but calibrate.mjs already reads it as too easy and adds `
         + `load next session. Wait, because that is the stall breaking on its own and a second `
         + `response would be the same fix applied twice.`);
       return { lift, action: "wait", reason: "already-climbing" };
+    }
+
+    if (verdict === "too-heavy" && !(lift.weightLb > 0)) {
+      /* Cannot happen off detectPlateau any more, which skips loadless rows,
+         but this function is exported and takes any list. "It goes lighter
+         this week" said of a lift with nothing to go lighter by is the app
+         being wrong out loud, so a struggling loadless movement changes
+         rather than lightens. */
+      why.push(`${lift.name}: flat ${lift.weeksFlat} weeks and calibrate.mjs says too heavy, but there `
+        + `is no load on it to take off. Rotate it: the variation is the lever on bodyweight work.`);
+      return { lift, action: "rotate" };
     }
 
     if (verdict === "too-heavy") {
@@ -295,7 +344,7 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
       return { lift, action: "deload-lift" };
     }
 
-    if (isStrengthGoal(goal) && lift.weeksFlat < PLATEAU_RESPONSE.shortStallWeeks) {
+    if (strengthShort) {
       why.push(`${lift.name}: ${lift.weeksFlat} weeks flat on a strength goal, which is a short `
         + `stall on a lift they came here for. Change the rep range first. `
         + `progressive-overload.md counts more reps at the same weight as overload, and it is `
@@ -324,7 +373,21 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
   };
 
   if (acting.length >= PLATEAU_RESPONSE.systemicLifts) {
-    if (overall === "back-off") {
+    if (cutTaken) {
+      summary = {
+        action: "none",
+        lifts: acting.length,
+        detail: `${acting.length} lifts still stalled after the lighter week. The cut has been `
+          + `taken inside the last ${PLATEAU_RESPONSE.cutSpentDays} days, so the per lift answers `
+          + `run now rather than a second lighter week.`,
+        say: null,
+      };
+      why.push(`${acting.length} stalled lifts would earn a volume cut, and one has already been `
+        + `handed out inside the last ${PLATEAU_RESPONSE.cutSpentDays} days. The note promised the `
+        + `sets come back after seven days, and the stall cannot have resolved during a week that `
+        + `deferred every answer to it, so a second cut here is the same evidence read twice. The `
+        + `per lift answers run instead.`);
+    } else if (overall === "back-off") {
       summary = {
         action: "none",
         lifts: acting.length,
@@ -404,6 +467,33 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
   }));
 
   return { responses, summary, why };
+}
+
+/**
+ * Whether a volume cut has been handed out recently, read off the plans the
+ * app saved. Every exercise on a cut week carries `volumeCut: true` on its way
+ * through the adapter, and `ai_workouts.exercises` is stored verbatim, so this
+ * is the one place the engine can see its own last answer without a table. A
+ * plan that was generated and never trained still counts: the cut was
+ * prescribed, and prescribing it again a week later is the thing the promise
+ * forbids. Rows are read the way calibrate.mjs reads them, a row that is not
+ * a row says nothing.
+ *
+ * @param {{ plans?: Array, today?: Date, withinDays?: number }} input
+ * @returns {boolean}
+ */
+export function cutTakenRecently({ plans = [], today = new Date(), withinDays = PLATEAU_RESPONSE.cutSpentDays } = {}) {
+  const now = today instanceof Date ? today.getTime() : Date.parse(today);
+  if (!Number.isFinite(now)) return false;
+  for (const p of (Array.isArray(plans) ? plans : [])) {
+    if (!p || typeof p !== "object" || !Array.isArray(p.exercises)) continue;
+    if (!p.exercises.some((e) => e && typeof e === "object" && e.volumeCut === true)) continue;
+    const at = Date.parse(`${String(p.entry_date)}T12:00:00Z`);
+    if (!Number.isFinite(at)) continue;
+    const days = (now - at) / 86400000;
+    if (days >= 0 && days < withinDays) return true;
+  }
+  return false;
 }
 
 /**

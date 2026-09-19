@@ -533,7 +533,11 @@ const FLOW_KEYS = new Set(["training", "label", "style", "level", "minutes", "se
 const FLOW_MOVE_KEYS = new Set(["name", "seconds", "perSide", "round", "category", "cue"]);
 const RAMP_KEYS = new Set(["exercise", "group", "sets", "seconds"]);
 const RAMP_SET_KEYS = new Set(["weight", "reps", "restSec", "pct", "cue"]);
-const EXERCISE_KEYS = new Set(["name", "sets", "reps", "targetWeight", "loadBasis", "note", "swap", "alternatives", "restSec"]);
+/* `volumeCut` is present only on a week the plateau answer cut the sets, and it
+   is the engine's memory of its own last answer: the app stores `exercises`
+   verbatim and plateau-response.mjs reads it back off `plans`. CONTRACT.md
+   documents it beside restSec. */
+const EXERCISE_KEYS = new Set(["name", "sets", "reps", "targetWeight", "loadBasis", "note", "swap", "alternatives", "restSec", "volumeCut"]);
 /* What a `targetWeight` of 0 is allowed to mean. "your size" is deliberately not
    in here: it was the cold start basis and there is no cold start any more, so a
    row carrying it would be an old prescription path finding its way back. */

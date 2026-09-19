@@ -31,7 +31,7 @@ import {
   learnPreferences, applyPreferences, avoidNote, openWeekBudget, heldBackNote, actedOn,
   SOFT_AT, HARD_AT, MAX_WEEK_SHARE, MIN_WEEK_MOVES,
 } from "./preferences.mjs";
-import { planPlateauResponse, applyRotateFallback, PLATEAU_RESPONSE } from "./plateau-response.mjs";
+import { planPlateauResponse, applyRotateFallback, cutTakenRecently, PLATEAU_RESPONSE } from "./plateau-response.mjs";
 import { BODY_AREAS, EQUIPMENT_OPTIONS, normalizeLimits, applyLimits, limitsSummary } from "./limits.mjs";
 import { JOINTS, JOINT_LOAD, defaultJointLoad, jointLoadFor } from "./joint-load.mjs";
 import { joinPlanToActual, calibrateExercise, calibrate, stepFor, STEP_ISOLATION, STEP_COMPOUND, STEP_HEAVY } from "./calibrate.mjs";
@@ -181,7 +181,7 @@ test("earning one movement earns nothing else", () => {
   assert.equal(earned.has("romanian deadlift"), false);
 });
 
-test("observedCapacity is null under eight sessions and a number past it", () => {
+test("observedCapacity is null under eight sessions inside a fortnight and a number past it", () => {
   const low = deriveTrainingAge({ logs: history({ n: 5 }) });
   assert.equal(observedCapacity(low), null);
   const enough = deriveTrainingAge({ logs: history({ n: 20 }) });
@@ -1268,6 +1268,38 @@ test("scoreAlternatives dedupes results by name when the pool has the same name 
  * preferences.mjs
  * ========================================================================= */
 
+/* CONTRACT.md promised two swaps sink a movement and three remove it with a
+   note. Measured on 2026-09-19: the sink took it off the card at two, because a
+   pool with anything else in it puts something else on top, and nothing was
+   said, because only a hard avoid spoke. The third swap could then never
+   happen. Nobody loses a movement without being told, at either count. */
+const swapsAwayFrom = (name, n) => Array.from({ length: n }, (_, i) => ({
+  entry_date: day(-(2 + i * 4)), planned_exercise: name, chosen_exercise: "Dumbbell Bench Press",
+}));
+const firstLiftOf = (args) => buildPlan(args).week[0].exercises[0].name;
+
+test(`${SOFT_AT} swaps away from a lift that then leaves the card are said out loud`, () => {
+  const args = { goal: { bubble: "build-muscle" }, person: { bodyWeightLb: 175, sex: "Male", daysAsked: 4 }, logs: history({ n: 12 }) };
+  const target = firstLiftOf(args);
+  const plan = buildPlan({ ...args, swaps: swapsAwayFrom(target, SOFT_AT) });
+  const inWeek = plan.week.some((d) => d.exercises.some((e) => e.name === target));
+  assert.equal(inWeek, false, `${target} is still in the week, so this test is not exercising the sink`);
+  const note = plan.dayNotes.find((n) => n.includes(target));
+  assert.ok(note, `nothing said about ${target}: ${plan.dayNotes.join(" | ")}`);
+  assert.match(note, /bottom of its list/);
+  assert.match(note, /comes back/);
+});
+
+test(`${HARD_AT} swaps away from a lift remove it and say so`, () => {
+  const args = { goal: { bubble: "build-muscle" }, person: { bodyWeightLb: 175, sex: "Male", daysAsked: 4 }, logs: history({ n: 12 }) };
+  const target = firstLiftOf(args);
+  const plan = buildPlan({ ...args, swaps: swapsAwayFrom(target, HARD_AT) });
+  assert.equal(plan.week.some((d) => d.exercises.some((e) => e.name === target)), false);
+  const note = plan.dayNotes.find((n) => n.includes(target));
+  assert.ok(note, `nothing said about ${target}: ${plan.dayNotes.join(" | ")}`);
+  assert.match(note, /so it is not in here/);
+});
+
 test(`${HARD_AT} swaps away from one exercise is a hard avoid`, () => {
   const swaps = [day(-5), day(-15), day(-25)].map((d) => ({
     entry_date: d, planned_exercise: "Overhead Press", chosen_exercise: "Dumbbell Shoulder Press",
@@ -1525,6 +1557,51 @@ test("plateau response uses the rep range for a strength goal with a short stall
   assert.equal(r.responses[0].action, "rep-range");
 });
 
+test("one stuck lift on a strength goal gets the rep range while the other lifts still climb", () => {
+  /* The audit's unreachable answer. Loading still works elsewhere, so the
+     still-linear wait used to swallow this, and the only person who got past
+     that wait was stalled everywhere and got the volume cut instead. */
+  const plateau = { lifts: [{ name: "Lat Pulldown", sessions: 8, weeksFlat: 5, weightLb: 95 }] };
+  const r = planPlateauResponse({ plateau, stillLinear: true, confidence: "high", goal: { bubble: "get-stronger" } });
+  assert.equal(r.responses[0].action, "rep-range", r.why.join(" | "));
+  /* Not with too few sessions of it, which is the attendance case the wait exists for. */
+  const thin = { lifts: [{ name: "Lat Pulldown", sessions: 4, weeksFlat: 5, weightLb: 95 }] };
+  assert.equal(planPlateauResponse({ plateau: thin, stillLinear: true, confidence: "high", goal: { bubble: "get-stronger" } }).responses[0].action, "wait");
+  /* And three of them at once is still the whole week, not three rep ranges. */
+  const three = { lifts: ["Bench Press", "Squat", "Row"].map((name) => ({ name, sessions: 8, weeksFlat: 5, weightLb: 200 })) };
+  assert.equal(planPlateauResponse({ plateau: three, stillLinear: true, confidence: "high", goal: { bubble: "get-stronger" } }).summary.action, "volume-cut");
+});
+
+test("a lift done once a week is not attendance once it has been flat for eight weeks", () => {
+  /* Six sessions inside a six week window is perfect attendance on a once a
+     week lift, and one rotation week put it out of reach for good: the audit's
+     Lat Pulldown, stuck sixteen weeks and answered twice. Sessions since the
+     last PR is the count that says how much of it they have done while flat. */
+  const logs = [];
+  for (let i = 0; i < 12; i++) {
+    logs.push({ entry_date: day(-(1 + i * 7)), exercise_name: "Lat Pulldown", sets: 3, reps: 8, weight: i >= 9 ? 90 : 95 });
+    logs.push({ entry_date: day(-(1 + i * 7)), exercise_name: "Bench Press", sets: 3, reps: 8, weight: 200 - i * 5 });
+  }
+  /* One week of the last six missing, so the window holds five. */
+  const thinned = logs.filter((l) => !(l.exercise_name === "Lat Pulldown" && l.entry_date === day(-(1 + 2 * 7))));
+  const plateau = detectPlateau({ logs: thinned });
+  const lift = plateau.lifts.find((l) => l.name === "Lat Pulldown");
+  assert.ok(lift, plateau.why.join(" | "));
+  assert.equal(lift.sessions, 5);
+  assert.equal(lift.sessionsFlat, 7, "eight weekly sessions since the PR, one of them missed");
+  const r = planPlateauResponse({ plateau, stillLinear: true, confidence: "high" });
+  assert.notEqual(r.responses.find((x) => x.exercise === "Lat Pulldown").action, "wait", r.why.join(" | "));
+});
+
+test("a lift calibrate has called too easy for eight weeks stops being told it is sorting itself out", () => {
+  const plateau = { lifts: [{ name: "Lat Pulldown", sessions: 12, weeksFlat: PLATEAU_RESPONSE.rotateFromWeeks + 1, weightLb: 95 }] };
+  const calibration = { byExercise: { "lat pulldown": { verdict: "too-easy" } }, overall: null };
+  const r = planPlateauResponse({ plateau, stillLinear: false, confidence: "high", calibration });
+  assert.notEqual(r.responses[0].action, "wait", r.why.join(" | "));
+  const young = { lifts: [{ name: "Lat Pulldown", sessions: 12, weeksFlat: 5, weightLb: 95 }] };
+  assert.equal(planPlateauResponse({ plateau: young, stillLinear: false, confidence: "high", calibration }).responses[0].action, "wait");
+});
+
 test("plateau response rotates otherwise", () => {
   const plateau = { lifts: [{ name: "Leg Press", sessions: 10, weeksFlat: PLATEAU_RESPONSE.rotateFromWeeks, weightLb: 400 }] };
   const r = planPlateauResponse({ plateau, stillLinear: false, confidence: "high" });
@@ -1652,6 +1729,46 @@ test("joinPlanToActual skips plans with no completed_at", () => {
   const plans = [{ entry_date: day(-1), exercises: [{ name: "Bench Press", sets: 3, reps: 8, targetWeight: 135 }] }];
   const rows = joinPlanToActual({ plans, logs: [] });
   assert.equal(rows.length, 0);
+});
+
+/* The app writes one exercise_logs row per distinct weight, so a session that
+   climbed or dropped mid-exercise is two or three rows on one date. Until
+   2026-09-19 the join kept the first row and threw the rest away, and a person
+   who worked UP to 150 on a 4x8 at 140 read as two sets done of four: too
+   heavy, bar comes down. Three ladder shapes, one prescription. */
+const ladderJoin = (rows) => {
+  const dates = [day(-1), day(-4)];
+  const plans = dates.map((d) => ({
+    entry_date: d, completed_at: `${d}T18:00:00Z`,
+    exercises: [{ name: "Bench Press", sets: 4, reps: 8, targetWeight: 140 }],
+  }));
+  const logs = dates.flatMap((d) => rows.map((r) => ({ entry_date: d, exercise_name: "Bench Press", reps: 8, ...r })));
+  return { joined: joinPlanToActual({ plans, logs }), verdict: calibrate({ plans, logs }).byExercise["bench press"] };
+};
+
+test("a climbing ladder joins as every set done, at the top weight, and reads too-easy", () => {
+  const { joined, verdict } = ladderJoin([{ sets: 2, weight: 140 }, { sets: 2, weight: 150 }]);
+  assert.equal(joined.length, 2);
+  assert.deepEqual(joined[0].actual, { sets: 4, reps: 8, weight: 150, weightLow: 140 });
+  assert.equal(verdict.verdict, "too-easy", verdict.why);
+  /* Measured against 150, the row load.mjs will pick as the base, not 140. */
+  assert.equal(Math.round(150 * verdict.nextLoadFactor), 155);
+});
+
+test("a flat ladder joins to the same answer as one row", () => {
+  const two = ladderJoin([{ sets: 2, weight: 140 }, { sets: 2, weight: 140 }]);
+  const one = ladderJoin([{ sets: 4, weight: 140 }]);
+  assert.deepEqual(two.joined[0].actual, one.joined[0].actual);
+  assert.equal(two.verdict.verdict, "too-easy");
+});
+
+test("a ladder that dropped below the target mid-exercise still reads as a struggle", () => {
+  /* Two sets at 150 and then two at 130 against a 140 target: the top weight
+     beat the plan and the lightest row fell under it, and it is the lightest
+     row that says the weight came down. */
+  const { joined, verdict } = ladderJoin([{ sets: 2, weight: 150 }, { sets: 2, weight: 130 }]);
+  assert.equal(joined[0].actual.weightLow, 130);
+  assert.equal(verdict.verdict, "too-heavy", verdict.why);
 });
 
 /* Asserted in pounds, never as a factor. The bug this replaces was a 1.025
@@ -4603,6 +4720,176 @@ test("a person who keeps turning up never gets a smaller week for it", () => {
   }
   /* And it goes up, rather than merely not going down. */
   assert.ok(totals[11] > totals[0] * 1.2, `twelve weeks of perfect attendance moved ${totals[0]} to ${totals[11]}`);
+});
+
+/* A life replayed through the production path: every week's plan becomes next
+   week's `plans` rows and the logs the person would have written. `log(e)`
+   returns the rows for one prescribed exercise, so a life is one function.
+   Bodyweight rows carry weight 0, which is what a person who types 0 writes and
+   what the 2026-09-19 audit replayed. */
+function replayLife({ payload, weeks, does = 4, log, start = new Date("2026-05-04T12:00:00Z") }) {
+  const logs = [], plans = [], out = [];
+  for (let w = 0; w < weeks; w++) {
+    const today = new Date(start.getTime() + w * 7 * DAY_MS);
+    const res = generateFromPayload({ ...payload, logs, plans }, { today, includePlan: true });
+    const plan = res.plan;
+    out.push({ week: w + 1, plan, sets: plan.week.reduce((n, d) => n + d.exercises.reduce((m, e) => m + e.sets, 0), 0) });
+    for (let s = 0; s < Math.min(does, plan.week.length); s++) {
+      const d = plan.week[s];
+      const date = isoDay(new Date(today.getTime() + s * DAY_MS));
+      plans.push({ entry_date: date, focus: d.name, completed_at: `${date}T18:00:00Z`,
+        exercises: d.exercises.map((e) => ({ name: e.name, sets: e.sets, reps: e.reps, targetWeight: e.weight ?? 0,
+          ...(e.volumeCut ? { volumeCut: true } : {}) })) });
+      for (const e of d.exercises) for (const row of log(e)) logs.push({ entry_date: date, exercise_name: e.name, ...row });
+    }
+  }
+  return out;
+}
+/* What a day one card leaves blank, a person fills in. */
+const GUESS_LB = { dumbbell: 25, cable: 60, machine: 90, barbell: 95 };
+const loadOf = (e) => (e.loadBasis === "bodyweight" ? 0 : e.weight > 0 ? e.weight : (GUESS_LB[e.equipment] ?? 45));
+const hitsEverything = (e) => [{ sets: e.sets, reps: e.reps, weight: loadOf(e) }];
+
+test("detectPlateau never calls a movement with no load on it stuck", () => {
+  /* Push-ups at 0 lb for ten sessions beside a bench that climbs. The push-up
+     has no weight to stall at; before 2026-09-19 it was the first lift named. */
+  const logs = [];
+  for (let i = 0; i < 10; i++) {
+    const d = day(-(1 + i * 3));
+    logs.push({ entry_date: d, exercise_name: "Push-Up", sets: 3, reps: 12, weight: 0 });
+    logs.push({ entry_date: d, exercise_name: "Plank", sets: 3, reps: 1, weight: null });
+    logs.push({ entry_date: d, exercise_name: "Bench Press", sets: 3, reps: 8, weight: 135 + Math.floor((9 - i) / 3) * 5 });
+    logs.push({ entry_date: d, exercise_name: "Lat Pulldown", sets: 3, reps: 8, weight: 95 });
+  }
+  const r = detectPlateau({ logs });
+  assert.deepEqual(r.lifts.map((l) => l.name), ["Lat Pulldown"], r.why.join(" | "));
+  /* And they do not drag stillLinear down either: the one loaded lift that
+     is judged is still climbing. */
+  const t = deriveTrainingAge({ logs });
+  assert.equal(t.progressJudged, 2, "only the two loaded lifts are judged for linear progress");
+});
+
+test("fourteen weeks of perfect bodyweight and dumbbell training never gets a volume cut", () => {
+  const weeks = replayLife({
+    payload: { goal_bubble: "build-muscle", challenge_target: 4, current_weight: 160, sex: "Female",
+      limits: { missing: ["barbell", "cable", "machine"] } },
+    weeks: 14, log: hitsEverything,
+  });
+  const cuts = weeks.filter((w) => w.plan.plateau.summary.action === "volume-cut").map((w) => w.week);
+  assert.deepEqual(cuts, [], `the cut fired on weeks ${cuts.join(", ")}`);
+  /* And no stall is spoken about at all: nothing here has a load to stall at. */
+  for (const w of weeks) {
+    assert.equal(w.plan.trainingAge.plateau.lifts.filter((l) => !(l.weightLb > 0)).length, 0,
+      `week ${w.week} listed a loadless lift as stalled`);
+    assert.ok(!w.plan.dayNotes.some((n) => /at 0 lb/.test(n)), `week ${w.week}: ${w.plan.dayNotes.find((n) => /at 0 lb/.test(n))}`);
+  }
+});
+
+test("a real stall on three loaded lifts cuts the week once and then lets the sets back up", () => {
+  /* The first three loaded lifts freeze at their first logged weight forever;
+     everything else lands. Before 2026-09-19 the cut fired every week from the
+     day it first fired, because it deferred the answers that would have
+     resolved the stall. */
+  const stuck = new Map();
+  const weeks = replayLife({
+    payload: { goal_bubble: "build-muscle", challenge_target: 4, current_weight: 190, sex: "Male" },
+    weeks: 16,
+    log: (e) => {
+      const k = e.name.toLowerCase();
+      const w = loadOf(e);
+      if (!stuck.has(k) && stuck.size < 3 && w > 0) stuck.set(k, w);
+      if (!stuck.has(k)) return hitsEverything(e);
+      const lb = stuck.get(k);
+      return [{ sets: e.sets, reps: w > lb ? e.reps - 1 : e.reps, weight: lb }];
+    },
+  });
+  const cuts = weeks.filter((w) => w.plan.plateau.summary.action === "volume-cut").map((w) => w.week);
+  assert.equal(cuts.length, 1, `the cut fired on weeks ${cuts.join(", ")}`);
+  const cut = weeks[cuts[0] - 1], next = weeks[cuts[0]], before = weeks[cuts[0] - 2];
+  assert.ok(cut.sets < before.sets, `cut week ${cut.sets} sets against ${before.sets} the week before`);
+  assert.ok(next.sets > cut.sets, `the week after the cut had ${next.sets} sets against the cut week's ${cut.sets}`);
+  /* The per lift answers that stood down for the cut run the week after. */
+  assert.ok(next.plan.plateau.responses.some((r) => r.action !== "wait"),
+    `week ${next.week} answered nothing: ${JSON.stringify(next.plan.plateau.responses.map((r) => r.action))}`);
+});
+
+test("goes lighter this week is never said of a lift with nothing to go lighter by", () => {
+  /* detectPlateau no longer lists loadless movements, but the response takes
+     any list, and a 0 lb lift with a too-heavy verdict used to be told it
+     "goes lighter this week and builds back up". */
+  const plateau = { lifts: [{ name: "Push-Up", sessions: 10, weeksFlat: 10, weightLb: 0 }] };
+  const calibration = { byExercise: { "push-up": { verdict: "too-heavy" } }, overall: null };
+  const r = planPlateauResponse({ plateau, stillLinear: false, confidence: "high", calibration });
+  assert.notEqual(r.responses[0].action, "deload-lift");
+  assert.ok(!/lighter/.test(r.responses[0].say), r.responses[0].say);
+});
+
+test("cutTakenRecently reads the cut marker off saved plans and forgets it after the block", () => {
+  const cutPlan = (daysAgo) => ({ entry_date: day(-daysAgo), exercises: [{ name: "Bench Press", sets: 3, reps: 8, volumeCut: true }] });
+  const plain = (daysAgo) => ({ entry_date: day(-daysAgo), exercises: [{ name: "Bench Press", sets: 4, reps: 8 }] });
+  assert.equal(cutTakenRecently({ plans: [cutPlan(10)] }), true);
+  assert.equal(cutTakenRecently({ plans: [cutPlan(PLATEAU_RESPONSE.cutSpentDays + 1)] }), false);
+  assert.equal(cutTakenRecently({ plans: [plain(3)] }), false);
+  assert.equal(cutTakenRecently({ plans: [null, 5, { entry_date: "nonsense", exercises: 7 }] }), false);
+  const spent = planPlateauResponse({
+    plateau: { lifts: ["A", "B", "C"].map((name) => ({ name, sessions: 10, weeksFlat: 10, weightLb: 200 })) },
+    stillLinear: false, confidence: "high", cutTaken: true,
+  });
+  assert.notEqual(spent.summary.action, "volume-cut");
+  assert.equal(spent.responses.filter((r) => r.action !== "wait").length, 3, "the per lift answers run once the cut is spent");
+});
+
+test("buildPlan without an age climbs at the rate production ships, not the young one", () => {
+  /* The adapter reads an unknown age as caution 1 (CONTRACT.md: the
+     age-unknown default looks like the older-adult default). buildPlan
+     defaulted to 0, so the sweep, the demo and every harness calling it
+     measured a squat going up 10 lb a week where production gives 5. */
+  const logs = history({ n: 70 });
+  const dates = [day(-2), day(-5)];
+  const plans = dates.map((d) => ({
+    entry_date: d, completed_at: `${d}T18:00:00Z`,
+    exercises: [{ name: "Barbell Back Squat", sets: 3, reps: 5, targetWeight: 295 }],
+  }));
+  const easy = dates.map((d) => ({ entry_date: d, exercise_name: "Barbell Back Squat", sets: 3, reps: 5, weight: 295 }));
+  const squatIn = (person) => {
+    const plan = buildPlan({ goal: { bubble: "get-stronger", child: "strong-a-lift" }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 4, ...person }, logs: logs.concat(easy), plans });
+    return plan.week.flatMap((d) => d.exercises).find((e) => e.name === "Barbell Back Squat")?.weight;
+  };
+  const silent = squatIn({}), careful = squatIn({ ageCaution: 1 }), young = squatIn({ ageCaution: 0 });
+  assert.ok(typeof silent === "number", "the squat is in the week");
+  assert.equal(silent, careful, `no age given: ${silent}; caution 1: ${careful}`);
+  assert.ok(young > careful, `caution 0 gave ${young} and caution 1 gave ${careful}`);
+  assert.equal(young - careful, 5, "the difference is one rung on a squat, 10 lb against 5");
+});
+
+test("one session a week reads as one a week after three weeks, not after two months", () => {
+  /* Eight sessions at one a week is eight weeks, and for all of them a person
+     who asked for four days got a full four day week. Three weeks of window
+     with three sessions in it is one a week, and that is enough to say so. */
+  const today = new Date("2026-09-18T12:00:00Z");
+  const one = deriveTrainingAge({ logs: trainingHistory(3, 1, today), today });
+  assert.equal(observedCapacity(one), 1, `${one.recentSessions} sessions over ${one.windowWeeks} weeks read as ${observedCapacity(one)}`);
+  /* Still nothing inside the first fortnight, whatever the count: the
+     window has not existed long enough to be a rhythm. */
+  const early = deriveTrainingAge({ logs: trainingHistory(2, 1, today), today });
+  assert.equal(observedCapacity(early), null);
+  const keen = deriveTrainingAge({ logs: trainingHistory(1, 4, today), today });
+  assert.equal(observedCapacity(keen), null, "four sessions in week one is not a capacity read");
+});
+
+test("the person doing one of four hears the true sentence within a month", () => {
+  const weeks = replayLife({
+    payload: { goal_bubble: "build-muscle", challenge_target: 4, current_weight: 175, sex: "Male" },
+    weeks: 6, does: 1, log: hitsEverything,
+  });
+  const congratulated = weeks.filter((w) => w.plan.dayNotes.some((n) => n === "Everything landed last week. Loads are up."));
+  assert.deepEqual(congratulated.map((w) => w.week), [], `"Everything landed" on weeks ${congratulated.map((w) => w.week).join(", ")}`);
+  const honest = weeks.filter((w) => w.plan.dayNotes.some((n) => /you did 1 of 4/.test(n)));
+  assert.ok(honest.length >= 3, `the honest sentence appeared on weeks ${honest.map((w) => w.week).join(", ")}`);
+  const capacity = weeks.filter((w) => w.plan.dayNotes.some((n) => /doing about 1\b/.test(n)));
+  assert.ok(capacity.length && capacity[0].week <= 4, `the capacity note first appeared on week ${capacity[0]?.week}`);
+  /* And the week shrinks to what they do, rather than staying a full four days. */
+  assert.ok(weeks[5].plan.week.filter((d) => d.short).length >= 3, "the days past capacity are kept short");
 });
 
 test("the capacity read is the rhythm they are actually keeping", () => {
