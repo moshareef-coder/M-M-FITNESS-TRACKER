@@ -27,12 +27,61 @@
 
   const canvas = document.getElementById("stage");
 
+  /* A wave, authored here rather than in knowledge/, which is read only and not
+     ours. It is Mountain Pose with different arm angles: cloning the pose keeps
+     its root, its feet, its stance and its breathing exactly, so the only thing
+     that changes is the right arm and there is no chance of the body drifting.
+
+     The rig's conventions, read off the library: arms at the side is
+     shoulder 10, straight out level with the shoulder is 88 (Lateral Raise), so
+     overhead beside the head is about 150. A wave reads front-on as the hand
+     travelling left and right, which is the SHOULDER angle swinging, not the
+     elbow: bending the elbow moves the hand up and down and looks like a pump.
+     The elbow therefore holds near 52 and the shoulder does the waving. */
+  function buildWave(base) {
+    if (!base || !base.keys || !base.keys.length) return null;
+    const k0 = base.keys[0], k1 = base.keys[base.keys.length - 1];
+    const at = (t, sR, eR, from, through) => ({
+      ...from, t, ...(through ? { through: true } : {}),
+      joints: { ...from.joints, shoulderR: sR, elbowR: eR },
+    });
+    return {
+      ...base,
+      /* NOT "hold", which despite the name is an eased ping-pong:
+         u = 0.5 - 0.5*cos(cycle*2pi), so the keys play forwards to the halfway
+         point and then backwards. The wave went up, came down, and went up
+         again. "oneway" runs the keys once across the first 82% of the cycle
+         and then stays put, which is what a wave is. */
+      loop: "oneway",
+      keys: [
+        at(0.00, 10, 4, k0),     // stands, arms down
+        at(0.15, 10, 4, k0),     // holds, so the lift reads as a decision
+        at(0.22, 80, 30, k0),    // arm on its way up
+        at(0.27, 150, 52, k0),   // up beside the head
+        /* through: the ease then runs across the whole wave instead of
+           settling on each extreme, so it is a wave and not four poses. */
+        at(0.32, 133, 52, k0, true),   // out
+        at(0.37, 161, 52, k0, true),   // back
+        at(0.42, 134, 52, k0, true),   // out
+        at(0.47, 157, 52, k0, true),   // back
+        at(0.54, 80, 26, k0),    // coming down
+        at(0.63, 10, 4, k0),     // arms down again
+        at(1.00, 7, 1, k1),      // and the pose lengthens out, as Mountain does
+      ],
+    };
+  }
+
+  const EXTRA = {};
+  const mp = moveFor("Mountain Pose");
+  const wv = buildWave(mp);
+  if (wv) EXTRA["UNIO Wave"] = wv;
+
   window.__size = (w, h) => { canvas.width = w; canvas.height = h; return [w, h]; };
 
   /* cycle is 0..1 through the move. face is in seconds and is what the blink
      runs off, so it is deliberately not derived from cycle. */
   window.__draw = (name, cycle, face, opts = {}) => {
-    const move = moveFor(name);
+    const move = EXTRA[name] || moveFor(name);
     if (!move) throw new Error(`no move called ${name}`);
     const C = palette(opts.theme || "light", opts.accent || "action", "mannequin", "male");
     render(canvas, move, C, cycle, face, { mood: opts.mood || undefined, view: opts.view || undefined });
@@ -40,6 +89,6 @@
   };
 
   window.__png = () => canvas.toDataURL("image/png").slice(22);
-  window.__dur = (name) => (moveFor(name) || {}).dur || 0;
+  window.__dur = (name) => (EXTRA[name] || moveFor(name) || {}).dur || 0;
   window.__ready = true;
 </script>
