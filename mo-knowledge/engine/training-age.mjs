@@ -314,9 +314,37 @@ export function deriveTrainingAge({ logs: given = [], today = new Date() } = {})
     ? Math.max(1, Math.round(effectiveDays.length / 3))
     : Math.max(1, Math.round(span / 7));
 
+  /* How often they train, over the stretch they have actually been training.
+   *
+   * This divided by a flat six weeks until 2026-09-18, and the six weeks were
+   * counted whether or not the person had existed for them. Somebody two weeks
+   * into the app who had trained eight times read as 1.3 sessions a week, which
+   * is not a rounding: `observedCapacity` below turns it into a day count, and
+   * plan.mjs turns a capacity under the asked days into SHORT days. Traced over
+   * twelve weeks of a person doing exactly the four sessions they signed up
+   * for, the week's sets went 76, 76, 52, 69, 81, 87 and then settled at 105.
+   * The 52 is week three, and research/09 says the first two weeks are the ones
+   * that decide whether anybody is still here in twelve. The app was reading a
+   * perfect fortnight as a failing one and shrinking the plan for it.
+   *
+   * The window now runs from their first session inside the last six weeks to
+   * today, capped at six weeks and floored at one. Eight sessions in a fortnight
+   * is four a week, because that is what four a week means.
+   *
+   * It runs to TODAY and not to the last session on purpose, so a lapse still
+   * shows: eight sessions in a fortnight followed by three weeks of nothing is
+   * five weeks of window and 1.6 a week, which is the honest read of somebody
+   * who has stopped. Measuring to the last session would have them frozen at
+   * four a week forever. */
   const cutoff = new Date(parse(todayStr) - THRESHOLDS.recentWeeks * 7 * DAY);
-  const recent = effectiveDays.filter((d) => parse(d) >= cutoff).length;
-  const perWeek = +(recent / THRESHOLDS.recentWeeks).toFixed(1);
+  const recentDays = effectiveDays.filter((d) => parse(d) >= cutoff);
+  const recent = recentDays.length;
+  const windowStart = recent ? Math.max(cutoff.getTime(), parse(recentDays[0]).getTime()) : cutoff.getTime();
+  const windowWeeks = Math.min(
+    THRESHOLDS.recentWeeks,
+    Math.max(1, (parse(todayStr).getTime() - windowStart) / (7 * DAY)),
+  );
+  const perWeek = +(recent / windowWeeks).toFixed(1);
   const sessionsPerWeek = Number.isFinite(perWeek) ? perWeek : 0;
 
   const prog = linearProgress(logs.filter((l) => {

@@ -596,22 +596,67 @@ function addSecondMainRamps(week, roleOf) {
    second hand off rather than to change what either of them pulls: the ease is
    the last thing that happens to a set count now, in `easeSets` below, so the
    back-off week is the week the person would have had minus the cut, and
-   nothing downstream can hand any of it back. */
-function setsFor({ base, hitCount, tier, ceiling = Infinity }) {
-  const per = (weekly) => Math.round(weekly / Math.max(1, hitCount));
-  const plain = per(base);
+   nothing downstream can hand any of it back.
+
+   Round five, 2026-09-18, is the one that made the four colours mean four
+   things. Every round above decided a SESSION and let the week be whatever the
+   sessions added up to, which quantises the week to whole multiples of how
+   often the group is hit: three chest slots can only ever deliver 6, 9, 12 or
+   15 sets, so the four tiers were asking for 6.8, 8.2, 9.5 and 11.9 and being
+   answered 6, 9, 9 and 12. Measured across 1,424 reachable goal x days x group
+   cells, the four runs came back with four distinct weekly totals 4.3% of the
+   time, and the TARGETS behind them were four distinct numbers 87.7% of the
+   time. The tiers were not broken. The divide was throwing them away on the way
+   out. So the week is decided first now (`weeklyWant`) and the sessions are cut
+   out of it (`weeklySets`), which is the same arithmetic run in the order the
+   thing being asked for is actually stated in: a weekly set count. */
+
+/* What the week asks for, before any session has to hold it. */
+function weeklyWant({ base, tier, ceiling = Infinity }) {
+  const plain = Math.round(base);
   /* The +1 guarantee is a floor and not a bonus, so it is the same +1 at every
      tier. A group somebody marked green has to come back with more sets than an
      identical group they did not mark, or the colour was decoration; how much
      more than that is the multiplier's job.
 
-     `ceiling` is the group's MRV and it caps the boosted week before the divide,
-     never the +1: a focus still always earns its set, because an ask past what a
-     week can recover from is a reason to stop adding, not a reason to take the
-     colour back. It sits outside the Math.max for exactly that reason. */
+     `ceiling` is the group's MRV and it caps the boosted week, never the +1: a
+     focus still always earns its set, because an ask past what a week can
+     recover from is a reason to stop adding, not a reason to take the colour
+     back. It sits outside the Math.max for exactly that reason. */
   const boosted = Math.min(base * PRIORITY_MULTIPLIER[tier], ceiling);
-  const wanted = tier ? Math.max(per(boosted), plain + 1) : plain;
-  return Math.max(2, Math.min(MAX_SETS_PER_SESSION, wanted));
+  return tier ? Math.max(Math.round(boosted), plain + 1) : plain;
+}
+
+/* The week's sets for one group, and then the same number a session at a time.
+ *
+ * `fullSlots` is how many ordinary sessions train the group and `shortSlots` how
+ * many short ones do. A short day is capped at SHORT_DAY_SETS whatever the week
+ * wants (it is the session they were least likely to make), so it is subtracted
+ * from the week rather than averaged into it: the remainder is what the full
+ * sessions have to carry, and dividing by a count that includes sessions which
+ * will ignore the answer is how a group quietly lost a set.
+ *
+ * The remainder is spread rather than rounded away. A week of 8 sets over three
+ * sessions is 3, 3, 2 and not three sessions of 3 or three of 2, so the weekly
+ * total is the number that was asked for instead of the nearest multiple of
+ * three. Uneven is also just how a real week looks: the day a muscle is fresh
+ * carries more than the day it is the third movement.
+ *
+ * Both clamps still bind and both still mean what they meant. Two sets is the
+ * floor for a slot worth writing down and MAX_SETS_PER_SESSION is what one
+ * session can hold, so the week can never be less than 2 a session nor more
+ * than 6; `ceiling` is the group's MRV on top of that, and it is the only one of
+ * the three that is about recovery rather than about what a card can say. */
+function weeklySets({ base, tier, ceiling = Infinity, fullSlots, shortSlots = 0 }) {
+  const n = Math.max(1, fullSlots);
+  const fromShort = SHORT_DAY_SETS * shortSlots;
+  const floor = 2 * n + fromShort;
+  const room = Math.min(MAX_SETS_PER_SESSION * n + fromShort, ceiling);
+  const total = Math.max(floor, Math.min(room, weeklyWant({ base, tier, ceiling })));
+  const onFull = total - fromShort;
+  const each = Math.floor(onFull / n);
+  const extra = onFull % n;
+  return { total, setsAt: (i) => (i < extra ? each + 1 : each) };
 }
 
 /* The back-off itself, unchanged in what it takes and moved in when it takes
@@ -1303,7 +1348,10 @@ export function buildPlan({
   }
 
   /* How often each group really gets hit, from what was picked, so weekly volume
-     can be split across sessions rather than guessed per session. */
+     can be split across sessions rather than guessed per session. Full and short
+     sessions are counted apart because they are not interchangeable: a short day
+     takes SHORT_DAY_SETS whatever the week wants, so the week's remainder falls
+     on the full ones. See `weeklySets`. */
   /* The group an exercise counts toward is the slot's group it was chosen FOR,
      not whatever its library row lists first. An incline press qualifies for
      the shoulders isolation slot because shoulders is among its primaries, and
@@ -1312,11 +1360,12 @@ export function buildPlan({
      chest three times. The sweep of 2026-09-10 found that on 307 of 726 clean
      days. Same rule below in the week map, same helper, one answer. */
   const groupFor = (slot, pick) => (slot.groups || []).find((g) => (pick.primary || []).includes(g)) || (pick.primary || [])[0];
-  const hits = {};
+  const fullHits = {}, shortHits = {};
   for (const day of selected) {
+    const bag = day.isShort ? shortHits : fullHits;
     for (const { slot, pick } of day.picks) {
       const g = groupFor(slot, pick);
-      if (g) hits[g] = (hits[g] || 0) + 1;
+      if (g) bag[g] = (bag[g] || 0) + 1;
     }
   }
 
@@ -1336,6 +1385,11 @@ export function buildPlan({
      decides, which is every call that existed before focus.mjs landed. */
   const tierMap = toTierMap(priorityOverride ?? P.priority);
   const tierFor = (group) => tierMap[group] || 0;
+  /* The goal's half of that map, kept apart so the week can tell a group
+     somebody tapped from a group the goal named. Only the first is a control a
+     person pressed, and only a control that did nothing has to apologise for
+     it: see `focusUntrained` at the end of pass 3. */
+  const goalTiers = toTierMap(P.priority);
   const isPriority = (group) => tierFor(group) > 0;
 
   /* ---- how long they actually have ----
@@ -1414,6 +1468,25 @@ export function buildPlan({
     for (const name of rotateBlocked) repRangeFor.set(name.toLowerCase(), shifted);
   }
 
+  /* The week's sets per group, settled once and then handed out a session at a
+     time. Memoised rather than recomputed per exercise because it is one answer
+     about the week: two chest slots asking the same question separately is how
+     the rounding used to get counted twice. `taken` is the running index into
+     that answer, so the first full session a group appears in takes the first
+     (largest) share. */
+  const weekVolume = new Map();
+  const taken = new Map();
+  const volumeFor = (group) => {
+    if (!weekVolume.has(group)) {
+      weekVolume.set(group, weeklySets({
+        base: baseSetsFor(group), tier: tierFor(group),
+        ceiling: WEEKLY_MRV[group] ?? Infinity,
+        fullSlots: fullHits[group] || 1, shortSlots: shortHits[group] || 0,
+      }));
+    }
+    return weekVolume.get(group);
+  };
+
   const week = selected.map(({ name, key, isShort, picks }) => {
     const exercises = picks.map(({ slot, pick, swap, alternatives, offPattern }) => {
       const group = groupFor(slot, pick);
@@ -1425,13 +1498,16 @@ export function buildPlan({
       const tier = tierFor(group);
       const priority = tier > 0;
       const isMain = slot.role === "main";
-      const full = setsFor({
-        base: baseSetsFor(group), hitCount: hits[group] || 1, tier,
-        ceiling: WEEKLY_MRV[group] ?? Infinity,
-      });
       /* A short day is the session they were least likely to make, so it stays
-         small however the multipliers landed. */
-      const sets = isShort ? SHORT_DAY_SETS : full;
+         small however the multipliers landed, and `weeklySets` already took it
+         out of the week before dividing what was left. */
+      let sets;
+      if (isShort) sets = SHORT_DAY_SETS;
+      else {
+        const i = taken.get(group) || 0;
+        taken.set(group, i + 1);
+        sets = volumeFor(group).setsAt(i);
+      }
       const repRange = repRangeFor.get(pick.name.toLowerCase()) || P.repRange;
       const reps = isMain ? repRange[0] : repRange[1];
 
@@ -1520,13 +1596,15 @@ export function buildPlan({
      days, which is the same direction her loop corrects in: the days furthest
      from being decided are the ones that give the sets back.
      Accessories only. A main movement is the reason the day exists. */
-  /* What the LEVEL asks for, before the week is allowed to argue with it. This
-     is the number BASE_WEEKLY_SETS and the focus multiplier between them come
-     to, and it is still the number every set count is divided out of in
-     `setsFor`. It is kept separate from the target below because the two mean
-     different things now and the ledger reports both. */
+  /* What the band and the focus tier ask for, before the week is allowed to
+     argue with it. Literally the same call `weeklySets` makes, so the number the
+     ledger reports and the number the sets were cut out of cannot drift: it was
+     a second copy of the same arithmetic until 2026-09-18, and the copy was
+     fractional while the prescription was whole, so `weeklyVolume.wanted` said
+     8.96 about a week that had asked for 9. It is kept separate from the target
+     below because the two mean different things and the ledger reports both. */
   const wantedFor = (group) =>
-    Math.min(baseSetsFor(group) * PRIORITY_MULTIPLIER[tierFor(group)], WEEKLY_MRV[group] ?? Infinity);
+    weeklyWant({ base: baseSetsFor(group), tier: tierFor(group), ceiling: WEEKLY_MRV[group] ?? Infinity });
 
   /* What this week could spend on a group if every one of its exercises ran at
      the top of the clamp. A group the split touches once cannot be handed more
@@ -2118,6 +2196,49 @@ export function buildPlan({
         + `needs another training day rather than more sets in the one you have.`,
     });
   }
+  /* The focus that bought nothing at all, which is a worse silence than the one
+     above and was the only one of the two nobody said out loud.
+   *
+     `frequencyCapped` is about a group the week trains and cannot train enough.
+     This is about a group the week never trains AT ALL: the multiplier had
+     nothing to multiply, so red, yellow, green and no pick came back as the same
+     zero. Measured over 2,268 goal x days x group combinations, 844 of them, 37%
+     of every focus a person can express, were this. Lower back is 100% of its
+     column because no slot in SLOTS names it; biceps, triceps, shoulders and
+     calves are 40% of theirs because a three day week is three full body days
+     and full body has no isolation slot.
+   *
+     Both of those are facts about the slot table, and neither is a set count, so
+     neither is fixable here: the answer to "my lower back is red" is a lower
+     back slot in the week, which changes what days are made of rather than how
+     big they are. What IS fixable here is the silence. A control that changes
+     nothing and says nothing is the one thing this file is not allowed to ship,
+     so the plan says which groups the tap could not reach and what would reach
+     them. */
+  const focusUntrained = Object.keys(tierMap)
+    .filter((g) => !(finalTotals[g] > 0))
+    .map((group) => ({
+      group, tier: tierFor(group),
+      /* Whose ask it was. The goal's own list is a parameter and the body map is
+         a thing somebody tapped, and only the second of those is a control that
+         lied to a person, so only the second gets a sentence on the card. */
+      asked: !goalTiers[group],
+      why: `${group} has no slot in this ${days} day split, so no tier can add a set to it.`,
+    }));
+  const askedUntrained = focusUntrained.filter((f) => f.asked).map((f) => f.group);
+  if (askedUntrained.length) {
+    const list = askedUntrained.length === 1
+      ? askedUntrained[0]
+      : `${askedUntrained.slice(0, -1).join(", ")} and ${askedUntrained[askedUntrained.length - 1]}`;
+    const one = askedUntrained.length === 1;
+    dayNotes.push(`You marked ${list} on the body map and this week has no slot that trains `
+      + `${one ? "it" : "them"} on ${one ? "its" : "their"} own, so the colour bought nothing. `
+      + (days < 4
+        ? `A ${days} day week is built out of full body days and the big movements, which work the small muscles as helpers rather than on their own. Another day in the week is what buys ${one ? "it" : "them"} a slot.`
+        : `A focus changes how many sets a movement gets; it cannot add a movement the split does not have.`)
+      + ` Better said than left as a colour that did nothing.`);
+  }
+
   if (frequencyCapped.length) {
     const names = frequencyCapped.map((f) => f.group);
     const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
@@ -2295,7 +2416,7 @@ export function buildPlan({
        from group to numbers and a caller can iterate it without having to know
        which keys are muscles and which are bookkeeping. */
     volumeNotes: {
-      trimmed: volumeTrimmed, over: volumeOver, under: volumeUnder, frequencyCapped, timeTrimmed, overBudget,
+      trimmed: volumeTrimmed, over: volumeOver, under: volumeUnder, frequencyCapped, focusUntrained, timeTrimmed, overBudget,
       /* The two new halves of the time ledger. `restCompressed` is the only
          trim in this file that changes what a set is worth, so it is reported
          separately from `timeTrimmed` rather than folded in with the dropped

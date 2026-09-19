@@ -592,7 +592,7 @@ function out_requested(out) {
 /* ------------------------------------------------------------------ *
  * Block B2: three tiers, or one tier painted three colours
  * ------------------------------------------------------------------ *
- * Red, yellow and green buy 1.6x, 1.4x and 1.2x of a group's weekly sets, and
+ * Red, yellow and green buy 1.75x, 1.4x and 1.2x of a group's weekly sets, and
  * the only way to know that is three answers rather than one is to build the
  * same week four times, once at each tier and once with no focus at all, and
  * read the group's weekly total back.
@@ -600,12 +600,17 @@ function out_requested(out) {
  * Monotonic is the invariant, and it is a FAIL: a group marked red can never
  * come back with fewer sets than the same group marked green, or the picker is
  * lying about what the colours do. Strictly increasing is NOT the invariant and
- * must not be, because `setsFor` clamps a session to [2, 6] and rounds to whole
- * sets, so above the beginner base every tier lands on the same ceiling. Where
- * the four runs come back identical it is warned instead, and that count is the
- * honest measurement of how much of the table the clamp is eating: it belongs
- * next to README "The sweep" finding 1, which is the same clamp seen from the
- * volume side.
+ * must not be: a group gets at most MAX_SETS_PER_SESSION sets per movement it
+ * appears in, so a week with two chest slots tops out at twelve chest sets
+ * whatever colour chest is, and for anybody already asking for twelve every
+ * tier lands there. That is the split talking and `volumeNotes.frequencyCapped`
+ * says so on the plan itself.
+ *
+ * So the four-way ladder is COUNTED rather than asserted, and printed in the
+ * report. It was 4.3% of reachable cells before the week stopped being decided
+ * one rounded session at a time (2026-09-18) and 63.8% after, measured over
+ * 1,424 goal x days x group cells at day one. A number that falls is the
+ * regression this block exists to catch.
  *
  * And the whole-body case, which is the one somebody will tap on the first day:
  * every group at one level is not a focus, and the plan has to say so in words
@@ -613,6 +618,9 @@ function out_requested(out) {
 const TIER_LADDER = [
   { id: "green", tier: 1 }, { id: "yellow", tier: 2 }, { id: "red", tier: 3 },
 ];
+/* How many of the cells the four colours could move, and how many they moved
+   four different ways. Printed in the report below. */
+let ladderCells = 0, ladderFourWay = 0;
 for (const goal of GOALS) {
   for (const days of [3, 5]) {
     for (const focusCase of focusAsks) {
@@ -631,6 +639,10 @@ for (const goal of GOALS) {
       const setsOf = (out, g) => out.plan?.weeklyVolume?.[g]?.sets ?? 0;
       for (const g of focusCase.groups) {
         const ladder = runs.map((r) => setsOf(r.out, g));
+        if (ladder.some((s) => s > 0)) {
+          ladderCells++;
+          if (new Set(ladder).size === 4) ladderFourWay++;
+        }
         for (let i = 1; i < ladder.length; i++) {
           if (ladder[i] < ladder[i - 1]) {
             fail("tier-not-monotone", input, `${g}: ${runs.map((r, j) => `${r.id}=${ladder[j]}`).join(" ")}`);
@@ -1537,6 +1549,8 @@ console.log(`  goal selections   ${GOALS.length} (${new Set(GOALS.map((g) => g.g
     + `every child plus every bubble default)`);
 console.log(`  threw             ${threw}`);
 console.log(`  ledger rows       ${ratios.length}`);
+console.log(`  focus ladder      ${ladderFourWay}/${ladderCells} cells gave four distinct weekly totals `
+  + `(${ladderCells ? (100 * ladderFourWay / ladderCells).toFixed(1) : "0.0"}%), the rest are named by frequencyCapped`);
 console.log("");
 
 console.log("FAILS");

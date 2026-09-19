@@ -3927,3 +3927,243 @@ test("meta says what the age did, including the part that is not wired up yet", 
   assert.equal(blank.meta.age.warmupCaution, 0);
 });
 
+/* ---------------------------------------------------------------- *
+ * How much work a person gets: the four things that must hold
+ * ---------------------------------------------------------------- *
+ * Added 2026-09-18 with the change that made the body map's four colours mean
+ * four different weeks. Each of these is a claim the engine now makes to a
+ * person, and a claim nobody was checking.
+ */
+
+/* Straight off knowledge/principles/volume-landmarks.md rather than out of
+   plan.mjs, on purpose. A ceiling checked against the constant that produced it
+   only proves the constant was used; this checks it against the research, so the
+   test still fails if somebody edits the table in plan.mjs to make a week fit.
+   Traps and forearms have no row in that file and are not checked here. */
+const LANDMARK_MRV = {
+  chest: 22, lats: 25, shoulders: 24, quads: 20, hamstrings: 18,
+  glutes: 18, biceps: 22, triceps: 20, calves: 22, abs: 20, obliques: 20,
+};
+
+const VOLUME_TODAY = new Date("2026-09-18T12:00:00Z");
+const DAY_MS = 86400000;
+const isoDay = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+/* A person who trains `perWeek` times a week for `weeks` weeks and logs it.
+   Real exercise names, because training-age.mjs groups by them. */
+function trainingHistory(weeks, perWeek, today = VOLUME_TODAY) {
+  const names = ["Barbell Bench Press", "Barbell Back Squat", "Barbell Row", "Overhead Press"];
+  const rows = [];
+  for (let w = weeks; w >= 1; w--) {
+    for (let s = 0; s < perWeek; s++) {
+      const date = isoDay(new Date(today.getTime() - (w * 7 - s) * DAY_MS));
+      for (const n of names) rows.push({ entry_date: date, exercise_name: n, sets: 3, reps: 8, weight: 100 + 2 * (weeks - w) });
+    }
+  }
+  return rows;
+}
+
+test("no week goes over MRV for any muscle, whatever is asked of it", () => {
+  /* The one ceiling that is protecting somebody rather than tidying a number.
+     Swept against the loudest inputs there are: every tier on every group, the
+     longest history the dial reads, and the day counts that train a group most
+     often. */
+  const goals = ["build-muscle", "get-stronger", "lose-weight", "tone-up"];
+  const history = trainingHistory(52, 5);
+  let checked = 0;
+  for (const goal_bubble of goals) {
+    for (const challenge_target of [3, 4, 5]) {
+      for (const group of Object.keys(LANDMARK_MRV)) {
+        for (const tier of [3, 2, 1]) {
+          const out = generateFromPayload({
+            goal_bubble, challenge_target, current_weight: 180, sex: "Male",
+            logs: history, focus_groups: [`${group}:${tier}`],
+          }, { today: VOLUME_TODAY, includePlan: true });
+          for (const [g, row] of Object.entries(out.plan.weeklyVolume)) {
+            if (LANDMARK_MRV[g] == null) continue;
+            checked++;
+            assert.ok(row.sets <= LANDMARK_MRV[g],
+              `${goal_bubble} ${challenge_target}d ${group}:${tier} put ${g} at ${row.sets} sets, past its MRV of ${LANDMARK_MRV[g]}`);
+          }
+        }
+      }
+    }
+  }
+  assert.ok(checked > 1000, `only ${checked} group weeks checked`);
+});
+
+test("none, light, medium and heavy are four different weeks", () => {
+  /* A tier that changes nothing is a lie told by a control.
+   *
+     Before this change the four runs came back with four distinct weekly totals
+     in 4.3% of the 1,424 reachable goal x days x group cells, because the week
+     was decided one session at a time and rounded: three chest slots can only
+     deliver 6, 9, 12 or 15 sets, so 6.8, 8.2, 9.5 and 11.9 were answered 6, 9, 9
+     and 12. The week is decided first now and it is 63.8% on the same sweep.
+   *
+     The rest is the split and not the arithmetic, and the two have to be told
+     apart or this test is measuring the slot table. A group gets at most
+     MAX_SETS_PER_SESSION sets per movement it appears in, so a week with two
+     chest slots tops out at twelve chest sets whatever colour chest is, and for
+     somebody far enough along the dial to be asking for twelve already, every
+     tier lands there. That ceiling is real (the answer is another chest slot,
+     which is a change to what a day is made of) so this asserts the honest
+     contract instead: EITHER the colour changes the week, OR the plan says why
+     it could not. The second half is checked below and has no exceptions. */
+  const cases = [];
+  for (const goal_bubble of ["build-muscle", "lose-weight", "get-stronger", "tone-up"]) {
+    for (const challenge_target of [3, 4, 5]) {
+      for (const group of ["chest", "lats", "quads", "abs", "hamstrings", "shoulders"]) {
+        cases.push({ goal_bubble, challenge_target, group });
+      }
+    }
+  }
+  const ladderFor = (c, logs) => [null, [`${c.group}:1`], [`${c.group}:2`], [`${c.group}:3`]].map((focus_groups) =>
+    generateFromPayload({
+      goal_bubble: c.goal_bubble, challenge_target: c.challenge_target,
+      current_weight: 180, sex: "Male", logs, focus_groups,
+    }, { today: VOLUME_TODAY, includePlan: true }));
+
+  let reachable = 0, four = 0;
+  const collapsed = [];
+  for (const c of cases) {
+    const runs = ladderFor(c, []);
+    const ladder = runs.map((out) => out.plan.weeklyVolume[c.group]?.sets ?? 0);
+    if (ladder.every((s) => s === 0)) continue;
+    reachable++;
+    /* Monotone is absolute: a heavier colour can never buy fewer sets. */
+    for (let i = 1; i < ladder.length; i++) {
+      assert.ok(ladder[i] >= ladder[i - 1],
+        `${c.goal_bubble} ${c.challenge_target}d ${c.group}: ${ladder.join(" -> ")} goes backwards`);
+    }
+    if (new Set(ladder).size === 4) four++;
+    else collapsed.push(`${c.goal_bubble} ${c.challenge_target}d ${c.group}: ${ladder.join("/")}`);
+  }
+  const share = four / reachable;
+  assert.ok(share >= 0.6,
+    `only ${(100 * share).toFixed(1)}% of ${reachable} cells gave four distinct weekly totals:\n  ${collapsed.join("\n  ")}`);
+});
+
+test("a colour that bought nothing is a colour the plan explains", () => {
+  /* The other half of the ladder, and the half that has to hold everywhere
+     rather than most of the time. Swept over day one and over somebody a year
+     in at five days a week, which is where the ceiling binds hardest: red buys
+     nothing on 337 of the trained cells there, and `volumeNotes.frequencyCapped`
+     names every one of them. Nothing is allowed to be silently inert. */
+  const groups = ["chest", "lats", "quads", "abs", "hamstrings", "shoulders", "biceps", "triceps", "calves", "glutes"];
+  let inert = 0;
+  for (const logs of [[], trainingHistory(52, 5)]) {
+    for (const goal_bubble of ["build-muscle", "lose-weight", "get-stronger"]) {
+      for (const challenge_target of [3, 4, 5]) {
+        for (const group of groups) {
+          const at = (focus_groups) => generateFromPayload({
+            goal_bubble, challenge_target, current_weight: 180, sex: "Male", logs, focus_groups,
+          }, { today: VOLUME_TODAY, includePlan: true }).plan;
+          const none = at(null), red = at([`${group}:3`]);
+          const before = none.weeklyVolume[group]?.sets ?? 0;
+          const after = red.weeklyVolume[group]?.sets ?? 0;
+          if (after !== before) continue;
+          const where = `${goal_bubble} ${challenge_target}d ${group}`;
+          if (after === 0) {
+            assert.ok((red.volumeNotes.focusUntrained || []).some((u) => u.group === group),
+              `${where}: red trains it nowhere and nothing says so`);
+            continue;
+          }
+          inert++;
+          const row = red.weeklyVolume[group];
+          const capped = (red.volumeNotes.frequencyCapped || []).some((f) => f.group === group);
+          assert.ok(capped || row.sets >= row.target,
+            `${where}: red bought nothing, the week is not at its ceiling (${row.sets} of ${row.target}) and no note says why`);
+        }
+      }
+    }
+  }
+  assert.ok(inert > 0, "nothing was inert at all, which means this test stopped testing anything");
+});
+
+test("a focus the split cannot train says so instead of doing nothing quietly", () => {
+  /* Lower back is the honest failure here and it is not a volume one. No slot in
+     SLOTS names `lowerback`, so no multiplier can reach it: marking it red adds
+     nothing, and it added nothing silently, which is the part that was fixable
+     without redesigning what a day is made of. The library has a whole lowerback
+     category and twenty movements with it as the primary, so the week that
+     trains it is a week with a slot for it, and that is a change to the split
+     rather than to the ledger. Written down here so it stays a known gap rather
+     than becoming a surprise.
+
+     If somebody gives lower back a slot, this test goes red on the first line
+     and that is the signal to delete it. */
+  const out = generateFromPayload({
+    goal_bubble: "build-muscle", challenge_target: 3, current_weight: 180, sex: "Male",
+    logs: [], focus_groups: ["lowerback:3"],
+  }, { today: VOLUME_TODAY, includePlan: true });
+  assert.equal(out.plan.weeklyVolume.lowerback, undefined, "lower back now has a slot; delete this test and check the ladder instead");
+  const untrained = out.plan.volumeNotes.focusUntrained;
+  assert.ok(untrained.some((u) => u.group === "lowerback" && u.asked), JSON.stringify(untrained));
+  assert.ok(out.plan.dayNotes.some((n) => n.includes("lowerback") && n.includes("bought nothing")),
+    out.plan.dayNotes.join(" | "));
+
+  /* And the same sentence for the ordinary version of it: biceps on a three day
+     week, which is three full body days and has no isolation slot at all. */
+  const arms = generateFromPayload({
+    goal_bubble: "build-muscle", challenge_target: 3, current_weight: 180, sex: "Male",
+    logs: [], focus_groups: ["biceps:3"],
+  }, { today: VOLUME_TODAY, includePlan: true });
+  assert.ok(arms.plan.dayNotes.some((n) => n.includes("biceps") && n.includes("bought nothing")),
+    arms.plan.dayNotes.join(" | "));
+});
+
+test("a person who keeps turning up never gets a smaller week for it", () => {
+  /* research/09: the first two weeks decide whether anybody is still here in
+     twelve, and the engine used to spend them taking the plan apart.
+     `observedCapacity` divided sessions by a flat six weeks whether or not the
+     person had existed for six, so eight perfect sessions in a fortnight read as
+     1.3 a week, plan.mjs read that as a capacity under the days they asked for,
+     and three of the four days went short. Traced week by week the sets went 76,
+     76, 52, 69, 81, 87 before settling: a 32% cut in week three, handed to
+     somebody who had missed nothing.
+
+     The window runs over the stretch they have actually been training now, so
+     this asserts the thing the trace was showing: while somebody is turning up,
+     the week never shrinks. */
+  const perWeek = 4;
+  const logs = [];
+  const start = new Date("2026-06-01T12:00:00Z");
+  const names = ["Barbell Bench Press", "Barbell Back Squat", "Barbell Row", "Overhead Press"];
+  const totals = [];
+  for (let w = 0; w < 12; w++) {
+    const today = new Date(start.getTime() + w * 7 * DAY_MS);
+    const out = generateFromPayload({
+      goal_bubble: "build-muscle", challenge_target: perWeek,
+      current_weight: 180, sex: "Male", logs,
+    }, { today, includePlan: true });
+    totals.push(out.plan.week.reduce((n, d) => n + d.exercises.reduce((m, e) => m + e.sets, 0), 0));
+    for (let s = 0; s < perWeek; s++) {
+      const date = isoDay(new Date(today.getTime() + s * DAY_MS));
+      for (const n of names) logs.push({ entry_date: date, exercise_name: n, sets: 3, reps: 8, weight: 100 + 5 * w });
+    }
+  }
+  for (let w = 1; w < totals.length; w++) {
+    assert.ok(totals[w] >= totals[w - 1],
+      `week ${w + 1} gave ${totals[w]} sets against week ${w}'s ${totals[w - 1]}: ${totals.join(", ")}`);
+  }
+  /* And it goes up, rather than merely not going down. */
+  assert.ok(totals[11] > totals[0] * 1.2, `twelve weeks of perfect attendance moved ${totals[0]} to ${totals[11]}`);
+});
+
+test("the capacity read is the rhythm they are actually keeping", () => {
+  /* The unit under the test above. Eight sessions in a fortnight is four a week.
+     Eight sessions in a fortnight and then three weeks of nothing is not, and
+     the window runs to today rather than to the last session so that it says so:
+     a lapse has to be visible or the number is only flattering. */
+  const today = new Date("2026-09-18T12:00:00Z");
+  const keen = deriveTrainingAge({ logs: trainingHistory(2, 4, today), today });
+  assert.equal(keen.sessionsPerWeek, 4, `${keen.sessionsPerWeek} a week off eight sessions in a fortnight`);
+  assert.equal(observedCapacity(keen), 4);
+
+  const lapsed = deriveTrainingAge({
+    logs: trainingHistory(2, 4, new Date(today.getTime() - 21 * DAY_MS)),
+    today,
+  });
+  assert.ok(lapsed.sessionsPerWeek < 2, `a three week gap still read as ${lapsed.sessionsPerWeek} a week`);
+  assert.ok(lapsed.sessionsPerWeek > 1, `and it is not zero either: ${lapsed.sessionsPerWeek}`);
+});
