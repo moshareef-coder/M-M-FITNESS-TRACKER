@@ -101,7 +101,7 @@ inside it are dropped in silence.
   honest: "Six weeks is enough for about twelve pounds, and here is the plan for twelve.",  // or null
   notes: [                              // new. Every sentence the plan said about itself, in the order it said them; [] when it said nothing
     "You asked for 6 days. This goal tops out at 5: more sessions than that and the recovery between them is what gives, so the week is 5.",
-    "Machine Shoulder Press is still in this week. The library has nothing else that fills that slot, so go light, stop if it hurts, and swap it out if it does not settle."
+    "Most of what loads a bad shoulder is out. Machine Shoulder Press is still in because nothing else fills that slot: go light, stop if it hurts, swap it out if it does not settle."
   ],
   meta: { ... }
 }

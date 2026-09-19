@@ -25,7 +25,7 @@ import { calibrate } from "./calibrate.mjs";
 import { learnPreferences, applyPreferences, avoidNote, openWeekBudget, heldBackNote, actedOn } from "./preferences.mjs";
 import { scoreAlternatives } from "./alternatives.mjs";
 import { planPlateauResponse, applyRotateFallback, repShiftFor } from "./plateau-response.mjs";
-import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary, softenedNote } from "./limits.mjs";
+import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary } from "./limits.mjs";
 import { mainGroupsForDay } from "./recovery.mjs";
 import { TIER_MULTIPLIER, TIERS } from "./focus.mjs";
 import { mobilityFor, COOLDOWN_SECONDS, WARMUP_SECONDS, RAMPED_WARMUP_SECONDS } from "./mobility.mjs";
@@ -878,10 +878,20 @@ const LOWERBACK_DAYS = new Set(["fullBody", "legs", "lower"]);
    three things read the template (selection, the preference budget's slot
    count, and the day's `allPatterns`) and a conditional slot two of them cannot
    see is a slot that would quietly exist in one of them and not the others. */
-function templateFor(key, { lowerBack = false } = {}) {
-  const all = SLOTS[key];
+function templateFor(key, { lowerBack = false, ankle = false } = {}) {
+  /* The calf slot goes when the ankle is named, and it is the one slot that
+     can go. Every calf movement in the library loads the ankle (joint-load.mjs
+     says so out loud), so for a bad ankle the slot could only ever be filled
+     with the least bad of six movements they should not be doing. Measured
+     2026-09-19: a bad ankle changed nothing in the week, because both calf
+     raises stayed. Calves are an isolation accessory a leg day can lose
+     without the day stopping being a leg day, which is not true of any other
+     slot, and the slot is dropped rather than refilled because the day already
+     has its hinge and its glute work. limits.mjs says so in the ankle line. */
+  const all = ankle ? SLOTS[key].filter((s) => !isCalfSlot(s)) : SLOTS[key];
   return lowerBack && LOWERBACK_DAYS.has(key) ? [...all, LOWERBACK_SLOT] : all;
 }
+const isCalfSlot = (s) => s.pattern === "isolation" && s.groups.length === 1 && s.groups[0] === "calves";
 
 /* Names, because "there is no Push day or Legs, just a list" is complaint 4.
    Exported so the one day case can be tested at all: every goal in the tree has
@@ -994,7 +1004,7 @@ const loadPenalty = (ex) => LOAD_PENALTY[ex.equipment] ?? 1;
  * What is gone is the ceiling: `(LEVEL_RANK[level] ?? 0) + (role === "main" ? 2 : 1)`,
  * a number on the person added to a number on the slot and compared against a
  * number on the movement. */
-function candidates({ groups, pattern, equipment, role = "accessory", earned = null, historyNames = [], preferences = null, prefBudget = null, exclude = null, emphasis = null, barred = null }) {
+function candidates({ groups, pattern, equipment, role = "accessory", earned = null, historyNames = [], preferences = null, prefBudget = null, exclude = null, emphasis = null, barred = null, hurtOut = null }) {
   const isEarned = (ex) => Boolean(earned && earned.has(ex.name.toLowerCase()));
   const match = (needPattern) => {
     const pool = [];
@@ -1064,7 +1074,30 @@ function candidates({ groups, pattern, equipment, role = "accessory", earned = n
      lift is still in the pool, which is how buildPlan knows the rotation was
      blocked and answers with the rep range instead. */
   const kept = exclude ? ranked.filter((e) => !exclude.has(e.name.toLowerCase())) : ranked;
-  const pool = kept.length ? kept : ranked;
+  /* When it was a joint they named that emptied the on-pattern pool, the same
+     group off pattern is tried before the movement they said hurts comes back.
+     The lunge slot is the case: it wants glutes through a lunge, every lunge
+     in the library loads the knee and the hip, and until 2026-09-19 a bad
+     knee got Step-Up anyway while Glute Bridge, Hip Thrust and Cable Kickback
+     sat one pattern over. That is the "bridges and hip work" the knee line in
+     limits.mjs had been promising all along. `hurtOut` is the joint half of
+     `exclude` on its own, because a rotated or avoided lift must NOT take this
+     road: plateau-response.mjs reads a rotated lift coming back as "rotation
+     blocked" and answers with a rep range change, and an off-pattern stand-in
+     would silently eat that answer.
+
+     Accessory slots only. A main slot is the day's reason to exist, and the
+     sweep showed what letting it wander costs: with every joint named and no
+     equipment, both pull slots on a five day split reached for Inverted Row,
+     the second lost it to the first, and the day came back with two
+     exercises, under the floor the app is allowed to hand back. A main slot
+     keeps its softened on-pattern pick and the sentence in limits.mjs, which
+     says nothing else fills that slot, stays true of it. */
+  let pool = kept;
+  if (!pool.length && hurtOut && role !== "main" && exact.length && ranked.some((e) => hurtOut.has(e.name.toLowerCase()))) {
+    pool = match(false).filter((e) => !exclude.has(e.name.toLowerCase()));
+  }
+  if (!pool.length) pool = ranked;
   /* research/07: what they swap away from and what they stop logging is a
      stronger signal than anything they could tell us. It is applied here, on
      the ranked pool, so a preference reorders the same candidates rather than
@@ -1253,8 +1286,8 @@ export function buildPlan({
   const limitsRun = applyLimits({ pool: libraryPool, limits: limitsUsed });
   const limitExcluded = limitsRun.excluded.filter((e) => e.excluded !== false);
   const limitOut = new Set(limitExcluded.map((e) => e.name.toLowerCase()));
-  const limitNotes = limitsSummary(limitsUsed);
-  for (const say of limitNotes) dayNotes.push(say);
+  /* The sentences about the limits are written after pass 3, once the week
+     exists, because which sentence a joint gets depends on what was kept. */
 
   const kitAllowed = allowedEquipment(limitsUsed);
   const kit = kitAllowed
@@ -1329,8 +1362,9 @@ export function buildPlan({
   const goalTiers = toTierMap(P.priority);
   const isPriority = (group) => tierFor(group) > 0;
 
-  /* The one slot in the table that is not always there. See LOWERBACK_SLOT. */
-  const slotOpts = { lowerBack: tierFor("lowerback") > 0 };
+  /* The one slot in the table that is not always there, and the one that is
+     sometimes taken away. See LOWERBACK_SLOT and templateFor. */
+  const slotOpts = { lowerBack: tierFor("lowerback") > 0, ankle: limitsUsed.hurts.includes("ankle") };
 
   const split = splitFor(days).slice(0, days);
   /* One lever, pulled once. A systemic volume cut is the same 0.85 that
@@ -1385,7 +1419,7 @@ export function buildPlan({
     let taken = 0;
     const picks = slots.map((slot) => {
       if (isShort && slot.role !== "main" && taken >= SHORT_DAY_MIN) return null;
-      const args = { ...slot, earned, equipment: kit, role: slot.role, historyNames, preferences, prefBudget, exclude: excludeOut, emphasis: P.emphasis };
+      const args = { ...slot, earned, equipment: kit, role: slot.role, historyNames, preferences, prefBudget, exclude: excludeOut, hurtOut: limitOut, emphasis: P.emphasis };
       const pool = candidates({ ...args, barred: goalBarred });
       if (!pool.length) {
         /* Empty for want of equipment is an old and quiet case, handled by
@@ -2443,12 +2477,16 @@ export function buildPlan({
 
   /* Same argument, for the limits. A slot the library could fill no other way
      kept a movement that still loads a joint they named, and the person has to
-     be told rather than left to find out under a bar. */
+     be told rather than left to find out under a bar. One sentence per joint,
+     and which sentence depends on this list: reassurance for a joint nothing
+     kept loads, the names and "go light, stop if it hurts" for the rest. The
+     two used to be printed independently, reassurance first, and contradicted
+     each other in every week with a bad knee. */
   const limitBlocked = [...new Set(
     week.flatMap((d) => d.exercises.map((e) => e.name)).filter((n) => limitOut.has(n.toLowerCase())),
   )];
-  const blockedSay = softenedNote(limitBlocked);
-  if (blockedSay) dayNotes.push(blockedSay);
+  const limitNotes = limitsSummary(limitsUsed, { blocked: limitBlocked });
+  for (const say of limitNotes) dayNotes.push(say);
 
   /* ---- pass 4: progression ---- */
   /* The plateau answer, spoken. A rotation the library could not afford becomes

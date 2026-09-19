@@ -34,6 +34,7 @@
  */
 import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
 import { MUSCLE_GROUPS } from "./focus.mjs";
+import { jointLoadFor } from "./joint-load.mjs";
 
 /* research/13, and the answer to "fifteen to thirty minutes?": no. ACSM says 5
    to 10 minutes; Li 2023 (network meta, 35 studies) puts the optimum for
@@ -142,8 +143,11 @@ const FREE_KIT = new Set(["none", "wall", "doorway", undefined, null, ""]);
 function eligible(entry, { hurts, bodyweightOnly }) {
   if (!entry || !entry.name) return false;
   /* A stretch that loads a joint they said hurts is the same mistake as a lift
-     that does, only slower. avoidIf is the library's own word on that. */
-  for (const j of entry.avoidIf || []) if (hurts.includes(j)) return false;
+     that does, only slower. avoidIf is the library's own word on that, and it
+     is on 30 of 57 rows; the other 27 were being read as "loads nothing",
+     which kept Squat to Stand, a full squat on every rep, in a bad knee's
+     warm-up. jointLoadFor unions the library's word with POSE_LOAD's. */
+  if (hurts.length && loadsHurt(entry, hurts)) return false;
   if (bodyweightOnly && !FREE_KIT.has(entry.equipment)) return false;
   /* Nothing tagged advanced, and nothing else is filtered.
    *
@@ -157,6 +161,9 @@ function eligible(entry, { hurts, bodyweightOnly }) {
    * every production user already got. */
   return (LEVEL_RANK[entry.level] ?? 0) <= LEVEL_RANK.intermediate;
 }
+
+const loadsHurt = (entry, hurts) =>
+  jointLoadFor(entry, { training: "stretching" }).joints.some((j) => hurts.includes(j));
 
 const toMove = (e) => ({
   name: e.name,
@@ -415,7 +422,7 @@ export function mobilityFor(day, { hurts = [], missing = [], goalChild = null, l
   }
   if (hurts.length) {
     const dropped = [...poolFor("dynamic"), ...poolFor("static"), ...poolFor("mobility")]
-      .filter((e) => (e.avoidIf || []).some((j) => hurts.includes(j))).length;
+      .filter((e) => loadsHurt(e, hurts)).length;
     if (dropped) why.push(`${dropped} stretch${dropped === 1 ? "" : "es"} left out for the ${hurts.join(", ")} they said hurts.`);
   }
 

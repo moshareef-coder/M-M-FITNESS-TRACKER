@@ -47,11 +47,14 @@
  * COVERAGE. Every exercise in weight-training.mjs and calisthenics.mjs is
  * tagged here explicitly, 159 rows across 146 distinct names (thirteen names
  * appear in both libraries and share one entry, which is correct: a Push-Up is
- * a Push-Up). Yoga and pilates are deliberately not tagged. They are low load
- * by nature, no pose in either file carries an external weight, and a pose by
- * pose pass belongs with somebody who knows the contraindications for each
- * one. Until that happens they default to [] rather than to a guess, and
- * `defaultJointLoad` is told which training a name came from so it can say so.
+ * a Push-Up). Yoga, pilates and stretching are tagged in POSE_LOAD, further
+ * down, with the same eight keys and the same bias. They were left untagged
+ * until 2026-09-19 on the argument that a pose carries no external weight,
+ * and a safety audit that day showed what that argument cost: a person who
+ * had ticked neck and lower back was handed Roll-Over, Jackknife, Wheel and
+ * Camel, because "low load" and "loads a bad neck" are different claims. A
+ * pose is bodyweight through a joint at end range, held, which is exactly
+ * what the rules above describe.
  *
  * Deno safe: no node: imports, no dependencies, no file reads.
  */
@@ -379,10 +382,290 @@ export const JOINT_LOAD = Object.freeze({
   "Human Flag": ["shoulder", "wrist", "elbow", "lowerback"],
 });
 
-/* Trainings whose exercises are deliberately untagged. See the header: low
-   load by nature, and a pose by pose pass is the follow up rather than a
-   guess dressed up as a decision. */
-const LOW_LOAD_TRAININGS = new Set(["yoga", "pilates"]);
+/* ---- the duration libraries: yoga, pilates and stretching --------------
+ *
+ * WRITTEN FROM SCRATCH, AS COACHING JUDGEMENT, same as the table above and
+ * with the same warning: not medical advice, a physio should review it, and
+ * the bias is towards leaving a pose out. The eight keys mean what the header
+ * says they mean. For a pose, "loaded" is bodyweight and the lever of the
+ * body, held for the forty five seconds a class gives it.
+ *
+ * Keyed by name across all three libraries, which is safe because the library
+ * test guarantees no stretch shares a name with anything else and the one
+ * pose two libraries share (Cat-Cow) is the same pose. Two names DO collide
+ * with the lifting table, "Plank" and "Side Plank", and mean different things
+ * there: the lifting Plank is the forearm hold and is tagged [], the Pilates
+ * front support is on the hands. That is why this is a second table and why
+ * jointLoadFor needs to be told which training a name came from.
+ *
+ * The stretching library carries its own `avoidIf` on 30 of its 57 rows and
+ * mobility.mjs has always honoured it. The 27 without one were being read as
+ * "loads nothing", which is how Squat to Stand, a deep squat on every rep,
+ * stayed in a bad knee's warm-up. Every stretching row is tagged here and the
+ * two lists are UNIONED by jointLoadFor: the library's word is never
+ * overruled, only added to. Where this table names a joint the library does
+ * not, the reasoning is in the comment. */
+export const POSE_LOAD = Object.freeze({
+  /* ---- yoga: standing --------------------------------------------------- */
+  "Mountain Pose": [],
+  /* A held partial squat. Shallower than a bodyweight squat and still the
+     knee doing the holding. */
+  "Chair Pose": ["knee"],
+  /* The front knee sits at ninety for the whole hold. The arms are overhead
+     but nothing is loading them, so the shoulder is not on this list. */
+  "Warrior I": ["knee"],
+  /* Same front knee, and the open stance puts the back hip at the end of its
+     external rotation. */
+  "Warrior II": ["knee", "hip"],
+  "Extended Side Angle": ["knee", "hip"],
+  /* Straight legs, so the knee is spared; the front hip is folded and
+     abducted to its end range. */
+  "Triangle Pose": ["hip"],
+  /* A one-leg hinge held level: the same movement as a single-leg Romanian
+     deadlift, without the dumbbell and with a much longer hold. */
+  "Warrior III": ["lowerback", "hip", "ankle"],
+  /* The hinge of Triangle with a spinal rotation on top of it. */
+  "Revolved Triangle": ["lowerback", "hip"],
+
+  /* ---- yoga: balance ---------------------------------------------------- */
+  /* Everything on one ankle for forty five seconds. */
+  "Tree Pose": ["ankle"],
+  /* A single leg bent and wrapped, which is knee flexion under bodyweight
+     with the joint twisted across the midline. */
+  "Eagle Pose": ["knee", "ankle"],
+  "Half Moon Pose": ["hip", "ankle"],
+  /* A standing backbend on one leg while pulling the other foot towards the
+     head: knee at end range under tension, lumbar in extension, shoulder
+     reaching behind. */
+  "Dancer's Pose": ["knee", "lowerback", "shoulder", "ankle"],
+  /* An arm balance. The whole body on two extended wrists, elbows bent and
+     loaded, shoulders taking the lean. The wrist rule of the header, exactly. */
+  "Crow Pose": ["wrist", "shoulder", "elbow"],
+
+  /* ---- yoga: core and twists -------------------------------------------- */
+  /* On the hands, so the wrist is loaded the way a push-up loads it. The
+     lifting library's Plank is the forearm version and is tagged []. */
+  "Plank Pose": ["wrist"],
+  /* One hand, so one wrist and one shoulder carry what two did. */
+  "Side Plank": ["wrist", "shoulder"],
+  /* The hip flexors holding both legs up against a long lever and the lumbar
+     spine holding the trunk: a V-Up with the head kept in line. */
+  "Boat Pose": ["lowerback", "hip"],
+  /* Chair Pose with the spine rotated under that load. */
+  "Revolved Chair Pose": ["knee", "lowerback"],
+  /* An arm balance with the legs over the arms. */
+  "Firefly Pose": ["wrist", "shoulder", "elbow"],
+
+  /* ---- yoga: backbends -------------------------------------------------- */
+  /* The gentle one, and close to the prone press-up a back is given as
+     treatment, so it stays. Depth is the difference between this and the
+     four below it. */
+  "Cobra Pose": [],
+  /* The yoga bridge rolls the shoulders under and puts the cervical spine in
+     flexion with bodyweight above it, which the lifting Glute Bridge does not. */
+  "Bridge Pose": ["neck"],
+  /* Deeper than Cobra, on straight arms, with the hips off the floor: the
+     lumbar spine takes the whole arc and the wrists take the upper body. */
+  "Upward-Facing Dog": ["lowerback", "wrist"],
+  /* A kneeling backbend to end range with the head dropped back. */
+  "Camel Pose": ["lowerback", "neck"],
+  /* The deepest backbend in the library, on the hands, head hanging. */
+  "Wheel Pose": ["lowerback", "neck", "shoulder", "wrist"],
+  /* Pigeon's hip and knee with a full backbend and a shoulder reaching back
+     overhead for the foot. */
+  "King Pigeon Pose": ["lowerback", "hip", "knee", "shoulder"],
+
+  /* ---- yoga: hip openers ------------------------------------------------ */
+  /* Bodyweight through extended wrists with the shoulders at full flexion
+     and loaded, which is the overhead rule of the header met by a pose. */
+  "Downward-Facing Dog": ["wrist", "shoulder"],
+  /* A standing fold is the trunk hanging off the lumbar spine at the end of
+     its flexion. The supine and seated versions of the same stretch are what
+     an irritated back is given instead. */
+  "Forward Fold": ["lowerback"],
+  /* The front knee at ninety and the back kneecap on the floor. */
+  "Low Lunge": ["knee", "hip"],
+  /* Seated, soles together, knees pressed down: the hip at the end of its
+     external rotation. */
+  "Butterfly Pose": ["hip"],
+  /* Deep external rotation of the front hip with the knee bent under the
+     body and the whole weight settling onto it. */
+  "Pigeon Pose": ["hip", "knee"],
+  "Lizard Pose": ["hip", "knee"],
+  "Splits (Hanumanasana)": ["hip", "knee"],
+
+  /* ---- yoga: restorative ------------------------------------------------ */
+  /* The rest pose, and still the knee folded past its end range with the
+     hips sitting on the heels. A sore knee is exactly the knee that cannot
+     get there. */
+  "Child's Pose": ["knee"],
+  /* Shared with Pilates. A neutral spine moving through a small range on all
+     fours, which is what a back is given. The wrists carry about half of
+     bodyweight and no lean, so they are left off, as on an incline push-up. */
+  "Cat-Cow": [],
+  "Corpse Pose (Savasana)": [],
+  /* Passive, supine and unresisted, which is not the loaded rotation the
+     lower back rule describes. */
+  "Reclined Twist": [],
+  "Legs-Up-the-Wall Pose": [],
+  "Reclined Bound Angle Pose": [],
+
+  /* ---- pilates: core ---------------------------------------------------- */
+  /* The head and shoulders held in flexion for a hundred beats while the
+     legs hang off the lumbar spine. The modification is head down, which
+     the table cannot express, so the whole move goes. */
+  "The Hundred": ["neck", "lowerback"],
+  /* The front support, on the hands. */
+  "Plank": ["wrist"],
+  "Double Leg Stretch": ["neck", "lowerback"],
+  "Single Leg Stretch": ["neck", "lowerback"],
+  /* Spinal flexion through its whole range against bodyweight, the mat
+     class's sit-up. */
+  "Roll-Up": ["lowerback", "neck"],
+  "Criss-Cross": ["neck", "lowerback"],
+  /* The V-Up. */
+  "Teaser": ["lowerback", "hip", "neck"],
+  /* The legs go over the head onto the shoulders and neck. */
+  "Jackknife": ["neck", "lowerback", "shoulder"],
+
+  /* ---- pilates: glutes and hips ----------------------------------------- */
+  "Bridge": [],
+  "Clamshell": [],
+  /* Supine, one leg drawing circles. The lumbar spine is meant to stay
+     pinned and the range is the person's to choose. */
+  "Leg Circles": [],
+  "Side-Lying Leg Lift": [],
+  "Side Kick Series": [],
+
+  /* ---- pilates: back and posture ---------------------------------------- */
+  /* "Cat-Cow" is shared with yoga and is tagged once, above. */
+  /* A seated fold over straight legs, the same flexion as Forward Fold. */
+  "Spine Stretch Forward": ["lowerback"],
+  /* Prone extension to end range, pressing up on the hands. */
+  "Swan": ["lowerback"],
+  /* Seated rotation with a fold on top of it. */
+  "Saw": ["lowerback"],
+  /* Superman, flutter kicking: lumbar extension held for the duration. */
+  "Swimming": ["lowerback"],
+
+  /* ---- pilates: full body ----------------------------------------------- */
+  "Shoulder Bridge": [],
+  /* Legs over the head onto the shoulders, then rolled back down one
+     vertebra at a time. */
+  "Roll-Over": ["neck", "lowerback"],
+  /* Roll-Over with the legs circling: lumbar rotation under load, then over
+     onto the neck. */
+  "Corkscrew": ["lowerback", "neck", "hip"],
+  /* Balanced on the shoulders and neck, holding one foot. */
+  "Control Balance": ["neck", "lowerback", "shoulder"],
+
+  /* ---- stretching: dynamic ---------------------------------------------- */
+  "Arm Circles": [],
+  "Shoulder Rolls": [],
+  "Cross-Body Arm Swings": [],
+  "Wall Slides": [],
+  "Elbow Circles": [],
+  "Wrist Circles": [],
+  /* Swinging rotation of the lumbar spine. The static side bend below is
+     slower and shorter and is left in. */
+  "Torso Twists": ["lowerback"],
+  /* The McKenzie press-up. What a back is given, not what it is kept from,
+     even though the static Sphinx hold beside it carries the library's own
+     lowerback tag: repeated and self-limited is a different thing from held. */
+  "Prone Press-Up": [],
+  "Pelvic Tilts": [],
+  /* A leg swung to the end of hip flexion and extension, with momentum. */
+  "Leg Swings": ["hip"],
+  "Lateral Leg Swings": ["hip"],
+  /* Controlled, to about ninety, no momentum. Stays. */
+  "Toy Soldier Kicks": [],
+  "Ankle Circles": [],
+  /* Library: knee, hip. A hand on the floor in a deep lunge adds the wrist. */
+  "World's Greatest Stretch": ["knee", "hip", "wrist"],
+  /* Library: knee. It is a lunge, and a lunge is knee, hip and ankle in the
+     lifting table. */
+  "Walking Lunge with Twist": ["knee", "hip", "ankle"],
+  /* A hinge drill with the spine held neutral against a wall. Given, not
+     kept from. */
+  "Wall Hip Hinge Drill": [],
+  /* Library: lowerback. It is also a full-depth squat on every rep, which is
+     the gap the safety audit found: a bad knee kept it. */
+  "Squat to Stand": ["knee", "hip", "lowerback"],
+  /* Library: ankle. */
+  "Knee-to-Wall Ankle Rock": ["ankle"],
+  "Band Pull-Apart": [],
+  /* Overhead pulling under load, with a band rather than a stack. The cable
+     version is tagged shoulder above and the band does not change the arc. */
+  "Straight-Arm Band Pulldown": ["shoulder"],
+  /* Prone and unloaded: the cuff and lower trap drill a physio hands out. */
+  "Prone Y Raise": [],
+  /* Library: wrist. A plank on the hands. */
+  "Scapular Push-Up": ["wrist"],
+  "Band Shoulder External Rotation": [],
+  /* Library: wrist. Deliberately loading it is the whole move. */
+  "Quadruped Wrist Rocks": ["wrist"],
+
+  /* ---- stretching: static ----------------------------------------------- */
+  "Doorway Pec Stretch": ["shoulder"],
+  "Cross-Body Shoulder Stretch": ["shoulder"],
+  /* Library: shoulder. The elbow is folded shut and pulled on. */
+  "Overhead Triceps Stretch": ["shoulder", "elbow"],
+  "Upper Trap Stretch": ["neck"],
+  "Thread the Needle Stretch": ["shoulder", "neck"],
+  /* Arms overhead on a bench, chest dropping through them: the shoulder at
+     the end of its flexion with the torso hanging off it. Kneeling with the
+     hips back is the same fold as Child's Pose for the knee. */
+  "Kneeling Lat Stretch": ["shoulder", "knee"],
+  "Biceps Wall Stretch": ["shoulder", "elbow"],
+  "Wrist Flexor Stretch": ["wrist"],
+  "Wrist Extensor Stretch": ["wrist"],
+  "Sphinx Stretch": ["lowerback"],
+  "Seated Spinal Twist": ["lowerback"],
+  "Standing Side Bend Stretch": [],
+  /* Supine and passive: the relief position, not the aggravating one. */
+  "Knees-to-Chest Stretch": [],
+  "Figure Four Stretch": ["hip"],
+  /* Library: knee, for the back kneecap on the floor. */
+  "Kneeling Hip Flexor Stretch": ["knee"],
+  "Couch Stretch": ["knee", "hip"],
+  "Frog Stretch": ["knee", "hip"],
+  /* Folding forward over a straight leg is the trunk hanging off the lumbar
+     spine at end range. The supine version below is the one a back keeps. */
+  "Standing Hamstring Stretch": ["lowerback"],
+  "Supine Hamstring Stretch": [],
+  /* Both calf stretches drive the ankle to the end of its dorsiflexion under
+     bodyweight, which is the library's own reason for tagging Knee-to-Wall
+     Ankle Rock, and a fresh sprain is the ankle that should not be there. */
+  "Standing Calf Stretch": ["ankle"],
+  "Bent-Knee Calf Stretch": ["ankle"],
+
+  /* ---- stretching: mobility --------------------------------------------- */
+  "90/90 Hip Switch": ["hip", "knee"],
+  "Half-Kneeling Hip Flexor Rock": ["knee"],
+  /* Library: knee, ankle. Sitting in the bottom of a squat is also the hip
+     folded well past ninety under bodyweight. */
+  "Deep Squat Hold": ["knee", "ankle", "hip"],
+  /* Library: knee, hip. A lateral lunge to full depth on one side puts that
+     ankle at the end of its range too. */
+  "Cossack Squat": ["knee", "hip", "ankle"],
+  /* Library: hip, knee. A single-leg hinge with rotation: add what the
+     single-leg Romanian deadlift carries. */
+  "Standing Hip Airplane": ["hip", "knee", "ankle", "lowerback"],
+  "Open Book Thoracic Rotation": [],
+  /* One hand on the floor while the other reaches, so one wrist carries the
+     upper body. */
+  "Quadruped Thoracic Rotation": ["wrist"],
+  "Foam Roller Thoracic Extension": ["lowerback"],
+  "Foam Roller Chest Opener": ["shoulder"],
+  "Chin Tucks": ["neck"],
+  /* Library: lowerback. The leg swinging across the body behind it is the
+     hip at the end of its extension and rotation. */
+  "Prone Scorpion Stretch": ["lowerback", "hip"],
+  "Standing Forward Hang": ["lowerback"],
+});
+
+/* The three libraries POSE_LOAD answers for. */
+const POSE_TRAININGS = new Set(["yoga", "pilates", "stretching"]);
 
 /* What a movement pattern loads when nobody has said. Conservative on
    purpose: a name that is not in the table is a name we have not thought
@@ -413,10 +696,13 @@ const GROUP_LOAD = {
 
 /* A conservative guess for anything not in the table, so nothing untagged
    slips through unprotected. `training` is the library id the name came from,
-   when the caller knows it: yoga and pilates come back empty rather than
-   guessed, per the header. */
+   when the caller knows it. A pose the table has not heard of has no pattern
+   to guess from, so it comes back with whatever the library itself says
+   (`avoidIf`, present on some stretching rows) and nothing more; the coverage
+   test in activity-session.test.mjs is what keeps that case from ever being
+   reached by a shipped library. */
 export function defaultJointLoad(exercise, { training = null } = {}) {
-  if (training && LOW_LOAD_TRAININGS.has(String(training).toLowerCase())) return [];
+  if (training && POSE_TRAININGS.has(String(training).toLowerCase())) return libraryAvoid(exercise);
   const out = [];
   const add = (list) => { for (const j of list) if (IS_JOINT.has(j) && !out.includes(j)) out.push(j); };
   add(PATTERN_LOAD[patternFor(exercise)] || []);
@@ -430,8 +716,26 @@ export function defaultJointLoad(exercise, { training = null } = {}) {
    fallback. */
 export function jointLoadFor(exercise, { table = JOINT_LOAD, training = null } = {}) {
   const name = exercise?.name || String(exercise || "");
+  /* A pose is answered from POSE_LOAD, never from the lifting table, because
+     two names live in both and mean different movements (see POSE_LOAD). The
+     library's own avoidIf rides along, unioned, so this file only ever adds a
+     joint to what the library said. */
+  if (training && POSE_TRAININGS.has(String(training).toLowerCase())) {
+    const hit = Object.prototype.hasOwnProperty.call(POSE_LOAD, name) ? POSE_LOAD[name] : null;
+    if (!hit) return { joints: libraryAvoid(exercise), explicit: false };
+    const joints = [...hit];
+    for (const j of libraryAvoid(exercise)) if (!joints.includes(j)) joints.push(j);
+    return { joints, explicit: true };
+  }
   const hit = Object.prototype.hasOwnProperty.call(table, name) ? table[name] : null;
   return hit
     ? { joints: hit, explicit: true }
     : { joints: defaultJointLoad(exercise, { training }), explicit: false };
+}
+
+/* What the library itself says a row loads, filtered to keys this file
+   knows. Only the stretching rows carry one today. */
+function libraryAvoid(exercise) {
+  const list = Array.isArray(exercise?.avoidIf) ? exercise.avoidIf : [];
+  return list.filter((j) => IS_JOINT.has(j));
 }

@@ -28,6 +28,7 @@ import { buildPlan } from "./plan.mjs";
 import { calibrate } from "./calibrate.mjs";
 import { learnPreferences } from "./preferences.mjs";
 import { jointLoadFor } from "./joint-load.mjs";
+import { BODY_AREAS } from "./limits.mjs";
 import { MUSCLE_GROUPS } from "./focus.mjs";
 import { buildMuscleIndex, muscleRecoveryStates } from "./recovery.mjs";
 import { readFileSync } from "node:fs";
@@ -226,11 +227,18 @@ const WARN = "warn";
    rather than in a comment somewhere. */
 const KNOWN_OPEN = new Map([]);
 
-const results = new Map();   // invariant -> { fail: [], warn: [], open: [], fails, warns, opens }
+const results = new Map();   // invariant -> { fail: [], warn: [], open: [], fails, warns, opens, runs }
 
+/* Events and reach are different numbers and the report prints both. An
+   event count alone hides how far a finding spreads: same-group-twice-in-day
+   was 15,496 events, which reads as a corner case until it is also 55% of
+   runs, and days-clamped was 3,524 events and 62% of runs. `runs` is the set
+   of distinct inputs an invariant fired on, keyed on the printed tag, which is
+   the same thing a reader would paste back to reproduce it. */
 function record(kind, invariant, input, detail) {
   let row = results.get(invariant);
-  if (!row) { row = { fail: [], warn: [], open: [], fails: 0, warns: 0, opens: 0 }; results.set(invariant, row); }
+  if (!row) { row = { fail: [], warn: [], open: [], fails: 0, warns: 0, opens: 0, runs: new Set() }; results.set(invariant, row); }
+  row.runs.add(JSON.stringify(input));
   if (kind === FAIL && KNOWN_OPEN.has(invariant)) { row.opens++; if (row.open.length < 5) row.open.push({ input, detail }); }
   else if (kind === FAIL) { row.fails++; if (row.fail.length < 5) row.fail.push({ input, detail }); }
   else { row.warns++; if (row.warn.length < 5) row.warn.push({ input, detail }); }
@@ -336,9 +344,12 @@ function checkOne(input, out) {
 }
 
 /* The week half, split out of `checkOne` so the blocks that drive `buildPlan`
-   directly can use it too. Those blocks exist because `plans` never reaches
-   buildPlan through the adapter, so a calibrated week cannot be produced from a
-   payload at all; see block G. Nothing in here reads `workout` or `meta`, which
+   directly can use it too. Those blocks drive it directly so they can hand it
+   a chosen history and a chosen set of completed plans and read the verdict
+   back without the adapter's own choices in between; the adapter has passed
+   `plans` through to `buildPlan` since 2026-09-12 (adapter.mjs, the `plans`
+   line in the buildPlan call), so calibration IS reachable from a payload and
+   block I checks that it is. Nothing in here reads `workout` or `meta`, which
    is why the split was possible without changing a single check. */
 function checkPlan(input, plan) {
   /* Not one of the named invariants, but it is the same claim one level down.
@@ -394,24 +405,13 @@ function checkPlan(input, plan) {
 
   /* ---- the limits, checked against the week and not against the intent ---- */
   const excluded = new Set((plan.limits?.excluded || []).map((n) => String(n).toLowerCase()));
-  const announced = new Set((plan.limits?.blocked || []).map((n) => String(n).toLowerCase()));
+  const blocked = (plan.limits?.blocked || []).map(String);
   const hurts = plan.limits?.applied?.hurts || [];
   const missing = plan.limits?.applied?.missing || [];
+  const notes = (plan.dayNotes || []).filter((n) => typeof n === "string");
   for (const d of plan.week) {
     for (const e of d.exercises) {
       const key = String(e.name).toLowerCase();
-      if (excluded.has(key)) {
-        /* Split in two, because they are not the same failure. A ruled-out
-           movement the plan also lists in `limits.blocked` was kept knowingly
-           and the person is told (plan.mjs softenedNote); one that is not
-           listed was prescribed with nobody saying anything. The second is the
-           one that can hurt somebody. */
-        /* Announced fallbacks are a design decision (plan.mjs: a hole in the
-           week is worse than one movement that is not ideal), and the invariant
-           that matters is the one below it, "silently". This counts them. */
-        warn("excluded-prescribed", input, `${e.name} on ${d.name}`);
-        if (!announced.has(key)) fail("excluded-prescribed-silently", input, `${e.name} on ${d.name}`);
-      }
       const entries = lookup(e.name);
       if (missing.includes("none") && entries.length) {
         /* A name clears this if ANY library row for it is bodyweight, because
@@ -419,15 +419,57 @@ function checkPlan(input, plan) {
         const kits = entries.map((x) => x.equipment || "bodyweight");
         if (!kits.includes("bodyweight")) fail("bodyweight-only", input, `${e.name} needs ${kits.join("/")}`);
       }
-      if (hurts.length && entries.length) {
-        /* Same rule for the same reason: flagged only when every row for the
-           name loads the joint, so an ambiguous name with a safe variant is not
-           counted against the engine. jointLoadFor is keyed by name, so for the
-           146 explicitly tagged movements the two are the same answer anyway. */
-        const bad = hurts.filter((j) => entries.every((x) => jointLoadFor(x, { training: x.training }).joints.includes(j)));
-        /* Same events as excluded-prescribed, same reasoning: counted, not failed,
-           because every one is in plan.limits.blocked with a note. */
-        if (bad.length) warn("hurt-joint-prescribed", input, `${e.name} loads ${bad.join("+")}`);
+      /* Flagged only when every row for the name loads the joint, so an
+         ambiguous name with a safe variant is not counted against the engine.
+         jointLoadFor is keyed by name, so for the 146 explicitly tagged lifting
+         movements the rows agree anyway. Counted, not failed: a kept movement
+         that loads a named joint is a design decision (plan.mjs: a hole in the
+         week is worse than one movement that is not ideal) and the FAILs below
+         are about whether the person is TOLD.
+
+         This used to be printed twice, as `excluded-prescribed` off the plan's
+         own excluded list and as `hurt-joint-prescribed` off this file's
+         independent lookup, and across 26,460 runs no run ever had one without
+         the other. One warning now, and the two lists agreeing is a FAIL
+         instead, which is what a second count of the same event was really
+         asserting. */
+      const bad = hurts.length && entries.length
+        ? hurts.filter((j) => entries.every((x) => jointLoadFor(x, { training: x.training }).joints.includes(j)))
+        : [];
+      if (bad.length) warn("hurt-joint-prescribed", input, `${e.name} on ${d.name} loads ${bad.join("+")}`);
+      if (hurts.length && entries.length && excluded.has(key) !== bad.length > 0) {
+        fail("excluded-list-disagrees", input, `${e.name}: plan.limits.excluded says ${excluded.has(key)}, the joint table says ${bad.join("+") || "nothing"}`);
+      }
+    }
+  }
+  /* The invariant that matters: every movement the plan kept against a named
+     joint is NAMED in a sentence the person will read. The old check here,
+     "in the week, in excluded, not in blocked", could never fail: plan.mjs
+     defines blocked as exactly (week and excluded), so it was the engine
+     agreeing with itself. This parses the sentence limits.mjs writes instead,
+     the same way a person reads it. */
+  const named = new Set();
+  for (const n of notes) {
+    const m = /^Most of what loads a bad [a-z ]+ is out\. (.+?) (?:is|are) still in because nothing else fills/.exec(n);
+    if (!m) continue;
+    for (const part of m[1].split(/, | and /)) named.add(part.trim().toLowerCase());
+  }
+  for (const b of blocked) {
+    if (!named.has(b.toLowerCase())) fail("blocked-not-in-note", input, `${b} is kept against a named joint and no sentence names it`);
+  }
+  /* And the reassurance line may not be printed over a week that contradicts
+     it. This was true in 44% of limited weeks on 2026-09-19 and in no week
+     with a bad knee. */
+  for (const j of hurts) {
+    const label = (BODY_AREAS.find((a) => a.key === j)?.label || j).toLowerCase();
+    const reassured = notes.some((n) => n.startsWith(`Nothing that loads a bad ${label}`));
+    if (!reassured) continue;
+    for (const d of plan.week) {
+      for (const e of d.exercises) {
+        const entries = lookup(e.name);
+        if (entries.length && entries.every((x) => jointLoadFor(x, { training: x.training }).joints.includes(j))) {
+          fail("limit-note-contradicts-week", input, `"Nothing that loads a bad ${label}" over ${e.name} on ${d.name}`);
+        }
       }
     }
   }
@@ -844,10 +886,13 @@ for (let i = 0; i < blockA.length; i += 12) {
  * These four blocks point it at them. Two things make them different in kind
  * from blocks A to E:
  *
- * 1. They call `buildPlan` directly rather than `generateFromPayload`. Not a
- *    shortcut: `adapter.mjs` passes `payload.plans` to `nextDayIndex` and never
- *    to `buildPlan`, so a calibrated week cannot be produced from a payload at
- *    all. Block I asserts exactly that and it is in KNOWN_OPEN above.
+ * 1. They call `buildPlan` directly rather than `generateFromPayload`, so a
+ *    block can hand the engine a chosen history and a chosen set of completed
+ *    plans and read the verdict back with nothing in between. It is not the
+ *    only road: the adapter has passed `payload.plans` through to `buildPlan`
+ *    since 2026-09-12, so a payload reaches calibration too, and block I
+ *    asserts that it does (it used to assert the opposite, from KNOWN_OPEN,
+ *    when the adapter dropped the argument).
  * 2. Block F runs a SEQUENCE. Every other block asks what the engine says
  *    today; the question that hid three bugs is what it says on week eight when
  *    you did everything it asked, and only a replay can ask it.
@@ -1597,7 +1642,7 @@ console.log("");
 console.log("ENGINE SWEEP");
 console.log(`  runs              ${runs + builds}`);
 console.log(`    payload         ${runs} through generateFromPayload`);
-console.log(`    direct          ${builds} through buildPlan, which is the only way to reach calibration`);
+console.log(`    direct          ${builds} through buildPlan, with a chosen history and completed plans`);
 console.log(`  goal selections   ${GOALS.length} (${new Set(GOALS.map((g) => g.goal_bubble)).size} bubbles from the research tree and the picker, `
     + `every child plus every bubble default)`);
 console.log(`  threw             ${threw}`);
@@ -1606,10 +1651,15 @@ console.log(`  focus ladder      ${ladderFourWay}/${ladderCells} cells gave four
   + `(${ladderCells ? (100 * ladderFourWay / ladderCells).toFixed(1) : "0.0"}%), the rest are named by frequencyCapped`);
 console.log("");
 
+/* Events, then how many runs they touched and what share of the whole sweep
+   that is. See `record`. */
+const total = runs + builds;
+const reach = (r) => `${String(r.runs.size).padStart(7)}  ${pct(r.runs.size, total).padStart(6)}`;
 console.log("FAILS");
 if (!failing.length) console.log("  none");
+else console.log("   events     runs    rate  invariant");
 for (const [inv, r] of failing.sort((a, b) => b[1].fails - a[1].fails)) {
-  console.log(`  ${String(r.fails).padStart(7)}  ${inv}`);
+  console.log(`  ${String(r.fails).padStart(7)}  ${reach(r)}  ${inv}`);
 }
 console.log("");
 
@@ -1624,8 +1674,9 @@ console.log("");
 
 console.log("WARNS");
 if (!warning.length) console.log("  none");
+else console.log("   events     runs    rate  invariant");
 for (const [inv, r] of warning.sort((a, b) => b[1].warns - a[1].warns)) {
-  console.log(`  ${String(r.warns).padStart(7)}  ${inv}`);
+  console.log(`  ${String(r.warns).padStart(7)}  ${reach(r)}  ${inv}`);
 }
 console.log("");
 
