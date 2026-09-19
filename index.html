@@ -16245,6 +16245,19 @@ function closeRecap() { $("recapScrim").classList.add("hidden"); }
    CARDIO_SES.plan or .card in saveCardioSession alongside the minutes, plus
    whichever move the clock had reached when End was pressed. */
 
+/* PostgREST answers a write to a column that does not exist with PGRST204 and
+   names the column in the message ("Could not find the 'session' column of
+   'exercise_logs' in the schema cache"). Reading the name back out is what
+   lets a save drop exactly what the database is missing and keep the rest,
+   rather than guessing which of two pending columns was the problem. */
+function missingColumnName(error) {
+  if (!error) return null;
+  const msg = String(error.message || "");
+  if (String(error.code || "") !== "PGRST204" && !/column/i.test(msg)) return null;
+  const m = msg.match(/'([a-z_]+)' column/i) || msg.match(/column "([a-z_]+)"/i);
+  return m ? m[1] : null;
+}
+
 /* Minutes and a distance are arithmetic, so a pace is a fact about this row and
    not an estimate. Only where the activity has a distance at all. */
 function activityPace(l) {
@@ -16286,6 +16299,14 @@ function openActivityDetail(logId) {
   const when = [relDayLabel(l.entry_date), at && !isNaN(at)
     ? at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : null]
     .filter(Boolean).join(" · ");
+  /* What the session held, if the row kept it. Written by
+     activitySessionRecord since 2026-09-19 and null for everything before
+     that, and for a session somebody ran off the bare clock, which has no
+     list to keep. Parsed defensively because a jsonb column comes back as
+     whatever was put in it and this screen is not the place to find out. */
+  let held = null;
+  try { held = typeof l.session === "string" ? JSON.parse(l.session) : (l.session || null); }
+  catch (e) { held = null; }
 
   /* Only the numbers that are real. A distance column reading a dash on a yoga
      class is the sheet shrugging, which is exactly what the recap's own stat
@@ -16325,13 +16346,35 @@ function openActivityDetail(logId) {
 
     ${rows.map((row) => `<div class="rc-stats" style="grid-template-columns:repeat(${row.length},1fr);">${row.join("")}</div>`).join("")}
 
-    <div class="rc-ex-head"><h4>What was in it</h4></div>
-    <div class="ad-gap">
-      <p>Nothing, and that is the honest answer rather than an empty screen. Unio writes down the activity${l.distance_mi ? ", the minutes and the distance" : " and the minutes"} when you save a session, and has never written down anything else.</p>
+    <div class="rc-ex-head"><h4>What was in it</h4>${
+      held?.moves?.length && held.reached != null && held.reached < held.moves.length
+        ? `<span class="rc-head-miss">Got to ${held.reached} of ${held.moves.length}</span>` : ""}</div>
+    ${held?.moves?.length ? `<div class="rc-list">${held.moves.map((m, i) => {
+        /* Past whichever move the clock had reached is not "skipped", it is
+           "never got there", and it reads in the same red as a lift that was
+           never logged because it is the same fact: it was on the session and
+           it did not happen. */
+        const missed = held.reached != null && i >= held.reached;
+        return `<div class="rc-ex${missed ? " rc-ex-miss" : ""}">
+          <span class="rc-n">${i + 1}</span>
+          <span class="rc-ex-name">${escapeHtml(m.name)}${missed ? `<span class="rc-miss">NOT REACHED</span>` : ""}</span>
+          <span class="rc-ex-num2">${Math.round((m.sec || 0) * (m.perSide ? 2 : 1))}s</span>
+        </div>`;
+      }).join("")}</div>`
+      : held?.card ? `<div class="ad-gap">
+          <p><b>${escapeHtml(held.card.name || actTitle(act))}</b>${held.card.effort ? `, ${escapeHtml(String(held.card.effort).toLowerCase())}` : ""}.</p>
+          ${held.card.structure ? `<p>${escapeHtml(held.card.structure)}</p>` : ""}
+        </div>`
+      : `<div class="ad-gap">
+      ${/* Everything logged before 20260919_activity_session_content.sql, and
+            every session somebody started from the bare clock. Saying so is
+            the same habit as dayNotes and meta.missing: the app reports what
+            it cannot answer rather than drawing something it guessed. */ ""}
+      <p>Not recorded. Sessions saved before this was built kept the activity${l.distance_mi ? ", the minutes and the distance" : " and the minutes"} and nothing else, so there is nothing here to mark off.</p>
       <p>${act?.training
-        ? "So the class itself, which moves it held and how far through them you got, is gone: it is built when you start it and thrown away when you save it. Rebuilding it now would be a guess, so it is not drawn."
-        : "So how the session was paced, and whether you finished the one you set out to do, was never recorded, and there is nothing here to mark off."}</p>
-    </div>`;
+        ? "New classes keep their moves, so the next one will show what it held and how far through it you got."
+        : "A session started straight from the clock has no list to keep, only the time on it."}</p>
+    </div>`}`;
 
   $("adClose").onclick = closeActivityDetail;
   $("actDetailScrim").classList.remove("hidden");
@@ -21768,6 +21811,36 @@ function renderCardioStage() {
   };
 }
 
+/* What the session actually held, captured here because this is the last
+   moment it exists: CARDIO_SES is nulled and csnSave clears its localStorage
+   key moments after this row is written. Nothing can rebuild it afterwards,
+   and the near miss is the trap: buildGuidedPlan is deterministic and seeded
+   on the date, but it is keyed on TODAY's level and on the minutes ASKED for,
+   and the row keeps neither, so a replay would draw a class nobody did.
+   See 20260919_activity_session_content.sql for the column this fills.
+
+   `reached` is the move the clock had got to, which is the only completion
+   signal that exists at all: the live screen reads the current move out of
+   elapsed milliseconds and never ticks one off. So it supports "you got to
+   move 7 of 12" and not "you completed 7", and the recap says the first. */
+function activitySessionRecord(mins) {
+  const s = CARDIO_SES;
+  const plan = s?.plan, card = s?.card;
+  if (!plan && !card) return null;   // a bare clock, which is a real way to train
+  const moves = (plan?.moves || []).map((m) => ({
+    name: m.name, sec: m.seconds, ...(m.perSide ? { perSide: true } : {}),
+  }));
+  const at = moves.length ? csnMoveAt(csnElapsedMs()) : null;
+  return {
+    kind: s.act || null,
+    asked_min: Number(s.minutes) || Number(mins) || null,
+    ...(moves.length ? { moves, reached: at?.done ? moves.length : (at?.i ?? null) } : {}),
+    /* A cardio session is a prescription rather than a list of moves, so what
+       is worth keeping is which one and how hard. */
+    ...(card && !plan ? { card: { name: card.name, effort: card.effort, structure: card.structure } } : {}),
+  };
+}
+
 async function saveCardioSession(mins) {
   const a = csnAct();
   const raw = a.dist ? parseFloat($("csnMiles")?.value) : NaN;
@@ -21775,6 +21848,7 @@ async function saveCardioSession(mins) {
   const payload = {
     user_name: ME, email: MY_EMAIL, entry_date: CARDIO_SES?.date || todayStr(),
     exercise_name: a.label, sets: 1, duration_min: mins, distance_mi: miles,
+    session: activitySessionRecord(mins),
   };
   const btn = $("csnSave");
   if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
@@ -21782,14 +21856,20 @@ async function saveCardioSession(mins) {
   let ok = false;
   if (navigator.onLine) {
     let { error } = await sb.from("exercise_logs").insert(payload);
-    /* distance_mi is behind 20260916_cardio_distance.sql. The minutes are the
-       session; losing them over a column that is not there yet would be the
-       worst possible trade. */
-    if (error && (String(error.code || "") === "PGRST204" || /distance_mi/.test(String(error.message || "")))) {
-      const { distance_mi, ...noDistance } = payload;
-      const retry = await sb.from("exercise_logs").insert(noDistance);
+    /* distance_mi is behind 20260916_cardio_distance.sql and session is behind
+       20260919_activity_session_content.sql, so either can be absent on a
+       database that has not run them. The minutes ARE the session; losing them
+       over a column that is not there yet would be the worst possible trade.
+       So a missing column is dropped by name and the insert tried again, twice
+       at most because there are two of them and a third round would mean the
+       error is saying something else. */
+    for (let i = 0; i < 2 && error && missingColumnName(error); i++) {
+      const dropped = missingColumnName(error);
+      if (!(dropped in payload)) break;
+      delete payload[dropped];
+      const retry = await sb.from("exercise_logs").insert(payload);
       error = retry.error;
-      if (!error) toast("Saved. Distance is not switched on yet.");
+      if (!error && dropped === "distance_mi") toast("Saved. Distance is not switched on yet.");
     }
     ok = !error;
     if (error && !isRetryable(error)) {
