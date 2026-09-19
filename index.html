@@ -562,6 +562,25 @@
   .rcv-move-t { min-width: 0; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rcv-move-t span { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
 
+  /* The goal, and the one or two numbers it turns on. Deliberately smaller
+     than the figures in the cards below: this card points at them, it does not
+     say them again in the same size and start an argument about which is the
+     real one. They wrap at 390 rather than shrink. */
+  .rcv-goal-nums { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 11px; }
+  .rcv-goal-num {
+    display: flex; align-items: baseline; gap: 5px; min-width: 0;
+    background: var(--panel); border-radius: 11px; padding: 7px 10px;
+  }
+  .rcv-goal-num b {
+    font-family: var(--font-display); font-weight: 800; font-size: 17px; line-height: 1;
+    letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums;
+  }
+  .rcv-goal-num i { font-style: normal; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  /* His voice, so it is the text colour and not the muted grey the footnotes
+     use: these two lines are the reason the card exists. */
+  .rcv-goal-line { margin: 0; font-size: 13px; color: var(--text); line-height: 1.45; }
+  .rcv-goal-line + .rcv-goal-line { margin-top: 7px; }
+
   /* The honest reading of the week: one row per true thing, no bars. */
   .rcv-week { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
   .rcv-week li { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.4; color: var(--text); }
@@ -29927,11 +29946,29 @@ function ensureMobilityEngine() {
   return mobilityEnginePromise;
 }
 
-/* Three holds is the block, so the budget is what three of the library's
-   longer statics cost: they run 30 to 40 seconds and most are per side, which
-   moveSeconds doubles. Short enough to actually do standing in a gym. */
-const RECOVERY_STRETCH_SECONDS = 180;
-const RECOVERY_MAX_STRETCHES = 3;
+/* Five minutes, and it is a floor rather than a budget.
+
+   Mo, 2026-09-18: "All stretches should always be 5 minutes minimum." The
+   block used to be 180 seconds capped at three holds, which came back as two
+   minutes on a day that trained two muscle groups, and two minutes is the
+   length of something you tap past. Five is also where the evidence sits: the
+   2024 Sports Medicine meta-regression mobility.mjs cites has range of motion
+   gains plateau at about four minutes a session, and ACSM's five to ten
+   minutes is the range every other block in this app is built on, which is
+   why COOLDOWN_SECONDS is already 300.
+
+   The cap moves with it. Three holds cannot spend five minutes: the library's
+   statics run 25 to 45 seconds and most are per side, so a five minute block
+   is five to seven of them. Eight is the engine's own MAX_MOVES and the point
+   past which nobody holds anything long enough to matter. */
+const RECOVERY_STRETCH_SECONDS = 300;
+const RECOVERY_MAX_STRETCHES = 8;
+/* Ten for the block once the top up has been through it, which is the engine's
+   own MAX_MOBILITY_MOVES: the five minutes is the thing Mo asked for, and a
+   body with a short list of allowed moves (bodyweight only, three sore joints)
+   buys those minutes in thirty second pieces. It is still a stop, not a
+   target, so nothing can spin here if the library runs dry. */
+const RECOVERY_MAX_BLOCK_MOVES = 10;
 
 /* What today's training touched, biggest first. The same per-group volume the
    Body tab reads, so the stretches and the heat map can never disagree about
@@ -29955,21 +29992,61 @@ async function recoveryStretches(pick = null) {
   const kind = pick?.block || "static";
   const groups = pick ? (pick.groups || []) : recoveryGroupsToday();
   const lim = MY_PROFILE?.limits && typeof MY_PROFILE.limits === "object" ? MY_PROFILE.limits : {};
-  return mob.pickBlock({
+  const common = {
     kind,
-    groups,
-    budgetSec: RECOVERY_STRETCH_SECONDS,
     /* A hold that loads a joint they said hurts is the same mistake as a lift
        that does, and the library tags for it. Passed through rather than
        ignored, exactly as the session's own cool-down passes it. */
     hurts: Array.isArray(lim.hurts) ? lim.hurts : [],
     missing: Array.isArray(lim.missing) ? lim.missing : [],
     maxMoves: RECOVERY_MAX_STRETCHES,
-    /* Stop once what was trained is covered, the same rule the cool-down uses:
-       filling the last seconds means reaching for a muscle the day never
-       touched. With nothing trained there is nothing to cover, so it fills. */
-    stopAtCoverage: groups.length > 0,
+  };
+  /* Stop once what was trained is covered, the same rule the cool-down uses:
+     filling the last seconds out of the same pool means reaching for a muscle
+     the day never touched. A warm up does not stop there, because more
+     preparation for what is about to happen is still preparation, and that is
+     the engine's own rule (mobility.mjs: "A warm-up does keep filling"). This
+     used to stop the dynamic block at coverage too, which is why the prep for
+     a leg day came back at half the length of the block it is preparing. */
+  const aimed = mob.pickBlock({
+    ...common,
+    groups,
+    budgetSec: RECOVERY_STRETCH_SECONDS,
+    stopAtCoverage: kind === "static" && groups.length > 0,
   });
+  if (!aimed.length) return aimed;
+
+  /* Coverage is not five minutes. Two groups trained is two holds, and the
+     rule above is right to stop there: nothing else in the static pool covers
+     anything new. So the block is topped up out of the general pool rather
+     than coming in short, which is Mo's call on 2026-09-18, and the moves the
+     top up added are marked, so the screen can say so out loud instead of
+     passing three general holds off as work aimed at today.
+
+     One move at a time, because pickBlock's budget is a ceiling and what is
+     wanted here is a floor. Handing it the ninety seconds that are left makes
+     it skip every hold longer than ninety seconds and stop, which is how a
+     block that was meant to be five minutes came back at four. Asking for the
+     single best remaining move, and then asking again, cannot stop short
+     while the pool still has something eligible in it. */
+  const taken = new Set(aimed.map((m) => String(m.name).toLowerCase()));
+  const block = aimed.slice();
+  let spent = stretchBlockSeconds(aimed);
+  while (spent < RECOVERY_STRETCH_SECONDS && block.length < RECOVERY_MAX_BLOCK_MOVES) {
+    const [next] = mob.pickBlock({
+      ...common,
+      groups: [],
+      budgetSec: RECOVERY_STRETCH_SECONDS,
+      maxMoves: 1,
+      exclude: taken,
+      stopAtCoverage: false,
+    });
+    if (!next) break;   // the pool is out of moves this body is allowed
+    taken.add(String(next.name).toLowerCase());
+    block.push({ ...next, roundsOut: true });
+    spent += stretchBlockSeconds([next]);
+  }
+  return block;
 }
 
 /* ---- The numbers ----
@@ -30154,12 +30231,182 @@ function timeOfDay(now = new Date()) {
   return { key: "late", label: "Late night stretch", greet: "Still up." };
 }
 
+/* Small counts in words. "2 for what you trained" is not a sentence anybody
+   says out loud, and every line on this screen is written to be read aloud. */
+const COUNT_WORDS = ["none", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight"];
+function countWord(n) { return COUNT_WORDS[n] || String(n); }
+
 /* "Chest, shoulders and triceps", with the last comma left off the way a
    person says it out loud. */
 function listWords(words) {
   const list = (words || []).filter(Boolean);
   if (list.length <= 1) return list[0] || "";
   return `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`;
+}
+
+/* ---- The goal, said at the top ----
+
+   Mo, 2026-09-18: "Showcase the goal in the recovery section. In order for you
+   to reach this you need to do this, if it's weight or etc."
+
+   So the first card under his line names the goal this account is actually on
+   and says the one thing recovery has to do with reaching it. Per goal,
+   because "recovery matters" is true of all seven and useful for none of
+   them: a cut turns on calories and protein, a strength goal turns on sleep
+   and the day off, and somebody who wants to move better needs the block
+   below this and nothing else on the screen.
+
+   Every number is handed in, never worked out again here. `fuel` is the same
+   object the Eat and Drink cards print, `inARow` is the same count the sleep
+   card's week rows read, and the stretch minutes are written in by the block
+   itself once the engine answers. Two numbers for the same thing on one
+   screen is how an app loses the argument about whether either is true.
+
+   Nothing here claims a result. Every line says what the number supports,
+   which is the only thing the maths underneath can stand behind. */
+function recoveryGoalCard({ fuel, inARow, restDue, resting }) {
+  const tile = recoveryGoalTile();
+
+  /* Setup owns the body stats and the goal page owns the goal, so a card that
+     cannot fill a number points at whichever screen takes the answer. */
+  const statsLink = `<button type="button" class="wkt-btn-soft sm" data-rcv-setup="stats">Take me where I can tell you</button>`;
+  const goalLink = `<button type="button" class="wkt-btn-soft sm" data-rcv-setup="goal">Pick my goal</button>`;
+
+  /* Null is a number this profile cannot support yet, and it becomes the ask
+     at the bottom of the card rather than a blank or a guess. */
+  const NUM = {
+    calories: fuel.calories ? { v: fuel.calories.toLocaleString(), u: "cal a day" } : null,
+    protein: fuel.protein ? { v: fuel.protein, u: "g protein" } : null,
+    water: fuel.water ? { v: fuel.water, u: "oz of water" } : null,
+    sleep: { v: SLEEP_RANGE, u: "hrs sleep" },
+    inARow: { v: inARow, u: inARow === 1 ? "day in a row" : "days in a row" },
+    /* Written in by the holds once they land, because the picker is a lazy
+       import and this card is drawn before it answers. It opens on the floor
+       every block on this screen is built to (RECOVERY_STRETCH_SECONDS) and on
+       "a day", which is true whatever lands: five minutes daily is the whole
+       of Mo's note on this goal. When a block does land, the number and the
+       word both change to it, off the same arithmetic the button under the
+       holds prints. A day the robot offers yoga instead never has a block, so
+       it keeps the daily floor rather than quoting a length nothing measured. */
+    stretch: { v: `<span id="rcvGoalMin">${Math.round(RECOVERY_STRETCH_SECONDS / 60)}</span>`, u: `<span id="rcvGoalMinUnit">min a day</span>` },
+  };
+
+  /* The day off reading, in the same words the sleep card's week rows use and
+     off the same count, so the top of the screen and the bottom of it cannot
+     disagree about whether a rest day is owed. */
+  const dayOffLine = restDue
+    ? `That is ${inARow} days in a row. Take the day off on purpose and it costs you nothing.`
+    : resting
+      ? "Today is a rest day, and the rest day is the part that does the work."
+      : inARow > 0
+        ? `${inARow} day${inARow === 1 ? "" : "s"} in a row so far. I will tell you when a day off is due.`
+        : "Nothing logged today, so tonight is the whole job.";
+
+  const showUpLine = inARow > 0
+    ? `${inARow} day${inARow === 1 ? "" : "s"} in a row. That is the thing that works, and it is already happening.`
+    : resting
+      ? "Today is a rest day, and turning up to a rest day still counts."
+      : "Nothing logged today. One session starts the count.";
+
+  const PER_GOAL = {
+    "lose-weight": {
+      nums: [NUM.calories, NUM.protein],
+      lines: [
+        "Weight comes off when you eat under what you burn. That is the whole job, and it happens here, not in the gym.",
+        "Keep the protein high while you do it, so what comes off is fat and the muscle you are training for stays on.",
+      ],
+    },
+    /* The calorie number on this goal is maintenance, because the goal tile
+       claims "flat" and estimateGoalTimeline is never asked for a direction.
+       So the line says maintenance. Telling somebody to eat under what they
+       burn while the card below them prints what they burn is the screen
+       arguing with itself, and the number is the part that is checkable. */
+    "tone-lean-abs": {
+      nums: [NUM.calories, NUM.protein],
+      lines: [
+        "Same weight, different shape. Eat about what you burn and expect the scale to sit still, because it is going to.",
+        "Protein high every day is what decides which one you lose. Keep it there and what comes off is fat.",
+      ],
+    },
+    "build-muscle": {
+      nums: [NUM.protein, NUM.sleep],
+      lines: [
+        "Muscle is built between sessions, not during them. The session is the ask. This screen is the answer.",
+        "Hit the protein every day and sleep like it is part of the plan, because it is.",
+      ],
+    },
+    "get-stronger": {
+      nums: [NUM.sleep, NUM.inARow],
+      lines: [
+        "Strength is recovery. A tired lift is a weaker lift, and a weaker lift teaches your body nothing.",
+        dayOffLine,
+      ],
+    },
+    "build-endurance": {
+      nums: [NUM.water, NUM.inARow],
+      lines: [
+        "Easy days are the training. The engine gets built on the days that do not hurt.",
+        `Drink your number and keep the easy days easy. ${dayOffLine}`,
+      ],
+    },
+    "move-better": {
+      nums: [NUM.stretch],
+      lines: [
+        "Little and often beats one long one. A few minutes today does more than an hour on Sunday.",
+        "Your block is right under this one. Do it today, then do it again tomorrow.",
+      ],
+    },
+    consistent: {
+      nums: [NUM.inARow],
+      lines: [
+        "No goal picked yet, so the goal is showing up. Choose one when you are ready and I will aim the rest at it.",
+        showUpLine,
+      ],
+    },
+  };
+
+  /* No tile at all is a real account: goal_bubble is the modern field and the
+     legacy fallbacks in recoveryGoalTile can still come back empty. Saying so
+     and opening the goal page beats printing somebody else's goal. */
+  const plan = PER_GOAL[tile?.id] || {
+    nums: [NUM.inARow],
+    ask: "goal",
+    lines: [
+      "You have not told me a goal yet, so I will keep this simple. Turn up, eat, drink, sleep.",
+      showUpLine,
+    ],
+  };
+
+  /* Every value in a chip is a number this screen computed or a constant it
+     owns, so there is nothing here to escape, and NUM.stretch is markup on
+     purpose: the holds write into it. */
+  const chips = plan.nums.filter(Boolean)
+    .map((n) => `<span class="rcv-goal-num"><b>${n.v}</b><i>${n.u}</i></span>`).join("");
+  const short = plan.nums.some((n) => !n);
+
+  const ask = plan.ask === "goal"
+    ? `<div style="margin-top:12px;">${goalLink}</div>`
+    : short
+      ? (fuel.missing.length ? `
+        <p class="rcv-line" style="margin-top:10px;">${/* Not "about what you eat", which is the Eat card's line: the number
+                 missing here can just as easily be the water one. */ ""}I need ${escapeHtml(listWords(fuel.missing))} before I can put a number on that. Guessing it would be worse than asking you.</p>
+        <div style="margin-top:12px;">${statsLink}</div>`
+        : `${/* Nothing missing, the formula modules simply have not landed.
+                 renderRecoveryScreen schedules the repaint. */ ""}
+        <p class="rcv-line" style="margin-top:10px;">Working that one out. One moment.</p>`)
+      : "";
+
+  return `
+    <section class="rcv-card" id="rcvGoal">
+      <p class="wkt-eyebrow">Your goal</p>
+      <div class="rcv-head">
+        <span class="rcv-ico">${icon(tile?.ico || "info", 18)}</span>
+        <h3>${escapeHtml(tile?.title || "Not picked yet")}</h3>
+      </div>
+      ${chips ? `<div class="rcv-goal-nums">${chips}</div>` : ""}
+      ${plan.lines.map((l) => `<p class="rcv-goal-line">${escapeHtml(l)}</p>`).join("")}
+      ${ask}
+    </section>`;
 }
 
 function renderRecoveryScreen() {
@@ -30195,7 +30442,7 @@ function renderRecoveryScreen() {
   const activityWords = (MY_PROFILE?.activity_level || "Moderate").toLowerCase();
   /* Setup owns these four numbers (saveBodyStats), so the card that needs them
      points at the screen that takes them rather than guessing a body. */
-  const setupLink = `<button type="button" class="wkt-btn-soft sm" data-rcv-setup="1">Take me where I can tell you</button>`;
+  const setupLink = `<button type="button" class="wkt-btn-soft sm" data-rcv-setup="stats">Take me where I can tell you</button>`;
 
   const eatCard = `
     <section class="rcv-card">
@@ -30280,6 +30527,7 @@ function renderRecoveryScreen() {
         <p class="rcv-say" id="rcvSay"></p>
       </div>
     </section>
+    ${recoveryGoalCard({ fuel, inARow, restDue, resting })}
     <section class="rcv-card" id="rcvStretch">
       <div class="rcv-head"><span class="rcv-ico">${icon("body", 18)}</span><h3 id="rcvStretchTitle">${escapeHtml(timeOfDay().label)}</h3></div>
       <div id="rcvStretchBody"><p class="rcv-line">Picking the right ones for today...</p></div>
@@ -30301,8 +30549,11 @@ function renderRecoveryScreen() {
     RECOVERY_WAITED_FOR_MATH = true;
     FIT_MATH_READY.then(() => { if (WORKOUT_MODE === "recovery") renderRecoveryScreen(); });
   }
+  /* Two doors now. The body stats the calorie maths refuses without, and the
+     goal page for an account that has never picked a goal. The attribute says
+     which one, so no card has to guess where its missing answer lives. */
   $("workoutContent").querySelectorAll("[data-rcv-setup]").forEach((b) => {
-    b.onclick = () => { switchTab("setup"); openSettingsPage("stats"); };
+    b.onclick = () => { switchTab("setup"); openSettingsPage(b.dataset.rcvSetup === "goal" ? "goal" : "stats"); };
   });
 
   /* The holds land a beat later, because the picker is an engine module and
@@ -30349,8 +30600,30 @@ function renderRecoveryScreen() {
     const lead = pick
       ? (named.length ? `${pick.why} ${listWords(named).charAt(0).toUpperCase()}${listWords(named).slice(1)}.` : pick.why)
       : "Nothing logged today, so these are the ones worth doing on any day.";
+    /* When the block was topped up out of the general pool, say so. Five
+       minutes aimed at two muscle groups is two real holds and three that are
+       there to fill the time, and letting the card imply otherwise would be
+       the app taking credit for work it did not do.
+
+       Only on the holds, and only when they were aimed at something. A warm up
+       fills past coverage by design, and an open day was never aimed anywhere,
+       so on either of those there is no split to describe and the sentence
+       would be inventing a distinction the block does not have. */
+    const roundedOut = moves.filter((m) => m.roundsOut).length;
+    const split = roundedOut && named.length && (!pick || pick.kind === "stretch")
+      ? `${countWord(moves.length - roundedOut)} for what you trained, ${countWord(roundedOut).toLowerCase()} to round it out.`
+      : "";
+    /* The block's real length, said once and used twice: the button under the
+       holds and the goal card above them quote the same minutes because they
+       are the same block. */
+    const mins = Math.max(1, Math.round(stretchBlockSeconds(moves) / 60));
+    const goalMin = $("rcvGoalMin");
+    if (goalMin) {
+      goalMin.textContent = mins;
+      $("rcvGoalMinUnit").textContent = "min today";
+    }
     body.innerHTML = `
-      <p class="rcv-line" style="margin-bottom:12px;">${escapeHtml(lead)}</p>
+      <p class="rcv-line" style="margin-bottom:12px;">${escapeHtml(`${lead}${split ? ` ${split}` : ""}`)}</p>
       <ul class="rcv-moves">
         ${moves.map((m) => `<li>
           <span class="rcv-move-n">${Math.max(1, Number(m.seconds) || 30)}s</span>
@@ -30359,7 +30632,7 @@ function renderRecoveryScreen() {
           </span>
         </li>`).join("")}
       </ul>
-      <button type="button" class="wkt-btn-solid sm" id="rcvStretchBtn">${escapeHtml(pick ? pick.label : timeOfDay().label)}, ${Math.max(1, Math.round(stretchBlockSeconds(moves) / 60))} min</button>`;
+      <button type="button" class="wkt-btn-solid sm" id="rcvStretchBtn">${escapeHtml(pick ? pick.label : timeOfDay().label)}, ${mins} min</button>`;
     $("rcvStretchBtn").onclick = () => startStretchSession(moves);
     });
   });
