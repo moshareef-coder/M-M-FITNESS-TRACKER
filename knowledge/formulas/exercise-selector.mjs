@@ -115,7 +115,11 @@ export const REP_RANGES = {
 
 export function normalizeGoal(goal) {
   const g = (goal || "").toLowerCase();
-  if (g.includes("strength")) return "strength";
+  // "strong" as the stem catches both "strength" and the app's actual button text "Get
+  // stronger" -- the previous "strength"-only check silently missed "stronger" (no shared
+  // substring), so every real user picking Get Stronger was landing on the general/circuit
+  // bucket instead of a strength program. Confirmed against index.html's live goal strings.
+  if (g.includes("strong")) return "strength";
   if (g.includes("muscle") || g.includes("hypertrophy") || g.includes("gain")) return "hypertrophy";
   return "general"; // fat loss / general fitness / unspecified
 }
@@ -170,7 +174,15 @@ export function sessionStyleForGoal(goal) {
 }
 
 export function restSecondsForGoal(goal) {
-  return sessionStyleForGoal(goal) === "circuit" ? 30 : 90;
+  const style = sessionStyleForGoal(goal);
+  if (style === "circuit") return 30; // endurance/circuit-style: 30-60s is the real range
+  // Strength and hypertrophy both use "traditional" style but need genuinely different rest --
+  // a systematic review (Grgic et al. 2017, Sports Medicine) found 3-5 minutes necessary for
+  // heavy compound strength work (1-5 reps, 80%+ 1RM); hypertrophy compound work needs less,
+  // 2-3 minutes. The old flat 90s for both was right for hypertrophy and far too short for
+  // strength -- see get-stronger-training.md.
+  if (normalizeGoal(goal) === "strength") return 240; // 4 min, middle of the 3-5 min range
+  return 90; // hypertrophy/general: matches 2-3 min compound guidance closely enough as a default
 }
 
 // ---------------------------------------------------------------------------
@@ -358,9 +370,10 @@ const CATEGORY_LABELS = {
   abs: "Abs", obliques: "Core", lowerback: "Lower Back",
 };
 
-export function nameForDay({ categories, sessionStyle, dayIndex = 0, isHypertrophy = false }) {
-  if (sessionStyle === "circuit") {
-    return `Full Body Circuit ${String.fromCharCode(65 + (dayIndex % 26))}`; // A, B, C...
+export function nameForDay({ categories, sessionStyle, dayIndex = 0, isHypertrophy = false, isFullBodyPattern = false }) {
+  if (sessionStyle === "circuit" || isFullBodyPattern) {
+    const label = sessionStyle === "circuit" ? "Full Body Circuit" : "Full Body Strength";
+    return `${label} ${String.fromCharCode(65 + (dayIndex % 26))}`; // A, B, C...
   }
   if (isHypertrophy) {
     return dayIndex % 2 === 0 ? "Upper Body Day" : "Lower Body Day";
@@ -393,15 +406,24 @@ export function buildWeightTrainingPlan({
 }) {
   const isCircuit = sessionStyleForGoal(goal) === "circuit";
   const isHypertrophy = normalizeGoal(goal) === "hypertrophy";
-  const categories = isCircuit
+  const isStrength = normalizeGoal(goal) === "strength";
+  // Strength reuses the same movement-pattern full-coverage picker as circuit sessions --
+  // pickFocusCategories had the identical skipped-categories bug here (8 of 14 groups, never
+  // touching hamstrings/glutes/calves/abs/obliques/lowerback, plus nonsensical pairings like
+  // wrist curls with leg press on the same day). Full-body-every-session with heavy compounds
+  // is also just how real beginner/intermediate strength programs are actually structured
+  // (StrongLifts, Starting Strength) -- this isn't a stretch, it's the standard template.
+  // Session style/reps/rest stay strength-appropriate; only category SELECTION is shared with
+  // circuit's logic, not circuit's actual pacing.
+  const categories = (isCircuit || isStrength)
     ? pickCircuitCategories({ level, weeklyVolumeByCategory })
     : isHypertrophy
       ? pickSplitCategories({ level, weeklyVolumeByCategory, dayIndex })
       : pickFocusCategories({ level, weeklyVolumeByCategory, count: focusCategoryCount });
-  // Circuit sessions cover 5 movement patterns in one exercise each (full-body every time);
-  // hypertrophy sessions alternate upper/lower for full coverage at ~2x/week frequency;
-  // other split-style sessions go deeper on fewer categories instead.
-  const perCategoryCount = (isCircuit || isHypertrophy) ? 1 : exercisesPerCategory;
+  // Circuit and strength sessions cover 5 movement patterns in one exercise each (full-body
+  // every time); hypertrophy sessions alternate upper/lower for full coverage at ~2x/week
+  // frequency; anything else falls back to the older, narrower split logic.
+  const perCategoryCount = (isCircuit || isHypertrophy || isStrength) ? 1 : exercisesPerCategory;
   const reps = repsForGoal(goal);
   const sets = applyDeload(setsPerExercise(level, goal), isDeloadWeek);
 
@@ -438,7 +460,7 @@ export function buildWeightTrainingPlan({
   const sessionStyle = sessionStyleForGoal(goal);
   return {
     trainingId: "weight-training", focusCategories: categories, exercises,
-    dayName: nameForDay({ categories, sessionStyle, dayIndex, isHypertrophy }),
+    dayName: nameForDay({ categories, sessionStyle, dayIndex, isHypertrophy, isFullBodyPattern: isStrength }),
     sessionStyle, restSeconds: restSecondsForGoal(goal), isDeloadWeek,
   };
 }
