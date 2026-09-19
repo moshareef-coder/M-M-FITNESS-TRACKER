@@ -12566,7 +12566,7 @@ const OB_STEPS = ["name", "intro", "goal", "about", "tune", "styles", "days", "p
    `kind` is what the page looks like:
      focus   the existing Focus areas picker, figure and all, reused rather
              than rebuilt so onboarding and Setup cannot drift apart
-     sore    the same picker asking the opposite question, where it bothers you
+     hurts   the limits sheet's eight joints as chips, into profiles.limits
      choice  a short list of chips
    `field` is where the answer lands on the draft. */
 const GOAL_TUNE = {
@@ -12592,9 +12592,22 @@ const GOAL_TUNE = {
       { id: "distance", label: "Going further", sub: "Longer runs or rides" },
       { id: "speed", label: "Going faster", sub: "Intervals and tempo work" },
     ] },
-  "move-better": { kind: "sore", field: "tune_move",
-    title: "Where does it bother you most?",
-    sub: "Tap anywhere stiff or sore and the mobility work builds around it. This is not medical advice, and if something actually hurts, see someone about it." },
+  /* Was a body map asking "where does it bother you most?", writing through
+     bodyRegionFocusEntries into focus_groups, the same column the "what do
+     you want to grow" map writes. Measured on 2026-09-19: tapping Back on
+     the sore map took lats from 8 to 11 weekly sets and lower back from 0 to
+     5. A screen inviting people to report pain answered by loading it.
+
+     The engine has exactly one input that responds to a sore joint, and it is
+     limits.hurts: every lift, warm-up move and stretch joint-load.mjs says
+     loads that joint comes out, and the plan says what that cost. It has no
+     way to bias the mobility block toward a region (mobilityFor covers the
+     groups the day worked), so the old copy promised something nothing could
+     deliver. This asks the limits sheet's own question, in its own eight
+     joints, into its own column, so Setup > Limits opens on the same answer. */
+  "move-better": { kind: "hurts", field: "hurts",
+    title: "Does anything hurt?",
+    sub: "Tap it and nothing in the plan loads it, lifts, warm-up and stretches included. Each chip says what that costs. This is not medical advice, and if something actually hurts, see someone about it." },
 };
 
 /* Every tuning answer on the draft, as one object keyed by goal. One column
@@ -12604,6 +12617,10 @@ const GOAL_TUNE = {
 function goalTuningPatch(data) {
   const out = {};
   for (const [goalId, spec] of Object.entries(GOAL_TUNE)) {
+    /* The hurts answer has a column of its own, profiles.limits, and the
+       engine reads it from there. A copy in goal_tuning would be a second
+       record of the same answer that Setup > Limits could never update. */
+    if (spec.kind === "hurts") continue;
     const v = data[spec.field];
     if (v === undefined || v === null) continue;
     if (Array.isArray(v) && !v.length && !data[spec.field + "_all"]) continue;
@@ -13127,9 +13144,57 @@ function renderOnboardStep(step, data = {}) {
       return;
     }
 
-    /* focus and sore are the SAME picker asking opposite questions, and since
-       2026-09-17 that picker is the region body, not Setup's fourteen muscle
-       map. Mo cut the detail here and nowhere else: "big regions, not muscles,
+    /* The limits sheet's question, asked on the way in for the one goal whose
+       tile says "less pain". Same chips, same hints, same engine list
+       (ensureLimitsLists), and the answer lands in profiles.limits through
+       saveLimits at the end of the run, so Setup > Limits opens on it.
+
+       Nothing tapped and Continue is an answer too: an empty hurts list is
+       written, so limits stops being null and the plan screen's after-plan
+       offer, which fires on null, does not ask the same person twice. Back
+       leaves the draft exactly as it was. */
+    if (spec.kind === "hurts") {
+      const chosen = new Set(Array.isArray(data[spec.field]) ? data[spec.field] : []);
+      ob.innerHTML = `
+        <div class="ob-step">
+          ${obChrome("tune", data)}
+          ${eyebrow}
+          <h1>${escapeHtml(spec.title)}</h1>
+          <p class="sub">${escapeHtml(spec.sub)}</p>
+          <div class="limit-chips" id="tuneHurtChips"><p class="muted-note">Loading the options...</p></div>
+          <button type="button" class="btn-primary" id="tuneNext">Nothing hurts</button>
+          <button type="button" class="btn-ghost" id="tuneBack">Back</button>
+        </div>`;
+      const label = () => { $("tuneNext").textContent = chosen.size ? "Work around those" : "Nothing hurts"; };
+      let areas = [];
+      ensureLimitsLists().then(({ BODY_AREAS }) => {
+        if (!$("tuneHurtChips")) return;   // navigated on before the module arrived
+        areas = BODY_AREAS;
+        $("tuneHurtChips").innerHTML = BODY_AREAS.map((a) => `<button type="button" class="limit-chip${chosen.has(a.key) ? " on" : ""}"
+            data-hurt="${escapeHtml(a.key)}" aria-pressed="${chosen.has(a.key)}"><b>${escapeHtml(a.label)}</b><i>${escapeHtml(a.hint)}</i></button>`).join("");
+        ob.querySelectorAll("[data-hurt]").forEach((b) => b.onclick = () => {
+          const k = b.dataset.hurt;
+          chosen.has(k) ? chosen.delete(k) : chosen.add(k);
+          b.classList.toggle("on", chosen.has(k));
+          b.setAttribute("aria-pressed", String(chosen.has(k)));
+          label();
+        });
+      }).catch((e) => {
+        console.error("limits: the engine's lists failed to load", e);
+        if ($("tuneHurtChips")) $("tuneHurtChips").innerHTML = `<p class="muted-note">Could not load the options. You can answer this later in Setup.</p>`;
+      });
+      label();
+      /* The engine's own order, not tap order, the way saveLimitsPage does it,
+         so two people who said the same thing store the same thing. */
+      $("tuneNext").onclick = () => onNext({ [spec.field]: areas.filter((a) => chosen.has(a.key)).map((a) => a.key) });
+      $("tuneBack").onclick = back;
+      return;
+    }
+
+    /* The focus question, on the region body rather than Setup's fourteen
+       muscle map since 2026-09-17. (The sore question used to share this
+       picker; it is the hurts page above now, because what it wrote here was
+       focus volume.) Mo cut the detail here and nowhere else: "big regions, not muscles,
        this is too much in the beginning". Setup still gets the muscles and the
        tiers, and bodyRegionFocusEntries() writes the same column in the same
        shape, so the two screens still cannot disagree about what was asked
@@ -13589,6 +13654,10 @@ function finishOnboardingFromDraft(data) {
     train_styles: Array.isArray(data.train_styles) ? data.train_styles : null,
     committed_at: data.committed_at || null,
     goal_tuning: goalTuningPatch(data),
+    /* A list only when the hurts page was passed, empty list included.
+       Undefined means the page was never shown, and limits stays null so the
+       plan screen still gets to ask once. */
+    hurts: Array.isArray(data.hurts) ? data.hurts : undefined,
   }).then((ok) => { if (!ok) finishOnboardingFromDraft.busy = false; })
     .catch((err) => { console.error(err); finishOnboardingFromDraft.busy = false; toast("Setup failed, try again"); });
 }
@@ -13658,6 +13727,13 @@ async function finishOnboarding(data) {
   const tune = data.goal_tuning?.[data.goal_bubble];
   if (tune && (tune.all || (tune.areas || []).length)) {
     await saveFocusGroups(tune.all ? ["all"] : tune.areas);
+  }
+  /* The hurts page's answer, through the one writer profiles.limits has, in
+     the exact shape the limits sheet writes, so that sheet opens on it. Only
+     when the page was shown: writing an empty answer for everybody else would
+     tell the plan screen the question had been asked when it had not. */
+  if (Array.isArray(data.hurts)) {
+    await saveLimits({ ...emptyLimits(), hurts: data.hurts });
   }
   clearObDraft();
   /* The weight they just typed, logged as what it is: a weigh-in. It is the
