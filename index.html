@@ -1611,6 +1611,10 @@
   /* The ring is dropped because it boxes the big number awkwardly, so the
      border has to carry the focus signal instead of nothing carrying it. */
   .sess-input:focus { outline: none; border-color: var(--accent); }
+  /* An empty weight field is a real state, not a missing one: the engine says
+     it has not been told. A question mark says that in the space a number
+     would take, where "0" would have claimed an answer. */
+  .sess-input::placeholder { color: var(--muted); opacity: .55; }
 
   .btn-outline {
     background: var(--panel); border: 1px solid var(--border); color: var(--text);
@@ -2094,6 +2098,10 @@
   .gen-row-b { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .gen-row-name { font-size: 15.5px; font-weight: 700; color: #f4f6f8; }
   .gen-row-t { font-size: 12.5px; color: rgba(255,255,255,.55); }
+  /* The reveal stage is dark whatever the theme is, so --accent-ink comes back
+     as the deep green meant for white and disappears here. Same fill the row
+     number uses. */
+  .gen-row-t .ex-ask { color: var(--accent); }
   /* The swap control on a plan row is the same chip as the one in the session
      header, but the reveal stage is dark whatever the theme is, so the panel
      and border tokens would come back light on top of it. */
@@ -3273,6 +3281,9 @@
   }
   .sess-lastline .last { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sess-lastline .last.warm { color: var(--stretch-ink); font-weight: 700; }
+  /* The one sentence asking for a number, so it wraps instead of ellipsising:
+     the half that gets cut is the half that says we will keep the number. */
+  .sess-lastline .last.ask { color: var(--accent-ink); font-weight: 700; white-space: normal; overflow: visible; }
   .sess-lastline .beat { color: var(--accent-ink); font-weight: 700; flex-shrink: 0; }
 
   /* Weight and reps, one cluster each, thumb-sized keys either side of a
@@ -6794,6 +6805,14 @@
   .exercise-row .ex-body { flex: 1; min-width: 0; }
   .exercise-row .ex-name { font-weight: 600; font-size: 15.5px; }
   .exercise-row .ex-target { font-size: 12.5px; color: var(--muted); }
+  /* "Bodyweight" is a fact about the movement and stays in the muted voice
+     beside the sets and reps. "Pick your weight" is a question being asked
+     once, so it is the one thing on the row wearing the accent, which is the
+     colour this app paints everything that wants a tap. The two states must
+     not look alike: one is settled forever, the other disappears the moment a
+     number exists. nowrap so a narrow row breaks BEFORE the phrase rather than
+     through the middle of it: "8 reps · Pick / your weight" reads as a glitch. */
+  .ex-ask { color: var(--accent-ink); font-weight: 700; white-space: nowrap; }
   .exercise-row .ex-note { font-size: 12.5px; color: var(--muted); margin-top: 2px; font-style: italic; }
   .exercise-row .stepper-btn { width: 30px; height: 30px; }
   .add-ex-form { margin: 12px 0; padding: 12px; background: var(--panel-2); border-radius: 10px; }
@@ -15896,7 +15915,12 @@ function openNextWorkoutReview(plan) {
     .toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 
   const exRow = (ex, i) => {
-    const load = ex.targetWeight != null && ex.targetWeight !== "" ? `@ ${ex.targetWeight} lb` : "";
+    /* This read `targetWeight != null`, so a lift the engine could not put a
+       number on printed "@ 0 lb" here: a weight nobody chose, stated as the
+       plan. The three answers are a number, a settled bodyweight, or an ask. */
+    const load = Number(ex.targetWeight) > 0 ? `@ ${ex.targetWeight} lb`
+      : loadIsBodyweight(ex) ? "bodyweight"
+      : loadAsk(ex) ? "pick a weight" : "";
     return `<div class="rc-ex">
       <span class="rc-n">${i + 1}</span>
       <span class="rc-ex-name">${escapeHtml(ex.name)}</span>
@@ -23927,7 +23951,7 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
             <span class="gen-row-n">${i + 1}</span>
             <span class="gen-row-b">
               <span class="gen-row-name">${escapeHtml(ex.name || "")}</span>
-              <span class="gen-row-t">${ex.sets || 3} sets · ${ex.reps || 10} reps</span>
+              <span class="gen-row-t">${ex.sets || 3} sets · ${ex.reps || 10} reps${loadSegmentHTML(ex)}</span>
               ${(() => {
                 /* Which lifts have a ramp, and the loads, in one line under the
                    row. The count and the sentence are above; this is the part
@@ -23976,7 +24000,7 @@ function revealGeneratedPlan(workout, honest, onGo, planDate, notes = [], sessio
           const row = $("genRows")?.querySelector(`[data-ex="${i}"]`);
           if (!row) return;
           row.querySelector(".gen-row-name").textContent = ex.name;
-          row.querySelector(".gen-row-t").textContent = `${ex.sets || 3} sets · ${ex.reps || 10} reps`;
+          row.querySelector(".gen-row-t").innerHTML = `${ex.sets || 3} sets · ${ex.reps || 10} reps${loadSegmentHTML(ex)}`;
           /* The ramp was built from the weight of the lift that just left, so it
              goes with it rather than sitting under a movement it was never for. */
           row.querySelector(".gen-row-ramp")?.remove();
@@ -24161,6 +24185,53 @@ function renderSwapResults() {
   });
 }
 
+/* ---------- Which kind of "no weight" a row is ----------
+   `targetWeight: 0` has always meant two different things and the app printed
+   both the same, which was survivable only while the second was rare: the
+   engine used to invent a starting load from bodyweight and sex, so almost
+   nobody ever saw "we have not been told". That guess is gone (engine
+   CONTRACT.md, "No training level, and no weight we have not been told",
+   2026-09-18) and a brand new person's whole first week now comes back at 0,
+   so the difference is the first thing they ever read.
+
+   `loadBasis` is the engine's answer: "bodyweight" is settled, a Push-Up has
+   no weight and never will, and "unknown" is a question being asked once. A
+   row carrying NO basis is a plan saved before the field existed or an
+   exercise somebody added by hand and dialled to 0, and neither of those is
+   the engine asking for a number, so only the word itself opens the
+   invitation. A real weight wins over both, because a basis left behind on a
+   row somebody has since put a number on must not keep asking. */
+function loadAsk(ex) {
+  return !(Number(ex?.targetWeight) > 0) && ex?.loadBasis === "unknown";
+}
+
+function loadIsBodyweight(ex) {
+  return !(Number(ex?.targetWeight) > 0) && ex?.loadBasis === "bodyweight";
+}
+
+/* The load half of a "3 sets x 8 reps" line, as its own segment so the three
+   answers sit in one column down the card: a number, a settled fact, or an
+   ask. The ask is the only thing on the row wearing the accent, because the
+   accent is what this app paints things that want a tap. */
+function loadSegmentHTML(ex, sep = " · ") {
+  if (Number(ex?.targetWeight) > 0) return `${sep}${ex.targetWeight} lb`;
+  if (loadIsBodyweight(ex)) return `${sep}Bodyweight`;
+  if (loadAsk(ex)) return `${sep}<b class="ex-ask">Pick your weight</b>`;
+  return "";
+}
+
+/* What the session's weight field opens at. A real target opens at itself, a
+   bodyweight row opens at 0 because there is nothing to add, and a row the
+   engine could not put a number on opens EMPTY: "0 lb" beside a Cable
+   Pull-Through is a number the app made up, which is the exact thing the
+   engine stopped doing. What they last actually lifted still beats an empty
+   field, for the case where the app holds a log the engine was not sent. */
+function plannedStartWeight(ex) {
+  if (Number(ex?.targetWeight) > 0) return ex.targetWeight;
+  if (loadAsk(ex)) return lastTimeFor(ex?.name)?.weight ?? "";
+  return ex?.targetWeight ?? lastTimeFor(ex?.name)?.weight ?? "";
+}
+
 /* The last weight actually put on a movement. previousBest() answers a
    different question, the heaviest ever, because it feeds the record line. A
    starting load wants the most recent one instead. */
@@ -24195,6 +24266,16 @@ async function applySwap(chosen, source) {
   ex.name = chosen;
   ex.targetWeight = last ?? 0;
   ex.note = last == null ? "Pick a weight with two reps left in you" : `Last time you did ${last} lb`;
+  /* The row keeps speaking the engine's `loadBasis` vocabulary after a swap,
+     or every screen that reads it would fall back to "no basis, say nothing"
+     and a swapped-in lift would be the one row on the card that never asks for
+     a number. A movement the library says needs no equipment is settled, not a
+     question: asking somebody what they load a Push-Up with is the mistake this
+     whole distinction exists to avoid. */
+  const chosenKit = findStrengthLibraryExercise(chosen);
+  ex.loadBasis = last != null ? "your last session"
+    : BODYWEIGHT_EQUIPMENT.has(chosenKit?.equipment) ? "bodyweight"
+    : "unknown";
 
   const idx = ctx.index;
   const exercises = ctx.list?.() || [];
@@ -24238,7 +24319,7 @@ function swapCurrentExercise() {
       const sets = ex.sets || 3;
       SESSION.setsDone[i] = new Array(sets).fill(false);
       SESSION.setWeights[i] = new Array(sets).fill(null);
-      SESSION.weights[i] = ex.targetWeight ?? "";
+      SESSION.weights[i] = plannedStartWeight(ex);
       SESSION.reps[i] = ex.reps ?? "";
       SESSION.completed[i] = false;
       SESSION.restStartedAt = null;   // a different exercise is not a rest period
@@ -24306,6 +24387,12 @@ function findStrengthLibraryExercise(name) {
    want, not the reason somebody cannot finish this at home. */
 const NO_GYM_EQUIPMENT = new Set(["barbell", "cable", "machine", "dumbbell"]);
 
+/* The library's own words for a movement that carries no external load, so a
+   swap can decide whether a missing weight is settled or a question. Listed
+   rather than inferred from NO_GYM_EQUIPMENT's complement: a band, a wall and
+   a foam roller are none of them a gym and none of them a weight you pick. */
+const BODYWEIGHT_EQUIPMENT = new Set(["bodyweight", "none", "wall", "doorway", "bench", "foam roller"]);
+
 /* "Already logged" means a set is actually in the log, not that every set is.
    SESSION.completed[i] only flips once the last of them lands, so a plan with
    one of three sets ticked on a lift is not "completed" and this rule would
@@ -24361,13 +24448,17 @@ async function switchRemainderToBodyweight() {
     ex.name = chosen.name;
     ex.targetWeight = last ?? 0;
     ex.note = last == null ? "Pick a weight with two reps left in you" : `Last time you did ${last} lb`;
+    /* Everything this door swaps in was filtered to `equipment: ["bodyweight"]`
+       above, so the zero is settled rather than a question. Same reason
+       applySwap sets it: a row with no basis says nothing on any screen. */
+    ex.loadBasis = last != null ? "your last session" : "bodyweight";
 
     // Same reset swapCurrentExercise's `after` does: a movement just picked
     // has had nothing done on it yet.
     const sets = ex.sets || 3;
     SESSION.setsDone[i] = new Array(sets).fill(false);
     SESSION.setWeights[i] = new Array(sets).fill(null);
-    SESSION.weights[i] = ex.targetWeight ?? "";
+    SESSION.weights[i] = plannedStartWeight(ex);
     SESSION.reps[i] = ex.reps ?? "";
 
     usedNames.add(chosen.name);
@@ -24585,12 +24676,21 @@ async function buildSessionAlternatives(current, date) {
       /* The week, built the way the generator builds it. `includePlan` is the
          only way to see the days this person's week has other than the one
          they are looking at. */
-      const { plan } = engine.generateFromPayload(workoutEnginePayload(), { includePlan: true });
+      const { plan, meta } = engine.generateFromPayload(workoutEnginePayload(), { includePlan: true });
       const week = plan?.week || [];
       /* Read for the cardio half below whether or not any day is offered: the
          library filters its sessions by level, and beginner-by-default would
-         quietly hide every interval session from somebody who trains. */
-      if (plan?.level) level = plan.level;
+         quietly hide every interval session from somebody who trains.
+
+         `plan.level` went with `meta.level` on 2026-09-18: there is no training
+         level in the engine's answer any more, so this read had gone silently
+         undefined and every cardio swap sheet was offering beginner sessions
+         to everybody. The cardio library still ranks by a level, so the count
+         the label used to summarise is turned into one here, with the same
+         ladder activity-session.mjs already uses for every other library
+         rather than a second one invented on this screen. */
+      const sessionEngine = await ensureSessionEngine();
+      level = sessionEngine?.levelFromSessions?.(meta?.experience?.sessions || 0) || level;
       if (optedIntoBuiltSessions()) {
         /* Start from the day AFTER the one on screen, so the first offer is the
            session that would come next rather than whichever day the week
@@ -25540,8 +25640,10 @@ function startWorkout() {
     // Weight is recorded per set, because it commonly climbs across an exercise.
     setWeights: TODAY_WORKOUT.exercises.map((ex) => new Array(ex.sets || 3).fill(null)),
     // What you lifted last time beats what the plan guessed, because it is
-    // the one number that is evidence rather than a suggestion.
-    weights: TODAY_WORKOUT.exercises.map((ex) => ex.targetWeight ?? lastTimeFor(ex.name)?.weight ?? ""),
+    // the one number that is evidence rather than a suggestion. And a row the
+    // engine could not put a number on opens empty rather than at 0: see
+    // plannedStartWeight.
+    weights: TODAY_WORKOUT.exercises.map((ex) => plannedStartWeight(ex)),
     reps: TODAY_WORKOUT.exercises.map((ex) => ex.reps ?? ""),
     completed: TODAY_WORKOUT.exercises.map((ex) => loggedAlready.has(ex.name.toLowerCase())),
   };
@@ -27593,6 +27695,15 @@ function renderSession() {
   /* Every rung on screen is a fraction of THIS number, so the two can never be
      read off the screen disagreeing with each other. See rampRungLoad. */
   const workLb = SESSION.weights[ei];
+  /* An empty string is a real state here now and it has to survive `|| 0`: a
+     row the engine could not put a number on opens with nothing in the field,
+     because this is the screen where somebody is standing at the rack and a
+     prefilled 0 is the app answering a question it just said it could not. */
+  const weightField = SESSION.weights[ei] === "" || SESSION.weights[ei] == null ? "" : (SESSION.weights[ei] || 0);
+  /* The engine's own sentence, shown where "First time on this lift" goes,
+     because it is the same slot answering the same question and the engine
+     wrote the words for the decision it made. */
+  const askLoad = loadAsk(ex) && !lastTime;
 
   const exChanged = SESSION_LAST_EX !== ei;
   SESSION_LAST_EX = ei;
@@ -27692,9 +27803,13 @@ function renderSession() {
                you the load but left you to work out what kind of set it was,
                which is the same thing the W chip did. */
             if (rampTicks < rungs.length) return `<span class="last warm">This is a warm-up set, ${escapeHtml(rampRungLabel(rungs[rampTicks], workLb))}</span>`;
-            return lastTime
-              ? `<span class="last">Last time ${lastTime.weight} lb${lastTime.reps ? ` &times; ${lastTime.reps}` : ""}</span>`
-              : `<span class="last">First time on this lift</span>`;
+            if (lastTime) return `<span class="last">Last time ${lastTime.weight} lb${lastTime.reps ? ` &times; ${lastTime.reps}` : ""}</span>`;
+            /* "First time on this lift" is true and says nothing about what to
+               do next. When the engine has told us it does not know the load,
+               its own sentence goes here instead: pick one today, and it is
+               the number every plan after this one is built from. */
+            if (askLoad && ex.note) return `<span class="last ask">${escapeHtml(humanizeNoteDates(ex.note))}</span>`;
+            return `<span class="last">First time on this lift</span>`;
           })()}
           ${/* The record line is about the working set, so it stands down while a
                 warm-up is still the live thing. It was also what squeezed the
@@ -27715,7 +27830,7 @@ function renderSession() {
             <div class="sess-dial-label">${rampTicks < rungs.length ? "Working lb" : "Weight lb"}</div>
             <div class="sess-dial-ctl">
               <button type="button" class="round-btn sm" id="sessWeightMinus" aria-label="Less weight">&minus;</button>
-              <input class="sess-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" max="2000" value="${SESSION.weights[ei] || 0}" />
+              <input class="sess-input" id="sessWeightVal" type="number" inputmode="decimal" step="2.5" min="0" max="2000" placeholder="?" aria-label="${askLoad ? "Weight in pounds, not set yet" : "Weight in pounds"}" value="${weightField}" />
               <button type="button" class="round-btn sm" id="sessWeightPlus" aria-label="More weight">+</button>
             </div>
           </div>
@@ -27868,7 +27983,10 @@ function renderSession() {
   };
   $("sessWeightVal").oninput = (e) => {
     const v = parseFloat(e.target.value);
-    SESSION.weights[ei] = isNaN(v) ? 0 : clampInput(e.target, v, 0, MAX_LIFT_LB);
+    /* Clearing the field on a lift we were never told the weight of goes back
+       to not knowing, rather than to 0. Emptying it anywhere else still means
+       0, which is what the blur rule below was written for. */
+    SESSION.weights[ei] = isNaN(v) ? (loadAsk(ex) ? "" : 0) : clampInput(e.target, v, 0, MAX_LIFT_LB);
     refreshRampLoad();
     saveSessionToStorage();
   };
@@ -27878,8 +27996,13 @@ function renderSession() {
     saveSessionToStorage();
   };
   // An emptied field logged 0 while showing nothing, so put the real number
-  // back the moment they leave it.
-  $("sessWeightVal").onblur = (e) => { e.target.value = SESSION.weights[ei] || 0; };
+  // back the moment they leave it. Unless there is no real number: a lift we
+  // have not been told the weight of stays blank and shows its placeholder,
+  // and logs null rather than a 0 nobody lifted.
+  $("sessWeightVal").onblur = (e) => {
+    const w = SESSION.weights[ei];
+    e.target.value = w === "" || w == null ? "" : (w || 0);
+  };
   $("sessRepsVal").onblur = (e) => { e.target.value = SESSION.reps[ei] || 0; };
   $("nextExBtn").onclick = finishExerciseAndAdvance;
   // Ending lives behind the pause button now (askPauseOrEnd).
@@ -32561,6 +32684,10 @@ function cbAdd(name, sets, reps, weight = 0) {
 function cbDose(ex) {
   const bits = [`${ex.sets} sets × ${ex.reps} reps`];
   if (Number(ex.targetWeight) > 0) bits.push(`${ex.targetWeight} lbs`);
+  /* Plan rows reach this list too, and one the engine could not weigh used to
+     look identical to a push-up. Plain text: the caller escapes this. */
+  else if (loadIsBodyweight(ex)) bits.push("Bodyweight");
+  else if (loadAsk(ex)) bits.push("Pick your weight");
   return bits.join(" · ");
 }
 
@@ -33374,7 +33501,7 @@ function renderPlanPreview(opts) {
       <div class="ex-icon"${isDone ? "" : ` data-fig="${escapeHtml(ex.name)}" data-fig-static`}>${doneMark}</div>
       <button type="button" class="ex-body ex-tap" data-plan-edit="${i}"${isDone ? " disabled" : ""}>
         <div class="ex-name">${escapeHtml(ex.name)}</div>
-        <div class="ex-target">${ex.sets} sets · ${ex.reps} reps${Number(ex.targetWeight) > 0 ? ` · ${ex.targetWeight} lb` : ""}${isDone ? "" : ` ${icon("pencil", 11)}`}</div>
+        <div class="ex-target">${ex.sets} sets · ${ex.reps} reps${loadSegmentHTML(ex)}${isDone ? "" : ` ${icon("pencil", 11)}`}</div>
         ${/* What to walk to. Only the things to fetch, no setup detail: the
               bench angle matters when you are standing at the bench, not when
               you are reading the list. Bodyweight says nothing, because
