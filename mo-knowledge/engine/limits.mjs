@@ -221,7 +221,7 @@ const HURT_SENTENCE = {
   lowerback: "Nothing that loads a bad lower back is in here, so deadlifts and good mornings are out and supported and machine work is in.",
   hip: "Nothing that loads a bad hip is in here, so deep squatting and heavy hinging are out and shorter range work is in.",
   knee: "Nothing that loads a bad knee is in here, so deep lunges and leg extensions are out and bridges and hip work are in.",
-  ankle: "Nothing that loads a bad ankle is in here, so calf raises and split squats are out and seated and supported work is in.",
+  ankle: "Nothing that loads a bad ankle is in here, so calf raises and split squats are out, and the calf slot on a leg day is left empty rather than filled with one.",
 };
 
 /* The other sentence, for a joint the week could not fully spare. It names

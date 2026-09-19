@@ -2041,6 +2041,45 @@ test("limitsSummary, joints in pairs: each joint gets its own truthful sentence 
   }
 });
 
+test("a bad knee or hip gets bridges and hip work in the lunge slot, not the lunge it was told to avoid", () => {
+  /* Measured 2026-09-19: knee and ankle each changed zero movements in the
+     default week, and Step-Up stayed for both a bad knee and a bad hip because
+     the exclusion emptied the lunge pool and the fallback handed the pool
+     back. Glute Bridge, Hip Thrust and Cable Kickback load neither joint. */
+  const lunges = ["Step-Up", "Curtsy Lunge", "Walking Lunge", "Bulgarian Split Squat", "Split Squat"];
+  for (const j of ["knee", "hip"]) {
+    const plan = buildPlan({ goal: { bubble: "build-muscle", child: null }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 4 }, logs: [], limits: { hurts: [j], missing: [] } });
+    const lower = plan.week.filter((d) => /Lower/.test(d.name));
+    assert.ok(lower.length >= 1);
+    for (const d of lower) {
+      for (const e of d.exercises) assert.ok(!lunges.includes(e.name), `${e.name} on a bad ${j}`);
+      const glute = d.exercises.find((e) => e.group === "glutes" && !JOINT_LOAD[e.name].includes(j));
+      assert.ok(glute, `${d.name} has no glute work that spares the ${j}: ${d.exercises.map((e) => e.name).join(", ")}`);
+    }
+    for (const n of plan.limits.blocked) assert.ok(!lunges.includes(n), `${n} still blocked`);
+  }
+  /* And a rotated lift still comes back as "rotation blocked" rather than
+     being replaced off pattern: that path is not this one. */
+});
+
+test("a bad ankle loses the calf slot and is told so, and the leg day is still a leg day", () => {
+  const plan = buildPlan({ goal: { bubble: "build-muscle", child: null }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 4 }, logs: [], limits: { hurts: ["ankle"], missing: [] } });
+  for (const d of plan.week) {
+    for (const e of d.exercises) {
+      assert.notEqual(e.group, "calves", `${e.name} on ${d.name}`);
+      assert.ok(!JOINT_LOAD[e.name]?.includes("ankle"), `${e.name} loads the ankle`);
+    }
+    assert.ok(d.exercises.length >= 4, `${d.name} has ${d.exercises.length}`);
+  }
+  assert.deepEqual(plan.limits.blocked, []);
+  const line = plan.dayNotes.find((n) => /bad ankle/.test(n));
+  assert.ok(line && /calf slot/.test(line) && /^Nothing that loads/.test(line), line);
+  /* Elbow is left alone on purpose: nothing in the default week loads it, so
+     the chip already changes exactly what it should. */
+  const elbow = buildPlan({ goal: { bubble: "build-muscle", child: null }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 4 }, logs: [], limits: { hurts: ["elbow"], missing: [] } });
+  assert.deepEqual(elbow.limits.blocked, []);
+});
+
 test("a built week never says nothing loads a joint while prescribing something that does", () => {
   for (const hurts of [["knee"], ["shoulder"], ["knee", "lowerback"], ["hip", "ankle"]]) {
     const plan = buildPlan({ goal: { bubble: "build-muscle", child: null }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 4 }, logs: [], limits: { hurts, missing: [] } });
