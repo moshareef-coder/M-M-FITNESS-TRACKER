@@ -172,13 +172,19 @@ export function joinPlanToActual({ plans = [], logs = [] } = {}) {
   const done = rowsOf(plans).filter((p) => p.completed_at);
 
   /* One pass over the logs, bucketed by date and name, so a long history does
-     not turn this into a nested scan. */
+     not turn this into a nested scan. Every row for the day is kept, not the
+     first: the app writes one `exercise_logs` row per distinct weight, so a
+     person who did two sets at 140 and then two at 150 is two rows, and until
+     2026-09-19 only the 140 row was read. Against a 4x8 at 140 that joined as
+     two sets done of four, the verdict was too-heavy, and the bar came down 5
+     lb on somebody who had just pushed it up. See `actualOf`. */
   const byDateName = new Map();
   for (const l of rowsOf(logs)) {
     const name = nameOf(l.exercise_name);
     if (!name) continue;
     const key = `${dateOf(l.entry_date)}|${lower(name)}`;
-    if (!byDateName.has(key)) byDateName.set(key, l);
+    if (!byDateName.has(key)) byDateName.set(key, []);
+    byDateName.get(key).push(l);
   }
 
   const rows = [];
@@ -199,23 +205,55 @@ export function joinPlanToActual({ plans = [], logs = [] } = {}) {
           reps: num(ex.reps),
           targetWeight: num(ex.targetWeight),
         },
-        actual: hit
-          ? { sets: num(hit.sets), reps: num(hit.reps), weight: num(hit.weight) }
-          : null,
+        actual: hit ? actualOf(hit) : null,
       });
     }
   }
   return rows;
 }
 
+/* One day's rows on one exercise, read as one session.
+ *
+ * Sets add up, because four sets is four sets whatever the bar held for each
+ * of them. `weight` is the TOP weight of the day rather than the mean, and the
+ * reason is not that it flatters: load.mjs's `fromHistory` picks the heaviest
+ * logged row as the base the next step is applied to, and `currentLoad` below
+ * has to measure the step against the same number or a 5 lb step on a 145 lb
+ * mean is applied to a 150 lb base and comes out as no step at all. `weightLow`
+ * is the lightest row, and it is what the struggle predicates read: a ladder
+ * that came DOWN below the target mid-exercise is row three of research/07's
+ * table however heavy its first set was, and the top weight alone cannot see
+ * that. Reps are the smallest across the rows for the same reason, the weakest
+ * set is the honest answer to "did every set land". The app writes one rep
+ * count per exercise, so the rows agree on it in practice. */
+function actualOf(rows) {
+  let sets = null, reps = null, weight = null, weightLow = null;
+  for (const r of rows) {
+    const s = num(r.sets), p = num(r.reps), w = num(r.weight);
+    if (s != null) sets = (sets ?? 0) + s;
+    if (p != null) reps = reps == null ? p : Math.min(reps, p);
+    if (w != null) {
+      weight = weight == null ? w : Math.max(weight, w);
+      weightLow = weightLow == null ? w : Math.min(weightLow, w);
+    }
+  }
+  return { sets, reps, weight, weightLow };
+}
+
+/* The lightest weight the day was done at, for callers that built their own
+   rows without one: `calibrateExercise` is exported and its tests hand it a
+   bare `{ sets, reps, weight }`. */
+const lowWeight = (actual) => actual.weightLow ?? actual.weight;
+
 /* Bodyweight work has no target to beat, so a missing or zero targetWeight is
    treated as satisfied rather than as a failure. Otherwise every push-up in the
-   plan would read as too heavy forever. */
+   plan would read as too heavy forever. Read off the lightest row of the day:
+   every set has to have been at the target for the target to count as met. */
 const weightMet = (planned, actual) =>
-  !planned.targetWeight ? true : (actual.weight ?? 0) >= planned.targetWeight;
+  !planned.targetWeight ? true : (lowWeight(actual) ?? 0) >= planned.targetWeight;
 
 const weightDropped = (planned, actual) =>
-  Boolean(planned.targetWeight) && actual.weight != null && actual.weight < planned.targetWeight;
+  Boolean(planned.targetWeight) && lowWeight(actual) != null && lowWeight(actual) < planned.targetWeight;
 
 const setsMet = (planned, actual) =>
   planned.sets == null || (actual.sets ?? 0) >= planned.sets;

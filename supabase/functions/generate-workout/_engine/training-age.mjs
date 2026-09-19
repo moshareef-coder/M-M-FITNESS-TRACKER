@@ -40,7 +40,15 @@ export const THRESHOLDS = {
      beginner who keeps restarting, and they need the beginner plan each time. */
   resetGapDays: 84,
   /* Away this long and the next session is a return, not a continuation.
-     research/02: connective tissue and skill both need a ramp back. */
+     research/02: connective tissue and skill both need a ramp back. Four
+     weeks is the one sourced number: mo-knowledge/sources.md, `barbend-return`,
+     "50% loads after 4+ weeks off", which is also where load.mjs's restart
+     comes from. Whether three weeks should count was asked on 2026-09-19 and
+     left alone on purpose: sources.md's own list of what still needs a real
+     literature pass has "detraining timelines" at number three, with "no
+     number I trust", and knowledge/ carries none either. Lowering this on a
+     guess would hand a lighter block to somebody who took a fortnight's
+     holiday. The day there is a number, it goes here with its citation. */
   layoffDays: 28,
   /* Weeks of history to read for current rhythm. Long enough to survive one bad
      week, short enough to notice somebody falling off. */
@@ -89,7 +97,9 @@ function linearProgress(logs) {
   const byExercise = new Map();
   for (const l of logs) {
     const k = norm(l.exercise_name);
-    if (l.weight == null || !k) continue;
+    /* A row with no load on it is not evidence about loading. See the same
+       rule in detectPlateau below for why 0 is skipped along with null. */
+    if (!(Number(l.weight) > 0) || !k) continue;
     if (!byExercise.has(k)) byExercise.set(k, []);
     byExercise.get(k).push({ date: rowDate(l), weight: Number(l.weight) });
   }
@@ -193,23 +203,34 @@ export function earnedMovements({ logs = [], swaps = [] } = {}) {
  * window, and names the lifts. A plan can act on a name; it cannot act on a ratio.
  *
  * @param {{ logs?: Array, today?: Date, weeks?: number }} input
- * @returns {{ stalled: boolean, lifts: Array<{name:string,sessions:number,weeksFlat:number,weightLb:number}>, why: string[] }}
+ * @returns {{ stalled: boolean, lifts: Array<{name:string,sessions:number,sessionsFlat:number,weeksFlat:number,weightLb:number}>, why: string[] }}
  */
 export function detectPlateau({ logs = [], today = new Date(), weeks = THRESHOLDS.recentWeeks } = {}) {
   const why = [];
   const cutoff = new Date(parse(iso(today)) - weeks * 7 * DAY);
 
   /* Per exercise, the best weight on each training day, oldest first. A day is the unit
-     because that is what a session is everywhere else in this file. */
+     because that is what a session is everywhere else in this file.
+
+     Only rows with a load on them. The app writes `weight: null` for a push-up and 0
+     when somebody types 0, and until 2026-09-19 the 0 got through: Push-Up, Plank,
+     Inverted Row, Glute Bridge and Crunch all read as "has not gone up in N weeks, still
+     at 0 lb", four of them at once tripped the systemic volume cut, and a person who had
+     hit every rep of everything lost 15% of their week for it. A bodyweight movement
+     cannot stall at a weight because it has none; its progression is the variation and
+     the reps (load.mjs says so on every bodyweight card), and the plan prescribes the
+     reps, so a logged rep count that never climbs is the plan reflected back rather than
+     a stall. Rep progress is not tracked here on purpose: the day the plan raises reps
+     on bodyweight work is the day there is something to measure. */
   const byExercise = new Map();
   for (const l of usableRows(logs)) {
     const k = norm(l.exercise_name);
     const date = rowDate(l);
     if (l.weight == null || !k || !date) continue;
+    const w = Number(l.weight);
+    if (!(w > 0)) continue;
     if (!byExercise.has(k)) byExercise.set(k, { name: String(l.exercise_name).trim(), days: new Map() });
     const rec = byExercise.get(k);
-    const w = Number(l.weight);
-    if (!Number.isFinite(w)) continue;
     rec.days.set(date, Math.max(w, rec.days.get(date) ?? -Infinity));
   }
 
@@ -235,8 +256,15 @@ export function detectPlateau({ logs = [], today = new Date(), weeks = THRESHOLD
       if (w > runningBest) { runningBest = w; lastPr = d; }
     }
     const weeksFlat = Math.max(0, Math.round((parse(iso(today)) - parse(lastPr)) / DAY / 7));
+    /* And how many times they have done it since, across the whole flat stretch. `sessions`
+       above is the window count, and on a lift scheduled once a week six of those means
+       perfect attendance and no rotation; one week out and the count could never reach
+       the six plateau-response.mjs asks for, so a Lat Pulldown flat for sixteen weeks was
+       answered twice and waited on the rest. Sessions since the last PR is the number
+       "how many sessions of it while flat" actually means. */
+    const sessionsFlat = all.filter(([d]) => d > lastPr).length;
 
-    lifts.push({ name: rec.name, sessions: window.length, weeksFlat, weightLb: best });
+    lifts.push({ name: rec.name, sessions: window.length, sessionsFlat, weeksFlat, weightLb: best });
   }
 
   lifts.sort((a, b) => b.weeksFlat - a.weeksFlat || b.sessions - a.sessions);
@@ -347,6 +375,15 @@ export function deriveTrainingAge({ logs: given = [], today = new Date() } = {})
   );
   const perWeek = +(recent / windowWeeks).toFixed(1);
   const sessionsPerWeek = Number.isFinite(perWeek) ? perWeek : 0;
+  /* Distinct training days in the seven days before today, for the week note
+     in plan.mjs: "everything landed" has to know how much of the week there
+     was. Today itself is left out, because a plan built in the morning is
+     about the week behind it and a session logged an hour ago is this week. */
+  const weekAgo = new Date(parse(todayStr) - 7 * DAY);
+  const sessionsLastWeek = effectiveDays.filter((d) => {
+    const t = parse(d);
+    return t >= weekAgo && t < parse(todayStr);
+  }).length;
 
   const prog = linearProgress(logs.filter((l) => {
     const d = rowDate(l);
@@ -385,6 +422,10 @@ export function deriveTrainingAge({ logs: given = [], today = new Date() } = {})
 
   return {
     confidence, sessions, effectiveSessions, sessionsPerWeek, weeksTraining,
+    /* The two numbers sessionsPerWeek was made from, published so that
+       observedCapacity can tell "few sessions because it is early" from "few
+       sessions because that is the rhythm". */
+    recentSessions: recent, windowWeeks: +windowWeeks.toFixed(2), sessionsLastWeek,
     daysSinceLast, longestGapDays, returning, restarting,
     stillLinear: prog.stillLinear, progressJudged: prog.judged, progressClimbing: prog.climbing,
     /* Jawa's contribution, see detectPlateau above. Reported rather than folded into the
@@ -396,9 +437,30 @@ export function deriveTrainingAge({ logs: given = [], today = new Date() } = {})
 }
 
 /* What they actually did per week, which research/09 argues should beat what they
-   said they would do. Returns null when there is not enough history to disagree. */
+   said they would do. Returns null when there is not enough history to disagree.
+
+   Two ways to have enough. Eight sessions, which is where this started, and it
+   is the right bar for somebody turning up often: it is reached inside a
+   fortnight at four a week, and the window above is what keeps that fortnight
+   from reading as a shortfall. But at one session a week eight sessions is two
+   months, and for those two months a person who asked for four days got a full
+   four day week and "everything landed" every Monday, while somebody doing
+   three of four got the honest sentence at once. So a window three weeks wide
+   holding three or more sessions also counts: three weeks is long enough that
+   the window is measuring a rhythm rather than a start, and three sessions in
+   it is one a week, which is the number the person is actually keeping. The
+   week-three protection in the comment above is untouched, because that was
+   about the window being counted before the person existed, and a window
+   three weeks wide has, by construction, existed for three weeks. */
+export const CAPACITY_MIN_SESSIONS = 8;
+export const CAPACITY_WINDOW_WEEKS = 3;
+export const CAPACITY_WINDOW_SESSIONS = 3;
+
 export function observedCapacity(trainingAge) {
-  if (!trainingAge || trainingAge.confidence === "none") return null;
-  if (trainingAge.effectiveSessions < 8) return null;
+  if (!trainingAge) return null;
+  const many = trainingAge.effectiveSessions >= CAPACITY_MIN_SESSIONS;
+  const settled = (Number(trainingAge.windowWeeks) || 0) >= CAPACITY_WINDOW_WEEKS
+    && (Number(trainingAge.recentSessions) || 0) >= CAPACITY_WINDOW_SESSIONS;
+  if (!many && !settled) return null;
   return Math.max(1, Math.round(trainingAge.sessionsPerWeek));
 }

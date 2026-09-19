@@ -24,7 +24,7 @@ import { prescribeLoad, patternFor, roundLoad } from "./load.mjs";
 import { calibrate } from "./calibrate.mjs";
 import { learnPreferences, applyPreferences, avoidNote, openWeekBudget, heldBackNote, actedOn } from "./preferences.mjs";
 import { scoreAlternatives } from "./alternatives.mjs";
-import { planPlateauResponse, applyRotateFallback, repShiftFor } from "./plateau-response.mjs";
+import { planPlateauResponse, applyRotateFallback, repShiftFor, cutTakenRecently } from "./plateau-response.mjs";
 import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary, softenedNote } from "./limits.mjs";
 import { mainGroupsForDay } from "./recovery.mjs";
 import { TIER_MULTIPLIER, TIERS } from "./focus.mjs";
@@ -1076,7 +1076,13 @@ export function buildPlan({
   goal, person = {}, logs: rawLogs = [], plans = [], swaps = [], equipment = null, today = new Date(), priorityOverride = null,
   limits = null, avoid = [],
 } = {}) {
-  const { bodyWeightLb = null, sex = null, daysAsked = null, sessionMinutes = null, ageCaution = 0 } = person;
+  /* `ageCaution` defaults to 1, the careful end, and not 0. The adapter reads
+     an unknown age as 1 (CONTRACT.md: the age-unknown default looks like the
+     older-adult default), so 1 is what production ships to everybody who has
+     not filled the field in. Until 2026-09-19 this defaulted to 0, and every
+     direct caller of buildPlan, the sweep, the demo, the harnesses, measured
+     an engine climbing 10 lb a week on a squat where production gives 5. */
+  const { bodyWeightLb = null, sex = null, daysAsked = null, sessionMinutes = null, ageCaution = 1 } = person;
 
   /* A log row is an object or it is not a row. Eight passes in this file, plus
      load.mjs, training-age.mjs, calibrate.mjs and preferences.mjs, read fields
@@ -1197,7 +1203,17 @@ export function buildPlan({
     dayNotes.push("Last week read as a struggle across several lifts, so this one is a touch lighter. "
       + "That is the plan working, not you failing.");
   } else if (calibration.overall === "push") {
-    dayNotes.push("Everything landed last week. Loads are up.");
+    /* "Everything landed" is a claim about the week, and calibrate.mjs only
+       ever saw the sessions that happened. Somebody doing one of four heard
+       it every Monday for two months. Under about three quarters of the
+       planned days the true sentence is the one that says how many. */
+    const did = trainingAge.sessionsLastWeek;
+    if (did != null && did < Math.ceil(days * 0.75)) {
+      dayNotes.push(`The sessions you did all landed, and you did ${did} of ${days}. `
+        + `Loads are up on what you trained.`);
+    } else {
+      dayNotes.push("Everything landed last week. Loads are up.");
+    }
   }
 
   /* ---- pass 4's decision, taken here because it changes pass 2 ----
@@ -1214,6 +1230,9 @@ export function buildPlan({
        rather than labelled: see planPlateauResponse. */
     stillLinear: trainingAge.stillLinear, confidence: trainingAge.confidence,
     calibration, goal: resolved,
+    /* A lighter week handed out inside the last block is spent: the sets go
+       back up and the per lift answers run. See cutTakenRecently. */
+    cutTaken: cutTakenRecently({ plans, today }),
   });
   const rotateOut = new Set(
     plateauPlan.responses.filter((r) => r.action === "rotate").map((r) => r.exercise.toLowerCase()),
@@ -2064,8 +2083,16 @@ export function buildPlan({
      NOT do is give the freed minutes back to the top-up above: those minutes
      are the back-off. */
   if (backOff) {
+    /* The plateau cut marks every lift it eased, and the adapter carries the
+       mark into the saved plan, so next week's build can see the cut was
+       taken and let the sets back up. Calibration's back-off is not marked:
+       it reacts to last session and is not the promise being kept here. */
+    const cutWeek = plateauPlan.summary.action === "volume-cut";
     for (const d of week) {
-      for (const e of d.exercises) e.sets = easeSets(e.sets, roleOf.get(e) === "main");
+      for (const e of d.exercises) {
+        e.sets = easeSets(e.sets, roleOf.get(e) === "main");
+        if (cutWeek) e.volumeCut = true;
+      }
       enforcePriorityFloor(d.exercises);
       d.estimatedMinutes = estimateMinutes(d.exercises, d.prepMinutes);
     }
@@ -2429,8 +2456,14 @@ export function buildPlan({
      slot unfillable, and a note claiming it is gone when it is still on the
      card would be worse than no note. */
   const inWeek = new Set(week.flatMap((d) => d.exercises.map((e) => String(e.name).toLowerCase())));
+  /* A soft avoid speaks too, since 2026-09-19. It only sinks a lift down its
+     pool, but a pool with anything else in it puts something else on top, so
+     at two swaps the movement was leaving the card with nothing said, and the
+     third swap the hard sentence waited for could never happen on a lift
+     nobody could see. An avoid only exists because the lift was on a card
+     inside the window, so absent from this week is the thing to explain. */
   for (const a of preferences.avoid) {
-    if (a.strength === "hard" && !inWeek.has(a.name.toLowerCase())) dayNotes.push(avoidNote(a));
+    if (!inWeek.has(a.name.toLowerCase())) dayNotes.push(avoidNote(a));
   }
 
   /* And the other half of the same promise. A hard avoid that is still on the
