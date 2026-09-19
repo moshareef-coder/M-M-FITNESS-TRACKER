@@ -24,6 +24,16 @@ export const MIN_DAILY_CALORIES = 1200;
 // every corroborating source expresses it.
 export const MAX_SURPLUS_KCAL_PER_DAY = { beginner: 500, intermediate: 400, advanced: 300 };
 
+// Recomp (real-goals.md Cluster 4 / mo-knowledge's "tone-lean-abs") needs a small, fixed
+// deficit, not a bodyweight-scaled one like "lose" and not a surplus like "gain". Multiple
+// convergent sources put the effective range at roughly 200-300 kcal/day -- going deeper
+// measurably impairs muscle protein synthesis and starts looking like a regular cut, which
+// defeats the point (see recomp-training.md). This was previously landing in the "gain"
+// bucket entirely by accident (normalizeGoal matched "muscle" in the goal string before this
+// fix) -- worth being extra deliberate here since that would have meant a recomp user getting
+// a calorie SURPLUS, the opposite of what the goal asks for.
+export const RECOMP_DEFICIT_KCAL = 250;
+
 /** Safe, sustainable weekly rate of change for a goal, in lb/week, BEFORE the TDEE-relative cap
  *  is applied below. Loss scales gently with current body weight (a heavier starting point can
  *  safely lose a bit faster). Gain scales by BOTH body weight and experience level -- lean-mass
@@ -39,13 +49,33 @@ export function recommendedWeeklyRateLb(direction, currentWeightLb, level = "beg
 }
 
 /**
- * targetChangeLb: positive number, how much to lose or gain (not signed).
- * direction: "lose" | "gain".
+ * targetChangeLb: positive number, how much to lose or gain (not signed). Optional for
+ * "recomp" -- see note below on why scale weight is a poor primary metric for that direction.
+ * direction: "lose" | "gain" | "recomp".
  * tdee: from calculateTDEE() in tdee.mjs.
- * level: experience tier (see experience-tiers.md) -- only affects the "gain" direction's cap.
+ * level: experience tier (see experience-tiers.md) -- affects the "gain" direction's cap.
  * Returns null if there isn't enough data to compute anything meaningful.
  */
 export function estimateGoalTimeline({ currentWeightLb, targetChangeLb, direction, tdee, level = "beginner", rateLbOverride = null }) {
+  if (direction === "recomp") {
+    if (!tdee) return null;
+    const dailyCalorieAdjustment = Math.min(
+      RECOMP_DEFICIT_KCAL,
+      Math.max(0, tdee - MIN_DAILY_CALORIES) // same safety floor as "lose", rarely binds at this small a deficit
+    );
+    const dailyCalorieTarget = tdee - dailyCalorieAdjustment;
+    const weeklyRateLb = Math.round(((dailyCalorieAdjustment * 7) / 3500) * 10) / 10;
+    return {
+      weeklyRateLb, dailyCalorieTarget, dailyCalorieAdjustment, direction,
+      weeks: null, // deliberately not estimated -- see scaleCaveat
+      wasCapped: dailyCalorieAdjustment < RECOMP_DEFICIT_KCAL,
+      scaleCaveat: "Scale weight can stay flat during a real recomposition -- losing fat and " +
+        "gaining muscle at once can cancel out on the number, so this isn't sold as a " +
+        "weeks-to-X-lb estimate the way lose/gain are. Track strength progress and how " +
+        "clothes fit instead of the scale alone.",
+    };
+  }
+
   if (!targetChangeLb || !tdee) return null;
 
   const uncappedRateLb = rateLbOverride ?? recommendedWeeklyRateLb(direction, currentWeightLb, level);

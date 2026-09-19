@@ -214,3 +214,21 @@ workout plans: `principles/sex-and-anthropometry.md`,
 - Keedia, "Rest Between Sets: What the Science Says You Actually Need" — https://keedia.com/fitness/rest-between-sets-science-strength-hypertrophy-endurance/
 - FitBesidesHealth, "Rest Periods Between Sets: Strength and Muscle
   Guide" — https://fitbesideshealth.com/rest-periods-between-sets/
+
+## Recomp: calorie direction and deficit sizing
+- VPA, "Body Recomposition: How to Lose Fat and Build Muscle at the Same
+  Time" — https://www.vpa.com.au/blogs/supplements/body-recomposition
+- Built With Science, "Body Recomposition: How to Build Muscle While
+  Losing Fat" — https://builtwithscience.com/diet/meal-plans/body-recomposition/
+- BodySpec, "Body Recomposition 101: Losing Fat and Gaining Muscle
+  Together" (cites NSCA Strength & Conditioning Journal 2020) — https://www.bodyspec.com/blog/post/body_recomposition_101_losing_fat_and_gaining_muscle_together
+- ProMealPlan, "Body Recomposition Meal Plan Template: 2,200 Kcal, 150g
+  Protein" — https://www.promealplan.com/en/blog/meal-plan-template-body-recomposition
+- CalEye, "Body Recomposition: Losing Fat While Gaining Muscle" (cites
+  Morton et al. 2018, British Journal of Sports Medicine) — https://caleye.fit/blog/body-recomposition-fat-loss-muscle-gain/
+- Hevy Coach, "Body Recomposition: Definition, How-to, Benefits, and
+  Tips" — https://hevycoach.com/glossary/body-recomposition/
+- Evolv, "Body Recomposition: How to Lose Fat and Build Muscle" (cites
+  Lahav et al. 2026) — https://evolvlife.com/blogs/the-evolv-journal/body-recomposition
+- Built With Science, "Body Recomposition Calculator: Build Muscle and
+  Lose Fat" — https://builtwithscience.com/fitness-tips/body-recomposition-calculator/
