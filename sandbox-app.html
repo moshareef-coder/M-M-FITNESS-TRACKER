@@ -434,14 +434,18 @@
   .wkt-btn-solid:active, .wkt-btn-soft:active { transform: translateY(1px); filter: brightness(.96); }
   .wkt-btn-solid.sm, .wkt-btn-soft.sm { font-size: 13px; height: 36px; padding: 0 12px; border-radius: 10px; }
 
-  /* Next workout: words and buttons on the left, the ring beside them, the
-     muscles it was read from down the right. */
+  /* Next workout, read top to bottom: what the day is, a sentence about it,
+     the ring, the two buttons, and a line naming the muscles the ring was read
+     from. The ring used to sit in a three column row with a ticked list beside
+     it, which made the one number the card exists for the smallest thing in
+     it. On its own row it can be 120 wide and still leave the buttons where
+     the thumb is. */
   .wkt-next-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 2px; }
   .wkt-next-top .info-dot { margin: -2px -2px 0 0; }
   .wkt-next-grid {
     display: grid; column-gap: 8px; row-gap: 12px; align-items: start;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    grid-template-areas: "words arc list" "acts acts acts";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "words" "arc" "acts" "line";
   }
   .wkt-next-words { grid-area: words; min-width: 0; }
   /* Not hired: the ring and the muscle list are the reading he does for you,
@@ -451,22 +455,27 @@
      where you do them. */
   .wkt-next-hire { grid-area: pitch; }
   .wkt-next.not-hired .wkt-next-grid {
-    grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "words" "pitch" "acts";
   }
   .wkt-next-sub { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
-  .wkt-arc { grid-area: arc; position: relative; width: 92px; height: 70px; align-self: center; }
+  /* A button, because the figure is a claim and tapping it shows the working.
+     Sized and pressed like the other cards on this tab rather than like a
+     control: it is the number that is tappable, not a widget around it. */
+  .wkt-arc {
+    grid-area: arc; position: relative; width: 120px; height: 92px; justify-self: center;
+    margin: 2px 0; padding: 0; border: 0; background: none; cursor: pointer;
+    transition: transform .12s ease;
+  }
+  .wkt-arc:active { transform: scale(.96); }
   .wkt-arc svg { position: absolute; inset: 0; width: 100%; height: 100%; }
   /* The gauge's centre sits below the middle of its box, since the gap is at
      the bottom, so the number is pinned to it rather than to the box. */
   .wkt-arc-num { position: absolute; left: 0; right: 0; top: 60%; transform: translateY(-50%); text-align: center; line-height: 1; }
-  .wkt-arc-num b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -.03em; color: var(--accent-ink); }
-  .wkt-arc-num i { display: block; margin-top: 3px; font-size: 9px; font-style: normal; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
-  .wkt-muscles { grid-area: list; align-self: center; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
-  .wkt-muscles li { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; white-space: nowrap; color: var(--text); }
-  .wkt-tick { width: 14px; height: 14px; display: grid; place-items: center; color: var(--accent-ink); }
-  /* An open ring, not a tick: the one the day is aimed at is the one not done. */
-  .wkt-ring { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--accent-ink); flex: none; }
+  .wkt-arc-num b { display: block; font-size: 28px; font-weight: 800; letter-spacing: -.03em; color: var(--accent-ink); }
+  .wkt-arc-num i { display: block; margin-top: 4px; font-size: 9px; font-style: normal; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
+  /* The caption under the buttons, where the ticked column used to be a third
+     thing competing with the ring. */
+  .wkt-next-line { grid-area: line; margin: 0; font-size: 12.5px; font-weight: 500; color: var(--muted); line-height: 1.4; }
   .wkt-next-acts { grid-area: acts; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .wkt-next-acts .wkt-more { flex-basis: 100%; }
   .wkt-more {
@@ -3488,28 +3497,8 @@
     width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
     background: none; border: none; color: var(--muted); display: flex; align-items: center; justify-content: center;
   }
-  /* Saved workouts, and putting one on a day. */
-  .sv-saved { margin-top: 20px; }
-  /* One door on the tab, the list behind it, a workout behind that. */
-  .sv-open {
-    width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; color: var(--text);
-    border: 1px solid var(--border); border-radius: 16px; padding: 14px; font: inherit;
-    background: var(--panel); cursor: pointer; transition: transform .12s ease;
-  }
-  .sv-open:active { transform: scale(.99); }
-  .sv-open-ico {
-    width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center;
-    justify-content: center; background: var(--panel-2); color: var(--accent-ink);
-  }
-  .sv-open-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .sv-open-name { font-size: 15.5px; font-weight: 800; letter-spacing: -.015em; }
-  .sv-open-meta { font-size: 12.5px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sv-count {
-    flex-shrink: 0; min-width: 24px; height: 24px; padding: 0 7px; border-radius: 100px; display: flex;
-    align-items: center; justify-content: center; font-size: 12.5px; font-weight: 800;
-    font-variant-numeric: tabular-nums; background: color-mix(in srgb, var(--accent) 16%, transparent);
-    color: var(--accent-ink);
-  }
+  /* A list of things to pick one of: the activities you can plan instead of
+     lifting, and the sessions the swap sheet offers. */
   .sv-rows { display: flex; flex-direction: column; gap: 8px; }
   .sv-row {
     width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; color: var(--text);
@@ -3525,44 +3514,7 @@
   .sv-row-name { font-size: 14px; font-weight: 700; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sv-row-meta { font-size: 12.5px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sv-row-go { color: var(--muted); flex-shrink: 0; transform: rotate(180deg); display: flex; }
-  .sv-cards { display: flex; flex-direction: column; gap: 8px; }
-  .sv-card {
-    text-align: left; font: inherit; cursor: pointer; padding: 12px 14px; border-radius: 14px;
-    background: var(--panel); border: 1px solid var(--border); color: var(--text);
-    display: flex; flex-direction: column; gap: 3px;
-  }
-  .sv-card:active { opacity: .75; }
-  .sv-card-name { font-size: 14px; font-weight: 700; }
-  .sv-card-meta { font-size: 12.5px; color: var(--muted); }
   .sv-name { font-size: 21px; font-weight: 800; letter-spacing: -.02em; margin-top: 2px; }
-  /* One saved workout in detail: the body it works on first, then what is
-     in it. */
-  .sd-hero {
-    display: flex; gap: 14px; align-items: stretch; padding: 14px; margin-bottom: 16px;
-    background: var(--panel-2); border: 1px solid var(--border); border-radius: 16px;
-  }
-  .sd-figs { display: flex; gap: 2px; flex-shrink: 0; }
-  .sd-fig { width: 84px; height: 230px; display: block; }
-  .sd-facts { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
-  .sd-stat b { display: block; font-size: 24px; font-weight: 800; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
-  .sd-stat span { display: block; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
-  .sd-groups { display: flex; flex-wrap: wrap; gap: 5px; }
-  .sd-group {
-    font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 100px;
-    background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent-ink);
-  }
-  .sd-list { display: flex; flex-direction: column; gap: 6px; margin: 0 0 16px; }
-  .sd-ex {
-    display: flex; align-items: center; gap: 12px; padding: 11px 13px; border-radius: 12px;
-    background: var(--panel); border: 1px solid var(--border);
-  }
-  .sd-ex-n { width: 22px; flex-shrink: 0; font-size: 12.5px; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .sd-ex-txt { flex: 1; min-width: 0; }
-  .sd-ex-name { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
-  .sd-ex-tag { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
-  .sd-ex-dose { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); white-space: nowrap; }
-  .sd-ex-dose i { font-style: normal; color: var(--muted); font-weight: 600; margin: 0 2px; }
-  .sd-acts { display: flex; flex-direction: column; gap: 0; }
   /* Moving between the tab's screens: the old one slides out the way you are
      leaving, the new one arrives from where you are going. */
   #workoutContent.scr-out { animation: scrOut .16s ease-in both; }
@@ -3576,14 +3528,6 @@
   @media (prefers-reduced-motion: reduce) {
     #workoutContent.scr-out, #workoutContent.scr-in { animation: none; }
   }
-  .sv-list { margin: 14px 0 6px; }
-  .sv-ex {
-    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-    font-size: 14px; padding: 7px 0; border-bottom: 1px solid var(--border);
-  }
-  .sv-ex b { color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
-  .sv-head { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
-  .sv-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 6px; margin-bottom: 12px; }
   /* The week planner: days down the page, what is on them, and a way in. */
   /* The month. Days carry their state in a dot rather than a colour wash, so a
      trained day, a planned one and a rest day are told apart at a glance
@@ -3598,8 +3542,8 @@
   }
   /* The week, kept visibly apart from today's workout above it, and the
      calendar kept visibly apart from everything else: its own bordered box
-     with its own heading inside it, the same shape as Today's Workout and
-     Saved workouts above, rather than a label floating over a box. Mo: "make
+     with its own heading inside it, the same shape as Today's Workout above
+     it, rather than a label floating over a box. Mo: "make
      the calendar in its own box, the whole thing is too long combined with
      today's workout." */
   .week-sec { margin-top: 34px; padding-top: 22px; border-top: 1px solid var(--border); }
@@ -3621,7 +3565,8 @@
   .cal-title.open svg { transform: rotate(180deg); }
   /* On the planner the month leads, so it opens already showing the grid and
      carries a little more air under it than it does as a footnote on the tab. */
-  .wk-plan-month { margin-bottom: 14px; }
+  /* Under the week rows now, so the gap it owns is above it rather than below. */
+  .wk-plan-month { margin-top: 18px; }
   .wk-plan-month .cal { padding: 0; border: 0; background: none; box-shadow: none; }
   .cal-pick { padding: 10px 8px 12px; border-radius: 14px; background: var(--panel-2); border: 1px solid var(--border); margin-bottom: 12px; }
   .cal-pick-year { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
@@ -3698,9 +3643,9 @@
   .cal-key .k-rest { background: var(--muted); }
 
   /* The tab had no arrival of its own while Home and Body both did. */
-  .opt-card, .spp, .sv-saved, .cal { animation: hRise .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms); }
+  .opt-card, .spp, .cal { animation: hRise .42s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms); }
   @media (prefers-reduced-motion: reduce) {
-    .opt-card, .spp, .sv-saved, .cal { animation: none; }
+    .opt-card, .spp, .cal { animation: none; }
     .cal-day:active { transform: none; }
   }
 
@@ -5013,6 +4958,18 @@
     font-family: var(--font-display);
   }
   .rc-ex-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
+  /* The same circle a lift's position number sits in, holding the activity's
+     own icon instead: a run is not exercise three of anything, so it gets the
+     picture rather than a number. */
+  .rc-act-ico {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; display: flex;
+    align-items: center; justify-content: center;
+    border: 1.5px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    color: var(--accent-ink);
+  }
+  /* Activities follow the exercises, so the second heading needs the air the
+     first one gets from the block above it. */
+  .rc-list + .rc-ex-head { margin-top: 16px; }
   .rc-ex-num { font-size: 12.5px; font-weight: 700; font-family: var(--font-display); text-align: right; white-space: nowrap; }
   .rc-pr {
     font-size: 11px; font-weight: 800; letter-spacing: .06em; padding: 2px 6px; border-radius: 9px;
@@ -8387,9 +8344,6 @@
   <div class="sheet-scrim hidden" id="cropScrim">
     <div class="partner-sheet" id="cropSheet"></div>
   </div>
-  <div class="sheet-scrim hidden" id="savedScrim">
-    <div class="partner-sheet" id="savedSheet"></div>
-  </div>
   <!-- Swapping an exercise. Its own scrim rather than the picker's, because
        this is the one sheet that has to open over the reveal overlay, and the
        reveal sits above every other sheet in the app. -->
@@ -8504,7 +8458,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.18.11";
+const APP_VERSION = "2026.09.18.17";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -11163,54 +11117,186 @@ async function upsertGoalFields(patch) {
    so many groups at once (see focusKept below), and when a pick falls past
    that the page says so in one plain sentence, naming the groups, with no
    arithmetic in it. */
-/* ---- Focus by area, ranked ----
-   Mo wanted the picker down to four things you can put in order rather than
-   fourteen muscles you tap individually: legs, arms, chest, back, ranked 1st
-   to 4th, or everything level when nothing in particular matters.
+/* ---- The four focus regions. ONE table, two views --------------------------
+   Two screens ask this question. Setup's Focus areas ranks these four 1st to
+   4th; onboarding's tune step toggles them on and off, and the day-focus sheet
+   borrows them too. They were written out twice, once here and once as
+   BODY_REGIONS, and the two copies had already drifted by the second day: one
+   led its arms with biceps and the other with shoulders, so the same button
+   bought a different muscle depending on which screen answered it, into one
+   column nothing downstream can tell the screens apart in. The labels had
+   drifted as well. So there is one table now and the other name is a view of
+   it, and the drift cannot come back.
 
-   Each area lists its muscle groups in the order the engine should reach for
-   them, biggest and most trainable first. Shoulders and core are deliberately
-   NOT here: they belong to no area anyone would call legs, arms, chest or
-   back, and putting them under "arms" would train the wrong thing. They are
-   Grouped the way Mo trains rather than the way an anatomy chart splits
-   things: shoulders go with arms because that is the day they get trained on,
-   and core rides with legs for the same reason. Every one of the fourteen
-   muscle groups now belongs to exactly one area, so nothing is unreachable. */
-const FOCUS_AREAS = [
-  { key: "armsdelts", label: "Arms & Shoulders", groups: ["biceps", "triceps", "shoulders", "forearms"] },
-  { key: "legscore",  label: "Legs & Core",      groups: ["quads", "hamstrings", "glutes", "abs", "obliques", "calves"] },
-  { key: "chest",     label: "Chest",            groups: ["chest"] },
-  { key: "back",      label: "Back",             groups: ["lats", "traps", "lowerback"] },
-];
+   A region names one thing or two, and the name is a promise. `lead` is the
+   half the name leads with, `also` is the other half, and focusRegionSpend
+   below buys BOTH whenever it has more than a single unit to spend. That is
+   the other half of the fix: "Legs and core" used to be six groups in one flat
+   list paid for from the front, the budget never reached past the third, and
+   the core half of the button was decoration in every combination there is.
+
+   Inside each list the groups are in the order the budget should reach for
+   them, biggest and most trainable first. Shoulders ride with arms and core
+   rides with legs because those are the days Mo trains them on, not because an
+   anatomy chart splits them that way. Every one of the app's fourteen groups is
+   in exactly one region, which is what lets a tap anywhere on the figure always
+   mean something. */
+const FOCUS_REGIONS = Object.freeze([
+  { id: "arms",  label: "Arms and shoulders", say: "your arms and shoulders",
+    lead: ["biceps", "triceps", "forearms"], also: ["shoulders"] },
+  { id: "chest", label: "Chest", say: "your chest",
+    lead: ["chest"], also: [] },
+  { id: "back",  label: "Back", say: "your back",
+    lead: ["lats", "traps", "lowerback"], also: [] },
+  { id: "legscore", label: "Legs and core", say: "your legs and core",
+    lead: ["quads", "hamstrings", "glutes", "calves"], also: ["abs", "obliques"] },
+].map((r) => Object.freeze({
+  ...r,
+  lead: Object.freeze(r.lead), also: Object.freeze(r.also),
+  /* Every group in the region, both halves, for the figure and for the chip
+     subtitles. Nothing outside the spend should care which half a group is in. */
+  groups: Object.freeze([...r.lead, ...r.also]),
+})));
 const FOCUS_RANK_WORD = ["", "1st", "2nd", "3rd", "4th"];
 
 let FOCUS_AREA_RANK = {};
 
-/* A ranking spent against the engine's own budget, which is 9 points with a
-   top-tier group costing 3, the next 2 and the lightest 1. Two groups from the
-   first area, one from the second, one from the third comes to exactly 9, so
-   the ranking lands whole instead of being silently trimmed by spend().
-   Fourth gets nothing, which is what fourth means. */
-const AREA_SPEND = [
-  { tier: 3, take: 2 },
-  { tier: 2, take: 1 },
-  { tier: 1, take: 1 },
-];
+/* The tier ladder, spent down a list of groups: as much as the budget can
+   afford on the first, then the next, stopping at tier 3 because that is the
+   ceiling for any one group. `left` is what could not be spent, which is a real
+   answer and not an error: Chest is one muscle group and cannot take more than
+   three units however many it is handed. */
+function focusSpendDown(groups, units, maxTier = FOCUS_TIERS.main) {
+  const pairs = [];
+  let left = Math.max(0, units);
+  for (const g of groups) {
+    if (left <= 0) break;
+    const tier = Math.min(maxTier, left);
+    pairs.push([g, tier]);
+    left -= tier;
+  }
+  return { pairs, left };
+}
+
+/* The same units spread ACROSS a list instead of down it: a unit to each group
+   in turn, so two units on a two group half buy both at the lightest tier
+   rather than one at the middle.
+
+   That is not a style choice, it is what the engine measures. The plan's core
+   slot names ONE group and which one depends on the split: the full body and
+   legs templates fill it from abs, the upper/lower template fills it from
+   obliques (SLOTS in mo-knowledge/engine/plan.mjs). So a core focus spent deep
+   on abs lands on a group a four day week never trains, and the week comes back
+   with LESS core work than picking nothing at all: measured on a four day
+   build-muscle week, abs:2 gives 2 weekly core sets against a baseline of 5,
+   while abs:1 plus obliques:1 gives 10. Spread across both, it lands whatever
+   the split. The real fix is one line per template in plan.mjs, widening that
+   slot to ["abs", "obliques"] the way the traps slot was already widened, and
+   this picker should stop compensating the day that lands. */
+function focusSpendAcross(groups, units) {
+  const tier = new Map(groups.map((g) => [g, 0]));
+  let left = Math.max(0, units);
+  while (left > 0) {
+    const lowest = Math.min(...groups.map((g) => tier.get(g)));
+    const g = groups.find((x) => tier.get(x) === lowest && tier.get(x) < FOCUS_TIERS.main);
+    if (!g) break;
+    tier.set(g, tier.get(g) + 1);
+    left -= 1;
+  }
+  return { pairs: [...tier].filter(([, t]) => t > 0), left };
+}
+
+/* What one region buys for a given number of budget units, keeping the promise
+   its label makes. A region named after two things spends about a quarter of
+   what it was given on the second half, never less than one unit per group in
+   that half so a named half is never bought as a coin flip, and never so much
+   that the half the name leads with stops leading.
+
+   The floor is why "Legs and core" with three units buys quads, abs and
+   obliques at a unit each rather than quads at two and abs at one. Measured, the
+   second of those is worse than not picking at all: the legs take the volume,
+   the single core unit lands on a group half the splits never train, and core
+   comes back at 2 weekly sets against a baseline of 5. A name that promises two
+   things and delivers less of the second one than silence would is the bug this
+   whole commit is about, one level down.
+
+   Two units is the one case where the floor cannot be paid, because the lead
+   half must keep a unit. That is a second-ranked area on Setup and nowhere
+   else. Paying for it would mean taking units off the first-ranked area, which
+   would change what Back and Chest buy at the top of a ranking, and those two
+   name one thing and must land exactly where they land today. */
+function focusRegionSpend(region, units) {
+  if (!region || units <= 0) return { pairs: [], left: Math.max(0, units) };
+  const share = region.also.length && units >= 2
+    ? Math.min(Math.max(region.also.length, Math.round(units / 4)), units - 1)
+    : 0;
+  const first = focusSpendDown(region.lead, units - share);
+  /* The lead half's own leftover goes here rather than being binned: a one
+     group lead (Chest) hands its whole allowance on. */
+  const second = focusSpendAcross(region.also, share + first.left);
+  return { pairs: [...first.pairs, ...second.pairs], left: second.left };
+}
+
+/* Several regions at once, and the units one of them cannot spend handed to
+   another one the person actually picked.
+
+   Chest is the whole reason the handing exists. It is one muscle group, it tops
+   out at tier 3, and before this the other units of a chest pick were binned:
+   picking Chest spent 3 of the 9 while every other pick spent 8. The other
+   candidate was to spend the remainder on the muscles that press with it,
+   triceps and shoulders, and that one is wrong for a reason the screens
+   settle: both pickers read their answer back out of the column by asking which
+   region each stored group belongs to, so a Chest pick that wrote triceps would
+   come back as Chest AND Arms on the next visit, on both screens. Writing
+   muscles nobody tapped is the same class of bug as the one this commit is
+   fixing. Inside the person's own picks it is safe, so that is where the
+   leftover goes, one unit at a time until nobody can take another. */
+function focusSpendRegions(regions, units) {
+  const allowance = regions.map((r, i) => Math.max(0, units[i] || 0));
+  const run = () => regions.map((r, i) => focusRegionSpend(r, allowance[i]));
+  /* Bounded by the budget rather than by `while`, because a spend table edited
+     later must not be able to hang the picker. */
+  for (let move = 0; move < FOCUS_BUDGET_UNITS; move++) {
+    const spends = run();
+    const donor = spends.findIndex((s) => s.left > 0);
+    if (donor < 0) break;
+    const taker = spends.findIndex((s, i) => i !== donor && allowance[i] > 0 && s.left === 0
+      && focusRegionSpend(regions[i], allowance[i] + 1).left === 0);
+    if (taker < 0) break;                       // nobody left who can use it
+    allowance[donor] -= 1;
+    allowance[taker] += 1;
+  }
+  const pairs = [];
+  for (const s of run()) pairs.push(...s.pairs);
+  return pairs;
+}
+
+/* One entry per group, highest tier wins, in the column's own "quads:3" shape.
+   Not a [group, tier] pair: focusParseStored here and parseFocus in the engine
+   both split a string on ":", so an array of arrays came back as no focus at
+   all, in the picker and in the plan. The dedupe is cheap insurance rather than
+   a live case today, and it can only ever lower the total: two rows for one
+   group would spend the budget twice and the engine would read one of them. */
+function focusEntriesOf(pairs) {
+  const best = new Map();
+  for (const [g, t] of pairs) best.set(g, Math.max(best.get(g) || 0, t));
+  return [...best].map(([g, t]) => `${g}:${t}`);
+}
+
+/* Setup's view: a ranking, spent against the engine's own budget of 9 units
+   where a top-tier group costs 3, the next 2 and the lightest 1. Six units to
+   the first area, two to the second, one to the third is exactly nine, so the
+   ranking lands whole instead of being silently trimmed by spend(). Fourth gets
+   nothing, which is what fourth means, and the units an unranked area would
+   have had are not handed out either: not ranking something is ranking it
+   last. */
+const AREA_RANK_UNITS = [6, 2, 1];
 function focusEntriesFromAreas() {
-  const ranked = FOCUS_AREAS
-    .filter((a) => FOCUS_AREA_RANK[a.key])
-    .sort((a, b) => FOCUS_AREA_RANK[a.key] - FOCUS_AREA_RANK[b.key]);
-  const out = [];
-  ranked.forEach((area, i) => {
-    const plan = AREA_SPEND[i];
-    if (!plan) return;
-    /* "quads:2", the column's own shape, not a [group, tier] pair. The pair is
-       what this returned for a while and nothing could read it: focusParseStored
-       here and parseFocus in the engine both split a string on ":", so an array
-       of arrays came back as no focus at all, in the picker and in the plan. */
-    area.groups.slice(0, plan.take).forEach((g) => out.push(`${g}:${plan.tier}`));
-  });
-  return out;
+  const ranked = FOCUS_REGIONS
+    .filter((r) => FOCUS_AREA_RANK[r.id])
+    .sort((a, b) => FOCUS_AREA_RANK[a.id] - FOCUS_AREA_RANK[b.id])
+    .slice(0, AREA_RANK_UNITS.length);
+  return focusEntriesOf(focusSpendRegions(ranked, ranked.map((r, i) => AREA_RANK_UNITS[i])));
 }
 
 /* The figure already paints every group in FOCUS_PICKED, so the ranking is
@@ -11224,8 +11310,8 @@ function syncPickedFromAreas() {
   /* FOCUS_ALL is read straight off the global by the repaint, which paints the
      whole body green from it, so there is deliberately nothing to mirror here. */
   if (FOCUS_ALL) return;
-  for (const area of FOCUS_AREAS) {
-    const tier = AREA_RANK_TIER[FOCUS_AREA_RANK[area.key]];
+  for (const area of FOCUS_REGIONS) {
+    const tier = AREA_RANK_TIER[FOCUS_AREA_RANK[area.id]];
     if (!tier) continue;
     for (const g of area.groups) FOCUS_PICKED.set(g, tier);
   }
@@ -11248,7 +11334,7 @@ function focusAreaTap(key) {
     }
   } else {
     const used = Object.keys(FOCUS_AREA_RANK).length;
-    if (used >= FOCUS_AREAS.length) return;
+    if (used >= FOCUS_REGIONS.length) return;
     FOCUS_AREA_RANK[key] = used + 1;
   }
   paintFocusAreas();
@@ -11258,10 +11344,10 @@ function paintFocusAreas() {
   const grid = $("focusAreaGrid");
   if (!grid) return;
   const anyRanked = Object.keys(FOCUS_AREA_RANK).length > 0;
-  grid.innerHTML = FOCUS_AREAS.map((a) => {
-    const r = FOCUS_AREA_RANK[a.key] || 0;
+  grid.innerHTML = FOCUS_REGIONS.map((a) => {
+    const r = FOCUS_AREA_RANK[a.id] || 0;
     const cls = FOCUS_ALL ? "level" : r ? "r" + r : "none";
-    return `<button type="button" class="fa-card ${cls}" data-area="${a.key}">
+    return `<button type="button" class="fa-card ${cls}" data-area="${a.id}">
       <span class="fa-rank">${FOCUS_ALL ? "Even" : r ? FOCUS_RANK_WORD[r] : ""}</span>
       <span class="fa-label">${escapeHtml(a.label)}</span>
       <span class="fa-sub">${a.groups.map((g) => BODY_GROUP_LABELS[g]).join(", ")}</span>
@@ -11284,15 +11370,15 @@ function paintFocusAreas() {
       ? "Tap wherever bothers you most. Tap more to rank what comes after it."
       : "Tap an area to make it first. Tap more to rank them after it.";
   } else if (FOCUS_SORE) {
-    const order = FOCUS_AREAS.filter((a) => FOCUS_AREA_RANK[a.key])
-      .sort((a, b) => FOCUS_AREA_RANK[a.key] - FOCUS_AREA_RANK[b.key]);
+    const order = FOCUS_REGIONS.filter((a) => FOCUS_AREA_RANK[a.id])
+      .sort((a, b) => FOCUS_AREA_RANK[a.id] - FOCUS_AREA_RANK[b.id]);
     note.textContent = "Your mobility work will concentrate on " + order.map((a) => a.label.toLowerCase()).join(", then ") + ".";
   } else {
-    const order = FOCUS_AREAS.filter((a) => FOCUS_AREA_RANK[a.key])
-      .sort((a, b) => FOCUS_AREA_RANK[a.key] - FOCUS_AREA_RANK[b.key]);
+    const order = FOCUS_REGIONS.filter((a) => FOCUS_AREA_RANK[a.id])
+      .sort((a, b) => FOCUS_AREA_RANK[a.id] - FOCUS_AREA_RANK[b.id]);
     const said = order.map((a, i) => {
-      const plan = AREA_SPEND[i];
-      return plan ? `${a.label.toLowerCase()} ${i === 0 ? "hardest" : i === 1 ? "next" : "a little"}` : `${a.label.toLowerCase()} not at all`;
+      const units = AREA_RANK_UNITS[i];
+      return units ? `${a.label.toLowerCase()} ${i === 0 ? "hardest" : i === 1 ? "next" : "a little"}` : `${a.label.toLowerCase()} not at all`;
     });
     note.textContent = "Your weeks will push " + said.join(", ") + ".";
   }
@@ -11332,8 +11418,8 @@ function renderBodyFocusPage(opts = {}) {
   if (!FOCUS_ALL) {
     const best = {};
     for (const [g, t] of storedPicks) {
-      const area = FOCUS_AREAS.find((a) => a.groups.includes(g));
-      if (area) best[area.key] = Math.max(best[area.key] || 0, t);
+      const area = FOCUS_REGIONS.find((a) => a.groups.includes(g));
+      if (area) best[area.id] = Math.max(best[area.id] || 0, t);
     }
     Object.entries(best).sort((a, b) => b[1] - a[1]).forEach(([k], i) => { FOCUS_AREA_RANK[k] = i + 1; });
   }
@@ -11367,74 +11453,53 @@ function closeBodyFocusPage() {
    regions, not muscles. I don't want to see too much detail." Four regions on
    the app's own body, front and back at once, and no ranking anywhere on it.
 
-   It is a SECOND picker on purpose and Setup's Focus areas is not going
-   anywhere. That one still owns the fourteen muscle groups and the three tiers,
-   because somebody who has trained for a month and opens Focus areas is not the
-   person answering their fourth ever question. What the two now share is the
-   body they draw and the column they write: bodyRegionFocusEntries() below
-   spends the engine's same nine units and emits the same "quads:3" strings, so
-   nothing downstream can tell which screen an answer came from.
+   It is a SECOND VIEW and not a second table. Setup's Focus areas is not going
+   anywhere: it still asks for a ranking, because somebody who has trained for a
+   month and opens Focus areas is not the person answering their fourth ever
+   question. But the four regions, their labels, their muscle groups and the
+   order the budget reaches for them all live in FOCUS_REGIONS now, above, and
+   this screen reads them from there. They used to be written out twice and the
+   two copies drifted inside two days.
 
-   The difference between them is only how much is on screen. Focus areas asks
-   for fourteen muscles and a ranking; this asks for four regions, and the same
-   figure answers both.
-
-   Those four are FOCUS_AREAS's four, one for one, since 2026-09-18. This
-   shipped with five, legs and core apart, and the app then asked the same
-   question twice and got two different answers into one column: five regions
-   here, four ranked areas there, and nothing downstream able to tell which
-   screen had answered. Core lost, because nobody trains core as a day. It
-   rides with legs here for the same reason it does in FOCUS_AREAS, whose
-   comment makes the argument at more length.
+   The difference between the screens is how much is on screen and how the
+   budget is handed out: a ranking pays 6, 2 and 1 units by position, and this
+   one has no ranking on it, so it pays every picked region the same. Both
+   spend the engine's same nine units through focusRegionSpend() and emit the
+   same "quads:3" strings, so nothing downstream can tell which screen an
+   answer came from.
 
    The two exported names are a contract with the onboarding sequence:
      bodyRegionPickerHTML({ sex, selected, sore })   -> markup string
      wireBodyRegionPicker(root, { sex, onChange })
 */
 
-/* Region to muscle groups, in the order the plan should reach for them, biggest
-   and most trainable first, because the spend below takes the front of each
-   list. Every one of the app's fourteen groups is in exactly one region, which
-   is what lets a tap anywhere on the figure always mean something. */
-const BODY_REGIONS = Object.freeze([
-  { id: "arms",  label: "Arms and shoulders", say: "your arms and shoulders",
-    groups: ["shoulders", "biceps", "triceps", "forearms"] },
-  { id: "chest", label: "Chest", say: "your chest",
-    groups: ["chest"] },
-  { id: "back",  label: "Back", say: "your back",
-    groups: ["lats", "traps", "lowerback"] },
-  /* Same six groups in the same order as FOCUS_AREAS's legscore, deliberately,
-     because the spend below pays from the front of this list and Setup's
-     AREA_SPEND pays from the front of that one. Two orders would mean the two
-     screens buying different muscles out of the same answer. Quads, hamstrings
-     and glutes lead because they are the three the budget can actually reach;
-     abs and obliques sit behind them, which is what "core rides with legs"
-     costs and is worth saying out loud. Calves are last for the reason they
-     are last everywhere. */
-  { id: "legscore", label: "Legs and core", say: "your legs and core",
-    groups: ["quads", "hamstrings", "glutes", "abs", "obliques", "calves"] },
-]);
+/* The onboarding view of the one table. Same rows, same order, no copy. */
+const BODY_REGIONS = FOCUS_REGIONS;
 const BODY_REGION_IDS = BODY_REGIONS.map((r) => r.id);
 const bodyRegionFor = (id) => BODY_REGIONS.find((r) => r.id === id) || null;
 
-/* How much of each picked region actually gets written, keyed by how many
-   regions were picked. Every row costs nine units or fewer against the engine's
+/* How many budget units each picked region gets, keyed by how many regions were
+   picked. Every row totals nine units or fewer against the engine's
    FOCUS_BUDGET, which is the whole reason this table exists: all four regions
    is fourteen muscle groups, and fourteen groups asked for at once is a request
    focus.mjs answers by silently dropping the tail.
 
-   Setup's picker solves the same arithmetic with AREA_SPEND, which pays out by
-   RANK: first area hardest, fourth nothing. That cannot be used here, because
-   this screen has no ranking on it. Ordering these by the order they happened
-   to be tapped would be a priority nobody can see and nobody can correct, which
-   is the kind of quiet decision this codebase is supposed to say out loud. So
-   picked regions are equals, and what moves instead is how deep into each one
-   the budget reaches. The tier numbers are the engine's own: 3 main, 2
-   secondary, 1 light, same as FOCUS_TIERS. */
-const BODY_REGION_SPEND = Object.freeze({
-  1: [3, 3, 2],   // one region, so go three groups deep into it: 3 + 3 + 2 = 8
-  2: [3, 1],      // the lead group of each, hard, and the next one as a nudge: 8
-  3: [3],         // the lead group of each, hard: 9, the budget exactly
+   Setup's picker hands its nine out by RANK, first area hardest. That cannot be
+   used here, because this screen has no ranking on it. Ordering these by the
+   order they happened to be tapped would be a priority nobody can see and
+   nobody can correct, which is the kind of quiet decision this codebase is
+   supposed to say out loud. So picked regions are equals, and what moves
+   instead is how deep into each one the budget reaches.
+
+   What each region then does with its units is focusRegionSpend's business, not
+   this table's. That is the fix of 2026-09-18: this used to hand out TIERS,
+   [3, 3, 2] paid down the front of one flat group list, so "Legs and core" with
+   eight units bought quads, hamstrings and glutes and the core half of the
+   button was decoration. */
+const BODY_REGION_UNITS = Object.freeze({
+  1: 8,   // one region, deep: three groups of it, 3 + 3 + 2
+  2: 4,   // four each: the lead half hard, the other half nudged
+  3: 3,   // three each, which is the budget exactly
   /* There is no row 4. Four regions is every region there is, which
      bodyRegionFocusEntries answers as the whole body before it ever reaches
      this table. A row here for a count that cannot arrive is a rule nobody
@@ -11464,19 +11529,12 @@ function bodyRegionFocusEntries(ids) {
   if (!picked.length || bodyRegionsAreWholeBody(ids)) return [];
   /* The fallback is unreachable while there are four regions and all four is
      the whole body, so picked.length is only ever 1, 2 or 3 by the time it is
-     read. It pays one light group per region rather than the deepest row,
-     because the only way to arrive here is a region added without a spend row
-     for it, and the safe answer to a count this table did not plan for is the
-     one that cannot overrun the budget whatever the count turns out to be. */
-  const tiers = BODY_REGION_SPEND[picked.length] || [1];
-  const out = [];
-  for (const region of picked) {
-    tiers.forEach((tier, i) => {
-      const group = region.groups[i];
-      if (group) out.push(`${group}:${tier}`);
-    });
-  }
-  return out;
+     read. It pays one unit per region rather than the deepest row, because the
+     only way to arrive here is a region added without a row for it, and the
+     safe answer to a count this table did not plan for is the one that cannot
+     overrun the budget whatever the count turns out to be. */
+  const units = BODY_REGION_UNITS[picked.length] || 1;
+  return focusEntriesOf(focusSpendRegions(picked, picked.map(() => units)));
 }
 
 /* The way back in, so somebody who taps Back and then Continue sees what they
@@ -11976,8 +12034,8 @@ async function initBodyFocusRive() {
      bicep lights both arms rather than that one head. Which is the point: the
      picker is areas now, and the body is the other way of reaching them. */
   function tapGroup(group) {
-    const area = FOCUS_AREAS.find((a) => a.groups.includes(group));
-    if (area) focusAreaTap(area.key);
+    const area = FOCUS_REGIONS.find((a) => a.groups.includes(group));
+    if (area) focusAreaTap(area.id);
   }
   function make(id, view) {
     return mod.createBodyHeatmap({
@@ -12034,7 +12092,7 @@ async function initBodyFocusRive() {
        picked set left a deselected muscle wearing the palette it had when it
        was ranked, and with its intensity dropped to zero that rendered black.
        A group with no rank is explicitly put back to base. */
-    for (const area of FOCUS_AREAS) {
+    for (const area of FOCUS_REGIONS) {
       const tier = FOCUS_PICKED.get(area.groups[0]);
       for (const g of area.groups) {
         if (FOCUS_ALL) {
@@ -13978,7 +14036,13 @@ function switchTab(tab) {
   if (tab === "home") renderHome(true);
   if (tab === "progress") renderProgressTab();
   if (tab === "body") { bodyResetFocus(); renderBodyTab(true); }
-  if (tab === "workout") renderWorkoutTab();
+  if (tab === "workout") {
+    /* Reviewing another day is somewhere you went from this tab, not a state
+       the tab holds. Coming back to it opens on today, the way every other
+       screen on it does. */
+    if (WORKOUT_MODE === "review") { WORKOUT_MODE = null; PLAN_VIEW_DATE = null; }
+    renderWorkoutTab();
+  }
   if (tab === "setup") renderSetupTab();
 }
 
@@ -14268,7 +14332,6 @@ async function loadAll() {
     loadBodyPhotos(),
     loadTodayWorkout(),
     loadDoneWorkouts(),
-    loadSavedWorkouts(),
   ]);
   watchLiveSessions();
   startLiveTick();
@@ -14922,13 +14985,11 @@ const INFO_TOPICS = {
     ],
     paras: ["Tap the month to jump to another month or year. Days before your first logged workout are not selectable."],
   }),
-  savedWorkouts: () => ({
-    eyebrow: "Saved workouts",
-    paras: [
-      "A saved workout is a template, not a booking. It carries no date, so keeping one costs you nothing and commits you to nothing.",
-      "Opening one shows the body it works and the exercises in it. From there you can do it today, edit a copy without touching the original, or delete it.",
-    ],
-  }),
+  /* The ring on the workout tab, tapped. Same arrangement as progressNote:
+     the working is put together when the card is drawn and this only reads it,
+     so the sheet explains the figure that is actually on screen. With nothing
+     built yet it falls back to what the little i beside it says. */
+  planMatchWhy: () => MATCH_NOTE || INFO_TOPICS.planMatch(),
   /* The Progress headline's own aside, whatever it happens to be saying about
      the person on screen right now. Built at tap time off the last render, so
      it can never disagree with the number above it. */
@@ -15731,17 +15792,33 @@ function recapFor(email, name, date) {
   const plans = (ALL_PLANS || []).filter((w) => w.email === email && w.entry_date === date);
   const entry = ALL_ENTRIES.find((e) => e.user_name === name && e.entry_date === date);
 
-  const sets = logs.reduce((s, l) => s + (l.sets || 1), 0);
-  const volume = logs.reduce((s, l) => s + (l.sets || 1) * (l.reps || 0) * (l.weight || 0), 0);
+  /* An activity is a row with minutes on it and no sets, which is exactly what
+     todaySessions tests for, through the same countsAsCardio, so this sheet and
+     the workout tab cannot disagree about what a session was. Splitting them
+     here is what lets the yoga class have its own block under the lifts
+     instead of being printed as one set of something, and it is what keeps
+     TOTAL SETS honest on a day that was only a run. */
+  const activities = logs.filter((l) => l.duration_min && countsAsCardio(l.exercise_name));
+  const actIds = new Set(activities.map((l) => l.id));
+  const lifts = logs.filter((l) => !actIds.has(l.id));
+
+  const sets = lifts.reduce((s, l) => s + (l.sets || 1), 0);
+  const volume = lifts.reduce((s, l) => s + (l.sets || 1) * (l.reps || 0) * (l.weight || 0), 0);
   const minutes = logs.reduce((s, l) => s + (l.duration_min || 0), 0);
   const seconds = plans.reduce((s, w) => s + (w.duration_sec || 0), 0);
 
   const { prLogIds } = personalRecords(name);
   return {
     date,
-    title: displayFocus(plans.find((w) => w.focus)?.focus, logs.map((l) => l.exercise_name)),
-    logs, sets, volume, minutes, seconds,
-    exercises: logs.length,
+    /* A day with nothing lifted on it is named after what was actually done.
+       This took its title off whatever plan sat on the date, so a morning yoga
+       class on a day whose push day never happened opened a recap headed
+       "Push Day" over a single thirty five minute row. */
+    title: lifts.length || !activities.length
+      ? displayFocus(plans.find((w) => w.focus)?.focus, logs.map((l) => l.exercise_name))
+      : activities.length === 1 ? activities[0].exercise_name : "Activity day",
+    logs, lifts, activities, sets, volume, minutes, seconds,
+    exercises: lifts.length,
     note: entry?.note || null,
     /* The same record personalRecords means, so the tag here and the banner
        mid-workout can never disagree. This used to look the name up in a
@@ -15898,7 +15975,16 @@ function openRecap(email, name, date) {
   const when = [relDayLabel(r.date), at ? at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : null]
     .filter(Boolean).join(" · ");
 
-  const timeText = r.seconds ? fmtElapsed(r.seconds * 1000) : (r.minutes ? `${r.minutes}:00` : "-");
+  /* Both halves of the day, added. The lift's clock came off the plan row and
+     an activity's minutes came off its log, and TIME only ever read the first
+     one: a day of a push day and a thirty five minute yoga class printed the
+     push day's clock and quietly dropped the yoga. */
+  const totalSeconds = (r.seconds || 0) + (r.minutes || 0) * 60;
+  const timeText = totalSeconds ? fmtElapsed(totalSeconds * 1000) : "-";
+  /* A day nobody lifted on. The sheet still opens on it, because a yoga class
+     is training and this is where the day is read back, but it cannot call
+     itself a completed workout or print sets it does not have. */
+  const onlyActivities = !r.lifts.length && r.activities.length > 0;
 
   /* Volume and calories only appear when they are real: a bodyweight session
      has no tonnage, and calories need a logged bodyweight to mean anything. */
@@ -15919,6 +16005,19 @@ function openRecap(email, name, date) {
     </div>`;
   };
 
+  /* An activity carries its own icon rather than a position number, because it
+     is not the third thing in a list of sets: it is the class or the run that
+     also happened. Distance only when there is one, the same way the session
+     list writes it, and from the same two columns. */
+  const actRow = (l) => {
+    const act = actForExerciseName((l.exercise_name || "").trim());
+    return `<div class="rc-ex">
+      <span class="rc-act-ico">${icon(act?.ico || "run", 15)}</span>
+      <span class="rc-ex-name">${escapeHtml((l.exercise_name || "").trim())}</span>
+      <span class="rc-ex-num2">${escapeHtml(`${l.duration_min} min`)}${l.distance_mi ? `<i>${escapeHtml(`${l.distance_mi} mi`)}</i>` : ""}</span>
+    </div>`;
+  };
+
   $("recapSheet").innerHTML = `
     <div class="ds-grip"></div>
     <div class="scr-head">
@@ -15931,18 +16030,24 @@ function openRecap(email, name, date) {
     <div class="rc-head">
       <div class="rc-tick">${icon("check", 22)}</div>
       <div>
-        <div class="rc-kicker">WORKOUT COMPLETED</div>
+        <div class="rc-kicker">${sharing && onlyActivities ? "ACTIVITY COMPLETED" : "WORKOUT COMPLETED"}</div>
         <div class="rc-title">${escapeHtml(sharing ? r.title : "Workout")}</div>
         <div class="rc-when">${escapeHtml(when)}</div>
       </div>
     </div>
 
-    <div class="rc-stats"${sharing ? "" : ` style="grid-template-columns:1fr;"`}>
-      ${sharing
-        ? `${recapStat(r.sets || "-", "TOTAL SETS")}
-           ${recapStat(r.exercises || "-", "EXERCISES")}
+    ${/* A day that was only a run has no sets and no exercises, and printing
+          two dashes over it is the sheet shrugging. It gets the two numbers it
+          does have instead. */ ""}
+    <div class="rc-stats"${!sharing ? ` style="grid-template-columns:1fr;"` : onlyActivities ? ` style="grid-template-columns:repeat(2,1fr);"` : ""}>
+      ${!sharing
+        ? recapStat(String(effortXPBetween(name, date, date)), "EFFORT XP")
+        : onlyActivities
+        ? `${recapStat(r.activities.length, r.activities.length === 1 ? "ACTIVITY" : "ACTIVITIES")}
            ${recapStat(timeText, "TIME")}`
-        : recapStat(String(effortXPBetween(name, date, date)), "EFFORT XP")}
+        : `${recapStat(r.sets || "-", "TOTAL SETS")}
+           ${recapStat(r.exercises || "-", "EXERCISES")}
+           ${recapStat(timeText, "TIME")}`}
     </div>
     ${secondRow.length
       ? `<div class="rc-stats" style="grid-template-columns:repeat(${secondRow.length},1fr);">${secondRow.join("")}</div>`
@@ -15964,41 +16069,32 @@ function openRecap(email, name, date) {
 
     ${!sharing
       ? `<p class="lw-private-note">${escapeHtml(name)} keeps workout details private. Their effort score is always shared.</p>`
-      : r.logs.length ? `
+      : r.lifts.length ? `
       <div class="rc-ex-head"><h4>Exercises</h4></div>
-      <div class="rc-list">${r.logs.map(exRow).join("")}</div>`
+      <div class="rc-list">${r.lifts.map(exRow).join("")}</div>`
+      : r.activities.length ? ""
       : `<div class="ps-empty">No exercises were logged for this one.</div>`}
+
+    ${/* Mo: "View today's training only shows the workout, but I also did an
+          activity, should be able to show that as well." Its own block under
+          the lifts, because a yoga class is not exercise three of the push
+          day; on a day that was only a run this is the whole recap, and the
+          sheet opens on it rather than on "no exercises were logged". */ ""}
+    ${sharing && r.activities.length ? `
+      <div class="rc-ex-head"><h4>Activities</h4></div>
+      <div class="rc-list">${r.activities.map(actRow).join("")}</div>` : ""}
 
     ${r.note ? `<p class="quote">${escapeHtml(r.note)}</p>` : ""}
 
-    ${mine ? `<div class="rc-actions">
-        <button type="button" class="btn-secondary" id="rcSave">Save this workout</button>
-        ${PARTNER_EMAIL ? `<button type="button" class="btn-primary" id="rcTell">Share to ${escapeHtml(partnerName())}</button>` : ""}
+    ${mine && PARTNER_EMAIL ? `<div class="rc-actions">
+        <button type="button" class="btn-primary" id="rcTell">Share to ${escapeHtml(partnerName())}</button>
       </div>` : ""}`;
 
   $("rcClose").onclick = closeRecap;
   if ($("rcTell")) $("rcTell").onclick = () => { closeRecap(); openNoteComposer("congratulate"); };
   if ($("rcShare")) $("rcShare").onclick = () => shareRecap(r);
-  if ($("rcSave")) $("rcSave").onclick = () => saveRecapAsPlan(r);
   $("recapScrim").classList.remove("hidden");
   $("recapScrim").onclick = (ev) => { if (ev.target === $("recapScrim")) closeRecap(); };
-}
-
-/* A workout worth repeating is worth keeping. It goes to the saved list and
-   stops there: what to do with it later is a separate decision, made on the
-   week planner when you are actually thinking about days. */
-async function saveRecapAsPlan(r) {
-  const exercises = r.logs.map((l) => ({
-    name: l.exercise_name,
-    sets: l.sets || 3,
-    reps: l.reps || 10,
-    targetWeight: l.weight ?? null,
-  }));
-  if (!exercises.length) { toast("Nothing to save"); return; }
-  const saved = await saveWorkoutAs(exercises, r.title);
-  if (!saved) return;
-  closeRecap();
-  renderWorkoutTab();
 }
 
 function closeRecap() { $("recapScrim").classList.add("hidden"); }
@@ -24372,6 +24468,43 @@ let planEnginePromise = null;
    closes. The engine import is lazy, so the card paints with its own guess
    first and repaints once, if the answer differs. */
 let ENGINE_NEXT_DAY = null;
+
+/* EVERY WAY A DAY'S PLAN CHANGES ENDS HERE.
+
+   Mo: "when I swap a workout then go back to the workout page, it should be
+   updated for the smart workout overview." Four doors lead to a swap, the
+   whole-session sheet from the plan screen, the same sheet from the reveal,
+   the day planner's Swap the whole workout, and swapping a lift for an
+   activity, and each one used to decide for itself what to reload and what to
+   redraw. A swap onto a day that is not today reloaded the tables and then
+   redrew the home tab, so the week strip and the next-workout card sitting
+   behind the sheet kept the day that had just been replaced.
+
+   ENGINE_NEXT_DAY is dropped here too. It is the generator's answer to "which
+   day next", cached, and it was asked before this write: on a day with no plan
+   the card reads it synchronously, so without this the card paints the
+   suggestion the old plan produced, and only corrects itself once the engine
+   module answers again.
+
+   `date` is the day that was written, and is what decides whether TODAY_WORKOUT
+   needs re-reading as well as the tables. `then` runs in the gap between the
+   reload and the repaint, for the one caller with a flag to set off the row it
+   has just read back (FRESH_PLAN_ID), which the repaint then has to see. */
+async function planChangedOn(date, { then = null } = {}) {
+  ENGINE_NEXT_DAY = null;
+  await loadAll();
+  if (date === sessionDate()) await loadTodayWorkout();
+  if (then) then();
+  renderHero();
+  /* Only while the workout tab is the one on screen: these sheets open over it
+     and over Home, and rebuilding a panel nobody is looking at is how a screen
+     ends up redrawn underneath an animation. Asked of the panel rather than of
+     the tab bar, because the workout tab has no tab button: it is reached from
+     the middle of the bar, and switchTab leaves every .tab-btn inactive for
+     it. respectMode, so a screen asked for by name stays where it is. */
+  if (!$("tab-workout")?.classList.contains("hidden")) renderWorkoutTab({ respectMode: true });
+}
+
 async function refreshEngineNextDay() {
   const engine = await ensurePlanEngine();
   if (!engine?.generateFromPayload) return;
@@ -24659,14 +24792,12 @@ async function applySessionSwap(workout, ctx) {
      to 45 min" offer pointing at a session they swapped away from is a trap. */
   if (ONE_OFF_SESSION?.date === date) ONE_OFF_SESSION = null;
 
-  await loadAll();
-  if (date === todayStr()) {
-    await loadTodayWorkout();
-    FRESH_PLAN_ID = TODAY_WORKOUT?.id || null;
-    renderWorkoutTab();
-  } else {
-    renderHero();
-  }
+  /* One reload and one repaint for every day, not just for today. A swap onto
+     Friday redrew Home and left the workout tab underneath showing Friday's
+     old session on the week strip. */
+  await planChangedOn(date, {
+    then: () => { if (date === sessionDate()) FRESH_PLAN_ID = TODAY_WORKOUT?.id || null; },
+  });
   toast(`Swapped to ${workout.focus}`);
   /* Opened from the reveal, so the reveal is what redraws: the same overlay,
      the new session landing a row at a time exactly as the first one did, with
@@ -24732,7 +24863,11 @@ async function archiveSwappedPlan(instead) {
   const { error } = await sb.from("ai_workouts").update({ archived: true }).eq("id", instead.planId);
   if (error) { console.error("could not stand the swapped plan down", error); return; }
   if (TODAY_WORKOUT?.id === instead.planId) TODAY_WORKOUT = null;
-  renderWorkoutTab();
+  /* Through the same door as every other plan change. It used to null out
+     TODAY_WORKOUT and redraw, leaving ALL_PLANS still holding the row it had
+     just archived, so the week strip kept a dot on a day whose lift had been
+     stood down. */
+  await planChangedOn(sessionDate());
 }
 
 /* The screen that says what went wrong. It has to be the most robust thing
@@ -28156,7 +28291,7 @@ async function sessionDone() {
   renderWorkoutTab();
 }
 
-let WORKOUT_MODE = null; // null | "choose" | "manual" | "week" | "activity"
+let WORKOUT_MODE = null; // null | "choose" | "manual" | "week" | "recovery" | "review" | "activity"
 let MANUAL_DRAFT = [];
 /* The id of a plan generated in this sitting. A new plan can legitimately
    contain something already logged today, and without this the preview read
@@ -29046,6 +29181,15 @@ function renderWorkoutTab({ respectMode = false } = {}) {
     return;
   }
 
+  /* Another day's plan, open for review. It comes before today's screen
+     because the writes made from it (an activity on that day, a rebuild around
+     what you have) redraw the whole tab when they land, and dropping back to
+     today there would be the app closing the screen somebody was working on. */
+  if (WORKOUT_MODE === "review" && PLAN_VIEW_DATE) {
+    renderPlanPreview({ date: PLAN_VIEW_DATE, review: true });
+    return;
+  }
+
   // An explicit request to see choose/manual/week (from goWorkoutScreen) wins
   // over the default "show today's plan" behaviour; a plain tab switch does not.
   if (TODAY_WORKOUT && !(respectMode && WORKOUT_MODE)) {
@@ -29386,8 +29530,14 @@ function budgetChangeLine(from, to, { restCompressed = null } = {}) {
    Everything below is measured off the plan's own exercises, so Focus,
    Duration, Equipment and Target Muscles describe the thing you are about to
    do rather than a second opinion about it. */
-function planFromToday() {
-  const list = TODAY_WORKOUT?.exercises || [];
+function planFromToday(date = todayStr()) {
+  /* Today reads the live TODAY_WORKOUT global; any other date reads the
+     plans table directly. Without this split, a finished day's own
+     leftover plan row (still sitting there, unarchived, exercises intact)
+     kept answering for tomorrow too, so the "next workout" card went on
+     naming today's already-finished session under a "Tomorrow" eyebrow. */
+  const src = date === todayStr() ? TODAY_WORKOUT : planForDate(date);
+  const list = src?.exercises || [];
   if (!list.length) return null;
 
   const names = list.map((e) => (e.name || "").toLowerCase());
@@ -29426,9 +29576,14 @@ function planFromToday() {
        `equipment` line below is the old guess from recently logged names and
        stays only as the fallback for the moment before the table loads. */
     kit: kitForDay(list.map((ex) => ex.name)),
-    focus: displayFocus(TODAY_WORKOUT.focus, list),
+    focus: displayFocus(src.focus, list),
     match: md.match,
     muscles: md.muscles,
+    /* Every muscle scored, and the week's hardest, for the sheet behind the
+       ring. The card only has room for four of them. */
+    all: md.all,
+    peak: md.peak,
+    peakName: md.peakName,
     duration: `${Math.max(10, mins - 5)}-${mins + 5} min`,
     equipment: kit.length ? kit.join(", ") : null,
     targets,
@@ -29457,14 +29612,54 @@ function matchDetail(counts) {
   const vols = computeMuscleVolume(ME, 0);
   const trained = Object.keys(counts || {});
   const peak = Math.max(...Object.values(vols), 0);
-  if (!trained.length) return { match: 99, muscles: [] };
+  if (!trained.length) return { match: 99, muscles: [], all: [], peak: 0 };
   const pretty = { lowerback: "Lower back", abs: "Core", obliques: "Obliques" };
+  const last = muscleLastTrained();
   const muscles = trained.map((m) => ({
+    key: m,
     name: pretty[m] || m.charAt(0).toUpperCase() + m.slice(1),
     fresh: peak > 0 ? Math.max(0, Math.min(100, Math.round((1 - (vols[m] || 0) / peak) * 100))) : 100,
+    /* The two numbers the freshness above is made of, carried out with it so
+       the sheet that explains the figure can show its working rather than
+       re-deriving it and risking a different answer. */
+    sets: Math.round((vols[m] || 0) * 10) / 10,
+    lastDate: last[m] || null,
+    focusTier: focusTierOfGroup(m),
   })).sort((a, b) => b.fresh - a.fresh);
   const match = Math.round(muscles.reduce((s, x) => s + x.fresh, 0) / muscles.length);
-  return { match: Math.max(35, Math.min(99, match)), muscles: muscles.slice(0, 4) };
+  /* `muscles` is the four the card has room for, freshest first. `all` is what
+     the average was actually taken over: the muscle dragging the figure down
+     is by definition the least fresh, which is the one the top four cut off,
+     and a sheet that explains a low number cannot leave it out. */
+  /* The muscle every other one is scored against, named, because "0% is
+     whichever one you have worked hardest" is not a fact anybody can check
+     without knowing which one that is. */
+  const peakKey = peak > 0 ? Object.keys(vols).find((m) => vols[m] === peak) : null;
+  return {
+    match: Math.max(35, Math.min(99, match)),
+    muscles: muscles.slice(0, 4),
+    all: muscles,
+    peak: Math.round(peak * 10) / 10,
+    peakName: peakKey ? (pretty[peakKey] || peakKey.charAt(0).toUpperCase() + peakKey.slice(1)) : null,
+  };
+}
+
+/* The last day each muscle got any credit, on the same weighting
+   computeMuscleVolumeBetween uses, so "trained yesterday" in the match sheet
+   means the same day the freshness figure was scored from. Whole history, not
+   this week: a muscle last worked nine days ago is still the answer to when. */
+function muscleLastTrained() {
+  const out = {};
+  const hidden = bodyHiddenToday(ME);
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== ME || isBodyHidden(l, hidden)) continue;
+    const rule = classifyMuscles(l.exercise_name);
+    if (!rule) continue;
+    for (const g of [...(rule.primary || []), ...(rule.secondary || [])]) {
+      if (!out[g] || l.entry_date > out[g]) out[g] = l.entry_date;
+    }
+  }
+  return out;
 }
 
 function matchReading(pct) {
@@ -29473,15 +29668,65 @@ function matchReading(pct) {
   if (pct >= 50) return "Reasonable fit. Some of this has had work already.";
   return "Most of this is already worked. Go lighter, or swap the focus.";
 }
+/* Mo: "when I click on the percentage match, then it should show me why it's a
+   low match." So the ring is a button, and this is what it says.
+
+   Built when the card is drawn rather than when the sheet opens, so the number
+   being explained is the number on screen and the two cannot drift. Every line
+   is a figure matchDetail already worked out: the muscle's own freshness, the
+   weighted sets behind it, the week's hardest worked muscle it was scored
+   against, and the day it was last trained. Nothing here is a new opinion
+   about the workout. */
+let MATCH_NOTE = null;
+function matchNoteFor(p) {
+  const all = p.all || [];
+  if (!all.length) return null;
+  /* "yesterday" reads as a word, a weekday and a date read as places, so the
+     preposition goes in front of those two and not in front of the first. */
+  const when = (d) => {
+    const lab = relDayLabel(d);
+    return lab === "Today" || lab === "Yesterday" ? lab.toLowerCase() : `on ${lab}`;
+  };
+  const working = (m) => {
+    const bits = [];
+    const s = m.sets === 1 ? "set" : "sets";
+    /* The muscle everything is measured against is named once, in the
+       paragraph below, rather than repeated on all four rows. */
+    if (!(m.sets > 0)) bits.push("nothing logged on it this week");
+    else if (p.peak > 0 && m.sets >= p.peak) bits.push(`${m.sets} ${s} this week, more than anything else you have trained`);
+    else bits.push(`${m.sets} ${s} this week`);
+    if (m.lastDate) bits.push(`last trained ${when(m.lastDate)}`);
+    if (m.focusTier) bits.push("marked as a focus");
+    return `${m.name}: ${bits.join(", ")}.`;
+  };
+  // Sorted freshest first, so the one dragging the figure down is the last one.
+  const worst = all[all.length - 1];
+  return {
+    eyebrow: `Why ${p.match}%`,
+    rows: all.map((m) => [`${m.fresh}%`, working(m)]),
+    paras: [
+      `${p.match}% is the average of the ${all.length} figure${all.length === 1 ? "" : "s"} above, one for every muscle this day trains. Each one is how much room that muscle has left this week: 100% is a muscle you have not worked at all, 0% is whichever one you have worked hardest.${p.peakName
+        ? ` That is your ${p.peakName.toLowerCase()} this week, at ${p.peak} sets, and every figure above is measured against it.`
+        : ` You have logged nothing this week, so every muscle reads full.`}`,
+      worst.fresh >= 80
+        ? `There is nothing here to fix. Every muscle this day trains is above 80%, so it already lands on what your week has had least of.`
+        : `${worst.name} at ${worst.fresh}% is what holds this one back. Training a day that leaves it out, or giving it another day before you come back to it, is what moves the number.`,
+      ...(all.some((m) => m.focusTier)
+        ? ["A muscle you marked as a focus does not change this figure. The match is only about how much room your week has left, not about what you want to work on."]
+        : []),
+    ],
+  };
+}
+
 function freshTone(pct) {
   if (pct >= 65) return "var(--accent)";
   if (pct >= 45) return "var(--warn)";
   return "var(--up)";
 }
 
-function planPreview() {
+function planPreview(date = todayStr()) {
   /* A real plan wins over a proposal, always. */
-  const real = planFromToday();
+  const real = planFromToday(date);
   if (real) return real;
 
   /* The day to propose. It used to be the two least-trained REGIONS, joined
@@ -29546,6 +29791,9 @@ function planPreview() {
     ask: focus,
     match,
     muscles: md.muscles,
+    all: md.all,
+    peak: md.peak,
+    peakName: md.peakName,
     duration: avg ? `${Math.max(15, avg - 5)}-${avg + 5} min` : null,
     equipment: kit.length ? kit.join(", ") : null,
     targets,
@@ -29560,7 +29808,7 @@ function staggerWorkoutCards() {
   /* Only top-level pieces. The build options live inside the Smart Plan card
      now, and giving them their own rise inside a card that is itself rising
      compounds the two transforms and wobbles. */
-  const parts = [...$("workoutContent").querySelectorAll(".spp, .opt-card, .sv-saved, .cal, .wkt-done, .wkt-next, .wkt-rest, .wkt-week")]
+  const parts = [...$("workoutContent").querySelectorAll(".spp, .opt-card, .cal, .wkt-done, .wkt-next, .wkt-rest, .wkt-week")]
     .filter((el) => !el.closest(".wkt-week") || el.classList.contains("wkt-week"))
     .filter((el) => !el.closest(".spp-actions"));
   parts.forEach((el, i) => {
@@ -29827,6 +30075,9 @@ function goWorkoutScreen(mode, { back = false, before } = {}) {
   const finish = () => {
     before?.();
     WORKOUT_MODE = mode;
+    // Leaving the review screen leaves the day it was about, or the next edit
+    // made on this tab would still be writing to somebody else's Saturday.
+    if (mode !== "review") PLAN_VIEW_DATE = null;
     window.scrollTo({ top: 0, behavior: "instant" });
     renderWorkoutTab({ respectMode: true });
     el.classList.remove("scr-out");
@@ -29859,7 +30110,18 @@ function renderChooseScreen() {
   // is paid for, so the option is not offered rather than offered and refused.
   const coached = isCoachedClient();
   const coachName = MY_COACH ? MY_COACH.split("@")[0] : "your coach";
-  const p = planPreview();
+  /* Moved up from further down so `p` can be asked about the right day:
+     once every session today is done, the card below is about tomorrow,
+     and the reading has to agree or it keeps naming today's own finished
+     plan under a "Tomorrow" eyebrow. */
+  const sessions = todaySessions();
+  const doneCount = sessions.filter((x) => x.state === "done").length;
+  const allDone = sessions.length > 0 && doneCount === sessions.length;
+  const p = planPreview(allDone ? shiftDate(todayStr(), 1) : todayStr());
+  /* The ring's explanation, built from the same p the ring is drawn from. Set
+     here rather than when the sheet opens so it can only ever describe the
+     number currently on screen. */
+  MATCH_NOTE = matchNoteFor(p);
 
   // The card's own heading and focus line would just repeat the screen title
   // and the preview, so this screen owns the top of the card outright.
@@ -29884,7 +30146,10 @@ function renderChooseScreen() {
     ${coached ? "" : p.real
       /* Plain apostrophe, not an entity: optionCard escapes its text, so a
          &rsquo; would print literally. */
-      ? optionCard("chooseBeginBtn", "play", partway ? "Resume workout" : "Begin workout",
+      /* It says which plan, because on this screen the other doors make
+         another one. Mo, 2026-09-18: "there should be a Start today's plan if
+         I clicked generate". */
+      ? optionCard("chooseBeginBtn", "play", partway ? "Resume today’s plan" : "Start today’s plan",
           "Today’s plan, ready when you are.", true)
       : optionCard("chooseGenerateBtn", "wand", "Generate for me",
           "Built around your goals and stats.", true)}
@@ -29960,10 +30225,8 @@ function renderChooseScreen() {
      from todaySessions(), the match figure and the muscle list from the same
      matchDetail the old card printed, the calendar from workoutCalendarHTML().
      This is assembly, not new arithmetic, which is why the numbers agree with
-     the rest of the app. */
-  const sessions = todaySessions();
-  const doneCount = sessions.filter((x) => x.state === "done").length;
-  const allDone = sessions.length > 0 && doneCount === sessions.length;
+     the rest of the app. `sessions`/`doneCount`/`allDone` are declared above,
+     next to `p`, which needs to know before it reads its own day. */
   const target = weeklyGoalFor(MY_EMAIL) || 5;
 
   /* The green card at the top, only when the day is actually finished. A card
@@ -30005,16 +30268,22 @@ function renderChooseScreen() {
       </div>
     </section>`;
 
-  /* Next workout. The ring and the muscle list are two readings of one number:
-     the percentage is the average freshness, the list is which muscles it came
-     from, and an open circle marks the one the day is aimed at. Printing both
-     is what stops the figure being a score nobody can check.
+  /* Next workout. The ring is the centrepiece and the muscles are a quiet line
+     at the bottom, which is Mo's note: "remove the triceps chest shoulders in
+     that tab or put it below, make the percentage match bigger." They were a
+     column of ticks beside the ring, three things competing for the same
+     glance on a card whose job is to name tomorrow and start it.
+
+     The figure is a score somebody is entitled to check, so it is now the
+     thing you tap: matchNoteFor puts its whole working in a sheet, muscle by
+     muscle. The line underneath still says which muscles it was read from,
+     because a percentage with nothing attached to it is a number nobody can
+     argue with.
 
      Two buttons, not three cards. The third door, an activity on the clock,
      is a line under them: it has to stay reachable from here because on an
      empty day this screen is where it lives, but it is not what most people
      open this tab to do. */
-  const aimed = (p.focus || "").toLowerCase();
   /* Which day this card is about. Today until today is done, then tomorrow.
      A plan already sitting on tomorrow is shown rather than offered again:
      the button becomes the way to look at it. */
@@ -30042,21 +30311,19 @@ function renderChooseScreen() {
           ${hiredHere ? `<p class="wkt-next-sub">${escapeHtml(matchReading(p.match))}</p>` : ""}
         </div>
         ${!hiredHere ? `<div class="wkt-next-hire">${hirePitchHTML("next")}</div>` : `
-        <div class="wkt-arc">
-          ${arcGaugeSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 96)}
+        <button type="button" class="wkt-arc" data-info="planMatchWhy" aria-label="Why this is a ${p.match}% match">
+          ${arcGaugeSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 120)}
           <div class="wkt-arc-num"><b>${p.match}%</b><i>MATCH</i></div>
-        </div>
-        <ul class="wkt-muscles">
-          ${(p.muscles || []).map((m) => {
-            const on = aimed.includes(m.name.toLowerCase());
-            return `<li>${on
-              ? `<span class="wkt-ring" aria-hidden="true"></span>`
-              : `<span class="wkt-tick" aria-hidden="true">${icon("check", 14)}</span>`}${escapeHtml(m.name)}</li>`;
-          }).join("")}
-        </ul>`}
+        </button>`}
         <div class="wkt-next-acts">
-          ${p.real
-            ? `<button type="button" class="wkt-btn-solid sm" id="chooseBeginBtn">${partway ? "Resume workout" : "Begin workout"}</button>`
+          ${/* p.real can now be true about TOMORROW too (planPreview reads
+                whichever day the card is on), so this has to ask about
+                TODAY specifically: Start/Resume opens a live session, and
+                the only day that means anything for is the one not yet
+                done. A real plan already sitting on tomorrow is reviewed,
+                not started, which is what the next branch is for. */ ""}
+          ${p.real && !allDone
+            ? `<button type="button" class="wkt-btn-solid sm" id="chooseBeginBtn">${partway ? "Resume today&rsquo;s plan" : "Start today&rsquo;s plan"}</button>`
             : tomorrowPlan
               ? `<button type="button" class="wkt-btn-solid sm" id="chooseSeeTomorrow">See tomorrow&rsquo;s plan</button>`
               : `<button type="button" class="wkt-btn-solid sm" id="chooseGenerateBtn">${allDone ? "Generate tomorrow&rsquo;s" : "Generate workout"}</button>`}
@@ -30065,6 +30332,12 @@ function renderChooseScreen() {
             ? `<button type="button" class="wkt-more" id="chooseActivityBtn">Resume ${escapeHtml(csnAct().label.toLowerCase())}, ${csnClock(csnElapsedMs())} ${icon("chevronRight", 13)}</button>`
             : `<button type="button" class="wkt-more" id="chooseActivityBtn">or start an activity ${icon("chevronRight", 13)}</button>`}
         </div>
+        ${/* Where the ticked column went. One line, under the buttons, saying
+              what the figure above was read from. It is a caption, not a
+              choice, so it is the last thing on the card and the quietest. */ ""}
+        ${hiredHere && (p.muscles || []).length
+          ? `<p class="wkt-next-line">Trains ${escapeHtml(p.muscles.map((m) => m.name.toLowerCase()).join(", "))}</p>`
+          : ""}
       </div>
     </section>`;
 
@@ -30100,12 +30373,12 @@ function renderChooseScreen() {
           the button acts on the strip above it: you look at the week, then you
           fill it in.
 
-          Mo, 2026-09-18: Saved workouts and the Plan your week card come off
-          this screen. Both were cards competing with the green button for the
-          same tap, and neither is what somebody opens this tab to do. Saved
-          workouts now lives on the planner, which is the screen about putting
-          something on a day; the planner itself is a quiet line under the
-          green button rather than a card beside it. */ ""}
+          Mo, 2026-09-18: the Plan your week card comes off this screen. It was
+          a card competing with the green button for the same tap, and it is
+          not what somebody opens this tab to do, so the planner is a quiet
+          line under the green button rather than a card beside it. Saved
+          workouts came off the same screen the same day, and then out of the
+          app entirely. */ ""}
     <section class="wkt-week">
       ${workoutCalendarHTML()}
       ${coached ? "" : `<div class="wkt-week-gen">
@@ -30152,7 +30425,10 @@ function renderChooseScreen() {
   /* Generating for tomorrow rather than today once today is done: the same
      function, handed the date it already knows how to take. */
   if ($("chooseGenerateBtn")) $("chooseGenerateBtn").onclick = () => generateWorkout(allDone ? nextDate : null, { keepFocus: p.ask || null });
-  if ($("chooseSeeTomorrow")) $("chooseSeeTomorrow").onclick = () => openDayPlanner(nextDate);
+  /* The same screen as the one before a workout, for tomorrow, in review.
+     It used to open a summary sheet whose only offer was a swap, which is not
+     what "see the plan" means. */
+  if ($("chooseSeeTomorrow")) $("chooseSeeTomorrow").onclick = () => openPlanReview(nextDate);
   if ($("chooseBeginBtn")) $("chooseBeginBtn").onclick = startWorkout;
   /* Planning your own for a day that is not today is the day planner's job,
      not the manual builder's: the builder writes to today. */
@@ -31008,88 +31284,6 @@ function endStretchSession() {
   renderWorkoutTab({ respectMode: true });
 }
 
-/* ---- Saved workouts ----
-   A workout you built or finished is worth keeping, because people repeat what
-   works. Saved ones carry no date; scheduling one writes an ai_workouts row for
-   the day you picked, which is exactly what the app already reads as "the plan
-   for that day", so nothing downstream has to know these exist. */
-
-let SAVED_WORKOUTS = [];
-
-async function loadSavedWorkouts() {
-  if (!MY_EMAIL) return;
-  const { data, error } = await sb.from("saved_workouts").select("*").order("created_at", { ascending: false });
-  if (error) { console.warn("could not load saved workouts", error); return; }
-  SAVED_WORKOUTS = data || [];
-}
-
-async function saveWorkoutAs(exercises, suggestedName) {
-  const clean = (exercises || []).filter((e) => e?.name).map((e) => ({
-    name: e.name, sets: e.sets || 3, reps: e.reps || 10, targetWeight: e.targetWeight || 0,
-  }));
-  if (!clean.length) { toast("Nothing to save"); return false; }
-  const name = await askForName("Name this workout", suggestedName || deriveFocus(clean));
-  if (!name) return false;
-  const { data, error } = await sb.from("saved_workouts").insert({
-    email: MY_EMAIL, name, focus: deriveFocus(clean), exercises: clean,
-  }).select().single();
-  if (error) { toast("Couldn't save it"); console.error(error); return null; }
-  await loadSavedWorkouts();
-  toast(`Saved as "${name}"`);
-  return data;
-}
-
-async function deleteSavedWorkout(id) {
-  const { error } = await sb.from("saved_workouts").delete().eq("id", id);
-  if (error) { toast("Couldn't remove it"); console.error(error); return; }
-  SAVED_WORKOUTS = SAVED_WORKOUTS.filter((w) => w.id !== id);
-  toast("Removed");
-}
-
-/* Putting a saved workout on a day is just writing the ai_workouts row that day
-   would have had anyway, which is what the calendar, the hero, the generator
-   and the session all already read. Same shape as generateWorkout and
-   saveManualWorkout write, archived and completed_at cleared for the same
-   reason: a day that already had a finished workout must not swallow this one. */
-async function scheduleSavedWorkout(w, dates) {
-  if (!w) return;
-  const exercises = (w.exercises || []).filter((e) => e?.name).map((e) => ({
-    name: e.name, sets: e.sets || 3, reps: e.reps || 10, targetWeight: e.targetWeight || 0,
-  }));
-  if (!exercises.length) { toast("That workout has no exercises in it yet"); return; }
-  const days = (dates || []).filter((d) => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d));
-  if (!days.length) return;
-
-  for (const date of days) {
-    const { error } = await sb.from("ai_workouts").upsert({
-      user_name: ME, email: MY_EMAIL, entry_date: date,
-      focus: w.name || w.focus || deriveFocus(exercises), exercises,
-      archived: false, completed_at: null,
-    }, { onConflict: "email,entry_date" });
-    if (error) { console.error("could not schedule the saved workout", error); toast("Couldn't put it on that day. Try again."); return; }
-  }
-
-  // Best effort: the sub-line reads last_used_at, but a failed stamp is not
-  // worth telling anyone about when the workout itself landed.
-  const { error: stampErr } = await sb.from("saved_workouts").update({ last_used_at: new Date().toISOString() }).eq("id", w.id);
-  if (stampErr) console.warn("could not stamp last_used_at", stampErr);
-
-  closeSavedSheet();
-  $("popScrim").classList.add("hidden");
-  await loadSavedWorkouts();
-  await loadAll();
-
-  const today = days.includes(todayStr());
-  if (today) await loadTodayWorkout();
-  FRESH_PLAN_ID = today ? TODAY_WORKOUT?.id || null : null;
-  WORKOUT_MODE = today ? null : "week";
-  switchTab("workout");
-  renderWorkoutTab({ respectMode: true });
-  if (today && days.length === 1) toast(`${w.name} is today's workout`);
-  else if (days.length === 1) toast(`${w.name} is on ${datedLabel(days[0])}`);
-  else toast(`${w.name} is on ${days.length} days`);
-}
-
 /* A week is Monday to Sunday, because that is what people mean by "this week".
    WEEK_OFFSET steps forward from the current one; it never goes back past it,
    since planning a day that has already happened is not planning. */
@@ -31139,119 +31333,6 @@ function planWeekLabel(offset = WEEK_OFFSET) {
   end.setDate(end.getDate() + 6);
   const fmt = (d) => dateFmt({ month: "short", day: "numeric" }).format(d);
   return `${fmt(start)} to ${fmt(end)}`;
-}
-
-/* Tapping a saved workout asks what you want to do with it, not which days.
-   Days are a separate screen, because "keep this" and "do this on Tuesday" are
-   different thoughts and making one require the other is a tax on saving. */
-let sdFrontCtrl = null, sdBackCtrl = null;
-function savedFigTeardown() {
-  try { sdFrontCtrl?.destroy(); } catch {}
-  try { sdBackCtrl?.destroy(); } catch {}
-  sdFrontCtrl = null;
-  sdBackCtrl = null;
-}
-
-/* The third level: one saved workout, the body it works lit muscle by muscle
-   from its own exercises, then the exercises themselves, then what to do
-   with it. The title is the workout's own name, so you always know which one
-   you opened. */
-function openSavedWorkout(id, { fromList = false } = {}) {
-  const w = SAVED_WORKOUTS.find((x) => x.id === id);
-  if (!w) return;
-  savedFigTeardown();
-  const exs = w.exercises || [];
-  const empty = !exs.length;
-  const sets = exs.reduce((n, e) => n + (parseInt(e.sets, 10) || 0), 0);
-  const minutes = Math.max(10, Math.round(sets * 2.5 / 5) * 5);   // a set and its rest is about 2.5 min
-  const groups = groupsHitFor(exs);
-  const tagFor = (name) => {
-    const rule = classifyMuscles(name);
-    const g = rule?.primary?.[0];
-    return g ? BODY_GROUP_LABELS[g] || g : "";
-  };
-
-  $("savedSheet").innerHTML = `
-    <div class="ds-grip"></div>
-    <div class="scr-head">
-      <button type="button" class="scr-back" id="sdBack" aria-label="${fromList ? "Back" : "Close"}">${icon("chevronLeft", 18)}</button>
-      <div class="scr-title">${escapeHtml(w.name)}</div>
-      <div class="spacer"></div>
-    </div>
-    <p class="muted-note" style="margin:-6px 0 14px;">${escapeHtml(savedWorkoutSub(w))}</p>
-    <div class="sd-hero">
-      <div class="sd-figs">
-        <canvas class="sd-fig" id="sdFigure" aria-label="Muscles this workout trains, front"></canvas>
-        <canvas class="sd-fig" id="sdFigureBack" aria-label="Muscles this workout trains, back"></canvas>
-      </div>
-      <div class="sd-facts">
-        <div class="sd-stat"><b>${exs.length}</b><span>Exercise${exs.length === 1 ? "" : "s"}</span></div>
-        <div class="sd-stat"><b>${sets}</b><span>Sets</span></div>
-        ${empty ? "" : `<div class="sd-stat"><b>~${minutes}</b><span>Minutes</span></div>`}
-        <div class="sd-groups">${groups.map((g) => `<span class="sd-group">${escapeHtml(BODY_GROUP_LABELS[g] || g)}</span>`).join("")}</div>
-      </div>
-    </div>
-    ${empty ? "" : `<div class="cb-line-head" style="margin-bottom:8px"><h3>Exercises</h3><span class="cb-row-sets">sets × reps</span></div>`}
-    <div class="sd-list">
-      ${empty ? `<p class="muted-note">Nothing in this one yet. Open a copy and add the exercises, then it can go on a day.</p>` : ""}
-      ${exs.map((ex, i) => `<div class="sd-ex">
-        <span class="sd-ex-n">${i + 1}</span>
-        <span class="sd-ex-txt">
-          <div class="sd-ex-name">${escapeHtml(ex.name)}</div>
-          ${tagFor(ex.name) ? `<div class="sd-ex-tag">${escapeHtml(tagFor(ex.name))}</div>` : ""}
-        </span>
-        <span class="sd-ex-dose">${ex.sets}<i>×</i>${ex.reps}</span>
-      </div>`).join("")}
-    </div>
-    <div class="sd-acts">
-      ${empty ? "" : `<button type="button" class="btn-primary" id="svToday">Do this today</button>`}
-      <button type="button" class="${empty ? "btn-primary" : "btn-secondary"}" id="svEdit">Edit a copy</button>
-      <button type="button" class="btn-ghost" id="svDelete">Delete</button>
-    </div>`;
-  $("savedScrim").classList.remove("hidden");
-  $("savedScrim").onclick = (e) => { if (e.target === $("savedScrim")) closeSavedSheet(); };
-  $("savedSheet").scrollTop = 0;
-
-  $("sdBack").onclick = () => (fromList ? openSavedList() : closeSavedSheet());
-  if ($("svToday")) $("svToday").onclick = () => { closeSavedSheet(); scheduleSavedWorkout(w, [todayStr()]); };
-  $("svEdit").onclick = () => {
-    /* A copy, not the original: editing one to use it once should not quietly
-       rewrite the thing you saved. */
-    MANUAL_DRAFT = exs.map((ex) => ({ ...ex }));
-    saveDraft();
-    closeSavedSheet();
-    goWorkoutScreen("manual");
-  };
-  $("svDelete").onclick = async () => {
-    if (!confirm(`Delete "${w.name}"? Workouts you already did are not affected.`)) return;
-    await deleteSavedWorkout(w.id);
-    closeSavedSheet();
-    renderWorkoutTab();
-  };
-
-  mountSavedFigures(exs);
-}
-
-async function mountSavedFigures(exs) {
-  try {
-    const [mod] = await Promise.all([ensureRiveBodyModule(), ensureBodyDetailModules()]);
-    const front = $("sdFigure"), back = $("sdFigureBack");
-    if (!front?.isConnected) return;   // sheet closed while the module loaded
-    const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const map = intensitiesFor(exs);
-    const make = (canvas, view) => {
-      canvas.width = Math.round(canvas.clientWidth * dpr);
-      canvas.height = Math.round(canvas.clientHeight * dpr);
-      return mod.createBodyHeatmap({
-        canvas, artboardName: `${sex}-${view}`, palette: mod.APP_HEAT_PALETTE, intensities: map,
-      });
-    };
-    sdFrontCtrl = make(front, "Front");
-    sdBackCtrl = make(back, "Back");
-  } catch (e) {
-    console.warn("loadout figure unavailable", e);
-  }
 }
 
 /* ---- Planning the week ----
@@ -31306,26 +31387,19 @@ function renderWeekPlanner() {
       <div class="wk-nav-label">${escapeHtml(planWeekLabel())}</div>
       <button type="button" class="wk-nav-btn" id="wkNext" aria-label="Next week">${icon("chevronRight", 16)}</button>
     </div>
-    ${/* Mo: "people like to see when they have gone in full view, and I
-          personally liked seeing the days in the whole month". The month is
-          the history and the overview; the seven rows under it are this week,
-          which is the only week you can reorder, because dragging a day is
-          moving a plan and there are no plans on a month you have not reached.
-          One calendar component, the same one the workout tab draws, so a day
-          means the same thing on both. */ ""}
-    <div class="wk-plan-month">${workoutCalendarHTML({ monthOnly: true })}</div>
-    <p class="muted-note">Tap a day to put a workout on it. You can generate one, build your own, or use something you saved.${canReorder ? " Drag a planned day by its handle, or nudge it with the arrows." : ""}</p>
+    ${/* Mo, 2026-09-18: "When I click on Plan my week, first show me the week,
+          and then below show me the calendar for the month." The week is what
+          this screen is for and the only thing on it you can reorder, so it
+          leads; the month underneath is the history and the overview, and it
+          used to sit on top of the rows, which put a month you cannot plan on
+          above the week you came here to plan. One calendar component, the
+          same one the workout tab draws, so a day means the same thing on
+          both. */ ""}
+    <p class="muted-note">Tap a day to put a workout on it. You can generate one, build your own, or do an activity instead.${canReorder ? " Drag a planned day by its handle, or nudge it with the arrows." : ""}</p>
     <div class="wk-plan reorder-list" id="wkPlanList">${days.map(dayRow).join("")}</div>
-    ${/* Saved workouts moved here off the workout tab, where it was a card
-          competing with the green button. This is the screen about putting
-          something on a day, and the note above already says one of the ways
-          is something you saved, so this is where the list belongs. It is the
-          only door into browsing, renaming and deleting them: the day planner
-          can still schedule one, but nothing else can open one. */ ""}
-    ${savedWorkoutsHTML()}`;
+    <div class="wk-plan-month">${workoutCalendarHTML({ monthOnly: true })}</div>`;
 
   wireWorkoutCalendar($("workoutContent"));
-  wireSavedWorkouts($("workoutContent"));
   if ($("wkPrev")) $("wkPrev").onclick = () => { if (WEEK_OFFSET > 0) { WEEK_OFFSET--; renderWeekPlanner(); } };
   $("wkNext").onclick = () => { WEEK_OFFSET++; renderWeekPlanner(); };
   $("workoutContent").querySelectorAll("[data-plan-day]").forEach((b) => {
@@ -31767,96 +31841,55 @@ function sparePlanDay(taken) {
   return null;
 }
 
-/* The day, and what you can do about it. Mo, 2026-09-18: "See tomorrow's plan
-   should open tomorrow's plan. And inside that it can be asked to swap it or
-   add limitations such as only wanting body weight, or only weights, or
-   anything you don't have. You also can have the option to do an activity
-   instead through there."
-
-   So a day that already holds a plan opens with the plan on it, in full, and
-   three doors under it. A day that holds nothing keeps the three ways of
-   filling it, which is what this sheet has always been. */
+/* Putting something on an empty day: generate one, build one, or do an
+   activity. Mo, 2026-09-18: a day that already holds a plan should open the
+   plan itself, full size, with the same rows and the same swaps as the screen
+   you get before a workout, so this sheet hands those days over to it rather
+   than printing a second, smaller version of the same plan. What is left here
+   is the question it was always best at, which is what to put on a blank
+   Thursday. */
 function openDayPlanner(date) {
   const existing = (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === date && !w.archived);
   const d = new Date(date + "T00:00:00");
   const today = todayStr();
+  /* A day with a plan still to do is a plan to read, not a summary to skim.
+     Today's own plan has a screen of its own already, with Begin on it, so it
+     goes there rather than into review. */
+  if (existing && !existing.completed_at) {
+    if (date === today) goWorkoutScreen(null);
+    else openPlanReview(date);
+    return;
+  }
   const label = date === today ? "Today" : d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
   /* What he calls the day out loud, which is not what the header prints:
      "Rebuild Thursday" reads better than "Rebuild Thu, Sep 24", and the two
      days everybody actually plans have names of their own. */
-  const dayWord = date === today ? "today"
-    : date === shiftDate(today, 1) ? "tomorrow"
-    : d.toLocaleDateString([], { weekday: "long" });
+  const dayWord = planDayWord(date);
   const close = () => $("popScrim").classList.add("hidden");
-  const exercises = existing?.exercises || [];
   const done = !!existing?.completed_at;
-  /* A planned activity is a real plan with no lifts in it: the name is in
-     `focus` and `exercises` is empty, which is the shape the generator already
-     writes for a week with no resistance training in it. */
-  const activityDay = !!existing && !exercises.length;
-
-  const planBlock = !existing || done ? "" : exercises.length
-    ? `<div class="dp-plan">
-        ${exercises.map((ex, i) => `<div class="dp-ex">
-          <span class="dp-ex-n">${i + 1}</span>
-          <span class="dp-ex-name">${escapeHtml(ex.name || "")}</span>
-          <span class="dp-ex-dose">${ex.sets || 3}&times;${ex.reps || 10}</span>
-        </div>`).join("")}
-      </div>`
-    : `<p class="ef-note">No lifts on this one. It is ${escapeHtml(displayFocus(existing.focus, exercises))}, on the clock.</p>`;
 
   $("popCard").innerHTML = `
     <div class="pop-body">
       <div class="ds-top">
         <div><div class="pop-who" style="color:var(--muted)">${escapeHtml(label.toUpperCase())}</div>
-          <div class="sv-name">${existing ? escapeHtml(displayFocus(existing.focus, exercises)) : "Nothing planned"}</div></div>
+          <div class="sv-name">${done ? escapeHtml(displayFocus(existing.focus, existing.exercises || [])) : "Nothing planned"}</div></div>
         <button type="button" class="ds-x" id="dpX" aria-label="Close">&times;</button>
       </div>
       ${done ? `<p class="ef-note">This one is already done. Putting something else here does not change what you logged.</p>` : ""}
-      ${planBlock}
-      ${existing && !done ? `
-        ${/* Three doors, in the order somebody reaches for them: a different
-              session, the same session around a limit, or not a workout at
-              all. Each one acts on THIS day and nothing else. */ ""}
-        <p class="dp-heading">Change it</p>
-        <div class="dp-ways">
-          ${isCoachedClient() ? "" : `<button type="button" class="dp-way" id="dpSwap">
-            <span class="dp-way-ico">${icon("swap", 18)}</span>
-            <span class="dp-way-txt"><b>Swap the whole workout</b><i>A different session, not another version of this one.</i></span>
-          </button>`}
-          ${isCoachedClient() || activityDay ? "" : `<button type="button" class="dp-way" id="dpLimits">
-            <span class="dp-way-ico">${icon("body", 18)}</span>
-            <span class="dp-way-txt"><b>Tell me what you have</b><i>Bodyweight only, free weights only, or tick what is missing.</i></span>
-          </button>`}
-          <button type="button" class="dp-way" id="dpAct">
-            <span class="dp-way-ico">${icon("run", 18)}</span>
-            <span class="dp-way-txt"><b>Do an activity instead</b><i>A run, a ride, yoga, Pilates.</i></span>
-          </button>
-        </div>` : `
-        <div class="dp-ways">
-          ${isCoachedClient() ? "" : `<button type="button" class="dp-way" id="dpGen">
-            <span class="dp-way-ico">${icon("wand", 18)}</span>
-            <span class="dp-way-txt"><b>Generate one</b><i>Built around your goals and history.</i></span>
-          </button>`}
-          <button type="button" class="dp-way" id="dpOwn">
-            <span class="dp-way-ico">${icon("pencil", 18)}</span>
-            <span class="dp-way-txt"><b>Plan my own</b><i>Pick the exercises yourself.</i></span>
-          </button>
-          <button type="button" class="dp-way" id="dpAct">
-            <span class="dp-way-ico">${icon("run", 18)}</span>
-            <span class="dp-way-txt"><b>Do an activity instead</b><i>A run, a ride, yoga, Pilates.</i></span>
-          </button>
-        </div>`}
-      ${SAVED_WORKOUTS.length && (!existing || done) ? `
-        <div class="sv-head">Or use a saved one</div>
-        <div class="sv-cards">
-          ${SAVED_WORKOUTS.map((w) => `
-            <button type="button" class="sv-card" data-put="${escapeHtml(w.id)}">
-              <span class="sv-card-name">${escapeHtml(w.name)}</span>
-              <span class="sv-card-meta">${(w.exercises || []).length} exercises</span>
-            </button>`).join("")}
-        </div>` : ""}
-      ${existing && !done ? `<button type="button" class="btn-ghost" id="dpClear">Clear this day</button>` : ""}
+      <div class="dp-ways">
+        ${isCoachedClient() ? "" : `<button type="button" class="dp-way" id="dpGen">
+          <span class="dp-way-ico">${icon("wand", 18)}</span>
+          <span class="dp-way-txt"><b>Generate one</b><i>Built around your goals and history.</i></span>
+        </button>`}
+        <button type="button" class="dp-way" id="dpOwn">
+          <span class="dp-way-ico">${icon("pencil", 18)}</span>
+          <span class="dp-way-txt"><b>Plan my own</b><i>Pick the exercises yourself.</i></span>
+        </button>
+        <button type="button" class="dp-way" id="dpAct">
+          <span class="dp-way-ico">${icon("run", 18)}</span>
+          <span class="dp-way-txt"><b>Do an activity instead</b><i>A run, a ride, yoga, Pilates.</i></span>
+        </button>
+      </div>
     </div>`;
   $("popScrim").classList.remove("hidden");
   $("popScrim").onclick = (e) => { if (e.target === $("popScrim")) close(); };
@@ -31872,36 +31905,9 @@ function openDayPlanner(date) {
     saveDraft();
     goWorkoutScreen("manual");
   };
-  /* The same sheet the reveal and the plan screen open, pointed at this day. A
-     second way of building alternatives would drift from that one. */
-  if ($("dpSwap")) $("dpSwap").onclick = () => {
-    close();
-    openSessionSwapSheet({ date, current: existing });
-  };
-  if ($("dpLimits")) $("dpLimits").onclick = () => { close(); openPlanLimitsSheet(date, dayWord); };
   if ($("dpAct")) $("dpAct").onclick = () => { close(); openActivityInstead(date, dayWord); };
-  $("popCard").querySelectorAll("[data-put]").forEach((b) => {
-    const w = SAVED_WORKOUTS.find((x) => x.id === b.dataset.put);
-    b.onclick = () => scheduleSavedWorkout(w, [date]);
-  });
-  if ($("dpClear")) {
-    $("dpClear").onclick = async () => {
-      const ok = await askConfirm({
-        heading: "Clear this day",
-        body: `${displayFocus(existing.focus, exercises)} is removed from ${label}. Anything you have already logged is kept.`,
-        ok: "Clear it",
-      });
-      if (!ok) return;
-      const { error } = await sb.from("ai_workouts").delete().eq("id", existing.id);
-      if (error) { toast("Couldn't clear it"); console.error(error); return; }
-      close();
-      await loadAll();
-      await loadTodayWorkout();
-      renderWorkoutTab();
-      toast("Day cleared");
-    };
-  }
 }
+
 
 /* ---- Limits for one plan ----
 
@@ -31918,7 +31924,10 @@ function openDayPlanner(date) {
    reason limits.mjs gives: an option the library cannot filter on is a promise
    the plan quietly breaks. The two presets above them are Mo's words mapped
    onto that same list and nothing more. */
-async function openPlanLimitsSheet(date, dayWord) {
+/* `after` runs once the rebuild has landed. A generate takes the workout tab
+   back to today on its way through, so the screen that opened this from
+   another day is the one that has to ask for that day back. */
+async function openPlanLimitsSheet(date, dayWord, { after = null } = {}) {
   let lists;
   try {
     lists = await ensureLimitsLists();
@@ -32001,7 +32010,11 @@ async function openPlanLimitsSheet(date, dayWord) {
   });
   scrim.querySelector("#dpLimitGo").onclick = () => {
     close();
-    generateWorkout(date, { limits: limitsWithMissing([...picked]) });
+    /* supabase-js and the generator both answer rather than throw, so this is
+       a result to check: only a rebuild that actually landed is worth taking
+       the caller back to. */
+    generateWorkout(date, { limits: limitsWithMissing([...picked]) })
+      .then((ok) => { if (ok) after?.(); });
   };
   paint();
 }
@@ -32175,115 +32188,9 @@ async function planActivityOnDay(date, name, { quiet = false } = {}) {
   /* The week builder writes several of these in a row and reloads once at the
      end, so a quiet call stops at the row it saved. */
   if (quiet) { rememberPlannedDay(date, name, []); return true; }
-  await loadAll();
-  if (date === todayStr()) await loadTodayWorkout();
-  renderHero();
-  renderWorkoutTab();
+  await planChangedOn(date);
   toast(`${name} is on ${datedLabel(date)}`);
   return true;
-}
-
-/* What a workout is mostly about. groupsHitFor lists groups top to bottom of
-   the body, which is right for the chips but wrong for a one line summary:
-   it called a leg workout "lower back and core" because the lower back sits
-   higher up the body. This weighs each group by the sets spent on it. */
-const UPPER_GROUPS = ["chest", "shoulders", "traps", "lats", "biceps", "triceps", "forearms"];
-const LOWER_GROUPS = ["quads", "hamstrings", "glutes", "calves"];
-function workoutFocusPhrase(exercises) {
-  const score = {};
-  for (const ex of exercises || []) {
-    const rule = classifyMuscles(ex.name);
-    const sets = parseInt(ex.sets, 10) || 1;
-    for (const g of rule?.primary || []) score[g] = (score[g] || 0) + sets;
-    for (const g of rule?.secondary || []) score[g] = (score[g] || 0) + sets * 0.4;
-  }
-  const ranked = Object.keys(score).sort((a, b) => score[b] - score[a]);
-  if (!ranked.length) return "";
-  const upper = ranked.some((g) => UPPER_GROUPS.includes(g));
-  const lower = ranked.some((g) => LOWER_GROUPS.includes(g));
-  if (upper && lower && ranked.length >= 5) return "Full body";
-  return bodyGroupsPhrase(ranked.slice(0, 2));
-}
-
-function savedWorkoutMeta(w) {
-  const exs = w.exercises || [];
-  const sets = exs.reduce((n, e) => n + (parseInt(e.sets, 10) || 0), 0);
-  const where = workoutFocusPhrase(exs) || w.focus || "";
-  return `${exs.length} exercise${exs.length === 1 ? "" : "s"} · ${sets} sets${where ? ` · ${where}` : ""}`;
-}
-
-/* The detail screen already shows the counts in the hero, so its subtitle
-   carries what the list cannot: what this is, and when you last did it. */
-function savedWorkoutSub(w) {
-  const focus = workoutFocusPhrase(w.exercises || []) || w.focus || "";
-  const stamp = w.last_used_at || w.created_at;
-  if (!stamp) return focus;
-  const d = new Date(stamp);
-  if (isNaN(d)) return focus;
-  const when = d.toLocaleDateString([], { month: "short", day: "numeric" });
-  return `${focus}${focus ? " · " : ""}${w.last_used_at ? `last done ${when}` : `saved ${when}`}`;
-}
-
-function savedWorkoutRow(w, attr) {
-  return `<button type="button" class="sv-row" ${attr}="${escapeHtml(w.id)}">
-    <span class="sv-row-ico">${icon("dumbbell", 18)}</span>
-    <span class="sv-row-txt">
-      <span class="sv-row-name">${escapeHtml(w.name)}</span>
-      <span class="sv-row-meta">${escapeHtml(savedWorkoutMeta(w))}</span>
-    </span>
-    <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
-  </button>`;
-}
-
-/* Three levels, one per decision: the tab says how many you have, the list
-   says which one, the workout says what is in it. The tab used to carry three
-   rows and a "view all", which put half the list in front of you before you
-   asked for any of it. */
-function savedWorkoutsHTML() {
-  if (!SAVED_WORKOUTS.length) return "";
-  const names = SAVED_WORKOUTS.slice(0, 3).map((w) => w.name).join(", ");
-  return `<div class="sv-saved">
-    <button type="button" class="sv-open" id="svOpen">
-      <span class="sv-open-ico">${icon("dumbbell", 20)}</span>
-      <span class="sv-open-txt">
-        <span class="sv-open-name">Saved workouts</span>
-        <span class="sv-open-meta">${escapeHtml(names)}${SAVED_WORKOUTS.length > 3 ? " and more" : ""}</span>
-      </span>
-      <span class="sv-count">${SAVED_WORKOUTS.length}</span>
-      <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
-    </button>
-  </div>`;
-}
-
-function wireSavedWorkouts(root) {
-  const open = root.querySelector("#svOpen");
-  if (open) open.onclick = openSavedList;
-}
-
-/* Level two: every saved workout, each one opening its own detail. */
-function openSavedList() {
-  savedFigTeardown();
-  $("savedSheet").innerHTML = `
-    <div class="ds-grip"></div>
-    <div class="scr-head">
-      <button type="button" class="scr-back" id="sdClose" aria-label="Close">${icon("chevronLeft", 18)}</button>
-      <div class="scr-title">Saved workouts</div>
-      <div class="spacer"></div>
-    </div>
-    <p class="muted-note" style="margin:-6px 0 14px;">${SAVED_WORKOUTS.length} saved. Tap one to see what it works.</p>
-    <div class="sv-rows">${SAVED_WORKOUTS.map((w) => savedWorkoutRow(w, "data-saved")).join("")}</div>`;
-  $("sdClose").onclick = closeSavedSheet;
-  $("savedSheet").querySelectorAll("[data-saved]").forEach((b) => {
-    b.onclick = () => openSavedWorkout(b.dataset.saved, { fromList: true });
-  });
-  $("savedSheet").scrollTop = 0;
-  $("savedScrim").classList.remove("hidden");
-  $("savedScrim").onclick = (e) => { if (e.target === $("savedScrim")) closeSavedSheet(); };
-}
-
-function closeSavedSheet() {
-  savedFigTeardown();
-  $("savedScrim").classList.add("hidden");
 }
 
 /* ---- Building a workout ----
@@ -32345,7 +32252,6 @@ function renderManualBuildScreen() {
          you actually want is the first one you reach at the end of the list. -->
     <div class="cb-go hidden" id="cbGo">
       <button type="button" class="btn-primary" id="manualStartBtn">${PLAN_FOR_DATE && PLAN_FOR_DATE !== todayStr() ? "Put it on that day" : "Start Workout"}</button>
-      <button type="button" class="btn-ghost" id="cbSaveBtn">Save workout</button>
     </div>
     <button type="button" class="btn-ghost" id="manualCancelBtn">Cancel</button>`;
 
@@ -32359,11 +32265,6 @@ function renderManualBuildScreen() {
     if (!MANUAL_DRAFT.length) { toast("Pick at least one exercise"); return; }
     cbTeardown();
     saveManualWorkout();
-  };
-  $("cbSaveBtn").onclick = async () => {
-    // Saving is just saving. Scheduling lives on its own screen, because
-    // being made to pick days every time you keep something is a tax.
-    if (await saveWorkoutAs(MANUAL_DRAFT)) renderWorkoutTab();
   };
   $("manualCancelBtn").onclick = () => {
     if (MANUAL_DRAFT.length && !confirm(`Discard ${MANUAL_DRAFT.length} exercise${MANUAL_DRAFT.length === 1 ? "" : "s"} you added?`)) return;
@@ -32388,10 +32289,12 @@ let CB_PENDING = null;   // the exercise waiting on its sets and reps
    One target switch rather than a second copy of the picker, because two
    pickers drift and only one of them ever gets the next fix. */
 let CB_TARGET = "draft";
-const cbList = () => (CB_TARGET === "plan" ? (TODAY_WORKOUT?.exercises || []) : MANUAL_DRAFT);
+/* "plan" is whichever plan the screen behind this sheet is showing, which is
+   today's unless somebody is reviewing another day. */
+const cbList = () => (CB_TARGET === "plan" ? (planBeingEdited()?.exercises || []) : MANUAL_DRAFT);
 
 async function cbCommit() {
-  if (CB_TARGET === "plan") { await savePlanExercises(); renderPlanPreview(); return; }
+  if (CB_TARGET === "plan") { await savePlanExercises(); rerenderPlanScreen(); return; }
   saveDraft();
   cbUpdateCharacter();
 }
@@ -32590,7 +32493,7 @@ function cbConfirmStep(ex, { editIndex = null } = {}) {
         const row = cbList()[at];
         const toPlan = CB_TARGET === "plan";
         if (row) { row.sets = sets; row.reps = reps; row.targetWeight = weight; }
-        if (toPlan) { cbClosePicker(); savePlanExercises().then(renderPlanPreview); return; }
+        if (toPlan) { cbClosePicker(); savePlanExercises().then(rerenderPlanScreen); return; }
         saveDraft();
         cbClosePicker();
         cbRenderLineup();
@@ -32616,7 +32519,7 @@ function cbAdd(name, sets, reps, weight = 0) {
   /* Writing into the plan means the plan screen redraws underneath, and none
      of the builder's row animation applies. */
   if (CB_TARGET === "plan") {
-    savePlanExercises().then(renderPlanPreview);
+    savePlanExercises().then(rerenderPlanScreen);
     toast(`${name} added`);
     return;
   }
@@ -32892,8 +32795,11 @@ async function saveManualWorkout() {
    and skippable for the day with one tap; the profile switch in Setup is the
    "never" answer and lives on the payload instead. A finished day shows
    nothing here: the blocks are for the session, not the record. */
-function planMobility() {
-  const m = TODAY_WORKOUT?.mobility;
+/* `plan` is today's unless a screen says otherwise: the plan screen can now be
+   pointed at another day, and everything it reads off the row has to come from
+   the row it is showing. */
+function planMobility(plan = TODAY_WORKOUT) {
+  const m = plan?.mobility;
   if (!m || typeof m !== "object") return null;
   /* Per block, falling back to the single old flag so rows written before
      this split keep behaving the way they read. */
@@ -32939,8 +32845,8 @@ function planMobility() {
 const RAMP_COMPOUND = /squat|deadlift|bench|overhead press|shoulder press|military|row\b|pull.?up|chin.?up|dip\b|clean|snatch|thrust|lunge|leg press|front press|push press/i;
 const RAMP_ISOLATION = /curl|pushdown|extension|raise|fly|flye|shrug|calf|crunch|kickback|pull.?over|face pull|lateral/i;
 
-function rampRungsWanted(name) {
-  const list = TODAY_WORKOUT?.exercises || [];
+function rampRungsWanted(name, plan = TODAY_WORKOUT) {
+  const list = plan?.exercises || [];
   const want = String(name || "").trim().toLowerCase();
   const idx = list.findIndex((e) => String(e?.name || "").trim().toLowerCase() === want);
   const ex = idx >= 0 ? list[idx] : null;
@@ -32967,13 +32873,13 @@ function rampRungsWanted(name) {
   return 1;
 }
 
-function rampForExercise(list, name) {
+function rampForExercise(list, name, plan = TODAY_WORKOUT) {
   const want = String(name || "").trim().toLowerCase();
   if (!want) return null;
   const found = (Array.isArray(list) ? list : [])
     .find((r) => String(r?.exercise || "").trim().toLowerCase() === want);
   if (!found || !Array.isArray(found.sets) || !found.sets.length) return null;
-  if (!rampRungsWanted(name)) return null;
+  if (!rampRungsWanted(name, plan)) return null;
   // The last rung, which is the heaviest: it rehearses the working weight,
   // which is the only thing a single warm-up set can usefully do.
   return { ...found, sets: found.sets.slice(-1) };
@@ -33001,8 +32907,8 @@ const CARDIO_ZONE_WORDS = {
      the card printed "mixed." as a sentence. */
   mixed: "mix it up, one easy session, one with hard intervals, one longer and steady",
 };
-function cardioNoteHTML(finished) {
-  const c = TODAY_WORKOUT?.cardio;
+function cardioNoteHTML(finished, plan = TODAY_WORKOUT) {
+  const c = plan?.cardio;
   if (finished || !c || !c.sessions) return "";
   const zone = CARDIO_ZONE_WORDS[c.zone] || c.zone || "";
   return `
@@ -33021,8 +32927,8 @@ function cardioNoteHTML(finished) {
    lifts are what the screen is for. */
 const STRETCH_OPEN = { warmup: false, cooldown: false };
 
-function stretchBlockHTML(which, finished) {
-  const m = planMobility();
+function stretchBlockHTML(which, finished, plan = TODAY_WORKOUT) {
+  const m = planMobility(plan);
   if (!m || finished) return "";
   const list = m[which];
   const skipped = which === "warmup" ? m.skippedWarmup : m.skippedCooldown;
@@ -33082,15 +32988,18 @@ function stretchBlockHTML(which, finished) {
    is still forty minutes away. `skipped` stays written for older rows and for
    anything that only reads one flag. */
 async function setStretchSkipped(skipped, which = null) {
-  const m = planMobility();
-  if (!m || !TODAY_WORKOUT?.id) return;
+  /* Whichever day the plan screen is on: skipping the cool-down while reading
+     Saturday's plan is a decision about Saturday. */
+  const plan = planBeingEdited();
+  const m = planMobility(plan);
+  if (!m || !plan?.id) return;
   const next = { ...m };
   if (which === "warmup") next.skippedWarmup = skipped;
   else if (which === "cooldown") next.skippedCooldown = skipped;
   else { next.skipped = skipped; next.skippedWarmup = skipped; next.skippedCooldown = skipped; }
-  TODAY_WORKOUT.mobility = next;
-  renderPlanPreview();
-  const { error } = await sb.from("ai_workouts").update({ mobility: next }).eq("id", TODAY_WORKOUT.id);
+  plan.mobility = next;
+  rerenderPlanScreen();
+  const { error } = await sb.from("ai_workouts").update({ mobility: next }).eq("id", plan.id);
   if (error) { console.error(error); toast("That didn't save"); }
 }
 
@@ -33098,9 +33007,10 @@ async function setStretchSkipped(skipped, which = null) {
    column. Unchecked they left the screen showing an edit the server never
    took; reloading on failure is what puts the two back in step. */
 async function savePlanExercises() {
-  if (!TODAY_WORKOUT?.id) return false;
+  const plan = planBeingEdited();
+  if (!plan?.id) return false;
   const { error } = await sb.from("ai_workouts")
-    .update({ exercises: TODAY_WORKOUT.exercises }).eq("id", TODAY_WORKOUT.id);
+    .update({ exercises: plan.exercises }).eq("id", plan.id);
   if (error) {
     console.error("plan edit not saved", error);
     toast("Couldn't save that change");
@@ -33259,20 +33169,147 @@ async function restoreSessionBudget() {
   toast("Your original session is back");
 }
 
-function renderPlanPreview() {
+/* ---------- Reviewing a day that is not today ----------
+
+   Mo, 2026-09-18: "When I click on See tomorrow's plan ... it would only say
+   swap workout. It should take me to that same page it would when I'm getting
+   ready to begin a workout, but instead it will be just reviewing it."
+
+   So the plan screen took a day, and these are the four things every screen
+   that opens one needs to agree on: which row it is, what to call the day, and
+   how to get back to it after a sheet has rewritten it. */
+
+/* The row a day's plan lives on. Read through here rather than copied, so
+   "the plan for Saturday" is one lookup wherever it is asked. */
+function planForDate(date) {
+  return (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === date && !w.archived) || null;
+}
+
+/* What the day is called at the top of its own plan. The two days anybody
+   actually plans have names of their own, and the weekday rides along with
+   tomorrow because "Tomorrow, Saturday" is how Mo says it out loud. */
+function planDayLabel(date) {
+  const d = new Date(date + "T00:00:00");
+  if (date === todayStr()) return "Today";
+  if (date === shiftDate(todayStr(), 1)) return `Tomorrow, ${d.toLocaleDateString([], { weekday: "long" })}`;
+  return d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
+}
+
+/* The same day inside a sentence, which is not the same string: "Rebuild
+   Thursday" reads, "Rebuild Thu, Sep 24" does not. The day planner's own
+   wording, because these two screens hand the same sheets the same day. */
+function planDayWord(date) {
+  const today = todayStr();
+  if (date === today) return "today";
+  if (date === shiftDate(today, 1)) return "tomorrow";
+  return new Date(date + "T00:00:00").toLocaleDateString([], { weekday: "long" });
+}
+
+/* Enough of a row to tell whether a sheet has rewritten the day underneath
+   this screen: what it is, and what is on it. */
+function planRowSignature(w) {
+  return w ? `${w.focus}|${planSignature(w.exercises)}` : "";
+}
+
+/* Which day the plan screen is currently showing: null is today, which is what
+   it is about unless it says otherwise. Everything that edits a plan from that
+   screen (the picker, the sets dials, reorder, remove, the stretch skip) goes
+   through planBeingEdited, so a change made while reviewing Saturday lands on
+   Saturday rather than on this morning. */
+let PLAN_VIEW_DATE = null;
+
+function planBeingEdited() {
+  return PLAN_VIEW_DATE ? planForDate(PLAN_VIEW_DATE) : TODAY_WORKOUT;
+}
+
+/* Redraw whichever day the plan screen is on. Called instead of
+   renderPlanPreview() bare by everything that edits from it: bare would jump a
+   review of Saturday back to today halfway through editing Saturday. */
+function rerenderPlanScreen() {
+  if (PLAN_VIEW_DATE) renderPlanPreview({ date: PLAN_VIEW_DATE, review: true });
+  else renderPlanPreview();
+}
+
+/* The way in. A mode rather than a plain render because the writes made from
+   this screen (an activity, a rebuild around what you have) redraw the whole
+   tab when they land, and the tab has to know it is showing Saturday. */
+function openPlanReview(date) {
+  PLAN_VIEW_DATE = date;
+  goWorkoutScreen("review");
+}
+
+/* The whole-session swap writes the day and then tells the hero about it,
+   because until this screen existed nothing else on the tab could be showing a
+   day other than today. This screen sits underneath that sheet while the write
+   happens, so it watches its own row and repaints when the row changes rather
+   than reaching into the sheet for a callback it does not have. Gives up after
+   a few seconds: a swap that never landed has already said so in a toast. */
+function watchReviewedDay(date, was) {
+  let tries = 0;
+  const tick = () => {
+    if (WORKOUT_MODE !== "review" || PLAN_VIEW_DATE !== date) return;
+    if (planRowSignature(planForDate(date)) !== was) { renderPlanPreview({ date, review: true }); return; }
+    if (++tries < 20) setTimeout(tick, 300);
+  };
+  setTimeout(tick, 300);
+}
+
+/* The plan screen, for today and for any other day.
+
+   Mo, 2026-09-18: "It should take me to that same page it would when I'm
+   getting ready to begin a workout, but instead it will be just reviewing it,
+   being able to swap specific workouts or the whole workout." So there is one
+   plan screen and not two: `date` says which row it is about, `review` says
+   the day has not arrived, and everything the person came to look at is the
+   same screen because it is the same code. The rows with their figures, the
+   sets and reps, the per-exercise swap, the grips, Add exercise and the
+   cool-down all behave exactly as they do today, pointed at that day's row.
+
+   What review takes away is only what belongs to a day you are standing in:
+   Begin, the progress bar, the time budget and the privacy row. What it puts
+   in their place are the three doors the day planner already had, acting on
+   that day and nothing else.
+
+   Called with no arguments it is today's screen, unchanged, which is what
+   every caller that was already here does. */
+function renderPlanPreview(opts) {
+  /* Read off `opts` rather than destructured, because this is handed straight
+     to callbacks all over the tab and one of them will eventually arrive with
+     a promise's value or an event in the first argument. */
+  const review = opts?.review === true;
+  const date = review ? opts.date : null;
+  PLAN_VIEW_DATE = date;
+  const plan = review ? planForDate(date) : TODAY_WORKOUT;
+  /* The day can be emptied out from under this screen: Clear this day, a swap
+     that turned it into an activity, a reload that lost it. Nothing to review
+     is not an error, it is the workout tab. */
+  if (!plan) { PLAN_VIEW_DATE = null; goWorkoutScreen("choose", { back: true }); return; }
+
   // Reachable straight from choose/manual/week now, each of which stamps its
   // own heading here, clear it or their title outlives them on this screen.
-  $("workoutCardTitle").textContent = "";
-  $("workoutFocusRow").textContent = `Focus: ${displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises)}`;
+  // Reviewing another day says which day, because that is the one thing this
+  // screen cannot get across any other way.
+  $("workoutCardTitle").textContent = review ? planDayLabel(date) : "";
+  $("workoutFocusRow").textContent = `Focus: ${displayFocus(plan.focus, plan.exercises)}`;
 
-  const loggedNow = todaysLoggedExerciseNames();
-  const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
-  const total = TODAY_WORKOUT.exercises.length;
+  const exercises = plan.exercises || [];
+  /* A day that has not arrived has nothing logged against it, so nothing on it
+     is done, started or finished. Asking the log about today's lifts while
+     looking at Saturday would grey out a row on Saturday because the same lift
+     was done this morning. */
+  const loggedNow = review ? new Set() : todaysLoggedExerciseNames();
+  const doneCount = exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
+  const total = exercises.length;
+  /* A planned activity is a real plan with no lifts in it: the name is in
+     `focus` and `exercises` is empty, which is the shape the generator already
+     writes for a week with no resistance training in it. There is no list to
+     show and nothing to add to it. */
+  const activityDay = review && !total;
 
   /* A plan made moments ago is untouched even when it happens to name something
      already logged this morning, so it keeps its grips, its remove buttons and
      Regenerate. Without this a regenerated plan could arrive locked. */
-  const fresh = !!FRESH_PLAN_ID && FRESH_PLAN_ID === TODAY_WORKOUT.id;
+  const fresh = !review && !!FRESH_PLAN_ID && FRESH_PLAN_ID === plan.id;
   const started = doneCount > 0 && !fresh;
   const finished = doneCount >= total && total > 0 && !fresh;
 
@@ -33282,11 +33319,13 @@ function renderPlanPreview() {
      ONE_OFF_SESSION above), and rebuilding the whole day underneath a live
      SESSION would strand the sets already done against exercises that are no
      longer on the plan. Gone for a coached client for the same reason
-     Regenerate is: their coach writes this. */
-  const estMin = sessionEstimateMinutes(TODAY_WORKOUT.exercises);
-  const oneOff = (ONE_OFF_SESSION?.date === (TODAY_WORKOUT.entry_date || todayStr())
-    && ONE_OFF_SESSION.made === planSignature(TODAY_WORKOUT.exercises)) ? ONE_OFF_SESSION : null;
-  const timeRow = (started || finished || SESSION || isCoachedClient() || !estMin) ? "" : `
+     Regenerate is: their coach writes this. And gone while reviewing another
+     day, where "how long have you got" is a question about a day nobody is
+     standing in yet. */
+  const estMin = sessionEstimateMinutes(exercises, planMobility(plan));
+  const oneOff = (!review && ONE_OFF_SESSION?.date === (plan.entry_date || todayStr())
+    && ONE_OFF_SESSION.made === planSignature(exercises)) ? ONE_OFF_SESSION : null;
+  const timeRow = (review || started || finished || SESSION || isCoachedClient() || !estMin) ? "" : `
     <div class="plan-time-row">
       <button type="button" class="plan-time" id="planTimeBtn" aria-label="About ${estMin} minutes. Change how long you have today.">
         ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
@@ -33295,13 +33334,13 @@ function renderPlanPreview() {
     </div>
     ${oneOff?.changed ? `<p class="plan-time-change" id="planTimeChange">${escapeHtml(oneOff.changed)}</p>` : ""}`;
 
-  const planRamps = planMobility()?.ramp || [];
-  const rows = TODAY_WORKOUT.exercises.map((ex, i) => {
+  const planRamps = planMobility(plan)?.ramp || [];
+  const rows = exercises.map((ex, i) => {
     const isDone = loggedNow.has(ex.name.toLowerCase());
     /* One quiet line, not a block: the card is the list of lifts, and a ramp is
        something you read at the rack rather than here. Gone once the lift is
        logged, because by then it has been done or it has not. */
-    const ramp = isDone ? null : rampForExercise(planRamps, ex.name);
+    const ramp = isDone ? null : rampForExercise(planRamps, ex.name, plan);
     const doneMark = isDone ? icon("check") : icon("dumbbell");
     return `<div class="exercise-row ${isDone ? "ex-done" : ""} ${started ? "" : "draggable"}" data-idx="${i}">
       ${started ? "" : `<button type="button" class="grip" data-grip aria-label="Drag to reorder">${icon("grip", 16)}</button>`}
@@ -33329,24 +33368,55 @@ function renderPlanPreview() {
   }).join("");
 
   /* Only once the day holds more than this plan. On an ordinary one-session day
-     the plan IS the day and a list of one above it says nothing. */
-  const dayList = todaySessions().length > 1 ? todaySessionsHTML() : "";
+     the plan IS the day and a list of one above it says nothing. Never while
+     reviewing another day: those sessions are today's. */
+  const dayList = !review && todaySessions().length > 1 ? todaySessionsHTML() : "";
+
+  /* The three doors, in the order somebody reaches for them: a different
+     session, the same session around a limit, or not a workout at all. Each
+     one acts on THIS day and nothing else. They are the day planner's own
+     markup because they are the day planner's own buttons: Mo asked for that
+     sheet's job to happen here, on the plan, rather than on a summary of it. */
+  const reviewActions = !review ? "" : `
+    <p class="dp-heading">Change it</p>
+    <div class="dp-ways">
+      ${isCoachedClient() ? "" : `<button type="button" class="dp-way" id="planReviewSwap">
+        <span class="dp-way-ico">${icon("swap", 18)}</span>
+        <span class="dp-way-txt"><b>Swap the whole workout</b><i>A different session, not another version of this one.</i></span>
+      </button>`}
+      ${isCoachedClient() || activityDay ? "" : `<button type="button" class="dp-way" id="planReviewLimits">
+        <span class="dp-way-ico">${icon("body", 18)}</span>
+        <span class="dp-way-txt"><b>Tell me what you have</b><i>Bodyweight only, free weights only, or tick what is missing.</i></span>
+      </button>`}
+      <button type="button" class="dp-way" id="planReviewAct">
+        <span class="dp-way-ico">${icon("run", 18)}</span>
+        <span class="dp-way-txt"><b>Do an activity instead</b><i>A run, a ride, yoga, Pilates.</i></span>
+      </button>
+    </div>
+    ${/* The day planner's last door, kept because this screen replaced it and
+          taking a workout off a day would otherwise have nowhere left to
+          happen. Quiet, under the three that change the day rather than
+          empty it. */ ""}
+    <button type="button" class="btn-ghost" id="planReviewClear">Clear this day</button>
+    <button type="button" class="btn-ghost" id="planReviewBack">Back to the workout tab</button>`;
 
   $("workoutContent").innerHTML = `
     ${backBar("Back", () => goWorkoutScreen("choose", { back: true }))}
     ${dayList}
+    ${review ? "" : `
     <div class="workout-progress-row">
       <span>Progress</span>
       <span class="workout-progress-count">${doneCount}/${total}</span>
     </div>
-    <div class="workout-progress-track"><div class="workout-progress-fill" style="width:${total ? (doneCount / total) * 100 : 0}%"></div></div>
+    <div class="workout-progress-track"><div class="workout-progress-fill" style="width:${total ? (doneCount / total) * 100 : 0}%"></div></div>`}
     ${timeRow}
-    ${stretchBlockHTML("warmup", finished)}
+    ${activityDay ? `<p class="ef-note">No lifts on this one. It is ${escapeHtml(displayFocus(plan.focus, exercises))}, on the clock.</p>` : ""}
+    ${stretchBlockHTML("warmup", finished, plan)}
     <div class="reorder-list" id="planRows">${rows}</div>
-    ${stretchBlockHTML("cooldown", finished)}
-    ${cardioNoteHTML(finished)}
-    ${finished ? "" : `<button type="button" class="btn-ghost" id="planAddExToggleBtn">+ Add exercise</button>`}
-    ${finished
+    ${stretchBlockHTML("cooldown", finished, plan)}
+    ${cardioNoteHTML(finished, plan)}
+    ${finished || activityDay ? "" : `<button type="button" class="btn-ghost" id="planAddExToggleBtn">+ Add exercise</button>`}
+    ${review ? reviewActions : finished
       ? `<p class="muted-note" style="text-align:center;margin:14px 0 10px;">${icon("check", 14)} Workout complete.</p>
          <button type="button" class="btn-primary" id="planNewBtn">Start new workout</button>`
       : `${PARTNER_EMAIL ? `<button type="button" class="wp-open" id="planPrivacyBtn">
@@ -33354,16 +33424,16 @@ function renderPlanPreview() {
              <span class="wp-open-txt"><b>Advanced</b><i>${escapeHtml(privacySummary())}</i></span>
              <span class="wp-open-go">${icon("chevronRight", 16)}</span>
            </button>` : ""}
-         <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume Workout" : "Begin Workout"}</button>
+         <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume today&rsquo;s plan" : "Start today&rsquo;s plan"}</button>
          ${started || isCoachedClient() ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>
            <button type="button" class="btn-ghost" id="planSwapDayBtn">Swap this workout</button>`}`}`;
   wireTodaySessions($("workoutContent"));
   mountMotionFigures($("workoutContent"));
 
   makeReorderable($("planRows"), async (order) => {
-    TODAY_WORKOUT.exercises = order.map((i) => TODAY_WORKOUT.exercises[i]);
+    plan.exercises = order.map((i) => exercises[i]);
     await savePlanExercises();
-    renderPlanPreview();
+    rerenderPlanScreen();
   });
 
   /* The overview is where "I generated this, now let me actually look at it"
@@ -33372,14 +33442,15 @@ function renderPlanPreview() {
      workout and discover the swap sheet already exists one screen later.
      Same sheet the reveal and the session use, same three ranked
      alternatives with a reason, same search. A logged exercise has no swap:
-     there is nothing left to replace. */
+     there is nothing left to replace. The sheet writes the row for the date it
+     is handed, so on a review it changes that day and only that day. */
   $("workoutContent").querySelectorAll("[data-plan-swap]").forEach((btn) => {
     btn.onclick = () => openSwapSheet({
-      list: () => TODAY_WORKOUT.exercises,
+      list: () => plan.exercises,
       index: Number(btn.dataset.planSwap),
-      date: TODAY_WORKOUT.entry_date || todayStr(),
-      focus: TODAY_WORKOUT.focus,
-      after: () => renderPlanPreview(),
+      date: plan.entry_date || todayStr(),
+      focus: plan.focus,
+      after: () => rerenderPlanScreen(),
     });
   });
 
@@ -33387,7 +33458,7 @@ function renderPlanPreview() {
     b.onclick = () => {
       const key = b.dataset.stretchToggle;
       STRETCH_OPEN[key] = !STRETCH_OPEN[key];
-      renderPlanPreview();
+      rerenderPlanScreen();
     };
   });
   /* Tapping a row opens the same sets/reps/weight dials the picker's second
@@ -33399,7 +33470,7 @@ function renderPlanPreview() {
   $("workoutContent").querySelectorAll("[data-plan-edit]").forEach((b) => {
     b.onclick = () => {
       const at = Number(b.dataset.planEdit);
-      const ex = TODAY_WORKOUT.exercises[at];
+      const ex = plan.exercises[at];
       if (!ex) return;
       CB_TARGET = "plan";
       $("cbPickScrim").classList.remove("hidden");
@@ -33416,9 +33487,9 @@ function renderPlanPreview() {
   $("workoutContent").querySelectorAll("[data-remove-plan]").forEach((btn) => {
     btn.onclick = async () => {
       const idx = parseInt(btn.dataset.removePlan, 10);
-      TODAY_WORKOUT.exercises.splice(idx, 1);
+      plan.exercises.splice(idx, 1);
       await savePlanExercises();
-      renderPlanPreview();
+      rerenderPlanScreen();
     };
   });
 
@@ -33448,7 +33519,7 @@ function renderPlanPreview() {
     $("planRegenBtn").onclick = async () => {
       const ok = await askConfirm({
         heading: "Regenerate this plan",
-        body: `A different ${displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises).toLowerCase()}: same muscles, different exercises. The ${total} on this plan are replaced, including anything you added, swapped or reordered. There is no way back to it.`,
+        body: `A different ${displayFocus(plan.focus, exercises).toLowerCase()}: same muscles, different exercises. The ${total} on this plan are replaced, including anything you added, swapped or reordered. There is no way back to it.`,
         ok: "Give me another",
         cancel: "Keep this plan",
       });
@@ -33459,11 +33530,46 @@ function renderPlanPreview() {
      type and changes the movements, this changes the day. */
   if ($("planSwapDayBtn")) {
     $("planSwapDayBtn").onclick = () => openSessionSwapSheet({
-      date: TODAY_WORKOUT.entry_date || todayStr(),
-      current: TODAY_WORKOUT,
+      date: plan.entry_date || todayStr(),
+      current: plan,
     });
   }
   if ($("planNewBtn")) $("planNewBtn").onclick = startFreshWorkout;
+
+  /* The three review doors. Each one hands the day to the sheet that already
+     does that job, so there is one way to swap a session, one way to say what
+     kit you have, and one way to put an activity on a day. */
+  if ($("planReviewSwap")) {
+    $("planReviewSwap").onclick = () => {
+      openSessionSwapSheet({ date, current: plan });
+      watchReviewedDay(date, planRowSignature(plan));
+    };
+  }
+  /* The limits sheet runs a generate, and a generate takes the tab back to
+     today; `after` is how this screen returns to the day it just rebuilt. */
+  if ($("planReviewLimits")) {
+    $("planReviewLimits").onclick = () => openPlanLimitsSheet(date, planDayWord(date), { after: () => openPlanReview(date) });
+  }
+  if ($("planReviewAct")) $("planReviewAct").onclick = () => openActivityInstead(date, planDayWord(date));
+  if ($("planReviewClear")) {
+    $("planReviewClear").onclick = async () => {
+      const ok = await askConfirm({
+        heading: "Clear this day",
+        body: `${displayFocus(plan.focus, exercises)} is removed from ${planDayLabel(date).toLowerCase()}. Anything you have already logged is kept.`,
+        ok: "Clear it",
+      });
+      if (!ok) return;
+      /* supabase-js resolves with an error rather than throwing, so a delete
+         nobody checked is a day that looks cleared and comes back tomorrow. */
+      const { error } = await sb.from("ai_workouts").delete().eq("id", plan.id);
+      if (error) { toast("Couldn't clear it"); console.error(error); return; }
+      await loadAll();
+      await loadTodayWorkout();
+      goWorkoutScreen("choose", { back: true });
+      toast("Day cleared");
+    };
+  }
+  if ($("planReviewBack")) $("planReviewBack").onclick = () => goWorkoutScreen("choose", { back: true });
 }
 
 
@@ -39491,11 +39597,10 @@ const A11Y_SHEETS = {
   daySheetScrim: "Day",
   timelineScrim: "Timeline",
   cropScrim: "Move and scale",
-  savedScrim: "Saved workouts",
   swapScrim: "Swap exercise",
   measureScrim: "Log measurements",
 };
-const A11Y_TITLE_SEL = ".scr-title, .pop-who, .ps-label, .cb-sheet-title, .ds-date, .sv-title, h1, h2, h3";
+const A11Y_TITLE_SEL = ".scr-title, .pop-who, .ps-label, .cb-sheet-title, .ds-date, h1, h2, h3";
 const A11Y_FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 const A11Y_CLOSE_SEL = '[aria-label="Close"], .ds-x, .cb-x, .notice-x';
 
