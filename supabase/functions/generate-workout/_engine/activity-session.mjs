@@ -38,6 +38,9 @@
  * Forty five seconds is the middle of what a mat class gives a move and what a
  * vinyasa holds a pose, and it is short enough that a thirty minute session is
  * a real list rather than six items. A move done on both sides gets both. */
+import { normalizeLimits, BODY_AREAS } from "./limits.mjs";
+import { jointLoadFor } from "./joint-load.mjs";
+
 export const DEFAULT_MOVE_SECONDS = 45;
 export const PER_SIDE_MULTIPLIER = 2;
 
@@ -80,6 +83,9 @@ function movesAtOrBelow(training, level) {
         seconds: Number(ex.seconds) > 0 ? Number(ex.seconds) : DEFAULT_MOVE_SECONDS,
         perSide: !!ex.perSide,
         cue: ex.cue || null,
+        /* The library's own word on what to avoid, where it has one, so the
+           joint lookup below can union it with ours. */
+        avoidIf: Array.isArray(ex.avoidIf) ? ex.avoidIf : [],
       });
     }
   }
@@ -177,12 +183,44 @@ export function levelFromSessions(count = 0) {
   return "beginner";
 }
 
-/* The session. `training` is a library object out of TRAININGS. */
+/* What the person said hurts, applied to the pool before anything is picked.
+ *
+ * This was missing until 2026-09-19 and it was the worst gap in the engine: a
+ * lifting week honoured a bad neck and the Pilates class built for the same
+ * person opened on The Hundred and finished on Roll-Over. The joint table for
+ * poses lives in joint-load.mjs (POSE_LOAD), the person's answer comes through
+ * limits.mjs in the same shape the plan reads, and the rule is the plan's
+ * rule: a move that loads a joint they named is out. What differs from
+ * applyLimits is that nothing here is softened back in. A lifting slot left
+ * empty is a hole in a week; a class with fewer poses is a shorter list, and
+ * a shorter list is what a class with a bad neck in it should be. */
+const LABEL = {};
+for (const a of BODY_AREAS) LABEL[a.key] = a.label.toLowerCase();
+const listOut = (a) => a.length === 1 ? a[0] : `${a.slice(0, -1).join(", ")} and ${a[a.length - 1]}`;
+
+function excludeForLimits(pool, training, limits) {
+  const lim = normalizeLimits(limits);
+  if (!lim.hurts.length) return { kept: pool, out: [], hurts: [] };
+  const kept = [];
+  const out = [];
+  for (const m of pool) {
+    const joints = jointLoadFor(m, { training: training.id }).joints;
+    const hit = lim.hurts.filter((j) => joints.includes(j));
+    if (hit.length) out.push({ name: m.name, joints: hit });
+    else kept.push(m);
+  }
+  return { kept, out, hurts: lim.hurts };
+}
+
+/* The session. `training` is a library object out of TRAININGS. `limits` is
+   the person's profiles.limits, in any shape normalizeLimits accepts, or
+   nothing. */
 export function buildActivitySession(training, {
   minutes = 30,
   level = "beginner",
   styleKey = null,
   seed = "",
+  limits = null,
 } = {}) {
   const notes = [];
   if (!training || !Array.isArray(training.categories)) {
@@ -201,9 +239,23 @@ export function buildActivitySession(training, {
   }
 
   const style = (training.styles || []).find((s) => s.key === styleKey) || null;
-  const pool = movesAtOrBelow(training, level);
-  if (!pool.length) {
+  const whole = movesAtOrBelow(training, level);
+  if (!whole.length) {
     return { ok: false, reason: "no-moves", moves: [], notes: ["Nothing in the library at that level."] };
+  }
+  const { kept: pool, out: excluded, hurts } = excludeForLimits(whole, training, limits);
+  const hurtSay = hurts.length ? listOut(hurts.map((j) => LABEL[j] || j)) : "";
+  if (!pool.length) {
+    /* Everything at this level loads something they named. Said, not padded:
+       a class made of the moves that were just ruled out is the one outcome
+       this function exists to prevent. */
+    return { ok: false, reason: "all-excluded", moves: [], excluded,
+      notes: [`Every ${training.label} move at this level loads the ${hurtSay} you said hurts, so there is no class to build today.`] };
+  }
+  /* First, because the app's reveal prints the first note and this is the one
+     that changes what the class is. */
+  if (excluded.length) {
+    notes.push(`Left out because you said your ${hurtSay} hurts: ${listOut(excluded.map((e) => e.name))}.`);
   }
 
   const rand = rng(`${training.id}|${level}|${styleKey || ""}|${seed}`);
@@ -218,7 +270,9 @@ export function buildActivitySession(training, {
   /* Said out loud, both halves: that it repeats, and how much there was to
      repeat. A person who can see the library is small can judge the session. */
   if (rounds > 1) {
-    notes.push(`${rounds} rounds of the same sequence. ${training.label} has about ${Math.round(uniqueSeconds / 60)} min of moves at this level, and a class repeats them.`);
+    notes.push(excluded.length
+      ? `${rounds} rounds of the same sequence. ${training.label} has about ${Math.round(uniqueSeconds / 60)} min of moves at this level with the ${excluded.length} that load your ${hurtSay} left out, and a class repeats them.`
+      : `${rounds} rounds of the same sequence. ${training.label} has about ${Math.round(uniqueSeconds / 60)} min of moves at this level, and a class repeats them.`);
   }
   /* The gap is reported rather than padded out with a move nobody chose. */
   const left = mins * 60 - seconds;
@@ -238,6 +292,9 @@ export function buildActivitySession(training, {
     rounds,
     uniqueSeconds,
     moves,
+    /* What the limits took out and why, by name, so a screen or a test can
+       check the class against the person rather than trust the note. */
+    excluded,
     notes,
   };
 }
