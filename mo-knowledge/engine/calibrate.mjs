@@ -81,12 +81,37 @@ const STEP_CEILING_PCT = 0.10;
    learns about a real plate inventory, this follows it. */
 const gridAt = (lb) => (lb < 40 ? 2.5 : 5);
 
-export function stepFor(name, currentLb) {
+/* How much of the step age is allowed to take off, at the top of the dial.
+ *
+ * research/02: "a longer ramp-in block and smaller load increments... Not a
+ * lower ceiling. A slower approach to it." Half is the number because half is
+ * what the grid can actually express: the step ladder is 2.5 / 5 / 10, so a
+ * cut of a half moves a squat from one rung to the next and anything smaller
+ * rounds straight back to where it started, which is the exact no-op this
+ * file's opening comment exists to describe. research/02 says any specific
+ * multiplier here is invented, and this one is.
+ *
+ * What it costs the person: nothing at the destination and more sessions on
+ * the way to it. A squat climbing 5 lb a session instead of 10 is still
+ * climbing. */
+export const AGE_STEP_CUT = 0.5;
+
+export function stepFor(name, currentLb, { ageCaution = 0 } = {}) {
   const step = STEP_BY_PATTERN[patternFor({ name })] ?? STEP_COMPOUND;
   if (!(currentLb > 0)) return step;
   const grid = gridAt(currentLb);
   const capped = Math.min(step, currentLb * STEP_CEILING_PCT);
-  return Math.max(grid, Math.round(capped / grid) * grid);
+  const base = Math.max(grid, Math.round(capped / grid) * grid);
+  const caution = Number.isFinite(Number(ageCaution)) ? Math.min(1, Math.max(0, Number(ageCaution))) : 0;
+  if (!(caution > 0)) return base;
+  /* Rounded to the same grid and never above the step it started from, so the
+     age dial can only ever slow the climb. The grid is coarse on purpose (it
+     is what a rack holds), so the visible effect is a rung and not a curve:
+     squat and hinge drop from 10 lb to 5 lb once the dial passes halfway,
+     around 48, and a 5 lb step cannot go lower than the 5 lb plate that
+     expresses it. Saying that out loud is better than pretending a continuous
+     multiplier survives contact with a weight rack. */
+  return Math.max(grid, Math.min(base, Math.round(base * (1 - AGE_STEP_CUT * caution) / grid) * grid));
 }
 
 /* Three sessions is the window. Two is enough to see a pattern and four starts
@@ -235,7 +260,7 @@ const factorFor = (current, stepLb) => (current > 0 ? (current + stepLb) / curre
  * Reads the three most recent completed sessions. Everything it says it can
  * defend from those rows, which is why `why` is a sentence rather than a code.
  */
-export function calibrateExercise(rows = []) {
+export function calibrateExercise(rows = [], { ageCaution = 0 } = {}) {
   /* Exported, so it is not only `calibrate` below that reaches it, and a caller
      holding rows it built itself is exactly how a shape this file does not
      expect gets in. Same rule as everywhere else here: a row that is not a row
@@ -273,7 +298,7 @@ export function calibrateExercise(rows = []) {
   }
 
   const current = currentLoad(done);
-  const step = current > 0 ? stepFor(name, current) : 0;
+  const step = current > 0 ? stepFor(name, current, { ageCaution }) : 0;
 
   const pair = done.slice(0, 2);
   if (pair.every(isEasy)) {
@@ -320,7 +345,13 @@ export function calibrateExercise(rows = []) {
  * research/09 says the fastest way to lose somebody is a plan that reacts to
  * noise, so it takes two exercises pointing the same way before the week moves.
  */
-export function calibrate({ plans = [], logs = [] } = {}) {
+/* `ageCaution` is age.mjs's dial, 0 to 1, and it only ever makes the step
+   smaller: see stepFor. It reaches this function rather than being applied
+   afterwards for the same reason the factor is computed here at all, which is
+   that `why` has to be able to describe the number the person is actually
+   given. Defaults to 0, so every caller that does not pass one behaves byte
+   for byte as it did before age existed. */
+export function calibrate({ plans = [], logs = [], ageCaution = 0 } = {}) {
   const rows = joinPlanToActual({ plans, logs });
 
   const grouped = new Map();
@@ -335,7 +366,7 @@ export function calibrate({ plans = [], logs = [] } = {}) {
   const COUNTER = { "too-easy": "tooEasy", "on-track": "onTrack", "too-heavy": "tooHeavy", skipped: "skipped" };
 
   for (const [key, list] of grouped) {
-    const result = calibrateExercise(list);
+    const result = calibrateExercise(list, { ageCaution });
     byExercise[key] = result;
     const counter = COUNTER[result.verdict];
     if (counter) summary[counter] += 1;

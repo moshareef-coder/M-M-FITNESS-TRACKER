@@ -1370,6 +1370,121 @@ for (const goal of GOALS) {
   }
 }
 
+/* ------------------------------------------------------------------ *
+ * Block J: age
+ * ------------------------------------------------------------------ *
+ * Added 2026-09-18, and the reason it is here is that nothing was varying age
+ * and so nobody found out that a 25 year old and a 60 year old were getting
+ * byte-identical weeks. The number reached the edge function, was bounded
+ * there, rode the payload into adapter.mjs and was never put on the `person`
+ * object. Every line of research/02 was unimplemented and every block above
+ * this one passed.
+ *
+ * A targeted block and not a fifth axis on block A: crossing five ages into
+ * 10,820 runs would be fifty thousand, and what has to be checked here is a
+ * COMPARISON between ages of one person rather than the health of each plan,
+ * which every block above already covers. One goal per bubble, three day
+ * counts, two histories, two clocks. About 150 runs.
+ *
+ * What it asserts is research/02's line about what age is and is not allowed to
+ * do: it modifies the rate of advance, never the destination. So the sets, the
+ * reps, the movements and the weights of an older person's week have to be the
+ * younger person's week, the preparation may grow, and the day must not end up
+ * past the clock it was costed against because of it.
+ */
+const AGE_CASES = [25, 45, 60, 75, null];
+const BUBBLES = [...new Map(GOALS.map((g) => [g.goal_bubble, g])).values()];
+
+for (const goal of BUBBLES) {
+  for (const days of [2, 3, 4]) {
+    for (const history of [HISTORY[0], HISTORY[2]]) {
+      for (const sessionMinutes of [null, 75]) {
+        const cell = {
+          goal, days, history, limitCase: LIMIT_CASES[0],
+          sex: "Male", bodyWeight: 180, focusCase: FOCUS_CASES[0],
+        };
+        const extra = sessionMinutes == null ? {} : { session_minutes: sessionMinutes };
+        const byAge = new Map();
+        for (const age of AGE_CASES) {
+          const out = run(cell, age == null ? extra : { ...extra, age });
+          if (out?.plan) byAge.set(age, out);
+        }
+        const young = byAge.get(25);
+        if (!young) continue;
+        const note = `age, sm=${sessionMinutes}`;
+
+        for (const [age, out] of byAge) {
+          const input = tag({ ...cell, note: `${note}, age=${age ?? "absent"}` });
+          checkOne(input, out);
+
+          /* research/02, the headline: "the instinct to hand a 55 year old a
+             lighter, easier, higher-rep program is not a safety measure. It is
+             a worse program justified by an assumption." Age must not have
+             quietly shrunk the training. */
+          for (let i = 0; i < out.plan.week.length; i++) {
+            const a = young.plan.week[i], b = out.plan.week[i];
+            if (!a || !b) { fail("age-changed-the-week", input, `day ${i} exists for one age and not the other`); continue; }
+            const lifting = (d) => JSON.stringify(d.exercises.map((e) => [e.name, e.sets, e.reps, e.weight]));
+            if (lifting(a) !== lifting(b)) {
+              fail("age-changed-the-lifting", input, `${a.name}: ${lifting(b)} against ${lifting(a)}`);
+            }
+            /* The preparation is the one thing allowed to move, and only up. */
+            if (b.mobility.warmupSeconds < a.mobility.warmupSeconds) {
+              fail("age-shortened-the-warmup", input, `${a.name}: ${b.mobility.warmupSeconds}s against ${a.mobility.warmupSeconds}s`);
+            }
+            /* And it may not be bought with minutes the person did not have.
+               A day already over its clock before age touched it is left where
+               it was; one that fit has to still fit. */
+            if (b.minutes != null && a.estimatedMinutes <= a.minutes && b.estimatedMinutes > b.minutes) {
+              fail("age-pushed-the-day-over-the-clock", input, `${a.name}: ${b.estimatedMinutes} min against ${b.minutes}`);
+            }
+            /* The ledger has to still add up, or the number on the screen is
+               not the session the person is doing. */
+            const rampSec = (b.rampSets || []).reduce((t, r) => t + (Number(r?.seconds) || 0), 0);
+            const expectPrep = Math.round((b.mobility.warmupBudgetSeconds + rampSec) / 60);
+            if (b.prepMinutes !== expectPrep) {
+              fail("age-broke-the-prep-ledger", input, `${a.name}: prepMinutes ${b.prepMinutes}, block+ramp says ${expectPrep}`);
+            }
+            if (b.totalMinutes !== b.estimatedMinutes + Math.round(b.mobility.cooldownSeconds / 60)) {
+              fail("age-broke-the-total-ledger", input, `${a.name}: total ${b.totalMinutes}, estimate ${b.estimatedMinutes}`);
+            }
+          }
+        }
+
+        /* The dial itself, measured off the response rather than off age.mjs,
+           because what matters is what a person receives. */
+        const dial = AGE_CASES.filter((a) => a != null).map((a) => byAge.get(a)?.meta.age.rampCaution);
+        if (dial.some((v) => v == null)) {
+          fail("age-not-reported", tag({ ...cell, note }), `meta.age missing for one of ${AGE_CASES.join(",")}`);
+        } else {
+          for (let i = 1; i < dial.length; i++) {
+            if (!(dial[i] >= dial[i - 1])) fail("age-dial-not-monotonic", tag({ ...cell, note }), dial.join(" "));
+          }
+          if (!(dial[3] > dial[0])) fail("age-changes-nothing", tag({ ...cell, note }), `75 and 25 both read ${dial[0]}`);
+        }
+
+        /* research/02's closing argument: a plan built for an unknown age uses
+           the cautious ramp. The one thing an absent field must never be is the
+           young-adult default, which is the shape the `sex` bug had. */
+        const blank = byAge.get(null);
+        if (blank && !(blank.meta.age.rampCaution >= 1)) {
+          fail("absent-age-is-not-the-careful-default", tag({ ...cell, note }), `rampCaution ${blank.meta.age.rampCaution}`);
+        }
+        /* And a warm-up that grew for somebody who never said they were older
+           would be spending research/13's minutes on research/02's argument
+           without the person research/02 is describing. */
+        if (blank) {
+          for (let i = 0; i < blank.plan.week.length; i++) {
+            if (blank.plan.week[i].mobility.warmupSeconds !== young.plan.week[i].mobility.warmupSeconds) {
+              fail("absent-age-bought-warmup-minutes", tag({ ...cell, note }), `day ${i}: ${blank.plan.week[i].mobility.warmupSeconds}s`);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 /* The shared log arrays are the one piece of state this script reuses across
    thousands of runs, so the assumption that the engine never writes to them is
    checked rather than trusted. If it were false every result after the first

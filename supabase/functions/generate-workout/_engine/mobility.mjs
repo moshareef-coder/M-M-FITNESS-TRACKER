@@ -68,6 +68,33 @@ export const WARMUP_SECONDS = 360;
    because the evidence moved, and the evidence stops supporting cuts here. */
 export const RAMPED_WARMUP_SECONDS = 240;
 export const COOLDOWN_SECONDS = 300;
+/* How much longer the general block runs at the top of the age dial.
+ *
+ * research/02, item 4: "Warm-up matters more. Cheap, uncontroversial, worth
+ * doing. More ramp-up sets before a working set." Confidence medium, which it
+ * calls out as the weakest of its four recommendations.
+ *
+ * research/13 is the file that owns this block and it argues the other way on
+ * its own evidence: McGowan 2015 has a long warm-up costing performance through
+ * fatigue, Behm 2016 has the benefit expiring inside thirty minutes so most of
+ * a twenty minute warm-up is gone before the last working set, and Oliva 2026
+ * measured 3.8% off peak squat force after general work. That is why the block
+ * is six minutes and not fifteen.
+ *
+ * The two are reconciled by staying inside the evidenced band rather than by
+ * picking a winner. Forty percent takes the unramped block from 6:00 to 8:24
+ * and the ramped one from 4:00 to 5:36, and ACSM's range is five to ten minutes
+ * while McGowan's own recommendation is ten to fifteen counting the ramp. So
+ * nothing here leaves the window either file is arguing inside; what moves is
+ * where in that window an older lifter sits.
+ *
+ * Note what this is NOT. research/02 asks specifically for more RAMP-UP SETS
+ * before a working set, which is preparation on the movement itself and is the
+ * half research/13 also wants prioritised. Ramp sets are built in plan.mjs and
+ * this file cannot reach them, so the general block growing is the reachable
+ * half of that recommendation and the weaker half. Said here so the next person
+ * does not read a longer stretch block as the request having been met. */
+export const AGE_WARMUP_GROWTH = 0.4;
 export const MOBILITY_GOAL_SECONDS = 600;
 /* The goal children whose whole point is this block. Ids from goal-tree.json;
    demo.mjs --check keeps the tree and goal-engine in step, and a test below
@@ -307,7 +334,14 @@ const total = (moves) => moves.reduce((t, m) => t + moveSeconds(m), 0);
    costing performance (McGowan 2015 on fatigue, Behm 2016 on shelf life, Oliva
    2026 on peak force) and a long cool-down costing nothing (Van Hooren 2018)
    while buying the one outcome stretching reliably produces. */
-export function mobilityFor(day, { hurts = [], missing = [], goalChild = null, longCooldown = false } = {}) {
+/* `ageCaution` is age.mjs's warm-up dial, 0 to 1, and `maxWarmupSeconds` is the
+   ceiling the caller's clock can actually afford. The two are separate because
+   they answer different questions: the dial is what this person's age argues
+   for, the ceiling is what their session length leaves room for, and where the
+   second bites the block stays where it was and the caller is the one that has
+   to say so. Both default to "no change", so every existing call site gets the
+   file exactly as it was. */
+export function mobilityFor(day, { hurts = [], missing = [], goalChild = null, longCooldown = false, ageCaution = 0, maxWarmupSeconds = Infinity } = {}) {
   const lib = library();
   if (!lib) {
     return { warmup: [], cooldown: [], warmupSeconds: 0, cooldownSeconds: 0, mobilityGoal: false,
@@ -334,7 +368,14 @@ export function mobilityFor(day, { hurts = [], missing = [], goalChild = null, l
      it. See RAMPED_WARMUP_SECONDS. plan.mjs decides which days ramp and reserves
      exactly these seconds inside the session estimate, so the two agree. */
   const ramped = Array.isArray(day?.rampSets) && day.rampSets.length > 0;
-  const warmupSec = ramped ? RAMPED_WARMUP_SECONDS : WARMUP_SECONDS;
+  const baseWarmupSec = ramped ? RAMPED_WARMUP_SECONDS : WARMUP_SECONDS;
+  /* Age lengthens the block, the clock caps it, and neither may ever shorten
+     it: `Math.max(baseWarmupSec, ...)` is there so a caller that passes a mean
+     `maxWarmupSeconds` cannot buy minutes back out of somebody's warm-up. The
+     ceiling is a limit on the GROWTH and not on the block. */
+  const caution = Number.isFinite(Number(ageCaution)) ? Math.min(1, Math.max(0, Number(ageCaution))) : 0;
+  const wanted = Math.round(baseWarmupSec * (1 + AGE_WARMUP_GROWTH * caution));
+  const warmupSec = Math.max(baseWarmupSec, Math.min(wanted, Number(maxWarmupSeconds) || baseWarmupSec));
   /* Both blocks fill to their own budget now. The ramped warm up keeps its
      shorter budget on purpose: the ramp sets are the rest of the potentiation
      and plan.mjs reserves exactly these seconds in the session estimate. */
@@ -361,6 +402,11 @@ export function mobilityFor(day, { hurts = [], missing = [], goalChild = null, l
       ? `${warmup.length} dynamic moves for ${mainGroups.length ? mainGroups.join(", ") : "the whole body"} before the first set. Shorter than the usual block, because the ramp-up sets on the first lift do the rest of the preparing and do it on the movement itself.`
       : `${warmup.length} dynamic moves for ${mainGroups.length ? mainGroups.join(", ") : "the whole body"} before the first set, inside the five minutes the session already budgets.`);
   }
+  if (warmup.length && warmupSec > baseWarmupSec) {
+    why.push(`${Math.round(warmupSec / 60)} minutes of it rather than ${Math.round(baseWarmupSec / 60)}, because the warm-up is the one part of a session that matters more with age and it is the cheapest thing in here to buy.`);
+  } else if (warmup.length && caution > 0) {
+    why.push("The longer warm-up your age argues for did not fit the session length, so this is the standard block. A few more minutes on the clock in Setup would buy it.");
+  }
   if (cooldown.length) {
     why.push(mobilityGoal
       ? `A ten minute mobility block after, hips and upper back first, because the goal is the range of motion itself (goal-tree: "5 to 10 min daily").`
@@ -379,6 +425,14 @@ export function mobilityFor(day, { hurts = [], missing = [], goalChild = null, l
     warmupSeconds: total(warmup),
     cooldownSeconds: total(cooldown),
     mobilityGoal,
+    /* What was ASKED for and what was RESERVED, which are two different
+       numbers the moment a clock is involved. A caller that has to re-cost the
+       day (adapter.mjs does, until plan.mjs passes the dial itself) needs the
+       reserved figure, and a caller deciding whether to bother rebuilding at
+       all needs the asked one. Both are 0 and the base block on every plan
+       built without an age, which is every plan built before this existed. */
+    ageCaution: caution,
+    warmupBudgetSeconds: warmupSec,
     why,
   };
 }

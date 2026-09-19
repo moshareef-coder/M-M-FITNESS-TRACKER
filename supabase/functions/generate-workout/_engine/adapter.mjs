@@ -18,14 +18,15 @@
  * Deno safe: no node: imports, no dependencies, no file reads. Which is why the
  * alias table below is hand written rather than loaded from goal-tree.json.
  */
-import { buildPlan } from "./plan.mjs";
+import { buildPlan, estimateMinutes } from "./plan.mjs";
 import { readStyles, mergeStyleLimits, cardioSessionFor } from "./styles.mjs";
 import { parseFocus, mergePriority, focusFreshness } from "./focus.mjs";
 import { normalizeLimits } from "./limits.mjs";
 /* Read only, for one field. See the focus block in generateFromPayload. */
 import { resolveGoal, GOAL_PARAMS } from "./goal-engine.mjs";
 import { buildMuscleIndex, muscleRecoveryStates, skipFreshDays } from "./recovery.mjs";
-import { stripMobility } from "./mobility.mjs";
+import { stripMobility, mobilityFor, MOBILITY_CHILDREN, WARMUP_SECONDS, RAMPED_WARMUP_SECONDS } from "./mobility.mjs";
+import { ageCaution, ageWarmupCaution, agePosition, ageNote } from "./age.mjs";
 import { TRAININGS } from "../_library/index.mjs";
 
 /* Built once. Same library plan.mjs reads, so the muscle a logged exercise
@@ -1004,6 +1005,23 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
     const styles = readStyles(payload.train_styles);
     const planLimits = styles.asked ? mergeStyleLimits(limits, styles) : limits;
 
+    step = "age";
+    /* profiles.age, which has reached this function since the payload was
+       widened and has never once been read. It was bounded by the edge
+       function, carried through the body, and dropped on the floor here: every
+       line of research/02 was unimplemented because the number never arrived,
+       not because anybody disagreed with it. See age.mjs for what the two
+       dials are and why the missing case is the careful end of one of them and
+       the young end of the other. */
+    /* `agePosition` and not a bare `Number.isFinite` decides whether we have an
+       age, so that `known` and the two dials can never disagree. A null reads
+       as 0 through Number() and a 9 or a 500 is out of the window age.mjs
+       believes; all three have to come back as "not told", or meta says we know
+       somebody's age while the engine is treating them as unknown. */
+    const ageYears = agePosition(payload.age) == null ? null : Number(payload.age);
+    const rampCaution = ageCaution(payload.age);
+    const warmupCaution = ageWarmupCaution(payload.age);
+
     step = "buildPlan";
     const plan = buildPlan({
       goal,
@@ -1011,6 +1029,16 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
         bodyWeightLb: payload.current_weight ?? null,
         sex: payload.sex ?? null,
         daysAsked,
+        /* How careful the rate of advance should be, 0 to 1. Sent, and at the
+           time of writing NOT READ: plan.mjs destructures four named fields off
+           `person` and this is not one of them, so the increment in
+           calibrate.mjs and the returning restart in load.mjs are both written,
+           tested and dark. Three call sites in plan.mjs light them (the
+           `person` destructure, the `calibrate` call and the `prescribeLoad`
+           call), and that file is owned by somebody else this week. It is sent
+           anyway so the day it is read nothing else has to change, and so this
+           comment is where the next person finds out. */
+        ageCaution: rampCaution,
         /* How long they want one session to be, from profiles.session_minutes.
            Absent, null, zero and nonsense all mean "never answered" and the
            goal's own session length runs, which is every plan built before this
@@ -1044,6 +1072,60 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
          has to return. */
       avoid: Array.isArray(payload.avoid) ? payload.avoid : [],
     });
+
+    step = "ageWarmup";
+    /* The half of research/02 this file CAN deliver on its own.
+     *
+     * plan.mjs builds every day's mobility and knows nothing about age, so the
+     * block is rebuilt here for somebody who told us they are older. This is a
+     * compensating move and not the right home for it: the moment plan.mjs
+     * passes the dial into its own `mobilityFor` call this whole block stops
+     * firing by itself, because `mobilityFor` stamps the caution it used and
+     * the guard below sees the work is already done.
+     *
+     * Two things it will not do. It will not lengthen a warm-up past the clock
+     * the week was costed against: the day is re-costed with plan.mjs's own
+     * exported `estimateMinutes` and the growth is capped at whatever slack the
+     * day has left, so a longer block can never quietly push somebody past the
+     * session length they asked for, and where there is no slack `mobilityFor`
+     * says so in its own `why`. And it will not touch a single set, rep or
+     * weight: research/02 is emphatic that an older person should get a plan
+     * that respects recovery and not a smaller plan, so the minutes come out of
+     * slack or they do not come at all. */
+    if (warmupCaution > 0) {
+      const applied = plan.limits?.applied || { hurts: [], missing: [] };
+      for (const d of plan.week || []) {
+        if (!d || !d.mobility) continue;
+        if ((d.mobility.ageCaution ?? 0) >= warmupCaution) continue;   // plan.mjs got there first
+        const rampSec = (d.rampSets || []).reduce((t, r) => t + (Number(r?.seconds) || 0), 0);
+        const baseSec = rampSec ? RAMPED_WARMUP_SECONDS : WARMUP_SECONDS;
+        const budgetMin = d.minutes ?? plan.sessionBudget?.minutes ?? null;
+        /* Floored to whole minutes because `prepMinutes` is whole minutes: half
+           a minute of slack cannot buy a minute of warm-up without the day
+           ending up a minute over the number it was trimmed to. */
+        const slackSec = budgetMin == null
+          ? Infinity
+          : Math.max(0, Math.floor(budgetMin - (d.estimatedMinutes ?? 0)) * 60);
+        d.mobility = mobilityFor(d, {
+          hurts: applied.hurts || [], missing: applied.missing || [],
+          /* Read off what plan.mjs actually decided rather than resolved a
+             second time from the goal: `mobilityGoal` is the only thing
+             `goalChild` is used for in there, and re-deriving it here would be
+             a second authority on the same question. */
+          goalChild: d.mobility.mobilityGoal ? MOBILITY_CHILDREN[0] : null,
+          longCooldown: !!d.longCooldown,
+          ageCaution: warmupCaution,
+          maxWarmupSeconds: baseSec + slackSec,
+        });
+        /* prepMinutesFor's arithmetic, from plan.mjs, against the budget the
+           block actually reserved. Rounded once at the end for the same reason
+           it is there: rounding the ramp and the block separately hands the day
+           a minute it never spends. */
+        d.prepMinutes = Math.round((d.mobility.warmupBudgetSeconds + rampSec) / 60);
+        d.estimatedMinutes = estimateMinutes(d.exercises, d.prepMinutes);
+        d.totalMinutes = d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60);
+      }
+    }
 
     step = "nextDayIndex";
     const rotation = nextDayIndex(plan, { logs, plans, today });
@@ -1295,6 +1377,23 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
              on a lighter week, and a screen showing "your rest was cut" beside a
              card printing the full interval is the app contradicting itself. */
           restCompressed: (plan.volumeNotes?.restCompressed || []).some((r) => r.day === (dayBuilt?.name) && !r.repaid),
+        },
+        /* What the age did, in the two numbers it turns into and one sentence.
+           `years` is the profile's own field coming back to the client that
+           sent it, and it is here because support reads `meta` and "why is this
+           person's squat going up 5 lb and mine 10" is otherwise unanswerable
+           from the response. `rampApplied` is false today and that is the
+           honest value: the dial is computed, sent to buildPlan and not read
+           there yet. See the comment on `ageCaution` in the person block. */
+        age: {
+          years: ageYears,
+          known: ageYears != null,
+          rampCaution,
+          rampApplied: false,
+          warmupCaution,
+          warmupApplied: warmupCaution > 0 && !styleSession && !skipStretching
+            && (dayBuilt?.mobility?.warmupBudgetSeconds ?? 0) > (dayBuilt?.rampSets?.length ? RAMPED_WARMUP_SECONDS : WARMUP_SECONDS),
+          note: ageNote(payload.age),
         },
         source: "engine",
         /* The warm-up and cool-down in three numbers and a reason, so the

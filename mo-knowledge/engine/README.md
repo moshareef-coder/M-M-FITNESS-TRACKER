@@ -2104,3 +2104,134 @@ change promises and the thing worth showing them. Recording it before anything
 reads it is the one place research/07's second rule ("never observe something we
 will not use") is being stretched, and it is stretched deliberately: it comes out
 of `logs` that are already in the payload, so nothing new is collected.
+
+## Age changes something now, 2026-09-18 (`age.mjs`)
+
+A 25 year old and a 60 year old were getting byte-identical weeks, and it was
+not a disagreement with research/02. **The number never arrived.** `index.html`
+puts `age` on the payload, `generate-workout/index.ts` bounds it to 10 to 120,
+`generateFromPayload` receives it, and the `person` object it hands `buildPlan`
+is `{ bodyWeightLb, sex, daysAsked, sessionMinutes }`. `age` is not in it, and
+`grep -n "\bage\b"` across the whole engine returns nothing but training age,
+percentage and storage. CONTRACT.md said so out loud the entire time:
+"`age` | number | function | TDEE only".
+
+### What research/02 is allowed to change, and what it is not
+
+Its headline is the opposite of the instinct: older adults respond to resistance
+training substantially, into their seventies and eighties, and "the instinct to
+hand a 55 year old a lighter, easier, higher-rep program is not a safety
+measure. It is a worse program justified by an assumption." Its own limit on
+itself: "age modifies the RATE at which we advance someone and the SELECTION we
+start them on. It does not set the destination."
+
+So nothing here touches weekly sets, rep ranges, movement selection or the
+ceiling. Three levers, all rate:
+
+| lever | file | 25 | 45 | 60 | 75 | absent |
+|---|---|---|---|---|---|---|
+| step on a squat or hinge | `calibrate.mjs` | 10 lb | 10 lb | 5 lb | 5 lb | 5 lb |
+| twelve weeks of that step | | +360 lb | +360 lb | +180 lb | +180 lb | +180 lb |
+| restart after a layoff, off a logged 200 lb squat | `load.mjs` | 110 | 100 | 95 | 90 | 90 |
+| general warm-up reserved, unramped day with slack | `mobility.mjs` | 6:00 | 7:02 | 8:03 | 8:24 | 6:00 |
+| and what the block actually came to, measured on one week | | 385s | 445s | 505s | 505s | 385s |
+
+60 and 75 land on the same block in that last row, and the reason is worth
+knowing: the library's moves are 20 to 80 seconds each and the block fills to
+its budget, so two budgets 21 seconds apart buy the same moves. The dial is
+continuous; the library quantises it.
+
+The step ladder is 2.5 / 5 / 10 because that is what a rack holds, so the dial
+is continuous and its visible effect on an increment is a rung: squat and hinge
+drop from 10 lb to 5 lb once the dial passes halfway, around 48, and a 5 lb
+compound step cannot go under the plate that expresses it. Better to write that
+down than to pretend a smooth multiplier survives contact with a weight rack.
+
+### Absent is not neutral, and it is not the young-adult default
+
+research/02 closes on this and it reads like an instruction: "A plan built for
+an unknown age should use the cautious ramp by default, which costs a young
+beginner very little (a slightly slower first three weeks) and protects an older
+one. The age-unknown default should look like the older-adult default, not the
+young-adult one."
+
+So `ageCaution(undefined) === 1`. This is deliberately the OPPOSITE shape to the
+`sex` bug: there an unset field was read as a specific claim about the person
+(male) that made half its users' weights too heavy. Here an unset field is read
+as no claim at all, and what follows from no claim is the answer that is
+survivable in both directions.
+
+The warm-up is the one place the two dials part company, and it is argued rather
+than sloppy. research/02 prices its unknown-age default as "a slightly slower
+first three weeks", which is a claim about ramp rate; minutes are a different
+currency, research/13 argues against a longer general block on its own evidence
+(McGowan 2015, Behm 2016, Oliva 2026), and research/02 rates its own warm-up
+item medium, the weakest of its four. So the block grows for somebody who TOLD
+us they are older and not for everybody who left a field blank.
+`ageWarmupCaution(undefined) === 0`.
+
+### The bottom end: nothing, on purpose
+
+The app's stated minimum is 13 and research/02 has no line about adolescents in
+either direction. A 16 year old gets exactly what a 25 year old gets. Inventing
+a youth branch to fill that silence would be the same mistake as inventing an
+old-age one, and there is a test asserting the dial is flat from 13 to 30.
+
+### What is written, tested and DARK
+
+`calibrate.mjs` and `load.mjs` both take `ageCaution` and both are covered. **No
+user receives either of them yet.** `plan.mjs` owns the three call sites and it
+was being rebuilt by somebody else the week this landed, so the adapter puts the
+dial on `person.ageCaution` and `meta.age.rampApplied` honestly reads `false`.
+Three forwards light it:
+
+```
+buildPlan destructure   const { bodyWeightLb, sex, daysAsked, sessionMinutes, ageCaution = 0 } = person;
+the calibrate call      calibrate({ plans, logs, ageCaution })
+the prescribeLoad call  prescribeLoad({ ..., ageCaution })
+```
+
+Flip `meta.age.rampApplied` to true in the same commit; a test asserts it is
+false so nobody can land the forwards and forget.
+
+### The warm-up, which does ship, and what it cost
+
+plan.mjs builds the mobility blocks, so adapter.mjs rebuilds the day's block for
+somebody who gave an age. A compensating move and not the right home for it:
+`mobilityFor` stamps the caution it used, so the adapter's block stops firing by
+itself the day plan.mjs passes the dial.
+
+It will not buy minutes the person does not have. The growth is capped at the
+day's remaining slack against its clock, the day is re-costed with plan.mjs's
+own exported `estimateMinutes`, and where there is no slack the block stays put
+and `mobility.why` says the longer warm-up did not fit. Measured over 192 weeks
+(six bubbles x four day counts x two histories x four clocks), **150 weeks and
+373 of 656 days grew**; the rest were days already over their own clock before
+age touched them, mostly an experienced lifter's four day week. Nothing was ever
+taken out of a set to pay for it, which is research/02's own line about not
+handing an older person a smaller plan.
+
+### Sweep
+
+Block J, about 660 runs, +1.7s on a 43s baseline. It compares one person across
+25 / 45 / 60 / 75 / absent and asserts what age is not allowed to do: the
+lifting has to be identical, the warm-up may only grow, the day may not end up
+past a clock it fit before, the prep and total ledgers have to still add up, and
+an absent age has to land on the careful ramp without buying warm-up minutes.
+Every WARN delta in this change is the new block's cells being counted for the
+first time: with block J removed the sweep output is byte-identical to the
+baseline.
+
+### What could not be reached at all
+
+**"Keep the explosive intent."** research/02's third item, and the one it most
+wants a second opinion on: rate of force development declines faster than
+maximum strength, it is the quality most tied to catching a stumble and climbing
+stairs, and the correct response is to keep moving a moderate load with fast
+intent rather than strip anything quick out of an older person's plan. The
+engine has nowhere to put it. There is no tempo, intent or velocity field on an
+exercise anywhere in this folder, and the app renders `name / sets / reps /
+targetWeight / note`. It is not a plan.mjs hunk, it is a new field plus a screen
+that shows it, and research/02's own hedge ("make the 60 year old move fast is
+the kind of advice that needs to be right") says it should not be smuggled in as
+a coaching cue by whoever happens to be editing the adapter.

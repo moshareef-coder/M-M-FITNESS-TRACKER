@@ -3710,3 +3710,220 @@ test("asking for core on a four day split beats splitting the ask in two", () =>
     assert.ok(down >= across, `a ${days} day week: spending down bought ${down} sets, spreading bought ${across}`);
   }
 });
+
+/* ------------------------------------------------------------------ *
+ * age.mjs, and the three levers research/02 asks for
+ * ------------------------------------------------------------------ *
+ * Written 2026-09-18, after finding that a 25 year old and a 60 year old got
+ * byte-identical weeks. `age` reached the edge function, was bounded there,
+ * rode the payload into adapter.mjs and was never put on the `person` object,
+ * so every line of research/02 was unimplemented because the number never
+ * arrived rather than because anybody disagreed with it.
+ */
+import { ageCaution, ageWarmupCaution, agePosition, ageNote, CAUTION_FROM, CAUTION_TO } from "./age.mjs";
+import { returnFactorFor, RETURN_FACTOR, AGE_RETURN_CUT } from "./load.mjs";
+import { AGE_WARMUP_GROWTH } from "./mobility.mjs";
+
+test("age is a dial and not a cliff", () => {
+  /* Nobody becomes a different trainee on their fiftieth birthday, so the only
+     thing this has to prove is that it never steps: every year is within a
+     year's worth of the year before it, all the way across. */
+  let prev = ageCaution(10);
+  for (let a = 10; a <= 120; a++) {
+    const c = ageCaution(a);
+    assert.ok(c >= prev, `caution went DOWN between ${a - 1} and ${a}`);
+    assert.ok(c - prev <= 1 / (CAUTION_TO - CAUTION_FROM) + 1e-9, `a cliff at ${a}: ${prev} -> ${c}`);
+    prev = c;
+  }
+  assert.equal(ageCaution(CAUTION_FROM), 0);
+  assert.equal(ageCaution(CAUTION_TO), 1);
+});
+
+test("the dial saturates, so a 75 year old never gets less than a 60 year old", () => {
+  /* research/02's headline is that older adults respond substantially into
+     their seventies and eighties and that a smaller program is not a safety
+     measure. A dial that kept climbing would eventually be one. */
+  for (let a = CAUTION_TO; a <= 120; a++) assert.equal(ageCaution(a), 1, `caution at ${a}`);
+});
+
+test("the research says nothing about teenagers, so neither does the engine", () => {
+  /* The app's stated minimum is 13 and research/02 has no line about
+     adolescents in either direction. Inventing a youth branch to fill that
+     silence would be the same mistake as inventing an old-age one. */
+  for (const a of [13, 16, 18, 25, 30]) assert.equal(ageCaution(a), 0, `age ${a}`);
+});
+
+test("a missing age gets the careful ramp and NOT a claim about the person", () => {
+  /* research/02: "the age-unknown default should look like the older-adult
+     default, not the young-adult one. The asymmetry of the costs says so."
+     Deliberately the opposite shape to the `sex` bug, where an unset field was
+     read as a specific claim (male) that made half its users' weights too
+     heavy. Here an unset field is read as no claim, and what follows from no
+     claim is the answer that is survivable either way. */
+  for (const bad of [null, undefined, "", NaN, "forty", {}, [], 0, 9, 121, Infinity]) {
+    assert.equal(ageCaution(bad), 1, `${JSON.stringify(bad)} should read as unknown`);
+    assert.equal(agePosition(bad), null);
+  }
+  assert.ok(/careful rate/.test(ageNote(null)), "and it says so out loud");
+});
+
+test("a missing age does NOT buy the longer warm-up", () => {
+  /* The one place the two dials part company, and it is argued rather than
+     sloppy: research/02 prices its unknown-age default as "a slightly slower
+     first three weeks", which is a claim about ramp rate. Minutes are a
+     different currency and research/13 is against spending them on a general
+     block. So the block grows for somebody who told us, and not for everybody
+     who left a field blank. */
+  assert.equal(ageWarmupCaution(null), 0);
+  assert.equal(ageCaution(null), 1);
+  assert.equal(ageWarmupCaution(70), ageCaution(70));
+});
+
+test("age makes the increment smaller and never the destination", () => {
+  /* research/02: "a longer ramp-in block and smaller load increments... Not a
+     lower ceiling. A slower approach to it." */
+  for (const [name, at] of [["Barbell Back Squat", 185], ["Romanian Deadlift", 155], ["Barbell Bench Press", 135], ["Dumbbell Curl", 25]]) {
+    const young = stepFor(name, at, { ageCaution: 0 });
+    assert.equal(young, stepFor(name, at), "no dial is the file as it was");
+    let prev = young;
+    for (let c = 0; c <= 1.0001; c += 0.05) {
+      const s = stepFor(name, at, { ageCaution: c });
+      assert.ok(s <= prev, `${name}: the step went UP at caution ${c.toFixed(2)}`);
+      assert.ok(s > 0, `${name}: a step of nothing is not a smaller step, it is a stall`);
+      prev = s;
+    }
+  }
+  /* Squat and hinge are the two the grid can actually express a smaller step
+     on, and they are also the two research/02's tendon argument points at. A
+     5 lb compound step cannot go under the 5 lb plate that expresses it, and
+     saying that is better than pretending otherwise. */
+  assert.equal(stepFor("Barbell Back Squat", 185, { ageCaution: 1 }), 5);
+  assert.equal(stepFor("Barbell Bench Press", 135, { ageCaution: 1 }), 5);
+});
+
+test("twelve weeks of increments: the older lifter is still climbing, just slower", () => {
+  /* The measurement that matters, because a step size on its own says nothing
+     about what somebody receives. Three sessions a week for twelve weeks, every
+     one of them earning the step. */
+  const climb = (name, start, caution) => {
+    let w = start;
+    for (let s = 0; s < 36; s++) w += stepFor(name, w, { ageCaution: caution });
+    return w - start;
+  };
+  const young = climb("Barbell Back Squat", 185, ageCaution(25));
+  const mid = climb("Barbell Back Squat", 185, ageCaution(45));
+  const old = climb("Barbell Back Squat", 185, ageCaution(75));
+  assert.equal(young, 360);
+  assert.equal(mid, 360);
+  assert.equal(old, 180);
+  assert.ok(old > 0, "slower is not stopped: research/02's whole point is the same destination");
+});
+
+test("the returning restart moves with age, smoothly, and only downward", () => {
+  assert.equal(returnFactorFor(0), RETURN_FACTOR);
+  assert.equal(returnFactorFor(1), RETURN_FACTOR - AGE_RETURN_CUT);
+  assert.equal(returnFactorFor(), RETURN_FACTOR);
+  for (const bad of [null, "x", NaN, -5, 9]) {
+    const f = returnFactorFor(bad);
+    assert.ok(f >= RETURN_FACTOR - AGE_RETURN_CUT && f <= RETURN_FACTOR, `${bad} gave ${f}`);
+  }
+  const logs = [{ entry_date: "2026-07-10", exercise_name: "Barbell Back Squat", sets: 3, reps: 5, weight: 200 }];
+  const at = (a) => prescribeLoad({
+    exercise: { name: "Barbell Back Squat", equipment: "barbell" }, reps: 5,
+    bodyWeightLb: 180, sex: "Male", logs, returning: true, ageCaution: ageCaution(a),
+  }).weight;
+  assert.equal(at(25), 110);
+  assert.equal(at(45), 100);
+  assert.equal(at(60), 95);
+  assert.equal(at(75), 90);
+  /* And the card has to say which of the two reasons it is. "You have been
+     away" is true for everybody; "further back than that" is a second claim. */
+  const older = prescribeLoad({
+    exercise: { name: "Barbell Back Squat", equipment: "barbell" }, reps: 5,
+    bodyWeightLb: 180, sex: "Male", logs, returning: true, ageCaution: 1,
+  });
+  assert.ok(/tendon/.test(older.note), older.note);
+});
+
+test("age never touches a weight that was not a restart", () => {
+  /* The line research/02 draws: age modifies the rate of advance and the
+     selection, never the destination. So a lifter who is NOT returning gets the
+     same number at 25 and at 75. */
+  const logs = [{ entry_date: "2026-09-15", exercise_name: "Barbell Back Squat", sets: 3, reps: 5, weight: 200 }];
+  const args = { exercise: { name: "Barbell Back Squat", equipment: "barbell" }, reps: 5, bodyWeightLb: 180, sex: "Male", logs };
+  assert.equal(prescribeLoad({ ...args, ageCaution: 0 }).weight, prescribeLoad({ ...args, ageCaution: 1 }).weight);
+});
+
+test("the warm-up grows with age, inside the band both research files argue in", () => {
+  const day = {
+    name: "Leg day", mainGroups: ["quads", "glutes", "hamstrings"],
+    mainPatterns: ["squat", "hinge"], allPatterns: ["squat", "hinge"],
+    exercises: [{ group: "quads" }, { group: "glutes" }],
+  };
+  const budget = (c) => mobilityFor(day, { ageCaution: c }).warmupBudgetSeconds;
+  assert.equal(budget(0), WARMUP_SECONDS);
+  assert.equal(budget(1), Math.round(WARMUP_SECONDS * (1 + AGE_WARMUP_GROWTH)));
+  /* research/13's own numbers: ACSM says five to ten minutes and McGowan 2015
+     says ten to fifteen counting the ramp. Nothing here leaves that window. */
+  assert.ok(budget(1) <= 600, `${budget(1)}s is outside the ten minutes research/13 allows`);
+  let prev = 0;
+  for (let c = 0; c <= 1.0001; c += 0.1) {
+    const b = budget(c);
+    assert.ok(b >= prev, "the warm-up never gets shorter with age");
+    prev = b;
+  }
+  /* And the clock wins. A caller with no minutes to spare gets the block it
+     always got, with a sentence saying what it could not buy. */
+  const squeezed = mobilityFor(day, { ageCaution: 1, maxWarmupSeconds: WARMUP_SECONDS });
+  assert.equal(squeezed.warmupBudgetSeconds, WARMUP_SECONDS);
+  assert.ok(squeezed.why.some((w) => /did not fit the session length/.test(w)), squeezed.why.join(" | "));
+  /* A mean ceiling can never buy minutes back OUT of a warm-up. */
+  assert.equal(mobilityFor(day, { ageCaution: 0, maxWarmupSeconds: 60 }).warmupBudgetSeconds, WARMUP_SECONDS);
+});
+
+test("a 25, a 45, a 60 and a 75 year old do not get the same week any more", () => {
+  /* The whole reason this block exists. Everything else held constant. */
+  const base = { goal_bubble: "get-stronger", challenge_target: 3, current_weight: 180, sex: "Male" };
+  const at = (age) => generateFromPayload(age == null ? base : { ...base, age }, { today: new Date("2026-09-18T12:00:00Z"), includePlan: true });
+  const seen = [25, 45, 60, 75].map(at);
+  for (let i = 1; i < seen.length; i++) {
+    assert.ok(seen[i].meta.age.rampCaution > seen[i - 1].meta.age.rampCaution, "the dial moves");
+  }
+  const warm = (o) => o.plan.week.reduce((t, d) => t + d.mobility.warmupSeconds, 0);
+  assert.ok(warm(seen[3]) > warm(seen[0]), `75 got ${warm(seen[3])}s of warm-up against 25's ${warm(seen[0])}s`);
+  assert.ok(warm(seen[2]) > warm(seen[0]), `60 got ${warm(seen[2])}s against 25's ${warm(seen[0])}s`);
+  /* And nothing got smaller. research/02 is emphatic that an older person gets
+     a plan that respects recovery, not a smaller plan, so the sets, the reps
+     and the movements are the week the 25 year old got. */
+  for (const o of seen) {
+    for (let i = 0; i < o.plan.week.length; i++) {
+      const a = seen[0].plan.week[i], b = o.plan.week[i];
+      assert.deepEqual(b.exercises.map((e) => [e.name, e.sets, e.reps, e.weight]), a.exercises.map((e) => [e.name, e.sets, e.reps, e.weight]),
+        `age changed the lifting on ${a.name}`);
+    }
+  }
+  /* And the day never runs past the clock it was costed against because of it. */
+  const old = at(75);
+  for (const d of old.plan.week) {
+    if (d.minutes == null) continue;
+    const young = seen[0].plan.week.find((x) => x.name === d.name);
+    if (young && young.estimatedMinutes > d.minutes) continue;   // already over before age touched it
+    assert.ok(d.estimatedMinutes <= d.minutes, `${d.name}: ${d.estimatedMinutes} min against a ${d.minutes} min clock`);
+  }
+});
+
+test("meta says what the age did, including the part that is not wired up yet", () => {
+  const out = generateFromPayload({ goal_bubble: "get-stronger", challenge_target: 3, age: 62 }, { today: new Date("2026-09-18T12:00:00Z") });
+  assert.equal(out.meta.age.years, 62);
+  assert.equal(out.meta.age.known, true);
+  assert.ok(out.meta.age.rampCaution > 0.8);
+  /* False on purpose and it must stay honest: plan.mjs does not read
+     `person.ageCaution` yet, so the increment and the restart are written,
+     tested and dark. Flip this the same commit that adds the three forwards. */
+  assert.equal(out.meta.age.rampApplied, false);
+  const blank = generateFromPayload({ goal_bubble: "get-stronger", challenge_target: 3 }, { today: new Date("2026-09-18T12:00:00Z") });
+  assert.equal(blank.meta.age.known, false);
+  assert.equal(blank.meta.age.rampCaution, 1);
+  assert.equal(blank.meta.age.warmupCaution, 0);
+});
+

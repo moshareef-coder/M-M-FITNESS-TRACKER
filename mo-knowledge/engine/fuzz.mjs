@@ -506,7 +506,7 @@ function badValues(v, path = "", out = [], seen = new Set()) {
 const META_KEYS = new Set([
   "experience", "volumeDial", "childUsed", "goals", "confidence", "days", "dayName", "focusHonoured",
   "focus", "limits", "stretching", "session", "source", "goalSource", "logsSource", "missing",
-  "styles",
+  "styles", "age",
 ]);
 /* Documented in the contract's prose and missing from its table. Warned, not
    failed: the key is deliberate and it is the TABLE that is behind, which is a
@@ -518,6 +518,7 @@ const META_SUBKEYS = {
   goals: ["primary", "secondary", "ignored"],
   focus: ["requested", "requestedTiers", "applied", "tiers", "why", "stale"],
   limits: ["hurts", "missing", "excludedCount"],
+  age: ["years", "known", "rampCaution", "rampApplied", "warmupCaution", "warmupApplied", "note"],
   stretching: ["included", "warmupMinutes", "cooldownMinutes", "mobilityGoal", "why"],
   session: ["budgetMinutes", "source", "asked", "goalMinutes", "estimatedMinutes", "rampMinutes", "fits", "restCompressed"],
   styles: ["asked", "picked", "resistance", "honoured", "equipmentMissing", "cardioModes", "flowTrainings", "note"],
@@ -758,6 +759,29 @@ function checkResult(ctx, out, payload) {
   const lim = meta.limits || {};
   if (!Array.isArray(lim.hurts) || lim.hurts.some((h) => !JOINT_KEYS.includes(h))) fail("meta-limits", ctx, `hurts ${stable(lim.hurts)}`);
   if (!Array.isArray(lim.missing) || lim.missing.some((m) => !EQUIP_KEYS.includes(m))) fail("meta-limits", ctx, `missing ${stable(lim.missing)}`);
+  /* age. `years` is the one field here that comes straight off a hostile
+     payload, so it has to be a number this engine believes or null, and `known`
+     has to agree with it: a `known: true` beside a null is meta claiming we have
+     something we are not using. Both dials are proportions and a proportion
+     outside 0 to 1 would be a multiplier somewhere doing the opposite of what
+     it says. The -0 this caught is why `years` is taken from age.mjs's own
+     verdict rather than from a bare Number(): -0 survives everything except
+     JSON, which writes it as 0, so the response changed on a round trip. */
+  const age = meta.age || {};
+  const yearsOk = age.years === null || (Number.isFinite(age.years) && age.years >= 10 && age.years <= 120 && !Object.is(age.years, -0));
+  if (!yearsOk) fail("meta-age", ctx, `years ${stable(age.years)}`);
+  if (age.known !== (age.years !== null)) fail("meta-age", ctx, `known ${stable(age.known)} beside years ${stable(age.years)}`);
+  for (const k of ["rampCaution", "warmupCaution"]) {
+    if (!(age[k] >= 0 && age[k] <= 1)) fail("meta-age", ctx, `${k} ${stable(age[k])}`);
+  }
+  /* research/02's closing argument, checked on every payload the fuzz can
+     build: an unknown age takes the careful ramp and does NOT take the warm-up
+     minutes. The `sex` bug is what this line is here to stop happening again in
+     a different field. */
+  if (!age.known && !(age.rampCaution === 1 && age.warmupCaution === 0)) {
+    fail("meta-age-unknown-default", ctx, `ramp ${stable(age.rampCaution)}, warmup ${stable(age.warmupCaution)}`);
+  }
+  if (!(age.note === null || typeof age.note === "string")) fail("meta-age", ctx, `note ${stable(age.note)}`);
   if (!Number.isInteger(lim.excludedCount) || lim.excludedCount < 0) fail("meta-limits", ctx, `excludedCount ${stable(lim.excludedCount)}`);
   const str = meta.stretching || {};
   if (typeof str.included !== "boolean") fail("meta-stretching", ctx, `included ${stable(str.included)}`);

@@ -437,10 +437,42 @@ const trustFor = (rows = 1) =>
    they arrive at is the number the next prescription is built from, and saying
    so is what makes the first session feel like the start of something rather
    than a blank. */
+/* Coming back after four weeks or more away: where the first session restarts,
+   as a fraction of what the logs say they were lifting.
+ *
+ * research/11 and research/02 both land on about half, and muscle memory makes
+ * the climb back quick enough that it costs very little. research/02 adds the
+ * age term: connective tissue lags muscle and lags it further with age, so
+ * muscle gets strong enough to hurt the structures holding it before those
+ * structures catch up, and week one back is exactly the unaccustomed eccentric
+ * work that finds that out. The answer it gives is "a longer ramp-in block and
+ * smaller load increments, especially for someone returning after years away.
+ * Not a lower ceiling. A slower approach to it."
+ *
+ * So the restart moves from 0.55 to 0.45 across the dial. Ten points, which is
+ * two thirds of one session's climb back, not a different program: the same
+ * logs, the same movements, the same place to get back to, reached with one
+ * more week under it. research/02 is explicit that the magnitude here is
+ * invented and that it would not put a number on how much slower recovery gets
+ * without checking; this is a small one for that reason. */
+export const RETURN_FACTOR = 0.55;
+export const AGE_RETURN_CUT = 0.10;
+
+export function returnFactorFor(ageCaution = 0) {
+  const c = Number(ageCaution);
+  const caution = Number.isFinite(c) ? Math.min(1, Math.max(0, c)) : 0;
+  return RETURN_FACTOR - AGE_RETURN_CUT * caution;
+}
+
 const FIRST_TIME_NOTE =
   "First time on this one: work up to a weight you could stop two reps short of. That becomes your number.";
 
-export function prescribeLoad({ exercise, reps, bodyWeightLb, sex, logs = [], returning = false, calibration = null }) {
+/* `ageCaution` is age.mjs's dial, 0 to 1. It reaches exactly one number in
+   this file, the returning restart, and it can only lower it. It does not
+   touch the ceiling, the pattern ratios, the cap or the first-time note: those
+   are claims about how strong somebody is and age is not allowed to make one.
+   Defaults to 0, so a caller that does not pass it gets the file as it was. */
+export function prescribeLoad({ exercise, reps, bodyWeightLb, sex, logs = [], returning = false, calibration = null, ageCaution = 0 }) {
   if (exercise?.equipment === "bodyweight") {
     return { weight: null, basis: "bodyweight", note: "Bodyweight. The progression is the variation, not the load." };
   }
@@ -452,11 +484,21 @@ export function prescribeLoad({ exercise, reps, bodyWeightLb, sex, logs = [], re
   if (hist) {
     let w = hist.weight;
     /* research/11 and 02: after four weeks or more away, start near half and
-       climb back. Muscle memory makes that quick, so it costs very little. */
-    if (returning) w *= 0.55;
+       climb back. Muscle memory makes that quick, so it costs very little, and
+       age moves where "half" starts. See RETURN_FACTOR. */
+    const restart = returnFactorFor(ageCaution);
+    if (returning) w *= restart;
+    /* The one sentence the restart owes them, and it has to say which of the
+       two reasons it is: "you have been away" is true for everybody, and
+       "further back than that because of your age" is a different claim and
+       the kind this file says out loud rather than performing. */
+    const away = !returning ? ""
+      : restart < RETURN_FACTOR
+        ? " Starting light because you have been away, and a little lighter still: tendon takes longer than muscle to catch back up."
+        : " Starting light because you have been away.";
     const tuned = applyCalibration(w, hist.source === "exact"
-      ? `You lifted ${hist.weight} on ${hist.date}.${returning ? " Starting light because you have been away." : ""}`
-      : `Guessed from your ${hist.from} on ${hist.date}.${returning ? " Starting light because you have been away." : ""}`,
+      ? `You lifted ${hist.weight} on ${hist.date}.${away}`
+      : `Guessed from your ${hist.from} on ${hist.date}.${away}`,
       calibration, exercise);
 
     /* The cap, applied last so that everything which can legitimately lower the
