@@ -2121,15 +2121,19 @@ export function buildPlan({
   });
   const costBlocks = (d) => {
     const rampSec = d.rampSets.reduce((t, r) => t + r.seconds, 0);
-    /* No stretching library in this build: fall back to the budgeted numbers
-       the day was costed at before the blocks existed. */
-    d.prepMinutes = d.mobility.warmupSeconds
-      ? Math.round((d.mobility.warmupSeconds + rampSec) / 60)
-      : prepMinutesFor(d);
-    d.cooldownMinutes = Math.round((d.mobility.cooldownSeconds || COOLDOWN_SECONDS) / 60);
-    /* The cool-down is inside the clock only when the clock is theirs: see
-       COOLDOWN_MIN for why the goal's own number never contained it. */
-    d.clockReserve = askedMinutes === null ? 0 : d.cooldownMinutes;
+    /* `prepMinutes` stays the BUDGETED warm-up plus the ramp, because the
+       ledger invariant in sweep.mjs (`age-broke-the-prep-ledger`) and the
+       adapter's age rebuild both define it that way. What the block overshoots
+       its budget by (five to fifty seconds; it finishes the move it is on) is
+       reserved against a clock a person named instead, beside the cool-down,
+       so the app's number is still what `fits` was judged on. */
+    d.prepMinutes = prepMinutesFor(d);
+    const cooldownSec = d.mobility.cooldownSeconds || COOLDOWN_SECONDS;
+    const warmupOver = Math.max(0, (d.mobility.warmupSeconds || 0) - (d.mobility.warmupBudgetSeconds || 0));
+    d.cooldownMinutes = Math.round(cooldownSec / 60);
+    /* Inside the clock only when the clock is theirs: see COOLDOWN_MIN for why
+       the goal's own number never contained it. */
+    d.clockReserve = askedMinutes === null ? 0 : Math.round((cooldownSec + warmupOver) / 60);
   };
   for (const d of week) {
     d.mobility = pickBlocks(d);

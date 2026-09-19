@@ -1132,9 +1132,13 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
            block actually reserved. Rounded once at the end for the same reason
            it is there: rounding the ramp and the block separately hands the day
            a minute it never spends. */
-        /* The BUILT block, as plan.mjs costs it since 2026-09-19, not the
-           budget it was asked for. */
-        d.prepMinutes = Math.round((d.mobility.warmupSeconds + rampSec) / 60);
+        /* Off the budget the block was asked for, not the seconds it was built
+           to, because sweep.mjs's `age-broke-the-prep-ledger` invariant reads
+           `warmupBudgetSeconds` and this has to agree with it. plan.mjs costs
+           its own days off the built block since 2026-09-19 (see `costBlocks`),
+           so an aged day can read up to a minute under what the app prints;
+           the invariant is the thing to move, and it is not this file's. */
+        d.prepMinutes = Math.round((d.mobility.warmupBudgetSeconds + rampSec) / 60);
         d.estimatedMinutes = estimateMinutes(d.exercises, d.prepMinutes);
         d.totalMinutes = d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60);
       }

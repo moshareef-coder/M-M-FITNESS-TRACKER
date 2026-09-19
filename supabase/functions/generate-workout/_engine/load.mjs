@@ -121,31 +121,165 @@ const NAME_PATTERN = [
   [/curl|\braise\b|extension|pushdown|\bfly\b|shrug|kickback|pec deck|face pull/i, "isolation"],
 ];
 
-/* A pattern ratio describes the barbell version of a movement. A goblet squat is
-   not a back squat and a dumbbell press is not a bench press, so the variant has
-   to scale it or the number is nonsense. Same failure as above: the first run
-   put 145 lb on a goblet squat, which nobody has ever held. */
-const VARIANT_FACTOR = [
-  [/goblet/i, 0.35],
-  [/leg press/i, 1.6],
-  [/hack squat|smith/i, 0.9],
-  [/single.?leg|single.?arm|bulgarian|split squat|step.?up|lunge/i, 0.45],
+/* A pattern ratio describes the reference lift of a pattern: the barbell
+   deadlift, the back squat, the bench, the strict overhead press, the barbell
+   row, the pulldown. Nothing else in the pattern is that lift, and the factor
+   here is how far off it each movement sits, as a fraction of the reference.
+ *
+ * It used to be one list of implements and a handful of variants, and the hinge
+ * had no rows at all past stiff-leg and sumo. So every hinge was priced as a
+ * deadlift: a logged Deadlift 3x8 at 315 prescribed a Romanian Deadlift at 300,
+ * a Good Morning at 300, a Hip Thrust at 300 and a Cable Pull-Through at 240,
+ * every one of them filed under "a similar lift", and a real week delivered
+ * "Romanian Deadlift 2x3 @ 300". A Good Morning at 95% of a deadlift is a
+ * lumbar injury with a note under it. Once logs exist a third of the loads on
+ * a card come through this path, so it is not a corner.
+ *
+ * The numbers are coaching convention rather than measured, the same standing
+ * as PATTERN_RATIO above, and knowledge/ has no table for them (checked
+ * 2026-09-19: volume-landmarks, the formulas folder and sources.md carry
+ * nothing on within-pattern ratios). Each row is the middle of the range a
+ * coach would quote, on the low side where the range is wide, because
+ * research/05 decides the direction when we are guessing: wrong-low costs one
+ * easy set, wrong-high costs the session, and on a Good Morning the session is
+ * the least of it.
+ *
+ * Two tables, composed. MOVEMENT_FACTOR is per pattern and names the movement;
+ * IMPLEMENT_FACTOR names what it is done with. A row marked `inclusive` already
+ * prices its implement (a goblet squat is a dumbbell held a particular way and
+ * discounting it again for the dumbbell halves it twice), so it is not
+ * multiplied further. First match wins inside each table, so specific rows sit
+ * above the word they contain, same rule as NAME_PATTERN. */
+const MOVEMENT_FACTOR = {
+  hinge: [
+    [/\bswing\b/i, 0.25, true],                 // a kettlebell, and the bell is the whole load
+    [/single.?leg/i, 0.3, true],                // one dumbbell on one leg
+    [/good morning/i, 0.4],                     // 0.3 to 0.45 of a deadlift; the bar is on the neck, the lever is the spine
+    [/\bpull.?through\b/i, 0.35],               // 0.3 to 0.4, before the cable's own discount
+    [/back extension|hyperextension/i, 0.15],   // a plate held to the chest at most
+    [/glute bridge/i, 0.2],                     // bodyweight or a small plate
+    [/hip thrust/i, 1.0],                       // 0.9 to 1.2: the one hinge that can match a deadlift
+    [/romanian|stiff.?leg/i, 0.75],             // 0.65 to 0.8
+    [/sumo|trap bar|deficit|\bpause\b/i, 1.0],
+  ],
+  squat: [
+    [/goblet/i, 0.35, true],
+    [/leg press/i, 1.6, true],                  // 1.5 to 2.0
+    [/hack squat/i, 0.9, true],
+    [/overhead squat/i, 0.5],
+    [/zercher/i, 0.7],
+    [/front squat/i, 0.8],                      // was priced as a back squat
+    [/box squat|safety bar|\bpause\b/i, 0.9],
+  ],
+  lunge: [
+    [/bulgarian|split squat/i, 0.45],
+    [/step.?up|curtsy/i, 0.4],
+    [/\blunge\b/i, 0.45],
+  ],
+  horizontalPush: [
+    [/landmine/i, 0.5, true],                   // half the load is on the floor; was priced as a bench
+    [/close.?grip/i, 0.85],
+    [/incline/i, 0.8],
+    [/floor press/i, 0.9],
+    [/\bpause\b|spoto/i, 0.9],
+  ],
+  verticalPush: [
+    [/arnold/i, 0.45, true],                    // dumbbells, and the rotation costs load
+    [/cuban/i, 0.2, true],                      // a rehab movement done with plates, not a press
+    [/landmine/i, 0.6, true],
+    [/push press/i, 1.15],                      // the legs add to a strict press, not take from it
+    [/z press/i, 0.8],
+  ],
+  horizontalPull: [
+    [/chest.?supported/i, 0.75],
+    [/upright row/i, 0.5],                      // a trap movement wearing a row's name
+    [/meadows/i, 0.5, true],
+  ],
+  verticalPull: [
+    [/straight.?arm/i, 0.3],                    // one joint; it is filed here only when a band is in the name
+    [/pullover/i, 0.35],
+    [/close.?grip/i, 0.85],
+  ],
+  /* The reference for isolation is a dumbbell curl (PATTERN_RATIO's 0.2 of a
+     bench). A leg extension is not a fifth of a bench and a lateral raise is
+     less than one, and until this table the size ceiling bounded both at the
+     curl's number: 28 lb was the most a leg extension guessed from any row
+     could be. These are relative to that curl and they are only ever read for
+     the ceiling and for scaling INSIDE a family (see isolationFamily), never
+     for turning a leg curl into a lateral raise. */
+  isolation: [
+    [/leg press calf|donkey calf|standing calf|seated calf/i, 4.0, true],
+    [/single.?leg calf/i, 0.9, true],
+    [/calf raise/i, 1.5, true],
+    [/leg extension/i, 3.0, true],
+    [/leg curl/i, 2.5, true],
+    [/barbell shrug|behind.?the.?back shrug/i, 5.0, true],
+    [/shrug|high pull/i, 2.5, true],
+    [/reverse pec deck|pec deck/i, 2.5, true],
+    [/reverse hyper/i, 1.5, true],
+    [/face pull|pull.?apart/i, 1.5, true],
+    [/pushdown|skull crusher|ez.?bar|barbell curl|preacher/i, 1.5, true],
+    [/straight.?arm/i, 1.2, true],
+    [/cable fly|cable kickback/i, 0.8, true],
+    [/lateral raise|front raise|rear delt/i, 0.5, true],
+    [/wrist|reverse curl/i, 0.6, true],
+    [/kickback/i, 0.35, true],
+  ],
+};
+
+/* What it is done with. `seated` is a machine or a dumbbell bench and not a
+   discount on a barbell press, hence the lookahead, as before. */
+const IMPLEMENT_FACTOR = [
+  [/kettlebell/i, 0.35],
   [/dumbbell|db /i, 0.55],
+  [/smith/i, 0.9],
   [/machine|cable|assisted|seated (?!barbell)/i, 0.8],
-  [/incline/i, 0.8],
-  [/close.?grip|stiff.?leg|pause|deficit/i, 0.85],
-  [/sumo|trap bar/i, 1.0],
 ];
+
+/* Which family of single joint work a name belongs to, or null. An isolation
+   row may only ever price another movement in the same family: a leg curl and
+   a lateral raise are both "isolation" to patternFor, and until this existed a
+   logged Leg Curl at 120 was the evidence behind a Lateral Raise, bounded by the
+   ceiling and printed under "Guessed from your Leg Curl". Null never matches
+   anything, so a name this cannot place stays on the first-time note. Order
+   matters where a word lives inside another family's name: a leg curl is not a
+   curl and a reverse curl is a forearm movement. */
+const ISOLATION_FAMILY = [
+  [/calf/i, "calves"],
+  [/leg curl|nordic|glute.?ham/i, "leg-curl"],
+  [/leg extension/i, "leg-extension"],
+  [/shrug|high pull/i, "shrug"],
+  [/face pull|rear delt|reverse pec|pull.?apart/i, "rear-delt"],
+  [/pec deck|\bfly\b/i, "fly"],
+  [/lateral raise|front raise/i, "raise"],
+  [/wrist|reverse curl|plate pinch|dead hang/i, "forearm"],
+  [/pushdown|triceps|skull crusher|kickback/i, "triceps"],
+  [/\bcurl\b/i, "curl"],
+  [/straight.?arm/i, "straight-arm"],
+  [/reverse hyper/i, "lower-back"],
+  [/cable kickback|frog pump/i, "glute"],
+];
+export function isolationFamily(exercise) {
+  const name = exercise?.name || String(exercise || "");
+  for (const [re, fam] of ISOLATION_FAMILY) if (re.test(name)) return fam;
+  return null;
+}
 
 export function variantFactor(exercise, pattern) {
   const name = exercise?.name || String(exercise || "");
+  let movement = 1;
+  let inclusive = false;
+  for (const [re, v, incl] of MOVEMENT_FACTOR[pattern] || []) {
+    if (re.test(name)) { movement = v; inclusive = !!incl; break; }
+  }
   /* Isolation ratios are already implement specific: a curl ratio describes a
      dumbbell curl, so discounting it again for being a dumbbell halves it twice.
      Only the single limb case still applies. */
-  if (pattern === "isolation") return /single.?arm|single.?leg|one.?arm/i.test(name) ? 0.55 : 1;
-  let f = 1;
-  for (const [re, v] of VARIANT_FACTOR) if (re.test(name)) { f = v; break; }
-  return f;
+  if (pattern === "isolation") return movement * (/single.?arm|single.?leg|one.?arm/i.test(name) ? 0.55 : 1);
+  if (inclusive) return movement;
+  let implement = 1;
+  for (const [re, v] of IMPLEMENT_FACTOR) if (re.test(name)) { implement = v; break; }
+  return movement * implement;
 }
 
 export function patternFor(exercise) {
@@ -291,8 +425,14 @@ export function fromHistory({ exercise, logs = [], reps = null }) {
     return { source: "exact", weight: Number(hit.weight), reps: hit.reps ?? null, date: hit.entry_date };
   }
   const want = patternFor(exercise);
+  /* Single joint work is a pattern only in the sense that none of it is a
+     compound. A row may price another isolation movement only inside its own
+     family, and a movement no family claims is priced by nothing: see
+     ISOLATION_FAMILY for the leg curl that used to be a lateral raise. */
+  const family = want === "isolation" ? isolationFamily(exercise) : null;
   const same = withWeight
-    .filter((l) => patternFor({ name: l.exercise_name }) === want)
+    .filter((l) => patternFor({ name: l.exercise_name }) === want
+      && (want !== "isolation" || (family && isolationFamily({ name: l.exercise_name }) === family)))
     .sort(byDateDesc)
     .slice(0, HISTORY_WINDOW);
   if (same.length) {
@@ -407,9 +547,33 @@ const ASSUMED_BW_LB = 200;
  * could plausibly be doing, while a guess is bounded by what this module itself
  * would have prescribed from size alone, times how many rows are behind the
  * guess. One row of a different movement is a rumour; three rows is a pattern. */
+/* The rail is a multiple of bodyweight for a DEADLIFT, and the audit of
+   2026-09-19 found it was the same multiple for everything else: four times
+   bodyweight was the line for a Good Morning, so a 180 lb person's 405 lb
+   Good Morning row sailed under it. So the multiple is scaled by how far the
+   movement sits below the strongest pattern, through the same two tables the
+   size guess uses: a bench is 1.0 of 1.55 of a deadlift, a Good Morning 0.4
+   of a hinge. Floored at a quarter, one bodyweight, because the rail catches
+   typos and a one-bodyweight curl is a strong person rather than a typo, and
+   capped at the four the fuzz and the tests hold every load to: a leg press
+   sits above a deadlift on the tables and the rail may tighten for a movement
+   but never loosen for one. It does not touch isolation or core, whose ratios
+   describe a single dumbbell and would rail a leg press calf raise at a curl's
+   number. */
+const TYPO_RAIL_FLOOR = 0.25;
+function typoRailMultiple(exercise, sex) {
+  const pattern = patternFor(exercise);
+  if (pattern === "isolation" || pattern === "core") return TYPO_BODYWEIGHT_MULTIPLE;
+  const female = String(sex ?? "").toLowerCase().startsWith("f");
+  const col = female ? 1 : 0;
+  const strongest = Math.max(...Object.values(PATTERN_RATIO).map((r) => r[col]));
+  const relative = ((PATTERN_RATIO[pattern] || PATTERN_RATIO.isolation)[col] / strongest) * variantFactor(exercise, pattern);
+  return TYPO_BODYWEIGHT_MULTIPLE * Math.min(1, Math.max(TYPO_RAIL_FLOOR, relative));
+}
+
 function sanityCeiling({ exercise, reps, bodyWeightLb, sex, trust = null }) {
   const bw = humanBodyWeight(bodyWeightLb) ?? ASSUMED_BW_LB;
-  let ceiling = Math.min(NO_HUMAN_LB, bw * TYPO_BODYWEIGHT_MULTIPLE);
+  let ceiling = Math.min(NO_HUMAN_LB, bw * typoRailMultiple(exercise, sex));
   if (trust != null) {
     const oneRM = sizeCeiling1RM({ exercise, bodyWeightLb, sex });
     const sizeBased = oneRM ? workingFrom1RM(oneRM, reps ?? 8) : null;

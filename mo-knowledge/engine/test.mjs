@@ -3477,11 +3477,12 @@ test("a ramp is inside the session estimate, never bolted on after it", () => {
        reserves the shorter general block plus the ramp, and the sum is what the
        estimate carries. */
     const rampSec = d.rampSets.reduce((t, r) => t + r.seconds, 0);
-    /* The BUILT block, not the budgeted one, since 2026-09-19: the block fills
-       to its budget and finishes the move it is on, and the app costs what was
-       built. The budget is still the floor of what gets built. */
-    const expected = Math.round((d.mobility.warmupSeconds + rampSec) / 60);
+    const expected = rampSec
+      ? Math.round((RAMPED_WARMUP_SECONDS + rampSec) / 60)
+      : Math.round(WARMUP_SECONDS / 60);
     assert.equal(d.prepMinutes, expected, `${d.name} reserves what it spends`);
+    /* What the built block runs over its budget is reserved against a stated
+       clock beside the cool-down (plan.mjs `costBlocks`), never lost. */
     assert.ok(d.mobility.warmupSeconds >= (rampSec ? RAMPED_WARMUP_SECONDS : WARMUP_SECONDS), `${d.name}: the block is under its budget`);
     /* The exported costing rather than a copy of it, so a change to what a set
        costs is made in one place; the worked example on REP_SECONDS in plan.mjs
