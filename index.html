@@ -21092,6 +21092,10 @@ async function buildGuidedPlan(act, minutes) {
     /* The date, so today's session is the same session all day and a different
        one tomorrow. Deterministic, which is the rest of the engine's rule. */
     seed: todayStr(),
+    /* What they said hurts, the same column the lifting plan reads. Until
+       2026-09-19 nothing was passed and a person who had ticked neck and
+       lower back got Roll-Over and Jackknife in their Pilates class. */
+    limits: MY_PROFILE?.limits ?? null,
   });
   return built?.ok ? built : null;
 }
@@ -21157,7 +21161,45 @@ async function cardioDayForStyles(st, forDate) {
      seed is built out of getDate(). */
   const day = new Date(`${forDate || todayStr()}T00:00:00`);
   const minutes = Number(MY_PROFILE?.session_minutes) || null;
-  return mod.cardioSessionFor(st, { today: day, minutes }) || null;
+  const gentle = cardioForLimits(st);
+  const built = mod.cardioSessionFor(gentle.styles, { today: day, minutes }) || null;
+  /* The sentence rides on the session, where the day card prints `note`
+     under the pacing line, so the person reads why the day is a walk before
+     they go and do it. */
+  if (built?.cardio && gentle.why) built.cardio = { ...built.cardio, note: gentle.why };
+  return built;
+}
+
+/* A run on a bad knee is the same promise as everything limits.mjs makes for
+   the lifting week, and until 2026-09-19 this picker did not read the column.
+   Running and a HIIT class are the two ticked modes that land on the joint
+   every stride; walking, cycling, swimming and rowing do not. So when knee,
+   ankle or hip is named and an impact mode is ticked, the day is built from
+   the modes that spare the joint, the ones they ticked if any, walking and
+   cycling if they ticked nothing else, and the session says why. Running is
+   still theirs: the activity sheet builds a run the moment they pick Running
+   on the day, and that is the "if they insist" this does not take away. */
+const CARDIO_IMPACT_MODES = new Set(["running", "hiit"]);
+const CARDIO_IMPACT_JOINTS = ["knee", "ankle", "hip"];
+function cardioForLimits(st) {
+  const modes = Array.isArray(st?.cardioModes) ? st.cardioModes : [];
+  const lim = MY_PROFILE?.limits && typeof MY_PROFILE.limits === "object" ? MY_PROFILE.limits : {};
+  const hurts = CARDIO_IMPACT_JOINTS.filter((j) => (Array.isArray(lim.hurts) ? lim.hurts : []).includes(j));
+  const impact = modes.filter((m) => CARDIO_IMPACT_MODES.has(m));
+  if (!hurts.length || !impact.length) return { styles: st, why: null };
+  const spared = modes.filter((m) => !CARDIO_IMPACT_MODES.has(m));
+  const label = { knee: "knee", ankle: "ankle", hip: "hip" };
+  const joints = hurts.map((j) => label[j]);
+  const said = joints.length === 1 ? joints[0] : `${joints.slice(0, -1).join(", ")} and ${joints[joints.length - 1]}`;
+  const both = impact.includes("running") && impact.includes("hiit");
+  const what = both ? "a run or a class" : impact.includes("running") ? "a run" : "a class";
+  const pick = both ? "Running or HIIT" : impact.includes("running") ? "Running" : "HIIT";
+  return {
+    styles: { ...st, cardioModes: spared.length ? spared : ["walking", "cycling"] },
+    why: `${spared.length ? "Not " + what : "A walk or a ride rather than " + what} this week, because you said your ${said} `
+      + `${joints.length === 1 ? "hurts" : "hurt"} and the impact is what finds it. `
+      + `If you would rather ${both ? "run or do a class" : impact.includes("running") ? "run" : "do a class"} anyway, pick ${pick} on the day and it will build you one.`,
+  };
 }
 
 /* Same seed rule the session engine keeps: the day plus the activity, so today
