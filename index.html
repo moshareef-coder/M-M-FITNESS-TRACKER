@@ -29529,8 +29529,14 @@ function budgetChangeLine(from, to, { restCompressed = null } = {}) {
    Everything below is measured off the plan's own exercises, so Focus,
    Duration, Equipment and Target Muscles describe the thing you are about to
    do rather than a second opinion about it. */
-function planFromToday() {
-  const list = TODAY_WORKOUT?.exercises || [];
+function planFromToday(date = todayStr()) {
+  /* Today reads the live TODAY_WORKOUT global; any other date reads the
+     plans table directly. Without this split, a finished day's own
+     leftover plan row (still sitting there, unarchived, exercises intact)
+     kept answering for tomorrow too, so the "next workout" card went on
+     naming today's already-finished session under a "Tomorrow" eyebrow. */
+  const src = date === todayStr() ? TODAY_WORKOUT : planForDate(date);
+  const list = src?.exercises || [];
   if (!list.length) return null;
 
   const names = list.map((e) => (e.name || "").toLowerCase());
@@ -29569,7 +29575,7 @@ function planFromToday() {
        `equipment` line below is the old guess from recently logged names and
        stays only as the fallback for the moment before the table loads. */
     kit: kitForDay(list.map((ex) => ex.name)),
-    focus: displayFocus(TODAY_WORKOUT.focus, list),
+    focus: displayFocus(src.focus, list),
     match: md.match,
     muscles: md.muscles,
     /* Every muscle scored, and the week's hardest, for the sheet behind the
@@ -29717,9 +29723,9 @@ function freshTone(pct) {
   return "var(--up)";
 }
 
-function planPreview() {
+function planPreview(date = todayStr()) {
   /* A real plan wins over a proposal, always. */
-  const real = planFromToday();
+  const real = planFromToday(date);
   if (real) return real;
 
   /* The day to propose. It used to be the two least-trained REGIONS, joined
@@ -30103,7 +30109,14 @@ function renderChooseScreen() {
   // is paid for, so the option is not offered rather than offered and refused.
   const coached = isCoachedClient();
   const coachName = MY_COACH ? MY_COACH.split("@")[0] : "your coach";
-  const p = planPreview();
+  /* Moved up from further down so `p` can be asked about the right day:
+     once every session today is done, the card below is about tomorrow,
+     and the reading has to agree or it keeps naming today's own finished
+     plan under a "Tomorrow" eyebrow. */
+  const sessions = todaySessions();
+  const doneCount = sessions.filter((x) => x.state === "done").length;
+  const allDone = sessions.length > 0 && doneCount === sessions.length;
+  const p = planPreview(allDone ? shiftDate(todayStr(), 1) : todayStr());
   /* The ring's explanation, built from the same p the ring is drawn from. Set
      here rather than when the sheet opens so it can only ever describe the
      number currently on screen. */
@@ -30211,10 +30224,8 @@ function renderChooseScreen() {
      from todaySessions(), the match figure and the muscle list from the same
      matchDetail the old card printed, the calendar from workoutCalendarHTML().
      This is assembly, not new arithmetic, which is why the numbers agree with
-     the rest of the app. */
-  const sessions = todaySessions();
-  const doneCount = sessions.filter((x) => x.state === "done").length;
-  const allDone = sessions.length > 0 && doneCount === sessions.length;
+     the rest of the app. `sessions`/`doneCount`/`allDone` are declared above,
+     next to `p`, which needs to know before it reads its own day. */
   const target = weeklyGoalFor(MY_EMAIL) || 5;
 
   /* The green card at the top, only when the day is actually finished. A card
@@ -30304,7 +30315,13 @@ function renderChooseScreen() {
           <div class="wkt-arc-num"><b>${p.match}%</b><i>MATCH</i></div>
         </button>`}
         <div class="wkt-next-acts">
-          ${p.real
+          ${/* p.real can now be true about TOMORROW too (planPreview reads
+                whichever day the card is on), so this has to ask about
+                TODAY specifically: Start/Resume opens a live session, and
+                the only day that means anything for is the one not yet
+                done. A real plan already sitting on tomorrow is reviewed,
+                not started, which is what the next branch is for. */ ""}
+          ${p.real && !allDone
             ? `<button type="button" class="wkt-btn-solid sm" id="chooseBeginBtn">${partway ? "Resume today&rsquo;s plan" : "Start today&rsquo;s plan"}</button>`
             : tomorrowPlan
               ? `<button type="button" class="wkt-btn-solid sm" id="chooseSeeTomorrow">See tomorrow&rsquo;s plan</button>`
