@@ -8441,7 +8441,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.18.9";
+const APP_VERSION = "2026.09.18.10";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -29873,6 +29873,53 @@ function renderChooseScreen() {
    one the session runs, and then the app would recommend one thing at the end
    of a workout and a different thing an hour later. */
 let mobilityEnginePromise = null;
+/* The recovery suggestion's rules live in the engine, next to the tests that
+   hold them, so the screen below renders a decision rather than making one.
+   Lazy like every other engine import: nothing about Recovery is on the path
+   between opening the app and seeing it. */
+let recoveryPickPromise = null;
+function ensureRecoveryPick() {
+  if (!recoveryPickPromise) {
+    recoveryPickPromise = import("/mo-knowledge/engine/recovery-pick.mjs")
+      .catch((e) => { console.warn("recovery pick", e); return null; });
+  }
+  return recoveryPickPromise;
+}
+
+/* What the rules need to know, read off this account once. Muscle groups for a
+   plan come from its exercise names through the same classifier the plan
+   preview uses, so "what does leg day train" has one answer in the app. */
+function recoveryContext() {
+  const today = todayStr();
+  const mine = (d) => (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === d && !w.archived);
+  const groupsOf = (plan) => {
+    const counts = {};
+    for (const ex of plan?.exercises || []) {
+      const rule = classifyMuscles(ex.name || "");
+      if (!rule) continue;
+      for (const g of rule.primary) counts[g] = (counts[g] || 0) + 2;
+      for (const g of rule.secondary) counts[g] = (counts[g] || 0) + 1;
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([g]) => g);
+  };
+  const planToday = mine(today);
+  const planTom = mine(shiftDate(today, 1));
+  const trainedToday = !!(TODAY_DONE_WORKOUTS || []).length || !!entryOn(ME, today)?.gym;
+  const styles = Array.isArray(MY_PROFILE?.train_styles) ? MY_PROFILE.train_styles : [];
+  return {
+    hour: new Date().getHours(),
+    trainedToday,
+    groupsToday: recoveryGroupsToday(),
+    /* A plan that is already finished is not still ahead of them. */
+    planToday: planToday && !planToday.completed_at && !trainedToday
+      ? { focus: displayFocus(planToday.focus, planToday.exercises), groups: groupsOf(planToday) }
+      : null,
+    planTomorrow: planTom ? { focus: displayFocus(planTom.focus, planTom.exercises), groups: groupsOf(planTom) } : null,
+    doesYoga: styles.includes("yoga"),
+    restDay: !!entryOn(ME, today)?.rest_day,
+  };
+}
+
 function ensureMobilityEngine() {
   if (!mobilityEnginePromise) {
     mobilityEnginePromise = import("/mo-knowledge/engine/mobility.mjs")
@@ -29899,13 +29946,18 @@ function recoveryGroupsToday() {
 /* The holds themselves. A day with nothing logged still gets a block: with no
    groups asked for, pickBlock ranks by level and length, which is a perfectly
    good general stretch and better than an empty card. */
-async function recoveryStretches() {
+async function recoveryStretches(pick = null) {
   const mob = await ensureMobilityEngine();
   if (!mob) return null;
-  const groups = recoveryGroupsToday();
+  /* Warm up before a session, hold after one. Asking for the static pool on
+     the morning of a leg day would hand somebody two minutes of holds and
+     then send them to squat, which is the one thing every warm up guideline
+     says not to do. */
+  const kind = pick?.block || "static";
+  const groups = pick ? (pick.groups || []) : recoveryGroupsToday();
   const lim = MY_PROFILE?.limits && typeof MY_PROFILE.limits === "object" ? MY_PROFILE.limits : {};
   return mob.pickBlock({
-    kind: "static",
+    kind,
     groups,
     budgetSec: RECOVERY_STRETCH_SECONDS,
     /* A hold that loads a joint they said hurts is the same mistake as a lift
@@ -30230,7 +30282,7 @@ function renderRecoveryScreen() {
       </div>
     </section>
     <section class="rcv-card" id="rcvStretch">
-      <div class="rcv-head"><span class="rcv-ico">${icon("body", 18)}</span><h3>${escapeHtml(timeOfDay().label)}</h3></div>
+      <div class="rcv-head"><span class="rcv-ico">${icon("body", 18)}</span><h3 id="rcvStretchTitle">${escapeHtml(timeOfDay().label)}</h3></div>
       <div id="rcvStretchBody"><p class="rcv-line">Picking the right ones for today...</p></div>
     </section>
     ${eatCard}
@@ -30257,7 +30309,30 @@ function renderRecoveryScreen() {
   /* The holds land a beat later, because the picker is an engine module and
      the import is lazy. Guarded on the screen still being the one open: a fast
      tap back to the choose screen must not have its markup written over. */
-  recoveryStretches().then((moves) => {
+  /* The decision first, then the moves it asks for. Both land a beat after
+     the screen, because both are lazy engine imports. */
+  ensureRecoveryPick().then(async (mod) => {
+    const pick = mod?.recoveryPick ? mod.recoveryPick(recoveryContext()) : null;
+    if (WORKOUT_MODE !== "recovery") return;
+    if (pick) {
+      const h = $("rcvStretchTitle");
+      if (h) h.textContent = pick.label;
+    }
+    /* Yoga is a session out of the activity library, not a block of holds, so
+       it is offered as one and started the way every other activity is. */
+    if (pick && pick.kind === "yoga") {
+      const body0 = $("rcvStretchBody");
+      if (body0) {
+        body0.innerHTML = `
+          <p class="rcv-line" style="margin-bottom:12px;">${escapeHtml(pick.why)}</p>
+          <button type="button" class="wkt-btn-solid sm" id="rcvYogaBtn">${escapeHtml(pick.label)}</button>`;
+        /* The activity sheet's own door, opened on yoga: the sheet builds the
+           session, and Recovery does not need a second way to do it. */
+        $("rcvYogaBtn").onclick = () => openCardioSession("setup", "yoga");
+      }
+      return;
+    }
+    return recoveryStretches(pick).then((moves) => {
     if (WORKOUT_MODE !== "recovery") return;
     const body = $("rcvStretchBody");
     if (!body) return;
@@ -30267,9 +30342,13 @@ function renderRecoveryScreen() {
       body.innerHTML = `<p class="rcv-line">I could not read the stretch library just now. The rest of this screen still stands.</p>`;
       return;
     }
-    const named = recoveryGroupsToday().slice(0, 2).map((g) => (BODY_GROUP_LABELS[g] || g).toLowerCase());
-    const lead = named.length
-      ? `For what you trained today: ${listWords(named)}.`
+    /* His reason comes from the rules; the muscles it names come from what
+       the block actually landed on, so the sentence cannot promise a group
+       the holds do not cover. */
+    const named = (pick ? (pick.groups || []) : recoveryGroupsToday()).slice(0, 2)
+      .map((g) => (BODY_GROUP_LABELS[g] || g).toLowerCase());
+    const lead = pick
+      ? (named.length ? `${pick.why} ${listWords(named).charAt(0).toUpperCase()}${listWords(named).slice(1)}.` : pick.why)
       : "Nothing logged today, so these are the ones worth doing on any day.";
     body.innerHTML = `
       <p class="rcv-line" style="margin-bottom:12px;">${escapeHtml(lead)}</p>
@@ -30281,8 +30360,9 @@ function renderRecoveryScreen() {
           </span>
         </li>`).join("")}
       </ul>
-      <button type="button" class="wkt-btn-solid sm" id="rcvStretchBtn">${escapeHtml(timeOfDay().label)}, ${Math.max(1, Math.round(stretchBlockSeconds(moves) / 60))} min</button>`;
+      <button type="button" class="wkt-btn-solid sm" id="rcvStretchBtn">${escapeHtml(pick ? pick.label : timeOfDay().label)}, ${Math.max(1, Math.round(stretchBlockSeconds(moves) / 60))} min</button>`;
     $("rcvStretchBtn").onclick = () => startStretchSession(moves);
+    });
   });
 
   staggerWorkoutCards();
