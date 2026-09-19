@@ -24301,6 +24301,27 @@ async function noEquipmentToday({ overlay } = {}) {
    falls back to what this app has always done: sessions of movements only. */
 
 let planEnginePromise = null;
+/* The generator's own answer to "which day comes next", cached so the
+   synchronous card can read it. planPreview scored the days by which muscles
+   had had the least work, which is exactly the "whatever hasn't been trained"
+   Mo's note rejects; the generator reads recovery windows, the split's
+   rotation and the person's marked focus, and the Body tab now shows that
+   reading. Two cards on two tabs recommending different days is the bug this
+   closes. The engine import is lazy, so the card paints with its own guess
+   first and repaints once, if the answer differs. */
+let ENGINE_NEXT_DAY = null;
+async function refreshEngineNextDay() {
+  const engine = await ensurePlanEngine();
+  if (!engine?.generateFromPayload) return;
+  let name = null;
+  try { name = engine.generateFromPayload(workoutEnginePayload()).meta?.dayName || null; }
+  catch (e) { console.warn("engine next day", e); return; }
+  if (name === ENGINE_NEXT_DAY) return;
+  ENGINE_NEXT_DAY = name;
+  /* Repaint only the screen that shows the guess, and only if it is still up. */
+  if ($("workoutContent")?.querySelector(".wkt-next")) renderWorkoutTab({ respectMode: true });
+}
+
 function ensurePlanEngine() {
   if (!planEnginePromise) {
     planEnginePromise = import("/mo-knowledge/engine/adapter.mjs")
@@ -29422,7 +29443,11 @@ function planPreview() {
      and it would silently outrank a standing preference. Only when the engine
      can parse it: one it cannot parse is not a focus as far as a plan goes. */
   const stated = SUGGESTABLE_DAYS.find((d) => engineDayFor(MY_PROFILE?.focus) === d.name);
+  /* The generator's day outranks the muscle-count guess once it is known: the
+     guess is only what paints before the engine has loaded. */
+  const engineSaid = ENGINE_NEXT_DAY && SUGGESTABLE_DAYS.find((d) => engineDayFor(ENGINE_NEXT_DAY) === d.name);
   const best = (stated && scored.find((d) => d.name === stated.name))
+    || (engineSaid && scored.find((d) => d.name === engineSaid.name))
     || scored.reduce((a, b) => (b.md.match > a.md.match ? b : a));
   const focus = best.name;
   const md = best.md;
@@ -30044,6 +30069,9 @@ function renderChooseScreen() {
   wireWorkoutCalendar($("workoutContent"));
   wireHirePitch($("workoutContent"));
   staggerWorkoutCards();
+  /* Ask the generator which day it would build, and repaint once if the guess
+     above was wrong. Not awaited: the screen is already up. */
+  if (!p.real) refreshEngineNextDay();
 
   const toManual = () => goWorkoutScreen("manual", {
     before: () => { if (!MANUAL_DRAFT.length) MANUAL_DRAFT = loadDraft(); },   // pick up where you left off
